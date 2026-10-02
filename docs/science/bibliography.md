@@ -57,7 +57,7 @@ library was used. Nothing in the library is checked against the printed version.
 
 ## Counts
 
-385 works. Stage 1 listed 475 entries and the flexure feature added 13; 103 entries were merged into 385 works (the merged keys are listed below).
+387 works. Stage 1 listed 475 entries, the flexure feature added 13 and the force balance (task 5, 2026-10-02) 2 (Cloos1993, Coblentz1994, both from memory); 103 entries were merged into 385 works (the merged keys are listed below).
 
 By access, as recorded for the work (the most open access class among its merged entries):
 
@@ -567,6 +567,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Read so far (by the project): (IMP) no statement (ERO, ISO, HYP) abstract unavailable ("The Heimsath abstract was unavailable"); rate constants not retrieved. (RCK, STR, DEF) not stated
 - Read in this pass: (IMP) not fetched (ERO, ISO, HYP) abstract fetched (full abstract, verbatim in S5). The paper's numerical parameters were not available; they are quoted in S5 from secondary sources. (RCK, STR, DEF) metadata only
 - Reference check: (IMP) matches. (ERO, ISO, HYP) Crossref matches authors, title, volume 388, issue 6640, pages 358-361, July 1997. The paper is a northern California (Tennessee Valley) study using 10Be and 26Al in bedrock under soil; the code uses its form but not its numbers (the 5 m depth scale is about ten times too deep, see S5). (RCK, STR, DEF) authors, year, volume, pages match the OpenAlex record.
+- Read in WP-7 (2026-10-02): still a landing page (WP-3 owns the soil production rows).
 
 ### Naldrett2004
 - Reference: Naldrett, A. J. (2004). Magmatic Sulfide Deposits: Geology, Geochemistry and Exploration. Springer, Berlin. [Subtitle and publisher from my recollection, not verified.]
@@ -1005,7 +1006,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Molnar, P. and Lyon-Caen, H. (1988). Some simple physical aspects of the support, structure, and evolution of mountain belts. In: Clark, S. P., Burchfiel, B. C. and Suppe, J. (eds), Processes in Continental Lithospheric Deformation, Geological Society of America Special Paper 218, pp. 179-208.
 - DOI or URL: 10.1130/SPE218-p179.
 - Cited as: (ERO, ISO, HYP) "Molnar & Lyon-Caen 1988, GSA Special Paper 218:179-207". (PLT) "Molnar & Lyon-Caen 1988 (GSA Spec. Pap. 218)", "pages 179-207" in the force-balance design (Tibet 6-7e12 N/m).
-- Ledger ids: ISO-019, ISO-020, PLT-187
+- Ledger ids: ISO-019, ISO-020, PLT-187, FRC-014
 - Access: book (not online); paywalled chapter. [other sections: book chapter (abstract visible via OpenAlex; full text not online).]
 - Library (the project's source library, not distributed): not fetched. Reason: book, no open copy named.
 - Merged keys: Molnar1988
@@ -1122,6 +1123,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read in this pass: (ERO, ISO, HYP) abstract fetched; PDF text partly extracted (title page, abstract, methods, Africa section). The page with global main-group shares was not located. (HYD, YNG) full text fetched (Table 1 with notes, the paragraphs on test order and on the Cs/Cw tie rule, the discussion with land shares) (MOI, BIO) full text fetched (decoded PDF text layer: Table 1 with its notes, the paragraphs on test order and on the Cs/Cw tie rule, the discussion with the land shares) (SCL, PRV, POL, BAK) abstract fetched (landing page); PDF returned as binary so Table 1 not read; criteria were taken from Wikipedia's Koppen article instead (secondary) (CLM) full text fetched (section 4 conclusions)
 - Reference check: (ERO, ISO, HYP) Crossref matches title, volume 11, issue 5, pages 1633-1644. The abstract in the HTML page says "BWh (14.2%, Hot desert) followed by Aw (11.5%, Tropical savannah)"; the build log's shares B 30.2 / D 24.6 / A 19.0 / C 13.4 / E 12.8 % were not found in the text read (S19). (HYD, YNG) matches. See the MOI file for the full Table 1 check. (MOI, BIO) authors, year, journal, volume, pages match. Table 1 is the table the code cites. The research note's source (Wikipedia) differs from the paper in the B threshold's form only (20 x MAT + 280/140/0 against 10 x (2 x MAT + 28/14/0), the same numbers) and in listing a "-3 degC" option the paper does not have. Details in Part 2. (SCL, PRV, POL, BAK) the code names no source. Peel et al. 2007 and Kottek et al. 2006 are the standard references per Wikipedia. (CLM) matches.
 - Cited as (HYD): "Koppen's E (polar climate: warmest month below 10 degC)", no paper named
+- Stage 2 read (WP-11, 2026-10-02, Peel2007.txt): full text. Table 1 and its notes, the text on test order (p. 1637), the Cs/Cw tie rule (p. 1639), Table 2 (Herberton Post Office) and the world shares (p. 1642). All BIO-001 to BIO-017 rows checked; BIO-002 and BIO-013 contradicted the code and were fixed.
 
 ### CharetteSmith2010
 - Reference: Charette, M. A. and Smith, W. H. F. (2010). The volume of Earth's ocean. Oceanography 23(2):112-114.
@@ -1222,6 +1224,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read so far (by the project): (ERO, ISO, HYP) "cf." only. (RCK, STR, DEF) not stated
 - Read in this pass: (ERO, ISO, HYP) not fetched. (RCK, STR, DEF) not fetched (bibliographic record only)
 - Reference check: (ERO, ISO, HYP) matches title and edition. (RCK, STR, DEF) authors, year, edition match the Open Library record. No table or page number given in the code, so the density table cannot be pinned (the density table is in the physical-properties chapter; table number not verified).
+- Read in WP-7 (2026-10-02): the library copy is still a landing page; the density table was not read. Densities were checked against Daly, Manger and Clark 1966 and Manger 1963 instead (RCK-001, RCK-086, RCK-087).
 
 ### Schon2015
 - Reference: Schoen, J. H. (2015). Physical Properties of Rocks: Fundamentals and Principles of Petrophysics, 2nd edition. Developments in Petroleum Science 65, Elsevier.
@@ -1233,6 +1236,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read so far (by the project): (ERO, ISO, HYP) "cf." only. (RCK, STR, DEF) not stated
 - Read in this pass: (ERO, ISO, HYP) not fetched. (RCK, STR, DEF) not fetched (bibliographic record only)
 - Reference check: (ERO, ISO, HYP) title and year match the Crossref record; the series number 65 is from memory and was not verified. (RCK, STR, DEF) title and edition exist; year 2015 vs 2016 record unresolved. No table or page number in the code.
+- Read in WP-7 (2026-10-02): not read (book).
 
 ### Not cited by the code but named in the task brief (identified for stage 2)
 - Whipple, K. X. and Tucker, G. E. (1999). Dynamics of the stream-power river incision model: Implications for height limits of mountain ranges, landscape response timescales, and research needs. Journal of Geophysical Research 104(B8):17661-17674. DOI 10.1029/1999JB900120 (Crossref confirmed). Paywalled; not fetched.
@@ -1437,6 +1441,7 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Read so far (by the project): n/a
 - Read in this pass: full text fetched (PMC, summariser: the class table and the definition AI = MA_Prec/MA_ET0)
 - Reference check: n/a (article number 409 is from my memory of the record, not seen; Crossref/EuropePMC gave volume 9 and year 2022). (from the joint entry MiddletonThomas1997 and Zomer2022: UNIDENTIFIED in the code; identified here as UNEP 1992 or 1997. Class limits differ between the two editions: see Part 2, BIO-038.)
+- Stage 2 read (WP-11, 2026-10-02, Zomer2022.txt): full text. The class table (<0.03, 0.03-0.2, 0.2-0.5, 0.5-0.65, >0.65) given 'as a general reference' from UNEP; BIO-038 split into BIO-038 (verified) and BIO-100 (the mapping's own anchors).
 
 ### Porter1989
 - Reference: Porter, Stephen C. 1989. Some geological implications of average Quaternary glacial conditions. Quaternary Research 32(3):245-261.
@@ -1682,6 +1687,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated (chapter level only)
 - Read in this pass: search result snippet only / chapter titles fetched from the Whitman page
 - Reference check: the Whitman page for the second edition lists Chapter 21 "Introduction to Metamorphism" and Chapter 25 "Metamorphic Facies and Mafic Rocks" (the book title of ch. 25 is "Metamorphic Facies and Metamorphosed Mafic Rocks"), so the chapter numbers in the code are right. Chapter 21 covers metamorphic field gradients and ch. 25 the facies; neither chapter number tells which figure holds each boundary.
+- Read in WP-7 (2026-10-02): not read (book); the Notre Dame lecture PDFs refuse the test machine. The formation temperatures RCK-039 to RCK-044 were compared with Baxter et al. 2002, Stipp et al. 2002, Ferrill et al. 2004 and the Tulane lecture notes (secondary).
 
 ### Yardley1989
 - Reference: Yardley, B. W. D. (1989). An Introduction to Metamorphic Petrology. Longman Earth Science Series. Longman Scientific & Technical, Harlow. ISBN 0-582-30096-7 (Open Library).
@@ -1693,6 +1699,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: not fetched (bibliographic record only)
 - Reference check: title, author, year, publisher exist. Chapter 3 content not checked (a 2020 second edition by Yardley & Warren also exists, so a "ch. 3" citation depends on the edition).
+- Read in WP-7 (2026-10-02): not read (book).
 
 ### Warren2016
 - Reference: Warren, J. K. (2016). Evaporites: A Geological Compendium, 2nd ed. Springer, Cham. ISBN 978-3-319-13511-3 (Open Library lists the Springer 2nd-edition ISBN 9783319135113; subtitle and year from my recall of the edition, not confirmed by the fetch).
@@ -1704,6 +1711,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: not fetched (bibliographic record only)
 - Reference check: author, title and edition exist; chapter 7 content not checked.
+- Read in WP-7 (2026-10-02): not read (book). RCK-045 was checked against Orti et al. 2012 and Hardie 1967.
 
 ### Cruden1998
 - Reference: Cruden, A. R. (1998). On the emplacement of tabular granites. Journal of the Geological Society 155(5):853-862.
@@ -1716,6 +1724,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: abstract fetched (OpenAlex)
 - Reference check: authors, year, volume and pages are right. The abstract contains no thickness-length power law and no 0.6 coefficient or exponent; it gives widths of 10-100 km and thicknesses of 3 km or less (see spot check RCK-061). Whether the equation appears in the full text is not known. A thickness-length power law is the topic of McCaffrey & Petford (1997), "Are granitic intrusions scale invariant?", J. Geol. Soc. 154:1-4 (title and venue from my recall; an OpenAlex search for it returned nothing relevant); that is a lead for stage 2, not a verified fact.
+- Read in WP-7 (2026-10-02): still abstract only (the full text is behind a bot check). The equation T = 0.6 L^0.6 is not in this paper's abstract; it is the fit of Cruden and McCaffrey 2001 (Phys. Chem. Earth A 26), which the same author restates in Cruden 2008 (SKB R-08-138, library `Cruden2008_SKB`), read in full: b = 0.6 +/- 0.15 and a = 0.6 +/- 0.1 for 66 plutons, with L the circle-equivalent diameter. RCK-061 now cites that source.
 
 ### Bateman1979
 - Reference: Bateman, P. C. & Chappell, B. W. (1979). Crystallization, fractionation, and solidification of the Tuolumne Intrusive Series, Yosemite National Park, California. Geological Society of America Bulletin 90(5):465-482.
@@ -1728,6 +1737,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: abstract fetched (OpenAlex summary)
 - Reference check: authors, year, journal, volume and pages match. The abstract does not state an area or dimensions; the code's 1,100 km2 and 45 x 25 km are unconfirmed.
+- Read in WP-7 (2026-10-02): still not read. The Tuolumne Intrusive Complex area of about 1,100 km2 was read in Ardill et al. 2020 (Front. Earth Sci. 8:190, library `Tuolumne_Frontiers2020`); the 45 x 25 km outline was not found.
 
 ### Buddington1959
 - Reference: Buddington, A. F. (1959). Granite emplacement with special reference to North America. Geological Society of America Bulletin 70(6):671-747 (OpenAlex shows only the first page, 671; the end page 747 is from my recall).
@@ -1740,6 +1750,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: metadata only
 - Reference check: the paper exists and is the classic granite-emplacement paper; code cites no page. Whether it gives a 2-6 km roof depth is not checked.
+- Read in WP-7 (2026-10-02): not read. Secondary lecture notes put the epizone at 0 to about 5-6 km and the mesozone to about 11-12 km.
 
 ### Hudec2007
 - Reference: Hudec, M. R. & Jackson, M. P. A. (2007). Terra infirma: Understanding salt tectonics. Earth-Science Reviews 82(1-2):1-28.
@@ -1752,6 +1763,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: (RCK, STR, DEF) metadata only (ORE) not fetched (OpenAlex metadata only).
 - Reference check: (RCK, STR, DEF) authors, year, volume, pages match. It is a review of salt tectonics; the specific 100 m / 1,000 m thresholds are not in anything fetched. (ORE) matches (authors, year, journal, volume, pages). Title is "Terra infirma: understanding salt tectonics".
+- Read in WP-7 (2026-10-02): not read (paywalled). Quoted at second hand: roofs of more than several hundred metres resist diapirs without extension or shortening. STR-026, STR-027 are now game choices.
 
 ### Doust1990
 - Reference: Doust, H. & Omatsola, E. (1990). Niger Delta. In: Edwards, J. D. & Santogrossi, P. A. (eds), Divergent/Passive Margin Basins, AAPG Memoir 48, pp. 201-238 (editors and pages from my recall; not confirmed).
@@ -1763,6 +1775,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: (RCK, STR, DEF) not fetched (ORE) not fetched (Crossref metadata only).
 - Reference check: (RCK, STR, DEF) unverified. Doust & Omatsola 1990 as a book chapter was not located in the databases reached; the 1,500 m sediment threshold is unsourced. (ORE) matches (authors, memoir number). Chapter title "Niger Delta".
+- Read in WP-7 (2026-10-02): not read. The Niger Delta wedge is 12 km thick in Sanuade and Kaka 2017 (secondary). STR-028, STR-029 are now game choices.
 
 ### Mouthereau2007
 - Reference: Mouthereau, F., Tensi, J., Bellahsen, N., Lacombe, O., De Boisgrollier, T. & Kargar, S. (2007). Tertiary sequence of deformation in a thin-skinned/thick-skinned collision belt: The Zagros Folded Belt (Fars, Iran). Tectonics 26(5):TC5006.
@@ -2125,6 +2138,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not applicable
 - Read in this pass: metadata only
 - Reference check: not applicable.
+- Read in WP-7 (2026-10-02): not read (paywalled); only secondary mentions of 1,600 km and 'up to 1000' plutons were found.
 
 ### Mukasa1986
 - Reference: Mukasa, S. B. (1986). Zircon U-Pb ages of super-units in the Coastal batholith, Peru: implications for magmatic and tectonic processes. Geological Society of America Bulletin 97(2):241-254.
@@ -2137,6 +2151,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not applicable
 - Read in this pass: abstract fetched (OpenAlex summary)
 - Reference check: not applicable.
+- Read in WP-7 (2026-10-02): not read (paywalled).
 
 ### Alavi2007
 - Reference: Alavi, M. (2007). Structures of the Zagros fold-thrust belt in Iran. American Journal of Science 307(9):1064-1095.
@@ -2149,6 +2164,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not applicable
 - Read in this pass: abstract fetched (OpenAlex)
 - Reference check: not applicable.
+- Read in WP-7 (2026-10-02): full text of the abstract and the passages on belt width: 'an average width of ~300 km' for the Zagros fold-thrust belt and 'a ~200 to 300 km-wide zone of distributed, partly synchronous, deformation'. STR-030's 300 km agrees.
 - Read in WP-8 (2026-10-02): full text (Alavi2007.txt). Abstract (p. 1064): cover 7-12 km thick, "a ⬃200 to 300 km-wide zone", minimum shortening 16-30 %; p. 1068: average width about 300 km, anticlines "long (up to ⬃150 –200 km)"; p. 1077: SW-verging (foreland-verging) asymmetric folds, interlimb angles 0-70° in the NE, 110-140° further SW, about 170° at the front, aspect ratios (axial length to half wavelength) typically over 10; table 1 (p. 1084): shortening 16.1 to 30.2 % on six sections (DEF-004, DEF-005, DEF-027, DEF-030).
 
 ### Pollack1993
@@ -2162,6 +2178,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not applicable
 - Read in this pass: abstract fetched (OpenAlex summary)
 - Reference check: not applicable.
+- Read in WP-7 (2026-10-02): not read; its 65 mW/m2 continental mean is restated in Davies and Davies 2010 (library `Davies2010`, read in full).
 
 ### Not bibliographic
 Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.md; plan docs (docs/deeptime-implementation-plan.md, STATUS.md, decisions log, build log, research notes); Ben's picks and decisions (STR-002/003 design rows, "Ben's pick 2026-09-27", diamictite, stone and deepslate stand-ins). Unsourced Earth figures (no reference in the code): Zagros "about 250 km", Subandean "100-200 km", Coastal Batholith pluton counts, magma chamber depths (Kilauea, St Helens, Vesuvius), lava lakes "eight of some 1,400", stock "100 km2", CCD "4.5-5 km". Cited-but-unlisted "Buchan"-type sources: none. Athy 1930 and Sclater & Christie 1980 are not cited anywhere in this subsystem (no porosity-depth law is coded; sediment lithification is the single 150 m / 2.2 MPa rule in RCK-022).
@@ -3554,6 +3571,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): nothing stated
 - Read in this pass: WorldClim page fetched: "BIO15 = Precipitation Seasonality (Coefficient of Variation)"; the USGS landing page did not define BIO15 on the page I got
 - Reference check: the variable name matches; the exact formula (n or n-1 in the standard deviation) is not on the pages I read.
+- Stage 2 read (WP-11, 2026-10-02, ODonnell2012.txt): full text. Bio 15 is the coefficient of variation of the twelve monthly totals; eq. 16 divides by 1 + Bio12/12. n or n-1 is not stated.
 
 ### Minder2010
 - Reference: Minder, Justin R.; Mote, Philip W.; Lundquist, Jessica D. 2010. Surface temperature lapse rates over complex terrain: lessons from the Cascade Mountains. Journal of Geophysical Research: Atmospheres 115(D14), D14122.
@@ -3673,7 +3691,7 @@ Vanilla's OverworldBiomeBuilder, Terralith, Tectonic (game and mod data), rustff
 - Reference: Coltice, N., Husson, L., Faccenna, C., Arnould, M., 2019. What drives tectonic plates? Science Advances 5(10): eaax4295.
 - DOI or URL: (SCL, PRV, POL, BAK) 10.1126/sciadv.aax4295 ; open access, Europe PMC PMC6821462 (PLT) 10.1126/sciadv.aax4295; https://pmc.ncbi.nlm.nih.gov/articles/PMC6821462/ (open access).
 - Cited as: (SCL, PRV, POL, BAK) "Coltice (run used a Pangea-like start)" (no year or title in the report; the research note tectonics_engines.md names "Coltice et al. 2019, What drives tectonic plates?") (PLT) "Coltice, Husson, Faccenna & Arnould 2019, Sci. Adv. 5:eaax4295".
-- Ledger ids: PLT-188, SCL-041
+- Ledger ids: PLT-188, SCL-041 (the force-balance page, plate-forces.md, quotes its abstract)
 - Access: open access
 - Library (the project's source library, not distributed): fetched (full-text XML from Europe PMC, 41,153 characters of text). From: epmcxml:PMC6821462. Text file: Coltice2019.txt.
 - Read so far (by the project): (SCL, PRV, POL, BAK) not stated for this claim (PLT) link given.
@@ -3768,11 +3786,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Forsyth, D., Uyeda, S. (1975). On the relative importance of the driving forces of plate motion. Geophysical Journal of the Royal Astronomical Society 43(1):163-200.
 - DOI or URL: 10.1111/j.1365-246X.1975.tb00631.x; https://academic.oup.com/gji/article/43/1/163/586101 (abstract page; PDF returns 403).
 - Cited as: "Forsyth & Uyeda 1975, Geophys. J. R. Astron. Soc. 43:163-200".
-- Ledger ids: PLT-023, PLT-030, PLT-162, PLT-182, PLT-185, PLT-189, PLT-199
+- Ledger ids: PLT-023, PLT-030, PLT-162, PLT-182, PLT-185, PLT-189, PLT-199, FRC-010, FRC-012, FRC-016, FRC-017
 - Access: paywalled (abstract only).
 - Library (the project's source library, not distributed): fetched in WP-13a (publisher's free PDF, 38 pages, text layer). From: https://academic.oup.com/gji/article-pdf/43/1/163/1576393/43-1-163.pdf. Text file: ForsythUyeda1975.txt.
 - Substitute: none found.
-- Read so far (by the project): abstract only / secondary pages.
+- Read so far (by the project): abstract only / secondary pages. Force-balance task 5 (2026-10-02): the full text in the library, by a Sonnet sub-agent with line numbers: slab forces "an order of magnitude stronger than any other force" and the "terminal velocity" (Summary, lines 27-35; 716-727; 7.0 cm/yr at 1237-1239); continental drag "approximately eight times" the oceanic (1238-1241, a result of their inverse fit); slab-attached plates 6-9 cm/yr, others 0-4 cm/yr (699-704); ridge push of McKenzie 1972 "of the order of 300 bars" (1441-1450); their lithosphere 80 km.
 - Read in this pass: abstract fetched (publisher page).
 - Reference check: citation correct. The journal title "Geophysical Journal of the Royal Astronomical Society" is the 1975 name (now Geophysical Journal International). The abstract does NOT contain the "3 to 4" speed ratio or any factor of 8 (see Part 2); those must come from the body or from another paper.
 - Read in WP-13a (2026-10-02): full text. Slab-attached plates 6-9 cm/yr, others 0-4 cm/yr, terminal velocity (p. 178); "no obvious relation between velocity and area" (p. 177, Fig. 5); slab pull and resistance an order of magnitude above the rest, drag under continents "approximately eight times" that under oceans (p. 189, Tables 5 and 6); continental viscosity "about eight times larger" (p. 194); Table 1 (areas, speeds, trench lengths) used to compute Earth statistics. Ledger: PLT-162, PLT-181 to PLT-189, PLT-197 to PLT-199, CHK-020 to CHK-027, CHK-056. The "3 to 4" is not a sentence of the paper (fix 18).
@@ -4119,10 +4137,10 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Conrad, C. P., Lithgow-Bertelloni, C. (2006). Influence of continental roots and asthenosphere on plate-mantle coupling. Geophysical Research Letters 33(5):L05312.
 - DOI or URL: 10.1029/2005GL025621 (bronze open access at Wiley; PDF returns 403 to scripts).
 - Cited as: "Conrad & Lithgow-Bertelloni 2006, GRL 33:L05312".
-- Ledger ids: PLT-188
+- Ledger ids: PLT-188, FRC-010, FRC-027
 - Access: open copy at Wiley (bronze), abstract read here.
 - Library (the project's source library, not distributed): fetched in WP-13a (4 pages, text layer). From: https://discovery.ucl.ac.uk/id/eprint/146995/1/2005GL025621.pdf. Text file: ConradLB2006.txt.
-- Read so far (by the project): from abstract.
+- Read so far (by the project): from abstract. Force-balance task 5 (2026-10-02): the full text in the library, by a Sonnet sub-agent: roots "increase traction magnitudes by a factor of 2-5 compared to 100 km thick lithosphere" (abstract, lines 19-21), "about three times larger on average" (165-169); reference lithosphere 100 km (97-98).
 - Read in this pass: abstract fetched.
 - Reference check: correct.
 - Read in WP-13a (2026-10-02): full text: continental roots "increase traction magnitudes by a factor of 2-5 compared to 100 km thick lithosphere" (abstract and section 3). PLT-188 verified.
@@ -4131,11 +4149,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Lithgow-Bertelloni, C., Richards, M. A. (1998). The dynamics of Cenozoic and Mesozoic plate motions. Reviews of Geophysics 36(1):27-78.
 - DOI or URL: 10.1029/97RG02282.
 - Cited as: "Lithgow-Bertelloni & Richards 1998, Rev. Geophys. 36:27-78".
-- Ledger ids: PLT-187
+- Ledger ids: PLT-187, FRC-009, FRC-016
 - Access: paywalled (abstract).
 - Library (the project's source library, not distributed): fetched in WP-13a (52 pages, text layer). From: https://discovery.ucl.ac.uk/id/eprint/125253/1/97RG02282.pdf. Text file: LithgowBertelloniRichards1998.txt.
 - Substitute: none found.
-- Read so far (by the project): from abstract.
+- Read so far (by the project): from abstract. Force-balance task 5 (2026-10-02): the full text in the library, by a Sonnet sub-agent: ">90%" slabs, "<10%" lithospheric effects (abstract, lines 15-17; 2386-2388; 3019); upper mantle 4-5 x 10^20 Pa s (2198-2200), a weak asthenosphere "of the order of 10^19 Pa s" (2467-2475); they give no ridge push or slab pull in N/m.
 - Read in this pass: abstract fetched (Crossref JSON).
 - Reference check: correct. (The 1995 GRL paper 22:1317-1320, same authors, has the same ">90 % slabs, <10 % lithospheric thickening" statement.)
 - Read in WP-13a (2026-10-02): full text: slabs "in excess of 90 %" of the driving forces, lithospheric thickening "of the order of 10 %" (abstract and conclusions). PLT-187.
@@ -4157,7 +4175,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Parsons, B., Richter, F. M. (1980). A relation between the driving force and geoid anomaly associated with mid-ocean ridges. Earth and Planetary Science Letters 51(2):445-450.
 - DOI or URL: 10.1016/0012-821X(80)90223-X.
 - Cited as: "Parsons & Richter 1980, EPSL 51:445-450".
-- Ledger ids: PLT-187
+- Ledger ids: PLT-187, FRC-012 (not read: the library has no copy)
 - Access: paywalled (no abstract in OpenAlex).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -4170,7 +4188,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: van Hunen, J., Allen, M. B. (2011). Continental collision and slab break-off: a comparison of 3-D numerical models with observations. Earth and Planetary Science Letters 302(1-2):27-37.
 - DOI or URL: 10.1016/j.epsl.2010.11.035.
 - Cited as: "van Hunen & Allen 2011, EPSL 302:27-37" (10-25 Myr).
-- Ledger ids: PLT-184
+- Ledger ids: PLT-184, FRC-026
 - Access: paywalled.
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Substitute: none found.
@@ -4183,10 +4201,10 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Zahirovic, S., Müller, R. D., Seton, M., Flament, N. (2015). Tectonic speed limits from plate kinematic reconstructions. Earth and Planetary Science Letters 418:40-52.
 - DOI or URL: 10.1016/j.epsl.2015.02.037; the EarthByte summary page https://www.earthbyte.org/tectonic-speed-limits-from-plate-kinematic-reconstructions/ returned HTTP 500 / timeouts in this pass.
 - Cited as: "Zahirovic et al. 2015, EPSL 418:40-52".
-- Ledger ids: PLT-025, PLT-198
+- Ledger ids: PLT-025, PLT-198, PLT-181, FRC-024
 - Access: paywalled (closed; OpenAlex has no open URL and no abstract).
 - Library (the project's source library, not distributed): fetched in WP-13a (accepted manuscript, 39 pages, text layer; the landing page is kept as Zahirovic2015_landing.txt). From: https://ro.uow.edu.au/ndownloader/files/50501994. Text file: Zahirovic2015.txt.
-- Read so far (by the project): link given.
+- Read so far (by the project): link given. Force-balance task 5 (2026-10-02): the full text in the library, by a Sonnet sub-agent: "a median RMS plate speed of ~4 cm/yr over 200 Myr" (lines 123-125); fastest plates ~8.5 cm/yr RMS, slowest ~2.6-2.8; oceanic plates 2-3 times faster than continental; plates with more than 25 % of their perimeter subducting median 7.9 cm/yr, without subduction 2.6 (652-662).
 - Read in this pass: metadata only (Crossref). Speed numbers could not be read.
 - Reference check: correct.
 - Read in WP-13a (2026-10-02): full text (accepted manuscript): median RMS plate speed ~4 cm/yr over 200 Myr, 4.2 over 3,952 samples; global RMS ~5-10 cm/yr (section 3.2); category medians: no subduction 2.6, over 25 % subducting 7.9, over 50 % continental 2.8, under 25 % continental 8.1 cm/yr (section 3.5); oceanic plates "2-3 times faster" (abstract); present RMS Antarctica 1.1, Africa 2.0, Pacific 7.9 cm/yr. PLT-181, PLT-190, PLT-197 to PLT-199, CHK-020 to CHK-025.
@@ -4208,7 +4226,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Turcotte, D. L., Schubert, G. Geodynamics. Cambridge University Press (editions 1982, 2002, 2014).
 - DOI or URL: none; Internet Archive copy (geodynamics0000turc) is lending-only (HTTP 401).
 - Cited as: "Turcotte & Schubert, Geodynamics" (flexure; gross slab pull "not confirmed").
-- Ledger ids: ISO-040 to ISO-042, ISO-067, PLT-183, PLT-193
+- Ledger ids: ISO-040 to ISO-042, ISO-067, PLT-183, PLT-193, FRC-002, FRC-004, FRC-008, FRC-012 (ridge push from memory; not read)
 - Access: book (not online).
 - Library (the project's source library, not distributed): not fetched. Reason: book, no open copy named.
 - Read so far (by the project): not read; gross slab pull "not confirmed in Turcotte & Schubert itself". For the flexure feature (2026-10-02) a sub-agent read chapter 3 as a PDF (https://sseh.uchicago.edu/doc/Geodynamics_Turcotte_Schubert_ch_3.pdf: E = 70 GPa and ν = 0.25 in the periodic-loading example, 100 GPa elsewhere) and the flexure formulas in lecture notes on the chapter (https://topex.ucsd.edu/geodynamics/12flexure.pdf); the edition of that PDF was not recorded.
@@ -4269,10 +4287,28 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Ledger ids: PLT-196
 - Access: open copy at par.nsf.gov.
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://par.nsf.gov/biblio/10127684. File: Huang2019.txt.
-- Read so far (by the project): from abstract.
+- Read so far (by the project): from abstract. Force-balance task 5 (2026-10-02): the abstract again (the library holds the landing page only): "extensional stress of 20-50 MPa in its interior" for a homogeneous supercontinent; the thickness it is averaged over is not in the abstract.
 - Read in this pass: abstract fetched (Crossref).
 - Reference check: correct. The abstract does give "extensional stress of 20-50 MPa in its interior" for a homogeneous supercontinent, matching the design.
 - Read in WP-13a (2026-10-02): no full text (the Curtin record has no file; Wiley refuses scripts). PLT-196 stays abstract-only.
+
+### Cloos1993
+- Reference: Cloos, M. (1993). Lithospheric buoyancy and collisional orogenesis: subduction of oceanic plateaus, continental margins, island arcs, spreading ridges, and seamounts. Geological Society of America Bulletin 105(6):715-737.
+- DOI or URL: 10.1130/0016-7606(1993)105<0715:LBACOS>2.3.CO;2.
+- Cited as: in ledger FRC-005 as the usual source for oceanic lithosphere becoming denser than the mantle after about 10 Myr.
+- Ledger ids: FRC-005
+- Access: paywalled.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): from memory (force-balance task 5, 2026-10-02); reference written from memory, not checked against Crossref.
+
+### Coblentz1994
+- Reference: Coblentz, D. D., Richardson, R. M., Sandiford, M. (1994). On the gravitational potential of the Earth's lithosphere. Tectonics 13(4):929-945.
+- DOI or URL: 10.1029/94TC00033.
+- Cited as: in ledger FRC-013 as the usual source for a mid-ocean ridge and continental lithosphere near sea level having about the same gravitational potential energy.
+- Ledger ids: FRC-013
+- Access: paywalled.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): from memory (force-balance task 5, 2026-10-02); reference written from memory, not checked against Crossref.
 
 ### DavisSuppeDahlen1983
 - Reference: Davis, D., Suppe, J., Dahlen, F. A. (1983). Mechanics of fold-and-thrust belts and accretionary wedges. Journal of Geophysical Research 88(B2):1153-1172.
@@ -5081,6 +5117,15 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct.
 
+### MinecraftSrc1211
+- Reference: Mojang Studios. Minecraft 1.21.1, `net.minecraft.world.level.biome.OverworldBiomeBuilder`, as decompiled and published in the NeoForge 21.1.249 sources jar.
+- DOI or URL: none (the jar is built by the project's Gradle setup, `neoforge-21.1.249-sources.jar`)
+- Cited as: "OverworldBiomeBuilder, Minecraft 1.21.1" (default.json, OverworldBands.java)
+- Ledger ids: BIO-021 to BIO-024
+- Access: game source, not redistributed
+- Library (the project's source library, not distributed): the one class, text file MinecraftSrc1211/OverworldBiomeBuilder.java.
+- Stage 2 read (WP-11, 2026-10-02): the temperature, humidity, continentalness, erosion and weirdness constants; all equal the bake's reference bands.
+
 ### DeCellesGiles1996_flexure
 - Reference: DeCelles, P. G., Giles, K. A. (1996). Foreland basin systems. Basin Research 8(2):105-123. (Also `DeCellesGiles1996` in the Plate tectonics section, where stage 1 saw the abstract only.)
 - DOI or URL: 10.1046/j.1365-2117.1996.01491.x; full text https://pages.uoregon.edu/rdorsey/BasinAnalysis/BasinPapers/DeCelles%20&%20Giles%201996.pdf
@@ -5192,6 +5237,7 @@ with pdftotext; the others are abstracts on the publisher's or the laboratory's 
 - Read so far (by the project): abstract only, 2026-10-02: "13 volcanoes along 260 km of the southern Kermadec arc", hydrothermal activity at seven. The vent depth range of 250-1,660 m below sea level was read in the abstract of de Ronde et al. 2003, not in this one.
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct.
+
 ## Geothermal features and editor hints (GEO, HNT), added in WP-15 and WP-16
 
 Works read for the geothermal page and the hint figure table (2026-10-02). Not counted in the totals above. "Fetch tool" means the page was read through a page-fetch tool that returns quoted sentences; the agency sites named return only a script stub to a plain download, so no copy is in the library.
@@ -5251,3 +5297,185 @@ Works read for the geothermal page and the hint figure table (2026-10-02). Not c
 - White, D.E. 1967, mercury deposits and hot springs; the Steamboat Springs and Sulphur Bank deposits (GEO-041).
 - Etheridge et al. 1996 (HNT-050); U.S. Standard Atmosphere 1976, NASA TM-X-74335 (HNT-043); Bouvier and Wadhwa 2010, Nature Geoscience 3:637 (HNT-054).
 
+
+## Rock classes, metamorphism, plutons and strata: sources read in WP-7 (RCK, STR)
+
+Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's source library (the test machine's `deeptime-sources` folder, one folder per key; not distributed, never committed) unless it says "no saved copy". "Read" says what was read and at what level; secondary means lecture notes, encyclopedias or a software manual that tabulates a paper.
+
+### DalyMangerClark1966
+- Reference: Daly, R. A., Manger, G. E. and Clark, S. P. (1966). Density of rocks. In: Clark, S. P. (ed.), Handbook of Physical Constants, Geological Society of America Memoir 97, section 4, pp. 19-26.
+- Ledger ids: RCK-001, RCK-087
+- Library: `DalyMangerClark1966/DalyMangerClark1966.pdf` and `.txt` (a copy of the GSA chapter). Tables 4-1 (holocrystalline igneous), 4-2 (natural glasses) and 4-5 (metamorphic) legible; table 4-4 (sedimentary) is a rotated page and did not extract.
+- Read: primary full text. Granite 155 samples mean 2.667 (2.516-2.809); granodiorite 2.716; diorite 2.839; gabbro 2.976; peridotite (fresh) 3.234 (3.152-3.276); dunite 3.277; anorthosite 2.734; rhyolite obsidian 2.370; slate 2.81; schist 2.70-3.03; gneiss 2.59-3.06; amphibolite 2.99; eclogite 3.392. Fresh rock, so upper bounds for field rock.
+
+### Manger1963
+- Reference: Manger, G. E. (1963). Porosity and bulk density of sedimentary rocks. U.S. Geological Survey Bulletin 1144-E.
+- Ledger ids: RCK-001, RCK-087, STR-049
+- Library: `Manger1963/Manger1963.pdf` and `.txt` (OCR text, columns scrambled; rows read where clean). https://pubs.usgs.gov/bul/1144e/report.pdf
+- Read: primary full text. Sandstone 2.13-2.69 dry; limestone, dolomite, marble, chert, conglomerate, chalk (Great Britain, 31 samples, porosity 17.6-42.8 %, dry 1.94), shale 1.73-2.71, slate 2.74-2.84, loose sand, gravel, silt, clay, loess, soils; Phosphoria Formation 2.91; iron formation and ironstone ore 3.46-4.53, Biwabik 2.75.
+
+### HandbookOfMineralogy
+- Reference: Anthony, J. W., Bideaux, R. A., Bladh, K. W. and Nichols, M. C. (eds), Handbook of Mineralogy. Mineralogical Society of America. https://www.handbookofmineralogy.org
+- Ledger ids: RCK-085, RCK-088
+- Library: `HandbookOfMineralogy/` (quartz, calcite, dolomite, halite, gypsum, anhydrite, hematite, magnetite, fluorapatite, albite, anorthite; PDF and text).
+- Read: primary reference text. Quartz H 7 D 2.65; calcite H 3 D 2.7102; dolomite D 2.86; halite H 2-2.5 D 2.168; gypsum H 1.5-2 D 2.317; anhydrite H 3-3.5 D 2.98; hematite D 5.26; magnetite D 5.175; fluorapatite D 3.1-3.25; albite 2.60-2.65, anorthite 2.74-2.76.
+
+### French1998
+- Reference: French, B. M. (1998). Traces of Catastrophe: A Handbook of Shock-Metamorphic Effects in Terrestrial Meteorite Impact Structures. Lunar and Planetary Institute Contribution 954. https://www.lpi.usra.edu/publications/books/CB-954/CB-954.pdf
+- Ledger ids: RCK-090
+- Library: `French1998/French1998.pdf` and `.txt`.
+- Read: primary full text of the sections on impact breccias, suevite and melt rocks, and the introduction.
+
+### StoefflerGrieve2007
+- Reference: Stoeffler, D. and Grieve, R. A. F. (2007). Impactites. In: Fettes, D. and Desmons, J. (eds), Metamorphic Rocks: A Classification and Glossary of Terms. Recommendations of the IUGS Subcommission on the Systematics of Metamorphic Rocks. Cambridge University Press, chapter 2.11.
+- Ledger ids: RCK-090
+- Library: `StoefflerGrieve2007/` (author-circulated copy, PDF and text).
+- Read: primary full text of the classification and glossary entries (suevite, lithic breccia, impact melt rock).
+
+### Hardie1967
+- Reference: Hardie, L. A. (1967). The gypsum-anhydrite equilibrium at one atmosphere pressure. American Mineralogist 52:171-200. https://minsocam.org/ammin/AM52/AM52_171.pdf
+- Ledger ids: RCK-045
+- Library: `Hardie1967/Hardie1967.pdf` and `.txt` (noisy OCR text layer; numbers re-checked against the abstract).
+- Read: abstract and discussion. 58 +/- 2 degC for pure water; 38-42 degC from solubility measurements; the transition drops to 18 degC in seawater saturated with halite and gypsum.
+
+### Orti2012
+- Reference: Orti, F., Rosell, L., Bet Playa, E. and Salvany, J. M. (2012). Meganodular anhydritization: a new mechanism of gypsum to anhydrite conversion (Palaeogene-Neogene, Ebro Basin, North-east Spain). Sedimentology 59:1257-1277. doi 10.1111/j.1365-3091.2011.01305.x
+- Ledger ids: RCK-045
+- Library: `Orti2012/Orti2012.pdf` and `.txt` (repository copy).
+- Read: primary full text of the discussion of the temperature and depth of the conversion (about 50 degC at 450-500 m with clastic or carbonate accompanying rock; about 20 degC with halite).
+
+### Davies2010
+- Reference: Davies, J. H. and Davies, D. R. (2010). Earth's surface heat flux. Solid Earth 1:5-24. CC BY 3.0.
+- Ledger ids: RCK-030
+- Library: `Davies2010/Davies2010.pdf` and `.txt`.
+- Read: primary full text. Table 7: continent 70.9 mW/m2, ocean 105.4, global 91.6; continental and island-arc margins 73.8 mW/m2 (standard deviation 91.1); 65 mW/m2 from Pollack et al. 1993 as restated.
+
+### Meinert1992
+- Reference: Meinert, L. D. (1992). Skarns and skarn deposits. Geoscience Canada 19(4):145-162.
+- Ledger ids: RCK-054
+- Library: `Meinert1992/Meinert1992.pdf` and `.txt` (a scan, read by OCR).
+- Read: primary full text (definitions of skarn, calc-silicate hornfels, reaction skarn).
+
+### NelsonTulane
+- Reference: Nelson, S. A., Tulane University, lecture notes for EENS 2120 Petrology: "Types of metamorphism", "Metamorphic rock classification and facies", "Contact metamorphism", "Regional metamorphism", "Metamorphic reactions". https://www2.tulane.edu/~sanelson/eens212/
+- Ledger ids: RCK-039 to RCK-049, RCK-054, STR-044
+- Library: `Nelson_Tulane_EENS212/` (five pages, PDF and text).
+- Read: secondary (lecture notes): diagenesis below 200 degC and 300 MPa; facies series at 30 and at 10 degC/km; protolith-rock pairs; Franciscan, Dalradian and southern Appalachian case-study conditions.
+
+### HackerUCSB
+- Reference: Hacker, B. R., University of California Santa Barbara, GEO 102C Metamorphic Petrology, lecture notes parts 1, 2, 3, 5, 6, 13 and 14.
+- Ledger ids: RCK-028, RCK-030, RCK-032, STR-006
+- Library: `Hacker_UCSB_geo102C/` (HTML and text).
+- Read: secondary (lecture notes): Fourier's law worked example (3 W/m/K x 20 K/km = 60 mW/m2); gradients of 5-10 K/km in cold subduction zones, 20 K/km in cratons, 50 K/km in rifts and arcs; crust never thicker than about 75 km; the 200-m ophiolite sole.
+
+### Robertson1988
+- Reference: Robertson, E. C. (1988). Thermal properties of rocks. U.S. Geological Survey Open-File Report 88-441.
+- Ledger ids: RCK-029
+- Library: `Robertson1988/Robertson1988.pdf` and `.txt`.
+- Read: primary full text, table 2: gneiss 2.1-3.0 (across foliation) and 2.9-4.5 (along), marble 2.8-2.9, amphibolite 2.9 W/m/K at 300 K and 5 MPa.
+
+### Baxter2002
+- Reference: Baxter, E. F., Ague, J. J. and DePaolo, D. J. (2002). Prograde temperature-time evolution in the Barrovian type-locality constrained by Sm/Nd garnet ages from Glen Clova, Scotland. Journal of the Geological Society 159:71-82.
+- Ledger ids: RCK-042, RCK-044
+- Library: `Baxter2002/Baxter2002.pdf` and `.txt` (author-institution copy).
+- Read: primary full text. Garnet zone c. 500-550 degC, kyanite c. 550-600 degC, sillimanite zone c. 650-700 degC at c. 6 kbar.
+
+### Stipp2002
+- Reference: Stipp, M., Stunitz, H., Heilbronner, R. and Schmid, S. M. (2002). Dynamic recrystallization of quartz: correlation between natural and experimental conditions. Geological Society, London, Special Publications 200:171-190.
+- Ledger ids: RCK-040
+- Library: `Stipp2002/Stipp2002.pdf` and `.txt` (OCR; noisy).
+- Read: primary full text of the abstract and summary: brittle-to-plastic transition near 280 degC; bulging recrystallisation 280-400 degC, subgrain rotation 400-500 degC, grain-boundary migration 500-700 degC (strain-rate dependent).
+
+### Ferrill2004
+- Reference: Ferrill, D. A., Morris, A. P., Evans, M. A., Burkhard, M., Groshong, R. H. and Onasch, C. M. (2004). Calcite twin morphology: a low-temperature deformation geothermometer. Journal of Structural Geology 26:1521-1529.
+- Ledger ids: RCK-040
+- Library: `Ferrill2004/Ferrill2004.pdf` and `.txt` (repository copy).
+- Read: primary full text. Calcite twinning dominates below about 400 degC; dynamic recrystallisation important above 250 degC.
+
+### Annen2017
+- Reference: Annen, C. (2017). Factors affecting the thickness of thermal aureoles. Frontiers in Earth Science 5:82. doi 10.3389/feart.2017.00082
+- Ledger ids: RCK-053
+- Library: `Annen2017/Annen2017.pdf` and `.txt`.
+- Read: primary full text of the abstract and introduction (aureole thickness proportional to intrusion thickness in the idealised case; Manaslu about 100 m round a several-km sheet; Western Adamello 1.7 km round a 5.5-km intrusion).
+
+### Mottram2014
+- Reference: Mottram, C. M. et al. (2014). Developing an inverted Barrovian sequence; insights from monazite petrochronology. Earth and Planetary Science Letters 403:418-431. CC BY.
+- Ledger ids: STR-006, STR-044
+- Library: `Mottram2014/Mottram2014.pdf` and `.txt`.
+- Read: primary full text of the introduction (inverted metamorphic sequences in ophiolite soles, the Caledonides, Appalachians, Variscan belt, Canadian Cordillera and Himalaya).
+
+### Sass1994
+- Reference: Sass, J. H., Lachenbruch, A. H., Galanis, S. P., Morgan, P., Priest, S. S., Moses, T. H. and Munroe, R. J. (1994). Thermal regime of the southern Basin and Range Province: 1. Heat flow data from Arizona and the Mojave Desert of California and Nevada. Journal of Geophysical Research 99(B11):22093-22119.
+- Ledger ids: RCK-030
+- Library: `Sass1994_SouthBasinRange/Sass1994.pdf` and `.txt` (state geological survey copy).
+- Read: primary full text of the abstract (heat flow from 5 mW/m2 on the Colorado Plateau to more than 150 mW/m2 in the Salton Trough rocks; 67 +/- 4 mW/m2 for the metamorphic core complexes).
+
+### Bateman1992
+- Reference: Bateman, P. C. (1992). Plutonism in the central part of the Sierra Nevada batholith, California. U.S. Geological Survey Professional Paper 1483. https://pubs.usgs.gov/pp/1483/report.pdf
+- Ledger ids: RCK-019, RCK-060, RCK-062, RCK-063, RCK-064
+- Library: `Bateman1992/Bateman1992_PP1483.pdf` and `.txt`.
+- Read: primary, abstract and introduction in full and the passages on pluton size, shape and depth: plutons from under 1 to over 1,000 km2; batholith at least 100 km2; Mount Givens 80 x 17 km (about 1,400 km2); Lamarck over 60 x 10 km; tonalite most common in the west, hornblende-biotite granodiorite along the axis; 3.5-7 km of rock eroded since emplacement.
+
+### Ducea2001
+- Reference: Ducea, M. (2001). The California arc: thick granitic batholiths, eclogitic residues, lithospheric-scale thrusting, and magmatic flare-ups. GSA Today 11(11):4-10. https://www.geosociety.org/gsatoday/archive/11/11/pdf/i1052-5173-11-11-4.pdf
+- Ledger ids: RCK-056, RCK-064
+- Library: `Ducea2001/Ducea2001.pdf` and `.txt`.
+- Read: primary full text. The arc was active 220-80 Ma; about 600 plutons for almost 65 % of the exposed arc; baseline addition about 10 km3 per km per Myr, flare-up as high as 85; exposed plutons are tonalite and granodiorite with under 3 % mafic rock.
+
+### Glazner2004
+- Reference: Glazner, A. F., Bartley, J. M., Coleman, D. S., Gray, W. and Taylor, R. Z. (2004). Are plutons assembled over millions of years by amalgamation from small magma chambers? GSA Today 14(4):4-11.
+- Ledger ids: RCK-068
+- Library: `Glazner2004/Glazner2004.pdf` and `.txt`.
+- Read: primary full text (incremental growth of large plutons; Half Dome Granodiorite emplaced over more than 3 Myr, 92.8-88.8 Ma; Tuolumne 95-85 Ma).
+
+### Greene2006
+- Reference: Greene, A. R., DeBari, S. M., Kelemen, P. B., Blusztajn, J. and Clift, P. D. (2006). A detailed geochemical study of island arc crust: the Talkeetna Arc section, south-central Alaska. Journal of Petrology 47(6):1051-1093.
+- Ledger ids: RCK-065
+- Library: `Greene2006/Greene2006.pdf` and `.txt`.
+- Read: primary abstract (mid-crustal plutonic rocks are gabbroic, dioritic to tonalitic over 30-40 % of the area, with mafic dikes).
+
+### DietlKoyi2008
+- Reference: Dietl, C. and Koyi, H. (2008). Formation of tabular plutons: results and implications of centrifuge modelling. Journal of Geosciences 53:253-261. doi 10.3190/jgeosci.032
+- Ledger ids: RCK-061
+- Library: `DietlKoyi2008/DietlKoyi2008.pdf` and `.txt`.
+- Read: primary full text of the introduction, which restates McCaffrey and Petford 1997 (laccoliths T = 0.12 L^0.88, 135 intrusions; plutons T = 0.29 L^0.80, 21 intrusions) and Petford and Clemens 2000 (exponent 0.6 +/- 0.1 for more than 100 plutons).
+
+### VigneresseBurg2003
+- Reference: Vigneresse, J.-L. and Burg, J.-P. (2003). The paradoxical aspect of the Himalayan granites. Journal of the Virtual Explorer 11, paper 3.
+- Ledger ids: RCK-056, RCK-058
+- Library: `VigneresseBurg2003/VigneresseBurg2003.html` and `.txt`.
+- Read: primary full text. Magmatic production rates: island arcs 20-40 km3 per km per Myr; Peruvian and Canadian Coastal about 200; High Himalayan leucogranites under 10; sheets 1.5-2 km thick.
+
+### Tuolumne_Frontiers2020
+- Reference: Ardill, K. E., Paterson, S. R., Stanback, J., Alasino, P. H. et al. (2020). Schlieren-bound magmatic structures record crystal flow-sorting in dynamic upper-crustal magma-mush chambers. Frontiers in Earth Science 8:190. doi 10.3389/feart.2020.00190
+- Ledger ids: RCK-060, RCK-063
+- Library: `Tuolumne_Frontiers2020/f.html` and `f.txt`.
+- Read: primary full text of the geological setting: the Tuolumne Intrusive Complex is about 1,100 km2, emplaced over about 10 Myr (95-85 Ma) at 6-10 km depth.
+
+### Cruden2008_SKB
+- Reference: Cruden, A. R. (2008). Emplacement mechanisms and structural influences of a younger granite intrusion into older wall rocks: a principal study with application to the Gotemar and Uthammar granites. Swedish Nuclear Fuel and Waste Management Co., report R-08-138. https://www.osti.gov/etdeweb/servlets/purl/951485
+- Ledger ids: RCK-057, RCK-061, STR-007
+- Library: `Cruden2008_SKB/Cruden2008_SKB_R-08-138.pdf` and `.txt`.
+- Read: primary full text of section 2.1.7, "Empirical power law": the author restating McCaffrey and Petford 1997 and Cruden and McCaffrey 2001. T = b L^a; 66 plutons; L the equivalent diameter of a circle; b = 0.6 (+/-0.15), a = 0.6 (+/-0.1); data points Gasborn (L 4.5 km, T 1.6 km), Lucerne (56 km, 4.5 km), Sierra Nevada (600 km, 15 km).
+
+### ChristensenMooney1995
+- Reference: Christensen, N. I. and Mooney, W. D. (1995). Seismic velocity structure and composition of the continental crust: a global view. Journal of Geophysical Research 100(B6):9761-9788.
+- Ledger ids: RCK-033
+- Library: `ChristensenMooney1995/abstract.json` (the USGS publications record).
+- Read: abstract only. Average crustal thickness 41.1 km (extended 30.5 km, orogens 46.3 km).
+
+### BrownJohnson2018_dataset
+- Reference: Brown, M. and Johnson, T. (2018). Global age, temperature and pressure data for secular change in metamorphism. EarthChem Library, doi 10.1594/IEDA/111316; slides of M. Brown's presidential address to the Mineralogical Society of America.
+- Ledger ids: RCK-048
+- Library: `Brown_UMD_MMSA/` (dataset abstract and slides).
+- Read: dataset abstract. Three apparent thermal-gradient classes: high T/P above 775 degC per GPa, intermediate 375-775, low below 375 (blueschists and low-temperature eclogites).
+
+### tectonicsjs_Crust
+- Reference: Davidson, tectonics.js, noncompiled/models/lithosphere/Crust.js, `model_lithification`. https://github.com/davidson16807/tectonics.js
+- Ledger ids: RCK-022
+- Library: no saved copy (read through the GitHub API on 2026-10-02).
+- Read: the source comment "2.2e6 Pascals is the pressure equivalent of 500ft of sediment @ 1500kg/m^3 density; 500ft from http://wiki.aapg.org/Sandstone_diagenetic_processes", and "convert sedimentary ... where it exceeds pressure/temperature equivalent of 300MPa/11km" for metamorphosis. The AAPG wiki page, fetched through a tool, does not state a 500-ft figure.
+
+### Read at second hand in WP-7 (no saved copy; secondary)
+- Sclater, J. G. and Christie, P. A. F. (1980), JGR 85:3711, porosity-depth parameters as tabulated in the pyBacktrack documentation (https://pybacktrack.readthedocs.io); Bjorlykke et al. (2009), AAPG Search and Discovery 50192; Sanuade and Kaka (2017), Geological Quarterly 61(1):106-123, on the Niger Delta; Hudec and Jackson (2007) as quoted by the EGU TS blog; Schultz-Ela, Jackson and Vendeville (1994) abstract; Ponce, Denton and Miller (2013), USGS, abstract (Mountain Pass carbonatite density); Christeson et al. (2018), EPSL, abstract (Chicxulub suevite and melt rock density); Devriese, Davis and Oldenburg (2017), Interpretation (kimberlite density, qualitative); RocFall documentation table of the New Zealand PETLAB rock-property database (Tenzer et al. 2011); Wikipedia pages (Carbonate compensation depth, Salt tectonics, Cathedral Peak Granodiorite, Migmatite, Gneiss, Blueschist, Granulite, Petroleum trap, Diamictite, Greisen, Skarn, Travertine); SEPM Strata and LibreTexts pages on the CCD; Greenwood and Berman, "Metamorphic rock", The Canadian Encyclopedia.
+- Closed and not read: Winter 2010, Yardley 1989, Spear 1993, Bucher and Grapes 2011, Warren 2016, Telford et al. 1990, Schon 2015, Cruden 1998, McCaffrey and Petford 1997, Cruden and McCaffrey 2001, Buddington 1959, Haederle and Atherton 2002, Mukasa 1986, Hudec and Jackson 2007, Doust and Omatsola 1990, Pollack et al. 1993, Heimsath et al. 1997, Roering et al. 1999, Kelsey and Hand 2015, Brown 2014.
