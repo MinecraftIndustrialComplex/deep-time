@@ -56,6 +56,8 @@ public final class DeepTimeCommands {
                 .then(Commands.literal("palette").executes(c -> probePalette(c.getSource())))
                 // Where the level has lava: the active volcanoes' magma, the lava features refused, the distances.
                 .then(Commands.literal("magma").executes(c -> MagmaProbe.probe(c.getSource())))
+                // P2-14: the geothermal sites around them, the palette, the distances.
+                .then(Commands.literal("geothermal").executes(c -> GeothermalProbe.probe(c.getSource())))
                 .then(Commands.literal("site")
                         .then(Commands.argument("x", IntegerArgumentType.integer())
                                 .then(Commands.argument("y", IntegerArgumentType.integer())

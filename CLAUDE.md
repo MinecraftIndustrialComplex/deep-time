@@ -21,7 +21,10 @@ MinecraftIndustrialComplex/deep-time.
 2. docs/deeptime-implementation-plan.md — the plan (§1.3 is the reading list; §10 the tasks).
 3. docs/research/geologic-history-worldgen-report.md — the research report (§1.2 of the plan lists
    the positions it held that were overturned).
-4. docs/research/notes/*.md — the research notes.
+4. docs/research/notes/*.md — the research notes (index: docs/research/README.md).
+   docs/science/ — the science documentation: one page per feature, the claims ledger
+   (claims.md: every constant and law in the code, its source and whether it was checked) and the
+   bibliography. See the rule "Science documentation is part of done".
 5. docs/plan-reviews/ — the cold-read reviews of the plan and their resolutions.
 6. /home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md — rock vocabulary
    (MIC's datapack, outside this repo; MIC ships it as pack/kubejs/data/deeptime/).
@@ -116,6 +119,16 @@ tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete m
   and its smoke/ folder is a stale copy, never a reference.
 - Land your work: commit, `git merge --no-ff` finished branches into master, push master. Catch up a
   behind checkout with `git merge --ff-only --autostash origin/master`.
+- **Science documentation is part of done** (Ben, 2026-10-02: "as backed by science as possible";
+  decisions log 2026-10-02). A feature is not done until its page in `docs/science/`, its rows in
+  the ledger `docs/science/claims.md` and `docs/science/bibliography.md` are updated in the same
+  branch. Every physical constant, law, threshold, rate or calibration target in code, presets or
+  data files carries its ledger id in a comment beside it (`// ledger: IMP-012`), or a
+  `game-choice` note saying why it is not physical and who decided. A value you could not check
+  against its source is marked `from-memory` in the ledger and in the comment, never cited as if
+  the source had been read; `verified` needs the source fetched and the value read, with what was
+  read recorded in the ledger. Changing a ledgered value means changing its row. New pages start
+  from `docs/science/_template.md`.
 - Decisions: ask Ben (AskUserQuestion, at most four questions per call, recommended option first)
   before anything that outlives the session, unless he said to work autonomously. While a question
   is open, list it under STATUS.md "Pending questions". When he answers, append an entry to the

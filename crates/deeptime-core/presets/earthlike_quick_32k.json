@@ -207,6 +207,10 @@
       "strength": 1.0,
       "young_ela_drop_m": 500.0,
       "valley_width": 3.0
+    },
+    "flexure": {
+      "strength": 1.0,
+      "elastic_thickness_scale": 1.0
     }
   },
   "climate": {
@@ -429,7 +433,11 @@
     "magma_chamber_depth_km": 3.0,
     "magma_chamber_size": 1.0,
     "crater_lake_share": 0.25,
-    "remove_lava_features": true
+    "remove_lava_features": true,
+    "geothermal_density": 1.0,
+    "geothermal_reach": 1.0,
+    "geothermal_size": 1.0,
+    "geothermal_spring_min_precip_mm": 400.0
   },
   "provinces": {
     "min_area_km2": 50000.0,
