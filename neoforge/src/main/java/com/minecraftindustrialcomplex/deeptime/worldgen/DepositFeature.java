@@ -26,7 +26,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * ({@link #unit}), so regenerating a chunk places exactly the same blocks; zones that overlap stack
  * their densities in zone order (a draw below the first zone's density takes its material, below the
  * sum of the first two the second's, …, capped at 1); of several bodies at one block the lowest id
- * places first.
+ * places first. An ore block of a zone with a raw-ore share is the material's raw-ore block
+ * where a second draw says so ({@link #rawAt}; vanilla's ore veins).
  *
  * <p>Host rock is what the strata pass leaves as rock: stone, deepslate and every rock class's
  * blocks ({@link RockPalette#host}); unconsolidated rock (sand, gravel, soil, …) hosts ore only in a
@@ -85,9 +86,10 @@ public final class DepositFeature extends Feature<NoneFeatureConfiguration> {
                     if (yLo > yHi || !b.aabbContains(c, x, yLo, z))
                         continue;
                     for (int y = yLo; y <= yHi; y++) {
-                        String material = materialAt(b, c, x, y, z);
-                        if (material == null)
+                        Body.Zone zone = zoneAt(b, c, x, y, z);
+                        if (zone == null)
                             continue;
+                        String material = zone.material();
                         pos.set(x, y, z);
                         BlockState host = level.getBlockState(pos);
                         RockPalette.Host kind = palette.host(host);
@@ -100,7 +102,10 @@ public final class DepositFeature extends Feature<NoneFeatureConfiguration> {
                             if (own != null)
                                 host = own;
                         }
-                        BlockState ore = ores.resolve(material(material), host, y);
+                        ResourceLocation mat = material(material);
+                        BlockState ore = rawAt(b, zone, c, x, y, z) ? ores.rawBlock(mat) : null;
+                        if (ore == null)
+                            ore = ores.resolve(mat, host, y);
                         if (ore == null)
                             continue;
                         level.setBlock(pos, ore, 2);
@@ -126,6 +131,12 @@ public final class DepositFeature extends Feature<NoneFeatureConfiguration> {
      * zones that apply there (plan §7.6). A pure function of the position and the body.
      */
     public static String materialAt(Body b, int c, int x, int y, int z) {
+        Body.Zone zone = zoneAt(b, c, x, y, z);
+        return zone == null ? null : zone.material();
+    }
+
+    /** The zone whose material {@link #materialAt} places at the block, or null. */
+    public static Body.Zone zoneAt(Body b, int c, int x, int y, int z) {
         Body.Location at = b.locate(c, x, y, z);
         if (at == null)
             return null;
@@ -136,23 +147,21 @@ public final class DepositFeature extends Feature<NoneFeatureConfiguration> {
                 continue;
             acc += zone.density();
             if (u < acc)
-                return zone.material();
+                return zone;
         }
         return null;
     }
 
-    /** A uniform draw in [0, 1) from a block position and a salt (SplitMix64 finaliser). */
-    public static double unit(int x, int y, int z, int salt) {
-        long h = mix(0x9E3779B97F4A7C15L * (x + 0x632BE59BD9B4E019L));
-        h = mix(h ^ (0xC2B2AE3D27D4EB4FL * (y + 0x2545F4914F6CDD1DL)));
-        h = mix(h ^ (0x165667B19E3779F9L * (z + 0x1B873593L)));
-        h = mix(h ^ Integer.toUnsignedLong(salt));
-        return (h >>> 11) * 0x1.0p-53;
+    /**
+     * Whether the ore block {@code zone} places at (x, y, z) of body {@code b} is the material's
+     * raw-ore block ({@link OreBlockResolver#rawBlock}; {@link OreDraws#rawAt}).
+     */
+    public static boolean rawAt(Body b, Body.Zone zone, int c, int x, int y, int z) {
+        return OreDraws.rawAt(b, zone, c, x, y, z);
     }
 
-    static long mix(long z) {
-        z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
-        z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
-        return z ^ (z >>> 31);
+    /** A uniform draw in [0, 1) from a block position and a salt ({@link OreDraws#unit}). */
+    public static double unit(int x, int y, int z, int salt) {
+        return OreDraws.unit(x, y, z, salt);
     }
 }

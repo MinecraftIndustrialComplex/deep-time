@@ -380,6 +380,21 @@ enum Command {
         /// Only the sites of this deposit type (repeatable; `placer_au` or `deeptime:placer_au`).
         #[arg(long)]
         only: Vec<String>,
+        /// Scatter multiplier instead of the world's (`notes.deposits.scatter_mult`).
+        #[arg(long)]
+        scatter_mult: Option<f64>,
+        /// Random land points of the early-game access probe (0: none).
+        #[arg(long, default_value_t = 150)]
+        access_points: usize,
+        /// Blocks under the top solid block the access probe counts ore in.
+        #[arg(long, default_value_t = 48)]
+        access_depth: i32,
+        /// Ore-equivalent (a raw block counts 9) the access probe gathers.
+        #[arg(long, default_value_t = 24.0)]
+        access_need: f64,
+        /// How far the access probe looks, in chunks.
+        #[arg(long, default_value_t = 96)]
+        access_radius: i64,
     },
     /// Write the Java↔Rust column parity fixture (plan §9.2): columns of a world-data folder as the
     /// column evaluator answers them, for `ColumnParityTest` and the real-planet GameTest.
@@ -938,8 +953,18 @@ fn main() -> ExitCode {
             area,
             json,
             only,
+            scatter_mult,
+            access_points,
+            access_depth,
+            access_need,
+            access_radius,
         }) => {
             let o = deposit_audit::Options {
+                scatter_mult,
+                access_points,
+                access_depth,
+                access_need,
+                access_radius,
                 world_data,
                 scatter_dir,
                 chunks,

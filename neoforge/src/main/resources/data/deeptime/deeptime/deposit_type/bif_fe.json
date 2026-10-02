@@ -53,8 +53,8 @@
     "dip_deg": [5, 40],
     "rock_class": "banded_iron_formation",
     "zoning": [
-      {"zone": "ore", "d": [0.0, 0.8], "material": "c:iron", "grade_mult": 1.0, "density": 0.35},
-      {"zone": "margin", "d": [0.8, 1.0], "material": "c:iron", "grade_mult": 0.8, "density": 0.15}
+      {"zone": "ore", "d": [0.0, 0.8], "material": "c:iron", "grade_mult": 1.0, "density": 0.6, "raw_share": 0.04},
+      {"zone": "margin", "d": [0.8, 1.0], "material": "c:iron", "grade_mult": 0.8, "density": 0.25}
     ],
     "extra_bodies": [],
     "children": []
@@ -73,6 +73,7 @@
   "balance": {"count_mult": 1.0, "size_mult_h": 6.0, "size_mult_v": 4.0, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
+    "RICHNESS (owner, decisions log 2026-10-02, \"Rich Deposits, Thinner Scatter, Also make deposits use some of the vanilla ore vein features\"): the zone densities were raised and the richest zone carries raw-ore blocks (raw_share: that share of its ore blocks is the raw-ore block, as vanilla's ore veins carry 2 %); game-choice, ledger ORE-266; the richness settings scale both in the world (ORE-262). Measured in docs/science/deposits.md. Inherited BIF lies only in iron-formation basins dealt over a share of the stable interiors (deposits.inherited_bif_share 0.014, basins of about 100,000 km2: ORE-261, ORE-263, ORE-264).",
     "Sizing: USGS Bulletin 1693 (Cox & Singer eds. 1986) model 34a, Superior Fe, n = 66: tonnage 11 / 170 / 2400 Mt (Fig. 172, p. 229) and Fe 30 / 53 / 66 % (Fig. 173, p. 230), figure intercepts. The model covers Algoma-type too (model 28b, p. 198: its grade–tonnage model 'is included under Superior Fe'). The 53 % Fe median is well above primary iron formation (typically 30–35 % Fe, OFR 95-831), so the model probably includes enriched ores. See crates/deeptime-core/data/usgs/bif_fe.json.",
     "PLACEHOLDERS (not found in any USGS source): ore_density_t_m3 3.6 (hematite–magnetite–quartz rock), density_per_1e5km2 1 / 4 / 12, min_separation_m 5000, formation_depth_m 1200 (for an inherited sheet: its depth at the timeline's start, which slow cratonic erosion then brings towards the surface).",
     "formation_time cause: an inherited deposit takes the time of its causing event (the BIF shelf sea), not a frame of the timeline.",
