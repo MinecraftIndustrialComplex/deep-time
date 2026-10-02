@@ -59,7 +59,12 @@ for root, _, files in os.walk("."):
             f = "bundle.json"
         if f.endswith(".json"):
             try:
-                b = json.dumps(clean(json.loads(b)), sort_keys=True).encode()
+                v = json.loads(b)
+                # The parity fixture's own check of the projection (added with the module): the
+                # columns are what is compared.
+                if f == "columns.json" and isinstance(v, dict):
+                    v.pop("projection", None)
+                b = json.dumps(clean(v), sort_keys=True).encode()
             except ValueError:
                 pass
         print(hashlib.sha256(b).hexdigest(), p)
