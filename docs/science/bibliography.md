@@ -4716,3 +4716,56 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: relaxation times "close to 3-5 kyr".
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct.
+
+## Geothermal features and editor hints (GEO, HNT), added in WP-15 and WP-16
+
+Works read for the geothermal page and the hint figure table (2026-10-02). Not counted in the totals above. "Fetch tool" means the page was read through a page-fetch tool that returns quoted sentences; the agency sites named return only a script stub to a plain download, so no copy is in the library.
+
+### NPS_YellowstoneHydrothermal
+- Reference: National Park Service, "Hydrothermal Features", Yellowstone National Park. https://www.nps.gov/yell/learn/nature/hydrothermal-features.htm
+- Ledger ids: GEO-007, GEO-019, GEO-022, GEO-026, GEO-033, GEO-044
+- Access: open (agency page).
+- Library: saved page, `NPS_YellowstoneHydrothermal/nps.html` and `nps.txt`.
+- Read in this pass: full text read for: more than 10,000 hydrothermal features of which more than 500 are geysers; hot-spring water begins as rain; a fumarole has "so little water in its system that the water boils away before reaching the surface", steam vents as hot as 138 degC; travertine terraces form where thermal water rises through limestone; thermophiles live at specific temperatures and show gradations of colour.
+
+### NPS_YellowstoneVolcano
+- Reference: National Park Service, "Volcano", Yellowstone National Park. https://www.nps.gov/yell/learn/nature/volcano.htm
+- Ledger ids: HNT-063
+- Library: saved page, `NPS_YellowstoneVolcano/nps.txt`. Read: "the present 30- by 45-mile-wide Yellowstone Caldera" (631,000 years ago).
+
+### PaulsonIngebritsen1991
+- Reference: Paulson, K.M. and Ingebritsen, S.E. 1991. Sodium and chloride data from selected streams in the Lassen area, north-central California, and their relation to thermal-fluid discharge from the Lassen hydrothermal system. U.S. Geological Survey Water-Resources Investigations Report 90-4201. https://pubs.usgs.gov/wri/1990/4201/report.pdf
+- Ledger ids: GEO-018
+- Access: open (government report).
+- Library: `PaulsonIngebritsen1991/report.pdf` and `report.txt` (text layer).
+- Read in this pass: abstract and introduction: steam rises to discharge at 1,800 to 2,500 m, fumaroles and steam-heated acid-sulfate springs there, high-chloride springs at about 1,500 m.
+
+### WEC2013_Geothermal
+- Reference: World Energy Council, 2013. World Energy Resources: Geothermal (chapter 9). https://www.worldenergy.org/assets/images/imported/2013/10/WER_2013_9_Geothermal.pdf
+- Ledger ids: GEO-012, GEO-013
+- Access: open.
+- Library: `WEC2013_Geothermal/wec.pdf` and `wec.txt`.
+- Read in this pass: the passage saying high-temperature fields (above 180 degC) lie along plate boundaries (the Pacific ring of fire, Iceland on the Mid-Atlantic Ridge, the East African Rift Valley) and at hotspots such as Hawaii and Yellowstone.
+
+### NASAEarthFactSheet
+- Reference: NASA Space Science Data Coordinated Archive, Earth Fact Sheet. https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
+- Ledger ids: HNT-001, HNT-002, HNT-003, HNT-004
+- Library: `NASAEarthFactSheet/earthfact.html` and `earthfact.txt`. Read: mean surface gravity 9.820 m/s2, standard gravity 9.80665 m/s2 (CODATA 2018), day 24.0000 h, sidereal rotation 23.9345 h, obliquity 23.44 deg, solar irradiance 1361.0 W/m2.
+
+### NOAA_OceanFraction
+- Reference: NOAA National Ocean Service, "How many oceans are there?". https://oceanservice.noaa.gov/facts/howmanyoceans.html
+- Ledger ids: HNT-005
+- Library: `NOAA_OceanFraction/noaa.html` and `noaa.txt`. Read: the ocean "covers 71 percent of the Earth".
+
+### USGS pages read through a fetch tool (no saved copy)
+- USGS Yellowstone Volcano Observatory, "Diverse chemistry of Yellowstone's hydrothermal features" (GEO-022): silica sinter in the geyser basins, travertine at Mammoth.
+- USGS, "Alterations to go! Hydrothermal alteration in Yellowstone" (GEO-039): opal, kaolinite, alunite, pyrite; yellow, orange and red altered rhyolite.
+- USGS Hawaiian Volcano Observatory, "Volcano Watch: Many forms of sulfur are found on Kilauea Volcano", 2018 (GEO-037): SO2 + 2H2S = 3S + 2H2O; stable as a solid below 115 degC.
+- USGS Hawaiian Volcano Observatory, "Volcano Watch: How high is Mauna Loa?" (HNT-016, HNT-059): 4,170 m above sea level, flanks continue 5,000 m below.
+- USGS, "Geology of Crater Lake National Park" (HNT-062): a basin "measuring 8-by-10-km (5-by-6-mi) across and more than 1 km deep".
+
+### Seen in search summaries only (not read)
+- Hurwitz, S. and Lowenstern, J.B. 2014. Dynamics of the Yellowstone hydrothermal system. Reviews of Geophysics 52:375-411, doi 10.1002/2014RG000452 (abstract only; the publisher blocks scripted downloads). GEO-007.
+- White, D.E. 1967, mercury deposits and hot springs; the Steamboat Springs and Sulphur Bank deposits (GEO-041).
+- Etheridge et al. 1996 (HNT-050); U.S. Standard Atmosphere 1976, NASA TM-X-74335 (HNT-043); Bouvier and Wadhwa 2010, Nature Geoscience 3:637 (HNT-054).
+

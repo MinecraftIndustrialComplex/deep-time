@@ -191,7 +191,7 @@ Read in full or in part from the project's source library (not distributed):
   away before reaching the surface", steam vents reach 138 degC; travertine terraces form where
   thermal water rises through limestone; thermophiles live at specific temperatures and make
   gradations of colour.
-- `Janik_Lassen_WRI904201`: Paulson, K.M. and Ingebritsen, S.E. 1991. Sodium and chloride data from
+- `PaulsonIngebritsen1991`: Paulson, K.M. and Ingebritsen, S.E. 1991. Sodium and chloride data from
   selected streams in the Lassen area, north-central California, and their relation to thermal-fluid
   discharge from the Lassen hydrothermal system. USGS Water-Resources Investigations Report 90-4201
   (full text; abstract and introduction read): the vertical zoning of steam-heated and chloride
