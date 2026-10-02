@@ -444,6 +444,7 @@ pub fn report(
         "noddy_check": {
             "columns": check.columns,
             "columns_with_events": check.columns_with_events,
+            "columns_too_long": check.columns_too_long,
             "points": check.points,
             "worst": check.worst,
             "side_flips": check.side_flips,

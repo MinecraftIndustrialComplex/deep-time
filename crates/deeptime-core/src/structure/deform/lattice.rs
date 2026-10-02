@@ -122,6 +122,9 @@ pub struct NoddyCheck {
     /// Columns sampled, and those of them with at least one candidate event.
     pub columns: u64,
     pub columns_with_events: u64,
+    /// Columns left out of the comparison: more events than a Noddy history holds
+    /// (`deeptime_noddy::taste::MAX_EVENTS` − 1; the column rule has no such limit).
+    pub columns_too_long: u64,
     /// Lattice points compared.
     pub points: u64,
     /// The largest distance between the two restored positions, blocks, over the points where
@@ -183,7 +186,7 @@ pub fn noddy_check(
         }
         out.columns_with_events += 1;
         // The history, oldest first, in a frame centred on the column.
-        let mut history = noddy::History::new(noddy::Stratigraphy::single());
+        let mut events = Vec::with_capacity(cand.len());
         for &n in cand.iter().rev() {
             let y = match st.events[n as usize].shape {
                 Shape::Fault { y, .. } => y,
@@ -191,8 +194,19 @@ pub fn noddy_check(
             };
             // (An intrusion moves nothing: it has no Noddy event here.)
             if let Some(e) = features[n as usize].to_noddy(x, z, c, y, &profile) {
-                history.push(e);
+                events.push(e);
             }
+        }
+        // A Noddy history holds at most MAX_EVENTS − 1 events and `push` panics past that
+        // (2026-10-02: a 1000 Myr `earthlike_quick_16k` run, seed 1, ended in that panic, in this
+        // check). The check leaves such a column out and says so.
+        if events.len() >= noddy::taste::MAX_EVENTS {
+            out.columns_too_long += 1;
+            continue;
+        }
+        let mut history = noddy::History::new(noddy::Stratigraphy::single());
+        for e in events {
+            history.push(e);
         }
         let t = Instant::now();
         for (k, &y) in heights.iter().enumerate() {
