@@ -148,7 +148,10 @@ public final class ClimateSample {
 
     /**
      * Precipitation seasonality: the coefficient of variation of the monthly totals, percent
-     * (WorldClim's BIO15; 0 = even all year, above ~100 = a strong dry season).
+     * (0 = even all year, above ~100 = a strong dry season). This is the standard deviation
+     * (n - 1) of the twelve totals over their mean. WorldClim's BIO15 as written up by O'Donnell and
+     * Ignizio (2012, eq. 16) divides by the mean plus 1 mm instead, to avoid huge values where the
+     * mean is under 1 mm; the two differ by under 2 % where the mean is above 50 mm. Ledger BIO-095.
      */
     public double precipitationSeasonality() {
         double mean = pAnnual / DeepTimeClimate.MONTHS;
