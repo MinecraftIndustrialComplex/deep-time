@@ -970,7 +970,7 @@ impl StructureStage {
             .filter(|v| v.len() == n);
         // The world's own folds and faults, where it has any (P2-01).
         let structural = (from == TrapSource::Configured && p.deformation.enabled())
-            .then(|| traps::structural(&self.st.features, &src.grid));
+            .then(|| traps::structural(&self.st.features, &src.grid, p.deformation.vertical_scale));
         // Distances on the plate model's Earth-sized sphere, as `fold_belt_km` is given: the
         // orogen distance is km on the block metric (300 m a block), and a planet 16,384 blocks
         // round is about an eighth of the Earth's size on it.

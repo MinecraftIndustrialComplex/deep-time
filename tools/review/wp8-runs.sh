@@ -8,13 +8,17 @@
 #       builds the release CLI, copies it as deeptime-<name>, runs earthlike_quick_16k
 #       (scattered_continents, 500 Myr, 3 threads) into <name>-world/, then strata-check
 #       (<name>-strata.json) and structure-sections (<name>-sections/); log <name>.log.
-#       A VAR=VALUE third argument is put in the run's environment.
+#       A VAR=VALUE third argument is put in the run's environment. WP8_RUNS, WP8_START and
+#       WP8_LENGTH override the scratch folder, the start and the length (the vertical-scale task:
+#       WP8_RUNS=…/def-scale WP8_START=supercontinent WP8_LENGTH=1000).
 #   tools/remote/mac.sh -- tools/review/wp8-runs.sh gates     (fmt, clippy, deny, cargo test, gradlew)
 #   tools/remote/mac.sh --no-sync -- tools/review/wp8-runs.sh status
 #   tools/remote/mac.sh --no-sync -- tools/review/wp8-runs.sh clean
 set -euo pipefail
 
-RUNS=/Volumes/Graphide/ban/deeptime-runs/wp8
+RUNS="${WP8_RUNS:-/Volumes/Graphide/ban/deeptime-runs/wp8}"
+START="${WP8_START:-scattered_continents}"
+LENGTH="${WP8_LENGTH:-500}"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 mkdir -p "$RUNS"
 cd "$REPO"
@@ -29,7 +33,7 @@ case "${1:-}" in
             && cp target/release/deeptime '$RUNS/deeptime-$name' \
             && rm -rf '$RUNS/$name-world' '$RUNS/$name-sections' \
             && env $envs /usr/bin/time -v '$RUNS/deeptime-$name' run --preset earthlike_quick_16k \
-               --start scattered_continents --length-myr 500 --threads 3 --out '$RUNS/$name-world' $sets \
+               --start '$START' --length-myr '$LENGTH' --threads 3 --out '$RUNS/$name-world' $sets \
             && '$RUNS/deeptime-$name' strata-check --world-data '$RUNS/$name-world' > '$RUNS/$name-strata.json' \
             && '$RUNS/deeptime-$name' structure-sections --world-data '$RUNS/$name-world' \
                --out '$RUNS/$name-sections' --half 300 --px 2 \

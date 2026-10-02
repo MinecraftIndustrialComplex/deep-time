@@ -258,7 +258,12 @@ mod tests {
                     // Along the rift (north), thin, and reaching above the ground.
                     let d = f.azimuth_deg.rem_euclid(180.0);
                     assert!(d.min(180.0 - d) < 50.0, "{}", f.azimuth_deg);
-                    assert!((1.0..=2.5).contains(&f.half_across) && f.rise > 0.0);
+                    let [lo, hi] = sp.deformation.dyke_half_width_blocks;
+                    assert!((lo..=hi).contains(&f64::from(f.half_across)) && f.rise > 0.0);
+                    assert!(
+                        hi <= 1.5,
+                        "dykes no wider than 3 blocks (decisions log 2026-10-02)"
+                    );
                 }
                 k => panic!("{k:?} from intrude::emplace"),
             }
@@ -302,5 +307,71 @@ mod tests {
         sp.deformation.intrusions = 1.0;
         sp.deformation.strength = 0.0;
         assert_eq!(run(&sp, &mut none, &mut rng), 0);
+    }
+
+    /// The narrowest default dyke still crops out without a break across the middle of its
+    /// length, whatever its trend and wherever it lies between block columns: the columns where
+    /// its basalt reaches the ground form one 8-connected run. (The outcrop is 0.6 of the dyke's
+    /// width there, so below a half-width of 0.83 blocks a dyke lying along the grid between two
+    /// columns would not crop out at all.)
+    #[test]
+    fn the_narrowest_dyke_crops_out_unbroken() {
+        use std::collections::HashSet;
+        let p = DeformationParams::default();
+        let hw = p.dyke_half_width_blocks[0];
+        let (ground, floor, half_along) = (70.0, -330.0, 40.0);
+        // Three blocks either side of the middle (the outcrop is a block wide out to four).
+        let span = 0.075 * half_along;
+        for az in [0.0f32, 13.0, 30.0, 45.0, 62.0, 90.0, 117.0] {
+            for (x0, z0) in [(0.0, 0.0), (0.5, 0.0), (0.5, 0.5), (0.25, 0.7)] {
+                let mut f = blank(1, Kind::Dyke, x0, z0, 0, 0.0);
+                f.azimuth_deg = az;
+                f.half_along = half_along as f32;
+                f.half_across = hw as f32;
+                f.rise = RISE;
+                let e = f.to_baked(ground, 1, floor);
+                let Shape::Intrusion { y, half_height, .. } = e.shape else {
+                    panic!("{e:?}")
+                };
+                // The column rule's test (`deeptime_format::structure`, "Intrusion"), and how
+                // far along the dyke a column lies.
+                let at = |x: i64, z: i64| {
+                    let (a, b) = e.window.local(x as f64, z as f64, 4096.0);
+                    let r2 = (a / e.window.half_along).powi(2) + (b / e.window.half_across).powi(2);
+                    (r2 < 1.0 && y + half_height * (1.0 - r2).sqrt() >= ground, a)
+                };
+                let r = span as i64 + 3;
+                let out: HashSet<(i64, i64)> = (-r..=r)
+                    .flat_map(|i| (-r..=r).map(move |j| (i, j)))
+                    .filter(|&(i, j)| {
+                        let (hit, a) = at(i, j);
+                        hit && a.abs() <= span + 1.5
+                    })
+                    .collect();
+                let place = format!("azimuth {az} at ({x0}, {z0})");
+                // Flood from the column nearest the middle.
+                let start = *out
+                    .iter()
+                    .min_by(|p, q| at(p.0, p.1).1.abs().total_cmp(&at(q.0, q.1).1.abs()))
+                    .unwrap_or_else(|| panic!("{place}: no outcrop"));
+                let mut seen = HashSet::from([start]);
+                let mut todo = vec![start];
+                while let Some((i, j)) = todo.pop() {
+                    for di in -1..=1 {
+                        for dj in -1..=1 {
+                            let q = (i + di, j + dj);
+                            if out.contains(&q) && seen.insert(q) {
+                                todo.push(q);
+                            }
+                        }
+                    }
+                }
+                let reach = |sign: f64| seen.iter().any(|q| sign * at(q.0, q.1).1 >= span);
+                assert!(
+                    reach(1.0) && reach(-1.0),
+                    "{place}: the outcrop breaks within {span} blocks of the middle"
+                );
+            }
+        }
     }
 }
