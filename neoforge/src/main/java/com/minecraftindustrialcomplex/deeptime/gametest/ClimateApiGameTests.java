@@ -135,7 +135,7 @@ public final class ClimateApiGameTests {
         helper.assertTrue(c > 0 && c == expected, "the synthetic planet's circumference " + c + " vs its generator's " + expected);
         helper.assertTrue(deep || DeepTimeClimate.circumferenceBlocks(overworld) == 0, "a level Deep Time did not generate has no circumference");
         helper.assertTrue(DeepTimeClimate.circumferenceBlocks(null) == 0, "no level, no circumference");
-        helper.assertTrue(DeepTimeClimate.latitudeDeg(-c / 4.0, c) == 90.0 && DeepTimeClimate.latitudeDeg(c / 8.0, c) == -45.0
+        helper.assertTrue(DeepTimeClimate.latitudeDeg(-com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c), c) == 90.0 && DeepTimeClimate.latitudeDeg(c / 8.0, c) == -45.0
                         && DeepTimeClimate.latitudeDeg(0, c) == 0.0 && Double.isNaN(DeepTimeClimate.latitudeDeg(100, 0)),
                 "latitude: north is -z, the poles at |z| = C/4");
         // The year convention: month 0 starts at solar longitude 280°.
