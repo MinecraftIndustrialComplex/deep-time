@@ -9,9 +9,9 @@
 //! `calcProfile`). [`Profile::Sine`] is the exact sine the default table approximates.
 
 /// Samples over one period (`X_PROFILE_RESOLUTION`).
-pub const X_RESOLUTION: usize = 628;
+pub const X_RESOLUTION: usize = 628; // ledger: DEF-068
 /// The table's unit: a stored 100 is a profile value of 1 (`Y_PROFILE_RESOLUTION`).
-pub const Y_RESOLUTION: f64 = 100.0;
+pub const Y_RESOLUTION: f64 = 100.0; // ledger: DEF-068
 
 /// One period of a fold's (or a curved fault's) shape.
 #[derive(Clone, Debug, PartialEq)]

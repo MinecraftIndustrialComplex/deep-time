@@ -120,6 +120,187 @@ fn the_front_is_the_middle_of_the_arc_band() {
     );
 }
 
+/// A volcano of the given kind, active, 900 m tall, for the rate checks.
+fn test_volcano(kind: Kind, oceanic: bool) -> Volcano {
+    Volcano {
+        id: 0,
+        kind,
+        x: 0.0,
+        z: 0.0,
+        plate: 0,
+        oceanic,
+        silicic: !oceanic,
+        hotspot: Some(0),
+        chain: 0,
+        born_myr: 0.0,
+        dies_myr: f64::INFINITY,
+        extinct_myr: None,
+        radius_m: 30_000.0,
+        height_m: 900.0,
+        peak_m: 900.0,
+        built_m: 900.0,
+        sunk_m: 0.0,
+        kept_m: 900.0,
+        target_m: 900.0,
+        flux_last: 0.0,
+        missed: 0,
+        flux_myr: 0.0,
+        active_myr: 0.0,
+        depression: None,
+        caldera: None,
+        cause: None,
+        segment: 0,
+        gone: None,
+    }
+}
+
+/// Ben, 2026-10-02 ("Lower to Earth's range"): stratovolcanoes stand 0.6-2.0 km (was 1.2-3.0),
+/// with the basal radius 10 km (was 14) so the proportions stay. On a synthetic arc whose flux
+/// rises from the threshold to the full flux, the cones the stage would place aim at heights
+/// whose median lies within Earth's (Grosse et al. 2014, table 1: 512 stratovolcanoes, median
+/// 1.02 km, mean 1.13 km, sd 0.55 km, range 0.17-4.57 km, height to basal width median 0.13,
+/// range 0.02-0.30).
+#[test]
+fn stratovolcano_heights_fall_in_earths_range() {
+    let p = VolcanoParams::default();
+    assert_eq!(p.arc_height_km, [0.6, 2.0]);
+    assert_eq!(p.arc_radius_km, 10.0);
+    let grid = GridDesc::for_planet("L1", 16_384, 16).unwrap();
+    let (w, n) = (grid.w as usize, grid.cells());
+    let mh = 300.0;
+    // A 600-cell arc, 3 cells wide, whose flux rises along it from the threshold to 1.
+    let mut flux = vec![0.0f64; n];
+    for i in 0..600 {
+        let f = p.arc_min_flux + (1.0 - p.arc_min_flux) * i as f64 / 599.0;
+        for j in 199..202 {
+            flux[j * w + 100 + i] = f;
+        }
+    }
+    let mut occupied = Vec::new();
+    let mut rng = Rng::stream(7, "heights");
+    let born = place_arcs(
+        &grid,
+        mh,
+        &flux,
+        p.arc_min_flux,
+        p.arc_spacing_km * 1000.0,
+        &mut occupied,
+        &mut rng,
+    );
+    assert!(born.len() >= 30, "{} cones", born.len());
+    let mut heights: Vec<f64> = born
+        .iter()
+        .map(|&(_, _, c)| arc_height_km(&p, flux[c]))
+        .collect();
+    heights.sort_by(f64::total_cmp);
+    let median = heights[heights.len() / 2];
+    // Earth's median 1.02 km; the mean 1.13 km plus or minus one standard deviation, 0.55 km, is
+    // 0.58-1.68 km. The old range (1.2-3.0) put this median at 2.1 km.
+    assert!((0.58..=1.68).contains(&median), "median {median} km");
+    let (lo, hi) = (heights[0], heights[heights.len() - 1]);
+    assert!(
+        lo >= 0.17 && hi <= 4.57,
+        "{lo}-{hi} km against Earth's 0.17-4.57"
+    );
+    // The tallest cone's height to basal width (the radius at the top of the range, doubled):
+    // inside Earth's 0.02-0.30 and within 10 % of the proportion the old defaults had (3 km over
+    // 28 km).
+    let ratio = p.arc_height_km[1] / (2.0 * p.arc_radius_km);
+    assert!((0.02..=0.30).contains(&ratio), "{ratio}");
+    assert!((ratio / (3.0 / 28.0) - 1.0).abs() < 0.10, "{ratio}");
+}
+
+/// Ben, 2026-10-02 ("About 1 per Myr"): a continental hotspot's silicic centre collapses into a
+/// caldera at about one per Myr while it is active (Christiansen 2001: three caldera-forming
+/// eruptions at Yellowstone in about 1.5 Myr). A collapse ends the centre, and the hotspot
+/// builds a new one, so a hotspot active for N Myr makes about N calderas: here one centre at a
+/// time, renewed after each collapse, through the stage's own decision (`caldera_erupts`), in
+/// steps of 0.05 Myr.
+#[test]
+fn a_continental_hotspot_makes_about_one_caldera_per_myr() {
+    let p = VolcanoParams::default();
+    assert_eq!(p.hotspot_caldera_rate_per_myr, 1.0);
+    let (dt, myr) = (0.05, 300.0);
+    let mut rng = Rng::stream(3, "hotspot-calderas");
+    let mut centre = test_volcano(Kind::Silicic, false);
+    let mut calderas = 0;
+    for _ in 0..(myr / dt) as usize {
+        if let Some(summit) = caldera_erupts(&centre, &p, dt, &mut rng) {
+            assert!(
+                !summit,
+                "a continental centre collapses to a rim, not a summit pit"
+            );
+            calderas += 1;
+            centre = test_volcano(Kind::Silicic, false);
+        }
+    }
+    // Expected 300 x (1 - e^-0.05) / 0.05 = 293, standard deviation 17: 240-360 is three sigma.
+    assert!(
+        (240..=360).contains(&calderas),
+        "{calderas} calderas in {myr} Myr"
+    );
+    // Arc calderas are unchanged at 0.04 per Myr: a silicic stratovolcano, same exposure.
+    let mut arc = test_volcano(Kind::Strato, false);
+    arc.silicic = true;
+    let mut rng = Rng::stream(3, "arc-calderas");
+    let n_arc = (0..(myr / dt) as usize)
+        .filter(|_| caldera_erupts(&arc, &p, dt, &mut rng).is_some())
+        .count();
+    // Not renewed: 300 Myr at 0.04 per Myr is 12 eruptions' worth of exposure, the old
+    // continental-hotspot rate (0.12) would give about 36.
+    assert!((4..=24).contains(&n_arc), "{n_arc} arc eruptions");
+    // A shield under 4 km never collapses, whatever the rates.
+    let shield = test_volcano(Kind::Shield, true);
+    let mut rng = Rng::stream(3, "shield");
+    assert!((0..2000).all(|_| caldera_erupts(&shield, &p, dt, &mut rng).is_none()));
+}
+
+/// Ben, 2026-10-02 ("Set it to 0, keep the setting"): the default island subsidence is 0, so the
+/// volcano stage leaves a dead oceanic volcano's height to the plate's flexure and the ageing
+/// ocean floor; the setting still sinks it when asked, up to its maximum.
+#[test]
+fn island_subsidence_defaults_to_nothing_and_the_setting_still_works() {
+    let mut p = VolcanoParams::default();
+    assert_eq!(p.island_subsidence_m_myr, 0.0);
+    let grid = GridDesc::for_planet("L1", 16_384, 16).unwrap();
+    let n = grid.cells();
+    let elev = vec![-3000.0f32; n];
+    let island = |extinct: bool| {
+        let mut v = test_volcano(Kind::Shield, true);
+        v.radius_m = 20_000.0;
+        v.extinct_myr = extinct.then_some(10.0);
+        v
+    };
+    let run = |p: &VolcanoParams, steps: usize| {
+        let mut l1 = L1 {
+            grid: &grid,
+            mh: 300.0,
+            cell_m: 300.0 * 16.0,
+            delta: vec![0.0; n],
+            elev: &elev,
+        };
+        let mut vs = vec![island(true), island(false)];
+        for _ in 0..steps {
+            sink_dead_islands(&mut vs, &mut l1, p, 2.0);
+        }
+        (vs, l1.delta)
+    };
+    let (vs, delta) = run(&p, 100);
+    assert!(vs.iter().all(|v| v.sunk_m == 0.0));
+    assert!(
+        delta.iter().all(|&d| d == 0.0),
+        "the default changes the surface"
+    );
+    // The setting: 25 m/Myr for 100 steps of 2 Myr would be 5 km; the maximum stops it at 1.5 km,
+    // and only the dead volcano sinks.
+    p.island_subsidence_m_myr = 25.0;
+    let (vs, delta) = run(&p, 100);
+    assert_eq!(vs[0].sunk_m, p.island_subsidence_max_m);
+    assert_eq!(vs[1].sunk_m, 0.0);
+    let deepest = delta.iter().fold(0.0f32, |m, &d| m.min(d));
+    assert!((-1500.0..=-1000.0).contains(&deepest), "{deepest}");
+}
+
 fn pipeline_json(n: u32, myr: f64, seed: u64) -> String {
     let json = with_timeline(
         planet_builtin("pipeline_quick_16k").unwrap(),
@@ -243,6 +424,12 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
         st.counts.shield_born + st.counts.silicic_born > 0,
         "{:?}",
         st.counts
+    );
+
+    // The default island subsidence is 0 (Ben, 2026-10-02): no volcano of the run has sunk.
+    assert!(
+        st.volcanoes.iter().chain(&st.gone).all(|v| v.sunk_m == 0.0),
+        "the volcano stage sank an island under the defaults"
     );
 
     // Active stratovolcanoes last saw enough arc flux and have grown.

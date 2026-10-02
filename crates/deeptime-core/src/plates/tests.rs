@@ -623,6 +623,149 @@ fn arcs_build_a_cordillera() {
     );
 }
 
+/// The life cycle of the collision states over a run (`shortening.rs`): checked after every step
+/// and against the dynamics record at the end.
+#[derive(Default)]
+struct CollisionLives {
+    /// By (subducting plate, overriding plate, onset step): the shortening last seen.
+    states: BTreeMap<(u32, u32, u64), f64>,
+    /// The most steps a state has lived.
+    longest: u64,
+}
+
+impl CollisionLives {
+    fn step(&mut self, st: &PlateState) {
+        for c in &st.contacts {
+            assert!(c.speed_count_km >= 0.0);
+            let Some(col) = &c.collision else { continue };
+            assert!(
+                col.onset_step >= c.onset_step,
+                "a collision before its contact"
+            );
+            assert!(col.onset_step <= col.last_step && col.last_step <= st.step);
+            assert!((col.onset_myr - col.last_myr) <= 1e-9 && col.last_myr <= st.t_myr + 1e-9);
+            assert!(col.shortening_km >= 0.0 && col.area_km2 >= 0.0);
+            assert!(
+                col.onset_convergence_mm_yr >= shortening::BEGIN_MM_YR,
+                "a collision begins converging"
+            );
+            assert!(col.peak_convergence_mm_yr >= col.convergence_mm_yr);
+            assert!(col.front_km > 0.0 && col.peak_front_km >= col.front_km);
+            assert!((0.0..=1.0).contains(&col.continental_over));
+            assert_eq!(
+                col.later_convergence_mm_yr.is_some(),
+                col.last_myr - col.onset_myr >= shortening::SLOWDOWN_AFTER_MYR - 1e-9
+            );
+            let (at, normal) = (
+                DVec3::from_array(col.centroid),
+                DVec3::from_array(col.normal),
+            );
+            assert!((at.length() - 1.0).abs() < 1e-9);
+            assert!(normal.length() < 1.0 + 1e-9 && normal.dot(at).abs() < 1e-9);
+            // Shortening never falls while the state lives, and a state is one life: its onset
+            // never moves.
+            let seen = self
+                .states
+                .entry((c.under, c.over, col.onset_step))
+                .or_insert(0.0);
+            assert!(col.shortening_km >= *seen - 1e-12, "shortening fell");
+            *seen = col.shortening_km;
+            self.longest = self.longest.max(st.step - col.onset_step + 1);
+        }
+    }
+
+    /// Every collision state ended exactly once: in a transfer or weld (a collision record that
+    /// carries the state's onset) or without one (a parting record; the run's end closes those
+    /// still under way).
+    fn finish(&self, st: &PlateState, d: &dynamics::Dynamics) {
+        assert!(st.contacts.is_empty(), "the run's end closes every contact");
+        assert!(st.counters.collision_onsets > 0);
+        let with_state = d
+            .collisions
+            .iter()
+            .filter(|c| c.onset_convergence_mm_yr.is_some())
+            .count();
+        assert_eq!(
+            (with_state + d.partings.len()) as u32,
+            st.counters.collision_onsets
+        );
+        assert!(self.states.len() as u32 <= st.counters.collision_onsets);
+        assert!(
+            self.longest >= 2,
+            "no collision state outlived its first step"
+        );
+        for r in &d.partings {
+            assert!(r.end_myr >= r.start_myr && r.start_myr >= r.contact_onset_myr - 1e-9);
+            assert!(r.shortening_km >= 0.0 && r.area_km2 >= 0.0 && r.front_km > 0.0);
+            assert!(r.peak_convergence_mm_yr > 0.0);
+            assert!(matches!(
+                r.reason.as_str(),
+                dynamics::PARTED
+                    | dynamics::REVERSED
+                    | dynamics::CLOSED
+                    | dynamics::EMPTIED
+                    | dynamics::OPEN
+            ));
+        }
+        for c in &d.collisions {
+            assert!(c.end_myr >= c.start_myr && c.start_myr >= c.contact_onset_myr - 1e-9);
+            match c.onset_convergence_mm_yr {
+                // A collision of a state: it began converging, and what crossed its front is
+                // its shortening times a front.
+                Some(v) => {
+                    assert!(v > 0.0);
+                    assert_eq!(c.front_shortening_km > 0.0, c.area_km2 > 0.0);
+                }
+                // No state (only while the pre-task-2 count fires): a collision of one step.
+                None => {
+                    assert_eq!(c.start_myr, c.end_myr);
+                    assert_eq!((c.front_shortening_km, c.area_km2), (0.0, 0.0));
+                }
+            }
+        }
+        // A belt record per collision that had a state, with its convergence at the onset.
+        let belts = d
+            .collisions
+            .iter()
+            .filter(|c| c.collision && c.onset_convergence_mm_yr.is_some())
+            .count();
+        assert_eq!(d.belts.len(), belts);
+        for b in &d.belts {
+            assert!(b.convergence_onset_mm_yr.is_some_and(|v| v > 0.0));
+            assert!(b.wedge_width_km.is_none() && b.foredeep_width_km.is_none());
+        }
+    }
+}
+
+/// With `tectonics.collision_on_shortening` on, a transfer or weld fires only on real shortening:
+/// every collision record ends a collision state that shortened by the threshold, however fast
+/// the plates slid; the states' life cycle holds; and collisions still happen.
+#[test]
+fn collisions_on_real_shortening_fire_at_the_threshold() {
+    let mut p = preset(8000, 300.0, "supercontinent", 21);
+    p.tectonics.collision_on_shortening = true;
+    let mut life = CollisionLives::default();
+    let world = run_stage(&p, |_, _, st| {
+        assert!(stats::summary(st).partition_ok);
+        life.step(st);
+    });
+    let st = world.plates.as_ref().unwrap();
+    let d = st.dynamics.as_ref().unwrap();
+    life.finish(st, d);
+    assert!(!d.collisions.is_empty(), "no transfer or weld in 300 Myr");
+    assert_eq!(d.collisions.len() as u32, st.counters.accretions);
+    for c in &d.collisions {
+        assert!(c.onset_convergence_mm_yr.is_some(), "fired with no state");
+        assert!(
+            c.front_shortening_km >= p.tectonics.collision_threshold_km,
+            "fired at {} km of shortening",
+            c.front_shortening_km
+        );
+    }
+    // Some collision took longer than a step to get there.
+    assert!(d.collisions.iter().any(|c| c.end_myr > c.start_myr));
+}
+
 /// The dynamics record (`dynamics.rs`) is measurement only: a run with it and a run without it
 /// end in the same world (crust, elevation, plate ids, events, fields), and the record agrees with
 /// the run's own counters and events.
@@ -631,10 +774,12 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     let p = preset(8000, 300.0, "supercontinent", 21);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
+    let mut life = CollisionLives::default();
     let (mut arc_cells_seen, mut mix_seen) = (0u64, 0.0f64);
     let mut deaths_before = 0;
     let mut prev_omega: BTreeMap<u32, glam::DVec3> = BTreeMap::new();
     let with = run_stage(&p, |stage, _, st| {
+        life.step(st);
         let d = st.dynamics.as_ref().expect("recording is on by default");
         let step = d.steps.last().expect("a record per step");
         assert_eq!(d.steps.len() as u64, st.step);
@@ -795,7 +940,17 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
         d.collisions.iter().any(|c| c.sutured),
         "no suture in 300 Myr: the collision record is untested"
     );
+    life.finish(st, d);
     for c in &d.collisions {
+        // The built-in presets still fire on the count used before task 2 (relative speed ×
+        // time): `tectonics.collision_on_shortening` is off.
+        assert!(!p.tectonics.collision_on_shortening);
+        assert!(
+            c.counted_km >= p.tectonics.collision_threshold_km,
+            "fired at {} km",
+            c.counted_km
+        );
+        assert!(c.front_shortening_km >= 0.0 && c.area_km2 >= 0.0);
         assert!(c.end_myr >= c.start_myr && c.start_myr >= c.contact_onset_myr - 1e-9);
         assert!(c.lifted100.samples <= c.lifted10.samples);
         assert!(c.peak_uplift_m >= 0.0 && c.shortening_km >= 0.0);
@@ -818,6 +973,7 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     let back: dynamics::Dynamics = serde_json::from_value(note["dynamics"].clone()).unwrap();
     assert_eq!(back.steps.len(), d.steps.len());
     assert_eq!(back.collisions.len(), d.collisions.len());
+    assert_eq!(back.partings.len(), d.partings.len());
     assert!(note["margins"].is_array());
 
     // The same run without the record ends in the same world.
