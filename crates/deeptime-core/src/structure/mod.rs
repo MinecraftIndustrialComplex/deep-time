@@ -730,6 +730,11 @@ impl StructureStage {
         let dist = traps::orogen_distance_km(d, src.regime, src.crust, flags);
         let halite = self.tables.halite;
         let p = &self.p;
+        // Impact structures (P2-08): the closure the impact stage found at its craters.
+        let craters = fields
+            .get(crate::surface::impacts::field::TRAP)
+            .map(|f| f.data.as_slice())
+            .filter(|v| v.len() == n);
         (0..n)
             .into_par_iter()
             .map(|c| {
@@ -742,6 +747,7 @@ impl StructureStage {
                     f64::from(dist[c]),
                     p,
                 )
+                .max(craters.map_or(0.0, |v| v[c]))
             })
             .collect()
     }

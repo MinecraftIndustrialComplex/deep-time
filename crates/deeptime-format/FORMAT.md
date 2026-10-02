@@ -875,7 +875,8 @@ not placed in a Deep Time level
 
 `{"classes": ["sandstone", "red_bed", "granite"]}` — index → rock class id (plan §5.4.1,
 `deeptime:rock/<class>` tags). The vocabulary is the rock-tag README's 60 classes (`diamictite`,
-lithified till, added 2026-09-30); a reader maps indices through this file, never through a fixed
+lithified till, added 2026-09-30) plus `impact_breccia` and `impact_melt` (the rocks of meteorite
+impacts, added for P2-08 on 2026-10-01), 62 in all; a reader maps indices through this file, never through a fixed
 list, so a class added to the vocabulary changes no bytes a reader depends on.
 
 ## `spawn/candidates.json`
@@ -1212,9 +1213,9 @@ survives in, the finished folder. The manifest's `notes.run.history` reports wha
   (or the content bundle's) essentials. `crates/deeptime-core/tests/presets/deposits_world_{4k,16k}.json`
   are the GameTest and smoke worlds.
 - All: a three-horizon strata placeholder on L1 (`notes.strata`); with `--strata every-class`
-  (P1-12) eight horizons 10 blocks apart holding all 60 rock classes, horizon h of L1 cell column
-  i having class (6·i + h) mod 60, so any ten neighbouring cell columns show every class at
-  h ≥ 2 (`notes.strata.class_rule`). Horizon h spans the keys 4096·h … 4096·h + 4095 in every
+  (P1-12) eight horizons 10 blocks apart holding all 62 rock classes, horizon h of L1 cell column
+  i having class (6·i + h) mod 62, so any eleven neighbouring cell columns show every class at
+  h ≥ 2 (six consecutive classes per column; 11 × 6 = 66 ≥ 62) (`notes.strata.class_rule`). Horizon h spans the keys 4096·h … 4096·h + 4095 in every
   cell, so the column rule correlates the synthetic stacks by index (and mixes the neighbouring
   cell columns' classes in as thin tongues). `--strata basin`: a readable sedimentary basin, the
   same in every cell — sandstone, shale, sandstone, mudstone, limestone, shale, sandstone and shale

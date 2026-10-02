@@ -1,0 +1,29 @@
+{
+  "class": "impact_breccia",
+  "family": "special_host",
+  "groups": [
+    "deeptime:rock/special"
+  ],
+  "density_kg_m3": 2300,
+  "erodibility": 1.6,
+  "diffusivity": 1.4,
+  "metamorphic_path": [
+    "schist",
+    "gneiss"
+  ],
+  "weathers_to": "clay",
+  "facies_rule": "impact",
+  "tags": [
+    "reservoir",
+    "porous",
+    "ore_host"
+  ],
+  "vanilla_fallback": "minecraft:cobblestone",
+  "sources": {
+    "density_kg_m3": "judgment: suevite and polymict lithic breccia are porous, about 2000-2500 kg/m3 (Ries suevite, Popigai); rounded to 10 kg/m³; set with the impact craters (P2-08, 2026-10-01)",
+    "erodibility": "judgment, relative to granite: a clast-rich, weakly welded breccia with altered glass: weaker than sandstone's well-cemented beds but with strong clasts; bedrock ranked by rock strength: river incision scales roughly with tensile strength^-2 (Sklar & Dietrich 2001, Geology 29(12):1087–1090) and lithologic K contrasts span orders of magnitude (Stock & Montgomery 1999, JGR 104(B3):4983–4993); the strength-based contrast is compressed to its square root, so bedrock spans about 0.3–4; set with the impact craters (P2-08, 2026-10-01)",
+    "diffusivity": "judgment, relative to granite: friable matrix that breaks down to a stony, clayey regolith; hillslope transport coefficient D of Roering, Kirchner & Dietrich 1999 (WRR 35(3):853–870), used as a linear creep multiplier and scaled by how readily the rock makes mobile soil (soil production function, Heimsath et al. 1997, Nature 388:358–361): loose and friable classes 2–5, soft sedimentary 1.2–2, crystalline 0.5–1; set with the impact craters (P2-08, 2026-10-01)",
+    "vanilla_fallback": "last fallback entry (MIC rock-tag README, Fallbacks table)"
+  },
+  "notes": "Impact breccia: suevite (melt-bearing polymict breccia) and lithic breccia filling and surrounding impact craters, and their proximal ejecta (the Ries suevite, long mapped as a volcanic tuff; the Onaping Formation at Sudbury). Porous and fractured, so a petroleum reservoir where sealed (Ames, Red Wing Creek). Stand-in: cobblestone, angular fragments in a matrix."
+}

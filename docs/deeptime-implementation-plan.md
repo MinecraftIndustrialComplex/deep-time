@@ -114,7 +114,8 @@ they are until P0-01; afterwards use the §1.2 table.
     hydrology), `ore_genesis_modeling.md` (deposits, sizing, schema), `runtime_packaging_options.md`
     (natives, determinism, servers), `player_demand_prior_art.md` (market context only).
 12. `/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md` — the rock
-    classes (59 there; Deep Time ships 60 since `diamictite`, decisions log 2026-09-30), the tag
+    classes (60 there; Deep Time ships 62: `impact_breccia` and `impact_melt` were added for P2-08 on
+    2026-10-01), the tag
     vocabulary and the `rock_states` format.
 
 Items 6–9 and 11 are research notes, in `/home/greencheetah/Projects/mic/Docs/research_notes/Geologic
@@ -132,7 +133,7 @@ history worldgen mod/` until P0-01 and in `docs/research/notes/` after it.
 | **Staging** | `<gamedir>/deeptime/staging/<session-uuid>/`, where the Create World screen writes world data before the world folder exists (§7.12). |
 | **Event log** | The shared, append-only record of what happened, where, when and why (§5.5). Feeds the timelapse, "Why here?" and a later legends view; the civ module appends to it. |
 | **Site / site registry** | A site is one fixed-by-generation resource location (deposit, reservoir, placer) with extent, grade, type and forming event. The registry is the list plus a spatial index and a Java API (§5.6). |
-| **Rock class** | One of the 60 lithologies in the rock-tag vocabulary (`diamictite`, lithified till, joined on 2026-09-30), e.g. `granodiorite`, `black_shale`. The simulation decides classes; tags decide blocks (§5.4). |
+| **Rock class** | One of the 62 lithologies in the rock-tag vocabulary (`diamictite`, lithified till, joined on 2026-09-30; `impact_breccia` and `impact_melt`, the rocks of meteorite impacts, on 2026-10-01 for P2-08), e.g. `granodiorite`, `black_shale`. The simulation decides classes; tags decide blocks (§5.4). |
 | **Rock group** | A union tag of classes, e.g. `deeptime:rock/carbonate`. |
 | **Stand-in / fallback** | A look-alike block used when a class has no member block: the first *installed* entry of `deeptime:rock_fallback/<class>` (never a random one). |
 | **Unclassified crust** | `minecraft:stone` and `minecraft:deepslate`, used where the simulation has no lithology opinion. Not a class. |
@@ -862,8 +863,8 @@ serialises the registries' contents through their codecs into one JSON document 
 }
 ```
 
-Deep Time ships definitions for all 60 classes of the vocabulary (59, plus `diamictite` for lithified
-till: decisions log 2026-09-30) in
+Deep Time ships definitions for all 62 classes of the vocabulary (59, plus `diamictite` for lithified
+till: decisions log 2026-09-30, and `impact_breccia` and `impact_melt` for P2-08, 2026-10-01) in
 `/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md` in its own jar
 (`neoforge/src/main/resources/data/deeptime/deeptime/rock_class/`). The numeric properties are
 relative multipliers the erosion and structure stages consume; their values are tuning parameters

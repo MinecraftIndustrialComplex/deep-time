@@ -72,6 +72,9 @@ pub struct WorldState {
     /// The volcano catalogue (P1-21), once the volcano stage has started; the amplifier shapes
     /// the edifices from it.
     pub volcanoes: Option<crate::surface::volcanoes::VolcanoState>,
+    /// The crater catalogue (P2-08), once the impact stage has started; the amplifier shapes the
+    /// craters from it.
+    pub impacts: Option<crate::surface::impacts::ImpactState>,
     /// The deposit engine's field history recorded by the history stages (P1-04 on). Not in the
     /// postcard body: a checkpoint carries its head in the body and its frames in sections of
     /// their own, streamed (`checkpoint.rs`), since frames may be on disk (P1-17).
@@ -97,6 +100,7 @@ impl WorldState {
             plates: None,
             surface: None,
             volcanoes: None,
+            impacts: None,
             history: None,
             next_event_seq: 0,
             next_site_id: 0,
