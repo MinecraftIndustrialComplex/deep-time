@@ -39,11 +39,18 @@ def count():
             continue
         prefix = name[:-3]
         c = {k: 0 for k in PRIMARY + FLAGS + ["merged", "rows"]}
+        seen = set()
         with open(os.path.join(LEDGER, name), encoding="utf-8") as f:
             for line in f:
                 m = ROW.match(line)
                 if not m or m.group(1) != prefix:
                     continue
+                # Two branches adding rows at once have taken the same next id; refuse to count until
+                # one is renumbered (and its `// ledger:` comments with it).
+                rid = line.split("|")[1].strip()
+                if rid in seen:
+                    sys.exit(f"claims_counts: {rid} appears twice in ledger/{name}: renumber one")
+                seen.add(rid)
                 cell = status_cell(line)
                 marks = re.findall(r"`([a-z-]+)`", cell) or re.findall(r"[a-z]+(?:-[a-z]+)*", cell)
                 if "merged" in marks:
