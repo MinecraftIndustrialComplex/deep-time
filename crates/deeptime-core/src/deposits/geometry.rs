@@ -534,7 +534,13 @@ mod tests {
         let sc = Scales::default();
         let b1 = bodies_for(t, 1, 240.0e6, &grades, &place, &sc, &mut next);
         let b2 = bodies_for(&rich, 1, 240.0e6, &grades, &place, &sc, &mut next);
-        let d = |b: &[Body]| b[0].zones.iter().find(|z| z.name == "potassic_core").unwrap().density;
+        let d = |b: &[Body]| {
+            b[0].zones
+                .iter()
+                .find(|z| z.name == "potassic_core")
+                .unwrap()
+                .density
+        };
         assert!(d(&b2) > d(&b1));
     }
 
