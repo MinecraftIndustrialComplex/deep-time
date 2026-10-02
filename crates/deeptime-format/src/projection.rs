@@ -22,6 +22,11 @@
 //! - **Map pictures** of the whole planet span the grid: x linear in longitude from the seam, y
 //!   linear in z from the north pole; aspect 2 : 1 ([`Projection::picture_height`]).
 //!
+//! The spatial indexes of the world data (the river tiles, the structure buckets, the site index,
+//! the playability regions) keep a fixed frame from z = −C/4 over C/2 rows of their own cells: it
+//! is a frame for lookups, not geography, and covers the world of any projection whose poles lie
+//! within it ([`Projection::pole_z`] ≤ C/4).
+//!
 //! The projection is a game choice (ledger SCL-049).
 
 /// Block space ↔ sphere for one planet.

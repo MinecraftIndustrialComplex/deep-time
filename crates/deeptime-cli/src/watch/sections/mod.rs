@@ -387,8 +387,9 @@ fn section_reply(run: &Run, query: &str) -> Reply {
     let s = &m.scale;
     let point = |p: (i64, i64)| {
         let wx = world.cw.wrap_x(p.0);
-        json!({ "x": p.0, "z": p.1, "lat": -360.0 * p.1 as f64 / c as f64,
-                "lon": 360.0 * (wx as f64 + c as f64 / 2.0) / c as f64 })
+        let proj = deeptime_format::Projection::of(c as f64);
+        json!({ "x": p.0, "z": p.1, "lat": proj.lat_deg(p.1 as f64),
+                "lon": proj.lon_deg(wx as f64) })
     };
     // The bodies the section crosses, with what they are.
     let mut ids: Vec<u32> = sec
