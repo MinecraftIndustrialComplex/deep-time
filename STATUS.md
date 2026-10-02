@@ -165,7 +165,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   (Sonnet) did the fetching; their extracts were spot-checked against the library text (Cruden eq. 1, Daly table 4-1).
 - **Gates** (test VM): `cargo fmt --check` clean; clippy `-D warnings` clean; `cargo test --workspace` all suites ok, 0
   failed (core lib 489 passed, 3 ignored); `cargo deny check licenses bans` ok; `./gradlew build test` 226 tests, 0 failures,
-  1 skipped. GameTests (the task asked for them because pluton bodies changed): `./gametest.sh` all 68 required tests passed (481 s); MICGT
+  1 skipped. GameTests (the task asked for them because pluton bodies changed): `./gametest.sh` all 68 required tests passed (481 s); `./gametest.sh -PwithMic` (`tools/smoke/install.sh mic`, 168 mods, MIC rock tags added) all 68 required tests passed (the ssh session dropped at the end; the VM log shows the pass).
 - **Next step.** Ben's answers to the four questions; then the value changes (each re-opens a calibration) in one small branch.
   Left for others: WP-3 owns the per-class erodibility and diffusivity (RCK-010); the IMP owner should look at the suevite
   caveat; DEF-042 (stock radius) is WP-8's.
