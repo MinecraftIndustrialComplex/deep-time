@@ -39,6 +39,9 @@ known duplicates are listed below. De-duplicating across sections is a stage 2 t
 
 475 entries (a work cited in two subsystems is counted twice).
 
+Thirteen more entries were added with the flexure feature on 2026-10-02, in their own section at
+the end ("Lithospheric flexure"). The three tables below count stage 1's 475 only.
+
 By access:
 
 | | Sources |
@@ -4208,9 +4211,9 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Turcotte, D. L., Schubert, G. Geodynamics. Cambridge University Press (editions 1982, 2002, 2014).
 - DOI or URL: none; Internet Archive copy (geodynamics0000turc) is lending-only (HTTP 401).
 - Cited as: "Turcotte & Schubert, Geodynamics" (flexure; gross slab pull "not confirmed").
-- Ledger ids: 183, 193.
+- Ledger ids: 183, 193; ISO-040, ISO-041, ISO-042, ISO-067.
 - Access: book (not online).
-- Read so far (by the project): not read; gross slab pull "not confirmed in Turcotte & Schubert itself".
+- Read so far (by the project): not read; gross slab pull "not confirmed in Turcotte & Schubert itself". For the flexure feature (2026-10-02) a sub-agent read chapter 3 as a PDF (https://sseh.uchicago.edu/doc/Geodynamics_Turcotte_Schubert_ch_3.pdf: E = 70 GPa and ν = 0.25 in the periodic-loading example, 100 GPa elsewhere) and the flexure formulas in lecture notes on the chapter (https://topex.ucsd.edu/geodynamics/12flexure.pdf); the edition of that PDF was not recorded.
 - Read in this pass: not fetched; a 2024 paper that cites it was read (see Li2024).
 - Reference check: edition not stated anywhere in the code or designs; the numbers depend on the edition and chapter.
 
@@ -4968,3 +4971,140 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 
 ---
 
+## Lithospheric flexure (ISO-040 to ISO-067)
+
+Added with the feature (build log 2026-10-02, "General lithospheric flexure"). Every record below
+was checked against Crossref by a Sonnet sub-agent of the flexure agent on 2026-10-02; "Read so far" says what was
+read of the work itself. `TurcotteSchubert_Geodynamics` (Plate tectonics section) is the other
+source of this feature: its chapter 3 was read as a PDF for ISO-041 and ISO-042, and through
+lecture notes for ISO-040 and ISO-067.
+
+### Calmant1990
+- Reference: Calmant, S., Francheteau, J., Cazenave, A. (1990). Elastic layer thickening with age of the oceanic lithosphere: a tool for prediction of the age of volcanoes or oceanic crust. Geophysical Journal International 100(1):59-67.
+- DOI or URL: 10.1111/j.1365-246X.1990.tb04567.x; full text https://horizon.documentation.ird.fr/exl-doc/pleins_textes/pleins_textes_5/b_fdi_31-32/34824.pdf
+- Cited as: "Calmant, Francheteau & Cazenave 1990"
+- Ledger ids: ISO-048.
+- Access: open copy.
+- Read so far (by the project): full text by a Sonnet sub-agent of the flexure agent on 2026-10-02: "Te (km) = (2.7 +- 0.15) sqrt(t (Ma))", a weighted regression of 38 seamount estimates; rheology prediction 3.3 (wet) to 4.3 (dry).
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct.
+
+### Watts1978
+- Reference: Watts, A. B. (1978). An analysis of isostasy in the world's oceans 1. Hawaiian-Emperor Seamount Chain. Journal of Geophysical Research 83(B12):5989-6004.
+- DOI or URL: 10.1029/JB083iB12p05989
+- Cited as: "Watts 1978"
+- Ledger ids: ISO-056 (and the comment of ISO-048).
+- Access: paywalled (abstract visible).
+- Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: Te 20-30 km along the chain, "corresponds closely to the 450 +- 150 C isotherm".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct. That a load keeps the elastic thickness of its time of loading is how the abstract is commonly summarised; the paper body was not read.
+
+### WattsTenBrink1989
+- Reference: Watts, A. B., ten Brink, U. S. (1989). Crustal structure, flexure, and subsidence history of the Hawaiian Islands. Journal of Geophysical Research 94(B8):10473-10500.
+- DOI or URL: 10.1029/JB094iB08p10473
+- Cited as: "Watts & ten Brink 1989"
+- Ledger ids: ISO-049.
+- Access: paywalled (abstract visible).
+- Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: a good fit with Te = 40 km, "higher than expected for 80 m.y. oceanic lithosphere".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct. The arch's distance and height, often attributed to it, were not confirmed.
+
+### Wessel1993
+- Reference: Wessel, P. (1993). A reexamination of the flexural deformation beneath the Hawaiian Islands. Journal of Geophysical Research 98(B7):12177-12190.
+- DOI or URL: 10.1029/93JB00523
+- Cited as: docs/design/flexure.md section 11
+- Ledger ids: none (context for ISO-049).
+- Access: paywalled (abstract visible).
+- Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: Te 35 km away from the load, 25 km under it.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct.
+
+### BurovDiament1995
+- Reference: Burov, E. B., Diament, M. (1995). The effective elastic thickness (Te) of continental lithosphere: What does it really mean? Journal of Geophysical Research 100(B3):3905-3927.
+- DOI or URL: 10.1029/94JB02770
+- Cited as: "Burov & Diament 1995"
+- Ledger ids: ISO-050.
+- Access: paywalled (abstract visible).
+- Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: 70-90 km for cratons, 10-20 km at the low end; thermotectonic age is one of at least three controls (with crust-mantle decoupling and plate curvature).
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct. The model uses the age control only.
+
+### PerezGussinyeWatts2005
+- Reference: Pérez-Gussinyé, M., Watts, A. B. (2005). The long-term strength of Europe and its implications for plate-forming processes. Nature 436:381-384.
+- DOI or URL: 10.1038/nature03854
+- Cited as: docs/design/flexure.md section 11
+- Ledger ids: none (context for ISO-050).
+- Access: paywalled (abstract on Europe PMC).
+- Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: mean Te above 60 km for lithosphere of 1.5 Gyr and older, under 30 km for younger.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct.
+
+### Lu2024
+- Reference: Lu, Z., Audet, P., Li, C.-F., Zhang, J., Li, S. (2024). Strength of continental lithosphere governed by the time since the last orogeny. Earth and Planetary Science Letters 643:118894.
+- DOI or URL: 10.1016/j.epsl.2024.118894
+- Cited as: "Lu et al. 2024"
+- Ledger ids: ISO-051, ISO-052.
+- Access: paywalled.
+- Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02 (on the authors' group page; the publisher's page was blocked): continental Te from 5 to about 140 km, mean 50 km, governed by the time since the last orogeny.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: record confirmed in Crossref. It gives no recovery law in the abstract: the exponential and its 300 Myr are not from it.
+
+### KarnerWatts1983
+- Reference: Karner, G. D., Watts, A. B. (1983). Gravity anomalies and flexure of the lithosphere at mountain ranges. Journal of Geophysical Research 88(B12):10449-10477.
+- DOI or URL: 10.1029/JB088iB12p10449
+- Cited as: docs/design/flexure.md section 11
+- Ledger ids: none (context for ISO-050, ISO-055).
+- Access: paywalled (abstract visible).
+- Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: Te 80-100 km for the Himalaya's foreland, 25-50 km for the Alps, 80-130 km for the Appalachians.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct.
+
+### LyonCaenMolnar1983
+- Reference: Lyon-Caen, H., Molnar, P. (1983). Constraints on the structure of the Himalaya from an analysis of gravity anomalies and a flexural model of the lithosphere. Journal of Geophysical Research 88(B10):8171-8191.
+- DOI or URL: 10.1029/JB088iB10p08171
+- Cited as: "Lyon-Caen & Molnar 1983"
+- Ledger ids: ISO-055.
+- Access: paywalled (abstract visible).
+- Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: flexural rigidity about 0.7e25 N m under the Ganga basin and Lesser Himalaya, 0.1 to 1.0e23 N m beneath the Greater Himalaya.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct. It is evidence for a stiff foreland beside a weak belt, not for a break along every plate boundary.
+
+### BrotchieSilvester1969
+- Reference: Brotchie, J. F., Silvester, R. (1969). On crustal flexure. Journal of Geophysical Research 74(22):5240-5252.
+- DOI or URL: 10.1029/JB074i022p05240
+- Cited as: "Brotchie & Silvester 1969"
+- Ledger ids: ISO-067.
+- Access: paywalled.
+- Read so far (by the project): not read; the point-load formula was read as quoted in Wickert 2016 (eq. 5-6, full text) by a Sonnet sub-agent of the flexure agent on 2026-10-02.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: record correct.
+
+### Wickert2016
+- Reference: Wickert, A. D. (2016). Open-source modular solutions for flexural isostasy: gFlex v1.0. Geoscientific Model Development 9(3):997-1017.
+- DOI or URL: 10.5194/gmd-9-997-2016
+- Cited as: docs/design/flexure.md section 11
+- Ledger ids: ISO-067.
+- Access: open access (the paper is CC-BY; the code is GPL-3).
+- Read so far (by the project): the paper's full text by a Sonnet sub-agent of the flexure agent on 2026-10-02, for the point-load formula and the licence. The code was not opened and nothing is ported.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct.
+
+### WieczerkowskiMitrovicaWolf1999
+- Reference: Wieczerkowski, K., Mitrovica, J. X., Wolf, D. (1999). A revised relaxation-time spectrum for Fennoscandia. Geophysical Journal International 139(1):69-86.
+- DOI or URL: 10.1046/j.1365-246X.1999.00924.x
+- Cited as: docs/design/flexure.md sections 7 and 11
+- Ledger ids: ISO-064.
+- Access: open (publisher page).
+- Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: relaxation times "close to 3-5 kyr".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct.
+
+### DeCellesGiles1996_flexure
+- Reference: DeCelles, P. G., Giles, K. A. (1996). Foreland basin systems. Basin Research 8(2):105-123. (Also `DeCellesGiles1996` in the Plate tectonics section, where stage 1 saw the abstract only.)
+- DOI or URL: 10.1046/j.1365-2117.1996.01491.x; full text https://pages.uoregon.edu/rdorsey/BasinAnalysis/BasinPapers/DeCelles%20&%20Giles%201996.pdf
+- Cited as: docs/design/flexure.md section 11
+- Ledger ids: none (the acceptance figures of docs/design/plate-force-balance.md).
+- Access: open copy.
+- Read so far (by the project): full text by a Sonnet sub-agent of the flexure agent on 2026-10-02: "Foredeep depozones are typically 100-300 km wide and 2-8 km thick"; forebulges 60-470 km wide and a few tens to a few hundred metres high, as a flexural prediction.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct; this settles what stage 1 could not see.
