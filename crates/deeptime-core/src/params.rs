@@ -590,12 +590,12 @@ impl Default for TectonicParams {
             continental_erosion_mm_yr: 0.03,
             sediment_accretion_mm_yr: 0.3,
             subduction_uplift_mm_yr: 0.6,
-            collision_threshold_km: 300.0,
+            collision_threshold_km: 100.0,
             subduction_peak_km: 300.0,
             collision_belt_km: 400.0,          // ledger: PLT-228
             collision_stacking_share: 0.5,     // ledger: PLT-229
             wedge_slope_deg: 1.5,              // ledger: PLT-192
-            collision_resistance_mm_yr: 100.0, // ledger: PLT-232
+            collision_resistance_mm_yr: 200.0, // ledger: PLT-232
             weld_speed_mm_yr: 5.0,             // ledger: PLT-233
             weld_after_myr: 10.0,              // ledger: PLT-233
             slab_pull_rad_per_1000km_myr: 0.002,

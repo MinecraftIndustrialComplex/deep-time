@@ -299,7 +299,7 @@ pub fn collide(
             lifted10: most(belt.lifted10),
             lifted100: most(belt.lifted100),
             emerged: most(belt.emerged),
-            belt: super::belts::footprint(&belt, norm.model_km),
+            belt: super::belts::footprint(&belt, col.as_ref().map_or(0.0, |c| c.peak_front_km)),
             under_born_myr: under_plate.born_myr,
             under_parent: under_plate.parent,
         };

@@ -71,11 +71,11 @@
 
 use std::collections::BTreeMap;
 
-use glam::{DQuat, DVec3};
+use glam::DVec3;
 
 use super::Env;
 use super::geometry::{Geo, dijkstra};
-use super::kinematics::{arr, quat, rotation, tangent, to_group};
+use super::kinematics::{quat, tangent, to_group};
 use super::pools::ISOSTATIC_FACTOR;
 use super::shortening::{Front, normal_convergence};
 use super::state::{Belt, CONTINENTAL, OROGENY_HIMALAYAN, PlateState, pool};
@@ -148,21 +148,14 @@ pub fn stack(
     let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
     for c in 0..state.contacts.len() {
         let (under, over) = (state.contacts[c].under, state.contacts[c].over);
-        let omega_over = DVec3::from_array(state.plates[over as usize].omega);
-        let Some(col) = state.contacts[c].collision.as_mut() else {
+        let Some(col) = state.contacts[c].collision.as_ref() else {
             continue;
         };
-        // The belt's frame turns with the overriding plate, by the rotation of this step.
-        col.belt.frame = arr((rotation(omega_over, env.dt_yr) * quat(col.belt.frame)).normalize());
         let Some(f) = fronts.get(&c) else { continue };
         if col.last_step != env.step || f.samples < MIN_CONTACT {
             continue;
         }
-        let (conv, normal, frame) = (
-            col.convergence_mm_yr,
-            DVec3::from_array(col.normal),
-            quat(col.belt.frame).inverse(),
-        );
+        let (conv, normal) = (col.convergence_mm_yr, DVec3::from_array(col.normal));
         let step = stack_front(
             state,
             geo,
@@ -174,7 +167,6 @@ pub fn stack(
                 over,
                 conv,
                 normal,
-                frame,
             },
             f,
             flexure,
@@ -193,12 +185,8 @@ pub fn stack(
         b.lifted100 = b.lifted100.max(step.lifted100);
         b.emerged = b.emerged.max(step.emerged);
         b.weight += step.weight;
-        for a in 0..3 {
-            b.sum[a] += step.sum[a];
-        }
-        for a in 0..6 {
-            b.second[a] += step.second[a];
-        }
+        b.across_sum += step.across_sum;
+        b.across_sq += step.across_sq;
         if applied.height_m >= b.peak_height_m {
             b.peak_height_m = applied.height_m;
             b.peak_step = env.step;
@@ -217,8 +205,6 @@ struct Side {
     over: u32,
     conv: f64,
     normal: DVec3,
-    /// Mantle frame → the belt's frame.
-    frame: DQuat,
 }
 
 /// One front's stacking, and what the belt's record gains.
@@ -228,8 +214,8 @@ struct FrontStep {
     lifted100: u32,
     emerged: u32,
     weight: f64,
-    sum: [f64; 3],
-    second: [f64; 6],
+    across_sum: f64,
+    across_sq: f64,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -371,8 +357,18 @@ fn stack_front(
         mix[pool::METAMORPHIC] = 1.0;
     }
 
-    let mut rises: Vec<(usize, f64, bool)> =
-        wedge.iter().map(|&(i, x)| (i, fill * x, true)).collect();
+    let mut rises: Vec<(usize, f64, bool)> = wedge
+        .iter()
+        .map(|&(i, x)| (i, fill * x, true))
+        .collect();
+    // Signed distance from the front, km: in front (the wedge) positive, behind negative.
+    let across = |i: usize, in_wedge: bool| {
+        if in_wedge {
+            norm.km(d_under[i])
+        } else {
+            -norm.km(d_over[i])
+        }
+    };
     if belt_weight > 0.0 && belt_rise_km2_m > 0.0 {
         rises.extend(
             belt.iter()
@@ -390,8 +386,8 @@ fn stack_front(
         lifted100: 0,
         emerged: 0,
         weight: 0.0,
-        sum: [0.0; 3],
-        second: [0.0; 6],
+        across_sum: 0.0,
+        across_sq: 0.0,
     };
     let stamp_m = OROGENY_MIN_M_PER_MYR * env.dt_myr;
     for (i, raw, in_wedge) in rises {
@@ -424,23 +420,11 @@ fn stack_front(
             let at = pos[i];
             s.fold = to_group(rot, tangent(at, side.normal).normalize_or_zero());
         }
-        // Where the collision raised ground, weighted by how much, in the belt's own frame.
-        let p = side.frame * pos[i];
+        // Where the collision raised ground across the front, weighted by how much.
+        let x = across(i, in_wedge);
         out.weight += dz;
-        for a in 0..3 {
-            out.sum[a] += dz * p[a];
-        }
-        let q = [
-            p.x * p.x,
-            p.y * p.y,
-            p.z * p.z,
-            p.x * p.y,
-            p.x * p.z,
-            p.y * p.z,
-        ];
-        for (s, x) in out.second.iter_mut().zip(q) {
-            *s += dz * x;
-        }
+        out.across_sum += dz * x;
+        out.across_sq += dz * x * x;
     }
 
     // The belt's height after the step: its mean above the sea within half its width, and its
@@ -546,7 +530,10 @@ pub fn resist(state: &PlateState, omega: &mut [DVec3], env: &Env, relax: f64, fr
         } else {
             1.0
         };
-        let r = k.collision_resistance_mm_yr * (col.belt.relief_m.max(0.0) / h_s) * reach;
+        // The belt's height above sea level, or its relief over the ground it was built on where
+        // that was lower (a belt raised from a submarine edge).
+        let h = col.belt.height_m.max(col.belt.relief_m).max(0.0);
+        let r = k.collision_resistance_mm_yr * (h / h_s) * reach;
         let (at, normal) = (
             DVec3::from_array(col.centroid),
             DVec3::from_array(col.normal),
@@ -571,43 +558,19 @@ pub fn resist(state: &PlateState, omega: &mut [DVec3], env: &Env, relax: f64, fr
     }
 }
 
-/// The belt's extent from its uplift-weighted moments, km on a sphere of `radius_km`: length and
-/// width as `dynamics::Moments` gives them (exact for a uniform strip), but from the spread in the
-/// plane tangent to the sphere at the belt's mean position. In three dimensions a long belt that
-/// follows the sphere's curve also spreads towards the centre (its sagitta: 880 km for a belt of
-/// 60° of arc), which would read as width.
-pub fn footprint(b: &Belt, radius_km: f64) -> super::dynamics::Footprint {
-    let mut f = super::dynamics::Footprint {
-        samples: 0,
-        ..Default::default()
-    };
+/// The belt's extent: its length is the front's (`length_km`, the longest it was), its width
+/// √(12·variance) of where it rose across the front, weighted by the uplift (belt and wedge
+/// together; exact for a uniform strip, and unaffected by how the front curves).
+pub fn footprint(b: &Belt, length_km: f64) -> super::dynamics::Footprint {
+    let mut f = super::dynamics::Footprint::default();
     if b.weight <= 0.0 {
         return f;
     }
-    let w = b.weight;
-    let mu = [b.sum[0] / w, b.sum[1] / w, b.sum[2] / w];
-    let c = [
-        b.second[0] / w - mu[0] * mu[0],
-        b.second[1] / w - mu[1] * mu[1],
-        b.second[2] / w - mu[2] * mu[2],
-        b.second[3] / w - mu[0] * mu[1],
-        b.second[4] / w - mu[0] * mu[2],
-        b.second[5] / w - mu[1] * mu[2],
-    ];
-    let cov = glam::DMat3::from_cols(
-        DVec3::new(c[0], c[3], c[4]),
-        DVec3::new(c[3], c[1], c[5]),
-        DVec3::new(c[4], c[5], c[2]),
-    );
-    let m = DVec3::from_array(mu).normalize_or_zero();
-    let p = glam::DMat3::IDENTITY - glam::DMat3::from_cols(m * m.x, m * m.y, m * m.z);
-    let t = p * cov * p;
-    let [l1, l2, _] = super::dynamics::eigenvalues([
-        t.x_axis.x, t.y_axis.y, t.z_axis.z, t.y_axis.x, t.z_axis.x, t.z_axis.y,
-    ]);
-    if l2 > 0.0 {
-        f.length_km = (12.0 * l1).sqrt() * radius_km;
-        f.width_km = (12.0 * l2).sqrt() * radius_km;
+    let mean = b.across_sum / b.weight;
+    let var = (b.across_sq / b.weight - mean * mean).max(0.0);
+    f.width_km = (12.0 * var).sqrt();
+    if f.width_km > 0.0 {
+        f.length_km = length_km;
     }
     f
 }
@@ -829,7 +792,7 @@ mod tests {
         let belt = &st.contacts[0].collision.as_ref().unwrap().belt;
         assert!(belt.peak_height_m > 1500.0, "{}", belt.peak_height_m);
         // The shape: along the front (6,670 km of it) and narrow across it.
-        let f = footprint(belt, fx.norm.model_km);
+        let f = footprint(belt, st.contacts[0].collision.as_ref().unwrap().peak_front_km);
         assert!(f.length_km > 4000.0, "{f:?}");
         assert!(f.width_km < 800.0, "{f:?}");
         assert!(f.elongation() > 6.0, "{f:?}");

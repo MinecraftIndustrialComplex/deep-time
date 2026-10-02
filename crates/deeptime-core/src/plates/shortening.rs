@@ -364,10 +364,7 @@ pub fn step_collision(
             normal: [0.0; 3],
             continental_over: 0.0,
             stalled_since_myr: None,
-            belt: super::state::Belt {
-                frame: [0.0, 0.0, 0.0, 1.0],
-                ..Default::default()
-            },
+            belt: super::state::Belt::default(),
         });
     }
     let c = collision.as_mut().expect("set above");
