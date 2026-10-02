@@ -160,7 +160,25 @@ with `--start scattered_continents --length-myr 1000` on master 29d493f (before)
 branch (after), 2026-10-02, `deeptime run … --threads 4`. Sites are deposits placed in the world;
 counted are survivors within the assessment depth; target is N\*.
 
-AFTER_TABLE
+| Type | Sites before | Sites after | Counted before / after | Target N\* before / after | Permissive area before / after, km² |
+|---|---|---|---|---|---|
+| porphyry Cu-Mo-Au | 14 | 17 | 9 / 9 | 5.8 / 13.5 (capped: 8.2 expected) | 32,434 / 76,185 |
+| supergene Cu blanket (child) | 1 | 2 | – | – | – |
+| placer Au (child) | 31 | 97 | – | – | – |
+| banded iron formation | **0** | **412** | 0 / 165 | 0 / 97.1 (capped: 41.1 expected) | 0 / 2,428,339 |
+| coal seam field | 79 | 53 | 51 / 32 | 59.1 / 38.2 | 422,047 / 272,509 |
+| MVT Zn-Pb | 107 | 93 | 40 / 39 | 38.8 / 31.9 | 775,958 / 638,263 |
+| sedex Zn-Pb | 2 | 6 | 0 / 0 | 0.24 / 1.01 | 4,705 / 20,223 |
+| petroleum trap | 10 | 10 | 10 / 10 | 8.2 / 8.1 | 40,863 / 40,640 |
+| impact types (Ni-Cu-PGE, hydrothermal, diamond, basin U) | 0, 22, 1, 17 | 0, 44, 0, 25 | – | – | – |
+
+The two runs are not the same history: the fixes change the strata (no coal facies before the
+Devonian), which changes erosion, and the runs are not bit-reproducible. The impact types, which
+the fixes do not touch, show the size of that run-to-run variation (hydrothermal sites 22 against
+44). Two changes are the fixes' own: **banded iron formation** goes from none to 412 sites (2.4
+million km² of stable continental interior becomes permissive, and its target of 97 survivors is
+capped because only 2.1 % of what forms survives within 1 km), and **coal** loses the first 581
+Myr of the run: its permissive area falls by a third and its target from 59 to 38 fields.
 
 **Earth figures read in stage 2**, for comparison with what a planet holds:
 
@@ -227,7 +245,7 @@ AFTER_TABLE
 ## Open questions
 
 - **How much banded iron formation.** With inherited iron formation in every stable interior, the
-  1,000 Myr run above forms BIF_SITES banded iron formation sites. Whether to keep the whole stable
+  1,000 Myr run above forms 412 banded iron formation sites (165 counted within 1 km), against 17 porphyries. Whether to keep the whole stable
   interior as permissive, limit it, or wait for a plate model that dates crust is an owner
   question (STATUS.md, "Pending questions").
 - **The richness setting** does not reach the blocks (owner question pending since 2026-10-01).
