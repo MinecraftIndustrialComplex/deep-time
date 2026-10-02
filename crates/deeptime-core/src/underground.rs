@@ -424,7 +424,10 @@ mod tests {
             ),
         ] {
             let e = bad.validate().unwrap_err();
-            assert!(e.to_string().contains(&format!("$.underground.{key}")), "{e}");
+            assert!(
+                e.to_string().contains(&format!("$.underground.{key}")),
+                "{e}"
+            );
         }
     }
 }

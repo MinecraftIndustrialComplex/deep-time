@@ -21,7 +21,7 @@ import java.util.List;
  *       than tall and a few blocks thick, stacked tens of blocks apart and growing with depth, joined by
  *       dike-like conduit segments, down to a basal lens that straddles the lava floor; set in a body of
  *       altered hot rock (the <b>mush</b>, {@link Body#mush}). Sizes follow the volcano's kind, basal
- *       radius and activity (ledger MAG-043 to MAG-062);</li>
+ *       radius and activity (ledger MAG-043 to MAG-056);</li>
  *   <li>a <b>magma chamber</b>: an ellipsoid of lava whose top lies {@code magma_chamber_depth_km}
  *       under the crater floor. Its radius is a tenth of the volcano's basal radius (1.2 to 4.5 km)
  *       times {@code magma_chamber_size}, its half-height a fifth of that radius. Heights are drawn
