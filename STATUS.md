@@ -159,7 +159,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   Nuccio2003_DDS69B_ch4, Dubiel2003_DDS69B_ch5, USGS2000b_DDS60chapters, AbramowitzStegun1964, Smolinski2014, Hancox2014,
   BohacsSuter1997, RyerLanger1980, ICS2023; files added to Singer2009 (the report's database), Cooke2005 (author's copy),
   BAP2018 (nine pages), Trippi2011 (the full report).
-- **Gates** (test machine): GATES_LINE
+- **Gates** (test machine, after merging master 412d517): `cargo fmt --check` clean; clippy `-D warnings` clean;
+  `cargo test --workspace` 684 passed, 0 failed, 3 ignored (the history-cap test now runs without BIF: inherited BIF at its
+  count_mult 40 made the deposit stage, not the history, the peak); `cargo deny check licenses bans` ok; `./gradlew build
+  test` 226 tests, 0 failures, 1 skipped; `./gametest.sh`, `-PwithMic` (168 mods) and `-PwithEv`: all 68 required tests
+  passed in each.
 - **Next step.** The owner answers the BIF question; then set the inherited-BIF extent and re-measure on the same preset.
 ### 2026-10-02 — Science documentation, stage 2, WP-2: volcanoes and magma checked against sources (agent worktree agent-a44828926d2eaecb7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What.** Every VOL and MAG row's source and status revised (`docs/science/ledger/VOL.md`, `MAG.md`); the page
