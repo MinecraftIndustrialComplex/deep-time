@@ -70,16 +70,24 @@ them in from [_template.md](_template.md).
 | [provinces.md](provinces.md) | stub | PRV |
 | [world-scale-and-bake.md](world-scale-and-bake.md) | stub | SCL, BAK |
 | [pole-cap.md](pole-cap.md) | stub | POL |
-| [geothermal-features.md](geothermal-features.md) | stub; feature not on master | GEO |
+| [geothermal-features.md](geothermal-features.md) | stub; rows written in stage 2 (WP-0) | GEO |
+
+Four ledgers have no page of their own; their rows belong with the pages of the subsystems they touch
+(added in stage 2, package WP-0): PRS (presets other than `earthlike_quick_16k`, the test presets and the
+in-game world presets), HNT (the editor's hint texts), CRE (constants in the plate geometry, noise, plate
+state and deformation lattice code) and CHK (the `plate-check` target ranges).
 
 Other files here:
 
 - [claims.md](claims.md): the ledger. Every physical constant, law, threshold, rate and
   calibration target in the code, with its source and status. Its rows are in `ledger/`, one file per
   subsystem. It ends with the verification plan for stage 2.
-- [bibliography.md](bibliography.md): every source the code relies on, with its full reference and
-  how it has been read so far. [bibliography-research-notes.md](bibliography-research-notes.md)
-  lists the further sources the research notes and designs cite.
+- [bibliography.md](bibliography.md): every source the code relies on, one entry per work, with its
+  full reference, how it has been read so far, and whether the project's source library (a folder of
+  open copies kept off the repository, never distributed) holds a readable copy.
+  [bibliography-research-notes.md](bibliography-research-notes.md) lists the further sources the
+  research notes and designs cite; mentions that are the same work as a bibliography entry carry
+  `[= Key]`, the rest are marked `[unresolved]`.
 - [spot-checks.md](spot-checks.md): what stage 1 found when it tried to read 403 values in their
   sources (176 matched, 134 in part, 19 did not, 74 could not be read). Leads for stage 2, not
   verification.
@@ -100,6 +108,7 @@ Every ledger row carries exactly one of these.
 | `calibrated` | The value was tuned until a run matched a target. The row names the target and where the target's Earth figure comes from. |
 | `game-choice` | Deliberately not physical, for playability or looks. The row says why and who decided: Ben, with the date in the decisions log, or an agent, with the build-log entry. |
 | `uncited` | No source is given anywhere. |
+| `merged` | Retired in stage 2 as a duplicate of another row, which now owns the claim. The row says which; it is not counted. |
 
 Two further marks can follow the status:
 

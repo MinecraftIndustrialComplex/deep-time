@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [world-scale-and-bake.md](../world-scale-and-bake.md). Extraction notes with flags: [extraction-notes/SCL.md](../extraction-notes/SCL.md).
 
-Rows: 51. By status: `cited-unverified` 6, `calibrated` 1, `game-choice` 37, `uncited` 7.
+Rows: 50 (1 further rows are `merged` into other rows and not counted: see the status table in claims.md). By status: `cited-unverified` 6, `calibrated` 1, `game-choice` 37, `uncited` 6.
 
 Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent. Nothing here has been checked against its source. Paths are relative to the repository root; line numbers are left out on purpose.
 

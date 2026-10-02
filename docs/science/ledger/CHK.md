@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks).
 
-Rows: 57. By status: `uncited` 29, `cited-unverified` 10, `abstract-only` 7, `from-memory` 2, `game-choice` 9. Of these, `pending-rewrite` 3 (CHK-050, CHK-052, CHK-056) and `not-yet-coded` 4 (CHK-037 to CHK-040).
+Rows: 57. By status: `cited-unverified` 10, `from-memory` 2, `abstract-only` 7, `game-choice` 9, `uncited` 29.
 
 Added in stage 2, package WP-0 (2026-10-02), by reading the code as it stood on master 1aa0579 (stage 1 had not
 covered it). Nothing here has been checked against its source. Paths are relative to the repository root; line

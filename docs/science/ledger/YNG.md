@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [young-landscape-and-amplifier.md](../young-landscape-and-amplifier.md). Extraction notes with flags: [extraction-notes/HYD.md](../extraction-notes/HYD.md).
 
-Rows: 21. By status: `cited-unverified` 1, `game-choice` 9, `uncited` 11.
+Rows: 19 (2 further rows are `merged` into other rows and not counted: see the status table in claims.md). By status: `game-choice` 9, `uncited` 10.
 
 Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent. Nothing here has been checked against its source. Paths are relative to the repository root; line numbers are left out on purpose.
 

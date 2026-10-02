@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [glacial-landforms.md](../glacial-landforms.md). Extraction notes with flags: [extraction-notes/AMP.md](../extraction-notes/AMP.md).
 
-Rows: 66. By status: `cited-unverified` 20, `from-memory` 1, `calibrated` 1, `game-choice` 26, `uncited` 18.
+Rows: 64 (2 further rows are `merged` into other rows and not counted: see the status table in claims.md). By status: `cited-unverified` 20, `from-memory` 1, `calibrated` 1, `game-choice` 25, `uncited` 17.
 
 Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent. Nothing here has been checked against its source. Paths are relative to the repository root; line numbers are left out on purpose.
 
