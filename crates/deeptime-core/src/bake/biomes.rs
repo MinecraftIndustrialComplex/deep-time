@@ -38,9 +38,12 @@
 //! drives the ocean biomes.
 //!
 //! **Vegetation** (humidity, 5 bands) from the aridity index P/PET — 0.03, 0.2, 0.5, 1, 2, 5 →
-//! 0 … 5 on a log scale (UNEP's hyper-arid | arid | semi-arid | dry sub-humid | humid) — held
-//! inside each class's range: BW ≤ 0.95 (the driest band), BS 1.05 … 1.95, Af ≥ 4.1 (jungle),
-//! Am ≥ 3.2, Aw/As and Cs squeezed into 1.05 … 2.5 (savanna, plains, open forest), the
+//! 0 … 5 on a log scale — held inside each class's range. The first three anchors are UNEP's limits
+//! of hyper-arid | arid | semi-arid (Zomer et al. 2022, Table 1, quoting UNEP 1997; ledger BIO-038).
+//! UNEP's dry sub-humid | humid limit is 0.65, which is not an anchor; the anchors 1, 2 and 5 are
+//! this mapping's own (a game choice, ledger BIO-100). The ranges: BW ≤ 0.95 (the driest band),
+//! BS 1.05 … 1.95, Af ≥ 4.1 (jungle), Am ≥ 3.2, Aw/As squeezed into 1.05 … 2.55 and Cs into
+//! 1.05 … 2.5 (savanna, plains, open forest), the
 //! subarctic D (Dsc, Dsd, Dwc, Dwd, Dfc, Dfd) ≥ 3.05 (taiga), other C/D ≥ 2.05, ET ≤ 1.95 (no
 //! trees: vanilla picks snowy taiga at the frozen band's third humidity band as a variant, and grove on
 //! its slopes). EF is the exception (P/PET is pinned at 10 below freezing, so the index says
@@ -287,6 +290,9 @@ pub(super) fn unit(v: f64) -> f64 {
 }
 
 /// Temperature band coordinate of a sea cell (from its surface temperature).
+///
+/// ledger: BIO-036, BIO-087. The −2 °C anchor is where sea ice begins: seawater of typical salinity
+/// freezes at about −2 °C (a game-choice use of a physical value); 6, 18 and 25 °C are game choices.
 pub fn thermal_sea(t_mean: f64) -> f64 {
     piecewise(
         &[
@@ -301,7 +307,7 @@ pub fn thermal_sea(t_mean: f64) -> f64 {
     )
 }
 
-/// Without the climate stage: the band coordinate of a mean temperature.
+/// Without the climate stage: the band coordinate of a mean temperature (ledger: BIO-037, game choice).
 pub fn thermal_plain(t_mean: f64) -> f64 {
     piecewise(
         &[
@@ -317,6 +323,9 @@ pub fn thermal_plain(t_mean: f64) -> f64 {
 }
 
 /// The aridity index's band coordinate before the class's range.
+///
+/// ledger: BIO-038 (anchors 0.03, 0.2, 0.5 are UNEP's hyper-arid, arid and semi-arid limits);
+/// BIO-100 (anchors 1, 2, 5 are a game choice, not UNEP's; UNEP's humid class starts at 0.65).
 pub fn humidity_of_aridity(aridity: f64) -> f64 {
     let x = aridity.max(1e-4).ln();
     piecewise(
