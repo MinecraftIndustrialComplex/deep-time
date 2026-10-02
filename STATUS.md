@@ -383,6 +383,49 @@ Branch `worktree-agent-a7e713f9fdd326fb4`, master e8668ca merged in (then 5e601d
   - *Gates* (test VM): fmt, clippy `-D warnings`, deny clean; `cargo test --workspace` core 476 + 3 ignored, cli 54, format 63, inspect 31 + 2 + 7, jni 7, viewer 6, history_cap 1; `./gradlew build test` tests=226 failures=0 skipped=1; `./gametest.sh` 68 of 68, `-PwithMic` 68 of 68, `-PwithTerraBlender` 68 of 68, all mixins bound. The Distant Horizons 3.3.1 caution did not show: the MIC profile's far-terrain tests passed (the mod set is the one `install.sh mic` installed from the pack's pin at the time of the run).
 - **Next.** Ben's answers on the orogen thresholds and region size (Pending); P1-11's review page could show province names; the plate model's collision frequency and back-arc halo are the real orogen-share lever (P1-27 follow-up).
 
+### 2026-10-02 — Science documentation, stage 2, WP-1: meteor impacts checked against their sources and corrected (agent worktree agent-a4f9bb12ed1f8797a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Ask.** The coordinator's work package WP-1 ("check everything, fix the code"). Sources read on the test VM
+  (`/Volumes/Graphide/ban/deeptime-sources/_incoming/`, never committed): Collins, Melosh & Marcus 2005, Davison &
+  Collins 2007, Hughes 2000, Grieve 1987 (OCR layer); Pike 1980 and 1985, Bland & Artemieva 2006, Moore et al. 1974,
+  Wood & Head 1976, Grieve & Cintala 1992 (ADS scans, read by tesseract OCR). Not obtainable: Grieve & Shoemaker 1994
+  (book; its rate read as quoted by Hughes 2000), Neukum et al. 2001, Le Feuvre & Wieczorek 2011, Alexopoulos &
+  McKinnon 1994, Fernandes & Dietrich 1997, Roering et al. 1999 (refused to scripts), Culling, Soderblom, Herrick.
+- **Ledger.** 141 rows: before `cited-unverified` 14, `from-memory` 34, `abstract-only` 3, `game-choice` 47, `uncited` 43;
+  after `verified` 43, `abstract-only` 6, `cited-unverified` 9, `from-memory` 6, `game-choice` 65, `uncited` 12.
+- **Code changed, each with a test that fails on the old value** (`surface/impacts/scaling.rs` tests):
+  - complex-crater depth 0.294 D^0.301 km to 0.4 D^0.3 km (CMM05 eq. 28, p. 824; 27 % too shallow: 0.72 to 0.98 km at 20 km);
+    tests `complex_craters_are_as_deep_as_equation_28`, `the_papers_worked_examples_come_out` (Table 6: 1.2, 23.7, 186 km);
+  - the production function below 20 km: it carried the 1.8 slope of large craters down to 2 km (63 times the rate at
+    20 km); now Hughes 2000's rates (12.0, 9.5, 6.5, 3.46 × 10⁻¹⁵ for D > 2.4, 5, 12, 20 km) give the shape, the level at 20 km
+    stays Grieve & Shoemaker's 5.6 × 10⁻¹⁵; 2-km craters are 3.7 times the 20-km rate, so 17 times fewer small craters
+    (0.158 per Myr on the 16k planet, was 2.7); test `the_production_function_follows_the_record`;
+  - the ocean rule: the straight line to zero at 6.3 impactor diameters (fitted to an abstract) is now Davison &
+    Collins's eq. 3 (final diameter 1 − 0.14 R of the dry one), no crater at R ≥ 8, and a resurge feature, not a crater,
+    for a dry-complex crater at R > 3.5; `sea_cutoff_ratio` default 6.3 to 8 in all presets; test
+    `the_sea_follows_davison_and_collins` (compares with their Table 2);
+  - editor hints (impact rate off by a factor of a million; ocean, speed, density, Vredefort, size slope, diffusivity),
+    the ni-Cu-PGE deposit note (170 km to 110 and 210 km), equation numbers in comments, ledger ids beside the constants;
+  - `planet_world_4k.json` flux 40 to 700 so the GameTest planet keeps its crater count (328 craters, 186 showing);
+    the pipeline tests' fluxes raised in the same proportion.
+- **Not changed (game choices, labelled in the ledger and on the page):** `depth_scale` 0.5 (IMP-130), `max_crater_km` 300
+  (IMP-015), the 2-km minimum (IMP-013), flux 1 (IMP-006, IMP-140), the 40x test-planet rate now 700x (IMP-139), the
+  larger-of-two diameter law (IMP-033), stand-in blocks, deposit placeholders.
+- **Re-measured** (`tools/review/impacts-census.sh`; quick 16k, 500 Myr, scattered continents, seed 1,
+  `structure.deformation.density=0` because seed 1 panics in the structure stage ("a history holds at most 128 events"),
+  master 1eac09f with general flexure; before = that master, after = with this branch; test VM, ~14.5 min each, 2 runs
+  side by side): craters formed 548 to 45 (by size 425/80/33/5/4/1 to 13/11/12/8/1/0), stopped by the sea 754 to 30,
+  catalogue at the end 105 to 5, showing 19 to 2, fresh/degraded/buried/roots 10/9/69/17 to 2/0/3/0, deposit sites
+  nickel/hydrothermal/diamond/basin-U 0/18/0/16 to 0/14/0/15. Comparison with the Earth Impact Database (via the
+  Wikipedia list, 71 structures ≥ 2 km under 130 Myr): the known fraction of the production function's craters is 0.13 to
+  0.39 at every size (about a fifth), against 0.002 at 2 to 5 km before.
+- **Gates** (test VM, on the branch with master 026725e merged): `cargo fmt --check` clean; clippy `-D warnings` clean;
+  `cargo test --workspace` all pass (core 490 passed, 3 ignored; cli 54; format 63); `cargo deny check licenses bans` ok;
+  `./gradlew build test` BUILD SUCCESSFUL, tests=226 failures=0 skipped=1;
+  `./gametest.sh` and `./gametest.sh -PwithMic` (168 mods, 160 linked): all 68 required tests passed in both; `aCraterIsABowlOverBreccia`: 328 craters, 186 showing.
+- **Open for Ben** (STATUS.md pending questions; the rate one is stronger now): the default rate, since a default planet now shows ~2 craters.
+- **Found elsewhere, not fixed:** the structure stage panics on seed 1 (above); `docs/science/impacts.md` "Open questions".
+- **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/wp1-impacts/` deleted at the end.
+
 ### 2026-10-02 — General lithospheric flexure in the surface stage (agent worktree agent-afae960b6db068f94, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Why.** Ben, decisions log 2026-10-02: "General flexure everywhere": every load bends the crust (belts, volcanic
   islands, ice, sediment), not only collision forelands. Design and measurements: `docs/design/flexure.md` (written
