@@ -58,6 +58,28 @@ case "${1:-}" in
         setsid nohup sh -c "$cmd echo CENSUS-DONE > '$RUNS/census.done'" > /dev/null 2>&1 < /dev/null &
         echo "census started pid $!"
         ;;
+    gametests)
+        # ./gametest.sh, -PwithMic (the MIC set reinstalled first) and -PwithEv, detached, under the
+        # server lock (mac.sh's protocol); logs gametest-{plain,mic,ev}.log, then gametests.done.
+        # Run from mac.sh with --pack, without --server.
+        LOCK="${DEEPTIME_CACHE:-/Volumes/Graphide/ban/deeptime-cache}/server.lock"
+        rm -f "$RUNS/gametests.done"
+        setsid nohup bash -c "
+            while ! mkdir '$LOCK' 2>/dev/null; do
+                age=\$(( \$(date +%s) - \$(stat -c %Y '$LOCK' 2>/dev/null || date +%s) ))
+                [ \$age -gt 10800 ] && rm -rf '$LOCK' && continue
+                sleep 30
+            done
+            basename '$REPO' > '$LOCK/owner'
+            trap \"rm -rf '$LOCK'\" EXIT
+            ./gametest.sh > '$RUNS/gametest-plain.log' 2>&1; a=\$?
+            tools/smoke/install.sh mic > '$RUNS/install-mic.log' 2>&1
+            ./gametest.sh -PwithMic > '$RUNS/gametest-mic.log' 2>&1; b=\$?
+            ./gametest.sh -PwithEv > '$RUNS/gametest-ev.log' 2>&1; c=\$?
+            echo \"plain=\$a mic=\$b ev=\$c\" > '$RUNS/gametests.done'
+        " > /dev/null 2>&1 < /dev/null &
+        echo "gametests started pid $!"
+        ;;
     status)
         for l in "$RUNS"/*.log; do [ -e "$l" ] && { echo "== $l"; tail -3 "$l"; }; done
         ;;
