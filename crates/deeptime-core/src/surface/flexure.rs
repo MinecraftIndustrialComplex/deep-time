@@ -866,6 +866,25 @@ impl Solver {
     }
 }
 
+/// `passes` passes of the binomial filter (1, 2, 1)/4 along x (wrapping) and y (the edge rows
+/// mirrored), in place.
+fn binomial(v: &mut [f64], w: usize, h: usize, passes: usize) {
+    let mut tmp = vec![0.0; v.len()];
+    for _ in 0..passes {
+        tmp.par_chunks_mut(w).zip(v.par_chunks(w)).for_each(|(out, row)| {
+            for i in 0..w {
+                out[i] = 0.25 * row[(i + w - 1) % w] + 0.5 * row[i] + 0.25 * row[(i + 1) % w];
+            }
+        });
+        v.par_chunks_mut(w).enumerate().for_each(|(j, out)| {
+            let (n, s) = (j.saturating_sub(1), (j + 1).min(h - 1));
+            for i in 0..w {
+                out[i] = 0.25 * tmp[n * w + i] + 0.5 * tmp[j * w + i] + 0.25 * tmp[s * w + i];
+            }
+        });
+    }
+}
+
 /// The mean of each `f` × `f` block of `v` (w × h).
 fn restrict(v: &[f64], w: usize, f: usize) -> Vec<f64> {
     if f == 1 {
@@ -933,6 +952,10 @@ pub struct StepIn<'a> {
     pub dims: &'a Dims,
     /// The L1 cell's side on the Earth-normalized sphere, m.
     pub norm_dx_m: f64,
+    /// The plate model's sample spacing on the same sphere, m (0: no filter). The plate model's
+    /// uplift carries no information on shorter scales; only the part of its root it resolves
+    /// bends the plate (`ledger: ISO-069`).
+    pub plate_spacing_m: f64,
     pub gravity_m_s2: f64,
     pub sea_level_m: f64,
     pub dt_myr: f64,
@@ -1021,6 +1044,8 @@ pub fn step(
         load: f64,
         /// The Airy root the plate model or the spreading already put in the elevation, m.
         root: f64,
+        /// The plate model's share of it.
+        plate_root: f64,
         /// The step's load increment (rock, water, ice), m of mantle.
         dq: f64,
         /// The water reference (the depth counted in `load`), m.
@@ -1046,6 +1071,7 @@ pub fn step(
             };
             let mut load = prev;
             let mut root = 0.0;
+            let mut plate_root = 0.0;
             // ledger: ISO-061
             // Crust the plate model thickened: orogens, arcs and hotspot volcanism. Subsidence
             // (the ocean floor cooling, a sample pulled to trench depth) is not a load.
@@ -1057,6 +1083,7 @@ pub fn step(
                 let (q, a) = thickening(u, x.h_start[c] - u, sea);
                 load += q;
                 root += a;
+                plate_root = a;
             }
             // Erosion and deposition.
             let dm = x.h_eroded[c] - x.h_start[c];
@@ -1078,6 +1105,7 @@ pub fn step(
                 fresh,
                 load,
                 root,
+                plate_root,
                 dq: load - prev + water_share * (depth - water) + ice_share * (ice - ice_prev),
                 water,
             }
@@ -1173,6 +1201,27 @@ pub fn step(
     };
     let dq = pick(&|c| cells[c].dq + carried(c, &st.unsolved_m));
     let root = pick(&|c| cells[c].root);
+    // ledger: ISO-069
+    // The root that bends the plate: the plate model's part only as far as the plate model
+    // resolves it. Its uplift is interpolated from samples `plate_spacing_m` apart; what varies
+    // from cell to cell below that is the sample lattice, not a load (measured: the uplift field
+    // zigzags at the cell scale in about 5 % of margin cells), and a stiff plate passed the whole
+    // thickening behind it, 5.5 times the uplift, where local isostasy had passed the uplift. The
+    // rest stays locally compensated, as the plate model made it.
+    let bend_part = {
+        let pr = pick(&|c| cells[c].plate_root);
+        let mut pf = pr.clone();
+        if x.plate_spacing_m > dxs {
+            // Binomial passes (1, 2, 1)/4: nothing of the two-cell wave survives; their
+            // variance (half a cell² each) reaches that of half the sample spacing.
+            let half = 0.5 * x.plate_spacing_m / dxs;
+            let passes = (2.0 * half * half).ceil().max(1.0) as usize;
+            binomial(&mut pf, ws, hs, passes);
+        }
+        (0..ws * hs)
+            .map(|c| root[c] - pr[c] + pf[c])
+            .collect::<Vec<f64>>()
+    };
     let wet = pick(&|c| if h[c] <= sea { 1.0 } else { 0.0 });
     let d_prev = pick(&|c| {
         if cells[c].fresh {
@@ -1200,7 +1249,7 @@ pub fn step(
     let mut l_released = vec![0.0; ws * hs];
     sv.laplacian(&released, &mut l_released);
     let mut bend_root = vec![0.0; ws * hs];
-    sv.bend(&d_now, &root, &mut bend_root);
+    sv.bend(&d_now, &bend_part, &mut bend_root);
     let r: Vec<f64> = (0..ws * hs)
         .map(|c| RHO_MANTLE * (dq[c] - root[c]) - bend_root[c] + l_released[c])
         .collect();
@@ -1268,7 +1317,7 @@ pub fn step(
         )
     };
     // The moment after the step: what was kept, plus the bending of the root and the sinking.
-    let total: Vec<f64> = root.iter().zip(&dw).map(|(a, b)| a + b).collect();
+    let total: Vec<f64> = bend_part.iter().zip(&dw).map(|(a, b)| a + b).collect();
     let mut curv = vec![0.0; ws * hs];
     sv.laplacian(&total, &mut curv);
     let m_new: Vec<f64> = (0..ws * hs)
@@ -1577,6 +1626,7 @@ mod tests {
     struct World {
         d: Dims,
         norm_dx: f64,
+        plate_spacing: f64,
         h: Vec<f64>,
         uplift: Vec<f32>,
         crust: Vec<f32>,
@@ -1594,6 +1644,7 @@ mod tests {
             World {
                 d: Dims::new(w, h, 4800.0, true),
                 norm_dx: 39_000.0,
+                plate_spacing: 0.0,
                 h: vec![z; n],
                 uplift: vec![0.0; n],
                 crust: vec![1.0; n],
@@ -1630,6 +1681,7 @@ mod tests {
                 &StepIn {
                     dims: &self.d,
                     norm_dx_m: self.norm_dx,
+                    plate_spacing_m: self.plate_spacing,
                     gravity_m_s2: G,
                     sea_level_m: sea,
                     dt_myr,
@@ -2050,6 +2102,7 @@ mod tests {
                 &StepIn {
                     dims: &d,
                     norm_dx_m: 39_000.0,
+                    plate_spacing_m: 71_000.0,
                     gravity_m_s2: G,
                     sea_level_m: sea,
                     dt_myr,
@@ -2194,4 +2247,38 @@ mod tests {
             );
         }
     }
+
+    /// The plate model's uplift varies from cell to cell below its own sample spacing (the
+    /// sample lattice, aliased onto L1). A stiff plate must not turn that into relief: with the
+    /// plate model's spacing given, an uplift that alternates column by column raises the ground
+    /// by about the uplift, as local isostasy does; without it, by the whole thickening behind it.
+    #[test]
+    fn the_plate_models_sample_lattice_is_not_a_load() {
+        let p = on();
+        let (w, h) = (32usize, 32usize);
+        let n = w * h;
+        let sea = -1.0e6;
+        let zig = |spacing: f64| {
+            let mut wd = World::new(w, h, 300.0);
+            wd.plate_spacing = spacing;
+            let (mut sv, mut st) = started(&mut wd, &p, sea);
+            let before = wd.h.clone();
+            for c in 0..n {
+                if c % 2 == 0 {
+                    wd.uplift[c] = 0.25; // 500 m of Airy uplift in the step, next to none
+                }
+            }
+            wd.step(&p, &mut sv, &mut st, &vec![0.0; n], sea);
+            let j = 16 * w;
+            (wd.h[j + 10] - before[j + 10]) - (wd.h[j + 11] - before[j + 11])
+        };
+        let filtered = zig(71_000.0);
+        assert!(
+            (filtered - 500.0).abs() < 50.0,
+            "column-to-column step {filtered} m, the uplift is 500 m"
+        );
+        let raw = zig(0.0);
+        assert!(raw > 1500.0, "unfiltered the thickening shows: {raw} m");
+    }
 }
+
