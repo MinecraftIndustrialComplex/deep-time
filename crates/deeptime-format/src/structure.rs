@@ -30,10 +30,10 @@ use serde::{Deserialize, Serialize};
 /// 2π as Noddy writes it (seven decimals). Part of the contract: the phase of a fold is computed
 /// with this value on both sides.
 #[allow(clippy::approx_constant)]
-pub const NODDY_TAU: f64 = 6.2831853;
+pub const NODDY_TAU: f64 = 6.2831853; // ledger: DEF-066
 
 /// Samples of a fold profile over one wavelength (Noddy's `X_PROFILE_RESOLUTION` + 1).
-pub const PROFILE_SAMPLES: usize = 629;
+pub const PROFILE_SAMPLES: usize = 629; // ledger: DEF-068
 
 /// A rectangle on the map with a smooth weight inside it, 1 at the centre and 0 at the edge.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -53,6 +53,7 @@ pub struct Window {
 /// `(1 − t²)²` for |t| < 1, 0 outside.
 #[inline]
 pub fn bump(t: f64) -> f64 {
+    // ledger: DEF-039
     if t > -1.0 && t < 1.0 {
         let u = 1.0 - t * t;
         u * u
@@ -203,7 +204,7 @@ pub struct Structure {
 }
 
 /// The least [`Structure::margin`] a bake writes, blocks.
-pub const REACH_MARGIN: f64 = 64.0;
+pub const REACH_MARGIN: f64 = 64.0; // ledger: DEF-074
 
 /// Side of the index's buckets, blocks.
 const BUCKET: f64 = 128.0;

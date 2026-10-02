@@ -46,6 +46,7 @@ fn half_width_rate(c: f64, strict: bool) -> f64 {
     } else {
         c.abs() > TOLERANCE
     };
+    // ledger: DEF-066
     if on { 0.693147 / (c * c) } else { 0.0 }
 }
 
@@ -231,7 +232,7 @@ impl Fault {
         } else {
             pitch
         };
-        let dip = if dip == 90.0 { 89.999 } else { dip };
+        let dip = if dip == 90.0 { 89.999 } else { dip }; // ledger: DEF-068
         let att = orient::convrt(dip, dip_direction, pitch);
         Fault {
             kind,

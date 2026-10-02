@@ -34,6 +34,7 @@ use crate::taste::Sequence;
 /// at the edge.
 #[inline]
 pub fn bump(t: f64) -> f64 {
+    // ledger: DEF-039, DEF-070
     if t > -1.0 && t < 1.0 {
         let u = 1.0 - t * t;
         u * u

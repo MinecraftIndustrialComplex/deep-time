@@ -32,7 +32,7 @@ public final class Structure {
     /** Samples of a fold profile over one wavelength. */
     static final int PROFILE_SAMPLES = 629;
     /** 2π as Noddy writes it: part of the contract. */
-    static final double NODDY_TAU = 6.2831853;
+    static final double NODDY_TAU = 6.2831853; // ledger: DEF-066
     /** Side of the index's buckets, blocks. */
     private static final double BUCKET = 128.0;
 
@@ -162,7 +162,7 @@ public final class Structure {
         return n;
     }
 
-    /** {@code (1 − t²)²} for |t| &lt; 1, 0 outside (Rust {@code structure::bump}). */
+    /** {@code (1 − t²)²} for |t| &lt; 1, 0 outside (Rust {@code structure::bump}). Ledger: DEF-039. */
     static double bump(double t) {
         if (t > -1.0 && t < 1.0) {
             double u = 1.0 - t * t;
@@ -173,7 +173,7 @@ public final class Structure {
 
     /** Rust {@code structure::profile_at} (Noddy's {@code calcProfile}). */
     static double profileAt(float[] table, double position) {
-        final long res = 628;
+        final long res = 628; // ledger: DEF-068
         double percent;
         long i1, i2;
         if (position < 0.0) {

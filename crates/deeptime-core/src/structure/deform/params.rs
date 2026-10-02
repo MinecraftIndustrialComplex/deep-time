@@ -7,12 +7,18 @@
 //! "structure": {"deformation": {"strength": 1.0, "density": 1.0, "fold_wavelength_km": [16, 8, 32]}}
 //! ```
 //!
-//! **Sizes are true in block space.** A fold's wavelength and a fault's length are given in km on
-//! the planet's horizontal block scale (300 m a block in the built-in presets), and amplitudes and
-//! slips are that many *blocks* times the shape's own ratio (amplitude over wavelength, slip over
-//! length), not metres at the vertical scale: heights are stretched 15 times against widths (20 m against 300 m per block), and a
-//! fold drawn with its true amplitude in metres would have vertical limbs. What is kept is the
-//! shape a geologist would draw in a cross-section at 1:1.
+//! **Sizes are true in block space** (ledger: DEF-011, a game choice open to Ben: STATUS.md
+//! "Pending questions", docs/science/folds-faults-intrusions.md). A fold's wavelength and a
+//! fault's length are given in km on the planet's horizontal block scale (300 m a block in the
+//! built-in presets), and amplitudes and slips are that many *blocks* times the shape's own ratio
+//! (amplitude over wavelength, slip over length), not metres at the vertical scale: heights are
+//! stretched 15 times against widths (20 m against 300 m per block), and a fold drawn with its
+//! true amplitude in metres would have near-vertical limbs. What is kept is the shape a geologist
+//! would draw in a cross-section at 1:1. In true metres (the scale the strata, the plutons and
+//! the terrain are drawn at) that makes every structure 15 times lower than it is wide: a 60°
+//! fault in blocks is a 6.6° fault in metres, a 30° thrust a 2.2° one, and a fold's amplitude and
+//! a fault's throw are a fifteenth of what the same shape has in metres. The horizontal part of
+//! a slip (the heave) is true in metres.
 
 use serde::{Deserialize, Serialize};
 
@@ -34,26 +40,33 @@ pub struct DeformationParams {
     /// Fold wavelength, km: [median, min, max] of a lognormal with `fold_wavelength_sigma`.
     /// Median 16 km: the folds of the Zagros Folded Belt have "homogeneous fold wavelengths
     /// (15.8 ± 5.3 km)" (Mouthereau, Tensi, Bellahsen, Lacombe, De Boisgrollier & Kargar 2007,
-    /// Tectonics 26:TC5006). The range is a design value about it. In buckling theory the
-    /// wavelength follows the thickness of the stiff layers (Biot 1961, Geol. Soc. Am. Bull.
-    /// 72:1595–1620, tested on natural folds by Sherwin & Chapple 1968, Am. J. Sci. 266:167–179);
-    /// here it is drawn, not derived from the strata.
+    /// Tectonics 26:TC5006, abstract and fig. 5: 149 anticlines). The range is a design value
+    /// about it; the same paper gives 11 km near the Surmeh fault to 30 km in the High Zagros. In
+    /// buckling theory the dominant wavelength is proportional to the stiff layer's thickness,
+    /// L = 2πH(R/6)^(1/3) for a viscosity ratio R (Biot 1957 and 1961, Ramberg 1962; Schmalholz
+    /// & Mancktelow 2016, Solid Earth 7:1417–1465, eq. 13), and natural folds have wavelengths of
+    /// 2 to 16 times their layer's thickness (same review, p. 1442); here it is drawn, not
+    /// derived from the strata. ledger: DEF-001, DEF-002
     pub fold_wavelength_km: [f64; 3],
     pub fold_wavelength_sigma: f64,
     /// Wavelengths across one fold train, [min, max]: a train is a bundle of a few parallel
     /// anticlines and synclines that dies out sideways.
     pub fold_train_waves: [f64; 2],
-    /// A fold train's length along its axis over its wavelength, [min, max]. A design value after
-    /// the long, doubly plunging anticlines of the Zagros Simple Folded Zone (its structural
-    /// styles: Blanc, Allen, Inger & Hassani 2003, J. Geol. Soc. 160:401–412).
+    /// A fold train's length along its axis over its wavelength, [min, max]: the Zagros anticlines
+    /// are "long (up to ~150–200 km)" and their axial length is typically over 10 half
+    /// wavelengths, so over 5 wavelengths (Alavi 2007, Am. J. Sci. 307:1064–1095, pp. 1068 and
+    /// 1077). ledger: DEF-004
     pub fold_length_ratio: [f64; 2],
-    /// Shortening taken up by folding, [least, most], as a fraction: a sine fold of amplitude A
-    /// and wavelength λ has shortened by about (πA/λ)², so A/λ = √e/π. The Zagros Folded Belt
-    /// has shortened by 16–19 % (Mouthereau et al. 2007) or about 20 % (McQuarrie 2004, J.
-    /// Struct. Geol. 26:519–535). The least (a design value) is used in forelands, the most (a
-    /// design value: limbs at about 45°) where a collision has thickened the crust the most;
-    /// 1 − `structure.reference_crust_m` / the plate model's thickness gives the local value in
-    /// between.
+    /// Shortening taken up by folding, [least, most], as a fraction: to first order a sine fold of
+    /// amplitude A and wavelength λ has shortened by (πA/λ)², so A/λ = √e/π. The first-order
+    /// form overstates it at steep limbs: by the sine's exact arc length the amplitudes drawn
+    /// shorten the beds by 7 % (limbs 30°) to 20 % (limbs 48°), in block space. The Zagros has
+    /// shortened by 16–19 % across the whole orogen (Mouthereau et al. 2007, abstract) and by 16 to
+    /// 30 % across the fold-thrust belt's sections (Alavi 2007, table 1); McQuarrie 2004 (J.
+    /// Struct. Geol. 26:519–535, abstract) gives about 20 %. The least (a design value) is used in
+    /// forelands, the most (a design value: limbs at about 45°) where a collision has thickened
+    /// the crust the most; 1 − `structure.reference_crust_m` / the plate model's thickness gives
+    /// the local value in between. ledger: DEF-005, DEF-007
     pub fold_shortening: [f64; 2],
     /// Fold trains per km² of full-strength shortening per Myr. Design value: a train covers
     /// about 28 λ² (7,000 km² at 16 km), so 6e-6 covers a collision belt about 1.3 times over in
@@ -62,23 +75,33 @@ pub struct DeformationParams {
 
     /// Fault trace length, km: [median, min, max] of a lognormal with `fault_length_sigma`.
     /// Design values (segments of some tens of km); faults grow by the linkage of such segments
-    /// (Gawthorpe & Leeder 2000, Basin Res. 12:195–218).
+    /// (Gawthorpe & Leeder 2000, Basin Res. 12:195–218, not read: no open copy). ledger: DEF-013
     pub fault_length_km: [f64; 3],
     pub fault_length_sigma: f64,
     /// How far into the hanging wall a fault's displacement reaches, as a share of its length:
     /// the width of the tilted block (a half-graben). A design value.
     pub fault_reach_ratio: f64,
     /// Greatest slip over trace length. A fault's greatest displacement grows in proportion to
-    /// its length, D = γ·L (Cowie & Scholz 1992, J. Struct. Geol. 14:1149–1156), with γ about
-    /// 0.03 for normal faults from millimetres to kilometres long (Schlische, Young, Ackermann &
-    /// Gupta 1996, Geology 24:683–686) and a spread of an order of magnitude between data sets
-    /// (reviewed by Kim & Sanderson 2005, Earth-Sci. Rev. 68:317–334). The values here are design
-    /// values inside that spread, chosen so that offsets read at block scale.
+    /// its length, D = γ·L: for normal faults D = 0.03 L^1.06 (Schlische, Young, Ackermann &
+    /// Gupta 1996, Geology 24:683–686), with γ "typically between 0.001 and 0.1" and strike-slip
+    /// faults displaced more for their length than normal ones (both as reviewed by Lathrop,
+    /// Jackson, Bell & Rotevatn 2022, Front. Earth Sci. 10:907543, pp. 2, 4 and 7); for thrusts
+    /// about 7 % (Elliott 1976, Phil. Trans. R. Soc. A 283:289–312, p. 297, 20 thrusts of the
+    /// Canadian Rockies). The values here are design values, slips along the dip in block space.
+    /// Their heave (the horizontal part) is true in metres, so in metres a normal fault's
+    /// displacement is 0.017 to 0.029 of its length and a thrust's 0.031 to 0.075, inside the
+    /// ranges read; their throw (the vertical part) is a fifteenth of the same slip's in metres
+    /// (see the module doc). ledger: DEF-015 to DEF-018
     pub normal_slip_ratio: f64,
     pub thrust_slip_ratio: f64,
     pub strike_slip_ratio: f64,
-    /// Dip of normal faults, degrees [min, max] (about 60°), and of thrusts (about 30°): the
-    /// fault angles of Anderson 1951, The Dynamics of Faulting, 2nd ed.
+    /// Dip of normal faults, degrees [min, max] (about 60°), and of thrusts (about 30°): normal
+    /// faults dip at more than 45° and thrusts at less, at 45° ∓ 15° for a friction coefficient of
+    /// 0.577 (Anderson 1905, Trans. Edinb. Geol. Soc. 8:387–402, pp. 389 and 402; the theory of
+    /// Anderson 1951, The Dynamics of Faulting, 2nd ed.); active normal faults rupture at 30° to
+    /// 65° and reverse faults peak at 30° ± 5° (Collettini & Sibson 2001, Geology 29:927–930,
+    /// abstract). Applied in block space (module doc): in metres these are 5.4° to 10.4° and 1.4°
+    /// to 3.2°. ledger: DEF-019, DEF-020
     pub normal_dip_deg: [f64; 2],
     pub thrust_dip_deg: [f64; 2],
     /// Faults per km² of full-strength regime per Myr: thrusts where the crust shortens, normal
@@ -88,8 +111,11 @@ pub struct DeformationParams {
     pub strike_slip_rate_km2_myr: f64,
 
     /// How far into the foreland of an active orogen the crust still shortens, km on the plate
-    /// model's (Earth-normalized) sphere: the Zagros Simply Folded Belt is about 250 km wide, the
-    /// Subandean belt 100–200 km. On a 16,384-block planet 250 km is about 100 blocks.
+    /// model's (Earth-normalized) sphere: the Zagros fold-thrust belt is "a ~200 to 300 km-wide
+    /// zone" (Alavi 2007, abstract), its Fars sector 200 km (Mouthereau et al. 2007, §2); the
+    /// Subandean belt of Bolivia is 60 to 140 km wide (Hérail et al., ORSTOM symposium paper,
+    /// pp. 179–180, a poor scan). On a 16,384-block planet 250 km is about 100 blocks (30 km on
+    /// the map, where the folds keep their Earth size). ledger: DEF-027
     pub foreland_km: f64,
     /// The plate model's uplift rate at which an Andean margin shortens at full strength, mm/yr
     /// (the amplifier's `active_uplift_mm_yr` is the same 0.1).
@@ -131,22 +157,32 @@ pub struct DeformationParams {
     pub intrusions: f64,
     /// Stocks per km² of collision or arc per Myr. A design value.
     pub stock_rate_km2_myr: f64,
-    /// A stock's radius, km: [median, min, max] of a lognormal (sigma 0.4). By definition a
-    /// stock crops out over less than 100 km² (a radius under 5.6 km); larger bodies are the
-    /// batholiths of `plutons.rs`.
+    /// A stock's radius, km: [median, min, max] of a lognormal (sigma 0.4): its half-width at
+    /// the world's floor, where the rooted ellipsoid is widest. A stock is a pluton exposed over
+    /// less than 100 km² (Earle 2019, Physical Geology 2nd ed., §3.5); here a stock's top lies
+    /// from 4 blocks above to 60 under the ground, so where one crops out it shows only its
+    /// cupola, a few per cent of its section at depth, and the 100 km² holds at the surface while
+    /// the body below widens to the size of a small batholith. ledger: DEF-042
     pub stock_radius_km: [f64; 3],
     /// How far a stock's top lies under the ground, blocks [min, max] (negative: it crops out).
     pub stock_top_depth_blocks: [f64; 2],
     /// Dykes per km² of continental rift per Myr. A design value.
     pub dyke_rate_km2_myr: f64,
     /// A dyke's length, km: [median, min, max] of a lognormal (sigma 0.5). Design values;
-    /// single dykes of rift swarms run for kilometres to tens of kilometres.
+    /// single dykes run for kilometres (the Ship Rock dikes 3 to 9 km: Delaney & Pollard 1981,
+    /// USGS PP 1202) to over 2,000 km in giant swarms (the Mackenzie swarm: Bunger, Menand,
+    /// Cruden, Zhang & Halls 2013, Earth Planet. Sci. Lett. 375:270–279). ledger: DEF-047
     pub dyke_length_km: [f64; 3],
-    /// A dyke's half-width at its middle, blocks [min, max]. Real dykes are metres wide; a
-    /// block is the least that can be drawn.
+    /// A dyke's half-width at its middle, blocks [min, max]: 2 to 5 blocks (600 to 1,500 m)
+    /// across. Real dykes are metres to tens of metres wide (Ship Rock's northeastern dike 2.3 m
+    /// on average, Delaney & Pollard 1981; the Mackenzie dykes 1 to 150 m, mean 30 m, Bunger et
+    /// al. 2013); a block (300 m) is the least that can be drawn. A game choice. ledger: DEF-048
     pub dyke_half_width_blocks: [f64; 2],
     /// A plug's radius as a share of its volcano's basal radius, and its range in blocks
-    /// [min, max]. Design values (necks are tens to hundreds of metres across).
+    /// [min, max]: 1.5 to 4.8 km across. Design values: real necks are tens to hundreds of
+    /// metres across (Ship Rock 500 m, New Mexico Bureau of Geology; the plugs beside it under
+    /// 30 m, Delaney & Pollard 1981), so plugs are drawn 3 to 10 times wider than Ship Rock. A
+    /// game choice. ledger: DEF-049
     pub plug_radius_share: f64,
     pub plug_radius_blocks: [f64; 2],
 }
@@ -154,46 +190,46 @@ pub struct DeformationParams {
 impl Default for DeformationParams {
     fn default() -> Self {
         DeformationParams {
-            strength: 1.0,
-            density: 1.0,
-            size: 1.0,
-            fold_wavelength_km: [16.0, 8.0, 32.0],
-            fold_wavelength_sigma: 0.35,
-            fold_train_waves: [2.0, 5.0],
-            fold_length_ratio: [5.0, 12.0],
-            fold_shortening: [0.08, 0.30],
-            fold_rate_km2_myr: 6.0e-6,
-            fault_length_km: [40.0, 15.0, 150.0],
-            fault_length_sigma: 0.5,
-            fault_reach_ratio: 0.4,
-            normal_slip_ratio: 0.05,
-            thrust_slip_ratio: 0.08,
-            strike_slip_ratio: 0.05,
-            normal_dip_deg: [55.0, 70.0],
-            thrust_dip_deg: [20.0, 40.0],
-            thrust_rate_km2_myr: 2.0e-5,
-            normal_rate_km2_myr: 4.0e-5,
-            strike_slip_rate_km2_myr: 4.0e-6,
-            foreland_km: 250.0,
-            arc_uplift_mm_yr: 0.1,
-            max_overlap: 3,
-            overprint_myr: 30.0,
-            trend_scatter_deg: 12.0,
-            max_structures: 60_000,
-            relief: 1.0,
-            relief_age_myr: 10.0,
-            relief_wear: 5.0,
-            fold_relief: 0.5,
-            footwall_share: 0.2,
-            intrusions: 1.0,
-            stock_rate_km2_myr: 2.0e-5,
-            stock_radius_km: [4.0, 2.0, 10.0],
-            stock_top_depth_blocks: [-4.0, 60.0],
-            dyke_rate_km2_myr: 8.0e-5,
-            dyke_length_km: [15.0, 5.0, 50.0],
-            dyke_half_width_blocks: [1.0, 2.5],
-            plug_radius_share: 0.08,
-            plug_radius_blocks: [2.5, 8.0],
+            strength: 1.0,                        // ledger: DEF-012
+            density: 1.0,                         // ledger: DEF-012
+            size: 1.0,                            // ledger: DEF-012
+            fold_wavelength_km: [16.0, 8.0, 32.0], // ledger: DEF-001
+            fold_wavelength_sigma: 0.35,          // ledger: DEF-001
+            fold_train_waves: [2.0, 5.0],         // ledger: DEF-003
+            fold_length_ratio: [5.0, 12.0],       // ledger: DEF-004
+            fold_shortening: [0.08, 0.30],        // ledger: DEF-005
+            fold_rate_km2_myr: 6.0e-6,            // ledger: DEF-008
+            fault_length_km: [40.0, 15.0, 150.0], // ledger: DEF-013
+            fault_length_sigma: 0.5,              // ledger: DEF-013
+            fault_reach_ratio: 0.4,               // ledger: DEF-014
+            normal_slip_ratio: 0.05,              // ledger: DEF-016
+            thrust_slip_ratio: 0.08,              // ledger: DEF-017
+            strike_slip_ratio: 0.05,              // ledger: DEF-018
+            normal_dip_deg: [55.0, 70.0],         // ledger: DEF-019
+            thrust_dip_deg: [20.0, 40.0],         // ledger: DEF-020
+            thrust_rate_km2_myr: 2.0e-5,          // ledger: DEF-022
+            normal_rate_km2_myr: 4.0e-5,          // ledger: DEF-022
+            strike_slip_rate_km2_myr: 4.0e-6,     // ledger: DEF-022
+            foreland_km: 250.0,                   // ledger: DEF-027
+            arc_uplift_mm_yr: 0.1,                // ledger: DEF-026
+            max_overlap: 3,                       // ledger: DEF-032
+            overprint_myr: 30.0,                  // ledger: DEF-033
+            trend_scatter_deg: 12.0,              // ledger: DEF-009
+            max_structures: 60_000,               // ledger: DEF-034
+            relief: 1.0,                          // ledger: DEF-054
+            relief_age_myr: 10.0,                 // ledger: DEF-055
+            relief_wear: 5.0,                     // ledger: DEF-056
+            fold_relief: 0.5,                     // ledger: DEF-058
+            footwall_share: 0.2,                  // ledger: DEF-059
+            intrusions: 1.0,                      // ledger: DEF-040
+            stock_rate_km2_myr: 2.0e-5,           // ledger: DEF-041
+            stock_radius_km: [4.0, 2.0, 10.0],    // ledger: DEF-042
+            stock_top_depth_blocks: [-4.0, 60.0], // ledger: DEF-044
+            dyke_rate_km2_myr: 8.0e-5,            // ledger: DEF-046
+            dyke_length_km: [15.0, 5.0, 50.0],    // ledger: DEF-047
+            dyke_half_width_blocks: [1.0, 2.5],   // ledger: DEF-048
+            plug_radius_share: 0.08,              // ledger: DEF-049
+            plug_radius_blocks: [2.5, 8.0],       // ledger: DEF-049
         }
     }
 }

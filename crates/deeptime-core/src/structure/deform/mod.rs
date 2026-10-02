@@ -39,8 +39,13 @@ pub use params::DeformationParams;
 
 use deeptime_format::structure::{PROFILE_SAMPLES, Structure};
 
-/// The fold profile every fold train uses: Noddy's sine table (`deeptime_noddy::Profile::
-/// sine_table`), one wavelength in [`PROFILE_SAMPLES`] values of 1/100.
+/// The fold profile every fold train uses: a sine in Noddy's table format
+/// (`deeptime_noddy::Profile::sine_table`), one wavelength in [`PROFILE_SAMPLES`] values of
+/// 1/100. Noddy's own default "sine" profile is coarser: 21 control points, each the sine
+/// rounded down to a whole hundredth, joined by straight segments (noddyverse `nodLib3.c`
+/// `initGraphPoints`, `proflib.c` `getArrayForProfile`), so it peaks at 0.99 and departs from
+/// the sine by up to 2.2 % of the amplitude. Here every sample is the sine itself.
+/// ledger: DEF-010
 pub fn sine_profile() -> Vec<f32> {
     match deeptime_noddy::Profile::sine_table() {
         deeptime_noddy::Profile::Table(t) => {
@@ -161,6 +166,7 @@ pub fn cause_of(
     let c = f64::from(circumference);
     let mut best = (c / 8.0, 0u64);
     for e in events {
+        // ledger: DEF-036 (150 Myr, an eighth of the circumference)
         if e.t_start > t_years || e.t_start < t_years - 150.0e6 || !kinds.contains(&e.kind.as_str())
         {
             continue;
