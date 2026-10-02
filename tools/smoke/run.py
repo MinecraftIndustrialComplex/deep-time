@@ -325,12 +325,13 @@ def probe_json(server, rcon, command, wait=1.0):
         return None, out
 
 
-def dh_pregen(steps, rcon, cx, cz, radius_chunks, label):
-    """Distant Horizons' own server-side pregeneration of the square around (cx, cz); returns its wall time."""
+def dh_pregen(steps, rcon, cx, cz, radius_chunks, label, limit_s=900, required=True):
+    """Distant Horizons' own server-side pregeneration of the square around (cx, cz); returns its
+    wall time, or None when it had not finished after limit_s (then it is stopped)."""
     out = rcon(f"dh pregen start minecraft:overworld {cx} {cz} {radius_chunks}", check=False)
     print(f"   dh pregen start: {out[:160]}", flush=True)
     t0 = time.time()
-    deadline = t0 + 900
+    deadline = t0 + limit_s
     seen = 0
     while time.time() < deadline:
         time.sleep(5)
@@ -342,10 +343,15 @@ def dh_pregen(steps, rcon, cx, cz, radius_chunks, label):
             print(f"   dh pregen status: {status[:160]}", flush=True)
     pregen_s = time.time() - t0
     finished = time.time() < deadline
-    steps.check((f"dh {label.strip()}: " if label.strip() else "dh: ") + "Distant Horizons' pregeneration finished", "finished",
-                f"{pregen_s:.0f} s" if finished else "timeout", finished)
+    name = (f"dh {label.strip()}: " if label.strip() else "dh: ") + "Distant Horizons' pregeneration finished"
+    if required:
+        steps.check(name, "finished", f"{pregen_s:.0f} s" if finished else "timeout", finished)
+    else:
+        steps.record(name, f"{pregen_s:.0f} s" if finished else f"not after {limit_s} s: {rcon('dh pregen status', check=False)[:160]}")
+    if not finished:
+        rcon("dh pregen stop", check=False)
     time.sleep(5)   # let DH flush the last sections to its store
-    return pregen_s
+    return pregen_s if finished else None
 
 
 def dh_area_check(steps, server, rcon, smoke, x0, z0, side, label, fname, status):
@@ -452,7 +458,7 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
     land_share, cx, cz = best
     steps.record("dh: area checked", f"centre {cx}, {cz} (spawn {spawn[0]}, {spawn[1]}; {100 * land_share:.0f} % land), "
                                      f"pregen radius {radius_chunks} chunks")
-    pregen_s = dh_pregen(steps, rcon, cx, cz, radius_chunks, "")
+    pregen_s = dh_pregen(steps, rcon, cx, cz, radius_chunks, "") or 0.0
 
     st, out = probe_json(server, rcon, "deeptime probe dh")
     level = next((l for l in (st or {}).get("levels", []) if l.get("level") == "minecraft:overworld"), {}) if st else {}
@@ -492,8 +498,14 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
     steps.record("dh seam: area checked", f"x = {half} (C = {circumference}), z = {sz} ({100 * seam_land:.0f} % land either side), "
                                           f"pregen radius {radius_seam} chunks on each side, inside the lap")
     before = sections
-    dh_pregen(steps, rcon, half - 16 * radius_seam, sz, radius_seam, "seam west ")
-    dh_pregen(steps, rcon, -half + 16 * radius_seam, sz, radius_seam, "seam east ")
+    # /dh pregen walks a spiral of 64-block sections, 8 either side of the centre's section for a
+    # radius of 32 chunks (PregenManager: ceil(r / 4 * 2)^2 sections). A section past the seam stalls
+    # it: DH files the section under its raw position, Toroidal World answers it under the folded
+    # one, and the raw entry is never cleared (seen 2026-10-02: section 6*128 folded to 6*-128, no
+    # progress after). So the west square's last section ends at the seam and the east square's
+    # first starts there: centre sections C/128 - 9 and -C/128 + 8.
+    dh_pregen(steps, rcon, half - 9 * 64, sz, radius_seam, "seam west ")
+    dh_pregen(steps, rcon, -half + 8 * 64, sz, radius_seam, "seam east ")
     st, out = probe_json(server, rcon, "deeptime probe dh")
     level = next((l for l in (st or {}).get("levels", []) if l.get("level") == "minecraft:overworld"), {}) if st else {}
     steps.check("dh seam: Distant Horizons asked the override for the seam's sections", "> 0 more",
@@ -502,6 +514,17 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
     seam_side = 10   # 160 blocks: 4 columns in each of 10 x 10 chunks
     dh_area_check(steps, server, rcon, smoke, half - 16 * seam_side, sz - 80, seam_side, "seam west ", "dh-check-seam-west.json", st)
     dh_area_check(steps, server, rcon, smoke, -half, sz - 80, seam_side, "seam east ", "dh-check-seam-east.json", st)
+
+    # A /dh pregen square across the seam, recorded: whether it finishes, and how many sections DH
+    # asked of the override meanwhile (DH's pregen bookkeeping against TW's key folding, above).
+    st, out = probe_json(server, rcon, "deeptime probe dh")
+    level = next((l for l in (st or {}).get("levels", []) if l.get("level") == "minecraft:overworld"), {}) if st else {}
+    before = level.get("sections", 0)
+    dh_pregen(steps, rcon, half, sz + 1024, radius_seam, "across the seam", limit_s=120, required=False)
+    st, out = probe_json(server, rcon, "deeptime probe dh")
+    level = next((l for l in (st or {}).get("levels", []) if l.get("level") == "minecraft:overworld"), {}) if st else {}
+    steps.record("dh across the seam: sections asked of the override", level.get("sections", 0) - before,
+                 note=f"{radius_seam}-chunk square centred on x = {half}, z = {sz + 1024}: about 256 sections")
 
     for detail in (0, 3, 6):
         b, out = probe_json(server, rcon, f"deeptime probe far bench {cx} {cz} {detail} 64", wait=2.0)
