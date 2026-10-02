@@ -323,7 +323,7 @@ mod tests {
         assert!(serde_json::from_str::<UndergroundParams>(r#"{"lava": 1}"#).is_err());
         assert!(serde_json::from_str::<UndergroundParams>(r#"{"lava_floor_blocks": -1}"#).is_err());
         let e = UndergroundParams {
-            lava_floor_blocks: 993,
+            lava_floor_blocks: 1153,
             ..UndergroundParams::default()
         }
         .validate()

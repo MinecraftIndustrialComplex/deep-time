@@ -1376,7 +1376,11 @@ mod tests {
     #[test]
     fn the_floor_holds_the_deepest_trench() {
         assert_eq!(d_min_y(), -512);
-        assert_eq!((d_min_y() + 1152 - 1, d_max_y()), (639, 639), "height 1152 ends at the top 639");
+        assert_eq!(
+            (d_min_y() + 1152 - 1, d_max_y()),
+            (639, 639),
+            "height 1152 ends at the top 639"
+        );
         for (name, json) in crate::preset::BUILTIN.iter().chain(PIPELINE_BUILTIN.iter()) {
             let p = planet(json);
             assert_eq!(p.scale.min_y, -512, "{name}");
