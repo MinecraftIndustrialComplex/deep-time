@@ -200,6 +200,8 @@ kind; until then a kind is reserved with its intended meaning. Source ids name t
 | `deeptime:volcano_flood_basalt` | a flood-basalt plateau (a large igneous province's lava pile) | volcanoes (P1-21) | see "The volcanoes' events" |
 | `deeptime:impact_crater` | a meteor impact that left a crater | impacts (P2-08) | see "The impacts' events" |
 | `deeptime:impact_ocean` | a large meteor impact into deep water that left no crater | impacts (P2-08) | see "The impacts' events" |
+| `deeptime:fold_belt` | the folds, thrusts and stocks one orogeny left in the rock | structure (P2-01) | see "The structures' events" |
+| `deeptime:fault_system` | the faults (and dykes) of one rift, or of one oblique margin | structure (P2-01) | see "The structures' events" |
 | `deeptime:basin_subsidence` | a sedimentary basin subsides | surface (P1-04) | see "The surface's events" |
 | `deeptime:marine_transgression` | the sea advances over land | surface (P1-04) | see "The surface's events" |
 | `deeptime:marine_regression` | the sea retreats | surface (P1-04) | see "The surface's events" |
@@ -312,6 +314,24 @@ group; its notable cone, if any, is caused by that onset.
 | `volcano_caldera_complex` | as a shield (a continental hotspot) | as above | as `volcano_shield`, `magma` = `silicic` | as above | its `volcano_hotspot_chain` |
 | `volcano_caldera` | the collapse | where its volcano stood then | `volcano`, `radius_km`, `depth_m`, `erupted_km3`, `type` (`silicic`: the volcano collapsed and died; `summit`: a shield's summit caldera) | erupted volume / 1,000 km³, ≤ 1 | its volcano's event, else its arc segment or chain |
 | `volcano_flood_basalt` | the eruption | the province's centre at the end | `area_km2`, `thickness_m` (the pile at its centre), `flows`, `preserved_frac` (share of its area where the pile still crops out within 150 m of the surface), `pile_frac` (share where any of it is left), `plate` | pile / 1 km | the plate model's `large_igneous_province` |
+
+### The structures' events (source `deeptime:structure`, P2-01)
+
+Written by `crates/deeptime-core/src/structure/deform/` on the structure stage's last step, from the
+folds, faults and small intrusions the world keeps (`structure/events.dtst`). Grouped, as the
+volcanoes' events are: one event per belt or system, never one per fold. A group is the
+structures one tectonic event made (the nearest collision, orogeny phase, terrane accretion or
+subduction onset in the 150 Myr before a fold or thrust; the rift onset before a normal fault or
+a dyke; the subduction onset behind a strike-slip fault); structures with no such event are
+grouped by the plate they ride (`plate`). Lengths are km on the block metric, heights m. Plugs
+belong to their volcanoes' events. Every group also names the structure that moved its rock furthest (its younger ones counting for more)
+(`strongest_x`, `strongest_z`: its centre, block coordinates; `strongest_azimuth_deg`: its long
+axis, clockwise from north), which is where `deeptime structure-sections` cuts its section.
+
+| Kind | t_start (t_end) | Place | Params | Magnitude | Causes |
+|---|---|---|---|---|---|
+| `fold_belt` | its first structure (its last) | the centroid of its structures as they lie now | `setting` (`orogen`), `fold_trains`, `thrusts`, `stocks`, `fold_wavelength_km` and `fold_amplitude_m` (medians), `max_thrust_throw_m`, `plate` (ungrouped ones only) | structures / 50, ≤ 1 | the tectonic event, when there is one |
+| `fault_system` | as above | as above | `setting` (`rift`: `faults`, `dykes`, `fault_length_km` (median), `max_throw_m`; `strike_slip`: `faults`, `fault_length_km`, `max_offset_km`), `plate` (ungrouped ones only) | as above | as above |
 
 ### The climate's events (source `deeptime:climate`, P1-05)
 

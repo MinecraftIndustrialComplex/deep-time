@@ -42,6 +42,7 @@ pub mod glacial;
 pub mod impact;
 pub mod kernels;
 pub mod resample;
+pub mod structure;
 pub mod tiles;
 pub mod volcano;
 pub mod window;
@@ -864,6 +865,15 @@ impl AmplifyStage {
         // Impact craters (P2-08): what L1 does not hold of them, on L3 after the last flood (the
         // sink below).
         let craters = impact::Shaper::from_world(world, &self.preset);
+        // Fault scarps, rift valleys and fold ridges (P2-01): the young structures' relief, put on
+        // the young landscape before the erosion passes work on it.
+        let relief_stats = match structure::Relief::from_world(world, &self.preset) {
+            Some(relief) => {
+                let g2 = GridDesc::for_planet("L2", c, r.l2_r)?;
+                relief.apply(&mut level, &g2, sea)
+            }
+            None => structure::ReliefStats::default(),
+        };
         let (gw, gh) = (l3.w as usize, l3.h as usize);
 
         // Whole raster in memory, or tile by tile (plan §5.7.5: streams automatically when the
@@ -1042,6 +1052,7 @@ impl AmplifyStage {
             "millis": {"setup": setup_ms, "total": total_ms},
             "preview": {"w": out.preview.w, "h": out.preview.h, "stride": s},
             "layers": [layer(&files.elevation), layer(&files.amplitude)],
+            "structure_relief": relief_stats,
             "volcanoes": {
                 "shaped": shaper.as_ref().map_or(0, volcano::Shaper::len),
                 "l2_cells": volcano_cells,

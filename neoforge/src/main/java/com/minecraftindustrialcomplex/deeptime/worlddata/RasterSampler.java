@@ -5,8 +5,8 @@ package com.minecraftindustrialcomplex.deeptime.worlddata;
  * Samples one layer (plan §5.3 {@code RasterRead}): cell lookups that wrap in x and clamp in z,
  * nearest and bilinear sampling in block space. The arithmetic is the Rust
  * {@code deeptime_format::RasterRead}'s, operation for operation, so both sides agree bit for bit
- * ({@code TilePackParityTest}). Thread-safe; a hit on the calling thread's last tile allocates
- * nothing.
+ * ({@code TilePackParityTest}). Thread-safe; a hit on one of the calling thread's last two tiles
+ * allocates nothing.
  */
 public final class RasterSampler {
 
@@ -15,8 +15,12 @@ public final class RasterSampler {
     private final GridDesc grid;
     private final int tile;
     private final int tilesX;
-    /** The calling thread's last tile: consecutive samples of a chunk nearly always share one. */
-    private final ThreadLocal<Tile[]> last = ThreadLocal.withInitial(() -> new Tile[1]);
+    /**
+     * The calling thread's last two tiles, the latest first: consecutive samples of a chunk nearly
+     * always share one, and a chunk on a tile's edge goes back and forth between two (the column
+     * rule's neighbourhood, and the source columns of a fault's hanging wall).
+     */
+    private final ThreadLocal<Tile[]> last = ThreadLocal.withInitial(() -> new Tile[2]);
 
     public RasterSampler(TilePack pack) {
         this.pack = pack;
@@ -39,7 +43,14 @@ public final class RasterSampler {
         Tile[] slot = last.get();
         Tile hit = slot[0];
         if (hit != null && hit.index == t) return hit;
+        Tile other = slot[1];
+        if (other != null && other.index == t) {
+            slot[1] = hit;
+            slot[0] = other;
+            return other;
+        }
         Tile fresh = pack.tile(t);
+        slot[1] = hit;
         slot[0] = fresh;
         return fresh;
     }

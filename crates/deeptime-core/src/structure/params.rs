@@ -86,6 +86,8 @@ pub struct StructureParams {
     pub strata_tongue_scale: f64,
     /// A rock's share of a layer below which it takes no part in the tongues (0–0.45).
     pub strata_minor_share: f64,
+    /// Folds and faults (P2-01, `deform/params.rs`).
+    pub deformation: super::deform::DeformationParams,
 }
 
 impl Default for StructureParams {
@@ -114,6 +116,7 @@ impl Default for StructureParams {
             strata_smoothing_cells: DEFAULT_STRATA_SMOOTHING_CELLS,
             strata_tongue_scale: 1.0,
             strata_minor_share: deeptime_format::strata::MINOR_SHARE,
+            deformation: super::deform::DeformationParams::default(),
         }
     }
 }
@@ -204,6 +207,7 @@ impl StructureParams {
             "aureole_shell",
             "must be in [0, 1)",
         )?;
+        self.deformation.validate()?;
         Ok(())
     }
 }

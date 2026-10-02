@@ -53,6 +53,15 @@ fn temp_dir(name: &str) -> PathBuf {
 /// Steps a stage directly (no session), calling `check` after every step.
 fn run_stage(
     p: &PlanetPreset,
+    check: impl FnMut(&PlatesStage, &WorldState, &PlateState),
+) -> WorldState {
+    run_stage_with(PlatesStage::new(p.clone()), p, check)
+}
+
+/// [`run_stage`] on a stage the caller made (to switch the dynamics record off).
+fn run_stage_with(
+    mut stage: PlatesStage,
+    p: &PlanetPreset,
     mut check: impl FnMut(&PlatesStage, &WorldState, &PlateState),
 ) -> WorldState {
     let pool = rayon::ThreadPoolBuilder::new()
@@ -60,7 +69,6 @@ fn run_stage(
         .build()
         .unwrap();
     let mut world = WorldState::new(p.seed, p.scale.circumference_blocks, p.t_start_years());
-    let mut stage = PlatesStage::new(p.clone());
     let log = crate::log::LogRing::default();
     let state = std::sync::atomic::AtomicU8::new(0);
     let gauge = NoGauge;
@@ -613,4 +621,130 @@ fn arcs_build_a_cordillera() {
         range > flat + 300.0,
         "arc crust {range:.0} m with the cordillera vs {flat:.0} m without"
     );
+}
+
+/// The dynamics record (`dynamics.rs`) is measurement only: a run with it and a run without it
+/// end in the same world (crust, elevation, plate ids, events, fields), and the record agrees with
+/// the run's own counters and events.
+#[test]
+fn recording_does_not_change_the_world_and_matches_the_run() {
+    let p = preset(8000, 300.0, "supercontinent", 21);
+    let total = PlatesStage::new(p.clone()).total_steps();
+    let mut checked = 0u64;
+    let with = run_stage(&p, |_, _, st| {
+        let d = st.dynamics.as_ref().expect("recording is on by default");
+        let step = d.steps.last().expect("a record per step");
+        assert_eq!(d.steps.len() as u64, st.step);
+        assert!((step.t - st.t_myr).abs() < 1e-9);
+        // The record's plates are the plates alive, and their samples the visible ones.
+        assert_eq!(step.plates.len(), st.alive().count());
+        assert_eq!(
+            step.plates.iter().map(|q| q.visible).sum::<u32>(),
+            step.visible
+        );
+        assert!(step.visible <= st.n && step.land <= step.visible);
+        assert!(step.continental <= step.visible);
+        for q in &step.plates {
+            assert!(q.continental <= q.visible);
+            assert!((0.0..=1.0).contains(&q.slab_share()), "{q:?}");
+            assert!(q.speed_mm_yr >= 0.0 && q.boundary_km >= 0.0 && q.front_km >= 0.0);
+        }
+        checked += 1;
+    });
+    assert_eq!(checked, total);
+    let st = with.plates.as_ref().unwrap();
+    let d = st.dynamics.as_ref().unwrap();
+    assert_eq!(d.steps.len() as u64, total);
+    assert!(d.steps.windows(2).all(|w| w[1].t > w[0].t));
+
+    // Births and deaths are the events', collisions the counters'.
+    let births = with
+        .events
+        .iter()
+        .filter(|e| e.kind == events::PLATE_BIRTH)
+        .count();
+    let deaths = with
+        .events
+        .iter()
+        .filter(|e| e.kind == events::PLATE_DEATH)
+        .count();
+    let initial = d.plates.iter().filter(|l| l.origin == "initial").count();
+    assert_eq!(d.plates.len(), initial + births);
+    assert_eq!(
+        d.plates.iter().filter(|l| l.died_myr.is_some()).count(),
+        deaths
+    );
+    assert_eq!(deaths as u32, st.counters.plate_deaths);
+    for l in &d.plates {
+        assert_eq!(l.died_myr.is_some(), l.fate.is_some());
+        assert_eq!(l.died_myr.is_some(), !st.plates[l.id as usize].alive);
+        if let Some(died) = l.died_myr {
+            assert!(died >= l.born_myr);
+            assert!(matches!(
+                l.fate.as_deref(),
+                Some("sutured" | "absorbed" | "consumed")
+            ));
+        }
+        if l.origin != "initial" {
+            assert!(l.parent.is_some());
+        }
+    }
+    let welds = d
+        .plates
+        .iter()
+        .filter(|l| l.fate.as_deref() == Some("sutured"))
+        .count() as u32;
+    assert_eq!(welds, st.counters.sutures);
+    assert_eq!(d.collisions.len() as u32, st.counters.accretions);
+    assert_eq!(
+        d.collisions.iter().filter(|c| c.collision).count() as u32,
+        st.counters.collisions
+    );
+    assert!(
+        d.collisions.iter().any(|c| c.sutured),
+        "no suture in 300 Myr: the collision record is untested"
+    );
+    for c in &d.collisions {
+        assert!(c.end_myr >= c.start_myr && c.start_myr >= c.contact_onset_myr - 1e-9);
+        assert!(c.lifted100.samples <= c.lifted10.samples);
+        assert!(c.peak_uplift_m >= 0.0 && c.shortening_km >= 0.0);
+        assert!(c.frac > 0.0 && c.terrane_samples > 0);
+        assert_eq!(c.collision, c.frac >= p.tectonics.collision_min_frac);
+        for f in [c.lifted10, c.lifted100, c.emerged] {
+            assert!(f.width_km <= f.length_km + 1e-6);
+        }
+    }
+    // The sea floor: histograms add up to the samples, the last record is the last step's.
+    assert!(!d.ages.is_empty());
+    for a in &d.ages {
+        assert_eq!(a.hist.len(), dynamics::AGE_BINS);
+        assert_eq!(a.hist.iter().sum::<u32>(), a.samples);
+        assert!(a.p50_myr <= a.p90_myr && a.p90_myr <= a.max_myr);
+    }
+    assert!((d.ages.last().unwrap().t - st.t_myr).abs() < 1e-9);
+    // The note carries the whole record, beside the margins.
+    let note: serde_json::Value = serde_json::from_str(&with.notes["plates"]).unwrap();
+    let back: dynamics::Dynamics = serde_json::from_value(note["dynamics"].clone()).unwrap();
+    assert_eq!(back.steps.len(), d.steps.len());
+    assert_eq!(back.collisions.len(), d.collisions.len());
+    assert!(note["margins"].is_array());
+
+    // The same run without the record ends in the same world.
+    let without = run_stage_with(
+        PlatesStage::new(p.clone()).without_dynamics(),
+        &p,
+        |_, _, st| assert!(st.dynamics.is_none()),
+    );
+    let strip = |mut w: WorldState| {
+        let st = w.plates.as_mut().unwrap();
+        st.dynamics = None;
+        for c in &mut st.contacts {
+            c.cont_in = 0;
+        }
+        let mut note: serde_json::Value = serde_json::from_str(&w.notes["plates"]).unwrap();
+        note.as_object_mut().unwrap().remove("dynamics");
+        w.notes.insert("plates".into(), note.to_string());
+        w
+    };
+    same_world(&strip(with), &strip(without));
 }
