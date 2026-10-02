@@ -29,6 +29,10 @@ pub const TABLES: &[(&str, &str)] = &[
         include_str!("../../data/usgs/sedex_zn_pb.json"),
     ),
     ("petroleum", include_str!("../../data/usgs/petroleum.json")),
+    (
+        "impact_structures",
+        include_str!("../../data/usgs/impact_structures.json"),
+    ),
 ];
 
 /// One sourced number (or percentile set).

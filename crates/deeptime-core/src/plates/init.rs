@@ -412,6 +412,7 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
             hotspots: k.hotspots_initial,
             ..Counters::default()
         },
+        dynamics: None,
     };
     Ok((state, geo))
 }

@@ -30,6 +30,7 @@ use deeptime_format::EventId;
 use glam::DVec3;
 
 use super::Env;
+use super::dynamics::{CollisionRec, Moments};
 use super::events::{self, COLLISION, OROGENY_PHASE, PLATE_DEATH, TERRANE_ACCRETION};
 use super::geometry::{Geo, coast_split, dijkstra};
 use super::kinematics::{cap_speed, quat, tangent, to_group};
@@ -169,6 +170,20 @@ pub fn collide(
     );
     let r_rad = norm.rad(r_km);
     let mut uplifted = 0usize;
+    // Measurement only (`dynamics.rs`): the ground the surge lifted, by more than 10 m and 100 m,
+    // and from below the sea to above it; the overlap's continental crust.
+    let recording = state.dynamics.is_some();
+    let (mut m10, mut m100, mut memerged, mut mseeds) = (
+        Moments::default(),
+        Moments::default(),
+        Moments::default(),
+        Moments::default(),
+    );
+    if recording {
+        for &s in seeds {
+            mseeds.add(pos[s as usize]);
+        }
+    }
     for (i, &d) in dist.iter().enumerate() {
         if !d.is_finite() || d > r_rad {
             continue;
@@ -180,6 +195,17 @@ pub fn collide(
         let z = f64::from(s.elevation_m);
         let dz = dz_max * w * ceiling(z, p.uplift_ceiling_m);
         s.elevation_m = (z + dz).min(p.max_elevation_m) as f32;
+        if recording {
+            if dz > 10.0 {
+                m10.add(pos[i]);
+            }
+            if dz > 100.0 {
+                m100.add(pos[i]);
+            }
+            if z <= 0.0 && z + dz > 0.0 {
+                memerged.add(pos[i]);
+            }
+        }
         // The orogen proper is the core of the surge, where the crust thickened most (P1-27:
         // stamping everything the surge lifted by 10 m made belts 4,000 km wide, and most of
         // every continent a collision orogen); the rest only rises.
@@ -207,7 +233,12 @@ pub fn collide(
     state.plates[over as usize].omega =
         cap_speed(merged, &norm, p.max_plate_speed_mm_yr).to_array();
 
+    let (counted_km, cont_in, contact_onset_myr) = {
+        let c = &state.contacts[k];
+        (c.depth_km, c.cont_in, c.onset_myr)
+    };
     state.contacts[k].depth_km = 0.0;
+    state.contacts[k].cont_in = 0;
     let planet_area = norm.planet_area_km2(area_km2);
     let onset = super::subduction::confirm(state, world, env, k)?;
     let frac = area_km2 / state.a0_km2;
@@ -277,6 +308,42 @@ pub fn collide(
         dead.samples = 0;
         state.counters.plate_deaths += 1;
         state.counters.sutures += 1;
+    }
+    if recording {
+        let seeds_fp = mseeds.footprint(norm.model_km);
+        let under_plate = &state.plates[under as usize];
+        let rec = CollisionRec {
+            collision: frac >= p.collision_min_frac,
+            sutured: suture,
+            start_myr: t_myr,
+            end_myr: t_myr,
+            contact_onset_myr,
+            under,
+            over,
+            under_samples: under_samples as u32,
+            over_samples: over_samples as u32,
+            terrane_samples: terrane.len() as u32,
+            frac,
+            convergence_mm_yr: conv,
+            counted_km,
+            cont_in,
+            front_km: seeds_fp.length_km,
+            shortening_km: if seeds_fp.length_km > 0.0 {
+                f64::from(cont_in) * norm.sample_area_km2() / seeds_fp.length_km
+            } else {
+                0.0
+            },
+            peak_uplift_m: dz_max,
+            radius_km: r_km,
+            lifted10: m10.footprint(norm.model_km),
+            lifted100: m100.footprint(norm.model_km),
+            emerged: memerged.footprint(norm.model_km),
+            under_born_myr: under_plate.born_myr,
+            under_parent: under_plate.parent,
+        };
+        if let Some(d) = state.dynamics.as_mut() {
+            d.collisions.push(rec);
+        }
     }
     Ok(Collided {
         event,

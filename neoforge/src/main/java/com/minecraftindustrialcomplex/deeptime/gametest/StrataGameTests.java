@@ -124,7 +124,7 @@ public final class StrataGameTests {
     }
 
     /**
-     * A pure-vanilla pack resolves all 60 classes: the palette built from only the {@code minecraft:}
+     * A pure-vanilla pack resolves all 62 classes: the palette built from only the {@code minecraft:}
      * members of the member tags plus each class's {@code vanilla_fallback} gives every class a
      * vanilla block, stone or deepslate for exactly the {@link #CRUST_STAND_INS} and for no other
      * class, and rejects nothing. Without a rock datapack the live palette is exactly that view.
@@ -136,8 +136,8 @@ public final class StrataGameTests {
         RockPalette live = RockPalette.get();
         List<String> ours = deepTimeClasses(helper);
         Expect e = new Expect();
-        if (ours.size() != 60)
-            e.wrong.add("Deep Time ships " + ours.size() + " rock classes, not 60");
+        if (ours.size() != 62)
+            e.wrong.add("Deep Time ships " + ours.size() + " rock classes, not 62");
         Map<String, Integer> bySource = new TreeMap<>();
         for (String cls : ours) {
             e.checked++;
@@ -169,6 +169,8 @@ public final class StrataGameTests {
         e.that(vanilla, "loess", Source.VANILLA_FALLBACK, "minecraft:smooth_sandstone");
         e.that(vanilla, "peridotite", Source.VANILLA_FALLBACK, "minecraft:tuff");
         e.that(vanilla, "diamictite", Source.VANILLA_FALLBACK, "minecraft:cobbled_deepslate");
+        e.that(vanilla, "impact_breccia", Source.VANILLA_FALLBACK, "minecraft:cobblestone");
+        e.that(vanilla, "impact_melt", Source.VANILLA_FALLBACK, "minecraft:smooth_basalt");
         e.that(vanilla, "black_shale", Source.VANILLA_FALLBACK, "minecraft:smooth_basalt");
         e.that(vanilla, "rhyolite", Source.VANILLA_FALLBACK, "minecraft:granite");
         DeepTime.LOGGER.info("[gametest] vanillaOnlyResolvesEveryClass classes={} sources={} rockTags={}", ours.size(), bySource, rockTags(helper));
@@ -352,17 +354,11 @@ public final class StrataGameTests {
         boolean bic = tags && loaded(BIC), iaf = tags && loaded(ICE_AND_FIRE);
         e.that(live, "black_shale", bic ? modded : standIn, bic ? "born_in_chaos_v1:black_argillite" : "minecraft:smooth_basalt");
         e.that(live, "volcanic_ash", iaf ? modded : standIn, iaf ? "iceandfire:ash" : "minecraft:tuff");
-        // Diamictite (lithified till, 2026-09-30) is newer than the MIC rock tags: until a pack names
-        // it, its own stand-in holds; a pack fallback tag of the same block is just as right.
-        e.checked++;
-        var diamictite = live.result("diamictite").orElse(null);
-        List<String> diamictiteBlocks = diamictite == null ? List.of() : diamictite.blocks().stream().map(StrataGameTests::id).toList();
-        boolean standInHolds = diamictite != null && diamictite.source() == Source.VANILLA_FALLBACK
-                && diamictiteBlocks.equals(List.of("minecraft:cobbled_deepslate"));
-        boolean packNamesIt = tags && diamictite != null && diamictite.source() != Source.VANILLA_FALLBACK
-                && diamictite.source() != Source.NONE;
-        if (!standInHolds && !packNamesIt)
-            e.wrong.add("diamictite: " + (diamictite == null ? "no such class" : diamictite.source().id() + " " + diamictiteBlocks));
+        // Diamictite (lithified till, 2026-09-30) and the impact rocks (P2-08, 2026-10-01) are newer
+        // than the MIC rock tags: until a pack names them, their own stand-ins hold.
+        newerThanTheTags(e, live, tags, "diamictite", "minecraft:cobbled_deepslate");
+        newerThanTheTags(e, live, tags, "impact_breccia", "minecraft:cobblestone");
+        newerThanTheTags(e, live, tags, "impact_melt", "minecraft:smooth_basalt");
         if (!tags) {
             for (String cls : live.classes()) {
                 e.checked++;
@@ -381,10 +377,26 @@ public final class StrataGameTests {
     }
 
     /**
+     * A class newer than the MIC rock tags: until a pack names it, its own {@code vanilla_fallback}
+     * stand-in holds; with the rock tags loaded, a pack member or fallback tag that does name it is
+     * just as right.
+     */
+    private static void newerThanTheTags(Expect e, RockPalette live, boolean tags, String cls, String standIn) {
+        e.checked++;
+        var r = live.result(cls).orElse(null);
+        List<String> blocks = r == null ? List.of() : r.blocks().stream().map(StrataGameTests::id).toList();
+        boolean standInHolds = r != null && r.source() == Source.VANILLA_FALLBACK && blocks.equals(List.of(standIn));
+        boolean packNamesIt = tags && r != null && r.source() != Source.VANILLA_FALLBACK && r.source() != Source.NONE;
+        if (!standInHolds && !packNamesIt)
+            e.wrong.add(cls + ": " + (r == null ? "no such class" : r.source().id() + " " + blocks));
+    }
+
+    /**
      * The strata pass paints every class into the world: {@code test_planet_data} carries the
-     * every-class strata ({@code deeptime synth --strata every-class}), where any ten neighbouring
-     * 16-block cell columns hold all 60 classes 20 or more blocks below the surface. In ten cell
-     * columns on two rows, at SURFACE status, every horizon from the third down holds its class's
+     * every-class strata ({@code deeptime synth --strata every-class}), where any eleven neighbouring
+     * 16-block cell columns hold all 62 classes 20 or more blocks below the surface (a column's
+     * horizons from the third down are six consecutive classes, and 11 x 6 = 66 covers 62). In
+     * eleven cell columns on two rows, at SURFACE status, every horizon from the third down holds its class's
      * block (the member its key picks) at two depths, and a class that resolves to nothing leaves the crust (a
      * class that resolves to stone or deepslate (P1-28) is painted as that block, even where the crust was
      * the other one).
@@ -401,8 +413,11 @@ public final class StrataGameTests {
         TreeSet<String> seen = new TreeSet<>();
         long i0 = Math.floorDiv(-grid.originBlockX(), grid.r()), j0 = Math.floorDiv(-grid.originBlockZ(), grid.r());
         StrataPass.Column col = new StrataPass.Column(strata.stackDepth());
+        // Horizon h of column i is class (6i + h) mod N, so the horizons from the third down hold
+        // (stackDepth - 2) = 6 consecutive classes: ceil(62 / 6) = 11 neighbouring columns hold all.
+        int columns = Math.ceilDiv(classes.size(), Math.max(1, strata.stackDepth() - 2));
         for (long j : new long[]{j0, j0 + 3}) {
-            for (long i = i0; i < i0 + 10; i++) {
+            for (long i = i0; i < i0 + columns; i++) {
                 int x = (int) grid.blockX(i), z = (int) grid.blockZ(j);
                 var chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.SURFACE, true);
                 StrataPass.column(wd, strata, x, z, col);
@@ -430,7 +445,7 @@ public final class StrataGameTests {
                 }
             }
         }
-        if (classes.size() != 60)
+        if (classes.size() != 62)
             e.wrong.add("test_planet_data has " + classes.size() + " classes; gametest.sh must write it with --strata every-class");
         TreeSet<String> missing = new TreeSet<>(classes);
         missing.removeAll(seen);
@@ -449,7 +464,7 @@ public final class StrataGameTests {
         int count = json.get("count").getAsInt(), resolved = json.get("resolved").getAsInt();
         DeepTime.LOGGER.info("[gametest] probePalette count={} resolved={} sources={} unresolved={} problems={} rockTags={}",
                 count, resolved, json.get("sources"), json.get("unresolved"), json.getAsJsonObject("problems").keySet(), rockTags(helper));
-        helper.assertTrue(count >= 60, "the palette lists " + count + " classes");
+        helper.assertTrue(count >= 62, "the palette lists " + count + " classes");
         helper.assertTrue(resolved == count, (count - resolved) + " classes unresolved: " + json.get("unresolved"));
         helper.assertTrue(DeepTimeCommands.PROBE_PREFIX.startsWith("[deeptime-probe]"), "probe prefix");
         helper.succeed();
