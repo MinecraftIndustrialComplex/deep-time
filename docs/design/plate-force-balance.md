@@ -605,7 +605,34 @@ foreland from the flexural basin (`surface/flexure_m` below about −100 m besid
 of `foreland_km` all round.
 
 **Measured** (the tables are in `docs/design/plate-check-baseline.md`, section "Tasks 3 and 4"):
-MEASURED_SUMMARY
+on `earthlike_quick_16k`, supercontinent, 1000 Myr, seeds 1 to 4, against master 2c60ca3f.
+
+| Measure | Master | After | Target |
+|---|---|---|---|
+| Steps with one plate above half the planet | 44 % | 7.5 % | at most 10 |
+| Largest plate, median share | 0.47 | 0.28 | 0.15–0.35 |
+| Median plate lifetime | 49 Myr | 96 Myr | at least 80 |
+| Rift-born plates alive after 50 Myr | 24 % | 70 % | at least 60 |
+| Rift-born plates welded back to their rift family within 50 Myr | 30 % | 6 % | at most 10 |
+| Most land gained in any step | 2.2 % | 1.06 % | at most 1.5 |
+| Collision belt width and elongation, median | 2,470 km, 2.1 | 378 km, 6.2 | at most 800, at least 4 |
+| Collision length, median | 6 Myr | 28 Myr | 15–50 |
+| Collisions per 100 Myr | 10.9 | 4.9 | 2–6 |
+| Convergence 20 Myr after onset over at onset | no meaning (collisions end after 6 Myr; two runs have a value, 1.6 and −0.05) | 0.06 | 0.2–0.6 |
+| Wedge width; foredeep width and depth, median | none | 0 km; 0 km, 9 m | 100–350; 150–450, 2–7 km |
+| Continental crust, lowest step | 0.33 | 0.35 | at least 0.37 |
+| Active share of the continental margin | 0.31 | 0.40 | 0.25–0.40 |
+| plate-check targets met | 14 of 42 | 28 of 45 | |
+
+Hypsometry at 500 Myr (six runs): land 0.284, median 515 m, above 2 km 0.118, highest cell 6.6 km
+[5.4, 9.8], all inside their targets on the mean (master 2c60ca3f: 0.300, 605 m, 0.088, 4.6 km).
+
+So the three faults of the review are fixed on today's motion law, and this is a usable fallback
+state. What it does not deliver: the slowdown ratio (collisions stop within 20 Myr, because the
+resistance has to overcome a base speed that has no physical cause), and the wedge and foreland
+basin on the quick preset (belts of 1.6 to 2.3 km give a wedge narrower than one 71 km sample, so
+nothing loads the incoming plate; the flexure does bend a basin under a resolved wedge, by a test).
+Both are for the force balance (task 7) and a finer front; see the questions in STATUS.md.
 
 ## 10. Risks
 

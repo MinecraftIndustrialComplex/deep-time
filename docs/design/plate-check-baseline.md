@@ -11,6 +11,9 @@ That is the point of a baseline: it is what tasks 2-5 must move. The recording c
 run computes (a test shows it), and the plates are exactly those of the first baseline (fa09e8b):
 every figure of the first table below that did not change its definition is the same to the digit.
 
+**Update 2026-10-02 (tasks 3 and 4):** the last section, "Tasks 3 and 4", has the tables before and after the collision
+belts, the resistance and the weld on stall: 28 of 45 targets met.
+
 **Update 2026-10-02:** the section "Added 2026-10-02: the boundary mix and the arc heights" below
 adds five judged and many reported rows, and says how the rows above moved on master 1eac09f (general
 flexure on). The tables above are the baseline as first measured (master 38ca6b0).
@@ -607,3 +610,252 @@ that run was 5-8 % slower: the shared machine); repeated with `/usr/bin/time`: p
 of the plates stage (at most about 10 ms of a 0.5 s step) and nothing measurable of a run. The
 record grows from 236 to 416 KB per 300 Myr and from about 1.05 to 1.7-2.0 MB per 1000 Myr (1.94 MB
 for seed 1 on the merged tree): the per-plate force budget is 14 numbers a plate-step.
+
+## Tasks 3 and 4: belts, the wedge, resistance and the weld on stall (2026-10-02)
+
+`earthlike_quick_16k`, supercontinent, 1000 Myr, `stage volcanoes`, 2 threads, seeds 1 2 3 4, on the
+test VM, every run with `structure.deformation.density=0` (the structure stage writes nothing the
+plates read; it only saves time). Each cell is the mean, with the runs in brackets.
+
+- **Before: master 750fc2cd** is the master this branch started from.
+- **Before: master 2c60ca3f** is the master the branch was measured on (merged in during the work;
+  it differs from 750fc2cd by the impact and deposit science packages, which change the planets a
+  little through the coupled stages). This is the column to compare with.
+- **After** is the branch on 2c60ca3f, with the built-in preset (the light calibration below
+  included). Master 5c4d2ed3 (task 5, the forces recorded and not applied) was merged afterwards;
+  it changes nothing a run computes.
+
+The before columns are read by each master's own `plate-check` (the branch cannot read their
+checkpoints: the plate state changed). Three measures changed their definition with the belts, so
+their before and after values are not the same quantity: the belt's width, length and elongation
+(before: second moments of the ground the one-step surge raised by 100 m or more; after: the spread
+of the belt and wedge's uplift across the front, and the front's length), and the "lifted" and
+"land raised" measures (before: the surge's one step, which was the whole collision; after: the
+largest single step of a collision that lasts many).
+
+Reproduce (about 25 minutes a run on the loaded VM, two at a time):
+
+    tools/remote/mac.sh -- tools/remote/detach.sh start pc env R=<scratch> tools/review/plate-check.sh 1000 1,2,3,4 supercontinent base:structure.deformation.density=0
+    deeptime plate-check --run <checkpoint> --record rec.json && tools/review/belts-record.py rec.json
+
+### Judged
+
+The check meets **28 of its 45 ranged targets** (master 750fc2cd: 15 of 42; master 2c60ca3f: 14 of
+42; three more rows are judged now that belts exist).
+
+| Measure | Unit | Before: master 750fc2cd | Before: master 2c60ca3f | After: this branch | Target | After |
+|---|---|---|---|---|---|---|
+| Largest plate, median share of the planet | share | 0.484 (0.613 0.437 0.42 0.466) | 0.471 (0.442 0.371 0.544 0.526) | 0.282 (0.327 0.273 0.274 0.255) | 0.15–0.35 | pass |
+| Steps with one plate above 50 % | % | 46.4 (63.4 39.8 39.0 43.4) | 43.5 (37.4 30.0 54.4 52.2) | 7.50 (16.0 0.8 7.40 5.80) | ≤ 10.0 | pass |
+| Plates above 5 % of the planet, median | plates | 4.00 (3.00 4.00 4.00 5.00) | 3.75 (4.00 4.00 4.00 3.00) | 6.00 (6.00 6.00 6.00 6.00) | 5.00–9.00 | pass |
+| Median plate lifetime (plates that died) | Myr | 48.8 (66.0 46.0 47.0 36.0) | 48.8 (54.0 42.0 51.0 48.0) | 95.5 (91.0 87.0 94.0 110) | ≥ 80.0 | pass |
+| Plates dead within 20 Myr | % | 32.2 (30.8 30.3 34.4 33.1) | 29.9 (30.6 32.4 30.1 26.6) | 6.81 (12.3 4.62 6.30 4.07) | ≤ 15.0 | pass |
+| Rift-born plates alive after 50 Myr | % | 25.2 (23.5 33.3 24.2 19.7) | 23.6 (29.8 14.3 26.3 24.1) | 70.0 (64.4 75.0 64.9 75.5) | ≥ 60.0 | pass |
+| Rift-born plates welded back to their own rift family within 50 Myr | % | 37.1 (41.2 30.0 39.4 37.9) | 29.8 (21.3 22.9 47.4 27.8) | 6.10 (4.44 0 10.5 9.43) | ≤ 10.0 | pass |
+| Land raised by one collision in one step, the most | % of planet | 2.57 (3.13 1.65 2.84 2.67) | 2.98 (1.12 3.37 3.88 3.56) | 0.096 (0.094 0.109 0.119 0.063) | ≤ 0.5 | pass |
+| Most land gained in any step (after the first 10 Myr) | % of planet | 2.01 (2.21 2.17 1.91 1.76) | 2.19 (0.984 2.51 2.69 2.59) | 1.06 (1.11 0.988 1.15 0.993) | ≤ 1.50 | pass |
+| Collision belt width, median (belt and wedge, weighted by their uplift) | km | 2,520 (2,644 2,498 2,471 2,468) | 2,468 (2,486 2,172 2,491 2,724) | 378 (376 380 378 377) | ≤ 800 | pass |
+| Collision belt elongation, median | ratio | 2.28 (2.47 2.07 2.30 2.30) | 2.06 (2.03 2.08 2.34 1.78) | 6.15 (5.54 6.50 5.39 7.18) | ≥ 4.00 | pass |
+| Collision length, first to last step of the collision, median | Myr | 6.00 (6.00 6.00 6.00 6.00) | 6.00 (6.00 6.00 6.00 6.00) | 28.2 (26.0 30.0 28.0 29.0) | 15.0–50.0 | pass |
+| Collision length, first to last step, 90th percentile | Myr | 11.5 (10.0 10.0 14.0 12.0) | 12.3 (11.2 10.0 14.0 14.0) | 50.8 (49.0 58.0 42.4 53.6) | ≤ 120 | pass |
+| Peak uplift per collision: 90th ÷ 10th percentile | ratio | 1.00 (1.00 1.00 1.00 1.00) | 1.00 (1.00 1.00 1.00 1.00) | 14.6 (10.1 20.9 9.11 18.4) | ≥ 2.00 | pass |
+| Collisions per 100 Myr | per 100 Myr | 10.4 (8.50 11.8 10.4 10.9) | 10.9 (11.5 12.7 8.50 11.0) | 4.88 (4.00 5.10 5.00 5.40) | 2.00–6.00 | pass |
+| Continental crust, share of the planet, lowest step (after the first 10 Myr) | share | 0.341 (0.379 0.323 0.322 0.342) | 0.332 (0.309 0.282 0.399 0.335) | 0.35 (0.357 0.336 0.388 0.319) | ≥ 0.37 | FAIL |
+| Continental crust, share of the planet, highest step (after the first 10 Myr) | share | 0.459 (0.452 0.444 0.476 0.465) | 0.454 (0.453 0.456 0.459 0.447) | 0.451 (0.452 0.45 0.452 0.448) | ≤ 0.45 | FAIL |
+| Active share of the continental margin (after the first 90 Myr of the record) | share | 0.316 (0.316 0.306 0.332 0.309) | 0.307 (0.32 0.287 0.31 0.313) | 0.4 (0.423 0.386 0.381 0.41) | 0.25–0.4 | pass |
+| Ocean floor, 90th percentile age, mean over the run after the first 100 Myr | Myr | 193 (197 206 185 186) | 195 (193 211 190 187) | 193 (185 194 200 193) | ≤ 230 | pass |
+| Plate speed, area-weighted RMS (mean over steps) | mm/yr | 58.4 (56.8 60.3 57.1 59.3) | 59.2 (59.8 59.7 56.9 60.3) | 58.1 (57.8 59.1 58.0 57.7) | 40.0–100 | pass |
+| Plate speed, 10th percentile of plate-steps (plates of 30 samples or more) | mm/yr | 40.0 (41.7 40.6 39.9 37.8) | 40.6 (41.5 40.6 37.8 42.6) | 34.6 (33.1 32.2 37.5 35.7) | ≤ 20.0 | FAIL |
+| Plate speed, median of plate-steps (plates of 30 samples or more) | mm/yr | 72.4 (72.6 71.7 71.9 73.3) | 72.1 (70.6 72.5 73.5 71.6) | 67.4 (64.6 68.0 70.4 66.7) | 30.0–60.0 | FAIL |
+| Plate speed, 90th percentile of plate-steps (plates of 30 samples or more) | mm/yr | 85.3 (84.6 85.3 85.1 86.1) | 85.7 (85.0 86.1 86.4 85.3) | 84.0 (82.2 84.8 84.6 84.5) | 70.0–110 | pass |
+| Median speed of plates under 20 % continental ÷ of plates over 50 % | ratio | 1.56 (1.61 1.48 1.60 1.53) | 1.59 (1.56 1.57 1.73 1.48) | 1.62 (1.70 1.65 1.54 1.59) | ≥ 2.00 | FAIL |
+| Median speed of plates with 20 % or more of their edge on slab ÷ of plates under 5 % | ratio | 1.54 (1.54 1.49 1.55 1.59) | 1.52 (1.44 1.47 1.74 1.43) | 1.68 (1.73 1.75 1.64 1.62) | ≥ 2.50 | FAIL |
+| Speed against slab share of the edge, rank correlation | rho | 0.419 (0.348 0.449 0.422 0.457) | 0.411 (0.407 0.426 0.416 0.397) | 0.495 (0.524 0.492 0.503 0.462) | ≥ 0.65 | FAIL |
+| Speed against plate area, rank correlation | rho | -0.272 (-0.268 -0.293 -0.317 -0.211) | -0.279 (-0.261 -0.305 -0.312 -0.239) | -0.322 (-0.223 -0.248 -0.429 -0.386) | -0.4–0.2 | pass |
+| Plate-steps above 150 mm/yr | % | 0 (0 0 0 0) | 0 (0 0 0 0) | 0 (0 0 0 0) | ≤ 0.5 | pass |
+| Steps on which the speed guard binds | steps | 403 (420 403 411 378) | 383 (392 378 343 418) | 440 (423 438 417 481) | ≤ 0 | FAIL |
+| Change of a plate's rotation per step, median | % | 4.89 (4.87 4.90 4.84 4.97) | 4.95 (4.96 4.90 4.99 4.96) | 5.03 (5.03 5.06 5.00 5.03) | ≤ 8.00 | pass |
+| Change of a plate's rotation per step, 90th percentile | % | 8.89 (8.61 9.02 8.73 9.20) | 8.99 (9.12 8.95 8.92 8.95) | 9.43 (9.72 9.81 8.84 9.34) | ≤ 20.0 | pass |
+| Ocean floor, median age (mean over the run after the first 100 Myr) | Myr | 69.7 (72.8 73.2 65.9 66.7) | 72.6 (74.3 74.3 69.3 72.4) | 68.3 (70.9 66.1 71.3 65.1) | 50.0–80.0 | pass |
+| Ocean floor older than 180 Myr (mean over the run after the first 100 Myr) | % of sea floor | 12.1 (12.3 13.9 10.8 11.2) | 12.7 (12.6 14.9 11.6 11.7) | 11.5 (10.5 11.0 13.0 11.5) | ≤ 10.0 | FAIL |
+| Ocean floor older than 250 Myr (mean over the run after the first 100 Myr) | % of sea floor | 4.69 (4.73 5.74 3.79 4.51) | 4.81 (4.87 5.85 4.66 3.85) | 4.71 (4.19 5.35 4.63 4.68) | ≤ 3.00 | FAIL |
+| Supercontinent tenure (largest continent from assembled to dispersed), median | Myr | 38.0 (62.0 25.0 24.0 41.0) | 29.2 (8.00 25.0 24.0 60.0) | 9.50 (12.0 10.0 8.00 8.00) | 100–300 | FAIL |
+| Assembly-to-assembly period, median | Myr | 90.0 (93.0 106 45.0 116) | 65.0 (31.0 46.0 54.0 129) | 41.5 (26.0 34.0 86.0 20.0) | 400–800 | FAIL |
+| Plate boundary that is subducting (ocean-ocean and ocean-continent), share of the total length, mean over the run after the first 100 Myr | % of boundary | 56.2 (56.5 55.2 56.2 57.0) | 55.8 (54.6 55.2 57.4 56.0) | 55.8 (55.3 56.2 56.1 55.6) | 15.0–25.0 | FAIL |
+| Oceanic (island) arc cells above sea level, share of the arc cells, over the run after the first 100 Myr | % of arc cells | 15.4 (14.3 13.9 15.7 17.7) | 14.0 (13.1 12.5 16.7 13.5) | 18.5 (18.8 18.9 16.9 19.3) | 10.0–35.0 | pass |
+| Oceanic arc cells, 90th percentile elevation (the crest; mean over the run after the first 100 Myr) | m | 386 (313 308 393 528) | 269 (185 156 451 284) | 647 (662 676 541 708) | -1,700–1,000 | pass |
+| Continental arc cells, median elevation (mean over the run after the first 100 Myr) | m | 1,592 (1,463 1,504 1,627 1,775) | 1,574 (1,604 1,533 1,659 1,500) | 1,771 (1,896 1,848 1,674 1,665) | 1,200–4,500 | pass |
+| Continental arc cells, 90th percentile elevation (the crest; mean over the run after the first 100 Myr) | m | 2,698 (2,555 2,646 2,730 2,858) | 2,682 (2,659 2,671 2,766 2,633) | 3,091 (3,291 3,243 2,845 2,983) | 2,000–6,000 | pass |
+| Convergence 20 Myr after a collision's onset ÷ at onset, median | ratio | 0.565 (1.33 0.113 -0.438 1.25) | 0.759 (1.56 n/a -0.046 n/a) | 0.063 (0.012 0.088 0.065 0.086) | 0.2–0.6 | FAIL |
+| Wedge on the incoming side, width when the belt stood highest, median | km | n/a (n/a n/a n/a n/a) | n/a (n/a n/a n/a n/a) | 0 (0 0 0 0) | 100–350 | FAIL |
+| Foredeep width in front of a belt above 3 km, median | km | n/a (n/a n/a n/a n/a) | n/a (n/a n/a n/a n/a) | 0 (0 0 0 0) | 150–450 | FAIL |
+| Foredeep depth below local isostasy in front of a belt above 3 km, median | m | n/a (n/a n/a n/a n/a) | n/a (n/a n/a n/a n/a) | 9.49 (1.05 23.7 8.28 4.92) | 2,000–7,000 | FAIL |
+
+### What moved, and what did not
+
+**The review's three faults.**
+
+1. *Land pops up in round areas.* Fixed. The most land one collision raises in a step is 0.10 % of
+   the planet (3.0 % on master 2c60ca3f), the most land gained in any step 1.06 % (2.2 %, target
+   1.5), a belt is a median 378 km wide and 6.2 times longer than wide (2,470 km and 2.1), and a
+   collision takes a median 28 Myr (6). Peak uplift now differs between collisions (90th over 10th percentile 15,
+   was 1).
+2. *No Wilson cycle.* Fixed on these measures. Rift-born plates alive after 50 Myr: 70 % (24 %);
+   welded back to their own rift family within 50 Myr: 6 % (30 %); plates dead within 20 Myr: 7 %
+   (30 %); median plate lifetime 96 Myr (49).
+3. *The mega-plate.* Fixed on these measures. One plate above half the planet in 7.5 % of steps
+   (44 %; seed 1 alone 16 %), the largest plate a median 0.28 of the planet (0.47), six plates above
+   5 % (3.75). After a rift splits a plate above half the planet it takes a median 343 Myr until
+   one is above half again (28 Myr). Collisions per 100 Myr: 4.9 (10.9).
+
+**Not met.**
+
+- *Convergence 20 Myr after onset over convergence at onset*: 0.06 (target 0.2 to 0.6). Collisions
+  stop too quickly: with `collision_resistance_mm_yr` 200 a belt about 1 km high already cancels
+  40 mm/yr on a front as long as the plate's own slab, so most collisions have stalled by 20 Myr.
+  At 100 the collisions did not stop before consuming their continents (below). The present speed
+  law gives no middle: it drives a plate with no slab at 45 mm/yr for no reason, and the resistance
+  has to overcome that. This is the measure the force balance (task 7) is for.
+- *Wedge width* 0 km and *foredeep* 0 km wide, 9 m deep (targets 100 to 350 km, 150 to 450 km, 2 to
+  7 km). The wedge is built (a test shows it), but at 1.5 degrees it is as wide as the belt's edge
+  stands above the foreland over 26 m per km, and belts peak at a median 1.6 to 2.3 km (mean height
+  within half the belt's width): under one sample spacing (71 km) for most. The widest wedges are
+  150 to 215 km. With no wedge standing on the incoming plate there is no load on it: the belt is
+  on the other plate, and the boundary between them is a break in the flexure until they weld. So
+  the basin does not form on these planets, although the mechanism works (a flexure test with a
+  resolved wedge gives a basin of over 100 m in one step). Of the belts above 3 km (10 to 19 a
+  run) the widest foredeep of each run was 71 to 357 km and the deepest 170 to 310 m.
+- *Active share of the continental margin*: 0.40 (0.38 to 0.42), at the top of its range (0.31
+  on master). Fewer welds leave more continents on plates of their own, facing oceans that subduct.
+- *Continental crust, lowest step*: 0.35 (0.36 0.34 0.39 0.32), against master's 0.33 (0.31 0.28
+  0.40 0.34) and the target of 0.37. Not compensated: the loss on master comes from the flexure
+  feedback on arcs and from resampling (the crust bisect, 2026-10-02), which another task repairs.
+  What collisions themselves do to the crust is reported below.
+- The speed measures, the boundary mix (56 % subducting), the supercontinent tenure and period and
+  the old sea floor are the speed law's and are not this task's; they are within noise of master.
+
+**The crust that collisions consume.** Continental crust that crosses collision fronts is lost as
+area (the stacked share stays as thickness). Per 1000 Myr run 0.25 to 0.40 of the sphere's area
+crossed fronts (0.26 0.31 0.25 0.40; master: about 0.21, from 8.4 + 2.1 million km2 per 100 Myr),
+and a collision that ends in a weld has shortened by a median 280 to 500 km. The
+design's defaults (resistance 100 against a 3,000 km front, threshold 300 km) gave 0.53 and a
+lowest crust share of 0.18 to 0.25 on one seed; the four changes that brought it down are in the
+design's "As built: tasks 3 and 4".
+
+### Reported, not judged
+
+| Measure | Unit | Before: master 750fc2cd | Before: master 2c60ca3f | After: this branch | Target | After |
+|---|---|---|---|---|---|---|
+| Steps with one plate above 30 % | % | 74.8 (86.8 65.6 72.2 74.8) | 78.7 (83.4 66.8 84.4 80.2) | 41.2 (52.2 37.8 40.0 34.8) | – | – |
+| Largest plate, worst step | share | 0.933 (0.973 0.917 0.924 0.919) | 0.873 (0.874 0.893 0.855 0.871) | 0.665 (0.745 0.555 0.769 0.59) | – | – |
+| Plates alive, median | plates | 12.5 (14.0 12.0 13.0 11.0) | 13.5 (13.0 15.0 12.0 14.0) | 16.2 (13.0 16.0 17.0 19.0) | – | – |
+| After a rift splits a plate above half the planet: until one is above half again, median | Myr | 19.5 (16.0 21.0 27.0 14.0) | 27.8 (25.0 52.0 20.0 14.0) | 343 (532 n/a 198 298) | – | – |
+| Rift-born plates that died: median lifetime | Myr | 23.0 (20.0 33.0 19.0 20.0) | 22.0 (24.0 21.0 23.0 20.0) | 85.8 (72.0 86.0 91.0 94.0) | – | – |
+| Plate deaths by welding | per run | 104 (85.0 118 104 109) | 109 (115 127 85.0 110) | 48.8 (40.0 51.0 50.0 54.0) | – | – |
+| Plate deaths by absorption of a tiny plate | per run | 49.2 (47.0 46.0 53.0 51.0) | 46.2 (38.0 54.0 48.0 45.0) | 69.2 (62.0 74.0 75.0 66.0) | – | – |
+| Plate deaths subducted away | per run | 1.25 (1.00 1.00 3.00 0) | 2.75 (4.00 1.00 3.00 3.00) | 3.50 (4.00 5.00 2.00 3.00) | – | – |
+| Welds in which the dying plate is the larger one | % | 53.7 (48.2 56.8 49.0 60.6) | 56.2 (58.3 62.2 42.4 61.8) | 0 (0 0 0 0) | – | – |
+| Land, median share of the planet | share | 0.322 (0.323 0.3 0.36 0.303) | 0.305 (0.299 0.279 0.327 0.315) | 0.309 (0.359 0.285 0.308 0.286) | – | – |
+| Continental crust at the end, share of the planet | share | 0.355 (0.405 0.332 0.322 0.363) | 0.343 (0.309 0.31 0.409 0.342) | 0.352 (0.364 0.336 0.391 0.319) | – | – |
+| Ground one collision lifts by more than 10 m in one step: median | % of planet | 2.44 (2.25 2.22 2.70 2.61) | 2.39 (1.91 1.80 3.10 2.76) | 0.283 (0.286 0.288 0.269 0.29) | – | – |
+| Ground one collision lifts by more than 10 m in one step: the most | % of planet | 23.0 (20.4 24.2 27.8 19.7) | 25.5 (15.5 25.0 30.3 31.2) | 1.05 (0.883 1.33 0.913 1.06) | – | – |
+| Collision belt length, median (belt and wedge, weighted by their uplift) | km | 6,316 (6,040 6,304 7,232 5,688) | 6,073 (6,249 5,506 6,948 5,589) | 2,250 (2,116 2,488 2,052 2,343) | – | – |
+| Collisions whose belt is at least 3 times longer than wide | % | 29.5 (40.0 26.3 28.8 22.9) | 28.3 (28.7 29.9 36.5 18.2) | 84.3 (90.0 82.4 76.0 88.9) | – | – |
+| Contact age when the collision began, median | Myr | 3.75 (4.00 4.00 3.00 4.00) | 3.50 (4.00 4.00 4.00 2.00) | 5.25 (5.00 4.00 6.00 6.00) | – | – |
+| Contact age when the collision began, 90th percentile | Myr | 25.7 (23.2 24.6 26.8 28.0) | 24.5 (26.0 18.0 20.0 34.0) | 36.5 (34.0 36.0 52.4 23.4) | – | – |
+| Continental crust gone under at the collision, over the front's length, median | km | 88.6 (90.5 85.6 80.8 97.7) | 70.9 (61.8 68.9 63.1 89.9) | 373 (280 499 388 323) | – | – |
+| Continental crust gone under at the collision, 90th percentile | km | 243 (254 234 251 234) | 239 (271 202 240 242) | 892 (663 1,304 761 839) | – | – |
+| Shortening across the front at the transfer or weld (convergence integrated), median | km | 184 (202 173 159 204) | 168 (165 187 150 170) | 373 (280 499 388 323) | – | – |
+| Shortening across the front at the transfer or weld, 90th percentile | km | 328 (298 344 334 336) | 321 (316 328 334 307) | 892 (663 1,304 761 839) | – | – |
+| Collisions that fired with no collision state (no converging continental front) | % | 11.4 (8.24 12.7 14.4 10.1) | 10.6 (13.0 12.6 10.6 6.36) | 0 (0 0 0 0) | – | – |
+| Collision states that ended with no transfer or weld | per 100 Myr | 22.7 (25.1 23.2 23.1 19.4) | 27.2 (26.8 32.7 18.1 31.2) | 25.7 (20.3 27.4 27.1 27.8) | – | – |
+| Of them: the continental crust left the front | per 100 Myr | 6.23 (7.40 6.40 5.40 5.70) | 7.28 (6.10 8.80 6.10 8.10) | 11.1 (9.70 11.2 12.4 11.1) | – | – |
+| Of them: the contact reversed | per 100 Myr | 2.62 (3.80 2.40 2.60 1.70) | 3.00 (3.00 4.10 1.90 3.00) | 6.62 (5.00 8.00 5.50 8.00) | – | – |
+| Of them: the contact closed or a plate died | per 100 Myr | 13.6 (13.4 14.1 14.7 12.0) | 16.5 (17.2 19.0 9.70 20.0) | 7.20 (5.00 7.30 8.50 8.00) | – | – |
+| Their length, median | Myr | 3.50 (2.00 4.00 4.00 4.00) | 4.00 (4.00 4.00 4.00 4.00) | 5.50 (8.00 4.00 4.00 6.00) | – | – |
+| Their shortening, median | km | 95.1 (91.1 90.4 85.3 113) | 92.7 (91.0 90.5 89.5 99.8) | 94.9 (107 94.7 87.7 90.5) | – | – |
+| Their shortening, 90th percentile | km | 215 (199 231 194 235) | 206 (210 205 204 204) | 579 (655 550 435 675) | – | – |
+| Continental crust that crossed their fronts | million km² per 100 Myr | 2.08 (1.92 2.22 2.48 1.72) | 2.48 (2.46 2.99 1.40 3.07) | 7.05 (7.63 6.81 4.77 8.99) | – | – |
+| Continental crust that crossed the fronts of transfers and welds | million km² per 100 Myr | 8.38 (7.61 7.93 8.48 9.50) | 7.75 (6.81 8.15 7.70 8.33) | 8.44 (5.64 8.84 8.04 11.2) | – | – |
+| Ocean floor, 90th percentile age, last step | Myr | 205 (219 220 213 167) | 202 (204 171 235 197) | 206 (209 207 196 211) | – | – |
+| Continental crust, share of the planet, lowest step (all steps) | share | 0.341 (0.379 0.323 0.322 0.342) | 0.332 (0.309 0.282 0.399 0.335) | 0.35 (0.357 0.336 0.388 0.319) | – | – |
+| Continental crust, share of the planet, highest step (all steps) | share | 0.459 (0.452 0.444 0.476 0.465) | 0.454 (0.453 0.456 0.459 0.447) | 0.451 (0.452 0.45 0.452 0.448) | – | – |
+| Plate speed, median over plates and steps | mm/yr | 72.4 (72.6 71.7 71.9 73.3) | 72.1 (70.6 72.6 73.5 71.6) | 67.5 (64.7 68.0 70.4 66.8) | – | – |
+| Speed of plates with a slab on 20 % of their boundary or more | mm/yr | 72.0 (72.0 71.9 71.5 72.5) | 72.2 (70.8 72.9 73.5 71.6) | 69.2 (68.4 69.6 70.9 68.1) | – | – |
+| Speed of plates with a slab on less than 20 % of their boundary | mm/yr | 52.9 (52.5 54.2 53.1 51.9) | 53.8 (54.6 54.9 49.5 56.2) | 49.7 (47.8 47.4 52.4 51.1) | – | – |
+| Slab-attached ÷ other plate speed (Earth: 3 to 4) | ratio | 1.36 (1.37 1.33 1.35 1.40) | 1.35 (1.30 1.33 1.49 1.27) | 1.40 (1.43 1.47 1.35 1.33) | – | – |
+| Correlation of plate speed with slab share of the boundary | r | 0.444 (0.406 0.453 0.446 0.47) | 0.427 (0.412 0.428 0.486 0.382) | 0.462 (0.5 0.459 0.478 0.412) | – | – |
+| Slab share of the boundary, mean over plates and steps | share | 0.454 (0.484 0.428 0.465 0.439) | 0.446 (0.436 0.424 0.485 0.44) | 0.411 (0.393 0.413 0.431 0.409) | – | – |
+| Speed of mostly oceanic plates (under half continental) | mm/yr | 70.1 (70.4 69.5 69.9 70.6) | 70.2 (69.2 70.4 72.0 69.2) | 67.3 (66.4 67.6 69.2 66.2) | – | – |
+| Speed of mostly continental plates | mm/yr | 49.5 (48.0 51.7 49.2 49.1) | 48.7 (48.2 49.4 45.6 51.8) | 46.6 (44.3 45.7 49.5 47.1) | – | – |
+| Plate-steps above 150 mm/yr, count | plate-steps | 0 (0 0 0 0) | 0 (0 0 0 0) | 0 (0 0 0 0) | – | – |
+| Plate-steps on which the speed guard binds | plate-steps | 836 (876 841 930 695) | 755 (914 777 529 799) | 1,180 (1,060 1,075 1,041 1,545) | – | – |
+| Plate-steps turning about a pole on the plate itself | % | 10.6 (11.3 10.8 9.14 11.2) | 10.2 (12.2 9.70 9.97 9.08) | 10.7 (10.6 12.3 9.99 9.90) | – | – |
+| Plate-steps turning about a pole within 30° of their own centroid (design: near themselves) | % | 7.58 (7.25 6.05 7.34 9.68) | 6.22 (5.84 6.22 5.51 7.31) | 10.6 (11.4 11.2 8.74 10.9) | – | – |
+| Connected pieces of continental crust (of 1 % or more of it), median over steps | pieces | 4.25 (3.00 7.00 4.00 3.00) | 5.50 (6.00 6.00 4.00 6.00) | 5.25 (3.00 5.00 6.00 7.00) | – | – |
+| Largest continental piece, share of the continental crust, median over steps | share | 0.717 (0.839 0.492 0.735 0.803) | 0.595 (0.453 0.507 0.8 0.619) | 0.535 (0.816 0.549 0.373 0.4) | – | – |
+| Largest continental piece, share of the continental crust, lowest step | share | 0.24 (0.276 0.17 0.259 0.255) | 0.207 (0.183 0.159 0.249 0.239) | 0.156 (0.158 0.171 0.129 0.166) | – | – |
+| Supercontinent assemblies in the run (one at the start counts) | episodes | 8.75 (7.00 6.00 13.0 9.00) | 9.00 (9.00 10.0 10.0 7.00) | 14.2 (15.0 21.0 7.00 14.0) | – | – |
+| Steps with a supercontinent assembled | % | 56.2 (75.4 21.4 60.0 68.2) | 48.5 (25.8 34.8 75.6 57.8) | 39.6 (69.4 48.2 10.2 30.6) | – | – |
+| Rifts of a plate above 40 % of the planet, per run | rifts | 17.0 (12.0 12.0 23.0 21.0) | 15.5 (13.0 14.0 21.0 14.0) | 5.75 (5.00 6.00 7.00 5.00) | – | – |
+| A plate above 40 % of the planet: time above it until a rift splits it, median | Myr | 16.5 (25.0 15.0 10.0 16.0) | 13.2 (14.0 17.0 12.0 10.0) | 13.8 (18.0 7.00 20.0 10.0) | – | – |
+| Rifts of such a plate whose fragments are all still separate 50 Myr later (strict) | % | 9.55 (0 9.09 9.09 20.0) | 12.9 (8.33 23.1 5.00 15.4) | 52.9 (75.0 80.0 16.7 40.0) | – | – |
+| Rifts of such a plate not healed whole: two plates or more still hold its crust 50 Myr later | % | 33.2 (27.3 63.6 31.8 10.0) | 40.7 (58.3 69.2 20.0 15.4) | 85.8 (100 80.0 83.3 80.0) | – | – |
+| Plate boundary, total length per step, mean (after the first 100 Myr; Earth: 260,487 km, Bird 2003) | km | 340,623 (365,798 361,781 330,456 304,459) | 352,274 (343,597 345,340 346,028 374,130) | 354,802 (303,138 339,717 366,473 409,880) | – | – |
+| Subducting plate boundary, length per step, mean (after the first 100 Myr; Earth: 51,310 km, Bird 2003) | km | 191,474 (207,289 199,369 185,365 173,873) | 198,247 (190,056 191,579 200,690 210,665) | 198,442 (167,019 191,447 206,089 229,213) | – | – |
+| Oceanic arc cells, median elevation (mean over the run after the first 100 Myr; band cells include the flanks, not only summits) | m | -2,036 (-2,070 -2,241 -1,938 -1,894) | -2,206 (-2,354 -2,322 -1,919 -2,227) | -1,893 (-1,936 -1,850 -1,964 -1,824) | – | – |
+| Subducting boundary that is ocean-ocean, share of the subducting length (after the first 100 Myr) | % of subduction | 51.1 (53.6 50.6 50.3 50.1) | 53.0 (52.8 55.0 49.3 54.8) | 54.1 (53.0 53.4 54.1 55.8) | – | – |
+| Plate boundary that is spreading (ridge and rift), share of the total length (after the first 100 Myr) | % of boundary | 39.4 (39.2 40.2 39.4 38.8) | 39.7 (40.5 40.3 38.7 39.3) | 39.4 (39.6 39.1 39.6 39.2) | – | – |
+| Plate boundary at a collision (continental crust at the subducting side), share of the total length (after the first 100 Myr) | % of boundary | 3.09 (2.95 3.12 3.12 3.15) | 3.00 (3.09 2.87 2.77 3.26) | 3.60 (3.70 3.63 3.13 3.95) | – | – |
+| Plate boundary that is transform or converging with no contact yet, share of the total length (after the first 100 Myr) | % of boundary | 1.30 (1.40 1.48 1.35 0.988) | 1.48 (1.75 1.64 1.13 1.39) | 1.25 (1.41 1.12 1.21 1.26) | – | – |
+| Plate boundary that is subducting, share of the total length, first 50 Myr | % of boundary | 50.0 (48.7 51.9 47.3 52.1) | 50.0 (48.7 52.0 47.3 51.9) | 49.0 (46.9 51.4 46.3 51.5) | – | – |
+| Subducting boundary that is ocean-ocean, share of the subducting length, first 50 Myr | % of subduction | 63.5 (61.0 61.4 62.5 69.2) | 63.4 (61.1 61.2 62.5 68.8) | 62.7 (62.8 58.4 62.7 67.0) | – | – |
+| Plate boundary that is spreading, share of the total length, first 50 Myr | % of boundary | 47.9 (48.8 46.8 50.2 45.9) | 47.9 (48.8 46.6 50.2 46.0) | 48.6 (50.2 47.0 50.4 46.7) | – | – |
+| Plate boundary at a collision, share of the total length, first 50 Myr | % of boundary | 0.74 (0.844 0.552 0.643 0.921) | 0.732 (0.853 0.476 0.643 0.957) | 0.924 (1.00 0.595 1.26 0.841) | – | – |
+| Plate boundary that is transform or converging with no contact yet, share of the total length, first 50 Myr | % of boundary | 1.35 (1.64 0.817 1.83 1.10) | 1.37 (1.64 0.862 1.83 1.15) | 1.45 (1.83 0.95 2.09 0.937) | – | – |
+| Oceanic arc cells per step, mean (after the first 100 Myr) | cells | 2,977 (3,379 3,162 2,736 2,630) | 3,232 (3,117 3,266 2,891 3,654) | 2,994 (2,430 2,783 3,251 3,512) | – | – |
+| Continental arc cells per step, mean (after the first 100 Myr) | cells | 2,682 (2,905 2,674 2,733 2,416) | 2,604 (2,554 2,359 2,844 2,658) | 2,611 (2,400 2,583 2,672 2,791) | – | – |
+| Oceanic arc cells above sea level, share, first 50 Myr | % of arc cells | 22.3 (21.4 25.5 22.4 20.1) | 22.8 (21.3 27.4 22.4 20.1) | 25.2 (21.5 31.5 22.9 24.8) | – | – |
+| Oceanic arc cells, 90th percentile elevation, first 50 Myr | m | 673 (686 733 721 552) | 696 (678 831 727 549) | 824 (727 953 804 814) | – | – |
+| Continental arc cells, 90th percentile elevation, first 50 Myr | m | 2,561 (2,505 2,609 2,663 2,470) | 2,561 (2,510 2,610 2,661 2,465) | 2,652 (2,554 2,696 2,794 2,565) | – | – |
+| Share of a plate's driving torque that is slab pull, median (needs the force budget) | share | n/a (n/a n/a n/a n/a) | n/a (n/a n/a n/a n/a) | n/a (n/a n/a n/a n/a) | – | – |
+| Mean in-plane stress of a plate above 40 %, median; tension positive (needs the force budget) | MPa | n/a (n/a n/a n/a n/a) | n/a (n/a n/a n/a n/a) | n/a (n/a n/a n/a n/a) | – | – |
+| Steps in which a plate above 40 % is in tension (needs the force budget) | % | n/a (n/a n/a n/a n/a) | n/a (n/a n/a n/a n/a) | n/a (n/a n/a n/a n/a) | – | – |
+| Slab length per contact, median (needs slab tracking) | km | n/a (n/a n/a n/a n/a) | n/a (n/a n/a n/a n/a) | n/a (n/a n/a n/a n/a) | – | – |
+
+### Hypsometry at 500 Myr
+
+`tools/review/p1-17-hyps.sh 500 "1 2 3" "supercontinent scattered_continents"`, mean of six
+[min, max]. The highest cell is the top of each run's hypsometric curve (L1, the plate-and-surface
+raster), the 99th percentile the surface stage's `land_z_p99_m`.
+
+| Measure | Before: master 750fc2cd | Before: master 2c60ca3f | Design defaults (share 0.5, uplift 0.42; 2 runs) | After (share 0.8, uplift 0.55) | Target |
+|---|---|---|---|---|---|
+| Land share | 0.304 [0.291, 0.312] | 0.300 [0.252, 0.364] | 0.231, 0.236 | **0.284** [0.252, 0.307] | 0.27–0.30 |
+| Median land height | 746 m [686, 824] | 605 m [435, 799] | 462, 379 m | **515 m** [398, 571] | 430–640 m |
+| Land height, 90th percentile | 2,126 m [1,854, 2,382] | 1,890 m [1,517, 2,132] | | 2,169 m [1,941, 2,397] | – |
+| Land above 2 km | 0.118 [0.076, 0.152] | 0.088 [0.052, 0.119] | 0.066, 0.075 | **0.118** [0.094, 0.144] | 0.10–0.13 |
+| Highest L1 cell | 4.8 km [4.4, 5.3] | 4.6 km [3.7, 5.6] | 5.4, 5.7 km | **6.6 km** [5.4, 9.8] | 5.5–7 km |
+| 99th percentile of land | 3.2 km [2.7, 3.6] | 3.2 km [2.7, 4.2] | | 4.1 km [3.4, 4.5] | 4.2–5.5 km |
+| Sample-steps at the plate model's elevation guard | 0 | 0 | | 0 | 0 |
+| Median sea depth | 3,833 m | 3,935 m | | 3,706 m | – |
+| Continental crust | 0.409 [0.394, 0.425] | 0.418 [0.369, 0.459] | 0.360, 0.371 | 0.413 [0.388, 0.435] | – |
+| Active share of the continental margin | 0.33 | 0.32 | | 0.42 [0.39, 0.46] | 0.25–0.40 |
+| Glaciated land | 0.134 | 0.123 | | 0.137 | – |
+| Crust spread by the plateau flow, per run | | 35 to 10,300 km3 | | 190,000 to 680,000 km3 | – |
+
+Land, the median, the share above 2 km and the mean highest cell are inside their targets; master
+met only the land share (and, on 2c60ca3f, the median). One run of six has a cell at 9.8 km (above
+the 7 km of the range), three have their highest cell at 5.4 km (just under 5.5), and the 99th
+percentile is 0.1 km under its range. The active margin share is above its range here as in the
+1000 Myr runs. Four of the six "after" runs were made with the two values given as `--set`
+overrides before they went into the preset; the last two with the preset.
+
+**The light calibration** (the owner chose light at this landing). Tuned: `collision_resistance_mm_yr`
+100 to 200 and `collision_threshold_km` 300 to 100 (so collisions stop and small terranes accrete
+before they are consumed: plate measures), `collision_stacking_share` 0.5 to 0.8 and
+`subduction_uplift_mm_yr` 0.42 to 0.55 on the quick presets (0.34 to 0.45 on the full presets, by
+the same factor, not re-measured) for the hypsometry, which lost the surge's broad uplift. Not
+tuned: the belt width, the wedge slope, the weld speed and wait, the cordillera, `arc_continental_m`
+(one seed with 40 m instead of 80 m gave a lower crust share, 0.29 against 0.32: noise, and the
+coordinator asked that the crust not be compensated).

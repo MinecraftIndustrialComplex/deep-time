@@ -92,6 +92,40 @@ Until these tasks every collision lifted everything within up to 2,000 km of the
 same 1,400 m in the step the count fired, and welded the plates at once (the review's three faults:
 land popping up in round blobs, rifted oceans re-welding at once, a mega-plate).
 
+**Earth against the model** (`earthlike_quick_16k`, supercontinent start, 1000 Myr, seeds 1 to 4,
+2026-10-02, `tools/review/plate-check.sh`; all tables in `docs/design/plate-check-baseline.md`,
+section "Tasks 3 and 4").
+
+| Quantity | Earth | Model before | Model now |
+|---|---|---|---|
+| Collision belt: width, length over width | Himalaya 150–350 km wide and 2,400 km long; young belts 5 to 15 times longer than wide (Wikipedia, via the collisions design) | 2,470 km, 2.1 | 378 km, 6.2 |
+| How long a collision lasts | India–Asia 50 Myr and going on; Alleghanian 65 Myr (Wikipedia; no statistic exists) | one event, 6 Myr of state | median 28 Myr, 90th percentile 51 Myr |
+| Largest plate's share of the planet | 0.205 (the Pacific, Bird 2003 Table 1) | 0.47 | 0.28 |
+| Convergence 20 Myr after onset over at onset | India: about 15 to about 4 cm/yr in 15 Myr, 0.27 (Copley et al. 2010, abstract) | not defined (welded) | 0.06 |
+| Wedge on the arriving plate | the Himalaya, 151–350 km (Wikipedia) | none | median 0; the widest of a run 150–215 km |
+| Foreland basin | 100–300 km wide, 2–8 km of fill (DeCelles & Giles 1996, full text) | none | median none; under belts above 3 km at most 71–357 km wide, 170–310 m deep |
+| Belt height | Tibet about 5 km over 1,000 km | every collision 1,400 m | median peak 1.6–2.3 km (mean within 200 km of the front); the highest belts 4.7–6.5 km |
+
+**Limits and game choices.**
+
+- The motion law is still the speed rules, not forces. The resistance is a speed (mm/yr), tuned
+  (200) so that collisions stop before they consume their continents; they then stop sooner than
+  India did. A plate with no slab is driven at 45 mm/yr for no physical reason, and the resistance
+  has to overcome that.
+- Crust that crosses a collision front is lost as continental area; the share that stays (0.8 in
+  the pipeline presets, calibrated against the land's height distribution; 0.5 by design; no
+  measured value was found) thickens the belt. Per 1000 Myr 0.25 to 0.40 of the sphere's area in
+  continental crust crosses collision fronts; island arcs that mature into continental crust make
+  up for it, as on master.
+- On the quick preset a sample of the plate model is 71 km across. A wedge at 1.5° under a belt
+  2 km high is 76 km wide, so most wedges are one row of samples or none, and the foreland basin,
+  which needs the wedge's weight on the arriving plate, does not form: the plate boundary is a
+  break in the flexure until the plates weld. The mechanism is tested with a resolved wedge.
+- The belt's profile across its width, the weld speed and wait, the 3-step grace of a collision
+  and the terrane threshold are choices of the implementation (ledger `game-choice`).
+- The folds and faults of the structure stage follow the belt and wedge through the `collision`
+  regime; they do not yet read the real shortening or the flexural basin (task 6 of the design).
+
 ## The planned force balance: its constants and targets checked (WP-13a)
 
 Checked 2026-10-02, before the force balance is built, so that it is built on numbers that were
