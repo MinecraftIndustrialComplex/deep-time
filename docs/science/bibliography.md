@@ -75,9 +75,9 @@ By what the project's source library now holds (WP-0; the library is on the test
 
 | | Works |
 |---|---|
-| full text fetched, with a text layer or as HTML/XML text | 109 |
+| full text fetched, with a text layer or as HTML/XML text | 104 |
 | fetched, scan without a text layer | 6 |
-| landing page only (abstract or page shell) | 30 |
+| landing page only (abstract or page shell) | 35 |
 | not fetched | 240 |
 | **all** | **385** |
 
@@ -86,10 +86,10 @@ Library status by access class:
 | access | text | scan | landing page only | not fetched |
 |---|---|---|---|---|
 | open access | 63 | 0 | 8 | 22 |
-| open copy | 32 | 1 | 7 | 9 |
-| paywalled | 9 | 0 | 8 | 146 |
+| open copy | 30 | 1 | 9 | 9 |
+| paywalled | 7 | 0 | 10 | 146 |
 | book | 1 | 0 | 2 | 31 |
-| other | 2 | 0 | 4 | 22 |
+| other | 1 | 0 | 5 | 22 |
 | not found | 2 | 5 | 1 | 10 |
 
 Of the paywalled works, 7 now have a repository or open copy in the library (a substitute for the printed version) and 146 have none.
@@ -1335,7 +1335,7 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Cited as: (HYD, YNG) "Porter 1989 (Quat. Res. 32:245-261): snowlines some 500 m lower than today" (glacial.rs; plan §8.2) (AMP, GLA) "Porter 1989, Quat. Res. 32:245-261"
 - Ledger ids: GLA-030
 - Access: only the abstract was reachable; open-access status not checked [other sections: paywalled (abstract only, via OpenAlex)]
-- Library (the project's source library, not distributed): fetched (HTML page, 14,800 characters of text). From: https://doi.org/10.1016/0033-5894(89)90092-6. Text file: Porter1989.txt.
+- Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://doi.org/10.1016/0033-5894(89)90092-6. File: Porter1989.txt.
 - Read so far (by the project): (HYD, YNG) nothing stated (AMP, GLA) not stated
 - Read in this pass: (HYD, YNG) abstract fetched (OpenAlex, reconstructed from the inverted index) (AMP, GLA) abstract fetched
 - Reference check: (HYD, YNG) matches (the project's title is absent; authors, year, volume, pages match). (AMP, GLA) matches.
@@ -3287,7 +3287,7 @@ Vanilla's OverworldBiomeBuilder, Terralith, Tectonic (game and mod data), rustff
 - Cited as: (SCL, PRV, POL, BAK) "Mallard et al. 2016" (plan §8.1), "Mallard et al. 2016, Nature 535:140-143" (plate-collisions doc) (PLT) "Mallard et al. 2016, Nature 535:140-143".
 - Ledger ids: PLT-145, SCL-030
 - Access: paywalled (abstract only); HAL submitted version exists but was not reachable; the research note links a Caltech course copy (https://web.gps.caltech.edu/~jstock/161/PapersToRead/nature17992-Mallard.pdf, certificate error from this tool) [other sections: paywalled in Nature (a Caltech-hosted copy was used by the research note; not located here).]
-- Library (the project's source library, not distributed): fetched (HTML page, 16,662 characters of text). From: https://www.nature.com/articles/nature17992. Text file: Mallard2016.txt.
+- Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://www.nature.com/articles/nature17992. File: Mallard2016.txt.
 - Read so far (by the project): (SCL, PRV, POL, BAK) not stated (PLT) research note Q2 says the PDF was read from web.gps.caltech.edu.
 - Read in this pass: (SCL, PRV, POL, BAK) abstract fetched (Europe PMC record) (PLT) metadata only.
 - Reference check: (SCL, PRV, POL, BAK) citation matches (authors, venue, volume, pages, year). The abstract supports "seven large plates ... and smaller plates whose areas follow a fractal distribution". The specific split near 10^7.6 km^2 was not in what I could read; see spot check SCL-030. (PLT) correct.
@@ -3827,7 +3827,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: "Zahirovic et al. 2015, EPSL 418:40-52".
 - Ledger ids: PLT-025, PLT-198
 - Access: paywalled (closed; OpenAlex has no open URL and no abstract).
-- Library (the project's source library, not distributed): fetched (HTML page, 12,562 characters of text). From: https://www.earthbyte.org/tectonic-speed-limits-from-plate-kinematic-reconstructions/. Text file: Zahirovic2015.txt.
+- Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://www.earthbyte.org/tectonic-speed-limits-from-plate-kinematic-reconstructions/. File: Zahirovic2015.txt.
 - Read so far (by the project): link given.
 - Read in this pass: metadata only (Crossref). Speed numbers could not be read.
 - Reference check: correct.
@@ -3907,7 +3907,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: "Huang et al. 2019 (G3 20:4830-4848)".
 - Ledger ids: PLT-196
 - Access: open copy at par.nsf.gov.
-- Library (the project's source library, not distributed): fetched (HTML page, 15,725 characters of text). From: https://par.nsf.gov/biblio/10127684. Text file: Huang2019.txt.
+- Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://par.nsf.gov/biblio/10127684. File: Huang2019.txt.
 - Read so far (by the project): from abstract.
 - Read in this pass: abstract fetched (Crossref).
 - Reference check: correct. The abstract does give "extensional stress of 20-50 MPa in its interior" for a homogeneous supercontinent, matching the design.
@@ -4090,7 +4090,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Cited as: "Archer et al. 2009"
 - Ledger ids: CLM-048
 - Access: open copy at https://orbi.uliege.be/handle/2268/12933 (landing page only seen)
-- Library (the project's source library, not distributed): fetched (HTML page, 13,053 characters of text). From: https://orbi.uliege.be/handle/2268/12933. Text file: Archer2009.txt.
+- Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://orbi.uliege.be/handle/2268/12933. File: Archer2009.txt.
 - Read so far (by the project): not stated
 - Read in this pass: search result snippet only (citing passages)
 - Reference check: matches (year 2009, vol 37, pp 117-134).
