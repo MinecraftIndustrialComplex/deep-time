@@ -417,7 +417,14 @@ this; it is on the WIP branch.
 
 ## 8. Tasks
 
-1. **Projection-neutral refactor, equirect kept.** Write the module of §2 with the equirectangular
+1. **Projection-neutral refactor, equirect kept.** *Built 2026-10-02 (branch
+   `worktree-agent-a3186d42ee9449d3d`): Rust `deeptime_format::projection` with the `GridDesc`
+   helpers, Java `worlddata/Projection`, the pages' `projection.js` (`window.DTProj`); the
+   sites of §3 call them, except the spatial-index frames (S), which stay fixed (the module's
+   documentation says why) and the synthetic test terrain's analytic latitude (its own formula,
+   twinned in Java). `tools/review/projection-identity.sh` shows the outputs bit-identical to
+   master (359 files: synthetic worlds, the test planet's bake, keyframes, satellite picture,
+   parity fixtures, deposit world).* Write the module of §2 with the equirectangular
    projection as its first implementation. Route every site of §3 through it, and add the parity
    fixture's projection block.
    - Output stays bit-identical: same bakes, same pictures, same tests.

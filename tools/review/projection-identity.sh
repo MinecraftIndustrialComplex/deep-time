@@ -50,7 +50,8 @@ def clean(v):
 for root, _, files in os.walk("."):
     for f in files:
         p = os.path.join(root, f)
-        if f == "log.txt":
+        # The run's log, and the viewer bundle's code (the page, its scripts): code, not output.
+        if f == "log.txt" or f in ("index.html", "viewer.js", "projection.js"):
             continue
         b = open(p, "rb").read()
         if f == "bundle.js" and b.startswith(b"window.DT_BUNDLE = "):
