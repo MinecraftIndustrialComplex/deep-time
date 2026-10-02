@@ -120,6 +120,9 @@ dependencies {
     // -PwithMic runs load them from the mic server set.
     compileOnly("maven.modrinth:create-ore-excavation:${coe_version}") { transitive = false }
     compileOnly("maven.modrinth:create-diesel-generators:${cdg_version}") { transitive = false }
+    // TerraBlender 4.1.0.8 (LGPL-3.0; P1-10): compileOnly for compat/terrablender (TerraBlenderRegions,
+    // RegionTrees) and mixin/compat/terrablender. -PwithTerraBlender runs load it from the terrablender set.
+    compileOnly("maven.modrinth:terrablender:${terrablender_version}") { transitive = false }
 
     testImplementation platform("org.junit:junit-bom:${junit_version}")
     testImplementation 'org.junit.jupiter:junit-jupiter'
