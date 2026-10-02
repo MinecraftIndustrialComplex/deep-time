@@ -52,7 +52,9 @@
 //! over the size of the previous one (`|Ω − Ω_prev| / |Ω_prev|`: direction and rate together); it
 //! is known only when the plate existed at the previous step. `pole_inside` is whether the
 //! plate's rotation pole (either end of its axis) lies on the plate: the visible sample nearest to
-//! it belongs to the plate. `guard` is whether the speed guard (`max_plate_speed_mm_yr`) holds the
+//! it belongs to the plate. `spinning` is whether the pole is within [`SPIN_ANGLE_DEG`] of the
+//! plate's centroid (either end of the axis): the plate then turns in place more than it travels
+//! (the design's "turning about a pole near themselves"). `guard` is whether the speed guard (`max_plate_speed_mm_yr`) holds the
 //! plate: its rotation is at the cap, which is where every clamp leaves it. A clamp that a later
 //! one in the same step overwrote is not seen; the measure is the plate's state after the step.
 //!
@@ -97,6 +99,10 @@ pub const PIECE_LINK_SPACINGS: f64 = 2.0;
 const POLE_INSIDE: u8 = 1;
 const GUARD_BOUND: u8 = 2;
 const ROT_KNOWN: u8 = 4;
+const SPINNING: u8 = 8;
+/// A plate whose rotation pole is within this many degrees of its own centroid (either end of the
+/// axis) mostly spins in place.
+pub const SPIN_ANGLE_DEG: f64 = 30.0;
 
 /// The dynamics of a run, from the first step to the latest.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -193,7 +199,7 @@ pub struct BeltRec {
 
 /// A plate in a step. Serialised as the array `[id, visible, continental, speed_mm_yr, front_km,
 /// boundary_km, rot_change, flags]` (flags: 1 pole inside, 2 speed guard bound, 4 `rot_change`
-/// known).
+/// known, 8 spinning).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(from = "[f64; 8]", into = "[f64; 8]")]
 pub struct PlateStep {
@@ -218,6 +224,8 @@ pub struct PlateStep {
     pub pole_inside: bool,
     /// Whether the speed guard holds the plate's rotation at its cap.
     pub guard: bool,
+    /// Whether the pole is within [`SPIN_ANGLE_DEG`] of the plate's centroid: it turns in place.
+    pub spinning: bool,
 }
 
 impl PlateStep {
@@ -250,6 +258,7 @@ impl From<[f64; 8]> for PlateStep {
             rot_known: flags & ROT_KNOWN != 0,
             pole_inside: flags & POLE_INSIDE != 0,
             guard: flags & GUARD_BOUND != 0,
+            spinning: flags & SPINNING != 0,
         }
     }
 }
@@ -259,7 +268,8 @@ impl From<PlateStep> for [f64; 8] {
         let flag = |on: bool, bit: u8| if on { bit } else { 0 };
         let flags = flag(p.pole_inside, POLE_INSIDE)
             | flag(p.guard, GUARD_BOUND)
-            | flag(p.rot_known, ROT_KNOWN);
+            | flag(p.rot_known, ROT_KNOWN)
+            | flag(p.spinning, SPINNING);
         [
             f64::from(p.id),
             f64::from(p.visible),
@@ -634,6 +644,7 @@ pub fn record_step(
     let spacing_km = env.norm.km(env.norm.spacing_rad());
     let round = |x: f64, scale: f64| (x * scale).round() / scale;
     let cap = env.norm.omega_of_speed(env.k.max_plate_speed_mm_yr);
+    let spin_cos = SPIN_ANGLE_DEG.to_radians().cos();
     let prev: BTreeMap<u32, DVec3> = d
         .prev_omega
         .iter()
@@ -658,6 +669,8 @@ pub fn record_step(
                     nearest.plate(2 * j) == p.id || nearest.plate(2 * j + 1) == p.id
                 }),
                 guard: cap > 0.0 && w.length() >= cap * (1.0 - 1.0e-9),
+                spinning: w.length() > 0.0
+                    && w.normalize().dot(DVec3::from_array(p.centroid)).abs() >= spin_cos,
             }
         })
         .collect();
@@ -865,6 +878,7 @@ mod tests {
                 rot_known: true,
                 pole_inside: true,
                 guard: false,
+                spinning: true,
             }],
             pieces: vec![40, 7],
             ..StepRec::default()
@@ -879,7 +893,7 @@ mod tests {
         let v = serde_json::to_value(&d).unwrap();
         assert_eq!(
             v["steps"][0]["plates"][0],
-            serde_json::json!([3.0, 60.0, 20.0, 41.5, 300.0, 900.0, 0.0625, 5.0])
+            serde_json::json!([3.0, 60.0, 20.0, 41.5, 300.0, 900.0, 0.0625, 13.0])
         );
         // The physics-to-come fields are there, empty (the checkpoint's postcard has no optional
         // fields).
