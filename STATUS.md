@@ -201,10 +201,18 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   game choices, open questions); ledger ORE-262 to ORE-266 new, ORE-020, -117, -127, -136, -222, -232, -261, DEP-020, -040,
   -044, -059, -070, -089, -114, -203, HNT-021, -089 changed, HNT-090 and -091 new; bibliography section added;
   `claims_counts.py --write`.
-- **Gates** (test VM): `cargo fmt --check` clean; clippy `-D warnings` clean; `cargo test --workspace` all passed (core 513, 3
-  ignored); `./gradlew build test` 229 tests, 0 failures, 1 skipped; `cargo deny`, GameTests: see the next bullet.
-- **Next step.** The coordinator merges; the owner answers the BIF count question; then the scratch folder
-  `/Volumes/Graphide/ban/deeptime-runs/deposit-richness` is deleted (`deposit-richness-runs.sh clean`).
+- **Gates** (test VM, the tree merged with master 5c4d2ed3 at 9b6b642d; master 00ef214c, docs only, merged after):
+  `cargo fmt --check` clean; clippy `-D warnings` clean; `cargo deny check licenses bans` ok; `cargo test --workspace` all
+  passed (core 530, 3 ignored; 0 failed in every suite); `./gradlew build test` 229 tests, 0 failures, 1 skipped;
+  `./gametest.sh`, `./gametest.sh -PwithMic` (168 mods, set reinstalled) and `./gametest.sh -PwithEv` (set installed first:
+  the first detached run failed only because the `ev` set was not installed in this checkout's VM copy): all 68 required
+  tests passed in each, under the server lock. The deposit scan places the raw blocks exactly (`test_deposits` porphyry
+  stockwork: due 5,188, placed 4,958 exact, 0 missed, 0 unexplained, 73 `minecraft:raw_copper_block`).
+- **Continued** by a second agent after the first was stopped (same worktree): the `-PwithEv` gate, the reachable-deposit
+  figures, the expectations in the pending question; no code change.
+- **Next step.** The coordinator merges and puts the BIF count question to the owner. The scratch folder
+  `/Volumes/Graphide/ban/deeptime-runs/deposit-richness` keeps only the audits, censuses and gate logs (the worlds and
+  binaries are deleted); `deposit-richness-runs.sh clean` removes the rest once the question is answered.
 ### 2026-10-02 — Continental crust bisect: the flexure merge cuts the crust (agent worktree agent-aee75761ddffd745f, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; measurement only, nothing fixed, no code committed)
 - **Question.** `deeptime plate-check` on `earthlike_quick_16k`, supercontinent start, 1000 Myr: continental
   crust at the end 0.42 on 38ca6b0 (baseline doc, mean of seeds 1-4) and 0.29 on 1eac09f.
