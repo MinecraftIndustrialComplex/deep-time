@@ -446,7 +446,16 @@ mod tests {
         let t = Tables::get();
         let (mut rng, mut next) = (Rng::new(7), 0u32);
         let out = emplace(
-            &grid, 300.0, &x, &p, &t, 1.0, 0.0, &mut rng, &mut next, |_, _| None,
+            &grid,
+            300.0,
+            &x,
+            &p,
+            &t,
+            1.0,
+            0.0,
+            &mut rng,
+            &mut next,
+            |_, _| None,
         );
         assert!(out.len() > 20, "{} plutons", out.len());
         for pl in &out {
