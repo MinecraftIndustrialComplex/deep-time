@@ -55,6 +55,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P3-04 | Distant Horizons far terrain (asked for ahead of Phase 3, Ben 2026-10-01) | done | 2026-10-01 | — | Branch worktree-agent-a6e8592da3ce000d8, not merged. DH LODs from the world data through a world-generator override bound by name (DH 3.3.0's merged `_neoforge` API and 3.3.1+'s published one). VM: JUnit 180/0 (`FarColumnTest` 14, `DhApiBindingTest` 4 on the real 3.3.0 and 3.3.3 jars); `FarTerrainGameTests` 3 of 3 (ground within a block 117 of 119, water and biome 119 of 119); smoke `dh` (`run.py --dh`): registered, DH's server-side pregen fed 257 sections with no failure, what DH stores has far terrain's surface in 400 of 400 columns, far terrain 9.6–11.1 ms a section; smoke `dh-next` (DH 3.3.3): Toroidal World refuses the override (pending question). Looks unverified (no client). See build log |
 
 | P2-01 | Fold-and-fault engine (Noddy evaluator; pulled forward, log 2026-10-01) | doing | 2026-10-01 | | Branch worktree-agent-a49703993341aa701 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), **not merged: waits for the coordinator's merge and GameTest batch**. Stage A (the port, bit-exact against the original C) and **stage B** are built: format 0.3 with `structure/events.dtst`, the deformed column rule in Rust and Java (`ColumnParityTest` over deformed columns, 173 JUnit tests, 0 failures), unconformities by age key, stocks, dykes and plugs as intrusion events, traps from the world's own structures, fault scarps and rift valleys in the amplifier, grouped `fold_belt` / `fault_system` events, `deeptime structure-sections` and the structure census of `strata-check`. `earthlike_quick_16k`, 500 Myr: 12,657 events (1,081 fold trains, 3,848 thrusts, 1,256 normal and 261 strike-slip faults, 2,760 stocks, 2,647 dykes, 804 plugs); they change 52 % of land columns, none of 20,000 malformed; the column rule costs 0.60 ms a chunk through them against 0.44 without (Java, one thread); land share 0.2770 with the relief and without, land median 661.1 m against 661.0. cargo fmt, clippy -D warnings, test --workspace, deny and `gradlew build test` clean after merging master ea40d3b (200 JUnit tests, GameTests 65 of 65 default and MIC). GameTests on the branch (allowed for this task): `./gametest.sh` and `./gametest.sh -PwithMic` (168 MIC mods): all 60 required tests passed in each. See the build log. |
+| SCI-1 | Science documentation, stage 1: the claims ledger, bibliography, feature pages (log 2026-10-02) | done | 2026-10-02 | | Branch worktree-agent-a33b33f9ecaf3af1a (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), not merged, not pushed. Docs only: `docs/science/` (README, claims.md with 2,069 ledger rows in `ledger/`, bibliography with 475 entries, 403 spot checks, two full pages, 17 stubs), `docs/research/README.md`, seven session notes, the standing rule in CLAUDE.md. No row is `verified`. One coded constant found wrong against its own citation (IMP-042, complex crater depth). Stage 2 work packages are at the end of `docs/science/claims.md`. |
 ## Review pages
 | Name | URL | Version label | Date |
 |---|---|---|---|
@@ -100,6 +101,69 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P2-08 impacts | **Impact deposits do not claim their materials.** Diamonds, nickel, platinum and uranium are products of the impact deposit types, and a claimed material loses its scattered ore in a Deep Time world; impact deposits are far too rare to be the only source, so the four types carry `minecraft.claims_scatter: false` and vanilla diamonds and the pack's nickel, platinum and uranium ores keep generating. (a) Keep it so (recommended); (b) claim them and add background scatter for each. Their tonnages, grades and densities are design values (no USGS model exists) and belong to the deposit audit's richness question. | Not asked yet |
 
 ## Build log
+### 2026-10-02 — Science documentation, stage 1: every claim in the code ledgered, sources resolved, two pages written (agent worktree agent-a33b33f9ecaf3af1a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; docs only)
+- **Ask.** Ben, decisions log 2026-10-02: the mod "as backed by science as possible", Markdown in the repo, "Check everything,
+  fix the code". Stage 1 changes no simulation or game code, presets or tests: it makes the unchecked visible. Stage 2
+  verifies each row and fixes the code. Branch `worktree-agent-a33b33f9ecaf3af1a`, master 60fc341 merged in, not merged,
+  not pushed.
+- **What is new** (all under `docs/`, plus CLAUDE.md and this file):
+  - `docs/science/README.md`: what the mod simulates, the pipeline, the page list, the status marks, the standing limits.
+  - `docs/science/claims.md`: the ledger's front (counts, column and status definitions, known gaps, the verification
+    plan). The rows are in `docs/science/ledger/<PREFIX>.md`, 24 files, because one file would be about 940 KB.
+  - `docs/science/bibliography.md` (sources the code relies on, full references, access, how read),
+    `bibliography-research-notes.md` (the further sources the report, notes and designs cite, as they write them) and
+    `spot-checks.md` (values the bibliography pass tried to read in their sources, with the passage quoted).
+  - `docs/science/_template.md`, two full pages (`impacts.md`, `volcanoes-and-magma.md`) and 17 stub pages.
+  - `docs/science/extraction-notes/`: per subsystem, the measured Earth-against-mod numbers found in this build log, the
+    stated simplifications, and flags; and `preset-coverage.md` (all 342 leaves of `earthlike_quick_16k` with their owner).
+  - `docs/research/README.md` (index of every note and design with its date) and seven `docs/research/notes/session-*.md`
+    notes recovered from the coordinator's conversation (Rust against Java, GPU against CPU, lava realism, the mountain
+    height limit, polar climate bands, supercontinent heating, the Distant Horizons version).
+  - CLAUDE.md: the rule "Science documentation is part of done", and `docs/science/` in the authority list.
+- **Counts.** 2,069 ledger rows: `game-choice` 723, `uncited` 635, `cited-unverified` 522, `calibrated` 76,
+  `abstract-only` 60, `from-memory` 53, `verified` 0; 377 of them `pending-rewrite` (today's plate motion and banded
+  climate) and 57 `not-yet-coded` (constants of the two approved designs). By ledger: PLT 212, CLM 146, MOI 76, BIO 99,
+  ERO 167, ISO 39, HYP 34, HYD 76, YNG 21, AMP 71, GLA 66, VOL 73, MAG 42, IMP 141, RCK 84, STR 48, DEF 74, DEP 204,
+  ORE 257, PRV 27, SCL 51, BAK 40, POL 21, GEO 0 (geothermal features are not on master). Bibliography: 475 entries
+  (a work cited in two subsystems counted twice; 94 known duplicate keys): 206 paywalled, 108 open access, 70 open
+  copy, 40 books, 15 not found, 7 unidentified; read in this pass: 74 in full text, 119 abstract, 29 secondary or
+  snippet, 228 not fetched. Spot checks: 403 (176 match, 134 partial, 19 mismatch, 74 could not read).
+- **How it was made.** Fourteen Sonnet sub-agents, one per subsystem, read the code, the presets, the data files and this
+  build log and wrote ledger rows, source lists and flags; ten more resolved the references by web lookup and tried to
+  read the most important values in their sources; one recovered the session notes from the transcript. The lead (Opus)
+  assembled, normalised the statuses, removed machine names and paths, read the impacts and volcano material in full and
+  wrote the pages, the README, the ledger front and the plan. No cargo, Gradle or test run: nothing executable changed.
+- **Found (nothing fixed; all in `docs/science/claims.md`, "Found in stage 1: fix first").** (1) IMP-042: complex crater
+  depth is coded 0.294 D^0.301 km citing Collins et al. 2005 eq. 28, which reads 0.4 D^0.3 km (read in the paper's text by
+  the lead): craters over 3.2 km are about 27 % too shallow, as the impacts agent suspected. (2) The deposit time windows
+  are not applied on real histories (the BIF, oxygen and land-plant clocks are hard-coded), so no BIF ever forms. (3) The
+  richness setting does not reach the blocks. (4) Köppen tests the polar group before the dry group, against Peel et al.
+  2007. (5) Holdridge biotemperature lacks its 30 degC upper limit. (6) Soil-production depth scale 5 m against about
+  0.25 to 0.5 m in secondary sources. (7) `k_spl` 2e-9 in the Rust default, 3e-9 in the presets. (8) An editor hint for the
+  impact rate is wrong by a factor of a million. (9) The one paper the volcano code cites says, in its abstract, that arc
+  volcano spacing has no characteristic value. (10) The "3 to 4 times faster" plate-speed ratio is attributed to Forsyth
+  & Uyeda 1975 and found in Conrad & Lithgow-Bertelloni 2004. Twenty-six such items are listed. Confirmed correct, from
+  the sources: every Table 3 constant of Cortial et al. 2019; the USGS grade and tonnage tables of the metal deposit
+  families; every Köppen threshold of Peel et al. 2007; the Landlab carbonate and marine constants; the other Collins et al.
+  2005 crater laws.
+- **Against the task or the rules.** The ledger is split into `ledger/*.md` files with `claims.md` as its front, not one
+  file. `spot-checks.md`, `extraction-notes/` and `bibliography-research-notes.md` were not asked for. No row is marked
+  `verified`: the spot checks were made by sub-agents, and only IMP-042 was re-read by the lead. The CLAUDE.md step
+  "set your task to doing and push" was not done (the task forbids pushing).
+- **Not covered.** Test modules; `plates/dynamics.rs`, `geometry.rs`, `noise.rs`, `state.rs`; `structure/deform/lattice.rs`;
+  solver internals; the Java twins of Rust code; the editor hint texts as a whole; presets other than
+  `earthlike_quick_16k` beyond a diff; the test presets. Duplicate rows between ledgers (ocean age-depth in PLT and ISO,
+  rock erodibility in ERO and RCK, coal and petroleum in DEP and ORE, the equilibrium-line rule in CLM, GLA and HYD) are
+  not merged. Bibliography keys are not de-duplicated across sections. The 676 source mentions of the research notes are
+  listed as written, not resolved. The stub pages hold a paragraph, ids and known problems, no model text.
+- **For the coordinator.** The older documents hold private details that should go before the repository is public
+  (machine and host names, home-directory paths, a full name, account handles, prices): the research-index sub-agent
+  listed them by file and line; the list is in this agent's report, not in the repo. The new files were scanned for them.
+- **Next step.** Ben reads `docs/science/README.md`, `impacts.md` and the fix list. Then stage 2 by work package
+  (`claims.md`, "Work packages"): WP-0 first (a way to read PDF text on the test machine: stage 1 lost most of its
+  time to PDFs the fetch tool cannot read and a web-search budget that ran out), WP-13a and WP-14a before the force
+  balance and the per-cell climate are built, the rest in parallel.
+
 ### 2026-10-01 — Meteor impacts (P2-08): craters that form, age and are buried; breccia, melt and impact deposits (agent worktree agent-a24e90e955a5a64d3, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Ask.** Ben, decisions log 2026-09-29 ("Yes, in full … not in v1, but before phase 3") and 2026-10-01 ("Feel free to start
   now, it can always just stay on a separate branch"). Branch `worktree-agent-a24e90e955a5a64d3`, master 38ca6b0 (with
