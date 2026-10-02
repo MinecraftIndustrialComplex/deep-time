@@ -137,15 +137,11 @@ pub struct Carry<'a> {
     pub dt_yr: f64,
 }
 
-/// The surface's elevation at the start of a step, m, and the number of cells where another
-/// plate's crust arrived: the last elevation of the same crust at its source (the corners that
-/// held the same rigid group, the same plate, or the parent of a plate born this step), plus the
-/// plate model's uplift of that crust over the step; where no corner held it (another plate's
-/// edge arrived over a trench, a small plate was absorbed), the plate model's elevation: what the
-/// surface had built there belongs to the crust that left. A group keeps its number when a
-/// collision hands it to another plate, so a sutured terrane keeps its surface.
-pub fn carried_elevation(x: &Carry<'_>) -> (Vec<f32>, u64) {
-    let same = |c: usize, s: usize| -> bool {
+impl Carry<'_> {
+    /// Whether source cell `s` held, before the step, the crust that is at cell `c` now: the same
+    /// rigid group, the same plate, or the parent of a plate born this step.
+    pub fn same(&self, c: usize, s: usize) -> bool {
+        let x = self;
         let Some(pp) = x.prev_plate else {
             return true;
         };
@@ -177,7 +173,64 @@ pub fn carried_elevation(x: &Carry<'_>) -> (Vec<f32>, u64) {
             }
         }
         false
-    };
+    }
+}
+
+/// Any other field of the surface carried with its crust, by [`carried_elevation`]'s rule: the
+/// bilinear sample of `v` over the source corners that held the same crust, `None` where none did
+/// (the crust is new at the place).
+pub fn carried_field(x: &Carry<'_>, v: &[f32]) -> Vec<Option<f32>> {
+    x.src
+        .par_iter()
+        .enumerate()
+        .map(|(c, &[fi, fj])| bilinear_same(x.w, x.h, v, fi, fj, |s| x.same(c, s)))
+        .collect()
+}
+
+/// Several fields carried at once (the corners and their weights are found once per cell).
+pub fn carried_fields<const K: usize>(x: &Carry<'_>, v: [&[f32]; K]) -> Vec<Option<[f32; K]>> {
+    let (w, h) = (x.w, x.h);
+    x.src
+        .par_iter()
+        .enumerate()
+        .map(|(c, &[fi, fj])| {
+            let fj = fj.clamp(0.0, (h - 1) as f64);
+            let (i0, j0) = (fi.floor(), fj.floor());
+            let (ti, tj) = (fi - i0, fj - j0);
+            let wi = |i: f64| (i as i64).rem_euclid(w as i64) as usize;
+            let j0u = j0 as usize;
+            let j1u = (j0u + 1).min(h - 1);
+            let (a, b) = (wi(i0), wi(i0 + 1.0));
+            let corners = [
+                (j0u * w + a, (1.0 - ti) * (1.0 - tj)),
+                (j0u * w + b, ti * (1.0 - tj)),
+                (j1u * w + a, (1.0 - ti) * tj),
+                (j1u * w + b, ti * tj),
+            ];
+            let mut sum = [0.0f64; K];
+            let mut weight = 0.0f64;
+            for (s, wt) in corners {
+                if wt > 0.0 && x.same(c, s) {
+                    for (acc, f) in sum.iter_mut().zip(&v) {
+                        *acc += wt * f64::from(f[s]);
+                    }
+                    weight += wt;
+                }
+            }
+            (weight > 1e-9).then(|| sum.map(|y| (y / weight) as f32))
+        })
+        .collect()
+}
+
+/// The surface's elevation at the start of a step, m, and the number of cells where another
+/// plate's crust arrived: the last elevation of the same crust at its source (the corners that
+/// held the same rigid group, the same plate, or the parent of a plate born this step), plus the
+/// plate model's uplift of that crust over the step; where no corner held it (another plate's
+/// edge arrived over a trench, a small plate was absorbed), the plate model's elevation: what the
+/// surface had built there belongs to the crust that left. A group keeps its number when a
+/// collision hands it to another plate, so a sutured terrane keeps its surface.
+pub fn carried_elevation(x: &Carry<'_>) -> (Vec<f32>, u64) {
+    let same = |c: usize, s: usize| x.same(c, s);
     let lift = x.dt_yr * 1.0e-3;
     let foreign = std::sync::atomic::AtomicU64::new(0);
     let h = x
