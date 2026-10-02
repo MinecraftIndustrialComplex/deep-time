@@ -16,16 +16,16 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 2,213 active rows in 28 ledgers (P1-10 added PRV-028 to PRV-031 and re-marked PRV rows; WP-9/10 added DEP-205 and ORE-258 to ORE-260, 2026-10-02). The ledgers hold 2,406 ids: stage 1 left 2,069 rows; stage 2 package WP-0
 (2026-10-02) retired 193 of them as duplicates (`merged`, not counted) and added 301 rows for code stage 1
 had not covered (51 in GEO, 74 in PRS, 84 in HNT, 35 in CRE, 57 in CHK). The flexure feature (ISO-040 to
-ISO-067, added to master the same day by its own agent) is included.
+ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 from its follow-up) is included.
 
 | Ledger | Subject | Rows | `verified` | `cited-unverified` | `from-memory` | `abstract-only` | `calibrated` | `game-choice` | `uncited` | of which `pending-rewrite` | of which `not-yet-coded` | `merged` (not counted) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| [PLT](ledger/PLT.md) | plate tectonics | 192 | 0 | 45 | 6 | 20 | 11 | 59 | 51 | 163 | 29 | 20 |
+| [PLT](ledger/PLT.md) | plate tectonics | 201 | 2 | 45 | 8 | 22 | 11 | 62 | 51 | 163 | 29 | 20 |
 | [CLM](ledger/CLM.md) | climate physics | 134 | 0 | 40 | 5 | 0 | 13 | 21 | 55 | 106 | 28 | 12 |
 | [MOI](ledger/MOI.md) | moisture, winds, seasons | 70 | 0 | 17 | 0 | 0 | 0 | 8 | 45 | 70 | 0 | 6 |
 | [BIO](ledger/BIO.md) | Köppen classes and biomes | 99 | 0 | 24 | 0 | 0 | 1 | 66 | 8 | 0 | 0 | 0 |
 | [ERO](ledger/ERO.md) | erosion, sediment, facies | 156 | 0 | 83 | 2 | 3 | 6 | 4 | 58 | 0 | 0 | 11 |
-| [ISO](ledger/ISO.md) | isostasy, flexure, subsidence, height limit, sea level | 65 | 3 | 8 | 0 | 6 | 6 | 12 | 30 | 0 | 0 | 2 |
+| [ISO](ledger/ISO.md) | isostasy, flexure, subsidence, height limit, sea level | 67 | 3 | 8 | 0 | 6 | 6 | 14 | 30 | 0 | 0 | 2 |
 | [HYP](ledger/HYP.md) | hypsometry and calibration targets | 34 | 0 | 10 | 0 | 1 | 18 | 1 | 4 | 0 | 0 | 0 |
 | [HYD](ledger/HYD.md) | rivers, lakes, runoff | 75 | 0 | 14 | 3 | 0 | 1 | 36 | 21 | 0 | 0 | 1 |
 | [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
