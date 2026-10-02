@@ -42,14 +42,15 @@ pub struct ImpactParams {
     /// Impactor density, kg/m³ (stony asteroids: 3,000; iron 7,800; comets ~1,000).
     pub impactor_density_kg_m3: f64,
     /// How deep craters are, as a share of the real depth: every vertical measure of a crater
-    /// (floor depth, rim, central peak, breccia lens) is its physical one times this. The world is
-    /// 15 times taller than wide (20 m against 300 m per block), so a bowl of real proportions (1)
+    /// (floor depth, rim, central peak, breccia lens) is its physical one times this. Heights are stretched 15 times
+    /// against widths (20 m high against 300 m wide per block), so a bowl of real proportions (1)
     /// is a shaft three times deeper than wide in blocks; the default 0.5 follows the volcanoes'
     /// `flank_steepness` (Ben, 2026-09-30: "Setting, gentler default").
     pub depth_scale: f64,
     /// How far the ejecta blanket reaches, in rim radii from the centre. The continuous blanket
     /// of lunar craters ends about 2.3 radii out (Moore, Hodges & Scott 1974, Proc. Lunar Sci.
-    /// Conf. 5:71–100); at 3 radii it is 1/27 of its thickness at the rim.
+    /// Conf. 5:71–100). The cubic law gives 1/27 of the rim thickness at 3 radii, but the drawn
+    /// blanket is tapered to zero over its outer 30 %, so it ends at this reach.
     pub ejecta_radii: f64,
     /// Water deeper than this many impactor diameters stops the impactor before the sea floor:
     /// no crater (6.3, fitted to Davison & Collins 2007; `scaling::sea_floor_factor`).

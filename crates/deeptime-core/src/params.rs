@@ -98,7 +98,7 @@ pub fn planet_builtin(name: &str) -> Option<&'static str> {
 }
 
 /// The top-level keys a planet preset adds to the header's.
-pub const PLANET_KEYS: [&str; 16] = [
+pub const PLANET_KEYS: [&str; 17] = [
     "seed",
     "planet",
     "keyframes",
@@ -114,6 +114,7 @@ pub const PLANET_KEYS: [&str; 16] = [
     "hydro",
     "volcanoes",
     "underground",
+    "provinces",
     "impacts",
 ];
 
@@ -690,6 +691,9 @@ pub struct PlanetPreset {
     /// What the game puts in the open space below ground (the lava floor and lava lakes); the
     /// bake records the defaults when the section is absent.
     pub underground: Option<crate::underground::UndergroundParams>,
+    /// What the bake's geologic provinces are (P1-10): they drive TerraBlender's regions; the bake
+    /// uses the defaults when the section is absent.
+    pub provinces: Option<crate::provinces::ProvinceParams>,
     /// The climate class placement table a datapack supplied through the content bundle
     /// (`climate_placement`, `bake::placement`); `None` uses the core's default table. Not part
     /// of the preset's JSON: it is pack data, recorded in the world data by the bake.
@@ -741,6 +745,7 @@ impl PlanetPreset {
             section(obj, "volcanoes")?;
         let underground: Option<crate::underground::UndergroundParams> =
             section(obj, "underground")?;
+        let provinces: Option<crate::provinces::ProvinceParams> = section(obj, "provinces")?;
         let impacts: Option<crate::surface::impacts::ImpactParams> = section(obj, "impacts")?;
         let missing = |what: &str| CoreError::preset("$", format!("missing section {what}"));
         let seed = match obj.get("seed") {
@@ -769,6 +774,7 @@ impl PlanetPreset {
             biomes,
             hydro,
             underground,
+            provinces,
             placement: None,
         };
         preset.validate()?;
@@ -1069,6 +1075,9 @@ impl PlanetPreset {
         if let Some(u) = &self.underground {
             u.validate()?;
         }
+        if let Some(p) = &self.provinces {
+            p.validate()?;
+        }
         if let Some(v) = &self.volcanoes {
             v.validate()?;
             check(
@@ -1128,6 +1137,9 @@ impl PlanetPreset {
         }
         if let Some(u) = &self.underground {
             v["underground"] = json!(u);
+        }
+        if let Some(p) = &self.provinces {
+            v["provinces"] = json!(p);
         }
         if let Some(i) = &self.impacts {
             v["impacts"] = json!(i);
