@@ -66,6 +66,7 @@
   "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 10.0, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
+    "RICHNESS (owner, decisions log 2026-10-02, \"Rich Deposits, Thinner Scatter, Also make deposits use some of the vanilla ore vein features\"): the zone densities were raised and the richest zone carries raw-ore blocks (raw_share: that share of its ore blocks is the raw-ore block, as vanilla's ore veins carry 2 %); game-choice, ledger ORE-266; the richness settings scale both in the world (ORE-262). Measured in docs/science/deposits.md.",
     "Sizing: USGS Bulletin 1693 (Cox & Singer eds. 1986) model 39a, Placer Au-PGE (Orris & Bliss), n = 65: tonnage 0.022 / 1.1 / 50 Mt of gravel (Fig. 196, p. 263) and Au 0.084 / 0.2 / 0.48 g/t (Fig. 197A, p. 264), figure intercepts; Ag p10 0.036 g/t, 16 of 65 deposits report Ag (p. 262); Au–tonnage r = −0.35 and Au–Ag r = 0.66 (p. 262); 2.0 t/m³, 'the average density of wet sand and gravel' (p. 262); deposits within one mile (1.6 km) are one deposit (p. 262). See crates/deeptime-core/data/usgs/placer_au.json.",
     "A child of deeptime:porphyry_cu_mo_au: a placer forms where an eroded porphyry lost gold, and holds at most capture_fraction of it.",
     "PLACEHOLDERS: density_per_1e5km2 and clustering (unused by a child; no USGS placer density found), capture_fraction 0.5 (no quantitative rule for placer concentration efficiency was found; ore_genesis_modeling.md Q5 gaps).",
