@@ -34,7 +34,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [HNT](ledger/HNT.md) | editor hint texts | 88 | 13 | 12 | 2 | 2 | 6 | 38 | 15 | 0 | 0 | 0 |
 | [HYD](ledger/HYD.md) | rivers, lakes, runoff | 75 | 0 | 14 | 3 | 0 | 1 | 36 | 21 | 0 | 0 | 1 |
 | [HYP](ledger/HYP.md) | hypsometry and calibration targets | 34 | 0 | 10 | 0 | 1 | 18 | 1 | 4 | 0 | 0 | 0 |
-| [IMP](ledger/IMP.md) | meteor impacts | 135 | 0 | 14 | 34 | 3 | 0 | 42 | 42 | 0 | 0 | 6 |
+| [IMP](ledger/IMP.md) | meteor impacts | 135 | 43 | 9 | 6 | 6 | 0 | 56 | 15 | 0 | 0 | 6 |
 | [ISO](ledger/ISO.md) | isostasy, flexure, subsidence, height limit, sea level | 67 | 3 | 8 | 0 | 6 | 6 | 14 | 30 | 0 | 0 | 2 |
 | [MAG](ledger/MAG.md) | magma and lava | 42 | 2 | 1 | 0 | 1 | 0 | 37 | 1 | 0 | 0 | 0 |
 | [MOI](ledger/MOI.md) | moisture, winds, seasons | 70 | 0 | 17 | 0 | 0 | 0 | 8 | 45 | 70 | 0 | 6 |
@@ -48,7 +48,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [STR](ledger/STR.md) | strata, traps, hosts | 44 | 0 | 4 | 0 | 0 | 2 | 34 | 4 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 74 | 0 | 0 | 0 | 1 | 2 | 47 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
-| **all** | | **2,231** | **72** | **475** | **54** | **69** | **79** | **881** | **601** | **359** | **58** | **193** |
+| **all** | | **2,231** | **115** | **470** | **26** | **72** | **79** | **895** | **574** | **359** | **58** | **193** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),
@@ -211,7 +211,7 @@ code). "Evidence" says how strong the finding is.
 
 | # | Ledger | What is wrong | Evidence |
 |---|---|---|---|
-| 1 | IMP-042 | Complex crater depth is coded 0.294 D^0.301 km and cites Collins et al. 2005, eq. 28. That equation is 0.4 D^0.3 km. Craters over 3.2 km are about 27 % too shallow. | primary full text, re-read by the stage 1 lead |
+| 1 | IMP-042 | Complex crater depth is coded 0.294 D^0.301 km and cites Collins et al. 2005, eq. 28. That equation is 0.4 D^0.3 km. Craters over 3.2 km are about 27 % too shallow. | primary full text, re-read by the stage 1 lead **Fixed in stage 2 (WP-1, 2026-10-02):** code, comment or hint corrected, with a test where a value changed; see [ledger/IMP.md](ledger/IMP.md). |
 | 2 | ORE-001 and following; `surface/fields.rs`, `surface/mod.rs` | The time windows are not applied on real histories: the banded-iron, oxygenated-ocean and land-plant clocks are hard-coded. No BIF ever forms; coal and sediment-hosted zinc-lead are not limited in time. | code reading by the extraction agent; the deposit audit found no BIF on either planet |
 | 3 | DEP (the `richness_mult` setting) | The richness setting is documented as scaling grade, and grade never reaches a block. | deposit audit, build log 2026-10-01 |
 | 4 | BIO-002 | Köppen: the code tests the polar group before the dry group. Peel et al. 2007 says "the B climates must be identified first". Cold dry land is classed tundra or ice cap instead of desert or steppe. | primary full text (sub-agent) |
@@ -219,8 +219,8 @@ code). "Evidence" says how strong the finding is.
 | 6 | ERO-070 | Soil production depth scale is 5 m. Secondary sources give 0.25 to 0.5 m for Heimsath's law. A possible factor of 10 to 20. | secondary only; Heimsath et al. 1997 not readable |
 | 7 | ERO-022, ERO-049 | The comment says diffusivity between two cells is averaged "as Landlab's LinearDiffuser". Landlab takes the maximum. | Landlab source (sub-agent) |
 | 8 | ERO-003; `SurfaceParams::default` | `k_spl` is 2e-9 in the Rust default and its comment, 3e-9 in all eight presets. | code reading |
-| 9 | IMP-018 | Editor hint: "one crater of 20 km or more per 180 million km² per year". The coded rate is one per 1.8 × 10¹⁴ km² per year: a factor of a million. | arithmetic |
-| 10 | IMP-038, IMP-054, IMP-062 | Equation numbers of Collins et al. 2005 cited in comments are wrong (rim height is eq. 48, ejecta eq. 47, melt eq. 30). Values are right. | primary full text (sub-agent) |
+| 9 | IMP-018 | Editor hint: "one crater of 20 km or more per 180 million km² per year". The coded rate is one per 1.8 × 10¹⁴ km² per year: a factor of a million. | arithmetic **Fixed in stage 2 (WP-1, 2026-10-02):** code, comment or hint corrected, with a test where a value changed; see [ledger/IMP.md](ledger/IMP.md). |
+| 10 | IMP-038, IMP-054, IMP-062 | Equation numbers of Collins et al. 2005 cited in comments are wrong (rim height is eq. 48, ejecta eq. 47, melt eq. 30). Values are right. | primary full text (sub-agent) **Fixed in stage 2 (WP-1, 2026-10-02):** code, comment or hint corrected, with a test where a value changed; see [ledger/IMP.md](ledger/IMP.md). |
 | 11 | VOL-039 | The 60 km spacing of arc volcanoes cites de Bremond d'Ars et al. 1995, whose abstract says spacing is random with no characteristic value. | primary abstract **Settled in WP-2 (2026-10-02):** the citation now quotes the abstract; the mean spacings are from Hildreth 2007 (27 to 87 km); 60 km is labelled a game choice. |
 | 12 | VOL-016, VOL-026, VOL-029, VOL-048 | Comments disagree with the code they sit on (flank angle, crater size, caldera "across" against radius, subsidence rate). | arithmetic by the extraction agent **Settled in WP-2 (2026-10-02):** comments rewritten from the arithmetic and the sources read; the caldera comment's numbers were radii, so flag 4's reading was wrong; the subsidence rate was a question for Ben, answered 2026-10-02: the default is now 0 (it counted flexure and cooling twice). |
 | 13 | DEF-016 to DEF-018 | Fault slip ratios are coded 0.05, 0.08, 0.05 beside a cited 0.03. | secondary (a review quoting Schlische) **Settled in WP-8 (2026-10-02):** not an error. The ratios are slips along the dip in block space; their horizontal part is true in metres, so in metres the displacements are 0.017 to 0.029 of the length for normal faults and 0.031 to 0.075 for thrusts, against 0.03 (Schlische, via Lathrop et al. 2022, read in full) and 7 % (Elliott 1976, read in full). What is short is the throw, which is flag 14's question. |
