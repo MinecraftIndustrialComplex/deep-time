@@ -84,7 +84,8 @@ impl Shaper {
         let items = st
             .volcanoes
             .iter()
-            .filter(|v| v.height_m >= 30.0) // ledger: VOL-064
+            // ledger: VOL-064
+            .filter(|v| v.height_m >= 30.0)
             .map(|v| {
                 let age = v.extinct_myr.map_or(0.0, |e| (st.t_myr - e).max(0.0));
                 let sharp = (-age / (3.0 * fade)).exp(); // ledger: VOL-065

@@ -83,9 +83,9 @@ impl Shape {
             return if rho < 0.0 { 1.0 } else { 0.0 };
         }
         match kind {
-            Kind::Strato => (1.0 - rho).powf(1.5), // ledger: VOL-016
+            Kind::Strato => (1.0 - rho).powf(1.5),       // ledger: VOL-016
             Kind::Shield => (1.0 - rho * rho).powf(1.5), // ledger: VOL-017
-            Kind::Silicic => (1.0 - rho * rho).powi(2), // ledger: VOL-018
+            Kind::Silicic => (1.0 - rho * rho).powi(2),  // ledger: VOL-018
         }
     }
 
@@ -108,9 +108,11 @@ impl Shape {
         }
         let x = rho / d.rho;
         if d.caldera {
-            d.depth * (1.0 - smoothstep(0.78, 1.0, x)) // ledger: VOL-027
+            // ledger: VOL-027
+            d.depth * (1.0 - smoothstep(0.78, 1.0, x))
         } else {
-            d.depth * (1.0 - x * x).sqrt() // ledger: VOL-027
+            // ledger: VOL-027
+            d.depth * (1.0 - x * x).sqrt()
         }
     }
 

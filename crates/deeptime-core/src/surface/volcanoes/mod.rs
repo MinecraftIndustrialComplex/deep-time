@@ -487,7 +487,8 @@ pub fn arc_flux(flags: f32, convergence: f32, crust: f32) -> f64 {
         return 0.0;
     }
     let cont = crust as u8 == CONTINENTAL;
-    f64::from((convergence / 80.0).clamp(0.0, 1.0)) * if cont { 1.0 } else { 0.7 } // ledger: VOL-003
+    // ledger: VOL-003
+    f64::from((convergence / 80.0).clamp(0.0, 1.0)) * if cont { 1.0 } else { 0.7 }
 }
 
 /// Rock classes the volcanoes lay down.
@@ -887,7 +888,8 @@ impl VolcanoStage {
                         }
                     }
                     // One step without flux is forgiven (the arc band is a few L0 samples wide).
-                    if t < v.dies_myr && v.missed < 2 { // ledger: VOL-010
+                    // ledger: VOL-010
+                    if t < v.dies_myr && v.missed < 2 {
                         v.flux_myr += v.flux_last * dt;
                         v.active_myr += dt;
                         true
@@ -1015,7 +1017,8 @@ impl VolcanoStage {
                     // still standing at half their height.
                     v.kind == Kind::Strato
                         && (v.extinct_myr.is_none_or(|e| t - e < recent)
-                            || v.height_m >= 0.5 * v.peak_m) // ledger: VOL-040
+                            // ledger: VOL-040
+                            || v.height_m >= 0.5 * v.peak_m)
                 })
                 .map(|v| (v.x, v.z))
                 .collect();
@@ -1043,7 +1046,8 @@ impl VolcanoStage {
                 let s01 = ((f - p.arc_min_flux) / (1.0 - p.arc_min_flux).max(1e-9)).clamp(0.0, 1.0);
                 let hk = p.arc_height_km[0] + (p.arc_height_km[1] - p.arc_height_km[0]) * s01;
                 let radius =
-                    p.arc_radius_km * (hk / p.arc_height_km[1]).powf(0.8) * 1000.0 * p.size // ledger: VOL-020
+                    // ledger: VOL-020
+                    p.arc_radius_km * (hk / p.arc_height_km[1]).powf(0.8) * 1000.0 * p.size
                         / p.flank_steepness;
                 let continental = crust[c] as u8 == CONTINENTAL;
                 let silicic = continental && f64::from(thick[c]) >= p.silicic_crust_km * 1000.0;
@@ -1247,7 +1251,8 @@ impl VolcanoStage {
                 base_p25_m: q(0.25),
                 base_p50_m: q(0.5),
                 base_p75_m: q(0.75),
-                low_share: bases.iter().filter(|&&b| b < 500.0).count() as f64 // ledger: VOL-071
+                // ledger: VOL-071
+                low_share: bases.iter().filter(|&&b| b < 500.0).count() as f64
                     / bases.len().max(1) as f64,
             });
         }
@@ -1282,13 +1287,15 @@ impl VolcanoStage {
             let before = v.shape();
             let (rc, depth_m) = if summit {
                 let rc = 0.08 * v.radius_m; // ledger: VOL-031
-                (rc, (0.04 * v.height_m).min(250.0)) // ledger: VOL-031
+                // ledger: VOL-031
+                (rc, (0.04 * v.height_m).min(250.0))
             } else {
                 let rc = (range(&mut rng, p.caldera_radius_km[0], p.caldera_radius_km[1])
                     * 1000.0
                     * p.size)
                     .min(0.6 * v.radius_m);
-                (rc, (0.5 * v.height_m).min(400.0 + 0.05 * rc)) // ledger: VOL-030
+                // ledger: VOL-030
+                (rc, (0.5 * v.height_m).min(400.0 + 0.05 * rc))
             };
             v.depression = Some(Depression {
                 rho: rc / v.radius_m,
@@ -1426,7 +1433,8 @@ impl VolcanoStage {
         let mut kept = Vec::with_capacity(st.volcanoes.len());
         for mut v in std::mem::take(&mut st.volcanoes) {
             let dead_for = v.extinct_myr.map_or(0.0, |e| t - e);
-            if !v.active() && ((dead_for > 5.0 && v.height_m < 0.1 * v.peak_m) || dead_for > 250.0) // ledger: VOL-049
+            // ledger: VOL-049
+            if !v.active() && ((dead_for > 5.0 && v.height_m < 0.1 * v.peak_m) || dead_for > 250.0)
             {
                 v.gone = Some(Gone::Eroded);
                 st.counts.eroded += 1;
@@ -1485,7 +1493,8 @@ impl VolcanoStage {
                     continue;
                 }
                 // Lava over regolith buries it as a palaeosol.
-                if surf.regolith_m[c] >= 0.5 && th >= 1.0 { // ledger: VOL-061
+                // ledger: VOL-061
+                if surf.regolith_m[c] >= 0.5 && th >= 1.0 {
                     let rk = match surf.regolith_kind[c] {
                         crate::surface::weathering::SAPROLITE => sap,
                         crate::surface::weathering::LATERITE => lat,
@@ -1610,7 +1619,8 @@ impl VolcanoStage {
                     if first.is_finite() {
                         pile += 1;
                     }
-                    if first.is_finite() && first <= 150.0 && left >= 30.0 { // ledger: VOL-062
+                    // ledger: VOL-062
+                    if first.is_finite() && first <= 150.0 && left >= 30.0 {
                         let wv = (left / 300.0).min(1.0) as f32;
                         fb[c] = fb[c].max(wv);
                         on += 1;
@@ -1918,7 +1928,8 @@ impl VolcanoStage {
             let Some(cal) = &v.caldera else {
                 continue;
             };
-            if !(standing(v) || cal.radius_m >= 3000.0 * size) { // ledger: VOL-014
+            // ledger: VOL-014
+            if !(standing(v) || cal.radius_m >= 3000.0 * size) {
                 continue;
             }
             let cause = notable
