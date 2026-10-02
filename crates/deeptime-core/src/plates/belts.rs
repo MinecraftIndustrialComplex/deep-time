@@ -119,9 +119,12 @@ pub struct Stacked {
     pub wedge_km2_m: f64,
     /// The largest uplift, m.
     pub max_dz_m: f64,
-    /// The wedge's width, km, and the belt's height, m, after the step.
+    /// The wedge's width, km, and the belt's height (mean above sea level) and mean elevation, m,
+    /// within half its width of the front, before and after the step.
     pub wedge_km: f64,
     pub height_m: f64,
+    pub mean_before_m: f64,
+    pub mean_m: f64,
     /// The foreland basin, when the surface's flexure was given.
     pub foredeep: Option<Foredeep>,
 }
@@ -180,6 +183,8 @@ pub fn stack(
         let col = state.contacts[c].collision.as_mut().expect("in collision");
         let b = &mut col.belt;
         b.height_m = applied.height_m;
+        let base = *b.base_m.get_or_insert(applied.mean_before_m);
+        b.relief_m = (applied.mean_m - base).max(0.0);
         b.wedge_km = applied.wedge_km;
         b.stacked_km2_m += applied.belt_km2_m + applied.wedge_km2_m;
         b.wedge_km2_m += applied.wedge_km2_m;
@@ -300,6 +305,16 @@ fn stack_front(
         }
     }
     let deficit_km2_m: f64 = wedge.iter().map(|&(_, x)| x).sum::<f64>() * area;
+    let half = 0.5 * norm.rad(belt_km);
+    let near: Vec<usize> = (0..n).filter(|&i| d_over[i] <= half).collect();
+    let mean_of = |z: &dyn Fn(usize) -> f64| {
+        if near.is_empty() {
+            z_front
+        } else {
+            near.iter().map(|&i| z(i)).sum::<f64>() / near.len() as f64
+        }
+    };
+    let mean_before_m = mean_of(&|i| f64::from(samples[i].elevation_m));
 
     // The step's crust: what crossed the front, its thickness and the share that stays.
     let shortened_km = side.conv.max(0.0) * env.dt_myr;
@@ -428,17 +443,12 @@ fn stack_front(
         }
     }
 
-    // The belt's height after the step: its mean above the sea within half its width.
-    let half = 0.5 * w_rad;
-    let near: Vec<f64> = (0..n)
-        .filter(|&i| d_over[i] <= half)
-        .map(|i| f64::from(state.samples[i].elevation_m).max(0.0))
-        .collect();
-    out.stacked.height_m = if near.is_empty() {
-        z_front.max(0.0)
-    } else {
-        near.iter().sum::<f64>() / near.len() as f64
-    };
+    // The belt's height after the step: its mean above the sea within half its width, and its
+    // mean elevation there.
+    let samples = &state.samples;
+    out.stacked.height_m = mean_of(&|i| f64::from(samples[i].elevation_m).max(0.0)).max(0.0);
+    out.stacked.mean_m = mean_of(&|i| f64::from(samples[i].elevation_m));
+    out.stacked.mean_before_m = mean_before_m;
     out.stacked.foredeep = flexure.map(|fl| foredeep(&d_under, fl, wedge_km, &norm_km(env)));
     out
 }
@@ -536,7 +546,7 @@ pub fn resist(state: &PlateState, omega: &mut [DVec3], env: &Env, relax: f64, fr
         } else {
             1.0
         };
-        let r = k.collision_resistance_mm_yr * (col.belt.height_m.max(0.0) / h_s) * reach;
+        let r = k.collision_resistance_mm_yr * (col.belt.relief_m.max(0.0) / h_s) * reach;
         let (at, normal) = (
             DVec3::from_array(col.centroid),
             DVec3::from_array(col.normal),

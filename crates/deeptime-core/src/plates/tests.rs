@@ -875,10 +875,11 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
         );
         assert!(step.pieces.first().copied().unwrap_or(0) <= loose.first().copied().unwrap_or(0));
         assert!(step.pieces.len() >= loose.len().min(dynamics::PIECES_KEPT));
-        // The boundary mix: every kind is a length; the fronts (the first three kinds) are the
-        // same fronts whose lengths the plates record, to the rounding of a km a plate.
+        // The boundary mix: every kind is a length; the subducting fronts (the first two kinds,
+        // oceanic slabs) are the same fronts whose lengths the plates record (a collision front
+        // pulls nothing since plate tasks 3 and 4), to the rounding of a km a plate.
         assert!(step.mix_km.iter().all(|&x| x.is_finite() && x >= 0.0));
-        let fronts: f64 = step.mix_km[..3].iter().sum();
+        let fronts: f64 = step.mix_km[..2].iter().sum();
         let recorded: f64 = step.plates.iter().map(|q| q.front_km).sum();
         // (A plate that died in the step, welded or absorbed, has no plate record: its fronts are
         // in the mix only.)
