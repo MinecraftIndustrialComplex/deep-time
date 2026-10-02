@@ -6,7 +6,7 @@ fixed. The band edges of Minecraft's biome builder were read in its source. The 
 biome is a game choice throughout and is labelled so. The climate that feeds the classifier (monthly
 temperature and rain) is being rewritten and is not checked here.
 
-Ledger ids on this page: `BIO-001` to `BIO-100` (see [ledger/BIO.md](ledger/BIO.md)).
+Ledger ids on this page: `BIO-001` to `BIO-103` (see [ledger/BIO.md](ledger/BIO.md)).
 
 ## What you see in the world
 
@@ -79,7 +79,7 @@ third letter:  a if Thot >= 22; else b if at least four months are above 10; els
 | BIO-021 to BIO-024 | vanilla band edges | temperature, humidity, continentalness, erosion, weirdness | | `OverworldBiomeBuilder`, Minecraft 1.21.1 | `verified` |
 | BIO-038 | aridity anchors 0.03, 0.2, 0.5 | UNEP limits | | Zomer et al. 2022, quoting UNEP 1997 | `verified` |
 | BIO-095 | precipitation seasonality | coefficient of variation | % | O'Donnell and Ignizio 2012 (adds 1 mm to the mean) | `verified` |
-| BIO-026 to BIO-070, BIO-075 to BIO-081, BIO-100 | the placement table, knobs and ice cover | see ledger | band coordinate, blocks | none: game choices | `game-choice` |
+| BIO-026 to BIO-070, BIO-075 to BIO-081, BIO-100 to BIO-103 | the placement table, knobs and ice cover | see ledger | band coordinate, blocks | none: game choices | `game-choice` |
 
 ## Earth against the mod
 
@@ -134,9 +134,9 @@ outside the earlier range.
   property of the climate physics, which is being rewritten.
 - The Köppen class of a block in the climate interface is the class of the ground's cell, not
   recomputed at the block's height, while its temperatures are lapsed.
-- Cold deserts (BWk) are placed on the same ramp as hot ones: a cold desert with a mean annual
-  temperature below 5 °C sits at the bottom of the hot band (4.05), so vanilla draws it as ordinary
-  desert (see the open questions).
+- Vanilla has no cold desert. A BWk below a mean of 10 °C is placed on the frozen or cold band by its
+  mean temperature (see "Cold deserts" below), so vanilla draws snowy plains or plains there; the
+  10 °C and 0 °C switches are game choices (BIO-101), not a classification of any source.
 
 ## Game choices
 
@@ -151,9 +151,6 @@ measured over ten test planets and catch a broken mapping, not a wrong climate.
 
 ## Open questions
 
-- Cold deserts drawn as hot deserts (owner question, STATUS.md "Pending questions"). After the test
-  order fix about 1.1 % of land (1,425 cells of 132,955 on the measured planet) is BWk that used to be
-  ET or EF, and the desert ramp (BIO-032) puts every BWk with a mean below 5 °C at band 4.05.
 - UNEP's humid class starts at 0.65, which is not an anchor of the mapping (BIO-100); the
   anchors 1, 2 and 5 are the mapping's own. Whether to add 0.65 is a design choice.
 - The Terralith facts under the frozen-ground placement (BIO-074) rest on an emulation that is not in

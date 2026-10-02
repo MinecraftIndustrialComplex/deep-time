@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [rock-and-metamorphism.md](../rock-and-metamorphism.md). Extraction notes with flags: [extraction-notes/RCK.md](../extraction-notes/RCK.md).
 
-Rows: 79 (11 further rows are `merged` into other rows and not counted: see the status table in claims.md). By status: `verified` 11, `abstract-only` 1, `cited-unverified` 9, `calibrated` 1, `game-choice` 54, `uncited` 3 (stage 1: `cited-unverified` 16, `calibrated` 1, `game-choice` 24, `uncited` 32 over 73 rows; WP-7 added RCK-085 to RCK-090).
+Rows: 79 (11 further rows are `merged` into other rows and not counted: see the status table in claims.md). By status: `verified` 11, `abstract-only` 1, `cited-unverified` 8, `calibrated` 1, `game-choice` 55, `uncited` 3 (RCK-042 moved to `game-choice` 2026-10-02 with schist at 525 degC; stage 1: `cited-unverified` 16, `calibrated` 1, `game-choice` 24, `uncited` 32 over 73 rows; WP-7 added RCK-085 to RCK-090).
 
 Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent. Nothing here has been checked against its source. Paths are relative to the repository root; line numbers are left out on purpose.
 
