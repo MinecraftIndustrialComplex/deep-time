@@ -199,6 +199,7 @@ impl PlatesStage {
         let overlaps = subduction::detect(st, &cache.geo, &pos, &tree);
         let resolved = subduction::resolve(st, world, &overlaps, &pos, &env)?;
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
+        let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
         let mut causes: BTreeMap<u32, EventId> = BTreeMap::new();
         let mut sutured = false;
         for (c, seeds) in &resolved.collisions {
@@ -212,6 +213,7 @@ impl PlatesStage {
         hotspots::step(st, world, &pos, &tree, &env)?;
         surface(st, &cache.geo, &env);
         finish_samples(st, &cache.geo, &z0, &env);
+        let arcs = dynamics::arc_heights(st);
 
         // Motion for the next step: slab pull (axis and speed), the random walk, the speed cap.
         let relax = 1.0 - (-env.dt_myr / k.slab_pull_relax_myr.max(1e-9)).exp();
@@ -273,9 +275,13 @@ impl PlatesStage {
             world,
             &cache.geo,
             &pos,
-            &pull.front_km,
             &env,
             final_step,
+            dynamics::Observed {
+                front_km: &pull.front_km,
+                mix_km,
+                arcs,
+            },
         );
         self.done = step;
         // How often the elevation cap binds: visible samples standing at `max_elevation_m` after

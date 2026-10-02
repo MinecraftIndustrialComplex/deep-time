@@ -4793,6 +4793,82 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct.
 
+### DeCellesGiles1996_flexure
+- Reference: DeCelles, P. G., Giles, K. A. (1996). Foreland basin systems. Basin Research 8(2):105-123. (Also `DeCellesGiles1996` in the Plate tectonics section, where stage 1 saw the abstract only.)
+- DOI or URL: 10.1046/j.1365-2117.1996.01491.x; full text https://pages.uoregon.edu/rdorsey/BasinAnalysis/BasinPapers/DeCelles%20&%20Giles%201996.pdf
+- Cited as: docs/design/flexure.md section 11
+- Ledger ids: none (the acceptance figures of docs/design/plate-force-balance.md).
+- Access: open copy.
+- Read so far (by the project): full text by a Sonnet sub-agent of the flexure agent on 2026-10-02: "Foredeep depozones are typically 100-300 km wide and 2-8 km thick"; forebulges 60-470 km wide and a few tens to a few hundred metres high, as a flexural prediction.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct; this settles what stage 1 could not see.
+
+## Plate-check boundary mix and arc heights (PLT-213 to PLT-221)
+
+Added with the feature (build log 2026-10-02, "plate-check boundary mix and arc heights"). Each source
+below was opened by the agent that built the measures on 2026-10-02; "Read so far" says how much.
+Bird 2003, Hildreth 2007 and Gregory-Wodzicki 2000 were downloaded as PDFs and their text extracted
+with pdftotext; the others are abstracts on the publisher's or the laboratory's page.
+
+### Bird2003_Table3
+- Reference: Bird, P. (2003). An updated digital model of plate boundaries. Geochemistry, Geophysics, Geosystems 4(3):1027.
+- DOI or URL: 10.1029/2001GC000252; full text http://peterbird.name/publications/2003_PB2002/2001GC000252.pdf
+- Cited as: "Bird 2003, Table 3"
+- Ledger ids: PLT-213 (and PLT-214, PLT-221 by reference). The same work is under `Bird2003` in the plate tectonics and climate sections for other claims.
+- Access: open (the author's site).
+- Read so far (by the project): full text, 2026-10-02: Table 3 "Collective Properties of Plate Boundaries by Class": CCB 23,003 km (8.8 %), CTF 26,132 (10.0 %), CRB 27,472 (10.5 %), OSR 67,338 (25.8 %), OTF 47,783 (18.3 %), OCB 17,449 (6.7 %), SUB 51,310 (19.7 %), total 260,487 km (100 %); paragraph 126 defines SUB as convergent steps "with a Benioff zone of intermediate to deep earthquakes and/or a parallel volcanic arc with Quaternary activity", "not divided into continental and oceanic types"; 5,819 steps of mean length 44.7 km.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct.
+
+### Hildreth2007_pp1744
+- Reference: Hildreth, W. (2007). Quaternary magmatism in the Cascades: geologic perspectives. U.S. Geological Survey Professional Paper 1744.
+- DOI or URL: 10.3133/pp1744; full text https://pubs.usgs.gov/pp/pp1744/pp1744.pdf
+- Cited as: "Hildreth 2007, p. 3 and Table 2"
+- Ledger ids: PLT-218, PLT-219. The same work is under `Hildreth2007` in the volcanoes section.
+- Access: open (agency report).
+- Read so far (by the project): full text, 2026-10-02: the arc "extends 1,250 km north-south"; "Elevation of the pre-Quaternary basement beneath the volcanic chain ... ranges from 1,200 to 1,500 m in much of Oregon to more than 2,000 m in northern Washington. Among the major cones, a dozen exceed 3,000 m in elevation but only Rainier and Shasta exceed 4,000 m" (p. 3); Table 2 (p. 7): Rainier 4,392 m, Shasta 4,316 m, Adams 3,742 m, Hood 3,425 m, Baker 3,286 m.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct.
+
+### GregoryWodzicki2000
+- Reference: Gregory-Wodzicki, K. M. (2000). Uplift history of the Central and Northern Andes: A review. Geological Society of America Bulletin 112(7):1091-1105.
+- DOI or URL: 10.1130/0016-7606(2000)112<1091:UHOTCA>2.0.CO;2; open copy http://geomorphology.sese.asu.edu/Papers/gregory-wodzicki_andes_uplift_gsab00.pdf
+- Cited as: "Gregory-Wodzicki 2000"
+- Ledger ids: PLT-218.
+- Access: open copy.
+- Read so far (by the project): full text, 2026-10-02: section "Morphotectonic provinces: across-strike variation", Altiplano subdomain: "The magmatic arc consists of widely spaced volcanic peaks superimposed on a 4500-m-high plateau (Western Cordillera)"; the Altiplano is a "3700-m-high plateau". The paper reviews paleoelevation; only this description of present relief was used.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct.
+
+### Baker2008
+- Reference: Baker, E. T., Embley, R. W., Walker, S. L., Resing, J. A., Lupton, J. E., Nakamura, K.-I., de Ronde, C. E. J., Massoth, G. J. (2008). Hydrothermal activity and volcano distribution along the Mariana arc. Journal of Geophysical Research 113:B08S09.
+- DOI or URL: 10.1029/2007JB005423 (full text blocked to the fetch tool, 403); abstract at https://www.pmel.noaa.gov/public/pmel/publications-search/search_abstract.php?fmContributionNum=3118
+- Cited as: "Baker et al. 2008"
+- Ledger ids: PLT-215.
+- Access: open (abstract read).
+- Read so far (by the project): abstract only, 2026-10-02: "76 volcanic edifices along 1370 km of arc, grouped into 60 'volcanic centers,' of which at least 26 (20 submarine) are hydrothermally or volcanically active"; all intraoceanic arcs combined may emit about 10 % of the global mid-ocean ridge's hydrothermal output. The full text, which would give the emergent islands, was not read.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct.
+
+### deRonde2003
+- Reference: de Ronde, C. E. J., Massoth, G. J., Baker, E. T., Lupton, J. E. (2003). Submarine hydrothermal venting related to volcanic arcs. In: Simmons, S. F., Graham, I. J. (eds), Volcanic, Geothermal and Ore-Forming Fluids: Rulers and Witnesses of Processes within the Earth, Society of Economic Geologists Special Publication 10:91-110 (Giggenbach Memorial Volume).
+- DOI or URL: abstract at https://www.pmel.noaa.gov/public/pmel/publications-search/search_abstract.php?fmContributionNum=2468
+- Cited as: "de Ronde et al. 2003"
+- Ledger ids: PLT-215, PLT-216.
+- Access: abstract read.
+- Read so far (by the project): abstract only, 2026-10-02: 21 volcanic arcs with a submarine component, almost 22,000 km (about 93 % in the Pacific); "696 volcanoes occur along these arcs, with at least 209 (30%) being submarine"; 31 active vent sites on submarine arc volcanoes, two thirds shallower than 1,000 m; less than 3 % of arc length surveyed.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct (the book title was taken from the series, not the abstract page).
+
+### Baker2003_Kermadec
+- Reference: Baker, E. T., Feely, R. A., de Ronde, C. E. J., Massoth, G. J., Wright, I. C. (2003). Submarine hydrothermal venting on the southern Kermadec volcanic arc front (offshore New Zealand): location and extent of particle plume signatures. In: Larter, R. D., Leat, P. T. (eds), Intra-Oceanic Subduction Systems: Tectonic and Magmatic Processes, Geological Society of London Special Publication 219:141-161.
+- DOI or URL: abstract at https://www.pmel.noaa.gov/public/pmel/publications-search/search_abstract.php?fmContributionNum=2437
+- Cited as: "Baker et al. 2003"
+- Ledger ids: PLT-216.
+- Access: abstract read.
+- Read so far (by the project): abstract only, 2026-10-02: "13 volcanoes along 260 km of the southern Kermadec arc", hydrothermal activity at seven. The vent depth range of 250-1,660 m below sea level was read in the abstract of de Ronde et al. 2003, not in this one.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct.
 ## Geothermal features and editor hints (GEO, HNT), added in WP-15 and WP-16
 
 Works read for the geothermal page and the hint figure table (2026-10-02). Not counted in the totals above. "Fetch tool" means the page was read through a page-fetch tool that returns quoted sentences; the agency sites named return only a script stub to a plain download, so no copy is in the library.

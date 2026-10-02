@@ -111,6 +111,54 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P1-10 | **Region size and when a world gets its regions.** (1) Provinces are at least 50,000 km² (the earlier bake minimum, kept; `provinces.min_area_km2`): the 16k planet has 40 provinces of 68,000 to 2,200,000 km² (about 870 to 4,900 blocks across), TerraBlender's own regions being about 1,000 to 3,000 blocks; smaller values give more, smaller regions (recommended: keep). (2) A world's province → region table is dealt once, at the first start with TerraBlender installed, and kept: a biome mod added later brings its regions to new worlds only, and one removed falls back to the vanilla region for its provinces (recommended; the alternative re-deals for unexplored chunks and shifts biomes at the border of explored ones). | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-02 — `plate-check`: the boundary mix and the arc heights (agent worktree agent-a8f59d60569b27473, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Why.** Ben saw, 28 Myr after a supercontinent start, nearly every boundary between ocean plates as subduction with a
+  continuous high arc; chose "Measure now, fix in the plate track" (decisions log 2026-10-02). Measurement only: no plate,
+  collision, surface or volcano rule changed; `subduction.rs` and `collision.rs` not touched.
+- **What.** `plates/dynamics.rs` (record version 3): per step `StepRec::mix_km` (boundary length by kind, km:
+  ocean-ocean and ocean-continent subduction, collision, ridge, rift, other; `classify_boundary`, `boundary_mix`) and
+  `arc_oceanic`/`arc_continental` (`ArcStat` `[cells, emergent, p50, p90, max]` of the elevation of the `ARC`-flag cells,
+  `arc_stats`). The mix repeats `fronts_and_uplift`'s relative-motion test, called right after it (the sample flags are
+  cleared by a resampling, so they cannot be read at the end of the step); arcs are read after `finish_samples`.
+  `record_step` now takes an `Observed` (fronts, mix, arcs) so `mod.rs` passes three more values. `plates/check.rs`: 5 judged
+  rows (`waits`-style, so a run without the data says "no data" and does not fail): subducting share 15-25 %, oceanic arc
+  cells above sea level 10-35 %, oceanic arc crest -1,700 to 1,000 m, continental arc median 1,200-4,500 m and crest
+  2,000-6,000 m; 23 reported rows (the rest of the mix, the first 50 Myr, lengths in km against Bird's, cells per step);
+  new definition `early_myr` (50). Ledger PLT-213 to PLT-221, bibliography section "Plate-check boundary mix and arc
+  heights", page `docs/science/plates.md`, baseline `docs/design/plate-check-baseline.md`.
+- **Earth sources, as read.** Bird 2003 Table 3 (full text PDF, read): subduction 51,310 of 260,487 km = 19.7 %, spreading
+  36.4 %, transform 28.4 %, continental convergent 8.8 %, oceanic convergent 6.7 % (PLT-213 `verified`). Hildreth 2007 p. 3
+  and Gregory-Wodzicki 2000 (full texts, read): Cascade basement 1.2-2 km, a dozen cones above 3 km; Andean arc on a 4.5 km
+  plateau (PLT-218 `verified`). Baker et al. 2008, de Ronde et al. 2003, Baker et al. 2003: abstracts only (PLT-215, -216
+  `abstract-only`). `from-memory`: the 1 km crest of island arcs (PLT-217) and the 6 km Andean crest (PLT-219). Range widths
+  are the agent's (`game-choice`, PLT-214).
+- **Measured** (test VM, master 1eac09f + this branch, `earthlike_quick_16k`, supercontinent, 1000 Myr, seeds 1-4; seed 1 with
+  `structure.deformation.density=0` for the structure-stage panic): subducting share **55.9 %** (55.5 54.9 56.9 56.4) against
+  Earth's 19.7 %: FAIL; 191,000 km a step against 51,310 (total boundary 341,000 against 260,487 km); ocean-ocean 50 % of it
+  (63 % in the first 50 Myr, when the subducting share is already 50 %); spreading 39.5 % (Earth 36.4), collision 3.2 %
+  (8.8), other 1.3 % (transform 28.4 + oceanic convergent 6.7: the model's sign-only tests leave no strike-slip class).
+  Oceanic arc cells above sea level 14.4 % (pass), crest 312 m (pass), median -2,146 m (reported); continental arc median
+  1,670 m and crest 2,874 m (pass). So in the plate model's own elevation the arcs are inside Earth's ranges; the snow-high
+  arcs Ben saw are not in this record (perhaps the volcano stage's cones or the surface stage's amplification; not
+  checked). The check now meets 13 of 41 ranged targets. The old rows moved because master now has general flexure on
+  (largest plate median 0.58 to 0.45, continental crust lowest step 0.40 to 0.29 so that target now fails, tenure 45 to 34
+  Myr, collisions per 100 Myr 10.0 to 11.3, ...; list in the baseline doc): not this branch's doing.
+- **Cost** (same 300 Myr plates run with and without the whole record, at once): +1.6 % (seed 1: 80.1 vs 78.8 s) and +2.6 %
+  (seed 2: 91.5 vs 89.2 s) of the plates stage; task 1b's record alone was within 0.5 %, so the new measures are about 1-2 %
+  of the plates stage (10-15 ms a step), about 0.5 % of a run. Record +16 numbers a step (about 50 KB of JSON; seed 1 1.05 MB).
+- **Gates** (VM): cargo fmt --check clean, clippy --workspace --all-targets -D warnings clean, `cargo test --workspace`
+  678 passed / 0 failed / 3 ignored (deeptime-core 478; new: boundary classification, arc statistics, record round trip, the
+  mix and arcs in `plate-check` and the mix compared with the recorded fronts on a 300 Myr run, plus the existing test that
+  recording does not change the world), `cargo deny check licenses bans` ok, `./gradlew build test` BUILD SUCCESSFUL, JUnit
+  tests=217 failures=0 skipped=1. No GameTests (nothing the game reads changed except the size of `notes.plates.dynamics`).
+- **Not verified.** The boundary mix is a count of lattice samples, not a surveyed length, and it repeats rather than shares
+  the fronts' code (a test ties its fronts to the recorded `front_km` except in steps where a plate died). How much of the
+  subduction surplus is the missing strike-slip tolerance (Bird: +-20 degrees) and how much real was not separated. The
+  oceanic/continental arc split by the arc accumulators (PLT-220) was not compared with a split by the overriding plate's
+  crust. Earth's island-arc emergent share rests on abstracts and on volcano counts, not on arc area. Full presets were not
+  run (the mix is one more pass over the lattice edges, like the fronts').
+- **Next.** The force-balance and belt tasks are judged on `boundary_subduction_pct` (and the arc rows). A strike-slip
+  tolerance for the mix (the +-20 degree rule) would make the transform row comparable with Bird's.
 ### 2026-10-02 — Science documentation, stage 2, WP-2: volcanoes and magma checked against sources (agent worktree agent-a44828926d2eaecb7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What.** Every VOL and MAG row's source and status revised (`docs/science/ledger/VOL.md`, `MAG.md`); the page
   `docs/science/volcanoes-and-magma.md` rewritten for stage 2; ten volcano and magma hints corrected
