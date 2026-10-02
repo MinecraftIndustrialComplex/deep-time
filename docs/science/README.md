@@ -68,7 +68,7 @@ them in from [_template.md](_template.md).
 | [strata.md](strata.md) | stub | STR |
 | [folds-faults-intrusions.md](folds-faults-intrusions.md) | stub | DEF |
 | [deposits.md](deposits.md) | stub | DEP, ORE |
-| [provinces.md](provinces.md) | stub | PRV |
+| [provinces.md](provinces.md) | written with P1-10 (2026-10-02) | PRV |
 | [world-scale-and-bake.md](world-scale-and-bake.md) | stub | SCL, BAK |
 | [pole-cap.md](pole-cap.md) | stub | POL |
 | [geothermal-features.md](geothermal-features.md) | written (stage 2, WP-16) | GEO |

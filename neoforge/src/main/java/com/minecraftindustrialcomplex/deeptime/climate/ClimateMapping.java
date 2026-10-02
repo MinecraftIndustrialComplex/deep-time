@@ -168,18 +168,39 @@ public final class ClimateMapping {
 
     private final Table temperature, vegetation, continents, erosion, ridges;
     private final JsonObject meta;
+    private final ProvinceRegions regions;
 
     public ClimateMapping(Table temperature, Table vegetation, Table continents, Table erosion, Table ridges, JsonObject meta) {
+        this(temperature, vegetation, continents, erosion, ridges, meta, null);
+    }
+
+    private ClimateMapping(Table temperature, Table vegetation, Table continents, Table erosion, Table ridges, JsonObject meta,
+                           ProvinceRegions regions) {
         this.temperature = temperature;
         this.vegetation = vegetation;
         this.continents = continents;
         this.erosion = erosion;
         this.ridges = ridges;
         this.meta = meta == null ? new JsonObject() : meta;
+        this.regions = regions;
     }
 
     public boolean isIdentity() {
         return temperature == null && vegetation == null && continents == null && erosion == null && ridges == null;
+    }
+
+    /**
+     * The TerraBlender region of each geologic province (P1-10, plan §7.3), or null while the world
+     * has none (TerraBlender was not installed when the mapping was built, or the world has no
+     * provinces).
+     */
+    public ProvinceRegions regions() {
+        return regions;
+    }
+
+    /** This mapping with a province → region table. */
+    public ClimateMapping withRegions(ProvinceRegions r) {
+        return new ClimateMapping(temperature, vegetation, continents, erosion, ridges, meta, r);
     }
 
     /** The table of a layer, or null (identity). */
@@ -297,6 +318,8 @@ public final class ClimateMapping {
                 tables.add(l, t.toJson());
         }
         o.add("tables", tables);
+        if (regions != null)
+            o.add(ProvinceRegions.KEY, regions.toJson());
         for (var e : meta.entrySet())
             if (!o.has(e.getKey()))
                 o.add(e.getKey(), e.getValue());
@@ -315,7 +338,12 @@ public final class ClimateMapping {
         JsonObject meta = o.deepCopy();
         meta.remove("tables");
         meta.remove("schema");
-        return new ClimateMapping(t[0], t[1], t[2], t[3], t[4], meta);
+        ProvinceRegions regions = null;
+        if (meta.has(ProvinceRegions.KEY) && meta.get(ProvinceRegions.KEY).isJsonObject()) {
+            regions = ProvinceRegions.fromJson(meta.getAsJsonObject(ProvinceRegions.KEY));
+            meta.remove(ProvinceRegions.KEY);
+        }
+        return new ClimateMapping(t[0], t[1], t[2], t[3], t[4], meta, regions);
     }
 
     public static ClimateMapping read(Path file) throws IOException {

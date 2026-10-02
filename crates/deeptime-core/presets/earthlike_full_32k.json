@@ -439,6 +439,12 @@
     "geothermal_size": 1.0,
     "geothermal_spring_min_precip_mm": 400.0
   },
+  "provinces": {
+    "min_area_km2": 50000.0,
+    "orogen_max_age_myr": 500.0,
+    "andean_max_age_myr": 50.0,
+    "andean_min_elevation_m": 1500.0
+  },
   "impacts": {
     "flux": 1.0,
     "size_slope": 1.8,
