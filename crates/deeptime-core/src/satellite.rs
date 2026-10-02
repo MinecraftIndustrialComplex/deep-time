@@ -1176,7 +1176,7 @@ mod tests {
         let e = f64::from(look.exaggeration);
         let dy = std::f64::consts::PI * 6.37e6 / h as f64;
         for j in 0..h {
-            let lat = (90.0 - 180.0 * j as f64 / h as f64).to_radians();
+            let lat = deeptime_format::Projection::picture_lat_deg(j as f64, h as u32).to_radians();
             let dx = 2.0 * std::f64::consts::PI * 6.37e6 * lat.cos().max(0.15) / w as f64;
             let (jn, js) = (j.saturating_sub(1), (j + 1).min(h - 1));
             for i in 0..w {

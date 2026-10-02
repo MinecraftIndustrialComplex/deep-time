@@ -233,7 +233,7 @@ fn climate_at<'w>(
                 at(cold),
             ),
             _ => {
-                let lat = -360.0 * z / circumference;
+                let lat = deeptime_format::Projection::of(circumference).lat_deg(z);
                 Climate::of(
                     zonal_precip(lat),
                     zonal_temperature(lat),

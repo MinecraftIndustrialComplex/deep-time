@@ -1180,7 +1180,7 @@ fn statistics(
             let round = |v: f32| (f64::from(v) * 100.0).round() / 100.0;
             json!({
                 "km2": km2(u64::from(l.cells)),
-                "latitude": (-360.0 * z / c * 10.0).round() / 10.0,
+                "latitude": (deeptime_format::Projection::of(c).lat_deg(z) * 10.0).round() / 10.0,
                 "block_x": inp.grid.origin_block_x + (cu % g.w) as i64 * i64::from(inp.grid.r),
                 "block_z": z,
                 "level_blocks": f64::from(l.level) / 16.0,
