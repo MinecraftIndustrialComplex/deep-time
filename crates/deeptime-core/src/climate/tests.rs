@@ -171,6 +171,82 @@ fn finish(s: &Session) {
     }
 }
 
+/// Ben 2026-10-02, "Merge with ice sheets off": the flowing sheets stay off in the code's default
+/// and in every built-in preset (game and pipeline) until the per-cell climate (P1-26) fixes the
+/// banded climate's cold bias.
+#[test]
+fn flowing_ice_sheets_are_off_by_default_and_in_every_built_in_preset() {
+    assert!(!ClimateParams::default().ice_dynamics);
+    for (name, json) in crate::preset::BUILTIN
+        .iter()
+        .chain(crate::params::PIPELINE_BUILTIN.iter())
+    {
+        let v: serde_json::Value = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            v["climate"]["ice_dynamics"],
+            serde_json::json!(false),
+            "{name} turns the flowing ice sheets on"
+        );
+    }
+}
+
+/// With the sheets off nothing of the sheet reaches the world: the land ice (and so the flexure's
+/// ice load and the ground it bends) is the equilibrium glaciers' of the model before the sheets,
+/// whatever the sheet's own settings are. With the sheets on the same settings change the ice
+/// (so the comparison can see the sheet at all).
+#[test]
+fn with_the_sheets_off_the_sheet_settings_change_nothing() {
+    let run = |label: &str, dynamics: bool, odd_sheet: bool| -> crate::world::WorldState {
+        let mut v: serde_json::Value = serde_json::from_str(&pipeline_json(3000, 20.0, 5)).unwrap();
+        // A cool star, so the small planet has ice to compare; no present-day nudge.
+        v["planet"]["star_flux_rel"] = serde_json::json!(0.97);
+        v["climate"]["present_climate"] = serde_json::json!("natural");
+        v["climate"]["ice_dynamics"] = serde_json::json!(dynamics);
+        if odd_sheet {
+            // Everything the sheet alone reads (the mass-balance gradients and cap also shape
+            // `climate/ice_balance_m_yr`, which is published either way, so they stay).
+            v["climate"]["ice_relax_kyr"] = serde_json::json!(300.0);
+            v["climate"]["ice_calving_m_yr"] = serde_json::json!(0.0);
+            v["climate"]["ice_grid_cells"] = serde_json::json!(64);
+            v["climate"]["ice_flow_a"] = serde_json::json!(1.0e-15);
+            v["climate"]["ice_isostasy_kyr"] = serde_json::json!(30.0);
+        }
+        let dir = temp_dir(&format!("sheet-{label}"));
+        let s = session(&v.to_string(), &dir, 2);
+        finish(&s);
+        let world = s.checkpoint().unwrap().world;
+        let _ = std::fs::remove_dir_all(&dir);
+        world
+    };
+    let base = run("off", false, false);
+    let odd = run("off-odd", false, true);
+    let on = run("on-odd", true, true);
+    for name in [
+        field::ICE_THICKNESS,
+        field::ICE_MAX_THICKNESS,
+        field::GLACIER,
+        field::ICE_BALANCE,
+        crate::surface::field::ELEVATION_M,
+    ] {
+        assert_eq!(
+            base.fields[name].data, odd.fields[name].data,
+            "{name}: the sheet's settings reached the world with the sheets off"
+        );
+    }
+    assert!(
+        base.fields[field::ICE_THICKNESS]
+            .data
+            .iter()
+            .any(|&x| x >= ICE_MIN_M),
+        "the planet has no land ice to compare"
+    );
+    assert_ne!(
+        base.fields[field::ICE_THICKNESS].data,
+        on.fields[field::ICE_THICKNESS].data,
+        "the sheets on changed nothing: the comparison cannot see them"
+    );
+}
+
 #[test]
 fn the_present_climate_setting_governs_only_the_present() {
     let run = |state: &str| -> crate::world::WorldState {
