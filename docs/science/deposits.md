@@ -1,14 +1,14 @@
 # Ore deposits, coal and petroleum
 
 Status of this page: `stage 2 (constants checked against sources on 2026-10-02)`. Every row of the
-two ledgers was read against its source in the project's source library (package WP-9/10). Of 350
+two ledgers was read against its source in the project's source library (package WP-9/10). Of 351
 active rows, 77 are `verified`, 37 rest on an abstract, 20 name a source nobody could read in full,
-120 are declared game or design choices and 96 have no source. The code was corrected where it
+121 are declared game or design choices and 96 have no source. The code was corrected where it
 contradicted its sources: the secular clocks (below) were never applied to a real history, so no
 banded iron formation could form.
 
 Ledger ids on this page: `DEP-001` to `DEP-205` ([ledger/DEP.md](ledger/DEP.md)) and `ORE-001` to
-`ORE-260` ([ledger/ORE.md](ledger/ORE.md)); rows marked `merged` are owned by the row they name.
+`ORE-261` ([ledger/ORE.md](ledger/ORE.md)); rows marked `merged` are owned by the row they name.
 
 ## What you see in the world
 
@@ -29,7 +29,9 @@ The deposit families are:
 - **Mississippi Valley-type zinc and lead** in limestone and dolostone of platforms near old
   mountain belts, and **sedimentary exhalative (sedex) zinc and lead** in black shale of rift basins.
 - **Banded iron formation**: sheets of iron ore in the old stable interiors of continents. Before
-  stage 2 none ever formed (see "Open questions" for how many form now).
+  stage 2 none ever formed. Now it can, but the built-in presets set the inherited share to 0
+  until the owner decides how much there should be, so a default world still has none (see
+  "Open questions").
 - **Coal seam fields**: stacks of coal seams a block or more thick, tens of kilometres across,
   in the sedimentary basins of the time after land plants appeared.
 - **Petroleum traps**: oil in anticlines and salt domes above a source rock that was buried deep
@@ -59,8 +61,10 @@ host rock in the top 2 km) and three global clocks.
    banded iron formation only from 2.6 to 1.85 Ga (ORE-016). A frame that straddles a date carries
    the share of its time inside the window. The surface stage asks the same land-plant date when it
    decides whether a step laid down peat (coal facies). When a run starts after the iron-formation
-   window, the stable continental interiors inherit banded iron formation in their basement, and the
-   basement counts as its host where it lies within the top 2 km (ORE-020).
+   window, the stable continental interiors can inherit banded iron formation in their basement,
+   and the basement then counts as its host where it lies within the top 2 km (ORE-020). How much
+   of an interior holds it is the preset setting `deposits.inherited_bif_share` (ORE-261), 0 in the
+   built-in presets for now.
 3. **Tracts and counts** (the USGS three-part method). Connected cells above a type's favourability
    threshold form permissive tracts. The number of deposits that **survive to the present** is the
    type's deposit density times the permissive area (`N* = ρ/10⁵ · ΣA`, DEP-166). For porphyry
@@ -122,7 +126,8 @@ The main constants by family; the ledgers hold every row.
 | ORE-014 | Sediment-hosted Zn–Pb after | 2.02 | Ga | Leach et al. 2010, Econ. Geol. | `abstract-only` |
 | ORE-015 | Coal-forming land plants after | 0.419 | Ga | Nelsen et al. 2016; ICS chart 2023/09 | `verified` |
 | ORE-016 | Banded iron formation window | 2.6 to 1.85 (was 2.65 to 1.85) | Ga | Bekker et al. 2010 | `abstract-only` |
-| ORE-020 | Inherited BIF in the stable interiors | craton share × the share of the window before the run | 0–1 | plan §8.6 | `game-choice` |
+| ORE-020 | Inherited BIF in the stable interiors | craton share × setting × the share of the window before the run | 0–1 | plan §8.6 | `game-choice` |
+| ORE-261 | Inherited BIF setting (`deposits.inherited_bif_share`) | 0 in the built-in presets (interim) | 0–1 | none; the owner's question | `game-choice` |
 | ORE-258 | Earth's age for the clocks | 4.57 | Gyr | as SCL-039 | `uncited` |
 | ORE-117 | Coal field area P90 / P50 / P10 | 300 / 1,000 / 3,000 | km² | the project's estimate | `uncited` |
 | ORE-119 | Coal field density P90 / P50 / P10 | 4 / 14 / 40 (P50 used) | per 100,000 km² | the project's estimate, re-derived in stage 2 | `uncited` |
