@@ -57,6 +57,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 
 | P2-01 | Fold-and-fault engine (Noddy evaluator; pulled forward, log 2026-10-01) | doing | 2026-10-01 | | Branch worktree-agent-a49703993341aa701 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), **not merged: waits for the coordinator's merge and GameTest batch**. Stage A (the port, bit-exact against the original C) and **stage B** are built: format 0.3 with `structure/events.dtst`, the deformed column rule in Rust and Java (`ColumnParityTest` over deformed columns, 173 JUnit tests, 0 failures), unconformities by age key, stocks, dykes and plugs as intrusion events, traps from the world's own structures, fault scarps and rift valleys in the amplifier, grouped `fold_belt` / `fault_system` events, `deeptime structure-sections` and the structure census of `strata-check`. `earthlike_quick_16k`, 500 Myr: 12,657 events (1,081 fold trains, 3,848 thrusts, 1,256 normal and 261 strike-slip faults, 2,760 stocks, 2,647 dykes, 804 plugs); they change 52 % of land columns, none of 20,000 malformed; the column rule costs 0.60 ms a chunk through them against 0.44 without (Java, one thread); land share 0.2770 with the relief and without, land median 661.1 m against 661.0. cargo fmt, clippy -D warnings, test --workspace, deny and `gradlew build test` clean after merging master ea40d3b (200 JUnit tests, GameTests 65 of 65 default and MIC). GameTests on the branch (allowed for this task): `./gametest.sh` and `./gametest.sh -PwithMic` (168 MIC mods): all 60 required tests passed in each. See the build log. |
 | SCI-1 | Science documentation, stage 1: the claims ledger, bibliography, feature pages (log 2026-10-02) | done | 2026-10-02 | | Branch worktree-agent-a33b33f9ecaf3af1a (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), not merged, not pushed. Docs only: `docs/science/` (README, claims.md with 2,069 ledger rows in `ledger/`, bibliography with 475 entries, 403 spot checks, two full pages, 17 stubs), `docs/research/README.md`, seven session notes, the standing rule in CLAUDE.md. No row is `verified`. One coded constant found wrong against its own citation (IMP-042, complex crater depth). Stage 2 work packages are at the end of `docs/science/claims.md`. |
+| SCI-2 / WP-0 | Science documentation, stage 2, work package 0: source library, de-duplicated bibliography and ledger, coverage gaps (log 2026-10-02) | done | 2026-10-02 | | Branch worktree-agent-a024f62a028c56ca4 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), master 1eac09f merged in, not merged to master, not pushed. Docs only. 475 bibliography entries (+13 from flexure) became 385 works; 193 duplicate ledger rows retired (`merged`); 301 rows added in five new ledgers (GEO 51, PRS 74, HNT 84, CRE 35, CHK 57); the source library holds 104 readable works, 6 scans and 35 landing pages (not distributed). No row changed status except by retirement. |
 ## Review pages
 | Name | URL | Version label | Date |
 |---|---|---|---|
@@ -104,6 +105,34 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P2-08 impacts | **Impact deposits do not claim their materials.** Diamonds, nickel, platinum and uranium are products of the impact deposit types, and a claimed material loses its scattered ore in a Deep Time world; impact deposits are far too rare to be the only source, so the four types carry `minecraft.claims_scatter: false` and vanilla diamonds and the pack's nickel, platinum and uranium ores keep generating. (a) Keep it so (recommended); (b) claim them and add background scatter for each. Their tonnages, grades and densities are design values (no USGS model exists) and belong to the deposit audit's richness question. | Not asked yet |
 
 ## Build log
+### 2026-10-02 — Science documentation, stage 2, WP-0: source library, de-duplicated bibliography and ledger, coverage gaps (agent worktree agent-a024f62a028c56ca4, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; docs only)
+- **Ask.** Prepare the ground for the verification packages: readable sources, one entry per work, one row per claim, the stage 1
+  coverage gaps filled. No simulation or game code, presets or tests changed; no claim status changed except by retiring duplicates.
+  Master 1eac09f (flexure, ISO-040 to ISO-067) merged in; the flexure rows duplicate nothing.
+- **Source library** (a folder on the test machine, one folder per bibliography key, with the PDF or page and a `.txt`
+  beside it; never in the repo, not distributed). Fetched by direct request only (DOIs, publisher and agency pages, repositories,
+  Crossref, Europe PMC, Semantic Scholar, NASA ADS, the Internet Archive); no shadow library; the 350 MB of stage 1 working copies
+  were copied in, not fetched again. Result: of 385 works, 104 are readable as text, 6 are page scans with machine OCR, 35 have a
+  landing page only, 240 were not fetched (146 paywalled with no lawful substitute found, 31 books, 22 open-access or open-copy
+  works whose publisher refuses scripted access, the rest software, web pages and unresolved citations). Seven paywalled works have
+  a repository copy. `bibliography.md` records, per entry, fetched or not, from where and the text file name.
+- **Bibliography.** 488 entries (475 + 13 flexure) merged into 385 works (103 entries folded in; two keys that named two different works
+  each were split (`Courtillot2003`, `USGS2000`), four joint entries divided). Stage 1's 7 unidentified: `SAIMM-coalfields` identified
+  and read (Jeffrey 2005), `Shepard`, `ICAO1993`, `Lallemand_EncMarineGeosciences` identified as probable, `Software` read as three
+  works, the rest unresolved. Of the 15 `not found`: `Gilbert1893` read (Internet Archive), five NASA ADS scans retrieved,
+  `GrieveCintala1992` identified (DOI), the rest unresolved. 171 of the 676 research-note mentions are the same work as an entry
+  (`[= Key]`); 505 stay `[unresolved]`.
+- **Ledger.** 216 candidate pairs (shared code symbols, text similarity) judged by four Sonnet agents; 193 rows retired, none renumbered;
+  six DEP/ORE and RCK/ERO disagreements between agents were settled by the lead. Owners absorb the retired row's extra citation; the
+  status disagreements that merging exposed are listed in `claims.md` for the verifying package. Rows now: 2,205 active (+193 merged).
+- **Rows added** (Sonnet agents, code read as on master): GEO 51 (the geothermal features), PRS 74 (presets, test presets, world
+  presets), HNT 84 (editor hints, incl. the impact-rate hint, factor of a million, not fixed), CRE 35 (plate geometry, noise, plate
+  state, deformation lattice), CHK 57 (plate-check target ranges). Flags 27 to 48 in `claims.md` list what they found.
+- **Against the task or the rules.** Ledger prefixes PRS, HNT, CRE, CHK were added besides GEO. A web fetch of ADS returned two
+  anti-robot pages saved as small PDFs; a sweep (`pdfinfo`, size per page) caught and removed them. OpenAlex's free allowance ran
+  out after about 300 lookups. `plates/dynamics.rs` is still not covered. A peer's `_incoming` folder in the library was not touched.
+- **Next step.** The verification packages read the text files named in `claims.md` ("Sources in the library, by work package").
+
 ### 2026-10-02 — General lithospheric flexure in the surface stage (agent worktree agent-afae960b6db068f94, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Why.** Ben, decisions log 2026-10-02: "General flexure everywhere": every load bends the crust (belts, volcanic
   islands, ice, sediment), not only collision forelands. Design and measurements: `docs/design/flexure.md` (written
