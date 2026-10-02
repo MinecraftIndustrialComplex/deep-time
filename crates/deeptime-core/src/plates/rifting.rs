@@ -409,7 +409,7 @@ fn initiate(
     }
     // Old floor that encloses a continent (a terrane stranded in the ocean, which since plate
     // tasks 3 and 4 is no longer carried off at the first contact) carries it along whole; a
-    // split that would be mostly continent is not old floor starting to sink.
+    // split that would be mostly continent is not old floor starting to sink. ledger: PLT-238
     let continental = split
         .iter()
         .filter(|&&i| state.samples[i as usize].kind == CONTINENTAL)

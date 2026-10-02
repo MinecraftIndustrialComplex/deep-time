@@ -412,6 +412,7 @@ fn stack_front(
         out.lifted10 += u32::from(dz > 10.0);
         out.lifted100 += u32::from(dz > 100.0);
         out.emerged += u32::from(z <= 0.0 && z1 > 0.0);
+        // ledger: PLT-234 (the stamp), PLT-079 (the regime it makes).
         if dz >= stamp_m {
             s.orogeny = OROGENY_HIMALAYAN;
             s.orogeny_myr = env.t_myr as f32;
