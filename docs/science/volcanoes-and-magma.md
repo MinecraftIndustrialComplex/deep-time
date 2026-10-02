@@ -41,7 +41,7 @@ only 3 islands and 8 seamounts stood at the end.
 
 **Calderas.** Volcanoes on thick continental crust, and hotspot centres under continents, can
 collapse after a large eruption into a caldera: a flat-floored basin with steep walls, 6 to 18 km
-(20 to 60 blocks) across and roughly 550 to 850 m (28 to 42 blocks) deep, ringed by a sheet of tuff
+(20 to 60 blocks) across and up to 550 to 850 m (28 to 42 blocks) deep, ringed by a sheet of tuff
 up to 250 m thick that thins outward.
 
 **Flood basalts.** A large igneous province becomes a basalt plateau 1,500 m (75 blocks) thick at
