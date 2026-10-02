@@ -227,6 +227,7 @@ public final class FarTerrainCommand {
                 if (b.generator() != null) {
                     l.addProperty("max_detail", b.generator().maxDetail());
                     l.addProperty("sections", b.generator().sections());
+                    l.addProperty("x_extent", b.generator().xExtent());
                     l.addProperty("failures", b.generator().failures());
                     if (b.generator().firstFailure() != null)
                         l.addProperty("first_failure", b.generator().firstFailure());
