@@ -98,7 +98,7 @@ pub fn planet_builtin(name: &str) -> Option<&'static str> {
 }
 
 /// The top-level keys a planet preset adds to the header's.
-pub const PLANET_KEYS: [&str; 16] = [
+pub const PLANET_KEYS: [&str; 17] = [
     "seed",
     "planet",
     "keyframes",
@@ -115,6 +115,7 @@ pub const PLANET_KEYS: [&str; 16] = [
     "volcanoes",
     "underground",
     "provinces",
+    "impacts",
 ];
 
 /// The `scale` keys a planet preset may carry (the header reads `circumference_blocks`).
@@ -667,6 +668,8 @@ pub struct PlanetPreset {
     pub amplify: Option<crate::surface::amplify::AmplifyParams>,
     /// Volcanoes as landforms (P1-21); `None` makes none. It needs a `surface` section.
     pub volcanoes: Option<crate::surface::volcanoes::VolcanoParams>,
+    /// Meteor impacts (P2-08); `None` makes none. It needs a `surface` section.
+    pub impacts: Option<crate::surface::impacts::ImpactParams>,
     /// The knobs of the climate → biome-input mapping (P1-09, plan §7.2); the bake uses the
     /// defaults when the section is absent.
     pub biomes: Option<crate::bake::biomes::BiomeParams>,
@@ -731,6 +734,7 @@ impl PlanetPreset {
         let underground: Option<crate::underground::UndergroundParams> =
             section(obj, "underground")?;
         let provinces: Option<crate::provinces::ProvinceParams> = section(obj, "provinces")?;
+        let impacts: Option<crate::surface::impacts::ImpactParams> = section(obj, "impacts")?;
         let missing = |what: &str| CoreError::preset("$", format!("missing section {what}"));
         let seed = match obj.get("seed") {
             None => 1,
@@ -754,6 +758,7 @@ impl PlanetPreset {
             young,
             amplify,
             volcanoes,
+            impacts,
             biomes,
             hydro,
             underground,
@@ -1069,6 +1074,14 @@ impl PlanetPreset {
                 "needs a surface section: volcanoes build on the deep-time surface",
             )?;
         }
+        if let Some(i) = &self.impacts {
+            i.validate()?;
+            check(
+                self.surface.is_some(),
+                "$.impacts",
+                "needs a surface section: craters are cut into the deep-time surface",
+            )?;
+        }
         Ok(())
     }
 
@@ -1115,6 +1128,9 @@ impl PlanetPreset {
         }
         if let Some(p) = &self.provinces {
             v["provinces"] = json!(p);
+        }
+        if let Some(i) = &self.impacts {
+            v["impacts"] = json!(i);
         }
         v
     }

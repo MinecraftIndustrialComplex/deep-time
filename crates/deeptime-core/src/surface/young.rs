@@ -172,6 +172,28 @@ pub struct YoungStage {
 /// A ×2 upsampling of a plain array (`amplify::resample`).
 type Upsample = dyn Fn(&[f32], usize, usize) -> Vec<f32>;
 
+/// A rock property (`table`, by class: erodibility, diffusivity) on the `w × h` grid `k`
+/// doublings finer than the grid of `class1`: the L1 cells' values interpolated linearly, as
+/// every other field the stage takes from L1 is.
+///
+/// P1-23. The stage read the property through `young/class`, which is L1's rock class copied
+/// into each of the finer cells (a class cannot be interpolated). The rivers' K, the hillslopes'
+/// κ and the erodibility the amplifier and the mountain character read were therefore constant
+/// over 16 × 16 blocks and stepped at the L1 cells' edges, and the terrain came out with square
+/// pits, benches and cliff bands the size of an L1 cell wherever the rock changes from cell to
+/// cell. The class stays what it was; only what the erosion reads of it is interpolated.
+pub fn rock_property(class1: &[f32], w1: usize, h1: usize, k: u32, table: &[f64]) -> Vec<f32> {
+    let of = |c: f32| table[(c.max(0.0) as usize).min(table.len() - 1)] as f32;
+    let (mut cur, mut w, mut h): (Vec<f32>, usize, usize) =
+        (class1.iter().map(|&c| of(c)).collect(), w1, h1);
+    for _ in 0..k {
+        cur = resample::upsample2_linear(&cur, w, h);
+        w *= 2;
+        h *= 2;
+    }
+    cur
+}
+
 /// Land elevations above sea: (median, 90th percentile, maximum), m.
 fn land_stats(z: &[f32], sea: f64) -> (f64, f64, f64) {
     let mut v: Vec<f32> = z.iter().copied().filter(|&x| f64::from(x) > sea).collect();
@@ -418,9 +440,35 @@ impl YoungStage {
         let k_scale = self.p.k_scale;
         let dt_myr = self.p.myr / f64::from(self.p.steps);
         let dt = dt_myr * 1.0e6;
-        let erod = lithology::erodibility();
-        let diffu = lithology::diffusivity();
-        let cls = |c: usize| (class[c].max(0.0) as usize).min(erod.len() - 1);
+        // The rock's erodibility and diffusivity: L1's, interpolated ([`rock_property`]), and the
+        // till's own where this stage's glaciers left enough of it to be the surface rock.
+        let till_at = world
+            .fields
+            .get(field::TILL)
+            .filter(|f| f.data.len() == n)
+            .map(|f| f.data.clone());
+        let till_class = usize::from(lithology::index("till"));
+        let rock = |table: Vec<f64>| -> Vec<f64> {
+            let k = doublings(self.preset.resolution.l1_r, g2.r).unwrap_or(0);
+            let (w1, h1) = (w >> k, hgt >> k);
+            let smooth: Vec<f32> = match world
+                .fields
+                .get(super::field::CLASS)
+                .filter(|f| f.data.len() == w1 * h1)
+            {
+                Some(c1) => rock_property(&c1.data, w1, h1, k, &table),
+                // No L1 class (a world built by hand): the cell's own class.
+                None => rock_property(&class, w, hgt, 0, &table),
+            };
+            (0..n)
+                .map(|c| match &till_at {
+                    Some(t) if t[c] >= TILL_SHOWS_M => table[till_class.min(table.len() - 1)],
+                    _ => f64::from(smooth[c]),
+                })
+                .collect()
+        };
+        let erod = rock(lithology::erodibility());
+        let diffu = rock(lithology::diffusivity());
 
         let started = Instant::now();
         let mut h: Vec<f64> = (0..n)
@@ -494,7 +542,7 @@ impl YoungStage {
         self.time("glacial", started);
 
         let started = Instant::now();
-        let kf: Vec<f64> = (0..n).map(|c| sp.k_spl * k_scale * erod[cls(c)]).collect();
+        let kf: Vec<f64> = (0..n).map(|c| sp.k_spl * k_scale * erod[c]).collect();
         let mut h_new = vec![0.0; n];
         let mut qin = vec![0.0; n];
         let spl_p = spl::SplParams {
@@ -539,7 +587,7 @@ impl YoungStage {
         let started = Instant::now();
         let kd: Vec<f64> = (0..n)
             .map(|c| {
-                let land = sp.kd_land_m2_yr * diffu[cls(c)];
+                let land = sp.kd_land_m2_yr * diffu[c];
                 marine::submarine_kd(
                     sea - h[c],
                     sp.kd_marine_m2_yr,
@@ -611,7 +659,7 @@ impl YoungStage {
         put(
             world,
             field::ERODIBILITY,
-            (0..n).map(|c| erod[cls(c)] as f32).collect(),
+            erod.iter().map(|&e| e as f32).collect(),
         );
         // The glaciers: where they are now (the amplifier shapes valleys under them), what they
         // cut and left over the stage; thick till becomes the surface rock.
@@ -784,5 +832,71 @@ impl Stage for YoungStage {
         let s: Saved = from_state(bytes)?;
         self.done = s.done;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::synth::SplitMix;
+
+    /// P1-23: what the erosion reads of the rock has no L1 cell in it. On a random map of two
+    /// rocks the property changes as much between two fine cells of one L1 cell as between two
+    /// of neighbouring L1 cells (copied per cell, as it was, it does not change inside one at
+    /// all), no step is larger than the contrast shared over the cell, and the mean is kept.
+    #[test]
+    fn rock_properties_are_interpolated_between_l1_cells() {
+        let (w1, h1) = (64usize, 32usize);
+        let table = [1.0f64, 3.0, 0.5];
+        let mut rng = SplitMix(5);
+        let class1: Vec<f32> = (0..w1 * h1).map(|_| rng.below(2) as f32).collect();
+        for k in [1u32, 2] {
+            let f = 1usize << k;
+            let (w, h) = (w1 * f, h1 * f);
+            let v = rock_property(&class1, w1, h1, k, &table);
+            assert_eq!(v.len(), w * h);
+            // The L1 cells' own points keep their values.
+            for j in 0..h1 {
+                for i in 0..w1 {
+                    assert_eq!(
+                        v[j * f * w + i * f],
+                        table[class1[j * w1 + i] as usize] as f32
+                    );
+                }
+            }
+            // Steps along x by the place inside the L1 cell.
+            let mut by_phase = vec![0.0f64; f];
+            let mut largest = 0.0f64;
+            for j in 0..h {
+                for i in 0..w {
+                    let step = f64::from((v[j * w + (i + 1) % w] - v[j * w + i]).abs());
+                    by_phase[i % f] += step;
+                    largest = largest.max(step);
+                }
+            }
+            let (lo, hi) = by_phase
+                .iter()
+                .fold((f64::MAX, f64::MIN), |(lo, hi), &x| (lo.min(x), hi.max(x)));
+            assert!(lo > 0.0, "k {k}: no change inside an L1 cell: {by_phase:?}");
+            assert!(
+                hi / lo < 1.25,
+                "k {k}: the steps sit at the L1 cells' edges: {by_phase:?}"
+            );
+            assert!(
+                largest <= 2.0 / f as f64 + 1e-6,
+                "k {k}: a step of {largest} between neighbours (contrast 2)"
+            );
+            let mean1: f64 =
+                class1.iter().map(|&c| table[c as usize]).sum::<f64>() / (w1 * h1) as f64;
+            let mean: f64 = v.iter().map(|&x| f64::from(x)).sum::<f64>() / v.len() as f64;
+            assert!((mean - mean1).abs() < 0.02, "k {k}: mean {mean} vs {mean1}");
+        }
+        // One rock everywhere: one value; a class beyond the table reads its last entry.
+        let v = rock_property(&vec![2.0; w1 * h1], w1, h1, 1, &table);
+        assert!(v.iter().all(|&x| x == 0.5));
+        assert_eq!(
+            rock_property(&[9.0, f32::NAN], 2, 1, 0, &table),
+            vec![0.5, 1.0]
+        );
     }
 }

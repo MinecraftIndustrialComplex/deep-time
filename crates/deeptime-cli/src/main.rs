@@ -10,6 +10,7 @@ mod heightmap;
 mod hydro;
 mod margins_view;
 mod parity;
+mod plate_check;
 mod provinces;
 mod run;
 mod satellite_view;
@@ -435,6 +436,10 @@ enum Command {
         /// More layers to sample (nearest), comma-separated.
         #[arg(long, value_delimiter = ',')]
         layers: Vec<String>,
+        /// Also what the column evaluator decides: rock classes at four depths, the horizon
+        /// count, the second horizon's top and the water kind.
+        #[arg(long)]
+        columns: bool,
         /// The .npy file to write (and <out>.json).
         #[arg(long)]
         out: PathBuf,
@@ -461,6 +466,25 @@ enum Command {
         /// Field names (comma-separated); default every field.
         #[arg(long, value_delimiter = ',')]
         fields: Vec<String>,
+    },
+    /// The plate dynamics of finished runs against the acceptance targets of
+    /// docs/design/plate-collisions-and-welding.md §6: largest plate, plate lifetimes and fates,
+    /// land gained per step, what each collision lifted, collisions per 100 Myr, continental
+    /// crust, active margins, sea-floor age. Prints one table (measure, value, target range, pass
+    /// or fail) and exits non-zero when a measure is outside its range. With several runs the
+    /// value is their mean.
+    PlateCheck {
+        /// A run: a checkpoint (`stage --out`), a world-data folder or its manifest.json, or a
+        /// JSON file holding the plates note. Repeatable.
+        #[arg(long = "run")]
+        runs: Vec<PathBuf>,
+        /// Also write the table as JSON here.
+        #[arg(long)]
+        json: Option<PathBuf>,
+        /// JSON file moving target ranges: {"measure_key": [lo, hi]}, null for an open end or for
+        /// no range at all (the measure is then only reported).
+        #[arg(long)]
+        targets: Option<PathBuf>,
     },
     /// Draw the continental margins of a checkpoint's plate model by tectonic setting (P1-27:
     /// passive, Andean, subducting, collision, other plate boundary) over the sea floor by age,
@@ -573,7 +597,7 @@ impl CommonArgs {
 enum StrataArg {
     /// Three horizons: sandstone, red beds from 6 blocks down, granite from 40 (P0-09).
     Placeholder,
-    /// All 60 rock classes: 8 horizons 10 blocks apart; any ten neighbouring 16-block cell
+    /// All 62 rock classes: 8 horizons 10 blocks apart; any eleven neighbouring 16-block cell
     /// columns hold every class 20 or more blocks below the surface (P1-12's GameTests).
     EveryClass,
     /// A readable sedimentary basin, the same in every cell: eight beds over granite from 165
@@ -981,6 +1005,7 @@ fn main() -> ExitCode {
             area,
             step,
             layers,
+            columns,
             out,
         }) => {
             let b = heightmap::Box2 {
@@ -989,7 +1014,7 @@ fn main() -> ExitCode {
                 x1: area[2],
                 z1: area[3],
             };
-            match heightmap::run(&world_data, &b, step, &layers, &out) {
+            match heightmap::run(&world_data, &b, step, &layers, columns, &out) {
                 Ok((rows, cols)) => {
                     println!("deeptime heightmap: {rows} x {cols} -> {}", out.display());
                     ExitCode::SUCCESS
@@ -1000,6 +1025,21 @@ fn main() -> ExitCode {
                 }
             }
         }
+        Some(Command::PlateCheck {
+            runs,
+            json,
+            targets,
+        }) => match plate_check::run(&plate_check::Options {
+            runs: &runs,
+            json: json.as_deref(),
+            targets: targets.as_deref(),
+        }) {
+            Ok(code) => code,
+            Err(e) => {
+                eprintln!("deeptime plate-check: {e}");
+                ExitCode::from(2)
+            }
+        },
         Some(Command::Margins { input, out }) => match margins_view::run(&input, &out) {
             Ok(m) => {
                 println!(
@@ -1259,8 +1299,8 @@ fn preset_command(action: PresetAction) -> run::CliResult<()> {
 
 /// `inspect-column --why`: puts `why` on each of the answer's sites: the forming event and its
 /// cause chain (four links deep, as the 3D export's site cards do) from the world data's event log;
-/// and `landforms`: the volcanoes and flood-basalt provinces (P1-21) whose footprint holds the
-/// column, nearest first, each with its event and cause chain.
+/// and `landforms`: the volcanoes and flood-basalt provinces (P1-21) and the impact craters
+/// (P2-08) whose footprint holds the column, nearest first, each with its event and cause chain.
 fn attach_why(v: &mut serde_json::Value, world_data: &std::path::Path) -> Result<(), String> {
     use deeptime_format::events::{EventId, EventLog};
     let log = EventLog::load(world_data).map_err(|e| e.to_string())?;
@@ -1291,7 +1331,8 @@ fn attach_why(v: &mut serde_json::Value, world_data: &std::path::Path) -> Result
 
 /// The volcano events (`deeptime:volcano_*`) whose footprint holds the point (lat, lon): a notable
 /// volcano out to its basal radius (at least 3 km), an arc segment or hotspot chain where one of its
-/// listed cones does, a caldera to its rim, a flood-basalt province over its area; each as
+/// listed cones does, a caldera to its rim, a flood-basalt province over its area; and the impact
+/// craters (`deeptime:impact_crater`) still in the catalogue, out to their rims; each as
 /// `{event, chain, distance_km}`, nearest first (a cone's own event before its group's).
 fn landforms_at(
     log: &deeptime_format::events::EventLog,
@@ -1313,6 +1354,8 @@ fn landforms_at(
         .filter(|e| {
             e.source == deeptime_core::surface::volcanoes::SOURCE
                 || e.params.contains_key("volcano_cones")
+                || (e.kind == deeptime_core::surface::impacts::kind::CRATER
+                    && e.params.get("standing") == Some(&ParamValue::Int(1)))
         })
         .filter_map(|e| {
             let dist = |la: f64, lo: f64| {
@@ -1767,7 +1810,14 @@ mod tests {
         assert_eq!(mid.next_stage_name(), Some("plates"));
         assert_eq!(
             mid.stage_names,
-            ["plates", "climate", "surface", "volcanoes", "structure"]
+            [
+                "plates",
+                "climate",
+                "surface",
+                "volcanoes",
+                "impacts",
+                "structure"
+            ]
         );
         assert!(mid.world.surface.is_some(), "the group steps every member");
         assert!(mid.world.fields.contains_key("climate/koppen"));
@@ -1781,7 +1831,7 @@ mod tests {
         )
         .unwrap();
         let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
-        assert_eq!(end.next_stage, 5);
+        assert_eq!(end.next_stage, 6);
         assert_eq!(end.world.t_years, 0.0);
         let st = end.world.surface.as_ref().unwrap();
         assert_eq!(st.totals.steps, 10);
@@ -1893,6 +1943,7 @@ mod tests {
                 "climate",
                 "surface",
                 "volcanoes",
+                "impacts",
                 "structure",
                 "deposits"
             ]

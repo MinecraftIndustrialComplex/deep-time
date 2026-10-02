@@ -72,6 +72,9 @@ pub struct WorldState {
     /// The volcano catalogue (P1-21), once the volcano stage has started; the amplifier shapes
     /// the edifices from it.
     pub volcanoes: Option<crate::surface::volcanoes::VolcanoState>,
+    /// The crater catalogue (P2-08), once the impact stage has started; the amplifier shapes the
+    /// craters from it.
+    pub impacts: Option<crate::surface::impacts::ImpactState>,
     /// The folds and faults the history left (P2-01), once the structure stage has finished:
     /// events the column rule undoes, youngest first.
     pub structure: Option<deeptime_format::structure::Structure>,
@@ -103,6 +106,7 @@ impl WorldState {
             plates: None,
             surface: None,
             volcanoes: None,
+            impacts: None,
             structure: None,
             structure_relief: Vec::new(),
             history: None,
