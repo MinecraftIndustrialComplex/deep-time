@@ -1801,7 +1801,10 @@ mod tests {
         let basin = (133..160).map(flex).fold(f64::MAX, f64::min);
         assert!(basin < -100.0, "no foreland basin: {basin}");
         let far = (210..250).map(|j| flex(j).abs()).fold(0.0f64, f64::max);
-        assert!(basin < -far - 100.0, "the basin {basin} against {far} far away");
+        assert!(
+            basin < -far - 100.0,
+            "the basin {basin} against {far} far away"
+        );
         let bulge = (133..220).map(flex).fold(f64::MIN, f64::max);
         assert!(bulge > 0.0, "no bulge beyond: {bulge}");
         // The overriding plate behind its belt does not feel the incoming plate's bending.

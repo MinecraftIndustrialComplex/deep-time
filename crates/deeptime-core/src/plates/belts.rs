@@ -357,10 +357,8 @@ fn stack_front(
         mix[pool::METAMORPHIC] = 1.0;
     }
 
-    let mut rises: Vec<(usize, f64, bool)> = wedge
-        .iter()
-        .map(|&(i, x)| (i, fill * x, true))
-        .collect();
+    let mut rises: Vec<(usize, f64, bool)> =
+        wedge.iter().map(|&(i, x)| (i, fill * x, true)).collect();
     // Signed distance from the front, km: in front (the wedge) positive, behind negative.
     let across = |i: usize, in_wedge: bool| {
         if in_wedge {
@@ -792,7 +790,10 @@ mod tests {
         let belt = &st.contacts[0].collision.as_ref().unwrap().belt;
         assert!(belt.peak_height_m > 1500.0, "{}", belt.peak_height_m);
         // The shape: along the front (6,670 km of it) and narrow across it.
-        let f = footprint(belt, st.contacts[0].collision.as_ref().unwrap().peak_front_km);
+        let f = footprint(
+            belt,
+            st.contacts[0].collision.as_ref().unwrap().peak_front_km,
+        );
         assert!(f.length_km > 4000.0, "{f:?}");
         assert!(f.width_km < 800.0, "{f:?}");
         assert!(f.elongation() > 6.0, "{f:?}");
