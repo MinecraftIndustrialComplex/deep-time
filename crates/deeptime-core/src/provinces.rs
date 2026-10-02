@@ -133,20 +133,20 @@ pub struct Rules {
 impl Default for Rules {
     fn default() -> Rules {
         Rules {
-            ocean_young_myr: 20.0, // ledger: PRV-002 (abstract-only)
-            ocean_mid_myr: 65.0, // ledger: PRV-003 (abstract-only)
+            ocean_young_myr: 20.0,               // ledger: PRV-002 (abstract-only)
+            ocean_mid_myr: 65.0,                 // ledger: PRV-003 (abstract-only)
             island_arc_min_thickness_m: 9_000.0, // ledger: PRV-005 (calibrated)
-            orogen_max_age_myr: 500.0, // ledger: PRV-011 (uncited)
-            andean_max_age_myr: 50.0, // ledger: PRV-012 (calibrated)
-            andean_min_elevation_m: 1500.0, // ledger: PRV-012
-            thinned_crust_m: 20_000.0, // ledger: PRV-013 (calibrated)
-            rifted_margin_deg: 1.35, // ledger: PRV-014 (uncited)
-            feature_deg: 1.35, // ledger: PRV-021 (abstract-only)
-            basin_cover_m: 3_000.0, // ledger: PRV-016 (uncited)
-            subsiding_mm_yr: 0.03, // ledger: PRV-017 (uncited)
-            subsiding_cover_m: 1_000.0, // ledger: PRV-017
-            shield_cover_m: 200.0, // ledger: PRV-018 (uncited)
-            lip_fraction: 0.2, // ledger: PRV-006 (uncited)
+            orogen_max_age_myr: 500.0,           // ledger: PRV-011 (uncited)
+            andean_max_age_myr: 50.0,            // ledger: PRV-012 (calibrated)
+            andean_min_elevation_m: 1500.0,      // ledger: PRV-012
+            thinned_crust_m: 20_000.0,           // ledger: PRV-013 (calibrated)
+            rifted_margin_deg: 1.35,             // ledger: PRV-014 (uncited)
+            feature_deg: 1.35,                   // ledger: PRV-021 (abstract-only)
+            basin_cover_m: 3_000.0,              // ledger: PRV-016 (uncited)
+            subsiding_mm_yr: 0.03,               // ledger: PRV-017 (uncited)
+            subsiding_cover_m: 1_000.0,          // ledger: PRV-017
+            shield_cover_m: 200.0,               // ledger: PRV-018 (uncited)
+            lip_fraction: 0.2,                   // ledger: PRV-006 (uncited)
             oceanic_basalt_m: crate::plates::pools::oceanic_column()
                 [crate::plates::state::pool::MAFIC_VOLCANIC],
         }
