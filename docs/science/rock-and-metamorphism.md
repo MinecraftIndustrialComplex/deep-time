@@ -33,7 +33,7 @@ The structure stage runs each step after the surface stage has laid down or stri
 2. **Burial.** While a cell is in a collision (or has a young Himalayan-type orogen), depths are multiplied by the
    thickening of its crust relative to 35 km, at most 2 (RCK-032 to RCK-035).
 3. **Metamorphism.** Each layer is tested at the temperature of its mid-depth. If it has reached the formation
-   temperature of the next class on its path (shale to slate at 250 degC, phyllite 350, schist 450, gneiss 650;
+   temperature of the next class on its path (shale to slate at 250 degC, phyllite 350, schist 525, gneiss 650;
    limestone to marble, sandstone to quartzite, basalt to greenstone at 300, to amphibolite at 500) it moves up. Classes
    never go back down, so an exhumed belt keeps its grade (RCK-036 to RCK-046).
 4. **Basement.** The plate model's rock pools under the loose cover (sediment, sedimentary, volcanic, metamorphic, plutonic)
@@ -73,7 +73,7 @@ T = 0.6 D^0.6, with T in km, D = sqrt(L W) in km the diameter of the circle of t
 | RCK-039 | shale to slate | 250 | degC | Winter 2010, Yardley 1989 (not read) | `cited-unverified` |
 | RCK-040 | quartzite, marble, greenstone | 300 | degC | Stipp 2002; Ferrill 2004; Greenwood and Berman | `cited-unverified` |
 | RCK-041 | phyllite | 350 | degC | not read | `cited-unverified` |
-| RCK-042 | schist | 450 | degC | Baxter 2002: garnet zone 500-550 | `cited-unverified` |
+| RCK-042 | schist | 525 | degC | Baxter 2002: garnet zone 500-550; Ben, decisions log 2026-10-02 | `game-choice` |
 | RCK-043 | amphibolite | 500 | degC | Nelson; Greenwood and Berman | `cited-unverified` |
 | RCK-044 | gneiss | 650 | degC | Baxter 2002: sillimanite zone 650-700 | `cited-unverified` |
 | RCK-045 | gypsum to anhydrite | 50 | degC | Orti 2012: about 50 degC at 450-500 m; Hardie 1967: 58 degC pure water | `verified` |
@@ -96,7 +96,7 @@ T = 0.6 D^0.6, with T in km, D = sqrt(L W) in km the diameter of the circle of t
 |---|---|---|---|---|
 | Mean continental heat flow | 65 mW/m2 (Pollack et al. 1993); 70.9 mW/m2 (Davies and Davies 2010) | Davies and Davies 2010, table 7 and section 3 (read in full) | gradient 26 degC/km at 65 mW/m2 with k = 2.5; the plate model's continental proxy is 55 + 35 exp(-t/60 Myr) | arithmetic; proxy from the P2-14 build-log entry |
 | Gradients by setting | 5-10 K/km cold subduction; 20 K/km craton; about 30 K/km Barrovian; about 50 K/km rifts and arcs | Hacker, UCSB GEO 102C part 3; Nelson, Tulane (lecture notes, secondary) | up to 48 degC/km (the 120 mW/m2 clamp at k 2.5); cold subduction (blueschist, eclogite) is not made | arithmetic |
-| Garnet zone | 500-550 degC (Glen Clova) | Baxter et al. 2002, abstract | schist at 450 degC | - |
+| Garnet zone | 500-550 degC (Glen Clova) | Baxter et al. 2002, abstract | schist at 525 degC (was 450 until 2026-10-02) | - |
 | Sillimanite zone | 650-700 degC, about 6 kbar | Baxter et al. 2002 | gneiss at 650 degC | - |
 | Thickness of a 56-km pluton | 4.5 km observed (Lucerne); 6.7 km predicted by the law | Cruden 2008, Fig. 2-4 and eq. 1 | 56 km round: 6.7 km | arithmetic; unit test |
 | Thickness of a 4.5-km pluton | 1.6 km observed (Gasborn); 1.5 predicted | same | 1.48 km | unit test |
@@ -145,16 +145,14 @@ generator comments ("dark grey", "banded") are descriptions, not data (RCK-089).
 
 ## Open questions
 
-1. **Schist at 450 degC.** The Barrovian type locality grew garnet at 500-550 degC; the comment said "garnet zone". Raise
-   schist to 500 (and amphibolite to 550)? STATUS pending questions.
-2. **Pluton width, roof depth, shares and collision rate.** Each is a game choice that real data put somewhere else
+1. **Pluton width, roof depth, shares and collision rate.** Each is a game choice that real data put somewhere else
    (rows above). STATUS pending questions.
-3. **Compaction and lithification depth** (RCK-022, STR-049).
-4. **Densities the sources disagree with** (RCK-087): peridotite, kimberlite, ironstone, BIF, phosphorite, pumice, travertine.
-5. **Suevite in carbonate targets.** French 1998: suevite has been found only in craters in crystalline silicate targets;
+2. **Compaction and lithification depth** (RCK-022, STR-049).
+3. **Densities the sources disagree with** (RCK-087): peridotite, kimberlite, ironstone, BIF, phosphorite, pumice, travertine.
+4. **Suevite in carbonate targets.** French 1998: suevite has been found only in craters in crystalline silicate targets;
    carbonate-target craters have lithic breccia only. The impact stage (IMP) should be asked whether it makes impact_breccia
    from limestone.
-6. **Sources that would settle the rest:** Winter 2010 and Yardley 1989 (formation temperatures), Haederle and Atherton 2002
+5. **Sources that would settle the rest:** Winter 2010 and Yardley 1989 (formation temperatures), Haederle and Atherton 2002
    (Coastal Batholith width and count), Cruden and McCaffrey 2001 itself, Buddington 1959, Telford 1990 (density table).
 
 ## Sources
