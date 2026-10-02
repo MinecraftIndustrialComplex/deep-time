@@ -545,6 +545,7 @@ pub struct TectonicParams {
     /// preset until the belt and the weld on stalled convergence land (tasks 3 and 4 of
     /// `docs/design/plate-force-balance.md`), because real shortening alone costs about 0.05 of
     /// the planet in continental crust (STATUS.md, 2026-10-02). Task 4 removes it.
+    // ledger: PLT-218 (game-choice, interim; the agent of plate-motion task 2, 2026-10-02).
     pub collision_on_shortening: bool,
     /// Oceanic crust older than this, on a plate that subducts nowhere, can start subducting on
     /// its own (Wilson cycle), Myr.

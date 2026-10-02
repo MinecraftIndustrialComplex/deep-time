@@ -13,11 +13,11 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 
 ## Counts
 
-2,069 rows.
+2,075 rows.
 
 | Ledger | Subject | Rows | `cited-unverified` | `from-memory` | `abstract-only` | `calibrated` | `game-choice` | `uncited` | of which `pending-rewrite` | of which `not-yet-coded` |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [PLT](ledger/PLT.md) | plate tectonics | 212 | 51 | 6 | 20 | 19 | 63 | 53 | 183 | 29 |
+| [PLT](ledger/PLT.md) | plate tectonics | 218 | 51 | 6 | 21 | 19 | 67 | 54 | 183 | 29 |
 | [CLM](ledger/CLM.md) | climate physics | 146 | 43 | 5 | 0 | 13 | 23 | 62 | 118 | 28 |
 | [MOI](ledger/MOI.md) | moisture, winds, seasons | 76 | 20 | 0 | 0 | 0 | 10 | 46 | 76 | 0 |
 | [BIO](ledger/BIO.md) | Köppen classes and biomes | 99 | 24 | 0 | 0 | 1 | 66 | 8 | 0 | 0 |
