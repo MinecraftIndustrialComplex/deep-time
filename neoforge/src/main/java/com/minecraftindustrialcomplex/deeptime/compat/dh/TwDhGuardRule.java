@@ -28,6 +28,7 @@ public final class TwDhGuardRule {
      * @param circumference  the world data's circumference C in blocks, or -1 when the level does not
      *                       generate from world data
      */
+    // ledger: BAK-041 (game-choice, Ben 2026-10-02: "Mixin around TW's guard")
     public static Verdict verdict(String generatorLevel, String level, boolean shaped, boolean loopsX, long widthX, boolean loopsZ,
                                   int circumference) {
         if (!shaped)
