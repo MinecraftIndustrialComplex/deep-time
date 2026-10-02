@@ -298,7 +298,54 @@
     ],
     "strata_smoothing_cells": 10.0,
     "strata_tongue_scale": 1.0,
-    "strata_minor_share": 0.15
+    "strata_minor_share": 0.15,
+    "deformation": {
+      "strength": 1.0,
+      "density": 1.0,
+      "size": 1.0,
+      "fold_wavelength_km": [
+        16.0,
+        8.0,
+        32.0
+      ],
+      "fold_shortening": [
+        0.08,
+        0.3
+      ],
+      "fold_rate_km2_myr": 6e-06,
+      "fault_length_km": [
+        40.0,
+        15.0,
+        150.0
+      ],
+      "fault_reach_ratio": 0.4,
+      "normal_slip_ratio": 0.05,
+      "thrust_slip_ratio": 0.08,
+      "strike_slip_ratio": 0.05,
+      "thrust_rate_km2_myr": 2e-05,
+      "normal_rate_km2_myr": 4e-05,
+      "strike_slip_rate_km2_myr": 4e-06,
+      "foreland_km": 250.0,
+      "max_overlap": 3,
+      "relief": 1.0,
+      "relief_age_myr": 10.0,
+      "relief_wear": 5.0,
+      "fold_relief": 0.5,
+      "footwall_share": 0.2,
+      "intrusions": 1.0,
+      "stock_rate_km2_myr": 2e-05,
+      "stock_radius_km": [
+        4.0,
+        2.0,
+        10.0
+      ],
+      "dyke_rate_km2_myr": 8e-05,
+      "dyke_length_km": [
+        15.0,
+        5.0,
+        50.0
+      ]
+    }
   },
   "volcanoes": {
     "density": 1.0,

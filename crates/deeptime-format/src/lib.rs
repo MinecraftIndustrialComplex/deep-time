@@ -21,6 +21,7 @@ pub mod raster;
 pub mod rivers;
 pub mod sites;
 pub mod strata;
+pub mod structure;
 pub mod tilepack;
 pub mod water;
 
@@ -48,7 +49,7 @@ pub use water::{WaterColumn, WaterKind, WaterSpec};
 pub const FORMAT_VERSION: &str = env!("DEEPTIME_FORMAT_VERSION");
 
 /// The minor part of [`FORMAT_VERSION`], written into every file header (plan §5.7.2).
-pub const FORMAT_MINOR: u16 = 2;
+pub const FORMAT_MINOR: u16 = 3;
 
 #[cfg(test)]
 mod tests {

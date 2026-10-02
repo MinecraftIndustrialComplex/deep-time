@@ -14,6 +14,7 @@ mod provinces;
 mod run;
 mod satellite_view;
 mod strata_check;
+mod structure_sections;
 mod structure_view;
 mod synth;
 mod volcano_view;
@@ -328,6 +329,26 @@ enum Command {
         /// Print this column's stack and findings instead of the census, `X,Z` (repeatable).
         #[arg(long = "column", value_name = "X,Z", allow_hyphen_values = true)]
         column: Vec<String>,
+    },
+    /// Cross-sections of a baked world through its folds and faults (P2-01), each drawn as the
+    /// layers were laid down and as the structures left them: across the largest collision belt,
+    /// arc and rift of the world's event log, and along any `--line`.
+    StructureSections {
+        /// World-data folder (a run's `--out`).
+        #[arg(long)]
+        world_data: PathBuf,
+        /// Folder to write the PNGs, `sections.json` and `index.html` into.
+        #[arg(long)]
+        out: PathBuf,
+        /// A line of your own, `TITLE:x0,z0,x1,z1` in blocks (repeatable).
+        #[arg(long = "line", allow_hyphen_values = true)]
+        line: Vec<String>,
+        /// Half the length of a suggested section, blocks.
+        #[arg(long, default_value_t = 320.0)]
+        half: f64,
+        /// Pixels a block.
+        #[arg(long, default_value_t = 2)]
+        px: u32,
     },
     /// How a baked planet's deposits come out in blocks, per deposit type, beside the background
     /// scatter and vanilla's ore density (no Minecraft server: the bake evaluated as the mod's
@@ -796,6 +817,33 @@ fn main() -> ExitCode {
             }
             Err(e) => {
                 eprintln!("deeptime volcano-view: {e}");
+                ExitCode::FAILURE
+            }
+        },
+        Some(Command::StructureSections {
+            world_data,
+            out,
+            line,
+            half,
+            px,
+        }) => match structure_sections::run(&world_data, &out, &line, half, px.clamp(1, 8)) {
+            Ok(v) => {
+                for s in v["sections"].as_array().into_iter().flatten() {
+                    println!(
+                        "deeptime structure-sections: {} from {} to {} ({:.0} km), {} of {} columns changed -> {}",
+                        s["title"].as_str().unwrap_or(""),
+                        s["from"],
+                        s["to"],
+                        s["km"].as_f64().unwrap_or(0.0),
+                        s["columns_changed"],
+                        s["columns"],
+                        out.join(s["structure"].as_str().unwrap_or("")).display()
+                    );
+                }
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("deeptime structure-sections: {e}");
                 ExitCode::FAILURE
             }
         },
@@ -1918,7 +1966,7 @@ mod tests {
         })
         .unwrap();
         let m = deeptime_format::Manifest::read(&dir.join("world")).unwrap();
-        assert_eq!(m.format_version, "0.2");
+        assert_eq!(m.format_version, "0.3");
         assert_eq!(m.notes["bake"]["baked"], true);
         // The bake says how much of its terrain stands above the build limit (whatever the planet).
         let limit = &m.notes["bake"]["terrain"]["build_limit"];
