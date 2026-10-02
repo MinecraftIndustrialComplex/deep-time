@@ -79,6 +79,25 @@ def main() -> int:
                "roughness_land_p50_m": round(float(np.median(dev[land])), 1),
                "roughness_land_p99_m": round(float(np.percentile(dev[land], 99)), 1),
                "roughness_sea_p99_m": round(float(np.percentile(dev[(z <= 0) & ~polar], 99)), 1)}
+        # Land whose four neighbours are land too: the coast (an island cell beside deep sea)
+        # left out.
+        inland = land.copy()
+        inland &= np.roll(z, 1, 1) > 0
+        inland &= np.roll(z, -1, 1) > 0
+        inland[1:] &= z[:-1] > 0
+        inland[:-1] &= z[1:] > 0
+        out["roughness_inland_p99_m"] = round(float(np.percentile(dev[inland], 99)), 1)
+        out["roughness_inland_margin_p99_m"] = round(float(np.percentile(dev[inland & margin], 99)), 1) if (inland & margin).any() else None
+        coast = land & ~inland
+        out["coast_cells_on_margin"] = int((coast & margin).sum())
+        out["coast_cells"] = int(coast.sum())
+        out["roughness_land_margin_p99_m"] = round(float(np.percentile(dev[land & margin], 99)), 1)
+        out["roughness_land_interior_p99_m"] = round(float(np.percentile(dev[land & ~margin], 99)), 1)
+        out["land_margin_share"] = round(float((land & margin).sum() / max(land.sum(), 1)), 3)
+        # The roughest 1 % of land cells: how many of them are zigzag cells.
+        rough = land & (dev >= np.percentile(dev[land], 99))
+        out["roughest_land_zigzag_share"] = round(float(zigzag(z)[rough].mean()), 3)
+        out["roughest_land_on_margin_share"] = round(float(margin[rough].mean()), 3)
         for name in ("surface/elevation_m", "surface/flexure_m"):
             if name not in f:
                 continue
