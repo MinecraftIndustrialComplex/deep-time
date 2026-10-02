@@ -221,6 +221,16 @@ pub(super) fn length_blocks(v: [f64; 3], sigma: f64, km_to_blocks: f64, rng: &mu
     (median * (sigma * rng.normal()).exp()).clamp(lo, hi) * km_to_blocks
 }
 
+/// A dip-slip fault of dip `dip_deg` and slip `slip` along its dip (block space, 1:1) drawn
+/// `vertical_scale` times taller: the heave (`slip · cos dip`) is kept and the throw
+/// (`slip · sin dip`) multiplied, so the dip becomes atan(X tan d) and the slip
+/// slip · √(cos² d + X² sin² d). Returns (dip in degrees, slip). ledger: DEF-011
+pub fn stretch(dip_deg: f64, slip: f64, vertical_scale: f64) -> (f64, f64) {
+    let (sin, cos) = dip_deg.to_radians().sin_cos();
+    let (heave, throw) = (cos, sin * vertical_scale);
+    (throw.atan2(heave).to_degrees(), slip * heave.hypot(throw))
+}
+
 /// Draws this step's new structures into `features` (the ones already there decide the overlap
 /// rule, and the oldest may give way); `cause(kind, x, z)` names the tectonic event behind a
 /// structure at a block position. Returns how many were started.
@@ -361,8 +371,9 @@ pub fn emplace(
                     let e = e_lo + (e_crust - e_lo) * s.shortening.min(1.0);
                     f.azimuth_deg = (trend + scatter).rem_euclid(360.0) as f32;
                     f.wavelength = wavelength as f32;
-                    f.amplitude =
-                        (p.strength * wavelength * e.sqrt() / std::f64::consts::PI) as f32;
+                    // ledger: DEF-007, DEF-011
+                    f.amplitude = (p.vertical_scale * p.strength * wavelength * e.sqrt()
+                        / std::f64::consts::PI) as f32;
                     f.half_across = (0.5 * lerp(p.fold_train_waves, u[0]) * wavelength) as f32;
                     f.half_along = (0.5 * lerp(p.fold_length_ratio, u[1]) * wavelength) as f32;
                     f.phase = u[2] as f32;
@@ -386,11 +397,16 @@ pub fn emplace(
                         az += 180.0;
                     }
                     f.azimuth_deg = az.rem_euclid(360.0) as f32;
-                    f.dip_deg = lerp(p.thrust_dip_deg, u[0]) as f32;
                     f.half_along = (0.5 * length) as f32;
                     f.half_across = (p.fault_reach_ratio * length) as f32;
                     let grow = 0.5 + 0.5 * s.shortening.min(1.0); // ledger: DEF-017
-                    f.slip = -(p.strength * p.thrust_slip_ratio * length * grow) as f32;
+                    let (dip, slip) = stretch(
+                        lerp(p.thrust_dip_deg, u[0]),
+                        p.strength * p.thrust_slip_ratio * length * grow,
+                        p.vertical_scale,
+                    );
+                    f.dip_deg = dip as f32;
+                    f.slip = -slip as f32;
                 }
                 Kind::Normal => {
                     let rift = |k: usize| {
@@ -412,10 +428,15 @@ pub fn emplace(
                         az += 180.0;
                     }
                     f.azimuth_deg = az.rem_euclid(360.0) as f32;
-                    f.dip_deg = lerp(p.normal_dip_deg, u[0]) as f32;
                     f.half_along = (0.5 * length) as f32;
                     f.half_across = (p.fault_reach_ratio * length) as f32;
-                    f.slip = (p.strength * p.normal_slip_ratio * length) as f32;
+                    let (dip, slip) = stretch(
+                        lerp(p.normal_dip_deg, u[0]),
+                        p.strength * p.normal_slip_ratio * length,
+                        p.vertical_scale,
+                    );
+                    f.dip_deg = dip as f32;
+                    f.slip = slip as f32;
                 }
                 Kind::StrikeSlip => {
                     let trend = trend_near(x, c).unwrap_or(random_trend);
@@ -441,6 +462,7 @@ pub fn emplace(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use deeptime_format::structure::Shape;
 
     /// A small planet with a north–south collision belt, a rift and an oblique margin.
     pub(crate) struct Planet {
@@ -614,7 +636,14 @@ pub(crate) mod tests {
                 Kind::Normal => {
                     assert!((177..=182).contains(&i), "normal fault at column {i}");
                     assert!(off_axis(f.azimuth_deg, 0.0) < 50.0, "{}", f.azimuth_deg);
-                    assert!(f.slip > 0.0 && (55.0..=70.0).contains(&f.dip_deg));
+                    // Anderson's 55° to 70°, steepened by the vertical scale.
+                    let x = sp.deformation.vertical_scale;
+                    let (lo, hi) = (stretch(55.0, 1.0, x).0, stretch(70.0, 1.0, x).0);
+                    let dip = f64::from(f.dip_deg);
+                    assert!(
+                        f.slip > 0.0 && dip >= lo - 1e-3 && dip <= hi + 1e-3,
+                        "{dip}"
+                    );
                 }
                 _ => unreachable!(),
             }
@@ -641,8 +670,10 @@ pub(crate) mod tests {
             assert!(f.slip < 0.0, "a thrust's hanging wall goes up");
         }
         assert!(right > 10 && wrong == 0, "{right} right, {wrong} wrong");
-        // Folds are tighter in the thickened core than in the foreland.
-        let ratio = |f: &Feature| f.amplitude / f.wavelength;
+        // Folds are tighter in the thickened core than in the foreland (amplitude over
+        // wavelength before the vertical scale).
+        let x = sp.deformation.vertical_scale as f32;
+        let ratio = |f: &Feature| f.amplitude / f.wavelength / x;
         let mean = |v: Vec<f32>| v.iter().sum::<f32>() / v.len().max(1) as f32;
         let core = mean(
             all.iter()
@@ -725,6 +756,84 @@ pub(crate) mod tests {
         }
         // The same seed gives the same structures.
         assert_eq!(p.run(&sp, 25, 3).0, base);
+    }
+
+    /// `vertical_scale` stretches structures upwards and nothing else: the same structures (the
+    /// same draws), fold amplitudes and fault throws times the scale, fault heaves unchanged,
+    /// dips steepened to atan(X tan d), and the baked slip vector's vertical part times the
+    /// scale with its horizontal part unchanged (what every reader of the column rule sees).
+    #[test]
+    fn vertical_scale_stretches_heights_only() {
+        let p = Planet::new();
+        let mut one = StructureParams::default();
+        one.deformation.vertical_scale = 1.0;
+        let (base, _) = p.run(&one, 25, 3);
+        assert!(base.iter().any(|f| f.kind == Kind::Normal));
+        assert!(base.iter().any(|f| f.kind == Kind::Thrust));
+        assert!(base.iter().any(|f| f.kind == Kind::FoldTrain));
+        // At 1 the dips are Anderson's, as drawn in blocks.
+        for f in &base {
+            let d = f64::from(f.dip_deg);
+            match f.kind {
+                Kind::Normal => assert!((54.99..=70.01).contains(&d), "{d}"),
+                Kind::Thrust => assert!((19.99..=40.01).contains(&d), "{d}"),
+                _ => {}
+            }
+        }
+        for x in [4.0, 15.0] {
+            let mut tall = one.clone();
+            tall.deformation.vertical_scale = x;
+            let (stretched, _) = p.run(&tall, 25, 3);
+            assert_eq!(base.len(), stretched.len());
+            for (a, b) in base.iter().zip(&stretched) {
+                assert_eq!(
+                    (
+                        a.x,
+                        a.z,
+                        a.kind,
+                        a.azimuth_deg,
+                        a.wavelength,
+                        a.half_along,
+                        a.half_across
+                    ),
+                    (
+                        b.x,
+                        b.z,
+                        b.kind,
+                        b.azimuth_deg,
+                        b.wavelength,
+                        b.half_along,
+                        b.half_across
+                    )
+                );
+                let close = |u: f64, v: f64| (u - v).abs() <= 1e-4 * v.abs().max(1.0);
+                match a.kind {
+                    Kind::FoldTrain => {
+                        assert!(close(f64::from(b.amplitude), x * f64::from(a.amplitude)));
+                    }
+                    Kind::Thrust | Kind::Normal => {
+                        let parts = |f: &Feature| {
+                            let (s, c) = f64::from(f.dip_deg).to_radians().sin_cos();
+                            (f64::from(f.slip) * c, f64::from(f.slip) * s)
+                        };
+                        let ((h0, t0), (h1, t1)) = (parts(a), parts(b));
+                        assert!(close(h1, h0), "heave {h1} vs {h0}");
+                        assert!(close(t1, x * t0), "throw {t1} vs {x} x {t0}");
+                        let want = (x * f64::from(a.dip_deg).to_radians().tan()).atan();
+                        assert!((f64::from(b.dip_deg).to_radians() - want).abs() < 1e-5);
+                        // Baked: the hanging wall's displacement, (x, y, z) in blocks.
+                        let slip = |f: &Feature| match f.to_baked(70.0, 1, -330.0).shape {
+                            Shape::Fault { slip, .. } => slip,
+                            s => panic!("{s:?}"),
+                        };
+                        let (v0, v1) = (slip(a), slip(b));
+                        assert!(close(v1[0].hypot(v1[2]), v0[0].hypot(v0[2])));
+                        assert!(close(v1[1], x * v0[1]), "{} vs {x} x {}", v1[1], v0[1]);
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
 
     #[test]

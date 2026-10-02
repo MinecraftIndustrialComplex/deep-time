@@ -7,18 +7,22 @@
 //! "structure": {"deformation": {"strength": 1.0, "density": 1.0, "fold_wavelength_km": [16, 8, 32]}}
 //! ```
 //!
-//! **Sizes are true in block space** (ledger: DEF-011, a game choice open to Ben: STATUS.md
-//! "Pending questions", docs/science/folds-faults-intrusions.md). A fold's wavelength and a
-//! fault's length are given in km on the planet's horizontal block scale (300 m a block in the
-//! built-in presets), and amplitudes and slips are that many *blocks* times the shape's own ratio
-//! (amplitude over wavelength, slip over length), not metres at the vertical scale: heights are
-//! stretched 15 times against widths (20 m against 300 m per block), and a fold drawn with its
-//! true amplitude in metres would have near-vertical limbs. What is kept is the shape a geologist
-//! would draw in a cross-section at 1:1. In true metres (the scale the strata, the plutons and
-//! the terrain are drawn at) that makes every structure 15 times lower than it is wide: a 60°
-//! fault in blocks is a 6.6° fault in metres, a 30° thrust a 2.2° one, and a fold's amplitude and
-//! a fault's throw are a fifteenth of what the same shape has in metres. The horizontal part of
-//! a slip (the heave) is true in metres.
+//! **Heights are drawn `vertical_scale` times taller than in block space** (ledger: DEF-011;
+//! Ben, decisions log 2026-10-02: "Setting, default 4x"). A fold's wavelength and a fault's length
+//! are given in km on the planet's horizontal block scale (300 m a block in the built-in presets),
+//! and amplitudes and slips are first that many *blocks* times the shape's own ratio (amplitude
+//! over wavelength, slip over length): the shape a geologist would draw in a cross-section at 1:1
+//! in blocks. `vertical_scale` X then stretches every structure upwards: a fold's amplitude is
+//! multiplied by X, and a fault of dip d and slip s keeps its heave (the horizontal part,
+//! s cos d) while its throw (the vertical part, s sin d) is multiplied by X, so its dip in blocks
+//! becomes atan(X tan d) and its slip s √(cos² d + X² sin² d). Heights in the world are stretched
+//! 15 times against widths (20 m against 300 m a block), so X = 1 draws every structure 15 times
+//! lower in metres than it is wide, X = 15 draws it in true metres (Anderson's 60° and 30° faults
+//! dip 60° and 30° in metres, fold amplitudes are Zagros-sized), and the default 4 lies between:
+//! in metres a 60° normal fault dips 25° and a 30° thrust 8.8°, fold amplitudes and throws are 4/15
+//! of true. True metres wait for fold wavelengths taken from the thickness of the layers being
+//! folded (Biot; docs/science/folds-faults-intrusions.md, "Open questions"): with every fold 16 km
+//! long whatever lies under it, true heights pull the basement up through thin cover in keels.
 
 use serde::{Deserialize, Serialize};
 
@@ -36,6 +40,11 @@ pub struct DeformationParams {
     /// Multiplies every length (wavelengths, fault lengths, and with them amplitudes and slips):
     /// the size structures are drawn at, like `scale.feature_scale`.
     pub size: f64,
+    /// How many times taller than in block space folds and faults are drawn (module doc): fold
+    /// amplitudes and fault throws times this, fault heaves unchanged. 1 is the shape at 1:1 in
+    /// blocks, 15 true metres at the built-in 300 m by 20 m block. A game choice (Ben, decisions
+    /// log 2026-10-02). ledger: DEF-011
+    pub vertical_scale: f64,
 
     /// Fold wavelength, km: [median, min, max] of a lognormal with `fold_wavelength_sigma`.
     /// Median 16 km: the folds of the Zagros Folded Belt have "homogeneous fold wavelengths
@@ -91,7 +100,7 @@ pub struct DeformationParams {
     /// Their heave (the horizontal part) is true in metres, so in metres a normal fault's
     /// displacement is 0.017 to 0.029 of its length and a thrust's 0.031 to 0.075, inside the
     /// ranges read; their throw (the vertical part) is a fifteenth of the same slip's in metres
-    /// (see the module doc). ledger: DEF-015 to DEF-018
+    /// (see the module doc); `vertical_scale` multiplies the throw. ledger: DEF-015 to DEF-018
     pub normal_slip_ratio: f64,
     pub thrust_slip_ratio: f64,
     pub strike_slip_ratio: f64,
@@ -100,8 +109,9 @@ pub struct DeformationParams {
     /// 0.577 (Anderson 1905, Trans. Edinb. Geol. Soc. 8:387–402, pp. 389 and 402; the theory of
     /// Anderson 1951, The Dynamics of Faulting, 2nd ed.); active normal faults rupture at 30° to
     /// 65° and reverse faults peak at 30° ± 5° (Collettini & Sibson 2001, Geology 29:927–930,
-    /// abstract). Applied in block space (module doc): in metres these are 5.4° to 10.4° and 1.4°
-    /// to 3.2°. ledger: DEF-019, DEF-020
+    /// abstract). Applied in block space before `vertical_scale` steepens them (module doc): at
+    /// the default 4, normal faults dip 80° to 85° in blocks (21° to 36° in metres) and thrusts
+    /// 55° to 73° in blocks (5.5° to 12.6° in metres). ledger: DEF-019, DEF-020
     pub normal_dip_deg: [f64; 2],
     pub thrust_dip_deg: [f64; 2],
     /// Faults per km² of full-strength regime per Myr: thrusts where the crust shortens, normal
@@ -134,14 +144,19 @@ pub struct DeformationParams {
 
     /// How much of their relief young structures put on the ground (fault scarps, rift valleys,
     /// fold ridges; `surface::amplify::structure`): 0 leaves the terrain as it was, 1 moves the
-    /// ground of a structure made in the last plate step as far as its rock moved.
+    /// ground of a structure made in the last plate step as far as its rock moved (as drawn,
+    /// `vertical_scale` included). The default 0.25 is 1 / the default `vertical_scale`: the
+    /// ground moves as far as it did before the vertical scale existed (up to about 340 m on a
+    /// 500 Myr quick world), where 1 would put 4 times that on the ground and true metres at 1
+    /// would raise it by up to 5.1 km (science package WP-8). A game choice (decisions log
+    /// 2026-10-02: "the scarp term lowered"). ledger: DEF-054
     pub relief: f64,
     /// A structure's relief fades to nothing over this long, Myr. Design value: metre-scale
     /// scarps soften within about 100 kyr and range fronts stand for millions of years; a
     /// structure here stands for a fault's whole active life.
     pub relief_age_myr: f64,
     /// … and as the deep-time surface erodes or buries the ground there by this many times the
-    /// structure's own height (a fault that is still slipping renews its scarp, so more than
+    /// height of the structure's relief on the ground (`relief` times its height as drawn) (a fault that is still slipping renews its scarp, so more than
     /// once).
     pub relief_wear: f64,
     /// The share of a fold train's shift that shows as ridges and valleys.
@@ -173,16 +188,24 @@ pub struct DeformationParams {
     /// USGS PP 1202) to over 2,000 km in giant swarms (the Mackenzie swarm: Bunger, Menand,
     /// Cruden, Zhang & Halls 2013, Earth Planet. Sci. Lett. 375:270–279). ledger: DEF-047
     pub dyke_length_km: [f64; 3],
-    /// A dyke's half-width at its middle, blocks [min, max]: 2 to 5 blocks (600 to 1,500 m)
-    /// across. Real dykes are metres to tens of metres wide (Ship Rock's northeastern dike 2.3 m
-    /// on average, Delaney & Pollard 1981; the Mackenzie dykes 1 to 150 m, mean 30 m, Bunger et
-    /// al. 2013); a block (300 m) is the least that can be drawn. A game choice. ledger: DEF-048
+    /// A dyke's half-width at its middle, blocks [min, max]: 0.85 to 1.5, so 1.7 to 3 blocks
+    /// (510 to 900 m) across at depth and 1 to 1.8 blocks where it reaches the ground (the
+    /// rooted ellipsoid narrows upwards to 0.6 of its width at the ground, `intrude::RISE`).
+    /// Real dykes are metres to tens of metres wide (Ship Rock's northeastern dike 2.3 m on
+    /// average, Delaney & Pollard 1981; the Mackenzie dykes 1 to 150 m, mean 30 m, Bunger et al.
+    /// 2013); a block (300 m) is the least that can be drawn, and below a half-width of 0.85 a
+    /// dyke's outcrop breaks into separate blocks. Ben (decisions log 2026-10-02, "Go somewhere
+    /// in between"): between the earlier 2 to 5 blocks (1.2 to 3 at the ground) and the
+    /// narrowest drawable. A game choice. ledger: DEF-048
     pub dyke_half_width_blocks: [f64; 2],
     /// A plug's radius as a share of its volcano's basal radius, and its range in blocks
-    /// [min, max]: 1.5 to 4.8 km across. Design values: real necks are tens to hundreds of
-    /// metres across (Ship Rock 500 m, New Mexico Bureau of Geology; the plugs beside it under
-    /// 30 m, Delaney & Pollard 1981), so plugs are drawn 3 to 10 times wider than Ship Rock. A
-    /// game choice. ledger: DEF-049
+    /// [min, max]: 2 to 5 blocks, 1.2 to 3 km across at depth and 0.7 to 1.8 km where it reaches
+    /// the ground (0.6 of its width there, as a dyke). Design values: real necks are tens to
+    /// hundreds of metres across (Ship Rock 500 m, New Mexico Bureau of Geology; the plugs
+    /// beside it under 30 m, Delaney & Pollard 1981), so plugs are drawn 1.4 to 3.6 times wider
+    /// than Ship Rock at the ground. Ben (decisions log 2026-10-02, "Go somewhere in between"):
+    /// between the earlier 2.5 to 8 blocks and the narrowest drawable 1 to 3. A game choice.
+    /// ledger: DEF-049
     pub plug_radius_share: f64,
     pub plug_radius_blocks: [f64; 2],
 }
@@ -193,6 +216,7 @@ impl Default for DeformationParams {
             strength: 1.0,                         // ledger: DEF-012
             density: 1.0,                          // ledger: DEF-012
             size: 1.0,                             // ledger: DEF-012
+            vertical_scale: 4.0,                   // ledger: DEF-011
             fold_wavelength_km: [16.0, 8.0, 32.0], // ledger: DEF-001
             fold_wavelength_sigma: 0.35,           // ledger: DEF-001
             fold_train_waves: [2.0, 5.0],          // ledger: DEF-003
@@ -216,7 +240,7 @@ impl Default for DeformationParams {
             overprint_myr: 30.0,                   // ledger: DEF-033
             trend_scatter_deg: 12.0,               // ledger: DEF-009
             max_structures: 60_000,                // ledger: DEF-034
-            relief: 1.0,                           // ledger: DEF-054
+            relief: 0.25,                          // ledger: DEF-054
             relief_age_myr: 10.0,                  // ledger: DEF-055
             relief_wear: 5.0,                      // ledger: DEF-056
             fold_relief: 0.5,                      // ledger: DEF-058
@@ -227,9 +251,9 @@ impl Default for DeformationParams {
             stock_top_depth_blocks: [-4.0, 60.0],  // ledger: DEF-044
             dyke_rate_km2_myr: 8.0e-5,             // ledger: DEF-046
             dyke_length_km: [15.0, 5.0, 50.0],     // ledger: DEF-047
-            dyke_half_width_blocks: [1.0, 2.5],    // ledger: DEF-048
+            dyke_half_width_blocks: [0.85, 1.5],   // ledger: DEF-048
             plug_radius_share: 0.08,               // ledger: DEF-049
-            plug_radius_blocks: [2.5, 8.0],        // ledger: DEF-049
+            plug_radius_blocks: [2.0, 5.0],        // ledger: DEF-049
         }
     }
 }
@@ -267,6 +291,11 @@ impl DeformationParams {
             (0.1..=10.0).contains(&self.size),
             "size",
             "must be in [0.1, 10]",
+        )?;
+        check(
+            (1.0..=30.0).contains(&self.vertical_scale),
+            "vertical_scale",
+            "must be in [1, 30]",
         )?;
         for (v, key) in [
             (self.fold_wavelength_km, "fold_wavelength_km"),

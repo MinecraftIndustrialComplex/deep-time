@@ -60,7 +60,8 @@ pub fn orogen_distance_km(d: &Dims, regime_f: &[f32], crust: &[f32], flags: &[f3
 /// The share of structural closure the world's folds and faults give each cell of `grid` (L1),
 /// 0–1: the largest over the structures whose window holds the cell's centre of
 /// - a fold train: how tight it is, amplitude / wavelength over 0.1 (10 % of the wavelength is a
-///   fold shortened by about a tenth), at most 1;
+///   fold shortened by about a tenth), at most 1, the amplitude taken before `vertical_scale`
+///   (`deform::DeformationParams`) stretched it;
 /// - a thrust: 0.8 over its hanging wall (the ramp anticline), 0.4 over its foot wall;
 /// - a normal fault: 0.6 (a tilted block against the fault);
 /// - a strike-slip fault: 0.3;
@@ -69,6 +70,7 @@ pub fn orogen_distance_km(d: &Dims, regime_f: &[f32], crust: &[f32], flags: &[f3
 pub fn structural(
     features: &[super::deform::Feature],
     grid: &deeptime_format::GridDesc,
+    vertical_scale: f64,
 ) -> Vec<f32> {
     use super::deform::Kind;
     let mut out = vec![0.0f32; grid.cells()];
@@ -79,7 +81,8 @@ pub fn structural(
     for f in features {
         let share = match f.kind {
             Kind::FoldTrain => {
-                (f64::from(f.amplitude) / f64::from(f.wavelength).max(1e-9) / 0.1).min(1.0)
+                let amplitude = f64::from(f.amplitude) / vertical_scale.max(1e-9);
+                (amplitude / f64::from(f.wavelength).max(1e-9) / 0.1).min(1.0)
             }
             Kind::Thrust => 0.8,
             Kind::Normal => 0.6,
@@ -313,7 +316,7 @@ mod tests {
         };
         let at = |v: &[f32], x: f64, z: f64| v[crate::structure::plutons::cell_of(&grid, x, z)];
         // A tight fold train: full closure at its middle, less towards its edge, none outside.
-        let fold = structural(std::slice::from_ref(&base), &grid);
+        let fold = structural(std::slice::from_ref(&base), &grid, 1.0);
         assert!((at(&fold, 0.0, 0.0) - 1.0).abs() < 1e-6);
         let edge = at(&fold, 100.0, 0.0);
         assert!(edge > 0.0 && edge < 0.5, "{edge}");
@@ -324,7 +327,14 @@ mod tests {
             amplitude: 3.0,
             ..base.clone()
         };
-        let v = structural(std::slice::from_ref(&gentle), &grid);
+        let v = structural(std::slice::from_ref(&gentle), &grid, 1.0);
+        // The same fold drawn four times taller closes the same.
+        let tall = Feature {
+            amplitude: 12.0,
+            ..base.clone()
+        };
+        let t = structural(std::slice::from_ref(&tall), &grid, 4.0);
+        assert!((at(&t, 0.0, 0.0) - 0.5).abs() < 1e-6);
         assert!((at(&v, 0.0, 0.0) - 0.5).abs() < 1e-6);
         // A thrust (dipping east: azimuth 0, the hanging wall to the east): more over the
         // hanging wall than the foot wall. A stock gives none. The largest wins.
@@ -332,18 +342,18 @@ mod tests {
             kind: Kind::Thrust,
             ..base.clone()
         };
-        let v = structural(std::slice::from_ref(&thrust), &grid);
+        let v = structural(std::slice::from_ref(&thrust), &grid, 1.0);
         assert!((at(&v, 24.0, 0.0) - 0.8).abs() < 1e-6 && (at(&v, -24.0, 0.0) - 0.4).abs() < 1e-6);
         let stock = Feature {
             kind: Kind::Stock,
             ..base.clone()
         };
         assert!(
-            structural(std::slice::from_ref(&stock), &grid)
+            structural(std::slice::from_ref(&stock), &grid, 1.0)
                 .iter()
                 .all(|&x| x == 0.0)
         );
-        let both = structural(&[thrust, gentle], &grid);
+        let both = structural(&[thrust, gentle], &grid, 1.0);
         assert!((at(&both, 24.0, 0.0) - 0.8).abs() < 1e-6);
     }
 }

@@ -255,8 +255,10 @@ fn a_planet_of_structures_evaluates_on_a_lattice() {
     );
     assert!(stats.faulted > 100 && stats.faulted <= stats.deformed);
     assert!(stats.max_candidates >= 2 && stats.max_segments >= 2);
+    // (Bounds at 1:1, times the vertical scale that heights are drawn at.)
+    let x = sp.deformation.vertical_scale;
     assert!(
-        stats.max_shift > 2.0 && stats.max_shift < 80.0,
+        stats.max_shift > 2.0 && stats.max_shift < 80.0 * x,
         "{}",
         stats.max_shift
     );
@@ -287,7 +289,9 @@ fn a_planet_of_structures_evaluates_on_a_lattice() {
         })
         .collect();
     let check = lattice::noddy_check(&features, &st, &index, &sample, -352.0, 640.0, 16.0);
-    assert!(check.worst < 1e-5, "{check:?}");
+    // (Rounding only: at the default vertical scale faults dip 80° to 85° in blocks, and the two
+    // frames' rounding differs by up to about 1 / cos(dip) times more than at 1:1.)
+    assert!(check.worst < 1e-4, "{check:?}");
     // The history as a Noddy event list reads like any other.
     let profile = noddy::Profile::sine_table();
     let e = features[0].to_noddy(0.0, 0.0, 4096.0, 70.0, &profile);
@@ -420,4 +424,134 @@ fn a_place_with_more_structures_than_one_noddy_history_holds() {
                 .all(|g| g.dy.is_finite() && g.x.is_finite() && g.z.is_finite())
         );
     }
+}
+
+/// The column rule (what the strata pass, far terrain, inspect and sections all read) offsets the
+/// beds by the vertical scale: a normal fault drawn 4 times taller restores the hanging wall's
+/// rock from 4 times as far up and from as far to the side, and a fold 4 times taller shifts the
+/// column 4 times as far.
+#[test]
+fn the_column_rule_offsets_beds_by_the_vertical_scale() {
+    let fault = |x: f64| {
+        let (dip, slip) = super::emplace::stretch(60.0, 10.0, x);
+        Feature {
+            id: 0,
+            kind: Kind::Normal,
+            x: 0.0,
+            z: 0.0,
+            plate: 0,
+            t_myr: -10.0,
+            azimuth_deg: 0.0,
+            half_along: 200.0,
+            half_across: 100.0,
+            wavelength: 50.0,
+            amplitude: 6.0 * x as f32,
+            phase: 0.0,
+            dip_deg: dip as f32,
+            slip: slip as f32,
+            cause: 0,
+            adrift: 0,
+            wear_m: 0.0,
+            rise: 0.0,
+            depth: 0.0,
+            rock: 0,
+        }
+    };
+    let column = |f: &Feature, x: f64| {
+        let st = finish(std::slice::from_ref(f), |_, _| 64.0, test_key, -64.0);
+        let mut segs = Vec::new();
+        st.column(&[0], x, 0.0, 4096.0, &mut segs);
+        segs
+    };
+    // East of the trace, past where either plane reaches, in the hanging wall.
+    let (one, four) = (fault(1.0), fault(4.0));
+    let (a, b) = (column(&one, 30.0), column(&four, 30.0));
+    let (ha, hb) = (a.last().unwrap(), b.last().unwrap());
+    assert!(ha.dy > 1.0, "{ha:?}");
+    assert!(
+        (hb.dy - 4.0 * ha.dy).abs() < 1e-3 * ha.dy,
+        "{} vs 4 x {}",
+        hb.dy,
+        ha.dy
+    );
+    assert!(
+        (hb.x - ha.x).abs() < 1e-3,
+        "the heave is kept: {} vs {}",
+        hb.x,
+        ha.x
+    );
+    // The steeper plane (atan(4 tan 60°) = 81.8°) lies deeper under this column.
+    assert!(b[0].y_hi < a[0].y_hi, "{} vs {}", b[0].y_hi, a[0].y_hi);
+    // A fold.
+    let fold = |x: f64| Feature {
+        kind: Kind::FoldTrain,
+        ..fault(x)
+    };
+    let (a, b) = (column(&fold(1.0), 12.5), column(&fold(4.0), 12.5));
+    assert!(a[0].dy.abs() > 2.0);
+    assert!((b[0].dy - 4.0 * a[0].dy).abs() < 1e-3 * a[0].dy.abs());
+}
+
+/// The ground keeps its relief at the default: a structure drawn 4 times taller with a quarter
+/// of the relief share moves the ground as far, and wears off it as fast, as one at 1:1 with
+/// the full share.
+#[test]
+fn the_default_relief_keeps_the_ground_as_at_one_to_one() {
+    let mut one = super::params::DeformationParams {
+        vertical_scale: 1.0,
+        relief: 1.0,
+        ..Default::default()
+    };
+    let four = super::params::DeformationParams::default();
+    assert_eq!((four.vertical_scale, four.relief), (4.0, 0.25));
+    let mut f1 = Feature {
+        id: 0,
+        kind: Kind::Normal,
+        x: 0.0,
+        z: 0.0,
+        plate: 0,
+        t_myr: -10.0,
+        azimuth_deg: 0.0,
+        half_along: 200.0,
+        half_across: 100.0,
+        wavelength: 50.0,
+        amplitude: 6.0,
+        phase: 0.0,
+        dip_deg: 60.0,
+        slip: 10.0,
+        cause: 0,
+        adrift: 0,
+        wear_m: 0.0,
+        rise: 0.0,
+        depth: 0.0,
+        rock: 0,
+    };
+    let (dip, slip) = super::emplace::stretch(60.0, 10.0, 4.0);
+    let mut f4 = Feature {
+        dip_deg: dip as f32,
+        slip: slip as f32,
+        amplitude: 24.0,
+        ..f1.clone()
+    };
+    let throw = |f: &Feature| f64::from(f.slip) * f64::from(f.dip_deg).to_radians().sin();
+    for (wear, now) in [(0.0, -9.0), (300.0, -8.0), (900.0, -5.0), (5_000.0, -9.5)] {
+        f1.wear_m = wear;
+        f4.wear_m = wear;
+        for kind in [Kind::Normal, Kind::FoldTrain] {
+            f1.kind = kind;
+            f4.kind = kind;
+            let height = |f: &Feature| match kind {
+                Kind::FoldTrain => f64::from(f.amplitude),
+                _ => throw(f),
+            };
+            let g1 = f64::from(relief_left(&f1, now, &one, 20.0)) * height(&f1);
+            let g4 = f64::from(relief_left(&f4, now, &four, 20.0)) * height(&f4);
+            assert!(
+                (g1 - g4).abs() < 1e-4 * g1.abs().max(1e-3),
+                "{kind:?} {wear}: {g1} vs {g4}"
+            );
+        }
+    }
+    one.relief = 0.0;
+    assert_eq!(relief_left(&f1, -9.0, &one, 20.0), 0.0);
 }

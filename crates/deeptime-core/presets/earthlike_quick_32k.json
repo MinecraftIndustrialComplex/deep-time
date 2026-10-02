@@ -309,6 +309,7 @@
       "strength": 1.0,
       "density": 1.0,
       "size": 1.0,
+      "vertical_scale": 4.0,
       "fold_wavelength_km": [
         16.0,
         8.0,
@@ -333,7 +334,7 @@
       "strike_slip_rate_km2_myr": 4e-06,
       "foreland_km": 250.0,
       "max_overlap": 3,
-      "relief": 1.0,
+      "relief": 0.25,
       "relief_age_myr": 10.0,
       "relief_wear": 5.0,
       "fold_relief": 0.5,
@@ -350,6 +351,15 @@
         15.0,
         5.0,
         50.0
+      ],
+      "dyke_half_width_blocks": [
+        0.85,
+        1.5
+      ],
+      "plug_radius_share": 0.08,
+      "plug_radius_blocks": [
+        2.0,
+        5.0
       ]
     }
   },

@@ -89,8 +89,9 @@ pub fn finish(
 
 /// How much of a structure's relief is left on the ground at `now_myr` (0 to `relief`): it fades
 /// linearly over `relief_age_myr`, and as the surface has eroded or buried the ground there
-/// ([`Feature::wear_m`]) by `relief_wear` times the structure's own height, as drawn
-/// (`m_per_block_v` metres a block). A strike-slip fault has none.
+/// ([`Feature::wear_m`]) by `relief_wear` times the height of its relief on the ground (`relief`
+/// times the structure's own height as drawn, `m_per_block_v` metres a block: the scarp on the
+/// ground is what wears away, not the offset in the rock). A strike-slip fault has none.
 pub fn relief_left(f: &Feature, now_myr: f64, p: &DeformationParams, m_per_block_v: f64) -> f32 {
     if p.relief <= 0.0 {
         return 0.0;
@@ -102,7 +103,7 @@ pub fn relief_left(f: &Feature, now_myr: f64, p: &DeformationParams, m_per_block
         }
         Kind::StrikeSlip | Kind::Stock | Kind::Dyke | Kind::Plug => 0.0,
     };
-    let height_m = height_blocks * m_per_block_v;
+    let height_m = p.relief * height_blocks * m_per_block_v;
     if height_m <= 0.0 {
         return 0.0;
     }
