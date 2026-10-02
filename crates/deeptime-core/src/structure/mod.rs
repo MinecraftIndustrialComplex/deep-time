@@ -864,11 +864,19 @@ impl StructureStage {
         let mut fr = vec![0.0f32; n * hc.max(1)];
         let p = &self.p;
         let t = &self.tables;
+        // BIF inherited in the cratons' basement (`deposits::clocks`): the basement is its host.
+        let bif_share =
+            crate::deposits::clocks::Epoch::of_preset(&self.preset).inherited_bif_share() as f32;
+        let bif_slot =
+            self.slot[usize::from(crate::surface::lithology::index("banded_iron_formation"))];
         fr.par_chunks_mut(hc.max(1))
             .enumerate()
             .for_each_init(Vec::new, |units, (c, out)| {
                 columns::build(&src.cell(c), t, p, src.now_myr, window, units);
-                hosts::fractions(units, window, &self.slot, out);
+                let inherited =
+                    (bif_share > 0.0 && bif_slot != usize::MAX && src.regime(c) == regime::CRATON)
+                        .then_some((bif_slot, bif_share));
+                hosts::fractions_inherited(units, window, &self.slot, inherited, out);
             });
         // Plutons take their share of the window from what was there.
         for pl in &self.st.plutons {
