@@ -17,7 +17,8 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
 | [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208 (23) |
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221 (40) |
-| [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-202 (29) |
+| [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
+| [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
 
 Rows by status (after WP-13a and plate-motion task 2, 2026-10-02): `verified` 17, `cited-unverified` 45, `from-memory` 4, `abstract-only` 14, `calibrated` 13, `game-choice` 68, `uncited` 46; `pending-rewrite` 144; `not-yet-coded` 25.
 
@@ -33,6 +34,7 @@ Rows by status (after WP-13a and plate-motion task 2, 2026-10-02): `verified` 17
 - Since 2026-10-02 (plate-motion task 2) a contact keeps a collision state with its real shortening: the convergence across the collision front, integrated (ledger PLT-222 to PLT-226). The built-in presets still transfer terranes and weld plates on the older count of relative speed times time (PLT-068, PLT-227), so the worlds are unchanged; the measurements behind that choice are in the build log entry of that date.
 
 - The accuracy review calls today's model "a convincing cartoon of plate tectonics, not yet an accurate simulation": no Wilson cycle (rifted pieces weld back after a median 18 Myr), one plate over half the planet in about half of all frames, collisions that raise round blobs in one step.
+- The force balance is computed and recorded every step since 2026-10-02 (task 5), not yet applied: [plate-forces.md](plate-forces.md), constants in ledger FRC; PLT-181 to PLT-190 are coded.
 - The force-balance design could not confirm three figures: the gross size of slab pull, a factor of 8 for continental drag attributed to Forsyth & Uyeda, and the wedge-taper reference. WP-13a settled all three; see the next section.
 
 ## The planned force balance: its constants and targets checked (WP-13a)
