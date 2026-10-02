@@ -2,10 +2,11 @@
 
 Status of this page: `stage 2 (constants checked against sources on 2026-10-02, package WP-2)`.
 
-Ledger ids on this page: `VOL-001` to `VOL-073` ([ledger/VOL.md](ledger/VOL.md)) and `MAG-001` to
-`MAG-042` ([ledger/MAG.md](ledger/MAG.md)). Of these 115 rows, 81 are `game-choice`, 28 `uncited`,
-2 `verified`, 2 `abstract-only`, 1 `cited-unverified` and 1 `calibrated` (stage 1: 47
-`game-choice`, 63 `uncited`, 4 `cited-unverified`, 1 `calibrated`).
+Ledger ids on this page: `VOL-001` to `VOL-074` ([ledger/VOL.md](ledger/VOL.md)) and `MAG-001` to
+`MAG-042` ([ledger/MAG.md](ledger/MAG.md)). Of these 116 rows, 84 are `game-choice`, 25 `uncited`,
+2 `verified`, 2 `abstract-only`, 1 `cited-unverified` and 2 `calibrated` (after stage 2: 81 `game-choice`, 28
+`uncited`, 1 `calibrated`; stage 1: 47 `game-choice`, 63 `uncited`, 4 `cited-unverified`, 1 `calibrated`).
+Ben's decisions of 2026-10-02 changed three defaults and added one setting (see "Decisions of 2026-10-02").
 
 **Read this first.** Most of this feature is design. Stage 2 read the sources that exist for each
 number and sorted the rows: 81 are rules or values with no Earth counterpart, or deliberate
@@ -13,10 +14,10 @@ departures from Earth, and are now labelled as such; 28 are physical values for 
 was found or the source read does not give the number. No volcano size in the code comes from a
 measurement of Earth's volcanoes. Where a source was read, this page says how the code compares
 with it. The one paper the code cited, for the spacing of arc volcanoes, says in its abstract that
-there is no characteristic spacing; the citation is corrected. Two departures from Earth that shape
-worlds are questions for Ben (see "Open questions"): stratovolcanoes stand about one and a half times
-the height of Earth's typical one, and dead ocean volcanoes are sunk twice now that the
-crust bends under them.
+there is no characteristic spacing; the citation is corrected. Two departures from Earth that shaped
+worlds were settled by Ben on 2026-10-02 (see "Decisions of 2026-10-02"): stratovolcanoes stood about
+one and a half times the height of Earth's typical one, and dead ocean volcanoes were sunk twice now
+that the crust bends under them.
 
 Scale used throughout: one block is 300 m across and 20 m up, so 1 km is 3.3 blocks across and
 50 blocks up, and every slope is drawn 15 times steeper than it is.
@@ -25,9 +26,9 @@ Scale used throughout: one block is 300 m across and 20 m up, so 1 km is 3.3 blo
 
 **Arc volcanoes.** Lines of cones stand along the landward side of ocean trenches, where one plate
 sinks under another, at least about 60 km (200 blocks) apart. They occur on continents and as island
-chains. A cone is planned at 1.2 to 3 km tall (60 to 150 blocks); in the runs measured, live cones stood
-a median 1.8 to 1.9 km and all standing cones 1.5 km (Earth's median: 1.0 km). It has a concave
-profile that steepens toward the top. At the default setting it is 13 to 28 km in radius (45 to 93
+chains. A cone is planned at 0.6 to 2 km tall (30 to 100 blocks; 1.2 to 3 km until 2026-10-02); in the runs
+measured, live cones stood a median 1.0 km and all standing cones 0.87 km (Earth's median: 1.0 km). It has a concave
+profile that steepens toward the top. At the default setting it is 7.6 to 20 km in radius (25 to 67
 blocks), twice as wide as its physical shape, so that it does not read as a spike. It has a summit
 crater at least 2 km (7 blocks) across. Its rock is andesite over tuff (volcanic ash turned to
 rock), or rhyolite over tuff where the crust is thick.
@@ -41,7 +42,8 @@ only 3 islands and 8 seamounts stood at the end.
 
 **Calderas.** Volcanoes on thick continental crust, and hotspot centres under continents, can
 collapse after a large eruption into a caldera: a flat-floored basin with steep walls, 6 to 18 km
-(20 to 60 blocks) across and up to 550 to 850 m (28 to 42 blocks) deep, ringed by a sheet of tuff
+(20 to 60 blocks) across (less on a small cone: at most 0.6 of its radius) and up to 550 to 850 m
+(28 to 42 blocks) deep, ringed by a sheet of tuff
 up to 250 m thick that thins outward.
 
 **Flood basalts.** A large igneous province becomes a basalt plateau 1,500 m (75 blocks) thick at
@@ -72,8 +74,8 @@ catalogue of individual volcanoes that ride on their plates.
    reach 1). It then thins the flagged band to its centre line, the volcanic front (VOL-004).
 2. **Birth of arc volcanoes.** On the front, wherever the flux is at least 0.25, a new
    stratovolcano (a steep cone of lava and ash) is placed if no other cone stands within 60 km
-   times a random factor of 0.8 to 1.2 (VOL-002, VOL-039). Its planned height runs from 1.2 km at
-   the threshold flux to 3 km at full flux (VOL-019); its radius follows height to the power 0.8
+   times a random factor of 0.8 to 1.2 (VOL-002, VOL-039). Its planned height runs from 0.6 km at
+   the threshold flux to 2 km at full flux (VOL-019); its radius follows height to the power 0.8
    (VOL-020); its life is drawn between 2 and 8 Myr (VOL-038). If the crust under it is continental
    and at least 42 km thick it is silicic: richer in silica, explosive, and able to form a caldera
    (VOL-005).
@@ -90,12 +92,15 @@ catalogue of individual volcanoes that ride on their plates.
 5. **Erosion.** The surface stage erodes a cone like any other land. The stage measures that
    change over the cone's footprint and lowers the volcano's recorded height to match (VOL-051).
 6. **Death.** A stratovolcano goes extinct when its planned life ends or the arc flux under it has
-   been too low for two steps (VOL-010). An extinct volcano on ocean crust sinks at 25 m/Myr, up to
-   1.5 km (VOL-048), on top of the flexure and of the plate model's deepening of old ocean floor.
+   been too low for two steps (VOL-010). An extinct volcano on ocean crust sinks with the flexure of the
+   plate under its weight and the plate model's deepening of old ocean floor; the setting
+   `island_subsidence_m_myr` adds a fixed rate on top (up to 1.5 km in all), 0 by default since
+   2026-10-02 (VOL-048).
    It leaves the catalogue when worn below a tenth of its peak height, or after 250 Myr (VOL-049),
    or when its plate carries it into a trench (VOL-050).
-7. **Calderas.** A silicic cone collapses into a caldera with a chance of 0.04 per Myr; a
-   continental hotspot centre with 0.12 per Myr (VOL-045). The radius is drawn between 3 and 9 km
+7. **Calderas.** A silicic cone collapses into a caldera with a chance of 0.04 per Myr (VOL-045); a
+   continental hotspot centre with its own rate, 1 per Myr while it is active (VOL-074; 0.12 until
+   2026-10-02), which ends the centre, so the hotspot builds a new one once the old has drifted away. The radius is drawn between 3 and 9 km
    (VOL-029) and the depth is half the cone's height, capped at 400 m plus 5 % of the radius
    (VOL-030). Half of the removed rock is laid around it as a tuff sheet (VOL-046). The volcano
    then dies.
@@ -119,8 +124,8 @@ fraction of the full height `H` at that distance.
 | VOL-016 | Stratovolcano profile | (1 − ρ)^1.5: steepest at the summit, 1.5 H/R; mean slope 0.8 H/R | – | none; compared with Grosse et al. 2014 | `uncited` |
 | VOL-017 | Shield profile | (1 − ρ²)^1.5: steepest at ρ = 0.71, 1.5 H/R | – | none; compared with Clague & Sherrod 2014, Grosse et al. 2014 | `uncited` |
 | VOL-018 | Silicic centre profile | (1 − ρ²)² | – | none | `uncited` |
-| VOL-019 | Stratovolcano height | 1.2 to 3.0, linear in arc flux | km | none; Grosse et al. 2014 gives Earth's distribution | `uncited` |
-| VOL-020 | Stratovolcano radius | 14 × (H / 3 km)^0.8 ÷ flank steepness | km | none; Grosse et al. 2014 for the height-to-width ratio | `uncited` |
+| VOL-019 | Stratovolcano height | 0.6 to 2.0 (1.2 to 3.0 until 2026-10-02), linear in arc flux | km | Grosse et al. 2014 gives Earth's distribution; Ben, 2026-10-02 | `calibrated` |
+| VOL-020 | Stratovolcano radius | 10 × (H / 2 km)^0.8 ÷ flank steepness (14 × (H / 3 km)^0.8 until 2026-10-02) | km | Grosse et al. 2014 for the height-to-width ratio; Ben, 2026-10-02 | `game-choice` |
 | VOL-021 | Shield height above the sea floor | 3.5 to 6.5, by plume strength | km | none; USGS for Mauna Loa | `uncited` |
 | VOL-022 | Shield radius | 40 × (H / 6.5 km)^0.8 ÷ flank steepness | km | none | `uncited` |
 | VOL-023 | Continental hotspot centre | 0.9 tall, 35 radius | km | none; Christiansen 2001 for Yellowstone | `uncited` |
@@ -131,8 +136,8 @@ fraction of the full height `H` at that distance.
 | VOL-031 | Shield summit caldera | radius 0.08 R, depth min(0.04 H, 250 m), on shields over 4 km | m | none | `uncited` |
 | VOL-032 | Summit ceiling | 6.8 above the sea; × 0.65 for shields; scaled by crust strength over gravity | km | Earth's highest volcano, secondary source | `abstract-only` |
 
-The slopes of the profiles, worked out from the code: a 3-km stratovolcano over its physical
-14 km radius is 18° at the summit and 10° on average; at the default doubled radius 9° and 5°. The
+The slopes of the profiles, worked out from the code: a 2-km stratovolcano over its physical
+10 km radius is 17° at the summit and 9° on average; at the default doubled radius 8.5° and 4.6°. The
 tallest shield is 14° at its steepest over 40 km, 7° at 80 km. In blocks every slope is 15 times
 steeper.
 
@@ -147,8 +152,9 @@ Rules and rates.
 | VOL-007 | Spacing along a hotspot chain | 70 | km | none | `uncited` |
 | VOL-038 | Stratovolcano lifetime | 2 to 8 | Myr | agent, build log 2026-09-30; Hildreth 2007 compared | `game-choice` |
 | VOL-041 | Growth time constant | 1 | Myr | none; consistent with Clague & Sherrod 2014 | `uncited` |
-| VOL-045 | Caldera eruption rate | 0.04 (silicic cone), 0.12 (continental hotspot) | per Myr | none; Christiansen 2001 compared | `uncited` |
-| VOL-048 | Subsidence of extinct ocean volcanoes | 25, up to 1,500 m in all | m/Myr | none; Clague & Sherrod 2014 compared | `uncited` |
+| VOL-045 | Caldera eruption rate | 0.04 (silicic cone; tall shield, summit caldera) | per Myr | none | `uncited` |
+| VOL-074 | Caldera eruption rate of a continental hotspot centre | 1.0 (0.12 until 2026-10-02) | per Myr | Christiansen 2001 compared; Ben, 2026-10-02 | `game-choice` |
+| VOL-048 | Extra subsidence of extinct ocean volcanoes | 0 (25 until 2026-10-02), up to 1,500 m in all | m/Myr | Clague & Sherrod 2014 compared; Ben, 2026-10-02 | `game-choice` |
 | VOL-052 | Flood basalt pile | 8 flows; thickness and radius from the plate model (1,500 m; 900 km on an Earth-sized planet) | – | agent | `game-choice` |
 | VOL-056 to VOL-060 | Rock laid down | arc: 35 % tuff, 65 % andesite; silicic: 45 % tuff, 55 % rhyolite; shield: basalt; flood basalt: 88 % basalt, 12 % tuff | share | none | `uncited` |
 | VOL-065 | Fading of an extinct volcano's fine detail | e^(−age / 5 Myr) for the crater, three times slower for the cone | Myr | agent (a look setting) | `game-choice` |
@@ -174,19 +180,19 @@ Earth, from the sources read in stage 2:
 
 | Quantity | Earth | Source and how it was read | The code |
 |---|---|---|---|
-| Height of stratovolcanoes | median 1.02 km, mean 1.13 km, s.d. 0.55 km, range 0.17–4.57 km (512 subaerial stratovolcanoes) | Grosse et al. 2014, table 1, full text | aimed at 1.2–3.0 km; standing cones measured at a median 1.5 km, live ones 1.8–1.9 km (runs below) |
-| Height to basal width of stratovolcanoes | median 0.13, range 0.02–0.30; 0.11 or less over 20 km wide | Grosse et al. 2014, table 1 and p. 7 | 0.09–0.11 at the physical radius, 0.045–0.054 at the default |
-| Basal width of stratovolcanoes | median 7.9 km, range 2–66 km | Grosse et al. 2014, table 1 | 13–28 km physical, 27–56 km at the default |
-| Flank slopes of stratovolcanoes | mean flank 17.7°, steepest average 27.7° at 0.79 of the height (medians) | Grosse et al. 2014, table 1 | 10° mean and 18° at the summit for 3 km over 14 km; half that at the default |
+| Height of stratovolcanoes | median 1.02 km, mean 1.13 km, s.d. 0.55 km, range 0.17–4.57 km (512 subaerial stratovolcanoes) | Grosse et al. 2014, table 1, full text | aimed at 0.6–2.0 km; standing cones measured at a median 0.87 km, live ones 1.04 km (six runs below); with the old 1.2–3.0 km: 1.48 and 1.88 km |
+| Height to basal width of stratovolcanoes | median 0.13, range 0.02–0.30; 0.11 or less over 20 km wide | Grosse et al. 2014, table 1 and p. 7 | 0.08–0.10 at the physical radius, 0.04–0.05 at the default (0.09–0.11 and 0.045–0.054 until 2026-10-02) |
+| Basal width of stratovolcanoes | median 7.9 km, range 2–66 km | Grosse et al. 2014, table 1 | 7.6–20 km physical, 15–40 km at the default (13–28 and 27–56 km until 2026-10-02) |
+| Flank slopes of stratovolcanoes | mean flank 17.7°, steepest average 27.7° at 0.79 of the height (medians) | Grosse et al. 2014, table 1 | 9° mean and 17° at the summit for 2 km over 10 km; half that at the default |
 | Shield flanks | lava flows dip 2°–10°; subaerial shields' mean flank 8.1° (median of 89) | Clague & Sherrod 2014, p. 114; Grosse et al. 2014, table 1 | 14° at the steepest for the tallest physical shield, 7° at the default |
-| Large summit craters and calderas on composite volcanoes | 0.6–11 km across, median 2.2 km; depth under 100 to 860 m, median 240 m (smaller craters not measurable) | Grosse et al. 2014, p. 8 | craters at least 2 km across, 4 km on a 3-km cone, 72–180 m deep; calderas 6–18 km across, up to 550–850 m deep |
+| Large summit craters and calderas on composite volcanoes | 0.6–11 km across, median 2.2 km; depth under 100 to 860 m, median 240 m (smaller craters not measurable) | Grosse et al. 2014, p. 8 | craters at least 2 km across, 2.8 km on a 2-km cone, 36–120 m deep; calderas 6–18 km across (smaller on a small cone), up to 550–850 m deep |
 | Spacing of arc volcanoes | no characteristic spacing: spacings follow a Gamma distribution, as random points do | de Bremond d'Ars et al. 1995, abstract only | a least distance of 60 km, so cones stand evenly |
 | Mean spacing of large arc centres | 27 km (Alaska Peninsula), 42 km (Cascades, Andean Southern Volcanic Zone); 87 km between the 17 largest Cascade centres | Hildreth 2007, tables 4 and 10, full text | 60 km least (the mean spacing a run makes was not measured) |
 | Lifespan of large arc centres | mostly 0.1–1 Myr | Hildreth 2007, p. 64 | 2–8 Myr (a game choice: one cone stands for a centre over a 2-Myr step) |
 | Mauna Loa above the sea floor | about 9 km (4.17 km above the sea, 5 km of submarine flank), the sea floor pushed down another 8 km | USGS Mauna Loa page, fetched | shields 3.5–6.5 km, summits at most 4.4 km above the sea |
 | Hawaiian growth | principal growth in the first 1–2 Myr | Clague & Sherrod 2014, abstract | growth time constant 1 Myr; activity window 0.7–2.8 Myr at 25–100 mm/yr |
-| Subsidence of Hawaiian volcanoes | more than 1 km in about 1 Myr under the growing load (2.6 m/kyr off Hawaii), then about 10 m/Myr as the plate cools | Clague & Sherrod 2014, pp. 130–131 | flexure under the load (since 2026-10-02), the plate model's ocean floor, and 25 m/Myr more after death |
-| Yellowstone | plateau about 2,400 m against 1,600–1,900 m beside it; caldera 45 by 85 km; caldera-forming eruptions at 2.1, 1.3 and 0.64 Ma | Christiansen 2001, full text | silicic centre 0.9 km tall; caldera radius at most 9 km; 0.12 calderas per Myr |
+| Subsidence of Hawaiian volcanoes | more than 1 km in about 1 Myr under the growing load (2.6 m/kyr off Hawaii), then about 10 m/Myr as the plate cools | Clague & Sherrod 2014, pp. 130–131 | flexure under the load (since 2026-10-02) and the plate model's ocean floor; a fixed extra rate after death is a setting, 0 by default since 2026-10-02 (25 m/Myr before) |
+| Yellowstone | plateau about 2,400 m against 1,600–1,900 m beside it; caldera 45 by 85 km; caldera-forming eruptions at 2.1, 1.3 and 0.64 Ma | Christiansen 2001, full text | silicic centre 0.9 km tall; caldera radius at most 9 km; a centre collapses at 1 per Myr while active (0.12 until 2026-10-02) |
 | Caldera sizes | Crater Lake a basin 8 by 10 km across; Long Valley 16 by 32 km | USGS "Geology of Crater Lake National Park" (read by WP-15); USGS Long Valley page (stage 1) | 6–18 km across |
 | Shallow magma storage | Hawaiian shields 1–7 km; Kilauea 1–2 km under the caldera centre, 2–4 km under its south part; arc volcanoes 6 ± 3 km | Clague & Sherrod 2014, abstract; Poland et al. 2014, p. 194; Rasmussen et al. 2022, abstract only | 3 km under every crater |
 | Kilauea's reservoir | "a few cubic kilometers", sill-like | Poland et al. 2014, pp. 194, 199 | 1.4–18 km³ (1.2–2.8 km radius, half-height 0.2 of it) |
@@ -250,6 +256,50 @@ What the runs show:
 - **The extra island subsidence makes no measurable difference** to the hypsometry or to how many
   shields stand at the end.
 
+Runs for the volcano decisions (2026-10-02): the same preset, length and tools, seeds 1 to 3 and both
+starts, six runs per variant, built from the commit that carries the new defaults; the old values
+are set by `--set` (`volcanoes.arc_height_km=[1.2,3.0]`, `arc_radius_km=14`,
+`island_subsidence_m_myr=25`, `hotspot_caldera_rate_per_myr=0.12`), which reproduces the WP-2 master
+numbers of seed 1 exactly (land 0.252 / 0.284, standing cones 1,471 / 1,524 m, 545 / 524 calderas).
+Command: `tools/review/p1-17-hyps.sh 500 "1 2 3" "scattered_continents supercontinent" new
+"old:volcanoes.arc_height_km=[1.2,3.0];..."`. Mean of the six runs, with the range in brackets.
+
+| Quantity | Earth | Old defaults (master) | New defaults |
+|---|---|---|---|
+| Land share | 0.289 | 0.295 (0.252-0.327) | 0.266 (0.185-0.336) |
+| Median land height, m | 427 | 687 (569-832) | 559 (478-625) |
+| Land above 2 km | 0.102 | 0.124 (0.092-0.149) | 0.077 (0.062-0.097) |
+| Standing stratovolcanoes' median height, m | 1,020 | 1,484 (1,389-1,627) | 869 (764-994) |
+| Active stratovolcanoes' median height, m | 1,020 | 1,875 (1,634-2,146) | 1,044 (835-1,252) |
+| Standing stratovolcanoes at the end | | 836 (670-974) | 625 (499-788) |
+| Relief built by volcanoes, km³ (block metric) | | 2.4 × 10⁷ (2.2-2.6) | 1.2 × 10⁷ (1.1-1.4) |
+| Calderas formed in all | | 512 (415-562) | 496 (384-568) |
+| of them at continental hotspot centres | | 42 (25-68) | 62 (18-102) |
+| of them elsewhere (arc cones) | | 469 (390-526) | 433 (366-493) |
+| Summit calderas on shields | | 22 (17-26) | 16 (9-22) |
+| Silicic hotspot centres born / share that collapsed | | 64 / 66 % (253 of 382) | 63 / 98 % (374 of 380) |
+
+What these runs show:
+
+- **The standing cones' median is 869 m, 85 % of Earth's 1,020 m**, inside one standard deviation
+  (Earth's s.d. is 550 m); the cones still active, whose heights are not yet lowered by erosion, are
+  at 1,044 m. With the old range they were at 1,484 m and 1,875 m.
+- **The land above 2 km fell below Earth's**: 0.077 against 0.124 (Earth 0.102), in all six
+  pairs of runs (by 0.004 to 0.072; the smallest is seed 3, supercontinent: 0.090 against 0.094). The median land height fell from 687 m
+  to 559 m (Earth 427 m). The two figures now straddle Earth's instead of both standing above it;
+  the hypsometry is recalibrated in a separate task, with the plate work (decisions log 2026-10-01).
+  These runs change the cone heights, the island subsidence and the hotspot caldera rate together,
+  and the WP-2 runs that isolated the first two found no measurable effect from either alone, so
+  most of the fall is probably the lower cones; this was not separated again.
+- **Nearly every continental hotspot centre now collapses** (98 % against 66 %), because a centre
+  stays active for several Myr over a slow plate, so even the old 0.12 per Myr collapsed two in
+  three; WP-2's estimate of a 10-30 % chance had assumed a life of 1-3 Myr. The hotspot calderas
+  rose from 42 to 62 per run (about 1.5 times) rather than tenfold, because the centre dies at its
+  collapse and a new one forms only after the plate has carried the old one away. Arc calderas
+  fell by 8 %, with the shorter cones (a cone under 300 m cannot collapse).
+- **Standing shields**: 4.5 on average (0-9) against 7.2 (4-14), not separable from run-to-run
+  scatter and from the changed hypsometry.
+
 ## Simplifications and limits
 
 - **Three kinds only.** There are no cinder cones, no volcanoes at mid-ocean ridges or in rifts,
@@ -272,10 +322,11 @@ What the runs show:
   an eighth of Earth's size, so volcanoes are large for their world. Flood basalt provinces, by
   contrast, are scaled to the planet (about 110 km in radius at 16k).
 - **Magma chambers are one fixed shape** at one depth, whatever the volcano's size, age or kind.
-- **Too much high land from volcanoes.** Cones add about a fifth of everything the surface erodes
-  in a run and push the share of high land well above Earth's (see the tables). This was kept as it
-  is (Ben, decisions log 2026-10-01: volcano density stays 1, revisited after the height fix and
-  the ice branch land).
+- **The volcanoes and the share of high land.** With the old, taller cones the volcanoes pushed the
+  share of high land above Earth's (land above 2 km 0.124 on average, Earth 0.102); with the cones
+  at Earth's heights they build half the relief (1.2 × 10⁷ against 2.4 × 10⁷ km³ in block metric)
+  and the share falls below Earth's (0.077). Neither is calibrated: Ben kept volcano density at 1
+  (decisions log 2026-10-01) and the hypsometry is recalibrated later with the plate work.
 - **Activity saturates.** Most arc volcanoes have the highest activity value, so which of them get
   a crater lake is decided by their catalogue number, not by anything physical.
 - **Hardwired couplings.** The hotspot strength scale (VOL-008) mirrors the plate model's random
@@ -287,6 +338,9 @@ What the runs show:
 | What | Why | Who and when |
 |---|---|---|
 | Which kinds exist (arc stratovolcanoes, hotspot shields and chains, calderas, flood basalts) | scope for version 1 | Ben, decisions log 2026-09-29 |
+| Stratovolcano height 0.6–2.0 km, radius 10 km at the top (VOL-019, VOL-020) | Earth's median stratovolcano is 1.02 km (Grosse et al. 2014); the proportions of the old defaults are kept | Ben, decisions log 2026-10-02 ("Lower to Earth's range") |
+| Extra island subsidence 0 by default (VOL-048) | flexure and the plate model's ocean floor already sink old islands; the setting stays | Ben, decisions log 2026-10-02 ("Set it to 0, keep the setting") |
+| Continental hotspot centres collapse at about 1 per Myr (VOL-074) | Yellowstone had three caldera-forming eruptions in about 1.5 Myr (Christiansen 2001); the rate is a new setting | Ben, decisions log 2026-10-02 ("About 1 per Myr") |
 | Flank steepness 0.5: every volcano twice as wide as its physical profile (VOL-024) | at 15 times vertical exaggeration a physical cone is a spike | Ben, decisions log 2026-09-30 ("Setting, gentler default") |
 | Young volcanoes are smooth; old ones regain rugged ground (VOL-068) | looks | Ben, decisions log 2026-09-30 |
 | Small arc segments counted on their subduction event (VOL-015) | event volume | Ben, decisions log 2026-09-30 ("Count small ones") |
@@ -302,30 +356,24 @@ What the runs show:
 | Eight flows in a flood basalt pile (VOL-052), terraces 80 m high (VOL-036) | visible layering and steps | agent, build log 2026-09-30 |
 | Implementation rules: the volcanic front, the flux threshold, merging, the blind step, retirement, rendering and fading (VOL-002, VOL-004, VOL-008 to VOL-011, VOL-027, VOL-028, VOL-040, VOL-042, VOL-043, VOL-047, VOL-049 to VOL-051, VOL-053 to VOL-055, VOL-061 to VOL-073) | how the stage turns plate data into cones and cones into blocks; no Earth counterpart | agent, build log 2026-09-30 and 2026-10-01; labelled WP-2 2026-10-02 |
 
+## Decisions of 2026-10-02
+
+Three questions of the stage-2 package were put to Ben and answered on 2026-10-02 (decisions log):
+
+1. **Stratovolcano heights** (VOL-019, VOL-020). "Lower to Earth's range (Recommended)": the
+   range is 0.6 to 2.0 km instead of 1.2 to 3.0 km and `arc_radius_km` 10 km instead of 14, so the
+   proportions stay. Measured: standing cones' median 869 m (Earth 1,020 m), old 1,484 m; see the
+   runs above for the side effect on the land above 2 km.
+2. **Island subsidence counted twice** (VOL-048). "Set it to 0, keep the setting (Recommended)":
+   `island_subsidence_m_myr` defaults to 0.
+3. **Continental hotspot calderas** (VOL-074). "About 1 per Myr (Recommended)": a new setting,
+   `hotspot_caldera_rate_per_myr`, 1.0, replaces the factor 3 on `caldera_rate_per_myr`, which keeps
+   its 0.04 for arc cones and shield summits. In the code's terms it is a chance per active centre
+   per step (1 − e^(−rate·Δt)); a collapse ends the centre and the hotspot builds a new one once
+   the old has drifted 70 km, so a hotspot track makes about one caldera per centre-life. Yellowstone's
+   own pace was 0.8 and 0.66 Myr between its three (Christiansen 2001), 1.4 to 2 per Myr.
+
 ## Open questions
-
-Questions for Ben (STATUS.md, pending questions, 2026-10-02), recommendation first:
-
-1. **Stratovolcano heights** (VOL-019, VOL-003). Earth's median stratovolcano stands 1.0 km above
-   its base (Grosse et al. 2014); the code aims at 1.2 to 3.0 km and, because most arcs reach full
-   flux, most cones aim at 3 km. In the runs above, active cones stand a median 1.8–1.9 km and standing ones 1.5 km;
-   with 0.6–2.0 km the standing cones' median is 0.91–0.93 km and the land above 2 km does not
-   change measurably. Recommended: lower the default range to 0.6–2.0 km and the radius at its top
-   (`arc_radius_km`) from 14 to 10 km, which keeps today's proportions, so the typical cone is
-   Earth's (arcs of lower cones; shields, calderas and the ceiling unchanged). The measured
-   variant kept the 14 km radius, so its cones were flatter and larger in volume than this. Alternative: keep 1.2–3.0 km as a game choice (taller cones read better at
-   15 times vertical exaggeration) and say so in the hint.
-2. **Island subsidence counted twice** (VOL-048). Since cones are flexure loads (decisions log
-   2026-10-02), the crust sinks under a growing volcano, and the plate model deepens old ocean
-   floor under it. The extra 25 m/Myr for dead ocean volcanoes repeats both. Recommended: set it to
-   0 by default and keep the setting. The runs above show no measurable effect on the
-   hypsometry or on the number of standing shields; the setting changes how deep old seamounts lie
-   (by up to 1.5 km), which a player meets only under the sea.
-3. **Continental hotspot calderas** (VOL-045). Yellowstone collapsed three times in 1.5 Myr
-   (Christiansen 2001); the code gives a continental hotspot centre a 10 to 30 % chance of one
-   caldera in its life. Recommended: raise the continental hotspot's rate to about 1 per Myr (the
-   arc rate unchanged), so most continental hotspot centres end in a caldera, as on Earth. A small
-   change to the look of a few places per planet; no effect on the hypsometry.
 
 Not yet settled, for a later package or a geologist:
 
