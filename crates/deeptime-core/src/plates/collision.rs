@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! Continental collision and terrane transfer (Cortial et al. 2019, §4.2 and §6).
 //!
-//! A contact counts continental interpenetration while the subducting plate's continental crust
-//! is being forced under the overriding plate (`subduction.rs`). Past `collision_threshold_km`
-//! (Cortial: 300 km) a collision event fires: the terrane R — the connected continental crust of
+//! A contact is in collision while the subducting plate's continental crust stands at the
+//! overriding plate's edge, and counts its shortening: the convergence across that front
+//! (`shortening.rs`). Past `collision_threshold_km` of shortening a collision event fires (an
+//! interim trigger: the design's task 4 welds plates when their convergence has stalled
+//! instead): the terrane R — the connected continental crust of
 //! the subducting plate that reached the contact, "from small isolated islands to entire
 //! continents" — detaches from its plate and sutures to the overriding one (here: its samples
 //! move into a new rigid group of the receiving plate with the rotation they already had), and the
@@ -91,7 +93,7 @@ pub fn collide(
         }
     }
     if terrane.is_empty() {
-        state.contacts[k].depth_km = 0.0;
+        super::shortening::end(state, k, super::dynamics::EMPTIED);
         return Ok(Collided::default());
     }
     terrane.sort_unstable();
@@ -233,12 +235,14 @@ pub fn collide(
     state.plates[over as usize].omega =
         cap_speed(merged, &norm, p.max_plate_speed_mm_yr).to_array();
 
-    let (counted_km, cont_in, contact_onset_myr) = {
-        let c = &state.contacts[k];
-        (c.depth_km, c.cont_in, c.onset_myr)
-    };
-    state.contacts[k].depth_km = 0.0;
+    // The collision state ends here, with the transfer or weld. (A contact fired from outside
+    // `shortening::advance`, as a test may, has none: it is a collision of this one step.)
+    let (cont_in, contact_onset_myr) = (state.contacts[k].cont_in, state.contacts[k].onset_myr);
+    let col = state.contacts[k].collision.take();
     state.contacts[k].cont_in = 0;
+    let counted_km = col.as_ref().map_or(0.0, |c| c.shortening_km);
+    let collision_onset_myr = col.as_ref().map_or(t_myr, |c| c.onset_myr);
+    let crossed_km2 = col.as_ref().map_or(0.0, |c| c.area_km2);
     let planet_area = norm.planet_area_km2(area_km2);
     let onset = super::subduction::confirm(state, world, env, k)?;
     let frac = area_km2 / state.a0_km2;
@@ -269,6 +273,8 @@ pub fn collide(
             .param("uplift_m", dz_max)
             .param("radius_km", norm.planet_len_km(r_km))
             .param("convergence_mm_yr", conv)
+            .param("onset_myr", collision_onset_myr)
+            .param("shortening_km", counted_km)
             .param("coast_split_km", coast_km)
             .param("sutured", i64::from(suture))
             .caused_by(onset);
@@ -315,7 +321,7 @@ pub fn collide(
         let rec = CollisionRec {
             collision: frac >= p.collision_min_frac,
             sutured: suture,
-            start_myr: t_myr,
+            start_myr: collision_onset_myr,
             end_myr: t_myr,
             contact_onset_myr,
             under,
@@ -326,6 +332,7 @@ pub fn collide(
             frac,
             convergence_mm_yr: conv,
             counted_km,
+            area_km2: crossed_km2,
             cont_in,
             front_km: seeds_fp.length_km,
             shortening_km: if seeds_fp.length_km > 0.0 {

@@ -7,6 +7,10 @@
 //! lattice triangles (three vertices of one rigid group, located in the group's frame). Such a
 //! sample overlaps the other plate: the plates interpenetrate there.
 //!
+//! **Collisions.** `resolve` also lists, per contact, the subducting plate's continental crust in
+//! the overlap (the seeds of a terrane). Whether a contact is in collision, how much it has
+//! shortened and when its terrane is transferred is `shortening.rs`.
+//!
 //! **Polarity** is decided once per plate pair, when the first overlap of at least three samples
 //! appears (Cortial: "Two converging oceanic plates always lead to the subduction of the older
 //! plate. An oceanic plate always plunges beneath a continental plate … partial subduction when we
@@ -57,7 +61,8 @@ use crate::world::WorldState;
 
 /// Samples consulted around each sample.
 const K_NEAR: usize = 8;
-/// Overlapping samples needed to establish a contact or count continental interpenetration.
+/// Overlapping samples needed to establish a contact; continental samples needed in the overlap
+/// to seed a terrane, and on a front for a collision to begin (`shortening.rs`).
 pub const MIN_CONTACT: u32 = 3;
 /// Andean orogenies shorter than this are not written as events, Myr.
 const OROGENY_MIN_MYR: f64 = 10.0;
@@ -116,13 +121,14 @@ struct Agg {
 
 /// What `resolve` found this step.
 pub struct Resolved {
-    /// Contacts whose continental interpenetration passed the collision threshold, with the
-    /// subducting plate's continental samples in the overlap.
-    pub collisions: Vec<(usize, Vec<u32>)>,
+    /// Per contact (by index): the subducting plate's continental samples in the overlap that are
+    /// not freshly sutured, sorted, each once. They seed the terrane when the contact's collision
+    /// fires (`shortening::advance`).
+    pub seeds: BTreeMap<usize, Vec<u32>>,
 }
 
-/// Establishes contacts and their polarity, hides subducted samples, accumulates continental
-/// interpenetration, and emits subduction_onset events. `step` is the number of this step.
+/// Establishes contacts and their polarity, hides subducted samples, lists the continental crust
+/// forced under, and emits subduction_onset events. `step` is the number of this step.
 pub fn resolve(
     state: &mut PlateState,
     world: &mut WorldState,
@@ -231,7 +237,7 @@ pub fn resolve(
                     setting,
                     last_step: step,
                     samples: agg.count,
-                    depth_km: 0.0,
+                    collision: None,
                     max_uplift_mm_yr: 0.0,
                     andean: false,
                     centroid: centroid.to_array(),
@@ -292,26 +298,11 @@ pub fn resolve(
             }
         }
     }
-    let mut collisions = Vec::new();
-    for (k, mut list) in seeds {
+    for list in seeds.values_mut() {
         list.sort_unstable();
         list.dedup();
-        if (list.len() as u32) < MIN_CONTACT {
-            continue;
-        }
-        let c = &mut state.contacts[k];
-        let conv = env.norm.speed_mm_yr(
-            DVec3::from_array(state.plates[c.under as usize].omega)
-                - DVec3::from_array(state.plates[c.over as usize].omega),
-            DVec3::from_array(c.centroid),
-        );
-        // mm/yr × Myr = km.
-        c.depth_km += conv * env.dt_myr;
-        if c.depth_km >= env.k.collision_threshold_km {
-            collisions.push((k, list));
-        }
     }
-    Ok(Resolved { collisions })
+    Ok(Resolved { seeds })
 }
 
 /// The isostatic ceiling on uplift (design choice): crust at height z above sea level rises by
@@ -332,7 +323,7 @@ pub fn ceiling(z: f64, zc: f64) -> f64 {
 /// cannot be forced under again: it never seeds a collision, and a contact whose subducting side
 /// is mostly such crust reverses. Without this a continent at a junction of three converging
 /// continental plates is handed round them every few Myr.
-fn locked(s: &super::state::Sample, t_myr: f64, env: &Env) -> bool {
+pub(super) fn locked(s: &super::state::Sample, t_myr: f64, env: &Env) -> bool {
     s.orogeny == OROGENY_HIMALAYAN && t_myr - f64::from(s.orogeny_myr) < env.k.collision_orogeny_myr
 }
 
@@ -343,7 +334,8 @@ const REVERSAL_UNDER: f64 = 0.5;
 const REVERSAL_OVER: f64 = 0.25;
 
 /// Reverses contact `k`: the subducting plate becomes the overriding one. The old subduction zone
-/// closes (with its Andean orogeny, if any) and a fresh contact starts with the opposite polarity.
+/// closes (with its Andean orogeny, if any, and its collision state) and a fresh contact starts
+/// with the opposite polarity.
 fn reverse(
     state: &mut PlateState,
     world: &mut WorldState,
@@ -371,13 +363,13 @@ fn reverse(
         .caused_by(onset);
         world.emit(e)?;
     }
+    super::shortening::end(state, k, super::dynamics::REVERSED);
     let c = &mut state.contacts[k];
     std::mem::swap(&mut c.under, &mut c.over);
     c.onset_myr = env.t_myr;
     c.onset_step = env.step;
     c.onset_event = None;
     c.setting = 1;
-    c.depth_km = 0.0;
     c.cont_in = 0;
     c.max_uplift_mm_yr = 0.0;
     c.andean = false;
@@ -690,7 +682,8 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
 }
 
 /// Closes contacts unseen for `contact_timeout_steps` (or all of them when `all`), writing an
-/// Andean orogeny_phase for those that uplifted continental crust. Returns the closed contacts'
+/// Andean orogeny_phase for those that uplifted continental crust and ending their collision
+/// states (`dynamics::CLOSED`, or `OPEN` at the end of the run). Returns the closed contacts'
 /// subducting plates with their onset events (the cause of a later plate death).
 pub fn close_contacts(
     state: &mut PlateState,
@@ -710,6 +703,14 @@ pub fn close_contacts(
             continue;
         }
         let last_myr = t_myr - env.dt_myr * step.saturating_sub(c.last_step) as f64;
+        if let Some(col) = &c.collision {
+            let reason = if all && !gone {
+                super::dynamics::OPEN
+            } else {
+                super::dynamics::CLOSED
+            };
+            super::dynamics::record_parting(&mut state.dynamics, &c, col, reason);
+        }
         let Some(onset) = c.onset_event else {
             continue;
         };
