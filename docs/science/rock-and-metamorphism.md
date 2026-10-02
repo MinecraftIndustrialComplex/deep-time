@@ -1,28 +1,167 @@
 # Rock classes, metamorphism and intrusions
 
-Status of this page: `stub` (stage 1). The ledger rows exist; the page is to be written in stage 2 from [_template.md](_template.md).
+Status of this page: `stage 2 (constants checked against sources on 2026-10-02, package WP-7)`. Of the 79 active
+rows, 11 are `verified`, 1 `abstract-only`, 9 `cited-unverified`, 1 `calibrated`, 54 `game-choice` and 3 `uncited`.
+Where a book the code cites (Winter 2010, Yardley 1989, Telford et al. 1990) could not be read, the row says so and
+says what was read instead.
 
-Deep Time knows 62 classes of rock: sedimentary (laid down as sediment), igneous (cooled from melt: lavas at the surface, granite-like plutons at depth), metamorphic (changed by heat and pressure) and a few special hosts. Buried rock is heated along a geothermal gradient (temperature rising with depth) and changes grade: shale becomes slate, then phyllite, schist and gneiss. Bodies of magma that freeze underground become plutons. Each class carries a density and how easily it erodes, and each maps to Minecraft blocks, with stone and deepslate standing in for the common ones.
+Ledger ids on this page: `RCK-001` to `RCK-090` (see [claims.md](claims.md)); the layer order, the traps and the
+checks are on [strata.md](strata.md).
 
-## Ledger ids that belong here
+## What you see in the world
 
-| Ledger | Feature | Ids (count) |
-|---|---|---|
-| [RCK](ledger/RCK.md) | rock classes | RCK-001 to RCK-027 (27) |
-| [RCK](ledger/RCK.md) | metamorphism | RCK-028 to RCK-055 (28) |
-| [RCK](ledger/RCK.md) | plutons and intrusions | RCK-056 to RCK-073 (18) |
-| [RCK](ledger/RCK.md) | rock to blocks | RCK-074 to RCK-084 (11) |
+Most of the rock under a Deep Time landscape is one of 62 named classes in seven families: intrusive igneous (granite,
+granodiorite, diorite, gabbro, anorthosite, peridotite), volcanic, clastic sedimentary, chemical and biogenic
+sedimentary, metamorphic, special hosts (kimberlite, carbonatite, pegmatite, greisen and the two impact rocks) and
+unconsolidated (soil, sand, gravel and the like). Each is drawn with a Minecraft block: the common grey rocks
+(shale, mudstone, coal) as stone, the dark foliated series (slate, phyllite, schist, gneiss) as deepslate, and the rest
+as the nearest look-alike (calcite for limestone, granite for granite, tuff for eclogite).
 
-Rows by status: `cited-unverified` 18, `calibrated` 1, `game-choice` 26, `uncited` 39.
+Where plates collided, the buried sediments have been heated and turned into slate, schist, gneiss, marble and
+quartzite; on a 500 Myr planet two thirds of all columns hold some of this, and 98 % of the columns on land. Under
+volcanic arcs, bodies of granodiorite and granite stand as rounded masses 8 to 80 km long (27 to 270 blocks), 2 to 8
+km thick, which erosion exposes as granite country; round them lies a rim of hornfels, or of skarn where the roof was
+limestone.
 
-## Material for the stage 2 writer
+## The model in plain words
 
-- Extraction notes (measured Earth-against-mod numbers from the build log, simplifications, flags): [extraction-notes/RCK.md](extraction-notes/RCK.md).
-- Rock vocabulary: MIC's rock-tag datapack README (outside this repository).
-- Work package in the verification plan: WP-7 ([claims.md](claims.md#verification-plan-for-stage-2)).
+The structure stage runs each step after the surface stage has laid down or stripped sediment.
 
-## Known before the page is written
+1. **Heat.** Every continental cell gets a straight-line temperature profile: the climate's mean surface
+   temperature (10 degC if none) plus the plate model's surface heat flow divided by a thermal conductivity of
+   2.5 W/m/K, times depth. Heat flow above 120 mW/m2 is clamped, so the steepest gradient is 48 degC/km (RCK-028 to RCK-031).
+2. **Burial.** While a cell is in a collision (or has a young Himalayan-type orogen), depths are multiplied by the
+   thickening of its crust relative to 35 km, at most 2 (RCK-032 to RCK-035).
+3. **Metamorphism.** Each layer is tested at the temperature of its mid-depth. If it has reached the formation
+   temperature of the next class on its path (shale to slate at 250 degC, phyllite 350, schist 450, gneiss 650;
+   limestone to marble, sandstone to quartzite, basalt to greenstone at 300, to amphibolite at 500) it moves up. Classes
+   never go back down, so an exhumed belt keeps its grade (RCK-036 to RCK-046).
+4. **Basement.** The plate model's rock pools under the loose cover (sediment, sedimentary, volcanic, metamorphic, plutonic)
+   have no burial history, so each is stepped along its path by the present geotherm and split at the depths of the
+   isotherms. A column never gets cooler downward: a unit under metamorphosed rock takes at least that grade (RCK-050, RCK-051).
+5. **Plutons.** Under arcs, and weakly in collision zones, a Poisson number of plutons is emplaced each step. Each is an
+   ellipsoid with a roof 2 to 6 km below the surface, a lognormal length (median 25 km), a width of 0.5 to 1 times that, and a
+   thickness from the Cruden-McCaffrey power law. They ride their plate, are unroofed by erosion, and are lost if the oceanic
+   crust carrying them is subducted (RCK-056 to RCK-067).
+6. **Aureoles.** The outer 15 % of a pluton's radius is its contact aureole: skarn if its host was a carbonate, hornfels if it
+   was other soft rock, none in crystalline host (RCK-053, RCK-054).
+7. **Blocks.** Each class resolves to a block through the rock tags of the pack, else a vanilla stand-in (RCK-074 to RCK-084).
 
-- Every erodibility and diffusivity value in the 62 rock-class files is called "judgment, relative to granite"; 41 of the 62 densities have no source (extraction notes RCK, flag 5).
-- A stock is coded with a radius of 2 to 10 km while the same comment defines a stock as under 100 km2 (flag 1).
-- The pluton thickness law cited to Cruden 1998 is not in that paper's abstract, which says granites 10 to 100 km wide are at most 3 km thick; the code gives 4.1 km at 25 km and 8.3 km at 80 km (RCK-061, MISMATCH at abstract level).
+## Equations and constants
+
+Geotherm and burial (RCK-028):
+
+T(z) = T_s + (q / k) z beta, with q = min(heat flow, 120 mW/m2), k = 2.5 W/m/K, beta = clamp(crust thickness / 35 km, 1, 2)
+in collisions and 1 elsewhere.
+
+Pluton thickness (RCK-061):
+
+T = 0.6 D^0.6, with T in km, D = sqrt(L W) in km the diameter of the circle of the pluton's area, L its length and W its width.
+
+| Ledger id | Quantity | As coded | Units | Source | Status |
+|---|---|---|---|---|---|
+| RCK-001 | densities of 26 classes | granite 2650 ... loess 1400 | kg/m3 | Daly, Manger and Clark 1966; Manger 1963 (ranges) | `verified` |
+| RCK-085 | halite, gypsum, anhydrite | 2160, 2310, 2950 | kg/m3 | Handbook of Mineralogy | `verified` |
+| RCK-086 | nine classes with a secondary or abstract range | rhyolite 2500 ... carbonatite 2900 | kg/m3 | RocFall/PETLAB table (secondary), USGS abstract | `cited-unverified` |
+| RCK-087 | seven classes the sources disagree with | peridotite 3300, kimberlite 2800, ironstone 3000, BIF 3400, phosphorite 2700, pumice 700, travertine 2400 | kg/m3 | judgment | `uncited` |
+| RCK-015 | carbonate compensation depth | 4500 | m | secondary: Pacific 4.2-4.5 km | `game-choice` |
+| RCK-022 | loose sediment shown to | 150 m depth, 20 Myr age | m; Myr | tectonics.js | `game-choice` |
+| RCK-028 | geotherm | T = T_s + q z / k beta | degC | Fourier's law (Hacker notes) | `verified` |
+| RCK-029 | thermal conductivity | 2.5 | W/m/K | Robertson 1988: 2.1-4.5 | `uncited` |
+| RCK-030 | heat-flow clamp | 120 | mW/m2 | game choice; Davies and Davies 2010 | `game-choice` |
+| RCK-033, RCK-034 | reference crust, largest burial factor | 35 km, 2 | km | Christensen and Mooney 1995 abstract: mean 41.1 km | `abstract-only`, `game-choice` |
+| RCK-039 | shale to slate | 250 | degC | Winter 2010, Yardley 1989 (not read) | `cited-unverified` |
+| RCK-040 | quartzite, marble, greenstone | 300 | degC | Stipp 2002; Ferrill 2004; Greenwood and Berman | `cited-unverified` |
+| RCK-041 | phyllite | 350 | degC | not read | `cited-unverified` |
+| RCK-042 | schist | 450 | degC | Baxter 2002: garnet zone 500-550 | `cited-unverified` |
+| RCK-043 | amphibolite | 500 | degC | Nelson; Greenwood and Berman | `cited-unverified` |
+| RCK-044 | gneiss | 650 | degC | Baxter 2002: sillimanite zone 650-700 | `cited-unverified` |
+| RCK-045 | gypsum to anhydrite | 50 | degC | Orti 2012: about 50 degC at 450-500 m; Hardie 1967: 58 degC pure water | `verified` |
+| RCK-049 | diagenesis ends | 200 | degC | Nelson | `verified` |
+| RCK-053 | contact aureole | outer 15 % of radius | - | Annen 2017: a few % to 30 % | `game-choice` |
+| RCK-054 | skarn on carbonate, hornfels elsewhere | - | - | Meinert 1992; Nelson | `verified` |
+| RCK-056 | pluton rate | 1e-5 | per km2 per Myr | calibrated to the Coastal Batholith (secondary) | `calibrated` |
+| RCK-057 | volume exponent | V proportional to D^2.6 | - | Cruden 2008 (a = 0.6) | `verified` |
+| RCK-058 | collision granite rate | 0.3 of arc | - | design; Vigneresse and Burg 2003 | `game-choice` |
+| RCK-060 | pluton length | median 25, 8 to 80 | km | design; Tuolumne about 1,100 km2 | `game-choice` |
+| RCK-061 | pluton thickness | 0.6 D^0.6 | km | Cruden and McCaffrey 2001 (via Cruden 2008) | `verified` |
+| RCK-062 | width over length | 0.5 to 1 | - | design; Sierra data 0.17-0.4 for large plutons | `game-choice` |
+| RCK-063 | roof depth | 2 to 6 | km | Buddington 1959 (not read) | `cited-unverified` |
+| RCK-064, RCK-065 | rock shares | arcs 70/20/10; island arcs 60/40 | % | design | `game-choice` |
+| RCK-090 | impact rock definitions | suevite, impact melt | - | Stoeffler and Grieve 2007; French 1998 | `verified` |
+
+## Earth against the mod
+
+| Quantity | Earth | Source of the Earth figure | The mod | Run |
+|---|---|---|---|---|
+| Mean continental heat flow | 65 mW/m2 (Pollack et al. 1993); 70.9 mW/m2 (Davies and Davies 2010) | Davies and Davies 2010, table 7 and section 3 (read in full) | gradient 26 degC/km at 65 mW/m2 with k = 2.5; the plate model's continental proxy is 55 + 35 exp(-t/60 Myr) | arithmetic; proxy from the P2-14 build-log entry |
+| Gradients by setting | 5-10 K/km cold subduction; 20 K/km craton; about 30 K/km Barrovian; about 50 K/km rifts and arcs | Hacker, UCSB GEO 102C part 3; Nelson, Tulane (lecture notes, secondary) | up to 48 degC/km (the 120 mW/m2 clamp at k 2.5); cold subduction (blueschist, eclogite) is not made | arithmetic |
+| Garnet zone | 500-550 degC (Glen Clova) | Baxter et al. 2002, abstract | schist at 450 degC | - |
+| Sillimanite zone | 650-700 degC, about 6 kbar | Baxter et al. 2002 | gneiss at 650 degC | - |
+| Thickness of a 56-km pluton | 4.5 km observed (Lucerne); 6.7 km predicted by the law | Cruden 2008, Fig. 2-4 and eq. 1 | 56 km round: 6.7 km | arithmetic; unit test |
+| Thickness of a 4.5-km pluton | 1.6 km observed (Gasborn); 1.5 predicted | same | 1.48 km | unit test |
+| Median pluton in the mod | - | - | length 25 km, width 0.5-1 of it: D = 21.7 km, thickness 3.8 km (4.1 km before the fix) | arithmetic |
+| Coastal Batholith of Peru | length 1,600 km; "up to" 1,000 plutons; 100-37 Ma; width not found | Williams slides; Wikipedia (secondary); the primary papers are closed | 1,034 plutons emplaced in 500 Myr on the whole 16k planet, 230 alive as bodies at the end | MODRUN |
+| Tuolumne Intrusive Complex | about 1,100 km2, 95-85 Ma, 6-10 km deep | Ardill et al. 2020 (full text) | median pluton about 370 km2 (D 21.7 km); roof 2-6 km | - |
+| Large Sierra plutons | width / length 0.17 (Lamarck), 0.21 (Mount Givens), 0.4 (Cathedral Peak) | Bateman 1992 (full text); Wikipedia | 0.5-1, mean 0.75 | - |
+| Crust thickness | mean 41.1 km; orogens 46.3 km; never over about 75 km | Christensen and Mooney 1995 abstract; Hacker part 14 | 35 km reference; burial factor up to 2 (70 km) | - |
+| Columns holding some metamorphic rock | not counted | - | MODMETA | MODRUN |
+| Grade inversions, thin metamorphic slivers, plutonic sheets | zero by construction of the check | - | STRATA_SHORT | MODRUN |
+
+MODRUN: `earthlike_quick_16k`, start `scattered_continents`, 500 Myr, default seed, 2 threads, `deeptime run` and
+`deeptime strata-check --columns 20000`, test machine, 2026-10-02; before is master 9e84fcf and after is this branch.
+
+## Simplifications and limits
+
+- **Temperature only.** No pressure and no time. Blueschist and eclogite (high pressure, low temperature) are never formed
+  because there is no cold-subduction path (RCK-048). Granulite is folded into gneiss.
+- **A straight geotherm** with constant conductivity and no radiogenic heat. Real geotherms bend with depth and with
+  heat production.
+- **Names are textures.** "Gneiss" and "schist" name textures, not temperatures (Nelson). The mod needs a series of
+  rocks to show and uses the temperatures at which the textures are usually reached in a Barrovian belt.
+- **Granite going to gneiss by heat** is a simplification: an orthogneiss needs non-hydrostatic deformation as well as heat.
+  Peridotite goes to serpentinite by hydration, not heating, and the mod never makes it.
+- **Pools have no burial history.** The basement is stepped along its path by today's geotherm, not by the heat it once had.
+- **One body per intrusive suite.** A pluton in the mod stands for a whole suite; real plutons grow in increments of
+  sheets over millions of years (Glazner et al. 2004).
+- **Aureoles have no distance.** They are a fixed outer shell, not a temperature field, and exist only on soft hosts.
+- **Plutons are rounder than the big real ones** (width over length 0.5 to 1 against 0.17 to 0.4), and sit shallower
+  than the Sierra's 3.5 to 10 km.
+- **Densities are of fresh rock.** Weathered and porous rock is lighter (the New Zealand database runs down to 1500-2000 kg/m3
+  for igneous rock); the table is for unweathered crust.
+- **One CCD** of 4,500 m for every ocean, the Pacific value.
+- **Loose and rock.** Sediment turns to rock at 150 m only for beds under 20 Myr old; real mud and sand stay soft for 1 to 3 km.
+
+## Game choices
+
+The vocabulary, families and groups (RCK-013, the MIC rock-tag README); the metamorphic grade index (RCK-047); continental crust
+only (RCK-036); forward-only metamorphism (RCK-038); every pool and path table (RCK-016 to RCK-023, RCK-046); aureole shell
+(RCK-053); pluton shares, length and width (RCK-058 to RCK-065); the stone and deepslate stand-ins (RCK-075 to RCK-079,
+decisions log 2026-10-01, Ben), the block resolution order (RCK-080, plan section 7.5). The appearance claims in the
+generator comments ("dark grey", "banded") are descriptions, not data (RCK-089).
+
+## Open questions
+
+1. **Schist at 450 degC.** The Barrovian type locality grew garnet at 500-550 degC; the comment said "garnet zone". Raise
+   schist to 500 (and amphibolite to 550)? STATUS pending questions.
+2. **Pluton width, roof depth, shares and collision rate.** Each is a game choice that real data put somewhere else
+   (rows above). STATUS pending questions.
+3. **Compaction and lithification depth** (RCK-022, STR-049).
+4. **Densities the sources disagree with** (RCK-087): peridotite, kimberlite, ironstone, BIF, phosphorite, pumice, travertine.
+5. **Suevite in carbonate targets.** French 1998: suevite has been found only in craters in crystalline silicate targets;
+   carbonate-target craters have lithic breccia only. The impact stage (IMP) should be asked whether it makes impact_breccia
+   from limestone.
+6. **Sources that would settle the rest:** Winter 2010 and Yardley 1989 (formation temperatures), Haederle and Atherton 2002
+   (Coastal Batholith width and count), Cruden and McCaffrey 2001 itself, Buddington 1959, Telford 1990 (density table).
+
+## Sources
+
+Read in full or in the relevant part: Cruden 2008 (SKB R-08-138); Daly, Manger and Clark 1966; Manger 1963; Handbook of Mineralogy;
+French 1998; Stoeffler and Grieve 2007; Hardie 1967; Orti et al. 2012; Davies and Davies 2010; Meinert 1992 (scan);
+Robertson 1988; Baxter et al. 2002; Stipp et al. 2002; Ferrill et al. 2004; Annen 2017; Mottram et al. 2014; Sass et al. 1994;
+Bateman 1992; Ducea 2001; Glazner et al. 2004; Greene et al. 2006; Dietl and Koyi 2008; Vigneresse and Burg 2003;
+Ardill et al. 2020. Abstract only: Christensen and Mooney 1995; the Brown and Johnson dataset. Secondary: Nelson (Tulane),
+Hacker (UCSB), Greenwood and Berman, Wikipedia pages, pyBacktrack and RocFall documentation. Closed and not read: Winter 2010,
+Yardley 1989, Spear 1993, Telford et al. 1990, Schon 2015, Cruden 1998, McCaffrey and Petford 1997, Cruden and McCaffrey 2001,
+Buddington 1959, Haederle and Atherton 2002, Mukasa 1986, Warren 2016. Details and library keys in
+[bibliography.md](bibliography.md), section "Rock classes, metamorphism, plutons and strata: sources read in WP-7".
