@@ -452,6 +452,7 @@
     "magma_lens_width": 1.0,
     "magma_mush_width": 1.0,
     "remove_lava_features": true,
+    "sea_cliff_skin_blocks": 6,
     "geothermal_density": 1.0,
     "geothermal_reach": 1.0,
     "geothermal_size": 1.0,

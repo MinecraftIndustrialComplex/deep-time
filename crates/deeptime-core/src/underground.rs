@@ -40,6 +40,9 @@ pub const MAX_BLOCKS: u32 = 992;
 /// The most lenses a volcano's crust-deep column may hold (`magma_lens_count`).
 pub const MAX_LENSES: u32 = 64;
 
+/// The widest sea-cliff guard accepted (`sea_cliff_skin_blocks`), blocks.
+pub const MAX_CLIFF_SKIN: u32 = 32;
+
 /// The world-data file of the active volcanoes.
 pub const VOLCANOES_PATH: &str = "volcanoes/active.json";
 /// The version of that file.
@@ -94,6 +97,13 @@ pub struct UndergroundParams {
     /// Whether the random lava lakes and lava springs of vanilla's and the pack's biomes are taken
     /// out of a Deep Time world, so lava is found at the volcanoes and at the world's floor only.
     pub remove_lava_features: bool,
+    /// Under the sea, vanilla's cave and canyon carvers are kept this many blocks away from the
+    /// face of a cliff (Ben, 2026-10-02: the carvers cut arches into the underwater base of sea
+    /// cliffs). A block under the sea level is left alone when the ground within this many blocks
+    /// to the side is lower than it is, that is when open water lies that close at its height; a
+    /// cave may still run through the cliff, but never opens onto its face. 0: no guard (vanilla's
+    /// carving). Ledger MAG-057.
+    pub sea_cliff_skin_blocks: u32,
     /// How many geothermal fields (hot springs, sinter and travertine terraces, fumaroles,
     /// altered ground) each active volcano gets, as a multiple of the default (P2-14): the
     /// count is floor(density × (0.7 + 2.3 activity) × clamp(sqrt(R / 45), 0.6, 2.2) + u), from none
@@ -125,6 +135,7 @@ impl Default for UndergroundParams {
             magma_lens_width: 1.0,                  // ledger: MAG-045
             magma_mush_width: 1.0,                  // ledger: MAG-054
             remove_lava_features: true,             // ledger: MAG-034
+            sea_cliff_skin_blocks: 6,               // ledger: MAG-057
             geothermal_density: 1.0,                // ledger: GEO-001 (game-choice)
             geothermal_reach: 1.0,                  // ledger: GEO-003 (game-choice)
             geothermal_size: 1.0,                   // ledger: GEO-005 (game-choice)
@@ -136,6 +147,12 @@ impl Default for UndergroundParams {
 impl UndergroundParams {
     /// Range checks, each naming its key.
     pub fn validate(&self) -> Result<(), CoreError> {
+        if self.sea_cliff_skin_blocks > MAX_CLIFF_SKIN {
+            return Err(CoreError::preset(
+                "$.underground.sea_cliff_skin_blocks".to_string(),
+                format!("must be in [0, {MAX_CLIFF_SKIN}]"),
+            ));
+        }
         if self.magma_lens_count > MAX_LENSES {
             return Err(CoreError::preset(
                 "$.underground.magma_lens_count".to_string(),
@@ -386,6 +403,15 @@ mod tests {
         assert_eq!(d.magma_lens_spacing_blocks, 28.0);
         assert_eq!(d.magma_lens_width, 1.0);
         assert_eq!(d.magma_mush_width, 1.0);
+        assert_eq!(d.sea_cliff_skin_blocks, 6);
+        let wide = UndergroundParams {
+            sea_cliff_skin_blocks: MAX_CLIFF_SKIN + 1,
+            ..d
+        };
+        assert!(wide.validate().is_err());
+        let off: UndergroundParams =
+            serde_json::from_str(r#"{"sea_cliff_skin_blocks": 0}"#).unwrap();
+        off.validate().unwrap();
         // A section that names none of them keeps the column.
         let p: UndergroundParams = serde_json::from_str(r#"{"crater_lake_share": 0.5}"#).unwrap();
         assert_eq!(p.magma_lens_count, 24);

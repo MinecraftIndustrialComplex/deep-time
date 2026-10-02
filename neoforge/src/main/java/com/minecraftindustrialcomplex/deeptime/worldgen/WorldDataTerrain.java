@@ -19,6 +19,7 @@ public final class WorldDataTerrain implements TerrainSource {
     private volatile LavaRules lava;
     private volatile Magma magma;
     private volatile MagmaRules magmaRules;
+    private volatile SeaCliffGuard.Rules cliffRules;
     private volatile Geothermal geothermal;
     private volatile GeothermalRules geothermalRules;
 
@@ -58,6 +59,16 @@ public final class WorldDataTerrain implements TerrainSource {
             lava = l;
         }
         return l;
+    }
+
+    /** The world's setting for the sea-cliff cave guard. */
+    public SeaCliffGuard.Rules cliffRules() {
+        SeaCliffGuard.Rules r = cliffRules;
+        if (r == null) {
+            r = SeaCliffGuard.Rules.of(data().manifest().notes());
+            cliffRules = r;
+        }
+        return r;
     }
 
     /** The world's settings for lava at its volcanoes. */
