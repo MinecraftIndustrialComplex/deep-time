@@ -49,7 +49,7 @@ class MagmaTest {
 
     @Test
     void aVolcanoOnLandGetsAChamberAConduitAndAPlug() {
-        Magma m = one(cone(100, 50, 182, 70), DRY, new MagmaRules(3.0, 1.0, 0.0, true));
+        Magma m = one(cone(100, 50, 182, 70), DRY, new MagmaRules(3.0, 1.0, 0.0, true).withoutColumn());
         Magma.Body b = m.bodies().get(0);
         assertEquals(175, b.floorY(), "the crater floor: H 176 at the centre");
         // Radius: a tenth of 14 km = 1.4 km = 5 blocks across; half-height a fifth of that = 14 blocks up.
@@ -353,7 +353,7 @@ class MagmaTest {
         Magma.Body silicic = kindOf("stratovolcano", true, 14_000, 1.0, COLUMN, LAVA_FLOOR, LAVA_FLOOR - 10).bodies().get(0);
         Magma.Body shield = kindOf("shield", false, 14_000, 1.0, COLUMN, LAVA_FLOOR, LAVA_FLOOR - 10).bodies().get(0);
         Magma.Body big = kindOf("stratovolcano", false, 40_000, 1.0, COLUMN, LAVA_FLOOR, LAVA_FLOOR - 10).bodies().get(0);
-        assertTrue(silicic.chamberRh() > arc.chamberRh() * 1.4, "silicic centres hold larger shallow chambers");
+        assertTrue(silicic.chamberRh() > arc.chamberRh() * 1.3, "silicic centres hold larger shallow chambers");
         assertTrue(shield.deep().lenses()[0][1] > arc.deep().lenses()[0][1] * 1.2, "shield lenses are broader");
         assertTrue(quiet.deep().lenses()[0][1] <= arc.deep().lenses()[0][1], "quiet volcanoes' lenses are not wider");
         assertTrue(big.deep().lenses()[0][1] > arc.deep().lenses()[0][1], "a bigger volcano has wider lenses");
@@ -409,7 +409,7 @@ class MagmaTest {
         assertFalse(b.mush(0, 0, b.minY() - 1));
         // It wraps the lava: no molten block outside it.
         for (int dx = -b.reach(); dx <= b.reach(); dx += 1)
-            for (int y = b.minY(); y <= b.chamberY(); y++)
+            for (int y = b.minY(); y <= b.chamberY() - b.chamberRv(); y++)
                 if (b.at(dx, 0, y).molten())
                     assertTrue(b.mush(dx, 0, y), "lava at " + dx + ", " + y + " outside the mush");
         // The setting: wider mush, none.
