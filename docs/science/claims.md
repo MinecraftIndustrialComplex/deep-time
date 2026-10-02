@@ -23,7 +23,7 @@ ISO-067, added to master the same day by its own agent) is included.
 | [PLT](ledger/PLT.md) | plate tectonics | 192 | 0 | 45 | 6 | 20 | 11 | 59 | 51 | 163 | 29 | 20 |
 | [CLM](ledger/CLM.md) | climate physics | 134 | 0 | 40 | 5 | 0 | 13 | 21 | 55 | 106 | 28 | 12 |
 | [MOI](ledger/MOI.md) | moisture, winds, seasons | 70 | 0 | 17 | 0 | 0 | 0 | 8 | 45 | 70 | 0 | 6 |
-| [BIO](ledger/BIO.md) | Köppen classes and biomes | 99 | 0 | 24 | 0 | 0 | 1 | 66 | 8 | 0 | 0 | 0 |
+| [BIO](ledger/BIO.md) | Köppen classes and biomes | 100 | 24 | 2 | 0 | 3 | 1 | 69 | 1 | 0 | 0 | 0 |
 | [ERO](ledger/ERO.md) | erosion, sediment, facies | 156 | 0 | 83 | 2 | 3 | 6 | 4 | 58 | 0 | 0 | 11 |
 | [ISO](ledger/ISO.md) | isostasy, flexure, subsidence, height limit, sea level | 65 | 3 | 8 | 0 | 6 | 6 | 12 | 30 | 0 | 0 | 2 |
 | [HYP](ledger/HYP.md) | hypsometry and calibration targets | 34 | 0 | 10 | 0 | 1 | 18 | 1 | 4 | 0 | 0 | 0 |
