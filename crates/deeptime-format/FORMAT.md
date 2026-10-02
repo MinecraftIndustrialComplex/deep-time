@@ -943,8 +943,11 @@ With R the volcano's basal radius in blocks (`radius_m` / `m_per_block_h`, at le
 (0.05 to 1), a volcano gets ⌊d · (0.7 + 2.3 a) · clamp(√(R / 45), 0.6, 2.2) + u⌋ **fields** (d =
 `geothermal_density`, u a uniform draw from the volcano's own seed, a hash of its id and position).
 The first field lies 0.08 to 0.35 R · `geothermal_reach` from the summit, the others 0.25 to 1.0 R ·
-`geothermal_reach`, in any direction, on the first of twelve draws that is dry land (3 blocks above
-the sea, no water column, no ice cover). A field is **hot springs** when it is at least 0.35 R from the summit,
+`geothermal_reach`, in any direction, on the first of twelve draws whose centre is dry land at least 5
+blocks above the sea (the 3 of `MIN_ABOVE_SEA` plus 2) with no water column and no ice cover. That
+gives from none (a small, quiet volcano: expected 0.49 fields) to seven fields (a large, active one:
+expected 6.6) at the default density; there is no "one to four". Every site's own columns must stand at
+least 3 blocks above the sea. A field is **hot springs** when it is at least 0.35 R from the summit,
 the baked `climate/p_mm` there reaches `geothermal_spring_min_precip_mm`, and `climate/t_mean_c` is at
 least 3 °C (a world without those layers counts as warm and wet); else it is a **fumarole field**.
 
@@ -958,10 +961,11 @@ least 3 °C (a world without those layers counts as warm and wet); else it is a 
   mat, then orange mat towards the edge; the ground above the level is cut to air. The **rim** (every
   column that touches the pool, else out to 1.5 blocks) is solid at the level and one block under it. The
   **apron** around it, out to the site's `apron` radius, wears the terrace rock on its top block (a
-  fifth the other rock), a tenth of it stained yellow.
+  fifth the other rock), 7 % of it stained yellow, and half the time the block under it too.
 - A fumarole field has two to four **vents** (radius 1 or 2: a core of magma blocks two blocks deep, a
   crust of native sulfur around it, bleached and yellow-stained ground out to 3 to 10 blocks) and one or
-  two **patches** of altered ground (3 to 11 blocks). At silicic volcanoes 6 % of the altered ground is cinnabar.
+  two **patches** of altered ground (3 to 11 blocks). About 30 % of altered ground is stained yellow and
+  the rest bleached; at silicic volcanoes 6 % is cinnabar (red stain) and 24 % yellow.
 - A terrace is **sinter** (white, siliceous) unless carbonate rock (limestone, dolostone, chalk, marble
   or travertine) lies within 150 blocks under the site in the strata horizons: then **travertine**.
 - Refused: a site on ground under 3 blocks above the sea; with a water column (the sea, a lake, a
@@ -979,7 +983,13 @@ least 3 °C (a world without those layers counts as warm and wet); else it is a 
 
 `DeepTimeClimate.geothermalWarmthC(x, y, z)` (API 3) is the warm-ground signal: kelvin over the
 climate's temperature, at most 12 (vent) / 10 (pool) / 6 (patch) at a site's heart, falling linearly to
-0 a few blocks beyond its altered ground, within 10 blocks under and 6 over its ground.
+0 a few blocks beyond its altered ground (1.1 times its altered-ground radius plus 4 blocks), within 10
+blocks under (12 for a pool) and 6 over its ground.
+
+**What is not modelled.** There are no geysers: pool water is plain water, with no steam, eruption,
+boiling point or temperature. The colours stand for the temperature zones of a real spring (a hot,
+sterile heart, then yellow and orange microbial mats) but no temperature is coded. The science page
+`docs/science/geothermal-features.md` lists the rules that are game choices.
 
 ## `strata/classes.json`
 
