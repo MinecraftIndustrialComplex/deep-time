@@ -71,7 +71,7 @@ them in from [_template.md](_template.md).
 | [provinces.md](provinces.md) | stub | PRV |
 | [world-scale-and-bake.md](world-scale-and-bake.md) | stub | SCL, BAK |
 | [pole-cap.md](pole-cap.md) | stub | POL |
-| [geothermal-features.md](geothermal-features.md) | stub; rows written in stage 2 (WP-0) | GEO |
+| [geothermal-features.md](geothermal-features.md) | written (stage 2, WP-16) | GEO |
 
 Four ledgers have no page of their own; their rows belong with the pages of the subsystems they touch
 (added in stage 2, package WP-0): PRS (presets other than `earthlike_quick_16k`, the test presets and the
