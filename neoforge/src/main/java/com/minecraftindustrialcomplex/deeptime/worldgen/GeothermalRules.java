@@ -18,6 +18,7 @@ import com.google.gson.JsonObject;
  */
 public record GeothermalRules(double density, double reach, double size, double springMinPrecipMm) {
 
+    // ledger: GEO-010 (game-choice; the defaults repeat GEO-001, GEO-003, GEO-005, GEO-007)
     public static final GeothermalRules DEFAULT = new GeothermalRules(1.0, 1.0, 1.0, 400.0);
 
     public GeothermalRules {
