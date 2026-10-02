@@ -74,7 +74,10 @@ def analyse(run):
     steps, collisions = [], []
     for line in open(run + ".trace"):
         d = json.loads(line)
-        (steps if d["k"] == "step" else collisions).append(d)
+        if d["k"] == "step":
+            steps.append(d)
+        elif d["k"] == "collision":
+            collisions.append(d)
     ev = json.load(open(run + ".events.json"))
     kind = lambda e: e["kind"].split(":")[-1]
     par = lambda e, k: e.get("params", {}).get(k)
