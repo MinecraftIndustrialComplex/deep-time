@@ -567,12 +567,16 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
                 sediment: f64::from(su.pools[pool::SEDIMENT]),
                 oceanic_slab: su.kind != CONTINENTAL,
             });
-            let under = state.contacts[c].under as usize;
-            front_len[under] += front_km;
-            let cu = DVec3::from_array(state.plates[under].centroid);
-            let axis = cu.cross(pos[v]);
-            if axis.length_squared() > 1e-18 {
-                pull[under] += axis.normalize() * (front_km / 1000.0);
+            // Only an oceanic slab pulls: continental crust at the front is buoyant, and where it
+            // comes in the collision resists instead (`belts::resist`; plate tasks 3 and 4).
+            if su.kind != CONTINENTAL {
+                let under = state.contacts[c].under as usize;
+                front_len[under] += front_km;
+                let cu = DVec3::from_array(state.plates[under].centroid);
+                let axis = cu.cross(pos[v]);
+                if axis.length_squared() > 1e-18 {
+                    pull[under] += axis.normalize() * (front_km / 1000.0);
+                }
             }
         }
     }

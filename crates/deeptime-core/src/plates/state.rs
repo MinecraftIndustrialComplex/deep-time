@@ -318,6 +318,12 @@ pub struct Belt {
     /// Mean height above sea level of the overriding plate within half the belt's width of the
     /// front, m, as of the last step with a front: the height the resistance reads.
     pub height_m: f64,
+    /// The mean elevation within half the belt's width of the front before the collision's first
+    /// stacking, m, and the belt's relief over it as of the last step with a front: how much the
+    /// collision has thickened the crust there (what the resistance reads, so a belt built on
+    /// a submarine edge resists too).
+    pub base_m: Option<f64>,
+    pub relief_m: f64,
     /// The highest `height_m` so far, and the step it was reached.
     pub peak_height_m: f64,
     pub peak_step: u64,
