@@ -82,6 +82,7 @@ pub fn classify(t: &[f64; 12], p: &[f64; 12]) -> u8 {
         2.0 * mat + 14.0
     };
     // The B (arid) test comes first, ahead of E (ledger: BIO-002).
+    // ledger: BIO-005
     let code = if map < 10.0 * pth {
         match (map < 5.0 * pth, mat >= 18.0) {
             (true, true) => "BWh",
@@ -90,8 +91,10 @@ pub fn classify(t: &[f64; 12], p: &[f64; 12]) -> u8 {
             (false, false) => "BSk",
         }
     } else if thot < 10.0 {
+        // ledger: BIO-003 (E: Thot < 10; ET: Thot > 0)
         if thot > 0.0 { "ET" } else { "EF" }
     } else if tcold >= 18.0 {
+        // ledger: BIO-007 to BIO-010 (A: Tcold >= 18; f 60 mm; m 100 - MAP/25)
         let pdry = p.iter().cloned().fold(f64::MAX, f64::min);
         if pdry >= 60.0 {
             "Af"
@@ -119,7 +122,10 @@ pub fn classify(t: &[f64; 12], p: &[f64; 12]) -> u8 {
             (false, true) => 'w',
             (false, false) => 'f',
         };
-        let warm_months = t.iter().filter(|&&x| x >= 10.0).count();
+        // Tmon10: "the number of months where the temperature is above 10" (Peel et al. 2007,
+        // Table 1 note; ledger BIO-015).
+        let warm_months = t.iter().filter(|&&x| x > 10.0).count();
+        // ledger: BIO-011 (C: 0 < Tcold < 18; D: Tcold <= 0), BIO-012 to BIO-014, BIO-016
         let first = if tcold > 0.0 { 'C' } else { 'D' };
         let third = if thot >= 22.0 {
             'a'
@@ -279,6 +285,20 @@ mod tests {
         assert_eq!(code(t, [12.5; 12]), "BSk");
         // Wet enough (400 mm) to pass the dry test, the same cold year is tundra.
         assert_eq!(code(t, [400.0 / 12.0; 12]), "ET");
+    }
+
+    #[test]
+    fn warm_months_are_those_above_10_degc() {
+        // Peel et al. 2007, Table 1 note: Tmon10 is "the number of months where the temperature
+        // is above 10". Four months at exactly 10 degC (and the rest colder) are none above 10:
+        // Cfc, not Cfb. Four months a hair over are Cfb.
+        let mut t = [4.0, 4.0, 5.0, 8.0, 10.0, 10.0, 10.0, 10.0, 8.0, 6.0, 4.0, 4.0];
+        let p = [60.0; 12];
+        assert_eq!(code(t, p), "Cfc");
+        for m in 4..8 {
+            t[m] = 10.01;
+        }
+        assert_eq!(code(t, p), "Cfb");
     }
 
     #[test]
