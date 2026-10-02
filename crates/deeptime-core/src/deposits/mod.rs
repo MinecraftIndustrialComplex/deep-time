@@ -53,6 +53,7 @@
 //! the type comes back with no other change.
 
 pub mod children;
+pub mod clocks;
 pub mod cluster;
 pub mod count;
 pub mod fields;
