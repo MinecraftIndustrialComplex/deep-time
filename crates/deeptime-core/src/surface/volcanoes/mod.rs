@@ -1997,6 +1997,25 @@ impl VolcanoStage {
             .fields
             .get(field::FLOOD_BASALT)
             .map_or(0, |f| f.data.iter().filter(|&&x| x > 0.0).count());
+        // Height distributions for the comparison with Earth's composite volcanoes (science page
+        // `volcanoes-and-magma.md`, VOL-019): the 10th, 50th and 90th percentiles, m.
+        let pct = |mut xs: Vec<f64>| -> serde_json::Value {
+            if xs.is_empty() {
+                return json!(null);
+            }
+            xs.sort_by(f64::total_cmp);
+            let q = |f: f64| xs[((xs.len() - 1) as f64 * f).round() as usize].round();
+            json!([q(0.1), q(0.5), q(0.9)])
+        };
+        let heights = |pick: &dyn Fn(&Volcano) -> bool| {
+            pct(st
+                .volcanoes
+                .iter()
+                .filter(|v| pick(v))
+                .map(|v| v.height_m)
+                .collect())
+        };
+        let is_standing = |v: &Volcano| v.height_m >= (0.25 * v.peak_m).max(300.0);
         json!({
             "steps": st.steps,
             "counts": st.counts,
@@ -2012,6 +2031,11 @@ impl VolcanoStage {
                 "caldera_complex": active(Kind::Silicic),
             },
             "tallest_m": peak.round(),
+            "height_pcts_m": {
+                "active_stratovolcano": heights(&|v| v.kind == Kind::Strato && v.active()),
+                "standing_stratovolcano": heights(&|v| v.kind == Kind::Strato && is_standing(v)),
+                "standing_shield": heights(&|v| v.kind == Kind::Shield && is_standing(v)),
+            },
             "flood_basalt_outcrop_cells": fb_on,
             "events": st.events_emitted,
             "events_by_kind": st.events_by_kind,
@@ -2237,12 +2261,24 @@ pub fn summary_line(v: &serde_json::Value) -> String {
         xs.iter().sum::<f64>() / xs.len().max(1) as f64
     };
     let last_of = |k: &str| bases.last().and_then(|b| b[k].as_f64()).unwrap_or(f64::NAN);
+    let pcts = |k: &str| {
+        v["height_pcts_m"][k].as_array().map_or_else(
+            || "-".to_string(),
+            |a| {
+                a.iter()
+                    .map(|x| format!("{}", x.as_f64().unwrap_or(f64::NAN)))
+                    .collect::<Vec<_>>()
+                    .join("/")
+            },
+        )
+    };
     format!(
         "volcanoes_final={} strato_born={} shield_born={} caldera_complex_born={} \
          standing_strato={} standing_shield={} standing_caldera_complex={} active_strato={} \
          active_shield={} calderas={} summit_calderas={} flood_basalts={} eroded={} subducted={} \
          built_km3={:.3e} tallest_m={} flood_basalt_outcrop_cells={} events={} \
-         arc_base_p50_mean_m={:.0} arc_base_low_share_mean={:.3} arc_base_p50_final_m={:.0}",
+         arc_base_p50_mean_m={:.0} arc_base_low_share_mean={:.3} arc_base_p50_final_m={:.0} \
+         height_p10_p50_p90_m: active_strato={} standing_strato={} standing_shield={}",
         v["steps"],
         c["strato_born"],
         c["shield_born"],
@@ -2264,6 +2300,9 @@ pub fn summary_line(v: &serde_json::Value) -> String {
         mean_of("base_p50_m"),
         mean_of("low_share"),
         last_of("base_p50_m"),
+        pcts("active_stratovolcano"),
+        pcts("standing_stratovolcano"),
+        pcts("standing_shield"),
     )
 }
 
