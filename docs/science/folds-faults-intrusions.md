@@ -18,9 +18,9 @@ One thing is not settled and is a question for Ben (STATUS.md, "Pending question
 else in a rock column is drawn in true metres, 20 m to a block upwards and 300 m across, so the world
 is stretched 15 times vertically; folds and faults alone are drawn undistorted in blocks. In blocks
 they look as a geologist would draw them (normal faults at about 60°, thrusts at about 30°). In
-metres every one of them is 15 times too low: the faults dip 5° to 10° and 1° to 3°, folds are about
-100 m high on a 16 km wavelength where Zagros folds are 500 to 1,000 m, and a normal fault 38 km long
-throws the beds about 120 m where a real one throws them about 1 km.
+metres every one of them is 15 times lower than it is drawn: normal faults dip 5° to 10° and thrusts
+1° to 3°, folds are about 100 m high on a 16 km wavelength where Zagros folds are 500 to 1,000 m,
+and a normal fault 38 km long throws the beds about 120 m where a real one throws them about 1 km.
 
 Scale used throughout: one block is 300 m across and 20 m up, so 1 km is 3.3 blocks across and
 50 blocks up.
@@ -47,9 +47,9 @@ arcs; most stop below the ground, and where one crops out only its domed top sho
 extinct volcano still standing on land a plug of rhyolite, andesite or basalt 5 to 16 blocks across
 fills the old conduit.
 
-On the measured planet the structures cover 48 % of all columns and change the rock of 49 % of land columns; 65 % of
-the stable continental interiors (cratons) lie under at least one structure, 16 % under one younger
-than 50 Myr.
+On the measured planet the structures cover 48 % of all columns and change the rock of 49 % of land
+columns; 65 % of the stable continental interiors (cratons) lie under at least one structure, 16 %
+under one younger than 50 Myr.
 
 ## The model in plain words
 
@@ -132,8 +132,8 @@ blocks; in metres the same folds shorten the beds by 0.04 % to 0.13 %.
 **Metres and blocks.** A dip d drawn in blocks is atan(tan d / 15) in metres. A slip s along the dip
 in blocks has a heave (horizontal part) of 300 s cos d metres and a throw (vertical part) of 20 s
 sin d metres. Because the heave dominates, the displacements are near real ones in metres (normal
-faults 0.017 to 0.029 of their length, thrusts 0.031 to 0.075), while the throws are a ninth to a
-fifteenth of real ones.
+faults 0.017 to 0.029 of their length, thrusts 0.031 to 0.075), while the throws are about a ninth
+(normal faults) and a sixteenth (thrusts) of real ones at the medians.
 
 ## Earth against the mod
 
