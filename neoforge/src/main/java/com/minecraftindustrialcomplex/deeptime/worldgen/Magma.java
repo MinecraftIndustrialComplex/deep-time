@@ -17,8 +17,8 @@ import java.util.List;
  * <ul>
  *   <li>a <b>magma chamber</b>: an ellipsoid of lava whose top lies {@code magma_chamber_depth_km}
  *       under the crater floor. Its radius is a tenth of the volcano's basal radius (1.2 to 4.5 km)
- *       times {@code magma_chamber_size}, its half-height a fifth of that radius. The world is 15
- *       times taller than wide, so in blocks a chamber is a tall lens (7 across and 40 high for a
+ *       times {@code magma_chamber_size}, its half-height a fifth of that radius. Heights are stretched 15
+ *       times against widths, so in blocks a chamber is a tall lens (7 across and 40 high for a
  *       2-km chamber). A chamber that would reach the lava floor is raised, and squeezed where the
  *       ground is too thin for it;</li>
  *   <li>a <b>conduit</b>: a plus-shaped column of lava from the chamber's centre up to six blocks
