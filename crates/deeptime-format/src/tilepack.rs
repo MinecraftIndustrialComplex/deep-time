@@ -574,10 +574,10 @@ mod tests {
 
         // Another minor version: a version error naming both.
         let mut b = good.clone();
-        b[8] = 3;
+        b[8] = 9;
         std::fs::write(&p, &b).unwrap();
         let err = TilePackReader::open(&p).err().unwrap().to_string();
-        assert!(err.contains("0.3") && err.contains(FORMAT_VERSION), "{err}");
+        assert!(err.contains("0.9") && err.contains(FORMAT_VERSION), "{err}");
 
         // Bad magic.
         let mut b = good;

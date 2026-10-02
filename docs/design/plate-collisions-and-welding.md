@@ -1,6 +1,15 @@
 # Plate collisions and welding: design
 
-Status: **design for review, nothing built** (2026-10-01). Ben chose "Design, then fix".
+Status: **design, nothing built** (2026-10-01). Ben chose "Design, then fix".
+
+**Decided 2026-10-02** (decisions log): question 1 → full force-balance motion; question 2 → decide
+about the mega-plate when measured; question 3 → both sides of the suture rise, with a foreland
+basin; question 4 → the start-up jump is a separate small task afterwards. The extension is
+`docs/design/plate-force-balance.md`. It supersedes this document where they differ: the belt of
+4.1 (1C) becomes two-sided (its section 3.5), the resistance and weld rule of 4.2 (2B) become terms
+of the balance (its 3.4), the settings of section 5 and the plan of section 7 are replaced by its
+sections 6 and 9. The diagnosis (section 2), the Earth notes (section 3) and the acceptance table
+(section 6) stand.
 Scope: three plate-stage faults found by the run review
 (`docs/research/notes/run-review-1a0f969d358.md`): collisions pop land out of the sea in one
 frame, rifted oceans close again at once (no Wilson cycle), and welding builds a mega-plate.
