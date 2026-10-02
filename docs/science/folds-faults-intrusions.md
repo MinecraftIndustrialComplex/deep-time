@@ -156,26 +156,32 @@ true-metre shape's: at the default 4 about a quarter.
 Measured on one run: `earthlike_quick_16k`, scattered continents, 500 Myr, seed 1, master 9e84fcf,
 2026-10-02, on the test machine (`tools/review/wp8-runs.sh world base`, which runs `deeptime run`,
 then `deeptime strata-check` and `deeptime structure-sections`); 6,108 folds and faults and 6,066
-intrusions kept.
+intrusions kept. Those figures are at the old stretch 1. The rows marked `x4` were measured at the
+default vertical scale 4 on a second pair of runs (2026-10-02, branch of the vertical-scale task, on
+the test machine: `earthlike_quick_16k`, supercontinent start, 1000 Myr, seed 1,
+`WP8_START=supercontinent WP8_LENGTH=1000 tools/review/wp8-runs.sh world <name>`), the same world
+built twice, before (stretch 1, the old intrusion sizes and relief 1) and after; `x1` is its before.
 
 | Quantity | Earth | Source of the Earth figure | The mod | Run |
 |---|---|---|---|---|
 | Fold wavelength | 15.8 ± 5.3 km (11 to 30 km) | Mouthereau et al. 2007, fig. 5 and §[55], full text | median 52.5 blocks = 15.8 km | base |
 | Fold length along the axis | up to 150 to 200 km; often over 100 km | Alavi 2007 p. 1068, Mouthereau et al. 2007 §[7], full text | median 424 blocks = 127 km | base |
-| Fold amplitude | 500 to 1,000 m (Zagros, maximum) | Mouthereau et al. 2007 art. p. 5, full text | median 5.1 blocks = 103 m in metres | base |
-| Fold limb dips | open folds 20° to 35° (interlimb 110° to 140°), near the front about 5° (170°), tight in the inner belt | Alavi 2007 p. 1077, full text | 30° to 48° in blocks; 2° to 4° in metres | arithmetic on DEF-005 |
-| Normal fault displacement over length | 0.03 (D = 0.03 L^1.06), typical 0.001 to 0.1 | Lathrop et al. 2022 pp. 2 and 7 (quoting Schlische et al. 1996), full text | 0.017 to 0.029 in metres; throw median 117 m for 38 km | base (median slip 6.6 blocks) |
-| Thrust displacement over length | about 7 % | Elliott 1976 p. 297, full text | 0.031 to 0.075 in metres; throw median 82 m | base (median slip 8.2 blocks) |
-| Normal fault dip | over 45°, about 60°; active ruptures 30° to 65° | Anderson 1905 pp. 389, 402; Waldron & Snyder 2020 p. 152; Collettini & Sibson 2001 abstract | 55° to 70° in blocks, 5° to 10° in metres | code |
-| Thrust dip | under 45°, about 30°; peak 30° ± 5° | Anderson 1905; Collettini & Sibson 2001 abstract | 20° to 40° in blocks, 1° to 3° in metres | code |
+| Fold amplitude | 500 to 1,000 m (Zagros, maximum) | Mouthereau et al. 2007 art. p. 5, full text | median 4.9 blocks = 98 m in metres (`x1`); 19.5 blocks = 390 m (`x4`) | base, x1, x4 |
+| Fold limb dips | open folds 20° to 35° (interlimb 110° to 140°), near the front about 5° (170°), tight in the inner belt | Alavi 2007 p. 1077, full text | at 1:1 30° to 48° in blocks, 2° to 4° in metres; at the default 4 66° to 77° in blocks, 9° to 16° in metres | arithmetic on DEF-005, DEF-011 |
+| Normal fault displacement over length | 0.03 (D = 0.03 L^1.06), typical 0.001 to 0.1 | Lathrop et al. 2022 pp. 2 and 7 (quoting Schlische et al. 1996), full text | 0.017 to 0.029 in metres; throw median 117 m for 38 km at 1:1, about 470 m at 4 | base (median slip 6.6 blocks); x4 (23.1) |
+| Thrust displacement over length | about 7 % | Elliott 1976 p. 297, full text | 0.031 to 0.075 in metres; throw median 82 m at 1:1, about 330 m at 4 | base (median slip 8.2 blocks); x4 (16.7) |
+| Normal fault dip | over 45°, about 60°; active ruptures 30° to 65° | Anderson 1905 pp. 389, 402; Waldron & Snyder 2020 p. 152; Collettini & Sibson 2001 abstract | at 4: 80° to 85° in blocks, 21° to 36° in metres (at 1:1 55° to 70° and 5° to 10°) | code |
+| Thrust dip | under 45°, about 30°; peak 30° ± 5° | Anderson 1905; Collettini & Sibson 2001 abstract | at 4: 55° to 73° in blocks, 5.5° to 12.6° in metres (at 1:1 20° to 40° and 1° to 3°) | code |
 | Fold-thrust belt width | 200 to 300 km (Zagros); 60 to 140 km (Subandean, Bolivia) | Alavi 2007 abstract; Mouthereau et al. 2007 §[7]; Hérail et al. pp. 179-180 (poor scan) | 250 km on the plate model's sphere, 102 blocks = 31 km on the map | code (DEF-027) |
-| Bed offset at a structure | throws of about 1 km on 40 km faults (from the rows above) | derived | median 2 blocks (40 m), p90 7 (140 m), max 166 | base, `strata-check`, 20,000 columns |
-| Dyke thickness | 2.3 m average (Ship Rock); 1 to 150 m, mean 30 m (Mackenzie giant swarm) | Delaney & Pollard 1981; Bunger et al. 2013, full text | 2 to 5 blocks, 600 to 1,500 m | code (DEF-048) |
+| Bed offset at a structure | throws of about 1 km on 40 km faults (from the rows above) | derived | median 2 blocks (40 m), p90 7 (140 m), max 166 (base); median 2, p90 8, max 252 (`x1`); median 8 (160 m), p90 29 (580 m), max 265 (`x4`) | `strata-check`, 20,000 columns |
+| Dyke thickness | 2.3 m average (Ship Rock); 1 to 150 m, mean 30 m (Mackenzie giant swarm) | Delaney & Pollard 1981; Bunger et al. 2013, full text | 1.7 to 3 blocks (510 to 900 m) at depth, 1 to 1.8 blocks where they crop out (were 2 to 5 blocks) | code (DEF-048) |
 | Dyke length | 1 to 9 km (Ship Rock); over 2,000 km (Mackenzie) | Delaney & Pollard 1981; Bunger et al. 2013 | median 50 blocks = 15 km | base |
 | Dyke spacing in a swarm | 6.7 km to 25 km mean (Mackenzie), most continuous ones 35 to 65 km | Bunger et al. 2013 (quoting Hou et al. 2010, Stott & Josey 2009) | not measured (2,633 dykes kept) | base |
-| Volcanic neck width | Ship Rock 500 m; small plugs under 30 m; Round Butte diatreme 170 to 190 m | New Mexico Bureau of Geology Ship Rock page; Delaney & Pollard 1981; Latutrie 2020 | 5 to 16 blocks, 1.5 to 4.8 km | code (DEF-049) |
+| Volcanic neck width | Ship Rock 500 m; small plugs under 30 m; Round Butte diatreme 170 to 190 m | New Mexico Bureau of Geology Ship Rock page; Delaney & Pollard 1981; Latutrie 2020 | 4 to 10 blocks (1.2 to 3 km) at depth, 2.4 to 6 blocks (0.7 to 1.8 km) where they crop out (were 5 to 16 blocks) | code (DEF-049) |
 | Stock | exposed over less than 100 km2 | Earle 2019 §3.5 | radius median 13.3 blocks = 4.0 km at the world's floor; outcrops a few per cent of that | base |
 | Cratons with old deformation | the basement of every craton is metamorphosed crystalline rock; its sedimentary platform cover is weakly deformed | Earle 2019 §21.1-21.2; Wikipedia "Craton" (secondary) | 65 % of craton cells under a structure, 16 % under one younger than 50 Myr | base |
+| Rock columns a geologist would object to | none expected outside real overturned belts | (a check, not an Earth figure) | grade inversions 0.15 % of columns (`x1`), 0.36 % (`x4`; on land 0.10 % and 0.71 %); metamorphic slivers 0.41 % and 0.95 %; plutonic sheets 0.015 % and 0.17 %; malformed columns 0 in both | `strata-check`, 20,000 columns |
+| Ground lifted or dropped by young structures | fault scarps and range fronts of hundreds of metres to a few km | (not sourced) | up to +337 m and -106 m, 43,920 cells, land median +1.2 m, identical in `x1` and `x4` (the relief share lowered to 0.25 with the scale) | x1, x4 |
 
 ## Simplifications and limits
 
