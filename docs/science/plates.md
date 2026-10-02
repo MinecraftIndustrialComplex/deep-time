@@ -17,7 +17,8 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
 | [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208 (23) |
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221 (40) |
-| [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-202 (29) |
+| [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
+| [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
 
 Rows by status: `verified` 2, `cited-unverified` 51, `from-memory` 8, `abstract-only` 22, `calibrated` 19, `game-choice` 66, `uncited` 53; `pending-rewrite` 183; `not-yet-coded` 29.
 
@@ -31,6 +32,7 @@ Rows by status: `verified` 2, `cited-unverified` 51, `from-memory` 8, `abstract-
 ## Known before the page is written
 
 - The accuracy review calls today's model "a convincing cartoon of plate tectonics, not yet an accurate simulation": no Wilson cycle (rifted pieces weld back after a median 18 Myr), one plate over half the planet in about half of all frames, collisions that raise round blobs in one step.
+- The force balance is computed and recorded every step since 2026-10-02, not yet applied: [plate-forces.md](plate-forces.md). Its task read Forsyth & Uyeda 1975 in full, which does state the factor of about 8 for drag under continents (an inverse-fit result; PLT-188), and Conrad & Lithgow-Bertelloni 2006, whose 2-5 (about 3 on average) the code uses.
 - The force-balance design could not confirm three figures: the gross size of slab pull (from textbook examples, not found in Turcotte & Schubert itself), a factor of 8 for continental drag attributed to Forsyth & Uyeda, and the wedge-taper reference (Davis, Suppe & Dahlen 1983, cited from memory).
 
 ## Plate-check: boundary mix and arc heights

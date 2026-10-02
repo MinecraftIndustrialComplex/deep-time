@@ -242,7 +242,7 @@ impl PlateForces {
     /// Share of the driving torque that is slab pull (by size: pull over the sum of the sizes of
     /// pull, suction, edge energy and the mantle flow; `None` with no driving torque).
     pub fn pull_share(&self) -> Option<f64> {
-        let driving = self.slab_pull + self.slab_suction + self.edge_energy + self.mantle_flow;
+        let driving = self.slab_pull + self.slab_suction + self.edge_energy + self.mantle_flow; // ledger: FRC-023
         (driving > 0.0).then(|| self.slab_pull / driving)
     }
 }
