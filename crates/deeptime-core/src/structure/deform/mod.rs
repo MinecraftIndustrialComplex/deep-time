@@ -447,6 +447,8 @@ pub fn report(
             "points": check.points,
             "worst": check.worst,
             "side_flips": check.side_flips,
+            "max_history": check.max_history,
+            "long_histories": check.long_histories,
             "events_per_point": check.events_per_point,
         },
         // Wall-clock numbers: the stage moves them into the note's `millis`, the one part of a
