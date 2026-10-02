@@ -13,7 +13,7 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 
 ## Counts
 
-2,205 active rows in 28 ledgers. The ledgers hold 2,398 ids: stage 1 left 2,069 rows; stage 2 package WP-0
+2,209 active rows in 28 ledgers (P1-10 added PRV-028 to PRV-031 and re-marked PRV rows, 2026-10-02). The ledgers hold 2,398 ids: stage 1 left 2,069 rows; stage 2 package WP-0
 (2026-10-02) retired 193 of them as duplicates (`merged`, not counted) and added 301 rows for code stage 1
 had not covered (51 in GEO, 74 in PRS, 84 in HNT, 35 in CRE, 57 in CHK). The flexure feature (ISO-040 to
 ISO-067, added to master the same day by its own agent) is included.
@@ -39,7 +39,7 @@ ISO-067, added to master the same day by its own agent) is included.
 | [DEF](ledger/DEF.md) | folds, faults, intrusions | 74 | 0 | 16 | 0 | 0 | 0 | 54 | 4 | 0 | 0 | 0 |
 | [DEP](ledger/DEP.md) | deposit models, counts, sizes | 164 | 0 | 74 | 0 | 15 | 0 | 49 | 26 | 0 | 0 | 40 |
 | [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 182 | 0 | 59 | 2 | 10 | 0 | 40 | 71 | 0 | 0 | 75 |
-| [PRV](ledger/PRV.md) | geologic provinces | 27 | 0 | 5 | 0 | 0 | 4 | 6 | 12 | 0 | 0 | 0 |
+| [PRV](ledger/PRV.md) | geologic provinces | 31 | 0 | 0 | 0 | 5 | 4 | 10 | 12 | 0 | 0 | 0 |
 | [SCL](ledger/SCL.md) | world scale, planet constants | 50 | 0 | 6 | 0 | 0 | 1 | 37 | 6 | 0 | 0 | 1 |
 | [BAK](ledger/BAK.md) | the bake, satellite view | 40 | 0 | 0 | 0 | 0 | 1 | 34 | 5 | 0 | 0 | 0 |
 | [POL](ledger/POL.md) | the pole cap | 21 | 0 | 0 | 0 | 0 | 0 | 18 | 3 | 0 | 0 | 0 |
@@ -48,7 +48,7 @@ ISO-067, added to master the same day by its own agent) is included.
 | [HNT](ledger/HNT.md) | editor hint texts | 84 | 10 | 13 | 2 | 2 | 6 | 34 | 17 | 0 | 0 | 0 |
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
 | [CHK](ledger/CHK.md) | plate-check target ranges | 57 | 0 | 10 | 2 | 7 | 0 | 9 | 29 | 3 | 4 | 0 |
-| **all** | | **2,205** | **3** | **508** | **57** | **65** | **76** | **815** | **681** | **359** | **62** | **193** |
+| **all** | | **2,209** | **3** | **503** | **57** | **70** | **76** | **819** | **681** | **359** | **62** | **193** |
 
 3 rows are `verified`: ISO-041, ISO-042 and ISO-048, read in their sources by the flexure agent. In plain terms,
 of the 2,205 active rows: 815 (37 %) are deliberate game or implementation choices; 681 (31 %) state something about
