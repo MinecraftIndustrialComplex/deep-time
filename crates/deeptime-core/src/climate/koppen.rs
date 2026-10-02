@@ -278,7 +278,9 @@ mod tests {
         // Peel et al. 2007: "the B climates must be identified first". A cold plateau whose
         // warmest month is 8 degC and whose year gives 72 mm is dry by Table 1: MAT 1.9 degC, rain
         // spread evenly, P_threshold = 2 MAT + 14 = 17.8 mm, 10 x that is 178 mm, 5 x that 89 mm.
-        let t = [-4.0, -3.0, -1.0, 2.0, 5.0, 7.5, 8.0, 7.0, 4.0, 1.0, -2.0, -3.5];
+        let t = [
+            -4.0, -3.0, -1.0, 2.0, 5.0, 7.5, 8.0, 7.0, 4.0, 1.0, -2.0, -3.5,
+        ];
         assert!(t.iter().cloned().fold(f64::MIN, f64::max) < 10.0);
         assert_eq!(code(t, [6.0; 12]), "BWk");
         // 150 mm is between 89 and 178 mm: steppe.
@@ -292,12 +294,12 @@ mod tests {
         // Peel et al. 2007, Table 1 note: Tmon10 is "the number of months where the temperature
         // is above 10". Four months at exactly 10 degC (and the rest colder) are none above 10:
         // Cfc, not Cfb. Four months a hair over are Cfb.
-        let mut t = [4.0, 4.0, 5.0, 8.0, 10.0, 10.0, 10.0, 10.0, 8.0, 6.0, 4.0, 4.0];
+        let mut t = [
+            4.0, 4.0, 5.0, 8.0, 10.0, 10.0, 10.0, 10.0, 8.0, 6.0, 4.0, 4.0,
+        ];
         let p = [60.0; 12];
         assert_eq!(code(t, p), "Cfc");
-        for m in 4..8 {
-            t[m] = 10.01;
-        }
+        t[4..8].fill(10.01);
         assert_eq!(code(t, p), "Cfb");
     }
 
