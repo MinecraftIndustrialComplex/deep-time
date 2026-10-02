@@ -9,7 +9,7 @@
 //!
 //! **Deep time** (decisions log 2026-09-29): a long-term carbon cycle and a brightening star
 //! (`carbon.rs`) set the EBM's greenhouse and sunlight; a fine clock (`clock.rs`) advances the
-//! carbon, the EBM and the ice every 100 kyr inside each plate step, so snowball Earths can start
+//! carbon, the EBM and the ice every 200 kyr inside each plate step, so snowball Earths can start
 //! and end on their own (events `deeptime:snowball`, `deeptime:hothouse`); the last 3 Myr run
 //! Milankovitch forcing (`orbit.rs`) with lagged ice sheets; the land ice has a thickness and a
 //! volume that lowers the sea (`ice.rs`), which the surface stage takes as its sea level.
@@ -53,6 +53,7 @@ pub mod lapse;
 pub mod orbit;
 pub mod orographic;
 pub mod params;
+pub mod sheet;
 pub mod snapshot;
 
 #[cfg(test)]
@@ -66,7 +67,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-pub use params::ClimateParams;
+pub use params::{ClimateParams, PresentClimate};
 
 use crate::deposits::fields::{cell_area_km2, lat_of_row};
 use crate::error::CoreError;
@@ -141,6 +142,10 @@ pub mod field {
     pub const ICE_TIME_SHARE: &str = "climate/ice_time_share";
     /// Annual-mean sea-ice cover of the sea, 0–1 (0 on land).
     pub const SEA_ICE: &str = "climate/sea_ice";
+    /// Surface mass balance of the land ice at the end of the step, m of ice per year: positive
+    /// where snow builds it (above the equilibrium line, at most what the precipitation allows),
+    /// negative where it melts (below the line: the meltwater's source); 0 off the ice.
+    pub const ICE_BALANCE: &str = "climate/ice_balance_m_yr";
 }
 
 /// The ice fields the surface stage's field history records as frame means.
@@ -152,7 +157,7 @@ pub mod history {
 }
 
 /// Bytes the stage holds per L1 cell (`estimate`).
-const BYTES_PER_CELL: u64 = 150 + 96;
+const BYTES_PER_CELL: u64 = 154 + 96;
 
 /// Keyframe layers (with the group's plates and surface layers).
 pub const KEYFRAME_LAYERS: [&str; 5] = [
@@ -169,6 +174,9 @@ pub const HOTHOUSE: &str = "deeptime:hothouse";
 
 /// Ice thinner than this is no ice, m.
 pub const ICE_MIN_M: f32 = 1.0;
+/// How far an interglacial's warm summers lift the equilibrium line above its mean, m (about
+/// 2 °C of summer warmth; Earth's early Holocene), in the deep-time sheet's relaxation.
+pub const INTERGLACIAL_RISE_M: f32 = 300.0;
 
 /// What the stage keeps between steps (and in a checkpoint taken inside the group).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -192,6 +200,52 @@ struct Saved {
     subduction_km2_yr: Option<f64>,
     /// Drawdown carbonate laid on the sea floor over the run, m.
     cap_carbonate_m: f64,
+    /// The ice sheet's coarse state (thickness, bed depression) inside the ice-age window.
+    sheet: sheet::State,
+    /// What `present_climate` did at the end of the run.
+    present: Option<Present>,
+}
+
+/// What `present_climate` did: the CO₂ factor it settled on and the state with and without it.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+struct Present {
+    ln_factor: f64,
+    /// Whether the state asked for was reached (an ice age only reachable as a snowball, or a
+    /// state beyond a factor of 10⁴, is not).
+    reached: bool,
+    trials: u32,
+    natural_land_ice: f64,
+    natural_sea_ice: f64,
+    natural_snowball: bool,
+    land_ice: f64,
+    sea_ice: f64,
+}
+
+/// The ice a clock run carries from step to step inside one plate step.
+#[derive(Clone)]
+struct IceRun {
+    /// Thickness now, the step's maximum, and the time each cell spent under ice, kyr.
+    hs: Vec<f32>,
+    hmax: Vec<f32>,
+    share_acc: Vec<f32>,
+    /// The equilibrium glaciers of the fine ground and the kyr since they were computed.
+    heq: Vec<f32>,
+    since_eq: f64,
+    sheet: sheet::State,
+    /// (land ice share, volume) of every window step.
+    rows: Vec<(f64, f64)>,
+}
+
+/// One run of the last stretch under a CO₂ factor (`present_climate`).
+struct Trial {
+    ln_factor: f64,
+    land_ice: f64,
+    sea_ice: f64,
+    snowball: bool,
+    clock: ClockState,
+    ebm: EbmState,
+    ir: IceRun,
+    out: clock::Output,
 }
 
 /// The climate stage.
@@ -378,10 +432,13 @@ fn kernel_of(
     precip: &[f32],
     er: &EbmResult,
     p: &ClimateParams,
+    erosion: Option<&[f32]>,
 ) -> carbon::Kernel {
     let k_t = p.weathering_temp_per_k;
     let warming = er.t_global - p.hydro_ref_c;
     let mut band = vec![0.0; g.bands];
+    let mut supply = vec![0.0; g.bands];
+    let limited = p.weathering_supply && erosion.is_some();
     for j in 0..g.h {
         let b = g.band[j];
         for i in 0..g.w {
@@ -394,11 +451,20 @@ fn kernel_of(
             let pet = (60.0 * (t - warming)).max(0.0);
             let runoff = (pr - crate::surface::climate::fu_et(pr, pet)).max(0.0) / 1000.0;
             band[b] += carbon::cell_kernel(g.area[j], runoff, t, k_t);
+            if let (true, Some(e)) = (limited, erosion) {
+                supply[b] += carbon::cell_supply(
+                    g.area[j],
+                    f64::from(e[c]).max(0.0),
+                    p.weathering_min_denudation_m_myr,
+                    p.weathering_rock_mol_kg,
+                ) * p.weathering_supply_scale;
+            }
         }
     }
     carbon::Kernel {
         band,
         ref_t_land: clock::land_temps(er).0,
+        supply: if limited { supply } else { Vec::new() },
     }
 }
 
@@ -447,7 +513,7 @@ impl ClimateStage {
     /// CO₂ now, ppm.
     fn ppm(&self) -> f64 {
         if self.s.clock.started {
-            self.s.clock.carbon.ppm()
+            self.s.clock.ppm()
         } else if self.p.initial_co2_ppm > 0.0 {
             self.p.initial_co2_ppm
         } else {
@@ -707,7 +773,8 @@ impl ClimateStage {
             let s0 = snapshot::compute(&inp, &mut ebm0, &[]);
             let er0 = s0.ebm.clone().expect("a snapshot keeps its EBM year");
             let (mean0, summer0) = clock::land_temps(&er0);
-            self.s.clock.kernel = kernel_of(&geo, &land0, &s0.t_mean, &s0.precip, &er0, &p);
+            // No erosion yet: the first step weathers without a supply limit.
+            self.s.clock.kernel = kernel_of(&geo, &land0, &s0.t_mean, &s0.precip, &er0, &p, None);
             self.s.clock.snap_summer = summer0;
             self.s.clock.snap_t_global = er0.t_global;
             self.s.clock.sheet = s0.band_sheet.clone();
@@ -725,6 +792,7 @@ impl ClimateStage {
                     &self.s.clock.sheet,
                     &self.s.clock.kernel,
                     degassing,
+                    activity.ridge_km2_yr / carbon::RIDGE_EARTH_KM2_YR,
                 );
                 self.s.ebm = state;
                 ppm
@@ -753,71 +821,276 @@ impl ClimateStage {
         let window_step = clock::in_window(&p, t1);
         // The lagged ice sheets of the window: their thickness, the window's maximum, and the time
         // each cell spent under ice this step.
-        let mut hs: Vec<f32> = ice_prev.clone().unwrap_or_else(|| vec![0.0; n]);
-        let mut hmax: Vec<f32> = if clock::in_window(&p, t0) {
+        let hs: Vec<f32> = ice_prev.clone().unwrap_or_else(|| vec![0.0; n]);
+        let hmax: Vec<f32> = if clock::in_window(&p, t0) {
             ice_max_prev.clone().unwrap_or_else(|| hs.clone())
         } else {
             hs.clone()
         };
-        let mut share_acc = vec![0.0f32; n];
-        let mut heq: Vec<f32> = vec![0.0; n];
-        let mut since_eq = f64::MAX;
-        let mut window_rows: Vec<(f64, f64)> = Vec::new(); // (land ice share, volume) per step
+        // The ice-sheet dynamics' coarse grid and what drives it: the bed (without the ice),
+        // each coarse cell's snapshot equilibrium line and its precipitation.
+        let dyn_ice = p.ice_dynamics;
+        let sg = sheet::Grid::new(w, hgt, &geo.sx, geo.sy, p.ice_grid_cells as usize);
+        let sp = sheet::Params::from(&p);
+        let coarse_band: Vec<usize> = (0..sg.h)
+            .map(|cj| geo.band[(cj * sg.k + sg.k / 2).min(hgt - 1)])
+            .collect();
+        let precip_prev: Vec<f32> = world
+            .fields
+            .get(field::PRECIP)
+            .filter(|f| f.data.len() == n)
+            .map_or_else(|| vec![500.0; n], |f| f.data.clone())
+            .iter()
+            .map(|&x| x / 1000.0)
+            .collect();
+        let bed_fine = |sea: f64| -> Vec<f32> { h.iter().map(|&z| (z - sea) as f32).collect() };
+        let bed0_c = sg.coarsen(&bed_fine(sea_prev), &|_| true);
+        let ela0_c = sg.coarsen(&ela0, &|c| land0[c]);
+        let precip0_c = sg.coarsen(&precip_prev, &|c| land0[c]);
+        if dyn_ice
+            && window_step
+            && (!clock::in_window(&p, t0) || self.s.sheet.thick.len() != sg.w * sg.h)
+        {
+            // The window begins: the sheet starts from the ice the plates carried here.
+            let start = sg.coarsen(&hs, &|_| true);
+            self.s.sheet = sheet::State::settled(start);
+        }
+        let mut ir = IceRun {
+            hs,
+            hmax,
+            share_acc: vec![0.0f32; n],
+            heq: vec![0.0; n],
+            since_eq: f64::MAX,
+            sheet: std::mem::take(&mut self.s.sheet),
+            rows: Vec::new(),
+        };
         let land0_km2 = geo.area_where(&|c| land0[c]);
         let dynamic = p.carbon_cycle || p.solar_brightening || window_step;
         let out = if dynamic {
-            let cin = clock::Input {
+            let band_lat: Vec<f64> = (0..bands)
+                .map(|b| -90.0 + (b as f64 + 0.5) * 180.0 / bands as f64)
+                .collect();
+            let (tilt_deg, star_flux_rel) = (
+                self.preset.planet.axial_tilt_deg,
+                self.preset.planet.star_flux_rel,
+            );
+            let ridge_rel = activity.ridge_km2_yr / carbon::RIDGE_EARTH_KM2_YR;
+            let cin = |a: f64, b: f64, nudge: Option<clock::Nudge>| clock::Input {
                 p: &p,
-                tilt_deg: self.preset.planet.axial_tilt_deg,
-                star_flux_rel: self.preset.planet.star_flux_rel,
-                t0,
-                t1,
+                tilt_deg,
+                star_flux_rel,
+                t0: a,
+                t1: b,
                 land_frac: &land_frac0,
-                band_lat: &(0..bands)
-                    .map(|b| -90.0 + (b as f64 + 0.5) * 180.0 / bands as f64)
-                    .collect::<Vec<_>>(),
+                band_lat: &band_lat,
                 degassing,
+                ridge_rel,
+                nudge,
             };
-            let mut ice_cb = |s: &clock::IceStep<'_>| -> Vec<f64> {
+            let ice_step = |ir: &mut IceRun, s: &clock::IceStep<'_>| -> Vec<f64> {
                 if !s.in_window {
                     return margins.shares(s.delta);
                 }
                 // Equilibrium ice for this orbit (refreshed every ~5 kyr), then Imbrie's lag.
-                since_eq += s.dt_kyr;
-                if since_eq >= 5.0 - 1e-9 {
+                ir.since_eq += s.dt_kyr;
+                if ir.since_eq >= 5.0 - 1e-9 {
                     let mask: Vec<bool> = (0..n)
                         .map(|c| {
                             mu0[c].is_finite() && f64::from(mu0[c]) > s.delta[geo.cell_band(c)]
                         })
                         .collect();
-                    heq = ice::thickness(w, hgt, &mask, &geo.sx, geo.sy, tau, cap);
-                    since_eq = 0.0;
+                    ir.heq = ice::thickness(w, hgt, &mask, &geo.sx, geo.sy, tau, cap);
+                    ir.since_eq = 0.0;
                 }
                 let dtk = s.dt_kyr as f32;
-                hs.par_iter_mut()
-                    .zip(hmax.par_iter_mut())
-                    .zip(share_acc.par_iter_mut())
-                    .zip(heq.par_iter())
-                    .enumerate()
-                    .for_each(|(c, (((hh, hm), sa), &e))| {
-                        let e = if land0[c] { e } else { 0.0 };
-                        let mut x =
-                            ice::relax(f64::from(*hh), f64::from(e), s.dt_kyr, p.ice_response_kyr)
-                                as f32;
-                        if x < ICE_MIN_M && e < ICE_MIN_M {
-                            x = 0.0;
-                        }
-                        *hh = x;
-                        *hm = hm.max(x);
-                        if x >= ICE_MIN_M {
-                            *sa += dtk;
-                        }
-                    });
-                let (sheet, ice_a, vol) = geo.ice_stats(&hs, &land0);
-                window_rows.push((ice_a / land0_km2.max(1e-9), vol));
+                if dyn_ice {
+                    // The sheet flows under this step's line; the ice is the sheet's, and the
+                    // equilibrium glaciers of the fine ground wherever they are thicker (valley and
+                    // plateau ice the coarse grid cannot see).
+                    let ela_c: Vec<f32> = (0..sg.w * sg.h)
+                        .map(|cc| ela0_c[cc] + s.delta[coarse_band[cc / sg.w]] as f32)
+                        .collect();
+                    let forcing = sheet::Forcing {
+                        bed: &bed0_c,
+                        ela: &ela_c,
+                        precip: &precip0_c,
+                    };
+                    ir.sheet.step(&sg, &forcing, &sp, s.dt_kyr * 1000.0);
+                    let fine = sg.refine(&ir.sheet.thick);
+                    ir.hs
+                        .par_iter_mut()
+                        .zip(ir.hmax.par_iter_mut())
+                        .zip(ir.share_acc.par_iter_mut())
+                        .zip(ir.heq.par_iter().zip(fine.par_iter()))
+                        .enumerate()
+                        .for_each(|(c, (((hh, hm), sa), (&e, &sh)))| {
+                            let x = if land0[c] {
+                                let x = e.max(sh);
+                                if x >= ICE_MIN_M { x } else { 0.0 }
+                            } else {
+                                0.0
+                            };
+                            *hh = x;
+                            *hm = hm.max(x);
+                            if x >= ICE_MIN_M {
+                                *sa += dtk;
+                            }
+                        });
+                } else {
+                    ir.hs
+                        .par_iter_mut()
+                        .zip(ir.hmax.par_iter_mut())
+                        .zip(ir.share_acc.par_iter_mut())
+                        .zip(ir.heq.par_iter())
+                        .enumerate()
+                        .for_each(|(c, (((hh, hm), sa), &e))| {
+                            let e = if land0[c] { e } else { 0.0 };
+                            let mut x = ice::relax(
+                                f64::from(*hh),
+                                f64::from(e),
+                                s.dt_kyr,
+                                p.ice_response_kyr,
+                            ) as f32;
+                            if x < ICE_MIN_M && e < ICE_MIN_M {
+                                x = 0.0;
+                            }
+                            *hh = x;
+                            *hm = hm.max(x);
+                            if x >= ICE_MIN_M {
+                                *sa += dtk;
+                            }
+                        });
+                }
+                let (sheet, ice_a, vol) = geo.ice_stats(&ir.hs, &land0);
+                ir.rows.push((ice_a / land0_km2.max(1e-9), vol));
                 sheet
             };
-            clock::run(&cin, &mut self.s.clock, &mut self.s.ebm, &mut ice_cb)
+            // The present (`present_climate`): the run's last stretch again under the smallest
+            // CO₂ factor that ends in the state asked for. Everything before it is untouched.
+            let mode = p.present_climate;
+            let t_adj = (t1 - p.present_adjust_kyr * 1.0e3).max(t0);
+            if last && mode != PresentClimate::Natural {
+                let started = Instant::now();
+                let first = (t_adj > t0 + 1.0).then(|| {
+                    clock::run(
+                        &cin(t0, t_adj, None),
+                        &mut self.s.clock,
+                        &mut self.s.ebm,
+                        &mut |s| ice_step(&mut ir, s),
+                    )
+                });
+                let saved = (self.s.clock.clone(), self.s.ebm.clone(), ir.clone());
+                // One trial: the stretch under ln(factor) `x`; its land-ice share and snowball.
+                let trial = |x: f64| -> Trial {
+                    let (mut c, mut e, mut i) = saved.clone();
+                    let nudge = (x != 0.0).then_some(clock::Nudge {
+                        t_start: t_adj,
+                        ramp_years: p.present_ramp_kyr * 1.0e3,
+                        ln_factor: x,
+                    });
+                    let out = clock::run(&cin(t_adj, t1, nudge), &mut c, &mut e, &mut |s| {
+                        ice_step(&mut i, s)
+                    });
+                    let (mut ice, mut all) = (0.0, 0.0);
+                    for (b, lat) in band_lat.iter().enumerate() {
+                        let a = land_frac0[b] * lat.to_radians().cos();
+                        ice += a * c.sheet.get(b).copied().unwrap_or(0.0);
+                        all += a;
+                    }
+                    Trial {
+                        ln_factor: x,
+                        land_ice: if all > 0.0 { ice / all } else { 0.0 },
+                        sea_ice: c.sea_ice,
+                        snowball: c.snowball.is_some(),
+                        clock: c,
+                        ebm: e,
+                        ir: i,
+                        out,
+                    }
+                };
+                let reach = |t: &Trial| -> bool {
+                    match mode {
+                        PresentClimate::Temperate => {
+                            !t.snowball && t.land_ice <= p.present_interglacial_ice_frac
+                        }
+                        PresentClimate::IceAge => {
+                            t.snowball || t.land_ice >= p.present_glacial_ice_frac
+                        }
+                        PresentClimate::Snowball => t.snowball,
+                        PresentClimate::Natural => true,
+                    }
+                };
+                let dir = if mode == PresentClimate::Temperate {
+                    1.0
+                } else {
+                    -1.0
+                };
+                let natural = trial(0.0);
+                let (nat_ice, nat_sea, nat_snow) =
+                    (natural.land_ice, natural.sea_ice, natural.snowball);
+                let mut trials = 1u32;
+                let mut reached = reach(&natural);
+                let mut chosen = natural;
+                if !reached {
+                    // Bracket (a factor of 1.4 … 10⁴), then halve the bracket four times.
+                    let mut lo = 0.0;
+                    let mut best: Option<Trial> = None;
+                    for m in [0.35, 0.7, 1.4, 2.8, 5.6, 9.2] {
+                        let t = trial(dir * m);
+                        trials += 1;
+                        if reach(&t) {
+                            best = Some(t);
+                            break;
+                        }
+                        lo = m;
+                        chosen = t;
+                    }
+                    if let Some(mut b) = best {
+                        for _ in 0..4 {
+                            let mid = 0.5 * (lo + b.ln_factor.abs());
+                            let t = trial(dir * mid);
+                            trials += 1;
+                            if reach(&t) {
+                                b = t;
+                            } else {
+                                lo = mid;
+                                chosen = t;
+                            }
+                        }
+                        // An ice age that could only be had as a snowball stays short of it.
+                        // (`chosen` is then the coldest trial without one.)
+                        if !(mode == PresentClimate::IceAge && b.snowball) {
+                            reached = true;
+                            chosen = b;
+                        }
+                    }
+                }
+                self.s.present = Some(Present {
+                    ln_factor: chosen.ln_factor,
+                    reached,
+                    trials,
+                    natural_land_ice: nat_ice,
+                    natural_sea_ice: nat_sea,
+                    natural_snowball: nat_snow,
+                    land_ice: chosen.land_ice,
+                    sea_ice: chosen.sea_ice,
+                });
+                self.s.clock = chosen.clock;
+                self.s.ebm = chosen.ebm;
+                ir = chosen.ir;
+                self.time("present", started);
+                match first {
+                    Some(f) => f.then(chosen.out),
+                    None => chosen.out,
+                }
+            } else {
+                clock::run(
+                    &cin(t0, t1, None),
+                    &mut self.s.clock,
+                    &mut self.s.ebm,
+                    &mut |s| ice_step(&mut ir, s),
+                )
+            }
         } else {
             clock::Output {
                 last: None,
@@ -832,6 +1105,15 @@ impl ClimateStage {
                 carbonate_excess_mol: 0.0,
             }
         };
+        let IceRun {
+            hs,
+            hmax,
+            share_acc,
+            sheet: sheet_state,
+            rows: window_rows,
+            ..
+        } = ir;
+        self.s.sheet = sheet_state;
         // The window's curve gets the ice the callback measured.
         if window_step {
             let rows = self.s.clock.window.len();
@@ -852,6 +1134,13 @@ impl ClimateStage {
         let mut mask_pre: Vec<bool> = Vec::new();
         let ice_end_pre: Vec<f32> = if window_step {
             hs.clone()
+        } else if dyn_ice {
+            // The sheet's ice of the last step (carried with the plates): the sea level lags a
+            // plate step in deep time.
+            hs.iter()
+                .enumerate()
+                .map(|(c, &x)| if land0[c] { x } else { 0.0 })
+                .collect()
         } else {
             mask_pre = (0..n)
                 .map(|c| mu0[c].is_finite() && f64::from(mu0[c]) > delta_end[geo.cell_band(c)])
@@ -1081,19 +1370,61 @@ impl ClimateStage {
             } else {
                 ice::thickness(w, hgt, &max_mask, &geo.sx, geo.sy, tau, cap)
             };
-            (
-                end,
-                max,
-                (0..n)
-                    .map(|c| {
-                        if land[c] {
-                            per_band[geo.cell_band(c)].share(mu[c]) as f32
-                        } else {
-                            0.0
-                        }
-                    })
-                    .collect(),
-            )
+            let mut share: Vec<f32> = (0..n)
+                .map(|c| {
+                    if land[c] {
+                        per_band[geo.cell_band(c)].share(mu[c]) as f32
+                    } else {
+                        0.0
+                    }
+                })
+                .collect();
+            let (mut end, mut max) = (end, max);
+            if dyn_ice && p.ice_relax_kyr > 0.0 {
+                // The sheet runs `ice_relax_kyr` under the step's end line from the ice the
+                // plates carried, on the final ground and sea: its flow and elevation feedback
+                // spread the ice beyond the equilibrium glaciers.
+                let bed_c = sg.coarsen(&bed_fine(sea), &|_| true);
+                let ela_c: Vec<f32> = sg
+                    .coarsen(&ela_all, &|c| land[c])
+                    .iter()
+                    .enumerate()
+                    .map(|(cc, &e)| e + d_end[coarse_band[cc / sg.w]] as f32)
+                    .collect();
+                let mut st = sheet::State::settled(sg.coarsen(&hs, &|_| true));
+                // A sheet outlives the line that grew it (on Earth's relief 16 % of the land
+                // stays under ice at today's line after a glacial, against 11 % from bare
+                // ground), and in deep time nothing would ever melt it back: the ice would only
+                // ratchet up from plate step to plate step. So the first third of the run stands
+                // for an interglacial's warm summers, the line `INTERGLACIAL_RISE_M` higher (as
+                // the orbit does every cycle), and the rest runs at the step's line.
+                let warm: Vec<f32> = ela_c.iter().map(|e| e + INTERGLACIAL_RISE_M).collect();
+                st.step(
+                    &sg,
+                    &sheet::Forcing {
+                        bed: &bed_c,
+                        ela: &warm,
+                        precip: &precip0_c,
+                    },
+                    &sp,
+                    p.ice_relax_kyr * 1000.0 / 3.0,
+                );
+                let forcing = sheet::Forcing {
+                    bed: &bed_c,
+                    ela: &ela_c,
+                    precip: &precip0_c,
+                };
+                st.step(&sg, &forcing, &sp, p.ice_relax_kyr * 1000.0 * 2.0 / 3.0);
+                let fine = sg.refine(&st.thick);
+                for c in 0..n {
+                    if land[c] && fine[c] >= ICE_MIN_M {
+                        end[c] = end[c].max(fine[c]);
+                        max[c] = max[c].max(fine[c]);
+                        share[c] = 1.0;
+                    }
+                }
+            }
+            (end, max, share)
         };
         let glacier: Vec<bool> = thick.iter().map(|&x| x >= ICE_MIN_M).collect();
         let ela_pub: Vec<f32> = (0..n)
@@ -1129,6 +1460,29 @@ impl ClimateStage {
         self.s.ice_volume_km3 = volume;
         self.s.land_ice_frac = ice_cover.frac();
         self.s.sea_level_m = Some(sea);
+        // The ice's surface mass balance (for the hydrology: no runoff under the ice, meltwater
+        // where the balance is negative): the sheet's law on the ice surface against the line.
+        let precip_m: Option<Vec<f32>> = world
+            .fields
+            .get(field::PRECIP)
+            .filter(|f| f.data.len() == n)
+            .map(|f| f.data.clone());
+        let balance: Vec<f32> = (0..n)
+            .map(|c| {
+                if !glacier[c] {
+                    return 0.0;
+                }
+                let above = h[c] - sea + f64::from(thick[c]) - f64::from(ela_pub[c]);
+                let pr = precip_m.as_ref().map_or(0.5, |v| f64::from(v[c]) / 1000.0);
+                if above >= 0.0 {
+                    (p.ice_accumulation_gradient * above)
+                        .min(p.ice_accumulation_max_m_yr * pr.max(0.0)) as f32
+                } else {
+                    (p.ice_ablation_gradient * above) as f32
+                }
+            })
+            .collect();
+        put(world, field::ICE_BALANCE, balance);
         put(world, field::ELA_ALL, ela_all);
         put(world, field::ELA, ela_pub);
         put(
@@ -1164,7 +1518,13 @@ impl ClimateStage {
         if let Some(er) = &er_end {
             let t_mean = &world.fields[field::T_MEAN].data;
             let precip = &world.fields[field::PRECIP].data;
-            self.s.clock.kernel = kernel_of(&geo, &land, t_mean, precip, er, &p);
+            // The surface's erosion of its last step (the rock it exposed) limits the supply.
+            let erosion = world
+                .fields
+                .get(crate::surface::field::EROSION)
+                .filter(|f| f.data.len() == n)
+                .map(|f| f.data.as_slice());
+            self.s.clock.kernel = kernel_of(&geo, &land, t_mean, precip, er, &p, erosion);
             let warming = er.t_global - p.hydro_ref_c;
             let (mut ra, mut rs) = (0.0, 0.0);
             for c in 0..n {
@@ -1205,6 +1565,7 @@ impl ClimateStage {
             f32::from(u8::from(self.s.clock.snowball.is_some())),
             activity.ridge_km2_yr as f32,
             activity.subduction_km2_yr as f32,
+            carbon::Weathering::supply(&self.s.clock.kernel, &self.s.clock.sheet) as f32,
             (geo.area_where(&|c| land[c]) / geo.area.iter().map(|a| a * w as f64).sum::<f64>())
                 as f32,
             (self.s.clock.kernel.band.iter().sum::<f64>() / carbon::KERNEL_EARTH) as f32,
@@ -1247,6 +1608,14 @@ impl ClimateStage {
                 });
             }
         }
+        // Where `present_climate` moved the CO₂, the start of its stretch (a snowball it set off or
+        // ended says so).
+        let nudged = self
+            .s
+            .present
+            .as_ref()
+            .filter(|x| last && x.ln_factor != 0.0)
+            .map(|_| t_now - self.p.present_adjust_kyr * 1.0e3);
         for hp in all {
             match hp {
                 Happening::SnowballOnset => {}
@@ -1282,7 +1651,9 @@ impl ClimateStage {
                         .param("cap_carbonate_m", if ongoing { 0.0 } else { cap_m })
                         .param(
                             "onset_cause",
-                            if drawdown >= 1.5 {
+                            if nudged.is_some_and(|t| open.t_start >= t) {
+                                "present_setting"
+                            } else if drawdown >= 1.5 {
                                 "weathering_drawdown"
                             } else {
                                 "slow_cooling"
@@ -1292,6 +1663,8 @@ impl ClimateStage {
                             "escape_cause",
                             if ongoing {
                                 "none"
+                            } else if nudged.is_some_and(|t| t_end >= t) {
+                                "present_setting"
                             } else if rise >= 2.0 {
                                 "degassing_buildup"
                             } else {
@@ -1302,6 +1675,10 @@ impl ClimateStage {
                     let id = world.emit(e)?;
                     if !ongoing {
                         self.s.clock.last_escape = Some((t_end, Some(id)));
+                        self.s
+                            .clock
+                            .spans
+                            .push([open.t_start / 1.0e6, t_end / 1.0e6]);
                     }
                     if ongoing {
                         self.s.clock.snowball = None;
@@ -1379,7 +1756,22 @@ impl ClimateStage {
             "snapshots": self.s.snapshots,
             "glaciations": self.s.tracker.count,
             "snowballs": self.s.clock.snowballs,
+            "snowball_spans_myr": self.s.clock.spans,
             "hothouses": self.s.clock.hothouses,
+            "present": self.s.present.as_ref().map_or_else(
+                || json!({"state": PresentClimate::Natural.name(), "co2_factor": 1.0}),
+                |x| json!({
+                    "state": self.p.present_climate.name(),
+                    "co2_factor": x.ln_factor.exp(),
+                    "reached": x.reached,
+                    "trials": x.trials,
+                    "land_ice_frac": x.land_ice,
+                    "sea_ice_frac": x.sea_ice,
+                    "natural_land_ice_frac": x.natural_land_ice,
+                    "natural_sea_ice_frac": x.natural_sea_ice,
+                    "natural_snowball": x.natural_snowball,
+                }),
+            ),
             "last": last,
             "series": {"columns": clock::SERIES_COLUMNS, "rows": round(&self.s.clock.series)},
             "window": {"columns": clock::WINDOW_COLUMNS, "rows": round(&self.s.clock.window)},
