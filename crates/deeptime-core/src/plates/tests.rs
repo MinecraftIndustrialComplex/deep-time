@@ -1131,3 +1131,45 @@ fn resampling_conserves_continental_area() {
         );
     }
 }
+
+/// Island-arc crust turns continental by the arc crust it has built (`arc_maturity_myr` of arc
+/// magma), not by its height: a mature arc below the sea becomes continent, a young arc whose
+/// cones stand above it does not, and neither does a mature arc's crust hidden in a trench.
+/// (Until 2026-10-02 only arcs above sea level converted, so flexure, which bends arcs down,
+/// cut the continents' growth.)
+#[test]
+fn arcs_turn_continental_by_their_crust_not_their_height() {
+    let p = preset(6000, 20.0, "supercontinent", 3);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo) = init::initial_state(&p, &env).unwrap();
+    let k = &p.tectonics;
+    let mature = (k.arc_magma_m_per_myr * k.arc_maturity_myr) as f32;
+    assert!(mature > 0.0);
+    let oceanic: Vec<usize> = (0..st.samples.len())
+        .filter(|&i| st.samples[i].kind == OCEANIC)
+        .take(4)
+        .collect();
+    // (arc magma, elevation, hidden) and whether it should turn continental.
+    let cases = [
+        (mature * 1.05, -1800.0, false, true),
+        (mature * 0.5, 600.0, false, false),
+        (mature * 2.0, -3000.0, true, false),
+        (0.0, 300.0, false, false),
+    ];
+    for (&i, &(arc, z, hidden, _)) in oceanic.iter().zip(&cases) {
+        let s = &mut st.samples[i];
+        s.arc_oceanic_m = arc;
+        s.elevation_m = z;
+        s.flags = if hidden { state::HIDDEN } else { ARC };
+    }
+    let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+    finish_samples(&mut st, &geo, &z0, &env);
+    for (&i, &(arc, z, hidden, turns)) in oceanic.iter().zip(&cases) {
+        assert_eq!(
+            st.samples[i].kind == CONTINENTAL,
+            turns,
+            "arc magma {arc} m (mature at {mature} m), elevation {z} m, hidden {hidden}"
+        );
+    }
+}
