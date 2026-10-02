@@ -121,6 +121,47 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Housekeeping.** No simulation code changed. Scratch folder `/Volumes/Graphide/ban/deeptime-runs/plate-force-design/`
   deleted. Earth figures checked online by a Sonnet sub-agent; most papers were read from abstracts only.
 - **Next.** Ben's answers (pending questions); `plate-check` additions (design section 7) for the agent on task 1.
+### 2026-10-01 — `deeptime plate-check`: the plate dynamics record and its baseline (task 1 of the plate collisions and welding design; agent worktree agent-aa612c9a7664feba7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What.** Measurement only. The plates stage records `PlateState::dynamics` (`plates/dynamics.rs`), copied as JSON
+  into `notes.plates.dynamics` beside `margins` every 10 Myr and at the end (format in the module docs and
+  FORMAT.md): per step the plates (id, visible samples, continental samples, speed, slab front length, boundary
+  length), land, continental crust and collisions; every plate's parent, origin, death and fate (`sutured` = weld,
+  `absorbed`, `consumed` = subducted away) read from the plate events; one record per terrane transfer (contact
+  onset, counter, real shortening, peak uplift, footprints of ground lifted by 10 m / 100 m / from below the sea
+  to above it with length and width from second moments); the sea-floor age histogram every 10 Myr. `Contact`
+  gains `cont_in` (continental samples that went under; counted only while recording; no rule reads it).
+  `deeptime plate-check --run <checkpoint | world-data folder | manifest.json | note.json> [--run …] [--json out]
+  [--targets file]` prints measure, value, target, pass/fail, exits 1 when a ranged measure fails or has no data.
+  Ranges are `MEASURES` in `plates/check.rs` (the design's section 6 table), moved by a `{"key": [lo, hi]}` file.
+  `tools/review/plate-check.sh` runs an ensemble. `plate-dynamics-trace.patch`, `plate-dynamics.sh` and
+  `plate-dynamics.py` are removed.
+- **Not changed.** No plate, collision or surface rule. The test `recording_does_not_change_the_world_and_matches_the_run`
+  runs 300 Myr at 8,000 samples with and without the record and compares crust, elevation, plate ids, pools,
+  contacts, rng, events and fields bit for bit; it also checks the record against the run's counters and events.
+- **Baseline** (master fa09e8b + this; `earthlike_quick_16k`, supercontinent, 1000 Myr, seeds 1-4, `stage
+  volcanoes`, 2 threads, ~15 min each at VM load 13-21): docs/design/plate-check-baseline.md. 3 of 19 targets met
+  (FAILS as intended). It reproduces the design's "Now" column inside its stated ranges for every figure (largest
+  plate 0.58, 59 % of steps above half, life 45 Myr, rift-born alive 19 %, welded back 42 %, land gain 3.75 %,
+  collision belt 7,062 × 2,783 km, elongation 2.19, 10 collisions per 100 Myr, megaplate regrows in 17 Myr, active
+  margins 0.30, ocean p90 208-269); seed 1's real shortening 87.4 / 269 km is the design's 87 / 269.
+  Three readings to settle: continental crust "every step" (end values 0.38-0.45 agree with the design, the
+  highest step is 0.45-0.49), ocean age read at the end of the run, collision length (one step today).
+- **Cost.** Same 300 Myr run, with and without the record (`DEEPTIME_NO_PLATE_DYNAMICS=1`), two at a time on the VM
+  and again with the seeds swapped: CPU 413.7 vs 413.0 s and 471.2 vs 470.5 s, wall 255.3 vs 254.8 s and 294.0 vs
+  293.6 s: +0.15 %. The record is ~0.9 MB of JSON per 1000 Myr on the quick 16k planet (500 steps); it also goes
+  into the game's manifest.json, which could be trimmed there if loading it ever matters.
+- **Not cheaply available / approximations.** The active margin share is not per step: `margins` (every 10 Myr,
+  `stats::margins`) has it and `plate-check` reads it. Slab share of a plate's boundary is an estimate (front samples
+  × spacing over boundary samples × spacing). Passing the full speed-vs-slab judgement needs the force-balance
+  model; today slab-attached plates are 1.4× faster than the rest (Earth 3-4×).
+- **Noticed, left alone.** `subduction::resolve` adds relative speed, not the speed across the boundary, to
+  `depth_km` (the design's bug). Checkpoints of the 16k planet are 1.1 GB each. `tools/remote/detach.sh start` kept
+  the calling `mac.sh` waiting for ~10 minutes while the detached job ran fine (killed the local call, not the job).
+- **Gates** (VM): cargo fmt --check clean, clippy -D warnings clean, `cargo test --workspace` 562 passed / 0 failed /
+  3 ignored, `cargo deny check licenses bans` ok, `./gradlew build test` BUILD SUCCESSFUL, JUnit tests=199 failures=0
+  skipped=1. No GameTests (nothing the game reads changed except `notes.plates` in the manifest).
+- **Next.** Task 2 (real shortening and the collision state): keep `CollisionRec`'s fields' meanings (`start_myr` /
+  `end_myr`, `shortening_km`, `peak_uplift_m`, the footprints).
 ### 2026-10-01 — Plate collisions and welding: design (agent worktree agent-a4560e6e131ce6cbd, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; design only, nothing built)
 - **Why.** The run review (docs/research/notes/run-review-1a0f969d358.md) found three plate-stage faults: land
   popping up at collisions, no Wilson cycle, a mega-plate. Ben: "Design, then fix".
