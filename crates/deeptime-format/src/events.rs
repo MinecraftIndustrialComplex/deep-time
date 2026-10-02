@@ -994,9 +994,7 @@ impl EventLog {
 /// The grid cell (nearest point sample) at a latitude and longitude (the planet's projection,
 /// [`crate::projection`]: the seam is longitude 0°), x wrapped, z clamped.
 pub fn cell_of(grid: &GridDesc, lat: f32, lon: f32) -> (u32, u32) {
-    let (x, z) = grid
-        .projection()
-        .block_of(f64::from(lat), f64::from(lon));
+    let (x, z) = grid.projection().block_of(f64::from(lat), f64::from(lon));
     let r = f64::from(grid.r);
     let i = ((x - grid.origin_block_x as f64) / r).round() as i64;
     let j = ((z - grid.origin_block_z as f64) / r).round() as i64;

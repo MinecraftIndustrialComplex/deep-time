@@ -209,13 +209,20 @@ mod tests {
             assert_eq!(p.lat_deg(q), -90.0);
             assert_eq!(p.lat_deg(-2.0 * q), 90.0, "latitude clamps past the pole");
             assert_eq!(p.z_of_lat(45.0), -q / 2.0);
-            assert_eq!(p.lon_deg(-f64::from(c) / 2.0), 0.0, "the seam is longitude 0");
+            assert_eq!(
+                p.lon_deg(-f64::from(c) / 2.0),
+                0.0,
+                "the seam is longitude 0"
+            );
             assert_eq!(p.lon_deg(0.0), 180.0);
             assert_eq!(p.grid_origin_z(), -(i64::from(c) / 4));
             // True scale on the equator both ways.
             let ns = p.great_circle_blocks((0.0, 0.0), (0.0, 1.0));
             let ew = p.great_circle_blocks((0.0, 0.0), (1.0, 0.0));
-            assert!((ns - 1.0).abs() < 1e-6 && (ew - 1.0).abs() < 1e-6, "{ns} {ew}");
+            assert!(
+                (ns - 1.0).abs() < 1e-6 && (ew - 1.0).abs() < 1e-6,
+                "{ns} {ew}"
+            );
         }
     }
 

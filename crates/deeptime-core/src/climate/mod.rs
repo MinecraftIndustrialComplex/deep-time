@@ -571,7 +571,11 @@ impl ClimateStage {
                 })
                 .collect(),
             sx: (0..hgt)
-                .map(|j| grid.true_cell_m(j as u32, self.preset.scale.m_per_block_h).0 / es)
+                .map(|j| {
+                    grid.true_cell_m(j as u32, self.preset.scale.m_per_block_h)
+                        .0
+                        / es
+                })
                 .collect(),
             // The rows are evenly spaced on the sphere (equirectangular); a projection whose rows
             // are not makes this a per-row vector (docs/design/equal-area-projection.md §4).
