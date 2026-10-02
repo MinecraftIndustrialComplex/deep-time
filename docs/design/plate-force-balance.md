@@ -468,7 +468,9 @@ departs from the plan above and from the collisions design's task 2:
   19 % of a strike-slip speed as convergence: the Fibonacci lattice's normals lean one way.
 - **The front** is where continental crust of the subducting plate stands at the overriding
   plate's edge (within 1.75 spacings), not where it lies in the overlap: the overlap is consumed at
-  every resampling and comes back over a few steps. The state survives 3 steps with no front.
+  every resampling and comes back over a few steps. A state begins where the front converges at
+  10 mm/yr or more (the subduction-confirmation rate; from above zero the onset convergence was a
+  few mm/yr and the 20-Myr slowdown ratio a meaningless 3–8) and survives 3 steps with no front.
 - **The state** carries onset, last step, shortening, crust crossed (km²), convergence now, at
   onset, peak and 20 Myr after onset, front length and peak, centroid and outward normal, and the
   share of the front that is continental on the overriding side. It ends in a transfer or weld

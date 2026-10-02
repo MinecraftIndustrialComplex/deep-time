@@ -646,7 +646,7 @@ impl CollisionLives {
             assert!((col.onset_myr - col.last_myr) <= 1e-9 && col.last_myr <= st.t_myr + 1e-9);
             assert!(col.shortening_km >= 0.0 && col.area_km2 >= 0.0);
             assert!(
-                col.onset_convergence_mm_yr > 0.0,
+                col.onset_convergence_mm_yr >= shortening::BEGIN_MM_YR,
                 "a collision begins converging"
             );
             assert!(col.peak_convergence_mm_yr >= col.convergence_mm_yr);
