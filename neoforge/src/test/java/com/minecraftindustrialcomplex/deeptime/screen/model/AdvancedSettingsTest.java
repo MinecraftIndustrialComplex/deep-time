@@ -146,7 +146,8 @@ class AdvancedSettingsTest {
         assertEquals(List.of(EditorFields.Section.ADV_PLATES, EditorFields.Section.ADV_SURFACE, EditorFields.Section.ADV_CLIMATE,
                 EditorFields.Section.ADV_ROCKS, EditorFields.Section.ADV_VOLCANOES, EditorFields.Section.ADV_IMPACTS,
                 EditorFields.Section.ADV_DEPOSITS,
-                EditorFields.Section.ADV_BIOMES, EditorFields.Section.ADV_WATER, EditorFields.Section.ADV_UNDERGROUND), adv);
+                EditorFields.Section.ADV_BIOMES, EditorFields.Section.ADV_WATER, EditorFields.Section.ADV_UNDERGROUND,
+                EditorFields.Section.ADV_GEOTHERMAL), adv);
         assertEquals(Set.copyOf(adv), EditorFields.ADVANCED);
         boolean seen = false;
         for (EditorFields.Field f : EditorFields.ALL) {
