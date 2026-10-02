@@ -13,14 +13,15 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 
 ## Counts
 
-2,218 active rows in 28 ledgers (P1-10 added PRV-028 to PRV-031 and re-marked PRV rows, 2026-10-02). The ledgers hold 2,398 ids: stage 1 left 2,069 rows; stage 2 package WP-0
+2,247 active rows in 29 ledgers (P1-10 added PRV-028 to PRV-031 and re-marked PRV rows, 2026-10-02; the force balance, task 5 of the force-balance design, added the ledger FRC with 27 rows and CHK-058 and CHK-059, and rewrote PLT-181 to PLT-191, 2026-10-02). The ledgers hold 2,427 ids: stage 1 left 2,069 rows; stage 2 package WP-0
 (2026-10-02) retired 193 of them as duplicates (`merged`, not counted) and added 301 rows for code stage 1
 had not covered (51 in GEO, 74 in PRS, 84 in HNT, 35 in CRE, 57 in CHK). The flexure feature (ISO-040 to
 ISO-067, added to master the same day by its own agent) is included.
 
 | Ledger | Subject | Rows | `verified` | `cited-unverified` | `from-memory` | `abstract-only` | `calibrated` | `game-choice` | `uncited` | of which `pending-rewrite` | of which `not-yet-coded` | `merged` (not counted) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| [PLT](ledger/PLT.md) | plate tectonics | 201 | 2 | 45 | 8 | 22 | 11 | 62 | 51 | 163 | 29 | 20 |
+| [PLT](ledger/PLT.md) | plate tectonics | 201 | 4 | 45 | 8 | 18 | 11 | 65 | 50 | 163 | 19 | 20 |
+| [FRC](ledger/FRC.md) | plate forces (the force balance, recorded) | 27 | 3 | 0 | 10 | 1 | 0 | 13 | 0 | 0 | 0 | 0 |
 | [CLM](ledger/CLM.md) | climate physics | 134 | 0 | 40 | 5 | 0 | 13 | 21 | 55 | 106 | 28 | 12 |
 | [MOI](ledger/MOI.md) | moisture, winds, seasons | 70 | 0 | 17 | 0 | 0 | 0 | 8 | 45 | 70 | 0 | 6 |
 | [BIO](ledger/BIO.md) | Köppen classes and biomes | 99 | 0 | 24 | 0 | 0 | 1 | 66 | 8 | 0 | 0 | 0 |
@@ -47,15 +48,15 @@ ISO-067, added to master the same day by its own agent) is included.
 | [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 74 | 0 | 9 | 0 | 0 | 2 | 54 | 9 | 16 | 0 | 0 |
 | [HNT](ledger/HNT.md) | editor hint texts | 84 | 11 | 12 | 2 | 2 | 6 | 36 | 15 | 0 | 0 | 0 |
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
-| [CHK](ledger/CHK.md) | plate-check target ranges | 57 | 0 | 10 | 2 | 7 | 0 | 9 | 29 | 3 | 4 | 0 |
-| **all** | | **2,218** | **19** | **498** | **59** | **76** | **76** | **866** | **624** | **359** | **62** | **193** |
+| [CHK](ledger/CHK.md) | plate-check target ranges | 59 | 0 | 10 | 2 | 7 | 0 | 11 | 29 | 3 | 4 | 0 |
+| **all** | | **2,247** | **24** | **498** | **69** | **73** | **76** | **884** | **623** | **359** | **52** | **193** |
 
-19 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
+24 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, and the force balance, task 5, the same day): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), PLT-187 and PLT-188 and FRC-010, FRC-024 and FRC-027 (the force balance), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and eleven HNT rows (WP-15, WP-16, WP-2).
-In plain terms, of the 2,218 active rows: 866 (39 %) are deliberate game or implementation choices; 624 (28 %)
+In plain terms, of the 2,247 active rows: 884 (39 %) are deliberate game or implementation choices; 623 (28 %)
 state something about the physical world with no source at all; 498 (23 %) name a source that nobody is recorded
-as having read; 135 (6 %) were written from memory or from an abstract and say so; 76 (3 %) were tuned to a target;
-19 (1 %) were read in their sources.
+as having read; 142 (6 %) were written from memory or from an abstract and say so; 76 (3 %) were tuned to a target;
+24 (1 %) were read in their sources.
 
 A low `from-memory` count does not mean a subsystem was written with its sources open. It means
 its agent did not say. The impacts agent was candid, and so has 34 such rows; most `cited-unverified`
