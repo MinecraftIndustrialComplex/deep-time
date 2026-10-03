@@ -59,6 +59,22 @@ public final class Magma {
     public static final int LAKE_MAX_DEPTH = 10; // ledger: MAG-022
     /** Ground above a lake's surface is opened up to this far above it. */
     public static final int LAKE_CLEAR = 24; // ledger: MAG-022
+    /** The shell around a chamber or lens: open space this many blocks out, across and up, becomes basalt. */
+    public static final double SHELL = 1.5; // ledger: MAG-011
+
+    /**
+     * Whether offset (d2 = dx² + dz², dy) from an ellipsoid of radius rh and half-height rv lies in
+     * its shell: the ellipsoid with {@link #SHELL} taken off the offset's horizontal distance and off
+     * its height, so the shell is that thick across and up at every point of the surface. (Scaling
+     * the radii up by {@link #SHELL} instead, as before 2026-10-03, leaves less than a block above
+     * the flanks of a lens much wider than tall: from a radius of 51 blocks up a lava block faced
+     * the open rock above it.)
+     */
+    static boolean inShell(long d2, int dy, double rh, double rv) {
+        double d = Math.max(0.0, Math.sqrt((double) d2) - SHELL), h = Math.max(0.0, Math.abs(dy) - SHELL) / rv;
+        return d * d / (rh * rh) + h * h <= 1.0;
+    }
+
     /** Blocks kept between a chamber's bottom and the lava floor. */
     public static final int FLOOR_GAP = 8; // ledger: MAG-007
 
@@ -169,8 +185,7 @@ public final class Magma {
                     return Part.CONDUIT_SHELL;
                 }
             }
-            double sh = chamberRh + 1.5, sv = chamberRv + 1.5, sy = (y - chamberY) / sv;
-            if (d2 / (sh * sh) + sy * sy <= 1.0)
+            if (inShell(d2, y - chamberY, chamberRh, chamberRv))
                 return Part.CHAMBER_SHELL;
             return deepPart;
         }
@@ -271,8 +286,7 @@ public final class Magma {
                 double q = (double) ddy / lrv[k];
                 if ((double) d2 / ((double) lrh[k] * lrh[k]) + q * q <= 1.0)
                     return Part.LENS;
-                double sh = lrh[k] + 1.5, sv = lrv[k] + 1.5, sy = ddy / sv;
-                if (d2 / (sh * sh) + sy * sy <= 1.0)
+                if (inShell(d2, ddy, lrh[k], lrv[k]))
                     best = Part.LENS_SHELL;
             }
             for (int k = Math.max(0, k0 - 5), e = Math.min(n - 2, k0 + 3); k <= e; k++) {
