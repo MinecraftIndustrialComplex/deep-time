@@ -49,7 +49,9 @@ public final class LavaGameTests {
      * every block is read back:
      * <ul>
      *   <li>{@code lavaAboveLakes}: no lava above the highest level a lava lake can have
-     *       ({@link LavaRules#highestLakeY}, y −288 by default). The old rule put it up to y −55;</li>
+     *       ({@link LavaRules#highestLakeY}, y −288 by default), the magma of active volcanoes
+     *       ({@link Magma}, read back by {@link #magmaUnderActiveVolcanoes}) counted apart. The old
+     *       rule put it up to y −55;</li>
      *   <li>{@code seaOnLava}: no sea column whose water stands on lava (the first block under the
      *       water is never lava). The old rule turned the sea below y −54 into lava;</li>
      *   <li>{@code floorNotLava}: under ground that stands clear of it, open space below the lava
@@ -74,6 +76,9 @@ public final class LavaGameTests {
         int minY = settings.noiseSettings().minY(), sea = settings.seaLevel();
         LavaRules rules = t.lava();
         int flood = rules.floodY(minY, sea), lakeTop = Math.max(rules.highestLakeY(minY), flood - 1);
+        // The magma under active volcanoes (chambers, conduits, the crust-deep column's lenses) is lava at
+        // any depth by design and is read back by magmaUnderActiveVolcanoes; it is counted apart here.
+        Magma magma = t.magma(g.waterReach(), minY, sea);
         helper.assertTrue(flood < -54 - 100, "the lava floor (y " + flood + ") must follow the world's floor (y " + minY + ")");
 
         // Sites from the world data: the deepest sea, a sea about 150 blocks deep, a coast, high ground.
@@ -97,7 +102,7 @@ public final class LavaGameTests {
             sites.add(deep);
         Site deepestSite = deepest;
 
-        long[] n = new long[8];   // lava, lavaAboveLakes, seaOnLava, floorOpen, floorNotLava, openDeep, deepSeaColumns, columns
+        long[] n = new long[9];   // lava, lavaAboveLakes, seaOnLava, floorOpen, floorNotLava, openDeep, deepSeaColumns, columns, magmaLava
         int[] topLava = {Integer.MIN_VALUE};
         StringBuilder detail = new StringBuilder();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
@@ -128,7 +133,9 @@ public final class LavaGameTests {
                             }
                             inSea = false;
                         }
-                        if (lava) {
+                        if (lava && y > lakeTop && magma.at(x, y, z).molten()) {
+                            n[8]++;
+                        } else if (lava) {
                             n[0]++;
                             topLava[0] = Math.max(topLava[0], y);
                             if (y > lakeTop) {
@@ -151,9 +158,9 @@ public final class LavaGameTests {
         }, () -> {
             DeepTime.LOGGER.info("[gametest] lavaStaysAtTheFloor rules={} minY={} lavaFloorY={} highestLakeY={} sites={} columns={} "
                             + "deepSeaColumns={} (deepest bed y {}) lava={} topLavaY={} lavaAboveLakes={} seaOnLava={} openDeep={} "
-                            + "floorOpen={} floorNotLava={}{}",
+                            + "floorOpen={} floorNotLava={} magmaLava={}{}",
                     rules, minY, flood, lakeTop, sites, n[7], n[6], (int) Math.floor(deepestSite.h), n[0],
-                    topLava[0] == Integer.MIN_VALUE ? "-" : topLava[0], n[1], n[2], n[5], n[3], n[4], detail);
+                    topLava[0] == Integer.MIN_VALUE ? "-" : topLava[0], n[1], n[2], n[5], n[3], n[4], n[8], detail);
             helper.assertTrue(n[6] > 0, "no sea bed below y -60 was sampled (deepest: y " + deepestSite.h
                     + "): the planet has no sea the old lava level would have reached");
             helper.assertTrue(n[5] > 0, "no open space between y " + lakeTop + " and y -54 in the sampled chunks: nothing the old lava level would have flooded");
