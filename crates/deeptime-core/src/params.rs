@@ -439,14 +439,14 @@ pub struct TectonicParams {
     pub weld_speed_mm_yr: f64,
     /// … for this long, Myr. The larger plate keeps its id.
     pub weld_after_myr: f64,
-    /// Orogenic collapse (`plates/collapse.rs`): thickened continental crust that no orogeny is
-    /// raising any more and that stands above `collapse_height_m` thins by spreading, with this
-    /// e-folding time of its height over that, Myr; the crust it loses fills the nearest thin
+    /// Orogenic collapse (`plates/collapse.rs`): continental crust thicker than
+    /// `collapse_thickness_km` that no orogeny is raising any more thins by spreading, with this
+    /// e-folding time of its excess thickness, Myr; the crust it loses fills the nearest thin
     /// crust of its plate, and the plate's ocean floor beside the continent turns continental,
     /// so collision belts give back the area they took. 0 = off.
     pub collapse_myr: f64,
-    /// … the height above the sea down to which it collapses, m …
-    pub collapse_height_m: f64,
+    /// … the crust thickness it thins back to, km …
+    pub collapse_thickness_km: f64,
     /// … and how far from the collapsing crust the crust it loses may go, km (Earth-normalized).
     pub collapse_reach_km: f64,
     /// Axis change of a subducting plate towards its fronts per 1,000 km of front and Myr
@@ -648,7 +648,7 @@ impl Default for TectonicParams {
             weld_speed_mm_yr: 5.0,             // ledger: PLT-246
             weld_after_myr: 10.0,              // ledger: PLT-246
             collapse_myr: 25.0,                // ledger: PLT-255
-            collapse_height_m: 1500.0,         // ledger: PLT-256
+            collapse_thickness_km: 45.0,       // ledger: PLT-256
             collapse_reach_km: 1000.0,         // ledger: PLT-257
             slab_pull_rad_per_1000km_myr: 0.002,
             slab_pull_speed_mm_yr: 80.0,
@@ -960,7 +960,7 @@ impl PlanetPreset {
             (k.weld_speed_mm_yr, "$.tectonics.weld_speed_mm_yr"),
             (k.weld_after_myr, "$.tectonics.weld_after_myr"),
             (k.collapse_myr, "$.tectonics.collapse_myr"),
-            (k.collapse_height_m, "$.tectonics.collapse_height_m"),
+            (k.collapse_thickness_km, "$.tectonics.collapse_thickness_km"),
             (k.collapse_reach_km, "$.tectonics.collapse_reach_km"),
         ] {
             check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
