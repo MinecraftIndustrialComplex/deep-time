@@ -56,6 +56,9 @@ WB="$CACHE/workbench"
 REMOTE="/Volumes/Graphide/ban/mic/mods/$(basename "$(git rev-parse --show-toplevel)")"
 VNCDRIVE="${VNCDRIVE:-/home/greencheetah/Projects/graphide/graphide-test-audit/utilities/scripts/macmini/vncdrive.sh}"
 SSH=(command ssh -n -o BatchMode=yes -o ConnectTimeout=15 "$HOST")
+# The test VM may be deallocated (idle watcher) or the laptop's address may have changed.
+. tools/remote/vm-access.sh
+vm_access_ensure "$HOST" || { echo "mac-watch: cannot reach $HOST" >&2; exit 1; }
 
 CMD=start
 case "${1:-}" in start|stop|status|tv) CMD="$1"; shift ;; esac
@@ -140,6 +143,28 @@ tv_open() {
     else echo "mac-watch: opened in Safari, but could not send ctrl-cmd-F (the M6 may be busy: vncdrive.sh status)" >&2; fi
     "$VNCDRIVE" close >/dev/null 2>&1 || true
 }
+
+# On the test VM the default workbench is the systemd service deeptime-workbench (tools/remote/vm/,
+# 2026-10-03: it comes back at boot after the idle watcher deallocated the VM). There, start installs
+# the new binary and restarts the service (its arguments are the unit's); stop and status ask systemd.
+if [ "$PORT" = 8642 ] && "${SSH[@]}" 'test -e /etc/systemd/system/deeptime-workbench.service'; then
+    case "$CMD" in
+    stop) "${SSH[@]}" 'sudo systemctl stop deeptime-workbench && echo "stopped the workbench service (it starts again at boot)"'; exit 0 ;;
+    status)
+        "${SSH[@]}" 'systemctl status deeptime-workbench --no-pager -n 3 | cut -c1-160'
+        "${SSH[@]}" "curl -s -m 5 http://127.0.0.1:$PORT/api/runs" | python3 -c 'import json,sys; j=json.load(sys.stdin); print("runs:", len(j["runs"]), "kept; running:", j["running"], "; queue:", len(j["queue"]))' 2>/dev/null || echo "not answering on port $PORT"
+        exit 0 ;;
+    tv) echo "mac-watch: no TV on the test VM" >&2; exit 2 ;;
+    esac
+    [ "${#PRESET[@]}" = 0 ] || echo "mac-watch: the service ignores --preset/--start/--length-myr; start runs from the page" >&2
+    busy="$("${SSH[@]}" "curl -s -m 5 http://127.0.0.1:$PORT/api/runs" | python3 -c 'import json,sys; j=json.load(sys.stdin); print(j["running"] or "", *j["queue"])' 2>/dev/null || true)"
+    [ -z "${busy// /}" ] || { echo "mac-watch: the workbench has runs in progress ($busy); not restarting it" >&2; exit 3; }
+    [ "$BUILD" = 0 ] || tools/remote/mac.sh -- 'cargo build --release -p deeptime-cli 2>&1 | tail -2'
+    "${SSH[@]}" "set -e; cp '$REMOTE/target/release/deeptime' '$WB/bin/deeptime.new' && mv '$WB/bin/deeptime.new' '$WB/bin/deeptime'
+sudo systemctl restart deeptime-workbench; sleep 2; systemctl is-active deeptime-workbench"
+    echo "mac-watch: the workbench service restarted with this checkout's binary (http://localhost:$PORT/ through the laptop's tunnel)"
+    exit 0
+fi
 
 case "$CMD" in
 stop) stop_remote; exit 0 ;;

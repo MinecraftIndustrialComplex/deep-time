@@ -26,11 +26,15 @@ pub struct VolcanoParams {
     /// How big: multiplies every edifice's height and radius (and a caldera's). Ledger VOL-025.
     pub size: f64,
     /// How steep volcano flanks are, as a share of the real profile: every edifice's basal radius is
-    /// its physical one divided by this, the height unchanged. Heights are drawn 15 times larger
-    /// than widths (a block is 300 m across and 20 m tall), so a cone of real proportions (1) is a
-    /// steep spire in blocks; the default 0.5 doubles the radius (Ben, 2026-09-30: "Setting,
-    /// gentler default"), broad enough to read as a volcano while cones 60 km apart along an arc
-    /// still stand apart. Ledger VOL-024 (game choice, Ben).
+    /// its physical one divided by this, the height unchanged. Heights are drawn
+    /// `m_per_block_h / m_per_block_v` times larger than widths (8.6 at the default 300 m across
+    /// and 35 m up a block; 15 at the 20 m of 2026-09-30), so a cone of real proportions (1) is
+    /// steep in blocks (a real 6° flank drawn at 42°, a 30° summit cone at 79°); the default 0.5
+    /// doubles the radius (Ben, 2026-09-30: "Setting, gentler default"), broad enough to read as a
+    /// volcano while cones 60 km apart along an arc still stand apart: a real 6° flank is drawn at
+    /// 24° (38° at 20 m). Kept at 0.5 when the vertical scale went to 35 m (2026-10-02): the cones
+    /// are the same in metres and gentler in blocks, as Ben asked. Ledger VOL-024 (game choice,
+    /// Ben).
     pub flank_steepness: f64,
     /// The least distance between stratovolcanoes along an arc, km: a new cone keeps this far
     /// (× 0.8–1.2) from the cones standing near it. A game choice, not a measured spacing: arcs
@@ -114,7 +118,8 @@ pub struct VolcanoParams {
     /// Deccan flows): the steps a plateau erodes into. Ledger VOL-052 (game choice).
     pub flood_basalt_flows: u32,
     /// Height of the steps the finished terrain shows where flood basalts crop out, m (a step of
-    /// 80 m is 4 blocks at 20 m per block; real flow thicknesses not checked). Ledger VOL-036.
+    /// 80 m is 2.3 blocks at 35 m per block, 4 at the earlier 20 m; real flow thicknesses not
+    /// checked). Ledger VOL-036.
     pub flood_basalt_step_m: f64,
     /// A volcano builds toward its target height with this time constant, Myr (Hawaiian shields
     /// do most of their growth in their first 1–2 Myr: Clague & Sherrod 2014). Ledger VOL-041.
