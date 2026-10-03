@@ -387,16 +387,16 @@ impl Default for ClimateParams {
             snapshot_every_myr: 10.0,
             model: ClimateModel::PerCell,      // ledger: CLM-175
             grid_columns: 128,                 // ledger: CLM-119
-            atmosphere_diffusivity_scale: 1.0, // ledger: CLM-176
-            zonal_diffusivity_ratio: 0.5,      // ledger: CLM-121
-            wind_heat_transport: 0.5,          // ledger: CLM-125
+            atmosphere_diffusivity_scale: 1.3, // ledger: CLM-176
+            zonal_diffusivity_ratio: 0.3,      // ledger: CLM-121
+            wind_heat_transport: 0.3,          // ledger: CLM-125
             desert_albedo: 0.08,               // ledger: CLM-123
             rain_model: RainModel::Belts,      // ledger: CLM-178
             thermal_wind_pa_k: 60.0,           // ledger: CLM-141
             precip_rh_slope: 11.4,             // ledger: CLM-145
             bucket_mm: 150.0,                  // ledger: CLM-143
             gyre_heat_efficiency: 1.0,         // ledger: CLM-130
-            overturning_sv: 15.0,              // ledger: CLM-131
+            overturning_sv: 30.0,              // ledger: CLM-131
             winter_inversion_c: 15.0,          // ledger: CLM-134
             sea_ice_edge_sharpness: 4.0,       // ledger: CLM-135
             snowball_cloud_w_m2: 0.0,          // ledger: CLM-172
