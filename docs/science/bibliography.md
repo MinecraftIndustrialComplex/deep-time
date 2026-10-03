@@ -5731,3 +5731,45 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 
 ETOPO 2022 (entry above, under the climate section) was used as data in the same task: the 60 arc-second surface GeoTIFF was downloaded to the test VM and the continental margins measured with the planet's transect code (build log 2026-10-03).
 
+
+## Quincuncial projections (SCL-070 to SCL-075), added 2026-10-03 with the seamless-wrapping prototype
+
+The prototype crate `crates/deeptime-quincuncial` (not shipped) rests on these. None was read in full this session.
+
+### Peirce1879
+- Reference: Peirce, C. S. (1879). A quincuncial projection of the sphere. American Journal of Mathematics 2(4):394-396 (volume and pages from memory).
+- Cited as: "Peirce 1879".
+- Ledger ids: SCL-070, SCL-074
+- Access: JSTOR (paywalled); not fetched.
+- Read so far (by the project): through Wikipedia "Peirce quincuncial projection" (docs/research/notes/world-projection-options.md, 2026-10-02).
+
+### Guyou1887
+- Reference: Guyou, É. (1887). Nouveau système de projection de la sphère: généralisation de la projection de Mercator. Annales Hydrographiques, série 2, 9:16-35 (from memory, not checked).
+- Cited as: "Guyou 1887".
+- Ledger ids: SCL-071, SCL-074
+- Access: not fetched.
+- Read so far (by the project): through Wikipedia "Guyou hemisphere-in-a-square projection", fetched 2026-10-03 by the prototype agent: "an oblique aspect of the Peirce quincuncial projection"; "conformal except for the four corners of each hemisphere's square"; "The Equator is represented by a horizontal line"; "the sphere as a rectangle of aspect ratio 2:1"; developed by Émile Guyou in 1887.
+
+### Lee1976
+- Reference: Lee, L. P. (1976). Conformal Projections Based on Elliptic Functions. Cartographica Monograph 16 (supplement to Canadian Cartographer 13).
+- Cited as: "Lee 1976".
+- Ledger ids: SCL-070
+- Access: not fetched. Read so far: catalogue entry only (via world-projection-options.md).
+
+### AbramowitzStegun1964
+- Reference: Abramowitz, M. and Stegun, I. A. (eds.) (1964). Handbook of Mathematical Functions. National Bureau of Standards Applied Mathematics Series 55. Chapter 16 (Jacobian elliptic functions, L. M. Milne-Thomson) and 17 (elliptic integrals).
+- Cited as: "A&S 16.4", "A&S 16.21.2-4", "A&S 17.6".
+- Ledger ids: SCL-073
+- Access: public domain (US government work); not fetched this session. Read so far: from memory.
+
+### DLMF
+- Reference: NIST Digital Library of Mathematical Functions, §19.36 (Carlson's duplication algorithm), §22.15 (inverse Jacobian functions), §19.25. https://dlmf.nist.gov/
+- Cited as: "DLMF 19.36.1", "DLMF 22.15.13 with 19.25.5".
+- Ledger ids: SCL-073
+- Access: open; not fetched this session. Read so far: from memory.
+
+### Carlson1995
+- Reference: Carlson, B. C. (1995). Numerical computation of real or complex elliptic integrals. Numerical Algorithms 10:13-26. doi:10.1007/BF02198293.
+- Cited as: "Carlson 1995".
+- Ledger ids: SCL-073
+- Access: arXiv math/9409227 (open); not fetched this session. Read so far: from memory.

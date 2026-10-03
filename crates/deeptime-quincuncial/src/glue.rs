@@ -34,13 +34,31 @@ pub struct Seam {
 }
 
 impl Seam {
-    pub fn new(name: &'static str, axis: char, at: f64, inward: (f64, f64), length: f64, kind: SeamKind) -> Seam {
-        Seam { name, axis, at, inward, length, kind }
+    pub fn new(
+        name: &'static str,
+        axis: char,
+        at: f64,
+        inward: (f64, f64),
+        length: f64,
+        kind: SeamKind,
+    ) -> Seam {
+        Seam {
+            name,
+            axis,
+            at,
+            inward,
+            length,
+            kind,
+        }
     }
 
     /// The point of the edge at parameter t ∈ [−length/2, length/2].
     pub fn point(&self, t: f64) -> (f64, f64) {
-        if self.axis == 'x' { (self.at, t) } else { (t, self.at) }
+        if self.axis == 'x' {
+            (self.at, t)
+        } else {
+            (t, self.at)
+        }
     }
 
     /// The gluing transform applied to a block of the plane.
@@ -65,6 +83,7 @@ impl Seam {
     /// The portal for this edge: a one-way global portal on the edge, `height` blocks tall centred
     /// on `y`, facing into the world. A half-turn portal's destination is its own centre turned
     /// 180° about the vertical; a slide portal's is its centre moved by the slide.
+    // ledger: SCL-077
     pub fn portal(&self, y: f64, height: f64) -> Value {
         let (cx, cz) = self.centre();
         let (dx, dz) = self.apply(cx, cz);
@@ -100,22 +119,42 @@ impl Seam {
             "{{CustomName:'\"{}\"',width:{:.1}d,height:{:.1}d,axisWX:{:.1}d,axisWY:0d,axisWZ:{:.1}d,\
              axisHX:0d,axisHY:1d,axisHZ:0d,dimensionTo:\"minecraft:overworld\",\
              destinationX:{:.1}d,destinationY:{:.1}d,destinationZ:{:.1}d",
-            self.name, self.length, height, f(w, 0), f(w, 2), f(d, 0), f(d, 1), f(d, 2)
+            self.name,
+            self.length,
+            height,
+            f(w, 0),
+            f(w, 2),
+            f(d, 0),
+            f(d, 1),
+            f(d, 2)
         );
         if matches!(self.kind, SeamKind::HalfTurn { .. }) {
             nbt.push_str(",rotationA:0f,rotationB:0f,rotationC:1f,rotationD:0f");
         }
         nbt.push('}');
-        format!("summon immersive_portals:portal {:.1} {:.1} {:.1} {nbt}", f(o, 0), f(o, 1), f(o, 2))
+        format!(
+            "summon immersive_portals:portal {:.1} {:.1} {:.1} {nbt}",
+            f(o, 0),
+            f(o, 1),
+            f(o, 2)
+        )
     }
 }
 
 fn lin(c: f64, v: &str) -> String {
-    if c == 0.0 { format!("-{v}") } else { format!("{c} - {v}") }
+    if c == 0.0 {
+        format!("-{v}")
+    } else {
+        format!("{c} - {v}")
+    }
 }
 
 fn signed(d: f64) -> String {
-    if d >= 0.0 { format!("+ {d}") } else { format!("- {}", -d) }
+    if d >= 0.0 {
+        format!("+ {d}")
+    } else {
+        format!("- {}", -d)
+    }
 }
 
 #[cfg(test)]
@@ -130,7 +169,11 @@ mod tests {
             for s in w.seams() {
                 let (cx, cz) = s.centre();
                 // The inward normal points at the domain's middle.
-                assert!(s.inward.0 * (mx - cx) + s.inward.1 * (mz - cz) > 0.0, "{}", s.name);
+                assert!(
+                    s.inward.0 * (mx - cx) + s.inward.1 * (mz - cz) > 0.0,
+                    "{}",
+                    s.name
+                );
                 let (wx, wz) = s.axis_w();
                 assert_eq!((-wz, wx), s.inward);
                 // The edge's ends are glued to the edge's (other) ends: the transform maps the edge
