@@ -66,29 +66,45 @@ cp "$SRV/mods/"*.jar "$CL/game/mods/"
 MESA=$(nix build --no-link --print-out-paths nixpkgs#mesa | head -1)
 GLVND=$(nix build --no-link --print-out-paths nixpkgs#libglvnd | head -1)
 XVFB=$(nix build --no-link --print-out-paths nixpkgs#xorg.xorgserver | head -1)/bin/Xvfb
+rm -f "$CL/xvfb.log"
 PMC=$(nix build --no-link --print-out-paths nixpkgs#portablemc | head -1)/bin/portablemc
 # The GL environment is exported before Xvfb starts: without it the X server has no GLX
 # (the client then dies with "GLX extension not found").
 export DISPLAY=$DISP LD_LIBRARY_PATH="$MESA/lib:$GLVND/lib" __GLX_VENDOR_LIBRARY_NAME=mesa \
     __EGL_VENDOR_LIBRARY_DIRS="$MESA/share/glvnd/egl_vendor.d" LIBGL_DRIVERS_PATH="$MESA/lib/dri" \
     LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe LP_NUM_THREADS=4
-if ! pgrep -f "Xvfb $DISP " > /dev/null; then
+start_xvfb() {
+    if [ -n "$XPID" ] && kill -0 "$XPID" 2>/dev/null; then return; fi
+    pgrep -f "Xvfb $DISP " > /dev/null && return
     rm -f "/tmp/.X${DISP#:}-lock" "/tmp/.X11-unix/X${DISP#:}"
-    setsid "$XVFB" $DISP -screen 0 1280x720x24 -nolisten tcp +extension GLX > "$CL/xvfb.log" 2>&1 < /dev/null &
+    setsid "$XVFB" $DISP -screen 0 1280x720x24 -nolisten tcp +extension GLX >> "$CL/xvfb.log" 2>&1 < /dev/null &
     XPID=$!; sleep 3
-fi
-say "== client joins 127.0.0.1:$GAME"
-setsid "$PMC" --main-dir "$CL/pmc" start "neoforge::$NEO" --mc-dir "$CL/game" --jvm "$JAVA" \
-    --jvm-arg=-Xmx6G --jvm-arg=-XX:ActiveProcessorCount=6 -u DeepTimeProbe --resolution 1280x720 \
-    --join-server 127.0.0.1 --join-server-port "$GAME" > "$CL/client.log" 2>&1 < /dev/null &
-CPID=$!
-for i in $(seq 180); do
-    grep -a -q 'DeepTimeProbe joined the game' "$SRV/console.log" && break
-    kill -0 $CPID 2>/dev/null || { say "client died (smoke/$P/client/client.log)"; exit 1; }
-    grep -a -q -e 'Failed to find a valid GLFW profile' -e 'Preparing crash report' "$CL/client.log" && { say "client failed to start: $(grep -a -m1 -e 'GLFW error' -e 'crash report' "$CL/client.log")"; exit 1; }
-    sleep 5
+}
+# Up to three attempts: on 2026-10-03 the display went away 20 s after the client reached its
+# title screen (Xlib: "X connection to :89 broken"), with nothing in Xvfb's log.
+joined=0
+for attempt in 1 2 3; do
+    start_xvfb
+    say "== client joins 127.0.0.1:$GAME (attempt $attempt)"
+    setsid "$PMC" --main-dir "$CL/pmc" start "neoforge::$NEO" --mc-dir "$CL/game" --jvm "$JAVA" \
+        --jvm-arg=-Xmx6G --jvm-arg=-XX:ActiveProcessorCount=6 -u DeepTimeProbe --resolution 1280x720 \
+        --join-server 127.0.0.1 --join-server-port "$GAME" > "$CL/client-$attempt.log" 2>&1 < /dev/null &
+    CPID=$!
+    why=""
+    for i in $(seq 180); do
+        grep -a -q 'DeepTimeProbe joined the game' "$SRV/console.log" && { joined=1; break; }
+        kill -0 $CPID 2>/dev/null || { why="client exited"; break; }
+        [ -n "$XPID" ] && ! kill -0 "$XPID" 2>/dev/null && { why="Xvfb $DISP went away"; break; }
+        grep -a -q -e 'X connection to .* broken' "$CL/client-$attempt.log" && { why="the client lost the X display"; break; }
+        grep -a -q -e 'Failed to find a valid GLFW profile' -e 'Preparing crash report' "$CL/client-$attempt.log" && {
+            why="client failed to start: $(grep -a -m1 -e 'GLFW error' -e 'crash report' "$CL/client-$attempt.log")"; break; }
+        sleep 5
+    done
+    [ $joined = 1 ] && break
+    say "   attempt $attempt: ${why:-did not join in 15 min} (smoke/$P/client/client-$attempt.log)"
+    kill "$CPID" 2>/dev/null; pkill -f -- "$CL/pmc/libraries" 2>/dev/null; sleep 5
 done
-grep -a -q 'DeepTimeProbe joined the game' "$SRV/console.log" || { say "client did not join in 15 min"; exit 1; }
+[ $joined = 1 ] || { say "the client did not join"; exit 1; }
 rcon "gamemode spectator DeepTimeProbe" >/dev/null
 J="$(probe)"; say "probe at join: $J"
 
