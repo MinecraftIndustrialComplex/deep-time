@@ -180,7 +180,9 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   unchanged in every run (task 5 changes nothing a run computes; its force rows now have values,
   in the baseline doc: slab pull 0.86 of the driving torque, a plate above 40 % in tension in 69 %
   of steps); master 60bbbea8 (deposits) merged after that is inert too (150 Myr, seed 1, same
-  table and hypsometry before and after merging it).
+  table and hypsometry before and after merging it). The hypsometry ensemble below, re-run on
+  b14023a3 with the preset as it stands: every height, land and crust number identical in all six
+  runs (only the Köppen E and B shares moved, by master's WP-11 classification order).
 
   | Measure | Master | After | Target | |
   |---|---|---|---|---|
