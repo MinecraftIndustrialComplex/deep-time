@@ -651,6 +651,52 @@ fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     ))
 }
 
+/// The per-cell climate's line (P1-26): `climate_cell t_2d_c=… zonal_c=… flux_fit_rms_k=… …`
+/// from the last snapshot's per-cell figures, the triggered snapshots and every snowball's
+/// escape CO₂; `None` under the banded climate.
+fn percell_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note: Value =
+        serde_json::from_str(world.notes.get(deeptime_core::climate::STAGE_NAME)?).ok()?;
+    let c = &note["last"]["per_cell"];
+    if c.is_null() {
+        return None;
+    }
+    let f = |v: &Value| v.as_f64().unwrap_or(f64::NAN);
+    let fc = &c["flux_corr"];
+    let esc: Vec<String> = note["snowball_escape_co2_ppm"]
+        .as_array()
+        .map(|a| a.iter().map(|x| format!("{:.0}", f(x))).collect())
+        .unwrap_or_default();
+    Some(format!(
+        "climate_cell t_2d_c={:.2} net_toa_2d_w_m2={:.3} years_2d={} zonal_c={:.2} \
+         flux_fit_rms_k={:.3} flux_fit_worst_k={:.2} flux_fit_first_rms_k={:.2} \
+         flux_w_m2={:.1}..{:.1} flux_capped={} d_face_w_m2_k={:.2}..{:.2} fit_iterations={} \
+         atm_peak_pw={:.2}@{:.0} ocean_peak_pw={:.2}@{:.0} psi_sv={:.1} sinking_lat={} \
+         triggered_snapshots={} escape_co2_ppm=[{}]",
+        f(&c["t_global_c"]),
+        f(&c["net_toa_w_m2"]),
+        c["years"],
+        f(&c["zonal_t_global_c"]),
+        f(&fc["rms_k"]),
+        f(&fc["worst_k"]),
+        f(&fc["first_rms_k"]),
+        f(&fc["min_w_m2"]),
+        f(&fc["max_w_m2"]),
+        fc["capped"],
+        f(&fc["d_min_w_m2_k"]),
+        f(&fc["d_max_w_m2_k"]),
+        fc["iterations"],
+        f(&c["atm_heat_peak_pw"]),
+        f(&c["atm_heat_peak_lat"]),
+        f(&c["ocean_heat_peak_pw"]),
+        f(&c["ocean_heat_peak_lat"]),
+        f(&c["gyre_psi_max_sv"]),
+        c["sinking"]["lat"].as_f64().map_or("none".to_string(), |x| format!("{x:.0}")),
+        note["triggered_snapshots"],
+        esc.join(","),
+    ))
+}
+
 /// The structure stage's summary line (P1-07): `structure_final=<steps> plutons_emplaced=… …`,
 /// when the pipeline ran it.
 fn structure_line(world: &deeptime_core::world::WorldState) -> Option<String> {
@@ -830,6 +876,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
             surface_line(world),
             glacial_line(world),
             climate_line(world),
+            percell_line(world),
             structure_line(world),
             volcanoes_line(world),
             impacts_line(world),
@@ -1035,6 +1082,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = climate_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = percell_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let (Some(path), Some(note)) = (

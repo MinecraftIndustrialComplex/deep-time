@@ -774,6 +774,7 @@ pub fn compute(
             "iterations": f.iterations,
             "worst_k": f.worst_k,
             "rms_k": f.rms_k,
+            "first_rms_k": f.first_rms_k,
             "capped": f.capped,
         });
         s.cell = Some(st);
