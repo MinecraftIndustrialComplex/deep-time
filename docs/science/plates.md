@@ -13,14 +13,14 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | subduction | PLT-029 to PLT-067, PLT-206 to PLT-207, PLT-229, PLT-251 to PLT-252 (44) |
 | [PLT](ledger/PLT.md) | collisions | PLT-068 to PLT-081, PLT-222 to PLT-227, PLT-241 to PLT-250 (30; PLT-069 to PLT-075 and PLT-227 retired 2026-10-02) |
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
-| [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212 (18) |
+| [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228 (19) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
 | [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208 (23) |
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221 (40) |
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
 
-Rows by status (after plate tasks 3 and 4, 2026-10-02): `verified` 17, `cited-unverified` 41, `from-memory` 4, `abstract-only` 16, `calibrated` 14, `game-choice` 73, `uncited` 42; `pending-rewrite` 152; `not-yet-coded` 18; `merged` (not counted) 33.
+Rows by status (after plate tasks 3 and 4 and the continental crust fix, 2026-10-02): `verified` 17, `cited-unverified` 41, `from-memory` 4, `abstract-only` 17, `calibrated` 13, `game-choice` 74, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
 
 ## Material for the stage 2 writer
 
@@ -225,3 +225,105 @@ velocity, the model's "other" also holds converging boundaries that have no cont
 comparison is by cells (area) against Earth's count of volcanoes. The oceanic arc crest limit
 (1 km) and the Andean crest limit (6 km) are from memory (PLT-217, PLT-219). The target ranges
 fail today's model by design: they are what the force-balance and belt tasks are to move.
+
+## The continental crust budget: resampling footprints and island-arc maturity
+
+Added 2026-10-02 (ledger PLT-045, PLT-047, PLT-228, PLT-229; build log "Continental crust fix").
+Ben's answer of that day ("Investigate, then fix arc emergence") followed a bisect. With general
+flexure on, the continental crust ended 1,000 Myr runs at 0.25-0.27 of the planet instead of
+about 0.40.
+
+**What happens on Earth.** Continental crust is made at subduction zones and destroyed there.
+Stern & Scholl (2010, read in full) put creation and destruction in balance at about 3.2 km³ a year
+or have destruction ahead. Of the creation, about 2.7 km³ a year is at convergent margins. The
+Izu-Bonin-Mariana and Aleutian arcs, active for 45-50 Myr, grew 90-180 km³ per km of arc per Myr.
+Growth is fastest in an arc's first few Myr. Intra-oceanic arc crust thickens by "several hundred
+metres per million years". Its Moho lies at 25-35 km, thinner than continental crust (typically
+about 40 km) and more mafic. Because crustal thickness shows in elevation, these arcs "are
+generally mostly below sea level" (Stern 2010, read in full). What makes arc crust behave like a
+continent is buoyancy, not height. Cloos (1993, abstract) finds that only crust thicker than about
+15 km makes the lithosphere buoyant enough to jam a subduction zone. Island arcs built on ocean
+crust "typically must be active for more than ~20 m.y." to reach that thickness. Tetreault & Buiter
+(2014, read in full) give island arcs an average of 26 km at 2.79 g/cm³. They also note that whole
+island-arc sections are rare in the geological record, which goes against Cloos's threshold.
+
+**What the model did.** The plate model's continental area came out of two churns, each roughly as
+large as the whole crust over 1,000 Myr:
+
+- *The resampling lost crust.* Every few steps the crust is resampled onto a new lattice, about 110
+  times in 1,000 Myr (PLT-228). A new point used to count as inside a plate only when a whole
+  lattice triangle of that plate held it. A point on a plate's boundary strip copied the nearest
+  visible sample, but only when no other plate covered it. At a subduction zone the subducting
+  plate's hidden crust covers the overriding plate's strip. So the overriding margin, often a
+  continent's edge, lost its outer half-spacing at every resampling. Measured on seed 1 of
+  `earthlike_quick_16k` (supercontinent start), the continental area fell by a mean 0.77 % per
+  resampling: 344 samples, 29 resamplings over 300 Myr. That was a conservation bug.
+- *Arcs above the sea turned continental.* A rising island arc became continental once it had
+  80 m of the model's arc magma (`arc_continental_m`), but only while it stood above sea level that
+  step. The 80 m was tuned to keep the crust near 0.40 against the resampling's loss (P1-27). It
+  converted about 50,000 samples in a 1,000 Myr run, half the planet's samples. When flexure began
+  to bend the plate under the arcs' load, they stood about 260 m lower, fewer crossed the sea, and
+  the budget fell.
+
+**What the model does now.**
+
+- *Resampling by footprints* (PLT-228). A plate's extent is its footprint: the old lattice's cells
+  its samples owned, moved rigidly with it. Each lattice triangle is split between its corners by
+  the largest barycentric weight. Footprints tile the sphere at a resampling, so a plate keeps its
+  area until it really overlaps another or leaves a gap. Where footprints overlap, the crust on top
+  is chosen in this order: visible, the overriding plate of a subduction contact, continental,
+  higher. A test resamples a static two-plate planet and one with an ocean running under a
+  continent, on six lattices each: continental area is conserved within 0.2 %. The old rule lost
+  0.35 % at the converging margin; the new one loses 0.03 %. On real runs (seed 1, the same
+  states), the old rule would lose 0.92 % per resampling and the new one loses 0.33 %. Over a
+  1,000 Myr run the new rule's loss (0.38 % per resampling) is real overlap: 82 % is continental
+  crust under other continental crust, where colliding continents overlap, and 18 % is continental
+  crust under an overriding oceanic plate. Neither is a lattice artefact. A subduction initiation
+  no longer splits off a plate that is at least half continental (PLT-229). With the fix, one test
+  history's initiation had split off a plate that was 0.89 continental.
+- *Island arcs mature by the crust they built* (PLT-047). An oceanic sample becomes continental
+  crust once its accumulated island-arc magma reaches `arc_magma_m_per_myr` × `arc_maturity_myr`,
+  whatever its height. Hidden crust does not convert. `arc_maturity_myr` is 20 Myr in every preset,
+  Cloos's lower bound. The model's arc magma (20 m per Myr at the arc axis at full convergence) is
+  25-90 times smaller than Earth's arc growth (PLT-045) and is not a thickness, so the rule counts
+  Cloos's time in it, at the model's full arc rate. An arc at a trench converging at half of v_0, or
+  off the arc axis, takes longer. No value was tuned against the crust share.
+
+**Earth against the mod.** `deeptime plate-check`, `earthlike_quick_16k`, supercontinent start,
+1,000 Myr, flexure on, mean of seeds 1-4 (per-seed values in the build log):
+
+| Build | Continental crust at the end | Lowest step | Land, median | Largest continental piece | Arc samples turned continental |
+|---|---|---|---|---|---|
+| before (master) | 0.34 | 0.33 | 0.31 | 0.59 | 51,836 |
+| resampling by footprints only | 0.55 | 0.43 | 0.37 | 0.83 | 45,070 |
+| arc maturity only | 0.15 | 0.15 | 0.25 | 0.37 | 8,532 |
+| both (the model now) | 0.31 (seeds 0.27-0.36) | 0.31 | 0.31 | 0.42 | 6,535 |
+
+The 500 Myr hypsometry ensemble (seeds 1-3, both starts) moves from land 0.300 and crust 0.418 to
+land 0.291 and crust 0.387, with a narrower spread between runs.
+
+**What it means.** The crust budget no longer depends on the surface stage's height.
+Seeds 1 and 2 with `surface.flexure.strength` 0 end at 0.28 and 0.37, against 0.33 and 0.30
+with flexure on. Before the fix flexure cut them from 0.39 and 0.40 to 0.27 and 0.25.
+Island arcs now add about 6,500 continental samples per 1,000 Myr instead of about 50,000. That is
+about 6.5 % of the planet's area per Gyr. As a rough check, Stern & Scholl's 2.7 km³ a year,
+spread at 40 km thick, is about 13 % of Earth's surface per Gyr (that conversion is this page's
+arithmetic, not theirs). The losses now set the share: continental crust that goes under at
+collisions and overlaps in them. Counted over 1,000 Myr on seeds 1 and 2 (100,000 samples, 42,254 continental at the start),
+continental crust hidden under other plates and not welded back cost about 5,000 samples. Crust
+consumed where continents overlap at a resampling cost about 13,000. Arcs added 6,000-7,900. The model has about 11 collisions per 100 Myr against a
+target of 2-6, so it destroys continental area too fast. That is the collision and force-balance
+work (plate tasks 3-5), not a calibration of the arc rule.
+
+**Limits.**
+- Cloos 1993 was read as an abstract only.
+- His 20 Myr is a lower bound ("more than ~20 m.y."), and he states it as a thickness reached, not
+  as a time.
+- Counting it at the model's full arc rate is this fix's choice.
+- A sample turns continental all at once. Its height does not change, so a mature arc may be
+  continental crust 2 km below the sea, like a submerged continental fragment. Its crust is not
+  thickened to a continent's.
+- The resampling's overlap order (visible, overriding, continental, higher) is a rule, not physics.
+- Where two visible continents of plates with no subduction contact between them overlap, the
+  losing crust's rock pools are not kept: volume goes with the area. This was the old behaviour
+  and is unchanged.

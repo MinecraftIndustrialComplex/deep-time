@@ -888,3 +888,36 @@ the same factor, not re-measured) for the hypsometry, which lost the surge's bro
 tuned: the belt width, the wedge slope, the weld speed and wait, the cordillera, `arc_continental_m`
 (one seed with 40 m instead of 80 m gave a lower crust share, 0.29 against 0.32: noise, and the
 coordinator asked that the crust not be compensated).
+
+## Continental crust fix (2026-10-02): resampling footprints and arc maturity
+
+Ben's answer "Investigate, then fix arc emergence" (decisions log 2026-10-02) changed two rules.
+
+- **Resampling.** It now keeps each plate's footprint (PLT-228). The old rule handed the
+  overriding margin's outer half-spacing to the subducting plate at every resampling, a mean
+  0.77 % of the continental area each time.
+- **Island arcs.** They turn continental after `arc_maturity_myr` (20 Myr, Cloos 1993) of arc
+  magma, whatever their height (PLT-047). Before, it was 80 m of arc magma and the arc had to stand
+  above the sea.
+
+Same runs as above (1,000 Myr, supercontinent, seeds 1-4, flexure on), mean and per seed:
+
+| Build | Crust at the end | Lowest step | Highest step | Land, median | Largest piece, median | Arc conversions per run | Targets met |
+|---|---|---|---|---|---|---|---|
+| master c52eb97b | 0.34 (0.31/0.31/0.41/0.34) | 0.33 | 0.45 | 0.31 | 0.59 | 51,836 | 14 |
+| footprints only | 0.55 (0.60/0.56/0.55/0.51) | 0.43 | 0.57 | 0.37 | 0.83 | 45,070 | 15 |
+| arc maturity only | 0.15 (0.18/0.16/0.13/0.12) | 0.15 | 0.43 | 0.25 | 0.37 | 8,532 | 17 |
+| both (this baseline from now on) | 0.31 (0.33/0.30/0.36/0.27) | 0.31 | 0.43 | 0.31 | 0.42 | 6,535 | 15 |
+
+**Flexure.** With both changes, flexure no longer decides the crust. Seeds 1 and 2 end at 0.28 and
+0.37 with `surface.flexure.strength` 0, and at 0.33 and 0.30 with flexure on.
+
+**Where the crust goes now.** Over 1,000 Myr on seeds 1 and 2, the counters show:
+
+- the crust hidden under other plates and not welded back: about -5,000 samples of 100,000;
+- crust consumed where continents overlap at resamplings: about -13,000;
+- arcs: +6,000 to +7,900.
+
+The crust share is therefore now set by how often continents collide and overlap. That is
+11 collisions per 100 Myr against the target of 2-6. It is tasks 3-5's to move, not the arc
+rule's. Build log: "Continental crust fix".
