@@ -436,16 +436,29 @@ pub fn run_tiles(
             // The troughs the glacial pass cut (it left each cell's cut in `cap`, which nothing
             // has touched since) fade the character there, so gullies and fold ridges do not
             // fight the U; the crests above the ice keep theirs. `zs`, done with on the last
-            // level, carries them: the ground plus up to 100 m where cut, nothing elsewhere.
+            // level, carries the fade (0–1). The cut itself varies cell by cell (it follows the
+            // ice depth over the rills of the bed, and a cell at the trimline is in or out of
+            // the ice), so the fade is a box mean of it over `character::TROUGH_FADE_CELLS`: an
+            // unblurred fade left single cells with the full character between faded ones, and
+            // the gullies and the sharpening turned them into one-cell spires 10–40 blocks tall
+            // (margins and spires task, 2026-10-03).
             let troughs = cfg.counts.glacial > 0 && buf.zs.len() == buf.z.len();
             if troughs {
-                for ((s, &z), &cut) in buf.zs.iter_mut().zip(&buf.z).zip(&buf.cap) {
+                for (s, &cut) in buf.zs.iter_mut().zip(&buf.cap) {
                     *s = if cut > 0.0 {
-                        z + (5.0 * cut).min(100.0)
+                        (cut / character::TROUGH_FADE_CUT_M).min(1.0)
                     } else {
-                        f32::NAN
+                        0.0
                     };
                 }
+                character::blur(
+                    &win,
+                    &buf.zs,
+                    &mut buf.sed,
+                    &mut buf.z2,
+                    character::TROUGH_FADE_CELLS,
+                );
+                buf.zs.copy_from_slice(&buf.z2);
             }
             let st = character::apply(
                 &win,
