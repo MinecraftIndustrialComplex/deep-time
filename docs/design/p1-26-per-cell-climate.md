@@ -281,9 +281,14 @@ revisit the slab depth against the seasonal SST amplitude.
 
 - a₀, a₂ and a_i are today's 0.33, 0.25 and 0.62. As in North, Cahalan & Coakley 1981, the a₂ term
   carries the zenith-angle and cloud dependence.
-- **Desert brightening** Δα_desert defaults to +0.05 in planetary terms. Sahara surfaces are about
-  0.35 against 0.15 for vegetation, but the atmosphere halves the contrast at the top of the
-  atmosphere. The desert share d is lagged by one snapshot (a Charney-type feedback), and a₀ is
+- **Desert brightening** Δα_desert defaults to +0.08 in planetary terms (WP-14a; the first draft
+  had +0.05, which did not follow from its own reasoning: a 0.20 contrast halved is 0.10). Bright
+  sand is 0.20–0.45 and savanna 0.15 (Stull 2017, *Practical Meteorology*, Table 2-5); Charney's
+  experiment raised the Sahel from 0.14 to 0.35 (as cited by Norton et al. 1979, p. 2): a surface
+  contrast of about 0.20. The atmosphere attenuates a surface albedo's contribution at the top of
+  the atmosphere by 68 % in the global mean and by about 60 % in the dry subtropics (Donohoe &
+  Battisti 2011, abstract and section 3; read WP-14a), so the planetary contrast is
+  0.20 × 0.40 ≈ 0.08. The desert share d is lagged by one snapshot (a Charney-type feedback), and a₀ is
   re-fitted so Earth's global albedo stays 0.30.
 - **Ice sheets brighten their own cell**, not a whole band. A Laurentide-sized sheet now cools North
   America, not the whole of 50–70°N.
@@ -294,10 +299,31 @@ revisit the slab depth against the seasonal SST amplitude.
 
 **Diffusion depends on the surface**, following the NMS83 lineage (Zhuang, North & Stevens 2017, as
 tabulated in Ziegler & Rehfeld 2021):
-- D_face = (1 − f̄) D_ocean + f̄ D_land(φ);
-- D_land(φ) = D_eq + (D_pole − D_eq)·|sin φ|⁵;
-- defaults D_ocean 0.40, D_eq 0.65, D_pole 0.28 (north) / 0.20 (south), in W/m²/K as today;
+- D_face = (1 − f̄) D_ocean(φ) + f̄ D_land(φ);
+- D_ocean(φ) = D_ocean,pole + (D_ocean,eq − D_ocean,pole)·cos⁵ φ;
+- D_land(φ) = D_land,pole + (D_land,eq − D_land,pole)·cos⁵ φ;
+- defaults D_ocean,eq 0.65, D_ocean,pole 0.40, D_land,eq 0.65, D_land,pole 0.28 (north) / 0.20
+  (south), in W/m²/K as today;
 - f̄ is the mean land fraction of the two cells sharing the face.
+
+*WP-14a correction (sources read).* The design first wrote a constant D_ocean = 0.40 and
+D_land = D_eq + (D_pole − D_eq)·|sin φ|⁵. The source has both media falling from the equator as
+the fifth power of the sine of the **colatitude**, cos⁵ φ: Ziegler & Rehfeld 2021 eq. 2 and
+Table 1 (κ_equ 0.65 and κ_ocean 0.40 for the sea, κ_land 0.65 and κ_land,NP 0.28 / κ_land,SP
+0.20 for land, Zhuang et al.'s column; p. 2846–2847), and Zhuang et al.'s release code, where the
+factor is `sin(theta)**5` of the colatitude "centered on equator" with "Keq: ocean diffusion
+coefficient at equator; Kocean: ocean diffusion coefficient at poles" (read, not copied: GPL-3).
+The difference is large in mid-latitudes: at 45° land D is 0.35 by the source and was 0.59 in the
+first draft; tropical sea D is 0.65, not 0.40. The prototype ran the first draft (runs A to M);
+T9 calibrates from the source's form.
+
+*What these D values stand for.* In Zhuang et al.'s model, as in North, Cahalan & Coakley 1981
+(D = 0.649 W/m²/K, p. 97), D is the **total** poleward transport, atmosphere and ocean together,
+of a model with one surface temperature. Here the ocean's transport is separate (§2.6), so the
+same D on top of it counts the ocean twice. The source values are the starting point and an
+upper bound; T9's step 1 calibrates them down against the atmospheric transport alone, which peaks
+at 5.0 ± 0.14 PW at 43°N (Trenberth & Caron 2001, abstract; read WP-14a), with the ocean's about
+2 PW near 15–20°N (their Fig. 7) as step 2's target.
 
 A zonal factor `climate.zonal_diffusivity_ratio` (default 0.5, calibrated) multiplies the
 east–west faces. PlaHab (Ramirez 2024, PSJ 5:2) uses D_lon/D_lat = 0.02/0.5 = 1/25 for Earth
@@ -360,7 +386,9 @@ Three terms act on the slab T_m (𝒪 above), each conservative in flux form:
 2. **Stommel gyres** (Stommel 1948; implemented from the paper).
    - **Equation.** The wind-driven transport streamfunction ψ (m³/s) solves
      `r ∇²ψ + β ∂ψ/∂x = curl τ / ρ₀` on the sea, with ψ = 0 on coasts. τ is the annual-mean
-     belt-wind stress ρ_a C_D |u| u with C_D 1.3·10⁻³, and β = 2Ω cos φ / a.
+     belt-wind stress ρ_a C_D |u| u with C_D 1.2·10⁻³ (WP-14a; was 1.3·10⁻³: the neutral 10-m
+     drag of Large & Yeager 2004, eq. 6a, is 1.06–1.18·10⁻³ at 5–10 m/s; Large & Pond 1981 could
+     not be read), and β = 2Ω cos φ / a.
    - **Friction.** r = β·1.5·Δx gives a western boundary layer about 1.5 cells wide.
    - **Grid.** ψ lives on cell corners, so the face transports are exact differences of ψ and are
      non-divergent whatever ψ is.
@@ -389,11 +417,18 @@ Three terms act on the slab T_m (𝒪 above), each conservative in flux form:
      mean true width that has sea poleward of 50° free of ice in late winter. On Earth this picks
      the North Atlantic (47° wide) over the North Pacific (68°). Basin width is one of the leading
      explanations of why deep water forms in the Atlantic and not the Pacific (Ferreira et al.
-     2018), and a model without salinity can use it.
+     2018), and a model without salinity can use it. *WP-14a (read in full):* Ferreira et al. list
+     "the P − E asymmetry, the different widths of the basins, and the meridional extent of the
+     African and American continents" as factors that "conspire in favor of Atlantic sinking"
+     (p. 344), the width acting through the gyres' western boundary currents and the halocline
+     (pp. 337–338). They argue that salinity is the proximate cause; width is one route to it,
+     so the rule is a stand-in, not their model. They give no basin widths.
    - **Upwelling.** Spread evenly over all sea equatorward of 50°.
    - **Flow.** A potential flow carries the transport Ψ (`climate.overturning_sv`, default 15 Sv;
-     Earth's AMOC is about 17 Sv) from upwelling to sinking.
-   - **Heat.** Flux = ρc_p·U·(T_upwind − T_deep), T_deep = 2 °C. This is conservative in flux form
+     Earth's AMOC is 17.2 Sv at 26°N over 2004–2012, McCarthy et al. 2015, and 17.0 ± 4.4 Sv over
+     2004–2017, Frajka-Williams et al. 2019; read WP-14a) from upwelling to sinking.
+   - **Heat.** Flux = ρc_p·U·(T_upwind − T_deep), T_deep = 2 °C (the design's round value; no source read in WP-14a, CLM-163). This is
+     conservative in flux form
      even though the flow has sources and sinks: heat is taken up where upwelled water warms and
      given back where the surface water cools on its way to sinking.
    - **Results.** On Earth's relief the prototype ran with the same settings without and with a
@@ -559,7 +594,9 @@ rain, conserves water exactly at convergence, and needs no time-step limit, pola
 ∇·(V W) − ∇·(K_q ∇W) = E(W) − P(W) − S_oro
 ```
 
-V is the month's low-level wind, K_q the eddy moisture diffusivity (1.5·10⁶ m²/s), and S_oro the
+V is the month's low-level wind, K_q the eddy moisture diffusivity (1.5·10⁶ m²/s; the design's own value: GREB uses one
+isotropic κ for heat and moisture, 8·10⁵ m²/s in Dommenget & Flöter 2011's text and 2·10⁵ in its
+Table 2, read WP-14a), and S_oro the
 mountain rain taken out on L1 (§3.6).
 
 ### 3.2 Winds
@@ -607,10 +644,16 @@ V = belt wind + thermal wind.
 ### 3.3 Evaporation
 
 Bulk formula per tile (GREB's form, Stassen et al. 2019):
-`E = ρ_a C_E max(|V|, 3 m/s) q_s(T_tile) (1 − RH)`, where:
+`E = ρ_a C_E (|V| + u_t) q_s(T_tile) (1 − RH)`, where:
 - RH = W/W_sat;
-- C_E = 1.3·10⁻³;
-- q_s is from Tetens;
+- u_t is GREB's turbulent wind, added to the mean wind: 3 m/s over the sea and 2 m/s over land
+  (Dommenget & Flöter 2011, section 3.3, eq. 7; read WP-14a). The first draft had a floor,
+  max(|V|, 3 m/s), which GREB does not use. Stassen et al. 2019 refit it as 5.4 m/s (sea) and
+  11.5 m/s (land) with efficiencies 0.58 and 0.25 (eqs. 12–16, p. 431): T9 may take those;
+- C_E = 1.3·10⁻³ (not found in GREB's papers, which leave their C_w unnumbered; the design's own,
+  open question);
+- q_s is from Tetens (Murray 1967's form, 6.1078 hPa · exp(17.27 T/(T + 237.3)) over water, read
+  only through a secondary page in WP-14a);
 - the sea tile has the factor (1 − ice cover);
 - the land tile has the bucket factor β(S) of Manabe 1969: β = min(1, S/(0.75 S_max)), S_max
   150 mm, with S stepped month by month by P − E − runoff and cycled until the year repeats.
@@ -620,7 +663,12 @@ today's `recycling` and `moisture_floor` constants.
 
 W_sat = 70 kg/m² · e^(0.065(T̄ − 27)) · (1 − f + f·e^(−z̄/2,500 m)). The last factor is the vapour
 scale height over high land, so a Tibet holds a fifth of the sea-level water. It replaces
-`plateau_m`.
+`plateau_m`. *WP-14a:* none of the three numbers is taken from a source; each is consistent with
+one. 70 kg/m² sits beside Bretherton et al.'s W*ref = 72 mm for actively convecting tropical
+columns (p. 1521); 0.065 K⁻¹ (6.7 %/K) is a little below Clausius–Clapeyron's ≈ 7 %/K and the
+models' 7.5 %/K for column vapour (Held & Soden 2006, pp. 5686 and 5689); 2,500 m is Clausius–
+Clapeyron with the model's 6.5 K/km lapse (R_v T²/(L Γ) = 2.4 km at 15 °C, computed) against a
+"typically 2 km" vapour scale height (Guilloteau 2000, IRAM lecture notes).
 
 ### 3.4 Condensation and precipitation
 
@@ -1163,7 +1211,7 @@ annual land temperature. On the two real runs (`earthlike_quick_16k`, scattered 
 
 The order is chosen so each knob is tuned on what it controls most, on Earth's relief:
 
-1. **Global and zonal energy:** a₀ and D_ocean/D_eq/D_pole against the 1-D model's Earth zonal
+1. **Global and zonal energy:** a₀ and the four D values of §2.5 against the 1-D model's Earth zonal
    means and 15 °C.
 2. **Ocean:**
    - γ_o and Ψ against the January sea surface of the North Atlantic and North Pacific;
