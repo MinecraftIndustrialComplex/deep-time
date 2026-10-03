@@ -108,7 +108,8 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
         DeepTime.LOGGER.info("Bound {} Deep Time density functions to {} (C = {})", count[0],
                 terrain.getClass().getSimpleName(), terrain.circumference());
         return new NoiseGeneratorSettings(s.noiseSettings(), s.defaultBlock(), s.defaultFluid(), router,
-                s.surfaceRule(), RegionSpawnTarget.wrap(s.spawnTarget(), terrain), s.seaLevel(), s.disableMobGeneration(), s.aquifersEnabled(),
+                s.surfaceRule(), RegionSpawnTarget.wrap(s.spawnTarget(), terrain,
+                        s.noiseSettings().getCellWidth(), s.noiseSettings().minY(), s.seaLevel()), s.seaLevel(), s.disableMobGeneration(), s.aquifersEnabled(),
                 s.oreVeinsEnabled(), s.useLegacyRandomSource());
     }
 
