@@ -265,6 +265,7 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
         p,
         w,
         inp.lat,
+        &inp.grid.row_weights(),
         &land_near,
         &t_o,
         &t_l,

@@ -9,7 +9,7 @@
 //!             "star_flux_rel": 1.0, "ocean_fraction": 0.7, "regime": "mobile_lid"},
 //!  "scale": {"circumference_blocks": 16384, "m_per_block_h": 300, …},
 //!  "timeline": {"start": "scattered_continents", "length_myr": 500},
-//!  "keyframes": {"every_myr": 50, "size": [1024, 512]},
+//!  "keyframes": {"every_myr": 50, "size": [1024, 326]},
 //!  "resolution": {"l0_samples": 100000, "l1_r": 16},
 //!  "tectonics": {…every key optional, Cortial et al. 2019 Appendix A by default…}}
 //! ```
@@ -299,7 +299,8 @@ fn d_every_myr() -> f64 {
     50.0
 }
 fn d_keyframe_size() -> [u32; 2] {
-    [1024, 512]
+    // The map's aspect (the Lambert projection, π : 1: `Projection::picture_height`).
+    [1024, 326]
 }
 
 /// Timelapse keyframes (plan §6.1).

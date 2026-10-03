@@ -15,13 +15,18 @@ class PoleCapCurveTest {
 
     @Test
     void linesMatchThePlanTable() {
-        // Plan §5.1: z of ±75° is ±3,413 (16k) / ±6,827 (32k); z of ±80° is ±3,641 / ±7,282.
-        assertEquals(3413, Math.round(C16.capZ()));
-        assertEquals(3641, Math.round(C16.stopZ()));
-        assertEquals(6827, Math.round(C32.capZ()));
-        assertEquals(7282, Math.round(C32.stopZ()));
-        assertEquals(90.0, PoleCapCurve.latitudeDeg(16384, -4096), 1e-12);
-        assertEquals(-90.0, PoleCapCurve.latitudeDeg(16384, 4096), 1e-12);
+        // The Lambert projection (docs/design/equal-area-projection.md): z = −R·sin φ, R = C/2π, so
+        // z of ±75° is ±2,519 (16k) / ±5,037 (32k) and z of ±80° is ±2,568 / ±5,136; the poles are
+        // at ±2,607.6 / ±5,215.2. (Equirectangular, they were ±3,413 / ±3,641 at 16k.)
+        assertEquals(2519, Math.round(C16.capZ()));
+        assertEquals(2568, Math.round(C16.stopZ()));
+        assertEquals(5037, Math.round(C32.capZ()));
+        assertEquals(5136, Math.round(C32.stopZ()));
+        double pole = 16384 / (2 * Math.PI);
+        assertEquals(90.0, PoleCapCurve.latitudeDeg(16384, -pole), 1e-12);
+        assertEquals(-90.0, PoleCapCurve.latitudeDeg(16384, pole), 1e-12);
+        assertEquals(90.0, PoleCapCurve.latitudeDeg(16384, -4096), 1e-12, "clamped past the pole");
+        assertEquals(30.0, PoleCapCurve.latitudeDeg(16384, -pole / 2), 1e-9, "sin 30° = 1/2");
     }
 
     @Test

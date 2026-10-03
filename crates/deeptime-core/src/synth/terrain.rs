@@ -19,11 +19,12 @@ pub trait Terrain: Sync {
         None
     }
 
-    /// Latitude φ = πz/(C/2), clamped to ±π/2 beyond the poles (`AnalyticTestTerrain.latitude`).
+    /// Latitude φ = asin(z/R), R = C/2π (the Lambert projection, `deeptime_format::projection`;
+    /// south positive here), clamped to ±π/2 beyond the poles (`AnalyticTestTerrain.latitude`;
+    /// its own formula, twinned in Java).
     fn latitude(&self, z: i64) -> f64 {
         let c = f64::from(self.circumference());
-        let phi = PI * z as f64 / (c / 2.0);
-        (-PI / 2.0).max((PI / 2.0).min(phi))
+        (z as f64 * std::f64::consts::TAU / c).clamp(-1.0, 1.0).asin()
     }
 
     /// A 2D biome input in vanilla parameter units (`AnalyticTestTerrain.raster`).

@@ -1,7 +1,7 @@
 {
   "schema": 0,
   "name": "pipeline_quick_32k",
-  "description": "The planet pipeline so far (P1-03 plates + P1-05 climate + P1-04 deep-time surface, interleaved per plate step, then P1-06's young landscape and L3 amplification) on an Earth-like planet: L0 100000 samples, L1 1024x512. The plate model reads L1 every step and leaves erosion to the surface stage. No timeline: choose the start and length (--start, --length-myr).",
+  "description": "The planet pipeline so far (P1-03 plates + P1-05 climate + P1-04 deep-time surface, interleaved per plate step, then P1-06's young landscape and L3 amplification) on an Earth-like planet: L0 100000 samples, L1 1024x328. The plate model reads L1 every step and leaves erosion to the surface stage. No timeline: choose the start and length (--start, --length-myr).",
   "seed": 1,
   "planet": {
     "gravity_m_s2": 9.81,
@@ -30,7 +30,7 @@
     "every_myr": 50.0,
     "size": [
       1024,
-      512
+      326
     ]
   },
   "young": {},

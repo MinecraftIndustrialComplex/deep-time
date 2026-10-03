@@ -1,7 +1,7 @@
 {
   "schema": 0,
   "name": "plates_quick_32k",
-  "description": "The plate pipeline (P1-03) on an Earth-like planet: L0 100000 samples, L1 1024x512. No timeline: choose the start and length (--start, --length-myr).",
+  "description": "The plate pipeline (P1-03) on an Earth-like planet: L0 100000 samples, L1 1024x328. No timeline: choose the start and length (--start, --length-myr).",
   "seed": 1,
   "planet": {
     "gravity_m_s2": 9.81,
@@ -24,7 +24,7 @@
     "every_myr": 50.0,
     "size": [
       1024,
-      512
+      326
     ]
   },
   "resolution": {

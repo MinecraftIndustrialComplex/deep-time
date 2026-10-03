@@ -203,7 +203,10 @@ fn runs_keep_their_invariants() {
         // The L1 fields are there, on the L1 grid, and finite where they must be.
         for name in KEYFRAME_LAYERS {
             let f = &world.fields[name];
-            assert_eq!(f.data.len(), 256 * 128, "{name}");
+            // C = 16,384 at 64 blocks a cell: 256 × 82, the rows from z = −2,624, past the
+            // Lambert pole at 2,607.6.
+            assert_eq!((f.grid.w, f.grid.h), (256, 82), "{name}");
+            assert_eq!(f.data.len(), 256 * 82, "{name}");
         }
         assert!(world.fields["elevation"].data.iter().all(|v| v.is_finite()));
         let ocean = world.fields["plates/crust_type"]

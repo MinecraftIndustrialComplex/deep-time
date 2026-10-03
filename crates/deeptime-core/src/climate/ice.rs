@@ -83,10 +83,56 @@ fn dt_1d(f: &[f64], s: f64, out: &mut [f64], v: &mut Vec<usize>, z: &mut Vec<f64
     }
 }
 
+/// [`dt_1d`] for samples at increasing positions `pos` (m) instead of a fixed spacing:
+/// d(p) = min_q (pos_p − pos_q)² + f(q). The column pass of the Lambert grid, whose rows are
+/// unevenly spaced on the sphere (1 / cos φ).
+fn dt_1d_at(f: &[f64], pos: &[f64], out: &mut [f64], v: &mut Vec<usize>, z: &mut Vec<f64>) {
+    v.clear();
+    z.clear();
+    let inter = |q: usize, r: usize| -> f64 {
+        ((f[q] + pos[q] * pos[q]) - (f[r] + pos[r] * pos[r])) / (2.0 * (pos[q] - pos[r]))
+    };
+    for (q, &fq) in f.iter().enumerate() {
+        if fq >= INF {
+            continue;
+        }
+        loop {
+            let Some(&r) = v.last() else {
+                v.push(q);
+                z.push(f64::NEG_INFINITY);
+                break;
+            };
+            let x = inter(q, r);
+            if x <= *z.last().expect("z parallels v") {
+                v.pop();
+                z.pop();
+                continue;
+            }
+            v.push(q);
+            z.push(x);
+            break;
+        }
+    }
+    if v.is_empty() {
+        out.iter_mut().for_each(|o| *o = INF);
+        return;
+    }
+    let mut k = 0;
+    for (p, o) in out.iter_mut().enumerate() {
+        while k + 1 < v.len() && z[k + 1] < pos[p] {
+            k += 1;
+        }
+        let q = v[k];
+        let dp = pos[p] - pos[q];
+        *o = dp * dp + f[q];
+    }
+}
+
 /// Distance, m, from every ice cell to the nearest ice-free cell (0 on ice-free cells), on a
-/// w × h grid whose rows are `sx[j]` metres apart across and `sy` metres apart along a column; x
-/// wraps. Rows in parallel, then columns in parallel: deterministic.
-pub fn distance_to_margin(w: usize, h: usize, ice: &[bool], sx: &[f64], sy: f64) -> Vec<f64> {
+/// w × h grid whose row `j`'s cells are `sx[j]` metres wide and `sy[j]` metres high (rows are
+/// (sy[j] + sy[j + 1]) / 2 apart along a column; the Lambert grid's rows are uneven on the
+/// sphere); x wraps. Rows in parallel, then columns in parallel: deterministic.
+pub fn distance_to_margin(w: usize, h: usize, ice: &[bool], sx: &[f64], sy: &[f64]) -> Vec<f64> {
     let mut rows = vec![0.0; w * h];
     rows.par_chunks_mut(w).enumerate().for_each(|(j, out)| {
         // Three copies of the row so the transform sees across the seam.
@@ -98,13 +144,18 @@ pub fn distance_to_margin(w: usize, h: usize, ice: &[bool], sx: &[f64], sy: f64)
         dt_1d(&f, sx[j].max(1e-6), &mut d, &mut v, &mut z);
         out.copy_from_slice(&d[w..2 * w]);
     });
+    // Row centres along a column, m (strictly increasing: a row wholly past a pole counts 1 µm).
+    let mut pos = vec![0.0; h];
+    for j in 1..h {
+        pos[j] = pos[j - 1] + (0.5 * (sy[j - 1] + sy[j])).max(1e-6);
+    }
     let cols: Vec<Vec<f64>> = (0..w)
         .into_par_iter()
         .map(|i| {
             let f: Vec<f64> = (0..h).map(|j| rows[j * w + i]).collect();
             let mut d = vec![0.0; h];
             let (mut v, mut z) = (Vec::new(), Vec::new());
-            dt_1d(&f, sy, &mut d, &mut v, &mut z);
+            dt_1d_at(&f, &pos, &mut d, &mut v, &mut z);
             d
         })
         .collect();
@@ -131,7 +182,7 @@ pub fn thickness(
     h: usize,
     ice: &[bool],
     sx: &[f64],
-    sy: f64,
+    sy: &[f64],
     tau_pa: f64,
     cap_m: f64,
 ) -> Vec<f32> {
@@ -146,7 +197,7 @@ pub fn thickness(
             if !on {
                 return 0.0;
             }
-            let half = 0.5 * sx[c / w].min(sy);
+            let half = 0.5 * sx[c / w].min(sy[c / w]);
             nye((dist - half).max(half), tau_pa, cap_m) as f32
         })
         .collect()
@@ -280,7 +331,7 @@ mod tests {
             ice[j * w + 30] = false;
         }
         let sx = vec![2.0; h];
-        let d = distance_to_margin(w, h, &ice, &sx, 3.0);
+        let d = distance_to_margin(w, h, &ice, &sx, &vec![3.0; h]);
         for j in 0..h {
             for i in 0..w {
                 let dx5 = (i as i64 - 5)
@@ -300,8 +351,19 @@ mod tests {
             }
         }
         // All ice: every distance is huge; no ice: zero.
-        let none = distance_to_margin(4, 3, &[false; 12], &[1.0; 3], 1.0);
+        let none = distance_to_margin(4, 3, &[false; 12], &[1.0; 3], &[1.0; 3]);
         assert!(none.iter().all(|&x| x == 0.0));
+    }
+
+    #[test]
+    fn the_column_pass_measures_uneven_rows() {
+        // One ice-free cell at row 0; rows 1, 2, 3 m high below it (the Lambert grid's rows
+        // grow towards the poles): the distance down the column is the sum of half-heights.
+        let (w, h) = (1, 4);
+        let ice = [false, true, true, true];
+        let sy = [1.0, 1.0, 2.0, 3.0];
+        let d = distance_to_margin(w, h, &ice, &[1.0; 4], &sy);
+        assert!((d[1] - 1.0).abs() < 1e-12 && (d[2] - 2.5).abs() < 1e-12 && (d[3] - 5.0).abs() < 1e-12, "{d:?}");
     }
 
     #[test]
@@ -328,7 +390,7 @@ mod tests {
                 i * i + j * j < 100.0
             })
             .collect();
-        let t = thickness(w, h, &ice, &vec![10_000.0; h], 10_000.0, 5.0e4, 4000.0);
+        let t = thickness(w, h, &ice, &vec![10_000.0; h], &vec![10_000.0; h], 5.0e4, 4000.0);
         let centre = t[16 * w + 32];
         let edge = t[16 * w + 41];
         assert!(centre > 2.0 * edge && edge > 0.0, "{centre} {edge}");

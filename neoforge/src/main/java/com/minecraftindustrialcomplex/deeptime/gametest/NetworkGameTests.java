@@ -160,10 +160,11 @@ public final class NetworkGameTests {
     @GameTest(template = GameTestSupport.TEMPLATE)
     public static void planetDebugLine(GameTestHelper helper) {
         WorldInfoPayload info = new WorldInfoPayload(true, "minecraft:overworld", "0.0", 16384, 300, 20, 75, 80, "wrap-test");
-        String north = PlanetDebugLine.format(info, 4096, -3500, 0f);
-        String south = PlanetDebugLine.format(info, -8192, 3600, 0.62f);
-        helper.assertTrue("Deep Time: 76.904° N 90.000° E · wrap-test (C 16384, 300 m/block)".equals(north), "north: " + north);
-        helper.assertTrue("Deep Time: 79.102° S 180.000° W · wrap-test (C 16384, 300 m/block) · polar storm 62%".equals(south), "south: " + south);
+        // The Lambert projection: φ = asin(−z / R), R = 16384 / 2π = 2,607.6.
+        String north = PlanetDebugLine.format(info, 4096, -2540, 0f);
+        String south = PlanetDebugLine.format(info, -8192, 2560, 0.62f);
+        helper.assertTrue("Deep Time: 76.926° N 90.000° E · wrap-test (C 16384, 300 m/block)".equals(north), "north: " + north);
+        helper.assertTrue("Deep Time: 79.036° S 180.000° W · wrap-test (C 16384, 300 m/block) · polar storm 62%".equals(south), "south: " + south);
         helper.assertTrue(PlanetDebugLine.format(WorldInfoPayload.notAPlanet("minecraft:the_nether"), 0, 0, 0) == null, "a line outside a planet");
         DeepTime.LOGGER.info("[gametest] planetDebugLine '{}' / '{}'", north, south);
         helper.succeed();

@@ -42,6 +42,7 @@ tools/remote/mac.sh --server takes). `run` takes it itself, unless --lock-held s
 Standard library only.
 """
 
+import math
 import argparse
 import datetime
 import hashlib
@@ -112,10 +113,11 @@ def fold(x, c):
 
 
 # The planet's projection (the twin of deeptime_format::projection, docs/design/equal-area-projection.md
-# §2): equirectangular, the seam x = −C/2 is longitude 0°, north is −z, the poles at z = ∓C/4.
+# §2): Lambert's equal-area cylinder, R = C/2π; the seam x = −C/2 is longitude 0°, north is −z,
+# latitude φ = asin(−z/R), the poles at z = ∓R.
 def pole_z(c):
-    """|z| of the poles, whole blocks."""
-    return c // 4
+    """|z| of the poles, whole blocks (inside them)."""
+    return int(c / (2 * math.pi))
 
 
 
@@ -1025,7 +1027,8 @@ def preview_world_note(run, why=""):
 def latlon_to_block(lat, lon, c=PREVIEW_C):
     """workbench.js blockXZ through the projection (pole_z's twin, projection.js xOfLon/zOfLat): x =
     longitude east of the seam scaled to C from −C/2; north is −z."""
-    return round(lon / 360 * c - c / 2), round(-lat / 360 * c)
+    lat = max(-90.0, min(90.0, lat))
+    return round(lon / 360 * c - c / 2), round(-c / (2 * math.pi) * math.sin(math.radians(lat)))
 
 
 def box_on_world(req, c=PREVIEW_C):

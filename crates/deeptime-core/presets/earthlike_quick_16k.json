@@ -1,7 +1,7 @@
 {
   "schema": 0,
   "name": "earthlike_quick_16k",
-  "description": "An Earth-like planet, quick (singleplayer size, C = 16384 blocks): plates and crust, climate, deep-time erosion and strata, volcanoes, meteor impacts, rock and metamorphism, ore deposits, the young landscape and its amplification, baked for the game. L0 100000 samples, L1 1024x512, L2 2048x1024, L3 8192x4096. The same parameters as pipeline_quick_16k (calibrated 2026-10-01, P1-17). It names no timeline: choose the start and the length in the editor or config/deeptime/server.json.",
+  "description": "An Earth-like planet, quick (singleplayer size, C = 16384 blocks): plates and crust, climate, deep-time erosion and strata, volcanoes, meteor impacts, rock and metamorphism, ore deposits, the young landscape and its amplification, baked for the game. L0 100000 samples, L1 1024x328, L2 2048x656, L3 8192x2624. The same parameters as pipeline_quick_16k (calibrated 2026-10-01, P1-17). It names no timeline: choose the start and the length in the editor or config/deeptime/server.json.",
   "seed": 1,
   "planet": {
     "gravity_m_s2": 9.81,
@@ -30,7 +30,7 @@
     "every_myr": 50.0,
     "size": [
       1024,
-      512
+      326
     ]
   },
   "young": {},
