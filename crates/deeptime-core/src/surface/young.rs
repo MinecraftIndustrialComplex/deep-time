@@ -470,6 +470,25 @@ impl YoungStage {
         let erod = rock(lithology::erodibility());
         let diffu = rock(lithology::diffusivity());
 
+        // The sediment each L2 cell may lose to submarine slope failure: L1's log and loose
+        // sediment over the L1 cell it lies in (`marine::slope_failure`).
+        let avail0: Vec<f64> = match world.surface.as_ref() {
+            Some(st) if sp.submarine_slope_deg > 0.0 => {
+                let k = doublings(self.preset.resolution.l1_r, g2.r).unwrap_or(0);
+                let w1 = st.grid.w as usize;
+                (0..n)
+                    .map(|c| {
+                        let c1 = ((c / w) >> k) * w1 + ((c % w) >> k);
+                        if c1 < st.log.cells() {
+                            st.log.total(c1) + f64::from(st.regolith_m[c1])
+                        } else {
+                            0.0
+                        }
+                    })
+                    .collect()
+            }
+            _ => Vec::new(),
+        };
         let started = Instant::now();
         let mut h: Vec<f64> = (0..n)
             .map(|c| {
@@ -598,6 +617,18 @@ impl YoungStage {
             })
             .collect();
         diffusion::step(&d, &mut h, &kd, dt);
+        if !avail0.is_empty() {
+            let sea_mask: Vec<bool> = kind.iter().map(|&k| k == BASE).collect();
+            let mut avail: Vec<f64> = (0..n)
+                .map(|c| (avail0[c] + h[c] - f64::from(z0[c])).max(0.0))
+                .collect();
+            let fp = marine::FailureParams {
+                critical_slope: sp.submarine_slope_deg.to_radians().tan(),
+                rate: marine::FAILURE_RATE,
+                iterations: marine::FAILURE_ITERATIONS,
+            };
+            marine::slope_failure(&d, &sea_mask, sea, &fp, &mut h, &mut avail);
+        }
         self.time("diffusion", started);
 
         // The routing of the surface as it now is: areas, lakes.

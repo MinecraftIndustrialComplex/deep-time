@@ -162,6 +162,7 @@
     "tidal_range_m": 2.0,
     "marine_fill_depth_m": 0.0,
     "shelf_slope": 0.0005,
+    "submarine_slope_deg": 2.5,
     "carbonate_max_mm_yr": 10.0,
     "carbonate_extinction_per_m": 0.1,
     "carbonate_surface_light": 2000.0,

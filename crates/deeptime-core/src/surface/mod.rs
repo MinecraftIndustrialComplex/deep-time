@@ -165,6 +165,9 @@ pub struct Totals {
     pub to_sea_km3: f64,
     pub weathered_km3: f64,
     pub isostasy_km3: f64,
+    /// Sediment moved down submarine slopes by slope failure (`marine::slope_failure`).
+    #[serde(default)]
+    pub slope_failure_km3: f64,
     /// Σ(Δh)·a − (carbonate + evaporite): what the processes created or lost, km³.
     pub mass_residual_km3: f64,
     pub steps: u64,
@@ -833,6 +836,19 @@ impl SurfaceStage {
         let mut iterations = 0u64;
         let mut cg_iterations = 0u64;
         let mut sinks = 0u64;
+        // Submarine slope failure (`marine::slope_failure`): what each cell may lose, its loose and
+        // logged sediment at the start of the step plus what the step lays on it.
+        let failure = (p.submarine_slope_deg > 0.0).then(|| marine::FailureParams {
+            critical_slope: p.submarine_slope_deg.to_radians().tan(),
+            rate: marine::FAILURE_RATE,
+            iterations: marine::FAILURE_ITERATIONS,
+        });
+        let h_step0 = sc.h.clone();
+        let avail0: Vec<f64> = (0..n)
+            .into_par_iter()
+            .map(|c| st.log.total(c) + f64::from(st.regolith_m[c]))
+            .collect();
+        let mut failed_m_cells = 0.0f64;
         for sub in 0..subs {
             let started = Instant::now();
             pflood::open_sea(&d, &sc.h, sea, (n / 500).max(1), &mut sc.kind);
@@ -1081,6 +1097,14 @@ impl SurfaceStage {
             }
             let before = sc.h.clone();
             cg_iterations += diffusion::step(&d, &mut sc.h, &sc.kd, dts) as u64;
+            if let Some(fp) = &failure {
+                let sea_mask: Vec<bool> = sc.kind.iter().map(|&k| k == BASE).collect();
+                let mut avail: Vec<f64> = (0..n)
+                    .map(|c| (avail0[c] + sc.h[c] - h_step0[c]).max(0.0))
+                    .collect();
+                failed_m_cells +=
+                    marine::slope_failure(&d, &sea_mask, sea, fp, &mut sc.h, &mut avail);
+            }
             #[allow(clippy::needless_range_loop)]
             for c in 0..n {
                 let dd = (sc.h[c] - before[c]) as f32;
@@ -1337,6 +1361,7 @@ impl SurfaceStage {
         t.to_sea_km3 += to_sea / 1.0e9;
         t.weathered_km3 += weathered * km3;
         t.isostasy_km3 += iso * km3;
+        t.slope_failure_km3 += failed_m_cells * km3;
         t.mass_residual_km3 += (sum_net - carb - evap) * km3;
         t.steps += 1;
         t.spl_iterations += iterations;
