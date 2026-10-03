@@ -56,16 +56,16 @@ echo "install.sh: deeptime-idle restarted ($(grep '^IDLE_MINUTES=' /etc/default/
 
 # shellcheck disable=SC1091
 . /etc/default/deeptime-play
-main_pid() { systemctl show -p MainPID --value "$1"; }
+main_pid() { /usr/bin/systemctl show -p MainPID --value "$1"; }
 hand_workbench() {
     local svc p; svc="$(main_pid deeptime-workbench)"
-    for p in $(pgrep -f '^/data/ban/deeptime-cache/workbench/bin/deeptime watch --bind 127.0.0.1 --port 8642' || true); do
+    for p in $(/usr/bin/pgrep -f '^/data/ban/deeptime-cache/workbench/bin/deeptime watch --bind 127.0.0.1 --port 8642' || true); do
         [ "$p" != "$svc" ] && echo "$p"
     done
 }
 hand_play() {
     local svc p; svc="$(main_pid deeptime-play)"
-    for p in $(pgrep -x java || true); do
+    for p in $(/usr/bin/pgrep -x java || true); do
         [ "$p" != "$svc" ] && [ "$(sudo readlink "/proc/$p/cwd" 2>/dev/null)" = "$PLAY_DIR" ] && echo "$p"
     done
 }

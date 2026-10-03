@@ -149,7 +149,7 @@ class Proc:
         return os.path.basename(self.argv[0]) if self.argv else self.comm
 
     def cmd(self, n=110):
-        s = " ".join(self.argv) if self.argv else f"[{self.comm}]"
+        s = " ".join(" ".join(self.argv).split()) if self.argv else f"[{self.comm}]"
         return s if len(s) <= n else s[:n] + "…"
 
     def cwd(self):
