@@ -15,7 +15,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
 | [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228 (19) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
-| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208 (23) |
+| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-258 (28; PLT-254 to PLT-258 the orogenic collapse and the thickest crust, 2026-10-03) |
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221 (40) |
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
@@ -130,6 +130,73 @@ section "Tasks 3 and 4").
   and the terrane threshold are choices of the implementation (ledger `game-choice`).
 - The folds and faults of the structure stage follow the belt and wedge through the `collision`
   regime; they do not yet read the real shortening or the flexural basin (task 6 of the design).
+
+## Orogenic collapse and the thickest crust (2026-10-03)
+
+Built 2026-10-03 (ledger PLT-254 to PLT-258; `plates/collapse.rs`). Ben's answer of that day
+("Merge, then give area back (Recommended)"): plate tasks 3 and 4 cost continental crust, because
+crust that crosses a collision front becomes belt thickness and its area never comes back.
+
+**What happens on Earth.** Thickened crust stands high, and its weight pushes outwards. While the
+plates converge they hold it up; when convergence stops, the hot, weak orogen spreads under its
+own weight and thins back towards a normal thickness, mostly by extension rather than erosion
+(Dewey 1988, abstract: collapse explains "the return of orogenic large crustal thicknesses to
+normal without very much erosional denudation"). The Variscan crust of Europe was 55-70 km thick
+by 315 Ma and thinned from 315 to 290 Ma (Hillenbrand & Williams 2022, abstract); the Caledonides
+began to collapse about 405 Ma, with detachments active from 400 to 365 Ma that moved rock
+40-100 km (Peron-Pinvidic & Osmundsen 2020, full text). Where extension goes is set by crustal
+thickness (Wernicke et al. 1987, full text). Crust thicker than about 50 km does not stay: "Isostatic
+forces uplift crust thicker than about 50 km, leading to erosion and crustal thinning" (Mooney,
+Prodehl & Pavlenkova 2002, full text); an orogen that never extended, the Urals, keeps a root of
+50-56 km (Carbonell et al. 2000, abstract). The weak lower crust flows only so far: "Over 15 m.y.,
+the length scale of channel-flow extrusion is 150 km rather than 1500 km" (Rey, Teyssier &
+Whitney 2010, full text). And no crust is much thicker than Tibet's and the Andes' 70-80 km
+(Mooney et al. 2002: "The thickest crust (70+ km)"; Wang et al. 2021: Moho at 80 ± 2 km under
+Lhasa): beyond that, continental crust carried down in a collision stays in the mantle (Stern &
+Scholl 2010, full text: at ultrahigh-pressure terranes "the bulk of the approximately 40 km-thick
+crust that must have originally existed is missing"), and a mafic root turned to eclogite founders.
+
+**What the model had.** At 500 Myr on master (6f72f0dd) a fifth of the visible continental samples
+had crust thicker than 70 km, holding over 40 % of the continental crust's volume, under ground at
+a median 200-500 m: in the coupled pipeline the surface stage owns the elevation, the belt's cap
+(PLT-253) reads that elevation while the stacked thickness stays, and an overlap at a resampling
+adds a whole column to the one on top (PLT-228). None of that crust gave area back.
+
+**What the model does now.** Each 2 Myr step, after the collision belts and subduction uplift:
+
+1. *The thickest crust* (PLT-258): a visible continental column thicker than `crust_max_km`
+   (70 km) loses the excess from the bottom of the column (mafic root first) to the mantle. It
+   gives no area.
+2. *Collapse* (PLT-254): a visible continental sample that no orogeny raised this step and whose
+   crust is thicker than `collapse_thickness_km` (50 km, PLT-256) releases
+   (1 − e^(−δt/τ)) × (T − 50 km) of its thickness, τ = `collapse_myr` (15 Myr, PLT-255). The
+   crust released (its own rock, thinned in proportion) fills the nearest samples of the same
+   plate that are thinner than the model's normal column (35.1 km), within `collapse_reach_km`
+   (200 km, PLT-257), nearest first: thinned continental crust, then the plate's own ocean floor
+   beside the continent, which turns continental once filled. A sample with no room within reach
+   keeps its crust until room appears.
+3. Heights follow Airy (5.5 m of crust per m of height) within the column's Airy height: a source
+   sinks but not below the height of the crust it keeps (a hidden root spreads without dragging
+   its surface down), a receiver rises but not above the height of its new column (ocean floor
+   filled to the normal column stands at a continent's mean height, about 525 m).
+
+**Earth against the model.** See the build log entry "Orogenic collapse" (2026-10-03) for the
+measured tables (`plate-check` at 1000 Myr and the 500 Myr hypsometry ensemble).
+
+**Limits and game choices.**
+- The transport is to the nearest room, not a solved lower-crustal flow; it is instantaneous within
+  the reach. The reach (200 km) is Rey et al.'s 150 km in 15 Myr rounded to about three samples of
+  the quick preset.
+- Collapse does not need the convergence to have stopped, only that no orogeny raised the sample
+  this step. On Earth thinning can lag thickening by tens of Myr (the Basin and Range: Lundstern &
+  Miller 2021, as read by the research sub-agent; not ledgered).
+- Thickness beyond `crust_max_km` is removed whether the crust is felsic or mafic. Felsic crust
+  does not founder by itself (Wang et al. 2021); in the model the limit stands for continental
+  subduction at the front as much as for foundering.
+- The driver is the excess thickness, not the height: the model's thickness is the better record
+  of the crust's weight because the surface stage's flexure and spreading change the height
+  without changing the thickness. That decoupling is the model's, and the reason the thickest
+  crust needs a limit at all.
 
 ## The planned force balance: its constants and targets checked (WP-13a)
 
