@@ -15,14 +15,16 @@
 //! The anchor colours are the classes of the `satellite` ramp in `ramps.json` ([`CLASSES`] are its
 //! `labels`), so the legend is a key to exactly the colours drawn. Per pixel, from the nearest
 //! cell of each field (the elevation averaged over the cells a pixel covers when its grid is finer);
-//! the climate's fields are smoothed first over a few cells (`box_filter`: temperatures over ±3
-//! rows, moisture over 3 × 3 cells, sea ice over 5 × 17 sea cells, the herb and tree cover and the
-//! rock colour over 3 × 3 land cells), so the energy-balance model's latitude bands, the orographic
-//! rain's cell streaks and the Köppen borders do not show as stripes and steps:
+//! the climate's moisture and the cover fields are smoothed first over a few cells (`box_filter`:
+//! moisture over 3 × 3 cells, the herb and tree cover and the rock colour over 3 × 3 land cells),
+//! so the orographic rain's cell streaks and the Köppen borders do not show as steps. The
+//! temperatures are drawn as they are, and the sea ice is smoothed over only 1 × 3 sea cells (one
+//! column, three rows): the per-cell climate (P1-26) has no latitude bands to hide, so the sea
+//! ice follows its cells and its edges are the climate's own (`climate.sea_ice_edge_sharpness`):
 //!
 //! - **Sea** (the elevation below sea level): coloured by depth, turquoise over the shallowest
 //!   8 m, the shelf colour at 120 m, ocean blue at 1.5 km, deep navy from 5 km; annual sea-ice
-//!   cover (`climate/sea_ice`) whitens it (fully from about 90 %).
+//!   cover (`climate/sea_ice`, per cell) whitens it (fully from about 90 %).
 //! - **Land with a climate** (`climate/t_mean_c` and `climate/aridity` or `climate/precip_mm`): a
 //!   continuous land cover. Herb cover grows with the aridity index P/PET (none below 0.05, full
 //!   from 0.45) and tree cover from 0.5 to 1.0; herbs need a warmest month (`climate/t_warm_c`) over
@@ -535,6 +537,9 @@ fn bare(c: &Cell, pal: &Palette) -> [f32; 3] {
     }
 }
 
+/// The sea ice's box filter, radii in cells (columns, rows): a window of 1 × 3 cells.
+pub const SEA_ICE_SMOOTHING: (usize, usize) = (0, 1);
+
 /// The cell of `f` nearest pixel (px, py) of a `w × h` picture (keyframe pixel centres).
 pub(crate) fn nearest(f: &Field, px: usize, py: usize, w: usize, h: usize) -> f32 {
     let (i, j) = f
@@ -546,8 +551,9 @@ pub(crate) fn nearest(f: &Field, px: usize, py: usize, w: usize, h: usize) -> f3
 /// A box-filtered copy of `f`: each cell the mean over ±`rx` columns (wrapping) and ±`ry` rows
 /// (clamped), geometric when `log`, counting only the cells where `keep` holds (all when `None`).
 /// The climate's fields carry steps a picture should not show as stripes: the orographic rain's
-/// cell-to-cell streaks, and the energy-balance model's latitude bands in the temperatures and the
-/// sea ice (whose edge would otherwise be a ruled line).
+/// cell-to-cell streaks and the Köppen borders. (The zonal model's latitude bands in the
+/// temperatures and the sea ice used to be hidden here too, over ±3 rows and 5 × 17 cells; the
+/// per-cell climate has none, so those blurs are gone.)
 pub fn box_filter(
     f: &Field,
     (rx, ry): (usize, usize),
@@ -766,26 +772,27 @@ pub fn render(
     let z = heights_m(elevation, view, size);
     let shade = hillshade(&z, w, h, view.radius_m, &look);
     let field = |name: &str| world.fields.get(name);
-    // The climate's fields, smoothed where their model draws steps (see `box_filter`).
+    // The climate's fields, smoothed where their model draws steps (see `box_filter`). The
+    // temperatures are the climate's own, per cell, with no smoothing.
     let smooth =
         |name: &str, r: (usize, usize), log: bool| field(name).map(|f| box_filter(f, r, log, None));
     let koppen = field(input::KOPPEN);
     let (t_mean, t_warm, t_cold) = (
-        smooth(input::T_MEAN, (0, 3), false),
-        smooth(input::T_WARM, (0, 3), false),
-        smooth(input::T_COLD, (0, 3), false),
+        field(input::T_MEAN).cloned(),
+        field(input::T_WARM).cloned(),
+        field(input::T_COLD).cloned(),
     );
     let (precip, aridity) = (
         smooth(input::PRECIP, (1, 1), true),
         smooth(input::ARIDITY, (1, 1), true),
     );
-    // Sea ice over the sea's cells only (it is 0 on land).
+    // Sea ice per cell, over the sea's cells only (it is 0 on land): one column by three rows.
     let sea_ice = field(input::SEA_ICE).map(|f| match koppen.filter(|k| k.grid == f.grid) {
         Some(k) => {
             let sea = |c: usize| k.data[c].round() as u8 == crate::climate::koppen::SEA;
-            box_filter(f, (2, 8), false, Some(&sea))
+            box_filter(f, SEA_ICE_SMOOTHING, false, Some(&sea))
         }
-        None => box_filter(f, (2, 8), false, None),
+        None => box_filter(f, SEA_ICE_SMOOTHING, false, None),
     });
     let (ice, glacier, ela) = (field(input::ICE), field(input::GLACIER), field(input::ELA));
     let rock = field(input::SURFACE_ROCK).or_else(|| field(input::STRUCTURE_ROCK));
@@ -1102,6 +1109,91 @@ mod tests {
         let mut none = w.clone();
         none.fields.remove("elevation");
         assert!(render(&none, &Ramps::builtin(), &ViewScale::default(), (8, 4)).is_none());
+    }
+
+    /// The picture of an all-sea frame whose sea ice is `ice(i, j)` per cell (P1-26 T7).
+    fn ice_frame(ice: impl Fn(usize, usize) -> f32) -> Vec<u8> {
+        let deep = [(-6000.0, [4.0, 5.0, 3.0, NAN, 31.0, 0.0, 0.0, NAN]); 8];
+        let mut w = world(&deep, true);
+        let f = w.fields.get_mut(input::SEA_ICE).unwrap();
+        for j in 0..H {
+            for i in 0..W {
+                f.data[j * W + i] = ice(i, j);
+            }
+        }
+        render(
+            &w,
+            &Ramps::builtin(),
+            &ViewScale::default(),
+            (W as u32, H as u32),
+        )
+        .unwrap()
+    }
+
+    fn px(rgba: &[u8], i: usize, j: usize) -> [u8; 3] {
+        let k = (j * W + i) * 4;
+        [rgba[k], rgba[k + 1], rgba[k + 2]]
+    }
+
+    /// The sea ice is drawn per cell: a small patch of ice is white inside it and open sea in the
+    /// columns beside it (no east-west smoothing) and beyond one row either side (the 1 × 3
+    /// window); the old 5 × 17 filter averaged a patch this size away to nothing.
+    #[test]
+    fn sea_ice_follows_its_cells() {
+        // A patch of 4 columns by 4 rows, cells (8..12, 6..10), in an ice-free sea.
+        let rgba = ice_frame(|i, j| f32::from((8..12).contains(&i) && (6..10).contains(&j)));
+        let sea = px(&rgba, 20, 8);
+        assert!(luma(&sea) < 60.0, "open sea: {sea:?}");
+        for (i, j) in [(8, 7), (9, 8), (11, 8), (10, 7)] {
+            let c = px(&rgba, i, j);
+            assert!(c.iter().all(|&v| v > 210), "ice at ({i}, {j}): {c:?}");
+        }
+        // The columns beside the patch and the rows two or more away from it are open sea, exactly
+        // as far from the patch as a plain sea.
+        for (i, j) in [(7, 8), (12, 8), (10, 4), (10, 11), (10, 0)] {
+            assert_eq!(px(&rgba, i, j), sea, "({i}, {j}) is open sea");
+        }
+        // Smoothing along the rows would spread a lone ice cell into a band: it stays in its own
+        // column, and three rows away there is nothing of it.
+        let one = ice_frame(|i, j| f32::from(i == 5 && j == 8));
+        assert_eq!(px(&one, 6, 8), sea);
+        assert_eq!(px(&one, 4, 8), sea);
+        assert_eq!(px(&one, 5, 5), sea);
+    }
+
+    /// The temperatures are drawn per cell: a step between two rows stays a step (seasonal snow
+    /// follows the coldest month of the cell itself) and is not blended over ±3 rows.
+    #[test]
+    fn temperatures_have_no_row_aligned_smoothing() {
+        let tundra = [(150.0, [-12.0, 6.0, -30.0, 1.2, 29.0, 0.0, 0.0, 0.0]); 8];
+        let mut w = world(&tundra, true);
+        // The coldest month is -30 °C in rows 0-7 and 0 °C in rows 8-15 (no seasonal snow).
+        let f = w.fields.get_mut(input::T_COLD).unwrap();
+        for j in H / 2..H {
+            for i in 0..W {
+                f.data[j * W + i] = 0.0;
+            }
+        }
+        let rgba = render(
+            &w,
+            &Ramps::builtin(),
+            &ViewScale::default(),
+            (W as u32, H as u32),
+        )
+        .unwrap();
+        for i in [3, 17] {
+            let (north, south) = (px(&rgba, i, H / 2 - 1), px(&rgba, i, H / 2));
+            assert!(
+                luma(&north) > luma(&south) + 10.0,
+                "snow on one side of the step only: {north:?} {south:?}"
+            );
+            for j in 0..H / 2 {
+                assert_eq!(px(&rgba, i, j), north, "row {j} is the step's north side");
+            }
+            for j in H / 2..H {
+                assert_eq!(px(&rgba, i, j), south, "row {j} is the step's south side");
+            }
+        }
     }
 
     #[test]

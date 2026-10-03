@@ -582,7 +582,7 @@
       ]
     },
     "sea_ice": {
-      "_comment": "Sea-ice cover of the sea, 0-1 (climate/sea_ice; deep-time climate).",
+      "_comment": "Sea-ice cover of the sea, 0-1 (climate/sea_ice, the annual mean, and climate/sea_ice_max and sea_ice_min, the winter and summer cover; deep-time climate).",
       "stops": [
         [0, "#10233f"],
         [0.5, "#5f7f9f"],
@@ -637,6 +637,8 @@
     "climate/ice_max_extent": "unit",
     "climate/ice_time_share": "unit",
     "climate/sea_ice": "sea_ice",
+    "climate/sea_ice_max": "sea_ice",
+    "climate/sea_ice_min": "sea_ice",
     "climate/ela_m": "relief",
     "deposits/favourability/*": "favourability",
     "deposits/sites": "sites",
