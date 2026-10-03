@@ -3844,8 +3844,8 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 ### Stern2002
 - Reference: Stern, R. J. (2002). Subduction zones. Reviews of Geophysics 40(4):1012.
 - DOI or URL: 10.1029/2001RG000108.
-- Cited as: "Stern 2002" (intra-oceanic arcs take tens of Myr to build 20-35 km of crust); no title or journal in the code.
-- Ledger ids: PLT-047
+- Cited as: "Stern 2002" (intra-oceanic arcs take tens of Myr to build 20-35 km of crust); no title or journal in the code. Since 2026-10-02 the code cites Cloos 1993 and Stern 2010 instead (PLT-047).
+- Ledger ids: none since 2026-10-02 (was PLT-047)
 - Access: paywalled (abstract only).
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Substitute: none found.
@@ -4295,11 +4295,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 ### Cloos1993
 - Reference: Cloos, M. (1993). Lithospheric buoyancy and collisional orogenesis: subduction of oceanic plateaus, continental margins, island arcs, spreading ridges, and seamounts. Geological Society of America Bulletin 105(6):715-737.
 - DOI or URL: 10.1130/0016-7606(1993)105<0715:LBACOS>2.3.CO;2.
-- Cited as: in ledger FRC-005 as the usual source for oceanic lithosphere becoming denser than the mantle after about 10 Myr.
-- Ledger ids: FRC-005
+- Cited as: in ledger FRC-005 as the usual source for oceanic lithosphere becoming denser than the mantle after about 10 Myr; since 2026-10-02 "Cloos 1993" for the island-arc maturity rule (PLT-047, HNT-090).
+- Ledger ids: FRC-005, PLT-047, HNT-092
 - Access: paywalled.
-- Library (the project's source library, not distributed): not fetched.
-- Read so far (by the project): from memory (force-balance task 5, 2026-10-02); reference written from memory, not checked against Crossref.
+- Library (the project's source library, not distributed): abstract only, 2026-10-02 (OpenAlex record of the GSW page): `Cloos1993/openalex.json`, text `Cloos1993/abstract.txt`.
+- Read so far (by the project): FRC-005 from memory (force-balance task 5, 2026-10-02). Abstract read 2026-10-02 (continental crust fix): "Oceanic lithosphere that is ~10 m.y. old is the youngest that is more dense than the asthenosphere"; "Lithosphere that is 100 km thick with a 30-km-thick granitic continental crust resists Subduction because it is ~0.09 gm/cm3 less dense than the asthenosphere"; "only bodies of continental and oceanic island arc crust that are > ~15 km thick make the lithosphere buoyant enough to jam a subduction zone. Oceanic island arc complexes built upon ocean crust typically must be active for more than ~20 m.y. to attain crustal thicknesses so that their attempted subduction causes collisional orogenesis." The reference agrees with the OpenAlex record.
 
 ### Coblentz1994
 - Reference: Coblentz, D. D., Richardson, R. M., Sandiford, M. (1994). On the gravitational potential of the Earth's lithosphere. Tectonics 13(4):929-945.
@@ -5542,3 +5542,41 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 ### Read at second hand in WP-7 (no saved copy; secondary)
 - Sclater, J. G. and Christie, P. A. F. (1980), JGR 85:3711, porosity-depth parameters as tabulated in the pyBacktrack documentation (https://pybacktrack.readthedocs.io); Bjorlykke et al. (2009), AAPG Search and Discovery 50192; Sanuade and Kaka (2017), Geological Quarterly 61(1):106-123, on the Niger Delta; Hudec and Jackson (2007) as quoted by the EGU TS blog; Schultz-Ela, Jackson and Vendeville (1994) abstract; Ponce, Denton and Miller (2013), USGS, abstract (Mountain Pass carbonatite density); Christeson et al. (2018), EPSL, abstract (Chicxulub suevite and melt rock density); Devriese, Davis and Oldenburg (2017), Interpretation (kimberlite density, qualitative); RocFall documentation table of the New Zealand PETLAB rock-property database (Tenzer et al. 2011); Wikipedia pages (Carbonate compensation depth, Salt tectonics, Cathedral Peak Granodiorite, Migmatite, Gneiss, Blueschist, Granulite, Petroleum trap, Diamictite, Greisen, Skarn, Travertine); SEPM Strata and LibreTexts pages on the CCD; Greenwood and Berman, "Metamorphic rock", The Canadian Encyclopedia.
 - Closed and not read: Winter 2010, Yardley 1989, Spear 1993, Bucher and Grapes 2011, Warren 2016, Telford et al. 1990, Schon 2015, Cruden 1998, McCaffrey and Petford 1997, Cruden and McCaffrey 2001, Buddington 1959, Haederle and Atherton 2002, Mukasa 1986, Hudec and Jackson 2007, Doust and Omatsola 1990, Pollack et al. 1993, Heimsath et al. 1997, Roering et al. 1999, Kelsey and Hand 2015, Brown 2014.
+
+## Arc crust and continental crust (PLT-045, PLT-047), added 2026-10-02 with the continental crust fix
+
+### Stern2010
+- Reference: Stern, R. J. (2010). The anatomy and ontogeny of modern intra-oceanic arc systems. In Kusky, T. M., Zhai, M.-G. and Xiao, W. (eds), The Evolving Continents: Understanding Processes of Continental Growth. Geological Society, London, Special Publications 338:7-34.
+- DOI or URL: 10.1144/SP338.2; author-hosted copy https://earthjay.com/earthquakes/20160729_mariana/stern_2010_anatomy_ontogeny_intraoceanic_arcs.pdf
+- Cited as: "Stern 2010".
+- Ledger ids: PLT-045, PLT-047
+- Access: paywalled at the publisher; a copy is hosted openly.
+- Library (the project's source library, not distributed): fetched 2026-10-02 (the hosted copy). Text file: `Stern2010/Stern2010.txt` (pdftotext).
+- Read so far (by the project): full text, 2026-10-02. p. 9: "Because crustal thickness typically is reflected in elevation, intra-oceanic arcs are generally mostly below sea level"; Moho "at depths between 25 and 35 km. This is where IOASs are thickest, but is nevertheless significantly thinner than continental crust, which is typically c. 40 km thick. IOAS crust also differs from continental crust in being significantly faster (by 0.5-1.0 km s-1)", i.e. more mafic; the crust "thickens at a rate of several hundred metres per million years"; p. 26: "a crustal thickening rate of c. 500 m Ma-1. When IOAS crust thickens sufficiently to stabilize garnet in the lower crust (greater than c. 30 km thick)...".
+
+### SternScholl2010
+- Reference: Stern, R. J. and Scholl, D. W. (2010). Yin and yang of continental crust creation and destruction by plate tectonic processes. International Geology Review 52(1):1-31.
+- DOI or URL: 10.1080/00206810903332322; author copy https://personal.utdallas.edu/~rjstern/pdfs/YinyangIGR10.pdf
+- Cited as: "Stern & Scholl 2010".
+- Ledger ids: PLT-045 (comparison)
+- Access: paywalled at the publisher; author copy open.
+- Library (the project's source library, not distributed): fetched 2026-10-02 (author copy). Text file: `SternScholl2010/SternScholl2010.txt`.
+- Read so far (by the project): full text, 2026-10-02. Abstract: creation and destruction of continental crust "is either in balance (~3.2 km3/year, or 3.2 AU) or more crust is being destroyed than created"; p. 9: the Aleutian and Izu-Bonin-Mariana arcs, "which have evolved since 45-50 Ma", give "crustal growth estimates of 90-180 km3/km-million years"; growth is front-loaded (several hundred km3/km/Myr in the first few Myr, "a few tens or less" for mature arcs); about 2.7 AU of growth at convergent margins (Table 1).
+
+### TetreaultBuiter2014
+- Reference: Tetreault, J. L. and Buiter, S. J. H. (2014). Future accreted terranes: a compilation of island arcs, oceanic plateaus, submarine ridges, seamounts, and continental fragments. Solid Earth 5:1243-1275.
+- DOI or URL: 10.5194/se-5-1243-2014 (open access, CC BY 3.0).
+- Cited as: "Tetreault & Buiter 2014".
+- Ledger ids: PLT-047 (secondary statement of Cloos 1993's 15 km)
+- Access: open.
+- Library (the project's source library, not distributed): fetched 2026-10-02 (publisher PDF). Text file: `TetreaultBuiter2014/TetreaultBuiter2014.txt`.
+- Read so far (by the project): full text, 2026-10-02. Abstract: "Island arcs have an average crustal thickness of 26 km, average bulk crustal density of 2.79 g cm-3"; section 3.1: "Cloos (1993) estimated that island arcs greater than 15 km in thickness are buoyant enough to collide with continental crust; however, the paucity of whole crustal sections of island arcs in the geologic record does not agree with this hypothesis (Condie and Kroner, 2013)."
+
+### JichaJagoutz2015
+- Reference: Jicha, B. R. and Jagoutz, O. (2015). Magma production rates for intraoceanic arcs. Elements 11(2):105-111.
+- DOI or URL: 10.2113/gselements.11.2.105
+- Cited as: not cited in the code; named in the task for the continental crust fix as a source for arc crust growth.
+- Ledger ids: PLT-045 (comparison, no value taken)
+- Access: paywalled (OpenAlex lists no open copy, 2026-10-02).
+- Library (the project's source library, not distributed): abstract only, 2026-10-02 (OpenAlex record of the GSW page): `JichaJagoutz2015/openalex.json`, text `JichaJagoutz2015/abstract.txt`.
+- Read so far (by the project): abstract, 2026-10-02. It gives no numbers: "Our revised magma production rates for active intraoceanic arcs are consistent with those calculated for mid-ocean ridge segments that have slow to moderate spreading rates. This is surprising because magma production at intraoceanic arcs has traditionally been assumed to be significantly less than that at mid-ocean ridges." No value in the code or the ledger rests on it; the rates PLT-045 is compared with are Stern 2010's and Stern & Scholl 2010's.
