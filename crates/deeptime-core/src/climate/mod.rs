@@ -44,6 +44,7 @@
 pub mod belts;
 pub mod carbon;
 pub mod clock;
+pub mod coarse;
 pub mod ebm;
 pub mod glaciers;
 pub mod ice;
