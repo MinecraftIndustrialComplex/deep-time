@@ -57,7 +57,7 @@ them in from [_template.md](_template.md).
 | [plates.md](plates.md) | stub; model about to be rewritten | PLT |
 | [plate-forces.md](plate-forces.md) | written with the feature (2026-10-02): the force balance, recorded and not yet applied | FRC; PLT-181 to PLT-191 |
 | [climate.md](climate.md) | stub; model about to be rewritten | CLM, MOI |
-| [per-cell-climate.md](per-cell-climate.md) | the per-cell climate design's constants, checked against sources before the build (stage 2, WP-14a, 2026-10-02) | CLM-119 to CLM-146, CLM-163 to CLM-166 |
+| [per-cell-climate.md](per-cell-climate.md) | the per-cell climate as built (P1-26, 2026-10-03): what it does, its constants, Earth against the mod; its design constants were checked against sources first (WP-14a, 2026-10-02) | CLM-119 to CLM-146, CLM-163 to CLM-168, CLM-170, CLM-172, CLM-175 to CLM-179 |
 | [biomes.md](biomes.md) | stub | BIO |
 | [erosion-and-sediment.md](erosion-and-sediment.md) | stub | ERO |
 | [isostasy-and-height-limit.md](isostasy-and-height-limit.md) | stub | ISO |

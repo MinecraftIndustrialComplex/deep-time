@@ -57,7 +57,7 @@ library was used. Nothing in the library is checked against the printed version.
 
 ## Counts
 
-388 works (the margins and spires task added Pratson1996, 2026-10-03). Stage 1 listed 475 entries, the flexure feature added 13 and the force balance (task 5, 2026-10-02) 2 (Cloos1993, Coblentz1994, both from memory); 103 entries were merged into 385 works (the merged keys are listed below).
+393 works (the margins and spires task added Pratson1996, 2026-10-03; P1-26 T6 added HEXTOR, Kopparapu2013, Abbot2012, Hu2011 and Pierrehumbert2011 the same day: the tables below were not recounted for them). Stage 1 listed 475 entries, the flexure feature added 13 and the force balance (task 5, 2026-10-02) 2 (Cloos1993, Coblentz1994, both from memory); 103 entries were merged into 385 works (the merged keys are listed below).
 
 By access, as recorded for the work (the most open access class among its merged entries):
 
@@ -4576,7 +4576,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Reference: Myhre, G., Highwood, E. J., Shine, K. P., & Stordal, F. (1998). New estimates of radiative forcing due to well mixed greenhouse gases. Geophysical Research Letters 25(14): 2715-2718.
 - DOI or URL: 10.1029/98GL01908
 - Cited as: "Myhre et al. 1998"
-- Ledger ids: CLM-069, CLM-073
+- Ledger ids: CLM-069, CLM-073, CLM-168 (the doubling anchor of the CO₂ table's scale)
 - Access: paywalled (abstract only)
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Substitute: none found.
@@ -4589,7 +4589,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Reference: Byrne, B., & Goldblatt, C. (2014). Radiative forcing at high concentrations of well-mixed greenhouse gases. Geophysical Research Letters 41(1): 152-160.
 - DOI or URL: 10.1002/2013GL058456; open copy https://dspace.library.uvic.ca/server/api/core/bitstreams/65d2a0aa-a7eb-44ba-b8e7-ac34d0d894d7/content (the article as corrected 17 Apr 2015)
 - Cited as: "Byrne & Goldblatt 2014, GRL 41: 152-160, Table 2"
-- Ledger ids: CLM-070, CLM-071
+- Ledger ids: CLM-070, CLM-071 (both retired in P1-26 T6: the fit is no longer the forcing law), CLM-166, CLM-167 (cross-check of the table at 10^4 and 5·10^4 ppm)
 - Access: open copy at the UVic URL above (publisher page returned 403)
 - Library (the project's source library, not distributed): fetched (PDF, 10 pages, text layer, 29,061 characters). From: https://dspace.library.uvic.ca/server/api/core/bitstreams/65d2a0aa-a7eb-44ba-b8e7-ac34d0d894d7/content. Text file: Byrne2014.txt.
 - Read so far (by the project): "checked in their Table 2 by a Sonnet lookup" (a sub-agent)
@@ -4601,7 +4601,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Reference: Hoffman, P. F., Abbot, D. S., Ashkenazy, Y., Benn, D. I., Brocks, J. J., Cohen, P. A., Cox, G. M., Creveling, J. R., Donnadieu, Y., Erwin, D. H., Fairchild, I. J., Ferreira, D., Goodman, J. C., Halverson, G. P., Jansen, M. F., Le Hir, G., Love, G. D., Macdonald, F. A., Maloof, A. C., Partin, C. A., Ramstein, G., Rose, B. E. J., Rose, C. V., Sadler, P. M., Tziperman, E., Voigt, A., & Warren, S. G. (2017). Snowball Earth climate dynamics and Cryogenian geology-geobiology. Science Advances 3(11): e1600983.
 - DOI or URL: 10.1126/sciadv.1600983; open copy https://dspace.library.uvic.ca/bitstream/1828/11278/1/hoffman_paul_scienceadvances_2017.pdf
 - Cited as: "Hoffman et al. 2017, Sci. Adv. 3: e1600983"
-- Ledger ids: CLM-103
+- Ledger ids: CLM-103, CLM-166, CLM-172
 - Access: open access
 - Library (the project's source library, not distributed): fetched (PDF, 45 pages, text layer, 258,807 characters). From: https://dspace.library.uvic.ca/bitstream/1828/11278/1/hoffman_paul_scienceadvances_2017.pdf. Text file: Hoffman2017.txt.
 - Read so far (by the project): not stated
@@ -5730,4 +5730,51 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Reference check: matches (title, journal, volume, pages on the Duke page).
 
 ETOPO 2022 (entry above, under the climate section) was used as data in the same task: the 60 arc-second surface GeoTIFF was downloaded to the test VM and the continental margins measured with the planet's transect code (build log 2026-10-03).
+
+## Per-cell climate as built: sources added with P1-26 T6 (2026-10-03)
+
+The sources of the CO₂ forcing and the snowball cloud term (research note `docs/research/notes/high-co2-forcing-and-snowball-escape.md`, section 7, which says how each was read). The library folders are named as in the note.
+
+### HEXTOR
+- Reference: Haqq-Misra, J., & Hayworth, B. P. C. (2022). An Energy Balance Model for Rapidly and Synchronously Rotating Terrestrial Planets. The Planetary Science Journal (volume and article number not recorded in the note; arXiv 2201.02685). The software and its tables: HEXTOR, Blue Marble Space, https://github.com/BlueMarbleSpace/hextor, MIT licence, Copyright (c) 2020 Blue Marble Space, commit f800e25f.
+- DOI or URL: arXiv 2201.02685 (the paper); https://github.com/BlueMarbleSpace/hextor (the table `model/radiation/radiation_N2_CO2_Sun.h5`)
+- Cited as: "Haqq-Misra & Hayworth 2022, PSJ (HEXTOR, MIT; table radiation_N2_CO2_Sun.h5, commit f800e25f)"
+- Ledger ids: CLM-167 (the table), CLM-168 (its scale)
+- Access: open (arXiv; GitHub, MIT).
+- Library (the project's source library, not distributed): fetched; folders `HaqqMisraHayworth2022` (arXiv text, `HaqqMisraHayworth2022.txt`) and `HEXTOR_software` (a sparse clone of `model/`; the table exported to `olr_sun_1bar_N2.csv` with the analysis scripts under `analysis/`).
+- Read in the research note (2026-10-03): the paper's radiative-transfer section 2, Appendix A and the software statement; `radiation.f90`'s header and v1 reader; `driver.f`'s OLR parameterizations; the Sun table read with h5py (1,748 rows: 19 temperatures, 190 to 370 K, by 92 CO₂ rows (91 distinct), 1.0e-4 to 10 bar; "1,748 values of FIR … radiative-convective climate model of Kopparapu et al. (2013)", "background N2 pressure of 1 bar"). The table ships in the repository as `crates/deeptime-core/src/climate/co2_table.rs` (1,729 values, the duplicated column dropped) under the MIT licence, credited in NOTICE.md and the file header.
+- Not read: the Haqq-Misra et al. 2016 fit's online supplement (its transcription in HEXTOR's `driver.f` was tested and rejected: 347 W/m² at 288 K and 280 ppm where the table gives 260).
+
+### Kopparapu2013
+- Reference: Kopparapu, R. K., Ramirez, R., Kasting, J. F., Eymet, V., Robinson, T. D., Mahadevan, S., Terrien, R. C., Domagal-Goldman, S., Meadows, V., & Deshpande, R. (2013). Habitable Zones Around Main-Sequence Stars: New Estimates. The Astrophysical Journal 765(2): 131.
+- DOI or URL: 10.1088/0004-637X/765/2/131; arXiv 1301.6674
+- Cited as: "Kopparapu et al. 2013, ApJ 765: 131"
+- Ledger ids: CLM-167
+- Access: open (arXiv).
+- Library (the project's source library, not distributed): fetched (arXiv copy). Text file: Kopparapu2013.txt.
+- Read in the research note (2026-10-03): section 2 (the model: cloud-free radiative-convective, moist adiabat, updated CO₂ collision-induced absorption) and its caveats on dense CO₂ (pp. 5 to 8), in particular that the method "tends to overestimate the greenhouse effect of dense CO2 atmospheres (Goldblatt & Zahnle 2011)" while neglecting CO₂ clouds "may cause us to underestimate" it. Goldblatt & Zahnle 2011 was not obtained.
+
+### Abbot2012
+- Reference: Abbot, D. S., et al. (2012). Clouds and Snowball Earth deglaciation. Geophysical Research Letters 39: L20711. (The note names only the first author, the title and the reference; the full author list was not recorded.)
+- DOI or URL: not recorded in the note
+- Cited as: "Abbot et al. 2012, GRL 39: L20711"
+- Ledger ids: CLM-172
+- Library (the project's source library, not distributed): fetched, the published version from the Max Planck institutional repository (MPG.PuRe). Text file: Abbot2012.txt.
+- Read in the research note (2026-10-03): in full (4 pages). Six GCMs at surface albedo 0.6 and S = 1285 W/m²: the cloud radiative forcing "varies widely among the models"; FOAM's condensate "an order of magnitude lower"; in the cloudy models it is "near zero in the winter hemisphere … but rises to ≈40 W m⁻² in the summer hemisphere"; clouds "could warm a Snowball enough to reduce the CO₂ required for deglaciation by a factor of 10–100" relative to FOAM.
+
+### Hu2011
+- Reference: Hu, Y., Yang, J., Ding, F., & Peltier, W. R. (2011). Model-dependence of the CO₂ threshold for melting the hard Snowball Earth. Climate of the Past 7: 17-25.
+- DOI or URL: not recorded in the note (open access, Copernicus)
+- Cited as: "Hu et al. 2011, Clim. Past 7: 17"
+- Ledger ids: CLM-172, CLM-166 (the literature's escape thresholds)
+- Library (the project's source library, not distributed): fetched (publisher, CC BY). Text file: Hu2011.txt.
+- Read in the research note (2026-10-03): in full. Escape CO₂ about 0.21 bar in a radiative-convective model (0.94 S₀, surface albedo 0.663), 0.38 bar in CAM3 with pressure broadening and collision-induced absorption, 1.0 bar without; January zonal-mean longwave cloud forcing maxima FOAM 6 to 10.5 W/m², CAM3 26 to 32, LMDz 50 (pp. 19 to 20). Le Hir et al. 2007 and Abbot & Pierrehumbert 2010 are known only as cited here.
+
+### Pierrehumbert2011
+- Reference: Pierrehumbert, R. T., Abbot, D. S., Voigt, A., & Koll, D. (2011). Climate of the Neoproterozoic. Annual Review of Earth and Planetary Sciences 39: 417-460.
+- DOI or URL: not recorded in the note (author institution's copy, University of Chicago)
+- Cited as: "Pierrehumbert et al. 2011, Annu. Rev. Earth Planet. Sci. 39: 417" (the note writes "Pierrehumbert et al. 2011")
+- Ledger ids: CLM-167 (the ppm to pCO₂ mapping, Table 1), CLM-172 (c_ld 10 to 30 W/m², Table 2), CLM-166
+- Library (the project's source library, not distributed): fetched (author institution's copy). Text file: Pierrehumbert2011.txt.
+- Read in the research note (2026-10-03): sections 3.1 to 3.3, Table 1 (inventory, partial pressure and molar concentration; the row "10⁵ Pa gives 39.7 % molar, pCO₂ = 7.95·10⁴ Pa and p_tot = 2.00·10⁵ Pa" checked), Table 2 (the 1-D EBM's escape inventories for cloud terms c_ld 10, 20 and 30 W/m²) and section 6. Its OLR fit (a Python supplement on the Annual Reviews site) was not fetched.
 
