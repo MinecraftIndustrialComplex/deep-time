@@ -109,7 +109,7 @@ public final class LakeGameTests {
                 frozenRead++;
                 if (!cold)
                     frozenWarm++;
-            }   // else: not water or ice at the lake's top, which riversHold's dry-shore count fails
+            }   // else the generated ground reaches the lake's top there: dry shore
         }
         for (Spot s : open) {
             BlockState top = level.getChunk(s.x() >> 4, s.z() >> 4).getBlockState(pos.set(s.x(), s.top(), s.z()));
