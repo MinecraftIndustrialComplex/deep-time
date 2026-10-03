@@ -33,7 +33,7 @@ impl Default for Scales {
         Scales {
             m_per_block_h: 300.0,
             m_per_block_v: deeptime_format::DEFAULT_M_PER_BLOCK_V,
-            min_y: -352,
+            min_y: -512,
             max_y: 639,
             sea_level_y: 63,
         }

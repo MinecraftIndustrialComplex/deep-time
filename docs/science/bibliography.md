@@ -57,7 +57,7 @@ library was used. Nothing in the library is checked against the printed version.
 
 ## Counts
 
-387 works. Stage 1 listed 475 entries, the flexure feature added 13 and the force balance (task 5, 2026-10-02) 2 (Cloos1993, Coblentz1994, both from memory); 103 entries were merged into 385 works (the merged keys are listed below).
+388 works (the margins and spires task added Pratson1996, 2026-10-03). Stage 1 listed 475 entries, the flexure feature added 13 and the force balance (task 5, 2026-10-02) 2 (Cloos1993, Coblentz1994, both from memory); 103 entries were merged into 385 works (the merged keys are listed below).
 
 By access, as recorded for the work (the most open access class among its merged entries):
 
@@ -4943,7 +4943,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Reference: NOAA National Centers for Environmental Information (2022). ETOPO 2022 15 Arc-Second Global Relief Model. NOAA NCEI.
 - DOI or URL: 10.25921/fd45-gt74 (title and year confirmed through the DataCite API)
 - Cited as: "ETOPO 2022"
-- Ledger ids: none
+- Ledger ids: ERO-168, HNT-093 (margins and spires task, 2026-10-03)
 - Access: open access (dataset)
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://doi.org/10.25921/fd45-gt74. File: ETOPO2022.txt.
 - Read so far (by the project): data named
@@ -5389,6 +5389,13 @@ Works read for the geothermal page and the hint figure table (2026-10-02). Not c
 - Library: `WEC2013_Geothermal/wec.pdf` and `wec.txt`.
 - Read in this pass: the passage saying high-temperature fields (above 180 degC) lie along plate boundaries (the Pacific ring of fire, Iceland on the Mid-Atlantic Ridge, the East African Rift Valley) and at hotspots such as Hawaii and Yellowstone.
 
+### Davies2010
+- Reference: Davies, J.H. and Davies, D.R. 2010. Earth's surface heat flux. Solid Earth 1:5-24, doi 10.5194/se-1-5-2010 (Creative Commons Attribution 3.0).
+- Ledger ids: GEO-052, GEO-057, GEO-059, GEO-060
+- Access: open.
+- Library: `Davies2010/Davies2010.pdf` and `Davies2010.txt`.
+- Read in this pass (GEO heat flow, 2026-10-02): full text of Tables 3 and 7 and Eq. 2. Continents (2.073e14 m2): 14.7 TW, mean 70.9 mW/m2; oceans 105.4; global 91.6. Mean heat flow by geology: Cenozoic extensional 102.4 (16 observations), Quaternary 82.0, Tertiary 77.3, continental and island arc margins 73.8, Precambrian 59.9. The empirical continental fit q = 102 - 2.25 sqrt(t) (t in Myr, Precambrian excluded; R squared 0.75 for the category means).
+
 ### NASAEarthFactSheet
 - Reference: NASA Space Science Data Coordinated Archive, Earth Fact Sheet. https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 - Ledger ids: HNT-001, HNT-002, HNT-003, HNT-004
@@ -5701,3 +5708,18 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Access: paywalled (OpenAlex lists no open copy, 2026-10-02).
 - Library (the project's source library, not distributed): abstract only, 2026-10-02 (OpenAlex record of the GSW page): `JichaJagoutz2015/openalex.json`, text `JichaJagoutz2015/abstract.txt`.
 - Read so far (by the project): abstract, 2026-10-02. It gives no numbers: "Our revised magma production rates for active intraoceanic arcs are consistent with those calculated for mid-ocean ridge segments that have slow to moderate spreading rates. This is surprising because magma production at intraoceanic arcs has traditionally been assumed to be significantly less than that at mid-ocean ridges." No value in the code or the ledger rests on it; the rates PLT-045 is compared with are Stern 2010's and Stern & Scholl 2010's.
+
+## Continental margins (ERO-168 to ERO-170, HNT-093), added 2026-10-03
+
+### Pratson1996
+- Reference: Pratson, L. F. and Haxby, W. F. (1996). What is the slope of the U.S. continental slope? Geology 24(1):3-6.
+- DOI or URL: 10.1130/0091-7613(1996)024<0003:WITSOT>2.3.CO;2
+- Cited as: "Pratson & Haxby 1996" (the regional slope of the steepest clastic margin, 2.5°).
+- Ledger ids: ERO-168, HNT-093
+- Access: paywalled (GSA); the abstract is on Duke Scholars (https://fds.duke.edu/db/pratt/gendell/faculty/lincoln.pratson/publications/279477).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract only, 2026-10-03 (margins and spires task): regional and mean local slopes, West Florida (passive carbonate) 4.4° and 12.0°, New Jersey–Maryland (passive clastic) 2.5° and 7.6°, Louisiana (salt) 0.5° and 2.9°, California (strike-slip) 1.8° and 5.2°, Oregon (convergent) 2.0° and 5.2°, from multibeam bathymetry of five U.S. margins.
+- Reference check: matches (title, journal, volume, pages on the Duke page).
+
+ETOPO 2022 (entry above, under the climate section) was used as data in the same task: the 60 arc-second surface GeoTIFF was downloaded to the test VM and the continental margins measured with the planet's transect code (build log 2026-10-03).
+

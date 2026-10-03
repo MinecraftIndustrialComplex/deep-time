@@ -93,8 +93,23 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
     s.arc_continental_m = lerp(&|x| x.arc_continental_m);
     s.arc_oceanic_m = lerp(&|x| x.arc_oceanic_m);
     s.oxidation = lerp(&|x| x.oxidation);
-    s.heat_flow_mw_m2 = lerp(&|x| x.heat_flow_mw_m2);
     s.uplift_mm_yr = lerp(&|x| x.uplift_mm_yr);
+    // Heat flow belongs to the kind of crust (the sea floor's age law against the continental
+    // sum), so only the corners of the sample's own kind are blended: a continental sample on the
+    // coast must not take the young ridge crust's 300 mW/m² from an oceanic corner. (The next
+    // step sets every sample's heat flow again; this only matters for what is read right after
+    // a resampling, the final snapshot among them: the bake's `meta/heat_flow_mw_m2`.)
+    let same_kind: f64 = (0..3)
+        .filter(|&k| corners[k].kind == s.kind)
+        .map(|k| w[k])
+        .sum();
+    if same_kind > 0.0 {
+        let blend: f64 = (0..3)
+            .filter(|&k| corners[k].kind == s.kind)
+            .map(|k| w[k] * f64::from(corners[k].heat_flow_mw_m2))
+            .sum();
+        s.heat_flow_mw_m2 = (blend / same_kind) as f32;
+    }
     if s.kind == OCEANIC {
         let (mut sw, mut sf) = (0.0, 0.0);
         for k in 0..3 {

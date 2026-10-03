@@ -15,17 +15,24 @@ import com.google.gson.JsonObject;
  * @param size                multiplies every feature's size ({@code geothermal_size})
  * @param springMinPrecipMm   a field is hot springs only where the year's rain reaches this much
  *                            ({@code geothermal_spring_min_precip_mm}); drier ground gets fumaroles
+ * @param heatFlowMinMwM2     continental ground whose baked heat flow ({@code meta/heat_flow_mw_m2}) reaches this,
+ *                            mW/m2, takes fields beyond the volcanoes ({@code geothermal_heat_flow_min_mw_m2})
+ * @param heatDensity         multiplies how many fields such ground gets; 0: none, the volcanoes' fields only
+ *                            ({@code geothermal_heat_density})
  */
-public record GeothermalRules(double density, double reach, double size, double springMinPrecipMm) {
+public record GeothermalRules(double density, double reach, double size, double springMinPrecipMm, double heatFlowMinMwM2,
+                              double heatDensity) {
 
-    // ledger: GEO-010 (game-choice; the defaults repeat GEO-001, GEO-003, GEO-005, GEO-007)
-    public static final GeothermalRules DEFAULT = new GeothermalRules(1.0, 1.0, 1.0, 400.0);
+    // ledger: GEO-010 (game-choice; the defaults repeat GEO-001, GEO-003, GEO-005, GEO-007, GEO-052, GEO-054)
+    public static final GeothermalRules DEFAULT = new GeothermalRules(1.0, 1.0, 1.0, 400.0, 100.0, 1.0);
 
     public GeothermalRules {
         density = Math.clamp(density, 0.0, 4.0);
         reach = Math.clamp(reach, 0.25, 3.0);
         size = Math.clamp(size, 0.5, 3.0);
         springMinPrecipMm = Math.clamp(springMinPrecipMm, 0.0, 4000.0);
+        heatFlowMinMwM2 = Math.clamp(heatFlowMinMwM2, 50.0, 400.0);
+        heatDensity = Math.clamp(heatDensity, 0.0, 4.0);
     }
 
     /** The world's rules; {@link #DEFAULT} for every key that is absent or of the wrong type. */
@@ -42,7 +49,9 @@ public record GeothermalRules(double density, double reach, double size, double 
         return new GeothermalRules(number(p, "geothermal_density", DEFAULT.density),
                 number(p, "geothermal_reach", DEFAULT.reach),
                 number(p, "geothermal_size", DEFAULT.size),
-                number(p, "geothermal_spring_min_precip_mm", DEFAULT.springMinPrecipMm));
+                number(p, "geothermal_spring_min_precip_mm", DEFAULT.springMinPrecipMm),
+                number(p, "geothermal_heat_flow_min_mw_m2", DEFAULT.heatFlowMinMwM2),
+                number(p, "geothermal_heat_density", DEFAULT.heatDensity));
     }
 
     private static double number(JsonObject p, String key, double fallback) {

@@ -145,8 +145,8 @@ public final class WorldDataTerrain implements TerrainSource {
                             new GeothermalEnv(wd), wd.circumference(), seaLevel, wd.manifest().mPerBlockH());
                     int[] n = geothermal.counts();
                     com.minecraftindustrialcomplex.deeptime.DeepTime.LOGGER.info(
-                            "[deeptime] geothermal: {} sites from {} active volcanoes: {} pools, {} vents, {} patches of altered ground ({} ms; {})",
-                            geothermal.sites().size(), wd.volcanoes().list().size(), n[0], n[1], n[2],
+                            "[deeptime] geothermal: {} sites ({} from hot ground) from {} active volcanoes: {} pools, {} vents, {} patches of altered ground ({} ms; {})",
+                            geothermal.sites().size(), geothermal.heatFlowSites(), wd.volcanoes().list().size(), n[0], n[1], n[2],
                             (System.nanoTime() - t0) / 1_000_000L, geothermalRules());
                 }
                 g = geothermal;

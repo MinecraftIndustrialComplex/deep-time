@@ -62,7 +62,7 @@ impl Scale {
             circumference_blocks: c,
             m_per_block_h: 300.0,
             m_per_block_v: DEFAULT_M_PER_BLOCK_V,
-            min_y: -352,
+            min_y: -512,
             max_y: 639,
             sea_level_y: 63,
         }

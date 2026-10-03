@@ -16,9 +16,9 @@ A Deep Time planet is small. Its circumference is 16,384 or 32,768 blocks, and o
 | [BAK](ledger/BAK.md) | spawn placement | BAK-014 to BAK-016 (3) |
 | [BAK](ledger/BAK.md) | satellite view | BAK-017 to BAK-032 (16) |
 | [BAK](ledger/BAK.md) | synthetic worlds | BAK-033 to BAK-038 (6) |
-| [BAK](ledger/BAK.md) | far terrain | BAK-039 to BAK-040 (2) |
+| [BAK](ledger/BAK.md) | far terrain | BAK-039 to BAK-042 (4) |
 
-Rows by status: `cited-unverified` 6, `calibrated` 2, `game-choice` 71, `uncited` 12.
+Rows by status: `cited-unverified` 6, `calibrated` 2, `game-choice` 73, `uncited` 12.
 
 ## Material for the stage 2 writer
 
@@ -54,7 +54,8 @@ was a fixed 40 m), and the deposits' surface height reads the world's sea level 
 detail cap and character pass, river channels, the thinnest rock unit (1 block), the metamorphic and
 plutonic minimum thicknesses (8 and 16 blocks), the build-limit band and its knee (y 575, now 17.9 km
 above the sea instead of 10.2 km: ISO-031), caves, aquifers and the lava floor. The world's range
-(y −352 to 639) holds 14.5 km below the sea and 20.2 km above it (SCL-010).
+(y −512 to 639 since the floor moved on 2026-10-02) holds 20.1 km below the sea and 20.2 km above it at
+35 m (SCL-010; 14.5 km below with the earlier floor at −352).
 
 **Settings tuned against 15×, re-checked** (all kept; the planet in metres is unchanged by keeping
 them, and the drawn shapes move the way Ben asked):
@@ -93,7 +94,8 @@ one visible crater of each planet: 15 → 9 and 11 → 7 blocks deep.
 
 **The deepest ground.** The lowest terrain is y −303 on the supercontinent planet (y −577 at 20 m)
 and y −260 on the scattered one (−502); at 35 m no column is below y −336 and two are below −300
-(at 20 m 500,227 and 125,646 columns were below the floor at −352). The sea floor's 1st percentile is
+(at 20 m 500,227 and 125,646 columns were below the old floor at −352). These bakes ran with the floor at
+−352; master has since moved it to −512, which 35 m does not need (STATUS.md, pending question). The sea floor's 1st percentile is
 y −164 and −140.
 
 **Rock layers** (`vertical_scale.py strata` and a comparison of the same land columns down to 2 km
@@ -113,5 +115,38 @@ million (scattered); a median porphyry body holds 241 → 155 ore blocks.
 
 **Open questions** (STATUS.md "Pending questions", 2026-10-02): whether rock layers keep their real
 thickness or today's thickness in blocks (`scale.feature_scale.strata` 1.75); whether ore bodies keep
-today's height in blocks; whether the settings above keep their values; and whether the floor's move
-to y −512 is still wanted.
+today's height in blocks; whether the settings above keep their values; and whether the floor stays at
+y −512 or goes back to −352.
+
+## Distant Horizons far terrain and Toroidal World's seam
+
+Far terrain (P3-04) gives Distant Horizons its distant LODs from the baked world data instead of
+from chunks generated far away. Nothing physical is decided here; the rows (BAK-039 to BAK-042)
+are game choices about how far terrain stays the same terrain as the chunks.
+
+- **The seam.** Every far column folds x into the planet's lap [-C/2, C/2), the period at which
+  the world data wraps and at which Toroidal World loops the level, so a section west of x = C/2,
+  east of it or across it draws what the chunks there have (BAK-042).
+- **Toroidal World's guard** (Ben, 2026-10-02: "Mixin around TW's guard"). TW 0.19.3 (MIT) refuses
+  every Distant Horizons world generator but DH's own on a level it wraps, from DH 3.3.1 on: TW
+  makes the seam seamless by reshaping the level's chunk generator and folding DH's section keys,
+  and a foreign generator would not know the seam. Deep Time's generator reads the same wrapped
+  world data the chunk generator does, so a mixin into TW's `DhGenerators.requireOwn` lets it
+  through, and only it, when the level's TW loop equals the world data's circumference and Z
+  does not loop (BAK-041). TW's key folding, retrieval, seam ranking and LOD-tree mixins are not
+  touched. The mixin is optional: it applies only when TW and DH are installed and TW's method is
+  as checked, and logs whether it applied.
+- **How it is checked.** GameTests compare far terrain with generated chunks over the planet and
+  on 64 blocks either side of the seam; `tools/smoke/run.py --dh` has Distant Horizons generate
+  and store sections beside the spawn and centred on the seam, then compares what it stores with
+  far terrain and far terrain with the chunks generated afterwards on 160 blocks either side.
+  `tools/client/dh-client-check.sh` joins a real client (software GL on the test machine) and
+  checks that its Distant Horizons requests reach the generator on both sides of the seam and
+  that the sections arrive in the client's own database. Its first complete run (2026-10-03) did
+  not pass: the client joined and DH's networking came up, but it sent no generation request, so
+  far terrain reaching a player is not verified yet (STATUS.md build log).
+- **What is not covered.** Distant Horizons' `/dh pregen` cannot cross the seam with Toroidal World
+  0.19.3: DH files a pending section under its raw position, TW answers it under the folded one, and
+  the pregeneration stops (STATUS.md, pending questions). Players' clients do not use it. The
+  GameTest server cannot load Distant Horizons (it casts the server to a dedicated one), so the
+  GameTests check far terrain without it and the smoke check covers Distant Horizons.
