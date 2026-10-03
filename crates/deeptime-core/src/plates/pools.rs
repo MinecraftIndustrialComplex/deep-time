@@ -152,7 +152,7 @@ pub fn surface_step(s: &mut Sample, r: &SurfaceRates) -> f64 {
         eroded = strip(&mut s.pools, lower * ISOSTATIC_FACTOR);
     }
     // A trench is the oceanic slab's: continental crust at a collision front is not pulled down
-    // (it builds the wedge, `belts.rs`; plate tasks 3 and 4). ledger: PLT-240
+    // (it builds the wedge, `belts.rs`; plate tasks 3 and 4). ledger: PLT-252
     if s.flags & TRENCH != 0 && s.kind == OCEANIC {
         z += (r.z_t - z) * r.trench_relax;
         z += r.accretion_m;

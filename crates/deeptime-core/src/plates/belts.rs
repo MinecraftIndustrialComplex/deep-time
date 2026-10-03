@@ -86,15 +86,15 @@ use super::subduction::{MIN_CONTACT, OROGENY_MIN_M_PER_MYR, ceiling};
 
 /// The surface's flexure below which ground in front of a wedge counts as the foreland basin, m
 /// (`docs/design/flexure.md` §8: `surface/flexure_m` below about −100 m beside a collision).
-// ledger: PLT-236 (game-choice: the measure's threshold).
+// ledger: PLT-249 (game-choice: the measure's threshold).
 pub const FOREDEEP_M: f64 = -100.0;
 /// How far beyond the wedge's toe the foreland basin is looked for, km (Earth-normalized; the
 /// widest foredeeps and forebulges of DeCelles & Giles 1996 reach a few hundred km).
-// ledger: PLT-236 (game-choice: the measure's reach).
+// ledger: PLT-249 (game-choice: the measure's reach).
 pub const FOREDEEP_REACH_KM: f64 = 600.0;
 /// The foredeep of the record is the one in front of a belt that stood at least this high, m
 /// (the design's acceptance row: "in front of a belt above 3 km").
-// ledger: PLT-236 (the measure's definition, design `plate-force-balance.md` §7).
+// ledger: PLT-249 (the measure's definition, design `plate-force-balance.md` §7).
 pub const FOREDEEP_BELT_M: f64 = 3000.0;
 /// The lowest ground the wedge's profile is followed down to, m (the reach of its distance
 /// field; ground lower than this is not continental lowland).
@@ -236,7 +236,7 @@ fn stack_front(
     let norm = env.norm;
     let n = state.samples.len();
     let area = norm.sample_area_km2();
-    // ledger: PLT-192 (the wedge's surface slope), PLT-231 (the wedge's rule).
+    // ledger: PLT-192 (the wedge's surface slope), PLT-244 (the wedge's rule).
     let tan = k.wedge_slope_deg.to_radians().tan();
     let samples = &state.samples;
     let visible_of =
@@ -317,7 +317,7 @@ fn stack_front(
             .sum::<f64>()
             / f.crust.len() as f64
     };
-    // ledger: PLT-229 (the share), PLT-121 (Airy, ISOSTATIC_FACTOR).
+    // ledger: PLT-242 (the share), PLT-121 (Airy, ISOSTATIC_FACTOR).
     let rise_km2_m = k.collision_stacking_share * crossed_km2 * thickness_m / ISOSTATIC_FACTOR;
     let fill = if deficit_km2_m > 0.0 {
         (rise_km2_m / deficit_km2_m).min(1.0)
@@ -326,7 +326,7 @@ fn stack_front(
     };
     let belt_rise_km2_m = rise_km2_m - fill * deficit_km2_m;
 
-    // ledger: PLT-230 (the belt's profile, 1 − (d/W)², highest at the front).
+    // ledger: PLT-243 (the belt's profile, 1 − (d/W)², highest at the front).
     let w_rad = norm.rad(belt_km);
     let belt: Vec<(usize, f64)> = (0..n)
         .filter(|&i| d_over[i].is_finite())
@@ -341,7 +341,7 @@ fn stack_front(
         .max(0.5 * 2.0 / 3.0 * belt_km * f.length_km());
 
     // The rock that stays: the consumed crust's own mix, its sediments buried and metamorphosed.
-    // ledger: PLT-235.
+    // ledger: PLT-248.
     let mut mix = [0.0f64; pool::COUNT];
     for &j in &f.crust {
         for (m, &x) in mix.iter_mut().zip(samples[j as usize].pools.iter()) {
@@ -415,7 +415,7 @@ fn stack_front(
         out.lifted10 += u32::from(dz > 10.0);
         out.lifted100 += u32::from(dz > 100.0);
         out.emerged += u32::from(z <= 0.0 && z1 > 0.0);
-        // ledger: PLT-234 (the stamp), PLT-079 (the regime it makes).
+        // ledger: PLT-247 (the stamp), PLT-079 (the regime it makes).
         if dz >= stamp_m {
             s.orogeny = OROGENY_HIMALAYAN;
             s.orogeny_myr = env.t_myr as f32;
@@ -521,7 +521,7 @@ pub fn resist(state: &PlateState, omega: &mut [DVec3], env: &Env, relax: f64, fr
         if u == o || !state.plates[u].alive || !state.plates[o].alive || h_s <= 0.0 {
             continue;
         }
-        // ledger: PLT-232 (the resistance law).
+        // ledger: PLT-245 (the resistance law).
         let drive_km = front_km
             .get(u)
             .copied()

@@ -626,12 +626,12 @@ impl Default for TectonicParams {
             subduction_uplift_mm_yr: 0.6,
             collision_threshold_km: 100.0, // ledger: PLT-068
             subduction_peak_km: 300.0,
-            collision_belt_km: 400.0,          // ledger: PLT-228
-            collision_stacking_share: 0.5,     // ledger: PLT-229
+            collision_belt_km: 400.0,          // ledger: PLT-241
+            collision_stacking_share: 0.5,     // ledger: PLT-242
             wedge_slope_deg: 1.5,              // ledger: PLT-192
-            collision_resistance_mm_yr: 200.0, // ledger: PLT-232
-            weld_speed_mm_yr: 5.0,             // ledger: PLT-233
-            weld_after_myr: 10.0,              // ledger: PLT-233
+            collision_resistance_mm_yr: 200.0, // ledger: PLT-245
+            weld_speed_mm_yr: 5.0,             // ledger: PLT-246
+            weld_after_myr: 10.0,              // ledger: PLT-246
             slab_pull_rad_per_1000km_myr: 0.002,
             slab_pull_speed_mm_yr: 80.0,
             slab_pull_front_km: 3000.0,

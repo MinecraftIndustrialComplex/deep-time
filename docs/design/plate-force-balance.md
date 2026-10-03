@@ -545,7 +545,7 @@ departs from the plan above and from the collisions design's task 2:
 
 Branch of the plate tasks 3 and 4 agent; new module `plates/belts.rs`, changes in `shortening.rs`,
 `collision.rs`, `subduction.rs`, `pools.rs`, `rifting.rs`, `mod.rs`, `state.rs`, `dynamics.rs` and
-`check.rs`. Ledger PLT-228 to PLT-240; science page `docs/science/plates.md`, section "Collision
+`check.rs`. Ledger PLT-241 to PLT-252; science page `docs/science/plates.md`, section "Collision
 belts, the wedge and the weld". Where it departs from section 3.5 above and from the collisions
 design (4.1 1C, 4.2 2B):
 
@@ -560,7 +560,7 @@ design (4.1 1C, 4.2 2B):
   preset): at 1.5° a wedge one row wide needs the belt's edge about 1.9 km above the foreland.
 - **The setting is `wedge_slope_deg`**, as WP-13a asked (a surface slope, not a taper).
 - **The foreland basin** is the surface stage's flexure, as decided; the record reads it back from
-  `surface/flexure_m` (PLT-236). No `plates/foreland_m` or `plates/shortening` L1 field was added:
+  `surface/flexure_m` (PLT-249). No `plates/foreland_m` or `plates/shortening` L1 field was added:
   the structure stage reads the belt through the `collision` regime (stamped belt and wedge), and
   its foreland rule and fold tightness from the real shortening are left for task 6 (below).
 - **Resistance** (2B) is a plastic cut inside the present speed law: each step the convergence
