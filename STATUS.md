@@ -134,9 +134,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   base); (2) **`plates/pools.rs` `surface_step`: the oceanic dampening z −= (1 − z/z_floor)·ε_o·δt relaxes every
   oceanic sample's height back to the age–depth curve with a 26 Myr time constant whatever its age**, so the sediment the
   surface stage lays on old ocean floor beside a margin (rise, prograding shelf and slope) subsides at ~200 m/Myr and is
-  erased (GDH1 at 100 Myr: ~4 m/Myr). Planned fix there: oceanic crust subsides at the age–depth curve's own rate at
-  its age, loads staying (the surface stage's isostasy and flexure compensate them). A few lines in `surface_step`
-  only; no other `plates/` file. The rest of the fix is in `surface/`.
+  erased (GDH1 at 100 Myr: ~4 m/Myr). **Tried and withdrawn (no `plates/` edit on the branch now):** subsiding oceanic
+  crust at the curve's own rate at its age kept every load on the sea floor, and the sediment budget then filled
+  the oceans (scattered 500 Myr: land 0.23 → 0.62, sea floor −2 km 100 km off the coast). The relaxation is today the
+  ocean's only sediment sink besides subduction; changing it needs the sediment budget and the hypsometry
+  recalibrated with it (a plate-model question for later, recorded in the build log). The fix stays in `surface/`.
 ### 2026-10-02 — The vertical-scale study (agent worktree agent-afbde2c1feb92691f, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; a study, no defaults changed; not merged)
 - **Asked:** Ben finds the worlds "cartoonishly stretched" at 20 m per block up and 300 m across (15×). Data and pictures to choose a vertical scale. Written to `docs/research/notes/vertical-scale-study.md` (index row in `docs/research/README.md`); pictures in `review/out/vertical-scale/` (planet B, with the references) and `review/out/vertical-scale/a/` (planet A), not committed.
 - **Tools (committed):** `deeptime-inspect heights` (any generated world's terrain and water tops as a NumPy array); `tools/review/vertical-scale.sh` and `vertical_scale.py` (`join`, `refjoin`, `stats`, `compare`, `places`, `strata`, `render`, `charts`, `page`).
