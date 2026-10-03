@@ -263,7 +263,7 @@
     "ebm_bands": 90,
     "ebm_steps_per_year": 72,
     "ebm_spinup_years": 40,
-    "ebm_warm_years": 6,
+    "ebm_warm_years": 12,
     "lapse_c_per_km": 6.5,
     "trade_wind_m_s": 7.0,
     "westerly_m_s": 10.0,

@@ -171,12 +171,14 @@ pub mod history {
 const BYTES_PER_CELL: u64 = 154 + 96;
 
 /// Keyframe layers (with the group's plates and surface layers).
-pub const KEYFRAME_LAYERS: [&str; 5] = [
+pub const KEYFRAME_LAYERS: [&str; 7] = [
     field::T_MEAN,
     field::PRECIP,
     field::KOPPEN,
     field::ICE_THICKNESS,
     field::SEA_ICE,
+    field::SEA_ICE_MAX,
+    field::SEA_ICE_MIN,
 ];
 
 /// Event kinds of the deep-time climate (EVENTS.md "The climate's events").
