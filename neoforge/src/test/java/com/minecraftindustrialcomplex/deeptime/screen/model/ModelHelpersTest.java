@@ -77,7 +77,7 @@ class ModelHelpersTest {
 
         double[] b = GlobeProjection.block(45, 90, 16_384, new double[2]);
         assertEquals(-4096, b[0], 1e-9, "lon 90 is a quarter east of the seam at x = −C/2");
-        assertEquals(-2048, b[1], 1e-9, "north is −z");
+        assertEquals(-16_384 / (2 * Math.PI) * Math.sin(Math.toRadians(45)), b[1], 1e-9, "north is −z; z = −R·sin φ (Lambert)");
         double[] back = GlobeProjection.latLon(b[0], b[1], 16_384, new double[2]);
         assertEquals(45, back[0], 1e-9);
         assertEquals(90, back[1], 1e-9);

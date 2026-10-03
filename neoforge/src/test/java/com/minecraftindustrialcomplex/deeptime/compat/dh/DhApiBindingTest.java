@@ -245,4 +245,81 @@ class DhApiBindingTest {
             }
         }
     }
+
+    /**
+     * The curvature slot reaches the real jar's {@code IDhApiConfigValue} by its published names:
+     * a model of Distant Horizons' two value layers stands behind {@code DhApi.Delayed.configs}, and
+     * the controller sets and clears the API layer through the binding without the player's value
+     * ({@code getTrueValue}) ever moving.
+     */
+    @Test
+    void theCurvatureSlotReachesTheRealConfigInterfaces() throws Exception {
+        for (Map.Entry<String, File> e : jars().entrySet()) {
+            try (URLClassLoader loader = new URLClassLoader(new URL[]{e.getValue().toURI().toURL()}, ClassLoader.getPlatformClassLoader())) {
+                DhApiBinding api = DhApiBinding.find(loader, null).orElseThrow();
+                String s = api.suffix(), base = DhApiBinding.API;
+                assertNull(api.earthCurvature(), "before Distant Horizons starts its API there is no setting");
+
+                Class<?> configType = Class.forName(base + "interfaces.config.IDhApiConfig" + s, false, loader);
+                Class<?> graphicsType = Class.forName(base + "interfaces.config.client.IDhApiGraphicsConfig" + s, false, loader);
+                Class<?> valueType = Class.forName(base + "interfaces.config.IDhApiConfigValue" + s, false, loader);
+                // The model of one config entry: the player's value and the API layer.
+                int[] player = {0};
+                Integer[] layer = {null};
+                int[] sets = {0};
+                Object value = Proxy.newProxyInstance(loader, new Class<?>[]{valueType}, (p, m, a) -> switch (m.getName()) {
+                    case "getValue" -> layer[0] != null ? layer[0] : player[0];
+                    case "getTrueValue" -> player[0];
+                    case "getApiValue" -> layer[0];
+                    case "getDefaultValue" -> 0;
+                    case "getCanBeOverrodeByApi" -> true;
+                    case "setValue" -> {
+                        sets[0]++;
+                        layer[0] = (Integer) a[0];
+                        yield true;
+                    }
+                    case "clearValue" -> {
+                        layer[0] = null;
+                        yield true;
+                    }
+                    default -> throw new UnsupportedOperationException(m.getName());
+                });
+                Object graphics = Proxy.newProxyInstance(loader, new Class<?>[]{graphicsType}, (p, m, a) -> {
+                    if (m.getName().equals("earthCurvatureRatio"))
+                        return value;
+                    throw new UnsupportedOperationException(m.getName());
+                });
+                Object configs = Proxy.newProxyInstance(loader, new Class<?>[]{configType}, (p, m, a) -> {
+                    if (m.getName().equals("graphics"))
+                        return graphics;
+                    throw new UnsupportedOperationException(m.getName());
+                });
+                Class.forName(base + "DhApi$Delayed" + s, true, loader).getField("configs").set(null, configs);
+
+                DhCurvature.Slot slot = api.earthCurvature();
+                assertNotNull(slot);
+                assertEquals(0, slot.playerValue());
+                assertEquals(0, slot.defaultValue());
+                assertNull(slot.apiValue());
+                assertTrue(slot.overridable());
+
+                DhCurvature.Controller controller = new DhCurvature.Controller();
+                assertEquals(DhCurvature.Outcome.SET, controller.reconcile(slot, 16_384, true));
+                assertEquals(2443, layer[0], e.getKey() + ": the 16k planet's ratio is on the API layer");
+                assertEquals(0, player[0], "the player's own value never moves");
+                assertEquals(DhCurvature.Outcome.UNCHANGED, controller.reconcile(slot, 16_384, true));
+                assertEquals(1, sets[0], "an unchanged ratio is not set again");
+                assertEquals(DhCurvature.Outcome.SET, controller.reconcile(slot, 32_768, true));
+                assertEquals(1222, layer[0]);
+                assertEquals(DhCurvature.Outcome.CLEARED, controller.release(slot));
+                assertNull(layer[0]);
+                assertEquals(0, player[0]);
+
+                player[0] = 300; // the player typed their own value into Distant Horizons' screen
+                assertEquals(DhCurvature.Outcome.PLAYER_VALUE, controller.reconcile(slot, 16_384, true));
+                assertNull(layer[0], "a player's value is left to show");
+                System.out.printf("[dh] %s: earthCurvatureRatio set, cleared and left alone through %s%n", e.getKey(), valueType.getSimpleName());
+            }
+        }
+    }
 }

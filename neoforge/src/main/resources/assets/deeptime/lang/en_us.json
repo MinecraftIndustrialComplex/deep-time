@@ -401,5 +401,9 @@
 
   "deeptime.polecap.storm": "Polar storm (%s): the wind is pushing you back toward the equator",
   "deeptime.polecap.storm.no_wind": "Polar storm (%s): the world ends at %s",
-  "deeptime.polecap.stop": "You cannot go any further: %s is the edge of the world"
+  "deeptime.polecap.stop": "You cannot go any further: %s is the edge of the world",
+
+  "deeptime.configuration.title": "Deep Time",
+  "deeptime.configuration.dhAutoCurvature": "Distant Horizons curvature follows the planet",
+  "deeptime.configuration.dhAutoCurvature.tooltip": "In a Deep Time world, bends Distant Horizons' far terrain to the planet's own curvature (a sphere of circumference / 2 pi blocks) unless you set Distant Horizons' Earth Curve Ratio yourself. It uses Distant Horizons' API override, so its config file is never rewritten, and puts the setting back when you leave."
 }

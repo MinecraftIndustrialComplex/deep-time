@@ -18,7 +18,8 @@ use crate::surface::grid::Dims;
 use crate::surface::{pflood, routing};
 
 const W2: usize = 96;
-const H2: usize = 48;
+// C = 768: the rows run from z = −128, the multiple of 32 past the Lambert pole at 122.2.
+const H2: usize = 32;
 const R2: u32 = 8;
 const C: u32 = W2 as u32 * R2;
 const SEA_Y: f64 = 63.0;
@@ -471,7 +472,7 @@ fn streamed_and_in_memory_l3_agree_bit_for_bit() {
 
 #[test]
 fn the_levels_before_the_last_agree_tiled_and_whole() {
-    // The middle level (192 × 96 cells here) in tiles of 64 with its halo, then the last level
+    // The middle level (192 × 64 cells here) in tiles of 64 with its halo, then the last level
     // in tiles: the terrain is what a run on whole rasters gives, to the bit.
     let l2 = l2_level();
     let whole_cfg = cfg(1.0);
@@ -480,7 +481,7 @@ fn the_levels_before_the_last_agree_tiled_and_whole() {
     tiled_cfg.p.stream = StreamMode::Always;
     tiled_cfg.p.tile_cells = 64;
     let (tiled, out) = run_mem(&l2, &tiled_cfg, plan_tiled(&tiled_cfg), 2);
-    assert!(out.levels[0].tiles >= 6, "{} tiles", out.levels[0].tiles);
+    assert!(out.levels[0].tiles >= 3, "{} tiles", out.levels[0].tiles);
     assert!(
         whole
             .z
@@ -531,7 +532,7 @@ fn streamed_tile_packs_hold_what_the_memory_run_holds() {
             .unwrap()
             .len()
     );
-    for j in [0usize, 1, 100, 191] {
+    for j in [0usize, 1, 100, 127] {
         for i in [0usize, 5, 100, 383] {
             let z = mem.z[j * 4 * W2 + i];
             let y = SEA_Y + (f64::from(z) - c.sea) / c.mv;
@@ -1173,14 +1174,17 @@ fn auto_mode_under(cap: u64, held: u64, name: &str) -> String {
 
 #[test]
 fn the_stage_streams_under_auto_when_only_the_whole_path_peak_is_over_the_cap() {
-    // L3 1024 x 512 from L2 256 x 128: 41.4 MB of buffers whole, and the middle level (512 x 256)
-    // and the preview on top of them in memory. A cap 1 MB over the buffers alone holds those but
-    // not the peak: `auto` must tile the last level, not reserve the rest late and fail.
-    let (gw, gh) = (1024usize, 512usize);
+    // L3 1024 x 328 from L2 256 x 82 (C = 16,384: rows from z = −2,624, past the Lambert pole),
+    // and the middle level (512 x 164) and the preview on top of them in memory. A cap 1 MB over
+    // the buffers alone holds those but not the peak: `auto` must tile the last level, not reserve
+    // the rest late and fail.
+    let l3 = GridDesc::for_planet("L3", 16_384, 16).unwrap();
+    let (gw, gh) = (l3.w as usize, l3.h as usize);
     let last_only = (gw * gh) as u64 * TILE_BYTES_PER_CELL;
     let peak_over_l2 = whole_last_level_peak(0, 2, gw, gh, 128);
     assert!(
-        peak_over_l2 > last_only + (2 << 20),
+        // The middle level alone is 1.7 MB (512 × 164 cells at 21 bytes).
+        peak_over_l2 > last_only + (3 << 19),
         "the case is not degenerate"
     );
     let held = 0;

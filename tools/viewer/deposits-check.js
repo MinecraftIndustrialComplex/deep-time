@@ -11,18 +11,20 @@ const path = require('path');
 
 // The page's scripts at least compile (a syntax error would blank the workbench).
 const fs = require('fs'), vm = require('vm');
-for (const f of ['workbench.js', 'deposits.js']) {
+for (const f of ['projection.js', 'workbench.js', 'deposits.js']) {
   const file = path.join(__dirname, '../../crates/deeptime-viewer/assets', f);
   new vm.Script(fs.readFileSync(file, 'utf8'), { filename: file });
 }
 
 globalThis.Path2D = class { constructor(d) { this.d = d; } };
+require(path.join(__dirname, '../../crates/deeptime-viewer/assets/projection.js'));
 require(path.join(__dirname, '../../crates/deeptime-viewer/assets/deposits.js'));
+const P = globalThis.DTProj;   // the planet's projection (Lambert equal-area)
 const D = globalThis.DTDeposits;
 
 const C = 16384;
 const raw = (id, type, x, z, extra) => Object.assign({
-  id, kind: 'deposit', type, x, y: 20, z, y_range: [10, 30], lat: -z / C * 360, lon: ((x + C / 2) / C * 360 + 360) % 360,
+  id, kind: 'deposit', type, x, y: 20, z, y_range: [10, 30], lat: P.latOfZ(C, z), lon: P.lonOfX(C, x),
   fp: { x, z, a: 40, c: 60, yaw: 0.5, km2: 678.6 }, bodies: 3,
   products: [{ material: 'c:coal', grade: 1, tonnage_t: 1.98e10, role: 'primary' }], forming_event: 1000 + id, parent: null,
 }, extra || {});
@@ -56,13 +58,16 @@ assert.strictEqual(m.byId.get(2).rank, 0);
 assert.strictEqual(m.byId.get(3).rank, 0.5, 'alone in its family');
 assert.strictEqual(m.byEvent.get(1003).id, 3);
 assert.strictEqual(m.byId.get(1).poly.length, 28);
-// The outline is the ellipse's: its extreme along the yaw axis is the long semi-axis (a = 40 blocks).
-const reach = Math.max(...m.byId.get(1).poly.map(([dx, dy]) => Math.hypot(dx, dy)));
-assert.ok(Math.abs(reach - 60 / C * 360) < 1e-6, `reach ${reach}`);
+// The outline is the ellipse's, in blocks: its extreme is the long semi-axis (c = 60 blocks).
+const reach = Math.max(...m.byId.get(1).poly.map(([dx, dz]) => Math.hypot(dx, dz)));
+assert.ok(Math.abs(reach - 60) < 1e-6, `reach ${reach}`);
 
-// Pointing: canvas 2048 × 1024 for the whole planet, as the workbench's map is.
-const W = 2048, H = 1024;
-const view = { project: (lat, lon) => [lon / 360 * W, (90 - lat) / 180 * H], ppdx: W / 360, ppdy: H / 180, worldW: W, dpr: 1 };
+// Pointing: a canvas of the whole planet at the map's aspect (π : 1), as the workbench's map is.
+const W = 2048, H = P.pictureHeight(W);
+const view = {
+  project: (lat, lon) => [P.xOfLonPic(P.wrapLon(lon), W), P.yOfLat(lat, H)],
+  ppbx: W / C, ppbz: P.yOfZ(C, 1, H) - P.yOfZ(C, 0, H), worldW: W, dpr: 1,
+};
 const at = s => view.project(s.lat, s.lon);
 const state = { hidden: new Set() };
 let [x, y] = at(m.byId.get(3));
@@ -76,8 +81,8 @@ assert.strictEqual(D.hit(m, view, x + 10, y, state).id, 7, 'the blanket beside i
 // A coal field is hit anywhere inside its area (the centre, and the long axis' end), not outside.
 [x, y] = at(m.byId.get(1));
 assert.strictEqual(D.hit(m, view, x, y, state).id, 1);
-const k = Math.max(1, 3.5 / (60 / C * 360 * view.ppdy));   // the area is drawn at least 3.5 px per semi-axis
-const along = 0.8 * 60 * k / C * 360 * view.ppdx;
+const k = Math.max(1, 3.5 / Math.max(40 * view.ppbx, 60 * view.ppbz));   // the area is drawn at least 3.5 px per semi-axis
+const along = 0.8 * 60 * k * view.ppbx;
 assert.strictEqual(D.hit(m, view, x + along * Math.cos(0.5 + Math.PI / 2), y + along * Math.sin(0.5 + Math.PI / 2), state).id, 1, 'along the long axis (c is the long one)');
 assert.strictEqual(D.hit(m, view, x + 60, y, state), null);
 // A symbol on the other side of the seam is hit from either edge.

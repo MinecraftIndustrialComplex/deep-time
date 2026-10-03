@@ -139,15 +139,15 @@ def main():
         for spec_ in a.section:
             name, coords = spec_.split("=", 1)
             x0, z0, x1, z1 = (float(v) for v in coords.split(","))
-            ll = lambda x, z: (-z / C * 360.0, (x + C / 2) / C * 360.0)
-            (la0, lo0), (la1, lo1) = ll(x0, z0), ll(x1, z1)
             p.js("window.DTWB.setTool('section')", wait=False)
             time.sleep(0.3)
-            pos = lambda la, lo: p.js(
-                "(() => { const r = document.querySelector('#paneA canvas.map').getBoundingClientRect();"
-                f"return [r.left + (({lo} % 360) / 360) * r.width, r.top + ((90 - {la}) / 180) * r.height]; }})()")
-            xa, ya = pos(la0, lo0)
-            xb, yb = pos(la1, lo1)
+            # Block (x, z) to the map's pixel through the page's own projection (projection.js).
+            pos = lambda x, z: p.js(
+                "(() => { const P = window.DTProj, r = document.querySelector('#paneA canvas.map').getBoundingClientRect();"
+                f"const la = P.latOfZ({C}, {z}), lo = P.lonOfX({C}, {x});"
+                "return [r.left + P.xOfLonPic(lo, r.width), r.top + P.yOfLat(la, r.height)]; })()")
+            xa, ya = pos(x0, z0)
+            xb, yb = pos(x1, z1)
             p.move(xa, ya)
             p.click(xa, ya)
             p.move(xa + (xb - xa) * 0.6, ya + (yb - ya) * 0.6)

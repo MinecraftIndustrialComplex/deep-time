@@ -67,8 +67,10 @@ public final class Magma {
      * its shell: the ellipsoid with {@link #SHELL} taken off the offset's horizontal distance and off
      * its height, so the shell is that thick across and up at every point of the surface. (Scaling
      * the radii up by {@link #SHELL} instead, as before 2026-10-03, leaves less than a block above
-     * the flanks of a lens much wider than tall: from a radius of 51 blocks up a lava block faced
-     * the open rock above it.)
+     * the flanks of a lens much wider than tall: with the half-height capped at 5 blocks, from a
+     * radius of 46 blocks up a lava block faced the open rock above it, and noise caves there.) A
+     * lens's shell also takes every block with a face on the lens ({@code Deep.touchesLens}, the
+     * same leak's fix on the Lambert branch), so it seals by construction as well.
      */
     static boolean inShell(long d2, int dy, double rh, double rv) {
         double d = Math.max(0.0, Math.sqrt((double) d2) - SHELL), h = Math.max(0.0, Math.abs(dy) - SHELL) / rv;
@@ -286,7 +288,7 @@ public final class Magma {
                 double q = (double) ddy / lrv[k];
                 if ((double) d2 / ((double) lrh[k] * lrh[k]) + q * q <= 1.0)
                     return Part.LENS;
-                if (inShell(d2, ddy, lrh[k], lrv[k]))
+                if (inShell(d2, ddy, lrh[k], lrv[k]) || touchesLens(k, ex, ez, ddy))
                     best = Part.LENS_SHELL;
             }
             for (int k = Math.max(0, k0 - 5), e = Math.min(n - 2, k0 + 3); k <= e; k++) {
@@ -301,6 +303,22 @@ public final class Magma {
                     best = Part.CONDUIT_SHELL;
             }
             return best;
+        }
+
+        /**
+         * Whether one of the six neighbours of the block at (ex, ddy, ez) from lens k's centre is in the
+         * lens: the shell must cover every face of the lava, and a flat lens's 1.5-block margin does
+         * not reach the blocks above and below its rim (a lens 40 blocks wide and 3 high left caves
+         * touching its lava).
+         */
+        private boolean touchesLens(int k, long ex, long ez, int ddy) {
+            return inLens(k, ex + 1, ez, ddy) || inLens(k, ex - 1, ez, ddy) || inLens(k, ex, ez + 1, ddy)
+                    || inLens(k, ex, ez - 1, ddy) || inLens(k, ex, ez, ddy + 1) || inLens(k, ex, ez, ddy - 1);
+        }
+
+        private boolean inLens(int k, long ex, long ez, int ddy) {
+            double q = (double) ddy / lrv[k];
+            return (double) (ex * ex + ez * ez) / ((double) lrh[k] * lrh[k]) + q * q <= 1.0;
         }
 
         boolean mush(int dx, int dz, int y) {

@@ -4,43 +4,52 @@
 //! (`docs/design/equal-area-projection.md` §2; the Java twin is `worlddata/Projection.java`, the
 //! pages' is `window.DTProj` in `deeptime-viewer/assets/projection.js`).
 //!
-//! The projection is **equirectangular** (plan §5.2): block x is linear in longitude and block z
-//! in latitude, one block being 360°/C both ways. Ben reopened the choice on 2026-10-02 (Lambert's
-//! equal-area cylinder, or a square tiling map); whichever he picks replaces the bodies of these
-//! functions, and the family-specific work of the design note §5 follows. Until then every
-//! function reproduces, operation for operation, the arithmetic its callers did by hand, so the
-//! refactor changes no output bit (`tools/review/projection-identity.sh`).
+//! The projection is **Lambert's cylindrical equal-area projection**, true on the equator (Ben,
+//! decisions log 2026-10-02: "Lambert for now"): block x is linear in longitude and block z in
+//! sin φ, so every block covers the same area of the planet. It replaced the equirectangular
+//! layout (z linear in φ) the module was written with.
 //!
 //! # Conventions
+//! - A planet of circumference C blocks has radius **R = C / 2π** blocks ([`Projection::radius`]).
 //! - **Longitude** λ = 360°·(x + C/2)/C in [0°, 360°): x = −C/2 (the seam) is 0°, x wraps with
 //!   period C.
-//! - **Latitude** φ = −360°·z/C, north positive; north is −z, as in Minecraft. The poles are at
-//!   z = ∓C/4 ([`Projection::pole_z`]) and φ clamps to ±90° beyond them.
+//! - **Latitude** φ = asin(−z / R), north positive; north is −z, as in Minecraft. The poles are at
+//!   z = ∓R ([`Projection::pole_z`]: 2,607.6 blocks at C = 16,384) and φ clamps to ±90° beyond.
 //! - **Unit vector** (cos φ cos λ, cos φ sin λ, sin φ): +Z the north pole, +X the seam meridian.
-//! - **Grids** (`GridDesc`) are square lattices in block space: W = C/r, H = W/2, origin
-//!   (−C/2, −C/4) ([`Projection::grid_origin_z`], [`Projection::grid_rows`]).
-//! - **Map pictures** of the whole planet span the grid: x linear in longitude from the seam, y
-//!   linear in z from the north pole; aspect 2 : 1 ([`Projection::picture_height`]).
-//!
+//! - **Metric**: east–west a block is cos φ blocks of planet, north–south 1 / cos φ
+//!   ([`Projection::scale_ew`], [`Projection::scale_ns`], [`Projection::metric`]); their product,
+//!   the area a block stands for, is 1 everywhere ([`Projection::area_scale`]). North is −z
+//!   everywhere ([`Projection::north`]). Shapes are true only on the equator.
+//! - **Grids** (`GridDesc`) are square lattices in block space: W = C/r columns from the seam, and
+//!   rows from z = −Zo to Zo, Zo the smallest multiple of the planet's quantum (64 blocks on every
+//!   real planet) at or past the pole ([`Projection::grid_half_extent`]); so the grids of a planet
+//!   share their origin and nest (L3 row 8j is L1 row j), and their rows are uniform in sin φ:
+//!   every cell inside the sphere has the same area. The rows past a pole hold no planet.
+//! - **Map pictures** of the whole planet run pole to pole: x linear in longitude from the seam,
+//!   y linear in z (so in sin φ) from the north pole; aspect π : 1 ([`Projection::picture_height`]).
 //! - **Topology**: a raster wraps in x and stops at its first and last rows
 //!   ([`wrap_col`], [`clamp_row`], [`neighbour`]); block x wraps with period C and the planet
 //!   ends at the poles ([`Projection::on_planet`]).
-//! - **Metric**: a block is cos φ blocks of planet east–west and one north–south
-//!   ([`Projection::scale_ew`], [`Projection::scale_ns`], [`Projection::metric`]), so a block
-//!   square stands for cos φ of its area ([`Projection::area_scale`]); north is −z everywhere
-//!   ([`Projection::north`]).
 //!
 //! The spatial indexes of the world data (the river tiles, the structure buckets, the site index,
 //! the playability regions) are frames for lookups, not geography: lattices of their own cells
-//! over the planet's extent, from [`Projection::index_origin`] over [`Projection::index_span`]
+//! over the grids' extent, from [`Projection::index_origin`] over [`Projection::index_span`]
 //! blocks.
 //!
-//! The projection is a game choice (ledger SCL-049).
+//! The projection is a game choice (ledger: SCL-049); that it keeps areas is a tested property of
+//! the formulas (ledger: SCL-052).
+
+use std::f64::consts::{PI, TAU};
+
+/// The largest quantum of the grids' z extent, blocks ([`Projection::quantum`]).
+pub const QUANTUM_MAX: u32 = 64;
 
 /// Block space ↔ sphere for one planet.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Projection {
     c: f64,
+    /// R = C / 2π, blocks.
+    r: f64,
 }
 
 impl Projection {
@@ -51,7 +60,10 @@ impl Projection {
 
     /// [`Projection::new`] for a circumference held as a float.
     pub fn of(circumference: f64) -> Projection {
-        Projection { c: circumference }
+        Projection {
+            c: circumference,
+            r: circumference / TAU,
+        }
     }
 
     /// C, blocks.
@@ -62,15 +74,15 @@ impl Projection {
     /// The planet's radius R = C / 2π, blocks (the sphere the blocks stand for, at true scale on
     /// the equator).
     pub fn radius(&self) -> f64 {
-        self.c / std::f64::consts::TAU
+        self.r
     }
 
-    /// |z| of the poles, blocks: C/4. The world's playable z range is [−pole_z, pole_z].
+    /// |z| of the poles, blocks: R. The planet's z range is [−pole_z, pole_z].
     pub fn pole_z(&self) -> f64 {
-        self.c / 4.0
+        self.r
     }
 
-    /// The planet's extent in block space, blocks: (east–west, north–south) = (C, C/2).
+    /// The planet's extent in block space, blocks: (east–west, north–south) = (C, 2R).
     pub fn extent(&self) -> (f64, f64) {
         (self.c, 2.0 * self.pole_z())
     }
@@ -106,14 +118,19 @@ impl Projection {
         self.wrap_x(wrap_deg(lon_deg) / 360.0 * self.c - 0.5 * self.c)
     }
 
-    /// Latitude of block z, degrees in [−90, 90] (north is −z; clamped beyond the poles).
-    pub fn lat_deg(&self, z: f64) -> f64 {
-        (-360.0 * z / self.c).clamp(-90.0, 90.0)
+    /// sin φ of block z, clamped to [−1, 1] (north is −z).
+    pub fn sin_lat(&self, z: f64) -> f64 {
+        (-z / self.r).clamp(-1.0, 1.0)
     }
 
-    /// Block z of a latitude (clamped to ±90°), in [−C/4, C/4].
+    /// Latitude of block z, degrees in [−90, 90] (north is −z; clamped beyond the poles).
+    pub fn lat_deg(&self, z: f64) -> f64 {
+        self.sin_lat(z).asin().to_degrees()
+    }
+
+    /// Block z of a latitude (clamped to ±90°), in [−R, R].
     pub fn z_of_lat(&self, lat_deg: f64) -> f64 {
-        -lat_deg.clamp(-90.0, 90.0) / 360.0 * self.c
+        -self.r * lat_deg.clamp(-90.0, 90.0).to_radians().sin()
     }
 
     /// Block (x, z) of a latitude and longitude, x in [−C/2, C/2).
@@ -128,34 +145,50 @@ impl Projection {
 
     /// The unit vector of block (x, z): (cos φ cos λ, cos φ sin λ, sin φ).
     pub fn unit(&self, x: f64, z: f64) -> [f64; 3] {
-        unit_of_lat_lon(self.lat_deg(z), self.lon_deg(x))
+        let (sp, cp) = (self.sin_lat(z), self.cos_lat(z));
+        let (sl, cl) = self.lon_deg(x).to_radians().sin_cos();
+        [cp * cl, cp * sl, sp]
     }
 
-    /// cos φ of block z (0 at the poles).
+    /// cos φ of block z (0 at and beyond the poles).
     pub fn cos_lat(&self, z: f64) -> f64 {
-        self.lat_deg(z).to_radians().cos().max(0.0)
+        let s = self.sin_lat(z);
+        (1.0 - s * s).max(0.0).sqrt()
     }
 
-    /// Blocks of planet per block east–west at block z: cos φ (the metric's x scale).
+    /// Blocks of planet per block east–west at block z: cos φ (the metric's x scale; 0 at the
+    /// poles).
     pub fn scale_ew(&self, z: f64) -> f64 {
         self.cos_lat(z)
     }
 
-    /// Blocks of planet per block north–south at block z: 1 everywhere.
-    pub fn scale_ns(&self, _z: f64) -> f64 {
-        1.0
+    /// Blocks of planet per block north–south at block z: 1 / cos φ (infinite at the poles).
+    pub fn scale_ns(&self, z: f64) -> f64 {
+        1.0 / self.cos_lat(z)
     }
 
     /// The metric of block space at block (x, z): (g_xx, g_xz, g_zz), blocks of planet per block,
-    /// squared. Diagonal for a cylindrical projection: (cos² φ, 0, 1).
+    /// squared. Diagonal for a cylindrical projection: (cos² φ, 0, 1 / cos² φ).
     pub fn metric(&self, _x: f64, z: f64) -> (f64, f64, f64) {
-        let (e, n) = (self.scale_ew(z), self.scale_ns(z));
-        (e * e, 0.0, n * n)
+        let c = self.cos_lat(z);
+        (c * c, 0.0, 1.0 / (c * c))
     }
 
-    /// Area of planet per block of block space at block z (√det g): cos φ.
+    /// Area of planet per block of block space (√det g): 1 everywhere on the planet (the
+    /// projection keeps areas), 0 past the poles.
     pub fn area_scale(&self, z: f64) -> f64 {
-        self.scale_ew(z) * self.scale_ns(z)
+        if self.on_planet(0.0, z) { 1.0 } else { 0.0 }
+    }
+
+    /// The share of the z band [z_lo, z_hi] that lies on the planet ([−R, R]): 1 inside, less on a
+    /// band reaching past a pole. With [`Projection::area_scale`] 1, it is the band's area weight.
+    pub fn band_share(&self, z_lo: f64, z_hi: f64) -> f64 {
+        let len = z_hi - z_lo;
+        if len <= 0.0 {
+            return 0.0;
+        }
+        let on = (z_hi.min(self.r) - z_lo.max(-self.r)).max(0.0);
+        (on / len).clamp(0.0, 1.0)
     }
 
     /// The unit vector of north in block space at block (x, z), as (dx, dz): (0, −1) everywhere.
@@ -175,49 +208,67 @@ impl Projection {
         2.0 * self.radius() * s.sqrt().clamp(0.0, 1.0).asin()
     }
 
-    /// Block z of the first row of every grid of this planet: −C/4 (the north pole).
-    pub fn grid_origin_z(&self) -> i64 {
-        -((self.c as i64) / 4)
+    /// The quantum the grids' z extent is a multiple of: the largest power of two up to
+    /// [`QUANTUM_MAX`] that divides C/2 and is at most R/2 (64 for every real planet).
+    pub fn quantum(&self) -> u32 {
+        let half = (self.c / 2.0).round() as u64;
+        let mut q = QUANTUM_MAX;
+        while q > 1 && (!half.is_multiple_of(u64::from(q)) || f64::from(q) > self.r / 2.0) {
+            q /= 2;
+        }
+        q
     }
 
-    /// Rows of a grid `w` cells wide: W/2 (pole to pole is half the circumference).
-    pub fn grid_rows(&self, w: u32) -> u32 {
-        w / 2
+    /// The half-extent Zo of the planet's grids, blocks: the smallest multiple of the quantum at
+    /// or past the pole. Every grid of a planet shares it (whatever its `r`), so the grids' rows
+    /// nest (L3 row 8j is L1 row j).
+    pub fn grid_half_extent(&self, _r: u32) -> i64 {
+        let q = f64::from(self.quantum());
+        ((self.r / q).ceil() * q) as i64
+    }
+
+    /// Block z of the first row of a grid of `r` blocks per cell: −Zo, at or just past the north
+    /// pole.
+    pub fn grid_origin_z(&self, r: u32) -> i64 {
+        -self.grid_half_extent(r)
+    }
+
+    /// Rows of a grid of `r` blocks per cell: 2·Zo / r (rounded up when r does not divide it,
+    /// which takes an r coarser than twice the quantum, 128 blocks on a real planet).
+    pub fn grid_rows(&self, r: u32) -> u32 {
+        let r = i64::from(r.max(1));
+        ((2 * self.grid_half_extent(r as u32) + r - 1) / r) as u32
     }
 
     /// Block (x, z) of the first cell of the world data's spatial indexes (river tiles, structure
-    /// buckets, site index, playability regions): (−C/2, −C/4), the seam and the north pole.
+    /// buckets, site index, playability regions): (−C/2, −Zo), the seam and the grids' first row.
     pub fn index_origin(&self) -> (f64, f64) {
-        (-self.c / 2.0, -self.c / 4.0)
+        let (x, z) = self.index_origin_blocks();
+        (x as f64, z as f64)
     }
 
-    /// Blocks the spatial indexes span: (east–west, north–south) = (C, C/2).
+    /// Blocks the spatial indexes span: (east–west, north–south) = (C, 2·Zo).
     pub fn index_span(&self) -> (f64, f64) {
-        (self.c, self.c / 2.0)
+        let (x, z) = self.index_span_blocks();
+        (x as f64, z as f64)
     }
 
     /// [`Projection::index_origin`] in whole blocks.
     pub fn index_origin_blocks(&self) -> (i64, i64) {
         let c = self.c as i64;
-        (-(c / 2), -(c / 4))
+        (-(c / 2), -self.grid_half_extent(1))
     }
 
     /// [`Projection::index_span`] in whole blocks.
     pub fn index_span_blocks(&self) -> (i64, i64) {
-        let c = self.c as i64;
-        (c, c / 2)
+        (self.c as i64, 2 * self.grid_half_extent(1))
     }
 
-    /// The latitude, degrees, in the middle of the band from row `j` to row `j + 1` of a grid `h`
-    /// rows high (rows from the north pole).
-    pub fn band_lat_deg(j: u32, h: u32) -> f64 {
-        90.0 - 180.0 * (f64::from(j) + 0.5) / f64::from(h)
-    }
-
-    /// The area weight of the band from row `j` to row `j + 1` of a grid `h` rows high, at its
-    /// middle: cos φ there.
-    pub fn band_weight(j: u32, h: u32) -> f64 {
-        (std::f64::consts::PI * (0.5 - (f64::from(j) + 0.5) / f64::from(h))).cos()
+    /// Block z of the north edge of the workbench's tile pyramid: −C/4. The pyramid is a 2 : 1
+    /// frame of power-of-two tiles centred on the equator, wider than the planet (pole to pole is
+    /// C/π); its pixels past the poles hold no planet.
+    pub fn tile_frame_z(&self) -> f64 {
+        -self.c / 4.0
     }
 
     /// The longitude, degrees (not wrapped), at column coordinate `x` of a map picture or grid
@@ -231,29 +282,46 @@ impl Projection {
         wrap_deg(lon_deg) / 360.0 * f64::from(w)
     }
 
-    /// Block z at row coordinate `y` of a map picture `h` rows high (y = 0 the north pole).
+    /// Block z at row coordinate `y` of a map picture `h` rows high (y = 0 the north pole, y = h
+    /// the south pole; pixel `py` is centred on y = py, as keyframes are).
     pub fn picture_z(&self, y: f64, h: u32) -> f64 {
-        -self.c / 4.0 + y * (self.c / 2.0) / f64::from(h.max(1))
+        -self.r + 2.0 * self.r * y / f64::from(h.max(1))
     }
 
     /// The row coordinate of block z in a map picture `h` rows high.
     pub fn picture_y(&self, z: f64, h: u32) -> f64 {
-        (z + self.c / 4.0) * f64::from(h) / (self.c / 2.0)
+        (z + self.r) / (2.0 * self.r) * f64::from(h.max(1))
     }
 
-    /// The latitude, degrees, at row coordinate `y` of a map picture `h` rows high.
+    /// The latitude, degrees, at row coordinate `y` of a map picture `h` rows high: rows are
+    /// uniform in sin φ.
     pub fn picture_lat_deg(y: f64, h: u32) -> f64 {
-        90.0 - 180.0 * y / f64::from(h.max(1))
+        (1.0 - 2.0 * y / f64::from(h.max(1)))
+            .clamp(-1.0, 1.0)
+            .asin()
+            .to_degrees()
     }
 
     /// The row coordinate of latitude `lat_deg` in a map picture `h` rows high.
     pub fn picture_y_of_lat(lat_deg: f64, h: u32) -> f64 {
-        (90.0 - lat_deg) / 180.0 * f64::from(h)
+        (1.0 - lat_deg.clamp(-90.0, 90.0).to_radians().sin()) / 2.0 * f64::from(h)
     }
 
-    /// The height of a map picture `w` pixels wide at the projection's aspect (2 : 1).
+    /// The true size, metres (east–west, north–south), of a pixel at row coordinate `y` of a
+    /// `w × h` map picture of a sphere of radius `radius_m`: 2πR·cos φ / w wide and
+    /// 2R / (h·cos φ) high, cos φ held at `min_cos` or more near the poles.
+    pub fn picture_pixel_m(y: f64, w: u32, h: u32, radius_m: f64, min_cos: f64) -> (f64, f64) {
+        let s = (1.0 - 2.0 * y / f64::from(h.max(1))).clamp(-1.0, 1.0);
+        let cos = (1.0 - s * s).sqrt().max(min_cos);
+        (
+            TAU * radius_m * cos / f64::from(w.max(1)),
+            2.0 * radius_m / (f64::from(h.max(1)) * cos),
+        )
+    }
+
+    /// The height of a map picture `w` pixels wide at the projection's aspect (π : 1).
     pub fn picture_height(w: u32) -> u32 {
-        (w / 2).max(1)
+        ((f64::from(w) / PI).round() as u32).max(1)
     }
 }
 
@@ -330,21 +398,22 @@ mod tests {
     fn fixed_points() {
         for c in CS {
             let p = Projection::new(c);
-            let q = f64::from(c) / 4.0;
-            assert_eq!(p.pole_z(), q);
+            let r = f64::from(c) / TAU;
+            assert_eq!(p.radius(), r);
+            assert_eq!(p.pole_z(), r);
             assert_eq!(p.lat_deg(0.0), 0.0);
-            assert_eq!(p.lat_deg(-q), 90.0, "north is -z");
-            assert_eq!(p.lat_deg(q), -90.0);
-            assert_eq!(p.lat_deg(-2.0 * q), 90.0, "latitude clamps past the pole");
-            assert_eq!(p.z_of_lat(45.0), -q / 2.0);
+            assert_eq!(p.lat_deg(-r), 90.0, "north is -z");
+            assert_eq!(p.lat_deg(r), -90.0);
+            assert_eq!(p.lat_deg(-2.0 * r), 90.0, "latitude clamps past the pole");
+            assert!((p.z_of_lat(90.0) + r).abs() < 1e-9);
+            assert!((p.z_of_lat(30.0) + r / 2.0).abs() < 1e-9, "sin 30° = 1/2");
             assert_eq!(
                 p.lon_deg(-f64::from(c) / 2.0),
                 0.0,
                 "the seam is longitude 0"
             );
             assert_eq!(p.lon_deg(0.0), 180.0);
-            assert_eq!(p.grid_origin_z(), -(i64::from(c) / 4));
-            // True scale on the equator both ways.
+            // True scale on the equator: one block of x and of z is one block of planet there.
             let ns = p.great_circle_blocks((0.0, 0.0), (0.0, 1.0));
             let ew = p.great_circle_blocks((0.0, 0.0), (1.0, 0.0));
             assert!(
@@ -352,6 +421,15 @@ mod tests {
                 "{ns} {ew}"
             );
         }
+        // The decision's 16k numbers: 5,215 blocks pole to pole, 60° at z = −2,258, the grids to
+        // ±2,624.
+        let p = Projection::new(16_384);
+        assert!((2.0 * p.radius() - 5_215.19).abs() < 0.01);
+        assert!((p.z_of_lat(60.0) + 2_258.2).abs() < 0.1);
+        assert_eq!(p.grid_half_extent(16), 2_624);
+        assert_eq!(p.grid_half_extent(2), 2_624);
+        assert_eq!(p.grid_rows(16), 328);
+        assert_eq!(Projection::new(32_768).grid_half_extent(32), 5_248);
     }
 
     #[test]
@@ -359,18 +437,29 @@ mod tests {
         let mut g = Rng(0xB10C);
         for c in CS {
             let p = Projection::new(c);
-            let (h, q) = (f64::from(c) / 2.0, p.pole_z());
+            let (h, r) = (f64::from(c) / 2.0, p.radius());
             for _ in 0..20_000 {
                 let x = -h + g.f() * f64::from(c);
-                let z = -q + g.f() * 2.0 * q;
+                let z = -r + g.f() * 2.0 * r;
                 let (lat, lon) = p.lat_lon(x, z);
                 let (x2, z2) = p.block_of(lat, lon);
                 assert!(p.wrap_x(x2 - x).abs() < 1e-9, "x {x} -> {x2}");
-                assert!((z2 - z).abs() < 1e-9, "z {z} -> {z2}");
+                assert!((z2 - z).abs() < 1e-8, "z {z} -> {z2}");
+                // And back from (lat, lon) through the blocks.
+                let lat = -90.0 + 180.0 * g.f();
+                let lon = 360.0 * g.f();
+                let (x, z) = p.block_of(lat, lon);
+                let (lat2, lon2) = p.lat_lon(x, z);
+                assert!((lat2 - lat).abs() < 1e-7, "lat {lat} -> {lat2}");
+                let d = (lon2 - lon).rem_euclid(360.0);
+                assert!(d.min(360.0 - d) < 1e-9);
+                // The unit vector is the one of (lat, lon).
                 let v = p.unit(x, z);
                 let want = unit_of_lat_lon(lat, lon);
-                assert_eq!(v, want);
-                assert!(((v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) - 1.0).abs() < 1e-15);
+                assert!(
+                    (0..3).all(|k| (v[k] - want[k]).abs() < 1e-7),
+                    "{v:?} {want:?}"
+                );
             }
         }
     }
@@ -384,7 +473,7 @@ mod tests {
                 let grid = GridDesc::for_planet("L", c, r).unwrap();
                 let p = grid.projection();
                 for _ in 0..5_000 {
-                    let z = -p.pole_z() + g.f() * 2.0 * p.pole_z();
+                    let z = -p.radius() + g.f() * 2.0 * p.radius();
                     let v = grid.row_of_z(z);
                     assert!((grid.z_of_row(v) - z).abs() < 1e-9);
                     let j = v.floor() as u32;
@@ -396,20 +485,54 @@ mod tests {
     }
 
     #[test]
-    fn the_cells_sum_to_the_sphere() {
+    fn every_cell_has_the_same_area_and_they_sum_to_the_sphere() {
         for c in CS {
-            for r in [2u32, 8, 16] {
+            for r in [2u32, 4, 8, 16, 32] {
                 let grid = GridDesc::for_planet("L", c, r).unwrap();
-                let total: f64 = (0..grid.h)
-                    .map(|j| grid.cell_area_km2(j, 300.0) * f64::from(grid.w))
-                    .sum();
-                let r_km = f64::from(c) * 0.3 / std::f64::consts::TAU;
-                let sphere = 2.0 * std::f64::consts::TAU * r_km * r_km;
-                assert!((total / sphere - 1.0).abs() < 0.01, "{total} vs {sphere}");
-                // The band weights integrate cos φ by the midpoint rule: to 2/π of the rows.
+                let p = grid.projection();
+                let m = 300.0;
+                // The true area of each row's cells on a sphere of R·m metres: 2πR²·Δ(sin φ)
+                // over the row's band, divided among its W cells (exact, not the helper's).
+                let rm = p.radius() * m;
+                let mut total = 0.0;
+                let mut interior = Vec::new();
+                for j in 0..grid.h {
+                    let z = grid.block_z(i64::from(j)) as f64;
+                    let lo = if j == 0 {
+                        f64::NEG_INFINITY
+                    } else {
+                        z - f64::from(r) / 2.0
+                    };
+                    let hi = if j + 1 == grid.h {
+                        f64::INFINITY
+                    } else {
+                        z + f64::from(r) / 2.0
+                    };
+                    let exact = TAU * rm * rm * (p.sin_lat(lo) - p.sin_lat(hi)) / f64::from(grid.w);
+                    let helper = grid.cell_area_km2(j, m) * 1e6;
+                    assert!(
+                        (helper - exact).abs() <= 1e-9 * exact.max(1.0),
+                        "row {j}: {helper} {exact}"
+                    );
+                    total += helper * f64::from(grid.w);
+                    if grid.area_share(j) == 1.0 {
+                        interior.push(exact);
+                    }
+                }
+                let sphere = 2.0 * TAU * rm * rm;
+                assert!(
+                    (total / sphere - 1.0).abs() < 1e-12,
+                    "C {c} r {r}: {total} vs {sphere}"
+                );
+                // Any two cells inside the sphere are equal (within rounding), (r·m)² each.
+                let (lo, hi) = interior
+                    .iter()
+                    .fold((f64::MAX, f64::MIN), |(a, b), &x| (a.min(x), b.max(x)));
+                assert!(hi / lo - 1.0 < 1e-9, "C {c} r {r}: {lo} .. {hi}");
+                assert!((lo / (f64::from(r) * m).powi(2) - 1.0).abs() < 1e-9);
+                // The row weights are the same shares.
                 let w: f64 = grid.row_weights().iter().sum();
-                let want = f64::from(grid.h) * 2.0 / std::f64::consts::PI;
-                assert!((w / want - 1.0).abs() < 1e-3, "{w} vs {want}");
+                assert!((w - 2.0 * p.radius() / f64::from(r)).abs() < 1e-9);
             }
         }
     }
@@ -432,8 +555,18 @@ mod tests {
                     (metric - gc).abs() <= 3e-3 * gc + 1e-6,
                     "C {c} lat {lat:.1}: metric {metric} gc {gc}"
                 );
+                let (gxx, gxz, gzz) = p.metric(x, zm);
+                assert!(((gxx * gzz - gxz * gxz).sqrt() - p.area_scale(zm)).abs() < 1e-9);
             }
         }
+        // The equirectangular metric (north–south unscaled) is not the sphere's here.
+        let p = Projection::new(16_384);
+        let z = p.z_of_lat(60.0);
+        let gc = p.great_circle_blocks((0.0, z), (0.0, z + 4.0));
+        assert!(
+            (gc - 8.0).abs() < 0.05,
+            "4 blocks of z at 60° are 8 of planet: {gc}"
+        );
     }
 
     #[test]
@@ -452,6 +585,67 @@ mod tests {
     }
 
     #[test]
+    fn pictures_span_pole_to_pole() {
+        let p = Projection::new(16_384);
+        assert_eq!(Projection::picture_height(1024), 326);
+        assert_eq!(p.lat_deg(p.picture_z(0.0, 326)), 90.0);
+        assert_eq!(p.lat_deg(p.picture_z(326.0, 326)), -90.0);
+        assert!(p.lat_deg(p.picture_z(163.0, 326)).abs() < 1e-12);
+        for y in [0.0, 17.5, 200.0] {
+            assert!((p.picture_y(p.picture_z(y, 326), 326) - y).abs() < 1e-9);
+            let lat = p.lat_deg(p.picture_z(y, 326));
+            assert!((Projection::picture_lat_deg(y, 326) - lat).abs() < 1e-9);
+            assert!((Projection::picture_y_of_lat(lat, 326) - y).abs() < 1e-9);
+        }
+        // Equal rows of a picture are equal bands of sin φ.
+        let s = |y: f64| p.sin_lat(p.picture_z(y, 326));
+        assert!(((s(10.0) - s(11.0)) - (s(300.0) - s(301.0))).abs() < 1e-12);
+        assert_eq!(Projection::picture_lon_deg(256.0, 1024), 90.0);
+        assert_eq!(Projection::picture_x_of_lon(450.0, 1024), 256.0);
+    }
+
+    #[test]
+    fn quantum_and_extent() {
+        assert_eq!(Projection::new(16_384).quantum(), 64);
+        assert_eq!(Projection::new(32_768).quantum(), 64);
+        // A tiny test planet: R = 10.2, so the quantum shrinks to 4.
+        assert_eq!(Projection::new(64).quantum(), 4);
+        let p = Projection::new(64);
+        assert_eq!(p.grid_half_extent(4), 12);
+        assert_eq!(p.grid_half_extent(2), 12);
+        for c in CS {
+            let p = Projection::new(c);
+            for r in [1u32, 2, 4, 8, 16, 32, 64] {
+                let zo = p.grid_half_extent(r);
+                assert!(zo as f64 >= p.radius() && zo % i64::from(r) == 0);
+                assert!((zo as f64) < p.radius() + 64.0f64.max(f64::from(r)));
+            }
+            let (ew, ns) = p.extent();
+            assert_eq!(ew, f64::from(c));
+            assert_eq!(ns, 2.0 * p.radius());
+            assert!(p.on_planet(0.0, p.pole_z()) && !p.on_planet(0.0, p.pole_z() + 1.0));
+            assert!(!p.inside_poles(-p.pole_z()) && p.inside_poles(0.0));
+            assert_eq!(p.clamp_z(1e9), p.pole_z());
+            // The grids and the spatial indexes share their origin, which covers the planet.
+            let grid = GridDesc::for_planet("L", c, 16).unwrap();
+            assert_eq!(
+                p.index_origin_blocks(),
+                (grid.origin_block_x, grid.origin_block_z)
+            );
+            assert_eq!(
+                p.index_span_blocks(),
+                (
+                    i64::from(grid.w) * i64::from(grid.r),
+                    i64::from(grid.h) * i64::from(grid.r)
+                )
+            );
+            assert!(p.index_span().1 >= ns);
+            assert_eq!(p.north(0.0, 0.0), (0.0, -1.0));
+            assert_eq!(p.band_share(-1e9, 1e9) * 2e9, 2.0 * p.radius());
+        }
+    }
+
+    #[test]
     fn the_neighbour_rule_wraps_columns_and_stops_at_the_rows() {
         assert_eq!(neighbour(8, 4, true, (7, 1), (1, 0)), Some((0, 1)));
         assert_eq!(neighbour(8, 4, true, (0, 1), (-1, -1)), Some((7, 0)));
@@ -463,66 +657,5 @@ mod tests {
         let grid = GridDesc::for_planet("L", 4_096, 16).unwrap();
         assert_eq!(grid.wrap_i(-1), grid.w - 1);
         assert_eq!(grid.clamp_j(i64::from(grid.h) + 5), grid.h - 1);
-    }
-
-    #[test]
-    fn the_extent_metric_and_frames_agree() {
-        for c in CS {
-            let p = Projection::new(c);
-            let (ew, ns) = p.extent();
-            assert_eq!(ew, f64::from(c));
-            assert_eq!(ns, 2.0 * p.pole_z());
-            assert!(p.on_planet(0.0, p.pole_z()) && !p.on_planet(0.0, p.pole_z() + 1.0));
-            assert!(!p.inside_poles(-p.pole_z()) && p.inside_poles(0.0));
-            assert_eq!(p.clamp_z(1e9), p.pole_z());
-            // The grids and the spatial indexes share the planet's extent.
-            let grid = GridDesc::for_planet("L", c, 16).unwrap();
-            assert_eq!(
-                p.index_origin_blocks(),
-                (grid.origin_block_x, grid.origin_block_z)
-            );
-            assert_eq!(p.index_origin(), (-ew / 2.0, -p.pole_z()));
-            assert_eq!(p.index_span(), (ew, ns));
-            assert_eq!(
-                p.index_span_blocks(),
-                (
-                    i64::from(grid.w) * i64::from(grid.r),
-                    i64::from(grid.h) * i64::from(grid.r)
-                )
-            );
-            // The metric: area scale is √det g, cos φ here; north is −z.
-            for lat in [0.0, 30.0, 60.0, 89.0] {
-                let z = p.z_of_lat(lat);
-                let (gxx, gxz, gzz) = p.metric(0.0, z);
-                assert!((p.area_scale(z) - (gxx * gzz - gxz * gxz).sqrt()).abs() < 1e-15);
-                assert!((p.area_scale(z) - lat.to_radians().cos()).abs() < 1e-12);
-            }
-            assert_eq!(p.north(0.0, 0.0), (0.0, -1.0));
-            // Bands: the middle of band j is half a row past row j.
-            assert_eq!(
-                Projection::band_lat_deg(0, grid.h),
-                Projection::picture_lat_deg(0.5, grid.h)
-            );
-            assert_eq!(grid.band_lat_deg(3), Projection::band_lat_deg(3, grid.h));
-            assert!((grid.band_weight(3) - grid.band_lat_deg(3).to_radians().cos()).abs() < 1e-12);
-        }
-        assert_eq!(Projection::picture_lon_deg(256.0, 1024), 90.0);
-        assert_eq!(Projection::picture_x_of_lon(450.0, 1024), 256.0);
-    }
-
-    #[test]
-    fn pictures_span_the_grid() {
-        let p = Projection::new(16_384);
-        assert_eq!(Projection::picture_height(1024), 512);
-        assert_eq!(p.picture_z(0.0, 512), -4096.0);
-        assert_eq!(p.picture_z(256.0, 512), 0.0);
-        for y in [0.0, 17.5, 200.0] {
-            assert!((p.picture_y(p.picture_z(y, 512), 512) - y).abs() < 1e-9);
-            let lat = p.lat_deg(p.picture_z(y, 512));
-            assert!((Projection::picture_lat_deg(y, 512) - lat).abs() < 1e-12);
-        }
-        let grid = GridDesc::for_planet("L1", 16_384, 16).unwrap();
-        assert_eq!(grid.picture_cell(512.0, 256.0, 1024, 512), (512, 256));
-        assert_eq!(grid.picture_cell(3.0, 7.0, 512, 256), (6, 14));
     }
 }
