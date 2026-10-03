@@ -185,7 +185,41 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   curves are per degree, so their documented values moved to 71–78° (`PoleCapCurve` doc and test, POL-003/006/
   008/009/011, PRS-033/073). The cap is not an editor field (the game reads the world preset; the Rust key is
   read only by validation, PRS-033), so no editor or lang change.
-- **Next.** The three GameTest profiles on this head; merge master before them.
+- **Merged master 6f72f0dd** (2026-10-03, after the restart: the 35 m vertical scale, plate tasks 3 and 4,
+  the floor at −512): conflicts only in STATUS.md and the claims counts. On the merged planet three tests
+  needed their premises re-read, none a projection fault: (1) `the_stage_never_panics_however_dense_the_structures`
+  never passed one Noddy history at 50 Myr (longest 122 over six seeds; master's planet passes), so it runs
+  80 Myr (270 and 135 on seeds 2 and 3, same wall time); (2) GameTest `lavaStaysAtTheFloor` read 1,322 lava
+  blocks at y −447: its "high ground" site is now the test planet's active shield volcano, whose crust-deep
+  magma column reaches y −507, so magma lava (`Magma.at(...).molten()`, read back by
+  `magmaUnderActiveVolcanoes`) is counted apart; (3) `climateConsistent`'s C family read 0.737 / 0.731 (156
+  columns, the misses coastal: stony shore and beach) against a floor of 0.75, so the floor goes to 0.63 by the
+  test's own rule (0.1 under the lowest planet). `carversSpareWater`, which failed on the pre-merge Lambert
+  planet (no river box above the sea), passes on the merged one (9 chains run above sea + 4).
+- **Evidence on the merged head** (test VM, `deeptime stage volcanoes --preset earthlike_quick_16k --start
+  scattered_continents --length-myr 500 --set seed=1 --threads 4`; before = master 6f72f0dd, equirectangular,
+  with the CLI's ice line ported for the measurement only; after = this branch at b23dc176). "Map" is the share
+  of the map's cells (what a picture shows), "true" the area-weighted share:
+
+  | | before map | before true | after map | after true |
+  |---|---|---|---|---|
+  | land | 0.146 | 0.192 | 0.200 | 0.201 |
+  | ice, land + sea | 0.274 | 0.094 | 0.097 | 0.095 |
+  | land ice | 0.0071 | 0.0069 | 0.0127 | 0.0128 |
+  | sea ice | 0.267 | 0.087 | 0.085 | 0.082 |
+  | poleward of 60° (sphere 0.134) | 0.334 | 0.1345 | 0.1346 | 0.1318 |
+
+  Before, the map showed 2.9 times the true ice (the polar sea ice) and 0.76 of the true land; after, map and
+  planet agree to 0.003 (the residue is the two partial rows at the poles, counted whole as cells and by area
+  as area). The planets differ (the plate model reads a different raster): land mean 882 / 786 m, p50 582 / 490,
+  p90 2,076 / 1,895, above 2 km 0.111 / 0.087, sea median depth 4,165 / 3,956 m, Köppen land E 0.11 / 0.13.
+  Cost 9 min 55 s / 6 min 21 s wall, 3.26 / 2.10 GB peak RSS. Logs and satellite pictures:
+  `review/out/projection-lambert/merged/` (not committed).
+- **Found, not changed:** the rows past the poles (|z| between R and Zo: 16 blocks at 16k, 52 at the 4k test
+  planet) are simulated at the clamped latitude and can hold land and rivers (the 4k test planet has river
+  vertices to z = 702, R = 652). They lie beyond the pole cap's stop line (80°), so no player reaches them; the
+  ice line leaves the rows wholly past a pole out and weighs the partial ones by their area.
+GATES_PLACEHOLDER
 ### 2026-10-02 — The vertical scale is 35 m per block (agent worktree agent-a6b275724b347abae, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Asked:** Ben's answer "35 m per block (Recommended)" (decisions log 2026-10-02): `scale.m_per_block_v` 20 → 35 (8.6× instead of 15×); re-check what was tuned against 15×; measure strata, ore, the floor.
 - **Changed:** one shared default `deeptime_format::DEFAULT_M_PER_BLOCK_V` = 35 (`params.rs` default, `Scale::default_for`, `ViewScale::default`, deposits `Scales::default`, the dummy world, the climate DEM tool) and Java `Manifest.DEFAULT_M_PER_BLOCK_V` = 35; 35.0 in all twelve built-in presets and in `tests/presets/planet_world_4k.json` (the GameTest world `test_planet_real` and ColumnParityTest follow the game's scale; no test preset kept 20 m: the only other pins are unit tests that pass 20 explicitly as input, and the two coal-stack tests in `deposits/geometry.rs`, whose cover and depth numbers were set in 20 m blocks, now say so). Fixed assumptions of 20 m: `VISIBLE_RELIEF_M` 40 m → `VISIBLE_RELIEF_BLOCKS` 2 × `m_per_block_v` (IMP-081; `Crater::state` takes the threshold); `deposits::surface_y` read sea level 63 → the world's `sea_level_y` (new field of `Scales`). Fallbacks to 20: workbench `sections.js`, `tools/review/p2-01-report.py`, `glacial_views.py --mv`. GameTest `worldInfoFollowsThePlayer` compares with `Manifest.DEFAULT_M_PER_BLOCK_V`. Editor hints (m_per_block_v, volcano flanks, crater depth) and the docs of the settings below describe 8.6×. New tests (fail on the old code): `a_crater_shows_while_two_blocks_deep_at_any_vertical_scale`, `surface_y_reads_the_world_sea_level_and_scale`; `the_top_band_is_compressed` now expects the knee 17.92 km above the sea.
