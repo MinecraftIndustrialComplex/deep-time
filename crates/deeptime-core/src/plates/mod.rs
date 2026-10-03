@@ -578,7 +578,7 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>) {
     }
 }
 
-/// Emerged arcs become continental; uplift rate, heat flow and regime for this step.
+/// Mature island arcs become continental; uplift rate, heat flow and regime for this step.
 fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
     let t = env.t_myr;
     let collision_myr = env.k.collision_orogeny_myr;
@@ -595,14 +595,22 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
         })
         .collect();
     let dt_yr = env.dt_yr;
-    // An emerged island arc becomes continental crust once it is a mature arc (P1-27: volcano
-    // cones lift young arcs above the sea long before their crust thickens, and with subduction
-    // starting in the open ocean every such arc turned into continent).
-    let mature_m = env.k.arc_continental_m as f32;
+    // Island-arc crust becomes continental crust once the arc has built enough of it, whatever
+    // its height (2026-10-02). Continental crust is defined by its thickness and buoyancy: arc
+    // crust thicker than about 15 km is too buoyant to subduct and jams a trench like a
+    // continent, which an arc built on ocean crust reaches after more than about 20 Myr of
+    // activity (Cloos 1993). The model's arc magma (`arc_magma_m_per_myr`, 20 m/Myr at the axis
+    // at v_0) is not a physical thickness (arcs thicken by several hundred m/Myr, Stern 2010), so
+    // the rule counts Cloos's time in it: `arc_maturity_myr` of arc magma at the axis at full
+    // rate (ledger: PLT-047). Until 2026-10-02 a mature arc also had to stand above sea level
+    // that step; most intra-oceanic arcs are submarine (Stern 2010), and the height the plate
+    // model sees is the surface's bent height, so flexure cut the continents' growth (build log
+    // "Continental crust bisect").
+    let mature_m = (env.k.arc_magma_m_per_myr * env.k.arc_maturity_myr) as f32;
     st.samples.par_iter_mut().enumerate().for_each(|(i, s)| {
         if s.kind == OCEANIC
-            && s.elevation_m > 0.0
-            && s.flags & ARC != 0
+            && !s.is_hidden()
+            && s.arc_oceanic_m > 0.0
             && s.arc_oceanic_m >= mature_m
         {
             s.kind = CONTINENTAL;

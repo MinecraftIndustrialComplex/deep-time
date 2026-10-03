@@ -379,7 +379,7 @@ row in `docs/science/ledger/PLT.md` (PLT-174 to PLT-202) says what was read.
 | Sea-floor age | spreading and subduction rates change; slow plates keep old floor | `subduction_initiation_*`, `slab_pull` |
 | Active margin share (P1-27) | which margins subduct depends on where slabs form and persist | `subduction_initiation_rate`, `_clearance_km` |
 | Hypsometry | subduction uplift scales with convergence speed, whose spread widens; belts replace surges | `subduction_uplift_mm_yr`, `collision_stacking_share`, cordillera |
-| Continental crust budget | shortening per collision is set by the balance | `arc_continental_m`, `collision_stacking_share` |
+| Continental crust budget | shortening per collision is set by the balance | `arc_continental_m` (since 2026-10-02 `arc_maturity_myr`, from Cloos 1993, not tuned), `collision_stacking_share` |
 | Rift rules | a rift opens only if forces open it; failed rifts heal | `rift_lambda0` |
 | Arc and volcano rates, deposits that read convergence | follow speed | re-checked, not retuned first |
 
