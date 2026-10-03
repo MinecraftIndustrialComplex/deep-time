@@ -20,7 +20,7 @@ class SeaCliffGuardTest {
 
     private static int[] column(Magma.Heights h, int x0, int lx, int skin) {
         int[] around = SeaCliffGuard.lowestAround(h, x0, 0, skin);
-        return SeaCliffGuard.guarded(Magma.top(h.at(x0 + lx, 0)), around[lx], SEA, MIN_Y);
+        return SeaCliffGuard.guarded(Magma.top(h.at(x0 + lx, 0)), around[lx], SEA, MIN_Y, skin);
     }
 
     @Test
@@ -48,20 +48,26 @@ class SeaCliffGuardTest {
     }
 
     @Test
-    void aGentleSlopeGuardsAtMostABlockOrTwo() {
-        Magma.Heights slope = (x, z) -> -100.0 + 0.1 * x;   // one block in ten
-        for (int lx = 0; lx < 16; lx++) {
-            int[] r = column(slope, 100, lx, SKIN);
-            if (r != null)
-                assertTrue(r[1] - r[0] + 1 <= 2, "band " + (r[1] - r[0] + 1) + " blocks at column " + lx);
+    void aSeaFloorIsNotACliff() {
+        // One block in ten and one in two (about 27 degrees): the drop within the skin is under the skin.
+        for (double gradient : new double[]{0.1, 0.5}) {
+            Magma.Heights slope = (x, z) -> -100.0 + gradient * x;
+            for (int lx = 0; lx < 16; lx++)
+                assertNull(column(slope, 100, lx, SKIN), "gradient " + gradient + " column " + lx);
         }
+        // One block in one (45 degrees) is a cliff: the drop within the skin reaches the skin.
+        Magma.Heights steep = (x, z) -> -100.0 + 1.0 * x;
+        for (int lx = 0; lx < 16; lx++)
+            assertNotNull(column(steep, 100, lx, SKIN), "45 degrees, column " + lx);
     }
 
     @Test
     void theGuardStopsAtTheSeaLevelAndTheFloor() {
-        assertArrayEquals(new int[]{-199, SEA - 1}, SeaCliffGuard.guarded(100, -200, SEA, MIN_Y));
-        assertArrayEquals(new int[]{MIN_Y, 10}, SeaCliffGuard.guarded(10, -900, SEA, MIN_Y));
-        assertNull(SeaCliffGuard.guarded(-210, -200, SEA, MIN_Y), "the ground is no higher than the neighbours'");
+        assertArrayEquals(new int[]{-199, SEA - 1}, SeaCliffGuard.guarded(100, -200, SEA, MIN_Y, SKIN));
+        assertArrayEquals(new int[]{MIN_Y, 10}, SeaCliffGuard.guarded(10, -900, SEA, MIN_Y, SKIN));
+        assertNull(SeaCliffGuard.guarded(-210, -200, SEA, MIN_Y, SKIN), "the ground is no higher than the neighbours'");
+        assertNull(SeaCliffGuard.guarded(-195, -200, SEA, MIN_Y, SKIN), "a drop of 5 blocks is under the skin of 6");
+        assertNotNull(SeaCliffGuard.guarded(-194, -200, SEA, MIN_Y, SKIN), "a drop of 6 blocks is a cliff");
     }
 
     @Test

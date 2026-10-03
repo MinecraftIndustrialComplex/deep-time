@@ -3,29 +3,41 @@ package com.minecraftindustrialcomplex.deeptime.worldgen;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.CarvingMask;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.levelgen.GenerationStep;
 
+import java.util.concurrent.atomic.LongAdder;
+
 /**
- * Keeps vanilla's cave and canyon carvers from cutting arches into the underwater face of a sea
- * cliff (Ben, 2026-10-02: the carvers cut arches into the underwater base of the sea cliffs beside
- * a volcano). A tunnel whose centre line runs a few blocks behind a steep face breaks out through
- * it: the cut is filled with the sea (or, in an aquifer cell that is dry, left as air), and the
- * cliff reads as an arch.
+ * Keeps arches out of the underwater face of a sea cliff (Ben, 2026-10-02: arches cut into the
+ * underwater base of the sea cliffs beside a volcano). Measured on the run's cliff (preview of
+ * 2026-10-02, seed fixed, MIC set): of 157,639 blocks of caves that open onto the open sea, vanilla's
+ * carvers (cave, cave_extra_underground, canyon) made about 46,000 and the density function's own
+ * noise caves (cheese, spaghetti and entrance caves) the rest; with the carvers switched off 111,023
+ * remained. So the guard has two halves, both on the same rule:
+ * <ol>
+ *   <li><b>The carvers are kept out</b>: the guarded blocks go in the chunk's carving masks, which
+ *       the carvers skip (as for {@link WaterBodies} and {@link MagmaPass}).</li>
+ *   <li><b>The noise caves are filled</b>: an open block (air, or cave water) in the guarded zone
+ *       becomes rock again (stone, deepslate below y 0, which the strata pass then turns into the
+ *       local rock), so no cave of any kind reaches the face. Lava and the sea above the ground are
+ *       never touched.</li>
+ * </ol>
  *
- * <p>The rule is one line of geometry: a block under the sea level, inside the ground, is out of
- * the carvers' reach when the terrain of some column within {@code skin} blocks to the side is
- * lower than the block, which is to say open water lies that close beside it at its height. The
- * block is put in the chunk's carving masks, which the carvers skip (as for {@link WaterBodies} and
- * {@link MagmaPass}). Caves may still run through the cliff and open on gentle ground; they just
- * keep a wall {@code skin} blocks thick towards open water. On a sea floor that slopes by a block
- * in ten the rule protects a band under the floor about as thick as the slope times the skin, one
- * block or less, and nothing at all on level ground.
+ * <p>The rule is geometry: a block under the sea level, inside the ground, is guarded where the
+ * terrain of some column within {@code skin} blocks to the side is lower than the block (open water
+ * lies that close beside it, at its height) <i>and</i> the ground drops by at least {@code skin}
+ * blocks within that distance (a slope of 45 degrees or more: a cliff, not a sea floor, where cave
+ * mouths are vanilla's and wanted). The guarded zone is a wall {@code skin} blocks thick behind the
+ * face; caves may still run through the cliff but keep that wall towards the water, and open on
+ * gentle ground.
  *
  * <p>Setting {@code underground.sea_cliff_skin_blocks} (6; 0 turns the guard off). Ledger MAG-057.
- * Noise caves (the density function's) are not carvers and are not touched.
  */
 public final class SeaCliffGuard {
 
@@ -89,36 +101,79 @@ public final class SeaCliffGuard {
     /**
      * The y range, inclusive, of the blocks of a column that the carvers must leave alone: those
      * above the lowest ground to the side and no higher than the column's own ground or the top of
-     * the water. Null when there are none.
+     * the water, in a column where the ground drops by at least {@code skin} blocks within {@code skin}
+     * columns. Null when there are none.
      */
-    static int[] guarded(int ownTop, int lowestAround, int seaLevel, int minY) {
+    static int[] guarded(int ownTop, int lowestAround, int seaLevel, int minY, int skin) {
+        if (ownTop - lowestAround < skin)
+            return null;   // not a cliff: a sea floor's cave mouths are left alone
         int hi = Math.min(ownTop, seaLevel - 1);
         int lo = Math.max(lowestAround + 1, minY);
         return lo > hi ? null : new int[]{lo, hi};
     }
 
-    /** Puts the guarded blocks of the chunk in its carving masks; returns how many. */
-    public static int apply(ChunkAccess chunk, Magma.Heights heights, int seaLevel, Rules rules) {
-        if (rules.skin() <= 0 || !(chunk instanceof ProtoChunk proto))
-            return 0;
-        int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
-        int minY = chunk.getMinBuildHeight();
-        int[] around = lowestAround(heights, x0, z0, rules.skin());
-        CarvingMask air = proto.getOrCreateCarvingMask(GenerationStep.Carving.AIR);
-        CarvingMask liquid = proto.getOrCreateCarvingMask(GenerationStep.Carving.LIQUID);
-        int n = 0;
+    /**
+     * The guarded blocks of the 16 x 16 columns of the chunk at (x0, z0): for each column, index
+     * {@code lz * 16 + lx}, the inclusive y range {@code {lo, hi}} of blocks the guard holds (the
+     * ground's top block is only masked, never filled, but is inside the range), or null.
+     */
+    public static int[][] zone(Magma.Heights heights, int x0, int z0, int seaLevel, int minY, int skin) {
+        int[][] out = new int[256][];
+        if (skin <= 0)
+            return out;
+        int[] around = lowestAround(heights, x0, z0, skin);
         for (int lz = 0; lz < 16; lz++)
             for (int lx = 0; lx < 16; lx++) {
                 int own = Magma.top(heights.at(x0 + lx, z0 + lz));
-                int[] r = guarded(own, around[lz * 16 + lx], seaLevel, minY);
+                out[lz * 16 + lx] = guarded(own, around[lz * 16 + lx], seaLevel, minY, skin);
+            }
+        return out;
+    }
+
+    /**
+     * Guards the chunk: puts the guarded blocks in its carving masks and fills the open ones among
+     * them with rock; returns how many blocks it filled. Call it before the strata pass.
+     */
+    public static int apply(ChunkAccess chunk, Magma.Heights heights, int seaLevel, Rules rules) {
+        if (rules.skin() <= 0)
+            return 0;
+        int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
+        int minY = chunk.getMinBuildHeight() + 1;   // never the bedrock layer
+        int[][] zone = zone(heights, x0, z0, seaLevel, minY, rules.skin());
+        CarvingMask[] masks = chunk instanceof ProtoChunk proto
+                ? new CarvingMask[]{proto.getOrCreateCarvingMask(GenerationStep.Carving.AIR),
+                        proto.getOrCreateCarvingMask(GenerationStep.Carving.LIQUID)}
+                : new CarvingMask[0];
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        int filled = 0;
+        for (int lz = 0; lz < 16; lz++)
+            for (int lx = 0; lx < 16; lx++) {
+                int own = Magma.top(heights.at(x0 + lx, z0 + lz));
+                int[] r = zone[lz * 16 + lx];
                 if (r == null)
                     continue;
                 for (int y = r[0]; y <= r[1]; y++) {
-                    air.set(lx, y, lz);
-                    liquid.set(lx, y, lz);
-                    n++;
+                    for (CarvingMask m : masks)
+                        m.set(lx, y, lz);
+                    if (y >= own)
+                        continue;   // the ground's top block is the surface: leave it as the density drew it
+                    BlockState s = chunk.getBlockState(pos.set(x0 + lx, y, z0 + lz));
+                    boolean open = s.isAir() || (!s.getFluidState().isEmpty() && !s.is(Blocks.LAVA));
+                    if (open) {
+                        chunk.setBlockState(pos, y >= 0 ? STONE : DEEPSLATE, false);
+                        filled++;
+                    }
                 }
             }
-        return n;
+        FILLED.add(filled);
+        return filled;
+    }
+
+    private static final BlockState STONE = Blocks.STONE.defaultBlockState(), DEEPSLATE = Blocks.DEEPSLATE.defaultBlockState();
+    private static final LongAdder FILLED = new LongAdder();
+
+    /** Blocks filled since the JVM started (for logs and tests). */
+    public static long filledTotal() {
+        return FILLED.sum();
     }
 }
