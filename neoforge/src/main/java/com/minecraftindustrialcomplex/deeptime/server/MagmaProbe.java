@@ -74,6 +74,10 @@ public final class MagmaProbe {
                 e.addProperty("chamberRv", b.chamberRv());
                 e.addProperty("chamberBlocks", b.chamberBlocks());
                 e.addProperty("conduitTop", b.conduitTop());
+                e.addProperty("lenses", b.lensCount());
+                e.addProperty("columnBlocks", b.columnBlocks());
+                e.addProperty("bodyBottomY", b.minY());
+                e.addProperty("reach", b.reach());
             }
             e.addProperty("lake", b.lake());
             if (b.lake()) {
