@@ -208,7 +208,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   (used as data), claims counts rewritten.
 - **Gates** (VM): `cargo fmt --check`, clippy `-D warnings`, `cargo deny check licenses bans` clean; `cargo test
   --workspace` all pass (core 534 + 3 ignored, cli 54, others); `./gradlew build test` tests=229 failures=0 skipped=1;
-  GAMETEST_PLACEHOLDER
+  `./gametest.sh` All 68 required tests passed; `./gametest.sh -PwithMic` (168 mods, after `tools/smoke/install.sh mic`)
+  All 68 required tests passed (both through `tools/remote/mac.sh --server`).
 - **Run time:** the coupled stages +8.5 % on master 00ef214c (491 → 533 s, four 500 Myr planets, a quiet VM); +39 % in the
   merged ensemble (626 → 873 s), which shared the VM with other agents' runs: the failure's 40 iterations a step cost
   something between the two.
