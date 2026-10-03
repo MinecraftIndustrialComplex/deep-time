@@ -68,9 +68,11 @@ fn an_idealised_planet_has_earthlike_zones() {
         p: &p,
         planet: planet(),
         monthly: true,
+        ice_prev: None,
+        koppen_prev: None,
     };
     let mut ebm = EbmState::default();
-    let s = snapshot::compute(&inp, &mut ebm, &[]);
+    let s = snapshot::compute(&inp, &mut ebm, &[], &mut Default::default());
     assert!(s.ebm_net_toa.abs() < 0.3, "EBM balance {}", s.ebm_net_toa);
     let row = |deg: f64| {
         (0..h)
