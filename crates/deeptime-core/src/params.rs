@@ -173,7 +173,9 @@ fn d_sea_level_y() -> i32 {
     63
 }
 fn d_pole_cap_deg() -> f64 {
-    75.0
+    // ledger: POL-003 (game-choice, Ben 2026-10-03: the storm band from 70°, so the band stays
+    // 118 blocks wide at 16k on the Lambert map instead of 49).
+    70.0
 }
 fn d_build_limit_band() -> f64 {
     48.0

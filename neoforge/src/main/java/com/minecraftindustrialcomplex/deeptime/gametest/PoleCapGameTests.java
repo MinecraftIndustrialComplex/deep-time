@@ -152,7 +152,7 @@ public final class PoleCapGameTests {
     // ---------------------------------------------------------------- entityPushedBack
 
     /**
-     * No effect below 75°, then a pushback toward the equator that grows with latitude, in both
+     * No effect below the cap line (70° by default), then a pushback toward the equator that grows with latitude, in both
      * hemispheres:
      * <ul>
      *   <li>survival players at 74.5°, 76°, 77.5° and 79° N and S are sent the storm and the wind
