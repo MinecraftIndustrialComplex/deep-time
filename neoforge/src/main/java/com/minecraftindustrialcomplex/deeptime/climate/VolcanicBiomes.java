@@ -184,9 +184,15 @@ public final class VolcanicBiomes {
             int tags = TAGS.get();
             if (r != null && r.key == source.key() && r.tags == tags)
                 return r;
-            r = build(source, tags);
-            resolved = r;
-            return r;
+            synchronized (this) {   // once per level and tag load, not once per worldgen thread
+                r = resolved;
+                tags = TAGS.get();
+                if (r != null && r.key == source.key() && r.tags == tags)
+                    return r;
+                r = build(source, tags);
+                resolved = r;
+                return r;
+            }
         }
     }
 
