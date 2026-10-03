@@ -369,7 +369,8 @@ public final class LavaGameTests {
         // that lies under the sea.
         List<int[]> chunks = new ArrayList<>();
         int[][] ring = {{skin, 0}, {-skin, 0}, {0, skin}, {0, -skin}, {skin, skin}, {-skin, -skin}, {skin, -skin}, {-skin, skin}};
-        for (int z = -c / 4; z < c / 4 && chunks.size() < 6; z += 16)
+        int pole = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);   // the planet's projection
+        for (int z = -pole; z < pole && chunks.size() < 6; z += 16)
             for (int x = -c / 2; x < c / 2 && chunks.size() < 6; x += 16) {
                 int own = (int) Math.ceil(t.height(x, z)) - 1;
                 int low = own;
