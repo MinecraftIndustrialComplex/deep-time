@@ -566,6 +566,7 @@ mod tests {
             v: [0.5, 1.0],
             grade: 1e-7,
             density: 0.08,
+            raw: 0.0,
         }];
         let s = Site {
             id,
