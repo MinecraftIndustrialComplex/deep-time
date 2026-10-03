@@ -2,7 +2,8 @@
 //! The rock class at a depth below the surface, over the whole planet map: "Rock at depth".
 //!
 //! Pixel (px, py) of a w × h map is what a keyframe pixel is: centred on longitude 360°·px/w (the
-//! seam is 0°) and latitude 90° − 180°·py/h, i.e. block x = −C/2 + C·px/w, z = −C/4 + C·py/(2h),
+//! seam is 0°) and on the row the projection gives py (`Projection::picture_z`: Lambert, sin φ =
+//! 1 − 2·py/h), i.e. block x = −C/2 + C·px/w, z = −R + 2R·py/h,
 //! so the picture sits under the workbench's map exactly. The depth is below the terrain's top
 //! block there (⌈H⌉ − 1, the evaluator's `top_y`), H the generated terrain height; `Floor` is the
 //! lowest block of the world.
@@ -117,10 +118,11 @@ mod tests {
 
     #[test]
     fn pixels_sit_where_keyframe_pixels_do() {
-        // Pixel 0 is the seam (x = −C/2) and the north pole row; the middle pixel is x = 0, z = 0.
-        assert_eq!(pixel_block(16384, 1024, 512, 0, 0), (-8192, -4096));
-        assert_eq!(pixel_block(16384, 1024, 512, 512, 256), (0, 0));
-        assert_eq!(pixel_block(16384, 1024, 512, 1023, 511), (8176, 4080));
+        // Pixel 0 is the seam (x = −C/2) and the north pole row (z = −R, R = C/2π = 2,607.6); the
+        // middle pixel is x = 0, z = 0 (the map is π : 1, 1024 × 326).
+        assert_eq!(pixel_block(16384, 1024, 326, 0, 0), (-8192, -2608));
+        assert_eq!(pixel_block(16384, 1024, 326, 512, 163), (0, 0));
+        assert_eq!(pixel_block(16384, 1024, 326, 1023, 325), (8176, 2591));
     }
 
     #[test]

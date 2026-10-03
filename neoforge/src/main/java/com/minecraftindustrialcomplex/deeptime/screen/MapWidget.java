@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.function.Supplier;
 
 /**
- * The equirectangular map view (plan §7.12): a keyframe (or the review page's final map) stretched
+ * The map view (Lambert equal-area, π : 1) (plan §7.12): a keyframe (or the review page's final map) stretched
  * into a 2:1 box, with overlays placed by latitude and longitude the way the viewer places them
  * (pixel (px, py) centred on 360°·px/w, 90° − 180°·py/h). Hovering shows the latitude and longitude.
  */
@@ -36,9 +36,11 @@ class MapWidget extends AbstractWidget {
         this.boxes = boxes;
     }
 
-    /** The largest box of the map picture's aspect (2 : 1) inside (w, h). */
+    /** The largest box of the map picture's aspect ({@code Projection.pictureHeight}: π : 1) inside (w, h). */
     static int[] fit(int w, int h) {
-        int mw = Math.min(w, 2 * h);
+        int mw = w;
+        while (mw > 1 && com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureHeight(mw) > h)
+            mw--;
         return new int[]{mw, com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureHeight(mw)};
     }
 

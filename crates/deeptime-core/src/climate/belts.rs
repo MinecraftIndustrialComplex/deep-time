@@ -173,7 +173,8 @@ pub fn hemispheric_shift(p: &ClimateParams, tilt_deg: f64, month: usize) -> f64 
 }
 
 /// The ITCZ's latitude per column and month (`w × 12`, degrees): the thermal equator, i.e. the
-/// cos φ-weighted soft maximum (τ 1.5 °C) of the estimated sea-level temperature over |φ| ≤ 35°,
+/// area-weighted soft maximum (τ 1.5 °C; `area_row` the rows' cell areas, any unit: equal on the
+/// Lambert grid) of the estimated sea-level temperature over |φ| ≤ 35°,
 /// where the estimate mixes the EBM's ocean and land temperatures by the land share within
 /// ~500 km; clamped to ±`itcz_max_shift_deg`, smoothed along the row over `itcz_smooth_km`
 /// (Earth km).
@@ -182,6 +183,7 @@ pub fn itcz(
     p: &ClimateParams,
     w: usize,
     lat_row: &[f64],
+    area_row: &[f64],
     land_near: &[f64],
     t_ocean: &[[f64; 12]],
     t_land: &[[f64; 12]],
@@ -205,7 +207,8 @@ pub fn itcz(
                 let tmax = rows.iter().map(|&j| est(j)).fold(f64::MIN, f64::max);
                 let (mut num, mut den) = (0.0, 0.0);
                 for &j in &rows {
-                    let wt = ((est(j) - tmax) / 1.5).exp() * lat_row[j].to_radians().cos();
+                    // Each row's cells weigh their true area (equal on the Lambert grid).
+                    let wt = ((est(j) - tmax) / 1.5).exp() * area_row[j];
                     num += wt * lat_row[j];
                     den += wt;
                 }

@@ -203,8 +203,8 @@
     const c = C();
     const left = S.cx - S.w / 2 * S.bpp, top = S.cz - S.h / 2 * S.bpp;
     const k0 = Math.floor((left + c / 2) / span), k1 = Math.floor((left + S.w * S.bpp + c / 2) / span);
-    const pz = proj.poleZ(c);   // the tile pyramid's frame starts at the north pole (worldmap.rs)
-    const j0 = Math.max(0, Math.floor((top + pz) / span)), j1 = Math.min((1 << z) - 1, Math.floor((top + S.h * S.bpp + pz) / span));
+    const fz = proj.tileFrameZ(c);   // the tile pyramid's frame (worldmap.rs): 2 : 1, wider than the planet
+    const j0 = Math.max(0, Math.floor((top - fz) / span)), j1 = Math.min((1 << z) - 1, Math.floor((top + S.h * S.bpp - fz) / span));
     const nx = 2 << z;
     const d = S.dpr;
     ctx.globalAlpha = alpha;

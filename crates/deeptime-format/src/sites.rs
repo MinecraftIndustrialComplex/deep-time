@@ -583,7 +583,7 @@ mod tests {
 
     #[test]
     fn index_finds_sites_and_wraps_the_seam() {
-        let c = 4096; // 8 × 4 cells of 512 blocks
+        let c = 4096; // 8 × 3 cells of 512 blocks (z from −704, the grids' extent)
         let near_seam = Site {
             aabb: [[-2100, -10, -30], [-2030, 5, 30]], // x from −2100 (wrapped: 1996) to −2030
             ..site(5, -2048, 0, 1)
@@ -597,7 +597,7 @@ mod tests {
         let idx = SiteIndex::build(c, &sites).unwrap();
         assert_eq!(
             (idx.cols, idx.rows, idx.origin_x, idx.origin_z),
-            (8, 4, -2048, -1024)
+            (8, 3, -2048, -704)
         );
         assert_eq!(idx.at_block(-2040, 0), &[5, 6]);
         assert_eq!(idx.at_block(2040, 0), &[5, 6], "the seam wraps");
@@ -606,7 +606,7 @@ mod tests {
         assert_eq!(idx.at_block(-1000, 1000), &[6]);
         // Every cell of the big site's span holds it.
         for col in 0..8 {
-            for row in 0..4 {
+            for row in 0..3 {
                 assert!(idx.cell(col, row).contains(&6));
             }
         }

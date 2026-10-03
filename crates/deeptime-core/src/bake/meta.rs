@@ -282,11 +282,13 @@ mod tests {
     use super::*;
     use crate::provinces::ProvinceParams;
 
-    /// `GridDesc::band_weight` of an `h`-row grid.
+    /// The row weights of an `h`-row grid that spans the planet pole to pole: on the equal-area
+    /// projection every row weighs the same (`GridDesc::row_weights`, inside the poles).
     fn band_weights(h: usize) -> Vec<f64> {
-        let g = deeptime_format::GridDesc::for_planet("L1", 4 * h as u32, 2).unwrap();
-        assert_eq!(g.h as usize, h);
-        g.row_weights()
+        let g = deeptime_format::GridDesc::for_planet("L1", 16_384, 16).unwrap();
+        let inside: Vec<f64> = g.row_weights().into_iter().filter(|&w| w == 1.0).collect();
+        assert!(inside.len() >= h);
+        inside[..h].to_vec()
     }
 
     #[test]

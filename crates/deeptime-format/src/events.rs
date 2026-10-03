@@ -1214,7 +1214,7 @@ mod tests {
 
     #[test]
     fn cell_index_places_points_and_sites() {
-        let grid = GridDesc::for_planet("L1", 1024, 16).unwrap(); // 64 × 32
+        let grid = GridDesc::for_planet("L1", 1024, 16).unwrap(); // 64 × 24
         let log = EventLog::from_events(vec![
             Event::new(EventId::new(1, 0), 0.0, "deeptime:a", "deeptime:s").at(Place::Point {
                 lat: 0.0,
@@ -1226,12 +1226,14 @@ mod tests {
         ])
         .unwrap();
         let idx = log.cell_index(&grid, |s| (s == 3).then_some([0.0, 180.0]));
-        // lat 0, lon 180° is block (0, 0): cell (32, 16).
-        assert_eq!(cell_of(&grid, 0.0, 180.0), (32, 16));
-        assert_eq!(idx.at(32, 16), &[EventId::new(1, 0), EventId::new(1, 1)]);
-        // The seam is 0° (and 360°): column 0; the poles clamp.
-        assert_eq!(cell_of(&grid, 90.0, 0.0), (0, 0));
-        assert_eq!(cell_of(&grid, -90.0, 360.0), (0, 31));
+        // lat 0, lon 180° is block (0, 0): cell (32, 12) (the grid's rows run from z = −192, the
+        // multiple of 64 past the Lambert pole R = 163).
+        assert_eq!((grid.h, grid.origin_block_z), (24, -192));
+        assert_eq!(cell_of(&grid, 0.0, 180.0), (32, 12));
+        assert_eq!(idx.at(32, 12), &[EventId::new(1, 0), EventId::new(1, 1)]);
+        // The seam is 0° (and 360°): column 0; the poles are z = ∓R: rows 2 and 22.
+        assert_eq!(cell_of(&grid, 90.0, 0.0), (0, 2));
+        assert_eq!(cell_of(&grid, -90.0, 360.0), (0, 22));
     }
 
     #[test]

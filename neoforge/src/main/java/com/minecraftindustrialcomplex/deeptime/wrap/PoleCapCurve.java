@@ -5,10 +5,12 @@ package com.minecraftindustrialcomplex.deeptime.wrap;
  * The pole soft cap's geometry and curves (plan §7.11, P1-18). Plain Java, no Minecraft: the server
  * cap ({@link PoleCap}), Sable's wind, the client and the JUnit tests all read the same numbers.
  *
- * <p><b>Latitude</b> is the planet's projection's ({@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection}, equirectangular:
- * φ = −z · 360° / C), so z ∈ [−C/4, C/4) spans pole to pole, north (−z) is positive, and |z| = C/4
- * is the pole edge. The cap starts at
- * {@code capDeg} (φc, default 75°) and becomes a hard stop at {@code stopDeg} (φs, default 80°).
+ * <p><b>Latitude</b> is the planet's projection's ({@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection}: Lambert's
+ * equal-area cylinder, φ = asin(−z / R), R = C/2π), so z ∈ [−R, R] spans pole to pole, north (−z) is
+ * positive, and |z| = R is the pole edge. The cap starts at {@code capDeg} (φc, default 75°) and
+ * becomes a hard stop at {@code stopDeg} (φs, default 80°); in blocks the band is R·(sin φs − sin φc):
+ * 49 blocks at C = 16,384, 98 at 32,768 (the cap keeps the same share of the planet behind it,
+ * 3.4 %, as on the old equirectangular map, where the band was 228 blocks).
  *
  * <p><b>Depth</b> s = clamp((|φ| − φc) / (φs − φc), 0, 1): 0 at the cap line, 1 at the stop line.
  *
@@ -26,9 +28,9 @@ package com.minecraftindustrialcomplex.deeptime.wrap;
  *       thrown back much harder, which is the point: no flying past the storm.</li>
  *   <li><b>Sable wind</b> (a velocity change toward the equator added every tick to a ship's
  *       rigid body, blocks/second per tick): {@link #WIND_MAX} · s<sup>1.5</sup>, i.e. up to
- *       20 blocks/s² at the stop (8 blocks/s² averaged over the band). A 40 blocks/s jet that
- *       enters at 75° is turned around at 78.6° (C = 16,384, a 227-block band) or 77.7°
- *       (C = 32,768); a slow airship much sooner.</li>
+ *       20 blocks/s² at the stop (8 blocks/s² averaged over the band). On the Lambert map the band
+ *       is 49 blocks (C = 16,384) or 98 (C = 32,768), so a 40 blocks/s jet that enters at 75°
+ *       reaches the stop line and is held there; a slow airship is turned round inside the band.</li>
  *   <li><b>Hard stop</b>: poleward of φs nothing that the cap governs stays; it is put back on the
  *       stop line (players, vehicles) or has its poleward velocity cancelled and is blown back
  *       (Sable ships).</li>
@@ -79,12 +81,12 @@ public record PoleCapCurve(int circumference, double capDeg, double stopDeg) {
         return latitudeDeg(circumference, z);
     }
 
-    /** |z| of the cap line (e.g. 3,413.3 at C = 16,384). */
+    /** |z| of the cap line (e.g. 2,518.7 at C = 16,384). */
     public double capZ() {
         return Math.abs(zOfLatitude(circumference, capDeg));
     }
 
-    /** |z| of the stop line (e.g. 3,640.9 at C = 16,384). */
+    /** |z| of the stop line (e.g. 2,568.0 at C = 16,384). */
     public double stopZ() {
         return Math.abs(zOfLatitude(circumference, stopDeg));
     }

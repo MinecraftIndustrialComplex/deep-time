@@ -1303,8 +1303,11 @@ mod tests {
         classes: [&str; 4],
         glaciated: [bool; 4],
     ) -> (Mapped, usize) {
-        let c = 1024u32;
+        // C = 1,536: L1 96 × 32 (rows from z = −256, the multiple of 64 past the Lambert pole at
+        // 244.5), so rows 8–23 are land between two seas.
+        let c = 1536u32;
         let l1 = GridDesc::for_planet("L1", c, 16).unwrap();
+        assert_eq!((l1.w, l1.h), (96, 32));
         let l2 = GridDesc::for_planet("L2", c, 8).unwrap();
         let (w1, h1) = (l1.w as usize, l1.h as usize);
         let quarter = |i: usize| classes[i * 4 / w1];

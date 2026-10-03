@@ -108,7 +108,8 @@ sections
 | 5 | path | polyline id (reserved: no writer stores paths yet) | 0 |
 
 Longitude is plan §5.2's 360°·(x + C/2)/C, so the seam is 0° and a point is at block
-x = lon/360 · C − C/2, z = −lat/90 · C/4 (north is −z; `FORMAT.md`, "Grids").
+x = lon/360 · C − C/2, z = −R·sin(lat) with R = C/2π (north is −z; the Lambert projection,
+`FORMAT.md`, "Grids").
 
 ### Param entry (16 bytes)
 
