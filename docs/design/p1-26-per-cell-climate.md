@@ -1348,6 +1348,42 @@ master merged in. Each task's notes record what differs from the sections above 
   projection's row weight), `corners` and `masked_at` (the masked bilinear of §2.9: only coarse
   cells of the medium, renormalized; `None` when none of the four has it).
 
+- **T2 2-D energy balance** (`climate/ebm2d.rs`). As §2.2–2.5 and §2.7–2.8, with these choices:
+  - The surface-dependent D is the source's (`ebm2d::D_*`, CLM-120) times one setting,
+    `atmosphere_diffusivity_scale` (default 1 until T9 calibrates it down to the atmosphere's
+    share), so T9 keeps the source's shape and tunes one number.
+  - The ITCZ that sets each row's belt latitude for the low-level wind is the thermal equator of
+    the previous model year's zonal-mean T̄ (the run's first year: the caller's, zeros at a spin-up);
+    a row's wind must be one number for the shift to conserve exactly.
+  - **The slab freezes right after the local step**, as well as after the ocean's transport (and
+    `ebm.rs` does the same now). With freezing only at the end of the step, a slab cooled below
+    −1.8 °C through thin ice drew heat by the slab's diffusion from its neighbours' slabs under
+    thick, insulated ice, which then grew without end (0.65 m a year in the Arctic of the test
+    planet; the run never settled). Freezing first keeps every slab at or above the freezing point
+    for the diffusion, which then cannot cool one below it.
+  - `ebm.rs`'s diffusion now uses each band's exact area, sin φ_N − sin φ_S, in place of cos φ·Δφ
+    (a 10⁻⁴ change of its D), so a zonally uniform 2-D planet equals it band by band (test: under
+    10⁻⁶ K after 4 years).
+  - Mountain blocking (§2.5, option, default off) is not built.
+  - Measured (unit test, an idealized Earth: two continents, Antarctica, 128 × 64, the 1-D
+    model's D values unscaled, gyres and a 15-Sv conveyor): settles in 27 years from the 1-D
+    model's initial state, 0.06–0.08 s per model year on the test VM, global mean 15.5 °C,
+    net TOA 0.0002 W/m², atmosphere's peak transport 3.4 PW, ocean's 2.9 PW, perennial Arctic ice
+    about 4.5 m.
+- **T3 ocean** (`climate/ocean2d.rs`). As §2.6. The wind stress is the annual mean of the surface
+  belt winds' zonal component (`belts::winds` weighted by the month's regimes at the row's belt
+  latitude), ρ_a 1.2 kg/m³, ρ₀ 1,025 kg/m³ (both from memory). A cell is sea for the transport
+  when its land fraction is below one half. A basin qualifies for the conveyor when, within
+  20–70° of its hemisphere, it is one connected sea that reaches 30° and holds sea poleward of 50°
+  ice-free in late winter (March north, September south: the previous snapshot's cover; none at
+  the first); the 30° reach keeps small enclosed seas (a Baltic, a Hudson Bay) from winning by
+  narrowness. Upwelling is spread over the sea equatorward of 50° of the connected ocean the basin
+  belongs to (a lake or an enclosed sea would have no sink). The potential flow is solved by
+  conjugate gradients on the Neumann Laplacian. Tests: a 60°-wide northern basin turns clockwise
+  with its northward western boundary current in the westernmost cell, ≥ 3× the interior's
+  speed, divergence at round-off; the conveyor sinks in the narrow of two northern basins, its
+  sources and sinks sum to 15 Sv, the transport conserves Σ heat to 10⁻⁹ and carries heat north.
+
 ## Appendix A. How the measurements were made
 
 All runs were on the M6 Mac, through `tools/remote/mac.sh` for the build and plain ssh for the

@@ -46,11 +46,13 @@ pub mod carbon;
 pub mod clock;
 pub mod coarse;
 pub mod ebm;
+pub mod ebm2d;
 pub mod glaciers;
 pub mod ice;
 pub mod insolation;
 pub mod koppen;
 pub mod lapse;
+pub mod ocean2d;
 pub mod orbit;
 pub mod orographic;
 pub mod params;
@@ -68,7 +70,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-pub use params::{ClimateParams, PresentClimate};
+pub use params::{ClimateModel, ClimateParams, PresentClimate};
 
 use crate::deposits::fields::{cell_area_km2, lat_of_row};
 use crate::error::CoreError;

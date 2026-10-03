@@ -208,6 +208,13 @@ impl EbmParams {
         let lat: Vec<f64> = (0..n).map(|j| self.band_lat(j)).collect();
         let cosl: Vec<f64> = lat.iter().map(|l| l.cos()).collect();
         let dphi = std::f64::consts::PI / n as f64;
+        // Each band's area per radian of longitude, sin φ_N − sin φ_S (= 2 sin(Δφ/2) cos φ, so the
+        // area weights stay ∝ cos φ): the diffusion is the exact finite-volume form on the sphere,
+        // which the per-cell model (`ebm2d.rs`) shares, face length over centre distance.
+        let span: Vec<f64> = lat
+            .iter()
+            .map(|l| (l + 0.5 * dphi).sin() - (l - 0.5 * dphi).sin())
+            .collect();
         // Faces between bands (j − ½, j + ½); the poles' faces have cos = 0 (no flux).
         let face: Vec<f64> = (0..=n)
             .map(|k| {
@@ -306,6 +313,11 @@ impl EbmParams {
                     state.t_ocean[j] = to2;
                     state.t_land[j] = tl2;
                     state.t_mixed[j] = tm2;
+                    // The slab freezes (or melts) at once, so the ocean's diffusion below never
+                    // sees a slab under the freezing point: otherwise a slab cooled through thin
+                    // ice drew heat from its neighbours' insulated slabs, whose ice then grew
+                    // without end.
+                    freeze_melt(&mut state.t_mixed[j], &mut state.ice_j_m2[j], self.c_ocean);
                 }
                 // 2. Diffusion of the band mean, implicit. Land and the sea's surface have the
                 //    same heat capacity, so both take the band mean's change.
@@ -314,7 +326,7 @@ impl EbmParams {
                         .map(|j| f[j] * state.t_land[j] + (1.0 - f[j]) * state.t_ocean[j])
                         .collect();
                     for j in 0..n {
-                        let k = self.d / (cosl[j] * dphi * dphi) * dt / self.c_land;
+                        let k = self.d / (span[j] * dphi) * dt / self.c_land;
                         let (kl, ku) = (k * face[j], k * face[j + 1]);
                         lo[j] = -kl;
                         up[j] = -ku;
@@ -343,7 +355,7 @@ impl EbmParams {
                         } else {
                             0.0
                         };
-                        let k = self.d_ocean / (cosl[j] * dphi * dphi) * dt / (self.c_ocean * sea);
+                        let k = self.d_ocean / (span[j] * dphi) * dt / (self.c_ocean * sea);
                         let (kl, ku) = (k * face[j] * fl, k * face[j + 1] * fu);
                         lo[j] = -kl;
                         up[j] = -ku;
@@ -355,15 +367,7 @@ impl EbmParams {
                 // 4. Freezing and melting at the slab: it holds at the freezing point while ice
                 //    grows, and melts its ice before it warms (the heat moves, none is lost).
                 for j in 0..n {
-                    let tm = state.t_mixed[j];
-                    if tm < SEA_FREEZE_C {
-                        state.ice_j_m2[j] += (SEA_FREEZE_C - tm) * self.c_ocean;
-                        state.t_mixed[j] = SEA_FREEZE_C;
-                    } else if state.ice_j_m2[j] > 0.0 {
-                        let melt = ((tm - SEA_FREEZE_C) * self.c_ocean).min(state.ice_j_m2[j]);
-                        state.ice_j_m2[j] -= melt;
-                        state.t_mixed[j] -= melt / self.c_ocean;
-                    }
+                    freeze_melt(&mut state.t_mixed[j], &mut state.ice_j_m2[j], self.c_ocean);
                 }
                 for j in 0..n {
                     let (to, tl) = (state.t_ocean[j], state.t_land[j]);
@@ -404,6 +408,20 @@ impl EbmParams {
             prev_mean = Some((annual, ice));
         }
         out
+    }
+}
+
+/// Freezing and melting at the slab `tm` (°C) with ice `ice` (J/m²) and heat capacity `c_ocean`
+/// (J/m²/K): below sea water's freezing point the slab holds at it and the heat it lost grows
+/// ice; above it, the ice melts first. The heat moves; none is lost.
+pub fn freeze_melt(tm: &mut f64, ice: &mut f64, c_ocean: f64) {
+    if *tm < SEA_FREEZE_C {
+        *ice += (SEA_FREEZE_C - *tm) * c_ocean;
+        *tm = SEA_FREEZE_C;
+    } else if *ice > 0.0 {
+        let melt = ((*tm - SEA_FREEZE_C) * c_ocean).min(*ice);
+        *ice -= melt;
+        *tm -= melt / c_ocean;
     }
 }
 
