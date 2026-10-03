@@ -5,30 +5,34 @@ package com.minecraftindustrialcomplex.deeptime.wrap;
  * The pole soft cap's geometry and curves (plan §7.11, P1-18). Plain Java, no Minecraft: the server
  * cap ({@link PoleCap}), Sable's wind, the client and the JUnit tests all read the same numbers.
  *
- * <p><b>Latitude</b> is the planet's projection's ({@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection}, equirectangular:
- * φ = −z · 360° / C), so z ∈ [−C/4, C/4) spans pole to pole, north (−z) is positive, and |z| = C/4
- * is the pole edge. The cap starts at
- * {@code capDeg} (φc, default 75°) and becomes a hard stop at {@code stopDeg} (φs, default 80°).
+ * <p><b>Latitude</b> is the planet's projection's ({@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection}: Lambert's
+ * equal-area cylinder, φ = asin(−z / R), R = C/2π), so z ∈ [−R, R] spans pole to pole, north (−z) is
+ * positive, and |z| = R is the pole edge. The cap starts at {@code capDeg} (φc, default 70°) and
+ * becomes a hard stop at {@code stopDeg} (φs, default 80°); in blocks the band is R·(sin φs − sin φc):
+ * 118 blocks at C = 16,384, 235 at 32,768, with 6.0 % of the planet behind the cap line (Ben,
+ * 2026-10-03: from 75° the Lambert band would have been 49 blocks; on the old equirectangular map,
+ * 75° to 80°, it was 228).
  *
  * <p><b>Depth</b> s = clamp((|φ| − φc) / (φs − φc), 0, 1): 0 at the cap line, 1 at the stop line.
  *
  * <p><b>The curves</b> (chosen in P1-18; the seam review page's curves were illustrations):
  * <ul>
  *   <li><b>Storm</b> (visual intensity, 0…1): s<sup>0.7</sup>. Concave, so the storm is already
- *       plain a little way in (0.2 at 75.5°, 0.62 at 77.5°) and a white-out at the stop.</li>
+ *       plain a little way in (0.2 at 71°, 0.62 at 75°) and a white-out at the stop.</li>
  *   <li><b>Pushback</b> (a velocity change toward the equator added every tick, blocks/tick²):
  *       {@link #PUSH_MAX} · s<sup>1.5</sup>, 0.10 at the stop. Convex, so the first degree is a
- *       breeze (0.009 at 76°) and the last one a gale. Vanilla ground friction (0.546 per tick)
+ *       breeze (0.009 at 72°) and the last one a gale. Vanilla ground friction (0.546 per tick)
  *       turns a per-tick push p into a steady drift of p / 0.454 ≈ 2.2 p, the same factor as the
- *       walking input (0.1): at 77.5° (p = 0.035) a walker keeps 65 % of his speed, at 79°
+ *       walking input (0.1): at 75° (p = 0.035) a walker keeps 65 % of his speed, at 78°
  *       (p = 0.072) 28 %, and at 80° walking is cancelled exactly while sprinting (0.13) still
  *       creeps. Anything airborne (drag 0.91, factor 11) or gliding (elytra, drag 0.99) is
  *       thrown back much harder, which is the point: no flying past the storm.</li>
  *   <li><b>Sable wind</b> (a velocity change toward the equator added every tick to a ship's
  *       rigid body, blocks/second per tick): {@link #WIND_MAX} · s<sup>1.5</sup>, i.e. up to
- *       20 blocks/s² at the stop (8 blocks/s² averaged over the band). A 40 blocks/s jet that
- *       enters at 75° is turned around at 78.6° (C = 16,384, a 227-block band) or 77.7°
- *       (C = 32,768); a slow airship much sooner.</li>
+ *       20 blocks/s² at the stop (8 blocks/s² averaged over the band). On the Lambert map the band
+ *       is 118 blocks (C = 16,384) or 235 (C = 32,768), so a 40 blocks/s jet that enters at 70°
+ *       is turned round at about 79.4° (16k; the band as if s grew linearly in z) or 77° (32k); a
+ *       slow airship much sooner.</li>
  *   <li><b>Hard stop</b>: poleward of φs nothing that the cap governs stays; it is put back on the
  *       stop line (players, vehicles) or has its poleward velocity cancelled and is blown back
  *       (Sable ships).</li>
@@ -40,7 +44,9 @@ package com.minecraftindustrialcomplex.deeptime.wrap;
  */
 public record PoleCapCurve(int circumference, double capDeg, double stopDeg) {
 
-    public static final double DEFAULT_CAP_DEG = 75.0;
+    /** ledger: POL-003. Ben, 2026-10-03: "Band from 70°, stop at 80°", so the band on the Lambert map
+     *  is 118 blocks at C = 16,384 (49 from 75°). */
+    public static final double DEFAULT_CAP_DEG = 70.0;
     public static final double DEFAULT_STOP_DEG = 80.0;
 
     /** Pushback at the stop line, blocks per tick per tick (see the class comment). */
@@ -79,12 +85,12 @@ public record PoleCapCurve(int circumference, double capDeg, double stopDeg) {
         return latitudeDeg(circumference, z);
     }
 
-    /** |z| of the cap line (e.g. 3,413.3 at C = 16,384). */
+    /** |z| of the cap line (e.g. 2,450.3 at C = 16,384 for the default 70°). */
     public double capZ() {
         return Math.abs(zOfLatitude(circumference, capDeg));
     }
 
-    /** |z| of the stop line (e.g. 3,640.9 at C = 16,384). */
+    /** |z| of the stop line (e.g. 2,568.0 at C = 16,384). */
     public double stopZ() {
         return Math.abs(zOfLatitude(circumference, stopDeg));
     }

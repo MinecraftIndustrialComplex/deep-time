@@ -398,7 +398,7 @@ impl DummyStage {
         }
         let field = world.fields.get_mut(ELEVATION).expect("inserted above");
         let grid = field.grid.clone();
-        let (gw, gh) = (grid.w as usize, grid.h as usize);
+        let gw = grid.w as usize;
         ctx.pool.install(|| {
             use rayon::prelude::*;
             field
@@ -406,7 +406,7 @@ impl DummyStage {
                 .par_chunks_mut(gw)
                 .enumerate()
                 .for_each(|(j, row)| {
-                    let lat = deeptime_format::Projection::picture_lat_deg(j as f64, gh as u32);
+                    let lat = grid.lat_of_row(j as u32);
                     for (i, v) in row.iter_mut().enumerate() {
                         // The seam is 0°.
                         let lon = deeptime_format::Projection::picture_lon_deg(i as f64, gw as u32);
@@ -634,7 +634,8 @@ mod tests {
             "world":{"circumference":2048,"grid_r":16,"keyframe_size":[64,32]}}}"#;
         let p = parse(json).unwrap();
         let w = p.world.clone().unwrap();
-        assert_eq!((w.grid().w, w.grid().h), (128, 64));
+        // Rows from z = −384, the multiple of 64 past the Lambert pole at 326.
+        assert_eq!((w.grid().w, w.grid().h), (128, 48));
         assert_eq!(w.keyframe_every_years, 5.0e8 / 8.0);
         let again = DummyParams::from_json(&p.to_json()["dummy"]).unwrap();
         assert_eq!(again, p);

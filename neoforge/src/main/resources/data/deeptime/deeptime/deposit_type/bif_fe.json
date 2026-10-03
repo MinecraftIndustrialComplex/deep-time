@@ -70,7 +70,7 @@
     "cdg_reservoir": false,
     "ore_block_policy": "ev_then_vanilla"
   },
-  "balance": {"count_mult": 1.0, "size_mult_h": 6.0, "size_mult_v": 4.0, "richness_mult": 1.0},
+  "balance": {"count_mult": 1.0, "size_mult_h": 6.0, "size_mult_v": 7.0, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
     "RICHNESS (owner, decisions log 2026-10-02, \"Rich Deposits, Thinner Scatter, Also make deposits use some of the vanilla ore vein features\"): the zone densities were raised and the richest zone carries raw-ore blocks (raw_share: that share of its ore blocks is the raw-ore block, as vanilla's ore veins carry 2 %); game-choice, ledger ORE-266; the richness settings scale both in the world (ORE-262). Measured in docs/science/deposits.md. Inherited BIF lies only in iron-formation basins dealt over a share of the stable interiors (deposits.inherited_bif_share 0.014, basins of about 100,000 km2: ORE-261, ORE-263, ORE-264).",
@@ -78,6 +78,7 @@
     "PLACEHOLDERS (not found in any USGS source): ore_density_t_m3 3.6 (hematite–magnetite–quartz rock), density_per_1e5km2 1 / 4 / 12, min_separation_m 5000, formation_depth_m 1200 (for an inherited sheet: its depth at the timeline's start, which slow cratonic erosion then brings towards the surface).",
     "formation_time cause: an inherited deposit takes the time of its causing event (the BIF shelf sea), not a frame of the timeline.",
     "Design values: the curves, clustering, zoning, aspect and dip (folded iron formation), size multipliers.",
-    "Create stones (decisions file): banded_iron_formation (crimsite → iron) is the preferred host at 2.0 and the sheet's own rock class."
+    "Create stones (decisions file): banded_iron_formation (crimsite → iron) is the preferred host at 2.0 and the sheet's own rock class.",
+    "VERTICAL SCALE (decisions log 2026-10-03, \"Keep today's block height\"): at 35 m per block the vertical multipliers are 1.75 times their 20 m values (balance.size_mult_v 4.0 -> 7.0), so a body keeps the height in blocks it had at 20 m per block; its size in metres is unchanged. game-choice, ledger ORE-055."
   ]
 }
