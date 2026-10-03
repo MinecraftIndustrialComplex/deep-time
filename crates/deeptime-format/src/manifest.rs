@@ -38,6 +38,12 @@ impl Writer {
     }
 }
 
+/// The default vertical scale, metres of planet per block up (`scale.m_per_block_v`): 35 m, an
+/// 8.6-fold vertical exaggeration against the 300 m horizontal block (Ben, decisions log
+/// 2026-10-02, "35 m per block (Recommended)", after docs/research/notes/vertical-scale-study.md:
+/// at 20 m, 42 % of the land was drawn steeper than 45° against vanilla's 15 %). A game choice.
+pub const DEFAULT_M_PER_BLOCK_V: f64 = 35.0; // ledger: SCL-002 (game choice, Ben)
+
 /// The scale parameters the reader needs (plan §5.1 `ScaleParams`, the fixed subset in v0).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Scale {
@@ -55,7 +61,7 @@ impl Scale {
         Scale {
             circumference_blocks: c,
             m_per_block_h: 300.0,
-            m_per_block_v: 20.0,
+            m_per_block_v: DEFAULT_M_PER_BLOCK_V,
             min_y: -352,
             max_y: 639,
             sea_level_y: 63,

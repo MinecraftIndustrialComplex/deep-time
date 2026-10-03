@@ -426,7 +426,7 @@ impl DummyStage {
                 .magnitude((continent.peak_m / 8000.0) as f32)
                 .param("stage", self.name())
                 .param("step", g as i64)
-                .param("peak_y", 63.0 + continent.peak_m / 20.0);
+                .param("peak_y", 63.0 + continent.peak_m / deeptime_format::DEFAULT_M_PER_BLOCK_V);
             if kind == "deeptime:orogeny_phase" {
                 e = e.until(world.t_years + 3.0 * dt);
             }
@@ -525,14 +525,14 @@ impl Continent {
         }
     }
 
-    /// Block y at a latitude and longitude (sea level y 63, 20 m per block).
+    /// Block y at a latitude and longitude (sea level y 63, the default metres per block up).
     fn elevation(&self, lat: f64, lon: f64) -> f64 {
         let d = angular_distance(lat, lon, self.lat, self.lon);
         let arc = angular_distance(lat, lon, -30.0, self.lon + 90.0);
         let g = (-(d / 0.55).powi(2)).exp();
         let a = (-(arc / 0.25).powi(2)).exp();
         let metres = -4000.0 + (self.peak_m + 4000.0) * g + 0.4 * (self.peak_m + 4000.0) * a;
-        63.0 + metres / 20.0
+        63.0 + metres / deeptime_format::DEFAULT_M_PER_BLOCK_V
     }
 }
 
@@ -662,7 +662,7 @@ mod tests {
     #[test]
     fn continent_is_land_at_its_centre_and_ocean_far_away() {
         let c = Continent::at(0.5);
-        assert!(c.elevation(c.lat, c.lon) > 63.0 + 300.0);
+        assert!(c.elevation(c.lat, c.lon) > 63.0 + 150.0);
         assert!(c.elevation(-c.lat, c.lon + 180.0) < 63.0);
         assert!((angular_distance(0.0, 179.0, 0.0, -179.0) - 2f64.to_radians()).abs() < 1e-9);
     }

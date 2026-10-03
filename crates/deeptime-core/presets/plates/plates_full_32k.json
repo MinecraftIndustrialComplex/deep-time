@@ -14,7 +14,7 @@
   "scale": {
     "circumference_blocks": 32768,
     "m_per_block_h": 300.0,
-    "m_per_block_v": 20.0,
+    "m_per_block_v": 35.0,
     "min_y": -352,
     "max_y": 639,
     "sea_level_y": 63,
