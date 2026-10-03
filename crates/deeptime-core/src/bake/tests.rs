@@ -328,3 +328,52 @@ fn a_run_without_amplify_gets_an_upsampled_terrain() {
     assert!(col.horizons[0].0 >= col.top_y);
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+/// A crater's breccia lens sits under the floor the game draws, not where the deep-time surface
+/// put it: the amplifier changes the ground after the impact stage placed the lens (on the seed-11
+/// test planet of the ice branch, 15 blocks at one crater), and the lens was centred at the rim's
+/// height with no breccia under the floor. `finalize_write` seats each lens on the baked terrain
+/// (`impacts::settle_folder`).
+#[test]
+fn a_craters_lens_is_seated_under_the_drawn_floor() {
+    let dir = temp_dir("lens-floor");
+    let mut v: serde_json::Value = serde_json::from_str(&small_planet(60.0)).unwrap();
+    // Forty times Earth's flux, as the test planet (planet_world_4k): craters the amplifier draws.
+    v["impacts"] = json!({"flux": 700.0, "max_crater_km": 40.0, "min_crater_km": 2.0});
+    run_to_folder(&v.to_string(), &dir);
+    let m = Manifest::read(&dir).unwrap();
+    m.verify(&dir).unwrap();
+    let w = ColumnWorld::open(&dir).unwrap();
+    let mv = m.scale.m_per_block_v;
+    let craters: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(dir.join("impacts/craters.json")).unwrap()).unwrap();
+    let craters = craters["craters"].as_array().expect("a crater list");
+    let (mut seated, mut off) = (0, 0);
+    for b in w.bodies.iter().filter(|b| b.role == "impact_breccia") {
+        let Some(c) = craters.iter().find(|c| {
+            (c["x"].as_f64().unwrap() - b.center[0]).abs() < 0.11
+                && (c["z"].as_f64().unwrap() - b.center[2]).abs() < 0.11
+        }) else {
+            continue;
+        };
+        // A crater with relief left has worn less than its depth: its lens lies under its cover.
+        if !matches!(c["fate"].as_str(), Some("fresh" | "degraded")) {
+            continue;
+        }
+        let drawn = w.height(b.center[0].round() as i64, b.center[2].round() as i64);
+        let want = drawn - c["cover_m"].as_f64().unwrap() / mv;
+        seated += 1;
+        eprintln!(
+            "crater {} lens at y {:.2}, drawn floor {:.2}, wanted {:.2}",
+            c["id"], b.center[1], drawn, want
+        );
+        // Exact up to the file's rounding of the cover (to a metre) and of the centre (0.1 block).
+        if (b.center[1] - want).abs() > 0.15 {
+            off += 1;
+        }
+    }
+    assert!(seated > 0, "the test planet has craters with lenses to read");
+    assert_eq!(off, 0, "of {seated} lenses read, {off} are not under the drawn floor");
+    assert!(m.notes["bake"]["impact_bodies"]["lenses"].as_u64().unwrap() > 0);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
