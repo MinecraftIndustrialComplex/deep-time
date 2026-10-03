@@ -532,6 +532,7 @@ impl DepositStage {
             m_per_block_v: sc.m_per_block_v,
             min_y: sc.min_y,
             max_y: sc.max_y,
+            sea_level_y: sc.sea_level_y,
         };
         let mut stage = DepositStage::build(
             preset.seed,
@@ -1224,10 +1225,10 @@ fn carry<T: Copy + Send + Sync>(v: &mut Vec<T>, origin: &[u32], fresh: T) {
         .collect();
 }
 
-/// The block y of the present surface at elevation `elev_m` (plan §8.8: y = 63 + h / 20; sea
-/// floors stay where they are, deposits there are rare).
+/// The block y of the present surface at elevation `elev_m` (plan §8.8: y = sea_level_y + h /
+/// m_per_block_v; sea floors stay where they are, deposits there are rare).
 pub fn surface_y(elev_m: f32, sc: &Scales) -> f64 {
-    (63.0 + f64::from(elev_m) / sc.m_per_block_v)
+    (f64::from(sc.sea_level_y) + f64::from(elev_m) / sc.m_per_block_v)
         .clamp(f64::from(sc.min_y + 8), f64::from(sc.max_y))
 }
 
@@ -3426,6 +3427,24 @@ mod spill_tests;
 #[cfg(test)]
 mod tests {
     use super::types::DepositType;
+
+    /// The surface's block y follows the world's sea level and vertical scale (2026-10-02: it read
+    /// sea level 63 whatever the world said).
+    #[test]
+    fn surface_y_reads_the_world_sea_level_and_scale() {
+        let sc = Scales {
+            sea_level_y: 100,
+            m_per_block_v: 35.0,
+            ..Scales::default()
+        };
+        assert_eq!(surface_y(700.0, &sc), 120.0);
+        assert_eq!(surface_y(-350.0, &sc), 90.0);
+        let sc20 = Scales {
+            m_per_block_v: 20.0,
+            ..Scales::default()
+        };
+        assert_eq!(surface_y(700.0, &sc20), 98.0);
+    }
 
     fn base_types() -> Vec<DepositType> {
         select_types(&DepositParams::default(), 1.0).unwrap()

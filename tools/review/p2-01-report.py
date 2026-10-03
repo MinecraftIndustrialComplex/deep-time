@@ -44,7 +44,7 @@ def heights(runs: Path, name: str, scale: dict, step: int = 8) -> np.ndarray:
 
 def hypsometry(h: np.ndarray, scale: dict) -> dict:
     sea = scale["sea_level_y"]
-    mv = scale.get("m_per_block_v", 20.0)
+    mv = scale.get("m_per_block_v", 35.0)
     # Rows are latitudes of an equirectangular grid: weight by cos(latitude).
     rows = h.shape[0]
     lat = (np.arange(rows) + 0.5) / rows * np.pi - np.pi / 2
@@ -86,7 +86,7 @@ def main() -> None:
         print(f"hypsometry[{other}] =", json.dumps(hypsometry(h_off, scale)))
         sea = scale["sea_level_y"]
         land = (h_on > sea) | (h_off > sea)
-        diff = (h_on - h_off)[land] * scale.get("m_per_block_v", 20.0)
+        diff = (h_on - h_off)[land] * scale.get("m_per_block_v", 35.0)
         moved = np.abs(diff) >= 20.0
         relief_picture(runs, name, other, h_on, h_off, scale, Path("review/out/p2-01/relief.png"))
         print("difference =", json.dumps({
@@ -110,7 +110,7 @@ def relief_picture(runs: Path, on: str, off: str, h_on: np.ndarray, h_off: np.nd
 
     c = scale["circumference_blocks"]
     sea = scale["sea_level_y"]
-    mv = scale.get("m_per_block_v", 20.0)
+    mv = scale.get("m_per_block_v", 35.0)
     d = np.abs(h_on - h_off) * ((h_on > sea) & (h_off > sea))
     k = side // step
     rows, cols = d.shape
