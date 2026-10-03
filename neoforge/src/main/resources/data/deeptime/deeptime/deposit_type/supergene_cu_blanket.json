@@ -60,7 +60,7 @@
     "cdg_reservoir": false,
     "ore_block_policy": "ev_then_vanilla"
   },
-  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 1.0, "richness_mult": 1.0},
+  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 1.75, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
     "RICHNESS (owner, decisions log 2026-10-02, \"Rich Deposits, Thinner Scatter, Also make deposits use some of the vanilla ore vein features\"): the zone densities were raised and the richest zone carries raw-ore blocks (raw_share: that share of its ore blocks is the raw-ore block, as vanilla's ore veins carry 2 %); game-choice, ledger ORE-266; the richness settings scale both in the world (ORE-262). Measured in docs/science/deposits.md. The rain floor of the weathering rules is 0 since 2026-10-02 (DEP-040).",
@@ -68,6 +68,7 @@
     "USGS SIR 2010-5070-B (John et al. 2010): enrichment up to 3× in the Andes (p. 66, restating Sillitoe 2005), up to ~8× in the south-western US; enriched sulfide ore 0.4–1.7 % Cu (pp. 4, 65); enriched zone seldom thicker than 200 m (p. 25); blankets form at the top of the water table (p. 120); rainfall of 10 cm/yr or more (p. 68, one Andean stage); the same source says enrichment happens from tropical to hyper-arid climates, so the precip lower bound is 0 (Ben, decisions log 2026-10-02, \"Apply all\"; it was 100 mm/yr). Supergene activity lasted at least 0.4–6.2 Myr per deposit (Sillitoe & McKee 1996, USGS record 70018070); the plan's 0.5 Myr minimum (Sillitoe 2005) is used. See crates/deeptime-core/data/usgs/supergene_cu.json.",
     "Enrichment applies to copper only: Mo, Au and Ag enrichment is not documented (SIR 2010-5070-B).",
     "PLACEHOLDERS (no USGS grade–tonnage model exists for blankets): tonnage_mt 10 / 100 / 1500 (the text gives 'tens of Mt' to more than 1.5 Gt), cu_pct p50 0.8 inside the 0.4–1.7 % range, ore_density_t_m3 2.7, density_per_1e5km2 and clustering (unused by a child), leach_depth_m and max_top_depth_m 300 ('several hundred m' of leached cap).",
-    "Design values: min_water_table_m 50, precip upper bound 1500 mm (hot semi-arid to pluvial, not quantified), max_erosion_m_myr 50 (erosion must not outpace enrichment), zoning split and densities, the blanket's aspect."
+    "Design values: min_water_table_m 50, precip upper bound 1500 mm (hot semi-arid to pluvial, not quantified), max_erosion_m_myr 50 (erosion must not outpace enrichment), zoning split and densities, the blanket's aspect.",
+    "VERTICAL SCALE (decisions log 2026-10-03, \"Keep today's block height\"): at 35 m per block the vertical multipliers are 1.75 times their 20 m values (balance.size_mult_v 1.0 -> 1.75), so a body keeps the height in blocks it had at 20 m per block; its size in metres is unchanged. game-choice, ledger ORE-055."
   ]
 }

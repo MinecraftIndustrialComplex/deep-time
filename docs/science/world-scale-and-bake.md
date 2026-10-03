@@ -64,8 +64,9 @@ above the sea instead of 10.2 km: ISO-031), caves, aquifers and the lava floor. 
 (y −512 to 639 since the floor moved on 2026-10-02) holds 20.1 km below the sea and 20.2 km above it at
 35 m (SCL-010; 14.5 km below with the earlier floor at −352).
 
-**Settings tuned against 15×, re-checked** (all kept; the planet in metres is unchanged by keeping
-them, and the drawn shapes move the way Ben asked):
+**Settings tuned against 15×, re-checked** (all kept but the deposits' vertical multipliers; the
+planet in metres is unchanged by keeping them, and the drawn shapes calm down with the world, as Ben
+chose on 2026-10-03, "Keep values, calmer shapes"):
 
 | Setting | At 20 m (15×) | At 35 m (8.6×), value kept | To keep the 20 m drawing |
 |---|---|---|---|
@@ -74,11 +75,12 @@ them, and the drawn shapes move the way Ben asked):
 | `surface.glacial.valley_width` 3 (GLA-029) | a 2 km trough 600 m deep: 20 blocks wide, 30 deep | 20 wide, 17 deep | 1.7 |
 | `volcanoes.flood_basalt_step_m` 80 m (VOL-036) | 4-block steps | 2.3-block steps | 140 m |
 | build-limit band 48 blocks, knee y 575 (ISO-031) | knee 10.2 km above the sea | 17.9 km; no Earth-like planet reaches it | unchanged (fixed in blocks) |
-| deposit `size_mult_v`, `spacing_mult_v` (per type) | as tuned | ore bodies and seam gaps 43 % shorter in blocks | × 1.75 |
+| deposit `size_mult_v`, `spacing_mult_v` (per type; ORE-055, ORE-145, DEP-127, DEP-195, IMP-110/115/118/123) | as tuned | **changed**: × 1.75 (Ben, 2026-10-03, "Keep today's block height"), so ore bodies and seam gaps are as tall in blocks as at 20 m | × 1.75 (applied) |
 
-The folds' vertical stretch is built on its own branch as `structure.deformation.true_height_share`
-(4/15 of the true height in metres, the share Ben's "4×" was on 20 m blocks): it does not depend on
-the vertical scale, and draws structures 2.3 times their 1:1 shape at 35 m.
+The folds' vertical stretch, `structure.deformation.true_height_share` 4/15 (the share Ben's "4×"
+was on 20 m blocks, DEF-011), keeps the structures' height in metres at any vertical scale, not
+their look in blocks: at 35 m they are drawn 2.29 times their 1:1 shape instead of 4, calmer like
+every other drawn shape. Ben kept the value (decisions log 2026-10-03).
 
 **Measured** (quick 16k preset, seed 2, test VM, 2026-10-03; each preset baked at 20 m on master
 463ee83e and at 35 m on this change; `tools/review/vertical-scale.sh` and `vertical_scale.py stats`,
@@ -102,7 +104,8 @@ one visible crater of each planet: 15 → 9 and 11 → 7 blocks deep.
 **The deepest ground.** The lowest terrain is y −303 on the supercontinent planet (y −577 at 20 m)
 and y −260 on the scattered one (−502); at 35 m no column is below y −336 and two are below −300
 (at 20 m 500,227 and 125,646 columns were below the old floor at −352). These bakes ran with the floor at
-−352; master has since moved it to −512, which 35 m does not need (STATUS.md, pending question). The sea floor's 1st percentile is
+−352; master has since moved it to −512, which 35 m does not need, and Ben kept it there (decisions log
+2026-10-03, "Keep −512"). The sea floor's 1st percentile is
 y −164 and −140.
 
 **Rock layers** (`vertical_scale.py strata` and a comparison of the same land columns down to 2 km
@@ -120,10 +123,28 @@ planet). Sites 505 → 603 and 90 → 117; the median deposit centre is 89 and 5
 (126 and 60 at 20 m); total ore in deposits 17.9 → 18.4 million blocks (supercontinent) and 5.9 → 3.0
 million (scattered); a median porphyry body holds 241 → 155 ore blocks.
 
-**Open questions** (STATUS.md "Pending questions", 2026-10-02): whether rock layers keep their real
-thickness or today's thickness in blocks (`scale.feature_scale.strata` 1.75); whether ore bodies keep
-today's height in blocks; whether the settings above keep their values; and whether the floor stays at
-y −512 or goes back to −352.
+**Ore after "Keep today's block height"** (2026-10-03; quick 16k preset, seed 2, master 6f72f0dd,
+which has the plate work, so the planets differ from the ones above; `deeptime deposit-audit`). The
+vertical multipliers × 1.75 bring the ore back to about the 20 m figures of the same master:
+
+| Planet | 20 m | 35 m, multipliers as tuned | 35 m, × 1.75 |
+|---|---|---|---|
+| Supercontinent, 1,000 Myr: sites | 264 | 291 | 291 |
+| ore blocks in deposits | 9.05 million | 4.66 million | 8.09 million |
+| median porphyry, ore blocks | 2,351 | 1,964 | 4,876 |
+| Scattered, 500 Myr: sites | 143 | 149 | 149 |
+| ore blocks in deposits | 6.46 million | 3.57 million | 5.77 million |
+| median porphyry, ore blocks | 1,694 | 983 | 1,685 |
+
+Coal is most of the ore (97 % and 95 %). The supercontinent planet has only 7 porphyries, so its
+median moves with which body is fourth. Sites do not change: no body was dropped or kept because of
+its taller drawing.
+
+**Answered** (decisions log 2026-10-03): rock layers keep their real thickness
+(`scale.feature_scale.strata` stays 1); ore bodies keep today's height in blocks (the vertical
+multipliers × 1.75, above); the drawing settings keep their values; the floor stays at y −512.
+**Still open** (STATUS.md "Pending questions"): plutons with a floor, whether the column builder
+carries plutonic rock to the world's floor where a pluton's layer is the lowest stored one.
 
 ## Distant Horizons far terrain and Toroidal World's seam
 
