@@ -451,7 +451,7 @@
     "crater_lake_share": 0.25,
     "magma_lens_count": 24,
     "magma_lens_spacing_blocks": 28.0,
-    "magma_lens_width": 1.0,
+    "magma_lens_width": 1.5,
     "magma_mush_width": 1.0,
     "remove_lava_features": true,
     "sea_cliff_skin_blocks": 6,

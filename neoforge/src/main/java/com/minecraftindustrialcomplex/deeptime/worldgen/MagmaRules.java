@@ -26,7 +26,7 @@ import com.google.gson.JsonObject;
 public record MagmaRules(double chamberDepthKm, double chamberSize, double craterLakeShare, boolean removeLavaFeatures,
                          int lensCount, double lensSpacingBlocks, double lensWidth, double mushWidth) {
 
-    public static final MagmaRules DEFAULT = new MagmaRules(3.0, 1.0, 0.25, true, 24, 28.0, 1.0, 1.0);
+    public static final MagmaRules DEFAULT = new MagmaRules(3.0, 1.0, 0.25, true, 24, 28.0, 1.5, 1.0);
 
     public MagmaRules {
         chamberDepthKm = Math.clamp(chamberDepthKm, 0.5, 15.0);
@@ -45,7 +45,7 @@ public record MagmaRules(double chamberDepthKm, double chamberSize, double crate
     }
 
     private static final int DEFAULT_LENS_COUNT = 24;
-    private static final double DEFAULT_LENS_SPACING = 28.0, DEFAULT_LENS_WIDTH = 1.0, DEFAULT_MUSH_WIDTH = 1.0;
+    private static final double DEFAULT_LENS_SPACING = 28.0, DEFAULT_LENS_WIDTH = 1.5, DEFAULT_MUSH_WIDTH = 1.0;
 
     /** The same rules without the crust-deep column (the chamber and conduit alone). */
     public MagmaRules withoutColumn() {
