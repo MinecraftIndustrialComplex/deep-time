@@ -980,7 +980,7 @@ mod tests {
         // A metre of soil on 1 km of schist, a 60-m (3-block) gneiss, a 200-m (10-block)
         // granodiorite, then gabbro: the soil is under a block and joins the schist, which keeps
         // its own keys (not the regolith's); the gneiss sliver and the plutonic sheet are gone.
-        let schist = key::pool(4, 4, 0);
+        let schist = key::pool(5, 4, 0);
         let units = [
             keyed("soil", 1.0, key::REGOLITH),
             keyed("schist", 1000.0, schist),
