@@ -43,7 +43,7 @@ customizable unless stated otherwise; the listed value is the default.
 | Tectonics scaling | Earth-normalized: plate count, speeds and ages as on Earth, mapped onto the smaller planet; surface physics (erosion, rivers, slopes) stays in real metres at map scale |
 | Horizontal scale | A middle ground of about 1:300 (radius about 1,565 km at 32k), to be playtested against about 1:100 and Earth-proportioned; customizable in both directions |
 | Vertical scale | 20 m per block |
-| Build range | y −352 to 639, **fixed for every Deep Time world until 1.0** (per-world ranges after 1.0); the vertical scale stays customizable within it |
+| Build range | y −352 to 639, **fixed for every Deep Time world until 1.0** (per-world ranges after 1.0); the vertical scale stays customizable within it (see log 2026-10-02: the floor is now y −512) |
 | Local features | Enlarged to playable size (deposits, rivers, canyons, strata), with per-feature multipliers |
 
 ## Terrain, climate, water, caves, fantasy

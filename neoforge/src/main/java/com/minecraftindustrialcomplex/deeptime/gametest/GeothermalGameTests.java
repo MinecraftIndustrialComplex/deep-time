@@ -99,6 +99,12 @@ public final class GeothermalGameTests {
             geo.sites().stream().filter(s -> s.kind() == k).findFirst().ifPresent(picked::add);
         geo.sites().stream().max(java.util.Comparator.comparingInt(Geothermal.Site::reach)).filter(s -> !picked.contains(s))
                 .ifPresent(picked::add);
+        // The test planet's preset lowers the heat-flow threshold to 60 (every continental cell), so
+        // the fields of hot ground are on it: read one back as well (2026-10-02, "Export heat flow").
+        helper.assertTrue(geo.heatFlowSites() > 0, "the test planet has no geothermal site from the baked heat flow ("
+                + t.geothermalRules() + ", " + geo.sites().size() + " sites): the layer meta/heat_flow_mw_m2 or the setting is missing");
+        geo.sites().stream().filter(s -> s.volcano() == Geothermal.HEAT_FLOW_SOURCE).findFirst().filter(s -> !picked.contains(s))
+                .ifPresent(picked::add);
         GeothermalPalette palette = GeothermalPalette.get();
         Set<BlockState> terrace = new java.util.HashSet<>(palette.blocks(Role.TRAVERTINE));
         terrace.addAll(palette.blocks(Role.SINTER));
@@ -227,9 +233,9 @@ public final class GeothermalGameTests {
                 if (failure == null && n.groundColumns > 0 && n.groundRight * 10 < n.groundColumns * 9)
                     failure = "site " + s.id() + ": only " + n.groundRight + " of " + n.groundColumns + " ground columns have their block";
             }
-            DeepTime.LOGGER.info("[gametest] geothermalAroundActiveVolcanoes rules={} activeVolcanoes={} sites={} pools={} vents={} patches={} "
+            DeepTime.LOGGER.info("[gametest] geothermalAroundActiveVolcanoes rules={} activeVolcanoes={} sites={} heatFlowSites={} pools={} vents={} patches={} "
                             + "read={} chunks={} palette={}{}", t.geothermalRules(), t.data().volcanoes().list().size(), geo.sites().size(),
-                    counts[0], counts[1], counts[2], picked.size(), jobs.size(), palette.toJson(), line);
+                    geo.heatFlowSites(), counts[0], counts[1], counts[2], picked.size(), jobs.size(), palette.toJson(), line);
             if (failure != null)
                 helper.fail(failure);
             helper.succeed();

@@ -11,7 +11,7 @@ terracottas, sulfur, cinnabar, vent magma blocks), then checks the water-safety 
 generator really drew: no water block above the sea with air beside it (a leak), no water touching lava,
 no magma block under water (a bubble column), and how many columns have one of the pass's blocks on
 top. `--png` writes a top-down picture of each column's top ground block (plants, leaves and logs skipped). Standard library only; a
-192 x 192 x 992 box takes about half a minute. The reader is the one of `lava_stats.py`.
+192 x 192 x 1152 box takes about half a minute. The reader is the one of `lava_stats.py`.
 """
 import array
 import gzip
