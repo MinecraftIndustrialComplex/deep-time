@@ -251,7 +251,10 @@ pub fn run(o: &Options) -> CliResult<()> {
     // The printed check: the class at each known place, and whether its group matches.
     let (mut same, mut group) = (0, 0);
     for (name, la, lo, want) in PLACES {
-        let j = (grid.row_of_z(grid.projection().z_of_lat(la)).round().max(0.0) as usize)
+        let j = (grid
+            .row_of_z(grid.projection().z_of_lat(la))
+            .round()
+            .max(0.0) as usize)
             .min(h - 1);
         let i = ((lo.rem_euclid(360.0) / 360.0 * w as f64).floor() as usize) % w;
         // Coastal cities can fall in a sea cell at this resolution: take the nearest land cell

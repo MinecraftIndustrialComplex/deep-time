@@ -24,7 +24,9 @@ pub trait Terrain: Sync {
     /// its own formula, twinned in Java).
     fn latitude(&self, z: i64) -> f64 {
         let c = f64::from(self.circumference());
-        (z as f64 * std::f64::consts::TAU / c).clamp(-1.0, 1.0).asin()
+        (z as f64 * std::f64::consts::TAU / c)
+            .clamp(-1.0, 1.0)
+            .asin()
     }
 
     /// A 2D biome input in vanilla parameter units (`AnalyticTestTerrain.raster`).

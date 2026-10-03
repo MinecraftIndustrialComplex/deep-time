@@ -508,8 +508,7 @@ mod tests {
                     } else {
                         z + f64::from(r) / 2.0
                     };
-                    let exact =
-                        TAU * rm * rm * (p.sin_lat(lo) - p.sin_lat(hi)) / f64::from(grid.w);
+                    let exact = TAU * rm * rm * (p.sin_lat(lo) - p.sin_lat(hi)) / f64::from(grid.w);
                     let helper = grid.cell_area_km2(j, m) * 1e6;
                     assert!(
                         (helper - exact).abs() <= 1e-9 * exact.max(1.0),
@@ -564,7 +563,10 @@ mod tests {
         let p = Projection::new(16_384);
         let z = p.z_of_lat(60.0);
         let gc = p.great_circle_blocks((0.0, z), (0.0, z + 4.0));
-        assert!((gc - 8.0).abs() < 0.05, "4 blocks of z at 60° are 8 of planet: {gc}");
+        assert!(
+            (gc - 8.0).abs() < 0.05,
+            "4 blocks of z at 60° are 8 of planet: {gc}"
+        );
     }
 
     #[test]

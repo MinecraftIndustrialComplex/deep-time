@@ -711,8 +711,9 @@ pub fn hillshade(z: &[f32], w: usize, h: usize, radius_m: f64, look: &Look) -> V
     let mut out = vec![1.0f32; w * h];
     for j in 0..h {
         // Slopes true on the sphere (cos φ held at 0.15 or more near the poles).
-        let (dx, dy) =
-            deeptime_format::Projection::picture_pixel_m(j as f64, w as u32, h as u32, radius_m, 0.15);
+        let (dx, dy) = deeptime_format::Projection::picture_pixel_m(
+            j as f64, w as u32, h as u32, radius_m, 0.15,
+        );
         let (jn, js) = (j.saturating_sub(1), (j + 1).min(h - 1));
         for i in 0..w {
             let c = z[j * w + i];
