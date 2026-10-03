@@ -7,6 +7,7 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.LavaFeatures;
 import com.minecraftindustrialcomplex.deeptime.worldgen.LavaRules;
 import com.minecraftindustrialcomplex.deeptime.worldgen.Magma;
 import com.minecraftindustrialcomplex.deeptime.worldgen.SeaCliffGuard;
+import com.minecraftindustrialcomplex.deeptime.worldgen.SeaCliffPass;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -392,7 +393,7 @@ public final class LavaGameTests {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         ChunkSampling.forEach(helper, chunks.size(), i -> {
             int cx = chunks.get(i)[0], cz = chunks.get(i)[1];
-            ChunkAccess chunk = level.getChunkSource().getChunk(cx, cz, ChunkStatus.LIQUID_CARVERS, true);
+            ChunkAccess chunk = level.getChunkSource().getChunk(cx, cz, ChunkStatus.CARVERS, true);
             int[][] zone = SeaCliffGuard.zone(t::height, cx << 4, cz << 4, sea, minY, skin);
             n[2]++;
             for (int lz = 0; lz < 16; lz++)
@@ -414,7 +415,7 @@ public final class LavaGameTests {
             return true;
         }, () -> {
             DeepTime.LOGGER.info("[gametest] seaCliffsHaveNoCaveMouths skin={} chunks={} guardedBlocks={} open={} filledSoFar={}{}", skin, n[2],
-                    n[0], n[1], SeaCliffGuard.filledTotal(), detail);
+                    n[0], n[1], SeaCliffPass.filledTotal(), detail);
             if (n[1] > 0)
                 helper.fail(n[1] + " of " + n[0] + " guarded blocks under sea cliffs are open (air or water):" + detail);
             helper.succeed();

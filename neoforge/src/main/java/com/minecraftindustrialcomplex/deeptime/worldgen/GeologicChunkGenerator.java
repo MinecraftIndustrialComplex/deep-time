@@ -118,7 +118,7 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
         super.buildSurface(region, structures, random, chunk);   // the pack's surface rules repaint the default block
         if (terrain() instanceof WorldDataTerrain w) {
             // No cave of any kind reaches the underwater face of a sea cliff: a wall of rock is kept (before the strata).
-            SeaCliffGuard.apply(chunk, w::height, sourceSettings.value().seaLevel(), w.cliffRules());
+            SeaCliffPass.apply(chunk, w::height, sourceSettings.value().seaLevel(), w.cliffRules());
             StrataPass.apply(chunk, w.data());
             WaterBodies.apply(chunk, w.data(), waterReach());  // lakes, rivers, banks (plan §7.9, P1-22)
             PlayaPass.apply(chunk, w.data());                  // salt on the floors of basins too dry for a lake
@@ -140,8 +140,7 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
     public void applyCarvers(net.minecraft.server.level.WorldGenRegion region, long seed, net.minecraft.world.level.levelgen.RandomState random,
                              net.minecraft.world.level.biome.BiomeManager biomes, net.minecraft.world.level.StructureManager structures,
                              net.minecraft.world.level.chunk.ChunkAccess chunk, net.minecraft.world.level.levelgen.GenerationStep.Carving step) {
-        if (!Boolean.getBoolean("deeptime.diag.noCarvers"))   // DIAG, remove
-            super.applyCarvers(region, seed, random, biomes, structures, chunk, step);
+        super.applyCarvers(region, seed, random, biomes, structures, chunk, step);
         if (step == net.minecraft.world.level.levelgen.GenerationStep.Carving.AIR && terrain() instanceof WorldDataTerrain w)
             WaterBodies.wake(chunk, w.data(), waterReach());
     }
