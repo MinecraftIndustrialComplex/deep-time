@@ -198,6 +198,8 @@ public final class BiomeGameTests {
     // (lowest 0.489); BS keeps 0.39 (lowest 0.496 of the first set).
     static final int MIN_COLUMNS_TB = 100;
     static final Map<String, Double> FLOORS_TB = Map.of("BS", 0.39, "E:snow", 0.65, "Af:jungle", 0.39);
+    /** The largest share of land columns the bake's wetland rule may hold (its flat share, BiomeParams.wetland_flat_share 0.35). */
+    static final double WETLAND_CEILING = 0.35;
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
     static final double FORBIDDEN_CEILING = 0.10;
 
@@ -240,6 +242,15 @@ public final class BiomeGameTests {
                 low.append(String.format(java.util.Locale.ROOT, " %s %.3f < %.3f (%d columns)", ch.name(), share, floor, r.total(ch.name())));
         }
         helper.assertTrue(low.isEmpty(), "Köppen families below their floor:" + low);
+        // The wetlands are left out of the families (BiomeCensus): the bake sends wet, flat, low,
+        // thawed land to vanilla's swamp band on purpose (BIO-066), at most the flattest 35 % of the
+        // land (wetland_flat_share). On master 6f72f0dd's planet the whole D-climate land was such a
+        // coastal plain (Dfc 66 % swamp, 28 % beach) and failed Dsub and Dfc:taiga for it. More than
+        // that share would mean the rule broke, and is a failure rather than a set-aside.
+        var wet = r.json().getAsJsonObject("wetlands_set_aside");
+        int landColumns = wet.get("land_columns").getAsInt(), wetColumns = wet.get("wetland_columns").getAsInt();
+        helper.assertTrue(wetColumns <= WETLAND_CEILING * landColumns,
+                wetColumns + " of " + landColumns + " land columns are in the bake's wetland band, more than " + WETLAND_CEILING);
         // EF is ice or barren frozen ground, never the red badlands or Nether-stone mountains.
         StringBuilder red = new StringBuilder();
         for (var f : BiomeCensus.FORBIDDEN) {

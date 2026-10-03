@@ -871,69 +871,70 @@ pub fn map(
     let land: Vec<bool> = elev.iter().map(|&z| f64::from(z) > sea).collect();
 
     // Temperature and humidity.
-    let (t_land, h_land, (h_wet, class), t_sea, (e_lo, e_hi, w_thr, w_noise, w_cap), by_class) = match climate {
-        Some(c) => {
-            let co = coords(c, g.l1, placement);
-            let up = |v: Vec<f32>| {
-                super::resample(
-                    &Field {
-                        grid: g.l1.clone(),
-                        data: v,
-                    },
-                    l2,
-                    false,
-                )
-            };
-            // The class's rules are not blended across a border: the nearest L1 cell's.
-            let near = |v: Vec<f32>| {
-                super::resample(
-                    &Field {
-                        grid: g.l1.clone(),
-                        data: v,
-                    },
-                    l2,
-                    true,
-                )
-            };
-            (
-                up(co.t_land),
-                up(co.h_land),
-                (up(co.h_wet), near(co.class)),
-                up(co.t_sea),
+    let (t_land, h_land, (h_wet, class), t_sea, (e_lo, e_hi, w_thr, w_noise, w_cap), by_class) =
+        match climate {
+            Some(c) => {
+                let co = coords(c, g.l1, placement);
+                let up = |v: Vec<f32>| {
+                    super::resample(
+                        &Field {
+                            grid: g.l1.clone(),
+                            data: v,
+                        },
+                        l2,
+                        false,
+                    )
+                };
+                // The class's rules are not blended across a border: the nearest L1 cell's.
+                let near = |v: Vec<f32>| {
+                    super::resample(
+                        &Field {
+                            grid: g.l1.clone(),
+                            data: v,
+                        },
+                        l2,
+                        true,
+                    )
+                };
                 (
-                    near(co.e_lo),
-                    near(co.e_hi),
-                    near(co.w_thr),
-                    near(co.w_noise),
-                    near(co.w_cap),
-                ),
-                co.by_class,
-            )
-        }
-        None => {
-            let t: Vec<f32> = (0..n)
-                .map(|k| {
-                    let j = k / w;
-                    let lat = l2.band_lat_deg(j as u32);
-                    thermal_plain(28.0 - 0.55 * lat.abs()) as f32
-                })
-                .collect();
-            (
-                t.clone(),
-                vec![2.5; n],
-                (vec![2.5; n], vec![f32::NAN; n]),
-                t,
+                    up(co.t_land),
+                    up(co.h_land),
+                    (up(co.h_wet), near(co.class)),
+                    up(co.t_sea),
+                    (
+                        near(co.e_lo),
+                        near(co.e_hi),
+                        near(co.w_thr),
+                        near(co.w_noise),
+                        near(co.w_cap),
+                    ),
+                    co.by_class,
+                )
+            }
+            None => {
+                let t: Vec<f32> = (0..n)
+                    .map(|k| {
+                        let j = k / w;
+                        let lat = l2.band_lat_deg(j as u32);
+                        thermal_plain(28.0 - 0.55 * lat.abs()) as f32
+                    })
+                    .collect();
                 (
-                    vec![-2.0; n],
-                    vec![2.0; n],
-                    vec![f32::NAN; n],
-                    vec![1.0; n],
-                    vec![NO_CAP; n],
-                ),
-                Value::Null,
-            )
-        }
-    };
+                    t.clone(),
+                    vec![2.5; n],
+                    (vec![2.5; n], vec![f32::NAN; n]),
+                    t,
+                    (
+                        vec![-2.0; n],
+                        vec![2.0; n],
+                        vec![f32::NAN; n],
+                        vec![1.0; n],
+                        vec![NO_CAP; n],
+                    ),
+                    Value::Null,
+                )
+            }
+        };
     let mut temperature = vec![0f32; n];
     let mut vegetation = vec![0f32; n];
     for k in 0..n {
@@ -1811,7 +1812,9 @@ mod tests {
         };
         let dfc = |ai: f32| {
             let (m, _) = fixture_dfc_ai(&low, table, ["Af", "BWh", "Dfc", "ET"], [false; 4], ai);
-            m.note["wetland_cells_by_class"]["Dfc"].as_u64().unwrap_or(0)
+            m.note["wetland_cells_by_class"]["Dfc"]
+                .as_u64()
+                .unwrap_or(0)
         };
         assert_eq!(dfc(0.6), 0, "a dry Dfc plain has no wetland");
         assert!(dfc(3.0) > 0, "a wet Dfc plain keeps its wetlands");
