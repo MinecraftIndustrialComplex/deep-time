@@ -321,6 +321,13 @@ u_a(φ′) = −6·b(|φ′|; 12°, 18°) + 9·b(|φ′|; 45°, 28°) − 2·b(|
 
 - b is `belts::bump`. The profile gives trades to about 25°, westerlies peaking at 45° and still
   blowing at 65°, and weak polar easterlies.
+- *WP-14a check against Earth* (NCEP/NCAR reanalysis, 1991–2020 monthly long-term means, annual
+  zonal mean at 850 hPa; computed WP-14a): westerlies peak at 4.9 m/s at 45°N and 12.7 m/s at 50°S
+  (the profile: 9 m/s at 45°, between the two); trades −3.8 m/s at 15°N and −4.5 m/s at 15°S (the
+  profile: −5.7 to −5.9 m/s at 10–15°, about 1.4 times stronger); 2.4 m/s at 60°N and 9.3 m/s at
+  60°S (the profile: 4.6); at 80°N the mean is +1.0 m/s, so the profile's polar easterlies
+  (−1.8 m/s) are an Antarctic-coast feature (−2.2 m/s at 70°S), not a northern one. The profile is
+  a hemispheric average, not a fit; T9 may give it the two hemispheres' strengths.
 - The surface regimes of `belts.rs` end the westerlies at 60°. Used for heat, they made the
   prototype advect *easterly* across Siberia in January.
 - β_T (`climate.wind_heat_transport`, default 0.5, calibrated) is the share of the wind's speed at
@@ -491,6 +498,14 @@ For each month m and L1 cell c (rows north first), the steps are:
      - interior = clamp((f_1000 km − 0.5)/0.5, 0, 1), with f_1000 km the land fraction within about
        1,000 km;
      - I_max = 15 K by default (`climate.winter_inversion_c`).
+   - *WP-14a check.* Serreze, Kahl & Schnell 1992 could not be obtained, so the "10–20 K" stays
+     from memory. The NCEP/NCAR reanalysis 1991–2020 monthly long-term means (Kalnay et al. 1996,
+     NOAA PSL, public domain; computed WP-14a) put January air at the lowest model level (σ 0.995)
+     8.1 K below 850 hPa at Yakutsk's grid point and 9.5 K below at Verkhoyansk's, against 9.4 K
+     *above* at Brest's. Measured from what a 6.5 K/km lapse would give over the 1.3–1.5 km to
+     850 hPa (about 9 K warmer at the surface), the inversion deficit is 17–19 K, and the
+     reanalysis level is itself 7 K warmer than Yakutsk's station (−32 against −39 °C). The 15-K
+     default sits inside that range.
    - The term is diagnostic. It does not enter the energy balance, so closure holds.
    - In the prototype, 15 K took Yakutsk from −23 to −34 °C (observed −39). It left Moscow alone,
      because Moscow's tile is above the snow threshold once the westerly heat reaches it. Winter
@@ -566,6 +581,10 @@ V = belt wind + thermal wind.
      ```
      It converges at the ITCZ and at 60° and diverges at 30° and the poles. That gives the wet and
      dry belts **from the budget**, replacing the `belt_precip` table.
+     *WP-14a check* (NCEP/NCAR reanalysis 1991–2020, annual zonal mean at σ 0.995, computed): the
+     trades blow equatorward at 1.4–1.5 m/s at 15–20°N and 2.0 m/s at 10–15°S (the profile: 2.5);
+     the Ferrel branch poleward at 0.7 m/s at 50°N and 2.3 m/s at 50°S (the profile: 1.0 at 45°).
+     Within a factor of two everywhere, hemispherically averaged; a T9 knob, not a sourced value.
 2. **Thermal wind** (monsoon lows and winter highs).
    - **Pressure.** The departure of T̄ from its row mean, smoothed over two coarse cells, makes a
      pressure anomaly p′ = −κ_p T̄′. κ_p is 60 Pa/K (ρ g H/T with H ≈ 1.5 km).
@@ -577,6 +596,13 @@ V = belt wind + thermal wind.
    - **Behaviour.** It is cross-isobaric near the equator and almost geostrophic in mid-latitudes.
      A summer continent 10 K warmer than its row gets about 5 m/s of inflow: an onshore monsoon.
      A winter continent gets outflow: a dry winter monsoon.
+   - *WP-14a.* Lindzen & Nigam 1987 could not be obtained; their friction constant is unread, so
+     r = 10⁻⁵ s⁻¹ stays the design's own value. κ_p = ρgH/T is the hydrostatic surface-pressure
+     change of a layer of depth H warmed by T′ (1.2 × 9.81 × 1,500 / 290 = 61 Pa/K, computed).
+     Back & Bretherton 2009 (J. Climate 22, 4182–4196; read in full, the authors' copy) say
+     Lindzen & Nigam needed a layer "extending up to 700 hPa" (about 3 km) and an ad hoc back
+     pressure, and that a mixed layer to 850 hPa (about 1.5 km) is more realistic (pp. 4183 and
+     4195): the design's H is that more realistic depth.
 
 ### 3.3 Evaporation
 
@@ -599,14 +625,22 @@ scale height over high land, so a Tibet holds a fifth of the sea-level water. It
 ### 3.4 Condensation and precipitation
 
 ```
-P = stab · (W/τ_P) · exp(a (RH − r_ref)),    τ_P = 8 days, a = 15.6, r_ref = 0.7
+P = stab · (W/τ_P) · exp(a (RH − r_ref)),    τ_P = 6.6 days, a = 11.4, r_ref = 0.7
 ```
 
-- **The exponential on RH** is Bretherton, Peters & Back 2004's observed relation (tropical P rises
-  15.6-fold per unit of column relative humidity). It is written relative to W, so P scales with
-  the air's water as Clausius–Clapeyron demands.
-- **Typical rates:** an ITCZ column (W 50, RH 0.75) rains about 14 mm/day; a subtropical high
-  (W 25, RH 0.45) about 0.06 mm/day; a mid-latitude column (W 15, RH 0.7) about 2 mm/day.
+- **The exponential on RH** is Bretherton, Peters & Back 2004's observed relation over the tropical
+  oceans. It is written relative to W, so P scales with the air's water as Clausius–Clapeyron
+  demands.
+  - *WP-14a (source read):* the paper gives two fits. The daily one is P = exp[15.6 (r − 0.603)]
+    mm/day (eq. 1, p. 1519); the **monthly-mean** one is P = exp[11.4 (r − 0.522)] mm/day (eq. 2,
+    p. 1521). 15.6 is an e-folding rate, not "15.6-fold per unit of RH". This budget solves monthly
+    means, so it takes the monthly rate, a = 11.4 (was 15.6), and τ_P = 6.6 days (was 8), which
+    makes the law equal Bretherton's monthly fit at their typical convecting column (W_sat = 72 mm,
+    p. 1521) and r = 0.7: 50.4 mm / 6.6 days = 7.6 mm/day = exp(11.4 × 0.178). The prototype ran
+    15.6 and 8 days; T9 calibrates `precip_rh_slope` from here.
+- **Typical rates** (a = 11.4, τ_P = 6.6 days): an ITCZ column (W 50, RH 0.75) rains about
+  13 mm/day; a subtropical high (W 25, RH 0.45) about 0.2 mm/day; a mid-latitude column (W 15,
+  RH 0.7) about 2 mm/day.
 - **Convergence.** Convergent winds pile W up until it rains: the ITCZ, the polar front, monsoon
   inflow. Divergence dries: the subtropical highs. This plays the role of GREB's ω term.
 - **Subsidence on the west sides of continents.**
@@ -956,7 +990,7 @@ model. Paths are under the preset's `climate` section, edited in `editor_fields.
 | Ocean overturning (`climate.overturning_sv`) | 15 Sv | Advanced, stops Off 0 / Earth 15 / Strong 25 | the deep-water conveyor that warms one subpolar sea; 0 = off |
 | Winter inversions (`climate.winter_inversion_c`) | 15 °C | Advanced | how much colder snow-covered interiors get in the dark season than the air above them |
 | Monsoon strength (`climate.thermal_wind_pa_k`) | 60 Pa/K | Advanced (`budget`) | how strongly hot continents draw in sea air in summer (and push it out in winter) |
-| Rain efficiency (`climate.precip_rh_slope`) | 15.6 | Advanced (`budget`) | how sharply rain grows with humidity: higher makes wet places wetter and dry places drier |
+| Rain efficiency (`climate.precip_rh_slope`) | 11.4 (WP-14a; was 15.6) | Advanced (`budget`) | how sharply rain grows with humidity: higher makes wet places wetter and dry places drier |
 | Soil water (`climate.bucket_mm`) | 150 mm | Advanced (`budget`) | how much rain the land stores and re-evaporates (inland reach of moisture) |
 | Sea-ice edges (`climate.sea_ice_edge_sharpness`) | 4 | Advanced | 1 = soft, coarse edges; higher = crisp L1 edges |
 | Orbital-window 2-D snapshots (`climate.orbital_snapshot_kyr`) | 0 | Advanced (Q6) | extra 2-D climates inside the ice-age window |
@@ -1207,21 +1241,22 @@ This design ports no new code. Every new piece is implemented from equations.
 | Stommel 1948, Trans. AGU 29, 202 | gyre equation | paper |
 | Rose & Marshall 2009, JAS 66, 2828 | ocean heat transport in EBMs (alternative closure) | paper |
 | Ferreira et al. 2018, Annu. Rev. Earth Planet. Sci. 46, 327 ("Atlantic–Pacific asymmetry in deep water formation") † | basin width selects the sinking basin | paper |
-| Trenberth & Caron 2001, J. Climate 14, 3433 | heat transport targets | paper |
-| Lindzen & Nigam 1987, JAS 44, 2418 † | linear frictional surface wind from temperature gradients | paper |
+| Trenberth & Caron 2001, J. Climate 14, 3433 | heat transport targets (read WP-14a: Fig. 7, ocean about 2 PW near 15–20°N; atmosphere 5.0 PW at 43°N) | paper |
+| Lindzen & Nigam 1987, JAS 44, 2418 † (not obtainable in WP-14a; read through Back & Bretherton 2009, J. Climate 22, 4182) | linear frictional surface wind from temperature gradients | paper |
 | Dommenget & Flöter 2011, Clim. Dyn. 37, 2143; Stassen, Dommenget & Loveday 2019, GMD 12, 425 (GREB) | bulk evaporation form, precipitation-on-RH-and-convergence idea | paper CC BY; **code has no licence** (github.com/christianstassen/greb-official: no LICENSE file; Zenodo "Other (Open)"); equations only |
 | Fanning & Weaver 1996, JGR 101(D10), 15111; Weaver et al. 2001 (UVic EMBM) | energy–moisture balance atmosphere precedent | papers; code licence unverifiable (site unreachable, forks unlicensed); equations only |
-| Bretherton, Peters & Back 2004, J. Climate 17, 1517 † | P against column relative humidity | paper |
-| Manabe 1969, Mon. Weather Rev. 97, 739 † | soil bucket | paper |
+| Bretherton, Peters & Back 2004, J. Climate 17, 1517 (read WP-14a) | P against column relative humidity (eq. 2, the monthly fit) | paper |
+| Manabe 1969, Mon. Weather Rev. 97, 739 (read WP-14a) | soil bucket (eqs. 18 and 20, p. 743) | paper |
 | Siler, Roe & Armour 2018, J. Climate 31, 7481; Bischoff & Schneider 2014, J. Climate 27, 4937 | moist EBM and energy-flux equator (later option, Q10) | papers |
-| Wagner & Eisenman 2015, J. Climate 28, 3998 | sea ice in EBMs | paper; code (eisenman-group) has no licence; equations only |
+| Wagner & Eisenman 2015, J. Climate 28, 3998 (read WP-14a) | sea ice in EBMs (Table 1: k = 2 W/m/K, pure ice) | paper; code (eisenman-group) has no licence; equations only |
 | Klein & Hartmann 1993, J. Climate 6, 1587 † | low cloud vs stability (follow-up, Q9) | paper |
-| Serreze, Kahl & Schnell 1992, J. Climate 5, 615 † | Arctic winter inversions | paper |
+| Serreze, Kahl & Schnell 1992, J. Climate 5, 615 † (not obtainable in WP-14a; the inversion size checked against NCEP/NCAR reanalysis instead, §2.9) | Arctic winter inversions | paper |
 | PlaHab (Ramirez 2024, PSJ 5:2, doi:10.3847/PSJ/ad0729) | zonal/meridional diffusivity ratio precedent (paper read WP-14a) | data and code CC BY 4.0 on UCF STARS (code not inspected, nothing taken) |
 | **Not used:** ExoPlaSim (GPL-2.0), PlaSim (treated as GPL), Isca (GPL-3.0), CLIMBER-X (GPL-3.0), OpenLEM/LFPM (GPL-3.0-or-later), SPEEDY (non-commercial grant) | — | do not port; oracles at most |
 
 † Cited from memory, not re-read in this session. The implementing tasks verify the page numbers
-before code headers cite them.
+before code headers cite them. WP-14a (2026-10-02) read the unmarked ones it could obtain; what it
+could not read is listed in `docs/science/per-cell-climate.md`, "Open questions".
 
 **Validation data** (never committed or shipped):
 - Beck et al. 2018, Sci. Data 5, 180214, Köppen maps: CC BY 4.0, figshare 6396959.
