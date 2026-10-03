@@ -34,7 +34,8 @@ class DeepTimeClimateTest {
         int c = wd.circumference();
         Random rng = new Random(25);
         for (int i = 0; i < 300; i++) {
-            int x = rng.nextInt(2 * c) - c, z = rng.nextInt(c / 2) - c / 4, y = rng.nextInt(400) - 60;
+            int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);
+            int x = rng.nextInt(2 * c) - c, z = rng.nextInt(2 * zp) - zp, y = rng.nextInt(400) - 60;
             for (int pass = 0; pass < 2; pass++) {
                 ClimateSample s = api.sample(x, y, z);
                 ClimateLayers.Sample r = cl.sample(x, y, z);

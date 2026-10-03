@@ -44,7 +44,7 @@ public final class RegionCensus {
     }
 
     /**
-     * Samples every {@code step} blocks inside the pole edge (|z| ≤ C/4).
+     * Samples every {@code step} blocks inside the pole edge (|z| ≤ C/4, {@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection#poleZ}).
      *
      * @param mapFile where to write the whole grid (JSON, base64 arrays), or null
      */
@@ -54,7 +54,8 @@ public final class RegionCensus {
         Optional<RegionSource> src = sourceOf(level);
         var sampler = level.getChunkSource().randomState().sampler();
         int c = t.circumference(), sea = g.getSeaLevel();
-        int w = c / step, h = c / (2 * step);
+        int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);   // the poles (the planet's projection)
+        int w = c / step, h = 2 * zp / step;
         short[] province = new short[w * h];
         short[] region = new short[w * h];
         short[] biomeIdx = new short[w * h];
@@ -64,7 +65,7 @@ public final class RegionCensus {
         // Per province: its biomes' namespaces (land columns), to see which provinces got mod biomes.
         Map<Integer, Map<String, Integer>> byProvince = new TreeMap<>();
         for (int j = 0; j < h; j++) {
-            int z = -c / 4 + step / 2 + j * step;
+            int z = -zp + step / 2 + j * step;
             for (int i = 0; i < w; i++) {
                 int x = -c / 2 + step / 2 + i * step;
                 int cell = j * w + i;

@@ -137,7 +137,7 @@ pub fn place(
     }
     let fits = |p: (f64, f64), r: f64, placed: &[Point]| -> Option<u32> {
         let (x, z) = (wrap_x(c, p.0), p.1);
-        let half = t.grid.circumference() as f64 / 4.0;
+        let half = t.grid.projection().pole_z();
         if !(-half..half).contains(&z) {
             return None;
         }
@@ -264,7 +264,7 @@ fn place_adjoining(
         for _ in 0..400 {
             let Some(p) = from_cells(rng, t) else { break };
             let (x, z) = (wrap_x(c, p.0), p.1);
-            let half = c / 4.0;
+            let half = deeptime_format::Projection::of(c).pole_z();
             if !(-half..half).contains(&z) {
                 continue;
             }

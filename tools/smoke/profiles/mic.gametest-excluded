@@ -4,4 +4,8 @@
 #
 # Distant Horizons 3.3.0 casts the server to DedicatedServer in its ServerAboutToStart listener
 # (AbstractModInitializer_neoforge line 158) -> ClassCastException on the GameTest server.
+# 3.3.1 (the pin since pack 57561c9) still does: `(DedicatedServer)server` in onInitializeServer's
+# server-starting listener (decompiled on the test VM, 2026-10-02). So the GameTest server runs
+# without it (linkRunMods logs "(mic.gametest-excluded)", and -Ddeeptime.dh.expected is false);
+# Distant Horizons with the MIC set is checked by `tools/smoke/run.py --profile mic --dh`.
 DistantHorizons-*.jar

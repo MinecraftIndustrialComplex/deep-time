@@ -363,7 +363,8 @@ pub fn advance(
             // A second point a little way along the axis carries the azimuth.
             let d = direction(f64::from(f.azimuth_deg));
             let step = 8.0; // ledger: DEF-037
-            let z2 = (f.z + step * d[1]).clamp(-c / 4.0, c / 4.0);
+            let pole = frame.projection().pole_z();
+            let z2 = (f.z + step * d[1]).clamp(-pole, pole);
             let (x1, z1) = frame.block(rot * frame.unit(f.x, f.z));
             let (x2, z2) = frame.block(rot * frame.unit(f.x + step * d[0], z2));
             let mut dx = x2 - x1;

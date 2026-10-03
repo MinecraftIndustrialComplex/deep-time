@@ -64,8 +64,8 @@ impl Provinces {
             .map(|cell| {
                 let i = (cell % grid.w as usize) as i64;
                 let j = (cell / grid.w as usize) as i64;
-                let lon = 360.0 * (grid.block_x(i) as f64 + c / 2.0) / c;
-                let lat = -(grid.block_z(j) as f64) / (c / 4.0) * 90.0;
+                let (lat, lon) = deeptime_format::Projection::of(c)
+                    .lat_lon(grid.block_x(i) as f64, grid.block_z(j) as f64);
                 let u = unit_from_lat_lon_deg(lat, lon);
                 let mut best = (0usize, f64::MIN);
                 for (k, s) in seeds.iter().enumerate() {

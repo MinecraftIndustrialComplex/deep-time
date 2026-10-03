@@ -38,6 +38,11 @@
 # jar copy goes stale as soon as the sources change; tools/workbench/preview.py refreshes it itself
 # (build, compare, replace), so a preview needs no re-install for Java or Rust changes.
 #
+# Exclusions: profiles/<profile>.excluded lists jar globs, profiles/<profile>.excluded-mods mod ids
+# (tools/smoke/exclude_mods.py also leaves out every jar that requires an excluded mod, to any depth).
+# mic and mic-ev leave out Cobblemon this way (Ben, 2026-10-02). Each is recorded in
+# smoke/<profile>/excluded.txt (jar names) and excluded-why.txt (jar, reason), and in the smoke report.
+#
 # Idempotent: downloads are cached under smoke/cache/ and packwiz-installer syncs, so a
 # re-run picks up exactly what the pack pins today. NOTHING under pack/ is written, and
 # nothing under mods/mic-climate is read or written.
@@ -280,7 +285,7 @@ JAR="$(find "$REPO/neoforge/build/libs" -maxdepth 1 -name 'deeptime-1.21.1-*.jar
 cp "$JAR" "$SERVER/mods/"
 say "installed $(basename "$JAR")"
 
-# Exclusions -- recorded, never silent.
+# Exclusions -- recorded, never silent (excluded.txt: jar names; excluded-why.txt: jar and reason).
 mkdir -p "$SERVER/mods-excluded"
 find "$SERVER/mods-excluded" -maxdepth 1 -name '*.jar' -exec mv -t "$SERVER/mods" {} + 2>/dev/null || true
 : > "$SMOKE/excluded.txt"
@@ -290,6 +295,13 @@ while IFS= read -r pattern; do
         mv "$hit" "$SERVER/mods-excluded/"; echo "$(basename "$hit")" >> "$SMOKE/excluded.txt"
     done < <(find "$SERVER/mods" -maxdepth 1 -name "$pattern")
 done < "$PROFILES/$PROFILE.excluded"
+# By mod id: profiles/<profile>.excluded-mods lists ids; every jar providing one, and every jar that
+# requires an excluded mod (to any depth), goes too, with its reason in excluded-why.txt.
+: > "$SMOKE/excluded-why.txt"
+if [ -f "$PROFILES/$PROFILE.excluded-mods" ]; then
+    say "excluding mods by id (profiles/$PROFILE.excluded-mods) and their dependants"
+    python3 "$REPO/tools/smoke/exclude_mods.py" "$SERVER" "$PROFILES/$PROFILE.excluded-mods" "$SMOKE/excluded.txt" "$SMOKE/excluded-why.txt"
+fi
 
 # ---------------------------------------------------------------------------
 # 4. Server configuration.

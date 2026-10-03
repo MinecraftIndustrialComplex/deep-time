@@ -1,6 +1,10 @@
 # P1-26 Per-cell climate — design
 
-Status: **design for Ben's approval** (2026-09-30). Nothing here is built yet. The build starts after
+Status: **approved by Ben 2026-10-01** (decisions log, "Approve as recommended"). Nothing here is
+built yet. Constants checked against their sources before the build (science stage 2, WP-14a,
+2026-10-02): each change is marked "WP-14a" with its source, and the ledger rows are CLM-119 to
+CLM-146 and CLM-163 onward (`docs/science/ledger/CLM.md`; page `docs/science/per-cell-climate.md`).
+The build starts after
 the climate agent's ice-sheet branch (`worktree-agent-adc924860a859865c-ice`) lands, because both
 change `crates/deeptime-core/src/climate/`. Ben asked for it on 2026-09-30 (decisions log: "I feel
 like climate in general should probably be per cell as opposed to completely banded across a
@@ -187,7 +191,8 @@ Why this grid:
 - **Planetary scale.** Like the rest of the planetary-scale climate, the grid is Earth-normalized:
   the same 2.8° on every preset, so a 16k and a 32k planet get the same climate.
 - **Precedent.** TransEBM (Ziegler & Rehfeld 2021), the current descendant of North, Mengel & Short
-  1983, uses this same resolution (T42, 128 × 64). GREB uses 3.75°.
+  1983, uses this same resolution (T42, 128 × 64; a Gaussian grid, where ours is regular: Ziegler &
+  Rehfeld 2021, p. 2845). GREB uses 3.75° × 3.75° (Stassen et al. 2019, p. 426).
 - **Reuse.**
   - L1 is equirectangular, so coarsening and refining are block means and bilinear interpolation.
   - The ice branch's `climate/sheet.rs` already has that machinery (`sheet::Grid::{new, coarsen,
@@ -250,10 +255,21 @@ C_l ∂T̄/∂t |_atm = ∇·(D ∇T̄)  −  β_T C_l u_a(φ′, month) ∂T̄/
 - 𝒪 is the ocean's heat transport (§2.6).
 
 **Heat capacities.** C_l = `land_depth_m` (3 m of water), C_m = `ocean_depth_m` (50 m), sea ice as
-today (k = 2.2 W/m/K, full cover at 0.5 m, conduction tapered above 10 m). The NMS83 lineage uses a
-much smaller land capacity (1.87·10⁶ J/m²/K, 0.45 m). In the prototype that fit worse: winter RMSE
-8.6 K against 6.3 K with 3 m (run B against run A). It stays a setting with today's 3 m as the
-default.
+today (k = 2.2 W/m/K, full cover at 0.5 m, conduction tapered above 10 m). In the prototype a land
+capacity of 1.87·10⁶ J/m²/K (0.45 m) fit worse: winter RMSE 8.6 K against 6.3 K with 3 m (run B
+against run A). It stays a setting with today's 3 m as the default.
+
+*WP-14a (sources read):* the 1.87·10⁶ J/m²/K is the land **surface** alone in Zhuang et al. 2017's
+model, which adds an atmospheric column of 4.76·10⁶ to every surface type: its land column is
+6.63·10⁶ J/m²/K (1.6 m of water), TransEBM's tuned one 2.66·10⁶ (0.64 m) (Ziegler & Rehfeld 2021,
+Tables 1 and 2). Run B therefore tested a land column without its air, not the lineage's value.
+North, Cahalan & Coakley 1981 give the "ideal land" earth-atmosphere capacity as C_L = 0.16 B years
+with B = 2.09 W/m²/K, that is 1.06·10⁷ J/m²/K or 2.5 m of water, and the ocean mixed layer as
+4.7 B years, 3.1·10⁸ J/m²/K or 74 m (p. 118, list of symbols). The air column alone is
+c_p p_s / g ≈ 1.0·10⁷ J/m²/K (2.5 m). Today's 3 m for land plus air is consistent with North et al.;
+the 50-m slab is shallower than their 74 m, Zhuang et al.'s 70 m and TransEBM's 96 m (Ziegler &
+Rehfeld 2021, p. 2846). Both stay as they are (calibrated, CLM-013, CLM-014, CLM-122); T9 may
+revisit the slab depth against the seasonal SST amplitude.
 
 ### 2.4 Albedo per cell
 
@@ -265,9 +281,14 @@ default.
 
 - a₀, a₂ and a_i are today's 0.33, 0.25 and 0.62. As in North, Cahalan & Coakley 1981, the a₂ term
   carries the zenith-angle and cloud dependence.
-- **Desert brightening** Δα_desert defaults to +0.05 in planetary terms. Sahara surfaces are about
-  0.35 against 0.15 for vegetation, but the atmosphere halves the contrast at the top of the
-  atmosphere. The desert share d is lagged by one snapshot (a Charney-type feedback), and a₀ is
+- **Desert brightening** Δα_desert defaults to +0.08 in planetary terms (WP-14a; the first draft
+  had +0.05, which did not follow from its own reasoning: a 0.20 contrast halved is 0.10). Bright
+  sand is 0.20–0.45 and savanna 0.15 (Stull 2017, *Practical Meteorology*, Table 2-5); Charney's
+  experiment raised the Sahel from 0.14 to 0.35 (as cited by Norton et al. 1979, p. 2): a surface
+  contrast of about 0.20. The atmosphere attenuates a surface albedo's contribution at the top of
+  the atmosphere by 68 % in the global mean and by about 60 % in the dry subtropics (Donohoe &
+  Battisti 2011, abstract and section 3; read WP-14a), so the planetary contrast is
+  0.20 × 0.40 ≈ 0.08. The desert share d is lagged by one snapshot (a Charney-type feedback), and a₀ is
   re-fitted so Earth's global albedo stays 0.30.
 - **Ice sheets brighten their own cell**, not a whole band. A Laurentide-sized sheet now cools North
   America, not the whole of 50–70°N.
@@ -278,13 +299,37 @@ default.
 
 **Diffusion depends on the surface**, following the NMS83 lineage (Zhuang, North & Stevens 2017, as
 tabulated in Ziegler & Rehfeld 2021):
-- D_face = (1 − f̄) D_ocean + f̄ D_land(φ);
-- D_land(φ) = D_eq + (D_pole − D_eq)·|sin φ|⁵;
-- defaults D_ocean 0.40, D_eq 0.65, D_pole 0.28 (north) / 0.20 (south), in W/m²/K as today;
+- D_face = (1 − f̄) D_ocean(φ) + f̄ D_land(φ);
+- D_ocean(φ) = D_ocean,pole + (D_ocean,eq − D_ocean,pole)·cos⁵ φ;
+- D_land(φ) = D_land,pole + (D_land,eq − D_land,pole)·cos⁵ φ;
+- defaults D_ocean,eq 0.65, D_ocean,pole 0.40, D_land,eq 0.65, D_land,pole 0.28 (north) / 0.20
+  (south), in W/m²/K as today;
 - f̄ is the mean land fraction of the two cells sharing the face.
 
+*WP-14a correction (sources read).* The design first wrote a constant D_ocean = 0.40 and
+D_land = D_eq + (D_pole − D_eq)·|sin φ|⁵. The source has both media falling from the equator as
+the fifth power of the sine of the **colatitude**, cos⁵ φ: Ziegler & Rehfeld 2021 eq. 2 and
+Table 1 (κ_equ 0.65 and κ_ocean 0.40 for the sea, κ_land 0.65 and κ_land,NP 0.28 / κ_land,SP
+0.20 for land, Zhuang et al.'s column; p. 2846–2847), and Zhuang et al.'s release code, where the
+factor is `sin(theta)**5` of the colatitude "centered on equator" with "Keq: ocean diffusion
+coefficient at equator; Kocean: ocean diffusion coefficient at poles" (read, not copied: GPL-3).
+The difference is large in mid-latitudes: at 45° land D is 0.35 by the source and was 0.59 in the
+first draft; tropical sea D is 0.65, not 0.40. The prototype ran the first draft (runs A to M);
+T9 calibrates from the source's form.
+
+*What these D values stand for.* In Zhuang et al.'s model, as in North, Cahalan & Coakley 1981
+(D = 0.649 W/m²/K, p. 97), D is the **total** poleward transport, atmosphere and ocean together,
+of a model with one surface temperature. Here the ocean's transport is separate (§2.6), so the
+same D on top of it counts the ocean twice. The source values are the starting point and an
+upper bound; T9's step 1 calibrates them down against the atmospheric transport alone, which peaks
+at 5.0 ± 0.14 PW at 43°N (Trenberth & Caron 2001, abstract; read WP-14a), with the ocean's about
+2 PW near 15–20°N (their Fig. 7) as step 2's target.
+
 A zonal factor `climate.zonal_diffusivity_ratio` (default 0.5, calibrated) multiplies the
-east–west faces. PlaHab (Ramirez 2023) uses 1/25. In the prototype, 0.1–0.5 added zonal variety but
+east–west faces. PlaHab (Ramirez 2024, PSJ 5:2) uses D_lon/D_lat = 0.02/0.5 = 1/25 for Earth
+equatorward of 45° and 0.0002/0.5 = 1/2,500 poleward of it, on 30° longitude bands, with the same
+1/cos²φ flux form (p. 3, eq. 1; read WP-14a). Our 0.5 is a calibrated value about 12 times
+PlaHab's low-latitude ratio, not a sourced one. In the prototype, 0.1–0.5 added zonal variety but
 needed the ocean terms to put it in the right places (Appendix B).
 
 The diffusion is in flux form on the sphere:
@@ -302,6 +347,13 @@ u_a(φ′) = −6·b(|φ′|; 12°, 18°) + 9·b(|φ′|; 45°, 28°) − 2·b(|
 
 - b is `belts::bump`. The profile gives trades to about 25°, westerlies peaking at 45° and still
   blowing at 65°, and weak polar easterlies.
+- *WP-14a check against Earth* (NCEP/NCAR reanalysis, 1991–2020 monthly long-term means, annual
+  zonal mean at 850 hPa; computed WP-14a): westerlies peak at 4.9 m/s at 45°N and 12.7 m/s at 50°S
+  (the profile: 9 m/s at 45°, between the two); trades −3.8 m/s at 15°N and −4.5 m/s at 15°S (the
+  profile: −5.7 to −5.9 m/s at 10–15°, about 1.4 times stronger); 2.4 m/s at 60°N and 9.3 m/s at
+  60°S (the profile: 4.6); at 80°N the mean is +1.0 m/s, so the profile's polar easterlies
+  (−1.8 m/s) are an Antarctic-coast feature (−2.2 m/s at 70°S), not a northern one. The profile is
+  a hemispheric average, not a fit; T9 may give it the two hemispheres' strengths.
 - The surface regimes of `belts.rs` end the westerlies at 60°. Used for heat, they made the
   prototype advect *easterly* across Siberia in January.
 - β_T (`climate.wind_heat_transport`, default 0.5, calibrated) is the share of the wind's speed at
@@ -334,7 +386,9 @@ Three terms act on the slab T_m (𝒪 above), each conservative in flux form:
 2. **Stommel gyres** (Stommel 1948; implemented from the paper).
    - **Equation.** The wind-driven transport streamfunction ψ (m³/s) solves
      `r ∇²ψ + β ∂ψ/∂x = curl τ / ρ₀` on the sea, with ψ = 0 on coasts. τ is the annual-mean
-     belt-wind stress ρ_a C_D |u| u with C_D 1.3·10⁻³, and β = 2Ω cos φ / a.
+     belt-wind stress ρ_a C_D |u| u with C_D 1.2·10⁻³ (WP-14a; was 1.3·10⁻³: the neutral 10-m
+     drag of Large & Yeager 2004, eq. 6a, is 1.06–1.18·10⁻³ at 5–10 m/s; Large & Pond 1981 could
+     not be read), and β = 2Ω cos φ / a.
    - **Friction.** r = β·1.5·Δx gives a western boundary layer about 1.5 cells wide.
    - **Grid.** ψ lives on cell corners, so the face transports are exact differences of ψ and are
      non-divergent whatever ψ is.
@@ -363,11 +417,18 @@ Three terms act on the slab T_m (𝒪 above), each conservative in flux form:
      mean true width that has sea poleward of 50° free of ice in late winter. On Earth this picks
      the North Atlantic (47° wide) over the North Pacific (68°). Basin width is one of the leading
      explanations of why deep water forms in the Atlantic and not the Pacific (Ferreira et al.
-     2018), and a model without salinity can use it.
+     2018), and a model without salinity can use it. *WP-14a (read in full):* Ferreira et al. list
+     "the P − E asymmetry, the different widths of the basins, and the meridional extent of the
+     African and American continents" as factors that "conspire in favor of Atlantic sinking"
+     (p. 344), the width acting through the gyres' western boundary currents and the halocline
+     (pp. 337–338). They argue that salinity is the proximate cause; width is one route to it,
+     so the rule is a stand-in, not their model. They give no basin widths.
    - **Upwelling.** Spread evenly over all sea equatorward of 50°.
    - **Flow.** A potential flow carries the transport Ψ (`climate.overturning_sv`, default 15 Sv;
-     Earth's AMOC is about 17 Sv) from upwelling to sinking.
-   - **Heat.** Flux = ρc_p·U·(T_upwind − T_deep), T_deep = 2 °C. This is conservative in flux form
+     Earth's AMOC is 17.2 Sv at 26°N over 2004–2012, McCarthy et al. 2015, and 17.0 ± 4.4 Sv over
+     2004–2017, Frajka-Williams et al. 2019; read WP-14a) from upwelling to sinking.
+   - **Heat.** Flux = ρc_p·U·(T_upwind − T_deep), T_deep = 2 °C (the design's round value; no source read in WP-14a, CLM-163). This is
+     conservative in flux form
      even though the flow has sources and sinks: heat is taken up where upwelled water warms and
      given back where the surface water cools on its way to sinking.
    - **Results.** On Earth's relief the prototype ran with the same settings without and with a
@@ -472,6 +533,14 @@ For each month m and L1 cell c (rows north first), the steps are:
      - interior = clamp((f_1000 km − 0.5)/0.5, 0, 1), with f_1000 km the land fraction within about
        1,000 km;
      - I_max = 15 K by default (`climate.winter_inversion_c`).
+   - *WP-14a check.* Serreze, Kahl & Schnell 1992 could not be obtained, so the "10–20 K" stays
+     from memory. The NCEP/NCAR reanalysis 1991–2020 monthly long-term means (Kalnay et al. 1996,
+     NOAA PSL, public domain; computed WP-14a) put January air at the lowest model level (σ 0.995)
+     8.1 K below 850 hPa at Yakutsk's grid point and 9.5 K below at Verkhoyansk's, against 9.4 K
+     *above* at Brest's. Measured from what a 6.5 K/km lapse would give over the 1.3–1.5 km to
+     850 hPa (about 9 K warmer at the surface), the inversion deficit is 17–19 K, and the
+     reanalysis level is itself 7 K warmer than Yakutsk's station (−32 against −39 °C). The 15-K
+     default sits inside that range.
    - The term is diagnostic. It does not enter the energy balance, so closure holds.
    - In the prototype, 15 K took Yakutsk from −23 to −34 °C (observed −39). It left Moscow alone,
      because Moscow's tile is above the snow threshold once the westerly heat reaches it. Winter
@@ -525,7 +594,9 @@ rain, conserves water exactly at convergence, and needs no time-step limit, pola
 ∇·(V W) − ∇·(K_q ∇W) = E(W) − P(W) − S_oro
 ```
 
-V is the month's low-level wind, K_q the eddy moisture diffusivity (1.5·10⁶ m²/s), and S_oro the
+V is the month's low-level wind, K_q the eddy moisture diffusivity (1.5·10⁶ m²/s; the design's own value: GREB uses one
+isotropic κ for heat and moisture, 8·10⁵ m²/s in Dommenget & Flöter 2011's text and 2·10⁵ in its
+Table 2, read WP-14a), and S_oro the
 mountain rain taken out on L1 (§3.6).
 
 ### 3.2 Winds
@@ -547,6 +618,10 @@ V = belt wind + thermal wind.
      ```
      It converges at the ITCZ and at 60° and diverges at 30° and the poles. That gives the wet and
      dry belts **from the budget**, replacing the `belt_precip` table.
+     *WP-14a check* (NCEP/NCAR reanalysis 1991–2020, annual zonal mean at σ 0.995, computed): the
+     trades blow equatorward at 1.4–1.5 m/s at 15–20°N and 2.0 m/s at 10–15°S (the profile: 2.5);
+     the Ferrel branch poleward at 0.7 m/s at 50°N and 2.3 m/s at 50°S (the profile: 1.0 at 45°).
+     Within a factor of two everywhere, hemispherically averaged; a T9 knob, not a sourced value.
 2. **Thermal wind** (monsoon lows and winter highs).
    - **Pressure.** The departure of T̄ from its row mean, smoothed over two coarse cells, makes a
      pressure anomaly p′ = −κ_p T̄′. κ_p is 60 Pa/K (ρ g H/T with H ≈ 1.5 km).
@@ -558,14 +633,27 @@ V = belt wind + thermal wind.
    - **Behaviour.** It is cross-isobaric near the equator and almost geostrophic in mid-latitudes.
      A summer continent 10 K warmer than its row gets about 5 m/s of inflow: an onshore monsoon.
      A winter continent gets outflow: a dry winter monsoon.
+   - *WP-14a.* Lindzen & Nigam 1987 could not be obtained; their friction constant is unread, so
+     r = 10⁻⁵ s⁻¹ stays the design's own value. κ_p = ρgH/T is the hydrostatic surface-pressure
+     change of a layer of depth H warmed by T′ (1.2 × 9.81 × 1,500 / 290 = 61 Pa/K, computed).
+     Back & Bretherton 2009 (J. Climate 22, 4182–4196; read in full, the authors' copy) say
+     Lindzen & Nigam needed a layer "extending up to 700 hPa" (about 3 km) and an ad hoc back
+     pressure, and that a mixed layer to 850 hPa (about 1.5 km) is more realistic (pp. 4183 and
+     4195): the design's H is that more realistic depth.
 
 ### 3.3 Evaporation
 
 Bulk formula per tile (GREB's form, Stassen et al. 2019):
-`E = ρ_a C_E max(|V|, 3 m/s) q_s(T_tile) (1 − RH)`, where:
+`E = ρ_a C_E (|V| + u_t) q_s(T_tile) (1 − RH)`, where:
 - RH = W/W_sat;
-- C_E = 1.3·10⁻³;
-- q_s is from Tetens;
+- u_t is GREB's turbulent wind, added to the mean wind: 3 m/s over the sea and 2 m/s over land
+  (Dommenget & Flöter 2011, section 3.3, eq. 7; read WP-14a). The first draft had a floor,
+  max(|V|, 3 m/s), which GREB does not use. Stassen et al. 2019 refit it as 5.4 m/s (sea) and
+  11.5 m/s (land) with efficiencies 0.58 and 0.25 (eqs. 12–16, p. 431): T9 may take those;
+- C_E = 1.3·10⁻³ (not found in GREB's papers, which leave their C_w unnumbered; the design's own,
+  open question);
+- q_s is from Tetens (Murray 1967's form, 6.1078 hPa · exp(17.27 T/(T + 237.3)) over water, read
+  only through a secondary page in WP-14a);
 - the sea tile has the factor (1 − ice cover);
 - the land tile has the bucket factor β(S) of Manabe 1969: β = min(1, S/(0.75 S_max)), S_max
   150 mm, with S stepped month by month by P − E − runoff and cycled until the year repeats.
@@ -575,19 +663,32 @@ today's `recycling` and `moisture_floor` constants.
 
 W_sat = 70 kg/m² · e^(0.065(T̄ − 27)) · (1 − f + f·e^(−z̄/2,500 m)). The last factor is the vapour
 scale height over high land, so a Tibet holds a fifth of the sea-level water. It replaces
-`plateau_m`.
+`plateau_m`. *WP-14a:* none of the three numbers is taken from a source; each is consistent with
+one. 70 kg/m² sits beside Bretherton et al.'s W*ref = 72 mm for actively convecting tropical
+columns (p. 1521); 0.065 K⁻¹ (6.7 %/K) is a little below Clausius–Clapeyron's ≈ 7 %/K and the
+models' 7.5 %/K for column vapour (Held & Soden 2006, pp. 5686 and 5689); 2,500 m is Clausius–
+Clapeyron with the model's 6.5 K/km lapse (R_v T²/(L Γ) = 2.4 km at 15 °C, computed) against a
+"typically 2 km" vapour scale height (Guilloteau 2000, IRAM lecture notes).
 
 ### 3.4 Condensation and precipitation
 
 ```
-P = stab · (W/τ_P) · exp(a (RH − r_ref)),    τ_P = 8 days, a = 15.6, r_ref = 0.7
+P = stab · (W/τ_P) · exp(a (RH − r_ref)),    τ_P = 6.6 days, a = 11.4, r_ref = 0.7
 ```
 
-- **The exponential on RH** is Bretherton, Peters & Back 2004's observed relation (tropical P rises
-  15.6-fold per unit of column relative humidity). It is written relative to W, so P scales with
-  the air's water as Clausius–Clapeyron demands.
-- **Typical rates:** an ITCZ column (W 50, RH 0.75) rains about 14 mm/day; a subtropical high
-  (W 25, RH 0.45) about 0.06 mm/day; a mid-latitude column (W 15, RH 0.7) about 2 mm/day.
+- **The exponential on RH** is Bretherton, Peters & Back 2004's observed relation over the tropical
+  oceans. It is written relative to W, so P scales with the air's water as Clausius–Clapeyron
+  demands.
+  - *WP-14a (source read):* the paper gives two fits. The daily one is P = exp[15.6 (r − 0.603)]
+    mm/day (eq. 1, p. 1519); the **monthly-mean** one is P = exp[11.4 (r − 0.522)] mm/day (eq. 2,
+    p. 1521). 15.6 is an e-folding rate, not "15.6-fold per unit of RH". This budget solves monthly
+    means, so it takes the monthly rate, a = 11.4 (was 15.6), and τ_P = 6.6 days (was 8), which
+    makes the law equal Bretherton's monthly fit at their typical convecting column (W_sat = 72 mm,
+    p. 1521) and r = 0.7: 50.4 mm / 6.6 days = 7.6 mm/day = exp(11.4 × 0.178). The prototype ran
+    15.6 and 8 days; T9 calibrates `precip_rh_slope` from here.
+- **Typical rates** (a = 11.4, τ_P = 6.6 days): an ITCZ column (W 50, RH 0.75) rains about
+  13 mm/day; a subtropical high (W 25, RH 0.45) about 0.2 mm/day; a mid-latitude column (W 15,
+  RH 0.7) about 2 mm/day.
 - **Convergence.** Convergent winds pile W up until it rains: the ITCZ, the polar front, monsoon
   inflow. Divergence dries: the subtropical highs. This plays the role of GREB's ω term.
 - **Subsidence on the west sides of continents.**
@@ -752,6 +853,17 @@ there would add 40–80 minutes single-threaded, or 10–20 minutes on all cores
     and the pattern through a snowball's onset and escape. Cost is one extra snapshot per crossing.
   - **A test.** On the existing snowball scenario (tropical supercontinent, weathering ramp), the
     2-D model run at the onset CO₂ must also freeze over, and run at the escape CO₂ must thaw.
+  - **The escape CO₂ is reported against Earth's (WP-14a).** The clock's CO₂ forcing, which this
+    design keeps, is Byrne & Goldblatt 2014's fit F = 5.32 ln(C/C₀) + 0.39 [ln(C/C₀)]², stated for
+    200–10,000 ppm and computed by them over 100–50,000 ppm (Table 2 and abstract; read WP-14a),
+    blended from Myhre's logarithm above 1,000 ppm (CLM-069 to CLM-071). Above 50,000 ppm it is
+    an extrapolation with no source behind it. Today's snowball scenario escaped at about
+    550,000 ppm (0.55 bar), where Hoffman et al. 2017 expect terminations at 10⁴ to 10⁵ ppm
+    (p. 3 of 43; read WP-14a) and note that cloud-free models do not deglaciate at any feasible
+    CO₂ while cloud condensate adds ≥ 10 W/m² (p. 10 of 43). T6 records the 2-D model's escape
+    CO₂ in the run's notes beside 10⁴–10⁵ ppm. What to do above 50,000 ppm (cap the forcing, find a radiative
+    calculation that covers 0.1–1 bar, or add the snowball's cloud and dust forcing) is an open
+    question for Ben (STATUS "Pending questions", WP-14a); until then the forcing law is unchanged.
 - **The ice-albedo feedback.**
   - In the 2-D model it is per cell: snow by tile temperature, sea ice by cover, sheets by s_g.
   - In the clock it is per band, as today.
@@ -808,6 +920,14 @@ This design depends on it as follows:
 - **Ice albedo.** The sheet's ice share per *coarse climate cell* feeds the 2-D model's s_g. Its
   per-band share keeps feeding the clock, as it does on the branch.
 - **No change** to supply limits, calving, isostasy or the clock step.
+- **The ice takes the planet's gravity (WP-14a; science stage 1 fix 17).** `ice.rs` uses a fixed
+  `G = 9.81` in Nye's profile H = √(2τ₀L/(ρ_i g)), and the branch's `sheet.rs` imports the same
+  constant into its shallow-ice rate factor 2A(ρ_i g)ⁿ/(n + 2). Both read `planet.gravity_m_s2`
+  instead, passed in by T6, which touches the sheet anyway. Test: on a planet with g = 3.71 m/s²
+  the Nye thickness at the same L and τ₀ is √(9.81/3.71) = 1.63 times Earth's, and the sheet's flux
+  for the same geometry is (3.71/9.81)³ = 0.054 times. Earth's presets carry 9.81, so Earth-like
+  worlds do not change. Glacio-eustasy and the ice's isostatic depression (ρ_i/ρ_m) do not depend
+  on g.
 
 ---
 
@@ -842,6 +962,19 @@ of these change in meaning, so no code changes. Effects:
 - Deserts move to interiors and cold coasts.
 - The placement table (`placement.json`, pack-overridable) needs no change. Its per-class bands stay
   valid.
+
+**Köppen on L2 (open, WP-14a note).** The grid-artifact audit (build log 2026-10-01, P1-23,
+finding 3; STATUS "Pending questions") recommends deciding the Köppen class on L2 inside P1-26, so
+biome borders stop stepping with the 16-block L1 cells. This design does not include it: §2.9 and
+T5 classify on L1 "exactly as today". It accommodates it without a format change. The class is a
+function of the twelve monthly temperatures and precipitations, which §2.9 already produces from
+smooth fields (masked bilinear of the coarse tiles, the coast blend, the inversion), and the bake
+already holds the twelve `month/t_sl_c_NN` and `month/p_share_NN` layers. A step in
+`bake/biomes.rs` can interpolate those to each L2 cell, lapse to the L2 height and classify there,
+then set the band coordinates per L2 cell; the baked L1 `climate/koppen` stays for the climate API.
+If Ben takes the audit's recommendation it becomes a T5/T10 item (Sonnet; acceptance: the audit's
+share of biome-input change faces within 2° of an axis falls from 24 % toward the 4.4 % of an
+isotropic field).
 
 ### 5.3 The `climateConsistent` GameTest floors
 
@@ -905,7 +1038,7 @@ model. Paths are under the preset's `climate` section, edited in `editor_fields.
 | Ocean overturning (`climate.overturning_sv`) | 15 Sv | Advanced, stops Off 0 / Earth 15 / Strong 25 | the deep-water conveyor that warms one subpolar sea; 0 = off |
 | Winter inversions (`climate.winter_inversion_c`) | 15 °C | Advanced | how much colder snow-covered interiors get in the dark season than the air above them |
 | Monsoon strength (`climate.thermal_wind_pa_k`) | 60 Pa/K | Advanced (`budget`) | how strongly hot continents draw in sea air in summer (and push it out in winter) |
-| Rain efficiency (`climate.precip_rh_slope`) | 15.6 | Advanced (`budget`) | how sharply rain grows with humidity: higher makes wet places wetter and dry places drier |
+| Rain efficiency (`climate.precip_rh_slope`) | 11.4 (WP-14a; was 15.6) | Advanced (`budget`) | how sharply rain grows with humidity: higher makes wet places wetter and dry places drier |
 | Soil water (`climate.bucket_mm`) | 150 mm | Advanced (`budget`) | how much rain the land stores and re-evaporates (inland reach of moisture) |
 | Sea-ice edges (`climate.sea_ice_edge_sharpness`) | 4 | Advanced | 1 = soft, coarse edges; higher = crisp L1 edges |
 | Orbital-window 2-D snapshots (`climate.orbital_snapshot_kyr`) | 0 | Advanced (Q6) | extra 2-D climates inside the ice-age window |
@@ -1036,6 +1169,16 @@ Under `belts` they are reported but are not gates.
   A test (T6).
 - **Earth.** The 2-D global mean stays 15 ± 0.5 °C at 280 ppm, as the 1-D model is today: a0 is
   re-fitted if needed.
+  - *WP-14a:* Earth's own pre-industrial mean is cooler. Berkeley Earth gives 14.10 °C for
+    1951–1980 (air temperature over sea ice; 14.70 °C with the water below the ice) and an
+    1850–1900 anomaly of −0.31 K against that base, so 13.8 °C (14.4 °C) for 1850–1900 (Rohde &
+    Hausfather 2020; the data file's header and monthly anomalies, read and averaged WP-14a). The
+    15 °C is the mean of North, Cahalan & Coakley 1981's models with their northern-hemisphere
+    coefficients (15.0 °C for an ice-free planet, p. 93; 14.97 °C for the diffusive model,
+    p. 97). Whether T9 targets 15 °C (today's
+    calibration) or
+    Earth's 13.8–14.4 °C is a question for Ben (STATUS "Pending questions", WP-14a); the target
+    stays 15 ± 0.5 °C until he answers.
 
 ### 7.3 Closure
 
@@ -1068,7 +1211,7 @@ annual land temperature. On the two real runs (`earthlike_quick_16k`, scattered 
 
 The order is chosen so each knob is tuned on what it controls most, on Earth's relief:
 
-1. **Global and zonal energy:** a₀ and D_ocean/D_eq/D_pole against the 1-D model's Earth zonal
+1. **Global and zonal energy:** a₀ and the four D values of §2.5 against the 1-D model's Earth zonal
    means and 15 °C.
 2. **Ocean:**
    - γ_o and Ψ against the January sea surface of the North Atlantic and North Pacific;
@@ -1146,21 +1289,22 @@ This design ports no new code. Every new piece is implemented from equations.
 | Stommel 1948, Trans. AGU 29, 202 | gyre equation | paper |
 | Rose & Marshall 2009, JAS 66, 2828 | ocean heat transport in EBMs (alternative closure) | paper |
 | Ferreira et al. 2018, Annu. Rev. Earth Planet. Sci. 46, 327 ("Atlantic–Pacific asymmetry in deep water formation") † | basin width selects the sinking basin | paper |
-| Trenberth & Caron 2001, J. Climate 14, 3433 | heat transport targets | paper |
-| Lindzen & Nigam 1987, JAS 44, 2418 † | linear frictional surface wind from temperature gradients | paper |
+| Trenberth & Caron 2001, J. Climate 14, 3433 | heat transport targets (read WP-14a: Fig. 7, ocean about 2 PW near 15–20°N; atmosphere 5.0 PW at 43°N) | paper |
+| Lindzen & Nigam 1987, JAS 44, 2418 † (not obtainable in WP-14a; read through Back & Bretherton 2009, J. Climate 22, 4182) | linear frictional surface wind from temperature gradients | paper |
 | Dommenget & Flöter 2011, Clim. Dyn. 37, 2143; Stassen, Dommenget & Loveday 2019, GMD 12, 425 (GREB) | bulk evaporation form, precipitation-on-RH-and-convergence idea | paper CC BY; **code has no licence** (github.com/christianstassen/greb-official: no LICENSE file; Zenodo "Other (Open)"); equations only |
 | Fanning & Weaver 1996, JGR 101(D10), 15111; Weaver et al. 2001 (UVic EMBM) | energy–moisture balance atmosphere precedent | papers; code licence unverifiable (site unreachable, forks unlicensed); equations only |
-| Bretherton, Peters & Back 2004, J. Climate 17, 1517 † | P against column relative humidity | paper |
-| Manabe 1969, Mon. Weather Rev. 97, 739 † | soil bucket | paper |
+| Bretherton, Peters & Back 2004, J. Climate 17, 1517 (read WP-14a) | P against column relative humidity (eq. 2, the monthly fit) | paper |
+| Manabe 1969, Mon. Weather Rev. 97, 739 (read WP-14a) | soil bucket (eqs. 18 and 20, p. 743) | paper |
 | Siler, Roe & Armour 2018, J. Climate 31, 7481; Bischoff & Schneider 2014, J. Climate 27, 4937 | moist EBM and energy-flux equator (later option, Q10) | papers |
-| Wagner & Eisenman 2015, J. Climate 28, 3998 | sea ice in EBMs | paper; code (eisenman-group) has no licence; equations only |
+| Wagner & Eisenman 2015, J. Climate 28, 3998 (read WP-14a) | sea ice in EBMs (Table 1: k = 2 W/m/K, pure ice) | paper; code (eisenman-group) has no licence; equations only |
 | Klein & Hartmann 1993, J. Climate 6, 1587 † | low cloud vs stability (follow-up, Q9) | paper |
-| Serreze, Kahl & Schnell 1992, J. Climate 5, 615 † | Arctic winter inversions | paper |
-| PlaHab (Ramirez 2023, PSJ) | zonal/meridional diffusivity ratio precedent | data and code CC BY 4.0 on UCF STARS (not inspected, nothing taken) |
+| Serreze, Kahl & Schnell 1992, J. Climate 5, 615 † (not obtainable in WP-14a; the inversion size checked against NCEP/NCAR reanalysis instead, §2.9) | Arctic winter inversions | paper |
+| PlaHab (Ramirez 2024, PSJ 5:2, doi:10.3847/PSJ/ad0729) | zonal/meridional diffusivity ratio precedent (paper read WP-14a) | data and code CC BY 4.0 on UCF STARS (code not inspected, nothing taken) |
 | **Not used:** ExoPlaSim (GPL-2.0), PlaSim (treated as GPL), Isca (GPL-3.0), CLIMBER-X (GPL-3.0), OpenLEM/LFPM (GPL-3.0-or-later), SPEEDY (non-commercial grant) | — | do not port; oracles at most |
 
 † Cited from memory, not re-read in this session. The implementing tasks verify the page numbers
-before code headers cite them.
+before code headers cite them. WP-14a (2026-10-02) read the unmarked ones it could obtain; what it
+could not read is listed in `docs/science/per-cell-climate.md`, "Open questions".
 
 **Validation data** (never committed or shipped):
 - Beck et al. 2018, Sci. Data 5, 180214, Köppen maps: CC BY 4.0, figshare 6396959.

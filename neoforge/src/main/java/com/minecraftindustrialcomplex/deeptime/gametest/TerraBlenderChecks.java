@@ -72,10 +72,11 @@ final class TerraBlenderChecks {
         int samples = 0, outside = 0, mismatch = 0, land = 0;
         String first = null;
         int c = t.circumference();
+        int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);   // the poles (the planet's projection)
         for (int j = 0; j < rows; j++) {
             for (int i = 0; i < cols; i++) {
                 int x = -c / 2 + (int) ((i + 0.5) * c / cols);
-                int z = -c / 4 + (int) ((j + 0.5) * (c / 2.0) / rows);
+                int z = -zp + (int) ((j + 0.5) * (2.0 * zp) / rows);
                 int province = src.provinceAt(x, z);
                 int region = src.regionAt(x, z);
                 double y = t.height(x, z);
@@ -123,7 +124,7 @@ final class TerraBlenderChecks {
         int minY = level.getMinBuildHeight(), maxY = level.getMaxBuildHeight() - 1;
         for (int k = 0; k < 64; k++) {
             int x = -c / 2 + (int) ((k + 0.5) * c / 64.0);
-            int z = -c / 4 + (int) ((((k * 29) % 64) + 0.5) * (c / 2.0) / 64.0);
+            int z = -zp + (int) ((((k * 29) % 64) + 0.5) * (2.0 * zp) / 64.0);
             int y = (int) Math.max(minY, Math.min(maxY, Math.floor(t.height(x, z))));
             var chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, net.minecraft.world.level.chunk.status.ChunkStatus.BIOMES, true);
             var key = chunk.getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(y), QuartPos.fromBlock(z)).unwrapKey().orElseThrow();
