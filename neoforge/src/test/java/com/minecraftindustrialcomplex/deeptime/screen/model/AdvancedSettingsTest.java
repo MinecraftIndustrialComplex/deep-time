@@ -117,8 +117,8 @@ class AdvancedSettingsTest {
         List<Num> numbers = List.of(
                 new Num("climate_grid", "grid_columns", 128, true),
                 new Num("atmosphere_mixing", "atmosphere_diffusivity_scale", 1.3, false),
-                new Num("zonal_mixing", "zonal_diffusivity_ratio", 0.3, false),
-                new Num("wind_heat", "wind_heat_transport", 0.3, false),
+                new Num("zonal_mixing", "zonal_diffusivity_ratio", 0.2, false),
+                new Num("wind_heat", "wind_heat_transport", 0.2, false),
                 new Num("desert_albedo", "desert_albedo", 0.08, false),
                 new Num("monsoon_strength", "thermal_wind_pa_k", 60, false),
                 new Num("rain_efficiency", "precip_rh_slope", 11.4, false),

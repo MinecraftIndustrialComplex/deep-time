@@ -388,8 +388,8 @@ impl Default for ClimateParams {
             model: ClimateModel::PerCell,      // ledger: CLM-175
             grid_columns: 128,                 // ledger: CLM-119
             atmosphere_diffusivity_scale: 1.3, // ledger: CLM-176
-            zonal_diffusivity_ratio: 0.3,      // ledger: CLM-121
-            wind_heat_transport: 0.3,          // ledger: CLM-125
+            zonal_diffusivity_ratio: 0.2,      // ledger: CLM-121
+            wind_heat_transport: 0.2,          // ledger: CLM-125
             desert_albedo: 0.08,               // ledger: CLM-123
             rain_model: RainModel::Belts,      // ledger: CLM-178
             thermal_wind_pa_k: 60.0,           // ledger: CLM-141
