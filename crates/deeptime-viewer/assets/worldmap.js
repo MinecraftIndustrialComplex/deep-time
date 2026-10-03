@@ -212,7 +212,7 @@
     for (let j = j0; j <= j1; j++) {
       for (let k = k0; k <= k1; k++) {
         const tx = ((k % nx) + nx) % nx;
-        const sx = ((-c / 2 + k * span) - left) / S.bpp, sy = ((-pz + j * span) - top) / S.bpp;
+        const sx = ((-c / 2 + k * span) - left) / S.bpp, sy = ((fz + j * span) - top) / S.bpp;
         const t = tileAt(layer, z, tx, j, true);
         if (t.state === 'ok') {
           ctx.drawImage(t.img, Math.round(sx * d), Math.round(sy * d), Math.ceil(px * d + 0.5), Math.ceil(px * d + 0.5));
