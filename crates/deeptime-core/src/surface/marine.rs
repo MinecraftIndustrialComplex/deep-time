@@ -167,9 +167,157 @@ pub fn fill(
     touched
 }
 
+/// Share of a pair's excess the slope failure moves per iteration, and its iterations per LEM
+/// step: numerical, not physical (a slope relaxes over a few steps; the result is the critical
+/// slope either way).
+pub const FAILURE_RATE: f64 = 0.05; // ledger: ERO-169
+pub const FAILURE_ITERATIONS: u32 = 40; // ledger: ERO-169
+
+/// Parameters of the submarine slope failure ([`slope_failure`]).
+#[derive(Clone, Copy, Debug)]
+pub struct FailureParams {
+    /// The steepest gradient sediment holds under the sea (tan of `surface.submarine_slope_deg`).
+    pub critical_slope: f64,
+    /// Share of a pair's excess over the critical drop moved per iteration (≤ 1/16 is stable).
+    pub rate: f64,
+    pub iterations: u32,
+}
+
+/// Submarine slope failure (margins and spires task, 2026-10-03): sediment on the sea floor
+/// steeper than `critical_slope` slides down it (slumps, debris flows, turbidity currents), so a
+/// prograding shelf ends in a foreset at that angle and the material builds the slope's toe and
+/// the continental rise, instead of standing as the cliff the mouth fill leaves (it raises every
+/// cell it reaches to the fill level) and the marine diffusion, which vanishes below the wave
+/// base, never relaxes.
+///
+/// Only pairs of open-sea cells (`sea[c]`, below `sea_level`) take part, and a cell gives at most
+/// `avail[c]` metres in all (its loose sediment and sedimentary log: the crystalline margin the
+/// plate model built does not slump). The pass is a Jacobi gather like the amplifier's thermal
+/// pass (`thermal.rs`): a pair (a, b) with h_a − h_b > S_c·d moves rate·(h_a − h_b − S_c·d) from a
+/// to b, scaled down for a giver that would exceed what it has; both ends compute the same
+/// amount, so **matter is conserved** to round-off. Returns the metres moved (Σ|Δh|/2 · cells).
+pub fn slope_failure(
+    d: &Dims,
+    sea: &[bool],
+    sea_level: f64,
+    p: &FailureParams,
+    h: &mut [f64],
+    avail: &mut [f64],
+) -> f64 {
+    use rayon::prelude::*;
+    let n = d.cells();
+    let wet = |c: usize, h: &[f64]| sea[c] && h[c] < sea_level;
+    let mut scale = vec![0.0f64; n];
+    let mut next = vec![0.0f64; n];
+    let mut moved = 0.0;
+    for _ in 0..p.iterations {
+        let hh: &[f64] = h;
+        // What each cell would give, and the share of it its sediment allows.
+        scale.par_iter_mut().enumerate().for_each(|(c, s)| {
+            *s = 0.0;
+            if !wet(c, hh) || avail[c] <= 0.0 {
+                return;
+            }
+            let mut give = 0.0;
+            for (m, dl) in d.neighbours(c) {
+                if wet(m, hh) {
+                    give += p.rate * (hh[c] - hh[m] - p.critical_slope * dl).max(0.0);
+                }
+            }
+            if give > 0.0 {
+                *s = (avail[c] / give).min(1.0);
+            }
+        });
+        let sc: &[f64] = &scale;
+        next.par_iter_mut().enumerate().for_each(|(c, o)| {
+            let mut dz = 0.0;
+            if wet(c, hh) {
+                for (m, dl) in d.neighbours(c) {
+                    if !wet(m, hh) {
+                        continue;
+                    }
+                    let out = (hh[c] - hh[m] - p.critical_slope * dl).max(0.0);
+                    let inn = (hh[m] - hh[c] - p.critical_slope * dl).max(0.0);
+                    dz += p.rate * (inn * sc[m] - out * sc[c]);
+                }
+            }
+            *o = dz;
+        });
+        let mut any = false;
+        for c in 0..n {
+            let dz = next[c];
+            if dz != 0.0 {
+                any = true;
+                h[c] += dz;
+                avail[c] = (avail[c] + dz).max(0.0);
+                moved += dz.abs() * 0.5;
+            }
+        }
+        if !any {
+            break;
+        }
+    }
+    moved
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A sediment cliff (a mouth fill's front) under the sea relaxes to the critical slope with
+    /// its mass kept; a crystalline step (no sediment) and land do not move.
+    #[test]
+    fn a_submarine_sediment_cliff_relaxes_to_the_critical_slope() {
+        let (w, hh) = (64, 3);
+        let d = Dims::new(w, hh, 1000.0, false);
+        let mut h = vec![0.0; w * hh];
+        let mut avail = vec![0.0; w * hh];
+        for j in 0..hh {
+            for i in 0..w {
+                let c = j * w + i;
+                h[c] = if i < 4 {
+                    50.0 // land
+                } else if i < 20 {
+                    -100.0 // the fill's shelf, on 3 km of sediment
+                } else {
+                    -3000.0
+                };
+                avail[c] = if (4..20).contains(&i) { 3000.0 } else { 0.0 };
+            }
+        }
+        let sea: Vec<bool> = h.iter().map(|&z| z < 0.0).collect();
+        let s_c = 2.5f64.to_radians().tan();
+        let p = FailureParams {
+            critical_slope: s_c,
+            rate: 0.05,
+            iterations: 30_000,
+        };
+        let before: f64 = h.iter().sum();
+        slope_failure(&d, &sea, 0.0, &p, &mut h, &mut avail);
+        let after: f64 = h.iter().sum();
+        assert!((before - after).abs() < 1e-6 * before.abs(), "mass kept");
+        let row = &h[w..2 * w];
+        assert_eq!(row[0], 50.0, "land does not move");
+        // No pair of sea cells is left much steeper than the critical slope.
+        let steepest = (4..w - 1)
+            .map(|i| (row[i] - row[i + 1]).abs() / 1000.0)
+            .fold(0.0, f64::max);
+        assert!(steepest < 1.2 * s_c, "steepest {steepest} against {s_c}");
+        // The foot is built out: the floor beyond the old cliff was raised.
+        assert!(row[24] > -2900.0, "{}", row[24]);
+        // A step without sediment stays a step.
+        let mut h2 = vec![-100.0; w * hh];
+        for (c, z) in h2.iter_mut().enumerate() {
+            if c % w >= 20 {
+                *z = -3000.0;
+            }
+        }
+        let keep = h2.clone();
+        let mut none = vec![0.0; w * hh];
+        let sea2 = vec![true; w * hh];
+        slope_failure(&d, &sea2, 0.0, &p, &mut h2, &mut none);
+        assert_eq!(h2, keep);
+    }
 
     #[test]
     fn kd_falls_below_the_wave_base_and_on_land() {

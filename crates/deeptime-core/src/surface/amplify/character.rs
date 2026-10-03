@@ -320,6 +320,22 @@ impl CharacterFields {
     }
 
     /// Uniform, moderate youth and no folds (a world without plate fields).
+    /// Uniform fields (tests): youth, fold strength and shortening direction everywhere.
+    #[cfg(test)]
+    pub(crate) fn uniform_for_tests(youth: f32, fold: f32, dir_deg: f64) -> Self {
+        let th = 2.0 * dir_deg.to_radians();
+        CharacterFields {
+            w: 4,
+            h: 4,
+            ratio: 8.0,
+            youth: vec![youth; 16],
+            fold_c2: vec![fold * th.cos() as f32; 16],
+            fold_s2: vec![fold * th.sin() as f32; 16],
+            calm: Vec::new(),
+            neutral: false,
+        }
+    }
+
     pub fn neutral() -> Self {
         CharacterFields {
             w: 1,
@@ -445,12 +461,30 @@ fn radii(p: &CharacterParams, cell_blocks: f64) -> Radii {
     }
 }
 
+/// Reach, cells, of a gully octave's fall-line estimate: a quarter of its wavelength.
+fn gully_reach(lam: f64, cell_blocks: f64) -> usize {
+    // ledger: AMP-073
+    (lam / (4.0 * cell_blocks)).round().max(1.0) as usize
+}
+
+/// Agreement of the fall line around a cell (|Σg| / Σ|g| of the five gradients) under which a
+/// gully octave is gone, and over which it is whole (margins and spires task, 2026-10-03; an
+/// implementation choice, not physical).
+const GULLY_COHERENCE: [f64; 2] = [0.5, 0.85]; // ledger: AMP-073
+
 /// The dependency radius, cells, of [`apply`]: the base smoothing, the slope smoothing, the
 /// relief window, one cell per gully octave (each reads the slope the previous ones left) and
 /// the unsharp blur, whichever chain is longest.
 pub fn radius_cells(p: &CharacterParams, cell_blocks: f64) -> usize {
     let r = radii(p, cell_blocks);
-    let chain = 1 + 2 * r.smooth + r.relief + (r.relief / 2 + 1) + r.octaves as usize + 1;
+    let mut lam = p.gully_wavelength_blocks;
+    let mut octaves = 0;
+    for _ in 0..r.octaves {
+        let g = gully_reach(lam, cell_blocks);
+        octaves += g + (g / 2).max(1);
+        lam *= 0.5;
+    }
+    let chain = 1 + 2 * r.smooth + r.relief + (r.relief / 2 + 1) + octaves + 1;
     chain.max(1 + 3 * r.sharpen) + 1
 }
 
@@ -603,6 +637,16 @@ fn at(win: &Win, i: usize, j: usize, di: i64, dj: i64) -> usize {
 }
 
 /// One box-blur pass of radius `r` (cells) from `src` into `dst` through `tmp`, separably.
+/// The cut, m, at which a cell counts as wholly in a glacial trough (the character's fade), and
+/// the radius, cells, the fade is averaged over (`run_tiles`).
+pub const TROUGH_FADE_CUT_M: f32 = 20.0; // ledger: AMP-072
+pub const TROUGH_FADE_CELLS: usize = 3; // ledger: AMP-072
+
+/// [`box_blur`] for the amplifier's other passes.
+pub fn blur(win: &Win, src: &[f32], tmp: &mut [f32], dst: &mut [f32], r: usize) {
+    box_blur(win, src, tmp, dst, r);
+}
+
 fn box_blur(win: &Win, src: &[f32], tmp: &mut [f32], dst: &mut [f32], r: usize) {
     let k = 1.0 / (2 * r + 1) as f32;
     let r = r as i64;
@@ -736,16 +780,12 @@ pub fn apply(
     };
     let is_land = |cell: usize| z[cell] > sea && lake[cell] == 0;
     // How much of the character a land cell takes: none on rivers and at the coast, nor in the
-    // glacial troughs and cirques `glacial.rs` cut (`glacier`: the ground plus up to 100 m where
-    // it cut, NaN elsewhere; empty without glaciers): gullies and fold ridges would fight the U.
+    // glacial troughs and cirques `glacial.rs` cut (`glacier`: the trough fade, 0–1, a smooth
+    // field (`run_tiles`); empty without glaciers): gullies and fold ridges would fight the U.
     let glaciated = |cell: usize| -> f64 {
-        glacier.get(cell).map_or(0.0, |&zs| {
-            if zs.is_finite() {
-                smoothstep(0.0, 100.0, f64::from(zs - z[cell]))
-            } else {
-                0.0
-            }
-        })
+        glacier
+            .get(cell)
+            .map_or(0.0, |&w| smoothstep(0.0, 1.0, f64::from(w)))
     };
     let fade = |cell: usize| -> f64 {
         let a_km2 = f64::from(area[cell]) * 1.0e-6;
@@ -799,13 +839,29 @@ pub fn apply(
                 let n = at(win, i, j, di, dj);
                 f64::from(smooth[n]) + f64::from(acc[n])
             };
-            let gx = (h(1, 0) - h(-1, 0)) / (2.0 * cb);
-            let gz = (h(0, 1) - h(0, -1)) / (2.0 * cb);
-            let g = (gx * gx + gz * gz).sqrt();
-            if g < 1e-4 {
+            // The fall line at the octave's own scale: the gradient over ±r cells, at the cell
+            // and half that away on each axis. Where those five disagree (a summit, a saddle, a
+            // crest or valley axis the coarser octaves left, where the fall line turns within
+            // a wavelength) the octave fades: there the stripes' direction is undefined, and
+            // neighbouring cells read unrelated stripes, which made one-cell spires.
+            let r = gully_reach(lam, cb);
+            let rf = r as f64 * cb;
+            let half = (r / 2).max(1) as i64;
+            let ri = r as i64;
+            let (mut sx, mut sz, mut mag) = (0.0, 0.0, 0.0);
+            for (oi, oj) in [(0, 0), (half, 0), (-half, 0), (0, half), (0, -half)] {
+                let gx = (h(oi + ri, oj) - h(oi - ri, oj)) / (2.0 * rf);
+                let gz = (h(oi, oj + ri) - h(oi, oj - ri)) / (2.0 * rf);
+                sx += gx;
+                sz += gz;
+                mag += (gx * gx + gz * gz).sqrt();
+            }
+            let g = (sx * sx + sz * sz).sqrt();
+            if g < 5e-4 {
                 return;
             }
-            let dir = (-gz / g, gx / g);
+            let coherent = smoothstep(GULLY_COHERENCE[0], GULLY_COHERENCE[1], g / mag);
+            let dir = (-sz / g, sx / g);
             // The depth follows the slope of the smoothed terrain (so the octaves do not feed on
             // each other's walls); the direction, everything so far.
             let m = |di, dj| f64::from(smooth[at(win, i, j, di, dj)]);
@@ -826,7 +882,7 @@ pub fn apply(
                 .min(rug * p.gully_max_ratio * lam * (0.6 + 0.4 * hard) * persist)
                 .min(headroom(cell) * persist);
             let b = stripes(ctx.seed, 300 + k, c, bx, bz, dir, lam, sharp);
-            *o = (amp * b * fade(cell)) as f32;
+            *o = (amp * b * fade(cell) * coherent) as f32;
         });
         s.acc
             .iter_mut()
@@ -976,7 +1032,7 @@ pub fn soften_pits(
 /// The halo the character needs on top of the passes': its own radius, the flood that measures
 /// the pits it closed, their softening, and the last flood.
 pub fn halo_cells(p: &CharacterParams, cell_blocks: f64, repair_margin: usize) -> usize {
-    radius_cells(p, cell_blocks) + 2 * repair_margin + 2 * PIT_SOFTEN_RADIUS + 1
+    radius_cells(p, cell_blocks) + 2 * repair_margin + 2 * PIT_SOFTEN_RADIUS + 1 + TROUGH_FADE_CELLS
 }
 
 #[cfg(test)]
@@ -986,17 +1042,7 @@ mod tests {
     impl CharacterFields {
         /// Uniform fields (tests): youth, fold strength and shortening direction everywhere.
         fn uniform(youth: f32, fold: f32, dir_deg: f64) -> Self {
-            let th = 2.0 * dir_deg.to_radians();
-            CharacterFields {
-                w: 4,
-                h: 4,
-                ratio: 8.0,
-                youth: vec![youth; 16],
-                fold_c2: vec![fold * th.cos() as f32; 16],
-                fold_s2: vec![fold * th.sin() as f32; 16],
-                calm: Vec::new(),
-                neutral: false,
-            }
+            Self::uniform_for_tests(youth, fold, dir_deg)
         }
     }
 

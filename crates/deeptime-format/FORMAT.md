@@ -66,7 +66,7 @@ reader needs to know.
   rasters/climate/month/*.dtr   L1: t_sl_c_NN i16 0.01 °C,  │ the twelve months (0.2, P1-25)
                                 p_share_NN u8 1/40          │
   rasters/surface/*.dtr         L2, u8                      │
-  rasters/meta/*.dtr            L1, u16                     ┘
+  rasters/meta/*.dtr            L1, u16 (meta/heat_flow_mw_m2: u16, 0.1 mW/m², "Geothermal features") ┘
   strata/horizons.dtr           L1, horizon_stack (7K bytes a cell), K = 3 in the synthetic worlds (8 with
                                 --strata every-class, 32 in a baked run)
   strata/classes.json           class index → rock class name
@@ -108,7 +108,7 @@ manifest last. The synthetic worlds have none of these.
   "preset_hash": null,
   "planet": {"radius_m": 48892.96},
   "scale": {"circumference_blocks": 1024, "m_per_block_h": 300.0, "m_per_block_v": 20.0,
-            "min_y": -352, "max_y": 639, "sea_level_y": 63},
+            "min_y": -512, "max_y": 639, "sea_level_y": 63},
   "grids": {"L3": {"name": "L3", "w": 512, "h": 256, "r": 2, "wraps_x": true,
                    "origin_block_x": -512, "origin_block_z": -256}, "...": {}},
   "layers": [{"name": "elevation", "path": "rasters/elevation.dtr", "grid": "L3",
@@ -170,6 +170,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `surface/class_top` | L2 | u8 | 1, class index | 255 | the rock class at the surface (`strata/classes.json`) |
 | `meta/plate_id` | L1 | u16 | 1, plate id | 65535 | the plate |
 | `meta/crust_age_myr` | L1 | u16 | 1, Myr | 65535 | oceanic crust age; nodata on continental crust |
+| `meta/heat_flow_mw_m2` | L1 | u16 | 0.1, mW/m² | 65535 | the plate model's surface heat flow at the present, on **continental crust only** (nodata on oceanic crust, whose heat flow is the sea floor's age law: a coastal land column must not read the young ridge crust beside it through the bilinear sample; the plate mesh's heat flow is interpolated over its continental corners only, L1 field `plates/continental_heat_flow_mw_m2`); the model's continental values run from 55 (old, quiet crust) up to 200 (a young orogen on a hotspot, an arc and a rift at once): 55 + 35 e^(−t/60) for the time t in Myr since the last orogeny, plus 40 on an arc, 40 on a hotspot, 30 at a divergent boundary (Java: geothermal fields, "Geothermal features (P2-14) and their settings"; added 2026-10-02) |
 | `meta/province` | L1 | u16 | 1, province id | — | geologic provinces (P1-10, "The geologic provinces"): contiguous areas of one USGS-style class, each at least the preset's `provinces.min_area_km2` (50,000 km² by default); `notes.bake.meta.provinces` lists them. With TerraBlender installed the game gives every province one biome region |
 
 `notes.bake`: `version` (1), `baked`, per part (`terrain`, `strata`, `climate`, `water`, `surface`, `meta`)
@@ -869,7 +870,7 @@ has none): `{"lava_floor_blocks": 10, "lava_lake_blocks": 54, "magma_chamber_dep
 "magma_lens_spacing_blocks": 28.0, "magma_lens_width": 1.5, "magma_mush_width": 1.0, "sea_cliff_skin_blocks": 6}`. No layer holds
 lava; the game reads the first two numbers when it generates chunks (Java `worldgen/LavaRules`, `LavaFluids`,
 `density/LavaLakesDensity`), and a world without the note uses the defaults. With `min_y` the floor
-of the noise settings (−352) and cover = 8:
+of the noise settings (−512) and cover = 8:
 
 - **The lava floor.** Open space with y < `min_y + lava_floor_blocks` (never above sea level) is lava.
   In a column whose terrain height H is that low, the limit is `min(that, ⌊H⌋ − cover)`: lava stays
@@ -879,8 +880,8 @@ of the noise settings (−352) and cover = 8:
   blocks of the cell's centre. 0: no lava lakes.
 
 Both are vanilla's rules (lava below y −54, lava lakes at y −10 and lower, in a world whose floor is
-y −64) measured from the floor instead of from y 0. Vanilla's own constants flood the lowest 298
-blocks of every cave, and of every sea deeper than 117 blocks, of a world whose floor is y −352.
+y −64) measured from the floor instead of from y 0. Vanilla's own constants flood the lowest 458
+blocks of every cave, and of every sea deeper than 117 blocks, of a world whose floor is y −512.
 Carver lava in the bottom eight blocks is vanilla's and not covered by these rules.
 
 ### Impact craters (`impacts/craters.json`)
@@ -987,17 +988,33 @@ not placed in a Deep Time level
 ### Geothermal features (P2-14) and their settings
 
 Hot springs, sinter and travertine terraces, fumaroles with native sulfur and bare altered ground
-sit around the active volcanoes. No file and no layer holds them: the game builds the sites from
-`volcanoes/active.json`, the terrain height, the water columns and four more keys of
+sit around the active volcanoes and on hot continental ground. No file holds them: the game builds the sites from
+`volcanoes/active.json`, the layer `meta/heat_flow_mw_m2`, the terrain height, the water columns and six more keys of
 `notes.bake.underground.params` (defaults in brackets; Java `worldgen/Geothermal`, placed by
 `worldgen/GeothermalPass` in the surface step after the magma and before the ice):
 `geothermal_density` (1.0, 0 to 4; **0: no geothermal features**), `geothermal_reach` (1.0, 0.25 to 3),
-`geothermal_size` (1.0, 0.5 to 3), `geothermal_spring_min_precip_mm` (400, 0 to 4000).
+`geothermal_size` (1.0, 0.5 to 3), `geothermal_spring_min_precip_mm` (400, 0 to 4000),
+`geothermal_heat_flow_min_mw_m2` (100, 50 to 400) and `geothermal_heat_density` (1.0, 0 to 4; 0: no
+fields from heat flow, the volcanoes' only).
 
-**The heat sources are the active volcanoes and nothing else.** The bake does not export the plate
-model's heat flow, its spreading ridges or its rifts, so nothing is placed on them. (The `meta/province`
-layer does have a `rift` setting, but regions under 50,000 km² are absorbed by their neighbours and a
-planet's rifts seldom survive; a 16k, 500 Myr planet baked on 2026-10-01 had none.)
+**There are two heat sources: the active volcanoes, and continental ground whose heat flow is high**
+(Ben, decisions log 2026-10-02, "Export heat flow"). The bake exports the plate model's heat flow as the
+L1 layer `meta/heat_flow_mw_m2` (see the table above; nodata on oceanic crust and in a world without
+the layer, which has no heat-flow fields). Spreading ridges are under the sea, so only the land
+that the model heats (rifts, arcs, hotspot swells, young belts) gets fields.
+
+**Fields from heat flow.** The world (C blocks round, C/2 from pole to pole, z from −C/4) is cut into a
+grid of cells of 10,000 km² / `geothermal_heat_density` each (100 km across at density 1; the cell side
+is rounded so a whole number of cells goes round the world). Each cell, from a seed made of its own
+index, draws up to 6 random points and puts one field at the first where the bilinear
+`meta/heat_flow_mw_m2` is at least `geothermal_heat_flow_min_mw_m2`, the ground is dry land at least 5
+blocks above the sea with no water column and no ice cover. So fields follow the hot ground: at most one for each cell, about one for each 10,000 km² of a
+broad hot province and a field in most of the cells a thin belt crosses; none is placed where the
+layer is nodata or cooler. The field
+is then built by the volcanoes' machinery below, as a field "away from the summit" (a share of 1: hot
+springs where the rain and the temperature allow, else fumaroles), at a non-silicic source (no
+cinnabar); its sites are numbered with the volcanoes' and carry the source id −1. Every other rule
+below holds for them. The geothermal features are all off at `geothermal_density` 0.
 
 With R the volcano's basal radius in blocks (`radius_m` / `m_per_block_h`, at least 6), a the activity
 (0.05 to 1), a volcano gets ⌊d · (0.7 + 2.3 a) · clamp(√(R / 45), 0.6, 2.2) + u⌋ **fields** (d =
