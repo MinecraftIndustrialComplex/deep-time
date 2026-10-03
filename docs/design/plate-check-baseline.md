@@ -876,7 +876,9 @@ met only the land share (and, on 2c60ca3f, the median). One run of six has a cel
 the 7 km of the range), three have their highest cell at 5.4 km (just under 5.5), and the 99th
 percentile is 0.1 km under its range. The active margin share is above its range here as in the
 1000 Myr runs. Four of the six "after" runs were made with the two values given as `--set`
-overrides before they went into the preset; the last two with the preset.
+overrides before they went into the preset; the last two with the preset. All six re-run on the
+branch merged with master 00ef214c, with the preset alone: every number of this table identical
+in every run.
 
 **The light calibration** (the owner chose light at this landing). Tuned: `collision_resistance_mm_yr`
 100 to 200 and `collision_threshold_km` 300 to 100 (so collisions stop and small terranes accrete
