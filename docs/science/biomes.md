@@ -152,16 +152,16 @@ land columns of class BWk (10,541 columns; BSk 16,642 columns, which hardly move
 
 | BWk columns on | Before | After |
 |---|---|---|
-| standalone: desert / plains / snowy plains / badlands | 68.2 / 3.3 / 0.0 / 7.8 % | 40.5 / 36.9 / 3.0 / 1.9 % |
-| MIC: vanilla desert / Terralith cold shrubland / temperate highlands / plains | 26.8 / 0.0 / 0.0 / 2.6 % | 9.2 / 14.2 / 9.8 / 4.9 % |
-| MIC: vanilla badlands / eroded badlands | 14.9 / 7.1 % | 5.4 / 0.9 % (eroded: not in the top eight) |
-| Biomes O' Plenty: vanilla desert / BOP cold_desert / vanilla plains | 24.1 / 0.0 / 0.0 % | 12.5 / 3.5 / 16.1 % |
+| standalone: desert / plains / snowy plains / badlands / eroded badlands | 68.2 / 3.3 / 0.0 / 7.8 / 4.7 % | 40.5 / 36.9 / 3.0 / 1.9 / 0.7 % |
+| MIC: vanilla desert / Terralith cold shrubland / temperate highlands / snowy slopes / snowy plains / plains | 26.8 / 0.0 / 0.0 / 0.2 / 0.0 / 2.6 % | 9.2 / 14.2 / 9.8 / 2.1 / 1.5 / 4.9 % |
+| MIC: vanilla badlands / eroded badlands | 14.9 / 7.1 % | 5.4 / 1.8 % |
+| Biomes O' Plenty: vanilla desert / BOP cold_desert / vanilla plains | 24.1 / 0.3 / 0.9 % | 12.5 / 3.5 / 16.1 % |
 
 (The desert that is left is the BWk above 10 °C: Gobi at 3 to 6 °C mean is not in it, the Atacama coast at 16 to 18 is.
 BOP's shares are not asserted anywhere: its regions fill whole provinces, so they follow province draws.)
 The GameTest `climateConsistent` has a check for this, `BWk:cold_not_sand` (BiomeCensus): of the BWk columns colder
-than the cold band's top, none may land on a sand desert or a badlands; it reads 0 of 65 columns in all three profiles
-(standalone, MIC, TerraBlender: 1 column only). The BW family shares (`BW`, `BW:desert`) now leave those cold
+than the cold band's top, none may land on a sand desert or a badlands; it reads 0 of 65 columns standalone and with MIC, and 0 of 1
+column with TerraBlender (Biomes O' Plenty's columns are left out of that census). The BW family shares (`BW`, `BW:desert`) now leave those cold
 columns out (`BiomeCensus.Check.notColderThan`), because they are not meant to be desert any more; the floors did not
 change. On the 4k test planet (201 columns left in BW): BW 0.692 standalone, 0.766 MIC (floor 0.57), BW:desert 0.502 and
 0.592 (floor 0.37). Without the exclusion the same planet read BW 0.457 and BW:desert 0.297 standalone and BW 0.543 MIC,
