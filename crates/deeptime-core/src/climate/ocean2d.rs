@@ -340,9 +340,15 @@ impl Ocean {
         let true_w = |j: usize| s.radius_m * lat[j].to_radians().cos() * g.lon_w[0] / 1000.0;
         let mut best: Option<(f64, i8, Vec<usize>, usize)> = None;
         for hemi in [1i8, -1] {
+            // A row belongs to the band when its centre is past the band's equatorward end and
+            // its poleward edge is inside the poleward end: on an equal-area grid the polar rows
+            // are tall, and one reaching from 66° to 73° would join the Atlantic and the Pacific
+            // through the Arctic into one basin.
             let in_band = |c: usize| {
-                let l = lat[c / w] * f64::from(hemi);
-                sea(c) && (BASIN_LAT.0..=BASIN_LAT.1).contains(&l)
+                let j = c / w;
+                let l = lat[j] * f64::from(hemi);
+                let pole_edge = (g.lat_edge[j] * f64::from(hemi)).max(g.lat_edge[j + 1] * f64::from(hemi));
+                sea(c) && l >= BASIN_LAT.0 && pole_edge <= BASIN_LAT.1
             };
             let lab = components(&in_band);
             let count = lab.iter().flatten().max().map_or(0, |m| m + 1);
