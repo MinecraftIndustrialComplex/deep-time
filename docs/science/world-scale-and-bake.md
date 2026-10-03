@@ -116,6 +116,23 @@ planet). Sites 505 → 603 and 90 → 117; the median deposit centre is 89 and 5
 (126 and 60 at 20 m); total ore in deposits 17.9 → 18.4 million blocks (supercontinent) and 5.9 → 3.0
 million (scattered); a median porphyry body holds 241 → 155 ore blocks.
 
+**Ore after "Keep today's block height"** (2026-10-03; quick 16k preset, seed 2, master 6f72f0dd,
+which has the plate work, so the planets differ from the ones above; `deeptime deposit-audit`). The
+vertical multipliers × 1.75 bring the ore back to about the 20 m figures of the same master:
+
+| Planet | 20 m | 35 m, multipliers as tuned | 35 m, × 1.75 |
+|---|---|---|---|
+| Supercontinent, 1,000 Myr: sites | 264 | 291 | 291 |
+| ore blocks in deposits | 9.05 million | 4.66 million | 8.09 million |
+| median porphyry, ore blocks | 2,351 | 1,964 | 4,876 |
+| Scattered, 500 Myr: sites | 143 | 149 | 149 |
+| ore blocks in deposits | 6.46 million | 3.57 million | 5.77 million |
+| median porphyry, ore blocks | 1,694 | 983 | 1,685 |
+
+Coal is most of the ore (97 % and 95 %). The supercontinent planet has only 7 porphyries, so its
+median moves with which body is fourth. Sites do not change: no body was dropped or kept because of
+its taller drawing.
+
 **Answered** (decisions log 2026-10-03): rock layers keep their real thickness
 (`scale.feature_scale.strata` stays 1); ore bodies keep today's height in blocks (the vertical
 multipliers × 1.75, above); the drawing settings keep their values; the floor stays at y −512.
