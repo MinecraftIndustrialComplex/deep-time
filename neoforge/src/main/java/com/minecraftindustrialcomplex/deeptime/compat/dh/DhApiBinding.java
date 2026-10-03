@@ -51,6 +51,10 @@ import java.util.Optional;
  * IDhApiWorldProxy.worldLoaded(), getAllLoadedLevelWrappers()
  * IDhApiLevelWrapper.getWrappedMcObject(), getMinHeight(), getDhIdentifier()
  * IDhApiTerrainDataRepo.getColumnDataAtBlockPos(IDhApiLevelWrapper, int, int, IDhApiTerrainDataCache)
+ * DhApi.Delayed.configs : IDhApiConfig (null until DH starts its API)
+ *   graphics() : IDhApiGraphicsConfig;  earthCurvatureRatio() : IDhApiConfigValue&lt;Integer&gt;  (client; {@link DhCurvature})
+ * IDhApiConfigValue: getTrueValue() (the player's file), getApiValue() (the override layer), getDefaultValue(),
+ *   getCanBeOverrodeByApi(), setValue(T) and clearValue() (override layer only, never saved)
  * </pre>
  *
  * <p><b>The y of a data source's points</b> is counted from the level's minimum height, not from
