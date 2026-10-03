@@ -399,6 +399,12 @@ def client_start():
         time.sleep(3)
     pmc = subprocess.run(["nix", "build", "--no-link", "--print-out-paths", "nixpkgs#portablemc"], capture_output=True, check=True).stdout.decode().split()[0]
     game = os.path.join(CLI, "game")
+    opts = os.path.join(game, "options.txt")
+    if os.path.exists(opts):
+        lines = [ln for ln in open(opts).read().splitlines()
+                 if not ln.startswith(("renderDistance:", "pauseOnLostFocus:", "simulationDistance:"))]
+        lines += ["renderDistance:8", "simulationDistance:6", "pauseOnLostFocus:false"]
+        open(opts, "w").write("\n".join(lines) + "\n")
     lp = os.path.join(game, "logs", "latest.log")
     if os.path.exists(lp):
         os.remove(lp)
@@ -532,56 +538,105 @@ def look_and_walk(name, start, yaw, pitch, seconds, portal=None, keys=("w",), se
     return res
 
 
+def glue_cell(p, bx, bz):
+    """The glued image of block (cell) (bx, bz): a half-turn about the integer point (cx, cz) maps
+    the cell to (2cx - bx - 1, 2cz - bz - 1); a slide moves it."""
+    ox, _, oz = p["origin"]
+    dx, _, dz = p["destination"]
+    if p["kind"] == "half_turn":
+        return int(2 * ox - bx - 1), int(2 * oz - bz - 1)
+    return int(bx + dx - ox), int(bz + dz - oz)
+
+
+def preload(points, r=48):
+    for (x, z) in points:
+        rc(f"forceload add {int(x) - r} {int(z) - r} {int(x) + r} {int(z) + r}")
+    for (x, z) in points:
+        for dx in (-r, 0, r):
+            for dz in (-r, 0, r):
+                wait_loaded(x + dx, z + dz, 300)
+
+
+def unload(points, r=48):
+    for (x, z) in points:
+        rc(f"forceload remove {int(x) - r} {int(z) - r} {int(x) + r} {int(z) + r}")
+
+
+def seam_walk(p, s, name):
+    """A glass bridge 3 wide across seam p at edge parameter s: 30 blocks inside, and the glued image
+    of 40 blocks outside on the far side; the player sprints along it across the seam."""
+    ix, iz = (int(v) for v in inward(p))
+    ox, _, oz = p["origin"]
+    ax = (int(p["axis_w"][0]), int(p["axis_w"][2]))
+    ex, ez = int(ox + ax[0] * s), int(oz + ax[1] * s)       # a point of the edge (integer)
+    plane = ex if ix else ez                                  # the edge's coordinate
+    lat = ez if ix else ex                                    # the path's lateral coordinate
+    sign = ix + iz                                            # +1: the inside is the + side
+    ins = (plane, plane + 29) if sign > 0 else (plane - 30, plane - 1)
+    outs = (plane - 40, plane - 1) if sign > 0 else (plane, plane + 39)
+
+    def cell(n, l):
+        return (n, l) if ix else (l, n)
+
+    start_n = plane + 24.5 if sign > 0 else plane - 24.5
+    sx, sz = cell(start_n, lat + 0.5)
+    g0 = glue_cell(p, *cell(outs[0], lat - 1))
+    g1 = glue_cell(p, *cell(outs[1], lat + 1))
+    far = ((g0[0] + g1[0]) / 2, (g0[1] + g1[1]) / 2)
+    preload([(sx, sz), far])
+    hs = [probe(*q).get("surfaceY", 80) for q in ((sx, sz), far)]
+    yb = max(hs + [63]) + 4
+    a0, a1 = cell(ins[0], lat - 1), cell(ins[1], lat + 1)
+    rc(f"fill {a0[0]} {yb} {a0[1]} {a1[0]} {yb} {a1[1]} minecraft:glass", show=True)
+    rc(f"fill {g0[0]} {yb} {g0[1]} {g1[0]} {yb} {g1[1]} minecraft:glass", show=True)
+    # Air above both bridges, so terrain never blocks the walk.
+    rc(f"fill {a0[0]} {yb + 1} {a0[1]} {a1[0]} {yb + 3} {a1[1]} minecraft:air")
+    rc(f"fill {g0[0]} {yb + 1} {g0[1]} {g1[0]} {yb + 3} {g1[1]} minecraft:air")
+    yaw = {(0, -1): 180, (0, 1): 0, (1, 0): -90, (-1, 0): 90}[(-ix, -iz)]
+    res = look_and_walk(name, (sx, yb + 1, sz), yaw, 15, 9, portal=p, keys=("Control_L", "w"), settle=45, fly=False)
+    res["bridge_y"] = yb
+    unload([(sx, sz), far])
+    return res
+
+
 def client():
     t = seams()
     by = {p["name"]: p for p in t["portals"]}
-    client_start()
+    rc("difficulty peaceful")
+    rc("gamerule doMobSpawning false")
+    rc("gamerule doInsomnia false")
     rc("time set noon")
     rc("gamerule doDaylightCycle false")
     rc("weather clear")
+    client_start()
     rc(f"op {PLAYER}")
     rc(f"gamemode creative {PLAYER}")
-    walks = []
+    rc(f"effect give {PLAYER} minecraft:night_vision infinite 0 true")
     shot("00-joined")
-    yaw_of = {(0, -1): 180, (0, 1): 0, (1, 0): -90, (-1, 0): 90}  # outward direction -> Minecraft yaw
-    # One crossing per seam, away from the singular points, flying 30 blocks above the ground.
-    plan = [("north", -2000), ("south", 3000), ("east", 1500), ("west", -1200)]
-    for name, s in plan:
-        p = by[name]
-        ix, iz = inward(p)
-        ox, _, oz = p["origin"]
-        ax = (p["axis_w"][0], p["axis_w"][2])
-        ex, ez = ox + ax[0] * s, oz + ax[1] * s
-        sx, sz = ex + ix * 24 + 0.5 * abs(ax[0]), ez + iz * 24 + 0.5 * abs(ax[1])
-        h = probe(sx, sz).get("surfaceY", 80)
-        g = glue_point(p, ex, ez)
-        hg = probe(*g).get("surfaceY", 80)
-        y = max(h, hg, 62) + 30
-        yaw = yaw_of[(int(-ix), int(-iz))]
-        walks.append(look_and_walk(f"walk-{name}", (sx, y, sz), yaw, 25, 9, portal=p))
-    # Over the north pole (the quarter point of the north edge): fly north along x = -B/2.
-    sx, sz = -B / 2 + 0.5, -B / 2 + 24.5
-    y = max(probe(sx, sz).get("surfaceY", 80), probe(-sx, -sz).get("surfaceY", 80), 62) + 30
-    walks.append(look_and_walk("walk-north-pole", (sx, y, sz), 180, 25, 9, portal=by["north"]))
-    # The east-west slide on the equator: fly east along z = 0.
-    sx, sz = B - 24.5, 0.5
-    y = max(probe(sx, sz).get("surfaceY", 80), probe(-B + 8, sz).get("surfaceY", 80), 62) + 30
-    walks.append(look_and_walk("walk-equator-east", (sx, y, sz), -90, 20, 9, portal=by["east"]))
-    report("walks", walks)
-    # Views: across each seam from inside, at a slant, and at the singular point (0, -B/2).
+    walks = []
+    # One crossing per seam, away from the singular points; then over the north pole (the north
+    # edge's quarter point x = -B/2) and along the equator through the east slide.
+    for name, (seam, s) in {"walk-north": ("north", -2000), "walk-south": ("south", 3000),
+                            "walk-east": ("east", 1500), "walk-west": ("west", -1200),
+                            "walk-north-pole": ("north", -B // 2), "walk-equator-east": ("east", 0)}.items():
+        walks.append(seam_walk(by[seam], s, name))
+        report("walks", walks)
+    # Views across seams from inside, and at the singular point (0, -B/2) on the north seam.
     views = {}
-    for name, (x, z, yaw) in {"view-north-seam": (-2000.5, -B / 2 + 60.5, 180), "view-south-seam": (3000.5, B / 2 - 60.5, 0),
-                              "view-east-seam": (B - 60.5, 1500.5, -90), "view-singular-north": (0.5, -B / 2 + 80.5, 180),
-                              "view-north-pole": (-B / 2 + 0.5, -B / 2 + 80.5, 180)}.items():
+    for name, (x, z, yaw) in {"view-north-seam": (-2000.5, -B / 2 + 50.5, 180), "view-south-seam": (-3000.5, B / 2 - 50.5, 0),
+                              "view-east-seam": (B - 50.5, 1500.5, -90), "view-singular-north": (0.5, -B / 2 + 60.5, 180),
+                              "view-north-pole": (-B / 2 + 0.5, -B / 2 + 60.5, 180)}.items():
         h = probe(x, z).get("surfaceY", 80)
-        rc(f"tp {PLAYER} {x} {max(h, 62) + 45} {z} {yaw} 30")
-        time.sleep(15)
+        preload([(x, z)], 64)
+        rc(f"tp {PLAYER} {x} {max(h, 63) + 30} {z} {yaw} 25")
+        time.sleep(45)
         views[name] = shot(name)
+        unload([(x, z)], 64)
     report("views", views)
     # Chunk loading through a seam: with the player at the north seam, is the glued side loaded?
     p = by["north"]
     rc(f"tp {PLAYER} -2000.5 120 {-B / 2 + 8.5} 180 20")
-    time.sleep(20)
+    time.sleep(30)
     g = glue_point(p, -2000, -B / 2 - 8)
     report("chunk_loading", {"player_at": [-2000.5, -B / 2 + 8.5], "glued_side": g,
                              "glued_side_loaded": "passed" in rc(f"execute if loaded {int(g[0])} 64 {int(g[1])}"),
