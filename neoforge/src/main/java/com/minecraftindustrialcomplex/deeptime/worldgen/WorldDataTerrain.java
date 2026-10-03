@@ -22,6 +22,8 @@ public final class WorldDataTerrain implements TerrainSource {
     private volatile SeaCliffGuard.Rules cliffRules;
     private volatile Geothermal geothermal;
     private volatile GeothermalRules geothermalRules;
+    private volatile VolcanicBiomeRules volcanicBiomeRules;
+    private volatile VolcanicZones volcanicZones;
 
     public WorldDataTerrain(WorldDataRef ref) {
         this.ref = ref;
@@ -153,6 +155,45 @@ public final class WorldDataTerrain implements TerrainSource {
             }
         }
         return g;
+    }
+
+    /** The world's setting for the volcanic biomes. */
+    public VolcanicBiomeRules volcanicBiomeRules() {
+        VolcanicBiomeRules r = volcanicBiomeRules;
+        if (r == null) {
+            r = VolcanicBiomeRules.of(data().manifest().notes());
+            volcanicBiomeRules = r;
+        }
+        return r;
+    }
+
+    /**
+     * Where the world's volcanic biomes go (Ben, decisions log 2026-10-03), built on first use from the
+     * active volcanoes, their geothermal sites and their magma (so every biome query sees the same zones).
+     *
+     * @param cell   the generator's noise cell width (the water rule's reach)
+     * @param minY   the level's floor, {@code seaLevel} its sea level
+     */
+    public VolcanicZones volcanicZones(int cell, int minY, int seaLevel) {
+        VolcanicZones z = volcanicZones;
+        if (z == null) {
+            synchronized (this) {
+                if (volcanicZones == null) {
+                    WorldData wd = data();
+                    Magma m = magma(cell, minY, seaLevel);
+                    Geothermal g = geothermal(cell, minY, seaLevel);
+                    volcanicZones = VolcanicZones.build(wd.volcanoes().list(), g.sites(), m.bodies(), volcanicBiomeRules(),
+                            wd.manifest().mPerBlockH(), wd.circumference());
+                    java.util.Map<VolcanicZones.Role, Long> byRole = new java.util.EnumMap<>(VolcanicZones.Role.class);
+                    for (VolcanicZones.Zone zn : volcanicZones.zones())
+                        byRole.merge(zn.role(), 1L, Long::sum);
+                    com.minecraftindustrialcomplex.deeptime.DeepTime.LOGGER.info("[deeptime] volcanic biome zones: {} ({})", byRole,
+                            volcanicBiomeRules());
+                }
+                z = volcanicZones;
+            }
+        }
+        return z;
     }
 
     @Override

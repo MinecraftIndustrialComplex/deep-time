@@ -119,7 +119,7 @@ final class TerraBlenderChecks {
             }
         }
         // The biomes a chunk stores when it is generated (its own climate sampler, built from the registry
-        // settings unless RegionChunkBiomesMixin hands it the level's) are offered by their column's region.
+        // settings unless ChunkBiomesSpawnTargetMixin hands it the level's) are offered by their column's region.
         int chunkSamples = 0, chunkOutside = 0, chunkMod = 0;
         int minY = level.getMinBuildHeight(), maxY = level.getMaxBuildHeight() - 1;
         for (int k = 0; k < 64; k++) {

@@ -38,7 +38,8 @@ import java.util.function.IntPredicate;
  * use, without loading a chunk. Per {@link Check}, the share of a Köppen family's columns whose
  * biome carries one of its NeoForge {@code c:} tags (Terralith and Biomes O' Plenty tag theirs the
  * same way). Used by {@code BiomeGameTests.climateConsistent} and {@code /deeptime probe biomes},
- * which can also write the whole grid for the review page.
+ * which can also write the whole grid for the review page. Its {@code volcanic} section is
+ * {@link VolcanicCensus}'s: the volcanic biomes against the real volcanoes.
  */
 public final class BiomeCensus {
 
@@ -296,6 +297,9 @@ public final class BiomeCensus {
         o.add("by_koppen", top);
         o.addProperty("biomes", palette.size());
         o.addProperty("skipped_untagged", skippedUntagged);
+        // The volcanic biomes against the real volcanoes, now and as the plain climate search placed them
+        // (decisions log 2026-10-03).
+        o.add("volcanic", VolcanicCensus.run(level, step, poleMargin).json());
         if (mapFile != null) {
             JsonObject map = new JsonObject();
             map.addProperty("schema", 1);
