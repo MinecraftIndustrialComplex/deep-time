@@ -53,7 +53,7 @@ class PoleCapCurveTest {
 
     @Test
     void nothingBelowTheCapInBothHemispheres() {
-        for (double lat : new double[]{0, 30, 60, 74.0, 74.5, 74.999}) {
+        for (double lat : new double[]{0, 30, 60, 69.0, 69.5, 69.999}) {
             for (double sign : new double[]{1, -1}) {
                 double z = PoleCapCurve.zOfLatitude(16384, sign * lat);
                 assertEquals(0.0, C16.push(z), "push at " + sign * lat);

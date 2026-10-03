@@ -47,7 +47,7 @@ import java.util.UUID;
 public final class PoleCapGameTests {
 
     /** Latitudes of the players and carts that must feel the cap; the first is below it. */
-    private static final double[] LATITUDES = {74.5, 76.0, 77.5, 79.0};
+    private static final double[] LATITUDES = {69.5, 76.0, 77.5, 79.0};
     private static final int RUN_TICKS = 40;
     /** How long a test may wait for its forced chunks. */
     private static final int LOAD_TICKS = 600;
@@ -155,21 +155,21 @@ public final class PoleCapGameTests {
      * No effect below the cap line (70° by default), then a pushback toward the equator that grows with latitude, in both
      * hemispheres:
      * <ul>
-     *   <li>survival players at 74.5°, 76°, 77.5° and 79° N and S are sent the storm and the wind
-     *       of {@link PoleCapCurve} for their latitude (none at 74.5°), increasing with latitude,
+     *   <li>survival players at 69.5°, 76°, 77.5° and 79° N and S are sent the storm and the wind
+     *       of {@link PoleCapCurve} for their latitude (none at 69.5°), increasing with latitude,
      *       and an action-bar warning inside the band;</li>
      *   <li>a creative player at 77.5° N gets the storm and the warning but no wind; a spectator at
      *       77.5° S the storm only;</li>
-     *   <li>gravity-free minecarts carrying a survival player at 74.5°, 76°, 77.5° and 79° S and
+     *   <li>gravity-free minecarts carrying a survival player at 69.5°, 76°, 77.5° and 79° S and
      *       77.5° N move toward the equator in 40 ticks, further the higher they start (the one at
-     *       74.5° does not move), and their riders get no wind of their own (the server moves the cart).</li>
+     *       69.5° does not move), and their riders get no wind of their own (the server moves the cart).</li>
      * </ul>
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 1200)
     public static void entityPushedBack(GameTestHelper helper) {
         Rig rig = new Rig(helper);
-        rig.force(-74, -79.5, 48);
-        rig.force(74, 79.5, 48);
+        rig.force(-69, -79.5, 48);
+        rig.force(69, 79.5, 48);
         Map<String, MockPlayers.Mock> players = new LinkedHashMap<>();
         Map<String, Minecart> carts = new LinkedHashMap<>();
         Map<String, MockPlayers.Mock> riders = new LinkedHashMap<>();
@@ -203,7 +203,7 @@ public final class PoleCapGameTests {
                 players.put("creative 77.5° N", rig.player(GameType.CREATIVE, dx, 77.5));
                 players.put("spectator 77.5° S", rig.player(GameType.SPECTATOR, dx + 2, -77.5));
                 int cx = 24;
-                for (double lat : new double[]{-74.5, -76.0, -77.5, -79.0, 77.5}) {
+                for (double lat : new double[]{-69.5, -76.0, -77.5, -79.0, 77.5}) {
                     String name = PoleCap.formatLatitude(lat);
                     MockPlayers.Mock[] rider = new MockPlayers.Mock[1];
                     Minecart cart = rig.cart(cx, lat, rider);
@@ -270,14 +270,14 @@ public final class PoleCapGameTests {
             problems.add("spectator at 77.5° S: expected the storm only, got " + ss + " bar=" + specBar);
         // Carts: toward the equator, more the further poleward.
         double lastMove = -1;
-        for (String name : List.of("74.5° S", "76.0° S", "77.5° S", "79.0° S")) {
+        for (String name : List.of("69.5° S", "76.0° S", "77.5° S", "79.0° S")) {
             Minecart cart = carts.get(name);
             double dz = cart.getZ() - cartZ0.get(name);
             PoleStormPayload rs = riders.get(name).last(PoleStormPayload.class);
             d.append(String.format(Locale.ROOT, " cart %s:dz=%s,riderPush=%s", name, f(dz), rs == null ? "-" : f(rs.push())));
-            if (name.startsWith("74.5")) {
+            if (name.startsWith("69.5")) {
                 if (Math.abs(dz) > 1e-3)
-                    problems.add("the cart at 74.5° S moved: dz=" + dz);
+                    problems.add("the cart at 69.5° S moved: dz=" + dz);
                 continue;
             }
             // South is +z: toward the equator is -z.
@@ -411,8 +411,8 @@ public final class PoleCapGameTests {
     }
 
     /**
-     * Sable ships (plan §7.11): hulls at rest at 74.5°, 76.5° and 78.5° S and 77.5° N. After 40
-     * ticks of wind the one at 74.5° has not moved in z, the others have moved toward the equator,
+     * Sable ships (plan §7.11): hulls at rest at 69.5°, 76.5° and 78.5° S and 77.5° N. After 40
+     * ticks of wind the one at 69.5° has not moved in z, the others have moved toward the equator,
      * further the higher they started. A fifth hull at 79.3° N launched poleward at 60 blocks/s
      * reaches the stop line and is held: its poleward edge is never more than one tick of travel
      * past the line, and it ends inside it, moving back toward the equator.
@@ -424,9 +424,9 @@ public final class PoleCapGameTests {
             return;
         }
         Rig rig = new Rig(helper);
-        rig.force(-74, -79, 40);
+        rig.force(-69, -79, 40);
         rig.force(77, 80.5, 40);
-        double[] lats = {-74.5, -76.5, -78.5, 77.5, 79.3};
+        double[] lats = {-69.5, -76.5, -78.5, 77.5, 79.3};
         List<BlockPos> anchors = new ArrayList<>();
         for (int i = 0; i < lats.length; i++)
             anchors.add(rig.spot(8 * i, lats[i]));
@@ -498,7 +498,7 @@ public final class PoleCapGameTests {
                 }
                 if (problems.isEmpty()) {
                     if (Math.abs(dz[0]) > 0.5)
-                        problems.add("the hull at 74.5° S moved in z: " + dz[0]);
+                        problems.add("the hull at 69.5° S moved in z: " + dz[0]);
                     if (!(dz[1] < -0.5 && dz[2] < dz[1] - 0.5))
                         problems.add("the hulls at 76.5° and 78.5° S were not pushed toward the equator (-z), more at 78.5°: "
                                 + dz[1] + ", " + dz[2]);
