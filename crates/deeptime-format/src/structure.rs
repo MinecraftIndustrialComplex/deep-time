@@ -228,8 +228,11 @@ impl StructIndex {
     /// Indexes `st` on a planet `circumference` blocks around.
     pub fn new(st: &Structure, circumference: u32) -> StructIndex {
         let c = f64::from(circumference);
-        let w = ((c / BUCKET).ceil() as usize).max(1);
-        let h = ((c / 2.0 / BUCKET).ceil() as usize).max(1);
+        // The buckets' frame is the projection's index frame.
+        let p = crate::Projection::new(circumference);
+        let ((ox, oz), (span_x, span_z)) = (p.index_origin(), p.index_span());
+        let w = ((span_x / BUCKET).ceil() as usize).max(1);
+        let h = ((span_z / BUCKET).ceil() as usize).max(1);
         let radius: Vec<f64> = st
             .events
             .iter()
@@ -238,10 +241,10 @@ impl StructIndex {
         let mut buckets = vec![Vec::new(); w * h];
         for (n, e) in st.events.iter().enumerate() {
             let r = radius[n];
-            let j0 = ((e.window.centre[1] - r + c / 4.0) / BUCKET).floor() as i64;
-            let j1 = ((e.window.centre[1] + r + c / 4.0) / BUCKET).floor() as i64;
-            let i0 = ((e.window.centre[0] - r + c / 2.0) / BUCKET).floor() as i64;
-            let i1 = ((e.window.centre[0] + r + c / 2.0) / BUCKET).floor() as i64;
+            let j0 = ((e.window.centre[1] - r - oz) / BUCKET).floor() as i64;
+            let j1 = ((e.window.centre[1] + r - oz) / BUCKET).floor() as i64;
+            let i0 = ((e.window.centre[0] - r - ox) / BUCKET).floor() as i64;
+            let i1 = ((e.window.centre[0] + r - ox) / BUCKET).floor() as i64;
             let across = (i1 - i0 + 1).min(w as i64);
             for j in j0.max(0)..=j1.min(h as i64 - 1) {
                 for di in 0..across {
@@ -270,8 +273,9 @@ impl StructIndex {
         if self.radius.is_empty() {
             return;
         }
-        let i = (((x + self.c / 2.0) / BUCKET).floor() as i64).rem_euclid(self.w as i64) as usize;
-        let j = (((z + self.c / 4.0) / BUCKET).floor() as i64).clamp(0, self.h as i64 - 1) as usize;
+        let (ox, oz) = crate::Projection::of(self.c).index_origin();
+        let i = (((x - ox) / BUCKET).floor() as i64).rem_euclid(self.w as i64) as usize;
+        let j = (((z - oz) / BUCKET).floor() as i64).clamp(0, self.h as i64 - 1) as usize;
         for &n in &self.buckets[j * self.w + i] {
             let e = &st.events[n as usize];
             let mut dx = x - e.window.centre[0];

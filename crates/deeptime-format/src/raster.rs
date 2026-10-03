@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::{FormatError, Result};
+use crate::projection::Projection;
 use crate::strata::{ColumnHorizon, StoredHorizon};
 
 /// Horizon `k` of one `horizon_stack` cell's bytes (K = `depth`, 7K bytes).
@@ -76,8 +77,9 @@ pub enum Codec {
     Lz4Block,
 }
 
-/// An equirectangular raster in block space (plan §5.2). Cell (i, j) is the **point sample** at
-/// block (origin_block_x + i·r, origin_block_z + j·r): cell 0 sits on the seam x = −C/2 and on the
+/// A raster in block space (plan §5.2), laid out by the planet's projection
+/// ([`crate::projection`]: equirectangular). Cell (i, j) is the **point sample** at block
+/// (origin_block_x + i·r, origin_block_z + j·r): cell 0 sits on the seam x = −C/2 and on the
 /// north edge z = −C/4. Indices wrap in x (mod W) and clamp in z to [0, H−1].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GridDesc {
@@ -108,15 +110,86 @@ impl GridDesc {
             )));
         }
         let w = c / r;
+        let p = Projection::new(c);
         Ok(GridDesc {
             name: name.to_owned(),
             w,
-            h: w / 2,
+            h: p.grid_rows(w),
             r,
             wraps_x: true,
             origin_block_x: -i64::from(c / 2),
-            origin_block_z: -i64::from(c / 4),
+            origin_block_z: p.grid_origin_z(),
         })
+    }
+
+    /// The planet's projection.
+    pub fn projection(&self) -> Projection {
+        Projection::of(self.circumference() as f64)
+    }
+
+    /// The (fractional) row of block z: (z − origin_block_z) / r.
+    pub fn row_of_z(&self, z: f64) -> f64 {
+        (z - self.origin_block_z as f64) / f64::from(self.r)
+    }
+
+    /// Block z of the (fractional) row `v`.
+    pub fn z_of_row(&self, v: f64) -> f64 {
+        self.origin_block_z as f64 + v * f64::from(self.r)
+    }
+
+    /// Latitude of row `j`, degrees (north positive).
+    pub fn lat_of_row(&self, j: u32) -> f64 {
+        self.projection().lat_deg(self.block_z(i64::from(j)) as f64)
+    }
+
+    /// True area of one cell of row `j`, km², on a planet `m_per_block` metres per block: the
+    /// r × r block square times the projection's area scale at the row's point sample.
+    pub fn cell_area_km2(&self, j: u32, m_per_block: f64) -> f64 {
+        let side_km = f64::from(self.r) * m_per_block / 1000.0;
+        side_km
+            * side_km
+            * self
+                .projection()
+                .area_scale(self.block_z(i64::from(j)) as f64)
+    }
+
+    /// The area weight of the band from row `j` to row `j + 1` (rows from the north pole), at its
+    /// middle: the weight true-area shares and means of whole rows use.
+    pub fn band_weight(&self, j: u32) -> f64 {
+        Projection::band_weight(j, self.h)
+    }
+
+    /// The latitude, degrees, in the middle of the band from row `j` to row `j + 1`.
+    pub fn band_lat_deg(&self, j: u32) -> f64 {
+        Projection::band_lat_deg(j, self.h)
+    }
+
+    /// [`GridDesc::band_weight`] of every row.
+    pub fn row_weights(&self) -> Vec<f64> {
+        (0..self.h).map(|j| self.band_weight(j)).collect()
+    }
+
+    /// True size of a cell of row `j` on the planet, metres: (east–west, north–south).
+    pub fn true_cell_m(&self, j: u32, m_per_block: f64) -> (f64, f64) {
+        let side = f64::from(self.r) * m_per_block;
+        let p = self.projection();
+        let z = self.block_z(i64::from(j)) as f64;
+        (side * p.scale_ew(z), side * p.scale_ns(z))
+    }
+
+    /// The (fractional) row under row coordinate `y` of a map picture `h` rows high (the picture
+    /// spans the grid pole to pole).
+    pub fn picture_row(&self, y: f64, h: u32) -> f64 {
+        y * f64::from(self.h) / f64::from(h)
+    }
+
+    /// The cell nearest pixel (px, py) of a `w × h` map picture of the planet (keyframe pixel
+    /// centres), not yet wrapped or clamped.
+    pub fn picture_cell(&self, px: f64, py: f64, w: u32, h: u32) -> (i64, i64) {
+        (
+            (px * f64::from(self.w) / f64::from(w)).round() as i64,
+            self.picture_row(py, h).round() as i64,
+        )
     }
 
     /// The circumference C = W·r in blocks.
@@ -136,12 +209,12 @@ impl GridDesc {
 
     /// Wraps a column index into [0, W).
     pub fn wrap_i(&self, i: i64) -> u32 {
-        i.rem_euclid(i64::from(self.w)) as u32
+        crate::projection::wrap_col(i, i64::from(self.w)) as u32
     }
 
     /// Clamps a row index into [0, H − 1].
     pub fn clamp_j(&self, j: i64) -> u32 {
-        j.clamp(0, i64::from(self.h) - 1) as u32
+        crate::projection::clamp_row(j, i64::from(self.h)) as u32
     }
 
     /// Cells in the raster.

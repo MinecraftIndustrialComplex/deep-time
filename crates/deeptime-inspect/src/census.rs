@@ -82,16 +82,18 @@ pub fn run(
     let step = step.max(1);
     let mut t = Tally::default();
     let (mut land, mut sampled) = (0u64, 0u64);
+    // Pole to pole (the projection's z of the poles).
+    let zp = deeptime_format::Projection::of(c as f64).pole_z() as i64;
     let (cols, rows) = (
         ((c / step) as usize).max(1),
-        (((c / 2) / step) as usize).max(1),
+        (((2 * zp) / step) as usize).max(1),
     );
     // Per lattice cell: None = not dry land, else (stone class at the top block, within DIG_BLOCKS).
     let mut cells: Vec<Option<(bool, bool)>> = vec![None; cols * rows];
     let is_stone =
         |class: &Option<String>| class.as_ref().is_some_and(|c| stone_classes.contains(c));
-    let mut z = -c / 4 + step / 2;
-    while z < c / 4 {
+    let mut z = -zp + step / 2;
+    while z < zp {
         let mut x = -c / 2 + step / 2;
         while x < c / 2 {
             sampled += 1;
@@ -99,7 +101,7 @@ pub fn run(
             // Dry land: the terrain above the sea and no lake, river or sea over it.
             if col.top_y > sea && col.hydro.kind.name() == "none" {
                 land += 1;
-                let (i, j) = (((x + c / 2) / step) as usize, ((z + c / 4) / step) as usize);
+                let (i, j) = (((x + c / 2) / step) as usize, ((z + zp) / step) as usize);
                 if i < cols && j < rows {
                     let top = col.rock.first().is_some_and(|r| is_stone(&r.2));
                     let dig = col.rock.iter().any(|(hi, lo, class)| {
@@ -110,7 +112,7 @@ pub fn run(
                 t.add(&col.rock, col.top_y, top_n);
                 // Every 4,000th dry-land column away from the poles, for review boxes that are
                 // not picked by class (the per-class examples are biased towards rare rock).
-                if land % 4000 == 1 && z.abs() < c / 4 * 4 / 5 {
+                if land % 4000 == 1 && z.abs() < zp * 4 / 5 {
                     t.examples.entry("*land*".into()).or_default().push((x, z));
                 }
                 if let Some((_, _, class)) = col.rock.first() {

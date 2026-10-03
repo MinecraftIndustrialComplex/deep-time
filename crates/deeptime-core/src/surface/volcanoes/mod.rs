@@ -364,9 +364,8 @@ fn landmasses(grid: &GridDesc, crust: &[f32], min_km2: f64, cell_m: f64) -> Vec<
         while let Some(c) = stack.pop() {
             members.push(c);
             let (i, j) = (c % w, c / w);
-            // Cells shrink towards the poles (the grid is equirectangular).
-            let lat = std::f64::consts::PI * (0.5 - (j as f64 + 0.5) / h as f64);
-            area += cell_m * cell_m * lat.cos() / 1.0e6;
+            // The true area of the cell (the projection's area weight of its row).
+            area += cell_m * cell_m * grid.band_weight(j as u32) / 1.0e6;
             let mut nb = [usize::MAX; 4];
             nb[0] = j * w + (i + 1) % w;
             nb[1] = j * w + (i + w - 1) % w;

@@ -233,7 +233,7 @@ fn climate_at<'w>(
                 at(cold),
             ),
             _ => {
-                let lat = -360.0 * z / circumference;
+                let lat = deeptime_format::Projection::of(circumference).lat_deg(z);
                 Climate::of(
                     zonal_precip(lat),
                     zonal_temperature(lat),
@@ -245,23 +245,18 @@ fn climate_at<'w>(
     }
 }
 
-/// The share of the cells under each pixel of a `(w, h)` picture that `wet` marks, for a raster of
-/// `gw × gh` cells (the mean over the cells a pixel covers when the grid is finer, the nearest
-/// cell when it is not).
-fn lake_cover(
-    gw: usize,
-    gh: usize,
-    wet: &dyn Fn(usize) -> bool,
-    (w, h): (usize, usize),
-) -> Vec<f32> {
+/// The share of the cells under each pixel of a `(w, h)` map picture that `wet` marks, for a
+/// raster on `grid` (the mean over the cells a pixel covers when the grid is finer, the nearest
+/// cell when it is not; pixel ↔ cell by `GridDesc::picture_cell`).
+fn lake_cover(grid: &GridDesc, wet: &dyn Fn(usize) -> bool, (w, h): (usize, usize)) -> Vec<f32> {
+    let (gw, gh) = (grid.w as usize, grid.h as usize);
     let (rx, ry) = ((gw / w).max(1), (gh / h).max(1));
     let norm = 1.0 / (rx * ry) as f32;
     let mut out = vec![0.0f32; w * h];
     for py in 0..h {
-        let cj = (py as f64 * gh as f64 / h as f64).round() as i64;
-        let j0 = cj - (ry / 2) as i64;
         for px in 0..w {
-            let ci = (px as f64 * gw as f64 / w as f64).round() as i64;
+            let (ci, cj) = grid.picture_cell(px as f64, py as f64, w as u32, h as u32);
+            let j0 = cj - (ry / 2) as i64;
             let i0 = ci - (rx / 2) as i64;
             let mut n = 0u32;
             for dj in 0..ry as i64 {
@@ -332,11 +327,12 @@ impl WaterView {
         if c <= 0.0 {
             return;
         }
-        let (fw, fh) = (self.w as f64, self.h as f64);
+        let (fw, ph) = (self.w as f64, self.h as u32);
+        let proj = deeptime_format::Projection::of(c);
         let px = |x: f32, z: f32| -> (f32, f32) {
             (
                 ((f64::from(x) + c / 2.0) * fw / c) as f32,
-                ((f64::from(z) + c / 4.0) * fh / (c / 2.0)) as f32,
+                proj.picture_y(f64::from(z), ph) as f32,
             )
         };
         let q_min = view.hydro.river_min_discharge_m3s.max(1e-3) as f32;
@@ -567,15 +563,14 @@ fn derive_with_rivers(
     });
     // Lake cells a block deep or more: a shallower one is dry ground in the game (and, on a cell
     // of 4.8 km, a margin of the flat a lake fills, which draws as streaks).
-    let (gw, gh) = (grid.w as usize, grid.h as usize);
     let deep = |c: usize| {
         let level = net.water_level[c];
         level != NODATA && i32::from(level) - i32::from(elev[c]) >= 16
     };
     let size_px = (out.w, out.h);
-    out.lake = lake_cover(gw, gh, &|c| net.kind[c] == kind::LAKE && deep(c), size_px);
-    out.frozen = lake_cover(gw, gh, &|c| net.kind[c] == kind::FROZEN && deep(c), size_px);
-    out.playa = lake_cover(gw, gh, &|c| net.kind[c] == kind::PLAYA, size_px);
+    out.lake = lake_cover(&grid, &|c| net.kind[c] == kind::LAKE && deep(c), size_px);
+    out.frozen = lake_cover(&grid, &|c| net.kind[c] == kind::FROZEN && deep(c), size_px);
+    out.playa = lake_cover(&grid, &|c| net.kind[c] == kind::PLAYA, size_px);
     let look = Look::default();
     out.draw_rivers(&net.rivers, view, &look);
     out.finish(&net.rivers, Source::Derived, started);
@@ -605,15 +600,15 @@ pub fn from_bake(
         let (grid, levels) = load_i16(&dir.join(path))?;
         // Frozen where the cell's mean annual temperature says so, as the hydrology marks it.
         let climate = climate_at(world, grid.circumference() as f64);
-        let (gw, gh) = (grid.w as usize, grid.h as usize);
+        let gw = grid.w as usize;
         let (ox, oz, r) = (grid.origin_block_x, grid.origin_block_z, i64::from(grid.r));
         let frozen = |c: usize| {
             let cl = climate(ox + (c % gw) as i64 * r, oz + (c / gw) as i64 * r);
             view.hydro.frozen(cl.t_mean_c)
         };
         let size_px = (out.w, out.h);
-        out.lake = lake_cover(gw, gh, &|c| levels[c] != NODATA && !frozen(c), size_px);
-        out.frozen = lake_cover(gw, gh, &|c| levels[c] != NODATA && frozen(c), size_px);
+        out.lake = lake_cover(&grid, &|c| levels[c] != NODATA && !frozen(c), size_px);
+        out.frozen = lake_cover(&grid, &|c| levels[c] != NODATA && frozen(c), size_px);
         // The bake stores no playas (they hold no water): the frame's own.
         if let Some(derived) = derive(world, view, size) {
             out.playa = derived.playa;

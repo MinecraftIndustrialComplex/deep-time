@@ -598,7 +598,8 @@ fn rule_columns(hz: &bake_horizons::Horizons, seed: u64, n: usize) -> realism::C
     let mut census = realism::Census::default();
     for _ in 0..n {
         let x = rng.below(c as u64) as i64 - c / 2;
-        let z = rng.below((c / 2) as u64) as i64 - c / 4;
+        let zp = deeptime_format::Projection::of(c as f64).pole_z() as i64;
+        let z = rng.below(2 * zp as u64) as i64 - zp;
         layer.stack_at(x, z, hz.min_y, &mut stack);
         raw.clear();
         raw.extend(stack.iter().map(|&(top, class, _)| (top, class)));

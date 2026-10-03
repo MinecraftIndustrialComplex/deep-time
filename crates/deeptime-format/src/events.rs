@@ -991,12 +991,10 @@ impl EventLog {
     }
 }
 
-/// The grid cell (nearest point sample) at a latitude and longitude (plan §5.2: longitude
-/// 360°·(x + C/2)/C, so the seam is 0°), x wrapped, z clamped.
+/// The grid cell (nearest point sample) at a latitude and longitude (the planet's projection,
+/// [`crate::projection`]: the seam is longitude 0°), x wrapped, z clamped.
 pub fn cell_of(grid: &GridDesc, lat: f32, lon: f32) -> (u32, u32) {
-    let c = grid.circumference() as f64;
-    let x = f64::from(lon) / 360.0 * c - c / 2.0;
-    let z = -f64::from(lat) / 90.0 * c / 4.0;
+    let (x, z) = grid.projection().block_of(f64::from(lat), f64::from(lon));
     let r = f64::from(grid.r);
     let i = ((x - grid.origin_block_x as f64) / r).round() as i64;
     let j = ((z - grid.origin_block_z as f64) / r).round() as i64;

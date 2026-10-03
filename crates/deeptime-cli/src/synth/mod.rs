@@ -148,8 +148,9 @@ fn dump_samples(manifest: &Manifest, layers: &[LoadedLayer], strata: &LoadedLaye
                 // Thousandths of a block, a few cells past the seam and the poles.
                 let bx = (-c / 2 - 3 * r) as f64
                     + rng.below(((c + 6 * r) * 1000) as u64) as f64 / 1000.0;
-                let bz = (-c / 4 - 3 * r) as f64
-                    + rng.below(((c / 2 + 6 * r) * 1000) as u64) as f64 / 1000.0;
+                let zp = d.grid.projection().pole_z() as i64;
+                let bz = (-zp - 3 * r) as f64
+                    + rng.below(((2 * zp + 6 * r) * 1000) as u64) as f64 / 1000.0;
                 pts.push(json!([bx, bz, l.bilinear(bx, bz)]));
             }
             bilinear.insert(name.into(), Value::Array(pts));

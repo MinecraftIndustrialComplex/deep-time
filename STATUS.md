@@ -143,6 +143,68 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Not readable:** Stommel 1948, Lindzen & Nigam 1987, Serreze et al. 1992, North, Mengel & Short 1983, Zhuang et al. 2017's paper, Murray 1967, Large & Pond 1981.
 - **Next:** Ben answers the two WP-14a questions above; P1-26's T2 builds the corrected D form and T9 starts from the corrected rain and evaporation values.
 
+### 2026-10-02 — The projection-neutral refactor: one projection module per language, equirectangular kept, output bit-identical (agent worktree agent-a3186d42ee9449d3d, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Ask.** The coordinator, after Ben reopened the projection choice (Lambert, or a square tiling map; research note
+  `docs/research/notes/world-projection-options.md`): build step 1 of `docs/design/equal-area-projection.md` §8 now, so
+  that whichever projection Ben picks is a module change plus its family's work. Equirectangular stays the only
+  projection; nothing may change in any output; world-data format unchanged (0.3).
+- **Built.**
+  - Rust `deeptime_format::projection::Projection`: `lat_deg`, `lon_deg`, `z_of_lat`, `x_of_lon`, `block_of`,
+    `lat_lon`, `unit`, `cos_lat`, `scale_ew`/`scale_ns` (the metric), `great_circle_blocks`, `pole_z`,
+    `grid_origin_z`/`grid_rows` (the grids' extent), `picture_z`/`picture_y`/`picture_lat_deg`/`picture_y_of_lat`/
+    `picture_height` (map pictures). `GridDesc` gained `projection`, `row_of_z`, `z_of_row`, `lat_of_row`,
+    `cell_area_km2`, `band_weight`/`band_lat_deg`/`row_weights` (area weights of row bands), `true_cell_m`,
+    `picture_row`/`picture_cell`; `for_planet` takes its extent from the projection. Core's `BlockFrame` wraps it;
+    `deposits::fields::{lat_of_row, cell_area_km2}`, `deposits::sites::{block_of, lat_lon_of}` and
+    `WorldState::block_of` delegate. About 50 Rust sites (core, CLI, inspect, viewer) call it instead of `c / 4`,
+    `90 − 180·j/h` or `−360·z/C`: provinces' coherence and the meta shares now take row weights, `lake_cover` takes
+    the grid, the climate's geometry takes `true_cell_m`.
+  - Java `worlddata/Projection` (the twin): `PoleCapCurve`, `DeepTimeClimate.latitudeDeg` (now clamped to ±90° past the
+    poles, as Rust's always was), `BeyondPoleDensity`, the crater-lake line, both probes, both censuses,
+    `GlobeProjection`, `MapWidget`, `ReviewModel` and the GameTests that place things by the pole call it.
+  - The pages: `crates/deeptime-viewer/assets/projection.js` (`window.DTProj`, loaded first by the workbench and the
+    viewer bundle, served at `/projection.js`); `workbench.js`, `worldmap.js`, `sections.js`, `deposits.js` and
+    `viewer.js` convert through it. `tools/workbench/preview.py` has `pole_z`.
+  - **Second pass (a fresh agent took the branch over, same day).** The module now also holds: the neighbour rule
+    (`projection::wrap_col`, `clamp_row`, `neighbour`; `GridDesc::wrap_i`/`clamp_j`, the surface kernels'
+    `Dims::neighbour` and Java's `GridDesc.wrapI`/`clampJ` call it); the extent (`extent`, `on_planet`,
+    `inside_poles`, `clamp_z`); the metric (`metric`, `area_scale`, `north`; `GridDesc::cell_area_km2` takes
+    `area_scale`, the band weights and latitudes moved from `GridDesc` into the module); the spatial indexes' frame
+    (`index_origin`, `index_span` and their whole-block forms: the river tiles, the structure buckets, the site
+    index and the playability regions take their origin and span from it, in Rust and in Java's `Rivers`,
+    `Structure`, `SiteData`; the first pass had left them at a hand-written −C/4, which a square map would not
+    fit); picture longitudes (`picture_lon_deg`, `picture_x_of_lon`, Java `pictureLongitudeDeg`/
+    `pictureXOfLongitude`, JS `xOfLonPic`/`lonOfPicX`/`wrapLon`: the dummy stage, `amplify_view`, the workbench's
+    inspect readout, `MapWidget`, `GlobeProjection`, `ReviewModel` and nine page sites).
+  - **Not routed yet** (listed in the design note §8 step 1): the kernels that wrap x or stop at the rows inline
+    (about 35 Rust files: blurs, flexure's FFT/DCT, the orographic FFT, advection, the amplifier's windows, the
+    regional windows, the ice distance transform, the outlet rows), which is the fold design pass of §5.3 and not a
+    call-site change; the x seam written `c / 2`; the climate's rows-are-parallels marches; the synthetic test
+    terrain's analytic latitude (its own formula, twinned in Java) and the Earth DEM reader; the presets'
+    `keyframes.size`; the workbench globe's texture loop and `ProvinceHints` (a latitude/longitude lattice); the
+    review scripts `grid_audit.py`, `glacial_views.py`, `p2-01-report.py`.
+  - Parity: `deeptime parity` writes a `projection` block (each picked column's latitude, longitude and area scale,
+    the z of every 5° of latitude, the extent, the index frame); JUnit `ColumnParityTest.theProjectionIsRusts`
+    checks Java against it (1e-9; the frame exactly).
+- **Identity, measured.** `tools/review/projection-identity.sh <binary> <dir>` runs a build over the JUnit fixtures'
+  worlds (wrap-test and lake-test synth at C 1,024 with sample dumps and lake parity, the real test planet
+  planet_world_4k: run, bake, viewer bundle with keyframes, column and climate parity fixtures, a satellite picture of
+  its last checkpoint; the deposit world and its dump) and hashes every output file (JSON without the run's clock,
+  timings and memory peaks; the viewer's own code files left out; the parity block above left out). Master 429b6531's
+  binary against this branch's: **355 of 355 files identical**; master run twice: identical (the check is
+  deterministic). After the second pass and the merge of master b828ab36 (deposit richness): master's binary (built
+  from `git archive master`) against the branch head 19e54623's, **355 of 355 identical** again. Folder
+  `/Volumes/Graphide/ban/deeptime-runs/projection-refactor/` on the VM (scripts `gates3.sh`, `gt-gates2.sh`).
+- **Gates** (VM, head 19e54623): `cargo fmt --check`, `clippy --workspace --all-targets -D warnings`,
+  `cargo deny check licenses bans` clean; `cargo test --workspace` 740 passed, 0 failed, 3 ignored (two new module
+  tests: the neighbour rule; extent, metric, index frame and bands agree); `./gradlew build test` tests=230
+  failures=0 skipped=1 (`ColumnParityTest.theProjectionIsRusts` with the extent, frame and area-scale checks).
+  GameTests: GT_RESULTS.
+- **Docs.** FORMAT.md "Grids" names the module; `docs/science/world-scale-and-bake.md` and ledger SCL-049 point at it;
+  the design note marks §8 step 1 built.
+- **Next.** Ben's pick (Lambert, or a square/torus map, the research note): the family-specific work of the design note
+  §8 steps 2–3. For Lambert, branch `projection-lambert-wip` (6529b910) holds a first build of the module's bodies to
+  port onto this interface.
 ### 2026-10-02 — The vertical-scale study (agent worktree agent-afbde2c1feb92691f, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; a study, no defaults changed; not merged)
 - **Asked:** Ben finds the worlds "cartoonishly stretched" at 20 m per block up and 300 m across (15×). Data and pictures to choose a vertical scale. Written to `docs/research/notes/vertical-scale-study.md` (index row in `docs/research/README.md`); pictures in `review/out/vertical-scale/` (planet B, with the references) and `review/out/vertical-scale/a/` (planet A), not committed.
 - **Tools (committed):** `deeptime-inspect heights` (any generated world's terrain and water tops as a NumPy array); `tools/review/vertical-scale.sh` and `vertical_scale.py` (`join`, `refjoin`, `stats`, `compare`, `places`, `strata`, `render`, `charts`, `page`).

@@ -570,11 +570,16 @@ impl ClimateStage {
                     cell_area_km2(&grid, j as u32, self.preset.scale.m_per_block_h) / (es * es)
                 })
                 .collect(),
-            sx: lat
-                .iter()
-                .map(|l| dx * l.to_radians().cos().max(0.0) / es)
+            sx: (0..hgt)
+                .map(|j| {
+                    grid.true_cell_m(j as u32, self.preset.scale.m_per_block_h)
+                        .0
+                        / es
+                })
                 .collect(),
-            sy: dx / es,
+            // The rows are evenly spaced on the sphere (equirectangular); a projection whose rows
+            // are not makes this a per-row vector (docs/design/equal-area-projection.md §4).
+            sy: grid.true_cell_m(0, self.preset.scale.m_per_block_h).1 / es,
             band: lat.iter().map(|&l| snapshot::band_of(l, bands)).collect(),
             bands,
         };
