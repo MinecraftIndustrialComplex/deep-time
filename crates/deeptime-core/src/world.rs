@@ -215,7 +215,8 @@ mod tests {
         assert_eq!(w.block_of(0.0, 180.0), (0, 0));
         assert_eq!(w.block_of(0.0, 0.0), (-2048, 0), "the seam");
         assert_eq!(w.block_of(0.0, 360.0), (-2048, 0));
-        assert_eq!(w.block_of(90.0, 90.0), (-1024, -1024));
+        // The north pole is z = −R, R = C/2π = 651.9 (the Lambert projection).
+        assert_eq!(w.block_of(90.0, 90.0), (-1024, -652));
         assert_eq!(w.next_site_id(), 0);
     }
 }

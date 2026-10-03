@@ -888,12 +888,13 @@ mod tests {
         );
         assert_eq!(n, 4);
         let h = Horizons {
+            // 2 × 2 cells: the rows run from z = −32, past the Lambert pole at 10.2.
             grid: GridDesc::for_planet("L1", 64, 32).unwrap(),
             k: k as u32,
             min_y: -352,
-            tops: tops.repeat(2),
-            classes: classes.repeat(2),
-            keys: keys.repeat(2),
+            tops: tops.repeat(4),
+            classes: classes.repeat(4),
+            keys: keys.repeat(4),
             tongues: (64, 0.15),
             min_blocks: Vec::new(),
         };
@@ -931,12 +932,13 @@ mod tests {
         );
         assert!((1..=k).contains(&n), "{n}");
         let h = Horizons {
+            // 2 × 2 cells: the rows run from z = −32, past the Lambert pole at 10.2.
             grid: GridDesc::for_planet("L1", 64, 32).unwrap(),
             k: k as u32,
             min_y: -352,
-            tops: tops.repeat(2),
-            classes: classes.repeat(2),
-            keys: keys.repeat(2),
+            tops: tops.repeat(4),
+            classes: classes.repeat(4),
+            keys: keys.repeat(4),
             tongues: (64, 0.15),
             min_blocks: Vec::new(),
         };
@@ -1002,12 +1004,13 @@ mod tests {
         assert_eq!(keys[0], schist, "the soil's keys are a hiatus");
         assert_eq!(classes[1], index("gabbro") as u8);
         let h = Horizons {
+            // 2 × 2 cells: the rows run from z = −32, past the Lambert pole at 10.2.
             grid: GridDesc::for_planet("L1", 64, 32).unwrap(),
             k: k as u32,
             min_y: -352,
-            tops: tops.repeat(2),
-            classes: classes.repeat(2),
-            keys: keys.repeat(2),
+            tops: tops.repeat(4),
+            classes: classes.repeat(4),
+            keys: keys.repeat(4),
             tongues: (64, 0.15),
             min_blocks: Vec::new(),
         };

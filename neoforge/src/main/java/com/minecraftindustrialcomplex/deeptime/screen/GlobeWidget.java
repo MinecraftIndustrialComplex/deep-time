@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.function.Supplier;
 
 /**
- * The globe view (plan §7.12 "map/globe toggle"): the current equirectangular frame projected
+ * The globe view (plan §7.12 "map/globe toggle"): the current map frame (Lambert equal-area) projected
  * orthographically on the CPU ({@link GlobeProjection}) into a square texture, re-rendered when the
  * frame or the rotation changes. It turns slowly on its own; dragging turns and tilts it.
  */

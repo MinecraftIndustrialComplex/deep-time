@@ -34,7 +34,7 @@ class GeothermalCensusTest {
         Magma.Heights h = (x, z) -> wd.height(Math.floorMod(x + c / 2, c) - c / 2, z);
         LavaRules lava = LavaRules.of(wd.manifest().notes());
         Magma magma = Magma.build(wd.volcanoes().list(), MagmaRules.of(wd.manifest().notes()), h, wet, c, sea, lava.floodY(minY, sea),
-                wd.manifest().mPerBlockH(), wd.manifest().mPerBlockV(), (int) (c / 4.0 * 75.0 / 90.0));
+                wd.manifest().mPerBlockH(), wd.manifest().mPerBlockV(), (int) Math.abs(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(c, com.minecraftindustrialcomplex.deeptime.wrap.PoleCapCurve.DEFAULT_CAP_DEG)));
         GeothermalEnv env = new GeothermalEnv(wd);
         System.out.println("CENSUS world C=" + c + " volcanoes=" + wd.volcanoes().list().size() + " rules=" + rules);
         for (double heatDensity : new double[]{0.0, rules.heatDensity()}) {
@@ -58,7 +58,8 @@ class GeothermalCensusTest {
         long land = 0, withData = 0;
         long[] over = new long[6];
         double[] bars = {70, 80, 90, 100, 120, 150};
-        for (int z = -c / 4 + step / 2; z < c / 4; z += step)
+        int pole = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);
+        for (int z = -pole + step / 2; z < pole; z += step)
             for (int x = -c / 2 + step / 2; x < c / 2; x += step) {
                 if (Magma.top(h.at(x, z)) < sea + 5 || wet.at(x, z))
                     continue;

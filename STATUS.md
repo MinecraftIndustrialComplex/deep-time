@@ -121,6 +121,114 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-02 | science WP-14a | **CO₂ forcing above 50,000 ppm and the snowball's escape** (CLM-070, CLM-166; design §4.2). The clock's forcing is Byrne & Goldblatt 2014's fit, stated for 200–10,000 ppm and computed to 50,000 ppm; the code uses it to 10⁶ ppm, and today's snowball escapes near 5.5·10⁵ ppm where Hoffman et al. 2017 expect 10⁴–10⁵ ppm (with cloud forcing of ≥ 10 W/m² that cloud-free models lack). (1, recommended) a short research task finds a published forcing calculation for 0.05–1 bar of CO₂ and the snowball cloud forcing; T6 then applies both, and the escape is measured against 10⁴–10⁵ ppm; (2) cap now: above 50,000 ppm continue the fit as a logarithm with its slope there (no source; escape CO₂ moves, direction to be measured); (3) leave it (escape stays near 0.55 bar). | to be asked by the coordinator (sub-agent report) |
 
 ## Build log
+### 2026-10-03 — The Lambert equal-area world: the projection module's bodies are Lambert's, format 0.4 (agent worktree agent-a3186d42ee9449d3d, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; phase 2 of the projection task, on top of the refactor below; not merged)
+- **Ask.** Ben, decisions log 2026-10-02: "Lambert for now" (Lambert cylindrical equal-area, true on the
+  equator, wrapping east–west with Toroidal World, pole cap kept). The coordinator: phase 2 of the projection
+  task, after the projection-neutral refactor (the entry below), reusing what fits of the parked
+  `projection-lambert-wip`; the true-metric corrections of `docs/design/equal-area-projection.md` §4.
+- **Built.** `deeptime_format::projection` is Lambert: R = C/2π, φ = asin(−z/R), poles at z = ∓R (2,607.6 at
+  16k); metric cos φ east–west, 1/cos φ north–south, area scale 1. Grids run from −Zo, Zo the smallest multiple
+  of the planet's quantum (64 blocks) at or past the pole, the same for every grid of a planet (the WIP's
+  lcm(quantum, r) gave a coarse r = 128 a different Zo and the ladder stopped nesting; H = ⌈2·Zo/r⌉): L1 1024 ×
+  328, L2 2048 × 656, L3 8192 × 2624 at 16k (L1 of 32k quick 1024 × 328). `GridDesc` gained `area_share`,
+  `thinned`; cell areas, row weights, `true_cell_m` (north–south the arc of the row's band) and the band
+  weights come from it. Map pictures are π : 1 (`picture_height`; keyframes 1024 × 326 in every preset and the
+  default), rows uniform in sin φ. World-data format 0.4 (Cargo.toml, `FORMAT_MINOR`, Java `FormatVersion`).
+  Java `worlddata/Projection` and the pages' `projection.js` are the twins (quantum, Zo, picture rows, the
+  metric); the Java analytic test terrain and the Rust synthetic one use asin(z·2π/C).
+- **True metric (design note §4).** The climate's geometry takes a per-row cell height and the ice distance
+  transform's column pass runs at the rows' cumulative true positions (`dt_1d_at`, from the WIP); the ITCZ
+  weighs rows by their cell areas; the satellite and world-map hill shades take a pixel's true size
+  (`Projection::picture_pixel_m`, cos φ held at 0.15); the deposit footprints on the pages are drawn in block
+  space (`ppbx`/`ppbz` instead of degrees); `climate-dem` resamples the Earth DEM (equirectangular input) onto
+  the planet's grid. Left on purpose: the orographic rain's block metric (cylindrical: unchanged), the
+  east–west marches (cos φ both ways), the section tool's km (game blocks × 300 m).
+- **Pages.** The workbench map pane is π : 1; the final world's tile pyramid stays a 2 : 1 frame from z = −C/4
+  (`Projection::tile_frame_z`) with the pixels past the poles drawn as the background (RENDER_VERSION 2); the
+  graticule, readouts, box selections, globe texture and the section clicks go through `DTProj`.
+  `tools/workbench/sections_shots.py` clicks through the page's projection; `tools/workbench/preview.py` and
+  `tools/viewer/deposits-check.js` are Lambert.
+- **Evidence (quick 16k, scattered continents, 500 Myr, seed 1, `deeptime stage volcanoes --threads 4` on the
+  VM; before = the refactor's equirectangular build with the new ice line, after = this branch).** The
+  planets differ in detail (the plate model reads a different raster, so the histories part), but the
+  projection's property is exact: the map's share is the planet's share. Ice: before map 0.333 against true
+  area 0.136 (land 0.084/0.039, sea 0.249/0.097), poleward of 60° map 0.334 against 0.1345; after map 0.1004
+  against area 0.0975 (land 0.0463/0.0448, sea 0.0541/0.0527), poleward of 60° map 0.1346 against 0.1318 (the
+  sphere 0.134). Land: the surface line's cell share 0.255 against true 0.268 before, 0.283 = 0.283 after.
+  True-area hypsometry before / after: land mean 753 / 771 m, p50 581 / 549, p90 1,678 / 1,747, above 2 km
+  0.055 / 0.069, sea median depth 4,037 / 3,810 m. Cost: 11 min 13 s / 8 min 44 s wall, 2.93 / 2.34 GB peak RSS
+  (36 % fewer cells). Pictures and logs: `review/out/projection-lambert/` (not committed; satellite-before.png
+  1024 × 512, satellite-after.png 1024 × 326). The before numbers equal the design note's §7 baseline exactly (the planet is
+  deterministic).
+- **Workbench, measured** (a private `deeptime watch` on port 8667 over a baked 500 Myr quick 16k Lambert run;
+  screenshots under `review/out/projection-lambert/wb/`): the run view's map is π : 1 with 60°N at the right
+  height; the readout over z = −1,339 says 30.9°N (asin(1339/2607.6)); the inspect API answers lat 59.99° at
+  z = −2,258, −30.005° at 1,304, ±85.63° at ∓2,600; tiles 200 (the planet's band in the 2 : 1 frame, dark past
+  the poles); the final world view shows the band with its graticule at Lambert latitudes; the section from
+  (1237, −2550) to (1237, −1800) reads 77.9°N → 43.7°N; sections and the rock slice draw, no page errors. The
+  inspector check's 6 failures are its event-list checks: a CLI bake served as a run has no event stream.
+- **Gates (VM, scratch copy of the branch)**: cargo fmt --check, clippy -D warnings, deny clean; `cargo test
+  --workspace` 741 passed, 0 failed, 3 ignored (about 40 tests that pinned the 2 : 1 layout rebuilt on the
+  Lambert grids: water view, hydrology, keyframes, satellite, amplify, deposits, plates, climate, coupling,
+  biomes, sessions, format, CLI; one hydrology fixture's third climate moved from 250 to 300 mm because the
+  192-row rough planet has fewer basins); `./gradlew build test` 230 tests, 0 failures, 1 skipped;
+  `node tools/viewer/deposits-check.js` passes its projection checks (its "a shape per family" check already
+  fails on master since the P2-08 impact families). GameTests: to run once the refactor's are done (one
+  server lock).
+- **Ledger.** SCL-049 rewritten (Lambert, Ben's choice); SCL-052 new (the equal-area property, tested);
+  POL-005, 006, 014, 015, 017, 020, BAK-035, MAG-024 rewritten; `docs/science/pole-cap.md`,
+  `world-scale-and-bake.md`, plan §5.1/§5.2 marked superseded; FORMAT.md, EVENTS.md.
+- **The pole cap** (Ben, decisions log 2026-10-03: "Band from 70°, stop at 80° (Recommended)"): from 75° the
+  Lambert band would have been 49 blocks at 16k; the default cap is now 70° (Rust `d_pole_cap_deg`, Java
+  `PoleCapCurve.DEFAULT_CAP_DEG`, every built-in and test preset, the world presets and `gen_worldgen.py`, the
+  probes' "inside the cap" line): a band of 118 blocks at 16k (235 at 32k), 6.0 % of the planet behind it. The
+  curves are per degree, so their documented values moved to 71–78° (`PoleCapCurve` doc and test, POL-003/006/
+  008/009/011, PRS-033/073). The cap is not an editor field (the game reads the world preset; the Rust key is
+  read only by validation, PRS-033), so no editor or lang change.
+- **Merged master 6f72f0dd** (2026-10-03, after the restart: the 35 m vertical scale, plate tasks 3 and 4,
+  the floor at −512): conflicts only in STATUS.md and the claims counts. On the merged planet three tests
+  needed their premises re-read, none a projection fault: (1) `the_stage_never_panics_however_dense_the_structures`
+  never passed one Noddy history at 50 Myr (longest 122 over six seeds; master's planet passes), so it runs
+  80 Myr (270 and 135 on seeds 2 and 3, same wall time); (2) GameTest `lavaStaysAtTheFloor` read 1,322 lava
+  blocks at y −447: its "high ground" site is now the test planet's active shield volcano, whose crust-deep
+  magma column reaches y −507, so magma lava (`Magma.at(...).molten()`, read back by
+  `magmaUnderActiveVolcanoes`) is counted apart; (3) `climateConsistent`'s C family read 0.737 / 0.731 (156
+  columns, the misses coastal: stony shore and beach) against a floor of 0.75, so the floor goes to 0.63 by the
+  test's own rule (0.1 under the lowest planet). `carversSpareWater`, which failed on the pre-merge Lambert
+  planet (no river box above the sea), passes on the merged one (9 chains run above sea + 4).
+- **Evidence on the merged head** (test VM, `deeptime stage volcanoes --preset earthlike_quick_16k --start
+  scattered_continents --length-myr 500 --set seed=1 --threads 4`; before = master 6f72f0dd, equirectangular,
+  with the CLI's ice line ported for the measurement only; after = this branch at b23dc176). "Map" is the share
+  of the map's cells (what a picture shows), "true" the area-weighted share:
+
+  | | before map | before true | after map | after true |
+  |---|---|---|---|---|
+  | land | 0.146 | 0.192 | 0.200 | 0.201 |
+  | ice, land + sea | 0.274 | 0.094 | 0.097 | 0.095 |
+  | land ice | 0.0071 | 0.0069 | 0.0127 | 0.0128 |
+  | sea ice | 0.267 | 0.087 | 0.085 | 0.082 |
+  | poleward of 60° (sphere 0.134) | 0.334 | 0.1345 | 0.1346 | 0.1318 |
+
+  Before, the map showed 2.9 times the true ice (the polar sea ice) and 0.76 of the true land; after, map and
+  planet agree to 0.003 (the residue is the two partial rows at the poles, counted whole as cells and by area
+  as area). The planets differ (the plate model reads a different raster): land mean 882 / 786 m, p50 582 / 490,
+  p90 2,076 / 1,895, above 2 km 0.111 / 0.087, sea median depth 4,165 / 3,956 m, Köppen land E 0.11 / 0.13.
+  Cost 9 min 55 s / 6 min 21 s wall, 3.26 / 2.10 GB peak RSS. Logs and satellite pictures:
+  `review/out/projection-lambert/merged/` (not committed).
+- **Found, not changed:** the rows past the poles (|z| between R and Zo: 16 blocks at 16k, 52 at the 4k test
+  planet) are simulated at the clamped latitude and can hold land and rivers (the 4k test planet has river
+  vertices to z = 702, R = 652). They lie beyond the pole cap's stop line (80°), so no player reaches them; the
+  ice line leaves the rows wholly past a pole out and weighs the partial ones by their area.
+- **Gates on the merged head** (test VM, ad052aa0; the later commits are docs only): cargo fmt --check, clippy
+  `-D warnings`, deny clean; `cargo test --workspace` 763 passed, 0 failed, 3 ignored; `./gradlew build test`
+  251 tests, 0 failures, 2 skipped. GameTests through `mac.sh --pack --server`: `./gametest.sh` 71 of 71,
+  `-PwithTerraBlender` 71 of 71, `-PwithMic` 71 of 71 (TerraBlender and MIC sets re-installed first). The
+  failures known on master (`magmaUnderActiveVolcanoes`, `farTerrainMatchesGeneratedChunksAcrossTheSeam`,
+  `riverBiomes`, `lakeIceAndSaltFollowTheClimate`, `realPlanetRockMatchesTheParityFixture`) pass on this
+  planet; the branch adds none. Logs: `/Volumes/Graphide/ban/deeptime-runs/projection-lambert/` on the VM
+  (delete when this lands, with `projection-refactor/`).
+- **Next.** The coordinator merges this branch (format 0.4: every bake and saved run is rebuilt), then runs
+  `tools/remote/mac-gc.sh` and deletes the two scratch folders above.
 ### 2026-10-02 — The vertical scale is 35 m per block (agent worktree agent-a6b275724b347abae, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Asked:** Ben's answer "35 m per block (Recommended)" (decisions log 2026-10-02): `scale.m_per_block_v` 20 → 35 (8.6× instead of 15×); re-check what was tuned against 15×; measure strata, ore, the floor.
 - **Changed:** one shared default `deeptime_format::DEFAULT_M_PER_BLOCK_V` = 35 (`params.rs` default, `Scale::default_for`, `ViewScale::default`, deposits `Scales::default`, the dummy world, the climate DEM tool) and Java `Manifest.DEFAULT_M_PER_BLOCK_V` = 35; 35.0 in all twelve built-in presets and in `tests/presets/planet_world_4k.json` (the GameTest world `test_planet_real` and ColumnParityTest follow the game's scale; no test preset kept 20 m: the only other pins are unit tests that pass 20 explicitly as input, and the two coal-stack tests in `deposits/geometry.rs`, whose cover and depth numbers were set in 20 m blocks, now say so). Fixed assumptions of 20 m: `VISIBLE_RELIEF_M` 40 m → `VISIBLE_RELIEF_BLOCKS` 2 × `m_per_block_v` (IMP-081; `Crater::state` takes the threshold); `deposits::surface_y` read sea level 63 → the world's `sea_level_y` (new field of `Scales`). Fallbacks to 20: workbench `sections.js`, `tools/review/p2-01-report.py`, `glacial_views.py --mv`. GameTest `worldInfoFollowsThePlayer` compares with `Manifest.DEFAULT_M_PER_BLOCK_V`. Editor hints (m_per_block_v, volcano flanks, crater depth) and the docs of the settings below describe 8.6×. New tests (fail on the old code): `a_crater_shows_while_two_blocks_deep_at_any_vertical_scale`, `surface_y_reads_the_world_sea_level_and_scale`; `the_top_band_is_compressed` now expects the knee 17.92 km above the sea.
@@ -236,7 +344,9 @@ Ben, 2026-10-02: "Mixin around TW's guard" (decisions log). Branch `worktree-age
   `cargo deny check licenses bans` clean; `cargo test --workspace` 740 passed, 0 failed, 3 ignored (two new module
   tests: the neighbour rule; extent, metric, index frame and bands agree); `./gradlew build test` tests=230
   failures=0 skipped=1 (`ColumnParityTest.theProjectionIsRusts` with the extent, frame and area-scale checks).
-  GameTests: GT_RESULTS.
+  GameTests at 9e426b91 (the refactor with master merged; detached behind the shared server lock, `gt-gates2.sh`):
+  `./gametest.sh` 68 of 68, `-PwithTerraBlender` 68 of 68 (its server set installed first), `-PwithMic` 68 of 68
+  (MIC set re-installed: 168 mods).
 - **Docs.** FORMAT.md "Grids" names the module; `docs/science/world-scale-and-bake.md` and ledger SCL-049 point at it;
   the design note marks §8 step 1 built.
 - **Next.** Ben's pick (Lambert, or a square/torus map, the research note): the family-specific work of the design note
