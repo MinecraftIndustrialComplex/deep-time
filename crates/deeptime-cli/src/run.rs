@@ -407,7 +407,7 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
 }
 
 /// The planet's hypsometry at the end of the surface (P1-17 calibration), true-area weighted
-/// (cos φ; the surface line's `land_frac` counts cells, which is the in-game share): land share,
+/// (cell areas; the surface line's `land_frac` counts cells, which is the in-game share): land share,
 /// land elevation mean and quantiles, the share of land above 1, 2 and 3 km, the median sea
 /// depth, the shelf share of the sea (0–200 m), the continental crust's share of the planet and
 /// the share of it above the sea (the plate model's crust type), and the share of the planet per
@@ -510,8 +510,72 @@ pub(crate) fn hypsometry_line(world: &deeptime_core::world::WorldState) -> Optio
     ))
 }
 
+/// How much of the map and of the planet is ice (the projection's evidence,
+/// `docs/design/equal-area-projection.md` §7): land ice (`climate/ice_thickness_m` ≥ `ICE_MIN_M`,
+/// else `climate/glacier`), sea ice (`climate/sea_ice` ≥ 0.5) and both, each as the share of the
+/// map's cells (what a picture of the map shows: the cells of rows on the planet) and as the
+/// true-area share (cell areas); and the share poleward of 60° both ways (the sphere's 13.4 %).
+pub(crate) fn ice_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    use deeptime_core::climate::field;
+    use deeptime_core::deposits::fields::{cell_area_km2, lat_of_row};
+    let st = world.surface.as_ref()?;
+    let g = &st.grid;
+    let (w, h) = (g.w as usize, g.h as usize);
+    let on = |name: &str| world.fields.get(name).filter(|f| f.data.len() == w * h);
+    let (ice, glacier, sea_ice) = (
+        on(field::ICE_THICKNESS),
+        on(field::GLACIER),
+        on(field::SEA_ICE),
+    );
+    if ice.is_none() && glacier.is_none() && sea_ice.is_none() {
+        return None;
+    }
+    let (mut cells, mut area) = (0.0f64, 0.0f64);
+    let mut c = [0.0f64; 4]; // land ice, sea ice, either, poleward of 60° (cells)
+    let mut a = [0.0f64; 4];
+    for j in 0..h {
+        let ar = cell_area_km2(g, j as u32, 1.0);
+        if ar <= 0.0 {
+            continue; // a row wholly past a pole: not on the map
+        }
+        let polar = lat_of_row(g, j as u32).abs() >= 60.0;
+        for i in 0..w {
+            let k = j * w + i;
+            let land_ice = match ice {
+                Some(f) => f.data[k] >= deeptime_core::climate::ICE_MIN_M,
+                None => glacier.is_some_and(|f| f.data[k] >= 0.5),
+            };
+            let sea = sea_ice.is_some_and(|f| f.data[k] >= 0.5);
+            cells += 1.0;
+            area += ar;
+            for (n, hit) in [land_ice, sea, land_ice || sea, polar]
+                .into_iter()
+                .enumerate()
+            {
+                if hit {
+                    c[n] += 1.0;
+                    a[n] += ar;
+                }
+            }
+        }
+    }
+    let (cells, area) = (cells.max(1.0), area.max(1e-12));
+    Some(format!(
+        "ice map_land_ice={:.4} map_sea_ice={:.4} map_ice={:.4} area_land_ice={:.4} \
+         area_sea_ice={:.4} area_ice={:.4} map_poleward_60={:.4} area_poleward_60={:.4}",
+        c[0] / cells,
+        c[1] / cells,
+        c[2] / cells,
+        a[0] / area,
+        a[1] / area,
+        a[2] / area,
+        c[3] / cells,
+        a[3] / area,
+    ))
+}
+
 /// The planet's hypsographic curve at the end of the surface (P1-17 hypsometry recalibration,
-/// 2026-10-01), true-area weighted (cos φ): the elevation above sea level, m, that 0, 1, …, 100 %
+/// 2026-10-01), true-area weighted (cell areas): the elevation above sea level, m, that 0, 1, …, 100 %
 /// of the surface stands above (the classic curve: 0 % is the highest cell, 100 % the deepest),
 /// for plotting against Earth's.
 pub(crate) fn hypsometry_curve_line(world: &deeptime_core::world::WorldState) -> Option<String> {
@@ -1078,6 +1142,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = hypsometry_curve_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = ice_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = evolution_line(&ck.world) {

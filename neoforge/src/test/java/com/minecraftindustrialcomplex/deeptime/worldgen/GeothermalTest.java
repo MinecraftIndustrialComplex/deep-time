@@ -457,9 +457,10 @@ class GeothermalTest {
         }
         // Cooler ground than the setting: nothing.
         assertTrue(heatBuild(GeothermalRules.DEFAULT, heatEnv(99, 1200, 15, (x, z) -> 0), DRY).sites().isEmpty(), "99 is under the 100 threshold");
-        // The threshold is a setting: lowered under the ground's 62 the whole world is hot.
+        // The threshold is a setting: lowered under the ground's 62 the whole world is hot (the planet,
+        // C × C/π on the Lambert map, is 2.7 times the box).
         Geothermal everywhere = heatBuild(new GeothermalRules(1.0, 1.0, 1.0, 400.0, 60.0, 1.0), heatEnv(99, 1200, 15, (x, z) -> 0), DRY);
-        assertTrue(everywhere.sites().size() > 3 * g.sites().size(), everywhere.sites().size() + " against " + g.sites().size());
+        assertTrue(everywhere.sites().size() > 2 * g.sites().size(), everywhere.sites().size() + " against " + g.sites().size());
         // Density is a setting too, and 0 means none from the heat flow (the volcanoes' fields are separate).
         assertTrue(heatBuild(new GeothermalRules(1.0, 1.0, 1.0, 400.0, 100.0, 0.0), heatEnv(120, 1200, 15, (x, z) -> 0), DRY).sites().isEmpty());
         int twice = heatBuild(new GeothermalRules(1.0, 1.0, 1.0, 400.0, 100.0, 2.0), heatEnv(120, 1200, 15, (x, z) -> 0), DRY).sites().size();

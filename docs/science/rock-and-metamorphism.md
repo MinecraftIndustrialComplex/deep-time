@@ -33,7 +33,7 @@ The structure stage runs each step after the surface stage has laid down or stri
 2. **Burial.** While a cell is in a collision (or has a young Himalayan-type orogen), depths are multiplied by the
    thickening of its crust relative to 35 km, at most 2 (RCK-032 to RCK-035).
 3. **Metamorphism.** Each layer is tested at the temperature of its mid-depth. If it has reached the formation
-   temperature of the next class on its path (shale to slate at 250 degC, phyllite 350, schist 450, gneiss 650;
+   temperature of the next class on its path (shale to slate at 250 degC, phyllite 350, schist 525, gneiss 650;
    limestone to marble, sandstone to quartzite, basalt to greenstone at 300, to amphibolite at 500) it moves up. Classes
    never go back down, so an exhumed belt keeps its grade (RCK-036 to RCK-046).
 4. **Basement.** The plate model's rock pools under the loose cover (sediment, sedimentary, volcanic, metamorphic, plutonic)
@@ -73,7 +73,7 @@ T = 0.6 D^0.6, with T in km, D = sqrt(L W) in km the diameter of the circle of t
 | RCK-039 | shale to slate | 250 | degC | Winter 2010, Yardley 1989 (not read) | `cited-unverified` |
 | RCK-040 | quartzite, marble, greenstone | 300 | degC | Stipp 2002; Ferrill 2004; Greenwood and Berman | `cited-unverified` |
 | RCK-041 | phyllite | 350 | degC | not read | `cited-unverified` |
-| RCK-042 | schist | 450 | degC | Baxter 2002: garnet zone 500-550 | `cited-unverified` |
+| RCK-042 | schist | 525 | degC | Baxter 2002: garnet zone 500-550; Ben, decisions log 2026-10-02 | `game-choice` |
 | RCK-043 | amphibolite | 500 | degC | Nelson; Greenwood and Berman | `cited-unverified` |
 | RCK-044 | gneiss | 650 | degC | Baxter 2002: sillimanite zone 650-700 | `cited-unverified` |
 | RCK-045 | gypsum to anhydrite | 50 | degC | Orti 2012: about 50 degC at 450-500 m; Hardie 1967: 58 degC pure water | `verified` |
@@ -96,7 +96,7 @@ T = 0.6 D^0.6, with T in km, D = sqrt(L W) in km the diameter of the circle of t
 |---|---|---|---|---|
 | Mean continental heat flow | 65 mW/m2 (Pollack et al. 1993); 70.9 mW/m2 (Davies and Davies 2010) | Davies and Davies 2010, table 7 and section 3 (read in full) | gradient 26 degC/km at 65 mW/m2 with k = 2.5; the plate model's continental proxy is 55 + 35 exp(-t/60 Myr) | arithmetic; proxy from the P2-14 build-log entry |
 | Gradients by setting | 5-10 K/km cold subduction; 20 K/km craton; about 30 K/km Barrovian; about 50 K/km rifts and arcs | Hacker, UCSB GEO 102C part 3; Nelson, Tulane (lecture notes, secondary) | up to 48 degC/km (the 120 mW/m2 clamp at k 2.5); cold subduction (blueschist, eclogite) is not made | arithmetic |
-| Garnet zone | 500-550 degC (Glen Clova) | Baxter et al. 2002, abstract | schist at 450 degC | - |
+| Garnet zone | 500-550 degC (Glen Clova) | Baxter et al. 2002, abstract | schist at 525 degC (was 450 until 2026-10-02) | - |
 | Sillimanite zone | 650-700 degC, about 6 kbar | Baxter et al. 2002 | gneiss at 650 degC | - |
 | Thickness of a 56-km pluton | 4.5 km observed (Lucerne); 6.7 km predicted by the law | Cruden 2008, Fig. 2-4 and eq. 1 | 56 km round: 6.7 km | arithmetic; unit test |
 | Thickness of a 4.5-km pluton | 1.6 km observed (Gasborn); 1.5 predicted | same | 1.48 km | unit test |
@@ -110,6 +110,54 @@ T = 0.6 D^0.6, with T in km, D = sqrt(L W) in km the diameter of the circle of t
 
 Run below: `earthlike_quick_16k`, start `scattered_continents`, 500 Myr, default seed, 2 threads, `deeptime run` and
 `deeptime strata-check --columns 20000`, test machine, 2026-10-02; before is master 9e84fcf and after is this branch (commit 5cb328c3). The pluton thickness fix lowered the surviving pluton bodies by 12 of 230 (5 %) and raised the eroded ones from 616 to 628; nothing else in the run changed (emplaced 1,034, subducted 104, metamorphosed volume 4.058e7 km3, deformed share 0.4805), and `strata-check` is identical (see [strata.md](strata.md)).
+
+### Schist at 525 degC instead of 450 (Ben, 2026-10-02)
+
+Ben answered the first open question of the stage-2 review with "Move schist to 500-550 degC". The coded value is
+now 525 degC, the middle of the 500-550 degC in which the garnet of the Barrovian type locality grew (Baxter et al.
+2002); amphibolite stays at 500 and gneiss at 650, so the order along the pelitic path is slate 250, phyllite 350,
+schist 525, gneiss 650, and the key bands of the strata (RCK-052) are 0, 250, 300, 350, 500, 525 and 650 degC, each
+still a formation temperature. Phyllite now covers 350 to 525 degC instead of 350 to 450. A unit test fails on the old
+value (`the_grade_order_and_the_key_bands_follow_the_formation_temperatures`).
+
+Measured on `earthlike_quick_16k` (scattered continents, 500 Myr, 2 threads, `strata-check --columns 20000`, test
+machine, 2026-10-02), before and after, on two seeds. The worlds are not the same planet before and after (a rock class
+changes the erodibility the surface stage reads, so the runs diverge: the shares below move on both seeds by amounts
+that are not all the schist's doing); read them as two samples each.
+
+| Share of | Seed 1 before | Seed 1 after | Seed 2 before | Seed 2 after |
+|---|---|---|---|---|
+| columns holding schist | 35.8 % | 27.4 % | 31.4 % | 14.0 % |
+| all rock blocks that are schist | 5.33 % | 5.49 % | 5.80 % | 1.60 % |
+| all rock blocks that are phyllite | 0.90 % | 1.31 % | 0.85 % | 1.02 % |
+| all rock blocks that are gneiss | 15.6 % | 14.2 % | 13.1 % | 16.8 % |
+| columns with a grade inversion | 0.14 % | 0.18 % | 0.08 % | 0.10 % |
+| stored cell stacks with a grade inversion | 0 | 0 | 0 | 0 |
+| columns without folds and faults with an inversion | 0 | 0 | 0 | 0 |
+
+A third pair on the code as it stood after the plate-force and deposit merges (seed 1, master before and the branch
+after, both through the branch's `strata-check`, whose class shares are the 524,288 stored cell stacks; the "before"
+inversions come from the master binary's own check, since reading the old world with the new temperatures reports
+inversions that the old code never made):
+
+| Share of | Before | After |
+|---|---|---|
+| stored stacks holding schist / phyllite / gneiss / amphibolite | 37.5 / 16.3 / 57.2 / 1.0 % | 29.1 / 21.7 / 57.6 / 0.8 % |
+| all rock blocks that are schist / phyllite / gneiss | 5.0 / 0.87 / 14.3 % | 5.2 / 1.27 / 13.0 % |
+| stored stacks with a grade inversion | 0 of 524,288 | 0 of 524,288 |
+| land columns with folds and faults applied: inversions | 2 of 4,556 (0.04 %) | 10 of 5,448 (0.18 %) |
+
+Same finding as the first two pairs: schist falls in columns, not in volume, phyllite takes the difference, gneiss does
+not move, and the stored stacks, where the rule is that grade rises downwards, stay at zero inversions. The land
+columns' ten inversions are gneiss over basalt (5), gneiss over phyllite (2), phyllite over basalt (2) and gneiss over
+sandstone (1), all structure-stage thrusts, 0.18 % of land columns.
+
+Schist is made two ways: by the temperature (shale and its kin stepping to schist) and directly, as the metamorphic
+pool of a young Himalayan-type orogen (RCK-018), which the threshold does not touch; that is why seed 1's schist volume
+did not fall while its column share did. Raising the threshold moved rock from schist into phyllite (and, on seed 2, the
+planet's own changes put more into gneiss). The inversions that exist are all made by the structure stage (thrusts and
+dykes put a hotter rock over a colder one, as in the Himalaya: Mottram et al. 2014), none by the stored stacks or by the
+columns before folds are applied; a wider phyllite band (350 to 525) makes more pairs such as gneiss over phyllite.
 
 ## Simplifications and limits
 
@@ -145,16 +193,14 @@ generator comments ("dark grey", "banded") are descriptions, not data (RCK-089).
 
 ## Open questions
 
-1. **Schist at 450 degC.** The Barrovian type locality grew garnet at 500-550 degC; the comment said "garnet zone". Raise
-   schist to 500 (and amphibolite to 550)? STATUS pending questions.
-2. **Pluton width, roof depth, shares and collision rate.** Each is a game choice that real data put somewhere else
+1. **Pluton width, roof depth, shares and collision rate.** Each is a game choice that real data put somewhere else
    (rows above). STATUS pending questions.
-3. **Compaction and lithification depth** (RCK-022, STR-049).
-4. **Densities the sources disagree with** (RCK-087): peridotite, kimberlite, ironstone, BIF, phosphorite, pumice, travertine.
-5. **Suevite in carbonate targets.** French 1998: suevite has been found only in craters in crystalline silicate targets;
+2. **Compaction and lithification depth** (RCK-022, STR-049).
+3. **Densities the sources disagree with** (RCK-087): peridotite, kimberlite, ironstone, BIF, phosphorite, pumice, travertine.
+4. **Suevite in carbonate targets.** French 1998: suevite has been found only in craters in crystalline silicate targets;
    carbonate-target craters have lithic breccia only. The impact stage (IMP) should be asked whether it makes impact_breccia
    from limestone.
-6. **Sources that would settle the rest:** Winter 2010 and Yardley 1989 (formation temperatures), Haederle and Atherton 2002
+5. **Sources that would settle the rest:** Winter 2010 and Yardley 1989 (formation temperatures), Haederle and Atherton 2002
    (Coastal Batholith width and count), Cruden and McCaffrey 2001 itself, Buddington 1959, Telford 1990 (density table).
 
 ## Sources

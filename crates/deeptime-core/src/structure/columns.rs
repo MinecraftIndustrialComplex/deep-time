@@ -46,7 +46,7 @@
 //! same way in every column, so the column evaluator can correlate one cell's horizons with its
 //! neighbours' (FORMAT.md, "`horizon_stack` cells"): a key is a u16 that grows downwards. The key
 //! space is ordered by **metamorphic grade first**: the regolith, then one band per formation
-//! temperature ([`key::BAND_FROM_C`]: unmetamorphosed, then 250, 300, 350, 450, 500 and 650 °C),
+//! temperature ([`key::BAND_FROM_C`]: unmetamorphosed, then 250, 300, 350, 500, 525 and 650 °C),
 //! then the mantle. A unit's band is that of the hottest formation temperature at or above it in
 //! its own column, so bands never decrease downwards in a column; plutonic pool units are
 //! crystalline basement and always lie in the last band, with the gneiss. Inside a band come the strata
@@ -94,9 +94,9 @@ pub mod key {
     /// Grade bands: band b holds the units whose hottest formation temperature (their own or of
     /// anything above them in their column) is at least `BAND_FROM_C[b]` and below the next
     /// (`metamorphism::formation_temp_c`: slate 250, quartzite, marble and greenstone 300,
-    /// phyllite 350, schist 450, amphibolite 500, gneiss 650 °C).
+    /// phyllite 350, amphibolite 500, schist 525, gneiss 650 °C).
     // ledger: RCK-052, STR-018, STR-019 (game choice)
-    pub const BAND_FROM_C: [f64; BANDS] = [0.0, 250.0, 300.0, 350.0, 450.0, 500.0, 650.0];
+    pub const BAND_FROM_C: [f64; BANDS] = [0.0, 250.0, 300.0, 350.0, 500.0, 525.0, 650.0];
     pub const BANDS: usize = 7;
     /// Band 0's strata log: key `LOG_TOP` is the present, `LOG_BASE` the oldest age of the run.
     pub const LOG_TOP: u16 = 4096;

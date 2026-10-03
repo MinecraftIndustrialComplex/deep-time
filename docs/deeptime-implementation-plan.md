@@ -688,7 +688,7 @@ pub struct ScaleParams {
 // Derived: radius_m = circumference_blocks * m_per_block_h / (2π).
 ```
 
-**Derived geometry** (the numbers every later section uses):
+**Derived geometry** (the numbers every later section uses; equirectangular, superseded on 2026-10-02 by the Lambert equal-area projection: pole to pole C/π = 5,215 / 10,430 blocks, the ±75° cap at ±2,519 / ±5,037, ±80° at ±2,568 / ±5,136; see §5.2's note and `docs/design/equal-area-projection.md` §6):
 
 | Quantity | Singleplayer (C = 16,384) | Server (C = 32,768) | Derivation |
 |---|---|---|---|
@@ -741,6 +741,13 @@ copies them, and `preset::tests::builtins_are_the_pipeline_presets` fails while 
 built in any more.
 
 ### 5.2 The grids
+
+> **Superseded in part (2026-10-02).** The grids and the world are on Lambert's cylindrical
+> equal-area projection, not equirectangular (decisions log 2026-10-02, "Lambert for now";
+> `docs/design/equal-area-projection.md`, `crates/deeptime-format/FORMAT.md` "Grids"): H = 2·Zo/r,
+> origin (−C/2, −Zo), latitude asin(−z/R). Where this section and §5.1's derived-geometry table
+> give the equirectangular numbers (z = ∓C/4 at the poles, H = W/2, 2 : 1 keyframes), the design
+> note wins.
 
 **Choice.** Two geometries, joined by resampling:
 

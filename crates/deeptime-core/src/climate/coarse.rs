@@ -151,14 +151,11 @@ impl Grid {
         self.coarsen_weighted(v, pick, &|_| 1.0)
     }
 
-    /// [`Grid::coarsen`] weighted by each fine cell's true area (the projection's area weight of
-    /// its fine row), for shares and means over the sphere (the climate's land fraction, heights).
+    /// [`Grid::coarsen`] weighted by each fine cell's true area, for shares and means over the
+    /// sphere (the climate's land fraction, heights). The map picture's rows are equal-area
+    /// (uniform in sin φ, Lambert's cylinder), so every fine cell weighs the same.
     pub fn coarsen_area(&self, v: &[f32], pick: &(dyn Fn(usize) -> bool + Sync)) -> Vec<f32> {
-        let fh = self.fh as u32;
-        let wt: Vec<f64> = (0..self.fh)
-            .map(|j| Projection::band_weight(j as u32, fh).max(0.0))
-            .collect();
-        self.coarsen_weighted(v, pick, &|c| wt[c / self.fw])
+        self.coarsen_weighted(v, pick, &|_| 1.0)
     }
 
     fn coarsen_weighted(

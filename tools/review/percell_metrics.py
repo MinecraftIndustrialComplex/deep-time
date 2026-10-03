@@ -7,9 +7,9 @@ climate.md §1.1, §7.4) on a run's final fields.
     deeptime dump-fields --in run.dtcp --out dump/
     python3 tools/review/percell_metrics.py dump/ [label]
 
-Prints one JSON line. Everything is area-weighted (cos φ of the row; the rows are taken as evenly
-spaced in latitude, the equirectangular projection's: change `row_lat` when the projection
-changes). Land is where the Köppen class is not the sea's (31).
+Prints one JSON line. Everything is area-weighted: the rows are Lambert's cylindrical equal-area
+rows (uniform in sin φ), so every cell weighs the same (change `row_lat` and the weights when the
+projection changes). Land is where the Köppen class is not the sea's (31).
 
 - along_row_std_winter / _annual: the mean over rows at 30–70° of the standard deviation of the
   land's sea-level temperature along the row (winter: January north, July south).
@@ -40,7 +40,8 @@ def load(d):
 
 
 def row_lat(h):
-    return 90.0 - 180.0 * (np.arange(h) + 0.5) / h
+    # Lambert's cylindrical equal-area rows: uniform in sin φ (so every row weighs the same).
+    return np.degrees(np.arcsin(1.0 - 2.0 * (np.arange(h) + 0.5) / h))
 
 
 def eta2(v, lat, wgt, mask):
@@ -75,7 +76,7 @@ def main():
     h, w = k.shape
     lat1 = row_lat(h)
     lat = np.repeat(lat1[:, None], w, axis=1)
-    wgt = np.cos(np.radians(lat))
+    wgt = np.ones_like(lat)  # equal-area rows
     land = k != SEA
     sea = ~land
     north = lat > 0

@@ -8,7 +8,8 @@
     python3 tools/validation/climate_vs_obs.py out/ [out.log] [label]
 
 Prints one JSON line. Earth's relief is GMT's `earth_relief_30m_p` (SRTM15+, Tozer et al. 2019)
-turned into 720 × 360 little-endian f32, north first, from 0° E; it and any observed grid stay out
+turned into 720 × 360 little-endian f32, north first, from 0° E (`climate-dem` resamples it onto
+the planet's projection and writes `z.f32` and the rows' latitudes); it and any observed grid stay out
 of the repository (§7.1). The observed values the points are compared with are the design's
 (§7.1's table); the grids it also names (Beck et al. 2018 Köppen, Beck et al. 2023 monthly T and
 P) are not read here.
@@ -35,12 +36,8 @@ SEA = 31
 LAPSE = 6.5e-3  # °C/m, ClimateParams::lapse_c_per_km's default
 
 
-def lat_of(h):
-    return 90.0 - 180.0 * (np.arange(h) + 0.5) / h
-
-
-def cell(lat, lon, h, w):
-    j = min(int((90.0 - lat) / 180.0 * h), h - 1)
+def cell(lat1, lat, lon, w):
+    j = int(np.argmin(np.abs(lat1 - lat)))
     i = int((lon % 360.0) / 360.0 * w) % w
     return j, i
 
@@ -75,9 +72,12 @@ def main():
     rd = lambda n: np.fromfile(os.path.join(d, n + ".f32"), dtype="<f4").reshape(h, w)
     k = rd("koppen").astype(int)
     land = k != SEA
-    lat1 = lat_of(h)
+    # Row latitudes from meta.json (the planet's projection: Lambert's rows are uniform in sin φ);
+    # each row's area weight is cos φ times its latitude span.
+    lat1 = np.array(meta["lat"], dtype=float)
+    span = np.abs(np.gradient(lat1))
     lat = np.repeat(lat1[:, None], w, axis=1)
-    wgt = np.cos(np.radians(lat))
+    wgt = np.repeat((np.cos(np.radians(lat1)) * span)[:, None], w, axis=1)
     t_sl = [rd(f"t_sl_{m:02d}") for m in range(1, 13)]
     t_ann = sum(t_sl) / 12.0
     north = lat > 0
@@ -111,11 +111,11 @@ def main():
         out[f"ice_edge_mean_{hemi}"] = float(np.mean(edges)) if edges else None
         out[f"ice_edge_std_{hemi}"] = float(np.std(edges)) if edges else None
     # January temperature with the lapse rate: the relief is the land's height (≥ 0).
-    z = np.fromfile(os.path.join(os.path.dirname(os.path.normpath(d)), "earth720.f32"), dtype="<f4").reshape(h, w) if os.path.exists(os.path.join(os.path.dirname(os.path.normpath(d)), "earth720.f32")) else np.zeros((h, w), np.float32)
+    z = rd("z")
     jan = t_sl[0] - LAPSE * np.maximum(z, 0.0)
 
     def at(a, la, lo):
-        j, i = cell(la, lo, h, w)
+        j, i = cell(lat1, la, lo, w)
         if not land[j, i]:
             best = None
             for dj in range(-2, 3):
