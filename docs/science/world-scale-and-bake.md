@@ -2,7 +2,7 @@
 
 Status of this page: `stub` (stage 1). The ledger rows exist; the page is to be written in stage 2 from [_template.md](_template.md).
 
-A Deep Time planet is small. Its circumference is 16,384 or 32,768 blocks, and one block stands for 300 m across and 20 m up, so the 16k planet is about 4,915 km round, an eighth of Earth's 40,075 km, and everything is stretched 15 times vertically. These are game choices, made so that a planet fits in a Minecraft world and a mountain range fits in its build height; they bound how literally any physical number can be taken. This page lists those choices, the planet's constants (gravity, day, tilt, sunlight, ocean share), the timeline and resolutions, and what the bake does when it turns the simulation's metres into blocks.
+A Deep Time planet is small. Its circumference is 16,384 or 32,768 blocks, and one block stands for 300 m across and 35 m up (20 m up until 2026-10-02), so the 16k planet is about 4,915 km round, an eighth of Earth's 40,075 km, and everything is stretched 8.6 times vertically (15 times at 20 m). These are game choices, made so that a planet fits in a Minecraft world and a mountain range fits in its build height; they bound how literally any physical number can be taken. This page lists those choices, the planet's constants (gravity, day, tilt, sunlight, ocean share), the timeline and resolutions, and what the bake does when it turns the simulation's metres into blocks.
 
 ## Ledger ids that belong here
 

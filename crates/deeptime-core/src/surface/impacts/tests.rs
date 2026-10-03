@@ -570,3 +570,21 @@ fn threads_and_a_resume_leave_the_craters_unchanged() {
         let _ = std::fs::remove_dir_all(d);
     }
 }
+
+/// A crater shows while its relief is two blocks at the world's vertical scale (2026-10-02: a
+/// fixed 40 m was two blocks only at 20 m a block): a bowl with 55 m of relief left shows on
+/// 20 m blocks and not on 35 m ones.
+#[test]
+fn a_crater_shows_while_two_blocks_deep_at_any_vertical_scale() {
+    assert_eq!(visible_relief_m(20.0), 40.0);
+    assert_eq!(visible_relief_m(35.0), 70.0);
+    let mut c = crater(3.0, 0.0);
+    let (full, _) = c.state(visible_relief_m(35.0));
+    // Fill it until 55 m of relief is left.
+    c.cover_m = c.profile.depth_m * (1.0 - 55.0 / full);
+    let (r20, f20) = c.state(visible_relief_m(20.0));
+    let (r35, f35) = c.state(visible_relief_m(35.0));
+    assert!((r20 - 55.0).abs() < 1.0 && r20 == r35, "{r20} {r35}");
+    assert_eq!(f20, Fate::Degraded);
+    assert_eq!(f35, Fate::Buried);
+}

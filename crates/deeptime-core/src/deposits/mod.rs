@@ -3426,6 +3426,24 @@ mod spill_tests;
 mod tests {
     use super::types::DepositType;
 
+    /// The surface's block y follows the world's sea level and vertical scale (2026-10-02: it read
+    /// sea level 63 whatever the world said).
+    #[test]
+    fn surface_y_reads_the_world_sea_level_and_scale() {
+        let sc = Scales {
+            sea_level_y: 100,
+            m_per_block_v: 35.0,
+            ..Scales::default()
+        };
+        assert_eq!(surface_y(700.0, &sc), 120.0);
+        assert_eq!(surface_y(-350.0, &sc), 90.0);
+        let sc20 = Scales {
+            m_per_block_v: 20.0,
+            ..Scales::default()
+        };
+        assert_eq!(surface_y(700.0, &sc20), 98.0);
+    }
+
     fn base_types() -> Vec<DepositType> {
         select_types(&DepositParams::default(), 1.0).unwrap()
     }
