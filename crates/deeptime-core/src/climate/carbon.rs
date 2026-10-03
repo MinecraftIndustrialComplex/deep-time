@@ -103,9 +103,10 @@ pub const CALCITE_M3_PER_MOL: f64 = 0.10009 / 2710.0;
 /// A province degasses over this long, years.
 pub const LIP_YEARS: f64 = 1.0e6;
 /// The weathering kernel Σ a·r·e^(0.09·(T − 15)) (km² · m/yr) of Earth's present land under the
-/// model's present climate (`deeptime climate-dem` on Earth's 1° relief, 2026-09-29: 2.845·10⁷ over
-/// 1.476·10⁸ km² of land — a mean runoff-weighted 0.19 m/yr at the 15 °C reference).
-pub const KERNEL_EARTH: f64 = 2.845e7;
+/// model's present climate (`deeptime climate-dem` on Earth's 1° relief: 2.845·10⁷ under the banded
+/// climate, 2026-09-29; 2.402·10⁷ over 1.479·10⁸ km² of land under the calibrated per-cell climate,
+/// P1-26 T9, 2026-10-03 — a mean runoff-weighted 0.16 m/yr at the 15 °C reference).
+pub const KERNEL_EARTH: f64 = 2.402e7;
 /// Reference temperature of the kernel's Arrhenius term, °C.
 pub const KERNEL_T_REF_C: f64 = 15.0;
 
