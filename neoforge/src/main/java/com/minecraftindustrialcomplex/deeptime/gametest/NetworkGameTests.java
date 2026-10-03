@@ -7,6 +7,7 @@ import com.minecraftindustrialcomplex.deeptime.net.PlanetDebugLine;
 import com.minecraftindustrialcomplex.deeptime.net.PoleStormPayload;
 import com.minecraftindustrialcomplex.deeptime.net.WorldInfoPayload;
 import com.minecraftindustrialcomplex.deeptime.worlddata.FormatVersion;
+import com.minecraftindustrialcomplex.deeptime.worlddata.Manifest;
 import io.netty.buffer.Unpooled;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -201,7 +202,7 @@ public final class NetworkGameTests {
             m.player.teleportTo(data, 0.5, 200, 0.5, 0, 0);
             WorldInfoPayload onData = m.last(WorldInfoPayload.class);
             helper.assertTrue(onData != null && onData.planet() && onData.circumference() == 1024 && onData.mPerBlockH() == 300.0
-                            && onData.mPerBlockV() == 20.0 && Objects.equals(onData.planetName(), "wrap-test"),
+                            && onData.mPerBlockV() == Manifest.DEFAULT_M_PER_BLOCK_V && Objects.equals(onData.planetName(), "wrap-test"),
                     "world-data planet: " + onData);
 
             m.forgetSent();

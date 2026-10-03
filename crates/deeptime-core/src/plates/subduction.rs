@@ -66,8 +66,9 @@ const K_NEAR: usize = 8;
 pub const MIN_CONTACT: u32 = 3;
 /// Andean orogenies shorter than this are not written as events, Myr.
 const OROGENY_MIN_MYR: f64 = 10.0;
-/// Uplift below this (m/Myr) does not reset the orogeny age.
-const OROGENY_MIN_M_PER_MYR: f64 = 5.0;
+/// Uplift below this (m/Myr) does not reset the orogeny age (here and in a collision belt,
+/// `belts.rs`).
+pub(super) const OROGENY_MIN_M_PER_MYR: f64 = 5.0;
 
 /// A sample lying inside another plate's surface.
 #[derive(Clone, Copy, Debug)]
@@ -145,12 +146,23 @@ pub fn resolve(
     for s in &mut state.samples {
         s.flags &= !(HIDDEN | TRENCH | ARC | HOTSPOT | DIVERGENT | SUBDUCTION_ZONE | EMERGED);
     }
+    // A collision's own belt and wedge are stamped as a collision orogeny each step (`belts.rs`):
+    // that crust is not locked against the collision that stamps it.
+    let since: BTreeMap<(u32, u32), f64> = state
+        .contacts
+        .iter()
+        .filter_map(|c| {
+            let col = c.collision.as_ref()?;
+            Some(((c.under.min(c.over), c.under.max(c.over)), col.onset_myr))
+        })
+        .collect();
     let mut aggs: BTreeMap<(u32, u32), Agg> = BTreeMap::new();
     for o in overlaps {
         let a = state.plate_of(o.i as usize);
         let b = state.groups[o.group as usize].plate;
         let key = (a.min(b), a.max(b));
         let (sa, sb) = if a == key.0 { (0, 1) } else { (1, 0) };
+        let own = since.get(&key).copied();
         let e = aggs.entry(key).or_default();
         e.count += 1;
         e.sum += pos[o.i as usize];
@@ -159,7 +171,7 @@ pub fn resolve(
             e.seen[side] += 1;
             if s.kind == CONTINENTAL {
                 e.cont[side] += 1;
-                if locked(s, t_myr, env) {
+                if locked_against(s, t_myr, env, own) {
                     e.locked[side] += 1;
                 }
             } else {
@@ -238,7 +250,6 @@ pub fn resolve(
                     last_step: step,
                     samples: agg.count,
                     collision: None,
-                    speed_count_km: 0.0,
                     max_uplift_mm_yr: 0.0,
                     andean: false,
                     centroid: centroid.to_array(),
@@ -278,6 +289,7 @@ pub fn resolve(
         if state.contacts[k].last_step != step {
             continue;
         }
+        let own = state.contacts[k].collision.as_ref().map(|c| c.onset_myr);
         if a == state.contacts[k].under {
             let s = &mut state.samples[o.i as usize];
             s.flags |= HIDDEN;
@@ -288,13 +300,13 @@ pub fn resolve(
                 state.contacts[k].cont_in += 1;
             }
             let s = &state.samples[o.i as usize];
-            if s.kind == CONTINENTAL && !locked(s, t_myr, env) {
+            if s.kind == CONTINENTAL && !locked_against(s, t_myr, env, own) {
                 seeds.entry(k).or_default().push(o.i);
             }
         } else {
             let m = o.cover.major();
             let s = &state.samples[m as usize];
-            if s.kind == CONTINENTAL && !locked(s, t_myr, env) {
+            if s.kind == CONTINENTAL && !locked_against(s, t_myr, env, own) {
                 seeds.entry(k).or_default().push(m);
             }
         }
@@ -326,6 +338,18 @@ pub fn ceiling(z: f64, zc: f64) -> f64 {
 /// continental plates is handed round them every few Myr.
 pub(super) fn locked(s: &super::state::Sample, t_myr: f64, env: &Env) -> bool {
     s.orogeny == OROGENY_HIMALAYAN && t_myr - f64::from(s.orogeny_myr) < env.k.collision_orogeny_myr
+}
+
+/// [`locked`], except against the collision that stamped it: crust stamped since `own` (the onset
+/// of the contact's own collision, if it is in one) is that collision's belt or wedge, which goes
+/// on converging and being stamped (`belts.rs`).
+pub(super) fn locked_against(
+    s: &super::state::Sample,
+    t_myr: f64,
+    env: &Env,
+    own: Option<f64>,
+) -> bool {
+    locked(s, t_myr, env) && own.is_none_or(|t0| f64::from(s.orogeny_myr) < t0 - 1e-6)
 }
 
 /// A contact reverses when at least this fraction of its subducting side's crust in the overlap
@@ -371,7 +395,6 @@ fn reverse(
     c.onset_step = env.step;
     c.onset_event = None;
     c.setting = 1;
-    c.speed_count_km = 0.0;
     c.cont_in = 0;
     c.max_uplift_mm_yr = 0.0;
     c.andean = false;
@@ -544,12 +567,17 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
                 sediment: f64::from(su.pools[pool::SEDIMENT]),
                 oceanic_slab: su.kind != CONTINENTAL,
             });
-            let under = state.contacts[c].under as usize;
-            front_len[under] += front_km;
-            let cu = DVec3::from_array(state.plates[under].centroid);
-            let axis = cu.cross(pos[v]);
-            if axis.length_squared() > 1e-18 {
-                pull[under] += axis.normalize() * (front_km / 1000.0);
+            // Only an oceanic slab pulls: continental crust at the front is buoyant, and where it
+            // comes in the collision resists instead (`belts::resist`; plate tasks 3 and 4).
+            // ledger: PLT-251
+            if su.kind != CONTINENTAL {
+                let under = state.contacts[c].under as usize;
+                front_len[under] += front_km;
+                let cu = DVec3::from_array(state.plates[under].centroid);
+                let axis = cu.cross(pos[v]);
+                if axis.length_squared() > 1e-18 {
+                    pull[under] += axis.normalize() * (front_km / 1000.0);
+                }
             }
         }
     }
@@ -600,7 +628,13 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
             let zn = ((src.z_sub - zt) / (zc - zt)).clamp(0.0, 1.0);
             let h = zn * zn;
             let z = f64::from(s.elevation_m);
-            let mut dz = u0_m * f * g * h * ceiling(z, z_ceiling);
+            // Cortial's h(z̃) uplift is the oceanic slab's: where continental crust comes in, the
+            // collision belt (`belts.rs`) builds the relief from the crust shortened.
+            let mut dz = if src.oceanic_slab {
+                u0_m * f * g * h * ceiling(z, z_ceiling)
+            } else {
+                0.0
+            };
             let w_arc = (-((d_km - k.arc_distance_km) / k.arc_width_km).powi(2)).exp();
             if z < 0.0 {
                 dz += arc_m * w_arc * g;
@@ -700,7 +734,12 @@ pub fn close_contacts(
     let alive: Vec<bool> = state.plates.iter().map(|p| p.alive).collect();
     for c in std::mem::take(&mut state.contacts) {
         let gone = !alive[c.under as usize] || !alive[c.over as usize];
-        if !(all || gone || step.saturating_sub(c.last_step) > timeout) {
+        // A collision keeps its contact while its front lives (`shortening::GRACE_STEPS`): two
+        // plates that have stalled against each other overlap no more, and must still weld.
+        let colliding = c.collision.as_ref().is_some_and(|col| {
+            step.saturating_sub(col.last_step) <= super::shortening::GRACE_STEPS
+        });
+        if !(all || gone || (step.saturating_sub(c.last_step) > timeout && !colliding)) {
             keep.push(c);
             continue;
         }
