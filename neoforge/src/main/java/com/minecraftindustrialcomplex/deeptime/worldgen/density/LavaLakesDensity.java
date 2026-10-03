@@ -16,7 +16,7 @@ import net.minecraft.world.level.levelgen.DensityFunction;
  * <p>Vanilla's aquifer makes a cave lake lava when its surface is at y −10 or lower and the
  * router's {@code lava} function exceeds 0.3 in magnitude, and y −10 is hard-coded
  * ({@code Aquifer.computeFluidType}): right 54 blocks above a floor at y −64, but in a world whose
- * floor is y −352 it would allow lava lakes through 342 blocks of rock. The aquifer samples the
+ * floor is y −512 it would allow lava lakes through 502 blocks of rock. The aquifer samples the
  * function at <b>cell</b> coordinates, not block coordinates: (⌊x/64⌋, ⌊y/40⌋, ⌊z/64⌋). So
  * {@link DensityFunction.FunctionContext#blockY} here is the lake's 40-block level cell, and the
  * gate is {@link LavaRules#lakeCell} for the level's rules: zero in every cell centred more than

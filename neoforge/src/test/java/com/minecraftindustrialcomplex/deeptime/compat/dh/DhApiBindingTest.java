@@ -127,12 +127,12 @@ class DhApiBindingTest {
 
                     @Override
                     public int minY() {
-                        return -352;
+                        return -512;
                     }
 
                     @Override
                     public int height() {
-                        return 992;
+                        return 1152;
                     }
                 };
                 // Columns whose ground rises with x and z: rock, soil, air, in world y.
@@ -142,7 +142,7 @@ class DhApiBindingTest {
                     for (int j = 0; j < n; j++)
                         for (int i = 0; i < n; i++) {
                             int ground = -300 + ((x0 + i * step) & 255) + ((z0 + j * step) & 127);
-                            bottom[0] = -352;
+                            bottom[0] = -512;
                             top[0] = ground - 3;
                             bottom[1] = ground - 3;
                             top[1] = ground + 1;
@@ -217,9 +217,9 @@ class DhApiBindingTest {
                                 assertTrue(t > b && t - b < 6095, "a height Distant Horizons accepts");
                                 last = t;
                             }
-                            assertEquals(992, last, "the column reaches the level's top");
+                            assertEquals(1152, last, "the column reaches the level's top");
                             Object soil = points.get(1);
-                            assertEquals(ground + 1 + 352, pointType.getField("topYBlockPos").getInt(soil), "the ground, counted from the bottom");
+                            assertEquals(ground + 1 + 512, pointType.getField("topYBlockPos").getInt(soil), "the ground, counted from the bottom");
                             assertEquals(15, pointType.getField("skyLightLevel").getInt(soil));
                             assertEquals("block soil", String.valueOf(pointType.getField("blockStateWrapper").get(soil)));
                             assertEquals("biome plains", String.valueOf(pointType.getField("biomeWrapper").get(soil)));

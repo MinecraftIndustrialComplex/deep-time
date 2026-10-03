@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class MagmaTest {
 
-    private static final int C = 4096, SEA = 63, LAVA_FLOOR = -342;
+    private static final int C = 4096, SEA = 63, LAVA_FLOOR = -502;
     private static final double MH = 300.0, MV = 20.0;
 
     /** A cone at (cx, cz): summit rim at y {@code top} twelve blocks out (3.6 km), a crater 6 blocks deep inside it. */

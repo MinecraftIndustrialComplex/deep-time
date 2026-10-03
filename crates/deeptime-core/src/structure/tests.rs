@@ -115,7 +115,7 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     // The stack's top is the surface, and the layer round-trips through the format.
     let src = CellSource::new(&world, &preset).unwrap();
     for c in (0..h.cells()).step_by(97) {
-        let want = (src.surface_y(c, &preset.scale).clamp(-351.0, 639.0) * 16.0).round();
+        let want = (src.surface_y(c, &preset.scale).clamp(-511.0, 639.0) * 16.0).round();
         assert!((f64::from(h.cell(c).0[0]) - want).abs() <= 1.0, "cell {c}");
     }
     let layer = h.to_layer(deeptime_format::Codec::Raw).unwrap();

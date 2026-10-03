@@ -66,7 +66,7 @@ import jarstate  # noqa: E402  (tools/smoke/jarstate.py: the jar comparison inst
 VIEWER = os.path.join(REPO, "tools", "review", "pages", "area3d")
 PROFILES = ("standalone", "mic", "mic-ev", "terrablender", "ev")
 MAX_SIDE = 256
-DEEP_TIME_Y = (-352, 639)
+DEEP_TIME_Y = (-512, 639)
 VANILLA_Y = (-64, 319)
 LEVEL_TYPES = {16384: "deeptime:planet", 32768: "deeptime:planet_32k"}
 # The Mac's shared cache (tools/remote/mac.sh): the server lock and the dev-shell profiles.
@@ -1293,7 +1293,7 @@ def main():
         p.add_argument("--profile", default="standalone", choices=PROFILES)
         p.add_argument("--size", type=int, default=16384)
         p.add_argument("--box", action="append", help="x0,z0,x1,z1 (x1, z1 exclusive); repeatable")
-        p.add_argument("--y", help="lo,hi inclusive (default -352,639)")
+        p.add_argument("--y", help="lo,hi inclusive (default -512,639)")
         p.add_argument("--synth")
         p.add_argument("--strata")
         p.add_argument("--preset")

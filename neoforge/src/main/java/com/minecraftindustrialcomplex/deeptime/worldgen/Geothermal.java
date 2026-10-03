@@ -17,12 +17,17 @@ import java.util.SplittableRandom;
  * chunk and every thread sees the same sites; {@link GeothermalPass} places the blocks. A site's
  * every block is decided from its record and the column's position alone, and once.
  *
- * <p><b>Where.</b> Only where the simulation has heat. The heat sources the bake exports are the
- * active volcanoes ({@code volcanoes/active.json}); the plate model's heat flow, its spreading
- * ridges and its rifts are not exported, so nothing sits on them (FORMAT.md, "Geothermal
- * features"). Each volcano gets a few <i>fields</i> (more at the more active and larger ones, times
- * {@code geothermal_density}), the first near the summit, the others out on the flanks as far as
- * {@code geothermal_reach} basal radii.
+ * <p><b>Where.</b> Only where the simulation has heat. The bake exports two heat sources: the
+ * active volcanoes ({@code volcanoes/active.json}) and the plate model's heat flow on continental
+ * crust ({@code meta/heat_flow_mw_m2}; Ben, decisions log 2026-10-02, "Export heat flow"; its
+ * spreading ridges are under the sea). Each volcano gets a few <i>fields</i> (more at the more
+ * active and larger ones, times {@code geothermal_density}), the first near the summit, the others
+ * out on the flanks as far as {@code geothermal_reach} basal radii. Beyond the volcanoes, ground
+ * whose baked heat flow reaches {@code geothermal_heat_flow_min_mw_m2} (rifts, arcs, hotspot swells
+ * and young belts in the plate model) takes at most one field for each {@link #HEAT_FIELD_AREA_KM2}
+ * (divided by {@code geothermal_heat_density}): the cells of a grid of that area are each
+ * given a field at the first of {@link #HEAT_DRAWS} random points that is hot enough, dry and
+ * clear of ice, so the fields follow the hot ground.
  *
  * <p><b>What.</b> The setting at a field decides its kind:
  * <ul>
@@ -68,6 +73,17 @@ public final class Geothermal {
     public static final double SUMMIT_ZONE = 0.35;
     /** The rock window checked for carbonate under a field, blocks under the ground. */
     public static final int CARBONATE_WINDOW = 150; // ledger: GEO-023 (game-choice)
+    /**
+     * The area of hot continental ground (heat flow at or over {@code geothermal_heat_flow_min_mw_m2})
+     * that takes one field at the default heat density, km2: the cells of the grid are this big
+     * (100 km across). A game choice (ledger: GEO-053): real high-temperature fields in a province
+     * stand from a few hundred to some thousand km2 apart (not sourced here).
+     */
+    public static final double HEAT_FIELD_AREA_KM2 = 10_000.0;
+    /** Random points tried in a grid cell for a hot, dry, ice-free place to put its field. */
+    public static final int HEAT_DRAWS = 6; // ledger: GEO-053 (game-choice)
+    /** The {@link Site#volcano()} of a site whose heat is the ground's heat flow, not a volcano. */
+    public static final int HEAT_FLOW_SOURCE = -1;
 
     /**
      * Peak warming over the climate, K, at the heart of each kind of site (the warm-ground signal).
@@ -115,6 +131,14 @@ public final class Geothermal {
 
         /** The annual mean temperature at the column, °C; NaN without a climate (then it is warm enough). */
         double meanC(int x, int z);
+
+        /**
+         * The plate model's heat flow at the column, mW/m2, on continental crust; NaN on oceanic
+         * crust and in a world without the layer (then the ground has no heat of its own).
+         */
+        default double heatFlowMwM2(int x, int z) {
+            return Double.NaN;
+        }
 
         /** Whether the column lies under glacial ice. */
         boolean iced(int x, int z);
@@ -355,6 +379,11 @@ public final class Geothermal {
         return best;
     }
 
+    /** Sites whose heat is the ground's heat flow, not a volcano. */
+    public long heatFlowSites() {
+        return sites.stream().filter(s -> s.volcano == HEAT_FLOW_SOURCE).count();
+    }
+
     /** Sites of each kind, for reports: {pool, vent, patch}. */
     public int[] counts() {
         int[] n = new int[3];
@@ -385,12 +414,51 @@ public final class Geothermal {
      */
     public static Geothermal build(List<Volcanoes.Volcano> volcanoes, GeothermalRules rules, Magma magma, Magma.Heights heights,
                                    Magma.Wet wet, Env env, int circumference, int seaLevel, double mH) {
-        if (rules.density() <= 0.0 || volcanoes.isEmpty())
+        if (rules.density() <= 0.0)
             return new Geothermal(List.of(), circumference);
         Ctx c = new Ctx(rules, magma, heights, wet, env, circumference, seaLevel, mH, new ArrayList<>());
         for (Volcanoes.Volcano v : volcanoes)
             volcano(c, v);
+        heatFlowFields(c);
         return new Geothermal(c.sites, circumference);
+    }
+
+    /** What a field needs to know of its heat: the volcano's id (or {@link #HEAT_FLOW_SOURCE}) and whether it is silicic. */
+    private record Source(int id, boolean silicic) {
+    }
+
+    /**
+     * The fields on hot continental ground. The world (circumference x half of it) is cut into cells
+     * of {@link #HEAT_FIELD_AREA_KM2} / {@code geothermal_heat_density} square km; each cell, from its
+     * own seed, tries {@link #HEAT_DRAWS} random points and takes the first where the baked heat flow
+     * reaches the setting and the ground is dry land clear of ice. Fields so placed are kinds of the
+     * same machinery as a volcano's, judged by the rain and the mean temperature of the place; a
+     * heat-flow field is never in a summit zone, so it is hot springs wherever those allow.
+     */
+    private static void heatFlowFields(Ctx c) {
+        GeothermalRules rules = c.rules;
+        if (rules.heatDensity() <= 0.0 || c.circumference <= 0)
+            return;
+        double side = Math.sqrt(HEAT_FIELD_AREA_KM2 / rules.heatDensity()) * 1000.0 / c.mH;   // blocks
+        int nx = Math.max(1, (int) Math.round(c.circumference / side)), nz = Math.max(1, (int) Math.round(c.circumference / 2.0 / side));
+        double wx = (double) c.circumference / nx, wz = c.circumference / 2.0 / nz;
+        double z0 = -c.circumference / 4.0;
+        for (int gz = 0; gz < nz; gz++)
+            for (int gx = 0; gx < nx; gx++) {
+                long seed = PaletteRules.mix(0x4EA7_F10EL ^ ((long) gx << 32) ^ (gz & 0xFFFFFFFFL));
+                SplittableRandom rng = new SplittableRandom(seed);
+                for (int draw = 0; draw < HEAT_DRAWS; draw++) {
+                    int fx = c.wrap((int) Math.round(-c.circumference / 2.0 + (gx + rng.nextDouble()) * wx));
+                    int fz = (int) Math.round(z0 + (gz + rng.nextDouble()) * wz);
+                    double q = c.env.heatFlowMwM2(fx, fz);
+                    if (!(q >= rules.heatFlowMinMwM2()))
+                        continue;
+                    if (Magma.top(c.h(fx, fz)) < c.seaLevel + MIN_ABOVE_SEA + 2 || c.wet.at(fx, fz) || c.env.iced(fx, fz))
+                        continue;
+                    field(c, new Source(HEAT_FLOW_SOURCE, false), rng, fx, fz, 1.0);
+                    break;
+                }
+            }
     }
 
     private static void volcano(Ctx c, Volcanoes.Volcano v) {
@@ -411,14 +479,14 @@ public final class Geothermal {
                 int fx = c.wrap((int) Math.round(sx + rad * Math.cos(angle))), fz = (int) Math.round(sz + rad * Math.sin(angle));
                 if (Magma.top(c.h(fx, fz)) < c.seaLevel + MIN_ABOVE_SEA + 2 || c.wet.at(fx, fz) || c.env.iced(fx, fz))
                     continue;
-                field(c, v, rng, fx, fz, rad / radius);
+                field(c, new Source(v.id(), v.silicic()), rng, fx, fz, rad / radius);
                 break;
             }
         }
     }
 
     /** One field around (fx, fz), {@code share} of a basal radius from the summit. */
-    private static void field(Ctx c, Volcanoes.Volcano v, SplittableRandom rng, int fx, int fz, double share) {
+    private static void field(Ctx c, Source v, SplittableRandom rng, int fx, int fz, double share) {
         GeothermalRules rules = c.rules;
         double size = rules.size();
         double precip = c.env.precipMm(fx, fz), mean = c.env.meanC(fx, fz);
@@ -484,7 +552,7 @@ public final class Geothermal {
      * Tries to put a site of this kind about (cx, cz): the first attempt at the centre, the others a
      * gaussian {@code spread} blocks about it; returns the accepted site (added to the list) or null.
      */
-    private static Site place(Ctx c, Volcanoes.Volcano v, Kind kind, int cx, int cz, int r, int apron, double spread, boolean sinter,
+    private static Site place(Ctx c, Source v, Kind kind, int cx, int cz, int r, int apron, double spread, boolean sinter,
                               long seed, SplittableRandom rng, int attempts) {
         for (int a = 0; a < attempts; a++) {
             int x = cx, z = cz;
