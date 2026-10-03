@@ -170,4 +170,78 @@ half-turn about the integer point (cx, cz) maps block (bx, bz) to (2cx − bx �
 `deeptime-quincuncial portals --layout guyou|peirce --size N --lon L` prints the table and the
 `/summon` lines for any size.
 
-RUN_PLACEHOLDER
+## 5. The prototype run
+
+**Set-up** [R]. NeoForge 21.1.249 dedicated server on the test VM with three mods: the Deep Time jar
+built from this branch and patched by `notw_jar.py` (Toroidal World optional, `WorldDimensionsShapeMixin`
+removed; TW and Immersive Portals cannot share a world, 2026-10-02 note §5), Immersive Portals – CE
+6.0.10 and Cloth Config. Level type `deeptime:planet_32k` (C = 32,768, the strip), world data
+`guyou-world`: the earthlike_quick_16k preset, scattered continents, 500 Myr, seed 1, baked by this
+branch's `deeptime run` (land 0.174 of the planet), resampled onto Guyou b = 8,192, λc = 31°. Deep Time
+bound it with no change ("Bound Deep Time world data … (format 0.3, C = 32768)"), built its climate
+mapping, chose a spawn from the carried-over candidates and generated terrain. The four portals were
+summoned over RCON from `deeptime-quincuncial portals`, converted to global portals, and the server was
+restarted (a fresh global portal moves entities only near its centre until then). The client is a real
+NeoForge client under Xvfb with Mesa llvmpipe (portablemc, offline profile), driven with xdotool;
+positions come over RCON every 0.25 s.
+
+**Maps** (`review/out/quincuncial/`, not committed): `src-equirect.png` (the bake),
+`guyou-domain.png` (the world: the rectangle, equator across the middle, poles and singular points
+marked), `guyou-strip.png` (the whole strip: the domain outlined, its copies beyond every edge turned
+or slid as the seams say).
+
+### 5.1 Terrain is continuous across every seam [R]
+
+`proto.py terrain`: 48 points along each seam. At each, the terrain height the chunk generator uses
+(`/deeptime probe column`, `terrainH`) at the block one step inside (A), the block one step outside (O,
+hidden by the portal), and O's glued image G (inside, on the far side).
+
+| Seam | Kind | H(O) − H(G): outside vs its glued image | per-block step A→G across the seam: median / p90 / max | per-block step between ordinary neighbours: median / p90 / max |
+|---|---|---|---|---|
+| east | slide | 0 at all 48 | 0.06 / 0.35 / 1.06 | 0.06 / 0.38 / 1.06 |
+| west | slide | 0 at all 48 | 0.06 / 0.35 / 1.06 | 0.06 / 0.36 / 1.05 |
+| south | half-turn | 0 at all 48 | 0.06 / 0.59 / 1.03 | 0.06 / 0.50 / 1.16 |
+| north | half-turn | 0 at all 48 | 0.05 / 0.30 / 1.00 | 0.05 / 0.28 / 1.31 |
+
+The folded outside is exactly the glued inside, so what a portal shows is what lies beyond it, and the
+step across a seam is drawn from the same distribution as the step between any two neighbouring
+blocks: there is no seam in the terrain. (Block for block, the generated column next to a half-turn
+seam is the terrain one block further on, because a half-turn about a block corner maps a block's
+sample point to its neighbour's corner; that is a one-block offset, within the slope of the step.)
+Caves, ores and decoration are seeded by block position and chunk, not by planet point, so they do
+not continue across a seam [I].
+
+### 5.2 Entities cross every seam and land at the matching point [R]
+
+`proto.py entities`: an item, a minecart and an arrow (no gravity, 0.8 blocks a tick outward) sent at
+each seam from 3 blocks inside.
+
+| Seam | Item | Minecart | Arrow |
+|---|---|---|---|
+| east (slide) | crossed: −8159.9, 701.0 | crossed: −8184.0, 701.0 | crossed: −8159.9, 701.0 |
+| west (slide) | crossed: 8160.0, −700.0 | crossed: 8184.0, −700.0 | crossed: 8159.8, −700.0 |
+| south (half-turn) | crossed: 1200.0, 4064.0 | crossed: 1200.0, 4088.1 | crossed: 1200.0, 4064.0 |
+| north (half-turn) | crossed: −1201.0, −4064.0 | crossed: −1201.0, −4088.1 | crossed: −1201.0, −4063.9 |
+
+All twelve crossed, and every one came out on the glued image of its track: 0.00 blocks off it along
+the seam (x = −1200 ↔ 1200 at the south seam, z = 701 kept at the east seam), moving away from the seam
+on the far side, as the half-turn requires. (A first try with NoAI pigs and no-gravity armour stands
+did not move them at all, so those two kinds are untested; arrows from that try stopped half a block
+short of the plane, in water, inconclusively.)
+
+WALK_PLACEHOLDER
+
+### 5.4 Fluids, redstone, chunk loading, load [R]
+
+- **Water** placed one block inside the north seam spread along the inside, but neither into the hidden
+  outside block nor into the glued block on the far side: fluids stop at the portal plane.
+- **Redstone**: a powered wire ending at the north seam does not light a lamp in the glued
+  neighbouring block. There is no block adjacency across a portal (as on 2026-10-02).
+- **Chunk loading**: with the player 8 blocks inside the north seam, the chunks on the far side of the
+  seam (the glued side, 4,000 blocks away in raw coordinates) were loaded by Immersive Portals, and so
+  were the hidden outside chunks (vanilla's view distance, which knows nothing of portals).
+- **Server load**: 1.7 ms/tick idle with the four global portals and no player; 6.4 ms/tick with one
+  player standing at a seam (chunks on both sides). Without a matched run without portals this is no
+  measure of the portals' cost; the 2026-10-02 prototype found none that stood out of the noise.
+
+RUN_REST_PLACEHOLDER
