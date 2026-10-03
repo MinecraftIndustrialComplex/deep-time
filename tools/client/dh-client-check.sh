@@ -82,6 +82,9 @@ PMC=$(nix build --no-link --print-out-paths nixpkgs#portablemc | head -1)/bin/po
 export DISPLAY=$DISP LD_LIBRARY_PATH="$MESA/lib:$GLVND/lib" __GLX_VENDOR_LIBRARY_NAME=mesa \
     __EGL_VENDOR_LIBRARY_DIRS="$MESA/share/glvnd/egl_vendor.d" LIBGL_DRIVERS_PATH="$MESA/lib/dri" \
     LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe LP_NUM_THREADS=4
+# No sound: OpenAL's PulseAudio/PipeWire backend aborted the client JVM on the test machine
+# (2026-10-03: "Assertion 'p' failed at ../src/pulse/simple.c:273"), so OpenAL gets its null device.
+export ALSOFT_DRIVERS=null
 start_xvfb() {
     if [ -n "$XPID" ] && kill -0 "$XPID" 2>/dev/null; then return; fi
     pgrep -f "Xvfb $DISP " > /dev/null && return
