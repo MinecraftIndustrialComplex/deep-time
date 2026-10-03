@@ -125,6 +125,66 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P1-10 | **Region size and when a world gets its regions.** (1) Provinces are at least 50,000 km² (the earlier bake minimum, kept; `provinces.min_area_km2`): the 16k planet has 40 provinces of 68,000 to 2,200,000 km² (about 870 to 4,900 blocks across), TerraBlender's own regions being about 1,000 to 3,000 blocks; smaller values give more, smaller regions (recommended: keep). (2) A world's province → region table is dealt once, at the first start with TerraBlender installed, and kept: a biome mod added later brings its regions to new worlds only, and one removed falls back to the vanilla region for its provinces (recommended; the alternative re-deals for unexplored chunks and shifts biomes at the border of explored ones). | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-03 — The Lambert equal-area world: the projection module's bodies are Lambert's, format 0.4 (agent worktree agent-a3186d42ee9449d3d, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; phase 2 of the projection task, on top of the refactor below; not merged)
+- **Ask.** Ben, decisions log 2026-10-02: "Lambert for now" (Lambert cylindrical equal-area, true on the
+  equator, wrapping east–west with Toroidal World, pole cap kept). The coordinator: phase 2 of the projection
+  task, after the projection-neutral refactor (the entry below), reusing what fits of the parked
+  `projection-lambert-wip`; the true-metric corrections of `docs/design/equal-area-projection.md` §4.
+- **Built.** `deeptime_format::projection` is Lambert: R = C/2π, φ = asin(−z/R), poles at z = ∓R (2,607.6 at
+  16k); metric cos φ east–west, 1/cos φ north–south, area scale 1. Grids run from −Zo, Zo the smallest multiple
+  of the planet's quantum (64 blocks) at or past the pole, the same for every grid of a planet (the WIP's
+  lcm(quantum, r) gave a coarse r = 128 a different Zo and the ladder stopped nesting; H = ⌈2·Zo/r⌉): L1 1024 ×
+  328, L2 2048 × 656, L3 8192 × 2624 at 16k (L1 of 32k quick 1024 × 328). `GridDesc` gained `area_share`,
+  `thinned`; cell areas, row weights, `true_cell_m` (north–south the arc of the row's band) and the band
+  weights come from it. Map pictures are π : 1 (`picture_height`; keyframes 1024 × 326 in every preset and the
+  default), rows uniform in sin φ. World-data format 0.4 (Cargo.toml, `FORMAT_MINOR`, Java `FormatVersion`).
+  Java `worlddata/Projection` and the pages' `projection.js` are the twins (quantum, Zo, picture rows, the
+  metric); the Java analytic test terrain and the Rust synthetic one use asin(z·2π/C).
+- **True metric (design note §4).** The climate's geometry takes a per-row cell height and the ice distance
+  transform's column pass runs at the rows' cumulative true positions (`dt_1d_at`, from the WIP); the ITCZ
+  weighs rows by their cell areas; the satellite and world-map hill shades take a pixel's true size
+  (`Projection::picture_pixel_m`, cos φ held at 0.15); the deposit footprints on the pages are drawn in block
+  space (`ppbx`/`ppbz` instead of degrees); `climate-dem` resamples the Earth DEM (equirectangular input) onto
+  the planet's grid. Left on purpose: the orographic rain's block metric (cylindrical: unchanged), the
+  east–west marches (cos φ both ways), the section tool's km (game blocks × 300 m).
+- **Pages.** The workbench map pane is π : 1; the final world's tile pyramid stays a 2 : 1 frame from z = −C/4
+  (`Projection::tile_frame_z`) with the pixels past the poles drawn as the background (RENDER_VERSION 2); the
+  graticule, readouts, box selections, globe texture and the section clicks go through `DTProj`.
+  `tools/workbench/sections_shots.py` clicks through the page's projection; `tools/workbench/preview.py` and
+  `tools/viewer/deposits-check.js` are Lambert.
+- **Evidence (quick 16k, scattered continents, 500 Myr, seed 1, `deeptime stage volcanoes --threads 4` on the
+  VM; before = the refactor's equirectangular build with the new ice line, after = this branch).** The
+  planets differ in detail (the plate model reads a different raster, so the histories part), but the
+  projection's property is exact: the map's share is the planet's share. Ice: before map 0.333 against true
+  area 0.136 (land 0.084/0.039, sea 0.249/0.097), poleward of 60° map 0.334 against 0.1345; after map 0.1004
+  against area 0.0975 (land 0.0463/0.0448, sea 0.0541/0.0527), poleward of 60° map 0.1346 against 0.1318 (the
+  sphere 0.134). Land: the surface line's cell share 0.255 against true 0.268 before, 0.283 = 0.283 after.
+  True-area hypsometry before / after: land mean 753 / 771 m, p50 581 / 549, p90 1,678 / 1,747, above 2 km
+  0.055 / 0.069, sea median depth 4,037 / 3,810 m. Cost: 11 min 13 s / 8 min 44 s wall, 2.93 / 2.34 GB peak RSS
+  (36 % fewer cells). Pictures and logs: `review/out/projection-lambert/` (not committed; satellite-before.png
+  1024 × 512, satellite-after.png 1024 × 326). Before/after numbers in §7 of the design note match the old
+  baseline exactly (the planet is deterministic).
+- **Workbench, measured** (a private `deeptime watch` on port 8667 over a baked 500 Myr quick 16k Lambert run;
+  screenshots under `review/out/projection-lambert/wb/`): the run view's map is π : 1 with 60°N at the right
+  height; the readout over z = −1,339 says 30.9°N (asin(1339/2607.6)); the inspect API answers lat 59.99° at
+  z = −2,258, −30.005° at 1,304, ±85.63° at ∓2,600; tiles 200 (the planet's band in the 2 : 1 frame, dark past
+  the poles); the final world view shows the band with its graticule at Lambert latitudes; the section from
+  (1237, −2550) to (1237, −1800) reads 77.9°N → 43.7°N; sections and the rock slice draw, no page errors. The
+  inspector check's 6 failures are its event-list checks: a CLI bake served as a run has no event stream.
+- **Gates (VM, scratch copy of the branch)**: cargo fmt --check, clippy -D warnings, deny clean; `cargo test
+  --workspace` 741 passed, 0 failed, 3 ignored (about 40 tests that pinned the 2 : 1 layout rebuilt on the
+  Lambert grids: water view, hydrology, keyframes, satellite, amplify, deposits, plates, climate, coupling,
+  biomes, sessions, format, CLI; one hydrology fixture's third climate moved from 250 to 300 mm because the
+  192-row rough planet has fewer basins); `./gradlew build test` 230 tests, 0 failures, 1 skipped;
+  `node tools/viewer/deposits-check.js` passes its projection checks (its "a shape per family" check already
+  fails on master since the P2-08 impact families). GameTests: to run once the refactor's are done (one
+  server lock).
+- **Ledger.** SCL-049 rewritten (Lambert, Ben's choice); SCL-052 new (the equal-area property, tested);
+  POL-005, 006, 014, 015, 017, 020, BAK-035, MAG-024 rewritten; `docs/science/pole-cap.md`,
+  `world-scale-and-bake.md`, plan §5.1/§5.2 marked superseded; FORMAT.md, EVENTS.md.
+- **Question to Ben** (Pending questions): the pole cap's band shrinks from 228 to 49 blocks at 16k;
+  recommended cap 70°, stop 80° (118 blocks).
+- **Next.** The three GameTest profiles on this head; merge master before them.
 ### 2026-10-02 — The projection-neutral refactor: one projection module per language, equirectangular kept, output bit-identical (agent worktree agent-a3186d42ee9449d3d, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Ask.** The coordinator, after Ben reopened the projection choice (Lambert, or a square tiling map; research note
   `docs/research/notes/world-projection-options.md`): build step 1 of `docs/design/equal-area-projection.md` §8 now, so
