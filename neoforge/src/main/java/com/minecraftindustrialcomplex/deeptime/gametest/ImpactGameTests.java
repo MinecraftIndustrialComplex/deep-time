@@ -8,6 +8,7 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
@@ -104,6 +105,8 @@ public final class ImpactGameTests {
         Set<BlockState> breccia = new HashSet<>(result.blocks());
         int lens = (int) Math.max(3, Math.min(24, Math.floor(best.brecciaM() / mV)));
         int[] found = new int[FLOOR_COLUMNS.length], read = new int[FLOOR_COLUMNS.length];
+        // What the columns hold under the floor, by block, for the log: the lens is breccia, the rest soil and strata.
+        java.util.Map<String, Integer> seen = new java.util.TreeMap<>();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         double rimF = rim;
         ChunkSampling.forEach(helper, FLOOR_COLUMNS.length, i -> {
@@ -114,6 +117,7 @@ public final class ImpactGameTests {
             for (int y = top; y >= Math.max(level.getMinBuildHeight(), top - lens - 2); y--) {
                 BlockState s = chunk.getBlockState(pos.set(x, y, z));
                 read[i]++;
+                seen.merge(BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath(), 1, Integer::sum);
                 if (breccia.contains(s))
                     found[i]++;
             }
@@ -126,11 +130,11 @@ public final class ImpactGameTests {
             }
             DeepTime.LOGGER.info("[gametest] aCraterIsABowlOverBreccia craters={} showing={} read=crater {} ({} m across, {}, {} Myr, "
                             + "{} m of {} m relief, lens {} m) at ({}, {}): centre y {} rim y {} bowl {} blocks (want {}); breccia {} "
-                            + "blocks in {} of {} columns, {} read each ({})", all.size(), showing, best.id(),
+                            + "blocks in {} of {} columns, {} read each ({}); read {}", all.size(), showing, best.id(),
                     Math.round(best.diameterM()), best.fate(), best.ageMyr(), Math.round(best.reliefM()), Math.round(best.depthM()),
                     Math.round(best.brecciaM()), cx, cz, String.format("%.1f", centre), String.format("%.1f", rimF),
                     String.format("%.1f", bowl), String.format("%.1f", want), blocks, columns, FLOOR_COLUMNS.length, read[0],
-                    result.blocks().stream().map(StrataGameTests::id).toList());
+                    result.blocks().stream().map(StrataGameTests::id).toList(), seen);
             if (bowl < want)
                 helper.fail("crater " + best.id() + ": its centre is " + bowl + " blocks below its rim, " + want + " wanted");
             if (columns == 0)
