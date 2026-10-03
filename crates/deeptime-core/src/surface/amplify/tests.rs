@@ -118,6 +118,12 @@ fn cfg(drama: f64) -> Config {
                 radius_cells: 5,
                 ..glacial::GlacialShape::default()
             },
+            // Shorter gullies for the same reason (each octave's fall line reaches a quarter of
+            // its wavelength).
+            character: character::CharacterParams {
+                gully_wavelength_blocks: 64.0,
+                ..character::CharacterParams::default()
+            },
             ..AmplifyParams::default()
         },
         drama,
