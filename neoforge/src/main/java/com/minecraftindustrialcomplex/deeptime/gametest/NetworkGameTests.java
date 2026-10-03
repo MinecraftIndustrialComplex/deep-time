@@ -173,7 +173,7 @@ public final class NetworkGameTests {
     /**
      * A player gets the world info on login and again on every dimension change (plan §7.15): a
      * mock player logs into the flat overworld (not a planet), is moved to the analytic test planet
-     * (C = 16,384, the default 75°/80° cap), to the world-data test planet (C = 1,024, its manifest's
+     * (C = 16,384, the default 70°/80° cap), to the world-data test planet (C = 1,024, its manifest's
      * scales and name) and back. Its own batch: a logged-in player must not disturb other tests.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, batch = "network_player", timeoutTicks = 200)
@@ -193,7 +193,7 @@ public final class NetworkGameTests {
             m.player.teleportTo(planet, 0.5, 200, 0.5, 0, 0);
             WorldInfoPayload onPlanet = m.last(WorldInfoPayload.class);
             helper.assertTrue(onPlanet != null, "no world info after moving to the test planet");
-            helper.assertTrue(onPlanet.planet() && onPlanet.circumference() == 16384 && onPlanet.poleCapDeg() == 75f
+            helper.assertTrue(onPlanet.planet() && onPlanet.circumference() == 16384 && onPlanet.poleCapDeg() == 70f
                             && onPlanet.poleStopDeg() == 80f && onPlanet.dimension().equals(GameTestSupport.TEST_PLANET.location().toString())
                             && onPlanet.formatVersion().equals(FormatVersion.CURRENT) && onPlanet.planetName().startsWith("wrap-test"),
                     "test planet: " + onPlanet);

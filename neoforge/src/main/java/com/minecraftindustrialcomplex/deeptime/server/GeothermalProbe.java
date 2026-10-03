@@ -80,7 +80,7 @@ public final class GeothermalProbe {
 
         // What it means for a player: land columns drawn evenly over the playable planet.
         int c = t.circumference();
-        int zMax = (int) Math.abs(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(c, 75.0));
+        int zMax = (int) Math.abs(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(c, com.minecraftindustrialcomplex.deeptime.wrap.PoleCapCurve.DEFAULT_CAP_DEG));
         SplittableRandom rnd = new SplittableRandom(20261001L);
         double[] any = new double[POINTS], pool = new double[POINTS], vent = new double[POINTS], volcano = new double[POINTS];
         int count = 0;

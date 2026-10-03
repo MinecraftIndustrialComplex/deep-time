@@ -473,7 +473,7 @@ this; it is on the WIP branch.
    footprints in block space on the pages; the Earth DEM resampled onto the planet's grid; the
    workbench's tile pyramid kept as a 2 : 1 frame (`tile_frame_z`) with the pixels past the poles
    drawn as background; the ice line in `deeptime stage`. The orographic rain keeps its block
-   metric (§4: cylindrical, unchanged). The pole-cap band went to Ben as a question (STATUS).
+   metric (§4: cylindrical, unchanged). The pole-cap band went to Ben: the cap line moved to 70° (2026-10-03), a 118-block band at 16k.
    Evidence in the STATUS build log.* Finish the WIP:
    - the remaining tests;
    - the JS (`DT.proj`), the tools and the docs;
