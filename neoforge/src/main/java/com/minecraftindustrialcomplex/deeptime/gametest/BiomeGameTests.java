@@ -160,8 +160,12 @@ public final class BiomeGameTests {
     // above its floor except Dsub, 0.481 on seed 14 (266 columns; its Dfc:taiga is 0.474), so Dsub goes
     // to 0.38 by the same rule. A floor that needs re-reading whenever the simulation changes is a weak
     // test; it stays as a guard against a broken mapping only.
+    //
+    // 2026-10-02 (continental crust fix: resampling footprints, island arcs mature by their crust): the
+    // default test planet changed again and its A family read 0.446 (83 columns; Af's columns 43 % jungle,
+    // 37 % stony shore), with the mapping unchanged. A goes to 0.34 by the same rule.
     static final Map<String, Double> FLOORS = Map.ofEntries(
-            Map.entry("A", 0.45), Map.entry("Af", 0.54), Map.entry("BW", 0.57), Map.entry("BS", 0.42), Map.entry("C", 0.75),
+            Map.entry("A", 0.34), Map.entry("Af", 0.54), Map.entry("BW", 0.57), Map.entry("BS", 0.42), Map.entry("C", 0.75),
             Map.entry("D", 0.88), Map.entry("Dsub", 0.38), Map.entry("E", 0.82), Map.entry("sea", 0.95),
             Map.entry("BW:desert", 0.37), Map.entry("Af:jungle", 0.41), Map.entry("Dfc:taiga", 0.33), Map.entry("E:snow", 0.72));
     static final int MIN_COLUMNS = 40;
