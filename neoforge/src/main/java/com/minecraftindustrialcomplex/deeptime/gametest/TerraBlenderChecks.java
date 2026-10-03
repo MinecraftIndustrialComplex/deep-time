@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.gametest;
 
+import com.minecraftindustrialcomplex.deeptime.climate.VolcanicBiomes;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.RegionSource;
 import com.minecraftindustrialcomplex.deeptime.worldgen.RegionSpawnTarget;
@@ -42,7 +43,7 @@ final class TerraBlenderChecks {
      * Samples a {@code cols × rows} grid of surface columns. For each: the province, the region its
      * table gives it, and the biome the level's biome source places there; the biome must be one the
      * region (or, for TerraBlender's deferred placeholder and its region-less trees, vanilla's
-     * region 0) offers. Also per province: one region, equal to the one named in the world's table.
+     * region 0) offers, unless it is a volcanic biome placed at a volcano (any region's: decisions log 2026-10-03). Also per province: one region, equal to the one named in the world's table.
      */
     static Result run(ServerLevel level, int cols, int rows) {
         var g = (GeologicChunkGenerator) level.getChunkSource().getGenerator();
@@ -91,7 +92,8 @@ final class TerraBlenderChecks {
                 }
                 var key = b.unwrapKey().orElseThrow();
                 Set<ResourceKey<Biome>> ok = offered.getOrDefault(region, vanilla);
-                if (!ok.contains(key) && !vanilla.contains(key)) {
+                // A volcanic role's biome goes at its volcano whatever the province's region (decisions log 2026-10-03).
+                if (!ok.contains(key) && !vanilla.contains(key) && !b.is(VolcanicBiomes.KEEP_OUT)) {
                     outside++;
                     if (first == null)
                         first = "biome " + key.location() + " at (" + x + "," + z + ") is not offered by region " + region
@@ -127,12 +129,13 @@ final class TerraBlenderChecks {
             int z = -zp + (int) ((((k * 29) % 64) + 0.5) * (2.0 * zp) / 64.0);
             int y = (int) Math.max(minY, Math.min(maxY, Math.floor(t.height(x, z))));
             var chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, net.minecraft.world.level.chunk.status.ChunkStatus.BIOMES, true);
-            var key = chunk.getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(y), QuartPos.fromBlock(z)).unwrapKey().orElseThrow();
+            var stored = chunk.getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(y), QuartPos.fromBlock(z));
+            var key = stored.unwrapKey().orElseThrow();
             int region = src.regionAt(x, z);
             chunkSamples++;
             if (!key.location().getNamespace().equals("minecraft"))
                 chunkMod++;
-            if (!offered.getOrDefault(region, vanilla).contains(key) && !vanilla.contains(key)) {
+            if (!offered.getOrDefault(region, vanilla).contains(key) && !vanilla.contains(key) && !stored.is(VolcanicBiomes.KEEP_OUT)) {
                 chunkOutside++;
                 if (first == null)
                     first = "generated chunk biome " + key.location() + " at (" + x + "," + z + ") is not offered by region " + region;

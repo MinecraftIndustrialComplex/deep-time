@@ -6,7 +6,7 @@ fixed. The band edges of Minecraft's biome builder were read in its source. The 
 biome is a game choice throughout and is labelled so. The climate that feeds the classifier (monthly
 temperature and rain) is being rewritten and is not checked here.
 
-Ledger ids on this page: `BIO-001` to `BIO-103` (see [ledger/BIO.md](ledger/BIO.md)).
+Ledger ids on this page: `BIO-001` to `BIO-114` (see [ledger/BIO.md](ledger/BIO.md)).
 
 ## What you see in the world
 
@@ -169,6 +169,53 @@ change. On the 4k test planet (201 columns left in BW): BW 0.692 standalone, 0.7
 0.592 (floor 0.37). Without the exclusion the same planet read BW 0.457 and BW:desert 0.297 standalone and BW 0.543 MIC,
 which failed the floors: the shares fell because 65 of 266 columns became plains by design, not because the mapping broke.
 
+## Volcanic biomes
+
+Biome mods bring volcanic biomes: Terralith (shipped by MIC) has yellowstone (hot springs and geysers),
+volcanic peaks, volcanic crater, caldera, ashen savanna, basalt cliffs and the cave biome thermal caves;
+Biomes O' Plenty has volcano, volcanic plains and hot springs. A biome source places each of them where its
+climate parameters fall, so before this change they came wherever the climate point happened to match,
+unrelated to the planet's volcanoes, and the planet's real volcanoes, calderas and hot springs stood in
+whatever biome the climate gave. Ben's answer (decisions log 2026-10-03): "Tie them to real volcanoes
+(Recommended)": where the pack has them they go only at real volcanoes (hot-spring fields, active cones,
+calderas, fresh ash) and are kept out everywhere else; without them (vanilla) the climate's biome stays.
+This follows the cold-desert answer: a mod's better biome when the player has it, otherwise the best vanilla
+pick.
+
+What the game does (Java `worldgen/VolcanicZones`, `climate/VolcanicBiomes`; ledger BIO-104 to BIO-114, all
+game choices but the vanilla depth band of BIO-112):
+
+- **Kept out.** Every biome in the tag `#deeptime:volcanic` is taken out of the climate search of a Deep Time
+  level. The search still runs on the pack's own search tree (the region's, with TerraBlender), with every
+  volcanic leaf set infinitely far, so the place gets the next-nearest biome of the same tree: the pack's own
+  second choice for that climate point. Nothing is filled with a fixed biome, so no hole opens in another
+  mod's placement (measured below).
+- **Put in.** Zones are discs around the active volcanoes of the baked list, their craters and calderas,
+  their hot-spring pools and their magma (FORMAT.md, "Volcanic biomes"). In priority order:
+
+| Role | Shipped tag order (first the pack has) | Where |
+|---|---|---|
+| hot-spring field | terralith:yellowstone, biomesoplenty:hot_springs | around every hot-spring pool (from a volcano or from hot ground), out to the pool's terraces + 4 blocks |
+| caldera floor | terralith:caldera | 0.9 of the caldera's rim radius |
+| summit crater | terralith:volcanic_crater, terralith:volcanic_peaks, biomesoplenty:volcano | the crater's rim + 4 blocks |
+| cone (summit, upper flanks) | terralith:volcanic_peaks, biomesoplenty:volcano | 0.45 of the basal radius, stratovolcanoes and shields |
+| fresh ash | terralith:ashen_savanna, biomesoplenty:volcanic_plains | out to the basal radius, stratovolcanoes and caldera complexes of activity 0.75 or more, where the climate allows |
+| young lava | terralith:basalt_cliffs, biomesoplenty:volcanic_plains | out to the basal radius, shields, where the climate allows |
+| thermal caves (underground) | terralith:cave/thermal_caves | 1.5 chamber radii round the magma, from the biome's own depth down |
+
+  A surface role holds only on land and above the cave band (biome depth under 0.2, vanilla's cave biomes
+  start there: BIO-112), and never on a river's channel. "Where the climate allows" means the climate point
+  lies inside that biome's own temperature and humidity ranges in the pack's parameter list (Terralith puts
+  ashen savanna on the warm band at dry to middling humidity), so the rule follows whatever biome a pack
+  lists. A role without a biome in the pack, or not allowed at the spot, gives way to the next role whose
+  disc holds the place and in the end to the climate search. Every disc is at least 12 blocks in radius, three
+  biome cells, and a field ring narrower than 8 blocks is dropped, so the edges blend into areas, not specks.
+  The setting `volcanic_biome_reach` (1, 0 to 3) scales the cone and the fields; 0 places none.
+- **Datapacks.** Both lists are tags: a pack adds a biome to a role tag (and it is kept out elsewhere too) or
+  to `#deeptime:volcanic` alone (kept out, never placed), or reorders a role tag with `"replace": true`.
+- Without such a biome in the pack nothing changes: the level's biome queries skip the whole layer (the
+  GameTest `volcanicBiomesChangeNothingWithoutThem` checks every sampled column on the vanilla profile).
+
 ## Simplifications and limits
 
 - Peel classifies station records of many years. The mod classifies the monthly means of one
@@ -186,6 +233,13 @@ which failed the floors: the shares fell because 65 of 266 columns became plains
 - Vanilla has no cold desert. A BWk below a mean of 10 °C is placed on the frozen or cold band by its
   mean temperature (see "Cold deserts" below), so vanilla draws snowy plains or plains there; the
   10 °C and 0 °C switches are game choices (BIO-101), not a classification of any source.
+- The volcanic biomes follow the baked list of active volcanoes, their craters and calderas, the hot-spring
+  pools and the magma. Dead volcanoes, flood-basalt plateaus and young lava outside a shield are not exported
+  by the bake, so they get no volcanic biome; nor do fumarole fields (only hot-spring pools mark a field). The
+  zones are discs, not ash plumes downwind; their sizes are game choices (BIO-104 to BIO-111), not measured
+  areas of real volcanic landscapes.
+- A volcanic role's biome ignores TerraBlender's regions: a volcano in a province whose region is vanilla's
+  still gets Biomes O' Plenty's volcanic biome when the pack has it.
 
 ## Game choices
 
@@ -196,7 +250,9 @@ humidity rules (BIO-039 to BIO-048, BIO-053, BIO-054, BIO-100), the knobs (BIO-0
 continentalness, erosion and weirdness derivations (BIO-063 to BIO-070), the frozen-ground placement
 (BIO-074 to BIO-078: Ben, decisions log 2026-09-29 and 2026-09-30) and the ice cover (BIO-079 to
 BIO-084: Ben, 2026-09-30). The GameTest floors (BIO-072) were set 0.1 under the lowest share
-measured over ten test planets and catch a broken mapping, not a wrong climate.
+measured over ten test planets and catch a broken mapping, not a wrong climate. The volcanic biomes (BIO-104 to BIO-114) are Ben's in kind
+(decisions log 2026-10-03, "Tie them to real volcanoes") and the agent's in every number: zone sizes, the
+activity needed for fresh ash, the role order and the tags' order.
 
 ## Open questions
 
