@@ -50,7 +50,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# 1. The server.
+# 1. The server. Its ports are the set's fixed ones, which other sets share: wait while they are taken
+# (2026-10-03: another worktree's standalone server held 25665 and this one died on start).
+for i in $(seq 120); do
+    ss -ltn 2>/dev/null | grep -q -e ":$GAME " -e ":$RCONP " || break
+    [ $i = 1 ] && say "== port $GAME or $RCONP is taken; waiting (at most 20 min)"
+    sleep 10
+done
 say "== server smoke/$P (NeoForge $NEO, port $GAME)"
 ( cd "$SRV" && exec setsid "$JAVA" @user_jvm_args.txt "@libraries/net/neoforged/neoforge/$NEO/unix_args.txt" --nogui ) > "$SRV/console.log" 2>&1 < /dev/null &
 SPID=$!
