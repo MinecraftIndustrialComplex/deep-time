@@ -823,10 +823,12 @@ width `cell` (4 in `deeptime:planet`; the parity fixture assumes 4) as the shore
 
 The pass: a sea column the aquifer left dry is filled from the sea's top down to the ground (the
 pass runs in every chunk with elevation cells within 17 blocks of sea level for this); a river column is cut or filled to `bed` (gravel on the bed of a channel under 6 blocks
-wide, sand on a wider one), water from bed + 1 to top, air above; a lake column fills the air from
-top down to the ground as P0-13's pass did, plugging a cave under `bed` (the generated ground, which
-between noise-cell corners can stand a block or two above `ground` on a steep shore: a lake column
-whose generated ground reaches `top` holds no water and is dry shore, flush with the lake); a bank is lowered to
+wide, sand on a wider one), water from bed + 1 to top, air above; a lake column is cut to its `bed` as a river's
+channel is: generated ground over `top` is removed, ground between `bed` and `top` becomes water
+(the generated ground between noise-cell corners can stand a block or two above `ground`, because the
+terrain density's scale differs from corner to corner; before the cut such a column in a lake one
+block deep held no water and was dry shore, flush with the lake: 22 % of one planet's lake columns),
+and a cave under `bed` is plugged; a bank is lowered to
 `max_ground` and raised to `min_ground` keeping its top block, and air from `seal_from` to
 `min_ground` is filled; where a water column's neighbour holds water higher up, the block at the
 higher top gets flowing water (level 1, resting on the water under it)
@@ -907,7 +909,9 @@ enough (two L1 cells) to be cut into the deep-time surface and laid in the strat
 drawn by the amplifier and given a body. `notes.bake.impacts` records `craters` (the count) and
 `craters_file`. The game does not read the file to build anything: the craters are in `elevation`,
 their rock in the horizon stacks and in bodies of role `impact_breccia` (rock class `impact_breccia`,
-with a zone `melt_sheet` of rock class `impact_melt` on the floor of a crater that has one). It is
+with a zone `melt_sheet` of rock class `impact_melt` on the floor of a crater that has one; the
+body is an ellipsoid centred on the crater's original floor, which the bake seats at the height of
+`elevation` at the crater's centre less `cover_m`, so the lens lies under the floor the game draws). It is
 there for tools, and Java's `worlddata/Craters` reads it for the GameTest that checks a crater in the placed world.
 
 ### Active volcanoes (`volcanoes/active.json`) and their magma
