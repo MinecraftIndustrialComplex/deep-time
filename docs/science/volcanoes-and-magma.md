@@ -57,7 +57,7 @@ the whole depth of the world, as current volcanology describes real arc and hots
 below the crater floor, is the shallow chamber, a lens of lava (for example 19 across and 57 high
 under a large arc cone, because heights are drawn 15 times larger than widths). A narrow column of
 lava rises from it to just under the crater, capped by magma blocks. **Below it** a column of flat lava
-lenses, each wider than tall and 5 to 11 blocks thick, hangs 28 blocks (560 m) apart, joined by thin
+lenses, each wider than tall and 5 to 11 blocks thick, hangs 28 blocks (980 m at 35 m a block) apart, joined by thin
 vertical conduits, and widens with depth (the lowest lens is about twice as wide as the highest)
 until a last lens sits on the lava floor at the bottom of the world, so the lava does not end. The
 lenses sit in a body of altered hot rock (basalt with a magma block in about every 25), a little
