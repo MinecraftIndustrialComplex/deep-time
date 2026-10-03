@@ -601,7 +601,7 @@ const FIT_GAIN: f64 = 0.8; // ledger: CLM-179
 const FIT_ITERATIONS: u32 = 30; // ledger: CLM-179
 const FIT_YEARS: u32 = 3; // ledger: CLM-179
 const FIT_RMS_K: f64 = 0.1; // ledger: CLM-179
-const FIT_WORST_K: f64 = 0.3; // ledger: CLM-137
+const FIT_WORST_K: f64 = 0.3; // ledger: CLM-179
 
 /// Smooths a band profile 1-2-1 (the ends keep their weight).
 fn smooth121(v: &[f64]) -> Vec<f64> {
@@ -645,10 +645,19 @@ pub fn fit_flux(
         let i = zonal_mean(c, &lat, &|cc| st.ice_j_m2[cc], &sea);
         let all = zonal_mean(c, &lat, &|cc| st.t_ocean[cc], &|_| 1.0);
         *ebm = EbmState {
-            t_land: (0..nb).map(|b| l[b].or(o[b]).or(all[b]).unwrap_or(0.0)).collect(),
-            t_ocean: (0..nb).map(|b| o[b].or(l[b]).or(all[b]).unwrap_or(0.0)).collect(),
+            t_land: (0..nb)
+                .map(|b| l[b].or(o[b]).or(all[b]).unwrap_or(0.0))
+                .collect(),
+            t_ocean: (0..nb)
+                .map(|b| o[b].or(l[b]).or(all[b]).unwrap_or(0.0))
+                .collect(),
             t_mixed: (0..nb)
-                .map(|b| m[b].or(o[b]).or(all[b]).unwrap_or(0.0).max(super::ebm::SEA_FREEZE_C))
+                .map(|b| {
+                    m[b].or(o[b])
+                        .or(all[b])
+                        .unwrap_or(0.0)
+                        .max(super::ebm::SEA_FREEZE_C)
+                })
                 .collect(),
             ice_j_m2: (0..nb).map(|b| i[b].unwrap_or(0.0).max(0.0)).collect(),
         };
