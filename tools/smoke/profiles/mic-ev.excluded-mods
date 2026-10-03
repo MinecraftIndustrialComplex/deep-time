@@ -1,0 +1,11 @@
+# Mod ids left out of the mic-ev set, one per line. install.sh also leaves out every jar whose required
+# dependencies name one of them, directly or through another excluded jar (tools/smoke/exclude_mods.py),
+# and records each with its reason in smoke/mic-ev/excluded.txt and excluded-why.txt (the smoke report).
+#
+# cobblemon: its event lists (PrioritizedList behind SimpleObservable) are not thread-safe and are
+# filled during NeoForge's parallel mod construction. They crashed Deep Time's MIC test servers at
+# start-up three times (spawn_notification, Cobblemon itself, capture_xp), failing GameTest batches
+# with nothing from Deep Time in the trace. Ben, 2026-10-02: "For now just run w/o cobblemon, I think
+# I'll be removing it relatively soon anyway" (decisions log). The MIC pack is not changed; nothing
+# in Deep Time's tests reads a Cobblemon biome or block.
+cobblemon

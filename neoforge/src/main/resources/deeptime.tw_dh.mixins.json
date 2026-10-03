@@ -1,0 +1,13 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.minecraftindustrialcomplex.deeptime.mixin.compat.toroidal_world",
+  "compatibilityLevel": "JAVA_21",
+  "plugin": "com.minecraftindustrialcomplex.deeptime.mixin.TwDhGuardMixinPlugin",
+  "mixins": [
+    "DhGeneratorsMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

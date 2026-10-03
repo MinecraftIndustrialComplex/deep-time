@@ -261,8 +261,32 @@ def modIdsOf = { File jar ->
     return ids
 }
 
+// Per-set GameTest-server exclusions (tools/smoke/profiles/<set>.gametest-excluded): glob matchers.
+def gametestExcluded = { String set ->
+    def f = set == null ? null : new File(repoRoot, "tools/smoke/profiles/${set}.gametest-excluded")
+    if (f == null || !f.isFile()) return []
+    def fs = java.nio.file.FileSystems.default
+    f.readLines().collect { it.trim() }.findAll { it && !it.startsWith('#') }.collect { fs.getPathMatcher("glob:${it}") }
+}
+
+// Whether a run's mods include Distant Horizons (P3-04): the server set has its jar and the run does
+// not leave it out. The run gets -Ddeeptime.dh.expected=<this>, and the far-terrain GameTests fail
+// when it is true and Distant Horizons is not loaded, instead of passing without it.
+def dhExpected = { String runName ->
+    def set = serverSetFor(runName)
+    def dir = set == null ? null : new File(repoRoot, "smoke/${set}/server/mods")
+    def jars = dir?.listFiles()?.findAll { it.name.endsWith('.jar') && it.name.toLowerCase(Locale.ROOT).startsWith('distanthorizons') } ?: []
+    if (runName == 'gameTestServer') {
+        def matchers = gametestExcluded(set)
+        jars = jars.findAll { jar -> !matchers.any { it.matches(java.nio.file.Paths.get(jar.name)) } }
+    }
+    return !jars.isEmpty()
+}
+
 ['gameTestServer', 'planetServer', 'client', 'server'].each { runName ->
     def cap = runName.capitalize()
+    if (runName in ['gameTestServer', 'planetServer'])
+        neoForge.runs.getByName(runName).systemProperty 'deeptime.dh.expected', dhExpected(runName).toString()
     def gameDir = runName == 'gameTestServer' ? file('../run-gametest')
                 : runName == 'planetServer' ? file('../run-planet') : file('../run')
     def linkTask = tasks.register("linkRunMods${cap}") {
@@ -289,13 +313,18 @@ def modIdsOf = { File jar ->
             // Sinytra Connector cannot run in a dev run ("Could not determine clean minecraft artifact
             // path"), so dev runs leave it out together with the Fabric-only jars it would load. The
             // production-launched smoke servers (tools/smoke/run.py) keep the whole pack.
+            // Fabric-only means a Fabric descriptor and no NeoForge one: a dual-loader jar (Distant
+            // Horizons 3.3.x carries fabric.mod.json and Fabric API jars under META-INF/jars next to
+            // META-INF/neoforge.mods.toml) is a NeoForge mod here and stays. Each jar left out is
+            // logged with its reason.
             def devSkipped = []
             jars = jars.findAll { jar ->
                 def z = new java.util.zip.ZipFile(jar)
                 try {
                     def fabricOnly = z.getEntry('fabric.mod.json') != null && z.getEntry('META-INF/neoforge.mods.toml') == null
                     def connector = jar.name.startsWith('connector-')
-                    if (fabricOnly || connector) { devSkipped << jar.name; return false }
+                    if (connector) { devSkipped << "${jar.name} (Connector)"; return false }
+                    if (fabricOnly) { devSkipped << "${jar.name} (Fabric-only)"; return false }
                     return true
                 } finally { z.close() }
             }
@@ -324,8 +353,9 @@ def modIdsOf = { File jar ->
             while (changed) {
                 changed = false
                 jars = jars.findAll { jar ->
-                    if (!requires(jar).intersect(skippedIds).isEmpty()) {
-                        devSkipped << jar.name
+                    def missing = requires(jar).intersect(skippedIds)
+                    if (!missing.isEmpty()) {
+                        devSkipped << "${jar.name} (requires ${missing.join(', ')})"
                         skippedIds.addAll(modIdsOf(jar))
                         changed = true
                         return false
@@ -334,18 +364,19 @@ def modIdsOf = { File jar ->
                 }
             }
             // Per-set GameTest-server exclusions (tools/smoke/profiles/<set>.gametest-excluded).
-            def gtExcluded = set == null ? null : new File(repoRoot, "tools/smoke/profiles/${set}.gametest-excluded")
-            if (runName == 'gameTestServer' && gtExcluded?.isFile()) {
-                def globs = gtExcluded.readLines().collect { it.trim() }.findAll { it && !it.startsWith('#') }
-                def fs = java.nio.file.FileSystems.default
-                def matchers = globs.collect { fs.getPathMatcher("glob:${it}") }
+            if (runName == 'gameTestServer') {
+                def matchers = gametestExcluded(set)
                 jars = jars.findAll { jar ->
-                    if (matchers.any { it.matches(java.nio.file.Paths.get(jar.name)) }) { devSkipped << jar.name; return false }
+                    if (matchers.any { it.matches(java.nio.file.Paths.get(jar.name)) }) {
+                        devSkipped << "${jar.name} (${set}.gametest-excluded)"
+                        return false
+                    }
                     return true
                 }
             }
             if (devSkipped)
-                logger.lifecycle("linkRunMods: left out of this dev run (Connector, Fabric-only, and what requires them): ${devSkipped.join(', ')}")
+                logger.lifecycle("linkRunMods: left out of this dev run: ${devSkipped.join(', ')}")
+            logger.lifecycle("linkRunMods: Distant Horizons expected in this run: ${dhExpected(runName)}")
             def seen = [:]
             jars.each { jar ->
                 def ids = modIdsOf(jar)

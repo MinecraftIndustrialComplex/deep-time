@@ -119,6 +119,12 @@ fn cfg(drama: f64) -> Config {
                 radius_cells: 5,
                 ..glacial::GlacialShape::default()
             },
+            // Shorter gullies for the same reason (each octave's fall line reaches a quarter of
+            // its wavelength).
+            character: character::CharacterParams {
+                gully_wavelength_blocks: 64.0,
+                ..character::CharacterParams::default()
+            },
             ..AmplifyParams::default()
         },
         drama,
@@ -314,6 +320,99 @@ fn a_glaciated_level_amplifies_the_same_in_tiles_and_on_any_thread_count() {
     l2.zs.clear();
     let (plain, _) = run_mem(&l2, &c, plan_whole(), 2);
     assert_ne!(bits(&whole.z), bits(&plain.z));
+}
+
+/// Land cells of an L3 raster (`w` wide, wrapping in x) standing more than `over_m` above all
+/// eight neighbours, away from the first and last rows.
+fn spires(z: &[f32], w: usize, over_m: f32) -> Vec<usize> {
+    let h = z.len() / w;
+    let mut out = Vec::new();
+    for j in 1..h - 1 {
+        for i in 0..w {
+            let c = j * w + i;
+            if z[c] <= 0.0 {
+                continue;
+            }
+            let mut top = f32::MIN;
+            for dj in [-1i64, 0, 1] {
+                for di in [-1i64, 0, 1] {
+                    if di != 0 || dj != 0 {
+                        let ii = (i as i64 + di).rem_euclid(w as i64) as usize;
+                        let jj = (j as i64 + dj) as usize;
+                        top = top.max(z[jj * w + ii]);
+                    }
+                }
+            }
+            if z[c] - top > over_m {
+                out.push(c);
+            }
+        }
+    }
+    out
+}
+
+/// No one-cell spires (margins and spires task, 2026-10-03). A young, steep, glaciated range at
+/// full ruggedness: no land cell of the finished L3 stands more than [`SPIRE_BLOCKS`] blocks above
+/// all eight of its neighbours (600 m away at 300 m per block). What may, and is not on this
+/// planet: a volcano's summit and an impact crater's central peak, whose cones are drawn on
+/// purpose (`volcano.rs`, `impact.rs`). Before the fix the glacial trough fade of the mountain
+/// character was taken cell by cell from the glacial cut, which jumps between neighbouring cells
+/// at the ice margin and over the bed's rills, and the gullies took their direction from a
+/// one-cell gradient that turns freely at summits and crests: single cells kept the character's
+/// cut or lift that their neighbours lost, 10–40 blocks tall on the planets.
+const SPIRE_BLOCKS: f32 = 6.0;
+
+#[test]
+fn a_glaciated_young_range_has_no_one_cell_spires() {
+    let mut l2 = l2_level();
+    // Steeper land (three times the relief) under 300 m of ice above 1,500 m.
+    for z in l2.z.iter_mut() {
+        if *z > 0.0 {
+            *z *= 3.0;
+        }
+    }
+    l2.zs =
+        l2.z.iter()
+            .map(|&z| if z > 1500.0 { z + 300.0 } else { z - 1.0 })
+            .collect();
+    let mut c = cfg(1.0);
+    c.p.ruggedness = 2.0;
+    let young = character::CharacterFields::uniform_for_tests(1.0, 0.5, 30.0);
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(2)
+        .build()
+        .unwrap();
+    let plan = plan_whole();
+    let mut sink = MemSink::new(plan.gw, plan.gh);
+    let out = pool
+        .install(|| {
+            run(
+                l2.clone(),
+                2,
+                &c,
+                c.character(&young),
+                plan,
+                &mut sink,
+                &never,
+                &free,
+            )
+        })
+        .unwrap();
+    assert!(out.last.glacial_cells > 0, "the glaciers shaped something");
+    assert!(
+        out.last.character.abs_change_blocks_cells > 0.0,
+        "the character did something"
+    );
+    let over = SPIRE_BLOCKS * c.mv as f32;
+    let found = spires(&sink.z, plan.gw, over);
+    let tallest = found.iter().map(|&s| sink.z[s]).fold(f32::MIN, f32::max);
+    assert!(
+        found.is_empty(),
+        "{} cells stand more than {SPIRE_BLOCKS} blocks above all their neighbours (first {:?}, \
+         highest {tallest} m)",
+        found.len(),
+        &found[..found.len().min(8)]
+    );
 }
 
 #[test]
