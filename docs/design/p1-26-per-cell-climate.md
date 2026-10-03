@@ -1470,9 +1470,10 @@ master merged in. Each task's notes record what differs from the sections above 
 - **T9 calibration (part)** on Earth's 0.5° relief (GMT `earth_relief_30m_p`, 720 × 360,
   `deeptime climate-dem`; `tools/validation/climate_vs_obs.py`). One knob at a time, then
   together (build log 2026-10-03). Defaults now: `overturning_sv` 30 (was 15), `atmosphere_
-  diffusivity_scale` 1.3 (was 1), `wind_heat_transport` 0.3 (was 0.5), `zonal_diffusivity_ratio`
-  0.3 (was 0.5). The global mean is 14.0 °C (Ben's 14.1 ± 0.4); a₀ was not touched, being shared
-  with the banded model. What was learned:
+  diffusivity_scale` 1.3 (was 1), `wind_heat_transport` 0.3 then 0.2 (was 0.5),
+  `zonal_diffusivity_ratio` 0.3 then 0.2 (was 0.5; the second values on Lambert's grid, below).
+  The global mean is 14.0 °C on the equirectangular grid and 13.8 °C on Lambert's (Ben's 14.1 ±
+  0.4); a₀ was not touched, being shared with the banded model. What was learned:
   - The winter seas were the problem: at 15 Sv the North Atlantic at 55° N was −3.7 °C in
     January (Earth about +9), Brest 2.9 °C and Moscow −17 °C. 30 Sv brings them to 7.4, 10.3 and
     −8.3 °C. It is a compensating choice: the ocean's northern heat transport now peaks at
@@ -1483,7 +1484,19 @@ master merged in. Each task's notes record what differs from the sections above 
   - Raising D warms the poles and the global mean; lowering it (the design's expectation, the
     ocean being separate) cooled the planet to 13.4 °C and iced 15 % of the land.
   - `KERNEL_EARTH` re-measured on the 1° relief: 2.402·10⁷ (was 2.845·10⁷ under the banded
-    climate).
+    climate), then 2.475·10⁷ on Lambert's grid (below).
+  - **Recalibrated on Lambert's equal-area grid** (master's projection, merged 2026-10-03; its
+    rows are uniform in sin φ, so the climate grid's rows are tall at high latitudes: 144 × 48 on
+    Earth's 720-cell relief, the polar row spanning 73–90°). At β_T 0.3 and ratio 0.3 the global
+    mean was 13.8 °C, the winter spread 4.07 K and Yakutsk −28.6 °C; `wind_heat_transport` 0.2 and
+    `zonal_diffusivity_ratio` 0.2 give 13.8 °C, 4.53 K winter and 1.92 K annual spread, Brest −
+    Vladivostok 20.6 K (Earth 20.1), Yakutsk −29.0 °C, 19 of 24 cities. The tall rows also joined
+    the North Atlantic and the North Pacific through the Arctic into one conveyor basin (the
+    sinking moved to 81° N, 14,600 km wide): the basin now takes a row only when its poleward
+    edge is inside 70° (`ocean2d.rs`), which puts the sinking back at 58° N, 26° W. The
+    correction's fit is looser on this grid (0.27 K RMS, 2.8 K worst, 39 band tiles at the cap),
+    the coarse polar rows giving the zonal model a coarse target there. `climate-dem` reads its
+    equirectangular DEM as W/2 rows (master read W/π) and resamples it onto the planet's grid.
 
 ## Appendix A. How the measurements were made
 
