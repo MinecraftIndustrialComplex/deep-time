@@ -216,7 +216,7 @@ pub fn bake(
             "params": params,
             "classes": CLASSES,
             "rule": "the USGS-style class of each cell (crate::provinces: shield, platform, orogen, basin, large igneous province, extended crust, oceanic crust by age), cut into connected regions of one class; regions under min_km2 are absorbed by the nearest larger one; ids by first cell, row-major",
-            "shares": shares(&ids, &classes, &set, w, h),
+            "shares": shares(&ids, &classes, &set, w, h, &l1.row_weights()),
             "shares_note": "`classified`: each class's share of the cells as the USGS-style rules classed them (the figure to set against Earth's: orogens and arcs about 0.17 of the continents); `provinces`: after regions under min_km2 were absorbed by larger neighbours, which thin belts (orogens, the young sea-floor bands) suffer most",
             "province": classes.iter().zip(&counts).enumerate().map(|(id, (&st, &n))| json!({
                 "id": id, "class": class_name(st), "cells": n, "km2": (n as f64 * cell_km2).round(),
@@ -226,18 +226,24 @@ pub fn bake(
     Ok(note)
 }
 
-/// The share of each class, by true area (rows weighted by the cosine of the latitude), of the
+/// The share of each class, by true area (rows weighted by `row_weight`, `GridDesc::row_weights`), of the
 /// planet and of its continents (the classes up to extended crust), as the rules classed the cells
 /// (`classified`: the numbers that tell how orogen-heavy the world is; Earth: orogens and arcs
 /// about 0.17 of the continents) and as the baked provinces hold them (`provinces`, after the
 /// small regions were absorbed), and how many cells changed class by it.
-fn shares(ids: &[u16], province_class: &[u8], raw: &[u8], w: usize, h: usize) -> Value {
+fn shares(
+    ids: &[u16],
+    province_class: &[u8],
+    raw: &[u8],
+    w: usize,
+    h: usize,
+    row_weight: &[f64],
+) -> Value {
     let by_area = |class_of: &dyn Fn(usize) -> u8| -> Value {
         let mut area = vec![0.0f64; CLASSES.len() + 1];
         let mut total = 0.0;
         for j in 0..h {
-            let lat = std::f64::consts::PI * (0.5 - (j as f64 + 0.5) / h as f64);
-            let wgt = lat.cos();
+            let wgt = row_weight[j];
             for i in 0..w {
                 area[usize::from(class_of(j * w + i))] += wgt;
                 total += wgt;
@@ -275,6 +281,13 @@ fn shares(ids: &[u16], province_class: &[u8], raw: &[u8], w: usize, h: usize) ->
 mod tests {
     use super::*;
     use crate::provinces::ProvinceParams;
+
+    /// `GridDesc::band_weight` of an `h`-row grid.
+    fn band_weights(h: usize) -> Vec<f64> {
+        let g = deeptime_format::GridDesc::for_planet("L1", 4 * h as u32, 2).unwrap();
+        assert_eq!(g.h as usize, h);
+        g.row_weights()
+    }
 
     #[test]
     fn small_regions_join_their_neighbours_and_ids_are_contiguous() {
@@ -324,7 +337,7 @@ mod tests {
         // The top half shield (0), the bottom oldest ocean (8).
         let raw: Vec<u8> = (0..w * h).map(|c| if c < 8 { 0 } else { 8 }).collect();
         let (ids, classes, _) = provinces(&raw, w, h, 1);
-        let s = shares(&ids, &classes, &raw, w, h);
+        let s = shares(&ids, &classes, &raw, w, h, &band_weights(h));
         for view in ["classified", "provinces"] {
             let planet: f64 = s[view]["planet"]
                 .as_object()
@@ -344,7 +357,7 @@ mod tests {
         let mut raw2 = raw.clone();
         raw2[5] = 2;
         let (ids, classes, _) = provinces(&raw2, w, h, 2);
-        let s = shares(&ids, &classes, &raw2, w, h);
+        let s = shares(&ids, &classes, &raw2, w, h, &band_weights(h));
         assert_eq!(s["absorbed_cells"], 1);
         assert!(s["classified"]["continental"]["Orogen"].as_f64().unwrap() > 0.0);
         assert_eq!(s["provinces"]["continental"]["Orogen"], 0.0);

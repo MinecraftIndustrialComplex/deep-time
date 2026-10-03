@@ -99,7 +99,8 @@ public final class WorldDataTerrain implements TerrainSource {
                     magma = Magma.build(wd.volcanoes().list(), magmaRules(), (x, z) -> wd.height(wrapX(x), z),
                             (x, z) -> com.minecraftindustrialcomplex.deeptime.worlddata.Water.column(wd, spec, wrapX(x), z).kind() != none,
                             wd.circumference(), seaLevel, lava().floodY(minY, seaLevel), minY, wd.manifest().mPerBlockH(),
-                            wd.manifest().mPerBlockV(), (int) (wd.circumference() / 4.0 * ref.poleCapDeg() / 90.0));
+                            wd.manifest().mPerBlockV(),
+                            (int) Math.abs(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(wd.circumference(), ref.poleCapDeg())));
                     long lakes = magma.bodies().stream().filter(Magma.Body::lake).count();
                     long molten = magma.bodies().stream().filter(b -> b.chamberRh() > 0).count();
                     com.minecraftindustrialcomplex.deeptime.DeepTime.LOGGER.info(

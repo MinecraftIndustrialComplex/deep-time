@@ -350,8 +350,9 @@ pub fn run(world: &Path, out: &Path, lines: &[String], half: f64, px: u32) -> Cl
                 }
             }
         }
-        let lat = |z: f64| -360.0 * z / c;
-        let lon = |x: f64| (360.0 * (x + c / 2.0).rem_euclid(c) / c).rem_euclid(360.0);
+        let proj = deeptime_format::Projection::of(c);
+        let lat = |z: f64| proj.lat_deg(z);
+        let lon = |x: f64| proj.lon_deg(x);
         let km = blocks * s.m_per_block_h / 1000.0;
         html.push_str(&format!(
             "<h2>{}</h2><p>From block ({:.0}, {:.0}) to ({:.0}, {:.0}): {:.0} blocks ({:.0} km), y {} to {}. \
