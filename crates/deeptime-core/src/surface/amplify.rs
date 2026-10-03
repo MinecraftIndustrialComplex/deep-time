@@ -437,7 +437,7 @@ impl Config {
             thermal_noise: self.p.thermal_noise as f32,
             cell_blocks: c / gw_fine as f64,
             origin_x: -c / 2.0,
-            origin_z: -c / 4.0,
+            origin_z: -deeptime_format::Projection::of(c).pole_z(),
         }
     }
 
@@ -473,7 +473,7 @@ impl Config {
                 circumference: self.circumference,
                 cell_blocks: self.cell_blocks_l3(),
                 origin_x: -c / 2.0,
-                origin_z: -c / 4.0,
+                origin_z: -deeptime_format::Projection::of(c).pole_z(),
                 sea: self.sea as f32,
                 sea_y: self.sea_y,
                 mv: self.mv,

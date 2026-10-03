@@ -24,6 +24,11 @@ import java.util.concurrent.atomic.LongAdder;
  *       valley, a river's cut or a trench over a chamber never opens it.</li>
  *   <li>Shell blocks that are open (air, water) become basalt: magma is always walled in.</li>
  *   <li>The plug's solid blocks become magma blocks.</li>
+ *   <li>The crust-deep column's lens blocks become lava by the chamber's rule (never within
+ *       {@link Magma#COVER} blocks of the column's ground); its conduit segments by the conduit's.</li>
+ *   <li>The body of altered hot rock around the column ({@link Magma.Body#mush}) replaces the solid
+ *       ground in it, and the shell's solid blocks, with the mush blocks of {@link MagmaPalette}
+ *       (basalt, a few magma blocks); it never replaces fluid, bedrock, lava or magma.</li>
  *   <li>A crater lake's blocks become lava and the ground above its surface air.</li>
  *   <li>Every block of a body and its shell goes into the chunk's carving masks, which vanilla's
  *       carvers skip (as {@link WaterBodies} does for water): a cave may run up to a chamber's
@@ -44,11 +49,16 @@ public final class MagmaPass {
     private static final BlockState MAGMA = Blocks.MAGMA_BLOCK.defaultBlockState();
     private static final BlockState AIR = Blocks.AIR.defaultBlockState();
 
-    private static final LongAdder LAVA_PLACED = new LongAdder(), CHUNKS = new LongAdder();
+    private static final LongAdder LAVA_PLACED = new LongAdder(), CHUNKS = new LongAdder(), MUSH_PLACED = new LongAdder();
 
-    /** Lava blocks placed and chunks touched since the JVM started (for logs and tests). */
+    /** Lava blocks placed, chunks touched and mush blocks placed since the JVM started (for logs and tests). */
     public static long[] totals() {
-        return new long[]{LAVA_PLACED.sum(), CHUNKS.sum()};
+        return new long[]{LAVA_PLACED.sum(), CHUNKS.sum(), MUSH_PLACED.sum()};
+    }
+
+    /** Whether a block may be replaced by mush: solid ground, not a fluid, bedrock, lava or the plug's magma. */
+    static boolean replaceable(BlockState s) {
+        return !s.isAir() && s.getFluidState().isEmpty() && !s.is(Blocks.BEDROCK) && !s.is(Blocks.MAGMA_BLOCK);
     }
 
     static boolean open(BlockState s) {
@@ -67,7 +77,8 @@ public final class MagmaPass {
                 ? new CarvingMask[]{proto.getOrCreateCarvingMask(GenerationStep.Carving.AIR),
                         proto.getOrCreateCarvingMask(GenerationStep.Carving.LIQUID)}
                 : new CarvingMask[0];
-        int placed = 0;
+        int placed = 0, mushed = 0;
+        MagmaPalette palette = MagmaPalette.get();
         for (Magma.Body b : bodies) {
             int lo = Math.max(minY, b.minY()), hi = Math.min(maxY, b.maxY());
             int dx0 = magma.dx(x0, b);
@@ -84,8 +95,13 @@ public final class MagmaPass {
                     int ground = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, lx, lz);
                     for (int y = lo; y <= hi; y++) {
                         Magma.Part part = b.at(dx, dz, y);
-                        if (part == Magma.Part.NONE)
+                        if (part == Magma.Part.NONE) {
+                            if (b.mush(dx, dz, y) && replaceable(chunk.getBlockState(pos.set(x, y, z)))) {
+                                chunk.setBlockState(pos, palette.mush(x, y, z), false);
+                                mushed++;
+                            }
                             continue;
+                        }
                         BlockState here = chunk.getBlockState(pos.set(x, y, z));
                         // Carvers skip what the masks hold: the body and its shell stay whole, so no
                         // cave opens onto magma (a crater lake's open air above it may be carved).
@@ -93,7 +109,7 @@ public final class MagmaPass {
                             for (CarvingMask m : masks)
                                 m.set(lx, y, lz);
                         switch (part) {
-                            case CHAMBER -> {
+                            case CHAMBER, LENS -> {
                                 if (y <= ground - Magma.COVER) {
                                     if (!here.is(Blocks.LAVA)) {
                                         chunk.setBlockState(pos, LAVA, false);
@@ -128,9 +144,13 @@ public final class MagmaPass {
                                 if (!here.isAir())
                                     chunk.setBlockState(pos, AIR, false);
                             }
-                            case CHAMBER_SHELL, CONDUIT_SHELL, LAKE_SHELL -> {
+                            case CHAMBER_SHELL, CONDUIT_SHELL, LAKE_SHELL, LENS_SHELL -> {
                                 if (open(here) && !here.is(Blocks.LAVA))
                                     chunk.setBlockState(pos, BASALT, false);
+                                else if (part != Magma.Part.LAKE_SHELL && b.mush(dx, dz, y) && replaceable(here)) {
+                                    chunk.setBlockState(pos, palette.mush(x, y, z), false);
+                                    mushed++;
+                                }
                             }
                             default -> { }
                         }
@@ -139,6 +159,7 @@ public final class MagmaPass {
             }
         }
         LAVA_PLACED.add(placed);
+        MUSH_PLACED.add(mushed);
         CHUNKS.increment();
         return placed;
     }

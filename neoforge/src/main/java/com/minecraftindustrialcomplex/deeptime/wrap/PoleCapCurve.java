@@ -5,8 +5,9 @@ package com.minecraftindustrialcomplex.deeptime.wrap;
  * The pole soft cap's geometry and curves (plan §7.11, P1-18). Plain Java, no Minecraft: the server
  * cap ({@link PoleCap}), Sable's wind, the client and the JUnit tests all read the same numbers.
  *
- * <p><b>Latitude</b> is equirectangular (plan §5.2): φ = −z · 360° / C, so z ∈ [−C/4, C/4) spans
- * pole to pole, north (−z) is positive, and |z| = C/4 is the pole edge. The cap starts at
+ * <p><b>Latitude</b> is the planet's projection's ({@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection}, equirectangular:
+ * φ = −z · 360° / C), so z ∈ [−C/4, C/4) spans pole to pole, north (−z) is positive, and |z| = C/4
+ * is the pole edge. The cap starts at
  * {@code capDeg} (φc, default 75°) and becomes a hard stop at {@code stopDeg} (φs, default 80°).
  *
  * <p><b>Depth</b> s = clamp((|φ| − φc) / (φs − φc), 0, 1): 0 at the cap line, 1 at the stop line.
@@ -59,21 +60,19 @@ public record PoleCapCurve(int circumference, double capDeg, double stopDeg) {
             throw new IllegalArgumentException("need 0 < pole_cap_deg < pole_stop_deg <= 90, got " + capDeg + " and " + stopDeg);
     }
 
-    /** Latitude in degrees of block z, north (−z) positive. */
+    /** Latitude in degrees of block z, north (−z) positive (the planet's projection). */
     public static double latitudeDeg(int circumference, double z) {
-        return -z * 360.0 / circumference;
+        return com.minecraftindustrialcomplex.deeptime.worlddata.Projection.latitudeDeg(circumference, z);
     }
 
     /** The z of a latitude (north positive). */
     public static double zOfLatitude(int circumference, double latDeg) {
-        return -latDeg * circumference / 360.0;
+        return com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(circumference, latDeg);
     }
 
     /** Longitude in degrees of block x, folded to [−180°, 180°), east (+x) positive. */
     public static double longitudeDeg(int circumference, double x) {
-        double lon = x * 360.0 / circumference;
-        lon = ((lon + 180.0) % 360.0 + 360.0) % 360.0 - 180.0;
-        return lon;
+        return com.minecraftindustrialcomplex.deeptime.worlddata.Projection.longitudeEastDeg(circumference, x);
     }
 
     public double latitudeDeg(double z) {

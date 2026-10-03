@@ -68,7 +68,7 @@ public final class Structure {
         this.margin = margin;
         this.c = circumference;
         this.w = Math.max(1, (int) Math.ceil(c / BUCKET));
-        this.h = Math.max(1, (int) Math.ceil(c / 2.0 / BUCKET));
+        this.h = Math.max(1, (int) Math.ceil(Projection.indexSpanZ(c) / BUCKET));
         this.radius = new double[n];
         int[] counts = new int[w * h];
         int[][] lists = new int[w * h][];
@@ -76,10 +76,12 @@ public final class Structure {
             for (int e = 0; e < n; e++) {
                 double r = Math.sqrt(halfAlong[e] * halfAlong[e] + halfAcross[e] * halfAcross[e]) + margin;
                 radius[e] = r;
-                long j0 = (long) Math.floor((cz[e] - r + c / 4.0) / BUCKET);
-                long j1 = (long) Math.floor((cz[e] + r + c / 4.0) / BUCKET);
-                long i0 = (long) Math.floor((cx[e] - r + c / 2.0) / BUCKET);
-                long i1 = (long) Math.floor((cx[e] + r + c / 2.0) / BUCKET);
+                // The buckets' frame is the projection's index frame.
+                double ox = Projection.indexOriginX(c), oz = Projection.indexOriginZ(c);
+                long j0 = (long) Math.floor((cz[e] - r - oz) / BUCKET);
+                long j1 = (long) Math.floor((cz[e] + r - oz) / BUCKET);
+                long i0 = (long) Math.floor((cx[e] - r - ox) / BUCKET);
+                long i1 = (long) Math.floor((cx[e] + r - ox) / BUCKET);
                 long across = Math.min(i1 - i0 + 1, w);
                 for (long j = Math.max(j0, 0); j <= Math.min(j1, h - 1L); j++) {
                     for (long di = 0; di < across; di++) {
@@ -279,8 +281,8 @@ public final class Structure {
     /** The candidates of the column at block position (x, z), youngest first (Rust {@code StructIndex::candidates}). */
     private void candidates(double x, double z, Scratch s) {
         s.nc = 0;
-        int i = (int) Math.floorMod((long) Math.floor((x + c / 2.0) / BUCKET), (long) w);
-        long jl = (long) Math.floor((z + c / 4.0) / BUCKET);
+        int i = (int) Math.floorMod((long) Math.floor((x - Projection.indexOriginX(c)) / BUCKET), (long) w);
+        long jl = (long) Math.floor((z - Projection.indexOriginZ(c)) / BUCKET);
         int j = (int) Math.max(0, Math.min(h - 1L, jl));
         for (int e : buckets[j * w + i]) {
             double dx = x - cx[e];

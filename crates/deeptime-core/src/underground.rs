@@ -18,6 +18,12 @@
 //! FORMAT.md ("Lava") has the geometry. The random lava lakes and lava springs of vanilla's and
 //! the pack's biomes are removed from Deep Time worlds (`remove_lava_features`).
 //!
+//! **The crust-deep column** (Ben, decisions log 2026-10-02, "Crust-deep magma system"). Under the
+//! chamber each active volcano gets stacked, sill-like lava lenses joined by a conduit, set in a body
+//! of altered hot rock, down to a basal lens on the lava floor, so the system does not end a few
+//! hundred blocks down. Four settings shape it: `magma_lens_count`, `magma_lens_spacing_blocks`,
+//! `magma_lens_width` and `magma_mush_width`; the game builds it (Java `worldgen/Magma`).
+//!
 //! **Geothermal features** (P2-14) sit around the same list: hot springs and terraces where the
 //! baked climate has groundwater, fumaroles and altered ground where it is dry or frozen. Four
 //! settings here shape them; the game places them (Java `worldgen/Geothermal`).
@@ -30,6 +36,12 @@ use crate::surface::volcanoes::VolcanoState;
 
 /// The largest distance accepted, blocks (the default build range is 992 blocks tall).
 pub const MAX_BLOCKS: u32 = 992;
+
+/// The most lenses a volcano's crust-deep column may hold (`magma_lens_count`).
+pub const MAX_LENSES: u32 = 64;
+
+/// The widest sea-cliff guard accepted (`sea_cliff_skin_blocks`), blocks.
+pub const MAX_CLIFF_SKIN: u32 = 32;
 
 /// The world-data file of the active volcanoes.
 pub const VOLCANOES_PATH: &str = "volcanoes/active.json";
@@ -64,9 +76,34 @@ pub struct UndergroundParams {
     /// secondary list) against about 1,350 potentially active ones (USGS); the default is far
     /// above that, because a player should be able to find one. Ledger MAG-019, MAG-020.
     pub crater_lake_share: f64,
+    /// The most stacked lava lenses a volcano's crust-deep column holds below its chamber (Ben,
+    /// decisions log 2026-10-02): current volcanology describes a vertically extensive system of
+    /// crystal mush with melt lenses from the shallow chamber down through the crust (Cashman,
+    /// Sparks and Blundy 2017; Sparks et al. 2019), and the game draws it down to the lava floor.
+    /// The lenses are spread evenly between the chamber and the floor, `magma_lens_spacing_blocks`
+    /// apart; fewer than this are drawn where the ground is thin, and where the count would stop the
+    /// column short of the floor the spacing widens instead. 0: no column (the chamber and its
+    /// conduit only). Ledger MAG-043.
+    pub magma_lens_count: u32,
+    /// Vertical distance between the lenses of the crust-deep column, blocks (35 m each by default,
+    /// so 28 is 980 m; 560 m at the earlier 20 m). Ledger MAG-043.
+    pub magma_lens_spacing_blocks: f64,
+    /// Multiplies every lens's radius (the top lens is about as wide as the chamber, the lowest 2.2
+    /// times wider; shields' are wider, quiet volcanoes' narrower). 0: no column. Ledger MAG-045.
+    pub magma_lens_width: f64,
+    /// Multiplies the radius of the body of altered hot rock (the mush) around the column; 0: none,
+    /// the lenses sit in the ordinary rock. Ledger MAG-054.
+    pub magma_mush_width: f64,
     /// Whether the random lava lakes and lava springs of vanilla's and the pack's biomes are taken
     /// out of a Deep Time world, so lava is found at the volcanoes and at the world's floor only.
     pub remove_lava_features: bool,
+    /// Under the sea, vanilla's cave and canyon carvers are kept this many blocks away from the
+    /// face of a cliff (Ben, 2026-10-02: the carvers cut arches into the underwater base of sea
+    /// cliffs). A block under the sea level is left alone when the ground within this many blocks
+    /// to the side is lower than it is, that is when open water lies that close at its height; a
+    /// cave may still run through the cliff, but never opens onto its face. 0: no guard (vanilla's
+    /// carving). Ledger MAG-057.
+    pub sea_cliff_skin_blocks: u32,
     /// How many geothermal fields (hot springs, sinter and travertine terraces, fumaroles,
     /// altered ground) each active volcano gets, as a multiple of the default (P2-14): the
     /// count is floor(density × (0.7 + 2.3 activity) × clamp(sqrt(R / 45), 0.6, 2.2) + u), from none
@@ -93,7 +130,12 @@ impl Default for UndergroundParams {
             magma_chamber_depth_km: 3.0,            // ledger: MAG-002
             magma_chamber_size: 1.0,                // ledger: MAG-006
             crater_lake_share: 0.25,                // ledger: MAG-019
+            magma_lens_count: 24,                   // ledger: MAG-043
+            magma_lens_spacing_blocks: 28.0,        // ledger: MAG-043
+            magma_lens_width: 1.5,                  // ledger: MAG-045
+            magma_mush_width: 1.0,                  // ledger: MAG-054
             remove_lava_features: true,             // ledger: MAG-034
+            sea_cliff_skin_blocks: 6,               // ledger: MAG-057
             geothermal_density: 1.0,                // ledger: GEO-001 (game-choice)
             geothermal_reach: 1.0,                  // ledger: GEO-003 (game-choice)
             geothermal_size: 1.0,                   // ledger: GEO-005 (game-choice)
@@ -105,6 +147,18 @@ impl Default for UndergroundParams {
 impl UndergroundParams {
     /// Range checks, each naming its key.
     pub fn validate(&self) -> Result<(), CoreError> {
+        if self.sea_cliff_skin_blocks > MAX_CLIFF_SKIN {
+            return Err(CoreError::preset(
+                "$.underground.sea_cliff_skin_blocks".to_string(),
+                format!("must be in [0, {MAX_CLIFF_SKIN}]"),
+            ));
+        }
+        if self.magma_lens_count > MAX_LENSES {
+            return Err(CoreError::preset(
+                "$.underground.magma_lens_count".to_string(),
+                format!("must be in [0, {MAX_LENSES}]"),
+            ));
+        }
         for (v, key) in [
             (self.lava_floor_blocks, "lava_floor_blocks"),
             (self.lava_lake_blocks, "lava_lake_blocks"),
@@ -125,6 +179,14 @@ impl UndergroundParams {
             ),
             (self.magma_chamber_size, 0.0, 4.0, "magma_chamber_size"),
             (self.crater_lake_share, 0.0, 1.0, "crater_lake_share"),
+            (
+                self.magma_lens_spacing_blocks,
+                8.0,
+                200.0,
+                "magma_lens_spacing_blocks",
+            ),
+            (self.magma_lens_width, 0.0, 4.0, "magma_lens_width"),
+            (self.magma_mush_width, 0.0, 4.0, "magma_mush_width"),
             (self.geothermal_density, 0.0, 4.0, "geothermal_density"),
             (self.geothermal_reach, 0.25, 3.0, "geothermal_reach"),
             (self.geothermal_size, 0.5, 3.0, "geothermal_size"),
@@ -332,5 +394,66 @@ mod tests {
             e.to_string().contains("$.underground.crater_lake_share"),
             "{e}"
         );
+    }
+
+    #[test]
+    fn the_crust_deep_column_has_defaults_and_ranges() {
+        let d = UndergroundParams::default();
+        assert_eq!(d.magma_lens_count, 24);
+        assert_eq!(d.magma_lens_spacing_blocks, 28.0);
+        assert_eq!(d.magma_lens_width, 1.5);
+        assert_eq!(d.magma_mush_width, 1.0);
+        assert_eq!(d.sea_cliff_skin_blocks, 6);
+        let wide = UndergroundParams {
+            sea_cliff_skin_blocks: MAX_CLIFF_SKIN + 1,
+            ..d
+        };
+        assert!(wide.validate().is_err());
+        let off: UndergroundParams =
+            serde_json::from_str(r#"{"sea_cliff_skin_blocks": 0}"#).unwrap();
+        off.validate().unwrap();
+        // A section that names none of them keeps the column.
+        let p: UndergroundParams = serde_json::from_str(r#"{"crater_lake_share": 0.5}"#).unwrap();
+        assert_eq!(p.magma_lens_count, 24);
+        // Zero is "no column" / "no altered rock", not an error.
+        let none: UndergroundParams =
+            serde_json::from_str(r#"{"magma_lens_count": 0, "magma_mush_width": 0}"#).unwrap();
+        none.validate().unwrap();
+        for (bad, key) in [
+            (
+                UndergroundParams {
+                    magma_lens_count: MAX_LENSES + 1,
+                    ..d
+                },
+                "magma_lens_count",
+            ),
+            (
+                UndergroundParams {
+                    magma_lens_spacing_blocks: 7.0,
+                    ..d
+                },
+                "magma_lens_spacing_blocks",
+            ),
+            (
+                UndergroundParams {
+                    magma_lens_width: 4.5,
+                    ..d
+                },
+                "magma_lens_width",
+            ),
+            (
+                UndergroundParams {
+                    magma_mush_width: -1.0,
+                    ..d
+                },
+                "magma_mush_width",
+            ),
+        ] {
+            let e = bad.validate().unwrap_err();
+            assert!(
+                e.to_string().contains(&format!("$.underground.{key}")),
+                "{e}"
+            );
+        }
     }
 }

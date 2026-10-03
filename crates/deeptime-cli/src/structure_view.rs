@@ -113,7 +113,8 @@ pub fn build(world: &WorldState, preset_json: &str) -> CliResult<Option<Structur
     {
         i_b = (i_a + w / 2) % w;
     }
-    let c = i64::from(s.circumference_blocks);
+    // Pole to pole (the projection's z of the poles).
+    let zp = deeptime_format::Projection::new(s.circumference_blocks).pole_z() as i64;
     let full = |i: usize, title: &str| {
         let top = (0..hgt)
             .map(|j| surface[j * w + i])
@@ -122,8 +123,8 @@ pub fn build(world: &WorldState, preset_json: &str) -> CliResult<Option<Structur
         Section {
             title: title.to_owned(),
             x: grid.block_x(i as i64),
-            z0: -c / 4,
-            z1: c / 4,
+            z0: -zp,
+            z1: zp,
             y0: s.min_y,
             y1,
             min_y: s.min_y,

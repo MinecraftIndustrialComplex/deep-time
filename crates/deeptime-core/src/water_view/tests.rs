@@ -408,11 +408,14 @@ fn lake_cover_averages_the_cells_under_a_pixel() {
     // the 2 × 2 cells (2px − 1 ..= 2px) × (2py − 1 ..= 2py). Pixel (1, 1): cells (1, 1), (2, 1),
     // (1, 2) and (2, 2) = 9, 10, 17, 18 of which three are wet.
     let wet = |c: usize| matches!(c, 9 | 10 | 17);
-    let cover = lake_cover(8, 4, &wet, (4, 2));
+    let g8 = GridDesc::for_planet("L", 16, 2).unwrap();
+    assert_eq!((g8.w, g8.h), (8, 4));
+    let cover = lake_cover(&g8, &wet, (4, 2));
     assert_eq!(cover[4 + 1], 0.75);
     assert_eq!(cover.iter().filter(|&&c| c > 0.0).count(), 1);
     // The same grid at the picture's own size is the grid itself.
-    let same = lake_cover(4, 2, &|c| c == 5, (4, 2));
+    let g4 = GridDesc::for_planet("L", 16, 4).unwrap();
+    let same = lake_cover(&g4, &|c| c == 5, (4, 2));
     assert_eq!(same, [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]);
 }
 

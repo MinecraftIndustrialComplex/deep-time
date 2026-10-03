@@ -84,7 +84,7 @@ class GeothermalTest {
 
     private static Geothermal build(List<Volcanoes.Volcano> vs, GeothermalRules rules, Geothermal.Env env, Magma.Wet wet) {
         Magma.Heights h = terrain(vs);
-        Magma magma = Magma.build(vs, MagmaRules.DEFAULT, h, wet, C, SEA, LAVA_FLOOR, MH, MV, C / 4);
+        Magma magma = Magma.build(vs, MagmaRules.DEFAULT, h, wet, C, SEA, LAVA_FLOOR, MH, MV, (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(C));
         return Geothermal.build(vs, rules, magma, h, wet, env, C, SEA, MH);
     }
 
@@ -234,7 +234,7 @@ class GeothermalTest {
                 }
         // The sea: ground at or below the coast takes nothing.
         Magma.Heights low = (x, z) -> SEA + 1.5;
-        Geothermal coast = Geothermal.build(vs, GeothermalRules.DEFAULT, Magma.build(vs, MagmaRules.DEFAULT, low, DRY, C, SEA, LAVA_FLOOR, MH, MV, C / 4),
+        Geothermal coast = Geothermal.build(vs, GeothermalRules.DEFAULT, Magma.build(vs, MagmaRules.DEFAULT, low, DRY, C, SEA, LAVA_FLOOR, MH, MV, (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(C)),
                 low, DRY, WET_WARM, C, SEA, MH);
         assertTrue(coast.sites().isEmpty());
     }
@@ -243,7 +243,7 @@ class GeothermalTest {
     void sitesKeepClearOfOneAnotherAndOfOpenMagma() {
         var vs = volcanoes(40, false);
         Magma.Heights h = terrain(vs);
-        Magma magma = Magma.build(vs, new MagmaRules(3.0, 1.0, 1.0, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV, C / 4);
+        Magma magma = Magma.build(vs, new MagmaRules(3.0, 1.0, 1.0, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV, (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(C));
         Geothermal g = Geothermal.build(vs, new GeothermalRules(3.0, 1.0, 1.0, 400.0), magma, h, DRY, WET_WARM, C, SEA, MH);
         assertTrue(magma.bodies().stream().anyMatch(Magma.Body::lake), "the test has crater lakes to keep clear of");
         List<Geothermal.Site> sites = g.sites();

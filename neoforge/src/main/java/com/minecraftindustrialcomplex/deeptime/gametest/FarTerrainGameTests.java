@@ -49,7 +49,7 @@ public final class FarTerrainGameTests {
     /** A spread of columns over the planet, clear of the pole edge and of the build floor. */
     static int[] column(int i, int c) {
         int x = -c / 2 + 11 + i * (c / 131);
-        int z = ((i * 53) % 113 - 56) * (c / 4 / 64) + 7;
+        int z = ((i * 53) % 113 - 56) * ((int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c) / 64) + 7;
         return new int[]{x, z};
     }
 
@@ -177,7 +177,7 @@ public final class FarTerrainGameTests {
         int c = far.data().circumference();
         int[][] jobs = new int[24][];
         for (int k = 0; k < jobs.length; k++)
-            jobs[k] = new int[]{-c / 2 + (k * 7 % 24) * (c / 24) / 64 * 64, ((k * 5) % 12 - 6) * (c / 4 / 8) / 64 * 64, k % 3 == 0 ? 8 : 1};
+            jobs[k] = new int[]{-c / 2 + (k * 7 % 24) * (c / 24) / 64 * 64, ((k * 5) % 12 - 6) * ((int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c) / 8) / 64 * 64, k % 3 == 0 ? 8 : 1};
         long[] alone = new long[jobs.length];
         for (int k = 0; k < jobs.length; k++)
             alone[k] = hash(far, jobs[k]);
