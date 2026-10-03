@@ -131,10 +131,12 @@ fn max_formed_per_survivor() -> f64 {
     20.0
 }
 
-/// Earth's 2.6–1.8 Ga iron-formation basins cover about 1.4 % of its shields and cratons (0.75
-/// million km² of 53.5 million: `bif_basins`). ledger: ORE-261
+/// 5 % of the stable interiors: a game choice (Ben, 2026-10-02, "5 % of stable interiors"), so a
+/// 16k planet, which has about 1/44 of Earth's area, holds a handful of iron-formation sites.
+/// Earth's own 2.6–1.8 Ga iron-formation basins cover about 1.4 % of its shields and cratons (0.75
+/// million km² of 53.5 million: `bif_basins`), the reference value. ledger: ORE-261
 fn inherited_bif_share() -> f64 {
-    0.014
+    0.05
 }
 
 /// The median of Earth's iron-formation basin areas (Hamersley about 100,000 km²; `bif_basins`).
