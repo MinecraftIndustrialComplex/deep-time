@@ -71,8 +71,8 @@ public final class NetworkGameTests {
         WorldInfoPayload cut = roundTrip(WorldInfoPayload.STREAM_CODEC,
                 new WorldInfoPayload(true, "minecraft:overworld", "0.0", 16384, 300, 20, 75, 80, longName), helper);
         helper.assertTrue(cut.planetName().length() == WorldInfoPayload.MAX_STRING, "long name not cut: " + cut.planetName().length());
-        helper.assertTrue(cut.poleCap() != null && cut.poleCap().stopZ() > 3640 && cut.poleCap().stopZ() < 3642,
-                "poleCap() of a 16k planet: " + cut.poleCap());
+        helper.assertTrue(cut.poleCap() != null && cut.poleCap().stopZ() > 2567 && cut.poleCap().stopZ() < 2569,
+                "poleCap() of a 16k planet (stop line R·sin 80°, R = C/2π): " + cut.poleCap());
         helper.assertTrue(WorldInfoPayload.notAPlanet("minecraft:the_end").poleCap() == null, "a non-planet has a cap");
         DeepTime.LOGGER.info("[gametest] worldInfoRoundTrip {} cases ok, id {}", cases.size() + 1, WorldInfoPayload.TYPE.id());
         helper.succeed();
