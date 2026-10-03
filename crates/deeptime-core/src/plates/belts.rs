@@ -371,9 +371,17 @@ fn stack_front(
         }
     };
     if belt_weight > 0.0 && belt_rise_km2_m > 0.0 {
+        let cap_m = k.strength_height_m(env.gravity);
+        let z_of: Vec<f64> = belt
+            .iter()
+            .map(|&(i, _)| f64::from(samples[i].elevation_m))
+            .collect();
+        let given = fill_belt(&belt, &z_of, belt_rise_km2_m, belt_weight, area, cap_m);
         rises.extend(
             belt.iter()
-                .map(|&(i, w)| (i, belt_rise_km2_m * w / belt_weight, false)),
+                .zip(given)
+                .filter(|&(_, g)| g > 0.0)
+                .map(|(&(i, _), g)| (i, g, false)),
         );
     }
     let mut out = FrontStep {
@@ -437,6 +445,68 @@ fn stack_front(
     out.stacked.mean_before_m = mean_before_m;
     out.stacked.foredeep = flexure.map(|fl| foredeep(&d_under, fl, wedge_km, &norm_km(env)));
     out
+}
+
+/// Shares the belt's crust (`rise_km2_m`, km² × m) among its samples by the profile `w`, over
+/// `weight` (km²: the profile's area, at least half a full belt's), each sample rising at most to
+/// the crust's strength height `cap_m` (its elevation `z` given). What a sample at the strength
+/// height cannot take goes to the samples behind it that can, by the same profile, in a few
+/// passes: the belt widens into a plateau instead of rising. What no sample can take goes down
+/// with the slab. Returns each sample's rise, m. `cap_m` ≤ 0: no limit.
+///
+/// Why a limit at all: crust above its strength height spreads in the surface stage
+/// (`surface::spread`), but that runs once a step on the surface while a fast collision stacks
+/// kilometres a step at its front. A collision that never stalls (a short front on a plate pulled
+/// by a long slab: the resistance's reach is the front's share of the plate's drive) then piled
+/// crust 200–290 km thick on an overriding sliver, and the surface stood 14 km high there
+/// (`earthlike_quick_16k`, scattered start, seed 1, 500 Myr, after the continental crust fix).
+// ledger: PLT-253 (the stack rises no higher than the strength height).
+fn fill_belt(
+    belt: &[(usize, f64)],
+    z: &[f64],
+    rise_km2_m: f64,
+    weight: f64,
+    area: f64,
+    cap_m: f64,
+) -> Vec<f64> {
+    let mut given = vec![0.0f64; belt.len()];
+    if cap_m <= 0.0 {
+        for (g, &(_, w)) in given.iter_mut().zip(belt) {
+            *g = rise_km2_m * w / weight;
+        }
+        return given;
+    }
+    let room = |j: usize, given: &[f64]| (cap_m - z[j] - given[j]).max(0.0);
+    let mut left = rise_km2_m;
+    let full = weight / area;
+    for _ in 0..6 {
+        let open: f64 = belt
+            .iter()
+            .enumerate()
+            .filter(|&(j, _)| room(j, &given) > 0.0)
+            .map(|(_, &(_, w))| w)
+            .sum();
+        if open <= 0.0 || left <= 1e-9 * rise_km2_m {
+            break;
+        }
+        // Per sample of profile 1: never more than the first pass gives (a sliver's samples
+        // take what half a belt would give them).
+        let per = left / (open.max(full) * area);
+        let mut placed = 0.0;
+        for (j, &(_, w)) in belt.iter().enumerate() {
+            let r = room(j, &given);
+            if r > 0.0 {
+                let g = (per * w).min(r);
+                given[j] += g;
+                placed += g * area;
+            }
+        }
+        left -= placed;
+        if placed <= 1e-9 * rise_km2_m {
+            break;
+        }
+    }
+    given
 }
 
 /// Distance (rad) to km and the bin width of the foreland's profile.
@@ -861,6 +931,8 @@ mod tests {
             let mut fx = Fixture::new();
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
             fx.preset.tectonics.collision_stacking_share = share;
+            // A crust strong enough that the strength height (PLT-253) never binds here.
+            fx.preset.tectonics.crust_strength_mpa = 2000.0;
             let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(40.0));
             let area = fx.norm.sample_area_km2();
             let kinds: Vec<u8> = st.samples.iter().map(|s| s.kind).collect();
@@ -989,6 +1061,47 @@ mod tests {
         assert!(
             h > 0.8 * h_stop && h < 3.0 * h_stop,
             "{h} m against {h_stop} m"
+        );
+    }
+
+    /// The belt rises no higher than the strength height: what the front cannot take widens the
+    /// belt behind it, what nothing can take goes with the slab, and without the limit (or below
+    /// it) the share is the profile's.
+    #[test]
+    fn the_belt_widens_instead_of_rising_past_the_strength_height() {
+        // Five samples of 100 km² from the front back, profile 1, 0.8, 0.6, 0.4, 0.2.
+        let belt: Vec<(usize, f64)> = (0..5).map(|j| (j, 1.0 - 0.2 * j as f64)).collect();
+        let area = 100.0;
+        let weight: f64 = belt.iter().map(|&(_, w)| w).sum::<f64>() * area;
+        let low = [0.0; 5];
+        // Below the limit: the profile's shares, all of it placed.
+        let g = fill_belt(&belt, &low, 30_000.0, weight, area, 5000.0);
+        let unlimited = fill_belt(&belt, &low, 30_000.0, weight, area, 0.0);
+        for (a, b) in g.iter().zip(&unlimited) {
+            assert!((a - b).abs() < 1e-9, "{g:?} vs {unlimited:?}");
+        }
+        assert!((g.iter().sum::<f64>() * area - 30_000.0).abs() < 1e-6);
+        // The front already at 4.9 km: it takes 100 m, the rest goes behind, up to the limit.
+        let high = [4900.0, 1000.0, 1000.0, 1000.0, 1000.0];
+        let g = fill_belt(&belt, &high, 150_000.0, weight, area, 5000.0);
+        assert!((g[0] - 100.0).abs() < 1e-6, "{g:?}");
+        for (j, &x) in g.iter().enumerate() {
+            assert!(high[j] + x <= 5000.0 + 1e-6, "{g:?}");
+        }
+        let placed = g.iter().sum::<f64>() * area;
+        assert!(placed <= 150_000.0 + 1e-6);
+        let first_pass = 150_000.0 * 0.8 / weight;
+        assert!(
+            g[1] > first_pass,
+            "the belt widens: {} against {first_pass}",
+            g[1]
+        );
+        // Everything at the limit: nothing rises.
+        let full = [5000.0; 5];
+        assert!(
+            fill_belt(&belt, &full, 150_000.0, weight, area, 5000.0)
+                .iter()
+                .all(|&x| x == 0.0)
         );
     }
 
