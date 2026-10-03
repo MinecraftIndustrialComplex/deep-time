@@ -489,10 +489,15 @@ pub struct TectonicParams {
     pub arc_uplift_mm_yr: f64,
     /// New arc crust per Myr at the arc axis at v = v_0, metres.
     pub arc_magma_m_per_myr: f64,
-    /// Arc magma an island arc must have accumulated (`arc_oceanic_m`) before its emerged crust
-    /// counts as continental, metres (P1-27; 0 converts any emerged arc at once, as P1-03 did;
-    /// intra-oceanic arcs take tens of Myr to build 20–35 km of crust, Stern 2002).
-    pub arc_continental_m: f64,
+    /// How long an island arc must build crust before its crust counts as continental, Myr of
+    /// arc magma at the axis at v = v_0: an oceanic sample turns continental once its
+    /// `arc_oceanic_m` reaches `arc_magma_m_per_myr` × this, whatever its height (2026-10-02;
+    /// before, `arc_continental_m` metres and only above sea level). Island-arc crust thicker
+    /// than about 15 km is too buoyant to subduct, and arcs built on ocean crust need more than
+    /// about 20 Myr of activity to reach it (Cloos 1993); the model's arc magma is not a physical
+    /// thickness, so the rule counts the time (`plates::finish_samples`). 0 turns every sample
+    /// that has received arc magma continental at once. ledger: PLT-047
+    pub arc_maturity_myr: f64,
     /// Uplift of continental crust over a magmatic arc at v = v_0, mm/yr: the arc's own
     /// cordillera, built by arc magmatism and crustal thickening (P1-27; 0, the default and the
     /// plate-only presets' value, leaves only Cortial's subduction uplift; the planet pipeline
@@ -653,7 +658,7 @@ impl Default for TectonicParams {
             arc_width_km: 60.0,
             arc_uplift_mm_yr: 0.1,
             arc_magma_m_per_myr: 20.0,
-            arc_continental_m: 0.0,
+            arc_maturity_myr: 20.0, // ledger: PLT-047
             cordillera_uplift_mm_yr: 0.0,
             cordillera_width_km: 120.0,
             cordillera_height_m: 2500.0,
@@ -1039,6 +1044,7 @@ impl PlanetPreset {
                 k.cordillera_uplift_mm_yr,
                 "$.tectonics.cordillera_uplift_mm_yr",
             ),
+            (k.arc_maturity_myr, "$.tectonics.arc_maturity_myr"),
         ] {
             check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
         }
