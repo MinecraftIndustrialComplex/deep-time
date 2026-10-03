@@ -18,6 +18,8 @@
 # one setting (a short value is for the end-to-end test only).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# mac.sh runs this in the dev shell, whose LD_LIBRARY_PATH breaks /usr/bin/pgrep (nix libsystemd).
+unset LD_LIBRARY_PATH
 LIB=/usr/local/lib/deeptime
 PLAY_DIR_DEFAULT=/data/ban/mic/mods/play-fa09e8b/smoke/mic/server
 SWITCH=0; IDLE=""
