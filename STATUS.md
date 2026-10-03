@@ -219,7 +219,16 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   planet) are simulated at the clamped latitude and can hold land and rivers (the 4k test planet has river
   vertices to z = 702, R = 652). They lie beyond the pole cap's stop line (80°), so no player reaches them; the
   ice line leaves the rows wholly past a pole out and weighs the partial ones by their area.
-GATES_PLACEHOLDER
+- **Gates on the merged head** (test VM, ad052aa0; the later commits are docs only): cargo fmt --check, clippy
+  `-D warnings`, deny clean; `cargo test --workspace` 763 passed, 0 failed, 3 ignored; `./gradlew build test`
+  251 tests, 0 failures, 2 skipped. GameTests through `mac.sh --pack --server`: `./gametest.sh` 71 of 71,
+  `-PwithTerraBlender` 71 of 71, `-PwithMic` 71 of 71 (TerraBlender and MIC sets re-installed first). The
+  failures known on master (`magmaUnderActiveVolcanoes`, `farTerrainMatchesGeneratedChunksAcrossTheSeam`,
+  `riverBiomes`, `lakeIceAndSaltFollowTheClimate`, `realPlanetRockMatchesTheParityFixture`) pass on this
+  planet; the branch adds none. Logs: `/Volumes/Graphide/ban/deeptime-runs/projection-lambert/` on the VM
+  (delete when this lands, with `projection-refactor/`).
+- **Next.** The coordinator merges this branch (format 0.4: every bake and saved run is rebuilt), then runs
+  `tools/remote/mac-gc.sh` and deletes the two scratch folders above.
 ### 2026-10-02 — The vertical scale is 35 m per block (agent worktree agent-a6b275724b347abae, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Asked:** Ben's answer "35 m per block (Recommended)" (decisions log 2026-10-02): `scale.m_per_block_v` 20 → 35 (8.6× instead of 15×); re-check what was tuned against 15×; measure strata, ore, the floor.
 - **Changed:** one shared default `deeptime_format::DEFAULT_M_PER_BLOCK_V` = 35 (`params.rs` default, `Scale::default_for`, `ViewScale::default`, deposits `Scales::default`, the dummy world, the climate DEM tool) and Java `Manifest.DEFAULT_M_PER_BLOCK_V` = 35; 35.0 in all twelve built-in presets and in `tests/presets/planet_world_4k.json` (the GameTest world `test_planet_real` and ColumnParityTest follow the game's scale; no test preset kept 20 m: the only other pins are unit tests that pass 20 explicitly as input, and the two coal-stack tests in `deposits/geometry.rs`, whose cover and depth numbers were set in 20 m blocks, now say so). Fixed assumptions of 20 m: `VISIBLE_RELIEF_M` 40 m → `VISIBLE_RELIEF_BLOCKS` 2 × `m_per_block_v` (IMP-081; `Crater::state` takes the threshold); `deposits::surface_y` read sea level 63 → the world's `sea_level_y` (new field of `Scales`). Fallbacks to 20: workbench `sections.js`, `tools/review/p2-01-report.py`, `glacial_views.py --mv`. GameTest `worldInfoFollowsThePlayer` compares with `Manifest.DEFAULT_M_PER_BLOCK_V`. Editor hints (m_per_block_v, volcano flanks, crater depth) and the docs of the settings below describe 8.6×. New tests (fail on the old code): `a_crater_shows_while_two_blocks_deep_at_any_vertical_scale`, `surface_y_reads_the_world_sea_level_and_scale`; `the_top_band_is_compressed` now expects the knee 17.92 km above the sea.
