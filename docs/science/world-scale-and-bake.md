@@ -53,3 +53,11 @@ are game choices about how far terrain stays the same terrain as the chunks.
   on 64 blocks either side of the seam; `tools/smoke/run.py --dh` has Distant Horizons generate
   and store sections beside the spawn and centred on the seam, then compares what it stores with
   far terrain and far terrain with the chunks generated afterwards on 160 blocks either side.
+  `tools/client/dh-client-check.sh` joins a real client (software GL on the test machine) and
+  checks that its Distant Horizons requests reach the generator on both sides of the seam and
+  that the sections arrive in the client's own database.
+- **What is not covered.** Distant Horizons' `/dh pregen` cannot cross the seam with Toroidal World
+  0.19.3: DH files a pending section under its raw position, TW answers it under the folded one, and
+  the pregeneration stops (STATUS.md, pending questions). Players' clients do not use it. The
+  GameTest server cannot load Distant Horizons (it casts the server to a dedicated one), so the
+  GameTests check far terrain without it and the smoke check covers Distant Horizons.
