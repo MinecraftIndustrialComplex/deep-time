@@ -1,6 +1,10 @@
 # P1-26 Per-cell climate — design
 
-Status: **design for Ben's approval** (2026-09-30). Nothing here is built yet. The build starts after
+Status: **approved by Ben 2026-10-01** (decisions log, "Approve as recommended"). Nothing here is
+built yet. Constants checked against their sources before the build (science stage 2, WP-14a,
+2026-10-02): each change is marked "WP-14a" with its source, and the ledger rows are CLM-119 to
+CLM-146 and CLM-163 onward (`docs/science/ledger/CLM.md`; page `docs/science/per-cell-climate.md`).
+The build starts after
 the climate agent's ice-sheet branch (`worktree-agent-adc924860a859865c-ice`) lands, because both
 change `crates/deeptime-core/src/climate/`. Ben asked for it on 2026-09-30 (decisions log: "I feel
 like climate in general should probably be per cell as opposed to completely banded across a
@@ -187,7 +191,8 @@ Why this grid:
 - **Planetary scale.** Like the rest of the planetary-scale climate, the grid is Earth-normalized:
   the same 2.8° on every preset, so a 16k and a 32k planet get the same climate.
 - **Precedent.** TransEBM (Ziegler & Rehfeld 2021), the current descendant of North, Mengel & Short
-  1983, uses this same resolution (T42, 128 × 64). GREB uses 3.75°.
+  1983, uses this same resolution (T42, 128 × 64; a Gaussian grid, where ours is regular: Ziegler &
+  Rehfeld 2021, p. 2845). GREB uses 3.75° × 3.75° (Stassen et al. 2019, p. 426).
 - **Reuse.**
   - L1 is equirectangular, so coarsening and refining are block means and bilinear interpolation.
   - The ice branch's `climate/sheet.rs` already has that machinery (`sheet::Grid::{new, coarsen,
@@ -250,10 +255,21 @@ C_l ∂T̄/∂t |_atm = ∇·(D ∇T̄)  −  β_T C_l u_a(φ′, month) ∂T̄/
 - 𝒪 is the ocean's heat transport (§2.6).
 
 **Heat capacities.** C_l = `land_depth_m` (3 m of water), C_m = `ocean_depth_m` (50 m), sea ice as
-today (k = 2.2 W/m/K, full cover at 0.5 m, conduction tapered above 10 m). The NMS83 lineage uses a
-much smaller land capacity (1.87·10⁶ J/m²/K, 0.45 m). In the prototype that fit worse: winter RMSE
-8.6 K against 6.3 K with 3 m (run B against run A). It stays a setting with today's 3 m as the
-default.
+today (k = 2.2 W/m/K, full cover at 0.5 m, conduction tapered above 10 m). In the prototype a land
+capacity of 1.87·10⁶ J/m²/K (0.45 m) fit worse: winter RMSE 8.6 K against 6.3 K with 3 m (run B
+against run A). It stays a setting with today's 3 m as the default.
+
+*WP-14a (sources read):* the 1.87·10⁶ J/m²/K is the land **surface** alone in Zhuang et al. 2017's
+model, which adds an atmospheric column of 4.76·10⁶ to every surface type: its land column is
+6.63·10⁶ J/m²/K (1.6 m of water), TransEBM's tuned one 2.66·10⁶ (0.64 m) (Ziegler & Rehfeld 2021,
+Tables 1 and 2). Run B therefore tested a land column without its air, not the lineage's value.
+North, Cahalan & Coakley 1981 give the "ideal land" earth-atmosphere capacity as C_L = 0.16 B years
+with B = 2.09 W/m²/K, that is 1.06·10⁷ J/m²/K or 2.5 m of water, and the ocean mixed layer as
+4.7 B years, 3.1·10⁸ J/m²/K or 74 m (p. 118, list of symbols). The air column alone is
+c_p p_s / g ≈ 1.0·10⁷ J/m²/K (2.5 m). Today's 3 m for land plus air is consistent with North et al.;
+the 50-m slab is shallower than their 74 m, Zhuang et al.'s 70 m and TransEBM's 96 m (Ziegler &
+Rehfeld 2021, p. 2846). Both stay as they are (calibrated, CLM-013, CLM-014, CLM-122); T9 may
+revisit the slab depth against the seasonal SST amplitude.
 
 ### 2.4 Albedo per cell
 
@@ -284,7 +300,10 @@ tabulated in Ziegler & Rehfeld 2021):
 - f̄ is the mean land fraction of the two cells sharing the face.
 
 A zonal factor `climate.zonal_diffusivity_ratio` (default 0.5, calibrated) multiplies the
-east–west faces. PlaHab (Ramirez 2023) uses 1/25. In the prototype, 0.1–0.5 added zonal variety but
+east–west faces. PlaHab (Ramirez 2024, PSJ 5:2) uses D_lon/D_lat = 0.02/0.5 = 1/25 for Earth
+equatorward of 45° and 0.0002/0.5 = 1/2,500 poleward of it, on 30° longitude bands, with the same
+1/cos²φ flux form (p. 3, eq. 1; read WP-14a). Our 0.5 is a calibrated value about 12 times
+PlaHab's low-latitude ratio, not a sourced one. In the prototype, 0.1–0.5 added zonal variety but
 needed the ocean terms to put it in the right places (Appendix B).
 
 The diffusion is in flux form on the sphere:
@@ -752,6 +771,17 @@ there would add 40–80 minutes single-threaded, or 10–20 minutes on all cores
     and the pattern through a snowball's onset and escape. Cost is one extra snapshot per crossing.
   - **A test.** On the existing snowball scenario (tropical supercontinent, weathering ramp), the
     2-D model run at the onset CO₂ must also freeze over, and run at the escape CO₂ must thaw.
+  - **The escape CO₂ is reported against Earth's (WP-14a).** The clock's CO₂ forcing, which this
+    design keeps, is Byrne & Goldblatt 2014's fit F = 5.32 ln(C/C₀) + 0.39 [ln(C/C₀)]², stated for
+    200–10,000 ppm and computed by them over 100–50,000 ppm (Table 2 and abstract; read WP-14a),
+    blended from Myhre's logarithm above 1,000 ppm (CLM-069 to CLM-071). Above 50,000 ppm it is
+    an extrapolation with no source behind it. Today's snowball scenario escaped at about
+    550,000 ppm (0.55 bar), where Hoffman et al. 2017 expect terminations at 10⁴ to 10⁵ ppm
+    (p. 3 of 43; read WP-14a) and note that cloud-free models do not deglaciate at any feasible
+    CO₂ while cloud condensate adds ≥ 10 W/m² (p. 10 of 43). T6 records the 2-D model's escape
+    CO₂ in the run's notes beside 10⁴–10⁵ ppm. What to do above 50,000 ppm (cap the forcing, find a radiative
+    calculation that covers 0.1–1 bar, or add the snowball's cloud and dust forcing) is an open
+    question for Ben (STATUS "Pending questions", WP-14a); until then the forcing law is unchanged.
 - **The ice-albedo feedback.**
   - In the 2-D model it is per cell: snow by tile temperature, sea ice by cover, sheets by s_g.
   - In the clock it is per band, as today.
@@ -808,6 +838,14 @@ This design depends on it as follows:
 - **Ice albedo.** The sheet's ice share per *coarse climate cell* feeds the 2-D model's s_g. Its
   per-band share keeps feeding the clock, as it does on the branch.
 - **No change** to supply limits, calving, isostasy or the clock step.
+- **The ice takes the planet's gravity (WP-14a; science stage 1 fix 17).** `ice.rs` uses a fixed
+  `G = 9.81` in Nye's profile H = √(2τ₀L/(ρ_i g)), and the branch's `sheet.rs` imports the same
+  constant into its shallow-ice rate factor 2A(ρ_i g)ⁿ/(n + 2). Both read `planet.gravity_m_s2`
+  instead, passed in by T6, which touches the sheet anyway. Test: on a planet with g = 3.71 m/s²
+  the Nye thickness at the same L and τ₀ is √(9.81/3.71) = 1.63 times Earth's, and the sheet's flux
+  for the same geometry is (3.71/9.81)³ = 0.054 times. Earth's presets carry 9.81, so Earth-like
+  worlds do not change. Glacio-eustasy and the ice's isostatic depression (ρ_i/ρ_m) do not depend
+  on g.
 
 ---
 
@@ -842,6 +880,19 @@ of these change in meaning, so no code changes. Effects:
 - Deserts move to interiors and cold coasts.
 - The placement table (`placement.json`, pack-overridable) needs no change. Its per-class bands stay
   valid.
+
+**Köppen on L2 (open, WP-14a note).** The grid-artifact audit (build log 2026-10-01, P1-23,
+finding 3; STATUS "Pending questions") recommends deciding the Köppen class on L2 inside P1-26, so
+biome borders stop stepping with the 16-block L1 cells. This design does not include it: §2.9 and
+T5 classify on L1 "exactly as today". It accommodates it without a format change. The class is a
+function of the twelve monthly temperatures and precipitations, which §2.9 already produces from
+smooth fields (masked bilinear of the coarse tiles, the coast blend, the inversion), and the bake
+already holds the twelve `month/t_sl_c_NN` and `month/p_share_NN` layers. A step in
+`bake/biomes.rs` can interpolate those to each L2 cell, lapse to the L2 height and classify there,
+then set the band coordinates per L2 cell; the baked L1 `climate/koppen` stays for the climate API.
+If Ben takes the audit's recommendation it becomes a T5/T10 item (Sonnet; acceptance: the audit's
+share of biome-input change faces within 2° of an axis falls from 24 % toward the 4.4 % of an
+isotropic field).
 
 ### 5.3 The `climateConsistent` GameTest floors
 
@@ -1036,6 +1087,16 @@ Under `belts` they are reported but are not gates.
   A test (T6).
 - **Earth.** The 2-D global mean stays 15 ± 0.5 °C at 280 ppm, as the 1-D model is today: a0 is
   re-fitted if needed.
+  - *WP-14a:* Earth's own pre-industrial mean is cooler. Berkeley Earth gives 14.10 °C for
+    1951–1980 (air temperature over sea ice; 14.70 °C with the water below the ice) and an
+    1850–1900 anomaly of −0.31 K against that base, so 13.8 °C (14.4 °C) for 1850–1900 (Rohde &
+    Hausfather 2020; the data file's header and monthly anomalies, read and averaged WP-14a). The
+    15 °C is the mean of North, Cahalan & Coakley 1981's models with their northern-hemisphere
+    coefficients (15.0 °C for an ice-free planet, p. 93; 14.97 °C for the diffusive model,
+    p. 97). Whether T9 targets 15 °C (today's
+    calibration) or
+    Earth's 13.8–14.4 °C is a question for Ben (STATUS "Pending questions", WP-14a); the target
+    stays 15 ± 0.5 °C until he answers.
 
 ### 7.3 Closure
 
@@ -1156,7 +1217,7 @@ This design ports no new code. Every new piece is implemented from equations.
 | Wagner & Eisenman 2015, J. Climate 28, 3998 | sea ice in EBMs | paper; code (eisenman-group) has no licence; equations only |
 | Klein & Hartmann 1993, J. Climate 6, 1587 † | low cloud vs stability (follow-up, Q9) | paper |
 | Serreze, Kahl & Schnell 1992, J. Climate 5, 615 † | Arctic winter inversions | paper |
-| PlaHab (Ramirez 2023, PSJ) | zonal/meridional diffusivity ratio precedent | data and code CC BY 4.0 on UCF STARS (not inspected, nothing taken) |
+| PlaHab (Ramirez 2024, PSJ 5:2, doi:10.3847/PSJ/ad0729) | zonal/meridional diffusivity ratio precedent (paper read WP-14a) | data and code CC BY 4.0 on UCF STARS (code not inspected, nothing taken) |
 | **Not used:** ExoPlaSim (GPL-2.0), PlaSim (treated as GPL), Isca (GPL-3.0), CLIMBER-X (GPL-3.0), OpenLEM/LFPM (GPL-3.0-or-later), SPEEDY (non-commercial grant) | — | do not port; oracles at most |
 
 † Cited from memory, not re-read in this session. The implementing tasks verify the page numbers
