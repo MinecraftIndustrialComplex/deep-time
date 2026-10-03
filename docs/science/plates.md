@@ -20,7 +20,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
 
-Rows by status (after plate tasks 3 and 4 and the continental crust fix, 2026-10-02): `verified` 17, `cited-unverified` 41, `from-memory` 4, `abstract-only` 17, `calibrated` 13, `game-choice` 75, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
+Rows by status (after the orogenic collapse, 2026-10-03): `verified` 17, `cited-unverified` 44, `from-memory` 4, `abstract-only` 19, `calibrated` 13, `game-choice` 75, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
 
 ## Material for the stage 2 writer
 
