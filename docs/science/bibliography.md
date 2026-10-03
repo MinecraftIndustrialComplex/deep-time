@@ -5817,3 +5817,11 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 - Access: open copy; full text read.
 - Library: not fetched.
 - Read so far (by the project): full text, 2026-10-03 (research sub-agent): Moho "60–80 km within the plateau"; maximum "~79 km is found in Karakorum and in the southern Lhasa block".
+
+### LundsternMiller2021
+- Reference: Lundstern, J.-E. and Miller, E. L. (2021). [Chapter on Basin and Range extension.] Geological Society of America Special Paper 555, chapter 13. Title not recorded by the sub-agent; take it from the DOI before quoting.
+- DOI or URL: 10.1130/2021.2555(13) (USGS record https://pubs.usgs.gov/publication/70226446)
+- Ledger ids: none (cited on plates.md as a limit: thinning can lag thickening by tens of Myr)
+- Access: abstract read (USGS record).
+- Library: not fetched.
+- Read so far (by the project): abstract, 2026-10-03 (research sub-agent): the collapse model is "difficult to reconcile with ... moderate regional extension (≤50%) and the discovery that most high-angle, Basin and Range faults slipped rapidly ca. 17 Ma, tens of millions of years after crustal thickening occurred".
