@@ -48,14 +48,26 @@ public final class BiomeCensus {
         return TagKey.create(Registries.BIOME, ResourceLocation.fromNamespaceAndPath("c", path));
     }
 
-    /** A Köppen family and the tags its biomes should carry. */
-    public record Check(String name, String classes, IntPredicate koppen, List<TagKey<Biome>> tags) {}
+    /** Vanilla's cold | temperate temperature edge (the band coordinate 2): colder is the cold band or frozen. */
+    static final double COLD_BAND_TOP = -0.15;
+
+    /**
+     * A Köppen family and the tags its biomes should carry. {@code notColderThan} leaves out the columns
+     * whose baked temperature parameter is below it (null: none are left out): the cold deserts, which are
+     * drawn as cold land on purpose (Ben, 2026-10-02) and have their own check, {@link Forbid}
+     * {@code BWk:cold_not_sand}, instead of being counted against the desert tags.
+     */
+    public record Check(String name, String classes, IntPredicate koppen, List<TagKey<Biome>> tags, Double notColderThan) {
+        public Check(String name, String classes, IntPredicate koppen, List<TagKey<Biome>> tags) {
+            this(name, classes, koppen, tags, null);
+        }
+    }
 
     /** Köppen class indices (`koppen::CODES`): 0–3 A, 4–7 B, 8–16 C, 17–28 D, 29–30 E, 31 sea. */
     public static final List<Check> CHECKS = List.of(
             new Check("A", "Af Am Aw As", k -> k <= 3, List.of(c("is_hot"), c("is_jungle"), c("is_savanna"), c("is_wet"))),
             new Check("Af", "Af", k -> k == 0, List.of(c("is_jungle"), c("is_wet"))),
-            new Check("BW", "BWh BWk", k -> k == 4 || k == 5, List.of(c("is_desert"), c("is_badlands"), c("is_dry"), c("is_sandy"))),
+            new Check("BW", "BWh BWk (not the cold deserts)", k -> k == 4 || k == 5, List.of(c("is_desert"), c("is_badlands"), c("is_dry"), c("is_sandy")), COLD_BAND_TOP),
             new Check("BS", "BSh BSk", k -> k == 6 || k == 7, List.of(c("is_dry"), c("is_savanna"), c("is_plains"), c("is_sparse_vegetation"))),
             new Check("C", "C*", k -> k >= 8 && k <= 16, List.of(c("is_temperate"))),
             new Check("D", "D*", k -> k >= 17 && k <= 28, List.of(c("is_cold"), c("is_temperate"), c("is_taiga"), c("is_tree/coniferous"))),
@@ -64,7 +76,7 @@ public final class BiomeCensus {
             new Check("E", "ET EF", k -> k == 29 || k == 30, List.of(c("is_snowy"), c("is_icy"), c("is_cold"))),
             new Check("sea", "sea (below sea level)", k -> k == 31, List.of(c("is_ocean"), c("is_deep_ocean"), c("is_aquatic"))),
             // The narrow ones Ben asked to see: deserts in BW, rainforest in Af, taiga in Dfc, snow and ice in ET/EF.
-            new Check("BW:desert", "BWh BWk", k -> k == 4 || k == 5, List.of(c("is_desert"), c("is_badlands"))),
+            new Check("BW:desert", "BWh BWk (not the cold deserts)", k -> k == 4 || k == 5, List.of(c("is_desert"), c("is_badlands")), COLD_BAND_TOP),
             new Check("Af:jungle", "Af", k -> k == 0, List.of(c("is_jungle"))),
             new Check("Dfc:taiga", "Dfc", k -> k == 27, List.of(c("is_taiga"), c("is_tree/coniferous"))),
             new Check("E:snow", "ET EF", k -> k == 29 || k == 30, List.of(c("is_snowy"), c("is_icy"))));
@@ -82,9 +94,6 @@ public final class BiomeCensus {
             this(name, classes, koppen, glaciated, null, biomes);
         }
     }
-
-    /** Vanilla's cold | temperate temperature edge (the band coordinate 2): colder is the cold band or frozen. */
-    static final double COLD_BAND_TOP = -0.15;
 
     /**
      * EF is ice cap where the glacier model puts ice and barren frozen ground elsewhere (Ben, 2026-09-29,
@@ -207,6 +216,8 @@ public final class BiomeCensus {
                 if (!untagged && (k == 31 ? y < sea - 4 : land)) {
                     for (Check ch : CHECKS) {
                         if (!ch.koppen().test(k))
+                            continue;
+                        if (ch.notColderThan() != null && t.raster("climate/temperature", x, z) < ch.notColderThan())
                             continue;
                         int[] n = checks.get(ch.name());
                         n[1]++;
