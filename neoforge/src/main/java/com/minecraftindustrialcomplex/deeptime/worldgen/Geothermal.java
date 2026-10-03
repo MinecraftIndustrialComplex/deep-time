@@ -428,7 +428,8 @@ public final class Geothermal {
     }
 
     /**
-     * The fields on hot continental ground. The world (circumference x half of it) is cut into cells
+     * The fields on hot continental ground. The world (circumference x pole to pole, the planet's
+     * projection: 2R = C/π on the Lambert map, where every block has the same area) is cut into cells
      * of {@link #HEAT_FIELD_AREA_KM2} / {@code geothermal_heat_density} square km; each cell, from its
      * own seed, tries {@link #HEAT_DRAWS} random points and takes the first where the baked heat flow
      * reaches the setting and the ground is dry land clear of ice. Fields so placed are kinds of the
@@ -440,9 +441,10 @@ public final class Geothermal {
         if (rules.heatDensity() <= 0.0 || c.circumference <= 0)
             return;
         double side = Math.sqrt(HEAT_FIELD_AREA_KM2 / rules.heatDensity()) * 1000.0 / c.mH;   // blocks
-        int nx = Math.max(1, (int) Math.round(c.circumference / side)), nz = Math.max(1, (int) Math.round(c.circumference / 2.0 / side));
-        double wx = (double) c.circumference / nx, wz = c.circumference / 2.0 / nz;
-        double z0 = -c.circumference / 4.0;
+        double pole = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c.circumference);
+        int nx = Math.max(1, (int) Math.round(c.circumference / side)), nz = Math.max(1, (int) Math.round(2 * pole / side));
+        double wx = (double) c.circumference / nx, wz = 2 * pole / nz;
+        double z0 = -pole;
         for (int gz = 0; gz < nz; gz++)
             for (int gx = 0; gx < nx; gx++) {
                 long seed = PaletteRules.mix(0x4EA7_F10EL ^ ((long) gx << 32) ^ (gz & 0xFFFFFFFFL));

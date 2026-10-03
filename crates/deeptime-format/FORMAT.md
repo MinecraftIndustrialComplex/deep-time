@@ -1022,7 +1022,7 @@ L1 layer `meta/heat_flow_mw_m2` (see the table above; nodata on oceanic crust an
 the layer, which has no heat-flow fields). Spreading ridges are under the sea, so only the land
 that the model heats (rifts, arcs, hotspot swells, young belts) gets fields.
 
-**Fields from heat flow.** The world (C blocks round, C/2 from pole to pole, z from −C/4) is cut into a
+**Fields from heat flow.** The world (C blocks round, 2R = C/π from pole to pole, z from −R: "Grids") is cut into a
 grid of cells of 10,000 km² / `geothermal_heat_density` each (100 km across at density 1; the cell side
 is rounded so a whole number of cells goes round the world). Each cell, from a seed made of its own
 index, draws up to 6 random points and puts one field at the first where the bilinear
