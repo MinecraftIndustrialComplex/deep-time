@@ -63,6 +63,15 @@ rcon "gamerule doDaylightCycle false" >/dev/null
 mkdir -p "$CL/game/mods"
 rm -f "$CL/game/mods/"*.jar
 cp "$SRV/mods/"*.jar "$CL/game/mods/"
+# Distant Horizons' update check opens an "update available" screen at the title screen, which
+# holds the client there instead of joining (seen 2026-10-03 with 3.3.1: 3.3.3 is out).
+DHC="$CL/game/config/DistantHorizons.toml"
+mkdir -p "$CL/game/config"
+if [ -f "$DHC" ]; then
+    sed -i 's/^\(\s*enableAutoUpdater\s*=\s*\).*/\1false/' "$DHC"
+else
+    printf '[client]\n\t[client.advanced]\n\t\t[client.advanced.autoUpdater]\n\t\t\tenableAutoUpdater = false\n' > "$DHC"
+fi
 MESA=$(nix build --no-link --print-out-paths nixpkgs#mesa | head -1)
 GLVND=$(nix build --no-link --print-out-paths nixpkgs#libglvnd | head -1)
 XVFB=$(nix build --no-link --print-out-paths nixpkgs#xorg.xorgserver | head -1)/bin/Xvfb
