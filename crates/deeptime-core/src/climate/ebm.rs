@@ -66,6 +66,11 @@ pub struct EbmParams {
     pub steps_per_year: usize,
     /// The orbit (circular unless the recent ice-age window sets it, `orbit.rs`).
     pub orbit: insolation::Orbit,
+    /// The CO₂ forcing of the atmosphere's CO₂ against 280 ppm, by each tile's temperature
+    /// (`co2.rs`); `None`: 280 ppm (none).
+    pub co2: Option<super::co2::Forcing>,
+    /// The snowball cloud greenhouse on frozen surfaces, W/m² (`snowball_cloud_w_m2`).
+    pub snow_cloud: f64,
 }
 
 /// The model's state at the start of a year (what a warm start continues from).
@@ -157,6 +162,8 @@ impl EbmParams {
             bands: c.ebm_bands as usize,
             steps_per_year: c.ebm_steps_per_year as usize,
             orbit: insolation::Orbit::default(),
+            co2: None,
+            snow_cloud: c.snowball_cloud_w_m2,
         }
     }
 
@@ -288,13 +295,31 @@ impl EbmParams {
                     let sl = qs[j] * (1.0 - al);
                     let (cl, cs, cm) = (self.c_land / dt, self.c_land / dt, self.c_ocean / dt);
                     let (xl, xo) = (self.exchange * (1.0 - f[j]), self.exchange * f[j]);
-                    // land:  (cl + B + xl)·Tl − xl·To                 = cl·Tl + Sl − A
-                    // sea:   −xo·Tl + (cs + B + xo + g)·To − g·Tm     = cs·To + So − A
-                    // slab:  −g·To + (cm + g)·Tm                      = cm·Tm
-                    let (r1, r2, r3) = (cl * tl + sl - self.a, cs * to + so - self.a, cm * tm);
+                    // Each tile's longwave A + B·T, less the CO₂ forcing at its temperature and
+                    // the snowball cloud greenhouse on its frozen share (`co2.rs`).
+                    let (a_l, b_l) = super::co2::longwave(
+                        self.a,
+                        self.b,
+                        self.co2.as_ref(),
+                        tl,
+                        self.snow_cloud,
+                        self.frozen(tl).max(g_sheet[j]),
+                    );
+                    let (a_o, b_o) = super::co2::longwave(
+                        self.a,
+                        self.b,
+                        self.co2.as_ref(),
+                        to,
+                        self.snow_cloud,
+                        cover,
+                    );
+                    // land:  (cl + B_l + xl)·Tl − xl·To                 = cl·Tl + Sl − A_l
+                    // sea:   −xo·Tl + (cs + B_o + xo + g)·To − g·Tm     = cs·To + So − A_o
+                    // slab:  −g·To + (cm + g)·Tm                        = cm·Tm
+                    let (r1, r2, r3) = (cl * tl + sl - a_l, cs * to + so - a_o, cm * tm);
                     let a33 = cm + g;
-                    let a11 = cl + self.b + xl;
-                    let a22 = cs + self.b + xo + g - g * g / a33;
+                    let a11 = cl + b_l + xl;
+                    let a22 = cs + b_o + xo + g - g * g / a33;
                     let r2 = r2 + g * r3 / a33;
                     let det = a11 * a22 - xl * xo;
                     let tl2 = (r1 * a22 + xl * r2) / det;
@@ -303,7 +328,7 @@ impl EbmParams {
                     // The budget of the implicit step: what it absorbed and emitted.
                     let w = cosl[j];
                     asr += w * (f[j] * sl + (1.0 - f[j]) * so);
-                    olr += w * (self.a + self.b * (f[j] * tl2 + (1.0 - f[j]) * to2));
+                    olr += w * (f[j] * (a_l + b_l * tl2) + (1.0 - f[j]) * (a_o + b_o * to2));
                     // Ice melts from the top when the surface above it thaws.
                     if state.ice_j_m2[j] > 0.0 && to2 > 0.0 {
                         let melt = (to2 * self.c_land).min(state.ice_j_m2[j]);

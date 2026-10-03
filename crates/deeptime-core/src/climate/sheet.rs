@@ -31,7 +31,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::ice::{G, RHO_ICE, RHO_SEA};
+use super::ice::{RHO_ICE, RHO_SEA};
 
 /// Density of the mantle, kg/m³ (isostasy).
 pub const RHO_MANTLE: f64 = 3300.0; // ledger: GLA-071
@@ -59,10 +59,12 @@ pub struct Params {
     pub cap_m: f64,
     /// Calving at a margin standing in water, m ice/yr.
     pub calving: f64,
+    /// The planet's gravity, m/s² (the flow's driving stress ρ_i g H ∇s).
+    pub gravity: f64,
 }
 
 impl Params {
-    pub fn from(p: &super::ClimateParams) -> Params {
+    pub fn from(p: &super::ClimateParams, gravity: f64) -> Params {
         Params {
             a: p.ice_flow_a,
             beta_acc: p.ice_accumulation_gradient,
@@ -71,6 +73,7 @@ impl Params {
             isostasy_years: p.ice_isostasy_kyr * 1000.0,
             cap_m: p.ice_max_thickness_m,
             calving: p.ice_calving_m_yr,
+            gravity,
         }
     }
 }
@@ -127,7 +130,7 @@ impl State {
                 depress: vec![0.0; n],
             };
         }
-        let gamma = 2.0 * p.a * (RHO_ICE * G).powf(GLEN_N) / (GLEN_N + 2.0);
+        let gamma = 2.0 * p.a * (RHO_ICE * p.gravity).powf(GLEN_N) / (GLEN_N + 2.0);
         let float = RHO_SEA / RHO_ICE;
         let min_d2 = g.dx.iter().map(|d| d * d).fold(g.dy * g.dy, f64::min);
         // The fastest ice (thick, steep margins) is held to the diffusivity an explicit step of
@@ -314,6 +317,7 @@ mod tests {
             acc_max: 0.5,
             isostasy_years: 3000.0,
             cap_m: 5000.0,
+            gravity: super::super::ice::G,
         }
     }
 
@@ -379,6 +383,45 @@ mod tests {
         assert!((v1 - v0).abs() < 1e-4 * v0, "{v0} → {v1}");
         assert!(st2.thick[16 * fw + 40] > 0.0, "the dome spread");
         let _ = g;
+    }
+
+    /// The flow takes the planet's gravity (P1-26 T6; fix 17): the same dome under Mars's
+    /// 3.71 m/s² moves (3.71/9.81)³ = 0.054 of the ice Earth's gravity moves in one short step.
+    #[test]
+    fn the_flow_scales_with_the_cube_of_gravity() {
+        let (fw, fh) = (64, 32);
+        let g = Grid::new(fw, fh, &[1.0e5; 32], 1.0e5, 64);
+        let land = vec![200.0f32; fw * fh];
+        let dome: Vec<f32> = (0..fw * fh)
+            .map(|c| {
+                let (i, j) = ((c % fw) as f64 - 32.0, (c / fw) as f64 - 16.0);
+                (2000.0 * (1.0 - (i * i + j * j) / 64.0)).max(0.0) as f32
+            })
+            .collect();
+        let high = vec![1.0e6f32; fw * fh];
+        let none = vec![0.0f32; fw * fh];
+        let f = Forcing {
+            bed: &land,
+            ela: &high,
+            precip: &none,
+        };
+        let moved = |grav: f64| -> f64 {
+            let mut p = params();
+            p.beta_abl = 0.0;
+            p.gravity = grav;
+            let mut st = State::settled(dome.clone());
+            st.step(&g, &f, &p, 1.0);
+            st.thick
+                .iter()
+                .zip(&dome)
+                .map(|(a, b)| f64::from((a - b).abs()))
+                .sum()
+        };
+        let ratio = moved(3.71) / moved(9.81);
+        assert!(
+            (ratio - (3.71f64 / 9.81).powi(3)).abs() < 1e-3,
+            "flux ratio {ratio}"
+        );
     }
 
     #[test]

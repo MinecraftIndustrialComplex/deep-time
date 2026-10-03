@@ -44,6 +44,7 @@
 pub mod belts;
 pub mod carbon;
 pub mod clock;
+pub mod co2;
 pub mod coarse;
 pub mod ebm;
 pub mod ebm2d;
@@ -521,7 +522,7 @@ impl ClimateStage {
             day_length_h: self.preset.planet.day_length_h,
             earth_scale: self.earth_scale(),
             m_per_block_h: self.preset.scale.m_per_block_h,
-            forcing_w_m2: carbon::forcing(ppm),
+            co2_ppm: ppm,
             sun_rel: clock::sun_at(&self.p, t_years),
             orbit: clock::orbit_at(&self.p, self.preset.planet.axial_tilt_deg, t_years),
         }
@@ -669,6 +670,8 @@ impl ClimateStage {
         let gamma = p.lapse_c_per_km / 1000.0;
         let tau = p.ice_yield_stress_kpa * 1000.0;
         let cap = p.ice_max_thickness_m;
+        // The ice takes the planet's gravity (Nye's profile and the sheet's flow).
+        let grav = self.preset.planet.gravity_m_s2;
 
         // Where the crust went this plate step, and the ground the surface will erode.
         let started = Instant::now();
@@ -855,7 +858,7 @@ impl ClimateStage {
         // each coarse cell's snapshot equilibrium line and its precipitation.
         let dyn_ice = p.ice_dynamics;
         let sg = sheet::Grid::new(w, hgt, &geo.sx, geo.sy, p.ice_grid_cells as usize);
-        let sp = sheet::Params::from(&p);
+        let sp = sheet::Params::from(&p, grav);
         let coarse_band: Vec<usize> = (0..sg.h)
             .map(|cj| geo.band[(cj * sg.k + sg.k / 2).min(hgt - 1)])
             .collect();
@@ -923,7 +926,7 @@ impl ClimateStage {
                             mu0[c].is_finite() && f64::from(mu0[c]) > s.delta[geo.cell_band(c)]
                         })
                         .collect();
-                    ir.heq = ice::thickness(w, hgt, &mask, &geo.sx, geo.sy, tau, cap);
+                    ir.heq = ice::thickness(w, hgt, &mask, &geo.sx, geo.sy, tau, cap, grav);
                     ir.since_eq = 0.0;
                 }
                 let dtk = s.dt_kyr as f32;
@@ -1170,7 +1173,7 @@ impl ClimateStage {
             mask_pre = (0..n)
                 .map(|c| mu0[c].is_finite() && f64::from(mu0[c]) > delta_end[geo.cell_band(c)])
                 .collect();
-            ice::thickness(w, hgt, &mask_pre, &geo.sx, geo.sy, tau, cap)
+            ice::thickness(w, hgt, &mask_pre, &geo.sx, geo.sy, tau, cap, grav)
         };
         let curve = self.curve_sea_level(t_end_myr);
         let ocean_km2 = geo.area_where(&|c| h[c] <= curve);
@@ -1453,14 +1456,14 @@ impl ClimateStage {
             let end = if end_mask == mask_pre {
                 ice_end_pre.clone()
             } else {
-                ice::thickness(w, hgt, &end_mask, &geo.sx, geo.sy, tau, cap)
+                ice::thickness(w, hgt, &end_mask, &geo.sx, geo.sy, tau, cap, grav)
             };
             // The step's largest ice is most often its end's (a steady climate): no second
             // distance transform then.
             let max = if max_mask == end_mask {
                 end.clone()
             } else {
-                ice::thickness(w, hgt, &max_mask, &geo.sx, geo.sy, tau, cap)
+                ice::thickness(w, hgt, &max_mask, &geo.sx, geo.sy, tau, cap, grav)
             };
             let mut share: Vec<f32> = (0..n)
                 .map(|c| {
