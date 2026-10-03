@@ -48,11 +48,15 @@ pub fn method_of(name: &str) -> Method {
     match name {
         "elevation" => Method::Elevation,
         "climate/ridges" => Method::Odd,
-        "climate/t_mean_c" | "climate/p_mm" | "climate/temperature" | "climate/vegetation"
-        | "climate/continents" | "climate/erosion" | "climate/ice_cover" | "meta/crust_age_myr"
-        | "meta/heat_flow_mw_m2" => {
-            Method::Bilinear
-        }
+        "climate/t_mean_c"
+        | "climate/p_mm"
+        | "climate/temperature"
+        | "climate/vegetation"
+        | "climate/continents"
+        | "climate/erosion"
+        | "climate/ice_cover"
+        | "meta/crust_age_myr"
+        | "meta/heat_flow_mw_m2" => Method::Bilinear,
         n if n.starts_with("climate/month/") => Method::Bilinear,
         _ => Method::Nearest,
     }
@@ -65,12 +69,15 @@ pub fn method_of(name: &str) -> Method {
 /// at |z| ≤ C′/8 it reads at most 45°.
 pub fn strip_circumference(w: &QWorld) -> f64 {
     let (_, _, z0, z1) = w.extent();
-    4.0 * (z1 - z0)
+    4.0 * (z1 - z0) // ledger: SCL-076 (game-choice, prototype)
 }
 
 fn out_grid(src: &GridDesc, c_out: u32) -> Result<GridDesc, String> {
-    if c_out % (2 * src.r) != 0 {
-        return Err(format!("C′ {c_out} is not a multiple of 2·r = {}", 2 * src.r));
+    if !c_out.is_multiple_of(2 * src.r) {
+        return Err(format!(
+            "C′ {c_out} is not a multiple of 2·r = {}",
+            2 * src.r
+        ));
     }
     let w = c_out / src.r;
     Ok(GridDesc {
@@ -108,11 +115,22 @@ fn odd(l: &LoadedLayer, bx: f64, bz: f64) -> f64 {
     let (fi, fj) = (u.floor(), v.floor());
     let (fu, fv) = (u - fi, v - fj);
     let (i0, j0) = (fi as i64, fj as i64);
-    let (v00, v10, v01, v11) = (l.get(i0, j0), l.get(i0 + 1, j0), l.get(i0, j0 + 1), l.get(i0 + 1, j0 + 1));
+    let (v00, v10, v01, v11) = (
+        l.get(i0, j0),
+        l.get(i0 + 1, j0),
+        l.get(i0, j0 + 1),
+        l.get(i0 + 1, j0 + 1),
+    );
     let a = v00.abs() + (v10.abs() - v00.abs()) * fu;
     let b = v01.abs() + (v11.abs() - v01.abs()) * fu;
     let m = a + (b - a) * fv;
-    let near = if fv < 0.5 { if fu < 0.5 { v00 } else { v10 } } else if fu < 0.5 { v01 } else { v11 };
+    let near = if fv < 0.5 {
+        if fu < 0.5 { v00 } else { v10 }
+    } else if fu < 0.5 {
+        v01
+    } else {
+        v11
+    };
     m.copysign(near)
 }
 
@@ -159,8 +177,14 @@ pub fn resample(src: &Path, out: &Path, world: &QWorld, c_out: u32) -> Result<Re
 
     let amplitude = match &detail {
         Some(d) => {
-            let le = m.layer(&d.layer).ok_or("the detail layer is not in the manifest")?;
-            Some(TilePackReader::open(&src.join(&le.path)).and_then(|r| r.load()).map_err(e)?)
+            let le = m
+                .layer(&d.layer)
+                .ok_or("the detail layer is not in the manifest")?;
+            Some(
+                TilePackReader::open(&src.join(&le.path))
+                    .and_then(|r| r.load())
+                    .map_err(e)?,
+            )
         }
         None => None,
     };
@@ -168,16 +192,24 @@ pub fn resample(src: &Path, out: &Path, world: &QWorld, c_out: u32) -> Result<Re
     let mut layers = Vec::new();
     for le in &m.layers {
         if detail.as_ref().is_some_and(|d| d.layer == le.name) {
-            report.dropped.push(format!("layer {} (baked into elevation)", le.name));
+            report
+                .dropped
+                .push(format!("layer {} (baked into elevation)", le.name));
             continue;
         }
-        let layer = TilePackReader::open(&src.join(&le.path)).and_then(|r| r.load()).map_err(e)?;
+        let layer = TilePackReader::open(&src.join(&le.path))
+            .and_then(|r| r.load())
+            .map_err(e)?;
         let og = grids[&le.grid].clone();
         let map = &maps[&le.grid];
         let mut desc = layer.desc.clone();
         desc.grid = og.clone();
         let cb = desc.cell_bytes();
-        let method = if desc.dtype == DType::HorizonStack { Method::Nearest } else { method_of(&le.name) };
+        let method = if desc.dtype == DType::HorizonStack {
+            Method::Nearest
+        } else {
+            method_of(&le.name)
+        };
         let sg = layer.desc.grid.clone();
         let mut bytes = vec![0u8; og.cells() * cb];
         bytes.par_chunks_mut(cb).enumerate().for_each(|(c, cell)| {
@@ -186,7 +218,10 @@ pub fn resample(src: &Path, out: &Path, world: &QWorld, c_out: u32) -> Result<Re
                 Method::Nearest => {
                     let u = (sx - sg.origin_block_x as f64) / f64::from(sg.r);
                     let v = (sz - sg.origin_block_z as f64) / f64::from(sg.r);
-                    let (i, j) = (sg.wrap_i((u + 0.5).floor() as i64), sg.clamp_j((v + 0.5).floor() as i64));
+                    let (i, j) = (
+                        sg.wrap_i((u + 0.5).floor() as i64),
+                        sg.clamp_j((v + 0.5).floor() as i64),
+                    );
                     let at = (j as usize * sg.w as usize + i as usize) * cb;
                     cell.copy_from_slice(&layer.bytes[at..at + cb]);
                 }
@@ -205,7 +240,9 @@ pub fn resample(src: &Path, out: &Path, world: &QWorld, c_out: u32) -> Result<Re
             std::fs::create_dir_all(parent).map_err(|x| x.to_string())?;
         }
         let written = write_tile_pack(&out.join(&le.path), &desc, &bytes).map_err(e)?;
-        report.layers.push((le.name.clone(), format!("{method:?}"), written.bytes));
+        report
+            .layers
+            .push((le.name.clone(), format!("{method:?}"), written.bytes));
         layers.push(LayerEntry {
             bytes: written.bytes,
             crc32: written.crc32,
@@ -229,7 +266,9 @@ pub fn resample(src: &Path, out: &Path, world: &QWorld, c_out: u32) -> Result<Re
             let mut v: Value = serde_json::from_str(&text).map_err(|x| x.to_string())?;
             if let Some(list) = v.get_mut("candidates").and_then(Value::as_array_mut) {
                 for c in list.iter_mut() {
-                    let (Some(x), Some(z)) = (c["x"].as_f64(), c["z"].as_f64()) else { continue };
+                    let (Some(x), Some(z)) = (c["x"].as_f64(), c["z"].as_f64()) else {
+                        continue;
+                    };
                     let (lat, lon) = proj.lat_lon(x, z);
                     let (nx, nz) = world.block_of(lat, lon);
                     c["x"] = json!(nx.round() as i64);
@@ -238,8 +277,11 @@ pub fn resample(src: &Path, out: &Path, world: &QWorld, c_out: u32) -> Result<Re
                 }
             }
             std::fs::create_dir_all(out.join("spawn")).map_err(|x| x.to_string())?;
-            std::fs::write(out.join(&f.path), serde_json::to_vec_pretty(&v).map_err(|x| x.to_string())?)
-                .map_err(|x| x.to_string())?;
+            std::fs::write(
+                out.join(&f.path),
+                serde_json::to_vec_pretty(&v).map_err(|x| x.to_string())?,
+            )
+            .map_err(|x| x.to_string())?;
             files.push(FileEntry::of(out, &f.path).map_err(e)?);
         } else {
             report.dropped.push(f.path.clone());
@@ -247,7 +289,11 @@ pub fn resample(src: &Path, out: &Path, world: &QWorld, c_out: u32) -> Result<Re
     }
 
     let mut om = m.clone();
-    om.source = format!("quincuncial-prototype:{}:{}", world.layout().name(), m.source);
+    om.source = format!(
+        "quincuncial-prototype:{}:{}",
+        world.layout().name(),
+        m.source
+    );
     om.writers.push(Writer::this("deeptime-quincuncial"));
     om.scale.circumference_blocks = c_out;
     om.grids = grids;
@@ -292,7 +338,10 @@ mod tests {
         let proj = Projection::new(c);
         let g = GridDesc::for_planet("L3", c, 2).unwrap();
         let elev = Raster::<i16>::from_fn(g.clone(), |i, j| {
-            let (lat, lon) = proj.lat_lon(g.block_x(i64::from(i)) as f64, g.block_z(i64::from(j)) as f64);
+            let (lat, lon) = proj.lat_lon(
+                g.block_x(i64::from(i)) as f64,
+                g.block_z(i64::from(j)) as f64,
+            );
             let u = crate::world::unit_of_lat_lon(lat, lon);
             (1000.0 * (3.0 * u[0] + 2.0 * u[1] * u[2] + u[2])) as i16
         });
@@ -317,7 +366,10 @@ mod tests {
             resample(&src, &out, &world, c_out).unwrap();
             let om = Manifest::read(&out).unwrap();
             assert_eq!(om.scale.circumference_blocks, c_out);
-            let l = TilePackReader::open(&out.join("elevation.dtr")).unwrap().load().unwrap();
+            let l = TilePackReader::open(&out.join("elevation.dtr"))
+                .unwrap()
+                .load()
+                .unwrap();
             for seam in world.seams() {
                 let mut worst = 0.0f64;
                 for k in 0..200 {
@@ -334,7 +386,12 @@ mod tests {
                     let d_cross = (l.bilinear(ix, iz) - l.bilinear(gx, gz)).abs();
                     assert!(d_cross < 120.0, "{} t {t}: {d_cross}", seam.name);
                 }
-                assert!(worst < 2.5, "{:?} {}: outside differs by {worst}", world.layout(), seam.name);
+                assert!(
+                    worst < 2.5,
+                    "{:?} {}: outside differs by {worst}",
+                    world.layout(),
+                    seam.name
+                );
             }
         }
         let _ = std::fs::remove_dir_all(&dir);

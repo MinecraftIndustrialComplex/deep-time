@@ -26,6 +26,7 @@ fn r3(v: f64) -> f64 {
 }
 
 /// The measurements, as JSON. `n` is the sampling grid's cells along the domain's long side.
+// ledger: SCL-075 (the numbers it prints)
 pub fn measure(w: &QWorld, n: usize) -> Value {
     let (x0, x1, z0, z1) = w.extent();
     let step = (x1 - x0) / n as f64;
@@ -54,7 +55,11 @@ pub fn measure(w: &QWorld, n: usize) -> Value {
     let total: f64 = samples.iter().map(|s| s.1).sum();
     samples.sort_by(|a, b| a.0.total_cmp(&b.0));
     let median = quantile(&samples, total, 0.5);
-    let within2: f64 = samples.iter().filter(|s| s.0 <= 2.0 * median && s.0 >= 0.5 * median).map(|s| s.1).sum();
+    let within2: f64 = samples
+        .iter()
+        .filter(|s| s.0 <= 2.0 * median && s.0 >= 0.5 * median)
+        .map(|s| s.1)
+        .sum();
     let (lat_min, lon_min) = w.lat_lon(min_at.0, min_at.1);
 
     // Blocks per degree at the named places.
@@ -100,7 +105,9 @@ pub fn measure(w: &QWorld, n: usize) -> Value {
     eq_bpd.sort_by(f64::total_cmp);
     let eq_finite: Vec<f64> = eq_bpd.iter().copied().filter(|v| v.is_finite()).collect();
     // Is the equator one straight world line? Fit the deviation from the line z = const.
-    let zs: Vec<f64> = (0..360).map(|k| w.block_of(0.0, -179.5 + k as f64).1).collect();
+    let zs: Vec<f64> = (0..360)
+        .map(|k| w.block_of(0.0, -179.5 + k as f64).1)
+        .collect();
     let straight = zs.iter().all(|z| (z - zs[0]).abs() < 1e-6 * w.size());
 
     json!({
@@ -150,10 +157,17 @@ pub fn measure(w: &QWorld, n: usize) -> Value {
 
 /// Where the singular points fall on a baked planet, for every candidate longitude: the land share
 /// in a disc of `radius_deg` around each and whether the point itself is land.
-pub fn place(src: &Path, w_of: impl Fn(f64) -> QWorld, step_deg: f64, radius_deg: f64) -> Result<Value, String> {
+pub fn place(
+    src: &Path,
+    w_of: impl Fn(f64) -> QWorld,
+    step_deg: f64,
+    radius_deg: f64,
+) -> Result<Value, String> {
     let m = Manifest::read(src).map_err(|e| e.to_string())?;
     let le = m.layer("elevation").ok_or("no elevation layer")?;
-    let elev = TilePackReader::open(&src.join(&le.path)).and_then(|r| r.load()).map_err(|e| e.to_string())?;
+    let elev = TilePackReader::open(&src.join(&le.path))
+        .and_then(|r| r.load())
+        .map_err(|e| e.to_string())?;
     let proj = Projection::new(m.scale.circumference_blocks);
     let sea = f64::from(m.scale.sea_level_y);
     let land = |lat: f64, lon: f64| {
@@ -178,12 +192,18 @@ pub fn place(src: &Path, w_of: impl Fn(f64) -> QWorld, step_deg: f64, radius_deg
         let (mut n, mut l) = (0, 0);
         for i in 0..41 {
             for j in 0..41 {
-                let (la, lo) = (lat - radius_deg + 2.0 * radius_deg * i as f64 / 40.0, lon - 3.0 * radius_deg + 6.0 * radius_deg * j as f64 / 40.0);
+                let (la, lo) = (
+                    lat - radius_deg + 2.0 * radius_deg * i as f64 / 40.0,
+                    lon - 3.0 * radius_deg + 6.0 * radius_deg * j as f64 / 40.0,
+                );
                 if la.abs() > 90.0 {
                     continue;
                 }
                 let u = unit_of_lat_lon(la, lo);
-                let d = (c[0] * u[0] + c[1] * u[1] + c[2] * u[2]).clamp(-1.0, 1.0).acos().to_degrees();
+                let d = (c[0] * u[0] + c[1] * u[1] + c[2] * u[2])
+                    .clamp(-1.0, 1.0)
+                    .acos()
+                    .to_degrees();
                 if d <= radius_deg {
                     n += 1;
                     if land(la, lo) {
@@ -199,7 +219,11 @@ pub fn place(src: &Path, w_of: impl Fn(f64) -> QWorld, step_deg: f64, radius_deg
     let mut lon = 0.0;
     while lon < 360.0 {
         let w = w_of(lon);
-        let pts: Vec<(f64, f64)> = w.singular_points().into_iter().map(|(x, z)| w.lat_lon(x, z)).collect();
+        let pts: Vec<(f64, f64)> = w
+            .singular_points()
+            .into_iter()
+            .map(|(x, z)| w.lat_lon(x, z))
+            .collect();
         let shares: Vec<f64> = pts.iter().map(|&(la, lo)| disc(la, lo)).collect();
         let on_land = pts.iter().filter(|&&(la, lo)| land(la, lo)).count();
         let worst = shares.iter().copied().fold(0.0, f64::max);
@@ -212,15 +236,20 @@ pub fn place(src: &Path, w_of: impl Fn(f64) -> QWorld, step_deg: f64, radius_deg
         lon += step_deg;
     }
     let b = best.unwrap();
-    let mut on: Vec<u64> = rows.iter().map(|r| r["points_on_land"].as_u64().unwrap()).collect();
+    let mut on: Vec<u64> = rows
+        .iter()
+        .map(|r| r["points_on_land"].as_u64().unwrap())
+        .collect();
     on.sort_unstable();
     let median_on_land = on[on.len() / 2];
-    Ok(json!({"planet_land_share": r3(lsum / wsum), "radius_deg": radius_deg, "best_lon": b.0,
+    Ok(
+        json!({"planet_land_share": r3(lsum / wsum), "radius_deg": radius_deg, "best_lon": b.0,
               "best_points_on_land": b.2, "best_score": r3(b.1),
               "best": rows.iter().find(|r| r["lon"].as_f64() == Some(b.0)).cloned(),
               "median_points_on_land": median_on_land,
               "candidates": rows.len(),
               "candidates_all_points_at_sea": rows.iter().filter(|r| r["points_on_land"].as_u64() == Some(0)).count(),
               "candidates_all_discs_at_sea": rows.iter().filter(|r| r["land_share_in_disc"].as_array().unwrap().iter().all(|v| v.as_f64() == Some(0.0))).count(),
-              "mean_disc_land_share": r3(rows.iter().map(|r| r["land_share_in_disc"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).sum::<f64>() / 4.0).sum::<f64>() / rows.len() as f64)}))
+              "mean_disc_land_share": r3(rows.iter().map(|r| r["land_share_in_disc"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).sum::<f64>() / 4.0).sum::<f64>() / rows.len() as f64)}),
+    )
 }

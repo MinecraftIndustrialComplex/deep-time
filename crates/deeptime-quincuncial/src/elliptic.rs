@@ -13,7 +13,7 @@ use crate::complex::C;
 
 /// The parameter m = k² of the Peirce quincuncial projection: k = 1/√2, so m = m₁ = ½ and the
 /// period lattice is square.
-pub const M_HALF: f64 = 0.5;
+pub const M_HALF: f64 = 0.5; // ledger: SCL-070 (the map), SCL-073 (the functions)
 
 /// K(m), the complete elliptic integral of the first kind, for 0 ≤ m < 1.
 pub fn complete_k(m: f64) -> f64 {
@@ -128,7 +128,7 @@ mod tests {
     use super::*;
 
     // K(1/2) = Γ(¼)² / (4√π) (from memory, not read from a table); the AGM must reproduce it.
-    const K_HALF: f64 = 1.854_074_677_301_372;
+    const K_HALF: f64 = 1.854_074_677_301_372; // ledger: SCL-072 (from-memory)
 
     #[test]
     fn complete_k_of_one_half_matches_the_table() {
@@ -159,7 +159,10 @@ mod tests {
         let kk = C::real(k);
         for i in 0..40 {
             for j in 0..40 {
-                let w = C::new(-3.0 + 0.15 * i as f64 + 0.013, -3.0 + 0.15 * j as f64 + 0.007);
+                let w = C::new(
+                    -3.0 + 0.15 * i as f64 + 0.013,
+                    -3.0 + 0.15 * j as f64 + 0.007,
+                );
                 if pole_distance_proxy(w, M_HALF) < 1e-3 {
                     continue;
                 }
@@ -179,7 +182,10 @@ mod tests {
                 assert!((dy - C::I * want).abs() < 1e-6 * (1.0 + want.abs()));
                 // Quarter turn about K: cn(K + i(w − K)) = i cn(w) (the square's 90° symmetry).
                 let turned = sncndn_c(kk + C::I * (w - kk), M_HALF).1;
-                assert!((turned - C::I * cn).abs() < 1e-9 * (1.0 + cn.abs()), "{w:?}");
+                assert!(
+                    (turned - C::I * cn).abs() < 1e-9 * (1.0 + cn.abs()),
+                    "{w:?}"
+                );
             }
         }
     }
@@ -201,11 +207,15 @@ mod tests {
         for i in 0..60 {
             for j in 0..60 {
                 let r = 0.02 + 0.08 * i as f64; // up to |ζ| = 4.7, deep in the south
-                let a = -std::f64::consts::FRAC_PI_4 + std::f64::consts::FRAC_PI_2 * j as f64 / 59.0;
+                let a =
+                    -std::f64::consts::FRAC_PI_4 + std::f64::consts::FRAC_PI_2 * j as f64 / 59.0;
                 let zeta = C::cis(a).scale(r);
                 let w = arccn(zeta, M_HALF);
                 let back = sncndn_c(w, M_HALF).1;
-                assert!((back - zeta).abs() < 1e-11 * (1.0 + r), "{zeta:?} -> {w:?} -> {back:?}");
+                assert!(
+                    (back - zeta).abs() < 1e-11 * (1.0 + r),
+                    "{zeta:?} -> {w:?} -> {back:?}"
+                );
             }
         }
     }

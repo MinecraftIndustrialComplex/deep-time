@@ -86,7 +86,11 @@ pub fn unit_of_lat_lon(lat_deg: f64, lon_deg: f64) -> [f64; 3] {
 
 pub fn lat_lon_of_unit(v: [f64; 3]) -> (f64, f64) {
     let lat = v[2].clamp(-1.0, 1.0).asin().to_degrees();
-    let lon = if v[0] == 0.0 && v[1] == 0.0 { 0.0 } else { v[1].atan2(v[0]).to_degrees() };
+    let lon = if v[0] == 0.0 && v[1] == 0.0 {
+        0.0
+    } else {
+        v[1].atan2(v[0]).to_degrees()
+    };
     (lat, lon)
 }
 
@@ -122,6 +126,7 @@ impl QWorld {
     /// The Guyou rectangle of two hemisphere squares of side `b` (the world 2b × b), the western
     /// one centred on the equator at longitude `centre_lon` (the eastern one at `centre_lon` + 180°).
     /// North is −z everywhere on the line z = 0 (the equator), east is +x.
+    // ledger: SCL-071
     pub fn guyou(b: f64, centre_lon_deg: f64) -> QWorld {
         let a = b * std::f64::consts::SQRT_2;
         let peirce = Peirce::new(a, 0.0);
@@ -280,13 +285,18 @@ impl QWorld {
         l * l * self.domain_area() / (4.0 * std::f64::consts::PI)
     }
 
-    /// The four distinct singular points, as world blocks inside the closed domain.
+    /// The four distinct singular points, as world blocks inside the closed domain (ledger: SCL-074).
     pub fn singular_points(&self) -> Vec<(f64, f64)> {
         match self.layout {
             Layout::Peirce => self.peirce.singular_points().to_vec(),
             Layout::Guyou => {
                 let b = self.size;
-                vec![(0.0, -0.5 * b), (0.0, 0.5 * b), (-b, -0.5 * b), (-b, 0.5 * b)]
+                vec![
+                    (0.0, -0.5 * b),
+                    (0.0, 0.5 * b),
+                    (-b, -0.5 * b),
+                    (-b, 0.5 * b),
+                ]
             }
         }
     }
@@ -297,19 +307,87 @@ impl QWorld {
             Layout::Peirce => {
                 let h = 0.5 * self.a;
                 vec![
-                    Seam::new("east", 'x', h, (-1.0, 0.0), self.a, SeamKind::HalfTurn { cx: h, cz: 0.0 }),
-                    Seam::new("south", 'z', h, (0.0, -1.0), self.a, SeamKind::HalfTurn { cx: 0.0, cz: h }),
-                    Seam::new("west", 'x', -h, (1.0, 0.0), self.a, SeamKind::HalfTurn { cx: -h, cz: 0.0 }),
-                    Seam::new("north", 'z', -h, (0.0, 1.0), self.a, SeamKind::HalfTurn { cx: 0.0, cz: -h }),
+                    Seam::new(
+                        "east",
+                        'x',
+                        h,
+                        (-1.0, 0.0),
+                        self.a,
+                        SeamKind::HalfTurn { cx: h, cz: 0.0 },
+                    ),
+                    Seam::new(
+                        "south",
+                        'z',
+                        h,
+                        (0.0, -1.0),
+                        self.a,
+                        SeamKind::HalfTurn { cx: 0.0, cz: h },
+                    ),
+                    Seam::new(
+                        "west",
+                        'x',
+                        -h,
+                        (1.0, 0.0),
+                        self.a,
+                        SeamKind::HalfTurn { cx: -h, cz: 0.0 },
+                    ),
+                    Seam::new(
+                        "north",
+                        'z',
+                        -h,
+                        (0.0, 1.0),
+                        self.a,
+                        SeamKind::HalfTurn { cx: 0.0, cz: -h },
+                    ),
                 ]
             }
             Layout::Guyou => {
                 let b = self.size;
                 vec![
-                    Seam::new("east", 'x', b, (-1.0, 0.0), b, SeamKind::Slide { dx: -2.0 * b, dz: 0.0 }),
-                    Seam::new("west", 'x', -b, (1.0, 0.0), b, SeamKind::Slide { dx: 2.0 * b, dz: 0.0 }),
-                    Seam::new("south", 'z', 0.5 * b, (0.0, -1.0), 2.0 * b, SeamKind::HalfTurn { cx: 0.0, cz: 0.5 * b }),
-                    Seam::new("north", 'z', -0.5 * b, (0.0, 1.0), 2.0 * b, SeamKind::HalfTurn { cx: 0.0, cz: -0.5 * b }),
+                    Seam::new(
+                        "east",
+                        'x',
+                        b,
+                        (-1.0, 0.0),
+                        b,
+                        SeamKind::Slide {
+                            dx: -2.0 * b,
+                            dz: 0.0,
+                        },
+                    ),
+                    Seam::new(
+                        "west",
+                        'x',
+                        -b,
+                        (1.0, 0.0),
+                        b,
+                        SeamKind::Slide {
+                            dx: 2.0 * b,
+                            dz: 0.0,
+                        },
+                    ),
+                    Seam::new(
+                        "south",
+                        'z',
+                        0.5 * b,
+                        (0.0, -1.0),
+                        2.0 * b,
+                        SeamKind::HalfTurn {
+                            cx: 0.0,
+                            cz: 0.5 * b,
+                        },
+                    ),
+                    Seam::new(
+                        "north",
+                        'z',
+                        -0.5 * b,
+                        (0.0, 1.0),
+                        2.0 * b,
+                        SeamKind::HalfTurn {
+                            cx: 0.0,
+                            cz: -0.5 * b,
+                        },
+                    ),
                 ]
             }
         }
@@ -339,7 +417,11 @@ mod tests {
     }
 
     fn worlds() -> Vec<QWorld> {
-        vec![QWorld::peirce(11_585.0, 20.0), QWorld::guyou(8192.0, -70.0), QWorld::guyou(8192.0, 33.0)]
+        vec![
+            QWorld::peirce(11_585.0, 20.0),
+            QWorld::guyou(8192.0, -70.0),
+            QWorld::guyou(8192.0, 33.0),
+        ]
     }
 
     #[test]
@@ -352,7 +434,11 @@ mod tests {
                 let lon = 360.0 * rng.next() - 180.0;
                 let (x, z) = w.block_of(lat, lon);
                 let t = 1e-6 * w.size();
-                assert!(x >= x0 - t && x <= x1 + t && z >= z0 - t && z <= z1 + t, "{:?} ({lat}, {lon}) -> ({x}, {z})", w.layout());
+                assert!(
+                    x >= x0 - t && x <= x1 + t && z >= z0 - t && z <= z1 + t,
+                    "{:?} ({lat}, {lon}) -> ({x}, {z})",
+                    w.layout()
+                );
                 let err = angle(w.unit(x, z), unit_of_lat_lon(lat, lon));
                 assert!(err < 1e-9, "{:?} ({lat}, {lon}): {err}", w.layout());
             }
@@ -367,10 +453,21 @@ mod tests {
                 for _ in 0..3000 {
                     let (x, z) = seam.point((rng.next() - 0.5) * seam.length);
                     let (gx, gz) = seam.apply(x, z);
-                    assert!(angle(w.unit(x, z), w.unit(gx, gz)) < 1e-10, "{} at ({x}, {z})", seam.name);
-                    let (ox, oz) = (x + (rng.next() - 0.5) * 200.0, z + (rng.next() - 0.5) * 200.0);
+                    assert!(
+                        angle(w.unit(x, z), w.unit(gx, gz)) < 1e-10,
+                        "{} at ({x}, {z})",
+                        seam.name
+                    );
+                    let (ox, oz) = (
+                        x + (rng.next() - 0.5) * 200.0,
+                        z + (rng.next() - 0.5) * 200.0,
+                    );
                     let (ix, iz) = seam.apply(ox, oz);
-                    assert!(angle(w.unit(ox, oz), w.unit(ix, iz)) < 1e-10, "{} off-seam", seam.name);
+                    assert!(
+                        angle(w.unit(ox, oz), w.unit(ix, iz)) < 1e-10,
+                        "{} off-seam",
+                        seam.name
+                    );
                 }
             }
         }
@@ -428,7 +525,10 @@ mod tests {
                 assert!(cx >= x0 - t && cx <= x1 + t && cz >= z0 - t && cz <= z1 + t);
                 let u = w.unit(x, z);
                 if u[2] > -1.0 + 1e-9 {
-                    assert!(angle(u, w.unit(cx, cz)) < 1e-8, "({x}, {z}) -> ({cx}, {cz})");
+                    assert!(
+                        angle(u, w.unit(cx, cz)) < 1e-8,
+                        "({x}, {z}) -> ({cx}, {cz})"
+                    );
                 }
             }
         }

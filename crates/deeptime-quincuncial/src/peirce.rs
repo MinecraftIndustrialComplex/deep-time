@@ -85,6 +85,7 @@ impl Peirce {
         self.lon0_deg
     }
 
+    // ledger: SCL-070
     pub fn w_of_block(&self, x: f64, z: f64) -> C {
         C::new(self.k + self.s * x, -self.s * z)
     }
@@ -225,7 +226,8 @@ impl Peirce {
         l * l * self.side * self.side / (4.0 * std::f64::consts::PI)
     }
 
-    /// The four singular points (the edge midpoints) in block coordinates, in [`Edge::ALL`] order.
+    /// The four singular points (the edge midpoints) in block coordinates, in [`Edge::ALL`] order
+    /// (ledger: SCL-074).
     pub fn singular_points(&self) -> [(f64, f64); 4] {
         let h = self.half();
         [(h, 0.0), (0.0, h), (-h, 0.0), (0.0, -h)]
@@ -298,12 +300,22 @@ mod tests {
             pts.extend([(90.0, 0.0), (-90.0, 0.0), (-89.999, 3.0), (89.9999, -77.0)]);
             for k in 0..4 {
                 let l = lon0 + 90.0 * k as f64;
-                pts.extend([(0.0, l), (1e-7, l), (-1e-7, l), (-45.0, l), (-89.0, l), (0.0, l + 45.0)]);
+                pts.extend([
+                    (0.0, l),
+                    (1e-7, l),
+                    (-1e-7, l),
+                    (-45.0, l),
+                    (-89.0, l),
+                    (0.0, l + 45.0),
+                ]);
             }
             for (lat, lon) in pts {
                 let (x, z) = p.block_of(lat, lon);
                 let h = p.half() * (1.0 + 1e-12);
-                assert!(x.abs() <= h && z.abs() <= h, "({lat}, {lon}) -> ({x}, {z}) outside");
+                assert!(
+                    x.abs() <= h && z.abs() <= h,
+                    "({lat}, {lon}) -> ({x}, {z}) outside"
+                );
                 let back = p.unit(x, z);
                 let err = angle(back, unit_of(lat, lon));
                 worst = worst.max(err);
@@ -324,7 +336,10 @@ mod tests {
             let (bx, bz) = p.block_of(lat, lon);
             // Inside the open square the inverse is unique.
             let tol = 1e-6 * (1.0 + p.blocks_per_degree(x, z) / 100.0);
-            assert!((bx - x).abs() < tol && (bz - z).abs() < tol, "({x}, {z}) -> ({lat}, {lon}) -> ({bx}, {bz})");
+            assert!(
+                (bx - x).abs() < tol && (bz - z).abs() < tol,
+                "({x}, {z}) -> ({lat}, {lon}) -> ({bx}, {bz})"
+            );
         }
     }
 
@@ -359,7 +374,10 @@ mod tests {
             for _ in 0..2000 {
                 let lon = 360.0 * rng.next();
                 let (x, z) = p.block_of(0.0, lon);
-                assert!((x.abs() + z.abs() - p.half()).abs() < 1e-6, "lon {lon}: ({x}, {z})");
+                assert!(
+                    (x.abs() + z.abs() - p.half()).abs() < 1e-6,
+                    "lon {lon}: ({x}, {z})"
+                );
             }
         }
     }
@@ -386,7 +404,10 @@ mod tests {
                 let (dx, dz) = ((rng.next() - 0.5) * 300.0, (rng.next() - 0.5) * 300.0);
                 let (ox, oz) = (x + dx, z + dz);
                 let (ix, iz) = turn(ox, oz);
-                assert!(angle(p.unit(ox, oz), p.unit(ix, iz)) < 1e-10, "{e:?} at ({ox}, {oz})");
+                assert!(
+                    angle(p.unit(ox, oz), p.unit(ix, iz)) < 1e-10,
+                    "{e:?} at ({ox}, {oz})"
+                );
             }
         }
     }
@@ -446,7 +467,11 @@ mod tests {
             let d = |ax: f64, az: f64| {
                 let a = p.unit(x + ax, z + az);
                 let b = p.unit(x - ax, z - az);
-                [(a[0] - b[0]) / (2.0 * h), (a[1] - b[1]) / (2.0 * h), (a[2] - b[2]) / (2.0 * h)]
+                [
+                    (a[0] - b[0]) / (2.0 * h),
+                    (a[1] - b[1]) / (2.0 * h),
+                    (a[2] - b[2]) / (2.0 * h),
+                ]
             };
             let ex = d(h, 0.0);
             let en = d(0.0, -h); // north is −z
@@ -461,7 +486,10 @@ mod tests {
                 ex[2] * en[0] - ex[0] * en[2],
                 ex[0] * en[1] - ex[1] * en[0],
             ];
-            assert!(cross[0] * n[0] + cross[1] * n[1] + cross[2] * n[2] > 0.0, "mirrored at ({x}, {z})");
+            assert!(
+                cross[0] * n[0] + cross[1] * n[1] + cross[2] * n[2] > 0.0,
+                "mirrored at ({x}, {z})"
+            );
             let want = p.scale_rad_per_block(x, z);
             assert!((lx / want - 1.0).abs() < 1e-5, "({x}, {z}): {lx} vs {want}");
             checked += 1;
@@ -499,17 +527,30 @@ mod tests {
         let zeros: Vec<_> = minima.iter().filter(|m| m.2 < 1e-10).collect();
         assert_eq!(zeros.len(), 4, "{minima:?}");
         for (sx, sz) in p.singular_points() {
-            assert!(zeros.iter().any(|m| (m.0 - sx).abs() < 1e-9 && (m.1 - sz).abs() < 1e-9));
+            assert!(
+                zeros
+                    .iter()
+                    .any(|m| (m.0 - sx).abs() < 1e-9 && (m.1 - sz).abs() < 1e-9)
+            );
             // L ∝ r: halving the distance halves the scale (sampled on a ray into the square,
             // slanted off the normal).
             let inward = (-sx.signum(), -sz.signum());
-            let slant = (if sx == 0.0 { 0.3 } else { 0.0 }, if sz == 0.0 { 0.3 } else { 0.0 });
-            let at = |r: f64| p.scale_rad_per_block(sx + r * (inward.0 + slant.0), sz + r * (inward.1 + slant.1));
+            let slant = (
+                if sx == 0.0 { 0.3 } else { 0.0 },
+                if sz == 0.0 { 0.3 } else { 0.0 },
+            );
+            let at = |r: f64| {
+                p.scale_rad_per_block(sx + r * (inward.0 + slant.0), sz + r * (inward.1 + slant.1))
+            };
             let ratio = at(8.0) / at(4.0);
             assert!((ratio - 2.0).abs() < 1e-3, "({sx}, {sz}): ratio {ratio}");
         }
         // Every other local minimum of the scale is well above zero.
-        let others = minima.iter().filter(|m| m.2 >= 1e-10).map(|m| m.2).fold(f64::INFINITY, f64::min);
+        let others = minima
+            .iter()
+            .filter(|m| m.2 >= 1e-10)
+            .map(|m| m.2)
+            .fold(f64::INFINITY, f64::min);
         assert!(others > 1e-5, "{others}");
     }
 
@@ -532,7 +573,10 @@ mod tests {
         let mut max = 0.0f64;
         for i in 0..n {
             for j in 0..n {
-                let (x, z) = (-p.half() + (i as f64 + 0.5) * step, -p.half() + (j as f64 + 0.5) * step);
+                let (x, z) = (
+                    -p.half() + (i as f64 + 0.5) * step,
+                    -p.half() + (j as f64 + 0.5) * step,
+                );
                 let a = p.area_scale_rel(x, z);
                 sum += a;
                 max = max.max(a);

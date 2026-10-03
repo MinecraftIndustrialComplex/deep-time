@@ -16,7 +16,10 @@ use deeptime_quincuncial::world::{Layout, QWorld};
 use serde_json::json;
 
 #[derive(Parser)]
-#[command(name = "deeptime-quincuncial", about = "PROTOTYPE: quincuncial worlds glued by portals")]
+#[command(
+    name = "deeptime-quincuncial",
+    about = "PROTOTYPE: quincuncial worlds glued by portals"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Cmd,
@@ -92,7 +95,10 @@ fn run() -> Result<(), String> {
     match Cli::parse().command {
         Cmd::Stats { w, grid } => {
             let world = w.world(w.lon)?;
-            println!("{}", serde_json::to_string_pretty(&measure(&world, grid)).unwrap());
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&measure(&world, grid)).unwrap()
+            );
         }
         Cmd::Portals { w, y, height } => {
             let world = w.world(w.lon)?;
@@ -106,12 +112,22 @@ fn run() -> Result<(), String> {
             });
             println!("{}", serde_json::to_string_pretty(&out).unwrap());
         }
-        Cmd::Place { w, src, step, radius } => {
+        Cmd::Place {
+            w,
+            src,
+            step,
+            radius,
+        } => {
             let ww = w.clone();
             let v = place(&src, move |lon| ww.world(lon).unwrap(), step, radius)?;
             println!("{}", serde_json::to_string_pretty(&v).unwrap());
         }
-        Cmd::Resample { w, src, out, circumference } => {
+        Cmd::Resample {
+            w,
+            src,
+            out,
+            circumference,
+        } => {
             let world = w.world(w.lon)?;
             let c = circumference.unwrap_or(strip_circumference(&world).round() as u32);
             let t0 = std::time::Instant::now();

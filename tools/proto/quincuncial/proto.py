@@ -29,8 +29,8 @@ CLI = os.path.join(MC, "client")
 OUT = os.path.join(RUNS, "out")
 IPP = "/data/ban/mic/mods/ip-proto"
 GAME_PORT, RCON_PORT = 25985, 25995
-B = 8192  # hemisphere square side: the world is 2B x B
-LON = 31.0
+B = 8192  # hemisphere square side: the world is 2B x B  (ledger: SCL-076, game-choice, prototype)
+LON = 31.0  # the western hemisphere centre; puts the singular points at sea (ledger: SCL-076)
 PLAYER = "IPTester"
 
 
@@ -143,8 +143,8 @@ def setup():
     subprocess.run([sys.executable, os.path.join(REPO, "tools/proto/quincuncial/notw_jar.py"),
                     os.path.join(REPO, "neoforge/build/libs", jars[-1]), notw], check=True)
     if not os.path.isdir(SRV):
-        subprocess.run(["rsync", "-a", "--exclude=world", "--exclude=logs", "--exclude=console.log", "--exclude=mods",
-                        "--exclude=server.pid", f"{IPP}/vp2-server/", SRV + "/"], check=True)
+        subprocess.run(["rsync", "-a", "--exclude=/world", "--exclude=/logs", "--exclude=/console.log", "--exclude=/mods",
+                        "--exclude=/server.pid", f"{IPP}/vp2-server/", SRV + "/"], check=True)
     mods = os.path.join(SRV, "mods")
     shutil.rmtree(mods, ignore_errors=True)
     os.makedirs(mods)
@@ -180,8 +180,9 @@ motd=Deep Time quincuncial prototype
     subprocess.run(["cp", "-a", os.path.join(RUNS, "guyou-world"), os.path.join(world, "deeptime")], check=True)
     # Client: its own game dir; the portablemc data copied once.
     game = os.path.join(CLI, "game")
+    os.makedirs(CLI, exist_ok=True)
     if not os.path.isdir(game):
-        subprocess.run(["rsync", "-a", "--exclude=logs", "--exclude=saves", "--exclude=mods", f"{IPP}/vp-client/game/", game + "/"], check=True)
+        subprocess.run(["rsync", "-a", "--exclude=/logs", "--exclude=/saves", "--exclude=/mods", f"{IPP}/vp-client/game/", game + "/"], check=True)
     cm = os.path.join(game, "mods")
     shutil.rmtree(cm, ignore_errors=True)
     os.makedirs(cm)
@@ -205,14 +206,19 @@ def boot(timeout=1800):
     if server_up():
         log("server already up")
         return
-    cons = open(os.path.join(SRV, "console.log"), "w")
+    cons = open(os.path.join(SRV, "console.log"), "a")
+    cons.write(f"\n===== proto.py boot {time.strftime('%H:%M:%S')}\n")
+    cons.flush()
+    start_at = os.path.getsize(os.path.join(SRV, "console.log"))
     p = subprocess.Popen(["nice", "-n", "5", "taskset", "-c", "16-23", ENV["JAVA"], "@user_jvm_args.txt",
                           "@libraries/net/neoforged/neoforge/21.1.249/unix_args.txt", "nogui"],
                          cwd=SRV, stdout=cons, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
     open(os.path.join(SRV, "server.pid"), "w").write(str(p.pid))
     t0 = time.time()
     while time.time() - t0 < timeout:
-        text = open(os.path.join(SRV, "console.log"), errors="replace").read()
+        with open(os.path.join(SRV, "console.log"), errors="replace") as f:
+            f.seek(start_at)
+            text = f.read()
         if re.search(r"Done \(", text):
             log("server up in", round(time.time() - t0), "s")
             global _r
@@ -225,6 +231,7 @@ def boot(timeout=1800):
 
 
 def stop():
+    global _r
     pid = server_up()
     if not pid:
         return
@@ -232,14 +239,27 @@ def stop():
         rc("stop")
     except Exception:
         pass
-    for _ in range(120):
-        try:
-            os.kill(pid, 0)
-        except OSError:
-            log("server stopped")
-            return
-        time.sleep(1)
-    os.kill(pid, 15)
+    _r = None
+    # The server saves and stops within seconds; with Immersive Portals the JVM can linger after
+    # "All dimensions are saved" (a non-daemon thread), so TERM and then KILL it.
+    for sig, wait in ((0, 60), (15, 30), (9, 10)):
+        if sig:
+            log(f"server JVM still alive, signal {sig}")
+            try:
+                os.kill(pid, sig)
+            except OSError:
+                pass
+        for _ in range(wait):
+            try:
+                os.kill(pid, 0)
+                os.waitpid(pid, os.WNOHANG)
+            except ChildProcessError:
+                pass
+            except OSError:
+                log("server stopped")
+                os.remove(os.path.join(SRV, "server.pid"))
+                return
+            time.sleep(1)
 
 
 def wait_loaded(x, z, secs=120):
@@ -332,14 +352,14 @@ def entities():
         for q in (start, far):
             rc(f"forceload add {int(q[0]) - 16} {int(q[1]) - 16} {int(q[0]) + 16} {int(q[1]) + 16}")
             wait_loaded(*q)
-        y = probe(*start).get("surfaceY", 100) + 40
+        y = max(probe(*start).get("surfaceY", 100), probe(*far).get("surfaceY", 100), 63) + 20
         mx, mz = -ix * 0.8, -iz * 0.8
         for kind, nbt in (("item", 'Item:{id:"minecraft:diamond",count:1},PickupDelay:32767,NoGravity:1b'),
-                          ("armor_stand", "NoGravity:1b,Invisible:0b"), ("arrow", "NoGravity:1b,pickup:0b")):
+                          ("pig", "NoGravity:1b,NoAI:1b"), ("arrow", "NoGravity:1b,pickup:0b")):
             tag = f"qx_{p['name']}_{kind}"
             rc(f"summon {kind} {start[0] + 0.5:.2f} {y:.1f} {start[1] + 0.5:.2f} {{Tags:[\"qx\",\"{tag}\"],Motion:[{mx}d,0.0d,{mz}d],{nbt}}}")
         time.sleep(6)
-        for kind in ("item", "armor_stand", "arrow"):
+        for kind in ("item", "pig", "arrow"):
             tag = f"qx_{p['name']}_{kind}"
             pos = entity_vec(f"@e[tag={tag},limit=1]", "Pos")
             want = glue_point(p, start[0] + 0.5 - ix * 6, start[1] + 0.5 - iz * 6)
@@ -387,12 +407,15 @@ def client_start():
                           "--join-server", "127.0.0.1", "--join-server-port", str(GAME_PORT)],
                          env=ENV, stdout=open(os.path.join(CLI, "client.log"), "w"), stderr=subprocess.STDOUT, start_new_session=True)
     open(os.path.join(CLI, "client.pid"), "w").write(str(p.pid))
+    cons_at = os.path.getsize(os.path.join(SRV, "console.log"))
     t0 = time.time()
     while time.time() - t0 < 900:
         if os.path.exists(lp) and "Level init received" in open(lp, errors="replace").read():
             break
-        if "IPTester joined" in open(os.path.join(SRV, "console.log"), errors="replace").read() and time.time() - t0 > 60:
-            break
+        with open(os.path.join(SRV, "console.log"), errors="replace") as f:
+            f.seek(cons_at)
+            if f"{PLAYER} joined" in f.read():
+                break
         if p.poll() is not None:
             raise RuntimeError("client died: " + open(os.path.join(CLI, "client.log"), errors="replace").read()[-2000:])
         time.sleep(5)
@@ -564,6 +587,9 @@ def physics():
     time.sleep(8)
     wcx, wcz = 2 * int(p["origin"][0]) - x - 1, 2 * int(p["origin"][2]) - (z - 1) - 1
     res = {
+        "water_source_kept": "passed" in rc(f"execute if block {x} {y + 1} {z} minecraft:water"),
+        "water_spread_inside": "passed" in rc(f"execute if block {x} {y + 1} {z + 1} minecraft:water"),
+        "wire_powered_at_seam": rc(f"data get block {x + 2} {y + 1} {z}") + " | " + rc(f"execute if block {x + 2} {y + 1} {z} minecraft:redstone_wire[power=13]"),
         "water_in_hidden_outside": "passed" in rc(f"execute if block {x} {y + 1} {z - 1} minecraft:water"),
         "water_in_glued_cell": "passed" in rc(f"execute if block {wcx} {y + 1} {wcz} minecraft:water"),
         "lamp_lit": "passed" in rc(f"execute if block {lx} {y + 1} {lz} minecraft:redstone_lamp[lit=true]"),
@@ -590,13 +616,14 @@ def all_phases():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    phase = sys.argv[1] if len(sys.argv) > 1 else "all"
-    fn = {"setup": setup, "boot": boot, "portals": portals, "terrain": terrain, "entities": entities,
-          "physics": physics, "client": client, "stop": stop, "all": all_phases}[phase]
+    phases = sys.argv[1:] or ["all"]
+    table = {"setup": setup, "boot": boot, "portals": portals, "terrain": terrain, "entities": entities,
+             "physics": physics, "client": client, "stop": stop, "all": all_phases}
     try:
-        fn()
-    except Exception:
-        if phase == "all":
-            client_stop()
-            stop()
-        raise
+        for ph in phases:
+            log("=== phase", ph)
+            table[ph]()
+    finally:
+        # The server lock is held only while this runs: never leave a server or client behind.
+        client_stop()
+        stop()
