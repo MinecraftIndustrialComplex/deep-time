@@ -54,8 +54,8 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
         super(biomeSource, settings);
         this.sourceSettings = settings;
         this.dataRef = dataRef;
-        // Vanilla's picker floods everything below y -54 with lava, which is 298 blocks of a world
-        // whose floor is y -352 (LavaRules). The field is opened by the access transformer; it is
+        // Vanilla's picker floods everything below y -54 with lava, which is 458 blocks of a world
+        // whose floor is y -512 (LavaRules). The field is opened by the access transformer; it is
         // read on first use, when the level's world data can be loaded.
         this.globalFluidPicker = com.google.common.base.Suppliers.memoize(() -> LavaFluids.picker(settings.value(), terrain()));
     }

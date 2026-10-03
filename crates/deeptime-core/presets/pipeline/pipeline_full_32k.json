@@ -15,7 +15,7 @@
     "circumference_blocks": 32768,
     "m_per_block_h": 300.0,
     "m_per_block_v": 20.0,
-    "min_y": -352,
+    "min_y": -512,
     "max_y": 639,
     "sea_level_y": 63,
     "pole_cap_deg": 70.0,
@@ -468,7 +468,9 @@
     "geothermal_density": 1.0,
     "geothermal_reach": 1.0,
     "geothermal_size": 1.0,
-    "geothermal_spring_min_precip_mm": 400.0
+    "geothermal_spring_min_precip_mm": 400.0,
+    "geothermal_heat_flow_min_mw_m2": 100.0,
+    "geothermal_heat_density": 1.0
   },
   "provinces": {
     "min_area_km2": 50000.0,
@@ -477,7 +479,7 @@
     "andean_min_elevation_m": 1500.0
   },
   "impacts": {
-    "flux": 1.0,
+    "flux": 3.0,
     "size_slope": 1.8,
     "min_crater_km": 2.0,
     "max_crater_km": 300.0,

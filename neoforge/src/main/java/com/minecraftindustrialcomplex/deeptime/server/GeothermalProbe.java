@@ -54,7 +54,9 @@ public final class GeothermalProbe {
         o.addProperty("patches", n[2]);
         o.addProperty("sinterPools", geo.sites().stream().filter(s -> s.kind() == Geothermal.Kind.POOL && s.sinter()).count());
         o.addProperty("travertinePools", geo.sites().stream().filter(s -> s.kind() == Geothermal.Kind.POOL && !s.sinter()).count());
-        o.addProperty("volcanoesWithSites", geo.sites().stream().map(Geothermal.Site::volcano).distinct().count());
+        o.addProperty("volcanoesWithSites", geo.sites().stream().filter(s -> s.volcano() != Geothermal.HEAT_FLOW_SOURCE)
+                .map(Geothermal.Site::volcano).distinct().count());
+        o.addProperty("heatFlowSites", geo.heatFlowSites());
         long[] totals = GeothermalPass.totals();
         o.addProperty("poolColumnsPlaced", totals[0]);
         o.addProperty("ventColumnsPlaced", totals[1]);
