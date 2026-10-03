@@ -51,6 +51,10 @@ import java.util.Optional;
  * IDhApiWorldProxy.worldLoaded(), getAllLoadedLevelWrappers()
  * IDhApiLevelWrapper.getWrappedMcObject(), getMinHeight(), getDhIdentifier()
  * IDhApiTerrainDataRepo.getColumnDataAtBlockPos(IDhApiLevelWrapper, int, int, IDhApiTerrainDataCache)
+ * DhApi.Delayed.configs : IDhApiConfig (null until DH starts its API)
+ *   graphics() : IDhApiGraphicsConfig;  earthCurvatureRatio() : IDhApiConfigValue&lt;Integer&gt;  (client; {@link DhCurvature})
+ * IDhApiConfigValue: getTrueValue() (the player's file), getApiValue() (the override layer), getDefaultValue(),
+ *   getCanBeOverrodeByApi(), setValue(T) and clearValue() (override layer only, never saved)
  * </pre>
  *
  * <p><b>The y of a data source's points</b> is counted from the level's minimum height, not from
@@ -260,6 +264,72 @@ public final class DhApiBinding {
         Object result = call(REGISTER, f.get(null), "registerWorldGeneratorOverride", levelWrapper, generator);
         return new Result((Boolean) result.getClass().getField("success").get(result),
                 String.valueOf(result.getClass().getField("message").get(result)));
+    }
+
+    private static final String CONFIG = "interfaces.config.IDhApiConfig", GRAPHICS = "interfaces.config.client.IDhApiGraphicsConfig",
+            CONFIG_VALUE = "interfaces.config.IDhApiConfigValue";
+
+    /**
+     * Distant Horizons' earth-curvature setting ({@code DhApi.Delayed.configs.graphics().
+     * earthCurvatureRatio()}, the client's world curvature) as a {@link DhCurvature.Slot}; null
+     * before Distant Horizons has started its API ({@code DhApi.Delayed.configs} is null until then).
+     * Reads and API-layer writes only: {@code getTrueValue}, {@code getApiValue},
+     * {@code getCanBeOverrodeByApi}, {@code setValue} (which, on the API layer, never saves) and
+     * {@code clearValue}. The config file's own setter is not reachable from here.
+     */
+    public DhCurvature.Slot earthCurvature() throws ReflectiveOperationException {
+        Object configs = delayed("configs");
+        if (configs == null)
+            return null;
+        Object value = call(GRAPHICS, call(CONFIG, configs, "graphics"), "earthCurvatureRatio");
+        return new CurvatureSlot(value);
+    }
+
+    /** {@code IDhApiConfigValue<Integer>} behind {@link DhCurvature.Slot}. */
+    private final class CurvatureSlot implements DhCurvature.Slot {
+        private final Object value;
+
+        CurvatureSlot(Object value) {
+            this.value = value;
+        }
+
+        private Object get(String method, Object... args) {
+            try {
+                return call(CONFIG_VALUE, value, method, args);
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException("Distant Horizons' " + method + ": " + e, e);
+            }
+        }
+
+        @Override
+        public int playerValue() {
+            return (Integer) get("getTrueValue");
+        }
+
+        @Override
+        public int defaultValue() {
+            return (Integer) get("getDefaultValue");
+        }
+
+        @Override
+        public Integer apiValue() {
+            return (Integer) get("getApiValue");
+        }
+
+        @Override
+        public boolean overridable() {
+            return (Boolean) get("getCanBeOverrodeByApi");
+        }
+
+        @Override
+        public boolean setApi(int ratio) {
+            return (Boolean) get("setValue", Integer.valueOf(ratio));
+        }
+
+        @Override
+        public boolean clearApi() {
+            return (Boolean) get("clearValue");
+        }
     }
 
     /** One stored data point of a column, top-down as Distant Horizons returns them; y in blocks, top exclusive. */
