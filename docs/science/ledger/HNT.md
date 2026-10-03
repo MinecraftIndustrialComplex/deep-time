@@ -151,4 +151,4 @@ Added in WP-15. A hint that gives an Earth figure is only as good as that figure
 | Fold wavelength, belt width | Zagros 16 km, 250 km | Mouthereau et al. 2007 | not read (WP-8) | HNT-024, HNT-029 |
 | Arc spacing, shield and stratovolcano heights, Hawaiian ranges, Ojos del Salado | see VOL rows | not read (WP-2) | - | HNT-015, HNT-058, HNT-060, HNT-067 |
 | Antarctic and ocean-floor figures in plate hints | see PLT rows | not read (WP-13) | - | HNT (PLT-204 to PLT-208) |
-
+| HNT-092 | coasts | The underwater-slope setting's hint: the steepest slope sediment holds under the sea; Earth's continental slopes are mostly 1 to 5 degrees | crates/deeptime-viewer/assets/editor_fields.json: field submarine_slope (path surface.submarine_slope_deg), hint | "Earth's continental slopes are mostly 1 to 5°"; slider 0 to 15; presets 2.5 | degrees | Pratson & Haxby 1996 (regional slopes 0.5 to 4.4 deg); ETOPO 2022 measured (10th-90th percentile 0.6 to 5.2 deg) | build log 2026-10-03 margins and spires; see ERO-168 | `abstract-only`, see ERO-168 |
