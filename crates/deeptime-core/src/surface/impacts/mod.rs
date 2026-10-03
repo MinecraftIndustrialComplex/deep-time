@@ -669,7 +669,11 @@ pub fn settle_folder(
     m: &mut deeptime_format::Manifest,
 ) -> Result<Value, CoreError> {
     use deeptime_format::bodies::{BODIES_PATH, read_bodies, write_bodies};
-    let Some(st) = world.impacts.as_ref().filter(|st| !st.lens_bodies.is_empty()) else {
+    let Some(st) = world
+        .impacts
+        .as_ref()
+        .filter(|st| !st.lens_bodies.is_empty())
+    else {
         return Ok(json!({"lenses": 0}));
     };
     let Some(mut bodies) = read_bodies(dir)? else {
@@ -1260,7 +1264,7 @@ impl ImpactStage {
             // (`settle_folder` seats the lens on it).
             let drawn_m = ground + centre;
             let drawn_y = f64::from(s.sea_level_y) + (drawn_m - sea) / mv;
-            let floor_y = lens_floor_y(&c, drawn_y, mv);
+            let floor_y = lens_floor_y(c, drawn_y, mv);
             bodies.push((c.clone(), floor_y));
         }
         for (c, floor_y) in bodies {
