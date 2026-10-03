@@ -14,20 +14,24 @@ plates slide past each other) and their dips follow Anderson's theory of faultin
 paper. Fold wavelengths and fold-train lengths come from the Zagros, read in full. Most counts and
 sizes are design values, now labelled as such.
 
-**How tall structures are drawn.** Everything else in a rock column is drawn in true metres, 20 m
-to a block upwards and 300 m across, so the world is stretched 15 times vertically. Folds and faults
-are first shaped at 1:1 in blocks (normal faults at about 60°, thrusts at about 30°, as a geologist
-would draw them) and then drawn `vertical_scale` times taller: fold heights and fault throws are
-multiplied by it, the sideways movement of a fault is not (DEF-011). Ben chose a setting with the
-default 4 on 2026-10-02. At 1 every structure would be 15 times lower in metres than it is wide; at
-15 it would be drawn in true metres. At 4, in metres, normal faults dip 21° to 36° and thrusts 5.5°
-to 12.6°, and fold heights and fault throws are 4/15 of real: folds about 400 m high on a 16 km
+**How tall structures are drawn.** Everything else in a rock column is drawn in true metres, with
+blocks `scale.m_per_block_h` across and `scale.m_per_block_v` high (300 m and 20 m in the presets
+these figures were measured on), so the world is stretched E = h / v times vertically (15 there).
+Folds and faults are first shaped at 1:1 in blocks (normal faults at about 60°, thrusts at about
+30°, as a geologist would draw them), which in metres is 1/E of their true height, and then drawn
+X = `true_height_share` × E times taller: fold heights and fault throws are multiplied by X, the
+sideways movement of a fault is not (DEF-011). Ben chose a setting with the default "4x" on
+2026-10-02, on the 20 m block; the setting is the share of true height, 4/15, so that the same
+structures keep the same height in metres when the block height changes (X = 2.29 at 35 m a block).
+A share of 1 draws them in true metres. At the default, in metres, normal faults dip 21° to 36° and
+thrusts 5.5° to 12.6°, and fold heights and fault throws are 4/15 of real: folds about 400 m high on a 16 km
 wavelength where Zagros folds are 500 to 1,000 m, and a 38 km normal fault throws the beds about
 470 m where a real one throws them about 1 km. True metres wait for one missing piece of physics:
 a fold's wavelength should follow the thickness of the layers being folded (Biot), and with every
 fold drawn about 16 km long whatever lies under it, true heights pull the granite basement up through
 thin cover in keels (open question 3). The ground's share of the structures (fault scarps, rift
-valleys) was lowered with the scale, so the terrain is as it was (DEF-054).
+valleys) was lowered with the stretch, so the terrain is as it was, and it moves the ground the same
+metres whatever the block height (DEF-054).
 
 Scale used throughout: one block is 300 m across and 20 m up, so 1 km is 3.3 blocks across and
 50 blocks up.
@@ -37,16 +41,17 @@ Scale used throughout: one block is 300 m across and 20 m up, so 1 km is 3.3 blo
 **Fold belts.** Where continents have collided, and in the mountain belts above subduction zones,
 the rock layers are bent into trains of folds: upright anticlines (arches) and synclines (troughs)
 with a crest-to-crest distance of about 53 blocks (16 km), half that to twice it, a few crests side
-by side and 130 to 1,300 blocks long along the axis. At the default vertical scale a fold rises and
-falls a median of about 20 blocks (400 m), its limbs dipping 66° to 77° in blocks (9° to 16° in
-metres). Rock laid down after a fold formed lies flat across it.
+by side and 130 to 1,300 blocks long along the axis. At the default height setting a fold rises and
+falls a median of about 400 m (20 blocks of 20 m), its limbs dipping 9° to 16° in metres (66° to
+77° in blocks of 300 m by 20 m). Rock laid down after a fold formed lies flat across it.
 
 **Faults.** Thrusts (gently dipping faults that push older rock up over younger) cut the same belts;
 normal faults (steep faults whose upper side has slid down) drop tilted blocks along rifts;
 strike-slip faults (vertical faults whose sides slid sideways) run along oblique plate margins. A
-fault's trace is 15 to 150 km long, a median 38 km (127 blocks). At the default vertical scale normal
-faults dip 80° to 85° in blocks and thrusts 55° to 73°, and a median normal fault drops the beds
-about 23 blocks (470 m) at its middle. Young faults and folds also shape the ground: fault scarps,
+fault's trace is 15 to 150 km long, a median 38 km (127 blocks). At the default height setting normal
+faults dip 21° to 36° in metres and thrusts 5.5° to 12.6° (80° to 85° and 55° to 73° in blocks of
+300 m by 20 m), and a median normal fault drops the beds about 470 m (23 blocks of 20 m) at its
+middle. Young faults and folds also shape the ground: fault scarps,
 rift valleys and fold ridges up to a few hundred metres high, worn away over 10 Myr.
 
 **Intrusions.** Stocks (small bodies of granite, granodiorite or diorite) rise in collision belts and
@@ -77,12 +82,12 @@ keeps a list of structures that ride on their plates.
    strain times area (DEF-022, DEF-023). Shortening makes fold trains and thrusts, extension normal
    faults and dykes, shear strike-slip faults; shortening in collisions and arcs also makes stocks.
 3. **Sizes and attitudes.** A fold train's wavelength is drawn about 16 km, its amplitude follows from
-   how much the crust there has thickened (DEF-001, DEF-005 to DEF-007), times the vertical scale
+   how much the crust there has thickened (DEF-001, DEF-005 to DEF-007), times the stretch X
    (DEF-011). Folds and thrusts run along
    the plate model's fold trend; thrusts dip under the high ground; normal faults run along the rift
    and dip towards its axis, one in four the other way (DEF-009, DEF-030, DEF-031). Fault length is
    drawn about 40 km, the slip is a fixed share of it (DEF-013, DEF-015 to DEF-018), dips are drawn
-   from Anderson's ranges (DEF-019 to DEF-021); then the vertical scale multiplies the throw and
+   from Anderson's ranges (DEF-019 to DEF-021); then the stretch X multiplies the throw and
    keeps the heave, which steepens the dip (DEF-011).
 4. **Room.** At most three structures of a kind overlap at a place; a new one replaces the oldest
    only if that is at least 30 Myr older (DEF-032, DEF-033).
@@ -107,7 +112,7 @@ keeps a list of structures that ride on their plates.
 | DEF-004 | fold length over wavelength | 5 to 12 | - | Alavi 2007: anticlines up to 150 to 200 km, over 10 half wavelengths | `verified` |
 | DEF-005 | fold shortening e | 0.08 to 0.30 | fraction | design; Zagros 16 to 30 % (Alavi 2007, Mouthereau et al. 2007) | `game-choice` |
 | DEF-007 | fold amplitude | A = X x strength x L x sqrt(e) / pi | blocks | geometry (first order) | `verified` |
-| DEF-011 | vertical scale of structures, X | 4 (1 = 1:1 in blocks, 15 = true metres) | - | Ben, decisions log 2026-10-02 | `game-choice` |
+| DEF-011 | height of structures as a share of true metres; stretch X = share x h / v | 4/15 (1 = true metres); X = 4 at 300 m by 20 m, 2.29 at 300 m by 35 m | - | Ben, decisions log 2026-10-02 | `game-choice` |
 | DEF-013 | fault length | lognormal, median 40, sigma 0.5, clamped 15 to 150 | km | design | `game-choice` |
 | DEF-015 | displacement and length | D = gamma L | - | Schlische et al. 1996 (0.03, via Lathrop et al. 2022); Elliott 1976 (7 % for thrusts) | `verified` |
 | DEF-016 to DEF-018 | slip over length, along the dip in blocks | normal 0.05; thrust 0.08 x (0.5 to 1); strike-slip 0.05 | - | design | `game-choice` |
@@ -134,22 +139,25 @@ The rest are design rules listed in the ledger. Equations as the code computes t
     shift of a column in a fold train = w * amplitude * profile(2 pi (b - offset) / L)        (DEF-010)
     w = (1 - a^2)^2 (1 - b^2)^2 inside the window, 0 outside                                  (DEF-039)
 
-where X is `vertical_scale`, L the wavelength in blocks, e the shortening, a and b the position along and across the
+where X = `true_height_share` × `m_per_block_h` / `m_per_block_v` (4 at the default share on a 300 m by
+20 m block), L the wavelength in blocks, e the shortening, a and b the position along and across the
 window as a fraction of its half-length and half-width, and the profile a sine with period 2 pi.
 
 **The first-order fold.** A sine of amplitude A and wavelength L has arc length L (1 + (pi A / L)^2)
 over one wavelength to first order, hence the code's A = L sqrt(e) / pi. Exactly, the amplitudes
 drawn shorten the bed by 7.0 % at e 0.08 (limbs 29.5°) and by 20.2 % at e 0.30 (limbs 47.6°): the
 first-order form overstates the shortening at the top of the range (DEF-007). All of that is at 1:1
-in blocks; drawn X times taller the shortening is (X/15)^2 of it in metres: 0.04 % to 0.13 % at X = 1,
-0.5 % to 1.4 % at the default 4, and the full 7 % to 20 % at 15.
+in blocks; drawn X times taller the shortening is (X/E)^2 = share^2 of it in metres, whatever the
+block height: 0.04 % to 0.13 % at the shape at 1:1 on a 20 m block (share 1/15), 0.5 % to 1.4 % at
+the default 4/15, and the full 7 % to 20 % at a share of 1.
 
 **Metres and blocks.** A fault of dip d and slip s at 1:1 in blocks has a heave (horizontal part) of
 s cos d blocks and a throw of s sin d. Drawn X times taller it keeps the heave and throws X s sin d
-blocks, so in metres the heave is 300 s cos d and the throw 20 X s sin d: the dip in metres is
-atan(X tan d / 15). The heave dominates, so the displacements are near real ones in metres (normal
-faults 0.017 to 0.029 of their length, thrusts 0.031 to 0.075), and the throws are X/15 of the
-true-metre shape's: at the default 4 about a quarter.
+blocks, so in metres the heave is h s cos d and the throw v X s sin d (h and v the metres a block is
+across and high): the dip in metres is atan(X tan d / E) = atan(share tan d), the same at any block
+height. The heave dominates, so the displacements are near real ones in metres (normal
+faults 0.017 to 0.029 of their length, thrusts 0.031 to 0.075), and the throws are the share (X/E) of the
+true-metre shape's: at the default 4/15 about a quarter.
 
 ## Earth against the mod
 
@@ -157,7 +165,7 @@ Measured on one run: `earthlike_quick_16k`, scattered continents, 500 Myr, seed 
 2026-10-02, on the test machine (`tools/review/wp8-runs.sh world base`, which runs `deeptime run`,
 then `deeptime strata-check` and `deeptime structure-sections`); 6,108 folds and faults and 6,066
 intrusions kept. Those figures are at the old stretch 1. The rows marked `x4` were measured at the
-default vertical scale 4 on a second pair of runs (2026-10-02, branch of the vertical-scale task, on
+default stretch 4 (share 4/15 on the 300 m by 20 m block) on a second pair of runs (2026-10-02, branch of the vertical-scale task, on
 the test machine: `earthlike_quick_16k`, supercontinent start, 1000 Myr, seed 1,
 `WP8_START=supercontinent WP8_LENGTH=1000 tools/review/wp8-runs.sh world <name>`), the same world
 built twice, before (stretch 1, the old intrusion sizes and relief 1) and after; `x1` is its before.
@@ -167,7 +175,7 @@ built twice, before (stretch 1, the old intrusion sizes and relief 1) and after;
 | Fold wavelength | 15.8 ± 5.3 km (11 to 30 km) | Mouthereau et al. 2007, fig. 5 and §[55], full text | median 52.5 blocks = 15.8 km | base |
 | Fold length along the axis | up to 150 to 200 km; often over 100 km | Alavi 2007 p. 1068, Mouthereau et al. 2007 §[7], full text | median 424 blocks = 127 km | base |
 | Fold amplitude | 500 to 1,000 m (Zagros, maximum) | Mouthereau et al. 2007 art. p. 5, full text | median 4.9 blocks = 98 m in metres (`x1`); 19.5 blocks = 390 m (`x4`) | base, x1, x4 |
-| Fold limb dips | open folds 20° to 35° (interlimb 110° to 140°), near the front about 5° (170°), tight in the inner belt | Alavi 2007 p. 1077, full text | at 1:1 30° to 48° in blocks, 2° to 4° in metres; at the default 4 66° to 77° in blocks, 9° to 16° in metres | arithmetic on DEF-005, DEF-011 |
+| Fold limb dips | open folds 20° to 35° (interlimb 110° to 140°), near the front about 5° (170°), tight in the inner belt | Alavi 2007 p. 1077, full text | at 1:1 30° to 48° in blocks, 2° to 4° in metres; at the default (X = 4 on the 20 m block) 66° to 77° in blocks, 9° to 16° in metres | arithmetic on DEF-005, DEF-011 |
 | Normal fault displacement over length | 0.03 (D = 0.03 L^1.06), typical 0.001 to 0.1 | Lathrop et al. 2022 pp. 2 and 7 (quoting Schlische et al. 1996), full text | 0.017 to 0.029 in metres; throw median 117 m for 38 km at 1:1, about 470 m at 4 | base (median slip 6.6 blocks); x4 (23.1) |
 | Thrust displacement over length | about 7 % | Elliott 1976 p. 297, full text | 0.031 to 0.075 in metres; throw median 82 m at 1:1, about 330 m at 4 | base (median slip 8.2 blocks); x4 (16.7) |
 | Normal fault dip | over 45°, about 60°; active ruptures 30° to 65° | Anderson 1905 pp. 389, 402; Waldron & Snyder 2020 p. 152; Collettini & Sibson 2001 abstract | at 4: 80° to 85° in blocks, 21° to 36° in metres (at 1:1 55° to 70° and 5° to 10°) | code |
@@ -229,21 +237,23 @@ built twice, before (stretch 1, the old intrusion sizes and relief 1) and after;
 
 ## Open questions
 
-1. **Settled: folds and faults at a vertical scale of 4** (DEF-011; Ben, decisions log 2026-10-02).
+1. **Settled: folds and faults at 4/15 of true height, X = 4 on the 20 m block** (DEF-011; Ben,
+   decisions log 2026-10-02; held as a share of true metres since the same day, so it survives a
+   change of `m_per_block_v`).
    The question compared stretch 1 (today then: bed offsets median 2 blocks, p90 7; grade
    inversions 0.07 % of columns), 4 (offsets 7, p90 26; inversions 0.33 %) and true metres, 15
    (offsets 22, p90 91; inversions 0.78 %; faults near vertical in blocks; the granite basement
    pulled up through thin cover in arcs; the relief term raising ground by up to 5.1 km), on a
    500 Myr scattered-continents world (WP-8). Physics says true metres, but only together with item
-   3; the default moves to 15 once that is built.
+   3; the default share moves to 1 once that is built.
 2. **Settled: intrusion sizes between the old ones and the narrowest drawable** (DEF-048, DEF-049;
    Ben, decisions log 2026-10-02): dykes 1.7 to 3 blocks wide at depth, plugs 2 to 5 blocks in
    radius.
 3. **Fold wavelength from layer thickness (Biot), then true metres.** A design would take the
    folded cover's thickness H from the stack at the fold's place and age and draw L about 6.5 H
    (2 to 16 H; Schmalholz & Mancktelow 2016, DEF-002), with the amplitude from the shortening in
-   metres. Once that is built, `vertical_scale` can default to true metres (15 at the built-in
-   block), the ground's share (DEF-054) lowered with it. Not built (Ben, decisions log 2026-10-02:
+   metres. Once that is built, `true_height_share` can default to 1 (true metres), the ground's
+   share (DEF-054) lowered with it. Not built (Ben, decisions log 2026-10-02:
    "true metres once fold wavelengths follow layer thickness").
 4. **Belt widths on the small planet** (DEF-027): fold belts 31 km wide holding 16 km folds. Either
    the folds shrink with the planet like the belts, or the belts keep their Earth width; a question
