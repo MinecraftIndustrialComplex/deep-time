@@ -106,6 +106,70 @@ class AdvancedSettingsTest {
         }
     }
 
+    /**
+     * P1-26's per-cell climate settings (design §5.7): each is an Advanced climate field whose
+     * path is {@code climate.<key>}, every pipeline preset and built-in carries it at the calibrated
+     * default {@code ClimateParams::default()} holds, and the default lies inside the editor's range.
+     */
+    @Test
+    void perCellClimateSettingsCarryTheCalibratedDefaults() throws IOException {
+        record Num(String id, String key, double value, boolean integer) {}
+        List<Num> numbers = List.of(
+                new Num("climate_grid", "grid_columns", 128, true),
+                new Num("atmosphere_mixing", "atmosphere_diffusivity_scale", 1.3, false),
+                new Num("zonal_mixing", "zonal_diffusivity_ratio", 0.3, false),
+                new Num("wind_heat", "wind_heat_transport", 0.3, false),
+                new Num("desert_albedo", "desert_albedo", 0.08, false),
+                new Num("monsoon_strength", "thermal_wind_pa_k", 60, false),
+                new Num("rain_efficiency", "precip_rh_slope", 11.4, false),
+                new Num("soil_water", "bucket_mm", 150, false),
+                new Num("ocean_gyres", "gyre_heat_efficiency", 1.0, false),
+                new Num("ocean_overturning", "overturning_sv", 30, false),
+                new Num("ocean_mixing", "ocean_diffusivity_w_m2_k", 0.3, false),
+                new Num("winter_inversions", "winter_inversion_c", 15, false),
+                new Num("sea_ice_edges", "sea_ice_edge_sharpness", 4, false),
+                new Num("snowball_clouds", "snowball_cloud_w_m2", 0, false));
+        List<JsonObject> presets = new ArrayList<>();
+        for (String name : PIPELINES)
+            presets.add(Presets.parseObject(pipelineText(name)));
+        for (String name : Presets.BUILTIN)
+            presets.add(Presets.parseObject(Presets.builtin(name).orElseThrow()));
+        for (Num n : numbers) {
+            EditorFields.Field f = EditorFields.byId(n.id());
+            assertEquals(EditorFields.Section.ADV_CLIMATE, f.section(), n.id());
+            assertEquals(EditorFields.Kind.NUMBER, f.kind(), n.id());
+            assertEquals("climate." + n.key(), f.path(), n.id());
+            assertEquals(n.integer(), f.integer(), n.id());
+            assertTrue(f.inRange(n.value()), n.id() + " default " + n.value() + " is outside " + f.min() + ".." + f.max());
+            for (JsonObject o : presets)
+                assertEquals(n.value(), f.get(o).orElseThrow(() -> new AssertionError(n.id())).getAsDouble(), 0.0, n.id());
+        }
+        EditorFields.Field model = EditorFields.byId("climate_model");
+        assertEquals("climate.model", model.path());
+        assertEquals(List.of("per_cell", "banded"), model.options());
+        EditorFields.Field rain = EditorFields.byId("rain_model");
+        assertEquals("climate.rain_model", rain.path());
+        assertEquals(List.of("belts", "budget"), rain.options());
+        for (JsonObject o : presets) {
+            assertEquals("per_cell", model.get(o).orElseThrow().getAsString());
+            assertEquals("belts", rain.get(o).orElseThrow().getAsString());
+        }
+        // The two choices write the core's names back, and an invalid name is refused.
+        EditorModel m = imported("pipeline_quick_16k");
+        assertEquals(java.util.Optional.of("per_cell"), m.choice(model));
+        m.setChoice(model, "banded");
+        m.setChoice(rain, "budget");
+        m.setFieldText(EditorFields.byId("climate_grid"), "180");
+        String json = m.effectivePresetJson();
+        assertTrue(json.contains("\"model\":\"banded\""), json);
+        assertTrue(json.contains("\"rain_model\":\"budget\""), json);
+        assertTrue(json.contains("\"grid_columns\":180,"), "an integer stays an integer: " + json);
+        m.setFieldText(EditorFields.byId("climate_grid"), "128.5");
+        assertFalse(m.fieldValid(EditorFields.byId("climate_grid")), "a whole number");
+        m.setFieldText(EditorFields.byId("climate_grid"), "8");
+        assertFalse(m.fieldValid(EditorFields.byId("climate_grid")), "below the core's 16");
+    }
+
     /** The Advanced settings are closed until asked for, and counted against what the preset carries. */
     @Test
     void advancedSettingsAreClosedByDefault() throws IOException {
