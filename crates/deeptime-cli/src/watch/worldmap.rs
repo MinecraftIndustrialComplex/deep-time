@@ -10,7 +10,9 @@
 //! `s = C / (512·2^z)` blocks wide. Zoom 0 is the whole planet in two tiles; the last native zoom
 //! is the one where `s` reaches one block (C = 16,384: zoom 5; C = 32,768: zoom 6). Pixel `(i, j)`
 //! of a tile samples block `(x0 + i·s, z0 + j·s)`, the top left of the block it draws at one block
-//! a pixel, so block columns line up with pixels there. x wraps; z is clamped at the poles.
+//! a pixel, so block columns line up with pixels there. x wraps. The frame spans z ∈ [−C/4, C/4)
+//! (`Projection::tile_frame_z`), wider than the planet: on the Lambert equal-area projection the
+//! poles are at z = ∓R = ∓C/2π, and pixels past them are drawn as the page's background.
 //!
 //! # What the pixels are
 //! The finest data the bake has is the **terrain height** `H = E + A·N` (FORMAT.md "The terrain
@@ -47,7 +49,9 @@ use serde_json::{Value, json};
 /// Tile edge, pixels.
 pub const TILE: usize = 256;
 /// Bumped whenever a change to the renderer makes cached tiles stale; the cache folder carries it.
-pub const RENDER_VERSION: u32 = 1;
+pub const RENDER_VERSION: u32 = 2;
+/// The colour of the pixels past the poles (the workbench's map background, #04060a).
+pub const BEYOND_POLE: [u8; 4] = [4, 6, 10, 255];
 /// A tile is computed with a one pixel border so the hill shade has its neighbours.
 const N: usize = TILE + 2;
 /// Mips start at this level (cells of `r·2^m` blocks): finer tiles read the L3 cells themselves.
@@ -150,7 +154,7 @@ impl TileGeom {
             ty,
             s,
             x0: -c / 2.0 + f64::from(tx) * TILE as f64 * s,
-            z0: -deeptime_format::Projection::of(c).pole_z() + f64::from(ty) * TILE as f64 * s,
+            z0: deeptime_format::Projection::of(c).tile_frame_z() + f64::from(ty) * TILE as f64 * s,
         })
     }
 }
@@ -1323,9 +1327,10 @@ impl BakeMap {
         let proj = deeptime_format::Projection::of(c);
         for j in 0..TILE {
             let zj = g.z0 + j as f64 * g.s;
+            // On the Lambert map a pixel is s·cos φ blocks of planet wide and s / cos φ high.
             let (dx, dy) = (
                 metres_px * proj.scale_ew(zj).max(0.15),
-                metres_px * proj.scale_ns(zj),
+                metres_px * proj.scale_ns(zj).min(1.0 / 0.15),
             );
             for i in 0..TILE {
                 let k = (j + 1) * N + i + 1;
@@ -1346,12 +1351,22 @@ impl BakeMap {
         let started = Instant::now();
         let hg = self.heights(g)?;
         let cov = self.rivers.as_ref().map(|r| r.draw(g));
-        let rgba = match layer {
+        let mut rgba = match layer {
             Layer::Satellite => self.paint_satellite(g, &hg, cov.as_ref()),
             Layer::Elevation => self.paint_elevation(g, &hg, cov.as_ref()),
             Layer::Water => self.paint_water(g, &hg, cov.as_ref()),
             Layer::Overlay => self.paint_overlay(&hg, cov.as_ref()),
         };
+        // Past the poles there is no planet: the page's background (transparent on the overlay).
+        let proj = deeptime_format::Projection::new(self.meta.c);
+        let beyond: [u8; 4] = if layer.opaque() { BEYOND_POLE } else { [0; 4] };
+        for j in 0..TILE {
+            if !proj.on_planet(0.0, g.z0 + j as f64 * g.s) {
+                for px in rgba[j * TILE * 4..(j + 1) * TILE * 4].chunks_mut(4) {
+                    px.copy_from_slice(&beyond);
+                }
+            }
+        }
         self.timing.add(
             layer,
             started.elapsed().as_micros().min(u128::from(u64::MAX)) as u64,

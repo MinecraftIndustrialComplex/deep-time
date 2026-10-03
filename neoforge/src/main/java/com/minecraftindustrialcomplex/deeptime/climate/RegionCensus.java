@@ -44,7 +44,7 @@ public final class RegionCensus {
     }
 
     /**
-     * Samples every {@code step} blocks inside the pole edge (|z| ≤ C/4, {@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection#poleZ}).
+     * Samples every {@code step} blocks inside the pole edge (|z| ≤ R = C/2π, {@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection#poleZ}).
      *
      * @param mapFile where to write the whole grid (JSON, base64 arrays), or null
      */
