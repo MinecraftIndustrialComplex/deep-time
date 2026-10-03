@@ -104,6 +104,16 @@ pub struct ClimateParams {
     pub precip_rh_slope: f64,
     /// The budget's soil water: what the land stores and evaporates again, mm.
     pub bucket_mm: f64,
+    /// How much heat the wind-driven gyres carry (`ocean2d.rs`; 0: none).
+    pub gyre_heat_efficiency: f64,
+    /// The overturning conveyor that sinks in the narrowest polar-connected basin, Sv (0: off;
+    /// Earth's Atlantic overturning is about 17).
+    pub overturning_sv: f64,
+    /// How much colder snow-covered continental interiors get in the dark season than the air
+    /// the energy balance carries, °C (winter surface inversions).
+    pub winter_inversion_c: f64,
+    /// How crisply sea-ice edges are drawn on L1: 1 soft (the coarse grid's), higher crisper.
+    pub sea_ice_edge_sharpness: f64,
 
     // --- The seasonal energy-balance model (climlab `EBM_seasonal`, MIT; `ebm.rs`).
     /// Solar constant at 1 AU, W/m² (climlab's `const.S0`); × `planet.star_flux_rel`.
@@ -381,6 +391,10 @@ impl Default for ClimateParams {
             thermal_wind_pa_k: 60.0,           // ledger: CLM-141
             precip_rh_slope: 11.4,             // ledger: CLM-145
             bucket_mm: 150.0,                  // ledger: CLM-143
+            gyre_heat_efficiency: 1.0,         // ledger: CLM-130
+            overturning_sv: 15.0,              // ledger: CLM-131
+            winter_inversion_c: 15.0,          // ledger: CLM-134
+            sea_ice_edge_sharpness: 4.0,       // ledger: CLM-135
             solar_constant_w_m2: 1365.2,
             olr_a_w_m2: 203.3,
             olr_b_w_m2_k: 2.09,
@@ -517,6 +531,15 @@ impl ClimateParams {
             (self.thermal_wind_pa_k, "thermal_wind_pa_k", 0.0, 500.0),
             (self.precip_rh_slope, "precip_rh_slope", 1.0, 40.0),
             (self.bucket_mm, "bucket_mm", 1.0, 2000.0),
+            (self.gyre_heat_efficiency, "gyre_heat_efficiency", 0.0, 5.0),
+            (self.overturning_sv, "overturning_sv", 0.0, 100.0),
+            (self.winter_inversion_c, "winter_inversion_c", 0.0, 40.0),
+            (
+                self.sea_ice_edge_sharpness,
+                "sea_ice_edge_sharpness",
+                1.0,
+                20.0,
+            ),
         ] {
             check(
                 v.is_finite() && (lo..=hi).contains(&v),

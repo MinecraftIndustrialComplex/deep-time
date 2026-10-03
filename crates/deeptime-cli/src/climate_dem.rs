@@ -27,6 +27,7 @@ pub struct Options {
     pub preset: Option<String>,
     pub circumference_km: f64,
     pub viewer: Option<PathBuf>,
+    pub dump: Option<PathBuf>,
 }
 
 /// Snapshots repeated on the relief when the preset turns the ice-sheet feedback on.
@@ -118,10 +119,13 @@ pub fn run(o: &Options) -> CliResult<()> {
         sea: 0.0,
         p: &p,
         planet,
-        monthly: false,
+        monthly: o.dump.is_some(),
+        ice_prev: None,
+        koppen_prev: None,
     };
     let mut ebm = EbmState::default();
-    let mut s = snapshot::compute(&inp, &mut ebm, &[]);
+    let mut cell = deeptime_core::climate::percell::PerCell::default();
+    let mut s = snapshot::compute(&inp, &mut ebm, &[], &mut cell);
     // With the ice-sheet feedback on (P1-17), the stage feeds each snapshot's ice sheets to the
     // next one's EBM; repeat the snapshot on the same relief until the ice settles, as the stage
     // would over this many 10-Myr snapshots.
@@ -133,7 +137,15 @@ pub fn run(o: &Options) -> CliResult<()> {
                 s.ice.frac()
             );
             let sheet = s.band_sheet.clone();
-            s = snapshot::compute(&inp, &mut ebm, &sheet);
+            // The per-cell climate reads the previous snapshot's glaciers and deserts.
+            let ice: Vec<f32> = s.glacier.iter().map(|&g| f32::from(g) * 1000.0).collect();
+            let kop: Vec<f32> = s.koppen.iter().map(|&k| f32::from(k)).collect();
+            let again = snapshot::Input {
+                ice_prev: Some(&ice),
+                koppen_prev: Some(&kop),
+                ..inp
+            };
+            s = snapshot::compute(&again, &mut ebm, &sheet, &mut cell);
         }
     }
     println!(
@@ -330,6 +342,45 @@ pub fn run(o: &Options) -> CliResult<()> {
                 t0.elapsed().as_secs_f64()
             );
         }
+    }
+    if let Some(dir) = &o.dump {
+        std::fs::create_dir_all(dir)?;
+        let write = |name: &str, v: &[f32]| -> std::io::Result<()> {
+            let mut b = Vec::with_capacity(v.len() * 4);
+            for x in v {
+                b.extend_from_slice(&x.to_le_bytes());
+            }
+            std::fs::write(dir.join(format!("{name}.f32")), b)
+        };
+        for m in 0..12 {
+            if let (Some(t), Some(pm)) = (s.t_sl_month.get(m), s.p_month.get(m)) {
+                write(&format!("t_sl_{:02}", m + 1), t)?;
+                write(&format!("p_{:02}", m + 1), pm)?;
+            }
+        }
+        write("t_mean", &s.t_mean)?;
+        write("t_warm", &s.t_warm)?;
+        write("t_cold", &s.t_cold)?;
+        write("precip", &s.precip)?;
+        write("sea_ice", &s.sea_ice)?;
+        write("sea_ice_max", &s.sea_ice_max)?;
+        write("sea_ice_min", &s.sea_ice_min)?;
+        write(
+            "koppen",
+            &s.koppen.iter().map(|&k| f32::from(k)).collect::<Vec<_>>(),
+        )?;
+        write(
+            "glacier",
+            &s.glacier.iter().map(|&g| f32::from(g)).collect::<Vec<_>>(),
+        )?;
+        let meta = serde_json::json!({
+            "w": w, "h": h, "model": p.model, "rain_model": p.rain_model,
+            "t_global_c": s.ebm_t_global, "net_toa_w_m2": s.ebm_net_toa, "years": s.ebm_years,
+            "glaciated_land": s.ice.frac(), "per_cell": s.cell,
+            "koppen_codes": koppen::CODES,
+        });
+        std::fs::write(dir.join("meta.json"), serde_json::to_string_pretty(&meta)?)?;
+        println!("deeptime climate-dem: fields -> {}", dir.display());
     }
     // The printed check: the class at each known place, and whether its group matches.
     let (mut same, mut group) = (0, 0);
