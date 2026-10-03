@@ -240,7 +240,9 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `cargo deny check licenses bans` clean; `cargo test --workspace` 740 passed, 0 failed, 3 ignored (two new module
   tests: the neighbour rule; extent, metric, index frame and bands agree); `./gradlew build test` tests=230
   failures=0 skipped=1 (`ColumnParityTest.theProjectionIsRusts` with the extent, frame and area-scale checks).
-  GameTests: GT_RESULTS.
+  GameTests at 9e426b91 (the refactor with master merged; detached behind the shared server lock, `gt-gates2.sh`):
+  `./gametest.sh` 68 of 68, `-PwithTerraBlender` 68 of 68 (its server set installed first), `-PwithMic` 68 of 68
+  (MIC set re-installed: 168 mods).
 - **Docs.** FORMAT.md "Grids" names the module; `docs/science/world-scale-and-bake.md` and ledger SCL-049 point at it;
   the design note marks §8 step 1 built.
 - **Next.** Ben's pick (Lambert, or a square/torus map, the research note): the family-specific work of the design note
