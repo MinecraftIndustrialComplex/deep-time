@@ -91,6 +91,7 @@ fn idealised_zones(p: ClimateParams) {
         monthly: true,
         ice_prev: None,
         koppen_prev: None,
+        correction: &super::percell::Correction::default(),
     };
     let mut ebm = EbmState::default();
     let s = snapshot::compute(&inp, &mut ebm, &[], &mut Default::default());

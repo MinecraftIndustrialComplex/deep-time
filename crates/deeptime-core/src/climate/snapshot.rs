@@ -88,6 +88,9 @@ pub struct Input<'a> {
     /// climate's ice-sheet and desert albedo (`None`: the band shares, no desert).
     pub ice_prev: Option<&'a [f32]>,
     pub koppen_prev: Option<&'a [f32]>,
+    /// The zonal model's correction from the last snapshot (the per-cell climate's; empty:
+    /// none), the first guess of this snapshot's fit.
+    pub correction: &'a super::percell::Correction,
 }
 
 /// Per-row zonal references the geographic anomalies are measured from (sea-level °C; ln mm/yr).
@@ -144,6 +147,9 @@ pub struct Snapshot {
     pub sea_ice_min: Vec<f32>,
     /// The per-cell climate's figures (`climate.model = per_cell`), JSON.
     pub cell: Option<serde_json::Value>,
+    /// The zonal model's correction fitted to the per-cell climate (design §4.1; empty under the
+    /// banded climate): the clock runs with it until the next snapshot.
+    pub correction: super::percell::Correction,
 }
 
 /// Thornthwaite's (1948) potential evapotranspiration from monthly mean temperatures, mm/yr
@@ -247,8 +253,12 @@ pub fn compute(
 
     // 1. The EBM on the current land fractions.
     let started = Instant::now();
-    let ep = inp.planet.ebm(p);
+    let mut ep = inp.planet.ebm(p);
     let bands = ep.bands;
+    let per_cell = p.model == super::ClimateModel::PerCell;
+    if per_cell {
+        inp.correction.apply(&mut ep);
+    }
     let land_frac = band_means(inp.lat, w, bands, &|c| if land[c] { 1.0 } else { 0.0 });
     let years = if ebm.t_ocean.len() == bands {
         p.ebm_warm_years
@@ -258,10 +268,9 @@ pub fn compute(
     let sheet: Vec<f64> = (0..bands)
         .map(|b| sheet.get(b).copied().unwrap_or(0.0) * p.ice_sheet_feedback)
         .collect();
-    let er = ep.run(ebm, &land_frac, &sheet, years);
+    let mut er = ep.run(ebm, &land_frac, &sheet, years);
     time(&mut millis, "ebm", started);
     // The per-cell climate (P1-26) on the coarse grid.
-    let per_cell = p.model == super::ClimateModel::PerCell;
     let mut pc: Option<super::percell::Coarse> = None;
     if per_cell {
         let started = Instant::now();
@@ -276,13 +285,27 @@ pub fn compute(
                 koppen_prev: inp.koppen_prev,
                 band_sheet: &sheet,
                 ebm: &*ebm,
-                ep: ep.clone(),
+                ep: EbmParams {
+                    flux_corr: Vec::new(),
+                    d_face: Vec::new(),
+                    ..ep.clone()
+                },
                 tilt_deg: inp.planet.axial_tilt_deg,
                 day_length_h: inp.planet.day_length_h,
             },
             cell,
         ));
         time(&mut millis, "ebm2d", started);
+    }
+    // The zonal model's flux correction to the 2-D zonal means (design §4.1): the clock's model,
+    // its references and its state from here are the corrected ones.
+    let mut fit = None;
+    if let Some(c) = &pc {
+        let started = Instant::now();
+        let (f, e) = super::percell::fit_flux(c, &ep, &land_frac, &sheet, ebm);
+        er = e;
+        fit = Some(f);
+        time(&mut millis, "flux_fit", started);
     }
     let started = Instant::now();
     let t_o: Vec<[f64; 12]> = inp
@@ -739,8 +762,24 @@ pub fn compute(
         let high = lz.iter().filter(|&&x| x > 2000.0).count() as f64 / lz.len() as f64;
         s.land_z = (q(0.5), q(0.9), high);
     }
+    if let Some(f) = fit {
+        let mut st = cell_stats(pc.as_ref().expect("a fit has its 2-D climate"), &er);
+        let all: Vec<f64> = f.corr.flux.iter().flatten().copied().collect();
+        let d = &f.corr.d_face;
+        st["flux_corr"] = serde_json::json!({
+            "min_w_m2": all.iter().cloned().fold(f64::MAX, f64::min),
+            "max_w_m2": all.iter().cloned().fold(f64::MIN, f64::max),
+            "d_min_w_m2_k": d.iter().cloned().fold(f64::MAX, f64::min),
+            "d_max_w_m2_k": d.iter().cloned().fold(f64::MIN, f64::max),
+            "iterations": f.iterations,
+            "worst_k": f.worst_k,
+            "rms_k": f.rms_k,
+            "capped": f.capped,
+        });
+        s.cell = Some(st);
+        s.correction = f.corr;
+    }
     if let Some(pc) = &pc {
-        s.cell = Some(cell_stats(pc, &er));
         s.ebm_t_global = pc.r.t_global;
         s.ebm_net_toa = pc.r.net_toa();
         s.ebm_years = pc.r.years;

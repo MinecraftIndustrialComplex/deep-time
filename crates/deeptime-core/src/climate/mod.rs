@@ -222,6 +222,15 @@ struct Saved {
     /// Each band's annual sea ice in the zonal model at the last snapshot (between snapshots a
     /// cell's sea ice moves with its band's change since).
     snap_band_ice: Vec<f64>,
+    /// The zonal model's correction fitted at the last snapshot (P1-26 design §4.1).
+    correction: percell::Correction,
+    /// The clock's sea-ice cover at the last snapshot (a triggered snapshot's reference).
+    snap_sea_ice: f64,
+    /// Snapshots the clock's departure triggered.
+    triggered: u64,
+    /// The CO₂ of every snowball's escape, ppm (the run's notes report them beside Earth's
+    /// expected 10⁴–10⁵ ppm, design §4.2).
+    escape_ppm: Vec<f64>,
 }
 
 /// What `present_climate` did: the CO₂ factor it settled on and the state with and without it.
@@ -748,7 +757,7 @@ impl ClimateStage {
         ]
         .iter()
         .all(|f| world.fields.get(*f).is_some_and(|x| x.data.len() == n));
-        let snap = k == 1
+        let mut snap = k == 1
             || last
             || k.is_multiple_of(every)
             || src.is_none()
@@ -795,9 +804,11 @@ impl ClimateStage {
                 monthly: false,
                 ice_prev: None,
                 koppen_prev: None,
+                correction: &percell::Correction::default(),
             };
             let mut ebm0 = EbmState::default();
             let s0 = snapshot::compute(&inp, &mut ebm0, &[], &mut self.s.cell);
+            self.s.correction = s0.correction.clone();
             let er0 = s0.ebm.clone().expect("a snapshot keeps its EBM year");
             let (mean0, summer0) = clock::land_temps(&er0);
             // No erosion yet: the first step weathers without a supply limit.
@@ -820,6 +831,7 @@ impl ClimateStage {
                     &self.s.clock.kernel,
                     degassing,
                     activity.ridge_km2_yr / carbon::RIDGE_EARTH_KM2_YR,
+                    &self.s.correction,
                 );
                 self.s.ebm = state;
                 ppm
@@ -902,6 +914,7 @@ impl ClimateStage {
                 self.preset.planet.star_flux_rel,
             );
             let ridge_rel = activity.ridge_km2_yr / carbon::RIDGE_EARTH_KM2_YR;
+            let correction = self.s.correction.clone();
             let cin = |a: f64, b: f64, nudge: Option<clock::Nudge>| clock::Input {
                 p: &p,
                 tilt_deg,
@@ -913,6 +926,7 @@ impl ClimateStage {
                 degassing,
                 ridge_rel,
                 nudge,
+                correction: &correction,
             };
             let ice_step = |ir: &mut IceRun, s: &clock::IceStep<'_>| -> Vec<f64> {
                 if !s.in_window {
@@ -1199,6 +1213,18 @@ impl ClimateStage {
         let ppm = self.ppm();
         let er_end: Option<EbmResult>;
         let mut deltas = out.deltas.clone();
+        // A triggered snapshot (P1-26 design §4.2): the clock's climate moved far from the last
+        // snapshot's (a snowball's onset or escape, a hothouse), so the per-cell climate, its
+        // flux correction and its pattern are refreshed now instead of at the next due one.
+        if !snap
+            && p.model == ClimateModel::PerCell
+            && out.steps > 0
+            && ((self.s.clock.t_global - self.s.clock.snap_t_global).abs() > percell::TRIGGER_K
+                || (self.s.clock.sea_ice - self.s.snap_sea_ice).abs() > percell::TRIGGER_ICE)
+        {
+            snap = true;
+            self.s.triggered += 1;
+        }
         if snap {
             let started = Instant::now();
             let inp = snapshot::Input {
@@ -1216,6 +1242,7 @@ impl ClimateStage {
                     .get(field::KOPPEN)
                     .filter(|f| f.data.len() == n)
                     .map(|f| f.data.as_slice()),
+                correction: &self.s.correction,
             };
             let mut ebm = std::mem::take(&mut self.s.ebm);
             let mut cell = std::mem::take(&mut self.s.cell);
@@ -1251,8 +1278,10 @@ impl ClimateStage {
                 }
             }
             self.s.cell = cell;
+            self.s.correction = s.correction.clone();
             if let Some(er) = &s.ebm {
                 self.s.snap_band_ice = er.sea_ice.clone();
+                self.s.snap_sea_ice = clock::sea_ice_frac(er, &band_land(&land_at(sea)));
             }
             put(world, field::SEA_ICE, s.sea_ice.clone());
             put(world, field::SEA_ICE_MAX, s.sea_ice_max.clone());
@@ -1729,6 +1758,9 @@ impl ClimateStage {
                     degassing_rel,
                 } => {
                     let ongoing = t_end.is_nan();
+                    if !ongoing {
+                        self.s.escape_ppm.push(co2_escape_ppm);
+                    }
                     let t_end = if ongoing { t_now } else { t_end };
                     let dur = (t_end - open.t_start) / 1.0e6;
                     let drawdown = open.co2_before_ppm / open.co2_low_ppm.max(1e-9);
@@ -1857,6 +1889,10 @@ impl ClimateStage {
         };
         json!({
             "snapshots": self.s.snapshots,
+            "triggered_snapshots": self.s.triggered,
+            // Hoffman et al. 2017 expect terminations at 10⁴–10⁵ ppm (design §4.2, WP-14a).
+            "snowball_escape_co2_ppm": self.s.escape_ppm,
+            "earth_escape_range_ppm": [1.0e4, 1.0e5], // ledger: CLM-166
             "glaciations": self.s.tracker.count,
             "snowballs": self.s.clock.snowballs,
             "snowball_spans_myr": self.s.clock.spans,
