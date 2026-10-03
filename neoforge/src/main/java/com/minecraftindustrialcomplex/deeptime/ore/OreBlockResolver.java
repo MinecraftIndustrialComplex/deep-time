@@ -146,6 +146,50 @@ public final class OreBlockResolver {
         return ores.get(0);
     }
 
+    // ---- raw-ore blocks (vanilla's ore veins; Ben, 2026-10-02) ----------------------------------
+
+    private final Map<ResourceLocation, Optional<BlockState>> raw = new ConcurrentHashMap<>();
+
+    /** {@code ns:name} → {@code #ns:storage_blocks/raw_name} (NeoForge's common tag for raw-ore blocks). */
+    public static TagKey<Block> rawTag(ResourceLocation material) {
+        return TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath(material.getNamespace(),
+                "storage_blocks/raw_" + material.getPath()));
+    }
+
+    /** Vanilla's raw-ore blocks, the fallback when a pack's tags name none. */
+    static final Map<String, Block> VANILLA_RAW = Map.of(
+            "iron", net.minecraft.world.level.block.Blocks.RAW_IRON_BLOCK,
+            "copper", net.minecraft.world.level.block.Blocks.RAW_COPPER_BLOCK,
+            "gold", net.minecraft.world.level.block.Blocks.RAW_GOLD_BLOCK);
+
+    /**
+     * The raw-ore block of {@code material} that a rich deposit core places among its ore (as
+     * vanilla's copper and iron ore veins carry {@code raw_copper_block} and {@code raw_iron_block}):
+     * the first block of {@code #<ns>:storage_blocks/raw_<material>} (so a pack's own, Create's raw
+     * zinc block, …), else vanilla's raw iron, copper or gold block, else null (no raw block: the
+     * deposit places ore there). Rock tags work the same way: a tag first, vanilla's block after.
+     */
+    public BlockState rawBlock(ResourceLocation material) {
+        return raw.computeIfAbsent(material, m -> {
+            if (access != null) {
+                var tag = access.registryOrThrow(Registries.BLOCK).getTag(rawTag(m));
+                if (tag.isPresent())
+                    for (Holder<Block> h : tag.get())
+                        return Optional.of(h.value().defaultBlockState());
+            }
+            Block v = VANILLA_RAW.get(m.getPath());
+            return Optional.ofNullable(v == null ? null : v.defaultBlockState());
+        }).orElse(null);
+    }
+
+    /** True when {@code state} is a raw-ore block of {@code material} (its tag, or vanilla's block). */
+    public static boolean isRawOf(BlockState state, ResourceLocation material) {
+        if (state.is(rawTag(material)))
+            return true;
+        Block v = VANILLA_RAW.get(material.getPath());
+        return v != null && state.is(v);
+    }
+
     /** True when Excavated Variants is installed. */
     public static boolean evLoaded() {
         return ModList.get() != null && ModList.get().isLoaded(EvBridge.MOD_ID);

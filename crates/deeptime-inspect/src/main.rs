@@ -319,6 +319,22 @@ enum Cmd {
         #[command(flatten)]
         exclude: Exclude,
     },
+    /// The terrain surface of an area as a NumPy array (the vertical-scale study): int16
+    /// `[rows (z), cols (x), 2]`, channel 0 the terrain top block of each column (trees, plants,
+    /// snow layers and fluids skipped), channel 1 the top water block above it; -32768 where a
+    /// chunk is missing or not fully generated, or the column has none. Works on any world
+    /// (vanilla, a pack's generator, Deep Time). Read a region at a time, so a large area fits.
+    Heights {
+        /// The world or dimension folder (the one holding region/).
+        #[arg(long)]
+        world: PathBuf,
+        /// x0,z0,x1,z1 (x1, z1 exclusive).
+        #[arg(long, value_parser = Area::parse, allow_hyphen_values = true)]
+        area: Area,
+        /// The .npy file to write.
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// Prints one column's blocks from its top block down, with the measured surface.
     Column {
         #[arg(long)]
@@ -791,6 +807,57 @@ fn run(cli: Cli) -> Result<()> {
                 deeptime_inspect::rivermap::planet(&world_data, &out, step, parsed)?
             };
             print_json(&v)?;
+        }
+        Cmd::Heights { world, area, out } => {
+            let (w, h) = (area.width(), area.height());
+            let mut data = vec![i16::MIN; w * h * 2];
+            let mut full = 0usize;
+            // One region (512 x 512 columns) in memory at a time.
+            for rz in (area.z0 >> 9)..=((area.z1 - 1) >> 9) {
+                for rx in (area.x0 >> 9)..=((area.x1 - 1) >> 9) {
+                    let part = Area {
+                        x0: (rx << 9).max(area.x0),
+                        z0: (rz << 9).max(area.z0),
+                        x1: ((rx + 1) << 9).min(area.x1),
+                        z1: ((rz + 1) << 9).min(area.z1),
+                    };
+                    let world = World::load_area(&world, Some(part))?;
+                    for z in part.z0..part.z1 {
+                        for x in part.x0..part.x1 {
+                            if world.full_chunk(x, z).is_none() {
+                                continue;
+                            }
+                            full += 1;
+                            let o = ((z - area.z0) as usize * w + (x - area.x0) as usize) * 2;
+                            let clamp = |y: i32| y.clamp(-32767, 32767) as i16;
+                            if let Some(t) = world.terrain_top(x, z) {
+                                data[o] = clamp(t);
+                            }
+                            if let Some(t) = world.water_top(x, z) {
+                                data[o + 1] = clamp(t);
+                            }
+                        }
+                    }
+                }
+            }
+            let mut header =
+                format!("{{'descr': '<i2', 'fortran_order': False, 'shape': ({h}, {w}, 2), }}");
+            while (10 + header.len() + 1) % 64 != 0 {
+                header.push(' ');
+            }
+            header.push('\n');
+            let mut bytes = Vec::with_capacity(10 + header.len() + data.len() * 2);
+            bytes.extend_from_slice(b"\x93NUMPY\x01\x00");
+            bytes.extend_from_slice(&(header.len() as u16).to_le_bytes());
+            bytes.extend_from_slice(header.as_bytes());
+            for v in &data {
+                bytes.extend_from_slice(&v.to_le_bytes());
+            }
+            std::fs::write(&out, bytes).map_err(|e| Error(format!("{}: {e}", out.display())))?;
+            println!(
+                "deeptime-inspect heights: {h} x {w} columns, {full} in full chunks -> {}",
+                out.display()
+            );
         }
         Cmd::Column { world, x, z, depth } => {
             let w = deeptime_inspect::world::World::load(&world, |cx, cz| {

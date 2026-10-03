@@ -7,16 +7,27 @@
 //! crust is resampled onto a fresh lattice: the Fibonacci sphere under a new random rotation,
 //! triangulated again by P1-02's hull.
 //!
-//! - A new sample inside a plate (a lattice triangle of one rigid group, located in the group's
-//!   frame) takes that plate's crust by barycentric interpolation ("the parameters of the other
-//!   sample points are computed using barycentric interpolation of crust data from the plate they
-//!   intersect"). Where several plates cover it, the visible one wins (the subducting plate's
-//!   hidden crust is consumed) and the conserved rock pools of the others are added to it —
-//!   tectonics.js's `Crust.overlap` (see `pools.rs`): trench sediment and forced-subducted
-//!   continental crust accrete to the overriding plate instead of vanishing.
-//! - A new sample in a gap between diverging plates becomes fresh oceanic crust of the nearest
-//!   plate. With d_P the distance to the nearest plate and d_Γ to the ridge (midway to the second
-//!   nearest plate), α = d_Γ/(d_Γ + d_P) and the elevation is Cortial's
+//! - A new sample inside a plate takes that plate's crust by barycentric interpolation ("the
+//!   parameters of the other sample points are computed using barycentric interpolation of crust
+//!   data from the plate they intersect"). A plate's extent is its footprint: the cells of the old
+//!   lattice that its samples owned at the last resampling (each triangle split between its
+//!   corners by the largest barycentric weight), moved rigidly with its group; inside the group's
+//!   own triangles that is the paper's interpolation, and on its boundary strip (a triangle shared
+//!   with another group) the group's own corners are interpolated. Footprints tile the sphere
+//!   at a resampling, so a plate keeps its area through one until it really overlaps or leaves a
+//!   gap. Where several footprints overlap, the visible crust wins (the subducting plate's hidden
+//!   crust is consumed), then the overriding plate of a subduction contact, then continental, then
+//!   higher crust; the conserved rock pools of hidden crust, of the same plate's and of the
+//!   subducting plate's crust are added to it — tectonics.js's `Crust.overlap` (see `pools.rs`):
+//!   trench sediment and forced-subducted continental crust accrete to the overriding plate
+//!   instead of vanishing. (Until 2026-10-02 only whole triangles of one group counted, and points
+//!   on a boundary strip copied the nearest visible sample within 0.75 spacings: where a plate
+//!   overrode another, the subducting crust under the strip won it, and the overriding plate lost
+//!   its outer half-spacing at every resampling, while the edges of diverging plates grew into
+//!   the gap by up to a quarter-spacing; build log "Resampling crust loss".)
+//! - A new sample in no footprint (a gap between diverging plates) becomes fresh oceanic crust of
+//!   the nearest plate. With d_P the distance to the nearest plate and d_Γ to the ridge (midway
+//!   to the second nearest plate), α = d_Γ/(d_Γ + d_P) and the elevation is Cortial's
 //!   z = α·z̄ + (1 − α)·z_Γ, z̄ interpolated between the two plates' edges and z_Γ the ridge
 //!   profile at the sample's age (the dampening's own age–depth curve, `pools::ocean_elevation`).
 //!   The crust's age is α times the time since the last resampling, and its ridge direction is
@@ -34,19 +45,13 @@ use rayon::prelude::*;
 
 use super::Env;
 use super::events::{self, PLATE_DEATH, RIDGE_BIRTH};
-use super::geometry::{Cover, Geo, Tree, cover, dijkstra_two};
+use super::geometry::{Cover, Geo, Tree, dijkstra_two};
 use super::init::random_rotation;
 use super::kinematics::{arr, quat, to_world};
 use super::pools::{accrete, ocean_elevation, ocean_heat_flow, oceanic_column, thickness};
 use super::state::{CONTINENTAL, Group, OCEANIC, PlateState, Ridge, Sample, pool, regime};
 use crate::error::CoreError;
-use crate::sphere::kdtree::angle_of_chord2;
 use crate::world::WorldState;
-
-/// New points within this many sample spacings of an old visible sample lie on a boundary strip,
-/// not in a gap (the farthest a point of a lattice triangle can be from its nearest corner is
-/// about 0.62 spacings).
-const STRIP: f64 = 0.75;
 
 /// What covers one new point: the group on top (if any) and the others.
 type Found = (Option<(u32, Cover)>, Vec<(u32, Cover)>);
@@ -128,6 +133,40 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
     s
 }
 
+/// Where the mantle-frame direction `q` falls in group `group`'s footprint (rotation `rot`): the
+/// old lattice triangle holding it in the group's frame, when the corner with the largest
+/// barycentric weight is the group's. The cells this partition gives each old sample tile the
+/// sphere at the last resampling, so the footprints of all groups are the crust's real extent
+/// moved rigidly: inside a group's triangles the cover is `geometry::cover`'s, and on its boundary
+/// strip (a triangle shared with another group) the weights are those of the group's own corners.
+/// `hint` is an old sample near `q`.
+fn footprint(
+    geo: &Geo,
+    src: &[Sample],
+    group: u32,
+    rot: DQuat,
+    q: DVec3,
+    hint: u32,
+) -> Option<Cover> {
+    let local = rot.inverse() * q;
+    let h = geo.mesh.vertex_triangle(hint).unwrap_or(0);
+    let t = geo.mesh.locate(local, h);
+    let tri = geo.mesh.triangles()[t as usize];
+    let mut w = geo.mesh.barycentric(t, local);
+    let own = tri.map(|v| src[v as usize].group == group);
+    let major = (0..3).fold(0, |k, i| if w[i] > w[k] { i } else { k });
+    if !own[major] {
+        return None;
+    }
+    if own.iter().any(|&o| !o) {
+        let sum: f64 = (0..3).filter(|&k| own[k]).map(|k| w[k]).sum();
+        for k in 0..3 {
+            w[k] = if own[k] { w[k] / sum } else { 0.0 };
+        }
+    }
+    Some(Cover { t, tri, w })
+}
+
 /// Resamples the crust onto a fresh lattice and returns its geometry.
 pub fn resample(
     state: &mut PlateState,
@@ -146,13 +185,14 @@ pub fn resample(
     let rots: Vec<DQuat> = state.groups.iter().map(|g| quat(g.rot)).collect();
     let tree = Tree::over(pos, |_| true);
     let src = &state.samples;
-    let st: &PlateState = state;
 
-    // Which old groups cover each new point; the visible one on top. A point on a plate's
-    // boundary strip (a lattice triangle spanning two groups) is not a gap: it copies its nearest
-    // visible sample. Only points farther than `STRIP` spacings from every visible sample are gaps
-    // that opened since the last resampling.
-    let strip = STRIP * norm.spacing_rad();
+    // Which old groups hold each new point in their footprint (`footprint`: the old lattice's
+    // cells, moved with the group), and which of them is on top.
+    let group_plate: Vec<u32> = state.groups.iter().map(|g| g.plate).collect();
+    let mut subducts: Vec<(u32, u32)> = state.contacts.iter().map(|c| (c.under, c.over)).collect();
+    subducts.sort_unstable();
+    subducts.dedup();
+    let overrides = |over: u32, under: u32| subducts.binary_search(&(under, over)).is_ok();
     let found: Vec<Found> = new_pts
         .par_iter()
         .map(|&q| {
@@ -165,38 +205,42 @@ pub fn resample(
                     continue;
                 }
                 tried.push(g);
-                if let Some(c) = cover(old, st, g, rots[g as usize], q, j) {
+                if let Some(c) = footprint(old, src, g, rots[g as usize], q, j) {
                     covers.push((g, c));
                 }
             }
             if covers.is_empty() {
-                let copy = near
-                    .iter()
-                    .find(|(j, d2)| !src[*j as usize].is_hidden() && angle_of_chord2(*d2) <= strip);
-                return match copy {
-                    Some(&(j, _)) => {
-                        let g = src[j as usize].group;
-                        let t = old.mesh.vertex_triangle(j).unwrap_or(0);
-                        let tri = old.mesh.triangles()[t as usize];
-                        let w = tri.map(|v| if v == j { 1.0 } else { 0.0 });
-                        (Some((g, Cover { t, tri, w })), covers)
-                    }
-                    None => (None, covers),
-                };
+                return (None, covers);
             }
-            // On top: visible, then continental, then higher, then the lower group id.
+            // On top: visible, then the overriding plate of a subduction contact, then
+            // continental, then higher, then the lower group id.
             let key = |i: usize| {
                 let (g, c) = &covers[i];
                 let m = &src[c.major() as usize];
-                (!m.is_hidden(), m.kind == CONTINENTAL, m.elevation_m, *g)
+                (
+                    !m.is_hidden(),
+                    group_plate[*g as usize],
+                    m.kind == CONTINENTAL,
+                    m.elevation_m,
+                    *g,
+                )
             };
             let best = (0..covers.len())
                 .max_by(|&a, &b| {
                     let (ka, kb) = (key(a), key(b));
                     ka.0.cmp(&kb.0)
-                        .then(ka.1.cmp(&kb.1))
-                        .then(ka.2.total_cmp(&kb.2))
-                        .then(kb.3.cmp(&ka.3))
+                        .then_with(|| {
+                            if overrides(ka.1, kb.1) {
+                                std::cmp::Ordering::Greater
+                            } else if overrides(kb.1, ka.1) {
+                                std::cmp::Ordering::Less
+                            } else {
+                                std::cmp::Ordering::Equal
+                            }
+                        })
+                        .then(ka.2.cmp(&kb.2))
+                        .then(ka.3.total_cmp(&kb.3))
+                        .then(kb.4.cmp(&ka.4))
                 })
                 .unwrap_or(0);
             let top = covers.swap_remove(best);
@@ -205,7 +249,6 @@ pub fn resample(
         .collect();
 
     // Covered samples.
-    let group_plate: Vec<u32> = state.groups.iter().map(|g| g.plate).collect();
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
     let mut samples: Vec<Sample> = found
         .par_iter()
@@ -217,7 +260,8 @@ pub fn resample(
                 *pl = group_plate[*g as usize];
                 for (g2, c2) in others {
                     let under = &src[c2.major() as usize];
-                    if under.is_hidden() || group_plate[*g2 as usize] == *pl {
+                    let p2 = group_plate[*g2 as usize];
+                    if under.is_hidden() || p2 == *pl || overrides(*pl, p2) {
                         let u = interpolate(src, c2, rots[*g2 as usize]);
                         accrete(&mut s.pools, &u.pools);
                     }
