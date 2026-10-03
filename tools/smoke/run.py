@@ -518,14 +518,17 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
 
     # A /dh pregen square across the seam, recorded: whether it finishes, and how many sections DH
     # asked of the override meanwhile (DH's pregen bookkeeping against TW's key folding, above).
+    # Its centre is five sections west of the seam: a centre at x = C/2 itself never starts, since
+    # Toroidal World's command coordinates reject it as outside the world (seen 2026-10-03).
     st, out = probe_json(server, rcon, "deeptime probe dh")
     level = next((l for l in (st or {}).get("levels", []) if l.get("level") == "minecraft:overworld"), {}) if st else {}
     before = level.get("sections", 0)
-    dh_pregen(steps, rcon, half, sz + 1024, radius_seam, "across the seam", limit_s=120, required=False)
+    across_x = half - 5 * 64
+    dh_pregen(steps, rcon, across_x, sz + 1024, radius_seam, "across the seam", limit_s=120, required=False)
     st, out = probe_json(server, rcon, "deeptime probe dh")
     level = next((l for l in (st or {}).get("levels", []) if l.get("level") == "minecraft:overworld"), {}) if st else {}
     steps.record("dh across the seam: sections asked of the override", level.get("sections", 0) - before,
-                 note=f"{radius_seam}-chunk square centred on x = {half}, z = {sz + 1024}: about 256 sections")
+                 note=f"{radius_seam}-chunk square centred on x = {across_x}, z = {sz + 1024}, crossing x = {half}: 257 sections")
 
     for detail in (0, 3, 6):
         b, out = probe_json(server, rcon, f"deeptime probe far bench {cx} {cz} {detail} 64", wait=2.0)
