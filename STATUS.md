@@ -172,10 +172,14 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   its last checkpoint; the deposit world and its dump) and hashes every output file (JSON without the run's clock,
   timings and memory peaks; the viewer's own code files left out; the parity block above left out). Master 429b6531's
   binary against this branch's: **355 of 355 files identical**; master run twice: identical (the check is
-  deterministic). Folder `/Volumes/Graphide/ban/deeptime-runs/projection-refactor/` on the VM.
-- **Gates** (VM): `cargo fmt --check`, `clippy --workspace --all-targets -D warnings`, `cargo deny check licenses bans`
-  clean; `cargo test --workspace` 733 passed, 0 failed, 3 ignored; `./gradlew build test` tests=227 failures=0
-  skipped=1. GameTests: running (detached, behind the shared server lock).
+  deterministic). After the second pass and the merge of master b828ab36 (deposit richness): master's binary (built
+  from `git archive master`) against the branch head 19e54623's, **355 of 355 identical** again. Folder
+  `/Volumes/Graphide/ban/deeptime-runs/projection-refactor/` on the VM (scripts `gates3.sh`, `gt-gates2.sh`).
+- **Gates** (VM, head 19e54623): `cargo fmt --check`, `clippy --workspace --all-targets -D warnings`,
+  `cargo deny check licenses bans` clean; `cargo test --workspace` 740 passed, 0 failed, 3 ignored (two new module
+  tests: the neighbour rule; extent, metric, index frame and bands agree); `./gradlew build test` tests=230
+  failures=0 skipped=1 (`ColumnParityTest.theProjectionIsRusts` with the extent, frame and area-scale checks).
+  GameTests: GT_RESULTS.
 - **Docs.** FORMAT.md "Grids" names the module; `docs/science/world-scale-and-bake.md` and ledger SCL-049 point at it;
   the design note marks §8 step 1 built.
 - **Next.** Ben's pick (Lambert, or a square/torus map, the research note): the family-specific work of the design note
