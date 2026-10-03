@@ -135,6 +135,23 @@ that are not all the schist's doing); read them as two samples each.
 | stored cell stacks with a grade inversion | 0 | 0 | 0 | 0 |
 | columns without folds and faults with an inversion | 0 | 0 | 0 | 0 |
 
+A third pair on the code as it stood after the plate-force and deposit merges (seed 1, master before and the branch
+after, both through the branch's `strata-check`, whose class shares are the 524,288 stored cell stacks; the "before"
+inversions come from the master binary's own check, since reading the old world with the new temperatures reports
+inversions that the old code never made):
+
+| Share of | Before | After |
+|---|---|---|
+| stored stacks holding schist / phyllite / gneiss / amphibolite | 37.5 / 16.3 / 57.2 / 1.0 % | 29.1 / 21.7 / 57.6 / 0.8 % |
+| all rock blocks that are schist / phyllite / gneiss | 5.0 / 0.87 / 14.3 % | 5.2 / 1.27 / 13.0 % |
+| stored stacks with a grade inversion | 0 of 524,288 | 0 of 524,288 |
+| land columns with folds and faults applied: inversions | 2 of 4,556 (0.04 %) | 10 of 5,448 (0.18 %) |
+
+Same finding as the first two pairs: schist falls in columns, not in volume, phyllite takes the difference, gneiss does
+not move, and the stored stacks, where the rule is that grade rises downwards, stay at zero inversions. The land
+columns' ten inversions are gneiss over basalt (5), gneiss over phyllite (2), phyllite over basalt (2) and gneiss over
+sandstone (1), all structure-stage thrusts, 0.18 % of land columns.
+
 Schist is made two ways: by the temperature (shale and its kin stepping to schist) and directly, as the metamorphic
 pool of a young Himalayan-type orogen (RCK-018), which the threshold does not touch; that is why seed 1's schist volume
 did not fall while its column share did. Raising the threshold moved rock from schist into phyllite (and, on seed 2, the
