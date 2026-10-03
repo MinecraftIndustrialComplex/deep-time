@@ -402,8 +402,9 @@ glaciated ground regardless of biome. The contract between the climate and that 
   rounds, giving `n` blocks for the column. The cover **replaces** the top `n` solid blocks of the
   ground, so the terrain's height is unchanged: the top `snow_blocks` (at most `n`) are `snow`, the
   last `blue_ice_blocks` of a cover of at least `blue_ice_from_blocks` are `deep_ice`, the blocks
-  between `ice`. A column whose surface is fluid (a lake, the sea) and air, bedrock and fluid blocks
-  are left alone. Vanilla's `freeze_top_layer` feature then lays its snow layer on the snow block.
+  between `ice`. A column whose surface is fluid (a lake, the sea) or is the ice of a frozen lake
+  (the water pass's `minecraft:ice` top block: the lake's surface, not ground), and air, bedrock and
+  fluid blocks, are left alone. Vanilla's `freeze_top_layer` feature then lays its snow layer on the snow block.
   The layer is not part of the column evaluator: Java alone reads it, and Rust's `inspect-column`
   prints it with the other layers.
 
