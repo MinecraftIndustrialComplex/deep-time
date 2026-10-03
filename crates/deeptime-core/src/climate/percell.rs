@@ -998,7 +998,7 @@ mod tests {
         // One step of both models at `ppm`: the 2-D model's sea ice, the zonal model's (its own
         // step decides its snowball, as the clock's tracker does) and its state then; a refit
         // afterwards moves the zonal state to the 2-D model's.
-        let mut step = |ppm: f64,
+        let step = |ppm: f64,
                         cell: &mut PerCell,
                         e1: &mut EbmState,
                         fit: &mut Fit|
