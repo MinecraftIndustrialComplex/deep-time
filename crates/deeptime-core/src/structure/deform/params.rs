@@ -47,7 +47,9 @@ pub struct DeformationParams {
     /// The share of their true height in metres that folds and faults are drawn at (module doc):
     /// 1 is true metres; fold amplitudes and fault throws are [`Self::block_stretch`] times their
     /// shape at 1:1 in blocks, fault heaves unchanged. The default 4/15 draws them 4 times taller
-    /// than at 1:1 on a 300 m by 20 m block and keeps that look at any `scale.m_per_block_v`. A game
+    /// than at 1:1 on a 300 m by 20 m block and 2.29 times on a 300 m by 35 m one: it keeps their
+    /// height in metres at any `scale.m_per_block_v`, not their look in blocks, which grows calmer
+    /// as the block grows taller (Ben kept the value at 35 m, decisions log 2026-10-03). A game
     /// choice (Ben, decisions log 2026-10-02). ledger: DEF-011
     pub true_height_share: f64,
 

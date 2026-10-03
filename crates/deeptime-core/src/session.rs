@@ -1527,9 +1527,9 @@ mod tests {
         assert!(matches!(s.keyframe_info(0), Err(CoreError::Unsupported(_))));
         let manifest = s.finalize_write().unwrap();
         let v: Value = serde_json::from_str(&manifest).unwrap();
-        assert_eq!(v["format_version"], "0.3");
+        assert_eq!(v["format_version"], "0.4");
         assert_eq!(v["layers"], json!([]));
-        assert!(manifest.contains("\"format_version\": \"0.3\""));
+        assert!(manifest.contains("\"format_version\": \"0.4\""));
         assert!(manifest.contains("\"layers\": []"));
         let on_disk = std::fs::read_to_string(dir.join("manifest.json")).unwrap();
         assert_eq!(on_disk, manifest);
@@ -1746,7 +1746,8 @@ mod tests {
             r#"{"base_bytes":0,"history_bytes":0,"mem_cap":4294967296,"peak_bytes":0,"spill_bytes":0,"stages":[{"base_bytes":0,"bytes":0,"history_bytes":0,"name":"dummy","seconds":0.0,"spill_bytes":0}]}"#
         );
         let world: Value = serde_json::from_str(&estimate(DUMMY_WORLD, "").unwrap()).unwrap();
-        assert_eq!(world["peak_bytes"], 256 * 128 * 4);
+        // 256 × 88 cells (rows from z = −704, past the Lambert pole at 651.9).
+        assert_eq!(world["peak_bytes"], 256 * 88 * 4);
         assert_eq!(world["stages"][1]["name"], "dummy_erode");
     }
 

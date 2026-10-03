@@ -164,8 +164,13 @@ public final class BiomeGameTests {
     // 2026-10-02 (continental crust fix: resampling footprints, island arcs mature by their crust): the
     // default test planet changed again and its A family read 0.446 (83 columns; Af's columns 43 % jungle,
     // 37 % stony shore), with the mapping unchanged. A goes to 0.34 by the same rule.
+    //
+    // 2026-10-03 (the Lambert equal-area map, merged with the 35 m vertical scale and plate tasks 3 and 4):
+    // the default test planet's C family read 0.737 standalone and 0.731 with MIC (156 columns), the
+    // mapping unchanged; its misses are coastal columns (Csa/Csb 64-100 % stony shore, Cfb 21 % beach and
+    // 15 % stony shore standalone). C goes to 0.63 by the same rule.
     static final Map<String, Double> FLOORS = Map.ofEntries(
-            Map.entry("A", 0.34), Map.entry("Af", 0.54), Map.entry("BW", 0.57), Map.entry("BS", 0.42), Map.entry("C", 0.75),
+            Map.entry("A", 0.34), Map.entry("Af", 0.54), Map.entry("BW", 0.57), Map.entry("BS", 0.42), Map.entry("C", 0.63),
             Map.entry("D", 0.88), Map.entry("Dsub", 0.38), Map.entry("E", 0.82), Map.entry("sea", 0.95),
             Map.entry("BW:desert", 0.37), Map.entry("Af:jungle", 0.41), Map.entry("Dfc:taiga", 0.33), Map.entry("E:snow", 0.72));
     static final int MIN_COLUMNS = 40;

@@ -416,7 +416,7 @@ mod tests {
         let v = version_string();
         let (semver_sha, rest) = v.split_once(';').unwrap();
         assert!(semver_sha.starts_with("0.0.1+"), "{v}");
-        assert!(rest.starts_with("format=0.3;target="), "{v}");
+        assert!(rest.starts_with("format=0.4;target="), "{v}");
         assert!(rest.ends_with(TARGET), "{v}");
     }
 

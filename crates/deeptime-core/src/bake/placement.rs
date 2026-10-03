@@ -65,16 +65,33 @@ struct Ramp {
     terms: Vec<Term>,
 }
 
+/// A class's temperature: a ramp, or a switch on one input between two of these (nested: a
+/// class can have a warm, a cool and a cold branch).
 #[derive(Clone, Debug, PartialEq)]
 enum Thermal {
     Ramp(usize),
     When {
         of: Input,
         above: f64,
-        then: usize,
-        otherwise: usize,
+        then: Box<Thermal>,
+        otherwise: Box<Thermal>,
     },
 }
+
+/// A class's humidity: a rule, or a switch on a temperature input between two of these.
+#[derive(Clone, Debug, PartialEq)]
+enum Humid {
+    Rule(usize),
+    When {
+        of: Input,
+        above: f64,
+        then: Box<Humid>,
+        otherwise: Box<Humid>,
+    },
+}
+
+/// The deepest a `when` may nest.
+const MAX_NEST: usize = 4;
 
 #[derive(Clone, Debug, PartialEq)]
 struct Rule {
@@ -88,7 +105,7 @@ struct Rule {
 #[derive(Clone, Debug, PartialEq)]
 struct Glaciated {
     thermal: Option<Thermal>,
-    humidity: Option<usize>,
+    humidity: Option<Humid>,
     erosion: Option<ErosionLimit>,
 }
 
@@ -203,7 +220,7 @@ pub struct Placement {
     rules: Vec<Rule>,
     /// By Köppen index 0 … 30.
     thermal: Vec<Thermal>,
-    humidity: Vec<usize>,
+    humidity: Vec<Humid>,
     /// By Köppen index 0 … 30: `Some` for a class with a `glaciated` block.
     glaciated: Vec<Option<Glaciated>>,
     /// By Köppen index 0 … 30: the class's erosion limits.
@@ -438,40 +455,105 @@ fn parse_ice_cover(v: Option<&Value>) -> Result<IceCoverSpec, CoreError> {
     Ok(spec)
 }
 
-/// A class's temperature: a ramp name, or a `{when, then, else}` switch.
+/// The parts of a `{when, then, else}` switch: the input and threshold of `when`, and the `then` and
+/// `else` values for the caller to read.
+fn parse_switch<'a>(
+    w: &'a Map<String, Value>,
+    tp: &str,
+) -> Result<(Input, f64, &'a Value, &'a Value), CoreError> {
+    no_other_keys(w, &["when", "then", "else"], tp)?;
+    let field = |key: &str| {
+        w.get(key)
+            .ok_or_else(|| err(&format!("{tp}.{key}"), "missing"))
+    };
+    let when = object(field("when")?, &format!("{tp}.when"))?;
+    no_other_keys(when, &["of", "above"], &format!("{tp}.when"))?;
+    let of = when
+        .get("of")
+        .ok_or_else(|| err(&format!("{tp}.when.of"), "missing"))?;
+    let of = Input::parse(string(of, &format!("{tp}.when.of"))?)
+        .ok_or_else(|| err(&format!("{tp}.when.of"), "must be t_mean, t_warm or t_cold"))?;
+    let above = when
+        .get("above")
+        .ok_or_else(|| err(&format!("{tp}.when.above"), "missing"))?;
+    let above = number(above, &format!("{tp}.when.above"), -100.0, 100.0)?;
+    Ok((of, above, field("then")?, field("else")?))
+}
+
+/// A class's temperature: a ramp name, or a `{when, then, else}` switch whose branches are again
+/// ramp names or switches (at most [`MAX_NEST`] deep).
 fn parse_thermal(
     t: &Value,
     tp: &str,
     ramp_ix: &BTreeMap<&str, usize>,
+    depth: usize,
 ) -> Result<Thermal, CoreError> {
     match t {
         Value::String(_) => Ok(Thermal::Ramp(ramp_named(ramp_ix, t, tp)?)),
         Value::Object(w) => {
-            no_other_keys(w, &["when", "then", "else"], tp)?;
-            let field = |key: &str| {
-                w.get(key)
-                    .ok_or_else(|| err(&format!("{tp}.{key}"), "missing"))
-            };
-            let when = object(field("when")?, &format!("{tp}.when"))?;
-            no_other_keys(when, &["of", "above"], &format!("{tp}.when"))?;
-            let of = when
-                .get("of")
-                .ok_or_else(|| err(&format!("{tp}.when.of"), "missing"))?;
-            let of = Input::parse(string(of, &format!("{tp}.when.of"))?)
-                .ok_or_else(|| err(&format!("{tp}.when.of"), "must be t_mean, t_warm or t_cold"))?;
-            let above = when
-                .get("above")
-                .ok_or_else(|| err(&format!("{tp}.when.above"), "missing"))?;
+            if depth >= MAX_NEST {
+                return Err(err(tp, format!("switches nest at most {MAX_NEST} deep")));
+            }
+            let (of, above, then, otherwise) = parse_switch(w, tp)?;
             Ok(Thermal::When {
                 of,
-                above: number(above, &format!("{tp}.when.above"), -100.0, 100.0)?,
-                then: ramp_named(ramp_ix, field("then")?, &format!("{tp}.then"))?,
-                otherwise: ramp_named(ramp_ix, field("else")?, &format!("{tp}.else"))?,
+                above,
+                then: Box::new(parse_thermal(
+                    then,
+                    &format!("{tp}.then"),
+                    ramp_ix,
+                    depth + 1,
+                )?),
+                otherwise: Box::new(parse_thermal(
+                    otherwise,
+                    &format!("{tp}.else"),
+                    ramp_ix,
+                    depth + 1,
+                )?),
             })
         }
         _ => Err(err(
             tp,
             "expected a ramp name or a {when, then, else} switch",
+        )),
+    }
+}
+
+/// A class's humidity: a rule name, or a `{when, then, else}` switch on a temperature whose
+/// branches are again rule names or switches (at most [`MAX_NEST`] deep).
+fn parse_humid(
+    h: &Value,
+    hp: &str,
+    rule_ix: &BTreeMap<&str, usize>,
+    depth: usize,
+) -> Result<Humid, CoreError> {
+    match h {
+        Value::String(_) => Ok(Humid::Rule(rule_named(rule_ix, h, hp)?)),
+        Value::Object(w) => {
+            if depth >= MAX_NEST {
+                return Err(err(hp, format!("switches nest at most {MAX_NEST} deep")));
+            }
+            let (of, above, then, otherwise) = parse_switch(w, hp)?;
+            Ok(Humid::When {
+                of,
+                above,
+                then: Box::new(parse_humid(
+                    then,
+                    &format!("{hp}.then"),
+                    rule_ix,
+                    depth + 1,
+                )?),
+                otherwise: Box::new(parse_humid(
+                    otherwise,
+                    &format!("{hp}.else"),
+                    rule_ix,
+                    depth + 1,
+                )?),
+            })
+        }
+        _ => Err(err(
+            hp,
+            "expected a humidity rule name or a {when, then, else} switch",
         )),
     }
 }
@@ -612,7 +694,7 @@ impl Placement {
         let classes = object(get("classes")?, "classes")?;
         let land = usize::from(koppen::SEA);
         let mut thermal: Vec<Option<Thermal>> = vec![None; land];
-        let mut humidity: Vec<Option<usize>> = vec![None; land];
+        let mut humidity: Vec<Option<Humid>> = vec![None; land];
         let mut glaciated: Vec<Option<Glaciated>> = vec![None; land];
         let mut erosion: Vec<Option<ErosionLimit>> = vec![None; land];
         let mut weirdness = vec![Weirdness::Noise; land];
@@ -642,10 +724,10 @@ impl Placement {
             }
             let tp = format!("{p}.temperature");
             let t = o.get("temperature").ok_or_else(|| err(&tp, "missing"))?;
-            thermal[k] = Some(parse_thermal(t, &tp, &ramp_ix)?);
+            thermal[k] = Some(parse_thermal(t, &tp, &ramp_ix, 0)?);
             let hp = format!("{p}.humidity");
             let n = o.get("humidity").ok_or_else(|| err(&hp, "missing"))?;
-            humidity[k] = Some(rule_named(&rule_ix, n, &hp)?);
+            humidity[k] = Some(parse_humid(n, &hp, &rule_ix, 0)?);
             if let Some(g) = o.get("glaciated") {
                 let gp = format!("{p}.glaciated");
                 let g = object(g, &gp)?;
@@ -658,11 +740,11 @@ impl Placement {
                 }
                 let thermal = match g.get("temperature") {
                     None => None,
-                    Some(t) => Some(parse_thermal(t, &format!("{gp}.temperature"), &ramp_ix)?),
+                    Some(t) => Some(parse_thermal(t, &format!("{gp}.temperature"), &ramp_ix, 0)?),
                 };
                 let humidity = match g.get("humidity") {
                     None => None,
-                    Some(n) => Some(rule_named(&rule_ix, n, &format!("{gp}.humidity"))?),
+                    Some(n) => Some(parse_humid(n, &format!("{gp}.humidity"), &rule_ix, 0)?),
                 };
                 let erosion = match g.get("erosion") {
                     None => None,
@@ -736,12 +818,32 @@ impl Placement {
                 then,
                 otherwise,
             } => {
-                let r = if Self::input(*of, t_mean, t_warm, t_cold) > *above {
-                    *then
+                let branch = if Self::input(*of, t_mean, t_warm, t_cold) > *above {
+                    then
                 } else {
-                    *otherwise
+                    otherwise
                 };
-                self.ramp_value(r, t_mean, t_warm, t_cold)
+                self.thermal_value(branch, t_mean, t_warm, t_cold)
+            }
+        }
+    }
+
+    /// The humidity rule a class's [`Humid`] picks at these temperatures.
+    fn humid_rule(h: &Humid, t_mean: f64, t_warm: f64, t_cold: f64) -> usize {
+        match h {
+            Humid::Rule(r) => *r,
+            Humid::When {
+                of,
+                above,
+                then,
+                otherwise,
+            } => {
+                let branch = if Self::input(*of, t_mean, t_warm, t_cold) > *above {
+                    then
+                } else {
+                    otherwise
+                };
+                Self::humid_rule(branch, t_mean, t_warm, t_cold)
             }
         }
     }
@@ -799,14 +901,24 @@ impl Placement {
         }
     }
 
-    /// Humidity band coordinate of a land cell of Köppen class `k` and aridity index `aridity`;
-    /// where the glacier flag is set, the class's `glaciated` humidity rule when it has one.
-    pub fn humidity_land(&self, k: u8, aridity: f64, glacier: bool) -> f64 {
+    /// Humidity band coordinate of a land cell of Köppen class `k` and aridity index `aridity`
+    /// (the temperatures decide a class's humidity only when its entry is a `when` switch); where
+    /// the glacier flag is set, the class's `glaciated` humidity rule when it has one.
+    pub fn humidity_land(
+        &self,
+        k: u8,
+        aridity: f64,
+        t_mean: f64,
+        t_warm: f64,
+        t_cold: f64,
+        glacier: bool,
+    ) -> f64 {
         let mut h = humidity_of_aridity(aridity);
         let rule = glacier
-            .then(|| self.glaciated_block(k).and_then(|g| g.humidity))
+            .then(|| self.glaciated_block(k).and_then(|g| g.humidity.as_ref()))
             .flatten()
-            .or_else(|| self.humidity.get(usize::from(k)).copied());
+            .or_else(|| self.humidity.get(usize::from(k)))
+            .map(|r| Self::humid_rule(r, t_mean, t_warm, t_cold));
         let Some(r) = rule else {
             return h;
         };
@@ -885,12 +997,17 @@ mod tests {
     /// is ice cap where glaciated and barren frozen ground elsewhere (its own tests below).
     const EF: u8 = 30;
 
+    /// BWk (index 5) is the other: a cold desert is not a hot one below a mean of 10 degC (its own
+    /// tests below); at and above 10 degC it is P1-09's desert exactly.
+    const BWK: u8 = 5;
+
     #[test]
     fn the_default_table_reproduces_the_compiled_in_constants_bit_for_bit() {
         let p = builtin();
-        // A grid over every class but EF, the temperatures the classes live in and the aridity's range.
+        // A grid over every class but EF and BWk, the temperatures the classes live in and the
+        // aridity's range.
         let mut n = 0u64;
-        for k in (0..32u8).filter(|&k| k != EF) {
+        for k in (0..32u8).filter(|&k| k != EF && k != BWK) {
             for tm in (-60..=45).step_by(3) {
                 let tm = f64::from(tm);
                 for tw in [tm, tm + 5.0, tm + 12.0] {
@@ -913,19 +1030,115 @@ mod tests {
             for i in 0..400 {
                 let ai = 0.005 * 1.03f64.powi(i);
                 assert_eq!(
-                    p.humidity_land(k, ai, false).to_bits(),
+                    p.humidity_land(k, ai, 10.0, 20.0, 0.0, false).to_bits(),
                     old::humidity_land(k, ai).to_bits(),
                     "class {k} aridity {ai}"
                 );
                 // No class but EF has a glaciated humidity rule.
                 assert_eq!(
-                    p.humidity_land(k, ai, true).to_bits(),
+                    p.humidity_land(k, ai, 10.0, 20.0, 0.0, true).to_bits(),
                     old::humidity_land(k, ai).to_bits(),
                     "class {k} aridity {ai} glaciated"
                 );
             }
         }
         assert!(n > 10_000);
+    }
+
+    /// Ben, 2026-10-02 (cold deserts): a BWk below a mean of 10 degC is not drawn as sand desert.
+    /// Above 10 degC it keeps the desert ramp; between 0 and 10 it sits in the cold band with a dry
+    /// humidity; at or below 0 it is barren frozen ground like EF's, fixed at humidity 1.5.
+    #[test]
+    fn a_cold_desert_is_placed_by_its_mean_temperature() {
+        let p = builtin();
+        let bwh = koppen::index("BWh").unwrap();
+        assert_eq!(koppen::index("BWk"), Some(BWK));
+        for tm in [10.5, 14.0, 18.0, 25.0] {
+            for ai in [0.01, 0.1, 0.19] {
+                assert_eq!(
+                    p.thermal_land(BWK, tm, tm + 12.0, tm - 12.0, false)
+                        .to_bits(),
+                    p.thermal_land(bwh, tm, tm + 12.0, tm - 12.0, false)
+                        .to_bits(),
+                    "BWk at {tm} degC is the hot desert's"
+                );
+                assert_eq!(
+                    p.humidity_land(BWK, ai, tm, tm + 12.0, tm - 12.0, false)
+                        .to_bits(),
+                    p.humidity_land(bwh, ai, tm, tm + 12.0, tm - 12.0, false)
+                        .to_bits()
+                );
+            }
+        }
+        let mut last = 0.0;
+        for tm in [0.5, 2.0, 5.0, 8.0, 10.0] {
+            let t = p.thermal_land(BWK, tm, tm + 14.0, tm - 14.0, false);
+            assert!((1.0..2.0).contains(&t), "BWk at {tm} degC: band {t}");
+            assert!(t > last, "warmer is further up the band");
+            last = t;
+            for ai in [0.001, 0.05, 0.19, 0.4] {
+                let h = p.humidity_land(BWK, ai, tm, tm + 14.0, tm - 14.0, false);
+                assert!(h <= 0.6 + 1e-12, "BWk at {tm} degC, aridity {ai}: band {h}");
+            }
+        }
+        for (tm, tw) in [(-0.1, 10.0), (-3.0, 12.0), (-9.0, 4.0), (-20.0, -5.0)] {
+            let t = p.thermal_land(BWK, tm, tw, tm - 15.0, false);
+            // The upper frozen band, where Terralith's gravel desert and cold shrubland are.
+            assert!((0.5..1.0).contains(&t), "BWk at {tm} degC: band {t}");
+            for ai in [0.001, 0.1, 0.4] {
+                assert_eq!(p.humidity_land(BWK, ai, tm, tw, tm - 15.0, false), 1.5);
+            }
+        }
+        // Vanilla's table has no cold desert: the cold branches fall on its dry cold land, not on
+        // the hot band's desert (band 4).
+        for tm in [-15.0, -3.0, 0.5, 4.0, 9.9] {
+            assert!(p.thermal_land(BWK, tm, tm + 12.0, tm - 12.0, false) < 2.0);
+        }
+        // The hot desert class is as P1-09 had it.
+        assert_eq!(
+            p.thermal_land(bwh, 5.0, 30.0, -10.0, false).to_bits(),
+            old::thermal_land(4, 5.0, 30.0, -10.0, false).to_bits()
+        );
+    }
+
+    #[test]
+    fn switches_nest_to_a_limit_and_name_the_path_of_a_bad_branch() {
+        let leaf = |depth: usize| {
+            let mut v = json!("desert");
+            for _ in 0..depth {
+                v = json!({"when": {"of": "t_mean", "above": 1.0}, "then": "desert", "else": v});
+            }
+            v
+        };
+        assert!(edited(|v| v["classes"]["BWk"]["temperature"] = leaf(MAX_NEST)).is_ok());
+        assert!(edited(|v| v["classes"]["BWk"]["humidity"] = leaf(MAX_NEST)).is_ok());
+        let temp = edited(|v| v["classes"]["BWk"]["temperature"] = leaf(MAX_NEST + 1));
+        assert!(path_of(temp).starts_with("$.climate_placement.classes.BWk.temperature"));
+        let hum = edited(|v| v["classes"]["BWk"]["humidity"] = leaf(MAX_NEST + 1));
+        assert!(path_of(hum).starts_with("$.climate_placement.classes.BWk.humidity"));
+        let bad = |key: &str, name: &str| {
+            path_of(edited(|v| {
+                v["classes"]["BWk"][key]["else"]["else"] = json!(name);
+            }))
+        };
+        assert_eq!(
+            bad("temperature", "no_such_ramp"),
+            "$.climate_placement.classes.BWk.temperature.else.else"
+        );
+        assert_eq!(
+            bad("humidity", "no_such_rule"),
+            "$.climate_placement.classes.BWk.humidity.else.else"
+        );
+        // A humidity switch reads the temperatures it names.
+        let q = edited(|v| {
+            v["classes"]["Af"]["humidity"] = json!({
+                "when": {"of": "t_cold", "above": 20.0}, "then": "rainforest", "else": "tundra"
+            });
+        })
+        .unwrap();
+        let af = koppen::index("Af").unwrap();
+        assert!(q.humidity_land(af, 2.5, 26.0, 28.0, 22.0, false) >= 4.1);
+        assert!(q.humidity_land(af, 2.5, 26.0, 28.0, 18.0, false) <= 1.95);
     }
 
     fn edited(f: impl FnOnce(&mut Value)) -> Result<Placement, CoreError> {
@@ -954,8 +1167,8 @@ mod tests {
         let (d, c) = (builtin(), &p);
         assert!(d.thermal_land(af, 27.0, 28.0, 26.0, false) < 4.0);
         assert!(c.thermal_land(af, 27.0, 28.0, 26.0, false) > 4.05);
-        assert!(d.humidity_land(af, 2.5, false) >= 4.1);
-        assert!(c.humidity_land(af, 2.5, false) <= 1.95);
+        assert!(d.humidity_land(af, 2.5, 10.0, 20.0, 0.0, false) >= 4.1);
+        assert!(c.humidity_land(af, 2.5, 10.0, 20.0, 0.0, false) <= 1.95);
         // The rest is untouched, and the glacier cap moved.
         let cfb = koppen::index("Cfb").unwrap();
         assert_eq!(
@@ -990,14 +1203,22 @@ mod tests {
             }
             for ai in [0.001, 0.4, 1.0, 10.0] {
                 // Fixed rules: the aridity index does not matter to a freezing climate.
-                assert_eq!(p.humidity_land(EF, ai, true), 0.5, "ice cap");
-                assert_eq!(p.humidity_land(EF, ai, false), 1.5, "barren");
+                assert_eq!(
+                    p.humidity_land(EF, ai, 10.0, 20.0, 0.0, true),
+                    0.5,
+                    "ice cap"
+                );
+                assert_eq!(
+                    p.humidity_land(EF, ai, 10.0, 20.0, 0.0, false),
+                    1.5,
+                    "barren"
+                );
             }
         }
         // Humidity band 0 (below vegetation -0.35) is where vanilla puts ice spikes and Terralith
         // no forest; band 1 (-0.35 … -0.1) stays under the band whose variants are taiga and grove.
-        assert!(p.humidity_land(EF, 10.0, true) < 1.0);
-        assert!((1.0..2.0).contains(&p.humidity_land(EF, 10.0, false)));
+        assert!(p.humidity_land(EF, 10.0, 10.0, 20.0, 0.0, true) < 1.0);
+        assert!((1.0..2.0).contains(&p.humidity_land(EF, 10.0, 10.0, 20.0, 0.0, false)));
         // The glacier cap no longer holds EF below band 0.35 (Terralith's snowy badlands).
         assert!(
             p.thermal_land(EF, -45.0, -35.0, -55.0, true)
@@ -1010,8 +1231,8 @@ mod tests {
             0.75 * (26.0f64 / 30.0)
         );
         assert_eq!(p.thermal_land(et, -6.0, 6.0, -15.0, true), 0.35);
-        assert_eq!(p.humidity_land(et, 5.0, false), 1.95);
-        assert_eq!(p.humidity_land(et, 5.0, true), 1.95);
+        assert_eq!(p.humidity_land(et, 5.0, 10.0, 20.0, 0.0, false), 1.95);
+        assert_eq!(p.humidity_land(et, 5.0, 10.0, 20.0, 0.0, true), 1.95);
     }
 
     #[test]
@@ -1187,10 +1408,10 @@ mod tests {
             p.thermal_land(dfc, 1.0, 15.0, -25.0, true),
             d.thermal_land(dfc, 1.0, 15.0, -25.0, false)
         );
-        assert_eq!(p.humidity_land(dfc, 4.0, true), 0.5);
+        assert_eq!(p.humidity_land(dfc, 4.0, 10.0, 20.0, 0.0, true), 0.5);
         assert_eq!(
-            p.humidity_land(dfc, 4.0, false),
-            d.humidity_land(dfc, 4.0, false)
+            p.humidity_land(dfc, 4.0, 10.0, 20.0, 0.0, false),
+            d.humidity_land(dfc, 4.0, 10.0, 20.0, 0.0, false)
         );
         // Dfd has no block: as before.
         assert_eq!(

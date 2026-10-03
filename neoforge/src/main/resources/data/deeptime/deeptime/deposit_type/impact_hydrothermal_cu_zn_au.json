@@ -168,7 +168,7 @@
   "balance": {
     "count_mult": 1.0,
     "size_mult_h": 12.0,
-    "size_mult_v": 4.0,
+    "size_mult_v": 7.0,
     "richness_mult": 1.0
   },
   "requires_fields": {},
@@ -176,6 +176,7 @@
     "P2-08 (meteor impacts). Examples: the Errington and Vermilion Zn-Cu-Pb deposits in the crater fill of the Sudbury structure (Ames, Watkinson & Parrish 1998, Geology 26:447-450), the sulphide and carbonate veins of Haughton and the Ries (Osinski et al. 2013, Icarus 224:347-363); Grieve & Masaitis 1994 (The economic potential of terrestrial impact craters, Int. Geol. Rev. 36(2):105-151).",
     "PLACEHOLDERS (design values, no USGS grade-tonnage or deposit-density model exists for impact deposits; crates/deeptime-core/data/usgs/impact_structures.json): tonnage, grades, ore density, deposit density, separation, clustering, geometry and the curves' thresholds.",
     "The hosts are the crater's own breccia and melt rock in the strata log, so the type forms in craters cut into the deep-time surface (at least two L1 cells across).",
-    "minecraft.claims_scatter is false: impact deposits are too rare to be a world's only source of their products, so the game leaves the pack's own scatter of these materials in place (a material another type claims, such as copper, zinc or gold, stays claimed)."
+    "minecraft.claims_scatter is false: impact deposits are too rare to be a world's only source of their products, so the game leaves the pack's own scatter of these materials in place (a material another type claims, such as copper, zinc or gold, stays claimed).",
+    "VERTICAL SCALE (decisions log 2026-10-03, \"Keep today's block height\"): at 35 m per block the vertical multipliers are 1.75 times their 20 m values (balance.size_mult_v 4.0 -> 7.0), so a body keeps the height in blocks it had at 20 m per block; its size in metres is unchanged. game-choice, ledger IMP-115."
   ]
 }

@@ -78,19 +78,20 @@ mod tests {
 
     #[test]
     fn components_wrap_the_seam_and_respect_the_threshold() {
-        let grid = GridDesc::for_planet("L1", 256, 16).unwrap(); // 16 × 8 cells
+        let grid = GridDesc::for_planet("L1", 256, 16).unwrap(); // 16 × 6 cells (z from −48)
+        assert_eq!((grid.w, grid.h), (16, 6));
         let mut f = vec![0.0; grid.cells()];
         // A band crossing the seam in row 3, and a separate blob.
         for i in [14usize, 15, 0, 1] {
             f[3 * 16 + i] = 0.8;
         }
-        f[6 * 16 + 7] = 0.5;
-        f[6 * 16 + 8] = 0.1; // below the threshold
+        f[5 * 16 + 7] = 0.5;
+        f[5 * 16 + 8] = 0.1; // below the threshold
         let t = find_tracts(&grid, &f, 0.2, 300.0);
         assert_eq!(t.len(), 2);
         assert_eq!(t[0].cells, vec![48, 49, 62, 63]);
         assert!((t[0].mean_f - 0.8).abs() < 1e-12);
-        assert_eq!(t[1].cells, vec![6 * 16 + 7]);
+        assert_eq!(t[1].cells, vec![5 * 16 + 7]);
         assert!(t[0].area_km2 > 0.0);
     }
 }
