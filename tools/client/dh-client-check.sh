@@ -46,6 +46,7 @@ cleanup() {
     pkill -f -- "$(basename "$REPO")/smoke/$P/client/pmc/libraries" 2>/dev/null   # the client JVM (its classpath names this folder)
     [ -n "$SPID" ] && { rcon stop >/dev/null 2>&1; for i in $(seq 60); do kill -0 "$SPID" 2>/dev/null || break; sleep 1; done; kill "$SPID" 2>/dev/null; }
     [ -n "$XPID" ] && kill "$XPID" 2>/dev/null
+    [ -n "${PAPID:-}" ] && kill "$PAPID" 2>/dev/null; [ -n "${PADIR:-}" ] && rm -rf "$PADIR"
 }
 trap cleanup EXIT
 
@@ -82,12 +83,16 @@ PMC=$(nix build --no-link --print-out-paths nixpkgs#portablemc | head -1)/bin/po
 export DISPLAY=$DISP LD_LIBRARY_PATH="$MESA/lib:$GLVND/lib" __GLX_VENDOR_LIBRARY_NAME=mesa \
     __EGL_VENDOR_LIBRARY_DIRS="$MESA/share/glvnd/egl_vendor.d" LIBGL_DRIVERS_PATH="$MESA/lib/dri" \
     LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe LP_NUM_THREADS=4
-# No sound: with a PulseAudio socket in the session the client JVM aborted while starting its
-# sound engine (2026-10-03: "Assertion 'p' failed at ../src/pulse/simple.c:273", also with OpenAL's
-# null driver), and when OpenAL could not open a device it ran on silently. So OpenAL is not
-# loaded at all (-Dorg.lwjgl.openal.libname below; Minecraft turns sound off) and the client sees
-# no PulseAudio server.
-export ALSOFT_DRIVERS=null PULSE_SERVER=unix:/nonexistent
+# Sound goes to a PulseAudio server of the check's own with a null sink: with the session's
+# half-working PulseAudio the client JVM aborted while starting its sound engine (2026-10-03:
+# "Assertion 'p' failed at ../src/pulse/simple.c:273"), and without OpenAL Minecraft does not start.
+PA=$(nix build --no-link --print-out-paths nixpkgs#pulseaudio | head -1)/bin/pulseaudio
+PADIR=$(mktemp -d /tmp/dhcc-pulse.XXXXXX)
+PULSE_RUNTIME_PATH="$PADIR" HOME="$PADIR" setsid "$PA" -n --daemonize=no --exit-idle-time=-1 --use-pid-file=no \
+    --disable-shm=yes --load="module-native-protocol-unix socket=$PADIR/native auth-anonymous=1" \
+    --load="module-null-sink" > "$CL/pulse.log" 2>&1 < /dev/null &
+PAPID=$!; sleep 2
+export PULSE_SERVER="unix:$PADIR/native" ALSOFT_DRIVERS=pulse
 start_xvfb() {
     if [ -n "$XPID" ] && kill -0 "$XPID" 2>/dev/null; then return; fi
     pgrep -f "Xvfb $DISP " > /dev/null && return
@@ -102,7 +107,7 @@ for attempt in 1 2 3; do
     start_xvfb
     say "== client joins 127.0.0.1:$GAME (attempt $attempt)"
     setsid "$PMC" --main-dir "$CL/pmc" start "neoforge::$NEO" --mc-dir "$CL/game" --jvm "$JAVA" \
-        --jvm-arg=-Xmx6G --jvm-arg=-XX:ActiveProcessorCount=6 --jvm-arg=-Dorg.lwjgl.openal.libname=/nonexistent/libopenal.so \
+        --jvm-arg=-Xmx6G --jvm-arg=-XX:ActiveProcessorCount=6 \
         -u DeepTimeProbe --resolution 1280x720 \
         --join-server 127.0.0.1 --join-server-port "$GAME" > "$CL/client-$attempt.log" 2>&1 < /dev/null &
     CPID=$!
