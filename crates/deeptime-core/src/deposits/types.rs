@@ -392,9 +392,16 @@ pub struct ZoneDef {
     /// Multiplies the site's grade of `material` in this zone.
     #[serde(default = "one")]
     pub grade_mult: f64,
-    /// Probability that a host block in the zone becomes ore.
+    /// Probability that a host block in the zone becomes ore, at richness 1 (the zone's density
+    /// in the world is this × the type's `balance.richness_mult` × the preset's, at most
+    /// [`super::geometry::DENSITY_CAP`]).
     #[serde(default)]
     pub density: f64,
+    /// Share of the zone's ore blocks that are the material's raw-ore block (vanilla's ore
+    /// veins; Ben, 2026-10-02), at richness 1; scaled like `density`, at most
+    /// [`super::geometry::RAW_CAP`]. 0 = none.
+    #[serde(default)]
+    pub raw_share: f64,
 }
 
 fn unit_range() -> [f32; 2] {
@@ -1101,8 +1108,12 @@ impl DepositType {
             {
                 return Err(format!("zone {}: material {m} is not a product", z.zone));
             }
-            if !(0.0..=1.0).contains(&z.density) || z.d[0] > z.d[1] || z.v[0] > z.v[1] {
-                return Err(format!("zone {}: bad range or density", z.zone));
+            if !(0.0..=1.0).contains(&z.density)
+                || !(0.0..=1.0).contains(&z.raw_share)
+                || z.d[0] > z.d[1]
+                || z.v[0] > z.v[1]
+            {
+                return Err(format!("zone {}: bad range, density or raw share", z.zone));
             }
         }
         for e in &self.geometry.extra_bodies {
