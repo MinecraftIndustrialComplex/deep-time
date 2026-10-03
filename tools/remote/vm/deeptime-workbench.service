@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# The Deep Time workbench on the test VM (127.0.0.1:8642; the laptop reaches it through its
+# deeptime-workbench-tunnel unit, tools/remote/tunnels.sh). Started at boot, so it is back after the
+# idle watcher deallocated the VM. Arguments as the hand-started server had them on 2026-10-03.
+# New binary: copy it to /data/ban/deeptime-cache/workbench/bin/deeptime, then (with no run in
+# progress) `sudo systemctl restart deeptime-workbench`. Installed by tools/remote/vm/install.sh.
+[Unit]
+Description=Deep Time workbench (deeptime watch on 127.0.0.1:8642)
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=/data /nix
+
+[Service]
+Type=simple
+User=ban
+Group=ban
+WorkingDirectory=/data/ban/deeptime-cache/workbench
+Environment=HOME=/home/ban
+Environment=PATH=/home/ban/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+Environment=LANG=C.UTF-8
+ExecStart=/data/ban/deeptime-cache/workbench/bin/deeptime watch --bind 127.0.0.1 --port 8642 \
+    --runs /Volumes/Graphide/ban/deeptime-cache/workbench/runs --keep 8 --threads 8 --mem-cap 8589934592 \
+    --preview /Volumes/Graphide/ban/mic/mods/deep-time/tools/workbench/preview.py --python /usr/bin/python3
+StandardOutput=append:/data/ban/deeptime-cache/workbench/watch.log
+StandardError=inherit
+# Preview jobs run in their own sessions (preview.py); a restart of the server leaves them running.
+KillMode=process
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target
