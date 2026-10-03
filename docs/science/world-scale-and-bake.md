@@ -28,10 +28,17 @@ Rows by status: `cited-unverified` 6, `calibrated` 2, `game-choice` 73, `uncited
 
 ## Known before the page is written
 
-- The projection (SCL-049, equirectangular) is computed in one module per language: Rust
-  `deeptime_format::projection`, Java `worlddata/Projection`, the pages' `projection.js`
-  (2026-10-02; `docs/design/equal-area-projection.md` §2). Ben reopened the choice of projection
-  on 2026-10-02; until he picks, the module is equirectangular and the worlds are what they were.
+- The projection (SCL-049) is Lambert's cylindrical equal-area projection, true on the equator
+  (Ben, decisions log 2026-10-02: "Lambert for now"); it replaced the equirectangular frame. It is
+  computed in one module per language: Rust `deeptime_format::projection`, Java
+  `worlddata/Projection`, the pages' `projection.js` (`docs/design/equal-area-projection.md` §2).
+  Every cell has the same true area (SCL-052, tested), so map shares are area shares; the grids
+  run from z = −Zo, the multiple of 64 past the pole (2,624 at C = 16,384, 1024 × 328 cells at
+  L1), and map pictures are π : 1 (1024 × 326). World-data format 0.4.
+  Measured on the quick 16k planet (scattered continents, 500 Myr, seed 1, 2026-10-03, STATUS build
+  log): the map's share of land is 0.200 against a true share of 0.201, of ice 0.097 against 0.095,
+  and of the band poleward of 60° 0.135 against the sphere's 0.134. On the equirectangular map they
+  were 0.146 against 0.192 (land), 0.274 against 0.094 (ice) and 0.334 (the band).
 
 - The preset's `pole_cap_deg` is read by nothing but validation; the game reads its own value from the world preset file (extraction notes SCL, flag 1).
 - A run may be set 4,600 Myr long while the planet's age defaults to 4.57 Gyr (flag 8).

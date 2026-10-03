@@ -14,19 +14,20 @@ use super::{Climate, HydroParams};
 const C: u32 = 1024;
 const SEA: f64 = 63.0;
 
-/// Terrain height in blocks at cell (i, j) of the 512 × 256 grid.
+/// Terrain height in blocks at cell (i, j) of the 512 × 192 grid (rows from z = −192, the multiple
+/// of 64 past the Lambert pole at 163): the sea from row 150.
 fn height(i: usize, j: usize) -> f64 {
     let (fi, fj) = (i as f64, j as f64);
-    if j >= 200 {
-        return SEA - 2.0 - (fj - 200.0) * 0.5;
+    if j >= 150 {
+        return SEA - 2.0 - (fj - 150.0) * 0.5;
     }
-    let slope = SEA + 1.0 + 0.25 * (200.0 - fj);
+    let slope = SEA + 1.0 + 0.25 * (150.0 - fj);
     // Two families of diagonal valleys, both draining south: where they cross, rivers join.
     let pi = std::f64::consts::PI;
     let a = (pi * (fi - 0.5 * fj) / 64.0).sin().abs();
     let b = (pi * (fi + 0.5 * fj) / 64.0).sin().abs();
     let valley = 8.0 * a.min(b);
-    let d2 = (fi - 300.0).powi(2) + (fj - 100.0).powi(2);
+    let d2 = (fi - 300.0).powi(2) + (fj - 75.0).powi(2);
     let bowl = if d2 < 144.0 {
         12.0 * (1.0 - d2 / 144.0)
     } else {
@@ -413,7 +414,7 @@ fn a_basin_below_sea_level_stands_at_sea_level_however_dry() {
     let elev: Vec<i16> = (0..w * h)
         .map(|c| {
             let (i, j) = ((c % w) as f64, (c / w) as f64);
-            let d2 = (i - 300.0).powi(2) + (j - 100.0).powi(2);
+            let d2 = (i - 300.0).powi(2) + (j - 75.0).powi(2);
             let y = if d2 < 144.0 {
                 SEA - 8.0 + 20.0 * d2 / 144.0
             } else {
@@ -453,7 +454,7 @@ fn a_basin_below_sea_level_stands_at_sea_level_however_dry() {
     assert!(full.cells > lake.cells);
 }
 
-/// A rough planet: hash noise in four octaves on a 512 × 256 grid of 2-block cells, sea beyond
+/// A rough planet: hash noise in four octaves on the 512 × 192 grid of 2-block cells, sea beyond
 /// the last rows, with basins of every size, some inside others.
 fn rough() -> (GridDesc, Vec<i16>) {
     let g = grid();
@@ -481,12 +482,12 @@ fn rough() -> (GridDesc, Vec<i16>) {
     let elev = (0..w * h)
         .map(|c| {
             let (i, j) = ((c % w) as f64, (c / w) as f64);
-            if j >= 230.0 {
+            if j >= 172.0 {
                 return ((SEA - 6.0) * 16.0) as i16;
             }
             let y = SEA
                 + 2.0
-                + 0.05 * (230.0 - j)
+                + 0.05 * (172.0 - j)
                 + 40.0 * noise(i, j, 64.0, 1)
                 + 16.0 * noise(i, j, 16.0, 2)
                 + 6.0 * noise(i, j, 4.0, 3)
@@ -595,7 +596,9 @@ fn rough_ground_holds_its_lakes_in_every_climate() {
     let (g, elev) = rough();
     let p = HydroParams::default();
     let mut lakes = Vec::new();
-    for (rain, t) in [(2000.0, 12.0), (500.0, 22.0), (250.0, 28.0), (80.0, 30.0)] {
+    // The third climate was 250 mm at 28 °C on the equirectangular grid's 256 rows; on the Lambert
+    // grid's 192 the basins are fewer and that climate leaves them all dry, so it is 300 mm.
+    for (rain, t) in [(2000.0, 12.0), (500.0, 22.0), (300.0, 28.0), (80.0, 30.0)] {
         let out = run_rough(&|_, _| Climate::steady(rain, t), &p);
         check_holds(&out, &elev, &g);
         let b = &out.stats["basins"];
@@ -632,8 +635,9 @@ fn an_upstream_lake_that_does_not_spill_feeds_nothing_downstream() {
     // upstream the rivers of the south carry less, and nothing a northern terminal lake holds
     // reaches them.
     let p = HydroParams::default();
-    let c = f64::from(C);
-    let north = |z: i64| (z as f64) < -deeptime_format::Projection::of(c).pole_z() + 200.0;
+    // The northern 75 of the 192 rows, 150 blocks (as 100 of 256 were before the Lambert grid).
+    let oz = grid().origin_block_z as f64;
+    let north = |z: i64| (z as f64) < oz + 150.0;
     let wet = run_rough(&|_, _| Climate::steady(1200.0, 15.0), &p);
     let split = run_rough(
         &|_, z| {

@@ -118,7 +118,7 @@ public final class BiomeCensus {
     }
 
     /**
-     * Samples every {@code step} blocks inside the pole edge (|z| ≤ C/4 − {@code poleMargin}).
+     * Samples every {@code step} blocks inside the pole edge (|z| ≤ R − {@code poleMargin}, R = C/2π the pole).
      *
      * @param mapFile write the whole grid (palette, biome indices, Köppen classes, heights) here as
      *                JSON with base64 arrays, or null

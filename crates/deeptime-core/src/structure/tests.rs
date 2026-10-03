@@ -667,7 +667,8 @@ fn baked_stacks_and_blended_columns_have_no_grade_inversion_and_no_sliver() {
 /// undone as chains, and the Noddy port still agrees with the column rule on every sampled
 /// point. (The settings here make far more structures than any preset: the longest history a
 /// sampled column meets must pass one Noddy history in at least one of the runs, or the test
-/// is not testing the case that used to panic.)
+/// is not testing the case that used to panic. 80 Myr: on the Lambert planet after plate tasks 3
+/// and 4, 50 Myr reached at most 122 events a column over six seeds; 80 reaches 270 and 135.)
 #[test]
 fn the_stage_never_panics_however_dense_the_structures() {
     let mut longest = 0u64;
@@ -681,7 +682,7 @@ fn the_stage_never_panics_however_dense_the_structures() {
         let json = with_timeline(
             planet_builtin("pipeline_quick_16k").unwrap(),
             Some(start),
-            Some(50.0),
+            Some(80.0),
         )
         .unwrap();
         let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();

@@ -2,17 +2,17 @@
 //! Block space ↔ sphere, and the L0 → raster coupling (plan §5.2).
 //!
 //! # Conventions
-//! The projection is `deeptime_format::projection` (equirectangular), which [`BlockFrame`] wraps
-//! with `glam` vectors:
+//! The projection is `deeptime_format::projection` (Lambert's cylindrical equal-area projection),
+//! which [`BlockFrame`] wraps with `glam` vectors:
 //! - **Longitude** λ = 360°·(x + C/2)/C, in [0°, 360°): block column x = −C/2 (the seam) is λ = 0,
 //!   x = 0 is λ = 180°, and x wraps with period C, so x = C/2 is the seam again.
-//! - **Latitude** φ = −360°·z/C, north positive; north is −z, as in Minecraft. z ∈ [−C/4, C/4]
-//!   spans pole to pole (0.02197° per block at C = 16,384), and φ clamps to ±90° beyond.
+//! - **Latitude** φ = asin(−z/R), R = C/2π, north positive; north is −z, as in Minecraft.
+//!   z ∈ [−R, R] spans pole to pole, and φ clamps to ±90° beyond.
 //! - **Unit vector** v = (cos φ cos λ, cos φ sin λ, sin φ): +Z is the north pole and +X the seam
 //!   meridian.
 //! - **Raster cells** follow `deeptime_format::GridDesc`: cell (i, j) is the point sample at block
-//!   (origin_block_x + i·r, origin_block_z + j·r), so column 0 sits on the seam and row 0 on the
-//!   north pole; i wraps modulo W = C/r.
+//!   (origin_block_x + i·r, origin_block_z + j·r), so column 0 sits on the seam and row 0 at or just
+//!   past the north pole; i wraps modulo W = C/r.
 //!
 //! # Coupling
 //! Every raster cell keeps a [`CellLink`]: the L0 triangle whose cone holds the cell's direction,
@@ -290,9 +290,10 @@ mod tests {
         let mesh = SphereMesh::build(&pts).unwrap();
         let tree = SampleTree::new(&pts);
         let grid = GridDesc::for_planet("L1", 16_384, 16).unwrap();
-        assert_eq!((grid.w, grid.h), (1024, 512));
+        // Rows from z = −2,624, the multiple of 64 past the Lambert pole at 2,607.6.
+        assert_eq!((grid.w, grid.h), (1024, 328));
         let coupling = Coupling::build(&grid, &mesh, &tree);
-        assert_eq!(coupling.links().len(), 1024 * 512);
+        assert_eq!(coupling.links().len(), 1024 * 328);
         let bad: Vec<String> = (0..grid.cells())
             .into_par_iter()
             .filter_map(|c| {
@@ -386,7 +387,7 @@ mod tests {
     fn fixed_points_of_the_mapping() {
         for c in CS {
             let f = BlockFrame::new(c);
-            let (h, q) = (f64::from(c) / 2.0, f64::from(c) / 4.0);
+            let (h, q) = (f64::from(c) / 2.0, f.projection().pole_z());
             assert_eq!(f.lon_deg(-h), 0.0, "the seam is longitude 0");
             assert_eq!(f.lon_deg(h), 0.0, "x = C/2 is the seam again");
             assert_eq!(f.lon_deg(0.0), 180.0);
@@ -412,7 +413,7 @@ mod tests {
         let mut rng = SplitMix64::new(0xB10C);
         for c in CS {
             let f = BlockFrame::new(c);
-            let (h, q) = (f64::from(c) / 2.0, f64::from(c) / 4.0);
+            let (h, q) = (f64::from(c) / 2.0, f.projection().pole_z());
             for _ in 0..20_000 {
                 let x = -h + rng.next_f64() * f64::from(c);
                 let z = -q + rng.next_f64() * 2.0 * q;
@@ -446,7 +447,7 @@ mod tests {
         let mut rng = SplitMix64::new(0x5EA1);
         for c in CS {
             let f = BlockFrame::new(c);
-            let (cc, h, q) = (f64::from(c), f64::from(c) / 2.0, f64::from(c) / 4.0);
+            let (cc, h, q) = (f64::from(c), f64::from(c) / 2.0, f.projection().pole_z());
             for _ in 0..20_000 {
                 let x = (rng.next_f64() - 0.5) * 8.0 * cc; // four circumferences either way
                 let z = -q + rng.next_f64() * 2.0 * q;
