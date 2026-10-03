@@ -30,7 +30,7 @@ public final class VolcanicBiomeGameTests {
     private VolcanicBiomeGameTests() {}
 
     /** A specky placement: more than this share of its volcanic surface cells have no neighbour of their biome. */
-    static final double MAX_SPECK_SHARE = 0.05;
+    static final double MAX_SPECK_SHARE = 0.05; // ledger: BIO-114 (game-choice)
 
     private static VolcanicCensus.Result census(GameTestHelper helper, ServerLevel level) {
         var t = RealPlanetGameTests.terrain(helper, level);

@@ -20,13 +20,14 @@ import java.util.Map;
  * biome grid's 4-block cells), so a role never makes a speck of one or two biome cells; a ring (the
  * ash and lava fields round a cone) is a disc of lower priority than the cone's, and is left out when
  * it would be narrower than {@link #MIN_RING}. Where discs overlap, {@link Role}'s order decides.
- * Every number here is a game choice (ledger BIO-104 to BIO-112).
+ * Every number here is a game choice (ledger BIO-104 to BIO-113).
  */
 public final class VolcanicZones {
 
     /**
      * A volcanic biome's place, in priority order (the first role whose disc holds a column and whose
-     * biome the pack has wins there).
+     * biome the pack has wins there). The roles, their order, which volcanoes get which and the
+     * climate gate are game choices (ledger: BIO-113).
      */
     public enum Role {
         /**

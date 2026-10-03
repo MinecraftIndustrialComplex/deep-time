@@ -57,7 +57,7 @@ public final class VolcanicBiomes {
             ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "volcanic"));
 
     /** A surface role answers where the biome depth parameter is below this (vanilla's cave biomes begin at 0.2). */
-    public static final float SURFACE_DEPTH = 0.2f; // ledger: BIO-112 (game-choice)
+    public static final float SURFACE_DEPTH = 0.2f; // ledger: BIO-112 (vanilla OverworldBiomeBuilder, verified)
 
     private static final long SURFACE_DEPTH_Q = Climate.quantizeCoord(SURFACE_DEPTH);
 

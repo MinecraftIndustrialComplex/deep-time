@@ -47,9 +47,9 @@ public final class VolcanicCensus {
     private VolcanicCensus() {}
 
     /** "Far from a volcano": more than this many blocks from every summit and hot-spring pool. */
-    public static final int FAR = 256;
+    public static final int FAR = 256; // ledger: BIO-114 (game-choice)
     /** "Outside the zones": more than this many blocks outside every surface zone (biome blending's slack and more). */
-    public static final int OUTSIDE = 8;
+    public static final int OUTSIDE = 8; // ledger: BIO-114 (game-choice)
 
     /** One placement's counts. */
     public static final class Side {

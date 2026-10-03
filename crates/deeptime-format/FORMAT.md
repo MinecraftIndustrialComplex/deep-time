@@ -1107,6 +1107,45 @@ boiling point or temperature. The colours stand for the temperature zones of a r
 sterile heart, then yellow and orange microbial mats) but no temperature is coded. The science page
 `docs/science/geothermal-features.md` lists the rules that are game choices.
 
+### Volcanic biomes (decisions log 2026-10-03) and their setting
+
+The pack's volcanic biomes go only at real volcanoes (Ben, "Tie them to real volcanoes (Recommended)").
+No file holds them: the game builds the zones from `volcanoes/active.json`, the geothermal sites and the
+magma bodies above and one key of `notes.bake.underground.params`, **`volcanic_biome_reach`** (1.0, 0 to
+3; **0: no volcanic biome anywhere**), and decides the biome in the biome source (Java
+`worldgen/VolcanicZones`, `climate/VolcanicBiomes`, the mixins `VolcanicBiomeSourceMixin` and, with
+TerraBlender, `compat.terrablender.RegionBiomeSourceMixin`).
+
+- **Kept out.** A biome in the tag `#deeptime:volcanic` is never the answer of a Deep Time level's climate
+  search: the search runs on the biome source's own R-tree (the region's, with TerraBlender) with a
+  distance metric that sets every such leaf infinitely far, so the next-nearest biome of the same tree
+  answers. Other levels are not touched.
+- **Roles**, in priority order, each a disc in blocks around its centre (R the basal radius
+  `radius_m` / `m_per_block_h`, at least 6; r = `volcanic_biome_reach`); no disc is under 12 blocks in radius:
+  `hot_spring_field` (every hot-spring pool, from a volcano or hot ground: its reach + 4),
+  `caldera` (a crater with `caldera: true`: 0.9 of its rim radius), `crater` (any other crater: its rim
+  radius + 4), `cone` (stratovolcanoes and shields: 0.45 R · r), `ash_field` (stratovolcanoes and caldera
+  complexes of activity 0.75 or more: R · r), `lava_field` (shields: R · r), `thermal_caves` (a magma body
+  with a chamber: 1.5 chamber radii). An ash or lava field narrower than 8 blocks beyond the zone inside it
+  is left out.
+- **The biome of a role** is the first biome of `#deeptime:volcanic/<role>` (the tag's order) that the
+  level's biome source can place; with none, the role gives way to the next role whose disc holds the
+  column, and in the end to the climate search. Surface roles answer where the biome depth parameter is
+  under 0.2 (vanilla's cave biomes start at 0.2), on land (terrain height at the cell's centre at or
+  above the sea level) and not on a river channel (variant input exactly 0); `ash_field` and
+  `lava_field` only where the climate point lies in one of that biome's own temperature and humidity
+  ranges in the source's parameter list. `thermal_caves` answers underground, from that biome's own
+  lowest depth parameter down.
+- **Tags shipped** (all entries optional, so a pack without the mod loads them): `caldera`
+  terralith:caldera; `crater` terralith:volcanic_crater, terralith:volcanic_peaks, biomesoplenty:volcano;
+  `hot_spring_field` terralith:yellowstone, biomesoplenty:hot_springs; `cone` terralith:volcanic_peaks,
+  biomesoplenty:volcano; `ash_field` terralith:ashen_savanna, biomesoplenty:volcanic_plains; `lava_field`
+  terralith:basalt_cliffs, biomesoplenty:volcanic_plains; `thermal_caves` terralith:cave/thermal_caves;
+  `#deeptime:volcanic` holds the seven role tags. A datapack adds a biome to a role tag (it is then kept
+  out too) or to `#deeptime:volcanic` alone (kept out, never placed).
+- Without any such biome in the pack (vanilla) every query is answered as before. `/deeptime probe
+  biomes` reports the placement against the volcanoes (`census.volcanic`).
+
 ## `strata/classes.json`
 
 `{"classes": ["sandstone", "red_bed", "granite"]}` — index → rock class id (plan §5.4.1,
