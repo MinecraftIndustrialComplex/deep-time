@@ -209,7 +209,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Not done here.** The other plate agent's files (`collision.rs`, `subduction.rs`, belt feedback) were not touched. In
   an overlap of two visible continents of plates with no subduction contact between them, the losing crust's pools are
   not accreted: volume is lost with the area (the old behaviour, not changed).
-- **GameTests.** `./gametest.sh` (VM, on 5507bbbb + the docs commit): 67 of 68; climateConsistent failed A 0.446 < 0.450 (83 columns) on the changed test planet, so the floor went to 0.34 by the test's own rule (0.1 under the lowest share measured; e0bc2f65). MIC run and the standalone rerun of climateConsistent: pending.
+- **GameTests.** `./gametest.sh` (VM, on 5507bbbb + the docs commit): 67 of 68; climateConsistent failed A 0.446 < 0.450 (83 columns) on the changed test planet, so the floor went to 0.34 by the test's own rule (0.1 under the lowest share measured; e0bc2f65). After it (head c5e2839d): `./gametest.sh -PwithMic` (`tools/smoke/install.sh mic`, 168 mods) all 68 required tests passed (A 0.892 there with Terralith's biomes); `./gametest.sh -PgametestOnly=climateconsistent` passed (A 0.446 against 0.34). The full standalone suite was not run again: the floor is the only change since its 67 of 68.
 - **Gates** (test VM, on the tree merged with master 00ef214c): `cargo fmt --check`, clippy `-D warnings`, `cargo deny check licenses bans` clean;
   `cargo test --workspace` 728 passed, 3 ignored (core 527 + 3 ignored, cli 54, format 63, inspect 31 + 2 + 7, jni 7,
   noddy 17 + 11 + 2, viewer 6, history_cap 1); `./gradlew build test` tests=226 failures=0 skipped=1, run again after the
