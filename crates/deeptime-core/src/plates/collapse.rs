@@ -34,7 +34,8 @@
 //! nearest room on the same plate, within `collapse_reach_km`: the samples thinner than the
 //! model's normal continental column T_n ([`normal_thickness_m`], 35.1 km), nearest first, are
 //! filled up to T_n (continental crust that erosion or rifting thinned, then the plate's own
-//! ocean floor at the continent's edge). An ocean sample filled to T_n becomes continental: the
+//! ocean floor at the continent's edge); the reach is at least 1.5 sample spacings, so a coarse
+//! lattice still reaches a column's neighbours. An ocean sample filled to T_n becomes continental: the
 //! continent's edge moves out. What finds no room within reach is not released this step.
 //! Volume is conserved: the rock moved is the collapsing column's own mix, thinned in
 //! proportion, as pure-shear extension does.
@@ -82,6 +83,9 @@ pub const GAINED_GLOBAL: &str = "plates/collapse_gained_km2";
 /// Continental crust lost to the mantle beyond `crust_max_km` over the run, km³.
 pub const FOUNDERED_GLOBAL: &str = "plates/foundered_km3";
 
+/// The shortest reach, in sample spacings (the nearest ring of neighbours, PLT-257).
+const REACH_MIN_SPACINGS: f64 = 1.5;
+
 /// Order in which crust beyond the thickest column goes down: the bottom of the column first.
 const ROOT_ORDER: [usize; pool::COUNT] = [
     pool::MAFIC_PLUTONIC,
@@ -98,7 +102,7 @@ const ROOT_ORDER: [usize; pool::COUNT] = [
 /// Runs every step, before [`step`], whether or not an orogeny raises the sample.
 pub fn founder(state: &mut PlateState, env: &Env) -> f64 {
     let k = env.k;
-    if !(k.crust_max_km > 0.0) {
+    if k.crust_max_km.is_nan() || k.crust_max_km <= 0.0 {
         return 0.0;
     }
     // ledger: PLT-258.
@@ -182,7 +186,12 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
     }
 
     let mut out = Collapse::default();
-    let reach = env.norm.rad(k.collapse_reach_km);
+    // At least to the next ring of samples: on a coarse lattice the reach may be shorter than a
+    // sample spacing, and a column always borders its neighbours.
+    let reach = env
+        .norm
+        .rad(k.collapse_reach_km)
+        .max(REACH_MIN_SPACINGS * env.norm.spacing_rad());
     for (p, sources) in by_plate {
         let budget: f64 = sources.iter().map(|&(_, q)| q).sum();
         let src: Vec<(u32, f64, u32)> = sources.iter().map(|&(i, _)| (i as u32, 0.0, 0)).collect();
@@ -424,7 +433,10 @@ mod tests {
             crust_m(&st)
         );
         let grown = continental(&st, 0) - c0;
-        assert!(grown > 20 && grown as u32 == converted, "{grown} {converted}");
+        assert!(
+            grown > 20 && grown as u32 == converted,
+            "{grown} {converted}"
+        );
         assert_eq!(continental(&st, 1), c1, "plate 1 has no belt");
         // The belt thinned towards the collapse thickness, never below it, and sank towards its
         // Airy height.
