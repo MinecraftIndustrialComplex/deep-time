@@ -1384,6 +1384,22 @@ master merged in. Each task's notes record what differs from the sections above 
   speed, divergence at round-off; the conveyor sinks in the narrow of two northern basins, its
   sources and sinks sum to 15 Sv, the transport conserves Σ heat to 10⁻⁹ and carries heat north.
 
+- **T4 moisture** (`climate/moisture.rs`, behind `rain_model = budget`; `belts` stays the
+  default). As §3.1–3.5, with these choices: the ITCZ of a column is the soft maximum of its
+  monthly T̄ over |φ| ≤ 35°, smoothed along the row over `itcz_smooth_km`; the zonal belt wind is
+  `belts::winds`' east component by the regimes at φ′; the thermal wind uses T̄′ smoothed 1-2-1
+  twice in x and in y; the cold-sea stability acts on the sea share only (1 − (1 − f)(1 − e^(0.3
+  min(0, ΔT)))); W_sat's height is the land's lowland height supplied by the caller (§3.7's fix
+  for a Bangladesh cell). The bucket starts half full (or from the caller's) and runs three passes
+  over the year, the solve of each month warm-started from the last pass. The line relaxation
+  stops when every cell's residual is below 10⁻¹⁰ kg/m²/s. The SB coupling (S_oro) is an input,
+  wired in T5. Tests: an aquaplanet (zonal seasonal temperatures) rains 14 mm/day at the
+  equator, 2.0 in the subtropical minimum (at 18–35°) and 3.5 in mid-latitudes, water closes to
+  5·10⁻⁸ of the evaporation every month, W ≥ 0, 0.2 s for the year's three passes (12 months
+  × 3) on the test VM; a 60°-wide continent at 10–35°N, 10 K warmer than the sea in summer and
+  colder in winter, rains 10.8 mm/day in its summer against 1.1 in winter, and the wind south of
+  it turns north in July.
+
 ## Appendix A. How the measurements were made
 
 All runs were on the M6 Mac, through `tools/remote/mac.sh` for the build and plain ssh for the

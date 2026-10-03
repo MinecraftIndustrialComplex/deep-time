@@ -58,6 +58,17 @@ pub enum ClimateModel {
     Banded,
 }
 
+/// Where a snapshot's rain comes from (`climate.rain_model`; P1-26 §3.8).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RainModel {
+    /// The belt rain (`belts.rs`, `lapse.rs`), fed by the per-cell climate's ITCZ and sea.
+    #[default]
+    Belts,
+    /// The monthly moisture budget on the coarse grid (`moisture.rs`).
+    Budget,
+}
+
 /// The climate section.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
@@ -82,6 +93,17 @@ pub struct ClimateParams {
     pub wind_heat_transport: f64,
     /// Planetary albedo added over desert (Köppen B land at the previous snapshot).
     pub desert_albedo: f64,
+    /// `belts` (the belt rain on the per-cell temperatures; the default) or `budget` (the monthly
+    /// moisture budget, `moisture.rs`).
+    pub rain_model: RainModel,
+    /// The budget's monsoons: pressure per kelvin a cell departs from its row's mean temperature,
+    /// Pa/K (hot continents draw sea air in, cold ones push it out).
+    pub thermal_wind_pa_k: f64,
+    /// The budget's rain: how sharply precipitation grows with the column's relative humidity
+    /// (Bretherton, Peters & Back 2004's monthly fit: 11.4).
+    pub precip_rh_slope: f64,
+    /// The budget's soil water: what the land stores and evaporates again, mm.
+    pub bucket_mm: f64,
 
     // --- The seasonal energy-balance model (climlab `EBM_seasonal`, MIT; `ebm.rs`).
     /// Solar constant at 1 AU, W/m² (climlab's `const.S0`); × `planet.star_flux_rel`.
@@ -355,6 +377,10 @@ impl Default for ClimateParams {
             zonal_diffusivity_ratio: 0.5,      // ledger: CLM-121
             wind_heat_transport: 0.5,          // ledger: CLM-125
             desert_albedo: 0.08,               // ledger: CLM-123
+            rain_model: RainModel::Belts,      // ledger: CLM-178
+            thermal_wind_pa_k: 60.0,           // ledger: CLM-141
+            precip_rh_slope: 11.4,             // ledger: CLM-145
+            bucket_mm: 150.0,                  // ledger: CLM-143
             solar_constant_w_m2: 1365.2,
             olr_a_w_m2: 203.3,
             olr_b_w_m2_k: 2.09,
@@ -488,6 +514,9 @@ impl ClimateParams {
             ),
             (self.wind_heat_transport, "wind_heat_transport", 0.0, 2.0),
             (self.desert_albedo, "desert_albedo", 0.0, 0.3),
+            (self.thermal_wind_pa_k, "thermal_wind_pa_k", 0.0, 500.0),
+            (self.precip_rh_slope, "precip_rh_slope", 1.0, 40.0),
+            (self.bucket_mm, "bucket_mm", 1.0, 2000.0),
         ] {
             check(
                 v.is_finite() && (lo..=hi).contains(&v),
