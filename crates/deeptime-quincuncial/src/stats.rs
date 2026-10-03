@@ -219,5 +219,8 @@ pub fn place(src: &Path, w_of: impl Fn(f64) -> QWorld, step_deg: f64, radius_deg
               "best_points_on_land": b.2, "best_score": r3(b.1),
               "best": rows.iter().find(|r| r["lon"].as_f64() == Some(b.0)).cloned(),
               "median_points_on_land": median_on_land,
+              "candidates": rows.len(),
+              "candidates_all_points_at_sea": rows.iter().filter(|r| r["points_on_land"].as_u64() == Some(0)).count(),
+              "candidates_all_discs_at_sea": rows.iter().filter(|r| r["land_share_in_disc"].as_array().unwrap().iter().all(|v| v.as_f64() == Some(0.0))).count(),
               "mean_disc_land_share": r3(rows.iter().map(|r| r["land_share_in_disc"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).sum::<f64>() / 4.0).sum::<f64>() / rows.len() as f64)}))
 }
