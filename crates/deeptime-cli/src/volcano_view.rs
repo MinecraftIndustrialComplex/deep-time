@@ -36,6 +36,8 @@ struct Ctx<'a> {
     r: f64,
     dx: f64,
     c: f64,
+    /// Block z of the L3 grid's row 0.
+    oz: f64,
     sea_y: f64,
     mv: f64,
     sea_m: f64,
@@ -50,7 +52,7 @@ impl Ctx<'_> {
     fn cell(&self, x: f64, z: f64) -> (i64, i64) {
         (
             ((x + self.c / 2.0) / self.r).round() as i64,
-            ((z + deeptime_format::Projection::of(self.c).pole_z()) / self.r).round() as i64,
+            ((z - self.oz) / self.r).round() as i64,
         )
     }
 }
@@ -275,6 +277,7 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
         r: f64::from(g.r),
         dx: f64::from(g.r) * s.m_per_block_h,
         c: f64::from(s.circumference_blocks),
+        oz: g.origin_block_z as f64,
         sea_y: f64::from(s.sea_level_y),
         mv: s.m_per_block_v,
         sea_m: st.sea_level_m,
@@ -289,8 +292,8 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
     let (pw, ph) = (prev.grid.w as usize, prev.grid.h as usize);
     let pr = f64::from(prev.grid.r);
     let mut map = shade(&prev.data, pw, ph, 1, &ctx, pr * s.m_per_block_h);
-    let pole = deeptime_format::Projection::of(ctx.c).pole_z();
-    let to_px = |x: f64, z: f64| ((x + ctx.c / 2.0) / pr, (z + pole) / pr);
+    let poz = prev.grid.origin_block_z as f64;
+    let to_px = |x: f64, z: f64| ((x + ctx.c / 2.0) / pr, (z - poz) / pr);
     let mut settings = vec![0u8; pw * ph * 4];
     {
         // Settings: grey land/sea from the map, the arc flux of the last frame with arcs, plumes.
@@ -316,9 +319,9 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
                 for j in 0..ph {
                     for i in 0..pw {
                         let x = -ctx.c / 2.0 + i as f64 * pr;
-                        let z = -pole + j as f64 * pr;
+                        let z = poz + j as f64 * pr;
                         let ci = ((x + ctx.c / 2.0) / r1).round() as usize % w1;
-                        let cj = (((z + pole) / r1).round() as usize).min(g1.h as usize - 1);
+                        let cj = (g1.row_of_z(z).round().max(0.0) as usize).min(g1.h as usize - 1);
                         let a = f64::from(f[cj * w1 + ci]).min(1.0);
                         if a > 0.0 {
                             put(

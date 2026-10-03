@@ -36,7 +36,7 @@ import java.util.UUID;
 
 /**
  * The pole soft cap (plan §7.11; decisions file, "Poles"): a storm and a pushback toward the equator
- * from {@code pole_cap_deg} (75°), a hard stop at {@code pole_stop_deg} (80°), per Deep Time level
+ * from {@code pole_cap_deg} (70°), a hard stop at {@code pole_stop_deg} (80°), per Deep Time level
  * (both from the generator's {@code world_data}; {@link PoleCapCurve} holds the geometry and the
  * curves). Runs on the server after every tick of a Deep Time level.
  *

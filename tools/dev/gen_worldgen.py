@@ -174,7 +174,7 @@ def main():
                 # The pole cap's lines (plan §7.11, P1-18): the defaults, written out so a
                 # datapack sees where to change them.
                 "world_data": {"folder": "deeptime", "circumference_blocks": c,
-                               "pole_cap_deg": 75.0, "pole_stop_deg": 80.0},
+                               "pole_cap_deg": 70.0, "pole_stop_deg": 80.0},
             },
         }
         write(f"deeptime/worldgen/world_preset/{name}.json", {"dimensions": dims})

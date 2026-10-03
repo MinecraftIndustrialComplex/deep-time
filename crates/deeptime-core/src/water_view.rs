@@ -250,7 +250,9 @@ fn climate_at<'w>(
 /// cell when it is not; pixel ↔ cell by `GridDesc::picture_cell`).
 fn lake_cover(grid: &GridDesc, wet: &dyn Fn(usize) -> bool, (w, h): (usize, usize)) -> Vec<f32> {
     let (gw, gh) = (grid.w as usize, grid.h as usize);
-    let (rx, ry) = ((gw / w).max(1), (gh / h).max(1));
+    // The picture spans the planet's extent, the grid may reach a little past it.
+    let rows = grid.projection().extent().1 / f64::from(grid.r);
+    let (rx, ry) = ((gw / w).max(1), ((rows / h as f64) as usize).max(1));
     let norm = 1.0 / (rx * ry) as f32;
     let mut out = vec![0.0f32; w * h];
     for py in 0..h {
