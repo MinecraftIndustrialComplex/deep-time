@@ -17,8 +17,9 @@ A Deep Time planet is small. Its circumference is 16,384 or 32,768 blocks, and o
 | [BAK](ledger/BAK.md) | satellite view | BAK-017 to BAK-032 (16) |
 | [BAK](ledger/BAK.md) | synthetic worlds | BAK-033 to BAK-038 (6) |
 | [BAK](ledger/BAK.md) | far terrain | BAK-039 to BAK-042 (4) |
+| [BAK](ledger/BAK.md) | Distant Horizons curvature | BAK-043 to BAK-047 (5) |
 
-Rows by status: `cited-unverified` 6, `calibrated` 2, `game-choice` 73, `uncited` 12.
+Rows by status: `verified` 2, `cited-unverified` 6, `calibrated` 2, `game-choice` 76, `uncited` 12.
 
 ## Material for the stage 2 writer
 
@@ -178,3 +179,91 @@ are game choices about how far terrain stays the same terrain as the chunks.
   the pregeneration stops (STATUS.md, pending questions). Players' clients do not use it. The
   GameTest server cannot load Distant Horizons (it casts the server to a dedicated one), so the
   GameTests check far terrain without it and the smoke check covers Distant Horizons.
+
+## Distant Horizons world curvature
+
+Ben, decisions log 2026-10-03: "btw, DH has world curvature settings, can you make it so those
+default to values that make sense for the given world a player is in (dependent upon the world
+size generated using our mod.)" In a Deep Time level the client's Distant Horizons (DH) curvature
+is the planet's own; elsewhere DH's value is its own. The geometry is BAK-043 and BAK-044, the
+choices BAK-045 to BAK-047. Sources: the DH 3.3.1 jar (the MIC pack's pin), read on the test VM
+with `javap` and by opening its shaders and lang file; DH is LGPL-3.0 (the jar's `LICENSE.LESSER.txt`
+and `neoforge.mods.toml`), so reading it and calling its API is fine and nothing was copied.
+
+### What DH offers (3.3.1)
+
+- **The setting.** `Config.Client.Advanced.Graphics.Experimental.earthCurveRatio`, shown as "Earth
+  Curve Ratio" under DH's experimental graphics options. An `Integer` from -5,000 to 5,000, default
+  0. It is a **client** setting: the shader that reads it runs only on a client, and the value
+  lives in the player's DH config file.
+- **Units.** The ratio of Earth's size to the curved world's. The terrain shader draws a sphere of
+  radius `6,371,000 / ratio` blocks (DH's own table: 1 is 6,371,000 blocks, 100 is 63,710, 10,000
+  is 637.1). 0 is flat; a negative ratio bends the ground up into a bowl. DH accepts 50 to 5,000
+  (spheres of 127,420 down to 1,274 blocks) and its change listener rewrites 1 to 49 to 50 and
+  saves it, which would put a value in the player's file, so Deep Time never offers one.
+- **What it bends.** Only DH's own level-of-detail meshes (its terrain vertex shader). Minecraft's
+  chunks are drawn flat. At DH's near edge, where its meshes meet the chunks, the bent ground sits
+  below the flat chunk edge by the drop at that distance: 7.1 blocks at 192 and 12.6 at 256 on a
+  16k planet, half that at 32k. Not yet seen on a screen (below).
+- **The API.** `DhApi.Delayed.configs.graphics().earthCurvatureRatio()` returns an
+  `IDhApiConfigValue<Integer>` (read in 3.3.1, API 7.1.0; `DhApiBindingTest` finds the same members in the newest jar, 3.3.3, API 7.2.0). It has two
+  layers: `getTrueValue()` is what the player's file and settings screen hold, `getApiValue()` is
+  an override held in memory, `getValue()` is the override when set and the true value otherwise
+  (the shader reads this, every frame), `setValue(n)` sets only the override, `clearValue()` removes
+  it, `getCanBeOverrodeByApi()` says whether the entry allows it. Nothing on the API reaches the
+  file. While an override is set, DH's settings screen locks the entry ("API LOCK: this option is
+  controlled by another mod via DH's API so it cannot be changed via the UI or config file").
+  `DhApi.Delayed.configs` is null until DH has started its API, so a mod polls for it.
+
+### How Deep Time sets it
+
+- **Planet size.** Already on the client: `WorldInfoPayload` carries the circumference C in blocks
+  (the GameTest `worldInfoFollowsThePlayer` checks it), and `ClientPlanetState.circumference(level)`
+  answers 0 for any level that is not the planet the server last described. No new payload.
+- **The rule** (`DhCurvature`, `client/DhCurvatureClient`, once a second on the client tick, only
+  when DH is installed; DH's API is bound by name like the rest of the compat): in a planet level
+  with the setting on, put `ratioFor(C)` on the API layer; anywhere else clear what Deep Time put
+  there. The player's own value wins: if `getTrueValue()` is not the default 0, nothing is set (a
+  value typed into DH's screen later takes Deep Time's off within a second). Another mod's override
+  is left alone, and DH's "not overridable" answer is respected. Leaving the server clears at once.
+  The player's config file is never written, so a vanilla world is never curved and nothing needs
+  restoring after a crash. The one thing that cannot be told apart is a player who typed 0 on purpose:
+  0 is DH's default, so it counts as "untouched", and they use the switch.
+- **The switch.** `config/deeptime-client.toml`, `dhAutoCurvature` (default true), with a screen
+  under Mods, Deep Time, Config (lang keys `deeptime.configuration.*`).
+
+### The arithmetic
+
+Radius `R = C / 2 pi`; ratio `= round(6,371,000 / R)`; the drawn sphere is then `6,371,000 / ratio`
+(within half a ratio step, at most 0.04 %). Drop at horizontal distance `d` (DH's shader moves the
+vertex to y += (cos phi - 1)(R + y), phi = d / (R + y); at sea level `R (1 - cos(d / R))`).
+
+| World | C (blocks) | R = C / 2 pi | 6,371,000 / R | ratio set | sphere drawn | drop at 256 | at 512 | at 1,024 |
+|---|---|---|---|---|---|---|---|---|
+| 16k | 16,384 | 2,607.6 | 2,443.25 | 2,443 | 2,607.9 | 12.56 | 50.10 | 198.5 |
+| 32k | 32,768 | 5,215.2 | 1,221.62 | 1,222 | 5,213.6 | 6.28 | 25.11 | 100.2 |
+
+Both are inside DH's 50 to 5,000. Doubling the world halves the ratio and the drop (a parabola,
+`d^2 / 2R`, to 1.3 % at 1,024 on 16k). DH's range covers circumferences from 8,006 to 800,603
+blocks; below, the strongest curve (5,000) is used, above, flat (BAK-046).
+
+### What this does not do: the vertical exaggeration
+
+A block is 300 m across and 35 m up (SCL-001, SCL-002), so the ground of a planet drawn to scale
+falls 300 / 35 = 8.57 times as far, in blocks, as an isotropic sphere of the same circumference:
+107.6 blocks at 256 on 16k (3,767 m, a real 77 km view on the planet), 429.5 at 512, 1,701 at 1,024.
+That sphere is 304 blocks across at 16k, ratio 20,942, which DH cannot draw (limit 5,000, 1,274
+blocks, 25.7 blocks of drop at 256). Deep Time uses the planet's radius in blocks, as asked: a world
+that curves like a sphere of its own circumference, not one that matches its mountains' scale
+(BAK-045; STATUS.md, pending question).
+
+### What was checked
+
+Unit tests (`DhCurvatureTest`): the conversion against the geometry, the two world sizes, the
+parabola, the limits (never a value in 1 to 49), and the rule against a model of DH's two layers
+(vanilla flat, set, resize, hand back, the player's value kept and later released, another mod's
+override kept, "not overridable"). `DhApiBindingTest` runs the same controller through the real
+`IDhApiConfigValue`, `IDhApiGraphicsConfig` and `IDhApiConfig` interfaces of the pinned and the
+newest DH jars. **Not checked:** a real client. The GameTests have none, and the software-GL
+client has not made DH request LODs (see above), so how the bent LODs meet the flat chunks has
+not been seen.
