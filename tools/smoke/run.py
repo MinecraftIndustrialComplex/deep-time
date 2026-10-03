@@ -41,6 +41,13 @@ What it proves, in order:
     "Done ("; the report records the generation time. --restart then expects "world data present".
 
 The exit code is 0 only if every check passed. smoke/<profile>/report.md is written either way.
+
+On the test VM the run goes through the admission tool (tools/remote/vm/admit.py, kind
+smoke:<profile>; Ben 2026-10-03: load-based admission, no server lock) and its server runs in a
+private copy of the set (tools/smoke/instance.py, in the job's DEEPTIME_SERVER_DIR) on the job's own
+ports; the world stays the set's own smoke/<profile>/server/planet, linked in, and the run holds the
+set's world lock, so two runs of one set in one checkout take turns while any other servers run
+beside it.
 """
 
 import argparse
@@ -58,6 +65,8 @@ from datetime import datetime, timezone
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import admission  # noqa: E402  (the test VM's admission tool)
+import instance  # noqa: E402  (private server instances)
 import jarstate  # noqa: E402  (what install.sh recorded about the Deep Time jar)
 
 FATAL = re.compile(
@@ -772,15 +781,24 @@ def main():
                          "its [deeptime-probe] line (from the server log when RCON cuts it) is recorded in the report "
                          "and appended to smoke/<profile>/rcon.jsonl (P1-15)")
     a = ap.parse_args()
+    admission.ensure(f"smoke:{a.profile}")
 
     smoke = os.path.join(REPO, "smoke", a.profile)
-    server_dir = os.path.join(smoke, "server")
+    set_server = os.path.join(smoke, "server")
     if not os.path.exists(os.path.join(smoke, "install.json")):
         sys.exit(f"run.py: no {smoke}/install.json -- run tools/smoke/install.sh {a.profile}")
     install = json.load(open(os.path.join(smoke, "install.json")))
     tools = load_env(os.path.join(REPO, "smoke", "tools.env"))
     password = open(os.path.join(smoke, "rcon.pw")).read().strip()
-    world = os.path.join(server_dir, "planet")
+    world = os.path.join(set_server, "planet")
+    ports = admission.ports({"game": install["game_port"], "rcon": install["rcon_port"]})
+    # The set's world is this run's until it ends (released when the process exits).
+    instance.world_lock(set_server).__enter__()
+    server_dir = set_server
+    if admission.server_dir():
+        server_dir = instance.make(set_server, os.path.join(admission.server_dir(), "server"), ports=ports,
+                                   world_link="planet",
+                                   say=lambda m: print(f"   {m}", flush=True))
 
     props_path = os.path.join(server_dir, "server.properties")
     props = open(props_path).read()
@@ -802,7 +820,7 @@ def main():
             elif os.path.exists(p):
                 os.remove(p)
 
-    for port in (install["game_port"], install["rcon_port"]):
+    for port in (ports["game"], ports["rcon"]):
         if not port_free(port):
             try:
                 owners = subprocess.run(["ss", "-ltnp", f"sport = :{port}"], capture_output=True, text=True).stdout
@@ -815,7 +833,7 @@ def main():
         run_scenario(a.scenario, a, smoke, server_dir, world, install, tools)
     log_path = os.path.join(smoke, "logs", "server.log")
     open(log_path, "w").close()
-    rcon = Rcon(tools["MCRCON"], install["rcon_port"], password)
+    rcon = Rcon(tools["MCRCON"], ports["rcon"], password)
     server = Server(server_dir, tools["JAVA"], install["neoforge"], log_path)
     steps = Steps()
     started = datetime.now(timezone.utc)
