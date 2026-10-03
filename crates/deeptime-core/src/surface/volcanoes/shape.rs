@@ -10,8 +10,8 @@
 //!   over R = 10 km, 8.5° at the default doubled radius; its mean slope is 0.8 H/R). Ledger VOL-016,
 //!   uncited: Earth's stratovolcanoes have mean flank slopes of 17.7° and steepest average slopes
 //!   of 27.7° (medians of 512; Grosse et al. 2014, Bull. Volcanol. 76:784, table 1), reached at
-//!   0.79 of the height, below the summit. In blocks every slope is drawn 15 times steeper
-//!   (300 m across, 20 m up a block);
+//!   0.79 of the height, below the summit. In blocks every slope's tangent is drawn
+//!   `m_per_block_h / m_per_block_v` times steeper (8.6 at 300 m across and 35 m up a block);
 //! - shield: (1 − ρ²)^1.5, broad and convex, steepest (1.5 H/R) at ρ = 0.71: 14° for 6.5 km over
 //!   40 km, 7° at the default doubled radius. Ledger VOL-017, uncited: Hawaiian shield lava flows
 //!   dip 2°–10° (Clague & Sherrod 2014, USGS PP 1801 ch. 3), Earth's subaerial shields have mean
