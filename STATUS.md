@@ -162,8 +162,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   True-area hypsometry before / after: land mean 753 / 771 m, p50 581 / 549, p90 1,678 / 1,747, above 2 km
   0.055 / 0.069, sea median depth 4,037 / 3,810 m. Cost: 11 min 13 s / 8 min 44 s wall, 2.93 / 2.34 GB peak RSS
   (36 % fewer cells). Pictures and logs: `review/out/projection-lambert/` (not committed; satellite-before.png
-  1024 × 512, satellite-after.png 1024 × 326). Before/after numbers in §7 of the design note match the old
-  baseline exactly (the planet is deterministic).
+  1024 × 512, satellite-after.png 1024 × 326). The before numbers equal the design note's §7 baseline exactly (the planet is
+  deterministic).
 - **Workbench, measured** (a private `deeptime watch` on port 8667 over a baked 500 Myr quick 16k Lambert run;
   screenshots under `review/out/projection-lambert/wb/`): the run view's map is π : 1 with 60°N at the right
   height; the readout over z = −1,339 says 30.9°N (asin(1339/2607.6)); the inspect API answers lat 59.99° at
