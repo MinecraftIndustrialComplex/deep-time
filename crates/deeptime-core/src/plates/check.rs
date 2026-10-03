@@ -71,7 +71,7 @@ const fn waits(
     }
 }
 
-const WAITS_COLLISION: &str = "the collision state and belts (design tasks 2-3)";
+const WAITS_COLLISION: &str = "the collision belts (design tasks 3-4)";
 const WAITS_FORCES: &str = "a run recorded with the force balance (dynamics version 4)";
 const WAITS_MIX: &str = "a run recorded with the boundary mix and arc heights (dynamics version 3)";
 
@@ -143,7 +143,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     m(
         "belt_width_km_p50",
-        "Collision belt width, median (ground raised 100 m or more)",
+        "Collision belt width, median (belt and wedge, weighted by their uplift)",
         "km",
         None,
         Some(800.0),
@@ -388,7 +388,7 @@ pub const MEASURES: &[MeasureDef] = &[
     // Waiting for physics: reported as "no data" until the record is filled (see `waits`).
     waits(
         "collision_convergence_ratio_20myr",
-        "Convergence 20 Myr after a collision's onset ÷ at onset, median (needs the collision state)",
+        "Convergence 20 Myr after a collision's onset ÷ at onset, median",
         "ratio",
         Some(0.2),
         Some(0.6),
@@ -396,7 +396,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     waits(
         "wedge_width_km_p50",
-        "Wedge on the incoming side, width, median (needs the belts)",
+        "Wedge on the incoming side, width when the belt stood highest, median",
         "km",
         Some(100.0),
         Some(350.0),
@@ -404,7 +404,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     waits(
         "foredeep_width_km_p50",
-        "Foredeep width, median (needs the belts)",
+        "Foredeep width in front of a belt above 3 km, median",
         "km",
         Some(150.0),
         Some(450.0),
@@ -412,7 +412,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     waits(
         "foredeep_depth_m_p50",
-        "Foredeep depth of fill, median (needs the belts)",
+        "Foredeep depth below local isostasy in front of a belt above 3 km, median",
         "m",
         Some(2000.0),
         Some(7000.0),
@@ -498,21 +498,21 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     m(
         "collision_lifted10_pct_p50",
-        "Ground one collision lifts by more than 10 m: median",
+        "Ground one collision lifts by more than 10 m in one step: median",
         "% of planet",
         None,
         None,
     ),
     m(
         "collision_lifted10_pct_max",
-        "Ground one collision lifts by more than 10 m: the most",
+        "Ground one collision lifts by more than 10 m in one step: the most",
         "% of planet",
         None,
         None,
     ),
     m(
         "belt_length_km_p50",
-        "Collision belt length, median (ground raised 100 m or more)",
+        "Collision belt length, median (belt and wedge, weighted by their uplift)",
         "km",
         None,
         None,
@@ -535,13 +535,6 @@ pub const MEASURES: &[MeasureDef] = &[
         "contact_age_p90_myr",
         "Contact age when the collision began, 90th percentile",
         "Myr",
-        None,
-        None,
-    ),
-    m(
-        "counted_km_p50",
-        "What the pre-task-2 count read at the transfer or weld (relative speed × time), median",
-        "km",
         None,
         None,
     ),
@@ -1587,9 +1580,17 @@ pub fn measures_with(
         if welds.is_empty() {
             f64::NAN
         } else {
+            // The plate that died is recorded since tasks 3 and 4 (the larger keeps its id);
+            // before, it was always the subducting one.
             let larger = welds
                 .iter()
-                .filter(|c| c.under_samples > c.over_samples)
+                .filter(|c| {
+                    if c.died == Some(c.over) {
+                        c.over_samples > c.under_samples
+                    } else {
+                        c.under_samples > c.over_samples
+                    }
+                })
                 .count();
             100.0 * larger as f64 / welds.len() as f64
         },
@@ -1657,30 +1658,22 @@ pub fn measures_with(
         "collision_lifted10_pct_max",
         lifted.iter().copied().fold(f64::NAN, f64::max),
     );
+    // The belt's extent: everything the collision raised, weighted by the uplift (since tasks 3
+    // and 4; `CollisionRec::belt`).
     let shaped: Vec<&super::dynamics::CollisionRec> = col
         .iter()
         .copied()
-        .filter(|c| c.lifted100.width_km > 0.0)
+        .filter(|c| c.belt.width_km > 0.0)
         .collect();
     put(
         "belt_width_km_p50",
-        median(
-            &shaped
-                .iter()
-                .map(|c| c.lifted100.width_km)
-                .collect::<Vec<_>>(),
-        ),
+        median(&shaped.iter().map(|c| c.belt.width_km).collect::<Vec<_>>()),
     );
     put(
         "belt_length_km_p50",
-        median(
-            &shaped
-                .iter()
-                .map(|c| c.lifted100.length_km)
-                .collect::<Vec<_>>(),
-        ),
+        median(&shaped.iter().map(|c| c.belt.length_km).collect::<Vec<_>>()),
     );
-    let elong: Vec<f64> = shaped.iter().map(|c| c.lifted100.elongation()).collect();
+    let elong: Vec<f64> = shaped.iter().map(|c| c.belt.elongation()).collect();
     put("belt_elongation_p50", median(&elong));
     put(
         "belt_elongation_over_3_pct",
@@ -1710,7 +1703,6 @@ pub fn measures_with(
     let age = pick(&|c| c.start_myr - c.contact_onset_myr);
     put("contact_age_p50_myr", median(&age));
     put("contact_age_p90_myr", pct(&age, 0.9));
-    put("counted_km_p50", median(&pick(&|c| c.counted_km)));
     let short: Vec<f64> = col
         .iter()
         .filter(|c| c.front_km > 0.0)
@@ -3056,17 +3048,19 @@ mod tests {
         a.emerged = fp(20, 500.0, 300.0);
         a.lifted10 = fp(250, 4000.0, 2000.0);
         a.lifted100 = fp(100, 3000.0, 1000.0);
-        a.counted_km = 350.0;
+        a.belt = fp(0, 3000.0, 1000.0);
         a.front_km = 600.0;
         a.shortening_km = 90.0;
         let mut b = collision(300.0, 330.0, 2800.0);
         b.emerged = fp(3, 100.0, 50.0);
         b.lifted10 = fp(80, 4000.0, 800.0);
         b.lifted100 = fp(40, 4000.0, 500.0);
+        b.belt = fp(0, 4000.0, 500.0);
         b.front_km = 1000.0;
         b.shortening_km = 200.0;
         let mut c = collision(600.0, 680.0, 700.0);
         c.lifted100 = fp(60, 5000.0, 800.0);
+        c.belt = fp(0, 5000.0, 800.0);
         c.lifted10 = fp(90, 5000.0, 1000.0);
         let mut transfer = collision(700.0, 700.0, 1400.0);
         transfer.collision = false;
@@ -3092,7 +3086,6 @@ mod tests {
         // Contact age 8 for all; the shortening of the two that have a front.
         assert_eq!(get(&m, "contact_age_p50_myr"), 8.0);
         assert_eq!(get(&m, "shortening_km_p50"), 145.0);
-        assert_eq!(get(&m, "counted_km_p50"), 0.0);
     }
 
     #[test]
@@ -3108,6 +3101,10 @@ mod tests {
         d.collisions[0].under_samples = 900;
         let m = measures(&d, &[]);
         assert_eq!(get(&m, "welded_dying_larger_pct"), 50.0);
+        // Since tasks 3 and 4 the record says which plate died: the larger keeps its id.
+        d.collisions[0].died = Some(d.collisions[0].over);
+        let m = measures(&d, &[]);
+        assert_eq!(get(&m, "welded_dying_larger_pct"), 0.0);
     }
 
     #[test]

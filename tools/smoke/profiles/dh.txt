@@ -3,4 +3,4 @@
 # (python3 tools/smoke/run.py --profile dh --dh). Keep the id equal to pack/mods/distanthorizons.pw.toml
 # and to dh_version in neoforge/gradle.properties; install.sh warns when the pack's differs.
 @include standalone
-distanthorizons     EtH8QtMq   # 3.3.0-1.21.1 (pack pin; LGPL-3.0; merged jar, API classes named <Class>_neoforge)
+distanthorizons     IcOcoekl   # 3.3.1-1.21.1 (pack pin since pack 57561c9; LGPL-3.0; published API names)

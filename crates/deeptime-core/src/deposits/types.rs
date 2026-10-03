@@ -500,7 +500,7 @@ pub struct Stack {
     #[serde(default)]
     pub gap_sigma: f64,
     /// Playability enlargement of the gaps between seams in blocks (like `size_mult_v` for
-    /// thickness): a 30 m gap is 1.5 blocks at 20 m per block, too tight to tell seams apart.
+    /// thickness): a 30 m gap is under a block at 35 m per block, too tight to tell seams apart.
     pub spacing_mult_v: f64,
 }
 

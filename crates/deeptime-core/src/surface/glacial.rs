@@ -145,9 +145,12 @@ pub struct GlacialParams {
     pub young_ela_drop_m: f64,
     /// How much wider than a real glacier the young landscape draws its troughs (the editor's
     /// "Glacial valley width"; Ben, 2026-09-30: default wider, 1 is physical). At the game's
-    /// scale (300 m a block across, 20 m up) a real 2-km trough is 7 blocks wide and reads as a
-    /// gorge; this widens the glaciers' footprint and the spread of their erosion on L2, and so
-    /// the U the amplifier cuts under them. The deep-time surface always uses 1 (physics).
+    /// scale (300 m a block across) a real 2-km trough is 7 blocks wide and, 600 m deep, 17 blocks
+    /// deep at 35 m up (30 at the earlier 20 m): it reads as a gorge; this widens the glaciers'
+    /// footprint and the spread of their erosion on L2, and so the U the amplifier cuts under
+    /// them. The default 3 draws that trough 20 blocks wide, about as wide as deep at 35 m (two
+    /// thirds at 20 m); kept with the 35 m scale (2026-10-02). The deep-time surface always uses
+    /// 1 (physics).
     pub valley_width: f64,
 }
 
