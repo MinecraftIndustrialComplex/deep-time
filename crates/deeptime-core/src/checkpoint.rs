@@ -42,8 +42,9 @@ pub const MAGIC: [u8; 4] = *b"DTCP";
 /// count, P1-14; 6: the recorded history's frames in sections of their own, streamed, P1-17;
 /// 7: `WorldState::globals` and the climate's carbon cycle, fine clock and ice state, deep-time
 /// climate; 8: the world's volcano catalogue, P1-21; 9: the world's crater catalogue, P2-08; 10: the
-/// climate's ice sheet, weathering supply and snowball list, 2026-09-30).
-pub const CHECKPOINT_SCHEMA: u32 = 10;
+/// climate's ice sheet, weathering supply and snowball list, 2026-09-30; 11: the per-cell climate's
+/// state, P1-26).
+pub const CHECKPOINT_SCHEMA: u32 = 11;
 const FIXED_BYTES: usize = 8;
 /// The sections before the history's frames.
 const HEAD_SECTIONS: usize = 2;

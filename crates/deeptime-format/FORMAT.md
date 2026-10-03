@@ -1488,7 +1488,8 @@ each: its fields' LZ4 blobs back to back in the head's order (the same record th
 holds). The next stage is always a group's lead: inside a group of coupled stages (plates + surface,
 P1-04) the saved state is the postcard `Vec<Vec<u8>>` of every member's state, in pipeline order.
 Schema 4 (P1-04) added the surface state and the recorded field history to `WorldState`; schema 6
-(P1-17) moved the history's frames out of the body into sections of their own (schema 10, 2026-09-30,
+(P1-17) moved the history's frames out of the body into sections of their own (schema 11, P1-26, added
+the per-cell climate's state; schema 10, 2026-09-30,
 added the climate's ice sheet, weathering supply and snowball list; schema 9, P2-08, the world's crater
 catalogue; schema 8, P1-21, the world's
 volcano catalogue; schema 7, the deep-time
