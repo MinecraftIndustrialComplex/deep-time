@@ -29,7 +29,6 @@
 //!   lake) — without it a sheet grown under a lowered line outlives the line's return (on Earth's
 //!   relief 19 % of the land stayed under ice at the present line after a 1-km lowering).
 
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::ice::{G, RHO_ICE, RHO_SEA};
@@ -41,106 +40,8 @@ pub const GLEN_N: f64 = 3.0; // ledger: GLA-067
 /// The shortest explicit step the flow is allowed to ask for, years (see `State::step`).
 pub const MIN_STEP_YEARS: f64 = 10.0; // ledger: GLA-073
 
-/// The coarse grid.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Grid {
-    /// Coarse cells across and down.
-    pub w: usize,
-    pub h: usize,
-    /// Fine cells per coarse cell along each side.
-    pub k: usize,
-    /// Fine grid.
-    pub fw: usize,
-    pub fh: usize,
-    /// Width of every coarse row and the height of a row, m (true, Earth-normalized; a row is
-    /// never narrower than a quarter of its height, so the poles do not stall the time step).
-    pub dx: Vec<f64>,
-    pub dy: f64,
-}
-
-impl Grid {
-    /// The coarse grid of a `fw` × `fh` fine grid whose rows are `sx[j]` m wide and `sy` m high,
-    /// about `cells` coarse columns across.
-    pub fn new(fw: usize, fh: usize, sx: &[f64], sy: f64, cells: usize) -> Grid {
-        let k = (fw / cells.max(1)).max(1);
-        let (w, h) = (fw.div_ceil(k), fh.div_ceil(k));
-        let dy = sy * k as f64;
-        let dx = (0..h)
-            .map(|j| {
-                let rows = (j * k..((j + 1) * k).min(fh))
-                    .map(|r| sx[r])
-                    .collect::<Vec<_>>();
-                let mean = rows.iter().sum::<f64>() / rows.len().max(1) as f64;
-                (mean * k as f64).max(0.25 * dy)
-            })
-            .collect();
-        Grid {
-            w,
-            h,
-            k,
-            fw,
-            fh,
-            dx,
-            dy,
-        }
-    }
-
-    /// Block means of a fine field over the cells `pick` accepts (all cells where it accepts none).
-    pub fn coarsen(&self, v: &[f32], pick: &(dyn Fn(usize) -> bool + Sync)) -> Vec<f32> {
-        (0..self.w * self.h)
-            .into_par_iter()
-            .map(|cc| {
-                let (ci, cj) = (cc % self.w, cc / self.w);
-                let (mut s, mut n, mut s_all, mut n_all) = (0.0f64, 0usize, 0.0f64, 0usize);
-                for j in cj * self.k..((cj + 1) * self.k).min(self.fh) {
-                    for i in ci * self.k..((ci + 1) * self.k).min(self.fw) {
-                        let c = j * self.fw + i;
-                        let x = f64::from(v[c]);
-                        if !x.is_finite() {
-                            continue;
-                        }
-                        s_all += x;
-                        n_all += 1;
-                        if pick(c) {
-                            s += x;
-                            n += 1;
-                        }
-                    }
-                }
-                if n > 0 {
-                    (s / n as f64) as f32
-                } else if n_all > 0 {
-                    (s_all / n_all as f64) as f32
-                } else {
-                    0.0
-                }
-            })
-            .collect()
-    }
-
-    /// A coarse field at every fine cell, bilinearly (x wraps; rows clamp).
-    pub fn refine(&self, v: &[f32]) -> Vec<f32> {
-        let k = self.k as f64;
-        (0..self.fw * self.fh)
-            .into_par_iter()
-            .map(|c| {
-                let (i, j) = (c % self.fw, c / self.fw);
-                let x = (i as f64 + 0.5) / k - 0.5;
-                let y = ((j as f64 + 0.5) / k - 0.5).clamp(0.0, (self.h - 1) as f64);
-                let (x0, y0) = (x.floor(), y.floor());
-                let (fx, fy) = (x - x0, y - y0);
-                let i0 = (x0 as i64).rem_euclid(self.w as i64) as usize;
-                let i1 = (i0 + 1) % self.w;
-                let j0 = y0 as usize;
-                let j1 = (j0 + 1).min(self.h - 1);
-                let at = |ii: usize, jj: usize| f64::from(v[jj * self.w + ii]);
-                let top = at(i0, j0) * (1.0 - fx) + at(i1, j0) * fx;
-                let bot = at(i0, j1) * (1.0 - fx) + at(i1, j1) * fx;
-                (top * (1.0 - fy) + bot * fy) as f32
-            })
-            .collect()
-    }
-}
+/// The coarse grid (shared with the per-cell climate, `coarse.rs`).
+pub use super::coarse::Grid;
 
 /// The sheet's parameters.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -513,16 +414,5 @@ mod tests {
         };
         big.step(&g, &fh, &params(), 20_000.0);
         assert!(big.volume_m3(&g) < 0.05 * v);
-    }
-
-    #[test]
-    fn coarsen_and_refine_round_trip() {
-        let g = Grid::new(64, 32, &[1.0; 32], 1.0, 16);
-        assert_eq!((g.w, g.h, g.k), (16, 8, 4));
-        let v: Vec<f32> = (0..64 * 32).map(|c| (c / 64) as f32).collect();
-        let cv = g.coarsen(&v, &|_| true);
-        assert!((cv[0] - 1.5).abs() < 1e-6);
-        let back = g.refine(&cv);
-        assert!((back[10 * 64 + 5] - 10.0).abs() < 0.6);
     }
 }

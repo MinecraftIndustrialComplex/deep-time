@@ -1334,6 +1334,20 @@ could not read is listed in `docs/science/per-cell-climate.md`, "Open questions"
 | Q10 | Latent heat in the energy balance (a moist EBM: rain heats the air where it falls) | (a) No: dry D includes latent transport, as today; (b) yes, recalibrate D | **(a)** for v1 |
 | Q11 | Runoff for weathering and the surface | (a) Keep Fu's Budyko curve on the new P and T (one runoff for climate and surface); (b) use the moisture budget's bucket runoff | **(a)** |
 
+## 11. As built (kept current by the build, 2026-10-02 onward)
+
+The build started on the ice branch (`worktree-agent-a1c432fc38faa9742`, checkpoint schema 10) with
+master merged in. Each task's notes record what differs from the sections above and why.
+
+- **T1 coarse grid** (`climate/coarse.rs`). `sheet::Grid` moved there (`sheet.rs` re-exports it),
+  unchanged for the sheet (its tests and `coarsen` are as before). New: each coarse row's edge
+  latitudes come from the projection (`Projection::picture_lat_deg` of the fine row edges), so a
+  projection whose rows are not evenly spaced in latitude gives rows of unequal height; areas
+  (Δλ·(sin φ_N − sin φ_S), Σ = 4π to 10⁻¹²), east–west and north–south face conductances (face
+  length over centre distance on the unit sphere), `coarsen_area` (fine cells weighted by the
+  projection's row weight), `corners` and `masked_at` (the masked bilinear of §2.9: only coarse
+  cells of the medium, renormalized; `None` when none of the four has it).
+
 ## Appendix A. How the measurements were made
 
 All runs were on the M6 Mac, through `tools/remote/mac.sh` for the build and plain ssh for the
