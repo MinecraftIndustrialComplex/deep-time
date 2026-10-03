@@ -404,10 +404,7 @@ fn a_glaciated_young_range_has_no_one_cell_spires() {
     );
     let over = SPIRE_BLOCKS * c.mv as f32;
     let found = spires(&sink.z, plan.gw, over);
-    let tallest = found
-        .iter()
-        .map(|&s| sink.z[s])
-        .fold(f32::MIN, f32::max);
+    let tallest = found.iter().map(|&s| sink.z[s]).fold(f32::MIN, f32::max);
     assert!(
         found.is_empty(),
         "{} cells stand more than {SPIRE_BLOCKS} blocks above all their neighbours (first {:?}, \

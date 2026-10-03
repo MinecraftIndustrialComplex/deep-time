@@ -243,7 +243,8 @@ impl SurfaceParams {
         nonneg(self.tidal_range_m, "tidal_range_m")?;
         nonneg(self.marine_fill_depth_m, "marine_fill_depth_m")?;
         nonneg(self.shelf_slope, "shelf_slope")?;
-        if !(self.submarine_slope_deg.is_finite() && (0.0..=30.0).contains(&self.submarine_slope_deg))
+        if !(self.submarine_slope_deg.is_finite()
+            && (0.0..=30.0).contains(&self.submarine_slope_deg))
         {
             return Err(CoreError::preset(
                 "$.surface.submarine_slope_deg",
