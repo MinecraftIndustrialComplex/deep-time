@@ -79,6 +79,9 @@ public final class DhLodGenerator implements InvocationHandler {
     private final LongAdder sections = new LongAdder(), nanos = new LongAdder(), points = new LongAdder(), failures = new LongAdder();
     private final AtomicLongArray sectionsByDetail = new AtomicLongArray(32), nanosByDetail = new AtomicLongArray(32);
     private volatile String firstFailure;
+    /** The x extent of the sections asked so far (block x, end exclusive): shows requests from both sides of the seam. */
+    private final java.util.concurrent.atomic.AtomicInteger minBlockX = new java.util.concurrent.atomic.AtomicInteger(Integer.MAX_VALUE),
+            maxBlockX = new java.util.concurrent.atomic.AtomicInteger(Integer.MIN_VALUE);
 
     public DhLodGenerator(DhApiBinding api, Source source, Wrappers wrappers, int maxDetail, boolean validate, String name) {
         this.api = api;
@@ -93,6 +96,22 @@ public final class DhLodGenerator implements InvocationHandler {
     /** The object to register with Distant Horizons. */
     public Object proxy() {
         return proxy;
+    }
+
+    /**
+     * The Deep Time generator behind {@code generator} when it is one of {@link #proxy()}'s
+     * objects, else null. Toroidal World's guard sees only the proxy ({@code TwDhGuard}).
+     */
+    public static DhLodGenerator of(Object generator) {
+        if (generator != null && Proxy.isProxyClass(generator.getClass())
+                && Proxy.getInvocationHandler(generator) instanceof DhLodGenerator g)
+            return g;
+        return null;
+    }
+
+    /** The level this generator was made for ({@code minecraft:overworld}). */
+    public String levelName() {
+        return name;
     }
 
     @Override
@@ -157,6 +176,8 @@ public final class DhLodGenerator implements InvocationHandler {
             nanos.add(dt);
             int d = Math.max(0, Math.min(31, detail));
             sectionsByDetail.incrementAndGet(d);
+            minBlockX.accumulateAndGet(chunkMinX * 16, Math::min);
+            maxBlockX.accumulateAndGet(chunkMinX * 16 + (64 << d), Math::max);
             nanosByDetail.addAndGet(d, dt);
             if (done != null)
                 done.accept(dataSource);
@@ -235,6 +256,12 @@ public final class DhLodGenerator implements InvocationHandler {
     }
 
     /** "detail 0: 1234 sections, 5.67 ms; detail 3: …" for the levels that were asked. */
+    /** The x extent of the sections asked so far, "min..max" in blocks, or "none". */
+    public String xExtent() {
+        int lo = minBlockX.get(), hi = maxBlockX.get();
+        return lo > hi ? "none" : lo + ".." + hi;
+    }
+
     public String byDetail() {
         StringBuilder sb = new StringBuilder();
         for (int d = 0; d < 32; d++) {
