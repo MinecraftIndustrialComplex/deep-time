@@ -691,7 +691,7 @@ fn the_stage_never_panics_however_dense_the_structures() {
         v["keyframes"]["every_myr"] = serde_json::json!(40.0);
         v["seed"] = serde_json::json!(seed);
         v["structure"] = serde_json::json!({"deformation": {
-            "density": 10.0, "intrusions": 10.0, "max_overlap": 16, "overprint_myr": 1000.0,
+            "density": 14.0, "intrusions": 14.0, "max_overlap": 16, "overprint_myr": 1000.0,
             "fault_length_km": [150.0, 100.0, 150.0], "fold_wavelength_km": [32.0, 30.0, 32.0]
         }});
         for stage in ["deposits", "young", "amplify"] {
