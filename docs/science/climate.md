@@ -4,6 +4,8 @@ Status of this page: `stub` (stage 1). The ledger rows exist; the page is to be 
 
 Climate decides temperature, rain, ice and sea level through the planet's history, and with them erosion, glaciers, coal and the biomes of the finished world. Today's code solves an energy balance (sunlight in, heat out, heat carried poleward) in latitude bands, adds wind and rain belts, rain shadows behind mountains, a carbon cycle with a slowly brightening sun, orbital cycles that pace ice ages, land ice and sea ice. Because it works in bands, climate follows latitude far too closely (the design measured latitude explaining 99.6 % of land temperature variance, against 96.8 % on Earth). **This model is about to be replaced** by a per-cell, seasonal, two-dimensional energy balance with a slab ocean and a moisture budget (`docs/design/p1-26-per-cell-climate.md`, approved 2026-10-01). The ledger rows describe the code as it is today and are marked `pending-rewrite`; constants of the new design are `not-yet-coded`.
 
+The constants of the per-cell design were checked against their sources before the build (WP-14a, 2026-10-02): see [per-cell-climate.md](per-cell-climate.md).
+
 ## Ledger ids that belong here
 
 | Ledger | Feature | Ids (count) |

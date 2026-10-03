@@ -3469,6 +3469,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read in this pass: (MOI, BIO) full text fetched (decoded PDF text layer: Figure 1 caption, the text on mass flux and Equation 7) (CLM) search result snippet only (citing passages)
 - Reference check: (MOI, BIO) matches. The abstract itself has no percent-per-kelvin figure; the numbers are in the text (Part 2). (CLM) matches.
 
+- Read in WP-14a (2026-10-02): Read WP-14a: saturation vapour pressure about 7 %/K (p. 5686) and column vapour 7.5 %/K in models (Fig. 2, p. 5689), as a consistency check for CLM-144.
 ### Thornthwaite1948
 - Reference: Thornthwaite, C. W. 1948. An approach toward a rational classification of climate. Geographical Review 38(1):55-94. (The end page 94 is from my recollection; OpenAlex lists only the first page.)
 - DOI or URL: https://doi.org/10.2307/210739
@@ -4439,6 +4440,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: full text fetched (source only): climlab/model/ebm.py, surface/albedo.py, utils/constants.py at main, v0.9.2 and fcbde37 (ebm.py identical in the defaults below at fcbde37 and v0.9.2; main differs from v0.9.2 at line 101, a docstring-area change, defaults unchanged). The JOSS paper itself was not fetched.
 - Reference check: matches. Citation volume is 3, issue 24, article 659. Note the code's defaults are NOT NCC81: Rose's lecture notes (Albany ATM623, Lecture 14, fetched) say A = 210 m2 and B = 2 m2/degC "we are going to use these values", derived from an NCEP fit (best fit A = 214, B = 1.6), and D = 0.55.
 
+- Read in WP-14a (2026-10-02): WP-14a saved climlab's MIT source files (library climlab_src/: ebm.py, albedo.py, LICENSE) and read the defaults: EBM A 210, B 2, D 0.555, water_depth 10 m, Tf -10, a0 0.3, a2 0.078, ai 0.62, num_lat 90; EBM_seasonal and P2Albedo a0 0.33, a2 0.25 (CLM-001, CLM-007 to CLM-010, CLM-020).
 ### North1981
 - Reference: North, G. R., Cahalan, R. F., & Coakley, J. A., Jr. (1981). Energy balance climate models. Reviews of Geophysics and Space Physics 19(1): 91-121.
 - DOI or URL: 10.1029/RG019I001P00091. Image-only scan at https://eisenman.ucsd.edu/courses/2024-sioc224/files/north-1981.pdf (no text layer; JBIG2 images; I could not OCR it). NASA NTRS record 19820032405 (abstract only, no download).
@@ -4450,6 +4452,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: abstract fetched (NTRS). Full text attempted, unreadable (scan).
 - Reference check: authors, year, venue, pages match. The code's field comment writes "North et al. 1981" for D and ebm.rs writes the full name; same paper. Whether A = 203.3, B = 2.09, D = 0.649 are NCC81's own numbers is NOT confirmed (see Part 2): citing papers disagree on whether A and B originate with Budyko (1969) or North & Coakley (1979).
 
+- Read in WP-14a (2026-10-02): Read WP-14a for the carried-over constants: A 203.3 and B 2.09 (p. 93, eq. 7), co-albedo 0.681 - 0.202 P2 (p. 95, eq. 18), D 0.649 (p. 97), Budyko's ice albedo 0.62 and -10 degC edge (p. 104), C_L 0.16 B years and C_W 4.7 B years (p. 118). CLM-003 to CLM-005, CLM-009, CLM-010, CLM-013, CLM-014, CLM-122, CLM-138.
 ### Berger1978
 - Reference: Berger, A. L. (1978). Long-term variations of daily insolation and Quaternary climatic changes. Journal of the Atmospheric Sciences 35(12): 2362-2367.
 - DOI or URL: 10.1175/1520-0469(1978)035<2362:LTVODI>2.0.CO;2
@@ -4554,6 +4557,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: abstract fetched (Crossref) plus citing passages
 - Reference check: matches. Byrne & Goldblatt's Table 1 prints the same 5.35 form (their row attributes it to "IPCC [1990]" and the adjusted forcing F_a).
 
+- Read in WP-14a (2026-10-02): Not read in WP-14a; its 5.35 was read in IPCC 2001 Table 6.2 (CLM-069).
 ### Byrne2014
 - Reference: Byrne, B., & Goldblatt, C. (2014). Radiative forcing at high concentrations of well-mixed greenhouse gases. Geophysical Research Letters 41(1): 152-160.
 - DOI or URL: 10.1002/2013GL058456; open copy https://dspace.library.uvic.ca/server/api/core/bitstreams/65d2a0aa-a7eb-44ba-b8e7-ac34d0d894d7/content (the article as corrected 17 Apr 2015)
@@ -4565,6 +4569,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: full text fetched (all sections, Tables 1 and 2)
 - Reference check: matches (authors, year, volume, pages, Table 2).
 
+- Read in WP-14a (2026-10-02): Read WP-14a: Table 2 CO2 fit and its range 200-10,000 ppmv; abstract: computed over 100-50,000 ppmv, 38.1 W/m2 at the top (CLM-070, CLM-166).
 ### Hoffman2017
 - Reference: Hoffman, P. F., Abbot, D. S., Ashkenazy, Y., Benn, D. I., Brocks, J. J., Cohen, P. A., Cox, G. M., Creveling, J. R., Donnadieu, Y., Erwin, D. H., Fairchild, I. J., Ferreira, D., Goodman, J. C., Halverson, G. P., Jansen, M. F., Le Hir, G., Love, G. D., Macdonald, F. A., Maloof, A. C., Partin, C. A., Ramstein, G., Rose, B. E. J., Rose, C. V., Sadler, P. M., Tziperman, E., Voigt, A., & Warren, S. G. (2017). Snowball Earth climate dynamics and Cryogenian geology-geobiology. Science Advances 3(11): e1600983.
 - DOI or URL: 10.1126/sciadv.1600983; open copy https://dspace.library.uvic.ca/bitstream/1828/11278/1/hoffman_paul_scienceadvances_2017.pdf
@@ -4576,6 +4581,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: full text fetched (text layer searched for sea level, ppm, bar, CO2 termination, ice thickness; not every section read)
 - Reference check: matches. The paper's CO2 range for termination is 10^4 to 10^5 ppm, and the ~1 km of sea level is stated as an assumption (see Part 2).
 
+- Read in WP-14a (2026-10-02): Read WP-14a: terminations at 10^4 to 10^5 ppm (p. 3 of 43); cloud radiative forcing >= 10 W/m2 and cloud-free FOAM never deglaciating (p. 10 of 43) (CLM-166).
 ### Nye1952
 - Reference: Nye, J. F. (1952). The mechanics of glacier flow. Journal of Glaciology 2(12): 82-93.
 - DOI or URL: 10.3189/S0022143000033967
@@ -4655,6 +4661,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: matches.
 
+- Read in WP-14a (2026-10-02): Read in full (eq. 2, eqs. 5-6, Tables 1-2, pp. 2845-2847) for CLM-119, CLM-120, CLM-122; the design's surface-dependent D was corrected to its eq. 2 (theta in eq. 2 is the colatitude).
 ### Zhuang2017
 - Reference: Zhuang, K., North, G. R., & Stevens, M. J. (2017). A NetCDF version of the two-dimensional energy balance model based on the full multigrid algorithm. SoftwareX 6: 198-202.
 - DOI or URL: 10.1016/j.softx.2017.07.003
@@ -4666,6 +4673,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: matches.
 
+- Read in WP-14a (2026-10-02): The paper could not be fetched (Elsevier refuses scripted access). The release on GitHub (ElsevierSoftwareX/SOFTX-D-16-00023) was read by a sub-agent: its manual is saved (Zhuang2017_manual.txt); the GPL-3 Fortran was read for the constants and not kept or copied (grid 128 x 65, B 2.15, A 210.3 at 315 ppm, Keq 0.65, Kocean 0.40, Kland 0.65, KlandNP 0.28, KlandSP 0.20, the factor sin^5 of the colatitude, soil 2 m, mixed layer 70 m). Ledger ids now also CLM-122.
 ### North1983
 - Reference: North, G. R., Mengel, J. G., & Short, D. A. (1983). Simple energy balance model resolving the seasons and the continents: Application to the astronomical theory of the ice ages. Journal of Geophysical Research 88(C11): 6576-6586.
 - DOI or URL: 10.1029/JC088IC11P06576
@@ -4677,6 +4685,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: matches (DOI as the design doc gives it).
 
+- Read in WP-14a (2026-10-02): Not obtained (AGU/Wiley and ADS refuse scripted access; NASA NTRS holds metadata only). The design's 1.87e6 J/m2/K attributed to this lineage was traced to Zhuang et al.'s land surface (CLM-122).
 ### NorthKim2017
 - Reference: North, G. R., & Kim, K.-Y. (2017). Energy Balance Climate Models. Wiley-VCH.
 - DOI or URL: 10.1002/9783527698844
@@ -4699,6 +4708,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: matches.
 
+- Read in WP-14a (2026-10-02): Not obtained. An open PDF exists only on a course page that re-hosts the publisher's file, which the library rules exclude. Ferreira et al. 2018 (p. 337) is the secondary statement used (CLM-128).
 ### RoseMarshall2009
 - Reference: Rose, B. E. J., & Marshall, J. (2009). Ocean heat transport, sea ice, and multiple climate states: Insights from energy balance models. Journal of the Atmospheric Sciences 66(9): 2828-2843.
 - DOI or URL: 10.1175/2009JAS3039.1; MIT copy http://hdl.handle.net/1721.1/53519
@@ -4721,6 +4731,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: abstract fetched (Crossref/Semantic Scholar)
 - Reference check: EXISTS and the citation is right (46: 327-352). What it is cited for (deep water forms in the narrowest polar-connected basin; basin width selects the Atlantic) is NOT what the abstract leads with: the abstract says the asymmetry occurs "because the Atlantic is more saline". Citing papers also say basin width/continent shape is one proposed control (see Part 2).
 
+- Read in WP-14a (2026-10-02): Fetched and read in full (NSF public access repository, https://par.nsf.gov/servlets/purl/10101075; Ferreira2018.txt): basin width as one cause of Atlantic sinking (section 4.2, pp. 337-338; p. 344). CLM-132 verified; it gives no basin widths, AMOC number or deep-water temperature (CLM-163).
 ### Trenberth2001
 - Reference: Trenberth, K. E., & Caron, J. M. (2001). Estimates of meridional atmosphere and ocean heat transports. Journal of Climate 14(16): 3433-3443.
 - DOI or URL: 10.1175/1520-0442(2001)014<3433:EOMAAO>2.0.CO;2
@@ -4732,6 +4743,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: search result snippet only (citing passages)
 - Reference check: matches.
 
+- Read in WP-14a (2026-10-02): Fetched (a copy deposited on Zenodo, https://zenodo.org/records/1234671, depositor unknown; Trenberth2001.txt) and read: atmosphere 5.0 +/- 0.14 PW at 43 N (abstract); the ocean peak only in Fig. 7, about 2 PW near 15-20 N, read by eye; 1.5-2.0 PW observed at 24 N (p. 3439). CLM-133 verified.
 ### Lindzen1987
 - Reference: Lindzen, R. S., & Nigam, S. (1987). On the role of sea surface temperature gradients in forcing low-level winds and convergence in the tropics. Journal of the Atmospheric Sciences 44(17): 2418-2436.
 - DOI or URL: 10.1175/1520-0469(1987)044<2418:OTROSS>2.0.CO;2
@@ -4744,6 +4756,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: search result snippet only (citing passages)
 - Reference check: EXISTS, citation right. The paper is about SST gradients forcing marine boundary-layer pressure gradients; the design uses the idea for land-sea (monsoon) temperature contrasts. That is an extension, not the paper's subject.
 
+- Read in WP-14a (2026-10-02): Not obtained (AMS refuses scripted access; NASA NTRS record only; no author copy found). Read through Back & Bretherton 2009 instead (CLM-141 stays from-memory).
 ### Dommenget2011
 - Reference: Dommenget, D., & Flöter, J. (2011). Conceptual understanding of climate change with a globally resolved energy balance model. Climate Dynamics 37(11-12): 2143-2165.
 - DOI or URL: 10.1007/s00382-011-1026-0
@@ -4755,6 +4768,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: matches.
 
+- Read in WP-14a (2026-10-02): Fetched (the author's copy, https://users.monash.edu.au/~dietmard/papers/dommenget.and.floeter.greb.paper.cdym2011.pdf; Dommenget2011.txt; correct DOI 10.1007/s00382-011-1026-0) and read: eq. 7 bulk evaporation with a turbulent wind of 3 m/s (ocean) and 2 m/s (land) added to the 850 hPa wind (section 3.3); kappa = 8e5 m2/s in section 3.5 but 2e5 in Table 2 (the paper disagrees with itself); C_w and rho_air not numbered; 3.75 x 3.75 degree grid (CLM-142, CLM-139).
 ### Stassen2019
 - Reference: Stassen, C., Dommenget, D., & Loveday, N. (2019). A hydrological cycle model for the Globally Resolved Energy Balance (GREB) model v1.0. Geoscientific Model Development 12(1): 425-440.
 - DOI or URL: 10.5194/gmd-12-425-2019
@@ -4766,6 +4780,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: matches.
 
+- Read in WP-14a (2026-10-02): Read WP-14a: 3.75 degree grid (p. 426), eq. 2 (p. 427), eqs. 12-16 (c_eva 0.58/0.25, c_turb 5.4/11.5 m/s, p. 431), eq. 18 (f = 2.5) (CLM-119, CLM-142).
 ### Fanning1996
 - Reference: Fanning, A. F., & Weaver, A. J. (1996). An atmospheric energy-moisture balance model: Climatology, interpentadal climate change, and coupling to an ocean general circulation model. Journal of Geophysical Research 101(D10): 15111-15128.
 - DOI or URL: 10.1029/96JD01017
@@ -4799,6 +4814,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: search result snippet only (citing passages)
 - Reference check: EXISTS, citation right. See Part 2 for the 15.6.
 
+- Read in WP-14a (2026-10-02): Fetched (a co-author's copy, https://www.aos.wisc.edu/~lback/wvpprecip.pdf; Bretherton2004.txt) and read: daily fit eq. 1 (a_d 15.6, r_d 0.603, p. 1519), monthly fit eq. 2 (a_m 11.4, r_m 0.522, p. 1521), W*ref 72 mm (p. 1521). The design's rain law was changed to the monthly fit (CLM-145).
 ### Manabe1969
 - Reference: Manabe, S. (1969). Climate and the ocean circulation: I. The atmospheric circulation and the hydrology of the earth's surface. Monthly Weather Review 97(11): 739-774.
 - DOI or URL: 10.1175/1520-0493(1969)097<0739:CATOC>2.3.CO;2
@@ -4811,6 +4827,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: search result snippet only (citing passages)
 - Reference check: EXISTS, citation right (Part I, pp. 739-774; Part II by Manabe & Bryan follows at 775-805).
 
+- Read in WP-14a (2026-10-02): Fetched from GFDL (https://www.gfdl.noaa.gov/bibliography/related_files/sm6901.pdf; Manabe1969.txt, poor text layer, equations read on the page image) and read: eqs. 18 and 20, W_K = 0.75 W_FC, field capacity 15 cm (p. 743). CLM-143 verified.
 ### Siler2018
 - Reference: Siler, N., Roe, G. H., & Armour, K. C. (2018). Insights into the zonal-mean response of the hydrologic cycle to global warming from a diffusive energy balance model. Journal of Climate 31(18): 7481-7493.
 - DOI or URL: 10.1175/JCLI-D-18-0081.1
@@ -4845,6 +4862,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: matches.
 
+- Read in WP-14a (2026-10-02): Fetched (the author's site, https://eisenman.ucsd.edu/papers/Wagner-Eisenman-2015.pdf; library key WagnerEisenman2015) and read: Table 1 (p. 4001), k = 2 W/m/K and L_f of pure ice, a 75 m mixed layer (p. 4002) (notes on CLM-013, CLM-093, CLM-095).
 ### Klein1993
 - Reference: Klein, S. A., & Hartmann, D. L. (1993). The seasonal cycle of low stratiform clouds. Journal of Climate 6(8): 1587-1606.
 - DOI or URL: 10.1175/1520-0442(1993)006<1587:TSCOLS>2.0.CO;2
@@ -4868,6 +4886,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: search result snippet only (citing passages)
 - Reference check: EXISTS, pages right. Author order differs: Crossref gives Serreze, Schnell, Kahl; the code writes Serreze, Kahl & Schnell. The paper is about inversions over the Eurasian Arctic (soundings and drifting stations), which fits "winter surface inversion"; the specific "Siberia's January surface 10-20 K below 850 hPa" could not be checked.
 
+- Read in WP-14a (2026-10-02): Not obtained (AMS refuses scripted access; no author copy found). The inversion size was checked against the NCEP/NCAR reanalysis instead (CLM-165); CLM-134 stays from-memory.
 ### Ramirez2024
 - Reference: Ramirez, R. M. (2024). A new 2D energy balance model for simulating the climates of rapidly and slowly rotating terrestrial planets. The Planetary Science Journal 5(1): 2.
 - DOI or URL: 10.3847/PSJ/AD0729; preprint arXiv 2310.15992
@@ -4879,6 +4898,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched (arxiv.org/html/2310.15992 returned 404; PDF not text-readable)
 - Reference check: IDENTIFIED by title search (the name "PlaHab" returns nothing in Crossref). Year is 2024 in the journal (2023 as a preprint); the design doc's "Ramirez 2023" is the preprint year. I did not confirm that the paper uses 1/25 for the zonal-to-meridional ratio.
 
+- Read in WP-14a (2026-10-02): Read WP-14a: eq. 1 and the diffusion values, p. 3 (Do,1 = 0.5; Do,2 = 0.02 below 45 degrees, 0.0002 above). CLM-121. The design had the year as 2023.
 ### Tetens
 - Reference: UNIDENTIFIED in this pass. The code names only "Tetens" for a saturation-vapour formula. Likely Tetens, O. (1930), "Über einige meteorologische Begriffe", Zeitschrift für Geophysik 6: 297-309; this is my recollection, not verified (no DOI, no lookup possible).
 - DOI or URL: none
@@ -4891,6 +4911,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: cannot confirm.
 
+- Read in WP-14a (2026-10-02): Murray 1967 (J. Appl. Meteor. 6: 203) could not be obtained; its coefficients were read only on a CIRES page quoting it (6.1078 hPa, 17.269388 and 35.86 K over water). Not verified (CLM-142).
 ### ETOPO2022
 - Reference: NOAA National Centers for Environmental Information (2022). ETOPO 2022 15 Arc-Second Global Relief Model. NOAA NCEI.
 - DOI or URL: 10.25921/fd45-gt74 (title and year confirmed through the DataCite API)
@@ -4935,6 +4956,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: full text fetched (the data file header and the annual series, not the paper)
 - Reference check: n/a
 
+- Read in WP-14a (2026-10-02): WP-14a fetched the Berkeley Earth Land/Ocean data file (library BerkeleyEarth_LandOcean/Land_and_Ocean_complete.txt, https://berkeley-earth-temperature.s3.us-west-1.amazonaws.com/Global/Land_and_Ocean_complete.txt) and averaged its monthly anomalies over 1850-1900: -0.306 K (air above sea ice) and -0.296 K (water below), so 13.80 and 14.40 degC (CLM-138).
 ### Kopp2011
 - Reference: Kopp, G., & Lean, J. L. (2011). A new, lower value of total solar irradiance: Evidence and climate significance. Geophysical Research Letters 38(1): L01706.
 - DOI or URL: 10.1029/2010GL045777
@@ -4973,6 +4995,78 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 ---
 
 ---
+
+## Per-cell climate design: sources added in WP-14a (2026-10-02)
+
+### DonohoeBattisti2011
+- Reference: Donohoe, A., & Battisti, D. S. (2011). Atmospheric and surface contributions to planetary albedo. Journal of Climate 24(16): 4402-4418.
+- DOI or URL: 10.1175/2011JCLI3946.1
+- Ledger ids: CLM-123
+- Library: fetched in WP-14a, the accepted manuscript from the co-author's page (https://atmos.uw.edu/~david/Donohoe_Battisti_Albedo.pdf). Text file: DonohoeBattisti2011.txt. Manuscript pagination, not the journal's.
+- Read in WP-14a: in full by a sub-agent: 88 % of planetary albedo is atmospheric; the atmosphere attenuates the surface contribution by about three (68 % globally, about 60 % in the dry subtropics, eq. 10).
+
+### McCarthy2015
+- Reference: McCarthy, G. D., Smeed, D. A., Johns, W. E., et al. (2015). Measuring the Atlantic Meridional Overturning Circulation at 26°N. Progress in Oceanography 130: 91-111.
+- DOI or URL: 10.1016/j.pocean.2014.10.006
+- Ledger ids: CLM-131
+- Library: fetched in WP-14a, the NERC accepted manuscript (http://nora.nerc.ac.uk/id/eprint/508654/). Text file: McCarthy2015.txt.
+- Read in WP-14a: abstract and highlights: 17.2 Sv and 1.22 PW, April 2004 to October 2012.
+
+### FrajkaWilliams2019
+- Reference: Frajka-Williams, E., Ansorge, I. J., Baehr, J., et al. (2019). Atlantic Meridional Overturning Circulation: observed transport and variability. Frontiers in Marine Science 6: 260.
+- DOI or URL: 10.3389/fmars.2019.00260
+- Ledger ids: CLM-131
+- Library: fetched in WP-14a (open access). Text file: FrajkaWilliams2019.txt.
+- Read in WP-14a: section 2.2.4: 17.0 +/- 4.4 Sv, April 2004 to February 2017.
+
+### BackBretherton2009
+- Reference: Back, L. E., & Bretherton, C. S. (2009). On the relationship between SST gradients, boundary layer winds, and convergence over the tropical oceans. Journal of Climate 22(15): 4182-4196.
+- DOI or URL: 10.1175/2009JCLI2392.1
+- Ledger ids: CLM-141
+- Library: fetched in WP-14a, the author's copy (https://www.aos.wisc.edu/~lback/SSTgradients.pdf). Text file: BackBretherton2009.txt.
+- Read in WP-14a: its account of Lindzen & Nigam 1987 (a layer to 700 hPa and a back-pressure term, p. 4183; 850 hPa more realistic, p. 4195).
+
+### LargeYeager2004
+- Reference: Large, W. G., & Yeager, S. G. (2004). Diurnal to decadal global forcing for ocean and sea-ice models: the data sets and flux climatologies. NCAR Technical Note NCAR/TN-460+STR.
+- DOI or URL: 10.5065/D6KK98Q6
+- Ledger ids: CLM-128
+- Library: fetched in WP-14a (https://www.aoml.noaa.gov/ftp/phod/sklee/articles/core2/large_yeager_2004_core.pdf). Text file: LargeYeager2004.txt.
+- Read in WP-14a: eq. 6a, the neutral 10-m drag coefficient (1.06e-3 at 5 m/s, 1.18e-3 at 10 m/s, computed).
+
+### IPCC2001_ch6
+- Reference: Ramaswamy, V., et al. (2001). Radiative forcing of climate change. In Climate Change 2001: The Scientific Basis (IPCC TAR, WG1), chapter 6, pp. 349-416. Cambridge University Press.
+- DOI or URL: https://www.ipcc.ch/site/assets/uploads/2018/03/TAR-06.pdf
+- Ledger ids: CLM-069
+- Library: fetched in WP-14a. Text file: IPCC2001_ch6.txt.
+- Read in WP-14a: Table 6.2 (p. 358), the three CO2 expressions and the footnote crediting Myhre et al. 1998b.
+
+### Kalnay1996
+- Reference: Kalnay, E., et al. (1996). The NCEP/NCAR 40-year reanalysis project. Bulletin of the American Meteorological Society 77: 437-471. Data: NOAA PSL, NCEP/NCAR Reanalysis 1 monthly long-term means 1991-2020.
+- DOI or URL: 10.1175/1520-0477(1996)077<0437:TNYRP>2.0.CO;2; data https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/Monthlies/
+- Ledger ids: CLM-164, CLM-165
+- Library: the data files (uwnd, vwnd, air at pressure levels and sigma 0.995) and the two scripts that read them, folder NCEP_R1_ltm/. The paper itself was not fetched. Public-domain US government data, used for validation only.
+- Read in WP-14a: computed zonal-mean winds and January inversions (see the rows).
+
+### Stull2017
+- Reference: Stull, R. (2017). Practical Meteorology: An Algebra-based Survey of Atmospheric Science, version 1.02b. University of British Columbia. Chapter 2.
+- DOI or URL: https://www.eoas.ubc.ca/books/Practical_Meteorology/
+- Ledger ids: CLM-123
+- Library: fetched in WP-14a (CC BY-NC-SA; chapters 1, 2, 4). Text file: Stull2017_Ch02-radiation.txt.
+- Read in WP-14a: Table 2-5, typical albedos (p. 43).
+
+### Norton1979
+- Reference: Norton, C. C., Mosher, F. R., & Hinton, B. (1979). An investigation of surface albedo variations during the recent Sahel drought. NASA CR-157198 (grant final report).
+- DOI or URL: https://ntrs.nasa.gov/citations/19790021556
+- Ledger ids: CLM-123
+- Library: fetched in WP-14a. Text file: Norton1979.txt.
+- Read in WP-14a: p. 2, Charney et al. 1977's Sahel albedo change from 0.14 to 0.35 (a secondary citation of Charney).
+
+### Guilloteau2000
+- Reference: Guilloteau, S. (2000). Atmospheric absorption: water (section 8.1.4). IRAM Interferometry School lecture notes.
+- DOI or URL: https://web-archives.iram.fr/IS/IS2002/html_1/node86.html
+- Ledger ids: CLM-144
+- Library: fetched in WP-14a. Text file: Guilloteau2000.txt.
+- Read in WP-14a: "The scale height of water ... is small (typically 2 km)". Institutional lecture notes, not peer reviewed.
 
 ## Lithospheric flexure (ISO-040 to ISO-067)
 

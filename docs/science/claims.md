@@ -24,7 +24,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [BAK](ledger/BAK.md) | the bake, satellite view | 40 | 0 | 0 | 0 | 0 | 1 | 34 | 5 | 0 | 0 | 0 |
 | [BIO](ledger/BIO.md) | Köppen classes and biomes | 100 | 24 | 2 | 0 | 3 | 1 | 69 | 1 | 0 | 0 | 0 |
 | [CHK](ledger/CHK.md) | plate-check target ranges | 59 | 19 | 3 | 1 | 7 | 0 | 11 | 18 | 3 | 4 | 0 |
-| [CLM](ledger/CLM.md) | climate physics | 134 | 0 | 40 | 5 | 0 | 13 | 21 | 55 | 106 | 28 | 12 |
+| [CLM](ledger/CLM.md) | climate physics | 138 | 23 | 24 | 2 | 0 | 14 | 25 | 50 | 106 | 32 | 12 |
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
 | [DEF](ledger/DEF.md) | folds, faults, intrusions | 74 | 17 | 0 | 0 | 1 | 0 | 56 | 0 | 0 | 0 | 0 |
 | [DEP](ledger/DEP.md) | deposit models, counts, sizes | 165 | 54 | 2 | 0 | 20 | 0 | 62 | 27 | 0 | 0 | 40 |
@@ -49,7 +49,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [STR](ledger/STR.md) | strata, traps, hosts | 46 | 1 | 0 | 0 | 1 | 2 | 42 | 0 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 74 | 0 | 0 | 0 | 1 | 2 | 47 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
-| **all** | | **2,285** | **234** | **323** | **34** | **93** | **79** | **989** | **533** | **357** | **48** | **193** |
+| **all** | | **2,289** | **257** | **307** | **31** | **93** | **80** | **993** | **528** | **357** | **52** | **193** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),
@@ -228,7 +228,7 @@ code). "Evidence" says how strong the finding is.
 | 14 | DEF-019, DEF-020 | Fault dips from Anderson 1951 are applied in block space, which is stretched 15 times vertically: real dips become about 6.6° and 2.2°. A design question, not a typo. | arithmetic from the build log's own formula **WP-8 (2026-10-02):** the angles are verified (Anderson 1905, read in full; Collettini & Sibson 2001, abstract). Not a units error: the code says on purpose that folds and faults are drawn undistorted in blocks (DEF-011). Physics favours true metres; put to Ben with sections drawn three ways (STATUS.md "Pending questions"). |
 | 15 | DEF-042, RCK-061 | A "stock" is coded larger than the definition quoted beside it; the pluton thickness law cited to Cruden 1998 is not in that paper's abstract. | secondary; primary abstract **DEF-042 settled in WP-8 (2026-10-02):** no contradiction. The definition is about the exposed area (Earle 2019, read); the coded radius is the body's half-width at the world's floor, and a stock's outcrop is only its cupola, a few per cent of that. The comment is corrected; no value changed. RCK-061 is WP-7's. **RCK-061 settled in WP-7 (2026-10-02):** T = 0.6 D^0.6 km is the fit of Cruden and McCaffrey 2001 (read in Cruden 2008, SKB R-08-138), with D the diameter of the circle of equal area; Cruden 1998 gives no equation. The code now uses D instead of the long axis. |
 | 16 | HYP-010 | The ocean's most common depth is stated as 3 to 4 km; NOAA gives about 4.3 km and the project's own Earth table peaks in the 4 to 5 km band. | agency page (sub-agent) |
-| 17 | CLM (ice thickness) | Land ice uses a hard-coded gravity of 9.81 m/s² and ignores the planet's gravity setting. In code that is `pending-rewrite`; carry the fix into the new climate. | code reading |
+| 17 | CLM (ice thickness) | Land ice uses a hard-coded gravity of 9.81 m/s² and ignores the planet's gravity setting. In code that is `pending-rewrite`; carry the fix into the new climate. | code reading **WP-14a (2026-10-02):** written into the per-cell design (section 4.6, task T6) with a test; the unmerged ice branch's `sheet.rs` imports the same constant, so T6 fixes both. No code changed now (the code is about to be replaced and the branch is not merged). |
 | 18 | PLT, plate-check and the force-balance design | "Slab-attached plates move 3 to 4 times faster" is attributed to Forsyth & Uyeda 1975; the statement found is in Conrad & Lithgow-Bertelloni 2004. Correct the attribution before the force balance is calibrated to it. | primary abstracts **Settled in WP-13a (2026-10-02):** Forsyth & Uyeda 1975 was read in full. They give slab-attached plates at 6-9 cm/yr and the others at 0-4 cm/yr (p. 178), and their Table 1 gives a ratio of means of 3.8; the words "~4 times faster" are Conrad & Lithgow-Bertelloni 2004's. The designs, PLT-162 and CHK-056 now say so. |
 | 19 | SCL (`pole_cap_deg`), preset | The preset's pole-cap latitude is read by nothing; the game uses its own value from the world preset file. | code reading |
 | 20 | SCL-039 and the timeline range | A run may be 4,600 Myr long while the planet's age defaults to 4.57 Gyr. | arithmetic |
@@ -350,7 +350,7 @@ well-specified checking and fixing, Opus where a wrong value forces a design or 
 | WP-12 | SCL, BAK, PRV, POL, PRS | 212 | 4 / 0 | 10 | Sonnet 5.5 | Fix 19, 20, 34, 35, 36, 37. Identify the province map properly or drop the citation. PRS (presets other than the default, test and world presets) is new here. |
 | WP-13a | PLT `not-yet-coded`, CHK | 86 | 5 / 0 | 27 | Opus | **Before the force balance is built.** Fix 18, 38 to 41. Confirm slab pull, continental drag, wedge taper, suction share. CHK (the plate-check target ranges) is new here. |
 | WP-13b | PLT rest, CRE | 198 | 3 / 0 | 23 | Sonnet 5.5 | **Deferred** until the plate rewrite lands; then ledger the new code and verify. CRE (geometry, noise, plate state, deformation lattice) is new; `plates/dynamics.rs` is still not covered. |
-| WP-14a | CLM `not-yet-coded` | 28 | 4 / 0 | 11 | Opus | **Before the per-cell climate is built.** Fix 17 in the new code. |
+| WP-14a | CLM `not-yet-coded` | 28 | 4 / 0 | 11 | Opus | **Done** (2026-10-02): the design's constants read against their sources; the design document corrected where a source disagreed (surface-dependent D, desert albedo, drag, evaporation wind, rain law); 12 rows `verified`, CLM-163 to CLM-166 added; eleven carried-over coded rows verified; fix 17 written into the design (T6). See [per-cell-climate.md](per-cell-climate.md). |
 | WP-14b | CLM rest, MOI | 176 | 13 / 0 | 19 | Sonnet 5.5 | **Deferred** until the climate rewrite lands. |
 | WP-15 | HNT (and the hint rows in PLT, HYD, IMP) | 84 | 0 / 0 | 0 | Sonnet 5.5 | The hint texts are now ledgered (HNT, 84 rows). Remaining: one table of Earth figures with one source each; fix 27 to 33. |
 | WP-16 | GEO | 51 | 0 / 0 | 0 | Sonnet 5.5 | New. The geothermal features (51 rows, all `game-choice` or `uncited`): find sources for the rainfall threshold and decide what is a game choice; fix 44 to 46. |
@@ -456,7 +456,7 @@ Produced by WP-0 (2026-10-02). The library is a folder on the test machine with 
 #### WP-14a: 28 rows; 15 sources
 
 - **Readable in the library** (text file names are in the folder named by the key): `Ramirez2024` (Ramirez2024.txt); `Rohde2020` (Rohde2020.txt); `Stassen2019` (Stassen2019.txt); `Ziegler2021` (Ziegler2021.txt).
-- **Not readable** : `Bretherton2004` (open access); `Dommenget2011` (other); `Ferreira2018` (open copy); `Lindzen1987` (paywalled, no substitute found); `Manabe1969` (paywalled, no substitute found); `North1983` (other); `Serreze1992` (open access); `Stommel1948` (other); `Tetens` (not found); `Trenberth2001` (open access); `Zhuang2017` (other).
+- **Added in WP-14a** (2026-10-02, lawful open copies): `Bretherton2004` (co-author's copy); `Manabe1969` (GFDL); `Trenberth2001` (Zenodo deposit); `Ferreira2018` (NSF public access repository); `Dommenget2011` (author's copy); `DonohoeBattisti2011` (accepted manuscript, co-author's page); `WagnerEisenman2015` (author's site); `McCarthy2015` (NERC accepted manuscript); `FrajkaWilliams2019` (open access); `BackBretherton2009` (author's copy); `LargeYeager2004` (NCAR technical note); `IPCC2001_ch6` (IPCC); `climlab_src` (MIT source); `Zhuang2017` (the release's manual only); `Stull2017`, `Norton1979`, `Bierwirth2009`, `Guilloteau2000`; `BerkeleyEarth_LandOcean` (data file); `NCEP_R1_ltm` (NOAA PSL reanalysis long-term means). Still not readable: `Lindzen1987`, `Serreze1992`, `Stommel1948` (an open copy exists only on a course page re-hosting the publisher's PDF), `North1983`, `Murray1967` (Tetens), Large & Pond 1981, the Zhuang et al. 2017 paper itself (Elsevier refuses scripted access).
 
 #### WP-14b: 176 rows; 32 sources
 
