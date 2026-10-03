@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! The meta part of the bake, on L1 (plan §5.3): `meta/plate_id` (u16), `meta/crust_age_myr`
 //! (u16, Myr; nodata 65535 on continental crust, whose formation age the plate model does not
-//! track) and `meta/province` (u16), for the viewer, "Why here?" and legends; `province` also
-//! drives TerraBlender's regions (plan §7.3, P1-10).
+//! track), `meta/heat_flow_mw_m2` (u16, 0.1 mW/m²; the plate model's continental heat flow, nodata
+//! on oceanic crust: the game's geothermal fields, GEO-055) and `meta/province` (u16), for the
+//! viewer, "Why here?" and legends; `province` also drives TerraBlender's regions (plan §7.3,
+//! P1-10).
 //!
 //! **Provinces** (P1-10). Every L1 cell gets its USGS class from [`crate::provinces`] (shield,
 //! platform, orogen, basin, large igneous province, extended crust, oceanic crust in three age
@@ -27,6 +29,24 @@ use crate::world::WorldState;
 
 /// The class code of a cell the plate model has nothing for.
 pub const UNCLASSIFIED: u8 = CLASSES.len() as u8; // ledger: PRV-031 (game-choice)
+
+/// The layer holding the plate model's continental heat flow (L1, u16).
+pub const HEAT_FLOW_LAYER: &str = "meta/heat_flow_mw_m2"; // ledger: GEO-055
+/// Its quantum, mW/m² per count (a value is `raw × scale`; the plate model's largest continental
+/// value is 200, far under the u16 range at 0.1).
+pub const HEAT_FLOW_SCALE: f64 = 0.1;
+/// Its nodata: oceanic crust, and a cell the plate model has nothing for.
+pub const HEAT_FLOW_NODATA: u16 = u16::MAX;
+
+/// The stored count of a cell's continental heat flow `q` (mW/m²): nodata where the plate model
+/// has none (oceanic crust, a gap).
+fn heat_flow_raw(q: f32) -> u16 {
+    if q.is_nan() || q < 0.0 {
+        return HEAT_FLOW_NODATA;
+    }
+    ((f64::from(q) / HEAT_FLOW_SCALE).round() as i64).clamp(0, i64::from(HEAT_FLOW_NODATA) - 1)
+        as u16
+}
 
 /// The name of a class code.
 pub fn class_name(code: u8) -> &'static str {
@@ -189,6 +209,26 @@ pub fn bake(
             &raw,
         )?;
         written.push("meta/crust_age_myr");
+    }
+    // The plate model's surface heat flow on continental crust (Ben, decisions log 2026-10-02,
+    // "Export heat flow"): the game puts geothermal fields where it is high. The L1 field is
+    // interpolated over the continental corners only and is NaN on oceanic crust, whose heat flow
+    // is the sea floor's age law: a coastal land column must not read the young ridge crust
+    // beside it through the raster's interpolation.
+    if let Some(q) = sample("plates/continental_heat_flow_mw_m2") {
+        let raw: Vec<u16> = q.iter().map(|&q| heat_flow_raw(q)).collect();
+        out.layer(
+            desc(
+                HEAT_FLOW_LAYER,
+                DType::U16,
+                &l1,
+                HEAT_FLOW_SCALE,
+                "mW/m2",
+                Some(f64::from(HEAT_FLOW_NODATA)),
+            ),
+            &raw,
+        )?;
+        written.push(HEAT_FLOW_LAYER);
     }
     let mut note = json!({ "layers": written, "grid": l1 });
     let params = p.provinces.unwrap_or_default();
