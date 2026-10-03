@@ -311,7 +311,9 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Gates** (test VM, the tree merged with master f545c0bc and the limit, 79302cee): cargo fmt --check
   clean; clippy -D warnings clean; cargo deny licenses and bans ok; `cargo test --workspace` all
   passed (core 540, 3 ignored; 0 failed in every suite); `./gradlew build test` 229 tests, 0
-  failures, 1 skipped. GameTests: GAMETESTS
+  failures, 1 skipped (741 Rust tests passed in all). GameTests (the same code, 79302cee, through
+  the server lock): `./gametest.sh` all 68 required tests passed; `./gametest.sh -PwithMic`
+  (`tools/smoke/install.sh mic` first, 168 mods) all 68 required tests passed.
 - **GameTests, first try** (tree merged with master 60bbbea8): `./gametest.sh` 1 of the required
   tests failed, `lakeIceAndSaltFollowTheClimate` (a playa column under a shore tree's leaves read
   `oak_leaves` as its ground); the test now looks under leaves (`LakeGameTests`). `-PwithMic` died
