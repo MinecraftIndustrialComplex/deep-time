@@ -125,7 +125,7 @@ catalogue of individual volcanoes that ride on their plates.
     (24) lava lenses about `magma_lens_spacing_blocks` (28) apart, wider than tall (half-height one
     fifth of the radius, 2 to 5 blocks), the lowest about 2.2 times as wide as the highest, joined by
     dike-like conduit segments, in a body of altered hot rock whose width is `magma_mush_width`.
-    Shields get lenses 1.4 times the chamber's radius, arc cones 1.0, silicic centres 0.9 (their
+    Lens radius is the chamber's radius times `magma_lens_width` (1.5) times a kind share: shields 1.4, arc cones 1.0, silicic centres 0.9 (their
     shallow chamber is 1.6 times larger), and quiet volcanoes' lenses are down to 0.7 of an active one's.
     The column's bottom comes from the level's own `min_y`, not from a number.
 

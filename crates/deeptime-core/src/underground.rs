@@ -132,7 +132,7 @@ impl Default for UndergroundParams {
             crater_lake_share: 0.25,                // ledger: MAG-019
             magma_lens_count: 24,                   // ledger: MAG-043
             magma_lens_spacing_blocks: 28.0,        // ledger: MAG-043
-            magma_lens_width: 1.0,                  // ledger: MAG-045
+            magma_lens_width: 1.5,                  // ledger: MAG-045
             magma_mush_width: 1.0,                  // ledger: MAG-054
             remove_lava_features: true,             // ledger: MAG-034
             sea_cliff_skin_blocks: 6,               // ledger: MAG-057
@@ -401,7 +401,7 @@ mod tests {
         let d = UndergroundParams::default();
         assert_eq!(d.magma_lens_count, 24);
         assert_eq!(d.magma_lens_spacing_blocks, 28.0);
-        assert_eq!(d.magma_lens_width, 1.0);
+        assert_eq!(d.magma_lens_width, 1.5);
         assert_eq!(d.magma_mush_width, 1.0);
         assert_eq!(d.sea_cliff_skin_blocks, 6);
         let wide = UndergroundParams {

@@ -378,11 +378,12 @@ class MagmaTest {
         assertNull(one(cone(100, 50, 182, 70), DRY, new MagmaRules(3.0, 1.0, 0.0, true, 24, 28.0, 0.0, 1.0)).bodies().get(0).deep());
         // Read from the world's notes; absent keys keep the defaults.
         JsonObject notes = JsonParser.parseString("{\"bake\": {\"underground\": {\"params\": {\"magma_lens_count\": 7, "
-                + "\"magma_lens_spacing_blocks\": 40, \"magma_lens_width\": 1.5, \"magma_mush_width\": 0}}}}").getAsJsonObject();
+                + "\"magma_lens_spacing_blocks\": 40, \"magma_lens_width\": 2.5, \"magma_mush_width\": 0}}}}").getAsJsonObject();
         MagmaRules r = MagmaRules.of(notes);
         assertEquals(7, r.lensCount());
         assertEquals(40.0, r.lensSpacingBlocks());
-        assertEquals(1.5, r.lensWidth());
+        assertEquals(2.5, r.lensWidth());
+        assertEquals(1.5, MagmaRules.DEFAULT.lensWidth());
         assertEquals(0.0, r.mushWidth());
         assertEquals(3.0, r.chamberDepthKm());
         assertEquals(24, MagmaRules.DEFAULT.lensCount());
