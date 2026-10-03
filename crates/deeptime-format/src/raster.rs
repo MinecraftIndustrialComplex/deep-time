@@ -165,7 +165,11 @@ impl GridDesc {
     pub fn area_share(&self, j: u32) -> f64 {
         let (z, half) = (self.block_z(i64::from(j)) as f64, 0.5 * f64::from(self.r));
         let lo = if j == 0 { f64::NEG_INFINITY } else { z - half };
-        let hi = if j + 1 >= self.h { f64::INFINITY } else { z + half };
+        let hi = if j + 1 >= self.h {
+            f64::INFINITY
+        } else {
+            z + half
+        };
         let r = self.projection().radius();
         ((hi.min(r) - lo.max(-r)).max(0.0) / f64::from(self.r)).min(1.0)
     }

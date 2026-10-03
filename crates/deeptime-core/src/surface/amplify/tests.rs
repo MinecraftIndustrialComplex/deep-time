@@ -1084,7 +1084,8 @@ fn the_stage_streams_under_auto_when_only_the_whole_path_peak_is_over_the_cap() 
     let last_only = (gw * gh) as u64 * TILE_BYTES_PER_CELL;
     let peak_over_l2 = whole_last_level_peak(0, 2, gw, gh, 128);
     assert!(
-        peak_over_l2 > last_only + (2 << 20),
+        // The middle level alone is 1.7 MB (512 × 164 cells at 21 bytes).
+        peak_over_l2 > last_only + (3 << 19),
         "the case is not degenerate"
     );
     let held = 0;

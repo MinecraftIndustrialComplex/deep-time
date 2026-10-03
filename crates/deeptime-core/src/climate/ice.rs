@@ -363,7 +363,10 @@ mod tests {
         let ice = [false, true, true, true];
         let sy = [1.0, 1.0, 2.0, 3.0];
         let d = distance_to_margin(w, h, &ice, &[1.0; 4], &sy);
-        assert!((d[1] - 1.0).abs() < 1e-12 && (d[2] - 2.5).abs() < 1e-12 && (d[3] - 5.0).abs() < 1e-12, "{d:?}");
+        assert!(
+            (d[1] - 1.0).abs() < 1e-12 && (d[2] - 2.5).abs() < 1e-12 && (d[3] - 5.0).abs() < 1e-12,
+            "{d:?}"
+        );
     }
 
     #[test]
@@ -390,7 +393,15 @@ mod tests {
                 i * i + j * j < 100.0
             })
             .collect();
-        let t = thickness(w, h, &ice, &vec![10_000.0; h], &vec![10_000.0; h], 5.0e4, 4000.0);
+        let t = thickness(
+            w,
+            h,
+            &ice,
+            &vec![10_000.0; h],
+            &vec![10_000.0; h],
+            5.0e4,
+            4000.0,
+        );
         let centre = t[16 * w + 32];
         let edge = t[16 * w + 41];
         assert!(centre > 2.0 * edge && edge > 0.0, "{centre} {edge}");

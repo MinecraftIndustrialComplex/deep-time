@@ -1359,11 +1359,7 @@ impl BakeMap {
         };
         // Past the poles there is no planet: the page's background (transparent on the overlay).
         let proj = deeptime_format::Projection::new(self.meta.c);
-        let beyond: [u8; 4] = if layer.opaque() {
-            BEYOND_POLE
-        } else {
-            [0; 4]
-        };
+        let beyond: [u8; 4] = if layer.opaque() { BEYOND_POLE } else { [0; 4] };
         for j in 0..TILE {
             if !proj.on_planet(0.0, g.z0 + j as f64 * g.s) {
                 for px in rgba[j * TILE * 4..(j + 1) * TILE * 4].chunks_mut(4) {
