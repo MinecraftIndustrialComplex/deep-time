@@ -128,7 +128,8 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     );
     assert_eq!(
         u32::from_be_bytes(slice.body[20..24].try_into().unwrap()),
-        64
+        41,
+        "the map's aspect, π : 1"
     );
     assert!(kept(&dir, "slice-d60-w128.png"), "the slice is kept");
     let again = route(&wb, "/api/runs/baked/rock/slice.png", q).unwrap();

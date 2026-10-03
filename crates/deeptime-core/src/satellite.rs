@@ -624,7 +624,10 @@ pub fn box_filter(
 /// The mean of `f` over the cells pixel (px, py) covers when `f` is finer than the picture, else
 /// the nearest cell.
 fn mean(f: &Field, px: usize, py: usize, w: usize, h: usize) -> f32 {
-    let (kx, ky) = (f.grid.w as usize / w, f.grid.h as usize / h);
+    // Rows of the grid a pixel covers: the picture spans the planet's extent, the grid may reach
+    // a little past it.
+    let rows = f.grid.projection().extent().1 / f64::from(f.grid.r);
+    let (kx, ky) = (f.grid.w as usize / w, (rows / h as f64) as usize);
     if kx < 2 && ky < 2 {
         return nearest(f, px, py, w, h);
     }
@@ -703,7 +706,6 @@ pub fn shaded(rgb: [f32; 3], strength: f32, shade: f32) -> [u8; 3] {
 /// equirectangular picture of a sphere of radius `radius_m`.
 pub fn hillshade(z: &[f32], w: usize, h: usize, radius_m: f64, look: &Look) -> Vec<f32> {
     let light = Light::new(look);
-    let dy = std::f64::consts::PI * radius_m / h as f64;
     let at = |i: usize, j: usize, c: f32| {
         let v = z[j * w + i];
         if v.is_finite() {
@@ -714,8 +716,10 @@ pub fn hillshade(z: &[f32], w: usize, h: usize, radius_m: f64, look: &Look) -> V
     };
     let mut out = vec![1.0f32; w * h];
     for j in 0..h {
-        let lat = deeptime_format::Projection::picture_lat_deg(j as f64, h as u32).to_radians();
-        let dx = 2.0 * std::f64::consts::PI * radius_m * lat.cos().max(0.15) / w as f64;
+        // Slopes true on the sphere (cos φ held at 0.15 or more near the poles).
+        let (dx, dy) = deeptime_format::Projection::picture_pixel_m(
+            j as f64, w as u32, h as u32, radius_m, 0.15,
+        );
         let (jn, js) = (j.saturating_sub(1), (j + 1).min(h - 1));
         for i in 0..w {
             let c = z[j * w + i];
@@ -899,7 +903,8 @@ mod tests {
     use deeptime_format::GridDesc;
 
     const W: usize = 32;
-    const H: usize = 16;
+    // C = 512: the grid's rows run from z = −96, past the Lambert pole at 81.5.
+    const H: usize = 12;
 
     fn luma(p: &[u8]) -> f32 {
         0.2126 * f32::from(p[0]) + 0.7152 * f32::from(p[1]) + 0.0722 * f32::from(p[2])
@@ -1267,10 +1272,12 @@ mod tests {
         let alt = f64::from(look.light_altitude_deg).to_radians();
         let light = [az.sin() * alt.cos(), -az.cos() * alt.cos(), alt.sin()];
         let e = f64::from(look.exaggeration);
-        let dy = std::f64::consts::PI * 6.37e6 / h as f64;
         for j in 0..h {
-            let lat = deeptime_format::Projection::picture_lat_deg(j as f64, h as u32).to_radians();
-            let dx = 2.0 * std::f64::consts::PI * 6.37e6 * lat.cos().max(0.15) / w as f64;
+            // The Lambert picture: rows uniform in sin φ.
+            let sin_lat = (1.0 - 2.0 * j as f64 / h as f64).clamp(-1.0, 1.0);
+            let cos_lat = (1.0 - sin_lat * sin_lat).sqrt().max(0.15);
+            let dx = 2.0 * std::f64::consts::PI * 6.37e6 * cos_lat / w as f64;
+            let dy = 2.0 * 6.37e6 / (h as f64 * cos_lat);
             let (jn, js) = (j.saturating_sub(1), (j + 1).min(h - 1));
             for i in 0..w {
                 let (iw, ie) = ((i + w - 1) % w, (i + 1) % w);

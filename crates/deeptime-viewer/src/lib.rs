@@ -245,12 +245,16 @@ fn satellite_entry(dir: &Path, c: u32, t: &Timeline) -> io::Result<Option<Value>
     let file = format!("layers/{}.png", slug(SATELLITE_LAYER));
     write_rgba_png(&dir.join(&file), k.w, k.h, rgba)?;
     let r = f64::from(c) / f64::from(k.w);
+    // The keyframe is a map picture: x linear in longitude, z linear from the north pole, so it is a
+    // block-space picture whose rows start at the pole (rounded: its rows are 2R/h blocks apart,
+    // within a block of r over the whole height at the π : 1 aspect).
+    let pole = deeptime_format::Projection::new(c).pole_z().round() as i64;
     Ok(Some(json!({
         "name": SATELLITE_LAYER, "slug": slug(SATELLITE_LAYER), "units": "", "scale": 1.0,
         "offset": 0.0, "nodata": null, "ramp": SATELLITE_LAYER,
         "grid": { "name": "keyframe", "w": k.w, "h": k.h, "r": r, "wraps_x": true,
                   "origin_block_x": -i64::from(c / 2),
-                  "origin_block_z": deeptime_format::Projection::new(c).grid_origin_z() },
+                  "origin_block_z": -pole },
         "image": { "file": file, "w": k.w, "h": k.h, "stride": 1 },
         "values": null,
         "view": { "n": k.n, "t": k.t, "stage": k.stage },
@@ -533,7 +537,7 @@ mod tests {
 
     #[test]
     fn sees_format() {
-        assert_eq!(super::FORMAT_VERSION, "0.3");
+        assert_eq!(super::FORMAT_VERSION, "0.4");
     }
 
     #[test]

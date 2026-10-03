@@ -4,8 +4,11 @@
 //! relief, whose Köppen map everyone knows — away from the simulated history.
 //!
 //! The raster is raw little-endian f32, `w` × `h` cells, row 0 at the north pole, column i at
-//! longitude 360°·i/w, metres relative to sea level. The planet is taken as Earth-sized (the
-//! Earth-normalized lengths apply 1:1) unless `--circumference-km` says otherwise.
+//! longitude 360°·i/w, metres relative to sea level, rows uniform in latitude (equirectangular,
+//! as GMT writes Earth's relief: the input file's own layout). The climate runs on the planet's own
+//! grid (`deeptime_format::projection`), each of whose rows takes the DEM row at its latitude. The
+//! planet is taken as Earth-sized (the Earth-normalized lengths apply 1:1) unless
+//! `--circumference-km` says otherwise.
 
 use std::path::PathBuf;
 use std::time::Instant;
@@ -76,7 +79,7 @@ pub fn run(o: &Options) -> CliResult<()> {
         )
         .into());
     }
-    let z: Vec<f64> = bytes
+    let dem: Vec<f64> = bytes
         .as_chunks::<4>()
         .0
         .iter()
@@ -96,10 +99,19 @@ pub fn run(o: &Options) -> CliResult<()> {
             gravity = pl["gravity_m_s2"].as_f64().unwrap_or(gravity);
         }
     }
-    // A planet grid of w cells around (r = 1 block per cell; block = circumference / w).
+    // A planet grid of w cells around (r = 1 block per cell; block = circumference / w); each of
+    // its rows takes the DEM row nearest its latitude.
     let grid = GridDesc::for_planet("L1", o.w, 1)?;
     let cell_m = o.circumference_km * 1000.0 / f64::from(o.w);
-    let lat: Vec<f64> = (0..h).map(|j| grid.band_lat_deg(j as u32)).collect();
+    let (dem_h, h) = (h, grid.h as usize);
+    let lat: Vec<f64> = (0..h).map(|j| grid.lat_of_row(j as u32)).collect();
+    let z: Vec<f64> = (0..w * h)
+        .map(|c| {
+            // The DEM's own (equirectangular) row of the latitude.
+            let jd = ((90.0 - lat[c / w]) / 180.0 * dem_h as f64 - 0.5).round();
+            dem[(jd.clamp(0.0, dem_h as f64 - 1.0) as usize) * w + c % w]
+        })
+        .collect();
     let planet = Planet {
         axial_tilt_deg: tilt,
         star_flux_rel: flux,
@@ -167,11 +179,11 @@ pub fn run(o: &Options) -> CliResult<()> {
         s.ice.frac(),
         started.elapsed().as_secs_f64()
     );
-    // Land means (cos φ-weighted) and the main groups' shares of the land.
+    // Land means (by true area) and the main groups' shares of the land.
     let (mut la, mut lt, mut lp) = (0.0, 0.0, 0.0);
     let mut groups = std::collections::BTreeMap::new();
     for j in 0..h {
-        let wgt = lat[j].to_radians().cos();
+        let wgt = grid.area_share(j as u32);
         for i in 0..w {
             let c = j * w + i;
             if z[c] > 0.0 {
@@ -199,9 +211,8 @@ pub fn run(o: &Options) -> CliResult<()> {
     {
         use deeptime_core::climate::{carbon, ice};
         let es = planet.earth_scale;
-        let area: Vec<f64> = lat
-            .iter()
-            .map(|l| (cell_m / 1000.0).powi(2) * l.to_radians().cos().max(0.0) / (es * es))
+        let area: Vec<f64> = (0..h)
+            .map(|j| grid.cell_area_km2(j as u32, cell_m) / (es * es))
             .collect();
         let (mut kernel, mut land_a) = (0.0, 0.0);
         for j in 0..h {
@@ -222,16 +233,18 @@ pub fn run(o: &Options) -> CliResult<()> {
         let mask: Vec<bool> = (0..w * h)
             .map(|c| z[c] > 0.0 && s.glacier[c] != 0)
             .collect();
-        let sx: Vec<f64> = lat
-            .iter()
-            .map(|l| cell_m * l.to_radians().cos().max(0.0) / es)
-            .collect();
+        let (sx, sy): (Vec<f64>, Vec<f64>) = (0..h)
+            .map(|j| {
+                let (a, b) = grid.true_cell_m(j as u32, cell_m);
+                (a / es, b / es)
+            })
+            .unzip();
         let thick = ice::thickness(
             w,
             h,
             &mask,
             &sx,
-            cell_m / es,
+            &sy,
             p.ice_yield_stress_kpa * 1000.0,
             p.ice_max_thickness_m,
             gravity,
@@ -379,8 +392,9 @@ pub fn run(o: &Options) -> CliResult<()> {
             "glacier",
             &s.glacier.iter().map(|&g| f32::from(g)).collect::<Vec<_>>(),
         )?;
+        write("z", &z.iter().map(|&x| x as f32).collect::<Vec<_>>())?;
         let meta = serde_json::json!({
-            "w": w, "h": h, "model": p.model, "rain_model": p.rain_model,
+            "w": w, "h": h, "lat": lat, "model": p.model, "rain_model": p.rain_model,
             "t_global_c": s.ebm_t_global, "net_toa_w_m2": s.ebm_net_toa, "years": s.ebm_years,
             "glaciated_land": s.ice.frac(), "per_cell": s.cell,
             "koppen_codes": koppen::CODES,
@@ -391,7 +405,10 @@ pub fn run(o: &Options) -> CliResult<()> {
     // The printed check: the class at each known place, and whether its group matches.
     let (mut same, mut group) = (0, 0);
     for (name, la, lo, want) in PLACES {
-        let j = (deeptime_format::Projection::picture_y_of_lat(la, h as u32).floor() as usize)
+        let j = (grid
+            .row_of_z(grid.projection().z_of_lat(la))
+            .round()
+            .max(0.0) as usize)
             .min(h - 1);
         let i = ((lo.rem_euclid(360.0) / 360.0 * w as f64).floor() as usize) % w;
         // Coastal cities can fall in a sea cell at this resolution: take the nearest land cell
@@ -490,7 +507,7 @@ pub fn run(o: &Options) -> CliResult<()> {
             "climate",
             &layers,
             0,
-            (o.w, o.h),
+            (o.w, deeptime_format::Projection::picture_height(o.w)),
         )
         .expect("layers exist");
         let info = deeptime_viewer::BundleInfo {

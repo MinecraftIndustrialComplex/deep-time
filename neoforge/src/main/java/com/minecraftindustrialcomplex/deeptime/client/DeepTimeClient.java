@@ -7,6 +7,11 @@ import com.minecraftindustrialcomplex.deeptime.net.WorldInfoPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModLoadingContext;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.neoforge.client.gui.ConfigurationScreen;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent;
@@ -33,7 +38,13 @@ public final class DeepTimeClient {
         NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.LoggingOut.class, e -> {
             ClientPlanetState.reset();
             PolarStorm.reset();
+            DhCurvatureClient.release();
         });
+        // Client settings and their screen (Mods, Deep Time, Config); Distant Horizons' curvature follows the planet.
+        ModContainer container = ModLoadingContext.get().getActiveContainer();
+        container.registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC);
+        container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
+        DhCurvatureClient.init();
     }
 
     /** True when the planet info the server sent is for the level the client shows. */

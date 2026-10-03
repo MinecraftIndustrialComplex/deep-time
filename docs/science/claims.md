@@ -21,10 +21,10 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | Ledger | Subject | Rows | `verified` | `cited-unverified` | `from-memory` | `abstract-only` | `calibrated` | `game-choice` | `uncited` | of which `pending-rewrite` | of which `not-yet-coded` | `merged` (not counted) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | [AMP](ledger/AMP.md) | the amplifier | 73 | 0 | 8 | 0 | 0 | 1 | 55 | 9 | 0 | 0 | 0 |
-| [BAK](ledger/BAK.md) | the bake, satellite view | 42 | 0 | 0 | 0 | 0 | 1 | 36 | 5 | 0 | 0 | 0 |
-| [BIO](ledger/BIO.md) | Köppen classes and biomes | 100 | 24 | 2 | 0 | 3 | 1 | 69 | 1 | 0 | 0 | 0 |
+| [BAK](ledger/BAK.md) | the bake, satellite view | 47 | 2 | 0 | 0 | 0 | 1 | 39 | 5 | 0 | 0 | 0 |
+| [BIO](ledger/BIO.md) | Köppen classes and biomes | 103 | 24 | 2 | 0 | 3 | 1 | 72 | 1 | 0 | 0 | 0 |
 | [CHK](ledger/CHK.md) | plate-check target ranges | 59 | 19 | 3 | 1 | 7 | 0 | 11 | 18 | 3 | 1 | 0 |
-| [CLM](ledger/CLM.md) | climate physics | 154 | 23 | 33 | 2 | 0 | 15 | 28 | 53 | 121 | 32 | 12 |
+| [CLM](ledger/CLM.md) | climate physics | 161 | 23 | 33 | 3 | 0 | 16 | 33 | 53 | 118 | 1 | 14 |
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
 | [DEF](ledger/DEF.md) | folds, faults, intrusions | 74 | 17 | 0 | 0 | 1 | 0 | 56 | 0 | 0 | 0 | 0 |
 | [DEP](ledger/DEP.md) | deposit models, counts, sizes | 165 | 54 | 2 | 0 | 20 | 0 | 62 | 27 | 0 | 0 | 40 |
@@ -32,7 +32,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [FRC](ledger/FRC.md) | plate forces (the force balance, recorded) | 27 | 3 | 0 | 10 | 1 | 0 | 13 | 0 | 0 | 0 | 0 |
 | [GEO](ledger/GEO.md) | geothermal features | 61 | 4 | 0 | 0 | 0 | 0 | 54 | 3 | 0 | 0 | 0 |
 | [GLA](ledger/GLA.md) | glacial erosion and landforms | 74 | 0 | 25 | 1 | 0 | 1 | 28 | 19 | 0 | 0 | 2 |
-| [HNT](ledger/HNT.md) | editor hint texts | 97 | 14 | 13 | 2 | 4 | 7 | 42 | 15 | 0 | 0 | 0 |
+| [HNT](ledger/HNT.md) | editor hint texts | 113 | 15 | 13 | 2 | 4 | 7 | 57 | 15 | 0 | 0 | 0 |
 | [HYD](ledger/HYD.md) | rivers, lakes, runoff | 75 | 0 | 14 | 3 | 0 | 1 | 36 | 21 | 0 | 0 | 1 |
 | [HYP](ledger/HYP.md) | hypsometry and calibration targets | 33 | 0 | 10 | 0 | 1 | 17 | 1 | 4 | 0 | 0 | 1 |
 | [IMP](ledger/IMP.md) | meteor impacts | 135 | 43 | 9 | 6 | 6 | 0 | 56 | 15 | 0 | 0 | 6 |
@@ -44,12 +44,12 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [POL](ledger/POL.md) | the pole cap | 21 | 0 | 0 | 0 | 0 | 0 | 18 | 3 | 0 | 0 | 0 |
 | [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 71 | 0 | 8 | 0 | 1 | 2 | 52 | 8 | 13 | 0 | 3 |
 | [PRV](ledger/PRV.md) | geologic provinces | 31 | 0 | 0 | 0 | 5 | 4 | 10 | 12 | 0 | 0 | 0 |
-| [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 79 | 11 | 9 | 0 | 1 | 1 | 54 | 3 | 0 | 0 | 11 |
-| [SCL](ledger/SCL.md) | world scale, planet constants | 50 | 0 | 6 | 0 | 0 | 1 | 37 | 6 | 0 | 0 | 1 |
+| [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 79 | 11 | 8 | 0 | 1 | 1 | 55 | 3 | 0 | 0 | 11 |
+| [SCL](ledger/SCL.md) | world scale, planet constants | 51 | 0 | 6 | 0 | 0 | 1 | 38 | 6 | 0 | 0 | 1 |
 | [STR](ledger/STR.md) | strata, traps, hosts | 46 | 1 | 0 | 0 | 1 | 2 | 42 | 0 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 74 | 0 | 0 | 0 | 1 | 2 | 47 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
-| **all** | | **2,348** | **260** | **317** | **31** | **97** | **81** | **1,034** | **528** | **359** | **41** | **210** |
+| **all** | | **2,380** | **263** | **316** | **32** | **97** | **82** | **1,062** | **528** | **356** | **10** | **212** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),

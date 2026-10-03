@@ -332,6 +332,7 @@ pub fn compute(
             p,
             w,
             inp.lat,
+            &inp.grid.row_weights(),
             &land_near,
             &t_o,
             &t_l,

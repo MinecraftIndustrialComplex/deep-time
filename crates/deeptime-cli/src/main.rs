@@ -794,7 +794,9 @@ fn main() -> ExitCode {
             climate_dem::run(&climate_dem::Options {
                 dem,
                 w: width,
-                h: deeptime_format::Projection::picture_height(width),
+                // The DEM is equirectangular (GMT's layout): W/2 rows, whatever the planet's
+                // projection (the climate resamples it onto its own grid).
+                h: width / 2,
                 preset,
                 circumference_km,
                 viewer,
@@ -2062,7 +2064,7 @@ mod tests {
         })
         .unwrap();
         let m = deeptime_format::Manifest::read(&dir.join("world")).unwrap();
-        assert_eq!(m.format_version, "0.3");
+        assert_eq!(m.format_version, "0.4");
         assert_eq!(m.notes["bake"]["baked"], true);
         // The bake says how much of its terrain stands above the build limit (whatever the planet).
         let limit = &m.notes["bake"]["terrain"]["build_limit"];
