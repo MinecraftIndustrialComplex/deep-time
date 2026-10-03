@@ -52,7 +52,7 @@ pub struct UndergroundParams {
     /// shallow reservoirs lie 1–7 km down under Hawaiian shields (Clague & Sherrod 2014, USGS PP
     /// 1801 ch. 3), 1–2 km under Kīlauea's caldera and 2–4 km under its south part (Poland et al.
     /// 2014, PP 1801 ch. 5); under arc volcanoes geophysics finds them at 6 ± 3 km (Rasmussen et
-    /// al. 2022, abstract). At 20 m per block 3 km is 150 blocks. The game raises a chamber that
+    /// al. 2022, abstract). At 35 m per block 3 km is 86 blocks. The game raises a chamber that
     /// would reach the lava floor. Ledger MAG-002.
     pub magma_chamber_depth_km: f64,
     /// Multiplies every magma chamber's size (its radius is a tenth of the volcano's basal
