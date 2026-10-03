@@ -272,7 +272,7 @@ public final class Magma {
                 if ((double) d2 / ((double) lrh[k] * lrh[k]) + q * q <= 1.0)
                     return Part.LENS;
                 double sh = lrh[k] + 1.5, sv = lrv[k] + 1.5, sy = ddy / sv;
-                if (d2 / (sh * sh) + sy * sy <= 1.0)
+                if (d2 / (sh * sh) + sy * sy <= 1.0 || touchesLens(k, ex, ez, ddy))
                     best = Part.LENS_SHELL;
             }
             for (int k = Math.max(0, k0 - 5), e = Math.min(n - 2, k0 + 3); k <= e; k++) {
@@ -287,6 +287,22 @@ public final class Magma {
                     best = Part.CONDUIT_SHELL;
             }
             return best;
+        }
+
+        /**
+         * Whether one of the six neighbours of the block at (ex, ddy, ez) from lens k's centre is in the
+         * lens: the shell must cover every face of the lava, and a flat lens's 1.5-block margin does
+         * not reach the blocks above and below its rim (a lens 40 blocks wide and 3 high left caves
+         * touching its lava).
+         */
+        private boolean touchesLens(int k, long ex, long ez, int ddy) {
+            return inLens(k, ex + 1, ez, ddy) || inLens(k, ex - 1, ez, ddy) || inLens(k, ex, ez + 1, ddy)
+                    || inLens(k, ex, ez - 1, ddy) || inLens(k, ex, ez, ddy + 1) || inLens(k, ex, ez, ddy - 1);
+        }
+
+        private boolean inLens(int k, long ex, long ez, int ddy) {
+            double q = (double) ddy / lrv[k];
+            return (double) (ex * ex + ez * ez) / ((double) lrh[k] * lrh[k]) + q * q <= 1.0;
         }
 
         boolean mush(int dx, int dz, int y) {
