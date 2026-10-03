@@ -123,9 +123,8 @@ pub fn thickness(pools: &[f32; pool::COUNT]) -> f32 {
 pub struct SurfaceRates {
     /// ε_c·δt.
     pub erosion_m: f64,
-    /// ε_o·δt, and ε_o itself.
+    /// ε_o·δt.
     pub damping_m: f64,
-    pub damping_mm_yr: f64,
     /// ε_t·δt.
     pub accretion_m: f64,
     /// Pelagic sediment per step, metres.
@@ -134,10 +133,6 @@ pub struct SurfaceRates {
     pub z_t: f64,
     /// The elevation oceanic crust subsides towards (`oceanic_floor_elevation_m`; Cortial: z_t).
     pub z_floor: f64,
-    /// The ridge's height (`ridge_elevation_m`), where the age–depth curve starts.
-    pub z_ridge: f64,
-    /// The time of the step, Myr (oceanic ages are counted from it).
-    pub t_myr: f64,
     pub trench_relax: f64,
     pub gravity: f64,
 }
@@ -147,15 +142,7 @@ pub fn surface_step(s: &mut Sample, r: &SurfaceRates) -> f64 {
     let mut z = f64::from(s.elevation_m);
     let mut eroded = 0.0;
     if s.kind == OCEANIC {
-        // Thermal subsidence at the rate the age–depth curve has at the crust's age (Cortial's
-        // dampening, dz/dt = −(1 − z/z_f)·ε_o, evaluated on the curve, not at the sample's own
-        // height): a load on old sea floor (a continental rise, a prograding shelf, a seamount)
-        // stays and is compensated by the surface stage's isostasy and flexure, instead of
-        // relaxing back to the curve in |z_f|/ε_o ≈ 26 Myr whatever the crust's age (margins and
-        // spires task, 2026-10-03: that erased every sediment wedge beside a passive margin).
-        // Unloaded crust follows the same curve as before.
-        let on_curve = ocean_elevation(s.age_myr(r.t_myr), r.z_ridge, r.z_floor, r.damping_mm_yr);
-        z -= (1.0 - on_curve / r.z_floor) * r.damping_m;
+        z -= (1.0 - z / r.z_floor) * r.damping_m;
         if !s.is_hidden() {
             s.pools[pool::SEDIMENT] += r.pelagic_m as f32;
         }
@@ -225,21 +212,18 @@ mod tests {
         let r = SurfaceRates {
             erosion_m: 60.0,
             damping_m: 0.04e-3 * 1.0e6,
-            damping_mm_yr: 0.04,
             accretion_m: 600.0,
             pelagic_m: 0.0,
             z_c: 10_000.0,
             z_t: -10_000.0,
             z_floor: -10_000.0,
-            z_ridge: -1000.0,
-            t_myr: 0.0,
             trench_relax: 0.5,
             gravity: 9.81,
         };
         let mut s = Sample::blank(0);
         s.elevation_m = -1000.0;
-        for i in 0..100 {
-            surface_step(&mut s, &SurfaceRates { t_myr: i as f64, ..r });
+        for _ in 0..100 {
+            surface_step(&mut s, &r);
         }
         let expect = ocean_elevation(100.0, -1000.0, -10_000.0, 0.04);
         assert!(
@@ -250,15 +234,13 @@ mod tests {
         // A shallower floor (the pipeline presets' GDH1 fit): the steps follow the same closed form.
         let r = SurfaceRates {
             damping_m: 0.215e-3 * 1.0e6,
-            damping_mm_yr: 0.215,
             z_floor: -5600.0,
-            z_ridge: -2500.0,
             ..r
         };
         let mut s = Sample::blank(0);
         s.elevation_m = -2500.0;
-        for i in 0..60 {
-            surface_step(&mut s, &SurfaceRates { t_myr: i as f64, ..r });
+        for _ in 0..60 {
+            surface_step(&mut s, &r);
         }
         let expect = ocean_elevation(60.0, -2500.0, -5600.0, 0.215);
         assert!(
@@ -267,40 +249,6 @@ mod tests {
             s.elevation_m
         );
         assert!(ocean_heat_flow(100.0) > 50.0 && ocean_heat_flow(0.0) == 300.0);
-    }
-
-    /// Sediment on old sea floor stays: the crust subsides at its age's rate, not back to the
-    /// curve (the old law relaxed a 3 km wedge on 150 Myr crust away in a few tens of Myr, so no
-    /// continental rise or prograding shelf survived beside a margin).
-    #[test]
-    fn a_load_on_old_sea_floor_is_kept() {
-        let r = SurfaceRates {
-            erosion_m: 0.0,
-            damping_m: 0.215e-3 * 1.0e6,
-            damping_mm_yr: 0.215,
-            accretion_m: 0.0,
-            pelagic_m: 0.0,
-            z_c: 10_000.0,
-            z_t: -10_000.0,
-            z_floor: -5600.0,
-            z_ridge: -2500.0,
-            t_myr: 150.0,
-            trench_relax: 0.0,
-            gravity: 9.81,
-        };
-        let curve = |t: f64| ocean_elevation(t, -2500.0, -5600.0, 0.215);
-        let mut loaded = Sample::blank(0);
-        loaded.elevation_m = (curve(150.0) + 3000.0) as f32;
-        let mut bare = Sample::blank(1);
-        bare.elevation_m = curve(150.0) as f32;
-        for i in 0..50 {
-            let ri = SurfaceRates { t_myr: 150.0 + i as f64, ..r };
-            surface_step(&mut loaded, &ri);
-            surface_step(&mut bare, &ri);
-        }
-        let load = f64::from(loaded.elevation_m - bare.elevation_m);
-        assert!((load - 3000.0).abs() < 1.0, "the load is kept: {load}");
-        assert!((f64::from(bare.elevation_m) - curve(200.0)).abs() < 20.0);
     }
 
     /// The pipeline presets' floor (−5,600 m at 0.215 mm/yr from a −2,500 m ridge) against Stein &
