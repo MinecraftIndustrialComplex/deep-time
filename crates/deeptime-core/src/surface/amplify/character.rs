@@ -463,13 +463,14 @@ fn radii(p: &CharacterParams, cell_blocks: f64) -> Radii {
 
 /// Reach, cells, of a gully octave's fall-line estimate: a quarter of its wavelength.
 fn gully_reach(lam: f64, cell_blocks: f64) -> usize {
+    // ledger: AMP-073
     (lam / (4.0 * cell_blocks)).round().max(1.0) as usize
 }
 
 /// Agreement of the fall line around a cell (|Σg| / Σ|g| of the five gradients) under which a
 /// gully octave is gone, and over which it is whole (margins and spires task, 2026-10-03; an
 /// implementation choice, not physical).
-const GULLY_COHERENCE: [f64; 2] = [0.5, 0.85];
+const GULLY_COHERENCE: [f64; 2] = [0.5, 0.85]; // ledger: AMP-073
 
 /// The dependency radius, cells, of [`apply`]: the base smoothing, the slope smoothing, the
 /// relief window, one cell per gully octave (each reads the slope the previous ones left) and
@@ -638,8 +639,8 @@ fn at(win: &Win, i: usize, j: usize, di: i64, dj: i64) -> usize {
 /// One box-blur pass of radius `r` (cells) from `src` into `dst` through `tmp`, separably.
 /// The cut, m, at which a cell counts as wholly in a glacial trough (the character's fade), and
 /// the radius, cells, the fade is averaged over (`run_tiles`).
-pub const TROUGH_FADE_CUT_M: f32 = 20.0;
-pub const TROUGH_FADE_CELLS: usize = 3;
+pub const TROUGH_FADE_CUT_M: f32 = 20.0; // ledger: AMP-072
+pub const TROUGH_FADE_CELLS: usize = 3; // ledger: AMP-072
 
 /// [`box_blur`] for the amplifier's other passes.
 pub fn blur(win: &Win, src: &[f32], tmp: &mut [f32], dst: &mut [f32], r: usize) {

@@ -111,7 +111,7 @@ pub struct SurfaceParams {
     /// measured (New Jersey–Maryland; the carbonate West Florida slope 4.4°, the others
     /// 0.5–2.0°); ETOPO 2022's continental slopes measured the same way as the planet's: median
     /// 2.2°, 90th percentile 5.2° (margins and spires task, 2026-10-03).
-    pub submarine_slope_deg: f64, // ledger: MAR-001
+    pub submarine_slope_deg: f64, // ledger: ERO-168
     /// Bosscher–Schlager G_m, mm/yr (Landlab: 10).
     pub carbonate_max_mm_yr: f64,
     /// Light extinction k, 1/m (Landlab: 0.1).
@@ -182,7 +182,7 @@ impl Default for SurfaceParams {
             tidal_range_m: 2.0,
             marine_fill_depth_m: 0.0,
             shelf_slope: 0.0005,
-            submarine_slope_deg: 2.5, // ledger: MAR-001
+            submarine_slope_deg: 2.5, // ledger: ERO-168
             carbonate_max_mm_yr: 10.0,
             carbonate_extinction_per_m: 0.1,
             carbonate_surface_light: 2000.0,

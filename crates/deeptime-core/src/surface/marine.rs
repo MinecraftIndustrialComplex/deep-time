@@ -170,8 +170,8 @@ pub fn fill(
 /// Share of a pair's excess the slope failure moves per iteration, and its iterations per LEM
 /// step: numerical, not physical (a slope relaxes over a few steps; the result is the critical
 /// slope either way).
-pub const FAILURE_RATE: f64 = 0.05;
-pub const FAILURE_ITERATIONS: u32 = 40;
+pub const FAILURE_RATE: f64 = 0.05; // ledger: ERO-169
+pub const FAILURE_ITERATIONS: u32 = 40; // ledger: ERO-169
 
 /// Parameters of the submarine slope failure ([`slope_failure`]).
 #[derive(Clone, Copy, Debug)]
