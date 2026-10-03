@@ -410,7 +410,7 @@ fn initiate(
     // Pieces of the young side cut off by the old floor ride with it: a sliver of continent may,
     // but a split that is mostly continent is no sinking ocean floor (2026-10-02: with the
     // resampling fix, a test history's initiation took a plate 0.89 continental, probably a
-    // continent the old floor cut off, which `connect_plates` hands to the split).
+    // continent the old floor cut off, which `connect_plates` hands to the split). ledger: PLT-229
     let cont_split = split
         .iter()
         .filter(|&&i| state.samples[i as usize].kind == CONTINENTAL)
