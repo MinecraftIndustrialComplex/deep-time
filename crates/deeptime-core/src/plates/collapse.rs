@@ -19,32 +19,41 @@
 //! extends widens, and the plate it sits on carries more continent.
 //!
 //! # The rule
+//! The driver is the crust's thickness. Under Airy isostasy the height of a column and the
+//! weight that pushes it outwards both follow from its thickness, and in this model the
+//! thickness is the better record of the two: the surface stage owns the elevation (its
+//! feedback overwrites the samples' heights each step), and crust stacked where continents
+//! overlap at a resampling (`ridges.rs`, `pools::accrete`) thickens a column without raising it.
 //! Each step, every visible continental sample that no orogeny raised this step (a belt being
-//! stacked or a margin being uplifted is held up by the convergence) and that stands higher than
-//! `collapse_height_m` above the sea releases
+//! stacked or a margin being uplifted is held up by the convergence) and whose crust is thicker
+//! than `collapse_thickness_km` (T_c) releases
 //!
-//!   q = (1 − e^(−δt/τ)) · 5.5 · (z − z_c),   at most T − T_n,
+//!   q = (1 − e^(−δt/τ)) · (T − T_c)
 //!
-//! of its crust thickness (τ = `collapse_myr`, 5.5 the Airy ratio of crust to surface,
-//! `pools::ISOSTATIC_FACTOR`; T its thickness, T_n the model's normal continental column,
-//! [`normal_thickness_m`]). The driver is the height, the gravitational potential energy: a
-//! sedimentary basin as thick as a range but low does not collapse, a swell with crust of normal
-//! thickness has nothing to give. The crust released moves to the nearest room on the same plate,
-//! within `collapse_reach_km`: the samples thinner than T_n, nearest first, are filled up to T_n
-//! (continental crust that erosion or rifting thinned, then the plate's own ocean floor at the
-//! continent's edge). An ocean sample filled to T_n becomes continental: the continent's edge
-//! moves out. What finds no room within reach is not released. Volume is conserved (the rock
-//! moved is the collapsing column's own mix, thinned in proportion, as pure-shear extension
-//! does), the surface follows by Airy (z −= q/5.5 at the source, += at the receiver).
+//! of its thickness (τ = `collapse_myr`, T its thickness). The crust released moves to the
+//! nearest room on the same plate, within `collapse_reach_km`: the samples thinner than the
+//! model's normal continental column T_n ([`normal_thickness_m`], 35.1 km), nearest first, are
+//! filled up to T_n (continental crust that erosion or rifting thinned, then the plate's own
+//! ocean floor at the continent's edge). An ocean sample filled to T_n becomes continental: the
+//! continent's edge moves out. What finds no room within reach is not released this step.
+//! Volume is conserved: the rock moved is the collapsing column's own mix, thinned in
+//! proportion, as pure-shear extension does.
 //!
-//! The area gained is the volume released over T_n: a belt that collapses from 5 km to
-//! `collapse_height_m` gives back about (5 − z_c) · 5.5 / 35 of its own area.
+//! The surface follows by Airy (`pools::ISOSTATIC_FACTOR`, 5.5 m of crust per m of height): a
+//! receiver rises by g / 5.5 for the g it takes; a source sinks by q / 5.5, but never below the
+//! Airy height of the crust it keeps (z_0 + (T − q − T_n) / 5.5, z_0 the middle of
+//! `continent_elevation_m`), so a root that never raised its surface (an overlap stack) does
+//! not drag it down as it spreads. Nothing rises above where it stood.
+//!
+//! The area gained is the volume released over T_n: a column of thickness T gives back
+//! (T − T_c) / T_n of a sample's area.
 //!
 //! # What it is not
 //! A lower-crustal flow solve. The surface stage's spreading (`surface::spread`) moves the surface
 //! above the strength height; this moves crust, and only on the plate model's samples. Where the
 //! orogen spreads is the plate's nearest room, not a flow field.
-// ledger: PLT-254 (the rule), PLT-255 (τ), PLT-256 (the height), PLT-257 (the reach).
+// ledger: PLT-254 (the rule), PLT-255 (τ), PLT-256 (the threshold thickness), PLT-257 (the
+// reach).
 
 use std::collections::BTreeMap;
 
@@ -88,6 +97,8 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
     }
     let rate = 1.0 - (-env.dt_myr / k.collapse_myr).exp();
     let normal = normal_thickness_m();
+    let t_c = (k.collapse_thickness_km * 1000.0).max(normal);
+    let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
     let n = state.samples.len();
     let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
     // A sample raised by an orogeny this step carries the step's time.
@@ -99,13 +110,8 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
         if s.kind != CONTINENTAL || s.is_hidden() || s.orogeny_myr >= quiet_before {
             continue;
         }
-        let z = f64::from(s.elevation_m);
-        let t = f64::from(s.thickness_m);
-        if z <= k.collapse_height_m || t <= normal {
-            continue;
-        }
-        // ledger: PLT-254, PLT-121 (Airy, ISOSTATIC_FACTOR).
-        let q = (rate * ISOSTATIC_FACTOR * (z - k.collapse_height_m)).min(t - normal);
+        // ledger: PLT-254, PLT-255, PLT-256.
+        let q = rate * (f64::from(s.thickness_m) - t_c);
         if q > 0.0 {
             by_plate.entry(plate_of[i]).or_default().push((i, q));
         }
@@ -158,7 +164,11 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
                 *m += before - f64::from(*x);
             }
             s.thickness_m = s.pools.iter().sum();
-            s.elevation_m = (f64::from(s.elevation_m) - take / ISOSTATIC_FACTOR) as f32;
+            // Airy (PLT-121): down by take / 5.5, not below the height the crust kept holds up.
+            let z = f64::from(s.elevation_m);
+            let airy = z_0 + (f64::from(s.thickness_m) - normal) / ISOSTATIC_FACTOR;
+            let drop = (take / ISOSTATIC_FACTOR).min((z - airy).max(0.0));
+            s.elevation_m = (z - drop) as f32;
             out.sources += 1;
         }
         let total: f64 = mix.iter().sum();
@@ -286,7 +296,7 @@ mod tests {
         fn new() -> Fx {
             let k = TectonicParams {
                 collapse_myr: 25.0,
-                collapse_height_m: 1500.0,
+                collapse_thickness_km: 45.0,
                 collapse_reach_km: 1500.0,
                 ..TectonicParams::default()
             };
@@ -320,9 +330,10 @@ mod tests {
         st.samples.iter().map(|s| f64::from(s.thickness_m)).sum()
     }
 
-    /// A quiet belt 5 km high on plate 0, at the continent's edge: it sinks towards the collapse
-    /// height, the crust it loses goes to the plate's own ocean floor beside the continent, which
-    /// turns continental, and the volume is kept. Plate 1, with no belt, does not change, and
+    /// A quiet belt 5 km high on plate 0, at the continent's edge: it thins towards the collapse
+    /// thickness and sinks towards that thickness's Airy height, the crust it loses goes to the
+    /// plate's own ocean floor beside the continent, which turns continental, and the volume is
+    /// kept. Plate 1, with no belt, does not change, and
     /// nothing turns continental beyond the reach.
     #[test]
     fn a_quiet_belt_collapses_and_its_continent_grows() {
@@ -347,15 +358,23 @@ mod tests {
         let grown = continental(&st, 0) - c0;
         assert!(grown > 20 && grown as u32 == converted, "{grown} {converted}");
         assert_eq!(continental(&st, 1), c1, "plate 1 has no belt");
-        // The belt sank towards the collapse height, never below it.
-        let top = (0..st.samples.len())
+        // The belt thinned towards the collapse thickness, never below it, and sank towards its
+        // Airy height.
+        let t_c = fx.k.collapse_thickness_km * 1000.0;
+        let airy = 0.5 * (fx.k.continent_elevation_m[0] + fx.k.continent_elevation_m[1])
+            + (t_c - normal_thickness_m()) / ISOSTATIC_FACTOR;
+        let in_belt: Vec<usize> = (0..st.samples.len())
             .filter(|&i| belt(fx.geo.points()[i]))
-            .map(|i| st.samples[i].elevation_m)
-            .fold(f32::MIN, f32::max);
-        assert!(
-            top < 2500.0 && top >= fx.k.collapse_height_m as f32 - 1.0,
-            "{top}"
-        );
+            .collect();
+        let top = in_belt
+            .iter()
+            .map(|&i| f64::from(st.samples[i].elevation_m))
+            .fold(f64::MIN, f64::max);
+        assert!(top < airy + 300.0 && top >= airy - 1.0, "{top} vs {airy}");
+        for &i in &in_belt {
+            let t = f64::from(st.samples[i].thickness_m);
+            assert!(t >= t_c - 1.0 && t < t_c + 1500.0, "{t}");
+        }
         // New continent is on plate 0's ocean floor, within the reach of the belt.
         let reach = fx.norm.rad(fx.k.collapse_reach_km);
         for (i, s) in st.samples.iter().enumerate() {
@@ -375,11 +394,12 @@ mod tests {
         step(st, &fx.geo, &env)
     }
 
-    /// A belt raised by an orogeny this step is held up by the convergence; a thick basin below
-    /// the collapse height and a high swell with normal crust have nothing to give; with no room
-    /// within reach nothing is released; with `collapse_myr` 0 nothing happens.
+    /// A belt raised by an orogeny this step is held up by the convergence; a root that never
+    /// raised its surface (an overlap stack) spreads and leaves its surface where it was; a high
+    /// swell with normal crust has nothing to give; with no room within reach nothing is
+    /// released; with `collapse_myr` 0 nothing happens.
     #[test]
-    fn only_quiet_high_thickened_crust_with_room_collapses() {
+    fn only_quiet_thickened_crust_with_room_collapses() {
         let mut fx = Fx::new();
         let belt = |p: DVec3| p.x < -0.1 && p.y > 0.766 && p.y < 0.85;
         // Active: stamped this step.
@@ -395,15 +415,23 @@ mod tests {
         assert_eq!(st.samples, before);
         // The same belt stamped last step collapses now.
         assert!(step_once(&fx, &mut st, 2).sources > 0);
-        // A thick basin, low: 10 km of sediment, at 300 m.
+        // A hidden root: 30 km more crust under ground at 300 m.
         let mut st = planet(&fx.geo, belt, 0.0);
         for (i, s) in st.samples.iter_mut().enumerate() {
             if belt(fx.geo.points()[i]) {
-                s.pools[pool::SEDIMENT] += 10_000.0;
-                s.thickness_m += 10_000.0;
+                s.pools[pool::FELSIC_PLUTONIC] += 30_000.0;
+                s.thickness_m += 30_000.0;
             }
         }
-        assert_eq!(step_once(&fx, &mut st, 1), Collapse::default());
+        let before = st.samples.clone();
+        let c = step_once(&fx, &mut st, 1);
+        assert!(c.sources > 0 && c.moved_km2_m > 0.0, "{c:?}");
+        for (i, s) in st.samples.iter().enumerate() {
+            if belt(fx.geo.points()[i]) {
+                assert!(s.thickness_m < before[i].thickness_m);
+                assert_eq!(s.elevation_m, 300.0);
+            }
+        }
         // A swell: high, normal crust.
         let mut st = planet(&fx.geo, belt, 0.0);
         for (i, s) in st.samples.iter_mut().enumerate() {

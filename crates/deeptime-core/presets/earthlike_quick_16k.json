@@ -88,7 +88,7 @@
     "weld_speed_mm_yr": 5.0,
     "weld_after_myr": 10.0,
     "collapse_myr": 25.0,
-    "collapse_height_m": 1500.0,
+    "collapse_thickness_km": 45.0,
     "collapse_reach_km": 1000.0,
     "slab_pull_rad_per_1000km_myr": 0.002,
     "slab_pull_speed_mm_yr": 80.0,

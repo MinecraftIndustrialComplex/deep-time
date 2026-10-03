@@ -262,7 +262,51 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
         q(0.5),
         q(0.9),
         q(0.99),
-    ))
+    ) + &crust_bins(st))
+}
+
+/// Diagnostic (belts-area): visible continental crust by thickness bin: share of the samples,
+/// share of the crust volume, median elevation, median time since the last orogeny stamp, median
+/// sediment share.
+fn crust_bins(st: &deeptime_core::plates::state::PlateState) -> String {
+    use deeptime_core::plates::state::pool;
+    const EDGES: [f64; 7] = [0.0, 30.0, 40.0, 55.0, 70.0, 100.0, 1.0e9];
+    let vis: Vec<_> = st
+        .samples
+        .iter()
+        .filter(|s| s.is_continental() && !s.is_hidden())
+        .collect();
+    let vol: f64 = vis.iter().map(|s| f64::from(s.thickness_m)).sum();
+    let med = |mut v: Vec<f64>| {
+        v.sort_by(f64::total_cmp);
+        v.get(v.len() / 2).copied().unwrap_or(f64::NAN)
+    };
+    let mut out = String::from("\ncrust_bins");
+    for w in EDGES.windows(2) {
+        let b: Vec<_> = vis
+            .iter()
+            .filter(|s| {
+                let t = f64::from(s.thickness_m) / 1000.0;
+                t >= w[0] && t < w[1]
+            })
+            .collect();
+        let bv: f64 = b.iter().map(|s| f64::from(s.thickness_m)).sum();
+        out += &format!(
+            " [{}-{}km n={:.3} v={:.3} z={:.0} quiet={:.0} sed={:.2}]",
+            w[0],
+            w[1].min(999.0),
+            b.len() as f64 / vis.len().max(1) as f64,
+            bv / vol.max(1.0),
+            med(b.iter().map(|s| f64::from(s.elevation_m)).collect()),
+            med(b.iter().map(|s| st.t_myr - f64::from(s.orogeny_myr)).collect()),
+            med(b
+                .iter()
+                .map(|s| f64::from(s.pools[pool::SEDIMENT] + s.pools[pool::SEDIMENTARY])
+                    / f64::from(s.thickness_m).max(1.0))
+                .collect()),
+        );
+    }
+    out
 }
 
 /// The continental margins over the run (P1-27, `notes.plates.margins`): the mean shares by
