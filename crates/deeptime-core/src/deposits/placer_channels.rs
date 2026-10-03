@@ -433,6 +433,7 @@ pub fn planet_ribbons(p: &PlanetPreset) -> Result<(Vec<DepositType>, Scales), Co
         m_per_block_v: s.m_per_block_v,
         min_y: s.min_y,
         max_y: s.max_y,
+        sea_level_y: s.sea_level_y,
     };
     Ok((types, sc))
 }

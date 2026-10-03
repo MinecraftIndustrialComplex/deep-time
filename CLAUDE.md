@@ -62,12 +62,33 @@ tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete m
   timing tests flaky. The subscription also holds graphide's production: touch nothing outside the
   `deeptime-test` resource group. The box is ours but shared by every agent: cargo at most 8 jobs
   (`CARGO_BUILD_JOBS=8`), simulation sweeps at most 4 runs of 2 threads at once, one Minecraft server
-  at a time (`--server`). It bills by the hour while running: `az vm deallocate -g deeptime-test -n
-  deeptime-test` stops the charge, `az vm start` brings it back.
+  at a time (`--server`). It bills by the hour while running (about $38 a day), so **it deallocates
+  itself after 30 idle minutes** (Ben, 2026-10-03: "Auto-stop when idle"): the watcher
+  `deeptime-idle.service` (`tools/remote/vm/idle-watcher.py`) counts as busy any cargo/rustc,
+  Gradle client, Java (except the idle play server and Gradle daemons), `deeptime` other than the
+  workbench, nix/Python/rsync process, any detached shell script (`setsid nohup bash …`, detach.sh
+  jobs), any ssh session running a command (not the laptop's `ssh -N` tunnels), the server lock, a
+  workbench run or preview in progress, a player on the play server, or load above 4. Keep a
+  long job visible to it: run it as a process or detached script on the VM, never as a laptop-side
+  loop that only ssh-polls now and then. `cat /data/ban/deeptime-cache/idle-watcher.state` says
+  what it sees (`idle-watcher.last-busy`, `idle-watcher.log`, `sudo python3
+  /usr/local/lib/deeptime/idle-watcher.py --once` for the full list); `touch
+  /data/ban/deeptime-cache/KEEP_AWAKE` holds it up (remove it when done). **The remote scripts start
+  it again by themselves**: `tools/remote/vm-access.sh` (sourced by mac.sh, mac-gc.sh, mic-climate.sh,
+  mac-watch.sh) finds it deallocated, runs `az vm start` and waits for SSH (it prints "STARTING the
+  test VM"; 2 to 4 minutes). A plain `ssh` does not: use `tools/remote/mac.sh --no-sync -- true`
+  first. The workbench (`deeptime-workbench.service`) and the play server (`deeptime-play.service`)
+  are systemd units that start at boot (`tools/remote/vm/install.sh` installs all three; restart
+  the workbench only with no run in progress, `sudo systemctl restart deeptime-workbench`, or
+  `tools/viewer/mac-watch.sh` for a new binary). The laptop's tunnels to them
+  (`deeptime-workbench-tunnel`, `deeptime-play-tunnel`) retry every 2 minutes while the VM is down;
+  `tools/remote/tunnels.sh` recreates them after a laptop restart. The VM's own managed identity
+  holds one custom role, "Deep Time Test VM Self Deallocate" (VM read + deallocate, assigned on this
+  VM only).
   Its firewall allows SSH only from addresses this laptop has had; `tools/remote/vm-access.sh` (called
   by the remote scripts) adds the laptop's current address to that one rule when the VM stops
-  answering (Ben, 2026-10-01: "Auto-update the rule"). A plain `ssh` that times out means the
-  address changed: run any `tools/remote/mac.sh --no-sync -- true` to repair it.
+  answering (Ben, 2026-10-01: "Auto-update the rule"). A plain `ssh` that times out means the VM is
+  deallocated or the address changed: run any `tools/remote/mac.sh --no-sync -- true` to repair it.
 - **No backward compatibility before a public release** (Ben, 2026-10-01: "Until I have told you to
   do a public release, you are to give absoluteley 0 shits about backwards compatability"). Old bakes,
   checkpoints, saved runs, presets, world-data format numbers and older jars need not keep working:

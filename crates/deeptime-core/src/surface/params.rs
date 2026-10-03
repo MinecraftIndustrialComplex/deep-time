@@ -105,6 +105,13 @@ pub struct SurfaceParams {
     pub marine_fill_depth_m: f64,
     /// … deepening with distance from the mouth by this gradient.
     pub shelf_slope: f64,
+    /// The steepest slope sediment holds under the sea, degrees (`marine::slope_failure`): steeper
+    /// sediment slumps and flows down to the slope's toe and the rise. 0 turns the failure off.
+    /// Default 2.5°: the regional slope of the steepest clastic margin Pratson & Haxby (1996)
+    /// measured (New Jersey–Maryland; the carbonate West Florida slope 4.4°, the others
+    /// 0.5–2.0°); ETOPO 2022's continental slopes measured the same way as the planet's: median
+    /// 2.2°, 90th percentile 5.2° (margins and spires task, 2026-10-03).
+    pub submarine_slope_deg: f64, // ledger: ERO-168
     /// Bosscher–Schlager G_m, mm/yr (Landlab: 10).
     pub carbonate_max_mm_yr: f64,
     /// Light extinction k, 1/m (Landlab: 0.1).
@@ -175,6 +182,7 @@ impl Default for SurfaceParams {
             tidal_range_m: 2.0,
             marine_fill_depth_m: 0.0,
             shelf_slope: 0.0005,
+            submarine_slope_deg: 2.5, // ledger: ERO-168
             carbonate_max_mm_yr: 10.0,
             carbonate_extinction_per_m: 0.1,
             carbonate_surface_light: 2000.0,
@@ -235,6 +243,14 @@ impl SurfaceParams {
         nonneg(self.tidal_range_m, "tidal_range_m")?;
         nonneg(self.marine_fill_depth_m, "marine_fill_depth_m")?;
         nonneg(self.shelf_slope, "shelf_slope")?;
+        if !(self.submarine_slope_deg.is_finite()
+            && (0.0..=30.0).contains(&self.submarine_slope_deg))
+        {
+            return Err(CoreError::preset(
+                "$.surface.submarine_slope_deg",
+                "must be in [0, 30] (0 = no slope failure)",
+            ));
+        }
         nonneg(self.carbonate_max_mm_yr, "carbonate_max_mm_yr")?;
         pos(
             self.carbonate_extinction_per_m,
