@@ -145,7 +145,7 @@ SEEDS = {
     "install": (3.0, 4.0, 8.0, 300),                # tools/smoke/install.sh: packwiz, Gradle jar
     "render": (4.0, 6.0, 16.0, 300),
     "sim": (2.0, 5.0, 2.0, 900),                    # see seed(): threads and planet size
-    "shell": (2.0, 2.0, 4.0, 120),                  # an unclassified command
+    "shell": (1.0, 1.0, 4.0, 120),                  # an unclassified command (shell:<program>)
 }
 
 
@@ -350,11 +350,32 @@ def _sim_kind(cmd):
     return f"sim:{preset}:{n if n else 'all'}t"
 
 
+def _program(parts):
+    """What an unrecognised command runs, for its kind: the first script named (x.sh, x.py), else
+    the first program word that is not cd, env or an assignment. Each learns its own load."""
+    words = [w for p in parts for w in p.split()]
+    for w in words:
+        w = w.strip("'\"")
+        if re.search(r"\.(sh|py)$", w):
+            return re.sub(r"[^A-Za-z0-9_.-]", "", os.path.basename(w))[:40]
+    for p in parts:
+        for w in p.split():
+            if w in ("cd", "env", "exec", "time", "nice", "sudo") or "=" in w:
+                continue
+            if re.match(r"^\s*cd\s", p):
+                break
+            return re.sub(r"[^A-Za-z0-9_.-]", "", os.path.basename(w))[:40] or "other"
+    return "other"
+
+
 def classify(cmd):
     """The kind for a shell command line, "light" when it needs no admission (a quick look, a
-    detached start whose job admits itself, git), "shell" when nothing heavy is recognised."""
+    detached start whose job admits itself, git), "shell:<script or program>" when nothing heavy is
+    recognised."""
     if _DETACHED.search(cmd):
         return "light"
+    # Quoted text (a grep pattern with `|` in it) is not shell structure.
+    cmd = re.sub(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"", lambda m: m.group(0)[0] + re.sub(r"[|;&\n]", " ", m.group(0)[1:-1]) + m.group(0)[0], cmd)
     kinds = []
     for part in re.split(r"&&|\|\||;|\n", cmd):
         for pat, fn in _HEAVY:
@@ -367,7 +388,7 @@ def classify(cmd):
         parts = [p for p in re.split(r"&&|\|\||;|\||\n", cmd) if p.strip()]
         if parts and all(_LIGHT.match(p) or re.match(r"^\s*cd\s", p) for p in parts):
             return "light"
-        return "shell"
+        return "shell:" + _program(parts)
     servers = [k for k in kinds if is_server_kind(k)]
     # A server launcher dominates (it runs the builds it needs itself); otherwise the parts are
     # joined: the history of `cargo:clippy+cargo:test` is its own.

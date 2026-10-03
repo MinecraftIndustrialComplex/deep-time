@@ -9,7 +9,7 @@ shows it in 3D and explains a clicked block (rock horizon, deposit body, the sit
 |---|---|
 | Voxel export | `deeptime-inspect export-area` (`crates/deeptime-inspect/src/area.rs` documents the `.dtva` format) |
 | Job runner + contract | `tools/workbench/preview.py` (Mac side, standard library only) |
-| From the laptop | `tools/workbench/preview-area.sh` (runs `preview.py run` through `tools/remote/mac.sh --server`, pulls the job back) |
+| From the laptop | `tools/workbench/preview-area.sh` (runs `preview.py run` through `tools/remote/mac.sh`, pulls the job back) |
 | Viewer | `tools/review/pages/area3d/` (`index.html` + `area3d.js`, three.js from jsDelivr) |
 
 ## From the laptop
@@ -55,15 +55,18 @@ To look at an export, serve the viewer folder and pass `?src=`:
    same fields, and the smoke report prints them (and says STALE when the sources have changed since);
 2. **prepare** the job's own world `<job>/world` (synthetic world data, a copied world-data folder, or
    a `config/deeptime/server.json` preset the server generates from on its first start; datapacks);
-   the profile's `server.properties` and `config/deeptime/server.json` are restored afterwards;
-3. **boot** the profile's server with `--universe <job> --world world`, so the smoke worlds are never
-   touched; takes the Mac's single server lock (`deeptime-cache/server.lock`, the one `mac.sh
-   --server` takes; `--lock-held` when the caller already holds it);
+   the job's `server.properties` and `config/deeptime/server.json` are written into its own copy
+   of the server set (`tools/smoke/instance.py`), so the set itself is never changed;
+3. **boot** that copy with `--universe <job> --world world`, so the smoke worlds are never touched.
+   On the test VM the whole run goes through the admission tool (`tools/remote/vm/admit.py`, kind
+   `preview:<profile>`; Ben 2026-10-03: load-based admission instead of the one-server lock): it
+   starts when its estimated load fits (the status says why while it waits) and gets its own ports
+   and folder, so previews run beside GameTests and other servers; `--lock-held` is ignored;
 4. **generate** each box with Chunky: one rectangle per box, a chunk of margin round it so every box
    chunk is `full`; a box across the seam is split into its two pieces in the canonical span;
 5. **probe** Deep Time: `/deeptime probe tw|palette|claims|column`, `sites near` round each box,
    `why <id>` and `probe site <centre>` for every site whose bounds meet a box → `probes.jsonl`;
-6. **stop** (`save-all flush`, `stop`) and release the lock;
+6. **stop** (`save-all flush`, `stop`);
 7. **export** `area-<i>.dtva.gz` per box with `--verify` (decoded again and compared block by block
    with the region files); the world is then deleted unless `--keep-world`.
 
