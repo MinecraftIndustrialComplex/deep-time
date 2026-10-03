@@ -1,10 +1,13 @@
 # The map projection: one coordinate layer, any projection
 
-**Status (2026-10-02).** Ben first chose Lambert's cylindrical equal-area projection (decisions
-log 2026-10-02: "Use an equal area projects FFS", then "Game world and maps" and "The equator
-(Lambert)"). He has since reopened the choice. He wants the Peirce quincuncial projection and its
-newer relatives looked at: square maps that tile the plane. A research agent is on that. So this
-note covers any projection. It says:
+**Status (2026-10-03).** Ben chose Lambert's cylindrical equal-area projection (decisions log
+2026-10-02: "Use an equal area projects FFS", then "Game world and maps" and "The equator
+(Lambert)"), reopened the choice to look at square tiling maps (Peirce quincuncial and its
+relatives), and then settled on **"Lambert for now"**: a Lambert world, true on the equator,
+wrapping east–west with Toroidal World, the pole cap kept; the portal pillowcase stays a later
+option. Step 1 of §8 (the projection-neutral module) and step 2 (Lambert in it) are built on branch
+`worktree-agent-a3186d42ee9449d3d`. The note still covers any projection, for when the choice comes
+back. It says:
 
 - what the code assumes today;
 - the single projection module, in Rust, Java and JS, that every coordinate conversion should go
@@ -369,7 +372,7 @@ What changes for the code:
      `inverse`.
    - The four singular points are where map features pinch.
 
-## 6. Lambert in numbers (the cylindrical case as built in the WIP)
+## 6. Lambert in numbers (as built, §8 step 2)
 
 | | C = 16,384 | C = 32,768 |
 |---|---|---|
@@ -460,7 +463,18 @@ this; it is on the WIP branch.
    - Output stays bit-identical: same bakes, same pictures, same tests.
    - It can land before Ben picks.
    - It turns every later choice into a module change plus the family-specific work below.
-2. **If cylindrical (Lambert).** Finish the WIP:
+2. **If cylindrical (Lambert).** *Built 2026-10-03 (the same branch, after step 1): the module's
+   bodies are Lambert's in Rust, Java and the pages; world-data format 0.4; grids from −Zo, Zo the
+   multiple of the planet's quantum (64) past the pole, **the same for every grid of a planet**
+   (the WIP's lcm(quantum, r) gave a coarse r of 128 another Zo than its finer levels, and the
+   ladder stopped nesting); H = ⌈2·Zo/r⌉; keyframes 1024 × 326 in every preset; the climate's
+   per-row cell height and the ice distance transform's uneven column pass (from the WIP); the
+   ITCZ by row areas; the hill shades' true pixel size (`Projection::picture_pixel_m`); deposit
+   footprints in block space on the pages; the Earth DEM resampled onto the planet's grid; the
+   workbench's tile pyramid kept as a 2 : 1 frame (`tile_frame_z`) with the pixels past the poles
+   drawn as background; the ice line in `deeptime stage`. The orographic rain keeps its block
+   metric (§4: cylindrical, unchanged). The pole-cap band went to Ben as a question (STATUS).
+   Evidence in the STATUS build log.* Finish the WIP:
    - the remaining tests;
    - the JS (`DT.proj`), the tools and the docs;
    - the keyframe size 1024 × 326 in every preset; format 0.4;

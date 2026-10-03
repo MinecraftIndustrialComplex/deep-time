@@ -12,7 +12,7 @@ public final class FormatVersion {
     public static final String CURRENT = "0.4";
 
     /** The minor part of {@link #CURRENT}, written into every file header. */
-    public static final int MINOR = 3;
+    public static final int MINOR = 4;
 
     private FormatVersion() {}
 
