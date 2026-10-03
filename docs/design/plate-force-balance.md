@@ -555,6 +555,14 @@ design (4.1 1C, 4.2 2B):
   sediments metamorphosed, so the volume added is the volume that crossed times the share (a test).
   Where the overriding plate is a sliver narrower than half the belt, each sample takes what a
   full belt would give it and the rest goes down with the slab.
+- **A belt sample rises no higher than the crust's strength height** (PLT-253, added after the
+  continental crust fix was merged): what the front cannot take goes to the belt behind it by the
+  same profile, and what nothing can take goes down with the slab. The design left the limit to
+  the surface stage's spreading, which runs once a step on the surface; a collision that never
+  stalls (a front a tenth as long as its plate's slab front gives a tenth of the resistance) then
+  stacked kilometres a step on a sliver, piled crust 200–290 km thick and stood 14 km high
+  (`earthlike_quick_16k`, scattered start, seed 1, 500 Myr). The limit is the spreading's own
+  threshold height, so it keeps its dependence on gravity and crust strength.
 - **The wedge** is the profile `z_front − d tan α` filled up from the ground, with `z_front` the
   overriding plate's edge. Its width is resolved in steps of a sample spacing (71 km on the quick
   preset): at 1.5° a wedge one row wide needs the belt's edge about 1.9 km above the foreland.
