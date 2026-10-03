@@ -94,11 +94,12 @@ public interface DeepTimeClimate {
 
     /**
      * Latitude in degrees at block {@code z} on a planet of circumference {@code circumferenceBlocks}
-     * (API 2): φ = −z · 360° / C, north (−z) positive, the equator at z = 0 and the poles at
-     * |z| = C/4. NaN when the circumference is not positive (not a planet).
+     * (API 2), by the planet's projection ({@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection}): φ = −z · 360° / C, north (−z)
+     * positive, the equator at z = 0 and the poles at |z| = C/4, clamped to ±90° past them. NaN when
+     * the circumference is not positive (not a planet).
      */
     static double latitudeDeg(double z, int circumferenceBlocks) {
-        return circumferenceBlocks > 0 ? -z * 360.0 / circumferenceBlocks : Double.NaN;
+        return circumferenceBlocks > 0 ? com.minecraftindustrialcomplex.deeptime.worlddata.Projection.latitudeDeg(circumferenceBlocks, z) : Double.NaN;
     }
 
     /** Year fraction [0, 1) at solar longitude {@code degrees} (0° = northern spring equinox). */

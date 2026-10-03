@@ -23,7 +23,7 @@ tools/workbench/preview-area.sh --name porphyry --profile standalone \
 
 Options: `--profile standalone|mic|mic-ev|terrablender|ev`, `--size 16384|32768`, `--box x0,z0,x1,z1`
 (repeatable; x1, z1 exclusive; at most 256 × 256 unless `--max-side`), `--y lo,hi` (default the whole
-build range −352..639), one world source (`--synth <kind> [--strata placeholder|every-class]`,
+build range −512..639), one world source (`--synth <kind> [--strata placeholder|every-class]`,
 `--preset <name|file> [--start S] [--length-myr N]`, `--world-data <dir>` (a run's bake),
 `--test-terrain <kind>`), `--datapack <dir>` (repeatable; MIC profiles add the MIC rock tags
 themselves unless `--no-mic-rock-tags`), `--seed N`, `--keep-world`, `--install` (re-run
@@ -67,7 +67,7 @@ To look at an export, serve the viewer folder and pass `?src=`:
 7. **export** `area-<i>.dtva.gz` per box with `--verify` (decoded again and compared block by block
    with the region files); the world is then deleted unless `--keep-world`.
 
-Measured on the M6 (2026-09-29, standalone, deposit world, 256 × 256 × 992): boot 12.7 s, first-start
+Measured on the M6 (2026-09-29, standalone, deposit world, 256 × 256 × 1152): boot 12.7 s, first-start
 generation 3.3 s, Chunky 361 chunks 9.1 s, probes 0.1 s, stop 2.9 s, export 0.5 s, whole job 44 s;
 0.94 MB. STATUS.md's P1-20 stage 2 entry has the seam and MIC numbers.
 
@@ -169,7 +169,7 @@ so they work behind any prefix. The viewer also loads in its own page through
   "profile": "standalone",
   "size": 16384,
   "boxes": [[-5698, -1158, -5442, -902]],
-  "y": [-352, 639],
+  "y": [-512, 639],
   "world": {
     "preset": "crates/deeptime-core/tests/presets/deposits_world_16k.json",
     "start": "supercontinent", "length_myr": 500,

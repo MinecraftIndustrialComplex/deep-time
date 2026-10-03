@@ -54,7 +54,9 @@ public final class GeothermalProbe {
         o.addProperty("patches", n[2]);
         o.addProperty("sinterPools", geo.sites().stream().filter(s -> s.kind() == Geothermal.Kind.POOL && s.sinter()).count());
         o.addProperty("travertinePools", geo.sites().stream().filter(s -> s.kind() == Geothermal.Kind.POOL && !s.sinter()).count());
-        o.addProperty("volcanoesWithSites", geo.sites().stream().map(Geothermal.Site::volcano).distinct().count());
+        o.addProperty("volcanoesWithSites", geo.sites().stream().filter(s -> s.volcano() != Geothermal.HEAT_FLOW_SOURCE)
+                .map(Geothermal.Site::volcano).distinct().count());
+        o.addProperty("heatFlowSites", geo.heatFlowSites());
         long[] totals = GeothermalPass.totals();
         o.addProperty("poolColumnsPlaced", totals[0]);
         o.addProperty("ventColumnsPlaced", totals[1]);
@@ -80,7 +82,7 @@ public final class GeothermalProbe {
 
         // What it means for a player: land columns drawn evenly over the playable planet.
         int c = t.circumference();
-        int zMax = (int) (c / 4 * (75.0 / 90.0));
+        int zMax = (int) Math.abs(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(c, 75.0));
         SplittableRandom rnd = new SplittableRandom(20261001L);
         double[] any = new double[POINTS], pool = new double[POINTS], vent = new double[POINTS], volcano = new double[POINTS];
         int count = 0;
