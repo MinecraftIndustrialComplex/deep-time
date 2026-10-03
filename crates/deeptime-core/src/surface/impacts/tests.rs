@@ -372,11 +372,7 @@ fn the_pipeline_makes_craters_at_the_rate_and_ages_them() {
         "young craters keep {young} of their relief, old ones {old} ({n_old})"
     );
     // … and many of those formed are gone or no longer show.
-    let visible = st
-        .craters
-        .iter()
-        .filter(|cr| cr.relief_m >= VM)
-        .count() as u64;
+    let visible = st.craters.iter().filter(|cr| cr.relief_m >= VM).count() as u64;
     assert!(visible > 0 && visible < formed, "{visible} of {formed}");
     let gone: u64 = c
         .eroded

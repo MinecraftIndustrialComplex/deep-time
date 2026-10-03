@@ -426,7 +426,10 @@ impl DummyStage {
                 .magnitude((continent.peak_m / 8000.0) as f32)
                 .param("stage", self.name())
                 .param("step", g as i64)
-                .param("peak_y", 63.0 + continent.peak_m / deeptime_format::DEFAULT_M_PER_BLOCK_V);
+                .param(
+                    "peak_y",
+                    63.0 + continent.peak_m / deeptime_format::DEFAULT_M_PER_BLOCK_V,
+                );
             if kind == "deeptime:orogeny_phase" {
                 e = e.until(world.t_years + 3.0 * dt);
             }
