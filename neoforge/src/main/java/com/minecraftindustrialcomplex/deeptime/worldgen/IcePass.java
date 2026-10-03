@@ -28,7 +28,8 @@ import java.util.Optional;
  * top {@code n} solid blocks of the ground, so the terrain's height does not change. The blocks are
  * the table's: the top {@code snow_blocks} snow, a base of blue ice where the cover is thick, packed
  * ice between ({@link IceCover.Spec#kind}). Columns whose surface is fluid (a lake, the sea) and
- * air, bedrock and fluid blocks are left as they are; the ice pass is the only thing here that
+ * air, bedrock and fluid blocks are left as they are, and so is the ice of a frozen lake (the water
+ * pass's top block, {@link #surfaceY}); the ice pass is the only thing here that
  * reads the climate, and it reads it through {@link IceCover} alone.
  *
  * <p>Vanilla's {@code freeze_top_layer} feature, which runs later in every cold biome, then lays its
@@ -107,7 +108,10 @@ public final class IcePass {
     /**
      * The y of the highest block of the column that is ground: the worldgen surface heightmap's,
      * walked down over air; {@code minY - 1} when that block is a fluid (a lake or the sea covers
-     * the ground there) or the column is empty.
+     * the ground there), the ice of a frozen lake (the water pass's {@code minecraft:ice} top: it is
+     * the lake's surface, not ground, and the cover must not replace it with snow, which left a
+     * frozen lake a block of snow over its dirt bed and no water: "dry shore" in 96 of 898 water
+     * columns of a test planet) or the column is empty.
      */
     static int surfaceY(ChunkAccess chunk, int x, int z, int minY) {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
@@ -116,7 +120,7 @@ public final class IcePass {
             BlockState s = chunk.getBlockState(pos.set(x, y, z));
             if (s.isAir())
                 continue;
-            return s.getFluidState().isEmpty() ? y : minY - 1;
+            return s.getFluidState().isEmpty() && !s.is(Blocks.ICE) ? y : minY - 1;
         }
         return minY - 1;
     }
