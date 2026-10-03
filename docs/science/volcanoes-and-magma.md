@@ -384,7 +384,7 @@ What these runs show:
 
 ## Decisions of 2026-10-02
 
-Three questions of the stage-2 package were put to Ben and answered on 2026-10-02 (decisions log):
+Three questions of the stage-2 package were put to Ben and answered on 2026-10-02 (decisions log; items 4 and 5 are later answers of the same day):
 
 1. **Stratovolcano heights** (VOL-019, VOL-020). "Lower to Earth's range (Recommended)": the
    range is 0.6 to 2.0 km instead of 1.2 to 3.0 km and `arc_radius_km` 10 km instead of 14, so the
@@ -398,6 +398,28 @@ Three questions of the stage-2 package were put to Ben and answered on 2026-10-0
    per step (1 − e^(−rate·Δt)); a collapse ends the centre and the hotspot builds a new one once
    the old has drifted 70 km, so a hotspot track makes about one caldera per centre-life. Yellowstone's
    own pace was 0.8 and 0.66 Myr between its three (Christiansen 2001), 1.4 to 2 per Myr.
+
+4. **Crust-deep magma system** (MAG-043 to MAG-057; Ben looking at a 3D preview of an active volcano:
+   "the amount of lava inside of them is truly pathetic. It just ends after ~100 blocks down???";
+   answer "Crust-deep magma system (Recommended)"). Before: a plus-shaped conduit from six blocks
+   under the crater to one chamber 3 km (150 blocks) down, and nothing below. Now: stacked lava lenses
+   in altered hot rock down to the lava floor (see "What you see in the world"). Lava blocks measured
+   in generated worlds (16k quick planet, 1,000 Myr, MIC set, one seed): an arc stratovolcano under
+   the sea, 4,769 before, 21,196 after (4.4 times); the shield with a crater lake, 43,060 before,
+   423,171 after (9.8 times), one connected body in each, no face on water, the lake's 13 faces on the
+   air the only ones open. Over all 121 volcanoes with magma, from the builder's own volumes: the
+   median arc volcano 3,680 blocks before (chamber and conduit), 18,419 after (5.0 times), 6 to 8 lenses;
+   the median shield 43,357 before, 344,409 after (7.9 times), 8 lenses; the planet 0.95 million before
+   and 5.7 million after (6 times). Lens width 1.0 gave a median arc 2.8 times: too little for the
+   decision's "several times", so the default is 1.5.
+5. **Arches in underwater cliffs** (MAG-057; Ben's report with run 1a0fb48c797). Found by generating the
+   same 255 x 255 box with one seed under four configurations: caves that open onto the open sea
+   were 157,646 blocks in 318 bodies; with vanilla's carvers switched off 111,023 blocks remained, so
+   the carvers made about 30 percent and the density function's own noise caves (cheese, spaghetti,
+   entrances) the rest. The guard (`sea_cliff_skin_blocks`, 6) keeps a wall of rock between any cave
+   and the water at a cliff of 45 degrees or more, under the sea: 31,148 blocks in 218 bodies after
+   (a fifth); caves on gentle sea floors are untouched (vanilla's ocean caves). Open space in the whole
+   box (air and water under ground) went from 320,379 to 280,039 blocks (13 percent less).
 
 ## Open questions
 
