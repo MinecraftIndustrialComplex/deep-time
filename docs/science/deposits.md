@@ -8,16 +8,26 @@ contradicted its sources: the secular clocks (below) were never applied to a rea
 banded iron formation could form.
 
 Ledger ids on this page: `DEP-001` to `DEP-205` ([ledger/DEP.md](ledger/DEP.md)) and `ORE-001` to
-`ORE-261` ([ledger/ORE.md](ledger/ORE.md)); rows marked `merged` are owned by the row they name.
+`ORE-266` ([ledger/ORE.md](ledger/ORE.md)); rows marked `merged` are owned by the row they name.
+
+Changed on 2026-10-02 by the owner's answers on deposits (decisions log 2026-10-02): inherited
+banded iron formation lies in a field of basins covering Earth's share of the stable interiors;
+deposits are richer, the richness setting reaches the blocks, rich cores carry vanilla's raw-ore
+blocks, and the background scatter is thinner; the supergene rain floor is 0 and the coal field
+P10 area about 6,000 km². Section "Richness against scatter" has the targets and the measurements.
 
 ## What you see in the world
 
 Ore in a Deep Time world comes in two kinds. **Deposits** are bodies of a known size and shape
 placed where the simulated history made the conditions for them. A thin **background scatter** of
-the same ores fills the rest of the rock at about a tenth of vanilla's amounts. On the two planets
-the deposit audit measured, deposits held 85 to 94 % of the coal blocks, 11 to 35 % of the zinc,
-3 to 6 % of the gold and 1 % of the copper; the rest is scatter (build log 2026-10-01, "Deposit
-audit"; before the stage 2 fixes, when no iron deposit formed).
+the same ores fills the rest of the rock at about a twentieth of vanilla's coal and iron (the
+setting `deposits.scatter_mult`, 0.5 of the scatter rules; a tenth before 2026-10-02). A chunk of
+a deposit holds more of its ore than a chunk of a vanilla world and 60 to 400 times the scatter,
+and the richest zone of a metal deposit carries **raw-ore blocks** among its ore, as vanilla's
+copper and iron ore veins do (`raw_copper_block`, `raw_iron_block`, a pack's own through
+`#c:storage_blocks/raw_<metal>`). On the quick 16k planet measured below, deposits hold 98 % of
+the coal, 57 % of the zinc, 48 % of the gold, 21 % of the copper and 3 % of the iron (before the
+change 96, 23, 14, 7 and 0 %); the rest is scatter.
 
 The deposit families are:
 
@@ -28,10 +38,10 @@ The deposit families are:
   downstream.
 - **Mississippi Valley-type zinc and lead** in limestone and dolostone of platforms near old
   mountain belts, and **sedimentary exhalative (sedex) zinc and lead** in black shale of rift basins.
-- **Banded iron formation**: sheets of iron ore in the old stable interiors of continents. Before
-  stage 2 none ever formed. Now it can, but the built-in presets set the inherited share to 0
-  until the owner decides how much there should be, so a default world still has none (see
-  "Open questions").
+- **Banded iron formation**: sheets of iron ore in a few old basins of the stable continental
+  interiors, as Earth's Hamersley, Transvaal and Lake Superior basins. They cover Earth's share of
+  the interiors, 1.4 %: on a quick 16k planet that is one basin and usually one large iron
+  deposit (see "Inherited iron-formation basins").
 - **Coal seam fields**: stacks of coal seams a block or more thick, tens of kilometres across,
   in the sedimentary basins of the time after land plants appeared.
 - **Petroleum traps**: oil in anticlines and salt domes above a source rock that was buried deep
@@ -62,9 +72,12 @@ host rock in the top 2 km) and three global clocks.
    the share of its time inside the window. The surface stage asks the same land-plant date when it
    decides whether a step laid down peat (coal facies). When a run starts after the iron-formation
    window, the stable continental interiors can inherit banded iron formation in their basement,
-   and the basement then counts as its host where it lies within the top 2 km (ORE-020). How much
-   of an interior holds it is the preset setting `deposits.inherited_bif_share` (ORE-261), 0 in the
-   built-in presets for now.
+   and the basement then counts as its host where it lies within the top 2 km (ORE-020). Not every
+   interior: at the run's first step the stable continental interiors are dealt a field of
+   basins covering `deposits.inherited_bif_share` of them (1.4 %, Earth's share, ORE-261), each
+   about `deposits.bif_basin_km2` (100,000 km², Hamersley's size, ORE-263), coherent ellipses with
+   rough edges (ORE-264); the basins ride with their crust and hold iron formation where their
+   crust is a stable interior.
 3. **Tracts and counts** (the USGS three-part method). Connected cells above a type's favourability
    threshold form permissive tracts. The number of deposits that **survive to the present** is the
    type's deposit density times the permissive area (`N* = ρ/10⁵ · ΣA`, DEP-166). For porphyry
@@ -85,8 +98,9 @@ host rock in the top 2 km) and three global clocks.
    (P90, P50, P10); grades are drawn with the published correlations (a Gaussian copula).
 7. **Bodies.** Each deposit becomes zoned bodies (porphyry: ore core, phyllic and propylitic halo,
    lithocap, gossan; coal: one body per seam) sized from tonnage and rock density and enlarged by
-   the type's size multipliers. In a zone a host block becomes ore with a fixed probability; the
-   grade does not reach the blocks (see "Open questions").
+   the type's size multipliers. In a zone a host block becomes ore with the zone's density times
+   the richness settings (ORE-262, at most 0.9), and a share of the ore blocks of the richest zone
+   is the material's raw-ore block (ORE-266), so the richness reaches the blocks.
 8. **Petroleum** follows its own path: Lopatin's time-temperature index (TTI) accumulates in each
    source-rock layer as it is buried and heated; oil is generated between TTI 15 and 160 (Waples
    1980) above 80 °C, migrates up to 50 km to the nearest trap with a seal, and charges it in order.
@@ -108,7 +122,7 @@ The main constants by family; the ledgers hold every row.
 | DEP-013 | Same-deposit distance | 2,000 | m | OFR 2008-1155, rules | `verified` |
 | DEP-017 | Porphyry emplacement depth (body centre) | 1,500 | m | OFR 2008-1155 data file, Cu subtype median | `verified` |
 | DEP-010 | Porphyry ore density | 2.7 | t/m³ | none (placeholder) | `uncited` |
-| DEP-040 | Supergene: eligible precipitation | 100 to 1,500 | mm/yr | SIR 2010-5070-B p. 68 (one Andean stage) | `cited-unverified` |
+| DEP-040 | Supergene: eligible precipitation | 0 to 1,500 (the floor was 100 until 2026-10-02) | mm/yr | SIR 2010-5070-B p. 68: enrichment from tropical to hyper-arid climates | `verified` |
 | DEP-041 | Supergene: minimum stable time | 0.5 | Myr | Sillitoe 2005 | `abstract-only` |
 | DEP-043 | Supergene enrichment factor | 2 to 3 × | – | SIR 2010-5070-B after Sillitoe 2005 | `abstract-only` |
 | DEP-050 | Placer gold tonnage P90 / P50 / P10 | 0.022 / 1.1 / 50 (n 65) | Mt of gravel | Bulletin 1693 model 39a, Fig. 196 | `verified` |
@@ -126,10 +140,16 @@ The main constants by family; the ledgers hold every row.
 | ORE-014 | Sediment-hosted Zn–Pb after | 2.02 | Ga | Leach et al. 2010, Econ. Geol. | `abstract-only` |
 | ORE-015 | Coal-forming land plants after | 0.419 | Ga | Nelsen et al. 2016; ICS chart 2023/09 | `verified` |
 | ORE-016 | Banded iron formation window | 2.6 to 1.85 (was 2.65 to 1.85) | Ga | Bekker et al. 2010 | `abstract-only` |
-| ORE-020 | Inherited BIF in the stable interiors | craton share × setting × the share of the window before the run | 0–1 | plan §8.6 | `game-choice` |
-| ORE-261 | Inherited BIF setting (`deposits.inherited_bif_share`) | 0 in the built-in presets (interim) | 0–1 | none; the owner's question | `game-choice` |
+| ORE-020 | Inherited BIF in the basins under a stable interior | basin × craton (frame mean) × the share of the window before the run | 0–1 | plan §8.6 | `game-choice` |
+| ORE-261 | Share of the stable interiors that are iron-formation basins (`deposits.inherited_bif_share`) | 0.014 (was 0, the interim) | 0–1 | Earth: 0.75 million km² of 2.6–1.8 Ga basins / 53.5 million km² of shields and cratons (see below) | `verified` (arithmetic) |
+| ORE-263 | Typical basin area (`deposits.bif_basin_km2`) | 100,000 | km² | median of seven Earth basins (Hamersley about 100,000, WAEPA1974) | `verified` |
+| ORE-264 | Basin field shape | ellipses of elongation 1–3, area lognormal σ 0.5, edges ±0.25 of the radius, none under a quarter basin | – | none | `game-choice` |
+| ORE-262 | Richness acts on the blocks | zone density × richness ≤ 0.9; raw share × richness ≤ 0.5 | probability | none | `game-choice` |
+| ORE-265 | Background scatter multiplier (`deposits.scatter_mult`) | 0.5 | × the scatter rules | none | `game-choice` |
+| ORE-266 | Zone ore densities and raw-ore shares | porphyry core Cu 0.6 (raw 0.05), placer Au 0.25, BIF ore 0.6 (raw 0.04), MVT core Zn 0.65 (raw 0.04), sedex Zn 0.55 (raw 0.03), supergene blanket 0.7 (raw 0.08), coal 0.6 | probability | vanilla OreVeinifier: ore 0.1–0.3 of a vein's solid blocks, raw blocks 0.02 of its ore | `game-choice` |
 | ORE-258 | Earth's age for the clocks | 4.57 | Gyr | as SCL-039 | `uncited` |
-| ORE-117 | Coal field area P90 / P50 / P10 | 300 / 1,000 / 3,000 | km² | the project's estimate | `uncited` |
+| ORE-117 | Coal field area P90 / P50 / P10 | 300 / 1,000 / 6,000 (P10 3,000 until 2026-10-02) | km² | the project's estimate; Witbank 5,680, Highveld 7,000 km² | `uncited` |
+| ORE-127 | Coal field tonnage P90 / P50 / P10 | 3,870 / 23,000 / 193,000 (was 3,800 / 19,800 / 115,000) | Mt | area × cumulative thickness × 1.32 t/m³, by simulation | `uncited` |
 | ORE-119 | Coal field density P90 / P50 / P10 | 4 / 14 / 40 (P50 used) | per 100,000 km² | the project's estimate, re-derived in stage 2 | `uncited` |
 | ORE-128 | Cumulative minable coal per field | 5 / 14 / 60 | m | the project's judgement | `uncited` |
 | ORE-130 | Density of bituminous coal in the ground | 1.32 | t/m³ | Circular 891, Table 2 | `verified` |
@@ -211,6 +231,107 @@ MVT 87 (35 counted), sedex 2, petroleum 9, impact types 0, 16, 0 and 8. Coal sti
 | Coal per area | Powder River Wyodak-Anderson about 23 Mt/km²; Illinois about 1.4 to 1.9 | PP 1625-A chap. PN; Averitt 1975 (full text) |
 | Oil fields | Niger Delta unit: undiscovered fields 1 / 12 / 1,500 MMBO (min / median / max); world units: about 45 % have a median undiscovered field of 1 to 10 MMBO | USGS DDS-60 data form and chapter AR (full text) |
 
+
+**Inherited iron-formation basins** (2026-10-02, the owner's "Earth-like patch field"). Earth's
+iron-formation basins of 2.6 to 1.8 Ga, read in the source library: Hamersley about 100,000 km²
+(WAEPA1974; once about 150,000, MarshSchlinger1980 after Trendall 1973), the Transvaal platform
+190,000 preserved of perhaps 600,000 (Beukes1987, abstract; the carbonate platform under the
+Kuruman and Penge iron formations), the Lake Superior region 220,000 (Pufahl1996 after Morey 1983;
+the region enclosing the iron ranges), Kursk 120,000 and the Quadrilátero Ferrífero 7,000
+(Wikipedia), Nabberu 60,000 (Bunting1986) and the Labrador Trough about 50,000 (850 km long and up
+to 160 km wide; the project's estimate): about 0.75 million km² (0.71 to 1.39 million with the
+original extents). Earth's shields and cratons cover 53.5 million km² (the provinces of
+Hasterok et al. 2022, areas computed from the open shapefiles), so the basins are 1.4 % of them
+(1.3 to 2.6 %; 1.0 % of the 73 million km² of Archean and Early Proterozoic crust of Abbott et
+al. 2000). The basin size is the median of the seven, 100,000 km².
+
+Measured on the quick 16k planet (`earthlike_quick_16k`, `scattered_continents`, 1,000 Myr,
+`tools/review/deposit-richness-runs.sh`, 2026-10-02): the first step's stable continental
+interiors were dealt one basin, 2.0 % of them (the share is met to within one basin). It made 8
+BIF deposits in 34 tracts (8,405 km² permissive, where the basement lies within the top 2 km),
+of which the planet preserved one (0.9 % of what forms survives 1,000 Myr of cratonic erosion), a
+large one: 11,283 iron ore and 305 raw iron blocks, 13 chunks. With the share at 0.05 (two basins)
+the same planet holds 15 BIF sites, 6 counted. Before, with every stable interior permissive (the
+setting at 1, stage 2), it held 412. On Earth the share holds about 66 deposits (Bulletin 1693
+model 34a, n = 66); scaled to the quick planet's 2.4 million km² of stable interior that is about
+three, so one is low but of the right order; a 32k planet has four times the area.
+
+## Richness against scatter
+
+The owner's answer of 2026-10-02 ("Rich Deposits, Thinner Scatter, Also make deposits use some of
+the vanilla ore vein features"): the richness setting reaches the blocks, deposits are clearly
+richer than the background, the background is thinner, and deposit bodies carry vanilla's ore-vein
+raw blocks. The deposit audit of 2026-10-01 had found the metal deposits to be noise beside the
+scatter: a chunk of a porphyry, placer or MVT body held about half of what a vanilla chunk holds
+of its ore, and the planet's copper was 93 % scatter.
+
+**Targets** (set by the agent from what the audit measured):
+
+1. A chunk of a deposit body holds at least as much ore-equivalent (a raw block counts nine, the
+   raw ore it crafts into) as a chunk of a vanilla world holds of that ore, and at least 50 times
+   the background scatter of a chunk.
+2. The background scatter is half of what it was: about 5 % of vanilla's coal and 7 % of its iron
+   per chunk (from 10 and 13 %).
+3. Raw-ore blocks in the richest zone of each metal deposit, at 2 to 4 times a vanilla vein's share
+   (vanilla: 2 % of a vein's ore blocks), and none in placers and coal.
+4. The early game keeps its ore: a player still finds a few dozen blocks of coal, copper and iron
+   near the surface within a short walk of any point.
+
+**Measured** with `deeptime deposit-audit` (the bake evaluated as the mod's features do; the
+access probe is new) on the quick 16k planet, `scattered_continents`, 1,000 Myr, before (master
+e50291c7) and after (this change), 2026-10-02. The two runs' histories are the same to the
+deposit (the same 6 porphyries, 121 MVT bodies); vanilla figures are the audit's 1,024-chunk
+sample of 2026-10-01 (vanilla copper includes the large copper veins under dripstone caves, so it
+is a generous yardstick):
+
+| type | ore-equivalent per chunk of body, before → after | × vanilla's chunk | × scatter's chunk | median deposit, ore-equivalent | raw blocks, median site |
+|---|---|---|---|---|---|
+| porphyry Cu | 151 → 278 | 0.52 → 0.95 (copper 293; 3.6 × vanilla iron's 77) | 20 → 71 | 906 → 1,669 | 0 → 23 |
+| placer Au | 10.6 → 32.5 | 0.41 → 1.27 | 10 → 58 | 54 → 153 | – |
+| MVT Zn | 39 → 84 | 0.51 → 1.11 | 19 → 80 | 123 → 263 | 0 → 2 |
+| sedex Zn | 238 → 444 | 3.1 → 5.8 | 114 → 422 | 2,140 → 3,999 (one site) | 0 → 88 |
+| BIF Fe | none → 1,056 | 13.6 | 207 | 13,723 (one site) | 305 |
+| coal | 1,951 → 2,018 | 19 → 20 | 189 → 389 | 123,999 → 127,356 | – |
+
+| scatter, per chunk | before | after | share of vanilla after |
+|---|---|---|---|
+| coal | 10.3 | 5.2 | 5 % |
+| iron | 10.1 | 5.1 | 7 % |
+| copper | 7.7 | 3.9 | 1 % (of vanilla's generous figure) |
+| gold | 1.08 | 0.56 | 2 % |
+| zinc | 2.1 | 1.05 | 1 % |
+
+The planet's ore in deposits (ore-equivalent): coal 96 → 98 %, zinc 23 → 57 %, gold 14 → 48 %,
+copper 7 → 21 %, iron 0 → 3 % (one BIF deposit). Deposits are rare, so on a planet most copper and
+iron stay scatter; where a deposit is, its chunks are worth 50 to 400 of the background's.
+
+**Real blocks.** The same box of 256 chunks (x 5,296 to 5,551, z 1,010 to 1,265: porphyry site 23
+and the placer bars of site 22) generated by the game on the standalone set (Deep Time and Create)
+before and after, and every block counted (`tools/review/deposit-richness-runs.sh census`):
+copper ore in deposit bodies 31,717 → 55,685 plus 870 `raw_copper_block`; gold in bodies 1,477 →
+2,022 (the placer's five bars in the box 196 → 658); scattered coal 2,878 → 1,433, iron 2,350 →
+1,147, copper 1,781 → 882, gold 262 → 111, zinc 468 → 256. The game places what the audit models
+(the audit predicts 898 raw blocks for the whole site).
+
+**Early game.** From 150 random land points, how far a player ranges (the half-width of a square of
+chunks around the point) to gather 24 ore-equivalent within 48 blocks under the ground: coal 24 →
+40 blocks (median; p90 40 → 56), copper 56 → 72 (72 → 88), iron 56 → 72 (72 → 88). The deposits do
+not move these medians (they are too rare); halving the scatter widens the square by about √2. The
+essentials (`deeptime:essentials`) still guarantee an exposed iron and coal deposit in every
+4,096-block region and within 2,048 blocks of the spawn. The probe assumes every block in the
+square is found, so it compares worlds; it is not a mining time.
+
+**Deposits within reach.** Of the 269 sites of the measured planet 196 lie under the sea (land is
+0.197 of it). Counting the sites not under the sea that hold at least 64 ore-equivalent, and
+taking the mean distance from a land point to the nearest as 0.5 / √(sites per land area) (an
+estimate from the site list, not a probe): coal 26 → 25 deposits, about 430 → 440 blocks; copper
+one porphyry before and after, about 2,200 blocks; iron none before and none after (the one
+iron-formation site is under the sea; at a basin share of 0.05, 6 land deposits, about 900
+blocks). The measured runs carry no essentials (the built-in presets list none; a world made in
+the game takes `deeptime:essentials`: a site of iron and of coal in every 4,096-block land
+region, of copper in every 8,192-block one), so a game world's nearest iron and copper deposit is closer
+than these figures; that was not measured.
+
 ## Simplifications and limits
 
 - **One density per type, flat over the tract.** Singer et al. 2005 found porphyry density falls
@@ -226,9 +347,10 @@ MVT 87 (35 counted), sedex 2, petroleum 9, impact types 0, 16, 0 and 8. Coal sti
 - **The clocks are Earth's dates.** They are applied by the planet's age; a planet younger than
   Earth sits earlier in Earth's history. The dates are earliest known occurrences, not physical
   limits.
-- **Inherited iron formation everywhere stable.** The plate model does not date continental
-  crust, so every stable continental interior is treated as old enough to hold inherited banded
-  iron formation in its basement. On Earth only the Archean and Paleoproterozoic cratons do.
+- **Inherited iron formation in dealt basins.** The plate model does not date continental crust,
+  so the basins are dealt at the run's first step over the stable continental interiors of that
+  moment and ride with their crust; crust made later holds none. On Earth the basins lie on
+  Archean and Paleoproterozoic cratons, which the model does not know apart.
 - **No banded iron formation is laid down during the window.** A run that spans 2.6 to 1.85 Ga
   opens the clock, but no process lays down iron-formation rock on the shelves, so the host score
   is zero and none forms then.
@@ -238,8 +360,12 @@ MVT 87 (35 counted), sedex 2, petroleum 9, impact types 0, 16, 0 and 8. Coal sti
 - **Petroleum is oil only**, generated from one TTI window with a hard 80 °C floor and one province's
   field sizes (the Niger Delta's) used everywhere; there is no gas window, no carrier beds and no
   fill-and-spill.
-- **Grade never reaches the blocks.** Ore blocks follow volume and a fixed zone density; the
-  richness setting changes the listed grade only (owner question pending since 2026-10-01).
+- **Grade and blocks.** Ore blocks follow volume and the zone density times the richness; the
+  site's grade is listed for prospecting and does not set the density itself (a 0.4 % copper
+  porphyry and a 0.2 g/t gold placer both place a game's worth of ore).
+- **The coal footprint.** The engine scales a field's three axes with the cube root of its
+  tonnage, so the larger tonnage P10 of 2026-10-02 gives a footprint P10 of about 4,560 km², not
+  the 6,000 km² of the area distribution.
 
 ## Game choices
 
@@ -251,6 +377,9 @@ MVT 87 (35 counted), sedex 2, petroleum 9, impact types 0, 16, 0 and 8. Coal sti
   banded iron formation 6 and 4, coal 1 and 20), so bodies are visible at 300 m per block
   (ORE-053, DEP-195, DEP-127 and the type files; agents, build log 2026-09-29 and 2026-10-01).
 - Placer gold moved into a real river channel within 30 km at the bake (Ben, 2026-10-01).
+- Richer deposits, thinner scatter and raw-ore cores (Ben, 2026-10-02: ORE-262, ORE-265, ORE-266;
+  the values are the agent's, against the targets above); inherited iron formation in a basin
+  field at Earth's share (Ben, 2026-10-02: ORE-261, ORE-263, ORE-264).
 - Province endowment strength and size, camp spacings, zoning fractions and zone densities
   (design values per the type files).
 - The favourability curves of every type: the concepts are sourced (for example Superior-type iron
@@ -259,19 +388,12 @@ MVT 87 (35 counted), sedex 2, petroleum 9, impact types 0, 16, 0 and 8. Coal sti
 
 ## Open questions
 
-- **How much banded iron formation.** With inherited iron formation in every stable interior (the
-  setting at 1), the 1,000 Myr run above forms 412 banded iron formation sites (165 counted within
-  1 km), against 17 porphyries. Until the owner decides, the built-in presets set the share to 0
-  (no inherited BIF; coordinator for the owner, 2026-10-02). The recommended answer is a limited
-  share like Earth's Paleoproterozoic iron-formation basins; the alternatives are every stable
-  interior, or none until the plate model dates crust (STATUS.md, "Pending questions").
-- **The richness setting** does not reach the blocks (owner question pending since 2026-10-01).
-- **Supergene enrichment** is allowed only with at least 100 mm/yr of rain, taken from one stage of
-  the central Andes; the same source says enrichment happens from tropical to hyper-arid climates.
-  Its minimum stable time, 0.5 Myr, is Sillitoe's floor; his typical minimum is 3 to 9 Myr.
-- **Porphyry density and tract size** (above).
-- **Coal field size.** The P10 of 3,000 km² is below several real named fields (Gillette 4,150 km²,
-  Witbank 5,680 km², Highveld 7,000 km²).
+- **How many iron-formation sites.** At Earth's share (1.4 %) the quick 16k planet holds one BIF
+  deposit; the owner's answer expected a handful to a few tens per planet, which a share of about
+  5 % gives (15 sites) (STATUS.md, "Pending questions").
+- **Supergene minimum stable time**, 0.5 Myr, is Sillitoe's floor; his typical minimum is 3 to
+  9 Myr (kept, the owner's answer of 2026-10-02). The rain floor is now 0.
+- **Porphyry density and tract size** (above; flat density kept, the owner's answer of 2026-10-02).
 - **The MVT clock.** One clock gates MVT and sedex at 2.02 Ga; Leach et al. 2010 say MVT was minor
   until the late Neoproterozoic and SIR 2010-5070-N finds no sedex older than 1.8 Ga.
 - **MVT integration time** is 5 Myr, the top of Garven's modelled range; dated ore events last 50
@@ -297,11 +419,16 @@ How each was read in stage 2 (full entries in [bibliography.md](bibliography.md)
   (OFR 2011-1296), SAIMM-coalfields, Hancox2014, BAP2018, Smolinski2014, Nelsen2016, ICS2023,
   Tuttle2000 (DDS-60 data form), USGS2000b (DDS-60 chapters), Moore2003, Nuccio1994, Nuccio2003,
   Dubiel2003, Spencer1988, Higley2005, Newell1997, Acklam, Hormann1993 (preprint), Blackman2021,
-  AbramowitzStegun1964, Cooke2005 (author's copy), Bliss1992.
+  AbramowitzStegun1964, Cooke2005 (author's copy), Bliss1992. Added 2026-10-02 for the
+  iron-formation basins: WAEPA1974_HamersleyIronProvince (excerpt), MarshSchlinger1980,
+  Pufahl1996, Bunting1986 (excerpts), Abbott2000, Hasterok2022 (areas computed from its open
+  data); and MinecraftSources (vanilla's OreVeinifier) for the raw-ore share.
 - Abstract only: Singer2005, Singer1993, Singer1995, Singer2008b, Kesler2006, Kesler2008,
   Agterberg1995, Bekker2010, Leach2010b, Garven1985, Garven1984 (part 1), Sillitoe2005,
   SillitoeMcKee1996, Richards2003, Robert2005, Garnett2005, Hoggard2020, Waples1980, Bohacs1997,
   Ryer1980, Hronsky2008, Skirrow2019, McCuaig2010, Sillitoe2010, Seedorff2005.
-- Secondary only: Butterworth2016 (a search summary of the abstract).
+- Secondary only: Butterworth2016 (a search summary of the abstract); Wikipedia's Kursk Magnetic
+  Anomaly and Iron Quadrangle pages and the Quebec survey's Kaniapiskau Supergroup entry
+  (2026-10-02). Abstract only (2026-10-02): Beukes1987, Klein2005.
 - Not readable: Root1992, Thomas1949, Lehmann2020, Magoon1994, Dyman2002, Heckel1986, Rasbury1998,
   Hampson1999.
