@@ -169,12 +169,19 @@ public final class DepositGameTests {
                         k -> level.getChunkSource().getChunk(xc >> 4, (int) (k >> 32), ChunkStatus.FEATURES, true));
                 for (int y = minY; y <= maxY; y++) {
                     BlockState state = chunk.getBlockState(new BlockPos(xc, y, z));
-                    String m = DepositFeature.materialAt(b, c, x, y, z);
+                    Body.Zone zone = DepositFeature.zoneAt(b, c, x, y, z);
+                    String m = zone == null ? null : zone.material();
                     boolean hasBlock = m != null && t.materials().contains(m);
                     if (hasBlock) {
                         due++;
                         ResourceLocation mat = ResourceLocation.parse(m);
-                        if (OreBlockResolver.isOreOf(state, mat)) {
+                        BlockState raw = DepositFeature.rawAt(b, zone, c, x, y, z) ? ores.rawBlock(mat) : null;
+                        if (raw != null && state == raw) {
+                            // A raw-ore block of a rich core (vanilla's ore veins): exactly the one due.
+                            placed++;
+                            exact++;
+                            blocks.merge(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(), 1, Integer::sum);
+                        } else if (raw == null && OreBlockResolver.isOreOf(state, mat)) {
                             placed++;
                             blocks.merge(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(), 1, Integer::sum);
                             BlockState host = StrataPass.predictedRock(wd, xc, y, z);

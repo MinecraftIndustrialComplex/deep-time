@@ -69,10 +69,10 @@
     "aspect": [1.0, 1.43, 1.0],
     "dip_deg": [0, 0],
     "zoning": [
-      {"zone": "potassic_core", "d": [0.0, 0.45], "material": "c:copper", "grade_mult": 1.3, "density": 0.35},
+      {"zone": "potassic_core", "d": [0.0, 0.45], "material": "c:copper", "grade_mult": 1.3, "density": 0.6, "raw_share": 0.05},
       {"zone": "potassic_core_mo", "d": [0.0, 0.3], "material": "c:molybdenum", "grade_mult": 1.5, "density": 0.06},
       {"zone": "potassic_core_au", "d": [0.0, 0.45], "material": "c:gold", "grade_mult": 1.2, "density": 0.04},
-      {"zone": "phyllic", "d": [0.45, 0.75], "material": "c:copper", "grade_mult": 0.8, "density": 0.2},
+      {"zone": "phyllic", "d": [0.45, 0.75], "material": "c:copper", "grade_mult": 0.8, "density": 0.35},
       {"zone": "phyllic_ag", "d": [0.45, 0.75], "material": "c:silver", "grade_mult": 1.0, "density": 0.03},
       {"zone": "propylitic_halo", "d": [0.75, 1.0], "rock_class": "greenstone", "density": 0.0}
     ],
@@ -101,6 +101,7 @@
   "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 1.0, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
+    "RICHNESS (owner, decisions log 2026-10-02, \"Rich Deposits, Thinner Scatter, Also make deposits use some of the vanilla ore vein features\"): the zone densities were raised and the richest zone carries raw-ore blocks (raw_share: that share of its ore blocks is the raw-ore block, as vanilla's ore veins carry 2 %); game-choice, ledger ORE-266; the richness settings scale both in the world (ORE-262). Measured in docs/science/deposits.md.",
     "Sizing: USGS OFR 2008-1155 (Singer, Berger & Moring 2008), Table 1 (PDF p. 9): all porphyry Cu deposits, n = 422; by-product percentiles count unreported grades as zero; presence = n_reported / 422 from the report's data file PorCuTX2008.txt; correlations (Pearson r of log10) from the text, PDF p. 8. See crates/deeptime-core/data/usgs/porphyry_cu.json.",
     "Deposit density 4 / 15 / 35 per 100,000 km² and the 2 km same-deposit rule: Singer, Berger & Menzie 2005 (USGS authors; Pubs Warehouse record 70197200) and OFR 2008-1155 PDF p. 4.",
     "PLACEHOLDER: ore_density_t_m3 2.7 (no USGS value found; generic intermediate-felsic intrusive rock).",

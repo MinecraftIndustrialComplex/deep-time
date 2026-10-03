@@ -407,6 +407,17 @@ fn initiate(
     if split.len() < 32 || members.len() - split.len() < 32 {
         return Ok(());
     }
+    // Pieces of the young side cut off by the old floor ride with it: a sliver of continent may,
+    // but a split that is mostly continent is no sinking ocean floor (2026-10-02: with the
+    // resampling fix, a test history's initiation took a plate 0.89 continental, probably a
+    // continent the old floor cut off, which `connect_plates` hands to the split).
+    let cont_split = split
+        .iter()
+        .filter(|&&i| state.samples[i as usize].kind == CONTINENTAL)
+        .count();
+    if 2 * cont_split >= split.len() {
+        return Ok(());
+    }
     let new_id = state.plates.len() as u32;
     let parent = state.plates[id as usize].clone();
     let mut twin: BTreeMap<u32, u32> = BTreeMap::new();
