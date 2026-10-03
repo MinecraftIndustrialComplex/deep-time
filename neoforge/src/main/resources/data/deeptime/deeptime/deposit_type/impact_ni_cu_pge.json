@@ -185,7 +185,7 @@
   "balance": {
     "count_mult": 1.0,
     "size_mult_h": 12.0,
-    "size_mult_v": 4.0,
+    "size_mult_v": 7.0,
     "richness_mult": 1.0
   },
   "requires_fields": {},
@@ -194,6 +194,7 @@
     "PLACEHOLDERS (design values, no USGS grade-tonnage or deposit-density model exists for impact deposits; crates/deeptime-core/data/usgs/impact_structures.json): tonnage, grades, ore density, deposit density, separation, clustering, geometry and the curves' thresholds.",
     "The ore body's host becomes gabbro (the norite sublayer). Nickel and platinum have no ore block in every pack: the ore-block resolver places nothing for a material the pack does not have.",
     "Rarity is the point: on a 16,384-block planet at Earth's rate a crater large enough (about 110 km for a 500 m melt sheet, 210 km for full ore) forms about once in 500 Myr and must survive; impacts.flux raises the odds.",
-    "minecraft.claims_scatter is false: impact deposits are too rare to be a world's only source of their products, so the game leaves the pack's own scatter of these materials in place (a material another type claims, such as copper, zinc or gold, stays claimed)."
+    "minecraft.claims_scatter is false: impact deposits are too rare to be a world's only source of their products, so the game leaves the pack's own scatter of these materials in place (a material another type claims, such as copper, zinc or gold, stays claimed).",
+    "VERTICAL SCALE (decisions log 2026-10-03, \"Keep today's block height\"): at 35 m per block the vertical multipliers are 1.75 times their 20 m values (balance.size_mult_v 4.0 -> 7.0), so a body keeps the height in blocks it had at 20 m per block; its size in metres is unchanged. game-choice, ledger IMP-110."
   ]
 }
