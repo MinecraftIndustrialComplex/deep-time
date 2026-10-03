@@ -122,12 +122,10 @@ pub fn render(
             },
         };
         let (_, ramp) = ramps.for_layer(name);
-        let (gw, gh) = (field.grid.w as f64, field.grid.h as f64);
         let mut rgba = Vec::with_capacity(w as usize * h as usize * 4);
         for py in 0..h {
-            let j = (f64::from(py) * gh / f64::from(h)).round() as i64;
             for px in 0..w {
-                let i = (f64::from(px) * gw / f64::from(w)).round() as i64;
+                let (i, j) = field.grid.picture_cell(f64::from(px), f64::from(py), w, h);
                 rgba.extend_from_slice(&ramp.rgba(f64::from(field.get(i, j))));
             }
         }

@@ -22,6 +22,7 @@ use std::path::Path;
 use crate::container::{self, f32_at, u32_at};
 use crate::error::{FormatError, Result};
 use crate::fsutil::write_atomic;
+use crate::projection::Projection;
 
 /// Where the network lives in a world-data folder.
 pub const RIVERS_PATH: &str = "rivers/rivers.dtrv";
@@ -187,8 +188,10 @@ impl Rivers {
     /// An empty network for a planet of circumference `c`.
     pub fn empty(c: u32) -> Rivers {
         let tile = TILE_BLOCKS;
-        let tiles_x = c.div_ceil(tile);
-        let tiles_z = (c / 2).div_ceil(tile);
+        // The tiles' frame is the projection's index frame.
+        let (span_x, span_z) = Projection::new(c).index_span_blocks();
+        let tiles_x = (span_x as u32).div_ceil(tile);
+        let tiles_z = (span_z as u32).div_ceil(tile);
         Rivers {
             c,
             tile,
@@ -224,8 +227,7 @@ impl Rivers {
                 chain_of[v as usize] = k as u32;
             }
         }
-        let c = f64::from(self.c);
-        let (x0, z0) = (-c / 2.0, -c / 4.0);
+        let (x0, z0) = Projection::new(self.c).index_origin();
         let tile = f64::from(self.tile);
         let mut lists: Vec<Vec<u32>> = vec![Vec::new(); n_tiles];
         for s in 0..self.vertices.len() {
@@ -264,14 +266,10 @@ impl Rivers {
 
     /// The tile of canonical column (wx, z).
     pub fn tile_of(&self, wx: i64, z: i64) -> usize {
-        let c = i64::from(self.c);
+        let (ox, oz) = Projection::new(self.c).index_origin_blocks();
         let t = i64::from(self.tile);
-        let tx = (wx + c / 2)
-            .div_euclid(t)
-            .rem_euclid(i64::from(self.tiles_x));
-        let tz = (z + c / 4)
-            .div_euclid(t)
-            .clamp(0, i64::from(self.tiles_z) - 1);
+        let tx = (wx - ox).div_euclid(t).rem_euclid(i64::from(self.tiles_x));
+        let tz = (z - oz).div_euclid(t).clamp(0, i64::from(self.tiles_z) - 1);
         (tz * i64::from(self.tiles_x) + tx) as usize
     }
 
@@ -331,14 +329,14 @@ impl Rivers {
     /// The segment ids of every tile touching block box [x0, x1] × [z0, z1] (canonical or not),
     /// ascending and without repeats.
     pub fn entries_in(&self, x0: i64, z0: i64, x1: i64, z1: i64) -> Vec<u32> {
-        let c = i64::from(self.c);
+        let (ox, oz) = Projection::new(self.c).index_origin_blocks();
         let t = i64::from(self.tile);
-        let tx0 = (x0 + c / 2).div_euclid(t);
-        let tx1 = (x1 + c / 2).div_euclid(t);
-        let tz0 = (z0 + c / 4)
+        let tx0 = (x0 - ox).div_euclid(t);
+        let tx1 = (x1 - ox).div_euclid(t);
+        let tz0 = (z0 - oz)
             .div_euclid(t)
             .clamp(0, i64::from(self.tiles_z) - 1);
-        let tz1 = (z1 + c / 4)
+        let tz1 = (z1 - oz)
             .div_euclid(t)
             .clamp(0, i64::from(self.tiles_z) - 1);
         let span = (tx1 - tx0).min(i64::from(self.tiles_x) - 1);

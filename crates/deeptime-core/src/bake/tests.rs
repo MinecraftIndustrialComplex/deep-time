@@ -205,7 +205,8 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     let (mut with_bodies, mut covered) = (0, 0);
     for _ in 0..400 {
         let x = rng.below(2 * c as u64) as i64 - c;
-        let z = rng.below((c / 2) as u64) as i64 - c / 4;
+        let zp = deeptime_format::Projection::of(c as f64).pole_z() as i64;
+        let z = rng.below(2 * zp as u64) as i64 - zp;
         let col = w.sample(x, z);
         assert!(!col.horizons.is_empty(), "({x}, {z}) has horizons");
         assert!(

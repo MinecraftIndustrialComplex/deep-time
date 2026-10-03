@@ -350,7 +350,7 @@ pub struct SiteIndex {
     pub cell_blocks: u32,
     pub cols: u32,
     pub rows: u32,
-    /// Block x of column 0 (−C/2) and z of row 0 (−C/4).
+    /// Block x of column 0 and z of row 0 (`Projection::index_origin_blocks`: −C/2, −C/4).
     pub origin_x: i32,
     pub origin_z: i32,
     /// CSR: cell c's ids are `ids[offsets[c]..offsets[c + 1]]`, cell c = row · cols + col.
@@ -367,10 +367,12 @@ impl SiteIndex {
             )));
         }
         let cb = INDEX_CELL_BLOCKS;
-        let cols = c.div_ceil(cb);
-        let rows = (c / 2).div_ceil(cb);
-        let origin_x = -((c / 2) as i32);
-        let origin_z = -((c / 4) as i32);
+        // The index's frame is the projection's index frame.
+        let p = crate::Projection::new(c);
+        let ((ox, oz), (span_x, span_z)) = (p.index_origin_blocks(), p.index_span_blocks());
+        let cols = (span_x as u32).div_ceil(cb);
+        let rows = (span_z as u32).div_ceil(cb);
+        let (origin_x, origin_z) = (ox as i32, oz as i32);
         let mut cells: Vec<Vec<SiteId>> = vec![Vec::new(); (cols * rows) as usize];
         let col_of = |x: i32| (i64::from(x) - i64::from(origin_x)).div_euclid(i64::from(cb));
         let row_of = |z: i32| {

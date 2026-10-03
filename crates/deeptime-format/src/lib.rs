@@ -16,6 +16,7 @@ pub mod fsutil;
 pub mod keyframes;
 pub mod lazy;
 pub mod manifest;
+pub mod projection;
 pub mod ramps;
 pub mod raster;
 pub mod rivers;
@@ -35,7 +36,12 @@ pub use events::{
 };
 pub use keyframes::{KeyframeEntry, KeyframeImage, KeyframeIndex};
 pub use lazy::LazyLayer;
+<<<<<<< HEAD
 pub use manifest::{DEFAULT_M_PER_BLOCK_V, FileEntry, LayerEntry, Manifest, Scale, Writer};
+=======
+pub use manifest::{FileEntry, LayerEntry, Manifest, Scale, Writer};
+pub use projection::Projection;
+>>>>>>> master
 pub use ramps::{Ramp, Ramps};
 pub use raster::{Cell, Codec, DType, GridDesc, LayerDesc, LoadedLayer, Raster, RasterRead, TILE};
 pub use rivers::{Chain, Mouth, RiverVertex, Rivers};

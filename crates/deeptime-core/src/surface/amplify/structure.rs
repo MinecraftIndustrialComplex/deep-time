@@ -78,7 +78,8 @@ impl Relief {
             .events
             .iter()
             .zip(&world.structure_relief)
-            .filter(|(_, r)| **r > 0.01) // ledger: DEF-061
+            // Less than 1 % of the relief share left. ledger: DEF-061
+            .filter(|(_, r)| f64::from(**r) > 0.01 * d.relief)
             .map(|(e, r)| (*e, f64::from(*r)))
             .collect();
         if items.is_empty() {

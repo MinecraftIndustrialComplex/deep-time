@@ -143,7 +143,8 @@ public final class BiomeCensus {
         RasterSampler iceLayer = wd.has(IceCover.LAYER) ? wd.layer(IceCover.LAYER) : null;
         var sampler = level.getChunkSource().randomState().sampler();
         int c = t.circumference(), sea = g.getSeaLevel();
-        int w = c / step, h = c / (2 * step);
+        int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);   // the poles (the planet's projection)
+        int w = c / step, h = 2 * zp / step;
         short[] biomeIdx = new short[w * h];
         byte[] koppen = new byte[w * h];
         short[] height = new short[w * h];
@@ -159,7 +160,7 @@ public final class BiomeCensus {
         Map<Integer, Map<Integer, Integer>> classBiomes = new HashMap<>();
         int skippedUntagged = 0;
         for (int j = 0; j < h; j++) {
-            int z = -c / 4 + step / 2 + j * step;
+            int z = -zp + step / 2 + j * step;
             for (int i = 0; i < w; i++) {
                 int x = -c / 2 + step / 2 + i * step;
                 int cell = j * w + i;
@@ -181,7 +182,7 @@ public final class BiomeCensus {
                 biomeIdx[cell] = (short) (int) idx;
                 koppen[cell] = (byte) k;
                 height[cell] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(y)));
-                if (Math.abs(z) > c / 4 - poleMargin)
+                if (Math.abs(z) > zp - poleMargin)
                     continue;
                 boolean untagged = !untaggedNamespaces.isEmpty()
                         && untaggedNamespaces.contains(b.unwrapKey().map(key -> key.location().getNamespace()).orElse("?"));
@@ -272,7 +273,7 @@ public final class BiomeCensus {
             map.addProperty("circumference", c);
             map.addProperty("step", step);
             map.addProperty("x0", -c / 2 + step / 2);
-            map.addProperty("z0", -c / 4 + step / 2);
+            map.addProperty("z0", -zp + step / 2);
             map.addProperty("w", w);
             map.addProperty("h", h);
             map.addProperty("sea_level", sea);
