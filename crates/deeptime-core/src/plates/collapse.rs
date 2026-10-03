@@ -39,11 +39,13 @@
 //! Volume is conserved: the rock moved is the collapsing column's own mix, thinned in
 //! proportion, as pure-shear extension does.
 //!
-//! The surface follows by Airy (`pools::ISOSTATIC_FACTOR`, 5.5 m of crust per m of height): a
-//! receiver rises by g / 5.5 for the g it takes; a source sinks by q / 5.5, but never below the
-//! Airy height of the crust it keeps (z_0 + (T − q − T_n) / 5.5, z_0 the middle of
-//! `continent_elevation_m`), so a root that never raised its surface (an overlap stack) does
-//! not drag it down as it spreads. Nothing rises above where it stood.
+//! The surface follows by Airy (`pools::ISOSTATIC_FACTOR`, 5.5 m of crust per m of height),
+//! within the Airy height of the column, z_A(T) = z_0 + (T − T_n) / 5.5 (z_0 the middle of
+//! `continent_elevation_m`): a source sinks by q / 5.5 but not below z_A of the crust it keeps,
+//! so a root that never raised its surface (an overlap stack) does not drag it down as it
+//! spreads; a receiver rises by g / 5.5 but not above z_A of its new column, so ocean floor
+//! filled to T_n stands at a continent's height and thin crust that the surface already holds
+//! high is not raised further.
 //!
 //! The area gained is the volume released over T_n: a column of thickness T gives back
 //! (T − T_c) / T_n of a sample's area.
@@ -247,7 +249,11 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
                 *x += (g * m) as f32;
             }
             s.thickness_m = s.pools.iter().sum();
-            s.elevation_m = (f64::from(s.elevation_m) + g / ISOSTATIC_FACTOR) as f32;
+            // Airy (PLT-121): up by g / 5.5, not above the height the crust now holds up.
+            let z = f64::from(s.elevation_m);
+            let airy = z_0 + (f64::from(s.thickness_m) - normal) / ISOSTATIC_FACTOR;
+            let rise = (g / ISOSTATIC_FACTOR).min((airy - z).max(0.0));
+            s.elevation_m = (z + rise) as f32;
             if s.kind == OCEANIC && f64::from(s.thickness_m) >= normal - 1.0 {
                 s.kind = CONTINENTAL;
                 out.converted += 1;
@@ -445,7 +451,10 @@ mod tests {
                 let p = fx.geo.points()[i];
                 // Angular distance to the belt's band (y = 0.85 is 31.8° from +y).
                 assert!(p.y.acos() - 0.766f64.acos() < reach, "{p}");
-                assert!(s.elevation_m > z0[i]);
+                // Raised to a continent's height, not above the Airy height of its column.
+                let z_a = 0.5 * (fx.k.continent_elevation_m[0] + fx.k.continent_elevation_m[1])
+                    + (f64::from(s.thickness_m) - normal_thickness_m()) / ISOSTATIC_FACTOR;
+                assert!(s.elevation_m > z0[i] && f64::from(s.elevation_m) <= z_a + 1.0);
             }
         }
     }
