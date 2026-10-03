@@ -64,10 +64,13 @@ lenses sit in a body of altered hot rock (basalt with a magma block in about eve
 broader than the lenses. Shields have broader lenses than arc cones, silicic centres a larger shallow
 chamber. A quarter of the active volcanoes on dry land have an open lava lake in the crater instead
 of the plug, 4 to 20 blocks across. Everything molten is walled in by smooth basalt, so lava never
-touches water or an open cave. Extinct volcanoes have no magma.
+touches water or an open cave: open space within 1.5 blocks of a chamber or lens, measured across and
+up from its surface, becomes basalt (MAG-011; since 2026-10-03 the shell is that thick everywhere,
+where before it was the ellipsoid's radii plus 1.5 and thinner than a block over the flanks of lenses
+more than about 50 blocks in radius). Extinct volcanoes have no magma.
 
 **Lava elsewhere.** The random lava lakes and springs of vanilla Minecraft and of Terralith are
-removed. The only other lava is a layer at the very bottom of the world (below y -342 in the default
+removed. The only other lava is a layer at the very bottom of the world (below y -502 in the default
 world). On the measured planet a point on land was a median 658 blocks from the nearest active
 volcano and 1,178 blocks from the nearest open lava lake.
 
