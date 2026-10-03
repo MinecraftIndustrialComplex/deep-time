@@ -137,7 +137,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   1,000 iron ore blocks or more). Matches the figures of the earlier agent's `--set` run (1 and 15 sites, 6 counted).
 - **Gates** (VM, this branch): `cargo fmt --check`, clippy `-D warnings`, `cargo test --workspace` (731 passed, 0 failed, 3 ignored),
   `cargo deny check licenses bans` (ok), `./gradlew build test` (BUILD SUCCESSFUL; 229 tests, 0 failures, 1 skipped).
-  GAMETEST_PLACEHOLDER
+  `./gametest.sh -PwithEv` (through `mac.sh`, server lock): All 68 required tests passed (plain and MIC profiles not run: a default share
+  changes nothing they pin, per the brief).
 ### 2026-10-02 — Deposits: richer, thinner scatter, raw-ore cores; inherited iron formation in Earth-like basins; supergene and coal judgement items (agent worktree agent-af40434ae4920f5c9, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Ask.** Ben's three answers of 2026-10-02 on deposits: "Earth-like patch field" (inherited BIF), "Apply all" (supergene rain
   floor 0, coal field P10 about 6,000 km², supergene minimum time and flat porphyry density kept), "Rich Deposits, Thinner
