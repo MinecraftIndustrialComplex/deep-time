@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Ben's play server on the test VM (MIC + Deep Time, port 25765; the laptop reaches it through its
+# deeptime-play-tunnel unit, tools/remote/tunnels.sh). Started at boot, so it is back after the idle
+# watcher deallocated the VM. The server folder is in /etc/default/deeptime-play (PLAY_DIR).
+# SIGTERM stops it cleanly (the server's shutdown hook saves the world). Installed by
+# tools/remote/vm/install.sh.
+[Unit]
+Description=Deep Time play server (Minecraft, port 25765)
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=/data /nix
+
+[Service]
+Type=simple
+User=ban
+Group=ban
+Environment=HOME=/home/ban
+EnvironmentFile=/etc/default/deeptime-play
+ExecStart=/usr/local/lib/deeptime/play-server.sh
+StandardInput=null
+StandardOutput=truncate:/data/ban/deeptime-cache/play-server.log
+StandardError=inherit
+SuccessExitStatus=143
+TimeoutStopSec=180s
+Restart=on-failure
+RestartSec=60s
+
+[Install]
+WantedBy=multi-user.target

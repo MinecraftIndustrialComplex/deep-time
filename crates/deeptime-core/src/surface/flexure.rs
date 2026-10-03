@@ -1757,6 +1757,61 @@ mod tests {
         assert!((wd.h[under] - bare[under]).abs() < 0.5, "rebound");
     }
 
+    /// A collision as the plate model builds it (`plates/belts.rs`, tasks 3 and 4): a belt on the
+    /// overriding plate and a wedge on the incoming one, both young orogens (weak), with the plate
+    /// boundary between them a break. The incoming plate is a stiff craton beyond the wedge: it
+    /// bends down in front of the wedge into a foreland basin deeper than its surroundings, with a
+    /// bulge beyond, and nothing of the load reaches across the boundary.
+    #[test]
+    fn a_collision_wedge_bends_a_foreland_basin_on_the_incoming_plate() {
+        let p = on();
+        let (w, h) = (32usize, 256usize);
+        let n = w * h;
+        let mut wd = World::new(w, h, 300.0);
+        let sea = -1.0e6;
+        // Rows below 128: the overriding plate; from row 128 on: the incoming plate.
+        for c in 0..n {
+            if c / w >= 128 {
+                wd.plate[c] = 1.0;
+            }
+        }
+        let (mut sv, mut st) = started(&mut wd, &p, sea);
+        // The belt: 10 rows (390 km) behind the front with the profile 1 − (d/W)², 2 km at the
+        // front in the step; the wedge: 5 rows (195 km) in front, rising straight to the front.
+        for c in 0..n {
+            let j = c / w;
+            let u = if (118..128).contains(&j) {
+                let x = (127 - j) as f64 / 10.0;
+                1.0 - x * x
+            } else if (128..133).contains(&j) {
+                1.0 - (j - 128) as f64 / 5.0
+            } else {
+                0.0
+            };
+            if u > 0.0 {
+                wd.uplift[c] = u as f32;
+                wd.orogeny[c] = 0.0;
+                wd.regime[c] = f32::from(regime::COLLISION);
+            }
+        }
+        let out = wd.step(&p, &mut sv, &mut st, &vec![0.0; n], sea);
+        assert!(out.solve.as_ref().unwrap().converged, "{:?}", out.solve);
+        let flex = |j: usize| f64::from(out.flexure_m[j * w + 3]);
+        // In front of the wedge's toe (row 133 on): the foreland basin.
+        let basin = (133..160).map(flex).fold(f64::MAX, f64::min);
+        assert!(basin < -100.0, "no foreland basin: {basin}");
+        let far = (210..250).map(|j| flex(j).abs()).fold(0.0f64, f64::max);
+        assert!(
+            basin < -far - 100.0,
+            "the basin {basin} against {far} far away"
+        );
+        let bulge = (133..220).map(flex).fold(f64::MIN, f64::max);
+        assert!(bulge > 0.0, "no bulge beyond: {bulge}");
+        // The overriding plate behind its belt does not feel the incoming plate's bending.
+        let behind = (60..110).map(|j| flex(j).abs()).fold(0.0f64, f64::max);
+        assert!(behind < 0.5 * basin.abs(), "{behind} behind the belt");
+    }
+
     /// A belt raised by the plate model on a craton: the plate holds part of its root, so the
     /// belt stands higher than its Airy height, a basin lies in front of it and a bulge beyond;
     /// the buoyancy of all the sinking is the belt's weight. When the belt is eroded away the
