@@ -124,6 +124,19 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P1-10 | **Region size and when a world gets its regions.** (1) Provinces are at least 50,000 km² (the earlier bake minimum, kept; `provinces.min_area_km2`): the 16k planet has 40 provinces of 68,000 to 2,200,000 km² (about 870 to 4,900 blocks across), TerraBlender's own regions being about 1,000 to 3,000 blocks; smaller values give more, smaller regions (recommended: keep). (2) A world's province → region table is dealt once, at the first start with TerraBlender installed, and kept: a biome mod added later brings its regions to new worlds only, and one removed falls back to the vanilla region for its provinces (recommended; the alternative re-deals for unexplored chunks and shifts biomes at the border of explored ones). | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-03 — Margins and spires: IN PROGRESS, early note for sequencing (agent worktree agent-acb3be522c393a248, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Margin cause found partly in `plates/` (heads-up for the plate tasks in flight).** Measured (shore-normal transects,
+  metres; quick 16k, seed 2, scattered 500 Myr) the plate model's own `plates/elevation_m` already has the wall: median
+  −1,790 m 10 km off the coast and +715 m 20 km inland, against ETOPO 2022's −79 m and +105 m; the surface, young and
+  amplified elevations keep it (the finer levels steepen it, 10.6° → 15° between the 500 and 2,000 m isobaths; Earth
+  2.1°). Two causes: (1) the ocean–continent step is one plate sample wide and the Earth-normalized plate geometry is
+  drawn 8.1× narrower on the map, and nothing under the sea relaxes it (marine diffusion vanishes below the 60 m wave
+  base); (2) **`plates/pools.rs` `surface_step`: the oceanic dampening z −= (1 − z/z_floor)·ε_o·δt relaxes every
+  oceanic sample's height back to the age–depth curve with a 26 Myr time constant whatever its age**, so the sediment the
+  surface stage lays on old ocean floor beside a margin (rise, prograding shelf and slope) subsides at ~200 m/Myr and is
+  erased (GDH1 at 100 Myr: ~4 m/Myr). Planned fix there: oceanic crust subsides at the age–depth curve's own rate at
+  its age, loads staying (the surface stage's isostasy and flexure compensate them). A few lines in `surface_step`
+  only; no other `plates/` file. The rest of the fix is in `surface/`.
 ### 2026-10-02 — The vertical-scale study (agent worktree agent-afbde2c1feb92691f, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; a study, no defaults changed; not merged)
 - **Asked:** Ben finds the worlds "cartoonishly stretched" at 20 m per block up and 300 m across (15×). Data and pictures to choose a vertical scale. Written to `docs/research/notes/vertical-scale-study.md` (index row in `docs/research/README.md`); pictures in `review/out/vertical-scale/` (planet B, with the references) and `review/out/vertical-scale/a/` (planet A), not committed.
 - **Tools (committed):** `deeptime-inspect heights` (any generated world's terrain and water tops as a NumPy array); `tools/review/vertical-scale.sh` and `vertical_scale.py` (`join`, `refjoin`, `stats`, `compare`, `places`, `strata`, `render`, `charts`, `page`).
