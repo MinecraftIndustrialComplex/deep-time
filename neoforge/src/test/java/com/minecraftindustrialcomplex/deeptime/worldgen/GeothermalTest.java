@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class GeothermalTest {
 
-    private static final int C = 8192, SEA = 63, LAVA_FLOOR = -342;
+    private static final int C = 8192, SEA = 63, LAVA_FLOOR = -502;
     private static final double MH = 300.0, MV = 20.0;
 
     private static final Geothermal.Env WET_WARM = env(1200, 15, false, false);
@@ -84,7 +84,7 @@ class GeothermalTest {
 
     private static Geothermal build(List<Volcanoes.Volcano> vs, GeothermalRules rules, Geothermal.Env env, Magma.Wet wet) {
         Magma.Heights h = terrain(vs);
-        Magma magma = Magma.build(vs, MagmaRules.DEFAULT, h, wet, C, SEA, LAVA_FLOOR, MH, MV, C / 4);
+        Magma magma = Magma.build(vs, MagmaRules.DEFAULT, h, wet, C, SEA, LAVA_FLOOR, MH, MV, (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(C));
         return Geothermal.build(vs, rules, magma, h, wet, env, C, SEA, MH);
     }
 
@@ -99,7 +99,7 @@ class GeothermalTest {
     @Test
     void aDensityOfZeroMeansNoFeaturesAndIsTheOnlySwitch() {
         var vs = volcanoes(20, false);
-        Geothermal none = build(vs, new GeothermalRules(0.0, 1.0, 1.0, 400.0), WET_WARM, DRY);
+        Geothermal none = build(vs, new GeothermalRules(0.0, 1.0, 1.0, 400.0, 100.0, 1.0), WET_WARM, DRY);
         assertTrue(none.sites().isEmpty());
         assertEquals(0.0, none.warmthC(vs.get(0).x() > 0 ? 1 : -1, 80, 0));
         assertTrue(none.near(-C / 2, -4000, C / 2, 4000).isEmpty());
@@ -118,7 +118,7 @@ class GeothermalTest {
         assertEquals(0, count(cold, Geothermal.Kind.POOL), "frozen ground: no pools");
         assertTrue(count(cold, Geothermal.Kind.VENT) > 0);
         // The threshold is a setting: with none, the dry world gets springs too.
-        Geothermal lowBar = build(vs, new GeothermalRules(1.0, 1.0, 1.0, 0.0), DRY_WARM, DRY);
+        Geothermal lowBar = build(vs, new GeothermalRules(1.0, 1.0, 1.0, 0.0, 100.0, 1.0), DRY_WARM, DRY);
         assertTrue(count(lowBar, Geothermal.Kind.POOL) > 0);
         // A world without a climate is taken as warm and wet.
         assertTrue(count(build(vs, Geothermal.Env.OPEN), Geothermal.Kind.POOL) > 0);
@@ -175,7 +175,7 @@ class GeothermalTest {
     void poolsSitOnSlopesByCuttingAndDamming() {
         var vs = volcanoes(60, false);
         Magma.Heights h = terrain(vs, 1.0);
-        Geothermal g = Geothermal.build(vs, new GeothermalRules(2.0, 1.0, 1.0, 400.0), Magma.NONE, h, DRY, WET_WARM, C, SEA, MH);
+        Geothermal g = Geothermal.build(vs, new GeothermalRules(2.0, 1.0, 1.0, 400.0, 100.0, 1.0), Magma.NONE, h, DRY, WET_WARM, C, SEA, MH);
         int pools = 0;
         for (Geothermal.Site s : g.sites()) {
             if (s.kind() != Geothermal.Kind.POOL)
@@ -234,7 +234,7 @@ class GeothermalTest {
                 }
         // The sea: ground at or below the coast takes nothing.
         Magma.Heights low = (x, z) -> SEA + 1.5;
-        Geothermal coast = Geothermal.build(vs, GeothermalRules.DEFAULT, Magma.build(vs, MagmaRules.DEFAULT, low, DRY, C, SEA, LAVA_FLOOR, MH, MV, C / 4),
+        Geothermal coast = Geothermal.build(vs, GeothermalRules.DEFAULT, Magma.build(vs, MagmaRules.DEFAULT, low, DRY, C, SEA, LAVA_FLOOR, MH, MV, (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(C)),
                 low, DRY, WET_WARM, C, SEA, MH);
         assertTrue(coast.sites().isEmpty());
     }
@@ -243,8 +243,8 @@ class GeothermalTest {
     void sitesKeepClearOfOneAnotherAndOfOpenMagma() {
         var vs = volcanoes(40, false);
         Magma.Heights h = terrain(vs);
-        Magma magma = Magma.build(vs, new MagmaRules(3.0, 1.0, 1.0, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV, C / 4);
-        Geothermal g = Geothermal.build(vs, new GeothermalRules(3.0, 1.0, 1.0, 400.0), magma, h, DRY, WET_WARM, C, SEA, MH);
+        Magma magma = Magma.build(vs, new MagmaRules(3.0, 1.0, 1.0, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV, (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(C));
+        Geothermal g = Geothermal.build(vs, new GeothermalRules(3.0, 1.0, 1.0, 400.0, 100.0, 1.0), magma, h, DRY, WET_WARM, C, SEA, MH);
         assertTrue(magma.bodies().stream().anyMatch(Magma.Body::lake), "the test has crater lakes to keep clear of");
         List<Geothermal.Site> sites = g.sites();
         for (int i = 0; i < sites.size(); i++) {
@@ -276,23 +276,23 @@ class GeothermalTest {
     @Test
     void densityScalesTheNumberOfFeatures() {
         var vs = volcanoes(60, false);
-        int half = build(vs, new GeothermalRules(0.5, 1.0, 1.0, 400.0), WET_WARM, DRY).sites().size();
+        int half = build(vs, new GeothermalRules(0.5, 1.0, 1.0, 400.0, 100.0, 1.0), WET_WARM, DRY).sites().size();
         int one = build(vs, WET_WARM).sites().size();
-        int twice = build(vs, new GeothermalRules(2.0, 1.0, 1.0, 400.0), WET_WARM, DRY).sites().size();
+        int twice = build(vs, new GeothermalRules(2.0, 1.0, 1.0, 400.0, 100.0, 1.0), WET_WARM, DRY).sites().size();
         assertTrue(half < one && one < twice, half + " < " + one + " < " + twice);
         // Every volcano can have some, the more active ones more.
-        assertTrue(build(vs, new GeothermalRules(4.0, 1.0, 1.0, 400.0), WET_WARM, DRY).sites().stream().map(Geothermal.Site::volcano)
+        assertTrue(build(vs, new GeothermalRules(4.0, 1.0, 1.0, 400.0, 100.0, 1.0), WET_WARM, DRY).sites().stream().map(Geothermal.Site::volcano)
                 .distinct().count() >= 55);
     }
 
     @Test
     void reachAndSizeAreSettings() {
         var vs = volcanoes(40, false);
-        double near = meanDistance(build(vs, new GeothermalRules(1.0, 0.25, 1.0, 400.0), WET_WARM, DRY), vs);
-        double far = meanDistance(build(vs, new GeothermalRules(1.0, 2.0, 1.0, 400.0), WET_WARM, DRY), vs);
+        double near = meanDistance(build(vs, new GeothermalRules(1.0, 0.25, 1.0, 400.0, 100.0, 1.0), WET_WARM, DRY), vs);
+        double far = meanDistance(build(vs, new GeothermalRules(1.0, 2.0, 1.0, 400.0, 100.0, 1.0), WET_WARM, DRY), vs);
         assertTrue(near < far, "reach 0.25: " + near + " blocks from the summit on average, reach 2: " + far);
-        double small = meanApron(build(vs, new GeothermalRules(1.0, 1.0, 0.5, 400.0), WET_WARM, DRY));
-        double large = meanApron(build(vs, new GeothermalRules(1.0, 1.0, 2.0, 400.0), WET_WARM, DRY));
+        double small = meanApron(build(vs, new GeothermalRules(1.0, 1.0, 0.5, 400.0, 100.0, 1.0), WET_WARM, DRY));
+        double large = meanApron(build(vs, new GeothermalRules(1.0, 1.0, 2.0, 400.0, 100.0, 1.0), WET_WARM, DRY));
         assertTrue(small < large, small + " < " + large);
     }
 
@@ -408,12 +408,122 @@ class GeothermalTest {
         assertTrue(seamSites > 0, "the volcano on the seam has features");
     }
 
+    /** An environment whose continental heat flow is {@code hot} mW/m2 inside the box x in [-2000, 2000), z in [-1000, 1000) and 62 elsewhere. */
+    private static Geothermal.Env heatEnv(double hot, double precip, double mean, java.util.function.IntBinaryOperator icedAt) {
+        return new Geothermal.Env() {
+            @Override
+            public double precipMm(int x, int z) {
+                return precip;
+            }
+
+            @Override
+            public double meanC(int x, int z) {
+                return mean;
+            }
+
+            @Override
+            public double heatFlowMwM2(int x, int z) {
+                return x >= -2000 && x < 2000 && z >= -1000 && z < 1000 ? hot : 62.0;
+            }
+
+            @Override
+            public boolean iced(int x, int z) {
+                return icedAt.applyAsInt(x, z) != 0;
+            }
+
+            @Override
+            public boolean carbonate(int x, int z, int groundY) {
+                return false;
+            }
+        };
+    }
+
+    private static Geothermal heatBuild(GeothermalRules rules, Geothermal.Env env, Magma.Wet wet) {
+        Magma.Heights flat = (x, z) -> 75.0;
+        return Geothermal.build(List.of(), rules, Magma.NONE, flat, wet, env, C, SEA, MH);
+    }
+
+    @Test
+    void hotContinentalGroundTakesFieldsWithoutAnyVolcano() {
+        // Ben, decisions log 2026-10-02: fields also where the baked heat flow is high.
+        Geothermal g = heatBuild(GeothermalRules.DEFAULT, heatEnv(120, 1200, 15, (x, z) -> 0), DRY);
+        assertTrue(g.sites().size() > 40, "a box of 720,000 km2 at one field per 10,000: " + g.sites().size() + " sites");
+        assertEquals(g.sites().size(), g.heatFlowSites(), "no volcano: every site is the ground's heat");
+        assertTrue(count(g, Geothermal.Kind.POOL) > 0, "wet and warm: hot springs");
+        for (Geothermal.Site s : g.sites()) {
+            assertEquals(Geothermal.HEAT_FLOW_SOURCE, s.volcano());
+            // A field is drawn on hot ground; its sites spread a few tens of blocks about it.
+            assertTrue(s.x() > -2060 && s.x() < 2060 && s.z() > -1060 && s.z() < 1060, "site at " + s.x() + "," + s.z() + " off the hot ground");
+        }
+        // Cooler ground than the setting: nothing.
+        assertTrue(heatBuild(GeothermalRules.DEFAULT, heatEnv(99, 1200, 15, (x, z) -> 0), DRY).sites().isEmpty(), "99 is under the 100 threshold");
+        // The threshold is a setting: lowered under the ground's 62 the whole world is hot.
+        Geothermal everywhere = heatBuild(new GeothermalRules(1.0, 1.0, 1.0, 400.0, 60.0, 1.0), heatEnv(99, 1200, 15, (x, z) -> 0), DRY);
+        assertTrue(everywhere.sites().size() > 3 * g.sites().size(), everywhere.sites().size() + " against " + g.sites().size());
+        // Density is a setting too, and 0 means none from the heat flow (the volcanoes' fields are separate).
+        assertTrue(heatBuild(new GeothermalRules(1.0, 1.0, 1.0, 400.0, 100.0, 0.0), heatEnv(120, 1200, 15, (x, z) -> 0), DRY).sites().isEmpty());
+        int twice = heatBuild(new GeothermalRules(1.0, 1.0, 1.0, 400.0, 100.0, 2.0), heatEnv(120, 1200, 15, (x, z) -> 0), DRY).sites().size();
+        assertTrue(twice > 1.5 * g.sites().size(), twice + " against " + g.sites().size());
+        // The one switch of the geothermal features turns these off too.
+        assertTrue(heatBuild(new GeothermalRules(0.0, 1.0, 1.0, 400.0, 100.0, 1.0), heatEnv(120, 1200, 15, (x, z) -> 0), DRY).sites().isEmpty());
+        // A world without the layer has none.
+        assertTrue(heatBuild(GeothermalRules.DEFAULT, WET_WARM, DRY).sites().isEmpty());
+    }
+
+    @Test
+    void heatFlowFieldsKeepEveryGeothermalRule() {
+        // Dry ground: fumaroles and altered ground, no pools. Cold: the same (no pools under 3 degC).
+        Geothermal dry = heatBuild(GeothermalRules.DEFAULT, heatEnv(120, 120, 15, (x, z) -> 0), DRY);
+        Geothermal cold = heatBuild(GeothermalRules.DEFAULT, heatEnv(120, 1200, -6, (x, z) -> 0), DRY);
+        assertFalse(dry.sites().isEmpty());
+        assertFalse(cold.sites().isEmpty());
+        assertEquals(0, count(dry, Geothermal.Kind.POOL));
+        assertEquals(0, count(cold, Geothermal.Kind.POOL));
+        // Under ice and in water: nothing in the footprint, as for a volcano's fields.
+        Magma.Wet wet = (x, z) -> z > 200;
+        Geothermal.Env iced = heatEnv(120, 1200, 15, (x, z) -> x > 0 ? 1 : 0);
+        Geothermal g = heatBuild(GeothermalRules.DEFAULT, iced, wet);
+        assertFalse(g.sites().isEmpty());
+        for (Geothermal.Site s : g.sites())
+            for (int dx = -s.reach(); dx <= s.reach(); dx++)
+                for (int dz = -s.reach(); dz <= s.reach(); dz++) {
+                    Geothermal.Part p = s.part(dx, dz);
+                    boolean exact = p.pool() || p == Geothermal.Part.RIM || p == Geothermal.Part.VENT || p == Geothermal.Part.SULFUR;
+                    if (!exact)
+                        continue;
+                    int x = Math.floorMod(s.x() + dx + C / 2, C) - C / 2, z = s.z() + dz;
+                    assertFalse(wet.at(x, z), "site " + s.id() + " " + p + " in water at " + x + "," + z);
+                    assertFalse(iced.iced(x, z), "site " + s.id() + " " + p + " under ice at " + x + "," + z);
+                }
+        // Every pool is sealed as for the volcanoes' (the same machinery): its level is the ground's.
+        assertTrue(heatBuild(GeothermalRules.DEFAULT, heatEnv(120, 1200, 15, (x, z) -> 0), DRY).sites().stream()
+                .filter(s -> s.kind() == Geothermal.Kind.POOL).allMatch(s -> s.level() == 74));
+        // A coast: ground at the sea takes nothing.
+        Magma.Heights low = (x, z) -> SEA + 1.0;
+        assertTrue(Geothermal.build(List.of(), GeothermalRules.DEFAULT, Magma.NONE, low, DRY, heatEnv(120, 1200, 15, (x, z) -> 0), C, SEA, MH)
+                .sites().isEmpty());
+    }
+
+    @Test
+    void theSameWorldGivesTheSameHeatFlowFields() {
+        Geothermal a = heatBuild(GeothermalRules.DEFAULT, heatEnv(120, 1200, 15, (x, z) -> 0), DRY);
+        Geothermal b = heatBuild(GeothermalRules.DEFAULT, heatEnv(120, 1200, 15, (x, z) -> 0), DRY);
+        assertEquals(a.sites(), b.sites());
+    }
+
     @Test
     void rulesComeFromTheBakeNotesAndAreClamped() {
+        JsonObject heat = JsonParser.parseString("{\"bake\": {\"underground\": {\"params\": {\"geothermal_heat_flow_min_mw_m2\": 85, "
+                + "\"geothermal_heat_density\": 2.5}}}}").getAsJsonObject();
+        assertEquals(new GeothermalRules(1.0, 1.0, 1.0, 400.0, 85.0, 2.5), GeothermalRules.of(heat));
+        JsonObject silly2 = JsonParser.parseString("{\"bake\": {\"underground\": {\"params\": {\"geothermal_heat_flow_min_mw_m2\": 5, "
+                + "\"geothermal_heat_density\": 90}}}}").getAsJsonObject();
+        assertEquals(50.0, GeothermalRules.of(silly2).heatFlowMinMwM2());
+        assertEquals(4.0, GeothermalRules.of(silly2).heatDensity());
         assertEquals(GeothermalRules.DEFAULT, GeothermalRules.of(new JsonObject()));
         JsonObject notes = JsonParser.parseString("{\"bake\": {\"underground\": {\"params\": {\"geothermal_density\": 0.4, "
                 + "\"geothermal_reach\": 2.5, \"geothermal_size\": 1.5, \"geothermal_spring_min_precip_mm\": 900}}}}").getAsJsonObject();
-        assertEquals(new GeothermalRules(0.4, 2.5, 1.5, 900.0), GeothermalRules.of(notes));
+        assertEquals(new GeothermalRules(0.4, 2.5, 1.5, 900.0, 100.0, 1.0), GeothermalRules.of(notes));
         JsonObject silly = JsonParser.parseString("{\"bake\": {\"underground\": {\"params\": {\"geothermal_density\": -3, "
                 + "\"geothermal_reach\": 99, \"geothermal_size\": \"big\"}}}}").getAsJsonObject();
         GeothermalRules r = GeothermalRules.of(silly);

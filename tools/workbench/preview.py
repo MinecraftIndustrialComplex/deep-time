@@ -66,7 +66,7 @@ import jarstate  # noqa: E402  (tools/smoke/jarstate.py: the jar comparison inst
 VIEWER = os.path.join(REPO, "tools", "review", "pages", "area3d")
 PROFILES = ("standalone", "mic", "mic-ev", "terrablender", "ev")
 MAX_SIDE = 256
-DEEP_TIME_Y = (-352, 639)
+DEEP_TIME_Y = (-512, 639)
 VANILLA_Y = (-64, 319)
 LEVEL_TYPES = {16384: "deeptime:planet", 32768: "deeptime:planet_32k"}
 # The Mac's shared cache (tools/remote/mac.sh): the server lock and the dev-shell profiles.
@@ -109,6 +109,14 @@ def new_job_id():
 
 def fold(x, c):
     return (x + c // 2) % c - c // 2
+
+
+# The planet's projection (the twin of deeptime_format::projection, docs/design/equal-area-projection.md
+# §2): equirectangular, the seam x = −C/2 is longitude 0°, north is −z, the poles at z = ∓C/4.
+def pole_z(c):
+    """|z| of the poles, whole blocks."""
+    return c // 4
+
 
 
 # ---------------------------------------------------------------------------------------------
@@ -162,8 +170,8 @@ def normalise_spec(spec, max_side=MAX_SIDE):
         if x1 - x0 > max_side or z1 - z0 > max_side:
             raise ValueError(f"box {b} is larger than {max_side} x {max_side} blocks")
         c = s["size"]
-        if abs(z0) > c // 4 or abs(z1) > c // 4:
-            raise ValueError(f"box {b}: z must lie within ±C/4 = ±{c // 4}")
+        if abs(z0) > pole_z(c) or abs(z1) > pole_z(c):
+            raise ValueError(f"box {b}: z must lie within the poles, ±{pole_z(c)}")
         norm.append([x0, z0, x1, z1])
     s["boxes"] = norm
     y = s.get("y") or list(VANILLA_Y if w0.get("level_type") else DEEP_TIME_Y)
@@ -1015,7 +1023,8 @@ def preview_world_note(run, why=""):
 
 
 def latlon_to_block(lat, lon, c=PREVIEW_C):
-    """workbench.js blockXZ: x = longitude east of the seam scaled to C from −C/2; north is −z."""
+    """workbench.js blockXZ through the projection (pole_z's twin, projection.js xOfLon/zOfLat): x =
+    longitude east of the seam scaled to C from −C/2; north is −z."""
     return round(lon / 360 * c - c / 2), round(-lat / 360 * c)
 
 
@@ -1039,7 +1048,7 @@ def box_on_world(req, c=PREVIEW_C):
         note = f"The box you drew ({x1 - x0} × {z1 - z0} blocks) was cut to its central {min(w, MAX_SIDE)} × {min(d, MAX_SIDE)}. "
     cx, cz = (x0 + x1) // 2, (z0 + z1) // 2
     w, d = min(w, MAX_SIDE), min(d, MAX_SIDE)
-    x0, z0 = cx - w // 2, max(-c // 4, min(c // 4 - d, cz - d // 2))
+    x0, z0 = cx - w // 2, max(-pole_z(c), min(pole_z(c) - d, cz - d // 2))
     return [fold(x0, c), z0, fold(x0, c) + w, z0 + d], note
 
 
@@ -1137,7 +1146,7 @@ def workbench_inspect(q):
     x = fold(x, c)
     if bake:
         return 200, inspect_bake(run, bake, x, z)
-    if abs(z) > PREVIEW_C // 4 - INSPECT_SIDE:
+    if abs(z) > pole_z(PREVIEW_C) - INSPECT_SIDE:
         raise ValueError(f"z {z} is past the preview planet's pole cap")
     for st in list_jobs():
         spec = st.get("spec") or {}
@@ -1284,7 +1293,7 @@ def main():
         p.add_argument("--profile", default="standalone", choices=PROFILES)
         p.add_argument("--size", type=int, default=16384)
         p.add_argument("--box", action="append", help="x0,z0,x1,z1 (x1, z1 exclusive); repeatable")
-        p.add_argument("--y", help="lo,hi inclusive (default -352,639)")
+        p.add_argument("--y", help="lo,hi inclusive (default -512,639)")
         p.add_argument("--synth")
         p.add_argument("--strata")
         p.add_argument("--preset")

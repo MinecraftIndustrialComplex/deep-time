@@ -12,6 +12,9 @@
 //! without bodies gets random columns instead. A world with a river network (P1-22) also gets 10 %
 //! on and beside random river vertices (channel, banks) and 5 % around the mouths of rivers that end
 //! in lakes; a world with lakes 5 % around random shore cells of `water_level` (lake water, shores, banks).
+//! The fixture also holds the projection (`deeptime_format::projection`): each column's latitude
+//! and longitude and the z of every 5° of latitude, which `ColumnParityTest` checks against Java's
+//! `worlddata/Projection`.
 //! A world with folds and faults (P2-01) gets 25 % inside the windows of random structural events,
 //! half of them within a few blocks of the event's centre line (a fault's trace), and the
 //! fixture says how many of its columns the events change (`deformed_columns`).
@@ -30,22 +33,20 @@ pub const DEFAULT_SEED: u64 = 0x5EED_0C01_0B0E;
 /// The columns to sample.
 pub fn pick(w: &ColumnWorld, n: usize, seed: u64) -> Vec<(i64, i64)> {
     let c = w.c;
+    // The z of the poles (the planet's projection).
+    let zp = deeptime_format::Projection::of(c as f64).pole_z() as i64;
     let mut rng = SplitMix(seed);
     let mut out = Vec::with_capacity(n);
     let (seam, poles, bodies) = (n / 10, n / 10, if w.bodies.is_empty() { 0 } else { n / 5 });
     for _ in 0..seam {
         let dx = rng.below(80) as i64 - 40;
-        let z = rng.below((c / 2) as u64) as i64 - c / 4;
+        let z = rng.below(2 * zp as u64) as i64 - zp;
         out.push((c / 2 + dx, z));
     }
     for k in 0..poles {
         let x = rng.below(c as u64) as i64 - c / 2;
         let d = rng.below(96) as i64 - 32;
-        let z = if k % 2 == 0 {
-            -c / 4 + d
-        } else {
-            c / 4 - 1 - d
-        };
+        let z = if k % 2 == 0 { -zp + d } else { zp - 1 - d };
         out.push((x, z));
     }
     for _ in 0..bodies {
@@ -118,7 +119,7 @@ pub fn pick(w: &ColumnWorld, n: usize, seed: u64) -> Vec<(i64, i64)> {
     }
     while out.len() < n {
         let x = rng.below(2 * c as u64) as i64 - c;
-        let z = rng.below((c / 2) as u64) as i64 - c / 4;
+        let z = rng.below(2 * zp as u64) as i64 - zp;
         out.push((x, z));
     }
     out
@@ -173,6 +174,23 @@ pub fn run(world: &Path, out: &Path, n: usize, seed: u64) -> Result<(usize, usiz
         .iter()
         .filter(|c| c["bodies"].as_array().is_some_and(|b| !b.is_empty()))
         .count();
+    // The projection (`deeptime_format::projection`): latitude, longitude and area scale of every
+    // picked column, the z of every 5° of latitude, the extent and the spatial indexes' frame,
+    // for the Java twin (`worlddata/Projection`).
+    let proj = deeptime_format::Projection::of(w.c as f64);
+    let points: Vec<Value> = pick(&w, n, seed)
+        .into_iter()
+        .map(|(x, z)| {
+            let (lat, lon) = proj.lat_lon(x as f64, z as f64);
+            json!([x, z, lat, lon, proj.area_scale(z as f64)])
+        })
+        .collect();
+    let lats: Vec<Value> = (0..=36)
+        .map(|k| {
+            let lat = -90.0 + 5.0 * f64::from(k);
+            json!([lat, proj.z_of_lat(lat)])
+        })
+        .collect();
     let doc = json!({
         "format_version": w.manifest.format_version,
         "world": w.manifest.source,
@@ -184,6 +202,14 @@ pub fn run(world: &Path, out: &Path, n: usize, seed: u64) -> Result<(usize, usiz
         "structure_events": w.structure().map_or(0, |d| d.structure.events.len()),
         "deformed_columns": deformed,
         "columns": columns,
+        "projection": {
+            "pole_z": proj.pole_z(),
+            "extent": [proj.extent().0, proj.extent().1],
+            "index_origin": [proj.index_origin().0, proj.index_origin().1],
+            "index_span": [proj.index_span().0, proj.index_span().1],
+            "points": points,
+            "latitudes": lats,
+        },
     });
     let bytes = serde_json::to_vec(&doc).map_err(|e| FormatError::Invalid(e.to_string()))?;
     if let Some(parent) = out.parent() {

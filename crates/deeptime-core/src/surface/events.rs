@@ -128,7 +128,9 @@ fn regions(
             vol += r * span_myr * a / 1.0e3; // m/Myr · Myr · km² → km³ / 1000
             peak = peak.max(r);
             let lat = lat_of_row(grid, j as u32);
-            let lon = 360.0 * (c % d.w) as f64 / d.w as f64;
+            let lon = grid
+                .projection()
+                .lon_deg(grid.block_x((c % d.w) as i64) as f64);
             v += crate::sphere::unit_from_lat_lon_deg(lat, lon) * a;
             let rg = reg[c];
             if rg.is_finite() && (rg as usize) < 10 {
@@ -325,7 +327,10 @@ fn mask_centroid(v: &FrameView<'_>, gained: &dyn Fn(usize) -> bool) -> Option<(f
             let j = c / v.d.w;
             let a = cell_area_km2(v.grid, j as u32, v.m_per_block);
             let lat = lat_of_row(v.grid, j as u32);
-            let lon = 360.0 * (c % v.d.w) as f64 / v.d.w as f64;
+            let lon = v
+                .grid
+                .projection()
+                .lon_deg(v.grid.block_x((c % v.d.w) as i64) as f64);
             s += crate::sphere::unit_from_lat_lon_deg(lat, lon) * a;
             area += a;
         }

@@ -4,7 +4,7 @@ package com.minecraftindustrialcomplex.deeptime.worlddata;
 import com.google.gson.JsonObject;
 
 /**
- * An equirectangular raster in block space (plan §5.2, FORMAT.md "Grids"). Cell (i, j) is the
+ * A raster in block space, laid out by the planet's {@link Projection} (plan §5.2, FORMAT.md "Grids"). Cell (i, j) is the
  * point sample at block (originBlockX + i·r, originBlockZ + j·r); x wraps with period w·r = C,
  * z clamps.
  */
@@ -28,12 +28,12 @@ public record GridDesc(String name, int w, int h, int r, boolean wrapsX, long or
 
     /** Wraps a column index into [0, w). */
     public int wrapI(long i) {
-        return (int) Math.floorMod(i, (long) w);
+        return Projection.wrapColumn(i, w);
     }
 
     /** Clamps a row index into [0, h − 1]. */
     public int clampJ(long j) {
-        return (int) Math.max(0, Math.min(h - 1L, j));
+        return Projection.clampRow(j, h);
     }
 
     /** Block x of column i. */

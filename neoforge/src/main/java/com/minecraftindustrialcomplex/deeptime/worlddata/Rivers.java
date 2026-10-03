@@ -135,8 +135,9 @@ public final class Rivers {
 
     /** The tile of canonical column (wx, z). */
     int tileOf(long wx, long z) {
-        long tx = Math.floorMod(Math.floorDiv(wx + c / 2, (long) tile), (long) tilesX);
-        long tz = Math.max(0, Math.min(tilesZ - 1L, Math.floorDiv(z + c / 4, (long) tile)));
+        // The tiles' frame is the projection's index frame.
+        long tx = Math.floorMod(Math.floorDiv(wx - Projection.indexOriginBlockX(c), (long) tile), (long) tilesX);
+        long tz = Math.max(0, Math.min(tilesZ - 1L, Math.floorDiv(z - Projection.indexOriginBlockZ(c), (long) tile)));
         return (int) (tz * tilesX + tx);
     }
 
@@ -151,9 +152,10 @@ public final class Rivers {
      * repeats (Rust {@code Rivers::entries_in}).
      */
     public int[] entriesIn(long x0, long z0, long x1, long z1) {
-        long tx0 = Math.floorDiv(x0 + c / 2, (long) tile), tx1 = Math.floorDiv(x1 + c / 2, (long) tile);
-        long tz0 = Math.max(0, Math.min(tilesZ - 1L, Math.floorDiv(z0 + c / 4, (long) tile)));
-        long tz1 = Math.max(0, Math.min(tilesZ - 1L, Math.floorDiv(z1 + c / 4, (long) tile)));
+        long ox = Projection.indexOriginBlockX(c), oz = Projection.indexOriginBlockZ(c);
+        long tx0 = Math.floorDiv(x0 - ox, (long) tile), tx1 = Math.floorDiv(x1 - ox, (long) tile);
+        long tz0 = Math.max(0, Math.min(tilesZ - 1L, Math.floorDiv(z0 - oz, (long) tile)));
+        long tz1 = Math.max(0, Math.min(tilesZ - 1L, Math.floorDiv(z1 - oz, (long) tile)));
         long span = Math.min(tx1 - tx0, tilesX - 1L);
         int n = 0;
         for (long tz = tz0; tz <= tz1; tz++)

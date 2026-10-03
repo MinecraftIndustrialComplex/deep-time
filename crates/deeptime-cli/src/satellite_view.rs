@@ -63,7 +63,10 @@ pub fn run(
         .into_iter()
         .find(|n| world.fields.contains_key(*n))
         .ok_or("the checkpoint's world has no elevation field")?;
-    let size = (width.max(2), (width / 2).max(1));
+    let size = (
+        width.max(2),
+        deeptime_format::Projection::picture_height(width.max(2)),
+    );
     let ramps = Ramps::builtin();
     let frame = keyframes::render(
         &world,

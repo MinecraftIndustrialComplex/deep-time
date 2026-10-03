@@ -15,7 +15,7 @@
     "circumference_blocks": 4096,
     "m_per_block_h": 300.0,
     "m_per_block_v": 20.0,
-    "min_y": -352,
+    "min_y": -512,
     "max_y": 639,
     "sea_level_y": 63,
     "pole_cap_deg": 75.0
@@ -315,5 +315,8 @@
     "sea_cutoff_ratio": 8.0,
     "diffusivity_m2_yr": 0.01,
     "degradation": 1.0
+  },
+  "underground": {
+    "geothermal_heat_flow_min_mw_m2": 60.0
   }
 }

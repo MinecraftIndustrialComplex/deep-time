@@ -892,7 +892,7 @@ pub fn map(
             let t: Vec<f32> = (0..n)
                 .map(|k| {
                     let j = k / w;
-                    let lat = 90.0 - 180.0 * (j as f64 + 0.5) / h as f64;
+                    let lat = l2.band_lat_deg(j as u32);
                     thermal_plain(28.0 - 0.55 * lat.abs()) as f32
                 })
                 .collect();

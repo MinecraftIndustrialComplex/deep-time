@@ -85,7 +85,7 @@ pub struct ImpactParams {
 impl Default for ImpactParams {
     fn default() -> Self {
         ImpactParams {
-            flux: 1.0,
+            flux: 3.0, // ledger: IMP-006 (a game choice; Earth's own rate is 1)
             size_slope: 1.8,
             min_crater_km: 2.0,
             max_crater_km: 300.0,

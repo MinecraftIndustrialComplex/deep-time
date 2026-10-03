@@ -934,6 +934,9 @@ def deeptime_build(install):
 
 def write_report(smoke, a, install, steps, level_type, boot_s, started, passed, server, gen_s=None):
     excluded = open(os.path.join(smoke, "excluded.txt")).read().split() if os.path.exists(os.path.join(smoke, "excluded.txt")) else []
+    why_path = os.path.join(smoke, "excluded-why.txt")
+    why = dict(l.rstrip("\n").split("\t", 1) for l in open(why_path) if "\t" in l) if os.path.exists(why_path) else {}
+    excluded = [f"{j} ({why[j]})" if j in why else j for j in excluded]
     mods = sorted(f for f in os.listdir(os.path.join(smoke, "server", "mods")) if f.endswith(".jar"))
     with open(os.path.join(smoke, "report.md"), "w") as r:
         r.write(f"# Deep Time smoke report — {a.profile}\n\n")

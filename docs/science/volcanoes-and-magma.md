@@ -3,7 +3,7 @@
 Status of this page: `stage 2 (constants checked against sources on 2026-10-02, package WP-2)`.
 
 Ledger ids on this page: `VOL-001` to `VOL-074` ([ledger/VOL.md](ledger/VOL.md)) and `MAG-001` to
-`MAG-042` ([ledger/MAG.md](ledger/MAG.md)). Of these 116 rows, 84 are `game-choice`, 25 `uncited`,
+`MAG-057` ([ledger/MAG.md](ledger/MAG.md)). Of these 131 rows (the 15 rows MAG-043 to MAG-057 of 2026-10-02 are all `game-choice`; the tallies in the next sentence are those of the first 116), 84 are `game-choice`, 25 `uncited`,
 2 `verified`, 2 `abstract-only`, 1 `cited-unverified` and 2 `calibrated` (after stage 2: 81 `game-choice`, 28
 `uncited`, 1 `calibrated`; stage 1: 47 `game-choice`, 63 `uncited`, 4 `cited-unverified`, 1 `calibrated`).
 Ben's decisions of 2026-10-02 changed three defaults and added one setting (see "Decisions of 2026-10-02").
@@ -51,13 +51,20 @@ up to 250 m thick that thins outward.
 its centre, built of eight flows with thin ash beds between. Where the pile is at the surface, the
 terrain is cut into steps 80 m (4 blocks) high.
 
-**Magma.** Under each volcano that is still active at the present there is a chamber of lava, its
-top 3 km (150 blocks) below the crater floor. In blocks it is a tall lens (for example 19 across and
-57 high under a large arc cone) because heights are drawn 15 times larger than widths. A narrow
-column of lava rises from it to just under the crater, capped by magma blocks. A quarter of the
-active volcanoes on dry land have an open lava lake in the crater instead, 4 to 20 blocks across.
-Everything molten is walled in by smooth basalt, so lava never touches water or an open cave.
-Extinct volcanoes have no magma.
+**Magma.** Under each volcano that is still active at the present there is a magma system that runs
+the whole depth of the world, as current volcanology describes real arc and hotspot systems (a
+"trans-crustal" column of stacked storage bodies, not one chamber). At the top, 3 km (150 blocks)
+below the crater floor, is the shallow chamber, a lens of lava (for example 19 across and 57 high
+under a large arc cone, because heights are drawn 15 times larger than widths). A narrow column of
+lava rises from it to just under the crater, capped by magma blocks. **Below it** a column of flat lava
+lenses, each wider than tall and 5 to 11 blocks thick, hangs 28 blocks (560 m) apart, joined by thin
+vertical conduits, and widens with depth (the lowest lens is about twice as wide as the highest)
+until a last lens sits on the lava floor at the bottom of the world, so the lava does not end. The
+lenses sit in a body of altered hot rock (basalt with a magma block in about every 25), a little
+broader than the lenses. Shields have broader lenses than arc cones, silicic centres a larger shallow
+chamber. A quarter of the active volcanoes on dry land have an open lava lake in the crater instead
+of the plug, 4 to 20 blocks across. Everything molten is walled in by smooth basalt, so lava never
+touches water or an open cave. Extinct volcanoes have no magma.
 
 **Lava elsewhere.** The random lava lakes and springs of vanilla Minecraft and of Terralith are
 removed. The only other lava is a layer at the very bottom of the world (below y -342 in the default
@@ -113,7 +120,14 @@ catalogue of individual volcanoes that ride on their plates.
 10. **Magma in the game.** The bake lists the volcanoes that are still active. The Minecraft side
     gives each a chamber (an ellipsoid whose radius is a tenth of the volcano's, between 1.2 and
     4.5 km), a conduit and a plug, and gives the most active quarter of those that can hold one a
-    crater lava lake (MAG-001 to MAG-026).
+    crater lava lake (MAG-001 to MAG-026). Below the chamber, down to the lava floor, each also gets a
+    crust-deep column (MAG-043 to MAG-056, Ben's decision of 2026-10-02): up to `magma_lens_count`
+    (24) lava lenses about `magma_lens_spacing_blocks` (28) apart, wider than tall (half-height one
+    fifth of the radius, 2 to 5 blocks), the lowest about 2.2 times as wide as the highest, joined by
+    dike-like conduit segments, in a body of altered hot rock whose width is `magma_mush_width`.
+    Lens radius is the chamber's radius times `magma_lens_width` (1.5) times a kind share: shields 1.4, arc cones 1.0, silicic centres 0.9 (their
+    shallow chamber is 1.6 times larger), and quiet volcanoes' lenses are down to 0.7 of an active one's.
+    The column's bottom comes from the level's own `min_y`, not from a number.
 
 ## Equations and constants
 
@@ -322,7 +336,16 @@ What these runs show:
 - **Lengths do not shrink with the planet.** A volcano's radius is in real kilometres on a planet
   an eighth of Earth's size, so volcanoes are large for their world. Flood basalt provinces, by
   contrast, are scaled to the planet (about 110 km in radius at 16k).
-- **Magma chambers are one fixed shape** at one depth, whatever the volcano's size, age or kind.
+- **Magma chambers are one fixed shape** at one depth, whatever the volcano's size, age or kind (the
+  chamber's size follows the volcano's radius; the crust-deep column below it follows kind, radius and
+  activity).
+- **The crust-deep column is a picture, not a model.** Edmonds et al. (2019, read as a fetched page,
+  not the full text) say arc systems are vertically extensive, stacked, and dominated by mush, with
+  thin sills (their model: under 10 m); the game draws lenses 40 to 100 m thick because a block is
+  20 m tall, spaces them by a setting, and makes them lava where the papers describe mostly
+  crystal-rich mush with 5 to 15 percent melt. The count, spacing, widths and the widening with depth
+  are the game's, set so that a volcano is a place with a great deal of lava below it. Nothing in the
+  column is simulated: no melt fraction, no heat, no eruption, no cooling.
 - **The volcanoes and the share of high land.** With the old, taller cones the volcanoes pushed the
   share of high land above Earth's (land above 2 km 0.124 on average, Earth 0.102); with the cones
   at Earth's heights they build half the relief (1.2 × 10⁷ against 2.4 × 10⁷ km³ in block metric)
@@ -348,8 +371,10 @@ What these runs show:
 | Volcano density 1 (VOL-012) | kept although it raises the land | Ben, decisions log 2026-10-01 |
 | Lava only at active volcanoes; random lava lakes and springs removed (MAG-001, MAG-034) | "only at active volcanoes, ridges and hotspots" is where lava is on Earth | Ben, decisions log 2026-10-01 |
 | The lava floor at the bottom of the world (MAG-027) | a Minecraft convention with no counterpart on Earth; kept as a setting until decided | open; Ben, decisions log 2026-10-01 |
+| A crust-deep column of stacked lava lenses in altered hot rock under every active volcano (MAG-043 to MAG-056) | "the amount of lava inside of them is truly pathetic": the old system stopped 150 blocks down; real arc systems are vertically extensive and stacked (Edmonds et al. 2019; Cashman et al. 2017, not opened) | Ben, decisions log 2026-10-02 ("Crust-deep magma system (Recommended)") |
 | One chamber shape at one depth, 3 km (MAG-002 to MAG-005) | a body a player can find under every active volcano; 3 km lies inside Earth's range | agent, build log 2026-10-01, under Ben's "Volcanoes is a go ahead" |
 | A quarter of able volcanoes have an open lava lake (MAG-019), though persistent lava lakes are rare on Earth | "a player should be able to find one" | agent, build log 2026-10-01 |
+| Vanilla's cave carvers are kept 6 blocks from the underwater face of a sea cliff (MAG-057) | the carvers cut arches into the underwater base of the sea cliffs beside a volcano; the arches are an artefact of the carvers, not geology | Ben's report, 2026-10-02 (the setting is `sea_cliff_skin_blocks`; 0 gives vanilla's carving) |
 | Lava is sealed in smooth basalt and never touches water (MAG-010, MAG-011, MAG-041) | lava pools were found overlapping the ocean | agent, build log 2026-10-01, after Ben's report |
 | Arc volcanoes at least 60 km apart (VOL-039) | keeps the doubled cones apart; one cone stands for a large long-lived centre | agent, build log 2026-09-30; reviewed WP-2 2026-10-02 |
 | Summit crater at least 2 km across (VOL-026) | a real crater would be under three blocks wide | agent, build log 2026-09-30 |
@@ -359,7 +384,7 @@ What these runs show:
 
 ## Decisions of 2026-10-02
 
-Three questions of the stage-2 package were put to Ben and answered on 2026-10-02 (decisions log):
+Three questions of the stage-2 package were put to Ben and answered on 2026-10-02 (decisions log; items 4 and 5 are later answers of the same day):
 
 1. **Stratovolcano heights** (VOL-019, VOL-020). "Lower to Earth's range (Recommended)": the
    range is 0.6 to 2.0 km instead of 1.2 to 3.0 km and `arc_radius_km` 10 km instead of 14, so the
@@ -373,6 +398,28 @@ Three questions of the stage-2 package were put to Ben and answered on 2026-10-0
    per step (1 − e^(−rate·Δt)); a collapse ends the centre and the hotspot builds a new one once
    the old has drifted 70 km, so a hotspot track makes about one caldera per centre-life. Yellowstone's
    own pace was 0.8 and 0.66 Myr between its three (Christiansen 2001), 1.4 to 2 per Myr.
+
+4. **Crust-deep magma system** (MAG-043 to MAG-057; Ben looking at a 3D preview of an active volcano:
+   "the amount of lava inside of them is truly pathetic. It just ends after ~100 blocks down???";
+   answer "Crust-deep magma system (Recommended)"). Before: a plus-shaped conduit from six blocks
+   under the crater to one chamber 3 km (150 blocks) down, and nothing below. Now: stacked lava lenses
+   in altered hot rock down to the lava floor (see "What you see in the world"). Lava blocks measured
+   in generated worlds (16k quick planet, 1,000 Myr, MIC set, one seed): an arc stratovolcano under
+   the sea, 4,769 before, 21,196 after (4.4 times); the shield with a crater lake, 43,060 before,
+   423,171 after (9.8 times), one connected body in each, no face on water, the lake's 13 faces on the
+   air the only ones open. Over all 121 volcanoes with magma, from the builder's own volumes: the
+   median arc volcano 3,680 blocks before (chamber and conduit), 18,419 after (5.0 times), 6 to 8 lenses;
+   the median shield 43,357 before, 344,409 after (7.9 times), 8 lenses; the planet 0.95 million before
+   and 5.7 million after (6 times). Lens width 1.0 gave a median arc 2.8 times: too little for the
+   decision's "several times", so the default is 1.5.
+5. **Arches in underwater cliffs** (MAG-057; Ben's report with run 1a0fb48c797). Found by generating the
+   same 255 x 255 box with one seed under four configurations: caves that open onto the open sea
+   were 157,646 blocks in 318 bodies; with vanilla's carvers switched off 111,023 blocks remained, so
+   the carvers made about 30 percent and the density function's own noise caves (cheese, spaghetti,
+   entrances) the rest. The guard (`sea_cliff_skin_blocks`, 6) keeps a wall of rock between any cave
+   and the water at a cliff of 45 degrees or more, under the sea: 31,148 blocks in 218 bodies after
+   (a fifth); caves on gentle sea floors are untouched (vanilla's ocean caves). Open space in the whole
+   box (air and water under ground) went from 320,379 to 280,039 blocks (13 percent less).
 
 ## Open questions
 
@@ -419,6 +466,8 @@ Keys refer to [bibliography.md](bibliography.md).
 | Christiansen2001 | Yellowstone: plateau height, caldera size, caldera-forming eruptions (VOL-006, VOL-023, VOL-029, VOL-045, VOL-046) | the summary, physiography and chronology sections, WP-2 |
 | Poland2014 | Kilauea reservoir depths, size and shape (MAG-002 to MAG-004) | the reservoir sections, WP-2 |
 | Bremond1995 | arc volcano spacing (VOL-039) | abstract only; the full text is free to read but refused scripted access |
+| Edmonds2019 | trans-crustal, stacked, mushy magma systems; thin sills; hot lower-crustal zone (MAG-043, MAG-044, MAG-047, MAG-054) | a page fetch of the open PMC copy (PMC6335485), summarised by the fetch tool, not the PDF; WP of 2026-10-02 |
+| Cashman2017, Sparks2019 | the same picture (Science 355:eaag3055; Phil. Trans. R. Soc. A 377) | named by the decision, not opened: no open copy was reachable from the test machine |
 | Rasmussen2022, ChaussardAmelung2014 | magma storage depths under arc volcanoes (MAG-002) | abstracts only, WP-2 |
 | TenBrink1991 | hotspot volcano spacing (VOL-007) | abstract only, WP-2 |
 | Courtillot2003a | Deccan thickness, trap durations, flood basalt frequency (VOL-036, VOL-052) | library text, WP-2 (stage 1: abstract) |
