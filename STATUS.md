@@ -8463,7 +8463,7 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
   |---|---|---|---|
   | arc stratovolcano under the sea, box 2 (−1295..−1040, 813..1068) | 4,769 | 21,196 | 4.4 |
   | shield with a crater lake, box 3 (7908..8163, −403..−148) | 43,060 | 423,171 | 9.8 |
-  | volcano beside the cliff, box 1 | 10,654 | 83,228 | 7.8 |
+  | volcano beside the cliff, box 1 (6978..7233, −2153..−1898; all lava in the box, lava floor included) | 10,654 | 83,228 | 7.8 |
   | median arc volcano of the planet (121 with magma, builder's volumes: chamber and conduit against all) | 3,680 | 18,419 | 5.0 |
   | median shield of the planet (5) | 43,357 | 344,409 | 7.9 |
   | the planet | 0.95 M | 5.7 M | 6 |
@@ -8479,7 +8479,7 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
   | Configuration | Caves open to the open sea (blocks, bodies) | Open space under ground (air + water) |
   |---|---|---|
   | before (this session's start) | 157,646 in 318 | 320,379 |
-  | guard off | 157,664 in 319 | 319,895 |
+  | guard off | 157,664 in 319 | 317,895 |
   | vanilla carvers switched off (guard not yet filling) | 111,023 in 263 | 227,168 |
   | guard on (final) | 31,148 in 218 | 280,039 |
 
