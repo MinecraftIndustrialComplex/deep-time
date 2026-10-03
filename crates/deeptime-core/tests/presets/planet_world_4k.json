@@ -1,7 +1,7 @@
 {
   "schema": 0,
   "name": "planet_world_4k",
-  "description": "A small real planet for the tests (P1-08): every stage of the pipeline (plates, climate, surface, volcanoes, impacts, structure, deposits, young, amplify) on the calibrated parameters of pipeline_quick_16k at C = 4096 blocks, L0 5000 samples, L1 256x128, L2 512x256, L3 2048x1024, 150 Myr from scattered continents, with ten times the pluton rate and more deposits so the columns cross bodies, and meteor impacts at forty times Earth's rate (craters up to 40 km) so a planet this small has craters to test. Its bake is the world of ColumnParityTest (Gradle testWorldPlanet4k) and of the GameTest level deeptime:test_planet_real (gametest.sh). Not a game preset.",
+  "description": "A small real planet for the tests (P1-08): every stage of the pipeline (plates, climate, surface, volcanoes, impacts, structure, deposits, young, amplify) on the calibrated parameters of pipeline_quick_16k at C = 4096 blocks, L0 5000 samples, L1 256x88, L2 512x176, L3 2048x704, 150 Myr from scattered continents, with ten times the pluton rate and more deposits so the columns cross bodies, and meteor impacts at forty times Earth's rate (craters up to 40 km) so a planet this small has craters to test. Its bake is the world of ColumnParityTest (Gradle testWorldPlanet4k) and of the GameTest level deeptime:test_planet_real (gametest.sh). Not a game preset.",
   "seed": 11,
   "planet": {
     "gravity_m_s2": 9.81,
@@ -18,13 +18,13 @@
     "min_y": -512,
     "max_y": 639,
     "sea_level_y": 63,
-    "pole_cap_deg": 75.0
+    "pole_cap_deg": 70.0
   },
   "keyframes": {
     "every_myr": 50.0,
     "size": [
       256,
-      128
+      81
     ]
   },
   "young": {},

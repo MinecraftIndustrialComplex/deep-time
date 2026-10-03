@@ -6,7 +6,7 @@ fixed. The band edges of Minecraft's biome builder were read in its source. The 
 biome is a game choice throughout and is labelled so. The climate that feeds the classifier (monthly
 temperature and rain) is being rewritten and is not checked here.
 
-Ledger ids on this page: `BIO-001` to `BIO-100` (see [ledger/BIO.md](ledger/BIO.md)).
+Ledger ids on this page: `BIO-001` to `BIO-103` (see [ledger/BIO.md](ledger/BIO.md)).
 
 ## What you see in the world
 
@@ -79,7 +79,7 @@ third letter:  a if Thot >= 22; else b if at least four months are above 10; els
 | BIO-021 to BIO-024 | vanilla band edges | temperature, humidity, continentalness, erosion, weirdness | | `OverworldBiomeBuilder`, Minecraft 1.21.1 | `verified` |
 | BIO-038 | aridity anchors 0.03, 0.2, 0.5 | UNEP limits | | Zomer et al. 2022, quoting UNEP 1997 | `verified` |
 | BIO-095 | precipitation seasonality | coefficient of variation | % | O'Donnell and Ignizio 2012 (adds 1 mm to the mean) | `verified` |
-| BIO-026 to BIO-070, BIO-075 to BIO-081, BIO-100 | the placement table, knobs and ice cover | see ledger | band coordinate, blocks | none: game choices | `game-choice` |
+| BIO-026 to BIO-070, BIO-075 to BIO-081, BIO-100 to BIO-103 | the placement table, knobs and ice cover | see ledger | band coordinate, blocks | none: game choices | `game-choice` |
 
 ## Earth against the mod
 
@@ -120,6 +120,55 @@ the share of BW columns with a desert or badlands biome is 0.651, against 0.475 
 over ten planets before (floor comment in `BiomeGameTests`), so the cold deserts did not pull it
 outside the earlier range.
 
+## Cold deserts
+
+Köppen tests dry land before polar (Peel et al. 2007, Table 1; BIO-002), so cold dry land is BWk or BSk and not ET or EF.
+Vanilla Minecraft has no cold desert: its desert is sand and its badlands are red, both in the hot band. Ben's answer
+(decisions log 2026-10-02): "This feels like a gap in Vanilla biomes, classify them properly and if a mod a player
+brings has a better biome then swap to it. Otherwise just go with our best bet in terms of other cold bimoes."
+
+What the mapping does (`placement.json`, `classes.BWk`; ledger BIO-101 to BIO-103, all game choices):
+
+- BWk keeps its own class through the whole bake, and splits on the mean annual temperature. Above 10 °C it is the hot
+  desert as before (ramp `desert`). From 0 to 10 °C it is the cold band at the driest humidity (ramp `cold_desert`,
+  1.05 to 1.95, humidity at most 0.6). At or below 0 °C it is barren frozen ground like EF's (ramp `polar_ice`,
+  humidity rule `polar_desert`).
+- BSk was never sand: it takes the C or D ramp by its coldest month (BIO-033) and lands on plains, as before.
+- A biome mod is not special-cased. Its biomes enter through the same band coordinates, so a mod's cold desert or cold
+  steppe is used wherever the mod put it on vanilla's temperature and humidity bands. Terralith (shipped by MIC) puts
+  cold shrubland, steppe, gravel desert and temperate highlands on the cold and frozen bands at low humidity, and
+  Biomes O' Plenty puts `cold_desert` there (TerraBlender regions, which follow the geologic provinces; P1-10).
+- With no mod, the best fit in vanilla is the cold band's driest open biome, plains (vanilla's cold-band, humidity-0
+  entry, a treeless grass plain), and in the frozen band snowy plains. They are the treeless, low, dry-looking cold
+  biomes vanilla has: not taiga (a forest), not a mountain biome (those follow height, not climate), and not desert
+  (sand is the one thing a cold desert is not). The 10 °C and 0 °C switches are the agent's; no source gives where a
+  desert stops being drawn as sand (BIO-101).
+
+Measured on one `earthlike_quick_16k` planet (scattered continents, 500 Myr, seed 1, test machine, 2026-10-03): the
+same world baked twice, once with the table before this change (given to the bake as a `climate_placement` content
+bundle) and once with the new one; the world data differ only in the temperature and vegetation layers (byte compare of
+the other rasters, strata and events). `/deeptime probe biomes 16` through each profile's biome source,
+land columns of class BWk (10,541 columns; BSk 16,642 columns, which hardly moves):
+
+| BWk columns on | Before | After |
+|---|---|---|
+| standalone: desert / plains / snowy plains / badlands / eroded badlands | 68.2 / 3.3 / 0.0 / 7.8 / 4.7 % | 40.5 / 36.9 / 3.0 / 1.9 / 0.7 % |
+| MIC: vanilla desert / Terralith cold shrubland / temperate highlands / snowy slopes / snowy plains / plains | 26.8 / 0.0 / 0.0 / 0.2 / 0.0 / 2.6 % | 9.2 / 14.2 / 9.8 / 2.1 / 1.5 / 4.9 % |
+| MIC: vanilla badlands / eroded badlands | 14.9 / 7.1 % | 5.4 / 1.8 % |
+| Biomes O' Plenty: vanilla desert / BOP cold_desert / vanilla plains | 24.1 / 0.3 / 0.9 % | 12.5 / 3.5 / 16.1 % |
+
+Over the land of that planet (138,101 land columns): BWk is 7.6 % of it, and the new table redraws 3.4 % of the land (4,750 columns, 45 % of the BWk) in standalone, 3.5 % (4,909 columns) with MIC; the rest of the BWk is above 10 °C and stays desert.
+
+(The desert that is left is the BWk above 10 °C: the Gobi at a mean of 3 to 6 °C is not in it, the Atacama coast at 16 to 18 is; those means are from memory, see BIO-101.
+BOP's shares are not asserted anywhere: its regions fill whole provinces, so they follow province draws.)
+The GameTest `climateConsistent` has a check for this, `BWk:cold_not_sand` (BiomeCensus): of the BWk columns colder
+than the cold band's top, none may land on a sand desert or a badlands; it reads 0 of 65 columns standalone and with MIC, and 0 of 1
+column with TerraBlender (Biomes O' Plenty's columns are left out of that census). The BW family shares (`BW`, `BW:desert`) now leave those cold
+columns out (`BiomeCensus.Check.notColderThan`), because they are not meant to be desert any more; the floors did not
+change. On the 4k test planet (201 columns left in BW): BW 0.692 standalone, 0.766 MIC (floor 0.57), BW:desert 0.502 and
+0.592 (floor 0.37). Without the exclusion the same planet read BW 0.457 and BW:desert 0.297 standalone and BW 0.543 MIC,
+which failed the floors: the shares fell because 65 of 266 columns became plains by design, not because the mapping broke.
+
 ## Simplifications and limits
 
 - Peel classifies station records of many years. The mod classifies the monthly means of one
@@ -134,9 +183,9 @@ outside the earlier range.
   property of the climate physics, which is being rewritten.
 - The Köppen class of a block in the climate interface is the class of the ground's cell, not
   recomputed at the block's height, while its temperatures are lapsed.
-- Cold deserts (BWk) are placed on the same ramp as hot ones: a cold desert with a mean annual
-  temperature below 5 °C sits at the bottom of the hot band (4.05), so vanilla draws it as ordinary
-  desert (see the open questions).
+- Vanilla has no cold desert. A BWk below a mean of 10 °C is placed on the frozen or cold band by its
+  mean temperature (see "Cold deserts" below), so vanilla draws snowy plains or plains there; the
+  10 °C and 0 °C switches are game choices (BIO-101), not a classification of any source.
 
 ## Game choices
 
@@ -151,9 +200,6 @@ measured over ten test planets and catch a broken mapping, not a wrong climate.
 
 ## Open questions
 
-- Cold deserts drawn as hot deserts (owner question, STATUS.md "Pending questions"). After the test
-  order fix about 1.1 % of land (1,425 cells of 132,955 on the measured planet) is BWk that used to be
-  ET or EF, and the desert ramp (BIO-032) puts every BWk with a mean below 5 °C at band 4.05.
 - UNEP's humid class starts at 0.65, which is not an anchor of the mapping (BIO-100); the
   anchors 1, 2 and 5 are the mapping's own. Whether to add 0.65 is a design choice.
 - The Terralith facts under the frozen-ground placement (BIO-074) rest on an emulation that is not in
