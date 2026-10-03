@@ -192,7 +192,7 @@ button.chip[aria-pressed="true"] { border-color: var(--accent-line); background:
     return `${d} blocks${info ? ` <small>≈ ${(d * info.m_per_block_v / 1000).toFixed(1)} km</small>` : ''}`;
   };
   const depthPlain = (d, info) => d === 'floor' ? 'the world floor' : d === 0 ? 'the surface' :
-    `${d} blocks (≈ ${(d * ((info && info.m_per_block_v) || 20) / 1000).toFixed(1)} km) below the surface`;
+    `${d} blocks (≈ ${(d * ((info && info.m_per_block_v) || 35) / 1000).toFixed(1)} km) below the surface`;
 
   const ctl = document.createElement('div');
   ctl.className = 'depthctl'; ctl.id = 'depthctl'; ctl.hidden = true;

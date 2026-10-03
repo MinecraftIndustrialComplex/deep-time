@@ -5,8 +5,8 @@
 //! (6,370 km: Cortial's Earth, so plate count, speeds and ages are Earth's), on the unit sphere of
 //! the L0 lattice. Its results map onto the real planet (radius R = C·300 m/2π) by latitude and
 //! longitude, so every tectonic length shrinks by R/R_model (0.123 at 16k, 0.246 at 32k) while
-//! elevations and uplift rates keep their physical values (they are vertical; the vertical scale
-//! is 20 m per block everywhere). Events report areas and distances on the real planet (`*_km`,
+//! elevations and uplift rates keep their physical values (they are vertical; the vertical scale,
+//! `scale.m_per_block_v`, is the same everywhere). Events report areas and distances on the real planet (`*_km`,
 //! `*_km2`) and speeds Earth-normalized (`*_mm_yr`), as the plates move in the model.
 //!
 //! Setting `model_radius_km` to the planet's own radius gives true-scale tectonics (the space-

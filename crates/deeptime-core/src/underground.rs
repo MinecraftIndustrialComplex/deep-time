@@ -64,7 +64,7 @@ pub struct UndergroundParams {
     /// shallow reservoirs lie 1–7 km down under Hawaiian shields (Clague & Sherrod 2014, USGS PP
     /// 1801 ch. 3), 1–2 km under Kīlauea's caldera and 2–4 km under its south part (Poland et al.
     /// 2014, PP 1801 ch. 5); under arc volcanoes geophysics finds them at 6 ± 3 km (Rasmussen et
-    /// al. 2022, abstract). At 20 m per block 3 km is 150 blocks. The game raises a chamber that
+    /// al. 2022, abstract). At 35 m per block 3 km is 86 blocks. The game raises a chamber that
     /// would reach the lava floor. Ledger MAG-002.
     pub magma_chamber_depth_km: f64,
     /// Multiplies every magma chamber's size (its radius is a tenth of the volcano's basal
@@ -85,8 +85,8 @@ pub struct UndergroundParams {
     /// column short of the floor the spacing widens instead. 0: no column (the chamber and its
     /// conduit only). Ledger MAG-043.
     pub magma_lens_count: u32,
-    /// Vertical distance between the lenses of the crust-deep column, blocks (20 m each by default,
-    /// so 28 is 560 m). Ledger MAG-043.
+    /// Vertical distance between the lenses of the crust-deep column, blocks (35 m each by default,
+    /// so 28 is 980 m; 560 m at the earlier 20 m). Ledger MAG-043.
     pub magma_lens_spacing_blocks: f64,
     /// Multiplies every lens's radius (the top lens is about as wide as the chamber, the lowest 2.2
     /// times wider; shields' are wider, quiet volcanoes' narrower). 0: no column. Ledger MAG-045.

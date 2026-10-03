@@ -161,7 +161,7 @@ fn d_m_per_block_h() -> f64 {
     300.0
 }
 fn d_m_per_block_v() -> f64 {
-    20.0
+    deeptime_format::DEFAULT_M_PER_BLOCK_V // ledger: SCL-002
 }
 fn d_min_y() -> i32 {
     -512
@@ -1430,7 +1430,8 @@ mod tests {
         let p = planet(PIPELINE_BUILTIN[0].1);
         let fit = p.scale.build_fit();
         assert_eq!((fit.knee_y, fit.top_y), (575.0, 623.0));
-        assert_eq!(p.scale.uncompressed_height_m(), 10_240.0);
+        // The knee is fixed in blocks: (575 − 63) blocks at 35 m a block.
+        assert_eq!(p.scale.uncompressed_height_m(), 17_920.0);
         for y in [-512.0, 63.0, 574.9, 575.0] {
             assert_eq!(fit.compress(y), y);
         }

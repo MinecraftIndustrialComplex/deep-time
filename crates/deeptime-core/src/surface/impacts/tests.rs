@@ -10,6 +10,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::*;
+
+/// The visible relief at the default vertical scale, m.
+const VM: f64 = VISIBLE_RELIEF_BLOCKS * deeptime_format::DEFAULT_M_PER_BLOCK_V;
 use crate::checkpoint::Checkpoint;
 use crate::params::planet_builtin;
 use crate::preset::with_timeline;
@@ -174,7 +177,7 @@ fn size_classes_and_the_expected_rate() {
 #[test]
 fn a_crater_fades_by_cover_wear_and_age() {
     let fresh = crater(3.0, 0.0);
-    let (relief, fate) = fresh.state();
+    let (relief, fate) = fresh.state(VM);
     assert_eq!(fate, Fate::Fresh);
     assert!(
         (relief / fresh.profile.depth_m - 1.0).abs() < 0.06,
@@ -183,18 +186,18 @@ fn a_crater_fades_by_cover_wear_and_age() {
     // Half filled: degraded, half the relief.
     let mut filled = fresh.clone();
     filled.cover_m = 0.5 * fresh.profile.depth_m;
-    let (r, f) = filled.state();
+    let (r, f) = filled.state(VM);
     assert_eq!(f, Fate::Degraded);
     assert!((r / relief - 0.5).abs() < 0.01);
     assert!((filled.lens_top_below_m() - filled.cover_m).abs() < 1e-9);
     // Filled to the rim and beyond: buried, its lens under the cover.
     filled.cover_m = 3.0 * fresh.profile.depth_m;
-    assert_eq!(filled.state(), (0.0, Fate::Buried));
+    assert_eq!(filled.state(VM), (0.0, Fate::Buried));
     assert!(!filled.worn_out());
     // Worn past its depth: its roots, the lens cut into; worn past the lens: gone.
     let mut worn = fresh.clone();
     worn.worn_m = fresh.profile.depth_m + 0.5 * fresh.breccia_m;
-    assert_eq!(worn.state(), (0.0, Fate::Roots));
+    assert_eq!(worn.state(VM), (0.0, Fate::Roots));
     assert!((worn.lens_top_below_m() + 0.5 * fresh.breccia_m).abs() < 1e-9);
     assert!(!worn.worn_out());
     worn.worn_m = fresh.profile.depth_m + 1.01 * fresh.breccia_m;
@@ -203,15 +206,15 @@ fn a_crater_fades_by_cover_wear_and_age() {
     // crater still stands after 300.
     let mut old = fresh.clone();
     old.kt_m2 = 0.01 * 30.0e6;
-    let (r30, _) = old.state();
+    let (r30, _) = old.state(VM);
     assert!(r30 < 0.7 * relief && r30 > 0.0, "{r30} of {relief}");
     old.kt_m2 = 0.01 * 300.0e6;
-    let (r300, f300) = old.state();
+    let (r300, f300) = old.state(VM);
     assert!(r300 < r30 && f300 != Fate::Fresh, "{r300}");
     let mut big = crater(60.0, 0.0);
-    let (b0, _) = big.state();
+    let (b0, _) = big.state(VM);
     big.kt_m2 = 0.01 * 300.0e6;
-    let (b300, _) = big.state();
+    let (b300, _) = big.state(VM);
     assert!(b300 > 0.5 * b0, "{b300} of {b0}");
 }
 
@@ -233,7 +236,7 @@ fn fields_map_and_bodies_come_from_the_catalogue() {
     roots.worn_m = roots.profile.depth_m + 1.0;
     let mut craters = vec![big.clone(), small.clone(), roots.clone()];
     for c in &mut craters {
-        let (r, f) = c.state();
+        let (r, f) = c.state(VM);
         c.relief_m = r;
         c.fate = f;
     }
@@ -390,11 +393,7 @@ fn the_pipeline_makes_craters_at_the_rate_and_ages_them() {
         "young craters keep {young} of their relief, old ones {old} ({n_old})"
     );
     // … and many of those formed are gone or no longer show.
-    let visible = st
-        .craters
-        .iter()
-        .filter(|cr| cr.relief_m >= VISIBLE_RELIEF_M)
-        .count() as u64;
+    let visible = st.craters.iter().filter(|cr| cr.relief_m >= VM).count() as u64;
     assert!(visible > 0 && visible < formed, "{visible} of {formed}");
     let gone: u64 = c
         .eroded
@@ -591,4 +590,22 @@ fn threads_and_a_resume_leave_the_craters_unchanged() {
     for d in [dir, dir2] {
         let _ = std::fs::remove_dir_all(d);
     }
+}
+
+/// A crater shows while its relief is two blocks at the world's vertical scale (2026-10-02: a
+/// fixed 40 m was two blocks only at 20 m a block): a bowl with 55 m of relief left shows on
+/// 20 m blocks and not on 35 m ones.
+#[test]
+fn a_crater_shows_while_two_blocks_deep_at_any_vertical_scale() {
+    assert_eq!(visible_relief_m(20.0), 40.0);
+    assert_eq!(visible_relief_m(35.0), 70.0);
+    let mut c = crater(3.0, 0.0);
+    let (full, _) = c.state(visible_relief_m(35.0));
+    // Fill it until 55 m of relief is left.
+    c.cover_m = c.profile.depth_m * (1.0 - 55.0 / full);
+    let (r20, f20) = c.state(visible_relief_m(20.0));
+    let (r35, f35) = c.state(visible_relief_m(35.0));
+    assert!((r20 - 55.0).abs() < 1.0 && r20 == r35, "{r20} {r35}");
+    assert_eq!(f20, Fate::Degraded);
+    assert_eq!(f35, Fate::Buried);
 }
