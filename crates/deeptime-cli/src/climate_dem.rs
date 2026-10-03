@@ -310,11 +310,14 @@ pub fn run(o: &Options) -> CliResult<()> {
                 },
             );
         };
-        // Elevation in block y at 20 m per block, sea level y 63 (the viewer's ramp).
+        // Elevation in block y at the default scale (the viewer's ramp and `ViewScale::default`).
+        let view = deeptime_core::keyframes::ViewScale::default();
         put(
             &mut world,
             "elevation",
-            z.iter().map(|&m| (63.0 + m / 20.0) as f32).collect(),
+            z.iter()
+                .map(|&m| (view.sea_level_y + m / view.m_per_block_v) as f32)
+                .collect(),
         );
         put(&mut world, "climate/t_mean_c", s.t_mean.clone());
         put(&mut world, "climate/t_warm_c", s.t_warm.clone());

@@ -133,9 +133,14 @@ pub const EVENT_MIN_KM: f64 = 5.0; // ledger: IMP-137 (game choice)
 /// An impactor the sea stopped gets an event when its crater on land would have been at least
 /// this wide, km.
 pub const OCEAN_EVENT_MIN_KM: f64 = 20.0; // ledger: IMP-070 (game choice)
-/// A crater shows in the finished terrain while its relief is at least this (two blocks at 20 m
-/// per block), m.
-pub const VISIBLE_RELIEF_M: f64 = 40.0; // ledger: IMP-081 (game choice)
+/// A crater shows in the finished terrain while its relief is at least this many blocks (2: one
+/// block is noise of the amplifier's detail term).
+pub const VISIBLE_RELIEF_BLOCKS: f64 = 2.0; // ledger: IMP-081 (game choice)
+
+/// [`VISIBLE_RELIEF_BLOCKS`] in metres at `m_per_block_v` metres a block (70 m at 35 m).
+pub fn visible_relief_m(m_per_block_v: f64) -> f64 {
+    VISIBLE_RELIEF_BLOCKS * m_per_block_v
+}
 /// Diffusion works above this depth below the sea (the surface stage's wave base), m.
 pub const WAVE_BASE_M: f64 = 60.0; // ledger: IMP-076 (the surface stage's value; uncited)
 /// Target (crust) density of the crater scaling, kg/m³. CMM05 (p. 818) uses 2,500 for sedimentary
@@ -264,12 +269,13 @@ impl Crater {
         shape::spread_m(self.kt_m2)
     }
 
-    /// Its relief now (rim crest to floor), m, and its state.
-    pub fn state(&self) -> (f64, Fate) {
+    /// Its relief now (rim crest to floor), m, and its state: it shows (fresh or degraded) while
+    /// the relief is at least `visible_m` ([`visible_relief_m`]).
+    pub fn state(&self, visible_m: f64) -> (f64, Fate) {
         let rim_rho = 1.0 / self.profile.ejecta_radii;
         let aged = self.profile.aged(self.spread_m());
         let relief = self.kept() * shape::relief_m(&aged, rim_rho);
-        let fate = if relief >= VISIBLE_RELIEF_M {
+        let fate = if relief >= visible_m {
             if relief >= 0.75 * self.profile.depth_m {
                 Fate::Fresh
             } else {
@@ -984,8 +990,9 @@ impl ImpactStage {
 
         // The craters' state, the map layer and the closure the structure stage reads.
         let started = Instant::now();
+        let visible_m = visible_relief_m(s.m_per_block_v);
         for c in &mut st.craters {
-            let (relief, fate) = c.state();
+            let (relief, fate) = c.state(visible_m);
             c.relief_m = relief;
             c.fate = fate;
         }
@@ -1099,8 +1106,9 @@ impl ImpactStage {
         // What to write: (time, 0 = a crater in the catalogue, 1 = one that left it, 2 = an ocean
         // impact, its index there).
         let mut order: Vec<(f64, u8, usize)> = Vec::new();
+        let visible_m = visible_relief_m(s.m_per_block_v);
         for (k, c) in st.craters.iter().enumerate() {
-            if c.diameter_m >= EVENT_MIN_KM * 1000.0 || c.relief_m >= VISIBLE_RELIEF_M {
+            if c.diameter_m >= EVENT_MIN_KM * 1000.0 || c.relief_m >= visible_m {
                 order.push((c.t_myr, 0, k));
             }
         }
@@ -1179,20 +1187,21 @@ impl ImpactStage {
             }
             standing.insert(fate.name(), by_size);
         }
+        let visible_m = visible_relief_m(self.preset.scale.m_per_block_v);
         let visible = st
             .craters
             .iter()
-            .filter(|c| c.relief_m >= VISIBLE_RELIEF_M)
+            .filter(|c| c.relief_m >= visible_m)
             .count();
         let on_land = st
             .craters
             .iter()
-            .filter(|c| c.relief_m >= VISIBLE_RELIEF_M && !c.oceanic)
+            .filter(|c| c.relief_m >= visible_m && !c.oceanic)
             .count();
         let oldest_visible = st
             .craters
             .iter()
-            .filter(|c| c.relief_m >= VISIBLE_RELIEF_M)
+            .filter(|c| c.relief_m >= visible_m)
             .map(|c| st.t_myr - c.t_myr)
             .fold(0.0f64, f64::max);
         json!({

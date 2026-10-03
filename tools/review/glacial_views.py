@@ -119,7 +119,7 @@ def main() -> int:
     ap.add_argument("--l3", action="append", required=True, help="label=folder holding rasters/elevation.dtr")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--window", type=int, default=48, help="window edge in L2 cells")
-    ap.add_argument("--mv", type=float, default=20.0, help="metres per block vertically")
+    ap.add_argument("--mv", type=float, default=35.0, help="metres per block vertically")
     ap.add_argument("--sea", type=float, default=None, help="sea level, m (default: guessed 0)")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
