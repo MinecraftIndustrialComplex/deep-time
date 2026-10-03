@@ -340,6 +340,7 @@ def entities():
     """Items and armour stands sent across each seam; where they land against the glued image."""
     t = seams()
     out = []
+    run_id = time.strftime("%H%M%S")
     rc("kill @e[tag=qx]")
     for p in t["portals"]:
         ix, iz = inward(p)
@@ -355,12 +356,12 @@ def entities():
         y = max(probe(*start).get("surfaceY", 100), probe(*far).get("surfaceY", 100), 63) + 20
         mx, mz = -ix * 0.8, -iz * 0.8
         for kind, nbt in (("item", 'Item:{id:"minecraft:diamond",count:1},PickupDelay:32767,NoGravity:1b'),
-                          ("pig", "NoGravity:1b,NoAI:1b"), ("arrow", "NoGravity:1b,pickup:0b")):
-            tag = f"qx_{p['name']}_{kind}"
+                          ("minecart", "NoGravity:1b"), ("arrow", "NoGravity:1b,pickup:0b")):
+            tag = f"qx_{run_id}_{p['name']}_{kind}"
             rc(f"summon {kind} {start[0] + 0.5:.2f} {y:.1f} {start[1] + 0.5:.2f} {{Tags:[\"qx\",\"{tag}\"],Motion:[{mx}d,0.0d,{mz}d],{nbt}}}")
         time.sleep(6)
-        for kind in ("item", "pig", "arrow"):
-            tag = f"qx_{p['name']}_{kind}"
+        for kind in ("item", "minecart", "arrow"):
+            tag = f"qx_{run_id}_{p['name']}_{kind}"
             pos = entity_vec(f"@e[tag={tag},limit=1]", "Pos")
             want = glue_point(p, start[0] + 0.5 - ix * 6, start[1] + 0.5 - iz * 6)
             row = {"seam": p["name"], "entity": kind, "start": [start[0] + 0.5, y, start[1] + 0.5], "pos": pos,
@@ -394,7 +395,7 @@ def shot(name):
 def client_start():
     if not os.path.exists("/tmp/.X11-unix/X95"):
         subprocess.Popen([ENV["XVFB"], ":95", "-screen", "0", "1280x720x24", "-nolisten", "tcp", "+extension", "GLX"],
-                         stdout=open(os.path.join(MC, "xvfb.log"), "w"), stderr=subprocess.STDOUT, start_new_session=True)
+                         env=ENV, stdout=open(os.path.join(MC, "xvfb.log"), "w"), stderr=subprocess.STDOUT, start_new_session=True)
         time.sleep(3)
     pmc = subprocess.run(["nix", "build", "--no-link", "--print-out-paths", "nixpkgs#portablemc"], capture_output=True, check=True).stdout.decode().split()[0]
     game = os.path.join(CLI, "game")
@@ -425,19 +426,44 @@ def client_start():
     time.sleep(20)
 
 
-def client_stop():
+def procs():
+    """(pid, ppid, cmdline) of every process, from /proc (the dev shell's procps tools do not run
+    on the VM: their libc does not match)."""
+    out = []
+    for d in os.listdir("/proc"):
+        if not d.isdigit():
+            continue
+        try:
+            stat = open(f"/proc/{d}/stat").read()
+            ppid = int(stat[stat.rindex(")") + 2:].split()[1])
+            cmd = open(f"/proc/{d}/cmdline", "rb").read().replace(b"\0", b" ").decode(errors="replace")
+            out.append((int(d), ppid, cmd))
+        except (OSError, ValueError):
+            pass
+    return out
+
+
+def kill_tree(pid):
+    kids = [p for p, pp, _ in procs() if pp == pid]
+    for k in kids:
+        kill_tree(k)
     try:
-        pid = int(open(os.path.join(CLI, "client.pid")).read())
-        subprocess.run(["pkill", "-P", str(pid)], check=False)
         os.kill(pid, 15)
-    except (OSError, ValueError):
-        pass
-    try:
-        out = subprocess.run(["bash", "-c", "pgrep -f 'Xvfb :95'"], capture_output=True).stdout.split()
-        for pid in out:
-            os.kill(int(pid), 15)
     except OSError:
         pass
+
+
+def client_stop():
+    try:
+        kill_tree(int(open(os.path.join(CLI, "client.pid")).read()))
+    except (OSError, ValueError):
+        pass
+    for pid, _, cmd in procs():
+        if "Xvfb :95 " in cmd + " ":
+            try:
+                os.kill(pid, 15)
+            except OSError:
+                pass
 
 
 def player_state():
@@ -589,7 +615,7 @@ def physics():
     res = {
         "water_source_kept": "passed" in rc(f"execute if block {x} {y + 1} {z} minecraft:water"),
         "water_spread_inside": "passed" in rc(f"execute if block {x} {y + 1} {z + 1} minecraft:water"),
-        "wire_powered_at_seam": rc(f"data get block {x + 2} {y + 1} {z}") + " | " + rc(f"execute if block {x + 2} {y + 1} {z} minecraft:redstone_wire[power=13]"),
+        "wire_at_seam_power_14": "passed" in rc(f"execute if block {x + 2} {y + 1} {z} minecraft:redstone_wire[power=14]"),
         "water_in_hidden_outside": "passed" in rc(f"execute if block {x} {y + 1} {z - 1} minecraft:water"),
         "water_in_glued_cell": "passed" in rc(f"execute if block {wcx} {y + 1} {wcz} minecraft:water"),
         "lamp_lit": "passed" in rc(f"execute if block {lx} {y + 1} {lz} minecraft:redstone_lamp[lit=true]"),
