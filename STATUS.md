@@ -87,6 +87,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+| 2026-10-03 | margins and spires | **The margins' remaining step** (build log 2026-10-03, "Margins and spires"; pictures `review/out/margins-spires/index.html`, not committed). Submarine slope failure brought the baked margins from 9.5–10° to 4.2–5.9° between the 500 and 2,000 m isobaths (Earth 2.1°) and narrowed the shelves by about a third (shelf-hosted deposits fell with them). What is left is the plate model's crystalline ocean–continent step, one sample wide and drawn 8.1× narrower than on Earth, which nothing relaxes. (a, recommended) keep the failure at 2.5° and give the plate model an ocean–continent transition of Earth width in map metres (a `plates/` task after the plate work; it also gives back shelf room); (b) let the failure move crust too (5° at L1, but the shelves go: share of the sea under 200 m 0.05 → 0.017); (c) keep loads on old sea floor (the dampening at the age's rate) and recalibrate the sediment budget so the oceans do not fill; (d) leave the margins at about twice Earth's slope. | For the coordinator to put to Ben |
 | 2026-10-02 | vertical-scale study | **The vertical scale** (docs/research/notes/vertical-scale-study.md; pictures `review/out/vertical-scale/index.html`, not committed). At 20 m per block 42 % of a today's-code planet's land is drawn steeper than 45° (vanilla 15 %, the MIC pack 15 %); 35 m per block brings the share over 60° to the references' (7 %) with relief near vanilla's. (a, recommended) 35 m per block (8.6×); (b) 40 m (7.5×), the calmest that matches; (c) 30 m (10×), pack-like relief but steeper; (d) keep 20 m and fix features one at a time; (e) a non-linear mapping (not recommended). | Study for the coordinator to put to Ben |
 | 2026-10-02 | science WP-7 | **Pluton shape, depth, rock shares and collision rate** (RCK-058, RCK-062 to RCK-065; docs/science/rock-and-metamorphism.md, "Open questions" 2). Real data sit elsewhere than the code: large Sierra plutons are 0.17 to 0.4 as wide as long (Mount Givens 80 x 17 km, Lamarck over 60 x 10 km), the code draws 0.5 to 1; the Sierra was emplaced at 3.5 to 7 km and the Tuolumne suite at 6 to 10 km, the code at 2 to 6 km; Cordilleran batholiths are mostly tonalite and granodiorite with under 3 % mafic rock, no source gives the code's 70/20/10 or 60/40; the collision-granite rate 0.3 of the arc rate fits an island arc, not a continental one (about 6 times too high). (a) Keep all of them as labelled game choices (recommended: they change only how the granite bodies look, and any change re-opens the pluton-rate calibration); (b) width ratio 0.25 to 1 and roof 3 to 8 km, with a recalibration run. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | science WP-7 | **Schist at 450 degC** (RCK-042). The Barrovian type locality grew garnet at 500 to 550 degC and reached sillimanite at 650 to 700 degC (Baxter et al. 2002); the code's schist (450) and amphibolite (500) lie 50 to 100 degC cooler than the garnet zone the stage-1 comment named. No source read gives a temperature for schist itself (a texture). (a) Keep 450 and call it mica-schist grade (recommended: done in the comment; moving the band edges re-keys every column and shifts the share of schist and gneiss at the surface, which needs a recalibration look); (b) raise schist to 500 and amphibolite to 550. | Not asked yet (sub-agent; for the coordinator) |
@@ -123,21 +124,96 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P1-10 | **Region size and when a world gets its regions.** (1) Provinces are at least 50,000 km² (the earlier bake minimum, kept; `provinces.min_area_km2`): the 16k planet has 40 provinces of 68,000 to 2,200,000 km² (about 870 to 4,900 blocks across), TerraBlender's own regions being about 1,000 to 3,000 blocks; smaller values give more, smaller regions (recommended: keep). (2) A world's province → region table is dealt once, at the first start with TerraBlender installed, and kept: a biome mod added later brings its regions to new worlds only, and one removed falls back to the vanilla region for its provinces (recommended; the alternative re-deals for unexplored chunks and shifts biomes at the border of explored ones). | Not asked yet (sub-agent report) |
 
 ## Build log
-### 2026-10-03 — Margins and spires: IN PROGRESS, early note for sequencing (agent worktree agent-acb3be522c393a248, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
-- **Margin cause found partly in `plates/` (heads-up for the plate tasks in flight).** Measured (shore-normal transects,
-  metres; quick 16k, seed 2, scattered 500 Myr) the plate model's own `plates/elevation_m` already has the wall: median
-  −1,790 m 10 km off the coast and +715 m 20 km inland, against ETOPO 2022's −79 m and +105 m; the surface, young and
-  amplified elevations keep it (the finer levels steepen it, 10.6° → 15° between the 500 and 2,000 m isobaths; Earth
-  2.1°). Two causes: (1) the ocean–continent step is one plate sample wide and the Earth-normalized plate geometry is
-  drawn 8.1× narrower on the map, and nothing under the sea relaxes it (marine diffusion vanishes below the 60 m wave
-  base); (2) **`plates/pools.rs` `surface_step`: the oceanic dampening z −= (1 − z/z_floor)·ε_o·δt relaxes every
-  oceanic sample's height back to the age–depth curve with a 26 Myr time constant whatever its age**, so the sediment the
-  surface stage lays on old ocean floor beside a margin (rise, prograding shelf and slope) subsides at ~200 m/Myr and is
-  erased (GDH1 at 100 Myr: ~4 m/Myr). **Tried and withdrawn (no `plates/` edit on the branch now):** subsiding oceanic
-  crust at the curve's own rate at its age kept every load on the sea floor, and the sediment budget then filled
-  the oceans (scattered 500 Myr: land 0.23 → 0.62, sea floor −2 km 100 km off the coast). The relaxation is today the
-  ocean's only sediment sink besides subduction; changing it needs the sediment budget and the hypsometry
-  recalibrated with it (a plate-model question for later, recorded in the build log). The fix stays in `surface/`.
+### 2026-10-03 — Margins and spires: the cause of each, submarine slope failure, the spires gone (agent worktree agent-acb3be522c393a248, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Asked.** Ben, 2026-10-02 ("Yes, find and fix both (Recommended)"): the one-column needle spires and the continental
+  margins too steep in the simulation itself, both found by the vertical-scale study.
+- **How measured** (test VM; scripts in the session scratchpad, not committed): every planet the quick 16k preset,
+  seed 2, planet A supercontinent 1,000 Myr, planet B scattered 500 Myr, full runs with checkpoints; before = master
+  f545c0bc (built from `git archive`), after = this branch on it. **Spires:** the baked terrain sampled at the L3 cell
+  centres (`deeptime heightmap --step 2`), a land cell's height over the highest of its eight neighbours, in blocks at
+  20 m. **Margins:** shore-normal transects in metres from every seventh open-sea coast cell of land masses over
+  750 km² (|lat| ≤ 75°), along the downhill direction of the terrain smoothed over 10 km, sampled every 500 m out to
+  400 km and 40 km inland; shelf break = first point deeper than 20 m whose 4 km gradient passes 1°; foot = first point
+  1 km deeper than the break whose gradient falls under 1°; on each stage's elevation (plate model L1, surface L1,
+  young L2, the bake's L3). **Earth:** the same code on ETOPO 2022's 60 arc-second surface (downloaded to the VM,
+  coarsened to 2′; land masses over 50,000 km², |lat| ≤ 70°; 3,777 transects).
+- **Spires: cause.** In the elevation layer, not the detail noise. Turning the amplifier's terms off one at a time on
+  planet B's young checkpoint (land cells over 8 blocks; base 450): ruggedness 0 → 3, gullies off → 21, glacial off →
+  67, folds, sharpening, terraces, the river fade: no change. Then, on the same young state: no trough fade → 64 (of
+  777 on that state), gully direction from the smoothed terrain only → 540, both → 3. Two inputs of the mountain
+  character varied cell by cell: the trough fade was each cell's own glacial cut (it jumps at the ice margin and over
+  the bed's rills: single cells kept the full character between faded ones), and each gully octave took its direction
+  from a one-cell gradient of the terrain plus the coarser octaves (undefined at summits, saddles and the coarser
+  gullies' crests and axes, where neighbouring cells read unrelated stripes).
+- **Spires: fix.** `amplify/tiles.rs` hands the character a trough fade that is the box mean over 3 cells of
+  min(cut / 20 m, 1) (AMP-072; 20 m is the old full-fade cut); `character.rs` takes each gully octave's fall line from
+  five gradients over ±¼ wavelength and fades the octave where they disagree (coherence 0.5–0.85, AMP-073). The halo
+  grows with the reach. Test `a_glaciated_young_range_has_no_one_cell_spires` (what counts as meant: volcano summits and
+  impact central peaks, not on its planet): no cell over 6 blocks above all neighbours; the old code gives 14. The
+  amplifier test config's gullies are 64 blocks so its halo still leaves real tiles.
+- **Spires: numbers** (land cells over 8 / over 16 blocks, tallest; 20 m per block): A 132 / 12 / 41.6 → 3 / 0 / 11.6;
+  B 167 / 10 / 19.8 → 0 / 0 / 6.0. (Master 00ef214c, the study's code: about 450 / 50–60 / 31–33 per planet.)
+- **Margins: Earth** (ETOPO 2022, medians): slope 500–2,000 m 2.1° (mean 3.1, p90 6.8); shelf break to foot 2.2°
+  (p10 0.6, p90 5.2); steepest 4 km 5.5°; shore to the 200 m isobath 25 km (mean 51); break depth 108 m; land 3 / 10 /
+  30 km inland 9 / 61 / 144 m. Pratson & Haxby 1996 (abstract): regional slopes 0.5–4.4°, NJ–MD 2.5°.
+- **Margins: cause, stage by stage** (planet B, master 00ef214c, slope 500–2,000 m): plate model 10.6° at L1, surface
+  11.3°, young 15.3°, L3 15.3°. The plate model's own elevation holds the wall (−1,790 m 10 km off the coast, +715 m
+  20 km inland): its ocean–continent step is one sample wide and the Earth-normalized plate geometry is drawn 8.1×
+  narrower on the map. Nothing under the sea relaxes it: marine diffusion vanishes below the 60 m wave base; the mouth
+  fill raises every cell it reaches to the fill level, so a prograding shelf ends in a one-cell cliff; and
+  `plates/pools.rs`'s oceanic dampening z −= (1 − z/z_floor)·ε_o·δt relaxes any load on old sea floor back to the
+  age–depth curve with the curve's own time constant (47 Myr at the presets' 0.12 mm/yr), so a rise subsides away.
+  The finer levels steepen what L1 has (the same drop in finer cells; the young stage's shallow diffusion builds a
+  narrow shelf with a steep front). Flexure's boundary breaks and the amplifier's own passes did not add to it.
+- **Margins: tried and withdrawn.** Oceanic crust subsiding at the curve's rate at its age (loads kept) filled the
+  oceans: planet B land 0.23 → 0.62, the sea floor −2 km 100 km off the coast. The dampening is today the ocean's main
+  sediment sink besides subduction; changing it needs the sediment budget recalibrated with it. No `plates/` edit is
+  on the branch. A failure that also moves crust (not only sediment) gave planet B 5.0° at L1 but took the shelves
+  (share of the sea under 200 m 0.050 → 0.017).
+- **Margins: fix.** Submarine slope failure (`marine::slope_failure`): sediment on the sea floor steeper than
+  `surface.submarine_slope_deg` (new setting, default 2.5° = Pratson & Haxby's steepest clastic margin; every built-in
+  preset and planet_world_4k, editor field `submarine_slope`, lang key) slides down to the toe and the rise, 40 Jacobi
+  iterations at rate 0.05 per LEM step, in the deep-time surface stage after the diffusion and in the young stage (its
+  sediment read from L1's log). Only sediment (log, regolith and the step's deposits) fails, only between open-sea
+  cells; mass conserved; `totals.slope_failure_km3` records it. Test `a_submarine_sediment_cliff_relaxes_to_the_critical_slope`.
+- **Margins: numbers** (L3 medians; A before → after, B before → after; Earth): slope 500–2,000 m 9.5 → 4.2°, 10.0 →
+  5.9° (2.1); shelf break to foot 6.8 → 3.6°, 7.5 → 4.3° (2.2); steepest 4 km 15.2 → 8.0°, 17.3 → 11.8° (5.5); shore to
+  200 m 14.5 → 8.5 km, 13.0 → 7.0 km (25); break depth 84 → 56 m, 76 → 47 m (108); land 10 km inland 388 → 430 m,
+  472 → 524 m (61). At L1 (surface): 8.5 → 5.2°, 9.0 → 6.8°. Median profiles, m at 10 / 20 / 30 km off the coast: A −90 / −877 /
+  −1,871 → −339 / −1,081 / −1,672; B −103 / −1,139 / −2,207 → −541 / −1,597 / −2,308; Earth −79 / −134 / −221: the
+  shelf ended in a wall 15–30 km out, now the slope starts nearer the coast and is gentler.
+- **Hypsometry** (L1, cos-weighted; A before → after, B before → after): land 0.180 → 0.188, 0.266 → 0.277; land median
+  445 → 517 m, 655 → 526 m; sea median depth 4,179 → 3,797 m, 4,170 → 3,686 m (Earth 4,062); share of the sea under
+  200 m 0.049 → 0.039, 0.060 → 0.041. Four planets, 500 Myr, seeds 1–2 × both starts (`tools/review/p1-17-hyps.sh`,
+  the merged code with the failure off / on / at 4°): land 0.291 / 0.266 / 0.274 (Earth 0.289); land median 581 / 616 /
+  586 m (427); p90 1,756 / 1,634 / 1,698 m (2,022); sea median depth 4,143 / 4,250 / 4,205 m (4,062); continental crust
+  0.386 / 0.383 / 0.383; share of the sea under 200 m 0.057 / 0.037 / 0.039; arc base p50 661 / 466 / 526 m. On master
+  00ef214c the same pair gave land 0.271 → 0.283 and sea 4,097 → 3,699 m: the hypsometry moves by a few hundredths
+  either way between planets; the shelf loss (about a third) and the lower arc bases are consistent. A 4° critical
+  slope does not keep the shelves.
+- **The study's slope statistics** (`tools/review/vertical-scale.sh stats`, land only; before → after): at 35 m per
+  block, land over 45° A 7.4 → 9.7 %, B 8.9 → 6.5 %; over 60° 1.9 → 2.5 %, 2.1 → 1.7 %; hillside p90 34.6 → 41.3°,
+  37.0 → 35.3°; coast within 8 blocks p90 6 → 13, 7 → 13 blocks (p99 19 → 29 both). At 20 m: over 45° A 20.2 → 25.1 %,
+  B 23.7 → 17.1 %. The coasts get higher: the fill flats at sea level that fronted them now go down the slope, so the
+  shore sits on steeper ground (land 3 km inland 88 → 107 m, 96 → 128 m; Earth 9 m). The land side of the margin is not
+  changed by this work and stays about 7× Earth's.
+- **Shelves and coastal deposits.** Shelves narrower (above). Sites by type, A / B (one planet each, not a sample):
+  coal seams 49 → 34, 23 → 14; Mississippi Valley-type Zn–Pb 98 → 81, 145 → 46; petroleum traps 6 → 0, 12 → 4; placer
+  gold 18 → 29, 30 → 18; all sites 252 → 190, 243 → 108.
+- **Pictures** `review/out/margins-spires/index.html` (not committed): the median profiles against Earth's, each run's
+  margin at its own 75th percentile of the 500–2,000 m slope (18.4° → 9.0° on A), each run's tallest column. The runs
+  diverge (the change feeds back into the plate model), so the pictures show each run's own places.
+- **Science docs:** `erosion-and-sediment.md` and `young-landscape-and-amplifier.md` (new sections), ledger ERO-168 to
+  ERO-170, AMP-072, AMP-073, HNT-093 (new), AMP-041 and PLT-129 (notes), bibliography Pratson1996 (new) and ETOPO2022
+  (used as data), claims counts rewritten.
+- **Gates** (VM): `cargo fmt --check`, clippy `-D warnings`, `cargo deny check licenses bans` clean; `cargo test
+  --workspace` all pass (core 534 + 3 ignored, cli 54, others); `./gradlew build test` tests=229 failures=0 skipped=1;
+  GAMETEST_PLACEHOLDER
+- **Run time:** the coupled stages +8.5 % on master 00ef214c (491 → 533 s, four 500 Myr planets, a quiet VM); +39 % in the
+  merged ensemble (626 → 873 s), which shared the VM with other agents' runs: the failure's 40 iterations a step cost
+  something between the two.
+- **Next.** Ben's answer to the pending question on the margins' remaining crustal step; the hypsometry calibration
+  task should take this in (sea median depth shallower).
 ### 2026-10-02 — The vertical-scale study (agent worktree agent-afbde2c1feb92691f, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; a study, no defaults changed; not merged)
 - **Asked:** Ben finds the worlds "cartoonishly stretched" at 20 m per block up and 300 m across (15×). Data and pictures to choose a vertical scale. Written to `docs/research/notes/vertical-scale-study.md` (index row in `docs/research/README.md`); pictures in `review/out/vertical-scale/` (planet B, with the references) and `review/out/vertical-scale/a/` (planet A), not committed.
 - **Tools (committed):** `deeptime-inspect heights` (any generated world's terrain and water tops as a NumPy array); `tools/review/vertical-scale.sh` and `vertical_scale.py` (`join`, `refjoin`, `stats`, `compare`, `places`, `strata`, `render`, `charts`, `page`).
