@@ -884,7 +884,8 @@ through the water like any other block.
 
 `notes.bake.underground.params` is the preset's `underground` section (its defaults when the preset
 has none): `{"lava_floor_blocks": 10, "lava_lake_blocks": 54, "magma_chamber_depth_km": 3.0,
-"magma_chamber_size": 1.0, "crater_lake_share": 0.25, "remove_lava_features": true}`. No layer holds
+"magma_chamber_size": 1.0, "crater_lake_share": 0.25, "remove_lava_features": true, "magma_lens_count": 24,
+"magma_lens_spacing_blocks": 28.0, "magma_lens_width": 1.5, "magma_mush_width": 1.0, "sea_cliff_skin_blocks": 6}`. No layer holds
 lava; the game reads the first two numbers when it generates chunks (Java `worldgen/LavaRules`, `LavaFluids`,
 `density/LavaLakesDensity`), and a world without the note uses the defaults. With `min_y` the floor
 of the noise settings (−352) and cover = 8:
@@ -959,6 +960,24 @@ step after the water pass). With `mH`, `mV` the metres per block, (cx, cz) the s
   its column's ground (the sea bed under the sea). `magma_chamber_size` 0: no magma anywhere.
 - **Conduit**: the centre column and its four neighbours, lava from the chamber's centre to
   `floor − 6`, then magma blocks: up to the surface on land, to `floor − 3` under water.
+- **Crust-deep column** (Ben, decisions log 2026-10-02, "Crust-deep magma system"; Java `Magma.Deep`):
+  from the chamber's bottom down to the lava floor. Lenses are flattened ellipsoids of lava, `n` of
+  them at most `magma_lens_count` (24, 0 to 64; **0: no column**), the first 0.8 spacings under the
+  chamber's bottom, then evenly (each up to 0.2 spacings off) down to a basal lens whose centre is 2
+  blocks over `lava_floor` and at least 6 over `min_y` (read from the level, not a number); the
+  spacing is `magma_lens_spacing_blocks` (28, 8 to 200), widened where the count would stop the column
+  short. Radius at the top = `rh` · `magma_lens_width` (1.5, 0 to 4; **0: no column**) · a kind share
+  (shield 1.4, silicic 0.9, otherwise 1.0) · (0.7 + 0.3 · activity), at least 5 and at most 90 blocks;
+  the lowest lens is 2.2 times wider (linear in between, each drawn 0.9 to 1.05 of that); half-height
+  0.2 · radius, 2 to 5 blocks; centres up to 0.15 of the radius off the axis. A volcano's chamber is
+  1.6 times larger when silicic. Neighbouring lenses are joined by the conduit's plus-shaped column
+  (lava), walled like the conduit. Lens lava obeys the chamber's rule (nothing within 8 blocks of its
+  column's ground) and the seal. Around the column lies **altered hot rock** (the mush): radius
+  `magma_mush_width` (1.0, 0 to 4; 0: none) · (1.25 · the column's radius at that depth + 3, bulging
+  by 0.25 at a lens, 1.1 times broader under a shield), narrowing to nothing at the chamber's equator;
+  it replaces the solid ground and shell with `minecraft:basalt` (`#deeptime:magma/mush`, fallback
+  `#deeptime:magma_fallback/mush`), one block in 25 `minecraft:magma_block` (`/hot`), never fluid,
+  bedrock or lava.
 - **Crater lava lake**: of the volcanoes that can hold one, the `crater_lake_share` most active
   (ties by id; ⌈share · n⌉ of n). Radius r = clamp(half the crater's radius in blocks, 2, 10); its
   surface is one block under the lowest ground of the ring r < d ≤ r + 2; lava from there down to two
@@ -969,6 +988,12 @@ step after the water pass). With `mH`, `mV` the metres per block, (cx, cz) the s
   the pole cap's line (|z| > R·sin(`pole_cap_deg`), R = C/2π: nobody reaches it).
 - **Seal**: every open block (air, water) within 1.5 blocks of a chamber, two columns of a conduit or
   two columns of a lake becomes smooth basalt, so lava never touches water or hangs over a cave.
+
+`sea_cliff_skin_blocks` (6, 0 to 32; 0: off; Java `worldgen/SeaCliffGuard`, `SeaCliffPass`): under the
+sea level, a block inside the ground is kept rock (no cave of any kind: it goes in the chunk's carving
+masks and open blocks in it are filled, before the strata pass) where the ground within that many
+columns to the side lies lower than the block and the ground drops by at least that many blocks within
+that distance (a cliff of 45 degrees or more).
 
 `remove_lava_features` (on by default): placed features whose configuration places lava (a block or
 fluid state named `minecraft:lava`: vanilla's `lake_lava_surface`, `lake_lava_underground`,

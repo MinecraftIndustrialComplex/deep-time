@@ -6,6 +6,8 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.LavaFeatures;
 import com.minecraftindustrialcomplex.deeptime.worldgen.LavaRules;
 import com.minecraftindustrialcomplex.deeptime.worldgen.Magma;
+import com.minecraftindustrialcomplex.deeptime.worldgen.SeaCliffGuard;
+import com.minecraftindustrialcomplex.deeptime.worldgen.SeaCliffPass;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -164,7 +166,7 @@ public final class LavaGameTests {
 
     /** What was read back around one body. */
     private static final class Tally {
-        long expected, lava, stray, wetFaces, airFaces, skippedFaces;
+        long expected, lava, stray, wetFaces, airFaces, skippedFaces, lensExpected, lensLava, mushBlocks, mushLava, mushOpen;
         final StringBuilder detail = new StringBuilder();
     }
 
@@ -218,6 +220,7 @@ public final class LavaGameTests {
         all.stream().filter(Magma.Body::lake).findFirst().ifPresent(picked::add);
         all.stream().filter(Magma.Body::submerged).findFirst().ifPresent(picked::add);
         all.stream().filter(b -> !b.lake() && !b.submerged()).findFirst().ifPresent(picked::add);
+        all.stream().filter(b -> "shield".equals(b.kind()) && !picked.contains(b)).findFirst().ifPresent(picked::add);
         all.stream().max(java.util.Comparator.comparingInt(Magma.Body::reach)).filter(b -> !picked.contains(b)).ifPresent(picked::add);
         List<Job> jobs = new ArrayList<>();
         java.util.Map<Magma.Body, Tally> tallies = new java.util.LinkedHashMap<>();
@@ -246,6 +249,19 @@ public final class LavaGameTests {
                         boolean lava = chunk.getBlockState(pos.set(x, y, z)).is(Blocks.LAVA);
                         if (part.molten())
                             n.expected++;
+                        if (part == Magma.Part.LENS)
+                            n.lensExpected++;
+                        if (part == Magma.Part.NONE && b.mush(dx, dz, y)) {
+                            BlockState ms = chunk.getBlockState(pos);
+                            if (lava && y > lakeZoneTop && !magma.at(x, y, z).molten())
+                                n.mushLava++;       // lava in the altered rock outside a lens: stray
+                            else if (ms.isAir() || !ms.getFluidState().isEmpty())
+                                n.mushOpen++;       // the mush leaves no cave or water inside it
+                            else
+                                n.mushBlocks++;
+                        }
+                        if (part == Magma.Part.LENS && lava)
+                            n.lensLava++;
                         if (!lava)
                             continue;
                         if (!part.molten()) {
@@ -295,9 +311,17 @@ public final class LavaGameTests {
                         failure = "volcano " + b.id() + ": its crater lake is " + lake;
                 }
                 line.append(String.format(" [id=%d %s at (%d, %d) floorY=%d chamber y=%d rh=%d rv=%d %s lake=%s molten=%d lava=%d stray=%d "
-                                + "wetFaces=%d airFaces=%d%s]", b.id(), b.kind(), b.x(), b.z(), b.floorY(), b.chamberY(), b.chamberRh(),
+                                + "wetFaces=%d airFaces=%d lenses=%d lensMolten=%d lensLava=%d mush=%d mushOpen=%d mushLava=%d column y %d..%d%s]",
+                        b.id(), b.kind(), b.x(), b.z(), b.floorY(), b.chamberY(), b.chamberRh(),
                         b.chamberRv(), b.submerged() ? "under water" : "on land", lake, n.expected, n.lava, n.stray, n.wetFaces,
-                        n.airFaces, n.detail));
+                        n.airFaces, b.lensCount(), n.lensExpected, n.lensLava, n.mushBlocks, n.mushOpen, n.mushLava, b.minY(), b.maxY(),
+                        n.detail));
+                if (failure == null && b.lensCount() > 0 && n.lensExpected > 0 && n.lensLava * 2 < n.lensExpected)
+                    failure = "volcano " + b.id() + ": only " + n.lensLava + " of " + n.lensExpected + " lens blocks are lava";
+                if (failure == null && b.lensCount() > 0 && n.mushBlocks == 0 && b.mush(0, 0, b.chamberY() - b.chamberRv() - 10))
+                    failure = "volcano " + b.id() + ": no altered hot rock was placed around its column";
+                if (failure == null && n.mushLava > 0)
+                    failure = "volcano " + b.id() + ": " + n.mushLava + " lava blocks in its altered rock outside any lens";
                 if (failure == null && n.lava * 2 < n.expected)
                     failure = "volcano " + b.id() + ": only " + n.lava + " of " + n.expected + " molten blocks are lava";
                 if (failure == null && n.stray > 0)
@@ -310,6 +334,91 @@ public final class LavaGameTests {
                     submerged, picked.size(), jobs.size(), line);
             if (failure != null)
                 helper.fail(failure);
+            helper.succeed();
+        });
+    }
+
+    /**
+     * No cave of any kind reaches the underwater face of a sea cliff ({@link SeaCliffGuard}, Ben's
+     * report of 2026-10-02: arches cut into the underwater base of sea cliffs). On the level with
+     * noise caves and aquifers, the planet is scanned for chunks where the ground drops by the guard's
+     * skin or more within the skin, beside water under the sea level; up to six, far apart, are
+     * generated through the carving step and read back: in every guarded block under the ground's top
+     * block there is no air and no water (lava is the lava floor's and the volcanoes'). A planet with
+     * no such cliff passes with a line saying so.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
+    public static void seaCliffsHaveNoCaveMouths(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel().getServer().getLevel(GameTestSupport.TEST_PLANET_CAVES);
+        if (level == null) {
+            helper.fail("level " + GameTestSupport.TEST_PLANET_CAVES.location() + " does not exist");
+            return;
+        }
+        if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g && g.terrain() instanceof WorldDataTerrain t)) {
+            helper.fail("test_planet_caves is not generating from world data");
+            return;
+        }
+        int sea = g.generatorSettings().value().seaLevel();
+        int skin = t.cliffRules().skin();
+        if (skin <= 0) {
+            helper.succeed();
+            return;
+        }
+        int minY = level.getMinBuildHeight() + 1, c = t.circumference();
+        // Pre-screen on a coarse grid: a column that stands skin blocks above a neighbour skin columns away
+        // that lies under the sea.
+        List<int[]> chunks = new ArrayList<>();
+        int[][] ring = {{skin, 0}, {-skin, 0}, {0, skin}, {0, -skin}, {skin, skin}, {-skin, -skin}, {skin, -skin}, {-skin, skin}};
+        for (int z = -c / 4; z < c / 4 && chunks.size() < 6; z += 16)
+            for (int x = -c / 2; x < c / 2 && chunks.size() < 6; x += 16) {
+                int own = (int) Math.ceil(t.height(x, z)) - 1;
+                int low = own;
+                for (int[] d : ring)
+                    low = Math.min(low, (int) Math.ceil(t.height(x + d[0], z + d[1])) - 1);
+                if (own - low < skin || low >= sea - 2)
+                    continue;
+                int cx = x >> 4, cz = z >> 4;
+                boolean far = true;
+                for (int[] o : chunks)
+                    far &= Math.abs(o[0] - cx) + Math.abs(o[1] - cz) > 8;
+                if (far)
+                    chunks.add(new int[]{cx, cz});
+            }
+        if (chunks.isEmpty()) {
+            DeepTime.LOGGER.info("[gametest] seaCliffsHaveNoCaveMouths skin={} no sea cliff on this planet; nothing to read back", skin);
+            helper.succeed();
+            return;
+        }
+        long[] n = {0, 0, 0};   // guarded blocks read, open ones, chunks read
+        StringBuilder detail = new StringBuilder();
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        ChunkSampling.forEach(helper, chunks.size(), i -> {
+            int cx = chunks.get(i)[0], cz = chunks.get(i)[1];
+            ChunkAccess chunk = level.getChunkSource().getChunk(cx, cz, ChunkStatus.CARVERS, true);
+            int[][] zone = SeaCliffGuard.zone(t::height, cx << 4, cz << 4, sea, minY, skin);
+            n[2]++;
+            for (int lz = 0; lz < 16; lz++)
+                for (int lx = 0; lx < 16; lx++) {
+                    int[] r = zone[lz * 16 + lx];
+                    if (r == null)
+                        continue;
+                    int own = (int) Math.ceil(t.height((cx << 4) + lx, (cz << 4) + lz)) - 1;
+                    for (int y = r[0]; y <= Math.min(r[1], own - 1); y++) {
+                        BlockState b = chunk.getBlockState(pos.set((cx << 4) + lx, y, (cz << 4) + lz));
+                        n[0]++;
+                        if (b.isAir() || (!b.getFluidState().isEmpty() && !b.is(Blocks.LAVA))) {
+                            n[1]++;
+                            if (detail.length() < 300)
+                                detail.append(" open(").append(pos.getX()).append(',').append(y).append(',').append(pos.getZ()).append(')');
+                        }
+                    }
+                }
+            return true;
+        }, () -> {
+            DeepTime.LOGGER.info("[gametest] seaCliffsHaveNoCaveMouths skin={} chunks={} guardedBlocks={} open={} filledSoFar={}{}", skin, n[2],
+                    n[0], n[1], SeaCliffPass.filledTotal(), detail);
+            if (n[1] > 0)
+                helper.fail(n[1] + " of " + n[0] + " guarded blocks under sea cliffs are open (air or water):" + detail);
             helper.succeed();
         });
     }
