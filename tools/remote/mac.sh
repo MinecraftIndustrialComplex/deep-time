@@ -142,7 +142,7 @@ PROFILE="$CACHE/devshell-$KEY"
 # shell is entered inside the admitted job.
 ADMIT=/usr/local/lib/deeptime/admit.py
 DEV="nix develop '$PROFILE' -c zsh -c $(printf '%q' "$CMD")"
-ADMIT_RUN="/usr/bin/python3 '$ADMIT' run --kind $(printf '%q' "$KIND") --label '$NAME'$([ "$SERVER" = 1 ] && echo ' --server') -- $DEV"
+ADMIT_RUN="/usr/bin/python3 '$ADMIT' run --kind $(printf '%q' "$KIND") --label '$NAME'$([ "$SERVER" = 1 ] && echo ' --server' || true) -- $DEV"
 INNER="cd '$REMOTE' && export GRADLE_USER_HOME='$CACHE/gradle' CARGO_HOME='$CACHE/cargo' XWIN_CACHE_DIR='$CACHE/xwin' TMPDIR='$CACHE/tmp' DEEPTIME_REMOTE=mac CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=line-tables-only && { [ -e '$PROFILE' ] || nix develop --profile '$PROFILE' -c true; } && if [ -f '$ADMIT' ]; then exec $ADMIT_RUN; else exec $DEV; fi"
 set +e
 "${SSH[@]}" "exec zsh -lc $(printf '%q' "$INNER")"
