@@ -49,7 +49,8 @@ pub fn method_of(name: &str) -> Method {
         "elevation" => Method::Elevation,
         "climate/ridges" => Method::Odd,
         "climate/t_mean_c" | "climate/p_mm" | "climate/temperature" | "climate/vegetation"
-        | "climate/continents" | "climate/erosion" | "climate/ice_cover" | "meta/crust_age_myr" => {
+        | "climate/continents" | "climate/erosion" | "climate/ice_cover" | "meta/crust_age_myr"
+        | "meta/heat_flow_mw_m2" => {
             Method::Bilinear
         }
         n if n.starts_with("climate/month/") => Method::Bilinear,

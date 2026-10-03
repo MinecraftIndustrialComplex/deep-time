@@ -1,0 +1,602 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
+"""PROTOTYPE, dev-only (docs/design/seamless-wrapping.md): a Deep Time world in the Guyou aspect of
+the Peirce quincuncial projection, its seams joined by Immersive Portals – CE global portals.
+
+Runs on the test VM, holding the server lock:
+  tools/remote/mac.sh --server -- 'python3 tools/proto/quincuncial/proto.py all'
+
+Phases (each also alone): setup, boot, portals, terrain, entities, client, physics, stop; `all` runs
+them in order. Results land in $RUNS/out/ (report.json, *.png, *.tsv, logs).
+
+What it needs on the VM (nothing here is redistributed or committed):
+  - $RUNS/guyou-world: `deeptime-quincuncial resample` output (the world data);
+  - $RUNS/deeptime-quincuncial: the prototype tool (for the portal table);
+  - the Deep Time jar built from this checkout (neoforge/build/libs), patched by notw_jar.py;
+  - Immersive Portals – CE 6.0.10 and Cloth Config, the copies the 2026-10-02 prototype downloaded
+    (/data/ban/mic/mods/ip-proto), and that prototype's NeoForge server libraries and portablemc
+    data (copied, not changed);
+  - the Mesa/Xvfb/ffmpeg/xdotool store paths in ip-proto/scripts/env.sh.
+Ports: game 25985, RCON 25995 (never the play server's 25765).
+"""
+import json, os, re, shutil, socket, struct, subprocess, sys, time
+
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+RUNS = os.environ.get("RUNS", "/data/ban/deeptime-runs/quincuncial")
+MC = os.path.join(RUNS, "mc")
+SRV = os.path.join(MC, "server")
+CLI = os.path.join(MC, "client")
+OUT = os.path.join(RUNS, "out")
+IPP = "/data/ban/mic/mods/ip-proto"
+GAME_PORT, RCON_PORT = 25985, 25995
+B = 8192  # hemisphere square side: the world is 2B x B
+LON = 31.0
+PLAYER = "IPTester"
+
+
+def env():
+    out = subprocess.run(["bash", "-c", f"source {IPP}/scripts/env.sh; env -0"], capture_output=True, check=True).stdout
+    e = dict(kv.split("=", 1) for kv in out.decode().split("\0") if "=" in kv)
+    e["DISPLAY"] = ":95"
+    return e
+
+
+ENV = env()
+
+
+def log(*a):
+    print(time.strftime("%H:%M:%S"), *a, flush=True)
+
+
+def report(key, value):
+    path = os.path.join(OUT, "report.json")
+    data = json.load(open(path)) if os.path.exists(path) else {}
+    data[key] = value
+    json.dump(data, open(path, "w"), indent=1)
+
+
+# ---------------------------------------------------------------- RCON
+
+class Rcon:
+    def __init__(self):
+        pw = open(os.path.join(SRV, "rcon.pw")).read().strip()
+        self.s = socket.create_connection(("127.0.0.1", RCON_PORT), timeout=120)
+        self.id = 0
+        self.cmd(pw, kind=3)
+
+    def cmd(self, text, kind=2):
+        self.id += 1
+        body = text.encode() + b"\0\0"
+        self.s.sendall(struct.pack("<iii", len(body) + 8, self.id, kind) + body)
+        n = struct.unpack("<i", self._read(4))[0]
+        return self._read(n)[8:-2].decode(errors="replace")
+
+    def _read(self, n):
+        b = b""
+        while len(b) < n:
+            c = self.s.recv(n - len(b))
+            if not c:
+                raise EOFError("rcon closed")
+            b += c
+        return b
+
+
+_r = None
+
+
+def rc(c, show=False):
+    global _r
+    for attempt in range(3):
+        try:
+            if _r is None:
+                _r = Rcon()
+            o = _r.cmd(c)
+            if show:
+                log(f"> {c[:150]}\n    {o[:300]}")
+            return o
+        except (OSError, EOFError):
+            _r = None
+            time.sleep(2)
+    raise RuntimeError(f"rcon failed: {c}")
+
+
+NUM = re.compile(r"(-?\d+\.?\d*(?:[eE]-?\d+)?)[dfb]?")
+
+
+def entity_vec(sel, key):
+    o = rc(f"data get entity {sel} {key}")
+    if "No entity" in o or "found" in o and ":" not in o:
+        return None
+    return [float(v) for v in NUM.findall(o.split(":", 1)[-1])]
+
+
+# ---------------------------------------------------------------- the world's seams
+
+def seams():
+    out = subprocess.run([os.path.join(RUNS, "deeptime-quincuncial"), "portals", "--layout", "guyou", "--size", str(B),
+                          "--lon", str(LON), "--y", "64", "--height", "1200"], capture_output=True, check=True).stdout
+    return json.loads(out)
+
+
+def glue_point(p, x, z):
+    """The glued image of a point (x, z) of the plane, by portal p (from `seams()`)."""
+    ox, _, oz = p["origin"]
+    dx, _, dz = p["destination"]
+    if p["kind"] == "half_turn":
+        return 2 * ox - x, 2 * oz - z
+    return x + dx - ox, z + dz - oz
+
+
+def inward(p):
+    wx, _, wz = p["axis_w"]
+    return -wz, wx
+
+
+# ---------------------------------------------------------------- phases
+
+def setup():
+    os.makedirs(OUT, exist_ok=True)
+    jars = sorted(f for f in os.listdir(os.path.join(REPO, "neoforge/build/libs")) if f.startswith("deeptime-1.21.1") and "sources" not in f)
+    assert jars, "build the Deep Time jar first (cd neoforge && ./gradlew jar)"
+    notw = os.path.join(MC, "deeptime-noTW.jar")
+    os.makedirs(MC, exist_ok=True)
+    subprocess.run([sys.executable, os.path.join(REPO, "tools/proto/quincuncial/notw_jar.py"),
+                    os.path.join(REPO, "neoforge/build/libs", jars[-1]), notw], check=True)
+    if not os.path.isdir(SRV):
+        subprocess.run(["rsync", "-a", "--exclude=world", "--exclude=logs", "--exclude=console.log", "--exclude=mods",
+                        "--exclude=server.pid", f"{IPP}/vp2-server/", SRV + "/"], check=True)
+    mods = os.path.join(SRV, "mods")
+    shutil.rmtree(mods, ignore_errors=True)
+    os.makedirs(mods)
+    for j in (f"{IPP}/dl/immersive_portals-6.0.10.jar", f"{IPP}/vp2-server/mods/cloth-config-15.0.140-neoforge.jar", notw):
+        shutil.copy(j, mods)
+    pw = open(os.path.join(SRV, "rcon.pw")).read().strip()
+    open(os.path.join(SRV, "server.properties"), "w").write(f"""# deep-time tools/proto/quincuncial/proto.py (dev-only prototype)
+server-port={GAME_PORT}
+query.port={GAME_PORT}
+enable-rcon=true
+rcon.port={RCON_PORT}
+rcon.password={pw}
+online-mode=false
+level-type=deeptime\\:planet_32k
+level-name=planet
+gamemode=creative
+force-gamemode=true
+difficulty=peaceful
+allow-flight=true
+spawn-protection=0
+max-tick-time=-1
+view-distance=10
+simulation-distance=6
+enable-command-block=true
+sync-chunk-writes=false
+spawn-monsters=false
+motd=Deep Time quincuncial prototype
+""")
+    open(os.path.join(SRV, "user_jvm_args.txt"), "w").write("-Xmx8G\n-XX:+UseG1GC\n-XX:ActiveProcessorCount=6\n")
+    world = os.path.join(SRV, "planet")
+    shutil.rmtree(world, ignore_errors=True)
+    os.makedirs(world)
+    subprocess.run(["cp", "-a", os.path.join(RUNS, "guyou-world"), os.path.join(world, "deeptime")], check=True)
+    # Client: its own game dir; the portablemc data copied once.
+    game = os.path.join(CLI, "game")
+    if not os.path.isdir(game):
+        subprocess.run(["rsync", "-a", "--exclude=logs", "--exclude=saves", "--exclude=mods", f"{IPP}/vp-client/game/", game + "/"], check=True)
+    cm = os.path.join(game, "mods")
+    shutil.rmtree(cm, ignore_errors=True)
+    os.makedirs(cm)
+    for j in os.listdir(mods):
+        shutil.copy(os.path.join(mods, j), cm)
+    if not os.path.isdir(os.path.join(MC, "pmc")):
+        subprocess.run(["cp", "-a", f"{IPP}/pmc", os.path.join(MC, "pmc")], check=True)
+    log("setup done:", os.listdir(mods))
+
+
+def server_up():
+    try:
+        pid = int(open(os.path.join(SRV, "server.pid")).read())
+        os.kill(pid, 0)
+        return pid
+    except (OSError, ValueError):
+        return None
+
+
+def boot(timeout=1800):
+    if server_up():
+        log("server already up")
+        return
+    cons = open(os.path.join(SRV, "console.log"), "w")
+    p = subprocess.Popen(["nice", "-n", "5", "taskset", "-c", "16-23", ENV["JAVA"], "@user_jvm_args.txt",
+                          "@libraries/net/neoforged/neoforge/21.1.249/unix_args.txt", "nogui"],
+                         cwd=SRV, stdout=cons, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
+    open(os.path.join(SRV, "server.pid"), "w").write(str(p.pid))
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        text = open(os.path.join(SRV, "console.log"), errors="replace").read()
+        if re.search(r"Done \(", text):
+            log("server up in", round(time.time() - t0), "s")
+            global _r
+            _r = None
+            return
+        if p.poll() is not None:
+            raise RuntimeError("server died:\n" + text[-3000:])
+        time.sleep(5)
+    raise RuntimeError("server boot timed out")
+
+
+def stop():
+    pid = server_up()
+    if not pid:
+        return
+    try:
+        rc("stop")
+    except Exception:
+        pass
+    for _ in range(120):
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            log("server stopped")
+            return
+        time.sleep(1)
+    os.kill(pid, 15)
+
+
+def wait_loaded(x, z, secs=120):
+    for _ in range(secs):
+        if "passed" in rc(f"execute if loaded {int(x)} 0 {int(z)}"):
+            return True
+        time.sleep(1)
+    return False
+
+
+def portals():
+    t = seams()
+    report("portals", t["portals"])
+    report("summon", t["summon"])
+    tps0 = rc("neoforge tps")
+    for p, cmd in zip(t["portals"], t["summon"]):
+        ox, _, oz = p["origin"]
+        rc(f"forceload add {int(ox) - 1} {int(oz) - 1} {int(ox) + 1} {int(oz) + 1}")
+        assert wait_loaded(ox, oz), f"chunk at {ox},{oz} never loaded"
+        time.sleep(1)
+        rc(cmd, show=True)
+        time.sleep(1)
+        rc("execute as @e[type=immersive_portals:portal] run portal global convert_normal_portal_to_global_portal", show=True)
+        rc(f"forceload remove {int(ox) - 1} {int(oz) - 1} {int(ox) + 1} {int(oz) + 1}")
+    left = rc("execute if entity @e[type=immersive_portals:portal]")
+    report("portal_entities_left_after_convert", left)
+    report("tps_before_portals", tps0)
+    # A fresh global portal moves entities only near its centre until a restart (2026-10-02 note §1).
+    stop()
+    time.sleep(5)
+    boot()
+
+
+def probe(x, z):
+    o = rc(f"deeptime probe column {int(x)} {int(z)}")
+    m = re.search(r"\{.*\}", o, re.S)
+    return json.loads(m.group(0)) if m else {"raw": o}
+
+
+def terrain():
+    """The data-level and generator-level seam check: across each seam, the folded outside equals the
+    glued inside, and the step from a block to its glued neighbour is like the step between ordinary
+    neighbours."""
+    t = seams()
+    res = {}
+    for p in t["portals"]:
+        name, length = p["name"], p["width"]
+        ix, iz = inward(p)
+        ox, _, oz = p["origin"]
+        along = (p["axis_w"][0], p["axis_w"][2])
+        same, cross, interior, rows = [], [], [], []
+        n = 48
+        for k in range(n):
+            s = -0.5 * length + (k + 0.5) * length / n
+            ex, ez = ox + along[0] * s, oz + along[1] * s
+            ex, ez = round(ex), round(ez)
+            a = (ex + ix * 1, ez + iz * 1)        # one block inside
+            b = (ex + ix * 2, ez + iz * 2)        # two blocks inside (ordinary neighbour of a)
+            o = (ex - ix * 1, ez - iz * 1)        # one block outside (hidden, folded)
+            g = glue_point(p, *o)                 # its glued image, inside on the far side
+            ha, hb, ho, hg = (probe(*q).get("terrainH") for q in (a, b, o, g))
+            if None in (ha, hb, ho, hg):
+                continue
+            same.append(abs(ho - hg))
+            cross.append(abs(ha - hg) / 2.0)      # a and g are 2 blocks apart across the seam
+            interior.append(abs(ha - hb))
+            rows.append({"edge": [ex, ez], "a": a, "glued": g, "H_a": round(ha, 2), "H_outside": round(ho, 2), "H_glued": round(hg, 2)})
+        def st(v):
+            v = sorted(v)
+            return {"n": len(v), "median": round(v[len(v) // 2], 3), "p90": round(v[int(0.9 * (len(v) - 1))], 3), "max": round(v[-1], 3)}
+        res[name] = {"kind": p["kind"], "outside_minus_glued": st(same), "per_block_step_across_seam": st(cross),
+                     "per_block_step_interior": st(interior), "samples": rows[:6]}
+        log(name, json.dumps({k: v for k, v in res[name].items() if k != "samples"}))
+    report("terrain_seams", res)
+
+
+def entities():
+    """Items and armour stands sent across each seam; where they land against the glued image."""
+    t = seams()
+    out = []
+    rc("kill @e[tag=qx]")
+    for p in t["portals"]:
+        ix, iz = inward(p)
+        ox, _, oz = p["origin"]
+        ax = (p["axis_w"][0], p["axis_w"][2])
+        s = 1200.5 if p["kind"] == "half_turn" else 700.5
+        ex, ez = ox + ax[0] * s, oz + ax[1] * s
+        start = (ex + ix * 3, ez + iz * 3)
+        far = glue_point(p, ex - ix * 3, ez - iz * 3)
+        for q in (start, far):
+            rc(f"forceload add {int(q[0]) - 16} {int(q[1]) - 16} {int(q[0]) + 16} {int(q[1]) + 16}")
+            wait_loaded(*q)
+        y = probe(*start).get("surfaceY", 100) + 40
+        mx, mz = -ix * 0.8, -iz * 0.8
+        for kind, nbt in (("item", 'Item:{id:"minecraft:diamond",count:1},PickupDelay:32767,NoGravity:1b'),
+                          ("armor_stand", "NoGravity:1b,Invisible:0b"), ("arrow", "NoGravity:1b,pickup:0b")):
+            tag = f"qx_{p['name']}_{kind}"
+            rc(f"summon {kind} {start[0] + 0.5:.2f} {y:.1f} {start[1] + 0.5:.2f} {{Tags:[\"qx\",\"{tag}\"],Motion:[{mx}d,0.0d,{mz}d],{nbt}}}")
+        time.sleep(6)
+        for kind in ("item", "armor_stand", "arrow"):
+            tag = f"qx_{p['name']}_{kind}"
+            pos = entity_vec(f"@e[tag={tag},limit=1]", "Pos")
+            want = glue_point(p, start[0] + 0.5 - ix * 6, start[1] + 0.5 - iz * 6)
+            row = {"seam": p["name"], "entity": kind, "start": [start[0] + 0.5, y, start[1] + 0.5], "pos": pos,
+                   "expected_near": [round(want[0], 1), round(want[1], 1)]}
+            if pos:
+                d0 = ((pos[0] - start[0]) ** 2 + (pos[2] - start[1]) ** 2) ** 0.5
+                gx, gz = glue_point(p, pos[0], pos[2])
+                row["crossed"] = d0 > 100
+                # Distance of the landing point from the seam line on the far side, and how far along.
+                row["landing_offset_from_glued_track"] = round(abs((pos[0] - want[0]) * ax[0] + (pos[2] - want[1]) * ax[1]), 2)
+            out.append(row)
+            log(json.dumps(row))
+        for q in (start, far):
+            rc(f"forceload remove {int(q[0]) - 16} {int(q[1]) - 16} {int(q[0]) + 16} {int(q[1]) + 16}")
+    report("entities", out)
+
+
+# ---------------------------------------------------------------- the real client
+
+def xd(*a):
+    subprocess.run([ENV["XDOTOOL"], *a], env=ENV, check=False)
+
+
+def shot(name):
+    path = os.path.join(OUT, name + ".png")
+    subprocess.run([ENV["FFMPEG"], "-nostdin", "-loglevel", "error", "-y", "-f", "x11grab", "-draw_mouse", "0",
+                    "-video_size", "1280x720", "-i", ENV["DISPLAY"], "-frames:v", "1", path], env=ENV, check=False)
+    return path
+
+
+def client_start():
+    if not os.path.exists("/tmp/.X11-unix/X95"):
+        subprocess.Popen([ENV["XVFB"], ":95", "-screen", "0", "1280x720x24", "-nolisten", "tcp", "+extension", "GLX"],
+                         stdout=open(os.path.join(MC, "xvfb.log"), "w"), stderr=subprocess.STDOUT, start_new_session=True)
+        time.sleep(3)
+    pmc = subprocess.run(["nix", "build", "--no-link", "--print-out-paths", "nixpkgs#portablemc"], capture_output=True, check=True).stdout.decode().split()[0]
+    game = os.path.join(CLI, "game")
+    lp = os.path.join(game, "logs", "latest.log")
+    if os.path.exists(lp):
+        os.remove(lp)
+    p = subprocess.Popen(["taskset", "-c", "24-31", pmc + "/bin/portablemc", "--main-dir", os.path.join(MC, "pmc"), "start",
+                          "neoforge::21.1.249", "--mc-dir", game, "--jvm", ENV["JAVA"], "--jvm-arg=-Xmx6G", "--jvm-arg=-Xms2G",
+                          "--jvm-arg=-XX:+UseG1GC", "--jvm-arg=-XX:ActiveProcessorCount=8", "-u", PLAYER, "--resolution", "1280x720",
+                          "--join-server", "127.0.0.1", "--join-server-port", str(GAME_PORT)],
+                         env=ENV, stdout=open(os.path.join(CLI, "client.log"), "w"), stderr=subprocess.STDOUT, start_new_session=True)
+    open(os.path.join(CLI, "client.pid"), "w").write(str(p.pid))
+    t0 = time.time()
+    while time.time() - t0 < 900:
+        if os.path.exists(lp) and "Level init received" in open(lp, errors="replace").read():
+            break
+        if "IPTester joined" in open(os.path.join(SRV, "console.log"), errors="replace").read() and time.time() - t0 > 60:
+            break
+        if p.poll() is not None:
+            raise RuntimeError("client died: " + open(os.path.join(CLI, "client.log"), errors="replace").read()[-2000:])
+        time.sleep(5)
+    else:
+        raise RuntimeError("client never joined")
+    log("client joined after", round(time.time() - t0), "s")
+    time.sleep(20)
+
+
+def client_stop():
+    try:
+        pid = int(open(os.path.join(CLI, "client.pid")).read())
+        subprocess.run(["pkill", "-P", str(pid)], check=False)
+        os.kill(pid, 15)
+    except (OSError, ValueError):
+        pass
+    try:
+        out = subprocess.run(["bash", "-c", "pgrep -f 'Xvfb :95'"], capture_output=True).stdout.split()
+        for pid in out:
+            os.kill(int(pid), 15)
+    except OSError:
+        pass
+
+
+def player_state():
+    p = entity_vec(PLAYER, "Pos")
+    r = entity_vec(PLAYER, "Rotation")
+    return p, r
+
+
+def fly_mode():
+    rc(f"gamemode creative {PLAYER}")
+    rc(f"effect give {PLAYER} minecraft:night_vision infinite 0 true")
+    # Creative flight: double-tap space, unless already flying.
+    if "1b" not in rc(f"data get entity {PLAYER} abilities.flying"):
+        xd("key", "--delay", "120", "space", "space")
+        time.sleep(1)
+
+
+def look_and_walk(name, start, yaw, pitch, seconds, portal=None, keys=("w",), settle=12, fly=True):
+    """Teleports the player, takes a 'look' screenshot, holds the keys and logs the position every
+    0.25 s; returns the jump (if any) and the end."""
+    x, y, z = start
+    rc(f"tp {PLAYER} {x:.2f} {y:.2f} {z:.2f} {yaw} {pitch}")
+    time.sleep(settle)
+    if fly:
+        fly_mode()
+        rc(f"tp {PLAYER} {x:.2f} {y:.2f} {z:.2f} {yaw} {pitch}")
+        time.sleep(3)
+    shot(f"{name}-look")
+    for k in keys:
+        xd("keydown", k)
+    t0 = time.time()
+    track = []
+    try:
+        while time.time() - t0 < seconds:
+            p, r = player_state()
+            if p:
+                track.append([round(time.time() - t0, 2), *[round(v, 3) for v in p[:3]], *(round(v, 1) for v in (r or [0, 0])[:2])])
+            time.sleep(0.25)
+    finally:
+        for k in keys:
+            xd("keyup", k)
+    time.sleep(2)
+    shot(f"{name}-after")
+    with open(os.path.join(OUT, f"{name}.tsv"), "w") as f:
+        f.write("t\tx\ty\tz\tyaw\tpitch\n")
+        for row in track:
+            f.write("\t".join(str(v) for v in row) + "\n")
+    jumps = []
+    for a, b in zip(track, track[1:]):
+        if abs(b[1] - a[1]) > 50 or abs(b[3] - a[3]) > 50:
+            j = {"t": b[0], "from": a[1:4], "to": b[1:4], "yaw_from": a[4], "yaw_to": b[4]}
+            if portal:
+                gx, gz = glue_point(portal, a[1], a[3])
+                ax = (portal["axis_w"][0], portal["axis_w"][2])
+                j["seam"] = portal["name"]
+                j["glued_from"] = [round(gx, 2), round(gz, 2)]
+                # Along the seam the landing must match the glued point exactly; across it, it
+                # differs by the distance flown between two samples (about 3 blocks).
+                j["error_along_seam_blocks"] = round(abs((b[1] - gx) * ax[0] + (b[3] - gz) * ax[1]), 2)
+                j["error_across_seam_blocks"] = round(abs((b[1] - gx) * ax[1] - (b[3] - gz) * ax[0]), 2)
+                j["yaw_turn"] = round(((b[4] - a[4]) + 540) % 360 - 180, 1)
+            jumps.append(j)
+    res = {"name": name, "start": start, "yaw": yaw, "samples": len(track), "jumps": jumps,
+           "end": track[-1][1:4] if track else None}
+    log(json.dumps(res))
+    return res
+
+
+def client():
+    t = seams()
+    by = {p["name"]: p for p in t["portals"]}
+    client_start()
+    rc("time set noon")
+    rc("gamerule doDaylightCycle false")
+    rc("weather clear")
+    rc(f"op {PLAYER}")
+    rc(f"gamemode creative {PLAYER}")
+    walks = []
+    shot("00-joined")
+    yaw_of = {(0, -1): 180, (0, 1): 0, (1, 0): -90, (-1, 0): 90}  # outward direction -> Minecraft yaw
+    # One crossing per seam, away from the singular points, flying 30 blocks above the ground.
+    plan = [("north", -2000), ("south", 3000), ("east", 1500), ("west", -1200)]
+    for name, s in plan:
+        p = by[name]
+        ix, iz = inward(p)
+        ox, _, oz = p["origin"]
+        ax = (p["axis_w"][0], p["axis_w"][2])
+        ex, ez = ox + ax[0] * s, oz + ax[1] * s
+        sx, sz = ex + ix * 24 + 0.5 * abs(ax[0]), ez + iz * 24 + 0.5 * abs(ax[1])
+        h = probe(sx, sz).get("surfaceY", 80)
+        g = glue_point(p, ex, ez)
+        hg = probe(*g).get("surfaceY", 80)
+        y = max(h, hg, 62) + 30
+        yaw = yaw_of[(int(-ix), int(-iz))]
+        walks.append(look_and_walk(f"walk-{name}", (sx, y, sz), yaw, 25, 9, portal=p))
+    # Over the north pole (the quarter point of the north edge): fly north along x = -B/2.
+    sx, sz = -B / 2 + 0.5, -B / 2 + 24.5
+    y = max(probe(sx, sz).get("surfaceY", 80), probe(-sx, -sz).get("surfaceY", 80), 62) + 30
+    walks.append(look_and_walk("walk-north-pole", (sx, y, sz), 180, 25, 9, portal=by["north"]))
+    # The east-west slide on the equator: fly east along z = 0.
+    sx, sz = B - 24.5, 0.5
+    y = max(probe(sx, sz).get("surfaceY", 80), probe(-B + 8, sz).get("surfaceY", 80), 62) + 30
+    walks.append(look_and_walk("walk-equator-east", (sx, y, sz), -90, 20, 9, portal=by["east"]))
+    report("walks", walks)
+    # Views: across each seam from inside, at a slant, and at the singular point (0, -B/2).
+    views = {}
+    for name, (x, z, yaw) in {"view-north-seam": (-2000.5, -B / 2 + 60.5, 180), "view-south-seam": (3000.5, B / 2 - 60.5, 0),
+                              "view-east-seam": (B - 60.5, 1500.5, -90), "view-singular-north": (0.5, -B / 2 + 80.5, 180),
+                              "view-north-pole": (-B / 2 + 0.5, -B / 2 + 80.5, 180)}.items():
+        h = probe(x, z).get("surfaceY", 80)
+        rc(f"tp {PLAYER} {x} {max(h, 62) + 45} {z} {yaw} 30")
+        time.sleep(15)
+        views[name] = shot(name)
+    report("views", views)
+    # Chunk loading through a seam: with the player at the north seam, is the glued side loaded?
+    p = by["north"]
+    rc(f"tp {PLAYER} -2000.5 120 {-B / 2 + 8.5} 180 20")
+    time.sleep(20)
+    g = glue_point(p, -2000, -B / 2 - 8)
+    report("chunk_loading", {"player_at": [-2000.5, -B / 2 + 8.5], "glued_side": g,
+                             "glued_side_loaded": "passed" in rc(f"execute if loaded {int(g[0])} 64 {int(g[1])}"),
+                             "hidden_outside_loaded": "passed" in rc(f"execute if loaded -2000 64 {-B // 2 - 8}"),
+                             "tps": rc("neoforge tps")})
+
+
+def physics():
+    """Fluids and redstone at the north seam, on a platform built across it."""
+    p = [q for q in seams()["portals"] if q["name"] == "north"][0]
+    x, z = -3000, -B // 2
+    for q in ((x, z), glue_point(p, x, z)):
+        rc(f"forceload add {int(q[0]) - 16} {int(q[1]) - 16} {int(q[0]) + 16} {int(q[1]) + 16}")
+        wait_loaded(*q)
+    y = 200
+    gx, gz = glue_point(p, x, z)
+    gx, gz = int(gx), int(gz)
+    rc(f"fill {x - 4} {y} {z - 4} {x + 4} {y} {z + 3} minecraft:stone")          # inside z >= -B/2 ... and outside
+    rc(f"fill {gx - 5} {y} {gz - 3} {gx + 4} {y} {gz + 4} minecraft:stone")
+    # Water source one block inside the seam (cell z = -B/2 is the first inside row).
+    rc(f"setblock {x} {y + 1} {z} minecraft:water")
+    # Redstone: a powered line up to the seam; the glued neighbour cell holds a lamp.
+    rc(f"setblock {x + 2} {y + 1} {z + 2} minecraft:redstone_block")
+    rc(f"setblock {x + 2} {y + 1} {z + 1} minecraft:redstone_wire")
+    rc(f"setblock {x + 2} {y + 1} {z} minecraft:redstone_wire")
+    # The cell glued to (x+2, z-1) (outside) is the half-turn image of that cell.
+    lx, lz = 2 * int(p["origin"][0]) - (x + 2) - 1, 2 * int(p["origin"][2]) - (z - 1) - 1
+    rc(f"setblock {lx} {y + 1} {lz} minecraft:redstone_lamp")
+    time.sleep(8)
+    wcx, wcz = 2 * int(p["origin"][0]) - x - 1, 2 * int(p["origin"][2]) - (z - 1) - 1
+    res = {
+        "water_in_hidden_outside": "passed" in rc(f"execute if block {x} {y + 1} {z - 1} minecraft:water"),
+        "water_in_glued_cell": "passed" in rc(f"execute if block {wcx} {y + 1} {wcz} minecraft:water"),
+        "lamp_lit": "passed" in rc(f"execute if block {lx} {y + 1} {lz} minecraft:redstone_lamp[lit=true]"),
+        "lamp_at": [lx, y + 1, lz],
+    }
+    log(json.dumps(res))
+    report("physics", res)
+
+
+def all_phases():
+    setup()
+    boot()
+    portals()
+    terrain()
+    entities()
+    physics()
+    try:
+        client()
+    finally:
+        client_stop()
+        report("tps_end", rc("neoforge tps"))
+        stop()
+
+
+if __name__ == "__main__":
+    os.makedirs(OUT, exist_ok=True)
+    phase = sys.argv[1] if len(sys.argv) > 1 else "all"
+    fn = {"setup": setup, "boot": boot, "portals": portals, "terrain": terrain, "entities": entities,
+          "physics": physics, "client": client, "stop": stop, "all": all_phases}[phase]
+    try:
+        fn()
+    except Exception:
+        if phase == "all":
+            client_stop()
+            stop()
+        raise

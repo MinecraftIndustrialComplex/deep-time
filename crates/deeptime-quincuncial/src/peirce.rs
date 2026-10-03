@@ -513,9 +513,10 @@ mod tests {
         assert!(others > 1e-5, "{others}");
     }
 
-    /// Area distortion, measured: the planet area per block relative to the mean, weighted by planet
-    /// area. The poles hold the least planet per block (2K²/π ≈ 2.19× the mean: the land there is
-    /// drawn largest), and the share of planet area falls to zero at the singular points.
+    /// Area distortion, measured: the planet area per block relative to the mean. The poles hold the
+    /// most planet per block (2K²/π ≈ 2.19× the mean: the land there is drawn smallest, 0.457× the
+    /// mean blocks per km²), and the planet per block falls to zero at the singular points (the land
+    /// there is drawn without bound larger).
     #[test]
     fn area_distortion_is_measured() {
         let p = Peirce::new(SIDE, 0.0);
