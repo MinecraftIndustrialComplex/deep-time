@@ -2117,7 +2117,8 @@ community ports) are not opened for code.
   (`subduction_initiation_clearance_km`), never taking continental crust; continental arcs build a
   cordillera (`cordillera_*`); a collision stamps its orogen only over the core of its surge
   (`collision_orogen_core`); an emerged island arc turns continental only once it is mature
-  (`arc_continental_m`). Constants from Cortial's Appendix A:
+  (`arc_continental_m`; since 2026-10-02 `arc_maturity_myr`, whatever the arc's height). Constants
+  from Cortial's Appendix A:
   2 Myr step, subduction distance 1,800 km, collision distance 4,200 km, 100 mm/yr speed cap,
   damping 0.04 mm/yr, erosion 0.03 mm/yr, accretion 0.3 mm/yr, subduction uplift 0.6 mm/yr, and the
   elevation envelope of §5.1.
@@ -4000,7 +4001,7 @@ on this machine.
     (`subduction_initiation_clearance_km`; rate 0.3); continental arcs build a cordillera
     (`cordillera_uplift_mm_yr`, `_width_km`, `_height_m`); a collision's orogen is only its surge's
     core (`collision_orogen_core`); island arcs turn continental only once mature
-    (`arc_continental_m`). The provinces view draws rifted margins as a continuous band and
+    (`arc_continental_m`; since 2026-10-02 `arc_maturity_myr`). The provinces view draws rifted margins as a continuous band and
     generalises to the USGS map's 150-km features.
   - **Measured** (6 pipeline runs × 400 Myr, before → after): active share of the continental margin
     0.67 → 0.31 (Earth ≈ 0.3, Bradley 2008), floor beside passive margins 50 → 102 Myr, ground under
