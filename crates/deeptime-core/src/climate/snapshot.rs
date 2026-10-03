@@ -47,8 +47,8 @@ pub struct Planet {
     /// R / R⊕ of the Earth-normalized mapping (planetary-scale lengths shrink by it).
     pub earth_scale: f64,
     pub m_per_block_h: f64,
-    /// CO₂ forcing against 280 ppm, W/m² (lowers the EBM's longwave A; `carbon.rs`).
-    pub forcing_w_m2: f64,
+    /// The atmosphere's CO₂, ppm (its forcing lowers each tile's longwave, `co2.rs`).
+    pub co2_ppm: f64,
     /// The star's luminosity against today's (Gough 1981; `carbon.rs`), × `star_flux_rel`.
     pub sun_rel: f64,
     /// The orbit inside the recent ice-age window (`orbit.rs`); `None`: circular at the tilt.
@@ -60,7 +60,7 @@ impl Planet {
     pub fn ebm(&self, p: &ClimateParams) -> EbmParams {
         let mut ep =
             EbmParams::from_climate(p, self.axial_tilt_deg, self.star_flux_rel * self.sun_rel);
-        ep.a -= self.forcing_w_m2;
+        ep.co2 = Some(super::co2::Forcing::new(self.co2_ppm));
         if let Some(o) = self.orbit {
             ep.obliquity_rad = o.obliquity_deg.to_radians();
             ep.orbit = o.orbit();

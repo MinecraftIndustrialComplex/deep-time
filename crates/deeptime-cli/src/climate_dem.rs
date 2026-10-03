@@ -83,6 +83,7 @@ pub fn run(o: &Options) -> CliResult<()> {
         .map(|b| f64::from(f32::from_le_bytes(*b)))
         .collect();
     let (mut p, mut tilt, mut flux, mut day) = (ClimateParams::default(), 23.44, 1.0, 24.0);
+    let mut gravity = deeptime_core::climate::ice::G;
     if let Some(arg) = &o.preset {
         let v: Value = serde_json::from_str(&crate::run::load_preset_with(arg, None, None)?)?;
         if let Some(c) = v.get("climate") {
@@ -92,6 +93,7 @@ pub fn run(o: &Options) -> CliResult<()> {
             tilt = pl["axial_tilt_deg"].as_f64().unwrap_or(tilt);
             flux = pl["star_flux_rel"].as_f64().unwrap_or(flux);
             day = pl["day_length_h"].as_f64().unwrap_or(day);
+            gravity = pl["gravity_m_s2"].as_f64().unwrap_or(gravity);
         }
     }
     // A planet grid of w cells around (r = 1 block per cell; block = circumference / w).
@@ -106,7 +108,7 @@ pub fn run(o: &Options) -> CliResult<()> {
         m_per_block_h: cell_m,
         // The present: 280 ppm, today's sun, and the ice-age window's present orbit when the
         // preset runs the window (the stage's last snapshot sees the same).
-        forcing_w_m2: 0.0,
+        co2_ppm: 280.0,
         sun_rel: 1.0,
         orbit: (p.orbital_window_myr > 0.0)
             .then(|| deeptime_core::climate::orbit::present(tilt, p.orbital_strength)),
@@ -229,6 +231,7 @@ pub fn run(o: &Options) -> CliResult<()> {
             cell_m / es,
             p.ice_yield_stress_kpa * 1000.0,
             p.ice_max_thickness_m,
+            gravity,
         );
         let vol: f64 = (0..w * h)
             .map(|c| f64::from(thick[c]) * area[c / w] / 1000.0)
@@ -263,7 +266,7 @@ pub fn run(o: &Options) -> CliResult<()> {
         let env = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<f64>().ok());
         let cells = env("DT_CELLS").map_or(p.ice_grid_cells as usize, |x| x as usize);
         let sg = sheet::Grid::new(w, h, &sx, cell_m / es, cells);
-        let mut sp = sheet::Params::from(&p);
+        let mut sp = sheet::Params::from(&p, gravity);
         if let Some(x) = env("DT_ISO") {
             sp.isostasy_years = x * 1000.0;
         }

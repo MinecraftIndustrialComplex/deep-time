@@ -114,6 +114,10 @@ pub struct ClimateParams {
     pub winter_inversion_c: f64,
     /// How crisply sea-ice edges are drawn on L1: 1 soft (the coarse grid's), higher crisper.
     pub sea_ice_edge_sharpness: f64,
+    /// Extra cloud greenhouse on frozen surfaces (sea ice, snow, ice sheets), W/m²: the cloudy
+    /// models' snowball clouds beyond the ~20 W/m² the linear longwave law already holds (0: none;
+    /// Ben 2026-10-02, "None by default, a setting").
+    pub snowball_cloud_w_m2: f64,
 
     // --- The seasonal energy-balance model (climlab `EBM_seasonal`, MIT; `ebm.rs`).
     /// Solar constant at 1 AU, W/m² (climlab's `const.S0`); × `planet.star_flux_rel`.
@@ -395,6 +399,7 @@ impl Default for ClimateParams {
             overturning_sv: 15.0,              // ledger: CLM-131
             winter_inversion_c: 15.0,          // ledger: CLM-134
             sea_ice_edge_sharpness: 4.0,       // ledger: CLM-135
+            snowball_cloud_w_m2: 0.0,          // ledger: CLM-172
             solar_constant_w_m2: 1365.2,
             olr_a_w_m2: 203.3,
             olr_b_w_m2_k: 2.09,
@@ -540,6 +545,7 @@ impl ClimateParams {
                 1.0,
                 20.0,
             ),
+            (self.snowball_cloud_w_m2, "snowball_cloud_w_m2", 0.0, 20.0),
         ] {
             check(
                 v.is_finite() && (lo..=hi).contains(&v),

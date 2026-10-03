@@ -453,17 +453,27 @@ pub fn run(
                     let sl = qs[j] * (1.0 - al);
                     let (cl, cs, cm) = (ep.c_land / dt, ep.c_land / dt, ep.c_ocean / dt);
                     let (xl, xo) = (ep.exchange * (1.0 - f[c]), ep.exchange * f[c]);
-                    let (r1, r2, r3) = (cl * tl + sl - ep.a, cs * to + so - ep.a, cm * tm);
+                    let (a_l, b_l) = super::co2::longwave(
+                        ep.a,
+                        ep.b,
+                        ep.co2.as_ref(),
+                        tl,
+                        ep.snow_cloud,
+                        frozen(tl).max(sheet[c]),
+                    );
+                    let (a_o, b_o) =
+                        super::co2::longwave(ep.a, ep.b, ep.co2.as_ref(), to, ep.snow_cloud, cover);
+                    let (r1, r2, r3) = (cl * tl + sl - a_l, cs * to + so - a_o, cm * tm);
                     let a33 = cm + gc;
-                    let a11 = cl + ep.b + xl;
-                    let a22 = cs + ep.b + xo + gc - gc * gc / a33;
+                    let a11 = cl + b_l + xl;
+                    let a22 = cs + b_o + xo + gc - gc * gc / a33;
                     let r2 = r2 + gc * r3 / a33;
                     let det = a11 * a22 - xl * xo;
                     let tl2 = (r1 * a22 + xl * r2) / det;
                     let mut to2 = (a11 * r2 + xo * r1) / det;
                     let mut tm2 = (r3 + gc * to2) / a33;
                     let a_sr = f[c] * sl + (1.0 - f[c]) * so;
-                    let a_lr = ep.a + ep.b * (f[c] * tl2 + (1.0 - f[c]) * to2);
+                    let a_lr = f[c] * (a_l + b_l * tl2) + (1.0 - f[c]) * (a_o + b_o * to2);
                     if ice > 0.0 && to2 > 0.0 {
                         let melt = (to2 * ep.c_land).min(ice);
                         ice -= melt;

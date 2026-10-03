@@ -47,7 +47,7 @@ fn planet() -> Planet {
         day_length_h: 24.0,
         earth_scale: 782.278 / 6370.0,
         m_per_block_h: 300.0,
-        forcing_w_m2: 0.0,
+        co2_ppm: 280.0,
         sun_rel: 1.0,
         orbit: None,
     }
