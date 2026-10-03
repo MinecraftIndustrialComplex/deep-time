@@ -691,7 +691,9 @@ fn percell_line(world: &deeptime_core::world::WorldState) -> Option<String> {
         f(&c["ocean_heat_peak_pw"]),
         f(&c["ocean_heat_peak_lat"]),
         f(&c["gyre_psi_max_sv"]),
-        c["sinking"]["lat"].as_f64().map_or("none".to_string(), |x| format!("{x:.0}")),
+        c["sinking"]["lat"]
+            .as_f64()
+            .map_or("none".to_string(), |x| format!("{x:.0}")),
         note["triggered_snapshots"],
         esc.join(","),
     ))
