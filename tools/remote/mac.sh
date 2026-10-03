@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
 #
-# Run a command on Ben's M6 Mac mini instead of the laptop (Ben's standing rule: cargo, Gradle,
-# GameTests, smoke/planet servers and BlueMap run on the Mac; the laptop only edits and runs git).
+# Run a command on the test VM (deeptime-test; "the Mac" in older notes) instead of the laptop (Ben's
+# standing rule: cargo, Gradle, GameTests, smoke/planet servers and BlueMap run there; the laptop only
+# edits and runs git).
 #
-#   tools/remote/mac.sh [--no-sync] [--pack] [--pull <path>]... -- <command>
+#   tools/remote/mac.sh [--no-sync] [--pack] [--server] [--kind K] [--pull <path>]... -- <command>
 #
 #   --no-sync      skip the rsync of this checkout (the Mac copy is already current)
 #   --pack         also sync the MIC pack (…/mic/pack, with its .git) for tools/smoke/install.sh mic,
 #                  and the MIC rock-tag datapack (…/mic/Docs/datapacks/deeptime-mic-rock-tags) that
 #                  ./gametest.sh -PwithMic adds
-#   --server       hold the Mac's Deep Time server lock while the command runs: use it for every
-#                  command that boots Minecraft (gametest.sh, gametest-planet.sh, smoke run.py,
-#                  BlueMap). Several agents build at once, but only one test server runs at a time
-#                  (fixed ports, 16 GB shared with graphide's agents). Waits for the lock.
+#   --server       the command boots Minecraft: its job gets a server slot (its own ports and folder;
+#                  tools/remote/vm/admit.py). The repo's server launchers (gametest.sh,
+#                  gametest-planet.sh, smoke run.py, preview.py, dh-client-check.sh) take a slot
+#                  themselves, so --server is only needed for other scripts that boot a server
+#   --kind K       the job's kind for the admission tool (default: classified from the command, e.g.
+#                  cargo:test, gradle:build, gametest:mic, sim:<preset>:<threads>t; `admit.py classify`)
 #   --pull <path>  after the command, copy <path> (relative to the repo root) back from the Mac;
 #                  repeatable (e.g. --pull smoke/mic/report.md --pull neoforge/build/gametest.log)
 #   <command>      run from the repo root on the Mac, already inside the repo's dev shell, e.g.
@@ -29,6 +32,12 @@
 # outputs and runtimes) and a Mac-side git index is refreshed with `git add -A`: a Nix flake only
 # sees files git tracks. That index is never committed or pushed; commits happen on the laptop.
 # Output that matters (reports, logs) comes back with --pull. Exit status is the command's.
+#
+# Every command runs through the VM's admission tool (/usr/local/lib/deeptime/admit.py; Ben,
+# 2026-10-03: "Guess load, run if load is less than what is available + 25%"): it starts when its
+# kind's estimated load fits in the free CPU and memory plus 25 %, waits (saying why) otherwise, and
+# its measured load refines the next estimate. Quick looks (cat, git, ls ...) and detached starts run
+# at once. `tools/remote/mac.sh --no-sync -- deeptime-admit status` shows what runs and waits.
 
 set -euo pipefail
 
@@ -39,18 +48,19 @@ NAME="$(basename "$REPO")"
 REMOTE="$SSD/mic/mods/$NAME"
 CACHE="$SSD/deeptime-cache"
 
-SYNC=1; PACK=0; SERVER=0; PULLS=()
+SYNC=1; PACK=0; SERVER=0; KIND=auto; PULLS=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --no-sync) SYNC=0; shift ;;
         --pack) PACK=1; shift ;;
         --server) SERVER=1; shift ;;
+        --kind) KIND="$2"; shift 2 ;;
         --pull) PULLS+=("$2"); shift 2 ;;
         --) shift; break ;;
         *) break ;;
     esac
 done
-[ $# -gt 0 ] || { echo "usage: tools/remote/mac.sh [--no-sync] [--pack] [--pull <path>]... -- <command>" >&2; exit 2; }
+[ $# -gt 0 ] || { echo "usage: tools/remote/mac.sh [--no-sync] [--pack] [--server] [--kind K] [--pull <path>]... -- <command>" >&2; exit 2; }
 CMD="$*"
 
 # -n: never let ssh read (and drain) this script's stdin.
@@ -119,18 +129,6 @@ fi
 # flake.nix + flake.lock. Evaluating the flake afresh on every call would copy the synced tree
 # into /nix/store each time (that pattern filled the Mac's SSD twice in September 2026); the
 # repo's scripts see IN_NIX_SHELL and skip their own `nix develop`.
-if [ "$SERVER" = 1 ]; then
-    # mkdir is atomic: the lock is a directory holding who took it and when. A lock older than
-    # three hours is taken to be stale (its holder died without releasing it).
-    LOCK="$CACHE/server.lock"
-    CMD="while ! mkdir '$LOCK' 2>/dev/null; do
-           age=\$(( \$(date +%s) - \$(stat -c %Y '$LOCK' 2>/dev/null || /usr/bin/stat -f %m '$LOCK' 2>/dev/null || date +%s) ))
-           if [ \$age -gt 10800 ]; then echo 'mac.sh: breaking a stale server lock'; rm -rf '$LOCK'; continue; fi
-           echo \"mac.sh: waiting for the server lock (held by \$(cat '$LOCK/owner' 2>/dev/null))\"; sleep 30
-         done
-         echo '$NAME' > '$LOCK/owner'; trap \"rm -rf '$LOCK'\" EXIT INT TERM
-         $CMD"
-fi
 KEY="$(cat "$REPO/flake.nix" "$REPO/flake.lock" | sha256sum | cut -c1-16)"
 PROFILE="$CACHE/devshell-$KEY"
 # Every worktree has its own copy and target/ on the SSD, so target size is multiplied by the number
@@ -138,10 +136,14 @@ PROFILE="$CACHE/devshell-$KEY"
 # and full debuginfo most of the rest; without them a copy's target is a fraction of the size, at the
 # cost of recompiling the workspace crates (not the dependencies) on each change. Line tables keep
 # file:line in panics and backtraces.
-# The machine is shared by every agent (32 vCPU): each job gets 8 cargo jobs and 6 Rayon threads by
-# default, or several test suites at once each take every core (2026-10-01: load 100). A command may
-# set its own values.
-INNER="cd '$REMOTE' && export GRADLE_USER_HOME='$CACHE/gradle' CARGO_HOME='$CACHE/cargo' XWIN_CACHE_DIR='$CACHE/xwin' TMPDIR='$CACHE/tmp' DEEPTIME_REMOTE=mac CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=line-tables-only CARGO_BUILD_JOBS=\${CARGO_BUILD_JOBS:-8} RAYON_NUM_THREADS=\${RAYON_NUM_THREADS:-6} && { [ -e '$PROFILE' ] || nix develop --profile '$PROFILE' -c true; } && exec nix develop '$PROFILE' -c zsh -c $(printf '%q' "$CMD")"
+# No fixed job sizes (the M6-era CARGO_BUILD_JOBS=8 and RAYON_NUM_THREADS=6 are gone): the admission
+# tool starts a job when its measured load fits. A command may still set its own values.
+# The admission tool runs outside the dev shell (its LD_LIBRARY_PATH breaks system tools); the dev
+# shell is entered inside the admitted job.
+ADMIT=/usr/local/lib/deeptime/admit.py
+DEV="nix develop '$PROFILE' -c zsh -c $(printf '%q' "$CMD")"
+ADMIT_RUN="/usr/bin/python3 '$ADMIT' run --kind $(printf '%q' "$KIND") --label '$NAME'$([ "$SERVER" = 1 ] && echo ' --server') -- $DEV"
+INNER="cd '$REMOTE' && export GRADLE_USER_HOME='$CACHE/gradle' CARGO_HOME='$CACHE/cargo' XWIN_CACHE_DIR='$CACHE/xwin' TMPDIR='$CACHE/tmp' DEEPTIME_REMOTE=mac CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=line-tables-only && { [ -e '$PROFILE' ] || nix develop --profile '$PROFILE' -c true; } && if [ -f '$ADMIT' ]; then exec $ADMIT_RUN; else exec $DEV; fi"
 set +e
 "${SSH[@]}" "exec zsh -lc $(printf '%q' "$INNER")"
 status=$?
