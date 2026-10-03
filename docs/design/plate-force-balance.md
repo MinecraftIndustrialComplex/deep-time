@@ -642,6 +642,13 @@ basin on the quick preset (belts of 1.6 to 2.3 km give a wedge narrower than one
 nothing loads the incoming plate; the flexure does bend a basin under a resolved wedge, by a test).
 Both are for the force balance (task 7) and a finer front; see the questions in STATUS.md.
 
+**After the continental crust fix** (master f545c0bc merged, the strength-height limit added;
+`docs/design/plate-check-baseline.md`, last section): plate-check 29 of 45 against master's 15 of
+42, the three faults fixed as above. Hypsometry at 500 Myr: land 0.258 (target 0.27-0.30, master
+0.291), median 504 m, above 2 km 0.106, highest cell 5.8 km [5.4, 6.5], 99th percentile 4.3 km.
+The continental crust ends 1000 Myr at 0.27 against master's 0.31: crust that crosses a front
+becomes belt thickness and its area is not given back, and no collision setting tried moved it.
+
 ## 10. Risks
 
 1. **The closed loop is untested.** Section 4 is open loop. Geometry and forces feed each other:
