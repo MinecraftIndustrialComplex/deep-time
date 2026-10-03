@@ -104,36 +104,38 @@ public final class RiverGameTests {
      * picks by shape (the widest channel is usually a river's mouth, at sea level), so on a planet
      * whose lakes and mouths all sit at the coast its boxes hold almost no water above the sea. One
      * box per chain at the middle of the chain's vertices between {@code sea + 4} and
-     * {@value #HIGH_SITE_TOP}, then at the two ends of that run, each at least three half-boxes from
+     * {@value #HIGH_SITE_TOP}, then boxes along those runs, each at least three half-boxes from
      * every box already chosen, up to {@link #HIGH_SITES}.
      */
     static List<Site> highSites(Rivers r, int sea, List<Site> have) {
         List<Site> out = new ArrayList<>();
-        for (int k = 0; k < r.chainCount() && out.size() < HIGH_SITES; k++) {
-            int first = -1, last = -1;
-            for (int i = r.chainFirst(k); i < r.chainFirst(k) + r.chainLength(k); i++)
-                if (r.vertexW(i) >= sea + 4 && r.vertexW(i) <= HIGH_SITE_TOP) {
-                    if (first < 0)
-                        first = i;
-                    last = i;
+        // First the middle of each chain's high run, then any of its high vertices: the Lambert test
+        // planet has few chains above the sea, so one box each was too few for the carvers to reach.
+        for (int pass = 0; pass < 2; pass++)
+            for (int k = 0; k < r.chainCount() && out.size() < HIGH_SITES; k++) {
+                int first = -1, last = -1;
+                for (int i = r.chainFirst(k); i < r.chainFirst(k) + r.chainLength(k); i++)
+                    if (r.vertexW(i) >= sea + 4 && r.vertexW(i) <= HIGH_SITE_TOP) {
+                        if (first < 0)
+                            first = i;
+                        last = i;
+                    }
+                if (first < 0)
+                    continue;
+                int from = pass == 0 ? (first + last) / 2 : first, to = pass == 0 ? (first + last) / 2 : last;
+                for (int at = from; at <= to && out.size() < HIGH_SITES; at++) {
+                    if (r.vertexW(at) < sea + 4 || r.vertexW(at) > HIGH_SITE_TOP)
+                        continue;
+                    int x = Math.round(r.vertexX(at)), z = Math.round(r.vertexZ(at));
+                    boolean near = false;
+                    for (Site s : have)
+                        near |= Math.abs(s.x() - x) < 3 * HALF && Math.abs(s.z() - z) < 3 * HALF;
+                    for (Site s : out)
+                        near |= Math.abs(s.x() - x) < 3 * HALF && Math.abs(s.z() - z) < 3 * HALF;
+                    if (!near)
+                        out.add(new Site("high river", x, z));
                 }
-            if (first < 0)
-                continue;
-            // The middle of the chain's high run, then its two ends (more boxes where few chains run
-            // above the sea: the Lambert test planet has fewer such chains than the old layout).
-            for (int at : new int[]{(first + last) / 2, first, last}) {
-                if (out.size() >= HIGH_SITES)
-                    break;
-                int x = Math.round(r.vertexX(at)), z = Math.round(r.vertexZ(at));
-                boolean near = false;
-                for (Site s : have)
-                    near |= Math.abs(s.x() - x) < 3 * HALF && Math.abs(s.z() - z) < 3 * HALF;
-                for (Site s : out)
-                    near |= Math.abs(s.x() - x) < 3 * HALF && Math.abs(s.z() - z) < 3 * HALF;
-                if (!near)
-                    out.add(new Site("high river", x, z));
             }
-        }
         return out;
     }
 
