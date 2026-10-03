@@ -5694,7 +5694,7 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Reference: Stern, R. J. and Scholl, D. W. (2010). Yin and yang of continental crust creation and destruction by plate tectonic processes. International Geology Review 52(1):1-31.
 - DOI or URL: 10.1080/00206810903332322; author copy https://personal.utdallas.edu/~rjstern/pdfs/YinyangIGR10.pdf
 - Cited as: "Stern & Scholl 2010".
-- Ledger ids: PLT-045 (comparison)
+- Ledger ids: PLT-045 (comparison), PLT-258 (2026-10-03: "the bulk of the approximately 40 km-thick crust that must have originally existed is missing" at UHP terranes; continental crust lost at all collision zones "approximately 0.7 km3/year", Scholl & von Huene 2009 as cited)
 - Access: paywalled at the publisher; author copy open.
 - Library (the project's source library, not distributed): fetched 2026-10-02 (author copy). Text file: `SternScholl2010/SternScholl2010.txt`.
 - Read so far (by the project): full text, 2026-10-02. Abstract: creation and destruction of continental crust "is either in balance (~3.2 km3/year, or 3.2 AU) or more crust is being destroyed than created"; p. 9: the Aleutian and Izu-Bonin-Mariana arcs, "which have evolved since 45-50 Ma", give "crustal growth estimates of 90-180 km3/km-million years"; growth is front-loaded (several hundred km3/km/Myr in the first few Myr, "a few tens or less" for mature arcs); about 2.7 AU of growth at convergent margins (Table 1).
@@ -5793,3 +5793,27 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 - Access: author PDF; full text read.
 - Library: not fetched.
 - Read so far (by the project): full text, 2026-10-03: "The Cyclades archipelago is underlain by a thinned crust with a very constant thickness around 26 km"; "The extended domain is superposed to a collapsed Early Cenozoic mountain belts".
+
+### MooneyProdehlPavlenkova2002
+- Reference: Mooney, W. D., Prodehl, C. and Pavlenkova, N. I. (2002). Seismic velocity structure of the continental lithosphere from controlled source data. In: Lee, W. H. K. and others (eds), International Handbook of Earthquake and Engineering Seismology, Part A. Academic Press. (Pages and DOI not checked.)
+- DOI or URL: USGS author copy https://escweb.wr.usgs.gov/share/mooney/54seismicvelocitystruct.pdf
+- Ledger ids: PLT-256, PLT-258
+- Access: author copy, full text read.
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-03 (research sub-agent): "The thickest crust (70+ km) occurs beneath the Tibetan Plateau and the South American Andes"; "Orogenic crust has a wide range of thickness of 20-80km, and an average thickness of 43 km"; "Isostatic forces uplift crust thicker than about 50 km, leading to erosion and crustal thinning".
+
+### WangEtAl2021Tibet
+- Reference: Wang, H. and others (2021). No mafic layer in 80 km thick Tibetan crust. Nature Communications 12:1069.
+- DOI or URL: 10.1038/s41467-021-21420-z (open, PMC7886915)
+- Ledger ids: PLT-258
+- Access: open; full text read.
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-03 (research sub-agent): "Moho at 80 ± 2 km" beneath the Lhasa terrane; felsic thick crust "precludes future delamination due to lack of mafic rocks that may transform into high density eclogitic rocks".
+
+### ZhaoEtAl2020Moho
+- Reference: Zhao, G. and others (2020). Moho beneath Tibet based on a joint analysis of gravity and seismic data. Geochemistry, Geophysics, Geosystems 21(2):e2019GC008849.
+- DOI or URL: 10.1029/2019GC008849 (GFZ open copy)
+- Ledger ids: PLT-258
+- Access: open copy; full text read.
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-03 (research sub-agent): Moho "60–80 km within the plateau"; maximum "~79 km is found in Karakorum and in the southern Lhasa block".
