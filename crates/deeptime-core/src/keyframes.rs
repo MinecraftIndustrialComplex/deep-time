@@ -65,12 +65,12 @@ pub struct ViewScale {
 }
 
 impl Default for ViewScale {
-    /// The defaults of a planet preset (sea level y 63, 20 m per block, 6,370 km, 300 m a block
+    /// The defaults of a planet preset (sea level y 63, 35 m per block up, 6,370 km, 300 m a block
     /// across, the default hydrology).
     fn default() -> ViewScale {
         ViewScale {
             sea_level_y: 63.0,
-            m_per_block_v: 20.0,
+            m_per_block_v: deeptime_format::DEFAULT_M_PER_BLOCK_V,
             radius_m: 6.37e6,
             m_per_block_h: 300.0,
             rivers_scale: 1.0,

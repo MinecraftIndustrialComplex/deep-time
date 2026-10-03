@@ -923,7 +923,8 @@ mod tests {
         for j in 0..H {
             for i in 0..W {
                 let (z, v) = regions[i / 4];
-                data[0][j * W + i] = (63.0 + f64::from(z) / 20.0) as f32;
+                data[0][j * W + i] =
+                    (63.0 + f64::from(z) / deeptime_format::DEFAULT_M_PER_BLOCK_V) as f32;
                 for (k, x) in v.iter().enumerate() {
                     data[k + 1][j * W + i] = *x;
                 }

@@ -16,6 +16,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -127,10 +128,13 @@ public final class LakeGameTests {
         BlockState saltBlock = found.length == 0 || found[0] == null ? null : found[0].pick(0L);
         for (Spot s : salt) {
             LevelChunk chunk = level.getChunk(s.x() >> 4, s.z() >> 4);
-            // The ground's top block: under air, plants and a snow layer.
+            // The ground's top block: under air, plants, a snow layer and the leaves of a tree on
+            // the shore that overhang the flat (a full block, but not the ground).
             int y = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, s.x() & 15, s.z() & 15);
             BlockState b = chunk.getBlockState(pos.set(s.x(), y, s.z()));
-            while (y > level.getMinBuildHeight() && (b.isAir() || !b.isCollisionShapeFullBlock(level, pos)) && b.getFluidState().isEmpty())
+            while (y > level.getMinBuildHeight()
+                    && (b.isAir() || b.is(BlockTags.LEAVES) || !b.isCollisionShapeFullBlock(level, pos))
+                    && b.getFluidState().isEmpty())
                 b = chunk.getBlockState(pos.set(s.x(), --y, s.z()));
             if (!b.getFluidState().isEmpty() || b.is(Blocks.SNOW_BLOCK) || b.is(Blocks.PACKED_ICE) || b.is(Blocks.BLUE_ICE))
                 continue;   // under water or under the ice cover: not this pass's surface

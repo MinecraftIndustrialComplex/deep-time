@@ -86,6 +86,11 @@ impl RockWorld {
                                     as i32,
                                 Depth::Floor => min_y,
                             };
+                            // A column whose ground lies below the world's floor (a deep trench)
+                            // has no rock at the floor: the evaluator's column ends below it.
+                            if y > top {
+                                continue;
+                            }
                             self.stack(&mut scratch, x, z, &mut stack);
                             row[px as usize] = self.class_at(x, y, z, &stack);
                         }
