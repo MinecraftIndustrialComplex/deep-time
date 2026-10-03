@@ -72,6 +72,8 @@ rm -f "$CL/game/mods/"*.jar
 cp "$SRV/mods/"*.jar "$CL/game/mods/"
 # Distant Horizons' update check opens an "update available" screen at the title screen, which
 # holds the client there instead of joining (seen 2026-10-03 with 3.3.1: 3.3.3 is out).
+# Minecraft's first-launch accessibility screen holds it the same way; the options file skips it.
+[ -f "$CL/game/options.txt" ] || printf 'onboardAccessibility:false\nskipMultiplayerWarning:true\njoinedFirstServer:true\nsoundCategory_master:0.0\n' > "$CL/game/options.txt"
 DHC="$CL/game/config/DistantHorizons.toml"
 mkdir -p "$CL/game/config"
 if [ -f "$DHC" ]; then
