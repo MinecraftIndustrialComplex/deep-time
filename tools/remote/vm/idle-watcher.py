@@ -483,7 +483,7 @@ def main():
             text = "; ".join(reasons)
             # One line a minute; the full list is in LAST_BUSY (and --once).
             log(f"busy ({len(reasons)}): {text if len(text) <= 500 else text[:500] + ' …'}")
-            write(LAST_BUSY, f"{now_iso()} {text}\n")
+            write(LAST_BUSY, f"{now_iso()} busy:\n" + "".join(f"  {r}\n" for r in reasons))
             write(STATE, f"{now_iso()} busy: {text}\n")
         else:
             if idle_since is None:
