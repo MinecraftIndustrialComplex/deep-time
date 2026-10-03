@@ -110,6 +110,7 @@
   "deeptime.editor.field.collapse_time": "Mountain collapse time",
   "deeptime.editor.field.collapse_thickness": "Mountain root thickness after collapse",
   "deeptime.editor.field.collapse_reach": "Mountain collapse reach",
+  "deeptime.editor.field.crust_max": "Thickest continental crust",
   "deeptime.editor.field.arc_range_uplift": "Arc mountain uplift",
   "deeptime.editor.field.arc_range_width": "Arc mountain width",
   "deeptime.editor.field.arc_range_height": "Arc mountain height",

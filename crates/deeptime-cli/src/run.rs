@@ -254,10 +254,11 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
             .unwrap_or(0.0)
     };
     Some(format!(
-        "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
+        "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} foundered_km3={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
         deeptime_core::plates::stats::summary(st).line(),
         global(collapse::MOVED_GLOBAL),
         global(collapse::GAINED_GLOBAL),
+        global(collapse::FOUNDERED_GLOBAL),
         q(0.1),
         q(0.5),
         q(0.9),

@@ -221,7 +221,13 @@ impl PlatesStage {
             shortening::advance(st, &cache.geo, &pos, &tree, &env, resolved.seeds);
         belts::stack(st, &cache.geo, &pos, &env, &fronts, flexure.as_deref());
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
-        // Thickened crust that nothing raises any more spreads and gives its area back.
+        // Crust beyond the thickest column goes down; thickened crust that nothing raises any
+        // more spreads and gives its area back.
+        let foundered = collapse::founder(st, &env);
+        *world
+            .globals
+            .entry(collapse::FOUNDERED_GLOBAL.to_owned())
+            .or_insert(0.0) += foundered / 1000.0;
         let fell = collapse::step(st, &cache.geo, &env);
         *world
             .globals
