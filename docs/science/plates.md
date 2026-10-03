@@ -10,8 +10,8 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 |---|---|---|
 | [PLT](ledger/PLT.md) | plate setup | PLT-001 to PLT-021, PLT-203, PLT-205, PLT-209 to PLT-211 (26) |
 | [PLT](ledger/PLT.md) | plate motion | PLT-022 to PLT-028 (7) |
-| [PLT](ledger/PLT.md) | subduction | PLT-029 to PLT-067, PLT-206 to PLT-207, PLT-238 to PLT-240 (44) |
-| [PLT](ledger/PLT.md) | collisions | PLT-068 to PLT-081, PLT-222 to PLT-237 (30; PLT-069 to PLT-075 and PLT-227 retired 2026-10-02) |
+| [PLT](ledger/PLT.md) | subduction | PLT-029 to PLT-067, PLT-206 to PLT-207, PLT-229, PLT-251 to PLT-252 (44) |
+| [PLT](ledger/PLT.md) | collisions | PLT-068 to PLT-081, PLT-222 to PLT-227, PLT-241 to PLT-250 (30; PLT-069 to PLT-075 and PLT-227 retired 2026-10-02) |
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
 | [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212 (18) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
@@ -39,7 +39,7 @@ Rows by status (after plate tasks 3 and 4, 2026-10-02): `verified` 17, `cited-un
 
 ## Collision belts, the wedge and the weld (plate tasks 3 and 4)
 
-Built 2026-10-02 (ledger PLT-228 to PLT-240; rows changed: PLT-029, PLT-030, PLT-038, PLT-053, PLT-068, PLT-078 to
+Built 2026-10-02 (ledger PLT-241 to PLT-252; rows changed: PLT-029, PLT-030, PLT-038, PLT-053, PLT-068, PLT-078 to
 PLT-080, PLT-192, PLT-202; retired: PLT-069 to PLT-075, PLT-227). This is the first of two stages: it runs on
 today's speed rules for plates, which a balance of forces is to replace (`docs/design/plate-force-balance.md`).
 
@@ -64,28 +64,28 @@ sinking plate standing at the overriding plate's edge and converging, PLT-224):
 
 1. The crust that crossed the front this step (the convergence across it times the step, times
    the front's length) times its own thickness is the volume to place. `collision_stacking_share`
-   (0.5, PLT-229; no source gives a measured share) of it stays in the crust; the rest goes down
+   (0.5, PLT-242; no source gives a measured share) of it stays in the crust; the rest goes down
    with the slab. Thickened crust raises the ground by one 5.5th of its thickness (Airy, PLT-121).
-2. The wedge takes its part first (PLT-231): continental ground on the arriving plate is raised to
+2. The wedge takes its part first (PLT-244): continental ground on the arriving plate is raised to
    the profile that rises from the foreland towards the front at `wedge_slope_deg` (1.5°, PLT-192)
    up to the overriding plate's height at the front.
-3. The belt takes the rest (PLT-228, PLT-230): spread over `collision_belt_km` (400 km) behind the
+3. The belt takes the rest (PLT-241, PLT-243): spread over `collision_belt_km` (400 km) behind the
    front, highest at the front. Nothing caps it. Crust that stands above its strength height
    spreads in the surface stage into a plateau; erosion wears it down.
-4. Belt and wedge are stamped as a collision orogeny (the `collision` regime, PLT-079, PLT-234), and
-   the stacked rock is the consumed crust's own rock, its sediments metamorphosed (PLT-235).
+4. Belt and wedge are stamped as a collision orogeny (the `collision` regime, PLT-079, PLT-247), and
+   the stacked rock is the consumed crust's own rock, its sediments metamorphosed (PLT-248).
 5. The surface stage's flexure (`flexure.md`) carries the uplift as a load: the stiff arriving
    plate bends down in front of the weak young wedge into the foreland basin, which the surface
    stage fills.
-6. The belt resists (PLT-232): the convergence across the front loses, over the speed rules' own
+6. The belt resists (PLT-245): the convergence across the front loses, over the speed rules' own
    relaxation time, up to `collision_resistance_mm_yr` (200 mm/yr, calibrated) × (the belt's height ÷ the strength height)
    × (the front's length ÷ the slab front that pulls the arriving plate, at most 1). A plate pulled
    by a long slab elsewhere keeps converging and widens its belt; a plate with no slab elsewhere
    stops once its belt stands about 2 km high. Continental crust at a front does not pull (only
-   oceanic slabs do, PLT-239), and a continent at a front is not dragged down to trench depth (PLT-240).
+   oceanic slabs do, PLT-251), and a continent at a front is not dragged down to trench depth (PLT-252).
 7. When the convergence has stayed below `weld_speed_mm_yr` (5 mm/yr) for `weld_after_myr`
-   (10 Myr), a continent welds its plate to the other and the larger plate keeps its id (PLT-233,
-   PLT-237). A terrane smaller than `collision_suture_frac` moves alone to the overriding plate once
+   (10 Myr), a continent welds its plate to the other and the larger plate keeps its id (PLT-246,
+   PLT-250). A terrane smaller than `collision_suture_frac` moves alone to the overriding plate once
    the collision has shortened by `collision_threshold_km` (PLT-068) or stalled.
 
 Until these tasks every collision lifted everything within up to 2,000 km of the contact by the

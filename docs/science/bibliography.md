@@ -1781,7 +1781,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Reference: Mouthereau, F., Tensi, J., Bellahsen, N., Lacombe, O., De Boisgrollier, T. & Kargar, S. (2007). Tertiary sequence of deformation in a thin-skinned/thick-skinned collision belt: The Zagros Folded Belt (Fars, Iran). Tectonics 26(5):TC5006.
 - DOI or URL: 10.1029/2007TC002098
 - Cited as: "Mouthereau, Tensi, Bellahsen, Lacombe, De Boisgrollier & Kargar 2007, Tectonics 26:TC5006"
-- Ledger ids: DEF-001, DEF-005, PLT-228, PLT-229 (plate tasks 3 and 4: "the 200-km-width ZFB"; underplating of Arabian crust "represents 75% of the total shortening", abstract)
+- Ledger ids: DEF-001, DEF-005, PLT-241, PLT-242 (plate tasks 3 and 4: "the 200-km-width ZFB"; underplating of Arabian crust "represents 75% of the total shortening", abstract)
 - Access: paywalled (abstract only)
 - Library (the project's source library, not distributed): not fetched. Reason: no copy could be fetched: html not the work (title match 0.00, 1010 chars).
 - Substitute: none found.
@@ -1934,7 +1934,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Reference: Schmalholz, S. M. & Mancktelow, N. S. (2016). Folding and necking across the scales: a review of theoretical and experimental results and their applications. Solid Earth 7:1417-1465.
 - DOI or URL: 10.5194/se-7-1417-2016 (open access)
 - Cited as: "Schmalholz & Mancktelow 2016, Solid Earth 7:1417-1465, eq. 13" (added to the code in WP-8)
-- Ledger ids: DEF-002, PLT-232 (plate tasks 3 and 4: the Himalaya-Tibet force of about 7 x 10^12 N/m, Molnar & Lyon-Caen 1988 as cited, text lines 1370-1373)
+- Ledger ids: DEF-002, PLT-245 (plate tasks 3 and 4: the Himalaya-Tibet force of about 7 x 10^12 N/m, Molnar & Lyon-Caen 1988 as cited, text lines 1370-1373)
 - Access: open access
 - Library: fetched WP-8 2026-10-02 (PDF, 49 pages, text layer). Text files: Schmalholz2016.txt, Schmalholz2016_raw.txt (printed page = PDF page + 1416).
 - Read in WP-8 (2026-10-02): full text for the passages used. Eq. (13), p. 1422: "Ld = 2π H (R/6)^(1/3) ... the dominant wavelength is directly proportional to the layer thickness ... first derived by Biot (1957)", Ramberg 1962 identical (p. 1423); p. 1425: lower limit of wavelength to thickness about 4; p. 1442: "common wavelength to thickness ratios are between 2 and 16 with a mean value at ∼ 6.5 (e.g. Hudleston and Treagus, 2010)"; p. 1434: a multilayer of m equal layers raises the wavelength by m^(1/3) (Biot 1961); eq. (32), p. 1436: Ld = 1.9 √(H Htot); pp. 1430-1433: linear theory good to about 20 % shortening and 25° limbs.
@@ -2157,7 +2157,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Reference: Alavi, M. (2007). Structures of the Zagros fold-thrust belt in Iran. American Journal of Science 307(9):1064-1095.
 - DOI or URL: 10.2475/09.2007.02
 - Cited as: not cited by the code; added as evidence for the belt width (STR-030, DEF-027).
-- Ledger ids: DEF-027, STR-030; notes: evidence only, PLT-228 (plate tasks 3 and 4: the Zagros fold-thrust belt "an average width of ~300 km", p. 1068, as an Earth comparison for the belt width)
+- Ledger ids: DEF-027, STR-030; notes: evidence only, PLT-241 (plate tasks 3 and 4: the Zagros fold-thrust belt "an average width of ~300 km", p. 1068, as an Earth comparison for the belt width)
 - Access: paywalled (abstract only)
 - Library (the project's source library, not distributed): fetched (PDF, 39 pages, text layer, 97,543 characters). From: https://ajsonline.org/article/65872.pdf. Text file: Alavi2007.txt.
 - Substitute: repository or open copy found by the lookups and saved as above (version not stated: the first pages were matched against the title, not compared with the printed version).
@@ -3977,7 +3977,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Copley, A., Avouac, J.-P., Royer, J.-Y. (2010). India-Asia collision and the Cenozoic slowdown of the Indian plate: implications for the forces driving plate motions. Journal of Geophysical Research 115(B3):B03410.
 - DOI or URL: 10.1029/2009JB006634.
 - Cited as: "Copley, Avouac & Royer 2010, JGR 115:B03410".
-- Ledger ids: PLT-154, PLT-177, PLT-200, PLT-232 (plate tasks 3 and 4: India-Asia convergence from about 15 to about 4 cm/yr, thickening of Tibet the dominant cause; abstract)
+- Ledger ids: PLT-154, PLT-177, PLT-200, PLT-245 (plate tasks 3 and 4: India-Asia convergence from about 15 to about 4 cm/yr, thickening of Tibet the dominant cause; abstract)
 - Access: paywalled (abstract only; Wiley).
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Substitute: none found.
@@ -4074,7 +4074,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Nocquet, J.-M., Sue, C., Walpersdorf, A., Tran, T., Lenôtre, N., Vernant, P., Cushing, M., Jouanne, F., Masson, F., Baize, S., Chéry, J., van der Beek, P. A. (2016). Present-day uplift of the western Alps. Scientific Reports 6:28404.
 - DOI or URL: 10.1038/srep28404 (open access).
 - Cited as: "Nocquet et al. 2016, Sci. Rep. 6:28404".
-- Ledger ids: PLT-180, PLT-229 (plate tasks 3 and 4: "as much as 280 km of shortening was accommodated by underthrusting of the European margin")
+- Ledger ids: PLT-180, PLT-242 (plate tasks 3 and 4: "as much as 280 km of shortening was accommodated by underthrusting of the European margin")
 - Access: open access.
 - Library (the project's source library, not distributed): fetched (HTML page, 27,074 characters of text). From: https://doi.org/10.1038/srep28404. Text file: Nocquet2016.txt.
 - Read so far (by the project): abstract-only status.
@@ -4213,7 +4213,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: DeCelles, P. G., Giles, K. A. (1996). Foreland basin systems. Basin Research 8(2):105-123.
 - DOI or URL: (PLT) 10.1046/j.1365-2117.1996.01491.x. (ISO) 10.1046/j.1365-2117.1996.01491.x; full text https://pages.uoregon.edu/rdorsey/BasinAnalysis/BasinPapers/DeCelles%20&%20Giles%201996.pdf
 - Cited as: (PLT) "DeCelles & Giles 1996, Basin Research 8:105-123" ("via a secondary source"). (ISO) docs/design/flexure.md section 11
-- Ledger ids: PLT-194; none (the acceptance figures of docs/design/plate-force-balance.md); notes: the acceptance figures of docs/design/plate-force-balance.md, PLT-236 (plate tasks 3 and 4: foredeeps 100-300 km wide and 2-8 km thick, forebulges 60-470 km, for the foreland measure)
+- Ledger ids: PLT-194; none (the acceptance figures of docs/design/plate-force-balance.md); notes: the acceptance figures of docs/design/plate-force-balance.md, PLT-249 (plate tasks 3 and 4: foredeeps 100-300 km wide and 2-8 km thick, forebulges 60-470 km, for the foreland measure)
 - Access: open copy. [other sections: paywalled (abstract visible).]
 - Library (the project's source library, not distributed): fetched (PDF, 19 pages, text layer, 79,621 characters). From: https://pages.uoregon.edu/rdorsey/BasinAnalysis/BasinPapers/DeCelles%20&%20Giles%201996.pdf. Text file: DeCellesGiles1996.txt.
 - Merged keys: DeCellesGiles1996_flexure
@@ -4314,7 +4314,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Davis, D., Suppe, J., Dahlen, F. A. (1983). Mechanics of fold-and-thrust belts and accretionary wedges. Journal of Geophysical Research 88(B2):1153-1172.
 - DOI or URL: 10.1029/JB088iB02p01153.
 - Cited as: "Davis, Suppe & Dahlen 1983, JGR 88:1153-1172" (from memory).
-- Ledger ids: PLT-192, PLT-231 (plate tasks 3 and 4: a critical wedge grows at constant taper; abstract)
+- Ledger ids: PLT-192, PLT-244 (plate tasks 3 and 4: a critical wedge grows at constant taper; abstract)
 - Access: paywalled (abstract only).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -4327,7 +4327,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Christensen, N. I., Mooney, W. D. (1995). Seismic velocity structure and composition of the continental crust: a global view. Journal of Geophysical Research 100(B6):9761-9788.
 - DOI or URL: 10.1029/95JB00259.
 - Cited as: not cited by the project; used here as a source for continental crust thickness and density.
-- Ledger ids: (none; supports 121, 122, 131); notes: none; supports 121, 122, 131, PLT-234 (plate tasks 3 and 4: mean continental crust 41.1 km, orogens 46.3 km; abstract)
+- Ledger ids: (none; supports 121, 122, 131); notes: none; supports 121, 122, 131, PLT-247 (plate tasks 3 and 4: mean continental crust 41.1 km, orogens 46.3 km; abstract)
 - Access: paywalled (abstract only).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -4397,7 +4397,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Li, Y., Liu, L., Li, S., Peng, D., Cao, Z., Li, X. (2024). Cenozoic India-Asia collision driven by mantle dragging the cratonic root. Nature Communications 15:6674.
 - DOI or URL: 10.1038/s41467-024-51107-0; https://pmc.ncbi.nlm.nih.gov/articles/PMC11303558/ (open).
 - Cited as: not cited by the project; used as an open secondary source that cites Turcotte & Schubert for force orders of magnitude.
-- Ledger ids: (supports 183, 187); notes: supports 183, 187, PLT-232 (plate tasks 3 and 4: "the late-Cenozoic resistance force due to the gravitational potential energy (GPE) of the Himalayas and Tibetan Plateau ranges from 3 x 10^12 N m-1 to 8 x 10^12 N m-1", text line 111; read for that sentence)
+- Ledger ids: (supports 183, 187); notes: supports 183, 187, PLT-245 (plate tasks 3 and 4: "the late-Cenozoic resistance force due to the gravitational potential energy (GPE) of the Himalayas and Tibetan Plateau ranges from 3 x 10^12 N m-1 to 8 x 10^12 N m-1", text line 111; read for that sentence)
 - Access: open access.
 - Library (the project's source library, not distributed): fetched (HTML page, 60,549 characters of text). From: https://doi.org/10.1038/s41467-024-51107-0. Text file: Li2024.txt.
 - Read so far (by the project): not read.
@@ -5545,8 +5545,8 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 
 ### Ducea2001
 - Reference: Ducea, M. (2001). The California arc: thick granitic batholiths, eclogitic residues, lithospheric-scale thrusting, and magmatic flare-ups. GSA Today 11(11):4-10.
-- Cited as: "Ducea 2001, GSA Today" (plate tasks 3 and 4, ledger PLT-229)
-- Ledger ids: PLT-229
+- Cited as: "Ducea 2001, GSA Today" (plate tasks 3 and 4, ledger PLT-242)
+- Ledger ids: PLT-242
 - Access: open (GSA Today)
 - Library (the project's source library, not distributed): Ducea2001.pdf, Ducea2001.txt.
 - Read in plate tasks 3 and 4 (2026-10-02): the passage on crustal thickness, p. 5: "The present crust beneath the Sierra Nevada is thin (33 km thick ...) and is probably an effect of Late Cenozoic extension and delamination"; "the Mesozoic crust was at least ~70 km thick". Used only as evidence that thickened crust can lose its root, not for a number in the code.

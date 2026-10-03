@@ -140,7 +140,7 @@ pub fn collide(
     // other sides, and those margins stay passive): the two plates are one from now on, and the
     // larger keeps its id. A smaller terrane moves alone to the overriding plate (an island arc
     // or a microcontinent accretes and subduction steps outboard of it).
-    // ledger: PLT-237 (the larger plate keeps its id).
+    // ledger: PLT-250 (the larger plate keeps its id).
     let (keep, die) = if suture && under_samples > over_samples {
         (under, over)
     } else {

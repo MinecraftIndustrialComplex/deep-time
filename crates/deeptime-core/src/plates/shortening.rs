@@ -386,7 +386,7 @@ pub fn step_collision(
     c.centroid = f.centroid().to_array();
     c.normal = f.normal().to_array();
     c.continental_over = f64::from(f.continental_over) / f64::from(f.samples);
-    // ledger: PLT-233 (the stall that welds: below `weld_speed_mm_yr`, timed from its first step).
+    // ledger: PLT-246 (the stall that welds: below `weld_speed_mm_yr`, timed from its first step).
     if conv < clock.stall_mm_yr {
         c.stalled_since_myr.get_or_insert(clock.t_myr);
     } else {
@@ -441,7 +441,7 @@ pub fn advance(
             Change::None | Change::Continued => {}
         }
     }
-    // ledger: PLT-068 (the threshold, for terrane transfers), PLT-233 (the weld on stall).
+    // ledger: PLT-068 (the threshold, for terrane transfers), PLT-246 (the weld on stall).
     let threshold = env.k.collision_threshold_km;
     let mut fired = Vec::new();
     for (k, c) in state.contacts.iter().enumerate() {
