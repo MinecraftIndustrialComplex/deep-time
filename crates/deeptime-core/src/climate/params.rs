@@ -47,6 +47,17 @@ impl PresentClimate {
     }
 }
 
+/// Which climate model computes a snapshot (`climate.model`; P1-26).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClimateModel {
+    /// Temperature and sea ice per cell of a 2-D coarse grid (`ebm2d.rs`, `ocean2d.rs`).
+    #[default]
+    PerCell,
+    /// The zonal model: one temperature and sea ice per latitude band (kept for comparison).
+    Banded,
+}
+
 /// The climate section.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
@@ -54,6 +65,23 @@ pub struct ClimateParams {
     /// A full climate snapshot every this many Myr (plan §8.3: 10), plus the first and the last
     /// plate step; between snapshots the climate's geographic part moves with the plates.
     pub snapshot_every_myr: f64,
+
+    // --- The per-cell climate (P1-26; `docs/design/p1-26-per-cell-climate.md`).
+    /// `per_cell` (the 2-D energy balance on a coarse grid) or `banded` (the zonal model).
+    pub model: ClimateModel,
+    /// Columns of the per-cell climate's coarse grid (rows: half); a coarse cell is a block of
+    /// L1 cells, so the count is rounded to a divisor of L1's width.
+    pub grid_columns: u32,
+    /// Scales the surface-dependent atmospheric diffusivity (`ebm2d::D_*`, the sources' total
+    /// transport) down to the atmosphere's own share (calibrated against its 5.0 PW at 43°N).
+    pub atmosphere_diffusivity_scale: f64,
+    /// East–west against north–south heat diffusion in the per-cell climate.
+    pub zonal_diffusivity_ratio: f64,
+    /// The share of the low-level wind's speed at which the boundary layer's heat moves along a
+    /// row (coastal mildness carried inland; 0: none).
+    pub wind_heat_transport: f64,
+    /// Planetary albedo added over desert (Köppen B land at the previous snapshot).
+    pub desert_albedo: f64,
 
     // --- The seasonal energy-balance model (climlab `EBM_seasonal`, MIT; `ebm.rs`).
     /// Solar constant at 1 AU, W/m² (climlab's `const.S0`); × `planet.star_flux_rel`.
@@ -321,6 +349,12 @@ impl Default for ClimateParams {
     fn default() -> Self {
         ClimateParams {
             snapshot_every_myr: 10.0,
+            model: ClimateModel::PerCell,      // ledger: CLM-175
+            grid_columns: 128,                 // ledger: CLM-119
+            atmosphere_diffusivity_scale: 1.0, // ledger: CLM-176
+            zonal_diffusivity_ratio: 0.5,      // ledger: CLM-121
+            wind_heat_transport: 0.5,          // ledger: CLM-125
+            desert_albedo: 0.08,               // ledger: CLM-123
             solar_constant_w_m2: 1365.2,
             olr_a_w_m2: 203.3,
             olr_b_w_m2_k: 2.09,
@@ -434,6 +468,33 @@ impl ClimateParams {
     pub fn validate(&self) -> Result<(), CoreError> {
         let pos = |v: f64, key: &str| check(v.is_finite() && v > 0.0, key, "must be > 0");
         pos(self.snapshot_every_myr, "snapshot_every_myr")?;
+        check(
+            (16..=720).contains(&self.grid_columns),
+            "grid_columns",
+            "must be in [16, 720]",
+        )?;
+        for (v, key, lo, hi) in [
+            (
+                self.atmosphere_diffusivity_scale,
+                "atmosphere_diffusivity_scale",
+                0.0,
+                5.0,
+            ),
+            (
+                self.zonal_diffusivity_ratio,
+                "zonal_diffusivity_ratio",
+                0.0,
+                2.0,
+            ),
+            (self.wind_heat_transport, "wind_heat_transport", 0.0, 2.0),
+            (self.desert_albedo, "desert_albedo", 0.0, 0.3),
+        ] {
+            check(
+                v.is_finite() && (lo..=hi).contains(&v),
+                key,
+                &format!("must be in [{lo}, {hi}]"),
+            )?;
+        }
         pos(self.solar_constant_w_m2, "solar_constant_w_m2")?;
         pos(self.olr_b_w_m2_k, "olr_b_w_m2_k")?;
         check(
