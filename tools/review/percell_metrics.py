@@ -17,7 +17,7 @@ changes). Land is where the Köppen class is not the sea's (31).
 - sea_ice_eta2: the same for the annual sea ice over the sea; ice_edge_std_n/_s: the standard
   deviation over longitudes of the most equatorward latitude whose (winter-maximum) cover is ≥ 0.5.
 - koppen_*: the main groups' land shares; koppen_longest_row_run_deg: the longest stretch of
-  longitude over which a class boundary follows one grid row (§7.4 item 4).
+  longitude over which a class boundary follows one grid row (§7.4 item 4), equatorward of 80°.
 - polar_*: the polar continent (land poleward of 60° in the hemisphere with more of it): its
   winter along-row std and the classes holding ≥ 5 % of it.
 """
@@ -121,9 +121,12 @@ def main():
         g = codes[c][0] if c < len(codes) else "?"
         groups[g] = groups.get(g, 0.0) + float(wgt[land & (k == c)].sum() / lw)
     out["koppen"] = {g: round(v, 3) for g, v in groups.items()}
-    # The longest run of a class boundary along one row (between row j and j + 1), degrees.
+    # The longest run of a class boundary along one row (between row j and j + 1), degrees; rows
+    # poleward of 80° are left out (the pole cap, where 90° of longitude is a few hundred km).
     longest = 0
     for j in range(h - 1):
+        if abs(lat1[j]) > 80.0:
+            continue
         diff = (k[j] != k[j + 1]) & land[j] & land[j + 1]
         run = best = 0
         for x in np.concatenate([diff, diff]):  # wraps
