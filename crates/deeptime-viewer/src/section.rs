@@ -194,8 +194,9 @@ pub fn write_sections(
         let file = format!("sections/section-{n}.png");
         crate::write_rgba_png(&dir.join(&file), s.w, s.h, &rgba)?;
         let c = f64::from(circumference);
-        let lat = |z: i64| -360.0 * z as f64 / c;
-        let lon = (360.0 * ((s.x as f64 + c / 2.0).rem_euclid(c)) / c).rem_euclid(360.0);
+        let proj = deeptime_format::Projection::of(c);
+        let lat = |z: i64| proj.lat_deg(z as f64);
+        let lon = proj.lon_deg(s.x as f64);
         let m_per_px_h = (s.z1 - s.z0).abs() as f64 * m_per_block.0 / f64::from(s.w);
         let m_per_px_v = f64::from(s.y1 - s.y0) * m_per_block.1 / f64::from(s.h);
         out.push(json!({

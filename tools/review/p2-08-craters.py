@@ -107,7 +107,8 @@ def main() -> None:
         box = [int(c["x"]) - 1, int(c["z"]) - 1, int(c["x"]) + 1, int(c["z"]) + 1]
         return float(heightmap(a.deeptime, a.world_data, box)[0, 0, 0]) > sea_y + 1
 
-    clear = [c for c in craters if abs(c["z"]) < circ / 4 - 3 * c["diameter_m"] / m_h - 32]
+    pole = circ / 4   # the z of the poles (deeptime_format::projection)
+    clear = [c for c in craters if abs(c["z"]) < pole - 3 * c["diameter_m"] / m_h - 32]
     showing = [c for c in clear if c["fate"] in ("fresh", "degraded")]
     showing_land = [c for c in showing if land(c)]
     picks: list[tuple[str, dict]] = []

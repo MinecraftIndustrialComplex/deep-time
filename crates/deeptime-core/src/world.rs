@@ -180,16 +180,13 @@ impl WorldState {
         Ok(id)
     }
 
-    /// Block (x, z) of a latitude and longitude on this planet: plan §5.2's longitude
-    /// 360°·(x + C/2)/C (the seam is 0°), so x = lon/360·C − C/2 (wrapped into [−C/2, C/2)) and
-    /// z = −lat/90·C/4.
+    /// Block (x, z) of a latitude and longitude on this planet (`deeptime_format::projection`),
+    /// rounded to whole blocks, x wrapped into [−C/2, C/2).
     pub fn block_of(&self, lat: f64, lon: f64) -> (i32, i32) {
-        let c = f64::from(self.circumference);
-        let x = (lon / 360.0 * c - c / 2.0).round() as i64;
+        let (x, z) = deeptime_format::Projection::new(self.circumference).block_of(lat, lon);
         let half = i64::from(self.circumference / 2);
-        let x = (x + half).rem_euclid(i64::from(self.circumference)) - half;
-        let z = (-lat / 90.0 * c / 4.0).round() as i64;
-        (x as i32, z as i32)
+        let x = (x.round() as i64 + half).rem_euclid(i64::from(self.circumference)) - half;
+        (x as i32, z.round() as i32)
     }
 }
 

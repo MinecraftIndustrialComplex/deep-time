@@ -28,6 +28,11 @@ Rows by status: `cited-unverified` 6, `calibrated` 2, `game-choice` 73, `uncited
 
 ## Known before the page is written
 
+- The projection (SCL-049, equirectangular) is computed in one module per language: Rust
+  `deeptime_format::projection`, Java `worlddata/Projection`, the pages' `projection.js`
+  (2026-10-02; `docs/design/equal-area-projection.md` §2). Ben reopened the choice of projection
+  on 2026-10-02; until he picks, the module is equirectangular and the worlds are what they were.
+
 - The preset's `pole_cap_deg` is read by nothing but validation; the game reads its own value from the world preset file (extraction notes SCL, flag 1).
 - A run may be set 4,600 Myr long while the planet's age defaults to 4.57 Gyr (flag 8).
 

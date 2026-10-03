@@ -19,6 +19,7 @@ public final class WorldDataTerrain implements TerrainSource {
     private volatile LavaRules lava;
     private volatile Magma magma;
     private volatile MagmaRules magmaRules;
+    private volatile SeaCliffGuard.Rules cliffRules;
     private volatile Geothermal geothermal;
     private volatile GeothermalRules geothermalRules;
 
@@ -60,6 +61,16 @@ public final class WorldDataTerrain implements TerrainSource {
         return l;
     }
 
+    /** The world's setting for the sea-cliff cave guard. */
+    public SeaCliffGuard.Rules cliffRules() {
+        SeaCliffGuard.Rules r = cliffRules;
+        if (r == null) {
+            r = SeaCliffGuard.Rules.of(data().manifest().notes());
+            cliffRules = r;
+        }
+        return r;
+    }
+
     /** The world's settings for lava at its volcanoes. */
     public MagmaRules magmaRules() {
         MagmaRules r = magmaRules;
@@ -87,8 +98,9 @@ public final class WorldDataTerrain implements TerrainSource {
                     var none = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Kind.NONE;
                     magma = Magma.build(wd.volcanoes().list(), magmaRules(), (x, z) -> wd.height(wrapX(x), z),
                             (x, z) -> com.minecraftindustrialcomplex.deeptime.worlddata.Water.column(wd, spec, wrapX(x), z).kind() != none,
-                            wd.circumference(), seaLevel, lava().floodY(minY, seaLevel), wd.manifest().mPerBlockH(),
-                            wd.manifest().mPerBlockV(), (int) (wd.circumference() / 4.0 * ref.poleCapDeg() / 90.0));
+                            wd.circumference(), seaLevel, lava().floodY(minY, seaLevel), minY, wd.manifest().mPerBlockH(),
+                            wd.manifest().mPerBlockV(),
+                            (int) Math.abs(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(wd.circumference(), ref.poleCapDeg())));
                     long lakes = magma.bodies().stream().filter(Magma.Body::lake).count();
                     long molten = magma.bodies().stream().filter(b -> b.chamberRh() > 0).count();
                     com.minecraftindustrialcomplex.deeptime.DeepTime.LOGGER.info(
@@ -133,8 +145,8 @@ public final class WorldDataTerrain implements TerrainSource {
                             new GeothermalEnv(wd), wd.circumference(), seaLevel, wd.manifest().mPerBlockH());
                     int[] n = geothermal.counts();
                     com.minecraftindustrialcomplex.deeptime.DeepTime.LOGGER.info(
-                            "[deeptime] geothermal: {} sites from {} active volcanoes: {} pools, {} vents, {} patches of altered ground ({} ms; {})",
-                            geothermal.sites().size(), wd.volcanoes().list().size(), n[0], n[1], n[2],
+                            "[deeptime] geothermal: {} sites ({} from hot ground) from {} active volcanoes: {} pools, {} vents, {} patches of altered ground ({} ms; {})",
+                            geothermal.sites().size(), geothermal.heatFlowSites(), wd.volcanoes().list().size(), n[0], n[1], n[2],
                             (System.nanoTime() - t0) / 1_000_000L, geothermalRules());
                 }
                 g = geothermal;

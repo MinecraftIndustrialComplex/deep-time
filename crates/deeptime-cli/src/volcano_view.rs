@@ -50,7 +50,7 @@ impl Ctx<'_> {
     fn cell(&self, x: f64, z: f64) -> (i64, i64) {
         (
             ((x + self.c / 2.0) / self.r).round() as i64,
-            ((z + self.c / 4.0) / self.r).round() as i64,
+            ((z + deeptime_format::Projection::of(self.c).pole_z()) / self.r).round() as i64,
         )
     }
 }
@@ -289,7 +289,8 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
     let (pw, ph) = (prev.grid.w as usize, prev.grid.h as usize);
     let pr = f64::from(prev.grid.r);
     let mut map = shade(&prev.data, pw, ph, 1, &ctx, pr * s.m_per_block_h);
-    let to_px = |x: f64, z: f64| ((x + ctx.c / 2.0) / pr, (z + ctx.c / 4.0) / pr);
+    let pole = deeptime_format::Projection::of(ctx.c).pole_z();
+    let to_px = |x: f64, z: f64| ((x + ctx.c / 2.0) / pr, (z + pole) / pr);
     let mut settings = vec![0u8; pw * ph * 4];
     {
         // Settings: grey land/sea from the map, the arc flux of the last frame with arcs, plumes.
@@ -315,9 +316,9 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
                 for j in 0..ph {
                     for i in 0..pw {
                         let x = -ctx.c / 2.0 + i as f64 * pr;
-                        let z = -ctx.c / 4.0 + j as f64 * pr;
+                        let z = -pole + j as f64 * pr;
                         let ci = ((x + ctx.c / 2.0) / r1).round() as usize % w1;
-                        let cj = (((z + ctx.c / 4.0) / r1).round() as usize).min(g1.h as usize - 1);
+                        let cj = (((z + pole) / r1).round() as usize).min(g1.h as usize - 1);
                         let a = f64::from(f[cj * w1 + ci]).min(1.0);
                         if a > 0.0 {
                             put(

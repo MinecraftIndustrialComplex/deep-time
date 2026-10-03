@@ -15,7 +15,7 @@
     "circumference_blocks": 16384,
     "m_per_block_h": 300.0,
     "m_per_block_v": 20.0,
-    "min_y": -352,
+    "min_y": -512,
     "max_y": 639,
     "sea_level_y": 63,
     "pole_cap_deg": 75.0,
@@ -52,10 +52,12 @@
     "count_mult": 1.0,
     "size_mult": 1.0,
     "richness_mult": 1.0,
+    "scatter_mult": 0.5,
     "province": "strong",
     "province_km": 800.0,
     "brine_flow_km": 600.0,
-    "inherited_bif_share": 0.0,
+    "inherited_bif_share": 0.05,
+    "bif_basin_km2": 100000.0,
     "types": [],
     "essentials": []
   },
@@ -122,7 +124,7 @@
     "arc_width_km": 60.0,
     "arc_uplift_mm_yr": 0.6,
     "arc_magma_m_per_myr": 20.0,
-    "arc_continental_m": 80.0,
+    "arc_maturity_myr": 20.0,
     "cordillera_uplift_mm_yr": 0.3,
     "cordillera_width_km": 120.0,
     "cordillera_height_m": 3000.0,
@@ -320,6 +322,7 @@
       "strength": 1.0,
       "density": 1.0,
       "size": 1.0,
+      "true_height_share": 0.26666666666666666,
       "fold_wavelength_km": [
         16.0,
         8.0,
@@ -344,7 +347,7 @@
       "strike_slip_rate_km2_myr": 4e-06,
       "foreland_km": 250.0,
       "max_overlap": 3,
-      "relief": 1.0,
+      "relief": 0.25,
       "relief_age_myr": 10.0,
       "relief_wear": 5.0,
       "fold_relief": 0.5,
@@ -361,6 +364,15 @@
         15.0,
         5.0,
         50.0
+      ],
+      "dyke_half_width_blocks": [
+        0.85,
+        1.5
+      ],
+      "plug_radius_share": 0.08,
+      "plug_radius_blocks": [
+        2.0,
+        5.0
       ]
     }
   },
@@ -447,11 +459,18 @@
     "magma_chamber_depth_km": 3.0,
     "magma_chamber_size": 1.0,
     "crater_lake_share": 0.25,
+    "magma_lens_count": 24,
+    "magma_lens_spacing_blocks": 28.0,
+    "magma_lens_width": 1.5,
+    "magma_mush_width": 1.0,
     "remove_lava_features": true,
+    "sea_cliff_skin_blocks": 6,
     "geothermal_density": 1.0,
     "geothermal_reach": 1.0,
     "geothermal_size": 1.0,
-    "geothermal_spring_min_precip_mm": 400.0
+    "geothermal_spring_min_precip_mm": 400.0,
+    "geothermal_heat_flow_min_mw_m2": 100.0,
+    "geothermal_heat_density": 1.0
   },
   "provinces": {
     "min_area_km2": 50000.0,
@@ -460,7 +479,7 @@
     "andean_min_elevation_m": 1500.0
   },
   "impacts": {
-    "flux": 1.0,
+    "flux": 3.0,
     "size_slope": 1.8,
     "min_crater_km": 2.0,
     "max_crater_km": 300.0,

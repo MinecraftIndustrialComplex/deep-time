@@ -74,6 +74,10 @@ public final class MagmaProbe {
                 e.addProperty("chamberRv", b.chamberRv());
                 e.addProperty("chamberBlocks", b.chamberBlocks());
                 e.addProperty("conduitTop", b.conduitTop());
+                e.addProperty("lenses", b.lensCount());
+                e.addProperty("columnBlocks", b.columnBlocks());
+                e.addProperty("bodyBottomY", b.minY());
+                e.addProperty("reach", b.reach());
             }
             e.addProperty("lake", b.lake());
             if (b.lake()) {
@@ -93,7 +97,7 @@ public final class MagmaProbe {
 
         // What it means for a player: land columns drawn evenly over the playable planet.
         int c = t.circumference();
-        int zMax = (int) (c / 4 * (75.0 / 90.0));   // inside the pole cap's soft line
+        int zMax = (int) Math.abs(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(c, 75.0));   // inside the pole cap's soft line
         SplittableRandom rnd = new SplittableRandom(20261001L);
         double[] toLake = new double[POINTS], toVolcano = new double[POINTS], down = new double[POINTS], any = new double[POINTS];
         int n = 0;

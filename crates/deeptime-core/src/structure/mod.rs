@@ -584,6 +584,7 @@ impl StructureStage {
             let inputs = deform::Inputs {
                 grid: &grid,
                 m_per_block_h: s.m_per_block_h,
+                m_per_block_v: s.m_per_block_v,
                 regime: reg,
                 crust_type: crust,
                 flags,
@@ -865,18 +866,21 @@ impl StructureStage {
         let mut fr = vec![0.0f32; n * hc.max(1)];
         let p = &self.p;
         let t = &self.tables;
-        // BIF inherited in the cratons' basement (`deposits::clocks`): the basement is its host.
-        let bif_share =
-            crate::deposits::clocks::Epoch::of_preset(&self.preset).inherited_bif_share() as f32;
+        // BIF inherited in the basement of the iron-formation basins under a stable interior
+        // (`deposits::bif_basins`, `deposits::clocks`): the basement is its host there.
+        let bif_window =
+            crate::deposits::clocks::Epoch::of_preset(&self.preset).inherited_bif_window() as f32;
+        let basin = &src.surface.bif_basin;
         let bif_slot =
             self.slot[usize::from(crate::surface::lithology::index("banded_iron_formation"))];
         fr.par_chunks_mut(hc.max(1))
             .enumerate()
             .for_each_init(Vec::new, |units, (c, out)| {
                 columns::build(&src.cell(c), t, p, src.now_myr, window, units);
+                let share = basin.get(c).map_or(0.0, |&b| b * bif_window);
                 let inherited =
-                    (bif_share > 0.0 && bif_slot != usize::MAX && src.regime(c) == regime::CRATON)
-                        .then_some((bif_slot, bif_share));
+                    (share > 0.0 && bif_slot != usize::MAX && src.regime(c) == regime::CRATON)
+                        .then_some((bif_slot, share));
                 hosts::fractions_inherited(units, window, &self.slot, inherited, out);
             });
         // Plutons take their share of the window from what was there.
@@ -970,8 +974,13 @@ impl StructureStage {
             .map(|f| f.data.as_slice())
             .filter(|v| v.len() == n);
         // The world's own folds and faults, where it has any (P2-01).
-        let structural = (from == TrapSource::Configured && p.deformation.enabled())
-            .then(|| traps::structural(&self.st.features, &src.grid));
+        let structural = (from == TrapSource::Configured && p.deformation.enabled()).then(|| {
+            let s = &self.preset.scale;
+            let x = p
+                .deformation
+                .block_stretch(s.m_per_block_h, s.m_per_block_v);
+            traps::structural(&self.st.features, &src.grid, x)
+        });
         // Distances on the plate model's Earth-sized sphere, as `fold_belt_km` is given: the
         // orogen distance is km on the block metric (300 m a block), and a planet 16,384 blocks
         // round is about an eighth of the Earth's size on it.
