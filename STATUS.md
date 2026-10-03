@@ -8435,3 +8435,84 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
 - The plan is at revision 2 plus a partial revision 3 (the decisions-log rule in §1.2). The 29 gaps of
   docs/plan-reviews/2026-09-28-cold-read-review-2.md are fixed in the plan by the task that hits each
   one; the build log names each fix as it lands.
+
+### 2026-10-02 — Crust-deep magma system; no arches in underwater sea cliffs (agent worktree agent-ae5dd76f2542ab9e7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; taken over from a stopped agent; not merged)
+- **Ask.** Ben, decisions log 2026-10-02, "Crust-deep magma system (Recommended)" ("the amount of lava inside of them is
+  truly pathetic. It just ends after ~100 blocks down???"), and his report of arches cut into the underwater base of the
+  sea cliffs beside a volcano (run 1a0fb48c797, box x 6978..7233, z −2153..−1898).
+- **Built: the column** (`worldgen/Magma.Deep`, `MagmaPass`, `MagmaPalette`; ledger MAG-043 to MAG-056; FORMAT.md "Active
+  volcanoes and their magma"). Under each active volcano's chamber: up to 24 lava lenses 28 blocks apart (the first 0.8
+  spacings under the chamber), flattened ellipsoids (half-height 0.2 of the radius, 2 to 5 blocks), the lowest 2.2 times
+  as wide as the highest and sitting 2 blocks over the lava floor, joined by plus-shaped conduit segments, set in a body of
+  altered hot rock (`minecraft:basalt` behind `#deeptime:magma/mush`, fallback tag `#deeptime:magma_fallback/mush`; one
+  block in 25 `minecraft:magma_block`, `/hot`). Why basalt: the seal is smooth basalt and the pack's basalt and gabbro
+  classes resolve to it, so the mush needed a block of its own that reads as dark hot rock, is mined like stone and is no
+  ore host. Radius follows kind (shield 1.4, arc 1.0, silicic 0.9 of the chamber's, whose silicic chambers are 1.6 times
+  larger), size (the chamber's) and activity (0.7 to 1). The bottom is read from the level's `min_y`
+  (`WorldDataTerrain.magma` now passes it; before this session's fix it passed lava floor − 10), so −512 works when it
+  lands. Lava obeys the old guarantees: decided once per level from the list and terrain, in the carving masks, sealed
+  with basalt within 1.5 blocks, never within 8 blocks of the ground above, dead volcanoes nothing.
+- **Settings** (all eight presets, editor section "Advanced · Lava and magma", lang keys, Rust validation):
+  `magma_lens_count` 24 (0 = no column), `magma_lens_spacing_blocks` 28, `magma_lens_width` **1.5**, `magma_mush_width` 1.0,
+  and for the carver finding `sea_cliff_skin_blocks` 6 (0 = off). The width default is 1.5 because 1.0 gave a median arc
+  volcano only 2.8 times its old lava.
+- **Lava per volcano** (blocks of lava; MIC set, same seed −2880253852422057465, `tools/workbench/lava_stats.py` on the
+  preview exports, jobs `ae5dd-before-mic` = lens count 0 and mush 0, `ae5dd-after-t`):
+
+  | Volcano | Before | After | Times |
+  |---|---|---|---|
+  | arc stratovolcano under the sea, box 2 (−1295..−1040, 813..1068) | 4,769 | 21,196 | 4.4 |
+  | shield with a crater lake, box 3 (7908..8163, −403..−148) | 43,060 | 423,171 | 9.8 |
+  | volcano beside the cliff, box 1 | 10,654 | 83,228 | 7.8 |
+  | median arc volcano of the planet (121 with magma, builder's volumes: chamber and conduit against all) | 3,680 | 18,419 | 5.0 |
+  | median shield of the planet (5) | 43,357 | 344,409 | 7.9 |
+  | the planet | 0.95 M | 5.7 M | 6 |
+
+  Each box has one connected body of lava, 0 faces on water, and 13 faces on air in the shield's box (the lake's surface).
+  Block census (shield box, within 90 blocks of the summit): 423,171 lava, 2,937,061 basalt, 123,718 magma blocks
+  (smooth basalt 8.9 M → 5.8 M: the mush replaces rock). Pictures: `review/out/magma/{arc,shield}-{before-mic,after-t}.png`
+  (section through the summit, 1 block = 3 px, lava orange, mush dark with red magma blocks; not committed).
+- **The carver finding.** Same box, same seed, MIC set, four configurations (`tools/workbench/cave_stats.py`: open space
+  under a solid block of its column, split into connected bodies, counting those that touch water or air that has no
+  rock above it, i.e. the open sea):
+
+  | Configuration | Caves open to the open sea (blocks, bodies) | Open space under ground (air + water) |
+  |---|---|---|
+  | before (this session's start) | 157,646 in 318 | 320,379 |
+  | guard off | 157,664 in 319 | 319,895 |
+  | vanilla carvers switched off (guard not yet filling) | 111,023 in 263 | 227,168 |
+  | guard on (final) | 31,148 in 218 | 280,039 |
+
+  Vanilla's carvers (`cave`, `cave_extra_underground`, `canyon`) made about 30 percent of the sea-open cave volume; the
+  rest are the density function's noise caves (cheese, spaghetti, entrance caves: no cliff-face rule applies to them
+  although `TerrainScale` thins their entrances on steep ground). So `SeaCliffGuard`/`SeaCliffPass` do two things on one
+  rule (a block under the sea level inside the ground, where the ground within `skin` columns beside it is lower than
+  the block and drops by at least `skin` blocks, i.e. a cliff of 45 degrees or more): put it in the carving masks
+  (carvers skip it) and fill the open blocks in it with stone or deepslate (the strata pass turns them into the local
+  rock), before the strata. A first version without the filling cut the volume only to 120,543; a version without the
+  steepness test would have capped gentle sea floors' cave mouths too. Caves on gentle sea floors are untouched.
+  Remaining sea mouths in the box are at slopes under 45 degrees (and a few at the box's edge).
+- **Seeds matter.** `preview.py` sets no `level-seed`, so every job drew its own random seed and caves differed from job to
+  job (an early comparison showed 4 times the cave volume for that reason). Compare jobs with `--seed N`.
+- **Tests.**
+  - JUnit `MagmaTest` (16): the column runs from the chamber to the lava floor, is one connected body of lava, gives several times
+    the old lava, follows the level's floor not a number, scales with kind, radius and activity, the four settings, sits in
+    a body of altered hot rock, a chamber at the floor has no column; plus the old eight. `SeaCliffGuardTest` (6):
+    the wall towards the water at a cliff, none on level ground or a gentle floor, 45 degrees is the line, the range stops at
+    the sea level and the floor, the window, the setting.
+  - GameTest `magmaUnderActiveVolcanoes` now reads lenses (`lensMolten`, `lensLava`) and the mush (`mush`, `mushOpen`,
+    `mushLava`) and fails on lens blocks that are not lava, no rock placed, or lava in the rock outside a lens. Before the
+    last merge it read three shields: 245,304 / 173,751 / 161,758 molten blocks (9, 6 and 7 lenses), all lava,
+    `stray=0 wetFaces=0 airFaces=0`. **After the merge with master the test planet has no active volcano with room for a
+    chamber, so it now passes with "nothing to read back"** (the geometry is MagmaTest's).
+  - GameTest `seaCliffsHaveNoCaveMouths` (new): six cliff chunks of the cave level scanned for, generated through the carving
+    step, 32,865 guarded blocks, 0 open (7,317 had been filled).
+- **Gates** (VM, master 535be05e merged in): `cargo fmt --check`, `clippy -D warnings`, `cargo deny` ok; `cargo test
+  --workspace` all pass (core 533, cli 54, format 63, viewer/inspect and the rest ok); `./gradlew build test` tests=243 failures=0;
+  `./gametest.sh` All 69 required tests passed; `./gametest.sh -PwithMic` All 69 required tests passed (MIC set 168 mods,
+  pack 57561c9).
+- **Not done / for the coordinator.** The Cashman, Sparks and Blundy 2017 and Sparks et al. 2019 papers were not opened (no
+  open copy reachable); Edmonds et al. 2019 was read as a page fetch only, so the ledger rows that lean on them are
+  `game-choice` with the architecture `cited-unverified`. The dimension `y` bottom moves to −512 in another branch: the
+  column reads it from the level, nothing here assumes −352 (`MagmaTest.theColumnFollowsTheWorldsFloorNotANumber`).
+  `mac.sh` leaves a stale `tools/workbench/lava_stats.py` bands table for y −352; unchanged.
