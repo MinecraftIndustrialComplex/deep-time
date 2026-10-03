@@ -213,9 +213,12 @@ class Classify(unittest.TestCase):
         "true": "light",
         "git status && cat STATUS.md | head": "light",
         "uptime; free -g": "light",
+        "grep -E \"GAME TESTS|required tests\" neoforge/build/gametest.log | head; grep -c x y | wc -l": "light",
         "tools/remote/detach.sh start run1 target/release/deeptime run --preset x": "light",
         "setsid nohup bash tools/review/sweep.sh > log 2>&1 &": "light",
-        "bash tools/review/some-analysis.sh": "shell",
+        "bash tools/review/some-analysis.sh": "shell:some-analysis.sh",
+        "python3 -c 'import json; print(1)'": "shell:python3",
+        "cd tools && FOO=1 ./thing --x": "shell:thing",
         "tools/client/dh-client-check.sh dh": "client:dh",
     }
 
