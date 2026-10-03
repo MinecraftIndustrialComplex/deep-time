@@ -43,7 +43,7 @@ field() { python3 -c 'import json,sys; d=json.loads(sys.argv[1]); l=[l for l in 
 SPID=""; XPID=""; CPID=""
 cleanup() {
     [ -n "$CPID" ] && kill "$CPID" 2>/dev/null
-    pkill -f -- "$CL/pmc/libraries" 2>/dev/null   # the client JVM (its classpath names this folder)
+    pkill -f -- "$(basename "$REPO")/smoke/$P/client/pmc/libraries" 2>/dev/null   # the client JVM (its classpath names this folder)
     [ -n "$SPID" ] && { rcon stop >/dev/null 2>&1; for i in $(seq 60); do kill -0 "$SPID" 2>/dev/null || break; sleep 1; done; kill "$SPID" 2>/dev/null; }
     [ -n "$XPID" ] && kill "$XPID" 2>/dev/null
 }
@@ -111,7 +111,7 @@ for attempt in 1 2 3; do
     done
     [ $joined = 1 ] && break
     say "   attempt $attempt: ${why:-did not join in 15 min} (smoke/$P/client/client-$attempt.log)"
-    kill "$CPID" 2>/dev/null; pkill -f -- "$CL/pmc/libraries" 2>/dev/null; sleep 5
+    kill "$CPID" 2>/dev/null; pkill -f -- "$(basename "$REPO")/smoke/$P/client/pmc/libraries" 2>/dev/null; sleep 5
 done
 [ $joined = 1 ] || { say "the client did not join"; exit 1; }
 rcon "gamemode spectator DeepTimeProbe" >/dev/null
