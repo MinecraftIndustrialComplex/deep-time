@@ -253,17 +253,19 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
             .copied()
             .unwrap_or(0.0)
     };
-    Some(format!(
-        "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} foundered_km3={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
-        deeptime_core::plates::stats::summary(st).line(),
-        global(collapse::MOVED_GLOBAL),
-        global(collapse::GAINED_GLOBAL),
-        global(collapse::FOUNDERED_GLOBAL),
-        q(0.1),
-        q(0.5),
-        q(0.9),
-        q(0.99),
-    ) + &crust_bins(st))
+    Some(
+        format!(
+            "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} foundered_km3={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
+            deeptime_core::plates::stats::summary(st).line(),
+            global(collapse::MOVED_GLOBAL),
+            global(collapse::GAINED_GLOBAL),
+            global(collapse::FOUNDERED_GLOBAL),
+            q(0.1),
+            q(0.5),
+            q(0.9),
+            q(0.99),
+        ) + &crust_bins(st),
+    )
 }
 
 /// Diagnostic (belts-area): visible continental crust by thickness bin: share of the samples,
@@ -299,11 +301,16 @@ fn crust_bins(st: &deeptime_core::plates::state::PlateState) -> String {
             b.len() as f64 / vis.len().max(1) as f64,
             bv / vol.max(1.0),
             med(b.iter().map(|s| f64::from(s.elevation_m)).collect()),
-            med(b.iter().map(|s| st.t_myr - f64::from(s.orogeny_myr)).collect()),
             med(b
                 .iter()
-                .map(|s| f64::from(s.pools[pool::SEDIMENT] + s.pools[pool::SEDIMENTARY])
-                    / f64::from(s.thickness_m).max(1.0))
+                .map(|s| st.t_myr - f64::from(s.orogeny_myr))
+                .collect()),
+            med(b
+                .iter()
+                .map(
+                    |s| f64::from(s.pools[pool::SEDIMENT] + s.pools[pool::SEDIMENTARY])
+                        / f64::from(s.thickness_m).max(1.0)
+                )
                 .collect()),
         );
     }
