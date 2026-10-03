@@ -101,12 +101,12 @@ defaults are in `ClimateParams::default()` and the presets.
 | CLM-119 | coarse grid | 128 columns target (k × k L1 blocks); 128 × 64 on L1 1024 × 512, 144 × 72 on Earth's 720 × 360 | cells | Ziegler & Rehfeld 2021 p. 2845 (TransEBM's T42) | `verified` |
 | CLM-120 | surface-dependent diffusivity, D_x(φ) = D_pole + (D_eq − D_pole) cos⁵φ | sea 0.65 → 0.40; land 0.65 → 0.28 N / 0.20 S; × CLM-176 | W/m²/K | Ziegler & Rehfeld 2021 eq. 2, Table 1; Zhuang et al.'s code | `verified` |
 | CLM-176 | `atmosphere_diffusivity_scale` | 1.3 | – | calibration (global mean 14.1 ± 0.4, winter spread) | `calibrated` |
-| CLM-121 | east-west diffusion factor | 0.3 (PlaHab: 1/25 below 45°, 1/2,500 above) | – | Ramirez 2024 p. 3 (for comparison) | `calibrated` |
+| CLM-121 | east-west diffusion factor | 0.2 (PlaHab: 1/25 below 45°, 1/2,500 above) | – | Ramirez 2024 p. 3 (for comparison) | `calibrated` |
 | CLM-122 | land heat capacity (land plus air), the zonal model's | 3 m of water (North et al.: 2.5 m) | m | North, Cahalan & Coakley 1981 p. 118; Ziegler & Rehfeld 2021 Tables 1–2 | `verified` |
 | CLM-013, CLM-014 | slab depth; land depth | 50 m; 3 m | m | none (consistent with the sources, see rows) | `uncited` |
 | CLM-123 | `desert_albedo`, desert share of land from the last Köppen | +0.08 | – | Donohoe & Battisti 2011; Stull 2017 Table 2-5 | `verified` |
 | CLM-124 | 850 hPa zonal wind profile | −6, +9, −2 m/s bumps at 12°, 45°, 82° | m/s | none; compared with reanalysis (CLM-164) | `calibrated` |
-| CLM-125 | `wind_heat_transport` β_T | 0.3 | – | calibration on Earth's relief | `calibrated` |
+| CLM-125 | `wind_heat_transport` β_T | 0.2 | – | calibration on Earth's relief | `calibrated` |
 | CLM-126 | mountain blocking | **not built** | – | none | `uncited`, `not-yet-coded` |
 | CLM-127 | ocean eddy diffusivity (CLM-017's value) | 0.3 (the prototype's 0.8 is not used) | W/m²/K | none | `uncited` |
 | CLM-128 | Stommel gyres: C_D; friction r | 1.2·10⁻³; 1.5 β Δx | – | Large & Yeager 2004 eq. 6a; Stommel 1948 not read | `cited-unverified` |
@@ -127,7 +127,7 @@ defaults are in `ClimateParams::default()` and the presets.
 | CLM-168 | its scale m so that 2 × CO₂ at 288.15 K gives 5.35 ln 2 | 0.903 | – | Myhre et al. 1998 via IPCC 2001 (CLM-069) | `calibrated` |
 | CLM-170 | the forcing below the table (about 100 ppm) | logarithm, the table's 100–200 ppm slope | W/m² | none | `game-choice` |
 | CLM-172 | `snowball_cloud_w_m2`: extra cloud greenhouse on frozen surfaces | 0 (setting, 0–20) | W/m² | Ben 2026-10-02; Hoffman 2017, Abbot 2012, Hu 2011, Pierrehumbert 2011 | `game-choice` |
-| CLM-061 | `KERNEL_EARTH`, the weathering kernel on Earth's 1° relief | 2.402·10⁷ (banded: 2.845·10⁷) | km² m/yr | re-measured, `deeptime climate-dem` | `calibrated` |
+| CLM-061 | `KERNEL_EARTH`, the weathering kernel on Earth's 1° relief | 2.475·10⁷ (banded: 2.845·10⁷) | km² m/yr | re-measured, `deeptime climate-dem` | `calibrated` |
 | CLM-100 | gravity of the ice | the planet's | m/s² | – | `uncited` |
 | CLM-178 | `rain_model` | `belts`; `budget` is built | – | Ben, decisions log 2026-10-01 (Q2) | `game-choice` |
 | CLM-139 | eddy moisture diffusivity K_q | 1.5·10⁶ (GREB 2–8·10⁵) | m²/s | none | `uncited` |
@@ -176,53 +176,55 @@ The main equations, as the code computes them:
 
 ## Earth against the mod
 
-Run: `deeptime climate-dem` on Earth's relief (GMT `earth_relief_30m_p`, 720 × 360, 0.5 degrees;
-the ice feedback repeated six times), 280 ppm, the calibrated defaults of CLM-121, CLM-125,
-CLM-131 and CLM-176, build log 2026-10-03 (T9); measured with
-`tools/validation/climate_vs_obs.py` and `tools/review/percell_metrics.py`. The banded climate on
-the same relief is in brackets. The numbers in the "mod" column were supplied from the calibration
-run's output for this page and were not re-measured when it was written. Earth's temperature and
-spread figures are the design's section 7.1 table: Beck et al. 2023's monthly temperatures
-(1961–1990, 0.5 degrees), brought to sea level with 6.5 K/km; the grid itself is read by the
-design's scratch script only, and no observed data are in the repository.
+Run: `deeptime climate-dem` on Earth's relief (GMT `earth_relief_30m_p`, 720 × 360, 0.5 degrees,
+resampled onto the planet's grid: Lambert's cylindrical equal-area projection, 720 × 240 cells, a
+144 × 48 climate grid; the ice feedback repeated six times), 280 ppm, the calibrated defaults of
+CLM-121, CLM-125, CLM-131 and CLM-176, build log 2026-10-03 (T9); measured with
+`tools/validation/climate_vs_obs.py`. The banded climate on the same relief is in brackets.
+Earth's temperature and spread figures are the design's section 7.1 table: Beck et al. 2023's
+monthly temperatures (1961–1990, 0.5 degrees), brought to sea level with 6.5 K/km; the grid
+itself is read by the design's scratch script only, and no observed data are in the repository.
 
 | Quantity | Earth | Source of the Earth figure | Design target | The mod (banded) |
 |---|---|---|---|---|
-| Global mean temperature, 280 ppm | 13.8–14.4 °C (1850–1900) | Berkeley Earth, averaged in WP-14a (CLM-138) | 14.1 ± 0.4 (Ben, 2026-10-02) | 14.0 °C (15.3) |
-| Land mean temperature | – | not recorded | none | 6.2 °C (7.7) |
-| Glaciated share of land | about 0.10 (Antarctica, Greenland) | `ice_sheet_feedback` comment in params.rs (a round value) | none | 0.105 (0.100) |
-| Land sea-level T, along-row std at 30–70°, January north / July south | 6.1 K | design §7.1 (Beck et al. 2023) | ≥ 5.0 K | 4.98 K (2.47) |
-| Same, annual | 3.3 K | same | ≥ 2.0 K | 2.10 K (0.74) |
-| Southern winter ice edge, std over longitudes | "several degrees" (roughly 55–68°S) | design §1.2, not measured | ≥ 2° | 3.3° (0.25°) |
-| Brest − Vladivostok, January | 20.1 K | design §7.1 | ≥ 12 K | 16.0 K (6.9) |
-| Yakutsk, January | −39 °C | design §7.1 | ≤ −28 °C | −37.7 °C (−17.5) |
+| Global mean temperature, 280 ppm | 13.8–14.4 °C (1850–1900) | Berkeley Earth, averaged in WP-14a (CLM-138) | 14.1 ± 0.4 (Ben, 2026-10-02) | 13.8 °C (15.3) |
+| Land mean temperature | – | not recorded | none | 7.9 °C (7.8) |
+| Glaciated share of land | about 0.10 (Antarctica, Greenland) | `ice_sheet_feedback` comment in params.rs (a round value) | none | 0.095 (0.101) |
+| Land sea-level T, along-row std at 30–70°, January north / July south | 6.1 K | design §7.1 (Beck et al. 2023) | ≥ 5.0 K | 4.53 K (2.25) |
+| Same, annual | 3.3 K | same | ≥ 2.0 K | 1.92 K (0.64) |
+| Southern winter ice edge, std over longitudes | "several degrees" (roughly 55–68°S) | design §1.2, not measured | ≥ 2° | 2.5° (0°) |
+| Brest − Vladivostok, January | 20.1 K | design §7.1 | ≥ 12 K | 20.6 K (7.1) |
+| Yakutsk, January | −39 °C | design §7.1 | ≤ −28 °C | −29.0 °C (−15.8) |
 | Reference cities in the right main group (`climate-dem` list of 24) | – | – | ≥ 21 | 19 (18) |
-| Köppen land shares A / B / C / D / E | – | not recorded | none | 0.14 / 0.28 / 0.15 / 0.19 / 0.25 |
-| Mumbai annual rain | 3,096 mm | design §1.2 (Beck et al. 2023) | ≥ 1,500 mm (budget) | 613 mm |
-| Sahara; Atacama annual rain | 11; 16 mm | design §1.2 | ≤ 80 mm (budget) | about 230; about 150 mm |
-| Ocean heat transport, northern peak | 1.5–2 PW at 15–25°N | Trenberth & Caron 2001 (CLM-133) | 1.5–2 PW | **3.2 PW at 27°N** |
-| Atmosphere heat transport, northern peak | 5.0 ± 0.14 PW at 43°N | Trenberth & Caron 2001 abstract | none | 3.5 PW at 30°N |
-| North Atlantic 55°N 20°W, January / July | about +9 in January | a round value, no dataset recorded | none | 7.4 / 17.8 °C |
+| Köppen land shares A / B / C / D / E | – | not recorded | none | 0.14 / 0.29 / 0.14 / 0.22 / 0.21 |
+| Mumbai annual rain | 3,096 mm | design §1.2 (Beck et al. 2023) | ≥ 1,500 mm (budget) | 623 mm |
+| Sahara; Atacama annual rain | 11; 16 mm | design §1.2 | ≤ 80 mm (budget) | about 230; about 180 mm |
+| Ocean heat transport, northern peak | 1.5–2 PW at 15–25°N | Trenberth & Caron 2001 (CLM-133) | 1.5–2 PW | **3.1 PW at 27°N** |
+| Atmosphere heat transport, northern peak | 5.0 ± 0.14 PW at 43°N | Trenberth & Caron 2001 abstract | none | 3.6 PW at 39°N |
+| North Atlantic 55°N 20°W, January / July (sea) | about +9 in January | a round value, no dataset recorded | none | 9.5 / 19.4 °C |
 
-January and July air temperature at sea level, selected places, °C (the July Earth figures and
-the rounding of the January ones are approximate and were not read from a dataset for this page):
+January and July air temperature of the nearest land cell, the lapse rate applied, °C (the July
+Earth figures and the rounding of the January ones are approximate and were not read from a
+dataset for this page):
 
-| Place | Jan, mod | Jan, Earth | Jul, mod | Jul, Earth |
+| Place | Jan, mod (banded) | Jan, Earth | Jul, mod (banded) | Jul, Earth |
 |---|---|---|---|---|
-| Brest | 10.3 | about 7 | 19.8 | about 17 |
-| Vladivostok | −5.5 | about −12 | 23.1 | about 20 |
-| Moscow | −8.3 | about −9 | 16.7 | about 18 |
-| Yakutsk | −36.8 | about −39 | 15.5 | about 19 |
+| Brest | 11.3 (4.0) | about 7 | 20.8 (15.0) | about 17 |
+| Vladivostok | −9.3 (−3.1) | about −12 | 24.4 (19.5) | about 20 |
+| Moscow | −8.2 (−17.7) | about −9 | 16.9 (13.4) | about 18 |
+| Yakutsk | −29.0 (−15.8) | about −39 | 15.4 (12.2) | about 19 |
 
 The reference cities that miss their main group: Mumbai and Buenos Aires (rain, still on the belts),
-Denver and Lhasa (height), Chicago and Anchorage. Buenos Aires and Mumbai belong to the rain
-targets, which wait for `rain_model = budget`; the others are the temperature model's.
+Denver and Lhasa (height), Anchorage. Buenos Aires and Mumbai belong to the rain targets, which wait
+for `rain_model = budget`; the others are the temperature model's.
 
-What the table says. The temperature targets are met except two: the winter along-row spread
-(4.98 K against 5.0) and the reference cities (19 against 21). Brest − Vladivostok (16.0 K) and
-Yakutsk (−37.7 °C) pass their targets but stay short of Earth's 20.1 K and −39 °C. The ocean's heat transport is about twice
-Earth's, on purpose (below). The rain rows are not targets of the default model and are reported
-only.
+What the table says. The temperature targets are met except two: the along-row spread (4.53 K
+winter and 1.92 K annual against 5.0 and 2.0) and the reference cities (19 against 21). Brest −
+Vladivostok (20.6 K) matches Earth; Yakutsk (−29.0 °C) passes its target only just and is 10 K
+warmer than Earth (on the 0.5° equirectangular grid before Lambert's projection landed it was
+−37.7 °C: the equal-area grid's tall high-latitude rows smooth the interior). Brest is 4 K too warm
+in January. The ocean's heat transport is about twice Earth's, on purpose (below). The rain rows
+are not targets of the default model and are reported only.
 
 ## Simplifications and limits
 
