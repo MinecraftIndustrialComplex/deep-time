@@ -150,7 +150,7 @@ impl TileGeom {
             ty,
             s,
             x0: -c / 2.0 + f64::from(tx) * TILE as f64 * s,
-            z0: -c / 4.0 + f64::from(ty) * TILE as f64 * s,
+            z0: -deeptime_format::Projection::of(c).pole_z() + f64::from(ty) * TILE as f64 * s,
         })
     }
 }
@@ -1320,13 +1320,17 @@ impl BakeMap {
             }
         };
         let mut out = vec![1f32; TILE * TILE];
+        let proj = deeptime_format::Projection::of(c);
         for j in 0..TILE {
-            let lat = -(g.z0 + j as f64 * g.s) / c * 2.0 * std::f64::consts::PI;
-            let dx = metres_px * lat.cos().max(0.15);
+            let zj = g.z0 + j as f64 * g.s;
+            let (dx, dy) = (
+                metres_px * proj.scale_ew(zj).max(0.15),
+                metres_px * proj.scale_ns(zj),
+            );
             for i in 0..TILE {
                 let k = (j + 1) * N + i + 1;
                 let dzdx = f64::from(flat(k + 1) - flat(k - 1)) * mv / (2.0 * dx);
-                let dzdy = f64::from(flat(k + N) - flat(k - N)) * mv / (2.0 * metres_px);
+                let dzdy = f64::from(flat(k + N) - flat(k - N)) * mv / (2.0 * dy);
                 out[j * TILE + i] = self.light.shade_exaggerated(dzdx, dzdy, boost);
             }
         }
@@ -1582,11 +1586,11 @@ impl BakeMap {
         } else {
             ("land", None)
         };
-        let radians = |v: f64| v / f64::from(self.meta.c) * 360.0;
+        let proj = deeptime_format::Projection::new(self.meta.c);
         let mut o = json!({
             "x": wx, "z": z,
-            "lat": -radians(bz),
-            "lon": radians(bx + f64::from(self.meta.c) / 2.0),
+            "lat": proj.lat_deg(bz),
+            "lon": proj.lon_deg(bx),
             "terrain_y": (h * 10.0).round() / 10.0,
             "height_m": ((h - sea) * mv).round(),
             "surface": kind,

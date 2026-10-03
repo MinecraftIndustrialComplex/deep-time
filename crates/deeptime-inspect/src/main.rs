@@ -268,7 +268,7 @@ enum Cmd {
         /// x0,z0,x1,z1 (x1, z1 exclusive); x is folded, so the box may straddle the seam.
         #[arg(long = "box", allow_hyphen_values = true)]
         bbox: String,
-        /// lo,hi, inclusive (default: -352,639 with world data, else the chunks' build range).
+        /// lo,hi, inclusive (default: -512,639 with world data, else the chunks' build range).
         #[arg(long, allow_hyphen_values = true)]
         y: Option<String>,
         /// The output file; gzipped when it ends in .gz.
@@ -943,7 +943,7 @@ fn export_area(a: ExportArgs) -> Result<()> {
     let c = a.span.or(wd.as_ref().map(|w| w.circumference)).unwrap_or(0);
     let y_given = match &a.y {
         Some(s) => Some(AreaBox::parse_y(s).map_err(Error)?),
-        None if wd.is_some() => Some((-352, 639)),
+        None if wd.is_some() => Some((-512, 639)),
         None => None,
     };
     let (y0, y1) = y_given.unwrap_or((0, 0));

@@ -421,8 +421,9 @@ impl ColumnWorld {
             None => Vec::new(),
         };
         let mut v = col.to_json();
-        v["lat"] = json!(-360.0 * bz / c);
-        v["lon"] = json!(360.0 * (bx + c / 2.0) / c);
+        let p = crate::Projection::of(c);
+        v["lat"] = json!(p.lat_deg(bz));
+        v["lon"] = json!(p.lon_deg(bx));
         v["world"] = json!(self.manifest.source);
         v["layers"] = Value::Object(layers);
         v["strata"] = json!(horizons);

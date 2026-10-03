@@ -2,9 +2,10 @@
 package com.minecraftindustrialcomplex.deeptime.screen.model;
 
 /**
- * The timelapse's globe view (plan §7.12): an orthographic projection of an equirectangular
- * keyframe, drawn on the CPU into a square image (no shaders on the Create World screen). Keyframe
- * pixel (px, py) is centred on longitude 360°·px/w (the seam is 0°) and latitude 90° − 180°·py/h
+ * The timelapse's globe view (plan §7.12): an orthographic projection of a keyframe (a map
+ * picture of the planet's projection, {@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection}), drawn on the CPU into a square
+ * image (no shaders on the Create World screen). Keyframe pixel (px, py) is centred on longitude
+ * 360°·px/w (the seam is 0°) and the latitude {@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection#pictureLatitudeDeg} gives row py
  * ({@code FORMAT.md}, "Keyframes"); the globe looks at ({@link #centreLat}, {@link #centreLon}).
  *
  * <p>Screen coordinates are u (right) and v (up) in [−1, 1]; the disk is u² + v² ≤ 1.
@@ -83,8 +84,8 @@ public final class GlobeProjection {
                     dst[at] = 0;
                     continue;
                 }
-                int px = (int) Math.round(ll[1] / 360.0 * w) % w;
-                int py = (int) Math.round((90.0 - ll[0]) / 180.0 * h);
+                int px = (int) Math.round(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureXOfLongitude(ll[1], w)) % w;
+                int py = (int) Math.round(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureYOfLatitude(ll[0], h));
                 py = Math.max(0, Math.min(h - 1, py));
                 int c = src[py * w + px];
                 double z = Math.sqrt(Math.max(0, 1 - u * u - v * v));
@@ -102,24 +103,24 @@ public final class GlobeProjection {
         return a << 24 | b << 16 | g << 8 | r;
     }
 
-    /** Map pixel of (lat, lon) in a {@code w × h} equirectangular image, as fractional coordinates of its centre. */
+    /** Map pixel of (lat, lon) in a {@code w × h} map picture, as fractional coordinates of its centre. */
     public static double[] mapPixel(double latDeg, double lonDeg, int w, int h, double[] out) {
-        out[0] = wrapLon(lonDeg) / 360.0 * w + 0.5;
-        out[1] = (90.0 - latDeg) / 180.0 * h + 0.5;
+        out[0] = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureXOfLongitude(wrapLon(lonDeg), w) + 0.5;
+        out[1] = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureYOfLatitude(latDeg, h) + 0.5;
         return out;
     }
 
-    /** Block (x, z) → (lat, lon) on a planet of circumference {@code c} (plan §5.2; {@code EVENTS.md}). */
+    /** Block (x, z) → (lat, lon) on a planet of circumference {@code c} (the planet's projection; {@code EVENTS.md}). */
     public static double[] latLon(double x, double z, int c, double[] out) {
-        out[0] = -z / (c / 4.0) * 90.0;
-        out[1] = wrapLon((x + c / 2.0) / c * 360.0);
+        out[0] = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.latitudeDeg(c, z);
+        out[1] = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.longitudeDeg(c, x);
         return out;
     }
 
     /** (lat, lon) → block (x, z) in the canonical span. */
     public static double[] block(double latDeg, double lonDeg, int c, double[] out) {
-        out[0] = wrapLon(lonDeg) / 360.0 * c - c / 2.0;
-        out[1] = -latDeg / 90.0 * (c / 4.0);
+        out[0] = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.xOfLongitude(c, lonDeg);
+        out[1] = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(c, latDeg);
         return out;
     }
 }

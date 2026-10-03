@@ -79,7 +79,8 @@ public final class SiteData {
 
     /** A registry with no sites (a world without {@code sites/}). */
     public static SiteData empty(int circumference) {
-        return new SiteData(List.of(), circumference, 512, 1, 1, -circumference / 2, -circumference / 4,
+        return new SiteData(List.of(), circumference, 512, 1, 1,
+                (int) Projection.indexOriginBlockX(circumference), (int) Projection.indexOriginBlockZ(circumference),
                 new int[]{0, 0}, new int[0]);
     }
 
