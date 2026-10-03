@@ -79,6 +79,35 @@ public final class FarTerrainGameTests {
         });
     }
 
+    static String diag(ChunkAccess chunk, FarTerrain.Column far, FarTerrainCheck.RealColumn real, int x, int z) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("(").append(x).append(", ").append(z).append(") far ").append(far.ground()).append(" real ").append(real.ground())
+                .append(" status ").append(chunk.getPersistedStatus()).append(" biome ").append(real.biome().unwrapKey().map(k -> k.location().toString()).orElse("?"));
+        net.minecraft.world.level.chunk.CarvingMask air = null, liquid = null;
+        if (chunk instanceof net.minecraft.world.level.chunk.ProtoChunk p) {
+            air = p.getCarvingMask(net.minecraft.world.level.levelgen.GenerationStep.Carving.AIR);
+            liquid = p.getCarvingMask(net.minecraft.world.level.levelgen.GenerationStep.Carving.LIQUID);
+        }
+        sb.append(" masks ").append(air != null).append('/').append(liquid != null).append(" column:");
+        net.minecraft.core.BlockPos.MutableBlockPos pos = new net.minecraft.core.BlockPos.MutableBlockPos();
+        String last = null;
+        int runTop = 0;
+        int lo = Math.min(far.ground(), real.ground()) - 2, hi = Math.max(far.ground(), real.ground()) + 3;
+        for (int y = hi; y >= lo; y--) {
+            String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(chunk.getBlockState(pos.set(x, y, z)).getBlock()).getPath();
+            if (air != null && air.get(x, y, z))
+                id += "*";
+            if (!id.equals(last)) {
+                if (last != null)
+                    sb.append(' ').append(last).append('@').append(runTop).append("..").append(y + 1);
+                last = id;
+                runTop = y;
+            }
+        }
+        sb.append(' ').append(last).append('@').append(runTop).append("..").append(lo);
+        return sb.toString();
+    }
+
     /** The properties far terrain must meet against generated chunks (see the class comment). */
     static void assertAgrees(GameTestHelper helper, FarTerrainCheck.Tally tally, int minColumns, String where) {
         helper.assertTrue(tally.columns >= minColumns, where + "only " + tally.columns + " columns compared");
@@ -118,7 +147,10 @@ public final class FarTerrainGameTests {
             if (column.ground() < level.getMinBuildHeight() + 32)
                 return false;
             ChunkAccess chunk = level.getChunkSource().getChunk(x >> 4, row >> 4, ChunkStatus.FEATURES, true);
-            (eastSide ? east : west).add(column, FarTerrainCheck.real(chunk, x, row));
+            FarTerrainCheck.RealColumn real = FarTerrainCheck.real(chunk, x, row);
+            (eastSide ? east : west).add(column, real);
+            if (Math.abs(column.ground() - real.ground()) > 2)
+                DeepTime.LOGGER.info("[gametest] seamDiag {}", diag(chunk, column, real, x, row));
             return true;
         }, () -> {
             DeepTime.LOGGER.info("[gametest] farTerrainMatchesGeneratedChunksAcrossTheSeam C={} west {} east {}", c, west, east);
