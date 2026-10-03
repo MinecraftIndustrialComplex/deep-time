@@ -599,6 +599,86 @@ def seam_walk(p, s, name):
     return res
 
 
+def land_sites(per_seam=1, step=32):
+    """Points along each seam where land crosses it: both the block 2 inside and the glued image of
+    the block 2 outside stand above sea level; the highest such point per seam."""
+    sites = []
+    for p in seams()["portals"]:
+        ix, iz = inward(p)
+        ox, _, oz = p["origin"]
+        ax = (p["axis_w"][0], p["axis_w"][2])
+        best = []
+        n = int(p["width"] // step)
+        for k in range(1, n):
+            s = -0.5 * p["width"] + k * step
+            ex, ez = round(ox + ax[0] * s), round(oz + ax[1] * s)
+            a = (ex + ix * 2, ez + iz * 2)
+            g = glue_point(p, ex - ix * 2, ez - iz * 2)
+            ha, hg = probe(*a).get("terrainH", -999), probe(*g).get("terrainH", -999)
+            if min(ha, hg) > 68:
+                best.append((min(ha, hg), s))
+        best.sort(reverse=True)
+        sites += [{"seam": p["name"], "s": s, "min_height": round(h, 1)} for h, s in best[:per_seam]]
+    report("land_sites", sites)
+    log("land sites:", sites)
+    return sites
+
+
+def land():
+    """Views and ground walks where land crosses a seam (no bridge: the terrain itself), and the
+    pole walk again with the hidden outside cleared."""
+    by = {p["name"]: p for p in seams()["portals"]}
+    sites = land_sites()
+    client_start()
+    rc(f"op {PLAYER}")
+    rc(f"gamemode creative {PLAYER}")
+    rc(f"effect give {PLAYER} minecraft:night_vision infinite 0 true")
+    rc("time set noon")
+    out = []
+    for site in sites:
+        p = by[site["seam"]]
+        ix, iz = (int(v) for v in inward(p))
+        ox, _, oz = p["origin"]
+        ax = (int(p["axis_w"][0]), int(p["axis_w"][2]))
+        ex, ez = int(ox + ax[0] * site["s"]), int(oz + ax[1] * site["s"])
+        yaw = {(0, -1): 180, (0, 1): 0, (1, 0): -90, (-1, 0): 90}[(-ix, -iz)]
+        g = glue_point(p, ex, ez)
+        preload([(ex, ez), g], 64)
+        # A view across the seam from 40 blocks inside, 20 above the ground.
+        vx, vz = ex + ix * 40 + 0.5 * abs(ax[0]), ez + iz * 40 + 0.5 * abs(ax[1])
+        hv = probe(vx, vz).get("surfaceY", 80)
+        rc(f"tp {PLAYER} {vx:.1f} {max(hv, 63) + 20} {vz:.1f} {yaw} 20")
+        time.sleep(50)
+        shot(f"land-view-{site['seam']}")
+        # The same view from the far side, looking back across the seam.
+        fx, fz = glue_point(p, ex - ix * 40, ez - iz * 40)
+        hf = probe(fx, fz).get("surfaceY", 80)
+        # On the far side of a half-turn seam the seam lies the same way (yaw unchanged); across a
+        # slide it is the opposite edge.
+        back = yaw if p["kind"] == "half_turn" else {180: 0, 0: 180, -90: 90, 90: -90}[yaw]
+        rc(f"tp {PLAYER} {fx + 0.5 * abs(ax[0]):.1f} {max(hf, 63) + 20} {fz + 0.5 * abs(ax[1]):.1f} {back} 20")
+        time.sleep(50)
+        shot(f"land-view-{site['seam']}-back")
+        # A walk on the ground, 12 blocks inside, straight at the seam.
+        sx, sz = ex + ix * 12 + 0.5 * abs(ax[0]) + 0.5 * abs(ix), ez + iz * 12 + 0.5 * abs(ax[1]) + 0.5 * abs(iz)
+        hs = probe(sx, sz).get("surfaceY", 80)
+        res = look_and_walk(f"land-walk-{site['seam']}", (sx, hs + 1, sz), yaw, 10, 8, portal=p,
+                            keys=("Control_L", "w"), settle=30, fly=False)
+        res["site"] = site
+        out.append(res)
+        unload([(ex, ez), g], 64)
+        report("land_walks", out)
+    # The pole again, with the hidden outside beyond the north seam cleared above the bridge.
+    p = by["north"]
+    yb = 67
+    rc("forceload add -4110 -4140 -4080 -4090")
+    wait_loaded(-4096, -4120)
+    rc(f"fill -4097 {yb + 1} -4136 -4095 {yb + 3} -4097 minecraft:air", show=True)
+    res = seam_walk(p, -B // 2, "walk-north-pole-cleared")
+    rc("forceload remove -4110 -4140 -4080 -4090")
+    report("pole_walk_cleared", res)
+
+
 def client():
     t = seams()
     by = {p["name"]: p for p in t["portals"]}
@@ -699,7 +779,7 @@ if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     phases = sys.argv[1:] or ["all"]
     table = {"setup": setup, "boot": boot, "portals": portals, "terrain": terrain, "entities": entities,
-             "physics": physics, "client": client, "stop": stop, "all": all_phases}
+             "physics": physics, "client": client, "land": land, "stop": stop, "all": all_phases}
     try:
         for ph in phases:
             log("=== phase", ph)
