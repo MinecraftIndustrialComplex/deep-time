@@ -38,7 +38,7 @@ y 639.
    (sand, mud), the rest as rock (RCK-022).
 3. **The order.** Every unit gets a stratigraphic key, a 16-bit number that grows downward and orders units
    identically in every column. The key space is built grade first: the regolith, then one band per
-   metamorphic grade (unmetamorphosed, then from 250, 300, 350, 450, 500 and 650 degC), then the mantle.
+   metamorphic grade (unmetamorphosed, then from 250, 300, 350, 500, 525 and 650 degC), then the mantle.
    Inside a band the log's layers go by age and the basement pools in erosion order (STR-018 to STR-021).
    Ordered by key, a column can only get hotter downward.
 4. **Settling.** The bake smooths the layers sideways (a Gaussian of about 10 cells, STR-011 to STR-014),
