@@ -449,6 +449,10 @@ pub struct TectonicParams {
     pub collapse_thickness_km: f64,
     /// … and how far from the collapsing crust the crust it loses may go, km (Earth-normalized).
     pub collapse_reach_km: f64,
+    /// The thickest continental crust, km: a column thicker than this loses the excess from its
+    /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
+    /// 0 = no limit.
+    pub crust_max_km: f64,
     /// Axis change of a subducting plate towards its fronts per 1,000 km of front and Myr
     /// (slab pull, Cortial §4.1's ε scaled by front length).
     pub slab_pull_rad_per_1000km_myr: f64,
@@ -650,6 +654,7 @@ impl Default for TectonicParams {
             collapse_myr: 25.0,                // ledger: PLT-255
             collapse_thickness_km: 45.0,       // ledger: PLT-256
             collapse_reach_km: 1000.0,         // ledger: PLT-257
+            crust_max_km: 70.0,                // ledger: PLT-258
             slab_pull_rad_per_1000km_myr: 0.002,
             slab_pull_speed_mm_yr: 80.0,
             slab_pull_front_km: 3000.0,
@@ -962,6 +967,7 @@ impl PlanetPreset {
             (k.collapse_myr, "$.tectonics.collapse_myr"),
             (k.collapse_thickness_km, "$.tectonics.collapse_thickness_km"),
             (k.collapse_reach_km, "$.tectonics.collapse_reach_km"),
+            (k.crust_max_km, "$.tectonics.crust_max_km"),
         ] {
             check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
         }

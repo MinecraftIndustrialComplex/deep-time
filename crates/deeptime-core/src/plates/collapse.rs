@@ -48,12 +48,23 @@
 //! The area gained is the volume released over T_n: a column of thickness T gives back
 //! (T − T_c) / T_n of a sample's area.
 //!
+//! # The thickest crust
+//! No continental crust on Earth is much thicker than Tibet's or the Altiplano's. Continental
+//! crust that a collision carries down further goes into the mantle with the slab (continental
+//! subduction), and a root thickened past that limit founders (its lower crust turns to
+//! eclogite, denser than the mantle). The model's stacking has no such limit of its own: the
+//! belt's cap reads the surface's height (PLT-253), which the surface stage lowers by flexure and
+//! erosion while the stacked thickness stays, and an overlap at a resampling adds a whole column
+//! to the one on top. [`founder`] takes every visible continental column thicker than
+//! `crust_max_km` back to it, from the bottom of the column; the crust taken is gone (it gives no
+//! area back).
+//!
 //! # What it is not
 //! A lower-crustal flow solve. The surface stage's spreading (`surface::spread`) moves the surface
 //! above the strength height; this moves crust, and only on the plate model's samples. Where the
 //! orogen spreads is the plate's nearest room, not a flow field.
 // ledger: PLT-254 (the rule), PLT-255 (τ), PLT-256 (the threshold thickness), PLT-257 (the
-// reach).
+// reach), PLT-258 (the thickest crust).
 
 use std::collections::BTreeMap;
 
@@ -66,6 +77,57 @@ use super::state::{CONTINENTAL, OCEANIC, PlateState, TRENCH, pool};
 pub const MOVED_GLOBAL: &str = "plates/collapse_km3";
 /// … and the ocean floor it turned continental, km² (Earth-normalized).
 pub const GAINED_GLOBAL: &str = "plates/collapse_gained_km2";
+/// Continental crust lost to the mantle beyond `crust_max_km` over the run, km³.
+pub const FOUNDERED_GLOBAL: &str = "plates/foundered_km3";
+
+/// Order in which crust beyond the thickest column goes down: the bottom of the column first.
+const ROOT_ORDER: [usize; pool::COUNT] = [
+    pool::MAFIC_PLUTONIC,
+    pool::MAFIC_VOLCANIC,
+    pool::FELSIC_PLUTONIC,
+    pool::METAMORPHIC,
+    pool::FELSIC_VOLCANIC,
+    pool::SEDIMENTARY,
+    pool::SEDIMENT,
+];
+
+/// Continental crust thicker than `crust_max_km` loses the excess from the bottom of its column
+/// to the mantle (see the module docs, "The thickest crust"); returns the crust lost, km² × m.
+/// Runs every step, before [`step`], whether or not an orogeny raises the sample.
+pub fn founder(state: &mut PlateState, env: &Env) -> f64 {
+    let k = env.k;
+    if !(k.crust_max_km > 0.0) {
+        return 0.0;
+    }
+    // ledger: PLT-258.
+    let t_max = (k.crust_max_km * 1000.0).max(normal_thickness_m());
+    let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
+    let normal = normal_thickness_m();
+    let mut lost = 0.0;
+    for s in state.samples.iter_mut() {
+        if s.kind != CONTINENTAL || s.is_hidden() || f64::from(s.thickness_m) <= t_max {
+            continue;
+        }
+        let mut left = f64::from(s.thickness_m) - t_max;
+        for &p in &ROOT_ORDER {
+            let take = f64::from(s.pools[p]).min(left);
+            s.pools[p] = (f64::from(s.pools[p]) - take) as f32;
+            left -= take;
+            if left <= 0.0 {
+                break;
+            }
+        }
+        let before = f64::from(s.thickness_m);
+        s.thickness_m = s.pools.iter().sum();
+        let gone = before - f64::from(s.thickness_m);
+        lost += gone;
+        // Airy, as in the collapse: never below the height of the column kept.
+        let z = f64::from(s.elevation_m);
+        let airy = z_0 + (f64::from(s.thickness_m) - normal) / ISOSTATIC_FACTOR;
+        s.elevation_m = (z - (gone / ISOSTATIC_FACTOR).min((z - airy).max(0.0))) as f32;
+    }
+    lost * env.norm.sample_area_km2()
+}
 
 /// The model's normal continental column, m: what a collapsing orogen thins towards and what it
 /// fills its receivers up to (`pools::continental_column`, 35.1 km).
@@ -452,5 +514,40 @@ mod tests {
         fx.k.collapse_myr = 0.0;
         let mut st = planet(&fx.geo, belt, 26_000.0);
         assert_eq!(step_once(&fx, &mut st, 1), Collapse::default());
+    }
+
+    /// A column thicker than `crust_max_km` loses the excess from its bottom (mafic root first)
+    /// and keeps its surface rock; its surface stays where it stood when it is lower than the
+    /// column it keeps would hold up. Columns at or under the limit, and ocean floor, keep all.
+    #[test]
+    fn crust_beyond_the_thickest_column_founders_from_the_bottom() {
+        let fx = Fx::new();
+        let belt = |p: DVec3| p.x < -0.1 && p.y > 0.766 && p.y < 0.85;
+        let mut st = planet(&fx.geo, belt, 0.0);
+        for (i, s) in st.samples.iter_mut().enumerate() {
+            if belt(fx.geo.points()[i]) {
+                s.pools[pool::FELSIC_PLUTONIC] += 100_000.0;
+                s.thickness_m += 100_000.0;
+            }
+        }
+        let before = st.samples.clone();
+        let lost = founder(&mut st, &fx.env(1));
+        let t_max = fx.k.crust_max_km * 1000.0;
+        let mut n = 0;
+        for (i, s) in st.samples.iter().enumerate() {
+            let b = &before[i];
+            if belt(fx.geo.points()[i]) {
+                n += 1;
+                assert!((f64::from(s.thickness_m) - t_max).abs() < 1.0);
+                assert_eq!(s.pools[pool::MAFIC_PLUTONIC], 0.0);
+                assert_eq!(s.pools[pool::SEDIMENT], b.pools[pool::SEDIMENT]);
+                assert_eq!(s.pools[pool::METAMORPHIC], b.pools[pool::METAMORPHIC]);
+                assert_eq!(s.elevation_m, b.elevation_m);
+            } else {
+                assert_eq!(s, b);
+            }
+        }
+        let expect = n as f64 * (135_100.0 - t_max) * fx.norm.sample_area_km2();
+        assert!((lost - expect).abs() < 1e-3 * expect, "{lost} vs {expect}");
     }
 }

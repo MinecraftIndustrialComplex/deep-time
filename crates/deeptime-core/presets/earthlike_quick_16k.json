@@ -90,6 +90,7 @@
     "collapse_myr": 25.0,
     "collapse_thickness_km": 45.0,
     "collapse_reach_km": 1000.0,
+    "crust_max_km": 70.0,
     "slab_pull_rad_per_1000km_myr": 0.002,
     "slab_pull_speed_mm_yr": 80.0,
     "slab_pull_front_km": 3000.0,
