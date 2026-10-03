@@ -640,7 +640,12 @@ mod tests {
     fn a_stack_is_held_in_its_sedimentary_cover() {
         let t = coal();
         let k = t.geometry.stack.clone().unwrap();
-        let sc = Scales::default();
+        // Covers and depths below are in blocks set at 20 m a block (where seed 3's gaps keep
+        // every seam apart: under 6 m of real gap, two half-block seams touch at 35 m).
+        let sc = Scales {
+            m_per_block_v: 20.0,
+            ..Scales::default()
+        };
         let plan = seam_plan(&k, 300.0, 1000.0, &mut Rng::new(3));
         // 300 m of measures stand spacing_mult_v · 300 / 20 blocks tall.
         let span = 300.0 * k.spacing_mult_v / sc.m_per_block_v;
@@ -718,7 +723,12 @@ mod tests {
         let t = coal();
         let k = t.geometry.stack.clone().unwrap();
         let grades: Grades = [("c:coal".to_string(), 1.0)].into_iter().collect();
-        let sc = Scales::default();
+        // Covers and depths below are in blocks set at 20 m a block (where seed 3's gaps keep
+        // every seam apart: under 6 m of real gap, two half-block seams touch at 35 m).
+        let sc = Scales {
+            m_per_block_v: 20.0,
+            ..Scales::default()
+        };
         let plan = seam_plan(&k, 500.0, 30.0, &mut Rng::new(3));
         assert!(plan.seams() >= 5);
         let build = |depth: f64| {
