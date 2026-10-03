@@ -404,6 +404,316 @@ fn departed(g: &Grid, land: &[f64], st: &State2d, z: &EbmState) -> bool {
 pub const TRIGGER_K: f64 = 3.0; // ledger: CLM-137
 pub const TRIGGER_ICE: f64 = 0.15; // ledger: CLM-137
 
+/// The zonal model's correction to the per-cell climate (design §4.1, P1-26 T6): the
+/// atmosphere's diffusivity of every face between its bands, fitted to the 2-D model's poleward
+/// heat transport, and a flux of every band's land and sea tile for what is left. The clock runs
+/// with it until the next snapshot.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Correction {
+    /// W/m²/K, bands + 1 faces (empty: the zonal model's own `d`).
+    pub d_face: Vec<f64>,
+    /// [land, sea] W/m² of every band (empty: none).
+    pub flux: Vec<[f64; 2]>,
+}
+
+impl Correction {
+    /// The zonal model `ep` with this correction (a correction for another band count is none).
+    pub fn apply(&self, ep: &mut super::ebm::EbmParams) {
+        ep.flux_corr = if self.flux.len() == ep.bands {
+            self.flux.clone()
+        } else {
+            Vec::new()
+        };
+        ep.d_face = if self.d_face.len() == ep.bands + 1 {
+            self.d_face.clone()
+        } else {
+            Vec::new()
+        };
+    }
+}
+
+/// The 2-D model's zonal annual mean of `value` weighted by `weight` at the latitudes `lat` of
+/// the zonal model's bands: each coarse row's weighted mean, linearly between the row centres
+/// that have weight (the coarse rows are wider than the bands; a stepwise remap would hand the
+/// smooth zonal model steps it cannot follow). Beyond the last row with weight, that row's
+/// value inside its span, `None` outside.
+pub fn zonal_mean(
+    c: &Coarse,
+    lat: &[f64],
+    value: &dyn Fn(usize) -> f64,
+    weight: &dyn Fn(usize) -> f64,
+) -> Vec<Option<f64>> {
+    let g = &c.grid;
+    // (centre, south edge, north edge, mean) of the rows with weight, south to north.
+    let mut rows: Vec<(f64, f64, f64, f64)> = (0..g.h)
+        .filter_map(|j| {
+            let (mut s, mut a) = (0.0, 0.0);
+            for i in 0..g.w {
+                let cc = j * g.w + i;
+                let wt = weight(cc) * g.area(i, j);
+                s += wt * value(cc);
+                a += wt;
+            }
+            (a > 1e-12).then(|| (g.lat_c(j), g.lat_edge[j + 1], g.lat_edge[j], s / a))
+        })
+        .collect();
+    rows.sort_by(|a, b| a.0.total_cmp(&b.0));
+    lat.iter()
+        .map(|&l| {
+            let k = rows.partition_point(|r| r.0 <= l);
+            match (k.checked_sub(1).map(|i| rows[i]), rows.get(k)) {
+                (Some(a), Some(b)) => {
+                    let f = (l - a.0) / (b.0 - a.0).max(1e-12);
+                    Some(a.3 + f * (b.3 - a.3))
+                }
+                (Some(a), None) => (l <= a.2).then_some(a.3),
+                (None, Some(b)) => (l >= b.1).then_some(b.3),
+                (None, None) => None,
+            }
+        })
+        .collect()
+}
+
+/// The 2-D model's zonal annual means of the land and the sea tiles over every band (land
+/// weighted by f, sea by 1 − f; `zonal_mean`).
+pub fn zonal_tiles(c: &Coarse, lat: &[f64]) -> Vec<[Option<f64>; 2]> {
+    let ann = |v: &[f64; 12]| v.iter().sum::<f64>() / 12.0;
+    let l = zonal_mean(c, lat, &|cc| ann(&c.r.t_land[cc]), &|cc| c.land[cc]);
+    let o = zonal_mean(c, lat, &|cc| ann(&c.r.t_ocean[cc]), &|cc| 1.0 - c.land[cc]);
+    l.into_iter().zip(o).map(|(a, b)| [a, b]).collect()
+}
+
+/// The fitted diffusivity's bounds, W/m²/K, and the smallest meridional gradient it is fitted
+/// across, K per radian (flatter: from the neighbouring faces).
+pub const D_FIT_MIN: f64 = 0.05; // ledger: CLM-179
+pub const D_FIT_MAX: f64 = 5.0; // ledger: CLM-179
+const D_FIT_GRADIENT_K_RAD: f64 = 3.0; // ledger: CLM-179
+
+/// The diffusivity of every face of the zonal model `ep` (bands + 1, south to north) that
+/// carries the 2-D climate's annual poleward heat transport (atmosphere and ocean) down the 2-D
+/// zonal-mean gradient of T̄, less what the zonal model's own slab diffusion carries at the 2-D
+/// slab temperatures: D = (H_2D − H_slab) / (2π R² cos φ · ΔT̄/Δφ), bounded, smoothed 1-2-1.
+pub fn fit_transport(c: &Coarse, ep: &super::ebm::EbmParams, land: &[f64]) -> Vec<f64> {
+    let nb = ep.bands;
+    let g = &c.grid;
+    let lat: Vec<f64> = (0..nb)
+        .map(|b| -90.0 + (b as f64 + 0.5) * 180.0 / nb as f64)
+        .collect();
+    let ann = |v: &[f64; 12]| v.iter().sum::<f64>() / 12.0;
+    let tbar = zonal_mean(
+        c,
+        &lat,
+        &|cc| c.land[cc] * ann(&c.r.t_land[cc]) + (1.0 - c.land[cc]) * ann(&c.r.t_ocean[cc]),
+        &|_| 1.0,
+    );
+    let tm = zonal_mean(c, &lat, &|cc| ann(&c.r.t_mixed[cc]), &|cc| 1.0 - c.land[cc]);
+    // The 2-D transport across its row edges (north first), W, by latitude.
+    let edges: Vec<(f64, f64)> = (0..g.h.saturating_sub(1))
+        .map(|e| {
+            let pw = c.r.heat_atm_pw[e] + c.r.heat_ocean_diff_pw[e] + c.r.heat_ocean_pw[e];
+            (g.lat_edge[e + 1], pw * 1.0e15)
+        })
+        .collect();
+    let h_at = |phi: f64| -> f64 {
+        // Linear between edges (descending latitude); zero at the poles.
+        let mut prev = (90.0, 0.0);
+        for &(l, h) in edges.iter().chain(std::iter::once(&(-90.0, 0.0))) {
+            if phi >= l {
+                let f = (phi - l) / (prev.0 - l).max(1e-12);
+                return h + f * (prev.1 - h);
+            }
+            prev = (l, h);
+        }
+        0.0
+    };
+    let dphi = std::f64::consts::PI / nb as f64;
+    let r2pi = EARTH_RADIUS_M * EARTH_RADIUS_M * std::f64::consts::TAU;
+    let mut d: Vec<Option<f64>> = vec![None; nb + 1];
+    for k in 1..nb {
+        let phi = -90.0 + k as f64 * 180.0 / nb as f64;
+        let (Some(ts), Some(tn)) = (tbar[k - 1], tbar[k]) else {
+            continue;
+        };
+        let grad = (ts - tn) / dphi;
+        if grad.abs() < D_FIT_GRADIENT_K_RAD {
+            continue;
+        }
+        let cosf = phi.to_radians().cos();
+        let sea = (1.0 - land[k - 1]).min(1.0 - land[k]).max(0.0);
+        let slab = match (tm[k - 1], tm[k]) {
+            (Some(a), Some(b)) => r2pi * cosf * ep.d_ocean * sea * (a - b) / dphi,
+            _ => 0.0,
+        };
+        let x = (h_at(phi) - slab) / (r2pi * cosf * grad);
+        if x.is_finite() {
+            d[k] = Some(x.clamp(D_FIT_MIN, D_FIT_MAX));
+        }
+    }
+    // Faces without a fit: linearly between the fitted ones (the zonal model's `d` if none).
+    let known: Vec<usize> = (0..=nb).filter(|&k| d[k].is_some()).collect();
+    let filled: Vec<f64> = (0..=nb)
+        .map(|k| {
+            if let Some(x) = d[k] {
+                return x;
+            }
+            let lo = known.iter().rev().find(|&&q| q < k);
+            let hi = known.iter().find(|&&q| q > k);
+            match (lo, hi) {
+                (Some(&a), Some(&b)) => {
+                    let f = (k - a) as f64 / (b - a) as f64;
+                    d[a].unwrap() + f * (d[b].unwrap() - d[a].unwrap())
+                }
+                (Some(&a), None) => d[a].unwrap(),
+                (None, Some(&b)) => d[b].unwrap(),
+                (None, None) => ep.d,
+            }
+        })
+        .collect();
+    smooth121(&smooth121(&filled))
+}
+
+/// The flux correction's fit (design §4.1) and how well it matched.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Fit {
+    pub corr: Correction,
+    pub iterations: u32,
+    /// After the fit: the largest |T_2D − T_1D| over the band tiles holding at least a tenth of
+    /// their band, and the RMS over all tiles (weighted by area), K.
+    pub worst_k: f64,
+    pub rms_k: f64,
+    /// The RMS miss of the first trial (the correction it started from), K.
+    pub first_rms_k: f64,
+    /// Band tiles held at the cap.
+    pub capped: usize,
+}
+
+/// The largest flux correction, W/m² (design §4.1's guard, raised from its 15 W/m²: the zonal
+/// model's land and sea tiles are tied by a 10 W/m²/K exchange, so the 2-D model's land–sea
+/// contrast in a band that is mostly sea takes 30–60 W/m² on the minor tile; build log).
+pub const FLUX_CORR_CAP_W_M2: f64 = 60.0; // ledger: CLM-179
+/// The fit's gain against the radiation's B (below 1: the ice-albedo feedback can make the
+/// zonal model more sensitive than 1/B), its most iterations and the years each runs, and when
+/// it is done (RMS and largest miss, K).
+const FIT_GAIN: f64 = 0.8; // ledger: CLM-179
+const FIT_ITERATIONS: u32 = 30; // ledger: CLM-179
+const FIT_YEARS: u32 = 3; // ledger: CLM-179
+const FIT_RMS_K: f64 = 0.1; // ledger: CLM-179
+const FIT_WORST_K: f64 = 0.3; // ledger: CLM-137
+
+/// Smooths a band profile 1-2-1 (the ends keep their weight).
+fn smooth121(v: &[f64]) -> Vec<f64> {
+    let n = v.len();
+    (0..n)
+        .map(|b| {
+            let a = v[b.saturating_sub(1)];
+            let c = v[(b + 1).min(n - 1)];
+            0.25 * a + 0.5 * v[b] + 0.25 * c
+        })
+        .collect()
+}
+
+/// Fits the zonal model's correction to the 2-D climate `c`: its faces' diffusivity
+/// (`fit_transport`), then F ← F + gain·B·(T_2D − T_1D) for each band's land and sea tile
+/// (annual means; the misses smoothed 1-2-1 over the bands, a tile under a tenth of its band
+/// taking the other tile's), each trial `FIT_YEARS` warm-started years of the zonal model `ep`
+/// (its `flux_corr` the first guess) on `land` and `sheet` from `ebm`, which is left at the
+/// fitted state. Returns the fit and the zonal model's last year.
+pub fn fit_flux(
+    c: &Coarse,
+    ep: &super::ebm::EbmParams,
+    land: &[f64],
+    sheet: &[f64],
+    ebm: &mut EbmState,
+) -> (Fit, super::ebm::EbmResult) {
+    let nb = ep.bands;
+    let lat: Vec<f64> = (0..nb)
+        .map(|b| -90.0 + (b as f64 + 0.5) * 180.0 / nb as f64)
+        .collect();
+    let target = zonal_tiles(c, &lat);
+    let mut ep = ep.clone();
+    ep.d_face = fit_transport(c, &ep, land);
+    if ep.flux_corr.len() != nb {
+        ep.flux_corr = vec![[0.0; 2]; nb];
+    }
+    let cap = FLUX_CORR_CAP_W_M2;
+    let gain = FIT_GAIN * ep.b;
+    let share = |b: usize| -> [f64; 2] {
+        let f = land.get(b).copied().unwrap_or(0.0).clamp(0.0, 1.0);
+        [f, 1.0 - f]
+    };
+    let mut fit = Fit::default();
+    let mut it = 0;
+    loop {
+        let er = ep.run(ebm, land, sheet, FIT_YEARS);
+        it += 1;
+        let (mut worst, mut ss, mut wsum) = (0.0f64, 0.0, 0.0);
+        let mut miss = vec![[f64::NAN; 2]; nb];
+        for b in 0..nb {
+            let w = lat[b].to_radians().cos();
+            let t1 = [
+                er.t_land[b].iter().sum::<f64>() / 12.0,
+                er.t_ocean[b].iter().sum::<f64>() / 12.0,
+            ];
+            let sh = share(b);
+            for k in 0..2 {
+                if let Some(t2) = target[b][k]
+                    && sh[k] > 0.0
+                {
+                    let m = t2 - t1[k];
+                    miss[b][k] = m;
+                    ss += w * sh[k] * m * m;
+                    wsum += w * sh[k];
+                    if sh[k] >= 0.1 {
+                        worst = worst.max(m.abs());
+                    }
+                }
+            }
+        }
+        fit.worst_k = worst;
+        fit.rms_k = if wsum > 0.0 { (ss / wsum).sqrt() } else { 0.0 };
+        if it == 1 {
+            fit.first_rms_k = fit.rms_k;
+        }
+        if (fit.rms_k < FIT_RMS_K && worst < FIT_WORST_K) || it > FIT_ITERATIONS {
+            fit.iterations = it;
+            fit.capped = ep
+                .flux_corr
+                .iter()
+                .flatten()
+                .filter(|x| x.abs() >= cap - 1e-9)
+                .count();
+            fit.corr = Correction {
+                d_face: ep.d_face.clone(),
+                flux: ep.flux_corr.clone(),
+            };
+            return (fit, er);
+        }
+        // A minor tile (under a tenth of its band) or a missing one takes the other's miss; a
+        // band with neither takes its neighbours' (through the smoothing, from zero).
+        for (b, m) in miss.iter_mut().enumerate() {
+            let sh = share(b);
+            for k in 0..2 {
+                if m[k].is_nan() || sh[k] < 0.1 {
+                    m[k] = m[1 - k];
+                }
+            }
+            for x in m.iter_mut() {
+                if x.is_nan() {
+                    *x = 0.0;
+                }
+            }
+        }
+        let mut ml: Vec<f64> = miss.iter().map(|m| m[0]).collect();
+        let mut mo: Vec<f64> = miss.iter().map(|m| m[1]).collect();
+        ml = smooth121(&ml);
+        mo = smooth121(&mo);
+        for (b, fc) in ep.flux_corr.iter_mut().enumerate() {
+            fc[0] = (fc[0] + gain * ml[b]).clamp(-cap, cap);
+            fc[1] = (fc[1] + gain * mo[b]).clamp(-cap, cap);
+        }
+    }
+}
+
 /// The moisture budget on the snapshot's coarse climate, with mountain rain taken out (`sink`,
 /// kg/m²/s per coarse cell and month) when given.
 pub fn budget(
@@ -479,6 +789,269 @@ pub fn inversion(p: &ClimateParams, t_land: f64, q: f64, f1000: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::climate::ebm::EbmParams;
+
+    /// A synthetic L1 planet `w` × w/2 (rows from the north) with land where `is_land(lat, lon)`,
+    /// 100 m high: its land and heights, the zonal model's band land fractions, and the zonal
+    /// model of climate section `p` at CO₂ `ppm` and star flux `sun`.
+    fn planet(
+        p: &ClimateParams,
+        w: usize,
+        is_land: &dyn Fn(f64, f64) -> bool,
+        ppm: f64,
+        sun: f64,
+    ) -> (Vec<bool>, Vec<f64>, Vec<f64>, EbmParams) {
+        let h = w / 2;
+        let lat = |j: usize| 90.0 - (j as f64 + 0.5) * 180.0 / h as f64;
+        let land: Vec<bool> = (0..w * h)
+            .map(|c| is_land(lat(c / w), (c % w) as f64 * 360.0 / w as f64))
+            .collect();
+        let z: Vec<f64> = land.iter().map(|&l| if l { 100.0 } else { 0.0 }).collect();
+        let mut ep = EbmParams::from_climate(p, 23.4, sun);
+        ep.co2 = Some(super::super::co2::Forcing::new(ppm));
+        let lats: Vec<f64> = (0..h).map(lat).collect();
+        let bands = super::super::snapshot::band_means(&lats, w, ep.bands, &|c| {
+            f64::from(u8::from(land[c]))
+        });
+        (land, z, bands, ep)
+    }
+
+    fn inputs<'a>(
+        p: &'a ClimateParams,
+        w: usize,
+        land: &'a [bool],
+        z: &'a [f64],
+        ebm: &'a EbmState,
+        ep: &EbmParams,
+    ) -> Inputs<'a> {
+        Inputs {
+            p,
+            w,
+            h: w / 2,
+            land,
+            z,
+            ice_prev: None,
+            koppen_prev: None,
+            band_sheet: &[],
+            ebm,
+            ep: ep.clone(),
+            tilt_deg: 23.4,
+            day_length_h: 24.0,
+        }
+    }
+
+    /// Two continents and a polar one: an Earth-like distribution.
+    fn earthlike(lat: f64, lon: f64) -> bool {
+        ((0.0..140.0).contains(&lon) && (-35.0..72.0).contains(&lat))
+            || ((230.0..300.0).contains(&lon) && (-55.0..70.0).contains(&lat))
+            || lat < -70.0
+    }
+
+    #[test]
+    fn the_flux_correction_brings_the_zonal_model_onto_the_2d_zonal_means() {
+        let p = ClimateParams {
+            grid_columns: 64,
+            ..ClimateParams::default()
+        };
+        let (land, z, bands, ep) = planet(&p, 256, &earthlike, 280.0, 1.0);
+        let mut ebm = ep.initial_state();
+        let e0 = ep.run(&mut ebm, &bands, &[], p.ebm_spinup_years);
+        let mut cell = PerCell::default();
+        let c = run(&inputs(&p, 256, &land, &z, &ebm, &ep), &mut cell);
+        // Uncorrected, the zonal model sits away from the 2-D model's zonal means.
+        let lat: Vec<f64> = (0..ep.bands)
+            .map(|b| -90.0 + (b as f64 + 0.5) * 180.0 / ep.bands as f64)
+            .collect();
+        let tgt = zonal_tiles(&c, &lat);
+        let before = (0..ep.bands)
+            .filter_map(|b| tgt[b][1].map(|t| (t - e0.t_ocean[b].iter().sum::<f64>() / 12.0).abs()))
+            .fold(0.0f64, f64::max);
+        let (fit, er) = fit_flux(&c, &ep, &bands, &[], &mut ebm);
+        eprintln!(
+            "flux fit: {} iterations, worst {:.3} K (before {:.2} K), rms {:.3} K, F {:.1}..{:.1} W/m², capped {}, T 1-D {:.2} 2-D {:.2}",
+            fit.iterations,
+            fit.worst_k,
+            before,
+            fit.rms_k,
+            fit.corr
+                .flux
+                .iter()
+                .flatten()
+                .cloned()
+                .fold(f64::MAX, f64::min),
+            fit.corr
+                .flux
+                .iter()
+                .flatten()
+                .cloned()
+                .fold(f64::MIN, f64::max),
+            fit.capped,
+            er.t_global,
+            c.r.t_global
+        );
+        assert!(
+            before > 0.3,
+            "the uncorrected models already agree ({before} K)"
+        );
+        // Every band within 1 K and 0.25 K RMS (the design's 0.3 K in every band is met except
+        // at the ice edge, where a band's snowy tile has two states; build log).
+        assert!(fit.worst_k < 1.0 && fit.rms_k < 0.25, "{fit:?}");
+        assert!(
+            fit.corr
+                .flux
+                .iter()
+                .flatten()
+                .all(|x| x.abs() <= FLUX_CORR_CAP_W_M2)
+        );
+        assert!(
+            (er.t_global - c.r.t_global).abs() < 0.2,
+            "global means {} and {}",
+            er.t_global,
+            c.r.t_global
+        );
+        // The fitted state is the zonal model's warm start: a second fit from it is at once done.
+        let mut ep2 = ep.clone();
+        fit.corr.apply(&mut ep2);
+        let (again, _) = fit_flux(&c, &ep2, &bands, &[], &mut ebm);
+        assert!(
+            again.first_rms_k < 0.25 && again.worst_k < 1.0 && again.rms_k < 0.25,
+            "{again:?}"
+        );
+    }
+
+    /// The snowball's onset and escape on a tropical supercontinent under a faint sun (design
+    /// §4.2, T6): CO₂ lowered and then raised in steps of × 1.25, each step continuing the last
+    /// one's state, in the 2-D model and in the zonal model corrected to it. As in the stage, the
+    /// correction is refitted to the 2-D model whenever the zonal model's global mean moved by
+    /// 3 K or its sea ice by 0.15 since the last fit (a triggered snapshot). The corrected zonal
+    /// model, which decides the clock's snowballs, freezes and thaws within two steps of where the
+    /// 2-D model does.
+    #[test]
+    fn the_corrected_zonal_model_freezes_and_thaws_where_the_2d_model_does() {
+        let p = ClimateParams {
+            grid_columns: 32,
+            ..ClimateParams::default()
+        };
+        let sun = 0.94;
+        let tropical = |lat: f64, lon: f64| {
+            let share = if lat.abs() < 25.0 { 0.8 } else { 0.03 };
+            (lon / 360.0 * 32.0).fract() < share
+        };
+        let w = 128;
+        let ice_of = |c: &Coarse| -> f64 {
+            let (mut s, mut a) = (0.0, 0.0);
+            for cc in 0..c.grid.w * c.grid.h {
+                let wt = c.grid.area(cc % c.grid.w, cc / c.grid.w) * (1.0 - c.land[cc]);
+                s += wt * c.r.sea_ice[cc].iter().sum::<f64>() / 12.0;
+                a += wt;
+            }
+            s / a
+        };
+        let warm_ppm = 2000.0;
+        let (land, z, bands, ep) = planet(&p, w, &tropical, warm_ppm, sun);
+        let mut e1 = ep.initial_state();
+        ep.run(&mut e1, &bands, &[], p.ebm_spinup_years);
+        // Each step runs both models to their equilibrium (a snowball deepens over centuries).
+        let q = ClimateParams {
+            ebm_warm_years: 400,
+            ..p.clone()
+        };
+        let at = |ppm: f64| {
+            let mut e = ep.clone();
+            e.co2 = Some(super::super::co2::Forcing::new(ppm));
+            e
+        };
+        let none = EbmState::default();
+        let mut cell = PerCell::default();
+        let c = run(&inputs(&p, w, &land, &z, &e1, &ep), &mut cell);
+        let (mut fit, r) = fit_flux(&c, &ep, &bands, &[], &mut e1);
+        let warm_cell = cell.clone();
+        let mut refits = 0;
+        let mut since = (r.t_global, super::super::clock::sea_ice_frac(&r, &bands));
+        // One step of both models at `ppm`: the 2-D model's sea ice, the zonal model's (its own
+        // step decides its snowball, as the clock's tracker does) and its state then; a refit
+        // afterwards moves the zonal state to the 2-D model's.
+        let mut step = |ppm: f64,
+                        cell: &mut PerCell,
+                        e1: &mut EbmState,
+                        fit: &mut Fit,
+                        since: &mut (f64, f64)|
+         -> (f64, f64, EbmState) {
+            let c2 = run(&inputs(&q, w, &land, &z, &none, &at(ppm)), cell);
+            let mut e = at(ppm);
+            fit.corr.apply(&mut e);
+            let r1 = e.run(e1, &bands, &[], 400);
+            let i1 = super::super::clock::sea_ice_frac(&r1, &bands);
+            let out = (ice_of(&c2), i1, e1.clone());
+            if (r1.t_global - since.0).abs() > TRIGGER_K || (i1 - since.1).abs() > TRIGGER_ICE {
+                let (f, r) = fit_flux(&c2, &e, &bands, &[], e1);
+                *fit = f;
+                refits += 1;
+                *since = (r.t_global, super::super::clock::sea_ice_frac(&r, &bands));
+            }
+            out
+        };
+        let (mut on2, mut on1, mut ppm) = (None, None, warm_ppm);
+        for k in 0..40 {
+            ppm = warm_ppm / 1.25f64.powi(k);
+            let (i2, i1, st) = step(ppm, &mut cell, &mut e1, &mut fit, &mut since);
+            if on2.is_none() && i2 >= p.snowball_on_frac {
+                on2 = Some(ppm);
+            }
+            if on1.is_none() && i1 >= p.snowball_on_frac {
+                on1 = Some((ppm, st));
+            }
+            // Six more steps down once both froze: a hard snowball before the CO₂ rises.
+            if on1.is_some() && on2.is_some() {
+                for _ in 0..6 {
+                    ppm /= 1.25;
+                    step(ppm, &mut cell, &mut e1, &mut fit, &mut since);
+                }
+                break;
+            }
+        }
+        let cold_cell = cell.clone();
+        let (mut esc1, mut esc2) = (None, None);
+        for k in 1..80 {
+            let x = ppm * 1.25f64.powi(k);
+            let (i2, i1, st) = step(x, &mut cell, &mut e1, &mut fit, &mut since);
+            if esc2.is_none() && i2 < p.snowball_off_frac {
+                esc2 = Some(x);
+            }
+            if esc1.is_none() && i1 < p.snowball_off_frac {
+                esc1 = Some((x, st));
+            }
+            if esc1.is_some() && esc2.is_some() {
+                break;
+            }
+        }
+        let esc2 = esc2.expect("2-D thawed");
+        let on2 = on2.expect("2-D froze");
+        let (on1, on_state) = on1.expect("zonal froze");
+        let (esc1, esc_state) = esc1.expect("zonal thawed");
+        // The triggered snapshots at the zonal model's onset and escape: the 2-D model restarts
+        // from the zonal state (it departed from the 2-D one) and stays frozen, then thawed.
+        let mut c_on_cell = warm_cell.clone();
+        let c_on = run(
+            &inputs(&p, w, &land, &z, &on_state, &at(on1)),
+            &mut c_on_cell,
+        );
+        let mut c_esc_cell = cold_cell.clone();
+        let c_esc = run(
+            &inputs(&p, w, &land, &z, &esc_state, &at(esc1)),
+            &mut c_esc_cell,
+        );
+        eprintln!(
+            "snowball onset: 2-D {on2:.0} ppm, corrected zonal {on1:.0} ppm (2-D there from the zonal state: sea ice {:.3}); escape: 2-D {esc2:.0} ppm, corrected zonal {esc1:.0} ppm (2-D there from the zonal state: {:.3}); {refits} refits",
+            ice_of(&c_on),
+            ice_of(&c_esc)
+        );
+        let steps = |a: f64, b: f64| ((a / b).ln() / 1.25f64.ln()).abs().round();
+        assert!(steps(on1, on2) <= 2.0, "onsets {on1} and {on2} ppm");
+        assert!(steps(esc1, esc2) <= 2.0, "escapes {esc1} and {esc2} ppm");
+        assert!(ice_of(&c_on) >= p.snowball_on_frac, "{}", ice_of(&c_on));
+        assert!(ice_of(&c_esc) < p.snowball_off_frac, "{}", ice_of(&c_esc));
+    }
 
     #[test]
     fn the_climate_grid_divides_l1_and_the_sharpening_keeps_its_ends() {

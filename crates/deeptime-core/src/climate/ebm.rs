@@ -71,6 +71,14 @@ pub struct EbmParams {
     pub co2: Option<super::co2::Forcing>,
     /// The snowball cloud greenhouse on frozen surfaces, W/m² (`snowball_cloud_w_m2`).
     pub snow_cloud: f64,
+    /// The per-cell climate's flux correction of every band, [land, sea] tile, W/m², added to
+    /// the absorbed sunlight (P1-26 design §4.1: fitted at each 2-D snapshot so this model's band
+    /// means match the 2-D model's zonal means; empty: none).
+    pub flux_corr: Vec<[f64; 2]>,
+    /// The atmosphere's diffusivity of every face between bands (n + 1, the poles' first and
+    /// last), W/m²/K: the per-cell climate's transport (P1-26 T6, fitted with `flux_corr`);
+    /// empty: `d` everywhere.
+    pub d_face: Vec<f64>,
 }
 
 /// The model's state at the start of a year (what a warm start continues from).
@@ -164,6 +172,8 @@ impl EbmParams {
             orbit: insolation::Orbit::default(),
             co2: None,
             snow_cloud: c.snowball_cloud_w_m2,
+            flux_corr: Vec::new(),
+            d_face: Vec::new(),
         }
     }
 
@@ -291,8 +301,9 @@ impl EbmParams {
                             * (1.0 - insulated);
                     let ao = self.albedo(free[j], to, cover);
                     let al = self.albedo(free[j], tl, g_sheet[j]);
-                    let so = qs[j] * (1.0 - ao);
-                    let sl = qs[j] * (1.0 - al);
+                    let [fl_corr, fo_corr] = self.flux_corr.get(j).copied().unwrap_or([0.0; 2]);
+                    let so = qs[j] * (1.0 - ao) + fo_corr;
+                    let sl = qs[j] * (1.0 - al) + fl_corr;
                     let (cl, cs, cm) = (self.c_land / dt, self.c_land / dt, self.c_ocean / dt);
                     let (xl, xo) = (self.exchange * (1.0 - f[j]), self.exchange * f[j]);
                     // Each tile's longwave A + B·T, less the CO₂ forcing at its temperature and
@@ -346,13 +357,19 @@ impl EbmParams {
                 }
                 // 2. Diffusion of the band mean, implicit. Land and the sea's surface have the
                 //    same heat capacity, so both take the band mean's change.
-                if self.d > 0.0 {
+                let per_face = self.d_face.len() == n + 1;
+                if self.d > 0.0 || per_face {
                     let mean: Vec<f64> = (0..n)
                         .map(|j| f[j] * state.t_land[j] + (1.0 - f[j]) * state.t_ocean[j])
                         .collect();
                     for j in 0..n {
-                        let k = self.d / (span[j] * dphi) * dt / self.c_land;
-                        let (kl, ku) = (k * face[j], k * face[j + 1]);
+                        let k = 1.0 / (span[j] * dphi) * dt / self.c_land;
+                        let (dl, du) = if per_face {
+                            (self.d_face[j], self.d_face[j + 1])
+                        } else {
+                            (self.d, self.d)
+                        };
+                        let (kl, ku) = (k * dl * face[j], k * du * face[j + 1]);
                         lo[j] = -kl;
                         up[j] = -ku;
                         di[j] = 1.0 + kl + ku;

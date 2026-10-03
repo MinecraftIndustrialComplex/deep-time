@@ -124,6 +124,7 @@ pub fn run(o: &Options) -> CliResult<()> {
         monthly: o.dump.is_some(),
         ice_prev: None,
         koppen_prev: None,
+        correction: &deeptime_core::climate::percell::Correction::default(),
     };
     let mut ebm = EbmState::default();
     let mut cell = deeptime_core::climate::percell::PerCell::default();
@@ -142,9 +143,11 @@ pub fn run(o: &Options) -> CliResult<()> {
             // The per-cell climate reads the previous snapshot's glaciers and deserts.
             let ice: Vec<f32> = s.glacier.iter().map(|&g| f32::from(g) * 1000.0).collect();
             let kop: Vec<f32> = s.koppen.iter().map(|&k| f32::from(k)).collect();
+            let fc = s.correction.clone();
             let again = snapshot::Input {
                 ice_prev: Some(&ice),
                 koppen_prev: Some(&kop),
+                correction: &fc,
                 ..inp
             };
             s = snapshot::compute(&again, &mut ebm, &sheet, &mut cell);

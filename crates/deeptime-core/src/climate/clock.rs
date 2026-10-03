@@ -222,6 +222,8 @@ pub struct Input<'a> {
     pub ridge_rel: f64,
     /// The present-state nudge, in the run's last stretch.
     pub nudge: Option<Nudge>,
+    /// The zonal model's correction to the per-cell climate (empty: none).
+    pub correction: &'a super::percell::Correction,
 }
 
 /// What a plate step's clock returns.
@@ -417,7 +419,8 @@ pub fn run(
         st.co2_factor = fac;
         let ppm = st.ppm();
         // 3. The EBM.
-        let ep = ebm_params(p, inp.tilt_deg, inp.star_flux_rel, ppm, t_next);
+        let mut ep = ebm_params(p, inp.tilt_deg, inp.star_flux_rel, ppm, t_next);
+        inp.correction.apply(&mut ep);
         let sheet: Vec<f64> = st.sheet.iter().map(|s| s * p.ice_sheet_feedback).collect();
         let er = ep.run(ebm, inp.land_frac, &sheet, p.ebm_clock_years);
         // 4. ELA shifts and the ice.
@@ -623,12 +626,14 @@ pub fn balance(
     k: &Kernel,
     d: f64,
     ridge_rel: f64,
+    correction: &super::percell::Correction,
 ) -> (f64, EbmState) {
     let (mut lo, mut hi) = (1.0f64.ln(), 1.0e6f64.ln());
     let sheet_fb: Vec<f64> = sheet.iter().map(|s| s * p.ice_sheet_feedback).collect();
     let trial = |x: f64| -> (f64, EbmState) {
         let ppm = x.exp();
-        let ep = ebm_params(p, tilt, flux, ppm, t);
+        let mut ep = ebm_params(p, tilt, flux, ppm, t);
+        correction.apply(&mut ep);
         let mut s = ep.initial_state();
         let er = ep.run(&mut s, land, &sheet_fb, p.ebm_spinup_years.max(40));
         (weathering_at(p, k, &er, sheet, ppm, ridge_rel, land) - d, s)
@@ -705,7 +710,16 @@ mod tests {
                 ..ClockState::default()
             };
             let (ppm, ebm) = balance(
-                &self.p, 23.4, 1.0, t, &self.land, &st.sheet, &st.kernel, d, 1.0,
+                &self.p,
+                23.4,
+                1.0,
+                t,
+                &self.land,
+                &st.sheet,
+                &st.kernel,
+                d,
+                1.0,
+                &Default::default(),
             );
             st.carbon = Carbon::at_ppm(ppm);
             (st, ebm)
@@ -748,6 +762,7 @@ mod tests {
                         .collect()
                 };
                 let inp = Input {
+                    correction: &Default::default(),
                     p: &p,
                     tilt_deg: 23.4,
                     star_flux_rel: 1.0,
@@ -818,6 +833,7 @@ mod tests {
         let end = |ln_factor: f64| -> (f64, f64, f64, bool) {
             let (mut st, mut ebm) = (st0.clone(), ebm0.clone());
             let inp = Input {
+                correction: &Default::default(),
                 p: &pl.p,
                 tilt_deg: 23.4,
                 star_flux_rel: 1.0,
@@ -1038,6 +1054,7 @@ mod tests {
                 share.clone()
             };
             let inp = Input {
+                correction: &Default::default(),
                 p: &p,
                 tilt_deg: 23.4,
                 star_flux_rel: 1.0,
