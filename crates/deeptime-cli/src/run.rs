@@ -235,10 +235,34 @@ pub fn load_preset_with(
 /// The plate model's summary line (plan P1-03: `plates_final=<n> ocean_age_p90_myr=<a> …`), when
 /// the world has plates.
 pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<String> {
-    world
-        .plates
-        .as_ref()
-        .map(|st| deeptime_core::plates::stats::summary(st).line())
+    use deeptime_core::plates::collapse;
+    let st = world.plates.as_ref()?;
+    // The orogenic collapse over the run, and the continental crust's thickness now (visible
+    // samples), km.
+    let global = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
+    let mut thick: Vec<f64> = st
+        .samples
+        .iter()
+        .filter(|s| s.is_continental() && !s.is_hidden())
+        .map(|s| f64::from(s.thickness_m) / 1000.0)
+        .collect();
+    thick.sort_by(f64::total_cmp);
+    let q = |f: f64| {
+        thick
+            .get(((thick.len().max(1) - 1) as f64 * f).round() as usize)
+            .copied()
+            .unwrap_or(0.0)
+    };
+    Some(format!(
+        "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
+        deeptime_core::plates::stats::summary(st).line(),
+        global(collapse::MOVED_GLOBAL),
+        global(collapse::GAINED_GLOBAL),
+        q(0.1),
+        q(0.5),
+        q(0.9),
+        q(0.99),
+    ))
 }
 
 /// The continental margins over the run (P1-27, `notes.plates.margins`): the mean shares by
