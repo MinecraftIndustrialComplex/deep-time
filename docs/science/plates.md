@@ -11,7 +11,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | plate setup | PLT-001 to PLT-021, PLT-203, PLT-205, PLT-209 to PLT-211 (26) |
 | [PLT](ledger/PLT.md) | plate motion | PLT-022 to PLT-028 (7) |
 | [PLT](ledger/PLT.md) | subduction | PLT-029 to PLT-067, PLT-206 to PLT-207, PLT-229, PLT-251 to PLT-252 (44) |
-| [PLT](ledger/PLT.md) | collisions | PLT-068 to PLT-081, PLT-222 to PLT-227, PLT-241 to PLT-250 (30; PLT-069 to PLT-075 and PLT-227 retired 2026-10-02) |
+| [PLT](ledger/PLT.md) | collisions | PLT-068 to PLT-081, PLT-222 to PLT-227, PLT-241 to PLT-250, PLT-253 (31; PLT-069 to PLT-075 and PLT-227 retired 2026-10-02) |
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
 | [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228 (19) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
@@ -20,7 +20,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
 
-Rows by status (after plate tasks 3 and 4 and the continental crust fix, 2026-10-02): `verified` 17, `cited-unverified` 41, `from-memory` 4, `abstract-only` 17, `calibrated` 13, `game-choice` 74, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
+Rows by status (after plate tasks 3 and 4 and the continental crust fix, 2026-10-02): `verified` 17, `cited-unverified` 41, `from-memory` 4, `abstract-only` 17, `calibrated` 13, `game-choice` 75, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
 
 ## Material for the stage 2 writer
 
@@ -70,8 +70,13 @@ sinking plate standing at the overriding plate's edge and converging, PLT-224):
    the profile that rises from the foreland towards the front at `wedge_slope_deg` (1.5°, PLT-192)
    up to the overriding plate's height at the front.
 3. The belt takes the rest (PLT-241, PLT-243): spread over `collision_belt_km` (400 km) behind the
-   front, highest at the front. Nothing caps it. Crust that stands above its strength height
-   spreads in the surface stage into a plateau; erosion wears it down.
+   front, highest at the front. A belt sample rises no higher than the crust's strength height
+   (about 5.2 km at 140 MPa and 1 g, PLT-253): what the front cannot take goes to the belt behind
+   it, so the belt widens into a plateau, and what no sample can take goes down with the slab.
+   Above that height the surface stage's spreading moves crust sideways (the same height), and
+   erosion wears the belt down. Before the limit (2026-10-03) a collision that never stalled
+   piled crust 200-290 km thick on a sliver of a plate and the surface stood 14 km high: the
+   spreading runs once a step on the surface, while a fast front stacks kilometres a step.
 4. Belt and wedge are stamped as a collision orogeny (the `collision` regime, PLT-079, PLT-247), and
    the stacked rock is the consumed crust's own rock, its sediments metamorphosed (PLT-248).
 5. The surface stage's flexure (`flexure.md`) carries the uplift as a load: the stiff arriving
