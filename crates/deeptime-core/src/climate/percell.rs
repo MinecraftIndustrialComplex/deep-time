@@ -377,6 +377,7 @@ pub fn run(inp: &Inputs<'_>, cell: &mut PerCell) -> Coarse {
 /// Whether the zonal model's state `z` has moved away from the 2-D state `st`: their sea-surface
 /// temperature over the sea differs by more than 3 K, or their sea-ice cover by more than 0.15
 /// of the sea (the design's thresholds for a triggered snapshot, §4.2).
+#[allow(clippy::needless_range_loop)]
 fn departed(g: &Grid, land: &[f64], st: &State2d, z: &EbmState) -> bool {
     let nb = z.t_ocean.len();
     if nb == 0 {
