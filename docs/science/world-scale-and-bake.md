@@ -126,7 +126,11 @@ are game choices about how far terrain stays the same terrain as the chunks.
 
 - **The seam.** Every far column folds x into the planet's lap [-C/2, C/2), the period at which
   the world data wraps and at which Toroidal World loops the level, so a section west of x = C/2,
-  east of it or across it draws what the chunks there have (BAK-042).
+  east of it or across it draws what the chunks there have (BAK-042). What far terrain does not
+  draw is what is random per chunk on top of the column rule: trees, plants, coral reefs and the
+  carvers' cuts. The checks read the ground under the first three and count a column a carver cut
+  below far terrain's ground apart (at most one in eight); on the MIC set Terralith's canyon, which
+  reaches from y −20 to 70, cut a sea bed two blocks under the water down to y −2 (2026-10-03).
 - **Toroidal World's guard** (Ben, 2026-10-02: "Mixin around TW's guard"). TW 0.19.3 (MIT) refuses
   every Distant Horizons world generator but DH's own on a level it wraps, from DH 3.3.1 on: TW
   makes the seam seamless by reshaping the level's chunk generator and folding DH's section keys,
