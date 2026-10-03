@@ -679,6 +679,58 @@ def land():
     report("pole_walk_cleared", res)
 
 
+def land2():
+    """Seam views over land, in spectator mode (no falling), with the seam marked: red concrete on
+    the inside row along the seam, blue on the glued row (the far side's first row), so the picture
+    shows where the seam is and that the ground runs on. Then a ground walk with jumping."""
+    by = {p["name"]: p for p in seams()["portals"]}
+    sites = [s for s in land_sites() if s["seam"] != "west"]
+    client_start()
+    rc(f"op {PLAYER}")
+    rc(f"effect give {PLAYER} minecraft:night_vision infinite 0 true")
+    rc("time set noon")
+    out = []
+    for site in sites:
+        p = by[site["seam"]]
+        ix, iz = (int(v) for v in inward(p))
+        ox, _, oz = p["origin"]
+        ax = (int(p["axis_w"][0]), int(p["axis_w"][2]))
+        ex, ez = int(ox + ax[0] * site["s"]), int(oz + ax[1] * site["s"])
+        yaw = {(0, -1): 180, (0, 1): 0, (1, 0): -90, (-1, 0): 90}[(-ix, -iz)]
+        back = yaw if p["kind"] == "half_turn" else {180: 0, 0: 180, -90: 90, 90: -90}[yaw]
+        g = glue_point(p, ex, ez)
+        preload([(ex, ez), g], 80)
+        # The inside row of cells along the seam, and the glued row.
+        inside_row = []
+        for k in range(-12, 13):
+            cx = ex + ax[0] * k - (1 if ix < 0 else 0)
+            cz = ez + ax[1] * k - (1 if iz < 0 else 0)
+            inside_row.append((cx, cz))
+        for (cx, cz) in inside_row:
+            hy = probe(cx, cz).get("surfaceY", 64)
+            rc(f"setblock {cx} {hy} {cz} minecraft:red_concrete")
+            ocx, ocz = cx - ix, cz - iz                     # the outside neighbour cell
+            gx, gz = glue_cell(p, ocx, ocz)                  # its glued cell on the far side
+            gy = probe(gx, gz).get("surfaceY", 64)
+            rc(f"setblock {gx} {gy} {gz} minecraft:blue_concrete")
+        rc(f"gamemode spectator {PLAYER}")
+        for tag, (vx, vz, vyaw) in {"near": (ex + ix * 45 + 0.5, ez + iz * 45 + 0.5, yaw),
+                                     "far": (*glue_point(p, ex - ix * 45 + 0.5, ez - iz * 45 + 0.5), back)}.items():
+            hv = probe(vx, vz).get("surfaceY", 80)
+            rc(f"tp {PLAYER} {vx:.1f} {max(hv, 63) + 28} {vz:.1f} {vyaw} 32")
+            time.sleep(50)
+            shot(f"seam-view-{site['seam']}-{tag}")
+        rc(f"gamemode creative {PLAYER}")
+        sx, sz = ex + ix * 10 + 0.5, ez + iz * 10 + 0.5
+        hs = probe(sx, sz).get("surfaceY", 80)
+        res = look_and_walk(f"ground-walk-{site['seam']}", (sx, hs + 1.2, sz), yaw, 10, 8, portal=p,
+                            keys=("Control_L", "w", "space"), settle=30, fly=False)
+        res["site"] = site
+        out.append(res)
+        unload([(ex, ez), g], 80)
+        report("ground_walks", out)
+
+
 def client():
     t = seams()
     by = {p["name"]: p for p in t["portals"]}
@@ -779,7 +831,8 @@ if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     phases = sys.argv[1:] or ["all"]
     table = {"setup": setup, "boot": boot, "portals": portals, "terrain": terrain, "entities": entities,
-             "physics": physics, "client": client, "land": land, "stop": stop, "all": all_phases}
+             "physics": physics, "client": client, "land": land, "land2": land2, "stop": stop,
+             "all": all_phases}
     try:
         for ph in phases:
             log("=== phase", ph)
