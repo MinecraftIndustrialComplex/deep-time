@@ -372,8 +372,14 @@ fn a_craters_lens_is_seated_under_the_drawn_floor() {
             off += 1;
         }
     }
-    assert!(seated > 0, "the test planet has craters with lenses to read");
-    assert_eq!(off, 0, "of {seated} lenses read, {off} are not under the drawn floor");
+    assert!(
+        seated > 0,
+        "the test planet has craters with lenses to read"
+    );
+    assert_eq!(
+        off, 0,
+        "of {seated} lenses read, {off} are not under the drawn floor"
+    );
     assert!(m.notes["bake"]["impact_bodies"]["lenses"].as_u64().unwrap() > 0);
     std::fs::remove_dir_all(&dir).unwrap();
 }
