@@ -74,7 +74,7 @@ host rock in the top 2 km) and three global clocks.
    window, the stable continental interiors can inherit banded iron formation in their basement,
    and the basement then counts as its host where it lies within the top 2 km (ORE-020). Not every
    interior: at the run's first step the stable continental interiors are dealt a field of
-   basins covering `deposits.inherited_bif_share` of them (1.4 %, Earth's share, ORE-261), each
+   basins covering `deposits.inherited_bif_share` of them (5 %, a game choice of the owner's; Earth's share is 1.4 %, ORE-261), each
    about `deposits.bif_basin_km2` (100,000 km², Hamersley's size, ORE-263), coherent ellipses with
    rough edges (ORE-264); the basins ride with their crust and hold iron formation where their
    crust is a stable interior.
@@ -141,7 +141,7 @@ The main constants by family; the ledgers hold every row.
 | ORE-015 | Coal-forming land plants after | 0.419 | Ga | Nelsen et al. 2016; ICS chart 2023/09 | `verified` |
 | ORE-016 | Banded iron formation window | 2.6 to 1.85 (was 2.65 to 1.85) | Ga | Bekker et al. 2010 | `abstract-only` |
 | ORE-020 | Inherited BIF in the basins under a stable interior | basin × craton (frame mean) × the share of the window before the run | 0–1 | plan §8.6 | `game-choice` |
-| ORE-261 | Share of the stable interiors that are iron-formation basins (`deposits.inherited_bif_share`) | 0.014 (was 0, the interim) | 0–1 | Earth: 0.75 million km² of 2.6–1.8 Ga basins / 53.5 million km² of shields and cratons (see below) | `verified` (arithmetic) |
+| ORE-261 | Share of the stable interiors that are iron-formation basins (`deposits.inherited_bif_share`) | 0.05 (a game choice, owner 2026-10-02; Earth's sourced share is 0.014; was 0, the interim) | 0–1 | Earth: 0.75 million km² of 2.6–1.8 Ga basins / 53.5 million km² of shields and cratons = 0.014 (see below) | `game-choice` (default); the Earth reference is `verified` (arithmetic) |
 | ORE-263 | Typical basin area (`deposits.bif_basin_km2`) | 100,000 | km² | median of seven Earth basins (Hamersley about 100,000, WAEPA1974) | `verified` |
 | ORE-264 | Basin field shape | ellipses of elongation 1–3, area lognormal σ 0.5, edges ±0.25 of the radius, none under a quarter basin | – | none | `game-choice` |
 | ORE-262 | Richness acts on the blocks | zone density × richness ≤ 0.9; raw share × richness ≤ 0.5 | probability | none | `game-choice` |
@@ -209,7 +209,7 @@ capped because only 2.1 % of what forms survives within 1 km), and **coal** lose
 Myr of the run: its permissive area falls by a third and its target from 59 to 38 fields.
 
 The run above had inherited BIF in every stable interior (the setting at 1). The built-in presets
-now ship `deposits.inherited_bif_share` at 0 (ORE-261). The same command on the branch with that
+then shipped `deposits.inherited_bif_share` at 0 (ORE-261; since 2026-10-02 0.05). The same command on the branch with that
 default (a8b90db, 2026-10-02) gives: porphyry 8 sites (3 counted, target 5.3, capped), supergene 1,
 placer 40, **banded iron formation 0**, coal 76 (54 counted, target 46.0, permissive 328,344 km²),
 MVT 87 (35 counted), sedex 2, petroleum 9, impact types 0, 16, 0 and 8. Coal still forms only after
@@ -244,6 +244,11 @@ original extents). Earth's shields and cratons cover 53.5 million km² (the prov
 Hasterok et al. 2022, areas computed from the open shapefiles), so the basins are 1.4 % of them
 (1.3 to 2.6 %; 1.0 % of the 73 million km² of Archean and Early Proterozoic crust of Abbott et
 al. 2000). The basin size is the median of the seven, 100,000 km².
+
+**The default is 5 %, not Earth's 1.4 %** (the owner's choice, 2026-10-02, "5 % of stable interiors").
+A 16k planet has about 1/44 of Earth's area, so at Earth's share it holds about one iron-formation
+site, often under the sea; at 5 % it holds a handful (about 15 sites, around 6 on land in the run
+below). Earth's 1.4 % stays as the reference value in ORE-261; the editor slider sets any share.
 
 Measured on the quick 16k planet (`earthlike_quick_16k`, `scattered_continents`, 1,000 Myr,
 `tools/review/deposit-richness-runs.sh`, 2026-10-02): the first step's stable continental
@@ -379,7 +384,8 @@ than these figures; that was not measured.
 - Placer gold moved into a real river channel within 30 km at the bake (Ben, 2026-10-01).
 - Richer deposits, thinner scatter and raw-ore cores (Ben, 2026-10-02: ORE-262, ORE-265, ORE-266;
   the values are the agent's, against the targets above); inherited iron formation in a basin
-  field at Earth's share (Ben, 2026-10-02: ORE-261, ORE-263, ORE-264).
+  field (Ben, 2026-10-02: ORE-261, ORE-263, ORE-264), at 5 % of the stable interiors rather than
+  Earth's 1.4 % (Ben, 2026-10-02, "5 % of stable interiors").
 - Province endowment strength and size, camp spacings, zoning fractions and zone densities
   (design values per the type files).
 - The favourability curves of every type: the concepts are sourced (for example Superior-type iron
