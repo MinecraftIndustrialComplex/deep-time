@@ -212,7 +212,7 @@ public final class RealPlanetGameTests {
                 return false;
             JsonObject col = fixture.get(k).getAsJsonObject();
             int x = col.get("wx").getAsInt(), z = col.get("z").getAsInt();
-            if (Math.abs(z) > c / 4 - 32)
+            if (Math.abs(z) > com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c) - 32)
                 return false;   // past the pole edge: the beyond-pole mask, not the bake
             n[0]++;
             ChunkAccess chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.SURFACE, true);

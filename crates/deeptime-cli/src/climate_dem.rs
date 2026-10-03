@@ -96,9 +96,7 @@ pub fn run(o: &Options) -> CliResult<()> {
     // A planet grid of w cells around (r = 1 block per cell; block = circumference / w).
     let grid = GridDesc::for_planet("L1", o.w, 1)?;
     let cell_m = o.circumference_km * 1000.0 / f64::from(o.w);
-    let lat: Vec<f64> = (0..h)
-        .map(|j| 90.0 - 180.0 * (j as f64 + 0.5) / h as f64)
-        .collect();
+    let lat: Vec<f64> = (0..h).map(|j| grid.band_lat_deg(j as u32)).collect();
     let planet = Planet {
         axial_tilt_deg: tilt,
         star_flux_rel: flux,
@@ -240,7 +238,8 @@ pub fn run(o: &Options) -> CliResult<()> {
     // The printed check: the class at each known place, and whether its group matches.
     let (mut same, mut group) = (0, 0);
     for (name, la, lo, want) in PLACES {
-        let j = (((90.0 - la) / 180.0 * h as f64).floor() as usize).min(h - 1);
+        let j = (deeptime_format::Projection::picture_y_of_lat(la, h as u32).floor() as usize)
+            .min(h - 1);
         let i = ((lo.rem_euclid(360.0) / 360.0 * w as f64).floor() as usize) % w;
         // Coastal cities can fall in a sea cell at this resolution: take the nearest land cell
         // within two cells.

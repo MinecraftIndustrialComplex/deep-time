@@ -380,6 +380,21 @@ enum Command {
         /// Only the sites of this deposit type (repeatable; `placer_au` or `deeptime:placer_au`).
         #[arg(long)]
         only: Vec<String>,
+        /// Scatter multiplier instead of the world's (`notes.deposits.scatter_mult`).
+        #[arg(long)]
+        scatter_mult: Option<f64>,
+        /// Random land points of the early-game access probe (0: none).
+        #[arg(long, default_value_t = 150)]
+        access_points: usize,
+        /// Blocks under the top solid block the access probe counts ore in.
+        #[arg(long, default_value_t = 48)]
+        access_depth: i32,
+        /// Ore-equivalent (a raw block counts 9) the access probe gathers.
+        #[arg(long, default_value_t = 24.0)]
+        access_need: f64,
+        /// How far the access probe looks, in chunks.
+        #[arg(long, default_value_t = 96)]
+        access_radius: i64,
     },
     /// Write the Java↔Rust column parity fixture (plan §9.2): columns of a world-data folder as the
     /// column evaluator answers them, for `ColumnParityTest` and the real-planet GameTest.
@@ -535,7 +550,7 @@ enum Command {
         /// PNG to write.
         #[arg(long)]
         out: PathBuf,
-        /// Width in pixels (the height is half of it).
+        /// Width in pixels (the height follows the projection's aspect: half of it).
         #[arg(long, default_value_t = 1024)]
         width: u32,
         /// Draw on this elevation field only (`elevation`: the deep-time surface's L1 frame;
@@ -769,7 +784,7 @@ fn main() -> ExitCode {
             climate_dem::run(&climate_dem::Options {
                 dem,
                 w: width,
-                h: width / 2,
+                h: deeptime_format::Projection::picture_height(width),
                 preset,
                 circumference_km,
                 viewer,
@@ -934,8 +949,18 @@ fn main() -> ExitCode {
             area,
             json,
             only,
+            scatter_mult,
+            access_points,
+            access_depth,
+            access_need,
+            access_radius,
         }) => {
             let o = deposit_audit::Options {
+                scatter_mult,
+                access_points,
+                access_depth,
+                access_need,
+                access_radius,
                 world_data,
                 scatter_dir,
                 chunks,
@@ -1367,14 +1392,12 @@ fn landforms_at(
                     && e.params.get("standing") == Some(&ParamValue::Int(1)))
         })
         .filter_map(|e| {
+            // Distance in blocks of the world (the projection's blocks), as km.
+            let proj = deeptime_format::Projection::of(c);
+            let (x0, z0) = proj.block_of(lat, lon);
             let dist = |la: f64, lo: f64| {
-                let mut dlon = (lon - lo).rem_euclid(360.0);
-                if dlon > 180.0 {
-                    dlon -= 360.0;
-                }
-                let dx = dlon / 360.0 * c * km_per_block;
-                let dz = (lat - la) / 360.0 * c * km_per_block;
-                dx.hypot(dz)
+                let (x1, z1) = proj.block_of(la, lo);
+                proj.wrap_x(x0 - x1).hypot(z0 - z1) * km_per_block
             };
             // An arc segment or a hotspot chain holds the column when one of its cones does (a
             // small segment's cones are listed on its subduction onset, `volcano_cones`, wherever

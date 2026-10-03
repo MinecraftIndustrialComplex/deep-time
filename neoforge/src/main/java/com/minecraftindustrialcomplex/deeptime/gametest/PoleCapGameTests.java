@@ -505,7 +505,7 @@ public final class PoleCapGameTests {
                     if (!(dz[3] > 0.5))
                         problems.add("the hull at 77.5° N was not pushed toward the equator (+z): " + dz[3]);
                     // The stop: one tick at 60 blocks/s is 3 blocks; allow a block more for Sable's substeps.
-                    double allowed = cap.stopDeg() + 4.0 * 360.0 / rig.c;
+                    double allowed = Math.abs(rig.lat(rig.z(cap.stopDeg()) - 4.0));   // 4 blocks past the stop
                     Vec3 fp = SableTestOps.position(level, fast), fv = SableTestOps.velocity(level, fast);
                     d.append(String.format(Locale.ROOT, " stop hull: maxEdgeLat=%s (allowed %s) end lat=%s vz=%s pushes=%d",
                             f(maxEdgeLat[0]), f(allowed), f(rig.lat(fp.z)), fv == null ? "-" : f(fv.z), pushes[0]));

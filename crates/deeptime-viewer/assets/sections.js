@@ -23,6 +23,7 @@
   if (!W) return;
   const { $, esc, ic, clamp, fmtInt, api, toast, modal, niceTicks } = W;
   const enc = encodeURIComponent;
+  const proj = window.DTProj;   // the planet's projection (projection.js)
 
   // ===============================================================================================
   // Page furniture: an icon, styles
@@ -363,7 +364,7 @@ button.chip[aria-pressed="true"] { border-color: var(--accent-line); background:
     if (end) {
       // The shorter way round in longitude, as the server cuts it; drawn again a lap to each side
       // so a line across the seam is seen leaving one edge and entering the other.
-      const bx = ax + shortDLon(end.lon - S.a.lon) / 360 * cw, by = (90 - end.lat) / 180 * ch;
+      const bx = ax + proj.xOfLonPic(shortDLon(end.lon - S.a.lon), cw), by = proj.yOfLat(end.lat, ch);
       ctx.setLineDash(S.state === 'pickB' ? [6 * dpr, 4 * dpr] : []);
       for (const [col, w] of [['rgba(6,9,14,.85)', 4.5 * dpr], ['#fff', 2 * dpr]]) {
         ctx.strokeStyle = col; ctx.lineWidth = w;
@@ -716,7 +717,7 @@ button.chip[aria-pressed="true"] { border-color: var(--accent-line); background:
   function placeDock() {
     if (dock.hidden || !S.a || !S.b || !W.pane(S.pane)) return;
     const vp = $('viewport').getBoundingClientRect(), cr = W.pane(S.pane).canvas.getBoundingClientRect();
-    const y = lat => cr.top - vp.top + (90 - lat) / 180 * cr.height;
+    const y = lat => cr.top - vp.top + proj.yOfLat(lat, cr.height);
     const lo = Math.min(y(S.a.lat), y(S.b.lat)), hi = Math.max(y(S.a.lat), y(S.b.lat));
     const room = dock.offsetHeight + 24;
     const top = hi > vp.height - room && lo > room;

@@ -57,8 +57,8 @@ public final class GeneratorGameTests {
         DeepTime.LOGGER.info("[gametest] testPlanetDimensionExists level={} generator={} C={} minY={} height={}",
                 level.dimension().location(), g.getClass().getSimpleName(), g.terrain().circumference(),
                 level.getMinBuildHeight(), level.getHeight());
-        helper.assertTrue(level.getMinBuildHeight() == -352 && level.getHeight() == 992,
-                "build range " + level.getMinBuildHeight() + " + " + level.getHeight() + ", expected -352 + 992");
+        helper.assertTrue(level.getMinBuildHeight() == -512 && level.getHeight() == 1152,
+                "build range " + level.getMinBuildHeight() + " + " + level.getHeight() + ", expected -512 + 1152");
         helper.succeed();
     }
 

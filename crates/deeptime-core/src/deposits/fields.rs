@@ -444,17 +444,15 @@ impl FieldHistory for MemoryHistory {
     }
 }
 
-/// True area of L1 cell row `j` in km² on a planet whose blocks are `m_per_block_h` wide:
-/// (r · m / 1000)² · cos φ (plan §5.2: block-metric cells, true area shrinks with latitude).
+/// True area of L1 cell row `j` in km² on a planet whose blocks are `m_per_block_h` wide
+/// (`GridDesc::cell_area_km2`: the projection's area scale at the row).
 pub fn cell_area_km2(grid: &GridDesc, j: u32, m_per_block_h: f64) -> f64 {
-    let side_km = f64::from(grid.r) * m_per_block_h / 1000.0;
-    side_km * side_km * lat_of_row(grid, j).to_radians().cos().max(0.0)
+    grid.cell_area_km2(j, m_per_block_h)
 }
 
-/// Latitude (degrees, north positive) of L1 row `j`: z = origin + j·r, lat = −z / (C/4) · 90.
+/// Latitude (degrees, north positive) of L1 row `j` (`GridDesc::lat_of_row`).
 pub fn lat_of_row(grid: &GridDesc, j: u32) -> f64 {
-    let z = grid.block_z(i64::from(j)) as f64;
-    -z / (grid.circumference() as f64 / 4.0) * 90.0
+    grid.lat_of_row(j)
 }
 
 #[cfg(test)]

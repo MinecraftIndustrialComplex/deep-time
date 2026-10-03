@@ -29,16 +29,15 @@ struct Entry {
     z: f64,
 }
 
-/// Block (x, z) of a latitude and longitude (plan §5.2).
+/// Block (x, z) of a latitude and longitude (`deeptime_format::projection`).
 pub fn block_of(c: f64, lat: f64, lon: f64) -> (f64, f64) {
-    let x = (lon / 360.0 * c - c / 2.0 + c / 2.0).rem_euclid(c) - c / 2.0;
-    (x, -lat / 90.0 * c / 4.0)
+    deeptime_format::Projection::of(c).block_of(lat, lon)
 }
 
 /// Latitude and longitude (degrees; the seam is 0°) of block (x, z).
 pub fn lat_lon_of(c: f64, x: f64, z: f64) -> [f32; 2] {
-    let lon = (360.0 * (x + c / 2.0) / c).rem_euclid(360.0);
-    [(-z / (c / 4.0) * 90.0) as f32, lon as f32]
+    let (lat, lon) = deeptime_format::Projection::of(c).lat_lon(x, z);
+    [lat as f32, lon as f32]
 }
 
 /// How far back an event may have ended and still count as a cause (years).

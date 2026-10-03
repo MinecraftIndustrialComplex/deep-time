@@ -31,10 +31,11 @@ public record Body(int id, int site, int shape, String role, double[] center, fl
 
     /**
      * One zone. {@code material} null: an alteration or cap zone (rock only). {@code density} is the
-     * probability that a host block in the zone becomes ore.
+     * probability that a host block in the zone becomes ore; {@code raw} the share of those ore
+     * blocks that are the material's raw-ore block instead (vanilla's ore veins; FORMAT.md).
      */
     public record Zone(String name, String material, String rockClass, float d0, float d1, float v0, float v1,
-                       float grade, float density) {
+                       float grade, float density, float raw) {
 
         /** Rust's {@code Zone::contains}: [lo, hi), an upper bound ≥ 1 inclusive. */
         public boolean contains(double d, double v) {

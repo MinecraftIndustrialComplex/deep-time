@@ -11,8 +11,8 @@ import com.google.gson.JsonObject;
  * <p><b>Why.</b> Vanilla hard-codes two heights for a world whose floor is y −64: every open block
  * below y −54 is lava ({@code NoiseBasedChunkGenerator.createFluidPicker}), and a cave lake whose
  * surface is at y −10 or lower may be lava ({@code Aquifer.computeFluidType}). Those are
- * floor + 10 and floor + 54. A Deep Time world's floor is y −352, so left alone the first rule
- * turned the lowest 298 blocks of every cave, and of every stretch of sea deeper than 117 blocks,
+ * floor + 10 and floor + 54. A Deep Time world's floor is y −512, so left alone the first rule
+ * turned the lowest 458 blocks of every cave, and of every stretch of sea deeper than 117 blocks,
  * into lava (Ben's preview of 2026-10-01: 2.15 million lava blocks in a 256 × 256 box, 4,020
  * columns of sea standing on lava). {@link LavaFluids} and the {@code deeptime:lava_lakes} density
  * function apply the two rules from this class instead.
@@ -39,7 +39,7 @@ public record LavaRules(int floorBlocks, int lakeBlocks) {
     public static final int LAKE_CELL = 40;
 
     /** The largest values accepted (the presets' range checks agree). */
-    public static final int MAX_BLOCKS = 992;
+    public static final int MAX_BLOCKS = 1152;
 
     public LavaRules {
         floorBlocks = Math.clamp(floorBlocks, 0, MAX_BLOCKS);

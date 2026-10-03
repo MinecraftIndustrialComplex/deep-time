@@ -8,13 +8,20 @@
 #       builds the release CLI, copies it as deeptime-<name>, runs earthlike_quick_16k
 #       (scattered_continents, 500 Myr, 3 threads) into <name>-world/, then strata-check
 #       (<name>-strata.json) and structure-sections (<name>-sections/); log <name>.log.
-#       A VAR=VALUE third argument is put in the run's environment.
+#       A VAR=VALUE third argument is put in the run's environment. WP8_RUNS, WP8_START and
+#       WP8_LENGTH override the scratch folder, the start and the length (the vertical-scale task:
+#       WP8_RUNS=…/def-scale WP8_START=supercontinent WP8_LENGTH=1000).
 #   tools/remote/mac.sh -- tools/review/wp8-runs.sh gates     (fmt, clippy, deny, cargo test, gradlew)
+#   tools/remote/mac.sh --server --pack -- tools/review/wp8-runs.sh gametest
+#       ./gametest.sh, tools/smoke/install.sh mic, ./gametest.sh -PwithMic under one hold of the
+#       server lock; full outputs in $WP8_RUNS/gt-standalone.out, install-mic.out and gt-mic.out
 #   tools/remote/mac.sh --no-sync -- tools/review/wp8-runs.sh status
 #   tools/remote/mac.sh --no-sync -- tools/review/wp8-runs.sh clean
 set -euo pipefail
 
-RUNS=/Volumes/Graphide/ban/deeptime-runs/wp8
+RUNS="${WP8_RUNS:-/Volumes/Graphide/ban/deeptime-runs/wp8}"
+START="${WP8_START:-scattered_continents}"
+LENGTH="${WP8_LENGTH:-500}"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 mkdir -p "$RUNS"
 cd "$REPO"
@@ -29,7 +36,7 @@ case "${1:-}" in
             && cp target/release/deeptime '$RUNS/deeptime-$name' \
             && rm -rf '$RUNS/$name-world' '$RUNS/$name-sections' \
             && env $envs /usr/bin/time -v '$RUNS/deeptime-$name' run --preset earthlike_quick_16k \
-               --start scattered_continents --length-myr 500 --threads 3 --out '$RUNS/$name-world' $sets \
+               --start '$START' --length-myr '$LENGTH' --threads 3 --out '$RUNS/$name-world' $sets \
             && '$RUNS/deeptime-$name' strata-check --world-data '$RUNS/$name-world' > '$RUNS/$name-strata.json' \
             && '$RUNS/deeptime-$name' structure-sections --world-data '$RUNS/$name-world' \
                --out '$RUNS/$name-sections' --half 300 --px 2 \
@@ -45,6 +52,17 @@ case "${1:-}" in
         cargo test --workspace --no-fail-fast 2>&1 | grep -E "^test result|FAILED|panicked"; echo "test=${PIPESTATUS[0]}"
         (cd neoforge && ./gradlew build test -q 2>&1 | tail -5; echo "gradle=${PIPESTATUS[0]}"; \
             python3 ../tools/ci/junit-summary.py build/test-results/test 2>&1 | tail -3)
+        ;;
+    gametest)
+        # Both GameTest gates, in the foreground (the caller holds the server lock).
+        set +e
+        ./gametest.sh > "$RUNS/gt-standalone.out" 2>&1; echo "gametest=$?"
+        tail -n 4 "$RUNS/gt-standalone.out"
+        grep -E "GAME TESTS COMPLETE|required tests (failed|passed)" neoforge/build/gametest.log | tail -3
+        tools/smoke/install.sh mic > "$RUNS/install-mic.out" 2>&1; echo "install_mic=$?"
+        ./gametest.sh -PwithMic > "$RUNS/gt-mic.out" 2>&1; echo "gametest_mic=$?"
+        tail -n 4 "$RUNS/gt-mic.out"
+        grep -E "GAME TESTS COMPLETE|required tests (failed|passed)" neoforge/build/gametest.log | tail -3
         ;;
     status)
         for f in "$RUNS"/*.log; do

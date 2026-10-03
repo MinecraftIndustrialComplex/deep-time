@@ -229,7 +229,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         let (t, pr) = match (&t_layer, &p_layer) {
             (Some(t), Some(pl)) => (t.bilinear(x, z), pl.bilinear(x, z)),
             _ => {
-                let lat = -360.0 * z / c;
+                let lat = deeptime_format::Projection::of(c).lat_deg(z);
                 (zonal_temperature(lat), zonal_precip(lat))
             }
         };

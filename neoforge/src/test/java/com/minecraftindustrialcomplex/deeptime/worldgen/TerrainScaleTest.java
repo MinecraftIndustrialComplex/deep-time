@@ -50,12 +50,12 @@ class TerrainScaleTest {
         double s0 = adaptive ? TerrainScale.at(src, x0, 0, h0, k) : k;
         double s1 = adaptive ? TerrainScale.at(src, x1, 0, h1, k) : k;
         double t = (x - x0) / 4.0;
-        for (int y = 639; y > -352; y--) {
+        for (int y = 639; y > -512; y--) {
             double d = (1 - t) * corner(h0, y, s0) + t * corner(h1, y, s1);
             if (d > 0)
                 return y;
         }
-        return -352;
+        return -512;
     }
 
     @Test
