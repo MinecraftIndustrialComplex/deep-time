@@ -105,6 +105,7 @@ POLL_S = setting("POLL_S", 3.0)
 SAMPLE_S = setting("SAMPLE_S", 5.0)
 RAMP_S = setting("RAMP_S", 180.0)                  # a CPU reservation lasts until reached, or this long
 HISTORY_KEEP = setting("HISTORY_KEEP", 20)
+QUICK_S = setting("QUICK_S", 60.0)                 # a kind whose runs are this short and small starts at once
 MIN_RECORD_S = setting("MIN_RECORD_S", 15.0)       # shorter runs are not recorded (too few samples)
 PORT_BASE = setting("PORT_BASE", 26000)
 PORT_STRIDE = 10
@@ -258,6 +259,13 @@ def pendings(jobs, now):
     return [pending(j, now, guest_cpu.get(j["id"], 0.0), guest_rss.get(j["id"], 0.0)) for j in jobs]
 
 
+def quick(est):
+    """A kind known to be short and small (two or more measured runs, a median under QUICK_S, at most
+    1.5 cores and 2 GiB): a quick look such as a python3 one-liner. It starts at once, still measured;
+    waiting would cost more than it saves."""
+    return est.get("runs", 0) >= 2 and est.get("wall_s", 1e9) <= QUICK_S and est["cpu"] <= 1.5 and est["mem_gib"] <= 2.0
+
+
 def plan(queue, jobs, cap, now, overcommit=None, reserve_cores=None, reserve_mem=None, starve_min=None):
     """Which waiting jobs start now. queue: entries with "id", "enq", "est" (oldest first after
     sorting); jobs: admitted entries; cap: {"free_cpu", "mem_avail_gib", "cpu_total", "mem_total_gib"}.
@@ -279,6 +287,9 @@ def plan(queue, jobs, cap, now, overcommit=None, reserve_cores=None, reserve_mem
     out = {}
     blocked_by = None
     for w in sorted(queue, key=lambda e: (e["enq"], e["id"])):
+        if quick(w["est"]):
+            out[w["id"]] = True
+            continue
         if blocked_by:
             out[w["id"]] = (f"behind {blocked_by['kind']} ({blocked_by['label']}), which has waited "
                             f"{(now - blocked_by['enq']) / 60:.0f} min: nothing starts ahead of it until it fits")
@@ -1083,7 +1094,9 @@ def _finish(store, job_id, job, summ, rc, say):
                 p["claim"] = None
                 p["claimed_s"] = p.get("claimed_s", 0.0) + summ["wall_s"]
         record = {"end": time.time(), "rc": rc, "label": e.get("label"), **summ}
-        recorded = summ["wall_s"] >= MIN_RECORD_S and summ["samples"] >= 3
+        # Short runs say little about load, except for unrecognised commands, which learn from
+        # them that they are quick (see quick()).
+        recorded = (summ["wall_s"] >= MIN_RECORD_S and summ["samples"] >= 3) or e["kind"].startswith("shell:")
         # A job whose time went mostly to a server launcher that took over its slot measured that
         # launcher (recorded under the launcher's kind): its own record would only be the wrapper.
         if e.get("claimed_s", 0.0) > 0.5 * summ["wall_s"]:

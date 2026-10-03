@@ -165,6 +165,17 @@ class Decision(unittest.TestCase):
         self.assertNotEqual(d["big"], True)
         self.assertIn("behind gametest:mic", d["small"])
 
+    def test_quick_kinds_start_at_once_even_on_a_full_box(self):
+        cap = dict(CAP, free_cpu=-6.0)
+        hist = {"shell:python3": [run_rec(0.3, 0.05, 1000 + i, wall=2.0) for i in range(2)]}
+        est = admit.estimate("shell:python3", hist)
+        self.assertTrue(admit.quick(est))
+        d, _ = admit.plan([dict(waiting("q", 0, 0, 0), est=est)], [], cap, 10)
+        self.assertIs(d["q"], True)
+        self.assertFalse(admit.quick(admit.estimate("shell:python3", {})))          # unknown: not quick
+        slow = {"k": [run_rec(0.3, 0.05, 1000 + i, wall=600.0) for i in range(3)]}
+        self.assertFalse(admit.quick(admit.estimate("k", slow)))
+
     def test_estimates_are_capped_at_what_the_box_has(self):
         cap = dict(CAP, free_cpu=32.0, mem_avail_gib=120.0)
         d, _ = admit.plan([waiting("huge", 100.0, 500.0, 0)], [], cap, 10)
