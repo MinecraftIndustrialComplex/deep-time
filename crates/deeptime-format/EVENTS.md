@@ -347,7 +347,7 @@ still open at the end of the run it is written with `ongoing` = 1. Place: the ic
 centroid at its largest.
 
 **Snowballs and hothouses** come from the fine clock (`clock.rs`: carbon, EBM and ice every
-100 kyr, every 2 kyr in the recent ice-age window), not from a script: a snowball starts when sea
+200 kyr (`climate.carbon_step_kyr`), every 2 kyr in the recent ice-age window), not from a script: a snowball starts when sea
 ice covers `climate.snowball_on_frac` (0.95) of the ocean (annual mean) — the ice-albedo runaway
 takes the ice edge from mid latitudes to the equator — and ends when the cover falls below
 `snowball_off_frac` (0.5), written at its end (or at the end of the run with `ongoing` = 1). A
@@ -357,7 +357,7 @@ it is 1 °C below. Both are global (place `Global`).
 | Kind | Params | Magnitude | Causes |
 |---|---|---|---|
 | `glaciation` | `peak_land_frac` (glaciated share of the land at its largest), `peak_area_km2`, `peak_t_years`, `ongoing` | peak share / 0.2, ≤ 1 | — |
-| `snowball` | `duration_myr`; CO₂ (ppm) `co2_before_ppm` (the most in the 10 Myr before the onset), `co2_onset_ppm`, `co2_escape_ppm`, `co2_max_ppm`, `co2_drawdown_factor` (the most / the least CO₂ of the 10 Myr before the onset), `co2_rise_factor` (escape / onset); `tropical_land_share` and `tropical_weathering_share` (within 30° of the equator, just before the onset); `degassing_onset_rel`, `degassing_escape_rel` (× Earth's today); `sun_rel`; `t_global_min_c`; `cap_carbonate_m` (the drawdown carbonate the escape's plate step laid on the sea floor above the compensation depth, ≤ 4 km: weathering beyond degassing precipitates as carbonate — the cap carbonate); `onset_cause` (`weathering_drawdown` when CO₂ fell by ≥ 1.5× over the 10 Myr before, else `slow_cooling`); `escape_cause` (`degassing_buildup` when CO₂ rose by ≥ 2× while frozen, else `warming`; `none` while ongoing); `ongoing` | duration / 50 Myr, ≤ 1 | — |
+| `snowball` | `duration_myr`; CO₂ (ppm) `co2_before_ppm` (the most in the 10 Myr before the onset), `co2_onset_ppm`, `co2_escape_ppm`, `co2_max_ppm`, `co2_drawdown_factor` (the most / the least CO₂ of the 10 Myr before the onset), `co2_rise_factor` (escape / onset); `tropical_land_share` and `tropical_weathering_share` (within 30° of the equator, just before the onset); `degassing_onset_rel`, `degassing_escape_rel` (× Earth's today); `sun_rel`; `t_global_min_c`; `cap_carbonate_m` (the drawdown carbonate the escape's plate step laid on the sea floor above the compensation depth, ≤ 4 km: weathering beyond degassing precipitates as carbonate — the cap carbonate); `onset_cause` (`present_setting` when the preset's `climate.present_climate` set it off in the run's last stretch; `weathering_drawdown` when CO₂ fell by ≥ 1.5× over the 10 Myr before, else `slow_cooling`); `escape_cause` (`present_setting` when `present_climate` ended it in the last stretch; `degassing_buildup` when CO₂ rose by ≥ 2× while frozen, else `warming`; `none` while ongoing); `ongoing` | duration / 50 Myr, ≤ 1 | — |
 | `hothouse` | `peak_t_global_c`, `peak_t_years`, `co2_peak_ppm`, `after_snowball` (1 when it began within 5 Myr of a snowball's end), `ongoing` | (peak − `hothouse_c`) / 25 °C, ≤ 1 | the `snowball` it followed |
 
 ### The dummy preset's events (source `deeptime:dummy`, until P1-03)

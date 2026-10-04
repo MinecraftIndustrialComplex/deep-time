@@ -675,11 +675,23 @@ fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
                 .join("/")
         })
         .unwrap_or_default();
+    // The sea ice of the last plate step (the clock's series: annual-mean share of the ocean).
+    let series_last = |name: &str| -> f64 {
+        let col = note["series"]["columns"]
+            .as_array()
+            .and_then(|c| c.iter().position(|x| x == name));
+        let row = note["series"]["rows"].as_array().and_then(|r| r.last());
+        match (col, row) {
+            (Some(i), Some(r)) => f(&r[i]),
+            _ => f64::NAN,
+        }
+    };
     Some(format!(
         "climate_final={} t_surface_c={:.1} t_land_c={:.1} precip_land_mm={:.0} koppen_land={} \
          glaciated_land_frac={:.3} glaciations={} ebm_t_global_c={:.1} ebm_net_toa_w_m2={:.3} \
          itcz_deg={:.1}..{:.1} land_z_p50_m={:.0} land_z_p90_m={:.0} land_above_2km={:.3} \
-         co2_ppm={:.0} sea_level_m={:.1} ice_volume_km3={:.3e} snowballs={} hothouses={}",
+         co2_ppm={:.0} sea_level_m={:.1} ice_volume_km3={:.3e} sea_ice_frac={:.3} snowballs={} \
+         hothouses={}",
         note["snapshots"],
         f(&last["t_surface_c"]),
         f(&last["t_land_c"]),
@@ -697,6 +709,7 @@ fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
         f(&last["co2_ppm"]),
         f(&last["sea_level_m"]),
         f(&last["ice_volume_km3"]),
+        series_last("sea_ice_frac"),
         note["snowballs"],
         note["hothouses"],
     ))
