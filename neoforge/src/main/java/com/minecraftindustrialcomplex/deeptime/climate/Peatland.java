@@ -64,25 +64,21 @@ public record Peatland(double erosion, List<String> regions, List<String> biomes
 
     /**
      * Asks {@code probe} in each region at the climate of cold wetland: the baked temperature
-     * coordinates the bake calls cold wetland (band 1, vanilla's cold band, up to {@code coldBelow}),
+     * coordinates of the classes the placement table calls cold wetland (the boreal ramp, band 1 to 2, vanilla's cold band),
      * the wet humidity coordinates, inland continentalness, both signs of weirdness, and the
      * erosion a peatland would be given. All through the world's mapping, so they are the pack's values.
      *
      * @param regionNames the regions to judge ({@link #NO_TABLE} for the pack's one biome source)
-     * @param coldBelow   the preset's {@code biomes.wetland_cold_below}
      * @return the verdict (a record with no regions when the pack has no peatland there), never null
      */
-    public static Peatland decide(ClimateMapping m, OverworldBands ref, List<String> regionNames, double coldBelow, Probe probe) {
+    public static Peatland decide(ClimateMapping m, OverworldBands ref, List<String> regionNames, Probe probe) {
         double erosionRef = 0.5 * (ref.erosion()[6] + 1.0);   // the middle of E6; ledger: BIO-107
         double erosion = m.apply(ClimateMapping.EROSION, erosionRef);
         List<Double> temps = new ArrayList<>(), hums = new ArrayList<>(), conts = new ArrayList<>(), weirds = new ArrayList<>();
         // The probe's grid of climates (game choice, ledger BIO-106): five temperatures of the cold band, five wet humidities,
         // three inland continentalness values, six weirdness values of both signs.
         for (double c : new double[] {1.1, 1.3, 1.5, 1.7, 1.9})
-            if (c < coldBelow)
-                temps.add(m.apply(ClimateMapping.TEMPERATURE, value(ref.temperature(), c)));
-        if (temps.isEmpty())
-            return new Peatland(erosion, List.of(), List.of());
+            temps.add(m.apply(ClimateMapping.TEMPERATURE, value(ref.temperature(), c)));
         for (double c : new double[] {2.5, 3.0, 3.5, 4.0, 4.5})
             hums.add(m.apply(ClimateMapping.VEGETATION, value(ref.vegetation(), c)));
         for (double c : new double[] {4.5, 5.5, 6.5})

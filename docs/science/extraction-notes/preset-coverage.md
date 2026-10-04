@@ -342,7 +342,6 @@ Keys the code accepts but the preset leaves at their defaults (not exhaustive: I
 | `biomes.wetland_humidity` | `2.5` | other (bake: climate to biome inputs) |
 | `biomes.wetland_flat_share` | `0.35` | other (bake: climate to biome inputs) |
 | `biomes.wetland_low_m` | `150.0` | other (bake: climate to biome inputs) |
-| `biomes.wetland_cold_below` | `2.0` | other (bake: climate to biome inputs) |
 | `hydro.enabled` | `true` | hydro |
 | `hydro.river_min_discharge_m3s` | `2.0` | hydro |
 | `hydro.river_min_area_km2` | `50.0` | hydro |

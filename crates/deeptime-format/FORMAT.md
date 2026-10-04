@@ -235,10 +235,8 @@ the distances from the sea, in blocks, where the continentalness bands begin —
 900–3,000), `inland_interior_blocks` (the top of the scale, 5,000, 3,500–20,000) — and the
 wetland thresholds: `wetland_humidity` (the humidity band coordinate from which land counts as
 wet, 2.5, 1–4.5; full weight 1.5 bands above), `wetland_flat_share` (the share of land, flattest
-first, swamps may take, 0.35, 0.05–0.9), `wetland_low_m` (the height above the sea at which
-lowland stops being low, 150 m, 20–600) and `wetland_cold_below` (the temperature band coordinate
-below which wetland is boreal peatland, not swamp, 2, 1–5; 2 is the top of vanilla's cold band; see
-"The wetland flag"). The ranges keep the edges in order (the beach is below
+first, swamps may take, 0.35, 0.05–0.9) and `wetland_low_m` (the height above the sea at which
+lowland stops being low, 150 m, 20–600). The ranges keep the edges in order (the beach is below
 `inland_mid_blocks` below `inland_far_blocks` below `inland_interior_blocks`).
 
 **The class placement table** says where each Köppen class goes on the temperature and humidity
@@ -444,12 +442,12 @@ glaciated ground regardless of biome. The contract between the climate and that 
 ### The wetland flag (Ben, 2026-10-03, "Taiga instead, peatland if present")
 
 Wet, flat, low, thawed land (BIO-066) is vanilla's swamp (erosion E6) in temperate and warm
-climates; in the cold band (temperature band coordinate below `biomes.wetland_cold_below`, 2) it is
-boreal peatland, which vanilla does not have. `climate/wetland` (L2, u8) says which: 0 none, 1 the swamp
+climates; in the subarctic classes the placement table marks `cold_wetland` (Dfc, Dfd, Dsc, Dsd, Dwc,
+Dwd; the table's `classes.<code>.cold_wetland`, default false) it is boreal peatland, which vanilla does
+not have. `climate/wetland` (L2, u8) says which: 0 none, 1 the swamp
 band, 2 cold wetland. A cold wetland cell keeps its class's temperature and humidity and its erosion is
 held under E5, so vanilla draws the class's ordinary biome there (taiga); the bake's note records
-`cold_wetland_cells` and `cold_wetland_cells_by_class` beside `wetland_cells`, and the
-`wetland_cold_below` it used. Java alone reads the layer: where the pack's own biome source answers
+`cold_wetland_cells` and `cold_wetland_cells_by_class` beside `wetland_cells`. Java alone reads the layer: where the pack's own biome source answers
 with a peatland biome (tagged `c:is_swamp` and `c:is_cold/overworld` or `c:is_snowy`: Biomes O' Plenty's
 bog and muskeg) at the swamp row of the cold band, `WorldDataTerrain` returns an erosion inside E6 for
 flagged cells of that region, and the pack draws its biome there. The verdict

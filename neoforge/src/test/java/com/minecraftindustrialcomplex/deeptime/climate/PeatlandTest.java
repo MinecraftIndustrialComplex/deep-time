@@ -37,7 +37,7 @@ class PeatlandTest {
 
     @Test
     void aPackWithABogInOneRegionHasPeatlandThere() {
-        Peatland p = Peatland.decide(identity(), REF, List.of("a", "b"), 2.0, PACK);
+        Peatland p = Peatland.decide(identity(), REF, List.of("a", "b"), PACK);
         assertEquals(List.of("b"), p.regions());
         assertEquals(List.of("mod:bog"), p.biomes());
         assertTrue(p.appliesTo("b"));
@@ -50,7 +50,7 @@ class PeatlandTest {
     @Test
     void aPackWithoutPeatlandGivesTaigaEverywhere() {
         // Vanilla and Terralith: the swamp row of the cold band holds swamp, which is not cold.
-        Peatland p = Peatland.decide(identity(), REF, List.of(Peatland.NO_TABLE), 2.0, (r, t, h, c, e, w) -> null);
+        Peatland p = Peatland.decide(identity(), REF, List.of(Peatland.NO_TABLE), (r, t, h, c, e, w) -> null);
         assertTrue(p.regions().isEmpty());
         assertTrue(p.biomes().isEmpty());
     }
@@ -59,30 +59,24 @@ class PeatlandTest {
     void aBogOnlyInTheFrozenOrTemperateBandIsNotColdWetland() {
         Peatland.Probe frozen = (r, t, h, c, e, w) -> e >= 0.55 && t < -0.45 ? "mod:muskeg" : null;
         Peatland.Probe temperate = (r, t, h, c, e, w) -> e >= 0.55 && t >= -0.15 ? "mod:fen" : null;
-        assertTrue(Peatland.decide(identity(), REF, List.of("b"), 2.0, frozen).regions().isEmpty());
-        assertTrue(Peatland.decide(identity(), REF, List.of("b"), 2.0, temperate).regions().isEmpty());
+        assertTrue(Peatland.decide(identity(), REF, List.of("b"), frozen).regions().isEmpty());
+        assertTrue(Peatland.decide(identity(), REF, List.of("b"), temperate).regions().isEmpty());
     }
 
     @Test
     void aBogThatAnswersAtTooFewPointsDoesNotCount() {
         // Peatland at the driest humidities of the wet range only (under a fifth of the points).
         Peatland.Probe few = (r, t, h, c, e, w) -> e >= 0.55 && h < 0.05 ? "mod:bog" : null;
-        assertTrue(Peatland.decide(identity(), REF, List.of("b"), 2.0, few).regions().isEmpty());
+        assertTrue(Peatland.decide(identity(), REF, List.of("b"), few).regions().isEmpty());
         // Under half of the points (one weirdness sign of two) is not a peatland region either.
         Peatland.Probe half = (r, t, h, c, e, w) -> e >= 0.55 && w > 0.3 ? "mod:bog" : null;
-        assertTrue(Peatland.decide(identity(), REF, List.of("b"), 2.0, half).regions().isEmpty());
-    }
-
-    @Test
-    void theKnobThatTurnsColdWetlandOffTurnsPeatlandOff() {
-        Peatland p = Peatland.decide(identity(), REF, List.of("b"), 1.0, PACK);
-        assertTrue(p.regions().isEmpty(), "no cold band, no peatland");
+        assertTrue(Peatland.decide(identity(), REF, List.of("b"), half).regions().isEmpty());
     }
 
     @Test
     void theProbePointsAreColdWetClimatesAtTheSwampRow() {
         List<double[]> seen = new ArrayList<>();
-        Peatland.decide(identity(), REF, List.of("b"), 2.0, (r, t, h, c, e, w) -> {
+        Peatland.decide(identity(), REF, List.of("b"), (r, t, h, c, e, w) -> {
             seen.add(new double[] {t, h, c, e, w});
             return null;
         });

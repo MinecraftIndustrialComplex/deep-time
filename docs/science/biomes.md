@@ -185,8 +185,10 @@ paper itself could not be fetched, see the ledger row for what was read). Ben's 
 
 What the mapping does (BIO-104 to BIO-107, all game choices):
 
-- Wetland in the cold band (temperature band coordinate under `biomes.wetland_cold_below`, 2: vanilla's cold
-  band, where the Dfc, Dfd, Dsc, Dsd, Dwc and Dwd ramps sit) is **cold wetland**. It is not put in E6. The
+- Wetland of the six subarctic classes (Dfc, Dfd, Dsc, Dsd, Dwc, Dwd: `classes.<code>.cold_wetland` in
+  `placement.json`, the classes of Ben's answer and the ones the table lifts to vanilla's taiga humidity) is
+  **cold wetland**. Dfa, Dfb and the C classes keep the swamp even though the table puts all of D on the same
+  boreal temperature ramp. It is not put in E6. The
   cell keeps its class's temperature and humidity and its erosion is held under E5, so without a mod vanilla
   draws what it draws for the class: taiga (or its old growth and snowy variants). The bake flags it in
   `climate/wetland` (2; 1 for temperate and warm wetland, which stays swamp, mangrove where hot).
