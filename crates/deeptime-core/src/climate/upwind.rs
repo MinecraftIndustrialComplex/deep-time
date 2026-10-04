@@ -641,9 +641,9 @@ pub fn rain(
         k_q: p.rain_diffusivity_m2_s,
         tau_f_s: TAU_F_S,
         beta: BETA,
-        // Bretherton, Peters & Back's e-folding of rain in the column's relative humidity
-        // r = r_ref W_v/W_ref: e^(a (r − r_ref)) = e^(a r_ref (W_v/W_ref − 1)).
-        rh_gain: p.precip_rh_slope * mp.r_ref, // ledger: CLM-145
+        // The rain's e-folding in the column's relative humidity r = r_ref W_v/W_ref (Bretherton,
+        // Peters & Back's form): e^(a (r − r_ref)) = e^(a r_ref (W_v/W_ref − 1)).
+        rh_gain: p.rain_rh_slope * mp.r_ref, // ledger: CLM-202
     };
     let f: Vec<f64> = inp.land.iter().map(|x| x.clamp(0.0, 1.0)).collect();
     let mut w_ref = vec![[0.0f64; 12]; n];
@@ -920,7 +920,13 @@ mod tests {
         let mo = month(n, 60, 8.0, 0.6);
         let s = solve_month(&mesh, &k, &mo, None);
         let t = tracers(&mesh, &k, &mo, &s, &ones);
-        assert!(t[55][0] > 0.9, "{}", t[55][0]);
+        // Over the sea the share grows downwind as the sea's evaporation replaces the land air
+        // the wind brought (the ring's land lies upwind of cell 0).
+        assert!(
+            t[5][0] < t[30][0] && t[30][0] < t[55][0] && t[55][0] > 0.5,
+            "{:?}",
+            [t[5][0], t[30][0], t[55][0]]
+        );
         assert!(t[70][0] > t[120][0] && t[120][0] > t[190][0], "{:?}", [t[70][0], t[120][0], t[190][0]]);
         assert!(t[190][0] < 0.8, "{}", t[190][0]);
         // A mark set by the sea's position (here the sea's western half 1, eastern half 0)
