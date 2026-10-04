@@ -15,7 +15,33 @@ Reading before this: [`world-projection-options.md`](../research/notes/world-pro
 **Tags.** [R] run and seen (a log line, an RCON readout, a screenshot); [C] computed by the
 prototype's tool or tests; [I] inference; [U] not verified.
 
-SUMMARY_PLACEHOLDER
+## 0. The answer in plain words
+
+- **A quincuncial Deep Time world with seamless wrapping runs.** The planet (a real bake of the 16k
+  quick preset) is laid out in Guyou's aspect of the Peirce quincuncial projection, 16,384 × 8,192
+  blocks, and its four edges are joined by four Immersive Portals – CE global portals. In game:
+  - terrain is continuous across every seam: the step from a block to its glued neighbour is drawn
+    from the same distribution as any step between neighbours, and the world beyond each portal is
+    exactly the terrain the portal shows (§5.1);
+  - a player sprinting across each of the four seams lands at the glued point to 0.00 blocks along the
+    seam, turned 180° on the two turning seams; walking north over the north pole comes out heading
+    south on its far side, as on a real globe (§5.3);
+  - items, minecarts and arrows cross all four seams and land on the glued track (§5.2).
+- **Peirce or Guyou: Guyou** (§2). They are the same conformal map with the same four singular points
+  and the same spread of area; Guyou is the oblique aspect with the equator straight. It keeps Deep
+  Time's 2:1 grid and x wrap (only the two long edges turn), the equator is one straight east–west walk,
+  and the poles are crossed like real poles. Peirce makes a square with four turning edges, the
+  singular points on the equator, and an equator walk of four legs through them.
+- **What breaks** (§6): collisions near a seam come from the hidden world behind the portal, which a
+  player cannot see (found when a walk over the pole stopped at an invisible ice wall); fluids and
+  redstone stop at seams; caves and decoration do not continue; Toroidal World must go; two pack mods
+  crash with Immersive Portals and Sable ships do not cross (2026-10-02 note). Neither projection is
+  equal-area; an equal-area relative (Petroff 2021) uses the same seams.
+- **Production: about 5–8 weeks** of agent time with Immersive Portals (§8); a portal-free wrap engine
+  of Deep Time's own would add 6–12 weeks.
+- **Questions for Ben** (§9): Guyou (recommended) or Peirce; an equal-area relative (recommended) or
+  conformal; Immersive Portals (recommended for a first version) or an own engine; project only the
+  world at the bake (recommended).
 
 ---
 
@@ -229,7 +255,64 @@ on the far side, as the half-turn requires. (A first try with NoAI pigs and no-g
 did not move them at all, so those two kinds are untested; arrows from that try stopped half a block
 short of the plane, in water, inconclusively.)
 
-WALK_PLACEHOLDER
+### 5.3 A player walking across each seam lands at the matching point [R]
+
+`proto.py client`: a real client; a 3-wide glass bridge 4 blocks above the higher of the two grounds,
+30 blocks on the inside and, on the far side, the glued image of the 40 blocks beyond the edge. The
+player starts 24 blocks inside and sprints straight at the seam (W + Ctrl held 9 s); RCON reads the
+position and rotation every 0.25 s (`*.tsv`).
+
+| Walk | Seam | Last sample before → first after | Off the glued point, along the seam | Across (one sample's run) | Turn of the player |
+|---|---|---|---|---|---|
+| walk-north | north, half-turn, x = −2000 | (−1999.5, −4095.3) → (1999.5, −4095.0) | 0.00 | 1.68 | 180° |
+| walk-south | south, half-turn, x = −3000 | (−2999.5, 4095.3) → (2999.5, 4095.0) | 0.00 | 1.68 | 180° |
+| walk-east | east, slide, z = 1500 | (8191.3, 1500.5) → (−8191.0, 1500.5) | 0.00 | 1.68 | 0° |
+| walk-west | west, slide, z = 1200 | (−8190.7, 1200.5) → (8191.6, 1200.5) | 0.00 | 1.68 | 0° |
+| walk-equator-east | east, slide, on the equator | (8191.9, 0.5) → (−8191.0, 0.5) | 0.00 | 1.12 | 0° |
+| walk-north-pole | north, half-turn, at the north pole (x = −4096) | blocked at z = −4095.7, never crossed (see below) | | | |
+| walk-north-pole-cleared | the same, hidden outside cleared | (−4095.5, −4095.3) → (4095.5, −4095.2) | 0.00 | 1.51 | 180° |
+
+Every crossing lands exactly on the glued point (0.00 blocks along the seam), the half-turn seams turn
+the player 180° (yaw −180° → 0°) and the slides do not, and the player keeps walking on the far bridge
+(each walk ends 25 blocks into the far side). Walking north at x = −4096 takes the player over the
+north pole: the walk comes out at x = +4096 heading south, which is what crossing a real pole does.
+
+**The pole walk found a real breakage.** The first pole walk stopped half a block before the plane and
+never crossed. At the pole the far side is an ice sheet higher than the bridge: the far bridge had a
+tunnel cleared through it, but the *hidden outside* (the raw world beyond the plane, which the portal
+covers) still held the uncleared ice. Immersive Portals collides the part of the player's box beyond the
+plane with those raw blocks. With the same 3 × 3 tunnel also cleared in the hidden outside, the same
+walk crossed at once. So collisions at a seam come from blocks the player cannot see. Generated terrain
+is the same on both (the folded outside), so on untouched ground it matches what is drawn (to the
+one-block offset of §5.1); anything a player builds or digs within a block or two of a seam is not.
+A production version has to keep the outside in step with the far side, or stop Immersive Portals from
+colliding with it.
+
+Screenshots (`review/out/quincuncial/run3/`, not committed): `walk-north-look.png` (the bridge running
+through the north seam over open sea: no seam visible), `walk-north-after.png` (on the far bridge,
+heading south), the same for the other walks, `walk-north-pole-after.png` (the ice wall of the first
+pole walk), and `run4/walk-north-pole-cleared-*.png`.
+
+**Over land, without a bridge** (`proto.py land`, `land2`). `land_sites` scans every seam each 32
+blocks for a point where both sides are land (terrain above y 68): one crossing on the east–west slide
+(z = −1696, a wooded hill whose ridge runs along the seam) and one on the south half-turn (x = −5632,
+on the south polar ice sheet, y about 120–140); on the test planet no land crosses the north seam.
+The seam rows were marked: red concrete on the inside row, blue on the glued row on the far side.
+
+- `run5/seam-view-east-near.png`: from 45 blocks inside, 28 up (spectator mode), looking east at the
+  seam: the hill, its trees, the beach and the sea run on past the red row with no step, no gap and no
+  change of light.
+- `run5/seam-view-east-far.png`: the same hill seen from the other side of the seam (45 blocks inside the
+  west edge, looking west), with the blue row on the ridge: the slope continues past it into the east
+  side's terrain.
+- `run5/seam-view-south-near.png`: the polar ice sheet across the south seam (the markers are hidden
+  under snow).
+- Ground walks with W, Ctrl and jump held (which in creative mode turned into a low flight 5–7 blocks
+  above the ground): east crossed from (8189.6, −1694.2) to (−8189.0, −1694.2), 0.00 off the glued point
+  along the seam; south crossed from (−5631.5, 4095.3) to (5631.5, 4091.2), 0.00 off, turned 180°. A
+  plain walk on foot stopped at the first one-block step (no auto-jump) and proves nothing either way.
+- Light: in every screenshot the daylight is the same on both sides of a seam; block light (torches)
+  across a seam was not tested.
 
 ### 5.4 Fluids, redstone, chunk loading, load [R]
 
@@ -244,4 +327,115 @@ WALK_PLACEHOLDER
   player standing at a seam (chunks on both sides). Without a matched run without portals this is no
   measure of the portals' cost; the 2026-10-02 prototype found none that stood out of the noise.
 
-RUN_REST_PLACEHOLDER
+## 6. What breaks
+
+Seen in this run [R] or carried from the 2026-10-02 prototype, which tested them in game ([02]).
+
+| What | State | Evidence |
+|---|---|---|
+| Terrain, biomes and climate inputs across a seam | **Continuous** | §5.1, the screenshots |
+| Players, items, minecarts, arrows across every seam | **Cross and land on the glued point** | §5.2, §5.3 |
+| Collisions near a seam | **Against the hidden outside's blocks**, which nobody sees; matches the far side only while both are untouched generated terrain | §5.3, pole walk |
+| Water and lava | Stop at the plane; neither the hidden outside nor the far side gets any | §5.4 |
+| Redstone, Create machines, pistons across a seam | No adjacency across a portal: a wire does not power the glued neighbour | §5.4; [02] for pistons and Create |
+| Caves, ores, trees, decoration | Placed by block position, so they do not continue across a seam (a cave can end at it) | [I], from how features are seeded |
+| Rivers, folds and faults, volcanoes, craters, deposits | Not in the prototype's world data (the resampler drops vector data) | §3 |
+| Chunk loading | The far side of a seam is loaded by Immersive Portals when a player is near; the hidden outside is loaded too (vanilla's view distance) and ticks | §5.4 |
+| Entities that cross into a chunk that is not ticking | Freeze there until a player comes ([02]); not re-tested | [02] |
+| Mobs seeing or pathing across | No ([02]) | [02] |
+| Sable ships | Do not cross a same-dimension portal; Sable + Immersive Portals crashed the pack server four times ([02]). IPSable, the compat mod Ben named, was not tried | [02] |
+| Toroidal World | Cannot run with Immersive Portals (every join kicked); the dev run patches Deep Time to boot without it | [02], `notw_jar.py` |
+| Petrolpark/Destroy, CBC Modern Warfare | Crash at mod construction with Immersive Portals ([02]) | [02] |
+| Distant Horizons | Not run. DH draws the raw world in raw coordinates and Immersive Portals does not draw DH terrain through portals ([02]). Here the raw world beyond every seam **is** the folded planet (§5.1), so DH's LODs beyond a seam would show the right terrain from beyond vanilla's render distance on; only the band inside it is the portal's | [I], [02] |
+| Maps, compasses, waypoints | Read raw coordinates: a map at a seam draws the hidden outside (the right terrain, the wrong copy for player edits); "north" is up only along the equator | [I] |
+| The four singular points | Smooth, stretched terrain round each, a cone of 180° (walking round one takes half the usual distance); placed at sea here | §3 |
+| Corners where two seams meet (Guyou: the rectangle's corners, where a slide meets a half-turn; they are singular points) | A walk aimed exactly at a corner escaped the world in [02]; not re-tested. Here the escape lands in the folded outside, which is the right terrain | [02], §3 |
+| Server load | 1.7 ms/tick idle with four global portals; 6.4 ms/tick with one player at a seam; no matched run without portals | §5.4 |
+| Client cost | [02]: 10–15 % of frame rate per seam in view, 30–40 % at a corner; not re-measured (llvmpipe) | [02] |
+
+[02] = `docs/research/notes/immersive-portals-pillowcase-prototype.md`.
+
+## 7. What a production version needs
+
+1. **The projection in the shipped layer.** Fold `peirce.rs` and `world.rs` into
+   `deeptime_format::projection`, with Java and JS twins and the parity fixture (the module's
+   interface in `equal-area-projection.md` §2 already has `canonical` and `copies`). A Guyou world
+   keeps today's 2:1 grid and x wrap; the new parts are the half-turn fold at the long edges and a
+   `north(x, z)` that rotates.
+2. **Bake-time resampling, not a re-gridded simulation.** The simulation keeps its own grid; the
+   bake writes the world on the Guyou grid, as this prototype's resampler does, with footprint
+   filtering. The vector data must be carried over: rivers (polylines split at seams), structures,
+   volcanoes, craters, deposit sites and bodies, events, spawn. The simulation's climate stays
+   per-latitude internally; only the world is projected.
+3. **The fold everywhere the game reads world data:** `FarTerrain`/Distant Horizons, the column rule,
+   the samplers. The strip trick (C′ = 4b) hides the problem for the rasters, but anything that wraps x
+   at C or clamps z must fold at the long edges.
+4. **The seams.** Either Immersive Portals as a required dependency, with the seams installed at world
+   creation (four global portals, chunks loaded, a restart or a fix to its `addPortal` cache), or Deep
+   Time's own half-turn wrap engine (an extension of Toroidal World's, which has the algebra but refuses
+   turning shapes). With Immersive Portals: TW goes (or is fixed to coexist), the pack drops or patches
+   Petrolpark/Destroy and CBC Modern Warfare, Sable needs IPSable or a fix for the crash, and the hidden
+   outside must be kept in step with the far side (mirror player edits within a few blocks of a seam, or
+   patch the collision to use the destination side).
+5. **Distant Horizons.** Fold the long edges in `FarTerrain` and `DhLodGenerator` (a few dozen lines;
+   the 2026-10-02 note §7) and test what DH and the portals draw where both apply.
+6. **Gameplay pieces.** The pole cap goes (both poles are walkable); the F3 line, the climate API's
+   latitude, compasses and maps work per position; the workbench draws the Guyou picture.
+7. **GameTests.** A seam test dimension with the four portals: terrain continuity (the probe of §5.1),
+   entity crossings (§5.2), the pole crossing, fluids and redstone stopping, the fold in `FarTerrain`.
+   Real-client walks stay a review script (this one), as today's screenshot driver.
+
+## 8. Effort
+
+Agent working days, for the Guyou world with Immersive Portals, the simulation unchanged:
+
+| Piece | Days |
+|---|---|
+| Projection module (Rust, Java, JS), parity, docs | 2–3 |
+| Bake-time resampling with filtering, rasters | 2 |
+| Vector data through the projection (rivers, structures, volcanoes, craters, deposits, events, spawn) | 5–8 |
+| Readers' fold at the long edges, `FarTerrain`, Distant Horizons | 3–4 |
+| Seam installation at world creation; the hidden-outside sync or collision patch | 4–6 |
+| TW removal or coexistence; pack fixes (Petrolpark, CBC Modern Warfare, Sable/IPSable) | 5–10, uncertain: two crashes are in other mods |
+| Pole cap removal, F3, climate API, maps, workbench picture | 2–3 |
+| GameTests and review scripts | 3–4 |
+| **Total** | **about 26–40 days**, roughly 5–8 weeks |
+
+Replacing Immersive Portals with Deep Time's own half-turn wrap engine (no portals; chunk aliasing with
+a turn, contraptions and fluids across the seam) adds 6–12 weeks and has no precedent anywhere
+(rotated-seam-worlds-prior-art.md). An equal-area relative (Petroff 2021) instead of Peirce's conformal
+map adds about 2 days (its forward and inverse in `peirce.rs`; the gluing does not change).
+
+## 9. Open questions for Ben (recommendation first)
+
+1. **Aspect: Guyou (recommended), or Peirce?** Guyou keeps the 2:1 world, the x wrap, a straight
+   equator and north up along it, and walks over the poles like the real thing; Peirce puts the north
+   pole in the middle of a square and four turning seams round it.
+2. **Projection: an equal-area relative in the same layout (recommended: Petroff 2021), or Peirce's
+   conformal map?** Conformal draws land near the four singular points without bound larger and the
+   poles (Peirce) or the equator (Guyou) at 0.46 of the mean; you chose equal area for today's world.
+   The seams and portals are the same either way.
+3. **Seams: Immersive Portals as a dependency (recommended for a first version), or Deep Time's own
+   wrap engine?** Portals work today for walking and entities, at the price of dropping Toroidal World,
+   two pack mods' compatibility, Sable crossings, and fluids, redstone and contraptions at the seams;
+   the engine would carry all of that but is months of work with no precedent.
+4. **Keep the simulation on its own grid and project only the world at the bake (recommended)?** It
+   keeps the climate, flexure and erosion as they are; a simulation run on the quincuncial grid itself
+   would be weeks more and buys nothing a player sees.
+
+## 10. Method and files
+
+- Code: `crates/deeptime-quincuncial/` (dev-only crate), `tools/proto/quincuncial/` (`proto.py`,
+  `notw_jar.py`, `render.py`). Ledger rows SCL-070 to SCL-077; science page
+  [`../science/quincuncial-projection.md`](../science/quincuncial-projection.md).
+- Planet: `deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500
+  --threads 4` (this branch, 2026-10-03), then `deeptime-quincuncial resample --layout guyou --size 8192
+  --lon 31`; measurements `deeptime-quincuncial stats|place`. Scratch on the VM under
+  `/data/ban/deeptime-runs/quincuncial/` (to be deleted when this lands).
+- Game: `tools/remote/mac.sh --server -- 'python3 tools/proto/quincuncial/proto.py setup boot portals
+  terrain entities physics client land land2'` (phases can run alone). Results in
+  `/data/ban/deeptime-runs/quincuncial/out/report.json`; screenshots pulled to
+  `review/out/quincuncial/` (not committed).
+- Gates on this branch: cargo fmt, clippy `-D warnings` (workspace), `cargo deny check licenses bans`,
+  `cargo test --workspace` (784 passed, 0 failed; the new crate 22), `./gradlew build test` (251 tests,
+  0 failures). No GameTest was run: nothing the game reads changed.
