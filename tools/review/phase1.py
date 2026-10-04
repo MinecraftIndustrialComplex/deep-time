@@ -295,7 +295,8 @@ def step_viewer(a):
     t0 = time.time()
     run = (f"target/release/deeptime run --preset earthlike_quick_16k --start {START} --length-myr {a.quick_myr} --threads 8 "
            "--out review/out/phase1/viewer-run/planet/deeptime --viewer review/out/phase1/viewer 2>&1 | tail -3")
-    out1, rc1, _ = vm("viewer", run)
+    # PHASE1_VIEWER_CHECK_ONLY=1 re-checks the bundle already on the VM (the bake is the 5 minutes; the check is seconds).
+    out1, rc1 = ("(bundle reused)", 0) if os.environ.get("PHASE1_VIEWER_CHECK_ONLY") else vm("viewer", run)[:2]
     out, rc, secs = vm("viewer", "nix shell nixpkgs#chromium -c python3 tools/viewer/phase1_viewer_check.py --bundle review/out/phase1/viewer "
                        "--out review/out/phase1/viewer-shots", pulls=["review/out/phase1/viewer-shots"])
     kids = checks(out)
