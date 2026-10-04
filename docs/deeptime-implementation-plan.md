@@ -2346,6 +2346,20 @@ the published fields are the annual mean, warmest and coldest month, precipitati
 Köppen, ELA and glacier. `deeptime climate-dem` runs one snapshot on a given relief (Earth's
 1° relief: 19 of 24 reference cities in the right Köppen group).
 
+*As built in P1-26* (2026-10-02 to 2026-10-03; the design's section 11 "As built" has the details,
+[docs/science/per-cell-climate.md](science/per-cell-climate.md) the constants and the Earth
+comparison): item 1 above is now a per-cell, seasonal, two-dimensional energy balance on a coarse
+grid (about 128 × 64) with land and sea tiles, a slab ocean with sea ice per cell, surface-dependent
+atmospheric diffusion and wind-carried heat, Stommel gyres and an overturning conveyor, and
+`climate.model = per_cell` is the default (`banded` stays a setting). Item 2's belt rain stays the
+default rain, fed by the per-cell temperatures; the monthly moisture budget is built behind
+`climate.rain_model = budget` and not yet calibrated. The fast clock stays one-dimensional,
+corrected to the 2-D zonal means and re-snapshotted at snowball and hothouse crossings. The
+CO₂ forcing is a radiative-convective table (HEXTOR) at every tile's temperature. The world
+format and the climate API are unchanged. On Earth's relief the global mean is 14.0 °C and 19 of 24
+reference cities are in the right main group (calibration of the temperature knobs only: T9 is not
+finished; rain and the heat-transport targets are open).
+
 *As built for the deep-time climate* (decisions log 2026-09-29: greenhouse and sun over time,
 emergent snowball Earths, recent ice-age cycles, ice-linked sea level; STATUS.md has the details):
 (8) A long-term **carbon cycle** (`carbon.rs`): COPSE's atmosphere–ocean reservoir split into the
@@ -3992,6 +4006,7 @@ on this machine.
   has fixed the cold bias is part of P1-26's calibration.
 - **Check.** Set out in the design doc (Earth-topography comparison, Köppen shares, energy balance,
   run-time budget, downstream recalibration).
+- **As built** (T1 to T6 and part of T9, 2026-10-03): see design section 11 and §8.3 above.
 - **Design** (2026-09-30, awaiting Ben's approval): `docs/design/p1-26-per-cell-climate.md`. It
   covers:
   - the current banding measured, with a prototype on Earth's relief;

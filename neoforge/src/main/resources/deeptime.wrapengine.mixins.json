@@ -1,0 +1,33 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.minecraftindustrialcomplex.deeptime.mixin.wrapengine",
+  "compatibilityLevel": "JAVA_21",
+  "plugin": "com.minecraftindustrialcomplex.deeptime.mixin.DeepTimeMixinPlugin",
+  "mixins": [
+    "LevelWrapMixin",
+    "LevelChunkWrapMixin",
+    "LevelTicksWrapMixin",
+    "BlockStateBaseWrapMixin",
+    "ServerLevelWrapMixin",
+    "NaturalSpawnerWrapMixin",
+    "compat.create.BeltConnectorSeamMixin",
+    "compat.create.ChainConveyorSeamMixin",
+    "compat.create.ContraptionSeamMixin",
+    "compat.create.DirectionalShaftHalvesSeamMixin",
+    "compat.create.FlowSourceAccessor",
+    "compat.create.FluidHandlerSourceSeamMixin",
+    "compat.create.FluidNetworkSeamMixin",
+    "compat.create.FluidPropagatorSeamMixin",
+    "compat.create.OtherPipeSeamMixin",
+    "compat.create.PipeConnectionSeamMixin",
+    "compat.create.PlacementInfoAccessor",
+    "compat.create.PumpBlockEntitySeamMixin",
+    "compat.create.RotationPropagatorSeamMixin",
+    "compat.create.TrackBlockSeamMixin",
+    "compat.create.TrackPlacementSeamMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

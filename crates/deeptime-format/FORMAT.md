@@ -1112,6 +1112,48 @@ boiling point or temperature. The colours stand for the temperature zones of a r
 sterile heart, then yellow and orange microbial mats) but no temperature is coded. The science page
 `docs/science/geothermal-features.md` lists the rules that are game choices.
 
+### Volcanic biomes (decisions log 2026-10-03) and their setting
+
+The pack's volcanic biomes go only at real volcanoes (Ben, "Tie them to real volcanoes (Recommended)").
+No file holds them: the game builds the zones from `volcanoes/active.json`, the geothermal sites and the
+magma bodies above and one key of `notes.bake.underground.params`, **`volcanic_biome_reach`** (1.0, 0 to
+3; **0: no volcanic biome anywhere**), and decides the biome in the biome source (Java
+`worldgen/VolcanicZones`, `climate/VolcanicBiomes`, the mixins `VolcanicBiomeSourceMixin` and, with
+TerraBlender, `compat.terrablender.RegionBiomeSourceMixin`).
+
+- **Kept out.** A biome in the tag `#deeptime:volcanic` is never the answer of a Deep Time level's climate
+  search: the search runs on the biome source's own R-tree (the region's, with TerraBlender) with a
+  distance metric that sets every such leaf infinitely far, so the next-nearest biome of the same tree
+  answers. With TerraBlender, where that answer is an ocean or river biome and the kept-out one was not,
+  the vanilla region's tree (region 0) answers instead, so a mod that put its volcanic land biome in a
+  slot surrounded by sea (Biomes O' Plenty: mushroom fields) leaves land, not ocean. Other levels are not
+  touched.
+- **Roles**, in priority order, each a disc in blocks around its centre (R the basal radius
+  `radius_m` / `m_per_block_h`, at least 6; r = `volcanic_biome_reach`); no disc is under 8 blocks in radius:
+  `hot_spring_field` (every hot-spring pool, from a volcano or hot ground: its reach + 4),
+  `caldera` (a crater with `caldera: true`: 0.9 of its rim radius), `crater` (any other crater: its rim
+  radius + 4), `cone` (stratovolcanoes and shields: 0.45 R · r), `ash_field` (stratovolcanoes and caldera
+  complexes of activity 0.75 or more: R · r), `lava_field` (shields: R · r), `thermal_caves` (a magma body
+  with a chamber: 1.5 chamber radii). An ash or lava field narrower than 8 blocks beyond the zone inside it
+  is left out.
+- **The biome of a role** is the first biome of `#deeptime:volcanic/<role>` (the tag's order) that the
+  level's biome source can place; with none, the role gives way to the next role whose disc holds the
+  column, and in the end to the climate search. Surface roles answer where the biome depth parameter is
+  under 0.2 (vanilla's cave biomes start at 0.2), on land (terrain height at the cell's centre at or
+  above the sea level) and not on a river channel (variant input exactly 0); `ash_field` and
+  `lava_field` only where the climate point lies in one of that biome's own temperature and humidity
+  ranges in the source's parameter list. `thermal_caves` answers underground, from that biome's own
+  lowest depth parameter down.
+- **Tags shipped** (all entries optional, so a pack without the mod loads them): `caldera`
+  terralith:caldera; `crater` terralith:volcanic_crater, terralith:volcanic_peaks, biomesoplenty:volcano;
+  `hot_spring_field` terralith:yellowstone, biomesoplenty:hot_springs; `cone` terralith:volcanic_peaks,
+  biomesoplenty:volcano; `ash_field` terralith:ashen_savanna, biomesoplenty:volcanic_plains; `lava_field`
+  terralith:basalt_cliffs, biomesoplenty:volcanic_plains; `thermal_caves` terralith:cave/thermal_caves;
+  `#deeptime:volcanic` holds the seven role tags. A datapack adds a biome to a role tag (it is then kept
+  out too) or to `#deeptime:volcanic` alone (kept out, never placed).
+- Without any such biome in the pack (vanilla) every query is answered as before. `/deeptime probe
+  biomes` reports the placement against the volcanoes (`census.volcanic`).
+
 ## `strata/classes.json`
 
 `{"classes": ["sandstone", "red_bed", "granite"]}` — index → rock class id (plan §5.4.1,
@@ -1510,8 +1552,23 @@ continental sheets that flowed below the snowline.
 | `climate/ice_max_extent` | 0/1 | 1 where `climate/ice_max_thickness_m` > 0 (the LGM extent at the present) |
 | `climate/ice_time_share` | 0–1 | share of the step's time the cell was under ice |
 | `climate/sea_ice` | 0–1 | annual-mean sea-ice cover of the sea (0 on land) |
+| `climate/sea_ice_max` | 0–1 | (P1-26) the winter maximum of the twelve monthly sea-ice covers of the per-cell climate (0 on land); pipeline field, **not baked** |
+| `climate/sea_ice_min` | 0–1 | (P1-26) the summer minimum of the same; pipeline field, **not baked** |
 | `climate/ice_balance_m_yr` | m ice/yr | surface mass balance of the land ice at the end of the step: positive where snow builds it (above the equilibrium line `climate/ela_m`, at most `ice_accumulation_max_m_yr` × the precipitation in m/yr), negative where it melts (`ice_ablation_gradient` × the ice surface's depth below the line); 0 off the ice. For the hydrology (decisions log 2026-10-01, "Yes, with the ice-sheet branch"): no runoff and no lake where `climate/ice_thickness_m` ≥ 1 m, and meltwater −balance × 0.917 m of water per year where it is negative (the ice edge) |
 | `climate/glacier` | 0/1 | (P1-05) 1 where land ice stands at the end of the step (= `climate/ice_thickness_m` > 0) |
+
+**The per-cell climate (P1-26, 2026-10-03) changes no baked layer.** The climate layers a bake reads
+and writes (`climate/t_mean_c`, `p_mm`, `koppen`, `month/*`, `ice_cover`, and the ice fields above)
+keep their names, units, grids and meaning; only the values come from the 2-D model and, for
+`climate/koppen`, from the L2 classification (the bake's `bake/biomes.rs`). `climate/sea_ice` is the
+annual mean as before (per cell now, the band's value under `climate.model = banded`).
+`climate/sea_ice_max` and `climate/sea_ice_min` are **pipeline fields only**: they live in the run's
+`WorldState`, are carried between snapshots like `climate/sea_ice`, and are written to
+checkpoints and shown by the viewer, but no bake or world folder stores them and the climate
+API (mic-climate) does not see them (design `docs/design/p1-26-per-cell-climate.md`, Q8: seasonal
+sea ice is not baked in Phase 1). The per-cell climate's state (the 2-D model's temperatures, slab
+and ice, the last sinking region and the flux correction) is part of the climate stage's saved
+state in checkpoints, not of any world layer.
 
 The surface stage's field history (the deposit engine's frames, `surface::fields::STEP_FIELDS`)
 records two of them as frame means:
@@ -1534,7 +1591,8 @@ each: its fields' LZ4 blobs back to back in the head's order (the same record th
 holds). The next stage is always a group's lead: inside a group of coupled stages (plates + surface,
 P1-04) the saved state is the postcard `Vec<Vec<u8>>` of every member's state, in pipeline order.
 Schema 4 (P1-04) added the surface state and the recorded field history to `WorldState`; schema 6
-(P1-17) moved the history's frames out of the body into sections of their own (schema 10, 2026-09-30,
+(P1-17) moved the history's frames out of the body into sections of their own (schema 12, P1-26 T6, added the zonal model's correction to the 2-D climate and the triggered-snapshot counters; schema 11, P1-26, added
+the per-cell climate's state; schema 10, 2026-09-30,
 added the climate's ice sheet, weathering supply and snowball list; schema 9, P2-08, the world's crater
 catalogue; schema 8, P1-21, the world's
 volcano catalogue; schema 7, the deep-time

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.compat.create.wrap;
 
-import com.minecraftindustrialcomplex.deeptime.wrapspike.CellIsometry;
-import com.minecraftindustrialcomplex.deeptime.wrapspike.WrapTopology;
+import com.minecraftindustrialcomplex.deeptime.wrapengine.CellIsometry;
+import com.minecraftindustrialcomplex.deeptime.wrapengine.WrapLayouts;
+import com.minecraftindustrialcomplex.deeptime.wrapengine.WrapTopology;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -83,10 +84,11 @@ class SeamTurnsTest {
     @Test
     void linksAcrossSeamsAreFoundBothWaysAndCancel() {
         List<WrapTopology> tops = List.of(
-                WrapTopology.halfTurnSeam(64, 32, 16, 8),
-                WrapTopology.guyou(256, Integer.MAX_VALUE),
-                WrapTopology.peirce(256, Integer.MAX_VALUE),
-                WrapTopology.quarterTurnCorner(40, 40, 16));
+                WrapLayouts.halfTurnSeam(64, 32, 16, 16),
+                WrapLayouts.guyou(256, 16, true),
+                WrapLayouts.peirce(256, 16),
+                WrapLayouts.quarterTurnCorner(48, 48, 256, 16),
+                WrapLayouts.cubeCross(128, 16, true));
         int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
         Random r = new Random(7);
         for (WrapTopology t : tops) {

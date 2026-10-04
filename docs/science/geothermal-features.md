@@ -48,6 +48,11 @@ build log there were 260 sites around 40 of the 67 volcanoes, of which 23 were p
 volcanoes alone give 170 sites around 24 volcanoes (11 pools, 97 vents, 62 patches) and the hot
 ground adds 97 (11 pools, 51 vents, 35 patches): 267 together.
 
+Where the pack has a hot-spring biome (Terralith's yellowstone, Biomes O' Plenty's hot springs), every
+hot-spring field lies in it, and the pack's other volcanic biomes sit on the active volcanoes, their craters
+and calderas instead of wherever their climate falls (decisions log 2026-10-03; see
+[biomes.md](biomes.md), "Volcanic biomes").
+
 There are no geysers. The water does not steam, boil or erupt, and no temperature is stored. A
 separate warm-ground signal lets another mod treat the ground in and beside a site as a few kelvin
 warmer than the climate's temperature (at most 12 K at the heart of a vent).

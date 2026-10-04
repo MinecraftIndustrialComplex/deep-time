@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.compat.create.wrap;
 
-import com.minecraftindustrialcomplex.deeptime.wrapspike.CellIsometry;
-import com.minecraftindustrialcomplex.deeptime.wrapspike.WrapTopology;
+import com.minecraftindustrialcomplex.deeptime.wrapengine.CellIsometry;
+import com.minecraftindustrialcomplex.deeptime.wrapengine.WrapTopology;
 
 import java.util.List;
 
