@@ -3763,6 +3763,26 @@ a smoke benchmark and again at the end.
   check is `tools/client/screenshots.sh` (HeadlessMC under Xvfb, `-Ddeeptime.dev.screenshots=true`
   drives the editor and takes screenshots). Rerun with the real presets after P1-08, and add the
   review page's biome names with P1-09.
+- **As built (2026-10-04, on the real stages).** A real planet's frames carry some sixty layers (24
+  on every step of the coupled stages, then one frame each from deposits, young and amplify) and a
+  1,000-Myr run logs about 10,000 events, so the timelapse follows the workbench: `screen/model/
+  LayerCatalog` (the satellite view first, layers grouped by their prefix in the workbench's order,
+  names from `deeptime.layer.<name>` or the word for the last part, `deeptime.layer.word.*`), the
+  run page shows one group at a time (a group button, two paged columns, a layer the displayed frame
+  lacks is greyed and picking it moves to the nearest frame that has it), map markers fade 24 Myr
+  after an event ends and are capped at 400, and `EventStyle` colours events by kind as the
+  workbench does. Bounded on a player's machine: `SimSession.launch` sessions run one at a time (a
+  run started while another is still stopping waits for it), leaving the Create World flow (title
+  screen, world list, server list, or the new world loading) cancels a run nobody accepted
+  (`EditorModel.abandon`), the simulation keeps its processors − 1 Rayon threads (the bake runs in
+  the session's pool), the keyframe ring stays at 64 MiB and pixel copies reuse one direct buffer
+  per loader thread. Tests: `RealRunWiringTest` (JUnit, natives: `planet_world_4k` cut to 100 Myr
+  through the editor, the timelapse, review, Accept; cancel, restart and abandon with the launch
+  gate), `LayerCatalogTest`, `TimelapseModelTest.{realLayersGroupsAndJumps, markersFadeAndAreCapped}`,
+  GameTest `EditorModelGameTests.realPlanetThroughTheEditor` (the same run inside the server, then
+  the staging move, the bind and the terrain). The client check runs on the test VM:
+  `tools/client/vm-client.sh` (the dev client on Xvfb with Mesa's llvmpipe), screenshots and a
+  contact sheet in `review/out/<name>/`.
 - **Ben reviews.** The same keyframes in the viewer (the screen itself is unverifiable, §9.8).
 
 #### P1-12 Strata pass with rock tags and `rock_states`

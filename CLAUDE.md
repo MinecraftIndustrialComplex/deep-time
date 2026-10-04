@@ -48,6 +48,7 @@ cd neoforge && nix develop -c ./gradlew build test && python3 ../tools/ci/junit-
 ./gametest-planet.sh [-PwithMic]                        # dev server with a real Deep Time + TW overworld
 tools/smoke/install.sh <standalone|mic|terrablender> [--size N] [--synth K] && python3 tools/smoke/run.py --profile <p>
 tools/client/mac-screenshots.sh [--name N] [--no-guidance] [--no-create]   # real client on the Mac's desktop → review/out/N/
+tools/remote/mac.sh -- tools/remote/detach.sh start <job> --kind client:editor tools/client/vm-client.sh --name N [--prop length=300]   # the Create World walk on the test VM (Xvfb, llvmpipe) → review/out/N/ (index.html)
 tools/review/publish.sh <name> <folder>                 # private spacesheep page (plan §2.6)
 tools/viewer/mac-watch.sh [--preset P --start S --length-myr L] [--tv] | stop | status   # workbench on the Mac → http://m6-mac-mini:8642/ (tailnet only)
 tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete merged worktrees' Mac copies
