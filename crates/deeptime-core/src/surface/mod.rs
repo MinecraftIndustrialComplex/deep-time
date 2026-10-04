@@ -763,7 +763,7 @@ impl SurfaceStage {
             .or_else(|| field_n(glacial::source::ICE_THICKNESS));
         let ice_share = field_n(glacial::source::ICE_TIME_SHARE);
         let climate_ice = field_n(glacial::source::ICE_THICKNESS);
-        let precip_m_yr: Vec<f32> = clim.precip_mm.iter().map(|&p| p / 1000.0).collect();
+        let precip_m_yr: Vec<f32> = clim.precip_mm.par_iter().map(|&p| p / 1000.0).collect();
         let mut gtot = glacial::Totals::read(&world.notes);
         let mut ice_cells = 0u64;
         let mut open: Vec<f64> =
@@ -771,7 +771,10 @@ impl SurfaceStage {
                 .map(|&z| if z <= sea { 1.0 } else { 0.0 })
                 .collect();
         box_blur(&d, &mut open, ((150_000.0 / dx).round() as usize).max(1), 2);
-        let restricted: Vec<bool> = (0..n).map(|c| sc.h[c] <= sea && open[c] < 0.4).collect();
+        let restricted: Vec<bool> = (0..n)
+            .into_par_iter()
+            .map(|c| sc.h[c] <= sea && open[c] < 0.4)
+            .collect();
         let basement: Vec<u16> = (0..n)
             .into_par_iter()
             .map(|c| {
@@ -950,7 +953,7 @@ impl SurfaceStage {
 
             // River loads into the sea.
             let started = Instant::now();
-            let sea_mask: Vec<bool> = sc.kind.iter().map(|&k| k == BASE).collect();
+            let sea_mask: Vec<bool> = sc.kind.par_iter().map(|&k| k == BASE).collect();
             for m in 0..n {
                 if sc.kind[m] != BASE || sc.qin[m] <= 0.0 {
                     continue;
@@ -994,7 +997,7 @@ impl SurfaceStage {
                 let mut g = std::mem::take(&mut sc.glacial);
                 // One ice state, not two: the cover's solve hands its arrays on.
                 g.ice = std::mem::take(&mut sc.ice);
-                let above: Vec<bool> = sc.h.iter().map(|&z| z >= sea).collect();
+                let above: Vec<bool> = sc.h.par_iter().map(|&z| z >= sea).collect();
                 glacial::step(
                     &d,
                     &sc.routing,
@@ -1026,7 +1029,7 @@ impl SurfaceStage {
                         u64::from(above[c] && h[c] < sea && g.eroded[c] > 0.0)
                     })
                     .sum::<u64>();
-                let sea_mask: Vec<bool> = sc.kind.iter().map(|&k| k == BASE).collect();
+                let sea_mask: Vec<bool> = sc.kind.par_iter().map(|&k| k == BASE).collect();
                 for m in 0..n {
                     let (ice_load, melt_load) = (g.sea_ice_load[m], g.sea_melt_load[m]);
                     if ice_load > 0.0 {
@@ -1181,6 +1184,7 @@ impl SurfaceStage {
         // The coal facies needs land plants (the atmosphere clock, `deposits::clocks`).
         let land_plants = self.epoch().land_plants_at(f64::from(t_mid) * 1.0e6); // ledger: ORE-018
         let slope: Vec<f32> = (0..n)
+            .into_par_iter()
             .map(|c| {
                 let r = sc.routing.rcv[c] as usize;
                 if r == c || sc.kind[c] == BASE {
@@ -1190,7 +1194,10 @@ impl SurfaceStage {
                 }
             })
             .collect();
-        let net: Vec<f64> = (0..n).map(|c| sc.h[c] - h_start[c]).collect();
+        let net: Vec<f64> = (0..n)
+            .into_par_iter()
+            .map(|c| sc.h[c] - h_start[c])
+            .collect();
         let mut kind_step = vec![fields::KIND_NONE; n];
         let mut coal = vec![false; n];
         let w0_ref = p.weathering_max_m_myr * 1.0e-6;
@@ -1305,6 +1312,7 @@ impl SurfaceStage {
         let mut iso = 0.0;
         if local_share > 0.0 {
             let mut load: Vec<f64> = (0..n)
+                .into_par_iter()
                 .map(|c| {
                     let r = if sc.h[c] <= sea { 0.7 } else { 1.0 };
                     net[c] * r * p.isostasy * local_share
@@ -1427,9 +1435,13 @@ impl SurfaceStage {
         let m_per_block_v = self.preset.scale.m_per_block_v;
         let sea_y = f64::from(self.preset.scale.sea_level_y);
         let erosion: Vec<f32> = (0..n)
+            .into_par_iter()
             .map(|c| ((-net[c]).max(0.0) / dt_myr) as f32)
             .collect();
-        let deposition: Vec<f32> = (0..n).map(|c| (net[c].max(0.0) / dt_myr) as f32).collect();
+        let deposition: Vec<f32> = (0..n)
+            .into_par_iter()
+            .map(|c| (net[c].max(0.0) / dt_myr) as f32)
+            .collect();
         let class_now: Vec<f32> = (0..n)
             .into_par_iter()
             .map(|c| f32::from(surface_class(&st, c)))
@@ -1439,6 +1451,7 @@ impl SurfaceStage {
             .map(|c| st.log.total(c) as f32)
             .collect();
         let drainage: Vec<f32> = (0..n)
+            .into_par_iter()
             .map(|c| {
                 if sc.kind[c] == BASE {
                     f32::NAN
@@ -1448,6 +1461,7 @@ impl SurfaceStage {
             })
             .collect();
         let elevation_y: Vec<f32> = (0..n)
+            .into_par_iter()
             .map(|c| (sea_y + (sc.h[c] - sea) / m_per_block_v) as f32)
             .collect();
         // What the plate model is told: where the surface stands over the plate model's own
@@ -1459,13 +1473,15 @@ impl SurfaceStage {
         // crust the plate model held at 2.8 km stood at 14 km and still took a full collision
         // surge.
         let feedback: Vec<f32> = (0..n)
+            .into_par_iter()
             .map(|c| (sc.h[c] - f64::from(pf.elevation[c])) as f32)
             .collect();
-        let material: Vec<f32> = net.iter().map(|&x| x as f32).collect();
+        let material: Vec<f32> = net.par_iter().map(|&x| x as f32).collect();
         st.offset_m = (0..n)
+            .into_par_iter()
             .map(|c| (sc.h[c] - f64::from(pf.elevation[c])) as f32)
             .collect();
-        st.elevation_m = sc.h.iter().map(|&z| z as f32).collect();
+        st.elevation_m = sc.h.par_iter().map(|&z| z as f32).collect();
         let put = |world: &mut WorldState, name: &str, data: Vec<f32>| {
             world.fields.insert(
                 name.to_owned(),
@@ -1488,6 +1504,7 @@ impl SurfaceStage {
         let ice_now: Vec<f32> = if ela_z.is_some() && sc.glacial.ice.footprint.len() == n {
             // Over the glaciers' whole width, on the ground as it now is.
             (0..n)
+                .into_par_iter()
                 .map(|c| {
                     let s = sc.glacial.ice.footprint[c];
                     if s.is_finite() {
@@ -1553,7 +1570,7 @@ impl SurfaceStage {
 
         // The deposit engine's fields for this step.
         let started = Instant::now();
-        let rel: Vec<f64> = sc.h.iter().map(|&z| z - sea).collect();
+        let rel: Vec<f64> = sc.h.par_iter().map(|&z| z - sea).collect();
         let step_fields = fields::step_fields(
             &fields::StepInputs {
                 flags: &pf.flags,
