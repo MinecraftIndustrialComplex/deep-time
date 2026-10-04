@@ -99,7 +99,7 @@ public final class GeothermalGameTests {
             geo.sites().stream().filter(s -> s.kind() == k).findFirst().ifPresent(picked::add);
         geo.sites().stream().max(java.util.Comparator.comparingInt(Geothermal.Site::reach)).filter(s -> !picked.contains(s))
                 .ifPresent(picked::add);
-        // The test planet's preset lowers the heat-flow threshold to 60 (every continental cell), so
+        // The test planet's preset lowers the heat-flow threshold to 50 (every continental cell; GEO-061), so
         // the fields of hot ground are on it: read one back as well (2026-10-02, "Export heat flow").
         helper.assertTrue(geo.heatFlowSites() > 0, "the test planet has no geothermal site from the baked heat flow ("
                 + t.geothermalRules() + ", " + geo.sites().size() + " sites): the layer meta/heat_flow_mw_m2 or the setting is missing");

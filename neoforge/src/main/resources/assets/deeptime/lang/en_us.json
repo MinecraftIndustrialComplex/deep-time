@@ -252,6 +252,7 @@
   "deeptime.editor.field.inland_mid": "Mid-inland distance",
   "deeptime.editor.field.inland_far": "Far-inland distance",
   "deeptime.editor.field.inland_interior": "Continental interior distance",
+  "deeptime.editor.field.volcanic_biome_reach": "Volcanic biomes down the flanks",
   "deeptime.editor.field.wetland_humidity": "Swamp humidity threshold",
   "deeptime.editor.field.wetland_flat_share": "Swamp flat-land share",
   "deeptime.editor.field.wetland_lowland": "Swamp height limit",

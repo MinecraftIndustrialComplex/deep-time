@@ -27,6 +27,11 @@
 //! **Geothermal features** (P2-14) sit around the same list: hot springs and terraces where the
 //! baked climate has groundwater, fumaroles and altered ground where it is dry or frozen. Four
 //! settings here shape them; the game places them (Java `worldgen/Geothermal`).
+//!
+//! **Volcanic biomes** (Ben, decisions log 2026-10-03, "Tie them to real volcanoes"): the pack's
+//! volcanic biomes go only at the active volcanoes, their craters and calderas, their hot-spring
+//! fields and their magma; `volcanic_biome_reach` scales how far down the flanks they reach (Java
+//! `worldgen/VolcanicZones`, `climate/VolcanicBiomes`).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -129,6 +134,13 @@ pub struct UndergroundParams {
     /// How many fields such hot ground takes, as a multiple of the default of one for each 10,000 km²
     /// of it (ledger: GEO-053, GEO-054, game-choice). 0: none beyond the volcanoes'.
     pub geothermal_heat_density: f64,
+    /// How far down an active volcano's flanks its own biomes reach (the pack's volcanic biomes, such
+    /// as Terralith's volcanic peaks and ashen savanna, which Deep Time keeps out of everywhere else;
+    /// Ben, decisions log 2026-10-03), as a multiple of the built-in shares of the basal radius (the
+    /// summit and upper flanks 0.45, fresh ash and young lava fields 1.0). Craters, calderas,
+    /// hot-spring fields and thermal caves follow their own landform and stay. 0: no volcanic biome
+    /// anywhere. The game reads it (Java `worldgen/VolcanicZones`); ledger BIO-104 (game-choice).
+    pub volcanic_biome_reach: f64,
 }
 
 impl Default for UndergroundParams {
@@ -151,6 +163,7 @@ impl Default for UndergroundParams {
             geothermal_spring_min_precip_mm: 400.0, // ledger: GEO-007 (game-choice)
             geothermal_heat_flow_min_mw_m2: 100.0,  // ledger: GEO-052 (game-choice)
             geothermal_heat_density: 1.0,           // ledger: GEO-054 (game-choice)
+            volcanic_biome_reach: 1.0,              // ledger: BIO-104 (game-choice)
         }
     }
 }
@@ -219,6 +232,7 @@ impl UndergroundParams {
                 4.0,
                 "geothermal_heat_density",
             ),
+            (self.volcanic_biome_reach, 0.0, 3.0, "volcanic_biome_reach"),
         ] {
             if !(v.is_finite() && (lo..=hi).contains(&v)) {
                 return Err(CoreError::preset(
@@ -409,6 +423,17 @@ mod tests {
         assert_eq!(none.geothermal_reach, 1.0);
         assert_eq!(none.geothermal_heat_flow_min_mw_m2, 100.0);
         assert_eq!(none.geothermal_heat_density, 1.0);
+        assert_eq!(none.volcanic_biome_reach, 1.0);
+        let e = UndergroundParams {
+            volcanic_biome_reach: 3.5,
+            ..UndergroundParams::default()
+        }
+        .validate()
+        .unwrap_err();
+        assert!(
+            e.to_string().contains("$.underground.volcanic_biome_reach"),
+            "{e}"
+        );
         let e = UndergroundParams {
             geothermal_heat_flow_min_mw_m2: 20.0,
             ..UndergroundParams::default()
