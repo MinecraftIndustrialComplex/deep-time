@@ -51,7 +51,7 @@ public class DeepTimeMixinPlugin implements IMixinConfigPlugin {
             boolean on = Boolean.getBoolean("deeptime.wrapspike");
             // mixin.wrapspike.compat.<modid>.*: the engine's adapters for a mod, which needs that mod too.
             String modid = modAfter(mixinClassName, WRAPSPIKE + "compat.");
-            if (on && modid != null && !installed(modid)) {
+            if (on && modid != null && (!installed(modid) || !Boolean.parseBoolean(System.getProperty("deeptime.wrapspike.compat", "true")))) {
                 LOGGER.info("Skipping wrap-engine mixin {}: {} is not installed", mixinClassName, modid);
                 return false;
             }
