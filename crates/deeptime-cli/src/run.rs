@@ -961,10 +961,44 @@ pub struct RunOptions {
     /// `timeline.length_myr`.
     pub length_myr: Option<f64>,
     pub content: Option<PathBuf>,
+    /// Pack placement tables (`data/climate_mapping/packs/*.json`) added to the content bundle's
+    /// `climate_placement_patches`, in order: what the game passes when their biome mod is
+    /// installed.
+    pub placement_patch: Vec<PathBuf>,
     pub out: PathBuf,
     pub viewer: Option<PathBuf>,
     pub checkpoints: bool,
     pub common: Common,
+}
+
+/// `content` (a JSON object, or empty) with the pack placement tables in `patches` appended to its
+/// `climate_placement_patches` list.
+fn with_placement_patches(content: String, patches: &[PathBuf]) -> CliResult<String> {
+    if patches.is_empty() {
+        return Ok(content);
+    }
+    let mut root: serde_json::Value = if content.trim().is_empty() {
+        serde_json::json!({})
+    } else {
+        serde_json::from_str(&content)
+            .map_err(|e| format!("the content bundle is not valid JSON: {e}"))?
+    };
+    let key = deeptime_core::bake::placement::PATCHES_KEY;
+    let list = root
+        .as_object_mut()
+        .ok_or("the content bundle is not a JSON object")?
+        .entry(key)
+        .or_insert_with(|| serde_json::json!([]));
+    let list = list
+        .as_array_mut()
+        .ok_or_else(|| format!("the content bundle's {key} is not a list"))?;
+    for p in patches {
+        let text = read_text(p, "placement patch")?;
+        let v: serde_json::Value = serde_json::from_str(&text)
+            .map_err(|e| format!("{} is not valid JSON: {e}", p.display()))?;
+        list.push(v);
+    }
+    Ok(root.to_string())
 }
 
 /// `deeptime run`: a whole planet into `--out`.
@@ -980,6 +1014,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         Some(p) => read_text(p, "content bundle")?,
         None => String::new(),
     };
+    let content = with_placement_patches(content, &o.placement_patch)?;
     let mut s = Session::create(
         &preset,
         &content,

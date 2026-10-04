@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.climate.ClimatePlacement;
 import com.minecraftindustrialcomplex.deeptime.climate.PlacementBundle;
+import com.minecraftindustrialcomplex.deeptime.climate.PlacementPacks;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.CancelledException;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeLoader;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeStatus;
@@ -234,6 +235,16 @@ public final class FirstStartGenerator {
                     "Fix or remove the pack's data/deeptime/deeptime/climate_mapping/placement.json (FORMAT.md, \"The climate mapping\").");
         }
         contentJson = PlacementBundle.addTo(contentJson, placement);
+        // ... and the pack placement tables of the installed biome mods (decisions log 2026-10-04): Terralith's when
+        // its biomes are registered.
+        List<PlacementPacks.Pack> packs;
+        try {
+            packs = ClimatePlacement.chosen(ClimatePlacement.packs(server.getResourceManager()), server.registryAccess());
+        } catch (IOException e) {
+            throw new Stop("a pack placement table cannot be used: " + e.getMessage(),
+                    "Fix or remove the datapack's data/<namespace>/deeptime/climate_mapping/packs/ file (FORMAT.md, \"Pack placement tables\").");
+        }
+        contentJson = PlacementPacks.addTo(contentJson, packs);
         try {
             estimate = Estimate.parse(SimSession.estimate(presetJson, contentJson));
             for (Estimate.Stage st : estimate.stages())
@@ -273,8 +284,9 @@ public final class FirstStartGenerator {
                 name.equals(resolved.label()) ? name : name + " (" + resolved.label() + ")", c, timeline, threads,
                 gib(cap), gib(peak), stageNames.size(), dir);
         long started = System.nanoTime();
-        DeepTime.LOGGER.info("[deeptime] content bundle: {}; climate placement table: {}", essentialsOnly,
-                placement.map(f -> "from pack " + f.packId()).orElse("the core's default"));
+        DeepTime.LOGGER.info("[deeptime] content bundle: {}; climate placement table: {}; pack placement tables: {}", essentialsOnly,
+                placement.map(f -> "from pack " + f.packId()).orElse("the core's default"),
+                packs.isEmpty() ? "none" : PlacementPacks.ids(packs));
         String manifestJson = run(server, presetJson, contentJson, work, threads, cap, stageNames, started);
 
         // 5. Into place, whole.

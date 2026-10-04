@@ -82,8 +82,17 @@ public final class EditorModel {
 
         /** The game's: the natives through {@link SimSession}. */
         public static Deps game(Path gameDir, Executor loader, Executor io) {
-            return new Deps(json -> SimSession.estimate(json, ""), SessionRunHandle::launch, gameDir, MachineInfo.current(),
-                    loader, io, NativeLoader::isLinked, List::of);
+            return game(gameDir, loader, io, () -> "");
+        }
+
+        /**
+         * The game's, with the content bundle every estimate and run gets ({@code content}, asked at each call: the pack
+         * placement tables of the biome mods the Create World screen's data packs register).
+         */
+        public static Deps game(Path gameDir, Executor loader, Executor io, Supplier<String> content) {
+            return new Deps(json -> SimSession.estimate(json, content.get()),
+                    (json, out, threads, cap) -> SessionRunHandle.launch(json, content.get(), out, threads, cap), gameDir,
+                    MachineInfo.current(), loader, io, NativeLoader::isLinked, List::of);
         }
     }
 
