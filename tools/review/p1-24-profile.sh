@@ -48,19 +48,18 @@ fi
 rm -rf "$out"; mkdir -p "$out"
 ( while true; do echo "$(date +%s) $(cut -d' ' -f1-3 /proc/loadavg)"; sleep 10; done ) > "$out/load.log" &
 sampler=$!
-# The run's resident memory (VmRSS, kB) every 2 s, from outside the scope.
-( pid=""; while true; do
-    if [ -z "$pid" ] || [ ! -d "/proc/$pid" ]; then pid=""
-        for p in $(pgrep -x deeptime); do tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null | grep -qF -- "$out/world" && pid=$p; done
-    fi
-    [ -n "$pid" ] && echo "$EPOCHREALTIME $(awk '/^VmRSS/{print $2}' "/proc/$pid/status" 2>/dev/null)"
+# The run's memory every 2 s, from outside the scope: the scope's anonymous memory (memory.stat
+# anon: what the run holds resident, without the page cache of the files it writes) in kB.
+unit="p124-$$-$RANDOM"
+( f="/sys/fs/cgroup/system.slice/$unit.scope/memory.stat"; while true; do
+    [ -r "$f" ] && echo "$EPOCHREALTIME $(awk '$1=="anon"{print int($2/1024)}' "$f")"
     sleep 2; done ) > "$out/mem.log" &
 memsampler=$!
 t0=$(date +%s.%N)
 # A system-level scope (sudo, run as this user): AllowedCPUs and MemoryMax are the PC; its
 # cpu.pressure says how long the run's threads waited for a CPU (other jobs on the same CPUs), and
 # memory.peak is the scope's peak (resident memory plus the page cache of what it wrote).
-sudo systemd-run --scope -q --uid="$(id -u)" --gid="$(id -g)" -p "AllowedCPUs=$cpus" \
+sudo systemd-run --scope -q --unit="$unit" --uid="$(id -u)" --gid="$(id -g)" -p "AllowedCPUs=$cpus" \
     -p "MemoryMax=$mem" -p MemorySwapMax=0 bash -c '
     cg=/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup); out="$1"; shift
     set -o pipefail
