@@ -276,6 +276,11 @@ pub fn cyclic_thomas(lo: &[f64], di: &[f64], up: &[f64], r: &[f64]) -> Vec<f64> 
 /// One row's zonal shift by `s` cells (east positive): the integer part moves whole cells, the
 /// fraction is donor-cell (upwind). Conserves the row's sum and keeps a uniform row uniform.
 pub fn shift_row(v: &mut [f64], s: f64) {
+    shift_row_with(v, s, &mut Vec::new());
+}
+
+/// [`shift_row`] with a reusable buffer for the row's old values.
+fn shift_row_with(v: &mut [f64], s: f64, src: &mut Vec<f64>) {
     let n = v.len();
     if n == 0 || s == 0.0 || !s.is_finite() {
         return;
@@ -283,7 +288,8 @@ pub fn shift_row(v: &mut [f64], s: f64) {
     let whole = s.floor();
     let frac = s - whole; // in [0, 1): a further shift east by frac
     let k = (whole as i64).rem_euclid(n as i64) as usize;
-    let src = v.to_vec();
+    src.clear();
+    src.extend_from_slice(v);
     for i in 0..n {
         // East shift by k + frac: cell i receives (1 − frac) of cell i − k and frac of i − k − 1.
         let a = src[(i + n - k) % n];
@@ -313,6 +319,11 @@ fn thermal_equator(g: &Grid, row_t: &[f64], max_deg: f64) -> f64 {
 /// with the ocean's transport `ocean` if given; stops early once no cell's annual mean T̄ moves
 /// by 0.005 K and no ice store by 2 cm from one year to the next. `itcz0` is the ITCZ to start
 /// from (the previous run's, or zeros).
+///
+/// The implicit solves' coefficients do not change during a run, so each row's and column's
+/// system is factored once ([`Adi`]) and a step only substitutes; the steps reuse their buffers.
+/// Every value is the same expression on the same inputs as solving afresh each step (P1-17; the
+/// tests keep the old loop and compare bit for bit).
 pub fn run(
     p: &Params2d,
     g: &Grid,
@@ -410,6 +421,9 @@ pub fn run(
     let dx_row: Vec<f64> = (0..h)
         .map(|j| p.radius_m * g.cos_mean(j).max(1e-6) * g.lon_w[0])
         .collect();
+    // The implicit diffusions, factored once for the run.
+    let atm = Adi::new(w, h, &k_ew, &k_ns, &cap_atm, dt);
+    let slab = (ep.d_ocean > 0.0).then(|| Adi::new(w, h, &ko_ew, &ko_ns, &cap_sea, dt));
 
     let mut out = Result2d {
         heat_atm_pw: vec![0.0; h.saturating_sub(1)],
@@ -420,6 +434,13 @@ pub fn run(
     };
     let mut itcz = itcz0;
     let mut prev: Option<(Vec<f64>, Vec<f64>)> = None;
+    // The steps' buffers: each cell's absorbed and emitted radiation, T̄ before and after the
+    // atmosphere's transport, and the solves' intermediate.
+    let mut a_sr = vec![0.0; n];
+    let mut a_lr = vec![0.0; n];
+    let mut mean = vec![0.0; n];
+    let mut tb = vec![0.0; n];
+    let mut half = vec![0.0; n];
     for year in 0..years.max(1) {
         let mut ml = vec![[0.0; 12]; n];
         let mut mo = vec![[0.0; 12]; n];
@@ -432,14 +453,20 @@ pub fn run(
         let mut north_o = vec![0.0; h.saturating_sub(1)];
         for (st, qs) in q.iter().enumerate() {
             let month = st / per_month;
-            // 1. Local terms, implicit (`ebm.rs`'s 3 × 3 solve), cells in parallel; each returns
-            //    its new tiles and its budget.
-            let local: Vec<(f64, f64, f64, f64, f64, f64)> = (0..n)
-                .into_par_iter()
-                .map(|c| {
+            // 1. Local terms, implicit (`ebm.rs`'s 3 × 3 solve), cells in parallel, each writing
+            //    its own tiles and its budget.
+            state
+                .t_land
+                .par_iter_mut()
+                .zip(state.t_ocean.par_iter_mut())
+                .zip(state.t_mixed.par_iter_mut())
+                .zip(state.ice_j_m2.par_iter_mut())
+                .zip(a_sr.par_iter_mut().zip(a_lr.par_iter_mut()))
+                .enumerate()
+                .for_each(|(c, ((((tl_c, to_c), tm_c), ice_c), (sr_c, lr_c)))| {
                     let j = c / w;
-                    let (to, tl, tm) = (state.t_ocean[c], state.t_land[c], state.t_mixed[c]);
-                    let mut ice = state.ice_j_m2[c];
+                    let (to, tl, tm) = (*to_c, *tl_c, *tm_c);
+                    let mut ice = *ice_c;
                     let h_ice = ice / ICE_J_M3;
                     let cover = (h_ice / FULL_ICE_M).min(1.0);
                     let insulated = smoothstep(0.5 * SEA_ICE_CAP_M, SEA_ICE_CAP_M, h_ice);
@@ -472,8 +499,8 @@ pub fn run(
                     let tl2 = (r1 * a22 + xl * r2) / det;
                     let mut to2 = (a11 * r2 + xo * r1) / det;
                     let mut tm2 = (r3 + gc * to2) / a33;
-                    let a_sr = f[c] * sl + (1.0 - f[c]) * so;
-                    let a_lr = f[c] * (a_l + b_l * tl2) + (1.0 - f[c]) * (a_o + b_o * to2);
+                    *sr_c = f[c] * sl + (1.0 - f[c]) * so;
+                    *lr_c = f[c] * (a_l + b_l * tl2) + (1.0 - f[c]) * (a_o + b_o * to2);
                     if ice > 0.0 && to2 > 0.0 {
                         let melt = (to2 * ep.c_land).min(ice);
                         ice -= melt;
@@ -482,33 +509,29 @@ pub fn run(
                     // At once, as `ebm.rs` does: the slab's diffusion then never sees a slab
                     // below the freezing point.
                     freeze_melt(&mut tm2, &mut ice, ep.c_ocean);
-                    (tl2, to2, tm2, ice, a_sr, a_lr)
-                })
-                .collect();
-            for (c, &(tl, to, tm, ice, a_sr, a_lr)) in local.iter().enumerate() {
-                state.t_land[c] = tl;
-                state.t_ocean[c] = to;
-                state.t_mixed[c] = tm;
-                state.ice_j_m2[c] = ice;
-                asr += area[c] * a_sr;
-                olr += area[c] * a_lr;
+                    (*tl_c, *to_c, *tm_c, *ice_c) = (tl2, to2, tm2, ice);
+                });
+            for c in 0..n {
+                asr += area[c] * a_sr[c];
+                olr += area[c] * a_lr[c];
             }
             // 2. The atmosphere's diffusion of T̄, implicit ADI: rows (cyclic), then columns.
-            let mean: Vec<f64> = (0..n)
-                .map(|c| f[c] * state.t_land[c] + (1.0 - f[c]) * state.t_ocean[c])
-                .collect();
-            let mut tb = diffuse_x(w, h, &mean, &k_ew, &cap_atm, dt);
-            tb = diffuse_y(w, h, &tb, &k_ns, &cap_atm, dt);
+            for c in 0..n {
+                mean[c] = f[c] * state.t_land[c] + (1.0 - f[c]) * state.t_ocean[c];
+            }
+            atm.solve(&mean, &mut half, &mut tb);
             northward(w, &k_ns, &tb, r2 * dt, &mut north_atm);
             // 3. The prevailing wind's zonal shift of T̄.
             if p.wind_heat > 0.0 {
                 let hemi = p.hemi_shift[month];
-                tb.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
-                    let phi = lat[j];
-                    let pb = phi - belts::shift(phi, itcz[month], hemi);
-                    let u = p.wind_heat * low_level_wind(pb);
-                    shift_row(row, u * dt / dx_row[j]);
-                });
+                tb.par_chunks_mut(w)
+                    .enumerate()
+                    .for_each_init(Vec::new, |src, (j, row)| {
+                        let phi = lat[j];
+                        let pb = phi - belts::shift(phi, itcz[month], hemi);
+                        let u = p.wind_heat * low_level_wind(pb);
+                        shift_row_with(row, u * dt / dx_row[j], src);
+                    });
             }
             for c in 0..n {
                 let d = tb[c] - mean[c];
@@ -516,21 +539,19 @@ pub fn run(
                 state.t_ocean[c] += d;
             }
             // 4. The ocean: the slab's diffusion through the sea, then its transport.
-            if ep.d_ocean > 0.0 {
-                let mut tm = diffuse_x(w, h, &state.t_mixed, &ko_ew, &cap_sea, dt);
-                tm = diffuse_y(w, h, &tm, &ko_ns, &cap_sea, dt);
-                northward(w, &ko_ns, &tm, r2 * dt, &mut north_od);
-                state.t_mixed = tm;
+            if let Some(slab) = &slab {
+                // `mean` is free again: it takes the slab's new temperatures.
+                slab.solve(&state.t_mixed, &mut half, &mut mean);
+                northward(w, &ko_ns, &mean, r2 * dt, &mut north_od);
+                std::mem::swap(&mut state.t_mixed, &mut mean);
             }
             if let Some(o) = ocean {
                 o.step(&mut state.t_mixed, dt, &mut north_o);
             }
-            // 5. Freezing and melting at the slab.
-            for c in 0..n {
-                freeze_melt(&mut state.t_mixed[c], &mut state.ice_j_m2[c], ep.c_ocean);
-            }
+            // 5. Freezing and melting at the slab, then the month's means (each cell's own).
             let pm = per_month as f64;
             for c in 0..n {
+                freeze_melt(&mut state.t_mixed[c], &mut state.ice_j_m2[c], ep.c_ocean);
                 let (to, tl) = (state.t_ocean[c], state.t_land[c]);
                 ml[c][month] += tl / pm;
                 mo[c][month] += to / pm;
@@ -597,63 +618,228 @@ fn northward(w: usize, k: &[f64], t: &[f64], scale: f64, acc: &mut [f64]) {
     }
 }
 
-/// Implicit diffusion along every row (x wraps): C A (x − v)/Δt = Σ K (x_nb − x). `k[c]` is the
-/// conductance of cell c's east face.
-fn diffuse_x(w: usize, h: usize, v: &[f64], k: &[f64], cap: &[f64], dt: f64) -> Vec<f64> {
-    let rows: Vec<Vec<f64>> = (0..h)
-        .into_par_iter()
-        .map(|j| {
-            let r0 = j * w;
-            let mut lo = vec![0.0; w];
-            let mut di = vec![0.0; w];
-            let mut up = vec![0.0; w];
-            for i in 0..w {
-                let c = r0 + i;
-                let ke = k[c] * dt / cap[c];
-                let kw = k[r0 + (i + w - 1) % w] * dt / cap[c];
-                lo[i] = -kw;
-                up[i] = -ke;
-                di[i] = 1.0 + ke + kw;
-            }
-            if lo.iter().all(|&x| x == 0.0) {
-                return v[r0..r0 + w].to_vec();
-            }
-            cyclic_thomas(&lo, &di, &up, &v[r0..r0 + w])
-        })
-        .collect();
-    rows.concat()
+/// A tridiagonal system lo[j]·x[j−1] + di[j]·x[j] + up[j]·x[j+1] = r[j] with its forward
+/// elimination done (`ebm::thomas`'s multipliers c and pivots m, which depend on the coefficients
+/// only): solving is the substitutions, each the same expression `thomas` evaluates.
+struct Tri {
+    lo: Vec<f64>,
+    c: Vec<f64>,
+    m: Vec<f64>,
 }
 
-/// Implicit diffusion along every column (rows stop at the poles). `k[c]` is the conductance of
-/// cell c's south face.
-fn diffuse_y(w: usize, h: usize, v: &[f64], k: &[f64], cap: &[f64], dt: f64) -> Vec<f64> {
-    let cols: Vec<Vec<f64>> = (0..w)
-        .into_par_iter()
-        .map(|i| {
-            let mut lo = vec![0.0; h];
-            let mut di = vec![0.0; h];
-            let mut up = vec![0.0; h];
-            let mut r = vec![0.0; h];
+impl Tri {
+    fn new(lo: &[f64], di: &[f64], up: &[f64]) -> Tri {
+        let n = di.len();
+        let mut c = vec![0.0; n];
+        let mut m = vec![0.0; n];
+        c[0] = up[0] / di[0];
+        m[0] = di[0];
+        for j in 1..n {
+            let mj = di[j] - lo[j] * c[j - 1];
+            c[j] = up[j] / mj;
+            m[j] = mj;
+        }
+        Tri {
+            lo: lo.to_vec(),
+            c,
+            m,
+        }
+    }
+
+    /// x = the solution for right-hand side `r` (`ebm::thomas(lo, di, up, r)`, bit for bit).
+    fn solve(&self, r: &[f64], x: &mut [f64]) {
+        let n = r.len();
+        x[0] = r[0] / self.m[0];
+        for j in 1..n {
+            x[j] = (r[j] - self.lo[j] * x[j - 1]) / self.m[j];
+        }
+        for j in (0..n - 1).rev() {
+            x[j] -= self.c[j] * x[j + 1];
+        }
+    }
+}
+
+/// A row's implicit diffusion along x (it wraps): nothing to do where the row has no conductance,
+/// else [`cyclic_thomas`] with the parts that do not depend on the right-hand side done once.
+enum RowSystem {
+    Still,
+    /// Sherman–Morrison on a factored tridiagonal: x = y − fact·z with y the tridiagonal's
+    /// solution for r, z its (fixed) solution for the correction vector, fact = (y₀ + β y_{n−1}/γ)
+    /// / denom.
+    Cyclic {
+        tri: Tri,
+        z: Vec<f64>,
+        beta: f64,
+        gamma: f64,
+        denom: f64,
+    },
+    /// Fewer than three cells: solved directly each time.
+    Small {
+        lo: Vec<f64>,
+        di: Vec<f64>,
+        up: Vec<f64>,
+    },
+}
+
+impl RowSystem {
+    fn new(lo: Vec<f64>, di: Vec<f64>, up: Vec<f64>) -> RowSystem {
+        if lo.iter().all(|&x| x == 0.0) {
+            return RowSystem::Still;
+        }
+        let n = di.len();
+        if n < 3 {
+            return RowSystem::Small { lo, di, up };
+        }
+        // `cyclic_thomas`'s set-up, verbatim.
+        let alpha = up[n - 1];
+        let beta = lo[0];
+        let gamma = -di[0];
+        let mut bb = di.clone();
+        bb[0] = di[0] - gamma;
+        bb[n - 1] = di[n - 1] - alpha * beta / gamma;
+        let tri = Tri::new(&lo, &bb, &up);
+        let mut u = vec![0.0; n];
+        u[0] = gamma;
+        u[n - 1] = alpha;
+        let mut z = vec![0.0; n];
+        tri.solve(&u, &mut z);
+        let denom = 1.0 + z[0] + beta * z[n - 1] / gamma;
+        RowSystem::Cyclic {
+            tri,
+            z,
+            beta,
+            gamma,
+            denom,
+        }
+    }
+
+    /// `out` = the row's new values from `v`.
+    fn solve(&self, v: &[f64], out: &mut [f64]) {
+        match self {
+            RowSystem::Still => out.copy_from_slice(v),
+            RowSystem::Cyclic {
+                tri,
+                z,
+                beta,
+                gamma,
+                denom,
+            } => {
+                let n = v.len();
+                tri.solve(v, out);
+                let fact = (out[0] + beta * out[n - 1] / gamma) / denom;
+                for (o, b) in out.iter_mut().zip(z) {
+                    *o -= fact * b;
+                }
+            }
+            RowSystem::Small { lo, di, up } => out.copy_from_slice(&cyclic_thomas(lo, di, up, v)),
+        }
+    }
+}
+
+/// Implicit diffusion by ADI with a run's fixed conductances and capacities: C A (x − v)/Δt =
+/// Σ K (x_nb − x) along every row (x wraps; `k_ew[c]` the conductance of cell c's east face),
+/// then along every column (rows stop at the poles; `k_ns[c]` that of its south face). Each
+/// row's and column's system is factored once.
+struct Adi {
+    w: usize,
+    h: usize,
+    rows: Vec<RowSystem>,
+    /// The columns' systems, row-major (element j·w + i is column i's row j), so the column
+    /// substitutions run along the rows.
+    col_lo: Vec<f64>,
+    col_c: Vec<f64>,
+    col_m: Vec<f64>,
+}
+
+impl Adi {
+    fn new(w: usize, h: usize, k_ew: &[f64], k_ns: &[f64], cap: &[f64], dt: f64) -> Adi {
+        let rows = (0..h)
+            .map(|j| {
+                let r0 = j * w;
+                let mut lo = vec![0.0; w];
+                let mut di = vec![0.0; w];
+                let mut up = vec![0.0; w];
+                for i in 0..w {
+                    let c = r0 + i;
+                    let ke = k_ew[c] * dt / cap[c];
+                    let kw = k_ew[r0 + (i + w - 1) % w] * dt / cap[c];
+                    lo[i] = -kw;
+                    up[i] = -ke;
+                    di[i] = 1.0 + ke + kw;
+                }
+                RowSystem::new(lo, di, up)
+            })
+            .collect();
+        let n = w * h;
+        let (mut col_lo, mut col_c, mut col_m) = (vec![0.0; n], vec![0.0; n], vec![0.0; n]);
+        let (mut lo, mut di, mut up) = (vec![0.0; h], vec![0.0; h], vec![0.0; h]);
+        for i in 0..w {
             for j in 0..h {
                 let c = j * w + i;
-                let ks = k[c] * dt / cap[c];
-                let kn = if j > 0 { k[c - w] * dt / cap[c] } else { 0.0 };
+                let ks = k_ns[c] * dt / cap[c];
+                let kn = if j > 0 {
+                    k_ns[c - w] * dt / cap[c]
+                } else {
+                    0.0
+                };
                 lo[j] = -kn;
                 up[j] = -ks;
                 di[j] = 1.0 + ks + kn;
-                r[j] = v[c];
             }
-            super::ebm::thomas(&lo, &di, &up, &r)
-        })
-        .collect();
-    let mut out = vec![0.0; w * h];
-    for (i, col) in cols.into_iter().enumerate() {
-        for (j, x) in col.into_iter().enumerate() {
-            out[j * w + i] = x;
+            let t = Tri::new(&lo, &di, &up);
+            for j in 0..h {
+                let c = j * w + i;
+                col_lo[c] = t.lo[j];
+                col_c[c] = t.c[j];
+                col_m[c] = t.m[j];
+            }
+        }
+        Adi {
+            w,
+            h,
+            rows,
+            col_lo,
+            col_c,
+            col_m,
         }
     }
-    out
+
+    /// `out` = v after the row sweep and then the column sweep; `half` holds the row sweep's
+    /// result. Exactly `diffuse_y(diffuse_x(v))` of the loop before P1-17.
+    fn solve(&self, v: &[f64], half: &mut [f64], out: &mut [f64]) {
+        let (w, h) = (self.w, self.h);
+        half.par_chunks_mut(w)
+            .zip(v.par_chunks(w))
+            .zip(self.rows.par_iter())
+            .with_min_len(8)
+            .for_each(|((o, row), sys)| sys.solve(row, o));
+        // Every column's substitutions at once, a row at a time: each column sees the same
+        // operations in the same order as on its own.
+        for i in 0..w {
+            out[i] = half[i] / self.col_m[i];
+        }
+        for j in 1..h {
+            let (done, rest) = out.split_at_mut(j * w);
+            let above = &done[(j - 1) * w..];
+            let c0 = j * w;
+            for i in 0..w {
+                let c = c0 + i;
+                rest[i] = (half[c] - self.col_lo[c] * above[i]) / self.col_m[c];
+            }
+        }
+        for j in (0..h.saturating_sub(1)).rev() {
+            let (cur, below) = out.split_at_mut((j + 1) * w);
+            let c0 = j * w;
+            for i in 0..w {
+                cur[c0 + i] -= self.col_c[c0 + i] * below[i];
+            }
+        }
+    }
 }
+
+#[cfg(test)]
+#[path = "ebm2d_reference.rs"]
+mod reference;
 
 #[cfg(test)]
 mod tests {
@@ -867,6 +1053,174 @@ mod tests {
         assert!(r.years < 40, "converged ({} years)", r.years);
         assert!(r.net_toa().abs() < 0.05, "ASR − OLR = {}", r.net_toa());
         assert!((0.0..30.0).contains(&r.t_global), "{}", r.t_global);
+    }
+
+    /// Every f64 of a result and a state, as bit patterns.
+    fn bits(r: &Result2d, st: &State2d) -> Vec<u64> {
+        let mut v: Vec<u64> = Vec::new();
+        for a in [&r.t_land, &r.t_ocean, &r.t_mixed, &r.sea_ice] {
+            v.extend(a.iter().flatten().map(|x| x.to_bits()));
+        }
+        for x in [r.asr, r.olr, r.t_global, f64::from(r.years)] {
+            v.push(x.to_bits());
+        }
+        for a in [&r.heat_atm_pw, &r.heat_ocean_diff_pw, &r.heat_ocean_pw] {
+            v.extend(a.iter().map(|x| x.to_bits()));
+        }
+        v.extend(r.itcz.iter().map(|x| x.to_bits()));
+        for a in [&st.t_land, &st.t_ocean, &st.t_mixed, &st.ice_j_m2] {
+            v.extend(a.iter().map(|x| x.to_bits()));
+        }
+        v
+    }
+
+    #[test]
+    fn the_factored_solves_give_the_old_loop_bit_for_bit() {
+        // A ragged planet with sea ice, ice sheets, deserts, wind, the slab's diffusion and the
+        // ocean's transport; one row without conductance (`RowSystem::Still`) on a second grid.
+        let fw = 256;
+        let g = Grid::new(fw, fw / 2, &vec![1.0e4; fw / 2], 1.0e4, 64);
+        let c = ClimateParams::default();
+        let mut ep = EbmParams::from_climate(&c, 23.4, 1.0);
+        ep.d_ocean = 0.8;
+        let p = Params2d::from_climate(&c, ep, 23.4);
+        let n = g.w * g.h;
+        let land: Vec<f64> = (0..n)
+            .map(|cc| {
+                let (i, j) = (cc % g.w, cc / g.w);
+                let lat = g.lat_c(j);
+                if lat < -66.0 || (i * 7 + j * 3) % 13 < 4 {
+                    1.0
+                } else if (i + j) % 5 == 0 {
+                    0.3
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+        let s = Surface {
+            land: land.clone(),
+            sheet: (0..n)
+                .map(|cc| if g.lat_c(cc / g.w) < -66.0 { 1.0 } else { 0.0 })
+                .collect(),
+            desert: (0..n).map(|cc| ((cc * 11) % 7) as f64 / 7.0).collect(),
+        };
+        let u = super::super::ocean2d::belt_wind_u(&c, &g, 23.4);
+        let oc = super::super::ocean2d::Ocean::build(&super::super::ocean2d::Setup {
+            grid: &g,
+            land: &land,
+            wind_u: &u,
+            omega: 7.292e-5,
+            radius_m: EARTH_RADIUS_M,
+            slab_m: c.ocean_depth_m,
+            gyre_efficiency: 1.0,
+            overturning_sv: 15.0,
+            late_winter_ice: None,
+        });
+        let start = || {
+            let mut st = State2d::from_bands(&g, &p.ebm.initial_state());
+            for cc in 0..n {
+                st.t_mixed[cc] += ((cc * 13) % 7) as f64 - 4.0;
+                if cc % 9 == 0 {
+                    st.ice_j_m2[cc] = 0.4 * ICE_J_M3;
+                }
+            }
+            st
+        };
+        let go = |threads: usize, new: bool| {
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .unwrap();
+            pool.install(|| {
+                let mut st = start();
+                let r = if new {
+                    run(&p, &g, &s, &mut st, Some(&oc), 3, [0.0; 12])
+                } else {
+                    super::reference::run(&p, &g, &s, &mut st, Some(&oc), 3, [0.0; 12])
+                };
+                bits(&r, &st)
+            })
+        };
+        let old = go(1, false);
+        for threads in [1, 3, 8] {
+            assert!(go(threads, true) == old, "{threads} threads");
+        }
+        // Without the slab's diffusion and the wind, on a grid with a row of no conductance.
+        let mut q = p.clone();
+        q.ebm.d_ocean = 0.0;
+        q.wind_heat = 0.0;
+        q.zonal_ratio = 0.0;
+        let g2 = grid(16);
+        let n2 = g2.w * g2.h;
+        let s2 = Surface {
+            land: (0..n2)
+                .map(|cc| if cc % 5 < 2 { 1.0 } else { 0.0 })
+                .collect(),
+            sheet: vec![0.0; n2],
+            desert: vec![0.0; n2],
+        };
+        let mut a = State2d::from_bands(&g2, &q.ebm.initial_state());
+        let mut b = a.clone();
+        let ra = run(&q, &g2, &s2, &mut a, None, 2, [0.0; 12]);
+        let rb = super::reference::run(&q, &g2, &s2, &mut b, None, 2, [0.0; 12]);
+        assert!(bits(&ra, &a) == bits(&rb, &b));
+    }
+
+    /// The year loop's speed against the old one on the default 128 × 64 grid (P1-17; run with
+    /// `--ignored --nocapture`, in release).
+    #[test]
+    #[ignore]
+    fn bench_the_year_loop() {
+        let fw = 512;
+        let g = Grid::new(fw, fw / 2, &vec![1.0e4; fw / 2], 1.0e4, 128);
+        let c = ClimateParams::default();
+        let mut ep = EbmParams::from_climate(&c, 23.4, 1.0);
+        ep.d_ocean = 0.8;
+        let p = Params2d::from_climate(&c, ep, 23.4);
+        let n = g.w * g.h;
+        let land: Vec<f64> = (0..n)
+            .map(|cc| {
+                let lat = g.lat_c(cc / g.w);
+                let lon = (cc % g.w) as f64 * 360.0 / g.w as f64;
+                let old = (0.0..140.0).contains(&lon) && (-35.0..72.0).contains(&lat);
+                let new = (230.0..300.0).contains(&lon) && (-55.0..70.0).contains(&lat);
+                if old || new || lat < -70.0 { 1.0 } else { 0.0 }
+            })
+            .collect();
+        let s = Surface {
+            land: land.clone(),
+            sheet: vec![0.0; n],
+            desert: vec![0.0; n],
+        };
+        let u = super::super::ocean2d::belt_wind_u(&c, &g, 23.4);
+        let setup = super::super::ocean2d::Setup {
+            grid: &g,
+            land: &land,
+            wind_u: &u,
+            omega: 7.292e-5,
+            radius_m: EARTH_RADIUS_M,
+            slab_m: c.ocean_depth_m,
+            gyre_efficiency: 1.0,
+            overturning_sv: 15.0,
+            late_winter_ice: None,
+        };
+        let t0 = std::time::Instant::now();
+        let oc = super::super::ocean2d::Ocean::build(&setup);
+        let build = t0.elapsed().as_secs_f64();
+        let years = 12;
+        let t0 = std::time::Instant::now();
+        let mut st = State2d::from_bands(&g, &p.ebm.initial_state());
+        super::reference::run(&p, &g, &s, &mut st, Some(&oc), years, [0.0; 12]);
+        let old = t0.elapsed().as_secs_f64();
+        let t0 = std::time::Instant::now();
+        let mut st = State2d::from_bands(&g, &p.ebm.initial_state());
+        let r = run(&p, &g, &s, &mut st, Some(&oc), years, [0.0; 12]);
+        let new = t0.elapsed().as_secs_f64();
+        eprintln!(
+            "ebm2d bench: ocean build {build:.3} s ({} sweeps); {} years: old {old:.3} s, new {new:.3} s",
+            oc.sweeps, r.years
+        );
     }
 
     #[test]
