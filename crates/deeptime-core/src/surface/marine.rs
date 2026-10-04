@@ -175,7 +175,7 @@ pub const FAILURE_ITERATIONS: u32 = 40; // ledger: ERO-169
 
 /// Counters of the slope failure's work since the process started (P1-17 diagnostics, printed by
 /// `deeptime bench`; not part of any world): full sweeps, neighbourhood passes, the movers they
-/// started from, and the cells the neighbourhood passes recomputed.
+/// started from, and the cells within one cell of those movers.
 static FAILURE_COUNTS: [std::sync::atomic::AtomicU64; 4] = [
     std::sync::atomic::AtomicU64::new(0),
     std::sync::atomic::AtomicU64::new(0),
@@ -184,7 +184,7 @@ static FAILURE_COUNTS: [std::sync::atomic::AtomicU64; 4] = [
 ];
 
 /// The slope failure's counters: (full sweeps, neighbourhood passes, movers summed over the
-/// neighbourhood passes, cells those passes recomputed).
+/// neighbourhood passes, cells within one cell of them).
 pub fn failure_counts() -> [u64; 4] {
     std::array::from_fn(|k| FAILURE_COUNTS[k].load(std::sync::atomic::Ordering::Relaxed))
 }
@@ -220,7 +220,10 @@ pub struct FailureParams {
 /// Cost (P1-17): only the first iteration visits every cell. After it, a cell's share can change
 /// only within one cell of a cell that moved, and its Δh only within two, so each later
 /// iteration recomputes just that neighbourhood of the last iteration's movers (or every cell
-/// again when the movers are many). Each value is computed by the same expression from the same
+/// again when the movers are many). The neighbourhoods are marked on the raster and the passes
+/// scan it row by row in parallel, which keeps the cells in ascending order without sorting;
+/// cells away from the raster's edges reach their neighbours by index steps, and whether a cell
+/// takes part is kept per cell. Each value is computed by the same expression from the same
 /// inputs and the movers are applied in ascending cell order, so the result is bit for bit what
 /// the full sweep gives (`slope_failure_reference` in the tests keeps the full sweep).
 pub fn slope_failure(
@@ -231,18 +234,43 @@ pub fn slope_failure(
     h: &mut [f64],
     avail: &mut [f64],
 ) -> f64 {
+    use super::grid::OFFSETS;
     use rayon::prelude::*;
+    let (w, hgt) = (d.w, d.h);
     let n = d.cells();
-    let wet = |c: usize, h: &[f64]| sea[c] && h[c] < sea_level;
+    if n == 0 {
+        return 0.0;
+    }
+    // Whether a cell takes part, kept up to date as the cells move (P1-17: the test was taken
+    // nine times per cell and pass before).
+    let mut wet: Vec<bool> = (0..n)
+        .into_par_iter()
+        .map(|c| sea[c] && h[c] < sea_level)
+        .collect();
+    // S_c·d for each neighbour offset, and the offset as an index step for cells away from the
+    // raster's edges (the same neighbours `Dims::neighbour` gives them).
+    let crit: [f64; 8] = std::array::from_fn(|k| p.critical_slope * d.step_len(k));
+    let step: [isize; 8] =
+        std::array::from_fn(|k| OFFSETS[k].1 as isize * w as isize + OFFSETS[k].0 as isize);
+    let inner = |i: usize, j: usize| i >= 1 && i + 1 < w && j >= 1 && j + 1 < hgt;
+    let nbr = |c: usize, inner: bool, k: usize| -> Option<usize> {
+        if inner {
+            Some((c as isize + step[k]) as usize)
+        } else {
+            d.neighbour(c, k)
+        }
+    };
     // What each cell would give, and the share of it its sediment allows.
-    let share = |c: usize, hh: &[f64], avail: &[f64]| -> f64 {
-        if !wet(c, hh) || avail[c] <= 0.0 {
+    let share = |c: usize, inner: bool, hh: &[f64], wet: &[bool], avail: &[f64]| -> f64 {
+        if !wet[c] || avail[c] <= 0.0 {
             return 0.0;
         }
         let mut give = 0.0;
-        for (m, dl) in d.neighbours(c) {
-            if wet(m, hh) {
-                give += p.rate * (hh[c] - hh[m] - p.critical_slope * dl).max(0.0);
+        for k in 0..8 {
+            if let Some(m) = nbr(c, inner, k)
+                && wet[m]
+            {
+                give += p.rate * (hh[c] - hh[m] - crit[k]).max(0.0);
             }
         }
         if give > 0.0 {
@@ -251,110 +279,108 @@ pub fn slope_failure(
             0.0
         }
     };
-    let change = |c: usize, hh: &[f64], sc: &[f64]| -> f64 {
+    let change = |c: usize, inner: bool, hh: &[f64], wet: &[bool], sc: &[f64]| -> f64 {
         let mut dz = 0.0;
-        if wet(c, hh) {
-            for (m, dl) in d.neighbours(c) {
-                if !wet(m, hh) {
+        if wet[c] {
+            for k in 0..8 {
+                let Some(m) = nbr(c, inner, k) else {
+                    continue;
+                };
+                if !wet[m] {
                     continue;
                 }
-                let out = (hh[c] - hh[m] - p.critical_slope * dl).max(0.0);
-                let inn = (hh[m] - hh[c] - p.critical_slope * dl).max(0.0);
+                let out = (hh[c] - hh[m] - crit[k]).max(0.0);
+                let inn = (hh[m] - hh[c] - crit[k]).max(0.0);
                 dz += p.rate * (inn * sc[m] - out * sc[c]);
             }
         }
         dz
     };
-    // A sparse pass costs ~9× a dense one per visited cell (the neighbourhoods overlap and
-    // are sorted); above this share of movers the full sweep is cheaper.
-    let dense_above = n / 16;
+    // Above this many movers every cell is recomputed; below it only their neighbourhoods are
+    // (either gives the same values: cells farther away have the inputs they had).
+    let dense_above = n / 8;
     let mut scale = vec![0.0f64; n];
-    let mut next = vec![0.0f64; n];
     let mut moved = 0.0;
     // The cells that moved in the last iteration (ascending), or None for "all of them".
     let mut movers: Option<Vec<u32>> = None;
-    let mut mark = vec![0u32; n];
+    // Neighbourhood marks: `near1[c] == stamp` within one cell of a mover, `near2` within two.
+    let mut near1 = vec![0u32; n];
+    let mut near2 = vec![0u32; n];
     let mut stamp = 0u32;
-    let mut grow = |from: &[u32], mark: &mut [u32]| -> Vec<u32> {
-        stamp += 1;
-        let mut out = Vec::with_capacity(from.len() * 3);
-        for &c in from {
-            let c = c as usize;
-            if mark[c] != stamp {
-                mark[c] = stamp;
-                out.push(c as u32);
-            }
-            for (m, _) in d.neighbours(c) {
-                if mark[m] != stamp {
-                    mark[m] = stamp;
-                    out.push(m as u32);
-                }
-            }
-        }
-        out.sort_unstable();
-        out
-    };
+    let mut ring = Vec::new();
+    // Each row's moved cells and their changes, ascending.
+    let mut rows: Vec<Vec<(u32, f64)>> = vec![Vec::new(); hgt];
     for _ in 0..p.iterations {
-        let mut moved_now = Vec::new();
-        match movers.as_deref() {
-            Some(from) if from.len() <= dense_above => {
-                let shares = grow(from, &mut mark);
-                let changes = grow(&shares, &mut mark);
-                count_failure(1, 1);
-                count_failure(2, from.len() as u64);
-                count_failure(3, changes.len() as u64);
+        let sparse = movers.as_deref().filter(|m| m.len() <= dense_above);
+        if let Some(from) = sparse {
+            stamp += 1;
+            ring.clear();
+            for &c in from {
+                let c = c as usize;
+                let i = inner(c % w, c / w);
+                for m in std::iter::once(Some(c))
+                    .chain((0..8).map(|k| nbr(c, i, k)))
+                    .flatten()
                 {
-                    let hh: &[f64] = h;
-                    let av: &[f64] = avail;
-                    let v: Vec<f64> = shares
-                        .par_iter()
-                        .map(|&c| share(c as usize, hh, av))
-                        .collect();
-                    for (&c, x) in shares.iter().zip(v) {
-                        scale[c as usize] = x;
-                    }
-                }
-                let dz: Vec<f64> = {
-                    let hh: &[f64] = h;
-                    let sc: &[f64] = &scale;
-                    changes
-                        .par_iter()
-                        .map(|&c| change(c as usize, hh, sc))
-                        .collect()
-                };
-                for (&c, dz) in changes.iter().zip(dz) {
-                    if dz != 0.0 {
-                        let c = c as usize;
-                        h[c] += dz;
-                        avail[c] = (avail[c] + dz).max(0.0);
-                        moved += dz.abs() * 0.5;
-                        moved_now.push(c as u32);
+                    if near1[m] != stamp {
+                        near1[m] = stamp;
+                        ring.push(m);
                     }
                 }
             }
-            _ => {
-                count_failure(0, 1);
+            for &c in &ring {
+                let i = inner(c % w, c / w);
+                for m in std::iter::once(Some(c))
+                    .chain((0..8).map(|k| nbr(c, i, k)))
+                    .flatten()
                 {
-                    let hh: &[f64] = h;
-                    let av: &[f64] = avail;
-                    scale
-                        .par_iter_mut()
-                        .enumerate()
-                        .for_each(|(c, s)| *s = share(c, hh, av));
-                    let sc: &[f64] = &scale;
-                    next.par_iter_mut()
-                        .enumerate()
-                        .for_each(|(c, o)| *o = change(c, hh, sc));
+                    near2[m] = stamp;
                 }
-                for c in 0..n {
-                    let dz = next[c];
-                    if dz != 0.0 {
-                        h[c] += dz;
-                        avail[c] = (avail[c] + dz).max(0.0);
-                        moved += dz.abs() * 0.5;
-                        moved_now.push(c as u32);
+            }
+            count_failure(1, 1);
+            count_failure(2, from.len() as u64);
+            count_failure(3, ring.len() as u64);
+        } else {
+            count_failure(0, 1);
+        }
+        let all = sparse.is_none();
+        {
+            let hh: &[f64] = h;
+            let av: &[f64] = avail;
+            let wt: &[bool] = &wet;
+            let (n1, s) = (&near1, stamp);
+            scale.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
+                for (i, x) in row.iter_mut().enumerate() {
+                    let c = j * w + i;
+                    if all || n1[c] == s {
+                        *x = share(c, inner(i, j), hh, wt, av);
                     }
                 }
+            });
+            let sc: &[f64] = &scale;
+            let n2: &[u32] = &near2;
+            rows.par_iter_mut().enumerate().for_each(|(j, out)| {
+                out.clear();
+                for i in 0..w {
+                    let c = j * w + i;
+                    if all || n2[c] == s {
+                        let dz = change(c, inner(i, j), hh, wt, sc);
+                        if dz != 0.0 {
+                            out.push((c as u32, dz));
+                        }
+                    }
+                }
+            });
+        }
+        let mut moved_now = Vec::new();
+        for row in &rows {
+            for &(c, dz) in row {
+                let c = c as usize;
+                h[c] += dz;
+                avail[c] = (avail[c] + dz).max(0.0);
+                wet[c] = sea[c] && h[c] < sea_level;
+                moved += dz.abs() * 0.5;
+                moved_now.push(c as u32);
             }
         }
         if moved_now.is_empty() {
