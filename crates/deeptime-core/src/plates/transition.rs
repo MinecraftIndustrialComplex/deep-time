@@ -554,11 +554,11 @@ mod tests {
         })
         .run(&mut old, 30);
         let z0 = profile(&old, &fx.geo, 0, 20.0, 160.0, |s| f64::from(s.elevation_m));
-        let old_step = z0
-            .windows(2)
-            .map(|p| p[1].1 - p[0].1)
-            .fold(0.0, f64::max);
-        assert!(old_step > 3000.0, "the old model steps at the coast: {z0:?}");
+        let old_step = z0.windows(2).map(|p| p[1].1 - p[0].1).fold(0.0, f64::max);
+        assert!(
+            old_step > 3000.0,
+            "the old model steps at the coast: {z0:?}"
+        );
     }
 
     /// The ocean side's thicker crust gives it a held floor, and cooling takes it towards that
@@ -603,7 +603,14 @@ mod tests {
                 "{} vs {want}",
                 kept.elevation_m
             );
-            assert!(bare.elevation_m < kept.elevation_m - 500.0);
+            // The bare floor ends lower by about what the extra crust holds up.
+            let held_up = want - fx.k.oceanic_floor_elevation_m;
+            assert!(
+                f64::from(kept.elevation_m - bare.elevation_m) > 0.8 * held_up,
+                "{} vs {} ({held_up:.0} m held up)",
+                kept.elevation_m,
+                bare.elevation_m
+            );
         }
         assert!(held > 20, "{held}");
         // Ocean floor with the ocean's own crust: the same as with no held floor.
