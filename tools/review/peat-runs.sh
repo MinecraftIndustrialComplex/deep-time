@@ -7,7 +7,8 @@
 #
 #   tools/remote/mac.sh -- tools/review/peat-runs.sh run <name> [length-myr] [start] [--set k=v]...
 #       builds the release CLI, runs `deeptime run` (earthlike_quick_16k, 2 threads) into <name>-world/;
-#       the log is <name>.log. `--set biomes.wetland_cold_below=1` is the old rule (swamp wherever thawed).
+#       the log is <name>.log. `--content <file>` passes a content bundle; `old-bundle` writes one with the placement
+#       table minus `cold_wetland`, which is the old rule (swamp wherever wet, flat, low land is thawed).
 #   tools/remote/mac.sh --no-sync -- tools/review/peat-runs.sh status | show <name> | clean
 set -euo pipefail
 
@@ -20,7 +21,7 @@ case "${1:-}" in
     run)
         name="$2"; length="${3:-500}"; start="${4:-scattered_continents}"
         sets=""; shift 4 2>/dev/null || shift $#
-        while [ $# -gt 0 ]; do [ "$1" = "--set" ] && sets="$sets --set $2"; shift 2; done
+        while [ $# -gt 0 ]; do sets="$sets $1 $2"; shift 2; done
         setsid nohup sh -c "deeptime-admit run --kind cargo:build -- env CARGO_BUILD_JOBS=8 cargo build --release -p deeptime-cli \
             && cp target/release/deeptime '$RUNS/deeptime-$name' \
             && rm -rf '$RUNS/$name-world' \
@@ -28,6 +29,17 @@ case "${1:-}" in
                --start '$start' --length-myr '$length' --threads 2 $sets --out '$RUNS/$name-world'" \
             > "$RUNS/$name.log" 2>&1 < /dev/null &
         echo "started pid $! -> $RUNS/$name.log"
+        ;;
+    old-bundle)
+        python3 - "$REPO/crates/deeptime-core/data/climate_mapping/placement.json" "$RUNS/old-placement-content.json" <<'PY'
+import json, sys
+t = json.load(open(sys.argv[1]))
+t.pop("_comment", None)
+for c in t["classes"].values():
+    c.pop("cold_wetland", None)
+json.dump({"climate_placement": t}, open(sys.argv[2], "w"))
+PY
+        echo "$RUNS/old-placement-content.json"
         ;;
     status)
         for f in "$RUNS"/*.log; do [ -e "$f" ] && { echo "== $f"; tail -n 4 "$f"; }; done
