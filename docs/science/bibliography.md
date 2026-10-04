@@ -1351,7 +1351,7 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Reference: Holdridge, Leslie R. 1967. Life Zone Ecology (revised edition). Tropical Science Center, San Jose, Costa Rica.
 - DOI or URL: none (book). A library scan is at https://app.ingemmet.gob.pe/biblioteca/pdf/Amb-56.pdf (title per its listing: "Life Zone Ecology by L.R. Holdridge, with photographic supplement prepared by Joseph A. Tosi Jr."). The scan's text layer starts at the table of contents, so I could not confirm the edition year from the scan itself; Lugo et al. 1999 cite it as "Holdridge, L.R. (1967) Life zone ecology. Tropical Science Center. San Jose, Costa Rica".
 - Cited as: "L. R. Holdridge 1967, Life Zone Ecology, Tropical Science Center: PET = 58.93 x the mean annual biotemperature"
-- Ledger ids: HYD-029, HYD-030, HYD-035, HYD-041
+- Ledger ids: HYD-029, HYD-030, HYD-035, HYD-041, BIO-126 (the dry forest precipitation band, from memory: the band is read off the life-zone chart, which the scan's text layer does not carry; the text says "Most of these savannas are to be found in the Tropical Dry Forest Life Zone", read 2026-10-04)
 - Access: book (not online), plus an unofficial library scan
 - Library (the project's source library, not distributed): fetched (PDF, 149 pages, text layer, 330,833 characters). From: https://app.ingemmet.gob.pe/biblioteca/pdf/Amb-56.pdf. Text file: Holdridge1967.txt.
 - Read so far (by the project): nothing says it was consulted
@@ -5991,6 +5991,20 @@ The survey `docs/research/notes/seamless-projection-survey.md` and its tools (`t
 - Cited as: "PEATMAP (Xu et al. 2018)".
 - Ledger ids: BIO-137
 - Access: paywalled at the publisher (an open copy exists at CORE, record 227455185); the paper's text was not fetched: ScienceDirect, CORE and Semantic Scholar all answered 403 (2026-10-03). Read so far: a search-result summary of the abstract (global peatland 4.23 million km2, 2.84 % of the land; northern peatlands 3.21 million km2), and two secondary pages: PMC11718193 (a 2025 study of Holocene peatland area, which writes "we used an area of 3.21 Mkm2 for the modern northern peatlands from PEATMAP by Xu et al.") and the International Peatland Society page "Where can peatlands be found?" (continent shares: Asia 38.4 %, North America 31.6 %, Europe 12.5 %; boreal and temperate northern peatlands "formed under high precipitation-low temperature climatic regimes").
+## Biome rules for Expanded Ecosphere (BIO-115 to BIO-130), added 2026-10-04
+
+### Walker2005
+- Reference: Walker, D. A.; Raynolds, M. K.; Daniëls, F. J. A.; Einarsson, E.; Elvebakk, A.; Gould, W. A.; Katenin, A. E.; Kholod, S. S.; Markon, C. J.; Melnikov, E. S.; Moskalenko, N. G.; Talbot, S. S.; Yurtsev, B. A. and the CAVM Team (2005). The Circumpolar Arctic vegetation map. Journal of Vegetation Science 16:267-282.
+- Cited as: "Walker et al. 2005 (CAVM), bioclimate subzones by summer warmth".
+- Ledger ids: BIO-124
+- Access: not fetched. Read so far: from memory (the five bioclimate subzones A to E, with July means rising from about 1-3 degC in A to about 9-12 degC in E; the 5 degC split used is near the B/C edge); to be checked against the paper's subzone table.
+
+### Alaback1991
+- Reference: Alaback, P. B. (1991). Comparative ecology of temperate rainforests of the Americas along analogous climatic gradients. Revista Chilena de Historia Natural 64:399-412.
+- Cited as: "Alaback 1991, the climatic limits of temperate rainforest".
+- Ledger ids: BIO-127
+- Access: not fetched. Read so far: from memory (temperate rainforest with annual precipitation over about 1,400 mm, a mean annual temperature of about 4 to 12 degC and cool summers); to be checked.
+
 ## Sphere-native simulation grids, added 2026-10-04 with the sphere-native grids note
 
 The research note `docs/research/notes/sphere-native-grids.md` and its benchmark (`tools/research/sphere-grid-bench/`) rest on these; nothing shipped does yet, so no ledger row cites them. "Sub-agent" means a Sonnet sub-agent of the note's session, whose transcriptions were kept in the session scratchpad (not committed, not in the source library). The note also cites, for their sphere use, works already listed above: [Braun2013] (not read), [Barnes2014], [Cortial2019], [SmithBarstad2004], [Hergarten2021], [Fastscapelib] (its `HealpixGrid`, release 0.3.0, 2025) and [Landlab] (its `IcosphereGlobalGrid`). The note's §13 lists every source with how it was read; the entries below are the ones its conclusions lean on.

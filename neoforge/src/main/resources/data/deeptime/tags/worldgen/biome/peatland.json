@@ -2,6 +2,22 @@
   "replace": false,
   "values": [
     {
+      "id": "wythers:fen",
+      "required": false
+    },
+    {
+      "id": "wythers:berry_bog",
+      "required": false
+    },
+    {
+      "id": "wythers:snowy_bog",
+      "required": false
+    },
+    {
+      "id": "wythers:snowy_fen",
+      "required": false
+    },
+    {
       "id": "biomesoplenty:bog",
       "required": false
     },
@@ -14,23 +30,7 @@
       "required": false
     },
     {
-      "id": "regions_unexplored:cold_fen",
-      "required": false
-    },
-    {
-      "id": "expanded_ecosphere:fen",
-      "required": false
-    },
-    {
-      "id": "expanded_ecosphere:snowy_fen",
-      "required": false
-    },
-    {
-      "id": "expanded_ecosphere:snowy_bog",
-      "required": false
-    },
-    {
-      "id": "expanded_ecosphere:berry_bog",
+      "id": "clifftree:bog",
       "required": false
     }
   ]
