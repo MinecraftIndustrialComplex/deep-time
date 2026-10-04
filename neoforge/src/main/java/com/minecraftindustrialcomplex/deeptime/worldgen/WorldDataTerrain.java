@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
+import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.climate.ClimateMapping;
+import com.minecraftindustrialcomplex.deeptime.climate.Peatland;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Rivers;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 
@@ -22,6 +24,9 @@ public final class WorldDataTerrain implements TerrainSource {
     private volatile SeaCliffGuard.Rules cliffRules;
     private volatile Geothermal geothermal;
     private volatile GeothermalRules geothermalRules;
+    private volatile Peatland peat;
+    private volatile java.util.function.Supplier<Peatland> peatDecider;
+    private final Object peatLock = new Object();
 
     public WorldDataTerrain(WorldDataRef ref) {
         this.ref = ref;
@@ -155,6 +160,60 @@ public final class WorldDataTerrain implements TerrainSource {
         return g;
     }
 
+    /**
+     * How the level asks its biome source where the pack has a peatland biome (BIO-105): set by the
+     * generator, called at the first flagged cold-wetland column of a world whose mapping has no verdict
+     * yet. It answers null while it cannot (TerraBlender's trees are not built).
+     */
+    public void peatlandDecider(java.util.function.Supplier<Peatland> decider) {
+        peatDecider = decider;
+    }
+
+    /** The world's peatland verdict, from its mapping or decided now and stored there; null while undecided. */
+    public Peatland peatland() {
+        Peatland p = peat;
+        if (p != null)
+            return p;
+        ClimateMapping m = mapping();
+        if (m.peatland() != null)
+            return peat = m.peatland();
+        java.util.function.Supplier<Peatland> d = peatDecider;
+        if (d == null || m.isIdentity())
+            return null;
+        synchronized (peatLock) {
+            if (peat != null)
+                return peat;
+            Peatland v = d.get();
+            if (v == null)
+                return null;
+            ClimateMapping updated = m.withPeatland(v);
+            ActiveWorldData.putMapping(ref.folder(), updated);
+            mapping = updated;
+            try {
+                updated.write(data().folder().resolve(ClimateMapping.FILE));
+            } catch (java.io.IOException e) {
+                DeepTime.LOGGER.error("Cannot write {} ({}): the peatland verdict holds for this start only", ClimateMapping.FILE, e.getMessage());
+            }
+            return peat = v;
+        }
+    }
+
+    /** The peatland verdict where it applies to cold wetland at (x, z): flagged ground in a peatland region, else null. */
+    private Peatland peatlandAt(ClimateMapping m, int x, int z) {
+        WorldData d = data();
+        if (!d.has(Peatland.LAYER) || Math.round(d.layer(Peatland.LAYER).nearest(x, z)) != Peatland.COLD_WETLAND)
+            return null;
+        Peatland p = peatland();
+        if (p == null || p.regions().isEmpty())
+            return null;
+        String region = Peatland.NO_TABLE;
+        if (m.regions() != null && d.has("meta/province")) {
+            double v = d.layer("meta/province").nearest(x, z);
+            region = Double.isNaN(v) ? "?" : m.regions().regionOf((int) v);
+        }
+        return p.appliesTo(region) ? p : null;
+    }
+
     @Override
     public int circumference() {
         return ref.circumferenceBlocks();
@@ -183,6 +242,13 @@ public final class WorldDataTerrain implements TerrainSource {
         }
         if (!m.isIdentity() && ClimateMapping.RIDGES.equals(layer))
             return m.apply(layer, data().layer(layer).bilinearOdd(wrapX(x), z));
+        if (ClimateMapping.EROSION.equals(layer) && !m.isIdentity()) {
+            // Cold wetland (BIO-104, BIO-105): taiga in the ordinary erosion; the swamp band, where the pack
+            // draws its bog or muskeg, in the regions of the pack that have one.
+            Peatland p = peatlandAt(m, wrapX(x), z);
+            if (p != null)
+                return p.erosion();
+        }
         return m.apply(layer, data().raster(layer, wrapX(x), z));
     }
 }

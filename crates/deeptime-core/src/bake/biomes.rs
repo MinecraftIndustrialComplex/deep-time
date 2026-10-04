@@ -72,10 +72,10 @@
 //! 2.5), flat (the flattest `wetland_flat_share`, 35 %), low (< `wetland_low_m`, 150 m) land that
 //! is not frozen goes into E6 in proportion to `wetlands` — swamps and mangroves only where they belong (vanilla
 //! puts E6 at hot temperatures to mangrove swamp, whatever the humidity). Cold wetland (temperature
-//! band below `wetland_cold_below`, 2: the subarctic and continental classes) is not swamp
+//! band below `wetland_cold_below`, 2: vanilla's cold band, the Dfc and the like; BIO-104) is not swamp
 //! (Ben, 2026-10-03, "Taiga instead, peatland if present"): it keeps the class's own temperature and
 //! humidity (taiga in vanilla) with erosion held under E5, and is flagged `climate/wetland` = 2 so the
-//! game can put the pack's peatland biome there. The deep sea keeps E4 or
+//! game can put the pack's peatland biome there (BIO-105). The deep sea keeps E4 or
 //! more, away from Terralith's sky-island band. A class's placement may clamp its land's erosion
 //! (`erosion: {min, max}`; EF's barren ground is held below 0.3, off Terralith's packed-ice glacial
 //! chasm, and its ice cap is not).
@@ -158,8 +158,8 @@ pub struct BiomeParams {
     /// Height above the sea, m, at which lowland stops counting as low for swamps.
     pub wetland_low_m: f64,
     /// The temperature band coordinate (1 … 5) below which wetland is cold wetland: taiga (the class's
-    /// ordinary placement), or the pack's peatland biome, instead of swamp. 2 is the top of the cold
-    /// band, where vanilla's swamp row ends; 1 gives no cold wetland (swamp wherever it is thawed).
+    /// ordinary placement), or the pack's peatland biome, instead of swamp. 2 is the top of vanilla's
+    /// cold band (its taiga row); 1 gives no cold wetland (swamp wherever it is thawed).
     pub wetland_cold_below: f64,
 }
 
@@ -1122,6 +1122,7 @@ pub fn map(
         "wetland_cells": wet_cells,
         "wetland_cells_by_class": by_class_map(&wet_by_class),
         "cold_wetland_cells": cold_cells,
+        "wetland_cold_below": p.wetland_cold_below,
         "cold_wetland_cells_by_class": by_class_map(&cold_by_class),
         "land_cells_l2": land_cells,
         "land_shares": {

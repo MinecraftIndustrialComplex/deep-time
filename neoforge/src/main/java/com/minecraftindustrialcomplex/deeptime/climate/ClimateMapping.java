@@ -169,13 +169,14 @@ public final class ClimateMapping {
     private final Table temperature, vegetation, continents, erosion, ridges;
     private final JsonObject meta;
     private final ProvinceRegions regions;
+    private final Peatland peatland;
 
     public ClimateMapping(Table temperature, Table vegetation, Table continents, Table erosion, Table ridges, JsonObject meta) {
-        this(temperature, vegetation, continents, erosion, ridges, meta, null);
+        this(temperature, vegetation, continents, erosion, ridges, meta, null, null);
     }
 
     private ClimateMapping(Table temperature, Table vegetation, Table continents, Table erosion, Table ridges, JsonObject meta,
-                           ProvinceRegions regions) {
+                           ProvinceRegions regions, Peatland peatland) {
         this.temperature = temperature;
         this.vegetation = vegetation;
         this.continents = continents;
@@ -183,6 +184,7 @@ public final class ClimateMapping {
         this.ridges = ridges;
         this.meta = meta == null ? new JsonObject() : meta;
         this.regions = regions;
+        this.peatland = peatland;
     }
 
     public boolean isIdentity() {
@@ -200,7 +202,20 @@ public final class ClimateMapping {
 
     /** This mapping with a province → region table. */
     public ClimateMapping withRegions(ProvinceRegions r) {
-        return new ClimateMapping(temperature, vegetation, continents, erosion, ridges, meta, r);
+        return new ClimateMapping(temperature, vegetation, continents, erosion, ridges, meta, r, peatland);
+    }
+
+    /**
+     * Where the pack has a peatland biome for the bake's cold wetland (BIO-105), or null while the world
+     * has not decided yet (decided once, at the first biome query of a world with the flag, and kept).
+     */
+    public Peatland peatland() {
+        return peatland;
+    }
+
+    /** This mapping with the peatland verdict. */
+    public ClimateMapping withPeatland(Peatland p) {
+        return new ClimateMapping(temperature, vegetation, continents, erosion, ridges, meta, regions, p);
     }
 
     /** The table of a layer, or null (identity). */
@@ -320,6 +335,8 @@ public final class ClimateMapping {
         o.add("tables", tables);
         if (regions != null)
             o.add(ProvinceRegions.KEY, regions.toJson());
+        if (peatland != null)
+            o.add(Peatland.KEY, peatland.toJson());
         for (var e : meta.entrySet())
             if (!o.has(e.getKey()))
                 o.add(e.getKey(), e.getValue());
@@ -343,7 +360,12 @@ public final class ClimateMapping {
             regions = ProvinceRegions.fromJson(meta.getAsJsonObject(ProvinceRegions.KEY));
             meta.remove(ProvinceRegions.KEY);
         }
-        return new ClimateMapping(t[0], t[1], t[2], t[3], t[4], meta, regions);
+        Peatland peatland = null;
+        if (meta.has(Peatland.KEY) && meta.get(Peatland.KEY).isJsonObject()) {
+            peatland = Peatland.fromJson(meta.getAsJsonObject(Peatland.KEY));
+            meta.remove(Peatland.KEY);
+        }
+        return new ClimateMapping(t[0], t[1], t[2], t[3], t[4], meta, regions, peatland);
     }
 
     public static ClimateMapping read(Path file) throws IOException {
