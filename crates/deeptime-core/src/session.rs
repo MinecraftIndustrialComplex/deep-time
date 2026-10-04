@@ -95,6 +95,10 @@ pub trait MemoryGauge: Send + Sync {
     fn in_use(&self) -> u64;
     /// The highest `in_use` seen.
     fn peak(&self) -> u64;
+    /// The session marks where the run is: `begin` true before a phase (a stage's step by the
+    /// stage's name, `keyframes`, `finish`, `bake`) and false after it, so a gauge can trace memory
+    /// per phase (`deeptime run --mem-trace`). Phases never nest. The default does nothing.
+    fn phase(&self, _name: &str, _begin: bool) {}
 }
 
 /// A gauge that reports nothing allocated.
@@ -668,8 +672,10 @@ impl Session {
             let group = s.group();
             if s.stages[group.clone()].iter().all(|st| st.is_done()) {
                 let name = group_label(&s.stages, &group);
-                self.finish_stage(s)
-                    .map_err(|e| self.fail(&format!("finishing stage {name}"), e))?;
+                self.gauge.phase("finish", true);
+                let result = self.finish_stage(s);
+                self.gauge.phase("finish", false);
+                result.map_err(|e| self.fail(&format!("finishing stage {name}"), e))?;
                 self.stage_permille.store(0, Ordering::Release);
                 if s.current >= s.stages.len() {
                     return Ok(self.complete());
@@ -705,7 +711,10 @@ impl Session {
                     needed_peak: Some(&self.needed_peak),
                 };
                 let stepped = Instant::now();
-                if let Err(e) = stage.step(&mut s.world, &ctx) {
+                self.gauge.phase(stage.name(), true);
+                let result = stage.step(&mut s.world, &ctx);
+                self.gauge.phase(stage.name(), false);
+                if let Err(e) = result {
                     let what = format!("stage {}", stage.name());
                     return Err(self.fail(&what, e));
                 }
@@ -722,8 +731,10 @@ impl Session {
                 Ordering::Release,
             );
             let stepped = Instant::now();
-            self.after_step(s)
-                .map_err(|e| self.fail("keyframe or event publishing", e))?;
+            self.gauge.phase("keyframes", true);
+            let result = self.after_step(s);
+            self.gauge.phase("keyframes", false);
+            result.map_err(|e| self.fail("keyframe or event publishing", e))?;
             // A stage's time includes publishing its events and drawing its keyframes (a group's
             // go to its last member that stepped).
             s.timings[last].millis += stepped.elapsed().as_secs_f64() * 1000.0;
@@ -1123,6 +1134,13 @@ impl Session {
     /// After `Done`: writes the world data and `manifest.json` last (tmp, fsync, rename; plan
     /// §6.3), and returns the manifest.
     pub fn finalize_write(&self) -> Result<String, CoreError> {
+        self.gauge.phase("bake", true);
+        let result = self.finalize_write_inner();
+        self.gauge.phase("bake", false);
+        result
+    }
+
+    fn finalize_write_inner(&self) -> Result<String, CoreError> {
         let s = self.lock_stepper()?;
         match self.state() {
             SessionState::Done | SessionState::Finalized => {}

@@ -1008,6 +1008,16 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         alloc::peak() as f64 / 1048576.0,
         started.elapsed().as_secs_f64()
     );
+    for (name, a) in alloc::trace_summary() {
+        println!(
+            "deeptime run: memtrace phase={name} count={} seconds={:.1} live_peak_mib={:.1} rss_peak_mib={:.1} rss_end_mib={:.1}",
+            a.count,
+            a.seconds,
+            a.live_peak as f64 / 1048576.0,
+            a.rss_peak as f64 / 1048576.0,
+            a.rss_end as f64 / 1048576.0,
+        );
+    }
     // The world as it stands, not a copy of it (a 32k full world is gigabytes).
     let timings = s.stage_timings()?;
     let lines = s.with_world(|world| {

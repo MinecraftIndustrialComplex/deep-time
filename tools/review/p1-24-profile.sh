@@ -21,7 +21,8 @@
 # <out>/result.json (wall, CPU, peak RSS, per-stage seconds, each phase's wall time and peak RSS,
 # the bake, the folder's size). P124_MEM=12G overrides the profile's memory (to measure a preset
 # that does not fit), P124_BIN another `deeptime` binary, P124_ENV environment words for the run
-# (`MALLOC_ARENA_MAX=2 LD_PRELOAD=...`: sudo drops the caller's environment). The world data is
+# (`MALLOC_ARENA_MAX=2`, `LD_PRELOAD=...`: sudo drops the caller's environment); the run traces its
+# memory per phase into <out>/memtrace.jsonl (DEEPTIME_MEM_TRACE). The world data is
 # deleted afterwards unless P124_KEEP=1. Runs through the admission tool as
 # sim:<preset>:<threads>t when it is not already inside an admitted job.
 set -uo pipefail
@@ -68,7 +69,7 @@ sudo systemd-run --scope -q --unit="$unit" --uid="$(id -u)" --gid="$(id -g)" -p 
     /usr/bin/time -v "$@" 2>&1 | while IFS= read -r l; do printf "%s %s\\n" "$EPOCHREALTIME" "$l"; done > "$out/run.log"; s=$?
     { echo "cpu $(grep ^some "$cg/cpu.pressure")"; echo "memory_peak $(cat "$cg/memory.peak")";
       echo "usage_usec $(grep ^usage_usec "$cg/cpu.stat")"; } > "$out/cgroup.txt"
-    exit $s' p124 "$out" env ${P124_ENV:-} nice -n "$nice" "$bin" run --preset "$preset" --start "$start" --length-myr "$length" \
+    exit $s' p124 "$out" nice -n "$nice" env ${P124_ENV:-} DEEPTIME_MEM_TRACE="$out/memtrace.jsonl" "$bin" run --preset "$preset" --start "$start" --length-myr "$length" \
     --out "$out/world" --threads "$threads" --mem-cap 4294967296 "$@"
 status=$?
 t1=$(date +%s.%N)
