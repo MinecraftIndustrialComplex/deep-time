@@ -87,8 +87,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
-| 2026-10-03 | orogenic collapse | **Land still short of 0.27-0.30, and one plate target slipped** (build log 2026-10-03, "Orogenic collapse"). The collapse brings the 1000 Myr crust to 0.39 at its lowest step (target ≥ 0.37) but the 500 Myr land only from 0.197 to 0.215: the new crust is a one-sample-wide shelf the surface carries down to the sea, and thinning old belts lowers the high ground (above 2 km 0.096 → 0.082). Steps with one plate above half: 3.8 % → 10.1 % (≤ 10). Options: (a) **keep the rule as built and let the Earth-width ocean–continent transition (decided 2026-10-03) and the belt cap read from thickness (tasks 7-8) raise the land (Recommended)**; (b) raise `collapse_thickness_km` to 56-60 km to give back less crust (fewer welds, but the land falls too); (c) let filled ocean floor stand higher than a continent's mean (no physical basis). | build log; not yet asked |
-| 2026-10-03 | orogenic collapse | **Lambert lowers the land share beyond the crust** (build log 2026-10-03, "35 m and Lambert"): land over crust 0.60 → 0.45 at 1000 Myr (seeds 1-2), 0.65 → 0.60 at 500 Myr, master before and after the Lambert merge; 35 m changes nothing. **Recommended: a short look by the projection agent at the surface stage on the Lambert L1 (1024 × 328 against the old grid: the margins' cell size and the pole band) before the land is recalibrated**; or accept it and recalibrate on Lambert. | build log; not yet asked |
+| 2026-10-03 | orogenic collapse | **Land still short of 0.27-0.30** (build log 2026-10-03, "Orogenic collapse", re-measured 2026-10-04 on master 297da4b6). The collapse brings the 1000 Myr crust from 0.291 to 0.440 at the end (lowest step 0.28 → 0.37, target ≥ 0.37 missed by a hair; highest step 0.45, just over its 0.45) and the 1000 Myr land from 0.161 to 0.204, but the 500 Myr land only from 0.189 to 0.207 (inside the ±0.02 chance): the new crust is a one-sample-wide shelf the surface carries down to the sea, and thinning old belts lowers the high ground. plate-check 29 of 45 in both. Options: (a) **keep the rule as built and let the Earth-width ocean–continent transition (decided 2026-10-03) and the belt cap read from thickness (tasks 7-8) raise the land (Recommended)**; (b) raise `collapse_thickness_km` to 56-60 km to give back less crust (the crust ceiling holds, but the land falls too); (c) let filled ocean floor stand higher than a continent's mean (no physical basis). | build log; not yet asked |
+| 2026-10-03 | orogenic collapse | **Lambert lowers the land share beyond the crust** (build log 2026-10-03, "Ben's 9 % run"): land over crust at 500 Myr 0.65 before Lambert, 0.57 on master 297da4b6 (six runs); 35 m changes nothing. Ben's 9 % is one seed's draw, repeated exactly here on his build (458a89a5: 0.090); the same seed gives 0.201 on today's master, and the four-seed 1000 Myr land is 0.161. **Recommended: a short look by the projection agent at the surface stage on the Lambert L1 (the margins' cell size and the pole band) before the land is recalibrated**; or accept it and recalibrate on Lambert. | build log; not yet asked |
 | 2026-10-03 | GameTest failures | **Boreal wetlands as vanilla swamp?** (build log 2026-10-03, "The GameTests that failed on master".) Wet, flat, low land that is not frozen goes to vanilla's swamp band (BIO-066), and vanilla's swamp spans the cold band too, so wet subarctic lowland (Dfc, Dfb) becomes `minecraft:swamp` (oaks with vines, lily pads); on master 6f72f0dd's test planet that was 66 % of the Dfc columns. (a) **Keep it** (recommended): vanilla does the same, and boreal peatlands are the largest wetlands on Earth; a pack with a cold wetland biome (BOP's bog or muskeg) fills the slot through its regions. (b) Swamps only from the temperate band up: subarctic lowland stays taiga, and the cold band gets no wetland in vanilla. Built: (a); the GameTest counts the wetland band apart either way. | build log |
 | 2026-10-04 | Wrap engine (design + spike) | **Four choices** (docs/design/wrap-engine.md §8): (1) architecture: one stored copy + folded access + replicated band, vanilla clients join, optional client re-anchor (recommended), or Toroidal World's client frame extended with turned packets; (2) keep Toroidal World for Guyou's slide edges, engine owns only the turning edges (recommended), or engine owns every edge; (3) Create: refuse kinetic, fluid and train connections across turning seams at first (recommended), or adapters in the first version; (4) start Phase 1 now alongside the Immersive Portals work (recommended; the engine takes any layout of translations, half- and quarter-turns), or stop at the spike until the projection survey settles the layout. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-03 | Seamless projection survey | **The production seamless world, four choices** (docs/research/notes/seamless-projection-survey.md §8; replaces the prototype's four, of which Ben answered three on 2026-10-03: research the projection, Immersive Portals plus an own engine, bake only): (1) a cube world, eight mild 270° corners, shapes ≤ 1.42× (recommended), or keep the 2:1 Guyou world with Petroff's equal-area map, shapes ≤ 2.67×; (2) the cube's map: the smooth equal-area table (the conformal cube made equal-area by Moser's flow, no creases; recommended) or closed-form QSC = Roşca–Plonka (41° creases on face diagonals); (3) the cross net, seven seam pairs, straight wrapped equator (recommended), or a 3 × 2 rectangle (eight); (4) faces of 3,776 / 7,552 blocks, today's scale (recommended), or 4,096 / 8,192. | Not asked yet (sub-agent; for the coordinator) |
@@ -124,7 +124,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-02 | science WP-14a | **CO₂ forcing above 50,000 ppm and the snowball's escape** (CLM-070, CLM-166; design §4.2). The clock's forcing is Byrne & Goldblatt 2014's fit, stated for 200–10,000 ppm and computed to 50,000 ppm; the code uses it to 10⁶ ppm, and today's snowball escapes near 5.5·10⁵ ppm where Hoffman et al. 2017 expect 10⁴–10⁵ ppm (with cloud forcing of ≥ 10 W/m² that cloud-free models lack). (1, recommended) a short research task finds a published forcing calculation for 0.05–1 bar of CO₂ and the snowball cloud forcing; T6 then applies both, and the escape is measured against 10⁴–10⁵ ppm; (2) cap now: above 50,000 ppm continue the fit as a logarithm with its slope there (no source; escape CO₂ moves, direction to be measured); (3) leave it (escape stays near 0.55 bar). | to be asked by the coordinator (sub-agent report) |
 
 ## Build log
-### 2026-10-03 — Orogenic collapse and the thickest crust: thickened belts give their area back (agent worktree agent-aeec1402fc6146955, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c, continued after a stop; not merged)
+### 2026-10-03 — Orogenic collapse and the thickest crust: thickened belts give their area back (agent worktree agent-aeec1402fc6146955, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c, continued after two stops, re-measured 2026-10-04; not merged)
 - **Ask.** Ben, decisions log 2026-10-03: "Merge, then give area back (Recommended)". Plate tasks 3-4
   cost continental crust (0.31 → 0.27 at 1000 Myr): crust crossing a collision front became belt
   thickness and never gave its area back. Kept as Ben said: PLT-253, resistance 200 mm/yr, stacking
@@ -173,22 +173,48 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   [4.4, 5.4] (no 14 km belts: the highest anywhere, 1000 Myr runs included, 5.5 km); 99th percentile
   3.8 → 3.3 km; continental crust 0.327 → 0.372 (+0.045). Most new crust is shelf: the filled ocean
   floor is one sample wide and the surface carries it to the sea (the margins task's cause).
-- **35 m and Lambert (the coordinator's question on Ben's 9 % run).** 35 m changes nothing in metres:
-  the six 500 Myr runs on master af22131a (20 m) and 6f72f0dd (35 m) agree to the last digit in land,
-  heights, crust and `sea_level_m`. Lambert lowers the land share more than the crust explains: at
-  1000 Myr, seeds 1 and 2, land 0.173 and 0.164 before Lambert, 0.133 and 0.125 after, with crust
-  0.290/0.260 → 0.268/0.312 (land over crust 0.60 → 0.45); at 500 Myr land 0.223 → 0.197 and crust
-  0.342 → 0.327 (land over crust 0.65 → 0.60; the master between also carries the cold-desert
-  merge). Ben's workbench run (seed 1, 458a89a5, `surface_final land_frac=0.090`, crust 0.255,
-  largest plate 0.56) is the simulation's own number; the same seed here ended at 0.133 (other
-  thread count, structure density 0, keyframes every 50 Myr): runs diverge, and master's 1000 Myr
-  land is 0.12-0.13 on all four seeds, so 9 % is the low end of the same trend.
-- **Gates** (test VM, branch head before this entry, 336de3b9): `cargo fmt --check` clean; clippy
-  `-D warnings` clean; `cargo test --workspace` 769 passed, 0 failed, 3 ignored; `cargo deny check
-  licenses bans` ok; `./gradlew build test` 251 tests, 0 failures, 2 skipped. GameTests not run (merge
-  batch); the test planet now collapses (its 4k lattice is why the reach has a 1.5-spacing floor).
-- **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/belts-area` (summaries only, 43 MB; checkpoints
-  deleted); `belts34` deleted.
+- **Re-measured on current master** (2026-10-04; branch merged with master 297da4b6, whose
+  simulation is master 5df2e9ec's: nothing since touched `crates/`; binary built from a27e2e81;
+  "master" = the same build with `tectonics.collapse_myr=0;tectonics.crust_max_km=0`, which return
+  before touching anything). Tables: `docs/design/plate-check-baseline.md`, "Re-measured on master
+  297da4b6". plate-check 1000 Myr, supercontinent, seeds 1-4: **29 of 45 targets** in both, two
+  traded: after passes the active margin share (0.41 → 0.38, target 0.25-0.40) and still the one
+  plate above half (6.2 → 9.8 %, ≤ 10), and fails both crust bounds by a hair: lowest step
+  0.28 → 0.37 (0.39 0.37 0.31 0.40; mean just under 0.37), highest step 0.43 → 0.45 (0.44 0.47
+  0.43 0.47; over 0.45). Crust at the end **0.291 → 0.440** (+0.149); land at the end **0.161 →
+  0.204** [0.134, 0.203] → [0.179, 0.229] (+0.043, clears the ±0.02 chance); above 2 km 0.123 →
+  0.095; highest cell 6.4 → 5.3 km (master's seed 2 has an 8.6 km belt; after at most 5.9 km; no
+  14 km belts anywhere); thickness p50/p99 81-105/440-649 km → 50-54/72-120 km. Hypsometry at
+  500 Myr, seeds 1-3 × both starts, mean [min, max]: land **0.189 → 0.207** [0.153, 0.259] →
+  [0.159, 0.252] (+0.018, inside the ±0.02 chance; target 0.27-0.30); median land 387 → 448 m
+  (inside the six runs' spread); above 2 km 0.081 → 0.078 (inside); highest cell 5.14 → 5.17 km
+  [4.5, 6.2] → [4.5, 5.8]; 99th percentile 3.50 → 3.21 km; continental crust **0.331 → 0.374**
+  (+0.043, clears).
+- **Ben's 9 % run (the coordinator's question).** The simulation is deterministic for a given build
+  whatever the thread count: seeds 1-4 at 8 threads (Ben's) give the plate-check's 2-thread numbers
+  to the last digit. So Ben's run can be repeated: master 458a89a5 (his workbench build), seed 1,
+  8 threads, coupled pipeline to the volcanoes, ends at `land_frac=0.090`, crust 0.255,
+  `max_elevation_m=4759`, `sea_level_m=37.2`, largest plate 0.562 of the planet, exactly the
+  workbench's run 1a103bb2d2b. The same seed ends at 0.174 on 6f72f0dd (Ben's run 1a1035d3741, before
+  Lambert), 0.133 on 970f6d04^1 (after the cold-desert, breccia and wetland merges; crust 0.268,
+  largest plate 0.27) and **0.201** on today's master (crust 0.332), and **0.179** with the collapse.
+  A 1000 Myr planet is chaotic: any code change re-rolls one seed's outcome. Ben's draw ended with
+  one plate over half the planet (2 plates above 5 %) and the least crust of any run here, with only
+  35 % of that crust above the sea. The ensemble, not one seed, says where master is: 1000 Myr land
+  0.127 on 0af3ff6e (seeds 1-4, 0.123-0.133), **0.161** on today's master (0.134-0.203; the ice
+  merge raised every seed), **0.204** with the collapse (0.179-0.229). 35 m changes nothing in
+  metres (the six 500 Myr runs on af22131a and 6f72f0dd agree to the last digit). Lambert: land over
+  crust at 500 Myr 0.65 before, 0.57 on today's master (0.189 / 0.331), 0.55 after (0.207 / 0.374).
+- **Test planet.** With the collapse on, `planet_world_4k` (C = 4096, reach shorter than a sample
+  spacing) bakes 6 river chains instead of 43 and no lakes, and `carversSpareWater` (GameTests,
+  standalone and MIC) failed its premise: 69 river columns above sea level, 4 carver cuts under them
+  (master: 2,002 and 5,230). The collapse and the limit are off on that test preset
+  (`collapse_myr` 0, `crust_max_km` 0, as its `collision_stacking_share` 0.5 is its own): the
+  GameTest fixtures keep master's planet; the 16k presets keep the defaults. The 1.5-spacing floor of
+  the reach stays for coarse lattices.
+- **Gates** (test VM, head GATES_HEAD): GATES_LINE
+- **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/belts-area` deleted with its builds of the older
+  masters; `belts34` deleted.
 - **Next.** Ben's answers below; the belt cap read from thickness and the overlap accretion (the
   sources of the stacked volume) belong to tasks 7-8.
 ### 2026-10-03/04 — Seamless projection survey: which projection for a portal-joined world (Ben's "Send off some research on what the current best projections would be for this"; agent worktree agent-a720027b758d66bc2, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; research only, not merged)
