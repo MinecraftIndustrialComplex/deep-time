@@ -173,7 +173,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Gates:**
   - `WrapTopologyTest` passes 6 of 6. It checks the algebra (local isometry, images, Guyou, Peirce, a
     quarter-turn corner) and failed on 2 bounded-seam edge cases before the fix.
-  - `./gradlew build test`: GATE-PLACEHOLDER.
+  - `./gradlew build test`: BUILD SUCCESSFUL, JUnit 271 tests, 0 failures, 2 skipped.
   - No Rust changed (no cargo gates). The normal `./gametest.sh` was not run (batch rule); the spike
     is inert there.
 - **Test VM incident.** From 00:59 to 02:00 UTC the admission queue froze, and every job on the VM
