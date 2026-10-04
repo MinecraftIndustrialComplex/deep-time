@@ -905,7 +905,7 @@ impl StructureStage {
         for (si, &k) in self.host_classes.iter().enumerate() {
             out.insert(
                 hosts::field_name(k),
-                (0..n).map(|c| fr[c * hc + si]).collect(),
+                (0..n).into_par_iter().map(|c| fr[c * hc + si]).collect(),
             );
         }
         let trap = self.trap_field(src, d, fields);
