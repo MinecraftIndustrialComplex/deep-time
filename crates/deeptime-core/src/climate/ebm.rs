@@ -66,6 +66,19 @@ pub struct EbmParams {
     pub steps_per_year: usize,
     /// The orbit (circular unless the recent ice-age window sets it, `orbit.rs`).
     pub orbit: insolation::Orbit,
+    /// The CO₂ forcing of the atmosphere's CO₂ against 280 ppm, by each tile's temperature
+    /// (`co2.rs`); `None`: 280 ppm (none).
+    pub co2: Option<super::co2::Forcing>,
+    /// The snowball cloud greenhouse on frozen surfaces, W/m² (`snowball_cloud_w_m2`).
+    pub snow_cloud: f64,
+    /// The per-cell climate's flux correction of every band, [land, sea] tile, W/m², added to
+    /// the absorbed sunlight (P1-26 design §4.1: fitted at each 2-D snapshot so this model's band
+    /// means match the 2-D model's zonal means; empty: none).
+    pub flux_corr: Vec<[f64; 2]>,
+    /// The atmosphere's diffusivity of every face between bands (n + 1, the poles' first and
+    /// last), W/m²/K: the per-cell climate's transport (P1-26 T6, fitted with `flux_corr`);
+    /// empty: `d` everywhere.
+    pub d_face: Vec<f64>,
 }
 
 /// The model's state at the start of a year (what a warm start continues from).
@@ -157,6 +170,10 @@ impl EbmParams {
             bands: c.ebm_bands as usize,
             steps_per_year: c.ebm_steps_per_year as usize,
             orbit: insolation::Orbit::default(),
+            co2: None,
+            snow_cloud: c.snowball_cloud_w_m2,
+            flux_corr: Vec::new(),
+            d_face: Vec::new(),
         }
     }
 
@@ -208,6 +225,13 @@ impl EbmParams {
         let lat: Vec<f64> = (0..n).map(|j| self.band_lat(j)).collect();
         let cosl: Vec<f64> = lat.iter().map(|l| l.cos()).collect();
         let dphi = std::f64::consts::PI / n as f64;
+        // Each band's area per radian of longitude, sin φ_N − sin φ_S (= 2 sin(Δφ/2) cos φ, so the
+        // area weights stay ∝ cos φ): the diffusion is the exact finite-volume form on the sphere,
+        // which the per-cell model (`ebm2d.rs`) shares, face length over centre distance.
+        let span: Vec<f64> = lat
+            .iter()
+            .map(|l| (l + 0.5 * dphi).sin() - (l - 0.5 * dphi).sin())
+            .collect();
         // Faces between bands (j − ½, j + ½); the poles' faces have cos = 0 (no flux).
         let face: Vec<f64> = (0..=n)
             .map(|k| {
@@ -277,17 +301,36 @@ impl EbmParams {
                             * (1.0 - insulated);
                     let ao = self.albedo(free[j], to, cover);
                     let al = self.albedo(free[j], tl, g_sheet[j]);
-                    let so = qs[j] * (1.0 - ao);
-                    let sl = qs[j] * (1.0 - al);
+                    let [fl_corr, fo_corr] = self.flux_corr.get(j).copied().unwrap_or([0.0; 2]);
+                    let so = qs[j] * (1.0 - ao) + fo_corr;
+                    let sl = qs[j] * (1.0 - al) + fl_corr;
                     let (cl, cs, cm) = (self.c_land / dt, self.c_land / dt, self.c_ocean / dt);
                     let (xl, xo) = (self.exchange * (1.0 - f[j]), self.exchange * f[j]);
-                    // land:  (cl + B + xl)·Tl − xl·To                 = cl·Tl + Sl − A
-                    // sea:   −xo·Tl + (cs + B + xo + g)·To − g·Tm     = cs·To + So − A
-                    // slab:  −g·To + (cm + g)·Tm                      = cm·Tm
-                    let (r1, r2, r3) = (cl * tl + sl - self.a, cs * to + so - self.a, cm * tm);
+                    // Each tile's longwave A + B·T, less the CO₂ forcing at its temperature and
+                    // the snowball cloud greenhouse on its frozen share (`co2.rs`).
+                    let (a_l, b_l) = super::co2::longwave(
+                        self.a,
+                        self.b,
+                        self.co2.as_ref(),
+                        tl,
+                        self.snow_cloud,
+                        self.frozen(tl).max(g_sheet[j]),
+                    );
+                    let (a_o, b_o) = super::co2::longwave(
+                        self.a,
+                        self.b,
+                        self.co2.as_ref(),
+                        to,
+                        self.snow_cloud,
+                        cover,
+                    );
+                    // land:  (cl + B_l + xl)·Tl − xl·To                 = cl·Tl + Sl − A_l
+                    // sea:   −xo·Tl + (cs + B_o + xo + g)·To − g·Tm     = cs·To + So − A_o
+                    // slab:  −g·To + (cm + g)·Tm                        = cm·Tm
+                    let (r1, r2, r3) = (cl * tl + sl - a_l, cs * to + so - a_o, cm * tm);
                     let a33 = cm + g;
-                    let a11 = cl + self.b + xl;
-                    let a22 = cs + self.b + xo + g - g * g / a33;
+                    let a11 = cl + b_l + xl;
+                    let a22 = cs + b_o + xo + g - g * g / a33;
                     let r2 = r2 + g * r3 / a33;
                     let det = a11 * a22 - xl * xo;
                     let tl2 = (r1 * a22 + xl * r2) / det;
@@ -296,7 +339,7 @@ impl EbmParams {
                     // The budget of the implicit step: what it absorbed and emitted.
                     let w = cosl[j];
                     asr += w * (f[j] * sl + (1.0 - f[j]) * so);
-                    olr += w * (self.a + self.b * (f[j] * tl2 + (1.0 - f[j]) * to2));
+                    olr += w * (f[j] * (a_l + b_l * tl2) + (1.0 - f[j]) * (a_o + b_o * to2));
                     // Ice melts from the top when the surface above it thaws.
                     if state.ice_j_m2[j] > 0.0 && to2 > 0.0 {
                         let melt = (to2 * self.c_land).min(state.ice_j_m2[j]);
@@ -306,16 +349,27 @@ impl EbmParams {
                     state.t_ocean[j] = to2;
                     state.t_land[j] = tl2;
                     state.t_mixed[j] = tm2;
+                    // The slab freezes (or melts) at once, so the ocean's diffusion below never
+                    // sees a slab under the freezing point: otherwise a slab cooled through thin
+                    // ice drew heat from its neighbours' insulated slabs, whose ice then grew
+                    // without end.
+                    freeze_melt(&mut state.t_mixed[j], &mut state.ice_j_m2[j], self.c_ocean);
                 }
                 // 2. Diffusion of the band mean, implicit. Land and the sea's surface have the
                 //    same heat capacity, so both take the band mean's change.
-                if self.d > 0.0 {
+                let per_face = self.d_face.len() == n + 1;
+                if self.d > 0.0 || per_face {
                     let mean: Vec<f64> = (0..n)
                         .map(|j| f[j] * state.t_land[j] + (1.0 - f[j]) * state.t_ocean[j])
                         .collect();
                     for j in 0..n {
-                        let k = self.d / (cosl[j] * dphi * dphi) * dt / self.c_land;
-                        let (kl, ku) = (k * face[j], k * face[j + 1]);
+                        let k = 1.0 / (span[j] * dphi) * dt / self.c_land;
+                        let (dl, du) = if per_face {
+                            (self.d_face[j], self.d_face[j + 1])
+                        } else {
+                            (self.d, self.d)
+                        };
+                        let (kl, ku) = (k * dl * face[j], k * du * face[j + 1]);
                         lo[j] = -kl;
                         up[j] = -ku;
                         di[j] = 1.0 + kl + ku;
@@ -343,7 +397,7 @@ impl EbmParams {
                         } else {
                             0.0
                         };
-                        let k = self.d_ocean / (cosl[j] * dphi * dphi) * dt / (self.c_ocean * sea);
+                        let k = self.d_ocean / (span[j] * dphi) * dt / (self.c_ocean * sea);
                         let (kl, ku) = (k * face[j] * fl, k * face[j + 1] * fu);
                         lo[j] = -kl;
                         up[j] = -ku;
@@ -355,15 +409,7 @@ impl EbmParams {
                 // 4. Freezing and melting at the slab: it holds at the freezing point while ice
                 //    grows, and melts its ice before it warms (the heat moves, none is lost).
                 for j in 0..n {
-                    let tm = state.t_mixed[j];
-                    if tm < SEA_FREEZE_C {
-                        state.ice_j_m2[j] += (SEA_FREEZE_C - tm) * self.c_ocean;
-                        state.t_mixed[j] = SEA_FREEZE_C;
-                    } else if state.ice_j_m2[j] > 0.0 {
-                        let melt = ((tm - SEA_FREEZE_C) * self.c_ocean).min(state.ice_j_m2[j]);
-                        state.ice_j_m2[j] -= melt;
-                        state.t_mixed[j] -= melt / self.c_ocean;
-                    }
+                    freeze_melt(&mut state.t_mixed[j], &mut state.ice_j_m2[j], self.c_ocean);
                 }
                 for j in 0..n {
                     let (to, tl) = (state.t_ocean[j], state.t_land[j]);
@@ -404,6 +450,20 @@ impl EbmParams {
             prev_mean = Some((annual, ice));
         }
         out
+    }
+}
+
+/// Freezing and melting at the slab `tm` (°C) with ice `ice` (J/m²) and heat capacity `c_ocean`
+/// (J/m²/K): below sea water's freezing point the slab holds at it and the heat it lost grows
+/// ice; above it, the ice melts first. The heat moves; none is lost.
+pub fn freeze_melt(tm: &mut f64, ice: &mut f64, c_ocean: f64) {
+    if *tm < SEA_FREEZE_C {
+        *ice += (SEA_FREEZE_C - *tm) * c_ocean;
+        *tm = SEA_FREEZE_C;
+    } else if *ice > 0.0 {
+        let melt = ((*tm - SEA_FREEZE_C) * c_ocean).min(*ice);
+        *ice -= melt;
+        *tm -= melt / c_ocean;
     }
 }
 

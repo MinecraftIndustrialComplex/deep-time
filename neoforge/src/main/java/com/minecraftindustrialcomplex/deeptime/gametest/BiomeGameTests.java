@@ -169,8 +169,14 @@ public final class BiomeGameTests {
     // the default test planet's C family read 0.737 standalone and 0.731 with MIC (156 columns), the
     // mapping unchanged; its misses are coastal columns (Csa/Csb 64-100 % stony shore, Cfb 21 % beach and
     // 15 % stony shore standalone). C goes to 0.63 by the same rule.
+    //
+    // 2026-10-04 (P1-26, the per-cell climate; design §5.3): the default test planet's BW family grew from
+    // 38 columns on master (0.500 standalone, 0.474 MIC; under MIN_COLUMNS, logged only) to 51 and read
+    // 0.608 standalone and 0.569 with MIC, the mapping unchanged; its misses are coastal and mountain
+    // columns (BWh 64 % stony shore standalone, granite cliffs with MIC). BW goes to 0.46 by the same rule.
+    // The same planet's high latitudes warmed (Dfc 138 -> 7 columns, E 4 -> 0; D 507 -> 511, mostly Dfa).
     static final Map<String, Double> FLOORS = Map.ofEntries(
-            Map.entry("A", 0.34), Map.entry("Af", 0.54), Map.entry("BW", 0.57), Map.entry("BS", 0.42), Map.entry("C", 0.63),
+            Map.entry("A", 0.34), Map.entry("Af", 0.54), Map.entry("BW", 0.46), Map.entry("BS", 0.42), Map.entry("C", 0.63),
             Map.entry("D", 0.88), Map.entry("Dsub", 0.38), Map.entry("E", 0.82), Map.entry("sea", 0.95),
             Map.entry("BW:desert", 0.37), Map.entry("Af:jungle", 0.41), Map.entry("Dfc:taiga", 0.33), Map.entry("E:snow", 0.72));
     static final int MIN_COLUMNS = 40;
@@ -200,7 +206,7 @@ public final class BiomeGameTests {
     static final Map<String, Double> FLOORS_TB = Map.of("BS", 0.39, "E:snow", 0.65, "Af:jungle", 0.39);
     /** The largest share of land columns the bake's wetland rule may hold (its flat share, BiomeParams.wetland_flat_share 0.35). */
     static final double WETLAND_CEILING = 0.35;
-    /** The largest share of cold wetland columns that may land on a swamp that is not a peatland (BIO-104). */
+    /** The largest share of cold wetland columns that may land on a swamp that is not a peatland (BIO-115). */
     static final double COLD_WETLAND_SWAMP_CEILING = 0.05;
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
     static final double FORBIDDEN_CEILING = 0.10;
@@ -253,12 +259,12 @@ public final class BiomeGameTests {
         int landColumns = wet.get("land_columns").getAsInt(), wetColumns = wet.get("wetland_columns").getAsInt();
         helper.assertTrue(wetColumns <= WETLAND_CEILING * landColumns,
                 wetColumns + " of " + landColumns + " land columns are in the bake's wetland band, more than " + WETLAND_CEILING);
-        // Cold wetland (Ben, 2026-10-03, "Taiga instead, peatland if present"; BIO-104, BIO-106): the bake's
+        // Cold wetland (Ben, 2026-10-03, "Taiga instead, peatland if present"; BIO-115, BIO-117): the bake's
         // flagged boreal wetland is taiga, or the pack's peatland biome where it has one, and never another
         // swamp. Before the rule it was all swamp (66 % of one planet's Dfc land). A few percent of a mod's
         // oddly tagged biomes are let through.
         var cold = r.json().getAsJsonObject("cold_wetland");
-        helper.assertTrue(cold.get("layer").getAsBoolean(), "the bake wrote climate/wetland, the flag of cold wetland (BIO-104)");
+        helper.assertTrue(cold.get("layer").getAsBoolean(), "the bake wrote climate/wetland, the flag of cold wetland (BIO-115)");
         int coldColumns = cold.get("columns").getAsInt(), coldSwamp = cold.get("on_swamp").getAsInt();
         DeepTime.LOGGER.info("[gametest] climateConsistent cold wetland {}", cold);
         helper.assertTrue(coldSwamp <= COLD_WETLAND_SWAMP_CEILING * coldColumns,

@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Research benchmark for docs/research/notes/sphere-native-grids.md (2026-10-04). Not shipped and not
+# a member of the main workspace: it is its own one-crate workspace, so the main workspace's builds
+# and gates never see it. Run it on the test VM with ./run.sh (see there).
+[package]
+name = "sphere-grid-bench"
+version = "0.0.0"
+edition = "2024"
+license = "LGPL-3.0-or-later"
+publish = false
+
+[workspace]
+
+[dependencies]
+deeptime-core = { path = "../../../crates/deeptime-core" }
+glam = "0.33.11"
+rayon = "=1.12.0"
+
+[profile.release]
+lto = "thin"
+debug = "line-tables-only"

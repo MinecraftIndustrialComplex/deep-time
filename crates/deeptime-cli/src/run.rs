@@ -235,10 +235,86 @@ pub fn load_preset_with(
 /// The plate model's summary line (plan P1-03: `plates_final=<n> ocean_age_p90_myr=<a> …`), when
 /// the world has plates.
 pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<String> {
-    world
-        .plates
-        .as_ref()
-        .map(|st| deeptime_core::plates::stats::summary(st).line())
+    use deeptime_core::plates::collapse;
+    let st = world.plates.as_ref()?;
+    // The orogenic collapse over the run, and the continental crust's thickness now (visible
+    // samples), km.
+    let global = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
+    let mut thick: Vec<f64> = st
+        .samples
+        .iter()
+        .filter(|s| s.is_continental() && !s.is_hidden())
+        .map(|s| f64::from(s.thickness_m) / 1000.0)
+        .collect();
+    thick.sort_by(f64::total_cmp);
+    let q = |f: f64| {
+        thick
+            .get(((thick.len().max(1) - 1) as f64 * f).round() as usize)
+            .copied()
+            .unwrap_or(0.0)
+    };
+    Some(
+        format!(
+            "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} foundered_km3={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
+            deeptime_core::plates::stats::summary(st).line(),
+            global(collapse::MOVED_GLOBAL),
+            global(collapse::GAINED_GLOBAL),
+            global(collapse::FOUNDERED_GLOBAL),
+            q(0.1),
+            q(0.5),
+            q(0.9),
+            q(0.99),
+        ) + &crust_bins(st),
+    )
+}
+
+/// Diagnostic (belts-area): visible continental crust by thickness bin: share of the samples,
+/// share of the crust volume, median elevation, median time since the last orogeny stamp, median
+/// sediment share.
+fn crust_bins(st: &deeptime_core::plates::state::PlateState) -> String {
+    use deeptime_core::plates::state::pool;
+    const EDGES: [f64; 7] = [0.0, 30.0, 40.0, 55.0, 70.0, 100.0, 1.0e9];
+    let vis: Vec<_> = st
+        .samples
+        .iter()
+        .filter(|s| s.is_continental() && !s.is_hidden())
+        .collect();
+    let vol: f64 = vis.iter().map(|s| f64::from(s.thickness_m)).sum();
+    let med = |mut v: Vec<f64>| {
+        v.sort_by(f64::total_cmp);
+        v.get(v.len() / 2).copied().unwrap_or(f64::NAN)
+    };
+    let mut out = String::from("\ncrust_bins");
+    for w in EDGES.windows(2) {
+        let b: Vec<_> = vis
+            .iter()
+            .filter(|s| {
+                let t = f64::from(s.thickness_m) / 1000.0;
+                t >= w[0] && t < w[1]
+            })
+            .collect();
+        let bv: f64 = b.iter().map(|s| f64::from(s.thickness_m)).sum();
+        out += &format!(
+            " [{}-{}km n={:.3} v={:.3} z={:.0} quiet={:.0} sed={:.2}]",
+            w[0],
+            w[1].min(999.0),
+            b.len() as f64 / vis.len().max(1) as f64,
+            bv / vol.max(1.0),
+            med(b.iter().map(|s| f64::from(s.elevation_m)).collect()),
+            med(b
+                .iter()
+                .map(|s| st.t_myr - f64::from(s.orogeny_myr))
+                .collect()),
+            med(b
+                .iter()
+                .map(
+                    |s| f64::from(s.pools[pool::SEDIMENT] + s.pools[pool::SEDIMENTARY])
+                        / f64::from(s.thickness_m).max(1.0)
+                )
+                .collect()),
+        );
+    }
+    out
 }
 
 /// The continental margins over the run (P1-27, `notes.plates.margins`): the mean shares by
@@ -715,6 +791,54 @@ fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     ))
 }
 
+/// The per-cell climate's line (P1-26): `climate_cell t_2d_c=… zonal_c=… flux_fit_rms_k=… …`
+/// from the last snapshot's per-cell figures, the triggered snapshots and every snowball's
+/// escape CO₂; `None` under the banded climate.
+fn percell_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note: Value =
+        serde_json::from_str(world.notes.get(deeptime_core::climate::STAGE_NAME)?).ok()?;
+    let c = &note["last"]["per_cell"];
+    if c.is_null() {
+        return None;
+    }
+    let f = |v: &Value| v.as_f64().unwrap_or(f64::NAN);
+    let fc = &c["flux_corr"];
+    let esc: Vec<String> = note["snowball_escape_co2_ppm"]
+        .as_array()
+        .map(|a| a.iter().map(|x| format!("{:.0}", f(x))).collect())
+        .unwrap_or_default();
+    Some(format!(
+        "climate_cell t_2d_c={:.2} net_toa_2d_w_m2={:.3} years_2d={} zonal_c={:.2} \
+         flux_fit_rms_k={:.3} flux_fit_worst_k={:.2} flux_fit_first_rms_k={:.2} \
+         flux_w_m2={:.1}..{:.1} flux_capped={} d_face_w_m2_k={:.2}..{:.2} fit_iterations={} \
+         atm_peak_pw={:.2}@{:.0} ocean_peak_pw={:.2}@{:.0} psi_sv={:.1} sinking_lat={} \
+         triggered_snapshots={} escape_co2_ppm=[{}]",
+        f(&c["t_global_c"]),
+        f(&c["net_toa_w_m2"]),
+        c["years"],
+        f(&c["zonal_t_global_c"]),
+        f(&fc["rms_k"]),
+        f(&fc["worst_k"]),
+        f(&fc["first_rms_k"]),
+        f(&fc["min_w_m2"]),
+        f(&fc["max_w_m2"]),
+        fc["capped"],
+        f(&fc["d_min_w_m2_k"]),
+        f(&fc["d_max_w_m2_k"]),
+        fc["iterations"],
+        f(&c["atm_heat_peak_pw"]),
+        f(&c["atm_heat_peak_lat"]),
+        f(&c["ocean_heat_peak_pw"]),
+        f(&c["ocean_heat_peak_lat"]),
+        f(&c["gyre_psi_max_sv"]),
+        c["sinking"]["lat"]
+            .as_f64()
+            .map_or("none".to_string(), |x| format!("{x:.0}")),
+        note["triggered_snapshots"],
+        esc.join(","),
+    ))
+}
+
 /// The structure stage's summary line (P1-07): `structure_final=<steps> plutons_emplaced=… …`,
 /// when the pipeline ran it.
 fn structure_line(world: &deeptime_core::world::WorldState) -> Option<String> {
@@ -894,6 +1018,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
             surface_line(world),
             glacial_line(world),
             climate_line(world),
+            percell_line(world),
             structure_line(world),
             volcanoes_line(world),
             impacts_line(world),
@@ -1102,6 +1227,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = climate_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = percell_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let (Some(path), Some(note)) = (

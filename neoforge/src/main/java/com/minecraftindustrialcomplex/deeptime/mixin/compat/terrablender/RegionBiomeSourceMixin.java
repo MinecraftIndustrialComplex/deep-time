@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.mixin.compat.terrablender;
 
+import com.minecraftindustrialcomplex.deeptime.climate.VolcanicBiomes;
 import com.minecraftindustrialcomplex.deeptime.compat.terrablender.RegionTrees;
 import com.minecraftindustrialcomplex.deeptime.worldgen.RegionSource;
 import com.minecraftindustrialcomplex.deeptime.worldgen.RegionSpawnTarget;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.biome.MultiNoiseBiomeSource;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,7 +20,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.Optional;
 
 /**
- * TerraBlender's regions follow Deep Time's geologic provinces (plan §7.3, P1-10).
+ * TerraBlender's regions follow Deep Time's geologic provinces (plan §7.3, P1-10), and the pack's
+ * volcanic biomes keep to real volcanoes (decisions log 2026-10-03; {@link VolcanicBiomes}).
  *
  * <p>Target: {@code MultiNoiseBiomeSource.getNoiseBiome(int, int, int, Climate.Sampler)}, quart
  * coordinates. TerraBlender 4.1.0.8 injects at HEAD, cancellable, and answers with
@@ -27,8 +30,10 @@ import java.util.Optional;
  * runs first (priority 900 against TerraBlender's default 1000, so its handler is the first at
  * HEAD) and, <em>only for a Deep Time level's sampler</em> (its spawn-target list is a
  * {@link RegionSpawnTarget}, which carries the level's province → region table), answers with the
- * same search in the region of the column's province. Anything else, and a parameter list
- * TerraBlender has not initialised, falls through to TerraBlender or vanilla unchanged.
+ * same search in the region of the column's province (TerraBlender's own region where the level has
+ * no province table), through {@link VolcanicBiomes} when the pack has volcanic biomes. Anything else,
+ * and a parameter list TerraBlender has not initialised, falls through to TerraBlender or vanilla
+ * unchanged.
  *
  * <p>Plan §7.3 ported ReTerraForged's four mixins (a {@code uniqueness} field on
  * {@code Climate.TargetPoint}, set by {@code Climate.Sampler.sample} from a {@code terrablender:
@@ -48,11 +53,18 @@ public abstract class RegionBiomeSourceMixin {
     private void deeptime$provinceRegion(int x, int y, int z, Climate.Sampler sampler, CallbackInfoReturnable<Holder<Biome>> cir) {
         if (!(sampler.spawnTarget() instanceof RegionSpawnTarget marker))
             return;
-        Optional<RegionSource> regions = marker.source();
         Climate.ParameterList<Holder<Biome>> parameters = parameters();
-        if (regions.isEmpty() || !RegionTrees.ready(parameters))
+        if (!RegionTrees.ready(parameters))
             return;
-        int region = regions.get().regionAt(QuartPos.toBlock(x), QuartPos.toBlock(z));
-        cir.setReturnValue(RegionTrees.find(parameters, region, sampler.sample(x, y, z)));
+        Optional<RegionSource> regions = marker.source();
+        int region = regions.isPresent() ? regions.get().regionAt(QuartPos.toBlock(x), QuartPos.toBlock(z))
+                : RegionTrees.ownRegion(parameters, x, y, z);
+        Holder<Biome> b = VolcanicBiomes.find(marker.volcanic(),
+                new RegionTrees.RegionSearch((BiomeSource) (Object) this, parameters, region), x, y, z, sampler);
+        if (b != null)
+            cir.setReturnValue(b);
+        else if (regions.isPresent())
+            cir.setReturnValue(RegionTrees.find(parameters, region, sampler.sample(x, y, z)));
+        // else: no province table and nothing volcanic, TerraBlender answers as it always did
     }
 }

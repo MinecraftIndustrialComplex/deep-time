@@ -39,7 +39,8 @@ import java.util.function.IntPredicate;
  * use, without loading a chunk. Per {@link Check}, the share of a Köppen family's columns whose
  * biome carries one of its NeoForge {@code c:} tags (Terralith and Biomes O' Plenty tag theirs the
  * same way). Used by {@code BiomeGameTests.climateConsistent} and {@code /deeptime probe biomes},
- * which can also write the whole grid for the review page.
+ * which can also write the whole grid for the review page. Its {@code volcanic} section is
+ * {@link VolcanicCensus}'s: the volcanic biomes against the real volcanoes.
  */
 public final class BiomeCensus {
 
@@ -187,7 +188,7 @@ public final class BiomeCensus {
             forbidden.put(f.name(), new int[2]);
         Map<Integer, Map<Integer, Integer>> classBiomes = new HashMap<>();
         int skippedUntagged = 0, landColumns = 0, wetlands = 0, wetlandSwamp = 0;
-        // Cold wetland (BIO-104, BIO-106): the bake's flagged boreal wetland, counted over every land column
+        // Cold wetland (BIO-115, BIO-117): the bake's flagged boreal wetland, counted over every land column
         // (a mod's untagged biomes too: its bog is the point): on the pack's peatland biome, on taiga, on
         // another swamp (which it must not be), or elsewhere.
         int coldWet = 0, coldPeat = 0, coldTaiga = 0, coldSwamp = 0;
@@ -344,6 +345,9 @@ public final class BiomeCensus {
                 .forEach(e -> cb.addProperty(e.getKey(), e.getValue()));
         cw.add("top_biomes", cb);
         o.add("cold_wetland", cw);
+        // The volcanic biomes against the real volcanoes, now and as the plain climate search placed them
+        // (decisions log 2026-10-03).
+        o.add("volcanic", VolcanicCensus.run(level, step, poleMargin).json());
         if (mapFile != null) {
             JsonObject map = new JsonObject();
             map.addProperty("schema", 1);

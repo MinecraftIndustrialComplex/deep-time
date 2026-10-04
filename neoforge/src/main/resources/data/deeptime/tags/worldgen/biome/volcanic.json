@@ -1,0 +1,33 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "#deeptime:volcanic/caldera",
+      "required": false
+    },
+    {
+      "id": "#deeptime:volcanic/crater",
+      "required": false
+    },
+    {
+      "id": "#deeptime:volcanic/hot_spring_field",
+      "required": false
+    },
+    {
+      "id": "#deeptime:volcanic/cone",
+      "required": false
+    },
+    {
+      "id": "#deeptime:volcanic/ash_field",
+      "required": false
+    },
+    {
+      "id": "#deeptime:volcanic/lava_field",
+      "required": false
+    },
+    {
+      "id": "#deeptime:volcanic/thermal_caves",
+      "required": false
+    }
+  ]
+}
