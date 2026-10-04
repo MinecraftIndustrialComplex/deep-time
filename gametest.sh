@@ -73,6 +73,12 @@ dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/
 # so they must pass on any of them (the simulation is not bit-identical across platforms).
 planet_sets=()
 for kv in ${DEEPTIME_TEST_PLANET_SET:-}; do planet_sets+=(--set "$kv"); done
+# The pack placement tables the set's biome mods get (decisions log 2026-10-04; a dedicated server chooses them
+# from its biome registry at the first start, which the GameTest server does not run): Terralith's with MIC.
+# PlacementPackGameTests checks that the bake used exactly the tables the server's registry chooses.
+case "$SET" in
+    mic) planet_sets+=(--placement-patch crates/deeptime-core/data/climate_mapping/packs/terralith.json) ;;
+esac
 dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/tests/presets/planet_world_4k.json "${planet_sets[@]}" --out "$RUN"/world/deeptime-real \
     || { echo "FAILED: deeptime run planet_world_4k"; exit 1; }
 dev cargo run --release -q -p deeptime-cli -- parity --world-data "$RUN"/world/deeptime-real \
