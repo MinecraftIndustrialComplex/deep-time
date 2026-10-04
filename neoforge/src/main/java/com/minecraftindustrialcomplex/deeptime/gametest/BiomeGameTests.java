@@ -319,8 +319,8 @@ public final class BiomeGameTests {
      * of 1 block, 8 to 11 of 5, 12 to 15 of 12; columns 0 to 3 have none. The top of each is ground
      * under a dirt block; the cover replaces the top {@code n} blocks (so the ground's height is
      * unchanged) with the table's snow on top, packed ice between and blue ice at the base of a
-     * thick one; a column under water and one that runs out of ground after two blocks are the edge
-     * cases.
+     * thick one; a column under water, one under a frozen lake's ice and one that runs out of ground
+     * after two blocks are the edge cases.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 1200)
     public static void icePassLaysTheCover(GameTestHelper helper) {
@@ -343,6 +343,10 @@ public final class BiomeGameTests {
                 if (lz == 14) {   // under a lake
                     for (int y = 81; y <= 85; y++)
                         chunk.setBlockState(pos.set(x, y, z), Blocks.WATER.defaultBlockState(), false);
+                } else if (lz == 13) {   // under a frozen lake: the water pass's ice on its water
+                    for (int y = 81; y <= 84; y++)
+                        chunk.setBlockState(pos.set(x, y, z), Blocks.WATER.defaultBlockState(), false);
+                    chunk.setBlockState(pos.set(x, 85, z), Blocks.ICE.defaultBlockState(), false);
                 } else {
                     chunk.setBlockState(pos.set(x, 81, z), Blocks.DIRT.defaultBlockState(), false);
                 }
@@ -382,6 +386,13 @@ public final class BiomeGameTests {
                         bad += " lake(" + lx + ")";
                     continue;
                 }
+                if (lz == 13) {
+                    // The lake's ice is its surface, not ground: the cover leaves it, whatever the thickness there.
+                    if (!chunk.getBlockState(pos.set(x, 80, z)).is(Blocks.STONE) || !chunk.getBlockState(pos.set(x, 84, z)).is(Blocks.WATER)
+                            || !chunk.getBlockState(pos.set(x, 85, z)).is(Blocks.ICE))
+                        bad += " frozenlake(" + lx + ")";
+                    continue;
+                }
                 if (n == 0) {
                     if (!chunk.getBlockState(pos.set(x, 81, z)).is(Blocks.DIRT))
                         bad += " bare(" + lx + "," + lz + ")";
@@ -398,10 +409,10 @@ public final class BiomeGameTests {
                 if (!chunk.getBlockState(pos.set(x, 82, z)).isAir())
                     bad += " above(" + lx + "," + lz + ")";
             }
-        // 14 rows of ground, 4 columns each of 1, 5 and 12 blocks; the thin row: 4 of 1 block and 8 of 2.
+        // 13 rows of ground, 4 columns each of 1, 5 and 12 blocks; the thin row: 4 of 1 block and 8 of 2.
         DeepTime.LOGGER.info("[gametest] icePassLaysTheCover placed={} bad={}", placed, bad);
         helper.assertTrue(bad.isEmpty(), "the ice pass left:" + bad);
-        helper.assertTrue(placed == 14 * 4 * (1 + 5 + 12) + 4 * 1 + 8 * 2, "blocks placed: " + placed);
+        helper.assertTrue(placed == 13 * 4 * (1 + 5 + 12) + 4 * 1 + 8 * 2, "blocks placed: " + placed);
         helper.succeed();
     }
 

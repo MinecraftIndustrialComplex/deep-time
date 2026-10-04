@@ -57,6 +57,7 @@ How to read this index:
 | [`p1-26-per-cell-climate.md`](../design/p1-26-per-cell-climate.md) | 2026-09-30, approved 2026-10-01 | How climate is computed per cell (a seasonal 2-D energy balance with sea ice and a moisture budget) instead of in latitude bands. | Approved, not built. Six of its references are marked "cited from memory". |
 | [`plate-collisions-and-welding.md`](../design/plate-collisions-and-welding.md) | 2026-10-01, decided 2026-10-02 | How to fix collisions that raise land in one step, the missing Wilson cycle, and the mega-plate. | Diagnosis and targets stand; superseded by the force-balance design where they differ. |
 | [`plate-force-balance.md`](../design/plate-force-balance.md) | 2026-10-02 | Whether plate speeds can come from a balance of forces (slab pull, ridge push, drag, collision resistance). | The newest design; chosen 2026-10-02, not built. Three of its figures could not be confirmed (see the ledger's verification plan). |
+| [`seamless-wrapping.md`](../design/seamless-wrapping.md) | 2026-10-03 | Whether a quincuncial world (Peirce, or its Guyou aspect) wraps seamlessly with Immersive Portals, measured both aspects, and what a production version costs. | A dev-only prototype; recommends Guyou; Lambert stays shipped. |
 | [`plate-check-baseline.md`](../design/plate-check-baseline.md) | 2026-10-01 | What the `deeptime plate-check` tool measures on the plate model as it is today. | The "before" picture for the plate rewrite. |
 
 ## Plan, decisions, reviews and formats
