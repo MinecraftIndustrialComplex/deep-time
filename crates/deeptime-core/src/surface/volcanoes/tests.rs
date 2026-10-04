@@ -89,8 +89,9 @@ fn the_front_is_the_middle_of_the_arc_band() {
             flux[j * w + i] = 1.0;
         }
     }
-    // A patch 40 × 40 cells striped every other row (the plate model's lattice stripes).
-    for j in (300..340).step_by(2) {
+    // A patch 40 × 40 cells striped every other row (the plate model's lattice stripes; the grid
+    // is 1024 × 328).
+    for j in (200..240).step_by(2) {
         for i in 500..540 {
             flux[j * w + i] = 1.0;
         }
@@ -105,7 +106,7 @@ fn the_front_is_the_middle_of_the_arc_band() {
         .filter(|&j| (200..400).any(|i| front[j * w + i]))
         .collect();
     assert_eq!(rows, vec![102], "the band's centre row");
-    let patch = (300..340)
+    let patch = (200..240)
         .flat_map(|j| (500..540).map(move |i| j * w + i))
         .filter(|&c| front[c])
         .count();

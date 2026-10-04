@@ -2,7 +2,7 @@
 
 Status of this page: `stub` (stage 1). The ledger rows exist; the page is to be written in stage 2 from [_template.md](_template.md).
 
-The world wraps east to west like a planet but cannot wrap over the poles: a flat grid of blocks cannot be folded into a sphere there without mirroring whatever crosses. So the playable world ends at a latitude short of each pole (75 degrees by default, a hard stop at 80), with a storm that turns players back. The map itself is a plain cylinder projection: one block is 300 m east to west at every latitude, although on a sphere a degree of longitude shrinks toward the poles. This is geometry and game design, not physics, and the page says what it distorts.
+The world wraps east to west like a planet but cannot wrap over the poles: a flat grid of blocks cannot be folded into a sphere there without mirroring whatever crosses. So the playable world ends at a latitude short of each pole (a storm from 70 degrees by default, a hard stop at 80), with a storm that turns players back. The map is Lambert's cylindrical equal-area projection (Ben, 2026-10-02, "Lambert for now"; SCL-049, POL-017): every block covers the same area of the planet, so east to west a block is 300·cos φ m of planet and north to south 300 / cos φ m; shapes are true only on the equator. From 75 degrees the band would be only 49 blocks at C = 16,384 on this map, so Ben moved the cap line to 70 degrees (2026-10-03): 118 blocks from 70 to 80 degrees (235 at 32,768), with 6.0 % of the planet behind the cap line; on the old equirectangular map the 75–80 band was 228 blocks (POL-006). This is geometry and game design, not physics, and the page says what it distorts.
 
 ## Ledger ids that belong here
 

@@ -308,7 +308,9 @@ mod tests {
     #[test]
     fn cells_round_trip_and_wrap() {
         let grid = GridDesc::for_planet("L1", 1024, 16).unwrap();
-        for cell in [0u32, 5, 64 * 3 + 63, 64 * 31] {
+        // 64 × 24 cells (rows from z = −192, past the Lambert pole at 163).
+        assert_eq!((grid.w, grid.h), (64, 24));
+        for cell in [0u32, 5, 64 * 3 + 63, 64 * 23] {
             let (x, z) = cell_xz(&grid, cell);
             assert_eq!(cell_of(&grid, x + 3.0, z - 7.0), cell);
         }

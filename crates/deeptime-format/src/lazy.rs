@@ -122,7 +122,8 @@ mod tests {
     fn a_lazy_layer_answers_what_the_loaded_one_does() {
         let dir = std::env::temp_dir().join(format!("dt-lazy-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        // 600 × 300 cells: tiles of 256 with cropped edges.
+        // 600 × 192 cells (z from −192: the Lambert pole is at 191): tiles of 256 with cropped
+        // edges.
         let grid = GridDesc::for_planet("L", 1200, 2).unwrap();
         let ras = Raster::<i16>::from_fn(grid.clone(), |i, j| {
             (i as i16).wrapping_mul(7) ^ (j as i16).wrapping_mul(13)
@@ -133,11 +134,12 @@ mod tests {
         write_tile_pack(&path, &d, &ras.to_le_bytes()).unwrap();
         let lazy = LazyLayer::open(&path).unwrap();
         let loaded = LoadedLayer::new(d, ras.to_le_bytes()).unwrap();
-        for (bx, bz) in [(-600.0, -300.0), (0.5, 3.25), (599.9, 299.0), (-1.3, 17.0)] {
+        assert_eq!((grid.w, grid.h), (600, 192));
+        for (bx, bz) in [(-600.0, -192.0), (0.5, 3.25), (599.9, 189.0), (-1.3, 17.0)] {
             assert_eq!(lazy.bilinear(bx, bz), loaded.bilinear(bx, bz));
             assert_eq!(lazy.nearest(bx, bz), loaded.nearest(bx, bz));
         }
-        for (i, j) in [(0, 0), (255, 255), (256, 0), (599, 299), (300, 150)] {
+        for (i, j) in [(0, 0), (255, 191), (256, 0), (599, 191), (300, 150)] {
             assert_eq!(lazy.raw_cell(i, j), loaded.raw_cell(i, j));
         }
 

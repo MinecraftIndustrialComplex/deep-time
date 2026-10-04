@@ -85,7 +85,8 @@ mod tests {
         assert_eq!((r.cols, r.rows), (4, 2));
         assert_eq!(r.of(-8192.0, -4096.0), (0, 0));
         assert_eq!(r.of(8191.0, 4095.0), (3, 1));
-        assert_eq!(r.of(8192.0 + 10.0, 0.0), (0, 1), "x wraps");
+        // Rows from z = −2,624 (the grids' extent past the Lambert pole at 2,607.6).
+        assert_eq!(r.of(8192.0 + 10.0, 2000.0), (0, 1), "x wraps");
         assert_eq!(r.index(0.0, -1.0), 2);
         assert_eq!(r.count(), 8);
     }

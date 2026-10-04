@@ -591,7 +591,8 @@
     const axes = !TV && !mob;
     const m = TV ? { l: 0, r: 0, t: 0, b: 0 } : mob ? { l: 8, r: 8, t: 8, b: 8 } : { l: 48, r: 22, t: 18, b: 32 };
     const head = side ? 30 : 0;
-    const fit = (x, y, w, h) => { const mw = Math.max(40, Math.min(w, 2 * h)); const mh = mw / 2; return [x + (w - mw) / 2, y + (h - mh) / 2, mw, mh]; };
+    // The map pane at the map picture's aspect (projection.js: π : 1).
+    const fit = (x, y, w, h) => { const mw = Math.max(40, Math.min(w, proj.aspect * h)); const mh = mw / proj.aspect; return [x + (w - mw) / 2, y + (h - mh) / 2, mw, mh]; };
     const place = (p, [x, y, w, h]) => {
       p.rect = { x, y, w, h };
       Object.assign(p.el.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
@@ -1076,15 +1077,15 @@
   // The sites show on the frames where the deposit stage has run.
   const depShown = (r, n) => !!r && !!r.deposits && r.depFrom >= 0 && n >= r.depFrom;
   // The map's pixels for a lat/lon, as the event markers use them.
-  function depView(p, f) {
+  function depView(p, f, r) {
     const c = p.canvas;
-    return { project: (lat, lon) => mapXY(lat, lon, f, c.width), ppdx: proj.xOfLonPic(1, c.width), ppdy: proj.yOfLat(0, c.height) - proj.yOfLat(1, c.height), worldW: c.width, dpr: window.devicePixelRatio || 1 };
+    return { project: (lat, lon) => mapXY(lat, lon, f, c.width), ppbx: c.width / circ(r), ppbz: proj.yOfZ(circ(r), 1, c.height) - proj.yOfZ(circ(r), 0, c.height), worldW: c.width, dpr: window.devicePixelRatio || 1 };
   }
   // The site whose forming event the inspector shows is the selected one.
   const depSelected = (p, r) => { const s = p.i === focus && selectedEvent ? r.deposits.byEvent.get(selectedEvent) : null; return s ? s.id : null; };
   function drawDeposits(p, r, f) {
     if (!depositsOn || !depShown(r, p.cur)) return;
-    DTDeposits.draw(p.ctx, r.deposits, depView(p, f), { hidden: depHidden, hover: p.depHover ?? null, selected: depSelected(p, r) });
+    DTDeposits.draw(p.ctx, r.deposits, depView(p, f, r), { hidden: depHidden, hover: p.depHover ?? null, selected: depSelected(p, r) });
   }
   const depAge = (r, s) => { const e = r.byId.get(s.forming_event); return e ? fmtT(e.t_start) : ''; };
 
@@ -1130,7 +1131,7 @@
       const r = p.run;
       if (TV || !depositsOn || !r || p.cur < 0 || !depShown(r, p.cur) || !r.frames[p.cur]) return null;
       const [x, y] = at(ev);
-      return DTDeposits.hit(r.deposits, depView(p, r.frames[p.cur]), x, y, { hidden: depHidden });
+      return DTDeposits.hit(r.deposits, depView(p, r.frames[p.cur], r), x, y, { hidden: depHidden });
     };
     const tip = () => {
       if (!p.depTip) { p.depTip = document.createElement('div'); p.depTip.className = 'dep-tip'; p.depTip.hidden = true; p.frame.appendChild(p.depTip); }
