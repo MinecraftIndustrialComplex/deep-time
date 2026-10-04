@@ -196,6 +196,13 @@ pub struct FailureParams {
 /// pass (`thermal.rs`): a pair (a, b) with h_a − h_b > S_c·d moves rate·(h_a − h_b − S_c·d) from a
 /// to b, scaled down for a giver that would exceed what it has; both ends compute the same
 /// amount, so **matter is conserved** to round-off. Returns the metres moved (Σ|Δh|/2 · cells).
+///
+/// Cost (P1-17): only the first iteration visits every cell. After it, a cell's share can change
+/// only within one cell of a cell that moved, and its Δh only within two, so each later
+/// iteration recomputes just that neighbourhood of the last iteration's movers (or every cell
+/// again when the movers are many). Each value is computed by the same expression from the same
+/// inputs and the movers are applied in ascending cell order, so the result is bit for bit what
+/// the full sweep gives (`slope_failure_reference` in the tests keeps the full sweep).
 pub fn slope_failure(
     d: &Dims,
     sea: &[bool],
@@ -207,55 +214,123 @@ pub fn slope_failure(
     use rayon::prelude::*;
     let n = d.cells();
     let wet = |c: usize, h: &[f64]| sea[c] && h[c] < sea_level;
+    // What each cell would give, and the share of it its sediment allows.
+    let share = |c: usize, hh: &[f64], avail: &[f64]| -> f64 {
+        if !wet(c, hh) || avail[c] <= 0.0 {
+            return 0.0;
+        }
+        let mut give = 0.0;
+        for (m, dl) in d.neighbours(c) {
+            if wet(m, hh) {
+                give += p.rate * (hh[c] - hh[m] - p.critical_slope * dl).max(0.0);
+            }
+        }
+        if give > 0.0 {
+            (avail[c] / give).min(1.0)
+        } else {
+            0.0
+        }
+    };
+    let change = |c: usize, hh: &[f64], sc: &[f64]| -> f64 {
+        let mut dz = 0.0;
+        if wet(c, hh) {
+            for (m, dl) in d.neighbours(c) {
+                if !wet(m, hh) {
+                    continue;
+                }
+                let out = (hh[c] - hh[m] - p.critical_slope * dl).max(0.0);
+                let inn = (hh[m] - hh[c] - p.critical_slope * dl).max(0.0);
+                dz += p.rate * (inn * sc[m] - out * sc[c]);
+            }
+        }
+        dz
+    };
+    // A sparse pass costs ~9× a dense one per visited cell (the neighbourhoods overlap and
+    // are sorted); above this share of movers the full sweep is cheaper.
+    let dense_above = n / 16;
     let mut scale = vec![0.0f64; n];
     let mut next = vec![0.0f64; n];
     let mut moved = 0.0;
-    for _ in 0..p.iterations {
-        let hh: &[f64] = h;
-        // What each cell would give, and the share of it its sediment allows.
-        scale.par_iter_mut().enumerate().for_each(|(c, s)| {
-            *s = 0.0;
-            if !wet(c, hh) || avail[c] <= 0.0 {
-                return;
+    // The cells that moved in the last iteration (ascending), or None for "all of them".
+    let mut movers: Option<Vec<u32>> = None;
+    let mut mark = vec![0u32; n];
+    let mut stamp = 0u32;
+    let mut grow = |from: &[u32], mark: &mut [u32]| -> Vec<u32> {
+        stamp += 1;
+        let mut out = Vec::with_capacity(from.len() * 3);
+        for &c in from {
+            let c = c as usize;
+            if mark[c] != stamp {
+                mark[c] = stamp;
+                out.push(c as u32);
             }
-            let mut give = 0.0;
-            for (m, dl) in d.neighbours(c) {
-                if wet(m, hh) {
-                    give += p.rate * (hh[c] - hh[m] - p.critical_slope * dl).max(0.0);
+            for (m, _) in d.neighbours(c) {
+                if mark[m] != stamp {
+                    mark[m] = stamp;
+                    out.push(m as u32);
                 }
-            }
-            if give > 0.0 {
-                *s = (avail[c] / give).min(1.0);
-            }
-        });
-        let sc: &[f64] = &scale;
-        next.par_iter_mut().enumerate().for_each(|(c, o)| {
-            let mut dz = 0.0;
-            if wet(c, hh) {
-                for (m, dl) in d.neighbours(c) {
-                    if !wet(m, hh) {
-                        continue;
-                    }
-                    let out = (hh[c] - hh[m] - p.critical_slope * dl).max(0.0);
-                    let inn = (hh[m] - hh[c] - p.critical_slope * dl).max(0.0);
-                    dz += p.rate * (inn * sc[m] - out * sc[c]);
-                }
-            }
-            *o = dz;
-        });
-        let mut any = false;
-        for c in 0..n {
-            let dz = next[c];
-            if dz != 0.0 {
-                any = true;
-                h[c] += dz;
-                avail[c] = (avail[c] + dz).max(0.0);
-                moved += dz.abs() * 0.5;
             }
         }
-        if !any {
+        out.sort_unstable();
+        out
+    };
+    for _ in 0..p.iterations {
+        let mut moved_now = Vec::new();
+        match movers.as_deref() {
+            Some(from) if from.len() <= dense_above => {
+                let shares = grow(from, &mut mark);
+                let changes = grow(&shares, &mut mark);
+                {
+                    let hh: &[f64] = h;
+                    let av: &[f64] = avail;
+                    let v: Vec<f64> = shares.par_iter().map(|&c| share(c as usize, hh, av)).collect();
+                    for (&c, x) in shares.iter().zip(v) {
+                        scale[c as usize] = x;
+                    }
+                }
+                let dz: Vec<f64> = {
+                    let hh: &[f64] = h;
+                    let sc: &[f64] = &scale;
+                    changes.par_iter().map(|&c| change(c as usize, hh, sc)).collect()
+                };
+                for (&c, dz) in changes.iter().zip(dz) {
+                    if dz != 0.0 {
+                        let c = c as usize;
+                        h[c] += dz;
+                        avail[c] = (avail[c] + dz).max(0.0);
+                        moved += dz.abs() * 0.5;
+                        moved_now.push(c as u32);
+                    }
+                }
+            }
+            _ => {
+                {
+                    let hh: &[f64] = h;
+                    let av: &[f64] = avail;
+                    scale
+                        .par_iter_mut()
+                        .enumerate()
+                        .for_each(|(c, s)| *s = share(c, hh, av));
+                    let sc: &[f64] = &scale;
+                    next.par_iter_mut()
+                        .enumerate()
+                        .for_each(|(c, o)| *o = change(c, hh, sc));
+                }
+                for c in 0..n {
+                    let dz = next[c];
+                    if dz != 0.0 {
+                        h[c] += dz;
+                        avail[c] = (avail[c] + dz).max(0.0);
+                        moved += dz.abs() * 0.5;
+                        moved_now.push(c as u32);
+                    }
+                }
+            }
+        }
+        if moved_now.is_empty() {
             break;
         }
+        movers = Some(moved_now);
     }
     moved
 }
@@ -263,6 +338,193 @@ pub fn slope_failure(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The slope failure as it was before P1-17's active set: every cell, every iteration.
+    fn slope_failure_reference(
+        d: &Dims,
+        sea: &[bool],
+        sea_level: f64,
+        p: &FailureParams,
+        h: &mut [f64],
+        avail: &mut [f64],
+    ) -> f64 {
+        use rayon::prelude::*;
+        let n = d.cells();
+        let wet = |c: usize, h: &[f64]| sea[c] && h[c] < sea_level;
+        let mut scale = vec![0.0f64; n];
+        let mut next = vec![0.0f64; n];
+        let mut moved = 0.0;
+        for _ in 0..p.iterations {
+            let hh: &[f64] = h;
+            scale.par_iter_mut().enumerate().for_each(|(c, s)| {
+                *s = 0.0;
+                if !wet(c, hh) || avail[c] <= 0.0 {
+                    return;
+                }
+                let mut give = 0.0;
+                for (m, dl) in d.neighbours(c) {
+                    if wet(m, hh) {
+                        give += p.rate * (hh[c] - hh[m] - p.critical_slope * dl).max(0.0);
+                    }
+                }
+                if give > 0.0 {
+                    *s = (avail[c] / give).min(1.0);
+                }
+            });
+            let sc: &[f64] = &scale;
+            next.par_iter_mut().enumerate().for_each(|(c, o)| {
+                let mut dz = 0.0;
+                if wet(c, hh) {
+                    for (m, dl) in d.neighbours(c) {
+                        if !wet(m, hh) {
+                            continue;
+                        }
+                        let out = (hh[c] - hh[m] - p.critical_slope * dl).max(0.0);
+                        let inn = (hh[m] - hh[c] - p.critical_slope * dl).max(0.0);
+                        dz += p.rate * (inn * sc[m] - out * sc[c]);
+                    }
+                }
+                *o = dz;
+            });
+            let mut any = false;
+            for c in 0..n {
+                let dz = next[c];
+                if dz != 0.0 {
+                    any = true;
+                    h[c] += dz;
+                    avail[c] = (avail[c] + dz).max(0.0);
+                    moved += dz.abs() * 0.5;
+                }
+            }
+            if !any {
+                break;
+            }
+        }
+        moved
+    }
+
+    /// A sea floor with sediment mounds (mouth fills) on a crystalline floor, a coast whose
+    /// cells sit within centimetres of the sea level (so cells cross it while they slump), and
+    /// rough ground; `mounds` = 0 gives sediment everywhere.
+    fn failure_world(
+        w: usize,
+        hh: usize,
+        seed: u64,
+        mounds: usize,
+    ) -> (Vec<f64>, Vec<f64>, Vec<bool>) {
+        let mut rng = crate::sphere::SplitMix64::new(seed);
+        let n = w * hh;
+        let mut h = vec![0.0; n];
+        let mut avail = vec![0.0; n];
+        for (c, z) in h.iter_mut().enumerate() {
+            let i = c % w;
+            *z = if i < w / 6 {
+                5.0 + 50.0 * rng.next_f64()
+            } else if i < w / 6 + 2 {
+                (rng.next_f64() - 0.5) * 0.02 // straddles the sea level
+            } else {
+                -3000.0 + 400.0 * rng.next_f64()
+            };
+        }
+        if mounds == 0 {
+            for a in avail.iter_mut() {
+                *a = 2000.0 * rng.next_f64();
+            }
+            for z in h.iter_mut() {
+                if *z < 0.0 {
+                    *z += 1500.0 * rng.next_f64();
+                }
+            }
+        } else {
+            for _ in 0..mounds {
+                let (ci, cj) = (rng.below(w as u64) as usize, rng.below(hh as u64) as usize);
+                let r = 1 + rng.below(4) as usize;
+                for dj in 0..=2 * r {
+                    for di in 0..=2 * r {
+                        let (i, j) = ((ci + di + w - r) % w, cj + dj);
+                        if j < r || j - r >= hh {
+                            continue;
+                        }
+                        let c = (j - r) * w + i;
+                        if h[c] < -10.0 {
+                            h[c] = -100.0 - 30.0 * rng.next_f64();
+                            avail[c] = 3000.0 * rng.next_f64();
+                        }
+                    }
+                }
+            }
+        }
+        let sea: Vec<bool> = h.iter().map(|&z| z < 0.0).collect();
+        (h, avail, sea)
+    }
+
+    /// P1-17: the active-set iterations give the full sweep's heights, sediment and the metres
+    /// moved bit for bit, on the dense path (sediment everywhere), the sparse one (a few mounds,
+    /// so few cells move after the first iteration) and grids that do not wrap or are one or two
+    /// cells wide, at 1, 2, 4 and 8 threads.
+    #[test]
+    fn the_active_set_failure_equals_the_full_sweep_bit_for_bit() {
+        let s_c = 2.5f64.to_radians().tan();
+        let mut cases = 0;
+        for &(w, hh, wrap, mounds) in &[
+            (96usize, 64usize, true, 3usize),
+            (96, 64, true, 0),
+            (160, 48, false, 6),
+            (1, 40, true, 1),
+            (2, 40, true, 1),
+            (40, 1, true, 2),
+            (33, 17, true, 40),
+        ] {
+            for seed in 1..=3u64 {
+                for &iterations in &[FAILURE_ITERATIONS, 400] {
+                    let d = Dims::new(w, hh, 4800.0, wrap);
+                    let (h0, a0, sea) = failure_world(w, hh, seed, mounds);
+                    let p = FailureParams {
+                        critical_slope: s_c,
+                        rate: FAILURE_RATE,
+                        iterations,
+                    };
+                    let (mut hr, mut ar) = (h0.clone(), a0.clone());
+                    let mr = slope_failure_reference(&d, &sea, 0.0, &p, &mut hr, &mut ar);
+                    for threads in [1, 2, 4, 8] {
+                        let pool = rayon::ThreadPoolBuilder::new()
+                            .num_threads(threads)
+                            .build()
+                            .unwrap();
+                        let (mut h, mut a) = (h0.clone(), a0.clone());
+                        let m = pool.install(|| slope_failure(&d, &sea, 0.0, &p, &mut h, &mut a));
+                        let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+                        assert_eq!(bits(&h), bits(&hr), "h {w}x{hh} seed {seed} t{threads}");
+                        assert_eq!(bits(&a), bits(&ar), "avail {w}x{hh} seed {seed}");
+                        assert_eq!(m.to_bits(), mr.to_bits(), "moved {w}x{hh} seed {seed}");
+                    }
+                    if mr > 0.0 {
+                        cases += 1;
+                    }
+                }
+            }
+        }
+        assert!(cases >= 20, "only {cases} cases moved any sediment");
+    }
+
+    /// The sparse path is the one that runs once the first sweep has done most of the work: on
+    /// a floor with a few mounds, fewer than a sixteenth of the cells move in the later
+    /// iterations, so the comparison above exercises it.
+    #[test]
+    fn few_cells_move_after_the_first_failure_sweep() {
+        let (w, hh) = (96, 64);
+        let d = Dims::new(w, hh, 4800.0, true);
+        let (mut h, mut avail, sea) = failure_world(w, hh, 2, 3);
+        let p = FailureParams {
+            critical_slope: 2.5f64.to_radians().tan(),
+            rate: FAILURE_RATE,
+            iterations: 1,
+        };
+        let before = h.clone();
+        slope_failure(&d, &sea, 0.0, &p, &mut h, &mut avail);
+        let movers = h.iter().zip(&before).filter(|(a, b)| a != b).count();
+        assert!(movers > 0 && movers <= w * hh / 16, "{movers} movers");
+    }
 
     /// A sediment cliff (a mouth fill's front) under the sea relaxes to the critical slope with
     /// its mass kept; a crystalline step (no sediment) and land do not move.
