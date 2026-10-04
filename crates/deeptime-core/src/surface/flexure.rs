@@ -466,17 +466,46 @@ impl Spectral {
     /// `spec` (nk × h, column-major) ← the transform of `v`: Σ_i Σ_j v e^(−2πi·ik/w)
     /// cos(π(j + ½)m/h). `half` is scratch (h × nk).
     fn forward(&self, v: &[f64], half: &mut [Complex64], spec: &mut [Complex64]) {
+        self.forward_with(v, None, None, half, spec);
+    }
+
+    /// [`Self::forward`] of `v` × `weight` (cell by cell) when given, each coefficient then divided
+    /// by `d`·λ² + `c` when `divide` = (d, c) is given: the same values as weighting, transforming
+    /// and dividing in three passes, in one (P1-17).
+    fn forward_with(
+        &self,
+        v: &[f64],
+        weight: Option<&[f64]>,
+        divide: Option<(f64, f64)>,
+        half: &mut [Complex64],
+        spec: &mut [Complex64],
+    ) {
         let (w, h, nk) = (self.w, self.h, self.nk);
         let zero = Complex64::new(0.0, 0.0);
         // Rows a and b as a + i·b: A[k] = (Z[k] + conj Z[−k]) / 2, B[k] = (Z[k] − conj Z[−k]) / 2i.
         half.par_chunks_mut(2 * nk)
             .zip(v.par_chunks(2 * w))
+            .enumerate()
             .for_each_init(
                 || (vec![zero; w], vec![zero; self.fx.get_inplace_scratch_len()]),
-                |(buf, scratch), (out, rows)| {
+                |(buf, scratch), (pair, (out, rows))| {
                     let (a, b) = rows.split_at(w);
-                    for (i, z) in buf.iter_mut().enumerate() {
-                        *z = Complex64::new(a[i], b.get(i).copied().unwrap_or(0.0));
+                    match weight {
+                        Some(wt) => {
+                            let wr = &wt[2 * pair * w..(2 * pair * w + rows.len())];
+                            let (wa, wb) = wr.split_at(w);
+                            for (i, z) in buf.iter_mut().enumerate() {
+                                *z = Complex64::new(
+                                    a[i] * wa[i],
+                                    b.get(i).map_or(0.0, |&x| x * wb[i]),
+                                );
+                            }
+                        }
+                        None => {
+                            for (i, z) in buf.iter_mut().enumerate() {
+                                *z = Complex64::new(a[i], b.get(i).copied().unwrap_or(0.0));
+                            }
+                        }
                     }
                     self.fx.process_with_scratch(buf, scratch);
                     let (oa, ob) = out.split_at_mut(nk);
@@ -510,12 +539,23 @@ impl Spectral {
                     let q = self.twiddle[h - m] * buf[h - m];
                     col[m] = (p + Complex64::new(-q.im, q.re)) * 0.5;
                 }
+                if let Some((d, c)) = divide {
+                    for (s, &l) in col.iter_mut().zip(&self.lam2[k * h..(k + 1) * h]) {
+                        *s /= d * l + c;
+                    }
+                }
             },
         );
     }
 
     /// `out` ← the inverse transform of `spec` (overwritten).
     fn inverse(&self, spec: &mut [Complex64], out: &mut [f64]) {
+        self.inverse_with(spec, None, out);
+    }
+
+    /// [`Self::inverse`], or with `weight` given, `out` += the inverse transform × `weight` (cell
+    /// by cell): the same values as transforming into a buffer and adding it, in one pass.
+    fn inverse_with(&self, spec: &mut [Complex64], weight: Option<&[f64]>, out: &mut [f64]) {
         let (w, h, nk) = (self.w, self.h, self.nk);
         let zero = Complex64::new(0.0, 0.0);
         let norm_y = 1.0 / h as f64;
@@ -554,10 +594,26 @@ impl Spectral {
                 }
                 self.ix.process_with_scratch(buf, scratch);
                 let (ra, rb) = rows.split_at_mut(w);
-                for (i, z) in buf.iter().enumerate() {
-                    ra[i] = z.re * norm_x;
-                    if let Some(x) = rb.get_mut(i) {
-                        *x = z.im * norm_x;
+                match weight {
+                    Some(wt) => {
+                        let wr = &wt[ja * w..(ja * w + w + rb.len())];
+                        let (wa, wb) = wr.split_at(w);
+                        for (i, z) in buf.iter().enumerate() {
+                            let p = z.re * norm_x;
+                            ra[i] += p * wa[i];
+                            if let Some(x) = rb.get_mut(i) {
+                                let p = z.im * norm_x;
+                                *x += p * wb[i];
+                            }
+                        }
+                    }
+                    None => {
+                        for (i, z) in buf.iter().enumerate() {
+                            ra[i] = z.re * norm_x;
+                            if let Some(x) = rb.get_mut(i) {
+                                *x = z.im * norm_x;
+                            }
+                        }
                     }
                 }
             },
@@ -672,7 +728,6 @@ pub struct Solver {
     half: Vec<Complex64>,
     spec: Vec<Complex64>,
     tmp: Vec<f64>,
-    tmp2: Vec<f64>,
 }
 
 /// A sum whose value does not depend on the thread count: per row, then over the rows in order.
@@ -701,7 +756,6 @@ impl Solver {
             half: vec![zero; h * nk],
             spec: vec![zero; nk * h],
             tmp: vec![0.0; w * h],
-            tmp2: vec![0.0; w * h],
         }
     }
 
@@ -773,34 +827,24 @@ impl Solver {
     fn spectral_solve(&mut self, bank: &Bank, r: &[f64], z: &mut [f64]) {
         let mut half = std::mem::take(&mut self.half);
         let mut spec = std::mem::take(&mut self.spec);
-        let mut part = std::mem::take(&mut self.tmp2);
-        let lam2 = &self.spectral.lam2;
-        let divide = |spec: &mut [Complex64], d: f64| {
-            spec.par_iter_mut()
-                .zip(lam2.par_iter())
-                .for_each(|(s, &l)| *s /= d * l + bank.c_ref);
-        };
+        // Each level is weighted, transformed, divided by d·λ² + c, transformed back and added
+        // in two passes (P1-17: six before), the same values operation for operation.
         if bank.weights.is_empty() {
-            self.spectral.forward(r, &mut half, &mut spec);
-            divide(&mut spec, bank.d[0]);
+            let divide = Some((bank.d[0], bank.c_ref));
+            self.spectral
+                .forward_with(r, None, divide, &mut half, &mut spec);
             self.spectral.inverse(&mut spec, z);
         } else {
             z.par_iter_mut().for_each(|x| *x = 0.0);
             for (k, wk) in bank.weights.iter().enumerate() {
-                part.par_iter_mut()
-                    .zip(r.par_iter().zip(wk.par_iter()))
-                    .for_each(|(p, (&r, &s))| *p = r * s);
-                self.spectral.forward(&part, &mut half, &mut spec);
-                divide(&mut spec, bank.d[k]);
-                self.spectral.inverse(&mut spec, &mut part);
-                z.par_iter_mut()
-                    .zip(part.par_iter().zip(wk.par_iter()))
-                    .for_each(|(z, (&p, &s))| *z += p * s);
+                let divide = Some((bank.d[k], bank.c_ref));
+                self.spectral
+                    .forward_with(r, Some(wk), divide, &mut half, &mut spec);
+                self.spectral.inverse_with(&mut spec, Some(wk), z);
             }
         }
         self.half = half;
         self.spec = spec;
-        self.tmp2 = part;
     }
 
     /// Solves (L D L + C) x = b from x = 0 by preconditioned conjugate gradients: `d` is D / g
@@ -1535,6 +1579,67 @@ mod tests {
         // A load on the soft plate sinks nearly where it lies; on a craton far less.
         let airy_wet = RHO_MANTLE / (RHO_MANTLE - RHO_WATER);
         assert!(x.iter().cloned().fold(f64::MIN, f64::max) < 4500.0 * airy_wet);
+    }
+
+    /// The fused blend of the spectral solves (P1-17) is the six-pass one it replaced, bit for bit,
+    /// on a patchy plate (three levels) and a uniform one (one level), rows odd and even in
+    /// number, at 1, 3 and 8 threads.
+    #[test]
+    fn the_fused_spectral_blend_is_the_six_pass_one_bit_for_bit() {
+        let old = |sp: &Spectral, bank: &Bank, r: &[f64]| -> Vec<f64> {
+            let n = r.len();
+            let zero = Complex64::new(0.0, 0.0);
+            let mut half = vec![zero; sp.h * sp.nk];
+            let mut spec = vec![zero; sp.nk * sp.h];
+            let divide = |spec: &mut [Complex64], d: f64| {
+                for (s, &l) in spec.iter_mut().zip(&sp.lam2) {
+                    *s /= d * l + bank.c_ref;
+                }
+            };
+            let mut z = vec![0.0; n];
+            if bank.weights.is_empty() {
+                sp.forward(r, &mut half, &mut spec);
+                divide(&mut spec, bank.d[0]);
+                sp.inverse(&mut spec, &mut z);
+                return z;
+            }
+            let mut part = vec![0.0; n];
+            for (k, wk) in bank.weights.iter().enumerate() {
+                for c in 0..n {
+                    part[c] = r[c] * wk[c];
+                }
+                sp.forward(&part, &mut half, &mut spec);
+                divide(&mut spec, bank.d[k]);
+                sp.inverse(&mut spec, &mut part);
+                for c in 0..n {
+                    z[c] += part[c] * wk[c];
+                }
+            }
+            z
+        };
+        let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<u64>>();
+        for (w, h) in [(96usize, 48usize), (64, 37)] {
+            let dx = 39_000.0;
+            for te in [patchy(w, h, 6.0, 70.0), vec![30.0; w * h]] {
+                let d: Vec<f64> = te.iter().map(|&t| rigidity_per_g(t, G)).collect();
+                let c = vec![RHO_MANTLE; w * h];
+                let r: Vec<f64> = (0..w * h)
+                    .map(|k| ((k * 37) % 101) as f64 - 50.0 + (k as f64 * 0.01).sin())
+                    .collect();
+                let bank = Bank::new(&d, &c, dx);
+                let mut sv = Solver::new(w, h, dx);
+                let want = bits(&old(&sv.spectral, &bank, &r));
+                for threads in [1, 3, 8] {
+                    let pool = rayon::ThreadPoolBuilder::new()
+                        .num_threads(threads)
+                        .build()
+                        .unwrap();
+                    let mut z = vec![0.0; w * h];
+                    pool.install(|| sv.spectral_solve(&bank, &r, &mut z));
+                    assert!(bits(&z) == want, "{w}×{h}, {threads} threads");
+                }
+            }
+        }
     }
 
     /// The weakest and the stiffest plates the editor allows (scale 0.25 and 3 on 5–80 km), and
