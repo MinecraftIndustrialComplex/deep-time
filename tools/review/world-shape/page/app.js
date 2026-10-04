@@ -4,6 +4,10 @@
 'use strict';
 (function () {
 const D = window.WS_DATA;
+if (/debug/.test(location.hash)) {
+  window.addEventListener('error', (e) => document.body.insertAdjacentHTML('afterbegin',
+    `<pre style="background:#600;color:#fff;padding:8px;white-space:pre-wrap">${e.message} ${e.filename}:${e.lineno}:${e.colno}</pre>`));
+}
 if (/(^|[#,])theme-dark/.test(location.hash)) document.documentElement.dataset.theme = 'dark';
 if (/(^|[#,])theme-light/.test(location.hash)) document.documentElement.dataset.theme = 'light';
 const $ = (s, r = document) => r.querySelector(s);
@@ -44,7 +48,7 @@ function bind() {
     if (v === undefined || v === null) { e.textContent = '?'; e.title = 'missing: ' + e.dataset.v; continue; }
     const f = e.dataset.f || 'int';
     e.textContent = f === 'pct' ? pct(v) : f === 'pct1' ? pct(v, 1) : f === 'f1' ? fmt(v, 1) : f === 'f2' ? fmt(v, 2)
-      : f === 'f3' ? fmt(v, 3) : f === 'deg' ? `${fmt(v, 0)}°` : f === 'raw' ? String(v) : fmt(v);
+      : f === 'f3' ? fmt(v, 3) : f === 'deg' ? `${fmt(v, 0)}°` : f === 'sci' ? Number(v).toExponential(0) : f === 'raw' ? String(v) : fmt(v);
   }
 }
 
@@ -213,13 +217,13 @@ function cornerFrame(id, kind) {
   pat.appendChild(sv('line', { x1: 0, y1: 0, x2: 0, y2: w / 40, stroke: css('--gap-ink'), 'stroke-width': w / 140 }));
   defs.appendChild(pat);
   s.appendChild(defs);
-  return { C, box, s, T, lw, w, X0, Y0, X1, Y1, ub };
+  return { C, box, s, T, lw, w, X0, Y0, X1, Y1, ub, pat: `hatch-${id}-${kind}` };
 }
 function missingWedge(f, id) {
   const { C, s, X0, Y0, X1, Y1 } = f;
   const [vx, vy] = C.V;
   const pts = id === G ? [[X0, -Y1], [X1, -Y1], [X1, -vy], [X0, -vy]] : [[vx, -Y1], [X1, -Y1], [X1, -vy], [vx, -vy]];
-  s.appendChild(sv('polygon', { points: pts.map((p) => p.join(',')).join(' '), fill: `url(#hatch-${id}-nbhd)` }));
+  s.appendChild(sv('polygon', { points: pts.map((p) => p.join(',')).join(' '), fill: `url(#${f.pat})` }));
 }
 function cornerSeams(f, id, withLetters) {
   const { C, s, T, lw, w } = f;
