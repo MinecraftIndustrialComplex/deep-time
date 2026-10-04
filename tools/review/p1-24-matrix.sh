@@ -16,6 +16,7 @@
 #          quick preset again, and the full preset on a 16 GiB scope, since it does not fit the
 #          profile's 6 GiB (it was killed by the kernel's OOM killer in the coupled stage). Pinned
 #          to CPUs 12-23 (P124_CPUS) so it can run beside the timing matrix on 0-11.
+# bg:      the background profile (bg2: 2 threads at nice 19 on 2 cores), quick preset, on CPUs 24-27.
 # A run whose result.json exists is skipped, so the matrix resumes after a stop.
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -57,5 +58,9 @@ if [ "$what" = mem ]; then
     P124_MEM=16G one m-mid6-full-$SC-500 mid6 $F $SC 500
     P124_MEM=16G one m-mid6-full-$SU-500 mid6 $F $SU 500
     P124_MEM=16G one m-mid6-full-$SC-1000 mid6 $F $SC 1000
+fi
+if [ "$what" = bg ]; then
+    export P124_CPUS=${P124_CPUS:-24-27}
+    one b-bg2-quick-$SC-500 bg2 $Q $SC 500
 fi
 echo "matrix done $(date -u +%H:%M:%S)"

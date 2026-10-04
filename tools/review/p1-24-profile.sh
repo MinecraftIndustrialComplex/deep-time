@@ -11,6 +11,8 @@
 #
 #   profile   mid6 = 6 cores / 12 threads, 6 GiB for the simulation (a mid-range gaming PC)
 #             low4 = 4 cores / 8 threads, 6 GiB (an older or laptop PC)
+#             bg2  = 2 cores / 4 threads, 2 Rayon threads at nice 19, 6 GiB (a background run
+#                    beside the game on a mid-range PC: option c of docs/design/faster-create-world.md)
 #   cpu list  the VM's CPUs to pin to (default: the first 12 or 8); siblings are n, n+1 on the VM
 #
 # Writes <out>/run.log (the run's own output, each line stamped with the time it was printed, and
@@ -30,9 +32,11 @@ if [ $# -gt 0 ] && [ "$1" != "--" ]; then cpus="$1"; shift; fi
 case "$profile" in
     mid6) ncpu=12; mem=${P124_MEM:-6G} ;;
     low4) ncpu=8; mem=${P124_MEM:-6G} ;;
+    bg2) ncpu=4; mem=${P124_MEM:-6G} ;;
     *) echo "unknown profile $profile" >&2; exit 2 ;;
 esac
-threads=$((ncpu - 1))
+threads=$((ncpu - 1)); nice=0
+[ "$profile" = bg2 ] && { threads=2; nice=19; }
 [ -n "$cpus" ] || cpus="0-$((ncpu - 1))"
 bin="$REPO/target/release/deeptime"
 [ -x "$bin" ] || { echo "build first: cargo build --release -p deeptime-cli" >&2; exit 2; }
@@ -63,7 +67,7 @@ sudo systemd-run --scope -q --uid="$(id -u)" --gid="$(id -g)" -p "AllowedCPUs=$c
     /usr/bin/time -v "$@" 2>&1 | while IFS= read -r l; do printf "%s %s\\n" "$EPOCHREALTIME" "$l"; done > "$out/run.log"; s=$?
     { echo "cpu $(grep ^some "$cg/cpu.pressure")"; echo "memory_peak $(cat "$cg/memory.peak")";
       echo "usage_usec $(grep ^usage_usec "$cg/cpu.stat")"; } > "$out/cgroup.txt"
-    exit $s' p124 "$out" "$bin" run --preset "$preset" --start "$start" --length-myr "$length" \
+    exit $s' p124 "$out" nice -n "$nice" "$bin" run --preset "$preset" --start "$start" --length-myr "$length" \
     --out "$out/world" --threads "$threads" --mem-cap 4294967296 "$@"
 status=$?
 t1=$(date +%s.%N)
