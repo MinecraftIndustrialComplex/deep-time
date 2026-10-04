@@ -155,10 +155,15 @@ public final class BiomeRuleSet {
         }
     }
 
-    /** One file: its id ({@code ns:name}), the biomes that make it active, its rules in order. */
-    public record File(String id, List<String> requires, List<Rule> rules) {
+    /**
+     * One file: its id ({@code ns:name}), the biomes that make it active, the biomes it keeps out of the climate search
+     * without placing them anywhere ({@code keep_out}: a pack's biomes whose slots Deep Time's coordinates reach in the
+     * wrong place, such as land islands at a continentalness Deep Time gives the deep sea), its rules in order.
+     */
+    public record File(String id, List<String> requires, List<String> keepOut, List<Rule> rules) {
         public File {
             requires = List.copyOf(requires);
+            keepOut = List.copyOf(keepOut);
             rules = List.copyOf(rules);
         }
     }
@@ -171,7 +176,11 @@ public final class BiomeRuleSet {
 
     /** Parses one file; throws {@link IllegalArgumentException} naming the file and the problem. */
     public static File parse(String id, JsonObject o) {
+        for (String k : o.keySet())
+            if (!k.startsWith("_") && !Set.of("requires", "keep_out", "rules").contains(k))
+                throw new IllegalArgumentException(id + ": unknown key '" + k + "'");
         List<String> requires = strings(o, "requires", id);
+        List<String> keepOut = strings(o, "keep_out", id);
         JsonElement rs = o.get("rules");
         if (rs == null || !rs.isJsonArray())
             throw new IllegalArgumentException(id + ": no 'rules' array");
@@ -183,13 +192,13 @@ public final class BiomeRuleSet {
                 throw new IllegalArgumentException(id + ": rule " + n + " is not an object");
             rules.add(rule(id, n, e.getAsJsonObject()));
         }
-        return new File(id, requires, rules);
+        return new File(id, requires, keepOut, rules);
     }
 
     private static Rule rule(String file, int n, JsonObject o) {
         String where = file + " rule " + n;
         for (String k : o.keySet())
-            if (!RULE_KEYS.contains(k))
+            if (!k.startsWith("_") && !RULE_KEYS.contains(k))
                 throw new IllegalArgumentException(where + ": unknown key '" + k + "'");
         String id = o.has("id") ? o.get("id").getAsString() : "rule" + n;
         where = file + " rule '" + id + "'";
