@@ -129,11 +129,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   34 cases). `admit.py run --kind K [--server] -- cmd`: the kind's estimate (mean cores over a run,
   peak resident GiB) comes from a seed table, then from the kind's measured runs (weighted 90th
   percentile, each older run 0.85 of the next; the seed stays in the mix until three runs). The job
-  starts when the estimate fits in 1.25 × (free − reserved − headroom), for CPU and memory alike:
-  free cores = 32 − max(1-minute load, busy cores over the last 30 s from /proc/stat); free memory =
-  MemAvailable; reserved = what admitted jobs have not used yet (CPU until a job first reaches 80 %
-  of its estimate or for 3 minutes; memory for its whole life); headroom = 4 cores and 15 GiB for
-  the play server, a workbench run and ssh. Otherwise it waits in order, printing the reason; a smaller
+  starts when the estimate fits: CPU, 1.25 × (free − reserved − 4 cores kept for the play server,
+  a workbench run and ssh), free cores = 32 − max(1-minute load, busy cores over the last 30 s from
+  /proc/stat); memory by the rule in the **Memory rule** bullet below (first built as 1.25 × (free −
+  reserved − 15 GiB), changed the same day); reserved = what admitted jobs have not used yet (CPU
+  until a job first reaches 80 % of its estimate or for 3 minutes; memory for its whole life). Otherwise it waits in order, printing the reason; a smaller
   job may pass a bigger one until the bigger one has waited 15 minutes, then nothing passes it.
   Measurement: every 5 s the job's process tree, plus processes carrying its job id in their
   environment, plus the Gradle daemon its Gradle client is connected to (found through the client's
@@ -145,6 +145,25 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   and the estimates. Settings in /etc/default/deeptime-admit. Quick looks (cat, grep, git, ...) and
   detached starts run at once; unrecognised commands are kinds of their own (`shell:<program>`) and
   start at once once two measured runs show them short and small.
+- **Memory rule (Ben's answer, decisions log 2026-10-03; changed after the first build).** "Don't kill
+  old things, just prevent new ones from launching if their usage isn't within it. I.E. On a machine w/
+  4GB of ram we shouldn't force being under 3.5Gb at all times, If we are at 3.5Gb and a run is
+  predicted to use 200mb it is green to run. If an agent predicts it will use 0.4 Mb [GB] then it will
+  be red since that would use up 100% of the machine after margin is applied." Now: a job starts when
+  its memory estimate × 1.25 is **under** free memory, free = MemAvailable − memory reserved but not
+  yet used by admitted jobs (a job's reservation is its estimate minus what it has used so far, for
+  its whole life). The 15 GiB standing headroom is gone, the margin is on the job's prediction instead
+  of on the free memory (the first build admitted an estimate up to 1.25 × free, which would have run
+  a 0.6 GiB job into 0.5 GiB free), and running jobs are never stopped. A 4 GiB box with 0.5 GiB free:
+  0.2 GiB needs 0.25 and runs, 0.4 GiB needs 0.5, not under 0.5, and waits. An estimate is capped at
+  90 % of the box's memory ÷ 1.25 so that no job waits forever on an idle box. The CPU rule is
+  unchanged, including its 4-core headroom (the play server, a workbench run's burst and ssh; CPU
+  overcommit only slows jobs down, and `deeptime-admit status` still shows it). The waiting message
+  now reads "needs 0.40 GiB (+25% margin = 0.50), 0.50 free: it must be under the free memory";
+  `deeptime-admit status` prints both rules with the memory free now and the largest estimate that
+  would start. Tests (`test_admit.py`): Ben's 4 GiB example (3.5 used: 0.2 admitted, 0.4 waits), the
+  margin on the job not on free memory, memory reserved but not yet used, two jobs in one pass, and
+  running jobs untouched; the old 15 GiB test is rewritten. `RESERVE_MEM_GIB` is no longer a setting.
 - **Many servers at once.** A server job gets a slot: ports 26000 + 10·slot (game, RCON, query, voice
   chat, spares), an X display (:200 + slot) and a folder `deeptime-cache/servers/<job>` removed when
   it ends. `tools/smoke/instance.py` copies a server set into it (libraries/ linked, mods/ and the
