@@ -71,7 +71,11 @@
 //! Wet (the aridity index's own band, before the class's humidity rule, ≥ `wetland_humidity`,
 //! 2.5), flat (the flattest `wetland_flat_share`, 35 %), low (< `wetland_low_m`, 150 m) land that
 //! is not frozen goes into E6 in proportion to `wetlands` — swamps and mangroves only where they belong (vanilla
-//! puts E6 at hot temperatures to mangrove swamp, whatever the humidity). The deep sea keeps E4 or
+//! puts E6 at hot temperatures to mangrove swamp, whatever the humidity). Cold wetland (temperature
+//! band below `wetland_cold_below`, 2: the subarctic and continental classes) is not swamp
+//! (Ben, 2026-10-03, "Taiga instead, peatland if present"): it keeps the class's own temperature and
+//! humidity (taiga in vanilla) with erosion held under E5, and is flagged `climate/wetland` = 2 so the
+//! game can put the pack's peatland biome there. The deep sea keeps E4 or
 //! more, away from Terralith's sky-island band. A class's placement may clamp its land's erosion
 //! (`erosion: {min, max}`; EF's barren ground is held below 0.3, off Terralith's packed-ice glacial
 //! chasm, and its ice cap is not).
@@ -115,6 +119,14 @@ const NO_CAP: f32 = 9.0;
 /// Salt of the noise that signs the weirdness.
 pub const VARIANT_SALT: u32 = 1801;
 
+/// `climate/wetland`: not wetland.
+pub const WETLAND_NONE: u8 = 0;
+/// `climate/wetland`: temperate or warm wetland, in vanilla's swamp band (E6): swamp, mangrove swamp.
+pub const WETLAND_SWAMP: u8 = 1;
+/// `climate/wetland`: cold wetland (boreal peatland): the climate's ordinary biome (taiga in vanilla),
+/// and the pack's peatland biome where it has one (the game swaps it in).
+pub const WETLAND_COLD: u8 = 2;
+
 /// The preset's `biomes` section: the knobs of the mapping (every key optional).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -145,6 +157,10 @@ pub struct BiomeParams {
     pub wetland_flat_share: f64,
     /// Height above the sea, m, at which lowland stops counting as low for swamps.
     pub wetland_low_m: f64,
+    /// The temperature band coordinate (1 … 5) below which wetland is cold wetland: taiga (the class's
+    /// ordinary placement), or the pack's peatland biome, instead of swamp. 2 is the top of the cold
+    /// band, where vanilla's swamp row ends; 1 gives no cold wetland (swamp wherever it is thawed).
+    pub wetland_cold_below: f64,
 }
 
 impl Default for BiomeParams {
@@ -162,6 +178,7 @@ impl Default for BiomeParams {
             wetland_humidity: 2.5,
             wetland_flat_share: 0.35,
             wetland_low_m: 150.0,
+            wetland_cold_below: 2.0,
         }
     }
 }
@@ -201,7 +218,8 @@ impl BiomeParams {
         )?;
         within(self.wetland_humidity, 1.0, 4.5, "wetland_humidity")?;
         within(self.wetland_flat_share, 0.05, 0.9, "wetland_flat_share")?;
-        within(self.wetland_low_m, 20.0, 600.0, "wetland_low_m")
+        within(self.wetland_low_m, 20.0, 600.0, "wetland_low_m")?;
+        within(self.wetland_cold_below, 1.0, 5.0, "wetland_cold_below")
     }
 }
 
@@ -690,6 +708,8 @@ pub struct Ground<'a> {
 /// vanilla parameter units, and the record for `notes.bake.climate`.
 pub struct Mapped {
     pub layers: [Vec<f32>; 5],
+    /// `climate/wetland` (L2): [`WETLAND_NONE`], [`WETLAND_SWAMP`] or [`WETLAND_COLD`] per cell.
+    pub wetland: Vec<u8>,
     pub note: Value,
 }
 
@@ -833,6 +853,16 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         w_cap,
         by_class: Value::Object(by_class),
     }
+}
+
+/// Per-class counts as a JSON object keyed by Köppen code (classes with no cells left out).
+fn by_class_map(counts: &[u64; 32]) -> serde_json::Map<String, Value> {
+    counts
+        .iter()
+        .enumerate()
+        .filter(|&(_, &c)| c > 0)
+        .map(|(i, &c)| (koppen::CODES[i].to_owned(), json!(c)))
+        .collect()
 }
 
 fn shares(v: &[f32], mask: &[bool], edges: &[f64], abs: bool) -> Vec<f64> {
@@ -985,6 +1015,11 @@ pub fn map(
     let mut erosion = vec![f32::NAN; n];
     let mut wet_cells = 0u64;
     let mut wet_by_class = [0u64; 32];
+    let mut cold_cells = 0u64;
+    let mut cold_by_class = [0u64; 32];
+    let mut wetland = vec![WETLAND_NONE; n];
+    // Erosion's E5 begins here: the shattered and windswept band, where flat ground does not belong.
+    let e5 = bands.erosion[5];
     for k in 0..n {
         if !land[k] {
             continue;
@@ -997,13 +1032,31 @@ pub fn map(
         let wet = unit((f64::from(h_wet[k]) + p.humidity_shift - p.wetland_humidity) / 1.5);
         let flat = unit((p.wetland_flat_share - u) / p.wetland_flat_share);
         let low = unit(1.0 - (f64::from(elev[k]) - sea) / p.wetland_low_m);
-        let thawed = f64::from(t_land[k]) + p.temperature_shift >= 1.0;
+        let tb = f64::from(t_land[k]) + p.temperature_shift;
+        let thawed = tb >= 1.0;
         let s = p.wetlands * wet * flat * low;
         if thawed && s > 0.15 {
-            e = e6 + 0.01 + (0.95 - e6 - 0.01) * unit((s - 0.15) / 0.6);
             wet_cells += 1;
-            if class[k].is_finite() {
-                wet_by_class[(class[k] as usize).min(31)] += 1;
+            let class_index = class[k].is_finite().then(|| (class[k] as usize).min(31));
+            if let Some(c) = class_index {
+                wet_by_class[c] += 1;
+            }
+            if tb < p.wetland_cold_below {
+                // Cold wetland (Ben, 2026-10-03, "Taiga instead, peatland if present"): not vanilla's
+                // swamp band. The cell keeps its class's temperature and humidity, so vanilla draws
+                // the class's ordinary biome (taiga for the subarctic classes); the flag lets the
+                // game swap in the pack's peatland biome when it has one. Erosion stays in the
+                // ordinary land range, below E5, so flat wet ground is not drawn as windswept hills.
+                // ledger: BIO-104, BIO-105
+                e = e.min(e5 - 1e-3);
+                wetland[k] = WETLAND_COLD;
+                cold_cells += 1;
+                if let Some(c) = class_index {
+                    cold_by_class[c] += 1;
+                }
+            } else {
+                e = e6 + 0.01 + (0.95 - e6 - 0.01) * unit((s - 0.15) / 0.6);
+                wetland[k] = WETLAND_SWAMP;
             }
         }
         // The class's own limits (EF: no packed-ice glacial chasm on barren polar desert).
@@ -1067,12 +1120,9 @@ pub fn map(
         "koppen_bands": by_class,
         "window_cells": k,
         "wetland_cells": wet_cells,
-        "wetland_cells_by_class": wet_by_class
-            .iter()
-            .enumerate()
-            .filter(|&(_, &c)| c > 0)
-            .map(|(i, &c)| (koppen::CODES[i].to_owned(), json!(c)))
-            .collect::<serde_json::Map<String, Value>>(),
+        "wetland_cells_by_class": by_class_map(&wet_by_class),
+        "cold_wetland_cells": cold_cells,
+        "cold_wetland_cells_by_class": by_class_map(&cold_by_class),
         "land_cells_l2": land_cells,
         "land_shares": {
             "temperature": shares(&temperature, &land, &bands.temperature, false),
@@ -1084,6 +1134,7 @@ pub fn map(
     });
     Mapped {
         layers: [temperature, vegetation, continents, erosion, ridges],
+        wetland,
         note,
     }
 }
