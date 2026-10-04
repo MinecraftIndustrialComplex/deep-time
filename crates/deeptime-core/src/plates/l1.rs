@@ -347,18 +347,18 @@ pub fn sample(
     names
         .iter()
         .enumerate()
-        .map(|(f, &name)| (name, per_cell.iter().map(|v| v[f]).collect()))
+        .map(|(f, &name)| (name, per_cell.par_iter().map(|v| v[f]).collect()))
         .chain(
             extra_names
                 .iter()
                 .enumerate()
-                .map(|(f, &name)| (name, extra.iter().map(|v| v[f]).collect())),
+                .map(|(f, &name)| (name, extra.par_iter().map(|v| v[f]).collect())),
         )
         .chain(
             POOL_FIELDS
                 .iter()
                 .enumerate()
-                .map(|(f, &name)| (name, pools.iter().map(|v| v[f]).collect())),
+                .map(|(f, &name)| (name, pools.par_iter().map(|v| v[f]).collect())),
         )
         .collect()
 }
