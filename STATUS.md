@@ -87,6 +87,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+| 2026-10-04 | Wrap engine (design + spike) | **Four choices** (docs/design/wrap-engine.md §8): (1) architecture: one stored copy + folded access + replicated band, vanilla clients join, optional client re-anchor (recommended), or Toroidal World's client frame extended with turned packets; (2) keep Toroidal World for Guyou's slide edges, engine owns only the turning edges (recommended), or engine owns every edge; (3) Create: refuse kinetic, fluid and train connections across turning seams at first (recommended), or adapters in the first version; (4) start Phase 1 now alongside the Immersive Portals work (recommended; the engine takes any layout of translations, half- and quarter-turns), or stop at the spike until the projection survey settles the layout. | Not asked yet (sub-agent; for the coordinator) |
+| 2026-10-04 | Test VM | **admit.py deadlocks when signalled while waiting** (build log 2026-10-03/04, wrap engine, "Test VM incident"): the queue froze for an hour. (a, recommended) make the wait loop's signal handler set a flag and leave the loop (or take the lock re-entrantly); (b) leave it. | For the coordinator (tool owner) |
 | 2026-10-04 | VM admission | **GameTests on branches again?** The rule "GameTests run once per merge batch" (Ben, 2026-09-30) came from the M6's single server slot, with ~7 agents queueing two runs each. With load-based admission the VM ran two GameTest sets, a preview and two simulations side by side (build log 2026-10-03/04). (a, recommended) Agents run `./gametest.sh` and `./gametest.sh -PwithMic` on their branch before reporting, as part of their gates; the coordinator still runs both once after a batch merge. (b) Keep the batch rule. | For the coordinator to put to Ben |
 | 2026-10-04 | VM admission | **The +25 % on memory.** Ben's "available + 25%" is applied to memory as to CPU: a job may start when its peak-memory estimate is up to 1.25 × the free memory left after the 15 GiB headroom, so the headroom absorbs the overshoot if every job peaks at once. (a, recommended) Keep it so. (b) No margin on memory (an overshoot there is an out-of-memory kill, not a slowdown): `OVERCOMMIT` would then apply to cores only. | For the coordinator to put to Ben |
 | 2026-10-04 | VM admission | **`deeptime run --threads N` bakes on all cores.** The simulation keeps to N threads, the bake runs on Rayon's global pool: 2-thread runs peak at 12–19 cores for about half a minute (mean 1.8). (a, recommended) Run the bake in the session's pool so `--threads` holds throughout (a small follow-up task). (b) Leave it; admission reserves the mean. | For the coordinator |
@@ -123,6 +125,68 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-02 | science WP-14a | **CO₂ forcing above 50,000 ppm and the snowball's escape** (CLM-070, CLM-166; design §4.2). The clock's forcing is Byrne & Goldblatt 2014's fit, stated for 200–10,000 ppm and computed to 50,000 ppm; the code uses it to 10⁶ ppm, and today's snowball escapes near 5.5·10⁵ ppm where Hoffman et al. 2017 expect 10⁴–10⁵ ppm (with cloud forcing of ≥ 10 W/m² that cloud-free models lack). (1, recommended) a short research task finds a published forcing calculation for 0.05–1 bar of CO₂ and the snowball cloud forcing; T6 then applies both, and the escape is measured against 10⁴–10⁵ ppm; (2) cap now: above 50,000 ppm continue the fit as a logarithm with its slope there (no source; escape CO₂ moves, direction to be measured); (3) leave it (escape stays near 0.55 bar). | to be asked by the coordinator (sub-agent report) |
 
 ## Build log
+### 2026-10-03/04 — A wrap engine of Deep Time's own for turning seams: design and server-side spike (Ben's "Immersive portals, begin custom wrap engine concurrently"; agent worktree agent-a9aa7e80efbedcf23, branch `dev/wrap-engine-spike`, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; dev-only, not merged)
+- **Design.** `docs/design/wrap-engine.md` (indexed in docs/research/README.md):
+  - five architectures compared: rotated chunk views; folded access at the `Level` boundary; a
+    replicated band; Toroidal World's client frame extended with turned packets; turned rendering on
+    the client;
+  - for each subsystem, the Minecraft and NeoForge hooks and the risks: block access, the band, light,
+    world generation and caves, entities and AI, client and network, Distant Horizons, the MIC pack;
+  - how Toroidal World 0.19.3 wraps (server canonical copy, unwrapped client frame, chunk-key aliasing,
+    a `PacketTranslator` choke point, byte-identical chunk payloads), read on `mc/1.21` `5ded155` by a
+    Sonnet sub-agent, and why a turn breaks it (`pos & 15` reverses).
+- **Recommended: one stored copy, folded access, a replicated band.**
+  - Every position that crosses the `Level` API is folded to the stored block, and states are turned.
+  - Real chunks beyond each edge hold turned copies, written straight into their sections.
+  - Entities are carried at the seam line, turned.
+  - Vanilla clients join unchanged; an optional client re-anchor removes the reload at a turning
+    crossing.
+- **Effort.** 46–75 agent days without Create trains (9–15 weeks), 56–95 with them. The engine's own
+  share beyond what the Immersive Portals route needs anyway is about 6–9 weeks.
+- **Spike.** Applied only with `-Ddeeptime.wrapspike=true`: `DeepTimeMixinPlugin` gates
+  `mixin.wrapspike.*`, and the tests use their own namespace `deeptime_wrapspike`, enabled only by
+  `./gametest.sh -PwrapSpike`.
+  - Code: `wrapspike/` (`CellIsometry`, `WrapEdge`, `WrapTopology`, `WrapEngine`,
+    `WrapSpikeGameTests`) and three mixins (`Level` get/set/fluid/block-entity, `handleNeighborChanged`,
+    `LevelTicks.schedule`/`hasScheduledTick`).
+  - Implementation choices: the band is depth 8 on the test sites; replica writes go straight into the
+    section, then heightmaps, light, `blockChanged`.
+- **Measured** (test VM, `./gametest.sh -PwrapSpike`, 2026-10-04 02:11): **All 3 required tests
+  passed, 34 of 34 assertions** [R], on one half-turn seam, block (x, z) beyond = (2cx−x−1, 2z0−z−1):
+  - stairs placed beyond the seam stored on the far side facing south; the band storage holds the
+    turned copy;
+  - an armour stand stopped at z0+0.2500 by the far side's block;
+  - water across: far channel amounts 6,5,4,3,2,1,0; a control site with no seam stays dry 7/7;
+  - wire power 15,14,13 | 12,11 across, and the far lamp lit; a repeater driving into the seam lit the
+    far lamp at power 15; both off again;
+  - an armour stand and an item carried across, turned 180°;
+  - block light 14 across the seam (≤ 2 without it).
+  - The first run's item check failed: its forceloaded chunk was not entity-ticking yet. It is fixed
+    by waiting.
+- **Not shown:**
+  - the client (not run);
+  - whole-world Guyou or Peirce dimensions, turn points and corners (unit tests only);
+  - band tickets and copy on load;
+  - players and ghosts;
+  - caves, Distant Horizons, Create, Sable, and Toroidal World on the same level;
+  - performance.
+- **Gates:**
+  - `WrapTopologyTest` passes 6 of 6. It checks the algebra (local isometry, images, Guyou, Peirce, a
+    quarter-turn corner) and failed on 2 bounded-seam edge cases before the fix.
+  - `./gradlew build test`: GATE-PLACEHOLDER.
+  - No Rust changed (no cargo gates). The normal `./gametest.sh` was not run (batch rule); the spike
+    is inert there.
+- **Test VM incident.** From 00:59 to 02:00 UTC the admission queue froze, and every job on the VM
+  waited.
+  - The cause: `admit.py`'s wait-loop signal handler (`_install_wait_signals` → `bail`) enters
+    `with store` while the loop already holds `state.lock`. A SIGTERM, SIGINT or SIGHUP arriving
+    inside the loop's locked section therefore deadlocks that process with the lock held.
+  - It was pid 1044950 (`batch.sh`'s `gametest:standalone`, label deep-time). Someone else cleared it
+    at 02:00; this agent killed nothing.
+  - The fix belongs in `tools/remote/vm/admit.py`: the handler should only set a flag, or the lock
+    should be re-entrant.
+- **Next.** Ben's questions (Pending questions). If Phase 1 is approved: whole-world topologies, the
+  fast path, the full fold list and the band manager.
 ### 2026-10-03/04 — Load-based admission on the test VM replaces the M6-era caps (Ben's "No set slots ... Guess load, run if load is less than what is available + 25%"; agent worktree agent-a2e1d18f0b1a34569, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; installed on the VM, not merged)
 - **What it replaces.** The one-server lock (`deeptime-cache/server.lock`, `mac.sh --server`, preview.py,
   detached-server.sh, mic-climate.sh), "two simulations per agent, four of 2 threads on the box", and
