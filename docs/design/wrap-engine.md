@@ -48,9 +48,11 @@ portals), [`rotated-seam-worlds-prior-art.md`](../research/notes/rotated-seam-wo
   - it is solid on both sides, and stops an entity at the seam from this side;
   - water crosses and runs on down the far channel, level by level;
   - redstone powers across by wire and through a repeater that faces the seam, and switches off again;
-  - an armour stand and an item are carried across, turned.
+  - an armour stand and an item are carried across, turned;
+  - block light reaches across the seam.
 
-  The client side was not run (§7.3).
+  All 34 assertions held, with a control site where nothing crosses. The client side was not run
+  (§7.3).
 - **Effort.** About 9 to 16 weeks of agent time for the whole engine at MIC quality (§6). About 6 to 9
   weeks without Create trains and kinetic networks across seams, which can stay blocked at first. The
   greatest unknowns are world generation across seams together with C2ME (caves and features), and
@@ -456,7 +458,44 @@ Immersive Portals version anyway, so the engine's own share is about 6 to 9 week
 
 ### 7.3 What it showed
 
-RESULTS-PLACEHOLDER
+**Result: all 3 required tests passed, all 34 assertions OK** [R]. Run: `./gametest.sh -PwrapSpike`
+on the test VM, 2026-10-04 02:11 UTC, 36 s wall time, peak server RSS 1.6 GB. The assertion lines are
+in `neoforge/build/gametest-standalone.log` (not committed).
+
+| Claim | Measured | |
+|---|---|---|
+| A block placed beyond the seam lands on the far side, turned | stairs set facing north at band (cx+1, z0−1) → stored at (cx−2, z0) facing **south**; read back through the seam: facing north | [R] |
+| The band shows it, turned (what the client is sent) | chunk storage at (cx+1, z0−1) holds stairs facing north; stairs stored facing east at (cx−5, z0) appear in the band at (cx+4, z0−1) facing **west** | [R] |
+| It is solid there | collision shape non-empty at both; an armour stand (half-width 0.25) at x = cx+1.5 moving 1 block north stops at z = z0 + **0.2500**, against the far side's stairs | [R] |
+| Water flows across | far channel B (cx−3, z0 … z0+6) holds amounts **6, 5, 4, 3, 2, 1, 0** from a source at A (cx+2, z0+1) = 8, A z0 = 7: the run continues level by level across the seam; flow at B z0+2 points away from the seam (+1.0 in z); the band copy beyond A holds water of amount 6; **control site without the seam: B dry in 7 of 7** | [R] |
+| Redstone powers across, by wire | wire placed beyond the seam lands at (cx−3, z0) and connects north into the far side; power **15, 14, 13 \| 12, 11** falls by one per block across the seam; the far lamp lights | [R] |
+| Through a repeater facing the seam | repeater powered; the wire across from its output at **15**; the far lamp lights; the band copy of the repeater beyond the far side is turned (facing north) and powered | [R] |
+| And turns off | redstone blocks removed: both far wires 0, both far lamps off | [R] |
+| Entities are carried across, turned | armour stand moved past the seam at x = cx+3.5 → (cx−3.5, z0+0.4), heading turned **180.0°**; a no-gravity item thrown north at x = cx+5.5 → now at x = cx−5.5, z = z0+7.3, moving south | [R] |
+| Light crosses | glowstone stored at (cx+6, z0): block light **14** at the far-side block (cx−7, z0) next to its band copy, 13 blocks away through ordinary space (2 at most that way) | [R] |
+
+**What this does not show:**
+- **The client.** No client was run. "What the client is sent" means the chunk storage that vanilla
+  serializes into chunk and block-update packets. That the client draws the band as it is stored is
+  vanilla behaviour [I], not observed here.
+- **A whole world.** Only bounded seams on a flat test world were run: no Guyou or Peirce dimension,
+  no turn point, no corner where two seams meet. The whole-world topologies are covered only by the
+  unit tests.
+- **Band management.** No source-chunk tickets, no copy on load, no unloaded sources. Each site copied
+  its band once at install (768 blocks).
+- **Players.** No player crossing, no ghost entities, no re-anchor.
+- **The rest of the pack.** No world generation (caves), no Distant Horizons, no Create, no Sable, no
+  Toroidal World on the same level.
+- **Performance.** Not measured. The spike's injections allocate on the hottest call (§5).
+
+**First run (for the record).** In the first run (02:07) the item had not moved after 20 ticks: its
+freshly forceloaded chunk was not entity-ticking yet. It crossed correctly a few ticks later (the
+engine's log line shows it landing at the glued point). The check now waits 120 ticks and the item
+moves at 0.2 blocks a tick.
+
+**Licences.** No code was adapted from Toroidal World (MIT) or Immersive Portals (Apache-2.0). TW's
+source was read for its design and its catalogue of position-bearing state only. The spike's algebra
+is written from the mathematics in §1. So nothing is added to NOTICE.md.
 
 ### 7.4 The shipped mod is unchanged
 
