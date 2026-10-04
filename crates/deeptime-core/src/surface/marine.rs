@@ -266,11 +266,11 @@ pub fn slope_failure(
             return 0.0;
         }
         let mut give = 0.0;
-        for k in 0..8 {
+        for (k, &ck) in crit.iter().enumerate() {
             if let Some(m) = nbr(c, inner, k)
                 && wet[m]
             {
-                give += p.rate * (hh[c] - hh[m] - crit[k]).max(0.0);
+                give += p.rate * (hh[c] - hh[m] - ck).max(0.0);
             }
         }
         if give > 0.0 {
@@ -282,15 +282,15 @@ pub fn slope_failure(
     let change = |c: usize, inner: bool, hh: &[f64], wet: &[bool], sc: &[f64]| -> f64 {
         let mut dz = 0.0;
         if wet[c] {
-            for k in 0..8 {
+            for (k, &ck) in crit.iter().enumerate() {
                 let Some(m) = nbr(c, inner, k) else {
                     continue;
                 };
                 if !wet[m] {
                     continue;
                 }
-                let out = (hh[c] - hh[m] - crit[k]).max(0.0);
-                let inn = (hh[m] - hh[c] - crit[k]).max(0.0);
+                let out = (hh[c] - hh[m] - ck).max(0.0);
+                let inn = (hh[m] - hh[c] - ck).max(0.0);
                 dz += p.rate * (inn * sc[m] - out * sc[c]);
             }
         }
@@ -497,7 +497,8 @@ mod tests {
                 let r = 1 + rng.below(4) as usize;
                 for dj in 0..=2 * r {
                     for di in 0..=2 * r {
-                        let (i, j) = ((ci + di + w - r) % w, cj + dj);
+                        // ci + di − r, mod w (w may be smaller than r).
+                        let (i, j) = ((ci + di + r * (w - 1)) % w, cj + dj);
                         if j < r || j - r >= hh {
                             continue;
                         }
