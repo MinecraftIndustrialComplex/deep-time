@@ -142,7 +142,10 @@ fn coupled_pipeline_reads_its_own_history_and_is_deterministic_across_threads() 
         let g = &b.fields[name];
         assert!(
             f.data.len() == g.data.len()
-                && f.data.iter().zip(&g.data).all(|(x, y)| x.to_bits() == y.to_bits()),
+                && f.data
+                    .iter()
+                    .zip(&g.data)
+                    .all(|(x, y)| x.to_bits() == y.to_bits()),
             "field {name} differs between 1 and 3 threads"
         );
     }
