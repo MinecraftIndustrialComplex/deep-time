@@ -21,7 +21,8 @@
 #   --no-guidance  skip the second pass (natives forced off: the guidance panel, Create blocked)
 #   --no-create    stop after Accept (no world creation, no in-world shot)
 #   --size WxH     window size (default 1280x720; the GUI scale is 2)
-#   --timeout S    per client pass (default 3600)
+#   --timeout S    per client pass (default 7200: a 1,000-Myr quick planet's ETA was ~2 h on the
+#                  loaded VM; --prop length=300 takes a fraction of that)
 #   --threads N    processors the client JVM sees (-XX:ActiveProcessorCount; default 8): the editor
 #                  runs the simulation on N - 1 of them, as on a player's 8-core machine
 #   --prop K=V     a ScreenshotDriver property for the main pass (repeatable), as
@@ -37,7 +38,7 @@ cd "$(dirname "$0")/../.."
 REPO="$PWD"
 ADMIT="${DEEPTIME_ADMIT:-/usr/local/lib/deeptime/admit.py}"
 
-NAME=vm-client; BUILD=1; GUIDANCE=1; CREATE=true; WSIZE=1280x720; TIMEOUT=3600; THREADS=8; PROPS=()
+NAME=vm-client; BUILD=1; GUIDANCE=1; CREATE=true; WSIZE=1280x720; TIMEOUT=7200; THREADS=8; PROPS=()
 ARGS=("$@")
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -77,6 +78,8 @@ WORK="$REPO/neoforge/build/vm-client"
 LAUNCH_SCRIPT="$REPO/neoforge/build/moddev/runClient.sh"
 rm -rf "$OUT" "$WORK"; mkdir -p "$OUT" "$WORK/tmp"
 LOG="$OUT/runner.log"
+# To stop a walk: kill $(cat neoforge/build/vm-client/runner.pid); the trap stops the client, Xvfb and PulseAudio.
+echo $$ > "$WORK/runner.pid"
 say() { echo "vm-client: $*" | tee -a "$LOG"; }
 [ -f "$LAUNCH_SCRIPT" ] || { say "no $LAUNCH_SCRIPT (./gradlew createClientLaunchScript)"; exit 1; }
 
