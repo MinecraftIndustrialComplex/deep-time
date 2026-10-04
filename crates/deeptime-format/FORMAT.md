@@ -200,6 +200,49 @@ term: `{"layer": "detail/amplitude", "seed": "<u64, decimal>", "salt": 1729, "oc
 "wavelength_blocks": 32.0}` (present exactly when `detail/amplitude` is). A preset without the
 deep-time surface (plate-only) bakes nothing (`baked: false`).
 
+### The bake's projection pass (format 0.5)
+
+The simulation runs on its own Lambert grid (`crates/deeptime-core`; Ben, 2026-10-03: "Bake only").
+`Session::finalize_write` bakes the world in Lambert as above, settles the crater lenses and placers,
+and then, when the preset's `scale.projection` is `petroff_guyou` (the default), **rewrites the whole
+folder in the world's projection** (`deeptime_core::bake::project`). A Lambert preset's folder stays as
+baked and gets a Lambert layout block.
+
+- **The world**: b from the simulation's C ("The world's layout"); λc chosen per planet when
+  `scale.lambda_c_deg` is −1 (the default): candidates 0.25° apart, each cone point's distance to the
+  nearest land (the baked elevation at or above sea level) measured up to 20°, the best by the
+  largest least distance, then the largest sum, then the smallest λc; or the value the preset sets.
+- **Rasters**: every layer is rewritten on the world grid of its own cell size (`L1`, `L2`, `L3`,
+  `L3h` keep their names and r; "Grids"). A world cell is the point sample at its block; the block's
+  sphere point is found through the projection and the layer is read at the matching Lambert block.
+  Continuous layers are averaged over a **footprint isotropic on the sphere**, as wide as the world
+  cell's own footprint and as the Lambert rows' spacing there (near the poles a Lambert row spans many
+  blocks of planet north–south and its columns a fraction of a block east–west; read at a point, that
+  anisotropy draws radial streaks round the poles). Categories (`climate/koppen`, `surface/class_top`,
+  `meta/plate_id`, `meta/province`), horizon stacks and any footprint touching no-data take the
+  nearest cell. The two edge rows are made exactly self-glued (cell i = cell w − i).
+- **Vector data**: rivers (vertices through the projection, x continuous along a chain; a chain
+  crossing a turning edge is split there, the parts before the edge ending as at the sea, and
+  confluences re-pointed; the index rebuilt in the world's frame), structural events (the window's
+  centre through the projection, its axes, sizes, a fold's wavelength and a fault's slip and plane
+  through the local Jacobian), bodies (centre, horizontal axes and yaw through the Jacobian, and
+  moved up or down by the change of the drawn terrain height between their old and new column, so a
+  crater's lens stays under the drawn floor), sites (centre; box from their bodies; the index in the
+  world's frame), `volcanoes/active.json` and `impacts/craters.json` (`x`, `z`), and
+  `spawn/candidates.json` (moved to the nearest world L3 point, `surface_y` from the world's
+  elevation, reordered by distance from (0, 0) unless ranked).
+- **Unchanged**: events (latitude and longitude; their L1 masks and paths are in the simulation's
+  frame), keyframes (the simulation's Lambert pictures, π : 1), `preset.json`, `strata/classes.json`.
+- **The manifest**: `scale.circumference_blocks` = 2b, `scale.m_per_block_h` = the world block's
+  true size √(4πR²/2b²) (`planet.radius_m` unchanged), `projection` (the layout block, with the
+  border the preset's `scale.edge_border` asks for), and `notes.bake.projection`: `hemisphere_blocks`,
+  `world_blocks`, `lambda_c_deg`, `lambda_c` (the search: least and per-cone distances to land, the
+  share of candidates with all four cone points at sea and 3° from land), `layers` (each layer's
+  sampling), `shares` (`land_map` / `land_true`, `ice_cover_map` / `ice_cover_true`: the share of the
+  world's cells, edge rows at half weight, against the simulation's true area share), `pole_anisotropy`
+  (mean squared tangential over radial elevation slope 80°–88° from the equator, and at 30°–60° for
+  reference, for the world and for point sampling), `vector` and `millis`.
+
 ### The climate at a block (0.2, P1-25)
 
 `notes.bake.climate.monthly` is `null` for a run without a climate section, else
@@ -590,7 +633,7 @@ Java `PortableMath`, JS `DTMath`):
   (cos λc, sin λc, 0), e2 = (0, 0, 1), f2 = a2 × e2: v = a2·(a·v_p) + e2·(e·v_p) + f2·(f·v_p).
   Latitude and longitude of v as in "Grids": unit vector (cos φ cos λ, cos φ sin λ, sin φ).
 - The forward map (sphere → block) inverts each step; φ_p ≥ 0 lands in the western tile.
-- Properties (tested in `projection.rs`, ledger SCL-078): every block covers the same area of the
+- Properties (tested in `projection.rs`, ledger SCL-086): every block covers the same area of the
   planet (2b² = 4πR², R = b/√(2π)); glued edge points are one planet point to 10⁻¹² rad; the map
   continues smoothly through every seam; round trips to 10⁻⁸ rad and 10⁻⁶ blocks; the equator is the
   line z = 0, north is −z along it, east +x.
@@ -821,6 +864,15 @@ it did (cells changed, mean and largest change, the flood after it, milliseconds
 carry the youth and fold strength it read (`amplify/youth`, `amplify/fold`, L1).
 
 ## The detail layer (`rasters/detail/amplitude.dtr`, P1-06)
+
+**Petroff–Guyou worlds (0.5).** The noise N is read through the world's half-turn edges
+(`DetailSpec::noise`, Java `DetailNoise`): a point past the north or south edge is first folded
+((x, z) → (−x, −b − z) north, (−x, b − z) south, repeated), and within 32 blocks of an edge
+(d = z + b/2 for z < 0, b/2 − z otherwise) N is blended towards its half-turn-symmetric mean:
+m = N at (−x, −b − z) north or (−x, b − z) south, S = 0.5·(N + m), t = d / 32, w = t·t·(3 − 2t),
+result S + (N − S)·w (in that order). On the edge the result is the same at both images of a planet
+point, so the detail term is continuous through the seam. Lambert and synthetic worlds: N as below.
+
 
 `deeptime:terrain` (plan §7.1) adds **A(x, z) · N(x, z)** to the L3 height, where A is this layer
 (u8, physical = raw / 16 blocks, L3 grid, sampled bilinearly like `elevation`) and N the noise

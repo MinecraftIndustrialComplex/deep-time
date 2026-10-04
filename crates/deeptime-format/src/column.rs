@@ -111,7 +111,11 @@ impl ColumnWorld {
         let detail = match DetailSpec::of(&manifest)? {
             Some(spec) => match layer(&spec.layer)? {
                 Some(l) => {
-                    let noise = Noise::new(spec.seed()?, manifest.scale.circumference_blocks);
+                    let noise = Noise::for_world(
+                        spec.seed()?,
+                        manifest.scale.circumference_blocks,
+                        &manifest.world_projection(),
+                    );
                     Some((spec, noise, l))
                 }
                 None => {

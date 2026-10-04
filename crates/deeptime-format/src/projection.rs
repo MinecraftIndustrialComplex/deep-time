@@ -421,7 +421,7 @@ pub const LAYOUT_VERSION: u32 = 1;
 /// The hemisphere square's side is a multiple of this many blocks: the world's x period 2b is
 /// then a multiple of 512 (a region file, what `WorldDataRef` and Toroidal World's loop take),
 /// every grid's r (up to 256) divides b, and the half-turn pivots sit on chunk corners.
-pub const HEMISPHERE_QUANTUM: u32 = 256;
+pub const HEMISPHERE_QUANTUM: u32 = 256; // ledger: SCL-084 (game-choice)
 
 /// One way a world edge is glued (`edges[].kind`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -604,7 +604,7 @@ fn unit_pm(lambda: f64, phi: f64) -> [f64; 3] {
 impl PetroffGuyou {
     /// The hemisphere side b for a planet `circumference` blocks round at today's scale: the
     /// world's 2b² blocks cover the planet's 4πR² (R = C/2π, so b = C/√(2π)), rounded to the
-    /// nearest multiple of [`HEMISPHERE_QUANTUM`] (game choice, ledger SCL-079). 16k: 6,656 (the
+    /// nearest multiple of [`HEMISPHERE_QUANTUM`] (game choice, ledger SCL-084). 16k: 6,656 (the
     /// planet drawn 1.8 % larger across); 32k: 13,056 (0.1 % smaller).
     pub fn hemisphere_for(circumference: u32) -> u32 {
         let exact = f64::from(circumference) / (2.0 * PI).sqrt();
@@ -1487,7 +1487,7 @@ mod tests {
     }
 }
 
-/// Petroff–Guyou: round trips, equal area, seams, folds and landmarks (ledger: SCL-078).
+/// Petroff–Guyou: round trips, equal area, seams, folds and landmarks (ledger: SCL-086).
 #[cfg(test)]
 mod petroff_guyou_tests {
     use super::*;

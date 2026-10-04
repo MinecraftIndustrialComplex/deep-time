@@ -263,7 +263,7 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     // The column evaluator reads the folder; the first horizon covers the terrain everywhere.
     let w = ColumnWorld::open(&dir).unwrap();
     let c = i64::from(m.scale.circumference_blocks);
-    let noise = Noise::new(5, c as u32);
+    let noise = Noise::for_world(5, c as u32, &m.world_projection());
     let mut rng = SplitMix(9);
     let (mut with_bodies, mut covered) = (0, 0);
     let zp = m.world_projection().z_range().1 as i64;
