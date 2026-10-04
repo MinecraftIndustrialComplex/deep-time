@@ -81,7 +81,7 @@ use super::geometry::{Geo, dijkstra};
 use super::kinematics::{quat, tangent, to_group};
 use super::pools::ISOSTATIC_FACTOR;
 use super::shortening::{Front, normal_convergence};
-use super::state::{Belt, CONTINENTAL, OROGENY_HIMALAYAN, PlateState, pool};
+use super::state::{Belt, CONTINENTAL, FORELAND, OROGENY_HIMALAYAN, PlateState, pool};
 use super::subduction::{MIN_CONTACT, OROGENY_MIN_M_PER_MYR, ceiling};
 
 /// The surface's flexure below which ground in front of a wedge counts as the foreland basin, m
@@ -170,6 +170,7 @@ pub fn stack(
                 over,
                 conv,
                 normal,
+                shortening_km: col.shortening_km,
             },
             f,
             flexure,
@@ -208,6 +209,8 @@ struct Side {
     over: u32,
     conv: f64,
     normal: DVec3,
+    /// The collision's shortening so far, km.
+    shortening_km: f64,
 }
 
 /// One front's stacking, and what the belt's record gains.
@@ -266,12 +269,9 @@ fn stack_front(
         // beyond the basin's reach.
         belt_km + FOREDEEP_REACH_KM,
     );
-    let reach_km = wedge_reach_km
-        + if flexure.is_some() {
-            FOREDEEP_REACH_KM
-        } else {
-            0.0
-        };
+    // Beyond the wedge's toe the foreland basin is looked for (`foredeep`) and the structure stage's
+    // foreland is flagged ([`FORELAND`]).
+    let reach_km = wedge_reach_km + FOREDEEP_REACH_KM;
     let src: Vec<(u32, f64, u32)> = f.crust.iter().map(|&v| (v, 0.0, 0)).collect();
     let (d_under, _) = dijkstra(geo, &src, |_, b| under_ok(b), norm.rad(reach_km));
 
@@ -435,6 +435,35 @@ fn stack_front(
         out.weight += dz;
         out.across_sum += dz * x;
         out.across_sq += dz * x * x;
+    }
+
+    // The collision's footprint, for the structure stage (`structure::deform::emplace`): every
+    // sample of the belt, the wedge and the foreland within reach of the basin carries the
+    // convergence and the shortening of this collision; the foreland on the incoming plate
+    // beyond the wedge's toe is flagged. Where two collisions meet the larger values stay and a
+    // belt or wedge sample is never a foreland one.
+    // ledger: PLT-260 (the footprint); PLT-249 (the basin's reach).
+    let marks: Vec<(usize, bool)> = (0..n)
+        .filter_map(|i| {
+            if d_over[i].is_finite() && d_over[i] < w_rad {
+                return Some((i, false));
+            }
+            let d = d_under[i];
+            (d.is_finite() && plate_of[i] == side.under && !state.samples[i].is_hidden())
+                .then(|| (i, norm.km(d) > wedge_km))
+        })
+        .collect();
+    let (conv, shortened) = (side.conv.max(0.0) as f32, side.shortening_km as f32);
+    for (i, foreland) in marks {
+        let s = &mut state.samples[i];
+        let was_belt = s.collision_mm_yr > 0.0 && s.flags & FORELAND == 0;
+        s.collision_mm_yr = s.collision_mm_yr.max(conv);
+        s.shortening_km = s.shortening_km.max(shortened);
+        if !foreland {
+            s.flags &= !FORELAND;
+        } else if !was_belt {
+            s.flags |= FORELAND;
+        }
     }
 
     // The belt's height after the step: its mean above the sea within half its width, and its
@@ -820,6 +849,12 @@ mod tests {
         ) -> (BTreeMap<usize, Stacked>, Vec<Fired>) {
             let pos = positions(st, &self.geo);
             let tree = Tree::over(&pos, |_| true);
+            // (What `subduction::resolve` does at the start of a step.)
+            for s in &mut st.samples {
+                s.flags &= !FORELAND;
+                s.collision_mm_yr = 0.0;
+                s.shortening_km = 0.0;
+            }
             st.contacts[0].last_step = step;
             let env = self.env(step);
             let (fronts, fired) =
@@ -919,6 +954,77 @@ mod tests {
             .filter(|s| s.orogeny == OROGENY_HIMALAYAN)
             .count();
         assert!(stamped > 50, "{stamped}");
+    }
+
+    /// The collision's footprint is marked for the structure stage (plate task 6): the belt
+    /// behind the front, the wedge and the foreland on the incoming plate carry the convergence
+    /// across the front and the collision's shortening so far; the incoming plate beyond the
+    /// wedge's toe, within the basin's reach, is flagged as foreland; nothing farther is marked.
+    #[test]
+    fn a_collision_marks_its_footprint() {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+        for step in 1..=8 {
+            fx.step(&mut st, step, None);
+        }
+        let col = st.contacts[0].collision.clone().expect("in collision");
+        assert!(col.convergence_mm_yr > 10.0 && col.shortening_km > 50.0);
+        let belt_km = fx.preset.tectonics.collision_belt_km;
+        let spacing = fx.norm.km(fx.norm.spacing_rad());
+        let wedge_km = col.belt.wedge_km;
+        let pts = fx.geo.points();
+        let (mut in_belt, mut in_foreland, mut in_wedge) = (0, 0, 0);
+        for (i, s) in st.samples.iter().enumerate() {
+            let p = pts[i];
+            // Inside the continental cap, away from its corners.
+            if !arc(p) || p.y < 0.95 {
+                continue;
+            }
+            let x = fx.norm.km(p.x.asin());
+            let marked = s.collision_mm_yr > 0.0;
+            let foreland = s.flags & FORELAND != 0;
+            if x < 0.0 && -x < belt_km - spacing {
+                // The belt on the overriding plate.
+                assert!(marked && !foreland, "belt sample at {x} km: {s:?}");
+                in_belt += 1;
+            } else if x < 0.0 && -x > belt_km + spacing {
+                assert!(
+                    !marked && !foreland,
+                    "overriding plate beyond the belt at {x} km"
+                );
+            } else if x >= 0.0 && x < wedge_km - spacing {
+                assert!(marked && !foreland, "wedge sample at {x} km");
+                in_wedge += 1;
+            } else if x > wedge_km + spacing && x < wedge_km + FOREDEEP_REACH_KM - spacing {
+                assert!(marked && foreland, "foreland sample at {x} km: {s:?}");
+                in_foreland += 1;
+            } else if x > wedge_km + FOREDEEP_REACH_KM + spacing {
+                assert!(
+                    !marked && !foreland,
+                    "incoming plate beyond the reach at {x} km"
+                );
+            }
+            if marked {
+                assert!(
+                    (f64::from(s.collision_mm_yr) - col.convergence_mm_yr.max(0.0)).abs() < 1e-3,
+                    "{} against {}",
+                    s.collision_mm_yr,
+                    col.convergence_mm_yr
+                );
+                assert!(
+                    (f64::from(s.shortening_km) - col.shortening_km).abs()
+                        < 1e-3 * col.shortening_km,
+                    "{} against {}",
+                    s.shortening_km,
+                    col.shortening_km
+                );
+            }
+        }
+        assert!(
+            in_belt > 3 && in_foreland > 10,
+            "{in_belt} {in_wedge} {in_foreland}"
+        );
     }
 
     /// The crust that stacks is the crust that crossed the front: the volume added is the
