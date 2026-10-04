@@ -524,3 +524,86 @@ is written from the mathematics in §1. So nothing is added to NOTICE.md.
    at the spike until the projection survey settles the layout?**
    - The engine takes any layout of translations, half-turns and quarter-turns, so the survey does not
      block Phase 1.
+
+## 9. The engine's API (Phase 1; stable)
+
+Settled 2026-10-04 on branch `worktree-agent-a4445c63094be0023` (Phase 1). Adapters (Create, Sable,
+Distant Horizons) and the rest of Deep Time use only what this section lists. A change to it is
+announced here first. Package `com.minecraftindustrialcomplex.deeptime.wrapengine` (the spike's
+`wrapspike` package is gone; the old `wrap` package is unrelated: Toroidal World's pole cap and
+planet shape).
+
+### 9.1 Switching it on
+
+- **The flag.** `-Ddeeptime.wrapengine=true` (`WrapEngine.FLAG`, `WrapEngine.enabled()`). Without it
+  the engine's mixins (`mixin.wrapengine.*`, `deeptime.wrapengine.mixins.json`) are not woven,
+  `WrapEngine.init()` registers nothing, `topology(level)` is null and `install` throws. The shipped
+  default is off.
+- **A level.** `WrapEngine.install(ServerLevel, WrapTopology)` on the server thread; `null` removes
+  it. The topology must be chunk-aligned (`WrapTopology.isChunkAligned()`). Folded access starts at
+  once; loaded band chunks are copied within a few ticks.
+- **Tests.** `./gametest.sh -PwrapEngine` runs namespaces `deeptime_wrapengine` and
+  `deeptime_wrapbench` with the flag; `./gametest.sh -PwrapBench` runs the benchmark alone without
+  it (the baseline).
+
+### 9.2 Topology types (pure integer code, no Minecraft types)
+
+| Type | What it is |
+|---|---|
+| `CellIsometry(quarterTurns, tx, tz)` | A grid motion: k clockwise quarter-turns (seen from above; one takes north to east, as `Rotation.CLOCKWISE_90`), then a translation. `applyX/applyZ(x, z)` move a block cell (allocation-free), `applyPoint` an entity position, `applyVector` a heading or velocity; `compose`, `inverse`, `yawDegrees()`, `mapsChunksToChunks()`. Factories `translation`, `halfTurnAbout(a, b)`, `quarterTurnAbout(k, a, b)` (about a block corner). |
+| `WrapEdge(name, normalX, minSide, coord, spanLo, spanHi, depth, iso)` | One edge: the line `coord` across x (`normalX`) or z, beyond it the low or high side, over the span, `depth` blocks out (the band); `iso` maps beyond → inside. Spans and depth are finite. |
+| `WrapTopology(name, edges)` | The edge table. `fold(x, z)` → `Fold(x, z, iso)` (the stored block and the motion band → stored) or null; `foldPoint(x, z)` → `PointFold`; `images(x, z)` (every band block showing a stored block); `inside(x, z)`; `mayFold(x, z)` (the fast-path test, false = certainly not folded); `chunkFold(cx, cz)` → `ChunkFold(sourceX, sourceZ, iso)` or null; `chunkImages(cx, cz)` (motions stored → band); `forEachBandChunk`; `union`. Immutable, thread-safe. |
+| `WrapLayouts` | `halfTurnSeam`, `quarterTurnCorner` (bounded, for tests), `guyou(h, depth, slides)`, `peirce(a, depth)`, `cubeCross(s, depth, slides)` and `cubeCrossCorners(s)`. `slides = false` leaves the east–west translation to Toroidal World (Ben, 2026-10-03, "TW slides, engine turns"). |
+
+### 9.3 Queries on a level (`WrapEngine`, static)
+
+| Method | Returns |
+|---|---|
+| `topology(Level)` | The installed topology or null (always null on the client and without the flag). |
+| `fold(Level, BlockPos)` | `Folded(pos, iso)`: the stored position and the motion band → stored, with `toStored()` (the `Rotation` a state takes into the stored frame, for a write) and `toBand()` (for a read); null when the position is not in a band. |
+| `canonical(Level, BlockPos)` | The stored position, or the position itself. **Compare canonical positions** when deciding whether two positions are the same block (multiblocks, networks, caches). |
+| `isBandChunk(Level, cx, cz)`, `isBandSynced(ServerLevel, cx, cz)` | Whether a chunk is a band chunk; whether its copy is current. |
+| `rawState(Level, BlockPos)` | Chunk storage, bypassing the fold (what collisions and the client see). |
+| `rotation(iso)`, `apply(iso, BlockPos)`, `turn(iso, Direction)`, `applyPoint(iso, Vec3)`, `applyVector(iso, Vec3)` | Motions on Minecraft types. |
+| `stats(ServerLevel)` | The band manager's counters, for logs. |
+
+### 9.4 What folded access guarantees (the behaviour adapters rely on)
+
+At a position `p` in a band, with `f = fold(level, p)`:
+
+- `level.getBlockState(p)` is the stored state turned into the band's frame (`toBand()`).
+- `level.getFluidState(p)` is the stored fluid (fluid states do not turn).
+- `level.getBlockEntity(p)` is the **stored** block entity; its `getBlockPos()` is `f.pos()`, not `p`.
+  `removeBlockEntity(p)` removes it.
+- `level.setBlock(p, s, …)` stores `s.rotate(toStored())` at `f.pos()`; the shape and neighbour
+  updates run there.
+- A neighbour update addressed to `p` (`BlockStateBase.handleNeighborChanged`) runs on the stored
+  block at `f.pos()`, with the source position moved by the same motion.
+- Scheduled ticks for `p` (`schedule`, `hasScheduledTick`, `willTickThisTick`) are kept at `f.pos()`.
+  No scheduled tick, random tick, natural spawn or generation post-processing ever runs in a band
+  chunk.
+- `LevelChunk.setBlockState` on a band chunk (a mod writing chunk storage) is redirected to the stored
+  block, turned (server thread; off it, the write stays and the chunk is re-copied when it reloads).
+- A band chunk's storage holds turned copies: read-only pictures. Collisions, light, heightmaps and
+  chunk packets read them.
+- **Not folded:** `isLoaded`/`hasChunkAt` and `getChunk`/`getChunkAt` (they answer for the band chunk
+  itself), `blockEvent`, `levelEvent`, `playSound`, `gameEvent`, explosions' entity knock-back,
+  `setBlockEntity` with a band position (never do this), and `Level.getBlockEntity` off the server
+  thread (null, as in vanilla).
+
+**Directions across a seam.** Logic at stored position `a` that looks at its neighbour
+`q = a.relative(d)` and finds `q` in a band sees the neighbour's state already turned into its own
+frame, so most code needs nothing. Code that follows a network into the neighbour and continues from
+its stored position must turn its direction too: the neighbour is at `f.pos()` and the direction `d`
+becomes `turn(f.iso(), d)` there (for a half-turn, east becomes west). Kinetic speed signs that depend
+on axis direction flip under a half-turn.
+
+### 9.5 Entities
+
+- After each server level tick, every root entity (riding nothing) whose position is beyond an edge
+  is carried to `foldPoint`: yaw, head and body turned by `iso.yawDegrees()`, velocity by the turn,
+  passengers turned with it and re-seated, a mob's path stopped. A player is sent a teleport and its
+  motion.
+- `WrapCrossingEvent` (NeoForge bus, server thread, cancellable) is posted first: `level()`,
+  `entity()`, `iso()`, `from()`, `to()`. Cancel it to carry the entity yourself (contraptions, Sable
+  bodies); the engine asks again next tick while the entity is still beyond the edge.

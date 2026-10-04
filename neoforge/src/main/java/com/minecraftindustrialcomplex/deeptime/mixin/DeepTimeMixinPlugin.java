@@ -19,8 +19,8 @@ import java.util.Set;
  *       is installed (COE, CDG, TerraBlender, ...).</li>
  *   <li>A mixin in {@code mixin.gametest} applies only with {@code -Ddeeptime.gametest=true},
  *       so test-only fixes never reach a player's game.</li>
- *   <li>A mixin in {@code mixin.wrapspike} (the wrap-engine spike) applies only with
- *       {@code -Ddeeptime.wrapspike=true}.</li>
+ *   <li>A mixin in {@code mixin.wrapengine} (the wrap engine, docs/design/wrap-engine.md) applies
+ *       only with {@code -Ddeeptime.wrapengine=true}.</li>
  *   <li>Everything else always applies.</li>
  * </ul>
  *
@@ -31,7 +31,7 @@ public class DeepTimeMixinPlugin implements IMixinConfigPlugin {
 
     private static final String COMPAT = "com.minecraftindustrialcomplex.deeptime.mixin.compat.";
     private static final String GAMETEST = "com.minecraftindustrialcomplex.deeptime.mixin.gametest.";
-    private static final String WRAPSPIKE = "com.minecraftindustrialcomplex.deeptime.mixin.wrapspike.";
+    private static final String WRAPENGINE = "com.minecraftindustrialcomplex.deeptime.mixin.wrapengine.";
 
     private static final Logger LOGGER = LoggerFactory.getLogger("deeptime");
 
@@ -45,11 +45,12 @@ public class DeepTimeMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        if (mixinClassName.startsWith(WRAPSPIKE)) {
-            // The wrap-engine spike (docs/design/wrap-engine.md): never in a player's game.
-            boolean on = Boolean.getBoolean("deeptime.wrapspike");
+        if (mixinClassName.startsWith(WRAPENGINE)) {
+            // The wrap engine (docs/design/wrap-engine.md): dev only until Ben switches it on. Mixin
+            // bootstrap must not load WrapEngine, so the flag is read here again.
+            boolean on = Boolean.getBoolean("deeptime.wrapengine");
             if (on)
-                LOGGER.warn("Applying wrap-engine SPIKE mixin {} (-Ddeeptime.wrapspike=true)", mixinClassName);
+                LOGGER.warn("Applying wrap-engine mixin {} (-Ddeeptime.wrapengine=true)", mixinClassName);
             return on;
         }
         if (mixinClassName.startsWith(GAMETEST)) {

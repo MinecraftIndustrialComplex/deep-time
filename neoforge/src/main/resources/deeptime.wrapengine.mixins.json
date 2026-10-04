@@ -1,13 +1,16 @@
 {
   "required": true,
   "minVersion": "0.8",
-  "package": "com.minecraftindustrialcomplex.deeptime.mixin.wrapspike",
+  "package": "com.minecraftindustrialcomplex.deeptime.mixin.wrapengine",
   "compatibilityLevel": "JAVA_21",
   "plugin": "com.minecraftindustrialcomplex.deeptime.mixin.DeepTimeMixinPlugin",
   "mixins": [
     "LevelWrapMixin",
+    "LevelChunkWrapMixin",
     "LevelTicksWrapMixin",
-    "BlockStateBaseWrapMixin"
+    "BlockStateBaseWrapMixin",
+    "ServerLevelWrapMixin",
+    "NaturalSpawnerWrapMixin"
   ],
   "injectors": {
     "defaultRequire": 1
