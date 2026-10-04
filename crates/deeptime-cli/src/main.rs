@@ -20,6 +20,7 @@ mod structure_view;
 mod synth;
 mod volcano_view;
 mod watch;
+mod world_map;
 
 use std::net::IpAddr;
 use std::path::PathBuf;
@@ -461,6 +462,19 @@ enum Command {
         #[arg(long)]
         columns: bool,
         /// The .npy file to write (and <out>.json).
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Whole-world pictures of a baked world-data folder in the world's own block space
+    /// (satellite.png, provinces.png with the layout's cone points and poles, world-map.json).
+    WorldMap {
+        /// World-data folder.
+        #[arg(long)]
+        world_data: PathBuf,
+        /// The satellite picture's zoom: 2^(z+1) × 2^z tiles of 256 pixels.
+        #[arg(long, default_value_t = 2)]
+        zoom: u32,
+        /// Folder to write into.
         #[arg(long)]
         out: PathBuf,
     },
@@ -1045,6 +1059,24 @@ fn main() -> ExitCode {
                 }
             }
         }
+        Some(Command::WorldMap {
+            world_data,
+            zoom,
+            out,
+        }) => match world_map::run(&world_data, zoom, &out) {
+            Ok(v) => {
+                println!(
+                    "deeptime world-map: {} pixels -> {}",
+                    v["pixels"],
+                    out.display()
+                );
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("deeptime world-map: {e}");
+                ExitCode::FAILURE
+            }
+        },
         Some(Command::Heightmap {
             world_data,
             area,
