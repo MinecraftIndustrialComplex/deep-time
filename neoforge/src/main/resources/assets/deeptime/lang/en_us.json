@@ -179,6 +179,8 @@
   "deeptime.editor.field.rain_wind": "Rain carried by the wind",
   "deeptime.editor.field.rain_recycling": "Rain recycled by land",
   "deeptime.editor.field.sea_humidity": "Humidity over the sea",
+  "deeptime.editor.field.summer_highs": "Summer winds round the ocean highs",
+  "deeptime.editor.field.east_coast_rain": "East-coast subtropical rain",
   "deeptime.editor.field.ocean_gyres": "Ocean gyres",
   "deeptime.editor.field.ocean_overturning": "Ocean overturning",
   "deeptime.editor.field.ocean_mixing": "Ocean mixing",

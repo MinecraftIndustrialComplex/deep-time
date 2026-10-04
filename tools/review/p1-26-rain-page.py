@@ -200,6 +200,7 @@ def main():
     if ens and os.path.exists(ens):
         ens_html = f"<h2>12-run ensemble (planets, not Earth)</h2><pre>{html.escape(open(ens).read())}</pre>"
     note_html = open(note).read() if note and os.path.exists(note) else ""
+    proj = meta.get("projection") or "rows from north to south, as the run's meta.json lists their latitudes"
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -222,9 +223,9 @@ pre {{ overflow-x:auto; font-size:12px; }}
 </style></head><body>
 <h1>Deep Time rain review (P1-26 T9 and T10)</h1>
 <p>Earth's relief (GMT earth_relief_30m_p) run through <code>deeptime climate-dem</code> on the planet's
-equal-area grid (720 × 240), each rain model against Beck et al. 2018's Köppen classes and Beck et al. 2023's
-1961–1990 monthly temperature and rain (CC BY 4.0), resampled onto the same grid. Maps are the equal-area
-projection: rows are uniform in the sine of latitude.</p>
+grid ({w} × {h} cells, {proj}), each rain model against Beck et al. 2018's Köppen classes and Beck et al. 2023's
+1961–1990 monthly temperature and rain (CC BY 4.0), resampled onto the same grid. The maps are drawn on that
+grid as it is, one pixel per cell.</p>
 {note_html}
 <h2>Numbers</h2>
 <table><tr><th></th>{head}</tr>{''.join(body)}</table>

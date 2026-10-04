@@ -128,6 +128,87 @@ impl Mesh {
     pub fn cells(&self) -> usize {
         self.area_m2.len()
     }
+
+    /// `x` smoothed over a length `l_m`: the solution of (1 − l² ∇²) y = x on the mesh (a
+    /// screened Poisson kernel, decaying as e^(−r/l)), by Gauss–Seidel. Area-weighted sums are
+    /// kept: Σ A y = Σ A x.
+    pub fn smooth(&self, x: &[f64], l_m: f64) -> Vec<f64> {
+        let n = self.cells();
+        let mut nb: Vec<Vec<(usize, f64)>> = vec![Vec::new(); n];
+        for f in &self.faces {
+            let g = l_m * l_m * f.len_m / f.dist_m.max(1e-300);
+            nb[f.a].push((f.b, g));
+            nb[f.b].push((f.a, g));
+        }
+        let diag: Vec<f64> = (0..n)
+            .map(|c| self.area_m2[c] + nb[c].iter().map(|(_, g)| g).sum::<f64>())
+            .collect();
+        let mut y = x.to_vec();
+        for _ in 0..2000 {
+            let (mut worst, mut big) = (0.0f64, 1e-300f64);
+            for c in 0..n {
+                let r: f64 = nb[c].iter().map(|&(o, g)| g * y[o]).sum();
+                let ny = (self.area_m2[c] * x[c] + r) / diag[c];
+                worst = worst.max((ny - y[c]).abs());
+                big = big.max(ny.abs());
+                y[c] = ny;
+            }
+            if worst <= 1e-10 * big {
+                break;
+            }
+        }
+        y
+    }
+}
+
+/// How far the highs' flow reaches inland, m: about the Rossby radius of deformation in the
+/// subtropics (from memory).
+pub const HIGHS_REACH_M: f64 = 1.0e6; // ledger: CLM-201
+/// The share of sea within the reach below which the highs' flow fades inland.
+const HIGHS_SEA_MIN: f64 = 0.25; // game-choice: where the flow fades over a continent
+
+/// The summer flow round the subtropical highs, m/s northward per cell and month: poleward under
+/// a sea basin's western side and equatorward under its eastern side (`basin` the cells' basin
+/// position in [−1, 1], east positive, over their sea; `sea` their sea share), carried over the
+/// coasts by the mesh's smoothing over [`HIGHS_REACH_M`], weighted by the subtropics of the
+/// month's belt latitude (`shift[m]` the belts' seasonal shift, `shift_max` its largest) and by
+/// how much the month is the hemisphere's summer. Only the direction north–south is used, so any
+/// grid whose cells have an east–north basis works.
+pub fn highs_flow(
+    mesh: &Mesh,
+    lat_deg: &[f64],
+    basin: &[f64],
+    sea: &[f64],
+    speed_m_s: f64,
+    shift: &[f64; 12],
+    shift_max: f64,
+) -> Vec<[f64; 12]> {
+    let n = mesh.cells();
+    if speed_m_s <= 0.0 {
+        return vec![[0.0; 12]; n];
+    }
+    let num = mesh.smooth(
+        &(0..n).map(|c| -basin[c] * sea[c]).collect::<Vec<_>>(),
+        HIGHS_REACH_M,
+    );
+    let den = mesh.smooth(sea, HIGHS_REACH_M);
+    let west: Vec<f64> = (0..n)
+        .map(|c| (num[c] / den[c].max(HIGHS_SEA_MIN)).clamp(-1.0, 1.0))
+        .collect();
+    (0..n)
+        .map(|c| {
+            let phi = lat_deg[c];
+            std::array::from_fn(|m| {
+                let summer = if shift_max > 0.0 {
+                    (phi.signum() * shift[m] / shift_max).clamp(0.0, 1.0)
+                } else {
+                    0.5
+                };
+                let s = super::belts::subtropics(phi - shift[m]);
+                speed_m_s * phi.signum() * west[c] * s * summer
+            })
+        })
+        .collect()
 }
 
 /// What the budget needs of one month, per cell.
@@ -538,7 +619,24 @@ pub fn rain(
     let g = inp.grid;
     let n = g.w * g.h;
     let mesh = Mesh::from_grid(g, mp.radius_m);
-    let (u, v, _itcz) = super::moisture::winds(mp, g, inp.land, inp.t_land, inp.t_ocean);
+    let (u, mut v, _itcz) = super::moisture::winds(mp, g, inp.land, inp.t_land, inp.t_ocean);
+    let lat: Vec<f64> = (0..n).map(|c| g.lat_c(c / g.w)).collect();
+    let sea: Vec<f64> = inp.land.iter().map(|x| 1.0 - x.clamp(0.0, 1.0)).collect();
+    let shift_max = mp.hemi_shift.iter().fold(0.0f64, |a, b| a.max(b.abs()));
+    let highs = highs_flow(
+        &mesh,
+        &lat,
+        inp.basin,
+        &sea,
+        p.rain_highs_m_s,
+        &mp.hemi_shift,
+        shift_max,
+    );
+    for (vc, hc) in v.iter_mut().zip(&highs) {
+        for (a, b) in vc.iter_mut().zip(hc) {
+            *a += b;
+        }
+    }
     let k = Constants {
         k_q: p.rain_diffusivity_m2_s,
         tau_f_s: TAU_F_S,
@@ -830,6 +928,54 @@ mod tests {
         let half: Vec<[f64; 1]> = (0..n).map(|c| [if c < 30 { 1.0 } else { 0.0 }]).collect();
         let t = tracers(&mesh, &k, &mo, &s, &half);
         assert!(t[62][0] < 0.2 && t[20][0] > 0.5, "{} {}", t[62][0], t[20][0]);
+    }
+
+    #[test]
+    fn smoothing_keeps_the_water_and_spreads_over_its_length() {
+        let n = 200;
+        let mesh = ring(n);
+        let x: Vec<f64> = (0..n).map(|c| if c == 100 { 1.0 } else { 0.0 }).collect();
+        let y = mesh.smooth(&x, 300_000.0);
+        let (sx, sy): (f64, f64) = (x.iter().sum(), y.iter().sum());
+        assert!((sx - sy).abs() < 1e-6, "{sx} {sy}");
+        // Symmetric, decaying about e^(−r/l) (l = 3 cells).
+        assert!((y[97] - y[103]).abs() < 1e-9);
+        let r = y[106] / y[103];
+        assert!((r / (-1.0f64).exp() - 1.0).abs() < 0.25, "{r}");
+        let c = mesh.smooth(&vec![2.0; n], 300_000.0);
+        assert!(c.iter().all(|v| (v - 2.0).abs() < 1e-6));
+    }
+
+    #[test]
+    fn the_highs_blow_poleward_on_a_basins_west_side_in_summer() {
+        // One row at 30° N: land on cells 0..40, then a sea basin 40..200 (west side −1, east
+        // side +1), the ring wrapping its east coast back onto the land's west coast.
+        let n = 200;
+        let mesh = ring(n);
+        let lat = vec![30.0; n];
+        let sea: Vec<f64> = (0..n).map(|c| if c < 40 { 0.0 } else { 1.0 }).collect();
+        let basin: Vec<f64> = (0..n)
+            .map(|c| if c < 40 { 0.0 } else { (c as f64 - 120.0) / 80.0 })
+            .collect();
+        let mut shift = [0.0f64; 12];
+        for (m, s) in shift.iter_mut().enumerate() {
+            *s = 5.0 * (std::f64::consts::PI * (m as f64 - 2.5) / 6.0).sin();
+        }
+        let v = highs_flow(&mesh, &lat, &basin, &sea, 4.0, &shift, 5.0);
+        let (jul, jan) = (6, 0);
+        assert!(v[50][jul] > 1.0, "{}", v[50][jul]);
+        assert!(v[190][jul] < -1.0, "{}", v[190][jul]);
+        assert!(v[50][jan].abs() < 1e-12 && v[190][jan].abs() < 1e-12);
+        // The east coast of the land (cell 39) gets the western side's poleward flow; it fades
+        // far inland (the middle of the 40-cell continent, 2,000 km from either coast).
+        assert!(v[39][jul] > 0.5 * v[50][jul], "{} {}", v[39][jul], v[50][jul]);
+        assert!(v[20][jul].abs() < 0.2 * v[39][jul], "{}", v[20][jul]);
+        // The southern hemisphere's summer flow is poleward too (southward).
+        let s = highs_flow(&mesh, &vec![-30.0; n], &basin, &sea, 4.0, &shift, 5.0);
+        assert!(s[50][jan] < -1.0, "{}", s[50][jan]);
+        // Off: none.
+        let z = highs_flow(&mesh, &lat, &basin, &sea, 0.0, &shift, 5.0);
+        assert!(z.iter().all(|m| m.iter().all(|&x| x == 0.0)));
     }
 
     #[test]

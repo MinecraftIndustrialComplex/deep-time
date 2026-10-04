@@ -44,7 +44,8 @@ Each model cell takes the observed 0.5° cell under its centre; land is where bo
 - brest_vladivostok_jan_k, yakutsk_jan_c: January temperature (the lapse rate applied).
 - mumbai_mm, dhaka_mm, sahara_mm, atacama_mm: annual precipitation (the Sahara 20–28° N,
   0–25° E and the Atacama 20–27° S, 71–69° W, means over their land cells).
-- places_same / places_group: the reference cities `climate-dem` prints (its log).
+- places_same / places_group: the reference cities `climate-dem` prints (its log);
+  places_group_station: the same with each cell's months taken to its city's station height.
 """
 import json
 import os
@@ -289,6 +290,10 @@ def main():
                 same += m.group(2) == "same"
                 grp += m.group(2) in ("same", "group")
         out["places_same"], out["places_group"] = same, grp
+        for line in open(log):
+            m = re.search(r"at their stations' heights: (\d+) of", line)
+            if m:
+                out["places_group_station"] = int(m.group(1))
     if od:
         obs_metrics(out, od, lat1, w, h, land, wgt, k, codes, t_sl, p, z)
     pc = meta.get("per_cell") or {}
