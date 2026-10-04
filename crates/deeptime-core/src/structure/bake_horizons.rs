@@ -448,7 +448,8 @@ impl Horizons {
                         for li in lattice(i) {
                             let il = li * step;
                             // smooth_axis_weight((il − i) as f64, σ) · (the same along z).
-                            let g = axis[(il - i + reach) as usize] * axis[(jl - j + reach) as usize];
+                            let g =
+                                axis[(il - i + reach) as usize] * axis[(jl - j + reach) as usize];
                             if g <= 0.0 {
                                 continue;
                             }
@@ -1344,7 +1345,11 @@ mod tests {
         for c in 0..hz.cells() {
             hz.heights_at_sorted(c, &ss, &mut out);
             for (&s, &y) in ss.iter().zip(&out) {
-                assert_eq!(y.to_bits(), hz.height_at(c, s).to_bits(), "cell {c} key {s}");
+                assert_eq!(
+                    y.to_bits(),
+                    hz.height_at(c, s).to_bits(),
+                    "cell {c} key {s}"
+                );
             }
         }
     }
