@@ -28,6 +28,14 @@ impl MemoryGauge for Gauge {
     fn peak(&self) -> u64 {
         alloc::peak()
     }
+    fn phase(&self, _name: &str, begin: bool) {
+        if begin {
+            alloc::start_window();
+        }
+    }
+    fn phase_peak(&self) -> u64 {
+        alloc::window_peak()
+    }
 }
 
 /// `deposits::recorded_tests`' small coupled planet (here 512 × 164 L1 cells) over 100 Myr, recording a

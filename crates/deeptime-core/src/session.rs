@@ -102,6 +102,13 @@ pub trait MemoryGauge: Send + Sync {
     /// A stage asked for room: `needed` = bytes in use + bytes reserved, `granted` whether it fit
     /// (after any history spill). For the trace; the default does nothing.
     fn reserved(&self, _needed: u64, _granted: bool) {}
+    /// The highest `in_use` since the current phase began. The session learns from it how much
+    /// a stage's step holds beyond what it reserved, and makes that room before the stage's next
+    /// step. A gauge that does not track phases returns `in_use` (the session then learns
+    /// nothing).
+    fn phase_peak(&self) -> u64 {
+        self.in_use()
+    }
 }
 
 /// A gauge that reports nothing allocated.
@@ -287,6 +294,11 @@ struct Stepper {
     /// its own.
     last_kf_t: Option<(f64, usize)>,
     timings: Vec<StageTiming>,
+    /// Per stage: the most one of its steps added to the memory in use at its start, reserved or
+    /// not (`MemoryGauge::phase_peak`). Before a stage steps, the history's frames make that much
+    /// room under the cap, so what a stage allocates without reserving it stays within the cap
+    /// from its second step on (memacct, 2026-10-04).
+    working: Vec<u64>,
 }
 
 impl Stepper {
@@ -557,6 +569,7 @@ impl Session {
                 kf_origin,
                 next_kf,
                 last_kf_t: None,
+                working: vec![0; timings.len()],
                 timings,
             }),
             policy,
@@ -736,10 +749,27 @@ impl Session {
                     history: history.as_ref(),
                     needed_peak: Some(&self.needed_peak),
                 };
+                let at_start = self.gauge.in_use();
+                if let Some(h) = &history
+                    && at_start.saturating_add(s.working[k]) > self.mem_cap
+                {
+                    match h.evict(at_start + s.working[k] - self.mem_cap) {
+                        Ok(e) => log_evicted(
+                            &self.log,
+                            &e,
+                            self.gauge.as_ref(),
+                            self.mem_cap,
+                            "the working set of the stage's last step",
+                        ),
+                        Err(e) => return Err(self.fail("spilling the recorded history", e)),
+                    }
+                }
+                let at_start = self.gauge.in_use();
                 let stepped = Instant::now();
                 self.gauge.phase(stage.name(), true);
                 let result = stage.step(&mut s.world, &ctx);
                 self.gauge.phase(stage.name(), false);
+                s.working[k] = s.working[k].max(self.gauge.phase_peak().saturating_sub(at_start));
                 if let Err(e) = result {
                     let what = format!("stage {}", stage.name());
                     return Err(self.fail(&what, e));

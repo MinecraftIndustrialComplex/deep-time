@@ -30,12 +30,15 @@ impl MemoryGauge for Gauge {
     fn peak(&self) -> u64 {
         alloc::peak()
     }
+    fn phase_peak(&self) -> u64 {
+        alloc::window_peak()
+    }
     fn phase(&self, name: &str, begin: bool) {
         if begin {
             alloc::start_window();
             return;
         }
-        let peak = alloc::window_peak().saturating_sub(self.start);
+        let peak = self.phase_peak().saturating_sub(self.start);
         let mut p = self.peaks.lock().unwrap();
         let e = p.entry(name.to_owned()).or_default();
         *e = (*e).max(peak);
