@@ -23,7 +23,8 @@
         [--scenario <name>]       a first-start stop scenario instead of a normal boot (P1-13):
                                   first_start_no_config, first_start_circumference_mismatch or
                                   first_start_native_failure (see SCENARIOS); implies a fresh world
-        [--timeout <s>]           how long to wait for "Done (" (default 1500)
+        [--timeout <s>]           how long to wait for "Done (" (default 5400: a real preset's first-start
+                                  generation took 13-15 min on a busy test VM, P1-13)
 
 Adapted from mic-climate's smoke/run.py (MIT, same author). Standard library only; the JDK and
 mcrcon come from smoke/tools.env, which install.sh resolves out of nixpkgs once.
@@ -82,6 +83,7 @@ PROBE = re.compile(r"\[deeptime-probe\]\s*(\{.*\})")
 # First-start generation (P1-13, FirstStartGenerator's lines).
 GEN_START = re.compile(r"\[deeptime\] generating the world's history")
 GEN_PROGRESS = re.compile(r"\[deeptime\] .* elapsed")
+NATIVE_GIB = re.compile(r"native ([0-9.]+)/([0-9.]+) GiB")
 GEN_DONE = re.compile(r"\[deeptime\] world data written to")
 DATA_PRESENT = re.compile(r"\[deeptime\] world data present at")
 STOPPING = re.compile(r"\[deeptime\] The server stops before creating the world")
@@ -623,9 +625,57 @@ def check_generation(steps, server, install, label=""):
     steps.check(f"{label}generation finished before Done (", "before", "before" if server.done_at and t1 <= server.done_at else "after",
                 bool(server.done_at) and t1 <= server.done_at)
     steps.record(f"{label}generation time (s)", f"{t1 - t0:.1f}")
+    # The native memory the generation held, from the progress lines' "native <in use>/<cap> GiB".
+    in_use = [float(m.group(1)) for l in progress if (m := NATIVE_GIB.search(l))]
+    if in_use:
+        cap = NATIVE_GIB.search(progress[-1]).group(2)
+        steps.record(f"{label}peak native memory (GiB)", f"{max(in_use):.1f} of the {cap} GiB cap",
+                     note="highest progress line, one every 5 s")
     for l in progress[:1] + progress[-1:]:
         steps.record(f"{label}progress line", l.split("[deeptime] ", 1)[-1])
     return t1 - t0
+
+
+# Columns the probes are compared on: the spawn, both sides of the seam (x = +-C/2), mid-latitudes
+# either way and the far side of the planet; fractions of C so the same code serves 16k and 32k.
+PROBE_COLUMNS = [(0.0, 0.0), (0.0625, 0.03), (-0.1875, -0.05), (0.4995, 0.01), (-0.4995, 0.01),
+                 (0.31, -0.12), (-0.42, 0.14), (0.2, 0.2)]
+
+
+def probe_consistency(steps, rcon, server, world_data, size):
+    """`/deeptime probe column` against the world data's own evaluator (P1-13, Phase 1 exit test item 2).
+
+    The probe answers from the Java reader of the bake (`terrainH`, the climate layers); the CLI's
+    `inspect-column --parity` reads the same folder with the Rust reader the bake was written by.
+    Their ground height has to be the same number, and the generator's base height has to sit where
+    the world data says the surface is. Skipped, and recorded as skipped, when the CLI is not built
+    (`install.sh` builds it)."""
+    cli = os.environ.get("DEEPTIME_CLI") or os.path.join(REPO, "target", "release", "deeptime")
+    if not os.path.exists(cli):
+        steps.record("probes agree with the world data", f"skipped: {cli} not built (install.sh builds it)")
+        return
+    bad, rows = [], []
+    for fx, fz in PROBE_COLUMNS:
+        x, z = round(fx * size), round(fz * size)
+        probe, out = probe_json(server, rcon, f"deeptime probe column {x} {z}", wait=0.5)
+        ref = subprocess.run([cli, "inspect-column", "--world-data", world_data, "--parity", str(x), str(z)],
+                             capture_output=True, text=True)
+        if probe is None or ref.returncode != 0:
+            bad.append(f"({x},{z}) no answer: {out[:80] or ref.stderr[:80]}")
+            continue
+        col = json.loads(ref.stdout)
+        h_java, h_rust = probe.get("terrainH"), col.get("elevation")
+        surf_y, top_y = probe.get("surfaceY"), col.get("top_y")
+        # terrainH is the world data's ground height in blocks at the column; the generator's base
+        # height is the integer surface (rounding, the seabed under water: within 2 blocks of top_y).
+        same = h_java is not None and h_rust is not None and abs(h_java - h_rust) <= 0.01
+        near = surf_y is not None and top_y is not None and abs(surf_y - top_y) <= 2
+        rows.append(f"({x},{z}) terrainH {h_java} vs {h_rust}, surfaceY {surf_y} vs top_y {top_y}")
+        if not (same and near):
+            bad.append(rows[-1])
+    steps.check("probe column agrees with the world data (inspect-column)", f"{len(PROBE_COLUMNS)} of {len(PROBE_COLUMNS)}",
+                f"{len(PROBE_COLUMNS) - len(bad)} of {len(PROBE_COLUMNS)}" + (": " + "; ".join(bad)[:400] if bad else ""),
+                not bad, note="; ".join(rows)[:600])
 
 
 # A scenario boots a world without data and expects Deep Time to stop the server before
@@ -770,7 +820,9 @@ def main():
                     help="one more Chunky square of radius R around X,Z (repeatable)")
     ap.add_argument("--restart", action="store_true")
     ap.add_argument("--scenario", choices=sorted(SCENARIOS))
-    ap.add_argument("--timeout", type=int, default=1500)
+    ap.add_argument("--timeout", type=int, default=5400,
+                    help="how long to wait for \"Done (\" (default 5400: a real preset generates on first "
+                         "start, 13-15 min on a busy test VM)")
     ap.add_argument("--dh", action="store_true",
                     help="Distant Horizons far terrain (P3-04; a set with Distant Horizons, e.g. dh or mic): the override "
                          "registers, DH's server-side pregeneration is fed from the world data, and what DH stores agrees "
@@ -870,6 +922,10 @@ def main():
                 jar, declared = declared_mixins(mods_dir, config)
                 steps.record(f"{config}: mixins applied by Done (", f"{len(server.applied(config))} of {len(declared)} declared (the rest target classes not loaded yet)")
             other = sorted({m.group(2) for l in server.lines if (m := MIXING.search(l)) and m.group(2).startswith("toroidal_world.compat.")})
+            compat_applied = sorted(k.rsplit(".", 1)[-1] for k in server.applied("deeptime.mixins.json") if ".compat." in k)
+            steps.record("Deep Time compat mixins applied (COE, CDG, EV, TerraBlender)", ", ".join(compat_applied) or "none")
+            steps.record("Deep Time's Distant Horizons guard mixins applied (deeptime.tw_dh.mixins.json)",
+                         ", ".join(sorted(k.rsplit(".", 1)[-1] for k in server.applied("deeptime.tw_dh.mixins.json"))) or "none")
             steps.record("Toroidal World compat configs that applied", ", ".join(other) or "none")
 
             if is_planet:
@@ -903,6 +959,9 @@ def main():
                     steps.check("every rock class resolves", f"{pal.get('count')} of {pal.get('count')}",
                                 f"{pal.get('resolved')} of {pal.get('count')}", pal.get("resolved") == pal.get("count"),
                                 note=f"sources {pal.get('sources')}; written to smoke/{a.profile}/palette.json")
+
+            if is_planet and os.path.isdir(os.path.join(world, "deeptime")):
+                probe_consistency(steps, rcon, server, os.path.join(world, "deeptime"), install["size"])
 
             if is_planet:
                 out = rcon("locate structure #minecraft:village", check=False)
