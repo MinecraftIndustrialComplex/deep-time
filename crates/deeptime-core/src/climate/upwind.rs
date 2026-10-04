@@ -22,13 +22,20 @@
 //!   W_v/W_ref), the near-surface air's humidity taken as h_s q_s at the reference column W_ref =
 //!   r_ref W_sat(T̄, z) and in proportion to the column's water (linear in W_v, so the system stays
 //!   linear and the evaporation is what keeps the sea's air moist).
-//! - **Where the air rains.** The circulation's ascent and descent (the ITCZ, the subtropical
-//!   highs, the storm tracks; `belts::belt_precip` of the belt latitude, the subsidence on the
-//!   east sides of basins, the cold sea's stability) set how fast a column at the reference water
-//!   W_ref rains, P_ref. The condensation time follows from the local balance P = W_v P_ref/W_ref:
-//!   τ_c = W_ref/P_ref − β τ_f. So the sea's air rains about the belt's rain, and air carried
-//!   inland rains in proportion to the water it still holds: the drying is the rain itself,
-//!   and the water closes exactly.
+//! - **Where the air rains.** The circulation (the caller's: the belt rain of the belt latitude,
+//!   drier under the subtropical highs' eastern flanks and wetter under their western ones, the
+//!   cold sea's stability, the plateau factor; `snapshot.rs`) sets how fast a column at the
+//!   reference water W_ref rains, P_ref, averaged over each cell. The condensation time follows
+//!   from the local balance P = W_v P_ref/W_ref: τ_c = W_ref/P_ref − β τ_f. So the sea's air
+//!   rains about the circulation's rain, and air carried inland rains in proportion to the water
+//!   it still holds: the drying is the rain itself, and the water closes exactly. On L1 the
+//!   caller's own circulation rain is multiplied by the cell's P/P_ref (bilinear), so the fine
+//!   pattern stays the circulation's and the amount the budget's.
+//! - **The sea's marks.** Which flank of which basin the air came from decides the subtropical
+//!   highs' subsidence over land, and the sea surface it crossed its stability. The vapour
+//!   carries both as tracers from where it evaporated ([`tracers`]); the land's recycled
+//!   vapour carries neither, so the marks fade inland as the land's own water replaces the
+//!   sea's.
 //! - **Land returns part of its rain** to the air: ε = ET/P from Fu's Budyko curve on the cell's
 //!   annual rain and potential evaporation (the surface stage's), so wet warm land recycles and
 //!   cold or dry land does not.
@@ -215,13 +222,15 @@ fn flow_order(n: usize, faces: &[Face], flux: &[f64]) -> Vec<usize> {
     post
 }
 
-/// Solves one month's budget, starting from `start` (vapour, cloud) when given.
-pub fn solve_month(
-    mesh: &Mesh,
-    k: &Constants,
-    mo: &Month,
-    start: Option<(&[f64], &[f64])>,
-) -> Solved {
+/// The month's transport: per cell the outflow and diffusion on the diagonal, the inflow
+/// neighbours (cell, coefficient), and the upwind-to-downwind order.
+struct Transport {
+    diag: Vec<f64>,
+    inflow: Vec<Vec<(usize, f64)>>,
+    order: Vec<usize>,
+}
+
+fn transport(mesh: &Mesh, k: &Constants, mo: &Month) -> Transport {
     let n = mesh.cells();
     let faces = &mesh.faces;
     // Face volume fluxes (normal wind × length) and diffusive conductances.
@@ -237,7 +246,6 @@ pub fn solve_month(
         .iter()
         .map(|f| k.k_q * f.len_m / f.dist_m.max(1e-300))
         .collect();
-    // Per cell: the transport's diagonal and its inflow neighbours (cell, coefficient).
     let mut diag = vec![0.0f64; n];
     let mut inflow: Vec<Vec<(usize, f64)>> = vec![Vec::new(); n];
     for ((f, &q), &d) in faces.iter().zip(&flux).zip(&cond) {
@@ -253,6 +261,94 @@ pub fn solve_month(
         }
     }
     let order = flow_order(n, faces, &flux);
+    Transport {
+        diag,
+        inflow,
+        order,
+    }
+}
+
+/// Where the vapour of a solved month came from: the mixing ratios of `K` tracers that the sea's
+/// evaporation puts into the air at its cell's values `src` (the land's recycled vapour carries
+/// none, so a tracer of 1 everywhere gives the share of the vapour that evaporated from the sea).
+/// The tracers move with the vapour and leave with its condensation and the mountains' sink
+/// (cloud water that evaporates again gives them back), the same upwind finite volumes as the
+/// vapour; with no recycling and a tracer of 1 everywhere the ratio is 1 everywhere (a test).
+pub fn tracers<const K: usize>(
+    mesh: &Mesh,
+    k: &Constants,
+    mo: &Month,
+    s: &Solved,
+    src: &[[f64; K]],
+) -> Vec<[f64; K]> {
+    let n = mesh.cells();
+    let Transport {
+        diag,
+        inflow,
+        order,
+    } = transport(mesh, k, mo);
+    // Each cell's loss per unit vapour and its source of tracer mass.
+    let mut dd = vec![0.0f64; n];
+    let mut sv = vec![[0.0f64; K]; n];
+    for c in 0..n {
+        let a = mesh.area_m2[c];
+        let (w, kc) = (s.w_v[c], mo.k_c[c]);
+        let wr = mo.w_ref[c].max(1e-9);
+        let cond = kc * w * (k.rh_gain * (w / wr - 1.0)).min(30.0).exp();
+        let back = k.beta * kc * s.w_c[c];
+        let loss = if w > 1e-12 {
+            ((cond - back) / w).max(0.0) + mo.k_s[c]
+        } else {
+            0.0
+        };
+        dd[c] = diag[c] + a * loss;
+        let e = a * s.e_sea[c].max(0.0);
+        sv[c] = src[c].map(|x| e * x);
+    }
+    let mut t = vec![[0.0f64; K]; n];
+    for it in 0..4000u32 {
+        let fwd = it % 2 == 0;
+        let (mut worst, mut big) = (0.0f64, 1e-30f64);
+        for idx in 0..n {
+            let c = if fwd { order[idx] } else { order[n - 1 - idx] };
+            let mut r = sv[c];
+            for &(o, coef) in &inflow[c] {
+                for (rk, tk) in r.iter_mut().zip(&t[o]) {
+                    *rk += coef * tk;
+                }
+            }
+            let nt = r.map(|x| x / dd[c].max(1e-300));
+            for (a, b) in nt.iter().zip(&t[c]) {
+                worst = worst.max((a - b).abs());
+                big = big.max(a.abs());
+            }
+            t[c] = nt;
+        }
+        if worst <= 1e-9 * big {
+            break;
+        }
+    }
+    (0..n)
+        .map(|c| {
+            let w = s.w_v[c];
+            t[c].map(|x| if w > 1e-12 { x / w } else { 0.0 })
+        })
+        .collect()
+}
+
+/// Solves one month's budget, starting from `start` (vapour, cloud) when given.
+pub fn solve_month(
+    mesh: &Mesh,
+    k: &Constants,
+    mo: &Month,
+    start: Option<(&[f64], &[f64])>,
+) -> Solved {
+    let n = mesh.cells();
+    let Transport {
+        diag,
+        inflow,
+        order,
+    } = transport(mesh, k, mo);
     let inv_f = 1.0 / k.tau_f_s;
     let (mut wv, mut wc) = match start {
         Some((a, b)) if a.len() == n && b.len() == n => (a.to_vec(), b.to_vec()),
@@ -357,7 +453,7 @@ const TAU_C_MIN_S: f64 = 3600.0; // game-choice: numerical floor, not a physical
 /// snapshot's first pass), about Earth's land ET/P.
 const EPS_START: f64 = 0.6; // ledger: CLM-197
 /// Fu's potential evaporation stand-in, mm/yr per °C of annual mean (the surface stage's).
-const PET_MM_PER_C: f64 = 60.0;
+const PET_MM_PER_C: f64 = 60.0; // ledger: HYD-029
 const YEAR_S: f64 = 365.25 * 86_400.0;
 
 /// What the upwind rain needs of the snapshot's coarse climate (rows north first on the coarse
@@ -371,14 +467,14 @@ pub struct ClimateIn<'a> {
     pub t_land: &'a [[f64; 12]],
     pub t_ocean: &'a [[f64; 12]],
     pub sea_ice: &'a [[f64; 12]],
-    /// The month's hemispheric shift of the belts, degrees.
-    pub hemi: [f64; 12],
+    /// The circulation's rain at the reference water, kg/m²/s, per cell and month (the caller's
+    /// belts, subsidence and stability, averaged over the cell).
+    pub p_ref: &'a [[f64; 12]],
     /// The sea's position across its basin (`belts::basin_position`, mean over the cell's sea)
-    /// and the sea tile's departure from its row's mean, °C.
+    /// and its sea surface's departure from its row's sea, °C: what the vapour carries inland
+    /// as tracers of where it evaporated.
     pub basin: &'a [f64],
     pub dsst: &'a [f64],
-    /// The hydrological cycle's scaling with the global temperature (`snapshot::hydro_ln`).
-    pub hydro: f64,
     /// The lapse rate, °C/m.
     pub lapse: f64,
     /// The mountains' rain at the reference water, kg/m²/s per cell and month (the snapshot's
@@ -400,6 +496,11 @@ pub struct Rain {
     /// The winds, m/s (east, north).
     pub u: Vec<[f64; 12]>,
     pub v: Vec<[f64; 12]>,
+    /// The basin position and the sea-surface departure the vapour carries (mixing ratios: the
+    /// sea's values times the share of the vapour that evaporated from the sea), per cell and
+    /// month.
+    pub basin_air: Vec<[f64; 12]>,
+    pub dsst_air: Vec<[f64; 12]>,
     /// Annual rain per cell, mm/yr, and the land's recycled share ε used.
     pub annual_mm: Vec<f64>,
     pub eps: Vec<f64>,
@@ -414,6 +515,16 @@ impl Rain {
         let s = &self.months[m];
         (s.p[c], s.w_v[c] / self.w_ref[c][m].max(1e-9))
     }
+
+    /// How much of the circulation's rain coarse cell `c` gets in month `m` (its rain over the
+    /// rain at its reference water) and its moisture W_v/W_ref.
+    pub fn dry(&self, c: usize, m: usize) -> (f64, f64) {
+        let s = &self.months[m];
+        (
+            s.p[c] / self.p_ref[c][m].max(1e-15),
+            s.w_v[c] / self.w_ref[c][m].max(1e-9),
+        )
+    }
 }
 
 /// The upwind rain of climate section `p` on a snapshot's coarse climate.
@@ -423,12 +534,11 @@ pub fn rain(
     mp: &super::moisture::MoistureParams,
     inp: &ClimateIn<'_>,
 ) -> Rain {
-    use super::belts;
     use super::moisture::{RHO_AIR, W_SAT_27, W_SAT_PER_K, W_SAT_SCALE_M, q_sat};
     let g = inp.grid;
     let n = g.w * g.h;
     let mesh = Mesh::from_grid(g, mp.radius_m);
-    let (u, v, itcz) = super::moisture::winds(mp, g, inp.land, inp.t_land, inp.t_ocean);
+    let (u, v, _itcz) = super::moisture::winds(mp, g, inp.land, inp.t_land, inp.t_ocean);
     let k = Constants {
         k_q: p.rain_diffusivity_m2_s,
         tau_f_s: TAU_F_S,
@@ -439,19 +549,12 @@ pub fn rain(
     };
     let f: Vec<f64> = inp.land.iter().map(|x| x.clamp(0.0, 1.0)).collect();
     let mut w_ref = vec![[0.0f64; 12]; n];
-    let mut p_ref = vec![[0.0f64; 12]; n];
+    let p_ref: Vec<[f64; 12]> = inp.p_ref.to_vec();
     for c in 0..n {
-        let (i, j) = (c % g.w, c / g.w);
-        let phi = g.lat_c(j);
         let hf = 1.0 - f[c] + f[c] * (-inp.z_low[c].max(0.0) / W_SAT_SCALE_M).exp();
         for m in 0..12 {
             let tbar = f[c] * inp.t_land[c][m] + (1.0 - f[c]) * inp.t_ocean[c][m];
             w_ref[c][m] = mp.r_ref * W_SAT_27 * (W_SAT_PER_K * (tbar - 27.0)).exp() * hf;
-            let pb = phi - belts::shift(phi, itcz[i][m], inp.hemi[m]);
-            let sea = 1.0 - f[c];
-            let sub = 1.0 - sea * (1.0 - belts::subsidence_factor(p, inp.basin[c], pb));
-            let stab = (0.07 * inp.dsst[c]).exp(); // ledger: CLM-192
-            p_ref[c][m] = belts::belt_precip(pb) * inp.hydro * sub * stab / YEAR_S;
         }
     }
     // The pieces that do not depend on the land's recycling.
@@ -492,6 +595,7 @@ pub fn rain(
             return 0.0;
         }
         let share = match annual.get(c) {
+            // Fu's Budyko curve (ledger: HYD-034).
             Some(&pr) if pr > 0.0 => crate::surface::climate::fu_et(pr, pet[c]) / pr,
             _ => EPS_START,
         };
@@ -501,8 +605,9 @@ pub fn rain(
     let mut annual = inp.annual_prev.to_vec();
     let mut eps: Vec<f64> = (0..n).map(|c| eps_of(c, &annual)).collect();
     let mut months: Vec<Solved> = inp.start.map(|r| r.months.clone()).unwrap_or_default();
+    let mut year: Vec<Month> = Vec::new();
     for _ in 0..passes {
-        let year: Vec<Month> = base
+        year = base
             .iter()
             .map(|mo| Month {
                 eps: eps.clone(),
@@ -516,7 +621,19 @@ pub fn rain(
             .collect();
         eps = (0..n).map(|c| eps_of(c, &annual)).collect();
     }
+    // Where each month's vapour evaporated: the basin position and sea-surface departure it
+    // carries (the share from the land's recycling carries neither).
+    let src: Vec<[f64; 2]> = (0..n).map(|c| [inp.basin[c], inp.dsst[c]]).collect();
+    let carried: Vec<Vec<[f64; 2]>> = year
+        .par_iter()
+        .zip(&months)
+        .map(|(mo, s)| tracers(&mesh, &k, mo, s, &src))
+        .collect();
+    let basin_air = (0..n).map(|c| std::array::from_fn(|m| carried[m][c][0])).collect();
+    let dsst_air = (0..n).map(|c| std::array::from_fn(|m| carried[m][c][1])).collect();
     Rain {
+        basin_air,
+        dsst_air,
         closure: months.iter().map(|s| s.closure).fold(0.0, f64::max),
         sweeps: months.iter().map(|s| s.sweeps).max().unwrap_or(0),
         months,
@@ -532,9 +649,11 @@ pub fn rain(
 /// Cloud water's fallout time, s: LFPM's real-world example takes the fallout length L_f =
 /// 25 km (Hergarten & Robl 2022, section 7), here at 10 m/s.
 pub const TAU_F_S: f64 = 2500.0; // ledger: CLM-193
-/// Cloud water's re-evaporation against condensation (LFPM's β at sea level): the example's
-/// long-range length L_l = 500 km with L_c = L_f = 25 km gives β = L_l/L_c + L_c/L_l − 2 ≈ 18
-/// (from L_l L_s = L_c L_f and L_l + L_s = (1 + β + L_c/L_f) L_c, its equation 27).
+/// Cloud water's re-evaporation against condensation (LFPM's β): the real-world example's lengths
+/// L_c = L_f = 25 km and long-range length L_l = 500 km (Hergarten & Robl 2022, section 7). The
+/// two decay lengths of the linear system are the eigenvalues of its matrix, so L_l L_s = L_c L_f
+/// (its equation 27) and 1/L_l + 1/L_s = (1 + β)/L_c + 1/L_f (its trace): L_s = 1.25 km and
+/// β = 18.05.
 pub const BETA: f64 = 18.05; // ledger: CLM-194
 
 #[cfg(test)]
@@ -659,6 +778,37 @@ mod tests {
         assert!(eff(190) < 0.5 * eff(62), "{} {}", eff(190), eff(62));
         // ... so the vapour reaches further than under linear condensation.
         assert!(s.w_v[190] > lin.w_v[190], "{} {}", s.w_v[190], lin.w_v[190]);
+    }
+
+    #[test]
+    fn the_sea_marks_follow_the_vapour_and_thin_with_the_lands_own() {
+        let n = 200;
+        let mesh = ring(n);
+        let k = Constants {
+            k_q: 2.0e5,
+            rh_gain: 4.0,
+            ..consts()
+        };
+        // Without recycling all vapour is the sea's: a mark of 1 everywhere stays 1.
+        let mo = month(n, 60, 8.0, 0.0);
+        let s = solve_month(&mesh, &k, &mo, None);
+        let ones = vec![[1.0f64]; n];
+        let t = tracers(&mesh, &k, &mo, &s, &ones);
+        for c in 0..n {
+            assert!((t[c][0] - 1.0).abs() < 1e-6, "cell {c}: {}", t[c][0]);
+        }
+        // With recycling the sea's share falls inland, downwind of the coast.
+        let mo = month(n, 60, 8.0, 0.6);
+        let s = solve_month(&mesh, &k, &mo, None);
+        let t = tracers(&mesh, &k, &mo, &s, &ones);
+        assert!(t[55][0] > 0.9, "{}", t[55][0]);
+        assert!(t[70][0] > t[120][0] && t[120][0] > t[190][0], "{:?}", [t[70][0], t[120][0], t[190][0]]);
+        assert!(t[190][0] < 0.8, "{}", t[190][0]);
+        // A mark set by the sea's position (here the sea's western half 1, eastern half 0)
+        // arrives from the sea that lies upwind: the coast gets the eastern half's.
+        let half: Vec<[f64; 1]> = (0..n).map(|c| [if c < 30 { 1.0 } else { 0.0 }]).collect();
+        let t = tracers(&mesh, &k, &mo, &s, &half);
+        assert!(t[62][0] < 0.2 && t[20][0] > 0.5, "{} {}", t[62][0], t[20][0]);
     }
 
     #[test]

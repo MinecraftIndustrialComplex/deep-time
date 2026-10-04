@@ -166,6 +166,21 @@ impl Coarse {
             .collect()
     }
 
+    /// The upwind rain's share of the circulation's rain and its moisture W_v/W_ref in month `m`
+    /// at L1 cell `c` (bilinear; (1, 1) without the upwind rain).
+    pub fn upwind_at(&self, c: usize, m: usize) -> (f64, f64) {
+        let Some(up) = &self.upwind else {
+            return (1.0, 1.0);
+        };
+        let (mut d, mut q) = (0.0, 0.0);
+        for (cc, wt) in self.grid.corners(c) {
+            let (dd, qq) = up.dry(cc, m);
+            d += wt * dd;
+            q += wt * qq;
+        }
+        (d, q)
+    }
+
     /// The coarse rain's precipitation rate (mm/yr) and moisture of month `m` at L1 cell `c`
     /// (bilinear), from the moisture budget (moisture: its relative humidity over `r_ref`) or
     /// the upwind rain (moisture: the vapour over its reference water); `None` under the belts.

@@ -76,6 +76,16 @@ fn an_idealised_planet_has_earthlike_zones_with_the_moisture_budget() {
     });
 }
 
+/// The same with the upwind rain (`climate.rain_model = upwind`: the circulation's rain dried by
+/// the budget of vapour and cloud water the wind carries).
+#[test]
+fn an_idealised_planet_has_earthlike_zones_with_the_upwind_rain() {
+    idealised_zones(ClimateParams {
+        rain_model: crate::climate::RainModel::Upwind,
+        ..ClimateParams::default()
+    });
+}
+
 fn idealised_zones(p: ClimateParams) {
     let (grid, lat, z) = idealised();
     let (w, h) = (grid.w as usize, grid.h as usize);
