@@ -224,7 +224,7 @@ public final class BiomeCensus {
                 if (land && wetlandLayer != null && Math.round(wetlandLayer.nearest(x, z)) == Peatland.COLD_WETLAND) {
                     coldWet++;
                     coldBiomes.merge(nameOf(b), 1, Integer::sum);
-                    if (Peatland.isPeatland(b))
+                    if (PeatlandProbe.isPeatland(b))
                         coldPeat++;
                     else if (b.is(c("is_swamp")))
                         coldSwamp++;

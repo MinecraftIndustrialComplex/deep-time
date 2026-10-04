@@ -8,7 +8,11 @@ import com.minecraftindustrialcomplex.deeptime.compat.terrablender.RegionTrees;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import net.minecraft.core.Holder;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.biome.BiomeSource;
+import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.biome.MultiNoiseBiomeSource;
 
 import java.util.List;
@@ -34,19 +38,19 @@ public final class PeatlandProbe {
         OverworldBands ref = OverworldBands.fromJson(climate.getAsJsonObject("reference").getAsJsonObject("bands"));
         double coldBelow = climate.has("wetland_cold_below") ? climate.get("wetland_cold_below").getAsDouble() : 2.0;
         if (!(source instanceof MultiNoiseBiomeSource ms))
-            return Peatland.decide(m, ref, List.of(), coldBelow, (r, t) -> null);
+            return Peatland.decide(m, ref, List.of(), coldBelow, (r, t, h, c, e, w) -> null);
         var params = ms.parameters();
         Optional<RegionCatalog> catalog = RegionCatalog.load();
         Peatland p;
         if (catalog.isPresent() && m.regions() != null) {
             if (!RegionTrees.ready(params))
                 return null;
-            p = Peatland.decide(m, ref, m.regions().names(), coldBelow, (region, t) -> {
+            p = Peatland.decide(m, ref, m.regions().names(), coldBelow, (region, t, h, c, e, w) -> {
                 int index = catalog.get().indexOf(region);
-                return index < 0 ? null : peat(RegionTrees.find(params, index, t));
+                return index < 0 ? null : peat(RegionTrees.find(params, index, target(t, h, c, e, w)));
             });
         } else {
-            p = Peatland.decide(m, ref, List.of(Peatland.NO_TABLE), coldBelow, (region, t) -> peat(params.findValue(t)));
+            p = Peatland.decide(m, ref, List.of(Peatland.NO_TABLE), coldBelow, (region, t, h, c, e, w) -> peat(params.findValue(target(t, h, c, e, w))));
         }
         DeepTime.LOGGER.info("Peatland of {}: {}", wd.folder(), p.regions().isEmpty()
                 ? "the pack has no peatland biome where cold wetland is: it is taiga"
@@ -54,7 +58,20 @@ public final class PeatlandProbe {
         return p;
     }
 
+    private static Climate.TargetPoint target(double t, double h, double c, double e, double w) {
+        return Climate.target((float) t, (float) h, (float) c, (float) e, 0f, (float) w);
+    }
+
+    /** A swamp and cold: the tags say so, whatever the biome's name or mod. */
+    public static boolean isPeatland(Holder<Biome> b) {
+        return b.is(tag("is_swamp")) && (b.is(tag("is_cold/overworld")) || b.is(tag("is_snowy")));
+    }
+
+    private static TagKey<Biome> tag(String path) {
+        return TagKey.create(Registries.BIOME, ResourceLocation.fromNamespaceAndPath("c", path));
+    }
+
     private static String peat(Holder<Biome> b) {
-        return b != null && Peatland.isPeatland(b) ? b.unwrapKey().map(k -> k.location().toString()).orElse("?") : null;
+        return b != null && isPeatland(b) ? b.unwrapKey().map(k -> k.location().toString()).orElse("?") : null;
     }
 }
