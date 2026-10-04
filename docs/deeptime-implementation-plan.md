@@ -2354,7 +2354,7 @@ and consumption plus large igneous provinces, GEOCARB/Walker–Hays–Kasting si
 land cell (runoff × e^(0.09 ΔT)), normalized on Earth's relief; CO₂ lowers the EBM's longwave A
 (Myhre, and Byrne & Goldblatt above 1,000 ppm). (9) A **brightening star** (Gough 1981) on the
 timeline's absolute age. (10) A **fine clock** (`clock.rs`) steps the carbon, the EBM and the ice
-every 100 kyr inside each plate step (halving through fast CO₂ changes), so the ice-albedo runaway
+every 200 kyr (`carbon_step_kyr`, a setting since 2026-09-30) inside each plate step (halving through fast CO₂ changes), so the ice-albedo runaway
 and the escape by degassing happen on their own (events `deeptime:snowball`, `deeptime:hothouse`);
 the 10-Myr geographic snapshots stay, and between them the zonal references follow the clock's EBM
 and the equilibrium line moves with each band's summer temperature. (11) **Orbital forcing** over
@@ -2365,6 +2365,29 @@ Imbrie & Imbrie's asymmetric response; the maximum ice of the window is the glac
 **glacio-eustasy** (ρ_i/ρ_w·ΔV/A_ocean against the model's present-Earth ice): item 7's curve keeps
 its tectonic cycles and the ice's sea level is added to it; the surface stage takes the sum
 (`WorldState::globals`). The ice fields for glacial erosion are FORMAT.md "The climate's ice fields".
+*Revised 2026-09-30* (decisions log: ice-sheet dynamics, supply-limited weathering, 200-kyr clock):
+(13) **Ice sheets** flow (`sheet.rs`: shallow-ice approximation on a coarse grid, the mass balance
+on the ice *surface* against the equilibrium line — the elevation feedback — elastic-free
+isostasy with a 3-kyr lag, calving where the depressed bed lies below the sea); every clock step in
+the ice-age window, `ice_relax_kyr` per plate step in deep time; a cell's ice is the sheet's or the
+equilibrium glacier's, whichever is thicker. (14) **Weathering is supply-limited**: each band's
+kinetic weathering saturates at the Ca + Mg its erosion exposes (the surface stage's erosion, West
+2012's kinetic/supply regimes). (15) `carbon_step_kyr` 200 by default, an editor setting.
+
+*Revised 2026-10-01* (decisions log: "prevent ice ages / snowball events for the final state"):
+(16) **The present-day climate is a setting**, `climate.present_climate`: `temperate` (default; no
+snowball and at most `present_interglacial_ice_frac`, 0.15, of the land under ice), `natural`,
+`ice_age` (at least `present_glacial_ice_frac`, 0.25, no snowball) or `snowball`. Only the run's
+last `present_adjust_kyr` (100) is touched: when the simulated end is not the state asked for, that
+stretch is run again with the atmosphere's CO₂ multiplied by a factor ramped in over
+`present_ramp_kyr` (10) — the ocean taking up or releasing carbon, the mechanism of Earth's own
+glacial terminations (Sigman & Boyle 2000) — and the smallest factor that reaches the state is kept
+(bracketing, then four halvings; at most ×10⁴ either way). The energy balance, the sea ice, the
+flowing ice sheets, the sea level and the weathering all respond to that CO₂ as they do to any
+other, so the present is a state the model itself produced. Everything older is the same run: the
+events, the deposits, the largest-ice fields of the last glacial cycles. The stage's note records
+the factor and the state without it (`present`); a snowball the setting set off or ended carries
+`present_setting` as its cause.
 
 ### 8.4 Hydrology — `core::hydro` (Phase 2; Phase 0 only proves water holds)
 
@@ -3963,7 +3986,10 @@ on this machine.
   orographic model and rain shadows kept). The fast carbon/ice clock may stay banded, calibrated to
   the 2-D model's zonal means. Absorbs the per-cell sea ice asked for the same day.
 - **Order.** Design doc first (Opus), approved by Ben; building after the climate agent's
-  ice-sheet branch lands (same code).
+  ice-sheet branch lands (same code). The ice branch is merged with the flowing ice sheets off by
+  default (decisions log 2026-10-02, "Merge with ice sheets off"; STATUS build log 2026-10-02),
+  so P1-26 can start; turning the sheets on (`climate.ice_dynamics`) once the per-cell climate
+  has fixed the cold bias is part of P1-26's calibration.
 - **Check.** Set out in the design doc (Earth-topography comparison, Köppen shares, energy balance,
   run-time budget, downstream recalibration).
 - **Design** (2026-09-30, awaiting Ben's approval): `docs/design/p1-26-per-cell-climate.md`. It

@@ -153,6 +153,15 @@ public final class RiverGameTests {
     }
 
     /**
+     * Water the pass placed, liquid or frozen: a frozen lake's top block is ice ({@code WaterBodies}
+     * sets it inside the shielded range), and on a cold planet a lake one block deep holds only
+     * that ice.
+     */
+    static boolean isPlacedWater(BlockState s) {
+        return isWater(s) || s.is(net.minecraft.world.level.block.Blocks.ICE);
+    }
+
+    /**
      * Reads the boxes back. A river column holds water up to its top, always: the pass cuts or fills
      * it to the channel. So does a lake column (FORMAT.md, "Water columns": a lake column is cut to
      * its bed): {@link Water}'s {@code ground} is the terrain bilinear between noise-cell corners,
@@ -326,9 +335,10 @@ public final class RiverGameTests {
      * rivers and lakes are generated, and every river and lake column is read back next to the same
      * column of {@code deeptime:test_rivers}, the same world data generated without carvers:
      * <ul>
-     *   <li>no block between its bed and its top that is water without carvers and air with them
-     *       ({@code drainedBlocks}), and no column whose top water block became air ({@code holes}):
-     *       the carvers replaced none of the water. Air where the uncarved level has ground is the
+     *   <li>no block between its bed and its top that is water (or a frozen lake's ice,
+     *       {@link #isPlacedWater}) without carvers and air with them ({@code drainedBlocks}), and
+     *       no column whose top water block became air ({@code holes}): the carvers replaced none
+     *       of the water. Air where the uncarved level has ground is the
      *       carvers' right ({@code carvedShore}: a lake column's generated ground can stand in the
      *       water's range, see {@link #count}; the ground beside and under the water stays
      *       carvable), so it is counted apart, and {@code waterBlocks} says how much water the
@@ -394,7 +404,7 @@ public final class RiverGameTests {
                     columns++;
                     int air = 0;
                     for (int y = bed + 1; y <= top; y++) {
-                        boolean was = isWater(uncarved.getBlockState(pos.set(x, y, z)));
+                        boolean was = isPlacedWater(uncarved.getBlockState(pos.set(x, y, z)));
                         if (was)
                             waterBlocks++;
                         if (chunk.getBlockState(pos).isAir()) {
@@ -410,7 +420,7 @@ public final class RiverGameTests {
                         if (detail.length() < 600)
                             detail.append(" drained(").append(x).append(',').append(top).append(',').append(z).append(")x").append(air);
                     }
-                    if (chunk.getBlockState(pos.set(x, top, z)).isAir() && isWater(uncarved.getBlockState(pos)))
+                    if (chunk.getBlockState(pos.set(x, top, z)).isAir() && isPlacedWater(uncarved.getBlockState(pos)))
                         holes++;
                     // The pass leaves solid ground under the bed, so a block there that is air or fluid was cut
                     // by a carver. Below sea level a carver's cut fills with water (this level has no aquifer:
@@ -465,7 +475,7 @@ public final class RiverGameTests {
                 sites.size(), chunks.size(), columns, waterBlocks, drainedBlocks, drainedColumns, holes, carvedShore, carvedBelow, entrances,
                 highColumns, carvedBelowHigh, detail.length() == 0 ? "" : " " + detail);
         helper.assertTrue(columns > 50, "only " + columns + " river or lake columns in the boxes");
-        helper.assertTrue(waterBlocks >= columns / 2, "the uncarved level holds only " + waterBlocks + " water blocks in " + columns
+        helper.assertTrue(waterBlocks >= columns / 2, "the uncarved level holds only " + waterBlocks + " water or lake-ice blocks in " + columns
                 + " river or lake columns: nothing to compare with");
         helper.assertTrue(carvedBelow >= 20, "the carvers cut only " + carvedBelow + " blocks under the beds: they did not reach the water, so the check proves nothing");
         helper.assertTrue(highColumns >= 20 && carvedBelowHigh >= 20, "only " + highColumns + " columns hold water above sea level, with " + carvedBelowHigh

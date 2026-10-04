@@ -11,8 +11,9 @@ Where the climate holds ice on land, glaciers grind the ground: they widen river
 | [GLA](ledger/GLA.md) | glacial erosion | GLA-001 to GLA-039 (39) |
 | [GLA](ledger/GLA.md) | glacial landforms | GLA-040 to GLA-052 (13) |
 | [GLA](ledger/GLA.md) | glacial block-scale shapes | GLA-053 to GLA-066 (14) |
+| [GLA](ledger/GLA.md) | ice sheets (`climate/sheet.rs`, off by default; see [climate.md](climate.md)) | GLA-067 to GLA-076 (10) |
 
-Rows by status: `cited-unverified` 20, `from-memory` 1, `calibrated` 1, `game-choice` 26, `uncited` 18.
+Rows by status: `cited-unverified` 25, `from-memory` 1, `calibrated` 1, `game-choice` 29, `uncited` 20.
 
 ## Material for the stage 2 writer
 
