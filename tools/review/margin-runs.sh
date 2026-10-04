@@ -55,7 +55,7 @@ run_one() {
     if [ ! -s "$f.margins.json" ]; then
         rm -rf "$f.dump"
         "$BIN" dump-fields --in "$f.ck" --out "$f.dump" \
-            --fields surface/elevation_m,elevation,plates/crust_type,plates/thickness_m,plates/elevation_m,regime > /dev/null
+            --fields surface/elevation_m,elevation,plates/crust_type,plates/thickness_m,plates/elevation_m,plates/flags,regime > /dev/null
         env -u DEEPTIME_ADMIT_JOB -u DEEPTIME_ADMIT_PID deeptime-admit run --kind shell:margins.py -- \
             nix shell --impure --expr "$PYENV" -c nice -n 10 python3 "$HERE/margins.py" planet "$f.dump" "$f.margins.json" \
             > "$f.margins.txt" 2>&1 || echo "margins FAILED $f" >&2

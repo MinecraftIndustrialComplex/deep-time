@@ -7,7 +7,9 @@ lies against the sea.
                                                   elevation, plates/crust_type; plates/thickness_m optional)
     margins.py pool <out.json> <run.json> ...      the transects of several runs pooled
 
-MARGINS_FIELD=plates/elevation_m measures another dumped elevation against the surface's sea level.
+MARGINS_FIELD=plates/elevation_m measures another dumped elevation against the surface's sea level. With
+plates/flags in the dump, transects are also summarised apart for passive and active margins (a trench,
+an arc or a subduction zone within 3 L1 cells of the coast cell is active).
 
 Transects (the margins-and-spires study's definitions, build log 2026-10-03, so its ETOPO 2022 figures
 compare): from every 3rd open-sea coast cell of land masses over 750 km2, |lat| <= 60 deg, seaward along
@@ -41,6 +43,8 @@ SEA_Y = 63
 MAX_LAT = 60.0
 STRIDE = 3
 DIST_BINS_KM = [0, 10, 25, 50, 100, 200, 400, 1e9]
+ACTIVE_FLAGS = 2 | 4 | 64  # TRENCH | ARC | SUBDUCTION_ZONE (plates/state.rs)
+ACTIVE_CELLS = 3
 
 
 def angle(dh, dl):
@@ -145,7 +149,7 @@ def open_sea_mask(wet):
     return keep[lab]
 
 
-def transects(elev, sea, g):
+def transects(elev, sea, g, active=None):
     H, W = elev.shape
     land = elev > sea
     lab, n = ndimage.label(land)
@@ -197,6 +201,8 @@ def transects(elev, sea, g):
             prof.append(float(ndimage.map_coordinates(elev, [[lj], [li]], order=1, mode="wrap")[0] - sea)
                         if 0 <= lj <= H - 1 else float("nan"))
         a["profile"] = prof
+        if active is not None:
+            a["active"] = bool(active[j, i])
         out.append(a)
     return out
 
@@ -269,13 +275,27 @@ def planet(d, out_path):
     g = Grid(e)
     inside = np.broadcast_to(g.inside[:, None], h.shape)
     sea = float(np.median((h - (y - SEA_Y) * M_PER_BLOCK_V)[inside][::97]))
-    rows = transects(h, sea, g)
+    flags, _ = load(d, "plates/flags")
+    active = None
+    if flags is not None:
+        # An active margin: a trench, an arc or a subduction zone (the plate model's flags) within
+        # ACTIVE_CELLS cells of the coast cell. The rest are passive (the transition's margins).
+        f = flags.astype(np.int64)
+        active = ndimage.binary_dilation((f & ACTIVE_FLAGS) != 0, iterations=ACTIVE_CELLS)
+    rows = transects(h, sea, g, active)
     res = {"sea_m": sea, "summary": summarise(rows)}
+    if active is not None:
+        res["summary_passive"] = summarise([r for r in rows if not r.get("active")])
+        res["summary_active"] = summarise([r for r in rows if r.get("active")])
     if kind is not None:
         res["crust"] = crust_part(h, sea, kind, thick, g)
     res["rows"] = rows
     json.dump(res, open(out_path, "w"))
     show(res["summary"], res.get("crust"))
+    for k in ("summary_passive", "summary_active"):
+        if k in res:
+            print(k)
+            show(res[k])
 
 
 def show(s, crust=None):
@@ -310,6 +330,9 @@ def pool(out_path, files):
             crusts.append(d["crust"])
     s = summarise(rows)
     res = {"runs": len(files), "summary": s}
+    if any("active" in r for r in rows):
+        res["summary_passive"] = summarise([r for r in rows if r.get("active") is False])
+        res["summary_active"] = summarise([r for r in rows if r.get("active") is True])
     if crusts:
         res["continental_wet_share_mean"] = float(np.mean([c["continental_wet_share"] for c in crusts]))
         bins = []
@@ -325,6 +348,10 @@ def pool(out_path, files):
         print(f"  continental crust under the sea, mean over runs: {res['continental_wet_share_mean']:.3f}")
         for b in res["bins"]:
             print(f"    from ocean {b['km']} km: {b['share_of_continental']:.3f} of continental, wet {b['wet']:.2f}")
+    for k in ("summary_passive", "summary_active"):
+        if k in res:
+            print(k)
+            show(res[k])
 
 
 if __name__ == "__main__":
