@@ -669,8 +669,8 @@ impl Default for TectonicParams {
             collapse_quiet_myr: 10.0,          // ledger: PLT-259
             collapse_reach_km: 200.0,          // ledger: PLT-257
             crust_max_km: 70.0,                // ledger: PLT-258
-            transition_width_km: 200.0,        // ledger: PLT-261
-            transition_myr: 20.0,              // ledger: PLT-262
+            transition_width_km: 200.0,        // ledger: PLT-262
+            transition_myr: 20.0,              // ledger: PLT-263
             slab_pull_rad_per_1000km_myr: 0.002,
             slab_pull_speed_mm_yr: 80.0,
             slab_pull_front_km: 3000.0,

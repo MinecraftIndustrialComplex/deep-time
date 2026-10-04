@@ -1351,7 +1351,7 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Reference: Holdridge, Leslie R. 1967. Life Zone Ecology (revised edition). Tropical Science Center, San Jose, Costa Rica.
 - DOI or URL: none (book). A library scan is at https://app.ingemmet.gob.pe/biblioteca/pdf/Amb-56.pdf (title per its listing: "Life Zone Ecology by L.R. Holdridge, with photographic supplement prepared by Joseph A. Tosi Jr."). The scan's text layer starts at the table of contents, so I could not confirm the edition year from the scan itself; Lugo et al. 1999 cite it as "Holdridge, L.R. (1967) Life zone ecology. Tropical Science Center. San Jose, Costa Rica".
 - Cited as: "L. R. Holdridge 1967, Life Zone Ecology, Tropical Science Center: PET = 58.93 x the mean annual biotemperature"
-- Ledger ids: HYD-029, HYD-030, HYD-035, HYD-041
+- Ledger ids: HYD-029, HYD-030, HYD-035, HYD-041, BIO-126 (the dry forest precipitation band, from memory: the band is read off the life-zone chart, which the scan's text layer does not carry; the text says "Most of these savannas are to be found in the Tropical Dry Forest Life Zone", read 2026-10-04)
 - Access: book (not online), plus an unofficial library scan
 - Library (the project's source library, not distributed): fetched (PDF, 149 pages, text layer, 330,833 characters). From: https://app.ingemmet.gob.pe/biblioteca/pdf/Amb-56.pdf. Text file: Holdridge1967.txt.
 - Read so far (by the project): nothing says it was consulted
@@ -3885,14 +3885,14 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Bradley, D. C. (2008). Passive margins through earth history. Earth-Science Reviews 91(1-4):1-26.
 - DOI or URL: 10.1016/j.earscirev.2008.08.001.
 - Cited as: "Bradley 2008, Earth-Sci. Rev. 91:1-26".
-- Ledger ids: PLT-160, PLT-167, PLT-207, PLT-260
+- Ledger ids: PLT-160, PLT-167, PLT-207, PLT-261
 - Access: paywalled (abstract not obtainable here).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
 - Read so far (by the project): abstract or secondary pages.
 - Read in this pass: metadata only (OpenAlex abstract field is null; ScienceDirect 403).
 - Reference check: correct (author affiliation USGS Anchorage). The figures 105,000 km passive / 53,000 km convergent and 104/181 Myr ages could not be checked.
-- Read 2026-10-04 (the ocean–continent transition task, a research sub-agent, full text from a repository copy, https://repository.geologyscience.ru/server/api/core/bitstreams/2230260d-7a9a-4757-b200-f847df8cec5b/content): "The present-day passive margins have an aggregate length of 105,000 km, even longer than the spreading ridges (65,000 km) or the convergent plate boundaries (53,000 km)"; "a mean age of 104 m.y., and a maximum age of 180 m.y."; lengths "taken as the great-circle distance between endpoints". Ledger PLT-260 (comparison only).
+- Read 2026-10-04 (the ocean–continent transition task, a research sub-agent, full text from a repository copy, https://repository.geologyscience.ru/server/api/core/bitstreams/2230260d-7a9a-4757-b200-f847df8cec5b/content): "The present-day passive margins have an aggregate length of 105,000 km, even longer than the spreading ridges (65,000 km) or the convergent plate boundaries (53,000 km)"; "a mean age of 104 m.y., and a maximum age of 180 m.y."; lengths "taken as the great-circle distance between endpoints". Ledger PLT-261 (comparison only).
 
 ### Lallemand_EncMarineGeosciences
 - Reference: Lallemand, S. entry in Encyclopedia of Marine Geosciences (Springer). Year and entry title not given in the code and not resolved.
@@ -4944,7 +4944,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Reference: NOAA National Centers for Environmental Information (2022). ETOPO 2022 15 Arc-Second Global Relief Model. NOAA NCEI.
 - DOI or URL: 10.25921/fd45-gt74 (title and year confirmed through the DataCite API)
 - Cited as: "ETOPO 2022"
-- Ledger ids: ERO-168, HNT-093 (margins and spires task, 2026-10-03), PLT-264 (the ocean–continent transition, 2026-10-04: the same transects as the comparison)
+- Ledger ids: ERO-168, HNT-093 (margins and spires task, 2026-10-03), PLT-265 (the ocean–continent transition, 2026-10-04: the same transects as the comparison)
 - Access: open access (dataset)
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://doi.org/10.25921/fd45-gt74. File: ETOPO2022.txt.
 - Read so far (by the project): data named
@@ -5987,6 +5987,20 @@ The survey `docs/research/notes/seamless-projection-survey.md` and its tools (`t
 - Ledger ids: none (the survey's cross-checks: QSC max a/b 1.555, HEALPix 2.430; continuity classes)
 - Access: open. Read so far: the ranking, continuity and distortion sections read by a sub-agent from a Semantic Scholar copy, 2026-10-03.
 
+## Biome rules for Expanded Ecosphere (BIO-115 to BIO-130), added 2026-10-04
+
+### Walker2005
+- Reference: Walker, D. A.; Raynolds, M. K.; Daniëls, F. J. A.; Einarsson, E.; Elvebakk, A.; Gould, W. A.; Katenin, A. E.; Kholod, S. S.; Markon, C. J.; Melnikov, E. S.; Moskalenko, N. G.; Talbot, S. S.; Yurtsev, B. A. and the CAVM Team (2005). The Circumpolar Arctic vegetation map. Journal of Vegetation Science 16:267-282.
+- Cited as: "Walker et al. 2005 (CAVM), bioclimate subzones by summer warmth".
+- Ledger ids: BIO-124
+- Access: not fetched. Read so far: from memory (the five bioclimate subzones A to E, with July means rising from about 1-3 degC in A to about 9-12 degC in E; the 5 degC split used is near the B/C edge); to be checked against the paper's subzone table.
+
+### Alaback1991
+- Reference: Alaback, P. B. (1991). Comparative ecology of temperate rainforests of the Americas along analogous climatic gradients. Revista Chilena de Historia Natural 64:399-412.
+- Cited as: "Alaback 1991, the climatic limits of temperate rainforest".
+- Ledger ids: BIO-127
+- Access: not fetched. Read so far: from memory (temperate rainforest with annual precipitation over about 1,400 mm, a mean annual temperature of about 4 to 12 degC and cool summers); to be checked.
+
 ## Sphere-native simulation grids, added 2026-10-04 with the sphere-native grids note
 
 The research note `docs/research/notes/sphere-native-grids.md` and its benchmark (`tools/research/sphere-grid-bench/`) rest on these; nothing shipped does yet, so no ledger row cites them. "Sub-agent" means a Sonnet sub-agent of the note's session, whose transcriptions were kept in the session scratchpad (not committed, not in the source library). The note also cites, for their sphere use, works already listed above: [Braun2013] (not read), [Barnes2014], [Cortial2019], [SmithBarstad2004], [Hergarten2021], [Fastscapelib] (its `HealpixGrid`, release 0.3.0, 2025) and [Landlab] (its `IcosphereGlobalGrid`). The note's §13 lists every source with how it was read; the entries below are the ones its conclusions lean on.
@@ -6086,7 +6100,7 @@ The research note `docs/research/notes/sphere-native-grids.md` and its benchmark
 - Ledger ids: none (§5: a non-spectral orographic rain model; §11 question 3)
 - Access: open. Read so far: full text by a sub-agent.
 
-## Rifted margins: the ocean–continent transition (PLT-260 to PLT-263), added 2026-10-04
+## Rifted margins: the ocean–continent transition (PLT-261 to PLT-264), added 2026-10-04
 
 Read by a research sub-agent of the transition task (2026-10-04); quotes are verbatim from the text
 it fetched. Many publisher pages refused it (Wiley, ScienceDirect, GeoScienceWorld); what it could
@@ -6096,7 +6110,7 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Reference: Franke, D. (2013). Rifting, lithosphere breakup and volcanism: comparison of magma-poor and volcanic rifted margins. Marine and Petroleum Geology 43:63-87.
 - DOI or URL: 10.1016/j.marpetgeo.2012.11.003; author's accepted manuscript at http://mantleplumes.webspace.durham.ac.uk/wp-content/uploads/sites/129/2021/05/Franke_RiftingMagmatism_MPG.pdf
 - Cited as: "Franke 2013" (the width of crustal thinning at volcanic margins).
-- Ledger ids: PLT-261
+- Ledger ids: PLT-262
 - Access: accepted manuscript, open.
 - Read so far (by the project): full text (accepted manuscript), 2026-10-04: at volcanic margins "Crustal thinning typically occurs over a comparably short distance in the order of only 50 to 100 km"; "Magma-poor rifted margins in contrast show wide domains of extended crust"; volcanic rifted margins are "the majority of passive continental margins worldwide".
 
@@ -6104,7 +6118,7 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Reference: Brune, S., Heine, C., Pérez-Gussinyé, M. and Sobolev, S. V. (2014). Rift migration explains continental margin asymmetry and crustal hyper-extension. Nature Communications 5:4014.
 - DOI or URL: 10.1038/ncomms5014
 - Cited as: "Brune et al. 2014" (hyper-extended crust up to 200 km wide).
-- Ledger ids: PLT-260, PLT-261
+- Ledger ids: PLT-261, PLT-262
 - Access: open access.
 - Read so far (by the project): full text, 2026-10-04: "up to 200 km wide areas of hyper-extended continental crust"; "hyper-extended (with a thickness <10 km) crustal slivers that vary in widths between 70 km offshore Iberia and 200 km off Angola".
 
@@ -6112,7 +6126,7 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Reference: Sapin, F., Ringenbach, J.-C. and Clerc, C. (2021). Rifted margins classification and forcing parameters. Scientific Reports 11:8199.
 - DOI or URL: 10.1038/s41598-021-87648-3
 - Cited as: "Sapin et al. 2021" (the necking domain's width; crust at the transition).
-- Ledger ids: PLT-260, PLT-261
+- Ledger ids: PLT-261, PLT-262
 - Access: open access.
 - Read so far (by the project): full text, 2026-10-04: "The width of the Necking Domain: this domain is the most variable in terms of width and general shape"; narrow, "~ 50 km", to "extending over more than 110 km across the shelf"; "the Exhumation Domain can reach a width of more than 150 km"; in the Coral Sea "a thinning of the crust from 22 km down to a 7–8 km thick ... in direct contact with the steady oceanic crust of similar thickness".
 
@@ -6120,7 +6134,7 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Reference: Harris, P. T., Macmillan-Lawler, M., Rupp, J. and Baker, E. K. (2014). Geomorphology of the oceans. Marine Geology 352:4-24.
 - DOI or URL: 10.1016/j.margeo.2014.01.011; author copy https://moodle2.units.it/pluginfile.php/486751/mod_folder/content/0/HarrisetalMARGO2014.pdf
 - Cited as: "Harris et al. 2014" (shelf and slope widths of passive margins; shelf, slope and rise areas).
-- Ledger ids: PLT-261, PLT-264
+- Ledger ids: PLT-262, PLT-265
 - Access: author copy, open.
 - Read so far (by the project): full text, 2026-10-04: "continental shelf width of passive margins (88 km) is nearly three times that of active margins (31 km)" (abstract; Table 2: 84 ± 0.66 km, all shelves 57 km); "the average width of active slopes (36 km) is less than the average width of passive margin slopes (46 km)"; slope "a narrow band 41 km wide"; Table 5: shelf 8.91 % of the ocean, slope 5.42 %, rise 8.24 % (superimposed on the abyss); "the Earth's margins are approximately 35% active and 65% passive". No shelf-break depth.
 
@@ -6128,7 +6142,7 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Reference: McKenzie, D. (1978). Some remarks on the development of sedimentary basins. Earth and Planetary Science Letters 40:25-32.
 - DOI or URL: 10.1016/0012-821X(78)90071-7 (the DOI from the standard citation, not seen on the scan); scan at http://www.zetaware.com/public/McKenzie_1978.pdf
 - Cited as: "McKenzie 1978" (uniform stretching by β; initial and thermal subsidence).
-- Ledger ids: PLT-260, PLT-262, PLT-263
+- Ledger ids: PLT-261, PLT-263, PLT-264
 - Access: scanned copy, open.
 - Read so far (by the project): full text (OCR; the equations partly garbled), 2026-10-04: "a unit length of continental lithosphere is suddenly extended to a length β, causing upwelling of hot asthenosphere"; "The slow subsidence and the heat flow depend only on the amount of stretching"; Table 1: τ = 62.8 My, E0 = 3.2 km, ρ_c 2.8, ρ_m 3.33, ρ_w 1.0 g/cm³; thermal subsidence S_t ≈ E0 r (1 − e^(−t/τ)), r = (β/π) sin(π/β).
 

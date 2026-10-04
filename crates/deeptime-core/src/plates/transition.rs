@@ -65,7 +65,7 @@
 //! its own side, through its own plate), and a stretch balances its sources against its sinks
 //! (a narrow peninsula has more ocean than continent: its continent thins to the profile and the
 //! ocean beside it gets what there is).
-// ledger: PLT-260 (the rule), PLT-261 (the width), PLT-262 (τ), PLT-263 (the height line).
+// ledger: PLT-261 (the rule), PLT-262 (the width), PLT-263 (τ), PLT-264 (the height line).
 
 use std::collections::BTreeMap;
 
@@ -108,7 +108,7 @@ pub fn oceanic_m() -> f64 {
 pub fn crust_per_metre(env: &Env) -> f64 {
     let k = env.k;
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
-    // ledger: PLT-263.
+    // ledger: PLT-264.
     (continental_m() - oceanic_m()) / (z_0 - k.oceanic_floor_elevation_m).max(1.0)
 }
 
@@ -136,7 +136,7 @@ pub struct Transition {
 /// planet, so it is scaled by R_model / R_planet.
 pub fn width_rad(env: &Env) -> f64 {
     let n = env.norm;
-    // ledger: PLT-261.
+    // ledger: PLT-262.
     env.k.transition_width_km / n.planet_km.max(1e-9)
 }
 
@@ -257,7 +257,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         if d.abs() >= 0.5 * w || seed == u32::MAX {
             continue;
         }
-        // ledger: PLT-260.
+        // ledger: PLT-261.
         let target = t_o + (t_n - t_o) * (0.5 + d / w).clamp(0.0, 1.0);
         members.push(Member {
             i,

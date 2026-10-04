@@ -139,7 +139,7 @@ pub struct SurfaceRates {
 
 /// One sample's surface step; returns the rock eroded from it (metres), to be exported downhill.
 /// `held_floor` (finite) is the floor an oceanic sample of an ocean–continent transition cools
-/// towards instead of `z_floor`: its thicker crust holds it up (`transition.rs`, ledger PLT-263).
+/// towards instead of `z_floor`: its thicker crust holds it up (`transition.rs`, ledger PLT-264).
 pub fn surface_step(s: &mut Sample, r: &SurfaceRates, held_floor: f32) -> f64 {
     let mut z = f64::from(s.elevation_m);
     let mut eroded = 0.0;

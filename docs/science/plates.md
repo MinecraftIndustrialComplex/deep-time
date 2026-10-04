@@ -15,12 +15,12 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
 | [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228 (19) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
-| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-263 (33; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-260 to PLT-263 the ocean–continent transition, 2026-10-04) |
-| [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221, PLT-264 (41; PLT-264 Earth's passive margins, the transition's comparison) |
+| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264 (33; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04) |
+| [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221, PLT-265 (41; PLT-265 Earth's passive margins, the transition's comparison) |
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
 
-Rows by status (after the ocean–continent transition, 2026-10-04): `verified` 17, `cited-unverified` 46, `from-memory` 4, `abstract-only` 19, `calibrated` 14, `game-choice` 78, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
+Rows by status (after the ocean–continent transition, 2026-10-04): `verified` 17, `cited-unverified` 46, `from-memory` 4, `abstract-only` 19, `calibrated` 14, `game-choice` 79, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
 
 ## Material for the stage 2 writer
 
@@ -205,7 +205,7 @@ measured tables (`plate-check` at 1000 Myr and the 500 Myr hypsometry ensemble).
 
 ## The ocean–continent transition of rifted margins (2026-10-04)
 
-Built 2026-10-04 (ledger PLT-260 to PLT-264; `plates/transition.rs`; the ocean side's cooling in
+Built 2026-10-04 (ledger PLT-261 to PLT-265; `plates/transition.rs`; the ocean side's cooling in
 `plates/pools.rs`, PLT-129's note). Ben's answer of 2026-10-03 ("Merge both, then fix the cause"):
 after submarine slope failure the continental slopes were still about twice Earth's, and the cause
 was the plate model's ocean–continent step.
@@ -249,8 +249,8 @@ orogenic collapse and before the surface processes:
    L1 map of one 1000 Myr run, supercontinent seed 2, 13 % of the ocean floor is thicker than
    35 km and the thickest is 240 km), and that is not
    the ocean floor beside a rifted margin.
-2. *The taper* (PLT-260). Every sample within W/2 of the boundary (W = `transition_width_km`,
-   200 km measured **on the planet**, PLT-261) gets a signed distance d from it (inland positive)
+2. *The taper* (PLT-261). Every sample within W/2 of the boundary (W = `transition_width_km`,
+   200 km measured **on the planet**, PLT-262) gets a signed distance d from it (inland positive)
    and a target crystalline thickness (the crust less its sediment and sedimentary rock)
    T*(d) = T_o + (T_n − T_o) · clamp(1/2 + d/W, 0, 1), with T_n = 33.0 km (the normal continental
    column's) and T_o = 7 km (the ocean's). The profile is linear in thickness: β = T_n / T* runs
@@ -260,10 +260,10 @@ orogenic collapse and before the surface processes:
    stretch of margin (boundary samples grouped round seeds at least W/2 apart; every sample of the
    zone belongs to the seed of its nearest boundary sample, through its own crust and plate), the
    share 1 − e^(−δt/τ) per step of what would bring the stretch to the profile (τ =
-   `transition_myr`, 20 Myr, PLT-262), as the source's own rock thinned in proportion (pure shear).
+   `transition_myr`, 20 Myr, PLT-263), as the source's own rock thinned in proportion (pure shear).
    Volume is conserved, and crust types do not change: the thickened ocean-side samples stay
    oceanic, so the continental area and the crust share are not redefined by this rule.
-4. *Heights* (PLT-263). A metre of crust moved changes the height by 1/f, f = (T_n − T_o) / (z_0 −
+4. *Heights* (PLT-264). A metre of crust moved changes the height by 1/f, f = (T_n − T_o) / (z_0 −
    z_f) = 4.24 m/m with the presets' continent (z_0 = 525 m) and old ocean floor (z_f = −5,600 m),
    on both sides, so the two sides meet. An oceanic sample of the zone then cools with its age (the
    dampening, PLT-129) towards the floor its crust holds up, z_f + (min(T, T*) − T_o)/f, instead
