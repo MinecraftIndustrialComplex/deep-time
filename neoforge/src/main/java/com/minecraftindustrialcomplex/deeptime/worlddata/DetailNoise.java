@@ -29,7 +29,7 @@ public record DetailNoise(long seed, int circumference, int salt, int octaves, d
 
     /** The width of the band inside a Petroff–Guyou world's turning edges where the noise is blended
      *  towards its half-turn-symmetric mean, blocks (Rust {@code EDGE_BLEND_BLOCKS}; ledger: SCL-089, game-choice). */
-    public static final double EDGE_BLEND_BLOCKS = 32.0;
+    public static final double EDGE_BLEND_BLOCKS = 32.0; // ledger: SCL-089 (game-choice)
 
     /** A world without turning edges. */
     public DetailNoise(long seed, int circumference, int salt, int octaves, double wavelength) {

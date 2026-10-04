@@ -17,7 +17,7 @@ package com.minecraftindustrialcomplex.deeptime.worlddata;
 public final class PetroffGuyou implements WorldProjection {
 
     /** The hemisphere side is a multiple of this (Rust {@code HEMISPHERE_QUANTUM}; ledger: SCL-084, game-choice). */
-    public static final int HEMISPHERE_QUANTUM = 256;
+    public static final int HEMISPHERE_QUANTUM = 256; // ledger: SCL-084 (game-choice)
 
     private final long b;
     private final double lambdaCDeg;
