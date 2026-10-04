@@ -1,7 +1,7 @@
 {
   "schema": 0,
   "name": "earthlike_full_32k",
-  "description": "An Earth-like planet, full (server size, C = 32768 blocks): plates and crust, climate, deep-time erosion and strata, volcanoes, meteor impacts, rock and metamorphism, ore deposits, the young landscape and its amplification, baked for the game. L0 250000 samples, L1 2048x656, L2 4096x1312, L3 16384x5248. The same parameters as pipeline_full_32k (calibrated 2026-10-01, P1-17). It names no timeline: choose the start and the length in the editor or config/deeptime/server.json.",
+  "description": "An Earth-like planet, full (server size, C = 32768 blocks): plates and crust, climate, deep-time erosion and strata, volcanoes, meteor impacts, rock and metamorphism, ore deposits, the young landscape and its amplification, baked for the game. L0 250000 samples, L1 2048x1024, L2 4096x2048, L3 16384x8192. The same parameters as pipeline_full_32k (calibrated 2026-10-01, P1-17). It names no timeline: choose the start and the length in the editor or config/deeptime/server.json.",
   "seed": 1,
   "planet": {
     "gravity_m_s2": 9.81,
@@ -247,6 +247,10 @@
     "thermal_wind_pa_k": 60.0,
     "precip_rh_slope": 11.4,
     "bucket_mm": 150.0,
+    "rain_diffusivity_m2_s": 500000.0,
+    "rain_wind_share": 0.5,
+    "rain_recycling": 1.0,
+    "sea_surface_rh": 0.8,
     "gyre_heat_efficiency": 1.0,
     "overturning_sv": 30.0,
     "winter_inversion_c": 15.0,

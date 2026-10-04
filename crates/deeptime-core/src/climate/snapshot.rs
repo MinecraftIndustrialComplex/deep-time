@@ -442,14 +442,52 @@ pub fn compute(
         barrier_recover: km(p.barrier_recover_km),
     };
     let oro_scale = 365.0 * p.oro_hours_per_day;
+    // The hydrological cycle follows the global temperature (Held & Soden 2006).
+    let ln_hydro = hydro_ln(p, er.t_global);
+    // The upwind rain's first pass (`rain_model = upwind`): the circulation's rain on the coarse
+    // grid, dried along the wind by the vapour and cloud water it carries (`upwind.rs`).
+    let mut up_basin: Vec<f64> = Vec::new();
+    if let Some(pcm) = pc.as_mut()
+        && p.rain_model == super::RainModel::Upwind
+    {
+        let started = Instant::now();
+        let g = &pcm.grid;
+        let (mut s, mut a) = (vec![0.0f64; g.w * g.h], vec![0.0f64; g.w * g.h]);
+        for c in 0..n {
+            if !land[c] {
+                let cc = g.coarse_of(c);
+                s[cc] += basin[c];
+                a[cc] += 1.0;
+            }
+        }
+        up_basin = s
+            .iter()
+            .zip(&a)
+            .map(|(s, a)| if *a > 0.0 { s / a } else { 0.0 })
+            .collect();
+        let r = upwind_rain(
+            pcm,
+            p,
+            &hemi,
+            &up_basin,
+            ln_hydro.exp(),
+            None,
+            &cell.rain_mm,
+        );
+        pcm.upwind = Some(r);
+        time(&mut millis, "upwind", started);
+    }
     // The budget's second pass: the mountain rain the L1 terrain takes out of the column (S_oro,
     // design §3.6), the windward excess over each coarse cell, so less water passes the range.
     if let Some(pcm) = pc.as_mut()
-        && pcm.moisture.is_some()
+        && (pcm.moisture.is_some() || pcm.upwind.is_some())
     {
         let started = Instant::now();
         let g = pcm.grid.clone();
+        // The sink at the coarse rain's moisture, and at the reference moisture (the upwind
+        // rain's sink is linear in its vapour).
         let mut sink = vec![[0.0f64; 12]; g.w * g.h];
+        let mut sink_ref = vec![[0.0f64; 12]; g.w * g.h];
         let per = (g.k * g.k) as f64;
         for c in 0..n {
             if !land[c] {
@@ -470,17 +508,31 @@ pub fn compute(
                 let (tl, to) = pcm.tiles(c, m);
                 let tsl = tl + sea_near[c] * (to - tl);
                 let ccf = (0.067 * (tsl - p.oro_ref_temp_c)).exp().clamp(0.05, 3.0);
-                let rh = pcm.budget_at(c, m).map_or(pcm.mp.r_ref, |x| x.1);
-                sink[cc][m] += o * oro_scale * (rh / pcm.mp.r_ref) * ccf / YEAR_S / per;
+                let q = pcm.rain_at(c, m).map_or(1.0, |x| x.1);
+                let s_ref = o * oro_scale * ccf / YEAR_S / per;
+                sink[cc][m] += s_ref * q;
+                sink_ref[cc][m] += s_ref;
             }
         }
-        let mo = super::percell::budget(pcm, &pcm.mp, Some(&sink), &cell.bucket);
-        cell.bucket = mo.bucket.clone();
-        pcm.moisture = Some(mo);
+        if pcm.upwind.is_some() {
+            let r = upwind_rain(
+                pcm,
+                p,
+                &hemi,
+                &up_basin,
+                ln_hydro.exp(),
+                Some(&sink_ref),
+                &cell.rain_mm,
+            );
+            cell.rain_mm = r.annual_mm.clone();
+            pcm.upwind = Some(r);
+        } else {
+            let mo = super::percell::budget(pcm, &pcm.mp, Some(&sink), &cell.bucket);
+            cell.bucket = mo.bucket.clone();
+            pcm.moisture = Some(mo);
+        }
         time(&mut millis, "budget", started);
     }
-    // The hydrological cycle follows the global temperature (Held & Soden 2006).
-    let ln_hydro = hydro_ln(p, er.t_global);
     let refs = zonal_refs(inp.lat, &er, ln_hydro);
     let hydro = ln_hydro.exp();
     struct Row {
@@ -630,12 +682,12 @@ pub fn compute(
                         }
                     }
                     let cc = (0.067 * (tsl - p.oro_ref_temp_c)).exp().clamp(0.05, 3.0);
-                    // The moisture budget's background rain and humidity (`rain_model =
-                    // budget`) or the belts'.
-                    let budget = pc.as_ref().and_then(|pc| pc.budget_at(c, m));
-                    let (base, q, k_h) = match (budget, &pc) {
-                        (Some((pbg, rh)), Some(pc)) => (pbg, rh / pc.mp.r_ref, 1.0),
-                        _ => (base, q, hydro),
+                    // The coarse rain and its moisture (`rain_model = budget` or `upwind`; the
+                    // upwind rain's circulation already holds the hydrological scaling) or the
+                    // belts'.
+                    let (base, q, k_h) = match pc.as_ref().and_then(|pc| pc.rain_at(c, m)) {
+                        Some((pbg, qq)) => (pbg, qq, 1.0),
+                        None => (base, q, hydro),
                     };
                     let oro_mm = o * oro_scale * q * cc;
                     // Windward rain adds; the lee's negative rate dries the background
@@ -793,6 +845,41 @@ pub fn compute(
 
 const YEAR_S: f64 = 365.25 * 86_400.0;
 
+/// The upwind rain on the snapshot's coarse climate `pcm` (warm-started from its last solution,
+/// whose annual rain then sets the land's recycling; else from `annual`, the last snapshot's).
+fn upwind_rain(
+    pcm: &super::percell::Coarse,
+    p: &ClimateParams,
+    hemi: &[f64; 12],
+    basin: &[f64],
+    hydro: f64,
+    sink_ref: Option<&[[f64; 12]]>,
+    annual: &[f64],
+) -> super::upwind::Rain {
+    let prev = pcm.upwind.as_ref();
+    let annual_prev: Vec<f64> = prev.map_or_else(|| annual.to_vec(), |r| r.annual_mm.clone());
+    super::upwind::rain(
+        p,
+        &pcm.mp,
+        &super::upwind::ClimateIn {
+            grid: &pcm.grid,
+            land: &pcm.land,
+            z_low: &pcm.z_low,
+            t_land: &pcm.r.t_land,
+            t_ocean: &pcm.r.t_ocean,
+            sea_ice: &pcm.r.sea_ice,
+            hemi: *hemi,
+            basin,
+            dsst: &pcm.dsst,
+            hydro,
+            lapse: p.lapse_c_per_km / 1000.0,
+            sink_ref,
+            start: prev,
+            annual_prev: &annual_prev,
+        },
+    )
+}
+
 /// The per-cell climate's figures for the run's notes: its global mean and balance, the zonal
 /// model's against it, the heat transports' northern peaks (PW, and where), the ocean's gyres and
 /// conveyor, the moisture budget's closure.
@@ -833,6 +920,10 @@ fn cell_stats(pc: &super::percell::Coarse, er: &super::ebm::EbmResult) -> serde_
             "cells": s.cells, "sv": s.sv,
         })),
         "moisture_closure_max": pc.moisture.as_ref().map(|m| m.closure.iter().cloned().fold(0.0, f64::max)),
+        "upwind": pc.upwind.as_ref().map(|r| serde_json::json!({
+            "closure_max": r.closure,
+            "sweeps_max": r.sweeps,
+        })),
     })
 }
 
