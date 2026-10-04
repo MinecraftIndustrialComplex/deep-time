@@ -89,6 +89,15 @@ public final class ClimatePlacement {
         return out;
     }
 
+    /**
+     * The pack tables a server's first start uses: those of its resources whose required biomes its registry holds.
+     * Kept here so callers name only {@code MinecraftServer} (FirstStartGenerator is loaded by unit tests without
+     * Minecraft's classes; verifying a {@code RegistryAccess} argument there would load them).
+     */
+    public static List<PlacementPacks.Pack> chosenFor(net.minecraft.server.MinecraftServer server) throws IOException {
+        return chosen(packs(server.getResourceManager()), server.registryAccess());
+    }
+
     /** The pack tables of {@code all} whose required biomes the biome registry of {@code registries} holds. */
     public static List<PlacementPacks.Pack> chosen(List<PlacementPacks.Pack> all, RegistryAccess registries) {
         Optional<? extends Registry<Biome>> biomes = registries.registry(Registries.BIOME);
