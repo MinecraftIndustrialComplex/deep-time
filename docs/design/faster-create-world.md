@@ -57,15 +57,99 @@ tools/review/p1-24-views.sh <runs> <out> base=t-mid6-quick-scattered_continents-
 
 ## 3. Option (b): shipped pre-made planets
 
-{{OPTION_B}}
+**What it is.** A set of planets baked ahead of time (by us, on the test VM, for each release) that
+the editor offers as "Ready planets": pick one, see its timelapse and review page, Accept. Nothing is
+simulated on the player's PC, so the wait is the copy and decompression: a few seconds (inferred:
+42 MB of zstd at a few hundred MB/s).
+
+**Size** (measured on the quick 500-Myr planet, `t-mid6-quick-scattered_continents-500`):
+
+| What is shipped | Raw | zstd -19 | xz -9 |
+|---|---|---|---|
+| The whole world folder | 130 MB | 87 MB | — |
+| Without the keyframes (playable, review page works, no timelapse) | 69 MB | 42 MB | 38 MB |
+| The keyframes alone (26 layers × 14 frames) | 61 MB | 45 MB | — |
+
+- The keyframes are only the timelapse. Keeping only the satellite layer for a replay would add
+  about 2–3 MB (inferred: 1 of 26 layers), so about **45 MB per quick planet** with a short replay.
+- A full-preset planet is larger: {{FULL_SIZE}}.
+- The climate mapping and TerraBlender regions are computed by the game at the review page from the
+  pack's biome source (read: plan §7.12), so one shipped planet serves standalone, MIC and other
+  packs alike.
+
+**Hosting.** Six planets (both starts × three seeds) are about 270 MB.
+
+| Where | Limit | For | Against |
+|---|---|---|---|
+| Inside the mod jar | Modrinth 500 MiB per file ([Modrinth issue 7260](https://github.com/modrinth/code/issues/7260)), CurseForge 2 GB (forum report, not checked) | works offline, no code for downloads | every server and every update downloads them; the jar goes from a few MB to ~300 MB |
+| A separate optional "Deep Time planets" file or project | the same per file | the mod stays small; packs (MIC) can include it | a second thing to publish and keep in step with the format |
+| Downloaded on demand from GitHub Releases | 2 GiB per file, no bandwidth limit ([GitHub docs](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)) | only what a player picks is fetched | needs a public repository or another host; network code, checksums and an offline fallback in the game |
+
+**Upkeep.** Until a public release, formats change freely (decisions log 2026-10-01), so the planets
+are re-baked for every release that touches the simulation or the format: a VM job of about 6 × 6
+minutes and an upload. After a public release, old worlds keep their own data, so only new planets
+need the current format.
+
+**What it costs the player.** No choice of settings: a ready planet is fixed (its preset, its
+start, its length). The editor's parameters stay greyed out for it. A planet everyone has seen is
+less "your planet's own history", which is Deep Time's point.
+
+**Build cost** (inferred): the bake job and manifest (1 day), a "Ready planets" list on the setup
+page with thumbnails from the satellite frame and the replay from the shipped keyframes (2 days),
+copy into staging (the existing `StagingMover` path; ½ day), and the hosting route (½ day in the jar,
+2–3 days for downloads). About 4 to 6 days.
 
 ## 4. Option (c): background generation
 
-{{OPTION_C}}
+Three variants; the first two can be combined.
+
+**(c1) Start while the player edits.** When the setup page opens with a timeline already chosen
+(the last one used), start the run at once at low priority; if the player presses Run with the same
+settings, the page attaches to it; any change discards it. It saves the time spent on the setup page
+(tens of seconds, inferred) and wastes the CPU when the settings change. Small (1–2 days), but a small
+gain.
+
+**(c2) A planet pool.** The game keeps one ready random planet in `<gamedir>/deeptime/pool/` and
+bakes the next in the background whenever the game is open (title screen, other worlds), with 2
+threads at the lowest priority. Create World offers it as "Use the planet the game prepared
+(instant)"; any custom settings still run live.
+
+- **Measured** (`bg2`: 2 cores, 2 threads at nice 19): the quick 500-Myr planet takes **812 s
+  (13.5 min)**, peak 3.7 GiB. The timelapse comes with it (the keyframes are in the folder).
+- The first world after installing still waits, unless combined with (b).
+- It needs: a background session manager (start, pause while a world is being created, stop at
+  quit), checkpoints so a half-done planet survives quitting the game (the core writes `*.dtcp`
+  checkpoints today, dev and CLI only), a free-memory check (3.7 GiB beside a running client: skip
+  on PCs with too little free memory; `MachineInfo.freeBytes` exists), a setting to turn it off, and
+  disk: 130 MB per pooled planet.
+- FPS beside the background run was not measured (Ben cannot launch the game, and the real-client
+  route on the VM is for screenshots); 2 low-priority threads on a 6-core PC should leave the
+  client's own threads alone (inferred).
+- Build cost (inferred): about 4 to 6 days.
+
+**(c3) Play while it generates.** Not possible as the simulation stands: every block depends on the
+whole history (the terrain at the end, the strata of every age, the deposits). A player could only
+wait in a holding area. Rejected.
 
 ## 5. Option (e): faster code, same planets
 
-{{OPTION_E}}
+**What it is.** Optimisation passes that keep the planets as they are (the decisions log of
+2026-10-01 already plans them "after features land").
+
+**What the measurements say** (section 1):
+
+- On 6 cores the run is CPU-bound, not waiting: it used {{CPU_UTIL}} of the 12 hardware threads on
+  average. More threads will not help a 6-core PC; less work per step will.
+- Scaling is poor past 4 cores: 4 cores took 418 s, 6 cores 349 s (1.2× for 1.5× the cores), and
+  2 cores 812 s. Part of the run is serial or bound by memory bandwidth.
+- Where the time goes (quick 500 Myr, mid6): surface ~119 s, climate ~80 s, plates ~41–47 s,
+  structure ~29 s, deposits ~17 s, amplify ~22 s, bake ~15 s. P1-17 found diffusion the largest
+  surface cost and the depression flood serial on purpose.
+
+**Cost and gain** (inferred): a profiling pass (1–2 days) and targeted work on the surface and
+climate stages could plausibly give 1.3–2× on the coupled stage, over 1–3 weeks, with no quality
+cost and no choice for the player. The gain is uncertain until profiled, and every later feature
+can eat it again.
 
 ## 6. Option (d): combinations, and the recommendation
 
