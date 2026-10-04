@@ -12,14 +12,15 @@ A job generates one or more boxes of a world on a headless server and exports ea
              replaced when its bytes differ, so a preview never boots older code than its checkout
     prepare  the job's own world folder <job>/world: synthetic world data, a world-data folder
              (a run's bake), or a preset the server generates from on its first start; datapacks
-    boot     the profile's server with --universe <job> --world world (the smoke world is untouched)
+    boot     a private copy of the profile's server set (tools/smoke/instance.py: the job's own folder
+             and ports) with --universe <job> --world world (the set and its smoke world are untouched)
     generate each box with Chunky (a box across the seam in two pieces, each in the canonical span)
     probe    /deeptime probe palette|claims|tw, sites near, why <site>, probe site (probes.jsonl)
     stop     save-all flush, stop
     export   area-<i>.dtva.gz per box (+ --verify), then the world is deleted (--keep-world keeps it)
 
 Commands:
-    preview.py run    [spec options] [--job ID] [--lock-held] [--install] [--keep-world]
+    preview.py run    [spec options] [--job ID] [--install] [--keep-world]
     preview.py refresh-jar --profile P        build the Deep Time jar and replace the profile's copy if it
                                               differs (what every `run` does first); no server, no job
     preview.py submit [spec options]          start `run` detached; prints {"job", "dir", ...}
@@ -35,9 +36,10 @@ minecraft:normal, for comparison renders of vanilla or Terralith terrain; --loca
 (repeatable) then centres a --locate-side box on the nearest such biome, found with /locate after
 the boot); plus --datapack DIR (repeatable), --seed N, --no-mic-rock-tags.
 
-Locking: every server boot on the Mac holds Deep Time's single server lock (the one
-tools/remote/mac.sh --server takes). `run` takes it itself, unless --lock-held says the caller
-(mac.sh --server) already holds it.
+Admission: on the test VM `run` goes through the admission tool (tools/remote/vm/admit.py, kind
+preview:<profile>; Ben 2026-10-03: load-based admission instead of the one-server lock). It waits
+until its estimated load fits (the job's status says why while it waits), then runs with its own
+ports and folder, beside any other servers. --lock-held is accepted and ignored.
 
 Standard library only.
 """
@@ -62,6 +64,8 @@ import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(REPO, "tools", "smoke"))
+import admission  # noqa: E402  (tools/smoke/admission.py: the test VM's admission tool)
+import instance  # noqa: E402  (tools/smoke/instance.py: private server instances)
 import jarstate  # noqa: E402  (tools/smoke/jarstate.py: the jar comparison install.sh's record shares)
 
 VIEWER = os.path.join(REPO, "tools", "review", "pages", "area3d")
@@ -70,7 +74,7 @@ MAX_SIDE = 256
 DEEP_TIME_Y = (-512, 639)
 VANILLA_Y = (-64, 319)
 LEVEL_TYPES = {16384: "deeptime:planet", 32768: "deeptime:planet_32k"}
-# The Mac's shared cache (tools/remote/mac.sh): the server lock and the dev-shell profiles.
+# The test VM's shared cache (tools/remote/mac.sh): the dev-shell profiles.
 MAC_CACHE = "/Volumes/Graphide/ban/deeptime-cache"
 
 DONE = re.compile(r"Done \(")
@@ -322,47 +326,6 @@ class Job:
 
 
 # ---------------------------------------------------------------------------------------------
-# The Mac's server lock (the same directory lock tools/remote/mac.sh --server takes).
-# ---------------------------------------------------------------------------------------------
-
-class ServerLock:
-    STALE_S = 3 * 3600
-
-    def __init__(self, job):
-        self.path = os.path.join(cache_dir(), "server.lock")
-        self.job, self.held = job, False
-
-    def acquire(self):
-        while True:
-            try:
-                os.mkdir(self.path)
-                with open(os.path.join(self.path, "owner"), "w") as f:
-                    f.write(f"{os.path.basename(REPO)} workbench {self.job.id}\n")
-                self.held = True
-                return
-            except FileExistsError:
-                try:
-                    age = time.time() - os.stat(self.path).st_mtime
-                except OSError:
-                    continue
-                if age > self.STALE_S:
-                    self.job.say("breaking a stale server lock")
-                    shutil.rmtree(self.path, ignore_errors=True)
-                    continue
-                try:
-                    owner = open(os.path.join(self.path, "owner")).read().strip()
-                except OSError:
-                    owner = "?"
-                self.job.set("waiting", f"waiting for the Mac's server lock (held by {owner})")
-                time.sleep(30)
-
-    def release(self):
-        if self.held:
-            shutil.rmtree(self.path, ignore_errors=True)
-            self.held = False
-
-
-# ---------------------------------------------------------------------------------------------
 # Tools.
 # ---------------------------------------------------------------------------------------------
 
@@ -426,11 +389,12 @@ def port_free(port):
 
 
 class Server:
-    """The profile's server booted on the job's world (--universe <job> --world world)."""
+    """The job's copy of the profile's server set, booted on the job's world (--universe <job>
+    --world world)."""
 
-    def __init__(self, job, smoke, install, tools, jvm_extra):
-        self.job, self.smoke = job, smoke
-        self.dir = os.path.join(smoke, "server")
+    def __init__(self, job, server_dir, install, tools, jvm_extra, rcon_port, password):
+        self.job = job
+        self.dir = server_dir
         args_file = os.path.join(self.dir, "libraries", "net", "neoforged", "neoforge",
                                  install["neoforge"], "unix_args.txt")
         if not os.path.exists(args_file):
@@ -440,7 +404,7 @@ class Server:
         self.log_path = os.path.join(job.dir, "server.log")
         self.lines, self.fatal, self.done_at, self.rcon_up, self.proc = [], None, None, False, None
         self.timed = []
-        self.rcon_port, self.password = install["rcon_port"], open(os.path.join(smoke, "rcon.pw")).read().strip()
+        self.rcon_port, self.password = rcon_port, password
         self.mcrcon = tools["MCRCON"]
 
     def start(self):
@@ -601,7 +565,10 @@ def refresh_deeptime_jar(job, smoke, build=build_deeptime_jar):
     job.set("preparing", "building the Deep Time jar (Gradle; the natives are packed into it)")
     build(job)
     built = jarstate.built_jar(REPO)
-    res = jarstate.refresh(built, os.path.join(smoke, "server", "mods"))
+    # Running servers have their own copies of the set (instance.py); a copy in progress reads the
+    # set under its shared lock, so the replacement waits for it.
+    with instance.set_lock(os.path.join(smoke, "server"), exclusive=True, say=job.say):
+        res = jarstate.refresh(built, os.path.join(smoke, "server", "mods"))
     fields = jarstate.jar_fields(REPO, built)
     install_json = os.path.join(smoke, "install.json")
     with open(install_json) as f:
@@ -653,32 +620,9 @@ def build_tools(job, smoke):
     return inspect, colors
 
 
-class Prepared:
-    """Server-dir files a job changes for its boot, restored afterwards."""
-
-    def __init__(self, job, smoke):
-        self.job, self.server = job, os.path.join(smoke, "server")
-        self.saved = []
-
-    def save(self, path):
-        backup = path + ".workbench-backup"
-        if os.path.exists(path):
-            shutil.copy2(path, backup)
-            self.saved.append((path, backup))
-        else:
-            self.saved.append((path, None))
-
-    def restore(self):
-        for path, backup in reversed(self.saved):
-            if backup:
-                shutil.move(backup, path)
-            elif os.path.exists(path):
-                os.remove(path)
-        self.saved = []
-
-
-def prepare_world(job, spec, smoke, prep):
-    """The job's world folder, the server.properties it boots with, and its JVM flags."""
+def prepare_world(job, spec, server_dir):
+    """The job's world folder, the server.properties it boots with (in the job's copy of the set),
+    and its JVM flags."""
     w, c = spec["world"], spec["size"]
     world = os.path.join(job.dir, "world")
     os.makedirs(world, exist_ok=True)
@@ -699,13 +643,12 @@ def prepare_world(job, spec, smoke, prep):
         job.set("preparing", f"a {w['level_type']} world (the pack's own generator, no Deep Time world data)")
     jvm += [f"-D{p}" for p in w.get("jvm_props", [])]
     # config/deeptime/server.json decides a first start (P1-13); only a preset job has one.
-    cfg = os.path.join(prep.server, "config", "deeptime", "server.json")
-    prep.save(cfg)
+    cfg = os.path.join(server_dir, "config", "deeptime", "server.json")
     if os.path.exists(cfg):
         os.remove(cfg)
     if w.get("preset"):
         os.makedirs(os.path.dirname(cfg), exist_ok=True)
-        write_json(cfg, {"_about": "Written by deep-time/tools/workbench/preview.py for one job; restored after.",
+        write_json(cfg, {"_about": "Written by deep-time/tools/workbench/preview.py for one job.",
                          "preset": w["preset"],
                          "timeline": {"start": w.get("start", "supercontinent"),
                                       "length_myr": float(w.get("length_myr", 1000))},
@@ -719,8 +662,7 @@ def prepare_world(job, spec, smoke, prep):
         dst = os.path.join(world, "datapacks", os.path.basename(d.rstrip(os.sep)))
         shutil.copytree(d, dst, dirs_exist_ok=True)
     spec["world"]["datapacks_used"] = datapacks
-    props = os.path.join(prep.server, "server.properties")
-    prep.save(props)
+    props = os.path.join(server_dir, "server.properties")
     text = open(props).read()
     level = w.get("level_type") or LEVEL_TYPES[c]
     text = re.sub(r"(?m)^level-type=.*$", "level-type=" + level.replace(":", "\\:"), text)
@@ -863,10 +805,10 @@ def export(job, spec, inspect, colors, probes):
 
 
 def run_job(job, lock_held=False):
+    """lock_held: ignored (the old server lock; admission happens before run_job, in main)."""
     spec = job.spec
-    lock = ServerLock(job)
-    prep = None
     server = None
+    server_dir = None
     t_all = time.time()
     try:
         write_json(os.path.join(job.dir, "spec.json"), spec)
@@ -877,14 +819,17 @@ def run_job(job, lock_held=False):
                                                           "deeptime_jar_sha256", "deeptime_src_rev", "deeptime_src_hash")}
         tools = load_env(os.path.join(REPO, "smoke", "tools.env"))
         inspect, colors = build_tools(job, smoke)
-        if not lock_held:
-            lock.acquire()
-        for port in (install["game_port"], install["rcon_port"]):
+        # The job's ports (admit.py's slot; the set's own off the VM) and its private copy of the set.
+        ports = admission.ports({"game": install["game_port"], "rcon": install["rcon_port"]})
+        for port in (ports["game"], ports["rcon"]):
             if not port_free(port):
-                raise RuntimeError(f"port {port} is in use: another server is running outside the lock")
-        prep = Prepared(job, smoke)
-        world, jvm = prepare_world(job, spec, smoke, prep)
-        server = Server(job, smoke, install, tools, jvm)
+                raise RuntimeError(f"port {port} is in use by a server outside the admission tool")
+        server_dir = os.path.join(admission.server_dir() or job.dir, "server")
+        job.set("preparing", "copying the server set for this job")
+        instance.make(os.path.join(smoke, "server"), server_dir, ports=ports, say=job.say)
+        world, jvm = prepare_world(job, spec, server_dir)
+        server = Server(job, server_dir, install, tools, jvm, ports["rcon"],
+                        open(os.path.join(smoke, "rcon.pw")).read().strip())
         job.set("booting", f"{spec['profile']} server on {world}")
         server.start()
         server.wait_ready()
@@ -903,8 +848,6 @@ def run_job(job, lock_held=False):
         time.sleep(2)
         server.stop()
         job.timing("stop_s", round(time.time() - t, 1))
-        prep.restore()
-        lock.release()
         export(job, spec, inspect, colors, probes)
         if not spec.get("keep_world"):
             shutil.rmtree(world, ignore_errors=True)
@@ -918,9 +861,8 @@ def run_job(job, lock_held=False):
     finally:
         if server:
             server.stop()
-        if prep:
-            prep.restore()
-        lock.release()
+        if server_dir and not admission.server_dir():
+            shutil.rmtree(server_dir, ignore_errors=True)   # admit.py removes its job folder itself
 
 
 # ---------------------------------------------------------------------------------------------
@@ -932,7 +874,7 @@ def submit(spec, job=None):
     spec = normalise_spec(spec)
     active = [s for s in list_jobs() if s.get("state") not in TERMINAL]
     if len(active) >= MAX_ACTIVE:
-        raise Busy(f"{len(active)} previews are already queued or running (one server boots at a time); "
+        raise Busy(f"{len(active)} previews are already queued or running; "
                    f"wait for {active[-1]['job']} to finish")
     job = job or new_job_id()
     j = Job(job, spec)
@@ -946,7 +888,9 @@ def submit(spec, job=None):
     return j.st
 
 
-MAX_ACTIVE = 3
+# Previews queued or running at once from the workbench: a guard against a runaway client, not a
+# load limit (the admission tool decides when each starts).
+MAX_ACTIVE = 8
 
 
 class Busy(Exception):
@@ -1319,7 +1263,7 @@ def main():
     spec_args(r)
     r.add_argument("--job")
     r.add_argument("--from-spec", action="store_true", help="read <job>/spec.json (what submit wrote)")
-    r.add_argument("--lock-held", action="store_true", help="the caller (mac.sh --server) holds the server lock")
+    r.add_argument("--lock-held", action="store_true", help="ignored (the old server lock is gone)")
     r.add_argument("--install", action="store_true", help="run tools/smoke/install.sh <profile> first")
     s = sub.add_parser("submit")
     spec_args(s)
@@ -1373,8 +1317,13 @@ def main():
             sys.exit(f"preview.py: {e}")
         spec["_install"] = a.install
         j = Job(job, spec)
+        if not admission.admitted() and admission.available():
+            # Through the admission tool: it merges its waiting reason into the job's status.
+            j.set("waiting", "waiting for room on the test VM")
+            argv = [os.path.abspath(__file__)] + sys.argv[1:] + ([] if a.job else ["--job", job])
+            admission.ensure(f"preview:{spec['profile']}", status_json=os.path.join(j.dir, "status.json"), argv=argv)
         j.set("queued", "runner started")
-        rc = run_job(j, lock_held=a.lock_held)
+        rc = run_job(j)
         print(json.dumps(j.st, indent=1))
         sys.exit(rc)
 

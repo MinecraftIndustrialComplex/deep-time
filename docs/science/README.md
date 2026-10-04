@@ -73,6 +73,7 @@ them in from [_template.md](_template.md).
 | [provinces.md](provinces.md) | written with P1-10 (2026-10-02) | PRV |
 | [world-scale-and-bake.md](world-scale-and-bake.md) | stub | SCL, BAK |
 | [pole-cap.md](pole-cap.md) | stub | POL |
+| [quincuncial-projection.md](quincuncial-projection.md) | stage 1 (prototype only, not shipped) | SCL-070 to SCL-077 |
 | [geothermal-features.md](geothermal-features.md) | written (stage 2, WP-16) | GEO |
 
 Four ledgers have no page of their own; their rows belong with the pages of the subsystems they touch

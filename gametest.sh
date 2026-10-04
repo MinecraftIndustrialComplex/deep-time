@@ -15,28 +15,55 @@
 # Boots NeoForge's GameTest server (namespace `deeptime`, -Ddeeptime.gametest=true), runs
 # every required test and exits non-zero if anything failed or the run never reached the
 # tests. Every assertion logs the numbers it compared on a "[gametest]" line. The log is
-# left in neoforge/build/gametest.log.
+# left in neoforge/build/gametest-<set>.log, and copied to neoforge/build/gametest.log.
+#
+# On the test VM it runs through the admission tool (tools/remote/vm/admit.py, kind
+# gametest:<set>; Ben 2026-10-03: load-based admission, no server lock): it starts when its load
+# fits, and runs in its own folder (the job's DEEPTIME_SERVER_DIR/run-gametest) with a copy of the
+# set's jars and its own voice-chat port, so several GameTest runs, from one checkout too, run at once.
 
 set -uo pipefail
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 cd "$(dirname "$0")"
+
+# The server set this run links (neoforge/build.gradle serverSetFor): its name is the job's kind.
+SET=standalone
+for a in "$@"; do
+    case "$a" in
+        -PwithMic) SET=mic ;;
+        -PwithTerraBlender) [ "$SET" = standalone ] && SET=terrablender ;;
+        -PwithEv) [ "$SET" = standalone ] && SET=ev ;;
+        -PrunSet=*) SET="${a#-PrunSet=}" ;;
+    esac
+done
+ADMIT="${DEEPTIME_ADMIT:-/usr/local/lib/deeptime/admit.py}"
+if [ "${DEEPTIME_ADMIT_PID:-}" != "$$" ] && [ -f "$ADMIT" ]; then
+    exec python3 "$ADMIT" run --kind "gametest:$SET" --server --label "$(basename "$PWD")" -- "$SELF" "$@"
+fi
 
 # Inside the dev shell already (tools/remote/mac.sh enters it once)? Then run directly.
 dev() { if [ -n "${IN_NIX_SHELL:-}" ]; then "$@"; else nix develop -c "$@"; fi; }
 
-LOG=neoforge/build/gametest.log
 mkdir -p neoforge/build
+LOG="neoforge/build/gametest-$SET.log"
+RUN=run-gametest
+if [ -n "${DEEPTIME_SERVER_DIR:-}" ]; then
+    RUN="$DEEPTIME_SERVER_DIR/run-gametest"
+    export DEEPTIME_GAMETEST_DIR="$RUN"
+fi
+mkdir -p "$RUN"
 
 # The GameTest server reuses its world folder; stale test levels and world data from an
 # older build would be tested again, so they go first.
-rm -rf run-gametest/world
+rm -rf "$RUN/world"
 
 # World data for the test_planet_data level (P0-10): the analytic terrain written as world data,
 # with every rock class in its horizons (P1-12's StrataGameTests.everyClassInTheWorld).
-dev cargo run --release -q -p deeptime-cli -- synth --kind wrap-test --strata every-class --size 1024 --out run-gametest/world/deeptime-test \
+dev cargo run --release -q -p deeptime-cli -- synth --kind wrap-test --strata every-class --size 1024 --out "$RUN"/world/deeptime-test \
     || { echo "FAILED: deeptime synth"; exit 1; }
 # World data for the test_deposits levels (P1-15): the deposit engine's synthetic run (sites, bodies,
 # events) with a terrain baked from the synthetic history's present elevation, C = 4096.
-dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/tests/presets/deposits_world_4k.json --out run-gametest/world/deeptime-deposits \
+dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/tests/presets/deposits_world_4k.json --out "$RUN"/world/deeptime-deposits \
     || { echo "FAILED: deeptime run deposits_world_4k"; exit 1; }
 # World data for the test_planet_real level (P1-08): a small real planet (every stage, baked, format
 # 0.1) and Rust's column evaluator on 500 of its columns (parity/columns.json), which the real-planet
@@ -46,42 +73,65 @@ dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/
 # so they must pass on any of them (the simulation is not bit-identical across platforms).
 planet_sets=()
 for kv in ${DEEPTIME_TEST_PLANET_SET:-}; do planet_sets+=(--set "$kv"); done
-dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/tests/presets/planet_world_4k.json "${planet_sets[@]}" --out run-gametest/world/deeptime-real \
+dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/tests/presets/planet_world_4k.json "${planet_sets[@]}" --out "$RUN"/world/deeptime-real \
     || { echo "FAILED: deeptime run planet_world_4k"; exit 1; }
-dev cargo run --release -q -p deeptime-cli -- parity --world-data run-gametest/world/deeptime-real \
+dev cargo run --release -q -p deeptime-cli -- parity --world-data "$RUN"/world/deeptime-real \
     || { echo "FAILED: deeptime parity"; exit 1; }
 # World data for the test_lake level (P0-13): a basin and a closed channel holding water at y 120.
-dev cargo run --release -q -p deeptime-cli -- synth --kind lake-test --size 1024 --out run-gametest/world/deeptime-lake \
+dev cargo run --release -q -p deeptime-cli -- synth --kind lake-test --size 1024 --out "$RUN"/world/deeptime-lake \
     || { echo "FAILED: deeptime synth lake-test"; exit 1; }
+
+# The set's jars, copied for this run (an install.sh refreshing smoke/<set> meanwhile cannot change
+# them), and this job's voice-chat port (Simple Voice Chat binds one even in a GameTest server).
+if [ "$SET" != standalone ]; then
+    if [ -d "smoke/$SET/server/mods" ]; then
+        python3 tools/smoke/instance.py snapshot-mods --set "smoke/$SET/server" --dest "$RUN/set-mods" >/dev/null \
+            || { echo "FAILED: could not copy smoke/$SET/server/mods"; exit 1; }
+        export DEEPTIME_RUN_MODS="$PWD/$RUN/set-mods"
+        [ "${RUN#/}" != "$RUN" ] && export DEEPTIME_RUN_MODS="$RUN/set-mods"
+    fi
+fi
+python3 tools/smoke/instance.py ports --dir "$RUN"
 
 peak_rss_file=$(mktemp)
 echo 0 > "$peak_rss_file"
-# This checkout's game JVM: its command line names this checkout's mod folder (the game directory and
-# the other run options sit in an @argfile, so the old 'run-gametest' match never hit: 0 MB). The
-# physical path: Gradle resolves symlinks (/Volumes/Graphide -> /data on the test VM), $PWD does not.
-jvm_marker="deeptime%%$(pwd -P)/neoforge/"
-(
-    while true; do
-        # Without the dev shell's LD_LIBRARY_PATH: on Linux the system ps otherwise loads the shell's
-        # libsystemd, fails against the system glibc and reports nothing (0 MB).
-        rss=$(env -u LD_LIBRARY_PATH ps -ww -eo rss=,args= 2>/dev/null \
-              | grep -F -- "$jvm_marker" \
-              | grep -v grep \
-              | awk '{ if ($1 > max) max = $1 } END { print max + 0 }')
-        if [ -n "${rss:-}" ] && [ "$rss" -gt "$(cat "$peak_rss_file")" ]; then
-            echo "$rss" > "$peak_rss_file"
-        fi
-        sleep 2
-    done
-) &
-sampler=$!
-trap 'kill "$sampler" 2>/dev/null; rm -f "$peak_rss_file"' EXIT
+sampler=""
+tailer=""
+trap 'kill $sampler $tailer 2>/dev/null; rm -f "$peak_rss_file"' EXIT
 
+# Gradle writes the run's argument files (system properties: the datapack, the tests, DH expected)
+# into neoforge/build/moddev just before it starts the game JVM: two runs of this checkout must not
+# interleave there, so the launch holds the checkout's launch lock until this run's JVM is up.
+exec 7>neoforge/build/.run-launch.lock
+flock -n 7 || { echo "gametest.sh: waiting for this checkout's other Gradle run to start its JVM"; flock 7; }
 start=$(date +%s)
-(cd neoforge && dev ./gradlew runGameTestServer --console=plain "$@") 2>&1 | tee "$LOG"
-status=${PIPESTATUS[0]}
+: > "$LOG"
+(cd neoforge && dev ./gradlew runGameTestServer --console=plain "$@") >> "$LOG" 2>&1 7>&- &
+gradle_pid=$!
+tail -n +1 -f --pid=$gradle_pid "$LOG" 7>&- &
+tailer=$!
+jvm=$(python3 tools/smoke/instance.py wait-jvm --dir "$RUN" --pid $gradle_pid --timeout 1800 7>&-)
+flock -u 7
+exec 7>&-
+if [ -n "$jvm" ]; then
+    (
+        # This run's game JVM: the one whose working directory is this run's folder.
+        while [ -r "/proc/$jvm/status" ]; do
+            rss=$(awk '/^VmRSS:/ { print $2 }' "/proc/$jvm/status" 2>/dev/null)
+            if [ -n "${rss:-}" ] && [ "$rss" -gt "$(cat "$peak_rss_file")" ]; then
+                echo "$rss" > "$peak_rss_file"
+            fi
+            sleep 2
+        done
+    ) &
+    sampler=$!
+fi
+wait $gradle_pid
+status=$?
+wait $tailer 2>/dev/null
 elapsed=$(( $(date +%s) - start ))
 peak_kb=$(cat "$peak_rss_file")
+cp "$LOG" neoforge/build/gametest.log
 
 echo
 echo "--------------------------------------------------------------------"

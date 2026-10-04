@@ -10,6 +10,7 @@
 #                               minutes (default 30; /etc/default/deeptime-idle)
 #   deeptime-workbench.service  `deeptime watch` on 127.0.0.1:8642, at boot
 #   deeptime-play.service       the play server (port 25765; its folder in /etc/default/deeptime-play)
+#   admit.py                    the admission tool every heavy job goes through (not a service)
 #
 # All three are enabled (they start at boot). The watcher is restarted on every install; the
 # workbench and the play server are not touched unless --switch is given, which hands a hand-started
@@ -33,6 +34,23 @@ done
 
 sudo install -d -m 0755 "$LIB"
 sudo install -m 0755 "$HERE/idle-watcher.py" "$LIB/idle-watcher.py"
+# The admission tool (Ben, 2026-10-03: load-based admission): mac.sh, the server launchers and
+# detach.sh call $LIB/admit.py; `deeptime-admit` is the same on PATH. Its state lives in
+# deeptime-cache/admit/, the server jobs' folders in deeptime-cache/servers/. Installing a new
+# version while jobs run is safe: each running admit.py keeps the code it started with, and the
+# state file's format is shared.
+sudo install -m 0755 "$HERE/admit.py" "$LIB/admit.py"
+sudo ln -sfn "$LIB/admit.py" /usr/local/bin/deeptime-admit
+install -d -m 0775 /data/ban/deeptime-cache/admit /data/ban/deeptime-cache/servers
+if [ ! -e /etc/default/deeptime-admit ]; then
+    sudo tee /etc/default/deeptime-admit >/dev/null <<'EOF'
+# tools/remote/vm/admit.py (deep-time repo). Read by every admit.py call; no restart needed.
+# OVERCOMMIT=0.25       start a job when its estimate fits in what is free plus this share
+# RESERVE_CORES=4       headroom kept for the play server, a workbench run and ssh
+# RESERVE_MEM_GIB=15
+# STARVE_MIN=15         after this wait, nothing starts ahead of the oldest waiting job
+EOF
+fi
 sudo install -m 0755 "$HERE/play-server.sh" "$LIB/play-server.sh"
 for u in deeptime-idle deeptime-workbench deeptime-play; do
     sudo install -m 0644 "$HERE/$u.service" "/etc/systemd/system/$u.service"
