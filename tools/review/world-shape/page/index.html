@@ -1,0 +1,303 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
+<!-- Deep Time review page: the world's shape (Lambert, the pillowcase family, the cube family), the cube's face
+     size and net, and how each plays with the seam technology. Source: tools/review/world-shape/ (plan §2.6).
+     Pictures and data come from tools/review/world-shape/compute.py, run on the test VM over a real 16k bake;
+     the distortion numbers are those of docs/research/notes/seamless-projection-survey.md. No network: three.js
+     (MIT) is a local copy, fonts are system faces (spacesheep's viewer blocks web fonts). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Deep Time World Shape</title>
+<meta name="description" content="Lambert, the pillowcase maps or an equal-area cube for Deep Time's world, with the cube's face size and net: real-planet maps, distortion, seams, walks, a folding 3D globe and the seam technology, for Ben's decision.">
+<style>
+/* Layout: one reading column (68ch) with full-width figure bands; the map explorer and the globe are the
+   instruments, everything else is a chart table. Colours are map colours: seam kinds are semantic. */
+:root{
+  color-scheme: light;
+  --bg:#ECEFEC; --panel:#F8FAF8; --panel-2:#E3E8E5; --ink:#15222A; --ink-2:#43525A; --ink-3:#66757C;
+  --rule:#C5CFCC; --rule-2:#D8DFDC; --accent:#1E5AA8; --accent-bg:#DCE6F4;
+  --slide:#0B8577; --quarter:#C9711D; --half:#C0185A; --corner:#F2C230; --corner-ink:#3A2E00;
+  --rec:#17683F; --rec-bg:#D5EDDF; --warn:#9A5B0E; --warn-bg:#F6E6CC; --bad:#A8231B; --bad-bg:#F5DAD7;
+  --walk-eq:#1F63D8; --walk-pole:#7B3FC4; --walk-a:#E5383B; --walk-b:#1B1F3B;
+  --stage:#0C1317; --stage-ink:#DCE6E9; --stage-ink-2:#8FA3AA;
+  --f-display:"Charter","Bitstream Charter","Sitka Text","Iowan Old Style","Palatino Linotype",Georgia,serif;
+  --f-body:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --f-mono:ui-monospace,"JetBrains Mono","SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  color-scheme: dark;
+  --bg:#0F1519; --panel:#161E23; --panel-2:#1D272D; --ink:#E2E9EB; --ink-2:#A8B5BA; --ink-3:#7D8C92;
+  --rule:#2C3940; --rule-2:#232E34; --accent:#7FB0F0; --accent-bg:#1B2A3D;
+  --slide:#38C2B0; --quarter:#F2A257; --half:#F2679E; --corner:#F5CF4A; --corner-ink:#2B2200;
+  --rec:#5BCB93; --rec-bg:#16301F; --warn:#E5AE5C; --warn-bg:#33270F; --bad:#F08A80; --bad-bg:#3A1A17;
+  --walk-eq:#6FA3FF; --walk-pole:#B48AF0; --walk-a:#FF6B6E; --walk-b:#F1F3FF;
+}}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0F1519; --panel:#161E23; --panel-2:#1D272D; --ink:#E2E9EB; --ink-2:#A8B5BA; --ink-3:#7D8C92;
+  --rule:#2C3940; --rule-2:#232E34; --accent:#7FB0F0; --accent-bg:#1B2A3D;
+  --slide:#38C2B0; --quarter:#F2A257; --half:#F2679E; --corner:#F5CF4A; --corner-ink:#2B2200;
+  --rec:#5BCB93; --rec-bg:#16301F; --warn:#E5AE5C; --warn-bg:#33270F; --bad:#F08A80; --bad-bg:#3A1A17;
+  --walk-eq:#6FA3FF; --walk-pole:#B48AF0; --walk-a:#FF6B6E; --walk-b:#F1F3FF;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:20px;padding-block:0 80px}
+.prose{max-width:72ch}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;text-wrap:balance;letter-spacing:-.005em}
+h1{font-size:clamp(2rem,4.2vw,3.1rem);line-height:1.08;margin:.2em 0 .25em}
+h2{font-size:1.75rem;line-height:1.2;margin:2.6em 0 .4em;padding-top:.6em;border-top:1px solid var(--rule)}
+h3{font-size:1.18rem;margin:1.6em 0 .4em}
+p{margin:.55em 0}
+a{color:var(--accent)}
+a:focus-visible,button:focus-visible,input:focus-visible,label:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.eyebrow{font:600 .72rem/1 var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.lead{font-size:1.1rem;color:var(--ink-2);max-width:70ch}
+small,.note{color:var(--ink-3);font-size:.86rem}
+code,.mono{font-family:var(--f-mono);font-size:.88em}
+.num{font-variant-numeric:tabular-nums}
+nav.toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--rule);margin-inline:-20px;padding:8px 20px;display:flex;gap:4px 14px;flex-wrap:wrap;font-size:.84rem}
+nav.toc a{color:var(--ink-2);text-decoration:none;white-space:nowrap}
+nav.toc a:hover{color:var(--accent)}
+header.top{padding-top:28px}
+/* decision cards */
+.decisions{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px;margin:22px 0 8px}
+.dcard{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.dcard h3{margin:0;font-size:1.05rem}
+.dcard .q{color:var(--ink-3);font-size:.86rem}
+.opt{display:flex;gap:10px;align-items:flex-start;font-size:.92rem;padding:6px 8px;border-radius:6px}
+.opt.rec{background:var(--rec-bg)}
+.opt b{font-weight:600}
+.tag{display:inline-block;font:600 .68rem/1.5 var(--f-body);letter-spacing:.06em;text-transform:uppercase;padding:1px 7px;border-radius:999px;white-space:nowrap}
+.tag.rec{background:var(--rec);color:var(--panel)}
+.tag.run{background:var(--accent-bg);color:var(--accent)}
+.tag.now{background:var(--panel-2);color:var(--ink-2)}
+.tag.out{background:var(--bad-bg);color:var(--bad)}
+.tag.alt{background:var(--warn-bg);color:var(--warn)}
+/* explorer */
+.explorer{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:18px;align-items:start;margin-top:14px}
+@media (max-width:980px){.explorer{grid-template-columns:1fr}}
+.picker{display:flex;flex-direction:column;gap:6px;margin:10px 0 12px}
+.picker .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.picker .fam{font:600 .7rem/1 var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);width:84px;flex:none}
+.chip{font:500 .84rem/1.2 var(--f-body);border:1px solid var(--rule);background:var(--panel);color:var(--ink);padding:5px 10px;border-radius:999px;cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.chip .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px;background:var(--ink-3)}
+.chip .dot.rec{background:var(--rec)}
+.controls{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:.86rem;margin:8px 0}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:7px;overflow:hidden}
+.seg button{font:500 .82rem var(--f-body);background:var(--panel);color:var(--ink-2);border:0;border-right:1px solid var(--rule);padding:5px 10px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel)}
+.checks{display:flex;flex-wrap:wrap;gap:4px 12px}
+.checks label{display:inline-flex;gap:5px;align-items:center;cursor:pointer;color:var(--ink-2)}
+.stagebox{background:var(--stage);border-radius:8px;padding:10px;position:relative}
+.mapbox{position:relative;width:100%;margin:0 auto}
+.mapbox img,.mapbox svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.mapbox img.grat{mix-blend-mode:normal}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;color:var(--stage-ink-2);font-size:.78rem;margin-top:8px}
+.legend .sw{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.legend .bar{display:inline-block;width:160px;height:10px;border-radius:2px;vertical-align:middle;margin:0 6px}
+.legend .cn{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--corner);border:1.5px solid #000;vertical-align:-1px;margin-right:5px}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:16px 18px;min-width:0}
+.panel h3{margin:.1em 0 .2em}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:.86rem;margin:10px 0}
+.kv dt{color:var(--ink-3)}
+.kv dd{margin:0}
+.pc{display:grid;grid-template-columns:1fr;gap:8px;font-size:.88rem}
+.pc ul{margin:.2em 0;padding-left:1.1em}
+.pc li{margin:.2em 0}
+.pc .pro h4,.pc .con h4{margin:.4em 0 0;font:600 .72rem/1 var(--f-body);letter-spacing:.1em;text-transform:uppercase}
+.pc .pro h4{color:var(--rec)} .pc .con h4{color:var(--bad)}
+/* tables */
+.tscroll{overflow-x:auto;margin:12px 0;border:1px solid var(--rule);border-radius:8px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:.84rem}
+#cmp{min-width:1560px}
+#cmp td:nth-child(1){width:180px}#cmp td:nth-child(2){width:150px}#cmp td:nth-child(4){width:170px}#cmp td:nth-child(5){width:140px}#cmp td:nth-child(7){width:220px}#cmp td:nth-child(8){width:150px;white-space:normal}#cmp td:nth-child(9),#cmp td:nth-child(10){width:210px}
+#tech-table{min-width:1280px}#tech-table td{width:13%}#tech-table td:first-child{width:110px}
+#size-table{min-width:1100px}
+th,td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule-2)}
+th{font-weight:600;color:var(--ink-2);background:var(--panel-2);position:sticky;top:0}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.rec td{background:var(--rec-bg)}
+tr.rec td:first-child{box-shadow:inset 3px 0 0 var(--rec)}
+tr.ref td{color:var(--ink-2)}
+td .sub{display:block;color:var(--ink-3);font-size:.78rem}
+.st{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
+.st.ok{background:var(--rec)} .st.mid{background:var(--quarter)} .st.bad{background:var(--bad)} .st.na{background:var(--ink-3)}
+/* figures */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin:12px 0}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin:12px 0}
+figure{margin:0;min-width:0}
+figcaption{font-size:.84rem;color:var(--ink-2);margin-top:6px}
+.fig{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:12px;min-width:0}
+.fig h4{margin:0 0 6px;font:600 .9rem var(--f-body)}
+svg text{font-family:var(--f-body)}
+.callout{border-left:3px solid var(--accent);background:var(--accent-bg);padding:10px 14px;border-radius:0 6px 6px 0;margin:14px 0;max-width:80ch}
+.callout.rec{border-color:var(--rec);background:var(--rec-bg)}
+.callout.warn{border-color:var(--warn);background:var(--warn-bg)}
+.globe-wrap{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:980px){.globe-wrap{grid-template-columns:1fr}}
+#globe{width:100%;aspect-ratio:4/3;max-height:640px;border-radius:8px;background:radial-gradient(circle at 50% 45%,#1A2830 0%,#0A1014 70%);touch-action:none;cursor:grab;display:block}
+.slider{display:flex;gap:10px;align-items:center;margin-top:10px;font-size:.84rem;color:var(--ink-2)}
+.slider input{width:100%}
+.slider .stops{display:flex;justify-content:space-between;font-size:.74rem;color:var(--ink-3)}
+button.act{font:600 .84rem var(--f-body);background:var(--ink);color:var(--panel);border:0;border-radius:6px;padding:6px 12px;cursor:pointer}
+.findings li{margin:.5em 0}
+.foot{margin-top:60px;color:var(--ink-3);font-size:.82rem;border-top:1px solid var(--rule);padding-top:14px}
+.kind{font-weight:600}
+.kind.slide{color:var(--slide)} .kind.quarter{color:var(--quarter)} .kind.half{color:var(--half)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow">Deep Time · decision page · 2026-10-03</div>
+  <h1>The world's shape</h1>
+  <p class="lead">Which flat world should hold the planet: today's Lambert strip, a pillowcase (two squares, Guyou's layout) or a cube (six squares)? And if a cube, how big are its faces and how is it unfolded? Every picture below is computed from the survey's own projection code with a real 16k bake (earthlike_quick_16k, workbench run <span class="mono">1a103bb2d2b</span>) resampled onto each world.</p>
+</header>
+<nav class="toc" aria-label="Sections">
+  <a href="#decide">Decide</a><a href="#why">Why a cube can win</a><a href="#maps">Maps</a><a href="#globe-sec">3D globe</a><a href="#compare">Compare</a><a href="#tech">Seam technology</a><a href="#size">Face size</a><a href="#net">Net</a><a href="#walks">Walking</a><a href="#sim">Simulation grid</a><a href="#findings">New findings</a><a href="#method">Method</a>
+</nav>
+
+<section id="decide">
+  <h2>The three decisions</h2>
+  <p class="prose">Recommendations follow the projection survey except where this page's own measurements add something (marked in <a href="#findings">New findings</a>). Each option has its fair case further down.</p>
+  <div class="decisions" id="decision-cards"></div>
+</section>
+
+<section id="why">
+  <h2>Why a cube can beat a pillowcase</h2>
+  <div class="grid2">
+    <div class="prose">
+      <p>Glue flat squares of block grid together with slides, half-turns and quarter-turns until they cover the planet once. Walking round almost any point you turn 360°. At a few <b>corners</b> you turn less, and by Gauss–Bonnet the missing angles always add up to <b>720°</b>. Since every glue is a multiple of 90°, a corner can miss 90° or 180° (or 270°, worse).</p>
+      <ul>
+        <li><b>Pillowcase</b> (Peirce, Guyou, Petroff, Gringorten, Collignon): 4 corners × 180° missing. Half-turn seams make it possible.</li>
+        <li><b>Cube</b> (Moser cube, QSC, HEALPix, the graphics warps): 8 corners × 90° missing. Only quarter-turn seams make it possible, which Immersive Portals and the wrap engine both allow.</li>
+      </ul>
+      <p>The less a corner misses, the less any map must distort round it. An equal-area map must stretch shapes to at least 2π/θ near a corner of angle θ: <b>2×</b> for the pillowcase, <b>1.33×</b> for the cube. The best measured maps reach 2.67× (Petroff) and 1.42× (Moser cube). A conformal map must instead blow up area: like r⁻² round a pillowcase corner, only r^−⅔ round a cube corner.</p>
+    </div>
+    <figure class="fig"><div id="cone-fig"></div><figcaption>What 360° of planet looks like round a corner in each world: a full disc of world (ordinary point), three quarters (cube corner, 270°), half (pillowcase corner, 180°). The same planet area is squeezed into less angle, so shapes stretch.</figcaption></figure>
+  </div>
+</section>
+
+<section id="maps">
+  <h2>Every candidate, with the real planet on it</h2>
+  <p class="prose">Pick a world. Layers: the planet itself, how many blocks each piece of planet gets (area), how stretched shapes are (shape), and a crease test (a smooth made-up planet, hill-shaded: wherever the map folds, the shading breaks along a line). Overlays: the seams (colour = how the edge is glued, letters and arrows = which edges meet and which way round), the corners, a 15° graticule, Tissot ellipses (each is a 6° disc of planet as the world draws it) and two straight walks.</p>
+  <div class="picker" id="picker"></div>
+  <div class="explorer">
+    <div>
+      <div class="controls">
+        <div class="seg" id="layer-seg" role="group" aria-label="Layer"></div>
+        <div class="checks" id="overlay-checks"></div>
+      </div>
+      <div class="stagebox">
+        <div class="mapbox" id="mapbox"></div>
+        <div class="legend" id="map-legend"></div>
+      </div>
+      <p class="note">Radial streaks round the poles come from the Lambert bake (its rows resolve the polar caps badly), not from the projection; a production bake samples the caps from the simulation's sphere (prototype §5). Longitudes are turned so corners avoid land where they can (λ₀ = <span id="lam0"></span>° for the cubes, λc = <span id="lamc"></span>° for Guyou; see <a href="#walks">placement</a>).</p>
+    </div>
+    <aside class="panel" id="cand-panel" aria-live="polite"></aside>
+  </div>
+</section>
+
+<section id="globe-sec">
+  <h2>Folding the world onto the planet</h2>
+  <div class="globe-wrap">
+    <div>
+      <canvas id="globe" aria-label="3D view: the world's net folding into a cube or pillowcase and inflating into the planet"></canvas>
+      <div class="slider">
+        <button class="act" id="g-play" type="button">Play</button>
+        <div style="flex:1;min-width:0">
+          <input id="g-t" type="range" min="0" max="200" value="200" aria-label="Fold">
+          <div class="stops"><span>flat net</span><span>folded</span><span>planet</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="picker" id="g-picker" style="margin-top:0"></div>
+      <div class="checks" id="g-checks"></div>
+      <p class="note" id="g-caption" style="margin-top:12px"></p>
+      <p class="note">Drag to turn, scroll or pinch to zoom. The texture is the world map itself, so at "planet" you see exactly where every face, seam and corner lands. Seams and corners appear once the shape is fully inflated.</p>
+    </div>
+  </div>
+</section>
+
+<section id="compare">
+  <h2>Side by side</h2>
+  <p class="prose">Distortion numbers are the survey's (300 × 300 samples per face, weighted by planet area). Seam lengths count each glued edge once, at today's 16k scale. Effort is agent-days; "IP" is the production world joined by Immersive Portals, "engine" Deep Time's own wrap engine.</p>
+  <div class="tscroll"><table id="cmp"></table></div>
+</section>
+
+<section id="tech">
+  <h2>How each shape plays with the seam technology</h2>
+  <p class="prose">Immersive Portals is the chosen route for v1; the wrap engine (folded access plus a replicated band) is being built in parallel, with Toroidal World keeping the east–west slide and the engine owning the turning edges (decisions log, 2026-10-03).</p>
+  <div class="tscroll"><table id="tech-table"></table></div>
+</section>
+
+<section id="size">
+  <h2>The cube's face size</h2>
+  <div class="grid2">
+    <div class="prose" id="size-text"></div>
+    <figure class="fig"><h4>The equatorial band at 16k, to scale, over Minecraft's 512-block region grid</h4><div id="size-ruler"></div><figcaption>Faces in alternating tints, seams in their kind's colour. With power-of-two faces every face edge and every seam sits on a region line, and the band is today's 16,384 blocks round.</figcaption></figure>
+  </div>
+  <div class="tscroll"><table id="size-table"></table></div>
+  <div class="grid2">
+    <figure class="fig"><h4>Chunk view of a face corner (3,776 blocks)</h4><div id="size-chunks-a"></div><figcaption>Face edges (236 chunks) and quarter-turn centres fall on chunk corners: the wrap engine can turn whole chunks. Region lines (every 32 chunks) cut through the face.</figcaption></figure>
+    <figure class="fig"><h4>Chunk view of a face corner (4,096 blocks)</h4><div id="size-chunks-b"></div><figcaption>Face edges sit on region lines too: each region file belongs to exactly one face.</figcaption></figure>
+  </div>
+</section>
+
+<section id="net">
+  <h2>The cube's net</h2>
+  <div class="grid2" id="net-maps"></div>
+  <div class="tscroll"><table id="net-table"></table></div>
+</section>
+
+<section id="walks">
+  <h2>What a player walks through</h2>
+  <p class="prose">Every seam is a rigid motion of the block grid, so a straight walk stays straight across every seam; only the heading in raw coordinates changes, and the portal or engine hides that. The maps show two straight walks per world: once round the equator, and north over a pole down to the equator on the far side.</p>
+  <div class="grid4" id="walk-grid"></div>
+  <div class="grid2">
+    <figure class="fig"><h4>Blocks per degree of planet along the equator walk</h4><div id="eq-chart"></div><figcaption>Lambert is true on the equator (45.5 blocks a degree). The Moser cube matches that at each face centre and draws the equator 17 % shorter at the face edges: 15,104 blocks round at today's scale, 8 % short on average (16,384 with 4,096-block faces). Petroff's Guyou world swings from 30 blocks a degree at a hemisphere centre to 46 at its edge.</figcaption></figure>
+    <figure class="fig"><h4>Two walkers either side of a corner</h4><div id="corner-fig"></div><figcaption id="corner-cap"></figcaption></figure>
+  </div>
+  <h3 id="placement">Where the corners land on this planet</h3>
+  <div class="grid2">
+    <figure class="fig"><h4>Cube: land within 3° of the worst corner, by λ₀</h4><div id="sweep-cube"></div></figure>
+    <figure class="fig"><h4>Guyou: land within 3° of the worst singular point, by λc</h4><div id="sweep-guyou"></div></figure>
+  </div>
+  <p class="note prose">The bake can turn the planet about its axis to keep corners off land. On an equal-area cube a corner magnifies nothing, so this matters less than for the conformal Peirce/Guyou map, where the four points must be at sea; it still keeps three-way portal corners away from builds.</p>
+</section>
+
+<section id="sim">
+  <h2>The simulation grid</h2>
+  <div class="callout warn"><b>Research in progress.</b> <span id="sim-status">A separate agent is surveying sphere-native grids for the climate and surface simulation, with benchmarks, in <span class="mono">docs/research/notes/sphere-native-grids.md</span>; that note had not landed when this page was published.</span></div>
+  <div class="prose">
+    <p>The plates already run on a sphere mesh; the climate and surface solvers run on the flat Lambert grid, whose polar cells are badly stretched. The world shape and the simulation grid are separate choices (Ben chose to project only at the bake), but they interact at the bake:</p>
+  </div>
+  <div class="tscroll"><table id="sim-table"></table></div>
+</section>
+
+<section id="findings">
+  <h2>What this page found that the survey did not say</h2>
+  <ol class="findings prose" id="findings-list"></ol>
+</section>
+
+<section id="method">
+  <h2>Method and sources</h2>
+  <div class="prose" id="method-text"></div>
+</section>
+<div class="foot" id="foot"></div>
+</div>
+<script src="data.js"></script>
+<script src="three.min.js"></script>
+<script src="app.js"></script>
+<script src="globe.js"></script>
+</body>
+</html>
