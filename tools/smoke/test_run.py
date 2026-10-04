@@ -66,7 +66,7 @@ class ProbeConsistency(unittest.TestCase):
 
     def fake_cli(self, elevation, top_y):
         with open(self.cli, "w") as f:
-            f.write("#!/bin/sh\necho '" + json.dumps({"elevation": elevation, "top_y": top_y}) + "'\n")
+            f.write("#!/bin/sh\necho '" + json.dumps({"surface": elevation, "top_y": top_y}) + "'\n")
         os.chmod(self.cli, os.stat(self.cli).st_mode | stat.S_IEXEC)
 
     def check(self, probe):
@@ -100,6 +100,27 @@ class ProbeConsistency(unittest.TestCase):
         steps = self.check({"terrainH": 1.0, "surfaceY": 1})
         self.assertFalse(steps.failed)
         self.assertIn("skipped", steps.rows[0][2])
+
+
+class CompatMixins(unittest.TestCase):
+    def mods(self, *names):
+        d = tempfile.mkdtemp()
+        for n in names:
+            open(os.path.join(d, n), "w").close()
+        return d
+
+    def test_each_compat_mixin_is_expected_only_when_its_mod_is_installed(self):
+        none = run.expected_compat_mixins(self.mods("deeptime-1.21.1-0.0.1.jar"))
+        self.assertEqual(none, [])
+        labels = [l for l, *_ in run.expected_compat_mixins(self.mods(
+            "createoreexcavation-1.21-1.6.8.jar", "createdieselgenerators-1.21.1-1.3.15.jar"))]
+        self.assertEqual(labels, ["Create Ore Excavation (COE)", "Create Diesel Generators (CDG)"])
+
+    def test_the_dh_guard_needs_both_distant_horizons_and_toroidal_world(self):
+        only_dh = run.expected_compat_mixins(self.mods("DistantHorizons-3.3.1.jar"))
+        both = run.expected_compat_mixins(self.mods("DistantHorizons-3.3.1.jar", "toroidal_world-0.19.3.jar"))
+        self.assertEqual(only_dh, [])
+        self.assertEqual([c for _, c, *_ in both], ["deeptime.tw_dh.mixins.json"])
 
 
 if __name__ == "__main__":

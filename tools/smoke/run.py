@@ -240,6 +240,25 @@ class Server:
         return [l.rstrip() for l in self.lines if rx.search(l)][:limit]
 
 
+# Compat mixins that must have applied by "Done (" when their mod is in the set (P1-13 exit item 2:
+# "every mixin is applied (COE, CDG and the DH guard)"): (label, config, jar name pattern, mixins).
+# The DH guard needs Toroidal World as well as Distant Horizons (TwDhGuardMixinPlugin).
+COMPAT_EXPECTED = [
+    ("Create Ore Excavation (COE)", "deeptime.mixins.json", [r"createoreexcavation"],
+     ["OreVeinGeneratorMixin", "OreDataMixin", "RandomSpreadGeneratorMixin"]),
+    ("Create Diesel Generators (CDG)", "deeptime.mixins.json", [r"createdieselgenerators"],
+     ["OilChunksSavedDataMixin"]),
+    ("Distant Horizons guard", "deeptime.tw_dh.mixins.json", [r"distanthorizons", r"toroidal_world"],
+     ["DhGeneratorsMixin"]),
+]
+
+
+def expected_compat_mixins(mods_dir):
+    jars = [n.lower() for n in os.listdir(mods_dir) if n.endswith(".jar")]
+    return [(label, config, rxs, wanted) for label, config, rxs, wanted in COMPAT_EXPECTED
+            if all(any(re.search(rx, j) for j in jars) for rx in rxs)]
+
+
 def declared_mixins(mods_dir, config):
     """The `mixins` (+ `server`) arrays of a config, searched through jars and their jar-in-jars."""
     def search(zf, name):
@@ -664,7 +683,7 @@ def probe_consistency(steps, rcon, server, world_data, size):
             bad.append(f"({x},{z}) no answer: {out[:80] or ref.stderr[:80]}")
             continue
         col = json.loads(ref.stdout)
-        h_java, h_rust = probe.get("terrainH"), col.get("elevation")
+        h_java, h_rust = probe.get("terrainH"), col.get("surface")
         surf_y, top_y = probe.get("surfaceY"), col.get("top_y")
         # terrainH is the world data's ground height in blocks at the column; the generator's base
         # height is the integer surface (rounding, the seabed under water: within 2 blocks of top_y).
@@ -927,6 +946,12 @@ def main():
             steps.record("Deep Time's Distant Horizons guard mixins applied (deeptime.tw_dh.mixins.json)",
                          ", ".join(sorted(k.rsplit(".", 1)[-1] for k in server.applied("deeptime.tw_dh.mixins.json"))) or "none")
             steps.record("Toroidal World compat configs that applied", ", ".join(other) or "none")
+            for label, config, jar_rx, wanted in expected_compat_mixins(mods_dir):
+                got = {k.rsplit(".", 1)[-1] for k in server.applied(config)}
+                missing = [w for w in wanted if w not in got]
+                steps.check(f"{label} mixins applied by Done (", f"{len(wanted)} of {len(wanted)}",
+                            f"{len(wanted) - len(missing)} of {len(wanted)}" + (f" (missing: {', '.join(missing)})" if missing else ""),
+                            not missing, note=f"{config}: {', '.join(wanted)}")
 
             if is_planet:
                 out = rcon("deeptime probe tw", check=False)
