@@ -79,7 +79,7 @@ class WrapTopologyTest {
         assertEquals(1, img.size());
         assertArrayEquals(new int[]{cx + 2, z0 - 1}, img.get(0));
         assertTrue(t.images(cx - 3, z0 + 8).isEmpty(), "a block deeper inside than the band has no image");
-        checkLocalIsometry(t, cx - 8, cx + 8, z0 - 8, z0 + 8, 8);
+        checkLocalIsometry(t, cx - 8, cx + 8, z0 - 8, z0 + 8, 8, (x, z) -> x >= cx - 8 && x < cx + 8);
     }
 
     @Test
@@ -120,7 +120,7 @@ class WrapTopologyTest {
         WrapTopology.Fold g = t.fold(-2, 5);
         assertNotNull(g);
         assertEquals(3, g.iso().quarterTurns());
-        checkLocalIsometry(t, -15, 200, -15, 200, 16);
+        checkLocalIsometry(t, -15, 200, -15, 200, 16, (x, z) -> x >= 0 || z >= 0);
     }
 
     /**
@@ -130,19 +130,31 @@ class WrapTopologyTest {
      * fluids, redstone and collisions.
      */
     private static void checkLocalIsometry(WrapTopology t, int x0, int x1, int z0, int z1, int depth) {
+        checkLocalIsometry(t, x0, x1, z0, z1, depth, (x, z) -> true);
+    }
+
+    /**
+     * As above, for a bounded topology: {@code valid} excludes the blocks a bounded seam leaves
+     * unglued (past the ends of a test seam, the quadrant a corner gluing does not cover).
+     */
+    private static void checkLocalIsometry(WrapTopology t, int x0, int x1, int z0, int z1, int depth,
+                                           java.util.function.BiPredicate<Integer, Integer> valid) {
         Random r = new Random(42);
         int checked = 0;
         for (int i = 0; i < 40000; i++) {
             int x = x0 + r.nextInt(x1 - x0), z = z0 + r.nextInt(z1 - z0);
-            if (!withinReach(t, x, z, depth - 1))
+            if (!withinReach(t, x, z, depth - 1) || !valid.test(x, z))
                 continue;
             Canon q = canon(t, x, z);
             for (int[] d : DIRS) {
-                if (!withinReach(t, x + d[0], z + d[1], depth - 1))
+                if (!withinReach(t, x + d[0], z + d[1], depth - 1) || !valid.test(x + d[0], z + d[1]))
                     continue;
                 Canon direct = canon(t, x + d[0], z + d[1]);
                 double[] rd = q.iso.applyVector(d[0], d[1]);
-                Canon stepped = canon(t, q.x + (int) Math.round(rd[0]), q.z + (int) Math.round(rd[1]));
+                int sx = q.x + (int) Math.round(rd[0]), sz = q.z + (int) Math.round(rd[1]);
+                if (!valid.test(sx, sz))
+                    continue;
+                Canon stepped = canon(t, sx, sz);
                 assertEquals(direct.x, stepped.x, "x at (" + x + ", " + z + ") + " + d[0] + "," + d[1]);
                 assertEquals(direct.z, stepped.z, "z at (" + x + ", " + z + ") + " + d[0] + "," + d[1]);
                 assertEquals(direct.iso.quarterTurns(), stepped.iso.compose(q.iso).quarterTurns(),
