@@ -67,12 +67,14 @@ includes writing the folder):
 | full, scattered, 500 Myr | mid6 (6 GiB) | **killed** after 494 s: out of memory in the coupled stage | | | | | > 6 GiB | |
 | full, supercontinent, 500 Myr | mid6 (6 GiB) | **killed** after 924 s: out of memory in the coupled stage | | | | | > 6 GiB | |
 | full, scattered, 500 Myr | mid6 on 16 GiB | **1,236 s** (20.6 min) | 1,063 s (179 / 174 / 545 / 60 / 104) | 70 s | 25 + 31 s | 45 s | **8.9 GiB** | 204 MB |
-{{FULL_ROWS}}
+| full, supercontinent, 500 Myr | mid6 on 16 GiB | **1,325 s** (22.1 min) | 1,119 s (196 / 175 / 566 / 63 / 116) | 81 s | 30 + 34 s | 59 s | 7.7 GiB | 222 MB |
+| full, scattered, 1000 Myr | mid6 on 16 GiB | **2,548 s** (42.5 min) | 2,286 s (423 / 342 / 1,190 / 127 / 199) | 148 s | 27 + 28 s | 57 s | **9.5 GiB** (1.4 GiB of history spilled to disk as well) | 285 MB |
 
 Peak memory is the run's peak resident set. Sampled every 2 s, the quick 500-Myr run peaks at
 2.4 GiB in the coupled stage, 2.5 GiB in deposits and **4.2 GiB in young + amplify + bake** (the
 amplifier holds the whole 8192 × 2624 terrain level); the full run at 7.6 GiB in the coupled stage
-and 8.8 GiB at the end.
+and 8.8 GiB at the end; the full 1,000-Myr run at 8.6 GiB in the coupled stage and 9.3 GiB at the
+end, while its accounting said 3.4 GiB and pushed 1.4 GiB of history to disk.
 
 ### 1.3 Findings
 
@@ -81,8 +83,9 @@ and 8.8 GiB at the end.
    On a fast current desktop, divide by 1.2–1.4 (inferred): about 4–5 and 7–8 minutes. The two starts
    cost the same.
 2. **The full preset does not fit a 16 GB PC.** It needs 8.9 GiB resident at 500 Myr and was killed
-   twice on the 6 GiB profile. On a real PC without a cgroup the OS would swap or kill the game. It
-   takes 20 minutes on 6 cores when it fits.
+   twice on the 6 GiB profile; at 1,000 Myr it needs 9.5 GiB. On a real PC without a cgroup the OS
+   would swap or kill the game. It takes 21–22 minutes for 500 Myr and 42 minutes for 1,000 Myr on 6
+   cores when it fits.
 3. **The memory cap does not hold the run.** Both presets run with the client's 4 GiB cap and the
    run's own accounting keeps under it: quick reports "982 MiB in use of the 4096 MiB cap" after the
    coupled stage (reserved peak 2.9 GiB); full reports 2,645 MiB after the coupled stage and 3,586
@@ -99,7 +102,41 @@ and 8.8 GiB at the end.
 
 ## 2. Option (a): a faster quick mode
 
-{{OPTION_A}}
+**What it is.** A built-in preset family beside quick and full (`earthlike_express_16k`, and a 32k
+one), made of settings the presets already have: a coarser grid, longer steps, fewer climate
+snapshots. No new simulation code; the player picks it on the setup page like quick or full.
+
+**Measured.** Each candidate is the quick preset, scattered continents, 500 Myr, on `mid6`, with one
+change (the `quality` section of the matrix; baseline 349 s):
+
+| Candidate | Change (`--set`) | Total | Speed-up | Coupled (plates / climate / surface / volcanoes / structure) | Peak memory | Folder |
+|---|---|---|---|---|---|---|
+| base | today's quick preset | 349 s | 1.0× | 285 s (41 / 80 / 119 / 15 / 29) | 4.2 GiB | 130 MB |
+| l1r32 | `resolution.l1_r` 16 → 32: the L1 grid 512 × 164 instead of 1024 × 328 (4× fewer cells) | 160 s | **2.2×** | 125 s (32 / 52 / 25 / 5 / 10) | 3.4 GiB | 89 MB |
+| l0-50k | `resolution.l0_samples` 100,000 → 50,000 (the plates' points) | 329 s | 1.06× | 271 s (29 / 73 / 124 / 16 / 28) | 4.1 GiB | 131 MB |
+| step4 | `tectonics.time_step_myr` 2 → 4, `climate.snapshot_every_myr` 10 → 20 | 215 s | **1.6×** | 162 s (23 / 51 / 60 / 6 / 22) | 4.1 GiB | 135 MB |
+| kf100 | `keyframes.every_myr` 50 → 100 (half the timelapse frames) | 343 s | 1.0× | 280 s | 4.2 GiB | 105 MB |
+| len250 | 250 Myr instead of 500 (already the player's choice) | 204 s | 1.7× | 151 s (23 / 44 / 60 / 8 / 16) | 3.8 GiB | 93 MB |
+| **express** | l1r32 + l0-50k + step4 + kf100 together | **115 s** | **3.0×** | 77 s (10 / 43 / 15 / 2 / 8) | 3.1 GiB | 74 MB |
+
+- The plates' points and the keyframes cost almost nothing; the L1 grid and the step are what cost.
+- In the express run the climate (43 s) and the fixed tail (young 6 s, amplify 22 s, bake 6 s:
+  the 8192 × 2624 terrain level does not shrink with L1) are two thirds of the time. Climate
+  snapshots every 50 Myr might take it to about 90 s (inferred, not run).
+- On a 1,000-Myr history the coupled stage doubles and the tail does not, so express would gain
+  more there (inferred: ~600 s → ~180 s).
+
+**Quality.** The pictures are on the review page ({{PAGE}}): for each candidate, the Create World
+screen's last frame, the whole planet hill-shaded, its most rugged and its most coastal
+1024-block squares. A coarser grid or a longer step changes the whole history, so each candidate is
+a different planet: the comparison is of character, not places.
+
+{{QUALITY}}
+
+**Build cost** (inferred): the preset files and the editor's family choice (½ day), a calibration
+check of the coarse preset against Earth's hypsometry, Köppen shares and deposit counts (P1-17's
+ensemble tools; 1–2 days, likely with a few settings retuned for the coarser grid, since erosion
+and uplift were calibrated at L1 r 16), lang keys and docs (½ day). About 2 to 3 days.
 
 ## 3. Option (b): shipped pre-made planets
 
@@ -118,7 +155,7 @@ simulated on the player's PC, so the wait is the copy and decompression: a few s
 
 - The keyframes are only the timelapse. Keeping only the satellite layer for a replay would add
   about 2–3 MB (inferred: 1 of 26 layers), so about **45 MB per quick planet** with a short replay.
-- A full-preset planet is larger: {{FULL_SIZE}}.
+- A full-preset planet is larger: 204–222 MB raw at 500 Myr and 285 MB at 1,000 Myr (measured), so about 65–90 MB compressed without the keyframes (inferred from the quick planet's ratio).
 - The climate mapping and TerraBlender regions are computed by the game at the review page from the
   pack's biome source (read: plan §7.12), so one shipped planet serves standalone, MIC and other
   packs alike.
@@ -184,8 +221,9 @@ wait in a holding area. Rejected.
 
 **What the measurements say** (section 1):
 
-- On 6 cores the run is CPU-bound, not waiting: it used {{CPU_UTIL}} of the 12 hardware threads on
-  average. More threads will not help a 6-core PC; less work per step will.
+- On 6 cores about 5.4 of the run's 11 threads are busy on average (535 % CPU). With 6 physical
+  cores that is close to one busy thread per core, so the PC is nearly full; more threads would gain
+  only what SMT gives. Less work per step, or less serial work, is what helps.
 - Scaling is poor past 4 cores: 4 cores took 418 s, 6 cores 349 s (1.2× for 1.5× the cores), and
   2 cores 812 s. Part of the run is serial or bound by memory bandwidth.
 - Where the time goes (quick 500 Myr, mid6): surface ~119 s, climate ~80 s, plates ~41–47 s,
