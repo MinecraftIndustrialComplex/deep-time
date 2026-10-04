@@ -12,6 +12,10 @@
     {
       "id": "biomesoplenty:volcano",
       "required": false
+    },
+    {
+      "id": "wythers:volcanic_crater",
+      "required": false
     }
   ]
 }
