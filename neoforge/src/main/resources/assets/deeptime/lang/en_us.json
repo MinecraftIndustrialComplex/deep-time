@@ -109,6 +109,7 @@
   "deeptime.editor.field.weld_wait": "Plate welding wait",
   "deeptime.editor.field.collapse_time": "Mountain collapse time",
   "deeptime.editor.field.collapse_thickness": "Mountain root thickness after collapse",
+  "deeptime.editor.field.collapse_quiet": "Quiet time before collapse",
   "deeptime.editor.field.collapse_reach": "Mountain collapse reach",
   "deeptime.editor.field.crust_max": "Thickest continental crust",
   "deeptime.editor.field.arc_range_uplift": "Arc mountain uplift",
