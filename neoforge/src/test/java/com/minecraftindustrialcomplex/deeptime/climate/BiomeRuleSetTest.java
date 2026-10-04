@@ -73,6 +73,7 @@ class BiomeRuleSetTest {
     void theShippedFilesParse() throws IOException {
         BiomeRuleSet.File ee = shipped("expanded_ecosphere");
         assertEquals(List.of("wythers:ice_cap", "wythers:fen"), ee.requires());
+        assertTrue(ee.keepOut().contains("wythers:mushroom_island") && ee.keepOut().contains("minecraft:mushroom_fields"), "the islands are kept out");
         Map<String, Rule> byId = ee.rules().stream().collect(Collectors.toMap(Rule::id, Function.identity()));
         assertEquals(ee.rules().size(), byId.size(), "rule ids are unique");
         for (Rule r : ee.rules())
@@ -141,6 +142,7 @@ class BiomeRuleSetTest {
         Function<String, IllegalArgumentException> parse = json -> assertThrows(IllegalArgumentException.class,
                 () -> BiomeRuleSet.parse("t:x", JsonParser.parseString(json).getAsJsonObject()));
         assertTrue(parse.apply("{}").getMessage().contains("rules"));
+        assertTrue(parse.apply("{\"rules\": [], \"keepout\": []}").getMessage().contains("unknown key 'keepout'"));
         assertTrue(parse.apply("{\"rules\": [{\"biomes\": \"a:b\", \"colour\": 1}]}").getMessage().contains("unknown key 'colour'"));
         assertTrue(parse.apply("{\"rules\": [{\"koppen\": \"ET\"}]}").getMessage().contains("no 'biomes'"));
         assertTrue(parse.apply("{\"rules\": [{\"biomes\": \"a:b\", \"role\": \"geyser\"}]}").getMessage().contains("unknown role"));

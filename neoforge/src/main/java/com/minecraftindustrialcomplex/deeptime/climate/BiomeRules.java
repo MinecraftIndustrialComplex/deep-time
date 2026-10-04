@@ -97,6 +97,7 @@ public final class BiomeRules {
                 on |= !resolve(List.of(req), possible, registry).isEmpty();
             if (!on)
                 continue;
+            exclusive.addAll(resolve(f.keepOut(), possible, registry));
             int bound = 0;
             for (Rule r : f.rules()) {
                 Set<Holder<Biome>> c = resolve(r.biomes(), possible, registry);

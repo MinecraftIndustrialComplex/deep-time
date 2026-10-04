@@ -1183,7 +1183,9 @@ game-side pieces, no world-data layer of their own:
   ```
 
   `requires` (ids or `#tags`; empty: always): the file is active only when the level's biome source can
-  place one of them. `rules`, tried in order, files in the order of their ids. A rule's keys, all optional
+  place one of them. `keep_out` (ids and `#tags`): biomes kept out of the climate search and placed by no rule
+  (a pack's biomes whose slots Deep Time's coordinates reach in the wrong place). Keys starting with `_` are
+  comments, any other unknown key refuses the file. `rules`, tried in order, files in the order of their ids. A rule's keys, all optional
   but `biomes`: `id`; `biomes` (ids and `#tags`: the candidates; those the source cannot place are
   dropped, and a rule left with none is dropped); `role` (a volcanic role id: the rule is tried only inside
   that role's zones, before the role tag's biome; cave roles take no rules); `koppen` (codes or prefixes:

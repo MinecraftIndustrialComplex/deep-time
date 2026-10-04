@@ -262,7 +262,10 @@ biomes` answered "minecraft:overworld is not a Deep Time level on world data". N
 in a Deep Time world the datapack's overworld is set aside, Deep Time's generator stays, and it takes the datapack
 overworld's biome list in place of vanilla's (the same for every other Deep Time level a datapack defines, such as
 the GameTest planets); EE's surface rule paints the terrain as Terralith's does in MIC. A world on a vanilla preset
-keeps EE's override, as EE intends.
+keeps EE's override, as EE intends. One part of EE's surface rule is left out of Deep Time levels: a layer of smooth
+basalt below y −55, drawn for vanilla's 384-block world, which in a Deep Time world (floor at −512) replaced every
+rock class below −55 (BIO-131; a pack's top-level layers between two fixed heights, other than vanilla's deepslate
+and the bedrock floor, are left out; the strata are the rock there).
 
 **Biome rules.** EE's own list puts biomes where Deep Time's climate coordinates never reach: its ice cap below
 vanilla's lowest temperature (−1.2 to −1.0), its salt lakes, mud pools and Tibesti mountains above the warm end
@@ -275,7 +278,9 @@ own coordinates: the Köppen class, the climate at the column in °C and mm, the
 playas, the volcanic zones and the rock at the surface. The first rule that holds runs the pack's own climate
 search over that rule's biomes alone, so the pack still picks among them by its ranges (a hot-spring field takes
 the snowy or the plain thermal taiga by temperature). A rule's biomes may be exclusive: kept out of the climate
-search elsewhere, as the volcanic biomes are. The same machinery serves every pack: the volcanic roles' tags list
+search elsewhere, as the volcanic biomes are; a file may also keep biomes out without placing them anywhere: EE's
+ten island biomes and its mushroom fields sit at a continentalness Deep Time gives the deep sea, where on the
+GameTest planet they took 17 % of the sea floor (BIO-132). The same machinery serves every pack: the volcanic roles' tags list
 EE's volcanoes after Terralith's and Biomes O' Plenty's biomes, and the peatland rule's tag lists every pack's bogs.
 
 | Rule (ledger) | Where (Deep Time's coordinates) | EE biomes | Basis |
@@ -375,7 +380,7 @@ continentalness, erosion and weirdness derivations (BIO-063 to BIO-070), the fro
 BIO-084: Ben, 2026-09-30). The GameTest floors (BIO-072) were set 0.1 under the lowest share
 measured over ten test planets and catch a broken mapping, not a wrong climate. The volcanic biomes (BIO-104 to BIO-114) are Ben's in kind
 (decisions log 2026-10-03, "Tie them to real volcanoes") and the agent's in every number: zone sizes, the
-activity needed for fresh ash, the role order and the tags' order. The biome rules (BIO-115 to BIO-131) are Ben's
+activity needed for fresh ash, the role order and the tags' order. The biome rules (BIO-115 to BIO-132) are Ben's
 in kind (decisions log 2026-10-04, "Build out support for both") and the agent's in every rule: which biome
 goes with which class or setting, every threshold, which biomes are exclusive, the rock window and the GameTest
 tolerances.
