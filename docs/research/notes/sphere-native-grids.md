@@ -17,7 +17,7 @@ me in the source; **[SA]** read in the source by a Sonnet sub-agent this session
 - **Yes, this is a solved problem, and the solution is not an unstructured mesh.** Weather and climate models met
   exactly this "pole problem" of latitude–longitude grids decades ago. The models that care most about speed store
   the sphere as **a few patches, each an ordinary rectangular array**: six cube faces (GFDL's FV3), ten icosahedral
-  rhombi (NICAM, and GME before ICON), or twelve HEALPix base pixels. Inside a patch every stencil is the same
+  rhombi (NICAM), or twelve HEALPix base pixels. Inside a patch every stencil is the same
   fixed-offset raster loop as today's; only a one-cell ring of "ghost" cells round each patch is copied from the
   neighbouring patch before each step. [SA, V]
 - **Measured on Deep Time's own L1 cell count (333,824 cells), the patch layouts cost what the Lambert raster
@@ -62,8 +62,10 @@ live on those rasters (design note §2, "Two metrics") [V]:
   hydrology, amplification (`surface/grid.rs`: "every L1 cell is r × 300 m wide in x and z whatever its latitude").
   These solvers see no polar anisotropy at all: in block metric the Lambert raster is a uniform square grid. What
   the poles cost them is elsewhere: planet-scale inputs (uplift, plates) are stretched east–west on the map, by
-  sec φ, and rows near the pole resolve the polar caps badly (the grid-artifact audit's "radial streaks round both
-  poles", `grid-artifact-audit.md`).
+  sec φ, and rows near the pole resolve the polar caps badly: the quincuncial prototype's resampling of a Lambert
+  bake showed "radial streaks round both poles: Lambert's rows resolve the polar caps badly (0.5° of latitude per L3
+  row at 85°, 2.5° at 89°)" (STATUS.md build log, 2026-10-03, seamless-wrapping prototype), and the grid-artifact
+  audit found the outlier rows of L1 all beyond 79° (`grid-artifact-audit.md`).
 - **True metric** (lengths on the sphere): the climate's geometry (`climate/mod.rs` `sx`, `sy`, per row), the ice
   distance transform, the climate's row marches, the orographic FFT along rows, the ITCZ. On Lambert a cell is
   cos φ as wide and 1/cos φ as tall as at the equator, so its aspect ratio is 1/cos²φ: 3 at 55°, 8.5 at 70°, 33 at
@@ -78,7 +80,94 @@ distinction drives the recommendation (§9).
 
 ## 2. How weather and climate models solved it
 
-<!-- CLIMATE-SECTION -->
+The lat-lon grid's trouble is old and well documented, and the fixes split into two families: grids that are
+logically rectangular in patches (cube, Yin-Yang, icosahedral rhombi, HEALPix) and grids stored as index lists
+(ICON, MPAS). The first family keeps the raster's loops; the second pays for its geometry in memory traffic.
+
+### 2.1 Why everyone left the lat-lon grid
+
+- Staniforth & Thuburn's review (2012) keeps the lat-lon grid's virtues ("logically rectangular structure,
+  orthogonality and symmetry" give most of their ten desiderata) and names its fault: at 10 km nominal resolution
+  the row nearest the pole has a spacing of 12 m, and "this spacing reduces quadratically"; it predicts the grid
+  will be outweighed "on massively parallel computers by data-communication bottlenecks", and that "all grids
+  proposed to date have known problems". [SA: abstract and the authors' own later list of desiderata; full text
+  closed]
+- Kageyama & Sato (2004): a lat-lon grid with a polar filter wastes about 36 % of its points, and "the filter
+  routine can take more than 30 % of the total execution time" in their geodynamo code. [SA]
+- ECMWF's octahedral grid (Malardel et al. 2016): on a full Gaussian grid the polar spacing is far finer than at the
+  equator, a "strong anisotropy [that] potentially risks numerical instabilities and carries a significant
+  computational cost"; the reduced grid cut the points by about 30 %, the octahedral grid saved a further 22 % of
+  total compute at N = 1280 (6.5 M points against 8.5 M). [SA]
+
+Deep Time's Lambert raster is the same disease in a milder form (equal area keeps the cell count honest, but the
+cell shape still degenerates as 1/cos²φ), and §7 measures the same symptom: the implicit solver's iterations.
+
+### 2.2 The cubed sphere (FV3): six rectangular arrays
+
+- FV3's source keeps each face as a plain array with ghost cells: `pt(isd:ied, jsd:jed, npz)`, `ng = 3 ! Number of
+  ghost zones required` (`fv_arrays.F90`, `fv_mp_mod.F90`, GFDL_atmos_cubed_sphere). The diagonal ghost block at
+  each of the 8 corners, which has no neighbouring face, is filled by copying from the adjacent ghost strip
+  (`fill_corners_2d`: `q(1-i,1-j) = q(1-j,i+1) !SW Corner`). [SA, code]
+- Putman & Lin (2007) compared gnomonic, equiangular, conformal and elliptic cubed spheres: the conformal grid
+  clusters cells at the corners (minimum over mean cell size 0.16 at c360) and needs half the time step; the
+  gnomonic (equiangular) grid "allows the largest possible time-step" and was used for the rest of the paper;
+  non-orthogonality is handled by a sin α factor in the fluxes; treating the 12 edges as continuous showed "no
+  evidence of spurious spikes"; mass is conserved to machine precision. Their motivation: no "much larger halo
+  region in the zonal direction near the poles" and no polar filter. [SA]
+- Grid imprinting at the kinked edges is FV3's known weakness; a two-sided extrapolation "significantly reduces" it
+  and the newer Duo-Grid remaps the neighbouring face onto an unkinked extension, "virtually eliminating grid
+  imprinting while retaining mass conservation" (Harris et al. 2021). [SA]
+- Cost of corners: on CPUs the corner and edge conditionals are "not an issue"; on GPUs they force separate kernel
+  launches (Dahm et al. 2023, the Pace port). No source gives a measured halo-exchange cost for FV3. [SA]
+- Speed in practice (not a pure grid effect: numerics, precision and tuning differ): in the DYAMOND comparison at
+  3–4 km FV3 ran 19 simulated days per day on 13,824 cores, ICON 6.1 on 12,960, MPAS 3.5 on 9,216 (Stevens et al.
+  2019); per simulated day FV3's structured tiles were about 3× cheaper than ICON or MPAS on similar nodes (the
+  sub-agent's arithmetic). In NOAA's 2015 dynamical-core test, FV3 ran 48–77× real time at 3 km against MPAS's 22×
+  (Michalakes et al. 2015). [SA]
+
+### 2.3 Icosahedral and hexagonal grids
+
+- **NICAM** treats icosahedral points as "two-dimensional structured data in the program code" (Tomita & Satoh 2004)
+  on "10 large diamonds" (Satoh et al. 2014), with seven-point stencils by integer offsets (Yashiro's slides, §3.1).
+  Its cost grows as N² against a spectral model's N³: 6.7 against 8 s per simulated day at T159, 1,520 against
+  1,880 s at T1279 on 80 Earth Simulator nodes. On the K computer, removing memory copies and intermediate arrays
+  cut run time by 30 %: "memory throughput is the most important aspect" (Satoh et al. 2014). [SA]
+- **GME** (DWD's model before ICON) stored its icosahedral grid as ten rhombi of regular arrays [M; Majewski 2002
+  not read].
+- **ICON** numbers its cells along a space-filling curve split into blocks of `nproma`, arrays `(nproma, nlev,
+  nblocks)`, with `nproma` the unit-stride, vectorised index; the CPU optimum was nproma = 8 (Lapillonne et al.
+  2025). Neighbours go through index arrays; "horizontal neighbour relations cannot be exploited in the memory
+  layout", and ICON behaves like the HPCG benchmark (1.3 % of peak on CPU; Adamidis et al. 2025). ICON is 3–4×
+  faster than GME on a NEC SX-9 and about 2× on a Cray XC30 (Zängl 2014). [SA]
+- **MPAS** stores the Voronoi mesh as padded index arrays (`cellsOnCell(maxEdges, nCells)`; MPAS mesh specification)
+  in reverse Cuthill–McKee order. Sarje et al. re-sorted each partition along a Hilbert or Morton curve: fewer L1,
+  L2, L3 and TLB misses, up to 1.34× overall with a deeper halo (MPAS-Ocean, 1.85 M cells). [SA]
+- Accuracy: on a C-grid staggering, quadrilateral (cube) grids satisfy the degree-of-freedom balance; triangles give
+  spurious gravity modes, hexagons spurious Rossby modes (Staniforth, Melvin & Wood 2013); among five quasi-uniform
+  grids the hexagonal icosahedron is "the most accurate (for least computational cost)" (Weller et al. 2012, AB).
+  Deep Time's solvers are scalar diffusion and routing, not staggered wave dynamics, so these concerns are weaker
+  here. [SA, I]
+
+### 2.4 Yin-Yang, HEALPix, reduced grids
+
+- **Yin-Yang** (Kageyama & Sato 2004): two identical lat-lon patches of ±45° × 270°, overlapping on about 6 % of the
+  sphere, joined by interpolation (vectors rotated at the overset points); the geodynamo code reached 46 % of peak on
+  4,096 Earth Simulator CPUs with 99 % vectorisation, and converting the lat-lon code was "easy" (Kageyama et al.
+  2004). Each patch is a lat-lon raster limited to ±45°, so its cells stay within cos 45° of square. [SA, I]
+- **HEALPix** (Górski et al. 2005): equal-area, hierarchical, iso-latitude rings (so spherical harmonics are fast);
+  NESTED order is a Z-order inside each of the 12 base pixels. In climate science it is an output and analysis
+  grid (ICON and IFS write km-scale output on it; zoom 10 = 6.4 km), not a dynamical-core grid; no HEALPix dycore or
+  stencil benchmark was found (easy.gems; Segura et al. 2025). Its equatorial belt (|lat| < 41.8°) has a constant
+  4·Nside pixels per ring, the same family as Deep Time's Lambert raster; the polar caps are where it departs from
+  it [SA; the family resemblance is my reading, I].
+- **Reduced and octahedral Gaussian grids** (IFS) thin the rows towards the poles; with FFTW any ring length works.
+  They serve the spectral transform (§5), not stencils, and the transpositions it needs "remain a concern" at scale
+  (Malardel et al. 2016). [SA]
+
+**What this says for Deep Time.** The fastest grid-point models keep their sphere in a few rectangular arrays
+(FV3, NICAM); the index-list models (ICON, MPAS) accept a memory-bound penalty and hide it behind vertical levels,
+which a 2-D landscape solver does not have. The literature has no clean like-for-like ratio between the two
+families; §7 measures one.
 
 ## 3. Data layouts that recover raster speed on a sphere
 
@@ -110,10 +199,12 @@ distinction drives the recommendation (§9).
   [SA]
 - Reordering data and computation together is what pays (Mellor-Crummey, Whalley & Kennedy 2001). [SA]
 - ICON, the operational unstructured model, says it plainly: "Accesses to cell, edge, and vertex neighbors go
-  through indexing arrays, i.e., indirect addressing", and "horizontal neighbour relations cannot be exploited in
-  the memory layout" (Giorgetta et al. 2022). ICON amortises each index lookup over the vertical levels stored
-  innermost (nproma blocking); Firedrake measured that 10–20 contiguous layers per lookup bring the cost of
-  indirection under the hardware limit's 70–90 % (Bercea et al. 2016). A 2-D landscape solver has no vertical
+  through indexing arrays, i.e., indirect addressing" (Giorgetta et al. 2022, through a summariser), and "as ICON
+  uses an unstructured icosahedral grid, horizontal neighbour relations cannot be exploited in the memory layout"
+  (Adamidis et al. 2025, full text). ICON amortises each index lookup over the vertical levels stored
+  innermost (nproma blocking); on Firedrake's extruded meshes the indirection is amortised after 10–20 contiguous
+  layers per lookup, reaching 70–90 % of the hardware limit, while a randomly numbered base mesh often never gets
+  there (Bercea et al. 2016). A 2-D landscape solver has no vertical
   levels to hide behind, so it is the worst case for an unstructured mesh. [SA, I]
 - Both stencils and sparse matrix products are memory-bandwidth bound (Williams, Waterman & Patterson 2009: SpMV
   0.17–0.25 flop per byte, a 7-point stencil 0.33–0.50); SIMD barely helps a memory-bound kernel "unless the working
@@ -152,7 +243,15 @@ and one CPU. §7 does.
 Deep Time has two FFT solvers on rows: Smith & Barstad orographic rain (`climate/orographic.rs`) and lithospheric
 flexure (`surface/flexure.rs`).
 
-<!-- SPECTRAL-SECTION -->
+- **Spherical harmonics are the sphere's FFT.** SHTns (Schaeffer 2013), single thread, forward plus backward scalar
+  transform on a Xeon X5650: 0.6 ms at truncation N = 127, 4.2 ms at 255, 28 ms at 511, 216 ms at 1023, about one
+  element per clock for N ≥ 511, 2–10× faster than the alternatives. Deep Time's L1 (333,824 cells) corresponds to
+  about N = 400, about 10–25 ms per transform pair (the sub-agent's interpolation, not measured). Spectral methods
+  cost N³ against a grid-point model's N² (the NICAM–AFES table, §2.3), and their global data transpositions hurt
+  at scale. For Deep Time a transform pair per step at L1 is affordable for a global, smooth field (flexure, a
+  global pressure or wind field), not for the 10 km-scale orographic transfer function, which needs high
+  truncation. [SA, I]
+- **FFT on cube faces:** no published per-face FFT on a cubed sphere was found. [SA]
 
 - **Hergarten & Robl 2022 (LFPM)** is a non-spectral orographic precipitation model: two moisture components,
   first-order upwind advection, transversal dispersion, one tridiagonal system of 2 × 2 blocks per slice; linear in
@@ -310,8 +409,8 @@ gathers (4.85 against 4.29). Deep Time ships the generic build, so the table abo
 | icosahedral rhombi (NICAM, GME) | near-uniform [I]; shape ≤ 1.18 inside 80° | 12 pentagons | 2.0 / 1.4; 0.9 | no rectangular FFT on a triangle lattice (needs hexagonal FFT or spherical harmonics) | 6-neighbour routing: new D6 code, B&W stack unchanged | higher: hexagonal stencils everywhere, new D6 |
 | Fibonacci / Voronoi mesh, Hilbert order | near-equal areas [I]; shape ≤ 1.60 | none (but irregular everywhere) | 4.9 / 3.1; 1.0 | none on the mesh: spherical harmonics or resample | graph routing (goSPL, Red Blob, Cordonnier) | highest: every stencil becomes a gather; L0 already has the mesh |
 | Fibonacci mesh, plain / random order | as above | as above | 7.5 / 2.7; 1.3 (plain); 9.5 / 4.6; 2.4 (random) | as above | as above | as above |
-| Yin-Yang (two lat-lon patches) | see §2 | none (overlap seams) | not measured [I: two rasters plus overlap interpolation] | FFT along each patch's rows | D8 per patch, overlap interpolation | interpolation at the overlap each step |
-| reduced Gaussian / spectral | see §2 | poles thinned | not measured | spherical harmonics (the global FFT analogue) | not a routing grid | not for routing; a candidate for global transforms only |
+| Yin-Yang (two lat-lon patches) | shape ≤ 1/cos 45° = 1.41 (each panel is a lat-lon raster to ±45°) [I]; ~6 % overlap | none (overlap seams) | not measured [I: two rasters plus overlap interpolation] | FFT along each patch's rows | D8 per patch, overlap interpolation | interpolation at the overlap each step |
+| reduced Gaussian / spectral | rows thinned towards the poles (§2.4) | poles, mild | not measured | spherical harmonics (the global FFT analogue) | not a routing grid | not for routing; a candidate for global transforms only |
 
 ## 9. Recommendation and migration sketch
 
@@ -331,7 +430,8 @@ Why the cube rather than HEALPix or the icosahedron:
 Which cube map: the survey's equal-area cube (Moser-smoothed conformal cube, or QSC), so the simulation's cells
 are equal-area like today's (mass bookkeeping per cell stays a multiply) and, on a cube world, coincide with the
 world's blocks. An equiangular cube is simpler (closed form) and was what the benchmark used; the per-face loops are
-identical, only the per-cell coefficients change. [I]
+identical, only the per-cell coefficients change. Not the plain conformal cube: Putman & Lin found its corner cells
+0.16 of the mean size and its time step halved (§2.2). [I, SA]
 
 **Migration, in order:**
 
@@ -411,4 +511,113 @@ FT = full text, AB = abstract or snippet only, DOC = documentation page, SUM = a
 page, not checked against it. [SA] = read by a Sonnet sub-agent this session, which wrote transcriptions to the
 session scratchpad (not committed); [V] = read by me.
 
-<!-- SOURCES -->
+**Climate and weather model grids** (sub-agent 1; it discarded every WebFetch summary after the summariser
+invented content for Putman & Lin, and read the PDFs as text):
+
+- Putman, W. M. & Lin, S.-J. (2007). Finite-volume transport on various cubed-sphere grids. J. Comput. Phys.
+  227:55–78. FT [SA].
+- Harris, L. et al. (2021). GFDL FV3 technical memorandum GFDL2021001. FT, relevant sections [SA].
+- NOAA-GFDL GFDL_atmos_cubed_sphere: `model/fv_arrays.F90`, `fv_mp_mod.F90`, `sw_core.F90`. CODE [SA].
+- Dahm, J. et al. (2023). Pace v0.2: a Python-based performance-portable atmospheric model. GMD 16:2719. FT, parts
+  [SA].
+- Chen, X. (2021). The Duo-Grid on the cubed sphere. AB [SA].
+- Ronchi, C., Iacono, R. & Paolucci, P. S. (1996). The "cubed sphere": a new method for the solution of partial
+  differential equations in spherical geometry. J. Comput. Phys. 124:93–114. AB (snippet; reference checked on
+  Crossref) [SA].
+- Sadourny, R. (1972). Conservative finite-difference approximations of the primitive equations on quasi-uniform
+  spherical grids. Mon. Wea. Rev. 100:136–144. Not fetched.
+- Staniforth, A. & Thuburn, J. (2012). Horizontal grids for global weather and climate prediction models: a review.
+  QJRMS 138:1–26. AB (Crossref) [SA]; the ten desiderata from Staniforth, Melvin & Wood (2013, GungHo), FT parts
+  [SA].
+- Weller, H., Thuburn, J. & Cotter, C. J. (2012). Computational modes and grid imprinting on five quasi-uniform
+  spherical C grids. Mon. Wea. Rev. 140:2734. AB [SA].
+- Zängl, G., Reinert, D., Rípodas, P. & Baldauf, M. (2015). The ICON modelling framework. QJRMS 141:563. AB [SA];
+  Zängl (2014), ECMWF slides, FT [SA].
+- Lapillonne, X. et al. (2025). ICON on GPUs (EGUsphere/GMD preprint). FT, parts [SA].
+- Adamidis, P. et al. (2025). GMD 18:905 (ICON exascale case study). FT, parts [SA].
+- Giorgetta, M. A. et al. (2022). The ICON-A model for direct QBO simulations on GPUs. GMD 15:6985. SUM [SA, the
+  layout sub-agent].
+- Skamarock, W. C. et al. (2012). A multiscale nonhydrostatic atmospheric model using centroidal Voronoi
+  tesselations and C-grid staggering. Mon. Wea. Rev. 140:3090. AB [SA]; ECMWF slides, FT [SA]; MPAS mesh
+  specification v1.0, DOC [SA].
+- Sarje, A. et al. Parallel performance optimizations on unstructured mesh-based simulations (MPAS-Ocean). FT [SA].
+- Tomita, H. & Satoh, M. (2004). ECMWF seminar (NICAM). FT, parts [SA]; Satoh, M. et al. (2014). The
+  Non-hydrostatic Icosahedral Atmospheric Model: description and development. Progress in Earth and Planetary
+  Science 1:18. FT, parts [SA]; Yashiro, H. (2014), ECMWF HPC workshop slides (NICAM data structure). FT [SA].
+- Majewski, D. et al. (2002). The operational global icosahedral–hexagonal gridpoint model GME. Mon. Wea. Rev.
+  130:319. Not fetched (blocked); the rhombus storage is [M].
+- Górski, K. M. et al. (2005). HEALPix: a framework for high-resolution discretization and fast analysis of data
+  distributed on the sphere. ApJ 622:759. arXiv:astro-ph/0409513. FT [SA, both sub-agents]; HEALPix Primer v3.83,
+  FT [SA].
+- easy.gems HEALPix documentation (DKRZ/MPI-M), DOC [SA]; Segura, H. et al. (2025). nextGEMS. GMD 18:7735. FT,
+  parts [SA].
+- Kageyama, A. & Sato, T. (2004). "Yin-Yang grid": an overset grid in spherical geometry. G-cubed 5:Q09005.
+  arXiv:physics/0403123. FT [SA]; Kageyama, A. et al. (2004). A 15.2 TFlops simulation of geodynamo on the Earth
+  Simulator. arXiv:physics/0410018. FT [SA]; Qaddouri, A. & Lee, V. (2011). The Canadian GEM model on the Yin-Yang
+  grid. QJRMS 137:1913. AB [SA].
+- Malardel, S. et al. (2016). A new grid for the IFS. ECMWF Newsletter 146. FT [SA].
+- Schaeffer, N. (2013). Efficient spherical harmonic transforms aimed at pseudospectral numerical simulations.
+  G-cubed 14:751. arXiv:1202.6522. FT, Table 1 [SA].
+- Michalakes, J. et al. (2015). AVEC report: NGGPS level-1 benchmarks and software evaluation. FT, parts [SA].
+- Stevens, B. et al. (2019). DYAMOND: the DYnamics of the Atmospheric general circulation Modeled On
+  Non-hydrostatic Domains. Progress in Earth and Planetary Science 6:61. FT, parts [SA].
+
+**Data layouts** (sub-agent 2):
+
+- Araújo, R. C., Gross, L. & Xavier-de-Souza, S. (2021). Boosting memory access locality of the spectral element
+  method with Hilbert space-filling curves. arXiv:2104.08416. FT [SA].
+- Aupy, G., Park, J. & Raghavan, P. (2016). Locality-aware Laplacian mesh smoothing. arXiv:1606.00803. FT [SA].
+- Mellor-Crummey, J., Whalley, D. & Kennedy, K. (2001). Improving memory hierarchy performance for irregular
+  applications using data and computation reorderings. Int. J. Parallel Programming 29(3). FT [SA].
+- Aftosmis, M. J., Berger, M. J. & Murman, S. M. (2004). Applications of space-filling curves to Cartesian methods
+  for CFD. AIAA 2004-1232 / NAS-04-002. FT [SA].
+- Dennis, J. M. (2003). Partitioning with space-filling curves on the cubed-sphere. IPDPS 2003. AB [SA].
+- Strout, M. M. & Hovland, P. D. (2004). Metrics and models for reordering transformations. AB [SA].
+- S2 geometry library documentation, s2geometry.io, cell hierarchy. DOC [SA].
+- H3 documentation, h3geo.org. DOC [SA]; Sahr, K., White, D. & Kimerling, A. J. (2003). Geodesic discrete global
+  grid systems. Cartography and GIS 30(2):121. AB [SA].
+- Bianco, M. et al. (2026). icon4py / GT4Py. arXiv:2608.21150. FT [SA].
+- Sulyok, A. A. et al. (2019). Locality optimized unstructured mesh algorithms on GPUs. arXiv:1802.03749. FT,
+  introduction [SA].
+- Williams, S., Waterman, A. & Patterson, D. (2009). Roofline. CACM 52(4):65. FT [SA]; Williams, S. et al. (2007).
+  Optimization of sparse matrix–vector multiplication on emerging multicore platforms. SC'07. FT [SA].
+- Kreutzer, M. et al. (2014). A unified sparse matrix data format for efficient general sparse matrix–vector
+  multiplication on modern processors with wide SIMD units (SELL-C-σ). arXiv:1307.6209. FT [SA].
+- Bercea, G.-T. et al. (2016). A structure-exploiting numbering algorithm for finite elements on extruded meshes.
+  arXiv:1604.05937. FT [SA]; MacDonald, A. E. et al. (2011), NOAA FIM, quoted there; not fetched.
+
+**Landscape evolution** (sub-agent 3):
+
+- Salles, T. et al. (2020). gospl: Global Scalable Paleo Landscape Evolution. JOSS 5(56):2804. FT [SA]; goSPL
+  documentation (gospl.readthedocs.io: technical guide, HPC scaling). DOC [SA].
+- Salles, T. et al. (2023). Hundred million years of landscape dynamics from catchment to global scale. Science
+  379:918. AB [SA]; Salles, T. et al. (2023). Nature 624:115, Methods. FT [SA].
+- Salles, T. (2019). eSCAPE. GMD 12:4165. FT [SA]; Salles, T., Ding, X. & Brocard, G. (2018). pyBadlands. PLOS ONE
+  13(4):e0195557. FT [SA]; Salles & Hardiman (2016), SoftwareX, not read (403).
+- fastscapelib documentation (fastscapelib.readthedocs.io: grids guide, eroders, flow routing, release notes 0.3.0,
+  planetary example, `HealpixGrid` API). DOC [SA]; the grids guide re-read by me, 2026-10-04 [V]: "2-dimensional,
+  HEALPix grid on the sphere, static"; "Planetary scale simulations"; Linux and macOS builds only.
+- Landlab `IcosphereGlobalGrid` documentation and Tucker's 2023 icosphere examples. DOC [SA].
+- Braun, J. & Willett, S. D. (2013) [= Braun2013]. Not read (paywalled).
+- Barnes, R., Lehman, C. & Mulla, D. (2014) [= Barnes2014]. FT [SA].
+- Cordonnier, G., Bovy, B. & Braun, J. (2019). A versatile, linear complexity algorithm for flow routing in
+  topographies with depressions. ESurf 7:549. FT [SA].
+- Cordonnier, G. et al. (2016). Large scale terrain generation from tectonic uplift and fluvial erosion. CGF
+  35(2):165. FT [SA, two sub-agents].
+- Cortial, Y. et al. (2019) [= Cortial2019]. FT [SA].
+- Barnes, R. (2018/2019). Accelerating a fluvial incision and landscape evolution model with parallelism.
+  arXiv:1803.02977; Geomorphology 2019. FT [SA].
+- Hergarten, S. & Robl, J. (2022). The linear feedback precipitation model (LFPM 1.0). GMD 15:2063. FT [SA].
+- Hergarten, S. (2021) [= Hergarten2021]. FT [SA].
+- Smith, R. B. & Barstad, I. (2004) [= SmithBarstad2004]. Not read (403).
+- Ringler, T. et al. (2010). J. Comput. Phys. 229:3065; Poveda & Peixoto, arXiv:2206.03685; Du, Gunzburger & Ju
+  (2003). AB or snippets only [SA].
+
+**Graphics and procedural planets** (sub-agent 2): Red Blob Games, "Procedural map generation on a sphere" (Patel
+2018) and the dual-mesh notes, DOC [SA]; World Orogen README, DOC [SA]; Roberts, D., "Simulating worlds on the
+GPU", DOC [SA]; Experilous (Gainey 2014), not read (site down).
+
+**Deep Time's own sources read by me** [V]: `crates/deeptime-core/src/sphere/` (coupling, mesh, Fibonacci),
+`surface/grid.rs`, `surface/routing.rs`, `surface/diffusion.rs`, `surface/flexure.rs`, `climate/orographic.rs`,
+`presets/earthlike_quick_16k.json`, `docs/design/equal-area-projection.md` §2–§5, the plan's §5.2,
+`docs/design/p1-26-per-cell-climate.md` §2.1, `seamless-projection-survey.md` §0, §9–§10.
