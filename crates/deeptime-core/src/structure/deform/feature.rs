@@ -148,9 +148,30 @@ pub struct Counts {
     pub dykes: u64,
     /// Plugs are made at the end of the run from the extinct volcanoes standing then.
     pub plugs: u64,
+    /// Fold trains (first) and thrusts (second) started, by where the shortening came from: the
+    /// collision regime, a lifted Andean margin, the foreland of an Andean margin and the foreland
+    /// basin of a collision (`emplace::Source` without `None`, in that order).
+    pub shortened_by: [[u64; 2]; 4],
 }
 
 impl Counts {
+    /// Counts a fold train or thrust under the rule that strained its cell.
+    pub fn add_source(&mut self, kind: Kind, source: super::emplace::Source) {
+        use super::emplace::Source;
+        let row = match source {
+            Source::None => return,
+            Source::Collision => 0,
+            Source::Arc => 1,
+            Source::Foreland => 2,
+            Source::Basin => 3,
+        };
+        match kind {
+            Kind::FoldTrain => self.shortened_by[row][0] += 1,
+            Kind::Thrust => self.shortened_by[row][1] += 1,
+            _ => {}
+        }
+    }
+
     pub fn add(&mut self, kind: Kind) {
         match kind {
             Kind::FoldTrain => self.fold_trains += 1,

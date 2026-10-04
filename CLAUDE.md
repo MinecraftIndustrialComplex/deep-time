@@ -44,9 +44,9 @@ nix develop -c cargo test --workspace
 nix develop -c cargo clippy --workspace --all-targets -- -D warnings
 nix develop -c cargo deny check licenses bans
 cd neoforge && nix develop -c ./gradlew build test && python3 ../tools/ci/junit-summary.py build/test-results/test
-./gametest.sh [-PwithMic|-PwithTerraBlender|-PwithEv]   # GameTest server (+ the test dimensions)
+./gametest.sh [-PwithMic|-PwithTerraBlender|-PwithEe|-PwithEv]   # GameTest server (+ the test dimensions; Ee: Expanded Ecosphere)
 ./gametest-planet.sh [-PwithMic]                        # dev server with a real Deep Time + TW overworld
-tools/smoke/install.sh <standalone|mic|terrablender> [--size N] [--synth K] && python3 tools/smoke/run.py --profile <p>
+tools/smoke/install.sh <standalone|mic|terrablender|ee> [--size N] [--synth K] && python3 tools/smoke/run.py --profile <p>
 tools/client/mac-screenshots.sh [--name N] [--no-guidance] [--no-create]   # real client on the Mac's desktop → review/out/N/
 tools/remote/mac.sh -- tools/remote/detach.sh start <job> --kind client:editor tools/client/vm-client.sh --name N [--prop length=300]   # the Create World walk on the test VM (Xvfb, llvmpipe) → review/out/N/ (index.html)
 tools/review/publish.sh <name> <folder>                 # private spacesheep page (plan §2.6)
