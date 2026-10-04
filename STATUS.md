@@ -212,7 +212,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   (`collapse_myr` 0, `crust_max_km` 0, as its `collision_stacking_share` 0.5 is its own): the
   GameTest fixtures keep master's planet; the 16k presets keep the defaults. The 1.5-spacing floor of
   the reach stays for coarse lattices.
-- **Gates** (test VM, head GATES_HEAD): GATES_LINE
+- **Gates** (test VM, head 060cebfb, merged with master 297da4b6): `cargo fmt --check` clean; clippy
+  `-D warnings` clean; `cargo test --workspace` 803 passed, 0 failed, 3 ignored; `cargo deny check
+  licenses bans` ok; `./gradlew build test` 272 tests, 0 failures, 2 skipped; `./gametest.sh` and
+  `./gametest.sh -PwithMic` all 71 required tests passed (before the test-planet change both failed
+  only `carversSpareWater`, above).
 - **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/belts-area` deleted with its builds of the older
   masters; `belts34` deleted.
 - **Next.** Ben's answers below; the belt cap read from thickness and the overlap accretion (the
