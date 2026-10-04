@@ -8,11 +8,15 @@
 # O' Plenty), then the biome shares of the two finished planets (peat-runs.sh run after4 / before4) per profile.
 set -uo pipefail
 cd "$(dirname "$0")/../.."
+PART="${PEAT_PART:-all}"   # all | gates (Gradle and GameTests) | shares (the biome shares) | cargo
+if [ "$PART" = all ] || [ "$PART" = cargo ]; then
 echo "=== cargo"
 cargo fmt --check 2>&1 | tail -n 5; echo FMT_DONE
 cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tail -n 5; echo CLIPPY_DONE
 cargo test --workspace 2>&1 | grep -E "^test result|FAILED|panicked|^error" | head -n 40; echo TEST_DONE
 cargo deny check licenses bans 2>&1 | tail -n 2; echo DENY_DONE
+fi
+if [ "$PART" = all ] || [ "$PART" = gates ]; then
 echo "=== gradle"
 (cd neoforge && ./gradlew build test 2>&1 | grep -E "BUILD|FAILED|error:"; python3 ../tools/ci/junit-summary.py build/test-results/test)
 for flag in "" "-PwithMic" "-PwithTerraBlender" "-PwithEe"; do
@@ -21,10 +25,13 @@ for flag in "" "-PwithMic" "-PwithTerraBlender" "-PwithEe"; do
     [ "$flag" = "-PwithEe" ] && tools/smoke/install.sh ee > /dev/null 2>&1
     ./gametest.sh $flag 2>&1 | grep -E "passed|failed|FAILED|required|BUILD|climateConsistent|cold_wetland" | tail -n 25
 done
+fi
+if [ "$PART" = all ] || [ "$PART" = shares ]; then
 for prof in standalone mic terrablender ee; do
     for name in after4 before4; do
         echo "=== $prof $name"
         tools/review/peat-biomes.sh "$prof" "$name" 2>&1 | grep -v "^admit" | tail -n 90
     done
 done
+fi
 echo PEATGATES_DONE
