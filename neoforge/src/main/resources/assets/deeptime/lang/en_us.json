@@ -437,6 +437,12 @@
   "deeptime.polecap.storm.no_wind": "Polar storm (%s): the world ends at %s",
   "deeptime.polecap.stop": "You cannot go any further: %s is the edge of the world",
 
+  "deeptime.wrap.create.refused.custom_kinetic": "Belts, chain conveyors and gantries cannot connect across a turning seam yet",
+  "deeptime.wrap.create.refused.belt": "Belts cannot cross or touch a turning seam yet",
+  "deeptime.wrap.create.refused.chain_conveyor": "Chain conveyors cannot connect across a turning seam yet",
+  "deeptime.wrap.create.refused.track": "Train track cannot cross or touch a turning seam yet: keep it at least one block away",
+  "deeptime.wrap.create.refused.contraption": "This structure reaches across a turning seam; moving structures cannot cross seams yet",
+  "create.track.deeptime_seam": "Train track cannot cross or touch a turning seam yet",
   "deeptime.configuration.title": "Deep Time",
   "deeptime.configuration.dhAutoCurvature": "Distant Horizons curvature follows the planet",
   "deeptime.configuration.dhAutoCurvature.tooltip": "In a Deep Time world, bends Distant Horizons' far terrain to the planet's own curvature (a sphere of circumference / 2 pi blocks) unless you set Distant Horizons' Earth Curve Ratio yourself. It uses Distant Horizons' API override, so its config file is never rewritten, and puts the setting back when you leave."

@@ -63,6 +63,11 @@ public final class WrapEngine {
         if (!ENABLED)
             return;
         DeepTime.LOGGER.warn("[wrapengine] Deep Time wrap engine is on (-D{}=true): dev only", FLAG);
+        // Create's adapters (compat/create/wrap, design §11) touch Create's classes, so not during mod
+        // construction, which runs beside Create's own: they are wired when the first server starts.
+        if (net.neoforged.fml.ModList.get().isLoaded("create"))
+            NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.server.ServerAboutToStartEvent.class,
+                    e -> com.minecraftindustrialcomplex.deeptime.compat.create.wrap.CreateWrapCompat.init());
         NeoForge.EVENT_BUS.addListener(LevelTickEvent.Post.class, e -> {
             if (e.getLevel() instanceof ServerLevel sl) {
                 BandManager b = bands(sl);
