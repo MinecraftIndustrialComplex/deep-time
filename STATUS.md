@@ -194,7 +194,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   the ocean floor thicker than 35 km, up to 240 km, on master) take part and hold its floor up gave
   land 0.244 from spurious high ocean floor; it was withdrawn (that stacked crust is a plate-model
   issue of its own).
-- **Gates**: GATES_PLACEHOLDER
+- **Gates**: (on the VM, after the master merge) `cargo fmt --check` ok, clippy `-D warnings` ok, `cargo test --workspace` 837 passed, 0 failed, 3 ignored; `cargo deny check licenses bans` ok; `./gradlew build test` BUILD SUCCESSFUL, JUnit 297 tests, 0 failures, 2 skipped; `./gametest.sh` all 79 required tests passed; `./gametest.sh -PwithMic` all 79 required tests passed.
 - **Next**: Ben's answer on the land question; then merge.
 
 ### 2026-10-04 — Plate task 6: the structure stage reads the collision's belt, wedge, shortening and basin (agent worktree agent-a8f44bbcf1b554a16, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; continued after the restart; not merged)
