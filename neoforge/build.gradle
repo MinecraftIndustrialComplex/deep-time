@@ -302,10 +302,20 @@ def dhExpected = { String runName ->
     return !jars.isEmpty()
 }
 
+// Whether a run's mods include Expanded Ecosphere (decisions log 2026-10-04): -Ddeeptime.ee.expected=<this>,
+// and the Expanded Ecosphere GameTests fail when it is true and the mod is not loaded.
+def eeExpected = { String runName ->
+    def set = serverSetFor(runName)
+    def dir = set == null ? null : runModsFor(set)
+    return (dir?.listFiles()?.findAll { it.name.endsWith('.jar') && it.name.toLowerCase(Locale.ROOT).startsWith('expanded_ecosphere') } ?: []).size() > 0
+}
+
 ['gameTestServer', 'planetServer', 'client', 'server'].each { runName ->
     def cap = runName.capitalize()
-    if (runName in ['gameTestServer', 'planetServer'])
+    if (runName in ['gameTestServer', 'planetServer']) {
         neoForge.runs.getByName(runName).systemProperty 'deeptime.dh.expected', dhExpected(runName).toString()
+        neoForge.runs.getByName(runName).systemProperty 'deeptime.ee.expected', eeExpected(runName).toString()
+    }
     def gameDir = runName == 'gameTestServer' ? gameTestDir
                 : runName == 'planetServer' ? planetDir : file('../run')
     def linkTask = tasks.register("linkRunMods${cap}") {

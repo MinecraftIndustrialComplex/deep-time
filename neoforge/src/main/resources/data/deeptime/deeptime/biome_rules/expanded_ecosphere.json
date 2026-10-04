@@ -1,0 +1,145 @@
+{
+ "_comment": "Deep Time's compatibility rules for Expanded Ecosphere 3.4.7 (William Wythers and Cristelknight; CC BY-NC-ND 4.0; never shipped or edited by Deep Time, this file only names its biome ids). Ben, decisions log 2026-10-04: 'Build out support for both so if I install EE it works or if I go w/ terralith it also works'. Active only when the level's biome source can place one of 'requires' (worldgen/OverworldOverride gives a Deep Time world Expanded Ecosphere's overworld biome list). Each rule places Expanded Ecosphere biomes from Deep Time's own coordinates; the first rule whose conditions hold for a land column at the surface, and whose candidates the source has, runs the source's climate search over those candidates alone (FORMAT.md 'Biome rules'). Every rule is a game choice (docs/science/ledger/BIO.md, BIO-117 to BIO-128); the thresholds that come from a classification say so. Role rules ('role') choose among a volcanic role's biomes by the climate; the role tags data/deeptime/tags/worldgen/biome/volcanic/<role>.json list Expanded Ecosphere's volcanic biomes after Terralith's and Biomes O' Plenty's, so they are kept out of the climate search everywhere but at real volcanoes. Peatland is the shared rule of deeptime:peatland (the tag deeptime:peatland lists Expanded Ecosphere's fen and bogs).",
+ "requires": ["wythers:ice_cap", "wythers:fen"],
+ "rules": [
+  {
+   "id": "icy_volcano",
+   "_comment": "An active cone in a polar or subarctic climate: Expanded Ecosphere's snow-capped volcano. BIO-117.",
+   "role": "cone",
+   "koppen": ["E", "Dfc", "Dfd", "Dsc", "Dsd", "Dwc", "Dwd"],
+   "biomes": ["wythers:icy_volcano"]
+  },
+  {
+   "id": "tropical_volcano",
+   "_comment": "An active cone in a tropical climate. Other cones take the role tag's first biome (wythers:volcano). BIO-117.",
+   "role": "cone",
+   "koppen": ["A"],
+   "biomes": ["wythers:tropical_volcano"]
+  },
+  {
+   "id": "thermal_taiga",
+   "_comment": "A hot-spring field in a cold climate (D, E): the thermal taiga biomes, the snowy one in the coldest (the search picks by temperature). BIO-118.",
+   "role": "hot_spring_field",
+   "koppen": ["D", "E"],
+   "biomes": ["wythers:thermal_taiga", "wythers:snowy_thermal_taiga", "wythers:thermal_taiga_crags"]
+  },
+  {
+   "id": "mud_pools",
+   "_comment": "A hot-spring field in any other climate: mud pools (above vanilla's temperature range in Expanded Ecosphere's own list, unreachable by the climate search). BIO-118.",
+   "role": "hot_spring_field",
+   "biomes": ["wythers:mud_pools"]
+  },
+  {
+   "id": "glacial_cliffs",
+   "_comment": "A coast (the pack's beach or stony shore) under the ice cover: tidewater ice cliffs. BIO-119.",
+   "ice": true,
+   "replaces": ["#c:is_beach", "#minecraft:is_beach", "#c:is_stony_shores"],
+   "biomes": ["wythers:glacial_cliffs"],
+   "exclusive": true
+  },
+  {
+   "id": "ice_cap",
+   "_comment": "Land under the ice cover (the glacier model's ice, BIO-075 onwards) that the pack does not draw as a peak or slope: Expanded Ecosphere's ice cap, whose temperature parameter (-1.2 to -1.0) is below every value Deep Time's climate gives. BIO-119.",
+   "ice": true,
+   "keeps": ["#c:is_mountain/peak", "#c:is_mountain/slope", "#minecraft:is_ocean", "#minecraft:is_river"],
+   "biomes": ["wythers:ice_cap"],
+   "exclusive": true
+  },
+  {
+   "id": "salt_lakes",
+   "_comment": "A playa (the hydrology's salt flat: a basin too dry for a lake, baked layer 'playa'): the salt lakes, whose colour the search picks by humidity (white, pink, turquoise). Unreachable by the climate search (temperature 0.9 to 1.05 at the swamp row of the hot band). BIO-120.",
+   "playa": true,
+   "biomes": ["wythers:salt_lakes_white", "wythers:salt_lakes_pink", "wythers:salt_lakes_turquoise"],
+   "exclusive": true
+  },
+  {
+   "id": "tsingy",
+   "_comment": "Karst pinnacles only on carbonate rock at the surface in a humid tropical or subtropical climate (Madagascar's tsingy, the tower karst of south China). BIO-121.",
+   "koppen": ["Af", "Am", "Aw", "As", "Cwa", "Cfa"],
+   "rock": ["limestone", "dolostone", "chalk"],
+   "biomes": ["wythers:tsingy_forest"],
+   "exclusive": true
+  },
+  {
+   "id": "black_beach_volcanic",
+   "_comment": "A beach inside a volcano's zone (any role): black sand. BIO-122.",
+   "volcanic": true,
+   "replaces": ["#c:is_beach", "#minecraft:is_beach"],
+   "biomes": ["wythers:black_beach"],
+   "exclusive": true
+  },
+  {
+   "id": "black_beach_basalt",
+   "_comment": "A beach whose top rock (within 6 blocks, BIO-116) is basaltic: black sand. BIO-122.",
+   "rock": ["basalt", "scoria", "obsidian"],
+   "replaces": ["#c:is_beach", "#minecraft:is_beach"],
+   "biomes": ["wythers:black_beach"],
+   "exclusive": true
+  },
+  {
+   "id": "tibesti_mountains",
+   "_comment": "Hot desert highland (BWh above 1,500 m): the Tibesti mountains biome, above vanilla's temperature range in Expanded Ecosphere's own list. BIO-123.",
+   "koppen": ["BWh"],
+   "elevation_m": {"min": 1500},
+   "keeps": ["#minecraft:is_river", "#minecraft:is_ocean"],
+   "biomes": ["wythers:tibesti_mountains"],
+   "exclusive": true
+  },
+  {
+   "id": "low_arctic_tundra",
+   "_comment": "Tundra (ET) with a warmest month of 5 degC or more: the low-arctic shrub tundra (Expanded Ecosphere's green tundra, which its list puts in the cold band, never reached by ET). Split at the CAVM's subzone C edge (Walker et al. 2005, from memory). BIO-124.",
+   "koppen": ["ET"],
+   "t_warm_c": {"min": 5.0},
+   "keeps": ["#c:is_mountain/peak", "#c:is_mountain/slope", "#c:is_beach", "#minecraft:is_beach", "#c:is_stony_shores", "#minecraft:is_river", "#minecraft:is_ocean", "#c:is_swamp"],
+   "biomes": ["wythers:tundra"]
+  },
+  {
+   "id": "high_arctic_tundra",
+   "_comment": "Colder tundra (ET, warmest month under 5 degC): the snowy tundra, not snowy taiga or ice spikes (ET is treeless and has no ice sheet). BIO-124.",
+   "koppen": ["ET"],
+   "keeps": ["#c:is_mountain/peak", "#c:is_mountain/slope", "#c:is_beach", "#minecraft:is_beach", "#c:is_stony_shores", "#minecraft:is_river", "#minecraft:is_ocean", "#c:is_swamp"],
+   "biomes": ["wythers:snowy_tundra"]
+  },
+  {
+   "id": "polar_desert",
+   "_comment": "Barren frozen ground: EF outside the ice cover, and BWk with a mean at or below 0 degC (the cold deserts' polar part, BIO-101 to BIO-103): the snowy tundra. BIO-125.",
+   "koppen": ["EF", "BWk"],
+   "ice": false,
+   "t_mean_c": {"max": 0.0},
+   "keeps": ["#c:is_mountain/peak", "#c:is_mountain/slope", "#c:is_beach", "#minecraft:is_beach", "#c:is_stony_shores", "#minecraft:is_river", "#minecraft:is_ocean"],
+   "biomes": ["wythers:snowy_tundra"]
+  },
+  {
+   "id": "dry_tropical_forest",
+   "_comment": "The wetter savanna climates (Aw, As with 1,000 mm or more a year): tropical dry forest, which Expanded Ecosphere puts at the hot edge of the warm band, beyond most of Deep Time's Aw. Holdridge's tropical dry forest takes 1,000 to 2,000 mm (Holdridge 1967, from memory); drier Aw keeps the pack's savannas. BIO-126.",
+   "koppen": ["Aw", "As"],
+   "p_mm": {"min": 1000.0},
+   "keeps": ["#c:is_mountain/peak", "#c:is_mountain/slope", "#c:is_beach", "#minecraft:is_beach", "#c:is_stony_shores", "#minecraft:is_river", "#minecraft:is_ocean", "#c:is_swamp"],
+   "biomes": ["wythers:dry_tropical_forest"]
+  },
+  {
+   "id": "temperate_rainforest",
+   "_comment": "Oceanic climates (Cfb, Cfc) with 1,400 mm or more a year and a mean of 4 to 12 degC: temperate rainforest (Alaback 1991's limits, from memory), its crags on hills and its flooded form in the wetlands (the search picks by erosion). Expanded Ecosphere puts these in the cold band, where Deep Time's Cfb never is. BIO-127.",
+   "koppen": ["Cfb", "Cfc"],
+   "p_mm": {"min": 1400.0},
+   "t_mean_c": {"min": 4.0, "max": 12.0},
+   "keeps": ["#c:is_mountain/peak", "#c:is_beach", "#minecraft:is_beach", "#c:is_stony_shores", "#minecraft:is_river", "#minecraft:is_ocean"],
+   "biomes": ["wythers:temperate_rainforest", "wythers:temperate_rainforest_crags", "wythers:flooded_temperate_rainforest"]
+  },
+  {
+   "id": "mediterranean_scrub",
+   "_comment": "The drier Mediterranean climates (Csa, Csb with 800 mm a year or less): chaparral, sclerophyll scrub (Expanded Ecosphere puts it in the hot band, never reached by Cs); wetter Cs keeps the pack's woodland. BIO-128.",
+   "koppen": ["Csa", "Csb"],
+   "p_mm": {"max": 800.0},
+   "keeps": ["#c:is_mountain/peak", "#c:is_mountain/slope", "#c:is_beach", "#minecraft:is_beach", "#c:is_stony_shores", "#minecraft:is_river", "#minecraft:is_ocean", "#c:is_swamp"],
+   "biomes": ["wythers:chaparral"]
+  },
+  {
+   "id": "cold_steppe",
+   "_comment": "Cold steppe (BSk): the cold plains, the highland plains or the subtropical grassland by temperature, not the pack's tundra or crimson tundra. BIO-128.",
+   "koppen": ["BSk"],
+   "keeps": ["#c:is_mountain/peak", "#c:is_mountain/slope", "#c:is_beach", "#minecraft:is_beach", "#c:is_stony_shores", "#minecraft:is_river", "#minecraft:is_ocean", "#c:is_swamp"],
+   "biomes": ["wythers:cold_plains", "wythers:highland_plains", "wythers:subtropical_grassland"]
+  }
+ ]
+}
