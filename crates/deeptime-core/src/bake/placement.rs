@@ -9,6 +9,16 @@
 //!
 //! A [`Placement`] is the parsed and checked table. The default reproduces the constants P1-09
 //! first compiled in, operation for operation (the bake's rasters are bit-identical).
+//!
+//! **Pack placement tables** (decisions log 2026-10-04, "Deep Time-side fixes"): a biome mod whose
+//! biomes sit in other parameter slots than vanilla's gets a table of its own, written as a JSON
+//! merge patch on the base table (`data/climate_mapping/packs/<id>.json`, shipped in the jar beside
+//! `placement.json`). The game applies the ones whose `requires_biomes` are all registered, in
+//! order of `priority` then `id`, and passes them in the content bundle under [`PATCHES_KEY`];
+//! [`Placement::with_packs`] merges them and the bake records their ids. Terralith's is the first.
+//! A table may carry `class_rules`: per-class overrides that hold only where their conditions on
+//! the cell (temperatures, aridity, latitude, height) do, such as Terralith's cloud forest on
+//! tropical mountains.
 
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
@@ -28,15 +38,25 @@ pub const SCHEMA: u64 = 1;
 /// The `content` key that carries a datapack's table to the bake.
 pub const CONTENT_KEY: &str = "climate_placement";
 
+/// The `content` key that carries the pack placement tables the game chose for the installed biome
+/// mods (`data/deeptime/deeptime/climate_mapping/packs/*.json`, each a merge patch on the base
+/// table; [`Placement::with_packs`]).
+pub const PATCHES_KEY: &str = "climate_placement_patches";
+
 /// A band coordinate is in [0, 5].
 const TOP: f64 = 5.0;
 
-/// The temperatures a ramp reads.
+/// What a ramp, a switch or a class rule's condition reads of a cell: the three temperatures (°C;
+/// a ramp reads only these), and, for switches and class rules, the aridity index P/PET, the
+/// absolute latitude (degrees) and the height of the ground above the sea (m).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Input {
     Mean,
     Warm,
     Cold,
+    Aridity,
+    AbsLat,
+    Height,
 }
 
 impl Input {
@@ -45,7 +65,71 @@ impl Input {
             "t_mean" => Some(Input::Mean),
             "t_warm" => Some(Input::Warm),
             "t_cold" => Some(Input::Cold),
+            "aridity" => Some(Input::Aridity),
+            "abs_lat_deg" => Some(Input::AbsLat),
+            "height_m" => Some(Input::Height),
             _ => None,
+        }
+    }
+
+    /// The names a switch or a condition accepts.
+    const NAMES: &'static str = "t_mean, t_warm, t_cold, aridity, abs_lat_deg or height_m";
+
+    /// The range a threshold on this input must lie in.
+    fn range(self) -> (f64, f64) {
+        match self {
+            Input::Mean | Input::Warm | Input::Cold => (-100.0, 100.0),
+            Input::Aridity => (0.0, 100.0),
+            Input::AbsLat => (0.0, 90.0),
+            Input::Height => (-12_000.0, 12_000.0),
+        }
+    }
+
+    fn is_temperature(self) -> bool {
+        matches!(self, Input::Mean | Input::Warm | Input::Cold)
+    }
+}
+
+/// What the table reads of one land cell. An input the caller does not know is NaN: a switch then
+/// takes its `else` branch and a class rule's condition on it fails.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Site {
+    /// Mean, warmest-month and coldest-month temperature, °C.
+    pub t_mean: f64,
+    pub t_warm: f64,
+    pub t_cold: f64,
+    /// The aridity index P/PET.
+    pub aridity: f64,
+    /// |latitude|, degrees.
+    pub abs_lat_deg: f64,
+    /// The ground's height above the sea, m (0 at or below it).
+    pub height_m: f64,
+    /// Above the equilibrium line (glaciated).
+    pub glacier: bool,
+}
+
+impl Site {
+    /// A site of these temperatures, aridity and glacier flag, its latitude and height unknown.
+    pub fn of(t_mean: f64, t_warm: f64, t_cold: f64, aridity: f64, glacier: bool) -> Site {
+        Site {
+            t_mean,
+            t_warm,
+            t_cold,
+            aridity,
+            abs_lat_deg: f64::NAN,
+            height_m: f64::NAN,
+            glacier,
+        }
+    }
+
+    fn input(&self, of: Input) -> f64 {
+        match of {
+            Input::Mean => self.t_mean,
+            Input::Warm => self.t_warm,
+            Input::Cold => self.t_cold,
+            Input::Aridity => self.aridity,
+            Input::AbsLat => self.abs_lat_deg,
+            Input::Height => self.height_m,
         }
     }
 }
@@ -109,12 +193,62 @@ struct Glaciated {
     erosion: Option<ErosionLimit>,
 }
 
-/// Erosion limits (vanilla's erosion units) a class's land is held to: clamped into
-/// `[min, max]`. A missing bound is the end of the parameter's range.
+/// Limits (vanilla's units of the parameter: erosion, or continentalness) a class's land is held
+/// to: clamped into `[min, max]`. A missing bound is the end of the parameter's range.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ErosionLimit {
+pub struct Limit {
     pub min: f64,
     pub max: f64,
+}
+
+/// Erosion limits (vanilla's erosion units, −1 … 1).
+pub type ErosionLimit = Limit;
+
+/// The continentalness parameter's range (vanilla's units: the mushroom-fields floor to the top).
+const CONTINENTS_RANGE: (f64, f64) = (-1.2, 1.0);
+
+/// One condition of a class rule: the input above or below a threshold (strictly; a NaN input
+/// fails).
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Cond {
+    of: Input,
+    above: Option<f64>,
+    below: Option<f64>,
+}
+
+impl Cond {
+    fn holds(&self, s: &Site) -> bool {
+        let x = s.input(self.of);
+        self.above.is_none_or(|a| x > a) && self.below.is_none_or(|b| x < b)
+    }
+}
+
+/// A class rule (`class_rules`): where every condition holds on the unglaciated land of one of its
+/// classes, its temperature, humidity, erosion and continentalness (each optional) replace the
+/// class's own. The first rule that holds decides.
+#[derive(Clone, Debug, PartialEq)]
+struct ClassRule {
+    name: String,
+    /// Bit k set: Köppen class k.
+    classes: u32,
+    when: Vec<Cond>,
+    thermal: Option<Thermal>,
+    humidity: Option<Humid>,
+    erosion: Option<Limit>,
+    continentalness: Option<Limit>,
+}
+
+/// Where the table puts one land cell: its band coordinates, the limits its land is held to and its
+/// branch of the variant noise.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Placed {
+    pub thermal: f64,
+    pub humidity: f64,
+    pub erosion: Option<Limit>,
+    pub continentalness: Option<Limit>,
+    pub weirdness: Weirdness,
+    /// The index of the class rule that decided, if one did.
+    pub rule: Option<usize>,
 }
 
 /// Which branch of the variant noise a class's land takes.
@@ -225,11 +359,17 @@ pub struct Placement {
     glaciated: Vec<Option<Glaciated>>,
     /// By Köppen index 0 … 30: the class's erosion limits.
     erosion: Vec<Option<ErosionLimit>>,
+    /// By Köppen index 0 … 30: the class's continentalness limits.
+    continentalness: Vec<Option<Limit>>,
     /// By Köppen index 0 … 30: the branch of the variant noise the class's land takes.
     weirdness: Vec<Weirdness>,
+    /// The class rules, in order.
+    class_rules: Vec<ClassRule>,
     ice_cover: IceCoverSpec,
     /// The table as written (without `_comment`): what `notes.bake.climate.placement` records.
     table: Value,
+    /// The pack placement tables applied over the base, in order (their `id`s).
+    patches: Vec<String>,
 }
 
 /// The default table, parsed once.
@@ -314,6 +454,11 @@ fn rule_named(
 
 /// `{min, max}` erosion limits (vanilla's erosion units, -1 .. 1; at least one key).
 fn parse_erosion(v: &Value, path: &str) -> Result<ErosionLimit, CoreError> {
+    parse_limit(v, path, (-1.0, 1.0))
+}
+
+/// `{min, max}` limits within `range` (at least one key; a missing one is the range's end).
+fn parse_limit(v: &Value, path: &str, range: (f64, f64)) -> Result<Limit, CoreError> {
     let o = object(v, path)?;
     no_other_keys(o, &["min", "max"], path)?;
     if o.is_empty() {
@@ -322,14 +467,61 @@ fn parse_erosion(v: &Value, path: &str) -> Result<ErosionLimit, CoreError> {
     let bound = |k: &str, default: f64| -> Result<f64, CoreError> {
         match o.get(k) {
             None => Ok(default),
-            Some(x) => number(x, &format!("{path}.{k}"), -1.0, 1.0),
+            Some(x) => number(x, &format!("{path}.{k}"), range.0, range.1),
         }
     };
-    let (min, max) = (bound("min", -1.0)?, bound("max", 1.0)?);
+    let (min, max) = (bound("min", range.0)?, bound("max", range.1)?);
     if min > max {
         return Err(err(path, "min is above max"));
     }
-    Ok(ErosionLimit { min, max })
+    Ok(Limit { min, max })
+}
+
+/// `{"of": input, "above": x}` and/or `"below"`: one condition of a class rule.
+fn parse_cond(v: &Value, path: &str) -> Result<Cond, CoreError> {
+    let o = object(v, path)?;
+    no_other_keys(o, &["of", "above", "below"], path)?;
+    let of = o
+        .get("of")
+        .ok_or_else(|| err(&format!("{path}.of"), "missing"))?;
+    let of = Input::parse(string(of, &format!("{path}.of"))?)
+        .ok_or_else(|| err(&format!("{path}.of"), format!("must be {}", Input::NAMES)))?;
+    let (lo, hi) = of.range();
+    let bound = |k: &str| -> Result<Option<f64>, CoreError> {
+        o.get(k)
+            .map(|x| number(x, &format!("{path}.{k}"), lo, hi))
+            .transpose()
+    };
+    let (above, below) = (bound("above")?, bound("below")?);
+    if above.is_none() && below.is_none() {
+        return Err(err(path, "needs at least one of above, below"));
+    }
+    if let (Some(a), Some(b)) = (above, below)
+        && a >= b
+    {
+        return Err(err(path, "above must be less than below"));
+    }
+    Ok(Cond { of, above, below })
+}
+
+/// A JSON merge patch (RFC 7386): objects merge key by key, `null` removes a key, anything else
+/// replaces the target.
+pub fn merge_patch(target: &mut Value, patch: &Value) {
+    let Value::Object(p) = patch else {
+        *target = patch.clone();
+        return;
+    };
+    if !target.is_object() {
+        *target = Value::Object(Map::new());
+    }
+    let t = target.as_object_mut().expect("made an object");
+    for (k, v) in p {
+        if v.is_null() {
+            t.remove(k);
+        } else {
+            merge_patch(t.entry(k.clone()).or_insert(Value::Null), v);
+        }
+    }
 }
 
 /// `"positive"`, or `{"positive_below_erosion": e}`.
@@ -471,12 +663,17 @@ fn parse_switch<'a>(
     let of = when
         .get("of")
         .ok_or_else(|| err(&format!("{tp}.when.of"), "missing"))?;
-    let of = Input::parse(string(of, &format!("{tp}.when.of"))?)
-        .ok_or_else(|| err(&format!("{tp}.when.of"), "must be t_mean, t_warm or t_cold"))?;
+    let of = Input::parse(string(of, &format!("{tp}.when.of"))?).ok_or_else(|| {
+        err(
+            &format!("{tp}.when.of"),
+            format!("must be {}", Input::NAMES),
+        )
+    })?;
     let above = when
         .get("above")
         .ok_or_else(|| err(&format!("{tp}.when.above"), "missing"))?;
-    let above = number(above, &format!("{tp}.when.above"), -100.0, 100.0)?;
+    let (lo, hi) = of.range();
+    let above = number(above, &format!("{tp}.when.above"), lo, hi)?;
     Ok((of, above, field("then")?, field("else")?))
 }
 
@@ -579,6 +776,7 @@ impl Placement {
                 "temperature_ramps",
                 "humidity_rules",
                 "classes",
+                "class_rules",
                 "ice_cover",
             ],
             "",
@@ -619,6 +817,7 @@ impl Placement {
                 let f = |k: &str| o.get(k).ok_or_else(|| err(&format!("{tp}.{k}"), "missing"));
                 let of = string(f("of")?, &format!("{tp}.of"))?;
                 let of = Input::parse(of)
+                    .filter(|i| i.is_temperature())
                     .ok_or_else(|| err(&format!("{tp}.of"), "must be t_mean, t_warm or t_cold"))?;
                 let from = number(f("from")?, &format!("{tp}.from"), -100.0, 100.0)?;
                 let to = number(f("to")?, &format!("{tp}.to"), -100.0, 100.0)?;
@@ -697,6 +896,7 @@ impl Placement {
         let mut humidity: Vec<Option<Humid>> = vec![None; land];
         let mut glaciated: Vec<Option<Glaciated>> = vec![None; land];
         let mut erosion: Vec<Option<ErosionLimit>> = vec![None; land];
+        let mut continentalness: Vec<Option<Limit>> = vec![None; land];
         let mut weirdness = vec![Weirdness::Noise; land];
         for (code, c) in classes {
             let p = format!("classes.{code}");
@@ -712,6 +912,7 @@ impl Placement {
                     "humidity",
                     "glaciated",
                     "erosion",
+                    "continentalness",
                     "weirdness",
                 ],
                 &p,
@@ -721,6 +922,13 @@ impl Placement {
             }
             if let Some(e) = o.get("erosion") {
                 erosion[k] = Some(parse_erosion(e, &format!("{p}.erosion"))?);
+            }
+            if let Some(e) = o.get("continentalness") {
+                continentalness[k] = Some(parse_limit(
+                    e,
+                    &format!("{p}.continentalness"),
+                    CONTINENTS_RANGE,
+                )?);
             }
             let tp = format!("{p}.temperature");
             let t = o.get("temperature").ok_or_else(|| err(&tp, "missing"))?;
@@ -770,6 +978,96 @@ impl Placement {
                 ),
             ));
         }
+        // Class rules.
+        let mut class_rules = Vec::new();
+        if let Some(rs) = root.get("class_rules") {
+            let rs = rs
+                .as_array()
+                .ok_or_else(|| err("class_rules", "expected a list"))?;
+            for (i, r) in rs.iter().enumerate() {
+                let p = format!("class_rules.{i}");
+                let o = object(r, &p)?;
+                no_other_keys(
+                    o,
+                    &[
+                        "name",
+                        "_comment",
+                        "classes",
+                        "when",
+                        "temperature",
+                        "humidity",
+                        "erosion",
+                        "continentalness",
+                    ],
+                    &p,
+                )?;
+                let name = string(
+                    o.get("name")
+                        .ok_or_else(|| err(&format!("{p}.name"), "missing"))?,
+                    &format!("{p}.name"),
+                )?
+                .to_owned();
+                let cp = format!("{p}.classes");
+                let codes = o
+                    .get("classes")
+                    .and_then(Value::as_array)
+                    .filter(|a| !a.is_empty())
+                    .ok_or_else(|| err(&cp, "expected a non-empty list of land classes"))?;
+                let mut classes = 0u32;
+                for (j, c) in codes.iter().enumerate() {
+                    let jp = format!("{cp}.{j}");
+                    match koppen::index(string(c, &jp)?) {
+                        Some(k) if k < koppen::SEA => classes |= 1 << k,
+                        _ => return Err(err(&jp, "not a land Köppen class (Af … EF)")),
+                    }
+                }
+                let wp = format!("{p}.when");
+                let when = o
+                    .get("when")
+                    .and_then(Value::as_array)
+                    .filter(|a| !a.is_empty())
+                    .ok_or_else(|| err(&wp, "expected a non-empty list of conditions"))?
+                    .iter()
+                    .enumerate()
+                    .map(|(j, c)| parse_cond(c, &format!("{wp}.{j}")))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let thermal = o
+                    .get("temperature")
+                    .map(|t| parse_thermal(t, &format!("{p}.temperature"), &ramp_ix, 0))
+                    .transpose()?;
+                let humidity = o
+                    .get("humidity")
+                    .map(|h| parse_humid(h, &format!("{p}.humidity"), &rule_ix, 0))
+                    .transpose()?;
+                let erosion = o
+                    .get("erosion")
+                    .map(|e| parse_erosion(e, &format!("{p}.erosion")))
+                    .transpose()?;
+                let continentalness = o
+                    .get("continentalness")
+                    .map(|e| parse_limit(e, &format!("{p}.continentalness"), CONTINENTS_RANGE))
+                    .transpose()?;
+                if thermal.is_none()
+                    && humidity.is_none()
+                    && erosion.is_none()
+                    && continentalness.is_none()
+                {
+                    return Err(err(
+                        &p,
+                        "needs at least one of temperature, humidity, erosion, continentalness",
+                    ));
+                }
+                class_rules.push(ClassRule {
+                    name,
+                    classes,
+                    when,
+                    thermal,
+                    humidity,
+                    erosion,
+                    continentalness,
+                });
+            }
+        }
         let ice_cover = parse_ice_cover(root.get("ice_cover"))?;
         let mut table = root.clone();
         table.remove("_comment");
@@ -781,9 +1079,12 @@ impl Placement {
             humidity: humidity.into_iter().flatten().collect(),
             glaciated,
             erosion,
+            continentalness,
             weirdness,
+            class_rules,
             ice_cover,
             table: Value::Object(table),
+            patches: Vec::new(),
         })
     }
 
@@ -792,44 +1093,113 @@ impl Placement {
         &self.table
     }
 
-    fn input(of: Input, t_mean: f64, t_warm: f64, t_cold: f64) -> f64 {
-        match of {
-            Input::Mean => t_mean,
-            Input::Warm => t_warm,
-            Input::Cold => t_cold,
+    /// The pack placement tables applied over the base table, in order (their `id`s).
+    pub fn patches(&self) -> &[String] {
+        &self.patches
+    }
+
+    /// The class rules' names, in order (what [`Placed::rule`] indexes).
+    pub fn rule_names(&self) -> Vec<&str> {
+        self.class_rules.iter().map(|r| r.name.as_str()).collect()
+    }
+
+    /// The base table (`base`, the table as written; `None` for the default) with the pack placement
+    /// tables `packs` applied in order (FORMAT.md, "Pack placement tables"): each is
+    /// `{"schema": 1, "id": "...", "patch": {...}}` (plus the game's own `requires_biomes`, `priority`
+    /// and `_comment`), its `patch` a JSON merge patch (RFC 7386) on the table so far. The result is
+    /// parsed and checked whole; an error names the pack and, inside it, the path.
+    pub fn with_packs(base: Option<&Value>, packs: &[Value]) -> Result<Placement, CoreError> {
+        let mut table = match base {
+            Some(b) => {
+                let mut t = b.clone();
+                if let Some(o) = t.as_object_mut() {
+                    o.remove("_comment");
+                }
+                t
+            }
+            None => builtin().table().clone(),
+        };
+        let mut ids = Vec::new();
+        for (i, pack) in packs.iter().enumerate() {
+            let p = format!("$.{PATCHES_KEY}.{i}");
+            let o = pack
+                .as_object()
+                .ok_or_else(|| CoreError::preset(&p, "expected a JSON object"))?;
+            if let Some(k) = o.keys().find(|k| {
+                ![
+                    "schema",
+                    "_comment",
+                    "id",
+                    "requires_biomes",
+                    "priority",
+                    "patch",
+                ]
+                .contains(&k.as_str())
+            }) {
+                return Err(CoreError::preset(format!("{p}.{k}"), "unknown key"));
+            }
+            if o.get("schema").and_then(Value::as_u64) != Some(SCHEMA) {
+                return Err(CoreError::preset(
+                    format!("{p}.schema"),
+                    format!("must be {SCHEMA}"),
+                ));
+            }
+            let id = o
+                .get("id")
+                .and_then(Value::as_str)
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| CoreError::preset(format!("{p}.id"), "expected a name"))?;
+            let patch = o
+                .get("patch")
+                .filter(|v| v.is_object())
+                .ok_or_else(|| CoreError::preset(format!("{p}.patch"), "expected a JSON object"))?;
+            merge_patch(&mut table, patch);
+            if let Some(t) = table.as_object_mut() {
+                t.remove("_comment");
+            }
+            ids.push(id.to_owned());
         }
+        let mut placed = Placement::from_value(&table).map_err(|e| match e {
+            CoreError::PresetInvalid { path, reason } if !ids.is_empty() => CoreError::preset(
+                path,
+                format!("{reason} (in the table after the packs {})", ids.join(", ")),
+            ),
+            e => e,
+        })?;
+        placed.patches = ids;
+        Ok(placed)
     }
 
-    fn ramp_value(&self, r: usize, t_mean: f64, t_warm: f64, t_cold: f64) -> f64 {
+    fn ramp_value(&self, r: usize, s: &Site) -> f64 {
         let r = &self.ramps[r];
-        let s = r.terms.iter().fold(0.0, |s, t| {
-            let x = Self::input(t.of, t_mean, t_warm, t_cold);
-            s + t.weight * unit((x - t.from) / (t.to - t.from))
+        let v = r.terms.iter().fold(0.0, |v, t| {
+            let x = s.input(t.of);
+            v + t.weight * unit((x - t.from) / (t.to - t.from))
         });
-        r.base + r.span * s
+        r.base + r.span * v
     }
 
-    fn thermal_value(&self, t: &Thermal, t_mean: f64, t_warm: f64, t_cold: f64) -> f64 {
+    fn thermal_value(&self, t: &Thermal, s: &Site) -> f64 {
         match t {
-            Thermal::Ramp(r) => self.ramp_value(*r, t_mean, t_warm, t_cold),
+            Thermal::Ramp(r) => self.ramp_value(*r, s),
             Thermal::When {
                 of,
                 above,
                 then,
                 otherwise,
             } => {
-                let branch = if Self::input(*of, t_mean, t_warm, t_cold) > *above {
+                let branch = if s.input(*of) > *above {
                     then
                 } else {
                     otherwise
                 };
-                self.thermal_value(branch, t_mean, t_warm, t_cold)
+                self.thermal_value(branch, s)
             }
         }
     }
 
-    /// The humidity rule a class's [`Humid`] picks at these temperatures.
-    fn humid_rule(h: &Humid, t_mean: f64, t_warm: f64, t_cold: f64) -> usize {
+    /// The humidity rule a class's [`Humid`] picks at this site.
+    fn humid_rule(h: &Humid, s: &Site) -> usize {
         match h {
             Humid::Rule(r) => *r,
             Humid::When {
@@ -838,13 +1208,69 @@ impl Placement {
                 then,
                 otherwise,
             } => {
-                let branch = if Self::input(*of, t_mean, t_warm, t_cold) > *above {
+                let branch = if s.input(*of) > *above {
                     then
                 } else {
                     otherwise
                 };
-                Self::humid_rule(branch, t_mean, t_warm, t_cold)
+                Self::humid_rule(branch, s)
             }
+        }
+    }
+
+    /// The humidity band coordinate rule `r` gives the aridity index's own band coordinate `h`.
+    fn apply_rule(&self, r: usize, mut h: f64) -> f64 {
+        let r = &self.rules[r];
+        if let Some((lo, hi)) = r.squeeze {
+            h = lo + (hi - lo) * unit((h - 1.0) / 3.0);
+        }
+        if let Some(m) = r.min {
+            h = h.max(m);
+        }
+        if let Some(m) = r.max {
+            h = h.min(m);
+        }
+        h
+    }
+
+    /// The first class rule of class `k` that holds at `s` (never on glaciated land).
+    fn class_rule(&self, k: u8, s: &Site) -> Option<usize> {
+        if s.glacier || k >= koppen::SEA {
+            return None;
+        }
+        self.class_rules
+            .iter()
+            .position(|r| r.classes & (1 << k) != 0 && r.when.iter().all(|c| c.holds(s)))
+    }
+
+    /// Where the table puts a land cell of Köppen class `k` at `s`: [`Placement::thermal_land`],
+    /// [`Placement::humidity_land`], [`Placement::erosion_limit`] and [`Placement::weirdness`] at
+    /// once, with the class rules applied (the first rule of the class whose conditions all hold
+    /// replaces what it names of the class's own; never on glaciated land).
+    pub fn place(&self, k: u8, s: &Site) -> Placed {
+        let rule = self.class_rule(k, s);
+        let r = rule.map(|i| &self.class_rules[i]);
+        let thermal = match r.and_then(|r| r.thermal.as_ref()) {
+            Some(t) => self.thermal_value(t, s),
+            None => self.thermal_at(k, s),
+        };
+        let humidity = match r.and_then(|r| r.humidity.as_ref()) {
+            Some(h) => self.apply_rule(Self::humid_rule(h, s), humidity_of_aridity(s.aridity)),
+            None => self.humidity_at(k, s),
+        };
+        let erosion = r
+            .and_then(|r| r.erosion)
+            .or_else(|| self.erosion_limit(k, s.glacier));
+        let continentalness = r
+            .and_then(|r| r.continentalness)
+            .or_else(|| self.continentalness.get(usize::from(k)).copied().flatten());
+        Placed {
+            thermal,
+            humidity,
+            erosion,
+            continentalness,
+            weirdness: self.weirdness(k),
+            rule,
         }
     }
 
@@ -882,21 +1308,27 @@ impl Placement {
     /// the sea's own curve). Where the glacier flag is set the class's `glaciated` block decides
     /// (its temperature, else the class's own, both uncapped); a class without one is held at or
     /// below the table's `glacier_cap`.
+    ///
+    /// The class rules are not applied (their latitude and height are unknown here): see
+    /// [`Placement::place`].
     pub fn thermal_land(&self, k: u8, t_mean: f64, t_warm: f64, t_cold: f64, glacier: bool) -> f64 {
+        self.thermal_at(k, &Site::of(t_mean, t_warm, t_cold, f64::NAN, glacier))
+    }
+
+    fn thermal_at(&self, k: u8, s: &Site) -> f64 {
         let own = || {
-            self.thermal.get(usize::from(k)).map_or_else(
-                || thermal_sea(t_mean),
-                |t| self.thermal_value(t, t_mean, t_warm, t_cold),
-            )
+            self.thermal
+                .get(usize::from(k))
+                .map_or_else(|| thermal_sea(s.t_mean), |t| self.thermal_value(t, s))
         };
-        if !glacier {
+        if !s.glacier {
             return own();
         }
         match self.glaciated_block(k) {
             Some(g) => g
                 .thermal
                 .as_ref()
-                .map_or_else(own, |t| self.thermal_value(t, t_mean, t_warm, t_cold)),
+                .map_or_else(own, |t| self.thermal_value(t, s)),
             None => own().min(self.glacier_cap),
         }
     }
@@ -904,6 +1336,9 @@ impl Placement {
     /// Humidity band coordinate of a land cell of Köppen class `k` and aridity index `aridity`
     /// (the temperatures decide a class's humidity only when its entry is a `when` switch); where
     /// the glacier flag is set, the class's `glaciated` humidity rule when it has one.
+    ///
+    /// The class rules are not applied (their latitude and height are unknown here): see
+    /// [`Placement::place`].
     pub fn humidity_land(
         &self,
         k: u8,
@@ -913,26 +1348,21 @@ impl Placement {
         t_cold: f64,
         glacier: bool,
     ) -> f64 {
-        let mut h = humidity_of_aridity(aridity);
-        let rule = glacier
+        self.humidity_at(k, &Site::of(t_mean, t_warm, t_cold, aridity, glacier))
+    }
+
+    fn humidity_at(&self, k: u8, s: &Site) -> f64 {
+        let h = humidity_of_aridity(s.aridity);
+        let rule = s
+            .glacier
             .then(|| self.glaciated_block(k).and_then(|g| g.humidity.as_ref()))
             .flatten()
             .or_else(|| self.humidity.get(usize::from(k)))
-            .map(|r| Self::humid_rule(r, t_mean, t_warm, t_cold));
-        let Some(r) = rule else {
-            return h;
-        };
-        let r = &self.rules[r];
-        if let Some((lo, hi)) = r.squeeze {
-            h = lo + (hi - lo) * unit((h - 1.0) / 3.0);
+            .map(|r| Self::humid_rule(r, s));
+        match rule {
+            Some(r) => self.apply_rule(r, h),
+            None => h,
         }
-        if let Some(m) = r.min {
-            h = h.max(m);
-        }
-        if let Some(m) = r.max {
-            h = h.min(m);
-        }
-        h
     }
 }
 
@@ -1525,5 +1955,237 @@ mod tests {
             "$.climate_placement.glacier_cap"
         );
         assert!(Placement::parse("{").is_err());
+    }
+
+    /// RFC 7386: objects merge key by key, null removes, anything else replaces.
+    #[test]
+    fn a_merge_patch_merges_objects_removes_nulls_and_replaces_the_rest() {
+        let mut t = json!({"a": 1, "b": {"c": 2, "d": [1, 2]}, "e": "x"});
+        merge_patch(
+            &mut t,
+            &json!({"a": null, "b": {"c": 3, "d": [9], "n": {"m": 1}}, "f": true}),
+        );
+        assert_eq!(
+            t,
+            json!({"b": {"c": 3, "d": [9], "n": {"m": 1}}, "e": "x", "f": true})
+        );
+        let mut s = json!("scalar");
+        merge_patch(&mut s, &json!({"k": 1}));
+        assert_eq!(s, json!({"k": 1}));
+    }
+
+    fn pack(id: &str, patch: Value) -> Value {
+        json!({"schema": 1, "id": id, "requires_biomes": ["some:biome"], "priority": 0, "patch": patch})
+    }
+
+    /// Decisions log 2026-10-04 ("Deep Time-side fixes"): a pack placement table is a merge patch on
+    /// the base table; several apply in order, the result is checked whole, and the bake records
+    /// their ids. A bad one names its index, or the path in the merged table and the packs.
+    #[test]
+    fn pack_tables_merge_over_the_base_in_order_and_record_their_ids() {
+        let am = koppen::index("Am").unwrap();
+        let a = pack(
+            "a",
+            json!({"humidity_rules": {"wetter": {"min": 4.05}}, "classes": {"Am": {"humidity": "wetter"}}}),
+        );
+        let b = pack("b", json!({"humidity_rules": {"wetter": {"min": 4.5}}}));
+        let p = Placement::with_packs(None, &[a.clone(), b.clone()]).unwrap();
+        assert_eq!(p.patches(), ["a", "b"]);
+        assert!(builtin().humidity_land(am, 1.0, 26.0, 28.0, 24.0, false) < 4.0);
+        assert_eq!(p.humidity_land(am, 1.0, 26.0, 28.0, 24.0, false), 4.5);
+        // Everything the packs do not name is the base's.
+        let af = koppen::index("Af").unwrap();
+        assert_eq!(
+            p.thermal_land(af, 26.0, 28.0, 24.0, false),
+            builtin().thermal_land(af, 26.0, 28.0, 24.0, false)
+        );
+        assert_eq!(p.table()["classes"]["Am"]["temperature"], json!("tropical"));
+        // No packs: the base itself.
+        let none = Placement::with_packs(None, &[]).unwrap();
+        assert_eq!(&none, builtin());
+        // Over a pack's own base table.
+        let mut base: Value = serde_json::from_str(PLACEMENT_JSON).unwrap();
+        base["glacier_cap"] = json!(0.2);
+        let q = Placement::with_packs(Some(&base), std::slice::from_ref(&a)).unwrap();
+        assert_eq!(q.table()["glacier_cap"], json!(0.2));
+        assert_eq!(q.humidity_land(am, 1.0, 26.0, 28.0, 24.0, false), 4.05);
+        // Refusals.
+        let refused = |packs: &[Value]| path_of(Placement::with_packs(None, packs));
+        assert_eq!(
+            refused(&[json!({"schema": 2, "id": "x", "patch": {}})]),
+            "$.climate_placement_patches.0.schema"
+        );
+        assert_eq!(
+            refused(&[a.clone(), json!({"schema": 1, "patch": {}})]),
+            "$.climate_placement_patches.1.id"
+        );
+        assert_eq!(
+            refused(&[json!({"schema": 1, "id": "x", "patch": {}, "colour": 1})]),
+            "$.climate_placement_patches.0.colour"
+        );
+        assert_eq!(
+            refused(&[json!({"schema": 1, "id": "x", "patch": []})]),
+            "$.climate_placement_patches.0.patch"
+        );
+        let broken = pack(
+            "broken",
+            json!({"classes": {"Am": {"humidity": "nowhere"}}}),
+        );
+        match Placement::with_packs(None, &[broken]).expect_err("refused") {
+            CoreError::PresetInvalid { path, reason } => {
+                assert_eq!(path, "$.climate_placement.classes.Am.humidity");
+                assert!(reason.contains("broken"), "{reason}");
+            }
+            e => panic!("{e}"),
+        }
+    }
+
+    /// The class rules (decisions log 2026-10-04: Terralith's cloud forest): the first rule of a
+    /// class whose conditions all hold replaces what it names; outside it, on glaciated land, or
+    /// where an input it reads is unknown, the class's own placement stands.
+    #[test]
+    fn class_rules_hold_only_where_their_conditions_do() {
+        let p = edited(|v| {
+            v["temperature_ramps"]["montane"] =
+                json!({"base": 1.9, "span": 0.0, "inputs": [{"of": "t_mean", "from": 0.0, "to": 1.0}]});
+            v["humidity_rules"]["montane"] = json!({"min": 3.5});
+            v["class_rules"] = json!([
+                {"name": "cloud_forest", "classes": ["Cfb", "Cwb"],
+                 "when": [{"of": "abs_lat_deg", "below": 25.0}, {"of": "height_m", "above": 1000.0},
+                          {"of": "aridity", "above": 1.0}],
+                 "temperature": "montane", "humidity": "montane",
+                 "erosion": {"min": 0.6}, "continentalness": {"min": 0.35}},
+                {"name": "second", "classes": ["Cfb"], "when": [{"of": "height_m", "above": 500.0}],
+                 "erosion": {"max": -0.5}}
+            ]);
+        })
+        .unwrap();
+        assert_eq!(p.rule_names(), ["cloud_forest", "second"]);
+        let cfb = koppen::index("Cfb").unwrap();
+        let site = |lat: f64, h: f64, ai: f64, glacier: bool| Site {
+            abs_lat_deg: lat,
+            height_m: h,
+            ..Site::of(15.0, 18.0, 12.0, ai, glacier)
+        };
+        let own = p.place(cfb, &site(40.0, 200.0, 2.0, false));
+        assert_eq!(own.rule, None);
+        assert_eq!(own.thermal, p.thermal_land(cfb, 15.0, 18.0, 12.0, false));
+        assert_eq!(
+            own.humidity,
+            p.humidity_land(cfb, 2.0, 15.0, 18.0, 12.0, false)
+        );
+        assert_eq!((own.erosion, own.continentalness), (None, None));
+        let cloud = p.place(cfb, &site(10.0, 2000.0, 2.0, false));
+        assert_eq!(cloud.rule, Some(0));
+        assert_eq!(cloud.thermal, 1.9);
+        assert!(cloud.humidity >= 3.5);
+        assert_eq!(cloud.erosion, Some(Limit { min: 0.6, max: 1.0 }));
+        assert_eq!(
+            cloud.continentalness,
+            Some(Limit {
+                min: 0.35,
+                max: 1.0
+            })
+        );
+        // Each condition matters; the next rule may then hold.
+        assert_eq!(p.place(cfb, &site(30.0, 2000.0, 2.0, false)).rule, Some(1));
+        assert_eq!(p.place(cfb, &site(10.0, 2000.0, 0.5, false)).rule, Some(1));
+        let low = p.place(cfb, &site(10.0, 800.0, 2.0, false));
+        assert_eq!(low.rule, Some(1));
+        assert_eq!(
+            low.erosion,
+            Some(Limit {
+                min: -1.0,
+                max: -0.5
+            })
+        );
+        assert_eq!(low.thermal, own.thermal);
+        // Glaciated land, an unknown height, another class: no rule.
+        assert_eq!(p.place(cfb, &site(10.0, 2000.0, 2.0, true)).rule, None);
+        assert_eq!(p.place(cfb, &site(10.0, f64::NAN, 2.0, false)).rule, None);
+        let cfa = koppen::index("Cfa").unwrap();
+        assert_eq!(p.place(cfa, &site(10.0, 2000.0, 2.0, false)).rule, None);
+        // Switches read the new inputs too.
+        let q = edited(|v| {
+            v["classes"]["Cfb"]["humidity"] = json!({"when": {"of": "abs_lat_deg", "above": 50.0},
+                                                     "then": "tundra", "else": "humid"});
+        })
+        .unwrap();
+        assert!(q.place(cfb, &site(60.0, 0.0, 3.0, false)).humidity <= 1.95);
+        assert!(q.place(cfb, &site(40.0, 0.0, 3.0, false)).humidity >= 2.05);
+        // Refusals name their path.
+        let rule = |r: Value| path_of(edited(|v| v["class_rules"] = json!([r])));
+        assert_eq!(
+            rule(
+                json!({"name": "x", "classes": ["Xx"], "when": [{"of": "t_mean", "above": 1.0}], "erosion": {"min": 0.0}})
+            ),
+            "$.climate_placement.class_rules.0.classes.0"
+        );
+        assert_eq!(
+            rule(json!({"name": "x", "classes": ["Cfb"], "when": [], "erosion": {"min": 0.0}})),
+            "$.climate_placement.class_rules.0.when"
+        );
+        assert_eq!(
+            rule(
+                json!({"name": "x", "classes": ["Cfb"], "when": [{"of": "height", "above": 1.0}], "erosion": {"min": 0.0}})
+            ),
+            "$.climate_placement.class_rules.0.when.0.of"
+        );
+        assert_eq!(
+            rule(
+                json!({"name": "x", "classes": ["Cfb"], "when": [{"of": "abs_lat_deg", "below": 95.0}], "erosion": {"min": 0.0}})
+            ),
+            "$.climate_placement.class_rules.0.when.0.below"
+        );
+        assert_eq!(
+            rule(
+                json!({"name": "x", "classes": ["Cfb"], "when": [{"of": "t_mean", "above": 1.0}]})
+            ),
+            "$.climate_placement.class_rules.0"
+        );
+        assert_eq!(
+            rule(
+                json!({"name": "x", "classes": ["Cfb"], "when": [{"of": "t_mean", "above": 1.0}], "continentalness": {"min": 1.5}})
+            ),
+            "$.climate_placement.class_rules.0.continentalness.min"
+        );
+        // A ramp still reads temperatures only.
+        assert_eq!(
+            path_of(edited(
+                |v| v["temperature_ramps"]["polar"]["inputs"][0]["of"] = json!("height_m")
+            )),
+            "$.climate_placement.temperature_ramps.polar.inputs.0.of"
+        );
+    }
+
+    /// Every pack placement table the game ships applies cleanly over the default table, and changes
+    /// nothing a vanilla world reads (the default table stays the default).
+    #[test]
+    fn every_shipped_pack_table_applies_over_the_default_table() {
+        let dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("data/climate_mapping/packs");
+        let mut n = 0;
+        for e in std::fs::read_dir(&dir).unwrap() {
+            let path = e.unwrap().path();
+            if path.extension().and_then(|x| x.to_str()) != Some("json") {
+                continue;
+            }
+            let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+            let id = v["id"].as_str().unwrap().to_owned();
+            assert_eq!(
+                path.file_stem().and_then(|s| s.to_str()),
+                Some(id.as_str()),
+                "a pack table's file is named by its id"
+            );
+            let reqs = v["requires_biomes"].as_array().expect("requires_biomes");
+            assert!(!reqs.is_empty(), "{id}: requires_biomes is empty");
+            let p = Placement::with_packs(None, std::slice::from_ref(&v))
+                .unwrap_or_else(|e| panic!("{id}: {e}"));
+            assert_eq!(p.patches(), [id.as_str()]);
+            assert_ne!(&p, builtin());
+            n += 1;
+        }
+        assert!(n >= 1, "no pack tables in {}", dir.display());
+        assert!(builtin().rule_names().is_empty());
     }
 }

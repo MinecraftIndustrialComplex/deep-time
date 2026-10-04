@@ -95,7 +95,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use super::placement::{Placement, Weirdness};
+use super::placement::{Placement, Site, Weirdness};
 use crate::climate::koppen;
 use crate::error::CoreError;
 use crate::world::Field;
@@ -724,6 +724,12 @@ struct Coords {
     /// across the sea like the others.
     e_lo: Vec<f32>,
     e_hi: Vec<f32>,
+    /// The class's (or its class rule's) continentalness limits (placement `continentalness`; ±2
+    /// where it has none). Land only: not filled across the sea.
+    c_lo: Vec<f32>,
+    c_hi: Vec<f32>,
+    /// Land cells each class rule decided (by rule index).
+    rule_cells: Vec<u64>,
     /// The class's variant-noise rule (placement `weirdness`): NaN = the noise signs it, [`ALWAYS_POSITIVE`]
     /// = the positive branch, else the erosion below which it is positive (negative above).
     w_thr: Vec<f32>,
@@ -747,6 +753,9 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
     let mut t_sea = vec![f32::NAN; n];
     let mut e_lo = vec![f32::NAN; n];
     let mut e_hi = vec![f32::NAN; n];
+    let mut c_lo = vec![-2.0f32; n];
+    let mut c_hi = vec![2.0f32; n];
+    let mut rule_cells = vec![0u64; placement.rule_names().len()];
     let mut w_thr = vec![f32::NAN; n];
     let mut w_noise = vec![1.0f32; n];
     let mut w_cap = vec![NO_CAP; n];
@@ -769,16 +778,27 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         let tc = at(c.t_cold, k).unwrap_or(tm - 8.0);
         let ai = at(c.aridity, k).unwrap_or(1.0);
         let glacier = at(c.glacier, k).is_some_and(|g| g >= 0.5);
-        let th = placement.thermal_land(class, tm, tw, tc, glacier);
-        let hu = placement.humidity_land(class, ai, tm, tw, tc, glacier);
+        // L1 has no ground height here: a class rule on height_m does not hold on this path.
+        let site = Site {
+            abs_lat_deg: l1.band_lat_deg((k / w) as u32).abs(),
+            ..Site::of(tm, tw, tc, ai, glacier)
+        };
+        let placed = placement.place(class, &site);
+        let (th, hu) = (placed.thermal, placed.humidity);
         t_land[k] = th as f32;
         h_land[k] = hu as f32;
         h_wet[k] = humidity_of_aridity(ai) as f32;
         cls[k] = f32::from(class);
-        let lim = placement.erosion_limit(class, glacier);
+        let lim = placed.erosion;
         e_lo[k] = lim.map_or(-2.0, |l| l.min as f32);
         e_hi[k] = lim.map_or(2.0, |l| l.max as f32);
-        w_thr[k] = match placement.weirdness(class) {
+        let cl = placed.continentalness;
+        c_lo[k] = cl.map_or(-2.0, |l| l.min as f32);
+        c_hi[k] = cl.map_or(2.0, |l| l.max as f32);
+        if let Some(r) = placed.rule {
+            rule_cells[r] += 1;
+        }
+        w_thr[k] = match placed.weirdness {
             Weirdness::Noise => f32::NAN,
             Weirdness::Positive => ALWAYS_POSITIVE,
             Weirdness::PositiveBelowErosion { erosion, flats } => {
@@ -843,6 +863,9 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         t_sea,
         e_lo,
         e_hi,
+        c_lo,
+        c_hi,
+        rule_cells,
         w_thr,
         w_noise,
         w_cap,
@@ -873,6 +896,8 @@ fn coords_l2(
         h_wet: f32,
         t_sea: f32,
         e: (f32, f32),
+        c: (f32, f32),
+        rule: Option<usize>,
         w: (f32, f32, f32),
         th: f64,
         hu: f64,
@@ -881,6 +906,7 @@ fn coords_l2(
         .into_par_iter()
         .map(|j| {
             let bz = l2.block_z(j as i64) as f64;
+            let abs_lat = l2.band_lat_deg(j as u32).abs();
             (0..w)
                 .map(|i| {
                     let k = j * w + i;
@@ -896,6 +922,8 @@ fn coords_l2(
                             h_wet: f32::NAN,
                             t_sea: thermal_sea(mean_sl) as f32,
                             e: (f32::NAN, f32::NAN),
+                            c: (-2.0, 2.0),
+                            rule: None,
                             w: (f32::NAN, 1.0, NO_CAP),
                             th: 0.0,
                             hu: 0.0,
@@ -917,11 +945,26 @@ fn coords_l2(
                         10.0
                     };
                     let glacier = c.glacier.is_some_and(|f| super::nearest(f, bx, bz) >= 0.5);
-                    let th = placement.thermal_land(class, tm, tw, tc, glacier);
-                    let hu = placement.humidity_land(class, ai, tm, tw, tc, glacier);
-                    let lim = placement.erosion_limit(class, glacier);
+                    let placed = placement.place(
+                        class,
+                        &Site {
+                            t_mean: tm,
+                            t_warm: tw,
+                            t_cold: tc,
+                            aridity: ai,
+                            abs_lat_deg: abs_lat,
+                            height_m: z,
+                            glacier,
+                        },
+                    );
+                    let (th, hu, lim, cl) = (
+                        placed.thermal,
+                        placed.humidity,
+                        placed.erosion,
+                        placed.continentalness,
+                    );
                     let (mut wn, mut wc) = (1.0f32, NO_CAP);
-                    let thr = match placement.weirdness(class) {
+                    let thr = match placed.weirdness {
                         Weirdness::Noise => f32::NAN,
                         Weirdness::Positive => ALWAYS_POSITIVE,
                         Weirdness::PositiveBelowErosion { erosion, flats } => {
@@ -940,6 +983,11 @@ fn coords_l2(
                             lim.map_or(-2.0, |l| l.min as f32),
                             lim.map_or(2.0, |l| l.max as f32),
                         ),
+                        c: (
+                            cl.map_or(-2.0, |l| l.min as f32),
+                            cl.map_or(2.0, |l| l.max as f32),
+                        ),
+                        rule: placed.rule,
                         w: (thr, wn, wc),
                         th,
                         hu,
@@ -956,6 +1004,9 @@ fn coords_l2(
         t_sea: Vec::with_capacity(n),
         e_lo: Vec::with_capacity(n),
         e_hi: Vec::with_capacity(n),
+        c_lo: Vec::with_capacity(n),
+        c_hi: Vec::with_capacity(n),
+        rule_cells: vec![0; placement.rule_names().len()],
         w_thr: Vec::with_capacity(n),
         w_noise: Vec::with_capacity(n),
         w_cap: Vec::with_capacity(n),
@@ -971,6 +1022,11 @@ fn coords_l2(
                 st.1 += x.th;
                 st.2 += x.hu;
             }
+            if let Some(r) = x.rule {
+                co.rule_cells[r] += 1;
+            }
+            co.c_lo.push(x.c.0);
+            co.c_hi.push(x.c.1);
             class.push(x.class);
             co.class.push(if x.class == koppen::SEA {
                 f32::NAN
@@ -1057,12 +1113,16 @@ pub fn map(
 
     // Temperature and humidity.
     let mut class_l2 = Vec::new();
+    let mut rule_cells = vec![0u64; placement.rule_names().len()];
+    let mut c_lo = vec![-2.0f32; n];
+    let mut c_hi = vec![2.0f32; n];
     let (t_land, h_land, (h_wet, class), t_sea, (e_lo, e_hi, w_thr, w_noise, w_cap), by_class) =
         match climate {
             Some(c) if c.months.is_some() => {
                 let mo = c.months.as_ref().expect("checked");
                 let (co, cl) = coords_l2(c, mo, g, &land, placement);
                 class_l2 = cl;
+                (c_lo, c_hi, rule_cells) = (co.c_lo, co.c_hi, co.rule_cells);
                 (
                     co.t_land,
                     co.h_land,
@@ -1095,6 +1155,7 @@ pub fn map(
                         true,
                     )
                 };
+                (c_lo, c_hi, rule_cells) = (near(co.c_lo), near(co.c_hi), co.rule_cells);
                 (
                     up(co.t_land),
                     up(co.h_land),
@@ -1166,6 +1227,11 @@ pub fn map(
         };
         cont_band[k] = b as f32;
         continents[k] = band_value(&bands.continents, b) as f32;
+        // A class's (or class rule's) limits, on land inland of the beach strip (band 4 starts at
+        // `beach_blocks`): a coast keeps its beach (Terralith's cloud forest is far inland).
+        if land[k] && b >= 4.0 {
+            continents[k] = continents[k].clamp(c_lo[k], c_hi[k].max(c_lo[k]));
+        }
     }
 
     // Relief and the ridge/valley index on the ground (the sea surface counted as ground).
@@ -1261,6 +1327,13 @@ pub fn map(
         "placement": {
             "source": if placement == super::placement::builtin() { "default" } else { "content bundle" },
             "table": placement.table(),
+            "patches": placement.patches(),
+            "class_rule_cells": placement
+                .rule_names()
+                .into_iter()
+                .zip(&rule_cells)
+                .map(|(name, &c)| (name.to_owned(), json!(c)))
+                .collect::<serde_json::Map<String, Value>>(),
         },
         "reference": { "bands": bands, "reference": r.reference },
         "koppen_bands": by_class,

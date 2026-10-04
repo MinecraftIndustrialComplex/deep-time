@@ -27,7 +27,12 @@ public final class SessionRunHandle implements RunHandle {
 
     /** Launches a run; see {@link SimSession#launch}. */
     public static SessionRunHandle launch(String presetJson, Path outDir, int threads, long capBytes) {
-        return new SessionRunHandle(SimSession.launch(presetJson, "", outDir, threads, capBytes, true));
+        return launch(presetJson, "", outDir, threads, capBytes);
+    }
+
+    /** Launches a run with a content bundle (the pack placement tables of the installed biome mods). */
+    public static SessionRunHandle launch(String presetJson, String contentJson, Path outDir, int threads, long capBytes) {
+        return new SessionRunHandle(SimSession.launch(presetJson, contentJson, outDir, threads, capBytes, true));
     }
 
     @Override

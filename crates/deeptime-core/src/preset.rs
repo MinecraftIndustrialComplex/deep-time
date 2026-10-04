@@ -509,8 +509,21 @@ impl Preset {
         }
         let v: Value = serde_json::from_str(content_json)
             .map_err(|e| CoreError::preset("content", format!("not valid JSON: {e}")))?;
-        if let Some(t) = v.get(crate::bake::placement::CONTENT_KEY) {
-            let table = crate::bake::placement::Placement::from_value(t)?;
+        // The pack's placement table (else the default), with the pack placement tables the game
+        // chose for the installed biome mods merged over it.
+        let base = v.get(crate::bake::placement::CONTENT_KEY);
+        let packs = match v.get(crate::bake::placement::PATCHES_KEY) {
+            None => &[][..],
+            Some(Value::Array(a)) => a.as_slice(),
+            Some(_) => {
+                return Err(CoreError::preset(
+                    format!("$.{}", crate::bake::placement::PATCHES_KEY),
+                    "expected a list",
+                ));
+            }
+        };
+        if base.is_some() || !packs.is_empty() {
+            let table = crate::bake::placement::Placement::with_packs(base, packs)?;
             if let PresetBody::Planet(p) = &mut self.body {
                 p.placement = Some(table);
             }
