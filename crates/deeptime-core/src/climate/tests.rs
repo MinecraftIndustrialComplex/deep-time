@@ -47,7 +47,7 @@ fn planet() -> Planet {
         day_length_h: 24.0,
         earth_scale: 782.278 / 6370.0,
         m_per_block_h: 300.0,
-        forcing_w_m2: 0.0,
+        co2_ppm: 280.0,
         sun_rel: 1.0,
         orbit: None,
     }
@@ -55,9 +55,30 @@ fn planet() -> Planet {
 
 #[test]
 fn an_idealised_planet_has_earthlike_zones() {
+    idealised_zones(ClimateParams::default());
+}
+
+/// The same on the banded climate (`climate.model = banded`, kept for comparison).
+#[test]
+fn an_idealised_planet_has_earthlike_zones_on_the_banded_climate() {
+    idealised_zones(ClimateParams {
+        model: crate::climate::ClimateModel::Banded,
+        ..ClimateParams::default()
+    });
+}
+
+/// The same with the per-cell climate's moisture budget (`climate.rain_model = budget`).
+#[test]
+fn an_idealised_planet_has_earthlike_zones_with_the_moisture_budget() {
+    idealised_zones(ClimateParams {
+        rain_model: crate::climate::RainModel::Budget,
+        ..ClimateParams::default()
+    });
+}
+
+fn idealised_zones(p: ClimateParams) {
     let (grid, lat, z) = idealised();
     let (w, h) = (grid.w as usize, grid.h as usize);
-    let p = ClimateParams::default();
     let d = Dims::new(w, h, 64.0 * 300.0, true);
     let inp = snapshot::Input {
         grid: &grid,
@@ -68,9 +89,12 @@ fn an_idealised_planet_has_earthlike_zones() {
         p: &p,
         planet: planet(),
         monthly: true,
+        ice_prev: None,
+        koppen_prev: None,
+        correction: &super::percell::Correction::default(),
     };
     let mut ebm = EbmState::default();
-    let s = snapshot::compute(&inp, &mut ebm, &[]);
+    let s = snapshot::compute(&inp, &mut ebm, &[], &mut Default::default());
     assert!(s.ebm_net_toa.abs() < 0.3, "EBM balance {}", s.ebm_net_toa);
     let row = |deg: f64| {
         (0..h)

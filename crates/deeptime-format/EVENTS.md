@@ -209,6 +209,7 @@ kind; until then a kind is reserved with its intended meaning. Source ids name t
 | `deeptime:glaciation` | an ice age | climate (P1-05) | see "The climate's events" |
 | `deeptime:snowball` | a snowball Earth: the ocean frozen over | climate (deep-time climate) | see "The climate's events" |
 | `deeptime:hothouse` | a hothouse: global mean above `climate.hothouse_c` | climate (deep-time climate) | see "The climate's events" |
+| `deeptime:ocean_overturning_shift` | the ocean's overturning conveyor sinks in another basin (per-cell climate) | climate (P1-26) | see "The climate's events" |
 | `deeptime:erosion_pulse` | a burst of erosion | surface (P1-04); dummy | see "The surface's events"; dummy: see below |
 | `deeptime:deposit_formation` | a deposit forms (place: its site) | deposits (P1-14); dummy | below |
 | `deeptime:deposit_exhumation` | erosion exposes (or destroys) a deposit | deposits (P1-14) | below |
@@ -359,6 +360,19 @@ it is 1 °C below. Both are global (place `Global`).
 | `glaciation` | `peak_land_frac` (glaciated share of the land at its largest), `peak_area_km2`, `peak_t_years`, `ongoing` | peak share / 0.2, ≤ 1 | — |
 | `snowball` | `duration_myr`; CO₂ (ppm) `co2_before_ppm` (the most in the 10 Myr before the onset), `co2_onset_ppm`, `co2_escape_ppm`, `co2_max_ppm`, `co2_drawdown_factor` (the most / the least CO₂ of the 10 Myr before the onset), `co2_rise_factor` (escape / onset); `tropical_land_share` and `tropical_weathering_share` (within 30° of the equator, just before the onset); `degassing_onset_rel`, `degassing_escape_rel` (× Earth's today); `sun_rel`; `t_global_min_c`; `cap_carbonate_m` (the drawdown carbonate the escape's plate step laid on the sea floor above the compensation depth, ≤ 4 km: weathering beyond degassing precipitates as carbonate — the cap carbonate); `onset_cause` (`present_setting` when the preset's `climate.present_climate` set it off in the run's last stretch; `weathering_drawdown` when CO₂ fell by ≥ 1.5× over the 10 Myr before, else `slow_cooling`); `escape_cause` (`present_setting` when `present_climate` ended it in the last stretch; `degassing_buildup` when CO₂ rose by ≥ 2× while frozen, else `warming`; `none` while ongoing); `ongoing` | duration / 50 Myr, ≤ 1 | — |
 | `hothouse` | `peak_t_global_c`, `peak_t_years`, `co2_peak_ppm`, `after_snowball` (1 when it began within 5 Myr of a snowball's end), `ongoing` | (peak − `hothouse_c`) / 25 °C, ≤ 1 | the `snowball` it followed |
+| `ocean_overturning_shift` | `from_lat`, `from_lon` (the previous sinking point, degrees), `transport_sv` (the conveyor's transport, Sv) | transport / 30 Sv, clamped to 0–1 | — |
+
+**Ocean overturning shifts** (P1-26, the per-cell climate; `climate/mod.rs`, `OCEAN_OVERTURNING_SHIFT`):
+the overturning conveyor sinks in one place per planet, the narrowest polar-connected basin that
+qualifies (`climate.overturning_sv`, ledger CLM-131, CLM-132). At each 2-D snapshot the stage
+compares the new sinking point with the last one and writes this event when the sinking has moved
+to another basin: more than 40° of arc away from the previous point, or into the other hemisphere.
+It is instantaneous, at the time of the snapshot (the end of its plate step). Place: a point, the
+new sinking point (latitude and longitude of the cell). Magnitude: the conveyor's transport over
+30 Sv, clamped to 0–1. Params: `from_lat` and `from_lon` (f64, degrees, the point it left) and
+`transport_sv` (f64, the transport it now carries, from the snapshot's notes, else the setting).
+Source `deeptime:climate`, as the glaciers' events. It has no cause. No event is written at the
+first snapshot or while either snapshot has no sinking point (the banded model has no conveyor).
 
 ### The dummy preset's events (source `deeptime:dummy`, until P1-03)
 

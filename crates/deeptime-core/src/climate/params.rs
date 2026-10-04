@@ -47,6 +47,28 @@ impl PresentClimate {
     }
 }
 
+/// Which climate model computes a snapshot (`climate.model`; P1-26).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClimateModel {
+    /// Temperature and sea ice per cell of a 2-D coarse grid (`ebm2d.rs`, `ocean2d.rs`).
+    #[default]
+    PerCell,
+    /// The zonal model: one temperature and sea ice per latitude band (kept for comparison).
+    Banded,
+}
+
+/// Where a snapshot's rain comes from (`climate.rain_model`; P1-26 §3.8).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RainModel {
+    /// The belt rain (`belts.rs`, `lapse.rs`), fed by the per-cell climate's ITCZ and sea.
+    #[default]
+    Belts,
+    /// The monthly moisture budget on the coarse grid (`moisture.rs`).
+    Budget,
+}
+
 /// The climate section.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
@@ -54,6 +76,48 @@ pub struct ClimateParams {
     /// A full climate snapshot every this many Myr (plan §8.3: 10), plus the first and the last
     /// plate step; between snapshots the climate's geographic part moves with the plates.
     pub snapshot_every_myr: f64,
+
+    // --- The per-cell climate (P1-26; `docs/design/p1-26-per-cell-climate.md`).
+    /// `per_cell` (the 2-D energy balance on a coarse grid) or `banded` (the zonal model).
+    pub model: ClimateModel,
+    /// Columns of the per-cell climate's coarse grid (rows: half); a coarse cell is a block of
+    /// L1 cells, so the count is rounded to a divisor of L1's width.
+    pub grid_columns: u32,
+    /// Scales the surface-dependent atmospheric diffusivity (`ebm2d::D_*`, the sources' total
+    /// transport) down to the atmosphere's own share (calibrated against its 5.0 PW at 43°N).
+    pub atmosphere_diffusivity_scale: f64,
+    /// East–west against north–south heat diffusion in the per-cell climate.
+    pub zonal_diffusivity_ratio: f64,
+    /// The share of the low-level wind's speed at which the boundary layer's heat moves along a
+    /// row (coastal mildness carried inland; 0: none).
+    pub wind_heat_transport: f64,
+    /// Planetary albedo added over desert (Köppen B land at the previous snapshot).
+    pub desert_albedo: f64,
+    /// `belts` (the belt rain on the per-cell temperatures; the default) or `budget` (the monthly
+    /// moisture budget, `moisture.rs`).
+    pub rain_model: RainModel,
+    /// The budget's monsoons: pressure per kelvin a cell departs from its row's mean temperature,
+    /// Pa/K (hot continents draw sea air in, cold ones push it out).
+    pub thermal_wind_pa_k: f64,
+    /// The budget's rain: how sharply precipitation grows with the column's relative humidity
+    /// (Bretherton, Peters & Back 2004's monthly fit: 11.4).
+    pub precip_rh_slope: f64,
+    /// The budget's soil water: what the land stores and evaporates again, mm.
+    pub bucket_mm: f64,
+    /// How much heat the wind-driven gyres carry (`ocean2d.rs`; 0: none).
+    pub gyre_heat_efficiency: f64,
+    /// The overturning conveyor that sinks in the narrowest polar-connected basin, Sv (0: off;
+    /// Earth's Atlantic overturning is about 17).
+    pub overturning_sv: f64,
+    /// How much colder snow-covered continental interiors get in the dark season than the air
+    /// the energy balance carries, °C (winter surface inversions).
+    pub winter_inversion_c: f64,
+    /// How crisply sea-ice edges are drawn on L1: 1 soft (the coarse grid's), higher crisper.
+    pub sea_ice_edge_sharpness: f64,
+    /// Extra cloud greenhouse on frozen surfaces (sea ice, snow, ice sheets), W/m²: the cloudy
+    /// models' snowball clouds beyond the ~20 W/m² the linear longwave law already holds (0: none;
+    /// Ben 2026-10-02, "None by default, a setting").
+    pub snowball_cloud_w_m2: f64,
 
     // --- The seasonal energy-balance model (climlab `EBM_seasonal`, MIT; `ebm.rs`).
     /// Solar constant at 1 AU, W/m² (climlab's `const.S0`); × `planet.star_flux_rel`.
@@ -321,6 +385,21 @@ impl Default for ClimateParams {
     fn default() -> Self {
         ClimateParams {
             snapshot_every_myr: 10.0,
+            model: ClimateModel::PerCell,      // ledger: CLM-175
+            grid_columns: 128,                 // ledger: CLM-119
+            atmosphere_diffusivity_scale: 1.3, // ledger: CLM-176
+            zonal_diffusivity_ratio: 0.2,      // ledger: CLM-121
+            wind_heat_transport: 0.2,          // ledger: CLM-125
+            desert_albedo: 0.08,               // ledger: CLM-123
+            rain_model: RainModel::Belts,      // ledger: CLM-178
+            thermal_wind_pa_k: 60.0,           // ledger: CLM-141
+            precip_rh_slope: 11.4,             // ledger: CLM-145
+            bucket_mm: 150.0,                  // ledger: CLM-143
+            gyre_heat_efficiency: 1.0,         // ledger: CLM-130
+            overturning_sv: 30.0,              // ledger: CLM-131
+            winter_inversion_c: 15.0,          // ledger: CLM-134
+            sea_ice_edge_sharpness: 4.0,       // ledger: CLM-135
+            snowball_cloud_w_m2: 0.0,          // ledger: CLM-172
             solar_constant_w_m2: 1365.2,
             olr_a_w_m2: 203.3,
             olr_b_w_m2_k: 2.09,
@@ -337,7 +416,7 @@ impl Default for ClimateParams {
             ebm_bands: 90,
             ebm_steps_per_year: 72,
             ebm_spinup_years: 40,
-            ebm_warm_years: 6,
+            ebm_warm_years: 12,
             lapse_c_per_km: 6.5,
             trade_wind_m_s: 7.0,
             westerly_m_s: 10.0,
@@ -434,6 +513,46 @@ impl ClimateParams {
     pub fn validate(&self) -> Result<(), CoreError> {
         let pos = |v: f64, key: &str| check(v.is_finite() && v > 0.0, key, "must be > 0");
         pos(self.snapshot_every_myr, "snapshot_every_myr")?;
+        check(
+            (16..=720).contains(&self.grid_columns),
+            "grid_columns",
+            "must be in [16, 720]",
+        )?;
+        for (v, key, lo, hi) in [
+            (
+                self.atmosphere_diffusivity_scale,
+                "atmosphere_diffusivity_scale",
+                0.0,
+                5.0,
+            ),
+            (
+                self.zonal_diffusivity_ratio,
+                "zonal_diffusivity_ratio",
+                0.0,
+                2.0,
+            ),
+            (self.wind_heat_transport, "wind_heat_transport", 0.0, 2.0),
+            (self.desert_albedo, "desert_albedo", 0.0, 0.3),
+            (self.thermal_wind_pa_k, "thermal_wind_pa_k", 0.0, 500.0),
+            (self.precip_rh_slope, "precip_rh_slope", 1.0, 40.0),
+            (self.bucket_mm, "bucket_mm", 1.0, 2000.0),
+            (self.gyre_heat_efficiency, "gyre_heat_efficiency", 0.0, 5.0),
+            (self.overturning_sv, "overturning_sv", 0.0, 100.0),
+            (self.winter_inversion_c, "winter_inversion_c", 0.0, 40.0),
+            (
+                self.sea_ice_edge_sharpness,
+                "sea_ice_edge_sharpness",
+                1.0,
+                20.0,
+            ),
+            (self.snowball_cloud_w_m2, "snowball_cloud_w_m2", 0.0, 20.0),
+        ] {
+            check(
+                v.is_finite() && (lo..=hi).contains(&v),
+                key,
+                &format!("must be in [{lo}, {hi}]"),
+            )?;
+        }
         pos(self.solar_constant_w_m2, "solar_constant_w_m2")?;
         pos(self.olr_b_w_m2_k, "olr_b_w_m2_k")?;
         check(
