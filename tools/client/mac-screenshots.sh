@@ -23,7 +23,7 @@
 # createClientLaunchScript linkRunModsClient` (Deep Time's classes and host natives, ModDevGradle's
 # dev launch script, Toroidal World's bundle in run/mods); (2) copies graphide's m6lock.sh to the
 # Mac (M6LOCK_SH overrides where it is read from); (3) `mac.sh --no-sync --server` runs
-# tools/client/mac-client.sh there, under Deep Time's server lock: it takes graphide's `drive`
+# tools/client/mac-client.sh there, as a server job of the admission tool: it takes graphide's `drive`
 # lease, launches the client in the desktop session (sudo -n launchctl asuser), lets
 # ScreenshotDriver walk the screens, renews the lease while the client runs, releases it, and kills
 # only its own client on any failure; (4) mac.sh --pull brings review/out/<name>/ back: the fourteen

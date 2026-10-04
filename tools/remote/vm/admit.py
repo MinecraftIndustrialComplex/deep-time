@@ -338,7 +338,8 @@ _DETACHED = re.compile(r"\bsetsid\b|\bnohup\b|\bdetach\.sh\s+(?:start|wait|tail)
 _LIGHT = re.compile(r"^\s*(?:true|false|:|exit|echo|printf|cat|tail|head|less|grep|rg|ls|command\s+ls|find|du|df|"
                     r"free|uptime|ps|pgrep|kill|pkill|stat|test|\[|wc|sort|uniq|diff|cmp|sha256sum|md5sum|date|"
                     r"sleep|mkdir|rm|cp|mv|ln|touch|chmod|readlink|realpath|basename|dirname|env|which|type|"
-                    r"git|jq|sqlite3|tar|zcat|gzip|journalctl|systemctl|ss|nproc|id|whoami|hostname|uname|"
+                    r"git|jq|sqlite3|tar|zcat|zgrep|gzip|journalctl|systemctl|ss|nproc|id|whoami|hostname|uname|"
+                    r"cut|awk|sed|tr|column|nl|xxd|file|lsof|deeptime-admit|"
                     r"sudo\s+python3\s+/usr/local/lib/deeptime/idle-watcher\.py)\b")
 
 
@@ -645,8 +646,15 @@ class Sampler:
                     dticks += max(0, ticks - was[1])
                 elif self.btime + st / HZ >= self.prev_t - 0.5:
                     dticks += ticks          # born since the last sample: all of it is this interval's
+            # A process that ended was reaped by its parent, whose cutime/cstime now carry the child's
+            # whole life, of which the part up to the last sample was counted already: take it off.
+            # (A reaper outside the job -- an orphan's -- makes this undercount a little instead.)
+            for q, (st, ticks) in self.prev.items():
+                if cur.get(q, (None,))[0] != st:
+                    dticks -= ticks
+            dticks = max(0, dticks)
             dt = now - self.prev_t
-            cores = dticks / HZ / dt if dt > 0 else 0.0
+            cores = min(dticks / HZ / dt, float(os.cpu_count() or 1)) if dt > 0 else 0.0
             self.cpu_ticks += dticks
             self.samples.append((now, cores, rss))
         else:

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 #
 # The Mac side of tools/client/ev-assets.sh (read that first); runs ON the Mac from the repo root,
-# inside `tools/remote/mac.sh --no-sync --server` (Deep Time's server lock) and the repo's dev shell.
+# inside `tools/remote/mac.sh --no-sync --server` (a server job of the VM's admission tool) and the repo's dev shell.
 #
 #   tools/client/ev-assets-mac.sh --m6lock <path to graphide's m6lock.sh> [--timeout S] [--lease-wait S]
 #
