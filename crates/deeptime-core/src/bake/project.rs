@@ -50,18 +50,18 @@ use crate::params::{EdgeBorder, LAMBDA_C_AUTO, PlanetPreset};
 pub const VERSION: u32 = 1;
 
 /// λc candidates, degrees apart (1,440 round the planet).
-pub const LAMBDA_STEP_DEG: f64 = 0.25; // ledger: SCL-080 (game-choice: the search's resolution)
+pub const LAMBDA_STEP_DEG: f64 = 0.25; // ledger: SCL-087 (game-choice: the search resolution)
 
 /// The farthest a cone point's distance to land is measured, degrees: beyond it every λc is as
 /// good (the secondary score, the sum of the four distances, then decides).
-pub const LAND_SEARCH_DEG: f64 = 20.0; // ledger: SCL-080
+pub const LAND_SEARCH_DEG: f64 = 20.0; // ledger: SCL-087
 
 /// The temporary border's inset inside the north and south edges, blocks.
-pub const BORDER_INSET_BLOCKS: f64 = 1.0; // ledger: SCL-081 (game-choice)
+pub const BORDER_INSET_BLOCKS: f64 = 1.0; // ledger: SCL-088 (game-choice)
 
 /// The largest planet-per-world-block stretch the footprint follows (near a cone point the
 /// stretch grows without bound; the cone points are put in open sea).
-pub const MAX_STRETCH: f64 = 8.0;
+pub const MAX_STRETCH: f64 = 8.0; // ledger: SCL-090 (game-choice)
 
 /// The most samples a footprint takes east–west and north–south.
 const MAX_SAMPLES_X: usize = 2048;
@@ -791,7 +791,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     let t = Instant::now();
     let frame = wp.index_frame();
     let mut vec_note = serde_json::Map::new();
-    let mut set_file = |m: &mut Manifest, rel: &str, bytes: u64, crc32: u32| {
+    let set_file = |m: &mut Manifest, rel: &str, bytes: u64, crc32: u32| {
         m.files.retain(|f| f.path != rel);
         m.files.push(FileEntry {
             path: rel.to_owned(),
@@ -822,22 +822,30 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         // the drawn height between its old column and its new one (the resampling smooths the
         // terrain a little, more near the poles), so a crater's lens stays under the floor and a
         // placer on the ground.
-        let detail = |amp: Option<&LoadedLayer>, c: u32| {
-            match (amp, spec.as_ref(), spec_seed) {
-                (Some(a), Some(s), Some(seed)) => {
-                    Some((a, s.clone(), deeptime_format::Noise::new(seed, c)))
-                }
-                _ => None,
-            }
+        let detail = |amp: Option<&LoadedLayer>, c: u32, wpj: &WorldProjection| match (
+            amp,
+            spec.as_ref(),
+            spec_seed,
+        ) {
+            (Some(a), Some(s), Some(seed)) => Some((
+                a,
+                s.clone(),
+                deeptime_format::Noise::for_world(seed, c, wpj),
+            )),
+            _ => None,
         };
         let old = Drawn {
             elev: &elev_src,
-            detail: detail(amp_src.as_ref(), c_sim),
+            detail: detail(
+                amp_src.as_ref(),
+                c_sim,
+                &WorldProjection::Lambert(Projection::new(c_sim)),
+            ),
             c: f64::from(c_sim),
         };
         let new = Drawn {
             elev: we,
-            detail: detail(world_amp.as_ref(), period),
+            detail: detail(world_amp.as_ref(), period, &wp),
             c: f64::from(period),
         };
         new_bodies = bs

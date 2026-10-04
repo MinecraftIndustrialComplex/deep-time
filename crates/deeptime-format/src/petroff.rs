@@ -17,7 +17,7 @@
 //! |x| + |y| = 1 (the southern hemisphere in the four corners); longitude λ in [0, 2π) runs counter-
 //! clockwise from the +x, −y diagonal's quadrant (λ ∈ [0, π/2) is the quadrant x > 0, y < 0). The
 //! map is equal-area: every part of the square covers the same share of the sphere (ledger:
-//! SCL-078, a tested property).
+//! SCL-083 for the constants, SCL-086 for the tested equal-area property).
 
 use crate::portable_math as pm;
 use pm::PI;

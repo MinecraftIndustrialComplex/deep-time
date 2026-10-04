@@ -820,7 +820,11 @@ impl BakeMap {
             Some(spec) => {
                 let p = layer(&spec.layer)
                     .ok_or("notes.bake.detail names a layer the manifest lacks")?;
-                let noise = Noise::new(spec.seed().map_err(|e| e.to_string())?, c);
+                let noise = Noise::for_world(
+                    spec.seed().map_err(|e| e.to_string())?,
+                    c,
+                    &manifest.world_projection(),
+                );
                 (Some(LayerStore::open(&p)?), Some((spec.clone(), noise)))
             }
             None => (None, None),
