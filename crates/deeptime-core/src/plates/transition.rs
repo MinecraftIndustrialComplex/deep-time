@@ -25,7 +25,9 @@
 //! Each step, for every plate, the samples near the plate's own ocean–continent boundary (an edge
 //! between a visible continental and a visible oceanic sample of the plate, neither at a trench,
 //! in a subduction zone, on an arc or, for continental crust, raised by an orogeny within
-//! `collapse_quiet_myr`) get a signed distance d from that boundary on the planet (positive inland;
+//! `collapse_quiet_myr`; oceanic crust thicker than T_n, which the plate model stacks at
+//! resamplings and accretes from slabs under the oceanic label, takes no part) get a signed
+//! distance d from that boundary on the planet (positive inland;
 //! the boundary lies half a sample spacing beyond each boundary sample), and a target crystalline
 //! thickness (the crust less its sediment and sedimentary rock)
 //!
@@ -47,7 +49,8 @@
 //! f = (T_n − T_o)/(z_0 − z_f) (4.24 with the presets' 525 m and −5,600 m, between the model's dry
 //! and water-loaded Airy factors, 5.5 and 3.78), on both sides, so the two sides of the boundary
 //! meet. The ocean side then cools with its own age (the dampening, `pools::surface_step`), but
-//! towards the floor its crust holds up, z_f + (T − T_o)/f, not the bare floor's: a young margin
+//! towards the floor its crust holds up, z_f + (min(T, T*) − T_o)/f, not the bare floor's (never
+//! above what the taper's own ocean-side crust holds up, about ridge depth): a young margin
 //! stands near ridge depth and the taper appears as the ocean beside it subsides (McKenzie's
 //! thermal subsidence, carried by the ocean's age–depth law).
 //!
@@ -110,9 +113,11 @@ pub fn crust_per_metre(env: &Env) -> f64 {
 }
 
 /// The floor oceanic crust of `crystalline` metres cools towards, m: the bare floor z_f, raised by
-/// the crust beyond the ocean's own (see the module docs).
-pub fn held_floor_m(crystalline: f64, z_f: f64, f: f64) -> f64 {
-    z_f + (crystalline - oceanic_m()).max(0.0) / f
+/// the crust beyond the ocean's own, but by no more than the taper's `target` holds up (see the
+/// module docs: the plate model keeps stacked and accreted crust under the oceanic label, and
+/// that crust is not a margin's).
+pub fn held_floor_m(crystalline: f64, target: f64, z_f: f64, f: f64) -> f64 {
+    z_f + (crystalline.min(target) - oceanic_m()).max(0.0) / f
 }
 
 /// What one step did.
@@ -156,12 +161,19 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
     let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
     let samples = &state.samples;
     // Who takes part: visible, not at a trench, in a subduction zone or on an arc; continental
-    // crust not raised by an orogeny lately (an active margin or a belt is not a rifted margin).
+    // crust not raised by an orogeny lately (an active margin or a belt is not a rifted margin);
+    // oceanic crust no thicker than the continent's (the plate model keeps crust stacked at
+    // resamplings and accreted from slabs under the oceanic label, up to hundreds of km on
+    // master: that is not the ocean floor beside a rifted margin, and it neither gives nor takes).
     let eligible: Vec<bool> = samples
         .iter()
         .map(|s| {
             s.flags & (HIDDEN | TRENCH | SUBDUCTION_ZONE | ARC) == 0
-                && (s.kind == OCEANIC || s.orogeny_myr < quiet_before)
+                && if s.kind == OCEANIC {
+                    crystalline_m(&s.pools) <= t_n
+                } else {
+                    s.orogeny_myr < quiet_before
+                }
         })
         .collect();
     let same = |a: u32, b: u32| {
@@ -230,6 +242,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
     struct Member {
         i: usize,
         seed: u32,
+        target: f64,
         excess: f64,
     }
     let mut members: Vec<Member> = Vec::new();
@@ -249,6 +262,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         members.push(Member {
             i,
             seed,
+            target,
             excess: crystalline_m(&s.pools) - target,
         });
     }
@@ -314,7 +328,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
     for m in &members {
         let s = &state.samples[m.i];
         if s.kind == OCEANIC {
-            out.floor_m[m.i] = held_floor_m(crystalline_m(&s.pools), z_f, f) as f32;
+            out.floor_m[m.i] = held_floor_m(crystalline_m(&s.pools), m.target, z_f, f) as f32;
         }
     }
     out
@@ -591,8 +605,12 @@ mod tests {
             }
             held += 1;
             let floor = last.floor_m[i];
-            let want = held_floor_m(cryst, fx.k.oceanic_floor_elevation_m, f);
-            assert!((f64::from(floor) - want).abs() < 1.0, "{floor} vs {want}");
+            let want = f64::from(floor);
+            let unbounded = held_floor_m(cryst, cryst, fx.k.oceanic_floor_elevation_m, f);
+            assert!(
+                want.is_finite() && want <= unbounded + 1.0,
+                "{floor} vs {unbounded}"
+            );
             let (mut kept, mut bare) = (*s, *s);
             for _ in 0..250 {
                 surface_step(&mut kept, &rates, floor);
@@ -618,10 +636,59 @@ mod tests {
         a.pools = oceanic_column();
         a.elevation_m = -3000.0;
         let mut b = a;
-        let floor = held_floor_m(oceanic_m(), fx.k.oceanic_floor_elevation_m, f) as f32;
+        let floor = held_floor_m(
+            oceanic_m(),
+            oceanic_m(),
+            fx.k.oceanic_floor_elevation_m,
+            f,
+        ) as f32;
         surface_step(&mut a, &rates, floor);
         surface_step(&mut b, &rates, f32::NAN);
         assert!((a.elevation_m - b.elevation_m).abs() < 1e-3);
+    }
+
+    /// The plate model keeps crust stacked at resamplings under the oceanic label (up to hundreds of
+    /// km on master). Such a column beside a margin is not the margin's ocean floor: it neither
+    /// gives nor takes crust and holds no floor up, and no ocean floor of the zone is held above
+    /// what the taper's thickest ocean-side crust holds up (ridge depth, near −2.5 km).
+    #[test]
+    fn stacked_crust_under_the_ocean_label_is_not_a_margin() {
+        let fx = Fx::new(PLANET_KM);
+        let mut st = planet(&fx.geo, 0.0);
+        let mut stacked = Vec::new();
+        for (i, s) in st.samples.iter_mut().enumerate() {
+            let d = inland_km(fx.geo.points()[i]);
+            if s.kind == OCEANIC && (-40.0..-20.0).contains(&d) && i % 3 == 0 {
+                s.pools[pool::FELSIC_PLUTONIC] += 93_000.0;
+                s.thickness_m = s.pools.iter().sum();
+                stacked.push(i);
+            }
+        }
+        assert!(stacked.len() > 10, "{}", stacked.len());
+        let before = st.samples.clone();
+        let last = fx.run(&mut st, 30);
+        let f = crust_per_metre(&fx.env(1));
+        let z_f = fx.k.oceanic_floor_elevation_m;
+        let ceiling = held_floor_m(
+            0.5 * (continental_m() + oceanic_m()),
+            f64::INFINITY,
+            z_f,
+            f,
+        );
+        for &i in &stacked {
+            assert_eq!(st.samples[i].pools, before[i].pools, "stacked column {i}");
+            assert!(last.floor_m[i].is_nan());
+        }
+        let held: Vec<f32> = last
+            .floor_m
+            .iter()
+            .copied()
+            .filter(|x| x.is_finite())
+            .collect();
+        assert!(held.len() > 20);
+        for x in held {
+            assert!(f64::from(x) <= ceiling + 1.0, "{x} over {ceiling:.0}");
+        }
     }
 
     /// An active margin (in a subduction zone) keeps its step; with the width or the time at 0
