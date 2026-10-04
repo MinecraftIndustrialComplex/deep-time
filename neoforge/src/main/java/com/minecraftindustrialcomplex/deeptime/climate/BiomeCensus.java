@@ -121,28 +121,37 @@ public final class BiomeCensus {
      * A pack placement table's check (decisions log 2026-10-04, "Deep Time-side fixes"): the share of a Köppen family's
      * land columns (wetlands set aside, as for {@link #CHECKS}) whose biome is one of {@code biomes}, at least
      * {@code bound} (or at most, with {@code atMost}). It counts only where the level's biome source can place
-     * {@code requires} (the pack is installed); elsewhere it is reported inactive.
+     * {@code requires} (the pack is installed); elsewhere it is reported inactive. Columns in a volcanic biome (the
+     * volcanic layer's, not the table's) are left out, and so are those whose pack-side continentalness is below
+     * {@code minContinents} or whose erosion is below {@code minErosion} (null: no limit): mountains (vanilla's slopes and
+     * peaks take any class's high relief) and the coast strip are not the table's to place.
      */
     public record PackCheck(String name, String classes, IntPredicate koppen, java.util.Set<String> biomes, double bound,
-                            boolean atMost, String requires) {}
+                            boolean atMost, String requires, Double minErosion, Double minContinents) {}
+
+    /** Below this erosion (vanilla's E1 | E2 edge) a column is mountain relief: slopes and peaks whatever its class. */
+    static final double MOUNTAIN_EROSION = -0.375;
+    /** Vanilla's near | mid inland edge: Terralith's steppe begins there. */
+    static final double MID_INLAND = 0.03;
 
     /** Terralith's table's checks: each fixed class reaches its intended biomes (bounds: ledger BIO-154, game choices). */
     public static final List<PackCheck> PACK_CHECKS = List.of(
             // Am (monsoon forest) in the jungles, not brushland.
             new PackCheck("terralith:Am_jungle", "Am", k -> k == 1, java.util.Set.of("minecraft:jungle", "minecraft:sparse_jungle",
                     "minecraft:bamboo_jungle", "terralith:tropical_jungle", "terralith:rocky_jungle", "terralith:jungle_mountains",
-                    "terralith:amethyst_rainforest"), 0.6, false, "terralith:tropical_jungle"),
+                    "terralith:amethyst_rainforest"), 0.6, false, "terralith:tropical_jungle", MOUNTAIN_EROSION, null),
             // Cs (Mediterranean) on Terralith's dry shrubland and steppe, not plains.
             new PackCheck("terralith:Cs_scrub", "Csa Csb Csc", k -> k >= 8 && k <= 10, java.util.Set.of("terralith:shrubland",
-                    "terralith:steppe", "terralith:hot_shrubland", "terralith:cold_shrubland"), 0.5, false, "terralith:shrubland"),
-            // BSk (cold steppe) on the steppe and the dry shrublands, and the steppe itself reached.
+                    "terralith:steppe", "terralith:hot_shrubland", "terralith:cold_shrubland"), 0.5, false, "terralith:shrubland",
+                    MOUNTAIN_EROSION, null),
+            // BSk (cold steppe) on the steppe and the dry shrublands, and, mid and far inland, the steppe itself reached.
             new PackCheck("terralith:BSk_steppe", "BSk", k -> k == 7, java.util.Set.of("terralith:steppe", "terralith:shrubland",
-                    "terralith:cold_shrubland"), 0.5, false, "terralith:steppe"),
-            new PackCheck("terralith:BSk_reaches_steppe", "BSk", k -> k == 7, java.util.Set.of("terralith:steppe"), 0.1, false,
-                    "terralith:steppe"),
+                    "terralith:cold_shrubland"), 0.5, false, "terralith:steppe", MOUNTAIN_EROSION, null),
+            new PackCheck("terralith:BSk_reaches_steppe", "BSk mid and far inland", k -> k == 7, java.util.Set.of("terralith:steppe"),
+                    0.1, false, "terralith:steppe", MOUNTAIN_EROSION, MID_INLAND),
             // ET (tundra) less snowy: snowy plains on at most a tenth of it.
             new PackCheck("terralith:ET_few_snowy_plains", "ET", k -> k == 29, java.util.Set.of("minecraft:snowy_plains"), 0.10, true,
-                    "terralith:gravel_desert"));
+                    "terralith:gravel_desert", null, null));
 
     /**
      * The cloud forest rule's ground in the census (Terralith's table, class rule {@code cloud_forest}): land columns of
@@ -310,7 +319,11 @@ public final class BiomeCensus {
                 if (land && !untagged && !wetland)
                     for (PackCheck pc : PACK_CHECKS) {
                         int[] n = packs.get(pc.name());
-                        if (n == null || !pc.koppen().test(k))
+                        if (n == null || !pc.koppen().test(k) || b.is(VolcanicBiomes.KEEP_OUT))
+                            continue;
+                        if (pc.minErosion() != null && t.raster(ClimateMapping.EROSION, x, z) < pc.minErosion())
+                            continue;
+                        if (pc.minContinents() != null && t.raster(ClimateMapping.CONTINENTS, x, z) < pc.minContinents())
                             continue;
                         n[1]++;
                         if (pc.biomes().contains(nameOf(b)))
