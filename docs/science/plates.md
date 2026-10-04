@@ -243,7 +243,11 @@ orogenic collapse and before the surface processes:
 1. *Who takes part.* For every plate, the edges between one of its visible continental samples and
    one of its visible oceanic samples are its ocean–continent boundary. Samples at a trench, in a
    subduction zone or on an arc, and continental samples an orogeny raised within the quiet time
-   (PLT-259), are left out: an active margin or a mountain front is not a rifted margin.
+   (PLT-259), are left out: an active margin or a mountain front is not a rifted margin. So are
+   oceanic samples whose crystalline crust is thicker than a continent's: the plate model keeps
+   crust stacked at resamplings and accreted from slabs under the oceanic label (on master 13 % of
+   the ocean floor is thicker than 35 km at 1000 Myr, some of it hundreds of km), and that is not
+   the ocean floor beside a rifted margin.
 2. *The taper* (PLT-260). Every sample within W/2 of the boundary (W = `transition_width_km`,
    200 km measured **on the planet**, PLT-261) gets a signed distance d from it (inland positive)
    and a target crystalline thickness (the crust less its sediment and sedimentary rock)
@@ -261,9 +265,10 @@ orogenic collapse and before the surface processes:
 4. *Heights* (PLT-263). A metre of crust moved changes the height by 1/f, f = (T_n − T_o) / (z_0 −
    z_f) = 4.24 m/m with the presets' continent (z_0 = 525 m) and old ocean floor (z_f = −5,600 m),
    on both sides, so the two sides meet. An oceanic sample of the zone then cools with its age (the
-   dampening, PLT-129) towards the floor its crust holds up, z_f + (T − T_o)/f, instead of z_f: a
-   young margin stands near ridge depth, and the taper deepens as its ocean ages, the age–depth law
-   standing for McKenzie's thermal subsidence.
+   dampening, PLT-129) towards the floor its crust holds up, z_f + (min(T, T*) − T_o)/f, instead
+   of z_f (never above what the taper's own crust holds up, about ridge depth beside the
+   boundary): a young margin stands near ridge depth, and the taper deepens as its ocean ages, the
+   age–depth law standing for McKenzie's thermal subsidence.
 
 The plate model's height change is its uplift for the surface stage, which carries it under its
 own elevation and flexure; the shelf comes from the sediment the surface brings onto the thinned
