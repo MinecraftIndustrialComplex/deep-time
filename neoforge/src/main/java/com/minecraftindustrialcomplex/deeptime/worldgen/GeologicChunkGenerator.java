@@ -64,6 +64,20 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
         return dataRef;
     }
 
+    /**
+     * The inset of the temporary edge border of a Petroff–Guyou world (its manifest's layout block,
+     * {@code border.inset_blocks}), or NaN when the level has none: a Lambert world, a test terrain, or
+     * a world whose preset asked for no border ({@code scale.edge_border = none}).
+     */
+    public double borderInset() {
+        if (!dataRef.petroffGuyou() || !(terrain() instanceof WorldDataTerrain w))
+            return Double.NaN;
+        var layout = w.data().layout();
+        if (layout == null || layout.border() == null || !layout.border().stops("north"))
+            return Double.NaN;
+        return layout.border().insetBlocks();
+    }
+
     /** The level's terrain source, chosen on first use (plan §7.1, "Terrain source"). */
     public TerrainSource terrain() {
         TerrainSource t = terrain;

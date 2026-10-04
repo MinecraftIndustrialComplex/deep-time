@@ -172,39 +172,55 @@ class ColumnParityTest {
     }
 
     /**
-     * The projection (design note {@code docs/design/equal-area-projection.md} §2): Java's {@link
-     * Projection} gives the latitude and longitude Rust's {@code deeptime_format::projection} gave for
-     * every column of the fixture, and the same z for every 5° of latitude (to 1e-9: trigonometric
-     * functions are not bitwise portable between the two runtimes).
+     * The world's projection (FORMAT.md "The world's layout"): Java's {@link WorldProjection}, built
+     * from the fixture world's manifest, gives the kind, z range and index frame Rust gave, the
+     * latitude and longitude of every column of the fixture and the block of every lattice latitude
+     * and longitude: bit for bit on a Petroff–Guyou world (both run on the portable trigonometry),
+     * to 1e-9 on a Lambert one (the platforms' own trigonometry).
      */
     @Test
     void theProjectionIsRusts() throws IOException {
         JsonObject doc = fixture();
         JsonObject p = doc.getAsJsonObject("projection");
-        int c = doc.get("circumference").getAsInt();
-        assertEquals(p.get("pole_z").getAsDouble(), Projection.poleZ(c), 1e-9, "the z of the poles");
-        // The extent and the spatial indexes' frame (river tiles, structure buckets, site index).
-        assertEquals(p.getAsJsonArray("extent").get(1).getAsDouble(), 2 * Projection.poleZ(c), 1e-9, "pole to pole");
-        assertTrue(Projection.onPlanet(c, Projection.poleZ(c)) && !Projection.onPlanet(c, Projection.poleZ(c) + 1), "the planet ends at the poles");
+        WorldProjection wp = WorldData.open(world()).projection();
+        assertEquals(p.get("kind").getAsString(), wp.kind().id(), "the projection");
+        boolean exact = wp instanceof PetroffGuyou;
+        double tol = exact ? 0.0 : 1e-9;
+        JsonArray zr = p.getAsJsonArray("z_range");
+        assertEquals(zr.get(0).getAsDouble(), wp.zMin(), 1e-9, "z range");
+        assertEquals(zr.get(1).getAsDouble(), wp.zMax(), 1e-9, "z range");
         JsonArray origin = p.getAsJsonArray("index_origin");
-        assertEquals(origin.get(0).getAsDouble(), Projection.indexOriginX(c), 0.0, "index origin x");
-        assertEquals(origin.get(1).getAsDouble(), Projection.indexOriginZ(c), 0.0, "index origin z");
-        assertEquals(origin.get(0).getAsDouble(), (double) Projection.indexOriginBlockX(c), 0.0, "index origin x, blocks");
-        assertEquals(origin.get(1).getAsDouble(), (double) Projection.indexOriginBlockZ(c), 0.0, "index origin z, blocks");
-        assertEquals(p.getAsJsonArray("index_span").get(1).getAsDouble(), Projection.indexSpanZ(c), 0.0, "index span z");
+        assertEquals(origin.get(0).getAsLong(), wp.indexOriginBlockX(), "index origin x");
+        assertEquals(origin.get(1).getAsLong(), wp.indexOriginBlockZ(), "index origin z");
+        assertEquals(p.getAsJsonArray("index_span").get(0).getAsDouble(), wp.period(), 0.0, "index span x");
+        assertEquals(p.getAsJsonArray("index_span").get(1).getAsLong(), wp.indexSpanBlockZ(), "index span z");
         JsonArray points = p.getAsJsonArray("points");
         assertTrue(points.size() >= 100, points.size() + " points");
         for (JsonElement e : points) {
             JsonArray q = e.getAsJsonArray();
             double x = q.get(0).getAsDouble(), z = q.get(1).getAsDouble();
-            assertEquals(q.get(2).getAsDouble(), Projection.latitudeDeg(c, z), 1e-9, "latitude at " + q);
-            double dl = Math.abs(q.get(3).getAsDouble() - Projection.longitudeDeg(c, x));
-            assertTrue(Math.min(dl, 360 - dl) < 1e-9, "longitude at " + q + ": " + Projection.longitudeDeg(c, x));
-            assertEquals(q.get(4).getAsDouble(), Projection.areaScale(c, z), 1e-9, "area scale at " + q);
+            double[] ll = wp.latLon(x, z);
+            assertEquals(q.get(2).getAsDouble(), ll[0], tol, "latitude at " + q);
+            double dl = Math.abs(q.get(3).getAsDouble() - ll[1]);
+            assertTrue(Math.min(dl, 360 - dl) <= tol, "longitude at " + q + ": " + ll[1]);
         }
-        for (JsonElement e : p.getAsJsonArray("latitudes")) {
+        for (JsonElement e : p.getAsJsonArray("inverse")) {
             JsonArray q = e.getAsJsonArray();
-            assertEquals(q.get(1).getAsDouble(), Projection.zOfLatitude(c, q.get(0).getAsDouble()), 1e-9, "z of " + q);
+            double[] b = wp.blockOf(q.get(0).getAsDouble(), q.get(1).getAsDouble());
+            // At a pole every longitude is the same point: compare the planet points then.
+            if (Math.abs(q.get(0).getAsDouble()) == 90.0 && !exact)
+                continue;
+            assertEquals(q.get(2).getAsDouble(), b[0], exact ? 0.0 : 1e-6, "x of " + q);
+            assertEquals(q.get(3).getAsDouble(), b[1], exact ? 0.0 : 1e-6, "z of " + q);
+        }
+        if (p.has("lambert")) {
+            JsonObject l = p.getAsJsonObject("lambert");
+            int c = doc.get("circumference").getAsInt();
+            assertEquals(l.get("pole_z").getAsDouble(), Projection.poleZ(c), 1e-9, "the z of the poles");
+            for (JsonElement e : l.getAsJsonArray("latitudes")) {
+                JsonArray q = e.getAsJsonArray();
+                assertEquals(q.get(1).getAsDouble(), Projection.zOfLatitude(c, q.get(0).getAsDouble()), 1e-9, "z of " + q);
+            }
         }
     }
 

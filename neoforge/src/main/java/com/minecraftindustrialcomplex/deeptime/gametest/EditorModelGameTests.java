@@ -154,7 +154,7 @@ public final class EditorModelGameTests {
                 "without natives Create is blocked for Deep Time (plan §6.6)");
 
         String id = stageTestWorld(helper);
-        WorldDimensions accepted = PlanetGenerators.withStaging(registries, fresh, id, 32_768);
+        WorldDimensions accepted = PlanetGenerators.withStaging(registries, fresh, id, 32_768, "lambert");
         GeologicChunkGenerator g = PlanetGenerators.overworld(accepted).orElseThrow();
         WorldDataRef ref = g.dataRef();
         helper.assertTrue(ref.stagingId().equals(Optional.of(id)), "bound to the staging folder");
@@ -271,14 +271,15 @@ public final class EditorModelGameTests {
 
             EditorModel.Accepted a = m.accept();
             RegistryAccess registries = helper.getLevel().getServer().registryAccess();
-            WorldDimensions dims = PlanetGenerators.withStaging(registries, planetDimensions(registries), a.stagingId(), a.circumference());
+            WorldDimensions dims = PlanetGenerators.withStaging(registries, planetDimensions(registries), a.stagingId(), a.worldCircumference(), a.projection());
             GeologicChunkGenerator accepted = PlanetGenerators.overworld(dims).orElseThrow();
             helper.assertTrue(PlanetGenerators.createBlock(dims, gameDir(), true) == PlanetGenerators.CreateBlock.NONE, "Create enabled");
 
             // The world's start: move the staged data into a world folder and bind it.
             Path world = helper.getLevel().getServer().getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
             WorldDataRef ref = new WorldDataRef("deeptime-e2e", accepted.dataRef().circumferenceBlocks(), Optional.empty(),
-                    accepted.dataRef().stagingId(), accepted.dataRef().poleCapDeg(), accepted.dataRef().poleStopDeg());
+                    accepted.dataRef().stagingId(), accepted.dataRef().poleCapDeg(), accepted.dataRef().poleStopDeg(),
+                    accepted.dataRef().projection());
             try {
                 Staging.deleteTree(world.resolve(ref.folder()));
                 var r = WorldDataBinder.moveStaged(gameDir(), world, ref, false).orElseThrow();

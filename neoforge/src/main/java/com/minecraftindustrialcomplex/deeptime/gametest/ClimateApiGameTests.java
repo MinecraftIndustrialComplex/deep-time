@@ -87,9 +87,9 @@ public final class ClimateApiGameTests {
         int nt = 0, nh = 0, land = 0, lapsed = 0, n = 400;
         for (int i = 0; i < n; i++) {
             int x = -c / 2 + (i * 97) % c;
-            int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);
+            int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
             int z = ((i * 61) % (2 * zp)) - zp;
-            double lat = DeepTimeClimate.latitudeDeg(z, c);
+            double lat = DeepTimeClimate.latitudeDeg(level, x, z);
             int y = Math.max((int) Math.ceil(t.height(x, z)), sea);
             ClimateSample s = climate.at(x, y, z).orElseThrow();
             if (!s.isSea())

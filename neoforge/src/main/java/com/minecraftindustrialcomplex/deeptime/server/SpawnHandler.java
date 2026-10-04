@@ -45,6 +45,13 @@ public final class SpawnHandler {
         });
     }
 
+    /**
+     * On a Petroff–Guyou world a candidate this close to the north or south edge is passed over, blocks
+     * (the temporary edge border stops players a block inside the edge and warns 24 blocks before it).
+     * Game choice (SW-1).
+     */
+    public static final int EDGE_MARGIN = 64;
+
     /** The chosen spawn and the candidate record it came from. */
     public record Choice(BlockPos pos, com.google.gson.JsonObject candidate) {}
 
@@ -60,12 +67,16 @@ public final class SpawnHandler {
             int sea = generator.getSeaLevel();
             Choice best = null;
             int bestUnmet = Integer.MAX_VALUE;
+            double zLimit = wd.projection() instanceof com.minecraftindustrialcomplex.deeptime.worlddata.PetroffGuyou pg
+                    ? pg.hemisphere() / 2.0 - EDGE_MARGIN : Double.MAX_VALUE;
             for (var e : root.getAsJsonArray("candidates")) {
                 var c = e.getAsJsonObject();
                 int unmet = c.has("unmet") ? c.get("unmet").getAsInt() : 0;
                 if (unmet >= bestUnmet)
                     continue;
                 int x = c.get("x").getAsInt(), z = c.get("z").getAsInt();
+                if (Math.abs(z) > zLimit)
+                    continue;
                 int y = generator.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, level.getChunkSource().randomState());
                 if (y > sea) {
                     best = new Choice(new BlockPos(x, y, z), c);

@@ -197,7 +197,7 @@ public final class PlanetEditorScreen extends Screen {
 
     private static void apply(CreateWorldScreen parent, EditorModel.Accepted a) {
         parent.getUiState().updateDimensions((registries, dims) ->
-                PlanetGenerators.withStaging(registries, dims, a.stagingId(), a.circumference()));
+                PlanetGenerators.withStaging(registries, dims, a.stagingId(), a.worldCircumference(), a.projection()));
     }
 
     /** The page's id, for the dev screenshot driver. */

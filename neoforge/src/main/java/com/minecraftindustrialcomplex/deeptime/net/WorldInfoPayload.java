@@ -29,10 +29,20 @@ import net.minecraft.server.level.ServerLevel;
  * @param poleCapDeg    where the pole storm starts
  * @param poleStopDeg   the hard stop
  * @param planetName    the preset or synthetic kind the world came from
+ * @param projection    the world's projection, {@code lambert} or {@code petroff_guyou} (format 0.5;
+ *                      {@code circumference} is then the x period 2b)
+ * @param lambdaCDeg    λc of a Petroff–Guyou world (its manifest's); 0 otherwise
  */
 public record WorldInfoPayload(boolean planet, String dimension, String formatVersion, int circumference,
                                double mPerBlockH, double mPerBlockV, float poleCapDeg, float poleStopDeg,
-                               String planetName) implements CustomPacketPayload {
+                               String planetName, String projection, double lambdaCDeg) implements CustomPacketPayload {
+
+    /** A Lambert planet's info (the tests and the analytic test terrains). */
+    public WorldInfoPayload(boolean planet, String dimension, String formatVersion, int circumference, double mPerBlockH,
+                            double mPerBlockV, float poleCapDeg, float poleStopDeg, String planetName) {
+        this(planet, dimension, formatVersion, circumference, mPerBlockH, mPerBlockV, poleCapDeg, poleStopDeg, planetName,
+                WorldDataRef.LAMBERT, 0.0);
+    }
 
     public static final Type<WorldInfoPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "world_info"));
@@ -47,6 +57,23 @@ public record WorldInfoPayload(boolean planet, String dimension, String formatVe
         dimension = cut(dimension);
         formatVersion = cut(formatVersion);
         planetName = cut(planetName);
+        projection = WorldDataRef.PETROFF_GUYOU.equals(projection) ? WorldDataRef.PETROFF_GUYOU : WorldDataRef.LAMBERT;
+    }
+
+    /** Whether the planet is a seamless Petroff–Guyou world. */
+    public boolean petroffGuyou() {
+        return WorldDataRef.PETROFF_GUYOU.equals(projection);
+    }
+
+    /**
+     * The world projection this info describes (a new object: {@link ClientPlanetState} keeps one), or
+     * null when it is not a planet.
+     */
+    public com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection worldProjection() {
+        if (!planet || circumference <= 0)
+            return null;
+        return petroffGuyou() ? new com.minecraftindustrialcomplex.deeptime.worlddata.PetroffGuyou(circumference / 2, lambdaCDeg)
+                : new com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Lambert(circumference);
     }
 
     private static String cut(String s) {
@@ -65,11 +92,14 @@ public record WorldInfoPayload(boolean planet, String dimension, String formatVe
         buf.writeFloat(poleCapDeg);
         buf.writeFloat(poleStopDeg);
         buf.writeUtf(planetName, MAX_STRING);
+        buf.writeUtf(projection, MAX_STRING);
+        buf.writeDouble(lambdaCDeg);
     }
 
     private static WorldInfoPayload read(FriendlyByteBuf buf) {
         return new WorldInfoPayload(buf.readBoolean(), buf.readUtf(MAX_STRING), buf.readUtf(MAX_STRING), buf.readVarInt(),
-                buf.readDouble(), buf.readDouble(), buf.readFloat(), buf.readFloat(), buf.readUtf(MAX_STRING));
+                buf.readDouble(), buf.readDouble(), buf.readFloat(), buf.readFloat(), buf.readUtf(MAX_STRING),
+                buf.readUtf(MAX_STRING), buf.readDouble());
     }
 
     @Override
@@ -77,9 +107,9 @@ public record WorldInfoPayload(boolean planet, String dimension, String formatVe
         return TYPE;
     }
 
-    /** The pole cap this info describes, or null when it is not a planet or the numbers are unusable. */
+    /** The pole cap this info describes, or null when it is not a planet, a Petroff–Guyou world (no pole cap) or the numbers are unusable. */
     public PoleCapCurve poleCap() {
-        if (!planet || circumference <= 0 || !(poleCapDeg > 0 && poleCapDeg < poleStopDeg && poleStopDeg <= 90))
+        if (!planet || circumference <= 0 || petroffGuyou() || !(poleCapDeg > 0 && poleCapDeg < poleStopDeg && poleStopDeg <= 90))
             return null;
         return new PoleCapCurve(circumference, poleCapDeg, poleStopDeg);
     }
@@ -98,6 +128,7 @@ public record WorldInfoPayload(boolean planet, String dimension, String formatVe
         String format = FormatVersion.CURRENT;
         double h = Manifest.DEFAULT_M_PER_BLOCK_H, v = Manifest.DEFAULT_M_PER_BLOCK_V;
         String name;
+        double lambdaC = 0.0;
         var testTerrain = ref.effectiveTestTerrain();
         if (testTerrain.isPresent()) {
             name = testTerrain.get() + " (test terrain)";
@@ -107,10 +138,12 @@ public record WorldInfoPayload(boolean planet, String dimension, String formatVe
             h = m.mPerBlockH();
             v = m.mPerBlockV();
             name = m.planetName();
+            if (m.layout() != null)
+                lambdaC = m.layout().lambdaCDeg();
         } else {
             name = ref.folder();
         }
         return new WorldInfoPayload(true, dim, format, ref.circumferenceBlocks(), h, v,
-                (float) ref.poleCapDeg(), (float) ref.poleStopDeg(), name);
+                (float) ref.poleCapDeg(), (float) ref.poleStopDeg(), name, ref.projection(), lambdaC);
     }
 }
