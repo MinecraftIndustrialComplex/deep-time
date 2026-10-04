@@ -581,6 +581,7 @@ impl StructureStage {
             }
             let flags = field_of(fields, "plates/flags", n)?;
             let orogen_km = traps::orogen_distance_km(&d, reg, crust, flags);
+            let arc_km = traps::arc_distance_km(&d, reg, crust, flags);
             let inputs = deform::Inputs {
                 grid: &grid,
                 m_per_block_h: s.m_per_block_h,
@@ -596,6 +597,14 @@ impl StructureStage {
                 uplift: field_of(fields, "plates/uplift_mm_yr", n)?,
                 elevation: &src.surface.elevation_m,
                 orogen_km: &orogen_km,
+                arc_km: &arc_km,
+                collision_mm_yr: field_of(fields, "plates/collision_mm_yr", n)?,
+                shortening_km: field_of(fields, "plates/shortening", n)?,
+                flexure_m: fields
+                    .get(crate::surface::flexure::field::FLEXURE)
+                    .filter(|f| f.data.len() == n)
+                    .map(|f| f.data.as_slice()),
+                collision_belt_km: self.preset.tectonics.collision_belt_km,
                 blocks_per_model_km: f64::from(s.circumference_blocks)
                     / (std::f64::consts::TAU * self.preset.tectonics.model_radius_km),
             };
