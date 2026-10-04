@@ -8,10 +8,16 @@
 //! type's most favourable land cell in the region, and records it as
 //! `deeptime:guaranteed_occurrence` so "Why here?" stays honest.
 //!
+//! A site counts toward an essential (here and in the spawn ranking) only when the material is one
+//! of its **primary** products ([`Essential::counts`]; `primary_only`, default on). Counting
+//! co-products and by-products let a 0.07 Mt impact Cu-Zn-Au deposit satisfy the copper essential of
+//! a planet with two porphyries, and ranked the spawn beside it (P1-15 on real planets).
+//!
 //! The essentials list is a pack's to define: the game passes its `deeptime:essentials` registry
 //! (P1-15) in the content bundle (`{"essentials": [...]}`), which replaces the preset's list
 //! (`crate::preset::Preset::with_content`); runs without a bundle (the CLI) use the preset's.
 
+use deeptime_format::Product;
 use serde::{Deserialize, Serialize};
 
 /// A site counts as exposed when its top is at most this many blocks below the surface.
@@ -31,6 +37,23 @@ pub struct Essential {
     /// spawn ranking ([`super::spawn`]) scores candidates by it. `None`: no spawn requirement.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_blocks_from_spawn: Option<u32>,
+    /// Only a site whose product of the material has the role `primary` counts toward the regional
+    /// minimum and the spawn's reach (default true); off, a co-product or by-product counts too.
+    #[serde(default = "primary_only_default")]
+    pub primary_only: bool,
+}
+
+fn primary_only_default() -> bool {
+    true
+}
+
+impl Essential {
+    /// Whether a site with these products counts toward this essential.
+    pub fn counts(&self, products: &[Product]) -> bool {
+        products
+            .iter()
+            .any(|p| p.material == self.material && (!self.primary_only || p.role == "primary"))
+    }
 }
 
 /// The region grid of an essential.
@@ -78,6 +101,35 @@ impl Regions {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn product(material: &str, role: &str) -> Product {
+        Product {
+            material: material.into(),
+            grade: 0.01,
+            tonnage_t: 1.0e6,
+            role: role.into(),
+        }
+    }
+
+    #[test]
+    fn only_primary_products_count_unless_the_essential_says_otherwise() {
+        let json = r#"{"material": "c:copper", "min_sites_per_region": 1, "region_blocks": 8192}"#;
+        let mut e: Essential = serde_json::from_str(json).unwrap();
+        assert!(e.primary_only, "the default counts primary products only");
+        let porphyry = [product("c:copper", "primary"), product("c:gold", "byproduct")];
+        let impact = [product("c:zinc", "primary"), product("c:copper", "coproduct")];
+        assert!(e.counts(&porphyry));
+        assert!(!e.counts(&impact), "a co-product is not a copper source");
+        assert!(!e.counts(&[]), "a site with no ore left counts for nothing");
+        e.primary_only = false;
+        assert!(e.counts(&impact));
+        assert!(!e.counts(&[]));
+        let off: Essential = serde_json::from_str(
+            r#"{"material": "c:copper", "min_sites_per_region": 1, "region_blocks": 64, "primary_only": false}"#,
+        )
+        .unwrap();
+        assert!(!off.primary_only);
+    }
 
     #[test]
     fn regions_cover_the_planet() {
