@@ -20,7 +20,10 @@ The class then decides which Minecraft biomes the cell may have. The class is pl
 five temperature bands (frozen, cold, temperate, warm, hot) and five humidity bands, and the biome
 source of the pack (vanilla, Terralith, Biomes O' Plenty) picks the biome inside that spot. A
 desert class gets the driest humidity band, a rainforest class the wettest, tundra the frozen band
-and so on. Land under ice gets a snow and ice cover whatever the biome, frozen lakes follow the
+and so on. Wet, flat, low land that is not frozen becomes swamp (or mangrove where it is hot)
+whatever its class, as in vanilla (BIO-066); "wet" is the cell's own rainfall against evaporation
+(the aridity index), not the humidity band its class is lifted to, since 2026-10-03 (before, every
+subarctic Dfc cell counted as wet because its class sits in vanilla's taiga humidity). Land under ice gets a snow and ice cover whatever the biome, frozen lakes follow the
 mean annual temperature, and other mods can read the monthly climate of any block through
 `DeepTimeClimate`.
 
