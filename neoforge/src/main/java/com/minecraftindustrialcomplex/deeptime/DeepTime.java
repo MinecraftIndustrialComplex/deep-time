@@ -53,8 +53,8 @@ public final class DeepTime {
                 e -> com.minecraftindustrialcomplex.deeptime.climate.VolcanicBiomes.tagsUpdated());
         OreBlockResolver.init();
         GameTestSupport.init(modBus);
-        // Wrap-engine spike (docs/design/wrap-engine.md): nothing without -Ddeeptime.wrapspike=true.
-        com.minecraftindustrialcomplex.deeptime.wrapspike.WrapEngine.init();
+        // Wrap engine (docs/design/wrap-engine.md): nothing without -Ddeeptime.wrapengine=true.
+        com.minecraftindustrialcomplex.deeptime.wrapengine.WrapEngine.init();
         DeepTimeNetwork.init(modBus);
         PoleCap.init();
         // COE and CDG hooks (P1-16): their mixins' targets load now, so a drifted signature fails the boot.

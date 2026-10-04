@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-package com.minecraftindustrialcomplex.deeptime.mixin.wrapspike;
+package com.minecraftindustrialcomplex.deeptime.mixin.wrapengine;
 
-import com.minecraftindustrialcomplex.deeptime.wrapspike.WrapEngine;
-import com.minecraftindustrialcomplex.deeptime.wrapspike.WrapTopology;
+import com.minecraftindustrialcomplex.deeptime.wrapengine.WrapEngine;
+import com.minecraftindustrialcomplex.deeptime.wrapengine.WrapLevel;
+import com.minecraftindustrialcomplex.deeptime.wrapengine.WrapTopology;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -15,16 +16,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * A neighbour update addressed to a band position runs on the stored block instead, with the source
- * position moved by the same motion (docs/design/wrap-engine.md §3.2): block logic always runs at
- * stored positions. Dev only ({@code -Ddeeptime.wrapspike=true}).
+ * position moved by the same motion (docs/design/wrap-engine.md §4.1): block logic always runs at
+ * stored positions. Applied only with {@code -Ddeeptime.wrapengine=true}.
  */
 @Mixin(BlockBehaviour.BlockStateBase.class)
 abstract class BlockStateBaseWrapMixin {
 
     @Inject(method = "handleNeighborChanged", at = @At("HEAD"), cancellable = true)
     private void deeptime$foldNeighbourUpdate(Level level, BlockPos pos, Block block, BlockPos fromPos, boolean isMoving, CallbackInfo ci) {
-        WrapTopology t = WrapEngine.topology(level);
-        if (t == null)
+        WrapTopology t = ((WrapLevel) level).deeptime$wrap();
+        if (t == null || !t.mayFold(pos.getX(), pos.getZ()))
             return;
         WrapTopology.Fold f = t.fold(pos.getX(), pos.getZ());
         if (f == null)

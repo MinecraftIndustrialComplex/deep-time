@@ -13,6 +13,11 @@ This engine runs alongside that work and covers what portals cannot carry across
 Nothing here changes the shipped mod. The spike's code is applied only with
 `-Ddeeptime.wrapspike=true` (§7.4).
 
+**Phase 1 (2026-10-04).** Ben chose "Folded access + band (Recommended)" and "TW slides, engine turns
+(Recommended)" (decisions log 2026-10-03). The spike is now the production core in package
+`wrapengine`, still dev-only: `-Ddeeptime.wrapengine=true`, `./gametest.sh -PwrapEngine`. Its API is
+§9, what was built and measured is §10. Where §7 says `wrapspike`, read `wrapengine`.
+
 Read first: [`seamless-wrapping.md`](seamless-wrapping.md) (the gluing tables, what breaks with
 portals), [`rotated-seam-worlds-prior-art.md`](../research/notes/rotated-seam-worlds-prior-art.md)
 (nobody has built turning seams), [`immersive-portals-pillowcase-prototype.md`](../research/notes/immersive-portals-pillowcase-prototype.md).
@@ -524,3 +529,205 @@ is written from the mathematics in §1. So nothing is added to NOTICE.md.
    at the spike until the projection survey settles the layout?**
    - The engine takes any layout of translations, half-turns and quarter-turns, so the survey does not
      block Phase 1.
+
+## 9. The engine's API (Phase 1; stable)
+
+Settled 2026-10-04 on branch `worktree-agent-a4445c63094be0023` (Phase 1). Adapters (Create, Sable,
+Distant Horizons) and the rest of Deep Time use only what this section lists. A change to it is
+announced here first. Package `com.minecraftindustrialcomplex.deeptime.wrapengine` (the spike's
+`wrapspike` package is gone; the old `wrap` package is unrelated: Toroidal World's pole cap and
+planet shape).
+
+### 9.1 Switching it on
+
+- **The flag.** `-Ddeeptime.wrapengine=true` (`WrapEngine.FLAG`, `WrapEngine.enabled()`). Without it
+  the engine's mixins (`mixin.wrapengine.*`, `deeptime.wrapengine.mixins.json`) are not woven,
+  `WrapEngine.init()` registers nothing, `topology(level)` is null and `install` throws. The shipped
+  default is off.
+- **A level.** `WrapEngine.install(ServerLevel, WrapTopology)` on the server thread; `null` removes
+  it. The topology must be chunk-aligned (`WrapTopology.isChunkAligned()`). Folded access starts at
+  once; loaded band chunks are copied within a few ticks.
+- **Tests.** `./gametest.sh -PwrapEngine` runs namespaces `deeptime_wrapengine` and
+  `deeptime_wrapbench` with the flag; `./gametest.sh -PwrapBench` runs the benchmark alone without
+  it (the baseline).
+
+### 9.2 Topology types (pure integer code, no Minecraft types)
+
+| Type | What it is |
+|---|---|
+| `CellIsometry(quarterTurns, tx, tz)` | A grid motion: k clockwise quarter-turns (seen from above; one takes north to east, as `Rotation.CLOCKWISE_90`), then a translation. `applyX/applyZ(x, z)` move a block cell (allocation-free), `applyPoint` an entity position, `applyVector` a heading or velocity; `compose`, `inverse`, `yawDegrees()`, `mapsChunksToChunks()`. Factories `translation`, `halfTurnAbout(a, b)`, `quarterTurnAbout(k, a, b)` (about a block corner). |
+| `WrapEdge(name, normalX, minSide, coord, spanLo, spanHi, depth, iso)` | One edge: the line `coord` across x (`normalX`) or z, beyond it the low or high side, over the span, `depth` blocks out (the band); `iso` maps beyond → inside. Spans and depth are finite. |
+| `WrapTopology(name, edges)` | The edge table. `fold(x, z)` → `Fold(x, z, iso)` (the stored block and the motion band → stored) or null; `foldPoint(x, z)` → `PointFold`; `images(x, z)` (every band block showing a stored block); `inside(x, z)`; `mayFold(x, z)` (the fast-path test, false = certainly not folded); `chunkFold(cx, cz)` → `ChunkFold(sourceX, sourceZ, iso)` or null; `chunkImages(cx, cz)` (motions stored → band); `forEachBandChunk`; `union`. Immutable, thread-safe. |
+| `WrapLayouts` | `halfTurnSeam`, `quarterTurnCorner` (bounded, for tests), `guyou(h, depth, slides)`, `peirce(a, depth)`, `cubeCross(s, depth, slides)` and `cubeCrossCorners(s)`. `slides = false` leaves the east–west translation to Toroidal World (Ben, 2026-10-03, "TW slides, engine turns"). |
+
+### 9.3 Queries on a level (`WrapEngine`, static)
+
+| Method | Returns |
+|---|---|
+| `topology(Level)` | The installed topology or null (always null on the client and without the flag). |
+| `fold(Level, BlockPos)` | `Folded(pos, iso)`: the stored position and the motion band → stored, with `toStored()` (the `Rotation` a state takes into the stored frame, for a write) and `toBand()` (for a read); null when the position is not in a band. |
+| `canonical(Level, BlockPos)` | The stored position, or the position itself. **Compare canonical positions** when deciding whether two positions are the same block (multiblocks, networks, caches). |
+| `isBandChunk(Level, cx, cz)`, `isBandSynced(ServerLevel, cx, cz)` | Whether a chunk is a band chunk; whether its copy is current. |
+| `rawState(Level, BlockPos)` | Chunk storage, bypassing the fold (what collisions and the client see). |
+| `rotation(iso)`, `apply(iso, BlockPos)`, `turn(iso, Direction)`, `applyPoint(iso, Vec3)`, `applyVector(iso, Vec3)` | Motions on Minecraft types. |
+| `stats(ServerLevel)` | The band manager's counters, for logs. |
+
+### 9.4 What folded access guarantees (the behaviour adapters rely on)
+
+At a position `p` in a band, with `f = fold(level, p)`:
+
+- `level.getBlockState(p)` is the stored state turned into the band's frame (`toBand()`).
+- `level.getFluidState(p)` is the stored fluid (fluid states do not turn).
+- `level.getBlockEntity(p)` is the **stored** block entity; its `getBlockPos()` is `f.pos()`, not `p`.
+  `removeBlockEntity(p)` removes it.
+- `level.setBlock(p, s, …)` stores `s.rotate(toStored())` at `f.pos()`; the shape and neighbour
+  updates run there.
+- A neighbour update addressed to `p` (`BlockStateBase.handleNeighborChanged`) runs on the stored
+  block at `f.pos()`, with the source position moved by the same motion.
+- Scheduled ticks for `p` (`schedule`, `hasScheduledTick`, `willTickThisTick`) are kept at `f.pos()`.
+  No scheduled tick, random tick, natural spawn or generation post-processing ever runs in a band
+  chunk.
+- `LevelChunk.setBlockState` on a band chunk (a mod writing chunk storage) is redirected to the stored
+  block, turned (server thread; off it, the write stays and the chunk is re-copied when it reloads).
+- A band chunk's storage holds turned copies: read-only pictures. Collisions, light, heightmaps and
+  chunk packets read them.
+- **Not folded:** `isLoaded`/`hasChunkAt` and `getChunk`/`getChunkAt` (they answer for the band chunk
+  itself), `blockEvent`, `levelEvent`, `playSound`, `gameEvent`, explosions' entity knock-back,
+  `setBlockEntity` with a band position (never do this), and `Level.getBlockEntity` off the server
+  thread (null, as in vanilla).
+
+**Directions across a seam.** Logic at stored position `a` that looks at its neighbour
+`q = a.relative(d)` and finds `q` in a band sees the neighbour's state already turned into its own
+frame, so most code needs nothing. Code that follows a network into the neighbour and continues from
+its stored position must turn its direction too: the neighbour is at `f.pos()` and the direction `d`
+becomes `turn(f.iso(), d)` there (for a half-turn, east becomes west). Kinetic speed signs that depend
+on axis direction flip under a half-turn.
+
+### 9.5 Entities
+
+- After each server level tick, every root entity (riding nothing) whose position is beyond an edge
+  is carried to `foldPoint`: yaw, head and body turned by `iso.yawDegrees()`, velocity by the turn,
+  passengers turned with it and re-seated, a mob's path stopped. A player is sent a teleport and its
+  motion.
+- `WrapCrossingEvent` (NeoForge bus, server thread, cancellable) is posted first: `level()`,
+  `entity()`, `iso()`, `from()`, `to()`. Cancel it to carry the entity yourself (contraptions, Sable
+  bodies); the engine asks again next tick while the entity is still beyond the edge.
+
+## 10. Phase 1 as built (2026-10-04)
+
+Branch `worktree-agent-a4445c63094be0023`. Dev-only: nothing changes without
+`-Ddeeptime.wrapengine=true`, and even then a level is unchanged until a topology is installed on it.
+The shipped default is unchanged; the normal `./gametest.sh` runs without the engine's mixins.
+
+### 10.1 What was built
+
+- **The edge table** (`CellIsometry`, `WrapEdge`, `WrapTopology`, `WrapLayouts`). Any mix of
+  translations, half-turns and quarter-turns, with finite bands. Layouts: Guyou (with or without the
+  slides; without leaves the east–west wrap to Toroidal World, as Ben chose), Peirce, the projection
+  survey's cube cross net (14 edges: the slide, eight quarter-turn edges, four half-turn edges), and
+  the bounded test seams. The unit tests (`WrapTopologyTest`, 11 tests, properties on seeded random
+  blocks) check the local isometry on every layout (the cube's away from its eight corners), the
+  images, the fast path and the chunk view [R].
+- **The fast path** (§5). `WrapTopology.mayFold` is a byte grid over the bands' bounding box, one cell
+  per chunk (coarser for huge layouts: at most 2²¹ cells). Outside the box, or in a cell no band
+  touches, nothing folds. The read path is `@ModifyVariable` at the head of `Level.getBlockState` (the
+  position replaced by a `FoldedPos` only when it folds) and `@ModifyReturnValue` at its return (the
+  state turned only for a `FoldedPos`): no callback object, no allocation off the bands. The less
+  hot calls (`setBlock`, neighbour updates, tick scheduling) keep cancellable injections.
+- **Folded access** (§9.4): `getBlockState`, `getFluidState`, `getBlockEntity`, `removeBlockEntity`,
+  `setBlock`, `handleNeighborChanged`, `LevelTicks.schedule`/`hasScheduledTick`/`willTickThisTick`.
+- **The choke point**: `LevelChunk.setBlockState` on a band chunk is redirected to the source chunk's
+  `setBlockState`, turned; on a stored chunk with images it replicates at its return. So a mod writing
+  chunk storage directly is folded too.
+- **The band manager** (`BandManager`, one per level):
+  - **Tickets mirror levels.** A band chunk at ticket level L ≤ 33 holds a region ticket at L on its
+    source chunk (`ChunkTicketLevelUpdatedEvent`, applied at the end of the tick, since the event
+    fires inside the distance manager's update). The far side of a seam is as loaded and as ticking
+    as the near side.
+  - **Copy on load**: a band chunk waits until its source is loaded, then only the blocks that differ
+    are rewritten (sections both air are skipped), its generated block entities are dropped and, when
+    it was generated just now, its generated mobs removed.
+  - **Updates**: every stored change near an edge goes into each loaded band chunk that shows it.
+  - **Suppressed in band chunks**: random ticks, weather ticks, natural spawning, scheduled ticks at
+    band positions, generation post-processing (which would write the band's generated blocks through
+    the fold).
+- **Entity crossing**: every root entity beyond an edge after each level tick, yaw, head, body and
+  velocity turned, passengers turned and re-seated, a mob's path stopped, a player teleported with its
+  motion. `WrapCrossingEvent` lets an adapter take a crossing over.
+
+### 10.2 Evidence [R]
+
+`./gametest.sh -PwrapEngine` on the test VM, 2026-10-04 04:22 UTC: **all 15 required tests passed**
+(namespace `deeptime_wrapengine` and the benchmark), 24 s of tests. Every test runs once across a
+half-turn seam and once across a quarter-turn corner, with expectations from the topology's motions:
+
+| Test | Half-turn | Quarter-turn |
+|---|---|---|
+| Building: stairs set facing north beyond the seam | stored on the far side facing south, read back north, the band copy north, solid both sides | stored facing east (a quarter turn), read back north |
+| A log stored along x shows in the band | along x (a half-turn keeps axes) | along z |
+| Collisions: an armour stand at the seam against the far side's stairs | stops at z = oz + 0.2500 | 0.2500 |
+| Entities: an armour stand walks over | carried to the topology's fold, heading +180° | +90° |
+| A no-gravity item thrown north | crosses, keeps going along the turned heading, 0.0000 off its line | the same |
+| A mock player steps beyond the edge | teleported to the fold, heading +180° | +90° |
+| Water: a channel straight across, source one block inside | amounts 6, 5, 4, 3, 2, 1, 0 beyond the seam; far side flows away from it; band copy 6; unglued control dry in 7 of 7 | 6 … 0; flows away |
+| Redstone: wire across, then a repeater facing the seam | 15 14 13 \| 12 11, far lamps lit, the repeater's band copy turned (north) and powered, both off again | the same, copy facing west |
+| Light: glowstone stored at the seam | block light 14 on the far side, 21 blocks away in ordinary space | 14, 40 blocks away |
+| Band consistency: 400 random edits on the stored side, 400 through the band, a direct chunk write into a band chunk (redirected) and into a stored chunk (replicated) | 0 of 7,168 band blocks wrong after each | 0 of 10,752 |
+| Unload and reload, band chunk 31 (half) and 16 (quarter) chunks from its source | source edited with the band chunk unloaded (did not load it); band chunk loaded alone: its ticket loaded the source, 0 of 98,304 blocks differ; unloading it released the source; source edited again, band chunk reloaded: 0 of 98,304 differ, the new marks show | the same |
+
+**The first run found a real bug.** A band chunk whose ticket level drops leaves the visible chunk map
+(`getChunkNow` is null) and can come back from the pending unloads without a load or an unload event.
+Replication skipped it, so it kept stale copies while marked synced (the reload test failed with 3 of
+98,304 blocks wrong, exactly the three edits). The band manager now tracks band chunks between their
+load and unload events and re-queues the copy of one that is loaded but invisible when a replica
+misses it.
+
+**The band does not wait on a forced source in a test.** Forcing a source chunk at level 31 loads its
+neighbours across the seam at 32; they are band chunks, so they ticket their sources at 32, one of
+which is the stored chunk next to the band chunk under test, whose neighbour (that band chunk) then
+loads at 33. That is right (the far side of a loaded place is loaded) and converges (every hop adds a
+level), but it would defeat a test of a band chunk loading after its source was edited, so the reload
+test edits the source under a border ticket (33).
+
+### 10.3 The getBlockState benchmark [R]
+
+`WrapBenchGameTests`: 16,384 fixed positions in a 2 × 2-chunk patch, four interleaved passes of every
+mode, each 2 warm-up and 5 measured rounds of 4,194,304 reads; median over the 20 measured rounds
+(p25–p75). Test VM, 2026-10-04, shared with other agents' jobs.
+
+Three JVMs with the engine off (`-PwrapBench`) and three with it on (`-PwrapEngine`, one of them the
+full suite), alternated. Each value is one JVM's median; the last column is the median of the three.
+
+| Mode | Run 1 | Run 2 | Run 3 | Median |
+|---|---|---|---|---|
+| Engine off: baseline | 28.23 | 23.34 | 23.79 | **23.8** |
+| Engine woven, no topology on the level | 24.42 | 26.18 | 25.85 | **25.9** |
+| Topology installed, patch outside the bands' bounding box (the GameTest sites) | 25.11 | 25.84 | 28.08 | **25.8** |
+| Whole-world Guyou (h = 65,536), patch deep inside: the grid cell says no band | 25.59 | 26.69 | 30.19 | **26.7** |
+| Every read in a band: fold, read at the stored position, turn | 48.31 | 49.14 | 54.33 | **49.1** |
+
+So off the bands the engine costs about 2 to 3 ns per read (8 to 12 %), less than the spread between
+JVMs of the same build (23.3 to 28.2 ns with the engine off). The topology's grid test adds nothing
+measurable over the woven null check. A read inside a band costs about twice a plain read; band reads
+are a small share of all reads (only blocks within the band's depth beyond an edge). The first,
+non-interleaved run ranked the modes by their order in the run (JIT profile changes), which is why the
+benchmark interleaves them.
+
+### 10.4 Not in Phase 1 (Phase 2 and later)
+
+- **Whole-world topologies from the world data.** The layout is not chosen (Guyou or the cube cross),
+  and the bake still writes Lambert, so nothing installs a topology on a real world yet. The engine
+  takes either layout as an edge table (`WrapLayouts`).
+- **Block-entity data in the band** (chests, signs, banners drawn by the client there) and container
+  range across a seam (`Container.stillValidBlockEntity` with the nearest image).
+- **Not folded yet**: `blockEvent`, `levelEvent`, `playSound`, `gameEvent`, explosions' entity part,
+  `setBlockEntity` with a band position, `LevelTicks.clearArea`, `isLoaded`/`hasChunkAt` (they answer
+  for the band chunk, which holds its source loaded).
+- **Entities**: leashes across a seam, player-driven vehicles (the client drives them), ghosts
+  (entities near a seam are not shown in the band), AI distances by nearest image.
+- **Off the server thread**: a band chunk written off it is left and re-copied on reload; C2ME and
+  async light are not checked.
+- **World generation across seams** (§4.4: symmetric noise, folded `WorldGenRegion`), Distant
+  Horizons, Toroidal World on the same level, Sable, Create (another agent, in parallel), the client
+  re-anchor, a multiplayer busy-seam measurement.
+- **Band chunks save their copies** (simplest, as §4.2 allowed); they are re-copied on load anyway.
