@@ -371,7 +371,6 @@ impl ColumnWorld {
     /// names, the bodies with their roles, and the sites whose box holds the column.
     pub fn inspect(&self, x: i64, z: i64) -> Value {
         let col = self.sample(x, z);
-        let c = self.c as f64;
         let (bx, bz) = (col.wx as f64, z as f64);
         let mut layers = serde_json::Map::new();
         for (name, l) in &self.others {
@@ -429,7 +428,6 @@ impl ColumnWorld {
             None => Vec::new(),
         };
         let mut v = col.to_json();
-        let _ = c;
         let (lat, lon) = self.manifest.world_projection().lat_lon(bx, bz);
         v["lat"] = json!(lat);
         v["lon"] = json!(lon);
