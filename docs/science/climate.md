@@ -17,13 +17,29 @@ The constants of the per-cell design were checked against their sources before t
 | [CLM](ledger/CLM.md) | land ice and sea ice | CLM-092 to CLM-112, CLM-135 (22) |
 | [CLM](ledger/CLM.md) | mountain glaciers | CLM-113 to CLM-118 (6) |
 | [CLM](ledger/CLM.md) | moisture (design only) | CLM-139 to CLM-146 (8) |
+| [CLM](ledger/CLM.md) | ice branch: the flowing-sheet switch, present-day climate, supply-limited and seafloor weathering (merged 2026-10-02) | CLM-147 to CLM-162 (16) |
+| [GLA](ledger/GLA.md) | the flowing ice sheet (`climate/sheet.rs`, off by default) and the ice mass balance for the hydrology; on the glacial page | GLA-067 to GLA-076 (10) |
 | [MOI](ledger/MOI.md) | wind and rain belts | MOI-001 to MOI-033 (33) |
 | [MOI](ledger/MOI.md) | orographic rain | MOI-034 to MOI-050 (17) |
 | [MOI](ledger/MOI.md) | lapse rate | MOI-051 to MOI-053 (3) |
 | [MOI](ledger/MOI.md) | seasons | MOI-054 to MOI-060 (7) |
 | [MOI](ledger/MOI.md) | climate snapshot | MOI-061 to MOI-076 (16) |
 
-Rows by status: `cited-unverified` 63, `from-memory` 5, `calibrated` 13, `game-choice` 33, `uncited` 108; `pending-rewrite` 194; `not-yet-coded` 28.
+Rows by status (CLM and MOI): `cited-unverified` 72, `from-memory` 5, `calibrated` 14, `game-choice` 36, `uncited` 111; `pending-rewrite` 209; `not-yet-coded` 28.
+
+## The ice branch, merged 2026-10-02
+
+What the merge added to the banded model (build log 2026-10-01 and 2026-10-02, "Climate ice branch"):
+
+- **Flowing ice sheets** (`climate/sheet.rs`, GLA-067 to GLA-076): shallow-ice flow with Glen's law on a coarse grid, mass balance on the ice surface against the equilibrium line (the elevation feedback), the bed sinking under the ice, calving where the pressed-down bed lies below the sea. On the Lambert grid (master, 2026-10-03) the coarse rows carry their true, uneven sizes (cos φ wide, 1/cos φ high, the gradients taken between the rows' true centres), and a coarse row wholly past a pole holds no ice and passes no flux. **Off by default and in every built-in preset** (`climate.ice_dynamics`, CLM-147; Ben, decisions log 2026-10-02): driven by the banded climate they overgrow. Off, the land ice is the model from before the branch (Nye's equilibrium profile with Imbrie's lag in the ice-age window), and the flexure's ice load (`climate/ice_thickness_m`, ISO rows) is that ice.
+- **Supply-limited weathering** (CLM-152 to CLM-157) and **seafloor weathering** (CLM-158 to CLM-162): on by default.
+- **The present-day climate** (`climate.present_climate`, CLM-148 to CLM-151): temperate by default.
+- **The fine clock's step** is 200 kyr (CLM-082).
+- **For the hydrology:** `climate/ice_balance_m_yr`, the land ice's surface mass balance (GLA-076), beside the ice thickness and extent.
+
+Measured on `earthlike_quick_16k` (seeds 1 and 2; scattered start 500 Myr, supercontinent 1000 Myr; final state; build log 2026-10-02): runs on one build are reproducible to every printed digit. With the branch's carbon-cycle settings set back to master's, the merged build with the sheets off printed master's figures exactly. With the defaults (sheets off) the new weathering keeps more CO2 (scattered 113 and 271 ppm against master's 88 and 119; supercontinent 471 and 475 against 237 and 374), so the land ice falls from 0.14 to 0.10 (scattered) and from 0.11 to 0.07 (supercontinent) of the land. Earth today is about 0.10. With the sheets on, the land ice is 0.15 in all four runs, but only because the temperate present raises CO2 to 650 to 1,726 ppm (15 to 18 degC). The sea ice is then 0.03 to 0.07 of the ocean, against 0.07 to 0.14 with them off. Without the present-day nudge, three 500-Myr planets ended with 47 to 52 % of the land under ice (build log 2026-10-01).
+
+Re-measured on master 35dacc0e (the Lambert world, 35 m per block, plate tasks 3–4) against the merged branch, sheets off, scattered start, 500 Myr, seeds 1–3 (build log 2026-10-02, "Readied for landing"): land 0.181 → 0.174 and continental crust 0.298 → 0.309 of the planet (seed-to-seed scatter larger than either change), mean surface temperature 15.3 → 16.1 degC, land under ice 0.116 → 0.064, CO2 444 → 519 ppm (means).
 
 ## Material for the stage 2 writer
 
@@ -36,6 +52,6 @@ Rows by status: `cited-unverified` 63, `from-memory` 5, `calibrated` 13, `game-c
 
 - Land ice thickness uses a hard-coded gravity of 9.81 m/s2, so it ignores the planet's gravity setting (extraction notes CLM, flag 1).
 - Earth-like runs end near 210 to 220 ppm CO2, not the 280 ppm the carbon cycle is balanced for (flag 7).
-- Ice sheets overgrow on the banded climate; whether they are on by default is held open (decisions log 2026-10-01, "Keep holding").
+- Ice sheets overgrow on the banded climate (47 to 52 % of the land under ice on three 500-Myr Earth-like planets, build log 2026-10-01 "Climate ice branch"), so the flowing sheets (`climate.ice_dynamics`, CLM-147, GLA-067 to GLA-076) are off by default and in every built-in preset (decisions log 2026-10-02, "Merge with ice sheets off"); they are turned on once the per-cell climate (P1-26) fixes the cold bias. See "The ice branch, merged 2026-10-02" below.
 - Stage 1 spot checks: the CO2 forcing fit (Byrne & Goldblatt 2014) is stated valid for 200 to 10,000 ppm and is used up to 1,000,000 ppm; a snowball state ends at 0.55 bar of CO2 where Hoffman and others 2017 give 0.01 to 0.1 bar; the code's Earth mean temperature of 15.6 degC is above any long-term mean (Berkeley Earth: 14.1 degC for 1951 to 1980).
 - The energy-balance constants are a mix: A, B and D attributed to North, Cahalan & Coakley 1981 (not readable: a scan), albedos from two different climlab classes that climlab does not combine.

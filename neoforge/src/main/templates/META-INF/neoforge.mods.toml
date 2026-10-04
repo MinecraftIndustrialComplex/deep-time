@@ -9,6 +9,11 @@ config = "deeptime.mixins.json"
 [[mixins]]
 config = "deeptime.gametest.mixins.json"
 
+# The wrap-engine spike (docs/design/wrap-engine.md): the plugin applies it only with
+# -Ddeeptime.wrapspike=true (./gametest.sh -PwrapSpike), never in a player's game.
+[[mixins]]
+config = "deeptime.wrapspike.mixins.json"
+
 # Toroidal World's Distant Horizons guard lets Deep Time's far terrain through (Ben, 2026-10-02).
 # Not required: its plugin applies it only when TW and DH are installed and TW's method is as
 # checked, and logs whether it applied (compat/dh/TwDhGuard).
