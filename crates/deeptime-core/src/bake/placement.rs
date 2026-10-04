@@ -861,7 +861,10 @@ impl Placement {
     /// Whether wet lowland of class `k` is cold wetland, boreal peatland, instead of swamp (the table's
     /// `cold_wetland`; Ben, 2026-10-03: Dfc, Dfd, Dsc, Dsd, Dwc, Dwd; ledger BIO-104).
     pub fn cold_wetland(&self, k: u8) -> bool {
-        self.cold_wetland.get(usize::from(k)).copied().unwrap_or(false)
+        self.cold_wetland
+            .get(usize::from(k))
+            .copied()
+            .unwrap_or(false)
     }
 
     /// The branch of the variant noise class `k`'s land takes (the positive one is vanilla's

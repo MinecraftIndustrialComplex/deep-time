@@ -1911,7 +1911,12 @@ mod tests {
             dfc.len() as u64,
             "the note counts the cold wetland"
         );
-        assert!(m.note["cold_wetland_cells_by_class"]["Dfc"].as_u64().unwrap() > 0);
+        assert!(
+            m.note["cold_wetland_cells_by_class"]["Dfc"]
+                .as_u64()
+                .unwrap()
+                > 0
+        );
         // The table decides which classes are cold: with the flag off on Dfc, its plain is swamp again.
         let mut v: serde_json::Value = serde_json::from_str(placement::PLACEMENT_JSON).unwrap();
         v["classes"]["Dfc"]["cold_wetland"] = json!(false);
@@ -1927,7 +1932,11 @@ mod tests {
         v["classes"]["Af"]["cold_wetland"] = json!(true);
         let af_cold = Placement::from_value(&v).unwrap();
         let (m, w2) = fixture_dfc_ai(&low, &af_cold, ["Af", "BWh", "Dfc", "ET"], [false; 4], 3.0);
-        assert!(quarter_cells(&m, w2, 0).iter().all(|&k| m.wetland[k] == WETLAND_COLD));
+        assert!(
+            quarter_cells(&m, w2, 0)
+                .iter()
+                .all(|&k| m.wetland[k] == WETLAND_COLD)
+        );
     }
 
     #[test]
