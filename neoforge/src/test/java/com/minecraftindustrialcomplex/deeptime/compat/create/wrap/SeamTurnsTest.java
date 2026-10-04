@@ -84,8 +84,8 @@ class SeamTurnsTest {
     void linksAcrossSeamsAreFoundBothWaysAndCancel() {
         List<WrapTopology> tops = List.of(
                 WrapTopology.halfTurnSeam(64, 32, 16, 8),
-                WrapTopology.guyou(256, 16),
-                WrapTopology.peirce(256, 16),
+                WrapTopology.guyou(256, Integer.MAX_VALUE),
+                WrapTopology.peirce(256, Integer.MAX_VALUE),
                 WrapTopology.quarterTurnCorner(40, 40, 16));
         int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
         Random r = new Random(7);
@@ -105,6 +105,10 @@ class SeamTurnsTest {
                     WrapTopology.Fold f = t.fold(qx, qz);
                     if (f == null)
                         continue;
+                    // At a turn point (cone point) a block can be its own neighbour across the seam; the
+                    // kinetic adapter refuses that self-connection (KineticSeams.modifier), so skip it here.
+                    if (f.x() == ax && f.z() == az)
+                        continue;
                     int[] img = SeamTurns.nearestImage(t, ax, az, f.x(), f.z(), 1);
                     assertNotNull(img, "image of (" + f.x() + ", " + f.z() + ") near (" + ax + ", " + az + ")");
                     WrapTopology.Fold back = t.fold(img[0], img[1]);
@@ -113,14 +117,24 @@ class SeamTurnsTest {
                     assertTrue(Math.max(Math.abs(img[0] - ax), Math.abs(img[1] - az)) <= 1, "the image is a neighbour");
                     // And from the far block, the first block's image near it.
                     int[] img2 = SeamTurns.nearestImage(t, f.x(), f.z(), ax, az, 1);
-                    assertNotNull(img2, "the link back from (" + f.x() + ", " + f.z() + ")");
+                    assertNotNull(img2, "the link back from (" + f.x() + ", " + f.z() + ") to (" + ax + ", " + az + "), reached through ("
+                            + qx + ", " + qz + ") by " + f.iso() + "; images of the first block " + imgs(t.images(ax, az)));
                     WrapTopology.Fold back2 = t.fold(img2[0], img2[1]);
                     assertEquals(0, (back.iso().quarterTurns() + back2.iso().quarterTurns()) % 4,
-                            "the turns of a link and its way back cancel");
+                            "the turns of a link and its way back cancel: topology " + tops.indexOf(t) + " a=(" + ax + ", " + az + ") q=(" + qx + ", "
+                                    + qz + ") f=(" + f.x() + ", " + f.z() + ") img=" + imgs(List.of(img)) + " by " + back.iso() + " img2="
+                                    + imgs(List.of(img2)) + " by " + back2.iso());
                     checked++;
                 }
             }
             assertTrue(checked >= 100, "enough seam neighbours sampled: " + checked);
         }
+    }
+
+    private static String imgs(List<int[]> l) {
+        StringBuilder sb = new StringBuilder();
+        for (int[] q : l)
+            sb.append('(').append(q[0]).append(", ").append(q[1]).append(')');
+        return sb.toString();
     }
 }
