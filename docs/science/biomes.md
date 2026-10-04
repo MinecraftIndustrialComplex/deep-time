@@ -221,6 +221,29 @@ game choices but the vanilla depth band of BIO-112):
 - Without such a biome in the pack nothing changes: the level's biome queries skip the whole layer (the
   GameTest `volcanicBiomesChangeNothingWithoutThem` checks every sampled column on the vanilla profile).
 
+Measured on one `earthlike_quick_16k` planet (scattered continents, 500 Myr, test machine, 2026-10-03; 110 active
+stratovolcanoes, 45 of them oceanic, no shield and no caldera; 50 hot-spring pools), `/deeptime probe biomes 16`, whose
+`volcanic` section samples the same 51,574 land columns as the plain climate search places them (the placement before this
+change) and as the game now does:
+
+| | MIC (Terralith) before | after | Biomes O' Plenty before | after |
+|---|---|---|---|---|
+| land columns in a volcanic biome | 490 (0.95 %) | 591 (1.15 %) | 358 (0.69 %) | 557 (1.08 %) |
+| of them more than 256 blocks from every active volcano and hot-spring pool | 285 (58 %) | 0 | 356 (99 %) | 0 |
+| of them more than 8 blocks outside every zone | 459 (94 %) | 0 | 358 (100 %) | 0 |
+| hot-spring pools in the hot-spring biome | 2 of 50 | 50 of 50 | 0 of 50 | 50 of 50 |
+| volcanic surface cells with no neighbour of their biome | 10 of 525 | 26 of 9,797 | 0 of 5 | 37 of 9,538 |
+
+Before, Terralith's yellowstone (378 of the 490 columns) lay wherever its cold-band, mid-humidity box fell, and BOP's volcanic
+plains (all 358) almost all far from any volcano. After, MIC shows volcanic peaks (341 columns), yellowstone (154), ashen
+savanna (53) and volcanic crater (43); BOP its volcano (384), hot springs (154) and volcanic plains (19). The places the kept-out
+biomes left went, with MIC, to taiga (173), Terralith's white cliffs (110), jagged peaks (37), savanna (36), forest (35); with
+BOP to its rainforest (176), the vanilla region's beach (109: the slot fix above) and floodplain (51). The vanilla profile
+changed no column. The zones on that planet: 50 hot-spring discs (mean 81 km², the pools' terraces plus margin, at least 8
+blocks), 110 crater discs (20 km²), 109 cone discs (187 km²), 64 fresh-ash discs (1,180 km², of which the climate gate let 53
+sampled columns become ashen savanna) and 110 thermal-cave discs (38 km²). These sizes are the game's choices; no real
+landscape was measured for them.
+
 ## Simplifications and limits
 
 - Peel classifies station records of many years. The mod classifies the monthly means of one
