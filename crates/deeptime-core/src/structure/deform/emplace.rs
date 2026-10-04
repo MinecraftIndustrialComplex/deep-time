@@ -4,9 +4,10 @@
 //!
 //! | Where (per L1 cell, continental crust) | Strain | What forms |
 //! |---|---|---|
-//! | the collision regime (a Himalayan orogeny in progress) | shortening, full strength | fold trains and thrusts along the plate model's fold trend, thrusts dipping under the high ground |
+//! | a collision's belt and wedge (the plate model's `plates/collision_mm_yr` above zero: a Himalayan orogeny in progress) | shortening at the convergence across the front over `collision_reference_mm_yr` (at most 1); fold tightness from the collision's real shortening (`plates/shortening`) | fold trains and thrusts along the plate model's fold trend, thrusts dipping under the high ground |
 //! | a continental arc and its back-arc where the plate model is lifting the crust (an Andean orogeny) | shortening, half strength at 80 mm/yr of convergence and `arc_uplift_mm_yr` of uplift | the same, dipping under the high ground |
-//! | the foreland, out to `foreland_km` from an active orogen | shortening, fading with distance | gentler folds and thrusts (the Zagros, the Subandean belt) |
+//! | a collision's foreland: the flexural basin (`surface/flexure_m` below 100 m under local isostasy) on the incoming plate, within the reach of the collision's front | 0.6 of the belt's shortening, none on the forebulge | gentler folds and thrusts in the basin's fill (the Zagros) |
+//! | the foreland of an Andean margin, out to `foreland_km` from a continental arc | shortening, fading with distance | gentler folds and thrusts (the Subandean belt) |
 //! | the rift regime | extension | normal faults along the rift, dipping towards its axis (one in four the other way) |
 //! | a lifted margin inside a subduction zone's reach where convergence is more than 30° oblique | shear | strike-slip faults along the margin (slip partitioning) |
 //!
@@ -31,7 +32,8 @@ use deeptime_format::GridDesc;
 use super::feature::{Counts, Feature, Kind, azimuth_of, direction};
 use super::params::DeformationParams;
 use crate::deposits::random::Rng;
-use crate::plates::state::{ARC, CONTINENTAL, SUBDUCTION_ZONE, regime};
+use crate::plates::belts::FOREDEEP_M;
+use crate::plates::state::{ARC, CONTINENTAL, FORELAND, SUBDUCTION_ZONE, regime};
 use crate::sphere::BlockFrame;
 use crate::structure::params::StructureParams;
 
@@ -56,8 +58,22 @@ pub struct Inputs<'a> {
     /// Ground height, m (any datum: only its slope is read).
     pub elevation: &'a [f32],
     /// Distance to the nearest active orogen, km on the block metric
-    /// (`traps::orogen_distance_km`).
+    /// (`traps::orogen_distance_km`): the direction a foreland thrust dips.
     pub orogen_km: &'a [f32],
+    /// Distance to the nearest continental arc, km on the block metric (`traps::arc_distance_km`):
+    /// the foreland of an Andean margin.
+    pub arc_km: &'a [f32],
+    /// The convergence across the front of the collision whose belt, wedge or foreland the cell
+    /// lies in this step, mm/yr (0: none; `plates/collision_mm_yr`), and that collision's
+    /// shortening so far, km (`plates/shortening`).
+    pub collision_mm_yr: &'a [f32],
+    pub shortening_km: &'a [f32],
+    /// The surface's flexure, m (`surface/flexure_m`: negative in basins), when the surface stage
+    /// made one.
+    pub flexure_m: Option<&'a [f32]>,
+    /// A collision's belt width, km on the plate model's sphere (`tectonics.collision_belt_km`):
+    /// the width its shortening was taken up over.
+    pub collision_belt_km: f64,
     /// Blocks per km of the plate model's sphere (C / 2π·`tectonics.model_radius_km`): tectonic
     /// widths are Earth-normalized, like the plate model's own distances.
     pub blocks_per_model_km: f64,
@@ -81,7 +97,12 @@ pub enum Source {
 /// The strain a cell is under: shortening, extension and shear, each 0–1.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Strain {
+    /// How fast structures form here, 0-1 (the rate constants times this).
     pub shortening: f64,
+    /// How tight a fold's strain is drawn here, 0-1: between the least and the most the
+    /// collision's (or the crust's) shortening gives (`fold_shortening`), and how far a thrust's
+    /// slip has grown.
+    pub tightness: f64,
     pub extension: f64,
     pub shear: f64,
     /// Which rule gave the shortening.
@@ -98,31 +119,48 @@ pub fn strain(x: &Inputs<'_>, c: usize, sp: &StructureParams) -> Strain {
     let conv = f64::from(x.convergence[c].max(0.0));
     let speed = (conv / 80.0).min(1.0); // ledger: DEF-026
     let p = &sp.deformation;
-    let (shortening, source) = if reg == regime::COLLISION {
-        (1.0, Source::Collision)
+    // A collision shortens its belt and wedge at the convergence across its front, so a slowing
+    // collision makes fewer structures; the foreland basin in front of the wedge, 0.6 of that
+    // where the crust lies in a flexural basin (none on the forebulge). ledger: DEF-075, DEF-076
+    let in_collision = f64::from(x.collision_mm_yr[c].max(0.0));
+    let rate = (in_collision / p.collision_reference_mm_yr).min(1.0);
+    let in_foreland = flags & FORELAND != 0;
+    let collision = if in_collision > 0.0 && !in_foreland {
+        (rate, 1.0, Source::Collision)
+    } else if in_collision > 0.0 && x.flexure_m.is_some_and(|f| f64::from(f[c]) < FOREDEEP_M) {
+        (0.6 * rate, 0.6, Source::Basin) // ledger: DEF-076
     } else {
-        // An Andean margin shortens where it is being lifted: the plate model's back-arc regime
-        // reaches the whole subduction distance inland, most of it undeformed.
-        let andean = if flags & ARC != 0 || reg == regime::ARC || reg == regime::BACK_ARC {
-            let lift = f64::from(x.uplift[c].max(0.0)) / p.arc_uplift_mm_yr.max(1e-9);
-            0.5 * speed * lift.min(1.0) // ledger: DEF-026
-        } else {
-            0.0
-        };
-        let d = f64::from(x.orogen_km[c]) * 1000.0 / x.m_per_block_h;
-        let belt = p.foreland_km * x.blocks_per_model_km;
-        let foreland = if d > 0.0 && d < belt {
-            0.6 * (1.0 - d / belt) // ledger: DEF-027
-        } else {
-            0.0
-        };
-        if andean >= foreland {
-            let source = if andean > 0.0 { Source::Arc } else { Source::None };
-            (andean, source)
-        } else {
-            (foreland, Source::Foreland)
-        }
+        (0.0, 0.0, Source::None)
     };
+    // An Andean margin shortens where it is being lifted: the plate model's back-arc regime
+    // reaches the whole subduction distance inland, most of it undeformed.
+    let andean = if flags & ARC != 0 || reg == regime::ARC || reg == regime::BACK_ARC {
+        let lift = f64::from(x.uplift[c].max(0.0)) / p.arc_uplift_mm_yr.max(1e-9);
+        0.5 * speed * lift.min(1.0) // ledger: DEF-026
+    } else {
+        0.0
+    };
+    // The foreland of an Andean margin fades with the distance from the arc.
+    let d = f64::from(x.arc_km[c]) * 1000.0 / x.m_per_block_h;
+    let belt = p.foreland_km * x.blocks_per_model_km;
+    let foreland = if d > 0.0 && d < belt {
+        0.6 * (1.0 - d / belt) // ledger: DEF-027
+    } else {
+        0.0
+    };
+    let (shortening, tightness, source) =
+        if collision.0 > 0.0 && collision.0 >= andean.max(foreland) {
+            collision
+        } else if andean >= foreland {
+            let source = if andean > 0.0 {
+                Source::Arc
+            } else {
+                Source::None
+            };
+            (andean, andean, source)
+        } else {
+            (foreland, foreland, Source::Foreland)
+        };
     let extension = if reg == regime::RIFT { 1.0 } else { 0.0 };
     let obliquity = f64::from(x.obliquity[c]);
     // Slip partitioning: the margin-parallel part of oblique convergence is taken up by
@@ -135,6 +173,7 @@ pub fn strain(x: &Inputs<'_>, c: usize, sp: &StructureParams) -> Strain {
     };
     Strain {
         shortening,
+        tightness,
         extension,
         shear,
         source,
@@ -395,7 +434,16 @@ pub fn emplace(
                     let thick = f64::from(x.thickness[c]).max(1.0);
                     // ledger: DEF-006
                     let e_crust = (1.0 - sp.reference_crust_m / thick).clamp(e_lo, e_hi);
-                    let e = e_lo + (e_crust - e_lo) * s.shortening.min(1.0);
+                    // In a collision's belt, wedge and foreland the collision's own shortening
+                    // S, taken up over the belt's width W: e = S / (S + W). ledger: DEF-077
+                    let shortened = f64::from(x.shortening_km[c]);
+                    let e_target = match s.source {
+                        Source::Collision | Source::Basin if shortened > 0.0 => {
+                            (shortened / (shortened + x.collision_belt_km)).clamp(e_lo, e_hi)
+                        }
+                        _ => e_crust,
+                    };
+                    let e = e_lo + (e_target - e_lo) * s.tightness.min(1.0);
                     f.azimuth_deg = (trend + scatter).rem_euclid(360.0) as f32;
                     f.wavelength = wavelength as f32;
                     // ledger: DEF-007, DEF-011
@@ -426,7 +474,7 @@ pub fn emplace(
                     f.azimuth_deg = az.rem_euclid(360.0) as f32;
                     f.half_along = (0.5 * length) as f32;
                     f.half_across = (p.fault_reach_ratio * length) as f32;
-                    let grow = 0.5 + 0.5 * s.shortening.min(1.0); // ledger: DEF-017
+                    let grow = 0.5 + 0.5 * s.tightness.min(1.0); // ledger: DEF-017
                     let (dip, slip) = stretch(
                         lerp(p.thrust_dip_deg, u[0]),
                         p.strength * p.thrust_slip_ratio * length * grow,
@@ -492,7 +540,9 @@ pub(crate) mod tests {
     use super::*;
     use deeptime_format::structure::Shape;
 
-    /// A small planet with a north–south collision belt, a rift and an oblique margin.
+    /// A small planet with a north–south collision belt (8 cells wide at columns 56 to 63, its
+    /// wedge-less foreland basin on the incoming side at 64 to 79 and a forebulge at 80 to 89), a
+    /// rift and an oblique margin.
     pub(crate) struct Planet {
         pub grid: GridDesc,
         pub regime: Vec<f32>,
@@ -506,6 +556,12 @@ pub(crate) mod tests {
         pub uplift: Vec<f32>,
         pub elevation: Vec<f32>,
         pub orogen_km: Vec<f32>,
+        pub arc_km: Vec<f32>,
+        /// The collision's convergence across its front, mm/yr, in its footprint (the belt and
+        /// the foreland on the incoming side), and its shortening so far, km.
+        pub collision: Vec<f32>,
+        pub shortened: Vec<f32>,
+        pub flexure: Option<Vec<f32>>,
         /// Metres a block is high (300 m across).
         pub m_per_block_v: f64,
     }
@@ -528,6 +584,10 @@ pub(crate) mod tests {
                 uplift: vec![0.0; n],
                 elevation: vec![300.0; n],
                 orogen_km: vec![3000.0; n],
+                arc_km: vec![3000.0; n],
+                collision: vec![0.0; n],
+                shortened: vec![0.0; n],
+                flexure: Some(vec![0.0; n]),
                 m_per_block_v: 20.0,
             };
             for c in 0..n {
@@ -544,9 +604,21 @@ pub(crate) mod tests {
                     p.trend[c] = 0.0;
                     p.orogen_km[c] = 0.0;
                     p.elevation[c] = 4000.0 - 400.0 * (i as f32 - 60.0).abs();
+                    p.collision[c] = 30.0;
+                    p.shortened[c] = 200.0;
                 } else if (64..100).contains(&i) {
                     p.orogen_km[c] = (i as f32 - 63.0) * 4.8;
                     p.trend[c] = 0.0;
+                }
+                // The incoming plate's foreland: a basin 500 m below local isostasy beside the
+                // belt (columns 64 to 79), then a forebulge 80 m above it (80 to 89).
+                if (64..90).contains(&i) {
+                    p.collision[c] = 30.0;
+                    p.shortened[c] = 200.0;
+                    p.flags[c] = f32::from(FORELAND);
+                    if let Some(f) = p.flexure.as_mut() {
+                        f[c] = if i < 80 { -500.0 } else { 80.0 };
+                    }
                 }
                 // A rift along i = 180, 4 cells wide, trending north.
                 if (178..182).contains(&i) {
@@ -572,6 +644,11 @@ pub(crate) mod tests {
                 uplift: &self.uplift,
                 elevation: &self.elevation,
                 orogen_km: &self.orogen_km,
+                arc_km: &self.arc_km,
+                collision_mm_yr: &self.collision,
+                shortening_km: &self.shortened,
+                flexure_m: self.flexure.as_deref(),
+                collision_belt_km: 400.0,
                 // The default 250 km of foreland is 600 blocks here (37 cells).
                 blocks_per_model_km: 2.4,
             }
@@ -606,12 +683,17 @@ pub(crate) mod tests {
         let sp = StructureParams::default();
         let w = p.grid.w as usize;
         let at = |i: usize, j: usize| strain(&p.inputs(), j * w + i, &sp);
+        // A collision at the reference convergence shortens at full strength, with the plate
+        // model's shortening behind the fold tightness.
         assert_eq!(at(60, 60).shortening, 1.0);
+        assert_eq!(at(60, 60).source, Source::Collision);
         assert_eq!(at(60, 60).extension, 0.0);
-        // The foreland fades with distance from the orogen and ends at the belt's width.
-        let near = at(66, 60).shortening;
-        let far = at(100 - 1, 60).shortening;
-        assert!(near > far && far > 0.0 && near < 0.6, "{near} {far}");
+        // The foreland basin on the incoming side shortens at 0.6; the forebulge and the plain
+        // beyond it not at all (no orogen distance reaches them any more).
+        assert_eq!(at(70, 60).source, Source::Basin);
+        assert!((at(70, 60).shortening - 0.6).abs() < 1e-9);
+        assert_eq!(at(85, 60).shortening, 0.0, "the forebulge is undeformed");
+        assert_eq!(at(95, 60).shortening, 0.0, "beyond the collision's reach");
         assert_eq!(at(140, 60).shortening, 0.0, "the craton is undeformed");
         assert_eq!(at(180, 60).extension, 1.0);
         // Oceanic crust is never deformed here.
@@ -633,6 +715,150 @@ pub(crate) mod tests {
         assert!((strain(&q.inputs(), c, &sp).shortening - 0.25).abs() < 1e-6);
         q.uplift[c] = 1.0;
         assert_eq!(strain(&q.inputs(), c, &sp).shortening, 0.5);
+    }
+
+    /// A collision shortens at the convergence across its front (plate task 6): a slowing
+    /// collision makes fewer structures, a stopped one none, and one faster than the reference
+    /// no more than the reference (the old rule drew the collision regime at full strength
+    /// whatever the convergence).
+    #[test]
+    fn a_slowing_collision_makes_fewer_structures() {
+        let sp = StructureParams::default();
+        let reference = sp.deformation.collision_reference_mm_yr as f32;
+        let count = |conv: f32| {
+            let mut p = Planet::new();
+            let w = p.grid.w as usize;
+            for c in 0..p.collision.len() {
+                if p.collision[c] > 0.0 {
+                    p.collision[c] = conv;
+                }
+            }
+            let at = |p: &Planet, i: usize| strain(&p.inputs(), 60 * w + i, &sp).shortening;
+            let rates = (at(&p, 60), at(&p, 70));
+            let mut dense = sp.clone();
+            dense.deformation.density = 20.0;
+            dense.deformation.max_overlap = 16;
+            let (all, counts) = p.run(&dense, 10, 11);
+            let shortening: u64 = counts.fold_trains + counts.thrusts;
+            (rates, all.len(), shortening)
+        };
+        let (r_full, _, n_full) = count(reference);
+        let (r_half, _, n_half) = count(0.5 * reference);
+        let (r_fast, _, n_fast) = count(5.0 * reference);
+        let (r_stop, _, n_stop) = count(0.0);
+        assert_eq!(r_full.0, 1.0);
+        assert!((r_half.0 - 0.5).abs() < 1e-6 && (r_half.1 - 0.3).abs() < 1e-6, "{r_half:?}");
+        assert_eq!(r_fast, r_full, "no more than the reference");
+        assert_eq!(r_stop, (0.0, 0.0), "a collision that stopped shortens nothing");
+        assert!(n_full > 30, "{n_full}");
+        assert!(
+            n_half < n_full * 3 / 4 && n_half > n_full / 4,
+            "half the convergence, about half the structures: {n_half} against {n_full}"
+        );
+        assert_eq!(n_fast, n_full, "the same draws");
+        assert_eq!(n_stop, 0, "{n_stop}");
+    }
+
+    /// A collision's folds are as tight as its real shortening says (plate task 6): a collision
+    /// that has shortened by 20 km over a 400 km belt folds the cover by 5 % (the least
+    /// the settings give), one that has shortened by 600 km by 30 % (the most), at the same crust
+    /// thickness (the old rule read only the thickness).
+    #[test]
+    fn fold_tightness_follows_the_real_shortening() {
+        let sp = StructureParams::default();
+        let [e_lo, e_hi] = sp.deformation.fold_shortening;
+        let mean_ratio = |km: f32| {
+            let mut p = Planet::new();
+            for v in p.shortened.iter_mut().filter(|v| **v > 0.0) {
+                *v = km;
+            }
+            let mut dense = sp.clone();
+            dense.deformation.density = 30.0;
+            dense.deformation.max_overlap = 16;
+            let (all, _) = p.run(&dense, 10, 5);
+            let x = sp.deformation.block_stretch(300.0, p.m_per_block_v) as f32;
+            let folds: Vec<f64> = all
+                .iter()
+                .filter(|f| f.kind == Kind::FoldTrain)
+                .map(|f| f64::from(f.amplitude / f.wavelength / x))
+                .collect();
+            assert!(folds.len() > 20, "{}", folds.len());
+            folds.iter().sum::<f64>() / folds.len() as f64
+        };
+        let (young, middle, old) = (mean_ratio(20.0), mean_ratio(100.0), mean_ratio(600.0));
+        // A/lambda = sqrt(e) / pi at the cell's strain e: the belt's cells (tightness 1) at the
+        // end of the range, the basin's (0.6 of the way between the least and the most) below.
+        let a = |e: f64| e.sqrt() / std::f64::consts::PI;
+        assert!(young < middle && middle < old, "{young} {middle} {old}");
+        assert!(old < a(e_hi) * 1.0001 && young > a(e_lo) * 0.9999, "{young} {old}");
+        // 100 km over a 400 km belt is 20 %: between the least and the most.
+        assert!(middle > a(0.15) && middle < a(0.25), "{middle}");
+    }
+
+    /// The foreland of a collision is the flexural basin on the incoming plate (plate task 6):
+    /// folds and thrusts in the basin, none on the forebulge or beyond it, and none at all in the
+    /// foreland of a world with no flexure field; the old rule gave every cell within
+    /// `foreland_km` of an orogen, on both sides.
+    #[test]
+    fn the_foreland_is_the_basin() {
+        let mut sp = StructureParams::default();
+        sp.deformation.density = 30.0;
+        sp.deformation.max_overlap = 16;
+        let p = Planet::new();
+        let (all, counts) = p.run(&sp, 15, 7);
+        let col = |f: &Feature| crate::structure::plutons::cell_of(&p.grid, f.x, f.z) % p.grid.w as usize;
+        let shortened: Vec<&Feature> = all
+            .iter()
+            .filter(|f| matches!(f.kind, Kind::FoldTrain | Kind::Thrust))
+            .collect();
+        let in_belt = shortened.iter().filter(|f| (55..=64).contains(&col(f))).count();
+        let in_basin = shortened.iter().filter(|f| (64..=80).contains(&col(f))).count();
+        let beyond = shortened.iter().filter(|f| col(f) > 80).count();
+        assert!(in_belt > 20 && in_basin > 20, "{in_belt} {in_basin}");
+        assert_eq!(beyond, 0, "the forebulge and the plain beyond are undeformed");
+        assert!(counts.shortened_by[3][0] > 5 && counts.shortened_by[3][1] > 5, "{counts:?}");
+        // The basin's cells are the foreland and their strain is gentler than the belt's.
+        let mut dry = Planet::new();
+        dry.flexure = None;
+        let (all, counts) = dry.run(&sp, 15, 7);
+        assert!(
+            all.iter().filter(|f| matches!(f.kind, Kind::FoldTrain | Kind::Thrust)).all(|f| col(f) <= 64),
+            "no flexure, no basin: the foreland has no structures"
+        );
+        assert_eq!(counts.shortened_by[3], [0, 0]);
+        // The behind-the-belt (overriding) side: no foreland (the plate's own flags say which
+        // side is the incoming one).
+        let overriding = all.iter().filter(|f| col(f) < 55 && f.kind != Kind::Normal).count();
+        assert_eq!(overriding, 0, "{overriding}");
+    }
+
+    /// The foreland of an Andean margin keeps the distance rule (`foreland_km` from a continental
+    /// arc), and a collision's belt does not give one (plate task 6).
+    #[test]
+    fn an_andean_foreland_fades_with_the_distance_from_the_arc() {
+        let mut p = Planet::new();
+        let sp = StructureParams::default();
+        let w = p.grid.w as usize;
+        // An arc along column 120 and its foreland east of it (4.8 km a cell).
+        for j in 30..226 {
+            for i in 100..140 {
+                p.arc_km[j * w + i] = (i as f32 - 120.0).abs() * 4.8;
+            }
+        }
+        let at = |p: &Planet, i: usize| strain(&p.inputs(), 60 * w + i, &sp);
+        let near = at(&p, 122);
+        let far = at(&p, 139);
+        assert_eq!(near.source, Source::Foreland);
+        assert!(near.shortening > far.shortening && far.shortening > 0.0, "{near:?} {far:?}");
+        assert!(near.shortening < 0.6, "{near:?}");
+        // The collision regime's own orogen distance (the old rule's input) no longer makes one.
+        for j in 30..226 {
+            for i in 64..100 {
+                p.collision[j * w + i] = 0.0;
+                p.flags[j * w + i] = 0.0;
+            }
+        }
+        assert_eq!(at(&p, 70).shortening, 0.0, "{:?}", at(&p, 70));
     }
 
     #[test]
@@ -661,7 +887,7 @@ pub(crate) mod tests {
             assert!((29..=226).contains(&j), "row {j}");
             match f.kind {
                 Kind::FoldTrain | Kind::Thrust => {
-                    assert!((55..=100).contains(&i), "{:?} at column {i}", f.kind);
+                    assert!((55..=80).contains(&i), "{:?} at column {i}", f.kind);
                     // Along the belt (north), within the scatter.
                     assert!(off_axis(f.azimuth_deg, 0.0) < 50.0, "{}", f.azimuth_deg);
                 }
@@ -715,7 +941,7 @@ pub(crate) mod tests {
         );
         let foreland = mean(
             all.iter()
-                .filter(|f| f.kind == Kind::FoldTrain && cell(f).0 >= 70)
+                .filter(|f| f.kind == Kind::FoldTrain && (68..=80).contains(&cell(f).0))
                 .map(ratio)
                 .collect(),
         );
