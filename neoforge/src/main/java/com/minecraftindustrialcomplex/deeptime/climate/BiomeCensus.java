@@ -120,8 +120,8 @@ public final class BiomeCensus {
             "Cwc", "Cfa", "Cfb", "Cfc", "Dsa", "Dsb", "Dsc", "Dsd", "Dwa", "Dwb", "Dwc", "Dwd", "Dfa", "Dfb", "Dfc", "Dfd", "ET", "EF",
             "sea"};
 
-    /** Counts per check: matching columns, columns. */
-    public record Result(Map<String, int[]> checks, Map<String, int[]> forbidden, JsonObject json) {
+    /** Counts per check: matching columns, columns; the biome rules' census (null when no rule file is active). */
+    public record Result(Map<String, int[]> checks, Map<String, int[]> forbidden, JsonObject json, RuleCensus rules) {
         public double share(String check) {
             int[] c = checks.get(check);
             return c == null || c[1] == 0 ? Double.NaN : c[0] / (double) c[1];
@@ -189,6 +189,11 @@ public final class BiomeCensus {
         // The bake's wetlands (BIO-066): wet, flat, low, thawed land put in vanilla's swamp band E6 on
         // purpose (the relief's own erosion stays below it), so swamp there whatever the Köppen family.
         double e6 = OverworldBands.defaults().erosion()[6];
+        // The biome rules (decisions log 2026-10-04): what decided each land column, with the level's bound rules.
+        VolcanicBiomes.Level rules = sampler.spawnTarget() instanceof com.minecraftindustrialcomplex.deeptime.worldgen.RegionSpawnTarget m
+                ? m.volcanic() : null;
+        RasterSampler wetFlag = wd.has(BiomeRules.WETLAND_LAYER) ? wd.layer(BiomeRules.WETLAND_LAYER) : null;
+        RuleCensus ruleCensus = null;
         for (int j = 0; j < h; j++) {
             int z = -zp + step / 2 + j * step;
             for (int i = 0; i < w; i++) {
@@ -202,6 +207,7 @@ public final class BiomeCensus {
                 boolean land = k != 31 && y > sea;
                 Holder<Biome> b = g.getBiomeSource().getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock((int) Math.floor(y)),
                         QuartPos.fromBlock(z), sampler);
+                String decision = VolcanicBiomes.lastDecision();
                 Integer idx = byHolder.get(b);
                 if (idx == null) {
                     idx = holders.size();
@@ -219,6 +225,13 @@ public final class BiomeCensus {
                 if (untagged && (k == 31 ? y < sea - 4 : land))
                     skippedUntagged++;
                 boolean wetland = land && !untagged && wd.raster(ClimateMapping.EROSION, x, z) >= e6;
+                if (land && !untagged && rules != null) {
+                    if (ruleCensus == null)
+                        ruleCensus = new RuleCensus(rules.rules());
+                    boolean coldWet = wetFlag != null ? wetFlag.nearest(x, z) >= 1.5
+                            : wetland && BiomeRules.COLD_WETLAND_CLASSES.contains(KOPPEN[k]);
+                    ruleCensus.add(b, decision, KOPPEN[k], coldWet);
+                }
                 if (land && !untagged) {
                     landColumns++;
                     if (wetland) {
@@ -319,6 +332,8 @@ public final class BiomeCensus {
         // The volcanic biomes against the real volcanoes, now and as the plain climate search placed them
         // (decisions log 2026-10-03).
         o.add("volcanic", VolcanicCensus.run(level, step, poleMargin).json());
+        if (ruleCensus != null && !rules.rules().isEmpty())
+            o.add("rules", ruleCensus.json());
         if (mapFile != null) {
             JsonObject map = new JsonObject();
             map.addProperty("schema", 1);
@@ -352,7 +367,7 @@ public final class BiomeCensus {
             Files.writeString(mapFile, map.toString(), StandardCharsets.UTF_8);
             o.addProperty("file", mapFile.toString());
         }
-        return new Result(checks, forbidden, o);
+        return new Result(checks, forbidden, o, ruleCensus != null && !rules.rules().isEmpty() ? ruleCensus : null);
     }
 
     static String nameOf(Holder<Biome> b) {

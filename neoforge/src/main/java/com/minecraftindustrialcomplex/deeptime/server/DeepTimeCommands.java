@@ -334,8 +334,11 @@ public final class DeepTimeCommands {
         JsonObject o;
         try {
             long t0 = System.nanoTime();
-            var r = BiomeCensus.run(level, step, 64,
-                    source.getServer().getServerDirectory().resolve("deeptime-probe").resolve("biomemap.json"));
+            // DEEPTIME_PROBE_DIR (dev tools): a folder that outlives a smoke job's private server copy.
+            String probeDir = System.getenv("DEEPTIME_PROBE_DIR");
+            var r = BiomeCensus.run(level, step, 64, (probeDir == null || probeDir.isBlank()
+                    ? source.getServer().getServerDirectory().resolve("deeptime-probe")
+                    : java.nio.file.Path.of(probeDir)).resolve("biomemap.json"));
             o = r.json();
             o.addProperty("seconds", Math.round((System.nanoTime() - t0) / 1e7) / 100.0);
         } catch (Exception e) {

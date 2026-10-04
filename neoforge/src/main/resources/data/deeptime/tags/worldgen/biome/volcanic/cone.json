@@ -8,6 +8,18 @@
     {
       "id": "biomesoplenty:volcano",
       "required": false
+    },
+    {
+      "id": "wythers:volcano",
+      "required": false
+    },
+    {
+      "id": "wythers:tropical_volcano",
+      "required": false
+    },
+    {
+      "id": "wythers:icy_volcano",
+      "required": false
     }
   ]
 }
