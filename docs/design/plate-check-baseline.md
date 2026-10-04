@@ -1082,3 +1082,47 @@ continent's mean height in the plate model (525 m), one 71 km sample wide, and t
 carries it down to the sea in a few steps (the margin's one-sample step, the cause named in the
 margins task). Collapse also lowers the old belts it thins: the highest cell and the share above
 2 km fall.
+
+### Re-measured on master 297da4b6 (2026-10-04)
+
+The branch merged with master 297da4b6 (its simulation is master 5df2e9ec's: the climate ice
+merge; nothing later touches `crates/`). Same runs and the same "master" (both rules off) as
+above. The simulation is deterministic for a build whatever the thread count: the four 1000 Myr
+runs at 8 threads gave these 2-thread numbers to the last digit.
+
+| Measure | Master 297da4b6 | After | Target | Difference against ±0.02 |
+|---|---|---|---|---|
+| Continental crust, lowest step | 0.28 (0.32 0.27 0.26 0.28) | 0.37 (0.39 0.37 0.31 0.40) | at least 0.37 | not met in either (mean just under) |
+| Continental crust, highest step | 0.43 (0.44 0.43 0.43 0.43) | 0.45 (0.44 0.47 0.43 0.47) | at most 0.45 | **now not met** (just over) |
+| Continental crust at the end | 0.291 (0.332 0.278 0.256 0.299) | 0.440 (0.409 0.456 0.432 0.461) | - | +0.149, clears |
+| Land at the end (true area) | 0.161 (0.203 0.134 0.138 0.168) | 0.204 (0.179 0.194 0.229 0.214) | - | +0.043, clears |
+| Land above 2 km at the end | 0.123 | 0.095 | - | -0.028 |
+| Highest cell at the end | 6.4 km (5.6 8.6 6.1 5.3) | 5.3 km (5.9 5.2 5.3 4.8) | - | |
+| Steps with one plate above 50 % | 6.15 (6.0 2.6 12.8 3.2) | 9.80 (10.4 8.4 13.8 6.6) | at most 10.0 | met in both |
+| Active share of the continental margin | 0.41 | 0.38 | 0.25-0.40 | **now met** |
+| Median plate lifetime | 94.5 Myr | 86.0 Myr | at least 80 | met |
+| Collisions per 100 Myr | 4.33 | 4.92 | 2-6 | met |
+| Ocean floor older than 250 Myr | 3.10 % | 3.92 % | at most 3 | not met (as master) |
+| Targets met | 29 of 45 | 29 of 45 | | |
+
+Thickness at the end (p10/50/90/99): master 34-40 / 81-105 / 209-273 / 440-649 km; after 35-37 /
+50-54 / 62-68 / 72-120 km. The collapse turned 111-116 million km² of ocean floor continental;
+the limit took 7.4-9.6 × 10⁹ km³ of crust to the mantle.
+
+Hypsometry at 500 Myr (`tools/review/p1-17-hyps.sh 500 "1 2 3" "supercontinent
+scattered_continents"`, mean [min, max] of six):
+
+| Measure | Master 297da4b6 | After | Target | Difference |
+|---|---|---|---|---|
+| Land share | 0.189 [0.153, 0.259] | 0.207 [0.159, 0.252] | 0.27-0.30 | +0.018, inside ±0.02 |
+| Median land height | 387 m [301, 469] | 448 m [363, 555] | 430-640 m | +61 m, inside the spread |
+| Land above 2 km | 0.081 [0.055, 0.129] | 0.078 [0.047, 0.110] | 0.10-0.13 | -0.003, inside |
+| Highest cell | 5.14 km [4.52, 6.23] | 5.17 km [4.47, 5.79] | 5.5-7 km | inside |
+| 99th percentile of land | 3.50 km | 3.21 km | 4.2-5.5 km | |
+| Continental crust | 0.331 [0.281, 0.362] | 0.374 [0.332, 0.418] | - | +0.043, clears |
+
+**Ben's workbench run** (`earthlike_quick_16k`, supercontinent, 1000 Myr, seed 1, 8 threads, master
+458a89a5, `land_frac=0.090`) repeats exactly from the command line on that build (land 0.090, crust
+0.255, highest cell 4,759 m, largest plate 0.562). The same seed ends at 0.174 on 6f72f0dd (before
+Lambert), 0.133 on 970f6d04^1, 0.201 on 297da4b6 and 0.179 with the collapse: every code change
+re-rolls a single seed's 1000 Myr outcome, so the land share is read from the four seeds.
