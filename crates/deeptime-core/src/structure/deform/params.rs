@@ -127,13 +127,25 @@ pub struct DeformationParams {
     pub normal_rate_km2_myr: f64,
     pub strike_slip_rate_km2_myr: f64,
 
-    /// How far into the foreland of an active orogen the crust still shortens, km on the plate
-    /// model's (Earth-normalized) sphere: the Zagros fold-thrust belt is "a ~200 to 300 km-wide
-    /// zone" (Alavi 2007, abstract), its Fars sector 200 km (Mouthereau et al. 2007, §2); the
-    /// Subandean belt of Bolivia is 60 to 140 km wide (Hérail et al., ORSTOM symposium paper,
-    /// pp. 179–180, a poor scan). On a 16,384-block planet 250 km is about 100 blocks (30 km on
-    /// the map, where the folds keep their Earth size). ledger: DEF-027
+    /// How far into the foreland of an Andean margin (a continental arc) the crust still
+    /// shortens, km on the plate model's (Earth-normalized) sphere: the Subandean belt of Bolivia
+    /// is 60 to 140 km wide (Hérail et al., ORSTOM symposium paper, pp. 179–180, a poor scan), the
+    /// Zagros fold-thrust belt "a ~200 to 300 km-wide zone" (Alavi 2007, abstract), its Fars
+    /// sector 200 km (Mouthereau et al. 2007, §2). **A collision's foreland is not this width:**
+    /// since plate task 6 it is the flexural basin on the incoming plate beyond the collision's
+    /// wedge (`surface/flexure_m` below 100 m under local isostasy, within reach of the collision's
+    /// front), with none on the forebulge (design `docs/design/plate-force-balance.md` §3.5). On a
+    /// 16,384-block planet 250 km is about 100 blocks (30 km on the map, where the folds keep
+    /// their Earth size). ledger: DEF-027
     pub foreland_km: f64,
+    /// The convergence across a collision's front at which its folds and thrusts form at the
+    /// rates above, mm/yr (Earth-normalized); slower collisions make proportionally fewer, faster
+    /// ones no more. A collision shortens at the convergence across its front (the plate model's
+    /// `plates/collision_mm_yr`), and structures form as the crust shortens, so their number
+    /// follows the shortening. The rates were set for a Zagros-like collision: Arabia and Eurasia
+    /// converge at 22 ± 2 mm/yr (Vernant et al. 2004, GJI 157:381–398, GPS; the figure is from a
+    /// search summary, the paper was not read) and 30 is a design round-up. ledger: DEF-075
+    pub collision_reference_mm_yr: f64,
     /// The plate model's uplift rate at which an Andean margin shortens at full strength, mm/yr
     /// (the amplifier's `active_uplift_mm_yr` is the same 0.1).
     pub arc_uplift_mm_yr: f64,
@@ -244,6 +256,7 @@ impl Default for DeformationParams {
             normal_rate_km2_myr: 4.0e-5,           // ledger: DEF-022
             strike_slip_rate_km2_myr: 4.0e-6,      // ledger: DEF-022
             foreland_km: 250.0,                    // ledger: DEF-027
+            collision_reference_mm_yr: 30.0,       // ledger: DEF-075
             arc_uplift_mm_yr: 0.1,                 // ledger: DEF-026
             max_overlap: 3,                        // ledger: DEF-032
             overprint_myr: 30.0,                   // ledger: DEF-033
@@ -370,6 +383,11 @@ impl DeformationParams {
             self.fault_reach_ratio > 0.0 && self.fault_reach_ratio <= 2.0,
             "fault_reach_ratio",
             "must be in (0, 2]",
+        )?;
+        check(
+            self.collision_reference_mm_yr > 0.0 && self.collision_reference_mm_yr.is_finite(),
+            "collision_reference_mm_yr",
+            "must be > 0",
         )?;
         check(
             self.arc_uplift_mm_yr > 0.0 && self.arc_uplift_mm_yr.is_finite(),

@@ -1333,6 +1333,63 @@ TerraBlender, `compat.terrablender.RegionBiomeSourceMixin`).
   out too) or to `#deeptime:volcanic` alone (kept out, never placed).
 - Without any such biome in the pack (vanilla) every query is answered as before. `/deeptime probe
   biomes` reports the placement against the volcanoes (`census.volcanic`).
+- **Tags added 2026-10-04** (Expanded Ecosphere, after the entries above): `cone` wythers:volcano,
+  wythers:tropical_volcano, wythers:icy_volcano; `crater` wythers:volcanic_crater; `hot_spring_field`
+  wythers:thermal_taiga, wythers:snowy_thermal_taiga, wythers:thermal_taiga_crags, wythers:mud_pools;
+  `lava_field` wythers:savanna_basaltic_incursions; `thermal_caves` wythers:volcanic_chamber. Which of a
+  role's biomes answers is chosen by the biome rules' role rules (next section) before the tag's order.
+
+### Biome rules (decisions log 2026-10-04) and a datapack's overworld
+
+Ben: "Build out support for both so if I install EE it works or if I go w/ terralith it also works". Two
+game-side pieces, no world-data layer of their own:
+
+- **A datapack's overworld** (`data/minecraft/dimension/overworld.json`, as Expanded Ecosphere's built-in
+  datapack `ee_default` ships through Cristel Lib) is the first source vanilla's `WorldDimensions.bake`
+  takes a dimension from, ahead of the world preset and level.dat. Java `worldgen/OverworldOverride` (from
+  `mixin/WorldDimensionsShapeMixin`, before the planet shape) sets it aside when the world's own overworld
+  is a `deeptime:geologic` generator, and gives every `deeptime:geologic` generator whose biome source is
+  `{"type": "minecraft:multi_noise", "preset": "minecraft:overworld"}` that datapack overworld's biome
+  source (its inline biome list) instead; a world whose overworld is not Deep Time's keeps the override.
+  The adopted list is saved with the generator in level.dat.
+- **Rule files**, `data/<ns>/deeptime/biome_rules/<name>.json` (Java `climate/BiomeRuleSet` the format,
+  `climate/BiomeRules` the game side), read from the server's datapacks at a level's first biome query
+  and again after a tag reload. A broken file is logged and skipped. Shape:
+
+  ```json
+  {"requires": ["wythers:ice_cap"],
+   "rules": [{"id": "ice_cap", "ice": true, "keeps": ["#c:is_mountain/peak"],
+              "biomes": ["wythers:ice_cap"], "exclusive": true}]}
+  ```
+
+  `requires` (ids or `#tags`; empty: always): the file is active only when the level's biome source can
+  place one of them. `keep_out` (ids and `#tags`): biomes kept out of the climate search and placed by no rule
+  (a pack's biomes whose slots Deep Time's coordinates reach in the wrong place). Keys starting with `_` are
+  comments, any other unknown key refuses the file. `rules`, tried in order, files in the order of their ids. A rule's keys, all optional
+  but `biomes`: `id`; `biomes` (ids and `#tags`: the candidates; those the source cannot place are
+  dropped, and a rule left with none is dropped); `role` (a volcanic role id: the rule is tried only inside
+  that role's zones, before the role tag's biome; cave roles take no rules); `koppen` (codes or prefixes:
+  `"Cs"` is Csa/Csb/Csc, `"E"` is ET/EF; read from `climate/koppen`, nearest cell); `t_mean_c`, `t_warm_c`,
+  `t_cold_c` and `p_mm` (`{"min", "max"}`, either end optional: the climate at the column's surface,
+  lapsed, from the monthly layers; a world without a climate never matches); `elevation_m` (surface above
+  sea level); `wetland` (`any`, `warm`, `cold`, `none`: `climate/wetland` 1 or 2 where the world has the
+  layer, else wet land in the swamp erosion band E6, cold in Dfc, Dfd, Dsc, Dsd, Dwc and Dwd); `ice` (the
+  ice cover lays ice); `playa` (`playa` above 0, nearest cell); `volcanic` (any volcanic zone holds the
+  column); `rock` (class names: the first horizon of the column's strata within 6 blocks of the surface);
+  `replaces` and `keeps` (ids and `#tags`: the rule holds only where the biome the climate search would
+  give is, respectively is not, among them); `exclusive` (true: the candidates are kept out of the climate
+  search, like `#deeptime:volcanic`, and appear only where a rule places them). Ordinary rules apply at
+  the surface (biome depth under 0.2), on land, off river channels. The first rule whose conditions hold
+  and whose search finds a candidate decides: the source's own climate search runs over the rule's
+  candidates alone (every other leaf infinitely far, as for the volcanic keep-out), so the pack's
+  parameter ranges choose among them, out-of-range biomes included.
+- **Shipped files**: `deeptime:peatland` (requires `#deeptime:peatland`; cold wetland takes a member of the
+  tag `#deeptime:peatland`: wythers:fen, wythers:berry_bog, wythers:snowy_bog, wythers:snowy_fen,
+  biomesoplenty:bog, biomesoplenty:muskeg, regions_unexplored:fen, clifftree:bog, all optional) and
+  `deeptime:expanded_ecosphere` (requires wythers:ice_cap or wythers:fen; 19 rules, docs/science/biomes.md,
+  "Expanded Ecosphere and the biome rules"). A datapack adds a file, or replaces one by its id.
+- `/deeptime probe biomes` reports what decided each sampled land column (`census.rules`: per rule, per
+  role and the climate search; candidates seen and absent; the checks the GameTests read).
 
 ## `strata/classes.json`
 

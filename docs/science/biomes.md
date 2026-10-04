@@ -244,6 +244,95 @@ blocks), 110 crater discs (20 km²), 109 cone discs (187 km²), 64 fresh-ash dis
 sampled columns become ashen savanna) and 110 thermal-cave discs (38 km²). These sizes are the game's choices; no real
 landscape was measured for them.
 
+## Expanded Ecosphere and the biome rules
+
+Expanded Ecosphere (EE, 3.4.7 for NeoForge 1.21.1, by William Wythers and Cristelknight; CC BY-NC-ND 4.0) has
+189 realistic biomes, all of vanilla blocks, and fills most of the gaps Terralith leaves (the biome-mods survey,
+docs/research/notes/biome-mods-survey.md). Ben (decisions log 2026-10-04): "Build out support for both so if I
+install EE it works or if I go w/ terralith it also works". Deep Time never ships, edits or redistributes EE; it
+ships a data file of its own that names EE's biome ids.
+
+**What EE did to a Deep Time world.** EE's built-in datapack `ee_default` (registered through Cristel Lib, on in
+its default mode, the mode without TerraBlender) defines `minecraft:overworld` as a dimension: vanilla's noise
+generator with an inline list of 4,589 biome entries, and its own `minecraft:overworld` noise settings (its surface
+rule). Vanilla's world loader takes a dimension from the datapacks first and from the world preset only where no
+datapack defines it, so a world created with Deep Time's preset and EE installed was an ordinary EE world: on the
+16k test planet the server started, Toroidal World still looped it every 16,384 blocks, and `/deeptime probe
+biomes` answered "minecraft:overworld is not a Deep Time level on world data". Now (Java `worldgen/OverworldOverride`):
+in a Deep Time world the datapack's overworld is set aside, Deep Time's generator stays, and it takes the datapack
+overworld's biome list in place of vanilla's (the same for every other Deep Time level a datapack defines, such as
+the GameTest planets); EE's surface rule paints the terrain as Terralith's does in MIC. A world on a vanilla preset
+keeps EE's override, as EE intends. One part of EE's surface rule is left out of Deep Time levels: a layer of smooth
+basalt below y −55, drawn for vanilla's 384-block world, which in a Deep Time world (floor at −512) replaced every
+rock class below −55 (BIO-131; a pack's top-level layers between two fixed heights, other than vanilla's deepslate
+and the bedrock floor, are left out; the strata are the rock there).
+
+**Biome rules.** EE's own list puts biomes where Deep Time's climate coordinates never reach: its ice cap below
+vanilla's lowest temperature (−1.2 to −1.0), its salt lakes, mud pools and Tibesti mountains above the warm end
+(0.9 to 1.2), its volcanoes at a continentalness under −1.05 (deep-sea islands). And it puts others where Deep
+Time's classes are not: chaparral in the driest hot cells, so 40 % of the planet's hot desert came out chaparral;
+temperate rainforest in the wettest cold cells, so 28 % of the humid boreal forest (Dfc) came out temperate
+rainforest; snowy taiga and ice spikes in the tundra. A rule file (`data/<ns>/deeptime/biome_rules/*.json`,
+FORMAT.md "Biome rules"; Java `climate/BiomeRuleSet`, `climate/BiomeRules`) places a pack's biomes from Deep Time's
+own coordinates: the Köppen class, the climate at the column in °C and mm, the wetland flag, the ice cover, the
+playas, the volcanic zones and the rock at the surface. The first rule that holds runs the pack's own climate
+search over that rule's biomes alone, so the pack still picks among them by its ranges (a hot-spring field takes
+the snowy or the plain thermal taiga by temperature). A rule's biomes may be exclusive: kept out of the climate
+search elsewhere, as the volcanic biomes are; a file may also keep biomes out without placing them anywhere: EE's
+ten island biomes and its mushroom fields sit at a continentalness Deep Time gives the deep sea, where on the
+GameTest planet they took 17 % of the sea floor (BIO-132). The same machinery serves every pack: the volcanic roles' tags list
+EE's volcanoes after Terralith's and Biomes O' Plenty's biomes, and the peatland rule's tag lists every pack's bogs.
+
+| Rule (ledger) | Where (Deep Time's coordinates) | EE biomes | Basis |
+|---|---|---|---|
+| icy / tropical volcano (BIO-117) | an active cone in E or Dxc/Dxd; in A | icy_volcano; tropical_volcano (elsewhere the role tag's volcano) | game choice |
+| thermal taiga / mud pools (BIO-118) | a hot-spring field in D or E; elsewhere | thermal_taiga, snowy_thermal_taiga, thermal_taiga_crags; mud_pools | game choice |
+| glacial cliffs (BIO-119) | a coast under the ice cover | glacial_cliffs (exclusive) | game choice |
+| ice cap (BIO-119) | land under the ice cover, but its peaks | ice_cap (exclusive) | game choice |
+| salt lakes (BIO-120) | a playa (the hydrology's salt flat) | salt_lakes_white, _pink, _turquoise (exclusive) | game choice |
+| tsingy (BIO-121) | carbonate at the surface in A, Cwa, Cfa | tsingy_forest (exclusive) | game choice (tropical tower karst) |
+| black beach (BIO-122) | a beach in a volcano's zone or on basaltic rock | black_beach (exclusive) | game choice |
+| Tibesti, hot desert (BIO-123) | BWh above 1,500 m; BW with a mean above 10 °C | tibesti_mountains (exclusive); EE's deserts and badlands | game choice |
+| tundra (BIO-124) | ET with a warmest month of 5 °C or more; colder ET | tundra; snowy_tundra | CAVM subzone C edge (Walker et al. 2005, from memory) |
+| polar desert (BIO-125) | EF off the ice, BWk at or below 0 °C | snowy_tundra | game choice |
+| dry tropical forest (BIO-126) | Aw, As with 1,000 mm or more | dry_tropical_forest | Holdridge's dry forest band (from memory) |
+| temperate rainforest (BIO-127) | Cfb, Cfc with 1,400 mm or more and a mean of 4 to 12 °C | temperate_rainforest, its crags, its flooded form (exclusive) | Alaback 1991 (from memory) |
+| Mediterranean scrub, cold steppe (BIO-128) | Csa, Csb with 800 mm or less; BSk | chaparral; cold_plains, highland_plains, subtropical_grassland | game choice |
+| boreal peatland (BIO-129; every pack) | cold wetland | `#deeptime:peatland`: fen, berry_bog, snowy_bog, snowy_fen | game choice (Ben, 2026-10-03, "peatland if present") |
+
+**Measured** on one `earthlike_quick_16k` planet (scattered continents, 500 Myr, seed 1, test machine, 2026-10-04;
+`tools/review/ee-biomes.sh`, `tools/review/profile_shares.py`), the same world data through each profile's biome
+source, `/deeptime probe biomes 16`, 93,727 land columns. Before (master's jar with EE): no Deep Time overworld at
+all. After, with EE, the rules decided 36,891 of 94,657 land columns (39 %; the census's own count, poles
+included), the volcanic roles 107, the climate search the rest; no column a rule decided lay outside the rule's
+classes or held a biome it does not name, no exclusive biome came from the climate search, and 94 of 97
+cold-wetland columns were on a peatland biome. The commonest biomes per class (share of the class's columns):
+
+| Class (columns) | EE | MIC (Terralith) | Vanilla |
+|---|---|---|---|
+| Af (3,452) | tropical_rainforest 65, jungle 20 | sparse_jungle 39, tropical_jungle 19 | jungle 69, bamboo_jungle 24 |
+| Am (1,507) | tropical_rainforest 71, sparse_jungle 8 | shrubland 29, jungle 27, brushland 21 | jungle 74, sparse_jungle 10 |
+| Aw (7,192) | dry_tropical_forest 60, savanna 14, wooded_savanna 12 | arid_highlands 43, savanna 23 | savanna 76, forest 13 |
+| BWh (1,561) | eroded_badlands 32, cactus_desert 30, desert 14 | desert 38, badlands 27 | desert 62, stony_shore 12 |
+| BSk (14,077) | cold_plains 50, subtropical_grassland 26, highland_plains 10 | plains 57, highlands 14 | plains 82, windswept_hills 6 |
+| Csa (1,469) | chaparral 87 | plains 46, highlands 25 | plains 70, windswept_hills 13 |
+| Csb (2,921) | chaparral 69, forest 10 | plains 60, birch_taiga 10 | plains 63, forest 23 |
+| Cfb (7,501) | forest 14, autumnal_birch_forest 13, birch_forest 11 | old_growth_birch_forest 19, forest 16 | old_growth_birch_forest 30, forest 29 |
+| Dfc (6,337) | taiga 61, pine_barrens 11, snowy_taiga 8 | taiga 36, forested_highlands 14 | taiga 50, old_growth_spruce_taiga 19 |
+| ET (9,952) | tundra 58, ice_cap 16, snowy_tundra 8 | cold_shrubland 24, snowy_slopes 17, snowy_plains 15 | snowy_plains 67, snowy_slopes 10 |
+| EF (3,362) | ice_cap 88, glacial_cliffs 6 | frozen_peaks 34, snowy_slopes 33, gravel_desert 11 | snowy_slopes 51, ice_spikes 20 |
+| all land: biomes, share of the mod's own | 141, 0.69 | 88, 0.42 | 40, 0 |
+
+The gaps each pack closes on this planet: **EE** closes peatland (fen and bog on 97 % of the cold wetland), summer
+tundra, the ice sheet as a biome, tropical dry forest, Mediterranean scrub, cold steppe, salt lakes on the playas
+(41 columns), tropical karst (tsingy, 128), temperate rainforest (68), black-sand beaches (56) and climate variants
+of volcanoes and hot springs (icy volcano 121 columns, mud pools 125, thermal taiga 19). **Terralith** keeps its
+known gaps (monsoon forest as dry shrubland and brushland, 50 % of Am; plains for Mediterranean and cold steppe; no
+peatland, no dry forest, no salt or karst biome) and is still the better set for volcanoes (its caldera and ash
+biomes, which EE lacks) and geology-named landforms. **Vanilla** closes none of them. EE's distinct biomes on land
+are 141 against Terralith's 88. The candidates a rule names that this planet's climate never reached: berry_bog,
+snowy_fen, salt_lakes_pink.
+
 ## Simplifications and limits
 
 - Peel classifies station records of many years. The mod classifies the monthly means of one
@@ -268,6 +357,17 @@ landscape was measured for them.
   areas of real volcanic landscapes.
 - A volcanic role's biome ignores TerraBlender's regions: a volcano in a province whose region is vanilla's
   still gets Biomes O' Plenty's volcanic biome when the pack has it.
+- The biome rules' climate thresholds (5 °C for low-arctic tundra, 1,000 mm for tropical dry forest, 1,400 mm and
+  4 to 12 °C for temperate rainforest, 800 mm for Mediterranean scrub) are cut from classifications read from
+  memory, not checked in their sources; a single class-wide threshold replaces what is in reality a gradient
+  with fire, soil and grazing in it (Holdridge's own text notes that most savannas lie in his tropical dry
+  forest zone). The rock condition reads the first horizon within 6 blocks of the surface, so a beach whose
+  sand horizon covers basalt is not "on basalt".
+- Expanded Ecosphere is tested in its default mode only. Its COMPATIBLE mode (with TerraBlender) registers a
+  TerraBlender region instead of the dimension override; Deep Time would deal that region to provinces like
+  any other, untested. EE with Terralith is not supported by EE itself (both define the overworld's biomes).
+- A world keeps the biome list it was created with in level.dat; removing EE afterwards leaves it naming
+  biomes that no longer exist.
 
 ## Game choices
 
@@ -280,7 +380,10 @@ continentalness, erosion and weirdness derivations (BIO-063 to BIO-070), the fro
 BIO-084: Ben, 2026-09-30). The GameTest floors (BIO-072) were set 0.1 under the lowest share
 measured over ten test planets and catch a broken mapping, not a wrong climate. The volcanic biomes (BIO-104 to BIO-114) are Ben's in kind
 (decisions log 2026-10-03, "Tie them to real volcanoes") and the agent's in every number: zone sizes, the
-activity needed for fresh ash, the role order and the tags' order.
+activity needed for fresh ash, the role order and the tags' order. The biome rules (BIO-115 to BIO-132) are Ben's
+in kind (decisions log 2026-10-04, "Build out support for both") and the agent's in every rule: which biome
+goes with which class or setting, every threshold, which biomes are exclusive, the rock window and the GameTest
+tolerances.
 
 ## Open questions
 

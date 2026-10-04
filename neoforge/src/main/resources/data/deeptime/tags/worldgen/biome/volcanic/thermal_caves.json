@@ -4,6 +4,10 @@
     {
       "id": "terralith:cave/thermal_caves",
       "required": false
+    },
+    {
+      "id": "wythers:volcanic_chamber",
+      "required": false
     }
   ]
 }

@@ -4,7 +4,7 @@
 # Installs one of Deep Time's server sets into smoke/<profile>/server/ (plan §9.5).
 # Adapted from mic-climate's smoke/install.sh.
 #
-#   tools/smoke/install.sh <standalone|mic|mic-ev|terrablender|ev|ev-client|dh|dh-next>
+#   tools/smoke/install.sh <standalone|mic|mic-ev|terrablender|ee|ev|ev-client|dh|dh-next>
 #       [--size 16384|32768]      the planet's circumference -> level-type deeptime:planet[_32k] (a
 #                                 Petroff-Guyou world 13,312 / 26,112 blocks round, format 0.5) for a
 #                                 --preset run, deeptime:planet_lambert[_32k] (C itself) for synthetic
@@ -35,7 +35,8 @@
 # for the plan Q10 comparison; ev-client is the ev set plus Create, the smallest set a client needs to
 # generate EV's variant textures for every ore and stone the MIC pack has (tools/client/ev-assets.sh).
 # dh is the standalone set plus Distant Horizons at the pack's pin, dh-next the same with the newest
-# Distant Horizons checked (P3-04: far terrain from the world data; run.py --dh).
+# Distant Horizons checked (P3-04: far terrain from the world data; run.py --dh). ee is the standalone set
+# plus Expanded Ecosphere (its biomes in a Deep Time world; never shipped, see profiles/ee.txt).
 #
 # install.json records the Deep Time jar's sha256 and the source it was built from (jarstate.py). The
 # jar copy goes stale as soon as the sources change; tools/workbench/preview.py refreshes it itself
@@ -51,7 +52,7 @@
 # nothing under mods/mic-climate is read or written.
 #
 # The server set is also the jar folder the dev runs link for -PwithMic / -PwithTerraBlender
-# / -PwithEv and the planet server (neoforge/build.gradle, linkRunMods*).
+# / -PwithEe / -PwithEv and the planet server (neoforge/build.gradle, linkRunMods*).
 
 set -euo pipefail
 
@@ -90,8 +91,8 @@ while [ $# -gt 0 ]; do
     esac
 done
 case "$PROFILE" in
-    standalone|mic|mic-ev|terrablender|ev|ev-client|dh|dh-next) ;;
-    *) echo "usage: install.sh <standalone|mic|mic-ev|terrablender|ev|ev-client|dh|dh-next> [--size N] [--synth K] [--strata S] [--datapack DIR] [--test-terrain K] [--preset P [--start S] [--length-myr N] [--memory-cap-gib N]] [--seed N] [--clean]" >&2; exit 2 ;;
+    standalone|mic|mic-ev|terrablender|ee|ev|ev-client|dh|dh-next) ;;
+    *) echo "usage: install.sh <standalone|mic|mic-ev|terrablender|ee|ev|ev-client|dh|dh-next> [--size N] [--synth K] [--strata S] [--datapack DIR] [--test-terrain K] [--preset P [--start S] [--length-myr N] [--memory-cap-gib N]] [--seed N] [--clean]" >&2; exit 2 ;;
 esac
 # The sets installed from the MIC pack (packwiz-installer); the others are their pin files alone.
 case "$PROFILE" in mic|mic-ev) FROM_PACK=1 ;; *) FROM_PACK=0 ;; esac
