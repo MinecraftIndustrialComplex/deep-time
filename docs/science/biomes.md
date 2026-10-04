@@ -193,9 +193,10 @@ What the mapping does (BIO-133 to BIO-136, all game choices):
   draws what it draws for the class: taiga (or its old growth and snowy variants). The bake flags it in
   `climate/wetland` (2; 1 for temperate and warm wetland, which stays swamp, mangrove where hot).
 - Where the pack has a peatland biome, the flagged ground goes there. A peatland biome is a biome in the
-  shared tag `#deeptime:peatland` (every entry optional: BOP's bog and muskeg, Regions Unexplored's fen and
-  cold fen, Expanded Ecosphere's fen, snowy fen, snowy bog and berry bog; the last two packs' ids are from
-  memory, unchecked), or, for a pack nobody listed, one the NeoForge tags call a swamp (`c:is_swamp`) and cold
+  shared tag `#deeptime:peatland` (every entry optional, shared with the biome rules, BIO-129: Expanded Ecosphere's
+  fen, berry bog, snowy bog and snowy fen, BOP's bog and muskeg, Regions Unexplored's fen, CliffTree's bog; the
+  rules place a member directly, and this probe is what makes a pack's own biome source draw one where no
+  rule does), or, for a pack nobody listed, one the NeoForge tags call a swamp (`c:is_swamp`) and cold
   (`c:is_cold/overworld` or `c:is_snowy`): BOP's bog and muskeg are both, vanilla's and Terralith's swamps and
   BOP's wetland are neither. A pack's support adds its biome to the tag; no biome name is in the code, and a
   tagged biome only counts where the pack's biome source puts it at the swamp row (below).
