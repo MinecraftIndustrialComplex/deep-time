@@ -68,9 +68,9 @@
 //! **Erosion** from the local relief (range of the ground, the sea surface counted as ground, in
 //! a `terrain_window_blocks` window, box-smoothed): its rank among the land cells, high relief
 //! first, read through the reference's land erosion distribution below the swamp band (E6).
-//! Wet (vegetation ≥ `wetland_humidity`, 2.5), flat (the flattest `wetland_flat_share`, 35 %), low
-//! (< `wetland_low_m`, 150 m) land that is not frozen goes
-//! into E6 in proportion to `wetlands` — swamps and mangroves only where they belong (vanilla
+//! Wet (the aridity index's own band, before the class's humidity rule, ≥ `wetland_humidity`,
+//! 2.5), flat (the flattest `wetland_flat_share`, 35 %), low (< `wetland_low_m`, 150 m) land that
+//! is not frozen goes into E6 in proportion to `wetlands` — swamps and mangroves only where they belong (vanilla
 //! puts E6 at hot temperatures to mangrove swamp, whatever the humidity). The deep sea keeps E4 or
 //! more, away from Terralith's sky-island band. A class's placement may clamp its land's erosion
 //! (`erosion: {min, max}`; EF's barren ground is held below 0.3, off Terralith's packed-ice glacial
@@ -698,6 +698,12 @@ pub struct Mapped {
 struct Coords {
     t_land: Vec<f32>,
     h_land: Vec<f32>,
+    /// The climate's own humidity band (the aridity index's, before the class's rule): what the
+    /// wetlands read, so a class rule that lifts a band into vanilla's taiga or jungle humidity does
+    /// not make its land a wetland.
+    h_wet: Vec<f32>,
+    /// The Köppen class of a land cell, nearest-filled across the sea (for the record).
+    class: Vec<f32>,
     t_sea: Vec<f32>,
     /// The class's erosion limits (placement `erosion`; ±2 where it has none), nearest-filled
     /// across the sea like the others.
@@ -721,6 +727,8 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         |f: Option<&Field>, k: usize| f.map(|f| f64::from(f.data[k])).filter(|v| v.is_finite());
     let mut t_land = vec![f32::NAN; n];
     let mut h_land = vec![f32::NAN; n];
+    let mut h_wet = vec![f32::NAN; n];
+    let mut cls = vec![f32::NAN; n];
     let mut t_sea = vec![f32::NAN; n];
     let mut e_lo = vec![f32::NAN; n];
     let mut e_hi = vec![f32::NAN; n];
@@ -750,6 +758,8 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         let hu = placement.humidity_land(class, ai, tm, tw, tc, glacier);
         t_land[k] = th as f32;
         h_land[k] = hu as f32;
+        h_wet[k] = humidity_of_aridity(ai) as f32;
+        cls[k] = f32::from(class);
         let lim = placement.erosion_limit(class, glacier);
         e_lo[k] = lim.map_or(-2.0, |l| l.min as f32);
         e_hi[k] = lim.map_or(2.0, |l| l.max as f32);
@@ -773,6 +783,12 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
     }
     if !fill_nearest(&mut h_land, &land, w, h) {
         h_land = vec![2.5; n];
+    }
+    if !fill_nearest(&mut h_wet, &land, w, h) {
+        h_wet = h_land.clone();
+    }
+    if !fill_nearest(&mut cls, &land, w, h) {
+        cls = vec![f32::NAN; n];
     }
     if !fill_nearest(&mut e_lo, &land, w, h) || !fill_nearest(&mut e_hi, &land, w, h) {
         e_lo = vec![-2.0; n];
@@ -807,6 +823,8 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
     Coords {
         t_land,
         h_land,
+        h_wet,
+        class: cls,
         t_sea,
         e_lo,
         e_hi,
@@ -853,67 +871,70 @@ pub fn map(
     let land: Vec<bool> = elev.iter().map(|&z| f64::from(z) > sea).collect();
 
     // Temperature and humidity.
-    let (t_land, h_land, t_sea, (e_lo, e_hi, w_thr, w_noise, w_cap), by_class) = match climate {
-        Some(c) => {
-            let co = coords(c, g.l1, placement);
-            let up = |v: Vec<f32>| {
-                super::resample(
-                    &Field {
-                        grid: g.l1.clone(),
-                        data: v,
-                    },
-                    l2,
-                    false,
-                )
-            };
-            // The class's rules are not blended across a border: the nearest L1 cell's.
-            let near = |v: Vec<f32>| {
-                super::resample(
-                    &Field {
-                        grid: g.l1.clone(),
-                        data: v,
-                    },
-                    l2,
-                    true,
-                )
-            };
-            (
-                up(co.t_land),
-                up(co.h_land),
-                up(co.t_sea),
+    let (t_land, h_land, (h_wet, class), t_sea, (e_lo, e_hi, w_thr, w_noise, w_cap), by_class) =
+        match climate {
+            Some(c) => {
+                let co = coords(c, g.l1, placement);
+                let up = |v: Vec<f32>| {
+                    super::resample(
+                        &Field {
+                            grid: g.l1.clone(),
+                            data: v,
+                        },
+                        l2,
+                        false,
+                    )
+                };
+                // The class's rules are not blended across a border: the nearest L1 cell's.
+                let near = |v: Vec<f32>| {
+                    super::resample(
+                        &Field {
+                            grid: g.l1.clone(),
+                            data: v,
+                        },
+                        l2,
+                        true,
+                    )
+                };
                 (
-                    near(co.e_lo),
-                    near(co.e_hi),
-                    near(co.w_thr),
-                    near(co.w_noise),
-                    near(co.w_cap),
-                ),
-                co.by_class,
-            )
-        }
-        None => {
-            let t: Vec<f32> = (0..n)
-                .map(|k| {
-                    let j = k / w;
-                    let lat = l2.band_lat_deg(j as u32);
-                    thermal_plain(28.0 - 0.55 * lat.abs()) as f32
-                })
-                .collect();
-            (
-                t.clone(),
-                vec![2.5; n],
-                t,
+                    up(co.t_land),
+                    up(co.h_land),
+                    (up(co.h_wet), near(co.class)),
+                    up(co.t_sea),
+                    (
+                        near(co.e_lo),
+                        near(co.e_hi),
+                        near(co.w_thr),
+                        near(co.w_noise),
+                        near(co.w_cap),
+                    ),
+                    co.by_class,
+                )
+            }
+            None => {
+                let t: Vec<f32> = (0..n)
+                    .map(|k| {
+                        let j = k / w;
+                        let lat = l2.band_lat_deg(j as u32);
+                        thermal_plain(28.0 - 0.55 * lat.abs()) as f32
+                    })
+                    .collect();
                 (
-                    vec![-2.0; n],
-                    vec![2.0; n],
-                    vec![f32::NAN; n],
-                    vec![1.0; n],
-                    vec![NO_CAP; n],
-                ),
-                Value::Null,
-            )
-        }
-    };
+                    t.clone(),
+                    vec![2.5; n],
+                    (vec![2.5; n], vec![f32::NAN; n]),
+                    t,
+                    (
+                        vec![-2.0; n],
+                        vec![2.0; n],
+                        vec![f32::NAN; n],
+                        vec![1.0; n],
+                        vec![NO_CAP; n],
+                    ),
+                    Value::Null,
+                )
+            }
+        };
     let mut temperature = vec![0f32; n];
     let mut vegetation = vec![0f32; n];
     for k in 0..n {
@@ -963,13 +984,17 @@ pub fn map(
     let q_ero = Quantile::new(&r.reference.erosion).below(e6 - 1e-3);
     let mut erosion = vec![f32::NAN; n];
     let mut wet_cells = 0u64;
+    let mut wet_by_class = [0u64; 32];
     for k in 0..n {
         if !land[k] {
             continue;
         }
         let u = f64::from(u_relief[k]);
         let mut e = q_ero.at(1.0 - u);
-        let wet = unit((f64::from(h_land[k]) + p.humidity_shift - p.wetland_humidity) / 1.5);
+        // The climate's own wetness, not the class's band (Dfc's rule lifts every Dfc cell to 3.05,
+        // which made all of its flat lowland wet: 66 % of the test planet's Dfc columns on swamp,
+        // 2026-10-03). ledger: BIO-066
+        let wet = unit((f64::from(h_wet[k]) + p.humidity_shift - p.wetland_humidity) / 1.5);
         let flat = unit((p.wetland_flat_share - u) / p.wetland_flat_share);
         let low = unit(1.0 - (f64::from(elev[k]) - sea) / p.wetland_low_m);
         let thawed = f64::from(t_land[k]) + p.temperature_shift >= 1.0;
@@ -977,6 +1002,9 @@ pub fn map(
         if thawed && s > 0.15 {
             e = e6 + 0.01 + (0.95 - e6 - 0.01) * unit((s - 0.15) / 0.6);
             wet_cells += 1;
+            if class[k].is_finite() {
+                wet_by_class[(class[k] as usize).min(31)] += 1;
+            }
         }
         // The class's own limits (EF: no packed-ice glacial chasm on barren polar desert).
         erosion[k] = (e as f32).clamp(e_lo[k], e_hi[k].max(e_lo[k]));
@@ -1039,6 +1067,12 @@ pub fn map(
         "koppen_bands": by_class,
         "window_cells": k,
         "wetland_cells": wet_cells,
+        "wetland_cells_by_class": wet_by_class
+            .iter()
+            .enumerate()
+            .filter(|&(_, &c)| c > 0)
+            .map(|(i, &c)| (koppen::CODES[i].to_owned(), json!(c)))
+            .collect::<serde_json::Map<String, Value>>(),
         "land_cells_l2": land_cells,
         "land_shares": {
             "temperature": shares(&temperature, &land, &bands.temperature, false),
@@ -1315,6 +1349,17 @@ mod tests {
         classes: [&str; 4],
         glaciated: [bool; 4],
     ) -> (Mapped, usize) {
+        fixture_dfc_ai(params, table, classes, glaciated, 1.2)
+    }
+
+    /// As [`fixture_of`], with the Dfc quarter's aridity index P/PET given.
+    fn fixture_dfc_ai(
+        params: &BiomeParams,
+        table: &Placement,
+        classes: [&str; 4],
+        glaciated: [bool; 4],
+        dfc_ai: f32,
+    ) -> (Mapped, usize) {
         // C = 1,536: L1 96 × 32 (rows from z = −256, the multiple of 64 past the Lambert pole at
         // 244.5), so rows 8–23 are land between two seas.
         let c = 1536u32;
@@ -1360,7 +1405,7 @@ mod tests {
         let ai = field(&|i, _| match quarter(i) {
             "Af" => 2.5,
             "BWh" => 0.03,
-            "Dfc" => 1.2,
+            "Dfc" => dfc_ai,
             "EF" => 10.0,
             _ => 1.0,
         });
@@ -1751,6 +1796,31 @@ mod tests {
         assert!(
             t.note["wetland_cells"].as_u64().unwrap() < wet,
             "a smaller flat share"
+        );
+    }
+
+    /// The wetlands read the climate's own wetness, not the band a class's humidity rule lifts it
+    /// to: Dfc's rule puts every Dfc cell at band 3.05 or more (vanilla's taiga humidity), which
+    /// before 2026-10-03 made all of its flat lowland count as wet, so a dry subarctic plain
+    /// (P/PET 0.6, band 2.3) became swamp; a wet one (P/PET 3) still has its wetlands.
+    #[test]
+    fn wetlands_follow_the_climate_not_the_class_band() {
+        let table = placement::builtin();
+        let low = BiomeParams {
+            wetland_low_m: 600.0,
+            ..BiomeParams::default()
+        };
+        let dfc = |ai: f32| {
+            let (m, _) = fixture_dfc_ai(&low, table, ["Af", "BWh", "Dfc", "ET"], [false; 4], ai);
+            m.note["wetland_cells_by_class"]["Dfc"]
+                .as_u64()
+                .unwrap_or(0)
+        };
+        assert_eq!(dfc(0.6), 0, "a dry Dfc plain has no wetland");
+        assert!(dfc(3.0) > 0, "a wet Dfc plain keeps its wetlands");
+        assert!(
+            humidity_of_aridity(0.6) < 3.05 - 0.5,
+            "the dry case sits well under the band Dfc's rule lifts it to"
         );
     }
 

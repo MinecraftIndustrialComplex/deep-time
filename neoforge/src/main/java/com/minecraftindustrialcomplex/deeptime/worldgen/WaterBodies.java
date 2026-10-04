@@ -26,8 +26,11 @@ import net.minecraft.world.level.material.Fluids;
  *   <li><b>River</b> columns are cut (or filled) to the channel's bed, water from the bed to the
  *       channel's top, air above: gravel on the bed of a narrow channel, sand on a wide one,
  *       never over air.</li>
- *   <li><b>Lake</b> columns fill the air from the lake's top down to the ground, as P0-13's pass
- *       did; a cave under the lake bed is plugged, and grass left under the water becomes dirt.
+ *   <li><b>Lake</b> columns are cut (or filled) to the lake's bed like a river's channel: the
+ *       generated ground that stands in the water's range or over its top is removed (the
+ *       density's ground between noise-cell corners can stand a block or two above the rule's), the
+ *       air is filled with water from the top down; a cave under the lake bed is plugged, and grass
+ *       left under the water becomes dirt.
  *       Where the climate freezes the lake ({@link LakeIce}: the mean annual temperature at the
  *       column is below the preset's {@code hydro.lake_freeze_mean_c}) its top water block is
  *       ice, whatever the biome; {@link LakeFreeze} keeps the other lake columns open.</li>
@@ -301,17 +304,29 @@ public final class WaterBodies {
                     }
                     case LAKE -> {
                         int t = Math.min(col.top(), maxY), bed = col.bed();
+                        // The generated ground between noise-cell corners can stand a block or two
+                        // above the rule's `ground` (the density's scale differs from corner to
+                        // corner, TerrainScale): in a lake a block deep it reached the water's top
+                        // and the column came out dry, flush with the lake (22 % of one test
+                        // planet's lake columns, 2026-10-03). A lake column is cut to its bed, as a
+                        // river's channel is: the ground over the top goes, the ground in the
+                        // water's range becomes water.
+                        for (int y = Math.max(g, t); y > t; y--)
+                            if (!chunk.getBlockState(pos.set(x, y, z)).isAir()) {
+                                chunk.setBlockState(pos, AIR, false);
+                                cut++;
+                            }
                         int y = t;
                         for (; y >= minY && y > bed; y--) {
                             BlockState s = chunk.getBlockState(pos.set(x, y, z));
                             if (!open(s))
-                                break;
+                                cut++;
                             if (!s.is(Blocks.WATER)) {
                                 chunk.setBlockState(pos, WATER, false);
                                 water++;
                             }
                         }
-                        // The loop stopped on the lake's bed or on the first ground: the water is above it.
+                        // The loop ended on the lake's bed (the water is above it).
                         shielded += shield(masks, lx, lz, y + 1, t, minY, maxY);
                         // A frozen lake: ice on its water, whatever the biome.
                         if (lakeIce != null && y < t && t >= minY && lakeIce.frozen(x, z)

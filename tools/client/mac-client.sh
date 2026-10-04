@@ -3,7 +3,7 @@
 #
 # The Mac half of tools/client/mac-screenshots.sh (run that, on the laptop; never this directly).
 # Runs ON Ben's M6 Mac mini from the repo root, inside `tools/remote/mac.sh --no-sync --server`,
-# so Deep Time's server lock is held for the whole run (the client starts an integrated server).
+# so the whole run is one server job of the admission tool (the client starts an integrated server).
 #
 # Boots the real NeoForge 1.21.1 client -- ModDevGradle's own dev launch (build/moddev/runClient.sh,
 # written by `./gradlew createClientLaunchScript`): Deep Time from this checkout's build output,
