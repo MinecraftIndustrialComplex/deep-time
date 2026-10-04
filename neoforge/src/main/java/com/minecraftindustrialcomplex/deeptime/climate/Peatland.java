@@ -3,12 +3,6 @@ package com.minecraftindustrialcomplex.deeptime.climate;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import net.minecraft.core.Holder;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.tags.TagKey;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.biome.Climate;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -23,7 +17,7 @@ import java.util.Set;
  * ground to the swamp band (E6) in exactly the regions of the pack that answer there with a
  * peatland biome, found by asking the pack's own biome source at the cold wetland's climate, never by
  * a biome name: a peatland biome is one the NeoForge tags call both a swamp ({@code c:is_swamp}) and
- * cold ({@code c:is_cold/overworld} or {@code c:is_snowy}) ({@link #isPeatland}). Biomes O' Plenty's
+ * cold ({@code c:is_cold/overworld} or {@code c:is_snowy}) ({@link PeatlandProbe#isPeatland}). Biomes O' Plenty's
  * bog and muskeg are; vanilla's and Terralith's swamps are not.
  *
  * <p>The verdict is per <em>region</em> (a TerraBlender region answers differently from another:
@@ -62,19 +56,10 @@ public record Peatland(double erosion, List<String> regions, List<String> biomes
         return regions.contains(region == null ? NO_TABLE : region);
     }
 
-    /** A swamp and cold: the tags say so, whatever the biome's name or mod. */
-    public static boolean isPeatland(Holder<Biome> b) {
-        return b.is(tag("is_swamp")) && (b.is(tag("is_cold/overworld")) || b.is(tag("is_snowy")));
-    }
-
-    private static TagKey<Biome> tag(String path) {
-        return TagKey.create(Registries.BIOME, ResourceLocation.fromNamespaceAndPath("c", path));
-    }
-
     /** What the pack's biome source answers in one region: the peatland biome's id there, or null. */
     @FunctionalInterface
     public interface Probe {
-        String peatlandAt(String region, Climate.TargetPoint point);
+        String peatlandAt(String region, double temperature, double humidity, double continentalness, double erosion, double weirdness);
     }
 
     /**
@@ -114,7 +99,7 @@ public record Peatland(double erosion, List<String> regions, List<String> biomes
                     for (double c : conts)
                         for (double w : weirds) {
                             all++;
-                            String b = probe.peatlandAt(region, Climate.target((float) t, (float) h, (float) c, (float) erosion, 0f, (float) w));
+                            String b = probe.peatlandAt(region, t, h, c, erosion, w);
                             if (b != null) {
                                 hit++;
                                 here.add(b);
