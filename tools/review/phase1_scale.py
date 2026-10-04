@@ -42,18 +42,15 @@ REGION = 2048
 C = 32768
 
 
-def vm(cmd, flags=(), pulls=(), log=None):
-    argv = [MAC, *flags]
-    for p in pulls:
-        argv += ["--pull", p]
-    argv += ["--", cmd]
-    t0 = time.time()
-    r = subprocess.run(argv, cwd=REPO, capture_output=True, text=True, errors="replace")
-    out = r.stdout + r.stderr
+def vm(cmd, flags=(), pulls=(), log=None, kind="auto", name="scale"):
+    """Detached on the VM (tools/review/phase1_detach.py), so a dropped ssh session does not lose the job."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import phase1_detach
+    out, rc, secs = phase1_detach.run(name, cmd, flags=flags, pulls=pulls, kind=kind)
     if log:
         os.makedirs(os.path.dirname(log), exist_ok=True)
         open(log, "w").write(out)
-    return r.returncode, out, time.time() - t0
+    return rc, out, secs
 
 
 def chosen(a):
@@ -79,7 +76,7 @@ def step_presets(a):
 
 
 def step_bake(a):
-    build, out, _ = vm("cargo build --release -q -p deeptime-cli -p deeptime-inspect", log=os.path.join(OUT, "logs", "build.log"))
+    build, out, _ = vm("cargo build --release -q -p deeptime-cli -p deeptime-inspect", log=os.path.join(OUT, "logs", "build.log"), kind="cargo:build", name="scale-build")
     if build:
         print(out[-600:])
         return False
@@ -90,7 +87,7 @@ def step_bake(a):
         cmd = (f"[ -f {man} ] || target/release/deeptime run --preset {WORK}/preset-h{m}.json --start scattered_continents "
                f"--length-myr 500 --threads 8 --out {WORK}/h{m}/planet/deeptime > {WORK}/bake-h{m}.log 2>&1; "
                f"tail -3 {WORK}/bake-h{m}.log 2>/dev/null; [ -f {man} ]")
-        rc, out, secs = vm(cmd, log=os.path.join(OUT, "logs", f"bake-h{m}.log"))
+        rc, out, secs = vm(cmd, log=os.path.join(OUT, "logs", f"bake-h{m}.log"), kind="sim:earthlike_quick_32k:8t", name=f"scale-bake-h{m}")
         print(f"bake {lab}: exit {rc} in {secs:.0f} s")
         return rc == 0
 
@@ -119,7 +116,7 @@ def step_render(a):
     for lab, m in chosen(a):
         cmd = f"WORK={WORK} tools/review/phase1-scale-one.sh {m} {region['cx']} {region['cz']} {REGION // 2}"
         rc, out, secs = vm(cmd, flags=["--server"], pulls=[f"review/out/phase1/scale/h{m}-tilt.png", f"review/out/phase1/scale/h{m}-flat.png"],
-                           log=os.path.join(OUT, "logs", f"render-h{m}.log"))
+                           log=os.path.join(OUT, "logs", f"render-h{m}.log"), name=f"scale-render-h{m}")
         print(f"render {lab}: exit {rc} in {secs:.0f} s")
         ok &= rc == 0 and os.path.exists(os.path.join(OUT, f"h{m}-tilt.png"))
     return ok
