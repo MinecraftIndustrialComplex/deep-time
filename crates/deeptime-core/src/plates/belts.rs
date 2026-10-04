@@ -929,10 +929,12 @@ mod tests {
         fx.preset.tectonics.mantle_flow_mm_yr = 0.0;
         let k = fx.preset.tectonics.clone();
         let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(40.0));
-        // The continent spans two thirds of the converging half of the boundary (y > 0.5), on
-        // both plates; the ocean floor is 100 Myr old, so its slab is heavy.
+        // The continent spans most of the converging half of the boundary (y > 0.2, all but the
+        // ends near the rotation's poles), on both plates; the ocean floor is 100 Myr old, so
+        // its slab is heavy. (With a continent on only part of the front the slab on the rest
+        // swings the plate about the collision, which then opens: no stall, and rightly so.)
         for (s, &p) in st.samples.iter_mut().zip(fx.geo.points()) {
-            if p.y > 0.5 {
+            if p.y > 0.2 {
                 s.kind = CONTINENTAL;
                 s.pools = continental_column();
                 s.thickness_m = s.pools.iter().sum();
@@ -987,7 +989,9 @@ mod tests {
         let broke = slab_km
             .iter()
             .position(|&km| km < 0.5 * k.slab_depth_km)
-            .expect("the blocked slab never broke off");
+            .unwrap_or_else(|| {
+                panic!("the blocked slab never broke off: fired at {fired_at}, slab {slab_km:?}, convergence {conv:?}")
+            });
         assert!(
             2.0 * (broke + 1) as f64 <= k.slab_breakoff_myr + 2.0,
             "broke after {broke} steps: {slab_km:?}"

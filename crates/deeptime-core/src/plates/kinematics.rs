@@ -5,7 +5,8 @@
 //! A plate's motion is its angular-velocity vector Ω = ω·w (rad/yr) in the mantle frame. Every
 //! step turns each of its groups by the rotation of angle |Ω|·δt about Ω/|Ω|. Ω itself comes from
 //! the force balance (`forces.rs`), towards which it relaxes each step; a speed guard
-//! ([`cap_speed`], `max_plate_speed_mm_yr`) is reported whenever it binds.
+//! ([`guard_speed`] on the plate's own fastest point, `max_plate_speed_mm_yr`) is reported
+//! whenever it binds; [`cap_speed`] caps the rotation itself (a weld's mixed motion).
 
 use glam::{DQuat, DVec3};
 
@@ -86,6 +87,44 @@ pub fn cap_speed(omega: DVec3, norm: &Norm, v_max_mm_yr: f64) -> DVec3 {
     if w > max { omega * (max / w) } else { omega }
 }
 
+/// Each plate's reach from its pole: the largest sin(angle) between the axis of `omega[p]` and a
+/// visible sample of plate `p` at the positions `pos`, so that the plate's fastest point moves at
+/// |Ω| R × reach (0 for a plate with no rotation or no visible sample).
+pub fn reach(state: &PlateState, pos: &[DVec3], omega: &[Option<DVec3>]) -> Vec<f64> {
+    let axes: Vec<Option<DVec3>> = omega
+        .iter()
+        .map(|w| w.and_then(|w| w.try_normalize()))
+        .collect();
+    let mut out = vec![0.0f64; omega.len()];
+    for (i, s) in state.samples.iter().enumerate() {
+        if s.is_hidden() {
+            continue;
+        }
+        let p = state.plate_of(i) as usize;
+        if let Some(Some(a)) = axes.get(p) {
+            let r = a.cross(pos[i]).length();
+            if r > out[p] {
+                out[p] = r;
+            }
+        }
+    }
+    out
+}
+
+/// The speed guard (`max_plate_speed_mm_yr`; ledger PLT-022): scales Ω down so the plate's fastest
+/// point (its `reach` from the pole, [`reach`]) moves at no more than `v_max`; returns the rotation
+/// and whether the guard bound. A plate spinning about a pole on itself is held by the speed of
+/// its own rim, not by the speed the rotation would have 90° away.
+pub fn guard_speed(omega: DVec3, reach: f64, norm: &Norm, v_max_mm_yr: f64) -> (DVec3, bool) {
+    let max = norm.omega_of_speed(v_max_mm_yr);
+    let w = omega.length() * reach.clamp(0.0, 1.0);
+    if w > max {
+        (omega * (max / w), true)
+    } else {
+        (omega, false)
+    }
+}
+
 /// An Euler pole and angular speed giving speed `v_mm_yr` at `centroid` (the pole is random but
 /// at least 30° from the centroid, so the plate does not merely spin): the earlier motion that
 /// ages the starting ocean floor (`init.rs`).
@@ -139,6 +178,12 @@ mod tests {
         let fast = DVec3::Z * norm.omega_of_speed(300.0);
         let capped = cap_speed(fast, &norm, 100.0);
         assert!((norm.speed_mm_yr(capped, DVec3::X) - 100.0).abs() < 1e-9);
+        // The guard reads the plate's own fastest point: a plate reaching 30° from its pole
+        // moves at half the sphere's speed, so it is held only above twice the guard there.
+        let (w, bound) = guard_speed(fast, 0.5, &norm, 100.0);
+        assert!(bound && (norm.speed_mm_yr(w, DVec3::X) * 0.5 - 100.0).abs() < 1e-9);
+        let slow = DVec3::Z * norm.omega_of_speed(180.0);
+        assert_eq!(guard_speed(slow, 0.5, &norm, 100.0), (slow, false));
         let mut rng = SplitMix64::new(3);
         let m = random_motion(&mut rng, DVec3::Y, 40.0, &norm);
         assert!((norm.speed_mm_yr(m, DVec3::Y) - 40.0).abs() < 1e-6);
