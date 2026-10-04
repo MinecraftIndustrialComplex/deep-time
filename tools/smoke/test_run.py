@@ -57,6 +57,18 @@ class GenerationCheck(unittest.TestCase):
         self.assertEqual([r[0] for r in steps.failed], ["[deeptime] progress lines at most 5 s apart"])
 
 
+class ProcessRss(unittest.TestCase):
+    def test_reads_vmrss_from_proc_without_ps(self):
+        root = tempfile.mkdtemp()
+        os.makedirs(os.path.join(root, "42"))
+        with open(os.path.join(root, "42", "status"), "w") as f:
+            f.write("Name:\tjava\nVmHWM:\t 9999 kB\nVmRSS:\t  1234 kB\n")
+        self.assertEqual(run.process_rss_kb(42, proc_root=root), 1234)
+
+    def test_this_process_has_a_size(self):
+        self.assertGreater(run.process_rss_kb(os.getpid()) or 0, 0)
+
+
 class ProbeConsistency(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
