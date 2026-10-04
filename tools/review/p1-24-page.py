@@ -48,7 +48,7 @@ def main() -> int:
     page = f"""<!doctype html><html lang=en><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <title>Faster Create World</title>
-<meta name=description content="P1-24: what each faster quick mode candidate costs in planet quality, on a mid-range PC profile.">
+<meta name="description" content="P1-24: what each faster quick mode candidate costs in planet quality, on a mid-range PC profile.">
 <style>
 :root{{--bg:#fafafa;--fg:#1c1c1f;--muted:#666;--card:#fff;--line:#ddd;--accent:#4c5fd7}}
 @media (prefers-color-scheme:dark){{:root:not([data-theme=light]){{--bg:#15161a;--fg:#ececef;--muted:#9a9aa3;--card:#1e1f24;--line:#2d2e35;--accent:#8ea2ff}}}}

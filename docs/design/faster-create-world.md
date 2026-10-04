@@ -9,7 +9,27 @@ build it"). The decisions log of 2026-10-01 still holds: features land first, op
 Statements are marked **measured** (a run made for this note), **read** (from the code or a
 document) or **inferred**.
 
-{{SUMMARY}}
+## Summary
+
+- **Today, on a mid-range PC** (6 cores, 16 GB; section 1): a quick 16k planet takes **about 6
+  minutes for 500 Myr and 10 minutes for 1,000 Myr**, peak 4.2–5.5 GiB. Both starts cost the same.
+  The coupled stage (plates, climate, surface, volcanoes, structure) is 80–90 % of it.
+- **The full preset does not fit a 16 GB PC**: 7.7–8.9 GiB at 500 Myr, 9.5 GiB at 1,000 Myr; it was
+  killed for lack of memory twice on the 6 GiB profile. Given the memory, it takes 21–22 minutes
+  (500 Myr) and 42 minutes (1,000 Myr).
+- **The memory cap under-counts**: the run's own accounting stays under its 4 GiB cap while the
+  process holds 1.5 GiB (quick) to 5 GiB (full) more, so the editor's estimate, refusal and
+  low-memory warning cannot be trusted. This needs fixing whatever Ben chooses.
+- **Options:**
+  - (a) an "express" preset family: 3.0× faster (115 s), with rounder coasts and fewer islands;
+    4-Myr steps alone give 1.6× and look like today's planets;
+  - (b) shipped ready planets: instant, ~45 MB each, but fixed and re-baked every release;
+  - (c) a background planet pool: instant from the second world on, 13.5 minutes of 2 low-priority
+    threads to refill;
+  - (e) optimisation passes: no quality cost, an uncertain gain.
+- **Recommendation: (a) + (c2)**, that is express now (2–3 days) and the planet pool next (4–6
+  days), plus the memory-accounting fix. Pre-made planets are not recommended: they give up the
+  player's own planet and add upkeep each release. Optimisation stays the planned later pass.
 
 ## 1. What a player waits for today
 
@@ -28,9 +48,9 @@ The player's PC is a cgroup scope on the test VM (`tools/review/p1-24-profile.sh
 - Each run records wall time, CPU time, per-stage seconds (the run's own `timings` line), its
   resident memory every 2 s (`mem.log`), the scope's peak, how long its threads waited for a CPU
   (`cpu.pressure`) and the VM's load.
-- **The box is shared.** The VM (AMD EPYC, D32as_v7) ran other agents' jobs beside these, at a load of
-  24 to 39 on 32 threads. The pinned CPUs keep that out of the run mostly: the threads waited
-  9 to 30 s for a CPU in a ~350 s run. Memory bandwidth and caches are still shared, so these
+- **The box is shared.** The VM (AMD EPYC, D32as_v7) ran other agents' jobs beside these, at a mean load of
+  21 to 41 on 32 threads. The pinned CPUs keep that out of the run mostly: the threads waited
+  9 to 30 s for a CPU in a ~350 s quick run, 80 to 91 s in a ~1,300 s full run. Memory bandwidth and caches are still shared, so these
   times are a little pessimistic.
 - **A desktop is faster per core.** A current desktop core (e.g. a Ryzen 5 7600 or Core i5-13400 at
   4.6 to 5.1 GHz) is roughly 1.2 to 1.4 times the VM's per-core speed (inferred, from the clock
@@ -79,7 +99,7 @@ end, while its accounting said 3.4 GiB and pushed 1.4 GiB of history to disk.
 ### 1.3 Findings
 
 1. **A quick planet takes about 6 minutes for 500 Myr and 10 minutes for 1,000 Myr** on a 6-core PC
-   (the coupled stage costs ~0.55 s per Myr; deposits, young, amplify and bake add a fixed ~65 s).
+   (the coupled stage costs ~0.5 s per Myr; deposits, young, amplify and bake add a fixed ~65 s).
    On a fast current desktop, divide by 1.2–1.4 (inferred): about 4–5 and 7–8 minutes. The two starts
    cost the same.
 2. **The full preset does not fit a 16 GB PC.** It needs 8.9 GiB resident at 500 Myr and was killed
@@ -97,7 +117,7 @@ end, while its accounting said 3.4 GiB and pushed 1.4 GiB of history to disk.
 4. **Cores help less than expected.** 2 → 4 → 6 cores: 812 → 418 → 349 s. Past 4 cores the run gains
    1.2× for 1.5× the cores; about 5.4 of its 11 threads are busy on average (535 % CPU). A
    12-core PC would gain little over 6 (inferred).
-5. **The box was shared.** The runs' threads waited 9–30 s for a CPU (cgroup `cpu.pressure`) and the
+5. **The box was shared.** The runs' threads waited 9–30 s (quick) and 80–91 s (full) for a CPU (cgroup `cpu.pressure`) and the
    two runs of the same planet differ by 7 % (349 and 372 s).
 
 ## 2. Option (a): a faster quick mode
@@ -126,12 +146,27 @@ change (the `quality` section of the matrix; baseline 349 s):
 - On a 1,000-Myr history the coupled stage doubles and the tail does not, so express would gain
   more there (inferred: ~600 s → ~180 s).
 
-**Quality.** The pictures are on the review page ({{PAGE}}): for each candidate, the Create World
+**Quality.** The pictures are on the review page (private: https://spacesheep.dev/@benmac/deeptime-p1-24): for each candidate, the Create World
 screen's last frame, the whole planet hill-shaded, its most rugged and its most coastal
 1024-block squares. A coarser grid or a longer step changes the whole history, so each candidate is
 a different planet: the comparison is of character, not places.
 
-{{QUALITY}}
+**What the pictures show** (Claude's reading of the review page; Ben judges):
+
+- **Ground level hardly changes.** In the most rugged and the most coastal 1024-block squares,
+  every candidate has the amplifier's ridges, gullies and valley lines. The block-scale character
+  comes from the L3 amplifier, which none of the candidates touches.
+- **The coarser L1 grid (l1r32, express) shows at map scale.** Continents are rounder with simpler
+  coastlines, there are fewer small islands and island arcs, plains are broader and flatter, and
+  the stair-steps on the sea floor (the L1 lattice the grid audit noted) are twice as large, 32
+  blocks instead of 16. Lake shores in express show the same steps.
+- **4-Myr steps (step4) look like today's planets**: the same coast detail, arcs and shelves.
+- **Land share differs run to run.** Base 0.29, l1r32 0.16, l0-50k 0.17, step4 0.22, len250 0.22,
+  express 0.21. Every candidate is a different planet, and P1-26's ensemble put the quick preset's
+  land at 0.19–0.20 on average, so one run each cannot separate a bias from chance. The l1r32 run
+  is the lowest; a calibration check would settle it.
+- **The keyframe interval changes nothing but the timelapse**: kf100 gives the same planet as base
+  (identical land share, windows and relief). That is a check that the comparison is sound.
 
 **Build cost** (inferred): the preset files and the editor's family choice (½ day), a calibration
 check of the coarse preset against Earth's hypsometry, Köppen shares and deposit counts (P1-17's
@@ -237,11 +272,48 @@ can eat it again.
 
 ## 6. Option (d): combinations, and the recommendation
 
-{{OPTION_D}}
+| Option | Wait for a quick 500-Myr planet on a 6-core PC | Player's own settings | Planet quality | Build (inferred) | Upkeep |
+|---|---|---|---|---|---|
+| Today | 5.8 min (10 min at 1,000 Myr) | yes | — | — | — |
+| (a) express preset | **1.9 min** (about 3 min at 1,000 Myr, inferred) | yes | rounder coasts, fewer islands, coarser sea-floor steps; ground level the same | 2–3 days | a third preset family to keep calibrated |
+| (a′) 4-Myr steps only | 3.6 min | yes | looks like today | 1–2 days (calibration check) | none extra if it becomes quick itself |
+| (b) ready planets | seconds | no: a fixed list | today's quick | 4–6 days | re-bake and upload every release; hosting |
+| (c2) planet pool | **instant** from the second world on (the first still waits) | the pooled planet is random; custom settings run live | today's quick | 4–6 days | none; 2 background threads and 130 MB of disk on the player's PC |
+| (e) optimisation | perhaps 3–4.5 min (1.3–2×, uncertain) | yes | the same | 1–3 weeks | later features can eat the gain |
+| **(d1) = (a) + (c2)** (recommended) | instant (pool) or 1.9 min (express, live) | yes | the player chooses | 6–9 days | as (a) |
+| (d2) = (b) + (c2) | always instant | the first worlds are fixed planets | today's quick | 8–12 days | as (b) |
+
+**Recommendation: (d1).**
+
+- **Express first.** It is cheap, needs no new code, and cuts the live wait 3× for anyone who
+  changes settings. Ben chooses between the full express (3.0×, coarser at map scale) and 4-Myr
+  steps alone (1.6×, no visible cost; it could even become the quick preset itself).
+- **The planet pool next.** Most players take a random planet. The pool gives them today's quality
+  at no wait from the second world on, without fixing the planet in advance or shipping data.
+- **The memory-accounting fix either way** (finding 3). Without it the editor can let a 16 GB PC
+  start a full-preset run that the OS will kill.
+- **Ready planets are not recommended.** They give up what makes Deep Time different (your planet's
+  own history), they must be re-baked for every release while formats are free, and the
+  download-on-demand route needs a public host. If wanted later, the pool's folder format is the
+  same thing, so a modpack such as MIC could pre-fill the pool with a planet or two.
 
 ## 7. Questions for Ben
 
-{{QUESTIONS}}
+1. **Which option to build?** (a, recommended) **(d1): express now, the planet pool next**; (b) the
+   express preset only; (c) the planet pool only; (d) shipped ready planets plus the pool; (e)
+   optimisation passes only, no new mode.
+2. **What is "express"?** (a, recommended) **all four changes** (coarser L1 grid, half the plate
+   points, 4-Myr steps, a keyframe every 100 Myr): 3.0×, coarser coasts at map scale, offered beside
+   quick and full; (b) 4-Myr steps only, 1.6× and no visible cost, as a separate choice; (c) 4-Myr
+   steps made the quick preset itself, so every quick planet gets 1.6× after a calibration check.
+3. **The memory accounting** (finding 3). (a, recommended) **Fix it now as its own task**: count the
+   working sets the run misses, check the estimate against the measured peaks of this note, and have
+   the editor warn that full needs about 9 GiB free; (b) only add the warning for full now and fix
+   the accounting in the optimisation pass.
+4. **When does the pool refill?** (a, recommended) **Whenever the game is open**, 2 threads at the
+   lowest priority, skipped while a world is being created or when less than 6 GiB is free, with a
+   setting to turn it off; (b) only on the title screen and other menus (no load during play, but it
+   rarely gets the 13 minutes it needs).
 
 ## 8. What was built for this note
 
