@@ -3885,7 +3885,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Bradley, D. C. (2008). Passive margins through earth history. Earth-Science Reviews 91(1-4):1-26.
 - DOI or URL: 10.1016/j.earscirev.2008.08.001.
 - Cited as: "Bradley 2008, Earth-Sci. Rev. 91:1-26".
-- Ledger ids: PLT-160, PLT-167, PLT-207
+- Ledger ids: PLT-160, PLT-167, PLT-207, PLT-260
 - Access: paywalled (abstract not obtainable here).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -4944,7 +4944,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Reference: NOAA National Centers for Environmental Information (2022). ETOPO 2022 15 Arc-Second Global Relief Model. NOAA NCEI.
 - DOI or URL: 10.25921/fd45-gt74 (title and year confirmed through the DataCite API)
 - Cited as: "ETOPO 2022"
-- Ledger ids: ERO-168, HNT-093 (margins and spires task, 2026-10-03)
+- Ledger ids: ERO-168, HNT-093 (margins and spires task, 2026-10-03), PLT-264 (the ocean–continent transition, 2026-10-04: the same transects as the comparison)
 - Access: open access (dataset)
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://doi.org/10.25921/fd45-gt74. File: ETOPO2022.txt.
 - Read so far (by the project): data named
