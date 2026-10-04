@@ -99,6 +99,22 @@ RECORDED_CONFIGS = ["toroidal_world.mixins.json", "toroidal_world.shape.mixins.j
                     "deeptime.tw_dh.mixins.json"]
 
 
+def process_rss_kb(pid, proc_root="/proc"):
+    """Resident set size of `pid` in kB: VmRSS from /proc on Linux (the test VM's nix `ps` does not
+    start there: it wants a newer glibc than Ubuntu's, so the report said 0 MB), `ps` elsewhere."""
+    try:
+        for line in open(f"{proc_root}/{pid}/status"):
+            if line.startswith("VmRSS:"):
+                return int(line.split()[1])
+    except (OSError, ValueError):
+        pass
+    try:
+        r = subprocess.run(["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True)
+    except OSError:
+        return None
+    return int(r.stdout.strip()) if r.stdout.strip().isdigit() else None
+
+
 def load_env(path):
     env = {}
     for line in open(path):
@@ -148,11 +164,10 @@ class Server:
                 self.fatal = line.rstrip()
 
     def rss_now_kb(self):
-        """The JVM's resident set size now (ps works on Linux and macOS), or None."""
+        """The JVM's resident set size now (/proc on Linux, ps on macOS), or None."""
         if self._proc is None or self._proc.poll() is not None:
             return None
-        r = subprocess.run(["ps", "-o", "rss=", "-p", str(self._proc.pid)], capture_output=True, text=True)
-        return int(r.stdout.strip()) if r.stdout.strip().isdigit() else None
+        return process_rss_kb(self._proc.pid)
 
     def done_seconds(self):
         """The server's own "Done (12.345s)!" figure (world loading, after mod loading), or None."""
@@ -176,9 +191,9 @@ class Server:
         # macOS has no /proc: sample the JVM's RSS every 2 s while it runs.
         self._peak_sampled = 0
         while self._proc.poll() is None:
-            r = subprocess.run(["ps", "-o", "rss=", "-p", str(self._proc.pid)], capture_output=True, text=True)
-            if r.stdout.strip().isdigit():
-                self._peak_sampled = max(self._peak_sampled, int(r.stdout.strip()))
+            kb = process_rss_kb(self._proc.pid)
+            if kb:
+                self._peak_sampled = max(self._peak_sampled, kb)
             time.sleep(2)
 
     def wait_for_done(self, timeout):
