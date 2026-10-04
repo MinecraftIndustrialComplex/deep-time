@@ -1186,12 +1186,73 @@ TerraBlender, `compat.terrablender.RegionBiomeSourceMixin`).
   out too) or to `#deeptime:volcanic` alone (kept out, never placed).
 - Without any such biome in the pack (vanilla) every query is answered as before. `/deeptime probe
   biomes` reports the placement against the volcanoes (`census.volcanic`).
+- **Tags added 2026-10-04** (Expanded Ecosphere, after the entries above): `cone` wythers:volcano,
+  wythers:tropical_volcano, wythers:icy_volcano; `crater` wythers:volcanic_crater; `hot_spring_field`
+  wythers:thermal_taiga, wythers:snowy_thermal_taiga, wythers:thermal_taiga_crags, wythers:mud_pools;
+  `lava_field` wythers:savanna_basaltic_incursions; `thermal_caves` wythers:volcanic_chamber. Which of a
+  role's biomes answers is chosen by the biome rules' role rules (next section) before the tag's order.
+
+### Biome rules (decisions log 2026-10-04) and a datapack's overworld
+
+Ben: "Build out support for both so if I install EE it works or if I go w/ terralith it also works". Two
+game-side pieces, no world-data layer of their own:
+
+- **A datapack's overworld** (`data/minecraft/dimension/overworld.json`, as Expanded Ecosphere's built-in
+  datapack `ee_default` ships through Cristel Lib) is the first source vanilla's `WorldDimensions.bake`
+  takes a dimension from, ahead of the world preset and level.dat. Java `worldgen/OverworldOverride` (from
+  `mixin/WorldDimensionsShapeMixin`, before the planet shape) sets it aside when the world's own overworld
+  is a `deeptime:geologic` generator, and gives every `deeptime:geologic` generator whose biome source is
+  `{"type": "minecraft:multi_noise", "preset": "minecraft:overworld"}` that datapack overworld's biome
+  source (its inline biome list) instead; a world whose overworld is not Deep Time's keeps the override.
+  The adopted list is saved with the generator in level.dat.
+- **Rule files**, `data/<ns>/deeptime/biome_rules/<name>.json` (Java `climate/BiomeRuleSet` the format,
+  `climate/BiomeRules` the game side), read from the server's datapacks at a level's first biome query
+  and again after a tag reload. A broken file is logged and skipped. Shape:
+
+  ```json
+  {"requires": ["wythers:ice_cap"],
+   "rules": [{"id": "ice_cap", "ice": true, "keeps": ["#c:is_mountain/peak"],
+              "biomes": ["wythers:ice_cap"], "exclusive": true}]}
+  ```
+
+  `requires` (ids or `#tags`; empty: always): the file is active only when the level's biome source can
+  place one of them. `keep_out` (ids and `#tags`): biomes kept out of the climate search and placed by no rule
+  (a pack's biomes whose slots Deep Time's coordinates reach in the wrong place). Keys starting with `_` are
+  comments, any other unknown key refuses the file. `rules`, tried in order, files in the order of their ids. A rule's keys, all optional
+  but `biomes`: `id`; `biomes` (ids and `#tags`: the candidates; those the source cannot place are
+  dropped, and a rule left with none is dropped); `role` (a volcanic role id: the rule is tried only inside
+  that role's zones, before the role tag's biome; cave roles take no rules); `koppen` (codes or prefixes:
+  `"Cs"` is Csa/Csb/Csc, `"E"` is ET/EF; read from `climate/koppen`, nearest cell); `t_mean_c`, `t_warm_c`,
+  `t_cold_c` and `p_mm` (`{"min", "max"}`, either end optional: the climate at the column's surface,
+  lapsed, from the monthly layers; a world without a climate never matches); `elevation_m` (surface above
+  sea level); `wetland` (`any`, `warm`, `cold`, `none`: `climate/wetland` 1 or 2 where the world has the
+  layer, else wet land in the swamp erosion band E6, cold in Dfc, Dfd, Dsc, Dsd, Dwc and Dwd); `ice` (the
+  ice cover lays ice); `playa` (`playa` above 0, nearest cell); `volcanic` (any volcanic zone holds the
+  column); `rock` (class names: the first horizon of the column's strata within 6 blocks of the surface); `ground`
+  (geology roles, "The geology gate" below: the column's ground has one of them); `in_slot` (true: the source's
+  own climate search with nothing kept out gives one of the rule's candidates, so the rule keeps the pack's own
+  slot; with `exclusive` a gate: the candidates appear in their slots only where the other conditions hold);
+  `replaces` and `keeps` (ids and `#tags`: the rule holds only where the biome the climate search would
+  give is, respectively is not, among them); `exclusive` (true: the candidates are kept out of the climate
+  search, like `#deeptime:volcanic`, and appear only where a rule places them). Ordinary rules apply at
+  the surface (biome depth under 0.2), on land, off river channels. The first rule whose conditions hold
+  and whose search finds a candidate decides: the source's own climate search runs over the rule's
+  candidates alone (every other leaf infinitely far, as for the volcanic keep-out), so the pack's
+  parameter ranges choose among them, out-of-range biomes included.
+- **Shipped files**: `deeptime:peatland` (requires `#deeptime:peatland`; cold wetland takes a member of the
+  tag `#deeptime:peatland`: wythers:fen, wythers:berry_bog, wythers:snowy_bog, wythers:snowy_fen,
+  biomesoplenty:bog, biomesoplenty:muskeg, regions_unexplored:fen, clifftree:bog, all optional) and
+  `deeptime:expanded_ecosphere` (requires wythers:ice_cap or wythers:fen; 19 rules, docs/science/biomes.md,
+  "Expanded Ecosphere and the biome rules") and `deeptime:rock_named` (requires `#deeptime:geology`; the geology
+  gate below). A datapack adds a file, or replaces one by its id.
+- `/deeptime probe biomes` reports what decided each sampled land column (`census.rules`: per rule, per
+  role and the climate search; candidates seen and absent; the checks the GameTests read).
 
 ### The geology gate (decisions log 2026-10-04)
 
-A pack's rock-named biomes stand only on the ground they are named for (Java `worldgen/GeologyGround`,
-`climate/GeologyBiomes`, in the same biome query as the volcanic biomes). No file holds them: the game
-reads `meta/province` (with `notes.bake.meta.provinces.province[i].class`), `surface/class_top`, the
+A pack's rock-named biomes stand only on the ground they are named for: the biome rule file
+`deeptime:rock_named` ("Biome rules" above) with the rule condition `ground`, whose roles Java
+`worldgen/GeologyGround` computes per column. No world-data layer holds them: the game reads `meta/province` (with `notes.bake.meta.provinces.province[i].class`), `surface/class_top`, the
 column's `strata/horizons` stack, `climate/koppen` and the terrain height. A column's **bedrock** is its
 surface rock class, or, where that is loose cover (the rock-class group `deeptime:rock/unconsolidated`:
 saprolite, laterite, till, sand …), the first other class of its stack within 8 blocks of the surface.
@@ -1207,13 +1268,17 @@ Its **roles** (`#deeptime:geology/<role>`, all entries optional):
 | `dry_sedimentary` | bedrock in `deeptime:rock/sedimentary`, Köppen B | terralith:bryce_canyon, painted_mountains, white_mesa, sandstone_valley, desert_canyon |
 | `humid_karst` | bedrock in `deeptime:rock/carbonate`, Köppen A, C or D | terralith:stony_spires |
 
-`#deeptime:geology` holds the seven role tags. Where the climate search's answer is a biome of a role
-tag and the column's ground has none of its roles, it is kept out: the search runs again with every
-leaf of a gated biome whose roles miss the column's ground, and every volcanic leaf, set infinitely far
-(a gated biome that is volcanic too, terralith:basalt_cliffs, counts as allowed on its own ground). On
-its ground the biome answers where the climate search puts it: the gate takes biomes away and never
-adds them. Without such a biome in the pack every query is answered as before. `/deeptime probe biomes`
-reports the rock-named biomes against their ground (`census.geology`).
+`#deeptime:geology` holds the seven role tags. The file has one rule per role:
+`{"id": "<role>", "biomes": ["#deeptime:geology/<role>"], "ground": "<role>", "in_slot": true, "exclusive": true}`.
+So a gated biome is kept out of the climate search, and on land at the surface, off river channels, a column
+whose own slot (the pack's search, nothing kept out) is one of them gets it back where its ground has the role;
+elsewhere the pack's next-nearest biome answers (on land never an ocean or river: the search is repeated with
+water leaves set aside where the kept-out answer would turn land into water). On its ground the biome answers
+where the climate search puts it: the gate takes biomes away and never adds them. A gated biome that is volcanic
+too (terralith:basalt_cliffs) goes at real volcanoes by its role and on its own ground by the rule. The file sorts
+after `deeptime:peatland`, so a rule that places another biome is tried first. Without such a biome in the
+pack the file is inactive and every query is answered as before. `/deeptime probe biomes` reports the
+rock-named biomes against their ground (`census.geology`).
 
 ## `strata/classes.json`
 

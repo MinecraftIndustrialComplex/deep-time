@@ -9,6 +9,7 @@
 #   ./gametest.sh -PextraDatapack=<folder>   one more datapack folder for any profile
 #   ./gametest.sh -PwithTerraBlender plus TerraBlender, Biomes O' Plenty, GlitchCore
 #   ./gametest.sh -PwithEv           plus Excavated Variants and Dynamic Asset Generator
+#   ./gametest.sh -PwithEe           plus Expanded Ecosphere, Cristel Lib, Cloth Config (tools/smoke/profiles/ee.txt)
 #   ./gametest.sh -PgametestOnly=<name>[,<name>…]   only those tests
 #   DEEPTIME_TEST_PLANET_SET="seed=12" ./gametest.sh   the real-planet level on another planet (see below)
 #
@@ -33,6 +34,7 @@ for a in "$@"; do
         -PwithMic) SET=mic ;;
         -PwithTerraBlender) [ "$SET" = standalone ] && SET=terrablender ;;
         -PwithEv) [ "$SET" = standalone ] && SET=ev ;;
+        -PwithEe) [ "$SET" = standalone ] && SET=ee ;;
         -PrunSet=*) SET="${a#-PrunSet=}" ;;
     esac
 done

@@ -42,19 +42,28 @@ use super::params::StructureParams;
 /// Distance (km, block metric) from every cell to the nearest active orogen (collision regime, or
 /// a continental arc); 0 inside one, 3,000 km where there is none.
 pub fn orogen_distance_km(d: &Dims, regime_f: &[f32], crust: &[f32], flags: &[f32]) -> Vec<f32> {
+    distance_to(d, |c| {
+        let reg = regime_f[c] as u8;
+        let cont = crust[c] as u8 == CONTINENTAL;
+        let arc = flags[c] as u32 as u8 & ARC != 0;
+        reg == regime::COLLISION || (cont && (arc || reg == regime::ARC))
+    })
+}
+
+/// Distance (km, block metric) from every cell to the nearest continental arc (an Andean
+/// margin); 0 inside one, 3,000 km where there is none. The foreland of a collision is not
+/// measured from here (the structure stage reads the flexural basin).
+pub fn arc_distance_km(d: &Dims, regime_f: &[f32], crust: &[f32], flags: &[f32]) -> Vec<f32> {
+    distance_to(d, |c| {
+        let cont = crust[c] as u8 == CONTINENTAL;
+        let arc = flags[c] as u32 as u8 & ARC != 0;
+        cont && (arc || regime_f[c] as u8 == regime::ARC)
+    })
+}
+
+fn distance_to(d: &Dims, inside: impl Fn(usize) -> bool) -> Vec<f32> {
     let n = d.cells();
-    let mask: Vec<f32> = (0..n)
-        .map(|c| {
-            let reg = regime_f[c] as u8;
-            let cont = crust[c] as u8 == CONTINENTAL;
-            let arc = flags[c] as u32 as u8 & ARC != 0;
-            if reg == regime::COLLISION || (cont && (arc || reg == regime::ARC)) {
-                1.0
-            } else {
-                0.0
-            }
-        })
-        .collect();
+    let mask: Vec<f32> = (0..n).map(|c| if inside(c) { 1.0 } else { 0.0 }).collect();
     let dist = dist_to_edge(d, &mask);
     dist.iter()
         .zip(&mask)
