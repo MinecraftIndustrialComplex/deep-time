@@ -5862,7 +5862,7 @@ The prototype crate `crates/deeptime-quincuncial` (not shipped) rests on these. 
 ### Lee1976
 - Reference: Lee, L. P. (1976). Conformal Projections Based on Elliptic Functions. Cartographica Monograph 16 (supplement to Canadian Cartographer 13).
 - Cited as: "Lee 1976".
-- Ledger ids: SCL-070
+- Ledger ids: SCL-070, SCL-080 (the conformal cube, seamless-projection survey)
 - Access: not fetched. Read so far: catalogue entry only (via world-projection-options.md).
 
 ### AbramowitzStegun1964
@@ -5882,3 +5882,58 @@ The prototype crate `crates/deeptime-quincuncial` (not shipped) rests on these. 
 - Cited as: "Carlson 1995".
 - Ledger ids: SCL-073
 - Access: arXiv math/9409227 (open); not fetched this session. Read so far: from memory.
+
+## Seamless world projections (SCL-078 to SCL-085), added 2026-10-03 with the seamless-projection survey
+
+The survey `docs/research/notes/seamless-projection-survey.md` and its tools (`tools/research/projection-survey/`) rest on these; nothing shipped does yet. "Sub-agent" means a Sonnet sub-agent of the survey session, whose transcriptions were kept in the session scratchpad (not committed, not in the source library).
+
+### Petroff2021
+- Reference: Petroff, M. A. (2021). A square equal-area map projection with low angular distortion, minimal cusps, and closed-form solutions. ACM Transactions on Spatial Algorithms and Systems 7(4), article 18. doi:10.1145/3460521. arXiv:2008.13670 (v3). Code: Zenodo, doi:10.5281/zenodo.4661351 (`new_projection.py`, CC0 1.0).
+- Cited as: "Petroff 2021".
+- Ledger ids: SCL-083
+- Access: open (arXiv; Zenodo).
+- Read so far (by the project): full text and code read by a sub-agent, 2026-10-03: forward Eqs 1-41, inverse Eqs 47-74, Table 1 (Collignon quincuncial mean omega 0.68 rad, max 1.05; Gringorten 0.52, 1.05; this work 0.54, 0.95), "phi0 was set to this exact value" (3 pi / 8); the inverse ported to numpy and Rust in the survey's tools and Table 1's mean and maximum reproduced. The 2026-10-02 note world-projection-options.md also read §§1-3 and Table 1.
+
+### RoscaPlonka2011
+- Reference: Roşca, D. and Plonka, G. (2011). Uniform spherical grids via equal area projection from the cube to the sphere. Journal of Computational and Applied Mathematics 236(6):1033-1041. doi:10.1016/j.cam.2011.07.009.
+- Cited as: "Rosca & Plonka 2011".
+- Ledger ids: SCL-082
+- Access: paywalled; author preprint (Göttingen, dated 2011-04-14) open.
+- Read so far (by the project): the preprint read in full by a sub-agent, 2026-10-03; Eqs 12-13 (the area-preserving map from the square to the curved square), the inverse (§4) and Eqs 18-20 (inverse Lambert azimuthal) transcribed from page images; beta = sqrt(pi/6).
+
+### CalabrettaGreisen2002
+- Reference: Calabretta, M. R. and Greisen, E. W. (2002). Representations of celestial coordinates in FITS. Astronomy & Astrophysics 395:1077-1122. doi:10.1051/0004-6361:20021327. arXiv:astro-ph/0207413.
+- Cited as: "Calabretta & Greisen 2002".
+- Ledger ids: SCL-082 (QSC, the same map as Rosca & Plonka's)
+- Access: open (arXiv).
+- Read so far (by the project): §5.6 (TSC, CSC, QSC; Eqs 163-185 and the CSC coefficient tables) read by a sub-agent, 2026-10-03, equations confirmed on page images; quoted: QSC's derivation "applies only in the quadrant ... non-differentiable along the diagonals"; CSC's equal-area deviation "+13.7% and -4.1% at the edges of the face".
+
+### ONeillLaubscher1976
+- Reference: O'Neill, E. M. and Laubscher, R. E. (1976). Extended studies of a quadrilateralized spherical cube Earth data base. Naval Environmental Prediction Research Facility, Technical Paper 3-76 (title and report number from memory).
+- Cited as: "O'Neill & Laubscher 1976".
+- Ledger ids: SCL-082
+- Access: not online; not fetched. Read so far: through Calabretta & Greisen 2002 and PROJ `qsc.cpp` (sub-agent).
+
+### Rancic1996
+- Reference: Rančić, M., Purser, R. J. and Mesinger, F. (1996). A global shallow-water model using an expanded spherical cube: gnomonic versus conformal coordinates. Quarterly Journal of the Royal Meteorological Society 122(532):959-982. doi:10.1002/qj.49712253209.
+- Cited as: "Rancic, Purser & Mesinger 1996".
+- Ledger ids: SCL-080
+- Access: paywalled; not read (a sub-agent tried, 2026-10-03). The only open implementation found (CSIRO CCAM `jimcc_m.f90`) is GPL-3 and was not used.
+
+### Moser1965
+- Reference: Moser, J. (1965). On the volume elements on a manifold. Transactions of the American Mathematical Society 120(2):286-294.
+- Cited as: "Moser 1965".
+- Ledger ids: SCL-081
+- Access: not fetched. Read so far: from memory (the flow dx/dt = -grad u / rho_t with Lap u = rho - 1 is the standard textbook form of Moser's argument).
+
+### Thurston1998
+- Reference: Thurston, W. P. (1998). Shapes of polyhedra and triangulations of the sphere. Geometry & Topology Monographs 1:511-549. arXiv:math/9801088.
+- Cited as: "Thurston 1998".
+- Ledger ids: none (the survey's §1: the cone-angle sum and the developing map near a cone point)
+- Access: open (arXiv). Read so far: introduction and §8 read by a sub-agent, 2026-10-03: "the sum of the apex curvatures is 2π times the Euler characteristic".
+
+### DimitrijevicStrobl2025
+- Reference: Dimitrijević, A. and Strobl, P. (2025). Hexahedral projections: a comprehensive review and ranking. ISPRS International Journal of Geo-Information 14(3):122. doi:10.3390/ijgi14030122 (DOI from the journal's pattern, not checked).
+- Cited as: "Dimitrijević & Strobl 2025".
+- Ledger ids: none (the survey's cross-checks: QSC max a/b 1.555, HEALPix 2.430; continuity classes)
+- Access: open. Read so far: the ranking, continuity and distortion sections read by a sub-agent from a Semantic Scholar copy, 2026-10-03.
