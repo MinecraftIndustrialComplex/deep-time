@@ -132,12 +132,12 @@ public final class VolcanicCensus {
                     continue;
                 int qx = QuartPos.fromBlock(x), qy = QuartPos.fromBlock((int) Math.floor(y)), qz = QuartPos.fromBlock(z);
                 Holder<Biome> b = biomes.getNoiseBiome(qx, qy, qz, sampler);
+                String why = VolcanicBiomes.lastDecision();
                 Holder<Biome> p = VolcanicBiomes.plain(() -> biomes.getNoiseBiome(qx, qy, qz, sampler));
                 double near = nearest(sources, x, z, c), out = zones.outsideSurfaceZones(x, z);
                 // A volcanic biome that is also rock-named (Terralith's Basalt Cliffs) may stand on its own ground away
-                // from volcanoes (the geology gate, decisions log 2026-10-04): not counted as volcanic there.
-                int gated = marker.volcanic().gatedRoles(b);
-                if (gated != 0 && b.is(VolcanicBiomes.KEEP_OUT) && (gated & marker.volcanic().geology().rolesAt(x, z)) != 0) {
+                // from volcanoes (the geology gate's rule put it there, decisions log 2026-10-04): not counted as volcanic there.
+                if (b.is(VolcanicBiomes.KEEP_OUT) && GeologyBiomes.byGroundRule(why, marker.volcanic().rules())) {
                     now.columns++;
                     now.onGeologicGround++;
                 } else {

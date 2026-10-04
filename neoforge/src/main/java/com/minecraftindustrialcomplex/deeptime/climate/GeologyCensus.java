@@ -86,8 +86,9 @@ public final class GeologyCensus {
         var biomes = g.getBiomeSource();
         int sea = g.getSeaLevel();
         GeologyGround ground = marker.volcanic().geology();
-        var registry = level.registryAccess().registry(Registries.BIOME);
-        Map<Holder<Biome>, Integer> gated = GeologyBiomes.gated(registry, biomes.possibleBiomes());
+        // One query binds the level's biome rules; the gate is every exclusive rule with a ground condition.
+        biomes.getNoiseBiome(0, QuartPos.fromBlock(sea), 0, sampler);
+        Map<Holder<Biome>, Integer> gated = GeologyBiomes.gated(marker.volcanic().rules());
         int c = t.circumference(), zp = (int) Projection.poleZ(c);
         Side now = new Side(), plain = new Side();
         Map<String, Integer> replaced = new HashMap<>();
@@ -103,6 +104,10 @@ public final class GeologyCensus {
                     continue;
                 int qx = QuartPos.fromBlock(x), qy = QuartPos.fromBlock((int) Math.floor(y)), qz = QuartPos.fromBlock(z);
                 Holder<Biome> b = biomes.getNoiseBiome(qx, qy, qz, sampler);
+                // A volcanic role's biome (Terralith's Basalt Cliffs as a young lava field) is placed by its zone, not
+                // by the climate search: the gate does not apply to it.
+                String why = VolcanicBiomes.lastDecision();
+                boolean byRole = why != null && why.startsWith("role:");
                 Holder<Biome> p = VolcanicBiomes.plain(() -> biomes.getNoiseBiome(qx, qy, qz, sampler));
                 int bx = QuartPos.toBlock(qx) + 2, bz = QuartPos.toBlock(qz) + 2;
                 int roles = gated.isEmpty() ? 0 : ground.rolesAt(bx, bz);
@@ -110,7 +115,10 @@ public final class GeologyCensus {
                     if ((roles & r.bit()) != 0)
                         groundCount[r.ordinal()]++;
                 boolean pOff = tally(plain, p, gated, roles, x, z);
-                tally(now, b, gated, roles, x, z);
+                if (byRole)
+                    now.columns++;
+                else
+                    tally(now, b, gated, roles, x, z);
                 if (b != p)
                     differ++;
                 if (pOff && b != p) {

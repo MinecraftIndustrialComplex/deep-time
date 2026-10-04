@@ -56,6 +56,28 @@ public final class GeologyGround {
         public int bit() {
             return 1 << ordinal();
         }
+
+        /** The role of a tag-path id, or null. */
+        public static Role byId(String id) {
+            for (Role r : values())
+                if (r.id.equals(id))
+                    return r;
+            return null;
+        }
+
+        /** Every role's id, in order. */
+        public static List<String> ids() {
+            return java.util.Arrays.stream(values()).map(r -> r.id).toList();
+        }
+
+        /** The role ids of a bit set, joined by {@code +} ("-" for none), for logs and censuses. */
+        public static String names(int bits) {
+            StringBuilder s = new StringBuilder();
+            for (Role r : values())
+                if ((bits & r.bit()) != 0)
+                    s.append(s.isEmpty() ? "" : "+").append(r.id);
+            return s.isEmpty() ? "-" : s.toString();
+        }
     }
 
     /** The rock groups the roles read (the rock-class registry's {@code groups}). */
