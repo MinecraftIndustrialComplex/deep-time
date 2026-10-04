@@ -153,6 +153,7 @@
     "slab_resistance": 3.0,
     "slab_suction_share": 0.3,
     "edge_energy": 0.1,
+    "collision_buoyancy": 1.0,
     "keel_drag": 3.0,
     "boundary_resistance": 3.0,
     "mantle_flow_mm_yr": 5.0,
