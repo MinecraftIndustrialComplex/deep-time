@@ -1,0 +1,12 @@
+# The standalone set plus Expanded Ecosphere (Ben, decisions log 2026-10-04: "Build out support for both
+# so if I install EE it works or if I go w/ terralith it also works"), for ./gametest.sh -PwithEe and the
+# biome census. Expanded Ecosphere is CC BY-NC-ND 4.0 (its jar's LICENSE: packs may include it unchanged
+# but for its config, with credit): it is downloaded here for testing only, never shipped, edited or
+# redistributed; Deep Time's own compatibility data names its biome ids (data/deeptime/deeptime/biome_rules).
+# In its DEFAULT mode (no TerraBlender) it overrides the overworld dimension through Cristel Lib's built-in
+# datapack ee_default; Deep Time keeps its own generator and takes that dimension's biome list
+# (worldgen/OverworldOverride).
+@include standalone
+expanded-ecosphere  IWfNhdRG   # 3.4.7 for NeoForge 1.21.1 (CC BY-NC-ND 4.0; requires Cristel Lib)
+cristel-lib         Sduz0AWP   # 3.1.7 for NeoForge 1.21.1 (CC BY-NC-ND 4.0; requires Cloth Config)
+cloth-config        izKINKFg   # 15.0.140 (LGPL-3.0-only)
