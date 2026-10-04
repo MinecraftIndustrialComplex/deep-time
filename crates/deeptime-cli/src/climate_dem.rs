@@ -273,15 +273,17 @@ pub fn run(o: &Options) -> CliResult<()> {
     if p.ice_dynamics {
         use deeptime_core::climate::sheet;
         let es = planet.earth_scale;
-        let sx: Vec<f64> = lat
-            .iter()
-            .map(|l| cell_m * l.to_radians().cos().max(0.0) / es)
-            .collect();
+        let (sx, sy): (Vec<f64>, Vec<f64>) = (0..h)
+            .map(|j| {
+                let (a, b) = grid.true_cell_m(j as u32, cell_m);
+                (a / es, b / es)
+            })
+            .unzip();
         let land: Vec<bool> = z.iter().map(|&x| x > 0.0).collect();
         // Tuning overrides (dev): DT_ISO kyr, DT_CALV m/yr, DT_ABL and DT_ACC per m, DT_CELLS.
         let env = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<f64>().ok());
         let cells = env("DT_CELLS").map_or(p.ice_grid_cells as usize, |x| x as usize);
-        let sg = sheet::Grid::new(w, h, &sx, cell_m / es, cells);
+        let sg = sheet::Grid::new(w, h, &sx, &sy, cells);
         let mut sp = sheet::Params::from(&p, gravity);
         if let Some(x) = env("DT_ISO") {
             sp.isostasy_years = x * 1000.0;
@@ -336,7 +338,8 @@ pub fn run(o: &Options) -> CliResult<()> {
             let fine = sg.refine(&st.thick);
             let (mut all, mut ice, mut north_all, mut north_ice) = (0.0, 0.0, 0.0, 0.0);
             for j in 0..h {
-                let wgt = lat[j].to_radians().cos();
+                // True area (equal on the Lambert grid; less on a row reaching past a pole).
+                let wgt = grid.area_share(j as u32);
                 for i in 0..w {
                     let c = j * w + i;
                     if !land[c] {

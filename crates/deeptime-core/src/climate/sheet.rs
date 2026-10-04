@@ -29,6 +29,7 @@
 //!   lake) — without it a sheet grown under a lowered line outlives the line's return (on Earth's
 //!   relief 19 % of the land stayed under ice at the present line after a 1-km lowering).
 
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::ice::{RHO_ICE, RHO_SEA};
@@ -40,8 +41,125 @@ pub const GLEN_N: f64 = 3.0; // ledger: GLA-067
 /// The shortest explicit step the flow is allowed to ask for, years (see `State::step`).
 pub const MIN_STEP_YEARS: f64 = 10.0; // ledger: GLA-073
 
-/// The coarse grid (shared with the per-cell climate, `coarse.rs`).
-pub use super::coarse::Grid;
+/// The coarse grid.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Grid {
+    /// Coarse cells across and down.
+    pub w: usize,
+    pub h: usize,
+    /// Fine cells per coarse cell along each side.
+    pub k: usize,
+    /// Fine grid.
+    pub fw: usize,
+    pub fh: usize,
+    /// Width and height of every coarse row, m (true, Earth-normalized; a row is never narrower
+    /// than a quarter of the equator row's height, so the poles do not stall the time step). On
+    /// the Lambert grid the rows are uneven along a column: a fine row is r·m / cos φ high.
+    pub dx: Vec<f64>,
+    pub dy: Vec<f64>,
+    /// Whether a coarse row holds any planet (a row wholly past a pole holds none: no ice, no
+    /// flux).
+    pub on: Vec<bool>,
+    /// Every coarse row's centre along a column, m from the first row's centre (strictly
+    /// increasing).
+    pub y: Vec<f64>,
+}
+
+impl Grid {
+    /// The coarse grid of a `fw` × `fh` fine grid whose row `j`'s cells are `sx[j]` m wide and
+    /// `sy[j]` m high, about `cells` coarse columns across.
+    pub fn new(fw: usize, fh: usize, sx: &[f64], sy: &[f64], cells: usize) -> Grid {
+        let k = (fw / cells.max(1)).max(1);
+        let (w, h) = (fw.div_ceil(k), fh.div_ceil(k));
+        let rows = |j: usize| j * k..((j + 1) * k).min(fh);
+        // A coarse row is as high as its fine rows together (a row wholly past a pole: 1 µm).
+        let dy_true: Vec<f64> = (0..h)
+            .map(|j| rows(j).map(|r| sy[r]).sum::<f64>())
+            .collect();
+        let on: Vec<bool> = dy_true.iter().map(|&d| d > 0.0).collect();
+        let dy: Vec<f64> = dy_true.iter().map(|&d| d.max(1e-6)).collect();
+        // The equator's row: the lowest on the Lambert grid, and every row's on an even one.
+        let dy_eq = dy[h / 2];
+        let dx = (0..h)
+            .map(|j| {
+                let n = rows(j).len().max(1) as f64;
+                let mean = rows(j).map(|r| sx[r]).sum::<f64>() / n;
+                (mean * k as f64).max(0.25 * dy_eq)
+            })
+            .collect();
+        let mut y = vec![0.0; h];
+        for j in 1..h {
+            y[j] = y[j - 1] + 0.5 * (dy[j - 1] + dy[j]);
+        }
+        Grid {
+            w,
+            h,
+            k,
+            fw,
+            fh,
+            dx,
+            dy,
+            on,
+            y,
+        }
+    }
+
+    /// Block means of a fine field over the cells `pick` accepts (all cells where it accepts none).
+    pub fn coarsen(&self, v: &[f32], pick: &(dyn Fn(usize) -> bool + Sync)) -> Vec<f32> {
+        (0..self.w * self.h)
+            .into_par_iter()
+            .map(|cc| {
+                let (ci, cj) = (cc % self.w, cc / self.w);
+                let (mut s, mut n, mut s_all, mut n_all) = (0.0f64, 0usize, 0.0f64, 0usize);
+                for j in cj * self.k..((cj + 1) * self.k).min(self.fh) {
+                    for i in ci * self.k..((ci + 1) * self.k).min(self.fw) {
+                        let c = j * self.fw + i;
+                        let x = f64::from(v[c]);
+                        if !x.is_finite() {
+                            continue;
+                        }
+                        s_all += x;
+                        n_all += 1;
+                        if pick(c) {
+                            s += x;
+                            n += 1;
+                        }
+                    }
+                }
+                if n > 0 {
+                    (s / n as f64) as f32
+                } else if n_all > 0 {
+                    (s_all / n_all as f64) as f32
+                } else {
+                    0.0
+                }
+            })
+            .collect()
+    }
+
+    /// A coarse field at every fine cell, bilinearly (x wraps; rows clamp).
+    pub fn refine(&self, v: &[f32]) -> Vec<f32> {
+        let k = self.k as f64;
+        (0..self.fw * self.fh)
+            .into_par_iter()
+            .map(|c| {
+                let (i, j) = (c % self.fw, c / self.fw);
+                let x = (i as f64 + 0.5) / k - 0.5;
+                let y = ((j as f64 + 0.5) / k - 0.5).clamp(0.0, (self.h - 1) as f64);
+                let (x0, y0) = (x.floor(), y.floor());
+                let (fx, fy) = (x - x0, y - y0);
+                let i0 = (x0 as i64).rem_euclid(self.w as i64) as usize;
+                let i1 = (i0 + 1) % self.w;
+                let j0 = y0 as usize;
+                let j1 = (j0 + 1).min(self.h - 1);
+                let at = |ii: usize, jj: usize| f64::from(v[jj * self.w + ii]);
+                let top = at(i0, j0) * (1.0 - fx) + at(i1, j0) * fx;
+                let bot = at(i0, j1) * (1.0 - fx) + at(i1, j1) * fx;
+                (top * (1.0 - fy) + bot * fy) as f32
+            })
+            .collect()
+    }
+}
 
 /// The sheet's parameters.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -113,7 +231,7 @@ impl State {
                     .iter()
                     .map(|&x| f64::from(x))
                     .sum();
-                row * g.dx[j] * g.dy
+                row * g.dx[j] * g.dy[j]
             })
             .sum()
     }
@@ -132,7 +250,16 @@ impl State {
         }
         let gamma = 2.0 * p.a * (RHO_ICE * p.gravity).powf(GLEN_N) / (GLEN_N + 2.0);
         let float = RHO_SEA / RHO_ICE;
-        let min_d2 = g.dx.iter().map(|d| d * d).fold(g.dy * g.dy, f64::min);
+        // The shortest distance between neighbouring cell centres, across or along a column.
+        let min_d2 =
+            g.dx.iter()
+                .map(|d| d * d)
+                .chain(
+                    (1..g.h)
+                        .filter(|&j| g.on[j - 1] && g.on[j])
+                        .map(|j| (g.y[j] - g.y[j - 1]) * (g.y[j] - g.y[j - 1])),
+                )
+                .fold(f64::INFINITY, f64::min);
         // The fastest ice (thick, steep margins) is held to the diffusivity an explicit step of
         // `MIN_STEP_YEARS` can carry: the few faces above it would otherwise set every cell's time
         // step (a year or less) for a flux the mass balance bounds anyway.
@@ -156,7 +283,11 @@ impl State {
                 .collect();
             let active: Vec<bool> = (0..h)
                 .map(|j| {
-                    can_grow[j] || has[j] || (j > 0 && has[j - 1]) || (j + 1 < h && has[j + 1])
+                    g.on[j]
+                        && (can_grow[j]
+                            || has[j]
+                            || (j > 0 && has[j - 1])
+                            || (j + 1 < h && has[j + 1]))
                 })
                 .collect();
             if !active.iter().any(|&a| a) {
@@ -191,17 +322,17 @@ impl State {
                             0.0
                         } else {
                             (s[at(i, jn)] + s[at(i + 1, jn)] - s[at(i, js)] - s[at(i + 1, js)])
-                                / (2.0 * (jn - js) as f64 * g.dy)
+                                / (2.0 * (g.y[jn] - g.y[js]))
                         };
                         (gamma * hf.powi(5) * (dsdx * dsdx + dsdy * dsdy)).min(d_cap)
                     } else {
                         0.0
                     };
-                    dfy[c] = if j + 1 < h {
+                    dfy[c] = if j + 1 < h && g.on[j + 1] {
                         let nn = at(i, j + 1);
                         let hf = 0.5 * (thick[c] + thick[nn]);
                         if hf > 0.0 {
-                            let dsdy = (s[nn] - s[c]) / g.dy;
+                            let dsdy = (s[nn] - s[c]) / (g.y[j + 1] - g.y[j]);
                             let dxm = 0.5 * (g.dx[j] + g.dx[j + 1]);
                             let dsdx = (s[at(i + 1, j)] + s[at(i + 1, j + 1)]
                                 - s[at(i - 1, j)]
@@ -234,7 +365,7 @@ impl State {
                 if j + 1 >= h {
                     0.0
                 } else {
-                    -dfy[c] * (s[at(i, j + 1)] - s[c]) / g.dy
+                    -dfy[c] * (s[at(i, j + 1)] - s[c]) / (g.y[j + 1] - g.y[j])
                 }
             };
             let mut new = thick.clone();
@@ -260,7 +391,7 @@ impl State {
                         0.0
                     };
                     let div = (qx(c, j, i) - qx(at(i - 1, j), j, i - 1)) / g.dx[j]
-                        + (qy(c, j, i) * len_n - q_s * len_s) / (g.dx[j] * g.dy);
+                        + (qy(c, j, i) * len_n - q_s * len_s) / (g.dx[j] * g.dy[j]);
                     let above = s[c] - f64::from(f.ela[c]);
                     let acc = p.acc_max * f64::from(f.precip[c]).max(0.0);
                     let b = if above >= 0.0 {
@@ -324,7 +455,7 @@ mod tests {
     /// A flat square continent 2,000 km across at 200 m, the sea around it, 100-km cells.
     fn continent(ela: f32) -> (Grid, Vec<f32>, Vec<f32>, Vec<f32>) {
         let (fw, fh) = (64, 32);
-        let g = Grid::new(fw, fh, &[1.0e5; 32], 1.0e5, 64);
+        let g = Grid::new(fw, fh, &[1.0e5; 32], &[1.0e5; 32], 64);
         let bed: Vec<f32> = (0..fw * fh)
             .map(|c| {
                 let (i, j) = ((c % fw) as i64 - 32, (c / fw) as i64 - 16);
@@ -360,7 +491,7 @@ mod tests {
         assert!(st.depress[16 * 64 + 32] > 0.2 * centre * 0.9 * (RHO_ICE / RHO_MANTLE) as f32);
         // Without a mass balance the flow alone conserves the ice: a dome on land everywhere.
         let (fw, fh) = (64, 32);
-        let g2 = Grid::new(fw, fh, &[1.0e5; 32], 1.0e5, 64);
+        let g2 = Grid::new(fw, fh, &[1.0e5; 32], &[1.0e5; 32], 64);
         let land = vec![200.0f32; fw * fh];
         let dome: Vec<f32> = (0..fw * fh)
             .map(|c| {
@@ -390,7 +521,7 @@ mod tests {
     #[test]
     fn the_flow_scales_with_the_cube_of_gravity() {
         let (fw, fh) = (64, 32);
-        let g = Grid::new(fw, fh, &[1.0e5; 32], 1.0e5, 64);
+        let g = Grid::new(fw, fh, &[1.0e5; 32], &[1.0e5; 32], 64);
         let land = vec![200.0f32; fw * fh];
         let dome: Vec<f32> = (0..fw * fh)
             .map(|c| {
@@ -457,5 +588,65 @@ mod tests {
         };
         big.step(&g, &fh, &params(), 20_000.0);
         assert!(big.volume_m3(&g) < 0.05 * v);
+    }
+
+    #[test]
+    fn the_flow_conserves_ice_on_uneven_rows() {
+        // The Lambert grid's rows: equal areas, cells 1 / cos φ high and cos φ wide, the first
+        // and last rows wholly past the poles. Flow alone (no mass balance) keeps the volume and
+        // spreads the dome; the rows past the poles stay empty.
+        let (fw, fh) = (64usize, 34usize);
+        let (sx, sy): (Vec<f64>, Vec<f64>) = (0..fh)
+            .map(|j| {
+                if j == 0 || j == fh - 1 {
+                    return (0.0, 0.0);
+                }
+                let sin = 1.0 - 2.0 * (j as f64 - 0.5) / (fh - 2) as f64;
+                let cos = (1.0 - sin * sin).max(1e-3).sqrt();
+                (1.0e5 * cos, 1.0e5 / cos)
+            })
+            .unzip();
+        let g = Grid::new(fw, fh, &sx, &sy, 64);
+        assert!(!g.on[0] && !g.on[fh - 1] && g.on[1] && g.on[fh / 2]);
+        assert!(g.dy[3] > g.dy[fh / 2], "rows grow toward the poles");
+        let dome: Vec<f32> = (0..fw * fh)
+            .map(|c| {
+                let (i, j) = ((c % fw) as f64 - 32.0, (c / fw) as f64 - 9.0);
+                (3000.0 * (1.0 - (i * i + j * j) / 36.0)).max(0.0) as f32
+            })
+            .collect();
+        let mut st = State::settled(dome);
+        let v0 = st.volume_m3(&g);
+        let n = fw * fh;
+        let mut p0 = params();
+        p0.beta_abl = 0.0;
+        st.step(
+            &g,
+            &Forcing {
+                bed: &vec![200.0f32; n],
+                ela: &vec![1.0e6f32; n],
+                precip: &vec![0.0; n],
+            },
+            &p0,
+            5000.0,
+        );
+        let v1 = st.volume_m3(&g);
+        assert!((v1 - v0).abs() < 1e-4 * v0, "{v0} → {v1}");
+        assert!(st.thick[9 * fw + 39] > 0.0, "the dome spread");
+        assert!(
+            st.thick[..fw].iter().all(|&x| x == 0.0),
+            "nothing past the pole"
+        );
+    }
+
+    #[test]
+    fn coarsen_and_refine_round_trip() {
+        let g = Grid::new(64, 32, &[1.0; 32], &[1.0; 32], 16);
+        assert_eq!((g.w, g.h, g.k), (16, 8, 4));
+        let v: Vec<f32> = (0..64 * 32).map(|c| (c / 64) as f32).collect();
+        let cv = g.coarsen(&v, &|_| true);
+        assert!((cv[0] - 1.5).abs() < 1e-6);
+        let back = g.refine(&cv);
+        assert!((back[10 * 64 + 5] - 10.0).abs() < 0.6);
     }
 }
