@@ -438,5 +438,39 @@ class EndToEnd(unittest.TestCase):
             self.assertEqual(s.state["queue"], {})
 
 
+class StoreSharing(unittest.TestCase):
+    """One Store shared by a job's main thread, its sampler thread and its signal handlers (the
+    2026-10-04 self-deadlock: a second entry overwrote the first's fd and leaked its flock)."""
+
+    def test_two_threads_on_one_store_never_deadlock(self):
+        import threading
+        with tempfile.TemporaryDirectory() as d:
+            store = admit.Store(d)
+
+            def bump(n):
+                for _ in range(n):
+                    with store as s:
+                        s.state.setdefault("n", 0)
+                        s.state["n"] += 1
+            ts = [threading.Thread(target=bump, args=(200,)) for _ in range(4)]
+            for t in ts:
+                t.start()
+            for t in ts:
+                t.join(timeout=30)
+            self.assertFalse(any(t.is_alive() for t in ts), "a thread is stuck on the state lock")
+            with admit.Store(d) as s:
+                self.assertEqual(s.state["n"], 800)
+
+    def test_reentry_on_one_thread_keeps_one_lock(self):
+        with tempfile.TemporaryDirectory() as d:
+            store = admit.Store(d)
+            with store as s:
+                s.state["a"] = 1
+                with store as s2:  # a signal handler entering while the main thread holds it
+                    s2.state["b"] = 2
+            with admit.Store(d) as s:
+                self.assertEqual((s.state["a"], s.state["b"]), (1, 2))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
