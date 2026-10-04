@@ -403,6 +403,9 @@ Why this order [I]:
 - **Immersive Portals:** fourteen one-way portals (seven pairs). The prototype's half-turn rotation NBT is
   `rotationA..D = (0, 0, 1, 0)`; by analogy a quarter-turn about +y would be (cos 45°, 0, ±sin 45°, 0), but that is my
   reading of the prototype's convention, not tested [I].
+- **Deep Time's own wrap engine:** its design (`../../design/wrap-engine.md`, landed on master the same night) already
+  takes any layout of translations, half-turns and quarter-turns, with a quarter-turn corner among its spike's test
+  layouts, so the cube needs nothing beyond what it plans [V, read its §2 and §8 headings only].
 
 **Cost in the crate** (agent days):
 
