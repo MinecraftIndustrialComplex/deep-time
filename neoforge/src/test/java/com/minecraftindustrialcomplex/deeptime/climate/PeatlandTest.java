@@ -118,7 +118,7 @@ class PeatlandTest {
                 assertFalse(v.get("required").getAsBoolean(), v + " must be optional");
                 ids.add(v.get("id").getAsString());
             }
-            for (String want : List.of("biomesoplenty:bog", "biomesoplenty:muskeg", "expanded_ecosphere:fen", "expanded_ecosphere:snowy_bog"))
+            for (String want : List.of("biomesoplenty:bog", "biomesoplenty:muskeg", "wythers:fen", "wythers:snowy_bog"))
                 assertTrue(ids.contains(want), want);
         }
     }
