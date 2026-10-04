@@ -465,6 +465,7 @@ impl Spectral {
 
     /// `spec` (nk × h, column-major) ← the transform of `v`: Σ_i Σ_j v e^(−2πi·ik/w)
     /// cos(π(j + ½)m/h). `half` is scratch (h × nk).
+    #[cfg(test)]
     fn forward(&self, v: &[f64], half: &mut [Complex64], spec: &mut [Complex64]) {
         self.forward_with(v, None, None, half, spec);
     }
