@@ -43,8 +43,8 @@ import java.util.List;
  * (default supercontinent, 1000), {@code .preset=<family>} the built-in family (default the first),
  * {@code .layers=a,b,…} the layers shot while the run goes (default plates, Köppen climate, rock,
  * provinces), {@code .cancel=false} skips the cancel-and-restart at the start of the run (by default
- * the first run is cancelled once it has a frame, its staging folder must go, and a second run
- * starts at once, which waits for the first to stop), and {@code .vista=x,y,z,yaw,pitch[;…]} adds, after the in-world
+ * the first run is cancelled once it has a frame, its staging folder must go once it stopped, and
+ * then a second run starts), and {@code .vista=x,y,z,yaw,pitch[;…]} adds, after the in-world
  * shot, one screenshot per viewpoint: the player is put there in spectator mode, the render
  * distance raised to 16 chunks, and the shot taken once the terrain around has had time to
  * generate and draw ({@code 11-vista-<n>}).
@@ -221,8 +221,7 @@ final class ScreenshotDriver {
                     }
                 }
                 case CANCEL -> {
-                    // Cancel the first run once it has shown a frame: its staging folder must go, and the
-                    // next run, started at once, must wait for it to stop (SimSession's launch gate).
+                    // Cancel the first run once it has shown a frame, check its staging folder goes, Run again.
                     if (!(screen instanceof PlanetEditorScreen ed))
                         return;
                     TimelapseModel run = model.run().orElseThrow();
@@ -231,26 +230,29 @@ final class ScreenshotDriver {
                             shot("03b-run-before-cancel");
                             DeepTime.LOGGER.info("[deeptime-shot] cancelling run {} at {}", run.stagingId(), run.progressLine(model.capBytes()));
                             cancelledId = run.stagingId();
-                            model.cancelRun();
+                            model.cancelRun();   // the Cancel button: back to the setup page, Run disabled until it stopped
                             cancelled = true;
-                            TimelapseModel next = model.startRun().orElseThrow();
                             ed.refresh();
-                            DeepTime.LOGGER.info("[deeptime-shot] restarted at once: waiting for the previous run = {}, launched sessions alive = {}",
-                                    next.run().waitingForPrevious(), com.minecraftindustrialcomplex.deeptime.nativebridge.SimSession.launchedLive());
                             stepTicks = 0;
                         }
-                    } else if (stepTicks == 10) {
-                        shot("03c-run-restarted-after-cancel");
-                    } else if (stepTicks > 10 && stepTicks % 20 == 0) {
+                    } else if (stepTicks == 5) {
+                        shot("03c-setup-while-cancelling");
+                        DeepTime.LOGGER.info("[deeptime-shot] after Cancel: Run enabled = {} (state {})", model.canRun(), run.state());
+                    } else if (stepTicks > 5 && run.state() != TimelapseModel.State.RUNNING) {
                         java.nio.file.Path old = com.minecraftindustrialcomplex.deeptime.server.Staging.dir(mc.gameDirectory.toPath(), cancelledId);
                         if (!java.nio.file.Files.exists(old)) {
-                            DeepTime.LOGGER.info("[deeptime-shot] the cancelled run's staging folder is gone after {} ticks; the new run waits = {}",
-                                    stepTicks, run.run().waitingForPrevious());
+                            DeepTime.LOGGER.info("[deeptime-shot] the cancelled run stopped ({}) and its staging folder is gone after {} ticks; Run enabled = {}",
+                                    run.state(), stepTicks, model.canRun());
+                            model.startRun();
+                            ed.refresh();
                             go(Step.RUNNING);
                         } else if (stepTicks >= 20 * 150) {
                             DeepTime.LOGGER.error("[deeptime-shot] FAILED: the cancelled run's staging folder {} is still there", old);
-                            go(Step.RUNNING);
+                            go(Step.QUIT);
                         }
+                    } else if (stepTicks >= 20 * 170) {
+                        DeepTime.LOGGER.error("[deeptime-shot] FAILED: the cancelled run did not stop ({})", run.progressLine(model.capBytes()));
+                        go(Step.QUIT);
                     }
                 }
                 case RUNNING -> {

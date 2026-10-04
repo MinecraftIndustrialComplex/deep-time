@@ -67,7 +67,8 @@ class TimelapseModelTest {
         m.poll();
         // Following a live run: every event so far.
         assertEquals(List.of(late, global, mid, early), m.visibleEvents(10));
-        assertEquals(3, m.markers().size(), "point events only");
+        // Markers: point events of the last 24 Myr before the newest event while live (the others are 50+ Myr old).
+        assertEquals(List.of(late), m.markers());
         m.scrubTo(1); // t = −200 Ma, previous frame −300 Ma
         assertEquals(List.of(early), m.visibleEvents(10));
         assertTrue(m.fresh(early));
@@ -84,7 +85,7 @@ class TimelapseModelTest {
         assertEquals(List.of(global), m.visibleEvents(1), "at most max, newest first");
         assertTrue(m.fresh(mid) && m.fresh(global));
         assertFalse(m.fresh(early), "happened before the previous frame");
-        assertEquals(2, m.markers().size());
+        assertTrue(m.markers().isEmpty(), "mid ended 50 Myr before −100 Ma: faded");
     }
 
     @Test
@@ -104,6 +105,77 @@ class TimelapseModelTest {
         assertEquals(0, m.displayed().orElseThrow().layer(), "a frame without the layer shows its first");
         m.setLayer("nonexistent");
         assertEquals("plates", m.layer().orElseThrow());
+    }
+
+    /**
+     * A real planet's frames: 24 layers on every step of the coupled stages, then one frame each
+     * from deposits (favourability, sites), young and amplify. The satellite view is the default;
+     * the list shows one group at a time; picking a layer the frame lacks moves to a frame with it.
+     */
+    @Test
+    void realLayersGroupsAndJumps() {
+        TimelapseModel m = model(Runnable::run);
+        String[] main = {"satellite", "elevation", "plates", "crust_age", "climate/koppen", "climate/t_mean_c",
+                "surface/erosion_m_myr", "structure/rock", "provinces", "rivers"};
+        for (int i = 0; i < 4; i++)
+            run.frame(-4e8 + i * 1e8, 8, 4, main);
+        run.frame(0, 8, 4, "deposits/favourability/porphyry_cu_mo_au", "deposits/sites", "input/elevation_m");
+        run.frame(0, 8, 4, "satellite", "amplify/elevation", "rivers");
+        m.poll();
+        assertEquals("satellite", m.layer().orElseThrow(), "the satellite view first, as in the workbench");
+        assertEquals(List.of("", "climate", "surface", "structure", "deposits", "input", "amplify"), m.groups());
+        assertEquals("", m.group());
+        assertEquals(List.of("satellite", "elevation", "plates", "crust_age", "provinces", "rivers"), m.groupLayers());
+        m.cycleGroup(1);
+        assertEquals("climate", m.group());
+        assertEquals(List.of("climate/koppen", "climate/t_mean_c"), m.groupLayers());
+        assertEquals("satellite", m.layer().orElseThrow(), "showing another group does not change the layer");
+        m.cycleGroup(-2);
+        assertEquals("amplify", m.group(), "wraps");
+
+        m.scrubTo(2);
+        assertTrue(m.currentHas("plates") && !m.currentHas("deposits/sites"));
+        m.setLayer("deposits/sites");
+        assertEquals(4, m.index(), "the only frame with the sites");
+        assertEquals("deposits", m.group());
+        assertEquals(1, m.displayed().orElseThrow().layer(), "layer 1 of the deposits frame");
+        m.setLayer("climate/koppen");
+        assertEquals(3, m.index(), "the nearest frame with Köppen");
+        m.setLayer("plates");
+        assertEquals(3, m.index(), "the frame has plates: no move");
+        // A layer chosen sticks when new layers arrive.
+        run.frame(1, 8, 4, "elevation");
+        m.poll();
+        assertEquals("plates", m.layer().orElseThrow());
+    }
+
+    /** Markers fade 24 Myr after an event ends and are capped, so 10,000 events do not all draw on every frame. */
+    @Test
+    void markersFadeAndAreCapped() {
+        TimelapseModel m = model(Runnable::run);
+        run.frame(-1e8, 8, 4, "satellite");
+        run.frame(0, 8, 4, "satellite");
+        long id = 0;
+        // A long event (an orogeny phase) still on the map while it lasts and 24 Myr after it ended.
+        run.pendingEvents.add(new GeoEvent(id++, -3e8, -1.1e8, "deeptime:orogeny_phase", "point", 10, 10, -1, 1));
+        run.pendingEvents.add(new GeoEvent(id++, -3e8, -1.5e8, "deeptime:orogeny_phase", "point", 10, 20, -1, 1));
+        for (int i = 0; i < 2 * TimelapseModel.MAX_MARKERS; i++) {
+            double t = -20e6 * i / (2.0 * TimelapseModel.MAX_MARKERS);
+            run.pendingEvents.add(new GeoEvent(id++, t, t, "deeptime:volcano_caldera", "point", 0, i % 360, -1, 1));
+        }
+        run.completion.complete("{}");
+        m.poll();
+        m.scrubTo(0); // t = −100 Ma
+        List<GeoEvent> at100 = m.markers();
+        assertTrue(at100.stream().anyMatch(e -> e.id() == 0), "ended 10 Myr earlier: still shown");
+        assertTrue(at100.stream().noneMatch(e -> e.id() == 1), "ended 50 Myr earlier: faded");
+        m.scrubTo(1); // t = 0
+        List<GeoEvent> now = m.markers();
+        assertEquals(TimelapseModel.MAX_MARKERS, now.size(), "capped");
+        assertTrue(now.stream().allMatch(e -> e.tStart() >= -TimelapseModel.MARKER_FADE_YEARS), "only the last 24 Myr");
+        for (int i = 1; i < now.size(); i++)
+            assertTrue(now.get(i - 1).tStart() <= now.get(i).tStart(), "oldest first, newest drawn on top");
+        assertEquals(0, now.get(now.size() - 1).tStart(), 1e-6, "the newest is kept");
     }
 
     /** Frames decode on the loader; until then the previous frame stays on screen. */
