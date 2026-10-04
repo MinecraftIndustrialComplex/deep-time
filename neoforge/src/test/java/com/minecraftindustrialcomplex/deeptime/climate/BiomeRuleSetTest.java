@@ -107,6 +107,9 @@ class BiomeRuleSetTest {
         assertEquals(null, first(ee, new F("Cfb", 9, 15, 3, 900, 50, Wetland.NONE, false, false, false, "", "x"), null));
         assertEquals("mediterranean_scrub", first(ee, new F("Csa", 17, 25, 9, 500, 50, Wetland.NONE, false, false, false, "", "x"), null));
         assertEquals("cold_steppe", first(ee, land("BSk"), null));
+        // Hot desert is the pack's deserts; a cold desert (BWk under 10 degC) is not.
+        assertEquals("hot_desert", first(ee, new F("BWh", 25, 33, 15, 80, 300, Wetland.NONE, false, false, false, "sandstone", "x"), null));
+        assertEquals(null, first(ee, new F("BWk", 5, 18, -10, 150, 300, Wetland.NONE, false, false, false, "sandstone", "x"), null));
         // Hot desert highland; a beach in a volcano's zone is black.
         assertEquals("tibesti_mountains", first(ee, new F("BWh", 22, 30, 12, 20, 1800, Wetland.NONE, false, false, false, "basalt", "x"), null));
         assertEquals("black_beach_volcanic", first(ee, new F("Cfb", 12, 17, 6, 1200, 2, Wetland.NONE, false, false, true, "sand",

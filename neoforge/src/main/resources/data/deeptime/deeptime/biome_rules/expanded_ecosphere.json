@@ -39,9 +39,9 @@
   },
   {
    "id": "ice_cap",
-   "_comment": "Land under the ice cover (the glacier model's ice, BIO-075 onwards) that the pack does not draw as a peak or slope: Expanded Ecosphere's ice cap, whose temperature parameter (-1.2 to -1.0) is below every value Deep Time's climate gives. BIO-119.",
+   "_comment": "Land under the ice cover (the glacier model's ice, BIO-075 onwards) that the pack does not draw as a peak (its snowy slopes on an ice sheet are ice too): Expanded Ecosphere's ice cap, whose temperature parameter (-1.2 to -1.0) is below every value Deep Time's climate gives. BIO-119.",
    "ice": true,
-   "keeps": ["#c:is_mountain/peak", "#c:is_mountain/slope", "#minecraft:is_ocean", "#minecraft:is_river"],
+   "keeps": ["#c:is_mountain/peak", "#minecraft:is_ocean", "#minecraft:is_river"],
    "biomes": ["wythers:ice_cap"],
    "exclusive": true
   },
@@ -86,6 +86,14 @@
    "exclusive": true
   },
   {
+   "id": "hot_desert",
+   "_comment": "Hot desert (BWh, and BWk with a mean above 10 degC, which the placement table draws as hot desert, BIO-101): the pack's hot deserts and badlands only, picked by the climate search among them; Expanded Ecosphere's own list puts its chaparral and scrub in the driest hot cells (measured on the 16k planet: 40 % of BWh was chaparral). BIO-123.",
+   "koppen": ["BW"],
+   "t_mean_c": {"min": 10.0},
+   "keeps": ["#c:is_mountain/peak", "#c:is_mountain/slope", "#c:is_beach", "#minecraft:is_beach", "#c:is_stony_shores", "#minecraft:is_river", "#minecraft:is_ocean", "#c:is_swamp"],
+   "biomes": ["wythers:deep_desert", "wythers:cactus_desert", "wythers:red_desert", "wythers:outback_desert", "wythers:badlands_desert", "wythers:desert_pinnacles", "wythers:danakil_desert", "minecraft:desert", "minecraft:badlands", "minecraft:eroded_badlands"]
+  },
+  {
    "id": "low_arctic_tundra",
    "_comment": "Tundra (ET) with a warmest month of 5 degC or more: the low-arctic shrub tundra (Expanded Ecosphere's green tundra, which its list puts in the cold band, never reached by ET). Split at the CAVM's subzone C edge (Walker et al. 2005, from memory). BIO-124.",
    "koppen": ["ET"],
@@ -119,12 +127,13 @@
   },
   {
    "id": "temperate_rainforest",
-   "_comment": "Oceanic climates (Cfb, Cfc) with 1,400 mm or more a year and a mean of 4 to 12 degC: temperate rainforest (Alaback 1991's limits, from memory), its crags on hills and its flooded form in the wetlands (the search picks by erosion). Expanded Ecosphere puts these in the cold band, where Deep Time's Cfb never is. BIO-127.",
+   "_comment": "Oceanic climates (Cfb, Cfc) with 1,400 mm or more a year and a mean of 4 to 12 degC: temperate rainforest (Alaback 1991's limits, from memory), its crags on hills and its flooded form in the wetlands (the search picks by erosion). Expanded Ecosphere puts these at the wettest cells of the cold band, where Deep Time's Cfb never is and its humid boreal forest (Dfc) is: there they are kept out (measured on the 16k planet before: 28 % of Dfc was temperate rainforest). BIO-127.",
    "koppen": ["Cfb", "Cfc"],
    "p_mm": {"min": 1400.0},
    "t_mean_c": {"min": 4.0, "max": 12.0},
    "keeps": ["#c:is_mountain/peak", "#c:is_beach", "#minecraft:is_beach", "#c:is_stony_shores", "#minecraft:is_river", "#minecraft:is_ocean"],
-   "biomes": ["wythers:temperate_rainforest", "wythers:temperate_rainforest_crags", "wythers:flooded_temperate_rainforest"]
+   "biomes": ["wythers:temperate_rainforest", "wythers:temperate_rainforest_crags", "wythers:flooded_temperate_rainforest"],
+   "exclusive": true
   },
   {
    "id": "mediterranean_scrub",
