@@ -4324,7 +4324,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 ### Cloos1993
 - Reference: Cloos, M. (1993). Lithospheric buoyancy and collisional orogenesis: subduction of oceanic plateaus, continental margins, island arcs, spreading ridges, and seamounts. Geological Society of America Bulletin 105(6):715-737.
 - DOI or URL: 10.1130/0016-7606(1993)105<0715:LBACOS>2.3.CO;2.
-- Cited as: in ledger FRC-005 as the usual source for oceanic lithosphere becoming denser than the mantle after about 10 Myr; since 2026-10-02 "Cloos 1993" for the island-arc maturity rule (PLT-047, HNT-090).
+- Cited as: in ledger FRC-005 as the usual source for oceanic lithosphere becoming denser than the mantle after about 10 Myr; since 2026-10-02 "Cloos 1993" for the island-arc maturity rule (PLT-047, HNT-090). Since 2026-10-05 for the collision's buoyancy (FRC-028 to FRC-030, PLT-275): 80-Myr oceanic lithosphere about 0.04 g/cm³ denser than the asthenosphere, 100 km of lithosphere with a 30 km continental crust about 0.09 g/cm³ lighter (abstract).
 - Ledger ids: FRC-005, PLT-047, HNT-092
 - Access: paywalled.
 - Library (the project's source library, not distributed): abstract only, 2026-10-02 (OpenAlex record of the GSW page): `Cloos1993/openalex.json`, text `Cloos1993/abstract.txt`.
