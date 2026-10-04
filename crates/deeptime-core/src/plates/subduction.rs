@@ -53,7 +53,7 @@ use super::geometry::{Cover, Geo, Tree, cover, dijkstra};
 use super::kinematics::{quat, tangent, to_group, to_world};
 use super::pools::ISOSTATIC_FACTOR;
 use super::state::{
-    ARC, CONTINENTAL, Contact, DIVERGENT, EMERGED, HIDDEN, HOTSPOT, OROGENY_ANDEAN,
+    ARC, CONTINENTAL, Contact, DIVERGENT, EMERGED, FORELAND, HIDDEN, HOTSPOT, OROGENY_ANDEAN,
     OROGENY_HIMALAYAN, PlateState, SUBDUCTION_ZONE, TRENCH, pool,
 };
 use crate::error::CoreError;
@@ -144,7 +144,11 @@ pub fn resolve(
         .is_some()
         .then(|| state.samples.iter().map(|s| s.is_hidden()).collect());
     for s in &mut state.samples {
-        s.flags &= !(HIDDEN | TRENCH | ARC | HOTSPOT | DIVERGENT | SUBDUCTION_ZONE | EMERGED);
+        s.flags &=
+            !(HIDDEN | TRENCH | ARC | HOTSPOT | DIVERGENT | SUBDUCTION_ZONE | EMERGED | FORELAND);
+        // The collisions' footprint is stamped again each step they have a front (`belts.rs`).
+        s.collision_mm_yr = 0.0;
+        s.shortening_km = 0.0;
     }
     // A collision's own belt and wedge are stamped as a collision orogeny each step (`belts.rs`):
     // that crust is not locked against the collision that stamps it.

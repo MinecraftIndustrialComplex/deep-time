@@ -49,7 +49,9 @@ use super::geometry::{Cover, Geo, Tree, dijkstra_two};
 use super::init::random_rotation;
 use super::kinematics::{arr, quat, to_world};
 use super::pools::{accrete, ocean_elevation, ocean_heat_flow, oceanic_column, thickness};
-use super::state::{CONTINENTAL, Group, OCEANIC, PlateState, Ridge, Sample, pool, regime};
+use super::state::{
+    CONTINENTAL, FORELAND, Group, OCEANIC, PlateState, Ridge, Sample, pool, regime,
+};
 use crate::error::CoreError;
 use crate::world::WorldState;
 
@@ -128,7 +130,10 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
     };
     s.ridge = vec(&|x| x.ridge);
     s.fold = vec(&|x| x.fold);
-    s.flags = 0;
+    // The step's flags are set again next step; the collision's footprint (`belts.rs`) goes with
+    // its convergence and shortening, which the nearest corner passes on, so the structure stage
+    // never sees the one without the other after a resampling.
+    s.flags &= FORELAND;
     s.thickness_m = thickness(&s.pools);
     s
 }

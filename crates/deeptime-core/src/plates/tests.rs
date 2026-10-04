@@ -796,6 +796,58 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     );
 }
 
+/// Plate task 6: a collision's footprint (`Sample::collision_mm_yr`, `shortening_km` and the
+/// FORELAND flag, the L1 fields `plates/collision_mm_yr` and `plates/shortening`) is there while
+/// a collision has a front, carries both numbers together, and is gone the step after it ends:
+/// the structure stage reads it as the strength and tightness of the folds, so a footprint that
+/// outlived its collision would keep folding a belt nothing shortens.
+#[test]
+fn the_collision_footprint_lives_with_its_collision() {
+    let p = preset(8000, 300.0, "scattered_continents", 23);
+    let (mut marked_steps, mut foreland_steps, mut prev_active, mut onsets) = (0, 0, false, 0);
+    let world = run_stage(&p, |_, _, st| {
+        let active = st
+            .contacts
+            .iter()
+            .any(|c| c.collision.as_ref().is_some_and(|k| k.last_step == st.step));
+        let marked = st.samples.iter().any(|s| s.collision_mm_yr > 0.0);
+        // (A collision that fires or ends in a step is gone from the contacts by its end.)
+        // (A collision that fires in the step it began never shows as active.)
+        let onset = st.counters.collision_onsets > onsets;
+        onsets = st.counters.collision_onsets;
+        assert!(
+            !marked || active || prev_active || onset,
+            "step {}: a footprint with no collision behind it",
+            st.step
+        );
+        for s in &st.samples {
+            assert!(s.collision_mm_yr >= 0.0 && s.shortening_km >= 0.0);
+            // The two numbers come together, and the foreland flag belongs to a footprint.
+            if s.collision_mm_yr > 0.0 || s.flags & state::FORELAND != 0 {
+                assert!(s.shortening_km > 0.0, "a footprint with no shortening");
+            }
+        }
+        marked_steps += i32::from(marked);
+        foreland_steps += i32::from(st.samples.iter().any(|s| s.flags & state::FORELAND != 0));
+        prev_active = active;
+    });
+    assert!(
+        marked_steps > 10,
+        "{marked_steps} steps with a footprint in 300 Myr"
+    );
+    assert!(
+        foreland_steps > 10,
+        "{foreland_steps} steps with a foreland"
+    );
+    for name in ["plates/collision_mm_yr", "plates/shortening"] {
+        let f = world
+            .fields
+            .get(name)
+            .unwrap_or_else(|| panic!("no {name}"));
+        assert!(f.data.iter().all(|v| v.is_finite() && *v >= 0.0), "{name}");
+    }
+}
+
 /// The dynamics record (`dynamics.rs`) is measurement only: a run with it and a run without it
 /// end in the same world (crust, elevation, plate ids, events, fields), and the record agrees with
 /// the run's own counters and events.
