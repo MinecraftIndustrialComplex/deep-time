@@ -206,7 +206,7 @@ public final class BiomeGameTests {
     static final Map<String, Double> FLOORS_TB = Map.of("BS", 0.39, "E:snow", 0.65, "Af:jungle", 0.39);
     /** The largest share of land columns the bake's wetland rule may hold (its flat share, BiomeParams.wetland_flat_share 0.35). */
     static final double WETLAND_CEILING = 0.35;
-    /** The largest share of cold wetland columns that may land on a swamp that is not a peatland (BIO-115). */
+    /** The largest share of cold wetland columns that may land on a swamp that is not a peatland (BIO-133). */
     static final double COLD_WETLAND_SWAMP_CEILING = 0.05;
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
     static final double FORBIDDEN_CEILING = 0.10;
@@ -259,12 +259,12 @@ public final class BiomeGameTests {
         int landColumns = wet.get("land_columns").getAsInt(), wetColumns = wet.get("wetland_columns").getAsInt();
         helper.assertTrue(wetColumns <= WETLAND_CEILING * landColumns,
                 wetColumns + " of " + landColumns + " land columns are in the bake's wetland band, more than " + WETLAND_CEILING);
-        // Cold wetland (Ben, 2026-10-03, "Taiga instead, peatland if present"; BIO-115, BIO-117): the bake's
+        // Cold wetland (Ben, 2026-10-03, "Taiga instead, peatland if present"; BIO-133, BIO-135): the bake's
         // flagged boreal wetland is taiga, or the pack's peatland biome where it has one, and never another
         // swamp. Before the rule it was all swamp (66 % of one planet's Dfc land). A few percent of a mod's
         // oddly tagged biomes are let through.
         var cold = r.json().getAsJsonObject("cold_wetland");
-        helper.assertTrue(cold.get("layer").getAsBoolean(), "the bake wrote climate/wetland, the flag of cold wetland (BIO-115)");
+        helper.assertTrue(cold.get("layer").getAsBoolean(), "the bake wrote climate/wetland, the flag of cold wetland (BIO-133)");
         int coldColumns = cold.get("columns").getAsInt(), coldSwamp = cold.get("on_swamp").getAsInt();
         DeepTime.LOGGER.info("[gametest] climateConsistent cold wetland {}", cold);
         helper.assertTrue(coldSwamp <= COLD_WETLAND_SWAMP_CEILING * coldColumns,

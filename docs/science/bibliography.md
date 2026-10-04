@@ -5989,7 +5989,7 @@ The survey `docs/research/notes/seamless-projection-survey.md` and its tools (`t
 ### Xu2018
 - Reference: Xu, J., Morris, P. J., Liu, J. and Holden, J. (2018). PEATMAP: Refining estimates of global peatland distribution based on a meta-analysis. CATENA 160:134-140. doi:10.1016/j.catena.2017.09.010 (DOI from the publisher URL S0341816217303004; not checked in Crossref).
 - Cited as: "PEATMAP (Xu et al. 2018)".
-- Ledger ids: BIO-119
+- Ledger ids: BIO-137
 - Access: paywalled at the publisher (an open copy exists at CORE, record 227455185); the paper's text was not fetched: ScienceDirect, CORE and Semantic Scholar all answered 403 (2026-10-03). Read so far: a search-result summary of the abstract (global peatland 4.23 million km2, 2.84 % of the land; northern peatlands 3.21 million km2), and two secondary pages: PMC11718193 (a 2025 study of Holocene peatland area, which writes "we used an area of 3.21 Mkm2 for the modern northern peatlands from PEATMAP by Xu et al.") and the International Peatland Society page "Where can peatlands be found?" (continent shares: Asia 38.4 %, North America 31.6 %, Europe 12.5 %; boreal and temperate northern peatlands "formed under high precipitation-low temperature climatic regimes").
 ## Sphere-native simulation grids, added 2026-10-04 with the sphere-native grids note
 

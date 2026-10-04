@@ -188,7 +188,7 @@ public final class BiomeCensus {
             forbidden.put(f.name(), new int[2]);
         Map<Integer, Map<Integer, Integer>> classBiomes = new HashMap<>();
         int skippedUntagged = 0, landColumns = 0, wetlands = 0, wetlandSwamp = 0;
-        // Cold wetland (BIO-115, BIO-117): the bake's flagged boreal wetland, counted over every land column
+        // Cold wetland (BIO-133, BIO-135): the bake's flagged boreal wetland, counted over every land column
         // (a mod's untagged biomes too: its bog is the point): on the pack's peatland biome, on taiga, on
         // another swamp (which it must not be), or elsewhere.
         int coldWet = 0, coldPeat = 0, coldTaiga = 0, coldSwamp = 0;

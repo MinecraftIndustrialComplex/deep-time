@@ -206,7 +206,7 @@ public final class ClimateMapping {
     }
 
     /**
-     * Where the pack has a peatland biome for the bake's cold wetland (BIO-117), or null while the world
+     * Where the pack has a peatland biome for the bake's cold wetland (BIO-135), or null while the world
      * has not decided yet (decided once, at the first biome query of a world with the flag, and kept).
      */
     public Peatland peatland() {

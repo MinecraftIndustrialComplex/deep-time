@@ -227,7 +227,7 @@ pub struct Placement {
     erosion: Vec<Option<ErosionLimit>>,
     /// By Köppen index 0 … 30: the branch of the variant noise the class's land takes.
     weirdness: Vec<Weirdness>,
-    /// By Köppen index 0 … 30: wet lowland of the class is cold wetland (boreal peatland), not swamp (BIO-115).
+    /// By Köppen index 0 … 30: wet lowland of the class is cold wetland (boreal peatland), not swamp (BIO-133).
     cold_wetland: Vec<bool>,
     ice_cover: IceCoverSpec,
     /// The table as written (without `_comment`): what `notes.bake.climate.placement` records.
@@ -859,7 +859,7 @@ impl Placement {
     }
 
     /// Whether wet lowland of class `k` is cold wetland, boreal peatland, instead of swamp (the table's
-    /// `cold_wetland`; Ben, 2026-10-03: Dfc, Dfd, Dsc, Dsd, Dwc, Dwd; ledger BIO-115).
+    /// `cold_wetland`; Ben, 2026-10-03: Dfc, Dfd, Dsc, Dsd, Dwc, Dwd; ledger BIO-133).
     pub fn cold_wetland(&self, k: u8) -> bool {
         self.cold_wetland
             .get(usize::from(k))

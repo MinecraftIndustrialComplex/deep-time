@@ -72,10 +72,10 @@
 //! 2.5), flat (the flattest `wetland_flat_share`, 35 %), low (< `wetland_low_m`, 150 m) land that
 //! is not frozen goes into E6 in proportion to `wetlands` — swamps and mangroves only where they belong (vanilla
 //! puts E6 at hot temperatures to mangrove swamp, whatever the humidity). Cold wetland (a
-//! class marked `cold_wetland` in the placement table: Dfc, Dfd, Dsc, Dsd, Dwc, Dwd; BIO-115) is not swamp
+//! class marked `cold_wetland` in the placement table: Dfc, Dfd, Dsc, Dsd, Dwc, Dwd; BIO-133) is not swamp
 //! (Ben, 2026-10-03, "Taiga instead, peatland if present"): it keeps the class's own temperature and
 //! humidity (taiga in vanilla) with erosion held under E5, and is flagged `climate/wetland` = 2 so the
-//! game can put the pack's peatland biome there (BIO-117). The deep sea keeps E4 or
+//! game can put the pack's peatland biome there (BIO-135). The deep sea keeps E4 or
 //! more, away from Terralith's sky-island band. A class's placement may clamp its land's erosion
 //! (`erosion: {min, max}`; EF's barren ground is held below 0.3, off Terralith's packed-ice glacial
 //! chasm, and its ice cap is not).
@@ -1240,7 +1240,7 @@ pub fn map(
                 // the class's ordinary biome (taiga for the subarctic classes); the flag lets the
                 // game swap in the pack's peatland biome when it has one. Erosion stays in the
                 // ordinary land range, below E5, so flat wet ground is not drawn as windswept hills.
-                // ledger: BIO-115, BIO-116, BIO-117
+                // ledger: BIO-133, BIO-134, BIO-135
                 e = e.min(e5 - 1e-3);
                 wetland[k] = WETLAND_COLD;
                 cold_cells += 1;
