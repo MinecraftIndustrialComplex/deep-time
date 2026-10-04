@@ -47,6 +47,10 @@ public final class KineticSeams {
         Level level = from.getLevel();
         if (current != null || !SeamFrames.active(level))
             return original.call(from, to);
+        // At a turn point a block can be its own neighbour across the seam (it sees itself turned):
+        // no rotation can agree with itself through a quarter turn, so that connection is never made.
+        if (from == to)
+            return 0;
         BlockPos a = from.getBlockPos(), b = to.getBlockPos();
         // Create's own rules assume the two are neighbours (an axis connection checks only that the
         // offset lies along one axis), so its answer for a pair reached through a seam, whose stored
