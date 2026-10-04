@@ -1041,7 +1041,7 @@ pub fn map(
                 // the class's ordinary biome (taiga for the subarctic classes); the flag lets the
                 // game swap in the pack's peatland biome when it has one. Erosion stays in the
                 // ordinary land range, below E5, so flat wet ground is not drawn as windswept hills.
-                // ledger: BIO-104, BIO-106
+                // ledger: BIO-104, BIO-105, BIO-106
                 e = e.min(e5 - 1e-3);
                 wetland[k] = WETLAND_COLD;
                 cold_cells += 1;
