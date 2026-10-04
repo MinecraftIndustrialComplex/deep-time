@@ -136,6 +136,7 @@ SEEDS = {
     "gametest:mic": (4.0, 11.0, 16.0, 900),         # -Xmx8G, 160 mods
     "gametest:terrablender": (4.0, 8.0, 16.0, 600),
     "gametest:ev": (4.0, 8.0, 16.0, 600),
+    "gametest:ee": (4.0, 8.0, 16.0, 600),
     "planet:standalone": (3.0, 8.0, 12.0, 600),     # -Xmx6G
     "planet:mic": (4.0, 11.0, 12.0, 900),
     "smoke:standalone": (3.0, 8.0, 12.0, 600),      # -Xmx6G
@@ -326,7 +327,8 @@ def plan(queue, jobs, cap, now, overcommit=None, reserve_cores=None, starve_min=
 _HEAVY = [
     # (pattern, kind or a function of the match and the command)
     (r"\bgametest\.sh\b", lambda c: "gametest:" + ("mic" if "-PwithMic" in c else "terrablender" if "-PwithTerraBlender" in c
-                                                   else "ev" if "-PwithEv" in c else "standalone")),
+                                                   else "ev" if "-PwithEv" in c else "ee" if "-PwithEe" in c
+                                                   else "standalone")),
     (r"\bgametest-planet\.sh\b|\brun_planet\.py\b", lambda c: "planet:" + ("mic" if "-PwithMic" in c else "standalone")),
     (r"\btools/smoke/run\.py\b", lambda c: "smoke:" + _opt(c, "--profile", "standalone")),
     (r"\bpreview\.py\s+run\b|\bpreview-area\.sh\b", lambda c: "preview:" + _opt(c, "--profile", "standalone")),

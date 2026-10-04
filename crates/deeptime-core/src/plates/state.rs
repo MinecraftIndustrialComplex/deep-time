@@ -42,6 +42,9 @@ pub const DIVERGENT: u8 = 16;
 pub const EMERGED: u8 = 32;
 /// Within the subduction distance of a front this step.
 pub const SUBDUCTION_ZONE: u8 = 64;
+/// On the incoming plate of an active collision, beyond the wedge and within the reach of its
+/// foreland basin this step (`belts.rs`): where the structure stage looks for foreland folds.
+pub const FORELAND: u8 = 128;
 
 /// Tectonic regime codes (the `plates/regime` L1 layer; `EVENTS.md` lists them too).
 pub mod regime {
@@ -146,6 +149,13 @@ pub struct Sample {
     pub heat_flow_mw_m2: f32,
     /// Net elevation change over the last step, mm/yr (uplift positive).
     pub uplift_mm_yr: f32,
+    /// In the footprint of an active collision this step (its belt behind the front, its wedge,
+    /// and on the incoming plate the foreland [`FORELAND`] flags): the convergence across the
+    /// front, mm/yr, and the shortening of the collision so far, km. Both 0 elsewhere
+    /// (`belts.rs`; the structure stage reads them as `plates/collision_mm_yr` and
+    /// `plates/shortening`).
+    pub collision_mm_yr: f32,
+    pub shortening_km: f32,
 }
 
 impl Sample {
@@ -172,6 +182,8 @@ impl Sample {
             slab_age_myr: 0.0,
             heat_flow_mw_m2: 0.0,
             uplift_mm_yr: 0.0,
+            collision_mm_yr: 0.0,
+            shortening_km: 0.0,
         }
     }
 
