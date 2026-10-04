@@ -1749,7 +1749,7 @@ mod tests {
         ));
         assert_eq!(
             estimate(r#"{"dummy":{"steps":1,"sleep_ms":0}}"#, "").unwrap(),
-            r#"{"base_bytes":0,"history_bytes":0,"mem_cap":4294967296,"peak_bytes":0,"spill_bytes":0,"stages":[{"base_bytes":0,"bytes":0,"history_bytes":0,"name":"dummy","seconds":0.0,"spill_bytes":0}]}"#
+            r#"{"base_bytes":0,"history_bytes":0,"mem_cap":4294967296,"peak_bytes":0,"spill_bytes":0,"stages":[{"base_bytes":0,"bytes":0,"coupled_to":null,"history_bytes":0,"name":"dummy","seconds":0.0,"spill_bytes":0}]}"#
         );
         let world: Value = serde_json::from_str(&estimate(DUMMY_WORLD, "").unwrap()).unwrap();
         // 256 × 88 cells (rows from z = −704, past the Lambert pole at 651.9).
@@ -1771,7 +1771,10 @@ mod tests {
         let est: Value = serde_json::from_str(&estimate(&json, "").unwrap()).unwrap();
         let stages = est["stages"].as_array().unwrap();
         let names: Vec<&str> = stages.iter().map(|s| s["name"].as_str().unwrap()).collect();
-        assert!(stages[0]["coupled_to"].is_null(), "the first stage leads: {est}");
+        assert!(
+            stages[0]["coupled_to"].is_null(),
+            "the first stage leads: {est}"
+        );
         let mut followers = 0;
         for (i, s) in stages.iter().enumerate() {
             if let Some(to) = s["coupled_to"].as_str() {
@@ -1783,7 +1786,10 @@ mod tests {
                 );
             }
         }
-        assert!(followers >= 1, "the real pipeline couples stages: {names:?}");
+        assert!(
+            followers >= 1,
+            "the real pipeline couples stages: {names:?}"
+        );
         let preset = Preset::from_json(&json).unwrap();
         let groups = stage_groups(&preset.stages()).unwrap();
         assert_eq!(
