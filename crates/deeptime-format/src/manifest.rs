@@ -283,7 +283,11 @@ mod tests {
         use crate::projection::{EdgeKind, PetroffGuyou, ProjectionKind};
         let g = PetroffGuyou::new(6_656, 31.25);
         let mut m = Manifest::new("test", Writer::this("unit"), Scale::default_for(13_312));
-        assert_eq!(m.world_projection().kind(), ProjectionKind::Lambert, "absent: Lambert");
+        assert_eq!(
+            m.world_projection().kind(),
+            ProjectionKind::Lambert,
+            "absent: Lambert"
+        );
         m.projection = Some(g.spec(None));
         let json = String::from_utf8(m.to_json_bytes().unwrap()).unwrap();
         assert!(json.contains("\"kind\": \"petroff_guyou\""), "{json}");
@@ -292,7 +296,10 @@ mod tests {
         let spec = back.projection.as_ref().unwrap();
         assert_eq!(spec.edges.len(), 4);
         assert_eq!(
-            spec.edges.iter().filter(|e| e.kind == EdgeKind::HalfTurn).count(),
+            spec.edges
+                .iter()
+                .filter(|e| e.kind == EdgeKind::HalfTurn)
+                .count(),
             2
         );
         match back.world_projection() {

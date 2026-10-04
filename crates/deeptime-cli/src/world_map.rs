@@ -120,7 +120,8 @@ pub fn run(dir: &Path, zoom: u32, out: &Path) -> Result<Value, String> {
             }
         }
     }
-    let png = deeptime_viewer::encode_png_rgb(w as u32, h as u32, &rgb).map_err(|e| e.to_string())?;
+    let png =
+        deeptime_viewer::encode_png_rgb(w as u32, h as u32, &rgb).map_err(|e| e.to_string())?;
     std::fs::write(out.join("provinces.png"), png).map_err(|e| e.to_string())?;
     let summary = json!({
         "world": dir.display().to_string(),

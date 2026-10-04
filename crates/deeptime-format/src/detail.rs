@@ -56,7 +56,11 @@ impl Noise {
     }
 
     /// The noise of a world laid out by `wp`: a Petroff–Guyou world's has its half-turn edges.
-    pub fn for_world(seed: u64, circumference: u32, wp: &crate::projection::WorldProjection) -> Noise {
+    pub fn for_world(
+        seed: u64,
+        circumference: u32,
+        wp: &crate::projection::WorldProjection,
+    ) -> Noise {
         let mut n = Noise::new(seed, circumference);
         if let crate::projection::WorldProjection::PetroffGuyou(g) = wp {
             n.half_turn_b = Some(g.hemisphere());
@@ -207,7 +211,11 @@ impl DetailSpec {
             }
         }
         let n = noise.fbm(x, z, self.wavelength_blocks, self.octaves, self.salt);
-        let (d, mz) = if z < 0.0 { (z + h, -b - z) } else { (h - z, b - z) };
+        let (d, mz) = if z < 0.0 {
+            (z + h, -b - z)
+        } else {
+            (h - z, b - z)
+        };
         if d >= EDGE_BLEND_BLOCKS {
             return n;
         }
