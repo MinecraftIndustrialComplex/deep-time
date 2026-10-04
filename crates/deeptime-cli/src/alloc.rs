@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-//! The CLI's counting global allocator (plan §5.7.5): `System` plus two atomics, so a run's memory
-//! cap works as in the game and `deeptime bench` can report each run's peak. The same scheme as
-//! `deeptime-jni`'s allocator (a global allocator must be declared by the final binary).
+//! The CLI's counting global allocator (plan §5.7.5; `deeptime_core::alloc`, as in `deeptime-jni`:
+//! a global allocator must be declared by the final binary), so a run's memory cap works as in
+//! the game and `deeptime bench` can report each run's peak.
 //!
 //! `DEEPTIME_MEM_TRACE=<file>` traces memory per phase of a run (each stage's step, keyframes,
 //! the bake; [`MemoryGauge::phase`]): one JSON line per phase with the live bytes' peak in it, the
@@ -11,89 +11,29 @@
 //! system after each phase (an experiment: it says how much of the resident size is free memory
 //! the allocator kept).
 
-use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use deeptime_core::alloc::{self as counts, CountingAlloc};
 use deeptime_core::session::MemoryGauge;
 
-static IN_USE: AtomicU64 = AtomicU64::new(0);
-static PEAK: AtomicU64 = AtomicU64::new(0);
-
-pub struct CountingAlloc;
-
-#[inline]
-fn added(bytes: usize) {
-    let now = IN_USE.fetch_add(bytes as u64, Ordering::Relaxed) + bytes as u64;
-    PEAK.fetch_max(now, Ordering::Relaxed);
-}
-
-#[inline]
-fn removed(bytes: usize) {
-    IN_USE.fetch_sub(bytes as u64, Ordering::Relaxed);
-}
-
-// SAFETY: every method forwards to `System` with the caller's layout and only updates counters.
-unsafe impl GlobalAlloc for CountingAlloc {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        // SAFETY: forwarded unchanged; the caller upholds `GlobalAlloc::alloc`'s contract.
-        let p = unsafe { System.alloc(layout) };
-        if !p.is_null() {
-            added(layout.size());
-        }
-        p
-    }
-
-    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-        // SAFETY: as for `alloc`.
-        let p = unsafe { System.alloc_zeroed(layout) };
-        if !p.is_null() {
-            added(layout.size());
-        }
-        p
-    }
-
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        // SAFETY: `ptr` was allocated by this allocator (hence by `System`) with `layout`.
-        unsafe { System.dealloc(ptr, layout) };
-        removed(layout.size());
-    }
-
-    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        // SAFETY: as for `dealloc`; `new_size` is checked by the caller.
-        let p = unsafe { System.realloc(ptr, layout, new_size) };
-        if !p.is_null() {
-            if new_size >= layout.size() {
-                added(new_size - layout.size());
-            } else {
-                removed(layout.size() - new_size);
-            }
-        }
-        p
-    }
-}
+pub use deeptime_core::alloc::{in_use, peak, reset_peak};
 
 #[global_allocator]
 static GLOBAL: CountingAlloc = CountingAlloc;
 
-/// Bytes allocated and not yet freed.
-pub fn in_use() -> u64 {
-    IN_USE.load(Ordering::Relaxed)
+/// `DEEPTIME_LARGE_ALLOC=<bytes>|off` (an experiment): the size from which blocks are mapped on
+/// their own (`deeptime_core::alloc::LARGE_BYTES` by default). Read before anything large is
+/// allocated.
+pub fn init_from_env() {
+    if let Some(v) = std::env::var_os("DEEPTIME_LARGE_ALLOC") {
+        let v = v.to_string_lossy();
+        if v == "off" {
+            counts::set_large_threshold(None);
+        } else if let Ok(b) = v.parse::<usize>() {
+            counts::set_large_threshold(Some(b));
+        }
+    }
 }
-
-/// The highest `in_use` since the start or the last [`reset_peak`].
-pub fn peak() -> u64 {
-    PEAK.load(Ordering::Relaxed)
-        .max(RUN_PEAK.load(Ordering::Relaxed))
-}
-
-/// Starts a new peak measurement from what is in use now.
-pub fn reset_peak() {
-    PEAK.store(in_use(), Ordering::Relaxed);
-    RUN_PEAK.store(0, Ordering::Relaxed);
-}
-
-/// The peak before the current phase's (the trace resets `PEAK` at each phase).
-static RUN_PEAK: AtomicU64 = AtomicU64::new(0);
 
 /// The allocator as the core's [`MemoryGauge`].
 pub struct AllocGauge;
@@ -110,7 +50,20 @@ impl MemoryGauge for AllocGauge {
             t.phase(name, begin);
         }
     }
+    fn reserved(&self, needed: u64, granted: bool) {
+        if trace().is_some() {
+            RESERVED.fetch_max(needed, Ordering::Relaxed);
+            if !granted {
+                REFUSED.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
 }
+
+/// The most a reservation asked for (in use + reserved) in the traced phase, and how many were
+/// refused.
+static RESERVED: AtomicU64 = AtomicU64::new(0);
+static REFUSED: AtomicU64 = AtomicU64::new(0);
 
 /// One phase's figures over all its occurrences.
 #[derive(Default, Clone)]
@@ -123,6 +76,8 @@ pub struct PhaseAgg {
     pub rss_peak: u64,
     /// The resident size at the phase's end.
     pub rss_end: u64,
+    /// The most a reservation asked for during the phase (in use + reserved; 0: none).
+    pub reserved: u64,
 }
 
 struct Tracer {
@@ -206,8 +161,9 @@ mod glibc {
 impl Tracer {
     fn phase(&self, name: &str, begin: bool) {
         if begin {
-            RUN_PEAK.fetch_max(PEAK.load(Ordering::Relaxed), Ordering::Relaxed);
-            PEAK.store(in_use(), Ordering::Relaxed);
+            counts::start_window();
+            RESERVED.store(0, Ordering::Relaxed);
+            REFUSED.store(0, Ordering::Relaxed);
             // Resets VmHWM to the current resident size (Linux 4.0+).
             let _ = std::fs::write("/proc/self/clear_refs", "5");
             if let Ok(mut b) = self.begun.lock() {
@@ -221,7 +177,9 @@ impl Tracer {
             .ok()
             .and_then(|mut b| b.take())
             .map_or(0.0, |b| b.elapsed().as_secs_f64());
-        let live_peak = PEAK.load(Ordering::Relaxed);
+        let live_peak = counts::window_peak();
+        let reserved = RESERVED.load(Ordering::Relaxed);
+        let refused = REFUSED.load(Ordering::Relaxed);
         let (rss_end, rss_peak) = rss();
         let (held, free) = glibc::held();
         let trimmed_rss = if self.trim {
@@ -231,7 +189,7 @@ impl Tracer {
             0
         };
         let line = format!(
-            "{{\"t\":{:.3},\"phase\":\"{name}\",\"s\":{seconds:.4},\"in_use\":{},\"live_peak\":{live_peak},\"rss_peak\":{rss_peak},\"rss\":{rss_end},\"malloc_held\":{held},\"malloc_free\":{free},\"rss_after_trim\":{trimmed_rss}}}\n",
+            "{{\"t\":{:.3},\"phase\":\"{name}\",\"s\":{seconds:.4},\"in_use\":{},\"live_peak\":{live_peak},\"rss_peak\":{rss_peak},\"rss\":{rss_end},\"malloc_held\":{held},\"malloc_free\":{free},\"rss_after_trim\":{trimmed_rss},\"reserved\":{reserved},\"refused\":{refused}}}\n",
             self.started.elapsed().as_secs_f64(),
             in_use(),
         );
@@ -253,6 +211,7 @@ impl Tracer {
             a.live_peak = a.live_peak.max(live_peak);
             a.rss_peak = a.rss_peak.max(rss_peak);
             a.rss_end = a.rss_end.max(rss_end);
+            a.reserved = a.reserved.max(reserved);
         }
     }
 }

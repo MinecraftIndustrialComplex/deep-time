@@ -99,6 +99,9 @@ pub trait MemoryGauge: Send + Sync {
     /// stage's name, `keyframes`, `finish`, `bake`) and false after it, so a gauge can trace memory
     /// per phase (`deeptime run --mem-trace`). Phases never nest. The default does nothing.
     fn phase(&self, _name: &str, _begin: bool) {}
+    /// A stage asked for room: `needed` = bytes in use + bytes reserved, `granted` whether it fit
+    /// (after any history spill). For the trace; the default does nothing.
+    fn reserved(&self, _needed: u64, _granted: bool) {}
 }
 
 /// A gauge that reports nothing allocated.

@@ -67,6 +67,13 @@ impl StageContext<'_> {
     /// of failing); only what does not fit even then fails.
     pub fn reserve(&self, bytes: u64) -> Result<(), CoreError> {
         let needed = self.gauge.in_use().saturating_add(bytes);
+        let r = self.reserve_inner(bytes);
+        self.gauge.reserved(needed, r.is_ok());
+        r
+    }
+
+    fn reserve_inner(&self, bytes: u64) -> Result<(), CoreError> {
+        let needed = self.gauge.in_use().saturating_add(bytes);
         if let Some(p) = self.needed_peak {
             p[0].fetch_max(needed, Ordering::Relaxed);
             let history = self.history.map_or(0, HistoryHandle::resident_bytes);
