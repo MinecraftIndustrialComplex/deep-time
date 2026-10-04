@@ -123,6 +123,10 @@ pub struct ClimateParams {
     /// basin's western side, equatorward on its eastern side, carried a Rossby radius inland;
     /// 0: none): what brings the sea's air to the humid subtropical east coasts.
     pub rain_highs_m_s: f64,
+    /// The upwind rain: how sharply condensation grows with the column's relative humidity (the
+    /// e-folding a in e^(a (r − r_ref)); 0: linear, as LFPM). The budget's `precip_rh_slope`
+    /// plays this part for `rain_model = budget`.
+    pub rain_rh_slope: f64,
     /// How much heat the wind-driven gyres carry (`ocean2d.rs`; 0: none).
     pub gyre_heat_efficiency: f64,
     /// The overturning conveyor that sinks in the narrowest polar-connected basin, Sv (0: off;
@@ -422,6 +426,7 @@ impl Default for ClimateParams {
             rain_recycling: 1.0,               // ledger: CLM-195
             sea_surface_rh: 0.8,               // ledger: CLM-196
             rain_highs_m_s: 0.0,               // ledger: CLM-200
+            rain_rh_slope: 1.0,                // ledger: CLM-202
             gyre_heat_efficiency: 1.0,         // ledger: CLM-130
             overturning_sv: 30.0,              // ledger: CLM-131
             winter_inversion_c: 15.0,          // ledger: CLM-134
@@ -574,6 +579,7 @@ impl ClimateParams {
             (self.rain_wind_share, "rain_wind_share", 0.0, 2.0),
             (self.sea_surface_rh, "sea_surface_rh", 0.3, 0.99),
             (self.rain_highs_m_s, "rain_highs_m_s", 0.0, 20.0),
+            (self.rain_rh_slope, "rain_rh_slope", 0.0, 40.0),
             (self.west_flank_wet, "west_flank_wet", 0.0, 5.0),
             (self.gyre_heat_efficiency, "gyre_heat_efficiency", 0.0, 5.0),
             (self.overturning_sv, "overturning_sv", 0.0, 100.0),
