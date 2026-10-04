@@ -36,6 +36,9 @@ impl MemoryGauge for Gauge {
     fn phase_peak(&self) -> u64 {
         alloc::window_peak()
     }
+    fn release(&self) -> u64 {
+        alloc::release_cache()
+    }
 }
 
 /// `deposits::recorded_tests`' small coupled planet (here 512 × 164 L1 cells) over 100 Myr, recording a

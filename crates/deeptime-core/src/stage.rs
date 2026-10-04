@@ -82,6 +82,15 @@ impl StageContext<'_> {
         if needed <= self.mem_cap {
             return Ok(());
         }
+        // What the allocator keeps for reuse goes first, then the history's frames.
+        let needed = if self.gauge.release() > 0 {
+            self.gauge.in_use().saturating_add(bytes)
+        } else {
+            needed
+        };
+        if needed <= self.mem_cap {
+            return Ok(());
+        }
         if let Some(h) = self.history {
             let over = needed - self.mem_cap;
             if h.resident_bytes() >= over {

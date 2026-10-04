@@ -109,6 +109,12 @@ pub trait MemoryGauge: Send + Sync {
     fn phase_peak(&self) -> u64 {
         self.in_use()
     }
+    /// Gives memory the allocator keeps for reuse back to the system (its count drops by as
+    /// much); returns the bytes released. Called before the history spills to make room under
+    /// the cap. The default releases nothing.
+    fn release(&self) -> u64 {
+        0
+    }
 }
 
 /// A gauge that reports nothing allocated.
@@ -749,7 +755,12 @@ impl Session {
                     history: history.as_ref(),
                     needed_peak: Some(&self.needed_peak),
                 };
-                let at_start = self.gauge.in_use();
+                let mut at_start = self.gauge.in_use();
+                if at_start.saturating_add(s.working[k]) > self.mem_cap
+                    && self.gauge.release() > 0
+                {
+                    at_start = self.gauge.in_use();
+                }
                 if let Some(h) = &history
                     && at_start.saturating_add(s.working[k]) > self.mem_cap
                 {
@@ -819,7 +830,10 @@ impl Session {
             }
         }
         let target = self.mem_cap - self.mem_cap / TRIM_HEADROOM;
-        let in_use = self.gauge.in_use();
+        let mut in_use = self.gauge.in_use();
+        if in_use > target && self.gauge.release() > 0 {
+            in_use = self.gauge.in_use();
+        }
         if in_use > target {
             let e = handle.evict(in_use - target)?;
             if e.frames > 0 {

@@ -33,6 +33,9 @@ impl MemoryGauge for Gauge {
     fn phase_peak(&self) -> u64 {
         alloc::window_peak()
     }
+    fn release(&self) -> u64 {
+        alloc::release_cache()
+    }
     fn phase(&self, name: &str, begin: bool) {
         if begin {
             alloc::start_window();
