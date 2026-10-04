@@ -22,9 +22,10 @@ server="smoke/$profile/server"
 rm -rf "$server/planet"
 mkdir -p "$server/planet"
 if [ -d "$world/deeptime" ]; then cp -R "$world/deeptime" "$server/planet/deeptime"; else cp -R "$world" "$server/planet/deeptime"; fi
-python3 tools/smoke/run.py --profile "$profile" --rcon "deeptime probe biomes 16" --timeout 3000 || true
-# The server runs in this job's private copy of the set (DEEPTIME_SERVER_DIR), which goes with the job.
-cp "${DEEPTIME_SERVER_DIR:-$PWD/$server/..}/server/deeptime-probe/biomemap.json" "$RUNS/$name-$profile-biomemap.json"
+PROBE="$RUNS/probe-$profile-$name"; rm -rf "$PROBE"; mkdir -p "$PROBE"
+DEEPTIME_PROBE_DIR="$PROBE" python3 tools/smoke/run.py --profile "$profile" --rcon "deeptime probe biomes 16" --timeout 3000 || true
+# The server runs in a private copy of the set that goes with its job: the probe writes where the mod is told to.
+cp "$PROBE/biomemap.json" "$RUNS/$name-$profile-biomemap.json"
 cp "$server/planet/deeptime/climate_mapping.json" "$RUNS/$name-$profile-climate_mapping.json" 2>/dev/null || true
 python3 tools/review/biomemap_shares.py "$RUNS/$name-$profile-biomemap.json" --classes Dfc,Dfd,Dsc,Dwc,Dfb,Cfb --top 14
 python3 - "$RUNS/$name-$profile-biomemap.json" <<'PY'
