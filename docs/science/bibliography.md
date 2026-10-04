@@ -5985,3 +5985,13 @@ The survey `docs/research/notes/seamless-projection-survey.md` and its tools (`t
 - Cited as: "Dimitrijević & Strobl 2025".
 - Ledger ids: none (the survey's cross-checks: QSC max a/b 1.555, HEALPix 2.430; continuity classes)
 - Access: open. Read so far: the ranking, continuity and distortion sections read by a sub-agent from a Semantic Scholar copy, 2026-10-03.
+
+## Terralith placement table and geology gate (BIO-140 to BIO-154), added 2026-10-04
+
+### Scatena2010
+- Reference: Scatena, F. N., Bruijnzeel, L. A., Bubb, P. and Das, S. (2010). Setting the stage. In: Bruijnzeel, L. A., Scatena, F. N. and Hamilton, L. S. (eds.), Tropical Montane Cloud Forests: Science for Conservation and Management, Cambridge University Press, pp. 3-13. ISBN 978-0-521-76035-5.
+- DOI or URL: Cambridge's excerpt of Part I, https://www.hydrology.nl/images/docs/ihp/nl/Tropical_Montane_Cloud_Forests.pdf
+- Cited as: "Scatena et al. 2010 (Tropical Montane Cloud Forests, ch. 1)".
+- Ledger ids: BIO-145; BIO-144 (its latitude is not in the excerpt)
+- Access: book; the publisher's excerpt is open.
+- Read in this pass (2026-10-04, excerpt fetched and converted with pdftotext): the change from lowland to lower montane forest "is normally observed at the elevation where the average minimum temperature drops below 18 °C ... On large equatorial inland mountains this transition usually occurs at an altitude of 1200–1500 m.a.s.l. and coincides with the general range of incipient and intermittent cloud formation"; the regional altitude table gives lower limits of cloud forest from 1000 to 2000 m (most 1000–1500 m), and 400–700 m on small islands; the potential-distribution method it describes (Kapos et al. 2000) takes mountain land from 1000 m (300 m where the local relief exceeds 300 m). The latitude limits (about 23° N in Mexico, 25° S in Argentina) come from a search-result snippet of another work, not read.

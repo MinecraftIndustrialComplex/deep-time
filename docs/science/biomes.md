@@ -244,6 +244,62 @@ blocks), 110 crater discs (20 km²), 109 cone discs (187 km²), 64 fresh-ash dis
 sampled columns become ashen savanna) and 110 thermal-cave discs (38 km²). These sizes are the game's choices; no real
 landscape was measured for them.
 
+## Terralith's placement table and the geology gate
+
+The biome-mods survey (research note `biome-mods-survey.md`, sections 7 to 9) measured Terralith, MIC's biome mod, on
+a real 16k planet: monsoon forest drawn as dry brushland, Mediterranean land as plains, cold steppe never on
+Terralith's own steppe, tundra too snowy, Terralith's cloud forest never reached, and its rock-named biomes (Shield,
+Yosemite, the White, Granite and Basalt Cliffs, the red-bed canyons, Stony Spires) wherever their parameters fell, on
+any rock. Ben's answers (decisions log 2026-10-04): "Deep Time-side fixes (Recommended)", no Deep Time biomes this
+round; keep the fantasy biomes. Terralith's licence forbids editing or overriding its files, so every fix lives in
+Deep Time's own data.
+
+**A placement table per pack.** The climate placement table (above) is written for vanilla's slots. A biome mod
+whose biomes sit elsewhere gets a table of its own: a JSON merge patch on `placement.json`
+(`data/climate_mapping/packs/<id>.json`), used only when every biome it names in `requires_biomes` is registered.
+A dedicated server's first start chooses the tables from its biome registry, the Create World screen from the
+data packs it has loaded; the bake merges them and records their ids (FORMAT.md, "Pack placement tables"). A
+vanilla world, or one with Biomes O' Plenty, bakes exactly as before: the default table is untouched. A table may
+also hold *class rules*: overrides for a class that hold only where conditions on the cell (temperatures, P/PET,
+latitude, height) do.
+
+Terralith's table (ledger BIO-140 to BIO-146; every value a game choice, tuned against Terralith 2.6.2's parameter
+list with an offline copy of the game's climate search that agrees with the in-game census on 98.8 % of land
+columns, `tools/review/terralith_emulate.py`):
+
+| Class | Change | Why (Terralith's slot) |
+|---|---|---|
+| Am (monsoon forest) | humidity band 4.05 and up | Terralith's jungles sit in the wettest band; band 3 is its brushland and shrubland |
+| Csa, Csb, Csc (Mediterranean) | humidity squeezed into 0.1 … 0.6 | Terralith's shrubland, a dry scrub, is the driest part of the dry band (humidity below −0.585); plains and its alpine highlands are above |
+| BSk (cold steppe) | the same dry humidity, erosion held to 0.12 … 0.4 | Terralith's steppe needs erosion 0.05 to 0.40 in the pack's own units; MIC's climate mapping (Tectonic's router) turns 0.12 … 0.4 into about 0.12 … 0.33 |
+| ET (tundra) | the positive branch of the variant noise | in the frozen band's humidity band 1 the negative branch is vanilla's snowy plains, the positive Terralith's gravel desert (and frozen peaks, not jagged ones). Holding ET's humidity at 1.5, the survey's proposal, was measured and changed nothing: most ET is in band 1 already |
+| Cfb, Cwb, Cfc, Cwc below 25° latitude, above 1,000 m, P/PET above 1 | rule `cloud_forest`: the cold band, humidity 3.05 and up, erosion 0.62 and up, far inland | Terralith's cloud forest has one slot: cold band, humid, the swamp band's erosion, far inland |
+
+The cloud forest rule follows the tropical montane cloud forest: lowland forest gives way to lower montane forest
+where the mean minimum temperature drops below 18 °C, "on large equatorial inland mountains ... at an altitude of
+1200–1500 m.a.s.l.", and regional lower limits of cloud forest run from 1,000 to 2,000 m (Scatena et al. 2010, read;
+BIO-145). The latitude limit (about 23° N to 25° S) is from a secondary snippet, not read (BIO-144, `from-memory`).
+The Köppen classes C at tropical latitudes are mountain climates by construction (a coldest month under 18 °C at low
+latitude needs height), so the rule asks the classes rather than a temperature.
+
+**The geology gate.** A rock-named biome stands only on the ground it is named for (BIO-147 to BIO-153): Shield on
+Precambrian shield provinces, Yosemite on exposed granite, the White, Granite and Basalt Cliffs on coasts of
+carbonate, granite and basalt, Bryce Canyon, the Painted Mountains, White Mesa, Sandstone Valley and Desert Canyon on
+sedimentary rock in a dry climate, Stony Spires on carbonate in a humid one. The rock is the column's bedrock: most
+land wears a weathering mantle (saprolite and laterite are 68 % of the measured planet's land surface), so where the
+surface class is loose cover the first rock of the column's stack within 8 blocks is used. Where the climate search
+answers such a biome off its ground, the biome is kept out the way the volcanic biomes are (the next-nearest biome
+of the pack's own tree answers). On its ground it answers where the climate puts it: the gate takes biomes away and
+never adds them, so Yosemite (whose slot needs a cold, dry valley floor) stays rare. Terralith's Basalt Cliffs are
+volcanic too: they go at real volcanoes and on basalt coasts. The tags `#deeptime:geology/<role>` hold the biomes,
+so another pack's rock-named biomes can join (FORMAT.md, "The geology gate").
+
+Measured on one `earthlike_quick_16k` planet (scattered continents, 500 Myr, seed 1; test machine, 2026-10-04),
+baked twice from the same simulation, without and with Terralith's table (all other rasters byte-identical; without
+the table all 43 rasters are byte-identical to master's), `/deeptime probe biomes 16` with MIC:
+
+MEASUREMENTS_TABLE
+
 ## Simplifications and limits
 
 - Peel classifies station records of many years. The mod classifies the monthly means of one
@@ -268,6 +324,14 @@ landscape was measured for them.
   areas of real volcanic landscapes.
 - A volcanic role's biome ignores TerraBlender's regions: a volcano in a province whose region is vanilla's
   still gets Biomes O' Plenty's volcanic biome when the pack has it.
+- A pack placement table is chosen when the world is baked. A singleplayer world takes the tables in Deep Time's
+  jar (a datapack's own pack table reaches only a dedicated server); the workbench, and its 3D previews with MIC,
+  use the default table, so they draw MIC's biomes as a world baked without Terralith's table.
+- Terralith's table is tuned to Terralith 2.6.2 and to MIC's climate mapping (Tectonic's router stretches erosion);
+  a Terralith update that moves its slots needs the table measured again (`tools/review/terralith_emulate.py`).
+- The geology gate only takes biomes away: a rock-named biome whose slot the climate never reaches on its ground
+  (Yosemite) stays rare or absent. The ground tests read the baked rock and provinces, not the blocks a pack's
+  surface rule paints.
 
 ## Game choices
 
@@ -280,7 +344,9 @@ continentalness, erosion and weirdness derivations (BIO-063 to BIO-070), the fro
 BIO-084: Ben, 2026-09-30). The GameTest floors (BIO-072) were set 0.1 under the lowest share
 measured over ten test planets and catch a broken mapping, not a wrong climate. The volcanic biomes (BIO-104 to BIO-114) are Ben's in kind
 (decisions log 2026-10-03, "Tie them to real volcanoes") and the agent's in every number: zone sizes, the
-activity needed for fresh ash, the role order and the tags' order.
+activity needed for fresh ash, the role order and the tags' order. Terralith's placement table and the geology
+gate (BIO-140 to BIO-154) are Ben's in kind (decisions log 2026-10-04, "Deep Time-side fixes (Recommended)") and the
+agent's in every number, but the cloud forest's height (BIO-145, read in Scatena et al. 2010).
 
 ## Open questions
 
@@ -303,6 +369,9 @@ activity needed for fresh ash, the role order and the tags' order.
 - O'Donnell and Ignizio 2012 (`ODonnell2012`): read in full text. The definition of Bio 15.
 - Minecraft 1.21.1 `OverworldBiomeBuilder` (`MinecraftSrc1211`): read in the NeoForge 21.1.249
   sources.
+- Scatena, Bruijnzeel, Bubb and Das 2010 (`Scatena2010`), chapter 1 of *Tropical Montane Cloud Forests*: the
+  publisher's excerpt read (the 18 °C threshold, 1200–1500 m on large equatorial mountains, the regional table).
+- Terralith 2.6.2's parameter list (the jar in MIC's server set): read on the test machine, 2026-10-04.
 - Ohmura, Kasser and Funk 1992 (`Ohmura1992`): the equation read; its use belongs to the glacier
   page.
 - Holdridge 1967 (`Holdridge1967`): the sentences on the 30 °C cut-off and the factor 58.93 read.
