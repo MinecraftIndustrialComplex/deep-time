@@ -239,7 +239,7 @@ public final class FirstStartGenerator {
         // its biomes are registered.
         List<PlacementPacks.Pack> packs;
         try {
-            packs = ClimatePlacement.chosen(ClimatePlacement.packs(server.getResourceManager()), server.registryAccess());
+            packs = ClimatePlacement.chosenFor(server);
         } catch (IOException e) {
             throw new Stop("a pack placement table cannot be used: " + e.getMessage(),
                     "Fix or remove the datapack's data/<namespace>/deeptime/climate_mapping/packs/ file (FORMAT.md, \"Pack placement tables\").");
