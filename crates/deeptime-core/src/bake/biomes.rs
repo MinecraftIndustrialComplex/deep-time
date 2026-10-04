@@ -75,7 +75,7 @@
 //! band below `wetland_cold_below`, 2: vanilla's cold band, the Dfc and the like; BIO-104) is not swamp
 //! (Ben, 2026-10-03, "Taiga instead, peatland if present"): it keeps the class's own temperature and
 //! humidity (taiga in vanilla) with erosion held under E5, and is flagged `climate/wetland` = 2 so the
-//! game can put the pack's peatland biome there (BIO-105). The deep sea keeps E4 or
+//! game can put the pack's peatland biome there (BIO-106). The deep sea keeps E4 or
 //! more, away from Terralith's sky-island band. A class's placement may clamp its land's erosion
 //! (`erosion: {min, max}`; EF's barren ground is held below 0.3, off Terralith's packed-ice glacial
 //! chasm, and its ice cap is not).
@@ -178,7 +178,7 @@ impl Default for BiomeParams {
             wetland_humidity: 2.5,
             wetland_flat_share: 0.35,
             wetland_low_m: 150.0,
-            wetland_cold_below: 2.0,
+            wetland_cold_below: 2.0, // ledger: BIO-105
         }
     }
 }
@@ -1047,7 +1047,7 @@ pub fn map(
                 // the class's ordinary biome (taiga for the subarctic classes); the flag lets the
                 // game swap in the pack's peatland biome when it has one. Erosion stays in the
                 // ordinary land range, below E5, so flat wet ground is not drawn as windswept hills.
-                // ledger: BIO-104, BIO-105
+                // ledger: BIO-104, BIO-106
                 e = e.min(e5 - 1e-3);
                 wetland[k] = WETLAND_COLD;
                 cold_cells += 1;

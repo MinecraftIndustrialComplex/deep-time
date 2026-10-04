@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link Peatland} (BIO-105): cold wetland is taiga unless the pack's own biome source answers with a
+ * {@link Peatland} (BIO-106): cold wetland is taiga unless the pack's own biome source answers with a
  * peatland biome at the swamp row of the cold band, region by region.
  */
 class PeatlandTest {
