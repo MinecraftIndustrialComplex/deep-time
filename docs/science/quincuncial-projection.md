@@ -63,3 +63,8 @@ agrees with the 2026-10-02 research note's own computation (`world-projection-op
   which is all the prototype needs; they do not prove it is Peirce's own normalisation (it could differ
   by a turn of the sphere, which would not matter).
 - None of the cited works was read in full.
+- Which projection production should use is surveyed in
+  [`../research/notes/seamless-projection-survey.md`](../research/notes/seamless-projection-survey.md)
+  (2026-10-03): with quarter-turn seams an equal-area cube does better than any pillowcase map; its
+  constants are ledgered as SCL-078 to SCL-085 (`not-yet-coded`). Its measurements of Peirce
+  reproduce SCL-075 by an independent route (Schwarz triangle functions).
