@@ -73,7 +73,9 @@ impl Grid {
         let (w, h) = (fw.div_ceil(k), fh.div_ceil(k));
         let rows = |j: usize| j * k..((j + 1) * k).min(fh);
         // A coarse row is as high as its fine rows together (a row wholly past a pole: 1 µm).
-        let dy_true: Vec<f64> = (0..h).map(|j| rows(j).map(|r| sy[r]).sum::<f64>()).collect();
+        let dy_true: Vec<f64> = (0..h)
+            .map(|j| rows(j).map(|r| sy[r]).sum::<f64>())
+            .collect();
         let on: Vec<bool> = dy_true.iter().map(|&d| d > 0.0).collect();
         let dy: Vec<f64> = dy_true.iter().map(|&d| d.max(1e-6)).collect();
         // The equator's row: the lowest on the Lambert grid, and every row's on an even one.
@@ -246,16 +248,15 @@ impl State {
         let gamma = 2.0 * p.a * (RHO_ICE * G).powf(GLEN_N) / (GLEN_N + 2.0);
         let float = RHO_SEA / RHO_ICE;
         // The shortest distance between neighbouring cell centres, across or along a column.
-        let min_d2 = g
-            .dx
-            .iter()
-            .map(|d| d * d)
-            .chain(
-                (1..g.h)
-                    .filter(|&j| g.on[j - 1] && g.on[j])
-                    .map(|j| (g.y[j] - g.y[j - 1]) * (g.y[j] - g.y[j - 1])),
-            )
-            .fold(f64::INFINITY, f64::min);
+        let min_d2 =
+            g.dx.iter()
+                .map(|d| d * d)
+                .chain(
+                    (1..g.h)
+                        .filter(|&j| g.on[j - 1] && g.on[j])
+                        .map(|j| (g.y[j] - g.y[j - 1]) * (g.y[j] - g.y[j - 1])),
+                )
+                .fold(f64::INFINITY, f64::min);
         // The fastest ice (thick, steep margins) is held to the diffusivity an explicit step of
         // `MIN_STEP_YEARS` can carry: the few faces above it would otherwise set every cell's time
         // step (a year or less) for a flux the mass balance bounds anyway.
@@ -589,7 +590,10 @@ mod tests {
         let v1 = st.volume_m3(&g);
         assert!((v1 - v0).abs() < 1e-4 * v0, "{v0} → {v1}");
         assert!(st.thick[9 * fw + 39] > 0.0, "the dome spread");
-        assert!(st.thick[..fw].iter().all(|&x| x == 0.0), "nothing past the pole");
+        assert!(
+            st.thick[..fw].iter().all(|&x| x == 0.0),
+            "nothing past the pole"
+        );
     }
 
     #[test]
