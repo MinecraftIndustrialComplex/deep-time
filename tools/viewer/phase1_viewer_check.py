@@ -167,6 +167,7 @@ def main():
             # 6c. layers: the layer list, and that choosing others redraws the frame.
             names = page.js("[...document.getElementById('kflayer').options].map(o => o.textContent)") or []
             hashes = set()
+            trace = []
             for i in range(min(len(names), 6)):
                 set_layer(page, i)
                 fp = page.js(CANVAS)
@@ -176,8 +177,10 @@ def main():
                 while time.time() < end and not (fp and fp["nonblank"] > 1000 and fp["hash"] not in hashes):
                     time.sleep(0.5)
                     fp = page.js(CANVAS)
+                trace.append((i, fp and fp["nonblank"], fp and fp["hash"]))
                 if fp and fp["nonblank"] > 1000:
                     hashes.add(fp["hash"])
+            print("layers trace (index, non-blank samples, hash):", trace, flush=True)
             page.shot(os.path.join(a.out, "layers.png"))
             check(len(names) >= 5 and len(hashes) >= 3, "the viewer shows layers",
                   f"{len(names)} keyframe layers ({', '.join(names[:8])}…); {len(hashes)} different pictures over the first {min(len(names), 6)}")
