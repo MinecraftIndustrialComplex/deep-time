@@ -170,6 +170,12 @@ def main():
             for i in range(min(len(names), 6)):
                 set_layer(page, i)
                 fp = page.js(CANVAS)
+                # The picture loads asynchronously (a loaded VM took longer than set_layer's pause): wait for the
+                # canvas to show something new, up to 20 s, before counting it.
+                end = time.time() + 20
+                while time.time() < end and not (fp and fp["nonblank"] > 1000 and fp["hash"] not in hashes):
+                    time.sleep(0.5)
+                    fp = page.js(CANVAS)
                 if fp and fp["nonblank"] > 1000:
                     hashes.add(fp["hash"])
             page.shot(os.path.join(a.out, "layers.png"))
