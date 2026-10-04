@@ -822,30 +822,32 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         // the drawn height between its old column and its new one (the resampling smooths the
         // terrain a little, more near the poles), so a crater's lens stays under the floor and a
         // placer on the ground.
-        let detail = |amp: Option<&LoadedLayer>, c: u32, wpj: &WorldProjection| match (
-            amp,
-            spec.as_ref(),
-            spec_seed,
-        ) {
-            (Some(a), Some(s), Some(seed)) => Some((
-                a,
-                s.clone(),
-                deeptime_format::Noise::for_world(seed, c, wpj),
-            )),
+        // The detail term of a drawing: its noise (spec and seed) for x period `c` in projection
+        // `wpj`; paired with the amplitude layer below (a plain fn keeps the borrow's lifetime).
+        let noise = |c: u32, wpj: &WorldProjection| match (spec.as_ref(), spec_seed) {
+            (Some(s), Some(seed)) => Some((s.clone(), deeptime_format::Noise::for_world(seed, c, wpj))),
             _ => None,
         };
+        fn pair<'a>(
+            amp: Option<&'a LoadedLayer>,
+            n: Option<(deeptime_format::DetailSpec, deeptime_format::Noise)>,
+        ) -> Option<(&'a LoadedLayer, deeptime_format::DetailSpec, deeptime_format::Noise)> {
+            match (amp, n) {
+                (Some(a), Some((s, n))) => Some((a, s, n)),
+                _ => None,
+            }
+        }
         let old = Drawn {
             elev: &elev_src,
-            detail: detail(
+            detail: pair(
                 amp_src.as_ref(),
-                c_sim,
-                &WorldProjection::Lambert(Projection::new(c_sim)),
+                noise(c_sim, &WorldProjection::Lambert(Projection::new(c_sim))),
             ),
             c: f64::from(c_sim),
         };
         let new = Drawn {
             elev: we,
-            detail: detail(world_amp.as_ref(), period, &wp),
+            detail: pair(world_amp.as_ref(), noise(period, &wp)),
             c: f64::from(period),
         };
         new_bodies = bs
