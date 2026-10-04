@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
 #
-# Cold deserts (2026-10-02 owner answer): the surface biomes of a finished quick-planet run through a
-# profile's biome source, by Koppen class. Takes the world data `peat-runs.sh run <name>`
+# Cold wetland (2026-10-03 owner answer, taiga or peatland): the surface biomes of a finished quick-planet run through a
+# profile's biome source, by Koppen class, and the census of the bake's cold-wetland columns. Takes the world data `peat-runs.sh run <name>`
 # wrote, puts it in the profile's smoke server (no new simulation), boots it and runs
 # `/deeptime probe biomes 16`; the grid lands in <runs>/<name>-<profile>-biomemap.json and
 # `tools/review/biomemap_shares.py` turns it into shares per class.
@@ -25,4 +25,10 @@ if [ -d "$world/deeptime" ]; then cp -R "$world/deeptime" "$server/planet/deepti
 python3 tools/smoke/run.py --profile "$profile" --rcon "deeptime probe biomes 16" --timeout 3000 || true
 cp "$server/deeptime-probe/biomemap.json" "$RUNS/$name-$profile-biomemap.json"
 cp "$server/planet/deeptime/climate_mapping.json" "$RUNS/$name-$profile-climate_mapping.json" 2>/dev/null || true
-python3 tools/review/biomemap_shares.py "$RUNS/$name-$profile-biomemap.json" --classes BWk,BSk,BWh,BSh,ET,EF --top 14
+python3 tools/review/biomemap_shares.py "$RUNS/$name-$profile-biomemap.json" --classes Dfc,Dfd,Dsc,Dwc,Dfb,Cfb --top 14
+python3 - "$RUNS/$name-$profile-biomemap.json" <<'PY'
+import json, sys
+c = json.load(open(sys.argv[1]))["census"]
+print("cold_wetland", json.dumps(c.get("cold_wetland")))
+print("wetlands_set_aside", json.dumps(c.get("wetlands_set_aside")))
+PY
