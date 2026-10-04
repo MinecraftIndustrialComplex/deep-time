@@ -1,6 +1,8 @@
 {
   "generator.deeptime.planet": "Deep Time Planet",
   "generator.deeptime.planet_32k": "Deep Time Planet (32k)",
+  "generator.deeptime.planet_lambert": "Deep Time Planet (Lambert map)",
+  "generator.deeptime.planet_lambert_32k": "Deep Time Planet (Lambert map, 32k)",
 
   "deeptime.editor.title": "Deep Time — Planet",
   "deeptime.editor.section.preset": "Preset",
@@ -437,6 +439,8 @@
   "deeptime.polecap.storm": "Polar storm (%s): the wind is pushing you back toward the equator",
   "deeptime.polecap.storm.no_wind": "Polar storm (%s): the world ends at %s",
   "deeptime.polecap.stop": "You cannot go any further: %s is the edge of the world",
+  "deeptime.edgeborder.near": "Near the world's %s edge: a temporary border stops you here until the seam is built",
+  "deeptime.edgeborder.stop": "The world's %s edge is closed for now: the seam that joins it is not built yet",
 
   "deeptime.wrap.create.refused.custom_kinetic": "Belts, chain conveyors and gantries cannot connect across a turning seam yet",
   "deeptime.wrap.create.refused.belt": "Belts cannot cross or touch a turning seam yet",

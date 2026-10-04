@@ -60,9 +60,10 @@ public final class RasterSampler {
         return tileFor(i, j).raw(i % tile, j % tile);
     }
 
-    /** The raw value at cell (i, j), x wrapped, z clamped. */
+    /** The raw value at cell (i, j), x wrapped, z clamped or folded through the edges ({@link GridDesc#cell}). */
     public double raw(long i, long j) {
-        return rawCell(grid.wrapI(i), grid.clampJ(j));
+        long c = grid.cell(i, j);
+        return rawCell(GridDesc.cellI(c), GridDesc.cellJ(c));
     }
 
     /** The physical value at cell (i, j), x wrapped, z clamped; NaN for nodata. */
@@ -125,34 +126,39 @@ public final class RasterSampler {
         return desc.stackDepth();
     }
 
-    /** Horizon k's top in blocks at cell (i, j) (x wrapped, z clamped); NaN if unused. */
+    /** Horizon k's top in blocks at cell (i, j) (x wrapped, z clamped or folded); NaN if unused. */
     public double horizonTop(long i, long j, int k) {
-        int ci = grid.wrapI(i), cj = grid.clampJ(j);
+        long cell = grid.cell(i, j);
+        int ci = GridDesc.cellI(cell), cj = GridDesc.cellJ(cell);
         short top = tileFor(ci, cj).horizonTop(ci % tile, cj % tile, k);
         return top == Short.MIN_VALUE ? Double.NaN : top * desc.scale() + desc.offset();
     }
 
     /** Horizon k's raw top (1/16 block) at cell (i, j). */
     public short horizonTopRaw(long i, long j, int k) {
-        int ci = grid.wrapI(i), cj = grid.clampJ(j);
+        long cell = grid.cell(i, j);
+        int ci = GridDesc.cellI(cell), cj = GridDesc.cellJ(cell);
         return tileFor(ci, cj).horizonTop(ci % tile, cj % tile, k);
     }
 
     /** Horizon k's class index at cell (i, j); 255 if unused. */
     public int horizonClass(long i, long j, int k) {
-        int ci = grid.wrapI(i), cj = grid.clampJ(j);
+        long cell = grid.cell(i, j);
+        int ci = GridDesc.cellI(cell), cj = GridDesc.cellJ(cell);
         return tileFor(ci, cj).horizonClass(ci % tile, cj % tile, k);
     }
 
     /** Horizon k's stratigraphic key top at cell (i, j) (format 0.2); 65535 if unused. */
     public int horizonKeyTop(long i, long j, int k) {
-        int ci = grid.wrapI(i), cj = grid.clampJ(j);
+        long cell = grid.cell(i, j);
+        int ci = GridDesc.cellI(cell), cj = GridDesc.cellJ(cell);
         return tileFor(ci, cj).horizonKeyTop(ci % tile, cj % tile, k);
     }
 
     /** Horizon k's stratigraphic key base at cell (i, j) (format 0.2); 65535 if unused. */
     public int horizonKeyBase(long i, long j, int k) {
-        int ci = grid.wrapI(i), cj = grid.clampJ(j);
+        long cell = grid.cell(i, j);
+        int ci = GridDesc.cellI(cell), cj = GridDesc.cellJ(cell);
         return tileFor(ci, cj).horizonKeyBase(ci % tile, cj % tile, k);
     }
 }

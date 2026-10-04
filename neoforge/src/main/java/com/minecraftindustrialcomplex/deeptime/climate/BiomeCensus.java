@@ -170,7 +170,7 @@ public final class BiomeCensus {
         RasterSampler iceLayer = wd.has(IceCover.LAYER) ? wd.layer(IceCover.LAYER) : null;
         var sampler = level.getChunkSource().randomState().sampler();
         int c = t.circumference(), sea = g.getSeaLevel();
-        int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);   // the poles (the planet's projection)
+        int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
         int w = c / step, h = 2 * zp / step;
         short[] biomeIdx = new short[w * h];
         byte[] koppen = new byte[w * h];
