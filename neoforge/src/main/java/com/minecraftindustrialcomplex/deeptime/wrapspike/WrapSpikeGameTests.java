@@ -173,7 +173,9 @@ public final class WrapSpikeGameTests {
         // next to the far-side block (cx-7, z0), which is 13 blocks from the glowstone through ordinary
         // space (block light 2 at most that way) and 1 block through the seam (14).
         s.set(6, 1, 0, Blocks.GLOWSTONE.defaultBlockState());
-        helper.runAfterDelay(20, () -> {
+        // 100 ticks, not 20: like the item, the stand is only carried once its freshly forceloaded
+        // chunk's entities are accessible to the carry, which took more than 20 ticks in a 2026-10-04 run.
+        helper.runAfterDelay(100, () -> {
             check(Math.abs(walker.getX() - (s.cx() - 3.5)) < 1e-3 && Math.abs(walker.getZ() - (2 * s.z0() - (s.z0() - 0.4))) < 1e-3,
                     "armour stand carried to (%.3f, %.3f), expected (cx-3.5, z0+0.4) = (%.1f, %.1f)",
                     walker.getX(), walker.getZ(), s.cx() - 3.5, s.z0() + 0.4);

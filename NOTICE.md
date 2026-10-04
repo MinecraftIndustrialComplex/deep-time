@@ -16,6 +16,18 @@ and contribute no code.
 
 ## APIs called (nothing ported, nothing shipped)
 
+- **Create** 6.0.10 by the Create Team / the Creators of Create
+  (https://github.com/Creators-of-Create/Create), code MIT, assets all rights reserved. The wrap
+  engine's Create adapters (`neoforge/src/main/java/.../compat/create/wrap/` and
+  `.../mixin/wrapspike/compat/create/`, dev-only behind `-Ddeeptime.wrapspike=true`) are mixins into
+  Create's own classes (`RotationPropagator`, `DirectionalShaftHalvesBlockEntity`, `FluidPropagator`,
+  `PumpBlockEntity`, `PipeConnection`, `FlowSource`, `FluidNetwork`, `BeltConnectorItem`,
+  `ChainConveyorBlockEntity`, `TrackPlacement`, `TrackBlock`, `Contraption`) that call Create's code
+  with turned inputs; they are compiled against the Create jar (and the Ponder, Flywheel and
+  Registrate jars it nests), which is never included in Deep Time's jar. Create's source at tag
+  `mc1.21.1-6.0.10` was read to find the hook points; no code was copied or adapted, and no asset is
+  used.
+
 - **Distant Horizons** by James Seibel and the Distant Horizons team
   (https://gitlab.com/distant-horizons-team/distant-horizons), LGPL-3.0. When it is installed, Deep
   Time registers a world generator through its public API (`com.seibel.distanthorizons.api`:

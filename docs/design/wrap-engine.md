@@ -365,10 +365,10 @@ Mixin targets are Minecraft 1.21.1 / NeoForge 21.1.249 names [C].
 | Mod | What crosses, what does not | Work |
 |---|---|---|
 | **Toroidal World** | Guyou's slide edges are TW's x wrap as shipped. The engine adds only the two turning edges, which TW never sees: z does not loop for TW. Both fold x in the corner bands; the engine folds first, so TW sees in-bounds positions [I]. | Phase 4: coexistence tests; TW's client mirror re-bases after an engine teleport through `teleport()`, which TW hooks [C]. Peirce has no slide edges, so TW would have to go. |
-| **Create**, kinetic networks | Shafts, cogs and belts read neighbours through `getBlockState`/`getBlockEntity`, so they would connect across a seam. Under a half-turn a shaft's axis direction flips, so its speed sign must flip, and Create's propagation uses position differences between frames [I]. | Block kinetic connections across seams at first (a refusal in `RotationPropagator`); an adapter later. |
-| **Create**, contraptions | Carried as entities, yaw turned. Contraption entities hold their own blocks, so the band does not show them; ghosts do. | Phase 4. |
-| **Create**, trains | The track graph is keyed by absolute positions and curved tracks store absolute positions; an edge across a seam would join stored positions up to the world's width apart. TW needed its own fold for slides [C]. | Forbid tracks across turning seams at first; a seam-split graph edge later (10–20 days, no precedent). |
-| **Create**, fluids and pipes | Same as kinetics. | Same. |
+| **Create**, kinetic networks | Shafts, cogs and belts read neighbours through `getBlockState`/`getBlockEntity`, so they would connect across a seam. Under a half-turn a shaft's axis direction flips, so its speed sign must flip, and Create's propagation uses position differences between frames [I]. | **Adapter built** (§9.2): shafts and cogs connect across half- and quarter-turns with the speed sign turned; belts, chain conveyors and gantries are refused [R]. |
+| **Create**, contraptions | Carried as entities, yaw turned. Contraption entities hold their own blocks, so the band does not show them; ghosts do. | Assembly beyond a seam is refused with Create's own message, and contraption entities are left out of the carry (§9.5) [R]. Crossing: 11–19 days. |
+| **Create**, trains | The track graph is keyed by absolute positions and curved tracks store absolute positions; an edge across a seam would join stored positions up to the world's width apart. TW needed its own fold for slides [C]. | Track within a block of a seam is refused (§9.4) [R]. Crossing through a same-dimension portal edge: 13–22 days for a half-turn. |
+| **Create**, fluids and pipes | Pipe searches, pump pressure and the transfer network walk in one block's frame and hand faces to block entities stored in another. | **Adapter built** (§9.3): water pumped across a half-turn reaches a tank on the far side [R]. |
 | **Sable** | Bodies cross through Sable's public `PhysicsPipeline.teleport(body, position, orientation)` with the orientation turned. Terrain near a seam comes from the band. | Phase 4. TW's Sable bridge refuses any turn (`requireTranslation`) [C], so the engine owns this for its turning edges. |
 | **C2ME** | Server chunk system and compiled density functions. | Phase 2 (§4.4) and band sync off-thread (§4.2). |
 | **Sodium** | Renders the band as ordinary chunks. | Only the optional re-anchor touches it. |
@@ -524,3 +524,341 @@ is written from the mathematics in §1. So nothing is added to NOTICE.md.
    at the spike until the projection survey settles the layout?**
    - The engine takes any layout of translations, half-turns and quarter-turns, so the survey does not
      block Phase 1.
+
+## 9. Create across turning seams
+
+**Status (2026-10-04).** Built and run in parallel with Phase 1, as Ben asked in the decisions log on
+2026-10-03: "If it can be done in parallel, do it now, otherwise defer. But we should be doing it."
+The code sits on the spike's fold API and runs only with `-Ddeeptime.wrapspike=true` and Create
+installed:
+- `neoforge/src/main/java/.../compat/create/wrap/` holds:
+  - `SeamFrames`, the only class that touches the engine;
+  - `SeamTurns`, the pure algebra;
+  - `KineticSeams`, `SeamRefusals` and `CreateWrapCompat`;
+  - the GameTests, `CreateSeamGameTests` and `CreateSeamChecks`.
+- `neoforge/src/main/java/.../mixin/wrapspike/compat/create/` holds 15 mixins, listed in
+  `deeptime.wrapspike.mixins.json`. `DeepTimeMixinPlugin` applies a mixin in
+  `mixin.wrapspike.compat.<modid>` only when the flag is set and that mod is installed.
+
+**Create version.** 6.0.10 for NeoForge 1.21.1, as the MIC pack pins it (`pack/mods/create.pw.toml`,
+`smoke/mic/server/mods/create-1.21.1-6.0.10.jar`).
+- **Licence.** Create's code is MIT; its assets are all rights reserved.
+- **What was used.** The source at tag `mc1.21.1-6.0.10` was read to find the hooks. Nothing was copied:
+  the mixins call Create's own methods with turned inputs (NOTICE.md).
+
+### 9.1 What a turn does to Create's quantities
+
+**Speed.**
+- Create stores a kinetic block's speed as a signed angular velocity about the *positive* direction of
+  its rotation axis. `KineticBlockEntity.convertToDirection` flips the sign for a face on the negative
+  side [C].
+- An angular velocity is an axial vector, but under a proper rotation (a turn about the vertical) it
+  turns like an ordinary one: ω′ = Rω.
+- So a speed s about +a, seen through a turn R, is s about R(+a). Where R(+a) is a negative direction,
+  the far block's stored speed is −s:
+
+| Turn (clockwise from above) | x axis | z axis | y axis |
+|---|---|---|---|
+| 0° | x, + | z, + | y, + |
+| 90° | z, + | x, **−** | y, + |
+| 180° | x, **−** | z, **−** | y, + |
+| 270° | z, **−** | x, + | y, + |
+
+- **A half-turn** flips the sign of every horizontal speed (shafts and cogs along x or z) and keeps
+  every vertical one.
+- **A quarter-turn** swaps x and z and flips exactly one of them.
+- **The gear ratio does not change.** A cog pair across a seam still reverses, and a large-to-small
+  pair is still 2:1. Only the frame of the stored number changes.
+
+**Axes and faces.**
+- The folded access already turns block states (`state.rotate`).
+- Every *direction* that Create hands from one block entity to another must be turned the same way:
+  a pipe connection's side, a pump's front, a gearbox's source face.
+
+**Unit test.** `SeamTurnsTest` checks:
+- the table, against the turned unit vectors;
+- that the signs compose like the turns;
+- on the spike seam, Guyou, Peirce and a quarter-turn corner, that every stored block next to a seam
+  finds its neighbour's band image and the way back;
+- that the two links' turns cancel, so a speed sent across and back returns with its own sign and
+  Create's propagation cannot flicker.
+
+**Turn points.** At a turn point a block can be its own neighbour across the seam: it sees itself,
+turned. No rotation agrees with itself through a quarter-turn, so the adapter never connects a block
+to itself.
+
+### 9.2 Kinetics [R]
+
+**How Create connects** [C]:
+- `RotationPropagator` walks from a block entity to the six faces (and diagonals, for cogs) by
+  `pos.relative(face)`.
+- `getRotationSpeedModifier(from, to)` decides the connection and the ratio from the two block states
+  and `diff = to.getBlockPos() − from.getBlockPos()`.
+- `setSource(neighbour.getBlockPos())` stores the source's absolute position.
+
+**What folded access does on its own.**
+- The walk reaches the band position, and the Level answers with the far block entity. That block
+  entity's `getBlockPos()` is its stored position, up to the world's width away. Its state is in its
+  own frame.
+- Usually Create then sees no connection.
+- Worse, an axis connection only checks that `diff` lies along one axis, never its length. Take two
+  parallel x shafts on either side of a north–south seam whose stored positions line up in x: Create
+  would call them "connected". So the adapter must never use Create's answer for a pair that is not
+  adjacent in stored space.
+
+**The adapter** (`KineticSeams`, `RotationPropagatorSeamMixin`):
+- A `@WrapMethod` on `getRotationSpeedModifier` keeps Create's answer for a pair that is adjacent in
+  stored space.
+- Otherwise it looks for `to`'s band image next to `from` (`SeamFrames.link`, by `images`).
+- If there is one, it runs Create's method again with `to` as `from` sees it:
+  - `to.getBlockPos()` is answered with the band position;
+  - `to.getBlockState()` is answered with the state turned back;
+  - `getAxisModifier(to, face)` gets the face turned into `to`'s frame.
+- The ratio that comes out is in `from`'s frame. It is multiplied by the axis sign (§9.1) of the axis
+  `to` is seen with.
+- So all of Create's own rules apply unchanged: cogs, large cogs, chain drives, and the modifiers of
+  gearboxes and split shafts. So does any addon cog that implements `ICogWheel`.
+
+**A source across the seam.**
+- Create stores the source's stored position.
+- Every comparison Create makes with it is between stored positions (`propagateMissingSource`,
+  `handleRemoved`, `validateKinetics`), so it stays consistent.
+- Only `DirectionalShaftHalvesBlockEntity.getSourceFacing` derives a face from it. That covers
+  gearboxes, clutches, gearshifts and sequenced gearshifts. A mixin answers it with the face the
+  source is seen through.
+
+**Custom connections are refused across a seam.**
+- These are the `propagateRotationTo` overrides: belts, chain conveyors, gantry shafts and carriages.
+- Their partners are found through stored absolute positions or offsets, which a turn does not carry.
+- The connection is not made, and the server logs it.
+
+**Evidence** (`./gametest.sh -PwithMic -PwrapSpike` on the test VM, 2026-10-04).
+- Each build is placed with the same code on a glued site and on a control site with no seam, then
+  compared block by block.
+- **`createKineticsAcrossHalfTurn`**:
+  - A z shaft line, driven by a creative motor at 16 rpm, runs 5 blocks to the seam and 3 beyond.
+  - The far shafts are stored at (cx−2, z0…z0+2) with axis z and speed **+16**. The control's speed
+    is −16.
+  - A vertical cog line keeps its sign: far −16 / +16, control −16 / +16.
+  - An x cog line flips: far +16 / −16, control −16 / +16.
+  - Breaking the shaft next to the motor stops all 7 remaining shafts, the far 3 included.
+- **`createKineticsAcrossQuarterTurn`**:
+  - A z shaft line that crosses a quarter-turn edge lands as an **x** line, stored at
+    (x0…x0+2, z0+6). Its speed is +16; the control's is −16.
+  - A vertical cog line keeps its sign.
+- All assertions held.
+
+### 9.3 Fluids [R]
+
+**How Create moves fluid** [C]:
+- Three walks start from one block and move by `pos.relative(face)`, in that block's frame:
+  - `FluidPropagator.propagateChangedPipe`, which finds pumps;
+  - `PumpBlockEntity.distributePressureTo`, the pump's pressure search;
+  - `FluidNetwork`, the transfer network.
+- Under folded access each walk continues straight through a seam in unfolded coordinates. Its reads
+  and states stay consistent there.
+- What breaks is every place where a *face* is handed to a block entity reached through a band
+  position. Pipe connections are keyed by face, in the owner's stored frame.
+
+**The adapter** turns that face into the target's frame (`SeamFrames.toStoredFrame`) at each such place:
+
+| Where | What is turned |
+|---|---|
+| `FluidPropagator.propagateChangedPipe` | the side a pump found across the seam is told to update |
+| `FluidPropagator.resetAffectedFluidNetworks` | the connection looked up on a pipe across the seam |
+| `FluidPropagator.hasFluidCapability` | the capability side (sided handlers) |
+| `PumpBlockEntity.distributePressureTo` | the side pressure is added to |
+| `PumpBlockEntity.hasReachedValidEndpoint` | another pump's front; a fluid handler's side |
+| `FlowSource.OtherPipe.provideFluid` | the neighbour's outward face |
+| `FlowSource.FluidHandler` (its capability cache, `lambda$manageSource$2` in 6.0.10) | the handler's side |
+| `FluidNetwork.get` | the connection's face |
+| `PipeConnection.determineSource` | called with the owner's band position, which is folded to its stored position first |
+
+**Evidence: `createFluidsAcrossHalfTurn`.**
+- The build, in order: a creative tank of water, a pipe, a mechanical pump pushing north, 4 pipes to
+  the seam, 2 pipes beyond it, and a fluid tank.
+  - A cog and a creative motor drive the pump.
+  - The fluid tank is set at a band offset, so it is stored on the far side, at (cx−3, z0+2).
+- After 120 ticks the far tank holds **104 mB** of water, the same as the control tank (104 mB).
+- The pipes are Create's ordinary pipe block. Its connections are computed from neighbours read
+  through the seam.
+
+### 9.4 Trains
+
+**Assessment** [C, from Create's `content/trains`, read by an Opus sub-agent with paths cited]:
+
+**The graph is absolute.**
+- `TrackNodeLocation` is absolute half-block coordinates plus a dimension. `TrackGraph` keys its nodes
+  by it.
+- A straight `TrackEdge` has no geometry of its own: its length, positions and direction come from its
+  two nodes.
+- A `BezierConnection` holds absolute positions.
+- Edge points (signals, stations) store a node pair and a distance along the edge.
+- So an edge whose ends lie on opposite sides of a turning seam would be a chord through the world.
+  `canTravelTo` requires a dot product above 7/8, so it would fail at both ends.
+
+**Folded access alone builds a second graph.**
+- `ITrackBlock.walkConnectedTracks` reads band blocks, and `TrackPropagator` carries the graph on in
+  band coordinates.
+- The far track's own propagation builds the mirror copy. The same track then sits in two graphs that
+  never merge.
+- A train on the band copy is re-aligned from the graph every tick (`Carriage.manageEntities` →
+  `alignEntity`), so the engine's carry and the graph would fight.
+- That train would not see the far side's stations and signals.
+
+**The precedent is Create's portal tracks.**
+- `PortalTrackProvider` maps `findExit(ServerLevel, BlockFace)` to `Exit(ServerLevel, BlockFace)`,
+  keyed by portal block. It joins two track ends by a zero-length "inter-dimensional" edge that skips
+  the direction check.
+- Each side is aligned on its own, and exits facing another way are already handled.
+- A carriage straddling a portal has one entity per dimension (`Carriage.entities`, keyed by
+  dimension), with cut-off planes and passenger hand-over.
+- A turning seam has exactly the portal shape: the inbound end points into the seam, the outbound end
+  out of it.
+- What blocks a same-dimension portal is that Create treats "same dimension" as "same frame"
+  everywhere:
+  - `interDimensional` is computed from the dimension alone, on the client too;
+  - there is one carriage entity per dimension;
+  - about 23 `dimension.equals` checks remain in `content/trains`;
+  - `forceNode` keys on the dimension;
+  - passenger transfer assumes a change of dimension.
+
+**Estimate: 13–22 agent days for a half-turn**, by the portal route:
+
+| Work | Days |
+|---|---|
+| Walk filter and band guard | 0.5–1 |
+| Binding seam ends and forcing nodes | 1.5–3 |
+| Generalising "dimension" to "frame", with client mixins (the client builds track edges itself) | 5–8 |
+| Carry exclusion, turned passengers, cut-off and ghosts, chunk loading on both sides | 2–3 |
+| Signals, stations, relocation and navigation | 2–3 |
+| Tests | 2–4 |
+
+- A quarter-turn adds 2–4 days, and track must be forbidden near turn points (`findPivot` assumes a
+  carriage spans at most two frames).
+- A native split edge without the portal machinery would take 20–35 days.
+- The doc's earlier 10–20 days roughly holds, raised at the low end.
+
+**Prototype: not built.** It does not fit beside Phase 1:
+- it needs a client part;
+- it needs Create's dimension handling generalised, which should start from Phase 1's final topology
+  API.
+
+**Refused now** (both refusals are tested):
+- **The track tool** (`TrackPlacementSeamMixin`) refuses a curve or straight run whose box comes within
+  a block of a seam. It does so before anything is placed or paid for. Create's own path shows the
+  refusal on the action bar with the deny sound (`create.track.deeptime_seam`).
+- **Any track block** (`TrackBlockSeamMixin`) within a block of a seam is broken and dropped one tick
+  after it is placed, before it joins the graph. That covers track placed by hand, by schematic or by
+  the tool.
+
+### 9.5 Contraptions
+
+**Assessment** [C, same sub-agent]:
+
+**Assembly** (`Contraption.searchMovedStructure`, `moveBlock`) reads through the Level, so a structure
+reaching beyond a seam would capture the far-side states turned correctly. Three things would still be
+wrong:
+- captured block-entity NBT is not turned;
+- multiblock controllers are subtracted from absolute stored positions;
+- glue in the band is not found.
+
+**Disassembly** writes back through `setBlock`, which is folded, but it turns block entities only by
+the contraption's own rotation.
+
+**The entities** follow something other than their own position, so the engine's carry would fight
+them. (The carry is a `moveTo` plus a yaw turn when an entity's position passes an edge.)
+- `ControlledContraptionEntity` (bearings, pistons, pulleys, gantries) follows its anchor. Pistons and
+  gantries reset their position every tick.
+- `OrientedContraptionEntity` (minecarts, trains) keeps its own yaw and follows its cart or its train's
+  graph.
+
+**Collisions** (`ContraptionCollider`) read world blocks through the Level, so they are folded. But
+entities on the far side sit at their stored coordinates, so a structure reaching into the band passes
+through them.
+
+**Estimate: about 11–19 days.**
+
+| Work | Days |
+|---|---|
+| Refusals and carry exclusion | 1–2 |
+| Structures that reach across while their anchor stays stored: turned block-entity NBT, controllers, glue, ghosts, far-side collisions | 6–10 |
+| Minecart contraptions crossing: carried as a unit, yaw and targetYaw turned, couplings by nearest image | 4–7 |
+
+**Done now:**
+- **Assembly is refused.** `ContraptionSeamMixin` throws Create's `AssemblyException` with
+  `deeptime.wrap.create.refused.contraption` when any captured block lies beyond a seam.
+  - The message shows on the controller's goggle tooltip.
+  - Every contraption kind assembles through this method, trains included.
+- **Contraption entities are left out of the carry.** `CreateWrapCompat` registers a veto in the
+  spike's new `WrapEngine.CARRY_VETO`. It covers contraption entities and any vehicle carrying one.
+
+**Not refused yet: movement into the band** by an assembled piston or gantry. Its collider sees the far
+side's blocks, but empty band space lets it in. The hook is `ContraptionCollider.isCollidingWithWorld`
+[C, not built].
+
+### 9.6 Other refusals
+
+- **Belts.** `BeltConnectorItem.canConnect` refuses a belt whose span touches a band position. Belt
+  segments find their controller by absolute position.
+- **Chain conveyors.** `ChainConveyorBlockEntity.addConnectionTo` refuses one whose span touches a band
+  position. Their connections are stored as offsets.
+- **How a refusal is reported.** Each refusal:
+  - logs one line per place and kind;
+  - shows its reason on the action bar of players within 16 blocks (`deeptime.wrap.create.refused.*`).
+
+  Nothing throws, apart from Create's own assembly exception.
+
+### 9.7 What waits for Phase 1, and why
+
+**The API swap.** Every adapter reaches the engine through `SeamFrames`: `fold`, `stored`,
+`toStoredFrame`, `link` (by `WrapTopology.images`) and `anyBeyond`. When Phase 1's folded-access API
+lands, only that class changes.
+
+**Rotating shafts and pipe flow in the band, on the client.**
+- The band holds turned block states and no block entities. A client that looks at the band therefore
+  sees no turning shaft, no pipe flow and no goggle data across the seam.
+- Phase 1 plans to send band block-entity data with a turned tag (§4.2). For Create that tag needs:
+  - `Speed` multiplied by the axis sign (§9.1);
+  - `Source` moved to its band image;
+  - pipe connections re-keyed by the turned face.
+- The rule for turning the tag is here; the hook that sends band block entities is Phase 1's.
+
+**Loaded band chunks.**
+- Create checks `level.isLoaded(neighbour)` before it steps to a neighbour. So a network reaches across
+  a seam only while the band chunk there is loaded.
+- The tests forceload it.
+- In play, Phase 1's band manager must keep loaded the band chunks next to a loaded stored chunk
+  (tickets). Otherwise networks stop at the seam until a player comes near.
+
+**Depth of the walk.**
+- Pipe searches and pump pressure walk on through the band in unfolded coordinates.
+- With a bounded band (the spike's test sites, depth 8), a far-side run longer than the depth is not
+  reached.
+- With Phase 1's whole-world topologies the fold has no depth limit.
+
+**Cost.**
+- The kinetic adapter calls `images` only near an edge, and only for a pair that is not adjacent in
+  stored space or whose direct answer is 0.
+- Propagation runs only when blocks change, not every tick.
+- The hot-path work is Phase 1's (§5).
+
+**Redstone under MIC** (found here; not a Create issue).
+- The spike's own `redstonePowersAcrossSeam` passes without MIC but **fails with the MIC set**: the
+  wire placed beyond the seam reads 0 after 13.
+- All the other spike tests pass with MIC.
+- The likely cause is MIC's Alternate Current 1.9.0, which replaces redstone wire propagation with its
+  own level access [I, not read].
+- Phase 1 or Phase 4 must fold Alternate Current's level access.
+
+### 9.8 Running the tests
+
+- `./gametest.sh -PwithMic -PwrapSpike`, through `tools/remote/mac.sh`, runs the spike's tests and the
+  four Create tests (Create is in the MIC set):
+  - `createKineticsAcrossHalfTurn`;
+  - `createKineticsAcrossQuarterTurn`;
+  - `createFluidsAcrossHalfTurn`;
+  - `createRefusalsAtSeam`: a belt, a bearing and a track, each with a control on this side that still
+    works.
+- Under plain `./gametest.sh -PwrapSpike` the Create tests log that they were skipped, and pass.
+- The tests use sites 8–14 of the spike's grid (x = 4096 + 64k).
