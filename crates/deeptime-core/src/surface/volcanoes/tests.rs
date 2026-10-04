@@ -121,6 +121,129 @@ fn the_front_is_the_middle_of_the_arc_band() {
     );
 }
 
+/// `volcanic_front` as it was before P1-17 (serial maps, raster sweeps over every cell).
+fn volcanic_front_reference(
+    grid: &GridDesc,
+    flux: &[f64],
+    elev: &[f32],
+    sea: f64,
+    min_flux: f64,
+) -> Vec<bool> {
+    let (w, h) = (grid.w as usize, grid.h as usize);
+    let n = w * h;
+    let mask: Vec<bool> = (0..n)
+        .map(|c| flux[c] >= min_flux && f64::from(elev[c]) >= sea - FRONT_MAX_DEPTH_M)
+        .collect();
+    let at = |i: i64, j: i64| -> Option<usize> {
+        (j >= 0 && j < h as i64).then(|| j as usize * w + i.rem_euclid(w as i64) as usize)
+    };
+    let morph = |src: &[bool], any: bool| -> Vec<bool> {
+        (0..n)
+            .map(|c| {
+                let (i, j) = ((c % w) as i64, (c / w) as i64);
+                let mut hit = !any;
+                for dj in -1..=1 {
+                    for di in -1..=1 {
+                        if let Some(m) = at(i + di, j + dj) {
+                            if any && src[m] {
+                                hit = true;
+                            } else if !any && !src[m] {
+                                hit = false;
+                            }
+                        }
+                    }
+                }
+                hit
+            })
+            .collect()
+    };
+    let closed = morph(&morph(&mask, true), false);
+    let inf = f32::INFINITY;
+    let mut dist: Vec<f32> = closed.iter().map(|&m| if m { inf } else { 0.0 }).collect();
+    let (a, b) = (1.0f32, std::f32::consts::SQRT_2);
+    for _ in 0..2 {
+        for j in 0..h as i64 {
+            for i in 0..w as i64 {
+                let c = j as usize * w + i as usize;
+                for (di, dj, s) in [(-1, 0, a), (-1, -1, b), (0, -1, a), (1, -1, b)] {
+                    if let Some(m) = at(i + di, j + dj) {
+                        dist[c] = dist[c].min(dist[m] + s);
+                    }
+                }
+            }
+        }
+        for j in (0..h as i64).rev() {
+            for i in (0..w as i64).rev() {
+                let c = j as usize * w + i as usize;
+                for (di, dj, s) in [(1, 0, a), (1, 1, b), (0, 1, a), (-1, 1, b)] {
+                    if let Some(m) = at(i + di, j + dj) {
+                        dist[c] = dist[c].min(dist[m] + s);
+                    }
+                }
+            }
+        }
+    }
+    (0..n)
+        .map(|c| {
+            if !closed[c] {
+                return false;
+            }
+            let (i, j) = ((c % w) as i64, (c / w) as i64);
+            let d = dist[c];
+            let near_mask =
+                (-1..=1).any(|dj| (-1..=1).any(|di| at(i + di, j + dj).is_some_and(|m| mask[m])));
+            near_mask
+                && d.is_finite()
+                && (-1..=1).all(|dj| {
+                    (-1..=1).all(|di| at(i + di, j + dj).is_none_or(|m| dist[m] <= d + 1e-3))
+                })
+        })
+        .collect()
+}
+
+/// P1-17: the parallel front with sweeps over the mask's cells only is the old front, cell for
+/// cell, on random arc bands and patches (some across the x seam, some on the first and last
+/// rows, some in trenches), at 1, 3 and 8 threads.
+#[test]
+fn the_front_matches_its_reference() {
+    let grid = GridDesc::for_planet("L1", 4096, 16).unwrap();
+    let (w, h, n) = (grid.w as usize, grid.h as usize, grid.cells());
+    for seed in 1..=4u64 {
+        let mut rng = crate::sphere::SplitMix64::new(seed);
+        let mut flux = vec![0.0f64; n];
+        let mut elev = vec![0.0f32; n];
+        for _ in 0..12 {
+            let (i0, j0) = (rng.below(w as u64) as usize, rng.below(h as u64) as usize);
+            let (len, wid) = (5 + rng.below(60) as usize, 1 + rng.below(6) as usize);
+            let striped = rng.below(3) == 0;
+            let deep = rng.below(5) == 0;
+            for dj in 0..wid {
+                let j = (j0 + dj).min(h - 1);
+                if striped && dj % 2 == 1 {
+                    continue;
+                }
+                for di in 0..len {
+                    let c = j * w + (i0 + di) % w;
+                    flux[c] = 0.1 + 0.9 * rng.next_f64();
+                    if deep {
+                        elev[c] = -6000.0;
+                    }
+                }
+            }
+        }
+        let want = volcanic_front_reference(&grid, &flux, &elev, 0.0, 0.25);
+        assert!(want.iter().any(|&f| f), "seed {seed}: some front");
+        for threads in [1, 3, 8] {
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .unwrap();
+            let got = pool.install(|| volcanic_front(&grid, &flux, &elev, 0.0, 0.25));
+            assert_eq!(got, want, "seed {seed}, {threads} threads");
+        }
+    }
+}
+
 /// A volcano of the given kind, active, 900 m tall, for the rate checks.
 fn test_volcano(kind: Kind, oceanic: bool) -> Volcano {
     Volcano {
