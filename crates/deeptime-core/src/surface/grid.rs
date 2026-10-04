@@ -70,10 +70,20 @@ impl Dims {
         }
     }
 
-    /// The eight neighbours of `c` with their distances.
+    /// The eight neighbours of `c` with their distances: [`Dims::neighbour`] and
+    /// [`Dims::step_len`] for k = 0..8, with the cell's column and row found once instead of
+    /// once per neighbour (P1-17: the two integer divisions per neighbour were most of the cost
+    /// of the kernels that walk them).
     #[inline]
     pub fn neighbours(&self, c: usize) -> impl Iterator<Item = (usize, f64)> + '_ {
-        (0..8).filter_map(move |k| self.neighbour(c, k).map(|n| (n, self.step_len(k))))
+        let ij = (c % self.w, c / self.w);
+        (0..8).filter_map(move |k| {
+            let (di, dj, _) = OFFSETS[k];
+            let (ni, nj) =
+                deeptime_format::projection::neighbour(self.w, self.h, self.wrap_x, ij, (di, dj))?;
+            let n = nj * self.w + ni;
+            (n != c).then(|| (n, self.step_len(k)))
+        })
     }
 
     /// Distance between two neighbouring cells, metres (dx or dx·√2).
@@ -158,6 +168,25 @@ mod tests {
         assert!((d.dist(0, 5) - 10.0 * std::f64::consts::SQRT_2).abs() < 1e-12);
         let closed = Dims::new(4, 3, 10.0, false);
         assert_eq!(closed.neighbours(0).count(), 3);
+    }
+
+    /// `neighbours` is `neighbour` and `step_len` for k = 0..8, cell by cell, on grids that wrap
+    /// and do not, including the one- and two-cell-wide and one-row ones.
+    #[test]
+    fn neighbours_match_the_one_at_a_time_rule() {
+        for &(w, h) in &[(1, 1), (1, 5), (2, 5), (5, 1), (3, 3), (17, 9), (64, 2)] {
+            for wrap in [true, false] {
+                let d = Dims::new(w, h, 7.5, wrap);
+                for c in 0..d.cells() {
+                    let fast: Vec<(usize, u64)> =
+                        d.neighbours(c).map(|(n, l)| (n, l.to_bits())).collect();
+                    let slow: Vec<(usize, u64)> = (0..8)
+                        .filter_map(|k| d.neighbour(c, k).map(|n| (n, d.step_len(k).to_bits())))
+                        .collect();
+                    assert_eq!(fast, slow, "{w}x{h} wrap {wrap} cell {c}");
+                }
+            }
+        }
     }
 
     #[test]
