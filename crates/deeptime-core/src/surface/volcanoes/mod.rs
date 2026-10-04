@@ -73,6 +73,7 @@ use std::time::Instant;
 
 use deeptime_format::{EventId, GridDesc, ParamValue, Place};
 use glam::DVec3;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -796,9 +797,11 @@ impl VolcanoStage {
         // concentrated on the cone lowers it and sediment filling round it buries it, while a
         // change of the whole area does neither. The relief measured over its foot would also
         // count the ridge or the chain neighbour beside it.
+        // Each edifice reads the step's fields and writes only itself, so they are measured in
+        // parallel (P1-17).
         let started = Instant::now();
         if let Some(m) = &material {
-            for v in &mut st.volcanoes {
+            st.volcanoes.par_iter_mut().for_each(|v| {
                 let sh = v.shape();
                 let prof = |r: f64| sh.body(r);
                 let mut cells = Vec::new();
@@ -813,19 +816,23 @@ impl VolcanoStage {
                     },
                 );
                 v.kept_m = (v.kept_m + fit_change(&cells, m)).clamp(0.0, v.peak_m);
-            }
+            });
         }
         // … and it stands no higher than the surface shows it either (the plate model's
         // resampling and the advection of the offset also flatten a small edifice): the smaller
         // of the two, each kept on its own so that a dip of one step does not stay.
-        for v in &mut st.volcanoes {
-            v.height_m = v.kept_m.min(l1.relief(v));
+        {
+            let l1 = &l1;
+            st.volcanoes
+                .par_iter_mut()
+                .for_each(|v| v.height_m = v.kept_m.min(l1.relief(v)));
         }
         self.time("measure", started);
 
         // 3–4. Activity and births.
         let started = Instant::now();
         let flux: Vec<f64> = (0..n)
+            .into_par_iter()
             .map(|c| arc_flux(flags[c], conv[c], crust[c]))
             .collect();
         let flagged = flags
@@ -1028,6 +1035,7 @@ impl VolcanoStage {
             // A front cell takes the strongest flux within a cell of it (a patch's skeleton may
             // run along a gap between the lattice's stripes).
             let front_flux: Vec<f64> = (0..n)
+                .into_par_iter()
                 .map(|c| if front[c] { near_flux(c) } else { 0.0 })
                 .collect();
             st.counts.front_cells_max = st
@@ -2141,6 +2149,7 @@ pub fn volcanic_front(
     let (w, h) = (grid.w as usize, grid.h as usize);
     let n = w * h;
     let mask: Vec<bool> = (0..n)
+        .into_par_iter()
         .map(|c| flux[c] >= min_flux && f64::from(elev[c]) >= sea - FRONT_MAX_DEPTH_M)
         .collect();
     let at = |i: i64, j: i64| -> Option<usize> {
@@ -2148,6 +2157,7 @@ pub fn volcanic_front(
     };
     let morph = |src: &[bool], any: bool| -> Vec<bool> {
         (0..n)
+            .into_par_iter()
             .map(|c| {
                 let (i, j) = ((c % w) as i64, (c / w) as i64);
                 let mut hit = !any;
@@ -2171,29 +2181,30 @@ pub fn volcanic_front(
     let inf = f32::INFINITY;
     let mut dist: Vec<f32> = closed.iter().map(|&m| if m { inf } else { 0.0 }).collect();
     let (a, b) = (1.0f32, std::f32::consts::SQRT_2);
+    // The raster sweeps visit only the closed mask's cells, in the same order (P1-17): a cell
+    // outside it holds 0, which no update lowers, so skipping it changes nothing.
+    let inside: Vec<usize> = (0..n).into_par_iter().filter(|&c| closed[c]).collect();
+    let ij = |c: usize| ((c % w) as i64, (c / w) as i64);
     for _ in 0..2 {
-        for j in 0..h as i64 {
-            for i in 0..w as i64 {
-                let c = j as usize * w + i as usize;
-                for (di, dj, s) in [(-1, 0, a), (-1, -1, b), (0, -1, a), (1, -1, b)] {
-                    if let Some(m) = at(i + di, j + dj) {
-                        dist[c] = dist[c].min(dist[m] + s);
-                    }
+        for &c in &inside {
+            let (i, j) = ij(c);
+            for (di, dj, s) in [(-1, 0, a), (-1, -1, b), (0, -1, a), (1, -1, b)] {
+                if let Some(m) = at(i + di, j + dj) {
+                    dist[c] = dist[c].min(dist[m] + s);
                 }
             }
         }
-        for j in (0..h as i64).rev() {
-            for i in (0..w as i64).rev() {
-                let c = j as usize * w + i as usize;
-                for (di, dj, s) in [(1, 0, a), (1, 1, b), (0, 1, a), (-1, 1, b)] {
-                    if let Some(m) = at(i + di, j + dj) {
-                        dist[c] = dist[c].min(dist[m] + s);
-                    }
+        for &c in inside.iter().rev() {
+            let (i, j) = ij(c);
+            for (di, dj, s) in [(1, 0, a), (1, 1, b), (0, 1, a), (-1, 1, b)] {
+                if let Some(m) = at(i + di, j + dj) {
+                    dist[c] = dist[c].min(dist[m] + s);
                 }
             }
         }
     }
     (0..n)
+        .into_par_iter()
         .map(|c| {
             if !closed[c] {
                 return false;
