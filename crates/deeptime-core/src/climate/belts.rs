@@ -314,7 +314,7 @@ pub fn sst_anomaly(p: &ClimateParams, a: f64, phi: f64) -> f64 {
 /// drier under their eastern flanks, wetter under their western (monsoonal) flanks.
 pub fn subsidence_factor(p: &ClimateParams, a: f64, phi_b: f64) -> f64 {
     let s = subtropics(phi_b);
-    (1.0 - p.subsidence * s * a.max(0.0) + 0.4 * s * (-a).max(0.0)).max(0.1)
+    (1.0 - p.subsidence * s * a.max(0.0) + p.west_flank_wet * s * (-a).max(0.0)).max(0.1)
 }
 
 #[cfg(test)]
