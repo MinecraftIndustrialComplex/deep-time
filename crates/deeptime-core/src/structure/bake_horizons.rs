@@ -1024,14 +1024,14 @@ mod tests {
     }
 
     /// P1-17: `smoothed` as it was before the heights at the window's keys were taken in one walk
-    /// per stack and the axis weights tabulated (kept verbatim, `self` → `hz`).
+    /// per stack and the axis weights tabulated (kept verbatim, `self` → `this`).
     #[allow(clippy::too_many_lines)]
-    fn smoothed_reference(hz: &Horizons, sigma: f64, t: &Tables) -> Horizons {
+    fn smoothed_reference(this: &Horizons, sigma: f64, t: &Tables) -> Horizons {
         if sigma <= 0.0 {
-            return hz.clone();
+            return this.clone();
         }
-        let (w, h) = (i64::from(hz.grid.w), i64::from(hz.grid.h));
-        let k = hz.k as usize;
+        let (w, h) = (i64::from(this.grid.w), i64::from(this.grid.h));
+        let k = this.k as usize;
         let step = smooth_stride(sigma);
         let reach = step * SMOOTH_RADIUS_SAMPLES;
         let lattice = |a: i64| -> std::ops::RangeInclusive<i64> {
@@ -1039,7 +1039,7 @@ mod tests {
             (a - reach).div_euclid(step) + i64::from((a - reach).rem_euclid(step) != 0)
                 ..=(a + reach).div_euclid(step)
         };
-        let mut out = hz.clone();
+        let mut out = this.clone();
         out.tops
             .par_chunks_mut(k)
             .zip(out.classes.par_chunks_mut(k))
@@ -1048,7 +1048,7 @@ mod tests {
             .for_each_init(
                 || (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
                 |(near, keys, ys, weight, win), (c, ((tc, cc), kc))| {
-                    let own = hz.cell(c);
+                    let own = this.cell(c);
                     if own.0.is_empty() {
                         return;
                     }
@@ -1068,7 +1068,7 @@ mod tests {
                             let n = (jl.clamp(0, h - 1) * w + il.rem_euclid(w)) as usize;
                             near.push((n, g));
                             wsum += g;
-                            for key in hz.cell(n).2 {
+                            for key in this.cell(n).2 {
                                 keys.extend_from_slice(key);
                             }
                         }
@@ -1084,7 +1084,7 @@ mod tests {
                     ys.resize(m, 0.0f64);
                     for &(n, g) in near.iter() {
                         for (q, &s) in keys.iter().enumerate() {
-                            ys[q] += g * hz.height_at(n, s);
+                            ys[q] += g * this.height_at(n, s);
                         }
                     }
                     let top0 = f64::from(own.0[0]);
@@ -1099,13 +1099,13 @@ mod tests {
                         }
                         weight.clear();
                         for &(n, g) in near.iter() {
-                            let (tops, classes, nk) = hz.cell(n);
+                            let (tops, classes, nk) = this.cell(n);
                             let Some(hh) =
                                 (0..tops.len()).find(|&x| nk[x][0] <= s0 && s1 <= nk[x][1])
                             else {
                                 continue;
                             };
-                            let th = g * (hz.height_at(n, s0) - hz.height_at(n, s1));
+                            let th = g * (this.height_at(n, s0) - this.height_at(n, s1));
                             match weight
                                 .iter_mut()
                                 .find(|e: &&mut (u8, f64)| e.0 == classes[hh])
@@ -1226,7 +1226,7 @@ mod tests {
                     for x in 1..hz.len() {
                         hz[x].top = hz[x].top.min(hz[x - 1].top - 1);
                     }
-                    hz.retain(|x| x.top > hz.min_y * 16);
+                    hz.retain(|x| x.top > this.min_y * 16);
                     if hz.is_empty() {
                         hz.push(H {
                             top: own.0[0].into(),
@@ -1234,7 +1234,7 @@ mod tests {
                             key: own.2[0],
                         });
                     }
-                    settle(&mut hz, hz.min_y * 16, k, &t.min_blocks);
+                    settle(&mut hz, this.min_y * 16, k, &t.min_blocks);
                     write_cell(&hz, tc, cc, kc);
                 },
             );

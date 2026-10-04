@@ -1058,7 +1058,7 @@ impl SurfaceStage {
             let started = Instant::now();
             let evap_rate = p.evaporite_m_myr * 1.0e-6;
             // Cell by cell, so in parallel (P1-17).
-            let (kind, filled, marine) = (&sc.kind, &sc.filled, &parts.marine);
+            let (kind, filled, clastic) = (&sc.kind, &sc.filled, &parts.marine);
             sc.h.par_iter_mut()
                 .zip(parts.carbonate.par_iter_mut())
                 .zip(parts.evaporite.par_iter_mut())
@@ -1069,7 +1069,7 @@ impl SurfaceStage {
                         let add = carbonate::produce(
                             z,
                             f64::from(clim.sst_c[c]),
-                            f64::from(marine[c]),
+                            f64::from(clastic[c]),
                             dts,
                             &carb_p,
                         );
