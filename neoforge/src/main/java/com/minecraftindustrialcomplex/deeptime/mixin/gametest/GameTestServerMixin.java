@@ -33,7 +33,9 @@ import java.util.stream.Collectors;
  * so datapack dimensions load as data but never become levels. This wraps that one
  * {@code WorldDimensions.bake} call and passes the datapack's {@code deeptime:*} stems instead —
  * only those, so a pack datapack that defines {@code minecraft:overworld} or another mod's
- * dimension cannot change the GameTest world (cold-read review 2, gap 9). Applied only with
+ * dimension cannot change the GameTest world (cold-read review 2, gap 9). Those of Deep Time's levels
+ * that sit on vanilla's overworld biome list take such a datapack overworld's biome source, as a real
+ * Deep Time world does ({@code worldgen.OverworldOverride}; Expanded Ecosphere). Applied only with
  * {@code -Ddeeptime.gametest=true} (DeepTimeMixinPlugin).
  *
  * <p>It also honours {@code -Ddeeptime.gametestOnly=<name>[,<name>…]} ({@code ./gametest.sh
@@ -51,9 +53,13 @@ abstract class GameTestServerMixin {
             Operation<WorldDimensions.Complete> original, @Local(argsOnly = true) WorldLoader.DataLoadContext ctx) {
         Registry<LevelStem> all = ctx.datapackDimensions().registryOrThrow(Registries.LEVEL_STEM);
         MappedRegistry<LevelStem> ours = new MappedRegistry<>(Registries.LEVEL_STEM, Lifecycle.stable());
+        LevelStem datapackOverworld = all.get(LevelStem.OVERWORLD);
+        com.minecraftindustrialcomplex.deeptime.gametest.GameTestSupport.datapackOverworld(datapackOverworld);
         all.entrySet().stream()
                 .filter(e -> e.getKey().location().getNamespace().equals(DeepTime.MODID))
-                .forEach(e -> ours.register(e.getKey(), e.getValue(), RegistrationInfo.BUILT_IN));
+                .forEach(e -> ours.register(e.getKey(),
+                        com.minecraftindustrialcomplex.deeptime.worldgen.OverworldOverride.adopt(e.getValue(), datapackOverworld),
+                        RegistrationInfo.BUILT_IN));
         DeepTime.LOGGER.info("[gametest] GameTest server gets {} Deep Time test dimension(s): {}", ours.size(), ours.keySet());
         return original.call(dims, ours.freeze());
     }

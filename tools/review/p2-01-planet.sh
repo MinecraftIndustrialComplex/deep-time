@@ -11,6 +11,9 @@
 #       builds the release CLI and runs the whole planet (`deeptime run`, 3 threads) detached into
 #       <name>-world/, then `strata-check`, `structure-sections` (<name>-sections/) and the
 #       parity fixture on it; the log is <name>.log
+#   tools/remote/mac.sh --no-sync -- tools/review/p2-01-planet.sh again <binary-name> <name> <preset> <start-config> <length-myr> [--set PATH=VALUE]...
+#       the same run with the binary an earlier `world` run built (deeptime-<binary-name>), under
+#       another name (a before-and-after on another start or seed: the binary stays the old code)
 #   tools/remote/mac.sh -- tools/review/p2-01-planet.sh tests
 #       runs `cargo test --workspace` detached (log: tests.log)
 #   tools/remote/mac.sh --no-sync -- tools/review/p2-01-planet.sh status
@@ -65,6 +68,14 @@ case "${1:-}" in
             && '$RUNS/deeptime-$name' structure-sections --world-data '$RUNS/$name-world' --out '$RUNS/$name-sections' --half 300 --px 2 \
             && '$RUNS/deeptime-$name' parity --world-data '$RUNS/$name-world' --columns 2000"
         ;;
+    again)
+        bin="$2"; name="$3"; preset="$4"; start="$5"; length="$6"; shift 6
+        sets=""; for a in "$@"; do sets="$sets '$a'"; done
+        detach "$RUNS/$name.log" sh -c "rm -rf '$RUNS/$name-world' '$RUNS/$name-sections' \
+            && deeptime-admit run --kind 'sim:$preset:3t' -- '$RUNS/deeptime-$bin' run --preset '$preset' \
+               --start '$start' --length-myr '$length' --threads 3 --out '$RUNS/$name-world' $sets \
+            && '$RUNS/deeptime-$bin' structure-sections --world-data '$RUNS/$name-world' --out '$RUNS/$name-sections' --half 300 --px 2"
+        ;;
     tests)
         detach "$RUNS/tests.log" cargo test --workspace --no-fail-fast
         ;;
@@ -96,6 +107,6 @@ case "${1:-}" in
         rm -rf "$RUNS"
         ;;
     *)
-        sed -n '3,22p' "$0"; exit 2
+        sed -n '3,25p' "$0"; exit 2
         ;;
 esac

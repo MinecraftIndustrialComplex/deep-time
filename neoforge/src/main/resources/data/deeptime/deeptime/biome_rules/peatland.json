@@ -1,0 +1,11 @@
+{
+ "_comment": "Boreal peatland for any pack (Ben, decisions log 2026-10-03, 'Taiga instead, peatland if present', and 2026-10-04, 'Build out support for both'): cold wetland (the bake's wetland flag 2 where the world has the layer climate/wetland, else wet, flat, low land in the swamp band in a subarctic class, BIO-115) takes the pack's peatland biome, the tag deeptime:peatland (Expanded Ecosphere's fen and bogs, Biomes O' Plenty's bog and muskeg, Regions Unexplored's fen, CliffTree's bog), chosen among by the pack's own climate search. Active only when the source can place a member; a TerraBlender region without one keeps its own answer. BIO-129 (game-choice). FORMAT.md 'Biome rules'.",
+ "requires": ["#deeptime:peatland"],
+ "rules": [
+  {
+   "id": "boreal_peatland",
+   "wetland": "cold",
+   "biomes": ["#deeptime:peatland"]
+  }
+ ]
+}

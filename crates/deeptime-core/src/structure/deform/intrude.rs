@@ -94,7 +94,14 @@ pub fn emplace(
     let mut total = [0.0f64; 2];
     for c in 0..n {
         let s = strain(x, c, sp);
-        let v = [if orogen(c) { s.shortening } else { 0.0 }, s.extension];
+        // A collision belt's magmatism does not follow the convergence (it outlasts it: the
+        // collision regime stays for `collision_orogeny_myr` after the last uplift).
+        let shortening = if x.regime[c] as u8 == regime::COLLISION {
+            1.0
+        } else {
+            s.shortening
+        };
+        let v = [if orogen(c) { shortening } else { 0.0 }, s.extension];
         for k in 0..2 {
             total[k] += v[k] * area;
             cum[k].push(total[k]);
