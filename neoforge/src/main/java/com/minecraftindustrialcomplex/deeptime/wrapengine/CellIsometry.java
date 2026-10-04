@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-package com.minecraftindustrialcomplex.deeptime.wrapspike;
+package com.minecraftindustrialcomplex.deeptime.wrapengine;
 
 /**
  * A rigid motion of the horizontal block grid that keeps blocks on blocks: a turn by a whole number of
- * quarter turns followed by a translation (dev-only wrap-engine spike, docs/design/wrap-engine.md).
+ * quarter turns followed by a translation (wrap engine, docs/design/wrap-engine.md §1 and §9).
  *
  * <p>Turns are clockwise seen from above, Minecraft's sense: one quarter turn takes north (−z) to east
  * (+x), as {@code Rotation.CLOCKWISE_90} does. On block <em>cells</em> (the block at integer (x, z)
@@ -18,6 +18,10 @@ package com.minecraftindustrialcomplex.deeptime.wrapspike;
  * {@code CellIsometry.halfTurnAbout(a, b)}: (x, z) → (2a − x − 1, 2b − z − 1) on cells and
  * (x, z) → (2a − x, 2b − z) on points. Pure integer algebra, no Minecraft types, so it is unit-tested
  * on its own (WrapTopologyTest).
+ *
+ * <p>Part of the engine's stable API (design doc §9): adapters use {@link #applyX}/{@link #applyZ} for
+ * block cells, {@link #applyPoint} for entity positions and {@link #applyVector} for headings and
+ * velocities.
  *
  * @param quarterTurns 0..3, clockwise from above
  * @param tx           translation in x, applied after the turn
@@ -48,16 +52,29 @@ public record CellIsometry(int quarterTurns, int tx, int tz) {
         return new CellIsometry(k, (int) Math.round(a - rc[0]), (int) Math.round(b - rc[1]));
     }
 
+    /** x of the cell (x, z) moved. Allocation-free; pair with {@link #applyZ}. */
+    public int applyX(int x, int z) {
+        return switch (quarterTurns) {
+            case 1 -> -z - 1 + tx;
+            case 2 -> -x - 1 + tx;
+            case 3 -> z + tx;
+            default -> x + tx;
+        };
+    }
+
+    /** z of the cell (x, z) moved. Allocation-free; pair with {@link #applyX}. */
+    public int applyZ(int x, int z) {
+        return switch (quarterTurns) {
+            case 1 -> x + tz;
+            case 2 -> -z - 1 + tz;
+            case 3 -> -x - 1 + tz;
+            default -> z + tz;
+        };
+    }
+
     /** The cell (x, z) moved: {x', z'}. */
     public int[] apply(int x, int z) {
-        int rx, rz;
-        switch (quarterTurns) {
-            case 1 -> { rx = -z - 1; rz = x; }
-            case 2 -> { rx = -x - 1; rz = -z - 1; }
-            case 3 -> { rx = z; rz = -x - 1; }
-            default -> { rx = x; rz = z; }
-        }
-        return new int[]{rx + tx, rz + tz};
+        return new int[]{applyX(x, z), applyZ(x, z)};
     }
 
     /** The point (x, z) moved (entities, which live on continuous coordinates): {x', z'}. */
@@ -98,6 +115,12 @@ public record CellIsometry(int quarterTurns, int tx, int tz) {
 
     public boolean isIdentity() {
         return quarterTurns == 0 && tx == 0 && tz == 0;
+    }
+
+    /** True when the motion takes whole 16 × 16 chunks onto whole chunks (the band manager needs it). */
+    public boolean mapsChunksToChunks() {
+        int x0 = applyX(0, 0), z0 = applyZ(0, 0), x1 = applyX(15, 15), z1 = applyZ(15, 15);
+        return Math.floorMod(Math.min(x0, x1), 16) == 0 && Math.floorMod(Math.min(z0, z1), 16) == 0;
     }
 
     /** Yaw change in degrees for an entity carried by this motion (Minecraft yaw grows clockwise from above). */
