@@ -233,6 +233,8 @@ neoForge {
             if (project.hasProperty('wrapEngine')) systemProperty 'deeptime.wrapengine', 'true'
             // -PwrapNoCompat: the engine without its mod adapters (mixin.wrapengine.compat.*), for A/B checks.
             if (project.hasProperty('wrapNoCompat')) systemProperty 'deeptime.wrapengine.compat', 'false'
+            // -PwrapCompatSkip=<Mixin>[,<Mixin>…]: leave those adapter mixins out (bisecting).
+            if (project.hasProperty('wrapCompatSkip')) systemProperty 'deeptime.wrapengine.compat.skip', project.property('wrapCompatSkip').toString()
             systemProperty 'deeptime.gametest', 'true'
             if (extraDatapack) systemProperty 'deeptime.extraDatapack', extraDatapack.toString()
             // -PgametestOnly=<name>[,<name>…]: run only those tests (GameTestServerMixin).

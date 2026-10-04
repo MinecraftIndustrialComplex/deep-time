@@ -79,13 +79,15 @@ public final class SeamFrames {
      * The band image of the stored block {@code target} that lies within {@code reach} blocks of the
      * stored block {@code viewer} (Chebyshev distance horizontally, y within {@code reach}), the nearest
      * by Manhattan distance; null when there is none or no topology. Rotation propagation and pipe
-     * searches only ever step to such neighbours.
+     * searches only ever step to such neighbours. With reach 1 the link must also be seen back from the
+     * target with a cancelling turn ({@link SeamTurns#seamLink}).
      */
     public static Link link(Level level, BlockPos viewer, BlockPos target, int reach) {
         WrapTopology t = topology(level);
         if (t == null || Math.abs(target.getY() - viewer.getY()) > reach)
             return null;
-        int[] q = SeamTurns.nearestImage(t, viewer.getX(), viewer.getZ(), target.getX(), target.getZ(), reach);
+        int[] q = reach == 1 ? SeamTurns.seamLink(t, viewer.getX(), viewer.getZ(), target.getX(), target.getZ())
+                : SeamTurns.nearestImage(t, viewer.getX(), viewer.getZ(), target.getX(), target.getZ(), reach);
         if (q == null)
             return null;
         WrapTopology.Fold f = t.fold(q[0], q[1]);

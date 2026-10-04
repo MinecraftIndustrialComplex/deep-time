@@ -62,6 +62,26 @@ public final class SeamTurns {
      * Pure part of {@code SeamFrames.link}: the image {x, z} of stored block (tx, tz) within {@code reach} of
      * (vx, vz), nearest first; null if none. Unit-tested (SeamTurnsTest).
      */
+    /**
+     * The image {x, z} of stored block (tx, tz) next to (vx, vz) (reach 1), accepted only when the link
+     * is the same seen from both ends: the target also sees the viewer through the seam, and the two
+     * turns cancel. Next to a cube corner (a 270° cone point) a diagonal seen through the seam can fail
+     * that, and is then refused from both ends alike, so Create's propagation cannot flicker. Null when
+     * there is no such link.
+     */
+    public static int[] seamLink(WrapTopology t, int vx, int vz, int tx, int tz) {
+        int[] q = nearestImage(t, vx, vz, tx, tz, 1);
+        if (q == null)
+            return null;
+        int[] back = nearestImage(t, tx, tz, vx, vz, 1);
+        if (back == null)
+            return null;
+        WrapTopology.Fold f = t.fold(q[0], q[1]), g = t.fold(back[0], back[1]);
+        if (f == null || g == null || (f.iso().quarterTurns() + g.iso().quarterTurns()) % 4 != 0)
+            return null;
+        return q;
+    }
+
     public static int[] nearestImage(WrapTopology t, int vx, int vz, int tx, int tz, int reach) {
         List<int[]> images = t.images(tx, tz);
         int[] best = null;

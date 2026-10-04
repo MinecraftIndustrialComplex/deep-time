@@ -55,15 +55,16 @@ public final class KineticSeams {
         // Create's own rules assume the two are neighbours (an axis connection checks only that the
         // offset lies along one axis), so its answer for a pair reached through a seam, whose stored
         // positions can be far apart along one axis, is meaningless and must not be used.
+        // Two blocks that are neighbours in stored space connect only as such, even where (next to a
+        // turn point or a cube corner) one also sees the other through the seam: near a 270° corner a
+        // diagonal seen through the seam is not seen back that way, and a rule that differs between
+        // the two ends would make Create's propagation flicker.
         boolean adjacent = Math.max(Math.abs(a.getX() - b.getX()), Math.max(Math.abs(a.getY() - b.getY()), Math.abs(a.getZ() - b.getZ()))) <= 1;
-        if (adjacent) {
-            float direct = original.call(from, to);
-            if (direct != 0)
-                return direct;
-        }
+        if (adjacent)
+            return original.call(from, to);
         SeamFrames.Link link = SeamFrames.link(level, a, b, 1);
         if (link == null)
-            return adjacent ? 0 : original.call(from, to);
+            return original.call(from, to);
         BlockState seen = link.view(to.getBlockState());
         if (!(seen.getBlock() instanceof IRotate rotate))
             return 0;
