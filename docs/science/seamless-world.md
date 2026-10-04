@@ -3,8 +3,8 @@
 Status of this page: `stage 2 (written with the code, 2026-10-04; Petroff's paper and code read in
 full, the map's properties tested; the layout and its sizes are game choices)`.
 
-Ledger ids on this page: `SCL-049`, `SCL-083`, `SCL-084`, `SCL-086` to `SCL-090` (see
-[claims.md](claims.md)).
+Ledger ids on this page: `SCL-049`, `SCL-083`, `SCL-084`, `SCL-086` to `SCL-090`, `POL-022` to
+`POL-024` (see [claims.md](claims.md)).
 
 ## What you see in the world
 
@@ -19,6 +19,16 @@ about their midpoint: walking north over the north pole comes out heading south 
 on a real globe. Until Deep Time's wrap engine joins those two edges, a temporary border stops
 players one block inside them; the terrain beyond the border is already the glued planet, so the view
 over it is right.
+
+Near the north and south edges the action bar says the edge is closed for now (24 blocks before the
+stop line), and at the line a player, the vehicle they ride or a Sable ship is put back inside;
+spectators pass. There is no polar storm and no pole cap on this world: the poles are not stretched,
+so nothing needs closing off there (POL-022, POL-023). New players never spawn within 64 blocks of
+those edges (POL-024). The F3 line and Deep Time's climate API (version 4: `latitudeDeg(level, x,
+z)`, `longitudeDeg`, `projectionKind`) give each block's true latitude and longitude, which on this
+world depend on both x and z. The Lambert world stays available: a preset's `scale.projection`
+`lambert` (the planet editor's "World map") bakes it, played on the level types
+`deeptime:planet_lambert` and `deeptime:planet_lambert_32k`.
 
 The poles are ordinary places of the planet. They lie on the north and south edges, a quarter of the
 way in (x = ∓b/2), so for now they stand at the border. Four other places on the edges, the cone
@@ -62,6 +72,9 @@ its axis so these four points lie as far from land as the planet allows.
 | SCL-088 | temporary border | 1 block inside the north and south edges | blocks | — | `game-choice` |
 | SCL-089 | detail noise at the edges | blend over 32 blocks to the half-turn-symmetric mean | blocks | — | `game-choice` |
 | SCL-090 | footprint | D = max(stretch·r, r / cos φ), stretch ≤ 8 | blocks | — | `game-choice` |
+| POL-022 | the game's edge border; no pole cap | stop 1 block inside the north and south edges; spectators pass; off when the wrap engine joins the edges | blocks | — | `game-choice` |
+| POL-023 | the border's warning | 24 blocks before the stop line, every 40 ticks | blocks, ticks | — | `game-choice` |
+| POL-024 | spawn clear of the edges | candidates within 64 blocks of an edge are passed over | blocks | — | `game-choice` |
 
 The world block's true size is √(4πR²/2b²) metres (294.6 m at 16k, 300.4 m at 32k), written as
 `scale.m_per_block_h`.
@@ -86,6 +99,9 @@ and the pole anisotropy with and without the round footprint.
   the seam.
 - Until the wrap engine joins the north and south edges, the poles are reachable only up to the
   border.
+- The terrain past an edge (seen from the border) is the folded inside for everything read from the
+  rasters (height, rock, water levels, climate, biomes); point features placed per chunk (ore bodies,
+  rivers' channels, structures) are not copied across, since nobody can reach that side yet.
 
 ## Game choices
 
@@ -94,6 +110,12 @@ and the pole anisotropy with and without the round footprint.
 - The world size at today's blocks per km² (not the prototype's 16,384 × 8,192): agent, 2026-10-04,
   in STATUS "Pending questions".
 - λc search, border inset, edge blend, footprint: agent, 2026-10-04 (SCL-087 to SCL-090).
+- The game side of the border (warning band, spectators, Sable hulls, the spawn margin) and turning
+  the pole cap off on this world: agent, 2026-10-04 (POL-022 to POL-024).
+- The same bits in Rust, Java and the pages: every projection call runs on the portable trigonometry
+  (`deeptime_format::portable_math`, Java `PortableMath`, JS `DTMath`), so the bake, the game and the
+  workbench agree on every block's latitude bit for bit (`ProjectionParityTest`,
+  `tools/viewer/projection-check.js`).
 
 ## Open questions
 
