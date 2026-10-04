@@ -376,6 +376,7 @@ mod tests {
             let k = TectonicParams {
                 collapse_myr: 25.0,
                 collapse_thickness_km: 45.0,
+                collapse_quiet_myr: 0.0,
                 collapse_reach_km: 1500.0,
                 ..TectonicParams::default()
             };
@@ -499,7 +500,18 @@ mod tests {
         assert_eq!(step_once(&fx, &mut st, 1), Collapse::default());
         assert_eq!(st.samples, before);
         // The same belt stamped last step collapses now.
-        assert!(step_once(&fx, &mut st, 2).sources > 0);
+        assert!(step_once(&fx, &mut st.clone(), 2).sources > 0);
+        // With a quiet time of 10 Myr it waits until the stamp is more than 10 Myr old.
+        let mut quiet = Fx::new();
+        quiet.k.collapse_quiet_myr = 10.0;
+        for step in 2..=6 {
+            assert_eq!(
+                step_once(&quiet, &mut st, step),
+                Collapse::default(),
+                "{step}"
+            );
+        }
+        assert!(step_once(&quiet, &mut st, 7).sources > 0);
         // A hidden root: 30 km more crust under ground at 300 m.
         let mut st = planet(&fx.geo, belt, 0.0);
         for (i, s) in st.samples.iter_mut().enumerate() {

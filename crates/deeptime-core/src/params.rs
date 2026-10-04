@@ -657,8 +657,8 @@ impl Default for TectonicParams {
             weld_speed_mm_yr: 5.0,             // ledger: PLT-246
             weld_after_myr: 10.0,              // ledger: PLT-246
             collapse_myr: 15.0,                // ledger: PLT-255
-            collapse_thickness_km: 50.0,       // ledger: PLT-256
-            collapse_quiet_myr: 0.0,           // ledger: PLT-259
+            collapse_thickness_km: 55.0,       // ledger: PLT-256
+            collapse_quiet_myr: 10.0,          // ledger: PLT-259
             collapse_reach_km: 200.0,          // ledger: PLT-257
             crust_max_km: 70.0,                // ledger: PLT-258
             slab_pull_rad_per_1000km_myr: 0.002,
