@@ -77,12 +77,34 @@ pub enum Codec {
     Lz4Block,
 }
 
-/// A raster in block space (plan §5.2), laid out by the planet's projection
-/// ([`crate::projection`]: Lambert's equal-area cylinder). Cell (i, j) is the **point sample** at
-/// block (origin_block_x + i·r, origin_block_z + j·r): column 0 sits on the seam x = −C/2 and row 0
-/// at z = −Zo, at or just past the north pole ([`Projection::grid_half_extent`]). Rows are uniform
-/// in sin φ, so every cell inside the sphere covers the same area of the planet. Indices wrap in x
-/// (mod W) and clamp in z to [0, H−1].
+/// What a row index past the first or the last row means (`z_edges`, FORMAT.md "Grids").
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ZEdges {
+    /// Rows clamp to [0, H − 1] (the simulation's grids and Lambert worlds: the rows stop at the
+    /// poles).
+    #[default]
+    Clamp,
+    /// Rows 0 and H − 1 lie on the world's north and south edges, each glued onto itself by a
+    /// half-turn about its midpoint (block x = 0, which is column W/2): row −k is row k and
+    /// row H − 1 + k is row H − 1 − k, both at column W − i (Petroff–Guyou worlds).
+    HalfTurn,
+}
+
+impl ZEdges {
+    fn is_clamp(&self) -> bool {
+        *self == ZEdges::Clamp
+    }
+}
+
+/// A raster in block space (plan §5.2), laid out by the world's projection
+/// ([`crate::projection`]). Cell (i, j) is the **point sample** at block
+/// (origin_block_x + i·r, origin_block_z + j·r). On the simulation's grids and Lambert worlds
+/// column 0 sits on the seam x = −C/2 and row 0 at z = −Zo, at or just past the north pole
+/// ([`Projection::grid_half_extent`]); rows are uniform in sin φ; indices wrap in x (mod W) and
+/// clamp in z to [0, H−1]. On a Petroff–Guyou world ([`crate::projection::PetroffGuyou::grid`])
+/// column 0 sits on x = −b, row 0 on the north edge and row H − 1 on the south edge, and a row
+/// past either folds through the edge's half-turn ([`ZEdges::HalfTurn`], [`GridDesc::cell`]).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GridDesc {
     /// The grid's role: `L1`, `L2`, `L3` (plan §5.2).
@@ -99,6 +121,9 @@ pub struct GridDesc {
     pub origin_block_x: i64,
     /// Block z of cell row 0 (−Zo).
     pub origin_block_z: i64,
+    /// What a row past the first or the last means (absent: clamp).
+    #[serde(default, skip_serializing_if = "ZEdges::is_clamp")]
+    pub z_edges: ZEdges,
 }
 
 impl GridDesc {
@@ -121,6 +146,7 @@ impl GridDesc {
             wraps_x: true,
             origin_block_x: -i64::from(c / 2),
             origin_block_z: p.grid_origin_z(r),
+            z_edges: ZEdges::Clamp,
         })
     }
 
@@ -136,6 +162,7 @@ impl GridDesc {
             wraps_x: self.wraps_x,
             origin_block_x: self.origin_block_x,
             origin_block_z: self.origin_block_z,
+            z_edges: self.z_edges,
         }
     }
 
@@ -249,6 +276,36 @@ impl GridDesc {
     /// Clamps a row index into [0, H − 1].
     pub fn clamp_j(&self, j: i64) -> u32 {
         crate::projection::clamp_row(j, i64::from(self.h)) as u32
+    }
+
+    /// The stored cell of any index pair: columns wrap; rows clamp, or fold through the edges'
+    /// half-turns ([`ZEdges::HalfTurn`]: row −k is row k and row H − 1 + k row H − 1 − k, at
+    /// column W − i). Every world-data reader samples through this.
+    #[inline]
+    pub fn cell(&self, i: i64, j: i64) -> (u32, u32) {
+        match self.z_edges {
+            ZEdges::Clamp => (self.wrap_i(i), self.clamp_j(j)),
+            ZEdges::HalfTurn => {
+                let last = i64::from(self.h) - 1;
+                let w = i64::from(self.w);
+                let (mut i, mut j) = (i, j);
+                if last <= 0 {
+                    return (self.wrap_i(i), 0);
+                }
+                for _ in 0..64 {
+                    if j < 0 {
+                        j = -j;
+                        i = w - i;
+                    } else if j > last {
+                        j = 2 * last - j;
+                        i = w - i;
+                    } else {
+                        break;
+                    }
+                }
+                (self.wrap_i(i), j.clamp(0, last) as u32)
+            }
+        }
     }
 
     /// Cells in the raster.
@@ -442,8 +499,8 @@ impl<T: Cell> Raster<T> {
 
     /// The cell at (i, j) with x wrapped and z clamped.
     pub fn get(&self, i: i64, j: i64) -> T {
-        let i = self.grid.wrap_i(i) as usize;
-        let j = self.grid.clamp_j(j) as usize;
+        let (i, j) = self.grid.cell(i, j);
+        let (i, j) = (i as usize, j as usize);
         self.data[j * self.grid.w as usize + i]
     }
 
@@ -468,7 +525,8 @@ pub trait RasterRead {
     /// The raw value at (i, j), x wrapped, z clamped.
     fn raw(&self, i: i64, j: i64) -> f64 {
         let g = &self.desc().grid;
-        self.raw_cell(g.wrap_i(i), g.clamp_j(j))
+        let (ci, cj) = g.cell(i, j);
+        self.raw_cell(ci, cj)
     }
 
     /// The physical value at cell (i, j), x wrapped, z clamped; NaN for nodata.
