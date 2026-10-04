@@ -183,9 +183,9 @@ public final class WrapSpikeGameTests {
                     item.getX(), item.getZ(), item.getDeltaMovement().z, s.cx() - 5.5);
             item.discard();
             int far = level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, s.at(-7, 1, 0));
-            int copy = level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, s.at(-7, 1, -1));
+            int atCopy = level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, s.at(-7, 1, -1));
             check(far >= 13, "block light on the far side next to the glowstone's band copy: %d (band copy itself %d; at most 2 without the seam)",
-                    far, copy);
+                    far, atCopy);
             helper.succeed();
         });
     }
