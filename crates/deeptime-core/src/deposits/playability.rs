@@ -116,8 +116,14 @@ mod tests {
         let json = r#"{"material": "c:copper", "min_sites_per_region": 1, "region_blocks": 8192}"#;
         let mut e: Essential = serde_json::from_str(json).unwrap();
         assert!(e.primary_only, "the default counts primary products only");
-        let porphyry = [product("c:copper", "primary"), product("c:gold", "byproduct")];
-        let impact = [product("c:zinc", "primary"), product("c:copper", "coproduct")];
+        let porphyry = [
+            product("c:copper", "primary"),
+            product("c:gold", "byproduct"),
+        ];
+        let impact = [
+            product("c:zinc", "primary"),
+            product("c:copper", "coproduct"),
+        ];
         assert!(e.counts(&porphyry));
         assert!(!e.counts(&impact), "a co-product is not a copper source");
         assert!(!e.counts(&[]), "a site with no ore left counts for nothing");
