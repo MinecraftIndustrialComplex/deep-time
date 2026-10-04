@@ -123,6 +123,15 @@ public final class VolcanicBiomes {
 
         /** Every entry the source can answer from. */
         void entries(Consumer<Entry> sink);
+
+        /**
+         * The vanilla tree under this one, if the source has one apart from itself (TerraBlender's region 0 under a
+         * mod's region): where keeping out a mod's volcanic land biome would leave the sea, the slot takes this
+         * tree's biome.
+         */
+        default Optional<Source> base() {
+            return Optional.empty();
+        }
     }
 
     /** What one level resolved against one parameter list. */
@@ -263,13 +272,37 @@ public final class VolcanicBiomes {
         Holder<Biome> b = role(level, r, qx, qz, t);
         if (b != null)
             return b;
-        Climate.DistanceMetric<Holder<Biome>> metric = r.keepOut ? NEAREST_KEPT : NEAREST;
+        // The plain nearest first: where it is not kept out, the keep-out search would find the same leaf.
+        Holder<Biome> plain = source.find(t, NEAREST);
+        if (!r.keepOut || !plain.is(KEEP_OUT))
+            return plain;
+        Holder<Biome> kept;
         try {
-            return source.find(t, metric);
+            kept = source.find(t, NEAREST_KEPT);
         } catch (NullPointerException emptyTree) {
             // A tree holding nothing but kept-out biomes (a region of volcanic biomes alone) answers null.
-            return source.find(t, NEAREST);
+            return plain;
         }
+        // A mod that put its volcanic land biome in the slot of a land biome surrounded by sea (Biomes O' Plenty's
+        // volcanic plains in vanilla's mushroom-fields slot) leaves the sea as the next-nearest biome of its tree:
+        // that slot takes the biome the vanilla tree has there instead, so land does not turn into ocean.
+        if (water(kept) && !water(plain)) {
+            Optional<Source> base = source.base();
+            if (base.isPresent()) {
+                try {
+                    Holder<Biome> under = base.get().find(t, NEAREST_KEPT);
+                    if (!water(under))
+                        return under;
+                } catch (NullPointerException emptyTree) {
+                    // keep the region's answer
+                }
+            }
+        }
+        return kept;
+    }
+
+    private static boolean water(Holder<Biome> b) {
+        return b.is(net.minecraft.tags.BiomeTags.IS_OCEAN) || b.is(net.minecraft.tags.BiomeTags.IS_RIVER);
     }
 
     /** The role biome at the column of quart (qx, qz) for climate point t, or null. */

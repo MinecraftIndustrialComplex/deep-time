@@ -1119,9 +1119,12 @@ TerraBlender, `compat.terrablender.RegionBiomeSourceMixin`).
 - **Kept out.** A biome in the tag `#deeptime:volcanic` is never the answer of a Deep Time level's climate
   search: the search runs on the biome source's own R-tree (the region's, with TerraBlender) with a
   distance metric that sets every such leaf infinitely far, so the next-nearest biome of the same tree
-  answers. Other levels are not touched.
+  answers. With TerraBlender, where that answer is an ocean or river biome and the kept-out one was not,
+  the vanilla region's tree (region 0) answers instead, so a mod that put its volcanic land biome in a
+  slot surrounded by sea (Biomes O' Plenty: mushroom fields) leaves land, not ocean. Other levels are not
+  touched.
 - **Roles**, in priority order, each a disc in blocks around its centre (R the basal radius
-  `radius_m` / `m_per_block_h`, at least 6; r = `volcanic_biome_reach`); no disc is under 12 blocks in radius:
+  `radius_m` / `m_per_block_h`, at least 6; r = `volcanic_biome_reach`); no disc is under 8 blocks in radius:
   `hot_spring_field` (every hot-spring pool, from a volcano or hot ground: its reach + 4),
   `caldera` (a crater with `caldera: true`: 0.9 of its rim radius), `crater` (any other crater: its rim
   radius + 4), `cone` (stratovolcanoes and shields: 0.45 R · r), `ash_field` (stratovolcanoes and caldera

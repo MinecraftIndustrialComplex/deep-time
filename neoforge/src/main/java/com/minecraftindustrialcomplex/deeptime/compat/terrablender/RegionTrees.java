@@ -84,6 +84,11 @@ public final class RegionTrees {
         }
 
         @Override
+        public java.util.Optional<VolcanicBiomes.Source> base() {
+            return region == 0 ? java.util.Optional.empty() : java.util.Optional.of(new RegionSearch(biomes, parameters, 0));
+        }
+
+        @Override
         public void entries(Consumer<VolcanicBiomes.Entry> sink) {
             IExtendedParameterList<?> ext = (IExtendedParameterList<?>) parameters;
             for (int i = 0; i < ext.getTreeCount(); i++) {

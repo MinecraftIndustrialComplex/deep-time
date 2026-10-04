@@ -54,7 +54,7 @@ class VolcanicZonesTest {
         var v = volcano(1, "stratovolcano", 1000, 500, 80, 0.8, 6, false);
         var z = VolcanicZones.build(List.of(v), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, C);
         assertEquals(Role.CRATER, first(z, 1000, 500));
-        assertEquals(Role.CRATER, first(z, 1000 + 9, 500));          // the crater's rim plus its margin (6 + 4), at least 12
+        assertEquals(Role.CRATER, first(z, 1000 + 9, 500));          // the crater's rim plus its margin (6 + 4)
         assertEquals(Role.CONE, first(z, 1000 + 30, 500));           // 0.45 R = 36
         assertEquals(Role.ASH_FIELD, first(z, 1000, 500 + 70));      // out to R = 80
         assertEquals(null, first(z, 1000 + 90, 500));
@@ -96,7 +96,7 @@ class VolcanicZonesTest {
     }
 
     @Test
-    void zonesAreNeverSmallerThanThreeBiomeCells() {
+    void zonesAreNeverSmallerThanTwoBiomeCells() {
         var tiny = volcano(1, "stratovolcano", 0, 0, 6, 0.9, 1, false);
         var z = VolcanicZones.build(List.of(tiny), List.of(pool(2, 500, 500, 2)), List.of(body(3, -500, -500, 3)), VolcanicBiomeRules.DEFAULT,
                 MH, C);
