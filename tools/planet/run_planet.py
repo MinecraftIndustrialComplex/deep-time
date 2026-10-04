@@ -146,7 +146,9 @@ def main():
         os.chmod(pw_path, 0o600)
     pw = open(pw_path).read().strip()
     open(os.path.join(RUN, "eula.txt"), "w").write("eula=true\n")  # accepted for test servers (plan §2.7)
-    level_type = "deeptime\\:planet" if a.size == 16384 else "deeptime\\:planet_32k"
+    # The analytic test terrains are Lambert worlds (C itself): the Lambert level types (format 0.5;
+    # deeptime:planet[_32k] are the Petroff-Guyou worlds, 13,312 / 26,112 blocks round).
+    level_type = "deeptime\\:planet_lambert" if a.size == 16384 else "deeptime\\:planet_lambert_32k"
     open(os.path.join(RUN, "server.properties"), "w").write(
         "# Written by tools/planet/run_planet.py\n"
         f"server-port={GAME_PORT}\nenable-rcon=true\nrcon.port={RCON_PORT}\nrcon.password={pw}\n"

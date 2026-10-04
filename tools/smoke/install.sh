@@ -5,7 +5,10 @@
 # Adapted from mic-climate's smoke/install.sh.
 #
 #   tools/smoke/install.sh <standalone|mic|mic-ev|terrablender|ev|ev-client|dh|dh-next>
-#       [--size 16384|32768]      world circumference -> level-type deeptime:planet[_32k]
+#       [--size 16384|32768]      the planet's circumference -> level-type deeptime:planet[_32k] (a
+#                                 Petroff-Guyou world 13,312 / 26,112 blocks round, format 0.5) for a
+#                                 --preset run, deeptime:planet_lambert[_32k] (C itself) for synthetic
+#                                 worlds, test terrains and Lambert presets
 #       [--synth <kind>]          write synthetic world data before the first start (P0-09+)
 #       [--strata <kind>]         the synthetic horizons: placeholder (default), every-class (P1-12) or basin
 #       [--datapack <folder>]     copy a datapack folder into the world's datapacks/ (e.g. the MIC
@@ -93,9 +96,18 @@ esac
 # The sets installed from the MIC pack (packwiz-installer); the others are their pin files alone.
 case "$PROFILE" in mic|mic-ev) FROM_PACK=1 ;; *) FROM_PACK=0 ;; esac
 case "$SEED" in ''|-[0-9]*|[0-9]*) ;; *) echo "install.sh: --seed must be a number" >&2; exit 2 ;; esac
-case "$SIZE" in
-    16384) LEVEL_TYPE='deeptime\:planet' ;;
-    32768) LEVEL_TYPE='deeptime\:planet_32k' ;;
+# A planet preset's world is Petroff-Guyou (the default since format 0.5) unless the preset says
+# lambert; synthetic worlds and test terrains are Lambert. Their level types differ in circumference.
+WORLD=lambert
+if [ -n "$PRESET" ]; then
+    WORLD=petroff_guyou
+    if [ -f "$PRESET" ] && grep -q '"projection": *"lambert"' "$PRESET"; then WORLD=lambert; fi
+fi
+case "$SIZE/$WORLD" in
+    16384/petroff_guyou) LEVEL_TYPE='deeptime\:planet' ;;
+    32768/petroff_guyou) LEVEL_TYPE='deeptime\:planet_32k' ;;
+    16384/lambert) LEVEL_TYPE='deeptime\:planet_lambert' ;;
+    32768/lambert) LEVEL_TYPE='deeptime\:planet_lambert_32k' ;;
     *) echo "install.sh: --size must be 16384 or 32768" >&2; exit 2 ;;
 esac
 
