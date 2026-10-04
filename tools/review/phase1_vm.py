@@ -129,15 +129,22 @@ def cmd_pick(a):
         plan["others"] = [{"site": s["id"], "center": s["center"], "tonnage_t": tonnage(s)} for s in picks]
     traps = sorted(of(TRAP), key=tonnage, reverse=True)
     plan["traps"] = [{"site": s["id"], "center": s["center"], "tonnage_t": tonnage(s)} for s in traps[:3]]
-    # Empty chunks: the spawn candidates (dry land) farthest from every site, at least 600 blocks away.
+    # Empty chunks: the spots of a 512-block grid over the planet (a 2026-10-04 run found that the spawn candidates
+    # alone had no spot farther than 150 blocks from every site) farthest from every site, at least 600 blocks away
+    # and 2,000 apart; the spawn candidates are the fallback.
+    grid = [{"x": x, "z": z} for x in range(-c // 2, c // 2, 512) for z in range(-c // 4, c // 4, 512)]
     far = []
-    for cd in cl:
+    for cd in grid + cl:
         dmin = min((wdist(c, cd["x"], cd["z"], s["center"][0], s["center"][2]) for s in sites), default=1e9)
         far.append((dmin, cd))
     far.sort(key=lambda t: -t[0])
-    plan["empty"] = [{"x": cd["x"], "z": cd["z"], "nearest_site": round(dm, 1)} for dm, cd in far[:3] if dm >= 600]
-    if not plan["empty"] and far:
-        plan["empty"] = [{"x": cd["x"], "z": cd["z"], "nearest_site": round(dm, 1)} for dm, cd in far[:1]]
+    pick = []
+    for dm, cd in far:
+        if len(pick) >= 3:
+            break
+        if all(wdist(c, cd["x"], cd["z"], q["x"], q["z"]) >= 2000 for q in pick):
+            pick.append({"x": cd["x"], "z": cd["z"], "nearest_site": round(dm, 1)})
+    plan["empty"] = [e for e in pick if e["nearest_site"] >= 600] or pick[:1]
 
     chunky = []
     rc = []
