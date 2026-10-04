@@ -188,7 +188,10 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
         proj["shares"]["land_map"].as_f64().unwrap(),
         proj["shares"]["land_true"].as_f64().unwrap(),
     );
-    assert!((lm - lt).abs() < 0.01, "land on the map {lm}, on the planet {lt}");
+    assert!(
+        (lm - lt).abs() < 0.01,
+        "land on the map {lm}, on the planet {lt}"
+    );
     let spec = m.projection.as_ref().expect("the layout block");
     assert_eq!(spec.edges.len(), 4);
     assert!(spec.border.as_ref().is_some_and(|b| b.temporary));
@@ -419,7 +422,10 @@ fn a_lambert_preset_keeps_the_cylinder() {
     assert_eq!(m.grids["L1"].w, 256);
     assert_eq!(m.grids["L3"].w, 1024);
     let spec = m.projection.as_ref().expect("a layout block");
-    assert_eq!(spec.kind, deeptime_format::projection::ProjectionKind::Lambert);
+    assert_eq!(
+        spec.kind,
+        deeptime_format::projection::ProjectionKind::Lambert
+    );
     assert_eq!(spec.edges.len(), 2);
     assert!(spec.border.is_none());
     assert_eq!(m.notes["bake"]["projection"]["kind"], "lambert");

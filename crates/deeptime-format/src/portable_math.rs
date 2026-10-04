@@ -37,6 +37,8 @@ pub const PI: f64 = std::f64::consts::PI;
 const PI_LO: f64 = 1.224_646_799_147_353_2e-16;
 
 /// sin r on |r| ≤ π/4 (about): Taylor series to r²³.
+// The nested Horner form is kept as written (rustfmt does not finish on it).
+#[rustfmt::skip]
 #[inline]
 fn kernel_sin(r: f64) -> f64 {
     let z = r * r;
@@ -56,6 +58,8 @@ fn kernel_sin(r: f64) -> f64 {
 
 /// cos r on |r| ≤ π/4 (about): Taylor series to r²⁴, summed as fdlibm's kernel does
 /// (1 − z/2 split so the leading terms keep their bits).
+// The nested Horner form is kept as written (rustfmt does not finish on it).
+#[rustfmt::skip]
 #[inline]
 fn kernel_cos(r: f64) -> f64 {
     let z = r * r;
@@ -128,6 +132,8 @@ pub fn tan(x: f64) -> f64 {
 }
 
 /// atan t for t in [0, 1]: three half-angle steps, then the Taylor series.
+// The nested Horner form is kept as written (rustfmt does not finish on it).
+#[rustfmt::skip]
 #[inline]
 fn atan_unit(t: f64) -> f64 {
     let mut s = t;

@@ -396,7 +396,10 @@ mod tests {
             let (l2, p2) = p.inverse(x, y);
             let d = angle(unit(lam, phi), unit(l2, p2));
             worst = worst.max(d);
-            assert!(d < 1e-9, "({lam}, {phi}) -> ({x}, {y}) -> ({l2}, {p2}): {d}");
+            assert!(
+                d < 1e-9,
+                "({lam}, {phi}) -> ({x}, {y}) -> ({l2}, {p2}): {d}"
+            );
             let (x, y) = (2.0 * g.f() - 1.0, 2.0 * g.f() - 1.0);
             let (l, f) = p.inverse(x, y);
             let (x2, y2) = p.forward(l, f);

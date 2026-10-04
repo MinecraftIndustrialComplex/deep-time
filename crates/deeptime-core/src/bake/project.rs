@@ -119,7 +119,11 @@ impl Src {
         let g = &self.layer.desc.grid;
         let (ci, cj) = g.cell(i, j);
         let at = (cj as usize * g.w as usize + ci as usize) * self.cb;
-        let v = self.layer.desc.dtype.decode_scalar(&self.layer.bytes[at..at + self.cb]);
+        let v = self
+            .layer
+            .desc
+            .dtype
+            .decode_scalar(&self.layer.bytes[at..at + self.cb]);
         match self.layer.desc.nodata {
             Some(nd) if v == nd => f64::NAN,
             _ => v,
@@ -311,10 +315,7 @@ impl Mapping {
 /// Applies a Jacobian (as [`Mapping::jacobian`] returns it) to a simulation vector (dx, dz).
 #[inline]
 fn apply(j: &[[f64; 2]; 2], v: (f64, f64)) -> (f64, f64) {
-    (
-        j[0][0] * v.0 + j[1][0] * v.1,
-        j[0][1] * v.0 + j[1][1] * v.1,
-    )
+    (j[0][0] * v.0 + j[1][0] * v.1, j[0][1] * v.0 + j[1][1] * v.1)
 }
 
 /// The λc the bake chose and how good it is.
@@ -389,9 +390,12 @@ pub fn choose_lambda_c(b: u32, land: &(dyn Fn([f64; 3]) -> bool + Sync)) -> Lamb
         })
         .collect();
     let lookup = |lat: f64, lon: f64| {
-        let t = lats.iter().position(|&l| (l - lat).abs() < 1e-6).unwrap_or(0);
-        let k = ((deeptime_format::projection::wrap_deg(lon) / LAMBDA_STEP_DEG).round() as usize)
-            % n;
+        let t = lats
+            .iter()
+            .position(|&l| (l - lat).abs() < 1e-6)
+            .unwrap_or(0);
+        let k =
+            ((deeptime_format::projection::wrap_deg(lon) / LAMBDA_STEP_DEG).round() as usize) % n;
         tables[t][k]
     };
     let mut best: Option<(f64, f64, f64, [f64; 4])> = None;
@@ -648,7 +652,10 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         let (ci, cj) = g.cell((u + 0.5).floor() as i64, (w + 0.5).floor() as i64);
         let cb = elev_src.desc.cell_bytes();
         let at = (cj as usize * g.w as usize + ci as usize) * cb;
-        let raw = elev_src.desc.dtype.decode_scalar(&elev_src.bytes[at..at + cb]);
+        let raw = elev_src
+            .desc
+            .dtype
+            .decode_scalar(&elev_src.bytes[at..at + cb]);
         raw * elev_src.desc.scale + elev_src.desc.offset >= sea
     };
     let t = Instant::now();
@@ -768,7 +775,11 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             let raw = |i: i64, j: i64| {
                 let (ci, cj) = g.cell(i, j);
                 let at = (cj as usize * g.w as usize + ci as usize) * cb;
-                elev_src.desc.dtype.decode_scalar(&elev_src.bytes[at..at + cb]) * elev_src.desc.scale
+                elev_src
+                    .desc
+                    .dtype
+                    .decode_scalar(&elev_src.bytes[at..at + cb])
+                    * elev_src.desc.scale
             };
             let (i0, j0) = (fi as i64, fj as i64);
             let a = raw(i0, j0) + (raw(i0 + 1, j0) - raw(i0, j0)) * fu;
@@ -847,7 +858,8 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             .iter()
             .map(|b| {
                 let mut nb = project_body(&map, b);
-                let dy = new.height(nb.center[0], nb.center[2]) - old.height(b.center[0], b.center[2]);
+                let dy =
+                    new.height(nb.center[0], nb.center[2]) - old.height(b.center[0], b.center[2]);
                 if dy.is_finite() {
                     nb.center[1] += dy;
                     if nb.clip_top_y != deeptime_format::bodies::NO_CLIP {
@@ -1289,7 +1301,10 @@ fn project_spawn(map: &Mapping, elev: &LoadedLayer, v: &mut Value) {
         if !ranked {
             list.sort_by(|a, b| {
                 let d = |o: &Value| {
-                    let (x, z) = (o["x"].as_f64().unwrap_or(0.0), o["z"].as_f64().unwrap_or(0.0));
+                    let (x, z) = (
+                        o["x"].as_f64().unwrap_or(0.0),
+                        o["z"].as_f64().unwrap_or(0.0),
+                    );
                     x * x + z * z
                 };
                 d(a).partial_cmp(&d(b)).unwrap_or(std::cmp::Ordering::Equal)

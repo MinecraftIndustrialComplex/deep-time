@@ -88,7 +88,10 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     // What the run offers.
     let info = json_of(&route(&wb, "/api/runs/baked/rock", "").unwrap());
     assert_eq!(info["available"], true, "{info}");
-    assert_eq!(info["circumference"], 3072, "the Petroff–Guyou world's x period 2b");
+    assert_eq!(
+        info["circumference"], 3072,
+        "the Petroff–Guyou world's x period 2b"
+    );
     assert_eq!(info["depths"][0], 0);
     assert_eq!(info["depths"].as_array().unwrap().last().unwrap(), "floor");
     let classes = info["classes"].as_array().unwrap();
