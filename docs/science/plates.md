@@ -245,8 +245,9 @@ orogenic collapse and before the surface processes:
    subduction zone or on an arc, and continental samples an orogeny raised within the quiet time
    (PLT-259), are left out: an active margin or a mountain front is not a rifted margin. So are
    oceanic samples whose crystalline crust is thicker than a continent's: the plate model keeps
-   crust stacked at resamplings and accreted from slabs under the oceanic label (on master 13 % of
-   the ocean floor is thicker than 35 km at 1000 Myr, some of it hundreds of km), and that is not
+   crust stacked at resamplings and accreted from slabs under the oceanic label (on master, in the
+   L1 map of one 1000 Myr run, supercontinent seed 2, 13 % of the ocean floor is thicker than
+   35 km and the thickest is 240 km), and that is not
    the ocean floor beside a rifted margin.
 2. *The taper* (PLT-260). Every sample within W/2 of the boundary (W = `transition_width_km`,
    200 km measured **on the planet**, PLT-261) gets a signed distance d from it (inland positive)
