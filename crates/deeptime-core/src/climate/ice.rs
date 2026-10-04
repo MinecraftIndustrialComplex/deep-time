@@ -33,7 +33,8 @@ use rayon::prelude::*;
 /// Density of glacier ice and of sea water, kg/m³.
 pub const RHO_ICE: f64 = 917.0;
 pub const RHO_SEA: f64 = 1028.0;
-/// Standard gravity, m/s².
+/// Earth's standard gravity, m/s² (the planet's own, `planet.gravity_m_s2`, is what the ice
+/// takes: P1-26 T6, science stage 1 fix 17).
 pub const G: f64 = 9.81;
 /// Imbrie & Imbrie's asymmetry b.
 pub const IMBRIE_B: f64 = 0.6;
@@ -173,15 +174,16 @@ pub fn distance_to_margin(w: usize, h: usize, ice: &[bool], sx: &[f64], sy: &[f6
     out
 }
 
-/// Nye's equilibrium thickness at distance `l_m` from the margin, m.
-pub fn nye(l_m: f64, tau_pa: f64, cap_m: f64) -> f64 {
-    (2.0 * tau_pa * l_m.max(0.0) / (RHO_ICE * G))
+/// Nye's equilibrium thickness at distance `l_m` from the margin under gravity `g` m/s², m.
+pub fn nye(l_m: f64, tau_pa: f64, cap_m: f64, g: f64) -> f64 {
+    (2.0 * tau_pa * l_m.max(0.0) / (RHO_ICE * g))
         .sqrt()
         .min(cap_m)
 }
 
 /// Thickness of every cell of an ice mask, m: Nye's profile at the distance to the margin (the
-/// margin taken half a cell outside the last ice cell's centre).
+/// margin taken half a cell outside the last ice cell's centre), under gravity `g` m/s².
+#[allow(clippy::too_many_arguments)]
 pub fn thickness(
     w: usize,
     h: usize,
@@ -190,6 +192,7 @@ pub fn thickness(
     sy: &[f64],
     tau_pa: f64,
     cap_m: f64,
+    g: f64,
 ) -> Vec<f32> {
     if !ice.iter().any(|&x| x) {
         return vec![0.0; w * h];
@@ -203,7 +206,7 @@ pub fn thickness(
                 return 0.0;
             }
             let half = 0.5 * sx[c / w].min(sy[c / w]);
-            nye((dist - half).max(half), tau_pa, cap_m) as f32
+            nye((dist - half).max(half), tau_pa, cap_m, g) as f32
         })
         .collect()
 }
@@ -377,9 +380,13 @@ mod tests {
     #[test]
     fn nye_and_eustasy_have_earths_numbers() {
         // 1,000 km from the margin at 50 kPa: ~3.3 km.
-        let hh = nye(1.0e6, 5.0e4, 1.0e9);
+        let hh = nye(1.0e6, 5.0e4, 1.0e9, G);
         assert!((3200.0..3400.0).contains(&hh), "{hh}");
-        assert_eq!(nye(1.0e7, 5.0e4, 4000.0), 4000.0);
+        assert_eq!(nye(1.0e7, 5.0e4, 4000.0, G), 4000.0);
+        // On a Mars-gravity planet the same margin distance and stress hold √(9.81/3.71) = 1.63
+        // times the ice (design §4.6).
+        let mars = nye(1.0e6, 5.0e4, 1.0e9, 3.71);
+        assert!((mars / hh - (9.81f64 / 3.71).sqrt()).abs() < 1e-12);
         // 10⁶ km³ on Earth's ocean: about 2.5 m.
         let dz = eustatic_m(1.0e6, 3.61e8);
         assert!((dz + 2.47).abs() < 0.03, "{dz}");
@@ -406,6 +413,7 @@ mod tests {
             &vec![10_000.0; h],
             5.0e4,
             4000.0,
+            G,
         );
         let centre = t[16 * w + 32];
         let edge = t[16 * w + 41];

@@ -139,6 +139,19 @@ pub fn bake(
             aridity: on_l1(climate::field::ARIDITY),
             koppen,
             glacier: on_l1(climate::field::GLACIER),
+            months: {
+                let t: Vec<&Field> = (0..12)
+                    .filter_map(|m| on_l1(&climate::field::t_sl_month(m)))
+                    .collect();
+                let pr: Vec<&Field> = (0..12)
+                    .filter_map(|m| on_l1(&climate::field::p_month(m)))
+                    .collect();
+                (t.len() == 12 && pr.len() == 12).then(|| biomes::Months {
+                    t_sl: std::array::from_fn(|m| t[m]),
+                    p: std::array::from_fn(|m| pr[m]),
+                    lapse_c_per_km: p.climate.as_ref().map_or(6.5, |c| c.lapse_c_per_km),
+                })
+            },
         }),
         _ => None,
     };

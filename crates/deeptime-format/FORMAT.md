@@ -1510,8 +1510,23 @@ continental sheets that flowed below the snowline.
 | `climate/ice_max_extent` | 0/1 | 1 where `climate/ice_max_thickness_m` > 0 (the LGM extent at the present) |
 | `climate/ice_time_share` | 0–1 | share of the step's time the cell was under ice |
 | `climate/sea_ice` | 0–1 | annual-mean sea-ice cover of the sea (0 on land) |
+| `climate/sea_ice_max` | 0–1 | (P1-26) the winter maximum of the twelve monthly sea-ice covers of the per-cell climate (0 on land); pipeline field, **not baked** |
+| `climate/sea_ice_min` | 0–1 | (P1-26) the summer minimum of the same; pipeline field, **not baked** |
 | `climate/ice_balance_m_yr` | m ice/yr | surface mass balance of the land ice at the end of the step: positive where snow builds it (above the equilibrium line `climate/ela_m`, at most `ice_accumulation_max_m_yr` × the precipitation in m/yr), negative where it melts (`ice_ablation_gradient` × the ice surface's depth below the line); 0 off the ice. For the hydrology (decisions log 2026-10-01, "Yes, with the ice-sheet branch"): no runoff and no lake where `climate/ice_thickness_m` ≥ 1 m, and meltwater −balance × 0.917 m of water per year where it is negative (the ice edge) |
 | `climate/glacier` | 0/1 | (P1-05) 1 where land ice stands at the end of the step (= `climate/ice_thickness_m` > 0) |
+
+**The per-cell climate (P1-26, 2026-10-03) changes no baked layer.** The climate layers a bake reads
+and writes (`climate/t_mean_c`, `p_mm`, `koppen`, `month/*`, `ice_cover`, and the ice fields above)
+keep their names, units, grids and meaning; only the values come from the 2-D model and, for
+`climate/koppen`, from the L2 classification (the bake's `bake/biomes.rs`). `climate/sea_ice` is the
+annual mean as before (per cell now, the band's value under `climate.model = banded`).
+`climate/sea_ice_max` and `climate/sea_ice_min` are **pipeline fields only**: they live in the run's
+`WorldState`, are carried between snapshots like `climate/sea_ice`, and are written to
+checkpoints and shown by the viewer, but no bake or world folder stores them and the climate
+API (mic-climate) does not see them (design `docs/design/p1-26-per-cell-climate.md`, Q8: seasonal
+sea ice is not baked in Phase 1). The per-cell climate's state (the 2-D model's temperatures, slab
+and ice, the last sinking region and the flux correction) is part of the climate stage's saved
+state in checkpoints, not of any world layer.
 
 The surface stage's field history (the deposit engine's frames, `surface::fields::STEP_FIELDS`)
 records two of them as frame means:
@@ -1534,7 +1549,8 @@ each: its fields' LZ4 blobs back to back in the head's order (the same record th
 holds). The next stage is always a group's lead: inside a group of coupled stages (plates + surface,
 P1-04) the saved state is the postcard `Vec<Vec<u8>>` of every member's state, in pipeline order.
 Schema 4 (P1-04) added the surface state and the recorded field history to `WorldState`; schema 6
-(P1-17) moved the history's frames out of the body into sections of their own (schema 10, 2026-09-30,
+(P1-17) moved the history's frames out of the body into sections of their own (schema 12, P1-26 T6, added the zonal model's correction to the 2-D climate and the triggered-snapshot counters; schema 11, P1-26, added
+the per-cell climate's state; schema 10, 2026-09-30,
 added the climate's ice sheet, weathering supply and snowball list; schema 9, P2-08, the world's crater
 catalogue; schema 8, P1-21, the world's
 volcano catalogue; schema 7, the deep-time

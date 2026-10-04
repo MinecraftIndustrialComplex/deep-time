@@ -207,6 +207,11 @@ enum Command {
         /// Also write an HTML viewer bundle (Köppen, temperature, precipitation) here.
         #[arg(long)]
         viewer: Option<PathBuf>,
+        /// Also write the snapshot's fields as raw little-endian f32 rasters here (the twelve
+        /// monthly sea-level temperatures and precipitations, the annual fields, the sea ice) with
+        /// meta.json (the per-cell climate's figures): for tools/validation/climate_vs_obs.py.
+        #[arg(long)]
+        dump: Option<PathBuf>,
     },
     /// The surface kernels (P1-04) on a plain raster, for the fastscapelib oracle
     /// (tools/validation/fastscape_compare.py): periodic in x, the first and last rows fixed at
@@ -783,15 +788,19 @@ fn main() -> ExitCode {
             preset,
             circumference_km,
             viewer,
+            dump,
         }) => finish(
             "climate-dem",
             climate_dem::run(&climate_dem::Options {
                 dem,
                 w: width,
-                h: deeptime_format::Projection::picture_height(width),
+                // The DEM is equirectangular (GMT's layout): W/2 rows, whatever the planet's
+                // projection (the climate resamples it onto its own grid).
+                h: width / 2,
                 preset,
                 circumference_km,
                 viewer,
+                dump,
             }),
         ),
         Some(Command::Lem {
