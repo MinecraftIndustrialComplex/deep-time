@@ -118,7 +118,7 @@ def step_phase0(a):
     os.makedirs(LOGS, exist_ok=True)
     if not a.skip_phase0:
         with open(out_path, "w") as f:
-            subprocess.run([sys.executable, p0, "--no-publish"], cwd=REPO, stdout=f, stderr=subprocess.STDOUT)
+            subprocess.run([sys.executable, p0, "--no-publish"], cwd=REPO, stdout=f, stderr=subprocess.STDOUT, env={**os.environ, "PHASE0_DETACH": "1"})
     rows_path = os.path.join(REPO, "review", "out", "phase0-src", "rows.json")
     if not os.path.exists(rows_path):
         return [Row("phase0", 0, "Phase 0's suite re-run", "ERROR", ["no review/out/phase0-src/rows.json: phase0.py did not finish (see logs/phase0.log)"])]
