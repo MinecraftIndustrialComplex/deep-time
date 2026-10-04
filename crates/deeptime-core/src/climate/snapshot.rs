@@ -47,8 +47,8 @@ pub struct Planet {
     /// R / R⊕ of the Earth-normalized mapping (planetary-scale lengths shrink by it).
     pub earth_scale: f64,
     pub m_per_block_h: f64,
-    /// CO₂ forcing against 280 ppm, W/m² (lowers the EBM's longwave A; `carbon.rs`).
-    pub forcing_w_m2: f64,
+    /// The atmosphere's CO₂, ppm (its forcing lowers each tile's longwave, `co2.rs`).
+    pub co2_ppm: f64,
     /// The star's luminosity against today's (Gough 1981; `carbon.rs`), × `star_flux_rel`.
     pub sun_rel: f64,
     /// The orbit inside the recent ice-age window (`orbit.rs`); `None`: circular at the tilt.
@@ -60,7 +60,7 @@ impl Planet {
     pub fn ebm(&self, p: &ClimateParams) -> EbmParams {
         let mut ep =
             EbmParams::from_climate(p, self.axial_tilt_deg, self.star_flux_rel * self.sun_rel);
-        ep.a -= self.forcing_w_m2;
+        ep.co2 = Some(super::co2::Forcing::new(self.co2_ppm));
         if let Some(o) = self.orbit {
             ep.obliquity_rad = o.obliquity_deg.to_radians();
             ep.orbit = o.orbit();
@@ -84,6 +84,13 @@ pub struct Input<'a> {
     /// Keep every cell's twelve months ([`Snapshot::t_sl_month`], [`Snapshot::p_month`]); the
     /// stage asks for them at its last snapshot, which the bake stores (P1-25).
     pub monthly: bool,
+    /// The previous step's land ice (thickness, m) and Köppen classes, for the per-cell
+    /// climate's ice-sheet and desert albedo (`None`: the band shares, no desert).
+    pub ice_prev: Option<&'a [f32]>,
+    pub koppen_prev: Option<&'a [f32]>,
+    /// The zonal model's correction from the last snapshot (the per-cell climate's; empty:
+    /// none), the first guess of this snapshot's fit.
+    pub correction: &'a super::percell::Correction,
 }
 
 /// Per-row zonal references the geographic anomalies are measured from (sea-level °C; ln mm/yr).
@@ -133,6 +140,16 @@ pub struct Snapshot {
     /// Land elevation above the sea: median, 90th percentile (m) and share above 2 km (by cell).
     pub land_z: (f64, f64, f64),
     pub millis: BTreeMap<&'static str, f64>,
+    /// Sea-ice cover of every sea cell, 0–1 (0 on land): the annual mean, the winter maximum and
+    /// the summer minimum of the monthly covers.
+    pub sea_ice: Vec<f32>,
+    pub sea_ice_max: Vec<f32>,
+    pub sea_ice_min: Vec<f32>,
+    /// The per-cell climate's figures (`climate.model = per_cell`), JSON.
+    pub cell: Option<serde_json::Value>,
+    /// The zonal model's correction fitted to the per-cell climate (design §4.1; empty under the
+    /// banded climate): the clock runs with it until the next snapshot.
+    pub correction: super::percell::Correction,
 }
 
 /// Thornthwaite's (1948) potential evapotranspiration from monthly mean temperatures, mm/yr
@@ -213,7 +230,12 @@ fn time(millis: &mut BTreeMap<&'static str, f64>, what: &'static str, since: Ins
 
 /// Computes a snapshot. `ebm` carries the EBM's state between snapshots (empty: spin up);
 /// `sheet` is the previous snapshot's `band_sheet` (empty at the first).
-pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
+pub fn compute(
+    inp: &Input<'_>,
+    ebm: &mut EbmState,
+    sheet: &[f64],
+    cell: &mut super::percell::PerCell,
+) -> Snapshot {
     let mut millis = BTreeMap::new();
     let p = inp.p;
     let (w, hgt) = (inp.d.w, inp.d.h);
@@ -231,8 +253,12 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
 
     // 1. The EBM on the current land fractions.
     let started = Instant::now();
-    let ep = inp.planet.ebm(p);
+    let mut ep = inp.planet.ebm(p);
     let bands = ep.bands;
+    let per_cell = p.model == super::ClimateModel::PerCell;
+    if per_cell {
+        inp.correction.apply(&mut ep);
+    }
     let land_frac = band_means(inp.lat, w, bands, &|c| if land[c] { 1.0 } else { 0.0 });
     let years = if ebm.t_ocean.len() == bands {
         p.ebm_warm_years
@@ -242,7 +268,46 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
     let sheet: Vec<f64> = (0..bands)
         .map(|b| sheet.get(b).copied().unwrap_or(0.0) * p.ice_sheet_feedback)
         .collect();
-    let er = ep.run(ebm, &land_frac, &sheet, years);
+    let mut er = ep.run(ebm, &land_frac, &sheet, years);
+    time(&mut millis, "ebm", started);
+    // The per-cell climate (P1-26) on the coarse grid.
+    let mut pc: Option<super::percell::Coarse> = None;
+    if per_cell {
+        let started = Instant::now();
+        pc = Some(super::percell::run(
+            &super::percell::Inputs {
+                p,
+                w,
+                h: hgt,
+                land: &land,
+                z: &z,
+                ice_prev: inp.ice_prev,
+                koppen_prev: inp.koppen_prev,
+                band_sheet: &sheet,
+                ebm: &*ebm,
+                ep: EbmParams {
+                    flux_corr: Vec::new(),
+                    d_face: Vec::new(),
+                    ..ep.clone()
+                },
+                tilt_deg: inp.planet.axial_tilt_deg,
+                day_length_h: inp.planet.day_length_h,
+            },
+            cell,
+        ));
+        time(&mut millis, "ebm2d", started);
+    }
+    // The zonal model's flux correction to the 2-D zonal means (design §4.1): the clock's model,
+    // its references and its state from here are the corrected ones.
+    let mut fit = None;
+    if let Some(c) = &pc {
+        let started = Instant::now();
+        let (f, e) = super::percell::fit_flux(c, &ep, &land_frac, &sheet, ebm);
+        er = e;
+        fit = Some(f);
+        time(&mut millis, "flux_fit", started);
+    }
+    let started = Instant::now();
     let t_o: Vec<[f64; 12]> = inp
         .lat
         .iter()
@@ -261,27 +326,51 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
     box_blur(&inp.d, &mut land_near, cells(500.0), 2);
     let mut sea_near: Vec<f64> = land.iter().map(|&l| if l { 0.0 } else { 1.0 }).collect();
     box_blur(&inp.d, &mut sea_near, cells(p.coast_km), 2);
-    let itcz = belts::itcz(
-        p,
-        w,
-        inp.lat,
-        &inp.grid.row_weights(),
-        &land_near,
-        &t_o,
-        &t_l,
-        cells(p.itcz_smooth_km),
-    );
+    let itcz = match &pc {
+        Some(pc) => pc.itcz_l1(),
+        None => belts::itcz(
+            p,
+            w,
+            inp.lat,
+            &inp.grid.row_weights(),
+            &land_near,
+            &t_o,
+            &t_l,
+            cells(p.itcz_smooth_km),
+        ),
+    };
     let hemi: [f64; 12] =
         std::array::from_fn(|m| belts::hemispheric_shift(p, inp.planet.axial_tilt_deg, m));
     let true_km = |j: usize| dx * inp.lat[j].to_radians().cos().max(0.0) / (1000.0 * scale);
     let basin = belts::basin_position(&inp.d, &land, &true_km, cells(300.0));
+    // The sea's departure from its row: the per-cell climate's own (its gyres and conveyor), or
+    // the prescribed gyre offsets of the banded climate.
     let dsst: Vec<f64> = (0..n)
         .map(|c| {
             if land[c] {
                 0.0
+            } else if let Some(pc) = &pc {
+                pc.dsst_at(c)
             } else {
                 belts::sst_anomaly(p, basin[c], inp.lat[c / w])
             }
+        })
+        .collect();
+    // The winter inversion's continental share within 1,000 km and each row's monthly sunlight.
+    let interior: Vec<f64> = if per_cell {
+        let mut v: Vec<f64> = land.iter().map(|&l| if l { 1.0 } else { 0.0 }).collect();
+        box_blur(&inp.d, &mut v, cells(super::percell::INTERIOR_KM), 2);
+        v
+    } else {
+        Vec::new()
+    };
+    let q_month: Vec<[f64; 12]> = inp
+        .lat
+        .iter()
+        .map(|&l| {
+            std::array::from_fn(|m| {
+                super::insolation::monthly(ep.s0, l.to_radians(), m, ep.obliquity_rad, 4)
+            })
         })
         .collect();
     time(&mut millis, "belts", started);
@@ -353,6 +442,43 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
         barrier_recover: km(p.barrier_recover_km),
     };
     let oro_scale = 365.0 * p.oro_hours_per_day;
+    // The budget's second pass: the mountain rain the L1 terrain takes out of the column (S_oro,
+    // design §3.6), the windward excess over each coarse cell, so less water passes the range.
+    if let Some(pcm) = pc.as_mut()
+        && pcm.moisture.is_some()
+    {
+        let started = Instant::now();
+        let g = pcm.grid.clone();
+        let mut sink = vec![[0.0f64; 12]; g.w * g.h];
+        let per = (g.k * g.k) as f64;
+        for c in 0..n {
+            if !land[c] {
+                continue;
+            }
+            let (i, j) = (c % w, c / w);
+            let phi = inp.lat[j];
+            let cc = g.coarse_of(c);
+            for m in 0..12 {
+                let wt = belts::regime_weights(phi, phi - belts::shift(phi, itcz[i][m], hemi[m]));
+                let o: f64 = (0..REGIMES)
+                    .filter(|&r| wt[r] > 0.0 && !oro[r].is_empty())
+                    .map(|r| wt[r] * f64::from(oro[r][c]))
+                    .sum();
+                if o <= 0.0 {
+                    continue;
+                }
+                let (tl, to) = pcm.tiles(c, m);
+                let tsl = tl + sea_near[c] * (to - tl);
+                let ccf = (0.067 * (tsl - p.oro_ref_temp_c)).exp().clamp(0.05, 3.0);
+                let rh = pcm.budget_at(c, m).map_or(pcm.mp.r_ref, |x| x.1);
+                sink[cc][m] += o * oro_scale * (rh / pcm.mp.r_ref) * ccf / YEAR_S / per;
+            }
+        }
+        let mo = super::percell::budget(pcm, &pcm.mp, Some(&sink), &cell.bucket);
+        cell.bucket = mo.bucket.clone();
+        pcm.moisture = Some(mo);
+        time(&mut millis, "budget", started);
+    }
     // The hydrological cycle follows the global temperature (Held & Soden 2006).
     let ln_hydro = hydro_ln(p, er.t_global);
     let refs = zonal_refs(inp.lat, &er, ln_hydro);
@@ -368,6 +494,7 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
         glacier: Vec<u8>,
         t_sl_month: Vec<[f32; 12]>,
         p_month: Vec<[f32; 12]>,
+        ice: Vec<[f32; 3]>,
     }
     // The air's march along every row, both ways; then smoothed over `air_mixing_km` so the
     // rows' independent marches do not leave streaks (the winds have meridional components and
@@ -426,6 +553,7 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
                 glacier: vec![0; w],
                 t_sl_month: Vec::with_capacity(if inp.monthly { w } else { 0 }),
                 p_month: Vec::with_capacity(if inp.monthly { w } else { 0 }),
+                ice: vec![[0.0; 3]; w],
             };
             let plateau = |zz: f64| (-(zz - p.plateau_m).max(0.0) / p.plateau_scale_m).exp();
             // How much each month is this row's summer (0 winter, 1 summer; follows the tilt).
@@ -441,6 +569,7 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
                 let mut t = [0.0f64; 12];
                 let mut t_sl = [0.0f64; 12];
                 let mut pm = [0.0f64; 12];
+                let mut ice = [0.0f64; 12];
                 for m in 0..12 {
                     let pb = phi - belts::shift(phi, itcz[i][m], hemi[m]);
                     let wt = belts::regime_weights(phi, pb);
@@ -457,14 +586,35 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
                         let mar = fe * air[2][c] + fw * air[3][c];
                         let bas = bas_q * mar_q;
                         let dcar = fe * air[6][c] + fw * air[7][c];
-                        let cont = 1.0 - mar.max(sea_near[c]).clamp(0.0, 1.0);
-                        (
-                            t_o[j][m] + cont * (t_l[j][m] - t_o[j][m]) + mar * dcar,
-                            bas,
-                            mar * dcar,
-                        )
+                        match &pc {
+                            // Per cell: the land tile, toward the sea's by the coast's sea share,
+                            // less the winter inversion.
+                            Some(pc) => {
+                                let (tl, to) = pc.tiles(c, m);
+                                let inv =
+                                    super::percell::inversion(p, tl, q_month[j][m], interior[c]);
+                                (tl + sea_near[c] * (to - tl) - inv, bas, mar * dcar)
+                            }
+                            None => {
+                                let cont = 1.0 - mar.max(sea_near[c]).clamp(0.0, 1.0);
+                                (
+                                    t_o[j][m] + cont * (t_l[j][m] - t_o[j][m]) + mar * dcar,
+                                    bas,
+                                    mar * dcar,
+                                )
+                            }
+                        }
                     } else {
-                        (t_o[j][m] + dsst[c], basin[c], dsst[c])
+                        match &pc {
+                            Some(pc) => {
+                                ice[m] = super::percell::sharpen(
+                                    pc.ice_at(c, m),
+                                    p.sea_ice_edge_sharpness,
+                                );
+                                (pc.tiles(c, m).1, basin[c], dsst[c])
+                            }
+                            None => (t_o[j][m] + dsst[c], basin[c], dsst[c]),
+                        }
                     };
                     t_sl[m] = tsl;
                     t[m] = tsl - gamma * zr[i];
@@ -480,6 +630,13 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
                         }
                     }
                     let cc = (0.067 * (tsl - p.oro_ref_temp_c)).exp().clamp(0.05, 3.0);
+                    // The moisture budget's background rain and humidity (`rain_model =
+                    // budget`) or the belts'.
+                    let budget = pc.as_ref().and_then(|pc| pc.budget_at(c, m));
+                    let (base, q, k_h) = match (budget, &pc) {
+                        (Some((pbg, rh)), Some(pc)) => (pbg, rh / pc.mp.r_ref, 1.0),
+                        _ => (base, q, hydro),
+                    };
                     let oro_mm = o * oro_scale * q * cc;
                     // Windward rain adds; the lee's negative rate dries the background
                     // proportionally, down to `oro_lee_floor` of it (linear theory's lee drying
@@ -490,7 +647,19 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
                         base * (1.0 + oro_mm / base.max(1e-9)).max(p.oro_lee_floor)
                     }
                     .max(p.precip_min_mm);
-                    pm[m] = rate * hydro / 12.0;
+                    pm[m] = rate * k_h / 12.0;
+                }
+                if !land[c] {
+                    row.ice[i] = if pc.is_some() {
+                        [
+                            (ice.iter().sum::<f64>() / 12.0) as f32,
+                            ice.iter().cloned().fold(0.0, f64::max) as f32,
+                            ice.iter().cloned().fold(1.0, f64::min) as f32,
+                        ]
+                    } else {
+                        let b = band_of(phi, er.sea_ice.len());
+                        [er.sea_ice[b] as f32; 3]
+                    };
                 }
                 if inp.monthly {
                     row.t_sl_month.push(t_sl.map(|v| v as f32));
@@ -546,6 +715,9 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
         s.ela.extend(r.ela);
         s.koppen.extend(r.koppen);
         s.glacier.extend(r.glacier);
+        s.sea_ice.extend(r.ice.iter().map(|x| x[0]));
+        s.sea_ice_max.extend(r.ice.iter().map(|x| x[1]));
+        s.sea_ice_min.extend(r.ice.iter().map(|x| x[2]));
         if inp.monthly {
             if s.t_sl_month.is_empty() {
                 s.t_sl_month = (0..12).map(|_| Vec::with_capacity(n)).collect();
@@ -591,9 +763,77 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
         let high = lz.iter().filter(|&&x| x > 2000.0).count() as f64 / lz.len() as f64;
         s.land_z = (q(0.5), q(0.9), high);
     }
+    if let Some(f) = fit {
+        let mut st = cell_stats(pc.as_ref().expect("a fit has its 2-D climate"), &er);
+        let all: Vec<f64> = f.corr.flux.iter().flatten().copied().collect();
+        let d = &f.corr.d_face;
+        st["flux_corr"] = serde_json::json!({
+            "min_w_m2": all.iter().cloned().fold(f64::MAX, f64::min),
+            "max_w_m2": all.iter().cloned().fold(f64::MIN, f64::max),
+            "d_min_w_m2_k": d.iter().cloned().fold(f64::MAX, f64::min),
+            "d_max_w_m2_k": d.iter().cloned().fold(f64::MIN, f64::max),
+            "iterations": f.iterations,
+            "worst_k": f.worst_k,
+            "rms_k": f.rms_k,
+            "first_rms_k": f.first_rms_k,
+            "capped": f.capped,
+        });
+        s.cell = Some(st);
+        s.correction = f.corr;
+    }
+    if let Some(pc) = &pc {
+        s.ebm_t_global = pc.r.t_global;
+        s.ebm_net_toa = pc.r.net_toa();
+        s.ebm_years = pc.r.years;
+    }
     time(&mut millis, "assemble", started);
     s.millis = millis;
     s
+}
+
+const YEAR_S: f64 = 365.25 * 86_400.0;
+
+/// The per-cell climate's figures for the run's notes: its global mean and balance, the zonal
+/// model's against it, the heat transports' northern peaks (PW, and where), the ocean's gyres and
+/// conveyor, the moisture budget's closure.
+fn cell_stats(pc: &super::percell::Coarse, er: &super::ebm::EbmResult) -> serde_json::Value {
+    let g = &pc.grid;
+    let edges: Vec<f64> = (1..g.h).map(|e| g.lat_edge[e]).collect();
+    let peak = |v: &[f64]| -> (f64, f64) {
+        v.iter()
+            .zip(&edges)
+            .filter(|(_, l)| **l > 0.0)
+            .fold(
+                (f64::MIN, 0.0),
+                |a, (x, l)| if *x > a.0 { (*x, *l) } else { a },
+            )
+    };
+    let ocean: Vec<f64> =
+        pc.r.heat_ocean_pw
+            .iter()
+            .zip(&pc.r.heat_ocean_diff_pw)
+            .map(|(a, b)| a + b)
+            .collect();
+    let (atm, atm_lat) = peak(&pc.r.heat_atm_pw);
+    let (oc, oc_lat) = peak(&ocean);
+    serde_json::json!({
+        "grid": [g.w, g.h],
+        "t_global_c": pc.r.t_global,
+        "net_toa_w_m2": pc.r.net_toa(),
+        "years": pc.r.years,
+        "zonal_t_global_c": er.t_global,
+        "atm_heat_peak_pw": atm,
+        "atm_heat_peak_lat": atm_lat,
+        "ocean_heat_peak_pw": oc,
+        "ocean_heat_peak_lat": oc_lat,
+        "gyre_psi_max_sv": pc.psi_max_sv,
+        "gyre_sweeps": pc.gyre_sweeps,
+        "sinking": pc.sinking.as_ref().map(|s| serde_json::json!({
+            "lat": s.lat, "lon": s.lon, "width_km": s.width_km, "hemisphere": s.hemisphere,
+            "cells": s.cells, "sv": s.sv,
+        })),
+        "moisture_closure_max": pc.moisture.as_ref().map(|m| m.closure.iter().cloned().fold(0.0, f64::max)),
+    })
 }
 
 /// ln of the hydrological factor at global mean `t_global` °C.

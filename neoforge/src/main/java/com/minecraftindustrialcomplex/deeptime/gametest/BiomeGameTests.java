@@ -169,8 +169,14 @@ public final class BiomeGameTests {
     // the default test planet's C family read 0.737 standalone and 0.731 with MIC (156 columns), the
     // mapping unchanged; its misses are coastal columns (Csa/Csb 64-100 % stony shore, Cfb 21 % beach and
     // 15 % stony shore standalone). C goes to 0.63 by the same rule.
+    //
+    // 2026-10-04 (P1-26, the per-cell climate; design §5.3): the default test planet's BW family grew from
+    // 38 columns on master (0.500 standalone, 0.474 MIC; under MIN_COLUMNS, logged only) to 51 and read
+    // 0.608 standalone and 0.569 with MIC, the mapping unchanged; its misses are coastal and mountain
+    // columns (BWh 64 % stony shore standalone, granite cliffs with MIC). BW goes to 0.46 by the same rule.
+    // The same planet's high latitudes warmed (Dfc 138 -> 7 columns, E 4 -> 0; D 507 -> 511, mostly Dfa).
     static final Map<String, Double> FLOORS = Map.ofEntries(
-            Map.entry("A", 0.34), Map.entry("Af", 0.54), Map.entry("BW", 0.57), Map.entry("BS", 0.42), Map.entry("C", 0.63),
+            Map.entry("A", 0.34), Map.entry("Af", 0.54), Map.entry("BW", 0.46), Map.entry("BS", 0.42), Map.entry("C", 0.63),
             Map.entry("D", 0.88), Map.entry("Dsub", 0.38), Map.entry("E", 0.82), Map.entry("sea", 0.95),
             Map.entry("BW:desert", 0.37), Map.entry("Af:jungle", 0.41), Map.entry("Dfc:taiga", 0.33), Map.entry("E:snow", 0.72));
     static final int MIN_COLUMNS = 40;

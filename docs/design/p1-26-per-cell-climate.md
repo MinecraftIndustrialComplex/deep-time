@@ -1334,6 +1334,180 @@ could not read is listed in `docs/science/per-cell-climate.md`, "Open questions"
 | Q10 | Latent heat in the energy balance (a moist EBM: rain heats the air where it falls) | (a) No: dry D includes latent transport, as today; (b) yes, recalibrate D | **(a)** for v1 |
 | Q11 | Runoff for weathering and the surface | (a) Keep Fu's Budyko curve on the new P and T (one runoff for climate and surface); (b) use the moisture budget's bucket runoff | **(a)** |
 
+## 11. As built (kept current by the build, 2026-10-02 onward)
+
+The build started on the ice branch (`worktree-agent-a1c432fc38faa9742`, checkpoint schema 10) with
+master merged in. Each task's notes record what differs from the sections above and why.
+
+- **T1 coarse grid** (`climate/coarse.rs`). `sheet::Grid` moved there (`sheet.rs` re-exports it),
+  unchanged for the sheet (its tests and `coarsen` are as before). New: each coarse row's edge
+  latitudes come from the projection (`Projection::picture_lat_deg` of the fine row edges), so a
+  projection whose rows are not evenly spaced in latitude gives rows of unequal height; areas
+  (Δλ·(sin φ_N − sin φ_S), Σ = 4π to 10⁻¹²), east–west and north–south face conductances (face
+  length over centre distance on the unit sphere), `coarsen_area` (fine cells weighted by the
+  projection's row weight), `corners` and `masked_at` (the masked bilinear of §2.9: only coarse
+  cells of the medium, renormalized; `None` when none of the four has it).
+
+- **T2 2-D energy balance** (`climate/ebm2d.rs`). As §2.2–2.5 and §2.7–2.8, with these choices:
+  - The surface-dependent D is the source's (`ebm2d::D_*`, CLM-120) times one setting,
+    `atmosphere_diffusivity_scale` (default 1 until T9 calibrates it down to the atmosphere's
+    share), so T9 keeps the source's shape and tunes one number.
+  - The ITCZ that sets each row's belt latitude for the low-level wind is the thermal equator of
+    the previous model year's zonal-mean T̄ (the run's first year: the caller's, zeros at a spin-up);
+    a row's wind must be one number for the shift to conserve exactly.
+  - **The slab freezes right after the local step**, as well as after the ocean's transport (and
+    `ebm.rs` does the same now). With freezing only at the end of the step, a slab cooled below
+    −1.8 °C through thin ice drew heat by the slab's diffusion from its neighbours' slabs under
+    thick, insulated ice, which then grew without end (0.65 m a year in the Arctic of the test
+    planet; the run never settled). Freezing first keeps every slab at or above the freezing point
+    for the diffusion, which then cannot cool one below it.
+  - `ebm.rs`'s diffusion now uses each band's exact area, sin φ_N − sin φ_S, in place of cos φ·Δφ
+    (a 10⁻⁴ change of its D), so a zonally uniform 2-D planet equals it band by band (test: under
+    10⁻⁶ K after 4 years).
+  - Mountain blocking (§2.5, option, default off) is not built.
+  - Measured (unit test, an idealized Earth: two continents, Antarctica, 128 × 64, the 1-D
+    model's D values unscaled, gyres and a 15-Sv conveyor): settles in 27 years from the 1-D
+    model's initial state, 0.06–0.08 s per model year on the test VM, global mean 15.5 °C,
+    net TOA 0.0002 W/m², atmosphere's peak transport 3.4 PW, ocean's 2.9 PW, perennial Arctic ice
+    about 4.5 m.
+- **T3 ocean** (`climate/ocean2d.rs`). As §2.6. The wind stress is the annual mean of the surface
+  belt winds' zonal component (`belts::winds` weighted by the month's regimes at the row's belt
+  latitude), ρ_a 1.2 kg/m³, ρ₀ 1,025 kg/m³ (both from memory). A cell is sea for the transport
+  when its land fraction is below one half. A basin qualifies for the conveyor when, within
+  20–70° of its hemisphere, it is one connected sea that reaches 30° and holds sea poleward of 50°
+  ice-free in late winter (March north, September south: the previous snapshot's cover; none at
+  the first); the 30° reach keeps small enclosed seas (a Baltic, a Hudson Bay) from winning by
+  narrowness. Upwelling is spread over the sea equatorward of 50° of the connected ocean the basin
+  belongs to (a lake or an enclosed sea would have no sink). The potential flow is solved by
+  conjugate gradients on the Neumann Laplacian. Tests: a 60°-wide northern basin turns clockwise
+  with its northward western boundary current in the westernmost cell, ≥ 3× the interior's
+  speed, divergence at round-off; the conveyor sinks in the narrow of two northern basins, its
+  sources and sinks sum to 15 Sv, the transport conserves Σ heat to 10⁻⁹ and carries heat north.
+
+- **T4 moisture** (`climate/moisture.rs`, behind `rain_model = budget`; `belts` stays the
+  default). As §3.1–3.5, with these choices: the ITCZ of a column is the soft maximum of its
+  monthly T̄ over |φ| ≤ 35°, smoothed along the row over `itcz_smooth_km`; the zonal belt wind is
+  `belts::winds`' east component by the regimes at φ′; the thermal wind uses T̄′ smoothed 1-2-1
+  twice in x and in y; the cold-sea stability acts on the sea share only (1 − (1 − f)(1 − e^(0.3
+  min(0, ΔT)))); W_sat's height is the land's lowland height supplied by the caller (§3.7's fix
+  for a Bangladesh cell). The bucket starts half full (or from the caller's) and runs three passes
+  over the year, the solve of each month warm-started from the last pass. The line relaxation
+  stops when every cell's residual is below 10⁻¹⁰ kg/m²/s. The SB coupling (S_oro) is an input,
+  wired in T5. Tests: an aquaplanet (zonal seasonal temperatures) rains 14 mm/day at the
+  equator, 2.0 in the subtropical minimum (at 18–35°) and 3.5 in mid-latitudes, water closes to
+  5·10⁻⁸ of the evaporation every month, W ≥ 0, 0.2 s for the year's three passes (12 months
+  × 3) on the test VM; a 60°-wide continent at 10–35°N, 10 K warmer than the sea in summer and
+  colder in winter, rains 10.8 mm/day in its summer against 1.1 in winter, and the wind south of
+  it turns north in July.
+
+- **T5 snapshot integration** (`climate/percell.rs`, `snapshot.rs`). As §2.9 and §3.6–3.8.
+  `snapshot::compute` runs the zonal model first (as before), then the 2-D model from the last
+  snapshot's 2-D state; the 2-D model restarts from the zonal state when the two have drawn apart
+  by the triggered-snapshot thresholds (3 K of sea surface or 0.15 of sea ice, §4.2), so a
+  snowball the clock froze into is not thawed by a warm start. Downscaling, the coast blend and
+  the winter inversion are as §2.9 (`percell::inversion`; dark below 150 W/m², the interior from
+  the land share within 1,000 km). The sea ice of a sea cell is the masked bilinear of the coarse
+  monthly covers, sharpened (`sea_ice_edge_sharpness`); its annual mean, winter maximum and summer
+  minimum are the pipeline fields `climate/sea_ice{,_max,_min}`. Between snapshots each cell's
+  sea ice moves with its band's change in the zonal model since the snapshot. Under `rain_model =
+  belts` the belt rain takes the 2-D model's column ITCZ and the sea tile's departure from its
+  row; under `budget` the budget's rain and humidity replace the belt background, with the
+  mountain rain the L1 terrain takes out as the sink S_oro. The ice-sheet share of each coarse
+  cell (the albedo s_g) is the previous step's land ice on L1, and the desert share the previous
+  snapshot's Köppen B land. **Köppen on L2** (Ben 2026-10-02, "classify on L2"; `bake/biomes.rs`):
+  every L2 cell's twelve months are bilinear from L1's monthly layers, lapsed to its own height,
+  and classed there, so biome borders no longer step with the L1 cells. `deeptime climate-dem
+  --dump` writes the fields for `tools/validation/climate_vs_obs.py`; `tools/review/
+  percell-runs.sh` and `percell_metrics.py` measure the real runs. Checkpoint schema 11.
+
+- **T6 clock coupling** (`percell::fit_flux`, `ebm.rs`, `clock.rs`, `climate/mod.rs`).
+  - **The correction has two parts, not one.** A flux per band alone could not hold the zonal
+    model on the 2-D zonal means: on a two-continent test planet it hit any cap up to 80 W/m² at
+    the poles and stalled at 0.7 K RMS, because the zonal model's uniform D carries far more heat
+    poleward than the 2-D model's surface-dependent D and ocean do (its Antarctica sat at −10 °C
+    against the 2-D model's −25 °C). So the fit first gives every face between bands its own
+    diffusivity, the one that carries the 2-D model's annual heat transport (atmosphere, slab
+    diffusion, gyres and conveyor) down the 2-D zonal-mean gradient of T̄, less what the zonal
+    model's own slab diffusion carries: D = (H₂D − H_slab)/(2π R² cos φ ΔT̄/Δφ), bounded to
+    0.05–5 W/m²/K, fitted only where the gradient exceeds 3 K/rad and interpolated across the
+    flat tropics, smoothed 1-2-1 twice (`EbmParams::d_face`). Then a flux per band and **tile**
+    (land and sea separately: one flux cannot match both, the zonal model's tiles being tied by a
+    10 W/m²/K exchange) closes the rest: F ← F + 0.8 B (T₂D − T₁D), the misses smoothed 1-2-1, a
+    tile under a tenth of its band taking the other's miss, 3 warm-started years per trial, at
+    most 31 trials, stopping at 0.1 K RMS and 0.3 K worst.
+  - **The target is interpolated, not remapped.** The 2-D rows (2.8°) are wider than the zonal
+    bands (2°); an area-overlap remap handed the smooth zonal model 2–3 K steps it could not
+    follow and the fit oscillated. The 2-D row means are interpolated linearly in latitude.
+  - **The fit starts from the 2-D model's zonal state** (its tiles, slab and ice), as §4.2
+    intends, so the zonal model is in the 2-D model's regime (a snowball it froze into or thawed
+    out of) whatever the clock did since.
+  - **Cap 60 W/m², not 15.** The land–sea split takes 30–60 W/m² on the minor tile of bands that
+    are mostly sea; the band means need much less. Measured: Earth's relief F −60…57 W/m², D
+    0.21–1.29, 0.12 K RMS, 0.11–0.32 K worst; the 50-Myr smoke run F −42.6…60 W/m², 0.15 K RMS,
+    0.32 K worst, 0.2 s for six fits.
+  - **Acceptance as built.** The design's 0.3 K in every band is met except at ice edges, where
+    a band's snowy tile has two states (worst 0.7–1.2 K on the test planets; RMS 0.13–0.18 K);
+    the global means agree to 0.02 K. Tests: `the_flux_correction_brings_the_zonal_model_onto_
+    the_2d_zonal_means` (≤ 1.5 K worst, ≤ 0.25 K RMS) and `the_corrected_zonal_model_freezes_
+    and_thaws_where_the_2d_model_does` (a tropical supercontinent at 0.94 of the sun, CO₂ down
+    and up in × 1.25 steps: the corrected zonal model freezes at 70 ppm where the 2-D model does
+    at 36, within the test's doubling, and both thaw at 71,054 ppm, inside Hoffman et al.'s
+    10⁴–10⁵ ppm; the 2-D model restarted from the zonal state at either stays frozen, then
+    thawed).
+  - **Triggered snapshots** fire at the end of a plate step when the clock's global mean moved
+    by more than 3 K or its sea ice by more than 0.15 against the last snapshot; the run's notes
+    count them and list every snowball's escape CO₂ beside Earth's 10⁴–10⁵ ppm (`deeptime run`
+    prints a `climate_cell` line). Checkpoint schema 12.
+  - **CO₂ forcing** (Ben 2026-10-02, "Research, then fix"): `co2.rs` takes HEXTOR's
+    radiative-convective clear-sky OLR table (Kopparapu et al. 2013's model, MIT data, NOTICE.md)
+    at every tile's temperature, scaled so a doubling at 288 K gives Myhre's 3.71 W/m²; it
+    replaces the Byrne & Goldblatt fit beyond its 10,000 ppm. `climate.snowball_cloud_w_m2`
+    (default 0, Ben 2026-10-02) adds cloud greenhouse on frozen surfaces. The ice takes the
+    planet's gravity (Nye's profile and the sheet's flow).
+  - The sheet's per-cell equilibrium line was already the snapshot's per-cell ELA once T5
+    downscaled it, so no code was needed for it.
+
+- **T9 calibration (part)** on Earth's 0.5° relief (GMT `earth_relief_30m_p`, 720 × 360,
+  `deeptime climate-dem`; `tools/validation/climate_vs_obs.py`). One knob at a time, then
+  together (build log 2026-10-03). Defaults now: `overturning_sv` 30 (was 15), `atmosphere_
+  diffusivity_scale` 1.3 (was 1), `wind_heat_transport` 0.3 then 0.2 (was 0.5),
+  `zonal_diffusivity_ratio` 0.3 then 0.2 (was 0.5; the second values on Lambert's grid, below).
+  The global mean is 14.0 °C on the equirectangular grid and 13.8 °C on Lambert's (Ben's 14.1 ±
+  0.4); a₀ was not touched, being shared with the banded model. What was learned:
+  - The winter seas were the problem: at 15 Sv the North Atlantic at 55° N was −3.7 °C in
+    January (Earth about +9), Brest 2.9 °C and Moscow −17 °C. 30 Sv brings them to 7.4, 10.3 and
+    −8.3 °C. It is a compensating choice: the ocean's northern heat transport now peaks at
+    3.2 PW at 27° N (Earth 1.5–2 PW) and the atmosphere's at 3.5 PW at 30° N (Earth 5.0 at 43° N),
+    standing in for the stationary eddies the model lacks.
+  - The wind's zonal shift with β_T 0.5 or more homogenized the rows (at 1.0 Vladivostok came out
+    warmer than Brest in January); 0.3 with a zonal ratio of 0.3 gives the contrast.
+  - Raising D warms the poles and the global mean; lowering it (the design's expectation, the
+    ocean being separate) cooled the planet to 13.4 °C and iced 15 % of the land.
+  - `KERNEL_EARTH` re-measured on the 1° relief: 2.402·10⁷ (was 2.845·10⁷ under the banded
+    climate), then 2.475·10⁷ on Lambert's grid (below).
+  - **Recalibrated on Lambert's equal-area grid** (master's projection, merged 2026-10-03; its
+    rows are uniform in sin φ, so the climate grid's rows are tall at high latitudes: 144 × 48 on
+    Earth's 720-cell relief, the polar row spanning 73–90°). At β_T 0.3 and ratio 0.3 the global
+    mean was 13.8 °C, the winter spread 4.07 K and Yakutsk −28.6 °C; `wind_heat_transport` 0.2 and
+    `zonal_diffusivity_ratio` 0.2 give 13.8 °C, 4.53 K winter and 1.92 K annual spread, Brest −
+    Vladivostok 20.6 K (Earth 20.1), Yakutsk −29.0 °C, 19 of 24 cities. The tall rows also joined
+    the North Atlantic and the North Pacific through the Arctic into one conveyor basin (the
+    sinking moved to 81° N, 14,600 km wide): the basin now takes a row only when its poleward
+    edge is inside 70° (`ocean2d.rs`), which puts the sinking back at 58° N, 26° W. The
+    correction's fit is looser on this grid (0.27 K RMS, 2.8 K worst, 39 band tiles at the cap),
+    the coarse polar rows giving the zonal model a coarse target there. `climate-dem` reads its
+    equirectangular DEM as W/2 rows (master read W/π) and resamples it onto the planet's grid.
+
+- **T10 downstream checks (part, 2026-10-04).** `climateConsistent`'s floors (§5.3): only BW needed
+  re-basing (51 columns on the default test planet, 0.608 standalone and 0.569 MIC; floor 0.57 →
+  0.46 by the documented rule); GameTests 71 of 71 standalone and MIC. Heights (§5.4) on a 12-run
+  ensemble (`tools/review/p1-17-hyps.sh`, `STAGE=deposits`, earthlike_quick_16k, 500 Myr, seeds
+  1–3, two starts): land median 414 → 405 m, p90 1,673 → 1,738 m, above 2 km 0.070 → 0.073,
+  glaciated land 0.088 → 0.067; erosion needs no retuning. Deposit counts (§5.5) change within the
+  runs' spread. The present ice (median 3.7·10⁶ km³ per-cell, 5.3·10⁶ banded) is far under
+  `ice_reference_km3` 1.0·10⁷; re-setting it is a pending question (STATUS). Not done: the review
+  page.
+
 ## Appendix A. How the measurements were made
 
 All runs were on the M6 Mac, through `tools/remote/mac.sh` for the build and plain ssh for the

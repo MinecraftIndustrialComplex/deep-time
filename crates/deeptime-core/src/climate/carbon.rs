@@ -64,13 +64,12 @@
 //! limit (without it the 8 %-land GameTest planet ran to 90,000 ppm); Foley 2015 (ApJ 812: 36)
 //! shows the land-fraction sensitivity of supply-limited weathering it buffers.
 //!
-//! **Forcing.** ΔF = 5.35 x (Myhre et al. 1998, "New estimates of radiative forcing due to well
-//! mixed greenhouse gases", GRL 25: 2715–2718) up to 1,000 ppm, and above 2,000 ppm Byrne &
-//! Goldblatt's (2014, "Radiative forcing at high concentrations of well-mixed greenhouse gases",
-//! GRL 41: 152–160, Table 2) fit 5.32 x + 0.39 x², x = ln(C/280 ppm) (fitted over 200–10,000 ppm;
-//! it also gives their 38.1 W/m² at 50,000 ppm, where the logarithm gives 28), blended linearly in
-//! x between. The forcing is subtracted from the EBM's longwave A (North et al.'s 203.3 W/m² is
-//! Earth's at 280 ppm).
+//! **Forcing** (P1-26 T6, `co2.rs`): a radiative-convective model's clear-sky OLR table
+//! (Kopparapu et al. 2013 as tabulated by HEXTOR) at every CO₂ level up to 10 bar and every surface
+//! temperature, scaled so a doubling gives Myhre et al. 1998's 5.35 ln 2 W/m². It replaced the
+//! Myhre/Byrne–Goldblatt fit, which was stated only to 10,000 ppm and extrapolated beyond 50,000.
+//! The energy balances subtract it from each tile's longwave at the tile's temperature (North et
+//! al.'s A = 203.3 W/m² is Earth's at 280 ppm).
 //!
 //! **The star.** L(t) = L₀ / (1 + 0.4·(1 − t/t₀)) (Gough 1981, "Solar interior structure and
 //! luminosity variations", Solar Phys. 74: 21–34), t the star's age, t₀ `present_age_gyr`.
@@ -104,9 +103,11 @@ pub const CALCITE_M3_PER_MOL: f64 = 0.10009 / 2710.0;
 /// A province degasses over this long, years.
 pub const LIP_YEARS: f64 = 1.0e6;
 /// The weathering kernel Σ a·r·e^(0.09·(T − 15)) (km² · m/yr) of Earth's present land under the
-/// model's present climate (`deeptime climate-dem` on Earth's 1° relief, 2026-09-29: 2.845·10⁷ over
-/// 1.476·10⁸ km² of land — a mean runoff-weighted 0.19 m/yr at the 15 °C reference).
-pub const KERNEL_EARTH: f64 = 2.845e7;
+/// model's present climate (`deeptime climate-dem` on Earth's 1° relief: 2.845·10⁷ under the banded
+/// climate, 2026-09-29; 2.475·10⁷ over 1.473·10⁸ km² of land under the calibrated per-cell climate
+/// on Lambert's equal-area grid, P1-26 T9, 2026-10-03 — a mean runoff-weighted 0.17 m/yr at the
+/// 15 °C reference).
+pub const KERNEL_EARTH: f64 = 2.475e7;
 /// Reference temperature of the kernel's Arrhenius term, °C.
 pub const KERNEL_T_REF_C: f64 = 15.0;
 
@@ -215,18 +216,10 @@ impl Carbon {
     }
 }
 
-/// Radiative forcing of `ppm` against 280 ppm, W/m²: Myhre et al.'s 5.35 x below 1,000 ppm, Byrne
-/// & Goldblatt's 5.32 x + 0.39 x² above 2,000 ppm, blended between (x = ln(C/280 ppm)).
+/// Radiative forcing of `ppm` against 280 ppm at Earth's 15 °C, W/m² (`co2.rs`; the energy
+/// balances take it at each tile's own temperature). For reports and first guesses.
 pub fn forcing(ppm: f64) -> f64 {
-    let x = (ppm.max(1e-3) / CO2_REF_PPM).ln();
-    let myhre = 5.35 * x;
-    let bg = 5.32 * x + 0.39 * x * x;
-    let (a, b) = (
-        (1000.0f64 / CO2_REF_PPM).ln(),
-        (2000.0f64 / CO2_REF_PPM).ln(),
-    );
-    let f = ((x - a) / (b - a)).clamp(0.0, 1.0);
-    myhre + f * (bg - myhre)
+    super::co2::Forcing::new(ppm).at(15.0)
 }
 
 /// The star's luminosity at age `age_gyr` against its luminosity at `present_gyr` (Gough 1981).
@@ -427,12 +420,16 @@ mod tests {
         let c = Carbon::at_ppm(1234.0);
         let e = Carbon::equilibrium(c.total());
         assert!((e.ppm() / 1234.0 - 1.0).abs() < 1e-6, "{}", e.ppm());
-        assert!((forcing(560.0) - 5.35 * 2f64.ln()).abs() < 1e-12);
+        // The table's doubling at 15 °C is within a few per cent of Myhre's 3.71 W/m² (exact
+        // at 288.15 K); none at 280 ppm; Byrne & Goldblatt's 38.1 W/m² at 50,000 ppm within 3.
+        assert!((forcing(560.0) - 5.35 * 2f64.ln()).abs() < 0.05);
         assert_eq!(forcing(280.0), 0.0);
-        let x = (50_000.0f64 / 280.0).ln();
-        assert!((forcing(50_000.0) - (5.32 * x + 0.39 * x * x)).abs() < 1e-9);
-        assert!((forcing(50_000.0) - 38.1).abs() < 0.3);
-        // Monotone across the blend.
+        assert!(
+            (forcing(50_000.0) - 38.1).abs() < 3.0,
+            "{}",
+            forcing(50_000.0)
+        );
+        // Monotone.
         let mut prev = f64::MIN;
         for k in 0..400 {
             let f = forcing(10.0 * 1.03f64.powi(k));
