@@ -137,7 +137,7 @@ public final class VolcanicCensus {
                 // A volcanic biome that is also rock-named (Terralith's Basalt Cliffs) may stand on its own ground away
                 // from volcanoes (the geology gate, decisions log 2026-10-04): not counted as volcanic there.
                 int gated = marker.volcanic().gatedRoles(b);
-                if (gated != 0 && (gated & marker.volcanic().geology().rolesAt(x, z)) != 0) {
+                if (gated != 0 && b.is(VolcanicBiomes.KEEP_OUT) && (gated & marker.volcanic().geology().rolesAt(x, z)) != 0) {
                     now.columns++;
                     now.onGeologicGround++;
                 } else {

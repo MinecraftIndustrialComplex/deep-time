@@ -45,6 +45,10 @@ import java.util.function.Consumer;
  *       in the end to the climate search: without the pack's volcanic biomes (vanilla) nothing changes.</li>
  * </ol>
  *
+ * <p>The same query keeps the geology gate (decisions log 2026-10-04; {@link GeologyBiomes}): a biome in a
+ * {@code #deeptime:geology/<role>} tag is kept out of a column whose ground ({@link GeologyGround}) has none of its
+ * roles, by a metric that depends on the column's role bits; on its ground it answers, even when it is volcanic too.
+ *
  * <p>Both lists are datapack tags, so any mod's biomes can join or leave them. The tag order is read from
  * the server's biome registry; the resolved choice is cached per level and parameter list and dropped when
  * tags reload ({@link #tagsUpdated()}).
@@ -170,6 +174,16 @@ public final class VolcanicBiomes {
             };
             metrics.set(ground, m);
             return m;
+        }
+
+        /** As {@link #metric}, with every ocean and river leaf set infinitely far too (the rare land-turned-water case). */
+        Climate.DistanceMetric<Holder<Biome>> dryMetric(int ground) {
+            Climate.DistanceMetric<Holder<Biome>> kept = metric(ground);
+            return (node, values) -> {
+                if (node instanceof Climate.RTree.Leaf<Holder<Biome>> leaf && water(leaf.value))
+                    return Long.MAX_VALUE;
+                return kept.distance(node, values);
+            };
         }
     }
 
@@ -389,6 +403,16 @@ public final class VolcanicBiomes {
                 } catch (NullPointerException emptyTree) {
                     // keep the region's answer
                 }
+            }
+            // Without a tree under it (a plain parameter list: Terralith's in MIC), the same tree once more with its
+            // ocean and river leaves set aside too: a rock-named biome kept out of a slot next to the river slice
+            // (Terralith's white mesa across it) must not turn land into river (118 land columns on the 16k planet).
+            try {
+                Holder<Biome> dry = source.find(t, r.dryMetric(ground));
+                if (dry != null && !water(dry))
+                    return dry;
+            } catch (NullPointerException emptyTree) {
+                // keep the water
             }
         }
         return kept;
