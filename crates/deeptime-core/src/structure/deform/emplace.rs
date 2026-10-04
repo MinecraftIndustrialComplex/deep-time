@@ -63,12 +63,29 @@ pub struct Inputs<'a> {
     pub blocks_per_model_km: f64,
 }
 
+/// Where a cell's shortening comes from (the run summary counts the folds and thrusts by it).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Source {
+    #[default]
+    None,
+    /// The collision regime: a belt or wedge the plate model is raising.
+    Collision,
+    /// A lifted Andean margin.
+    Arc,
+    /// The foreland of an Andean margin (the distance rule).
+    Foreland,
+    /// The foreland basin of a collision (the flexural basin on the incoming plate).
+    Basin,
+}
+
 /// The strain a cell is under: shortening, extension and shear, each 0–1.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Strain {
     pub shortening: f64,
     pub extension: f64,
     pub shear: f64,
+    /// Which rule gave the shortening.
+    pub source: Source,
 }
 
 /// The strain of cell `c`.
@@ -81,8 +98,8 @@ pub fn strain(x: &Inputs<'_>, c: usize, sp: &StructureParams) -> Strain {
     let conv = f64::from(x.convergence[c].max(0.0));
     let speed = (conv / 80.0).min(1.0); // ledger: DEF-026
     let p = &sp.deformation;
-    let shortening = if reg == regime::COLLISION {
-        1.0
+    let (shortening, source) = if reg == regime::COLLISION {
+        (1.0, Source::Collision)
     } else {
         // An Andean margin shortens where it is being lifted: the plate model's back-arc regime
         // reaches the whole subduction distance inland, most of it undeformed.
@@ -99,7 +116,12 @@ pub fn strain(x: &Inputs<'_>, c: usize, sp: &StructureParams) -> Strain {
         } else {
             0.0
         };
-        andean.max(foreland)
+        if andean >= foreland {
+            let source = if andean > 0.0 { Source::Arc } else { Source::None };
+            (andean, source)
+        } else {
+            (foreland, Source::Foreland)
+        }
     };
     let extension = if reg == regime::RIFT { 1.0 } else { 0.0 };
     let obliquity = f64::from(x.obliquity[c]);
@@ -115,6 +137,7 @@ pub fn strain(x: &Inputs<'_>, c: usize, sp: &StructureParams) -> Strain {
         shortening,
         extension,
         shear,
+        source,
     }
 }
 
@@ -456,6 +479,7 @@ pub fn emplace(
             }
             *next_id += 1;
             counts.add(kind);
+            counts.add_source(kind, s.source);
             features.push(f);
             born += 1;
         }
