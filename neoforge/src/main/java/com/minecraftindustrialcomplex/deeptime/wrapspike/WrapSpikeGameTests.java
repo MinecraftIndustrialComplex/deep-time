@@ -121,7 +121,7 @@ public final class WrapSpikeGameTests {
      * sides; an armour stand walking at the seam is stopped by it from this side; one walking where
      * nothing stands is carried over and turned; a thrown item crosses and keeps going.
      */
-    @GameTest(templateNamespace = NS, template = TEMPLATE, timeoutTicks = 200)
+    @GameTest(templateNamespace = NS, template = TEMPLATE, timeoutTicks = 300)
     public static void placedAcrossSeamIsTurnedAndSolid(GameTestHelper helper) {
         Site s = open(helper, 0, true);
         ServerLevel level = s.level();
@@ -156,25 +156,36 @@ public final class WrapSpikeGameTests {
         float yaw0 = walker.getYRot();
         walker.move(MoverType.SELF, new Vec3(0, 0, -1));
         check(walker.getZ() < s.z0(), "open column: armour stand moved past the seam line to z=%.3f", walker.getZ());
-        // A thrown item, no gravity, heading north at 0.4 blocks a tick.
+        // A thrown item, no gravity, heading north at 0.2 blocks a tick (it moves only once its freshly
+        // forceloaded chunk is entity-ticking, which took more than 20 ticks in the first run).
         ItemEntity item = new ItemEntity(level, s.cx() + 5.5, Y0 + 0.5, s.z0() + 1.5, new ItemStack(Items.DIAMOND));
         item.setNoGravity(true);
         item.setPickUpDelay(32767);
-        item.setDeltaMovement(0, 0, -0.4);
+        item.setDeltaMovement(0, 0, -0.2);
         level.addFreshEntity(item);
 
+        // Light: glowstone stored right at the seam, at (cx+6, z0). Its band copy is at (cx-7, z0-1),
+        // next to the far-side block (cx-7, z0), which is 13 blocks from the glowstone through ordinary
+        // space (block light 2 at most that way) and 1 block through the seam (14).
+        s.set(6, 1, 0, Blocks.GLOWSTONE.defaultBlockState());
         helper.runAfterDelay(20, () -> {
             check(Math.abs(walker.getX() - (s.cx() - 3.5)) < 1e-3 && Math.abs(walker.getZ() - (2 * s.z0() - (s.z0() - 0.4))) < 1e-3,
                     "armour stand carried to (%.3f, %.3f), expected (cx-3.5, z0+0.4) = (%.1f, %.1f)",
                     walker.getX(), walker.getZ(), s.cx() - 3.5, s.z0() + 0.4);
             float turn = ((walker.getYRot() - yaw0) % 360f + 360f) % 360f;
             check(Math.abs(turn - 180f) < 1e-3, "armour stand's heading turned by %.1f degrees", turn);
+            blocked.discard();
+            walker.discard();
+        });
+        helper.runAfterDelay(120, () -> {
             check(Math.abs(item.getX() - (s.cx() - 5.5)) < 1e-3 && item.getZ() > s.z0() + 1 && item.getDeltaMovement().z > 0,
                     "item crossed: now (%.3f, %.3f) moving %.3f in z (expected x = cx-5.5 = %.1f, z > z0+1, moving south)",
                     item.getX(), item.getZ(), item.getDeltaMovement().z, s.cx() - 5.5);
-            blocked.discard();
-            walker.discard();
             item.discard();
+            int far = level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, s.at(-7, 1, 0));
+            int copy = level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, s.at(-7, 1, -1));
+            check(far >= 13, "block light on the far side next to the glowstone's band copy: %d (band copy itself %d; at most 2 without the seam)",
+                    far, copy);
             helper.succeed();
         });
     }
