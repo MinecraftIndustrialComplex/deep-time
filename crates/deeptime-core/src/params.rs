@@ -597,6 +597,11 @@ pub struct TectonicParams {
     /// 0.1 is the gravitational potential energy as computed (a ridge's push is then about 0.1 of
     /// the reference slab pull). PLT-187.
     pub edge_energy: f64,
+    /// The buoyancy of continental crust dragged down a collision front, relative to its physical
+    /// size (1): continental crust is lighter than the mantle, so the deeper a collision drags it
+    /// the harder it pushes back against the convergence (Cloos 1993). A term of the collision
+    /// resistance beside the belt's weight (`plates::forces`). PLT-275.
+    pub collision_buoyancy: f64,
     /// Basal drag under continental crust, as a multiple of that under oceanic crust. PLT-188.
     pub keel_drag: f64,
     /// Resistance along plate boundaries to relative motion, against the basal drag of the
@@ -694,6 +699,7 @@ impl Default for TectonicParams {
             slab_resistance: 3.0,          // ledger: PLT-185
             slab_suction_share: 0.3,       // ledger: PLT-186
             edge_energy: 0.1,              // ledger: PLT-187
+            collision_buoyancy: 1.0,       // ledger: PLT-275
             keel_drag: 3.0,                // ledger: PLT-188
             boundary_resistance: 3.0,      // ledger: PLT-189
             mantle_flow_mm_yr: 5.0,        // ledger: PLT-190
@@ -966,6 +972,7 @@ impl PlanetPreset {
             (k.slab_resistance, "$.tectonics.slab_resistance"),
             (k.slab_suction_share, "$.tectonics.slab_suction_share"),
             (k.edge_energy, "$.tectonics.edge_energy"),
+            (k.collision_buoyancy, "$.tectonics.collision_buoyancy"),
             (k.boundary_resistance, "$.tectonics.boundary_resistance"),
             (k.mantle_flow_mm_yr, "$.tectonics.mantle_flow_mm_yr"),
             (k.initiation_slab_km, "$.tectonics.initiation_slab_km"),

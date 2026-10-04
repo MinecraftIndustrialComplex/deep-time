@@ -130,6 +130,7 @@
   "deeptime.editor.field.slab_resistance": "Slab resistance",
   "deeptime.editor.field.slab_suction": "Slab suction",
   "deeptime.editor.field.ridge_push": "Ridge push",
+  "deeptime.editor.field.collision_buoyancy": "Collision buoyancy",
   "deeptime.editor.field.keel_drag": "Continental drag",
   "deeptime.editor.field.boundary_resistance": "Plate-edge friction",
   "deeptime.editor.field.mantle_flow": "Mantle flow",
