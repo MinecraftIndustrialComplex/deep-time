@@ -13,10 +13,12 @@
 #             low4 = 4 cores / 8 threads, 6 GiB (an older or laptop PC)
 #   cpu list  the VM's CPUs to pin to (default: the first 12 or 8); siblings are n, n+1 on the VM
 #
-# Writes <out>/run.log (the run's own output, /usr/bin/time -v), <out>/load.log (the VM's load
-# every 10 s: the box is shared, so wall time is only as good as the load beside it) and
-# <out>/result.json (wall, CPU, peak RSS, per-stage seconds, the bake, the folder's size). The
-# world data is deleted afterwards unless P124_KEEP=1. Runs through the admission tool as
+# Writes <out>/run.log (the run's own output, each line stamped with the time it was printed, and
+# /usr/bin/time -v), <out>/mem.log (the run's resident memory every 2 s), <out>/load.log (the VM's
+# load every 10 s: the box is shared, so wall time is only as good as the load beside it) and
+# <out>/result.json (wall, CPU, peak RSS, per-stage seconds, each phase's wall time and peak RSS,
+# the bake, the folder's size). P124_MEM=12G overrides the profile's memory (to measure a preset
+# that does not fit). The world data is deleted afterwards unless P124_KEEP=1. Runs through the admission tool as
 # sim:<preset>:<threads>t when it is not already inside an admitted job.
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -26,8 +28,8 @@ cpus=""
 if [ $# -gt 0 ] && [ "$1" != "--" ]; then cpus="$1"; shift; fi
 [ "${1:-}" = "--" ] && shift
 case "$profile" in
-    mid6) ncpu=12; mem=6G ;;
-    low4) ncpu=8; mem=6G ;;
+    mid6) ncpu=12; mem=${P124_MEM:-6G} ;;
+    low4) ncpu=8; mem=${P124_MEM:-6G} ;;
     *) echo "unknown profile $profile" >&2; exit 2 ;;
 esac
 threads=$((ncpu - 1))
@@ -42,6 +44,14 @@ fi
 rm -rf "$out"; mkdir -p "$out"
 ( while true; do echo "$(date +%s) $(cut -d' ' -f1-3 /proc/loadavg)"; sleep 10; done ) > "$out/load.log" &
 sampler=$!
+# The run's resident memory (VmRSS, kB) every 2 s, from outside the scope.
+( pid=""; while true; do
+    if [ -z "$pid" ] || [ ! -d "/proc/$pid" ]; then pid=""
+        for p in $(pgrep -x deeptime); do tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null | grep -qF -- "$out/world" && pid=$p; done
+    fi
+    [ -n "$pid" ] && echo "$EPOCHREALTIME $(awk '/^VmRSS/{print $2}' "/proc/$pid/status" 2>/dev/null)"
+    sleep 2; done ) > "$out/mem.log" &
+memsampler=$!
 t0=$(date +%s.%N)
 # A system-level scope (sudo, run as this user): AllowedCPUs and MemoryMax are the PC; its
 # cpu.pressure says how long the run's threads waited for a CPU (other jobs on the same CPUs), and
@@ -49,14 +59,15 @@ t0=$(date +%s.%N)
 sudo systemd-run --scope -q --uid="$(id -u)" --gid="$(id -g)" -p "AllowedCPUs=$cpus" \
     -p "MemoryMax=$mem" -p MemorySwapMax=0 bash -c '
     cg=/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup); out="$1"; shift
-    /usr/bin/time -v "$@" > "$out/run.log" 2>&1; s=$?
+    set -o pipefail
+    /usr/bin/time -v "$@" 2>&1 | while IFS= read -r l; do printf "%s %s\\n" "$EPOCHREALTIME" "$l"; done > "$out/run.log"; s=$?
     { echo "cpu $(grep ^some "$cg/cpu.pressure")"; echo "memory_peak $(cat "$cg/memory.peak")";
       echo "usage_usec $(grep ^usage_usec "$cg/cpu.stat")"; } > "$out/cgroup.txt"
     exit $s' p124 "$out" "$bin" run --preset "$preset" --start "$start" --length-myr "$length" \
     --out "$out/world" --threads "$threads" --mem-cap 4294967296 "$@"
 status=$?
 t1=$(date +%s.%N)
-kill "$sampler" 2>/dev/null
+kill "$sampler" "$memsampler" 2>/dev/null
 size=$(du -sb "$out/world" 2>/dev/null | cut -f1)
 python3 - "$out" "$status" "$t0" "$t1" "${size:-0}" "$profile" "$preset" "$start" "$length" "$cpus" "$threads" "$mem" <<'PY'
 import json, re, sys
@@ -71,6 +82,42 @@ if m:
     for name, sec, steps in re.findall(r"(\w+)=([\d.]+)s/(\d+)steps", m.group(1)):
         stages[name] = float(sec)
 total = grab(r"\) in ([\d.]+)s")
+# Phases from the stamped lines: "stage X started" .. "stage X finished" (the coupled stages start
+# together and finish as one), and the bake after the last finished stage.
+lines = []
+for raw in log.splitlines():
+    t, _, rest = raw.partition(" ")
+    try:
+        lines.append((float(t), rest))
+    except ValueError:
+        pass
+mem = []
+try:
+    for l in open(f"{out}/mem.log"):
+        p = l.split()
+        if len(p) == 2:
+            mem.append((float(p[0]), int(p[1]) / 1048576))
+except OSError:
+    pass
+phases, open_at = [], None
+for t, rest in lines:
+    m2 = re.search(r"stage (\S+) (started|finished)", rest)
+    if not m2:
+        continue
+    if m2.group(2) == "started" and open_at is None:
+        open_at = t
+    elif m2.group(2) == "finished" and open_at is not None:
+        phases.append((m2.group(1), open_at, t))
+        open_at = None
+end_t = lines[-1][0] if lines else None
+if open_at is not None and end_t:
+    phases.append(("unfinished", open_at, end_t))
+elif phases and end_t:
+    phases.append(("bake+write", phases[-1][2], end_t))
+def peak(a, b):
+    v = [g for t, g in mem if a - 1 <= t <= b + 1]
+    return round(max(v), 2) if v else None
+phase_rows = [{"phase": n, "wall_s": round(b - a, 1), "peak_rss_gib": peak(a, b)} for n, a, b in phases]
 loads = [float(l.split()[1]) for l in open(f"{out}/load.log") if len(l.split()) > 1]
 user = grab(r"User time \(seconds\): ([\d.]+)")
 cg = {}
@@ -91,6 +138,8 @@ r = {
     "max_rss_gib": round((grab(r"Maximum resident set size \(kbytes\): (\d+)", int) or 0) / 1048576, 2),
     "native_peak_mib": grab(r"peak ([\d.]+) MiB\)"),
     "stages_s": stages,
+    "phases": phase_rows,
+    "sampled_peak_rss_gib": round(max(g for _, g in mem), 2) if mem else None,
     "bake_s": round(total - sum(stages.values()), 1) if total and stages else None,
     "world_bytes": int(size),
     "cpu_wait_s": cg.get("cpu_wait_s"), "scope_memory_peak_gib": cg.get("memory_peak_gib"),
