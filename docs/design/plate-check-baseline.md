@@ -1061,3 +1061,24 @@ about ten times Earth's rate).
 
 Without the limit (the first versions, 500 Myr, seed 1 of the supercontinent start) the collapse
 returned the whole overlap stack and the crust reached 0.53-0.56 of the planet at 500 Myr.
+
+**Hypsometry at 500 Myr** (`tools/review/p1-17-hyps.sh 500 "1 2 3" "supercontinent
+scattered_continents"`, mean [min, max] of six; highest cell from the surface stage's
+`max_elevation_m`; master = the same build with both rules off):
+
+| Measure | Master 0af3ff6e | After | Target |
+|---|---|---|---|
+| Land share | 0.197 [0.137, 0.267] | 0.215 [0.168, 0.252] | 0.27-0.30 |
+| Median land height | 433 m [306, 538] | 415 m [367, 462] | 430-640 m |
+| Land above 2 km | 0.096 [0.061, 0.155] | 0.082 [0.063, 0.107] | 0.10-0.13 |
+| Highest cell | 5.4 km [4.2, 6.3] | 4.9 km [4.4, 5.4] | 5.5-7 km |
+| 99th percentile of land | 3.8 km | 3.3 km | 4.2-5.5 km |
+| Continental crust | 0.327 [0.243, 0.383] | 0.372 [0.324, 0.408] | - |
+| Continental crust above the sea | 0.58 | 0.56 | - |
+
+A six-run mean moves about ±0.02 by chance: the crust (+0.045) clears that, the land share
+(+0.018) does not. The new continental crust is mostly shelf: the ocean floor it fills stands at a
+continent's mean height in the plate model (525 m), one 71 km sample wide, and the surface stage
+carries it down to the sea in a few steps (the margin's one-sample step, the cause named in the
+margins task). Collapse also lowers the old belts it thins: the highest cell and the share above
+2 km fall.

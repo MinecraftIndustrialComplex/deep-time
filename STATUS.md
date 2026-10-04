@@ -119,6 +119,73 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-02 | science WP-14a | **CO₂ forcing above 50,000 ppm and the snowball's escape** (CLM-070, CLM-166; design §4.2). The clock's forcing is Byrne & Goldblatt 2014's fit, stated for 200–10,000 ppm and computed to 50,000 ppm; the code uses it to 10⁶ ppm, and today's snowball escapes near 5.5·10⁵ ppm where Hoffman et al. 2017 expect 10⁴–10⁵ ppm (with cloud forcing of ≥ 10 W/m² that cloud-free models lack). (1, recommended) a short research task finds a published forcing calculation for 0.05–1 bar of CO₂ and the snowball cloud forcing; T6 then applies both, and the escape is measured against 10⁴–10⁵ ppm; (2) cap now: above 50,000 ppm continue the fit as a logarithm with its slope there (no source; escape CO₂ moves, direction to be measured); (3) leave it (escape stays near 0.55 bar). | to be asked by the coordinator (sub-agent report) |
 
 ## Build log
+### 2026-10-03 — Orogenic collapse and the thickest crust: thickened belts give their area back (agent worktree agent-aeec1402fc6146955, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c, continued after a stop; not merged)
+- **Ask.** Ben, decisions log 2026-10-03: "Merge, then give area back (Recommended)". Plate tasks 3-4
+  cost continental crust (0.31 → 0.27 at 1000 Myr): crust crossing a collision front became belt
+  thickness and never gave its area back. Kept as Ben said: PLT-253, resistance 200 mm/yr, stacking
+  share 0.8, `arc_maturity_myr` 20.
+- **What the model had.** At 500 Myr on master a fifth of the visible continental samples were thicker
+  than 70 km (over 40 % of the crust's volume) under ground at a median 200-500 m; at 1000 Myr the
+  median continental column was 83-104 km and the 99th percentile 450-480 km. Two causes, neither
+  fixed here: the belt's cap (PLT-253) reads the elevation, which the surface stage owns and lowers
+  (flexure, erosion) while the stacked thickness stays, so the belt keeps stacking; and a
+  continent-on-continent overlap at a resampling adds the whole lower column to the upper one
+  (PLT-228, `pools::accrete`).
+- **Built** (`plates/collapse.rs`, run each plate step after belts and subduction; science page
+  `docs/science/plates.md`, "Orogenic collapse and the thickest crust"; ledger PLT-254 to PLT-259):
+  (1) *the thickest crust* (PLT-258): a visible continental column thicker than `crust_max_km`
+  (70 km: Tibet and the Andes, Mooney et al. 2002; Lhasa 80 ± 2 km) loses the excess from its bottom
+  to the mantle, no area back; (2) *collapse* (PLT-254): a visible continental sample no orogeny has
+  raised for `collapse_quiet_myr` (10 Myr) and thicker than `collapse_thickness_km` (55 km) releases
+  (1 − e^(−δt/τ))(T − 55 km), τ = `collapse_myr` 15 Myr, into the nearest samples of its plate
+  thinner than the normal column (35.1 km), within `collapse_reach_km` (200 km, at least 1.5 sample
+  spacings), filling them to 35.1 km; ocean floor filled turns continental. Heights follow Airy
+  within each column's Airy height (a hidden root spreads without sinking its surface; a filled
+  receiver rises to at most a continent's mean height). The driver is thickness, not height
+  (the first version, height above 1.5 km, gave +0.02 crust at 500 Myr). Settings in the 12
+  built-in presets and the test planet (`planet_world_4k`, which collapses now too), editor fields
+  `collapse_time`, `collapse_thickness`, `collapse_quiet`, `collapse_reach`, `crust_max`, lang
+  keys. The plates summary line gains `collapse_km3`, `collapse_gained_km2`, `foundered_km3`,
+  `continental_thickness_km_p10/50/90/99` and a `crust_bins` diagnostic line.
+- **Sources** (read by two Sonnet research sub-agents; bibliography section "Orogenic collapse"):
+  Variscan crust 55-70 km by 315 Ma, thinned 315-290 Ma (Hillenbrand & Williams 2022, abstract);
+  Bird 1991 (abstract): Moho relief not kept "for times greater than 10–20 m.y."; Urals root 50-56 km
+  kept (Carbonell et al. 2000, abstract); channel flow 150 km in 15 Myr (Rey, Teyssier & Whitney 2010,
+  full text); thickest crust 70+ km (Mooney, Prodehl & Pavlenkova 2002, full text). τ, the reach and
+  the limit are taken from these; 55 km and the 10 Myr quiet time were chosen, inside the sources'
+  range, by the 1000 Myr crust share (`calibrated` and `game-choice` in the ledger).
+- **Measured: plate-check**, `earthlike_quick_16k`, supercontinent, 1000 Myr, seeds 1-4,
+  `structure.deformation.density=0`; master = this branch merged with master 0af3ff6e with both rules
+  off (`collapse_myr=0;crust_max_km=0`). Tables: `docs/design/plate-check-baseline.md`, "Orogenic
+  collapse and the thickest crust". **29 of 45 targets** in both. Crust lowest step 0.28 → **0.39**
+  (target ≥ 0.37, now met); highest step 0.43 → 0.45 (≤ 0.45, at the edge: 0.43 0.44 0.47 0.46);
+  at the end 0.285 → 0.438; land at the end 0.127 → 0.170. Lost: steps with one plate above half
+  3.8 % → **10.1 %** (≤ 10; seeds 13.6 9.8 7.2 9.8). Variants: 50 km without and with the quiet time
+  ended at 0.52 crust (over the ceiling); 55 km without the quiet time 0.49.
+- **Measured: hypsometry**, 500 Myr, seeds 1-3 × both starts (`tools/review/p1-17-hyps.sh`), master
+  → after, mean [min, max]: land **0.197 → 0.215** [0.168, 0.252] (target 0.27-0.30; +0.018, inside
+  the ±0.02 chance); median land 433 → 415 m; above 2 km 0.096 → 0.082; highest cell 5.4 → 4.9 km
+  [4.4, 5.4] (no 14 km belts: the highest anywhere, 1000 Myr runs included, 5.5 km); 99th percentile
+  3.8 → 3.3 km; continental crust 0.327 → 0.372 (+0.045). Most new crust is shelf: the filled ocean
+  floor is one sample wide and the surface carries it to the sea (the margins task's cause).
+- **35 m and Lambert (the coordinator's question on Ben's 9 % run).** 35 m changes nothing in metres:
+  the six 500 Myr runs on master af22131a (20 m) and 6f72f0dd (35 m) agree to the last digit in land,
+  heights, crust and `sea_level_m`. Lambert lowers the land share more than the crust explains: at
+  1000 Myr, seeds 1 and 2, land 0.173 and 0.164 before Lambert, 0.133 and 0.125 after, with crust
+  0.290/0.260 → 0.268/0.312 (land over crust 0.60 → 0.45); at 500 Myr land 0.223 → 0.197 and crust
+  0.342 → 0.327 (land over crust 0.65 → 0.60; the master between also carries the cold-desert
+  merge). Ben's workbench run (seed 1, 458a89a5, `surface_final land_frac=0.090`, crust 0.255,
+  largest plate 0.56) is the simulation's own number; the same seed here ended at 0.133 (other
+  thread count, structure density 0, keyframes every 50 Myr): runs diverge, and master's 1000 Myr
+  land is 0.12-0.13 on all four seeds, so 9 % is the low end of the same trend.
+- **Gates** (test VM, branch head before this entry, 336de3b9): `cargo fmt --check` clean; clippy
+  `-D warnings` clean; `cargo test --workspace` 769 passed, 0 failed, 3 ignored; `cargo deny check
+  licenses bans` ok; `./gradlew build test` 251 tests, 0 failures, 2 skipped. GameTests not run (merge
+  batch); the test planet now collapses (its 4k lattice is why the reach has a 1.5-spacing floor).
+- **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/belts-area` (summaries only, 43 MB; checkpoints
+  deleted); `belts34` deleted.
+- **Next.** Ben's answers below; the belt cap read from thickness and the overlap accretion (the
+  sources of the stacked volume) belong to tasks 7-8.
 ### 2026-10-03 — The Lambert equal-area world: the projection module's bodies are Lambert's, format 0.4 (agent worktree agent-a3186d42ee9449d3d, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; phase 2 of the projection task, on top of the refactor below; not merged)
 - **Ask.** Ben, decisions log 2026-10-02: "Lambert for now" (Lambert cylindrical equal-area, true on the
   equator, wrapping east–west with Toroidal World, pole cap kept). The coordinator: phase 2 of the projection
