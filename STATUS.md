@@ -9984,7 +9984,7 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
   2. `RSS at Done (MB)` printed 0: the VM's nix-provided `ps` does not start (wants a newer glibc than Ubuntu's). RSS is
      now read from `/proc/<pid>/status` (`process_rss_kb`, two tests); the same run now reports 4279 MB.
 - **Gates.** `python3 -m unittest tools/smoke/test_run.py` 12 tests OK; `./gradlew build test` BUILD SUCCESSFUL (2m24s);
-  `./gametest.sh` All 79 required tests passed (663 s). cargo untouched (no Rust change). `-PwithMic` see the line below.
+  `./gametest.sh` All 79 required tests passed (663 s). cargo untouched (no Rust change). `./gametest.sh -PwithMic` All 79 required tests passed (164 s) on the second run; the first run, started at the same time as the standalone one, died before any test with `NullPointerException: Trying to access unbound value artifacts:generic.attack_burning_duration` (the Artifacts mod's `createLivingAttributes` mixin during `DefaultAttributes.<clinit>` in the registry revert; same 157 jars, no Deep Time frame in the trace; not reproduced, so recorded as a startup race in the MIC dev run, not a P1-13 fault).
 - **Contradicts the plan / for the coordinator.** Phase 1 exit item 2 holds on both sets at `earthlike_quick_16k`; the
   `earthlike_full_16k` and 32k first starts were not run (a full preset takes much longer). The first start blocks the
   server for about 15 minutes before `Done (` on a shared VM; a player-facing note is the launcher's wait time, not a bug.
