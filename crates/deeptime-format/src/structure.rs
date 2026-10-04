@@ -217,6 +217,9 @@ const BUCKET: f64 = 128.0;
 #[derive(Clone, Debug)]
 pub struct StructIndex {
     c: f64,
+    /// The buckets' origin, block (x, z).
+    ox: f64,
+    oz: f64,
     w: usize,
     h: usize,
     /// Per event: its reach plus the margin.
@@ -225,12 +228,25 @@ pub struct StructIndex {
 }
 
 impl StructIndex {
-    /// Indexes `st` on a planet `circumference` blocks around.
+    /// Indexes `st` on a Lambert planet `circumference` blocks around.
     pub fn new(st: &Structure, circumference: u32) -> StructIndex {
+        StructIndex::new_in(
+            st,
+            circumference,
+            crate::projection::IndexFrame::lambert(circumference),
+        )
+    }
+
+    /// Indexes `st` on a world of x period `circumference` over `frame` (the world projection's
+    /// index frame).
+    pub fn new_in(
+        st: &Structure,
+        circumference: u32,
+        frame: crate::projection::IndexFrame,
+    ) -> StructIndex {
         let c = f64::from(circumference);
-        // The buckets' frame is the projection's index frame.
-        let p = crate::Projection::new(circumference);
-        let ((ox, oz), (span_x, span_z)) = (p.index_origin(), p.index_span());
+        let (ox, oz) = (frame.origin.0 as f64, frame.origin.1 as f64);
+        let (span_x, span_z) = (frame.span.0 as f64, frame.span.1 as f64);
         let w = ((span_x / BUCKET).ceil() as usize).max(1);
         let h = ((span_z / BUCKET).ceil() as usize).max(1);
         let radius: Vec<f64> = st
@@ -255,6 +271,8 @@ impl StructIndex {
         }
         StructIndex {
             c,
+            ox,
+            oz,
             w,
             h,
             radius,
@@ -273,7 +291,7 @@ impl StructIndex {
         if self.radius.is_empty() {
             return;
         }
-        let (ox, oz) = crate::Projection::of(self.c).index_origin();
+        let (ox, oz) = (self.ox, self.oz);
         let i = (((x - ox) / BUCKET).floor() as i64).rem_euclid(self.w as i64) as usize;
         let j = (((z - oz) / BUCKET).floor() as i64).clamp(0, self.h as i64 - 1) as usize;
         for &n in &self.buckets[j * self.w + i] {
@@ -706,11 +724,32 @@ impl Deformer {
         Deformer { structure, index }
     }
 
-    /// The deformer of a world-data folder; `None` when the world has no structural events.
+    /// The deformer of a Lambert world-data folder; `None` when the world has no structural
+    /// events.
     pub fn read(world: &Path, circumference: u32) -> Result<Option<Deformer>> {
+        Deformer::read_in(
+            world,
+            circumference,
+            crate::projection::IndexFrame::lambert(circumference),
+        )
+    }
+
+    /// The deformer of a world-data folder whose spatial indexes use `frame` (the manifest's
+    /// world projection); `None` when the world has no structural events.
+    pub fn read_in(
+        world: &Path,
+        circumference: u32,
+        frame: crate::projection::IndexFrame,
+    ) -> Result<Option<Deformer>> {
         Ok(read_structure(world)?
             .filter(|s| !s.events.is_empty())
-            .map(|s| Deformer::new(s, circumference)))
+            .map(|s| {
+                let index = StructIndex::new_in(&s, circumference, frame);
+                Deformer {
+                    structure: s,
+                    index,
+                }
+            }))
     }
 
     /// [`Structure::deformed_stack`] at block column (x, z).

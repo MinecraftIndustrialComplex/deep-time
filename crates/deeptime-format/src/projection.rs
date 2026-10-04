@@ -1004,6 +1004,25 @@ pub fn local_frame(v: [f64; 3]) -> ([f64; 3], [f64; 3]) {
     (east, north)
 }
 
+/// The frame of the world data's spatial indexes (river tiles, structure buckets, site index):
+/// lattices of their own cells from `origin` over `span` blocks; x wraps with period `span.0`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct IndexFrame {
+    pub origin: (i64, i64),
+    pub span: (i64, i64),
+}
+
+impl IndexFrame {
+    /// The frame of a Lambert planet (and of the simulation's grids): (−C/2, −Zo) over (C, 2·Zo).
+    pub fn lambert(c: u32) -> IndexFrame {
+        let p = Projection::new(c);
+        IndexFrame {
+            origin: p.index_origin_blocks(),
+            span: p.index_span_blocks(),
+        }
+    }
+}
+
 /// A world's projection: what its world data is laid out in (manifest `projection`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum WorldProjection {
@@ -1117,6 +1136,14 @@ impl WorldProjection {
         match self {
             WorldProjection::Lambert(p) => p.index_span_blocks(),
             WorldProjection::PetroffGuyou(g) => (g.period(), g.hemisphere() + 1),
+        }
+    }
+
+    /// The spatial indexes' frame.
+    pub fn index_frame(&self) -> IndexFrame {
+        IndexFrame {
+            origin: self.index_origin_blocks(),
+            span: self.index_span_blocks(),
         }
     }
 

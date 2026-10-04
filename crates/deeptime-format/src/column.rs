@@ -152,7 +152,11 @@ impl ColumnWorld {
                 others.push((e.name.clone(), LazyLayer::open(&dir.join(&e.path))?));
             }
         }
-        let structure = Deformer::read(dir, manifest.scale.circumference_blocks)?;
+        let structure = Deformer::read_in(
+            dir,
+            manifest.scale.circumference_blocks,
+            manifest.world_projection().index_frame(),
+        )?;
         Ok(ColumnWorld {
             dir: dir.to_owned(),
             structure,
@@ -421,9 +425,10 @@ impl ColumnWorld {
             None => Vec::new(),
         };
         let mut v = col.to_json();
-        let p = crate::Projection::of(c);
-        v["lat"] = json!(p.lat_deg(bz));
-        v["lon"] = json!(p.lon_deg(bx));
+        let _ = c;
+        let (lat, lon) = self.manifest.world_projection().lat_lon(bx, bz);
+        v["lat"] = json!(lat);
+        v["lon"] = json!(lon);
         v["world"] = json!(self.manifest.source);
         v["layers"] = Value::Object(layers);
         v["strata"] = json!(horizons);
