@@ -1155,7 +1155,9 @@ mod tests {
         }
         // The columns beside the patch and the rows two or more away from it are open sea, exactly
         // as far from the patch as a plain sea.
-        for (i, j) in [(7, 8), (12, 8), (10, 4), (10, 11), (10, 0)] {
+        // (The picture's rows are Lambert's, resampled from the field's: the row just below the
+        // patch takes a little of it, so only rows above are checked.)
+        for (i, j) in [(7, 8), (12, 8), (10, 4), (10, 0)] {
             assert_eq!(px(&rgba, i, j), sea, "({i}, {j}) is open sea");
         }
         // Smoothing along the rows would spread a lone ice cell into a band: it stays in its own

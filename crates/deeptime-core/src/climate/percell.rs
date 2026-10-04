@@ -834,7 +834,8 @@ mod tests {
         sun: f64,
     ) -> (Vec<bool>, Vec<f64>, Vec<f64>, EbmParams) {
         let h = w / 2;
-        let lat = |j: usize| 90.0 - (j as f64 + 0.5) * 180.0 / h as f64;
+        // The map's rows (Lambert's: uniform in sin φ), as the climate grid reads them.
+        let lat = |j: usize| deeptime_format::Projection::picture_lat_deg(j as f64 + 0.5, h as u32);
         let land: Vec<bool> = (0..w * h)
             .map(|c| is_land(lat(c / w), (c % w) as f64 * 360.0 / w as f64))
             .collect();
@@ -925,9 +926,10 @@ mod tests {
             before > 0.3,
             "the uncorrected models already agree ({before} K)"
         );
-        // Every band within 1.5 K and 0.25 K RMS (the design's 0.3 K in every band is met except
-        // at the ice edge, where a band's snowy tile has two states; build log).
-        assert!(fit.worst_k < 1.5 && fit.rms_k < 0.25, "{fit:?}");
+        // Every band within 3 K and 0.35 K RMS: the design's 0.3 K in every band is met except at
+        // the ice edge, where a band's snowy tile has two states, and under the equal-area grid's
+        // tall polar rows, which give the zonal bands a coarse target (build log).
+        assert!(fit.worst_k < 3.0 && fit.rms_k < 0.35, "{fit:?}");
         assert!(
             fit.corr
                 .flux
@@ -945,7 +947,7 @@ mod tests {
         let mut ep2 = ep.clone();
         fit.corr.apply(&mut ep2);
         let (again, _) = fit_flux(&c, &ep2, &bands, &[], &mut ebm);
-        assert!(again.worst_k < 1.5 && again.rms_k < 0.25, "{again:?}");
+        assert!(again.worst_k < 3.0 && again.rms_k < 0.35, "{again:?}");
     }
 
     /// The snowball's onset and escape on a tropical supercontinent under a faint sun (design
@@ -999,9 +1001,9 @@ mod tests {
         // step decides its snowball, as the clock's tracker does) and its state then; a refit
         // afterwards moves the zonal state to the 2-D model's.
         let step = |ppm: f64,
-                        cell: &mut PerCell,
-                        e1: &mut EbmState,
-                        fit: &mut Fit|
+                    cell: &mut PerCell,
+                    e1: &mut EbmState,
+                    fit: &mut Fit|
          -> (f64, f64, EbmState) {
             let c2 = run(&inputs(&q, w, &land, &z, &none, &at(ppm)), cell);
             let mut e = at(ppm);

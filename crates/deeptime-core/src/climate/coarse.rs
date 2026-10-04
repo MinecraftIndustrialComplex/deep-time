@@ -53,6 +53,22 @@ impl Grid {
     /// about `cells` coarse columns across. The fine rows span the planet pole to pole (a map
     /// picture of the projection, `Projection::picture_lat_deg`).
     pub fn new(fw: usize, fh: usize, sx: &[f64], sy: f64, cells: usize) -> Grid {
+        let fh32 = fh as u32;
+        Grid::with_edges(fw, fh, sx, sy, cells, &|y| {
+            Projection::picture_lat_deg(y as f64, fh32)
+        })
+    }
+
+    /// [`Grid::new`] with the latitude of every fine row edge `y` (0 north … `fh` south) given
+    /// (a test's equal-angle rows).
+    pub fn with_edges(
+        fw: usize,
+        fh: usize,
+        sx: &[f64],
+        sy: f64,
+        cells: usize,
+        lat_of_edge: &dyn Fn(usize) -> f64,
+    ) -> Grid {
         let k = (fw / cells.max(1)).max(1);
         let (w, h) = (fw.div_ceil(k), fh.div_ceil(k));
         let dy = sy * k as f64;
@@ -65,10 +81,7 @@ impl Grid {
                 (mean * k as f64).max(0.25 * dy)
             })
             .collect();
-        let fh32 = fh as u32;
-        let lat_edge = (0..=h)
-            .map(|j| Projection::picture_lat_deg(((j * k).min(fh)) as f64, fh32))
-            .collect();
+        let lat_edge = (0..=h).map(|j| lat_of_edge((j * k).min(fh))).collect();
         let lon_w = (0..w)
             .map(|i| {
                 let cols = ((i + 1) * k).min(fw) - i * k;
@@ -257,7 +270,7 @@ mod tests {
     use super::*;
 
     fn earthish(fw: usize, cells: usize) -> Grid {
-        let fh = fw / 2;
+        let fh = Projection::picture_height(fw as u32) as usize;
         Grid::new(fw, fh, &vec![1.0e4; fh], 1.0e4, cells)
     }
 
@@ -267,7 +280,7 @@ mod tests {
             let g = earthish(fw, cells);
             let total: f64 = g.areas().iter().sum();
             assert!(
-                (total - 4.0 * std::f64::consts::PI).abs() < 1e-12,
+                (total - 4.0 * std::f64::consts::PI).abs() < 1e-11,
                 "{fw}/{cells}: Σ A = {total}"
             );
             assert!((g.lat_edge[0] - 90.0).abs() < 1e-12);
@@ -275,7 +288,7 @@ mod tests {
             assert!(g.lat_edge.windows(2).all(|e| e[0] > e[1]), "north first");
         }
         let g = earthish(1024, 128);
-        assert_eq!((g.w, g.h, g.k), (128, 64, 8));
+        assert_eq!((g.w, g.h, g.k), (128, 41, 8));
     }
 
     #[test]
@@ -287,9 +300,9 @@ mod tests {
             assert!((a - g.cos_mean(j) * g.dphi(j) * g.lon_w[0]).abs() < 1e-15);
         }
         let eq = g.h / 2;
-        assert!((g.g_ew(0, eq) - 1.0).abs() < 1e-3, "{}", g.g_ew(0, eq));
+        assert!((g.g_ew(0, eq) - 1.0).abs() < 1e-2, "{}", g.g_ew(0, eq));
         assert!(
-            (g.g_ns(0, eq - 1) - 1.0).abs() < 1e-9,
+            (g.g_ns(0, eq - 1) - 1.0).abs() < 1e-2,
             "{}",
             g.g_ns(0, eq - 1)
         );

@@ -347,7 +347,8 @@ impl Ocean {
             let in_band = |c: usize| {
                 let j = c / w;
                 let l = lat[j] * f64::from(hemi);
-                let pole_edge = (g.lat_edge[j] * f64::from(hemi)).max(g.lat_edge[j + 1] * f64::from(hemi));
+                let pole_edge =
+                    (g.lat_edge[j] * f64::from(hemi)).max(g.lat_edge[j + 1] * f64::from(hemi));
                 sea(c) && l >= BASIN_LAT.0 && pole_edge <= BASIN_LAT.1
             };
             let lab = components(&in_band);

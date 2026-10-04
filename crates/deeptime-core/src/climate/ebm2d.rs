@@ -660,10 +660,13 @@ mod tests {
     use super::*;
     use crate::climate::ClimateParams;
 
+    /// A grid of equal-angle rows (the zonal model's bands), whatever the map's projection.
     fn grid(cols: usize) -> Grid {
         let fw = cols * 4;
         let fh = fw / 2;
-        Grid::new(fw, fh, &vec![1.0e4; fh], 1.0e4, cols)
+        Grid::with_edges(fw, fh, &vec![1.0e4; fh], 1.0e4, cols, &|y| {
+            90.0 - 180.0 * y as f64 / fh as f64
+        })
     }
 
     fn params(g: &Grid) -> Params2d {
