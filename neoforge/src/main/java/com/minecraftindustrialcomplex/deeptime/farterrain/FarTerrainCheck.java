@@ -11,7 +11,10 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.CarvingMask;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ProtoChunk;
+import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.Fluids;
 
@@ -33,7 +36,7 @@ public final class FarTerrainCheck {
      * A generated column.
      *
      * @param ground      the y of the top block of the ground: under water, ice on water, snow layers,
-     *                    plants, leaves and logs
+     *                    plants, leaves and logs, and under water the blocks of a coral reef
      * @param groundBlock that block
      * @param water       water (or the ice on it) stands over the ground
      * @param waterTop    the y of the top water or ice block, when {@code water}
@@ -47,6 +50,28 @@ public final class FarTerrainCheck {
         return s.isAir() || s.is(BlockTags.LEAVES) || s.is(BlockTags.LOGS) || s.is(Blocks.SNOW) || !s.blocksMotion()
                 || s.is(Blocks.BAMBOO) || s.is(Blocks.CACTUS) || s.is(Blocks.MUSHROOM_STEM) || s.is(Blocks.RED_MUSHROOM_BLOCK)
                 || s.is(Blocks.BROWN_MUSHROOM_BLOCK) || s.is(Blocks.BEE_NEST) || s.is(Blocks.PUMPKIN) || s.is(Blocks.MELON);
+    }
+
+    /** A block of a coral reef: the warm oceans' feature, up to several blocks over the sea bed. */
+    static boolean coral(BlockState s) {
+        return s.is(BlockTags.CORAL_BLOCKS) || s.is(BlockTags.CORALS) || s.is(BlockTags.WALL_CORALS);
+    }
+
+    /**
+     * Whether a carver opened block (x, y, z) of a chunk still being generated: it is open (air or a
+     * fluid) and in the chunk's air carving mask. False once the chunk is promoted (the masks are
+     * gone). Deep Time's own passes put the blocks they guard in that mask too, but those stay solid
+     * or keep their water over the bed, so an open block there at the height of far terrain's ground
+     * is a carver's cut.
+     */
+    public static boolean carved(ChunkAccess chunk, int x, int y, int z) {
+        if (!(chunk instanceof ProtoChunk proto) || y < chunk.getMinBuildHeight() || y >= chunk.getMaxBuildHeight())
+            return false;
+        CarvingMask air = proto.getCarvingMask(GenerationStep.Carving.AIR);
+        if (air == null || !air.get(x & 15, y, z & 15))
+            return false;
+        BlockState s = chunk.getBlockState(new BlockPos(x, y, z));
+        return s.isAir() || !s.getFluidState().isEmpty();
     }
 
     static boolean waterLike(BlockState s) {
@@ -68,8 +93,8 @@ public final class FarTerrainCheck {
                 water = true;
                 continue;
             }
-            if (water && !s.blocksMotion())
-                continue;   // seagrass, kelp
+            if (water && (!s.blocksMotion() || coral(s)))
+                continue;   // seagrass, kelp, a coral reef (a feature far terrain does not draw)
             if (s.is(Blocks.SNOW))
                 snow = true;
             if (!water && overGround(s))
@@ -96,7 +121,26 @@ public final class FarTerrainCheck {
         /** Columns where a feature of ice stands in the water far terrain shows (an iceberg): counted apart. */
         public int icebergs;
 
+        /**
+         * Columns whose ground a carver cut more than two blocks below far terrain's (a canyon under a
+         * shallow sea, a cave mouth): counted apart. Far terrain draws the column rule the chunk is
+         * built by, not the carvers, which are random per chunk; the caller bounds their share.
+         */
+        public int carved;
+        public String carvedAt = "";
+
         public void add(FarTerrain.Column far, RealColumn real) {
+            add(far, real, null);
+        }
+
+        /** As {@link #add(FarTerrain.Column, RealColumn)}; {@code chunk}, while still generating, tells a carver's cut apart. */
+        public void add(FarTerrain.Column far, RealColumn real, ChunkAccess chunk) {
+            if (chunk != null && real.ground() < far.ground() - 2 && carved(chunk, far.x(), far.ground(), far.z())) {
+                carved++;
+                if (carvedAt.length() < 200)
+                    carvedAt += (carvedAt.isEmpty() ? "" : " ") + "(" + far.x() + ", " + far.z() + ") far " + far.ground() + " real " + real.ground();
+                return;
+            }
             // An iceberg is a feature (vanilla's, in frozen oceans): packed or blue ice from the sea
             // floor to above the surface, where the world data and far terrain have open water.
             if (far.water() && !real.water() && real.ground() > far.ground()
@@ -165,6 +209,9 @@ public final class FarTerrainCheck {
             JsonObject o = new JsonObject();
             o.addProperty("columns", columns);
             o.addProperty("icebergs_set_aside", icebergs);
+            o.addProperty("carved_set_aside", carved);
+            if (carved > 0)
+                o.addProperty("carved_at", carvedAt);
             o.addProperty("height_exact", heightExact);
             o.addProperty("height_within_1", heightWithin1);
             o.addProperty("height_within_2", heightWithin2);

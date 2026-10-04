@@ -293,8 +293,12 @@ public final class LavaGameTests {
                                     n.detail.append(" wet(").append(x).append(',').append(y).append(',').append(z).append(')');
                             } else if (s.isAir() && !(part == Magma.Part.LAKE && d[1] == 1)) {
                                 n.airFaces++;
-                                if (n.detail.length() < 300)
-                                    n.detail.append(" air(").append(x).append(',').append(y).append(',').append(z).append(')');
+                                if (n.detail.length() < 600) {
+                                    int ax = x0 + nx, az = z0 + nz;
+                                    n.detail.append(" air(").append(x).append(',').append(y).append(',').append(z).append(" ").append(part)
+                                            .append(" by ").append(b.at(magma.dx(ax, b), az - b.z(), ny)).append(b.mush(magma.dx(ax, b), az - b.z(), ny) ? "/mush" : "")
+                                            .append(' ').append(chunk.getPersistedStatus()).append(')');
+                                }
                             }
                         }
                     }

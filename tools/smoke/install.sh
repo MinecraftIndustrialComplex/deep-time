@@ -105,6 +105,14 @@ say() { printf '\n== %s\n' "$*"; }
 dev() { if [ -n "${IN_NIX_SHELL:-}" ]; then "$@"; else nix develop -c "$@"; fi; }
 
 [ -f "$PACK/pack.toml" ] || { echo "install.sh: no pack at $PACK" >&2; exit 1; }
+# Servers never run in the set itself (tools/smoke/instance.py copies it under a shared lock), but
+# the smoke runs and the client check use its world: the install waits for those (the world lock),
+# then for copies in progress (the set lock), in that order, the order the runs take them in.
+mkdir -p "$SMOKE"
+exec 8>"$SMOKE/.world.lock"
+flock -n 8 || { echo "install.sh: waiting for smoke/$PROFILE's world (a run of this set uses it)"; flock 8; }
+exec 9>"$SMOKE/.set.lock"
+flock -n 9 || { echo "install.sh: waiting while a server copies smoke/$PROFILE"; flock 9; }
 if [ "$CLEAN" = 1 ]; then say "removing $SERVER"; rm -rf "$SERVER"; fi
 mkdir -p "$CACHE/modrinth" "$SERVER/mods"
 
@@ -279,7 +287,7 @@ done < <(profile_pins "$PROFILE")
 
 # Always the current sources: an old jar left in build/libs once installed pre-P0-10 code.
 say "building the Deep Time jar"
-( cd "$REPO/neoforge" && dev ./gradlew jar -q --console=plain )
+( cd "$REPO/neoforge" && dev ./gradlew jar -q --console=plain ) 8>&- 9>&-
 JAR="$(find "$REPO/neoforge/build/libs" -maxdepth 1 -name 'deeptime-1.21.1-*.jar' ! -name '*-sources.jar' 2>/dev/null | sort | tail -1)"
 [ -n "$JAR" ] || { echo "install.sh: no Deep Time jar -- run (cd neoforge && nix develop -c ./gradlew build) first" >&2; exit 1; }
 cp "$JAR" "$SERVER/mods/"

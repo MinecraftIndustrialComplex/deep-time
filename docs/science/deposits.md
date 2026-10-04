@@ -378,9 +378,12 @@ than these figures; that was not measured.
   decisions log 2026-09-29).
 - The mean density for porphyry and only survivors within the assessment depth counting (Ben,
   decisions log 2026-09-29, "Use the USGS mean density").
-- The size multipliers (porphyry 12 × horizontally, placer 12 and 10, MVT 12 and 3, sedex 12 and 4,
-  banded iron formation 6 and 4, coal 1 and 20), so bodies are visible at 300 m per block
-  (ORE-053, DEP-195, DEP-127 and the type files; agents, build log 2026-09-29 and 2026-10-01).
+- The size multipliers (porphyry 12 × horizontally, placer 12 and 17.5, MVT 12 and 5.25, sedex 12 and
+  7, banded iron formation 6 and 7, coal 1 and 35), so bodies are visible at 300 m per block
+  (ORE-053, ORE-055, DEP-195, DEP-127 and the type files; agents, build log 2026-09-29 and
+  2026-10-01). The vertical multipliers and coal's seam spacing (`spacing_mult_v` 10.5, ORE-145)
+  are 1.75 times the values tuned at 20 m per block, so at 35 m per block bodies keep the height
+  in blocks they had (Ben, decisions log 2026-10-03, "Keep today's block height").
 - Placer gold moved into a real river channel within 30 km at the bake (Ben, 2026-10-01).
 - Richer deposits, thinner scatter and raw-ore cores (Ben, 2026-10-02: ORE-262, ORE-265, ORE-266;
   the values are the agent's, against the targets above); inherited iron formation in a basin
