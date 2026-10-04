@@ -661,6 +661,9 @@ PROBE_COLUMNS = [(0.0, 0.0), (0.0625, 0.03), (-0.1875, -0.05), (0.4995, 0.01), (
                  (0.31, -0.12), (-0.42, 0.14), (0.2, 0.2)]
 
 
+MAX_CARVED_COLUMNS = 2   # of PROBE_COLUMNS: cave mouths are a few percent of a planet's columns
+
+
 def probe_consistency(steps, rcon, server, world_data, size):
     """`/deeptime probe column` against the world data's own evaluator (P1-13, Phase 1 exit test item 2).
 
@@ -673,7 +676,7 @@ def probe_consistency(steps, rcon, server, world_data, size):
     if not os.path.exists(cli):
         steps.record("probes agree with the world data", f"skipped: {cli} not built (install.sh builds it)")
         return
-    bad, rows = [], []
+    bad, rows, carved = [], [], []
     for fx, fz in PROBE_COLUMNS:
         x, z = round(fx * size), round(fz * size)
         probe, out = probe_json(server, rcon, f"deeptime probe column {x} {z}", wait=0.5)
@@ -687,11 +690,23 @@ def probe_consistency(steps, rcon, server, world_data, size):
         surf_y, top_y = probe.get("surfaceY"), col.get("top_y")
         # terrainH is the world data's ground height in blocks at the column; the generator's base
         # height is the integer surface (rounding, the seabed under water: within 2 blocks of top_y).
+        # The base height is read from the density, caves included: a cave mouth opening in the
+        # surface (the real mic 16k world has one at (0,0), 16 blocks down under the sea: the generated
+        # chunk has stone, seagrass and an air cavity there) puts it BELOW the world data's surface.
+        # That is the generator carving, so a few columns may sit lower (MAX_CARVED_COLUMNS, named in
+        # the note); one above the surface, or the terrainH readers disagreeing, always fails.
         same = h_java is not None and h_rust is not None and abs(h_java - h_rust) <= 0.01
-        near = surf_y is not None and top_y is not None and abs(surf_y - top_y) <= 2
-        rows.append(f"({x},{z}) terrainH {h_java} vs {h_rust}, surfaceY {surf_y} vs top_y {top_y}")
-        if not (same and near):
+        have = surf_y is not None and top_y is not None
+        near = have and abs(surf_y - top_y) <= 2
+        below = have and surf_y < top_y - 2
+        rows.append(f"({x},{z}) terrainH {h_java} vs {h_rust}, surfaceY {surf_y} vs top_y {top_y}"
+                    + (" (below the surface: a cave mouth)" if same and below else ""))
+        if same and below:
+            carved.append(rows[-1])
+        elif not (same and near):
             bad.append(rows[-1])
+    if len(carved) > MAX_CARVED_COLUMNS:
+        bad.extend(carved)
     steps.check("probe column agrees with the world data (inspect-column)", f"{len(PROBE_COLUMNS)} of {len(PROBE_COLUMNS)}",
                 f"{len(PROBE_COLUMNS) - len(bad)} of {len(PROBE_COLUMNS)}" + (": " + "; ".join(bad)[:400] if bad else ""),
                 not bad, note="; ".join(rows)[:600])

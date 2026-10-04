@@ -96,6 +96,29 @@ class ProbeConsistency(unittest.TestCase):
         steps = self.check({"terrainH": 12.5, "surfaceY": 90})
         self.assertEqual(len(steps.failed), 1)
 
+    def test_a_cave_mouth_below_the_surface_is_tolerated_up_to_a_limit(self):
+        self.fake_cli(12.5, 12)
+        calls = []
+
+        def probe(server, rcon, command, wait=1.0):
+            calls.append(command)
+            return ({"terrainH": 12.5, "surfaceY": 12 - 16 if len(calls) <= run.MAX_CARVED_COLUMNS else 13}, "")
+        steps = run.Steps()
+        orig = run.probe_json
+        run.probe_json = probe
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                run.probe_consistency(steps, None, None, self.tmp, 16384)
+        finally:
+            run.probe_json = orig
+        self.assertFalse(steps.failed)
+        self.assertIn("cave mouth", str(steps.rows[0]))
+
+    def test_every_column_below_the_surface_fails(self):
+        self.fake_cli(12.5, 12)
+        steps = self.check({"terrainH": 12.5, "surfaceY": -4})
+        self.assertEqual(len(steps.failed), 1)
+
     def test_missing_cli_is_recorded_not_failed(self):
         steps = self.check({"terrainH": 1.0, "surfaceY": 1})
         self.assertFalse(steps.failed)
