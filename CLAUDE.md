@@ -69,9 +69,15 @@ tools/remote/mac.sh --no-sync -- deeptime-admit status  # the VM's admission too
   per-agent counts and no fixed job sizes. A job has a kind (`cargo:test`, `gradle:build`,
   `gametest:mic`, `preview:standalone`, `sim:<preset>:<threads>t`, ...); its estimated load (mean
   cores, peak memory: a seed table at first, then a high percentile of the kind's measured runs) must
-  fit in the free CPU and memory plus 25 % (free = what /proc shows now, minus what running jobs have
-  reserved and not used yet, minus headroom for the play server, the workbench and ssh), or it waits
-  in order and says why; a job that has waited 15 minutes stops anything behind it from starting
+  fit what is free now or it waits in order and says why. Memory (Ben, 2026-10-03: "Don't kill old
+  things, just prevent new ones from launching if their usage isn't within it ... If we are at 3.5Gb
+  and a run is predicted to use 200mb it is green to run. If an agent predicts it will use 0.4 [GB]
+  then it will be red since that would use up 100% of the machine after margin is applied."): a job
+  starts when its memory estimate x 1.25 is under the free memory, where free = MemAvailable minus
+  what admitted jobs have reserved and not used yet; the margin is on the job's prediction, there is
+  no standing headroom, and running jobs are never stopped (a 4 GiB box with 0.5 GiB free: a 0.2 GiB
+  job runs, a 0.4 GiB job waits). CPU is unchanged (estimate fits in 1.25 x the free cores, 4 cores
+  kept for the play server, the workbench and ssh, since overcommitting CPU only slows jobs down); a job that has waited 15 minutes stops anything behind it from starting
   first. Its process tree is measured while it runs and refines the next estimate. mac.sh admits
   every command (`--kind` overrides the kind it classifies; quick looks and detached starts run at
   once); `tools/remote/detach.sh start`, `gametest.sh`, `gametest-planet.sh`, `tools/smoke/run.py`,
