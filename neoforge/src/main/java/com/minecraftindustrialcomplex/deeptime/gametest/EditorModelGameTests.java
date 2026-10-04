@@ -7,6 +7,7 @@ import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.preset.Presets;
 import com.minecraftindustrialcomplex.deeptime.preset.ShareCode;
 import com.minecraftindustrialcomplex.deeptime.screen.model.EditorModel;
+import com.minecraftindustrialcomplex.deeptime.screen.model.GlobeProjection;
 import com.minecraftindustrialcomplex.deeptime.screen.model.MachineInfo;
 import com.minecraftindustrialcomplex.deeptime.screen.model.ReviewModel;
 import com.minecraftindustrialcomplex.deeptime.screen.model.SessionRunHandle;
@@ -387,8 +388,14 @@ public final class EditorModelGameTests {
                 if (h > sea)
                     land++;
             }
+            // Land and sea both (planet_world_4k cut to 100 Myr has about a tenth land: 0.09 on
+            // 2026-10-04), and the review's spawn stands on dry land in the moved world's terrain.
             double share = land / (double) n;
-            helper.assertTrue(share > 0.1 && share < 0.6, "land share " + share + " (the preset's ocean fraction is 0.7)");
+            helper.assertTrue(share > 0.02 && share < 0.6, "land share " + share + " (the preset's ocean fraction is 0.7)");
+            double[] sp = review.spawn().orElseThrow();
+            double[] sb = GlobeProjection.block(sp[0], sp[1], 4096, new double[2]);
+            double spawnH = t.height((int) Math.floor(sb[0]), (int) Math.floor(sb[1]));
+            helper.assertTrue(spawnH > sea, "the review's spawn " + (int) sb[0] + "," + (int) sb[1] + " is dry land (height " + spawnH + ", sea " + sea + ")");
             DeepTime.LOGGER.info("[gametest] realPlanetThroughTheEditor {} s: frames={} events={} layers={} groups={} native peak {} MiB, "
                             + "spawn={} land share {} staging={} moved+bound", (System.currentTimeMillis() - started) / 1000, run.frameCount(),
                     run.events().size(), run.layers().size(), run.groups(), p.nativeBytesPeak() >> 20,
