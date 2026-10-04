@@ -7,8 +7,8 @@
 # fields the margin measure reads (`deeptime dump-fields`), `tools/review/margins.py` on them, and
 # `deeptime plate-check` on the checkpoints. On the test VM through tools/remote/detach.sh:
 #
-#   tools/remote/mac.sh -- tools/remote/detach.sh start mt-base tools/review/margin-runs.sh base 1000 1,2,3,4 supercontinent
-#   tools/remote/mac.sh -- tools/remote/detach.sh start mt-base5 tools/review/margin-runs.sh base 500 1,2,3 supercontinent,scattered_continents
+#   tools/remote/mac.sh -- tools/remote/detach.sh start mt-base --kind light tools/review/margin-runs.sh base 1000 1,2,3,4 supercontinent
+#   tools/remote/mac.sh -- tools/remote/detach.sh start mt-base5 --kind light tools/review/margin-runs.sh base 500 1,2,3 supercontinent,scattered_continents
 #
 #   tools/review/margin-runs.sh <tag> <length Myr> "<seeds>" "<starts>" [path=value ...]
 #
@@ -26,11 +26,14 @@ T=${T:-2}
 O=$R/$TAG
 mkdir -p "$O"
 if [ -z "${BIN:-}" ]; then
-    if [ ! -x "$O/bin/deeptime" ]; then
-        env -u DEEPTIME_ADMIT_JOB -u DEEPTIME_ADMIT_PID deeptime-admit run --kind cargo:build -- cargo build --release -q -p deeptime-cli
-        mkdir -p "$O/bin"
-        cp target/release/deeptime "$O/bin/deeptime"
-    fi
+    (
+        flock 9
+        if [ ! -x "$O/bin/deeptime" ]; then
+            env -u DEEPTIME_ADMIT_JOB -u DEEPTIME_ADMIT_PID deeptime-admit run --kind cargo:build -- cargo build --release -q -p deeptime-cli
+            mkdir -p "$O/bin"
+            cp target/release/deeptime "$O/bin/deeptime"
+        fi
+    ) 9> "$O/.build.lock"
     BIN=$O/bin/deeptime
 fi
 sets=(--set structure.deformation.density=0)
@@ -53,7 +56,8 @@ run_one() {
         rm -rf "$f.dump"
         "$BIN" dump-fields --in "$f.ck" --out "$f.dump" \
             --fields surface/elevation_m,elevation,plates/crust_type,plates/thickness_m,plates/elevation_m,regime > /dev/null
-        nix shell --impure --expr "$PYENV" -c nice -n 10 python3 "$HERE/margins.py" planet "$f.dump" "$f.margins.json" \
+        env -u DEEPTIME_ADMIT_JOB -u DEEPTIME_ADMIT_PID deeptime-admit run --kind shell:margins.py -- \
+            nix shell --impure --expr "$PYENV" -c nice -n 10 python3 "$HERE/margins.py" planet "$f.dump" "$f.margins.json" \
             > "$f.margins.txt" 2>&1 || echo "margins FAILED $f" >&2
     fi
 }
