@@ -24,9 +24,10 @@
 //! thickness is the better record of the two: the surface stage owns the elevation (its
 //! feedback overwrites the samples' heights each step), and crust stacked where continents
 //! overlap at a resampling (`ridges.rs`, `pools::accrete`) thickens a column without raising it.
-//! Each step, every visible continental sample that no orogeny raised this step (a belt being
-//! stacked or a margin being uplifted is held up by the convergence) and whose crust is thicker
-//! than `collapse_thickness_km` (T_c) releases
+//! Each step, every visible continental sample that no orogeny has raised for
+//! `collapse_quiet_myr` (a belt being stacked or a margin being uplifted is held up by the
+//! convergence; collapse follows the end of the thickening) and whose crust is thicker than
+//! `collapse_thickness_km` (T_c) releases
 //!
 //!   q = (1 − e^(−δt/τ)) · (T − T_c)
 //!
@@ -169,8 +170,9 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
     let n = state.samples.len();
     let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
-    // A sample raised by an orogeny this step carries the step's time.
-    let quiet_before = (env.t_myr - 0.5 * env.dt_myr) as f32;
+    // A sample raised by an orogeny carries the time of the step that raised it; it is held up
+    // until no orogeny has raised it for `collapse_quiet_myr` (at least this step). ledger: PLT-259
+    let quiet_before = (env.t_myr - k.collapse_quiet_myr.max(0.5 * env.dt_myr)) as f32;
 
     // Each plate's sources and what they would release this step, m of thickness.
     let mut by_plate: BTreeMap<u32, Vec<(usize, f64)>> = BTreeMap::new();

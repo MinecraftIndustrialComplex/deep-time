@@ -69,6 +69,7 @@
     "weld_after_myr": 10.0,
     "collapse_myr": 15.0,
     "collapse_thickness_km": 50.0,
+    "collapse_quiet_myr": 0.0,
     "collapse_reach_km": 200.0,
     "crust_max_km": 70.0,
     "slab_pull_rad_per_1000km_myr": 0.002,

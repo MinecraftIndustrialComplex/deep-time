@@ -450,6 +450,8 @@ pub struct TectonicParams {
     pub collapse_myr: f64,
     /// … the crust thickness it thins back to, km …
     pub collapse_thickness_km: f64,
+    /// … once no orogeny has raised it for this long, Myr …
+    pub collapse_quiet_myr: f64,
     /// … and how far from the collapsing crust the crust it loses may go, km (Earth-normalized).
     pub collapse_reach_km: f64,
     /// The thickest continental crust, km: a column thicker than this loses the excess from its
@@ -656,6 +658,7 @@ impl Default for TectonicParams {
             weld_after_myr: 10.0,              // ledger: PLT-246
             collapse_myr: 15.0,                // ledger: PLT-255
             collapse_thickness_km: 50.0,       // ledger: PLT-256
+            collapse_quiet_myr: 0.0,           // ledger: PLT-259
             collapse_reach_km: 200.0,          // ledger: PLT-257
             crust_max_km: 70.0,                // ledger: PLT-258
             slab_pull_rad_per_1000km_myr: 0.002,
@@ -969,6 +972,7 @@ impl PlanetPreset {
             (k.weld_after_myr, "$.tectonics.weld_after_myr"),
             (k.collapse_myr, "$.tectonics.collapse_myr"),
             (k.collapse_thickness_km, "$.tectonics.collapse_thickness_km"),
+            (k.collapse_quiet_myr, "$.tectonics.collapse_quiet_myr"),
             (k.collapse_reach_km, "$.tectonics.collapse_reach_km"),
             (k.crust_max_km, "$.tectonics.crust_max_km"),
         ] {
