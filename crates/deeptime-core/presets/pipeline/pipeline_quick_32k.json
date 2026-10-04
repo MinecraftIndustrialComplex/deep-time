@@ -506,7 +506,8 @@
     "geothermal_size": 1.0,
     "geothermal_spring_min_precip_mm": 400.0,
     "geothermal_heat_flow_min_mw_m2": 100.0,
-    "geothermal_heat_density": 1.0
+    "geothermal_heat_density": 1.0,
+    "volcanic_biome_reach": 1.0
   },
   "provinces": {
     "min_area_km2": 50000.0,
