@@ -69,6 +69,12 @@ class Planet:
         self.p = np.array(a[..., 4], dtype=np.float32)
         self.rows, self.cols = self.H.shape
         self.x0, self.z0, self.step = -8192.0, -2624.0, 4.0
+        # the bake's own x wrap: the step from the last column to the first against ordinary steps
+        wrap = np.abs(self.H[:, 0] - self.H[:, -1])
+        inner = np.abs(np.diff(self.H, axis=1))
+        self.wrap_check = {"wrap_median": float(np.median(wrap)), "wrap_p90": float(np.percentile(wrap, 90)),
+                           "inner_median": float(np.median(inner)), "inner_p90": float(np.percentile(inner, 90))}
+        log("bake x-wrap step", self.wrap_check)
         mx = float(np.nanmax(self.ice))
         self.ice_full = mx if mx > 1.5 else 1.0
         log("planet", self.H.shape, "H", float(self.H.min()), float(self.H.max()),
@@ -1229,7 +1235,9 @@ def coast_lambda(L_at, Vt, bis_deg, planet):
     best = None
     for lam in np.arange(0, 360, 1.0):
         pv = zrot(math.radians(lam)) @ P0
-        s5 = float(planet.land(disc_points(pv, math.radians(5), 160)).mean())
+        if abs(abs(math.degrees(math.atan2(pv[1], pv[0]))) - 180) < 8:
+            continue  # keep the close-ups off the bake's own x wrap (lon 180)
+        s5 =float(planet.land(disc_points(pv, math.radians(5), 160)).mean())
         s15 = float(planet.land(disc_points(pv, math.radians(15), 300)).mean())
         score = abs(s5 - 0.5) + 0.5 * max(0.0, 0.3 - s15)
         if best is None or score < best[0]:
@@ -1694,7 +1702,7 @@ def main():
     Lg, Lc = mk_guyou(best_guyou[0]), mk_cube(best_cube[0])
     mains = [Lg, Lc]
     only = os.environ.get("ONLY", "")
-    data = {"generated": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()), "R16": R16,
+    data = {"generated": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()), "R16": R16, "bake_wrap": getattr(planet, "wrap_check", None),
             "lam0_deg": best_cube[0], "lamc_deg": best_guyou[0],
             "sweep_cube": sw_cube, "sweep_guyou": sw_guyou, "layouts": {}, "stats": {}}
     R = {}
