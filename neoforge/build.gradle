@@ -83,6 +83,34 @@ def extractSableCompanion = tasks.register('extractSableCompanion', Copy) {
 }
 
 // ---------------------------------------------------------------------------
+// Create 6.0.10 (code MIT): compileOnly, for compat/create/wrap only (the wrap engine's Create
+// adapters, applied only with -Ddeeptime.wrapspike=true and Create installed). Its API types reach
+// into the jars it nests (Ponder's catnip, Flywheel, Registrate), which are extracted for javac.
+// Never on a run's classpath (-PwithMic runs load Create from the mic set) and never in the jar.
+// ---------------------------------------------------------------------------
+configurations {
+    createJar {
+        canBeConsumed = false
+        canBeResolved = true
+        transitive = false
+    }
+}
+dependencies {
+    createJar "maven.modrinth:create:${create_version}"
+}
+def createNestedDir = layout.buildDirectory.dir('create-nested')
+def createNestedJars = create_nested_jars.split(',').collect { it.trim() }
+def extractCreateNested = tasks.register('extractCreateNested', Copy) {
+    description = "Unpacks the jars Create nests (Ponder, Flywheel, Registrate) for compiling the Create adapters."
+    from({ zipTree(configurations.createJar.singleFile) }) {
+        createNestedJars.each { include "META-INF/jarjar/${it}" }
+        eachFile { it.path = it.name }
+        includeEmptyDirs = false
+    }
+    into createNestedDir
+}
+
+// ---------------------------------------------------------------------------
 // Distant Horizons (LGPL-3.0; P3-04): never on a compile or run classpath. compat/dh binds its API
 // by name at run time, because the API classes have two names (DhApiBinding); the two jars here
 // are only opened by DhApiBindingTest, each in its own class loader, to prove the binding against
@@ -123,6 +151,9 @@ dependencies {
     // TerraBlender 4.1.0.8 (LGPL-3.0; P1-10): compileOnly for compat/terrablender (TerraBlenderRegions,
     // RegionTrees) and mixin/compat/terrablender. -PwithTerraBlender runs load it from the terrablender set.
     compileOnly("maven.modrinth:terrablender:${terrablender_version}") { transitive = false }
+    // Create 6.0.10 and the jars it nests (code MIT): compileOnly for compat/create/wrap (see above).
+    compileOnly("maven.modrinth:create:${create_version}") { transitive = false }
+    compileOnly files(createNestedJars.collect { n -> createNestedDir.map { it.file(n) } }).builtBy(extractCreateNested)
 
     testImplementation platform("org.junit:junit-bom:${junit_version}")
     testImplementation 'org.junit.jupiter:junit-jupiter'

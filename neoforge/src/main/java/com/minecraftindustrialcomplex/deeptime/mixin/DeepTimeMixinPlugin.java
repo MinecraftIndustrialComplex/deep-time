@@ -20,7 +20,8 @@ import java.util.Set;
  *   <li>A mixin in {@code mixin.gametest} applies only with {@code -Ddeeptime.gametest=true},
  *       so test-only fixes never reach a player's game.</li>
  *   <li>A mixin in {@code mixin.wrapspike} (the wrap-engine spike) applies only with
- *       {@code -Ddeeptime.wrapspike=true}.</li>
+ *       {@code -Ddeeptime.wrapspike=true}; one in {@code mixin.wrapspike.compat.<modid>} (the engine's
+ *       adapters for a mod, such as Create) also needs that mod installed.</li>
  *   <li>Everything else always applies.</li>
  * </ul>
  *
@@ -48,6 +49,12 @@ public class DeepTimeMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.startsWith(WRAPSPIKE)) {
             // The wrap-engine spike (docs/design/wrap-engine.md): never in a player's game.
             boolean on = Boolean.getBoolean("deeptime.wrapspike");
+            // mixin.wrapspike.compat.<modid>.*: the engine's adapters for a mod, which needs that mod too.
+            String modid = modAfter(mixinClassName, WRAPSPIKE + "compat.");
+            if (on && modid != null && !installed(modid)) {
+                LOGGER.info("Skipping wrap-engine mixin {}: {} is not installed", mixinClassName, modid);
+                return false;
+            }
             if (on)
                 LOGGER.warn("Applying wrap-engine SPIKE mixin {} (-Ddeeptime.wrapspike=true)", mixinClassName);
             return on;
@@ -58,20 +65,23 @@ public class DeepTimeMixinPlugin implements IMixinConfigPlugin {
                 LOGGER.debug("Skipping gametest mixin {}", mixinClassName);
             return on;
         }
-        String modid = requiredMod(mixinClassName);
-        if (modid == null)
-            return true;
-        LoadingModList mods = LoadingModList.get();
-        if (mods == null || mods.getModFileById(modid) != null)
+        String modid = modAfter(mixinClassName, COMPAT);
+        if (modid == null || installed(modid))
             return true;
         LOGGER.info("Skipping mixin {}: {} is not installed", mixinClassName, modid);
         return false;
     }
 
-    private static String requiredMod(String mixinClassName) {
-        if (!mixinClassName.startsWith(COMPAT))
+    private static boolean installed(String modid) {
+        LoadingModList mods = LoadingModList.get();
+        return mods == null || mods.getModFileById(modid) != null;
+    }
+
+    /** The mod id of {@code <prefix><modid>.<Class>}, or null when the name does not start so. */
+    private static String modAfter(String mixinClassName, String prefix) {
+        if (!mixinClassName.startsWith(prefix))
             return null;
-        String rest = mixinClassName.substring(COMPAT.length());
+        String rest = mixinClassName.substring(prefix.length());
         int dot = rest.indexOf('.');
         return dot <= 0 ? null : rest.substring(0, dot);
     }

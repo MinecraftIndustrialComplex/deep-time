@@ -49,32 +49,32 @@ import java.util.List;
 @PrefixGameTestTemplate(false)
 public final class WrapSpikeGameTests {
 
-    static final String NS = "deeptime_wrapspike";
-    static final String TEMPLATE = "empty_5x5x5";
-    static final int HALF = 8;
-    static final int Y0 = 100;
+    public static final String NS = "deeptime_wrapspike";
+    public static final String TEMPLATE = "empty_5x5x5";
+    public static final int HALF = 8;
+    public static final int Y0 = 100;
 
     private static final List<WrapEdge> EDGES = new ArrayList<>();
 
     private WrapSpikeGameTests() {}
 
     /** One test site: its seam pivot and whether its seam is glued (a control site is not). */
-    record Site(ServerLevel level, int cx, int z0, boolean glued) {
-        BlockPos at(int dx, int dy, int dz) {
+    public record Site(ServerLevel level, int cx, int z0, boolean glued) {
+        public BlockPos at(int dx, int dy, int dz) {
             return new BlockPos(cx + dx, Y0 + dy, z0 + dz);
         }
 
-        void set(int dx, int dy, int dz, BlockState s) {
+        public void set(int dx, int dy, int dz, BlockState s) {
             level.setBlock(at(dx, dy, dz), s, Block.UPDATE_ALL);
         }
 
-        BlockState stored(int dx, int dy, int dz) {
+        public BlockState stored(int dx, int dy, int dz) {
             return WrapEngine.rawState(level, at(dx, dy, dz));
         }
     }
 
     /** Forceloads, clears and floors a site, then glues its seam and copies its band. */
-    static Site open(GameTestHelper helper, int index, boolean glued) {
+    public static Site open(GameTestHelper helper, int index, boolean glued) {
         ServerLevel level = helper.getLevel();
         int cx = 4096 + 64 * index, z0 = 4096;
         for (int x = (cx - HALF) >> 4; x <= (cx + HALF - 1) >> 4; x++)
@@ -89,10 +89,7 @@ public final class WrapSpikeGameTests {
                             Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
         Site site = new Site(level, cx, z0, glued);
         if (glued) {
-            synchronized (EDGES) {
-                EDGES.addAll(WrapTopology.halfTurnSeam(cx, z0, HALF, HALF).edges());
-                WrapEngine.install(level, new WrapTopology(EDGES));
-            }
+            glue(level, WrapTopology.halfTurnSeam(cx, z0, HALF, HALF).edges());
             WrapTopology t = WrapEngine.topology(level);
             int n = WrapEngine.resyncBand(level, t, cx - HALF, cx + HALF - 1, Y0 - 1, Y0 + 4, z0 - HALF, z0 + HALF - 1);
             log("site %d at cx=%d z0=%d glued; %d band blocks copied", index, cx, z0, n);
@@ -102,11 +99,19 @@ public final class WrapSpikeGameTests {
         return site;
     }
 
-    static void log(String fmt, Object... args) {
+    /** Adds a site's edges to the level's topology (the union of every glued site's edges). */
+    public static void glue(ServerLevel level, List<WrapEdge> edges) {
+        synchronized (EDGES) {
+            EDGES.addAll(edges);
+            WrapEngine.install(level, new WrapTopology(EDGES));
+        }
+    }
+
+    public static void log(String fmt, Object... args) {
         DeepTime.LOGGER.info("[gametest] wrapspike " + String.format(fmt, args));
     }
 
-    static void check(boolean ok, String fmt, Object... args) {
+    public static void check(boolean ok, String fmt, Object... args) {
         String msg = String.format(fmt, args);
         log("%s %s", ok ? "OK  " : "FAIL", msg);
         if (!ok)
