@@ -72,19 +72,19 @@ class Row:
         return r
 
 
+KINDS = {"build": "cargo:build", "bench": "sim:earthlike_quick_16k:8t"}
+
+
 def vm(sid, cmd, flags=(), pulls=()):
-    """Runs `cmd` on the VM through mac.sh; returns (output without noise, exit code, seconds). Kept in logs/<sid>.log."""
+    """Runs `cmd` on the VM detached (tools/review/phase1_detach.py: a dropped ssh session does not lose the job),
+    admitted by the VM's admission tool; returns (output without noise, exit code, seconds). Kept in logs/<sid>.log."""
+    import phase1_detach
     os.makedirs(LOGS, exist_ok=True)
-    argv = [MAC, *flags]
-    for p in pulls:
-        argv += ["--pull", p]
-    argv += ["--", cmd]
-    t0 = time.time()
-    r = subprocess.run(argv, cwd=REPO, capture_output=True, text=True, errors="replace")
-    out = "\n".join(l for l in (r.stdout + r.stderr).splitlines() if not NOISE.match(l))
+    out, rc, secs = phase1_detach.run(sid, cmd, flags=flags, pulls=pulls, kind=KINDS.get(sid, "auto"))
+    out = "\n".join(l for l in out.splitlines() if not NOISE.match(l))
     with open(os.path.join(LOGS, f"{sid}.log"), "a") as f:
-        f.write(f"$ {cmd}\n{out}\n[exit {r.returncode}, {time.time() - t0:.0f} s]\n\n")
-    return out, r.returncode, time.time() - t0
+        f.write(f"$ {cmd}\n{out}\n[exit {rc}, {secs:.0f} s]\n\n")
+    return out, rc, secs
 
 
 def checks(out):
