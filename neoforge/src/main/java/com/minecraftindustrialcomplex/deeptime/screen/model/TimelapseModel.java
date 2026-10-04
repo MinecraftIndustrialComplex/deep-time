@@ -42,6 +42,16 @@ public final class TimelapseModel {
     /** Bytes of decoded frames kept (1024 × 512 frames are 2 MiB per layer). */
     public static final long RING_BYTES = 64L << 20;
 
+    /**
+     * How long a point event stays on the map after it ended: the workbench's {@code FADE_YEARS}
+     * (24 Myr). A real 1,000-Myr planet logs some 10,000 events; without a window every one of them
+     * would be a marker on every frame (game-choice: a display window, not a physical value).
+     */
+    public static final double MARKER_FADE_YEARS = 24e6;
+
+    /** At most this many markers on the map (the newest by start time). */
+    public static final int MAX_MARKERS = 400;
+
     /** A decoded frame layer. */
     public record Frame(KeyframeInfo info, int layer, int[] abgr) {}
 
@@ -59,6 +69,10 @@ public final class TimelapseModel {
     private final List<GeoEvent> events = new ArrayList<>();
     private final List<String> layers = new ArrayList<>();
     private String layer;
+    /** True once the player picked a layer (until then the default follows the layers that arrive). */
+    private boolean layerChosen;
+    /** The group the layer list shows (null: the current layer's). */
+    private String group;
     private int index = -1;
     private boolean follow = true;
     private boolean playing;
@@ -144,8 +158,8 @@ public final class TimelapseModel {
                 if (!layers.contains(l))
                     layers.add(l);
         }
-        if (layer == null && !layers.isEmpty())
-            layer = layers.get(0);
+        if (!layerChosen && !layers.isEmpty())
+            layer = LayerCatalog.defaultLayer(layers);
         List<GeoEvent> ev = run.newEvents();
         if (!ev.isEmpty()) {
             events.addAll(ev);
@@ -281,11 +295,66 @@ public final class TimelapseModel {
         return Optional.ofNullable(layer);
     }
 
+    /**
+     * Shows layer {@code name}. When the displayed frame lacks it (the deposits, young and amplify
+     * layers exist only in their stage's frame at the end), the view moves to the nearest frame
+     * that has it.
+     */
     public void setLayer(String name) {
-        if (layers.contains(name)) {
-            layer = name;
-            requestDisplayed();
+        if (!layers.contains(name))
+            return;
+        layer = name;
+        layerChosen = true;
+        group = LayerCatalog.group(name);
+        if (index >= 0 && frames.get(index).layerIndex(name) < 0) {
+            int best = -1;
+            for (int i = 0; i < frames.size(); i++)
+                if (frames.get(i).layerIndex(name) >= 0 && (best < 0 || Math.abs(i - index) < Math.abs(best - index)))
+                    best = i;
+            if (best >= 0) {
+                playing = false;
+                scrubTo(best);
+                return;
+            }
         }
+        requestDisplayed();
+    }
+
+    /** True when the displayed frame carries layer {@code name} (the page dims the others). */
+    public boolean currentHas(String name) {
+        return index >= 0 && frames.get(index).layerIndex(name) >= 0;
+    }
+
+    /** The layer groups seen so far ({@link LayerCatalog#groups}). */
+    public List<String> groups() {
+        return LayerCatalog.groups(layers);
+    }
+
+    /** The group the layer list shows: the one picked, else the current layer's. */
+    public String group() {
+        if (group != null && groups().contains(group))
+            return group;
+        return layer == null ? "" : LayerCatalog.group(layer);
+    }
+
+    /** Shows another group in the layer list (the displayed layer does not change). */
+    public void selectGroup(String g) {
+        if (groups().contains(g))
+            group = g;
+    }
+
+    /** The next group after the shown one (wrapping), for the page's group button. */
+    public void cycleGroup(int delta) {
+        List<String> gs = groups();
+        if (gs.isEmpty())
+            return;
+        int i = Math.max(0, gs.indexOf(group()));
+        group = gs.get(Math.floorMod(i + delta, gs.size()));
+    }
+
+    /** The layers of the shown group, in first-seen order. */
+    public List<String> groupLayers() {
+        return LayerCatalog.inGroup(layers, group());
     }
 
     /** The layer shown for frame {@code f}: the chosen one, or the frame's first when it lacks it. */
@@ -406,15 +475,44 @@ public final class TimelapseModel {
         return e.tStart() > previousTime();
     }
 
-    /** Point events up to the cursor (the map's markers). */
+    /**
+     * The time the map's markers are drawn at: the displayed frame's, or while following a live run
+     * the newest of that frame and the newest event (events arrive between frames).
+     */
+    double markerTime() {
+        if (index < 0)
+            return Double.NEGATIVE_INFINITY;
+        double t = frames.get(index).t();
+        if (following() && !events.isEmpty())
+            t = Math.max(t, events.get(events.size() - 1).tStart());
+        return t;
+    }
+
+    /**
+     * The map's markers: point events that began by {@link #markerTime()} and ended at most
+     * {@link #MARKER_FADE_YEARS} before it, at most {@link #MAX_MARKERS} of them (the newest), oldest
+     * first (fresh ones are drawn last, on top).
+     */
     public List<GeoEvent> markers() {
-        double t = cursorTime();
+        double t = markerTime();
         List<GeoEvent> out = new ArrayList<>();
-        for (GeoEvent e : events)
-            if (e.hasPoint() && e.tStart() <= t)
+        // Events are sorted by start time: walk back from the newest that began by t.
+        for (int i = events.size() - 1; i >= 0 && out.size() < MAX_MARKERS; i--) {
+            GeoEvent e = events.get(i);
+            if (e.tStart() > t || !e.hasPoint())
+                continue;
+            double end = Math.min(Math.max(e.tEnd(), e.tStart()), t);
+            if (t - end <= MARKER_FADE_YEARS)
                 out.add(e);
+            else if (t - e.tStart() > MARKER_FADE_YEARS + MAX_EVENT_SPAN_YEARS)
+                break; // nothing older can still be within the window
+        }
+        Collections.reverse(out);
         return out;
     }
+
+    /** No event is assumed to last longer than this (the walk back in {@link #markers()} stops past it). */
+    static final double MAX_EVENT_SPAN_YEARS = 500e6;
 
     // ------------------------------------------------------------------------------------------
     // Progress text
@@ -438,7 +536,7 @@ public final class TimelapseModel {
         switch (state) {
             case RUNNING -> {
                 if (p.stageCount() == 0) {
-                    b.append("starting");
+                    b.append(run.waitingForPrevious() ? "waiting for the previous run to stop" : "starting");
                 } else if (p.state() == SimSession.Progress.RUNNING) {
                     b.append(stageName()).append(' ').append(Formats.percent(p.stagePermille()))
                             .append(" (").append(Formats.ma(p.simulatedTime())).append(')')
