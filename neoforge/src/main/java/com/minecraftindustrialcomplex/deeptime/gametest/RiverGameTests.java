@@ -479,8 +479,9 @@ public final class RiverGameTests {
     /**
      * Channels wide enough for a river biome ({@code biome_min_width}) are river biomes: the biome
      * source at their centre, at the water surface, carries {@code #minecraft:is_river} on the real
-     * planet's own biomes. Logged per sample; a floor, since vanilla's parameter list keeps rivers
-     * out of mid- and far-inland mountains (erosion E0–E1).
+     * planet's own biomes, or swamp where vanilla's valley slice is swamp (any biome of
+     * {@code #c:is_swamp}, so a pack's own swamp there counts). Logged per sample; a floor, since
+     * vanilla's parameter list keeps rivers out of mid- and far-inland mountains (erosion E0–E1).
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 600)
     public static void riverBiomes(GameTestHelper helper) {
@@ -505,10 +506,13 @@ public final class RiverGameTests {
             sampled++;
             // Vanilla's own valley slice (weirdness 0) is river except on the flattest, wettest ground
             // (erosion 6), where it is swamp or mangrove swamp: a planet whose wide rivers cross such
-            // lowland (seed 16: 21 of 37 samples) has swamp along them, as vanilla would.
+            // lowland (seed 16: 21 of 37 samples) has swamp along them, as vanilla would. A pack may
+            // put its own swamp in that slot (Biomes O' Plenty's wetland, under TerraBlender: 12 of 14
+            // samples on the planet of 2026-10-02), so any biome of the common tag #c:is_swamp counts.
             if (b.is(BiomeTags.IS_RIVER))
                 river++;
-            else if (b.is(net.minecraft.world.level.biome.Biomes.SWAMP) || b.is(net.minecraft.world.level.biome.Biomes.MANGROVE_SWAMP))
+            else if (b.is(net.neoforged.neoforge.common.Tags.Biomes.IS_SWAMP) || b.is(net.minecraft.world.level.biome.Biomes.SWAMP)
+                    || b.is(net.minecraft.world.level.biome.Biomes.MANGROVE_SWAMP))
                 swamp++;
             else if (seen.length() < 400)
                 seen.append(' ').append(b.getRegisteredName());
