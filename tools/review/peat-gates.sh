@@ -4,19 +4,27 @@
 # Cold wetland gates, run on the test VM as one detached script (a dropped laptop session loses only the wait):
 #   tools/remote/mac.sh -- tools/remote/detach.sh start peatgates tools/review/peat-gates.sh
 #   tools/remote/mac.sh --no-sync -- tools/remote/detach.sh wait peatgates
-# Gradle build + JUnit, ./gametest.sh on standalone, MIC and TerraBlender (with Biomes O' Plenty), then the TerraBlender
-# biome shares of the two finished planets (peat-runs.sh run after3 / before3).
+# cargo (fmt, clippy, test, deny), Gradle build + JUnit, ./gametest.sh on standalone, MIC and TerraBlender (with Biomes
+# O' Plenty), then the biome shares of the two finished planets (peat-runs.sh run after3 / before3) per profile.
 set -uo pipefail
 cd "$(dirname "$0")/../.."
+echo "=== cargo"
+cargo fmt --check 2>&1 | tail -n 5; echo FMT_DONE
+cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tail -n 5; echo CLIPPY_DONE
+cargo test --workspace 2>&1 | grep -E "^test result|FAILED|panicked|^error" | head -n 40; echo TEST_DONE
+cargo deny check licenses bans 2>&1 | tail -n 2; echo DENY_DONE
 echo "=== gradle"
-(cd neoforge && deeptime-admit run --kind gradle:build -- ./gradlew build test 2>&1 | grep -E "BUILD|FAILED|error:"; python3 ../tools/ci/junit-summary.py build/test-results/test)
+(cd neoforge && ./gradlew build test 2>&1 | grep -E "BUILD|FAILED|error:"; python3 ../tools/ci/junit-summary.py build/test-results/test)
 for flag in "" "-PwithMic" "-PwithTerraBlender"; do
     echo "=== gametest $flag"
     [ "$flag" = "-PwithMic" ] && tools/smoke/install.sh mic > /dev/null 2>&1
     ./gametest.sh $flag 2>&1 | grep -E "passed|failed|FAILED|required|BUILD|climateConsistent|cold_wetland" | tail -n 25
 done
-for name in after3 before3; do
-    echo "=== terrablender $name"
-    tools/review/peat-biomes.sh terrablender "$name" 2>&1 | grep -v "^admit" | tail -n 90
+for prof in standalone mic terrablender; do
+    for name in after3 before3; do
+        [ "$name" = before3 ] && [ "$prof" != terrablender ] && continue
+        echo "=== $prof $name"
+        tools/review/peat-biomes.sh "$prof" "$name" 2>&1 | grep -v "^admit" | tail -n 90
+    done
 done
 echo PEATGATES_DONE
