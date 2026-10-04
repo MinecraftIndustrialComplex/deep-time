@@ -902,10 +902,11 @@ impl DepositStage {
             if self.state.acc[i].is_empty() {
                 continue;
             }
-            let data: Vec<f32> = self.state.acc[i]
-                .iter()
-                .map(|a| a.favourability() as f32)
-                .collect();
+            // Cell by cell, so in parallel (P1-17).
+            let acc = &self.state.acc[i];
+            let data: Vec<f32> = ctx
+                .pool
+                .install(|| acc.par_iter().map(|a| a.favourability() as f32).collect());
             world.fields.insert(
                 format!("deposits/favourability/{}", t.short()),
                 Field {
