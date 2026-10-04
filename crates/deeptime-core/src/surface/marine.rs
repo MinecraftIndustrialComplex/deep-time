@@ -283,7 +283,10 @@ pub fn slope_failure(
                 {
                     let hh: &[f64] = h;
                     let av: &[f64] = avail;
-                    let v: Vec<f64> = shares.par_iter().map(|&c| share(c as usize, hh, av)).collect();
+                    let v: Vec<f64> = shares
+                        .par_iter()
+                        .map(|&c| share(c as usize, hh, av))
+                        .collect();
                     for (&c, x) in shares.iter().zip(v) {
                         scale[c as usize] = x;
                     }
@@ -291,7 +294,10 @@ pub fn slope_failure(
                 let dz: Vec<f64> = {
                     let hh: &[f64] = h;
                     let sc: &[f64] = &scale;
-                    changes.par_iter().map(|&c| change(c as usize, hh, sc)).collect()
+                    changes
+                        .par_iter()
+                        .map(|&c| change(c as usize, hh, sc))
+                        .collect()
                 };
                 for (&c, dz) in changes.iter().zip(dz) {
                     if dz != 0.0 {

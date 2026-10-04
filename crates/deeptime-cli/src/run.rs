@@ -1431,11 +1431,12 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
     let preset = load_preset_with(&o.preset, o.start.as_deref(), o.length_myr)?;
     // What the editor shows a player before the run (plan §5.7.5): the gate compares the
     // measured peak with it (P1-17).
-    let estimate: Value =
-        serde_json::from_str(&deeptime_core::session::estimate_for(&preset, "", o.mem_cap)?)?;
-    let estimate_seconds: f64 = estimate["stages"]
-        .as_array()
-        .map_or(0.0, |a| a.iter().filter_map(|s| s["seconds"].as_f64()).sum());
+    let estimate: Value = serde_json::from_str(&deeptime_core::session::estimate_for(
+        &preset, "", o.mem_cap,
+    )?)?;
+    let estimate_seconds: f64 = estimate["stages"].as_array().map_or(0.0, |a| {
+        a.iter().filter_map(|s| s["seconds"].as_f64()).sum()
+    });
     println!(
         "deeptime bench: estimate peak_bytes={} seconds={estimate_seconds:.0} stages={}",
         estimate["peak_bytes"],

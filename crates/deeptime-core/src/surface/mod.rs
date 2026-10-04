@@ -894,13 +894,16 @@ impl SurfaceStage {
                     &mut sc.ice,
                 );
                 let (kf, cover) = (&sc.kf, &sc.ice.cover);
-                sc.kf_eff.par_iter_mut().enumerate().for_each(|(c, kf_eff)| {
-                    // The glacier's share of the cell, or the climate's thick ice.
-                    let thick = climate_ice.as_ref().map_or(0.0, |v| {
-                        crate::climate::ebm::smoothstep(10.0, 100.0, f64::from(v[c]))
+                sc.kf_eff
+                    .par_iter_mut()
+                    .enumerate()
+                    .for_each(|(c, kf_eff)| {
+                        // The glacier's share of the cell, or the climate's thick ice.
+                        let thick = climate_ice.as_ref().map_or(0.0, |v| {
+                            crate::climate::ebm::smoothstep(10.0, 100.0, f64::from(v[c]))
+                        });
+                        *kf_eff = kf[c] * (1.0 - cover[c].max(thick)).max(0.0);
                     });
-                    *kf_eff = kf[c] * (1.0 - cover[c].max(thick)).max(0.0);
-                });
                 self.time("glacial", started);
             } else {
                 sc.kf_eff.copy_from_slice(&sc.kf);
@@ -1134,7 +1137,11 @@ impl SurfaceStage {
                 });
             }
             let before = sc.h.clone();
+            let solve = Instant::now();
             cg_iterations += diffusion::step(&d, &mut sc.h, &sc.kd, dts) as u64;
+            // The solve's own share of "diffusion" (P1-17's breakdown).
+            self.time("diffusion_solve", solve);
+            let failing = Instant::now();
             if let Some(fp) = &failure {
                 let sea_mask: Vec<bool> = sc.kind.par_iter().map(|&k| k == BASE).collect();
                 let h = &sc.h;
@@ -1145,6 +1152,7 @@ impl SurfaceStage {
                 failed_m_cells +=
                     marine::slope_failure(&d, &sea_mask, sea, fp, &mut sc.h, &mut avail);
             }
+            self.time("slope_failure", failing);
             {
                 let (h, kind) = (&sc.h, &sc.kind);
                 parts
