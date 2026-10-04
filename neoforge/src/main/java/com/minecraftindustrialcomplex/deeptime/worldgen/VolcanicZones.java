@@ -16,8 +16,8 @@ import java.util.Map;
  * the magma bodies ({@link Magma}); the biome a role puts there is the pack's business
  * ({@code climate.VolcanicBiomes}, the tags {@code #deeptime:volcanic/<role>}).
  *
- * <p>Every zone is a disc in blocks, at least {@link #MIN_RADIUS} across in radius (three of the
- * biome grid's 4-block cells), so a role never makes a speck of one or two biome cells; a ring (the
+ * <p>Every zone is a disc in blocks, at least {@link #MIN_RADIUS} in radius (two of the biome
+ * grid's 4-block cells), so a role never makes a speck of one or two biome cells; a ring (the
  * ash and lava fields round a cone) is a disc of lower priority than the cone's, and is left out when
  * it would be narrower than {@link #MIN_RING}. Where discs overlap, {@link Role}'s order decides.
  * Every number here is a game choice (ledger BIO-104 to BIO-113).
@@ -62,8 +62,8 @@ public final class VolcanicZones {
         }
     }
 
-    /** The smallest radius of any zone, blocks: three biome cells, so blending leaves no speck. */
-    public static final int MIN_RADIUS = 12; // ledger: BIO-105 (game-choice)
+    /** The smallest radius of any zone, blocks: two biome cells, so blending leaves no speck. */
+    public static final int MIN_RADIUS = 8; // ledger: BIO-105 (game-choice)
     /** A ring narrower than this beyond the zone inside it is left out, blocks. */
     public static final int MIN_RING = 8; // ledger: BIO-105 (game-choice)
     /** The cone zone: summit and upper flanks, as a share of the basal radius (times the reach setting). */

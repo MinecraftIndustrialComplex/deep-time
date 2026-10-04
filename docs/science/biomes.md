@@ -188,8 +188,10 @@ game choices but the vanilla depth band of BIO-112):
 - **Kept out.** Every biome in the tag `#deeptime:volcanic` is taken out of the climate search of a Deep Time
   level. The search still runs on the pack's own search tree (the region's, with TerraBlender), with every
   volcanic leaf set infinitely far, so the place gets the next-nearest biome of the same tree: the pack's own
-  second choice for that climate point. Nothing is filled with a fixed biome, so no hole opens in another
-  mod's placement (measured below).
+  second choice for that climate point. Nothing is filled with a fixed biome. One hole did open: Biomes O'
+  Plenty puts its volcanic plains in vanilla's mushroom-fields slot (land surrounded by deep sea), and the
+  next-nearest biome of its region there is the lukewarm ocean; with TerraBlender such a slot takes the
+  vanilla region's biome instead (measured below).
 - **Put in.** Zones are discs around the active volcanoes of the baked list, their craters and calderas,
   their hot-spring pools and their magma (FORMAT.md, "Volcanic biomes"). In priority order:
 
@@ -208,7 +210,7 @@ game choices but the vanilla depth band of BIO-112):
   lies inside that biome's own temperature and humidity ranges in the pack's parameter list (Terralith puts
   ashen savanna on the warm band at dry to middling humidity), so the rule follows whatever biome a pack
   lists. A role without a biome in the pack, or not allowed at the spot, gives way to the next role whose
-  disc holds the place and in the end to the climate search. Every disc is at least 12 blocks in radius, three
+  disc holds the place and in the end to the climate search. Every disc is at least 8 blocks in radius, two
   biome cells, and a field ring narrower than 8 blocks is dropped, so the edges blend into areas, not specks.
   The setting `volcanic_biome_reach` (1, 0 to 3) scales the cone and the fields; 0 places none.
 - **Datapacks.** Both lists are tags: a pack adds a biome to a role tag (and it is kept out elsewhere too) or
