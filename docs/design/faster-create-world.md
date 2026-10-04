@@ -30,7 +30,7 @@ The player's PC is a cgroup scope on the test VM (`tools/review/p1-24-profile.sh
   (`cpu.pressure`) and the VM's load.
 - **The box is shared.** The VM (AMD EPYC, D32as_v7) ran other agents' jobs beside these, at a load of
   24 to 39 on 32 threads. The pinned CPUs keep that out of the run mostly: the threads waited
-  {{WAIT}} s for a CPU in a ~350 s run. Memory bandwidth and caches are still shared, so these
+  9 to 30 s for a CPU in a ~350 s run. Memory bandwidth and caches are still shared, so these
   times are a little pessimistic.
 - **A desktop is faster per core.** A current desktop core (e.g. a Ryzen 5 7600 or Core i5-13400 at
   4.6 to 5.1 GHz) is roughly 1.2 to 1.4 times the VM's per-core speed (inferred, from the clock
@@ -49,7 +49,53 @@ tools/remote/detach.sh start p124-bg --kind sim:earthlike_quick_16k:2t \
 tools/review/p1-24-views.sh <runs> <out> base=t-mid6-quick-scattered_continents-500 l1r32=a-l1r32 ...
 ```
 
-{{TIMING}}
+### 1.2 Results
+
+**Measured** (`python3 tools/review/p1-24-summary.py /Volumes/Graphide/ban/deeptime-runs/p1-24`;
+seconds are wall time on the pinned CPUs; "coupled" is the one stage in which plates, climate,
+surface, volcanoes, impacts and structure step together, split by the run's own timers; the bake
+includes writing the folder):
+
+| Preset, start, length | Profile | Total | Coupled (plates / climate / surface / volcanoes / structure) | Deposits | Young + amplify | Bake | Peak memory | Folder |
+|---|---|---|---|---|---|---|---|---|
+| quick, scattered, 500 Myr | mid6 | **349 s** (5.8 min); again 372 s | 285 s (41 / 80 / 119 / 15 / 29) | 18 s | 6 + 23 s | 16 s | 4.2–4.4 GiB | 130 MB |
+| quick, supercontinent, 500 Myr | mid6 | **356 s** | 298 s (47 / 84 / 122 / 15 / 29) | 16 s | 5 + 21 s | 15 s | 4.6 GiB | 134 MB |
+| quick, scattered, 1000 Myr | mid6 | **608 s** (10.1 min) | 546 s (91 / 132 / 240 / 32 / 50) | 23 s | 5 + 18 s | 15 s | 5.5 GiB | 196 MB |
+| quick, supercontinent, 1000 Myr | mid6 | **609 s** | 545 s (89 / 135 / 239 / 31 / 50) | 24 s | 5 + 19 s | 16 s | 5.0 GiB | 190 MB |
+| quick, scattered, 500 Myr | low4 | **418 s** (7.0 min) | 331 s (50 / 88 / 140 / 15 / 38) | 25 s | 7 + 32 s | 23 s | 3.9 GiB | 130 MB |
+| quick, scattered, 500 Myr | bg2 | **812 s** (13.5 min) | 630 s (108 / 141 / 296 / 17 / 68) | 45 s | 11 + 64 s | 63 s | 3.7 GiB | 130 MB |
+| full, scattered, 500 Myr | mid6 (6 GiB) | **killed** after 494 s: out of memory in the coupled stage | | | | | > 6 GiB | |
+| full, supercontinent, 500 Myr | mid6 (6 GiB) | **killed** after 924 s: out of memory in the coupled stage | | | | | > 6 GiB | |
+| full, scattered, 500 Myr | mid6 on 16 GiB | **1,236 s** (20.6 min) | 1,063 s (179 / 174 / 545 / 60 / 104) | 70 s | 25 + 31 s | 45 s | **8.9 GiB** | 204 MB |
+{{FULL_ROWS}}
+
+Peak memory is the run's peak resident set. Sampled every 2 s, the quick 500-Myr run peaks at
+2.4 GiB in the coupled stage, 2.5 GiB in deposits and **4.2 GiB in young + amplify + bake** (the
+amplifier holds the whole 8192 × 2624 terrain level); the full run at 7.6 GiB in the coupled stage
+and 8.8 GiB at the end.
+
+### 1.3 Findings
+
+1. **A quick planet takes about 6 minutes for 500 Myr and 10 minutes for 1,000 Myr** on a 6-core PC
+   (the coupled stage costs ~0.55 s per Myr; deposits, young, amplify and bake add a fixed ~65 s).
+   On a fast current desktop, divide by 1.2–1.4 (inferred): about 4–5 and 7–8 minutes. The two starts
+   cost the same.
+2. **The full preset does not fit a 16 GB PC.** It needs 8.9 GiB resident at 500 Myr and was killed
+   twice on the 6 GiB profile. On a real PC without a cgroup the OS would swap or kill the game. It
+   takes 20 minutes on 6 cores when it fits.
+3. **The memory cap does not hold the run.** Both presets run with the client's 4 GiB cap and the
+   run's own accounting keeps under it: quick reports "982 MiB in use of the 4096 MiB cap" after the
+   coupled stage (reserved peak 2.9 GiB); full reports 2,645 MiB after the coupled stage and 3,586
+   MiB at its fullest, and even spilled history frames to disk to stay under the cap. The process
+   meanwhile held 4.2 GiB (quick) and 7.6 GiB in the coupled stage, 8.9 GiB at the end (full). The
+   accounting misses about 1.5 GiB on quick and about 5 GiB on full, so the editor's estimate, its
+   "over the cap" refusal and its low-memory warning all under-count. This is a defect whichever
+   option is chosen (question 3).
+4. **Cores help less than expected.** 2 → 4 → 6 cores: 812 → 418 → 349 s. Past 4 cores the run gains
+   1.2× for 1.5× the cores; about 5.4 of its 11 threads are busy on average (535 % CPU). A
+   12-core PC would gain little over 6 (inferred).
+5. **The box was shared.** The runs' threads waited 9–30 s for a CPU (cgroup `cpu.pressure`) and the
+   two runs of the same planet differ by 7 % (349 and 372 s).
 
 ## 2. Option (a): a faster quick mode
 

@@ -17,6 +17,7 @@
 #          profile's 6 GiB (it was killed by the kernel's OOM killer in the coupled stage). Pinned
 #          to CPUs 12-23 (P124_CPUS) so it can run beside the timing matrix on 0-11.
 # bg:      the background profile (bg2: 2 threads at nice 19 on 2 cores), quick preset, on CPUs 24-27.
+# views:   tools/review/p1-24-views.sh, p1-24-page.py and p1-24-summary.py into review/out/p1-24.
 # A run whose result.json exists is skipped, so the matrix resumes after a stop.
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -62,5 +63,15 @@ fi
 if [ "$what" = bg ]; then
     export P124_CPUS=${P124_CPUS:-24-27}
     one b-bg2-quick-$SC-500 bg2 $Q $SC 500
+fi
+if [ "$what" = views ]; then   # the quality pictures, the review page and the summary into review/out/p1-24
+    o="$REPO/review/out/p1-24"
+    "$REPO/tools/review/p1-24-views.sh" "$runs" "$o" base=t-mid6-quick-$SC-500 l1r32=a-l1r32 l0-50k=a-l0-50k \
+        step4=a-step4 kf100=a-kf100 len250=a-len250 express=a-express
+    python3 "$REPO/tools/review/p1-24-page.py" "$runs" "$o" base=t-mid6-quick-$SC-500:"today's quick preset" \
+        l1r32=a-l1r32:"L1 grid 4x coarser (resolution.l1_r 32)" l0-50k=a-l0-50k:"half the plate samples (resolution.l0_samples 50000)" \
+        step4=a-step4:"4-Myr steps, climate every 20 Myr" kf100=a-kf100:"a keyframe every 100 Myr" \
+        len250=a-len250:"250 Myr instead of 500" express=a-express:"all of l1r32, l0-50k, step4, kf100"
+    python3 "$REPO/tools/review/p1-24-summary.py" "$runs" > "$o/summary.md"
 fi
 echo "matrix done $(date -u +%H:%M:%S)"
