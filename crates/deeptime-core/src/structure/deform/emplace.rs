@@ -840,7 +840,8 @@ pub(crate) mod tests {
         let sp = StructureParams::default();
         let w = p.grid.w as usize;
         // An arc along column 120 and its foreland east of it (4.8 km a cell).
-        for j in 30..226 {
+        let rows = p.grid.h as usize;
+        for j in 30..rows {
             for i in 100..140 {
                 p.arc_km[j * w + i] = (i as f32 - 120.0).abs() * 4.8;
             }
@@ -852,7 +853,7 @@ pub(crate) mod tests {
         assert!(near.shortening > far.shortening && far.shortening > 0.0, "{near:?} {far:?}");
         assert!(near.shortening < 0.6, "{near:?}");
         // The collision regime's own orogen distance (the old rule's input) no longer makes one.
-        for j in 30..226 {
+        for j in 30..rows {
             for i in 64..100 {
                 p.collision[j * w + i] = 0.0;
                 p.flags[j * w + i] = 0.0;

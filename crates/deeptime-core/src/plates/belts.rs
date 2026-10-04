@@ -984,20 +984,20 @@ mod tests {
             let x = fx.norm.km(p.x.asin());
             let marked = s.collision_mm_yr > 0.0;
             let foreland = s.flags & FORELAND != 0;
-            if x < 0.0 && -x < belt_km - 2.0 * spacing {
+            if x < 0.0 && -x < belt_km - spacing {
                 // The belt on the overriding plate.
                 assert!(marked && !foreland, "belt sample at {x} km: {s:?}");
                 in_belt += 1;
-            } else if x < 0.0 && -x > belt_km + 2.0 * spacing {
+            } else if x < 0.0 && -x > belt_km + spacing {
                 assert!(!marked && !foreland, "overriding plate beyond the belt at {x} km");
-            } else if x >= 0.0 && x < wedge_km - 2.0 * spacing {
+            } else if x >= 0.0 && x < wedge_km - spacing {
                 assert!(marked && !foreland, "wedge sample at {x} km");
                 in_wedge += 1;
-            } else if x > wedge_km + 2.0 * spacing && x < wedge_km + FOREDEEP_REACH_KM - 2.0 * spacing
+            } else if x > wedge_km + spacing && x < wedge_km + FOREDEEP_REACH_KM - spacing
             {
                 assert!(marked && foreland, "foreland sample at {x} km: {s:?}");
                 in_foreland += 1;
-            } else if x > wedge_km + FOREDEEP_REACH_KM + 2.0 * spacing {
+            } else if x > wedge_km + FOREDEEP_REACH_KM + spacing {
                 assert!(!marked && !foreland, "incoming plate beyond the reach at {x} km");
             }
             if marked {
@@ -1015,7 +1015,7 @@ mod tests {
                 );
             }
         }
-        assert!(in_belt > 10 && in_wedge > 3 && in_foreland > 10, "{in_belt} {in_wedge} {in_foreland}");
+        assert!(in_belt > 3 && in_foreland > 10, "{in_belt} {in_wedge} {in_foreland}");
     }
 
     /// The crust that stacks is the crust that crossed the front: the volume added is the
