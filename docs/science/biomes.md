@@ -401,12 +401,18 @@ the table all 43 rasters are byte-identical to master's), `/deeptime probe biome
 
 Terralith's names; "plains", "forest", "jungle" and the like are vanilla's. The census's checks for the table (BIO-154):
 Am on jungles 0.858, Cs on shrubland and steppe 0.794, BSk on steppe and dry shrublands 0.860 and on the steppe
-itself 0.436, ET on snowy plains 0.048. The geology gate on the same world: without it, 2,888 sampled land columns
-carried a rock-named biome and 1,654 of them stood off their ground (Shield on orogens and platforms, Granite and
-White Cliffs on andesite and mudstone coasts, Stony Spires off carbonate); with it none does, and 1,321
-remain (White Mesa 941, Shield 271, all on shield provinces, Painted Mountains 108). The ground on that planet: 8,891
-shield columns, 7 granite, 57 carbonate coast, 6 granite coast, 853 basalt coast, 27,885 dry sedimentary, 280 humid
-karst. Vanilla on the same world: no pack table chosen, the gate inactive, 0 columns changed.
+itself 0.436, ET on snowy plains 0.048. The geology gate (as the rule file `deeptime:rock_named`, measured
+2026-10-04 after the merge with the biome rules), the census's plain search (no gate, no volcanic layer) against the
+level's: on the world without the table 2,888 sampled land columns carried a rock-named biome and 1,654 of them
+stood off their ground (Shield on orogens and platforms, Granite and White Cliffs on andesite and mudstone coasts,
+Stony Spires off carbonate); with the gate none does, and 1,234 remain (White Mesa 941, Shield 189, Painted
+Mountains 103, Sandstone Valley 1; every one placed by its rule), no land column turned to water. On the world with
+the table: 2,162 and 1,117 off their ground (Yosemite Cliffs 202 off granite among them) → 1,045, 0 off (White Mesa
+941, Painted Mountains 103, Sandstone Valley 1); Shield's own slot covers only 3 columns there, all off shield
+ground, so it has none. (The gate's first version, a metric of its own, let a rock-named biome come in as the
+second choice where another was kept out, which gave that world 271 Shield columns; as a rule file each keeps to its
+own slot.) The ground on that planet: 8,891 shield columns, 7 granite, 57 carbonate coast, 6 granite coast, 853
+basalt coast, 27,885 dry sedimentary, 280 humid karst. Vanilla on the same world: no pack table chosen, the gate inactive, 0 columns changed.
 
 ## Simplifications and limits
 
