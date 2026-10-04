@@ -24,7 +24,7 @@
 # the checkout, installs the ev-client set if the Mac has none (tools/smoke/install.sh ev-client) and
 # runs `./gradlew -PrunSet=ev-client classes gametestClasses createClientLaunchScript
 # linkRunModsClient`; (2) graphide's m6lock.sh is copied to the Mac; (3) `mac.sh --no-sync --server`
-# runs tools/client/ev-assets-mac.sh there, under Deep Time's server lock (memory: fixed ports, 16 GB
+# runs tools/client/ev-assets-mac.sh there, as a server job of the VM's admission tool (memory: 16 GB
 # shared), which takes graphide's `drive` lease, renews it while the client runs, starts the client
 # in ban's desktop session (sudo -n launchctl asuser, the window server macOS gives no process
 # started from sshd) and kills only its own client on any failure (tools/client/mac-client-lib.sh);

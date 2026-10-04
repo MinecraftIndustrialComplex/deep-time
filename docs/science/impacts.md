@@ -94,7 +94,10 @@ The impact stage runs once per plate step, after the volcano stage.
 7. **Into the world.** A crater at least two coarse grid cells across (9.6 km on the default
    planet) is cut into the terrain the deep-time simulation erodes, and its breccia and melt are
    written into the rock record. A smaller one is drawn only at block scale, with its breccia as a
-   separate body (IMP-132, IMP-093, IMP-094). A new crater destroys smaller ones inside it (IMP-060).
+   separate body (IMP-132, IMP-093, IMP-094), which the bake seats under the floor the game
+   draws at the crater's centre (the amplifier changes the ground after the impact stage placed
+   the body; the first placement from the deep-time surface was off by up to nine blocks). A new
+   crater destroys smaller ones inside it (IMP-060).
 8. **Ageing.** Each later step, the crater turns with its plate. Sediment laid inside the rim adds
    to its cover; erosion strips the cover and then wears the crater (IMP-078). Soil creep is
    modelled as a blur that widens with time: the profile is smoothed by a width of √(12 κ t), with

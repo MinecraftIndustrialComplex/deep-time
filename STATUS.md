@@ -88,6 +88,10 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | Date | Task | Question | Asked how |
 |---|---|---|---|
 | 2026-10-03 | P1-26 | **The climate grid's rows on Lambert's map.** The per-cell climate's coarse grid is built from k × k blocks of L1 cells, so on the equal-area map its rows are uniform in sin φ: tall at high latitude (on Earth's relief the polar row spans 73–90°). Since master's projection merged, Yakutsk's January warmed from −37.7 to −29 °C, the winter spread fell from 4.98 to 4.5 K, and the zonal clock's correction fits 2–3 K worse at the poles. Options: (a) give the climate grid rows of equal latitude, each a run of L1 rows (a change to `coarse.rs` and the masked bilinear, about a day; recommended); (b) more rows (a finer grid, × 2 cost); (c) keep. | Not asked yet: for the coordinator to put to Ben |
+| 2026-10-04 | VM admission | **GameTests on branches again?** The rule "GameTests run once per merge batch" (Ben, 2026-09-30) came from the M6's single server slot, with ~7 agents queueing two runs each. With load-based admission the VM ran two GameTest sets, a preview and two simulations side by side (build log 2026-10-03/04). (a, recommended) Agents run `./gametest.sh` and `./gametest.sh -PwithMic` on their branch before reporting, as part of their gates; the coordinator still runs both once after a batch merge. (b) Keep the batch rule. | For the coordinator to put to Ben |
+| 2026-10-04 | VM admission | **The +25 % on memory.** Ben's "available + 25%" is applied to memory as to CPU: a job may start when its peak-memory estimate is up to 1.25 × the free memory left after the 15 GiB headroom, so the headroom absorbs the overshoot if every job peaks at once. (a, recommended) Keep it so. (b) No margin on memory (an overshoot there is an out-of-memory kill, not a slowdown): `OVERCOMMIT` would then apply to cores only. | For the coordinator to put to Ben |
+| 2026-10-04 | VM admission | **`deeptime run --threads N` bakes on all cores.** The simulation keeps to N threads, the bake runs on Rayon's global pool: 2-thread runs peak at 12–19 cores for about half a minute (mean 1.8). (a, recommended) Run the bake in the session's pool so `--threads` holds throughout (a small follow-up task). (b) Leave it; admission reserves the mean. | For the coordinator |
+| 2026-10-03 | Seamless-wrapping prototype | **Quincuncial world, four choices** (docs/design/seamless-wrapping.md §9): (1) aspect: Guyou, equator straight, 2:1 (recommended) or Peirce, pole-centred square; (2) an equal-area relative in the same layout, Petroff 2021 (recommended) or Peirce's conformal map; (3) seams by Immersive Portals for a first version (recommended) or Deep Time's own wrap engine; (4) project only the world at the bake, simulation unchanged (recommended). | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | 35 m vertical scale | **Plutons with a floor.** `strata-check` on the 35 m bakes finds plutonic rock with other rock under it in 16 to 17 % of land columns (0.1 % at 20 m) and 5.4 to 5.8 % of the stored stacks (0 at 20 m): the world now reaches 14.5 km below the sea, under the floors of the stored plutonic layers. The rule is measured, not asserted (structure/realism.rs rule 3); a question for the rock/pluton work, not changed here. (a, recommended) Let the column builder carry plutonic rock to the world's floor where a pluton's layer is the lowest stored one (a follow-up task). (b) Accept floored plutons (real plutons have floors). | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-03 | margins and spires | **The margins' remaining step** (build log 2026-10-03, "Margins and spires"; pictures `review/out/margins-spires/index.html`, not committed). Submarine slope failure brought the baked margins from 9.5–10° to 4.2–5.9° between the 500 and 2,000 m isobaths (Earth 2.1°) and narrowed the shelves by about a third (shelf-hosted deposits fell with them). What is left is the plate model's crystalline ocean–continent step, one sample wide and drawn 8.1× narrower than on Earth, which nothing relaxes. (a, recommended) keep the failure at 2.5° and give the plate model an ocean–continent transition of Earth width in map metres (a `plates/` task after the plate work; it also gives back shelf room); (b) let the failure move crust too (5° at L1, but the shelves go: share of the sea under 200 m 0.05 → 0.017); (c) keep loads on old sea floor (the dampening at the age's rate) and recalibrate the sediment budget so the oceans do not fill; (d) leave the margins at about twice Earth's slope. | For the coordinator to put to Ben |
 | 2026-10-02 | P3-04 TW guard | **`/dh pregen` stalls on a square that crosses the seam** (build log 2026-10-02, "far terrain through Toroidal World's guard"). DH's PregenManager files each pending section under its raw position and clears it under the position the retrieval answers with; Toroidal World folds that position into the lap, so a section past the seam is never cleared and the pregen stops (seen twice: section 6*128 folded to 6*-128, no progress for 15 min; the video agent saw it stop at radius 75–76 chunks; 2026-10-03 on the dh set: a square from x = C/2 − 832 stopped at 53 % after 136 sections and did not move in 200 s, DH's two-minute expiry of a pending section never fires because nothing touches its cache, while a square ending at the seam finished all 257 in under 10 s; a square centred on x = C/2 never starts, Toroidal World's command coordinates reject 8192 as outside the world). It does not depend on Deep Time's generator (read in DH's PregenManager and TW's fold; the folded section is generated and stored, and matches far terrain); players' clients do not use /dh pregen. (a) Report it to Toroidal World's author; harnesses pregenerate squares that stay inside the lap (recommended, done in run.py); (b) a Deep Time mixin into DH's PregenManager clearing the raw key too; (c) leave it. | Not asked yet (sub-agent report) |
@@ -205,6 +209,132 @@ Ben's answer of 2026-10-02, "Merge with ice sheets off (Recommended)". On branch
   - **Neither failure is the ice switch or the climate code.** Both tests pass on the same tree with `DEEPTIME_TEST_PLANET_SET` set to master's carbon cycle (`climate.weathering_supply=false climate.seafloor_weathering_share=0 climate.carbon_step_kyr=100 climate.present_climate=natural`, which reproduces master's planet), and with the branch's defaults on `seed=12` (`-PgametestOnly=aCraterIsABowlOverBreccia,riversHold`). The tests promise to pass on any planet (gametest.sh), so this planet exposes two latent defects, in the impact lens placement and in the lake shores. See the pending question "GameTests on the merged ice branch".
 - **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/ice-merge/` was deleted each time, after the numbers were copied here.
 - **Next.** P1-26 per-cell climate (design approved, `docs/design/p1-26-per-cell-climate.md`, tasks T1–T11) can start on top of this branch: `sheet::Grid`, `kernel_of` with the supply limit, the clock's `Input`, schema 10. Turning `ice_dynamics` on is part of P1-26's calibration, once the cold bias is fixed. Landing the branch on master waits on the two GameTest failures above (pending question "GameTests on the merged ice branch"); P1-26's climate work does not touch either and can start on the branch now. Head after this entry: see the report.
+### 2026-10-03/04 — Load-based admission on the test VM replaces the M6-era caps (Ben's "No set slots ... Guess load, run if load is less than what is available + 25%"; agent worktree agent-a2e1d18f0b1a34569, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; installed on the VM, not merged)
+- **What it replaces.** The one-server lock (`deeptime-cache/server.lock`, `mac.sh --server`, preview.py,
+  detached-server.sh, mic-climate.sh), "two simulations per agent, four of 2 threads on the box", and
+  mac.sh's `CARGO_BUILD_JOBS=8` / `RAYON_NUM_THREADS=6` defaults. CLAUDE.md now states the new rule.
+- **The tool.** `tools/remote/vm/admit.py` (stdlib Python; installed by `tools/remote/vm/install.sh` as
+  `/usr/local/lib/deeptime/admit.py`, `deeptime-admit` on PATH; tests `tools/remote/vm/test_admit.py`,
+  34 cases). `admit.py run --kind K [--server] -- cmd`: the kind's estimate (mean cores over a run,
+  peak resident GiB) comes from a seed table, then from the kind's measured runs (weighted 90th
+  percentile, each older run 0.85 of the next; the seed stays in the mix until three runs). The job
+  starts when the estimate fits in 1.25 × (free − reserved − headroom), for CPU and memory alike:
+  free cores = 32 − max(1-minute load, busy cores over the last 30 s from /proc/stat); free memory =
+  MemAvailable; reserved = what admitted jobs have not used yet (CPU until a job first reaches 80 %
+  of its estimate or for 3 minutes; memory for its whole life); headroom = 4 cores and 15 GiB for
+  the play server, a workbench run and ssh. Otherwise it waits in order, printing the reason; a smaller
+  job may pass a bigger one until the bigger one has waited 15 minutes, then nothing passes it.
+  Measurement: every 5 s the job's process tree, plus processes carrying its job id in their
+  environment, plus the Gradle daemon its Gradle client is connected to (found through the client's
+  TCP socket: a daemon runs one build at a time), minus nested admitted jobs; per-pid CPU deltas,
+  with a reaped child's CPU not counted twice through its parent's cutime (a bug found in the demo:
+  a 40-core peak on 32 cores; test `test_a_reaped_child_is_not_counted_twice` fails on the old code
+  with 5.89 cores for a 1-core job). State in `deeptime-cache/admit/` (state.json, history.json,
+  admit.log) under one flock; `deeptime-admit status` shows capacity, admitted, waiting with reasons,
+  and the estimates. Settings in /etc/default/deeptime-admit. Quick looks (cat, grep, git, ...) and
+  detached starts run at once; unrecognised commands are kinds of their own (`shell:<program>`) and
+  start at once once two measured runs show them short and small.
+- **Many servers at once.** A server job gets a slot: ports 26000 + 10·slot (game, RCON, query, voice
+  chat, spares), an X display (:200 + slot) and a folder `deeptime-cache/servers/<job>` removed when
+  it ends. `tools/smoke/instance.py` copies a server set into it (libraries/ linked, mods/ and the
+  rest copied; worlds and logs left out; ports written into server.properties and Simple Voice
+  Chat's config), under the set's shared lock; `tools/smoke/install.sh` takes the set's world lock,
+  then the set lock, exclusively. gametest.sh and run_planet.py run in `<job>/run-gametest|run-planet`
+  (`DEEPTIME_GAMETEST_DIR`, `DEEPTIME_PLANET_DIR` in build.gradle) with a copy of the set's jars
+  (`DEEPTIME_RUN_MODS`), and hold the checkout's Gradle launch lock until their JVM is up (Gradle
+  writes a run's argument files into the shared build folder just before it starts the JVM).
+  run.py and dh-client-check.sh keep the set's own world, linked in, under the set's world lock.
+  preview.py boots a copy of the set instead of editing the set's server.properties and config.
+  The play server (25765, voice 24464) and the workbench (8642) are outside the pool.
+- **Callers.** mac.sh admits every command (`--kind`, or classified: `cargo:test`, `gradle:build`,
+  `gametest:mic`, `sim:<preset>:<threads>t`, ...; `--server` only for scripts that boot Minecraft
+  without the launchers); gametest.sh, gametest-planet.sh, run.py, preview.py (so the workbench's
+  `/api/preview`), dh-client-check.sh admit themselves (a launcher inside an admitted server job takes
+  over that job's slot); `detach.sh start` admits the detached job; detached-server.sh and
+  mic-climate.sh use the tool instead of the lock. The idle watcher counts admitted and waiting jobs
+  as busy (seen in its state: "admitted job ... (agent-..., pid ...)").
+- **Rollout.** Installed on the VM from this branch (admit.py and the new idle watcher; the watcher
+  restarted, the workbench and play server untouched). Nothing on master calls the tool yet, so the
+  ~8 agents on the old scripts carry on with the lock; while `server.lock` exists the tool counts its
+  holder as one admitted server job (`server:legacy`, its estimate reserved for 3 minutes after it was
+  taken, its memory for 10). New servers never use the old fixed ports (25665/25675/25666/25676/24454),
+  so old and new servers do not collide. No process of another agent was touched.
+- **Demo** (the VM shared with other agents throughout; their load 18–43). Round 3, the measuring code
+  final, six jobs submitted at 00:11:47 UTC from one call (`detach.sh start` × 5, `preview.py submit`):
+
+  | Job | Kind | Waited | Estimate (cores, GiB) | Measured: cores mean / p90 / peak, GiB peak, wall | Result |
+  |---|---|---|---|---|---|
+  | `./gametest.sh` | gametest:standalone | 0 s | 4.0, 8.0 (seed) | 1.75 / 4.45 / 7.56, 7.70, 602 s | 70 of 71 (finding 2) |
+  | `./gametest.sh -PwithMic` | gametest:mic | 0 s | 4.0, 11.0 (seed) | 4.44 / 6.61 / 9.79, 8.86, 179 s | 71 of 71 |
+  | `preview.py submit --profile mic` | preview:mic | 6 s | 4.0, 10.0 (seed) | 4.09 / 5.19 / 8.99, 4.60, 70 s | exported |
+  | `deeptime run` quick 16k, 2 threads | sim:earthlike_quick_16k:2t | 0 s | 1.8, 3.5 (4 runs) | 1.73 / 1.92 / 13.82, 3.20, 647 s | baked |
+  | the same, scattered start | sim:earthlike_quick_16k:2t | 6 s | 1.8, 3.5 (4 runs) | 1.76 / 1.93 / 19.15, 3.16, 647 s | baked |
+  | `cargo test --workspace` | cargo:test | 501 s | 10.0, 12.0 (seed) | 8.52 / 20.63 / 23.93, 5.37, 279 s | 766 passed, 0 failed |
+
+  The first three got slots 0–2 (ports 26000, 26010, 26020; the MIC GameTest's voice chat 26013, its
+  468 MB jar copy in its own folder; the preview's server "Starting Minecraft server on *:26020").
+  sim 2 and the preview waited 6 s (free 9.3 cores at load 22.7, the GameTests' reservations still
+  held); `cargo test` waited "needs 10.0 cores, 0.0 free (+25% = 0.0)" while other agents drove the
+  load to 40–43, and started at 00:20:09 (free 12.5 cores). Rounds 1 and 2 (seed, then measured
+  estimates; before the double-count fix, so their peaks read high) ran the standalone and MIC
+  GameTests, a standalone then a MIC preview and two simulations, all admitted at once each time,
+  with the same results (MIC 71 of 71 twice, standalone 70 of 71 twice, previews done in 47 and 57 s).
+  The standalone set was also run the old way, in ./run-gametest outside the slot's folder: the same
+  one failure.
+- **Seed table** (cores mean, GiB peak): gametest standalone 4/8, mic 4/11; planet 3/8, mic 4/11;
+  smoke 3/8, mic 4/10; preview 3/8, mic 4/10; client:dh 6/15; server (other, legacy) 4/10; cargo:test
+  10/12, clippy 8/6, build 8/6, other 4/4; gradle:build 4/8; install 3/4; render 4/6; sim 0.9 × threads
+  (all cores: 16), 3 GiB quick or 4k, 5 default, 7 at 32k, 9 at 64k; unrecognised 1/1.
+- **Findings.** (1) `deeptime run --threads 2` keeps the simulation to 2 threads but bakes on Rayon's
+  global pool: its runs peak at 12–16 cores for about half a minute (mean 1.8). (2)
+  `farTerrainMatchesGeneratedChunksAcrossTheSeam` fails on the standalone GameTest set of master
+  7c14e4ab, deterministically (60 of 64 columns, worst (2002, −249) far −33 real −5), also when run
+  the old way in ./run-gametest; it passes in the MIC set. (3) `test_preview.py` has two failures on
+  master unrelated to this (a symlinked tmp path; the Lambert z of a box). (4) The play server
+  (deeptime-play) has been inactive since 19:59 UTC (it exited 0 after 29 s); not touched here.
+- **Next.** The coordinator merges this branch (mac.sh and the launchers then use the tool; the
+  installed tool is already the branch's), runs `tools/remote/vm/install.sh` from master once, and
+  sends the paste-in note below. When no agent is left on the old scripts, the `server:legacy`
+  shim can go.
+- **Gates.** `test_admit.py` 34 of 34 (Python 3.14 and the VM's 3.12); cargo test 766 passed, 0 failed,
+  3 ignored; fmt, clippy -D warnings and deny clean; `./gradlew build test` BUILD SUCCESSFUL, JUnit
+  265 tests, 0 failures, 2 skipped (build.gradle changed: the run folders and the jar snapshot).
+  GameTests: in the demo (MIC 71 of 71; standalone 70 of 71, the failure is master's).
+- **Estimates now** (history after the fix; a kind keeps its seed in the mix until three runs, so one
+  run below the seed leaves the seed): gametest:mic 4.4 cores 11.0 GiB, gametest:standalone 4.0/8.0,
+  preview:mic 4.1/10.0, cargo:test 10.0/12.0, cargo:clippy 8.0/6.0, gradle:build 4.0/8.0,
+  sim:earthlike_quick_16k:2t 1.8/3.5 (6 runs, measured only).
+- **Paste-in note for agent briefs** (replaces "at most two simulations at once" and "one server at a
+  time"): "Test VM jobs: there are no slots or counts any more (Ben, 2026-10-03). Every heavy job on the
+  VM goes through its admission tool, which starts it when its estimated load fits in the free CPU
+  and memory plus 25 % and otherwise makes it wait in order, printing why. tools/remote/mac.sh does
+  this for every command (quick looks such as cat and grep run at once); gametest.sh,
+  gametest-planet.sh, tools/smoke/run.py, tools/workbench/preview.py, tools/client/dh-client-check.sh
+  and `tools/remote/detach.sh start` do it themselves. Minecraft servers run side by side, each on its
+  own ports in its own copy of its server set: start what you need without waiting for anyone. If a
+  script of yours starts several heavy steps itself (a sweep of `deeptime run`s), wrap each:
+  `deeptime-admit run --kind sim:<preset>:<threads>t -- target/release/deeptime run ...` (`--kind auto`
+  classifies it). `mac.sh --server` is only for scripts that boot Minecraft without those launchers.
+  `tools/remote/mac.sh --no-sync -- deeptime-admit status` shows what runs, what waits and why. A wait
+  is the system working: never stop another agent's job to make room."
+
+### 2026-10-03 — Seamless wrapping: a quincuncial world joined by Immersive Portals, prototype (agent worktree agent-afec00aa80f7be0a6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; dev-only, not merged)
+- **What.** Ben's "prototype a pierce quincuil projection w/ 100% seamless wrappings ... with immersive portals" (log 2026-10-03), widened by the coordinator to compare Peirce and Guyou. New dev-only crate `crates/deeptime-quincuncial` (nothing depends on it): complex Jacobi functions and Carlson R_F, the Peirce square and its Guyou aspect as one map with the aspect as a parameter, the gluing table and Immersive Portals portals, a resampler of baked world data onto either layout, measurements (`deeptime-quincuncial stats|portals|place|resample`); 22 property tests. Prototype scripts `tools/proto/quincuncial/` (`proto.py`, `notw_jar.py`, `render.py`). Design doc `docs/design/seamless-wrapping.md`; science page `docs/science/quincuncial-projection.md`; ledger SCL-070 to SCL-077 (ids above 069 to stay clear of the Lambert branch); bibliography section "Quincuncial projections".
+- **Measured** (`deeptime-quincuncial stats`, b = 8192 / a = 11,585): same area spread for both aspects (blocks per planet area / mean: min 0.457, median 0.79, 99 % 4.6, ∞ at the four singular points); Peirce's singular points on the equator, Guyou's at ±45°; Guyou's equator a straight 16,384-block walk with one slide seam, Peirce's four legs through the singular points. Recommendation: Guyou.
+- **In game** (test VM, `proto.py` under `mac.sh --server`; NeoForge 21.1.249, Deep Time from this branch patched to boot without TW, Immersive Portals – CE 6.0.10 (Apache-2.0); world: earthlike_quick_16k scattered 500 Myr seed 1 resampled onto Guyou b = 8192, λc = 31°): terrain continuous at all four seams (outside = glued inside exactly at 192 points; across-seam step distributed as interior steps); 12 of 12 entities, 5 bridge walks, the pole walk (once cleared, below) and 2 land crossings landed on the glued point (0.00 blocks along the seam), half-turn seams turning the player 180°; the north-pole walk was blocked by uncleared blocks in the hidden outside and crossed once those were cleared (Immersive Portals collides with the raw world behind the plane). Fluids and redstone stop at seams.
+- **After merging master (Lambert, format 0.4).** The game run used master 9a95c917 (equirectangular data); the resampler reads a fresh Lambert bake of the merged tree unchanged (68 s), but the result shows radial streaks round both poles: Lambert's rows resolve the polar caps badly (0.5° of latitude per L3 row at 85°, 2.5° at 89°). Production must sample the poles from something else (design doc §7).
+- **Gates.** Before the merge: cargo fmt, clippy -D warnings (workspace), deny, `cargo test --workspace` 784 passed; `./gradlew build test` 251 tests, 0 failures. After the merge: fmt, clippy (the crate), deny, the crate's 22 tests. No GameTest (nothing the game reads changed).
+- **Next.** Ben's four questions (Pending questions). VM scratch `/data/ban/deeptime-runs/quincuncial/` deleted except `out/` (report and screenshots).
+
+### 2026-10-03 — Two latent defects the ice branch's seed-11 test planet exposed: crater breccia at rim height, lake margins dry (agent worktree agent-ae203a8a910c7657a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c, continued by a second agent after a stop; master 0261caf0 merged; not merged)
+- **Asked (Ben, decisions log 2026-10-03, "Fix both bugs, then land (Recommended)"):** `aCraterIsABowlOverBreccia` and `riversHold` failed on the ice branch's test planet (66 of 68 GameTests); fix both in the impact and lake code, then the ice branch lands.
+- **1. Breccia at rim height (impacts).** Root cause: `ImpactStage::finish` placed each small crater's lens body from the deep-time surface (`ground + kept × aged profile at 0`), but the amplifier changes the ground after that (erosion, glacial and thermal passes; up to 15 blocks at one crater on the ice planet), so the lens was centred at the rim's height with the floor 8 blocks above it. Fix: the stage records `lens_bodies` (crater id, body id); `impacts::settle_folder` (called from `session::finalize_write` once the folder is complete, as the placer pass is) reads the baked terrain at each crater's centre and re-seats the lens at `drawn height − cover` (`lens_floor_y`, `seat_bodies`), rewriting `bodies` and the manifest entry, `notes.bake.impact_bodies` records how many moved. Test: `bake::tests::a_craters_lens_is_seated_under_the_drawn_floor` (fails on the old code: 1,794 of 1,851 lenses off the drawn floor on a 40x-flux 4k planet, passes now). FORMAT.md "Impact craters" and `docs/science/impacts.md` step 7 say where the body sits; IMP-094 updated.
+- **2. Lake margins flush with the waterline (lakes), two causes.** (a) The water pass filled a lake column only down to the *generated* ground, which between noise-cell corners can stand a block or two above `Water`'s bilinear `ground` (the density's scale differs from corner to corner): in a lake one block deep the column held no water, flush with the lake ("dry shore"). Fix: a lake column is cut to its bed like a river's channel (`WaterBodies` LAKE case: ground over `top` removed, ground between `bed` and `top` becomes water); FORMAT.md "Water columns", new ledger row HYD-077, `rivers-and-lakes.md`. `riversHold` now allows no dry shore (it allowed 1 in 20) and logs each one it finds (ground, surface, level, bed, blocks). Measured on one cold seed-11 planet (`DEEPTIME_TEST_PLANET_SET="planet.star_flux_rel=0.92 hydro.lake_freeze_mean_c=10"`, same planet before and after): dryShore 6 of 2,268 lake columns before, 0 after. (b) The ice pass replaced a frozen lake's ice (the water pass's `minecraft:ice` top block, which is not a fluid) with snow where the glacier cover reaches a lake, leaving a block of snow over the water: `IcePass.surfaceY` now leaves it alone (FORMAT.md "Ice cover", BIO-084); `icePassLaysTheCover` gets a frozen-lake column that fails on the old pass.
+- **Not reproduced exactly.** The ice branch's own failing planet (seed 11, before master's 35 m scale and plate work) cannot be rebuilt on current master (the merged tree's seed-11 planet is a different one: no frozen lake at all, dryShore 0 before and after). The lake bug was therefore reproduced on a cold planet of the merged tree (above); the crater bug by the bake test.
+- **Seen, not mine: `aCraterIsABowlOverBreccia` fails on `seed=12`** on the merged tree: crater 582 (6.2 km, fresh, 340 m of relief) has a bowl of 0.8 blocks where 3.2 are wanted; its lens is in place (breccia under the floor in 5 of 5 columns). It is a different failure (the drawn bowl, not the lens); this branch changes no terrain, so it is not caused by it, but it was not run on plain master. Not investigated; recommend a look at why a fresh 6 km crater has no bowl in the drawn terrain there.
+- **Evidence on the ice branch's planet.** With the ice branch merged (uncommitted, then aborted: `32a9a39d`'s successor a2f51b75 with master 6f72f0dd) and the `seed=11` default test planet, `aCraterIsABowlOverBreccia` (crater 484, breccia in 5 of 5 columns), `riversHold` (dryShore 0 of 1,019 lake columns), `icePassLaysTheCover`, `lakeHolds`, `carversSpareWater` and `lakeIceAndSaltFollowTheClimate` pass; that planet has no frozen lake, so the lake fix was shown on the cold planet above.
+- **Gates** (test VM, head 280d4aa9 less docs: master 7c14e4ab merged; the cargo and JUnit runs were on b23b38ec, the same code): `cargo fmt --check`, clippy `-D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace` 557 core + 54 + 72 + 1 and the small ones, 0 failed; `./gradlew build test` 265 tests, 0 failures, 2 skipped. GameTests through `mac.sh --server`: `-PwithMic` 71 of 71 (`tools/smoke/install.sh mic` first); `./gametest.sh` 70 of 71 twice: `farTerrainMatchesGeneratedChunksAcrossTheSeam` fails (60 of 64 columns, worst (2002, -249) far -33, real -5) on this planet, and fails identically with this branch's WaterBodies and IcePass changes reverted, so it is the known master failure, not added here (the bake-time lens fix touches only the bodies file).
+- **Merging.** `git merge-tree` against master: clean. Against the ice branch (a2f51b75): the same four files that conflict between master and the ice branch (STATUS.md, claims.md, CLM.md, HNT.md, plus `climate/mod.rs` from master's newer climate work); this branch adds no conflict of its own. HYD-077 is new (master and the ice branch stop at HYD-076); recount with `claims_counts.py --write` after merging.
 ### 2026-10-03 — Distant Horizons curvature follows the planet (Ben's request in the decisions log; agent worktree agent-adffa6fb9561d851d, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Asked (Ben, decisions log 2026-10-03):** "btw, DH has world curvature settings, can you make it so those default to values that make sense for the given world a player is in (dependent upon the world size generated using our mod.)"
 - **Research (DH 3.3.1, the MIC pin; licence LGPL-3.0, read with javap and by opening the jar's shaders and lang file on the VM; nothing copied):** the setting is `Config.Client.Advanced.Graphics.Experimental.earthCurveRatio`, an Integer in [-5000, 5000], default 0 (flat), a client setting stored in the player's DH config. The terrain vertex shader draws a sphere of radius 6,371,000 / ratio blocks (uniform `uEarthRadius`, read through `ConfigEntry.get()` every frame); 1 to 49 is rewritten to 50 *and saved* by `WorldCurvatureConfigEventHandler`. Only DH's LOD meshes bend, not Minecraft's chunks. The API is `DhApi.Delayed.configs.graphics().earthCurvatureRatio()` (`IDhApiConfigValue<Integer>`, null until DH starts): `setValue`/`clearValue` act on an in-memory override layer that `get()` prefers and that is never saved; `getTrueValue()` is the player's file value; while the override is set DH's screen shows "API LOCK" on the entry. Details and ledger BAK-043 to BAK-047 in `docs/science/world-scale-and-bake.md` "Distant Horizons world curvature".
