@@ -192,9 +192,13 @@ What the mapping does (BIO-115 to BIO-118, all game choices):
   cell keeps its class's temperature and humidity and its erosion is held under E5, so without a mod vanilla
   draws what it draws for the class: taiga (or its old growth and snowy variants). The bake flags it in
   `climate/wetland` (2; 1 for temperate and warm wetland, which stays swamp, mangrove where hot).
-- Where the pack has a peatland biome, the flagged ground goes there. A peatland biome is a biome the
-  NeoForge tags call a swamp (`c:is_swamp`) and cold (`c:is_cold/overworld` or `c:is_snowy`): Biomes O' Plenty's
-  bog and muskeg are, vanilla's and Terralith's swamps and BOP's wetland are not. No biome name is in the code.
+- Where the pack has a peatland biome, the flagged ground goes there. A peatland biome is a biome in the
+  shared tag `#deeptime:peatland` (every entry optional: BOP's bog and muskeg, Regions Unexplored's fen and
+  cold fen, Expanded Ecosphere's fen, snowy fen, snowy bog and berry bog; the last two packs' ids are from
+  memory, unchecked), or, for a pack nobody listed, one the NeoForge tags call a swamp (`c:is_swamp`) and cold
+  (`c:is_cold/overworld` or `c:is_snowy`): BOP's bog and muskeg are both, vanilla's and Terralith's swamps and
+  BOP's wetland are neither. A pack's support adds its biome to the tag; no biome name is in the code, and a
+  tagged biome only counts where the pack's biome source puts it at the swamp row (below).
   At a world's first flagged cell the game asks the pack's biome source, in each TerraBlender region of the
   province table, what it puts at the swamp row of the cold band (450 climates: five temperatures of the band,
   five wet humidities, three inland continentalness values, six weirdness values). A region that answers
