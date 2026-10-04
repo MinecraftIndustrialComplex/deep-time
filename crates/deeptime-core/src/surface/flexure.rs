@@ -1204,18 +1204,21 @@ pub fn step(
     // the synthetic margin). The boundary cells are blurred instead and the share is taken from
     // that: on a straight boundary the two boundary rows stay at the floor and the next rows
     // carry 0.17 and 0.72 of their stiffness, and along a stepped boundary it varies smoothly.
-    let mut near_edge: Vec<f64> = edge.iter().map(|&e| if e { 1.0 } else { 0.0 }).collect();
+    let mut near_edge: Vec<f64> = edge
+        .par_iter()
+        .map(|&e| if e { 1.0 } else { 0.0 })
+        .collect();
     near_edge = restrict(&near_edge, w, f);
     box_blur(&ds, &mut near_edge, 1, 2);
     let whole: Vec<f64> = near_edge
-        .iter()
+        .par_iter()
         .map(|&b| (1.0 - 2.5 * b).clamp(0.0, 1.0)) // ledger: ISO-055
         .collect();
-    for (t, share) in te.iter_mut().zip(whole) {
-        *t = floor + (*t - floor).max(0.0) * share;
-    }
+    te.par_iter_mut()
+        .zip(whole.par_iter())
+        .for_each(|(t, &share)| *t = floor + (*t - floor).max(0.0) * share);
     let te_out: Vec<f32> = prolong_const(&te, ws, f)
-        .into_iter()
+        .into_par_iter()
         .map(|t| t as f32)
         .collect();
 
@@ -1261,6 +1264,7 @@ pub fn step(
             binomial(&mut pf, ws, hs, passes);
         }
         (0..ws * hs)
+            .into_par_iter()
             .map(|c| root[c] - pr[c] + pf[c])
             .collect::<Vec<f64>>()
     };
@@ -1278,6 +1282,7 @@ pub fn step(
     // the stiffer plate. Rigidity lost (reheating, a cell becoming a plate's broken edge)
     // releases the moment in proportion, and the released moment is a force.
     let m_kept: Vec<f64> = (0..ws * hs)
+        .into_par_iter()
         .map(|c| {
             let ratio = d_now[c] / d_prev[c];
             if ratio.is_finite() && ratio < 1.0 {
@@ -1287,16 +1292,21 @@ pub fn step(
             }
         })
         .collect();
-    let released: Vec<f64> = m_old.iter().zip(&m_kept).map(|(a, b)| a - b).collect();
+    let released: Vec<f64> = m_old
+        .par_iter()
+        .zip(m_kept.par_iter())
+        .map(|(a, b)| a - b)
+        .collect();
     let mut l_released = vec![0.0; ws * hs];
     sv.laplacian(&released, &mut l_released);
     let mut bend_root = vec![0.0; ws * hs];
     sv.bend(&d_now, &bend_part, &mut bend_root);
     let r: Vec<f64> = (0..ws * hs)
+        .into_par_iter()
         .map(|c| RHO_MANTLE * (dq[c] - root[c]) - bend_root[c] + l_released[c])
         .collect();
     let c_rest: Vec<f64> = wet
-        .iter()
+        .par_iter()
         .map(|&s| RHO_MANTLE - RHO_WATER * p.strength * s)
         .collect();
 
@@ -1331,10 +1341,15 @@ pub fn step(
         )
     };
     // The moment after the step: what was kept, plus the bending of the root and the sinking.
-    let total: Vec<f64> = bend_part.iter().zip(&dw).map(|(a, b)| a + b).collect();
+    let total: Vec<f64> = bend_part
+        .par_iter()
+        .zip(dw.par_iter())
+        .map(|(a, b)| a + b)
+        .collect();
     let mut curv = vec![0.0; ws * hs];
     sv.laplacian(&total, &mut curv);
     let m_new: Vec<f64> = (0..ws * hs)
+        .into_par_iter()
         .map(|c| m_kept[c] + d_now[c] * curv[c])
         .collect();
     let m_fine = prolong_const(&m_new, ws, f);
@@ -1342,39 +1357,58 @@ pub fn step(
     let left_fine = prolong_const(&left, ws, f);
     let delta = prolong_linear(&dw, ws, f);
 
-    // 4. The elevation takes the sinking that is not yet in it; the state takes the step.
+    // 4. The elevation takes the sinking that is not yet in it; the state takes the step. Cell
+    // by cell, rows in parallel; the sum of the changes is then taken in cell order, as before
+    // (P1-17).
     let mut flex = vec![0.0f32; n];
+    let mut changes = vec![0.0f64; n];
+    (
+        h.par_chunks_mut(w),
+        st.load_m.par_chunks_mut(w),
+        st.deflection_m.par_chunks_mut(w),
+        st.water_m.par_chunks_mut(w),
+        st.ice_m.par_chunks_mut(w),
+        st.moment.par_chunks_mut(w),
+        st.rigidity.par_chunks_mut(w),
+        st.unsolved_m.par_chunks_mut(w),
+        flex.par_chunks_mut(w),
+        changes.par_chunks_mut(w),
+    )
+        .into_par_iter()
+        .enumerate()
+        .for_each(|(j, (hr, lr, dr, wr, ir, mr, rr, ur, fr, cr))| {
+            for i in 0..w {
+                let c = j * w + i;
+                let cell = &cells[c];
+                let change = -p.strength * delta[c];
+                hr[i] += change;
+                cr[i] = change;
+                let depth = (sea - hr[i]).max(0.0);
+                let w_prev = if cell.fresh { 0.0 } else { f64::from(dr[i]) };
+                let w_new = w_prev + cell.root + delta[c];
+                let load = cell.load + water_share * (depth - cell.water);
+                let ice = x.ice_m.map_or(0.0, |v| f64::from(v[c]).max(0.0));
+                lr[i] = load as f32;
+                dr[i] = w_new as f32;
+                wr[i] = depth as f32;
+                ir[i] = ice as f32;
+                mr[i] = m_fine[c] as f32;
+                rr[i] = d_fine[c] as f32;
+                ur[i] = left_fine[c] as f32;
+                let restoring = if hr[i] <= sea {
+                    RHO_MANTLE - RHO_WATER
+                } else {
+                    RHO_MANTLE
+                };
+                fr[i] = (RHO_MANTLE * (load + ice_share * ice - w_new) / restoring) as f32;
+            }
+        });
     let (mut sum, mut peak) = (0.0, 0.0f64);
-    for c in 0..n {
-        let cell = &cells[c];
-        let change = -p.strength * delta[c];
-        h[c] += change;
+    for &change in &changes {
         sum += change;
         peak = peak.max(change.abs());
-        let depth = (sea - h[c]).max(0.0);
-        let w_prev = if cell.fresh {
-            0.0
-        } else {
-            f64::from(st.deflection_m[c])
-        };
-        let w_new = w_prev + cell.root + delta[c];
-        let load = cell.load + water_share * (depth - cell.water);
-        let ice = x.ice_m.map_or(0.0, |v| f64::from(v[c]).max(0.0));
-        st.load_m[c] = load as f32;
-        st.deflection_m[c] = w_new as f32;
-        st.water_m[c] = depth as f32;
-        st.ice_m[c] = ice as f32;
-        st.moment[c] = m_fine[c] as f32;
-        st.rigidity[c] = d_fine[c] as f32;
-        st.unsolved_m[c] = left_fine[c] as f32;
-        let restoring = if h[c] <= sea {
-            RHO_MANTLE - RHO_WATER
-        } else {
-            RHO_MANTLE
-        };
-        flex[c] = (RHO_MANTLE * (load + ice_share * ice - w_new) / restoring) as f32;
     }
-    st.seen_elevation_m = h.iter().map(|&z| z as f32).collect();
+    st.seen_elevation_m = h.par_iter().map(|&z| z as f32).collect();
     out.sum_change_m = sum;
     out.max_change_m = peak;
     out.deflection_m = st.deflection_m.clone();
