@@ -3,8 +3,8 @@
 Status of this page: `stage 2 (constants checked against sources on 2026-10-02)` for the sources
 the project's library holds; the rest is marked `from-memory` in the ledger.
 
-Ledger ids on this page: `FRC-001` to `FRC-027`, `PLT-181` to `PLT-191`, `PLT-022`, `PLT-037` and
-`PLT-270` to `PLT-273` (see [claims.md](claims.md)).
+Ledger ids on this page: `FRC-001` to `FRC-030`, `PLT-181` to `PLT-191`, `PLT-022`, `PLT-037`,
+`PLT-270` to `PLT-273` and `PLT-275` (see [claims.md](claims.md)).
 
 ## What you see in the world
 
@@ -43,9 +43,11 @@ front), and then sums the forces:
    a little.
 3. **Resisting forces.** The mantle drags on the base of each plate, more under the deep roots of
    continents. A sinking slab resists sinking faster. Plates rub against their neighbours along
-   every boundary. Where a continent has reached a trench (a collision), the weight of the mountain
-   belt resists further convergence: a force set by the belt's height, whatever the speed, so it can
-   stop two plates but never push them apart.
+   every boundary. Where a continent has reached a trench (a collision), two forces resist further
+   convergence, each whatever the speed, so they can stop two plates but never push them apart:
+   the weight of the mountain belt (set by its height), and the buoyancy of the continental
+   lithosphere the collision has already dragged down the trench, which grows as the collision
+   shortens (continental lithosphere is lighter than the mantle, Cloos 1993; `collision_buoyancy`).
 4. **The balance.** A plate has no inertia, so all torques on it add up to zero. Every resisting
    force grows in proportion to the plates' speeds (the collision's is linearised at the step's
    convergence), so the balance of all plates together is one linear system, solved exactly each
@@ -97,6 +99,16 @@ with U the gravitational potential energy of the column (Ū the plate's mean):
                        C = g (ρ_m − ρ_w)² π / (4 ρ_m α ΔT) · (1 + 2 ρ_m α ΔT / (π (ρ_m − ρ_w)))
     continental crust: U = ρ g h (H + h (1 + ρ / (ρ_m − ρ_c)) / 2),  h its height above sea level
 
+**Collision resistance** per metre of collision front, against the convergence (plastic: put into
+the linear solve as a drag of this force over max(convergence, 5 mm/yr)):
+
+    (U(belt) − U(incoming))⁺ · edge_energy / 0.1  +  collision_buoyancy · 2.25 · F_sp · (T / 30 km) · min(S, D) / D
+
+T the incoming continental crust's thickness, S the collision's shortening so far, D
+`slab_depth_km`: the second term is the up-dip push of S km of continental lithosphere dragged
+down the trench, 0.09 / 0.04 = 2.25 times the down-dip pull of the same length of 80-Myr slab
+(Cloos 1993's density contrasts).
+
 **Basal drag** per square metre: c_b (v − v_flow), times `keel_drag` under continental crust, with
 c_b fixed by the speed scale: (1 + slab_resistance + boundary_resistance) c_b A v_s = F_sp L_ref.
 
@@ -126,6 +138,9 @@ plate's centroid, f the edge forces at the balance's answer, b the basal drag, h
 | FRC-016 | Basal drag coefficient c_b (defaults) | 2.5 × 10¹⁴ | Pa s/m | defined by the speed scale | `game-choice` |
 | FRC-010 | Lithosphere thickness for the stress | 100 | km | Conrad & Lithgow-Bertelloni 2006's reference (read) | `verified` |
 | FRC-011 | Collision drag's speed floor | 5 | mm/yr | stand-in for the collisions design's weld speed | `game-choice` |
+| FRC-028 | Continental lithosphere's buoyancy over 80-Myr slab's weight | 0.09 / 0.04 = 2.25 | ratio | Cloos 1993 (abstract, read) | `abstract-only` |
+| FRC-029 | Crust thickness of that figure (buoyancy in proportion to thickness) | 30 | km | Cloos 1993 (abstract, read); the proportion is a game choice | `abstract-only` |
+| FRC-030, PLT-275 | Collision buoyancy law and strength `collision_buoyancy` | 1 | relative | Cloos 1993 (abstract): continental lithosphere "resists subduction" | `game-choice` (the law's form) |
 | PLT-191 | Relaxation time (used from the switch on) | 6 | Myr | the design | `game-choice` |
 
 Two checks of the formulas against the design's figures (unit test
