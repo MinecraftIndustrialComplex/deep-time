@@ -66,7 +66,7 @@ pub fn method_of(name: &str) -> Method {
 /// lattice translation of both layouts (Peirce's lattice holds (2a, 0), Guyou's (2b, 0)), and the strip's
 /// z range ±C′/4 holds the domain (±a/2 or ±b/2) with as much again of folded outside on each side.
 /// That keeps today's latitude-from-z code (the pole cap, `BeyondPoleDensity`) away from the domain:
-/// at |z| ≤ C′/8 it reads at most 45°.
+/// at |z| ≤ C′/8 it reads at most 45° (equirectangular) or asin(π/4) = 51.8° (Lambert).
 pub fn strip_circumference(w: &QWorld) -> f64 {
     let (_, _, z0, z1) = w.extent();
     4.0 * (z1 - z0) // ledger: SCL-076 (game-choice, prototype)
