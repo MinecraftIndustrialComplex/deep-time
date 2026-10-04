@@ -71,11 +71,11 @@
 //! Wet (the aridity index's own band, before the class's humidity rule, ≥ `wetland_humidity`,
 //! 2.5), flat (the flattest `wetland_flat_share`, 35 %), low (< `wetland_low_m`, 150 m) land that
 //! is not frozen goes into E6 in proportion to `wetlands` — swamps and mangroves only where they belong (vanilla
-//! puts E6 at hot temperatures to mangrove swamp, whatever the humidity). Cold wetland (temperature
-//! class marked `cold_wetland` in the placement table: Dfc, Dfd, Dsc, Dsd, Dwc, Dwd; BIO-104) is not swamp
+//! puts E6 at hot temperatures to mangrove swamp, whatever the humidity). Cold wetland (a
+//! class marked `cold_wetland` in the placement table: Dfc, Dfd, Dsc, Dsd, Dwc, Dwd; BIO-115) is not swamp
 //! (Ben, 2026-10-03, "Taiga instead, peatland if present"): it keeps the class's own temperature and
 //! humidity (taiga in vanilla) with erosion held under E5, and is flagged `climate/wetland` = 2 so the
-//! game can put the pack's peatland biome there (BIO-106). The deep sea keeps E4 or
+//! game can put the pack's peatland biome there (BIO-117). The deep sea keeps E4 or
 //! more, away from Terralith's sky-island band. A class's placement may clamp its land's erosion
 //! (`erosion: {min, max}`; EF's barren ground is held below 0.3, off Terralith's packed-ice glacial
 //! chasm, and its ice cap is not).
@@ -685,6 +685,18 @@ pub struct Climate<'a> {
     pub aridity: Option<&'a Field>,
     pub koppen: &'a Field,
     pub glacier: Option<&'a Field>,
+    /// The twelve monthly sea-level temperatures and precipitation rates on L1 (the climate's
+    /// last snapshot, P1-25) and the lapse rate: with them the Köppen class is decided on L2
+    /// (P1-26, Ben 2026-10-02, "classify on L2"), so biome borders do not step with the L1 cells.
+    pub months: Option<Months<'a>>,
+}
+
+/// The climate's twelve months on L1 (`climate/month/t_sl_c_NN`, °C at sea level, and
+/// `climate/month/p_mm_NN`, mm/yr rates) and the lapse rate, °C/km.
+pub struct Months<'a> {
+    pub t_sl: [&'a Field; 12],
+    pub p: [&'a Field; 12],
+    pub lapse_c_per_km: f64,
 }
 
 /// What the mapping needs besides the climate.
@@ -705,6 +717,9 @@ pub struct Mapped {
     /// `climate/wetland` (L2): [`WETLAND_NONE`], [`WETLAND_SWAMP`] or [`WETLAND_COLD`] per cell.
     pub wetland: Vec<u8>,
     pub note: Value,
+    /// The Köppen class of every L2 cell when it was decided on L2 (`Climate::months`; the sea's
+    /// on the sea), else empty.
+    pub class_l2: Vec<u8>,
 }
 
 /// Temperature and humidity band coordinates on L1: land values filled across the sea, the sea's
@@ -859,6 +874,176 @@ fn by_class_map(counts: &[u64; 32]) -> serde_json::Map<String, Value> {
         .collect()
 }
 
+/// The band coordinates decided on L2 (P1-26): every L2 cell's twelve months bilinear from L1,
+/// its temperatures lapsed to its own height, its Köppen class, aridity (Thornthwaite) and the
+/// class's rules from them; the sea's thermal band from its annual mean. The humidity band is
+/// filled across the sea from the nearest land, as on L1.
+#[allow(clippy::type_complexity)]
+fn coords_l2(
+    c: &Climate<'_>,
+    mo: &Months<'_>,
+    g: &Ground<'_>,
+    land: &[bool],
+    placement: &Placement,
+) -> (Coords, Vec<u8>) {
+    let l2 = g.l2;
+    let (w, h) = (l2.w as usize, l2.h as usize);
+    let n = w * h;
+    let gamma = mo.lapse_c_per_km / 1000.0;
+    struct Cell {
+        class: u8,
+        t_land: f32,
+        h_land: f32,
+        h_wet: f32,
+        t_sea: f32,
+        e: (f32, f32),
+        w: (f32, f32, f32),
+        th: f64,
+        hu: f64,
+    }
+    let rows: Vec<Vec<Cell>> = (0..h)
+        .into_par_iter()
+        .map(|j| {
+            let bz = l2.block_z(j as i64) as f64;
+            (0..w)
+                .map(|i| {
+                    let k = j * w + i;
+                    let bx = l2.block_x(i as i64) as f64;
+                    let t_sl: [f64; 12] =
+                        std::array::from_fn(|m| f64::from(super::bilinear(mo.t_sl[m], bx, bz)));
+                    let mean_sl = t_sl.iter().sum::<f64>() / 12.0;
+                    if !land[k] {
+                        return Cell {
+                            class: koppen::SEA,
+                            t_land: f32::NAN,
+                            h_land: f32::NAN,
+                            h_wet: f32::NAN,
+                            t_sea: thermal_sea(mean_sl) as f32,
+                            e: (f32::NAN, f32::NAN),
+                            w: (f32::NAN, 1.0, NO_CAP),
+                            th: 0.0,
+                            hu: 0.0,
+                        };
+                    }
+                    let z = (f64::from(g.elevation_m[k]) - g.sea_level_m).max(0.0);
+                    let t: [f64; 12] = std::array::from_fn(|m| t_sl[m] - gamma * z);
+                    let pm: [f64; 12] = std::array::from_fn(|m| {
+                        f64::from(super::bilinear(mo.p[m], bx, bz)).max(0.0) / 12.0
+                    });
+                    let class = koppen::classify(&t, &pm);
+                    let tm = t.iter().sum::<f64>() / 12.0;
+                    let tw = t.iter().cloned().fold(f64::MIN, f64::max);
+                    let tc = t.iter().cloned().fold(f64::MAX, f64::min);
+                    let pet = crate::climate::snapshot::thornthwaite(&t);
+                    let ai = if pet > 0.0 {
+                        (pm.iter().sum::<f64>() / pet).min(10.0)
+                    } else {
+                        10.0
+                    };
+                    let glacier = c.glacier.is_some_and(|f| super::nearest(f, bx, bz) >= 0.5);
+                    let th = placement.thermal_land(class, tm, tw, tc, glacier);
+                    let hu = placement.humidity_land(class, ai, tm, tw, tc, glacier);
+                    let lim = placement.erosion_limit(class, glacier);
+                    let (mut wn, mut wc) = (1.0f32, NO_CAP);
+                    let thr = match placement.weirdness(class) {
+                        Weirdness::Noise => f32::NAN,
+                        Weirdness::Positive => ALWAYS_POSITIVE,
+                        Weirdness::PositiveBelowErosion { erosion, flats } => {
+                            wn = flats.positive_noise_above as f32;
+                            wc = flats.max_magnitude.map_or(NO_CAP, |m| m as f32);
+                            erosion as f32
+                        }
+                    };
+                    Cell {
+                        class,
+                        t_land: th as f32,
+                        h_land: hu as f32,
+                        h_wet: humidity_of_aridity(ai) as f32,
+                        t_sea: thermal_sea(mean_sl) as f32,
+                        e: (
+                            lim.map_or(-2.0, |l| l.min as f32),
+                            lim.map_or(2.0, |l| l.max as f32),
+                        ),
+                        w: (thr, wn, wc),
+                        th,
+                        hu,
+                    }
+                })
+                .collect()
+        })
+        .collect();
+    let mut co = Coords {
+        t_land: Vec::with_capacity(n),
+        h_land: Vec::with_capacity(n),
+        h_wet: Vec::with_capacity(n),
+        class: Vec::with_capacity(n),
+        t_sea: Vec::with_capacity(n),
+        e_lo: Vec::with_capacity(n),
+        e_hi: Vec::with_capacity(n),
+        w_thr: Vec::with_capacity(n),
+        w_noise: Vec::with_capacity(n),
+        w_cap: Vec::with_capacity(n),
+        by_class: Value::Null,
+    };
+    let mut class = Vec::with_capacity(n);
+    let mut stats = [(0u64, 0f64, 0f64); 32];
+    for row in rows {
+        for x in row {
+            if x.class != koppen::SEA {
+                let st = &mut stats[x.class as usize];
+                st.0 += 1;
+                st.1 += x.th;
+                st.2 += x.hu;
+            }
+            class.push(x.class);
+            co.class.push(if x.class == koppen::SEA {
+                f32::NAN
+            } else {
+                f32::from(x.class)
+            });
+            co.t_land.push(x.t_land);
+            co.h_land.push(x.h_land);
+            co.h_wet.push(x.h_wet);
+            co.t_sea.push(x.t_sea);
+            co.e_lo.push(x.e.0);
+            co.e_hi.push(x.e.1);
+            co.w_thr.push(x.w.0);
+            co.w_noise.push(x.w.1);
+            co.w_cap.push(x.w.2);
+        }
+    }
+    if !fill_nearest(&mut co.h_land, land, w, h) {
+        co.h_land = vec![2.5; n];
+    }
+    if !fill_nearest(&mut co.h_wet, land, w, h) {
+        co.h_wet = co.h_land.clone();
+    }
+    if !fill_nearest(&mut co.class, land, w, h) {
+        co.class = vec![f32::NAN; n];
+    }
+    if !fill_nearest(&mut co.t_land, land, w, h) {
+        co.t_land = co.t_sea.clone();
+    }
+    co.by_class = Value::Object(
+        stats
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.0 > 0)
+            .map(|(i, s)| {
+                (
+                    koppen::CODES[i].to_owned(),
+                    json!({
+                        "cells_l2": s.0,
+                        "temperature_band": ((s.1 / s.0 as f64) * 100.0).round() / 100.0,
+                        "humidity_band": ((s.2 / s.0 as f64) * 100.0).round() / 100.0,
+                    }),
+                )
+            })
+            .collect(),
+    );
+    (co, class)
+}
+
 fn shares(v: &[f32], mask: &[bool], edges: &[f64], abs: bool) -> Vec<f64> {
     let n = edges.len() - 1;
     let mut c = vec![0u64; n];
@@ -895,8 +1080,22 @@ pub fn map(
     let land: Vec<bool> = elev.iter().map(|&z| f64::from(z) > sea).collect();
 
     // Temperature and humidity.
+    let mut class_l2 = Vec::new();
     let (t_land, h_land, (h_wet, class), t_sea, (e_lo, e_hi, w_thr, w_noise, w_cap), by_class) =
         match climate {
+            Some(c) if c.months.is_some() => {
+                let mo = c.months.as_ref().expect("checked");
+                let (co, cl) = coords_l2(c, mo, g, &land, placement);
+                class_l2 = cl;
+                (
+                    co.t_land,
+                    co.h_land,
+                    (co.h_wet, co.class),
+                    co.t_sea,
+                    (co.e_lo, co.e_hi, co.w_thr, co.w_noise, co.w_cap),
+                    co.by_class,
+                )
+            }
             Some(c) => {
                 let co = coords(c, g.l1, placement);
                 let up = |v: Vec<f32>| {
@@ -1041,7 +1240,7 @@ pub fn map(
                 // the class's ordinary biome (taiga for the subarctic classes); the flag lets the
                 // game swap in the pack's peatland biome when it has one. Erosion stays in the
                 // ordinary land range, below E5, so flat wet ground is not drawn as windswept hills.
-                // ledger: BIO-104, BIO-105, BIO-106
+                // ledger: BIO-115, BIO-116, BIO-117
                 e = e.min(e5 - 1e-3);
                 wetland[k] = WETLAND_COLD;
                 cold_cells += 1;
@@ -1112,6 +1311,7 @@ pub fn map(
         },
         "reference": { "bands": bands, "reference": r.reference },
         "koppen_bands": by_class,
+        "koppen_grid": if class_l2.is_empty() { "L1" } else { "L2" },
         "window_cells": k,
         "wetland_cells": wet_cells,
         "wetland_cells_by_class": by_class_map(&wet_by_class),
@@ -1130,6 +1330,7 @@ pub fn map(
         layers: [temperature, vegetation, continents, erosion, ridges],
         wetland,
         note,
+        class_l2,
     }
 }
 
@@ -1472,6 +1673,7 @@ mod tests {
             t_cold: Some(&tc),
             aridity: Some(&ai),
             koppen: &kp,
+            months: None,
             glacier: Some(&gl),
         };
         let g = Ground {
@@ -1484,6 +1686,103 @@ mod tests {
         };
         let m = map(Some(&climate), &g, params, table);
         (m, w2)
+    }
+
+    /// Ben 2026-10-02 ("classify on L2"): with the climate's months the Köppen class is decided on
+    /// L2, so a class border running diagonally across the L1 cells crosses them instead of
+    /// stepping along their edges (the grid-artifact audit's finding 3).
+    #[test]
+    fn the_koppen_class_is_decided_on_l2_and_its_borders_leave_the_l1_cells() {
+        let c = 1024u32;
+        let l1 = GridDesc::for_planet("L1", c, 16).unwrap();
+        let l2 = GridDesc::for_planet("L2", c, 2).unwrap();
+        let (w1, h1) = (l1.w as usize, l1.h as usize);
+        let (w2, h2) = (l2.w as usize, l2.h as usize);
+        let field = |f: &dyn Fn(usize, usize) -> f32| Field {
+            grid: l1.clone(),
+            data: (0..w1 * h1).map(|k| f(k % w1, k / w1)).collect(),
+        };
+        // Annual temperature falls along one diagonal, rain along the other: diagonal borders.
+        let tm = |i: usize, j: usize| 32.0 - 0.9 * (i + j) as f64;
+        let pr = |i: usize, j: usize| 3000.0 * (0.5 + 0.5 * ((i as f64 - j as f64) / 24.0).tanh());
+        let t_sl: Vec<Field> = (0..12)
+            .map(|m| {
+                let s = (std::f64::consts::TAU * (m as f64 - 0.5) / 12.0).cos();
+                field(&|i, j| (tm(i, j) - 12.0 * s) as f32)
+            })
+            .collect();
+        let p_m: Vec<Field> = (0..12).map(|_| field(&|i, j| pr(i, j) as f32)).collect();
+        // The L1 classes (what the climate stage writes) from the same months.
+        let class1 = |i: usize, j: usize| -> u8 {
+            let t: [f64; 12] = std::array::from_fn(|m| f64::from(t_sl[m].data[j * w1 + i]));
+            koppen::classify(&t, &[pr(i, j) / 12.0; 12])
+        };
+        let kp = field(&|i, j| f32::from(class1(i, j)));
+        let tmf = field(&|i, j| tm(i, j) as f32);
+        let elev = vec![10.0f32; w2 * h2];
+        let climate = Climate {
+            t_mean: &tmf,
+            t_warm: None,
+            t_cold: None,
+            aridity: None,
+            koppen: &kp,
+            glacier: None,
+            months: Some(Months {
+                t_sl: std::array::from_fn(|m| &t_sl[m]),
+                p: std::array::from_fn(|m| &p_m[m]),
+                lapse_c_per_km: 6.5,
+            }),
+        };
+        let g = Ground {
+            elevation_m: &elev,
+            sea_level_m: 0.0,
+            l1: &l1,
+            l2: &l2,
+            seed: 3,
+            circumference: c,
+        };
+        let m = map(
+            Some(&climate),
+            &g,
+            &BiomeParams::default(),
+            placement::builtin(),
+        );
+        assert_eq!(m.note["koppen_grid"], "L2");
+        let k2 = &m.class_l2;
+        assert_eq!(k2.len(), w2 * h2);
+        // Class-change faces between L2 neighbours, and how many lie on an L1 cell's edge.
+        let ratio = (l1.r / l2.r) as usize;
+        let (mut faces, mut on_edge) = (0usize, 0usize);
+        for j in 0..h2 {
+            for i in 0..w2 {
+                let a = k2[j * w2 + i];
+                if i + 1 < w2 && a != k2[j * w2 + i + 1] {
+                    faces += 1;
+                    on_edge += usize::from((i + 1) % ratio == 0);
+                }
+                if j + 1 < h2 && a != k2[(j + 1) * w2 + i] {
+                    faces += 1;
+                    on_edge += usize::from((j + 1) % ratio == 0);
+                }
+            }
+        }
+        assert!(faces > 200, "{faces} class-change faces");
+        let share = on_edge as f64 / faces as f64;
+        // Classed on L1 every one would lie on an L1 edge; here about 1 in `ratio`.
+        assert!(share < 0.35, "{on_edge} of {faces} faces on L1 edges");
+        // At the L1 cells' centres the L2 class is (almost always) the L1 class.
+        let (mut same, mut all) = (0, 0);
+        for j1 in 0..h1 {
+            for i1 in 0..w1 {
+                let (i2, j2) = (i1 * ratio + ratio / 2, j1 * ratio + ratio / 2);
+                all += 1;
+                same += usize::from(k2[j2 * w2 + i2] == class1(i1, j1));
+            }
+        }
+        assert!(
+            same as f64 >= 0.9 * all as f64,
+            "{same} of {all} agree at the L1 centres"
+        );
     }
 
     #[test]

@@ -19,8 +19,10 @@ import java.util.Set;
  *       is installed (COE, CDG, TerraBlender, ...).</li>
  *   <li>A mixin in {@code mixin.gametest} applies only with {@code -Ddeeptime.gametest=true},
  *       so test-only fixes never reach a player's game.</li>
- *   <li>A mixin in {@code mixin.wrapspike} (the wrap-engine spike) applies only with
- *       {@code -Ddeeptime.wrapspike=true}.</li>
+ *   <li>A mixin in {@code mixin.wrapengine} (the wrap engine, docs/design/wrap-engine.md) applies
+ *       only with {@code -Ddeeptime.wrapengine=true}; one in
+ *       {@code mixin.wrapengine.compat.<modid>} (the engine's adapters for a mod, such as Create) also
+ *       needs that mod installed.</li>
  *   <li>Everything else always applies.</li>
  * </ul>
  *
@@ -31,7 +33,7 @@ public class DeepTimeMixinPlugin implements IMixinConfigPlugin {
 
     private static final String COMPAT = "com.minecraftindustrialcomplex.deeptime.mixin.compat.";
     private static final String GAMETEST = "com.minecraftindustrialcomplex.deeptime.mixin.gametest.";
-    private static final String WRAPSPIKE = "com.minecraftindustrialcomplex.deeptime.mixin.wrapspike.";
+    private static final String WRAPENGINE = "com.minecraftindustrialcomplex.deeptime.mixin.wrapengine.";
 
     private static final Logger LOGGER = LoggerFactory.getLogger("deeptime");
 
@@ -45,11 +47,21 @@ public class DeepTimeMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        if (mixinClassName.startsWith(WRAPSPIKE)) {
-            // The wrap-engine spike (docs/design/wrap-engine.md): never in a player's game.
-            boolean on = Boolean.getBoolean("deeptime.wrapspike");
+        if (mixinClassName.startsWith(WRAPENGINE)) {
+            // The wrap engine (docs/design/wrap-engine.md): dev only until Ben switches it on. Mixin
+            // bootstrap must not load WrapEngine, so the flag is read here again.
+            boolean on = Boolean.getBoolean("deeptime.wrapengine");
+            // mixin.wrapengine.compat.<modid>.*: the engine's adapters for a mod, which need that mod too
+            // (and -Ddeeptime.wrapengine.compat not false: ./gametest.sh -PwrapNoCompat, for A/B checks).
+            String modid = modAfter(mixinClassName, WRAPENGINE + "compat.");
+            String simple = mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1);
+            boolean skipped = modid != null && java.util.Arrays.asList(System.getProperty("deeptime.wrapengine.compat.skip", "").split(",")).contains(simple);
+            if (on && modid != null && (skipped || !installed(modid) || !Boolean.parseBoolean(System.getProperty("deeptime.wrapengine.compat", "true")))) {
+                LOGGER.info("Skipping wrap-engine mixin {}: {} is not installed or the adapters are off", mixinClassName, modid);
+                return false;
+            }
             if (on)
-                LOGGER.warn("Applying wrap-engine SPIKE mixin {} (-Ddeeptime.wrapspike=true)", mixinClassName);
+                LOGGER.warn("Applying wrap-engine mixin {} (-Ddeeptime.wrapengine=true)", mixinClassName);
             return on;
         }
         if (mixinClassName.startsWith(GAMETEST)) {
@@ -58,20 +70,23 @@ public class DeepTimeMixinPlugin implements IMixinConfigPlugin {
                 LOGGER.debug("Skipping gametest mixin {}", mixinClassName);
             return on;
         }
-        String modid = requiredMod(mixinClassName);
-        if (modid == null)
-            return true;
-        LoadingModList mods = LoadingModList.get();
-        if (mods == null || mods.getModFileById(modid) != null)
+        String modid = modAfter(mixinClassName, COMPAT);
+        if (modid == null || installed(modid))
             return true;
         LOGGER.info("Skipping mixin {}: {} is not installed", mixinClassName, modid);
         return false;
     }
 
-    private static String requiredMod(String mixinClassName) {
-        if (!mixinClassName.startsWith(COMPAT))
+    private static boolean installed(String modid) {
+        LoadingModList mods = LoadingModList.get();
+        return mods == null || mods.getModFileById(modid) != null;
+    }
+
+    /** The mod id of {@code <prefix><modid>.<Class>}, or null when the name does not start so. */
+    private static String modAfter(String mixinClassName, String prefix) {
+        if (!mixinClassName.startsWith(prefix))
             return null;
-        String rest = mixinClassName.substring(COMPAT.length());
+        String rest = mixinClassName.substring(prefix.length());
         int dot = rest.indexOf('.');
         return dot <= 0 ? null : rest.substring(0, dot);
     }

@@ -18,7 +18,9 @@
 //! 3. keeps each contact's collision state and real shortening (`shortening.rs`), stacks the
 //!    crust each collision shortened into a belt and a wedge (`belts.rs`), and welds two plates
 //!    whose collision has stalled, or moves a small terrane to the other plate once it has
-//!    shortened by the threshold (`collision.rs`);
+//!    shortened by the threshold (`collision.rs`); thickened crust that nothing raises any more
+//!    collapses, spreading into the nearest thin crust of its plate and turning the plate's ocean
+//!    floor beside the continent continental (`collapse.rs`);
 //! 4. runs hotspots and large igneous provinces (`hotspots.rs`);
 //! 5. applies continental erosion, oceanic dampening and trench accretion, and the rock-pool
 //!    processes (`pools.rs`);
@@ -43,6 +45,7 @@
 
 pub mod belts;
 pub mod check;
+pub mod collapse;
 pub mod collision;
 pub mod dynamics;
 pub mod events;
@@ -218,6 +221,22 @@ impl PlatesStage {
             shortening::advance(st, &cache.geo, &pos, &tree, &env, resolved.seeds);
         belts::stack(st, &cache.geo, &pos, &env, &fronts, flexure.as_deref());
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
+        // Crust beyond the thickest column goes down; thickened crust that nothing raises any
+        // more spreads and gives its area back.
+        let foundered = collapse::founder(st, &env);
+        *world
+            .globals
+            .entry(collapse::FOUNDERED_GLOBAL.to_owned())
+            .or_insert(0.0) += foundered / 1000.0;
+        let fell = collapse::step(st, &cache.geo, &env);
+        *world
+            .globals
+            .entry(collapse::MOVED_GLOBAL.to_owned())
+            .or_insert(0.0) += fell.moved_km2_m / 1000.0;
+        *world
+            .globals
+            .entry(collapse::GAINED_GLOBAL.to_owned())
+            .or_insert(0.0) += f64::from(fell.converted) * env.norm.sample_area_km2();
         let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
         // The force balance, recorded and not applied (`forces.rs`; nothing when the record is
         // off).
