@@ -492,6 +492,10 @@ def main():
             print(f"   {r.status:7s} item {r.item}: {r.title} ({r.secs:.0f} s)", flush=True)
             for k in r.kids:
                 print(f"            {k[0]:5s} {k[1]}", flush=True)
+        # Several invocations may run side by side (--only bench / --only smoke-mic,...): merge into the file as it is now.
+        merged = load_rows()
+        merged.update({r.sid: r for r in got})
+        rows.update(merged)
         json.dump([r.to_json() for r in order_rows(rows)], open(os.path.join(SRC, "rows.json"), "w"), indent=1)
     allrows = order_rows(rows)
     if "page" not in rows or (only is not None and "page" not in only):
