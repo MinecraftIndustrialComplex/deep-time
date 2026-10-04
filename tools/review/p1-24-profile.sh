@@ -94,12 +94,12 @@ for raw in log.splitlines():
         lines.append((float(t), rest))
     except ValueError:
         pass
-mem = []
+rss = []
 try:
     for l in open(f"{out}/mem.log"):
         p = l.split()
         if len(p) == 2:
-            mem.append((float(p[0]), int(p[1]) / 1048576))
+            rss.append((float(p[0]), int(p[1]) / 1048576))
 except OSError:
     pass
 phases, open_at = [], None
@@ -118,7 +118,7 @@ if open_at is not None and end_t:
 elif phases and end_t:
     phases.append(("bake+write", phases[-1][2], end_t))
 def peak(a, b):
-    v = [g for t, g in mem if a - 1 <= t <= b + 1]
+    v = [g for t, g in rss if a - 1 <= t <= b + 1]
     return round(max(v), 2) if v else None
 phase_rows = [{"phase": n, "wall_s": round(b - a, 1), "peak_rss_gib": peak(a, b)} for n, a, b in phases]
 loads = [float(l.split()[1]) for l in open(f"{out}/load.log") if len(l.split()) > 1]
@@ -142,7 +142,7 @@ r = {
     "native_peak_mib": grab(r"peak ([\d.]+) MiB\)"),
     "stages_s": stages,
     "phases": phase_rows,
-    "sampled_peak_rss_gib": round(max(g for _, g in mem), 2) if mem else None,
+    "sampled_peak_rss_gib": round(max(g for _, g in rss), 2) if rss else None,
     "bake_s": round(total - sum(stages.values()), 1) if total and stages else None,
     "world_bytes": int(size),
     "cpu_wait_s": cg.get("cpu_wait_s"), "scope_memory_peak_gib": cg.get("memory_peak_gib"),
