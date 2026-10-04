@@ -168,8 +168,9 @@ def step_bench(a):
     t0 = time.time()
     for key, preset, myr, gate in (("quick16k", "earthlike_quick_16k", a.quick_myr, QUICK_GATE_S), ("full16k", "earthlike_full_16k", a.full_myr, FULL_GATE_S)):
         d = f"review/out/phase1/bench/{key}"
-        cmd = (f"mkdir -p review/out/phase1/bench && target/release/deeptime bench --preset {preset} --start {START} --length-myr {myr} --threads 8 "
-               f"--out {d}.json --viewer {d} 2>&1 | grep -E 'bench: threads=8 (timings|total_ms)|bench: .* runs'")
+        cmd = (f"mkdir -p review/out/phase1/bench && echo load-start $(cut -d' ' -f1 /proc/loadavg) && target/release/deeptime bench --preset {preset} "
+               f"--start {START} --length-myr {myr} --threads 8 --out {d}.json --viewer {d} 2>&1 | grep -E 'bench: threads=8 (timings|total_ms)|bench: .* runs'; "
+               "echo load-end $(cut -d' ' -f1,2 /proc/loadavg)")
         out, rc, secs = vm("bench", cmd, pulls=[f"{d}.json", d])
         res = bench_json(os.path.join(REPO, d + ".json"))
         if res is None:
@@ -177,7 +178,9 @@ def step_bench(a):
             kids.append(kid(False, f"bench {preset}: peak memory within the estimate", "no bench.json"))
             continue
         s, peak, est, stages, doc = res
-        ev = [f"{d}.json", f"{d}/index.html", f"{preset} {myr} Myr from {START}, 8 threads on {doc.get('host')}: {s:.0f} s (gate {gate:.0f} s)",
+        load = " / ".join(re.findall(r"^load-(?:start|end) (.*)$", out, re.M))
+        ev = [f"{d}.json", f"{d}/index.html", f"VM load average (1 min at start / 1 and 5 min at end; the bench shares the box with other agents' jobs, so a miss under load is a reason to re-run): {load}",
+              f"{preset} {myr} Myr from {START}, 8 threads on {doc.get('host')}: {s:.0f} s (gate {gate:.0f} s)",
               "stages: " + stage_lines(stages)]
         if s > gate:
             # The plan's alternative: "a per-stage report for Ben's decision" with the scaling across thread counts.
