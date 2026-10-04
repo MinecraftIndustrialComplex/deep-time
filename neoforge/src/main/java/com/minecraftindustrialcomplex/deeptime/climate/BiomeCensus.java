@@ -246,9 +246,9 @@ public final class BiomeCensus {
                 if (land && !untagged && rules != null) {
                     if (ruleCensus == null)
                         ruleCensus = new RuleCensus(rules.rules());
-                    boolean coldWet = wetFlag != null ? wetFlag.nearest(x, z) >= 1.5
+                    boolean ruleColdWet = wetFlag != null ? wetFlag.nearest(x, z) >= 1.5
                             : wetland && BiomeRules.COLD_WETLAND_CLASSES.contains(KOPPEN[k]);
-                    ruleCensus.add(b, decision, KOPPEN[k], coldWet);
+                    ruleCensus.add(b, decision, KOPPEN[k], ruleColdWet);
                 }
                 if (land && !untagged) {
                     landColumns++;
