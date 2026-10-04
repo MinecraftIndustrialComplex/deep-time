@@ -734,18 +734,24 @@ benchmark interleaves them.
 
 ## 11. Create across turning seams
 
-**Status (2026-10-04).** Built and run in parallel with Phase 1, as Ben asked in the decisions log on
+**Status (2026-10-04).** Built in parallel with Phase 1, as Ben asked in the decisions log on
 2026-10-03: "If it can be done in parallel, do it now, otherwise defer. But we should be doing it."
-The code sits on the spike's fold API and runs only with `-Ddeeptime.wrapspike=true` and Create
-installed:
-- `neoforge/src/main/java/.../compat/create/wrap/` holds:
-  - `SeamFrames`, the only class that touches the engine;
-  - `SeamTurns`, the pure algebra;
-  - `KineticSeams`, `SeamRefusals` and `CreateWrapCompat`;
-  - the GameTests, `CreateSeamGameTests` and `CreateSeamChecks`.
-- `neoforge/src/main/java/.../mixin/wrapspike/compat/create/` holds 15 mixins, listed in
-  `deeptime.wrapspike.mixins.json`. `DeepTimeMixinPlugin` applies a mixin in
-  `mixin.wrapspike.compat.<modid>` only when the flag is set and that mod is installed.
+- **History.** It was first built on the spike's fold, then moved onto Phase 1's API (§9) when that
+  landed.
+- **When it runs.** Only with `-Ddeeptime.wrapengine=true` and Create installed.
+- **Where the code is:**
+  - `neoforge/src/main/java/.../compat/create/wrap/`:
+    - `SeamFrames` is the only class that touches the engine, through `WrapEngine.fold`, `canonical`,
+      `turn`, `rotation`, `topology` and `WrapTopology.images`.
+    - `SeamTurns` holds the pure algebra.
+    - `KineticSeams`, `SeamRefusals` and `CreateWrapCompat`.
+  - The GameTests `CreateSeamGameTests` and `CreateSeamChecks` sit in the `wrapengine` package, next to
+    the engine's own tests whose sites they share.
+  - `neoforge/src/main/java/.../mixin/wrapengine/compat/create/` holds 15 mixins, listed in
+    `deeptime.wrapengine.mixins.json`. `DeepTimeMixinPlugin` applies a mixin in
+    `mixin.wrapengine.compat.<modid>` only when the flag is set and that mod is installed.
+- **Dev switches:** `-PwrapNoCompat` leaves every adapter mixin out, and `-PwrapCompatSkip=<Mixin>,…`
+  leaves the named ones out.
 
 **Create version.** 6.0.10 for NeoForge 1.21.1, as the MIC pack pins it (`pack/mods/create.pw.toml`,
 `smoke/mic/server/mods/create-1.21.1-6.0.10.jar`).
@@ -785,14 +791,23 @@ installed:
 **Unit test.** `SeamTurnsTest` checks:
 - the table, against the turned unit vectors;
 - that the signs compose like the turns;
-- on the spike seam, Guyou, Peirce and a quarter-turn corner, that every stored block next to a seam
-  finds its neighbour's band image and the way back;
-- that the two links' turns cancel, so a speed sent across and back returns with its own sign and
-  Create's propagation cannot flicker.
+- on a half-turn seam, Guyou, Peirce, a quarter-turn corner and the cube cross, sampling blocks along
+  every edge (corners and turn points included), that a link to a neighbour across the seam is
+  accepted from both ends or refused from both;
+- that an accepted link's two turns cancel, so a speed sent across and back returns with its own sign
+  and Create's propagation cannot flicker;
+- that refusals stay under a tenth of the samples.
 
-**Turn points.** At a turn point a block can be its own neighbour across the seam: it sees itself,
-turned. No rotation agrees with itself through a quarter-turn, so the adapter never connects a block
-to itself.
+**Turn points and cube corners.** Three rules keep the adapter's view the same from both ends of a
+connection:
+- **A block is never its own neighbour.** At a turn point a block can be its own neighbour across the
+  seam: it sees itself, turned. No rotation agrees with itself through a quarter-turn, so the adapter
+  never connects a block to itself.
+- **Neighbours in stored space connect only directly.** Two blocks that are neighbours in stored
+  space connect only as such, even where one also sees the other through the seam.
+- **A seam link must hold from both ends** (`SeamTurns.seamLink`). Next to a cube corner (a 270° cone
+  point) a diagonal seen through the seam is not always seen back that way. The unit test found this
+  on the cube cross at (128, 0). Such a link is refused from both ends.
 
 ### 11.2 Kinetics [R]
 
@@ -816,7 +831,8 @@ to itself.
 **The adapter** (`KineticSeams`, `RotationPropagatorSeamMixin`):
 - A `@WrapMethod` on `getRotationSpeedModifier` keeps Create's answer for a pair that is adjacent in
   stored space.
-- Otherwise it looks for `to`'s band image next to `from` (`SeamFrames.link`, by `images`).
+- Otherwise it looks for `to`'s band image next to `from` (`SeamFrames.link`, by `images`). The link
+  must hold from both ends (§11.1).
 - If there is one, it runs Create's method again with `to` as `from` sees it:
   - `to.getBlockPos()` is answered with the band position;
   - `to.getBlockState()` is answered with the state turned back;
@@ -997,8 +1013,9 @@ through them.
   `deeptime.wrap.create.refused.contraption` when any captured block lies beyond a seam.
   - The message shows on the controller's goggle tooltip.
   - Every contraption kind assembles through this method, trains included.
-- **Contraption entities are left out of the carry.** `CreateWrapCompat` registers a veto in the
-  spike's new `WrapEngine.CARRY_VETO`. It covers contraption entities and any vehicle carrying one.
+- **Contraption entities are left out of the carry.** `CreateWrapCompat` cancels the engine's
+  `WrapCrossingEvent` (§9.5) for contraption entities and any vehicle carrying one, so the engine
+  leaves them where they are.
 
 **Not refused yet: movement into the band** by an assembled piston or gantry. Its collider sees the far
 side's blocks, but empty band space lets it in. The hook is `ContraptionCollider.isCollidingWithWorld`
