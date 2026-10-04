@@ -228,6 +228,8 @@ neoForge {
             // mixins (-Ddeeptime.wrapspike=true; docs/design/wrap-engine.md). Never in a normal run.
             systemProperty 'neoforge.enabledGameTestNamespaces', project.hasProperty('wrapSpike') ? 'deeptime_wrapspike' : 'deeptime'
             if (project.hasProperty('wrapSpike')) systemProperty 'deeptime.wrapspike', 'true'
+            // -PwrapNoCompat: the spike without its mod adapters (mixin.wrapspike.compat.*), for A/B checks.
+            if (project.hasProperty('wrapNoCompat')) systemProperty 'deeptime.wrapspike.compat', 'false'
             systemProperty 'deeptime.gametest', 'true'
             if (extraDatapack) systemProperty 'deeptime.extraDatapack', extraDatapack.toString()
             // -PgametestOnly=<name>[,<name>…]: run only those tests (GameTestServerMixin).
