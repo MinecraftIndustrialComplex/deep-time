@@ -76,10 +76,11 @@ class SeamTurnsTest {
     }
 
     /**
-     * For every stored block next to a seam and every neighbour that lies beyond it: the neighbour's
-     * stored block finds, near the first block, exactly that band position; the link back exists too; and
-     * the two links' turns cancel, so a speed sent across and back returns with its own sign (no
-     * flicker in Create's propagation).
+     * For every stored block next to a seam and every neighbour that lies beyond it: the link is accepted
+     * from both ends or refused from both (refused only right at cube corners and turn points, under a
+     * tenth of the samples); an accepted link is that neighbour, next to the first block; and the two
+     * links' turns cancel, so a speed sent across and back returns with its own sign (no flicker in
+     * Create's propagation).
      */
     @Test
     void linksAcrossSeamsAreFoundBothWaysAndCancel() {
@@ -92,12 +93,14 @@ class SeamTurnsTest {
         int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
         Random r = new Random(7);
         for (WrapTopology t : tops) {
-            int checked = 0;
+            int checked = 0, refused = 0;
             for (int i = 0; i < 40000 && checked < 400; i++) {
                 // A block just inside a random edge, anywhere along it (corners and turn points included).
                 var e = t.edges().get(r.nextInt(t.edges().size()));
                 int v = e.minSide() ? e.coord() + r.nextInt(2) : e.coord() - 1 - r.nextInt(2);
-                int lo = Math.max(e.spanLo(), -300), hi = Math.min(e.spanHi(), 300);
+                int lo = Math.max(e.spanLo(), -4000), hi = Math.min(e.spanHi(), 4000);
+                if (hi <= lo)
+                    continue;
                 int u = lo + r.nextInt(hi - lo);
                 int ax = e.normalX() ? v : u, az = e.normalX() ? u : v;
                 if (!t.inside(ax, az))
@@ -111,25 +114,32 @@ class SeamTurnsTest {
                     // kinetic adapter refuses that self-connection (KineticSeams.modifier), so skip it here.
                     if (f.x() == ax && f.z() == az)
                         continue;
-                    int[] img = SeamTurns.nearestImage(t, ax, az, f.x(), f.z(), 1);
-                    assertNotNull(img, "image of (" + f.x() + ", " + f.z() + ") near (" + ax + ", " + az + ")");
+                    // Next to a turn point or cube corner the far block can also be a direct neighbour; the
+                    // adapter then connects the two only directly (symmetric), so no seam link is needed.
+                    if (Math.max(Math.abs(f.x() - ax), Math.abs(f.z() - az)) <= 1)
+                        continue;
+                    int[] img = SeamTurns.seamLink(t, ax, az, f.x(), f.z());
+                    int[] img2 = SeamTurns.seamLink(t, f.x(), f.z(), ax, az);
+                    String where = "topology " + t.name() + " a=(" + ax + ", " + az + ") q=(" + qx + ", " + qz + ") f=(" + f.x() + ", " + f.z() + ")";
+                    assertEquals(img == null, img2 == null, "a link is accepted from both ends or refused from both: " + where);
+                    if (img == null) {
+                        refused++;
+                        checked++;
+                        continue;
+                    }
                     WrapTopology.Fold back = t.fold(img[0], img[1]);
                     assertNotNull(back);
-                    assertArrayEquals(new int[]{f.x(), f.z()}, new int[]{back.x(), back.z()}, "the image folds to the neighbour");
-                    assertTrue(Math.max(Math.abs(img[0] - ax), Math.abs(img[1] - az)) <= 1, "the image is a neighbour");
-                    // And from the far block, the first block's image near it.
-                    int[] img2 = SeamTurns.nearestImage(t, f.x(), f.z(), ax, az, 1);
-                    assertNotNull(img2, "the link back from (" + f.x() + ", " + f.z() + ") to (" + ax + ", " + az + "), reached through ("
-                            + qx + ", " + qz + ") by " + f.iso() + "; images of the first block " + imgs(t.images(ax, az)));
+                    assertArrayEquals(new int[]{f.x(), f.z()}, new int[]{back.x(), back.z()}, "the image folds to the neighbour: " + where);
+                    assertTrue(Math.max(Math.abs(img[0] - ax), Math.abs(img[1] - az)) <= 1, "the image is a neighbour: " + where);
                     WrapTopology.Fold back2 = t.fold(img2[0], img2[1]);
                     assertEquals(0, (back.iso().quarterTurns() + back2.iso().quarterTurns()) % 4,
-                            "the turns of a link and its way back cancel: topology " + tops.indexOf(t) + " a=(" + ax + ", " + az + ") q=(" + qx + ", "
-                                    + qz + ") f=(" + f.x() + ", " + f.z() + ") img=" + imgs(List.of(img)) + " by " + back.iso() + " img2="
-                                    + imgs(List.of(img2)) + " by " + back2.iso());
+                            "the turns of a link and its way back cancel: " + where);
                     checked++;
                 }
             }
             assertTrue(checked >= 100, "enough seam neighbours sampled: " + checked);
+            // Refusals happen only right at cube corners and turn points, a small share of an edge.
+            assertTrue(refused * 10 <= checked, t.name() + ": " + refused + " of " + checked + " seam neighbours refused");
         }
     }
 

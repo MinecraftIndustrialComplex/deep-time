@@ -54,7 +54,9 @@ public class DeepTimeMixinPlugin implements IMixinConfigPlugin {
             // mixin.wrapengine.compat.<modid>.*: the engine's adapters for a mod, which need that mod too
             // (and -Ddeeptime.wrapengine.compat not false: ./gametest.sh -PwrapNoCompat, for A/B checks).
             String modid = modAfter(mixinClassName, WRAPENGINE + "compat.");
-            if (on && modid != null && (!installed(modid) || !Boolean.parseBoolean(System.getProperty("deeptime.wrapengine.compat", "true")))) {
+            String simple = mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1);
+            boolean skipped = modid != null && java.util.Arrays.asList(System.getProperty("deeptime.wrapengine.compat.skip", "").split(",")).contains(simple);
+            if (on && modid != null && (skipped || !installed(modid) || !Boolean.parseBoolean(System.getProperty("deeptime.wrapengine.compat", "true")))) {
                 LOGGER.info("Skipping wrap-engine mixin {}: {} is not installed or the adapters are off", mixinClassName, modid);
                 return false;
             }
