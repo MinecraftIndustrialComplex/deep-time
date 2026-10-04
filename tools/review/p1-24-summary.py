@@ -8,8 +8,8 @@ Per run: wall time, CPU time, the stages' own seconds (the run's `timings` line:
 surface, volcanoes, impacts and structure are one coupled stage, each sub-stage timed), the bake,
 peak memory and the world folder's size. Memory is the scope's anonymous memory every 2 s
 (mem.log, runs from 2026-10-04 08:40 on) split into three windows by the run's stamped log lines:
-the coupled stage, deposits, and young + amplify + bake (the session's log lines of the last
-three come out together at the end, so they are one window); older runs have only the whole run's
+the coupled stage, deposits, and young + amplify + bake (from the end of deposits: the session's
+log lines of the last three come out together at the very end, so they are one window); older runs have only the whole run's
 peak resident set (/usr/bin/time) and the scope's peak (which includes the page cache of what the
 run wrote).
 """
@@ -41,12 +41,12 @@ def windows(run: Path):
             t = float(t)
         except ValueError:
             continue
-        m = re.search(r"stage (\w+) started", rest)
-        if m and m.group(1) not in marks:
-            marks[m.group(1)] = t
-    t0 = marks.get("plates", samples[0][0])
-    td = marks.get("deposits")
-    ty = marks.get("young")
+        m = re.search(r"stage (\w+) (started|finished)", rest)
+        if m and (m.group(1), m.group(2)) not in marks:
+            marks[(m.group(1), m.group(2))] = t
+    t0 = marks.get(("plates", "started"), samples[0][0])
+    td = marks.get(("deposits", "started"))
+    ty = marks.get(("deposits", "finished"))
     end = samples[-1][0] + 1
 
     def peak(a, b):
