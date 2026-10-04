@@ -184,7 +184,10 @@ public final class BiomeCensus {
         for (Forbid f : FORBIDDEN)
             forbidden.put(f.name(), new int[2]);
         Map<Integer, Map<Integer, Integer>> classBiomes = new HashMap<>();
-        int skippedUntagged = 0;
+        int skippedUntagged = 0, landColumns = 0, wetlands = 0, wetlandSwamp = 0;
+        // The bake's wetlands (BIO-066): wet, flat, low, thawed land put in vanilla's swamp band E6 on
+        // purpose (the relief's own erosion stays below it), so swamp there whatever the Köppen family.
+        double e6 = OverworldBands.defaults().erosion()[6];
         for (int j = 0; j < h; j++) {
             int z = -zp + step / 2 + j * step;
             for (int i = 0; i < w; i++) {
@@ -214,8 +217,19 @@ public final class BiomeCensus {
                         && untaggedNamespaces.contains(b.unwrapKey().map(key -> key.location().getNamespace()).orElse("?"));
                 if (untagged && (k == 31 ? y < sea - 4 : land))
                     skippedUntagged++;
+                boolean wetland = land && !untagged && wd.raster(ClimateMapping.EROSION, x, z) >= e6;
+                if (land && !untagged) {
+                    landColumns++;
+                    if (wetland) {
+                        wetlands++;
+                        if (b.is(c("is_swamp")))
+                            wetlandSwamp++;
+                    }
+                }
                 if (!untagged && (k == 31 ? y < sea - 4 : land)) {
                     for (Check ch : CHECKS) {
+                        if (wetland)
+                            break;   // counted apart (above), not against the family's tags
                         if (!ch.koppen().test(k))
                             continue;
                         if (ch.notColderThan() != null && t.raster("climate/temperature", x, z) < ch.notColderThan())
@@ -296,6 +310,11 @@ public final class BiomeCensus {
         o.add("by_koppen", top);
         o.addProperty("biomes", palette.size());
         o.addProperty("skipped_untagged", skippedUntagged);
+        JsonObject wj = new JsonObject();
+        wj.addProperty("land_columns", landColumns);
+        wj.addProperty("wetland_columns", wetlands);
+        wj.addProperty("on_swamp", wetlandSwamp);
+        o.add("wetlands_set_aside", wj);
         if (mapFile != null) {
             JsonObject map = new JsonObject();
             map.addProperty("schema", 1);

@@ -128,29 +128,50 @@ class MagmaTest {
         for (double share : new double[]{0.0, 1.0}) {
             Magma.Body b = one(cone(100, 50, 182, 70), DRY, new MagmaRules(3.0, 1.5, share, true)).bodies().get(0);
             assertEquals(share > 0, b.lake());
-            long molten = 0;
-            int[][] n6 = {{1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, -1, 0}};
-            for (int dx = -b.reach() - 1; dx <= b.reach() + 1; dx++)
-                for (int dz = -b.reach() - 1; dz <= b.reach() + 1; dz++)
-                    for (int y = b.minY() - 1; y <= b.maxY() + 1; y++) {
-                        Magma.Part p = b.at(dx, dz, y);
-                        if (Math.abs(dx) > b.reach() || Math.abs(dz) > b.reach() || y < b.minY() || y > b.maxY()) {
-                            assertEquals(Magma.Part.NONE, p, "nothing outside the body's reach");
-                            continue;
-                        }
-                        if (!p.molten())
-                            continue;
-                        molten++;
-                        for (int[] d : n6) {
-                            Magma.Part q = b.at(dx + d[0], dz + d[2], y + d[1]);
-                            assertNotEquals(Magma.Part.NONE, q,
-                                    p + " at (" + dx + ", " + y + ", " + dz + ") is open towards " + d[0] + "," + d[1] + "," + d[2]);
-                            if (q == Magma.Part.LAKE_AIR)
-                                assertTrue(p == Magma.Part.LAKE && d[1] == 1, "only a lake's surface faces air");
-                        }
-                    }
-            assertTrue(molten > b.chamberBlocks() / 2, "molten " + molten);
+            assertTrue(sealed(b) > b.chamberBlocks() / 2);
         }
+    }
+
+    /**
+     * The same for the broad, flat lenses under a large active shield (the GameTest planet's volcano
+     * 78 of 2026-10-03): a lens 50 to 90 blocks across and 5 blocks high. With the shell's radii
+     * scaled up by 1.5 blocks, the shell above such a lens's flanks was thinner than a block and lava
+     * faced the rock (and the caves) over it.
+     */
+    @Test
+    void broadLensesAreSealedOnEverySide() {
+        Magma.Body b = kindOf("shield", false, 45_000, 1.0, COLUMN, LAVA_FLOOR, LAVA_FLOOR - 10).bodies().get(0);
+        int widest = 0;
+        for (int[] l : b.deep().lenses())
+            widest = Math.max(widest, l[1]);
+        assertTrue(widest >= 51, "the case needs a lens 51 blocks or more in radius: " + widest);
+        sealed(b);
+    }
+
+    /** Asserts every molten block of a body faces only the body on all six sides; returns the molten blocks. */
+    private static long sealed(Magma.Body b) {
+        long molten = 0;
+        int[][] n6 = {{1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, -1, 0}};
+        for (int dx = -b.reach() - 1; dx <= b.reach() + 1; dx++)
+            for (int dz = -b.reach() - 1; dz <= b.reach() + 1; dz++)
+                for (int y = b.minY() - 1; y <= b.maxY() + 1; y++) {
+                    Magma.Part p = b.at(dx, dz, y);
+                    if (Math.abs(dx) > b.reach() || Math.abs(dz) > b.reach() || y < b.minY() || y > b.maxY()) {
+                        assertEquals(Magma.Part.NONE, p, "nothing outside the body's reach");
+                        continue;
+                    }
+                    if (!p.molten())
+                        continue;
+                    molten++;
+                    for (int[] d : n6) {
+                        Magma.Part q = b.at(dx + d[0], dz + d[2], y + d[1]);
+                        assertNotEquals(Magma.Part.NONE, q,
+                                p + " at (" + dx + ", " + y + ", " + dz + ") is open towards " + d[0] + "," + d[1] + "," + d[2]);
+                        if (q == Magma.Part.LAKE_AIR)
+                            assertTrue(p == Magma.Part.LAKE && d[1] == 1, "only a lake's surface faces air");
+                    }
+                }
+        return molten;
     }
 
     @Test

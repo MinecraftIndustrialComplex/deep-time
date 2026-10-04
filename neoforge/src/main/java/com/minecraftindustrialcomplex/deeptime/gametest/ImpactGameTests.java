@@ -8,6 +8,7 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
@@ -104,16 +105,23 @@ public final class ImpactGameTests {
         Set<BlockState> breccia = new HashSet<>(result.blocks());
         int lens = (int) Math.max(3, Math.min(24, Math.floor(best.brecciaM() / mV)));
         int[] found = new int[FLOOR_COLUMNS.length], read = new int[FLOOR_COLUMNS.length];
+        // What the columns hold under the floor, by block, for the log: the lens is breccia, the rest soil and strata.
+        java.util.Map<String, Integer> seen = new java.util.TreeMap<>();
+        StringBuilder profile = new StringBuilder();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         double rimF = rim;
         ChunkSampling.forEach(helper, FLOOR_COLUMNS.length, i -> {
             int x = cx + FLOOR_COLUMNS[i][0], z = cz + FLOOR_COLUMNS[i][1];
             ChunkAccess chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.SURFACE, true);
             int top = (int) Math.ceil(t.height(x, z));
+            if (i == 0)
+                profile.append(columnProfile(chunk, x, z, top + 8, top - 40)).append(" heightmap ")
+                        .append(chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, x & 15, z & 15));
             // From the floor down through the lens (the top blocks are the surface rules' soil).
             for (int y = top; y >= Math.max(level.getMinBuildHeight(), top - lens - 2); y--) {
                 BlockState s = chunk.getBlockState(pos.set(x, y, z));
                 read[i]++;
+                seen.merge(BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath(), 1, Integer::sum);
                 if (breccia.contains(s))
                     found[i]++;
             }
@@ -126,16 +134,36 @@ public final class ImpactGameTests {
             }
             DeepTime.LOGGER.info("[gametest] aCraterIsABowlOverBreccia craters={} showing={} read=crater {} ({} m across, {}, {} Myr, "
                             + "{} m of {} m relief, lens {} m) at ({}, {}): centre y {} rim y {} bowl {} blocks (want {}); breccia {} "
-                            + "blocks in {} of {} columns, {} read each ({})", all.size(), showing, best.id(),
+                            + "blocks in {} of {} columns, {} read each ({}); read {}; centre column {}", all.size(), showing, best.id(),
                     Math.round(best.diameterM()), best.fate(), best.ageMyr(), Math.round(best.reliefM()), Math.round(best.depthM()),
                     Math.round(best.brecciaM()), cx, cz, String.format("%.1f", centre), String.format("%.1f", rimF),
                     String.format("%.1f", bowl), String.format("%.1f", want), blocks, columns, FLOOR_COLUMNS.length, read[0],
-                    result.blocks().stream().map(StrataGameTests::id).toList());
+                    result.blocks().stream().map(StrataGameTests::id).toList(), seen, profile);
             if (bowl < want)
                 helper.fail("crater " + best.id() + ": its centre is " + bowl + " blocks below its rim, " + want + " wanted");
             if (columns == 0)
                 helper.fail("crater " + best.id() + ": no impact breccia in the " + lens + " blocks under its floor");
             helper.succeed();
         });
+    }
+
+    /** The column from y {@code from} down to {@code to} as runs of one block, top first. */
+    static String columnProfile(ChunkAccess chunk, int x, int z, int from, int to) {
+        StringBuilder b = new StringBuilder();
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        String last = null;
+        int top = from, y = from;
+        for (; y >= Math.max(to, chunk.getMinBuildHeight()); y--) {
+            String id = BuiltInRegistries.BLOCK.getKey(chunk.getBlockState(p.set(x, y, z)).getBlock()).getPath();
+            if (!id.equals(last)) {
+                if (last != null)
+                    b.append(' ').append(last).append('[').append(top).append("..").append(y + 1).append(']');
+                last = id;
+                top = y;
+            }
+        }
+        if (last != null)
+            b.append(' ').append(last).append('[').append(top).append("..").append(y + 1).append(']');
+        return b.toString();
     }
 }

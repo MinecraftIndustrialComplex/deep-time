@@ -51,6 +51,7 @@ tools/client/mac-screenshots.sh [--name N] [--no-guidance] [--no-create]   # rea
 tools/review/publish.sh <name> <folder>                 # private spacesheep page (plan §2.6)
 tools/viewer/mac-watch.sh [--preset P --start S --length-myr L] [--tv] | stop | status   # workbench on the Mac → http://mac-mini:8642/ (tailnet only)
 tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete merged worktrees' Mac copies
+tools/remote/mac.sh --no-sync -- deeptime-admit status  # the VM's admission tool: what runs, what waits and why, the estimates
 
 ## Rules
 - **The test machine is the Azure VM `deeptime-test`** (Ben, 2026-10-01; D32as_v7, 32 vCPU, 125 GiB,
@@ -60,14 +61,42 @@ tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete m
   this file and in tools/ holds there. Where this file says "the Mac", read this machine.
   **Never run Deep Time jobs on the M6 Mac (mac-mini) again**: our load made graphide's ms-precision
   timing tests flaky. The subscription also holds graphide's production: touch nothing outside the
-  `deeptime-test` resource group. The box is ours but shared by every agent: cargo at most 8 jobs
-  (`CARGO_BUILD_JOBS=8`), simulation sweeps at most 4 runs of 2 threads at once, one Minecraft server
-  at a time (`--server`). It bills by the hour while running (about $38 a day), so **it deallocates
+  `deeptime-test` resource group. The box is ours but shared by every agent, and **every heavy job
+  goes through its admission tool** (Ben, 2026-10-03: "No set slots, instead we should have a system
+  of: Guess load, run if load is less than what is available + 25%, (measure load while running to
+  fine-tune future guesses)."): `tools/remote/vm/admit.py`, installed as
+  `/usr/local/lib/deeptime/admit.py` (`deeptime-admit` on PATH). There are no fixed slots, no
+  per-agent counts and no fixed job sizes. A job has a kind (`cargo:test`, `gradle:build`,
+  `gametest:mic`, `preview:standalone`, `sim:<preset>:<threads>t`, ...); its estimated load (mean
+  cores, peak memory: a seed table at first, then a high percentile of the kind's measured runs) must
+  fit what is free now or it waits in order and says why. Memory (Ben, 2026-10-03: "Don't kill old
+  things, just prevent new ones from launching if their usage isn't within it ... If we are at 3.5Gb
+  and a run is predicted to use 200mb it is green to run. If an agent predicts it will use 0.4 [GB]
+  then it will be red since that would use up 100% of the machine after margin is applied."): a job
+  starts when its memory estimate x 1.25 is under the free memory, where free = MemAvailable minus
+  what admitted jobs have reserved and not used yet; the margin is on the job's prediction, there is
+  no standing headroom, and running jobs are never stopped (a 4 GiB box with 0.5 GiB free: a 0.2 GiB
+  job runs, a 0.4 GiB job waits). CPU is unchanged (estimate fits in 1.25 x the free cores, 4 cores
+  kept for the play server, the workbench and ssh, since overcommitting CPU only slows jobs down); a job that has waited 15 minutes stops anything behind it from starting
+  first. Its process tree is measured while it runs and refines the next estimate. mac.sh admits
+  every command (`--kind` overrides the kind it classifies; quick looks and detached starts run at
+  once); `tools/remote/detach.sh start`, `gametest.sh`, `gametest-planet.sh`, `tools/smoke/run.py`,
+  `tools/workbench/preview.py` (so the workbench's previews) and `tools/client/dh-client-check.sh`
+  admit themselves. A script of your own that starts several heavy steps itself wraps each:
+  `deeptime-admit run --kind <kind|auto> -- <command>`. Minecraft servers run side by side: each
+  server job gets its own ports (26000 + 10 per slot: game, RCON, query, voice chat), X display and
+  folder (`deeptime-cache/servers/<job>`, removed when it ends), and runs in a private copy of its
+  server set (`tools/smoke/instance.py`), never in `smoke/<profile>/server` itself; the play server
+  (25765) and the workbench (8642) stay outside the pool. `mac.sh --server` is only for scripts that
+  boot Minecraft without those launchers. The old `deeptime-cache/server.lock` (agents still on the
+  old scripts) counts as one running server job while it exists. It bills by the hour while running
+  (about $38 a day), so **it deallocates
   itself after 30 idle minutes** (Ben, 2026-10-03: "Auto-stop when idle"): the watcher
-  `deeptime-idle.service` (`tools/remote/vm/idle-watcher.py`) counts as busy any cargo/rustc,
+  `deeptime-idle.service` (`tools/remote/vm/idle-watcher.py`) counts as busy any job the admission
+  tool has admitted or queued, any cargo/rustc,
   Gradle client, Java (except the idle play server and Gradle daemons), `deeptime` other than the
   workbench, nix/Python/rsync process, any detached shell script (`setsid nohup bash …`, detach.sh
-  jobs), any ssh session running a command (not the laptop's `ssh -N` tunnels), the server lock, a
+  jobs), any ssh session running a command (not the laptop's `ssh -N` tunnels), the old server lock, a
   workbench run or preview in progress, a player on the play server, or load above 4. Keep a
   long job visible to it: run it as a process or detached script on the VM, never as a laptop-side
   loop that only ssh-polls now and then. `cat /data/ban/deeptime-cache/idle-watcher.state` says
@@ -103,9 +132,11 @@ tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete m
   Gradle build, GameTest, smoke/planet server and BlueMap render goes through
   `tools/remote/mac.sh [--pack] [--pull <path>]... -- '<command>'`, which rsyncs this checkout to the
   Mac's external SSD (`/Volumes/Graphide/ban/mic/…`; /nix, Gradle and cargo caches are there too)
-  and runs the command in a login shell there. The laptop edits, commits and pushes. Builds from
-  several agents may overlap; anything that boots Minecraft (GameTests, planet/smoke servers,
-  BlueMap) must pass `--server`, which holds the Mac's single server lock (fixed ports, 16 GB shared).
+  and runs the command in a login shell there, through the VM's admission tool (above). The laptop
+  edits, commits and pushes. Jobs from several agents run side by side as their load allows;
+  anything that boots Minecraft goes through the repo's launchers (gametest.sh, gametest-planet.sh,
+  smoke run.py, preview.py, dh-client-check.sh), which take a server slot themselves, or passes
+  `--server`.
 - **Nothing heavy on the laptop, not even "just a script"** (Ben, 2026-09-29, after agents' local
   headless Chromium screenshot runs, Python sweeps and CFR decompiles drove it to load ~60 and swap):
   screenshots (playwright/Chromium), decompiles (cfr/javap over jars), jar greps, Python sweeps and
@@ -124,8 +155,8 @@ tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete m
 - **Real-client runs** (booting a Minecraft client for screenshots) go to the Mac's logged-in desktop
   session too, never the laptop's Xvfb (Ben, 2026-09-28). That desktop is shared with graphide's
   agents: take a "drive" lease with graphide's `utilities/scripts/mactest/m6lock.sh` first.
-  `tools/client/mac-screenshots.sh` does all of it from the laptop (sync and build, Deep Time's server
-  lock, the drive lease, the launch in the desktop session, the PNGs back in review/out/<name>/);
+  `tools/client/mac-screenshots.sh` does all of it from the laptop (sync and build, a server job of
+  the admission tool, the drive lease, the launch in the desktop session, the PNGs back in review/out/<name>/);
   the ScreenshotDriver's walk is the model for any other client check. Any other real-client tool
   (`tools/client/ev-assets.sh`) launches through the same Mac-side library, `tools/client/mac-client-lib.sh`
   (lease, desktop session, cleanup), and stops with exit 4 when nobody is logged in or the screen is
@@ -167,7 +198,7 @@ tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete m
   agents queueing two runs each): an agent on a branch runs cargo (test, clippy, fmt, deny) and
   `./gradlew build test`, not `./gametest.sh`. The coordinator merges a batch into master, then runs
   `./gametest.sh` and `./gametest.sh -PwithMic` once and fixes failures on master. Planet probes
-  and smoke runs that a task needs for its own measurements still take `--server`.
+  and smoke runs that a task needs for its own measurements run as usual (admitted like any job).
 - Never commit smoke/, run/, run-gametest/, run-planet/, libs/, review/out/, rcon.pw or
   .spacesheep.json. Never redistribute Project Atmosphere.
 - Licence acceptances Ben made (2026-09-28): Minecraft EULA for headless test servers, BlueMap

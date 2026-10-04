@@ -18,8 +18,9 @@
 #              the server set's copy when its bytes differ, and says so in its status)
 #
 # Everything else goes to tools/workbench/preview.py run (README.md next to this file). Paths are
-# relative to the repo root. The run holds the Mac's server lock (mac.sh --server), waiting for it
-# if another agent's server holds it. The job lands in smoke/workbench/jobs/<job>/ here:
+# relative to the repo root. On the test VM the run goes through the admission tool (it starts when
+# its load fits, on its own ports and in its own copy of the server set). The job lands in
+# smoke/workbench/jobs/<job>/ here:
 # status.json, area-<i>.dtva.gz, probes.jsonl, server.log. Open an export with
 #   tools/workbench/view.sh smoke/workbench/jobs/<job>/area-0.dtva.gz
 
@@ -27,7 +28,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO"
 
-MAC=(tools/remote/mac.sh --server)
+MAC=(tools/remote/mac.sh)
 JOB=""; PASS=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -47,7 +48,7 @@ REL="smoke/workbench/jobs/$JOB"
 QUOTED=""
 for a in "${PASS[@]}"; do QUOTED+=" $(printf '%q' "$a")"; done
 set +e
-"${MAC[@]}" --pull "$REL" -- "python3 tools/workbench/preview.py run --lock-held --job $JOB$QUOTED"
+"${MAC[@]}" --pull "$REL" -- "python3 tools/workbench/preview.py run --job $JOB$QUOTED"
 status=$?
 set -e
 if [ -f "$REL/status.json" ]; then
