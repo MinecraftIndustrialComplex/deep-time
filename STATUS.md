@@ -87,6 +87,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+| 2026-10-04 | Create across turning seams | **Three choices** (docs/design/wrap-engine.md §9): (1) trains across turning seams: build the portal-edge route (13–22 days for a half-turn, plus 2–4 for a quarter-turn) once Phase 1's topology API is final, with track refused at seams until then (recommended); or keep track refused at seams for good; (2) contraptions across seams (11–19 days): after trains, in Phase 4 (recommended); or keep assembly refused at seams for good; (3) MIC's Alternate Current breaks redstone across seams (spike test fails with MIC only): fold its level access in Phase 1 (recommended), or leave Alternate Current out of MIC worlds that use the engine. | Coordinator's report (not yet asked) |
 | 2026-10-04 | Wrap engine (design + spike) | **Four choices** (docs/design/wrap-engine.md §8): (1) architecture: one stored copy + folded access + replicated band, vanilla clients join, optional client re-anchor (recommended), or Toroidal World's client frame extended with turned packets; (2) keep Toroidal World for Guyou's slide edges, engine owns only the turning edges (recommended), or engine owns every edge; (3) Create: refuse kinetic, fluid and train connections across turning seams at first (recommended), or adapters in the first version; (4) start Phase 1 now alongside the Immersive Portals work (recommended; the engine takes any layout of translations, half- and quarter-turns), or stop at the spike until the projection survey settles the layout. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-03 | Seamless projection survey | **The production seamless world, four choices** (docs/research/notes/seamless-projection-survey.md §8; replaces the prototype's four, of which Ben answered three on 2026-10-03: research the projection, Immersive Portals plus an own engine, bake only): (1) a cube world, eight mild 270° corners, shapes ≤ 1.42× (recommended), or keep the 2:1 Guyou world with Petroff's equal-area map, shapes ≤ 2.67×; (2) the cube's map: the smooth equal-area table (the conformal cube made equal-area by Moser's flow, no creases; recommended) or closed-form QSC = Roşca–Plonka (41° creases on face diagonals); (3) the cross net, seven seam pairs, straight wrapped equator (recommended), or a 3 × 2 rectangle (eight); (4) faces of 3,776 / 7,552 blocks, today's scale (recommended), or 4,096 / 8,192. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | 35 m vertical scale | **Plutons with a floor.** `strata-check` on the 35 m bakes finds plutonic rock with other rock under it in 16 to 17 % of land columns (0.1 % at 20 m) and 5.4 to 5.8 % of the stored stacks (0 at 20 m): the world now reaches 14.5 km below the sea, under the floors of the stored plutonic layers. The rule is measured, not asserted (structure/realism.rs rule 3); a question for the rock/pluton work, not changed here. (a, recommended) Let the column builder carry plutonic rock to the world's floor where a pluton's layer is the lowest stored one (a follow-up task). (b) Accept floored plutons (real plutons have floors). | Not asked yet (sub-agent; for the coordinator) |
@@ -121,6 +122,77 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-02 | science WP-14a | **CO₂ forcing above 50,000 ppm and the snowball's escape** (CLM-070, CLM-166; design §4.2). The clock's forcing is Byrne & Goldblatt 2014's fit, stated for 200–10,000 ppm and computed to 50,000 ppm; the code uses it to 10⁶ ppm, and today's snowball escapes near 5.5·10⁵ ppm where Hoffman et al. 2017 expect 10⁴–10⁵ ppm (with cloud forcing of ≥ 10 W/m² that cloud-free models lack). (1, recommended) a short research task finds a published forcing calculation for 0.05–1 bar of CO₂ and the snowball cloud forcing; T6 then applies both, and the escape is measured against 10⁴–10⁵ ppm; (2) cap now: above 50,000 ppm continue the fit as a logarithm with its slope there (no source; escape CO₂ moves, direction to be measured); (3) leave it (escape stays near 0.55 bar). | to be asked by the coordinator (sub-agent report) |
 
 ## Build log
+### 2026-10-04 — Create across the wrap engine's turning seams: kinetics and fluids adapters, refusals, train and contraption assessment (Ben's "If it can be done in parallel, do it now, otherwise defer. But we should be doing it."; agent worktree agent-a9fc837518e2419c1, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; dev-only behind `-Ddeeptime.wrapspike=true`, not merged)
+- **Design.** `docs/design/wrap-engine.md` §9, "Create across turning seams". The §4.8 Create rows now
+  point at it.
+- **Create 6.0.10** (the MIC pin; code MIT, assets all rights reserved). It is compileOnly, with the
+  Ponder, Flywheel and Registrate jars it nests extracted for javac (`create_version`,
+  `create_nested_jars` in `gradle.properties`). Nothing was copied, and NOTICE.md lists it under
+  "APIs called".
+- **The rule** (§9.1): a turn carries a speed s about +a to s about R(+a).
+  - A half-turn flips x and z speeds and keeps y.
+  - A quarter-turn swaps x and z and flips one of them.
+  - Faces handed between block entities turn with the state.
+  - `SeamTurns` holds the rule; `SeamTurnsTest` checks it (5 tests), including links found both ways
+    with cancelling turns on Guyou, Peirce, the spike seam and a quarter-turn corner.
+- **Kinetics.**
+  - `KineticSeams` plus `RotationPropagatorSeamMixin` re-run Create's own
+    `getRotationSpeedModifier` with the far block entity shown at its band position, its state turned
+    back and faces turned. The result is multiplied by the axis sign.
+  - Create's answer is never used for a pair that is not adjacent in stored space: its axis rule
+    ignores distance.
+  - `DirectionalShaftHalvesSeamMixin` gives a gearbox the face its source is seen through.
+  - Custom connections (belts, chain conveyors, gantries) are refused, and so are self-links at turn
+    points.
+- **Fluids.** Faces are turned into the target's frame at 9 places: `FluidPropagator` (3),
+  `PumpBlockEntity` (3), `FlowSource` (2), `FluidNetwork`. `PipeConnection.determineSource` folds a
+  band position.
+- **Refused with a message, never a crash** (`SeamRefusals`: one log line per place and kind, an
+  action-bar message within 16 blocks):
+  - belts and chain conveyors whose span touches the band;
+  - track within a block of a seam: the track tool, through Create's own placement message, and any
+    track block one tick after placing;
+  - contraption assembly reaching beyond a seam, through Create's `AssemblyException`, which shows on
+    the goggles.
+  - Contraption entities are vetoed from the spike's carry (new `WrapEngine.CARRY_VETO`).
+- **Spike edits (small).**
+  - `WrapSpikeGameTests`: the site helpers are public, and there is a `glue(level, edges)` method.
+  - The walker check waits 100 ticks, not 20. Its stand was carried after the check in one standalone
+    run.
+  - `DeepTimeMixinPlugin`: `mixin.wrapspike.compat.<modid>` mixins need the flag and the mod.
+  - `WrapEngine.init` wires the Create adapters at server start. Loading Create's entity classes during
+    mod construction broke Registrate ("Found unused register callbacks").
+- **Evidence** (`./gametest.sh -PwithMic -PwrapSpike`, test VM, 2026-10-04 04:27 UTC, 43 s): all 4
+  Create tests passed.
+  - **Half-turn.**
+    - z shafts: far stored speed +16 at (cx−2, z0…z0+2), control −16.
+    - y cogs: same sign as the control.
+    - x cogs: flipped.
+    - Breaking the shaft next to the motor stops all 7, the far side included.
+  - **Quarter-turn.** z shafts land as an x line at (x0…x0+2, z0+6), speed +16 against the control's
+    −16. y cogs keep their sign.
+  - **Fluids.** The far tank holds 104 mB of water after 120 ticks, the same as the control.
+  - **Refusals.** A belt across the seam is refused while one on this side connects. A bearing across
+    the seam is refused while one on this side assembles. Track at the seam is broken; track 5 blocks
+    away stays.
+- **Found.** The spike's `redstonePowersAcrossSeam` fails with the MIC set: power goes 13, then 0
+  beyond the seam. It passes without MIC. The likely cause is Alternate Current's own level access
+  [not read]; it is listed in §9.7.
+- **Blocked on Phase 1** (§9.7):
+  - client-side band block entities (turned Create tags: `Speed` times the sign, `Source` moved, pipe
+    faces re-keyed);
+  - band chunk tickets (Create only steps into loaded chunks);
+  - the API swap, which touches `SeamFrames` only.
+- **Assessed, not built.**
+  - Trains across a half-turn: 13–22 days, by a same-dimension portal edge on Create's portal-track
+    machinery. That route needs "dimension" generalised to "frame", client included. A quarter-turn
+    adds 2–4 days.
+  - Contraptions: 11–19 days.
+- **Gates:** see the next entry line.
+- **Next:** swap `SeamFrames` onto Phase 1's API when it lands. Then send band block entities with
+  turned Create tags, and refuse piston and gantry movement into the band
+  (`ContraptionCollider.isCollidingWithWorld`).
+
 ### 2026-10-03/04 — Seamless projection survey: which projection for a portal-joined world (Ben's "Send off some research on what the current best projections would be for this"; agent worktree agent-a720027b758d66bc2, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; research only, not merged)
 - **What.** `docs/research/notes/seamless-projection-survey.md` and its tools `tools/research/projection-survey/` (survey.py: any map as tiles plus a seam table, measuring area, shape, straight-walk drift and derivative jumps across every seam and face line; conformal.py: Schwarz triangle maps for the conformal cube, Peirce, Lee's tetrahedron; moser.py: a conformal map made equal-area by Moser's flow; bench.rs: inverse cost; run.sh runs them on the VM through the admission tool, results in review/out/projection-survey/). Two Sonnet sub-agents read the sources (formulas and licences; post-2015 cube-map work).
 - **Found.** With quarter-turn seams the cube (8 corners of 270°) beats the pillowcase (4 of 180°) by a theorem: equal-area maps need shape ratio ≥ 4/3 near a cube corner against ≥ 2 near a Peirce point. Measured on 16 maps: the conformal cube made equal-area by Moser's flow (the note's own construction) has area 0.01 % rms, shape median 1.26 / max 1.42, no creases (derivative jumps ≤ 0.02, the table's floor); QSC = Roşca–Plonka (the same map, measured) median 1.32 / max 1.55, creased (diagonals ε 0.87, 41°); Petroff in the Guyou layout median 1.78 / max 2.67, smooth across its seams; HEALPix is a cube in disguise with 63° creases; Gringorten's crease lies on its seams. Inverse costs 4 ns (gnomonic) to 2 µs (Gringorten) per block; irrelevant at the bake (0.3 s for the table map on a 16k cube world).
