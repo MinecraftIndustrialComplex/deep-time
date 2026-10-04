@@ -20,7 +20,9 @@
 # load every 10 s: the box is shared, so wall time is only as good as the load beside it) and
 # <out>/result.json (wall, CPU, peak RSS, per-stage seconds, each phase's wall time and peak RSS,
 # the bake, the folder's size). P124_MEM=12G overrides the profile's memory (to measure a preset
-# that does not fit). The world data is deleted afterwards unless P124_KEEP=1. Runs through the admission tool as
+# that does not fit), P124_BIN another `deeptime` binary, P124_ENV environment words for the run
+# (`MALLOC_ARENA_MAX=2 LD_PRELOAD=...`: sudo drops the caller's environment). The world data is
+# deleted afterwards unless P124_KEEP=1. Runs through the admission tool as
 # sim:<preset>:<threads>t when it is not already inside an admitted job.
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -38,7 +40,7 @@ esac
 threads=$((ncpu - 1)); nice=0
 [ "$profile" = bg2 ] && { threads=2; nice=19; }
 [ -n "$cpus" ] || cpus="0-$((ncpu - 1))"
-bin="$REPO/target/release/deeptime"
+bin="${P124_BIN:-$REPO/target/release/deeptime}"
 [ -x "$bin" ] || { echo "build first: cargo build --release -p deeptime-cli" >&2; exit 2; }
 
 if [ -z "${DEEPTIME_ADMIT_JOB:-}" ] && command -v deeptime-admit >/dev/null; then
@@ -66,7 +68,7 @@ sudo systemd-run --scope -q --unit="$unit" --uid="$(id -u)" --gid="$(id -g)" -p 
     /usr/bin/time -v "$@" 2>&1 | while IFS= read -r l; do printf "%s %s\\n" "$EPOCHREALTIME" "$l"; done > "$out/run.log"; s=$?
     { echo "cpu $(grep ^some "$cg/cpu.pressure")"; echo "memory_peak $(cat "$cg/memory.peak")";
       echo "usage_usec $(grep ^usage_usec "$cg/cpu.stat")"; } > "$out/cgroup.txt"
-    exit $s' p124 "$out" nice -n "$nice" "$bin" run --preset "$preset" --start "$start" --length-myr "$length" \
+    exit $s' p124 "$out" env ${P124_ENV:-} nice -n "$nice" "$bin" run --preset "$preset" --start "$start" --length-myr "$length" \
     --out "$out/world" --threads "$threads" --mem-cap 4294967296 "$@"
 status=$?
 t1=$(date +%s.%N)
