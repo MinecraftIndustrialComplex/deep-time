@@ -1833,3 +1833,151 @@ mod petroff_guyou_tests {
         }
     }
 }
+
+/// The cross-language parity fixture (`tests/data/projection_parity.json`): inputs and outputs of
+/// the portable trigonometry, Petroff's square and two Petroff–Guyou worlds, every number as the
+/// hex of its bits. Java's `ProjectionParityTest` and the pages' `tools/viewer/projection-check.js`
+/// read it and must give the same bits. `DEEPTIME_WRITE_PARITY=1 cargo test -p deeptime-format
+/// parity_fixture` rewrites it after a deliberate change.
+#[cfg(test)]
+mod parity_fixture {
+    use super::*;
+    use crate::petroff::Petroff;
+
+    fn hx(v: f64) -> String {
+        format!("\"{:016x}\"", v.to_bits())
+    }
+
+    struct Rng(u64);
+    impl Rng {
+        fn f(&mut self) -> f64 {
+            self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
+            let mut z = self.0;
+            z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+            ((z ^ (z >> 31)) >> 11) as f64 / (1u64 << 53) as f64
+        }
+    }
+
+    /// The fixture's text.
+    pub(super) fn fixture() -> String {
+        let mut g = Rng(0x0DE5_7001);
+        let mut out = String::from(
+            "{\n  \"about\": \"deeptime_format::projection parity fixture: inputs and outputs as f64 bit patterns (hex). Regenerate with DEEPTIME_WRITE_PARITY=1.\",\n",
+        );
+        // Portable trigonometry.
+        out.push_str("  \"math\": [\n");
+        let mut rows = Vec::new();
+        for k in 0..240 {
+            let x = (g.f() - 0.5) * if k % 3 == 0 { 40.0 } else { 4.0 };
+            let y = (g.f() - 0.5) * 4.0;
+            let u = g.f() * 2.0 - 1.0;
+            rows.push(format!(
+                "    {{\"x\": {}, \"y\": {}, \"u\": {}, \"sin\": {}, \"cos\": {}, \"tan\": {}, \"atan\": {}, \"atan2\": {}, \"asin\": {}, \"acos\": {}}}",
+                hx(x),
+                hx(y),
+                hx(u),
+                hx(pm::sin(x)),
+                hx(pm::cos(x)),
+                hx(pm::tan(x)),
+                hx(pm::atan(x)),
+                hx(pm::atan2(y, x)),
+                hx(pm::asin(u)),
+                hx(pm::acos(u))
+            ));
+        }
+        out.push_str(&rows.join(",\n"));
+        out.push_str("\n  ],\n");
+        // Petroff's square.
+        let p = Petroff::new();
+        out.push_str("  \"petroff\": [\n");
+        let mut rows = Vec::new();
+        for _ in 0..200 {
+            let (x, y) = (g.f() * 2.0 - 1.0, g.f() * 2.0 - 1.0);
+            let (l, f) = p.inverse(x, y);
+            let lam = g.f() * 2.0 * PI;
+            let phi = pm::asin(g.f() * 2.0 - 1.0);
+            let (fx, fy) = p.forward(lam, phi);
+            rows.push(format!(
+                "    {{\"x\": {}, \"y\": {}, \"lambda\": {}, \"phi\": {}, \"lam_in\": {}, \"phi_in\": {}, \"x_out\": {}, \"y_out\": {}}}",
+                hx(x),
+                hx(y),
+                hx(l),
+                hx(f),
+                hx(lam),
+                hx(phi),
+                hx(fx),
+                hx(fy)
+            ));
+        }
+        out.push_str(&rows.join(",\n"));
+        out.push_str("\n  ],\n");
+        // Two worlds.
+        out.push_str("  \"worlds\": [\n");
+        let mut worlds = Vec::new();
+        for (b, lc) in [(6_656u32, 31.25f64), (1_536, 0.0)] {
+            let w = PetroffGuyou::new(b, lc);
+            let (bf, h) = (f64::from(b), f64::from(b) / 2.0);
+            let mut pts = Vec::new();
+            for k in 0..200 {
+                // Points inside, on the edges and a few past them (folded).
+                let x = (g.f() - 0.5) * 2.0 * bf;
+                let z = match k % 10 {
+                    0 => -h,
+                    1 => h,
+                    2 => -h - g.f() * 50.0,
+                    _ => (g.f() - 0.5) * bf,
+                };
+                let v = w.unit(x, z);
+                let (lat, lon) = w.lat_lon(x, z);
+                pts.push(format!(
+                    "        {{\"x\": {}, \"z\": {}, \"v\": [{}, {}, {}], \"lat\": {}, \"lon\": {}}}",
+                    hx(x),
+                    hx(z),
+                    hx(v[0]),
+                    hx(v[1]),
+                    hx(v[2]),
+                    hx(lat),
+                    hx(lon)
+                ));
+            }
+            let mut inv = Vec::new();
+            for _ in 0..200 {
+                let lat = pm::to_degrees(pm::asin(g.f() * 2.0 - 1.0));
+                let lon = g.f() * 360.0;
+                let (x, z) = w.block_of(lat, lon);
+                inv.push(format!(
+                    "        {{\"lat\": {}, \"lon\": {}, \"x\": {}, \"z\": {}}}",
+                    hx(lat),
+                    hx(lon),
+                    hx(x),
+                    hx(z)
+                ));
+            }
+            worlds.push(format!(
+                "    {{\"b\": {b}, \"lambda_c_deg\": {}, \"points\": [\n{}\n      ], \"inverse\": [\n{}\n      ]}}",
+                hx(lc),
+                pts.join(",\n"),
+                inv.join(",\n")
+            ));
+        }
+        out.push_str(&worlds.join(",\n"));
+        out.push_str("\n  ]\n}\n");
+        out
+    }
+
+    #[test]
+    fn parity_fixture_is_current() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/projection_parity.json");
+        let text = fixture();
+        if std::env::var_os("DEEPTIME_WRITE_PARITY").is_some() {
+            std::fs::create_dir_all(std::path::Path::new(path).parent().unwrap()).unwrap();
+            std::fs::write(path, &text).unwrap();
+        }
+        let on_disk = std::fs::read_to_string(path).expect("the parity fixture");
+        assert!(
+            on_disk == text,
+            "{path} is stale: rerun with DEEPTIME_WRITE_PARITY=1 and commit it (Java and JS read it)"
+        );
+    }
+}
