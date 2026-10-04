@@ -636,12 +636,8 @@ mod tests {
         a.pools = oceanic_column();
         a.elevation_m = -3000.0;
         let mut b = a;
-        let floor = held_floor_m(
-            oceanic_m(),
-            oceanic_m(),
-            fx.k.oceanic_floor_elevation_m,
-            f,
-        ) as f32;
+        let floor =
+            held_floor_m(oceanic_m(), oceanic_m(), fx.k.oceanic_floor_elevation_m, f) as f32;
         surface_step(&mut a, &rates, floor);
         surface_step(&mut b, &rates, f32::NAN);
         assert!((a.elevation_m - b.elevation_m).abs() < 1e-3);
@@ -669,12 +665,7 @@ mod tests {
         let last = fx.run(&mut st, 30);
         let f = crust_per_metre(&fx.env(1));
         let z_f = fx.k.oceanic_floor_elevation_m;
-        let ceiling = held_floor_m(
-            0.5 * (continental_m() + oceanic_m()),
-            f64::INFINITY,
-            z_f,
-            f,
-        );
+        let ceiling = held_floor_m(0.5 * (continental_m() + oceanic_m()), f64::INFINITY, z_f, f);
         for &i in &stacked {
             assert_eq!(st.samples[i].pools, before[i].pools, "stacked column {i}");
             assert!(last.floor_m[i].is_nan());
