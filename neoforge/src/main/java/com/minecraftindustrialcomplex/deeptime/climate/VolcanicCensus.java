@@ -53,7 +53,7 @@ public final class VolcanicCensus {
 
     /** One placement's counts. */
     public static final class Side {
-        public int columns, volcanic, far, outside, poolsInRole, volcanicCells, specks;
+        public int columns, volcanic, far, outside, poolsInRole, volcanicCells, specks, onGeologicGround;
         public final Map<String, Integer> byBiome = new HashMap<>();
         public final StringBuilder examples = new StringBuilder();
 
@@ -69,6 +69,7 @@ public final class VolcanicCensus {
             o.addProperty("pools_in_role", poolsInRole);
             o.addProperty("volcanic_cells", volcanicCells);
             o.addProperty("specks", specks);
+            o.addProperty("volcanic_on_their_geologic_ground", onGeologicGround);
             JsonObject b = new JsonObject();
             byBiome.entrySet().stream().sorted(Map.Entry.<String, Integer>comparingByValue(Comparator.reverseOrder()))
                     .forEach(e -> b.addProperty(e.getKey(), e.getValue()));
@@ -133,7 +134,15 @@ public final class VolcanicCensus {
                 Holder<Biome> b = biomes.getNoiseBiome(qx, qy, qz, sampler);
                 Holder<Biome> p = VolcanicBiomes.plain(() -> biomes.getNoiseBiome(qx, qy, qz, sampler));
                 double near = nearest(sources, x, z, c), out = zones.outsideSurfaceZones(x, z);
-                tally(now, b, near, out, x, z);
+                // A volcanic biome that is also rock-named (Terralith's Basalt Cliffs) may stand on its own ground away
+                // from volcanoes (the geology gate, decisions log 2026-10-04): not counted as volcanic there.
+                int gated = marker.volcanic().gatedRoles(b);
+                if (gated != 0 && (gated & marker.volcanic().geology().rolesAt(x, z)) != 0) {
+                    now.columns++;
+                    now.onGeologicGround++;
+                } else {
+                    tally(now, b, near, out, x, z);
+                }
                 tally(plain, p, near, out, x, z);
                 if (b != p)
                     differ++;

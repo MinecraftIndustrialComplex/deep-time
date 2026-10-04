@@ -1,0 +1,33 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "#deeptime:geology/shield",
+      "required": false
+    },
+    {
+      "id": "#deeptime:geology/granite",
+      "required": false
+    },
+    {
+      "id": "#deeptime:geology/carbonate_coast",
+      "required": false
+    },
+    {
+      "id": "#deeptime:geology/granite_coast",
+      "required": false
+    },
+    {
+      "id": "#deeptime:geology/basalt_coast",
+      "required": false
+    },
+    {
+      "id": "#deeptime:geology/dry_sedimentary",
+      "required": false
+    },
+    {
+      "id": "#deeptime:geology/humid_karst",
+      "required": false
+    }
+  ]
+}
