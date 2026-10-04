@@ -53,11 +53,15 @@ pub struct ImpactParams {
     /// Collins, Melosh & Marcus 2005, p. 819; the defaults take 3,000 and 7,800 for iron).
     pub impactor_density_kg_m3: f64,
     /// How deep craters are, as a share of the real depth: every vertical measure of a crater
-    /// (floor depth, rim, central peak, breccia lens) is its physical one times this. Heights are stretched 15 times
-    /// against widths (20 m high against 300 m wide per block), so a bowl of real proportions (1)
-    /// is a shaft three times deeper than wide in blocks; the default 0.5 follows the volcanoes'
-    /// `flank_steepness` (Ben, 2026-09-30: "Setting, gentler default"). Game choice (ledger
-    /// IMP-130): the agent reused Ben's answer for volcanoes; the question for craters is open.
+    /// (floor depth, rim, central peak, breccia lens) is its physical one times this. Heights are
+    /// stretched `m_per_block_h / m_per_block_v` times against widths (8.6 at the default 35 m
+    /// high against 300 m wide per block, 15 at the earlier 20 m), so a simple bowl of real
+    /// proportions (1, a fifth as deep as wide) is 1.7 times deeper than wide in blocks (3 times
+    /// at 20 m); the default 0.5 follows the volcanoes' `flank_steepness` (Ben, 2026-09-30:
+    /// "Setting, gentler default") and draws it 0.86 times as deep as wide (1.5 at 20 m). Kept at
+    /// 0.5 with the 35 m scale (2026-10-02): craters the same in metres, shallower in blocks.
+    /// Game choice (ledger IMP-130): the agent reused Ben's answer for volcanoes; the question
+    /// for craters is open.
     pub depth_scale: f64,
     /// How far the ejecta blanket reaches, in rim radii from the centre. The continuous blanket
     /// of lunar craters ends 2.35 radii out (Moore, Hodges & Scott 1974, eq. 1: R_ce = 2.348 R,
@@ -85,7 +89,7 @@ pub struct ImpactParams {
 impl Default for ImpactParams {
     fn default() -> Self {
         ImpactParams {
-            flux: 1.0,
+            flux: 3.0, // ledger: IMP-006 (a game choice; Earth's own rate is 1)
             size_slope: 1.8,
             min_crater_km: 2.0,
             max_crater_km: 300.0,

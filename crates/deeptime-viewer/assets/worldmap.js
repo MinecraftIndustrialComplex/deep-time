@@ -22,6 +22,7 @@
   if (!DT || !stage || !host || !toggle) return;
   const { esc, fmtInt, latText, lonText } = DT;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const proj = window.DTProj;   // the planet's projection (projection.js)
   const T = 256;                       // tile edge, px
   const MAX_FLIGHT = 8;                // tiles loading at once
   const KEEP_TILES = 420;              // decoded tiles kept
@@ -116,13 +117,13 @@
   const C = () => S.info.circumference;
   const s0 = () => C() / (2 * T);                    // blocks per tile pixel at zoom 0
   const minBpp = () => 1 / MAG;
-  const maxBpp = () => Math.max(C() / Math.max(S.w, 1), (C() / 2) / Math.max(S.h, 1));
+  const maxBpp = () => Math.max(C() / Math.max(S.w, 1), (2 * proj.poleZ(C())) / Math.max(S.h, 1));
 
   function setView(cx, cz, bpp) {
     S.bpp = clamp(bpp, minBpp(), maxBpp());
     const halfH = S.h * S.bpp / 2;
     // Vertically the view stays on the planet (or centred when it is taller than the planet).
-    const lim = C() / 4;
+    const lim = proj.poleZ(C());
     S.cz = halfH >= lim ? 0 : clamp(cz, -lim + halfH, lim - halfH);
     const c = C();
     S.cx = ((cx + c / 2) % c + c) % c - c / 2;
@@ -202,7 +203,8 @@
     const c = C();
     const left = S.cx - S.w / 2 * S.bpp, top = S.cz - S.h / 2 * S.bpp;
     const k0 = Math.floor((left + c / 2) / span), k1 = Math.floor((left + S.w * S.bpp + c / 2) / span);
-    const j0 = Math.max(0, Math.floor((top + c / 4) / span)), j1 = Math.min((1 << z) - 1, Math.floor((top + S.h * S.bpp + c / 4) / span));
+    const fz = proj.tileFrameZ(c);   // the tile pyramid's frame (worldmap.rs): 2 : 1, wider than the planet
+    const j0 = Math.max(0, Math.floor((top - fz) / span)), j1 = Math.min((1 << z) - 1, Math.floor((top + S.h * S.bpp - fz) / span));
     const nx = 2 << z;
     const d = S.dpr;
     ctx.globalAlpha = alpha;
@@ -210,7 +212,7 @@
     for (let j = j0; j <= j1; j++) {
       for (let k = k0; k <= k1; k++) {
         const tx = ((k % nx) + nx) % nx;
-        const sx = ((-c / 2 + k * span) - left) / S.bpp, sy = ((-c / 4 + j * span) - top) / S.bpp;
+        const sx = ((-c / 2 + k * span) - left) / S.bpp, sy = ((fz + j * span) - top) / S.bpp;
         const t = tileAt(layer, z, tx, j, true);
         if (t.state === 'ok') {
           ctx.drawImage(t.img, Math.round(sx * d), Math.round(sy * d), Math.ceil(px * d + 0.5), Math.ceil(px * d + 0.5));
@@ -239,7 +241,7 @@
   function drawGrid() {
     const c = C(), d = S.dpr;
     const left = S.cx - S.w / 2 * S.bpp, top = S.cz - S.h / 2 * S.bpp;
-    const degPerBlock = 360 / c;
+    const degPerBlock = proj.dLonOfDx(c, 1, 0);
     const stepDeg = niceStep(Math.max(S.w, S.h) * S.bpp * degPerBlock / 8);
     const steps = [1, 2, 5, 10, 15, 30, 45, 90];
     const step = steps.find(s => s >= stepDeg) || 90;
@@ -247,13 +249,14 @@
     ctx.lineWidth = 1; ctx.font = `${11 * d}px ui-monospace, monospace`; ctx.textBaseline = 'top';
     ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.fillStyle = 'rgba(255,255,255,.8)';
     for (let lat = -90; lat <= 90; lat += step) {
-      const [, y] = toScreen(0, -lat / 360 * c);
+      const [, y] = toScreen(0, proj.zOfLat(c, lat));
       if (y < 0 || y > S.h) continue;
       ctx.beginPath(); ctx.moveTo(0, Math.round(y * d) + .5); ctx.lineTo(S.w * d, Math.round(y * d) + .5); ctx.stroke();
       ctx.fillText(`${Math.abs(lat)}°${lat < 0 ? 'S' : lat > 0 ? 'N' : ''}`, 56 * d, y * d + 2 * d);
     }
-    for (let k = Math.floor((left + c / 2) / (c * step / 360)) - 1; k <= Math.ceil((left + S.w * S.bpp + c / 2) / (c * step / 360)) + 1; k++) {
-      const bx = -c / 2 + k * c * step / 360;
+    const lonSpan = proj.dxOfDLon(c, step, 0);   // blocks between meridians
+    for (let k = Math.floor((left + c / 2) / lonSpan) - 1; k <= Math.ceil((left + S.w * S.bpp + c / 2) / lonSpan) + 1; k++) {
+      const bx = proj.xOfLon(c, k * step);
       const [x] = toScreen(bx, 0);
       if (x < 0 || x > S.w) continue;
       const lon = ((k * step) % 360 + 360) % 360;
@@ -272,7 +275,7 @@
     const hw = Math.min(128, S.w * S.bpp / 2), hh = Math.min(128, S.h * S.bpp / 2);
     const x0 = Math.round(S.cx - hw), z0 = Math.round(S.cz - hh);
     const x1 = Math.round(S.cx + hw), z1 = Math.round(S.cz + hh);
-    const lim = c / 4;
+    const lim = proj.poleZ(c);
     const zz0 = clamp(z0, -lim, lim - 1), zz1 = clamp(z1, zz0 + 1, lim);
     return { x0, z0: zz0, x1: Math.max(x1, x0 + 1), z1: zz1 };
   }
@@ -338,7 +341,7 @@
     const [bx, bz] = toWorld(S.cursor[0], S.cursor[1]);
     const c = C();
     const x = Math.floor(((bx + c / 2) % c + c) % c - c / 2), zz = Math.floor(bz);
-    const lat = clamp(-bz / c * 360, -90, 90), lon = (((bx + c / 2) / c) * 360 % 360 + 360) % 360;
+    const lat = proj.latOfZ(c, bz), lon = proj.lonOfX(c, bx);
     let h = `x <b>${fmtInt(x)}</b> z <b>${fmtInt(zz)}</b><span class="dim"> · </span><b>${esc(latText(lat))}</b> ${esc(lonText(lon))}`;
     const s = S.sample && S.sample.x === x && S.sample.z === zz ? S.sample : null;
     if (s) {
@@ -476,7 +479,8 @@
     const c = C(), b = previewBox();
     const x0 = ((b.x0 + c / 2) % c + c) % c - c / 2;       // folded; a box across the seam is split by the runner
     const box = { x0, z0: b.z0, x1: x0 + (b.x1 - b.x0), z1: b.z1 };
-    const ll = { north: -box.z0 / c * 360, south: -box.z1 / c * 360, west: (box.x0 + c / 2) / c * 360, east: (box.x1 + c / 2) / c * 360 };
+    const west = proj.lonOfX(c, box.x0);
+    const ll = { north: proj.latOfZ(c, box.z0), south: proj.latOfZ(c, box.z1), west, east: west + proj.dLonOfDx(c, box.x1 - box.x0, proj.latOfZ(c, (box.z0 + box.z1) / 2)) };
     const w = box.x1 - box.x0, h = box.z1 - box.z0;
     DT.preview(S.run, box, ll, `${fmtInt(w)} × ${fmtInt(h)} blocks, from the final world map`);
   });

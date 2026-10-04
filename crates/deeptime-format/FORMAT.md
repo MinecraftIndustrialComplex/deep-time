@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
-# Deep Time world-data format 0.3
+# Deep Time world-data format 0.4
 
 The contract between the Rust writer (`crates/deeptime-format`) and the Java reader
 (`neoforge/src/main/java/com/minecraftindustrialcomplex/deeptime/worlddata`). Plan §5.3 and §5.7
@@ -48,6 +48,15 @@ folder without the file is read as before. The `elevation` of such a world alrea
 young structures' relief (fault scarps, rift valleys, fold ridges: the amplifier adds it); no
 reader needs to know.
 
+**0.4** over 0.3 (the equal-area projection; Ben, decisions log 2026-10-02, "Lambert for now"):
+every header's minor is 4. The world and every map use **Lambert's cylindrical equal-area
+projection** ("Grids"): latitude φ = asin(−z / R) with R = C / 2π, so the poles are at z = ∓R
+(∓2,607.6 blocks at C = 16,384) instead of ∓C/4; every grid's rows start at z = −Zo (Zo the smallest
+multiple of 64 at or past the pole: 2,624 at 16k, 5,248 at 32k) and H = 2·Zo / r; keyframes are
+Lambert maps, π : 1 ("Keyframes"); the rivers', structure and site indexes are framed from z = −Zo
+over 2·Zo. Every raster, every latitude in events, sites and the climate API, and every block
+position derived from a latitude changed. 0.3 worlds are refused.
+
 ## Folder layout
 
 ```text
@@ -66,7 +75,7 @@ reader needs to know.
   rasters/climate/month/*.dtr   L1: t_sl_c_NN i16 0.01 °C,  │ the twelve months (0.2, P1-25)
                                 p_share_NN u8 1/40          │
   rasters/surface/*.dtr         L2, u8                      │
-  rasters/meta/*.dtr            L1, u16                     ┘
+  rasters/meta/*.dtr            L1, u16 (meta/heat_flow_mw_m2: u16, 0.1 mW/m², "Geothermal features") ┘
   strata/horizons.dtr           L1, horizon_stack (7K bytes a cell), K = 3 in the synthetic worlds (8 with
                                 --strata every-class, 32 in a baked run)
   strata/classes.json           class index → rock class name
@@ -108,7 +117,7 @@ manifest last. The synthetic worlds have none of these.
   "preset_hash": null,
   "planet": {"radius_m": 48892.96},
   "scale": {"circumference_blocks": 1024, "m_per_block_h": 300.0, "m_per_block_v": 20.0,
-            "min_y": -352, "max_y": 639, "sea_level_y": 63},
+            "min_y": -512, "max_y": 639, "sea_level_y": 63},
   "grids": {"L3": {"name": "L3", "w": 512, "h": 256, "r": 2, "wraps_x": true,
                    "origin_block_x": -512, "origin_block_z": -256}, "...": {}},
   "layers": [{"name": "elevation", "path": "rasters/elevation.dtr", "grid": "L3",
@@ -170,6 +179,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `surface/class_top` | L2 | u8 | 1, class index | 255 | the rock class at the surface (`strata/classes.json`) |
 | `meta/plate_id` | L1 | u16 | 1, plate id | 65535 | the plate |
 | `meta/crust_age_myr` | L1 | u16 | 1, Myr | 65535 | oceanic crust age; nodata on continental crust |
+| `meta/heat_flow_mw_m2` | L1 | u16 | 0.1, mW/m² | 65535 | the plate model's surface heat flow at the present, on **continental crust only** (nodata on oceanic crust, whose heat flow is the sea floor's age law: a coastal land column must not read the young ridge crust beside it through the bilinear sample; the plate mesh's heat flow is interpolated over its continental corners only, L1 field `plates/continental_heat_flow_mw_m2`); the model's continental values run from 55 (old, quiet crust) up to 200 (a young orogen on a hotspot, an arc and a rift at once): 55 + 35 e^(−t/60) for the time t in Myr since the last orogeny, plus 40 on an arc, 40 on a hotspot, 30 at a divergent boundary (Java: geothermal fields, "Geothermal features (P2-14) and their settings"; added 2026-10-02) |
 | `meta/province` | L1 | u16 | 1, province id | — | geologic provinces (P1-10, "The geologic provinces"): contiguous areas of one USGS-style class, each at least the preset's `provinces.min_area_km2` (50,000 km² by default); `notes.bake.meta.provinces` lists them. With TerraBlender installed the game gives every province one biome region |
 
 `notes.bake`: `version` (1), `baked`, per part (`terrain`, `strata`, `climate`, `water`, `surface`, `meta`)
@@ -268,8 +278,14 @@ jar ships it and the core compiles the same file in as the default). Band coordi
                                                                            {"positive_below_erosion": e,
                                                                             "flats": {positive_noise_above, max_magnitude}}
     "BSk": { "temperature": { "when": { "of": "t_cold", "above": 0.0 },   the ramp "then" where the input is above
-                              "then": "temperate", "else": "boreal" },     the threshold, "else" elsewhere
-             "humidity": "steppe" }
+                              "then": "temperate", "else": "boreal" },     the threshold, "else" elsewhere; "then" and
+             "humidity": "steppe" },                                       "else" may themselves be switches (4 deep)
+    "BWk": { "temperature": { "when": { "of": "t_mean", "above": 10.0 }, "then": "desert",
+                              "else": { "when": { "of": "t_mean", "above": 0.0 },
+                                        "then": "cold_desert", "else": "polar_ice" } },
+             "humidity": { "when": { "of": "t_mean", "above": 10.0 }, "then": "desert",     the humidity may switch on
+                           "else": { "when": { "of": "t_mean", "above": 0.0 },               a temperature the same way
+                                     "then": "cold_desert", "else": "polar_desert" } } }
   },
   "ice_cover": {                         optional, every key optional (defaults as written here): "The ice cover"
     "step_m": 160.0, "max_blocks": 12, "snow_blocks": 3, "blue_ice_from_blocks": 9, "blue_ice_blocks": 2,
@@ -315,8 +331,22 @@ optional). The default table uses all three for EF:
   vanilla's units, which the game then maps onto the pack's, so a pack with another router wants
   its own numbers (MIC's tuned ones are the defaults').
 
+**Cold deserts (Ben, 2026-10-02).** Vanilla has no cold desert, and P1-09's BWk was the hot
+desert's ramp from a mean of 5 °C up, so a BWk in the tundra's climate was drawn as sand. The
+default table splits BWk by its mean annual temperature (a switch on `t_mean`): above 10 °C it is
+the hot desert as before (`desert` ramp and rule: sand, badlands on plateaus); from 0 to 10 °C it
+is `cold_desert` (temperature 1.05 … 1.95 by the mean, the cold band; humidity at most 0.6, the
+driest band: vanilla's plains and meadow, Terralith's steppe, cold shrubland and temperate
+highlands, and any biome mod's own cold-desert or cold-steppe biome that its parameter list puts
+there); at or below 0 °C it is barren frozen ground like EF's (`polar_ice`, `polar_desert`: snowy
+plains in vanilla, gravel desert and cold shrubland in Terralith). A pack with its own biomes
+overrides the table where its cold-desert biome sits on other coordinates. BSk is unchanged: it
+was already cold (its D ramp below a coldest month of 0 °C, its C ramp above), semi-arid
+(humidity 1.05 … 1.95), so vanilla draws plains or snowy plains and Terralith its steppe and
+cold shrubland.
+
 The default table reproduces what P1-09 first compiled in, operation for operation for every class
-but EF (a test holds the core's default to the old formulas bit for bit). A ramp is a `base`/`span` pair rather than two
+but EF and BWk (a test holds the core's default to the old formulas bit for bit). A ramp is a `base`/`span` pair rather than two
 end points so that the coordinates the default writes are exactly the ones P1-09 computed.
 The sea's own temperature curve, the aridity → humidity anchors and the depth anchors of the sea
 stay in the core.
@@ -401,19 +431,34 @@ glaciated ground regardless of biome. The contract between the climate and that 
   rounds, giving `n` blocks for the column. The cover **replaces** the top `n` solid blocks of the
   ground, so the terrain's height is unchanged: the top `snow_blocks` (at most `n`) are `snow`, the
   last `blue_ice_blocks` of a cover of at least `blue_ice_from_blocks` are `deep_ice`, the blocks
-  between `ice`. A column whose surface is fluid (a lake, the sea) and air, bedrock and fluid blocks
-  are left alone. Vanilla's `freeze_top_layer` feature then lays its snow layer on the snow block.
+  between `ice`. A column whose surface is fluid (a lake, the sea) or is the ice of a frozen lake
+  (the water pass's `minecraft:ice` top block: the lake's surface, not ground), and air, bedrock and
+  fluid blocks, are left alone. Vanilla's `freeze_top_layer` feature then lays its snow layer on the snow block.
   The layer is not part of the column evaluator: Java alone reads it, and Rust's `inspect-column`
   prints it with the other layers.
 
 ## Grids
 
-Equirectangular in block space (plan §5.2). A grid has `w` × `h` cells with `w = C / r`,
-`h = w / 2`, `r` blocks per cell, origin `(−C/2, −C/4)`.
+Rasters in block space on the **Lambert cylindrical equal-area projection** (plan §5.2 as amended
+by `docs/design/equal-area-projection.md`). The projection's formulas (block ↔ latitude and
+longitude, the grids' extent and neighbour rule, the local metric and cell areas, the frame of the
+spatial indexes below, map pictures) are in one place per side: Rust `deeptime_format::projection`,
+Java `worlddata/Projection` (and the pages' `projection.js`). A planet of circumference C has radius
+R = C / 2π blocks; longitude λ = 360°·(x + C/2)/C (the seam x = −C/2 is 0°), latitude
+φ = asin(−z / R) (north is −z; clamped to ±90° past the poles). Every block covers the same area
+of the planet; east–west a block is cos φ blocks of planet, north–south 1 / cos φ.
+
+A grid has `w` × `h` cells with `w = C / r`, `h = 2·Zo / r`, `r` blocks per cell, origin
+`(−C/2, −Zo)`. Zo is the smallest multiple of the planet's quantum q at or past the pole R, q the
+largest power of two ≤ 64 dividing C/2 and ≤ R/2 (64 on every real planet), raised to `r` when `r`
+is coarser: Zo = 2,624 at C = 16,384 and 5,248 at C = 32,768, the same for every grid of a planet,
+so the rows of L1, L2 and L3 nest. Rows are uniform in z, hence in sin φ: every cell is equal in
+area, (r·m)² for m metres per block, less only on the rows that reach past a pole.
 
 - Cell `(i, j)` is the **point sample** at block `x = origin_block_x + i·r`,
   `z = origin_block_z + j·r` (not the centre of an r × r square). Column 0 lies on the seam.
-- Row-major: row `j` (z) outer, column `i` (x) inner. Row 0 is the north edge (z = −C/4).
+- Row-major: row `j` (z) outer, column `i` (x) inner. Row 0 is at z = −Zo, at or just past the
+  north pole; rows past a pole hold no planet (they sample the pole).
 - Indices wrap in x: `i mod w` (Euclidean). They clamp in z: `clamp(j, 0, h − 1)`.
 - Bilinear sampling at block `(bx, bz)`:
   `u = (bx − ox) / r`, `v = (bz − oz) / r`, `i0 = floor(u)`, `j0 = floor(v)`, `fu = u − i0`,
@@ -428,7 +473,7 @@ Equirectangular in block space (plan §5.2). A grid has `w` × `h` cells with `w
 offset        size  field
 0             4     magic "DTR1" (0x44 0x54 0x52 0x31)
 4             4     u32 header_len = 16 + json_len (bytes from file start to the end of the JSON)
-8             2     u16 format_minor (3 for "0.3")
+8             2     u16 format_minor (4 for "0.4")
 10            2     u16 flags, reserved, 0
 12            4     u32 CRC32 of bytes 0..12 followed by the JSON bytes
 16            json  LayerDesc, UTF-8 JSON, no BOM
@@ -500,8 +545,8 @@ schist on shale; Phase 1 has no thrusts that could put it there):
 | 61440–65535 | the mantle |
 
 Bands are the formation temperatures of the regional metamorphic classes: 1 from 250 °C (slate),
-2 from 300 (quartzite, marble, greenstone), 3 from 350 (phyllite), 4 from 450 (schist), 5 from
-500 (amphibolite), 6 from 650 (gneiss). A unit's band is that of the hottest formation
+2 from 300 (quartzite, marble, greenstone), 3 from 350 (phyllite), 4 from 500 (amphibolite), 5 from
+525 (schist, the garnet zone), 6 from 650 (gneiss). A unit's band is that of the hottest formation
 temperature at or above it in its own column (so a column's bands never decrease downwards);
 plutonic pool units (granite, granodiorite, gabbro) are always in band 6, with the gneiss: the
 crystalline basement. In a band's strata log a layer spans the ages from the base of the layer
@@ -714,7 +759,7 @@ blocks of random shore cells of `water_level` (wet beside dry), the rest anywher
 
 Code `crates/deeptime-format/src/rivers.rs` (Java `worlddata/Rivers`); written by the bake's water
 part (`deeptime_core::hydro`, `bake::water`; plan §8.4). `DTRV` fixed fields (48 bytes): `u32 C, u32
-tile (32), u32 tiles_x (C / tile), u32 tiles_z (C / 2 / tile), u32 V vertices, u32 K chains, u32 E
+tile (32), u32 tiles_x (C / tile), u32 tiles_z (2·Zo / tile), u32 V vertices, u32 K chains, u32 E
 index entries, f32 biome_min_width, f32 bank_zone, f32 bank_ratio, 8 reserved bytes`. Sections: 0 V
 vertices of 24 bytes, 1 K chains of 16 bytes, 2 `tiles_x · tiles_z + 1` u32 offsets, 3 E u32 entries.
 
@@ -732,7 +777,7 @@ Chains are consecutive in the vertex array; **segment s** is vertices (s, s + 1)
 one chain. A chain runs downstream from a spring or a lake's outlet (whose first vertex is the lake
 cell feeding it) to its mouth: its last vertex lies in the sea, in lake `into`, or on a vertex of
 chain `into` (a confluence, where the tributary keeps its own width). w never rises along a chain.
-**The index**: tile (tx, tz) covers x ∈ [−C/2 + tx·tile, …), z ∈ [−C/4 + tz·tile, …); entries
+**The index**: tile (tx, tz) covers x ∈ [−C/2 + tx·tile, …), z ∈ [−Zo + tz·tile, …) ("Grids"); entries
 `offsets[t] … offsets[t+1]` of tile t = tz·tiles_x + tx are the segments, ascending, whose box grown
 by `max(hw_a, hw_b, 0.71) + bank_zone + bank_ratio · max(hw_a, hw_b) + 1` touches it (x folded).
 
@@ -818,10 +863,12 @@ width `cell` (4 in `deeptime:planet`; the parity fixture assumes 4) as the shore
 
 The pass: a sea column the aquifer left dry is filled from the sea's top down to the ground (the
 pass runs in every chunk with elevation cells within 17 blocks of sea level for this); a river column is cut or filled to `bed` (gravel on the bed of a channel under 6 blocks
-wide, sand on a wider one), water from bed + 1 to top, air above; a lake column fills the air from
-top down to the ground as P0-13's pass did, plugging a cave under `bed` (the generated ground, which
-between noise-cell corners can stand a block or two above `ground` on a steep shore: a lake column
-whose generated ground reaches `top` holds no water and is dry shore, flush with the lake); a bank is lowered to
+wide, sand on a wider one), water from bed + 1 to top, air above; a lake column is cut to its `bed` as a river's
+channel is: generated ground over `top` is removed, ground between `bed` and `top` becomes water
+(the generated ground between noise-cell corners can stand a block or two above `ground`, because the
+terrain density's scale differs from corner to corner; before the cut such a column in a lake one
+block deep held no water and was dry shore, flush with the lake: 22 % of one planet's lake columns),
+and a cave under `bed` is plugged; a bank is lowered to
 `max_ground` and raised to `min_ground` keeping its top block, and air from `seal_from` to
 `min_ground` is filled; where a water column's neighbour holds water higher up, the block at the
 higher top gets flowing water (level 1, resting on the water under it)
@@ -861,10 +908,11 @@ through the water like any other block.
 
 `notes.bake.underground.params` is the preset's `underground` section (its defaults when the preset
 has none): `{"lava_floor_blocks": 10, "lava_lake_blocks": 54, "magma_chamber_depth_km": 3.0,
-"magma_chamber_size": 1.0, "crater_lake_share": 0.25, "remove_lava_features": true}`. No layer holds
+"magma_chamber_size": 1.0, "crater_lake_share": 0.25, "remove_lava_features": true, "magma_lens_count": 24,
+"magma_lens_spacing_blocks": 28.0, "magma_lens_width": 1.5, "magma_mush_width": 1.0, "sea_cliff_skin_blocks": 6}`. No layer holds
 lava; the game reads the first two numbers when it generates chunks (Java `worldgen/LavaRules`, `LavaFluids`,
 `density/LavaLakesDensity`), and a world without the note uses the defaults. With `min_y` the floor
-of the noise settings (−352) and cover = 8:
+of the noise settings (−512) and cover = 8:
 
 - **The lava floor.** Open space with y < `min_y + lava_floor_blocks` (never above sea level) is lava.
   In a column whose terrain height H is that low, the limit is `min(that, ⌊H⌋ − cover)`: lava stays
@@ -874,8 +922,8 @@ of the noise settings (−352) and cover = 8:
   blocks of the cell's centre. 0: no lava lakes.
 
 Both are vanilla's rules (lava below y −54, lava lakes at y −10 and lower, in a world whose floor is
-y −64) measured from the floor instead of from y 0. Vanilla's own constants flood the lowest 298
-blocks of every cave, and of every sea deeper than 117 blocks, of a world whose floor is y −352.
+y −64) measured from the floor instead of from y 0. Vanilla's own constants flood the lowest 458
+blocks of every cave, and of every sea deeper than 117 blocks, of a world whose floor is y −512.
 Carver lava in the bottom eight blocks is vanilla's and not covered by these rules.
 
 ### Impact craters (`impacts/craters.json`)
@@ -901,7 +949,9 @@ enough (two L1 cells) to be cut into the deep-time surface and laid in the strat
 drawn by the amplifier and given a body. `notes.bake.impacts` records `craters` (the count) and
 `craters_file`. The game does not read the file to build anything: the craters are in `elevation`,
 their rock in the horizon stacks and in bodies of role `impact_breccia` (rock class `impact_breccia`,
-with a zone `melt_sheet` of rock class `impact_melt` on the floor of a crater that has one). It is
+with a zone `melt_sheet` of rock class `impact_melt` on the floor of a crater that has one; the
+body is an ellipsoid centred on the crater's original floor, which the bake seats at the height of
+`elevation` at the crater's centre less `cover_m`, so the lens lies under the floor the game draws). It is
 there for tools, and Java's `worlddata/Craters` reads it for the GameTest that checks a crater in the placed world.
 
 ### Active volcanoes (`volcanoes/active.json`) and their magma
@@ -936,6 +986,24 @@ step after the water pass). With `mH`, `mV` the metres per block, (cx, cz) the s
   its column's ground (the sea bed under the sea). `magma_chamber_size` 0: no magma anywhere.
 - **Conduit**: the centre column and its four neighbours, lava from the chamber's centre to
   `floor − 6`, then magma blocks: up to the surface on land, to `floor − 3` under water.
+- **Crust-deep column** (Ben, decisions log 2026-10-02, "Crust-deep magma system"; Java `Magma.Deep`):
+  from the chamber's bottom down to the lava floor. Lenses are flattened ellipsoids of lava, `n` of
+  them at most `magma_lens_count` (24, 0 to 64; **0: no column**), the first 0.8 spacings under the
+  chamber's bottom, then evenly (each up to 0.2 spacings off) down to a basal lens whose centre is 2
+  blocks over `lava_floor` and at least 6 over `min_y` (read from the level, not a number); the
+  spacing is `magma_lens_spacing_blocks` (28, 8 to 200), widened where the count would stop the column
+  short. Radius at the top = `rh` · `magma_lens_width` (1.5, 0 to 4; **0: no column**) · a kind share
+  (shield 1.4, silicic 0.9, otherwise 1.0) · (0.7 + 0.3 · activity), at least 5 and at most 90 blocks;
+  the lowest lens is 2.2 times wider (linear in between, each drawn 0.9 to 1.05 of that); half-height
+  0.2 · radius, 2 to 5 blocks; centres up to 0.15 of the radius off the axis. A volcano's chamber is
+  1.6 times larger when silicic. Neighbouring lenses are joined by the conduit's plus-shaped column
+  (lava), walled like the conduit. Lens lava obeys the chamber's rule (nothing within 8 blocks of its
+  column's ground) and the seal. Around the column lies **altered hot rock** (the mush): radius
+  `magma_mush_width` (1.0, 0 to 4; 0: none) · (1.25 · the column's radius at that depth + 3, bulging
+  by 0.25 at a lens, 1.1 times broader under a shield), narrowing to nothing at the chamber's equator;
+  it replaces the solid ground and shell with `minecraft:basalt` (`#deeptime:magma/mush`, fallback
+  `#deeptime:magma_fallback/mush`), one block in 25 `minecraft:magma_block` (`/hot`), never fluid,
+  bedrock or lava.
 - **Crater lava lake**: of the volcanoes that can hold one, the `crater_lake_share` most active
   (ties by id; ⌈share · n⌉ of n). Radius r = clamp(half the crater's radius in blocks, 2, 10); its
   surface is one block under the lowest ground of the ring r < d ≤ r + 2; lava from there down to two
@@ -943,9 +1011,15 @@ step after the water pass). With `mH`, `mV` the metres per block, (cx, cz) the s
   the conduit opening into its floor. A volcano cannot hold one when its summit is at or under sea
   level + 2, when any column of the lake or its ring holds or borders water (the sea, a lake, a river,
   a bank), when the surface would lie more than 12 blocks under `floor`, or when it stands beyond
-  the pole cap's line (|z| > C/4 · `pole_cap_deg`/90: nobody reaches it).
+  the pole cap's line (|z| > R·sin(`pole_cap_deg`), R = C/2π: nobody reaches it).
 - **Seal**: every open block (air, water) within 1.5 blocks of a chamber, two columns of a conduit or
   two columns of a lake becomes smooth basalt, so lava never touches water or hangs over a cave.
+
+`sea_cliff_skin_blocks` (6, 0 to 32; 0: off; Java `worldgen/SeaCliffGuard`, `SeaCliffPass`): under the
+sea level, a block inside the ground is kept rock (no cave of any kind: it goes in the chunk's carving
+masks and open blocks in it are filled, before the strata pass) where the ground within that many
+columns to the side lies lower than the block and the ground drops by at least that many blocks within
+that distance (a cliff of 45 degrees or more).
 
 `remove_lava_features` (on by default): placed features whose configuration places lava (a block or
 fluid state named `minecraft:lava`: vanilla's `lake_lava_surface`, `lake_lava_underground`,
@@ -958,17 +1032,33 @@ not placed in a Deep Time level
 ### Geothermal features (P2-14) and their settings
 
 Hot springs, sinter and travertine terraces, fumaroles with native sulfur and bare altered ground
-sit around the active volcanoes. No file and no layer holds them: the game builds the sites from
-`volcanoes/active.json`, the terrain height, the water columns and four more keys of
+sit around the active volcanoes and on hot continental ground. No file holds them: the game builds the sites from
+`volcanoes/active.json`, the layer `meta/heat_flow_mw_m2`, the terrain height, the water columns and six more keys of
 `notes.bake.underground.params` (defaults in brackets; Java `worldgen/Geothermal`, placed by
 `worldgen/GeothermalPass` in the surface step after the magma and before the ice):
 `geothermal_density` (1.0, 0 to 4; **0: no geothermal features**), `geothermal_reach` (1.0, 0.25 to 3),
-`geothermal_size` (1.0, 0.5 to 3), `geothermal_spring_min_precip_mm` (400, 0 to 4000).
+`geothermal_size` (1.0, 0.5 to 3), `geothermal_spring_min_precip_mm` (400, 0 to 4000),
+`geothermal_heat_flow_min_mw_m2` (100, 50 to 400) and `geothermal_heat_density` (1.0, 0 to 4; 0: no
+fields from heat flow, the volcanoes' only).
 
-**The heat sources are the active volcanoes and nothing else.** The bake does not export the plate
-model's heat flow, its spreading ridges or its rifts, so nothing is placed on them. (The `meta/province`
-layer does have a `rift` setting, but regions under 50,000 km² are absorbed by their neighbours and a
-planet's rifts seldom survive; a 16k, 500 Myr planet baked on 2026-10-01 had none.)
+**There are two heat sources: the active volcanoes, and continental ground whose heat flow is high**
+(Ben, decisions log 2026-10-02, "Export heat flow"). The bake exports the plate model's heat flow as the
+L1 layer `meta/heat_flow_mw_m2` (see the table above; nodata on oceanic crust and in a world without
+the layer, which has no heat-flow fields). Spreading ridges are under the sea, so only the land
+that the model heats (rifts, arcs, hotspot swells, young belts) gets fields.
+
+**Fields from heat flow.** The world (C blocks round, 2R = C/π from pole to pole, z from −R: "Grids") is cut into a
+grid of cells of 10,000 km² / `geothermal_heat_density` each (100 km across at density 1; the cell side
+is rounded so a whole number of cells goes round the world). Each cell, from a seed made of its own
+index, draws up to 6 random points and puts one field at the first where the bilinear
+`meta/heat_flow_mw_m2` is at least `geothermal_heat_flow_min_mw_m2`, the ground is dry land at least 5
+blocks above the sea with no water column and no ice cover. So fields follow the hot ground: at most one for each cell, about one for each 10,000 km² of a
+broad hot province and a field in most of the cells a thin belt crosses; none is placed where the
+layer is nodata or cooler. The field
+is then built by the volcanoes' machinery below, as a field "away from the summit" (a share of 1: hot
+springs where the rain and the temperature allow, else fumaroles), at a non-silicic source (no
+cinnabar); its sites are numbered with the volcanoes' and carry the source id −1. Every other rule
+below holds for them. The geothermal features are all off at `geothermal_density` 0.
 
 With R the volcano's basal radius in blocks (`radius_m` / `m_per_block_h`, at least 6), a the activity
 (0.05 to 1), a volcano gets ⌊d · (0.7 + 2.3 a) · clamp(√(R / 45), 0.6, 2.2) + u⌋ **fields** (d =
@@ -1114,7 +1204,7 @@ site record                               product entry
 ```
 
 `DTSI` fixed fields: `u32 C, u32 cell_blocks (512), u32 cols = ceil(C/512), u32 rows =
-ceil(C/2/512), i32 origin_x (−C/2), i32 origin_z (−C/4), u32 entries, u32 reserved`. Section 0 is
+ceil(2·Zo/512), i32 origin_x (−C/2), i32 origin_z (−Zo, "Grids"), u32 entries, u32 reserved`. Section 0 is
 `cols·rows + 1` u32 offsets, section 1 `entries` u32 site ids: cell `c = row·cols + col` holds
 `ids[offsets[c] .. offsets[c+1]]`, ascending — every site whose AABB footprint (x, z) touches the
 cell, with columns wrapping in x. Block (x, z) is in column `floor((x − origin_x)/512) mod cols`
@@ -1358,8 +1448,10 @@ Timelapse frames (plan §6.1), written while a run goes; frame `n` counts from 0
 `DTKF` fixed fields: `u32 n, u32 w, u32 h, u32 L layers, f64 t (years)`. Section 0 is a string
 table of `1 + L` strings: the stage, then the layer names in section order. Sections `1 … L` are
 one LZ4 raw block each (as tile packs), decoding to `w·h·4` bytes of RGBA8, row-major, row 0 north.
-Pixel (px, py) is centred on longitude 360°·px/w (the seam is 0°, plan §5.2) and latitude
-90° − 180°·py/h, the nearest cell of the field it was drawn from, coloured with `crates/deeptime-viewer/assets/ramps.json`
+Pixel (px, py) is centred on longitude 360°·px/w (the seam is 0°) and on sin φ = 1 − 2·py/h, i.e.
+block z = −R + 2R·py/h (a Lambert equal-area map, "Grids": rows uniform in sin φ from the north pole
+to the south pole; aspect π : 1, 1024 × 326 by default), the nearest cell of the field it was drawn
+from, coloured with `crates/deeptime-viewer/assets/ramps.json`
 (the same ramps the viewer and the game use); alpha 0 is nodata. Frames are taken when the clock
 passes the next multiple of the preset's keyframe interval (counted from the run's start) and at
 the end of each stage.

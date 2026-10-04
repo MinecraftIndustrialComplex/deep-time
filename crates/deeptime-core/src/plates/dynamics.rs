@@ -28,12 +28,8 @@
 //! | `ages` | the sea-floor age distribution every [`AGE_EVERY_MYR`] ([`AgeRec`]) |
 //! | `steps[].mix_km`, `arc_oceanic`, `arc_continental` | version 3: the boundary mix and the arc cells' heights (below) |
 //! | `prev_omega` | each plate's rotation vector after the last step (for the next step's change) |
-//! | `belts` | one [`BeltRec`] per collision belt: empty until the belt physics exists |
+//! | `belts` | one [`BeltRec`] per collision (a terrane of `collision_min_frac` or more) that ended in a transfer or weld: its belt, wedge, foredeep and slowdown |
 //! | `steps[].forces`, `slabs_km`, `breakoffs`; `slabs`, `prev_balance` | version 4: the force balance (below) |
-//!
-//! Left empty by today's model, to be filled by the task that adds the physics (the check reads
-//! it and reports "no data" while it is empty): `Dynamics::belts` (convergence 20 Myr after
-//! onset, wedge and foredeep, [`BeltRec`]).
 //!
 //! # The force balance (version 4)
 //! `forces.rs` sums each plate's driving and resisting forces every step, solves the torque
@@ -64,20 +60,20 @@
 //! times Myr relative to world creation. "Visible" samples are those not hidden under another
 //! plate. The active margin share is not repeated here: `notes.plates.margins` has it.
 //!
-//! # What each collision must keep meaning
-//! Tasks 2–4 of the design turn a collision from a one-step event into a state of a contact
-//! (`state::Collision`, `shortening.rs`; the state exists since task 2). The record keeps its
-//! fields' meanings across that change: `start_myr` and `end_myr` are the **first and last step**
-//! of the collision state (the step continental crust first converged at the front, and the step
-//! of the transfer or weld; the check's length is `end − start + dt`, so a one-step collision is
-//! one step long, counted from the collision's first step and not from the contact's onset, which
-//! is `contact_onset_myr`), `peak_uplift_m` the largest uplift it produced anywhere,
-//! `shortening_km` the continental crust that went under over the front's length,
-//! `lifted10`/`lifted100` the ground it raised by more than 10 and 100 m over its life, and
-//! `emerged` the ground that rose from below the sea to above it. Until task 3 the uplift is still
-//! the one-step surge at the end, so the footprints are that step's. A collision state that ends
-//! without a transfer or weld (the plates part, the contact reverses or closes, the run ends) is a
-//! [`PartingRec`].
+//! # What each collision means
+//! A collision is a state of a contact (`state::Collision`, `shortening.rs`) that builds its belt
+//! step by step (`belts.rs`, tasks 3 and 4). `start_myr` and `end_myr` are the **first and last
+//! step** of the collision state (the step continental crust first converged at the front, and
+//! the step of the transfer or weld; the check's length is `end − start + dt`, counted from the
+//! collision's first step and not from the contact's onset, which is `contact_onset_myr`).
+//! `peak_uplift_m` is the most any ground rose by it (the step's largest uplift, summed over its
+//! steps: the uplift at the front), `shortening_km` the convergence across the front integrated,
+//! `belt` the extent of everything it raised (its width from where the belt and wedge rose across
+//! the front, weighted by the uplift; its length the front's: `belts::footprint`),
+//! and `lifted10`, `lifted100` and `emerged` the most samples one step raised by more than 10 m,
+//! by more than 100 m and from below the sea datum to above it (their extents are not kept). A
+//! collision state that ends without a transfer or weld (the plates part, the contact reverses or
+//! closes, the run ends) is a [`PartingRec`].
 //!
 //! # Per plate and step (task 1b)
 //! `rot_change` is the size of the change of the plate's rotation vector since the previous step
@@ -159,8 +155,7 @@ pub struct Dynamics {
     pub events_seen: usize,
     /// Each plate's rotation vector after the last step, for the next step's `rot_change`.
     pub prev_omega: Vec<(u32, [f64; 3])>,
-    /// Collision belts: convergence history, wedge and foredeep. Empty until the belt physics
-    /// (design tasks 2-3) writes it.
+    /// Collision belts: convergence history, belt, wedge and foredeep (`belts.rs`).
     pub belts: Vec<BeltRec>,
     /// Version 4 (`forces.rs`): the slab of every contact, and each plate's balance rotation
     /// after the last step (rad/yr, for the next step's `PlateForces::rot_change`).
@@ -310,22 +305,38 @@ pub struct SlabTrack {
     pub blocked_myr: f64,
 }
 
-/// A collision belt's later history and shape; the check reads it. `None` is "not measured".
-/// Since task 2 `collision::collide` writes one per collision that had a collision state, with
-/// the convergence at its onset and 20 Myr later; the wedge and foredeep wait for task 3.
+/// A collision belt's history and shape (`belts.rs`); the check reads it. `None` is "not
+/// measured". `collision::collide` writes one per collision (a terrane of `collision_min_frac` or
+/// more) that ends in a transfer or weld.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct BeltRec {
-    /// The collision's `start_myr` and its two plates, to find its `CollisionRec`.
+    /// The collision's `start_myr` and `end_myr` and its two plates, to find its `CollisionRec`.
     pub start_myr: f64,
+    #[serde(default)]
+    pub end_myr: Option<f64>,
     pub under: u32,
     pub over: u32,
+    /// It ended in a weld (else a terrane transfer).
+    #[serde(default)]
+    pub welded: bool,
     /// Convergence across the front at the collision's onset, and 20 Myr later (`None` while the
     /// collision has not lasted that long), mm/yr.
     pub convergence_onset_mm_yr: Option<f64>,
     pub convergence_20myr_mm_yr: Option<f64>,
-    /// Width of the wedge on the incoming side, km.
+    /// The belt's highest mean height above the sea within half its width of the front, m.
+    #[serde(default)]
+    pub peak_height_m: Option<f64>,
+    /// Width and length of everything the collision raised, km (`belts::footprint`: the spread of
+    /// the belt and wedge's uplift across the front, and the front's longest length).
+    #[serde(default)]
+    pub belt_width_km: Option<f64>,
+    #[serde(default)]
+    pub belt_length_km: Option<f64>,
+    /// Width of the wedge on the incoming side when the belt stood highest, km.
     pub wedge_width_km: Option<f64>,
-    /// Width, km, and depth of fill, m, of the foreland basin in front of the wedge.
+    /// Width, km, and depth below local isostasy, m, of the foreland basin in front of the wedge
+    /// when the belt stood highest (`surface/flexure_m`; `belts::Foredeep`), for a belt that
+    /// reached `belts::FOREDEEP_BELT_M`.
     pub foredeep_width_km: Option<f64>,
     pub foredeep_depth_m: Option<f64>,
 }
@@ -536,8 +547,14 @@ pub struct CollisionRec {
     /// Collision: the terrane is at least `collision_min_frac` of an average plate (a `collision`
     /// event is written); otherwise a terrane transfer.
     pub collision: bool,
-    /// The plate welded whole to the receiving one.
+    /// The two plates welded into one.
     pub sutured: bool,
+    /// With a weld, the plate that died (the smaller: the larger keeps its id).
+    #[serde(default)]
+    pub died: Option<u32>,
+    /// It ended because its convergence had stalled (else: a terrane transfer on shortening).
+    #[serde(default)]
+    pub stalled: bool,
     /// First and last step of the collision state, Myr: when continental crust first converged
     /// at the front, and when the terrane was transferred or the plates welded.
     pub start_myr: f64,
@@ -553,39 +570,36 @@ pub struct CollisionRec {
     /// Samples in the terrane, and its share of an average plate's area.
     pub terrane_samples: u32,
     pub frac: f64,
-    /// Convergence at the contact, mm/yr.
+    /// Convergence across the front in the collision's last step, mm/yr.
     pub convergence_mm_yr: f64,
-    /// What the contact's pre-task-2 count read (relative speed × time, km;
-    /// `state::Contact::speed_count_km`): it fires the transfer or weld while
-    /// `tectonics.collision_on_shortening` is off, and it is not shortening.
-    pub counted_km: f64,
     /// The collision state's shortening, km: the convergence across the front integrated over
-    /// the collision (`state::Collision::shortening_km`). It fires the transfer or weld when
-    /// `tectonics.collision_on_shortening` is on. 0 when the contact fired with no collision state.
+    /// the collision (`state::Collision::shortening_km`).
     #[serde(default)]
     pub front_shortening_km: f64,
     /// Crust that crossed the front over the collision state, km² (Earth-normalized): each
     /// step's shortening times its front length (`state::Collision::area_km2`).
     #[serde(default)]
     pub area_km2: f64,
-    /// Convergence across the front when the collision state began, mm/yr; `None` when the
-    /// contact fired with no collision state (possible while the pre-task-2 count fires).
+    /// Convergence across the front when the collision state began, mm/yr.
     #[serde(default)]
     pub onset_convergence_mm_yr: Option<f64>,
     /// Continental samples of the subducting plate that went under since the contact began (or
     /// since its last collision), each counted once.
     pub cont_in: u32,
-    /// Length of the overlap's continental crust, km, and the real shortening: `cont_in` samples'
-    /// area over that length.
+    /// The front's longest length, km, and the shortening across it, km (as
+    /// `front_shortening_km`).
     pub front_km: f64,
     pub shortening_km: f64,
-    /// The largest uplift, m, and the radius of the surge, km.
+    /// The most any ground rose by the collision, m (see the module docs).
     pub peak_uplift_m: f64,
-    pub radius_km: f64,
-    /// Ground raised by more than 10 m, by more than 100 m, and from below sea level to above it.
+    /// The most samples one step raised by more than 10 m, by more than 100 m, and from below sea
+    /// level to above it (counts only).
     pub lifted10: Footprint,
     pub lifted100: Footprint,
     pub emerged: Footprint,
+    /// The extent of everything the collision raised (see the module docs).
+    #[serde(default)]
+    pub belt: Footprint,
     /// Birth of the terrane's plate and its parent.
     pub under_born_myr: f64,
     pub under_parent: Option<u32>,
@@ -621,6 +635,11 @@ pub struct PartingRec {
     /// The longest its front was, km, and its fastest convergence across it, mm/yr.
     pub front_km: f64,
     pub peak_convergence_mm_yr: f64,
+    /// Its belt's highest mean height, m, and the crust it stacked, km² × m (`belts.rs`).
+    #[serde(default)]
+    pub peak_height_m: f64,
+    #[serde(default)]
+    pub stacked_km2_m: f64,
     /// [`PARTED`], [`REVERSED`], [`CLOSED`], [`EMPTIED`] or [`OPEN`].
     pub reason: String,
 }
@@ -644,6 +663,8 @@ pub fn record_parting(
             area_km2: col.area_km2,
             front_km: col.peak_front_km,
             peak_convergence_mm_yr: col.peak_convergence_mm_yr,
+            peak_height_m: col.belt.peak_height_m,
+            stacked_km2_m: col.belt.stacked_km2_m,
             reason: reason.to_owned(),
         });
     }

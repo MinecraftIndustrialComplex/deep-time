@@ -10,18 +10,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** The pole cap's geometry and curves (plan §5.1's table, §7.11; P1-18's chosen curves). */
 class PoleCapCurveTest {
 
-    private static final PoleCapCurve C16 = new PoleCapCurve(16384, 75, 80);
-    private static final PoleCapCurve C32 = new PoleCapCurve(32768, 75, 80);
+    // The defaults (Ben, 2026-10-03: the band from 70°, the stop at 80°).
+    private static final PoleCapCurve C16 = new PoleCapCurve(16384, PoleCapCurve.DEFAULT_CAP_DEG, PoleCapCurve.DEFAULT_STOP_DEG);
+    private static final PoleCapCurve C32 = new PoleCapCurve(32768, PoleCapCurve.DEFAULT_CAP_DEG, PoleCapCurve.DEFAULT_STOP_DEG);
 
     @Test
     void linesMatchThePlanTable() {
-        // Plan §5.1: z of ±75° is ±3,413 (16k) / ±6,827 (32k); z of ±80° is ±3,641 / ±7,282.
-        assertEquals(3413, Math.round(C16.capZ()));
-        assertEquals(3641, Math.round(C16.stopZ()));
-        assertEquals(6827, Math.round(C32.capZ()));
-        assertEquals(7282, Math.round(C32.stopZ()));
-        assertEquals(90.0, PoleCapCurve.latitudeDeg(16384, -4096), 1e-12);
-        assertEquals(-90.0, PoleCapCurve.latitudeDeg(16384, 4096), 1e-12);
+        // The Lambert projection (docs/design/equal-area-projection.md): z = −R·sin φ, R = C/2π, so
+        // z of ±70° is ±2,450 (16k) / ±4,901 (32k) and z of ±80° is ±2,568 / ±5,136: a band of 118 /
+        // 235 blocks; the poles are at ±2,607.6 / ±5,215.2. (Equirectangular, 75° and 80° were
+        // ±3,413 / ±3,641 at 16k.)
+        assertEquals(70.0, C16.capDeg());
+        assertEquals(2450, Math.round(C16.capZ()));
+        assertEquals(2568, Math.round(C16.stopZ()));
+        assertEquals(4901, Math.round(C32.capZ()));
+        assertEquals(5136, Math.round(C32.stopZ()));
+        assertEquals(118, Math.round(C16.stopZ() - C16.capZ()));
+        double pole = 16384 / (2 * Math.PI);
+        assertEquals(90.0, PoleCapCurve.latitudeDeg(16384, -pole), 1e-12);
+        assertEquals(-90.0, PoleCapCurve.latitudeDeg(16384, pole), 1e-12);
+        assertEquals(90.0, PoleCapCurve.latitudeDeg(16384, -4096), 1e-12, "clamped past the pole");
+        assertEquals(30.0, PoleCapCurve.latitudeDeg(16384, -pole / 2), 1e-9, "sin 30° = 1/2");
     }
 
     @Test
@@ -44,7 +53,7 @@ class PoleCapCurveTest {
 
     @Test
     void nothingBelowTheCapInBothHemispheres() {
-        for (double lat : new double[]{0, 30, 60, 74.0, 74.5, 74.999}) {
+        for (double lat : new double[]{0, 30, 60, 69.0, 69.5, 69.999}) {
             for (double sign : new double[]{1, -1}) {
                 double z = PoleCapCurve.zOfLatitude(16384, sign * lat);
                 assertEquals(0.0, C16.push(z), "push at " + sign * lat);
@@ -59,7 +68,7 @@ class PoleCapCurveTest {
     void curvesGrowWithLatitudeAndAreSymmetric() {
         double lastPush = 0, lastStorm = 0, lastWind = 0;
         for (int i = 1; i <= 100; i++) {
-            double lat = 75 + i * 0.05;
+            double lat = 70 + i * 0.1;
             double zN = PoleCapCurve.zOfLatitude(16384, lat), zS = -zN;
             assertTrue(C16.push(zN) > lastPush && C16.storm(zN) > lastStorm && C16.wind(zN) > lastWind, "not increasing at " + lat);
             assertEquals(C16.push(zN), C16.push(zS), 1e-15);
@@ -74,11 +83,11 @@ class PoleCapCurveTest {
         assertEquals(1.0, C16.storm(zStop), 1e-12);
         assertEquals(PoleCapCurve.WIND_MAX, C16.wind(zStop), 1e-12);
         // Documented values (PoleCapCurve's class comment).
-        assertEquals(0.0089, C16.push(PoleCapCurve.zOfLatitude(16384, 76)), 1e-4);
-        assertEquals(0.0354, C16.push(PoleCapCurve.zOfLatitude(16384, 77.5)), 1e-4);
-        assertEquals(0.0716, C16.push(PoleCapCurve.zOfLatitude(16384, 79)), 1e-4);
-        assertEquals(0.20, C16.storm(PoleCapCurve.zOfLatitude(16384, 75.5)), 0.005);
-        assertEquals(0.62, C16.storm(PoleCapCurve.zOfLatitude(16384, 77.5)), 0.005);
+        assertEquals(0.0089, C16.push(PoleCapCurve.zOfLatitude(16384, 72)), 1e-4);
+        assertEquals(0.0354, C16.push(PoleCapCurve.zOfLatitude(16384, 75)), 1e-4);
+        assertEquals(0.0716, C16.push(PoleCapCurve.zOfLatitude(16384, 78)), 1e-4);
+        assertEquals(0.20, C16.storm(PoleCapCurve.zOfLatitude(16384, 71)), 0.005);
+        assertEquals(0.62, C16.storm(PoleCapCurve.zOfLatitude(16384, 75)), 0.005);
     }
 
     @Test

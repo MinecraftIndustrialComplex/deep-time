@@ -81,7 +81,7 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     let m = Manifest::read(&dir).unwrap();
     m.verify(&dir).unwrap();
     assert_eq!(m.format_version, FORMAT_VERSION);
-    assert_eq!(FORMAT_VERSION, "0.3");
+    assert_eq!(FORMAT_VERSION, "0.4");
     for name in [
         "elevation",
         "detail/amplitude",
@@ -100,9 +100,39 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
         "surface/class_top",
         "meta/plate_id",
         "meta/crust_age_myr",
+        "meta/heat_flow_mw_m2",
         "meta/province",
     ] {
         assert!(m.layer(name).is_some(), "{name} is listed");
+    }
+    // The plate model's heat flow (2026-10-02): continental cells only, every one between the
+    // model's floor (55 mW/m²) and its largest sum (90 + 40 arc + 40 hotspot + 30 divergent), and
+    // nodata on oceanic crust (where the crust-age layer has data; a continental cell has none).
+    {
+        let load = |n: &str| {
+            deeptime_format::TilePackReader::open(&dir.join(format!("rasters/{n}.dtr")))
+                .unwrap()
+                .load()
+                .unwrap()
+        };
+        let q = load("meta/heat_flow_mw_m2");
+        let age = load("meta/crust_age_myr");
+        assert_eq!(q.desc.grid.w, age.desc.grid.w);
+        let (mut hot, mut cold) = (0u32, 0u32);
+        for j in 0..q.desc.grid.h {
+            for i in 0..q.desc.grid.w {
+                let (i, j) = (i64::from(i), i64::from(j));
+                let (v, a) = (q.get(i, j), age.get(i, j));
+                if v.is_nan() {
+                    cold += 1;
+                } else {
+                    assert!((54.9..=200.1).contains(&v), "({i}, {j}) heat flow {v}");
+                    assert!(a.is_nan(), "({i}, {j}) has an age and a continental flow");
+                    hot += 1;
+                }
+            }
+        }
+        assert!(hot > 0 && cold > 0, "continents {hot}, ocean {cold}");
     }
     for f in [
         "strata/classes.json",
@@ -114,6 +144,19 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     let bake = &m.notes["bake"];
     assert_eq!(bake["baked"], true);
     assert_eq!(bake["terrain"]["elevation"], "amplify");
+    // The world's floor is y -512 and nothing of this planet's sea floor is cut by it
+    // (2026-10-02; trenches reach y -437 at the default scale).
+    let floor = &bake["terrain"]["build_limit"];
+    assert_eq!(floor["min_y"], -512);
+    // The deepest finished trenches (plate model's -10 km plus flexure and the amplifier) can
+    // still pass the floor by a few blocks: far fewer than a thousandth of the cells (the quick
+    // 16k planet had 33 of about 33 million; with the old floor -352 it had 69,011).
+    let l3_cells = (m.grids["L3"].w * m.grids["L3"].h) as f64;
+    assert!(
+        floor["cells_below_min_y"].as_f64().unwrap() < 1e-3 * l3_cells,
+        "sea floor below the world's floor: {floor}"
+    );
+    assert!(floor["lowest_y"].as_f64().unwrap() > -600.0, "{floor}");
     // The ice cover the game's surface pass lays is recorded with the table's section.
     assert_eq!(bake["climate"]["ice_cover"]["max_blocks"], 12);
     assert_eq!(bake["climate"]["ice_cover"]["snow"], "minecraft:snow_block");
@@ -205,7 +248,8 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     let (mut with_bodies, mut covered) = (0, 0);
     for _ in 0..400 {
         let x = rng.below(2 * c as u64) as i64 - c;
-        let z = rng.below((c / 2) as u64) as i64 - c / 4;
+        let zp = deeptime_format::Projection::of(c as f64).pole_z() as i64;
+        let z = rng.below(2 * zp as u64) as i64 - zp;
         let col = w.sample(x, z);
         assert!(!col.horizons.is_empty(), "({x}, {z}) has horizons");
         assert!(
@@ -232,7 +276,7 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
                 assert!(class.is_none());
             }
         }
-        assert_eq!(y, -353, "down to min_y");
+        assert_eq!(y, -513, "down to min_y");
         if !col.bodies.is_empty() {
             with_bodies += 1;
         }
@@ -282,5 +326,60 @@ fn a_run_without_amplify_gets_an_upsampled_terrain() {
     assert_eq!(col.detail, 0.0);
     assert_eq!(col.surface, col.elevation);
     assert!(col.horizons[0].0 >= col.top_y);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// A crater's breccia lens sits under the floor the game draws, not where the deep-time surface
+/// put it: the amplifier changes the ground after the impact stage placed the lens (on the seed-11
+/// test planet of the ice branch, 15 blocks at one crater), and the lens was centred at the rim's
+/// height with no breccia under the floor. `finalize_write` seats each lens on the baked terrain
+/// (`impacts::settle_folder`).
+#[test]
+fn a_craters_lens_is_seated_under_the_drawn_floor() {
+    let dir = temp_dir("lens-floor");
+    let mut v: serde_json::Value = serde_json::from_str(&small_planet(60.0)).unwrap();
+    // Forty times Earth's flux, as the test planet (planet_world_4k): craters the amplifier draws.
+    v["impacts"] = json!({"flux": 700.0, "max_crater_km": 40.0, "min_crater_km": 2.0});
+    run_to_folder(&v.to_string(), &dir);
+    let m = Manifest::read(&dir).unwrap();
+    m.verify(&dir).unwrap();
+    let w = ColumnWorld::open(&dir).unwrap();
+    let mv = m.scale.m_per_block_v;
+    let craters: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(dir.join("impacts/craters.json")).unwrap()).unwrap();
+    let craters = craters["craters"].as_array().expect("a crater list");
+    let (mut seated, mut off) = (0, 0);
+    for b in w.bodies.iter().filter(|b| b.role == "impact_breccia") {
+        let Some(c) = craters.iter().find(|c| {
+            (c["x"].as_f64().unwrap() - b.center[0]).abs() < 0.11
+                && (c["z"].as_f64().unwrap() - b.center[2]).abs() < 0.11
+        }) else {
+            continue;
+        };
+        // A crater with relief left has worn less than its depth: its lens lies under its cover.
+        if !matches!(c["fate"].as_str(), Some("fresh" | "degraded")) {
+            continue;
+        }
+        let drawn = w.height(b.center[0].round() as i64, b.center[2].round() as i64);
+        let want = drawn - c["cover_m"].as_f64().unwrap() / mv;
+        seated += 1;
+        eprintln!(
+            "crater {} lens at y {:.2}, drawn floor {:.2}, wanted {:.2}",
+            c["id"], b.center[1], drawn, want
+        );
+        // Exact up to the file's rounding of the cover (to a metre) and of the centre (0.1 block).
+        if (b.center[1] - want).abs() > 0.15 {
+            off += 1;
+        }
+    }
+    assert!(
+        seated > 0,
+        "the test planet has craters with lenses to read"
+    );
+    assert_eq!(
+        off, 0,
+        "of {seated} lenses read, {off} are not under the drawn floor"
+    );
+    assert!(m.notes["bake"]["impact_bodies"]["lenses"].as_u64().unwrap() > 0);
     std::fs::remove_dir_all(&dir).unwrap();
 }

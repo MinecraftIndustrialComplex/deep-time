@@ -16,6 +16,7 @@ pub mod fsutil;
 pub mod keyframes;
 pub mod lazy;
 pub mod manifest;
+pub mod projection;
 pub mod ramps;
 pub mod raster;
 pub mod rivers;
@@ -35,7 +36,8 @@ pub use events::{
 };
 pub use keyframes::{KeyframeEntry, KeyframeImage, KeyframeIndex};
 pub use lazy::LazyLayer;
-pub use manifest::{FileEntry, LayerEntry, Manifest, Scale, Writer};
+pub use manifest::{DEFAULT_M_PER_BLOCK_V, FileEntry, LayerEntry, Manifest, Scale, Writer};
+pub use projection::Projection;
 pub use ramps::{Ramp, Ramps};
 pub use raster::{Cell, Codec, DType, GridDesc, LayerDesc, LoadedLayer, Raster, RasterRead, TILE};
 pub use rivers::{Chain, Mouth, RiverVertex, Rivers};
@@ -49,7 +51,7 @@ pub use water::{WaterColumn, WaterKind, WaterSpec};
 pub const FORMAT_VERSION: &str = env!("DEEPTIME_FORMAT_VERSION");
 
 /// The minor part of [`FORMAT_VERSION`], written into every file header (plan §5.7.2).
-pub const FORMAT_MINOR: u16 = 3;
+pub const FORMAT_MINOR: u16 = 4;
 
 #[cfg(test)]
 mod tests {

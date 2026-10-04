@@ -137,7 +137,7 @@ pub fn place(
     }
     let fits = |p: (f64, f64), r: f64, placed: &[Point]| -> Option<u32> {
         let (x, z) = (wrap_x(c, p.0), p.1);
-        let half = t.grid.circumference() as f64 / 4.0;
+        let half = t.grid.projection().pole_z();
         if !(-half..half).contains(&z) {
             return None;
         }
@@ -264,7 +264,7 @@ fn place_adjoining(
         for _ in 0..400 {
             let Some(p) = from_cells(rng, t) else { break };
             let (x, z) = (wrap_x(c, p.0), p.1);
-            let half = c / 4.0;
+            let half = deeptime_format::Projection::of(c).pole_z();
             if !(-half..half).contains(&z) {
                 continue;
             }
@@ -308,7 +308,9 @@ mod tests {
     #[test]
     fn cells_round_trip_and_wrap() {
         let grid = GridDesc::for_planet("L1", 1024, 16).unwrap();
-        for cell in [0u32, 5, 64 * 3 + 63, 64 * 31] {
+        // 64 × 24 cells (rows from z = −192, past the Lambert pole at 163).
+        assert_eq!((grid.w, grid.h), (64, 24));
+        for cell in [0u32, 5, 64 * 3 + 63, 64 * 23] {
             let (x, z) = cell_xz(&grid, cell);
             assert_eq!(cell_of(&grid, x + 3.0, z - 7.0), cell);
         }

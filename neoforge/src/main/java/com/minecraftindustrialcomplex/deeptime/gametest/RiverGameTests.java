@@ -35,8 +35,7 @@ import java.util.List;
  * with a bare biome and no carvers, features or caves ({@code deeptime:test_rivers}), boxes around a
  * big river, a small stream, a river mouth in a lake and a lake outlet. At generation no water block
  * floats (air under it) and none leaks (air beside it over ground or over air); every river and
- * lake column's water top is the one {@link Water} decides (a lake column whose generated ground
- * reaches the lake's top is dry shore, see {@link #count}); then every water block is woken with a
+ * lake column's water top is the one {@link Water} decides (none is dry shore, see {@link #count}); then every water block is woken with a
  * fluid tick and after {@value #WAIT_TICKS} ticks no water has reached a column that should be dry.
  *
  * <p>The checks are properties of any planet, not one planet's numbers: the simulation is not
@@ -48,8 +47,6 @@ import java.util.List;
 public final class RiverGameTests {
 
     static final int WAIT_TICKS = 300;
-    /** At most one water column in this many may be dry shore (see {@link #count}). */
-    static final int MAX_DRY_SHORE_INV = 20;
     /** Half the side of each box, blocks. */
     static final int HALF = 20;
 
@@ -103,31 +100,39 @@ public final class RiverGameTests {
      * that replaces water leave air (below sea level the cut fills with sea water). {@link #sites}
      * picks by shape (the widest channel is usually a river's mouth, at sea level), so on a planet
      * whose lakes and mouths all sit at the coast its boxes hold almost no water above the sea. One
-     * box per chain, at the middle of the chain's vertices between {@code sea + 4} and
-     * {@value #HIGH_SITE_TOP}, at least three half-boxes from every box already chosen.
+     * box per chain at the middle of the chain's vertices between {@code sea + 4} and
+     * {@value #HIGH_SITE_TOP}, then boxes along those runs, each at least three half-boxes from
+     * every box already chosen, up to {@link #HIGH_SITES}.
      */
     static List<Site> highSites(Rivers r, int sea, List<Site> have) {
         List<Site> out = new ArrayList<>();
-        for (int k = 0; k < r.chainCount() && out.size() < HIGH_SITES; k++) {
-            int first = -1, last = -1;
-            for (int i = r.chainFirst(k); i < r.chainFirst(k) + r.chainLength(k); i++)
-                if (r.vertexW(i) >= sea + 4 && r.vertexW(i) <= HIGH_SITE_TOP) {
-                    if (first < 0)
-                        first = i;
-                    last = i;
+        // First the middle of each chain's high run, then any of its high vertices: the Lambert test
+        // planet has few chains above the sea, so one box each was too few for the carvers to reach.
+        for (int pass = 0; pass < 2; pass++)
+            for (int k = 0; k < r.chainCount() && out.size() < HIGH_SITES; k++) {
+                int first = -1, last = -1;
+                for (int i = r.chainFirst(k); i < r.chainFirst(k) + r.chainLength(k); i++)
+                    if (r.vertexW(i) >= sea + 4 && r.vertexW(i) <= HIGH_SITE_TOP) {
+                        if (first < 0)
+                            first = i;
+                        last = i;
+                    }
+                if (first < 0)
+                    continue;
+                int from = pass == 0 ? (first + last) / 2 : first, to = pass == 0 ? (first + last) / 2 : last;
+                for (int at = from; at <= to && out.size() < HIGH_SITES; at++) {
+                    if (r.vertexW(at) < sea + 4 || r.vertexW(at) > HIGH_SITE_TOP)
+                        continue;
+                    int x = Math.round(r.vertexX(at)), z = Math.round(r.vertexZ(at));
+                    boolean near = false;
+                    for (Site s : have)
+                        near |= Math.abs(s.x() - x) < 3 * HALF && Math.abs(s.z() - z) < 3 * HALF;
+                    for (Site s : out)
+                        near |= Math.abs(s.x() - x) < 3 * HALF && Math.abs(s.z() - z) < 3 * HALF;
+                    if (!near)
+                        out.add(new Site("high river", x, z));
                 }
-            if (first < 0)
-                continue;
-            int mid = (first + last) / 2;
-            int x = Math.round(r.vertexX(mid)), z = Math.round(r.vertexZ(mid));
-            boolean near = false;
-            for (Site s : have)
-                near |= Math.abs(s.x() - x) < 3 * HALF && Math.abs(s.z() - z) < 3 * HALF;
-            for (Site s : out)
-                near |= Math.abs(s.x() - x) < 3 * HALF && Math.abs(s.z() - z) < 3 * HALF;
-            if (!near)
-                out.add(new Site("high river", x, z));
-        }
+            }
         return out;
     }
 
@@ -149,13 +154,14 @@ public final class RiverGameTests {
 
     /**
      * Reads the boxes back. A river column holds water up to its top, always: the pass cuts or fills
-     * it to the channel. A lake column is filled from the lake's top down to the generated ground
-     * (FORMAT.md, "Water columns": "a lake column fills the air from top down to the ground"), and
-     * {@link Water}'s {@code ground} is the terrain bilinear between noise-cell corners, which the
-     * generated ground between corners can exceed by a block or two on a steep shore. Where it
-     * reaches the lake's top, the column has no room for water: {@code dryShore}, ground flush with
-     * the water beside it, not a hole. A lake column whose top block is open and holds no water is
-     * a mismatch, as is any river column below its top.
+     * it to the channel. So does a lake column (FORMAT.md, "Water columns": a lake column is cut to
+     * its bed): {@link Water}'s {@code ground} is the terrain bilinear between noise-cell corners,
+     * which the generated ground between corners can exceed by a block or two (the density's scale
+     * differs from corner to corner), and the pass removes that ground from the water's range. A
+     * lake column whose top block is neither water nor ice is {@code dryShore}: ground flush with
+     * the water beside it, which the pass must not leave (it was 96 of 898 water columns on the
+     * seed-11 test planet of the ice branch before the cut). A lake column whose top block is open
+     * and holds no water is a mismatch, as is any river column below its top.
      */
     static Tally count(ServerLevel level, WorldData wd, Water.Spec spec, List<Site> sites) {
         Tally t = new Tally();
@@ -220,6 +226,11 @@ public final class RiverGameTests {
                             // Water under the ice, or the ice rests on the bed: nothing to add.
                         } else if (lake && highestWater < col.top() && !atTop.isAir() && atTop.getFluidState().isEmpty()) {
                             t.dryShore++;
+                            StringBuilder blocks = new StringBuilder();
+                            for (int y = col.top() + 2; y >= col.top() - 3; y--)
+                                blocks.append(' ').append(BuiltInRegistries.BLOCK.getKey(chunk.getBlockState(pos.set(x, y, z)).getBlock()).getPath());
+                            t.note("dry" + col.top() + "[ground " + col.ground() + " surface " + String.format(java.util.Locale.ROOT, "%.3f", col.surface())
+                                    + " level " + col.level() + " bed " + col.bed() + " heightmap " + top + " y" + (col.top() + 2) + "↓" + blocks + "]", x, highestWater, z);
                         } else if (highestWater < col.top()) {
                             t.topMismatch++;
                             StringBuilder blocks = new StringBuilder();
@@ -289,10 +300,10 @@ public final class RiverGameTests {
             helper.assertTrue(before.floating == 0, before.floating + " water blocks over air after generation");
             helper.assertTrue(before.leaks == 0, before.leaks + " water blocks beside open air after generation");
             helper.assertTrue(before.topMismatch == 0, before.topMismatch + " river or lake columns below their water top");
-            // Dry shore is the exception (0 to 0.7 % of the water columns on the planets measured): were the
-            // pass not filling lakes at all, every lake column over open ground would be a mismatch above.
-            helper.assertTrue(before.dryShore * MAX_DRY_SHORE_INV <= before.waterColumns, before.dryShore + " of " + before.waterColumns
-                    + " water columns are lake columns with ground at the waterline: more than 1 in " + MAX_DRY_SHORE_INV);
+            // The pass cuts a lake column to its bed as it does a river's: no lake column is left with
+            // ground at the waterline (22 % of one planet's lake columns were, before the cut).
+            helper.assertTrue(before.dryShore == 0, before.dryShore + " of " + before.waterColumns
+                    + " water columns are lake columns with ground at the waterline");
             helper.assertTrue(before.wrongIce == 0, before.wrongIce + " lake columns are iced where the climate keeps them open, or open where it freezes them");
             helper.assertTrue(before.outside == 0, before.outside + " dry columns hold water after generation");
             helper.assertTrue(after.outside == 0, after.outside + " dry columns hold water after " + WAIT_TICKS + " ticks");

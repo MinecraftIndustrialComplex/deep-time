@@ -36,6 +36,9 @@ pub use deeptime_format::ramps::RAMPS_JSON;
 
 const INDEX_HTML: &str = include_str!("../assets/index.html");
 const VIEWER_JS: &str = include_str!("../assets/viewer.js");
+/// The pages' map projection (`window.DTProj`, the twin of `deeptime_format::projection`), loaded
+/// before every other script of the viewer bundle and the workbench.
+pub const PROJECTION_JS: &str = include_str!("../assets/projection.js");
 const BENCH_HTML: &str = include_str!("../assets/bench.html");
 const WORKBENCH_HTML: &str = include_str!("../assets/workbench.html");
 /// The workbench page's script (`deeptime watch` serves it as `workbench.js`).
@@ -132,6 +135,7 @@ pub fn write_bundle_with(
         INDEX_HTML.replace("{{TITLE}}", &html_escape(&info.title)),
     )?;
     fs::write(dir.join("viewer.js"), VIEWER_JS)?;
+    fs::write(dir.join("projection.js"), PROJECTION_JS)?;
     fs::write(dir.join("ramps.json"), RAMPS_JSON)?;
 
     let mut entries = Vec::new();
@@ -241,11 +245,16 @@ fn satellite_entry(dir: &Path, c: u32, t: &Timeline) -> io::Result<Option<Value>
     let file = format!("layers/{}.png", slug(SATELLITE_LAYER));
     write_rgba_png(&dir.join(&file), k.w, k.h, rgba)?;
     let r = f64::from(c) / f64::from(k.w);
+    // The keyframe is a map picture: x linear in longitude, z linear from the north pole, so it is a
+    // block-space picture whose rows start at the pole (rounded: its rows are 2R/h blocks apart,
+    // within a block of r over the whole height at the π : 1 aspect).
+    let pole = deeptime_format::Projection::new(c).pole_z().round() as i64;
     Ok(Some(json!({
         "name": SATELLITE_LAYER, "slug": slug(SATELLITE_LAYER), "units": "", "scale": 1.0,
         "offset": 0.0, "nodata": null, "ramp": SATELLITE_LAYER,
         "grid": { "name": "keyframe", "w": k.w, "h": k.h, "r": r, "wraps_x": true,
-                  "origin_block_x": -i64::from(c / 2), "origin_block_z": -i64::from(c / 4) },
+                  "origin_block_x": -i64::from(c / 2),
+                  "origin_block_z": -pole },
         "image": { "file": file, "w": k.w, "h": k.h, "stride": 1 },
         "values": null,
         "view": { "n": k.n, "t": k.t, "stage": k.stage },
@@ -528,7 +537,7 @@ mod tests {
 
     #[test]
     fn sees_format() {
-        assert_eq!(super::FORMAT_VERSION, "0.3");
+        assert_eq!(super::FORMAT_VERSION, "0.4");
     }
 
     #[test]

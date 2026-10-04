@@ -19,7 +19,7 @@ import java.util.Optional;
  * @param stagingId           the Create World screen's staging folder id, until the data is moved
  *                            into the world at server start (P1-11)
  * @param poleCapDeg          where the pole soft cap starts (plan §5.1 {@code scale.pole_cap_deg},
- *                            §7.11; default 75°)
+ *                            §7.11; default 70°, Ben 2026-10-03)
  * @param poleStopDeg         where the soft cap becomes a hard stop ({@code pole_stop_deg}; default 80°)
  */
 public record WorldDataRef(String folder, int circumferenceBlocks, Optional<String> testTerrain,

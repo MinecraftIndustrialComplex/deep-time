@@ -25,8 +25,9 @@ use crate::world::WorldState;
 
 /// Frames kept in memory (older ones are re-read from disk).
 pub const RING_CAPACITY: usize = 16;
-/// The keyframe size of the globe/map view (plan §6.1).
-pub const DEFAULT_SIZE: (u32, u32) = (1024, 512);
+/// The keyframe size of the globe/map view (plan §6.1): 1024 wide at the map's aspect (the
+/// Lambert projection's π : 1, `Projection::picture_height`).
+pub const DEFAULT_SIZE: (u32, u32) = (1024, 326);
 
 /// When and how large a session renders keyframes.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -64,12 +65,12 @@ pub struct ViewScale {
 }
 
 impl Default for ViewScale {
-    /// The defaults of a planet preset (sea level y 63, 20 m per block, 6,370 km, 300 m a block
+    /// The defaults of a planet preset (sea level y 63, 35 m per block up, 6,370 km, 300 m a block
     /// across, the default hydrology).
     fn default() -> ViewScale {
         ViewScale {
             sea_level_y: 63.0,
-            m_per_block_v: 20.0,
+            m_per_block_v: deeptime_format::DEFAULT_M_PER_BLOCK_V,
             radius_m: 6.37e6,
             m_per_block_h: 300.0,
             rivers_scale: 1.0,
@@ -79,7 +80,8 @@ impl Default for ViewScale {
 }
 
 /// Renders `layers` of `world.fields` (those present) at `size`. Pixel (px, py) is centred on
-/// longitude 360°·px/w (the seam is 0°, plan §5.2) and latitude 90° − 180°·py/h (as a tile
+/// longitude 360°·px/w (the seam is 0°) and on sin φ = 1 − 2·py/h (the Lambert map,
+/// `deeptime_format::projection`) (as a tile
 /// pack's cell is a point sample, `FORMAT.md`) and takes the nearest grid cell, coloured with the
 /// layer's ramp; NaN is transparent. The satellite view (`satellite`) is composited instead
 /// (`crate::satellite`; `view` turns block heights into metres), with the water of the frame's
@@ -122,12 +124,10 @@ pub fn render(
             },
         };
         let (_, ramp) = ramps.for_layer(name);
-        let (gw, gh) = (field.grid.w as f64, field.grid.h as f64);
         let mut rgba = Vec::with_capacity(w as usize * h as usize * 4);
         for py in 0..h {
-            let j = (f64::from(py) * gh / f64::from(h)).round() as i64;
             for px in 0..w {
-                let i = (f64::from(px) * gw / f64::from(w)).round() as i64;
+                let (i, j) = field.grid.picture_cell(f64::from(px), f64::from(py), w, h);
                 rgba.extend_from_slice(&ramp.rgba(f64::from(field.get(i, j))));
             }
         }
@@ -427,8 +427,11 @@ mod tests {
         let ramps = Ramps::builtin();
         let mut world = WorldState::new(1, 1024, -1.0e6);
         let grid = GridDesc::for_planet("L1", 1024, 16).unwrap();
+        // NaN in the cell under the frame's first pixel (the seam and the north pole).
+        let (i0, j0) = grid.picture_cell(0.0, 0.0, 32, 16);
+        let nan_at = j0 as usize * grid.w as usize + i0 as usize;
         let mut field = Field::filled(grid, 63.0);
-        field.data[0] = f32::NAN;
+        field.data[nan_at] = f32::NAN;
         world.fields.insert("elevation".into(), field);
         let view = ViewScale::default();
         assert!(render(&world, &ramps, &view, "s", &["nothing"], 0, (8, 4)).is_none());
@@ -530,11 +533,12 @@ mod tests {
         assert!(f.layers[0].1.chunks(4).all(|p| p[3] == 255));
     }
 
-    /// A 64 × 32 planet: sea in the west, a plain in the east.
+    /// A 64 × 24 planet (rows from z = −192, past the Lambert pole at 163): sea in the west, a
+    /// plain in the east.
     fn half_land() -> WorldState {
         let mut world = WorldState::new(1, 1024, -1.0e6);
         let grid = GridDesc::for_planet("L1", 1024, 16).unwrap();
-        let data = (0..64 * 32)
+        let data = (0..grid.cells())
             .map(|k| if k % 64 < 32 { 40.0 } else { 70.0 })
             .collect();
         world

@@ -148,8 +148,9 @@ fn dump_samples(manifest: &Manifest, layers: &[LoadedLayer], strata: &LoadedLaye
                 // Thousandths of a block, a few cells past the seam and the poles.
                 let bx = (-c / 2 - 3 * r) as f64
                     + rng.below(((c + 6 * r) * 1000) as u64) as f64 / 1000.0;
-                let bz = (-c / 4 - 3 * r) as f64
-                    + rng.below(((c / 2 + 6 * r) * 1000) as u64) as f64 / 1000.0;
+                let zp = d.grid.projection().pole_z() as i64;
+                let bz = (-zp - 3 * r) as f64
+                    + rng.below(((2 * zp + 6 * r) * 1000) as u64) as f64 / 1000.0;
                 pts.push(json!([bx, bz, l.bilinear(bx, bz)]));
             }
             bilinear.insert(name.into(), Value::Array(pts));
@@ -230,15 +231,16 @@ mod tests {
         run(&opts).unwrap();
         let m = Manifest::read(&opts.out).unwrap();
         m.verify(&opts.out).unwrap();
-        assert_eq!(m.format_version, "0.3");
+        assert_eq!(m.format_version, "0.4");
         assert_eq!(m.layers.len(), 8);
         let e = TilePackReader::open(&opts.out.join("rasters/elevation.dtr"))
             .unwrap()
             .load()
             .unwrap();
-        assert_eq!((e.desc.grid.w, e.desc.grid.h), (512, 256));
+        // The grid runs from z = −192 (the multiple of 64 past the Lambert pole at 163).
+        assert_eq!((e.desc.grid.w, e.desc.grid.h), (512, 192));
         let t = WrapTest::new(1024);
-        for (x, z) in [(0i64, 0i64), (128, 32), (-512, -256), (510, 254)] {
+        for (x, z) in [(0i64, 0i64), (128, 32), (-512, -150), (510, 150)] {
             let h = e.bilinear(x as f64, z as f64);
             assert!((h - t.height(x, z)).abs() <= 1.0 / 32.0, "H({x},{z}) {h}");
         }
@@ -257,7 +259,7 @@ mod tests {
                 .as_array()
                 .unwrap()
                 .len(),
-            2 * 65536 + 1000
+            512 * 192 + 1000
         );
         std::fs::remove_dir_all(&dir).unwrap();
     }

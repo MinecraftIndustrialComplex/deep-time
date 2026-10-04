@@ -7,6 +7,7 @@ import com.minecraftindustrialcomplex.deeptime.net.PlanetDebugLine;
 import com.minecraftindustrialcomplex.deeptime.net.PoleStormPayload;
 import com.minecraftindustrialcomplex.deeptime.net.WorldInfoPayload;
 import com.minecraftindustrialcomplex.deeptime.worlddata.FormatVersion;
+import com.minecraftindustrialcomplex.deeptime.worlddata.Manifest;
 import io.netty.buffer.Unpooled;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -71,8 +72,8 @@ public final class NetworkGameTests {
         WorldInfoPayload cut = roundTrip(WorldInfoPayload.STREAM_CODEC,
                 new WorldInfoPayload(true, "minecraft:overworld", "0.0", 16384, 300, 20, 75, 80, longName), helper);
         helper.assertTrue(cut.planetName().length() == WorldInfoPayload.MAX_STRING, "long name not cut: " + cut.planetName().length());
-        helper.assertTrue(cut.poleCap() != null && cut.poleCap().stopZ() > 3640 && cut.poleCap().stopZ() < 3642,
-                "poleCap() of a 16k planet: " + cut.poleCap());
+        helper.assertTrue(cut.poleCap() != null && cut.poleCap().stopZ() > 2567 && cut.poleCap().stopZ() < 2569,
+                "poleCap() of a 16k planet (stop line R·sin 80°, R = C/2π): " + cut.poleCap());
         helper.assertTrue(WorldInfoPayload.notAPlanet("minecraft:the_end").poleCap() == null, "a non-planet has a cap");
         DeepTime.LOGGER.info("[gametest] worldInfoRoundTrip {} cases ok, id {}", cases.size() + 1, WorldInfoPayload.TYPE.id());
         helper.succeed();
@@ -160,10 +161,11 @@ public final class NetworkGameTests {
     @GameTest(template = GameTestSupport.TEMPLATE)
     public static void planetDebugLine(GameTestHelper helper) {
         WorldInfoPayload info = new WorldInfoPayload(true, "minecraft:overworld", "0.0", 16384, 300, 20, 75, 80, "wrap-test");
-        String north = PlanetDebugLine.format(info, 4096, -3500, 0f);
-        String south = PlanetDebugLine.format(info, -8192, 3600, 0.62f);
-        helper.assertTrue("Deep Time: 76.904° N 90.000° E · wrap-test (C 16384, 300 m/block)".equals(north), "north: " + north);
-        helper.assertTrue("Deep Time: 79.102° S 180.000° W · wrap-test (C 16384, 300 m/block) · polar storm 62%".equals(south), "south: " + south);
+        // The Lambert projection: φ = asin(−z / R), R = 16384 / 2π = 2,607.6.
+        String north = PlanetDebugLine.format(info, 4096, -2540, 0f);
+        String south = PlanetDebugLine.format(info, -8192, 2560, 0.62f);
+        helper.assertTrue("Deep Time: 76.926° N 90.000° E · wrap-test (C 16384, 300 m/block)".equals(north), "north: " + north);
+        helper.assertTrue("Deep Time: 79.036° S 180.000° W · wrap-test (C 16384, 300 m/block) · polar storm 62%".equals(south), "south: " + south);
         helper.assertTrue(PlanetDebugLine.format(WorldInfoPayload.notAPlanet("minecraft:the_nether"), 0, 0, 0) == null, "a line outside a planet");
         DeepTime.LOGGER.info("[gametest] planetDebugLine '{}' / '{}'", north, south);
         helper.succeed();
@@ -172,7 +174,7 @@ public final class NetworkGameTests {
     /**
      * A player gets the world info on login and again on every dimension change (plan §7.15): a
      * mock player logs into the flat overworld (not a planet), is moved to the analytic test planet
-     * (C = 16,384, the default 75°/80° cap), to the world-data test planet (C = 1,024, its manifest's
+     * (C = 16,384, the default 70°/80° cap), to the world-data test planet (C = 1,024, its manifest's
      * scales and name) and back. Its own batch: a logged-in player must not disturb other tests.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, batch = "network_player", timeoutTicks = 200)
@@ -192,7 +194,7 @@ public final class NetworkGameTests {
             m.player.teleportTo(planet, 0.5, 200, 0.5, 0, 0);
             WorldInfoPayload onPlanet = m.last(WorldInfoPayload.class);
             helper.assertTrue(onPlanet != null, "no world info after moving to the test planet");
-            helper.assertTrue(onPlanet.planet() && onPlanet.circumference() == 16384 && onPlanet.poleCapDeg() == 75f
+            helper.assertTrue(onPlanet.planet() && onPlanet.circumference() == 16384 && onPlanet.poleCapDeg() == 70f
                             && onPlanet.poleStopDeg() == 80f && onPlanet.dimension().equals(GameTestSupport.TEST_PLANET.location().toString())
                             && onPlanet.formatVersion().equals(FormatVersion.CURRENT) && onPlanet.planetName().startsWith("wrap-test"),
                     "test planet: " + onPlanet);
@@ -201,7 +203,7 @@ public final class NetworkGameTests {
             m.player.teleportTo(data, 0.5, 200, 0.5, 0, 0);
             WorldInfoPayload onData = m.last(WorldInfoPayload.class);
             helper.assertTrue(onData != null && onData.planet() && onData.circumference() == 1024 && onData.mPerBlockH() == 300.0
-                            && onData.mPerBlockV() == 20.0 && Objects.equals(onData.planetName(), "wrap-test"),
+                            && onData.mPerBlockV() == Manifest.DEFAULT_M_PER_BLOCK_V && Objects.equals(onData.planetName(), "wrap-test"),
                     "world-data planet: " + onData);
 
             m.forgetSent();

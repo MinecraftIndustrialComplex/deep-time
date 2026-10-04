@@ -109,8 +109,10 @@ too (the Earth's are a few per cent); no Earth figure has been looked for.
   basin is a sediment-cover test.
 - Continental crust has no age in the plate model, so shield and platform are told apart by cover
   and surface rock, not by Precambrian age (PRV-020).
-- Regions are 4-neighbour regions on the equirectangular L1 grid, wider in km at the equator than
-  near the poles; the minimum area is counted in map kilometres (cell = 16 x 300 m), not true area.
+- Regions are 4-neighbour regions on the L1 grid, which is Lambert's cylindrical equal-area map
+  since 2026-10-03 (SCL-049, SCL-052): every cell covers the same true area, so the minimum area
+  counted in map kilometres (cell = 16 x 300 m) is the true area. A region's shape is still the
+  map's: east-west stretched and north-south squashed by sec(latitude) (POL-017).
 - 50,000 km^2 is 0.65 % of the 16k planet's 7.7 million km^2, a larger share than on the Earth
   (PRV-029).
 - The Earth shares are not a published table. They depend on a mapping from CRUST 2.0 type names

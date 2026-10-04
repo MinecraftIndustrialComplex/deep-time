@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Deallocates the test VM after IDLE_MINUTES with no work (tools/remote/vm/idle-watcher.py; Ben,
+# 2026-10-03). Root: it reads every user's processes and flushes the play server before going down.
+# Settings: /etc/default/deeptime-idle. Installed by tools/remote/vm/install.sh.
+[Unit]
+Description=Deep Time test VM idle watcher (deallocates the VM after idle minutes)
+Wants=network-online.target
+After=network-online.target deeptime-workbench.service deeptime-play.service
+RequiresMountsFor=/data
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/deeptime-idle
+ExecStart=/usr/bin/python3 -u /usr/local/lib/deeptime/idle-watcher.py
+Restart=always
+RestartSec=30s
+
+[Install]
+WantedBy=multi-user.target

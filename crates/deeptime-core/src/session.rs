@@ -1306,6 +1306,28 @@ impl Session {
         }
         let mut bytes = m.to_json_bytes()?;
         write_atomic(&dir.join(MANIFEST), &bytes)?;
+        // The impact craters' breccia lenses go under the floor the bake drew (the amplifier
+        // changed the ground after the impact stage placed them): the pass reads the complete
+        // folder as the game does, so the manifest is written again.
+        if let crate::preset::PresetBody::Planet(p) = &self.preset.body
+            && m.notes
+                .get(crate::bake::NOTES_KEY)
+                .is_some_and(|b| b["baked"] == json!(true))
+            && world.impacts.is_some()
+        {
+            let note = crate::surface::impacts::settle_folder(world, dir, p, &mut m)?;
+            if note["lenses"].as_u64().unwrap_or(0) > 0 {
+                self.log.push(
+                    Level::Info,
+                    format!(
+                        "impact lenses: {} seated under the drawn floor, {} moved by a block or more, {} dropped",
+                        note["lenses"], note["moved_a_block_or_more"], note["dropped"]
+                    ),
+                );
+                bytes = m.to_json_bytes()?;
+                write_atomic(&dir.join(MANIFEST), &bytes)?;
+            }
+        }
         // Placers go where the finished world has their gravel: into the river channels the bake
         // made, or onto its ground (deposits::placer_channels). The pass reads the folder as the
         // game does, so it runs on the complete folder and the manifest is written again.
@@ -1505,9 +1527,9 @@ mod tests {
         assert!(matches!(s.keyframe_info(0), Err(CoreError::Unsupported(_))));
         let manifest = s.finalize_write().unwrap();
         let v: Value = serde_json::from_str(&manifest).unwrap();
-        assert_eq!(v["format_version"], "0.3");
+        assert_eq!(v["format_version"], "0.4");
         assert_eq!(v["layers"], json!([]));
-        assert!(manifest.contains("\"format_version\": \"0.3\""));
+        assert!(manifest.contains("\"format_version\": \"0.4\""));
         assert!(manifest.contains("\"layers\": []"));
         let on_disk = std::fs::read_to_string(dir.join("manifest.json")).unwrap();
         assert_eq!(on_disk, manifest);
@@ -1724,7 +1746,8 @@ mod tests {
             r#"{"base_bytes":0,"history_bytes":0,"mem_cap":4294967296,"peak_bytes":0,"spill_bytes":0,"stages":[{"base_bytes":0,"bytes":0,"history_bytes":0,"name":"dummy","seconds":0.0,"spill_bytes":0}]}"#
         );
         let world: Value = serde_json::from_str(&estimate(DUMMY_WORLD, "").unwrap()).unwrap();
-        assert_eq!(world["peak_bytes"], 256 * 128 * 4);
+        // 256 × 88 cells (rows from z = −704, past the Lambert pole at 651.9).
+        assert_eq!(world["peak_bytes"], 256 * 88 * 4);
         assert_eq!(world["stages"][1]["name"], "dummy_erode");
     }
 

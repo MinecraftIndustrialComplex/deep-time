@@ -55,7 +55,7 @@ impl MemoryGauge for Gauge {
     }
 }
 
-/// `deposits::recorded_tests`' small coupled planet (256 × 128 L1 cells) over 100 Myr, recording a
+/// `deposits::recorded_tests`' small coupled planet (here 512 × 164 L1 cells) over 100 Myr, recording a
 /// frame every plate step and keeping 8 layers of strata, so the history (50 frames) outweighs
 /// the rest and half of it is more than the stages' reservations keep in hand.
 fn preset() -> String {
@@ -67,7 +67,9 @@ fn preset() -> String {
     .unwrap();
     let mut v: Value = serde_json::from_str(&json).unwrap();
     v["resolution"]["l0_samples"] = json!(3000);
-    v["resolution"]["l1_r"] = json!(64);
+    // L1 512 × 164: at 64 blocks a cell the Lambert grid (256 × 82) left too small a history to
+    // outweigh the rest (it was tuned on the equirectangular 256 × 128).
+    v["resolution"]["l1_r"] = json!(32);
     v["keyframes"]["size"] = json!([32, 16]);
     v["keyframes"]["every_myr"] = json!(20.0);
     v["seed"] = json!(5);

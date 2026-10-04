@@ -437,8 +437,13 @@ impl Config {
             thermal_noise: self.p.thermal_noise as f32,
             cell_blocks: c / gw_fine as f64,
             origin_x: -c / 2.0,
-            origin_z: -c / 4.0,
+            origin_z: self.origin_z((c / gw_fine as f64).round() as u32),
         }
+    }
+
+    /// Block z of row 0 of a level of `r` blocks per cell (`GridDesc::for_planet`: −Zo).
+    fn origin_z(&self, r: u32) -> f64 {
+        deeptime_format::Projection::new(self.circumference).grid_origin_z(r) as f64
     }
 
     /// The halo the last level needs: the passes', and with ruggedness the character's radius and
@@ -473,7 +478,7 @@ impl Config {
                 circumference: self.circumference,
                 cell_blocks: self.cell_blocks_l3(),
                 origin_x: -c / 2.0,
-                origin_z: -c / 4.0,
+                origin_z: self.origin_z(self.l3_r),
                 sea: self.sea as f32,
                 sea_y: self.sea_y,
                 mv: self.mv,
@@ -938,7 +943,7 @@ impl AmplifyStage {
 
         // The thinned copies (keyframes, the workbench) …
         let s = out.preview.stride;
-        let grid_p = GridDesc::for_planet("L3p", c, r.l3_r * s as u32)?;
+        let grid_p = l3.thinned("L3p", s as u32);
         debug_assert_eq!(
             (grid_p.w as usize, grid_p.h as usize),
             (out.preview.w, out.preview.h)

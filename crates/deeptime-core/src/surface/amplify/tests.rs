@@ -18,7 +18,8 @@ use crate::surface::grid::Dims;
 use crate::surface::{pflood, routing};
 
 const W2: usize = 96;
-const H2: usize = 48;
+// C = 768: the rows run from z = −128, the multiple of 32 past the Lambert pole at 122.2.
+const H2: usize = 32;
 const R2: u32 = 8;
 const C: u32 = W2 as u32 * R2;
 const SEA_Y: f64 = 63.0;
@@ -117,6 +118,12 @@ fn cfg(drama: f64) -> Config {
             glacial: glacial::GlacialShape {
                 radius_cells: 5,
                 ..glacial::GlacialShape::default()
+            },
+            // Shorter gullies for the same reason (each octave's fall line reaches a quarter of
+            // its wavelength).
+            character: character::CharacterParams {
+                gully_wavelength_blocks: 64.0,
+                ..character::CharacterParams::default()
             },
             ..AmplifyParams::default()
         },
@@ -315,6 +322,99 @@ fn a_glaciated_level_amplifies_the_same_in_tiles_and_on_any_thread_count() {
     assert_ne!(bits(&whole.z), bits(&plain.z));
 }
 
+/// Land cells of an L3 raster (`w` wide, wrapping in x) standing more than `over_m` above all
+/// eight neighbours, away from the first and last rows.
+fn spires(z: &[f32], w: usize, over_m: f32) -> Vec<usize> {
+    let h = z.len() / w;
+    let mut out = Vec::new();
+    for j in 1..h - 1 {
+        for i in 0..w {
+            let c = j * w + i;
+            if z[c] <= 0.0 {
+                continue;
+            }
+            let mut top = f32::MIN;
+            for dj in [-1i64, 0, 1] {
+                for di in [-1i64, 0, 1] {
+                    if di != 0 || dj != 0 {
+                        let ii = (i as i64 + di).rem_euclid(w as i64) as usize;
+                        let jj = (j as i64 + dj) as usize;
+                        top = top.max(z[jj * w + ii]);
+                    }
+                }
+            }
+            if z[c] - top > over_m {
+                out.push(c);
+            }
+        }
+    }
+    out
+}
+
+/// No one-cell spires (margins and spires task, 2026-10-03). A young, steep, glaciated range at
+/// full ruggedness: no land cell of the finished L3 stands more than [`SPIRE_BLOCKS`] blocks above
+/// all eight of its neighbours (600 m away at 300 m per block). What may, and is not on this
+/// planet: a volcano's summit and an impact crater's central peak, whose cones are drawn on
+/// purpose (`volcano.rs`, `impact.rs`). Before the fix the glacial trough fade of the mountain
+/// character was taken cell by cell from the glacial cut, which jumps between neighbouring cells
+/// at the ice margin and over the bed's rills, and the gullies took their direction from a
+/// one-cell gradient that turns freely at summits and crests: single cells kept the character's
+/// cut or lift that their neighbours lost, 10–40 blocks tall on the planets.
+const SPIRE_BLOCKS: f32 = 6.0;
+
+#[test]
+fn a_glaciated_young_range_has_no_one_cell_spires() {
+    let mut l2 = l2_level();
+    // Steeper land (three times the relief) under 300 m of ice above 1,500 m.
+    for z in l2.z.iter_mut() {
+        if *z > 0.0 {
+            *z *= 3.0;
+        }
+    }
+    l2.zs =
+        l2.z.iter()
+            .map(|&z| if z > 1500.0 { z + 300.0 } else { z - 1.0 })
+            .collect();
+    let mut c = cfg(1.0);
+    c.p.ruggedness = 2.0;
+    let young = character::CharacterFields::uniform_for_tests(1.0, 0.5, 30.0);
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(2)
+        .build()
+        .unwrap();
+    let plan = plan_whole();
+    let mut sink = MemSink::new(plan.gw, plan.gh);
+    let out = pool
+        .install(|| {
+            run(
+                l2.clone(),
+                2,
+                &c,
+                c.character(&young),
+                plan,
+                &mut sink,
+                &never,
+                &free,
+            )
+        })
+        .unwrap();
+    assert!(out.last.glacial_cells > 0, "the glaciers shaped something");
+    assert!(
+        out.last.character.abs_change_blocks_cells > 0.0,
+        "the character did something"
+    );
+    let over = SPIRE_BLOCKS * c.mv as f32;
+    let found = spires(&sink.z, plan.gw, over);
+    let tallest = found.iter().map(|&s| sink.z[s]).fold(f32::MIN, f32::max);
+    assert!(
+        found.is_empty(),
+        "{} cells stand more than {SPIRE_BLOCKS} blocks above all their neighbours (first {:?}, \
+         highest {tallest} m)",
+        found.len(),
+        &found[..found.len().min(8)]
+    );
+}
+
 #[test]
 fn streamed_and_in_memory_l3_agree_bit_for_bit() {
     let l2 = l2_level();
@@ -372,7 +472,7 @@ fn streamed_and_in_memory_l3_agree_bit_for_bit() {
 
 #[test]
 fn the_levels_before_the_last_agree_tiled_and_whole() {
-    // The middle level (192 × 96 cells here) in tiles of 64 with its halo, then the last level
+    // The middle level (192 × 64 cells here) in tiles of 64 with its halo, then the last level
     // in tiles: the terrain is what a run on whole rasters gives, to the bit.
     let l2 = l2_level();
     let whole_cfg = cfg(1.0);
@@ -381,7 +481,7 @@ fn the_levels_before_the_last_agree_tiled_and_whole() {
     tiled_cfg.p.stream = StreamMode::Always;
     tiled_cfg.p.tile_cells = 64;
     let (tiled, out) = run_mem(&l2, &tiled_cfg, plan_tiled(&tiled_cfg), 2);
-    assert!(out.levels[0].tiles >= 6, "{} tiles", out.levels[0].tiles);
+    assert!(out.levels[0].tiles >= 3, "{} tiles", out.levels[0].tiles);
     assert!(
         whole
             .z
@@ -432,7 +532,7 @@ fn streamed_tile_packs_hold_what_the_memory_run_holds() {
             .unwrap()
             .len()
     );
-    for j in [0usize, 1, 100, 191] {
+    for j in [0usize, 1, 100, 127] {
         for i in [0usize, 5, 100, 383] {
             let z = mem.z[j * 4 * W2 + i];
             let y = SEA_Y + (f64::from(z) - c.sea) / c.mv;
@@ -1074,14 +1174,17 @@ fn auto_mode_under(cap: u64, held: u64, name: &str) -> String {
 
 #[test]
 fn the_stage_streams_under_auto_when_only_the_whole_path_peak_is_over_the_cap() {
-    // L3 1024 x 512 from L2 256 x 128: 41.4 MB of buffers whole, and the middle level (512 x 256)
-    // and the preview on top of them in memory. A cap 1 MB over the buffers alone holds those but
-    // not the peak: `auto` must tile the last level, not reserve the rest late and fail.
-    let (gw, gh) = (1024usize, 512usize);
+    // L3 1024 x 328 from L2 256 x 82 (C = 16,384: rows from z = −2,624, past the Lambert pole),
+    // and the middle level (512 x 164) and the preview on top of them in memory. A cap 1 MB over
+    // the buffers alone holds those but not the peak: `auto` must tile the last level, not reserve
+    // the rest late and fail.
+    let l3 = GridDesc::for_planet("L3", 16_384, 16).unwrap();
+    let (gw, gh) = (l3.w as usize, l3.h as usize);
     let last_only = (gw * gh) as u64 * TILE_BYTES_PER_CELL;
     let peak_over_l2 = whole_last_level_peak(0, 2, gw, gh, 128);
     assert!(
-        peak_over_l2 > last_only + (2 << 20),
+        // The middle level alone is 1.7 MB (512 × 164 cells at 21 bytes).
+        peak_over_l2 > last_only + (3 << 19),
         "the case is not degenerate"
     );
     let held = 0;

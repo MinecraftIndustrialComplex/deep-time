@@ -321,7 +321,7 @@ struct Geometry {
     area: Vec<f64>,
     /// True Earth-normalized cell width of every row and height, m.
     sx: Vec<f64>,
-    sy: f64,
+    sy: Vec<f64>,
     /// EBM band of every row.
     band: Vec<usize>,
     bands: usize,
@@ -636,11 +636,22 @@ impl ClimateStage {
                     cell_area_km2(&grid, j as u32, self.preset.scale.m_per_block_h) / (es * es)
                 })
                 .collect(),
-            sx: lat
-                .iter()
-                .map(|l| dx * l.to_radians().cos().max(0.0) / es)
+            sx: (0..hgt)
+                .map(|j| {
+                    grid.true_cell_m(j as u32, self.preset.scale.m_per_block_h)
+                        .0
+                        / es
+                })
                 .collect(),
-            sy: dx / es,
+            // On the Lambert grid a row's cells are r·m / cos φ high on the sphere: the rows are
+            // not evenly spaced along a column (docs/design/equal-area-projection.md §4).
+            sy: (0..hgt)
+                .map(|j| {
+                    grid.true_cell_m(j as u32, self.preset.scale.m_per_block_h)
+                        .1
+                        / es
+                })
+                .collect(),
             band: lat.iter().map(|&l| snapshot::band_of(l, bands)).collect(),
             bands,
         };
@@ -830,7 +841,7 @@ impl ClimateStage {
         // The ice-sheet dynamics' coarse grid and what drives it: the bed (without the ice),
         // each coarse cell's snapshot equilibrium line and its precipitation.
         let dyn_ice = p.ice_dynamics;
-        let sg = sheet::Grid::new(w, hgt, &geo.sx, geo.sy, p.ice_grid_cells as usize);
+        let sg = sheet::Grid::new(w, hgt, &geo.sx, &geo.sy, p.ice_grid_cells as usize);
         let sp = sheet::Params::from(&p);
         let coarse_band: Vec<usize> = (0..sg.h)
             .map(|cj| geo.band[(cj * sg.k + sg.k / 2).min(hgt - 1)])
@@ -899,7 +910,7 @@ impl ClimateStage {
                             mu0[c].is_finite() && f64::from(mu0[c]) > s.delta[geo.cell_band(c)]
                         })
                         .collect();
-                    ir.heq = ice::thickness(w, hgt, &mask, &geo.sx, geo.sy, tau, cap);
+                    ir.heq = ice::thickness(w, hgt, &mask, &geo.sx, &geo.sy, tau, cap);
                     ir.since_eq = 0.0;
                 }
                 let dtk = s.dt_kyr as f32;
@@ -1146,7 +1157,7 @@ impl ClimateStage {
             mask_pre = (0..n)
                 .map(|c| mu0[c].is_finite() && f64::from(mu0[c]) > delta_end[geo.cell_band(c)])
                 .collect();
-            ice::thickness(w, hgt, &mask_pre, &geo.sx, geo.sy, tau, cap)
+            ice::thickness(w, hgt, &mask_pre, &geo.sx, &geo.sy, tau, cap)
         };
         let curve = self.curve_sea_level(t_end_myr);
         let ocean_km2 = geo.area_where(&|c| h[c] <= curve);
@@ -1362,14 +1373,14 @@ impl ClimateStage {
             let end = if end_mask == mask_pre {
                 ice_end_pre.clone()
             } else {
-                ice::thickness(w, hgt, &end_mask, &geo.sx, geo.sy, tau, cap)
+                ice::thickness(w, hgt, &end_mask, &geo.sx, &geo.sy, tau, cap)
             };
             // The step's largest ice is most often its end's (a steady climate): no second
             // distance transform then.
             let max = if max_mask == end_mask {
                 end.clone()
             } else {
-                ice::thickness(w, hgt, &max_mask, &geo.sx, geo.sy, tau, cap)
+                ice::thickness(w, hgt, &max_mask, &geo.sx, &geo.sy, tau, cap)
             };
             let mut share: Vec<f32> = (0..n)
                 .map(|c| {

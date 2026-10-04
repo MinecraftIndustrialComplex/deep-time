@@ -296,7 +296,8 @@ fn parse_world(v: &Value) -> Result<DummyWorld, CoreError> {
             ),
         ));
     }
-    let (gw, gh) = (circumference / grid_r, circumference / grid_r / 2);
+    let gw = circumference / grid_r;
+    let gh = deeptime_format::Projection::picture_height(gw);
     if gw > 8192 {
         return Err(preset_err(
             &format!("{path}.grid_r"),
@@ -397,7 +398,7 @@ impl DummyStage {
         }
         let field = world.fields.get_mut(ELEVATION).expect("inserted above");
         let grid = field.grid.clone();
-        let (gw, gh) = (grid.w as usize, grid.h as usize);
+        let gw = grid.w as usize;
         ctx.pool.install(|| {
             use rayon::prelude::*;
             field
@@ -405,9 +406,10 @@ impl DummyStage {
                 .par_chunks_mut(gw)
                 .enumerate()
                 .for_each(|(j, row)| {
-                    let lat = 90.0 - 180.0 * j as f64 / gh as f64;
+                    let lat = grid.lat_of_row(j as u32);
                     for (i, v) in row.iter_mut().enumerate() {
-                        let lon = 360.0 * i as f64 / gw as f64; // plan §5.2: the seam is 0°
+                        // The seam is 0°.
+                        let lon = deeptime_format::Projection::picture_lon_deg(i as f64, gw as u32);
                         *v = continent.elevation(lat, lon) as f32;
                     }
                 });
@@ -426,7 +428,10 @@ impl DummyStage {
                 .magnitude((continent.peak_m / 8000.0) as f32)
                 .param("stage", self.name())
                 .param("step", g as i64)
-                .param("peak_y", 63.0 + continent.peak_m / 20.0);
+                .param(
+                    "peak_y",
+                    63.0 + continent.peak_m / deeptime_format::DEFAULT_M_PER_BLOCK_V,
+                );
             if kind == "deeptime:orogeny_phase" {
                 e = e.until(world.t_years + 3.0 * dt);
             }
@@ -525,14 +530,14 @@ impl Continent {
         }
     }
 
-    /// Block y at a latitude and longitude (sea level y 63, 20 m per block).
+    /// Block y at a latitude and longitude (sea level y 63, the default metres per block up).
     fn elevation(&self, lat: f64, lon: f64) -> f64 {
         let d = angular_distance(lat, lon, self.lat, self.lon);
         let arc = angular_distance(lat, lon, -30.0, self.lon + 90.0);
         let g = (-(d / 0.55).powi(2)).exp();
         let a = (-(arc / 0.25).powi(2)).exp();
         let metres = -4000.0 + (self.peak_m + 4000.0) * g + 0.4 * (self.peak_m + 4000.0) * a;
-        63.0 + metres / 20.0
+        63.0 + metres / deeptime_format::DEFAULT_M_PER_BLOCK_V
     }
 }
 
@@ -629,7 +634,8 @@ mod tests {
             "world":{"circumference":2048,"grid_r":16,"keyframe_size":[64,32]}}}"#;
         let p = parse(json).unwrap();
         let w = p.world.clone().unwrap();
-        assert_eq!((w.grid().w, w.grid().h), (128, 64));
+        // Rows from z = −384, the multiple of 64 past the Lambert pole at 326.
+        assert_eq!((w.grid().w, w.grid().h), (128, 48));
         assert_eq!(w.keyframe_every_years, 5.0e8 / 8.0);
         let again = DummyParams::from_json(&p.to_json()["dummy"]).unwrap();
         assert_eq!(again, p);
@@ -662,7 +668,7 @@ mod tests {
     #[test]
     fn continent_is_land_at_its_centre_and_ocean_far_away() {
         let c = Continent::at(0.5);
-        assert!(c.elevation(c.lat, c.lon) > 63.0 + 300.0);
+        assert!(c.elevation(c.lat, c.lon) > 63.0 + 150.0);
         assert!(c.elevation(-c.lat, c.lon + 180.0) < 63.0);
         assert!((angular_distance(0.0, 179.0, 0.0, -179.0) - 2f64.to_radians()).abs() < 1e-9);
     }

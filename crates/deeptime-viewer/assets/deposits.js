@@ -8,8 +8,9 @@
 // - `prepare(answer)`: the server's `GET api/runs/<id>/deposits` turned into a model (footprint
 //   outlines, a size rank inside each family, counts per family);
 // - `draw` / `hit`: the overlay on a map canvas and the site under a point, both through a `view`
-//   the caller gives ({ project(lat, lon) -> [x, y], ppdx, ppdy (canvas px per degree), worldW
-//   (canvas px for 360 degrees), dpr }), so a map that zooms or pans only has to say so there;
+//   the caller gives ({ project(lat, lon) -> [x, y], ppbx, ppbz (canvas px per block east and
+//   south: map pictures are linear in block space), worldW (canvas px for 360 degrees), dpr }), so
+//   a map that zooms or pans only has to say so there;
 // - text: the legend, the hover card, the site's facts and its cause chain.
 //
 // The overlay draws data the run already keeps (the sites and bodies the deposit stage placed;
@@ -21,6 +22,7 @@
   const D2R = Math.PI / 180;
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const proj = () => root.DTProj;   // the planet's projection (projection.js, loaded first)
 
   // ---------------------------------------------------------------------------------------------
   // The families. Colours: the data-viz palette's dark-mode categorical steps (blue, orange, aqua,
@@ -117,17 +119,18 @@
     const sites = (answer.sites || []).map(raw => {
       const family = familyOf(raw.type);
       const fp = raw.fp || { x: raw.x, z: raw.z, a: 1, c: 1, yaw: 0, km2: 0 };
-      // The footprint's outline as degrees about its centre (the seam is x = ±C/2, north is −z).
+      // The footprint's outline as blocks (dx, dz) about its centre (north is −z).
       const poly = [];
       const cy = Math.cos(fp.yaw), sy = Math.sin(fp.yaw);
+      const P = proj(), clat = P.latOfZ(C, fp.z);
       for (let i = 0; i < RING; i++) {
         const th = 2 * Math.PI * i / RING, u = fp.a * Math.cos(th), v = fp.c * Math.sin(th);
-        poly.push([(u * cy - v * sy) / C * 360, -(u * sy + v * cy) / C * 360]);
+        poly.push([u * cy - v * sy, u * sy + v * cy]);
       }
       const p = primary(raw);
       return Object.assign({}, raw, {
         family, poly, rank: 0.5,
-        clat: -fp.z / C * 360, clon: (((fp.x + C / 2) / C * 360) % 360 + 360) % 360,
+        clat, clon: P.lonOfX(C, fp.x),
         tonnes: p ? p.tonnage_t : 0,
       });
     });
@@ -174,7 +177,7 @@
 
   // The footprint's scale-up to the minimum size and the pixel semi-axes (`pa` along the long one).
   function areaScale(s, view) {
-    const pa = s.fp.a / view.C * 360 * view.ppdx, pc = s.fp.c / view.C * 360 * view.ppdy;
+    const pa = s.fp.a * view.ppbx, pc = s.fp.c * view.ppbz;
     return Math.max(1, MIN_AREA_PX * view.dpr / Math.max(pa, pc, 1e-6));
   }
   // Where a site's symbol (or a coal field's centre) is: its spot, a symbol's width over from any
@@ -188,8 +191,8 @@
 
   function outline(ctx, s, cx, cy, view, k) {
     ctx.beginPath();
-    s.poly.forEach(([dlon, dlat], i) => {
-      const x = cx + dlon * view.ppdx * k, y = cy - dlat * view.ppdy * k;
+    s.poly.forEach(([dx, dz], i) => {
+      const x = cx + dx * view.ppbx * k, y = cy + dz * view.ppbz * k;
       if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
     });
     ctx.closePath();
@@ -221,7 +224,7 @@
     for (const s of shown) {
       if (!s.family.area) continue;
       const [x0, y0] = view.project(s.clat, s.clon), k = areaScale(s, view);
-      const ext = Math.max(s.fp.a, s.fp.c) / view.C * 360 * view.ppdx * k;
+      const ext = Math.max(s.fp.a * view.ppbx, s.fp.c * view.ppbz) * k;
       const on = s.id === state.selected || s.id === state.hover;
       for (const cx of copies(x0, ext, view)) {
         outline(ctx, s, cx, y0, view, k);
@@ -264,7 +267,7 @@
     const sel = state.selected != null ? model.byId.get(state.selected) : null;
     if (sel && sel.family.area && !hidden.has(sel.family.key)) {
       const [x0, y0] = view.project(sel.clat, sel.clon), k = areaScale(sel, view);
-      const ext = Math.max(sel.fp.a / view.C * 360 * view.ppdx, sel.fp.c / view.C * 360 * view.ppdy) * k;
+      const ext = Math.max(sel.fp.a * view.ppbx, sel.fp.c * view.ppbz) * k;
       for (const cx of copies(x0, ext, view)) {
         ctx.beginPath(); ctx.arc(cx, y0, ext + 5 * dpr, 0, 2 * Math.PI);
         ctx.lineWidth = 2 * dpr; ctx.strokeStyle = '#fff'; ctx.setLineDash([4 * dpr, 3 * dpr]); ctx.stroke(); ctx.setLineDash([]);
@@ -285,8 +288,8 @@
       if (s.family.area) {
         const [x0, y0] = view.project(s.clat, s.clon), k = areaScale(s, view);
         const cy = Math.cos(s.fp.yaw), sy = Math.sin(s.fp.yaw);
-        for (const cx of copies(x0, Math.max(s.fp.a, s.fp.c) / view.C * 360 * view.ppdx * k, view)) {
-          const bx = (x - cx) / view.ppdx / 360 * view.C, bz = (y - y0) / view.ppdy / 360 * view.C;
+        for (const cx of copies(x0, Math.max(s.fp.a * view.ppbx, s.fp.c * view.ppbz) * k, view)) {
+          const bx = (x - cx) / view.ppbx, bz = (y - y0) / view.ppbz;
           const u = bx * cy + bz * sy, v = -bx * sy + bz * cy;
           const d = (u / (s.fp.a * k)) ** 2 + (v / (s.fp.c * k)) ** 2 <= 1 ? AREA_D : Infinity;
           const near = Math.hypot(x - cx, y - y0);

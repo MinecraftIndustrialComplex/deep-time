@@ -5,6 +5,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.compat.dh.DhApiBinding;
 import com.minecraftindustrialcomplex.deeptime.compat.dh.DhFarTerrain;
+import com.minecraftindustrialcomplex.deeptime.compat.dh.TwDhGuard;
+import com.minecraftindustrialcomplex.deeptime.compat.dh.TwDhGuardRule;
 import com.minecraftindustrialcomplex.deeptime.farterrain.FarTerrain;
 import com.minecraftindustrialcomplex.deeptime.farterrain.FarTerrainCheck;
 import com.mojang.brigadier.CommandDispatcher;
@@ -196,6 +198,9 @@ public final class FarTerrainCommand {
         o.add("spawn", spawn);   // the smoke harness checks an area beside the spawn chunks
         o.addProperty("installed", DhFarTerrain.installed());
         o.addProperty("enabled", DhFarTerrain.enabled());
+        // Deep Time's patch to Toroidal World's guard: applied, pending, skipped (and why) or failed
+        // (TwDhGuardMixinPlugin sets it; a class of the mixin package cannot be read from here).
+        o.addProperty("tw_guard_patch", System.getProperty("deeptime.twDhGuard", "not configured"));
         if (DhFarTerrain.installed() && DhFarTerrain.enabled()) {
             Optional<DhApiBinding> api = DhFarTerrain.api();
             o.addProperty("api_bound", api.isPresent());
@@ -213,9 +218,16 @@ public final class FarTerrainCommand {
                 l.addProperty("registered", b.registered());
                 if (!b.registered())
                     l.addProperty("message", b.message());
+                l.addProperty("circumference", b.terrain().data().circumference());
+                // Toroidal World's guard (TwDhGuard): passed, left to TW (and why), or never asked.
+                TwDhGuardRule.Verdict guard = TwDhGuard.seen(key.location().toString());
+                l.addProperty("tw_guard", guard == null ? "not asked" : !guard.guarded() ? "not needed" : guard.pass() ? "passed" : "left to Toroidal World");
+                if (guard != null)
+                    l.addProperty("tw_guard_reason", guard.reason());
                 if (b.generator() != null) {
                     l.addProperty("max_detail", b.generator().maxDetail());
                     l.addProperty("sections", b.generator().sections());
+                    l.addProperty("x_extent", b.generator().xExtent());
                     l.addProperty("failures", b.generator().failures());
                     if (b.generator().firstFailure() != null)
                         l.addProperty("first_failure", b.generator().firstFailure());
@@ -343,15 +355,41 @@ public final class FarTerrainCommand {
         StringBuilder why = new StringBuilder();
         if (bound != null && bound.levelWrapper() != null && DhFarTerrain.api().isPresent()) {
             DhApiBinding api = DhFarTerrain.api().get();
-            for (int j = 0; j < n; j++) {
-                for (int i = 0; i < 4 * n; i++) {
+            // Distant Horizons answers a column it does not hold by waiting for its section
+            // (DhApiTerrainDataRepo: getAsync(..).get()), which can wait on this server thread: each
+            // lookup runs on a thread of its own with a time limit of 30 s (a loaded test machine
+            // has run past 10 s right after a pregeneration, while DH was still writing), and the
+            // third that runs out ends the lookups (recorded, so the check fails instead of the
+            // server hanging).
+            java.util.concurrent.ExecutorService lookups = java.util.concurrent.Executors.newCachedThreadPool(r -> {
+                Thread t = new Thread(r, "deeptime-dh-check");
+                t.setDaemon(true);
+                return t;
+            });
+            int timeouts = 0;
+            StringBuilder timedOutAt = new StringBuilder();
+            for (int j = 0; j < n && timeouts < 3; j++) {
+                for (int i = 0; i < 4 * n && timeouts < 3; i++) {
                     int x = x0 + (i / 4) * spacing + OFFSETS[i % 4][0], z = z0 + j * spacing + OFFSETS[i % 4][1];
                     if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) != null) {
                         generated++;   // a loaded chunk: Distant Horizons holds the chunk's own column there
                         continue;
                     }
                     try {
-                        List<DhApiBinding.StoredPoint> stored = api.storedColumn(bound.levelWrapper(), x, z);
+                        java.util.concurrent.Future<List<DhApiBinding.StoredPoint>> lookup =
+                                lookups.submit(() -> api.storedColumn(bound.levelWrapper(), x, z));
+                        List<DhApiBinding.StoredPoint> stored;
+                        try {
+                            stored = lookup.get(30, java.util.concurrent.TimeUnit.SECONDS);
+                        } catch (java.util.concurrent.TimeoutException e) {
+                            lookup.cancel(true);
+                            timeouts++;
+                            timedOutAt.append(timedOutAt.isEmpty() ? "" : "; ").append(x).append(", ").append(z);
+                            o.addProperty("lookup_timed_out_at", timedOutAt.toString());
+                            continue;
+                        } catch (java.util.concurrent.ExecutionException | InterruptedException e) {
+                            throw new RuntimeException(e.getCause() == null ? e : e.getCause());
+                        }
                         if (stored == null || stored.isEmpty()
                                 || stored.stream().allMatch(p -> p.block() instanceof BlockState s && s.is(Blocks.AIR) || p.block() == null))
                             continue;
@@ -384,12 +422,13 @@ public final class FarTerrainCommand {
                                 example[0] = sb.toString();
                             }
                         }
-                    } catch (ReflectiveOperationException | RuntimeException e) {
+                    } catch (RuntimeException e) {
                         if (why.length() < 400)
                             why.append(e).append("; ");
                     }
                 }
             }
+            lookups.shutdownNow();
         }
         JsonObject stored = new JsonObject();
         stored.addProperty("asked", 4 * n * n - generated);

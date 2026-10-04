@@ -203,7 +203,10 @@ fn runs_keep_their_invariants() {
         // The L1 fields are there, on the L1 grid, and finite where they must be.
         for name in KEYFRAME_LAYERS {
             let f = &world.fields[name];
-            assert_eq!(f.data.len(), 256 * 128, "{name}");
+            // C = 16,384 at 64 blocks a cell: 256 × 82, the rows from z = −2,624, past the
+            // Lambert pole at 2,607.6.
+            assert_eq!((f.grid.w, f.grid.h), (256, 82), "{name}");
+            assert_eq!(f.data.len(), 256 * 82, "{name}");
         }
         assert!(world.fields["elevation"].data.iter().all(|v| v.is_finite()));
         let ocean = world.fields["plates/crust_type"]
@@ -636,7 +639,6 @@ struct CollisionLives {
 impl CollisionLives {
     fn step(&mut self, st: &PlateState) {
         for c in &st.contacts {
-            assert!(c.speed_count_km >= 0.0);
             let Some(col) = &c.collision else { continue };
             assert!(
                 col.onset_step >= c.onset_step,
@@ -732,18 +734,22 @@ impl CollisionLives {
         assert_eq!(d.belts.len(), belts);
         for b in &d.belts {
             assert!(b.convergence_onset_mm_yr.is_some_and(|v| v > 0.0));
-            assert!(b.wedge_width_km.is_none() && b.foredeep_width_km.is_none());
+            assert!(b.end_myr.is_some_and(|t| t >= b.start_myr));
+            assert!(b.wedge_width_km.is_some_and(|w| w >= 0.0));
+            assert!(b.peak_height_m.is_some_and(|h| h >= 0.0));
+            assert!(b.belt_width_km.is_none_or(|w| w > 0.0));
+            // The plate-only presets have no surface stage, so no flexure to read a basin from.
+            assert!(b.foredeep_width_km.is_none() && b.foredeep_depth_m.is_none());
         }
     }
 }
 
-/// With `tectonics.collision_on_shortening` on, a transfer or weld fires only on real shortening:
-/// every collision record ends a collision state that shortened by the threshold, however fast
-/// the plates slid; the states' life cycle holds; and collisions still happen.
+/// Tasks 3 and 4: a collision builds its belt over many steps and ends in a weld only once it
+/// has stalled (the larger plate keeping its id), or, for a small terrane, in a transfer once it
+/// has shortened by the threshold; the states' life cycle holds; and collisions still happen.
 #[test]
-fn collisions_on_real_shortening_fire_at_the_threshold() {
-    let mut p = preset(8000, 300.0, "supercontinent", 21);
-    p.tectonics.collision_on_shortening = true;
+fn collisions_weld_on_stall_and_transfer_on_shortening() {
+    let p = preset(8000, 300.0, "scattered_continents", 23);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -756,14 +762,36 @@ fn collisions_on_real_shortening_fire_at_the_threshold() {
     assert_eq!(d.collisions.len() as u32, st.counters.accretions);
     for c in &d.collisions {
         assert!(c.onset_convergence_mm_yr.is_some(), "fired with no state");
-        assert!(
-            c.front_shortening_km >= p.tectonics.collision_threshold_km,
-            "fired at {} km of shortening",
-            c.front_shortening_km
-        );
+        if c.sutured {
+            assert!(c.stalled, "a weld before the collision stalled");
+            let died = c.died.expect("a weld names the plate that died");
+            let (smaller, larger) = if c.under_samples > c.over_samples {
+                (c.over, c.under)
+            } else {
+                (c.under, c.over)
+            };
+            assert!(
+                died == smaller || c.under_samples == c.over_samples,
+                "plate {died} died, {larger} was larger"
+            );
+            assert!(c.end_myr - c.start_myr >= p.tectonics.weld_after_myr - 1e-9);
+        } else {
+            assert!(
+                c.stalled || c.front_shortening_km >= p.tectonics.collision_threshold_km,
+                "a transfer at {} km of shortening",
+                c.front_shortening_km
+            );
+        }
     }
-    // Some collision took longer than a step to get there.
+    // Collisions take many steps to get there, and the welds' belts were built over them.
     assert!(d.collisions.iter().any(|c| c.end_myr > c.start_myr));
+    assert!(d.collisions.iter().any(|c| c.sutured), "no weld in 300 Myr");
+    assert!(
+        d.collisions
+            .iter()
+            .filter(|c| c.sutured)
+            .all(|c| c.end_myr - c.start_myr >= 4.0)
+    );
 }
 
 /// The dynamics record (`dynamics.rs`) is measurement only: a run with it and a run without it
@@ -771,7 +799,7 @@ fn collisions_on_real_shortening_fire_at_the_threshold() {
 /// the run's own counters and events.
 #[test]
 fn recording_does_not_change_the_world_and_matches_the_run() {
-    let p = preset(8000, 300.0, "supercontinent", 21);
+    let p = preset(8000, 300.0, "scattered_continents", 23);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
@@ -851,10 +879,11 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
         );
         assert!(step.pieces.first().copied().unwrap_or(0) <= loose.first().copied().unwrap_or(0));
         assert!(step.pieces.len() >= loose.len().min(dynamics::PIECES_KEPT));
-        // The boundary mix: every kind is a length; the fronts (the first three kinds) are the
-        // same fronts whose lengths the plates record, to the rounding of a km a plate.
+        // The boundary mix: every kind is a length; the subducting fronts (the first two kinds,
+        // oceanic slabs) are the same fronts whose lengths the plates record (a collision front
+        // pulls nothing since plate tasks 3 and 4), to the rounding of a km a plate.
         assert!(step.mix_km.iter().all(|&x| x.is_finite() && x >= 0.0));
-        let fronts: f64 = step.mix_km[..3].iter().sum();
+        let fronts: f64 = step.mix_km[..2].iter().sum();
         let recorded: f64 = step.plates.iter().map(|q| q.front_km).sum();
         // (A plate that died in the step, welded or absorbed, has no plate record: its fronts are
         // in the mix only.)
@@ -969,14 +998,6 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     );
     life.finish(st, d);
     for c in &d.collisions {
-        // The built-in presets still fire on the count used before task 2 (relative speed ×
-        // time): `tectonics.collision_on_shortening` is off.
-        assert!(!p.tectonics.collision_on_shortening);
-        assert!(
-            c.counted_km >= p.tectonics.collision_threshold_km,
-            "fired at {} km",
-            c.counted_km
-        );
         assert!(c.front_shortening_km >= 0.0 && c.area_km2 >= 0.0);
         assert!(c.end_myr >= c.start_myr && c.start_myr >= c.contact_onset_myr - 1e-9);
         assert!(c.lifted100.samples <= c.lifted10.samples);

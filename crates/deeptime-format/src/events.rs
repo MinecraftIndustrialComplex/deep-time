@@ -991,12 +991,10 @@ impl EventLog {
     }
 }
 
-/// The grid cell (nearest point sample) at a latitude and longitude (plan §5.2: longitude
-/// 360°·(x + C/2)/C, so the seam is 0°), x wrapped, z clamped.
+/// The grid cell (nearest point sample) at a latitude and longitude (the planet's projection,
+/// [`crate::projection`]: the seam is longitude 0°), x wrapped, z clamped.
 pub fn cell_of(grid: &GridDesc, lat: f32, lon: f32) -> (u32, u32) {
-    let c = grid.circumference() as f64;
-    let x = f64::from(lon) / 360.0 * c - c / 2.0;
-    let z = -f64::from(lat) / 90.0 * c / 4.0;
+    let (x, z) = grid.projection().block_of(f64::from(lat), f64::from(lon));
     let r = f64::from(grid.r);
     let i = ((x - grid.origin_block_x as f64) / r).round() as i64;
     let j = ((z - grid.origin_block_z as f64) / r).round() as i64;
@@ -1216,7 +1214,7 @@ mod tests {
 
     #[test]
     fn cell_index_places_points_and_sites() {
-        let grid = GridDesc::for_planet("L1", 1024, 16).unwrap(); // 64 × 32
+        let grid = GridDesc::for_planet("L1", 1024, 16).unwrap(); // 64 × 24
         let log = EventLog::from_events(vec![
             Event::new(EventId::new(1, 0), 0.0, "deeptime:a", "deeptime:s").at(Place::Point {
                 lat: 0.0,
@@ -1228,12 +1226,14 @@ mod tests {
         ])
         .unwrap();
         let idx = log.cell_index(&grid, |s| (s == 3).then_some([0.0, 180.0]));
-        // lat 0, lon 180° is block (0, 0): cell (32, 16).
-        assert_eq!(cell_of(&grid, 0.0, 180.0), (32, 16));
-        assert_eq!(idx.at(32, 16), &[EventId::new(1, 0), EventId::new(1, 1)]);
-        // The seam is 0° (and 360°): column 0; the poles clamp.
-        assert_eq!(cell_of(&grid, 90.0, 0.0), (0, 0));
-        assert_eq!(cell_of(&grid, -90.0, 360.0), (0, 31));
+        // lat 0, lon 180° is block (0, 0): cell (32, 12) (the grid's rows run from z = −192, the
+        // multiple of 64 past the Lambert pole R = 163).
+        assert_eq!((grid.h, grid.origin_block_z), (24, -192));
+        assert_eq!(cell_of(&grid, 0.0, 180.0), (32, 12));
+        assert_eq!(idx.at(32, 12), &[EventId::new(1, 0), EventId::new(1, 1)]);
+        // The seam is 0° (and 360°): column 0; the poles are z = ∓R: rows 2 and 22.
+        assert_eq!(cell_of(&grid, 90.0, 0.0), (0, 2));
+        assert_eq!(cell_of(&grid, -90.0, 360.0), (0, 22));
     }
 
     #[test]

@@ -172,7 +172,7 @@ def forceload(rcon, c, x0, z0, x1, z1, wait=180, points=()):
     Toroidal World's /forceload accepts canonical coordinates only (-C/2 <= x < C/2: "8217 is
     outside this world"), so a box across the seam is folded and split into two canonical boxes.
     Forceloading is asynchronous; `/test run` puts a test on the WORLD_SURFACE heightmap of its
-    position, which reads y = min build height (-352) until the chunk is there, so the harness
+    position, which reads y = min build height (-512) until the chunk is there, so the harness
     waits (execute if loaded, every corner) before running anything. Re-adding forced chunks is
     harmless (the command reports that nothing changed), so this runs before every test.
     """

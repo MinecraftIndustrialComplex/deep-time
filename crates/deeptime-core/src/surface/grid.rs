@@ -47,21 +47,16 @@ impl Dims {
     /// on a grid one cell wide the wrapped neighbour would be the cell itself and is skipped).
     #[inline]
     pub fn neighbour(&self, c: usize, k: usize) -> Option<usize> {
+        // The raster's topology is the projection's neighbour rule.
         let (di, dj, _) = OFFSETS[k];
-        let i = (c % self.w) as i64;
-        let j = (c / self.w) as i64;
-        let nj = j + dj;
-        if nj < 0 || nj >= self.h as i64 {
-            return None;
-        }
-        let mut ni = i + di;
-        if ni < 0 || ni >= self.w as i64 {
-            if !self.wrap_x {
-                return None;
-            }
-            ni = ni.rem_euclid(self.w as i64);
-        }
-        let n = nj as usize * self.w + ni as usize;
+        let (ni, nj) = deeptime_format::projection::neighbour(
+            self.w,
+            self.h,
+            self.wrap_x,
+            (c % self.w, c / self.w),
+            (di, dj),
+        )?;
+        let n = nj * self.w + ni;
         (n != c).then_some(n)
     }
 

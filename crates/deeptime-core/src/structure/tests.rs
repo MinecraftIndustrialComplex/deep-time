@@ -115,7 +115,7 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     // The stack's top is the surface, and the layer round-trips through the format.
     let src = CellSource::new(&world, &preset).unwrap();
     for c in (0..h.cells()).step_by(97) {
-        let want = (src.surface_y(c, &preset.scale).clamp(-351.0, 639.0) * 16.0).round();
+        let want = (src.surface_y(c, &preset.scale).clamp(-511.0, 639.0) * 16.0).round();
         assert!((f64::from(h.cell(c).0[0]) - want).abs() <= 1.0, "cell {c}");
     }
     let layer = h.to_layer(deeptime_format::Codec::Raw).unwrap();
@@ -598,7 +598,8 @@ fn rule_columns(hz: &bake_horizons::Horizons, seed: u64, n: usize) -> realism::C
     let mut census = realism::Census::default();
     for _ in 0..n {
         let x = rng.below(c as u64) as i64 - c / 2;
-        let z = rng.below((c / 2) as u64) as i64 - c / 4;
+        let zp = deeptime_format::Projection::of(c as f64).pole_z() as i64;
+        let z = rng.below(2 * zp as u64) as i64 - zp;
         layer.stack_at(x, z, hz.min_y, &mut stack);
         raw.clear();
         raw.extend(stack.iter().map(|&(top, class, _)| (top, class)));
@@ -666,7 +667,8 @@ fn baked_stacks_and_blended_columns_have_no_grade_inversion_and_no_sliver() {
 /// undone as chains, and the Noddy port still agrees with the column rule on every sampled
 /// point. (The settings here make far more structures than any preset: the longest history a
 /// sampled column meets must pass one Noddy history in at least one of the runs, or the test
-/// is not testing the case that used to panic.)
+/// is not testing the case that used to panic. 80 Myr: on the Lambert planet after plate tasks 3
+/// and 4, 50 Myr reached at most 122 events a column over six seeds; 80 reaches 270 and 135.)
 #[test]
 fn the_stage_never_panics_however_dense_the_structures() {
     let mut longest = 0u64;
@@ -680,7 +682,7 @@ fn the_stage_never_panics_however_dense_the_structures() {
         let json = with_timeline(
             planet_builtin("pipeline_quick_16k").unwrap(),
             Some(start),
-            Some(50.0),
+            Some(80.0),
         )
         .unwrap();
         let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
