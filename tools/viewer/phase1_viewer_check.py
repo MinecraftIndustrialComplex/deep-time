@@ -166,24 +166,33 @@ def main():
             page.shot(os.path.join(a.out, "ticker.png"))
             # 6c. layers: the layer list, and that choosing others redraws the frame.
             names = page.js("[...document.getElementById('kflayer').options].map(o => o.textContent)") or []
-            hashes = set()
-            trace = []
-            for i in range(min(len(names), 6)):
-                set_layer(page, i)
-                fp = page.js(CANVAS)
-                # The picture loads asynchronously (a loaded VM took longer than set_layer's pause): wait for the
-                # canvas to show something new, up to 20 s, before counting it.
-                end = time.time() + 20
-                while time.time() < end and not (fp and fp["nonblank"] > 1000 and fp["hash"] not in hashes):
-                    time.sleep(0.5)
+            # A layer is drawn from the frames that carry it (the last keyframe holds only a few layers; a frame without
+            # the chosen layer shows the first one), so try the layers on the first, a middle and the last frame and
+            # take the frame that shows the most different pictures.
+            best = (set(), None)
+            trace = {}
+            for pos in (0, (n - 1) // 2, n - 1):
+                set_scrub(page, pos)
+                hashes = set()
+                for i in range(min(len(names), 6)):
+                    set_layer(page, i)
                     fp = page.js(CANVAS)
-                trace.append((i, fp and fp["nonblank"], fp and fp["hash"]))
-                if fp and fp["nonblank"] > 1000:
-                    hashes.add(fp["hash"])
-            print("layers trace (index, non-blank samples, hash):", trace, flush=True)
+                    end = time.time() + 20
+                    while time.time() < end and not (fp and fp["nonblank"] > 1000 and fp["hash"] not in hashes):
+                        time.sleep(0.5)
+                        fp = page.js(CANVAS)
+                    if fp and fp["nonblank"] > 1000:
+                        hashes.add(fp["hash"])
+                trace[pos] = len(hashes)
+                if len(hashes) > len(best[0]):
+                    best = (hashes, pos)
+                if len(hashes) >= 3:
+                    break
+            hashes = best[0]
+            print("layers trace (frame, different pictures over the first layers):", trace, flush=True)
             page.shot(os.path.join(a.out, "layers.png"))
             check(len(names) >= 5 and len(hashes) >= 3, "the viewer shows layers",
-                  f"{len(names)} keyframe layers ({', '.join(names[:8])}…); {len(hashes)} different pictures over the first {min(len(names), 6)}")
+                  f"{len(names)} keyframe layers ({', '.join(names[:8])}…); {len(hashes)} different pictures over the first {min(len(names), 6)} layers at frame {best[1]} of {n}")
             # 6d. ore provinces: a deposit-tract / province layer, the census and the site markers.
             prov = [i for i, nme in enumerate(names) if any(k in nme.lower() for k in ("tract", "province", "favour", "prospect", "deposit"))]
             census = page.js("(() => { const c = document.getElementById('census'); return c && !c.hidden ? c.innerText.slice(0, 400) : null; })()")
