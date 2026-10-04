@@ -21,6 +21,8 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Predicate;
 
 /**
  * The wrap-engine spike's runtime (dev-only; docs/design/wrap-engine.md §3 and §6). Inert unless the
@@ -47,6 +49,12 @@ public final class WrapEngine {
     /** The dev flag: {@code -Ddeeptime.wrapspike=true}. */
     public static final boolean ENABLED = Boolean.getBoolean("deeptime.wrapspike");
 
+    /**
+     * Entities the carry leaves where they are: those whose position another system owns (Create's
+     * contraptions follow their anchor or their track; compat/create/wrap/CreateWrapCompat).
+     */
+    public static final List<Predicate<Entity>> CARRY_VETO = new CopyOnWriteArrayList<>();
+
     private WrapEngine() {}
 
     /** Wires the entity carrier; call once from the mod constructor. Does nothing without the flag. */
@@ -54,6 +62,8 @@ public final class WrapEngine {
         if (!ENABLED)
             return;
         DeepTime.LOGGER.warn("[wrapspike] Deep Time wrap-engine SPIKE is on (-Ddeeptime.wrapspike=true): dev only");
+        if (net.neoforged.fml.ModList.get().isLoaded("create"))
+            com.minecraftindustrialcomplex.deeptime.compat.create.wrap.CreateWrapCompat.init();
         NeoForge.EVENT_BUS.addListener(LevelTickEvent.Post.class, e -> {
             if (e.getLevel() instanceof ServerLevel sl)
                 carryEntities(sl);
@@ -170,7 +180,8 @@ public final class WrapEngine {
         for (WrapEdge e : t.edges()) {
             AABB box = bandBox(level, e);
             if (box != null)
-                level.getEntities((Entity) null, box, en -> en.getVehicle() == null).forEach(moving::add);
+                level.getEntities((Entity) null, box, en -> en.getVehicle() == null && CARRY_VETO.stream().noneMatch(v -> v.test(en)))
+                        .forEach(moving::add);
         }
         for (Entity en : moving) {
             WrapTopology.PointFold f = t.foldPoint(en.getX(), en.getZ());

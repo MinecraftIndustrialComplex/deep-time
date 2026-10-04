@@ -1,0 +1,126 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+package com.minecraftindustrialcomplex.deeptime.compat.create.wrap;
+
+import com.minecraftindustrialcomplex.deeptime.wrapspike.CellIsometry;
+import com.minecraftindustrialcomplex.deeptime.wrapspike.WrapTopology;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Random;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * The Create adapters' frame algebra (docs/design/wrap-engine.md, "Create across turning seams"): what a
+ * turn does to a rotation axis and to the sign of a speed about it, and how a stored block finds its
+ * neighbour's image across a seam. Properties, not pinned outputs.
+ */
+class SeamTurnsTest {
+
+    private static final int[] AXES = {SeamTurns.X, SeamTurns.Y, SeamTurns.Z};
+
+    /** An angular velocity s·e_axis carried by a turn is s·R(e_axis); the sign rule must say exactly that. */
+    @Test
+    void axisSignIsTheTurnedPositiveDirection() {
+        for (int k = 0; k < 4; k++)
+            for (int a : AXES) {
+                double[] v = a == SeamTurns.Y ? new double[]{0, 0}
+                        : new CellIsometry(k, 0, 0).applyVector(a == SeamTurns.X ? 1 : 0, a == SeamTurns.Z ? 1 : 0);
+                int turned = SeamTurns.turnedAxis(k, a);
+                if (a == SeamTurns.Y) {
+                    assertEquals(SeamTurns.Y, turned);
+                    assertEquals(1, SeamTurns.axisSign(k, a), "a vertical axis keeps its speed under any turn");
+                    continue;
+                }
+                // The turned unit vector lies along the turned axis, with the sign the rule gives.
+                double along = turned == SeamTurns.X ? v[0] : v[1];
+                double across = turned == SeamTurns.X ? v[1] : v[0];
+                assertEquals(0, across, 1e-12, "turn " + k + " axis " + a + " lands on axis " + turned);
+                assertEquals(SeamTurns.axisSign(k, a), (int) Math.signum(along), "turn " + k + " axis " + a);
+            }
+    }
+
+    @Test
+    void halfTurnFlipsHorizontalSpeedsOnly() {
+        assertEquals(-1, SeamTurns.axisSign(2, SeamTurns.X));
+        assertEquals(-1, SeamTurns.axisSign(2, SeamTurns.Z));
+        assertEquals(1, SeamTurns.axisSign(2, SeamTurns.Y));
+        for (int a : AXES)
+            assertEquals(a, SeamTurns.turnedAxis(2, a), "a half-turn keeps every axis");
+    }
+
+    @Test
+    void quarterTurnSwapsHorizontalAxesAndFlipsOne() {
+        for (int k : new int[]{1, 3}) {
+            assertEquals(SeamTurns.Z, SeamTurns.turnedAxis(k, SeamTurns.X));
+            assertEquals(SeamTurns.X, SeamTurns.turnedAxis(k, SeamTurns.Z));
+            assertEquals(-1, SeamTurns.axisSign(k, SeamTurns.X) * SeamTurns.axisSign(k, SeamTurns.Z),
+                    "exactly one of x and z flips under turn " + k);
+        }
+    }
+
+    /** Signs compose like the turns: carrying a speed through two seams equals carrying it through their composite. */
+    @Test
+    void signsComposeAndUndo() {
+        for (int k1 = 0; k1 < 4; k1++)
+            for (int k2 = 0; k2 < 4; k2++)
+                for (int a : AXES) {
+                    int viaTwo = SeamTurns.axisSign(k1, a) * SeamTurns.axisSign(k2, SeamTurns.turnedAxis(k1, a));
+                    assertEquals(SeamTurns.axisSign(k1 + k2, a), viaTwo, k1 + "+" + k2 + " axis " + a);
+                    assertEquals(SeamTurns.turnedAxis(k1 + k2, a), SeamTurns.turnedAxis(k2, SeamTurns.turnedAxis(k1, a)));
+                }
+    }
+
+    /**
+     * For every stored block next to a seam and every neighbour that lies beyond it: the neighbour's
+     * stored block finds, near the first block, exactly that band position; the link back exists too; and
+     * the two links' turns cancel, so a speed sent across and back returns with its own sign (no
+     * flicker in Create's propagation).
+     */
+    @Test
+    void linksAcrossSeamsAreFoundBothWaysAndCancel() {
+        List<WrapTopology> tops = List.of(
+                WrapTopology.halfTurnSeam(64, 32, 16, 8),
+                WrapTopology.guyou(256, 16),
+                WrapTopology.peirce(256, 16),
+                WrapTopology.quarterTurnCorner(40, 40, 16));
+        int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
+        Random r = new Random(7);
+        for (WrapTopology t : tops) {
+            int checked = 0;
+            for (int i = 0; i < 40000 && checked < 400; i++) {
+                // A block just inside a random edge, anywhere along it (corners and turn points included).
+                var e = t.edges().get(r.nextInt(t.edges().size()));
+                int v = e.minSide() ? e.coord() + r.nextInt(2) : e.coord() - 1 - r.nextInt(2);
+                int lo = Math.max(e.spanLo(), -300), hi = Math.min(e.spanHi(), 300);
+                int u = lo + r.nextInt(hi - lo);
+                int ax = e.normalX() ? v : u, az = e.normalX() ? u : v;
+                if (!t.inside(ax, az))
+                    continue;
+                for (int[] d : dirs) {
+                    int qx = ax + d[0], qz = az + d[1];
+                    WrapTopology.Fold f = t.fold(qx, qz);
+                    if (f == null)
+                        continue;
+                    int[] img = SeamTurns.nearestImage(t, ax, az, f.x(), f.z(), 1);
+                    assertNotNull(img, "image of (" + f.x() + ", " + f.z() + ") near (" + ax + ", " + az + ")");
+                    WrapTopology.Fold back = t.fold(img[0], img[1]);
+                    assertNotNull(back);
+                    assertArrayEquals(new int[]{f.x(), f.z()}, new int[]{back.x(), back.z()}, "the image folds to the neighbour");
+                    assertTrue(Math.max(Math.abs(img[0] - ax), Math.abs(img[1] - az)) <= 1, "the image is a neighbour");
+                    // And from the far block, the first block's image near it.
+                    int[] img2 = SeamTurns.nearestImage(t, f.x(), f.z(), ax, az, 1);
+                    assertNotNull(img2, "the link back from (" + f.x() + ", " + f.z() + ")");
+                    WrapTopology.Fold back2 = t.fold(img2[0], img2[1]);
+                    assertEquals(0, (back.iso().quarterTurns() + back2.iso().quarterTurns()) % 4,
+                            "the turns of a link and its way back cancel");
+                    checked++;
+                }
+            }
+            assertTrue(checked >= 100, "enough seam neighbours sampled: " + checked);
+        }
+    }
+}
