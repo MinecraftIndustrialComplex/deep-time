@@ -8,8 +8,8 @@ lies against the sea.
     margins.py pool <out.json> <run.json> ...      the transects of several runs pooled
 
 MARGINS_FIELD=plates/elevation_m measures another dumped elevation against the surface's sea level. With
-plates/flags in the dump, transects are also summarised apart for passive and active margins (a trench,
-an arc or a subduction zone within 3 L1 cells of the coast cell is active).
+regime in the dump, transects are also summarised apart for passive and active margins (a trench, an
+arc, a back-arc or a collision regime within 3 L1 cells of the coast cell is active).
 
 Transects (the margins-and-spires study's definitions, build log 2026-10-03, so its ETOPO 2022 figures
 compare): from every 3rd open-sea coast cell of land masses over 750 km2, |lat| <= 60 deg, seaward along
@@ -43,7 +43,7 @@ SEA_Y = 63
 MAX_LAT = 60.0
 STRIDE = 3
 DIST_BINS_KM = [0, 10, 25, 50, 100, 200, 400, 1e9]
-ACTIVE_FLAGS = 2 | 4 | 64  # TRENCH | ARC | SUBDUCTION_ZONE (plates/state.rs)
+ACTIVE_REGIMES = [2, 3, 4, 5]  # trench, arc, back-arc, collision (plates/state.rs, mod regime)
 ACTIVE_CELLS = 3
 
 
@@ -275,13 +275,13 @@ def planet(d, out_path):
     g = Grid(e)
     inside = np.broadcast_to(g.inside[:, None], h.shape)
     sea = float(np.median((h - (y - SEA_Y) * M_PER_BLOCK_V)[inside][::97]))
-    flags, _ = load(d, "plates/flags")
+    reg, _ = load(d, "regime")
     active = None
-    if flags is not None:
-        # An active margin: a trench, an arc or a subduction zone (the plate model's flags) within
-        # ACTIVE_CELLS cells of the coast cell. The rest are passive (the transition's margins).
-        f = flags.astype(np.int64)
-        active = ndimage.binary_dilation((f & ACTIVE_FLAGS) != 0, iterations=ACTIVE_CELLS)
+    if reg is not None:
+        # An active margin: a trench, an arc, a back-arc (within the subduction distance of a
+        # front) or a collision orogen (the plate model's regime layer) within ACTIVE_CELLS cells of
+        # the coast cell. The rest are passive (the margins the transition shapes).
+        active = ndimage.binary_dilation(np.isin(np.rint(reg), ACTIVE_REGIMES), iterations=ACTIVE_CELLS)
     rows = transects(h, sea, g, active)
     res = {"sea_m": sea, "summary": summarise(rows)}
     if active is not None:
