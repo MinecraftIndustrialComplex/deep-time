@@ -32,6 +32,8 @@
 //!
 //! Both act on the slab by upwind advection, sub-stepped to a Courant number of 0.5.
 
+use rayon::prelude::*;
+
 use super::coarse::Grid;
 use super::ebm::WATER_J_M3_K;
 use super::ebm2d::OceanTransport;
@@ -526,15 +528,110 @@ fn conjugate_gradient(apply: &dyn Fn(&[f64]) -> Vec<f64>, b: &[f64], inside: &[b
 }
 
 impl OceanTransport for Ocean {
+    /// Upwind advection of the slab's heat, sub-stepped to a Courant number of 0.5. Each
+    /// sub-step first finds the heat every face carries (from the temperatures at its start),
+    /// then gathers each cell's change from its four faces, rows in parallel. A cell takes its
+    /// faces' terms in the order the serial sweep over the faces gave them (the west face, its
+    /// own east and north faces, then its south face; for the first cell of a row its own faces,
+    /// then the wrapped west face, then the south face), so every value is the serial sweep's
+    /// bit for bit (P1-17; the test keeps the sweep).
     fn step(&self, tm: &mut [f64], dt: f64, north_j: &mut [f64]) {
         let (w, h) = (self.w, self.h);
         let n = w * h;
         if self.vol.is_empty() {
             return;
         }
-        // Sub-steps: Courant ≤ 0.5 on every cell's outflow.
-        let mut worst = 0.0f64;
+        if w < 2 {
+            return self.step_serial(tm, dt, north_j);
+        }
+        let Some(ds_subs) = self.substeps(dt) else {
+            return;
+        };
+        let (subs, ds) = ds_subs;
+        let rc = WATER_J_M3_K;
+        let mut th: Vec<f64> = tm.iter().map(|t| t - T_DEEP_C).collect();
+        // The heat each east and north face carries in a sub-step, m³·K (0 where none flows).
+        let mut ce = vec![0.0; n];
+        let mut cn = vec![0.0; n];
+        for _ in 0..subs {
+            {
+                let th = &th;
+                ce.par_chunks_mut(w)
+                    .zip(cn.par_chunks_mut(w))
+                    .enumerate()
+                    .with_min_len(8)
+                    .for_each(|(j, (ce_row, cn_row))| {
+                        for i in 0..w {
+                            let c = j * w + i;
+                            let f = self.f_east[c];
+                            if f != 0.0 {
+                                let e = j * w + (i + 1) % w;
+                                ce_row[i] = f * if f > 0.0 { th[c] } else { th[e] } * ds;
+                            }
+                            let f = self.f_north[c];
+                            if f != 0.0 && j > 0 {
+                                let nn = c - w;
+                                cn_row[i] = f * if f > 0.0 { th[c] } else { th[nn] } * ds;
+                            }
+                        }
+                    });
+            }
+            let (ce, cn) = (&ce, &cn);
+            let gather = |j: usize, row: &mut [f64], north: Option<&mut f64>| {
+                for (i, t) in row.iter_mut().enumerate() {
+                    let c = j * w + i;
+                    let mut dq = 0.0;
+                    if i > 0 && self.f_east[c - 1] != 0.0 {
+                        dq += ce[c - 1];
+                    }
+                    if self.f_east[c] != 0.0 {
+                        dq -= ce[c];
+                    }
+                    if j > 0 && self.f_north[c] != 0.0 {
+                        dq -= cn[c];
+                    }
+                    if i == 0 && self.f_east[c + w - 1] != 0.0 {
+                        dq += ce[c + w - 1];
+                    }
+                    if j + 1 < h && self.f_north[c + w] != 0.0 {
+                        dq += cn[c + w];
+                    }
+                    if self.vol[c] > 0.0 {
+                        *t += dq / self.vol[c];
+                    }
+                }
+                if let Some(acc) = north {
+                    for i in 0..w {
+                        let c = j * w + i;
+                        if self.f_north[c] != 0.0 {
+                            *acc += cn[c] * rc;
+                        }
+                    }
+                }
+            };
+            let (first, rest) = th.split_at_mut(w);
+            gather(0, first, None);
+            rest.par_chunks_mut(w)
+                .zip(north_j.par_iter_mut())
+                .enumerate()
+                .with_min_len(8)
+                .for_each(|(k, (row, acc))| gather(k + 1, row, Some(acc)));
+        }
         for c in 0..n {
+            if self.vol[c] > 0.0 {
+                tm[c] = th[c] + T_DEEP_C;
+            }
+        }
+    }
+}
+
+impl Ocean {
+    /// The sub-steps of a step of `dt` seconds (Courant ≤ 0.5 on every cell's outflow) and their
+    /// length; `None` when nothing flows.
+    fn substeps(&self, dt: f64) -> Option<(usize, f64)> {
+        let (w, h) = (self.w, self.h);
+        let mut worst = 0.0f64;
+        for c in 0..w * h {
             if self.vol[c] <= 0.0 {
                 continue;
             }
@@ -548,10 +645,23 @@ impl OceanTransport for Ocean {
             worst = worst.max(out * dt / self.vol[c]);
         }
         if worst == 0.0 {
-            return;
+            return None;
         }
         let subs = (worst / 0.5).ceil().max(1.0) as usize;
-        let ds = dt / subs as f64;
+        Some((subs, dt / subs as f64))
+    }
+
+    /// The serial sweep over the faces (grids one cell wide, where a cell is its own east
+    /// neighbour, and the tests' reference).
+    fn step_serial(&self, tm: &mut [f64], dt: f64, north_j: &mut [f64]) {
+        let (w, h) = (self.w, self.h);
+        let n = w * h;
+        if self.vol.is_empty() {
+            return;
+        }
+        let Some((subs, ds)) = self.substeps(dt) else {
+            return;
+        };
         let rc = WATER_J_M3_K;
         let mut th: Vec<f64> = tm.iter().map(|t| t - T_DEEP_C).collect();
         let mut dq = vec![0.0; n]; // heat change × (1/ρc_p), m³·K
@@ -650,6 +760,52 @@ mod tests {
                 }
             })
             .collect()
+    }
+
+    #[test]
+    fn the_parallel_step_is_the_serial_sweep_bit_for_bit() {
+        // Two basins open to a southern ocean, gyres and the conveyor, a step long enough for
+        // several sub-steps; 1, 3 and 8 threads.
+        let g = grid();
+        let land = land_of(&g, &|lat, i| {
+            lat < -40.0
+                || ((-40.0..70.0).contains(&lat)
+                    && ((10..30).contains(&i) || (50..95).contains(&i)))
+        });
+        let u = belt_wind_u(&ClimateParams::default(), &g, 23.4);
+        let o = Ocean::build(&setup(&g, &land, &u, 15.0));
+        let n = g.w * g.h;
+        let tm0: Vec<f64> = (0..n)
+            .map(|c| 28.0 - 30.0 * (g.lat_c(c / g.w) / 90.0).powi(2) + ((c * 7) % 5) as f64 * 0.3)
+            .collect();
+        let dt = 365.25 * 86_400.0;
+        assert!(
+            o.substeps(dt).is_some_and(|(k, _)| k > 1),
+            "{:?}",
+            o.substeps(dt)
+        );
+        let mut a = tm0.clone();
+        let mut na = vec![0.1; g.h - 1];
+        for _ in 0..3 {
+            o.step_serial(&mut a, dt, &mut na);
+        }
+        let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<u64>>();
+        for threads in [1, 3, 8] {
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .unwrap();
+            let (b, nb) = pool.install(|| {
+                let mut b = tm0.clone();
+                let mut nb = vec![0.1; g.h - 1];
+                for _ in 0..3 {
+                    o.step(&mut b, dt, &mut nb);
+                }
+                (b, nb)
+            });
+            assert!(bits(&a) == bits(&b), "{threads} threads: temperatures");
+            assert!(bits(&na) == bits(&nb), "{threads} threads: northward heat");
+        }
     }
 
     #[test]
