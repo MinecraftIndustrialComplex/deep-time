@@ -631,19 +631,29 @@ impl SurfaceStage {
                     let basin = std::mem::take(&mut st.bif_basin);
                     st.bif_basin = nearest.par_iter().map(|&s| basin[s]).collect();
                 }
+                // Each layer slot is written once, in parallel: the source column's used layers,
+                // then empty ones (P1-17: `StrataLog::new`'s serial zero fill of the whole log,
+                // 129 MB a step at 16k quick and 515 MB at full, then the copy over it).
                 let k = st.log.k as usize;
                 let old = std::mem::take(&mut st.log);
-                let mut log = StrataLog::new(n, old.k);
-                log.layers
-                    .par_chunks_mut(k)
-                    .zip(log.count.par_iter_mut())
-                    .zip(nearest.par_iter())
-                    .for_each(|((col, cnt), &s)| {
-                        let m = usize::from(old.count[s]);
-                        col[..m].copy_from_slice(&old.layers[s * k..s * k + m]);
-                        *cnt = old.count[s];
-                    });
-                st.log = log;
+                let layers: Vec<strata_log::Layer> = (0..n * k)
+                    .into_par_iter()
+                    .map(|x| {
+                        let (c, i) = (x / k, x % k);
+                        let s = nearest[c];
+                        if i < usize::from(old.count[s]) {
+                            old.layers[s * k + i]
+                        } else {
+                            strata_log::Layer::default()
+                        }
+                    })
+                    .collect();
+                let count: Vec<u8> = nearest.par_iter().map(|&s| old.count[s]).collect();
+                st.log = StrataLog {
+                    k: old.k,
+                    count,
+                    layers,
+                };
                 // Crust born this step starts bare.
                 let mut newborn = vec![false; n];
                 for (c, born) in newborn.iter_mut().enumerate() {
