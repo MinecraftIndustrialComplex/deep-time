@@ -405,7 +405,7 @@ Why this order [I]:
   reading of the prototype's convention, not tested [I].
 - **Deep Time's own wrap engine:** its design (`../../design/wrap-engine.md`, landed on master the same night) already
   takes any layout of translations, half-turns and quarter-turns, with a quarter-turn corner among its spike's test
-  layouts, so the cube needs nothing beyond what it plans [V, read its §2 and §8 headings only].
+  layouts, so the cube needs nothing beyond what it plans [V: its title and the lines on quarter-turns, not the whole document].
 
 **Cost in the crate** (agent days):
 
