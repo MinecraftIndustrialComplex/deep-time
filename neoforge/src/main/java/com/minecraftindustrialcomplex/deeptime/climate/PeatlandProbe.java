@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Asks a level's biome source where the pack has a peatland biome ({@link Peatland}, BIO-105): the
+ * Asks a level's biome source where the pack has a peatland biome ({@link Peatland}, BIO-106): the
  * registry-bound half of the decision, which reads the pack's parameter list (and TerraBlender's
  * region trees, when it is installed, one answer per region of the world's province table).
  */

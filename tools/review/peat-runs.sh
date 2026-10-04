@@ -5,9 +5,9 @@
 # for before/after comparisons (biome shares by Koppen class through the game's biome source;
 # rock-class shares in columns through `strata-check`). Scratch: /Volumes/Graphide/ban/deeptime-runs/peat/.
 #
-#   tools/remote/mac.sh -- tools/review/peat-runs.sh run <name> [length-myr] [start]
-#       builds the release CLI, runs `deeptime run` (earthlike_quick_16k, 2 threads) into <name>-world/,
-#       then `strata-check` (20,000 columns) into <name>-strata.json; the log is <name>.log
+#   tools/remote/mac.sh -- tools/review/peat-runs.sh run <name> [length-myr] [start] [--set k=v]...
+#       builds the release CLI, runs `deeptime run` (earthlike_quick_16k, 2 threads) into <name>-world/;
+#       the log is <name>.log. `--set biomes.wetland_cold_below=1` is the old rule (swamp wherever thawed).
 #   tools/remote/mac.sh --no-sync -- tools/review/peat-runs.sh status | show <name> | clean
 set -euo pipefail
 
@@ -19,13 +19,14 @@ cd "$REPO"
 case "${1:-}" in
     run)
         name="$2"; length="${3:-500}"; start="${4:-scattered_continents}"
-        setsid nohup sh -c "CARGO_BUILD_JOBS=8 cargo build --release -p deeptime-cli \
+        sets=""; shift 4 2>/dev/null || shift $#
+        while [ $# -gt 0 ]; do [ "$1" = "--set" ] && sets="$sets --set $2"; shift 2; done
+        setsid nohup sh -c "deeptime-admit run --kind cargo:build -- env CARGO_BUILD_JOBS=8 cargo build --release -p deeptime-cli \
             && cp target/release/deeptime '$RUNS/deeptime-$name' \
             && rm -rf '$RUNS/$name-world' \
-            && '$RUNS/deeptime-$name' run --preset earthlike_quick_16k --start '$start' --length-myr '$length' \
-               --threads 2 --out '$RUNS/$name-world' \
-            && '$RUNS/deeptime-$name' strata-check --world-data '$RUNS/$name-world' --columns 20000 \
-               > '$RUNS/$name-strata.json'" > "$RUNS/$name.log" 2>&1 < /dev/null &
+            && deeptime-admit run --kind sim:earthlike_quick_16k:2t -- '$RUNS/deeptime-$name' run --preset earthlike_quick_16k \
+               --start '$start' --length-myr '$length' --threads 2 $sets --out '$RUNS/$name-world'" \
+            > "$RUNS/$name.log" 2>&1 < /dev/null &
         echo "started pid $! -> $RUNS/$name.log"
         ;;
     status)

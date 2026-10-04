@@ -161,7 +161,7 @@ public final class WorldDataTerrain implements TerrainSource {
     }
 
     /**
-     * How the level asks its biome source where the pack has a peatland biome (BIO-105): set by the
+     * How the level asks its biome source where the pack has a peatland biome (BIO-106): set by the
      * generator, called at the first flagged cold-wetland column of a world whose mapping has no verdict
      * yet. It answers null while it cannot (TerraBlender's trees are not built).
      */
@@ -243,7 +243,7 @@ public final class WorldDataTerrain implements TerrainSource {
         if (!m.isIdentity() && ClimateMapping.RIDGES.equals(layer))
             return m.apply(layer, data().layer(layer).bilinearOdd(wrapX(x), z));
         if (ClimateMapping.EROSION.equals(layer) && !m.isIdentity()) {
-            // Cold wetland (BIO-104, BIO-105): taiga in the ordinary erosion; the swamp band, where the pack
+            // Cold wetland (BIO-104, BIO-106): taiga in the ordinary erosion; the swamp band, where the pack
             // draws its bog or muskeg, in the regions of the pack that have one.
             Peatland p = peatlandAt(m, wrapX(x), z);
             if (p != null)
