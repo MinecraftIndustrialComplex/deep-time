@@ -877,10 +877,7 @@ impl ClimateStage {
         // The ice-sheet dynamics' coarse grid and what drives it: the bed (without the ice),
         // each coarse cell's snapshot equilibrium line and its precipitation.
         let dyn_ice = p.ice_dynamics;
-        // The sheet's grid takes one row height: the mean of the rows' true heights (Lambert's
-        // rows are taller toward the poles; the sheet is off by default).
-        let sy_mean = geo.sy.iter().sum::<f64>() / geo.sy.len().max(1) as f64;
-        let sg = sheet::Grid::new(w, hgt, &geo.sx, sy_mean, p.ice_grid_cells as usize);
+        let sg = sheet::Grid::new(w, hgt, &geo.sx, &geo.sy, p.ice_grid_cells as usize);
         let sp = sheet::Params::from(&p, grav);
         let coarse_band: Vec<usize> = (0..sg.h)
             .map(|cj| geo.band[(cj * sg.k + sg.k / 2).min(hgt - 1)])

@@ -31,7 +31,10 @@ import java.util.List;
  * <p>The thresholds are properties any planet must meet, not one planet's numbers: the ground and
  * the water come from the same column rule the chunk is built by, so they agree but for what
  * features and the pack's surface rules do on top; the top block comes from a table, so its
- * agreement is logged and only a floor is asserted.
+ * agreement is logged and only a floor is asserted. The ground is read under trees, plants and coral
+ * reefs, and a column a carver cut below far terrain's ground is counted apart (at most one in eight:
+ * on the MIC set Terralith's canyon, which reaches from y −20 to 70, cut a sea bed two blocks under
+ * the water down to y −2 in two of the 64 columns east of the seam, 2026-10-03).
  */
 @GameTestHolder(GameTestSupport.NS)
 @PrefixGameTestTemplate(false)
@@ -70,7 +73,7 @@ public final class FarTerrainGameTests {
             if (column.ground() < level.getMinBuildHeight() + 32)
                 return false;   // the floor band: the router's bottom slide, not the bake
             ChunkAccess chunk = level.getChunkSource().getChunk(p[0] >> 4, p[1] >> 4, ChunkStatus.FEATURES, true);
-            tally.add(column, FarTerrainCheck.real(chunk, p[0], p[1]));
+            tally.add(column, FarTerrainCheck.real(chunk, p[0], p[1]), chunk);
             return true;
         }, () -> {
             DeepTime.LOGGER.info("[gametest] farTerrainMatchesGeneratedChunks {}", tally);
@@ -79,9 +82,43 @@ public final class FarTerrainGameTests {
         });
     }
 
+    /** One column where far terrain and the chunk differ, for the log: the blocks between the two grounds ({@code *}: in the air carving mask). */
+    static String diag(ChunkAccess chunk, FarTerrain.Column far, FarTerrainCheck.RealColumn real, int x, int z) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("(").append(x).append(", ").append(z).append(") far ").append(far.ground()).append(" real ").append(real.ground())
+                .append(" status ").append(chunk.getPersistedStatus()).append(" biome ").append(real.biome().unwrapKey().map(k -> k.location().toString()).orElse("?"));
+        net.minecraft.world.level.chunk.CarvingMask air = null, liquid = null;
+        if (chunk instanceof net.minecraft.world.level.chunk.ProtoChunk p) {
+            air = p.getCarvingMask(net.minecraft.world.level.levelgen.GenerationStep.Carving.AIR);
+            liquid = p.getCarvingMask(net.minecraft.world.level.levelgen.GenerationStep.Carving.LIQUID);
+        }
+        sb.append(" masks ").append(air != null).append('/').append(liquid != null).append(" column:");
+        net.minecraft.core.BlockPos.MutableBlockPos pos = new net.minecraft.core.BlockPos.MutableBlockPos();
+        String last = null;
+        int runTop = 0;
+        int lo = Math.min(far.ground(), real.ground()) - 2, hi = Math.max(far.ground(), real.ground()) + 3;
+        for (int y = hi; y >= lo; y--) {
+            String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(chunk.getBlockState(pos.set(x, y, z)).getBlock()).getPath();
+            if (air != null && air.get(x, y, z))
+                id += "*";
+            if (!id.equals(last)) {
+                if (last != null)
+                    sb.append(' ').append(last).append('@').append(runTop).append("..").append(y + 1);
+                last = id;
+                runTop = y;
+            }
+        }
+        sb.append(' ').append(last).append('@').append(runTop).append("..").append(lo);
+        return sb.toString();
+    }
+
     /** The properties far terrain must meet against generated chunks (see the class comment). */
     static void assertAgrees(GameTestHelper helper, FarTerrainCheck.Tally tally, int minColumns, String where) {
         helper.assertTrue(tally.columns >= minColumns, where + "only " + tally.columns + " columns compared");
+        // Carvers are not far terrain's to draw (FarTerrainCheck.Tally#carved), but they must stay the
+        // exception: a generator that let them cut most columns would hide here otherwise.
+        helper.assertTrue(8 * tally.carved <= tally.columns + tally.carved,
+                where + tally.carved + " of " + (tally.columns + tally.carved) + " columns were cut by a carver: " + tally.carvedAt);
         helper.assertTrue(tally.share(tally.heightWithin1) >= 0.90,
                 where + "the ground is within a block in only " + tally.heightWithin1 + " of " + tally.columns + " columns; worst " + tally.worstHeight);
         helper.assertTrue(tally.share(tally.heightWithin2) >= 0.95,
@@ -118,7 +155,10 @@ public final class FarTerrainGameTests {
             if (column.ground() < level.getMinBuildHeight() + 32)
                 return false;
             ChunkAccess chunk = level.getChunkSource().getChunk(x >> 4, row >> 4, ChunkStatus.FEATURES, true);
-            (eastSide ? east : west).add(column, FarTerrainCheck.real(chunk, x, row));
+            FarTerrainCheck.RealColumn real = FarTerrainCheck.real(chunk, x, row);
+            (eastSide ? east : west).add(column, real, chunk);
+            if (Math.abs(column.ground() - real.ground()) > 2)
+                DeepTime.LOGGER.info("[gametest] seamDiag {}", diag(chunk, column, real, x, row));
             return true;
         }, () -> {
             DeepTime.LOGGER.info("[gametest] farTerrainMatchesGeneratedChunksAcrossTheSeam C={} west {} east {}", c, west, east);

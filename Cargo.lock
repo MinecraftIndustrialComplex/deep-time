@@ -287,6 +287,16 @@ name = "deeptime-noddy"
 version = "0.0.1"
 
 [[package]]
+name = "deeptime-quincuncial"
+version = "0.0.1"
+dependencies = [
+ "clap",
+ "deeptime-format",
+ "rayon",
+ "serde_json",
+]
+
+[[package]]
 name = "deeptime-viewer"
 version = "0.0.1"
 dependencies = [

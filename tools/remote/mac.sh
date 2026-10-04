@@ -35,7 +35,7 @@
 #
 # Every command runs through the VM's admission tool (/usr/local/lib/deeptime/admit.py; Ben,
 # 2026-10-03: "Guess load, run if load is less than what is available + 25%"): it starts when its
-# kind's estimated load fits in the free CPU and memory plus 25 %, waits (saying why) otherwise, and
+# kind's estimated load fits (CPU: 1.25 x the free cores; memory: estimate x 1.25 under the free memory), waits (saying why) otherwise, and
 # its measured load refines the next estimate. Quick looks (cat, git, ls ...) and detached starts run
 # at once. `tools/remote/mac.sh --no-sync -- deeptime-admit status` shows what runs and waits.
 
