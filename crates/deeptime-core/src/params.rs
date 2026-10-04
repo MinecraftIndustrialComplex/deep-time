@@ -458,6 +458,14 @@ pub struct TectonicParams {
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
     /// 0 = no limit.
     pub crust_max_km: f64,
+    /// The ocean–continent transition of rifted margins (`plates/transition.rs`): continental
+    /// crust tapers into the ocean floor of its own plate over this width, km **on the planet**
+    /// (not Earth-normalized: the margin keeps Earth's width in metres whatever the planet's
+    /// size), centred on the boundary between the crusts; the crust the continent's edge loses
+    /// thickens the ocean floor beside it. 0 = off …
+    pub transition_width_km: f64,
+    /// … with this e-folding time towards the taper, Myr (0 = off).
+    pub transition_myr: f64,
     /// Axis change of a subducting plate towards its fronts per 1,000 km of front and Myr
     /// (slab pull, Cortial §4.1's ε scaled by front length).
     pub slab_pull_rad_per_1000km_myr: f64,
@@ -661,6 +669,8 @@ impl Default for TectonicParams {
             collapse_quiet_myr: 10.0,          // ledger: PLT-259
             collapse_reach_km: 200.0,          // ledger: PLT-257
             crust_max_km: 70.0,                // ledger: PLT-258
+            transition_width_km: 200.0,        // ledger: PLT-261
+            transition_myr: 20.0,              // ledger: PLT-262
             slab_pull_rad_per_1000km_myr: 0.002,
             slab_pull_speed_mm_yr: 80.0,
             slab_pull_front_km: 3000.0,
@@ -975,6 +985,8 @@ impl PlanetPreset {
             (k.collapse_quiet_myr, "$.tectonics.collapse_quiet_myr"),
             (k.collapse_reach_km, "$.tectonics.collapse_reach_km"),
             (k.crust_max_km, "$.tectonics.crust_max_km"),
+            (k.transition_width_km, "$.tectonics.transition_width_km"),
+            (k.transition_myr, "$.tectonics.transition_myr"),
         ] {
             check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
         }

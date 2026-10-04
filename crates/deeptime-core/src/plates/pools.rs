@@ -138,11 +138,20 @@ pub struct SurfaceRates {
 }
 
 /// One sample's surface step; returns the rock eroded from it (metres), to be exported downhill.
-pub fn surface_step(s: &mut Sample, r: &SurfaceRates) -> f64 {
+/// `held_floor` (finite) is the floor an oceanic sample of an ocean–continent transition cools
+/// towards instead of `z_floor`: its thicker crust holds it up (`transition.rs`, ledger PLT-263).
+pub fn surface_step(s: &mut Sample, r: &SurfaceRates, held_floor: f32) -> f64 {
     let mut z = f64::from(s.elevation_m);
     let mut eroded = 0.0;
     if s.kind == OCEANIC {
-        z -= (1.0 - z / r.z_floor) * r.damping_m;
+        // z −= (1 − z/z_f)·ε_o·δt, the relaxation towards z_f at the rate ε_o / |z_f|; towards
+        // the held floor at the same rate where the crust holds one.
+        if held_floor.is_finite() {
+            let floor = f64::from(held_floor).max(r.z_floor);
+            z -= (z - floor) / -r.z_floor * r.damping_m;
+        } else {
+            z -= (1.0 - z / r.z_floor) * r.damping_m;
+        }
         if !s.is_hidden() {
             s.pools[pool::SEDIMENT] += r.pelagic_m as f32;
         }
@@ -225,7 +234,7 @@ mod tests {
         let mut s = Sample::blank(0);
         s.elevation_m = -1000.0;
         for _ in 0..100 {
-            surface_step(&mut s, &r);
+            surface_step(&mut s, &r, f32::NAN);
         }
         let expect = ocean_elevation(100.0, -1000.0, -10_000.0, 0.04);
         assert!(
@@ -242,7 +251,7 @@ mod tests {
         let mut s = Sample::blank(0);
         s.elevation_m = -2500.0;
         for _ in 0..60 {
-            surface_step(&mut s, &r);
+            surface_step(&mut s, &r, f32::NAN);
         }
         let expect = ocean_elevation(60.0, -2500.0, -5600.0, 0.215);
         assert!(
