@@ -239,7 +239,6 @@
   "deeptime.editor.field.wetland_humidity": "Swamp humidity threshold",
   "deeptime.editor.field.wetland_flat_share": "Swamp flat-land share",
   "deeptime.editor.field.wetland_lowland": "Swamp height limit",
-  "deeptime.editor.field.wetland_cold": "Peatland temperature limit",
   "deeptime.editor.field.region_size": "Smallest geologic province",
   "deeptime.editor.field.orogen_age": "Collision belt age limit",
   "deeptime.editor.field.range_age": "Subduction range age limit",

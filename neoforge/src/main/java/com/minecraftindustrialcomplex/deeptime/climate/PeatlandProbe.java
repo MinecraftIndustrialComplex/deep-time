@@ -36,21 +36,20 @@ public final class PeatlandProbe {
         if (climate == null)
             return null;
         OverworldBands ref = OverworldBands.fromJson(climate.getAsJsonObject("reference").getAsJsonObject("bands"));
-        double coldBelow = climate.has("wetland_cold_below") ? climate.get("wetland_cold_below").getAsDouble() : 2.0;
         if (!(source instanceof MultiNoiseBiomeSource ms))
-            return Peatland.decide(m, ref, List.of(), coldBelow, (r, t, h, c, e, w) -> null);
+            return Peatland.decide(m, ref, List.of(), (r, t, h, c, e, w) -> null);
         var params = ms.parameters();
         Optional<RegionCatalog> catalog = RegionCatalog.load();
         Peatland p;
         if (catalog.isPresent() && m.regions() != null) {
             if (!RegionTrees.ready(params))
                 return null;
-            p = Peatland.decide(m, ref, m.regions().names(), coldBelow, (region, t, h, c, e, w) -> {
+            p = Peatland.decide(m, ref, m.regions().names(), (region, t, h, c, e, w) -> {
                 int index = catalog.get().indexOf(region);
                 return index < 0 ? null : peat(RegionTrees.find(params, index, target(t, h, c, e, w)));
             });
         } else {
-            p = Peatland.decide(m, ref, List.of(Peatland.NO_TABLE), coldBelow, (region, t, h, c, e, w) -> peat(params.findValue(target(t, h, c, e, w))));
+            p = Peatland.decide(m, ref, List.of(Peatland.NO_TABLE), (region, t, h, c, e, w) -> peat(params.findValue(target(t, h, c, e, w))));
         }
         DeepTime.LOGGER.info("Peatland of {}: {}", wd.folder(), p.regions().isEmpty()
                 ? "the pack has no peatland biome where cold wetland is: it is taiga"
