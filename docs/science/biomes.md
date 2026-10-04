@@ -213,7 +213,30 @@ biome, which thawed wetland never reaches. So with MIC cold wetland is taiga. Wi
 `wetland`, which is not cold (read in the class files of `BOPOverworldBiomeBuilder` and
 `BOPSecondaryOverworldBiomeBuilder`, 2026-10-03; BOP's `muskeg` sits in the frozen band of its middle biomes).
 
-@@SHARES@@
+Measured on one `earthlike_quick_16k` planet (scattered continents, 500 Myr, the preset's seed, test machine,
+2026-10-04): the same simulation baked with the old rule (swamp wherever wet, flat, low land is thawed) and the new
+one, `/deeptime probe biomes 16` through each profile's biome source. Dfc is 4,219 of the 43,162 sampled land
+columns (Dfb 3,760); the bake flags 1,413 Dfc cells as cold wetland (of 178,818 land cells) and the probe finds 336
+flagged columns (0.8 % of the land). Dfc columns, share of the class:
+
+| Dfc columns on | Old rule | New rule |
+|---|---|---|
+| standalone: swamp / taiga / old growth pine taiga / old growth spruce taiga | 5.5 / 38.5 / 22.5 / 12.5 % | 0 / 41.5 / 23.7 / 13.5 % |
+| MIC (Terralith): swamp / taiga / old growth pine taiga / old growth spruce taiga | 4.6 / 26.6 / 15.6 / 12.0 % | 0 / 28.2 / 16.8 / 13.1 % |
+| MIC: forested highlands / alpine highlands / lush valley / ice marsh | 14.4 / 3.3 / 2.3 / 1.3 % | 14.5 / 4.0 / 2.7 / 1.3 % |
+| Biomes O' Plenty: swamp / BOP wetland / taiga / BOP bog | 1.5 / 3.8 / 15.5 / 0.2 % | 0 / 0 / 16.7 / 0.2 % |
+| Biomes O' Plenty: BOP field / forested field / muskeg | 16.5 / 13.8 / 2.0 % | 19.1 / 15.0 / 2.0 % |
+
+Dfb and the C classes are unchanged (Dfb: swamp 4.5 % standalone, 1.6 % MIC, 3.8 % BOP, both rules). The 336
+cold wetland columns end on (new rule): standalone, taiga 126, beach 100, old growth pine taiga 53, old growth spruce
+taiga 41, river 16; MIC, taiga 71, old growth pine taiga 70, beach 49, old growth spruce taiga 47, alpine
+highlands 28, windswept forest 22; BOP, field 109, gravel beach 89, forested field 53, taiga 51, river 14, beach
+11, bog 9. None is on a swamp that is not a peatland. A third of them are shore (beach, gravel beach: wet coastal
+plain is where the wetland rule puts them, and the continentalness band beside the sea is beach in vanilla's table,
+before and after). In the BOP world the verdict is `biomesoplenty:overworld_secondary` only (bog; 6 of the 25
+provinces): cold wetland is bog in those provinces and taiga, or whatever BOP draws on the ground below E5 (field,
+forested field), in the others, because BOP's primary region puts its `wetland`, which is not cold, at the swamp row.
+Standalone and MIC have no peatland region (`regions: []`).
 
 ## Simplifications and limits
 
