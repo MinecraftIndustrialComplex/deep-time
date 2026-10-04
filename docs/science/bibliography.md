@@ -1045,7 +1045,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Bird, P. (1991). Lateral extrusion of lower crust from under high topography in the isostatic limit. Journal of Geophysical Research 96(B6):10275-10286.
 - DOI or URL: 10.1029/91JB00370.
 - Cited as: (ERO, ISO, HYP) "Bird 1991, JGR 96(B6):10275-10286". (PLT) "Bird 1991 (JGR 96:10275)".
-- Ledger ids: ISO-019, ISO-020
+- Ledger ids: ISO-019, ISO-020, PLT-255 (orogenic collapse, 2026-10-03: the abstract's "cannot maintain short-wavelength (100 km) Moho relief of more than 1 km for times greater than 10–20 m.y. at most", Basin and Range)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -5652,7 +5652,7 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 
 ### ChristensenMooney1995
 - Reference: Christensen, N. I. and Mooney, W. D. (1995). Seismic velocity structure and composition of the continental crust: a global view. Journal of Geophysical Research 100(B6):9761-9788.
-- Ledger ids: RCK-033
+- Ledger ids: RCK-033, PLT-256 (orogenic collapse, 2026-10-03: orogens 46.3 km, global 41.1 km, as comparison)
 - Library: `ChristensenMooney1995/abstract.json` (the USGS publications record).
 - Read: abstract only. Average crustal thickness 41.1 km (extended 30.5 km, orogens 46.3 km).
 
@@ -5695,7 +5695,7 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Reference: Stern, R. J. and Scholl, D. W. (2010). Yin and yang of continental crust creation and destruction by plate tectonic processes. International Geology Review 52(1):1-31.
 - DOI or URL: 10.1080/00206810903332322; author copy https://personal.utdallas.edu/~rjstern/pdfs/YinyangIGR10.pdf
 - Cited as: "Stern & Scholl 2010".
-- Ledger ids: PLT-045 (comparison)
+- Ledger ids: PLT-045 (comparison), PLT-258 (2026-10-03: "the bulk of the approximately 40 km-thick crust that must have originally existed is missing" at UHP terranes; continental crust lost at all collision zones "approximately 0.7 km3/year", Scholl & von Huene 2009 as cited)
 - Access: paywalled at the publisher; author copy open.
 - Library (the project's source library, not distributed): fetched 2026-10-02 (author copy). Text file: `SternScholl2010/SternScholl2010.txt`.
 - Read so far (by the project): full text, 2026-10-02. Abstract: creation and destruction of continental crust "is either in balance (~3.2 km3/year, or 3.2 AU) or more crust is being destroyed than created"; p. 9: the Aleutian and Izu-Bonin-Mariana arcs, "which have evolved since 45-50 Ma", give "crustal growth estimates of 90-180 km3/km-million years"; growth is front-loaded (several hundred km3/km/Myr in the first few Myr, "a few tens or less" for mature arcs); about 2.7 AU of growth at convergent margins (Table 1).
@@ -5780,6 +5780,115 @@ The sources of the CO₂ forcing and the snowball cloud term (research note `doc
 - Read in the research note (2026-10-03): sections 3.1 to 3.3, Table 1 (inventory, partial pressure and molar concentration; the row "10⁵ Pa gives 39.7 % molar, pCO₂ = 7.95·10⁴ Pa and p_tot = 2.00·10⁵ Pa" checked), Table 2 (the 1-D EBM's escape inventories for cloud terms c_ld 10, 20 and 30 W/m²) and section 6. Its OLR fit (a Python supplement on the Annual Reviews site) was not fetched.
 
 
+## Orogenic collapse (PLT-254 to PLT-259), added 2026-10-03
+
+Read by a research sub-agent of the collapse task (2026-10-03) through publisher pages, Crossref and
+USGS publication records; no copy was saved to the library. Bird 1991 and Christensen & Mooney 1995
+(entries above) were read again for the same rows.
+
+### HillenbrandWilliams2022
+- Reference: Hillenbrand, I. W. and Williams, M. L. (2022). Geochemical evidence for diachronous uplift and synchronous collapse of the high elevation Variscan hinterland. Geophysical Research Letters 49(21):e2022GL100435.
+- DOI or URL: 10.1029/2022GL100435 (USGS record https://pubs.usgs.gov/publication/70238122).
+- Ledger ids: PLT-255, PLT-256
+- Access: open record of the abstract; full text not read.
+- Library: not fetched.
+- Read so far (by the project): abstract, 2026-10-03: "thick crust (55–70 km) capable of supporting 3–5 km elevations developed diachronously from east to west between ca. 350 and 315 Ma. Crustal thinning occurred from ca. 315 to 290 Ma across the orogen."
+
+### Dewey1988
+- Reference: Dewey, J. F. (1988). Extensional collapse of orogens. Tectonics 7(6):1123-1139.
+- DOI or URL: 10.1029/TC007i006p01123
+- Ledger ids: PLT-254
+- Access: paywalled; abstract read.
+- Library: not fetched.
+- Read so far (by the project): abstract, 2026-10-03: collapse explains "the return of orogenic large crustal thicknesses to normal without very much erosional denudation"; "Even where overall convergence is continuing, orogenic collapse may be enhanced by subduction rollback".
+
+### Carbonell2000
+- Reference: Carbonell, R. and others (2000). [Wide-angle seismic study of the Urals crustal root; title not recorded by the sub-agent.] Journal of Geophysical Research 105(B6):13755-13777. Co-authors and title to be taken from the DOI before quoting.
+- DOI or URL: 10.1029/2000JB900048
+- Ledger ids: PLT-256
+- Access: paywalled; abstract read.
+- Library: not fetched.
+- Read so far (by the project): abstract, 2026-10-03: "a 50–56 km crustal thickness beneath the central part of the orogen in contrast to Moho depths of ≈ 45 km documented at the edges of the transect". The IGCP 559 transect page (earthscrust.org.au, Urals) adds that the root "is consistent with the preservation of the Urals as an intact, unextended orogen".
+
+### ReyTeyssierWhitney2010
+- Reference: Rey, P. F., Teyssier, C. and Whitney, D. L. (2010). Limit of channel flow in orogenic plateaux. Lithosphere 2(5):328-332.
+- DOI or URL: 10.1130/L114.1 (author copy https://www.earthbyte.org/Resources/Pdf/rey_L114_v1.pdf)
+- Ledger ids: PLT-257
+- Access: open author copy; full text read.
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-03: "Over 15 m.y., the length scale of channel-flow extrusion is 150 km rather than 1500 km"; a channel "travels at most 150 km into the foreland after 12 m.y. of gravitational collapse"; flow "1 cm yr–1 or less".
+
+### WernickeEtAl1987
+- Reference: Wernicke, B. P., Christiansen, R. L., England, P. C. and Sonder, L. J. (1987). Tectonomagmatic evolution of Cenozoic extension in the North American Cordillera. Geological Society, London, Special Publications 28:203-221.
+- DOI or URL: 10.1144/GSL.SP.1987.028.01.15
+- Ledger ids: PLT-254, PLT-257
+- Access: read in full by the sub-agent.
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-03: "We conclude that the locus of extension is controlled principally by crustal thickness, while its timing is governed by the thermal state of the lithosphere at the time of thickening"; the extended area "widened to several hundred kilometres".
+
+### PeronPinvidicOsmundsen2020
+- Reference: Peron-Pinvidic, G. and Osmundsen, P. T. (2020). From orogeny to rifting: insights from the Norwegian 'reactivation phase'. Scientific Reports 10:14860.
+- DOI or URL: 10.1038/s41598-020-71893-z (open access)
+- Ledger ids: PLT-255, PLT-257
+- Access: open; full text read.
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-03: "Fossen constrained the onset of the orogenic collapse to about 405 Ma"; "the Høybakken detachment zone was mostly active between 400 and 365 Ma"; "cumulative displacements ... on the order of 40–100 km".
+
+### JolivetBrun2010
+- Reference: Jolivet, L. and Brun, J.-P. (2010). Cenozoic geodynamic evolution of the Aegean. International Journal of Earth Sciences 99:109-138.
+- DOI or URL: 10.1007/s00531-008-0366-4
+- Ledger ids: PLT-254
+- Access: author PDF; full text read.
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-03: "The Cyclades archipelago is underlain by a thinned crust with a very constant thickness around 26 km"; "The extended domain is superposed to a collapsed Early Cenozoic mountain belts".
+
+### MooneyProdehlPavlenkova2002
+- Reference: Mooney, W. D., Prodehl, C. and Pavlenkova, N. I. (2002). Seismic velocity structure of the continental lithosphere from controlled source data. In: Lee, W. H. K. and others (eds), International Handbook of Earthquake and Engineering Seismology, Part A. Academic Press. (Pages and DOI not checked.)
+- DOI or URL: USGS author copy https://escweb.wr.usgs.gov/share/mooney/54seismicvelocitystruct.pdf
+- Ledger ids: PLT-256, PLT-258
+- Access: author copy, full text read.
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-03 (research sub-agent): "The thickest crust (70+ km) occurs beneath the Tibetan Plateau and the South American Andes"; "Orogenic crust has a wide range of thickness of 20-80km, and an average thickness of 43 km"; "Isostatic forces uplift crust thicker than about 50 km, leading to erosion and crustal thinning".
+
+### WangEtAl2021Tibet
+- Reference: Wang, H. and others (2021). No mafic layer in 80 km thick Tibetan crust. Nature Communications 12:1069.
+- DOI or URL: 10.1038/s41467-021-21420-z (open, PMC7886915)
+- Ledger ids: PLT-258
+- Access: open; full text read.
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-03 (research sub-agent): "Moho at 80 ± 2 km" beneath the Lhasa terrane; felsic thick crust "precludes future delamination due to lack of mafic rocks that may transform into high density eclogitic rocks".
+
+### ZhaoEtAl2020Moho
+- Reference: Zhao, G. and others (2020). Moho beneath Tibet based on a joint analysis of gravity and seismic data. Geochemistry, Geophysics, Geosystems 21(2):e2019GC008849.
+- DOI or URL: 10.1029/2019GC008849 (GFZ open copy)
+- Ledger ids: PLT-258
+- Access: open copy; full text read.
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-03 (research sub-agent): Moho "60–80 km within the plateau"; maximum "~79 km is found in Karakorum and in the southern Lhasa block".
+
+### LundsternMiller2021
+- Reference: Lundstern, J.-E. and Miller, E. L. (2021). [Chapter on Basin and Range extension.] Geological Society of America Special Paper 555, chapter 13. Title not recorded by the sub-agent; take it from the DOI before quoting.
+- DOI or URL: 10.1130/2021.2555(13) (USGS record https://pubs.usgs.gov/publication/70226446)
+- Ledger ids: none (cited on plates.md as a limit: thinning can lag thickening by tens of Myr)
+- Access: abstract read (USGS record).
+- Library: not fetched.
+- Read so far (by the project): abstract, 2026-10-03 (research sub-agent): the collapse model is "difficult to reconcile with ... moderate regional extension (≤50%) and the discovery that most high-angle, Basin and Range faults slipped rapidly ca. 17 Ma, tens of millions of years after crustal thickening occurred".
+
+### SundellEtAl2021
+- Reference: Sundell, K. E. and others (2021). Jurassic to Neogene quantitative crustal thickness estimates in southern Tibet. GSA Today 31(6).
+- DOI or URL: GSA Today June 2021 (open, geosociety.org).
+- Ledger ids: PLT-259
+- Access: open; full text read.
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-03 (research sub-agent): "crustal thickness increased by ~40 km at ~1.3 mm/a between 60 and 30 Ma to near modern crustal thickness, before the onset of Miocene east-west extension"; "Our results are inconsistent with models that invoke net crustal thinning via orogenic collapse (Dewey, 1988) beginning in the Miocene".
+
+### BaslerEtAl2026
+- Reference: Basler, L. and others (2026). [Paleogene crustal thickness of Nevada.] Tectonics 45. Title and authors to be taken from the DOI before quoting.
+- DOI or URL: 10.1029/2025TC009110
+- Ledger ids: PLT-259
+- Access: abstract read (Crossref).
+- Library: not fetched.
+- Read so far (by the project): abstract, 2026-10-03 (research sub-agent): "crust at least 50 km thick was present until the Early Miocene, which suggests that thickened crust was maintained for a protracted interval following Cretaceous shortening. These results indicate that most crustal thinning was contemporaneous with a change in plate boundary conditions".
 ## Quincuncial projections (SCL-070 to SCL-075), added 2026-10-03 with the seamless-wrapping prototype
 
 The prototype crate `crates/deeptime-quincuncial` (not shipped) rests on these. None was read in full this session.

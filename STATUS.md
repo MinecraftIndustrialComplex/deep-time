@@ -96,6 +96,10 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-04 | volcanic biomes | **Fumarole fields.** Only hot-spring pools mark a hot-spring field; a fumarole field (vents and altered ground, the summit zone's and the dry or cold country's) gets no biome of its own and sits in the cone's or the climate's biome. (a) Keep (recommended: yellowstone is a hot-spring landscape); (b) give fumarole fields away from the summit the hot-spring field's biome too. | Not asked yet |
 | 2026-10-03 | GameTest failures | **Boreal wetlands as vanilla swamp?** (build log 2026-10-03, "The GameTests that failed on master".) Wet, flat, low land that is not frozen goes to vanilla's swamp band (BIO-066), and vanilla's swamp spans the cold band too, so wet subarctic lowland (Dfc, Dfb) becomes `minecraft:swamp` (oaks with vines, lily pads); on master 6f72f0dd's test planet that was 66 % of the Dfc columns. (a) **Keep it** (recommended): vanilla does the same, and boreal peatlands are the largest wetlands on Earth; a pack with a cold wetland biome (BOP's bog or muskeg) fills the slot through its regions. (b) Swamps only from the temperate band up: subarctic lowland stays taiga, and the cold band gets no wetland in vanilla. Built: (a); the GameTest counts the wetland band apart either way. | build log |
 | 2026-10-03 | Biome mods survey | **Biomes going forward, after the survey** (docs/research/notes/biome-mods-survey.md §10): (1) Terralith primary with Deep Time-side fixes (a veto by `#c:is_magical`/`#c:is_rare`, a Terralith-tuned placement table, a geology gate for Terralith's named biomes, peatland and salt-crust tags, lava-field and salt-flat surface features), no Deep Time biomes this round (recommended), or plus one vanilla-blocked `deeptime:peat_bog`, or a full own set; (2) veto Terralith's fantasy biomes (1.35 % of land on the test planet; recommended) or keep them; (3) peatland in MIC: taiga now with the tag ready and a separate decision on Regions Unexplored (recommended), add Regions Unexplored now, or build `deeptime:peat_bog`; (4) geology gate for Shield, Yosemite, the cliffs and the red-bed biomes after the volcanic tie-in (recommended), only cliffs and Shield, or leave; (5) Stardust Labs' licence forbids using its works to "configure, test, debug, or augment" an AI system and agents read and test with Terralith: Ben asks Stardust Labs (recommended), judges it does not apply, or agents stop testing with it; (6) Expanded Ecosphere not supported (recommended) or tested. | Not asked yet (sub-agent; for the coordinator) |
+
+| 2026-10-03 | orogenic collapse | **Land still short of 0.27-0.30** (build log 2026-10-03, "Orogenic collapse", re-measured 2026-10-04 on master 297da4b6). The collapse brings the 1000 Myr crust from 0.291 to 0.440 at the end (lowest step 0.28 → 0.37, target ≥ 0.37 missed by a hair; highest step 0.45, just over its 0.45) and the 1000 Myr land from 0.161 to 0.204, but the 500 Myr land only from 0.189 to 0.207 (inside the ±0.02 chance): the new crust is a one-sample-wide shelf the surface carries down to the sea, and thinning old belts lowers the high ground. plate-check 29 of 45 in both. Options: (a) **keep the rule as built and let the Earth-width ocean–continent transition (decided 2026-10-03) and the belt cap read from thickness (tasks 7-8) raise the land (Recommended)**; (b) raise `collapse_thickness_km` to 56-60 km to give back less crust (the crust ceiling holds, but the land falls too); (c) let filled ocean floor stand higher than a continent's mean (no physical basis). | build log; not yet asked |
+| 2026-10-03 | orogenic collapse | **Lambert lowers the land share beyond the crust** (build log 2026-10-03, "Ben's 9 % run"): land over crust at 500 Myr 0.65 before Lambert, 0.57 on master 297da4b6 (six runs); 35 m changes nothing. Ben's 9 % is one seed's draw, repeated exactly here on his build (458a89a5: 0.090); the same seed gives 0.201 on today's master, and the four-seed 1000 Myr land is 0.161. **Recommended: a short look by the projection agent at the surface stage on the Lambert L1 (the margins' cell size and the pole band) before the land is recalibrated**; or accept it and recalibrate on Lambert. | build log; not yet asked |
+| 2026-10-03 | GameTest failures | **Boreal wetlands as vanilla swamp?** (build log 2026-10-03, "The GameTests that failed on master".) Wet, flat, low land that is not frozen goes to vanilla's swamp band (BIO-066), and vanilla's swamp spans the cold band too, so wet subarctic lowland (Dfc, Dfb) becomes `minecraft:swamp` (oaks with vines, lily pads); on master 6f72f0dd's test planet that was 66 % of the Dfc columns. (a) **Keep it** (recommended): vanilla does the same, and boreal peatlands are the largest wetlands on Earth; a pack with a cold wetland biome (BOP's bog or muskeg) fills the slot through its regions. (b) Swamps only from the temperate band up: subarctic lowland stays taiga, and the cold band gets no wetland in vanilla. Built: (a); the GameTest counts the wetland band apart either way. | build log |
 | 2026-10-04 | Wrap engine (design + spike) | **Four choices** (docs/design/wrap-engine.md §8): (1) architecture: one stored copy + folded access + replicated band, vanilla clients join, optional client re-anchor (recommended), or Toroidal World's client frame extended with turned packets; (2) keep Toroidal World for Guyou's slide edges, engine owns only the turning edges (recommended), or engine owns every edge; (3) Create: refuse kinetic, fluid and train connections across turning seams at first (recommended), or adapters in the first version; (4) start Phase 1 now alongside the Immersive Portals work (recommended; the engine takes any layout of translations, half- and quarter-turns), or stop at the spike until the projection survey settles the layout. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-03 | Seamless projection survey | **The production seamless world, four choices** (docs/research/notes/seamless-projection-survey.md §8; replaces the prototype's four, of which Ben answered three on 2026-10-03: research the projection, Immersive Portals plus an own engine, bake only): (1) a cube world, eight mild 270° corners, shapes ≤ 1.42× (recommended), or keep the 2:1 Guyou world with Petroff's equal-area map, shapes ≤ 2.67×; (2) the cube's map: the smooth equal-area table (the conformal cube made equal-area by Moser's flow, no creases; recommended) or closed-form QSC = Roşca–Plonka (41° creases on face diagonals); (3) the cross net, seven seam pairs, straight wrapped equator (recommended), or a 3 × 2 rectangle (eight); (4) faces of 3,776 / 7,552 blocks, today's scale (recommended), or 4,096 / 8,192. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | 35 m vertical scale | **Plutons with a floor.** `strata-check` on the 35 m bakes finds plutonic rock with other rock under it in 16 to 17 % of land columns (0.1 % at 20 m) and 5.4 to 5.8 % of the stored stacks (0 at 20 m): the world now reaches 14.5 km below the sea, under the floors of the stored plutonic layers. The rule is measured, not asserted (structure/realism.rs rule 3); a question for the rock/pluton work, not changed here. (a, recommended) Let the column builder carry plutonic rock to the world's floor where a pluton's layer is the lowest stored one (a follow-up task). (b) Accept floored plutons (real plutons have floors). | Not asked yet (sub-agent; for the coordinator) |
@@ -272,6 +276,103 @@ Ben's answer of 2026-10-02, "Merge with ice sheets off (Recommended)". On branch
 - **Not done.** No game launched; Expanded Ecosphere's dimension override, Spawn's and BloomingNature's placement, and Terralith combined with BOP or RU in a Deep Time world not tested. No code changed; no gates (nothing the build reads changed).
 - **Next.** Ben's six questions (Pending questions, "Biome mods survey").
 
+### 2026-10-03 — Orogenic collapse and the thickest crust: thickened belts give their area back (agent worktree agent-aeec1402fc6146955, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c, continued after two stops, re-measured 2026-10-04; not merged)
+- **Ask.** Ben, decisions log 2026-10-03: "Merge, then give area back (Recommended)". Plate tasks 3-4
+  cost continental crust (0.31 → 0.27 at 1000 Myr): crust crossing a collision front became belt
+  thickness and never gave its area back. Kept as Ben said: PLT-253, resistance 200 mm/yr, stacking
+  share 0.8, `arc_maturity_myr` 20.
+- **What the model had.** At 500 Myr on master a fifth of the visible continental samples were thicker
+  than 70 km (over 40 % of the crust's volume) under ground at a median 200-500 m; at 1000 Myr the
+  median continental column was 83-104 km and the 99th percentile 450-480 km. Two causes, neither
+  fixed here: the belt's cap (PLT-253) reads the elevation, which the surface stage owns and lowers
+  (flexure, erosion) while the stacked thickness stays, so the belt keeps stacking; and a
+  continent-on-continent overlap at a resampling adds the whole lower column to the upper one
+  (PLT-228, `pools::accrete`).
+- **Built** (`plates/collapse.rs`, run each plate step after belts and subduction; science page
+  `docs/science/plates.md`, "Orogenic collapse and the thickest crust"; ledger PLT-254 to PLT-259):
+  (1) *the thickest crust* (PLT-258): a visible continental column thicker than `crust_max_km`
+  (70 km: Tibet and the Andes, Mooney et al. 2002; Lhasa 80 ± 2 km) loses the excess from its bottom
+  to the mantle, no area back; (2) *collapse* (PLT-254): a visible continental sample no orogeny has
+  raised for `collapse_quiet_myr` (10 Myr) and thicker than `collapse_thickness_km` (55 km) releases
+  (1 − e^(−δt/τ))(T − 55 km), τ = `collapse_myr` 15 Myr, into the nearest samples of its plate
+  thinner than the normal column (35.1 km), within `collapse_reach_km` (200 km, at least 1.5 sample
+  spacings), filling them to 35.1 km; ocean floor filled turns continental. Heights follow Airy
+  within each column's Airy height (a hidden root spreads without sinking its surface; a filled
+  receiver rises to at most a continent's mean height). The driver is thickness, not height
+  (the first version, height above 1.5 km, gave +0.02 crust at 500 Myr). Settings in the 12
+  built-in presets and the test planet (`planet_world_4k`, which collapses now too), editor fields
+  `collapse_time`, `collapse_thickness`, `collapse_quiet`, `collapse_reach`, `crust_max`, lang
+  keys. The plates summary line gains `collapse_km3`, `collapse_gained_km2`, `foundered_km3`,
+  `continental_thickness_km_p10/50/90/99` and a `crust_bins` diagnostic line.
+- **Sources** (read by two Sonnet research sub-agents; bibliography section "Orogenic collapse"):
+  Variscan crust 55-70 km by 315 Ma, thinned 315-290 Ma (Hillenbrand & Williams 2022, abstract);
+  Bird 1991 (abstract): Moho relief not kept "for times greater than 10–20 m.y."; Urals root 50-56 km
+  kept (Carbonell et al. 2000, abstract); channel flow 150 km in 15 Myr (Rey, Teyssier & Whitney 2010,
+  full text); thickest crust 70+ km (Mooney, Prodehl & Pavlenkova 2002, full text). τ, the reach and
+  the limit are taken from these; 55 km and the 10 Myr quiet time were chosen, inside the sources'
+  range, by the 1000 Myr crust share (`calibrated` and `game-choice` in the ledger).
+- **Measured: plate-check**, `earthlike_quick_16k`, supercontinent, 1000 Myr, seeds 1-4,
+  `structure.deformation.density=0`; master = this branch merged with master 0af3ff6e with both rules
+  off (`collapse_myr=0;crust_max_km=0`). Tables: `docs/design/plate-check-baseline.md`, "Orogenic
+  collapse and the thickest crust". **29 of 45 targets** in both. Crust lowest step 0.28 → **0.39**
+  (target ≥ 0.37, now met); highest step 0.43 → 0.45 (≤ 0.45, at the edge: 0.43 0.44 0.47 0.46);
+  at the end 0.285 → 0.438; land at the end 0.127 → 0.170. Lost: steps with one plate above half
+  3.8 % → **10.1 %** (≤ 10; seeds 13.6 9.8 7.2 9.8). Variants: 50 km without and with the quiet time
+  ended at 0.52 crust (over the ceiling); 55 km without the quiet time 0.49.
+- **Measured: hypsometry**, 500 Myr, seeds 1-3 × both starts (`tools/review/p1-17-hyps.sh`), master
+  → after, mean [min, max]: land **0.197 → 0.215** [0.168, 0.252] (target 0.27-0.30; +0.018, inside
+  the ±0.02 chance); median land 433 → 415 m; above 2 km 0.096 → 0.082; highest cell 5.4 → 4.9 km
+  [4.4, 5.4] (no 14 km belts: the highest anywhere, 1000 Myr runs included, 5.5 km); 99th percentile
+  3.8 → 3.3 km; continental crust 0.327 → 0.372 (+0.045). Most new crust is shelf: the filled ocean
+  floor is one sample wide and the surface carries it to the sea (the margins task's cause).
+- **Re-measured on current master** (2026-10-04; branch merged with master 297da4b6, whose
+  simulation is master 5df2e9ec's: nothing since touched `crates/`; binary built from a27e2e81;
+  "master" = the same build with `tectonics.collapse_myr=0;tectonics.crust_max_km=0`, which return
+  before touching anything). Tables: `docs/design/plate-check-baseline.md`, "Re-measured on master
+  297da4b6". plate-check 1000 Myr, supercontinent, seeds 1-4: **29 of 45 targets** in both, two
+  traded: after passes the active margin share (0.41 → 0.38, target 0.25-0.40) and still the one
+  plate above half (6.2 → 9.8 %, ≤ 10), and fails both crust bounds by a hair: lowest step
+  0.28 → 0.37 (0.39 0.37 0.31 0.40; mean just under 0.37), highest step 0.43 → 0.45 (0.44 0.47
+  0.43 0.47; over 0.45). Crust at the end **0.291 → 0.440** (+0.149); land at the end **0.161 →
+  0.204** [0.134, 0.203] → [0.179, 0.229] (+0.043, clears the ±0.02 chance); above 2 km 0.123 →
+  0.095; highest cell 6.4 → 5.3 km (master's seed 2 has an 8.6 km belt; after at most 5.9 km; no
+  14 km belts anywhere); thickness p50/p99 81-105/440-649 km → 50-54/72-120 km. Hypsometry at
+  500 Myr, seeds 1-3 × both starts, mean [min, max]: land **0.189 → 0.207** [0.153, 0.259] →
+  [0.159, 0.252] (+0.018, inside the ±0.02 chance; target 0.27-0.30); median land 387 → 448 m
+  (inside the six runs' spread); above 2 km 0.081 → 0.078 (inside); highest cell 5.14 → 5.17 km
+  [4.5, 6.2] → [4.5, 5.8]; 99th percentile 3.50 → 3.21 km; continental crust **0.331 → 0.374**
+  (+0.043, clears).
+- **Ben's 9 % run (the coordinator's question).** The simulation is deterministic for a given build
+  whatever the thread count: seeds 1-4 at 8 threads (Ben's) give the plate-check's 2-thread numbers
+  to the last digit. So Ben's run can be repeated: master 458a89a5 (his workbench build), seed 1,
+  8 threads, coupled pipeline to the volcanoes, ends at `land_frac=0.090`, crust 0.255,
+  `max_elevation_m=4759`, `sea_level_m=37.2`, largest plate 0.562 of the planet, exactly the
+  workbench's run 1a103bb2d2b. The same seed ends at 0.174 on 6f72f0dd (Ben's run 1a1035d3741, before
+  Lambert), 0.133 on 970f6d04^1 (after the cold-desert, breccia and wetland merges; crust 0.268,
+  largest plate 0.27) and **0.201** on today's master (crust 0.332), and **0.179** with the collapse.
+  A 1000 Myr planet is chaotic: any code change re-rolls one seed's outcome. Ben's draw ended with
+  one plate over half the planet (2 plates above 5 %) and the least crust of any run here, with only
+  35 % of that crust above the sea. The ensemble, not one seed, says where master is: 1000 Myr land
+  0.127 on 0af3ff6e (seeds 1-4, 0.123-0.133), **0.161** on today's master (0.134-0.203; the ice
+  merge raised every seed), **0.204** with the collapse (0.179-0.229). 35 m changes nothing in
+  metres (the six 500 Myr runs on af22131a and 6f72f0dd agree to the last digit). Lambert: land over
+  crust at 500 Myr 0.65 before, 0.57 on today's master (0.189 / 0.331), 0.55 after (0.207 / 0.374).
+- **Test planet.** With the collapse on, `planet_world_4k` (C = 4096, reach shorter than a sample
+  spacing) bakes 6 river chains instead of 43 and no lakes, and `carversSpareWater` (GameTests,
+  standalone and MIC) failed its premise: 69 river columns above sea level, 4 carver cuts under them
+  (master: 2,002 and 5,230). The collapse and the limit are off on that test preset
+  (`collapse_myr` 0, `crust_max_km` 0, as its `collision_stacking_share` 0.5 is its own): the
+  GameTest fixtures keep master's planet; the 16k presets keep the defaults. The 1.5-spacing floor of
+  the reach stays for coarse lattices.
+- **Gates** (test VM, head 060cebfb, merged with master 297da4b6): `cargo fmt --check` clean; clippy
+  `-D warnings` clean; `cargo test --workspace` 803 passed, 0 failed, 3 ignored; `cargo deny check
+  licenses bans` ok; `./gradlew build test` 272 tests, 0 failures, 2 skipped; `./gametest.sh` and
+  `./gametest.sh -PwithMic` all 71 required tests passed (before the test-planet change both failed
+  only `carversSpareWater`, above).
+- **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/belts-area` deleted with its builds of the older
+  masters; `belts34` deleted.
+- **Next.** Ben's answers below; the belt cap read from thickness and the overlap accretion (the
+  sources of the stacked volume) belong to tasks 7-8.
 ### 2026-10-03/04 — Seamless projection survey: which projection for a portal-joined world (Ben's "Send off some research on what the current best projections would be for this"; agent worktree agent-a720027b758d66bc2, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; research only, not merged)
 - **What.** `docs/research/notes/seamless-projection-survey.md` and its tools `tools/research/projection-survey/` (survey.py: any map as tiles plus a seam table, measuring area, shape, straight-walk drift and derivative jumps across every seam and face line; conformal.py: Schwarz triangle maps for the conformal cube, Peirce, Lee's tetrahedron; moser.py: a conformal map made equal-area by Moser's flow; bench.rs: inverse cost; run.sh runs them on the VM through the admission tool, results in review/out/projection-survey/). Two Sonnet sub-agents read the sources (formulas and licences; post-2015 cube-map work).
 - **Found.** With quarter-turn seams the cube (8 corners of 270°) beats the pillowcase (4 of 180°) by a theorem: equal-area maps need shape ratio ≥ 4/3 near a cube corner against ≥ 2 near a Peirce point. Measured on 16 maps: the conformal cube made equal-area by Moser's flow (the note's own construction) has area 0.01 % rms, shape median 1.26 / max 1.42, no creases (derivative jumps ≤ 0.02, the table's floor); QSC = Roşca–Plonka (the same map, measured) median 1.32 / max 1.55, creased (diagonals ε 0.87, 41°); Petroff in the Guyou layout median 1.78 / max 2.67, smooth across its seams; HEALPix is a cube in disguise with 63° creases; Gringorten's crease lies on its seams. Inverse costs 4 ns (gnomonic) to 2 µs (Gringorten) per block; irrelevant at the bake (0.3 s for the table map on a 16k cube world).
