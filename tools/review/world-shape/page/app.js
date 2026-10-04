@@ -10,6 +10,18 @@ if (/debug/.test(location.hash)) {
 }
 if (/(^|[#,])theme-dark/.test(location.hash)) document.documentElement.dataset.theme = 'dark';
 if (/(^|[#,])theme-light/.test(location.hash)) document.documentElement.dataset.theme = 'light';
+// review screenshots only (#from-<id>): hide everything before element <id>, since a headless
+// screenshot cannot scroll to an anchor
+const fromM = /(^|[#,])from-([\w-]+)/.exec(location.hash);
+if (fromM) {
+  window.addEventListener('load', () => {
+    let el = document.getElementById(fromM[2]);
+    while (el && el !== document.body) {
+      for (let p = el.previousElementSibling; p; p = p.previousElementSibling) p.style.display = 'none';
+      el = el.parentElement;
+    }
+  });
+}
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const el = (tag, attrs = {}, html) => {
@@ -354,8 +366,10 @@ function cornerRaw(id) {
   const [vx, vy] = f.C.V;
   const o = f.w * 0.3, z = f.w * 0.04;
   if (id === G) {
-    label(f.s, vx - o, -vy - o, 'east square, turned 180°', z * 0.9);
-    label(f.s, vx + o, -vy - o, 'west square, turned 180°', z * 0.9);
+    label(f.s, vx - o, -vy - o * 1.1, 'east square,', z * 0.9);
+    label(f.s, vx - o, -vy - o * 0.8, 'turned 180°', z * 0.9);
+    label(f.s, vx + o, -vy - o * 1.1, 'west square,', z * 0.9);
+    label(f.s, vx + o, -vy - o * 0.8, 'turned 180°', z * 0.9);
   } else {
     label(f.s, vx + o, -vy - o * 1.1, 'F1, turned 90°', z);
     label(f.s, vx + o, -vy - o * 0.75, '(N-east/F1 is first)', z * 0.8);
