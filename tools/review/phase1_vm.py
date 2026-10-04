@@ -103,7 +103,14 @@ def cmd_pick(a):
     def dist(s):
         return wdist(c, sx, sz, s["center"][0], s["center"][2])
 
-    por = sorted(of(PORPHYRY), key=dist)
+    def complete(s):
+        """A porphyry with a gossan body and a placer-gold child: the one item 3 can show in full."""
+        return any(b["role"] == "gossan" for b in by_site.get(s["id"], [])) and any(k.get("parent") == s["id"] for k in of(PLACER))
+
+    # Nearest first among the porphyries within the essentials reach that show the whole chain (gossan, placer child),
+    # then the others in reach, then the rest: a body that lacks a gossan or a child is a finding, but one that has
+    # them elsewhere in reach should be the one shown.
+    por = sorted(of(PORPHYRY), key=lambda s: (reach is not None and dist(s) > reach, not complete(s), dist(s)))
     plan = {"circumference": c, "spawn": {"x": sx, "z": sz}, "essentials_reach": reach,
             "essentials": ranked, "manifest_essentials": (manifest.get("notes") or {}).get("essentials"),
             "counts": {short(t): sum(1 for s in sites if short(s["deposit_type"]) == short(t))
