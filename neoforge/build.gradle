@@ -193,10 +193,13 @@ neoForge {
         // ./gametest.sh -- the headless GameTest server; namespace `deeptime`.
         gameTestServer {
             type = 'gameTestServer'
-            // -PwrapSpike: the wrap-engine spike's tests only (namespace deeptime_wrapspike) and its
-            // mixins (-Ddeeptime.wrapspike=true; docs/design/wrap-engine.md). Never in a normal run.
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.hasProperty('wrapSpike') ? 'deeptime_wrapspike' : 'deeptime'
-            if (project.hasProperty('wrapSpike')) systemProperty 'deeptime.wrapspike', 'true'
+            // -PwrapEngine: the wrap engine's tests only (namespaces deeptime_wrapengine and
+            // deeptime_wrapbench) with its mixins (-Ddeeptime.wrapengine=true; docs/design/wrap-engine.md).
+            // -PwrapBench: the getBlockState benchmark alone with the engine off (its baseline).
+            // Never in a normal run: the shipped default stays without the engine.
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.hasProperty('wrapEngine') ? 'deeptime_wrapengine,deeptime_wrapbench'
+                    : project.hasProperty('wrapBench') ? 'deeptime_wrapbench' : 'deeptime'
+            if (project.hasProperty('wrapEngine')) systemProperty 'deeptime.wrapengine', 'true'
             systemProperty 'deeptime.gametest', 'true'
             if (extraDatapack) systemProperty 'deeptime.extraDatapack', extraDatapack.toString()
             // -PgametestOnly=<name>[,<name>…]: run only those tests (GameTestServerMixin).
