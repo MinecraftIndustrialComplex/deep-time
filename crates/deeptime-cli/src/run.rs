@@ -1501,9 +1501,20 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
             "stages": stages,
         }));
     }
+    // What the editor shows the player for this preset under the cap: the core's estimate plus what the process
+    // holds beyond the stages (`SERVER_OVERHEAD_BYTES`), so the Phase 1 exit can hold the measured peak against it.
+    let estimate = deeptime_core::session::estimate_for(&preset, "", o.mem_cap)
+        .ok()
+        .and_then(|e| serde_json::from_str::<Value>(&e).ok())
+        .map(|mut e| {
+            let peak = e["peak_bytes"].as_u64().unwrap_or(0);
+            e["shown_peak_bytes"] = json!(peak + crate::watch::editor::SERVER_OVERHEAD_BYTES);
+            e
+        });
     let bench = json!({
         "preset": name,
         "preset_file": o.preset,
+        "estimate": estimate,
         "version": deeptime_core::VERSION,
         "host": format!(
             "{}-{} ({} processors)",

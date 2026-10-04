@@ -153,8 +153,8 @@ def bench_json(path):
             if src.get(k):
                 est = src[k]
         e = src.get("estimate")
-        if isinstance(e, dict) and e.get("peak_bytes"):
-            est = e["peak_bytes"]
+        if isinstance(e, dict) and (e.get("shown_peak_bytes") or e.get("peak_bytes")):
+            est = e.get("shown_peak_bytes") or e["peak_bytes"]   # what the editor shows the player: the stages' peak plus the server overhead
     return secs, peak, est, run.get("stages", []), d
 
 
@@ -192,7 +192,7 @@ def step_bench(a):
         kids.append(kid(s <= gate, f"bench {preset}: within {gate:.0f} s at 8 threads", *ev))
         if est is None:
             kids.append(kid(False, f"bench {preset}: peak memory within the estimate",
-                            f"peak {peak / 2**20:.0f} MiB measured; bench.json carries no estimate (expected `estimate.peak_bytes` or `estimate_peak_bytes`: P1-17 writes it)"))
+                            f"peak {peak / 2**20:.0f} MiB measured; bench.json carries no estimate (`deeptime bench` writes `estimate.shown_peak_bytes`)"))
         else:
             kids.append(kid(peak <= est, f"bench {preset}: peak memory within the estimate", f"peak {peak / 2**20:.0f} MiB against an estimate of {est / 2**20:.0f} MiB"))
     return [Row("bench", 1, "Bench gate: quick 16k in 5 min and full 16k in 15 min at 8 threads, peak memory within the estimate", status_of(kids), [], kids, time.time() - t0)]
