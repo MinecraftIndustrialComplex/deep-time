@@ -1498,6 +1498,16 @@ master merged in. Each task's notes record what differs from the sections above 
     the coarse polar rows giving the zonal model a coarse target there. `climate-dem` reads its
     equirectangular DEM as W/2 rows (master read W/π) and resamples it onto the planet's grid.
 
+- **T10 downstream checks (part, 2026-10-04).** `climateConsistent`'s floors (§5.3): only BW needed
+  re-basing (51 columns on the default test planet, 0.608 standalone and 0.569 MIC; floor 0.57 →
+  0.46 by the documented rule); GameTests 71 of 71 standalone and MIC. Heights (§5.4) on a 12-run
+  ensemble (`tools/review/p1-17-hyps.sh`, `STAGE=deposits`, earthlike_quick_16k, 500 Myr, seeds
+  1–3, two starts): land median 414 → 405 m, p90 1,673 → 1,738 m, above 2 km 0.070 → 0.073,
+  glaciated land 0.088 → 0.067; erosion needs no retuning. Deposit counts (§5.5) change within the
+  runs' spread. The present ice (median 3.7·10⁶ km³ per-cell, 5.3·10⁶ banded) is far under
+  `ice_reference_km3` 1.0·10⁷; re-setting it is a pending question (STATUS). Not done: the review
+  page.
+
 ## Appendix A. How the measurements were made
 
 All runs were on the M6 Mac, through `tools/remote/mac.sh` for the build and plain ssh for the
