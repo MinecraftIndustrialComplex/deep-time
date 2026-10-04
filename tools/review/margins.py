@@ -7,6 +7,8 @@ lies against the sea.
                                                   elevation, plates/crust_type; plates/thickness_m optional)
     margins.py pool <out.json> <run.json> ...      the transects of several runs pooled
 
+MARGINS_FIELD=plates/elevation_m measures another dumped elevation against the surface's sea level.
+
 Transects (the margins-and-spires study's definitions, build log 2026-10-03, so its ETOPO 2022 figures
 compare): from every 3rd open-sea coast cell of land masses over 750 km2, |lat| <= 60 deg, seaward along
 the downhill direction of the surface smoothed over 10 km, every 500 m out to 400 km: shelf break = the
@@ -21,6 +23,7 @@ sea, by distance (km, on the planet, through the cells) from the nearest oceanic
 """
 import json
 import math
+import os
 import sys
 
 import numpy as np
@@ -254,6 +257,13 @@ def crust_part(elev, sea, kind, thick, g):
 def planet(d, out_path):
     h, e = load(d, "surface/elevation_m")
     y, _ = load(d, "elevation")
+    field = os.environ.get("MARGINS_FIELD")
+    if field:
+        # Transects on another stage's elevation (e.g. plates/elevation_m, the plate model's own),
+        # against the same sea level.
+        h0 = h
+        h, _ = load(d, field)
+        y = y + (h - h0) / M_PER_BLOCK_V
     kind, _ = load(d, "plates/crust_type")
     thick, _ = load(d, "plates/thickness_m")
     g = Grid(e)

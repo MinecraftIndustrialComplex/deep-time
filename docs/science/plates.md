@@ -203,6 +203,91 @@ measured tables (`plate-check` at 1000 Myr and the 500 Myr hypsometry ensemble).
   without changing the thickness. That decoupling is the model's, and the reason the thickest
   crust needs a limit at all.
 
+## The ocean–continent transition of rifted margins (2026-10-04)
+
+Built 2026-10-04 (ledger PLT-260 to PLT-264; `plates/transition.rs`; the ocean side's cooling in
+`plates/pools.rs`, PLT-129's note). Ben's answer of 2026-10-03 ("Merge both, then fix the cause"):
+after submarine slope failure the continental slopes were still about twice Earth's, and the cause
+was the plate model's ocean–continent step.
+
+**What happens on Earth.** Most of today's continental edges are passive margins: 105,000 km of
+them against 53,000 km of convergent plate boundary (Bradley 2008, full text). A passive margin is
+a rift that broke up. Before the ocean opened, the continent was stretched, by a factor β that
+grows towards the future ocean (McKenzie 1978, full text: "a unit length of continental lithosphere
+is suddenly extended to a length β"), so its crust thins from a normal thickness at the landward
+limit of thinning to a few kilometres where it meets the first ocean crust. In the Coral Sea "a
+thinning of the crust from 22 km down to a 7–8 km thick" continental crust lies "in direct contact
+with the steady oceanic crust of similar thickness" (Sapin, Ringenbach & Clerc 2021, full text). How
+wide the thinning is depends on the margin: at volcanic margins, "the majority of passive
+continental margins worldwide", "Crustal thinning typically occurs over a comparably short distance
+in the order of only 50 to 100 km" (Franke 2013, accepted manuscript), while magma-poor margins
+have wide extended domains: the necking domain from about 50 to more than 110 km, the exhumation
+domain more than 150 km (Sapin et al. 2021), hyper-extended crust under 10 km thick over 70 km off
+Iberia and 200 km off Angola (Brune et al. 2014, full text). Thinned crust stands lower, and once
+the stretched lithosphere cools the margin subsides further with the ocean floor beside it
+(McKenzie 1978). The surface over the taper is the shelf, the slope and the rise: passive-margin
+shelves average 88 km wide and their slopes 46 km (Harris et al. 2014, author copy); the slope
+between the 500 and 2,000 m isobaths has a median of 2.1° in ETOPO 2022 (the margins study, build
+log 2026-10-03).
+
+**What the model had.** The plate model's crust steps from a continental column (35.1 km, a few
+hundred metres up) to ocean floor (7 km, 2.5–5.6 km down) between two neighbouring samples. On the
+quick 16k planet a sample is 71 km apart on the Earth-sized model sphere but 8.7 km on the planet,
+and heights are not scaled: the step is drawn 8.1 times narrower than Earth's margins, and the
+surface stage inherited a wall that nothing under the sea relaxes (marine diffusion vanishes below
+wave base; slope failure moves only sediment).
+
+**What the model does now.** Each 2 Myr step, after the collision belts, subduction uplift and the
+orogenic collapse and before the surface processes:
+
+1. *Who takes part.* For every plate, the edges between one of its visible continental samples and
+   one of its visible oceanic samples are its ocean–continent boundary. Samples at a trench, in a
+   subduction zone or on an arc, and continental samples an orogeny raised within the quiet time
+   (PLT-259), are left out: an active margin or a mountain front is not a rifted margin.
+2. *The taper* (PLT-260). Every sample within W/2 of the boundary (W = `transition_width_km`,
+   200 km measured **on the planet**, PLT-261) gets a signed distance d from it (inland positive)
+   and a target crystalline thickness (the crust less its sediment and sedimentary rock)
+   T*(d) = T_o + (T_n − T_o) · clamp(1/2 + d/W, 0, 1), with T_n = 33.0 km (the normal continental
+   column's) and T_o = 7 km (the ocean's). The profile is linear in thickness: β = T_n / T* runs
+   from 1 at the hinge to T_n / T_o ≈ 4.7 at the toe, and centred on the model's boundary, so
+   turning the one-sample step into the ramp keeps the crust's volume.
+3. *Moving the crust.* Crust moves from samples thicker than T* to samples thinner than T* within a
+   stretch of margin (boundary samples grouped round seeds at least W/2 apart; every sample of the
+   zone belongs to the seed of its nearest boundary sample, through its own crust and plate), the
+   share 1 − e^(−δt/τ) per step of what would bring the stretch to the profile (τ =
+   `transition_myr`, 20 Myr, PLT-262), as the source's own rock thinned in proportion (pure shear).
+   Volume is conserved, and crust types do not change: the thickened ocean-side samples stay
+   oceanic, so the continental area and the crust share are not redefined by this rule.
+4. *Heights* (PLT-263). A metre of crust moved changes the height by 1/f, f = (T_n − T_o) / (z_0 −
+   z_f) = 4.24 m/m with the presets' continent (z_0 = 525 m) and old ocean floor (z_f = −5,600 m),
+   on both sides, so the two sides meet. An oceanic sample of the zone then cools with its age (the
+   dampening, PLT-129) towards the floor its crust holds up, z_f + (T − T_o)/f, instead of z_f: a
+   young margin stands near ridge depth, and the taper deepens as its ocean ages, the age–depth law
+   standing for McKenzie's thermal subsidence.
+
+The plate model's height change is its uplift for the surface stage, which carries it under its
+own elevation and flexure; the shelf comes from the sediment the surface brings onto the thinned
+crust, and its slope failure keeps that sediment at most 2.5° steep.
+
+**Earth against the model.** MEASURED_PLACEHOLDER
+
+**Limits and game choices.**
+- The profile is linear in thickness and the same on every margin; Earth's margins have a necking
+  zone where the crust thins fastest, and volcanic and magma-poor margins differ in width by a
+  factor of two to three. One width (200 km, inside the sources' 50–300 km) stands for all.
+- The width is in metres on the planet, so a small planet's margins are as wide as Earth's in
+  metres and take a larger share of its continents; on the quick 16k planet the zone is 23 samples
+  across.
+- τ (20 Myr) is a game choice: the sources give the duration of rifting (tens of Myr) and the
+  thermal subsidence's time constant (62.8 Myr, carried by the ocean's age–depth law), not a time
+  for the crust to take the taper's shape.
+- The heights follow a straight line through two of the model's own columns rather than Airy
+  isostasy with and without water: Airy gives 5.5 (dry) and 3.78 (water-loaded) metres of crust per
+  metre of height, and 4.24 lies between; the line is what makes the plate model's continent and
+  ocean heights meet.
+- The rule moves crust only within a plate and only between visible samples; the thickened ocean
+  side keeps its oceanic type and is subducted with its ocean when the margin later turns active.
+
 ## The planned force balance: its constants and targets checked (WP-13a)
 
 Checked 2026-10-02, before the force balance is built, so that it is built on numbers that were
