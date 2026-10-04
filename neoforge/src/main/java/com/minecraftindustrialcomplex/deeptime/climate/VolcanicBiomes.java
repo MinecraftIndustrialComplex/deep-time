@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.climate;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.worldgen.GeologyGround;
 import com.minecraftindustrialcomplex.deeptime.worldgen.VolcanicZones;
 import com.minecraftindustrialcomplex.deeptime.worldgen.VolcanicZones.Role;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
@@ -134,9 +135,43 @@ public final class VolcanicBiomes {
         }
     }
 
-    /** What one level resolved against one parameter list. */
+    /**
+     * What one level resolved against one parameter list. {@code gated}: the geology gate's biomes the source can
+     * place and the ground role bits each may stand on ({@link GeologyBiomes}); {@code metrics}: the search's metric
+     * per ground role bits, made on first use.
+     */
     private record Resolved(Object key, int tags, boolean active, boolean keepOut, Holder<Biome>[] byRole,
-                            Map<Holder<Biome>, List<Entry>> entries) {}
+                            Map<Holder<Biome>, List<Entry>> entries, Map<Holder<Biome>, Integer> gated,
+                            java.util.concurrent.atomic.AtomicReferenceArray<Climate.DistanceMetric<Holder<Biome>>> metrics) {
+
+        /**
+         * The keep-out metric of a column whose ground has the role bits {@code ground}: a gated leaf is infinitely far
+         * unless its roles meet the ground's (and then counts as any leaf, even if it is volcanic too); any other kept-out
+         * (volcanic) leaf is infinitely far.
+         */
+        Climate.DistanceMetric<Holder<Biome>> metric(int ground) {
+            if (gated.isEmpty())
+                return NEAREST_KEPT;
+            Climate.DistanceMetric<Holder<Biome>> m = metrics.get(ground);
+            if (m != null)
+                return m;
+            boolean out = keepOut;
+            m = (node, values) -> {
+                if (node == null)
+                    return Long.MAX_VALUE;
+                if (node instanceof Climate.RTree.Leaf<Holder<Biome>> leaf) {
+                    Integer roles = gated.get(leaf.value);
+                    if (roles != null)
+                        return (roles & ground) != 0 ? node.distance(values) : Long.MAX_VALUE;
+                    if (out && leaf.value.is(KEEP_OUT))
+                        return Long.MAX_VALUE;
+                }
+                return node.distance(values);
+            };
+            metrics.set(ground, m);
+            return m;
+        }
+    }
 
     /**
      * One Deep Time level's state (held by its {@code RegionSpawnTarget}): its terrain and the volcanic zones,
@@ -146,6 +181,7 @@ public final class VolcanicBiomes {
         private final WorldDataTerrain terrain;
         private final int cell, minY, seaLevel;
         private volatile VolcanicZones zones;
+        private volatile com.minecraftindustrialcomplex.deeptime.worldgen.GeologyGround geology;
         private volatile Resolved resolved;
 
         public Level(WorldDataTerrain terrain, int cell, int minY, int seaLevel) {
@@ -171,6 +207,40 @@ public final class VolcanicBiomes {
 
         public int seaLevel() {
             return seaLevel;
+        }
+
+        /** The level's geology gate ground (built on first use, with the server's rock classes). */
+        public com.minecraftindustrialcomplex.deeptime.worldgen.GeologyGround geology() {
+            var g = geology;
+            if (g == null) {
+                var server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+                Map<String, List<String>> groups = new HashMap<>();
+                if (server != null)
+                    com.minecraftindustrialcomplex.deeptime.rock.RockClassRegistry.byName(server.registryAccess())
+                            .forEach((n, rc) -> groups.put(n, rc.groups()));
+                g = new com.minecraftindustrialcomplex.deeptime.worldgen.GeologyGround(terrain, seaLevel,
+                        com.minecraftindustrialcomplex.deeptime.worldgen.GeologyGround.groupsOf(groups));
+                geology = g;
+            }
+            return g;
+        }
+
+        /**
+         * Whether a biome of the geology gate may stand at block (x, z) of this level: true for a biome in no geology
+         * role, else whether the column's ground has one of its roles. False before the level's first query.
+         */
+        public boolean geologyAllows(Holder<Biome> biome, int x, int z) {
+            Resolved r = resolved;
+            if (r == null)
+                return false;
+            Integer roles = r.gated.get(biome);
+            return roles == null || (roles & geology().rolesAt(x, z)) != 0;
+        }
+
+        /** The geology roles a biome may stand on at this level (0: not gated, or before the level's first query). */
+        public int gatedRoles(Holder<Biome> biome) {
+            Resolved r = resolved;
+            return r == null ? 0 : r.gated.getOrDefault(biome, 0);
         }
 
         /**
@@ -244,11 +314,24 @@ public final class VolcanicBiomes {
         for (Role role : Role.values())
             roles.append(' ').append(role.id).append('=').append(byRole[role.ordinal()] == null ? "-"
                     : byRole[role.ordinal()].unwrapKey().map(k -> k.location().toString()).orElse("?"));
-        if (registry.isPresent())
+        // The geology gate (decisions log 2026-10-04): the rock-named biomes this source can place, and their roles. Like
+        // the keep-out, never every biome of the tree.
+        Map<Holder<Biome>, Integer> gated = GeologyBiomes.gated(registry, possible);
+        if (gated.size() >= possible.size())
+            gated = Map.of();
+        if (registry.isPresent()) {
             DeepTime.LOGGER.info("[deeptime] volcanic biomes: {} of {} biomes kept out of the climate search; roles:{}", kept,
                     possible.size(), roles);
+            if (!gated.isEmpty()) {
+                StringBuilder g = new StringBuilder();
+                gated.forEach((b, bits) -> g.append(' ').append(b.unwrapKey().map(k -> k.location().toString()).orElse("?"))
+                        .append('=').append(GeologyBiomes.names(bits)));
+                DeepTime.LOGGER.info("[deeptime] geology gate: {} rock-named biomes kept to their ground:{}", gated.size(), g);
+            }
+        }
         // Without a registry the roles are retried on the next query.
-        return new Resolved(source.key(), registry.isPresent() ? tags : -1, keepOut || any, keepOut, byRole, entries);
+        return new Resolved(source.key(), registry.isPresent() ? tags : -1, keepOut || any || !gated.isEmpty(), keepOut, byRole,
+                entries, gated, new java.util.concurrent.atomic.AtomicReferenceArray<>(1 << GeologyGround.Role.values().length));
     }
 
     private static Optional<Registry<Biome>> biomeRegistry() {
@@ -274,11 +357,21 @@ public final class VolcanicBiomes {
             return b;
         // The plain nearest first: where it is not kept out, the keep-out search would find the same leaf.
         Holder<Biome> plain = source.find(t, NEAREST);
-        if (!r.keepOut || !plain.is(KEEP_OUT))
+        Integer gatedRoles = r.gated.isEmpty() ? null : r.gated.get(plain);
+        int ground = 0;
+        if (gatedRoles != null) {
+            // A rock-named biome: on its ground it answers (even when it is volcanic too), elsewhere it is kept out.
+            ground = level.geology().rolesAt(QuartPos.toBlock(qx) + 2, QuartPos.toBlock(qz) + 2);
+            if ((gatedRoles & ground) != 0)
+                return plain;
+        } else if (!r.keepOut || !plain.is(KEEP_OUT)) {
             return plain;
+        } else if (!r.gated.isEmpty()) {
+            ground = level.geology().rolesAt(QuartPos.toBlock(qx) + 2, QuartPos.toBlock(qz) + 2);
+        }
         Holder<Biome> kept;
         try {
-            kept = source.find(t, NEAREST_KEPT);
+            kept = source.find(t, r.metric(ground));
         } catch (NullPointerException emptyTree) {
             // A tree holding nothing but kept-out biomes (a region of volcanic biomes alone) answers null.
             return plain;
@@ -290,7 +383,7 @@ public final class VolcanicBiomes {
             Optional<Source> base = source.base();
             if (base.isPresent()) {
                 try {
-                    Holder<Biome> under = base.get().find(t, NEAREST_KEPT);
+                    Holder<Biome> under = base.get().find(t, r.metric(ground));
                     if (!water(under))
                         return under;
                 } catch (NullPointerException emptyTree) {

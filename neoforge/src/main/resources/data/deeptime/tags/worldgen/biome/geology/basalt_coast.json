@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "terralith:basalt_cliffs",
+      "required": false
+    }
+  ]
+}
