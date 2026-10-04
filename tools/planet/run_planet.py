@@ -4,8 +4,11 @@
 
 Called by ./gametest-planet.sh; see there for the flags. Standard library only.
 
-The server is ModDevGradle's `runPlanetServer` (a dev dedicated server, so /test exists) in
-run-planet/, on Deep Time's planet ports (game 25666, RCON 25676). GameTest results come from
+The server is ModDevGradle's `runPlanetServer` (a dev dedicated server, so /test exists). On the test
+VM it runs through the admission tool (tools/remote/vm/admit.py, kind planet:<set>; Ben 2026-10-03:
+load-based admission, no server lock) in the job's own folder (DEEPTIME_SERVER_DIR/run-planet) on the
+job's ports, with a copy of the set's jars; elsewhere in run-planet/ on the old fixed ports (game
+25666, RCON 25676). The log is always run-planet/planet.log in the checkout. GameTest results come from
 Deep Time's own reporter (DeepTimeTestReporter): a headless 1.21.1 server logs no passes and no
 summary of its own, so after `/test runall <class>` the harness polls
 `/deeptime gametest summary` until every expected test has a result, with a timeout.
@@ -24,7 +27,12 @@ import threading
 import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(REPO, "tools", "smoke"))
+import admission  # noqa: E402  (tools/smoke/admission.py: the test VM's admission tool)
+import instance  # noqa: E402  (tools/smoke/instance.py: jar snapshots, ports, the launch lock)
+
 RUN = os.path.join(REPO, "run-planet")
+LOG_DIR = RUN
 GAME_PORT, RCON_PORT = 25666, 25676
 DONE = re.compile(r"Done \(")
 # RCON comes up after "Done (" (38 s later on the first planet boot), so wait for it too.
@@ -52,10 +60,14 @@ class Planet:
     def start(self):
         self.lines, self.fatal, self.done, self.rcon_up = [], None, False, False
         self.log = open(self.log_path, "a", buffering=1, errors="replace")
-        self.proc = subprocess.Popen(self.cmd, cwd=os.path.join(REPO, "neoforge"), stdin=subprocess.PIPE,
-                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                                     errors="replace", bufsize=1, start_new_session=True)
-        threading.Thread(target=self._read, daemon=True).start()
+        # Gradle writes the run's argument files into neoforge/build just before it starts the JVM:
+        # two runs of this checkout must not interleave there (instance.launch_lock).
+        with instance.launch_lock(REPO):
+            self.proc = subprocess.Popen(self.cmd, cwd=os.path.join(REPO, "neoforge"), stdin=subprocess.PIPE,
+                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                         errors="replace", bufsize=1, start_new_session=True)
+            threading.Thread(target=self._read, daemon=True).start()
+            instance.wait_jvm(RUN, self.proc.pid, timeout=1800)
 
     def _read(self):
         for line in self.proc.stdout:
@@ -108,10 +120,26 @@ def main():
     ap.add_argument("gradle_args", nargs="*")
     a = ap.parse_args()
 
+    run_set = "mic" if "-PwithMic" in a.gradle_args else "standalone"
+    admission.ensure(f"planet:{run_set}")
+    global RUN, GAME_PORT, RCON_PORT
+    ports = admission.ports()
+    if ports:
+        GAME_PORT, RCON_PORT = ports["game"], ports["rcon"]
+    if admission.server_dir():
+        RUN = os.path.join(admission.server_dir(), "run-planet")
+        os.environ["DEEPTIME_PLANET_DIR"] = RUN
     t = tools()
-    # Fresh world every run; mods/ is re-linked by Gradle's linkRunModsPlanetServer.
+    # Fresh world every run; mods/ is re-linked by Gradle's linkRunModsPlanetServer, from a copy of
+    # the set's jars (an install.sh meanwhile cannot change them under the server).
     shutil.rmtree(os.path.join(RUN, "world"), ignore_errors=True)
     os.makedirs(RUN, exist_ok=True)
+    os.makedirs(LOG_DIR, exist_ok=True)
+    set_server = os.path.join(REPO, "smoke", run_set, "server")
+    if admission.server_dir() and os.path.isdir(os.path.join(set_server, "mods")):
+        os.environ["DEEPTIME_RUN_MODS"] = instance.snapshot_mods(set_server, os.path.join(RUN, "set-mods"))
+    if ports:
+        instance.write_ports(RUN, ports)
     pw_path = os.path.join(RUN, "rcon.pw")
     if not os.path.exists(pw_path):
         open(pw_path, "w").write(secrets.token_hex(16))
@@ -122,6 +150,7 @@ def main():
     open(os.path.join(RUN, "server.properties"), "w").write(
         "# Written by tools/planet/run_planet.py\n"
         f"server-port={GAME_PORT}\nenable-rcon=true\nrcon.port={RCON_PORT}\nrcon.password={pw}\n"
+        + (f"query.port={ports['query']}\nenable-query=false\n" if ports else "") +
         f"level-type={level_type}\nlevel-name=world\nonline-mode=false\nmax-tick-time=-1\n"
         "spawn-protection=0\nview-distance=6\nsimulation-distance=4\nsync-chunk-writes=false\n")
     # The terrain source comes from a JVM property; ModDevGradle passes -P... through to the run
@@ -134,7 +163,7 @@ def main():
                            capture_output=True, text=True, timeout=600)
         return (r.stdout + r.stderr).strip()
 
-    log_path = os.path.join(RUN, "planet.log")
+    log_path = os.path.join(LOG_DIR, "planet.log")
     open(log_path, "w").close()
     srv = Planet(a.gradle_args, log_path)
     print(f"== planet server: C={a.size}, test terrain {a.test_terrain}", flush=True)

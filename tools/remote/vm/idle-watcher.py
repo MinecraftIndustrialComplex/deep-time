@@ -14,7 +14,9 @@ shutdown alone would leave the VM "stopped (allocated)" and still billed.
 
 Busy means any of:
   - the override file KEEP_AWAKE exists;
-  - the Minecraft server lock (mac.sh --server) exists;
+  - the admission tool (admit.py, deeptime-cache/admit/state.json) has a job admitted or waiting
+    whose process is alive;
+  - the old Minecraft server lock (mac.sh --server before the admission tool) exists;
   - the workbench reports a run running or queued, or a preview job not finished;
   - the play server has a player online (RCON `list`; if RCON does not answer, an established TCP
     connection to its game port counts instead);
@@ -57,6 +59,7 @@ INTERVAL = float(env("INTERVAL", "60"))
 CACHE = env("CACHE", "/data/ban/deeptime-cache")
 KEEP_AWAKE = env("KEEP_AWAKE", f"{CACHE}/KEEP_AWAKE")
 SERVER_LOCK = env("SERVER_LOCK", f"{CACHE}/server.lock")
+ADMIT_STATE = env("ADMIT_STATE", f"{CACHE}/admit/state.json")
 PLAY_DIR = env("PLAY_DIR", "/data/ban/mic/mods/play-fa09e8b/smoke/mic/server")
 WORKBENCH_URL = env("WORKBENCH_URL", "http://127.0.0.1:8642")
 LOAD_BUSY = float(env("LOAD_BUSY", "4.0"))
@@ -363,10 +366,36 @@ def play_reasons(procs):
     return [f"play server: {n} connection(s) on port {game_port} (rcon did not answer)"] if n else []
 
 
+def proc_start(pid):
+    try:
+        with open(f"/proc/{pid}/stat") as f:
+            s = f.read()
+        return int(s[s.rindex(")") + 2:].split()[19])
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def admit_reasons():
+    """Jobs the admission tool (admit.py) has admitted or queued, whose process is alive. Read
+    without its lock: the file is replaced atomically."""
+    try:
+        with open(ADMIT_STATE) as f:
+            st = json.load(f)
+    except (OSError, ValueError):
+        return []
+    out = []
+    for table, what in (("jobs", "admitted"), ("queue", "waiting")):
+        for e in (st.get(table) or {}).values():
+            if e.get("pid") and proc_start(e["pid"]) == e.get("start"):
+                out.append(f"{what} job {e.get('kind')} ({str(e.get('label'))[:40]}, pid {e['pid']})")
+    return out
+
+
 def busy_reasons():
     reasons = []
     if os.path.exists(KEEP_AWAKE):
         reasons.append(f"override {KEEP_AWAKE}")
+    reasons += admit_reasons()
     if os.path.exists(SERVER_LOCK):
         owner = ""
         try:

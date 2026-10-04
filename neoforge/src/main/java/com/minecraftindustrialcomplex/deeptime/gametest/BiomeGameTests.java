@@ -198,6 +198,8 @@ public final class BiomeGameTests {
     // (lowest 0.489); BS keeps 0.39 (lowest 0.496 of the first set).
     static final int MIN_COLUMNS_TB = 100;
     static final Map<String, Double> FLOORS_TB = Map.of("BS", 0.39, "E:snow", 0.65, "Af:jungle", 0.39);
+    /** The largest share of land columns the bake's wetland rule may hold (its flat share, BiomeParams.wetland_flat_share 0.35). */
+    static final double WETLAND_CEILING = 0.35;
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
     static final double FORBIDDEN_CEILING = 0.10;
 
@@ -240,6 +242,15 @@ public final class BiomeGameTests {
                 low.append(String.format(java.util.Locale.ROOT, " %s %.3f < %.3f (%d columns)", ch.name(), share, floor, r.total(ch.name())));
         }
         helper.assertTrue(low.isEmpty(), "Köppen families below their floor:" + low);
+        // The wetlands are left out of the families (BiomeCensus): the bake sends wet, flat, low,
+        // thawed land to vanilla's swamp band on purpose (BIO-066), at most the flattest 35 % of the
+        // land (wetland_flat_share). On master 6f72f0dd's planet the whole D-climate land was such a
+        // coastal plain (Dfc 66 % swamp, 28 % beach) and failed Dsub and Dfc:taiga for it. More than
+        // that share would mean the rule broke, and is a failure rather than a set-aside.
+        var wet = r.json().getAsJsonObject("wetlands_set_aside");
+        int landColumns = wet.get("land_columns").getAsInt(), wetColumns = wet.get("wetland_columns").getAsInt();
+        helper.assertTrue(wetColumns <= WETLAND_CEILING * landColumns,
+                wetColumns + " of " + landColumns + " land columns are in the bake's wetland band, more than " + WETLAND_CEILING);
         // EF is ice or barren frozen ground, never the red badlands or Nether-stone mountains.
         StringBuilder red = new StringBuilder();
         for (var f : BiomeCensus.FORBIDDEN) {
@@ -319,8 +330,8 @@ public final class BiomeGameTests {
      * of 1 block, 8 to 11 of 5, 12 to 15 of 12; columns 0 to 3 have none. The top of each is ground
      * under a dirt block; the cover replaces the top {@code n} blocks (so the ground's height is
      * unchanged) with the table's snow on top, packed ice between and blue ice at the base of a
-     * thick one; a column under water and one that runs out of ground after two blocks are the edge
-     * cases.
+     * thick one; a column under water, one under a frozen lake's ice and one that runs out of ground
+     * after two blocks are the edge cases.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 1200)
     public static void icePassLaysTheCover(GameTestHelper helper) {
@@ -343,6 +354,10 @@ public final class BiomeGameTests {
                 if (lz == 14) {   // under a lake
                     for (int y = 81; y <= 85; y++)
                         chunk.setBlockState(pos.set(x, y, z), Blocks.WATER.defaultBlockState(), false);
+                } else if (lz == 13) {   // under a frozen lake: the water pass's ice on its water
+                    for (int y = 81; y <= 84; y++)
+                        chunk.setBlockState(pos.set(x, y, z), Blocks.WATER.defaultBlockState(), false);
+                    chunk.setBlockState(pos.set(x, 85, z), Blocks.ICE.defaultBlockState(), false);
                 } else {
                     chunk.setBlockState(pos.set(x, 81, z), Blocks.DIRT.defaultBlockState(), false);
                 }
@@ -382,6 +397,13 @@ public final class BiomeGameTests {
                         bad += " lake(" + lx + ")";
                     continue;
                 }
+                if (lz == 13) {
+                    // The lake's ice is its surface, not ground: the cover leaves it, whatever the thickness there.
+                    if (!chunk.getBlockState(pos.set(x, 80, z)).is(Blocks.STONE) || !chunk.getBlockState(pos.set(x, 84, z)).is(Blocks.WATER)
+                            || !chunk.getBlockState(pos.set(x, 85, z)).is(Blocks.ICE))
+                        bad += " frozenlake(" + lx + ")";
+                    continue;
+                }
                 if (n == 0) {
                     if (!chunk.getBlockState(pos.set(x, 81, z)).is(Blocks.DIRT))
                         bad += " bare(" + lx + "," + lz + ")";
@@ -398,10 +420,10 @@ public final class BiomeGameTests {
                 if (!chunk.getBlockState(pos.set(x, 82, z)).isAir())
                     bad += " above(" + lx + "," + lz + ")";
             }
-        // 14 rows of ground, 4 columns each of 1, 5 and 12 blocks; the thin row: 4 of 1 block and 8 of 2.
+        // 13 rows of ground, 4 columns each of 1, 5 and 12 blocks; the thin row: 4 of 1 block and 8 of 2.
         DeepTime.LOGGER.info("[gametest] icePassLaysTheCover placed={} bad={}", placed, bad);
         helper.assertTrue(bad.isEmpty(), "the ice pass left:" + bad);
-        helper.assertTrue(placed == 14 * 4 * (1 + 5 + 12) + 4 * 1 + 8 * 2, "blocks placed: " + placed);
+        helper.assertTrue(placed == 13 * 4 * (1 + 5 + 12) + 4 * 1 + 8 * 2, "blocks placed: " + placed);
         helper.succeed();
     }
 
