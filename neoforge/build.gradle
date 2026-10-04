@@ -158,6 +158,18 @@ if (project.hasProperty('withMic') && !project.hasProperty('extraDatapack') && m
     logger.warn("-PwithMic: no MIC rock-tag datapack at ${new File(repoRoot, '../../Docs/datapacks/deeptime-mic-rock-tags')} " +
             "(tools/remote/mac.sh --pack syncs it); the runs go without the rock tags")
 
+// Each running server has its own folder (tools/remote/vm/admit.py gives a server job one, and
+// gametest.sh / run_planet.py point these at it), so several runs, from one checkout too, never share
+// a world, logs or mods/. Unset (outside admit.py): the folders at the repository root.
+def gameTestDir = file(System.getenv('DEEPTIME_GAMETEST_DIR') ?: '../run-gametest')
+def planetDir = file(System.getenv('DEEPTIME_PLANET_DIR') ?: '../run-planet')
+// The launchers copy the server set's jars for their run (tools/smoke/instance.py snapshot-mods), so
+// an install.sh refreshing smoke/<set> cannot change the jars under a running server.
+def runModsFor = { String set ->
+    def snap = System.getenv('DEEPTIME_RUN_MODS')
+    return snap ? new File(snap) : new File(repoRoot, "smoke/${set}/server/mods")
+}
+
 neoForge {
     version = project.neo_version
 
@@ -186,12 +198,12 @@ neoForge {
             if (extraDatapack) systemProperty 'deeptime.extraDatapack', extraDatapack.toString()
             // -PgametestOnly=<name>[,<name>…]: run only those tests (GameTestServerMixin).
             if (project.hasProperty('gametestOnly')) systemProperty 'deeptime.gametestOnly', project.property('gametestOnly').toString()
-            // The 160-mod MIC set needs more heap than the default runtime; one server runs at a time.
+            // The 160-mod MIC set needs more heap than the default runtime.
             // (The OutOfMemoryError "in lakeHolds" of P1-12/P1-09 was the suite's scattered column
             // samples all resident at once; gametest/ChunkSampling bounds them per tick.)
             jvmArgument(project.hasProperty('withMic') ? '-Xmx8G' : '-Xmx6G')
             if (project.hasProperty('gametestDebugLog')) logLevel = org.slf4j.event.Level.DEBUG
-            gameDirectory = file('../run-gametest')
+            gameDirectory = gameTestDir
         }
         // ./gametest-planet.sh -- a dev dedicated server with a real Deep Time + TW
         // overworld; namespace `deeptime_planet` (plan §9.4), plus `deeptime` so the harness can
@@ -206,7 +218,7 @@ neoForge {
             systemProperty 'deeptime.testTerrain', System.getenv('DEEPTIME_TEST_TERRAIN') ?: ''
             if (extraDatapack) systemProperty 'deeptime.extraDatapack', extraDatapack.toString()
             jvmArgument '-Xmx6G'
-            gameDirectory = file('../run-planet')
+            gameDirectory = planetDir
         }
     }
 
@@ -274,7 +286,7 @@ def gametestExcluded = { String set ->
 // when it is true and Distant Horizons is not loaded, instead of passing without it.
 def dhExpected = { String runName ->
     def set = serverSetFor(runName)
-    def dir = set == null ? null : new File(repoRoot, "smoke/${set}/server/mods")
+    def dir = set == null ? null : runModsFor(set)
     def jars = dir?.listFiles()?.findAll { it.name.endsWith('.jar') && it.name.toLowerCase(Locale.ROOT).startsWith('distanthorizons') } ?: []
     if (runName == 'gameTestServer') {
         def matchers = gametestExcluded(set)
@@ -287,8 +299,8 @@ def dhExpected = { String runName ->
     def cap = runName.capitalize()
     if (runName in ['gameTestServer', 'planetServer'])
         neoForge.runs.getByName(runName).systemProperty 'deeptime.dh.expected', dhExpected(runName).toString()
-    def gameDir = runName == 'gameTestServer' ? file('../run-gametest')
-                : runName == 'planetServer' ? file('../run-planet') : file('../run')
+    def gameDir = runName == 'gameTestServer' ? gameTestDir
+                : runName == 'planetServer' ? planetDir : file('../run')
     def linkTask = tasks.register("linkRunMods${cap}") {
         description = "Links Toroidal World and the run's server set into ${gameDir}/mods."
         dependsOn configurations.twBundle
@@ -301,7 +313,7 @@ def dhExpected = { String runName ->
             def jars = [configurations.twBundle.singleFile]
             def set = serverSetFor(runName)
             if (set != null) {
-                def setMods = new File(repoRoot, "smoke/${set}/server/mods")
+                def setMods = runModsFor(set)
                 if (!setMods.isDirectory())
                     throw new GradleException("Server set '${set}' is not installed: run tools/smoke/install.sh ${set}")
                 def setJars = setMods.listFiles().findAll { it.name.endsWith('.jar') }.sort { it.name }
