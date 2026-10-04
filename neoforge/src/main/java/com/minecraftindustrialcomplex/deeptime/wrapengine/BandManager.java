@@ -72,6 +72,12 @@ public final class BandManager {
     final WrapTopology topology;
     private final LongLinkedOpenHashSet pending = new LongLinkedOpenHashSet();
     private final LongOpenHashSet synced = new LongOpenHashSet();
+    /**
+     * Band chunks between their load and unload events. A chunk whose ticket level drops can leave the
+     * visible map ({@code getChunkNow} null) and come back from the pending unloads without either
+     * event; a replica write that finds it invisible re-queues its copy instead of skipping it.
+     */
+    private final LongOpenHashSet loadedBand = new LongOpenHashSet();
     private final LongOpenHashSet fresh = new LongOpenHashSet();
     /** Band chunk → the level of the ticket it holds on its source (absent: none). */
     private final Long2IntOpenHashMap ticketLevel = new Long2IntOpenHashMap();
@@ -93,8 +99,10 @@ public final class BandManager {
             ChunkHolder h = level.getChunkSource().chunkMap.getVisibleChunkIfPresent(key);
             if (h != null) {
                 wantedLevel.put(key, h.getTicketLevel());
-                if (level.getChunkSource().getChunkNow(ChunkPos.getX(key), ChunkPos.getZ(key)) != null)
+                if (level.getChunkSource().getChunkNow(ChunkPos.getX(key), ChunkPos.getZ(key)) != null) {
                     pending.add(key);
+                    loadedBand.add(key);
+                }
             }
         });
         DeepTime.LOGGER.info("[wrapengine] band manager started: {} band chunks loaded", pending.size());
@@ -114,7 +122,7 @@ public final class BandManager {
 
     String stats() {
         return "copies=" + copies + " blocks=" + copiedBlocks + " replicas=" + replicas + " carried=" + carried + " pending=" + pending.size()
-                + " synced=" + synced.size() + " tickets=" + ticketLevel.size();
+                + " synced=" + synced.size() + " loaded=" + loadedBand.size() + " tickets=" + ticketLevel.size();
     }
 
     // --- Events ---------------------------------------------------------------------------------
@@ -131,6 +139,7 @@ public final class BandManager {
         if (closed || ((WrapChunk) chunk).deeptime$bandIso() == null)
             return;
         long key = chunk.getPos().toLong();
+        loadedBand.add(key);
         pending.add(key);
         synced.remove(key);
         if (isNew)
@@ -138,6 +147,7 @@ public final class BandManager {
     }
 
     void onUnload(long key) {
+        loadedBand.remove(key);
         pending.remove(key);
         synced.remove(key);
         fresh.remove(key);
@@ -278,8 +288,15 @@ public final class BandManager {
                 continue;
             }
             LevelChunk band = level.getChunkSource().getChunkNow(x >> 4, z >> 4);
-            if (band == null)
+            if (band == null) {
+                long key = ChunkPos.asLong(x >> 4, z >> 4);
+                if (loadedBand.contains(key)) {
+                    // Loaded but not visible (its level dropped; it may come back without a load event).
+                    synced.remove(key);
+                    pending.add(key);
+                }
                 continue;
+            }
             writeCopy(band, new BlockPos(x, pos.getY(), z), state.rotate(WrapEngine.rotation(g)));
             replicas++;
         }
