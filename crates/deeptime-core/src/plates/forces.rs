@@ -121,14 +121,13 @@ pub const LITHOSPHERE_KM: f64 = 100.0; // ledger: FRC-010
 /// The collision drag's least convergence floor, mm/yr: the floor is `weld_speed_mm_yr`, and at
 /// least this.
 pub const COLLISION_FLOOR_MM_YR: f64 = 5.0; // ledger: FRC-011
-/// The dip at which a collision drags continental crust down, degrees: the mean slab dip
-/// (Faccenna et al. 2012 take 55°, the reason their slabs are 700 km long). The crust's leading
-/// edge stands `shortening × sin(dip)` deep.
-pub const COLLISION_DIP_DEG: f64 = 55.0; // ledger: FRC-028
-/// The depth below which dragged-down continental crust adds no more buoyancy, km: beyond some
-/// 100-150 km it turns to eclogite, and the deepest continental rocks known to have come back
-/// up reached about that depth (ultrahigh-pressure terranes; from memory).
-pub const COLLISION_BUOYANT_DEPTH_KM: f64 = 120.0; // ledger: FRC-029
+/// Cloos 1993 (abstract): 80-Myr oceanic lithosphere is about 0.04 g/cm³ denser than the
+/// asthenosphere, and 100 km of lithosphere with a 30 km granitic crust "resists subduction
+/// because it is ∼0.09 gm/cm3 less dense": the buoyancy of continental lithosphere dragged down a
+/// trench is this many times the negative buoyancy of the same length of 80-Myr slab.
+pub const CONTINENT_BUOYANCY_RATIO: f64 = 0.09 / 0.04; // ledger: FRC-028
+/// … for the crust thickness of that figure, km (thicker crust is more buoyant, in proportion).
+pub const CONTINENT_BUOYANCY_CRUST_KM: f64 = 30.0; // ledger: FRC-029
 /// Torques are recorded in this unit, N m.
 pub const TORQUE_UNIT_N_M: f64 = 1.0e24;
 
@@ -735,17 +734,21 @@ fn sig4(x: f64) -> f64 {
     (x / s).round() * s
 }
 
-/// The buoyancy of continental crust a collision has dragged down, N per metre of front (design
-/// §3.4's collision resistance, its second part; ledger FRC-030): crust of thickness `t_m`, lighter
-/// than the mantle by `RHO_MANTLE − RHO_CRUST`, reaching `shortening × sin(dip)` deep (at most
-/// [`COLLISION_BUOYANT_DEPTH_KM`]), pushes back up its dip with `Δρ g t d` per metre, as a slab
-/// of length `d / sin(dip)` pulls down it. Continental crust "resists subduction" because it is
-/// buoyant (Cloos 1993), which is what ends a collision once the slab that drew it in has broken
-/// off and nothing else pulls hard enough.
-pub fn collision_buoyancy_n_m(t_m: f64, shortening_km: f64, gravity: f64) -> f64 {
-    let depth_km = (shortening_km.max(0.0) * COLLISION_DIP_DEG.to_radians().sin())
-        .min(COLLISION_BUOYANT_DEPTH_KM);
-    (RHO_MANTLE - RHO_CRUST) * gravity * t_m.max(0.0) * depth_km * 1000.0 // ledger: FRC-030
+/// The buoyancy of the continental lithosphere a collision has dragged down, N per metre of front
+/// (design §3.4's collision resistance, its second part; ledger FRC-030). A collision that has
+/// shortened by `s` km has dragged about `s` km of the incoming plate's lithosphere down the
+/// trench; an 80-Myr slab that long would pull with `pull_n_m × min(s, D) / D` (`D` the slab
+/// length that pulls in full, `slab_depth_km`, as for slab pull), and continental lithosphere
+/// pushes back up with [`CONTINENT_BUOYANCY_RATIO`] times that, in proportion to its crust's
+/// thickness `t_m` over [`CONTINENT_BUOYANCY_CRUST_KM`]. So continental crust "resists
+/// subduction" (Cloos 1993): a collision slows as it shortens and stalls once nothing else pulls
+/// hard enough.
+pub fn collision_buoyancy_n_m(pull_n_m: f64, slab_depth_km: f64, t_m: f64, shortening_km: f64) -> f64 {
+    let d = slab_depth_km.max(1.0);
+    CONTINENT_BUOYANCY_RATIO // ledger: FRC-030
+        * pull_n_m
+        * (t_m.max(0.0) / (CONTINENT_BUOYANCY_CRUST_KM * 1000.0))
+        * (shortening_km.max(0.0).min(d) / d)
 }
 
 /// The relaxation of a rotation towards the balance's over one step (design §5.1 a): the share
@@ -1028,7 +1031,13 @@ fn balance_step(
                         .as_ref()
                         .map_or(0.0, |col| col.shortening_km);
                     let force = (c.edge_scale * du.max(0.0) // ledger: FRC-018
-                        + c.buoyancy * collision_buoyancy_n_m(f64::from(su.thickness_m), shortened, c.gravity))
+                        + c.buoyancy
+                            * collision_buoyancy_n_m(
+                                c.pull_n_m,
+                                c.slab_depth_km,
+                                f64::from(su.thickness_m),
+                                shortened,
+                            ))
                         * ell;
                     let speed = conv.max(floor) * 1.0e-3 / YEAR_S;
                     if force > 0.0 {
@@ -1623,24 +1632,27 @@ mod tests {
         assert!(slowed > held && slowed < free, "{slowed} {free}");
     }
 
-    /// The collision's buoyancy (FRC-030): nothing before any crust has gone down, growing with
-    /// the shortening as `Δρ g t × shortening × sin(dip)`, and no more once the crust's edge is
-    /// past the buoyant depth; a 35 km crust 100 km into a collision pushes back with about half
-    /// the reference slab pull.
+    /// The collision's buoyancy (FRC-030): nothing before any crust has gone down; growing with
+    /// the shortening as Cloos 1993's 0.09 / 0.04 times the pull of the same length of 80-Myr
+    /// slab, in proportion to the crust's thickness; no more past the slab length that pulls in
+    /// full. A 30 km crust 100 km into a collision pushes back with 0.32 of a full slab's pull.
     #[test]
-    fn continental_crust_dragged_down_pushes_back_up_to_the_buoyant_depth() {
-        let g = G_EARTH;
-        assert_eq!(collision_buoyancy_n_m(35_000.0, 0.0, g), 0.0);
-        let f100 = collision_buoyancy_n_m(35_000.0, 100.0, g);
-        let f50 = collision_buoyancy_n_m(35_000.0, 50.0, g);
-        assert!((f100 / f50 - 2.0).abs() < 1e-12);
-        let want = (RHO_MANTLE - RHO_CRUST) * g * 35_000.0 * 100.0e3 * 55f64.to_radians().sin();
-        assert!((f100 / want - 1.0).abs() < 1e-12, "{f100} {want}");
-        assert!(f100 > 0.4 * SLAB_PULL_N_M && f100 < 0.6 * SLAB_PULL_N_M, "{f100}");
-        let deep = collision_buoyancy_n_m(35_000.0, 1.0e4, g);
-        let cap = (RHO_MANTLE - RHO_CRUST) * g * 35_000.0 * COLLISION_BUOYANT_DEPTH_KM * 1.0e3;
-        assert!((deep / cap - 1.0).abs() < 1e-12);
-        assert_eq!(collision_buoyancy_n_m(35_000.0, 1.0e4, g / 2.0), cap / 2.0);
+    fn continental_lithosphere_dragged_down_pushes_back() {
+        let (f, d) = (SLAB_PULL_N_M, 700.0);
+        assert_eq!(collision_buoyancy_n_m(f, d, 30_000.0, 0.0), 0.0);
+        let f100 = collision_buoyancy_n_m(f, d, 30_000.0, 100.0);
+        assert!((f100 / collision_buoyancy_n_m(f, d, 30_000.0, 50.0) - 2.0).abs() < 1e-12);
+        assert!((f100 / (2.25 * f * 100.0 / 700.0) - 1.0).abs() < 1e-12, "{f100}");
+        assert!((f100 / f - 0.3214).abs() < 1e-3);
+        // Thicker crust, more buoyancy.
+        let thick = collision_buoyancy_n_m(f, d, 45_000.0, 100.0);
+        assert!((thick / f100 - 1.5).abs() < 1e-12);
+        // No more past the full slab length.
+        assert_eq!(
+            collision_buoyancy_n_m(f, d, 30_000.0, 2000.0),
+            collision_buoyancy_n_m(f, d, 30_000.0, 700.0)
+        );
+        assert!((collision_buoyancy_n_m(f, d, 30_000.0, 700.0) / f - 2.25).abs() < 1e-12);
     }
 
     #[test]
