@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-//! The force balance of the plates (docs/design/plate-force-balance.md, §3; its task 5): every
-//! step, the driving and resisting forces on each plate, their torques, and the rotation at which
-//! the torques balance. **Recorded, not applied**: the answer goes into the dynamics record
-//! (`dynamics.rs`, `StepRec::forces`) and today's speed rules still move the plates, so the
-//! balance can be watched on real geometry, open loop, until the switch (the design's task 7).
-//! Nothing here is read by a plate rule; it runs only while the dynamics record is on.
+//! The force balance of the plates (docs/design/plate-force-balance.md, §3; its tasks 5 and 7):
+//! every step, the driving and resisting forces on each plate, their torques, and the rotation at
+//! which the torques balance. **This is what moves the plates** (since the switch, task 7): each
+//! plate's rotation relaxes towards the answer over `motion_relax_myr` ([`relax`]; the plates step,
+//! `plates/mod.rs`), under a speed guard that is reported whenever it binds. With the dynamics
+//! record on, the budget of every plate also goes into the record (`dynamics.rs`,
+//! `StepRec::forces`).
 //!
 //! # The balance
 //! Mantle flow is viscous, so a plate has no inertia: the torques on it sum to zero (Forsyth &
@@ -60,23 +61,28 @@
 //! index, not a stress field.
 //!
 //! # Slabs
-//! A subducting contact keeps one slab length ([`super::dynamics::SlabTrack`]): it grows by the
-//! convergence at the contact's oceanic front each step, up to `slab_depth_km`, and breaks off
-//! (length 0) when continental crust has held at least half of the contact's front for
-//! `slab_breakoff_myr` (design §3.3, option 5.3a). A new or reversed contact starts at 0. The
-//! track lives in the record (so a checkpoint carries it); the switch moves it onto `Contact`.
+//! A subduction zone keeps one slab length ([`SlabTrack`], in `PlateState::slabs`), known by its
+//! two plates: it grows by the convergence at the contact's oceanic front each step, up to
+//! `slab_depth_km`, and breaks off (length 0) when continental crust has held at least half of
+//! the contact's front for `slab_breakoff_myr` (design §3.3, option 5.3a). A contact that flickers
+//! off and on keeps its slab (task 5 found the restarts to be the main source of noise); a
+//! reversed contact starts a new one. A slab no oceanic front feeds this step hangs: it pulls at
+//! the subducting plate's samples beside the overriding plate (with suction and slab resistance
+//! as at a front) and is gone after `slab_breakoff_myr` without a front. A subduction initiation
+//! plants a slab of `initiation_slab_km` (`rifting.rs`), which pulls the new plate towards its
+//! parent until the trench forms.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use glam::{DMat3, DVec3};
 use rayon::prelude::*;
 
 use super::Env;
-use super::dynamics::{PlateForces, SlabTrack};
+use super::dynamics::PlateForces;
 use super::geometry::Geo;
 use super::kinematics::{quat, tangent};
 use super::normalise::Norm;
-use super::state::{CONTINENTAL, PlateState};
+use super::state::{CONTINENTAL, PlateState, SlabTrack};
 use crate::params::TectonicParams;
 use crate::sphere::SplitMix64;
 
@@ -110,8 +116,8 @@ pub const DELTA_T_K: f64 = 1300.0; // ledger: FRC-008
 pub const EDGE_ENERGY_PHYSICAL: f64 = 0.1; // ledger: FRC-009
 /// The thickness over which edge forces are spread to give a mean stress, km.
 pub const LITHOSPHERE_KM: f64 = 100.0; // ledger: FRC-010
-/// The collision drag's convergence floor, mm/yr (a stand-in for `weld_speed_mm_yr` of the
-/// collisions design, not built yet).
+/// The collision drag's least convergence floor, mm/yr: the floor is `weld_speed_mm_yr`, and at
+/// least this.
 pub const COLLISION_FLOOR_MM_YR: f64 = 5.0; // ledger: FRC-011
 /// Torques are recorded in this unit, N m.
 pub const TORQUE_UNIT_N_M: f64 = 1.0e24;
@@ -638,6 +644,10 @@ struct Edge {
     /// The front this sample overrides: the subducting neighbour, the contact, the outward
     /// direction towards it and the convergence, mm/yr.
     front: Option<(u32, usize, DVec3, f64)>,
+    /// A neighbour of a plate whose slab hangs under this sample's plate (a slab with no front
+    /// this step, or one a subduction initiation planted): the neighbour and the direction
+    /// towards it.
+    hang: Option<(u32, DVec3)>,
     /// The sample is continental on the subducting side of an active contact, converging: the
     /// incoming side of a collision.
     incoming: bool,
@@ -652,10 +662,11 @@ pub struct FrontSum {
     pub conv_sum: f64,
 }
 
-/// One step of a slab (design §3.3; ledger PLT-184): it lengthens by the oceanic front's mean
-/// convergence over `dt_myr` (mm/yr × Myr = km), up to `depth_km`; while continental crust holds
-/// at least half of the front the block time runs, and after `breakoff_myr` of it the slab is
-/// gone (length 0; returns true). An unblocked step resets the block time.
+/// One step of a slab fed by a front (design §3.3; ledger PLT-184): it lengthens by the oceanic
+/// front's mean convergence over `dt_myr` (mm/yr × Myr = km), up to `depth_km`; while
+/// continental crust holds at least half of the front the block time runs, and after
+/// `breakoff_myr` of it the slab is gone (length 0; returns true). An unblocked step resets the
+/// block time.
 pub fn grow_slab(
     s: &mut SlabTrack,
     f: &FrontSum,
@@ -691,6 +702,16 @@ pub struct Recorded {
     pub breakoffs: u16,
 }
 
+/// The step's balance: each plate's balance rotation, rad/yr (indexed by plate id; `None` for a
+/// plate not in the balance, or for every plate when the solve failed), and what the dynamics
+/// record keeps (`None` when the record is off).
+#[derive(Clone, Debug, Default)]
+pub struct Answer {
+    pub omega: Vec<Option<DVec3>>,
+    pub solved: bool,
+    pub recorded: Option<Recorded>,
+}
+
 /// Four significant digits (the record's precision for forces).
 fn sig4(x: f64) -> f64 {
     if x == 0.0 || !x.is_finite() {
@@ -701,30 +722,53 @@ fn sig4(x: f64) -> f64 {
     (x / s).round() * s
 }
 
-/// Set this environment variable and the dynamics record leaves the force balance out (to time
-/// what it costs).
-pub const OFF_ENV: &str = "DEEPTIME_NO_PLATE_FORCES";
+/// The relaxation of a rotation towards the balance's over one step (design §5.1 a): the share
+/// `1 − e^(−δt/τ)` of the way, τ = `motion_relax_myr` (ledger PLT-191).
+pub fn relax(omega: DVec3, target: DVec3, dt_myr: f64, tau_myr: f64) -> DVec3 {
+    let a = 1.0 - (-dt_myr / tau_myr.max(1e-9)).exp();
+    omega + (target - omega) * a
+}
 
 /// The step's slab lengths and force balance, on the positions `pos` and the motion the step's
 /// fronts were found with (call it after `subduction::fronts_and_uplift`, before the motion is
-/// updated). Updates the slab tracks in the dynamics record and returns what to record; does
-/// nothing (and returns `None`) when the record is off or [`OFF_ENV`] is set. Reads nothing else
-/// it changes.
-pub fn record(
+/// updated). Updates the slabs (`PlateState::slabs`) and, when the dynamics record is on, its
+/// memory of the last answers; returns each plate's balance rotation, which the plates step
+/// relaxes the plates' motion towards.
+pub fn step(
     st: &mut PlateState,
     geo: &Geo,
     pos: &[DVec3],
     env: &Env<'_>,
     flow: DVec3,
-) -> Option<Recorded> {
-    static OFF: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    if *OFF.get_or_init(|| std::env::var_os(OFF_ENV).is_some()) {
-        return None;
+) -> Answer {
+    let mut slabs = std::mem::take(&mut st.slabs);
+    let (omega, solved, out) = balance_step(st, geo, pos, env, flow, &mut slabs);
+    st.slabs = slabs;
+    let recorded = st.dynamics.as_mut().map(|d| {
+        let last: BTreeMap<u32, DVec3> = d
+            .prev_balance
+            .iter()
+            .map(|&(id, w)| (id, DVec3::from_array(w)))
+            .collect();
+        d.prev_balance.clear();
+        let mut out = out;
+        for f in &mut out.forces {
+            if let Some(w) = omega.get(f.id as usize).copied().flatten() {
+                let change = last
+                    .get(&f.id)
+                    .and_then(|&w0| super::dynamics::rotation_change(w0, w));
+                f.rot_change = change.map_or(0.0, |x| (x * 1.0e4).round() / 1.0e4);
+                f.rot_known = change.is_some();
+                d.prev_balance.push((f.id, w.to_array()));
+            }
+        }
+        out
+    });
+    Answer {
+        omega,
+        solved,
+        recorded,
     }
-    let mut d = st.dynamics.take()?;
-    let out = balance_step(st, geo, pos, env, flow, &mut d.slabs, &mut d.prev_balance);
-    st.dynamics = Some(d);
-    Some(out)
 }
 
 fn balance_step(
@@ -734,8 +778,7 @@ fn balance_step(
     env: &Env<'_>,
     flow: DVec3,
     slabs: &mut Vec<SlabTrack>,
-    prev: &mut Vec<(u32, [f64; 3])>,
-) -> Recorded {
+) -> (Vec<Option<DVec3>>, bool, Recorded) {
     let k = env.k;
     let norm = env.norm;
     let samples = &st.samples;
@@ -755,6 +798,18 @@ fn balance_step(
             active.insert((c.under, c.over), i);
         }
     }
+    // Slabs of living plates (before this step's growth): a sample of the overriding plate beside
+    // the subducting one may hang one.
+    slabs.retain(|s| {
+        s.under != s.over
+            && st.plates.get(s.under as usize).is_some_and(|p| p.alive)
+            && st.plates.get(s.over as usize).is_some_and(|p| p.alive)
+    });
+    let hanging: BTreeSet<(u32, u32)> = slabs
+        .iter()
+        .filter(|s| s.km > 0.0)
+        .map(|s| (s.under, s.over))
+        .collect();
 
     // The boundary, sample by sample (the tests of `subduction::fronts_and_uplift`).
     let edges: Vec<Edge> = (0..n)
@@ -774,6 +829,7 @@ fn balance_step(
                 others: [u32::MAX; 6],
                 n_others: 0,
                 front: None,
+                hang: None,
                 incoming: false,
             };
             let mut any = false;
@@ -797,6 +853,9 @@ fn balance_step(
                     e.others[usize::from(e.n_others)] = pu;
                     e.n_others += 1;
                 }
+                if e.hang.is_none() && !su.is_hidden() && hanging.contains(&(pu, pv)) {
+                    e.hang = Some((u, dir));
+                }
                 let rel = norm.velocity_mm_yr(omega[pu as usize] - omega[pv as usize], x);
                 let along = rel.dot(dir);
                 if along < 0.0 {
@@ -815,7 +874,8 @@ fn balance_step(
         .collect();
 
     // Slabs: grow by the oceanic front's convergence, break off when continental crust has held
-    // the trench for `slab_breakoff_myr`.
+    // the trench for `slab_breakoff_myr`; a slab no front feeds hangs and pulls along the shared
+    // boundary for `slab_breakoff_myr` and is then gone.
     let mut fronts: BTreeMap<usize, FrontSum> = BTreeMap::new();
     for e in &edges {
         if let Some((u, c, _, conv)) = e.front {
@@ -828,33 +888,48 @@ fn balance_step(
             }
         }
     }
-    let key = |c: &super::state::Contact| (c.under, c.over, c.onset_step);
-    let mut old: BTreeMap<(u32, u32, u64), SlabTrack> = std::mem::take(slabs)
+    let mut by_key: BTreeMap<(u32, u32), SlabTrack> = std::mem::take(slabs)
         .into_iter()
-        .map(|s| ((s.under, s.over, s.onset_step), s))
+        .map(|s| ((s.under, s.over), s))
         .collect();
     let mut breakoffs = 0u16;
     let mut slab_km: BTreeMap<usize, f64> = BTreeMap::new();
     let mut slabs_km = Vec::new();
-    for (i, c) in st.contacts.iter().enumerate() {
-        let mut s = old.remove(&key(c)).unwrap_or(SlabTrack {
+    // Slabs with a front this step (fed when it is partly oceanic).
+    let mut fronted: BTreeSet<(u32, u32)> = BTreeSet::new();
+    let mut fed: BTreeSet<(u32, u32)> = BTreeSet::new();
+    for (&ci, f) in &fronts {
+        let c = &st.contacts[ci];
+        let key = (c.under, c.over);
+        fronted.insert(key);
+        let s = by_key.entry(key).or_insert(SlabTrack {
             under: c.under,
             over: c.over,
-            onset_step: c.onset_step,
-            km: 0.0,
-            blocked_myr: 0.0,
+            ..SlabTrack::default()
         });
-        if let Some(f) = fronts.get(&i) {
-            if grow_slab(&mut s, f, env.dt_myr, k.slab_depth_km, k.slab_breakoff_myr) {
-                breakoffs += 1;
-            }
-            if f.oceanic > 0 {
-                slabs_km.push((s.km * 10.0).round() / 10.0);
-            }
+        if grow_slab(s, f, env.dt_myr, k.slab_depth_km, k.slab_breakoff_myr) {
+            breakoffs += 1;
         }
-        slab_km.insert(i, s.km);
-        slabs.push(s);
+        if f.oceanic > 0 {
+            s.idle_myr = 0.0;
+            fed.insert(key);
+            slabs_km.push((s.km * 10.0).round() / 10.0);
+        }
+        slab_km.insert(ci, s.km);
     }
+    for (key, s) in &mut by_key {
+        if !fronted.contains(key) {
+            s.idle_myr += env.dt_myr; // ledger: PLT-271
+        }
+    }
+    by_key.retain(|_, s| s.km > 0.0 && s.idle_myr < k.slab_breakoff_myr - 1e-9);
+    // Slabs that pull along the boundary this step without a front.
+    let hang_km: BTreeMap<(u32, u32), f64> = by_key
+        .iter()
+        .filter(|(key, _)| !fronted.contains(key))
+        .map(|(&key, s)| (key, s.km))
+        .collect();
+    *slabs = by_key.into_values().collect();
 
     // The system.
     let a0 = st.a0_km2;
@@ -902,53 +977,69 @@ fn balance_step(
         .collect();
 
     let ell = c.spacing_m;
-    let floor = COLLISION_FLOOR_MM_YR;
+    // The collision drag's convergence floor: the weld speed (design §3.4), at least
+    // `COLLISION_FLOOR_MM_YR`.
+    let floor = k.weld_speed_mm_yr.max(COLLISION_FLOOR_MM_YR); // ledger: FRC-011
     for e in &edges {
         let v = e.v as usize;
         let sv = &samples[v];
         let x = pos[v];
         let p = e.plate;
         let mut collision = e.incoming;
-        if let Some((u, ci, dir, conv)) = e.front {
-            let su = &samples[u as usize];
-            let under = st.contacts[ci].under;
-            let towards = -dir;
-            if su.kind == CONTINENTAL {
-                // The belt's weight against the convergence (design §3.4).
-                collision = true;
-                let du = c.energy(f64::from(sv.elevation_m), sv.kind == CONTINENTAL)
-                    - c.energy(f64::from(su.elevation_m), true);
-                let force = c.edge_scale * du.max(0.0) * ell; // ledger: FRC-018
-                let speed = conv.max(floor) * 1.0e-3 / YEAR_S;
-                if force > 0.0 {
-                    bal.add_link(Link {
-                        a: under,
-                        b: p,
-                        x,
-                        n: Some(towards),
-                        k: force / speed,
-                        term: Resist::Collision,
-                    });
+        // The slab under this sample, at its front or hanging with no front: the subducting
+        // plate, the neighbour, the direction towards it, the slab's length.
+        let slab = match e.front {
+            Some((u, ci, dir, conv)) => {
+                let su = &samples[u as usize];
+                let under = st.contacts[ci].under;
+                if su.kind == CONTINENTAL {
+                    // The belt's weight against the convergence (design §3.4).
+                    collision = true;
+                    let du = c.energy(f64::from(sv.elevation_m), sv.kind == CONTINENTAL)
+                        - c.energy(f64::from(su.elevation_m), true);
+                    let force = c.edge_scale * du.max(0.0) * ell; // ledger: FRC-018
+                    let speed = conv.max(floor) * 1.0e-3 / YEAR_S;
+                    if force > 0.0 {
+                        bal.add_link(Link {
+                            a: under,
+                            b: p,
+                            x,
+                            n: Some(-dir),
+                            k: force / speed,
+                            term: Resist::Collision,
+                        });
+                    }
+                    None
+                } else {
+                    Some((under, u, dir, slab_km.get(&ci).copied().unwrap_or(0.0)))
                 }
-            } else {
-                let len = slab_km.get(&ci).copied().unwrap_or(0.0);
-                let pull = c.pull_n_m
-                    * slab_weight(su.age_myr(env.t_myr))
-                    * (len / c.slab_depth_km).clamp(0.0, 1.0)
-                    * ell;
-                if pull > 0.0 {
-                    bal.add_force(under, x, towards * pull, Drive::SlabPull);
-                    bal.add_force(p, x, dir * (pull * c.suction_share), Drive::Suction);
-                }
-                bal.add_link(Link {
-                    a: under,
-                    b: MANTLE,
-                    x,
-                    n: Some(towards),
-                    k: c.slab_res * ell,
-                    term: Resist::Slab,
-                });
             }
+            None => e.hang.and_then(|(u, dir)| {
+                let under = plate_of[u as usize];
+                (samples[u as usize].kind != CONTINENTAL)
+                    .then(|| hang_km.get(&(under, p)).map(|&km| (under, u, dir, km)))
+                    .flatten()
+            }),
+        };
+        if let Some((under, u, dir, len)) = slab {
+            let su = &samples[u as usize];
+            let towards = -dir;
+            let pull = c.pull_n_m
+                * slab_weight(su.age_myr(env.t_myr))
+                * (len / c.slab_depth_km).clamp(0.0, 1.0)
+                * ell;
+            if pull > 0.0 {
+                bal.add_force(under, x, towards * pull, Drive::SlabPull);
+                bal.add_force(p, x, dir * (pull * c.suction_share), Drive::Suction);
+            }
+            bal.add_link(Link {
+                a: under,
+                b: MANTLE,
+                x,
+                n: Some(towards),
+                k: c.slab_res * ell,
+                term: Resist::Slab,
+            });
         }
         if !collision {
             let out = e.out.normalize_or_zero();
@@ -974,25 +1065,18 @@ fn balance_step(
         }
     }
 
-    let answers = match bal.solve() {
-        Some(w) => bal.answers(&w),
-        None => vec![None; np],
+    let (answers, solved) = match bal.solve() {
+        Some(w) => (bal.answers(&w), true),
+        None => (vec![None; np], false),
     };
-    let last: BTreeMap<u32, DVec3> = prev
-        .iter()
-        .map(|&(id, w)| (id, DVec3::from_array(w)))
-        .collect();
     let unit = TORQUE_UNIT_N_M;
     let mut forces = Vec::new();
-    prev.clear();
+    let mut out = vec![None; np];
     for p in st.alive() {
         let Some(a) = answers.get(p.id as usize).copied().flatten() else {
             continue;
         };
-        let change = last
-            .get(&p.id)
-            .and_then(|&w0| super::dynamics::rotation_change(w0, a.omega));
-        prev.push((p.id, a.omega.to_array()));
+        out[p.id as usize] = Some(a.omega);
         forces.push(PlateForces {
             id: p.id,
             slab_pull: sig4(a.slab_pull / unit),
@@ -1006,15 +1090,19 @@ fn balance_step(
             stress_mpa: (a.stress_mpa * 100.0).round() / 100.0,
             speed_mm_yr: (a.speed_mm_yr * 10.0).round() / 10.0,
             rms_mm_yr: (a.rms_mm_yr * 10.0).round() / 10.0,
-            rot_change: change.map_or(0.0, |x| (x * 1.0e4).round() / 1.0e4),
-            rot_known: change.is_some(),
+            rot_change: 0.0,
+            rot_known: false,
         });
     }
-    Recorded {
-        forces,
-        slabs_km,
-        breakoffs,
-    }
+    (
+        out,
+        solved,
+        Recorded {
+            forces,
+            slabs_km,
+            breakoffs,
+        },
+    )
 }
 
 #[cfg(test)]
@@ -1377,6 +1465,128 @@ mod tests {
         }
         let mut bad = vec![1.0, 2.0, 2.0, 1.0];
         assert!(cholesky_solve(&mut bad, &[1.0, 1.0], 2).is_none());
+    }
+
+    /// The switch's relaxation (design §5.1 a): after one relaxation time a plate has made
+    /// 1 − 1/e of the way to the balance's rotation, and it never overshoots.
+    #[test]
+    fn the_motion_relaxes_towards_the_balance_without_overshooting() {
+        let (w0, target) = (DVec3::new(1.0, 0.0, 0.0), DVec3::new(0.0, 2.0, 0.0));
+        let mut w = w0;
+        for _ in 0..3 {
+            w = relax(w, target, 2.0, 6.0);
+        }
+        let gone = 1.0 - (w - target).length() / (w0 - target).length();
+        assert!((gone - (1.0 - (-1.0f64).exp())).abs() < 1e-12, "{gone}");
+        for _ in 0..200 {
+            let next = relax(w, target, 2.0, 6.0);
+            assert!((next - target).length() <= (w - target).length() + 1e-15);
+            w = next;
+        }
+        assert!((w - target).length() < 1e-9);
+        // At rest, a plate stays at rest until a force acts.
+        assert_eq!(relax(DVec3::ZERO, DVec3::ZERO, 2.0, 6.0), DVec3::ZERO);
+    }
+
+    /// Two hemispheres: plate 0 pulled by a trench, plate 1 free, coupled by boundary
+    /// resistance along their whole shared great circle. The rotations about the pull's axis
+    /// are the known answer of the 2 × 2 system [D + K, −K; −K, D + K] w = [T, 0]: uncoupled the
+    /// free plate stands still and the pulled one turns at T / D; stiffly coupled both turn at
+    /// T / 2D.
+    #[test]
+    fn two_coupled_plates_move_as_the_algebra_says() {
+        for br in [0.0, 3.0, 1.0e4] {
+            let k = TectonicParams {
+                boundary_resistance: br,
+                slab_resistance: 0.0,
+                ..quiet()
+            };
+            let c = coeffs(&k);
+            let (pts, _) = cap(&c, 90.0);
+            // Plate 0 the northern hemisphere, plate 1 the southern.
+            let mut bal = Balance::new(c, &[DVec3::Z, -DVec3::Z]);
+            for &x in &pts {
+                bal.add_area(0, x, false);
+                bal.add_area(1, DVec3::new(x.x, x.y, -x.z), false);
+            }
+            // A trench on plate 0 near its pole: pulls towards +X, a torque about +Y.
+            let x0 = on_sphere(0.0, 60.0);
+            let f = tangent(x0, DVec3::X).normalize() * (c.pull_n_m * 1.0e6);
+            bal.add_force(0, x0, f, Drive::SlabPull);
+            // The boundary: the equator, one link per spacing.
+            let ring = (2.0 * std::f64::consts::PI * c.radius_m / c.spacing_m).round() as usize;
+            for j in 0..ring {
+                let x = on_sphere(360.0 * j as f64 / ring as f64, 0.0);
+                bal.add_link(Link {
+                    a: 0,
+                    b: 1,
+                    x,
+                    n: None,
+                    k: c.boundary_res * c.spacing_m,
+                    term: Resist::Boundary,
+                });
+            }
+            let w = bal.solve().unwrap();
+            // The known answer, from the same sums about the y axis.
+            let d = bal.acc[0].drag.col(1).y;
+            let kk: f64 = bal
+                .links
+                .iter()
+                .map(|l| bal.link_matrix(l).col(1).y)
+                .sum();
+            let t = bal.acc[0].t_pull.y;
+            let det = d * (d + 2.0 * kk);
+            let (w0, w1) = (t * (d + kk) / det, t * kk / det);
+            assert!((w[0].y - w0).abs() < 1e-6 * w0.abs(), "{br}: {} {w0}", w[0].y);
+            assert!((w[1].y - w1).abs() < 1e-6 * w0.abs(), "{br}: {} {w1}", w[1].y);
+            if br == 0.0 {
+                assert!(w[1].length() < 1e-12 * w[0].length());
+            }
+            if br > 1000.0 {
+                assert!((w[0].y / (t / (2.0 * d)) - 1.0).abs() < 0.01, "{}", w[0].y);
+            }
+        }
+    }
+
+    /// The collision term is plastic: a collision front whose belt force exceeds the pull holds
+    /// the convergence under the floor speed (`COLLISION_FLOOR_MM_YR`), and a weaker one only
+    /// slows the plate.
+    #[test]
+    fn a_collision_front_stalls_a_plate_only_when_its_belt_outweighs_the_pull() {
+        let k = quiet();
+        let c = coeffs(&k);
+        let (pts, _) = cap(&c, 25.0);
+        let x0 = on_sphere(0.0, 65.0);
+        let dir = tangent(x0, DVec3::X).normalize();
+        let pull = c.pull_n_m * 1.0e6;
+        let solve = |belt: Option<f64>| {
+            let mut bal = Balance::new(c, &[DVec3::Z]);
+            for &x in &pts {
+                bal.add_area(0, x, false);
+            }
+            bal.add_force(0, x0, dir * pull, Drive::SlabPull);
+            if let Some(force) = belt {
+                let v = COLLISION_FLOOR_MM_YR * 1.0e-3 / YEAR_S;
+                bal.add_link(Link {
+                    a: 0,
+                    b: MANTLE,
+                    x: x0,
+                    n: Some(dir),
+                    k: force / v,
+                    term: Resist::Collision,
+                });
+            }
+            let w = bal.solve().unwrap();
+            (w[0].cross(x0) * YEAR_S * c.radius_m * 1.0e3).dot(dir)
+        };
+        let free = solve(None);
+        assert!(free > 20.0, "{free}");
+        // A belt twice the pull: under the floor.
+        let held = solve(Some(2.0 * pull));
+        assert!(held > 0.0 && held < COLLISION_FLOOR_MM_YR, "{held}");
+        // A belt of a small share of the pull: the plate still moves, slower.
+        let slowed = solve(Some(0.001 * pull));
+        assert!(slowed > held && slowed < free, "{slowed} {free}");
     }
 
     #[test]

@@ -941,6 +941,31 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     });
     assert_eq!(checked, total);
     assert_eq!(balance_steps, total, "a balance every step");
+    // The switch (force-balance design, task 7): the balance was solved every step and the speed
+    // guard never bound in 300 Myr; plates started at rest and the balance set them moving.
+    assert_eq!(with.globals.get(UNSOLVED_GLOBAL), None, "an unsolved balance");
+    assert_eq!(
+        with.globals.get(GUARD_BOUND_GLOBAL),
+        None,
+        "the speed guard bound"
+    );
+    {
+        let d = with.plates.as_ref().unwrap().dynamics.as_ref().unwrap();
+        let median = |mut v: Vec<f64>| {
+            v.sort_by(f64::total_cmp);
+            v[v.len() / 2]
+        };
+        // After one step from rest a plate has made 1 − e^(−δt/τ) of the way to its answer.
+        let first = median(d.steps[0].plates.iter().map(|q| q.speed_mm_yr).collect());
+        let late = median(
+            d.steps[d.steps.len() / 2..]
+                .iter()
+                .flat_map(|s| s.plates.iter().map(|q| q.speed_mm_yr))
+                .collect(),
+        );
+        assert!(late > 10.0, "the plates hardly move: median {late} mm/yr");
+        assert!(first < late, "plates did not start at rest: {first} against {late}");
+    }
     assert!(longest_slab > 0.0, "no slab grew in 300 Myr");
     assert!(mix_seen > 0.0, "no plate boundary recorded in 300 Myr");
     assert!(arc_cells_seen > 0, "no arc cell recorded in 300 Myr");
@@ -974,7 +999,7 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
             assert!(died >= l.born_myr);
             assert!(matches!(
                 l.fate.as_deref(),
-                Some("sutured" | "absorbed" | "consumed")
+                Some("sutured" | "absorbed" | "consumed" | "healed")
             ));
         }
         if l.origin != "initial" {
@@ -1192,5 +1217,60 @@ fn arcs_turn_continental_by_their_crust_not_their_height() {
             turns,
             "arc magma {arc} m (mature at {mature} m), elevation {z} m, hidden {hidden}"
         );
+    }
+}
+
+/// A rift that did not open heals (force-balance design §3.4): two plates a rift separated that
+/// move together for `weld_after_myr` become one again, the larger keeping its id; two that move
+/// past each other faster than the weld speed stay two.
+#[test]
+fn a_rift_that_does_not_open_heals_and_one_that_opens_does_not() {
+    let p = preset(6000, 20.0, "supercontinent", 3);
+    let stage = PlatesStage::new(p.clone());
+    let k = &p.tectonics;
+    for apart_mm_yr in [0.0, 20.0] {
+        let env0 = stage.env(&p.tectonics, 1);
+        let (mut st, geo, pos) = two_plates(&p, &env0, 0.0);
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        let e = events::event(&mut world, env0.t_myr, events::RIFT_ONSET, DVec3::Z);
+        let rift = world.emit(e).unwrap();
+        st.rift_links.push(state::RiftLink {
+            a: 0,
+            b: 1,
+            event: rift,
+            quiet_since_myr: None,
+        });
+        // Plate 1 turns about the z axis relative to plate 0: along the equator a strike-slip
+        // of `apart_mm_yr`.
+        st.plates[1].omega = (DVec3::Z * env0.norm.omega_of_speed(apart_mm_yr)).to_array();
+        let steps = (k.weld_after_myr / env0.dt_myr).ceil() as u64 + 2;
+        let mut healed_at = None;
+        for step in 1..=steps {
+            let env = stage.env(&p.tectonics, step);
+            let healed = rifting::heal(&mut st, &mut world, &geo, &pos, &env).unwrap();
+            if !healed.is_empty() {
+                healed_at = Some(step);
+                break;
+            }
+        }
+        if apart_mm_yr == 0.0 {
+            let at = healed_at.expect("a rift that never opened did not heal");
+            assert!(
+                at as f64 * env0.dt_myr >= k.weld_after_myr - 1e-9,
+                "healed at step {at}"
+            );
+            assert_eq!(st.alive().count(), 1);
+            assert!(st.rift_links.is_empty());
+            assert_eq!(st.counters.healed, 1);
+            let died = world
+                .events
+                .iter()
+                .filter(|e| e.kind == events::PLATE_DEATH)
+                .count();
+            assert_eq!(died, 1);
+        } else {
+            assert_eq!(healed_at, None, "a rift that opened healed");
+            assert_eq!(st.alive().count(), 2);
+        }
     }
 }

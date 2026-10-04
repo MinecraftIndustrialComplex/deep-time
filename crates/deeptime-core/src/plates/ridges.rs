@@ -409,7 +409,7 @@ pub fn resample(
         }
         let spread = norm.speed_mm_yr(omega[a as usize] - omega[b as usize], at);
         let mut e = events::event(world, t, RIDGE_BIRTH, at)
-            .magnitude((spread / k.max_plate_speed_mm_yr) as f32)
+            .magnitude((spread / k.convergence_ref_mm_yr) as f32)
             .param("plate_a", i64::from(a))
             .param("plate_b", i64::from(b))
             .param("spreading_mm_yr", spread)

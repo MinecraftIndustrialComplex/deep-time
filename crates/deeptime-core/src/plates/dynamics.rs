@@ -29,16 +29,16 @@
 //! | `steps[].mix_km`, `arc_oceanic`, `arc_continental` | version 3: the boundary mix and the arc cells' heights (below) |
 //! | `prev_omega` | each plate's rotation vector after the last step (for the next step's change) |
 //! | `belts` | one [`BeltRec`] per collision (a terrane of `collision_min_frac` or more) that ended in a transfer or weld: its belt, wedge, foredeep and slowdown |
-//! | `steps[].forces`, `slabs_km`, `breakoffs`; `slabs`, `prev_balance` | version 4: the force balance (below) |
+//! | `steps[].forces`, `slabs_km`, `breakoffs`; `prev_balance` | version 4: the force balance (below) |
 //!
 //! # The force balance (version 4)
-//! `forces.rs` sums each plate's driving and resisting forces every step, solves the torque
-//! balance for every plate's rotation and records it here without applying it (design
-//! `docs/design/plate-force-balance.md`, task 5): `StepRec::forces` ([`PlateForces`]: the torque
-//! of each term, the mean in-plane stress, the answer's speed and its change since the last
-//! step), `StepRec::slabs_km` (the slab length of each subducting contact) and
-//! `StepRec::breakoffs`; `Dynamics::slabs` ([`SlabTrack`]) and `prev_balance` carry the state
-//! from step to step. It is taken right after the step's fronts are found, as the boundary mix.
+//! `forces.rs` sums each plate's driving and resisting forces every step and solves the torque
+//! balance for every plate's rotation, towards which the plates' motion relaxes (design
+//! `docs/design/plate-force-balance.md`, tasks 5 and 7); the record keeps `StepRec::forces`
+//! ([`PlateForces`]: the torque of each term, the mean in-plane stress, the answer's speed and its
+//! change since the last step), `StepRec::slabs_km` (the slab length of each subducting contact)
+//! and `StepRec::breakoffs`; `prev_balance` carries the last answers from step to step (the slabs
+//! themselves are plate state, `PlateState::slabs`). It is taken right after the step's fronts are found, as the boundary mix.
 //!
 //! # Boundary mix and arc heights (version 3)
 //! Two more measures for `plate-check`, measurement only (nothing a plate rule reads):
@@ -157,10 +157,8 @@ pub struct Dynamics {
     pub prev_omega: Vec<(u32, [f64; 3])>,
     /// Collision belts: convergence history, belt, wedge and foredeep (`belts.rs`).
     pub belts: Vec<BeltRec>,
-    /// Version 4 (`forces.rs`): the slab of every contact, and each plate's balance rotation
-    /// after the last step (rad/yr, for the next step's `PlateForces::rot_change`).
-    #[serde(default)]
-    pub slabs: Vec<SlabTrack>,
+    /// Version 4 (`forces.rs`): each plate's balance rotation after the last step (rad/yr, for
+    /// the next step's `PlateForces::rot_change`).
     #[serde(default)]
     pub prev_balance: Vec<(u32, [f64; 3])>,
 }
@@ -291,18 +289,6 @@ impl From<PlateForces> for [f64; 14] {
             f64::from(u8::from(f.rot_known)),
         ]
     }
-}
-
-/// The slab hanging from one subducting contact (`forces.rs`, design §3.3): its length, km, and
-/// how long continental crust has held at least half of its front, Myr. The contact is known by
-/// its plates and the step it began (a reversed contact begins again, with a new slab).
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct SlabTrack {
-    pub under: u32,
-    pub over: u32,
-    pub onset_step: u64,
-    pub km: f64,
-    pub blocked_myr: f64,
 }
 
 /// A collision belt's history and shape (`belts.rs`); the check reads it. `None` is "not
@@ -1082,7 +1068,7 @@ pub fn arc_heights(st: &PlateState) -> [ArcStat; 2] {
 
 /// What a step measured before `record_step` sees its end state: the fronts' lengths, the boundary
 /// mix and the arc heights, taken where the flags are fresh ([`boundary_mix`], [`arc_heights`]),
-/// and the force balance (`forces::record`).
+/// and the force balance (`forces::step`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Observed<'a> {
     /// Each plate's subduction front length this step (`subduction::Pull::front_km`).

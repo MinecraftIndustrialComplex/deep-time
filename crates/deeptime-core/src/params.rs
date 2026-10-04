@@ -390,8 +390,15 @@ pub struct TectonicParams {
     pub crust_flow_km2_myr: f64,
     /// r_s (1,800 km).
     pub subduction_distance_km: f64,
-    /// v_0 (100 mm/yr).
+    /// The speed guard, mm/yr: no point of a plate moves faster. Plate motion comes from the force
+    /// balance (`plates::forces`); the guard is reported every time it binds (the dynamics record
+    /// and `plates/guard_bound_plate_steps`) and should never bind (design
+    /// `docs/design/plate-force-balance.md` §6; ledger PLT-022).
     pub max_plate_speed_mm_yr: f64,
+    /// v_0 of Cortial et al. 2019 (100 mm/yr): the convergence at which subduction uplift, island
+    /// arcs and arc magma run at their full rate (g(v) = min(1, v / v_0)). Until the switch to the
+    /// force balance it was also the speed cap. Ledger PLT-037.
+    pub convergence_ref_mm_yr: f64,
     /// ε_o (0.04 mm/yr).
     pub oceanic_damping_mm_yr: f64,
     /// The elevation ageing ocean floor subsides towards, m: z(a) = z_f + (z_r − z_f)·
@@ -430,13 +437,6 @@ pub struct TectonicParams {
     /// towards the front at this slope up to the belt's height there (a critical wedge keeps
     /// its shape as it grows; the Lesser Himalayan wedge's surface slope is 1–1.6°).
     pub wedge_slope_deg: f64,
-    /// Collision resistance (task 4 of `docs/design/plate-force-balance.md`): the convergence
-    /// across a collision front, mm/yr, that a belt at the strength height
-    /// (`strength_height_m`) cancels along a front as long as the oceanic slab front that pulls
-    /// the incoming plate (or any front, for a plate no slab pulls). It grows with the belt's
-    /// height and acts inside the speed law, over its relaxation time; it can stop two plates
-    /// but never push them apart (`plates/belts.rs`).
-    pub collision_resistance_mm_yr: f64,
     /// Two plates in collision weld into one when the convergence across their front has stayed
     /// below this, mm/yr …
     pub weld_speed_mm_yr: f64,
@@ -458,28 +458,10 @@ pub struct TectonicParams {
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
     /// 0 = no limit.
     pub crust_max_km: f64,
-    /// Axis change of a subducting plate towards its fronts per 1,000 km of front and Myr
-    /// (slab pull, Cortial §4.1's ε scaled by front length).
-    pub slab_pull_rad_per_1000km_myr: f64,
-    /// Slab pull on speed: a plate with at least `slab_pull_front_km` of subduction front relaxes
-    /// towards this speed at its centroid (less for shorter fronts; Forsyth & Uyeda 1975: plates
-    /// attached to slabs move several times faster), mm/yr …
-    pub slab_pull_speed_mm_yr: f64,
-    /// … the front length that gives the full speed, km …
-    pub slab_pull_front_km: f64,
-    /// … with this relaxation time; plates without a front relax to the middle of
-    /// `plate_speed_mm_yr`, Myr.
-    pub slab_pull_relax_myr: f64,
-    /// Random walk of the Euler poles, relative change per √Myr (mantle reorganisation).
-    pub motion_jitter_per_sqrt_myr: f64,
     /// Plates at the start.
     pub initial_plates: u32,
     /// Spread of initial plate sizes (additive Voronoi weight, radians).
     pub plate_size_variety_rad: f64,
-    /// Initial plate speeds at their centroids, mm/yr.
-    pub plate_speed_mm_yr: [f64; 2],
-    /// Speed factor of an all-continental plate (continents move slower).
-    pub continental_speed_factor: f64,
     /// Initial continental elevation range, metres.
     pub continent_elevation_m: [f64; 2],
     /// Share of the continental crust under the sea (shelves, slopes, epeiric seas): the initial
@@ -501,8 +483,6 @@ pub struct TectonicParams {
     pub rift_ocean_weight: f64,
     /// Fragments of one rift, inclusive (Cortial: 2–4).
     pub rift_fragments: [u32; 2],
-    /// Divergence speed given to rift fragments, mm/yr.
-    pub rift_speed_mm_yr: [f64; 2],
     /// Fracture-line irregularity (radians of noise warp).
     pub rift_warp_rad: f64,
     /// Plates smaller than this fraction of the planet are absorbed by a neighbour.
@@ -585,17 +565,19 @@ pub struct TectonicParams {
     /// Old crust can start subducting only this far from every trench, km (Earth-normalized;
     /// a new subduction zone does not open beside a working one).
     pub subduction_initiation_clearance_km: f64,
-    /// Convergence given to the plate a subduction initiation splits off, mm/yr.
-    pub subduction_initiation_speed_mm_yr: [f64; 2],
+    /// The slab a subduction initiation plants on the old floor it splits off, km: the plate
+    /// moves only by the force balance, and the planted slab pulls it towards its parent until
+    /// the trench forms and the slab grows by the convergence (design §3.3). Subduction becomes
+    /// self-sustaining once some 100-150 km of slab has gone down (ledger PLT-270, from memory).
+    pub initiation_slab_km: f64,
     /// Contacts unseen for this many steps are closed.
     pub contact_timeout_steps: u32,
     /// Duration recorded for a collision orogeny, Myr.
     pub collision_orogeny_myr: f64,
     /// Sample L1 every this many steps (0 = only for keyframes and at the end).
     pub l1_every_steps: u32,
-    // The force balance (`plates::forces`, docs/design/plate-force-balance.md §3 and §6). **Not
-    // active yet**: the balance is computed and recorded each step (the dynamics record), but
-    // plates still move by the speed rules above until the switch (the design's task 7).
+    // The force balance (`plates::forces`, docs/design/plate-force-balance.md §3 and §6): every
+    // plate's rotation relaxes each step towards the one at which the forces on it balance.
     /// The overall speed scale of the balance, mm/yr: a reference oceanic plate (the average
     /// starting plate's area, a 3,000 km trench of a full-length 80-Myr slab, its neighbours at
     /// rest) moves at this speed. Sets the basal drag coefficient. Ledger PLT-181.
@@ -623,8 +605,7 @@ pub struct TectonicParams {
     /// Peak speed of the weak, slow mantle flow that drags plates with no slab, mm/yr (a degree-2
     /// stand-in for convection). PLT-190.
     pub mantle_flow_mm_yr: f64,
-    /// Relaxation time of a plate's rotation towards the balance, Myr (used from the switch on).
-    /// PLT-191.
+    /// Relaxation time of a plate's rotation towards the balance, Myr. PLT-191.
     pub motion_relax_myr: f64,
 }
 
@@ -642,7 +623,8 @@ impl Default for TectonicParams {
             crust_strength_mpa: 140.0,
             crust_flow_km2_myr: 0.0,
             subduction_distance_km: 1800.0,
-            max_plate_speed_mm_yr: 100.0,
+            max_plate_speed_mm_yr: 250.0, // ledger: PLT-022
+            convergence_ref_mm_yr: 100.0, // ledger: PLT-037
             oceanic_damping_mm_yr: 0.04,
             oceanic_floor_elevation_m: -10000.0,
             continental_erosion_mm_yr: 0.03,
@@ -653,7 +635,6 @@ impl Default for TectonicParams {
             collision_belt_km: 400.0,          // ledger: PLT-241
             collision_stacking_share: 0.5,     // ledger: PLT-242
             wedge_slope_deg: 1.5,              // ledger: PLT-192
-            collision_resistance_mm_yr: 200.0, // ledger: PLT-245
             weld_speed_mm_yr: 5.0,             // ledger: PLT-246
             weld_after_myr: 10.0,              // ledger: PLT-246
             collapse_myr: 15.0,                // ledger: PLT-255
@@ -661,15 +642,8 @@ impl Default for TectonicParams {
             collapse_quiet_myr: 10.0,          // ledger: PLT-259
             collapse_reach_km: 200.0,          // ledger: PLT-257
             crust_max_km: 70.0,                // ledger: PLT-258
-            slab_pull_rad_per_1000km_myr: 0.002,
-            slab_pull_speed_mm_yr: 80.0,
-            slab_pull_front_km: 3000.0,
-            slab_pull_relax_myr: 20.0,
-            motion_jitter_per_sqrt_myr: 0.02,
             initial_plates: 14,
             plate_size_variety_rad: 0.35,
-            plate_speed_mm_yr: [20.0, 70.0],
-            continental_speed_factor: 0.6,
             continent_elevation_m: [150.0, 900.0],
             continental_shelf_share: 0.0,
             scattered_continents: 6,
@@ -677,7 +651,6 @@ impl Default for TectonicParams {
             rift_lambda0: 0.012,
             rift_ocean_weight: 0.08,
             rift_fragments: [2, 4],
-            rift_speed_mm_yr: [20.0, 50.0],
             rift_warp_rad: 0.2,
             min_plate_area_frac: 0.003,
             max_plates: 40,
@@ -710,7 +683,7 @@ impl Default for TectonicParams {
             subduction_initiation_age_myr: 150.0,
             subduction_initiation_rate: 0.3,
             subduction_initiation_clearance_km: 1000.0,
-            subduction_initiation_speed_mm_yr: [30.0, 60.0],
+            initiation_slab_km: 150.0, // ledger: PLT-270
             contact_timeout_steps: 12,
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
@@ -953,6 +926,7 @@ impl PlanetPreset {
         pos(k.time_step_myr, "$.tectonics.time_step_myr")?;
         pos(k.model_radius_km, "$.tectonics.model_radius_km")?;
         pos(k.max_plate_speed_mm_yr, "$.tectonics.max_plate_speed_mm_yr")?;
+        pos(k.convergence_ref_mm_yr, "$.tectonics.convergence_ref_mm_yr")?;
         pos(
             k.subduction_distance_km,
             "$.tectonics.subduction_distance_km",
@@ -964,10 +938,6 @@ impl PlanetPreset {
             "must be in (0, 45)",
         )?;
         for (v, key) in [
-            (
-                k.collision_resistance_mm_yr,
-                "$.tectonics.collision_resistance_mm_yr",
-            ),
             (k.weld_speed_mm_yr, "$.tectonics.weld_speed_mm_yr"),
             (k.weld_after_myr, "$.tectonics.weld_after_myr"),
             (k.collapse_myr, "$.tectonics.collapse_myr"),
@@ -982,9 +952,7 @@ impl PlanetPreset {
             k.collision_threshold_km,
             "$.tectonics.collision_threshold_km",
         )?;
-        pos(k.slab_pull_relax_myr, "$.tectonics.slab_pull_relax_myr")?;
-        pos(k.slab_pull_front_km, "$.tectonics.slab_pull_front_km")?;
-        // The force balance (recorded, not applied yet).
+        // The force balance.
         pos(
             k.plate_speed_scale_mm_yr,
             "$.tectonics.plate_speed_scale_mm_yr",
@@ -1000,6 +968,7 @@ impl PlanetPreset {
             (k.edge_energy, "$.tectonics.edge_energy"),
             (k.boundary_resistance, "$.tectonics.boundary_resistance"),
             (k.mantle_flow_mm_yr, "$.tectonics.mantle_flow_mm_yr"),
+            (k.initiation_slab_km, "$.tectonics.initiation_slab_km"),
         ] {
             check(v.is_finite() && v >= 0.0, key, "must be >= 0")?;
         }
@@ -1055,14 +1024,8 @@ impl PlanetPreset {
             "must be in [1, resample_max_steps]",
         )?;
         for (v, key) in [
-            (k.plate_speed_mm_yr, "$.tectonics.plate_speed_mm_yr"),
-            (k.rift_speed_mm_yr, "$.tectonics.rift_speed_mm_yr"),
             (k.hotspot_lifetime_myr, "$.tectonics.hotspot_lifetime_myr"),
             (k.continent_elevation_m, "$.tectonics.continent_elevation_m"),
-            (
-                k.subduction_initiation_speed_mm_yr,
-                "$.tectonics.subduction_initiation_speed_mm_yr",
-            ),
         ] {
             check(
                 v[0].is_finite() && v[1].is_finite() && v[0] <= v[1],
