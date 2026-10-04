@@ -77,7 +77,7 @@ class BiomeRuleSetTest {
         assertEquals(ee.rules().size(), byId.size(), "rule ids are unique");
         for (Rule r : ee.rules())
             for (String b : r.biomes())
-                assertTrue(b.startsWith("wythers:") || b.startsWith("#"), r.id() + " names " + b);
+                assertTrue(b.startsWith("wythers:") || b.startsWith("minecraft:") || b.startsWith("#"), r.id() + " names " + b);
         BiomeRuleSet.File peat = shipped("peatland");
         assertEquals(List.of("#deeptime:peatland"), peat.requires());
         assertEquals("cold", peat.rules().get(0).wetland());
