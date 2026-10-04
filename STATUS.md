@@ -90,6 +90,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-03 | orogenic collapse | **Land still short of 0.27-0.30, and one plate target slipped** (build log 2026-10-03, "Orogenic collapse"). The collapse brings the 1000 Myr crust to 0.39 at its lowest step (target ≥ 0.37) but the 500 Myr land only from 0.197 to 0.215: the new crust is a one-sample-wide shelf the surface carries down to the sea, and thinning old belts lowers the high ground (above 2 km 0.096 → 0.082). Steps with one plate above half: 3.8 % → 10.1 % (≤ 10). Options: (a) **keep the rule as built and let the Earth-width ocean–continent transition (decided 2026-10-03) and the belt cap read from thickness (tasks 7-8) raise the land (Recommended)**; (b) raise `collapse_thickness_km` to 56-60 km to give back less crust (fewer welds, but the land falls too); (c) let filled ocean floor stand higher than a continent's mean (no physical basis). | build log; not yet asked |
 | 2026-10-03 | orogenic collapse | **Lambert lowers the land share beyond the crust** (build log 2026-10-03, "35 m and Lambert"): land over crust 0.60 → 0.45 at 1000 Myr (seeds 1-2), 0.65 → 0.60 at 500 Myr, master before and after the Lambert merge; 35 m changes nothing. **Recommended: a short look by the projection agent at the surface stage on the Lambert L1 (1024 × 328 against the old grid: the margins' cell size and the pole band) before the land is recalibrated**; or accept it and recalibrate on Lambert. | build log; not yet asked |
 | 2026-10-03 | GameTest failures | **Boreal wetlands as vanilla swamp?** (build log 2026-10-03, "The GameTests that failed on master".) Wet, flat, low land that is not frozen goes to vanilla's swamp band (BIO-066), and vanilla's swamp spans the cold band too, so wet subarctic lowland (Dfc, Dfb) becomes `minecraft:swamp` (oaks with vines, lily pads); on master 6f72f0dd's test planet that was 66 % of the Dfc columns. (a) **Keep it** (recommended): vanilla does the same, and boreal peatlands are the largest wetlands on Earth; a pack with a cold wetland biome (BOP's bog or muskeg) fills the slot through its regions. (b) Swamps only from the temperate band up: subarctic lowland stays taiga, and the cold band gets no wetland in vanilla. Built: (a); the GameTest counts the wetland band apart either way. | build log |
+| 2026-10-04 | Wrap engine (design + spike) | **Four choices** (docs/design/wrap-engine.md §8): (1) architecture: one stored copy + folded access + replicated band, vanilla clients join, optional client re-anchor (recommended), or Toroidal World's client frame extended with turned packets; (2) keep Toroidal World for Guyou's slide edges, engine owns only the turning edges (recommended), or engine owns every edge; (3) Create: refuse kinetic, fluid and train connections across turning seams at first (recommended), or adapters in the first version; (4) start Phase 1 now alongside the Immersive Portals work (recommended; the engine takes any layout of translations, half- and quarter-turns), or stop at the spike until the projection survey settles the layout. | Not asked yet (sub-agent; for the coordinator) |
+| 2026-10-03 | Seamless projection survey | **The production seamless world, four choices** (docs/research/notes/seamless-projection-survey.md §8; replaces the prototype's four, of which Ben answered three on 2026-10-03: research the projection, Immersive Portals plus an own engine, bake only): (1) a cube world, eight mild 270° corners, shapes ≤ 1.42× (recommended), or keep the 2:1 Guyou world with Petroff's equal-area map, shapes ≤ 2.67×; (2) the cube's map: the smooth equal-area table (the conformal cube made equal-area by Moser's flow, no creases; recommended) or closed-form QSC = Roşca–Plonka (41° creases on face diagonals); (3) the cross net, seven seam pairs, straight wrapped equator (recommended), or a 3 × 2 rectangle (eight); (4) faces of 3,776 / 7,552 blocks, today's scale (recommended), or 4,096 / 8,192. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | 35 m vertical scale | **Plutons with a floor.** `strata-check` on the 35 m bakes finds plutonic rock with other rock under it in 16 to 17 % of land columns (0.1 % at 20 m) and 5.4 to 5.8 % of the stored stacks (0 at 20 m): the world now reaches 14.5 km below the sea, under the floors of the stored plutonic layers. The rule is measured, not asserted (structure/realism.rs rule 3); a question for the rock/pluton work, not changed here. (a, recommended) Let the column builder carry plutonic rock to the world's floor where a pluton's layer is the lowest stored one (a follow-up task). (b) Accept floored plutons (real plutons have floors). | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-03 | margins and spires | **The margins' remaining step** (build log 2026-10-03, "Margins and spires"; pictures `review/out/margins-spires/index.html`, not committed). Submarine slope failure brought the baked margins from 9.5–10° to 4.2–5.9° between the 500 and 2,000 m isobaths (Earth 2.1°) and narrowed the shelves by about a third (shelf-hosted deposits fell with them). What is left is the plate model's crystalline ocean–continent step, one sample wide and drawn 8.1× narrower than on Earth, which nothing relaxes. (a, recommended) keep the failure at 2.5° and give the plate model an ocean–continent transition of Earth width in map metres (a `plates/` task after the plate work; it also gives back shelf room); (b) let the failure move crust too (5° at L1, but the shelves go: share of the sea under 200 m 0.05 → 0.017); (c) keep loads on old sea floor (the dampening at the age's rate) and recalibrate the sediment budget so the oceans do not fill; (d) leave the margins at about twice Earth's slope. | For the coordinator to put to Ben |
 | 2026-10-02 | P3-04 TW guard | **`/dh pregen` stalls on a square that crosses the seam** (build log 2026-10-02, "far terrain through Toroidal World's guard"). DH's PregenManager files each pending section under its raw position and clears it under the position the retrieval answers with; Toroidal World folds that position into the lap, so a section past the seam is never cleared and the pregen stops (seen twice: section 6*128 folded to 6*-128, no progress for 15 min; the video agent saw it stop at radius 75–76 chunks; 2026-10-03 on the dh set: a square from x = C/2 − 832 stopped at 53 % after 136 sections and did not move in 200 s, DH's two-minute expiry of a pending section never fires because nothing touches its cache, while a square ending at the seam finished all 257 in under 10 s; a square centred on x = C/2 never starts, Toroidal World's command coordinates reject 8192 as outside the world). It does not depend on Deep Time's generator (read in DH's PregenManager and TW's fold; the folded section is generated and stored, and matches far terrain); players' clients do not use /dh pregen. (a) Report it to Toroidal World's author; harnesses pregenerate squares that stay inside the lap (recommended, done in run.py); (b) a Deep Time mixin into DH's PregenManager clearing the raw key too; (c) leave it. | Not asked yet (sub-agent report) |
@@ -189,6 +191,76 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   deleted); `belts34` deleted.
 - **Next.** Ben's answers below; the belt cap read from thickness and the overlap accretion (the
   sources of the stacked volume) belong to tasks 7-8.
+### 2026-10-03/04 — Seamless projection survey: which projection for a portal-joined world (Ben's "Send off some research on what the current best projections would be for this"; agent worktree agent-a720027b758d66bc2, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; research only, not merged)
+- **What.** `docs/research/notes/seamless-projection-survey.md` and its tools `tools/research/projection-survey/` (survey.py: any map as tiles plus a seam table, measuring area, shape, straight-walk drift and derivative jumps across every seam and face line; conformal.py: Schwarz triangle maps for the conformal cube, Peirce, Lee's tetrahedron; moser.py: a conformal map made equal-area by Moser's flow; bench.rs: inverse cost; run.sh runs them on the VM through the admission tool, results in review/out/projection-survey/). Two Sonnet sub-agents read the sources (formulas and licences; post-2015 cube-map work).
+- **Found.** With quarter-turn seams the cube (8 corners of 270°) beats the pillowcase (4 of 180°) by a theorem: equal-area maps need shape ratio ≥ 4/3 near a cube corner against ≥ 2 near a Peirce point. Measured on 16 maps: the conformal cube made equal-area by Moser's flow (the note's own construction) has area 0.01 % rms, shape median 1.26 / max 1.42, no creases (derivative jumps ≤ 0.02, the table's floor); QSC = Roşca–Plonka (the same map, measured) median 1.32 / max 1.55, creased (diagonals ε 0.87, 41°); Petroff in the Guyou layout median 1.78 / max 2.67, smooth across its seams; HEALPix is a cube in disguise with 63° creases; Gringorten's crease lies on its seams. Inverse costs 4 ns (gnomonic) to 2 µs (Gringorten) per block; irrelevant at the bake (0.3 s for the table map on a 16k cube world).
+- **Recommendation.** Equal-area smooth cube in a cross net (faces 3,776 / 7,552 blocks; 7 seam pairs: 1 translation, 4 quarter-turns, 2 half-turns); fallback face map QSC; runner-up Petroff in the Guyou 2:1 layout (1–2 crate days). Crate cost of the cube about 8–11 days, +5–10 days outside the crate over the Guyou plan.
+- **Science docs.** Ledger SCL-078 to SCL-085 (all `not-yet-coded`); bibliography section "Seamless world projections" (Petroff2021, RoscaPlonka2011, CalabrettaGreisen2002, ONeillLaubscher1976, Rancic1996, Moser1965, Thurston1998, DimitrijevicStrobl2025; Lee1976 gains SCL-080); counts rewritten with `claims_counts.py --write`; research index row.
+- **Not done.** No game launched, no real bake resampled onto a cube, the Moser table built at 512² only. No shipped code changed; no gates beyond the tools' own runs (nothing the build reads changed).
+- **Next.** Ben's four questions (Pending questions, "Seamless projection survey").
+
+### 2026-10-03/04 — A wrap engine of Deep Time's own for turning seams: design and server-side spike (Ben's "Immersive portals, begin custom wrap engine concurrently"; agent worktree agent-a9aa7e80efbedcf23, branch `dev/wrap-engine-spike`, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; dev-only, not merged)
+- **Design.** `docs/design/wrap-engine.md` (indexed in docs/research/README.md):
+  - five architectures compared: rotated chunk views; folded access at the `Level` boundary; a
+    replicated band; Toroidal World's client frame extended with turned packets; turned rendering on
+    the client;
+  - for each subsystem, the Minecraft and NeoForge hooks and the risks: block access, the band, light,
+    world generation and caves, entities and AI, client and network, Distant Horizons, the MIC pack;
+  - how Toroidal World 0.19.3 wraps (server canonical copy, unwrapped client frame, chunk-key aliasing,
+    a `PacketTranslator` choke point, byte-identical chunk payloads), read on `mc/1.21` `5ded155` by a
+    Sonnet sub-agent, and why a turn breaks it (`pos & 15` reverses).
+- **Recommended: one stored copy, folded access, a replicated band.**
+  - Every position that crosses the `Level` API is folded to the stored block, and states are turned.
+  - Real chunks beyond each edge hold turned copies, written straight into their sections.
+  - Entities are carried at the seam line, turned.
+  - Vanilla clients join unchanged; an optional client re-anchor removes the reload at a turning
+    crossing.
+- **Effort.** 46–75 agent days without Create trains (9–15 weeks), 56–95 with them. The engine's own
+  share beyond what the Immersive Portals route needs anyway is about 6–9 weeks.
+- **Spike.** Applied only with `-Ddeeptime.wrapspike=true`: `DeepTimeMixinPlugin` gates
+  `mixin.wrapspike.*`, and the tests use their own namespace `deeptime_wrapspike`, enabled only by
+  `./gametest.sh -PwrapSpike`.
+  - Code: `wrapspike/` (`CellIsometry`, `WrapEdge`, `WrapTopology`, `WrapEngine`,
+    `WrapSpikeGameTests`) and three mixins (`Level` get/set/fluid/block-entity, `handleNeighborChanged`,
+    `LevelTicks.schedule`/`hasScheduledTick`).
+  - Implementation choices: the band is depth 8 on the test sites; replica writes go straight into the
+    section, then heightmaps, light, `blockChanged`.
+- **Measured** (test VM, `./gametest.sh -PwrapSpike`, 2026-10-04 02:11): **All 3 required tests
+  passed, 34 of 34 assertions** [R], on one half-turn seam, block (x, z) beyond = (2cx−x−1, 2z0−z−1):
+  - stairs placed beyond the seam stored on the far side facing south; the band storage holds the
+    turned copy;
+  - an armour stand stopped at z0+0.2500 by the far side's block;
+  - water across: far channel amounts 6,5,4,3,2,1,0; a control site with no seam stays dry 7/7;
+  - wire power 15,14,13 | 12,11 across, and the far lamp lit; a repeater driving into the seam lit the
+    far lamp at power 15; both off again;
+  - an armour stand and an item carried across, turned 180°;
+  - block light 14 across the seam (≤ 2 without it).
+  - The first run's item check failed: its forceloaded chunk was not entity-ticking yet. It is fixed
+    by waiting.
+- **Not shown:**
+  - the client (not run);
+  - whole-world Guyou or Peirce dimensions, turn points and corners (unit tests only);
+  - band tickets and copy on load;
+  - players and ghosts;
+  - caves, Distant Horizons, Create, Sable, and Toroidal World on the same level;
+  - performance.
+- **Gates:**
+  - `WrapTopologyTest` passes 6 of 6. It checks the algebra (local isometry, images, Guyou, Peirce, a
+    quarter-turn corner) and failed on 2 bounded-seam edge cases before the fix.
+  - `./gradlew build test`: BUILD SUCCESSFUL, JUnit 271 tests, 0 failures, 2 skipped.
+  - No Rust changed (no cargo gates). The normal `./gametest.sh` was not run (batch rule); the spike
+    is inert there.
+- **Test VM incident.** From 00:59 to 02:00 UTC the admission queue froze, and every job on the VM
+  waited.
+  - The cause: `admit.py`'s wait-loop signal handler (`_install_wait_signals` → `bail`) enters
+    `with store` while the loop already holds `state.lock`. A SIGTERM, SIGINT or SIGHUP arriving
+    inside the loop's locked section therefore deadlocks that process with the lock held.
+  - It was pid 1044950 (`batch.sh`'s `gametest:standalone`, label deep-time). Someone else cleared it
+    at 02:00; this agent killed nothing.
+  - The fix belongs in `tools/remote/vm/admit.py`: the handler should only set a flag, or the lock
+    should be re-entrant.
+- **Next.** Ben's questions (Pending questions). If Phase 1 is approved: whole-world topologies, the
+  fast path, the full fold list and the band manager.
 ### 2026-10-03/04 — Load-based admission on the test VM replaces the M6-era caps (Ben's "No set slots ... Guess load, run if load is less than what is available + 25%"; agent worktree agent-a2e1d18f0b1a34569, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; installed on the VM, not merged)
 - **What it replaces.** The one-server lock (`deeptime-cache/server.lock`, `mac.sh --server`, preview.py,
   detached-server.sh, mic-climate.sh), "two simulations per agent, four of 2 threads on the box", and
