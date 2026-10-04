@@ -45,9 +45,9 @@ install -d -m 0775 /data/ban/deeptime-cache/admit /data/ban/deeptime-cache/serve
 if [ ! -e /etc/default/deeptime-admit ]; then
     sudo tee /etc/default/deeptime-admit >/dev/null <<'EOF'
 # tools/remote/vm/admit.py (deep-time repo). Read by every admit.py call; no restart needed.
-# OVERCOMMIT=0.25       start a job when its estimate fits in what is free plus this share
-# RESERVE_CORES=4       headroom kept for the play server, a workbench run and ssh
-# RESERVE_MEM_GIB=15
+# OVERCOMMIT=0.25       CPU: start when the estimate fits in free cores plus this share;
+#                       memory: start when the estimate x (1 + this) is under the free memory
+# RESERVE_CORES=4       CPU headroom kept for the play server, a workbench run and ssh (no memory headroom)
 # STARVE_MIN=15         after this wait, nothing starts ahead of the oldest waiting job
 EOF
 fi

@@ -111,11 +111,65 @@ class Decision(unittest.TestCase):
         self.assertIn("needs 20.5 cores", d["a"])
 
     def test_memory_must_fit_too(self):
-        # 60 - 15 = 45 GiB; 45 * 1.25 = 56.25.
-        d, _ = admit.plan([waiting("a", 2.0, 56.0, 0)], [], CAP, 10)
+        # 60 GiB free, no headroom: the estimate times 1.25 must be under it (48 * 1.25 = 60 is not).
+        d, info = admit.plan([waiting("a", 2.0, 47.9, 0)], [], CAP, 10)
         self.assertIs(d["a"], True)
-        d, _ = admit.plan([waiting("a", 2.0, 57.0, 0)], [], CAP, 10)
+        self.assertEqual(info["avail_mem"], 60.0)
+        d, _ = admit.plan([waiting("a", 2.0, 48.0, 0)], [], CAP, 10)
         self.assertIn("GiB", d["a"])
+
+    # Ben, decisions log 2026-10-03: on a 4 GB box at 3.5 GB used, a run predicted at 200 MB is green
+    # and one predicted at 0.4 GB is red (with the margin it would use the whole machine).
+    SMALL = {"free_cpu": 8.0, "mem_avail_gib": 0.5, "cpu_total": 8.0, "mem_total_gib": 4.0}
+
+    def test_ben_example_small_job_runs_on_a_nearly_full_box(self):
+        d, info = admit.plan([waiting("a", 0.5, 0.2, 0)], [], self.SMALL, 10)      # 0.2 * 1.25 = 0.25 < 0.5
+        self.assertIs(d["a"], True)
+        self.assertEqual(info["avail_mem"], 0.5)                                    # no standing headroom
+
+    def test_ben_example_job_that_would_fill_the_box_waits(self):
+        d, _ = admit.plan([waiting("a", 0.5, 0.4, 0)], [], self.SMALL, 10)         # 0.4 * 1.25 = 0.5, not under 0.5
+        self.assertIn("needs 0.40 GiB", d["a"])
+        self.assertIn("0.50 free", d["a"])
+
+    def test_the_margin_is_on_the_job_not_on_the_free_memory(self):
+        # The old rule (estimate <= 1.25 * free) would admit 0.6 GiB into 0.5 free; the new one must not.
+        d, _ = admit.plan([waiting("a", 0.5, 0.6, 0)], [], self.SMALL, 10)
+        self.assertNotEqual(d["a"], True)
+        # And a job just under free / 1.25 runs.
+        d, _ = admit.plan([waiting("a", 0.5, 0.399, 0)], [], self.SMALL, 10)
+        self.assertIs(d["a"], True)
+
+    def test_memory_reserved_but_not_yet_used_is_not_free(self):
+        # A job admitted with a 3 GiB estimate has used 1 GiB so far: 2 GiB are still promised to it.
+        # MemAvailable is 2.7 GiB, so free = 2.7 - 2.0 = 0.7 GiB.
+        fresh = admitted("j", 1.0, 3.0, at=100, measured={"cpu": 1.0, "cpu_max": 1.0, "rss_gib": 1.0})
+        cap = dict(self.SMALL, mem_avail_gib=2.7)
+        d, info = admit.plan([waiting("a", 0.5, 0.5, 0)], [fresh], cap, 110)       # 0.5 * 1.25 = 0.625 < 0.7
+        self.assertEqual(info["pending_mem"], 2.0)
+        self.assertAlmostEqual(info["avail_mem"], 0.7)
+        self.assertIs(d["a"], True)
+        d, _ = admit.plan([waiting("a", 0.5, 0.6, 0)], [fresh], cap, 110)          # 0.75 is not under 0.7
+        self.assertIn("needs 0.60 GiB", d["a"])
+        # Without the reservation the same job runs, so the reservation is what held it back.
+        d, _ = admit.plan([waiting("a", 0.5, 0.6, 0)], [], cap, 110)
+        self.assertIs(d["a"], True)
+
+    def test_jobs_started_in_one_pass_reserve_memory_for_the_next(self):
+        q = [waiting("a", 0.5, 0.2, 0), waiting("b", 0.5, 0.2, 1)]
+        d, _ = admit.plan(q, [], self.SMALL, 10)                                    # 0.5 - 0.2 = 0.3; 0.25 < 0.3
+        self.assertIs(d["a"], True)
+        self.assertIs(d["b"], True)
+        d, _ = admit.plan(q + [waiting("c", 0.5, 0.2, 2)], [], self.SMALL, 10)      # 0.1 left; 0.25 is not under it
+        self.assertNotEqual(d["c"], True)
+
+    def test_running_jobs_are_never_touched(self):
+        # plan() only decides starts: an overcommitted box (nothing free) leaves its jobs alone.
+        busy = admitted("j", 1.0, 3.0, at=0, measured={"cpu": 1.0, "rss_gib": 3.0})
+        cap = dict(self.SMALL, mem_avail_gib=-0.2)
+        d, info = admit.plan([waiting("a", 0.5, 0.1, 0)], [busy], cap, 10_000)
+        self.assertNotEqual(d["a"], True)
+        self.assertEqual(set(d), {"a"})
 
     def test_admitted_jobs_reserve_what_they_have_not_used_yet(self):
         fresh = admitted("j", 10.0, 20.0, at=100, measured={"cpu": 2.0, "cpu_max": 2.0, "rss_gib": 5.0})
@@ -295,10 +349,10 @@ class EndToEnd(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.saved = (admit.MIN_RECORD_S, admit.SAMPLE_S, admit.POLL_S, admit.LEGACY_LOCK,
-                      admit.RESERVE_CORES, admit.RESERVE_MEM_GIB)
+                      admit.RESERVE_CORES)
         admit.MIN_RECORD_S, admit.SAMPLE_S, admit.POLL_S = 1.0, 0.5, 0.2
         admit.LEGACY_LOCK = os.path.join(self.tmp.name, "no-lock")
-        admit.RESERVE_CORES, admit.RESERVE_MEM_GIB = 0.0, 0.0
+        admit.RESERVE_CORES = 0.0
         # A roomy box whatever the test machine is doing (its real load would make these wait).
         self.saved_capacity = admit.capacity
         admit.capacity = lambda samples, now: {"cpu_total": 32.0, "load1": 0.0, "busy30": 0.0, "free_cpu": 32.0,
@@ -306,7 +360,7 @@ class EndToEnd(unittest.TestCase):
 
     def tearDown(self):
         (admit.MIN_RECORD_S, admit.SAMPLE_S, admit.POLL_S, admit.LEGACY_LOCK,
-         admit.RESERVE_CORES, admit.RESERVE_MEM_GIB) = self.saved
+         admit.RESERVE_CORES) = self.saved
         admit.capacity = self.saved_capacity
         self.tmp.cleanup()
 
