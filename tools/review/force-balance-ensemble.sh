@@ -13,8 +13,10 @@
 # The binary is copied into <out dir> first, so a rebuild does not change a running ensemble.
 # Environment: PRESET (default earthlike_quick_16k), T (threads per run, default 2). A run whose
 # summary already exists is not run again. Checkpoints (.ck, about 0.8 GB each) stay in <out dir>
-# for plate-check; delete the folder when the task lands.
+# for plate-check, with each run's dynamics record (.rec.json) and its history in 20 Myr bins
+# (.series.txt, tools/review/force-balance-series.py); delete the folder when the task lands.
 set -uo pipefail
+HERE=$(cd "$(dirname "$0")" && pwd)
 OUT=$1; BIN=$2; LEN=$3; SEEDS=${4//,/ }; STARTS=${5//,/ }; MODE=$6; shift 6
 LABEL=r
 if [ $# -gt 0 ] && [ "${1#--}" = "$1" ]; then LABEL=$1; shift; fi
@@ -53,7 +55,8 @@ if [ "$MODE" = ck ]; then
       [ -s "$f.ck" ] || continue
       runs+=(--run "$f.ck")
       all+=(--run "$f.ck")
-      "$BIN" plate-check --run "$f.ck" --json "$f.json" > "$f.table.txt" 2>&1 || true
+      "$BIN" plate-check --run "$f.ck" --json "$f.json" --record "$f.rec.json" > "$f.table.txt" 2>&1 || true
+      python3 "$HERE/force-balance-series.py" "$f.rec.json" 20 > "$f.series.txt" 2>&1 || true
     done
     [ ${#runs[@]} -gt 0 ] || continue
     "$BIN" plate-check "${runs[@]}" --json "$OUT/$LABEL-$start-$LEN.json" \

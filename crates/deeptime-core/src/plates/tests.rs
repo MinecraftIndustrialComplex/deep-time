@@ -620,8 +620,10 @@ fn arcs_build_a_cordillera() {
         sum.0 / sum.1 as f64
     };
     let (flat, range) = (mean_arc(0.0), mean_arc(0.5));
+    // Plates start at rest since the switch to the force balance, so 60 Myr hold less convergence
+    // than they did under the old speed rules (which asserted 300 m).
     assert!(
-        range > flat + 300.0,
+        range > flat + 150.0,
         "arc crust {range:.0} m with the cordillera vs {flat:.0} m without"
     );
 }
@@ -827,7 +829,8 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
             assert!(q.speed_mm_yr >= 0.0 && q.boundary_km >= 0.0 && q.front_km >= 0.0);
         }
         // Task 1b. Rotation change: the vector change since the previous step, for the plates that
-        // were there; the guard: rotation at the cap; the pole: on some plate.
+        // were there; the guard: a plate the guard held has its fastest point at the guard; the
+        // pole: on some plate.
         let cap = stage
             .norm()
             .omega_of_speed(p.tectonics.max_plate_speed_mm_yr);
@@ -843,7 +846,9 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
                 }
                 _ => assert_eq!(q.rot_change, 0.0),
             }
-            assert_eq!(q.guard, w.length() >= cap * (1.0 - 1e-9), "{q:?}");
+            if q.guard {
+                assert!(w.length() >= cap * (1.0 - 1e-9), "{q:?}");
+            }
             let c = glam::DVec3::from_array(st.plates[q.id as usize].centroid);
             assert_eq!(
                 q.spinning,

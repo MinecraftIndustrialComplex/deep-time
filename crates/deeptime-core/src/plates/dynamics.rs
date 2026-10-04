@@ -1078,6 +1078,8 @@ pub struct Observed<'a> {
     pub arcs: [ArcStat; 2],
     /// The force balance (`None` when it was not taken).
     pub forces: Option<&'a super::forces::Recorded>,
+    /// The plates the speed guard held this step (`kinematics::guard_speed`).
+    pub guarded: &'a [u32],
 }
 
 /// Appends this step's record. `seen` is what the step measured (the fronts' lengths per plate,
@@ -1136,7 +1138,6 @@ pub fn record_step(
     }
     let spacing_km = env.norm.km(env.norm.spacing_rad());
     let round = |x: f64, scale: f64| (x * scale).round() / scale;
-    let cap = env.norm.omega_of_speed(env.k.max_plate_speed_mm_yr);
     let spin_cos = SPIN_ANGLE_DEG.to_radians().cos();
     let prev: BTreeMap<u32, DVec3> = d
         .prev_omega
@@ -1161,7 +1162,7 @@ pub fn record_step(
                 pole_inside: pole_of[k].is_some_and(|j| {
                     nearest.plate(2 * j) == p.id || nearest.plate(2 * j + 1) == p.id
                 }),
-                guard: cap > 0.0 && w.length() >= cap * (1.0 - 1.0e-9),
+                guard: seen.guarded.contains(&p.id),
                 spinning: w.length() > 0.0
                     && w.normalize().dot(DVec3::from_array(p.centroid)).abs() >= spin_cos,
             }

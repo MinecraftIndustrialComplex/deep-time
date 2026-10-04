@@ -222,6 +222,9 @@ impl PlatesStage {
             shortening::advance(st, &cache.geo, &pos, &tree, &env, resolved.seeds);
         belts::stack(st, &cache.geo, &pos, &env, &fronts, flexure.as_deref());
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
+        // The boundary mix (measurement only) on the same samples as the fronts, before the
+        // collapse below turns any crust over.
+        let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
         // Crust beyond the thickest column goes down; thickened crust that nothing raises any
         // more spreads and gives its area back.
         let foundered = collapse::founder(st, &env);
@@ -238,7 +241,6 @@ impl PlatesStage {
             .globals
             .entry(collapse::GAINED_GLOBAL.to_owned())
             .or_insert(0.0) += f64::from(fell.converted) * env.norm.sample_area_km2();
-        let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
         // The force balance (`forces.rs`): the rotation each plate's motion relaxes towards.
         let balance = forces::step(
             st,
@@ -279,33 +281,38 @@ impl PlatesStage {
         let arcs = dynamics::arc_heights(st);
 
         // Motion for the next step: each plate's rotation relaxes towards the balance's
-        // (`motion_relax_myr`), under the speed guard, which is counted whenever it binds.
-        let cap = env.norm.omega_of_speed(k.max_plate_speed_mm_yr);
-        let mut bound = 0u32;
-        for p in 0..st.plates.len() {
+        // (`motion_relax_myr`), under the speed guard on the plate's own fastest point, which is
+        // counted whenever it binds.
+        let mut next: Vec<Option<DVec3>> = vec![None; st.plates.len()];
+        for (p, w) in next.iter_mut().enumerate() {
             if !st.plates[p].alive || merged.contains(&(p as u32)) {
                 continue;
             }
-            let Some(target) = balance.omega.get(p).copied().flatten() else {
-                continue;
-            };
-            let w = forces::relax(
-                DVec3::from_array(st.plates[p].omega),
-                target,
-                env.dt_myr,
-                k.motion_relax_myr,
-            );
-            if w.length() > cap {
-                bound += 1;
+            if let Some(target) = balance.omega.get(p).copied().flatten() {
+                *w = Some(forces::relax(
+                    DVec3::from_array(st.plates[p].omega),
+                    target,
+                    env.dt_myr,
+                    k.motion_relax_myr,
+                ));
             }
-            st.plates[p].omega = kinematics::cap_speed(w, &env.norm, k.max_plate_speed_mm_yr)
-                .to_array();
         }
-        if bound > 0 {
+        let reach = kinematics::reach(st, &pos, &next);
+        let mut guarded: Vec<u32> = Vec::new();
+        for (p, w) in next.into_iter().enumerate() {
+            let Some(w) = w else { continue };
+            let (w, bound) =
+                kinematics::guard_speed(w, reach[p], &env.norm, k.max_plate_speed_mm_yr);
+            if bound {
+                guarded.push(p as u32);
+            }
+            st.plates[p].omega = w.to_array();
+        }
+        if !guarded.is_empty() {
             *world
                 .globals
                 .entry(GUARD_BOUND_GLOBAL.to_owned())
-                .or_insert(0.0) += f64::from(bound);
+                .or_insert(0.0) += guarded.len() as f64;
         }
         rifting::maybe_rift(st, world, &cache.geo, &pos, &env)?;
         rifting::maybe_initiate_subduction(st, world, &cache.geo, &pos, &env)?;
@@ -349,6 +356,7 @@ impl PlatesStage {
                 mix_km,
                 arcs,
                 forces: balance.recorded.as_ref(),
+                guarded: &guarded,
             },
         );
         self.done = step;

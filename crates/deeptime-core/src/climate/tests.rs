@@ -448,7 +448,13 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
         "frame {mf} vs climate {mc} mm/yr"
     );
     let note: serde_json::Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
-    assert_eq!(note["snapshots"], 7, "t = 2, 10, …, 50 and 60 Myr");
+    // The due ones, plus those the clock's departure triggered (P1-26 design §4.2), which depend
+    // on the planet.
+    assert_eq!(
+        note["snapshots"].as_u64().unwrap(),
+        7 + note["triggered_snapshots"].as_u64().unwrap(),
+        "t = 2, 10, …, 50 and 60 Myr, and the triggered ones"
+    );
     // The curve: one row per plate step; the ice-age window's rows every 2 kyr of the last 3 Myr;
     // the carbon cycle balanced (weathering follows degassing) at the end.
     let rows = note["series"]["rows"].as_array().unwrap();

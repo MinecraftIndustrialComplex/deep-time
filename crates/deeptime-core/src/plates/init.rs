@@ -2,8 +2,8 @@
 //! The initial planet (Cortial §3, "Workflow"): plates as noise-warped spherical Voronoi cells of
 //! random centroids, continents shaped by the start configuration the player chose, plates at
 //! rest (the force balance sets them moving from the first step, docs/design/plate-force-balance.md
-//! task 7), oceanic crust aged from the boundaries that diverge under a drawn earlier motion, and
-//! the first hotspots.
+//! task 7), oceanic crust aged from the boundaries that diverge under a drawn earlier motion, the
+//! slabs that motion was sinking where it converged ([`earlier_slabs`]), and the first hotspots.
 //!
 //! Start configurations (plan §5.1, decisions file "Timeline"):
 //! - **supercontinent**: one continent of the whole continental area, centred on the largest
@@ -19,6 +19,8 @@
 //! once erosion and the sea have drowned the continents' margins as on Earth; with s = 0 (the
 //! default) all continental crust starts dry.
 
+use std::collections::BTreeMap;
+
 use glam::{DQuat, DVec3};
 use rayon::prelude::*;
 
@@ -28,7 +30,8 @@ use super::kinematics::{arr, random_motion};
 use super::noise::fbm;
 use super::pools::{continental_column, ocean_elevation, ocean_heat_flow, oceanic_column};
 use super::state::{
-    CONTINENTAL, Counters, Group, Hotspot, OCEANIC, Plate, PlateState, Sample, pool, regime,
+    CONTINENTAL, Counters, Group, Hotspot, OCEANIC, Plate, PlateState, Sample, SlabTrack, pool,
+    regime,
 };
 use crate::error::CoreError;
 use crate::params::PlanetPreset;
@@ -416,5 +419,88 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
         slabs: Vec::new(),
         dynamics: None,
     };
+    let mut state = state;
+    state.slabs = earlier_slabs(&geo, &plate, &state.samples, &omega, k, t0, &norm);
     Ok((state, geo))
+}
+
+/// The slabs of the earlier motion that aged the starting sea floor (ledger: PLT-274). Plates start
+/// at rest, but the planet is a moment of a longer history: wherever the earlier motion converged
+/// across a plate boundary with ocean floor on its sinking side, that floor was going down, and
+/// its slab hangs from the boundary at full length (`slab_depth_km`). The sinking side follows the
+/// rule of a new contact (`subduction::resolve`): ocean floor under continent, the older floor
+/// where both sides are oceanic, and no slab where both are continental. A pair needs
+/// `MIN_CONTACT` converging boundary samples. The force balance then sets the plates moving within
+/// the first relaxation time; a slab whose trench never forms is gone after `slab_breakoff_myr`
+/// (`forces.rs`, hanging slabs).
+fn earlier_slabs(
+    geo: &Geo,
+    plate: &[u32],
+    samples: &[Sample],
+    omega: &[DVec3],
+    k: &crate::params::TectonicParams,
+    t0: f64,
+    norm: &super::normalise::Norm,
+) -> Vec<SlabTrack> {
+    #[derive(Default)]
+    struct Side {
+        seen: u32,
+        cont: u32,
+        age: f64,
+    }
+    let pts = geo.points();
+    let mut pairs: BTreeMap<(u32, u32), [Side; 2]> = BTreeMap::new();
+    for v in 0..plate.len() as u32 {
+        let pv = plate[v as usize];
+        let x = pts[v as usize];
+        // A sample counts once for its plate, if any neighbour of another plate converges on it.
+        let mut hit: Option<u32> = None;
+        for (u, _) in geo.edges(v) {
+            let pu = plate[u as usize];
+            if pu == pv {
+                continue;
+            }
+            let rel = norm.velocity_mm_yr(omega[pu as usize] - omega[pv as usize], x);
+            if rel.dot(pts[u as usize] - x) < 0.0 {
+                hit = Some(pu);
+                break;
+            }
+        }
+        let Some(pu) = hit else { continue };
+        let key = (pv.min(pu), pv.max(pu));
+        let side = &mut pairs.entry(key).or_default()[usize::from(pv != key.0)];
+        let s = &samples[v as usize];
+        side.seen += 1;
+        if s.kind == CONTINENTAL {
+            side.cont += 1;
+        } else {
+            side.age += s.age_myr(t0);
+        }
+    }
+    let mut out = Vec::new();
+    for ((lo, hi), sides) in pairs {
+        if sides[0].seen + sides[1].seen < super::subduction::MIN_CONTACT {
+            continue;
+        }
+        let frac = |s: &Side| f64::from(s.cont) / f64::from(s.seen.max(1));
+        let mean_age = |s: &Side| {
+            let oceanic = s.seen - s.cont;
+            if oceanic == 0 { 0.0 } else { s.age / f64::from(oceanic) }
+        };
+        let (c0, c1) = (frac(&sides[0]) >= 0.5, frac(&sides[1]) >= 0.5);
+        let under_lo = match (c0, c1) {
+            (false, true) => true,
+            (true, false) => false,
+            (false, false) => mean_age(&sides[0]) >= mean_age(&sides[1]),
+            (true, true) => continue,
+        };
+        let (under, over) = if under_lo { (lo, hi) } else { (hi, lo) };
+        out.push(SlabTrack {
+            under,
+            over,
+            km: k.slab_depth_km, // ledger: PLT-274
+            ..SlabTrack::default()
+        });
+    }
+    out
 }
