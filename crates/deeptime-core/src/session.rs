@@ -137,13 +137,27 @@ pub fn estimate(preset_json: &str, content_json: &str) -> Result<String, CoreErr
 /// engine's two passes (an SSD at ~1 GB/s; P1-17 measures it).
 const SPILL_SECONDS_PER_BYTE: f64 = 3.0e-9;
 
+/// The stages whose `Stage::estimate` is their own working set only; the others count the world
+/// they run beside (the plates, the surface, the climate, the young landscape and the
+/// amplification each include the stages before them). In [`estimate_for`] these add the world
+/// the stages before them left, so every stage's figure is the run's memory while it runs
+/// (memacct, 2026-10-04: the deposits stage listed 178 MiB on quick 16k while the run held
+/// 1.4 GiB).
+const OWN_ONLY_ESTIMATES: [&str; 4] = [
+    crate::structure::STAGE_NAME,
+    crate::surface::volcanoes::STAGE_NAME,
+    crate::surface::impacts::STAGE_NAME,
+    crate::deposits::STAGE_NAME,
+];
+
 /// The memory and time estimate for a preset run under a memory cap of `mem_cap` bytes (0: the
 /// default), as JSON (plan §5.7.5; P1-17's history spill):
 ///
 /// `{"peak_bytes", "base_bytes", "history_bytes", "spill_bytes", "mem_cap",
 ///   "stages": [{"name", "bytes", "seconds", "base_bytes", "history_bytes", "spill_bytes"}, …]}`
 ///
-/// A stage's `base_bytes` is its working set without the recorded history (what must fit under
+/// A stage's `base_bytes` is the run's working set while it runs (the world the stages before it
+/// built included) without the recorded history (what must fit under
 /// the cap, or the run fails cleanly), `history_bytes` the history at the end of the stage (it
 /// stays in memory while the cap allows and spills to the run's folder after that), `bytes`
 /// = base + the history held in memory under this cap (its peak) and `spill_bytes` the rest (the
@@ -165,13 +179,22 @@ pub fn estimate_for(
         mem_cap
     };
     let (mut peak, mut base, mut history, mut spill) = (0u64, 0u64, 0u64, 0u64);
+    // The world the stages so far built (their largest base and history): it stays in memory
+    // under the stages after them.
+    let (mut world, mut world_history) = (0u64, 0u64);
     let stages: Vec<Value> = preset
         .stages()
         .iter()
         .map(|s| {
             let e = s.estimate();
-            let hist = e.history_bytes.min(e.bytes);
-            let b = e.bytes - hist;
+            let mut hist = e.history_bytes.min(e.bytes);
+            let mut b = e.bytes - hist;
+            if OWN_ONLY_ESTIMATES.contains(&s.name()) {
+                b += world;
+                hist = hist.max(world_history);
+            }
+            world = world.max(b);
+            world_history = world_history.max(hist);
             let held = hist.min(cap.saturating_sub(b));
             let spilled = hist - held;
             peak = peak.max(b + held);
