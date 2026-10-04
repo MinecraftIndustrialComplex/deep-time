@@ -1875,6 +1875,61 @@ mod tests {
         );
     }
 
+    /// Cold wetland is not swamp (Ben, 2026-10-03, "Taiga instead, peatland if present"): a wet,
+    /// flat, low Dfc plain keeps its class's temperature and humidity (vanilla draws taiga), holds
+    /// its erosion under E5 and carries the cold-wetland flag; a warm wet plain (Af) still goes to
+    /// vanilla's swamp band E6 with the swamp flag. `wetland_cold_below` 1 turns the rule off.
+    #[test]
+    fn cold_wetland_is_taiga_or_peatland_not_swamp() {
+        let b = &reference().bands;
+        let (e5, e6) = (b.erosion[5], b.erosion[6]);
+        let table = placement::builtin();
+        let low = BiomeParams {
+            wetland_low_m: 600.0,
+            ..BiomeParams::default()
+        };
+        let quarter_cells = |m: &Mapped, w2: usize, q: usize| -> Vec<usize> {
+            // Quarters are 1/4 of L2's width; land is rows 16..48 of L2's 64.
+            (16 * w2..48 * w2)
+                .filter(|k| k % w2 * 4 / w2 == q)
+                .filter(|&k| m.layers[3][k].is_finite() && m.wetland[k] != WETLAND_NONE)
+                .collect()
+        };
+        let (m, w2) = fixture_dfc_ai(&low, table, ["Af", "BWh", "Dfc", "ET"], [false; 4], 3.0);
+        let dfc = quarter_cells(&m, w2, 2);
+        assert!(!dfc.is_empty(), "a wet Dfc plain has wetland");
+        for &k in &dfc {
+            assert_eq!(m.wetland[k], WETLAND_COLD, "Dfc wetland is cold wetland");
+            assert!(
+                f64::from(m.layers[3][k]) < e5,
+                "cold wetland stays under E5, not in swamp's E6: {}",
+                m.layers[3][k]
+            );
+        }
+        let af = quarter_cells(&m, w2, 0);
+        assert!(!af.is_empty(), "a wet Af plain has wetland");
+        for &k in &af {
+            assert_eq!(m.wetland[k], WETLAND_SWAMP, "warm wetland is swamp");
+            assert!(f64::from(m.layers[3][k]) >= e6, "in vanilla's swamp band");
+        }
+        assert_eq!(
+            m.note["cold_wetland_cells"].as_u64().unwrap(),
+            dfc.len() as u64,
+            "the note counts the cold wetland"
+        );
+        assert!(m.note["cold_wetland_cells_by_class"]["Dfc"].as_u64().unwrap() > 0);
+        // The knob: nothing is cold below band 1, so the Dfc plain is swamp again.
+        let off = BiomeParams {
+            wetland_cold_below: 1.0,
+            ..low
+        };
+        let (m, w2) = fixture_dfc_ai(&off, table, ["Af", "BWh", "Dfc", "ET"], [false; 4], 3.0);
+        let dfc = quarter_cells(&m, w2, 2);
+        assert!(!dfc.is_empty());
+        assert!(dfc.iter().all(|&k| m.wetland[k] == WETLAND_SWAMP));
+        assert_eq!(m.note["cold_wetland_cells"], 0);
+    }
+
     #[test]
     fn the_new_settings_are_checked() {
         let bad = |f: &dyn Fn(&mut BiomeParams)| {
@@ -1909,6 +1964,10 @@ mod tests {
         assert_eq!(
             bad(&|p| p.wetland_low_m = f64::NAN),
             "$.biomes.wetland_low_m"
+        );
+        assert_eq!(
+            bad(&|p| p.wetland_cold_below = 5.5),
+            "$.biomes.wetland_cold_below"
         );
     }
 }
