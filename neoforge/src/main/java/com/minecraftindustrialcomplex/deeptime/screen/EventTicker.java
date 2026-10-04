@@ -48,7 +48,8 @@ class EventTicker extends AbstractWidget {
             if (fresh)
                 g.fill(x + 1, ly - 1, x + w - 1, ly + LINE - 1, 0x40ffffff);
             String t = Formats.time(e.tStart());
-            g.drawString(font, font.plainSubstrByWidth(t, w / 2 - 4), x + 3, ly, fresh ? 0xffffffff : 0xffb0b0b0, false);
+            g.fill(x + 3, ly + 2, x + 7, ly + 6, com.minecraftindustrialcomplex.deeptime.screen.model.EventStyle.colour(e.kind()));
+            g.drawString(font, font.plainSubstrByWidth(t, w / 2 - 12), x + 10, ly, fresh ? 0xffffffff : 0xffb0b0b0, false);
             Component kind = Lang.eventKind(e.kind());
             int kx = x + w / 2;
             g.drawString(font, font.substrByWidth(kind, w - (kx - x) - 3).getString(), kx, ly, fresh ? 0xffffe080 : 0xffd0d0d0, false);
