@@ -539,7 +539,6 @@ pub fn compute(
     // its land under the sea marks the budget's vapour carries (`carry`: none on the first pass);
     // the budget dries it along the wind. The first pass sets the mountains' sink and the marks
     // the second uses.
-    let mut up_pref: Vec<[f64; 12]> = Vec::new();
     let mut up_src: (Vec<f64>, Vec<f64>) = (Vec::new(), Vec::new());
     let mut carry: Option<(Vec<[f64; 12]>, Vec<[f64; 12]>)> = None;
     let carry_at = |g: &super::coarse::Grid,
@@ -608,8 +607,7 @@ pub fn compute(
             .map(|(s, a)| if *a > 0.0 { s / a } else { 0.0 })
             .collect();
         up_src.1 = pcm.dsst.clone();
-        up_pref = pref_of(&g, &None);
-        let r = upwind_rain(pcm, p, &up_pref, &up_src, None, &cell.rain_mm);
+        let r = upwind_rain(pcm, p, &pref_of(&g, &None), &up_src, None, &cell.rain_mm);
         carry = Some((r.basin_air.clone(), r.dsst_air.clone()));
         pcm.upwind = Some(r);
         time(&mut millis, "upwind", started);
@@ -652,8 +650,7 @@ pub fn compute(
             }
         }
         if pcm.upwind.is_some() {
-            up_pref = pref_of(&g, &carry);
-            let r = upwind_rain(pcm, p, &up_pref, &up_src, Some(&sink_ref), &cell.rain_mm);
+            let r = upwind_rain(pcm, p, &pref_of(&g, &carry), &up_src, Some(&sink_ref), &cell.rain_mm);
             cell.rain_mm = r.annual_mm.clone();
             pcm.upwind = Some(r);
         } else {

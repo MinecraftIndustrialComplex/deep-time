@@ -631,6 +631,27 @@ pub fn rain(
         .collect();
     let basin_air = (0..n).map(|c| std::array::from_fn(|m| carried[m][c][0])).collect();
     let dsst_air = (0..n).map(|c| std::array::from_fn(|m| carried[m][c][1])).collect();
+    // TEMP-DIAG (not for commit): dump the coarse fields for calibration.
+    if let Ok(dir) = std::env::var("DEEPTIME_UPWIND_DUMP") {
+        let _ = std::fs::create_dir_all(&dir);
+        let mut out = String::new();
+        out.push_str("c,lat,lon,land,m,u,v,wv,wref,wc,p,pref,esea,eland,eps,ks,basin,dsst\n");
+        for c in 0..n {
+            let (i, j) = (c % g.w, c / g.w);
+            let lon = (i as f64 + 0.5) / g.w as f64 * 360.0;
+            for m in [0usize, 6] {
+                let s = &months[m];
+                out.push_str(&format!(
+                    "{c},{:.2},{:.2},{:.3},{m},{:.3},{:.3},{:.3},{:.3},{:.4},{:.4e},{:.4e},{:.4e},{:.4e},{:.3},{:.3e},{:.3},{:.3}\n",
+                    g.lat_c(j), lon, f[c], u[c][m] * p.rain_wind_share, v[c][m] * p.rain_wind_share,
+                    s.w_v[c], w_ref[c][m], s.w_c[c], s.p[c], p_ref[c][m], s.e_sea[c], s.e_land[c],
+                    eps[c], year[m].k_s[c], carried[m][c][0], carried[m][c][1]
+                ));
+            }
+        }
+        let k = std::fs::read_dir(&dir).map(|d| d.count()).unwrap_or(0);
+        let _ = std::fs::write(format!("{dir}/upwind-{k}.csv"), out);
+    }
     Rain {
         basin_air,
         dsst_air,
