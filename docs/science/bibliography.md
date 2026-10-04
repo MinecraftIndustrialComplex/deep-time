@@ -5825,3 +5825,19 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 - Access: abstract read (USGS record).
 - Library: not fetched.
 - Read so far (by the project): abstract, 2026-10-03 (research sub-agent): the collapse model is "difficult to reconcile with ... moderate regional extension (≤50%) and the discovery that most high-angle, Basin and Range faults slipped rapidly ca. 17 Ma, tens of millions of years after crustal thickening occurred".
+
+### SundellEtAl2021
+- Reference: Sundell, K. E. and others (2021). Jurassic to Neogene quantitative crustal thickness estimates in southern Tibet. GSA Today 31(6).
+- DOI or URL: GSA Today June 2021 (open, geosociety.org).
+- Ledger ids: PLT-259
+- Access: open; full text read.
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-03 (research sub-agent): "crustal thickness increased by ~40 km at ~1.3 mm/a between 60 and 30 Ma to near modern crustal thickness, before the onset of Miocene east-west extension"; "Our results are inconsistent with models that invoke net crustal thinning via orogenic collapse (Dewey, 1988) beginning in the Miocene".
+
+### BaslerEtAl2026
+- Reference: Basler, L. and others (2026). [Paleogene crustal thickness of Nevada.] Tectonics 45. Title and authors to be taken from the DOI before quoting.
+- DOI or URL: 10.1029/2025TC009110
+- Ledger ids: PLT-259
+- Access: abstract read (Crossref).
+- Library: not fetched.
+- Read so far (by the project): abstract, 2026-10-03 (research sub-agent): "crust at least 50 km thick was present until the Early Miocene, which suggests that thickened crust was maintained for a protracted interval following Cretaceous shortening. These results indicate that most crustal thinning was contemporaneous with a change in plate boundary conditions".
