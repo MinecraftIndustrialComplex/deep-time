@@ -153,7 +153,8 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
         let s = rw.slice(depth, 128, 64, 2);
         for py in (0..64).step_by(3) {
             for px in (0..128).step_by(5) {
-                let (x, z) = slice::pixel_block(c, 128, 64, px, py);
+                let (x, z) =
+                    slice::pixel_block(&world.manifest.world_projection(), c, 128, 64, px, py);
                 let col = world.sample(x, z);
                 let y = match depth {
                     Depth::Below(d) => (col.top_y - d as i32).max(min_y),

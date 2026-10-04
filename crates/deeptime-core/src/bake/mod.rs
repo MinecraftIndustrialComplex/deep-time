@@ -24,6 +24,7 @@ pub mod climate;
 pub mod ice;
 pub mod meta;
 pub mod placement;
+pub mod project;
 pub mod strata;
 pub mod surface;
 pub mod terrain;

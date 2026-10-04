@@ -1349,6 +1349,35 @@ impl Session {
                 write_atomic(&dir.join(MANIFEST), &bytes)?;
             }
         }
+        // The world's projection (Ben, decisions log 2026-10-04: Petroff–Guyou; "Bake only",
+        // 2026-10-03): the last step rewrites the finished Lambert folder in the preset's world
+        // projection, reading it as the game would (`bake::project`). A Lambert preset only gets
+        // its layout block.
+        if let crate::preset::PresetBody::Planet(p) = &self.preset.body {
+            let baked = m
+                .notes
+                .get(crate::bake::NOTES_KEY)
+                .is_some_and(|b| b["baked"] == json!(true));
+            if baked {
+                let note = self
+                    .pool
+                    .install(|| crate::bake::project::project_folder(dir, p, &mut m))?;
+                self.log
+                    .push(Level::Info, crate::bake::project::summary_line(&note));
+                if let Some(b) = m.notes.get_mut(crate::bake::NOTES_KEY) {
+                    b["projection"] = note;
+                }
+            } else {
+                m.projection = Some(
+                    deeptime_format::projection::WorldProjection::Lambert(
+                        deeptime_format::Projection::new(c),
+                    )
+                    .spec(None),
+                );
+            }
+            bytes = m.to_json_bytes()?;
+            write_atomic(&dir.join(MANIFEST), &bytes)?;
+        }
         self.state
             .store(SessionState::Finalized as u8, Ordering::Release);
         self.log.push(
