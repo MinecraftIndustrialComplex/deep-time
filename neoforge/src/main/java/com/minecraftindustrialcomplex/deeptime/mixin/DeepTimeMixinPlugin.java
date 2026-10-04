@@ -19,6 +19,8 @@ import java.util.Set;
  *       is installed (COE, CDG, TerraBlender, ...).</li>
  *   <li>A mixin in {@code mixin.gametest} applies only with {@code -Ddeeptime.gametest=true},
  *       so test-only fixes never reach a player's game.</li>
+ *   <li>A mixin in {@code mixin.wrapspike} (the wrap-engine spike) applies only with
+ *       {@code -Ddeeptime.wrapspike=true}.</li>
  *   <li>Everything else always applies.</li>
  * </ul>
  *
@@ -29,6 +31,7 @@ public class DeepTimeMixinPlugin implements IMixinConfigPlugin {
 
     private static final String COMPAT = "com.minecraftindustrialcomplex.deeptime.mixin.compat.";
     private static final String GAMETEST = "com.minecraftindustrialcomplex.deeptime.mixin.gametest.";
+    private static final String WRAPSPIKE = "com.minecraftindustrialcomplex.deeptime.mixin.wrapspike.";
 
     private static final Logger LOGGER = LoggerFactory.getLogger("deeptime");
 
@@ -42,6 +45,13 @@ public class DeepTimeMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        if (mixinClassName.startsWith(WRAPSPIKE)) {
+            // The wrap-engine spike (docs/design/wrap-engine.md): never in a player's game.
+            boolean on = Boolean.getBoolean("deeptime.wrapspike");
+            if (on)
+                LOGGER.warn("Applying wrap-engine SPIKE mixin {} (-Ddeeptime.wrapspike=true)", mixinClassName);
+            return on;
+        }
         if (mixinClassName.startsWith(GAMETEST)) {
             boolean on = Boolean.getBoolean("deeptime.gametest");
             if (!on)

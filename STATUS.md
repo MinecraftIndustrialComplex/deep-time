@@ -48,7 +48,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-23 | Grid-artifact audit (log 2026-09-29) | done | 2026-10-01 | — | Branch worktree-agent-a851cf286456a3901 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), not merged. Audit: docs/research/notes/grid-artifact-audit.md. <br>**Clean:** the seam, the mesh, slope directions (within 2° of an axis 4.8 % against 4.4 %), cones, deposits. <br>**Shows, worst first:** straight sediment dams and lake shores on plains (3–8 blocks high, up to 1,000 blocks long); rivers in dead-straight reaches (10.2 % of their length within 0.5° of an eight-direction heading against 2.2 %); biome borders in 16-block steps (24 % of the temperature input's change faces along an axis against 4.4 %). <br>**Fixed, each with a property test:** rock erodibility interpolated between L1 cells (its steps were 7 × larger at cell edges, now 1.02 ×), the strata smoothing's lattice (thickness phase 15 % → 7 %), the distance to the sea (inland a8 −0.39 → 0.00). <br>**Gates:** cargo fmt/clippy/deny clean, cargo test 546 passed, JUnit 199/0, `./gametest.sh` and `-PwithMic` (168 mods) All 65 required tests passed each. <br>Four design questions for Ben in the note and the build log. |
 | P1-24 | Faster Create World (log 2026-09-29) | todo | | | After P1-17's benchmarks; options go to Ben. |
 | P1-25 | Climate API for mic-climate and Project Atmosphere (log 2026-09-29) | done | 2026-09-30 | — | On branch worktree-agent-a02882c5e6567370e, not yet merged. Format 0.2 bakes twelve monthly layers. `DeepTimeClimate` is at API version 1.<br>**Parity:** `ClimateParityTest` 500/500 blocks bit for bit, and the GameTest `climateApiOnTheRealPlanet` matches too.<br>**mic-climate `deep-time` branch** (pushed): Deep Time's climate plus Project Atmosphere's weather anomaly. Its GameTests pass 19/19, with and without Project Atmosphere, and its pack smoke passes 20/20.<br>**MIC planet probe** (earthlike_quick_16k): Af 24.5 °C, BWk 8.8/19.6 °C, Dfc −12.9/15.3 °C, ET −24.7/0.6 °C, EF plateau (4,860 m) −22.7/−46.7 °C, each pair midwinter/midsummer. Project Atmosphere read 8.6, 8.9, −0.6, 4.0 and 10.5 °C at the same places. Its simulated weather adds −2.4…+2.5 °C.<br>JUnit 150/0 and `./gametest.sh` All 52 passed after merging master 8872c91; cargo gates clean. See build log. |
-| P1-26 | Per-cell climate: 2-D energy balance, sea ice, moisture (log 2026-09-30) | doing | 2026-09-30 | | Design approved 2026-10-01 (docs/design/p1-26-per-cell-climate.md, recommended answers); tasks T1–T11 start after the climate agent's ice-sheet branch (worktree-agent-adc924860a859865c-ice) lands. |
+| P1-26 | Per-cell climate: 2-D energy balance, sea ice, moisture (log 2026-09-30) | doing | 2026-09-30 | | Design approved 2026-10-01 (docs/design/p1-26-per-cell-climate.md, recommended answers); the ice-sheet branch is merged with the flowing sheets off (decisions log 2026-10-02; build log 2026-10-02, "Climate ice branch merged"), so tasks T1–T11 can start on top of it. |
 | P1-27 | Plate margins and coherent continents (logs 2026-09-29, 2026-09-30) | done | 2026-09-30 | | Branch worktree-agent-ad3b417fd428c1ac2 (session f981c0d3-5144-49ec-8686-2946d755872c), not merged. Cause: a collision moved the continent alone to the overriding plate, leaving its passive margins facing an ocean that kept converging (collisions cut 295,000–455,000 km of margin off its ocean per 750-Myr run; rifts ~2,000, initiations < 300). Fixed by sutures, initiation anywhere clear of trenches (rate 0.3), arc cordilleras, collision orogen cores, arc maturity; provinces view generalised to the USGS map's 150 km. Mac, 6 pipeline runs × 400 Myr before → after: active margin 0.67 → 0.31 (Earth ~0.3, Bradley 2008), passive 0.30 → 0.63, floor beside passive margins 50 → 102 Myr, ground under arc cones 307 → 812 m, provinces orogen 0.51 → 0.40, shield+platform 0.17 → 0.29, edge density 0.078 → 0.060; land 0.398 → 0.391, median 1,350 → 1,030 m, ocean p90 108 → 194 Myr. cargo test/clippy/fmt/deny clean, JUnit 155/0; evidence review/out/p1-27/ (not committed); see build log |
 | P1-28 | Stone and deepslate for the common rocks (log 2026-10-01; first the hardness tiers, replaced the same day) | done | 2026-10-01 | | Branch worktree-agent-a72907749021691b5 (session f981c0d3-5144-49ec-8686-2946d755872c), not merged. `minecraft:stone` is the `vanilla_fallback` of shale and mudstone, `minecraft:deepslate` of slate, phyllite, schist and gneiss (`CRUST_STAND_INS` in `tools/dev/gen_rock_classes.py`); no recipe, item tag or drop touched. Stone or deepslate share of the placed rock, top 64 blocks / whole column: 0.0 % → 47.8 % / 55.3 % (12 generated boxes, standalone), census of the whole planet 0.1 % → 56.2 % / 0.0 % → 56.0 %. Gates: cargo fmt/clippy/test/deny clean, gradlew build test 161/0, `./gametest.sh` and `-PwithMic` All 58 passed. MIC rows are in the build log; see the entry. |
 | P2-08 | Meteor impacts (log 2026-09-29; started on a branch, log 2026-10-01) | done | 2026-10-01 | | Branch worktree-agent-a24e90e955a5a64d3 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), master 38ca6b0 merged in, not merged to master, not pushed. Coupled `impacts` stage, craters in the amplifier, `impact_breccia` and `impact_melt` (62 classes), four impact deposit types, events, workbench layers, eleven settings. Quick 16k, 500 Myr: 1,302 impactors, 567 craters formed (448/81/28/5/4/1 by size), 735 stopped by the sea, 439 eroded, 57 subducted, 71 in the catalogue, 19 showing (17 on continental crust). Build log 2026-10-01, "Meteor impacts". |
@@ -87,9 +87,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
-| 2026-10-04 | VM admission | **GameTests on branches again?** The rule "GameTests run once per merge batch" (Ben, 2026-09-30) came from the M6's single server slot, with ~7 agents queueing two runs each. With load-based admission the VM ran two GameTest sets, a preview and two simulations side by side (build log 2026-10-03/04). (a, recommended) Agents run `./gametest.sh` and `./gametest.sh -PwithMic` on their branch before reporting, as part of their gates; the coordinator still runs both once after a batch merge. (b) Keep the batch rule. | For the coordinator to put to Ben |
-| 2026-10-04 | VM admission | **The +25 % on memory.** Ben's "available + 25%" is applied to memory as to CPU: a job may start when its peak-memory estimate is up to 1.25 × the free memory left after the 15 GiB headroom, so the headroom absorbs the overshoot if every job peaks at once. (a, recommended) Keep it so. (b) No margin on memory (an overshoot there is an out-of-memory kill, not a slowdown): `OVERCOMMIT` would then apply to cores only. | For the coordinator to put to Ben |
-| 2026-10-04 | VM admission | **`deeptime run --threads N` bakes on all cores.** The simulation keeps to N threads, the bake runs on Rayon's global pool: 2-thread runs peak at 12–19 cores for about half a minute (mean 1.8). (a, recommended) Run the bake in the session's pool so `--threads` holds throughout (a small follow-up task). (b) Leave it; admission reserves the mean. | For the coordinator |
+| 2026-10-04 | Wrap engine (design + spike) | **Four choices** (docs/design/wrap-engine.md §8): (1) architecture: one stored copy + folded access + replicated band, vanilla clients join, optional client re-anchor (recommended), or Toroidal World's client frame extended with turned packets; (2) keep Toroidal World for Guyou's slide edges, engine owns only the turning edges (recommended), or engine owns every edge; (3) Create: refuse kinetic, fluid and train connections across turning seams at first (recommended), or adapters in the first version; (4) start Phase 1 now alongside the Immersive Portals work (recommended; the engine takes any layout of translations, half- and quarter-turns), or stop at the spike until the projection survey settles the layout. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-03 | Seamless projection survey | **The production seamless world, four choices** (docs/research/notes/seamless-projection-survey.md §8; replaces the prototype's four, of which Ben answered three on 2026-10-03: research the projection, Immersive Portals plus an own engine, bake only): (1) a cube world, eight mild 270° corners, shapes ≤ 1.42× (recommended), or keep the 2:1 Guyou world with Petroff's equal-area map, shapes ≤ 2.67×; (2) the cube's map: the smooth equal-area table (the conformal cube made equal-area by Moser's flow, no creases; recommended) or closed-form QSC = Roşca–Plonka (41° creases on face diagonals); (3) the cross net, seven seam pairs, straight wrapped equator (recommended), or a 3 × 2 rectangle (eight); (4) faces of 3,776 / 7,552 blocks, today's scale (recommended), or 4,096 / 8,192. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | 35 m vertical scale | **Plutons with a floor.** `strata-check` on the 35 m bakes finds plutonic rock with other rock under it in 16 to 17 % of land columns (0.1 % at 20 m) and 5.4 to 5.8 % of the stored stacks (0 at 20 m): the world now reaches 14.5 km below the sea, under the floors of the stored plutonic layers. The rule is measured, not asserted (structure/realism.rs rule 3); a question for the rock/pluton work, not changed here. (a, recommended) Let the column builder carry plutonic rock to the world's floor where a pluton's layer is the lowest stored one (a follow-up task). (b) Accept floored plutons (real plutons have floors). | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-03 | margins and spires | **The margins' remaining step** (build log 2026-10-03, "Margins and spires"; pictures `review/out/margins-spires/index.html`, not committed). Submarine slope failure brought the baked margins from 9.5–10° to 4.2–5.9° between the 500 and 2,000 m isobaths (Earth 2.1°) and narrowed the shelves by about a third (shelf-hosted deposits fell with them). What is left is the plate model's crystalline ocean–continent step, one sample wide and drawn 8.1× narrower than on Earth, which nothing relaxes. (a, recommended) keep the failure at 2.5° and give the plate model an ocean–continent transition of Earth width in map metres (a `plates/` task after the plate work; it also gives back shelf room); (b) let the failure move crust too (5° at L1, but the shelves go: share of the sea under 200 m 0.05 → 0.017); (c) keep loads on old sea floor (the dampening at the age's rate) and recalibrate the sediment budget so the oceans do not fill; (d) leave the margins at about twice Earth's slope. | For the coordinator to put to Ben |
@@ -131,6 +129,68 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Not done.** No game launched, no real bake resampled onto a cube, the Moser table built at 512² only. No shipped code changed; no gates beyond the tools' own runs (nothing the build reads changed).
 - **Next.** Ben's four questions (Pending questions, "Seamless projection survey").
 
+### 2026-10-03/04 — A wrap engine of Deep Time's own for turning seams: design and server-side spike (Ben's "Immersive portals, begin custom wrap engine concurrently"; agent worktree agent-a9aa7e80efbedcf23, branch `dev/wrap-engine-spike`, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; dev-only, not merged)
+- **Design.** `docs/design/wrap-engine.md` (indexed in docs/research/README.md):
+  - five architectures compared: rotated chunk views; folded access at the `Level` boundary; a
+    replicated band; Toroidal World's client frame extended with turned packets; turned rendering on
+    the client;
+  - for each subsystem, the Minecraft and NeoForge hooks and the risks: block access, the band, light,
+    world generation and caves, entities and AI, client and network, Distant Horizons, the MIC pack;
+  - how Toroidal World 0.19.3 wraps (server canonical copy, unwrapped client frame, chunk-key aliasing,
+    a `PacketTranslator` choke point, byte-identical chunk payloads), read on `mc/1.21` `5ded155` by a
+    Sonnet sub-agent, and why a turn breaks it (`pos & 15` reverses).
+- **Recommended: one stored copy, folded access, a replicated band.**
+  - Every position that crosses the `Level` API is folded to the stored block, and states are turned.
+  - Real chunks beyond each edge hold turned copies, written straight into their sections.
+  - Entities are carried at the seam line, turned.
+  - Vanilla clients join unchanged; an optional client re-anchor removes the reload at a turning
+    crossing.
+- **Effort.** 46–75 agent days without Create trains (9–15 weeks), 56–95 with them. The engine's own
+  share beyond what the Immersive Portals route needs anyway is about 6–9 weeks.
+- **Spike.** Applied only with `-Ddeeptime.wrapspike=true`: `DeepTimeMixinPlugin` gates
+  `mixin.wrapspike.*`, and the tests use their own namespace `deeptime_wrapspike`, enabled only by
+  `./gametest.sh -PwrapSpike`.
+  - Code: `wrapspike/` (`CellIsometry`, `WrapEdge`, `WrapTopology`, `WrapEngine`,
+    `WrapSpikeGameTests`) and three mixins (`Level` get/set/fluid/block-entity, `handleNeighborChanged`,
+    `LevelTicks.schedule`/`hasScheduledTick`).
+  - Implementation choices: the band is depth 8 on the test sites; replica writes go straight into the
+    section, then heightmaps, light, `blockChanged`.
+- **Measured** (test VM, `./gametest.sh -PwrapSpike`, 2026-10-04 02:11): **All 3 required tests
+  passed, 34 of 34 assertions** [R], on one half-turn seam, block (x, z) beyond = (2cx−x−1, 2z0−z−1):
+  - stairs placed beyond the seam stored on the far side facing south; the band storage holds the
+    turned copy;
+  - an armour stand stopped at z0+0.2500 by the far side's block;
+  - water across: far channel amounts 6,5,4,3,2,1,0; a control site with no seam stays dry 7/7;
+  - wire power 15,14,13 | 12,11 across, and the far lamp lit; a repeater driving into the seam lit the
+    far lamp at power 15; both off again;
+  - an armour stand and an item carried across, turned 180°;
+  - block light 14 across the seam (≤ 2 without it).
+  - The first run's item check failed: its forceloaded chunk was not entity-ticking yet. It is fixed
+    by waiting.
+- **Not shown:**
+  - the client (not run);
+  - whole-world Guyou or Peirce dimensions, turn points and corners (unit tests only);
+  - band tickets and copy on load;
+  - players and ghosts;
+  - caves, Distant Horizons, Create, Sable, and Toroidal World on the same level;
+  - performance.
+- **Gates:**
+  - `WrapTopologyTest` passes 6 of 6. It checks the algebra (local isometry, images, Guyou, Peirce, a
+    quarter-turn corner) and failed on 2 bounded-seam edge cases before the fix.
+  - `./gradlew build test`: BUILD SUCCESSFUL, JUnit 271 tests, 0 failures, 2 skipped.
+  - No Rust changed (no cargo gates). The normal `./gametest.sh` was not run (batch rule); the spike
+    is inert there.
+- **Test VM incident.** From 00:59 to 02:00 UTC the admission queue froze, and every job on the VM
+  waited.
+  - The cause: `admit.py`'s wait-loop signal handler (`_install_wait_signals` → `bail`) enters
+    `with store` while the loop already holds `state.lock`. A SIGTERM, SIGINT or SIGHUP arriving
+    inside the loop's locked section therefore deadlocks that process with the lock held.
+  - It was pid 1044950 (`batch.sh`'s `gametest:standalone`, label deep-time). Someone else cleared it
+    at 02:00; this agent killed nothing.
+  - The fix belongs in `tools/remote/vm/admit.py`: the handler should only set a flag, or the lock
+    should be re-entrant.
+- **Next.** Ben's questions (Pending questions). If Phase 1 is approved: whole-world topologies, the
+  fast path, the full fold list and the band manager.
 ### 2026-10-03/04 — Load-based admission on the test VM replaces the M6-era caps (Ben's "No set slots ... Guess load, run if load is less than what is available + 25%"; agent worktree agent-a2e1d18f0b1a34569, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; installed on the VM, not merged)
 - **What it replaces.** The one-server lock (`deeptime-cache/server.lock`, `mac.sh --server`, preview.py,
   detached-server.sh, mic-climate.sh), "two simulations per agent, four of 2 threads on the box", and
@@ -140,11 +200,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   34 cases). `admit.py run --kind K [--server] -- cmd`: the kind's estimate (mean cores over a run,
   peak resident GiB) comes from a seed table, then from the kind's measured runs (weighted 90th
   percentile, each older run 0.85 of the next; the seed stays in the mix until three runs). The job
-  starts when the estimate fits in 1.25 × (free − reserved − headroom), for CPU and memory alike:
-  free cores = 32 − max(1-minute load, busy cores over the last 30 s from /proc/stat); free memory =
-  MemAvailable; reserved = what admitted jobs have not used yet (CPU until a job first reaches 80 %
-  of its estimate or for 3 minutes; memory for its whole life); headroom = 4 cores and 15 GiB for
-  the play server, a workbench run and ssh. Otherwise it waits in order, printing the reason; a smaller
+  starts when the estimate fits: CPU, 1.25 × (free − reserved − 4 cores kept for the play server,
+  a workbench run and ssh), free cores = 32 − max(1-minute load, busy cores over the last 30 s from
+  /proc/stat); memory by the rule in the **Memory rule** bullet below (first built as 1.25 × (free −
+  reserved − 15 GiB), changed the same day); reserved = what admitted jobs have not used yet (CPU
+  until a job first reaches 80 % of its estimate or for 3 minutes; memory for its whole life). Otherwise it waits in order, printing the reason; a smaller
   job may pass a bigger one until the bigger one has waited 15 minutes, then nothing passes it.
   Measurement: every 5 s the job's process tree, plus processes carrying its job id in their
   environment, plus the Gradle daemon its Gradle client is connected to (found through the client's
@@ -156,6 +216,25 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   and the estimates. Settings in /etc/default/deeptime-admit. Quick looks (cat, grep, git, ...) and
   detached starts run at once; unrecognised commands are kinds of their own (`shell:<program>`) and
   start at once once two measured runs show them short and small.
+- **Memory rule (Ben's answer, decisions log 2026-10-03; changed after the first build).** "Don't kill
+  old things, just prevent new ones from launching if their usage isn't within it. I.E. On a machine w/
+  4GB of ram we shouldn't force being under 3.5Gb at all times, If we are at 3.5Gb and a run is
+  predicted to use 200mb it is green to run. If an agent predicts it will use 0.4 Mb [GB] then it will
+  be red since that would use up 100% of the machine after margin is applied." Now: a job starts when
+  its memory estimate × 1.25 is **under** free memory, free = MemAvailable − memory reserved but not
+  yet used by admitted jobs (a job's reservation is its estimate minus what it has used so far, for
+  its whole life). The 15 GiB standing headroom is gone, the margin is on the job's prediction instead
+  of on the free memory (the first build admitted an estimate up to 1.25 × free, which would have run
+  a 0.6 GiB job into 0.5 GiB free), and running jobs are never stopped. A 4 GiB box with 0.5 GiB free:
+  0.2 GiB needs 0.25 and runs, 0.4 GiB needs 0.5, not under 0.5, and waits. An estimate is capped at
+  90 % of the box's memory ÷ 1.25 so that no job waits forever on an idle box. The CPU rule is
+  unchanged, including its 4-core headroom (the play server, a workbench run's burst and ssh; CPU
+  overcommit only slows jobs down, and `deeptime-admit status` still shows it). The waiting message
+  now reads "needs 0.40 GiB (+25% margin = 0.50), 0.50 free: it must be under the free memory";
+  `deeptime-admit status` prints both rules with the memory free now and the largest estimate that
+  would start. Tests (`test_admit.py`): Ben's 4 GiB example (3.5 used: 0.2 admitted, 0.4 waits), the
+  margin on the job not on free memory, memory reserved but not yet used, two jobs in one pass, and
+  running jobs untouched; the old 15 GiB test is rewritten. `RESERVE_MEM_GIB` is no longer a setting.
 - **Many servers at once.** A server job gets a slot: ports 26000 + 10·slot (game, RCON, query, voice
   chat, spares), an X display (:200 + slot) and a folder `deeptime-cache/servers/<job>` removed when
   it ends. `tools/smoke/instance.py` copies a server set into it (libraries/ linked, mods/ and the
@@ -240,6 +319,90 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `tools/remote/mac.sh --no-sync -- deeptime-admit status` shows what runs, what waits and why. A wait
   is the system working: never stop another agent's job to make room."
 
+### 2026-10-02 — Climate ice branch merged, flowing ice sheets off (agent worktree agent-a1c432fc38faa9742, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged into master)
+Ben's answer of 2026-10-02, "Merge with ice sheets off (Recommended)". On branch `worktree-agent-a1c432fc38faa9742`.
+
+- **How it was merged.** Master e50291c7 with the held ice branch merged in (`git merge --no-ff worktree-agent-adc924860a859865c-ice`, b2be641f), not rebased. There were three textual conflicts. (1) `checkpoint.rs`: master's crater catalogue had taken schema 9, so the ice sheet, weathering supply and snowball list are **schema 10** (FORMAT.md says so). (2) `editor_fields.json`: master's newer hints for `ocean_fraction` and `ice_sheet_height` were kept and the branch's four fields added (`present_climate`, `weathering_supply`, `carbon_step`, `ice_dynamics`). (3) STATUS.md: the branch's two build-log entries were kept and its answered pending question dropped. Everything else merged automatically and compiled unchanged: climate/, surface/ (flexure), presets, lang, FORMAT/EVENTS.
+- **The switch.** `climate.ice_dynamics` is **false** in `ClimateParams::default()` and in all eight built-in presets (four game, four pipeline). Its hint now says why. Off, the climate stage runs exactly the ice code master had (Nye's equilibrium profile with Imbrie's lag). It never steps the sheet and never adds its ice.
+- **Flexure and ice.** The hook exists on master. `surface/mod.rs` step 5c passes `climate/ice_thickness_m` (the ice at the step's end) to `flexure::step` as `ice_m`, and the ice is not kept in the carried load. With the sheets off that field is the equilibrium glaciers', the same ice master loads. No flowing-sheet ice ever reaches the plate. A new test checks it (below).
+- **Kept from the branch, per earlier decisions.** The present-day climate (`temperate` default, `natural`, `ice_age`, `snowball`); supply-limited and seafloor weathering; the 200-kyr clock; the land-ice fields for the hydrology (`climate/ice_thickness_m`, `glacier`, `ice_time_share`, `ice_max_*`, `ice_balance_m_yr`).
+- **Tests** (new, `climate/tests.rs`). `flowing_ice_sheets_are_off_by_default_and_in_every_built_in_preset` checks the default and all eight presets; it fails on the branch as it was. `with_the_sheets_off_the_sheet_settings_change_nothing` runs three 20-Myr coupled planets: sheets off; sheets off with five sheet-only settings at odd values; and sheets on with those values. Between the two off runs the land ice, its maximum, the glacier flag, the mass balance and the elevation that flexure bends are identical. The sheets-on run differs, so the comparison can see the sheet.
+- **Ledger.** CLM-147 to CLM-162: the switch, the present-day climate, supply-limited and seafloor weathering. All are `pending-rewrite` except the switch, which is an owner `game-choice`. GLA-067 to GLA-076: the flowing sheet and the ice mass balance, not `pending-rewrite`, because P1-26 keeps the sheet. CLM-082 is now 200 kyr. HNT-093 to HNT-096 cover the four new hints (HNT-090 to HNT-093 on the branch, renumbered at the merges with master 463ee83e and f545c0bc, whose deposit work and crust fix took HNT-090 to HNT-092; **now HNT-097 to HNT-100** after master 35dacc0e, see below). `// ledger:` ids sit beside the constants, and the climate and glacial pages list the rows. The climate page has a new section, "The ice branch, merged 2026-10-02". No source was fetched, so named sources are `cited-unverified`. `claims_counts.py --write`: 2,267 active rows.
+- **Small tool change.** The `deeptime run/stage` climate line now prints `sea_ice_frac` (the last plate step's annual-mean sea-ice share of the ocean, from the clock's series). `tools/review/p1-17-hyps.py` reads it and the sea level.
+- **Evidence** (`tools/review/p1-17-hyps.sh`, `earthlike_quick_16k`, 2 threads, 2 runs at a time on the test VM; master = e50291c7 with the climate-line patch, built separately; "off" = this branch's defaults; "on" = `--set climate.ice_dynamics=true`). Each cell gives seed 1 / seed 2:
+
+  | | master | off (default) | on (reference) |
+  |---|---|---|---|
+  | *scattered, 500 Myr* | | | |
+  | land share | 0.268 / 0.252 | 0.249 / 0.285 | 0.275 / 0.266 |
+  | land z50 / z90, m | 581 / 628; 1678 / 2034 | 631 / 653; 1949 / 1896 | 827 / 1034; 2259 / 2526 |
+  | land above 2 km | 0.055 / 0.105 | 0.094 / 0.085 | 0.138 / 0.198 |
+  | continental crust | 0.402 / 0.378 | 0.413 / 0.382 | 0.395 / 0.321 |
+  | land under ice | 0.143 / 0.135 | 0.101 / 0.106 | 0.150 / 0.155 |
+  | sea ice (of ocean) | 0.138 / 0.120 | 0.142 / 0.078 | 0.070 / 0.029 |
+  | T surface, °C; CO2, ppm | 10.1 / 11.0; 88 / 119 | 10.9 / 13.4; 113 / 271 | 15.3 / 18.4; 650 / 1726 |
+  | sea level, m | 25 / 20 | 31 / 32 | 4 / 7 |
+  | *supercontinent, 1000 Myr* | | | |
+  | land share | 0.191 / 0.208 | 0.165 / 0.178 | 0.263 / 0.222 |
+  | land z50 / z90, m | 727 / 859; 1822 / 2425 | 788 / 670; 2003 / 2042 | 759 / 668; 2205 / 2240 |
+  | land above 2 km | 0.071 / 0.168 | 0.100 / 0.104 | 0.133 / 0.132 |
+  | continental crust | 0.309 / 0.310 | 0.258 / 0.273 | 0.383 / 0.313 |
+  | land under ice | 0.117 / 0.105 | 0.061 / 0.077 | 0.153 / 0.152 |
+  | sea ice (of ocean) | 0.085 / 0.074 | 0.079 / 0.069 | 0.039 / 0.028 |
+  | T surface, °C; CO2, ppm | 13.7 / 14.5; 237 / 374 | 15.6 / 15.7; 471 / 475 | 17.1 / 18.1; 1052 / 1259 |
+  | sea level, m | 34 / 33 | 41 / 37 | 7 / 15 |
+
+  - **Run-to-run scatter: none here.** Re-runs of seed 1 (master and off, both starts) printed every figure identically on the same build and thread count.
+  - **"Off" is master's behaviour.** The merged build with the sheets off, run with the branch's carbon-cycle settings set back to master's (`weathering_supply=false`, `seafloor_weathering_share=0`, `carbon_step_kyr=100`, `present_climate=natural`), printed master's figures to the last digit on seed 1 of both starts (land, hypsometry, crust, land ice, sea ice, temperature, sea level). So the switch and the merge reproduce master exactly.
+  - **The default differences come from the carbon cycle.** All differences between "off" and master come from those decided carbon-cycle changes: CO2 1.3 to 2.3 times master's, 1 to 2 °C warmer, land ice 0.14 → 0.10 (scattered) and 0.11 → 0.07 (supercontinent). On the supercontinent the continental crust is 0.31 → 0.27 and the land 0.20 → 0.17 (two seeds; see the pending question).
+  - **Sheets on** hold 0.15 of the land under ice everywhere. That is the temperate present's cap, reached only by raising CO2 to 650 to 1,726 ppm (15 to 18 °C). Without that nudge they overgrow (47 to 52 %, build log 2026-10-01). This is the reference for turning them on after P1-26.
+- **Gates** (test VM, this branch at d95e332f before the docs commit). `cargo fmt --all -- --check` clean after one rustfmt pass on the ledger comments. `cargo clippy --workspace --all-targets -- -D warnings` clean. `cargo deny check licenses bans` ok. `cargo test --workspace --no-fail-fast` all pass (core 517 + 3 ignored, cli 54, format 63, the rest). `./gradlew build test`: tests=226 failures=0 skipped=1. `./gametest.sh`: all 68 required tests passed. `tools/smoke/install.sh mic` (168 mods) then `./gametest.sh -PwithMic`: all 68 passed.
+- **Re-checked after merging master 5c4d2ed and 00ef214c** (WP-7 rock, WP-11 Köppen, plate forces recorded but not applied, docs; head b026de22; continuation agent, same worktree). Seed 1 of both starts was re-run on the merged head and on master 00ef214c (with the same climate-line patch), 2 threads, 2 runs at a time. All 8 runs printed the table's seed-1 figures to the last digit: master, off, on, and "off with master's carbon cycle", which again equals master exactly on both starts (land 0.268 / 0.191, z50 581 / 727, z90 1678 / 1822, crust 0.402 / 0.309, land ice 0.143 / 0.117, sea ice 0.138 / 0.085, sea level 25 / 34). So the master code merged since e50291c7 changes none of these, and the seed-2 columns stand. Gates on b026de22: `cargo fmt --check`, `clippy -D warnings` and `deny check licenses bans` clean. `cargo test --workspace --no-fail-fast` all pass (core 534 + 3 ignored, cli 54, format 63, the rest). `./gradlew build test`: tests=226 failures=0 skipped=1. `./gametest.sh`: all 68 required tests passed. `tools/smoke/install.sh mic` (pack 57561c9, 160 mods linked) then `./gametest.sh -PwithMic`: all 68 passed. Claims counts after the merge: 2,305 active rows (2,315 after the merges with 463ee83e and f545c0bc).
+- **Merged again with master 463ee83e (deposit richness, vertical-scale study) and f545c0bc (the continental crust fix: resampling keeps each plate's footprint, arcs turn continental by maturity; iron-formation share 5 %); head 32a9a39d.** Conflicts were in STATUS (entries kept side by side) and the ledger only: master's deposit work and crust fix took HNT-090 to HNT-092, so the ice branch's four hints are now **HNT-093 to HNT-096**. The crust fix changes every world, so the table above no longer describes master; seed 1 of both starts was re-run on 32a9a39d and on master f545c0bc (with the climate-line patch), same method:
+
+  | seed 1 | master f545c0bc | off (default) | on (reference) |
+  |---|---|---|---|
+  | *scattered, 500 Myr* | | | |
+  | land share | 0.303 | 0.262 | 0.309 |
+  | land z50 / z90, m | 560 / 1717 | 453 / 1428 | 594 / 1711 |
+  | land above 2 km | 0.070 | 0.040 | 0.065 |
+  | continental crust | 0.380 | 0.374 | 0.386 |
+  | land under ice | 0.070 | 0.073 | 0.093 |
+  | sea ice (of ocean) | 0.148 | 0.110 | 0.064 |
+  | T surface, °C; CO2, ppm | 11.2; 138 | 11.9; 131 | 13.1; 242 |
+  | sea level, m | 40 | 43 | 13 |
+  | *supercontinent, 1000 Myr* | | | |
+  | land share | 0.219 | 0.173 | 0.181 |
+  | land z50 / z90, m | 618 / 1902 | 524 / 1876 | 505 / 1768 |
+  | land above 2 km | 0.086 | 0.085 | 0.075 |
+  | continental crust | 0.328 | 0.271 | 0.317 |
+  | land under ice | 0.169 | 0.089 | 0.155 |
+  | sea ice (of ocean) | 0.064 | 0.070 | 0.022 |
+  | T surface, °C; CO2, ppm | 14.1; 277 | 15.6; 429 | 18.4; 1102 |
+  | sea level, m | 24 | 38 | 19 |
+
+  "Off with master's carbon cycle" again printed master's figures to the last digit on both starts, so the switch still reproduces master exactly with the crust fix in. The carbon-cycle defaults now move the scattered world little (land ice 0.070 -> 0.073, CO2 138 -> 131) but the supercontinent as before (land ice 0.169 -> 0.089, land 0.219 -> 0.173, crust 0.328 -> 0.271, CO2 x1.5): the pending question on the carbon cycle's shift still stands (one seed here). With the sheets on, the scattered world holds 0.093 of its land under ice instead of 0.15. Gates on 32a9a39d: fmt, clippy `-D warnings`, deny clean; `cargo test --workspace --no-fail-fast` 742 passed, 0 failed (core 541 + 3 ignored); `./gradlew build test` tests=229 failures=0 skipped=1.
+- **GameTests on 32a9a39d: 66 of 68, the same two fail in both runs** (`./gametest.sh`, and `tools/smoke/install.sh mic` (pack 57561c9, 160 mods) then `./gametest.sh -PwithMic`; a first MIC attempt crashed in mod loading, Create's register callbacks and an unbound Artifacts attribute, a pack race, and passed loading on the retry). Both failures are on the `test_planet_real` planet (`planet_world_4k.json`, seed 11), which gametest.sh simulates afresh. Its climate now comes from the ice branch's carbon cycle together with master's crust fix; b026de22, before the crust fix, passed 68 of 68.
+  - `aCraterIsABowlOverBreccia`: crater 303 (3.9 km, fresh, 77.8 Myr, on land at y 224) has no breccia in the 15 blocks under its floor. `deeptime inspect-column` there gives the lens body from y 218 to y 246, centred at 232. That is the rim's height (232.2), not the drawn floor (224.2), so `impacts::to_body`'s `floor_y` (deep-time ground plus `kept() × aged profile at 0`, minus the cover) misses the 8-block bowl the amplifier draws. Even the 6 blocks of lens left under the floor read no breccia.
+  - `riversHold`: 96 of 898 water columns are lake columns with ground at the waterline ("dry shore"; the limit is 1 in 20; 354 of the 450 lake columns are iced).
+  - **Neither failure is the ice switch or the climate code.** Both tests pass on the same tree with `DEEPTIME_TEST_PLANET_SET` set to master's carbon cycle (`climate.weathering_supply=false climate.seafloor_weathering_share=0 climate.carbon_step_kyr=100 climate.present_climate=natural`, which reproduces master's planet), and with the branch's defaults on `seed=12` (`-PgametestOnly=aCraterIsABowlOverBreccia,riversHold`). The tests promise to pass on any planet (gametest.sh), so this planet exposes two latent defects, in the impact lens placement and in the lake shores. See the pending question "GameTests on the merged ice branch".
+- **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/ice-merge/` was deleted each time, after the numbers were copied here.
+- **Readied for landing on master 35dacc0e (2026-10-03; Ben's answers in the decisions log: "Fix both bugs, then land (Recommended)" and, for the carbon cycle, "Keep it (Recommended)").** Master 35dacc0e (the breccia and lake-shore fixes, the Lambert world, plate tasks 3–4, 35 m per block, margins and spires, seamless-wrapping prototype) merged in, f9b01ee5. Conflicts: `climate/mod.rs` (one hunk: master's per-row `geo.sy` against the branch's `IceRun`), STATUS, claims.md, CLM.md, HNT.md.
+  - **The sheet on Lambert's rows.** The textual conflict was one line, but master's Lambert grid makes every row's cells cos φ wide and 1/cos φ high, so `sheet::Grid`'s single row height (`dy: f64`) no longer held. `sheet::Grid::new` now takes per-row heights: a coarse row is as high as its fine rows together, the y gradients are taken between the rows' true centres (`Grid::y`), the cell areas are dx·dy per row, a coarse row wholly past a pole holds no ice and passes no flux (`Grid::on`), and the polar width clamp is a quarter of the equator row's height (on an even grid all of this is the old scheme exactly). New test `the_flow_conserves_ice_on_uneven_rows`. `deeptime climate-dem`'s sheet check takes the planet grid's true cells and area shares instead of cos φ. The sheets stay off by default, so default worlds do not run this code.
+  - **Ledger.** CLM: master's WP-14a had numbered its rows CLM-163 to CLM-166, above the branch's CLM-147 to CLM-162, so nothing moved; header recounted (154 rows). GLA: master's highest is GLA-066, the branch's GLA-067 to GLA-076 stand. HNT: master's margins work took HNT-093 (underwater slope), so the branch's four hints are now **HNT-097 to HNT-100** (were HNT-093 to HNT-096; no `// ledger:` comment named them, the hints live in `editor_fields.json`). `claims_counts.py --write`: 2,366 active rows. The two pending questions this branch had raised (the carbon cycle's shift, the GameTests) were answered on 2026-10-03 and are removed.
+  - **Gates on 82f7dda8.** `cargo fmt --check` clean, clippy `-D warnings` clean, `cargo test --workspace --no-fail-fast` 799 passed, 0 failed, 3 ignored; `cargo deny check licenses bans` ok; `./gradlew build test` tests=265 failures=0 skipped=2.
+  - **GameTests** (`./gametest.sh`, `-PwithMic` after `tools/smoke/install.sh mic`, `-PwithTerraBlender` after `tools/smoke/install.sh terrablender`, one hold of the server lock): on 82f7dda8 standalone 70 of 71, MIC 69 of 71, TerraBlender 69 of 71. `carversSpareWater` failed in all three: "the uncarved level holds only 581 water blocks in 2104 river or lake columns" (the test's premise, at least one per two columns). `farTerrainMatchesGeneratedChunks` (MIC: 120 of 128 columns within two blocks) and `farTerrainMatchesGeneratedChunksAcrossTheSeam` (TerraBlender: 57 of 64 within a block) are master's own, for other agents. The known master failures in the restart note (`magmaUnderActiveVolcanoes`, `riverBiomes`, `lakeIceAndSaltFollowTheClimate`, `realPlanetRockMatchesTheParityFixture`) and `climateConsistent` passed here. **`carversSpareWater` is the branch's planet, not its code:** on the seed-11 test planet the branch's carbon cycle makes, `riversHold`'s boxes hold 1,523 frozen lake columns of 1,725, one block deep, whose only "water" is the ice master's lake fix keeps on top, and the test counted liquid water only. It passed with master's carbon cycle on the same planet (`DEEPTIME_TEST_PLANET_SET` as in the entry above: 3,635 water blocks in 1,683 columns, drained 0) and with the branch's defaults on `seed=12` (3,608 in 1,812). Fix (2c71bee8, test only): the pass places a frozen lake's ice inside the shielded range, so the carvers must spare it like the water, and `RiverGameTests.isPlacedWater` counts it in `waterBlocks`, `drainedBlocks` and `holes`. After it, on 2c71bee8: `./gametest.sh` **71 of 71**; `carversSpareWater` alone passes with MIC and TerraBlender (2,104 placed-water blocks in 2,104 columns, drained 0, holes 0, 5,240 cuts under the beds) and on master's planet.
+  - **Measurements** (`tools/review/p1-17-hyps.sh`, `earthlike_quick_16k`, scattered start, 500 Myr, seeds 1–3, 2 threads; master = 35dacc0e built from a clean archive; branch = 82f7dda8 with its defaults, ice sheets off; runs started while the VM's 1-minute load was under 24):
+
+    | seed | land share (master → branch) | continental crust | T surface, °C | land under ice | CO2, ppm |
+    |---|---|---|---|---|---|
+    | 1 | 0.189 → 0.155 | 0.345 → 0.281 | 14.8 → 17.0 | 0.150 → 0.067 | 331 → 656 |
+    | 2 | 0.217 → 0.153 | 0.306 → 0.289 | 15.0 → 15.7 | 0.072 → 0.092 | 424 → 486 |
+    | 3 | 0.137 → 0.215 | 0.243 → 0.356 | 16.2 → 15.5 | 0.127 → 0.033 | 577 → 416 |
+    | mean | 0.181 → 0.174 | 0.298 → 0.309 | 15.3 → 16.1 | 0.116 → 0.064 | 444 → 519 |
+
+    Seed to seed the scatter is larger than the change in land and crust (master's land 0.137 to 0.217; the branch moves seed 3 up and seeds 1 and 2 down), so on this start and three seeds the carbon cycle shows no shift in land or crust either way. What it does shift: the land ice roughly halves (0.116 → 0.064, Earth ~0.10) and the world is 0.8 °C warmer with more CO2. The sheets-on reference was not re-run (off by default). Scratch `/Volumes/Graphide/ban/deeptime-runs/ice-land/` deleted after the numbers were copied here.
+- **Next.** Ready to land: merge `worktree-agent-a1c432fc38faa9742` into master (the coordinator). P1-26 per-cell climate (design approved, `docs/design/p1-26-per-cell-climate.md`, tasks T1–T11) is being built on this branch (`worktree-agent-a1d2d85d0bfeddcc8`): `sheet::Grid` now takes per-row heights (`Grid::new(fw, fh, &sx, &sy, cells)`), `kernel_of` with the supply limit, the clock's `Input`, schema 10. Turning `ice_dynamics` on is part of P1-26's calibration, once the cold bias is fixed.
 ### 2026-10-03 — Seamless wrapping: a quincuncial world joined by Immersive Portals, prototype (agent worktree agent-afec00aa80f7be0a6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; dev-only, not merged)
 - **What.** Ben's "prototype a pierce quincuil projection w/ 100% seamless wrappings ... with immersive portals" (log 2026-10-03), widened by the coordinator to compare Peirce and Guyou. New dev-only crate `crates/deeptime-quincuncial` (nothing depends on it): complex Jacobi functions and Carlson R_F, the Peirce square and its Guyou aspect as one map with the aspect as a parameter, the gluing table and Immersive Portals portals, a resampler of baked world data onto either layout, measurements (`deeptime-quincuncial stats|portals|place|resample`); 22 property tests. Prototype scripts `tools/proto/quincuncial/` (`proto.py`, `notw_jar.py`, `render.py`). Design doc `docs/design/seamless-wrapping.md`; science page `docs/science/quincuncial-projection.md`; ledger SCL-070 to SCL-077 (ids above 069 to stay clear of the Lambert branch); bibliography section "Quincuncial projections".
 - **Measured** (`deeptime-quincuncial stats`, b = 8192 / a = 11,585): same area spread for both aspects (blocks per planet area / mean: min 0.457, median 0.79, 99 % 4.6, ∞ at the four singular points); Peirce's singular points on the equator, Guyou's at ±45°; Guyou's equator a straight 16,384-block walk with one slide seam, Peirce's four legs through the singular points. Recommendation: Guyou.
@@ -257,6 +420,19 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Evidence on the ice branch's planet.** With the ice branch merged (uncommitted, then aborted: `32a9a39d`'s successor a2f51b75 with master 6f72f0dd) and the `seed=11` default test planet, `aCraterIsABowlOverBreccia` (crater 484, breccia in 5 of 5 columns), `riversHold` (dryShore 0 of 1,019 lake columns), `icePassLaysTheCover`, `lakeHolds`, `carversSpareWater` and `lakeIceAndSaltFollowTheClimate` pass; that planet has no frozen lake, so the lake fix was shown on the cold planet above.
 - **Gates** (test VM, head 280d4aa9 less docs: master 7c14e4ab merged; the cargo and JUnit runs were on b23b38ec, the same code): `cargo fmt --check`, clippy `-D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace` 557 core + 54 + 72 + 1 and the small ones, 0 failed; `./gradlew build test` 265 tests, 0 failures, 2 skipped. GameTests through `mac.sh --server`: `-PwithMic` 71 of 71 (`tools/smoke/install.sh mic` first); `./gametest.sh` 70 of 71 twice: `farTerrainMatchesGeneratedChunksAcrossTheSeam` fails (60 of 64 columns, worst (2002, -249) far -33, real -5) on this planet, and fails identically with this branch's WaterBodies and IcePass changes reverted, so it is the known master failure, not added here (the bake-time lens fix touches only the bodies file).
 - **Merging.** `git merge-tree` against master: clean. Against the ice branch (a2f51b75): the same four files that conflict between master and the ice branch (STATUS.md, claims.md, CLM.md, HNT.md, plus `climate/mod.rs` from master's newer climate work); this branch adds no conflict of its own. HYD-077 is new (master and the ice branch stop at HYD-076); recount with `claims_counts.py --write` after merging.
+
+### 2026-10-03 — The GameTests that failed on master: each root cause (agent worktree agent-a7304a5adc996ef91, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c, continued by a second agent after a stop; master 78cffc7b merged; not merged)
+- **How reproduced.** Master's test planet changed twice since the failures were seen (plate tasks 3+4 at 6f72f0dd, then the Lambert merge), and on both later planets the tests pass or read nothing (6f72f0dd: no active volcano, no wide river above the sea). So the failing planets were rebuilt from their own commits on the VM: the planet of 91b1550f (master df381d62 + the 35 m scale, where the four were measured) baked by that commit's `deeptime` and read by this branch's Java, and 6f72f0dd's whole tree for `climateConsistent`. Every failure reproduced exactly (same columns, same counts).
+- **`magmaUnderActiveVolcanoes` (all sets). Cause: the shell of a broad lens was too thin.** The shell was the ellipsoid with radii rh + 1.5 and rv + 1.5; with a lens's half-height capped at 5, from a radius of 46 blocks up that leaves less than a block over the flanks, so a lava block faced the rock above it (checked over every radius 10–90; none with the new rule). Volcano 78 (an active shield, rh 15, 17 lenses down to y −507, the lower ones about 70 blocks in radius) had noise caves there, at y −473 to −479, in the part of the column the −512 floor added (cdfc907d): a latent bug of the crust-deep column (78bc6b50) that the merged planet exposed. **Fix (generator):** `Magma.inShell` takes 1.5 blocks off the offset's horizontal distance and height, so the shell is 1.5 blocks thick across and up everywhere, for chambers too (MAG-011). Master's Lambert branch fixed the same leak independently (a37fa3ee, `touchesLens`: any block with a face on the lens); the merge keeps both. **Evidence:** on the 91b1550f planet, with the fix 0 air faces of 828,114 molten blocks on all three sets; with the old formula 51 air faces, every open neighbour outside the old shell (`NONE`, in the altered rock). `MagmaTest.broadLensesAreSealedOnEverySide` (a 45 km shield's lenses) fails on the old formula.
+- **`farTerrainMatchesGeneratedChunksAcrossTheSeam` (MIC). Cause: a Terralith canyon and coral reefs, not the seam or the projection; deterministic** (the same columns in every run: carvers are seeded by world seed and chunk). Terralith overrides `minecraft:canyon` (y −20 to 70, yScale up to 13.5); one cut through a sea bed two blocks under the water at (−1995, 519) down to y −2 and filled with water, and the next column (−1991, 519) to y 53. The other two misses were coral reefs of `terralith:deep_warm_ocean` up to 7 blocks over the bed at z 7, which the reader counted as ground. Standalone the same rows have neither (vanilla's canyon has other odds and range). **Fix (the test was wrong):** `FarTerrainCheck` reads under coral as it does under trees, and a column whose bed a carver cut below far terrain's ground (open and in the chunk's air carving mask) is counted apart, at most one in eight per tally (`carved_set_aside`). Far terrain draws the column rule, not the per-chunk carvers. On the 91b1550f planet with MIC: east 62 of 62 within two blocks, 2 set aside.
+- **`riverBiomes` (TerraBlender). Cause: the test knew only vanilla's swamps.** The 12 of 14 wide-channel samples that standalone read `minecraft:swamp` (vanilla's valley slice on the flattest wet ground) read `biomesoplenty:wetland` under TerraBlender: BOP puts its own swamp in that slot and tags it `#c:is_swamp`. **Fix (test):** swamp means any biome of `#c:is_swamp`. 91b1550f planet, TB: 2 river + 12 swamp of 14.
+- **`lakeIceAndSaltFollowTheClimate` (TerraBlender). Cause: an acacia's leaves over a playa column,** read as its ground; master already fixed it (3bff8305, reads under leaves, merged in 088d42a5 after the failing run). Passes on the 91b1550f planet with TB (24 of 24 playa columns salt).
+- **`climateConsistent` (standalone and MIC, master 6f72f0dd; the coordinator's addition). Cause: the wetland rule did its job and the census counted it against the taiga tags.** On that planet all of the D-climate land is a wet coastal plain under 150 m: all 47 Dfc columns lie in the bake's wetland band (vanilla's E6, which only the wetland rule BIO-066 reaches on land), 66 % swamp and 28 % beach (Dfb 67 % and 30 %). Vanilla itself puts swamp at E6 in the cold and temperate bands, and the cells are genuinely wet (Dfc mean humidity band 3.95, P/PET about 1.9). On the way a real input bug turned up: the rule read the humidity band *after* the class's rule, which lifts Dfc, Dfd, Dsc, Dsd, Dwc and Dwd to 3.05 (taiga humidity) and Af to 4.1, so all of their flat lowland counted as wet whatever the rainfall. **Fixes:** (1) generator: the wetland rule reads the aridity index's own band (BIO-066); the bake note records `wetland_cells_by_class`; new test `wetlands_follow_the_climate_not_the_class_band` (a P/PET 0.6 Dfc plain has no wetland, P/PET 3 has; fails on the old rule). On 6f72f0dd's planet this changes Dfc nothing (179 wetland cells either way; 11 Af cells fewer) and the test still failed. (2) test: `BiomeCensus` leaves land in the wetland band out of the Köppen families, as it does the cold deserts, and logs it (`wetlands_set_aside`, with how many are swamp); the GameTest fails if that band holds more than the rule's flat share (0.35) of the land. On 6f72f0dd's planet: 112 of 1,385 land columns set aside (69 on swamp), Dsub and Dfc:taiga left with no columns, `climateConsistent` passes. No floor was lowered. Whether boreal wetland should be vanilla's swamp at all is Ben's (Pending questions).
+- **Not this branch's:** `realPlanetRockMatchesTheParityFixture` (35 m; another agent).
+- **Gates** (test VM; head 615fb1e7, master 78cffc7b merged; later commits STATUS only): `cargo fmt --check` clean (after `cargo fmt` of the wetland change), clippy `-D warnings` clean, `cargo test --workspace` 767 passed / 0 failed / 3 ignored, `cargo deny check licenses bans` ok; `./gradlew build test` 266 tests, 0 failures, 2 skipped. GameTests through the server lock, after `tools/smoke/install.sh` of each set: `./gametest.sh` 71 of 71, `-PwithMic` 71 of 71, `-PwithTerraBlender` 71 of 71, `-PwithEv` 71 of 71. On master's current (Lambert) planet `magmaUnderActiveVolcanoes` reads nothing (no active volcano) and `riverBiomes` samples nothing above the sea, so their evidence is the 91b1550f planet's runs above; `realPlanetRockMatchesTheParityFixture` passes on this planet.
+- **Scratch:** `/Volumes/Graphide/ban/deeptime-runs/a7304/` on the VM (delete when this lands).
+- **Next step:** the coordinator merges; Ben answers the boreal-swamp question.
+
 ### 2026-10-03 — Distant Horizons curvature follows the planet (Ben's request in the decisions log; agent worktree agent-adffa6fb9561d851d, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Asked (Ben, decisions log 2026-10-03):** "btw, DH has world curvature settings, can you make it so those default to values that make sense for the given world a player is in (dependent upon the world size generated using our mod.)"
 - **Research (DH 3.3.1, the MIC pin; licence LGPL-3.0, read with javap and by opening the jar's shaders and lang file on the VM; nothing copied):** the setting is `Config.Client.Advanced.Graphics.Experimental.earthCurveRatio`, an Integer in [-5000, 5000], default 0 (flat), a client setting stored in the player's DH config. The terrain vertex shader draws a sphere of radius 6,371,000 / ratio blocks (uniform `uEarthRadius`, read through `ConfigEntry.get()` every frame); 1 to 49 is rewritten to 50 *and saved* by `WorldCurvatureConfigEventHandler`. Only DH's LOD meshes bend, not Minecraft's chunks. The API is `DhApi.Delayed.configs.graphics().earthCurvatureRatio()` (`IDhApiConfigValue<Integer>`, null until DH starts): `setValue`/`clearValue` act on an in-memory override layer that `get()` prefers and that is never saved; `getTrueValue()` is the player's file value; while the override is set DH's screen shows "API LOCK" on the entry. Details and ledger BAK-043 to BAK-047 in `docs/science/world-scale-and-bake.md` "Distant Horizons world curvature".
@@ -3042,6 +3218,133 @@ Ben asked for it ahead of the rest of Phase 3. On branch `worktree-agent-a6e8592
 - **Next step.** Ben's answers below; then either the pack-side table for Terralith's biomes on the MIC deep-time branch, or the exact-surface option. When P2-01's folds and faults land, give `FarColumn.rock`'s wide-column path the same rule.
 
 
+### 2026-10-01 — Climate ice branch: supply-limited weathering, the 200-kyr clock, the present-day climate setting, flowing ice sheets (not Earth-like yet: a decision for Ben) (agent worktree agent-adc924860a859865c, branch `worktree-agent-adc924860a859865c-ice`, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Review page:** https://spacesheep.dev/@benmac/deeptime-climate-ice (private; tables of every run below).
+- **Open decision (pending question): the flowing sheets' default.** `climate.ice_dynamics` is **on** in the
+  presets on this branch (Ben, 2026-09-30: "Yes, add ice-sheet dynamics") and does not give Earth-like ice on
+  the game's planets: three 500-Myr planets end with 47–52 % of the land under ice and the sea 273–312 m down
+  (off: 8–21 %, +20 to −50 m; master: 13–22 %, +16 to −19 m), the ice hardly cycles in the last 3 Myr, and the
+  default `temperate` present can then only clear the ice by heating the world to ~29 °C. **Do not merge with
+  the toggle on.** Recommended: off by default until the per-cell climate (P1-26), which replaces the banded
+  snowline and albedo the sheet is driven by. Not changed here: a default is Ben's.
+- **What the sheet itself does** (`deeptime climate-dem`, new "sheet" lines, Earth's 1° relief): 11.0 % of the
+  land under ice at today's line from bare ground (Earth ~10 %), 21.2 % with the line 1 km lower (LGM ~25 %),
+  12.6 % after an interglacial peak (line +300 m for 10 kyr), 15.8 % when the line only returns to today's.
+  So the flow, isostasy and calving are sound; the overgrowth comes from the coupling (band-wide albedo cooling
+  under a regional sheet, the sea-level drop lifting all land against the line, the elevation feedback). Six
+  one-change runs on seed 3 did not cure it (`ice_sheet_feedback` 0.5, `ice_ablation_gradient` 0.03,
+  `ice_accumulation_max_m_yr` 0.2, `glacio_eustasy` 0, `ice_relax_kyr` 0: 46–86 % ice).
+- **Sheet changes since the WIP:** calving at margins whose depressed bed lies below the sea
+  (`ice_calving_m_yr` 20, Pollard 1982; without it 19 % of Earth's land kept its ice after a glacial); a
+  diffusivity limiter (`MIN_STEP_YEARS` 10: same extents on Earth, 8× faster; the ice-age window 40 min → 4 min
+  at 2 threads); deep time's relaxation runs a third of its time with the line `INTERGLACIAL_RISE_M` (300 m)
+  higher.
+- **Supply-limited weathering** (Ben, 2026-09-30). Three fixes to the unverified WIP, found by the tests it
+  broke: (1) the sea floor's sink counts against the air only for the ice-free ocean (with all of it on the air
+  a frozen supercontinent stood at 0.6 bar CO₂ after 70 Myr and had not thawed); (2) the sea floor's sink is
+  itself supply-limited (`SEAFLOOR_SUPPLY_REL` 1 × today's degassing per unit of spreading); (3) the land's
+  supply follows the runoff (1 + k_r·ΔT), not the kinetics' 2^(ΔT/10), which had made the limit toothless.
+  Synthetic gap between snowballs 0.39 → 3.65 Myr; on a real planet (supercontinent, degassing 0.3, 1000 Myr,
+  sheets on) the gaps are 17.4 and 18.4 Myr (and one of 461), Ben's 9–19 Myr near the threshold; with the
+  sheets off they are 57–92 Myr at 0.3 and 3–8 Myr at 0.1.
+- **Snowball frequency after the runoff fix** (1000 Myr, `--set climate.degassing_scale=X`): at the default
+  degassing a supercontinent start has **2** snowballs with the sheets off (22 and 24 Myr long) and 0 with
+  them on; a scattered start has 0 either way. 0.3: 4 either way. 0.2 (off): 2. 0.1 (off): 8. No retune of
+  the defaults is proposed.
+- **Calibration, sheets off, against master** (same day's master binary, its presets): seed 1 scattered
+  12.7 °C / 180 ppm / 8 % ice / +20 m (master 13.8 / 198 / 15 % / +15); supercontinent 13.0 / 206 / 15 % / −10
+  (12.6 / 124 / 13 % / +16); seed 3 11.5 / 190 / 21 % / −50 (11.5 / 99 / 22 % / −19). The Earth check is
+  unchanged: 19 of 24 cities, kernel 2.8448·10⁷. The ice-age window swings 3–14 m of sea level with the sheets
+  off, as on master: Earth-size cycles need the sheets.
+- **`carbon_step_kyr` 200**, an editor setting; `the_200_kyr_clock_still_resolves_onset_and_escape` passes
+  (onset within 1.5 Myr, escape within 2 Myr of the 100-kyr clock).
+- **The present-day climate** (Ben, 2026-10-01): `climate.present_climate` = `temperate` (default) | `natural`
+  | `ice_age` | `snowball`; editor field `present_climate` (section Planet, a choice), lang keys, presets.
+  The run's last `present_adjust_kyr` (100) is run again with the atmosphere's CO₂ held at a factor of its
+  level (ramped in over 10 kyr), the smallest factor that reaches the state (bracket, four halvings, at most
+  ×10⁴); nothing is touched when the simulation already ends there. The carbon reservoirs stand still under
+  the factor (weathering took a large one back within the stretch). Everything older is the same run: the
+  test compares every plate step's row but the last and the window's rows before the stretch. A snowball the
+  setting sets off or ends carries `present_setting` as its cause; the note's `present` object has the factor
+  and the state without it. With the sheets off (3 planets): temperate leaves two alone and takes seed 3
+  from 21 % to 15 % ice with CO₂ × 3.3 (15.9 °C); ice age needs × 0.17–0.55 (25 % ice, 1.6–8.5 °C, sea −58 to
+  −80 m); snowball × 0.12–0.23 (−40 °C, all sea frozen, sea −330 m). Cost 17–41 s a run.
+- **For the hydrology** (Ben, 2026-10-01, "Yes, with the ice-sheet branch"): the climate publishes at L1 every
+  step `climate/ice_thickness_m`, `climate/glacier` (1 where ≥ 1 m), `climate/ice_time_share`, the LGM pair
+  `climate/ice_max_thickness_m` / `ice_max_extent`, and new `climate/ice_balance_m_yr` (surface mass balance:
+  negative = melt, the meltwater's source at the ice edge; FORMAT.md "The climate's ice fields"); per frame the
+  history has `deeptime:ice_thickness_m` and `deeptime:ice_cover`. All reflect the present-day setting.
+- **Checkpoint schema 9** (ice sheet, weathering supply, snowball list, the nudge's factor and note).
+- **Gates** (test machine): cargo fmt, clippy, `cargo test --workspace`, `cargo deny`, `./gradlew build test`
+  green on c831063 (160 Java tests); re-run on the final tree, see the commit. Knob extremes
+  (`tools/dev/knob_extremes.py --stage climate --only …present_climate,carbon_step`): 6 of 6 ok. No GameTests
+  (coordinator). **Not re-checked:** the `climateConsistent` floors on the test planet (its ice may change).
+- **Lost and redone:** a `mac.sh --pull` finished while I was editing the same files and overwrote two
+  edits; do not edit under a running `--pull`.
+- **Next.** Ben's answer on the sheets' default; then merge; P1-26 builds on `sheet::Grid`, `kernel_of` with
+  the supply limit and the clock's `Input`.
+
+### 2026-10-01 — Climate ice branch: master merged, nothing built; what is left and the runs to make (agent worktree agent-adc924860a859865c, branch `worktree-agent-adc924860a859865c-ice`, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **State.** Master 90e07ba is merged into the branch **without a build or a test** (M6 paused, new
+  machine pending). One textual conflict, `checkpoint.rs`: master's volcano catalogue took schema 8, so
+  the ice sheet / weathering supply / snowball list is now **schema 9** (FORMAT.md says so). Everything
+  else merged automatically, including `surface/mod.rs` (+212 lines of rivers and margins), the presets,
+  `editor_fields.json` and `BiomeGameTests.java`; none of that is compiled yet, so the first job on the
+  new machine is the build. The code before the merge (4867998) was built and short-tested; 269feae
+  (docs) and this merge were not.
+- **On the branch, written.** (1) Ice-sheet dynamics: `climate/sheet.rs`, shallow-ice flow (Mahaffy
+  scheme, n = 3) on a ~256-column grid, mass balance on the ice surface against the snowline (the
+  elevation feedback), isostasy (3 kyr), calving; every 2-kyr step in the orbital window, relaxed
+  30 kyr per plate step in deep time; switch `ice_dynamics`. (2) Supply-limited weathering (West
+  2012): per band W = S(1 − e^(−K/S)), S from the surface stage's erosion (floor 2 m/Myr) × 2700 kg/m³
+  × 1.26 mol/kg × `weathering_supply_scale` 2 × 2^(ΔT/10); plus a seafloor-weathering sink
+  (`seafloor_weathering_share` 0.2), added because the raw cap alone ran to a hothouse. (3)
+  `carbon_step_kyr` default 200, a setting (25–500 kyr) in `editor_fields.json`, presets synced; the
+  halving down to 1 kyr is unchanged and `the_200_kyr_clock_still_resolves_onset_and_escape` holds
+  onset and escape to 1.5 / 2 Myr against the 50-kyr clock (last passed at 4867998).
+- **Measured so far (before the merge, short runs only).** Synthetic snowball gap 0.23 → 9.1 Myr with the
+  supply cap (before the seafloor sink was added; not re-measured after). 4k test planet 21.0 °C /
+  1,694 ppm (master: 23 °C / 2,949 ppm). Earth-like 150 Myr: 15.7 °C, 367 ppm, 10 % of land glaciated.
+- **Not done.** The ice-age cycle's size on a real planet (target ~10 → 25 % of land glaciated, 100–130 m
+  of sea level); the snowball gap on a real planet (target 9–19 Myr near the threshold); snowball
+  frequency at the defaults after the runoff fix 970efd1 (the diamictite agent found none at
+  `degassing_scale` 0.3 and six at 0.1 over 1000 Myr on master); the 500-Myr calibration; the
+  `climateConsistent` floors, which were set for the 23 °C planet; knob extremes; the review page.
+- **Runs, in this order** (`D` = the release `deeptime` binary; outputs under the new machine's
+  `deeptime-runs/climate-ice/`; the scripts are this worktree's gitignored `build/dtc/runs5.sh`,
+  `runs6.sh`, `runs7.sh`, `summ.py`, `gaps.py`, paths to be changed for the new host):
+  1. Gates on the merge: `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`,
+     `cargo test --workspace`, `cargo deny check licenses bans`, `cd neoforge && ./gradlew build test`.
+  2. Earth check: `D climate-dem` on GMT `earth_relief_30m_p` (the 720-column dump was on the deleted
+     Mac copy; fetch it again). Pass: 19/24 as before, `KERNEL_EARTH` within 2 % of 2.845·10⁷.
+  3. Pre-window checkpoints, three planets:
+     `D stage climate --preset pipeline_quick_16k --start <S> --seed <N> --length-myr 500 --max-steps 248 --out <ck>`
+     for (scattered_continents, 1), (supercontinent, 1), (scattered_continents, 3).
+  4. Ice-age window from each checkpoint: `D stage climate --in <ck> --climate-json <f> --out <ck2>`
+     with the defaults, then one change at a time: `--set climate.ice_accumulation_gradient=0.01`,
+     `--set climate.ice_ablation_gradient=0.005`, `--set climate.ice_isostasy_kyr=10`,
+     `--set climate.ice_dynamics=false` (the old Nye + lag model, for the comparison). Read from the
+     series: glaciated share of land (min, max), sea-level swing, period.
+  5. Calibration: the same three planets, 500 Myr in full, no `--max-steps`, with
+     `--viewer <dir> --viewer-layers` for the review page. Compare with master's table in the 2026-09-29
+     entry (temperature, ppm, glaciated share, S/D).
+  6. Snowball frequency, 1000 Myr, supercontinent and scattered_continents (seed 1):
+     `--set climate.degassing_scale=X` for X = 1.0 (default), 0.3, 0.25, 0.2, 0.1, each with
+     `climate.weathering_supply` true and false (20 runs). From `snowball_spans_myr`: count, lengths, gaps.
+     If nothing snowballs at the defaults in plausible conditions, the retune options go to Ben with
+     these numbers; no default changes without his answer.
+  7. `tools/dev/knob_extremes.py --stage climate` for the new settings.
+  8. `./gametest.sh` and `./gametest.sh -PwithMic` (server slot) for `climateConsistent` on the now
+     21 °C test planet; re-set floors only with the class counts to show for it.
+  9. Review page, this entry completed, report. No merge into master by this agent.
+- **What P1-26 (per-cell climate) needs first.** It builds on `sheet::Grid` (moved to
+  `climate/coarse.rs`), on the sheet's forcing (`ela`, `precip`), on `kernel_of` with the supply limit
+  and on the clock's `Input`/`balance` signatures, and it re-measures `KERNEL_EARTH`. So before it
+  starts: steps 1–2 (the merge compiles and the Earth check holds), steps 4–6 decided (any retune of
+  the ice gradients, `weathering_supply_scale`, the seafloor share or degassing settles the carbon
+  balance P1-26 will normalise against), schema 9 fixed, and the branch merged into master. Steps 7–9
+  can follow in the same batch. P1-26 re-sets the `climateConsistent` floors itself (its §5.3), so step 8
+  only has to pass, not be tuned finely.
 ### 2026-10-01 — P1-22b lakes sized by the climate, and frozen (agent worktree agent-a2195c5c858c73075, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 Ben's decision of 2026-10-01, "Both: freeze them and size them by climate". On branch `worktree-agent-a2195c5c858c73075`, not merged, not pushed.
 

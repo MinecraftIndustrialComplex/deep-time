@@ -16,14 +16,16 @@ import sys
 KEYS = {
     "hypsometry": ["land_frac_area", "land_z_p50_m", "land_z_p90_m", "land_above_1km", "land_above_2km",
                    "sea_depth_p50_m", "shelf_frac_of_sea", "continental_frac", "continental_dry"],
-    "climate_final": ["t_surface_c", "t_land_c", "glaciated_land_frac", "co2_ppm", "snowballs"],
+    "climate_final": ["t_surface_c", "t_land_c", "glaciated_land_frac", "co2_ppm", "snowballs", "sea_ice_frac",
+                      "sea_level_m"],
     "margins records": ["active_mean"],
     "volcanoes_final": ["arc_base_p50_mean_m", "arc_base_p50_final_m"],
 }
 SHOW = [("land", "land_frac_area", "{:.3f}"), ("z50", "land_z_p50_m", "{:.0f}"), ("z90", "land_z_p90_m", "{:.0f}"),
         (">2km", "land_above_2km", "{:.3f}"), ("sea50", "sea_depth_p50_m", "{:.0f}"),
         ("crust", "continental_frac", "{:.3f}"), ("dry", "continental_dry", "{:.2f}"),
-        ("T", "t_surface_c", "{:.1f}"), ("ice", "glaciated_land_frac", "{:.3f}"), ("E", "koppen_E", "{:.2f}"),
+        ("T", "t_surface_c", "{:.1f}"), ("ice", "glaciated_land_frac", "{:.3f}"), ("seaice", "sea_ice_frac", "{:.3f}"),
+        ("sl", "sea_level_m", "{:.0f}"), ("E", "koppen_E", "{:.2f}"),
         ("B", "koppen_B", "{:.2f}"), ("active", "active_mean", "{:.2f}"), ("arc", "arc_base_p50_mean_m", "{:.0f}"),
         ("snow", "snowballs", "{:.0f}"), ("s", "seconds", "{:.0f}")]
 

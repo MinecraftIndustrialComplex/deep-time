@@ -16,11 +16,18 @@ Every heavy job (Minecraft servers, simulations, cargo and Gradle builds, render
   2. Its load is estimated for that kind: CPU cores (mean over a run) and resident memory (peak),
      from the seed table below until the kind has measured runs, then from those runs (a weighted
      90th percentile of the recent ones; newer runs weigh more).
-  3. It starts when that estimate fits in what is free plus 25 %: free cores are the CPU count minus
-     the larger of the 1-minute load and the measured busy cores of the last 30 s; free memory is
-     MemAvailable; both minus the part of each admitted job's estimate it has not reached yet (its
-     reservation) and minus the headroom kept for the play server, the workbench and its runs, and
-     ssh. Otherwise it waits in order, and says why on stderr.
+  3. It starts when its estimate fits what is free now. Memory (Ben, decisions log 2026-10-03: "Don't
+     kill old things, just prevent new ones from launching if their usage isn't within it ... If we
+     are at 3.5Gb and a run is predicted to use 200mb it is green to run. If an agent predicts it will
+     use 0.4 [GB] then it will be red since that would use up 100% of the machine after margin is
+     applied."): the job's estimate times 1.25 must be under free memory, where free memory is
+     MemAvailable minus the part of each admitted job's estimate it has not reached yet (its
+     reservation). The margin sits on the new job's prediction, not on the free memory, and there is no
+     standing memory headroom. Running jobs are never stopped. CPU (Ben, "available + 25%"): the
+     estimate fits in 1.25 x free cores, where free cores are the CPU count minus the larger of the
+     1-minute load and the measured busy cores of the last 30 s, minus the reservations and a small
+     headroom (RESERVE_CORES) for the play server, the workbench and ssh; CPU overcommit only slows
+     jobs down. Otherwise it waits in order, and says why on stderr.
   4. While it runs, its processes are sampled every few seconds (CPU and RSS of its process tree,
      plus processes that carry its job id in their environment, plus the Gradle daemon its Gradle
      client is talking to); at the end its mean and peak CPU, mean and peak RSS and wall time go to
@@ -97,9 +104,9 @@ def setting(name, default):
 
 CACHE = setting("CACHE", "/data/ban/deeptime-cache")
 DIR = setting("DIR", os.path.join(CACHE, "admit"))
-OVERCOMMIT = setting("OVERCOMMIT", 0.25)          # Ben: "available + 25%"
+OVERCOMMIT = setting("OVERCOMMIT", 0.25)          # CPU: fits in 1.25 x free cores. Memory: estimate x 1.25 < free
+MEM_CEILING = 0.9                                  # an estimate is capped so x1.25 fits in this share of the box
 RESERVE_CORES = setting("RESERVE_CORES", 4.0)      # play server 1, a workbench run's burst 2, ssh/system 1
-RESERVE_MEM_GIB = setting("RESERVE_MEM_GIB", 15.0)  # workbench run 9 (8 GiB cap + process), play growth 2, system 4
 STARVE_MIN = setting("STARVE_MIN", 15.0)
 POLL_S = setting("POLL_S", 3.0)
 SAMPLE_S = setting("SAMPLE_S", 5.0)
@@ -266,24 +273,23 @@ def quick(est):
     return est.get("runs", 0) >= 2 and est.get("wall_s", 1e9) <= QUICK_S and est["cpu"] <= 1.5 and est["mem_gib"] <= 2.0
 
 
-def plan(queue, jobs, cap, now, overcommit=None, reserve_cores=None, reserve_mem=None, starve_min=None):
+def plan(queue, jobs, cap, now, overcommit=None, reserve_cores=None, starve_min=None):
     """Which waiting jobs start now. queue: entries with "id", "enq", "est" (oldest first after
     sorting); jobs: admitted entries; cap: {"free_cpu", "mem_avail_gib", "cpu_total", "mem_total_gib"}.
     Returns ({id: True to start | reason string}, {"avail_cpu", "avail_mem"} before any start)."""
     overcommit = OVERCOMMIT if overcommit is None else overcommit
     reserve_cores = RESERVE_CORES if reserve_cores is None else reserve_cores
-    reserve_mem = RESERVE_MEM_GIB if reserve_mem is None else reserve_mem
     starve_min = STARVE_MIN if starve_min is None else starve_min
     ps = pendings(jobs, now)
     pend_cpu = sum(p[0] for p in ps)
     pend_mem = sum(p[1] for p in ps)
     avail_cpu = cap["free_cpu"] - pend_cpu - reserve_cores
-    avail_mem = cap["mem_avail_gib"] - pend_mem - reserve_mem
+    avail_mem = cap["mem_avail_gib"] - pend_mem        # free now; no standing headroom
     info = {"avail_cpu": round(avail_cpu, 2), "avail_mem": round(avail_mem, 2),
             "pending_cpu": round(pend_cpu, 2), "pending_mem": round(pend_mem, 2)}
     # No estimate may exceed what the box could ever give, or it would wait forever.
     max_cpu = max(1.0, cap["cpu_total"] - reserve_cores)
-    max_mem = max(1.0, cap["mem_total_gib"] - reserve_mem)
+    max_mem = max(1.0, cap["mem_total_gib"] * MEM_CEILING / (1 + overcommit))
     out = {}
     blocked_by = None
     for w in sorted(queue, key=lambda e: (e["enq"], e["id"])):
@@ -297,17 +303,18 @@ def plan(queue, jobs, cap, now, overcommit=None, reserve_cores=None, reserve_mem
         cpu = min(w["est"]["cpu"], max_cpu)
         mem = min(w["est"]["mem_gib"], max_mem)
         fits_cpu = cpu <= (1 + overcommit) * avail_cpu if avail_cpu > 0 else cpu <= 0
-        fits_mem = mem <= (1 + overcommit) * avail_mem if avail_mem > 0 else mem <= 0
+        fits_mem = mem <= 0 or mem * (1 + overcommit) < avail_mem
         if fits_cpu and fits_mem:
             out[w["id"]] = True
             avail_cpu -= cpu
-            avail_mem -= mem
+            avail_mem -= mem        # the next job in this pass sees it as reserved
             continue
         short = []
         if not fits_cpu:
             short.append(f"{cpu:.1f} cores, {max(avail_cpu, 0):.1f} free (+{overcommit:.0%} = {max(avail_cpu, 0) * (1 + overcommit):.1f})")
         if not fits_mem:
-            short.append(f"{mem:.1f} GiB, {max(avail_mem, 0):.1f} free (+{overcommit:.0%} = {max(avail_mem, 0) * (1 + overcommit):.1f})")
+            short.append(f"{mem:.2f} GiB (+{overcommit:.0%} margin = {mem * (1 + overcommit):.2f}), "
+                         f"{max(avail_mem, 0):.2f} free: it must be under the free memory")
         out[w["id"]] = "needs " + "; ".join(short)
         if now - w["enq"] >= starve_min * 60:
             blocked_by = w
@@ -700,12 +707,26 @@ class Store:
         self.hist_path = os.path.join(self.dir, "history.json")
         self.log_path = os.path.join(self.dir, "admit.log")
         self.fd = None
+        # One Store is shared by a job's main thread, its sampler thread and its signal handlers. A
+        # flock belongs to an open file description, so two entries each opening their own fd
+        # deadlocked the process against itself (2026-10-04: the second entry overwrote self.fd, the
+        # first lock leaked, and every job on the VM queued behind it). Entries now serialise on a
+        # re-entrant thread lock and only the outermost one opens, flocks and writes.
+        self._tlock = threading.RLock()
+        self._depth = 0
 
     def __enter__(self):
-        self.fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o664)
-        fcntl.flock(self.fd, fcntl.LOCK_EX)
-        self.state = self._read(self.state_path, {"jobs": {}, "queue": {}, "sys": []})
-        self._hist = None
+        self._tlock.acquire()
+        try:
+            if self._depth == 0:
+                self.fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o664)
+                fcntl.flock(self.fd, fcntl.LOCK_EX)
+                self.state = self._read(self.state_path, {"jobs": {}, "queue": {}, "sys": []})
+                self._hist = None
+            self._depth += 1
+        except BaseException:
+            self._tlock.release()
+            raise
         return self
 
     @property
@@ -716,14 +737,19 @@ class Store:
 
     def __exit__(self, *exc):
         try:
-            if exc[0] is None:
-                self._write(self.state_path, self.state)
-                if self._hist is not None:
-                    self._write(self.hist_path, self._hist)
+            self._depth -= 1
+            if self._depth == 0:
+                try:
+                    if exc[0] is None:
+                        self._write(self.state_path, self.state)
+                        if self._hist is not None:
+                            self._write(self.hist_path, self._hist)
+                finally:
+                    fcntl.flock(self.fd, fcntl.LOCK_UN)
+                    os.close(self.fd)
+                    self.fd = None
         finally:
-            fcntl.flock(self.fd, fcntl.LOCK_UN)
-            os.close(self.fd)
-            self.fd = None
+            self._tlock.release()
 
     @staticmethod
     def _read(path, default):
@@ -1147,9 +1173,12 @@ def status(as_json=False, store=None):
         return 0
     print(f"capacity: {cap['cpu_total']:.0f} cores, load {cap['load1']:.1f}, busy (30 s) {cap['busy30']}, free "
           f"{cap['free_cpu']:.1f} cores; {cap['mem_avail_gib']:.1f} of {cap['mem_total_gib']:.0f} GiB available")
-    print(f"reserved by running jobs: {info['pending_cpu']:.1f} cores, {info['pending_mem']:.1f} GiB; headroom kept: "
-          f"{RESERVE_CORES:g} cores, {RESERVE_MEM_GIB:g} GiB; left for new jobs: {info['avail_cpu']:.1f} cores, "
-          f"{info['avail_mem']:.1f} GiB (+{OVERCOMMIT:.0%})")
+    print(f"reserved by running jobs (not yet used): {info['pending_cpu']:.1f} cores, {info['pending_mem']:.1f} GiB")
+    print(f"rule, memory: a new job starts when its estimate x {1 + OVERCOMMIT:g} is under the free memory "
+          f"({info['avail_mem']:.1f} GiB now = available minus reserved, no standing headroom): "
+          f"largest estimate that starts now {max(info['avail_mem'], 0) / (1 + OVERCOMMIT):.1f} GiB; running jobs are never stopped")
+    print(f"rule, CPU: a new job starts when its estimate fits in {1 + OVERCOMMIT:g} x the free cores "
+          f"({info['avail_cpu']:.1f} now = free minus reserved minus {RESERVE_CORES:g} kept for the play server and ssh)")
     print(f"\nadmitted ({len(jobs)}):")
     for e in sorted(jobs, key=lambda e: e.get("admitted_at", 0)):
         m = e.get("measured", {})
