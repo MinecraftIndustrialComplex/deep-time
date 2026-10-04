@@ -5995,3 +5995,102 @@ The survey `docs/research/notes/seamless-projection-survey.md` and its tools (`t
 - Ledger ids: BIO-145; BIO-144 (its latitude is not in the excerpt)
 - Access: book; the publisher's excerpt is open.
 - Read in this pass (2026-10-04, excerpt fetched and converted with pdftotext): the change from lowland to lower montane forest "is normally observed at the elevation where the average minimum temperature drops below 18 °C ... On large equatorial inland mountains this transition usually occurs at an altitude of 1200–1500 m.a.s.l. and coincides with the general range of incipient and intermittent cloud formation"; the regional altitude table gives lower limits of cloud forest from 1000 to 2000 m (most 1000–1500 m), and 400–700 m on small islands; the potential-distribution method it describes (Kapos et al. 2000) takes mountain land from 1000 m (300 m where the local relief exceeds 300 m). The latitude limits (about 23° N in Mexico, 25° S in Argentina) come from a search-result snippet of another work, not read.
+
+## Sphere-native simulation grids, added 2026-10-04 with the sphere-native grids note
+
+The research note `docs/research/notes/sphere-native-grids.md` and its benchmark (`tools/research/sphere-grid-bench/`) rest on these; nothing shipped does yet, so no ledger row cites them. "Sub-agent" means a Sonnet sub-agent of the note's session, whose transcriptions were kept in the session scratchpad (not committed, not in the source library). The note also cites, for their sphere use, works already listed above: [Braun2013] (not read), [Barnes2014], [Cortial2019], [SmithBarstad2004], [Hergarten2021], [Fastscapelib] (its `HealpixGrid`, release 0.3.0, 2025) and [Landlab] (its `IcosphereGlobalGrid`). The note's §13 lists every source with how it was read; the entries below are the ones its conclusions lean on.
+
+### PutmanLin2007
+- Reference: Putman, W. M. and Lin, S.-J. (2007). Finite-volume transport on various cubed-sphere grids. Journal of Computational Physics 227(1):55-78. doi:10.1016/j.jcp.2007.07.022.
+- Ledger ids: none (the note's §2.2: gnomonic against conformal and elliptic cubed spheres; conformal min/mean cell 0.16 at c360)
+- Access: author copy open. Read so far: full text read by a sub-agent as extracted text, 2026-10-04 (a web summariser's version was discarded after it invented content).
+
+### Harris2021FV3
+- Reference: Harris, L., Chen, X., Putman, W., Zhou, L. and Chen, J.-H. (2021). A scientific description of the GFDL finite-volume cubed-sphere dynamical core. NOAA Technical Memorandum OAR GFDL 2021-001 (authors from memory of the memo; the sub-agent recorded the memo number).
+- Ledger ids: none (§2.2: edge imprinting, the Duo-Grid)
+- Access: open. Read so far: relevant sections by a sub-agent, 2026-10-04; FV3's `fv_arrays.F90`, `fv_mp_mod.F90` and `sw_core.F90` read as code (ghost width 3, corner fills).
+
+### Ronchi1996
+- Reference: Ronchi, C., Iacono, R. and Paolucci, P. S. (1996). The "cubed sphere": a new method for the solution of partial differential equations in spherical geometry. Journal of Computational Physics 124(1):93-114.
+- Ledger ids: none
+- Access: paywalled. Read so far: abstract only (reference checked on Crossref by a sub-agent).
+
+### StaniforthThuburn2012
+- Reference: Staniforth, A. and Thuburn, J. (2012). Horizontal grids for global weather and climate prediction models: a review. Quarterly Journal of the Royal Meteorological Society 138(662):1-26. doi:10.1002/qj.958.
+- Ledger ids: none (§2.1)
+- Access: paywalled. Read so far: abstract (Crossref) and the ten desiderata as quoted in the authors' later GungHo paper (Staniforth, Melvin and Wood 2013), by a sub-agent.
+
+### Gorski2005
+- Reference: Górski, K. M., Hivon, E., Banday, A. J., Wandelt, B. D., Hansen, F. K., Reinecke, M. and Bartelmann, M. (2005) (full author list, pages and issue from memory). HEALPix: a framework for high-resolution discretization and fast analysis of data distributed on the sphere. The Astrophysical Journal 622(2):759-771. arXiv:astro-ph/0409513.
+- Ledger ids: none (§2.4, §3.1; the benchmark's HEALPix centres follow its nested-scheme face formulas)
+- Access: open (arXiv). Read so far: full text by two sub-agents, 2026-10-04.
+
+### TomitaSatoh2004 and Satoh2014
+- Reference: Tomita, H. and Satoh, M. (2004). A new dynamical framework of nonhydrostatic global model using the icosahedral grid. Fluid Dynamics Research 34:357-400 (the sub-agent read the authors' 2004 ECMWF seminar paper on NICAM); Satoh, M. et al. (2014). The Non-hydrostatic Icosahedral Atmospheric Model: description and development. Progress in Earth and Planetary Science 1:18. doi:10.1186/s40645-014-0018-1.
+- Ledger ids: none (§2.3: structured 2-D storage on 10 diamonds; N² against N³ cost; memory throughput)
+- Access: open (the seminar paper and PEPS). Read so far: relevant sections by a sub-agent; Yashiro's 2014 ECMWF slides (NICAM data structure and offsets) in full by another.
+
+### Adamidis2025
+- Reference: Adamidis, P. et al. (2025). Geoscientific Model Development 18:905 (an exascale case study of ICON's performance).
+- Ledger ids: none (§3.2: "horizontal neighbour relations cannot be exploited in the memory layout"; ICON behaves like HPCG)
+- Access: open. Read so far: relevant sections by a sub-agent.
+
+### KageyamaSato2004
+- Reference: Kageyama, A. and Sato, T. (2004). "Yin-Yang grid": an overset grid in spherical geometry. Geochemistry, Geophysics, Geosystems 5(9):Q09005. arXiv:physics/0403123.
+- Ledger ids: none (§2.1, §2.4)
+- Access: open (arXiv). Read so far: full text by a sub-agent.
+
+### Malardel2016
+- Reference: Malardel, S., Wedi, N., Deconinck, W., Diamantakis, M., Kühnlein, C., Mozdzynski, G., Hamrud, M. and Smolarkiewicz, P. (2016) (full author list, pages and issue from memory). A new grid for the IFS. ECMWF Newsletter 146:23-28.
+- Ledger ids: none (§2.1, §2.4)
+- Access: open. Read so far: full text by a sub-agent.
+
+### Schaeffer2013
+- Reference: Schaeffer, N. (2013). Efficient spherical harmonic transforms aimed at pseudospectral numerical simulations. Geochemistry, Geophysics, Geosystems 14(3):751-758. arXiv:1202.6522.
+- Ledger ids: none (§5: SHTns timings, Table 1)
+- Access: open (arXiv). Read so far: full text by a sub-agent.
+
+### Stevens2019
+- Reference: Stevens, B. et al. (2019). DYAMOND: the DYnamics of the Atmospheric general circulation Modeled On Non-hydrostatic Domains. Progress in Earth and Planetary Science 6:61.
+- Ledger ids: none (§2.2: simulated days per day by model)
+- Access: open. Read so far: relevant sections by a sub-agent.
+
+### Araujo2021
+- Reference: Araújo, R. C., Gross, L. and Xavier-de-Souza, S. (2021). Boosting memory access locality of the spectral element method with Hilbert space-filling curves. arXiv:2104.08416.
+- Ledger ids: none (§3.2)
+- Access: open. Read so far: full text by a sub-agent.
+
+### Aupy2016
+- Reference: Aupy, G., Park, J. and Raghavan, P. (2016). Locality-aware Laplacian mesh smoothing. arXiv:1606.00803.
+- Ledger ids: none (§3.2)
+- Access: open. Read so far: full text by a sub-agent.
+
+### Bercea2016
+- Reference: Bercea, G.-T. et al. (2016). A structure-exploiting numbering algorithm for finite elements on extruded meshes, and its performance evaluation in Firedrake. arXiv:1604.05937 (published in Geoscientific Model Development 9).
+- Ledger ids: none (§3.2)
+- Access: open. Read so far: full text by a sub-agent.
+
+### Kreutzer2014
+- Reference: Kreutzer, M., Hager, G., Wellein, G., Fehske, H. and Bishop, A. R. (2014) (full author list, pages and issue from memory). A unified sparse matrix data format for efficient general sparse matrix-vector multiplication on modern processors with wide SIMD units. SIAM Journal on Scientific Computing 36(5):C401-C423. arXiv:1307.6209.
+- Ledger ids: none (§3.2: SIMD and memory-bound kernels)
+- Access: open (arXiv). Read so far: full text by a sub-agent.
+
+### Salles2020 and Salles2023
+- Reference: Salles, T., Mallard, C. and Zahirovic, S. (2020) (full author list, pages and issue from memory). gospl: Global Scalable Paleo Landscape Evolution. Journal of Open Source Software 5(56):2804. doi:10.21105/joss.02804; Salles, T. et al. (2023). Nature 624:115-121, doi:10.1038/s41586-023-06777-z (Methods describe goSPL's global runs); Salles, T. et al. (2023). Hundred million years of landscape dynamics from catchment to global scale. Science 379:918-923, doi:10.1126/science.add2541.
+- Ledger ids: none (§4)
+- Access: JOSS and the Nature Methods (PMC) open; Science paywalled. Read so far: JOSS and Nature Methods in full, goSPL documentation (technical guide, HPC scaling) by a sub-agent; Science abstract only.
+
+### CordonnierBovyBraun2019
+- Reference: Cordonnier, G., Bovy, B. and Braun, J. (2019). A versatile, linear complexity algorithm for flow routing in topographies with depressions. Earth Surface Dynamics 7:549-562. doi:10.5194/esurf-7-549-2019.
+- Ledger ids: none (§4: routing on any planar graph)
+- Access: open. Read so far: full text by a sub-agent.
+
+### Cordonnier2016
+- Reference: Cordonnier, G., Braun, J., Cani, M.-P., Benes, B., Galin, É., Peytavie, A. and Guérin, É. (2016) (full author list, pages and issue from memory). Large scale terrain generation from tectonic uplift and fluvial erosion. Computer Graphics Forum 35(2):165-175. doi:10.1111/cgf.12820.
+- Ledger ids: none (§4, §6)
+- Access: author copy open. Read so far: full text by two sub-agents.
+
+### HergartenRobl2022
+- Reference: Hergarten, S. and Robl, J. (2022). The linear feedback precipitation model (LFPM 1.0): a simple and efficient model for orographic precipitation in the context of landform evolution modeling. Geoscientific Model Development 15:2063-2084. doi:10.5194/gmd-15-2063-2022.
+- Ledger ids: none (§5: a non-spectral orographic rain model; §11 question 3)
+- Access: open. Read so far: full text by a sub-agent.
