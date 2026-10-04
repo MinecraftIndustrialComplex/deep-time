@@ -113,6 +113,8 @@
   "deeptime.editor.field.collapse_quiet": "Quiet time before collapse",
   "deeptime.editor.field.collapse_reach": "Mountain collapse reach",
   "deeptime.editor.field.crust_max": "Thickest continental crust",
+  "deeptime.editor.field.transition_width": "Continental margin width",
+  "deeptime.editor.field.transition_time": "Continental margin forming time",
   "deeptime.editor.field.arc_range_uplift": "Arc mountain uplift",
   "deeptime.editor.field.arc_range_width": "Arc mountain width",
   "deeptime.editor.field.arc_range_height": "Arc mountain height",

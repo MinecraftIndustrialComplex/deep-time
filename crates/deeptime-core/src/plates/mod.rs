@@ -64,6 +64,7 @@ pub mod shortening;
 pub mod state;
 pub mod stats;
 pub mod subduction;
+pub mod transition;
 
 use std::collections::BTreeMap;
 
@@ -237,6 +238,12 @@ impl PlatesStage {
             .globals
             .entry(collapse::GAINED_GLOBAL.to_owned())
             .or_insert(0.0) += f64::from(fell.converted) * env.norm.sample_area_km2();
+        // Rifted margins taper from continent to ocean over Earth's width (`transition.rs`).
+        let taper = transition::step(st, &cache.geo, &pos, &env);
+        *world
+            .globals
+            .entry(transition::MOVED_GLOBAL.to_owned())
+            .or_insert(0.0) += taper.moved_km2_m / 1000.0;
         let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
         // The force balance, recorded and not applied (`forces.rs`; nothing when the record is
         // off).
@@ -260,7 +267,7 @@ impl PlatesStage {
             sutured |= done.sutured;
         }
         hotspots::step(st, world, &pos, &tree, &env)?;
-        surface(st, &cache.geo, &env);
+        surface(st, &cache.geo, &env, &taper.floor_m);
         finish_samples(st, &cache.geo, &z0, &env);
         let arcs = dynamics::arc_heights(st);
 
@@ -617,7 +624,7 @@ fn note_dynamics(st: &PlateState, world: &mut WorldState) {
 /// Continental erosion, oceanic dampening, trench accretion and the rock pools (Cortial §4.5,
 /// `pools.rs`), then eroded rock moves one hop downhill as sediment (to the lowest lattice
 /// neighbour of the same rigid group).
-fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>) {
+fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32]) {
     let k = env.k;
     let rates = SurfaceRates {
         erosion_m: k.continental_erosion_mm_yr * 1.0e-3 * env.dt_yr,
@@ -633,7 +640,8 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>) {
     let eroded: Vec<f64> = st
         .samples
         .par_iter_mut()
-        .map(|s| surface_step(s, &rates))
+        .enumerate()
+        .map(|(i, s)| surface_step(s, &rates, held_floor.get(i).copied().unwrap_or(f32::NAN)))
         .collect();
     let samples = &st.samples;
     let targets: Vec<(u32, f32)> = (0..samples.len())
