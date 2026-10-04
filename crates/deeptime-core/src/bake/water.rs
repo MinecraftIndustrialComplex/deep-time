@@ -150,6 +150,7 @@ pub(crate) fn halve(g: &GridDesc, v: &[i16]) -> (GridDesc, Vec<i16>) {
         wraps_x: g.wraps_x,
         origin_block_x: g.origin_block_x,
         origin_block_z: g.origin_block_z,
+        z_edges: g.z_edges,
     };
     (grid, out)
 }
