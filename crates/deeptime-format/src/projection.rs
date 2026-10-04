@@ -733,7 +733,7 @@ impl PetroffGuyou {
 
     /// Polar-aspect unit vector → world unit vector.
     #[inline]
-    fn to_world(&self, v: [f64; 3]) -> [f64; 3] {
+    fn polar_to_world(&self, v: [f64; 3]) -> [f64; 3] {
         let (pa, pe, pf) = (dot3(self.a, v), dot3(self.e, v), dot3(self.f, v));
         [
             self.a2[0] * pa + self.e2[0] * pe + self.f2[0] * pf,
@@ -744,7 +744,7 @@ impl PetroffGuyou {
 
     /// World unit vector → polar-aspect unit vector.
     #[inline]
-    fn to_polar(&self, v: [f64; 3]) -> [f64; 3] {
+    fn world_to_polar(&self, v: [f64; 3]) -> [f64; 3] {
         let (pa, pe, pf) = (dot3(self.a2, v), dot3(self.e2, v), dot3(self.f2, v));
         [
             self.a[0] * pa + self.e[0] * pe + self.f[0] * pf,
@@ -778,13 +778,13 @@ impl PetroffGuyou {
         };
         let (lam, phi) = self.pet.inverse(0.5 * (u + v), 0.5 * (v - u));
         let phi = if south { -phi } else { phi };
-        self.to_world(unit_pm(lam, phi))
+        self.polar_to_world(unit_pm(lam, phi))
     }
 
     /// The canonical point (x, z) of a unit vector (any length > 0): x in [−b, b), z in
     /// [−b/2, b/2].
     pub fn point_of_unit(&self, v: [f64; 3]) -> (f64, f64) {
-        let q = self.to_polar(v);
+        let q = self.world_to_polar(v);
         let phi = pm::atan2(q[2], (q[0] * q[0] + q[1] * q[1]).sqrt());
         let lam = pm::atan2(q[1], q[0]);
         let south = phi < 0.0;
@@ -1024,6 +1024,9 @@ impl IndexFrame {
 }
 
 /// A world's projection: what its world data is laid out in (manifest `projection`).
+// Copy on purpose (it is passed by value everywhere); the Petroff–Guyou variant's constants make it
+// a few hundred bytes, which is fine for a value made once per world.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum WorldProjection {
     Lambert(Projection),

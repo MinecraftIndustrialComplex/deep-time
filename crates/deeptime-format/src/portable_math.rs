@@ -24,17 +24,17 @@
 //! across the languages is tested by the parity fixture (`ColumnParityTest`, the pages' check).
 
 /// π/2's high part: 33 significant bits, so k·P1 is exact for |k| < 2²⁰ (fdlibm's `pio2_1`).
-const P1: f64 = 1.570_796_326_734_125_614_17;
+const P1: f64 = 1.570_796_326_734_125_6;
 /// π/2 − P1 (fdlibm's `pio2_1t`).
-const P1T: f64 = 6.077_100_506_506_192_249_32e-11;
+const P1T: f64 = 6.077_100_506_506_192e-11;
 /// π/2 rounded to double.
-pub const HALF_PI: f64 = 1.570_796_326_794_896_558;
+pub const HALF_PI: f64 = std::f64::consts::FRAC_PI_2;
 /// π/2 − HALF_PI.
-const HALF_PI_LO: f64 = 6.123_233_995_736_766_036e-17;
+const HALF_PI_LO: f64 = 6.123_233_995_736_766e-17;
 /// π rounded to double.
-pub const PI: f64 = 3.141_592_653_589_793_116;
+pub const PI: f64 = std::f64::consts::PI;
 /// π − PI.
-const PI_LO: f64 = 1.224_646_799_147_353_207_2e-16;
+const PI_LO: f64 = 1.224_646_799_147_353_2e-16;
 
 /// sin r on |r| ≤ π/4 (about): Taylor series to r²³.
 #[inline]
