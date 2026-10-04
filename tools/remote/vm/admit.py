@@ -707,12 +707,26 @@ class Store:
         self.hist_path = os.path.join(self.dir, "history.json")
         self.log_path = os.path.join(self.dir, "admit.log")
         self.fd = None
+        # One Store is shared by a job's main thread, its sampler thread and its signal handlers. A
+        # flock belongs to an open file description, so two entries each opening their own fd
+        # deadlocked the process against itself (2026-10-04: the second entry overwrote self.fd, the
+        # first lock leaked, and every job on the VM queued behind it). Entries now serialise on a
+        # re-entrant thread lock and only the outermost one opens, flocks and writes.
+        self._tlock = threading.RLock()
+        self._depth = 0
 
     def __enter__(self):
-        self.fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o664)
-        fcntl.flock(self.fd, fcntl.LOCK_EX)
-        self.state = self._read(self.state_path, {"jobs": {}, "queue": {}, "sys": []})
-        self._hist = None
+        self._tlock.acquire()
+        try:
+            if self._depth == 0:
+                self.fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o664)
+                fcntl.flock(self.fd, fcntl.LOCK_EX)
+                self.state = self._read(self.state_path, {"jobs": {}, "queue": {}, "sys": []})
+                self._hist = None
+            self._depth += 1
+        except BaseException:
+            self._tlock.release()
+            raise
         return self
 
     @property
@@ -723,14 +737,19 @@ class Store:
 
     def __exit__(self, *exc):
         try:
-            if exc[0] is None:
-                self._write(self.state_path, self.state)
-                if self._hist is not None:
-                    self._write(self.hist_path, self._hist)
+            self._depth -= 1
+            if self._depth == 0:
+                try:
+                    if exc[0] is None:
+                        self._write(self.state_path, self.state)
+                        if self._hist is not None:
+                            self._write(self.hist_path, self._hist)
+                finally:
+                    fcntl.flock(self.fd, fcntl.LOCK_UN)
+                    os.close(self.fd)
+                    self.fd = None
         finally:
-            fcntl.flock(self.fd, fcntl.LOCK_UN)
-            os.close(self.fd)
-            self.fd = None
+            self._tlock.release()
 
     @staticmethod
     def _read(path, default):
