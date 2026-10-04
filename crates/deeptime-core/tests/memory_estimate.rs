@@ -83,6 +83,9 @@ fn no_stage_holds_more_than_its_estimate() {
     let dir: PathBuf =
         std::env::temp_dir().join(format!("deeptime-memory-estimate-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
+    // The model's figures, without the freed blocks the allocator keeps for reuse (at most
+    // `alloc::CACHE_BYTES`, which the estimate adds on its own).
+    alloc::set_cache_limit(0);
     let start = alloc::in_use();
     alloc::reset_peak();
     let gauge = Arc::new(Gauge {

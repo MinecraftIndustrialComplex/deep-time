@@ -23,6 +23,8 @@ mod tests {
         );
         assert!(peak() >= 64 << 20);
         drop(v);
+        // The freed block is kept for reuse, and counted, until the cache is released.
+        deeptime_core::alloc::release_cache();
         // Other test threads allocate concurrently, so only check the order of magnitude.
         assert!(in_use() < before + (32 << 20));
     }

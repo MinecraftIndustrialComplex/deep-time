@@ -192,11 +192,11 @@ pub fn estimate_for(
         mem_cap
     };
     let (mut peak, mut base, mut history, mut spill) = (0u64, 0u64, 0u64, 0u64);
-    // The world the stages so far built (their largest base and history): it stays in memory
-    // under the stages after them.
+    let list = preset.stages();
+    // Each stage's working set and history: the world the stages so far built (their largest
+    // base and history) stays in memory under the stages after them.
     let (mut world, mut world_history) = (0u64, 0u64);
-    let stages: Vec<Value> = preset
-        .stages()
+    let mut sets: Vec<(u64, u64)> = list
         .iter()
         .map(|s| {
             let e = s.estimate();
@@ -208,6 +208,21 @@ pub fn estimate_for(
             }
             world = world.max(b);
             world_history = world_history.max(hist);
+            (b, hist)
+        })
+        .collect();
+    // A coupled group's stages step in turn over the same world: each holds the group's most.
+    for g in stage_groups(&list)? {
+        let most = sets[g.clone()]
+            .iter()
+            .fold((0, 0), |a, &(b, h)| (a.0.max(b), a.1.max(h)));
+        sets[g].iter_mut().for_each(|x| *x = most);
+    }
+    let stages: Vec<Value> = list
+        .iter()
+        .zip(&sets)
+        .map(|(s, &(b, hist))| {
+            let e = s.estimate();
             let held = hist.min(cap.saturating_sub(b));
             let spilled = hist - held;
             peak = peak.max(b + held);
@@ -519,7 +534,7 @@ impl Session {
             }
         }
         let stage_names: Vec<String> = stages.iter().map(|s| s.name().to_owned()).collect();
-        let timings = stage_names
+        let timings: Vec<StageTiming> = stage_names
             .iter()
             .map(|n| StageTiming {
                 name: n.clone(),
