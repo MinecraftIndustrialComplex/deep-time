@@ -3782,7 +3782,12 @@ a smoke benchmark and again at the end.
   GameTest `EditorModelGameTests.realPlanetThroughTheEditor` (the same run inside the server, then
   the staging move, the bind and the terrain). The client check runs on the test VM:
   `tools/client/vm-client.sh` (the dev client on Xvfb with Mesa's llvmpipe), screenshots and a
-  contact sheet in `review/out/<name>/`.
+  contact sheet in `review/out/<name>/`. The run page's time left comes from the editor's
+  estimate (`Estimate.timeLeftMs`: the stages' estimated seconds, a group of coupled stages
+  counted as all of its stages since the session reports it under its lead, scaled by the run's
+  own pace once 2 % is done; the estimate JSON names each stage's `coupled_to`): the session's
+  own figure weights every group alike and read "~55 min left" for a run that took 5. While Run
+  is disabled by a run still going, the setup page says so ("Stopping the cancelled run …").
 - **Ben reviews.** The same keyframes in the viewer (the screen itself is unverifiable, §9.8).
 
 #### P1-12 Strata pass with rock tags and `rock_states`
