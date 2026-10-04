@@ -359,10 +359,43 @@ own when no pack overrides it) and adds it as the bundle's key `climate_placemen
 `deeptime run --content <file>` takes the same key. `Preset::with_content` parses and checks it
 (an unusable table stops the run with the path of the problem, `$.climate_placement.classes.Af.temperature`)
 and the bake places the climate by it. Without the key the core's default is used, which is what
-the Create World editor's runs and the workbench do (they pass no bundle, as they pass no
+the Create World editor's runs and the workbench do (they pass no table, as they pass no
 essentials). The table the bake used is recorded whole in the world data: `notes.bake.climate.placement`
-is `{"source": "default" | "content bundle", "table": {…}}`. The game does not read the table
+is `{"source": "default" | "content bundle", "table": {…}, "patches": [ids], "class_rule_cells": {name: L2 cells}}`
+(`patches`: the pack placement tables merged in, below). The game does not read the table
 again: the world's biome inputs are already baked with it.
+
+*Pack placement tables* (decisions log 2026-10-04, "Deep Time-side fixes (Recommended)"). A biome mod
+whose biomes sit in other parameter slots than vanilla's gets a table of its own:
+`data/<namespace>/deeptime/climate_mapping/packs/<id>.json` (the jar ships the core's
+`crates/deeptime-core/data/climate_mapping/packs/*.json`; Terralith's is `terralith.json`):
+`{"schema": 1, "id": "<id>", "requires_biomes": ["ns:biome", …], "priority": 0, "patch": {…}}` with an
+optional `_comment`. `patch` is a JSON merge patch (RFC 7386) on the placement table: objects merge key
+by key (a class entry keeps the keys the patch does not name), `null` removes a key, anything else
+replaces. The game keeps a pack table when **every** biome in `requires_biomes` is in its biome registry
+(one table per `id`; a datapack's file of the same id replaces the jar's) and orders them by `priority`,
+then `id`: a dedicated server's first start reads them from its resources, the Create World editor from
+Deep Time's jar against the screen's data-pack registries. They travel in the content bundle as the list
+`climate_placement_patches` (whole files); `deeptime run --placement-patch <file>` (repeatable) adds to
+it. `Preset::with_content` merges them in order over the base table (the bundle's `climate_placement`,
+else the default), checks the merged table whole (an error names the packs) and the bake records their
+ids. Without a pack table the bake is exactly the default table's.
+
+*Class rules.* A table may hold `class_rules`: a list of `{"name", "classes": [codes], "when": [{"of",
+"above" | "below"}, …], "temperature"?, "humidity"?, "erosion"?, "continentalness"?}` (and `_comment`).
+On unglaciated land of one of its classes, the first rule whose conditions all hold (strictly) replaces
+what it names of the class's own placement. A condition, like a `when` switch, may read `t_mean`,
+`t_warm`, `t_cold` (°C), `aridity` (P/PET), `abs_lat_deg` and `height_m` (the cell's ground above the
+sea); an unknown input (the L1 path has no ground height) fails it. A ramp still reads temperatures
+only. `continentalness: {min, max}` (vanilla units, −1.2 … 1), for a class or a rule, holds the land
+inland of the beach strip (continentalness band 4 and up) in its range; a coast keeps its beach.
+
+Terralith's table (ledger BIO-140 to BIO-146): Am takes humidity 4.05 and up (`monsoon_jungle`), Csa,
+Csb and Csc are squeezed into 0.1 … 0.6 (`dry_scrub`: Terralith's shrubland), BSk takes `dry_scrub` and
+erosion 0.12 … 0.4, ET takes the positive branch of the variant noise, and the class rule
+`cloud_forest` puts Cfb, Cwb, Cfc and Cwc land below 25° of latitude, above 1,000 m and with P/PET above
+1 on the cold band (`montane`: 1.2 + 0.75 · unit((t_mean − 6)/12)), humidity 3.05 and up, erosion 0.62
+and up and continentalness 0.35 and up (Terralith's cloud forest slot).
 
 At the world's first start the game builds `climate_mapping.json` next to the manifest and reads
 it on every later start (so a pack update never moves biomes in unexplored chunks): `schema` 1,
@@ -1153,6 +1186,34 @@ TerraBlender, `compat.terrablender.RegionBiomeSourceMixin`).
   out too) or to `#deeptime:volcanic` alone (kept out, never placed).
 - Without any such biome in the pack (vanilla) every query is answered as before. `/deeptime probe
   biomes` reports the placement against the volcanoes (`census.volcanic`).
+
+### The geology gate (decisions log 2026-10-04)
+
+A pack's rock-named biomes stand only on the ground they are named for (Java `worldgen/GeologyGround`,
+`climate/GeologyBiomes`, in the same biome query as the volcanic biomes). No file holds them: the game
+reads `meta/province` (with `notes.bake.meta.provinces.province[i].class`), `surface/class_top`, the
+column's `strata/horizons` stack, `climate/koppen` and the terrain height. A column's **bedrock** is its
+surface rock class, or, where that is loose cover (the rock-class group `deeptime:rock/unconsolidated`:
+saprolite, laterite, till, sand …), the first other class of its stack within 8 blocks of the surface.
+Its **roles** (`#deeptime:geology/<role>`, all entries optional):
+
+| role | ground | tag shipped |
+|---|---|---|
+| `shield` | province class Shield | terralith:shield, snowy_shield, shield_clearing |
+| `granite` | bedrock in `deeptime:rock/intrusive` and `deeptime:rock/felsic` | terralith:yosemite_cliffs, yosemite_lowlands |
+| `carbonate_coast` | a coast (the sea within 32 blocks: the column, or 16 or 32 blocks away in eight directions, below the sea level) whose bedrock (the column's, else the first within 48 blocks) is in `deeptime:rock/carbonate` | terralith:white_cliffs |
+| `granite_coast` | as above, intrusive and felsic | terralith:granite_cliffs |
+| `basalt_coast` | as above, `deeptime:rock/volcanic` and `deeptime:rock/mafic` | terralith:basalt_cliffs |
+| `dry_sedimentary` | bedrock in `deeptime:rock/sedimentary`, Köppen B | terralith:bryce_canyon, painted_mountains, white_mesa, sandstone_valley, desert_canyon |
+| `humid_karst` | bedrock in `deeptime:rock/carbonate`, Köppen A, C or D | terralith:stony_spires |
+
+`#deeptime:geology` holds the seven role tags. Where the climate search's answer is a biome of a role
+tag and the column's ground has none of its roles, it is kept out: the search runs again with every
+leaf of a gated biome whose roles miss the column's ground, and every volcanic leaf, set infinitely far
+(a gated biome that is volcanic too, terralith:basalt_cliffs, counts as allowed on its own ground). On
+its ground the biome answers where the climate search puts it: the gate takes biomes away and never
+adds them. Without such a biome in the pack every query is answered as before. `/deeptime probe biomes`
+reports the rock-named biomes against their ground (`census.geology`).
 
 ## `strata/classes.json`
 
