@@ -250,6 +250,7 @@ def serverSetFor = { String run ->
     if (run == 'gameTestServer') {
         if (project.hasProperty('withTerraBlender')) return 'terrablender'
         if (project.hasProperty('withEv')) return 'ev'
+        if (project.hasProperty('withEe')) return 'ee'
         return null
     }
     if (run == 'planetServer') return 'standalone'
