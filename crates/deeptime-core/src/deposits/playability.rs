@@ -39,7 +39,7 @@ pub struct Essential {
     pub max_blocks_from_spawn: Option<u32>,
     /// Only a site whose product of the material has the role `primary` counts toward the regional
     /// minimum and the spawn's reach (default true); off, a co-product or by-product counts too.
-    #[serde(default = "primary_only_default")]
+    #[serde(default = "primary_only_default")] // ledger: DEP-206
     pub primary_only: bool,
 }
 
