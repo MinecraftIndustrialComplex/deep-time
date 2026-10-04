@@ -823,23 +823,16 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         // terrain a little, more near the poles), so a crater's lens stays under the floor and a
         // placer on the ground.
         // The detail term of a drawing: its noise (spec and seed) for x period `c` in projection
-        // `wpj`; paired with the amplitude layer below (a plain fn keeps the borrow's lifetime).
+        // `wpj`; paired with the amplitude layer by `drawn_detail`.
         let noise = |c: u32, wpj: &WorldProjection| match (spec.as_ref(), spec_seed) {
-            (Some(s), Some(seed)) => Some((s.clone(), deeptime_format::Noise::for_world(seed, c, wpj))),
+            (Some(s), Some(seed)) => {
+                Some((s.clone(), deeptime_format::Noise::for_world(seed, c, wpj)))
+            }
             _ => None,
         };
-        fn pair(
-            amp: Option<&LoadedLayer>,
-            n: Option<(deeptime_format::DetailSpec, deeptime_format::Noise)>,
-        ) -> Option<(&LoadedLayer, deeptime_format::DetailSpec, deeptime_format::Noise)> {
-            match (amp, n) {
-                (Some(a), Some((s, n))) => Some((a, s, n)),
-                _ => None,
-            }
-        }
         let old = Drawn {
             elev: &elev_src,
-            detail: pair(
+            detail: drawn_detail(
                 amp_src.as_ref(),
                 noise(c_sim, &WorldProjection::Lambert(Projection::new(c_sim))),
             ),
@@ -847,7 +840,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         };
         let new = Drawn {
             elev: we,
-            detail: pair(world_amp.as_ref(), noise(period, &wp)),
+            detail: drawn_detail(world_amp.as_ref(), noise(period, &wp)),
             c: f64::from(period),
         };
         new_bodies = bs
@@ -990,8 +983,26 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
 /// (`ColumnWorld::height`), from loaded layers; `c` the x period the detail noise wraps with.
 struct Drawn<'a> {
     elev: &'a LoadedLayer,
-    detail: Option<(&LoadedLayer, deeptime_format::DetailSpec, deeptime_format::Noise)>,
+    detail: DrawnDetail<'a>,
     c: f64,
+}
+
+/// A drawing's detail term: the amplitude layer, the spec and the noise.
+type DrawnDetail<'a> = Option<(
+    &'a LoadedLayer,
+    deeptime_format::DetailSpec,
+    deeptime_format::Noise,
+)>;
+
+/// The detail term of a drawing from its amplitude layer and its noise (either may be absent).
+fn drawn_detail(
+    amp: Option<&LoadedLayer>,
+    n: Option<(deeptime_format::DetailSpec, deeptime_format::Noise)>,
+) -> DrawnDetail<'_> {
+    match (amp, n) {
+        (Some(a), Some((s, n))) => Some((a, s, n)),
+        _ => None,
+    }
 }
 
 impl Drawn<'_> {
