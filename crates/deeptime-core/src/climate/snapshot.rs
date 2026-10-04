@@ -296,6 +296,9 @@ pub fn compute(
             cell,
         ));
         time(&mut millis, "ebm2d", started);
+        for &(what, secs) in pc.as_ref().map_or(&[][..], |c| c.timing.as_slice()) {
+            *millis.entry(what).or_insert(0.0) += secs * 1000.0;
+        }
     }
     // The zonal model's flux correction to the 2-D zonal means (design §4.1): the clock's model,
     // its references and its state from here are the corrected ones.

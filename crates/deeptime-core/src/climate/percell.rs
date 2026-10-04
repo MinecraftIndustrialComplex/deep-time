@@ -99,6 +99,8 @@ pub struct Coarse {
     pub mp: MoistureParams,
     /// The 2-D model's state after the run (the zonal model's start when it is fitted).
     pub state: State2d,
+    /// Seconds spent in each part of the run (the bench's climate timings, P1-17).
+    pub timing: Vec<(&'static str, f64)>,
 }
 
 impl Coarse {
@@ -270,9 +272,13 @@ fn surface(inp: &Inputs<'_>, g: &Grid) -> (Surface, Vec<f64>) {
 /// Runs the per-cell climate of a snapshot; `cell` carries its state to the next.
 pub fn run(inp: &Inputs<'_>, cell: &mut PerCell) -> Coarse {
     let p = inp.p;
+    let mut timing = Vec::new();
+    let started = std::time::Instant::now();
     let g = climate_grid(inp.w, inp.h, p.grid_columns as usize);
     let n = g.w * g.h;
     let (s, z_low) = surface(inp, &g);
+    timing.push(("pc_surface", started.elapsed().as_secs_f64()));
+    let started = std::time::Instant::now();
     let omega = std::f64::consts::TAU / (inp.day_length_h * 3600.0) * (1.0 + 1.0 / 365.25);
     let wind_u = ocean2d::belt_wind_u(p, &g, inp.tilt_deg);
     let late = (cell.late_ice.len() == n).then_some(cell.late_ice.as_slice());
@@ -287,6 +293,8 @@ pub fn run(inp: &Inputs<'_>, cell: &mut PerCell) -> Coarse {
         overturning_sv: p.overturning_sv,
         late_winter_ice: late,
     });
+    timing.push(("pc_ocean_build", started.elapsed().as_secs_f64()));
+    let started = std::time::Instant::now();
     let prm = Params2d::from_climate(p, inp.ep.clone(), inp.tilt_deg);
     // A warm start continues the last snapshot's state, unless the zonal model's climate has
     // since moved far from it (a snowball's onset or escape, a hothouse): then it starts again
@@ -306,6 +314,8 @@ pub fn run(inp: &Inputs<'_>, cell: &mut PerCell) -> Coarse {
         p.ebm_spinup_years
     };
     let r = ebm2d::run(&prm, &g, &s, &mut cell.state, Some(&ocean), years, itcz0);
+    timing.push(("pc_years", started.elapsed().as_secs_f64()));
+    let started = std::time::Instant::now();
     cell.itcz = r.itcz.to_vec();
     cell.late_ice = (0..n)
         .map(|cc| {
@@ -368,11 +378,14 @@ pub fn run(inp: &Inputs<'_>, cell: &mut PerCell) -> Coarse {
         itcz_col,
         mp,
         state: cell.state.clone(),
+        timing: Vec::new(),
     };
     if p.rain_model == RainModel::Budget {
         let m = budget(&out, &out.mp, None, &cell.bucket);
         out.moisture = Some(m);
     }
+    timing.push(("pc_rest", started.elapsed().as_secs_f64()));
+    out.timing = timing;
     cell.sinking = out.sinking.as_ref().map(|s| (s.lat, s.lon, s.hemisphere));
     out
 }
