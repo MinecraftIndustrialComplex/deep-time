@@ -2,9 +2,10 @@
 
 Status of this page: `stage 2 (constants checked against sources on 2026-10-02, package WP-8; vertical scale and intrusion sizes decided by Ben the same day)`.
 
-Ledger ids on this page: `DEF-001` to `DEF-074` ([ledger/DEF.md](ledger/DEF.md)). Of these 74
-rows, 17 are `verified`, 1 `abstract-only` and 56 `game-choice` (stage 1: 16 `cited-unverified`,
-54 `game-choice`, 4 `uncited`).
+Ledger ids on this page: `DEF-001` to `DEF-077` ([ledger/DEF.md](ledger/DEF.md)). Of these 77
+rows, 17 are `verified`, 1 `abstract-only` and 59 `game-choice` (stage 1: 16 `cited-unverified`,
+54 `game-choice`, 4 `uncited`). DEF-075 to DEF-077 and PLT-260 were added by plate task 6
+(2026-10-04): the structure stage reads the plate model's collisions.
 
 **Read this first.** The method is a port of Noddy, a kinematic structural-geology program, and the
 port matches the original: its constants were found in the original source and its conventions in
@@ -72,18 +73,28 @@ The structure stage runs once per plate step (about 2 Myr), after the plate and 
 keeps a list of structures that ride on their plates.
 
 1. **Strain from the plates.** Each cell of continental crust gets three strain values from the plate
-   model's tectonic regime: shortening (1 in a collision; up to 0.5 in an arc or back-arc that the
-   plate model is lifting; up to 0.6 fading to 0 across a 250 km foreland, measured on the plate
-   model's Earth-sized sphere), extension (1 in a rift) and shear (where a lifted subduction margin
-   converges more than 30° obliquely) (DEF-024 to DEF-029).
+   model: shortening, extension (1 in a rift) and shear (where a lifted subduction margin converges
+   more than 30° obliquely) (DEF-024 to DEF-029). Shortening has three sources. **A collision's
+   belt and wedge** (the plate model marks the ground of an active collision with the convergence
+   across its front, PLT-260) shorten at that convergence over a reference of 30 mm/yr, at most 1:
+   a collision that slows down makes proportionally fewer structures and one that has stopped none
+   (DEF-075). **A collision's foreland** is the flexural basin the plate bends into on the incoming
+   side, beyond the wedge: 0.6 of the belt's strength where the surface stage's flexure lies more
+   than 100 m below local isostasy, nothing on the forebulge or beyond it (DEF-076). **An Andean
+   margin** shortens up to 0.5 where the plate model is lifting the arc or back-arc, and its
+   foreland up to 0.6 fading to 0 across 250 km (measured on the plate model's Earth-sized
+   sphere) from the arc (DEF-026, DEF-027).
 2. **New structures.** For each kind the expected number in the step is the sum over cells of
    strain times area times the kind's rate times the step's length; the actual number is drawn from a
    Poisson distribution and each structure is placed in a cell with probability in proportion to its
    strain times area (DEF-022, DEF-023). Shortening makes fold trains and thrusts, extension normal
    faults and dykes, shear strike-slip faults; shortening in collisions and arcs also makes stocks.
 3. **Sizes and attitudes.** A fold train's wavelength is drawn about 16 km, its amplitude follows from
-   how much the crust there has thickened (DEF-001, DEF-005 to DEF-007), times the stretch X
-   (DEF-011). Folds and thrusts run along
+   how much the cover there has shortened (DEF-001, DEF-005 to DEF-007), times the stretch X
+   (DEF-011). In a collision the shortening is the collision's own: the convergence integrated over
+   its life, S, taken up over the belt's width W, e = S / (S + W) between the least and the most
+   (DEF-077), so a young collision folds loosely and an old one tightly; elsewhere (an Andean
+   margin) it is inferred from the thickening of the crust, as before (DEF-006). Folds and thrusts run along
    the plate model's fold trend; thrusts dip under the high ground; normal faults run along the rift
    and dip towards its axis, one in four the other way (DEF-009, DEF-030, DEF-031). Fault length is
    drawn about 40 km, the slip is a fixed share of it (DEF-013, DEF-015 to DEF-018), dips are drawn
@@ -119,7 +130,10 @@ keeps a list of structures that ride on their plates.
 | DEF-019 | normal fault dip | 55 to 70 | degrees | Anderson 1905; Collettini & Sibson 2001 | `verified` |
 | DEF-020 | thrust dip | 20 to 40 | degrees | Anderson 1905; Collettini & Sibson 2001 | `verified` |
 | DEF-021 | strike-slip dip | 90 (stored 89.999) | degrees | Anderson 1905 | `verified` |
-| DEF-027 | foreland belt width | 250, on the plate model's sphere | km | Alavi 2007: 200 to 300 km | `verified` |
+| DEF-027 | foreland belt width of an Andean margin (not of a collision since plate task 6) | 250, on the plate model's sphere | km | Alavi 2007: 200 to 300 km | `verified` |
+| DEF-075 | collision strength | min(1, convergence / 30 mm/yr) | - | rates set for a Zagros-sized collision; Arabia-Eurasia 22 +/- 2 mm/yr (Vernant et al. 2004, from a search summary, not read) | `game-choice` |
+| DEF-076 | collision foreland | 0.6 x strength where the plate is flagged foreland and flexure < -100 m | - | Davis, Suppe & Dahlen 1983; DeCelles & Giles 1996 (as read for PLT-249) | `game-choice` |
+| DEF-077 | fold strain in a collision | e = S / (S + W), clamped to 0.08 to 0.30 | fraction | geometry of pure shortening; Zagros 16 to 30 % | `game-choice` |
 | DEF-030 | thrust dip direction | under the hinterland | - | Alavi 2007: foreland-verging folds | `verified` |
 | DEF-042 | stock radius at the world's floor | lognormal, median 4, clamped 2 to 10 | km | design; a stock is exposed over less than 100 km2 (Earle 2019) | `game-choice` |
 | DEF-047 | dyke length | lognormal, median 15, clamped 5 to 50 | km | design inside 1 to 2,000 km read | `game-choice` |
@@ -205,6 +219,15 @@ built twice, before (stretch 1, the old intrusion sizes and relief 1) and after;
   Earth-sized sphere and shrink with the planet (a 250 km foreland is 31 km on the 16k map), while
   the folds in them keep their Earth size, so a foreland belt holds about two fold wavelengths
   across where the Zagros holds about thirteen.
+- **A collision's foreland is only as wide as the plate model's basin.** It is the flexure the
+  surface stage solves under the belt and wedge, so a collision whose belt is low or whose wedge is
+  narrower than one sample (the quick preset's 71 km) bends a shallow basin and gets a small
+  foreland (see the measurement in the build log, 2026-10-04); the old rule gave every collision a
+  250 km foreland on both sides whatever its size.
+- **The foreland's strain does not follow the basin's depth**, only whether it passes 100 m: a
+  500 m basin and a 4 km one fold alike (DEF-076).
+- **Stocks in a collision belt still follow the collision regime**, not the convergence: the
+  magmatism of a belt outlasts the shortening (the regime stays 30 Myr after the last uplift).
 - **No structure older than the run.** The planet starts with undeformed crust, so the basement of
   a craton that no structure reached in the run (35 % of craton cells here) is still flat-layered,
   where on Earth every craton's basement is old, deformed metamorphic rock.

@@ -66,7 +66,7 @@ def main() -> None:
     runs, name = Path(sys.argv[1]), sys.argv[2]
     n = notes(runs / f"{name}-world")
     d = n.get("structure", {}).get("deformation", {})
-    for key in ["structures", "formed", "median", "lattice", "coverage", "traps", "events", "with_relief",
+    for key in ["structures", "formed", "formed_by", "median", "lattice", "coverage", "traps", "events", "with_relief",
                 "saturated", "overprinted", "subducted", "noddy_check"]:
         print(f"deformation.{key} = {json.dumps(d.get(key))}")
     print("amplify.structure_relief =", json.dumps(n.get("amplify", {}).get("structure_relief")))
