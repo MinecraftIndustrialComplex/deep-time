@@ -4,8 +4,8 @@
 # Cold wetland gates, run on the test VM as one detached script (a dropped laptop session loses only the wait):
 #   tools/remote/mac.sh -- tools/remote/detach.sh start peatgates tools/review/peat-gates.sh
 #   tools/remote/mac.sh --no-sync -- tools/remote/detach.sh wait peatgates
-# cargo (fmt, clippy, test, deny), Gradle build + JUnit, ./gametest.sh on standalone, MIC and TerraBlender (with Biomes
-# O' Plenty), then the biome shares of the two finished planets (peat-runs.sh run after3 / before3) per profile.
+# cargo (fmt, clippy, test, deny), Gradle build + JUnit, ./gametest.sh on standalone, MIC, TerraBlender and EE (with Biomes
+# O' Plenty), then the biome shares of the two finished planets (peat-runs.sh run after4 / before4) per profile.
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 echo "=== cargo"
@@ -15,14 +15,14 @@ cargo test --workspace 2>&1 | grep -E "^test result|FAILED|panicked|^error" | he
 cargo deny check licenses bans 2>&1 | tail -n 2; echo DENY_DONE
 echo "=== gradle"
 (cd neoforge && ./gradlew build test 2>&1 | grep -E "BUILD|FAILED|error:"; python3 ../tools/ci/junit-summary.py build/test-results/test)
-for flag in "" "-PwithMic" "-PwithTerraBlender"; do
+for flag in "" "-PwithMic" "-PwithTerraBlender" "-PwithEe"; do
     echo "=== gametest $flag"
     [ "$flag" = "-PwithMic" ] && tools/smoke/install.sh mic > /dev/null 2>&1
+    [ "$flag" = "-PwithEe" ] && tools/smoke/install.sh ee > /dev/null 2>&1
     ./gametest.sh $flag 2>&1 | grep -E "passed|failed|FAILED|required|BUILD|climateConsistent|cold_wetland" | tail -n 25
 done
-for prof in standalone mic terrablender; do
-    for name in after3 before3; do
-        [ "$name" = before3 ] && [ "$prof" != terrablender ] && continue
+for prof in standalone mic terrablender ee; do
+    for name in after4 before4; do
         echo "=== $prof $name"
         tools/review/peat-biomes.sh "$prof" "$name" 2>&1 | grep -v "^admit" | tail -n 90
     done
