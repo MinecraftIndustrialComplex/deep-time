@@ -298,7 +298,23 @@ Measured on one `earthlike_quick_16k` planet (scattered continents, 500 Myr, see
 baked twice from the same simulation, without and with Terralith's table (all other rasters byte-identical; without
 the table all 43 rasters are byte-identical to master's), `/deeptime probe biomes 16` with MIC:
 
-MEASUREMENTS_TABLE
+| Class (sampled land columns) | Before (master): top biomes, % | After: top biomes, % |
+|---|---|---|
+| Am (1,507) | shrubland 29, jungle 27, brushland 21, sparse jungle 6, hot shrubland 3, tropical jungle 2 | sparse jungle 44, tropical jungle 21, jungle 14, rocky jungle 4, brushland 4, bamboo jungle 3 |
+| Csa (1,469) | plains 46, highlands 25, blooming plateau 14, forest 6 | shrubland 52, steppe 26, fractured savanna 8, windswept savanna 7 |
+| Csb (2,921) | plains 61, birch taiga 10, old-growth birch forest 8, forest 8 | shrubland 80, steppe 3, snowy slopes 3, forest 2 |
+| BSk (14,077) | plains 57, highlands 14, blooming plateau 7, shield 5 | steppe 44, shrubland 42, plains 2, beach 2 |
+| ET (9,952) | cold shrubland 24, snowy slopes 17, snowy plains 15, gravel desert 14, frozen peaks 4, snowy badlands 4, scarlet mountains 4 | gravel desert 25, cold shrubland 23, snowy slopes 16, frozen peaks 8, snowy plains 5, snowy badlands 4 |
+| Cfb (7,501), Cwb (970) | cloud forest 0 | cloud forest 9.7 and 9.8; of the 1,351 columns of the rule's ground (class, latitude, height; P/PET not checked), 49 % |
+
+Terralith's names; "plains", "forest", "jungle" and the like are vanilla's. The census's checks for the table (BIO-154):
+Am on jungles 0.858, Cs on shrubland and steppe 0.794, BSk on steppe and dry shrublands 0.860 and on the steppe
+itself 0.436, ET on snowy plains 0.048. The geology gate on the same world: without it, 2,888 sampled land columns
+carried a rock-named biome and 1,654 of them stood off their ground (Shield on orogens and platforms, Granite and
+White Cliffs on andesite and mudstone coasts, Stony Spires off carbonate); with it none does, and 1,321
+remain (White Mesa 941, Shield 271, all on shield provinces, Painted Mountains 108). The ground on that planet: 8,891
+shield columns, 7 granite, 57 carbonate coast, 6 granite coast, 853 basalt coast, 27,885 dry sedimentary, 280 humid
+karst. Vanilla on the same world: no pack table chosen, the gate inactive, 0 columns changed.
 
 ## Simplifications and limits
 
