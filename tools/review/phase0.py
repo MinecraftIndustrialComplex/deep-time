@@ -84,8 +84,15 @@ def step_defs():
 def run_step(sid, flags, cmd):
     os.makedirs(LOGS, exist_ok=True)
     t0 = time.time()
-    r = subprocess.run([MAC, *flags, "--", cmd], cwd=REPO, capture_output=True, text=True, errors="replace")
-    out = r.stdout + r.stderr
+    if os.environ.get("PHASE0_DETACH"):
+        # Phase 1's exit re-runs this suite with each step detached on the VM (a dropped ssh session loses a wait, not a step).
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import phase1_detach
+        out, rc, _ = phase1_detach.run("p0-" + sid, cmd, flags=flags)
+        r = subprocess.CompletedProcess([], rc, "", "")
+    else:
+        r = subprocess.run([MAC, *flags, "--", cmd], cwd=REPO, capture_output=True, text=True, errors="replace")
+        out = r.stdout + r.stderr
     noise = re.compile(r"^(copying|building|fetching|these \d|  /nix|warning: Git|trace:|evaluation warning|mac\.sh: waiting)")
     out = "\n".join(l for l in out.splitlines() if not noise.match(l))
     open(os.path.join(LOGS, f"{sid}.log"), "w").write(out + "\n")
