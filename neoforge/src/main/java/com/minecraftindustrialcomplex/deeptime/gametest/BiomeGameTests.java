@@ -258,6 +258,7 @@ public final class BiomeGameTests {
         // swamp. Before the rule it was all swamp (66 % of one planet's Dfc land). A few percent of a mod's
         // oddly tagged biomes are let through.
         var cold = r.json().getAsJsonObject("cold_wetland");
+        helper.assertTrue(cold.get("layer").getAsBoolean(), "the bake wrote climate/wetland, the flag of cold wetland (BIO-104)");
         int coldColumns = cold.get("columns").getAsInt(), coldSwamp = cold.get("on_swamp").getAsInt();
         DeepTime.LOGGER.info("[gametest] climateConsistent cold wetland {}", cold);
         helper.assertTrue(coldSwamp <= COLD_WETLAND_SWAMP_CEILING * coldColumns,

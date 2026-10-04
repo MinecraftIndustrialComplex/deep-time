@@ -334,6 +334,7 @@ public final class BiomeCensus {
         wj.addProperty("on_swamp", wetlandSwamp);
         o.add("wetlands_set_aside", wj);
         JsonObject cw = new JsonObject();
+        cw.addProperty("layer", wetlandLayer != null);
         cw.addProperty("columns", coldWet);
         cw.addProperty("on_peatland", coldPeat);
         cw.addProperty("on_taiga", coldTaiga);
