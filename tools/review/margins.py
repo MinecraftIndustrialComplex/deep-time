@@ -9,7 +9,7 @@ lies against the sea.
 
 MARGINS_FIELD=plates/elevation_m measures another dumped elevation against the surface's sea level. With
 regime in the dump, transects are also summarised apart for passive and active margins (a trench, an
-arc, a back-arc or a collision regime within 3 L1 cells of the coast cell is active).
+arc or a collision regime within 6 L1 cells of the coast cell is active; ACTIVE_REGIMES below).
 
 Transects (the margins-and-spires study's definitions, build log 2026-10-03, so its ETOPO 2022 figures
 compare): from every 3rd open-sea coast cell of land masses over 750 km2, |lat| <= 60 deg, seaward along
@@ -43,8 +43,13 @@ SEA_Y = 63
 MAX_LAT = 60.0
 STRIDE = 3
 DIST_BINS_KM = [0, 10, 25, 50, 100, 200, 400, 1e9]
-ACTIVE_REGIMES = [2, 3, 4, 5]  # trench, arc, back-arc, collision (plates/state.rs, mod regime)
-ACTIVE_CELLS = 3
+# An active margin: a trench, an arc or a collision orogen (plates/state.rs, mod regime) within 6 L1
+# cells (about 30 km on the quick 16k planet, where the Earth-normalized 200 km from trench to arc is
+# 25 km) of the coast cell. The back-arc (the overriding plate within the subduction distance, 800 km
+# Earth-normalized) is not counted: its own-plate margins are rifted margins (back-arc basins, the far
+# side of a narrow continent). Overrides: MARGINS_ACTIVE_REGIMES=2,3,4,5 MARGINS_ACTIVE_CELLS=3.
+ACTIVE_REGIMES = [int(x) for x in os.environ.get("MARGINS_ACTIVE_REGIMES", "2,3,5").split(",")]
+ACTIVE_CELLS = int(os.environ.get("MARGINS_ACTIVE_CELLS", "6"))
 
 
 def angle(dh, dl):
@@ -278,9 +283,7 @@ def planet(d, out_path):
     reg, _ = load(d, "regime")
     active = None
     if reg is not None:
-        # An active margin: a trench, an arc, a back-arc (within the subduction distance of a
-        # front) or a collision orogen (the plate model's regime layer) within ACTIVE_CELLS cells of
-        # the coast cell. The rest are passive (the margins the transition shapes).
+        # Active margins (ACTIVE_REGIMES near the coast cell); the rest are passive.
         active = ndimage.binary_dilation(np.isin(np.rint(reg), ACTIVE_REGIMES), iterations=ACTIVE_CELLS)
     rows = transects(h, sea, g, active)
     res = {"sea_m": sea, "summary": summarise(rows)}
