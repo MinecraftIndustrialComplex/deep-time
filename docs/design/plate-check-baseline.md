@@ -1019,3 +1019,45 @@ gave 0.248 and 0.342 (base 0.247 and 0.335); with the limit, subduction uplift 0
 share 0.9 gave 0.227 and 0.317. None was kept. The arc rule, the crust budget term of the designs,
 is fixed at Cloos's 20 Myr by Ben's answer of 2026-10-02 ("Let the plate work fix it"). A
 question is pending in STATUS.md.
+
+## Orogenic collapse and the thickest crust (2026-10-03)
+
+The branch `worktree-agent-aeec1402fc6146955` merged with master 0af3ff6e (Lambert, 35 m), with the
+collapse (PLT-254 to PLT-259, `plates/collapse.rs`). Same runs as above: `earthlike_quick_16k`,
+supercontinent, 1000 Myr, seeds 1-4, `structure.deformation.density=0`, two threads, test VM.
+"Master" is the same build with the collapse and the limit off (`tectonics.collapse_myr=0`,
+`tectonics.crust_max_km=0`; both rules return before touching anything when off). After: τ 15 Myr,
+55 km, quiet 10 Myr, reach 200 km, thickest crust 70 km (the defaults). The check meets **29 of its
+45 targets** in both.
+
+| Measure | Master 0af3ff6e | After | Target | |
+|---|---|---|---|---|
+| Continental crust, lowest step | 0.28 (0.27 0.31 0.27 0.29) | **0.39** (0.39 0.37 0.40 0.39) | at least 0.37 | now met |
+| Continental crust, highest step | 0.43 (0.43 0.44 0.43 0.43) | 0.45 (0.43 0.44 0.47 0.46) | at most 0.45 | met, at the edge |
+| Continental crust at the end | 0.285 (0.268 0.312 0.274 0.288) | 0.438 (0.421 0.406 0.465 0.458) | - | |
+| Land at the end (true area) | 0.127 (0.133 0.125 0.127 0.123) | 0.170 (0.178 0.156 0.169 0.179) | - | |
+| Steps with one plate above 50 % | 3.80 | **10.1** (13.6 9.80 7.20 9.80) | at most 10.0 | **now not met** |
+| Median plate lifetime | 94.0 Myr | 84.8 Myr | at least 80 | met |
+| Collisions per 100 Myr | 5.12 | 5.25 | 2-6 | met |
+| Active share of the continental margin | 0.40 | 0.37 | 0.25-0.40 | met |
+| Ocean floor older than 250 Myr | 3.78 % | 4.61 % | at most 3 | not met (as master) |
+| Supercontinent tenure; assembly period | 41.5; 224 Myr | 27.0; 62.8 Myr | 100-300; 400-800 | not met (as master) |
+
+Every other row passes or fails as on master. Thickness at the end (visible continental crust,
+p10/50/90/99): master 36-43 / 83-104 / 215-247 / 446-480 km; after 34-35 / 50-52 / 63-66 / 74-94 km.
+The collapse turned 106-113 million km² of ocean floor continental over the run; the limit took
+7.1-8.9 × 10⁹ km³ of crust to the mantle (Earth loses about 0.7 km³ a year at collision zones,
+Scholl & von Huene as cited by Stern & Scholl 2010, so 0.7 × 10⁹ km³ per 1000 Myr: the model stacks
+about ten times Earth's rate).
+
+**Variants measured on the way** (1000 Myr, supercontinent; seeds in brackets):
+
+| Variant | Crust at the end | Highest step | Land at the end |
+|---|---|---|---|
+| τ 15, 50 km, no quiet time, reach 200, limit 70 (seeds 1-2) | 0.52 (0.54 0.49) | 0.52 | 0.21 |
+| τ 15, 55 km, no quiet time (seed 1) | 0.49 | - | 0.18 |
+| τ 15, 50 km, quiet 10 Myr (seed 1) | 0.52 | - | 0.20 |
+| **τ 15, 55 km, quiet 10 Myr (kept)** | 0.44 | 0.45 | 0.17 |
+
+Without the limit (the first versions, 500 Myr, seed 1 of the supercontinent start) the collapse
+returned the whole overlap stack and the crust reached 0.53-0.56 of the planet at 500 Myr.
