@@ -418,6 +418,13 @@ pub fn report(
             "stock": counts.stocks,
             "dyke": counts.dykes,
         },
+        // Fold trains and thrusts started, by the rule that strained their cell.
+        "formed_by": {
+            "collision": {"fold_train": counts.shortened_by[0][0], "thrust": counts.shortened_by[0][1]},
+            "arc": {"fold_train": counts.shortened_by[1][0], "thrust": counts.shortened_by[1][1]},
+            "foreland": {"fold_train": counts.shortened_by[2][0], "thrust": counts.shortened_by[2][1]},
+            "basin": {"fold_train": counts.shortened_by[3][0], "thrust": counts.shortened_by[3][1]},
+        },
         "saturated": counts.saturated,
         "overprinted": counts.overprinted,
         "subducted": counts.subducted,
