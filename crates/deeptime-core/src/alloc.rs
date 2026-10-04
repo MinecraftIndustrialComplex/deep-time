@@ -244,7 +244,8 @@ impl CountingAlloc {
         if is_large(&layout) {
             let len = pages(layout.size());
             // A kept block is already counted.
-            if let Some(p) = cache().take(len) {
+            let kept = cache().take(len);
+            if let Some(p) = kept {
                 if zeroed {
                     // SAFETY: the kept block is `len` writable bytes nothing else refers to.
                     unsafe { std::ptr::write_bytes(p, 0, len) };
@@ -424,6 +425,8 @@ mod tests {
         assert!(in_use() >= before + (64 << 20) - (8 << 20), "in_use did not grow");
         assert!(peak() >= 64 << 20);
         drop(v);
+        // The freed block is kept for reuse, and counted, until the cache is released.
+        release_cache();
         assert!(in_use() < before + (32 << 20));
     }
 
