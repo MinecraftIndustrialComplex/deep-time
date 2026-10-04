@@ -12,6 +12,10 @@
 #          at 1000 Myr, and the low4 profile on the quick preset.
 # quality: the faster-quick-mode candidates (option a) on the quick preset, scattered continents,
 #          500 Myr, each world kept for tools/review/p1-24-views.py.
+# mem:     with each phase's wall time and peak memory sampled (p1-24-profile.sh's mem.log): the
+#          quick preset again, and the full preset on a 16 GiB scope, since it does not fit the
+#          profile's 6 GiB (it was killed by the kernel's OOM killer in the coupled stage). Pinned
+#          to CPUs 12-23 (P124_CPUS) so it can run beside the timing matrix on 0-11.
 # A run whose result.json exists is skipped, so the matrix resumes after a stop.
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -21,7 +25,7 @@ one() {   # name profile preset start length [extra run args...]
     local name="$1"; shift
     if [ -f "$runs/$name/result.json" ]; then echo "skip $name"; return; fi
     echo "=== $name $(date -u +%H:%M:%S)"
-    "$P" "$1" "$2" "$3" "$4" "$runs/$name" "" -- "${@:5}" | tail -1
+    "$P" "$1" "$2" "$3" "$4" "$runs/$name" "${P124_CPUS:-}" -- "${@:5}" | tail -1
 }
 keep() { P124_KEEP=1 one "$@"; }
 Q=earthlike_quick_16k; F=earthlike_full_16k; SC=scattered_continents; SU=supercontinent
@@ -46,5 +50,12 @@ if [ "$what" = quality ] || [ "$what" = all ]; then
 fi
 if [ "$what" = long ] || [ "$what" = all ]; then
     one t-mid6-full-$SC-1000 mid6 $F $SC 1000
+fi
+if [ "$what" = mem ]; then
+    export P124_CPUS=${P124_CPUS:-12-23}
+    one m-mid6-quick-$SC-500 mid6 $Q $SC 500
+    P124_MEM=16G one m-mid6-full-$SC-500 mid6 $F $SC 500
+    P124_MEM=16G one m-mid6-full-$SU-500 mid6 $F $SU 500
+    P124_MEM=16G one m-mid6-full-$SC-1000 mid6 $F $SC 1000
 fi
 echo "matrix done $(date -u +%H:%M:%S)"
