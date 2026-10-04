@@ -12,7 +12,7 @@
 #                       drive lease with it; nothing is leased from the laptop
 #   mcl_stop_on_interrupt   Ctrl-C/TERM on the laptop TERMs the Mac runner through its pid file
 #                       (neoforge/build/mac-client/runner.pid), which stops the client, releases
-#                       the lease and (mac.sh's trap) the server lock
+#                       the lease (and the admitted job ends with mac.sh)
 #
 # It also names the host and the Mac's layout, the same as tools/remote/mac.sh: HOST, REMOTE (this
 # checkout's copy), CACHE (the caches on the SSD; the m6lock copy sits there), SSH.

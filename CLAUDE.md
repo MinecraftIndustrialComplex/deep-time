@@ -149,8 +149,8 @@ tools/remote/mac.sh --no-sync -- deeptime-admit status  # the VM's admission too
 - **Real-client runs** (booting a Minecraft client for screenshots) go to the Mac's logged-in desktop
   session too, never the laptop's Xvfb (Ben, 2026-09-28). That desktop is shared with graphide's
   agents: take a "drive" lease with graphide's `utilities/scripts/mactest/m6lock.sh` first.
-  `tools/client/mac-screenshots.sh` does all of it from the laptop (sync and build, Deep Time's server
-  lock, the drive lease, the launch in the desktop session, the PNGs back in review/out/<name>/);
+  `tools/client/mac-screenshots.sh` does all of it from the laptop (sync and build, a server job of
+  the admission tool, the drive lease, the launch in the desktop session, the PNGs back in review/out/<name>/);
   the ScreenshotDriver's walk is the model for any other client check. Any other real-client tool
   (`tools/client/ev-assets.sh`) launches through the same Mac-side library, `tools/client/mac-client-lib.sh`
   (lease, desktop session, cleanup), and stops with exit 4 when nobody is logged in or the screen is

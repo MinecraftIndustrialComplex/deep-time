@@ -224,6 +224,7 @@ class Classify(unittest.TestCase):
         "true": "light",
         "git status && cat STATUS.md | head": "light",
         "uptime; free -g": "light",
+        "grep -E \"a|b\" log | cut -c1-260; awk '{print $1}' x | sed s/a/b/": "light",
         "grep -E \"GAME TESTS|required tests\" neoforge/build/gametest.log | head; grep -c x y | wc -l": "light",
         "tools/remote/detach.sh start run1 target/release/deeptime run --preset x": "light",
         "setsid nohup bash tools/review/sweep.sh > log 2>&1 &": "light",
@@ -330,6 +331,18 @@ class EndToEnd(unittest.TestCase):
         with store as s:
             r = s.history["test:two"][-1]
         self.assertGreater(r["cpu_peak"], 1.4)    # two children busy at once
+
+    def test_a_reaped_child_is_not_counted_twice(self):
+        # A shell runs one busy child for 3 s and waits for it: when the child ends, the shell's
+        # cutime jumps by the child's whole 3 s, already counted while the child ran.
+        store = admit.Store(self.tmp.name)
+        code = f"import subprocess,sys,time\nsubprocess.run([sys.executable,'-c',{BURN.format(s=3)!r}])\ntime.sleep(1.5)\n"
+        rc = admit.run("test:reap", [sys.executable, "-c", code], cpu=0.1, mem=0.1, store=store, quiet=True)
+        self.assertEqual(rc, 0)
+        with store as s:
+            r = s.history["test:reap"][-1]
+        self.assertLess(r["cpu_peak"], 1.6)
+        self.assertLess(r["cpu_mean"] * r["wall_s"], 4.0)    # about 3 core-seconds, not 6
 
     def test_a_server_job_gets_a_slot_and_a_nested_launcher_takes_it_over(self):
         store = admit.Store(self.tmp.name)
