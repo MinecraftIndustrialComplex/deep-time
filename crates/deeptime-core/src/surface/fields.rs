@@ -254,93 +254,113 @@ fn column(log: &StrataLog, c: usize, cls: &Classes, regolith: f64) -> [f32; 7] {
 /// The step's fields, in [`STEP_FIELDS`] order.
 pub fn step_fields(x: &StepInputs<'_>, cls: &Classes) -> Vec<Vec<f32>> {
     let n = x.flags.len();
-    let rows: Vec<[f32; 26]> = (0..n)
-        .into_par_iter()
-        .map(|c| {
-            let flags = x.flags[c] as u32 as u8;
-            let cont = x.crust_type[c] as u8 == CONTINENTAL;
-            let reg = x.regime[c] as u8;
-            let conv = x.convergence[c];
-            let arc = if flags & ARC != 0 {
-                (conv / 80.0).clamp(0.0, 1.0) * if cont { 1.0 } else { 0.7 }
-            } else {
-                0.0
-            };
-            let zone = flags & SUBDUCTION_ZONE != 0;
-            let fault = match reg {
-                regime::COLLISION => 1.0,
-                regime::RIFT => 0.8,
-                regime::ARC => 0.6,
-                regime::TRENCH => 0.5,
-                regime::BACK_ARC => 0.4,
-                regime::HOTSPOT => 0.3,
-                _ => {
-                    let age = x.orogeny_age[c];
-                    if age.is_finite() {
-                        (0.6 * (-age / 50.0).exp()).max(0.05)
-                    } else {
-                        0.05
-                    }
+    let row = |c: usize| -> [f32; 26] {
+        let flags = x.flags[c] as u32 as u8;
+        let cont = x.crust_type[c] as u8 == CONTINENTAL;
+        let reg = x.regime[c] as u8;
+        let conv = x.convergence[c];
+        let arc = if flags & ARC != 0 {
+            (conv / 80.0).clamp(0.0, 1.0) * if cont { 1.0 } else { 0.7 }
+        } else {
+            0.0
+        };
+        let zone = flags & SUBDUCTION_ZONE != 0;
+        let fault = match reg {
+            regime::COLLISION => 1.0,
+            regime::RIFT => 0.8,
+            regime::ARC => 0.6,
+            regime::TRENCH => 0.5,
+            regime::BACK_ARC => 0.4,
+            regime::HOTSPOT => 0.3,
+            _ => {
+                let age = x.orogeny_age[c];
+                if age.is_finite() {
+                    (0.6 * (-age / 50.0).exp()).max(0.05)
+                } else {
+                    0.05
                 }
-            };
-            let up = x.uplift_mm_yr[c] * 1000.0;
-            let orogenic = if cont && x.orogeny_type[c] as u8 != 0 {
-                up.max(0.0)
-            } else {
-                0.0
-            };
-            let rift = if cont { (-up).max(0.0) } else { 0.0 };
-            let z = x.rel_elev[c];
-            let marine = z < 0.0;
-            let k = x.kind[c];
-            let [carb, evap, eux, toc, src_depth, res, seal] =
-                column(x.log, c, cls, f64::from(x.regolith_m[c]));
-            let step_share = |kind: u8| if k == kind { 1.0 } else { 0.0 };
-            let t_c = x.t_c[c];
-            let geotherm = x.heat_flow[c] / 1000.0 / 2.5; // °C per metre
-            let burial = if src_depth.is_finite() {
-                t_c.max(0.0) + geotherm * src_depth
-            } else {
-                t_c.max(0.0)
-            };
-            let wtd = if marine {
-                0.0
-            } else {
-                5.0 + 150.0 * (1.0 - x.aridity[c].min(1.0)) + 0.05 * x.slope[c] * x.dx as f32
-            };
-            [
-                arc,
-                if arc > 0.0 { x.oxidation[c] } else { 0.0 },
-                if zone { conv } else { 0.0 },
-                if zone { x.obliquity[c] } else { 0.0 },
-                if zone { x.slab_age[c] } else { 0.0 },
-                x.thickness_m[c] / 1000.0,
-                fault,
-                orogenic,
-                rift,
-                x.heat_flow[c],
-                z as f32,
-                x.erosion_m_myr[c],
-                x.deposition_m_myr[c],
-                if marine && z > -200.0 { 1.0 } else { 0.0 },
-                carb.max(step_share(KIND_CARBONATE)),
-                evap.max(step_share(KIND_EVAPORITE)),
-                eux.max(step_share(KIND_EUXINIC)),
-                if x.coal[c] { 1.0 } else { 0.0 },
-                toc,
-                burial,
-                res,
-                seal,
-                wtd,
-                x.precip_mm[c],
-                t_c,
-                if reg == regime::CRATON { 1.0 } else { 0.0 },
-            ]
-        })
+            }
+        };
+        let up = x.uplift_mm_yr[c] * 1000.0;
+        let orogenic = if cont && x.orogeny_type[c] as u8 != 0 {
+            up.max(0.0)
+        } else {
+            0.0
+        };
+        let rift = if cont { (-up).max(0.0) } else { 0.0 };
+        let z = x.rel_elev[c];
+        let marine = z < 0.0;
+        let k = x.kind[c];
+        let [carb, evap, eux, toc, src_depth, res, seal] =
+            column(x.log, c, cls, f64::from(x.regolith_m[c]));
+        let step_share = |kind: u8| if k == kind { 1.0 } else { 0.0 };
+        let t_c = x.t_c[c];
+        let geotherm = x.heat_flow[c] / 1000.0 / 2.5; // °C per metre
+        let burial = if src_depth.is_finite() {
+            t_c.max(0.0) + geotherm * src_depth
+        } else {
+            t_c.max(0.0)
+        };
+        let wtd = if marine {
+            0.0
+        } else {
+            5.0 + 150.0 * (1.0 - x.aridity[c].min(1.0)) + 0.05 * x.slope[c] * x.dx as f32
+        };
+        [
+            arc,
+            if arc > 0.0 { x.oxidation[c] } else { 0.0 },
+            if zone { conv } else { 0.0 },
+            if zone { x.obliquity[c] } else { 0.0 },
+            if zone { x.slab_age[c] } else { 0.0 },
+            x.thickness_m[c] / 1000.0,
+            fault,
+            orogenic,
+            rift,
+            x.heat_flow[c],
+            z as f32,
+            x.erosion_m_myr[c],
+            x.deposition_m_myr[c],
+            if marine && z > -200.0 { 1.0 } else { 0.0 },
+            carb.max(step_share(KIND_CARBONATE)),
+            evap.max(step_share(KIND_EVAPORITE)),
+            eux.max(step_share(KIND_EUXINIC)),
+            if x.coal[c] { 1.0 } else { 0.0 },
+            toc,
+            burial,
+            res,
+            seal,
+            wtd,
+            x.precip_mm[c],
+            t_c,
+            if reg == regime::CRATON { 1.0 } else { 0.0 },
+        ]
+    };
+    // Each task fills its block of cells in all 26 fields at once (P1-17: the cells' rows were
+    // collected and then read back field by field on one thread, 26 strided sweeps of the
+    // whole raster every step).
+    const BLOCK: usize = 4096;
+    let mut fields: Vec<Vec<f32>> = (0..26).map(|_| vec![0.0; n]).collect();
+    let mut blocks: Vec<Vec<&mut [f32]>> = (0..n.div_ceil(BLOCK))
+        .map(|_| Vec::with_capacity(26))
         .collect();
-    (0..26)
-        .map(|f| rows.iter().map(|r| r[f]).collect())
-        .collect()
+    for field in fields.iter_mut() {
+        for (k, part) in field.chunks_mut(BLOCK).enumerate() {
+            blocks[k].push(part);
+        }
+    }
+    blocks
+        .into_par_iter()
+        .enumerate()
+        .for_each(|(k, mut outs)| {
+            let c0 = k * BLOCK;
+            for i in 0..outs[0].len() {
+                let r = row(c0 + i);
+                for (out, v) in outs.iter_mut().zip(r) {
+                    out[i] = v;
+                }
+            }
+        });
+    fields
 }
 
 /// Distance (km, block metric) from every cell to the nearest craton edge (a cell whose
