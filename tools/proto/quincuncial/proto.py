@@ -28,7 +28,10 @@ SRV = os.path.join(MC, "server")
 CLI = os.path.join(MC, "client")
 OUT = os.path.join(RUNS, "out")
 IPP = "/data/ban/mic/mods/ip-proto"
-GAME_PORT, RCON_PORT = 25985, 25995
+# A server job of the test VM's admission tool has its own ports and X display (tools/remote/vm/admit.py).
+GAME_PORT = int(os.environ.get("DEEPTIME_PORT_GAME", "25985"))
+RCON_PORT = int(os.environ.get("DEEPTIME_PORT_RCON", "25995"))
+DISP = os.environ.get("DEEPTIME_DISPLAY", ":95")
 B = 8192  # hemisphere square side: the world is 2B x B  (ledger: SCL-076, game-choice, prototype)
 LON = 31.0  # the western hemisphere centre; puts the singular points at sea (ledger: SCL-076)
 PLAYER = "IPTester"
@@ -37,7 +40,7 @@ PLAYER = "IPTester"
 def env():
     out = subprocess.run(["bash", "-c", f"source {IPP}/scripts/env.sh; env -0"], capture_output=True, check=True).stdout
     e = dict(kv.split("=", 1) for kv in out.decode().split("\0") if "=" in kv)
-    e["DISPLAY"] = ":95"
+    e["DISPLAY"] = DISP
     return e
 
 
@@ -394,7 +397,7 @@ def shot(name):
 
 def client_start():
     if not os.path.exists("/tmp/.X11-unix/X95"):
-        subprocess.Popen([ENV["XVFB"], ":95", "-screen", "0", "1280x720x24", "-nolisten", "tcp", "+extension", "GLX"],
+        subprocess.Popen([ENV["XVFB"], DISP, "-screen", "0", "1280x720x24", "-nolisten", "tcp", "+extension", "GLX"],
                          env=ENV, stdout=open(os.path.join(MC, "xvfb.log"), "w"), stderr=subprocess.STDOUT, start_new_session=True)
         time.sleep(3)
     pmc = subprocess.run(["nix", "build", "--no-link", "--print-out-paths", "nixpkgs#portablemc"], capture_output=True, check=True).stdout.decode().split()[0]
@@ -465,7 +468,7 @@ def client_stop():
     except (OSError, ValueError):
         pass
     for pid, _, cmd in procs():
-        if "Xvfb :95 " in cmd + " ":
+        if f"Xvfb {DISP} " in cmd + " ":
             try:
                 os.kill(pid, 15)
             except OSError:

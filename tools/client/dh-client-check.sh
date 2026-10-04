@@ -2,9 +2,14 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 #
 # Distant Horizons far terrain to a joined client (P3-04; Ben 2026-10-02, "Mixin around TW's
-# guard"): run on the test VM, under the server lock, from the repo root:
+# guard"): run on the test VM from the repo root:
 #
-#   tools/remote/mac.sh --server -- tools/remote/detach.sh run dh-client tools/client/dh-client-check.sh [profile]
+#   tools/remote/mac.sh -- tools/remote/detach.sh run dh-client tools/client/dh-client-check.sh [profile]
+#
+# It runs through the admission tool (tools/remote/vm/admit.py, kind client:<profile>; Ben 2026-10-03:
+# load-based admission, no server lock): the server runs in a private copy of the set on the job's
+# own ports, the client on the job's own X display; the set's world is linked in and held with the
+# set's world lock, so another check of the same set waits while other servers run beside it.
 #
 # profile: an installed smoke set with Distant Horizons (default dh: standalone + DH at the MIC
 # pack's pin; install it first with tools/smoke/install.sh dh --preset earthlike_quick_16k ...).
@@ -21,19 +26,33 @@
 # Output: smoke/<profile>/client-check.txt (the probe lines and the verdicts); exit 0 when the
 # client's requests reached the generator on both sides of the seam and the sections arrived.
 set -uo pipefail
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 cd "$(dirname "$0")/../.."
 REPO="$PWD"
 P="${1:-dh}"
-SRV="$REPO/smoke/$P/server"
+ADMIT="${DEEPTIME_ADMIT:-/usr/local/lib/deeptime/admit.py}"
+if [ "${DEEPTIME_ADMIT_PID:-}" != "$$" ] && [ -f "$ADMIT" ]; then
+    exec python3 "$ADMIT" run --kind "client:$P" --server --label "$(basename "$REPO")" -- "$SELF" "$@"
+fi
+SET_SRV="$REPO/smoke/$P/server"
+SRV="$SET_SRV"
 CL="$REPO/smoke/$P/client"
 OUT="$REPO/smoke/$P/client-check.txt"
-[ -d "$SRV/mods" ] || { echo "dh-client-check: smoke/$P is not installed (tools/smoke/install.sh $P ...)" >&2; exit 2; }
+[ -d "$SET_SRV/mods" ] || { echo "dh-client-check: smoke/$P is not installed (tools/smoke/install.sh $P ...)" >&2; exit 2; }
+# The set's world (and this check's client folder) are this run's until it ends.
+exec 8>"$REPO/smoke/$P/.world.lock"
+flock -n 8 || { echo "dh-client-check: waiting for smoke/$P's world (another run of this set uses it)"; flock 8; }
+if [ -n "${DEEPTIME_SERVER_DIR:-}" ]; then
+    SRV="$DEEPTIME_SERVER_DIR/server"
+    python3 "$REPO/tools/smoke/instance.py" make --set "$SET_SRV" --dest "$SRV" --world-link planet >/dev/null \
+        || { echo "dh-client-check: could not copy smoke/$P/server" >&2; exit 1; }
+fi
 . "$REPO/smoke/tools.env"
 NEO="$(cat "$REPO/smoke/$P/neoforge.version")"
 GAME=$(sed -n 's/^server-port=//p' "$SRV/server.properties")
 RCONP=$(sed -n 's/^rcon.port=//p' "$SRV/server.properties")
 PW=$(sed -n 's/^rcon.password=//p' "$SRV/server.properties")
-DISP=:89
+DISP="${DEEPTIME_DISPLAY:-:89}"
 : > "$OUT"
 say() { echo "$*" | tee -a "$OUT"; }
 rcon() { "$MCRCON" -H 127.0.0.1 -P "$RCONP" -p "$PW" -c "$1" 2>&1; }
@@ -47,11 +66,12 @@ cleanup() {
     [ -n "$SPID" ] && { rcon stop >/dev/null 2>&1; for i in $(seq 60); do kill -0 "$SPID" 2>/dev/null || break; sleep 1; done; kill "$SPID" 2>/dev/null; }
     [ -n "$XPID" ] && kill "$XPID" 2>/dev/null
     [ -n "${PAPID:-}" ] && kill "$PAPID" 2>/dev/null; [ -n "${PADIR:-}" ] && rm -rf "$PADIR"
+    [ "$SRV" != "$SET_SRV" ] && [ -f "$SRV/console.log" ] && cp "$SRV/console.log" "$REPO/smoke/$P/console.log"
 }
 trap cleanup EXIT
 
-# 1. The server. Its ports are the set's fixed ones, which other sets share: wait while they are taken
-# (2026-10-03: another worktree's standalone server held 25665 and this one died on start).
+# 1. The server, on the job's ports (instance.py wrote them into its server.properties). Off the test
+# VM the set's fixed ones, which other sets share: wait while they are taken.
 for i in $(seq 120); do
     ss -ltn 2>/dev/null | grep -q -e ":$GAME " -e ":$RCONP " || break
     [ $i = 1 ] && say "== port $GAME or $RCONP is taken; waiting (at most 20 min)"
