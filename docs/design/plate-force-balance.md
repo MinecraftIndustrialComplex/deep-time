@@ -605,7 +605,7 @@ design (4.1 1C, 4.2 2B):
   says. `plate-check --record` writes the whole dynamics record; `tools/review/belts-record.py`
   summarises its collisions.
 
-**Left for task 6 (structure stage):** the regime field carries the belt and the wedge as
+**Left for task 6 (structure stage; done, see "As built: task 6" below):** the regime field carries the belt and the wedge as
 `collision` (stamped each step they rise by 5 m/Myr or more), so fold trains and thrusts follow the
 suture on both sides with no change there. Not read yet: the shortening strength from the step's
 convergence, fold tightness from the real shortening (a `plates/shortening` field), and the
@@ -648,6 +648,71 @@ Both are for the force balance (task 7) and a finer front; see the questions in 
 0.291), median 504 m, above 2 km 0.106, highest cell 5.8 km [5.4, 6.5], 99th percentile 4.3 km.
 The continental crust ends 1000 Myr at 0.27 against master's 0.31: crust that crosses a front
 becomes belt thickness and its area is not given back, and no collision setting tried moved it.
+
+### As built: task 6, the structure stage reads the collision (2026-10-04)
+
+Branch of the plate task 6 agent; changes in `structure/deform/` (`emplace.rs`, `params.rs`,
+`feature.rs`, `intrude.rs`, `mod.rs`), `structure/mod.rs` and `structure/traps.rs`, and, to carry
+the numbers across, `plates/belts.rs`, `l1.rs`, `state.rs`, `subduction.rs` and `ridges.rs`.
+Ledger DEF-075 to DEF-077, PLT-260, HNT-117; science page `docs/science/folds-faults-intrusions.md`.
+The structure stage's rules were set against the three rows of section 3.5's table:
+
+- **A footprint, not a regime.** The plate model marks, each step a collision has a front, every
+  sample of the belt, the wedge and the foreland with the convergence across the front and the
+  collision's shortening so far (`Sample::collision_mm_yr`, `shortening_km`; L1 fields
+  `plates/collision_mm_yr` and `plates/shortening`, PLT-260), and flags the incoming plate beyond
+  the wedge's toe, within the foredeep's reach (600 km), as `FORELAND`. The marks are cleared at the
+  start of each step. They replace the `collision` regime as the structure stage's input: the regime
+  outlasts the last uplift by `collision_orogeny_myr`, so it kept folding belts nothing shortened
+  (it still gates the magmatism of a belt, which does outlast the shortening).
+- **Strength from the convergence.** A belt or wedge shortens at `min(1, convergence /
+  collision_reference_mm_yr)` (new setting, 30 mm/yr, about the Zagros; DEF-075), so a slowing
+  collision makes proportionally fewer folds and thrusts and a stopped one none. The rates of the
+  structure stage were set for a collision at full strength, so a collision at the reference gives
+  what the old rule gave.
+- **Fold tightness from the real shortening.** In a belt, wedge or foreland the cover's strain is
+  `e = S / (S + W)`, S the collision's shortening so far and W the belt's width
+  (`collision_belt_km`), between the least and the most `fold_shortening` gives (DEF-077). A young
+  collision folds loosely and an old one tightly; elsewhere the strain still comes from the crust's
+  thickening (DEF-006).
+- **The foreland is the basin.** On the incoming plate, a flagged sample whose
+  `surface/flexure_m` is below -100 m shortens at 0.6 of the belt's strength (DEF-076); the
+  forebulge and the plain beyond get nothing, and neither does the overriding plate. Without a
+  flexure field there is no collision foreland. **`foreland_km` is now the foreland of an Andean
+  margin only**, measured from the continental arc (a new `arc_distance_km`), not from any orogen;
+  its value is unchanged (250 km, DEF-027). Fold and thrust counts are reported by the rule that
+  strained their cell (`formed_by` in the structure note: collision, arc, foreland, basin).
+- **`true_height_share` stays 4/15** (Ben's decision); nothing here touches it.
+
+**Measured** (`earthlike_quick_16k`, 500 Myr, seed 1, plates identical before and after: the
+same 989 and 937 plutons emplaced; before is cda3b894, which counts by rule, after is the head of
+the branch):
+
+| Start | Measure | Before | After |
+|---|---|---|---|
+| scattered | fold trains, thrusts (run summary) | 564, 2,144 | 459, 1,583 |
+| scattered | normal, strike-slip faults | 723, 145 | 764, 109 |
+| scattered | fold trains + thrusts formed in the collision rule | 233 + 733 | 36 + 133 |
+| scattered | formed in a foreland (before: distance rule, both sides; after: Andean only) | 344 + 1,180 | 293 + 960 |
+| scattered | formed in the collision's foreland basin | 0 | 7 + 29 |
+| scattered | collision cells covered, young (under 30 Myr) | 0.90, 0.67 | 0.82, 0.22 |
+| scattered | deformed, faulted share of the land | 0.438, 0.314 | 0.400, 0.285 |
+| supercontinent | fold trains, thrusts | 601, 2,204 | 418, 1,424 |
+| supercontinent | normal, strike-slip faults | 894, 112 | 899, 81 |
+| supercontinent | in the collision rule | 322 + 1,093 | 48 + 184 |
+| supercontinent | in a foreland (as above) | 304 + 1,081 | 243 + 869 |
+| supercontinent | in the collision's foreland basin | 0 | 10 + 26 |
+| supercontinent | collision cells covered, young | 0.98, 0.81 | 0.92, 0.55 |
+
+The terrain is unchanged to the metre (land share 0.2442, median 415 m, highest 4.1 km, scattered);
+the structures' relief changes 10,500 cells against 19,800. Collisions now make a sixth of the folds
+and thrusts they did; what remains is mostly the Andean forelands, which is a rule of its own and
+not one of this task (question in STATUS.md).
+
+What it does not do: the foreland basin on the quick preset is thin (36 folds and thrusts in 500 Myr),
+for the reason task 4 gave: belts of 1.6 to 2.3 km give a wedge narrower than a 71 km sample, so
+little loads the incoming plate and the flexural basin is shallow. A finer front or the force
+balance (task 7) is what widens it; the rule is ready for it (a test builds the basin by hand).
 
 ## 10. Risks
 

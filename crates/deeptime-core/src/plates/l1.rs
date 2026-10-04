@@ -190,7 +190,7 @@ pub fn sample(
     let cells = links.len();
     // The deposit engine's inputs and the surface's basement (P1-04): the nearest sample's flags,
     // top rock pool and trench values; the rest interpolated.
-    let extra: Vec<[f32; 10]> = (0..cells)
+    let extra: Vec<[f32; 12]> = (0..cells)
         .into_par_iter()
         .map(|c| {
             let s = &samples[links[c].nearest as usize];
@@ -207,6 +207,8 @@ pub fn sample(
                     7000.0,
                     s.group as f32,
                     f32::NAN,
+                    0.0,
+                    0.0,
                 ];
             }
             let top = TOP_ORDER
@@ -229,6 +231,8 @@ pub fn sample(
                 } else {
                     f32::NAN
                 },
+                s.collision_mm_yr,
+                s.shortening_km,
             ]
         })
         .collect();
@@ -328,7 +332,7 @@ pub fn sample(
         "plates/fold_trend_deg",
         "plates/plate_id",
     ];
-    let extra_names: [&'static str; 10] = [
+    let extra_names: [&'static str; 12] = [
         "plates/flags",
         "plates/top_pool",
         "plates/oxidation",
@@ -343,6 +347,12 @@ pub fn sample(
         "plates/group_id",
         // The heat flow of continental crust alone, NaN on oceanic crust and in gaps (above).
         "plates/continental_heat_flow_mw_m2",
+        // The footprint of an active collision this step: its belt, its wedge and its foreland
+        // (`plates/flags` carries FORELAND for the last): the convergence across the front, mm/yr,
+        // and the collision's shortening so far, km; 0 elsewhere and in gaps. The structure stage
+        // reads them (`belts.rs`, `structure::deform::emplace`).
+        "plates/collision_mm_yr",
+        "plates/shortening",
     ];
     names
         .iter()
