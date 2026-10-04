@@ -88,6 +88,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+| 2026-10-04 | Create across turning seams | **Three choices** (docs/design/wrap-engine.md §11): (1) trains across turning seams: build the portal-edge route (13–22 days for a half-turn, plus 2–4 for a quarter-turn) once Phase 1's topology API is final, with track refused at seams until then (recommended); or keep track refused at seams for good; (2) contraptions across seams (11–19 days): after trains, in Phase 4 (recommended); or keep assembly refused at seams for good; (3) MIC's Alternate Current breaks redstone across seams (the engine's redstone tests fail with MIC only): fold its level access next (recommended), or leave Alternate Current out of MIC worlds that use the engine. | Coordinator's report (not yet asked) |
 | 2026-10-03 | P1-26 | **The climate grid's rows on Lambert's map.** The per-cell climate's coarse grid is built from k × k blocks of L1 cells, so on the equal-area map its rows are uniform in sin φ: tall at high latitude (on Earth's relief the polar row spans 73–90°). Since master's projection merged, Yakutsk's January warmed from −37.7 to −29 °C, the winter spread fell from 4.98 to 4.5 K, and the zonal clock's correction fits 2–3 K worse at the poles. Options: (a) give the climate grid rows of equal latitude, each a run of L1 rows (a change to `coarse.rs` and the masked bilinear, about a day; recommended); (b) more rows (a finer grid, × 2 cost); (c) keep. | Not asked yet: for the coordinator to put to Ben |
 | 2026-10-04 | P1-26 | **`climate.ice_reference_km3` (the ice the sea-level curve assumes, CLM-108).** It is 1.0·10⁷ km³, the present ice of the 2026-09-29 calibration runs. A 12-run ensemble on this branch (earthlike_quick_16k, 500 Myr, seeds 1–3, scattered and supercontinent; build log 2026-10-04) ends with a median of 3.7·10⁶ km³ under the per-cell climate (0.7–11.2·10⁶) and 5.3·10⁶ under the banded one (2.4–10.1·10⁶), so today's presets sit about 15 m above their calibrated coastline whichever climate runs. (a, recommended) Set it to 4·10⁶ when P1-26 lands, and let P1-17's light re-check after P1-26 read the land share with it; (b) keep 1.0·10⁷ (the 15 m stays in the curve); (c) re-measure on a larger ensemble first (the spread is a factor of 16). Kept at 1.0·10⁷ until answered. | Not asked yet: for the coordinator to put to Ben |
 
@@ -235,6 +236,117 @@ Ben's answer of 2026-10-02, "Merge with ice sheets off (Recommended)". On branch
 | 2026-10-02 | science WP-14a | **CO₂ forcing above 50,000 ppm and the snowball's escape** (CLM-070, CLM-166; design §4.2). The clock's forcing is Byrne & Goldblatt 2014's fit, stated for 200–10,000 ppm and computed to 50,000 ppm; the code uses it to 10⁶ ppm, and today's snowball escapes near 5.5·10⁵ ppm where Hoffman et al. 2017 expect 10⁴–10⁵ ppm (with cloud forcing of ≥ 10 W/m² that cloud-free models lack). (1, recommended) a short research task finds a published forcing calculation for 0.05–1 bar of CO₂ and the snowball cloud forcing; T6 then applies both, and the escape is measured against 10⁴–10⁵ ppm; (2) cap now: above 50,000 ppm continue the fit as a logarithm with its slope there (no source; escape CO₂ moves, direction to be measured); (3) leave it (escape stays near 0.55 bar). | to be asked by the coordinator (sub-agent report) |
 
 ## Build log
+### 2026-10-04 — Create across the wrap engine's turning seams: kinetics and fluids adapters, refusals, train and contraption assessment (Ben's "If it can be done in parallel, do it now, otherwise defer. But we should be doing it."; agent worktree agent-a9fc837518e2419c1, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; dev-only behind `-Ddeeptime.wrapengine=true`, not merged)
+
+**Docs.** The design is `docs/design/wrap-engine.md` §11, "Create across turning seams"; the §4.8
+Create rows point at it. The adapters were built first on the spike's fold, then moved onto Phase 1's
+API (§9) once master 01d63213 landed.
+
+**Create 6.0.10**, the MIC pin (code MIT, assets all rights reserved):
+- compileOnly, with the Ponder, Flywheel and Registrate jars it nests extracted for javac
+  (`create_version` and `create_nested_jars` in `gradle.properties`);
+- nothing copied; NOTICE.md lists it under "APIs called".
+
+**The rule** (§11.1). A turn carries a speed s about +a to s about R(+a):
+- a half-turn flips x and z speeds and keeps y;
+- a quarter-turn swaps x and z and flips one of them;
+- a face handed between block entities turns with the state.
+
+`SeamTurns` holds the rule and `SeamTurnsTest` checks it (5 tests). On a half-turn seam, Guyou,
+Peirce, a quarter-turn corner and the cube cross:
+- a seam link is accepted from both ends or refused from both;
+- the two turns of an accepted link cancel;
+- refusals stay under 10 %.
+
+The test found a cube-corner diagonal that is seen through the seam from one end only. Hence three
+rules:
+- a seam link must hold from both ends (`SeamTurns.seamLink`);
+- pairs adjacent in stored space connect only directly;
+- no self-links at turn points.
+
+**Kinetics.**
+- `KineticSeams` with `RotationPropagatorSeamMixin` re-runs Create's own `getRotationSpeedModifier`
+  with the far block entity shown at its band position, its state turned back and faces turned. The
+  result is multiplied by the axis sign.
+- Create's answer is never used for a pair that is not adjacent in stored space: its axis rule ignores
+  distance.
+- `DirectionalShaftHalvesSeamMixin` gives a gearbox the face its source is seen through.
+- Belts, chain conveyors and gantries are refused as custom connections.
+
+**Fluids.**
+- Faces are turned into the target's frame at 9 places: `FluidPropagator` (3), `PumpBlockEntity` (3),
+  `FlowSource` (2) and `FluidNetwork`.
+- `PipeConnection.determineSource` folds a band position.
+
+**Refused, with a message and never a crash** (`SeamRefusals`: one log line per place and kind, plus an
+action-bar message within 16 blocks):
+- belts and chain conveyors whose span touches the band;
+- track within a block of a seam: the track tool goes through Create's own placement message, and any
+  other track block is broken one tick after it is placed;
+- contraption assembly that reaches beyond a seam, through Create's `AssemblyException`, which shows on
+  the goggles.
+
+Contraption entities are also left out of the engine's carry: the adapters cancel `WrapCrossingEvent`
+for them.
+
+**Edits outside the compat package (small):**
+- `DeepTimeMixinPlugin`: a `mixin.wrapengine.compat.<modid>` mixin needs the flag and the mod. Two dev
+  switches leave adapters out: `-PwrapNoCompat` (all) and `-PwrapCompatSkip=…` (by name).
+- `WrapEngine.init` wires the Create adapters at server start. Doing it during mod construction loaded
+  Create's classes early and broke Registrate.
+- `WrapEngineGameTests.TOPOLOGY` includes the Create sites.
+
+**Evidence** (`./gametest.sh -PwithMic -PwrapEngine`, test VM, 2026-10-04). All 4 Create tests passed:
+- **Half-turn kinetics:**
+  - z shafts: far stored speed +16 at (24574, 20480…20482), against the control's −16;
+  - y cogs keep their sign; x cogs flip;
+  - breaking the shaft next to the motor stops all 7 shafts, the far side included.
+- **Quarter-turn kinetics:** z shafts land as an x line at (25600…25602, 22534), +16 against −16.
+- **Fluids:** the far tank holds 112 mB of water after 120 ticks, the same as the control.
+- **Refusals:**
+  - a belt across the seam is refused, while one on this side connects;
+  - a bearing across the seam is refused, while one on this side assembles;
+  - track at the seam is broken, while track 5 blocks away stays.
+- **Control without the adapters** (`-PwrapNoCompat`): the far shafts stand at 0 rpm, the far tank
+  stays at 0 mB, and the belt is not refused.
+
+**Found: 6 of Phase 1's own tests fail under MIC** (`-PwithMic -PwrapEngine`). The same 6 fail
+without the adapters:
+- `redstoneAcross*`: 13, then 0 beyond the seam. The likely cause is Alternate Current [not read].
+- `playerCrosses*`: a KubeJS payload sent to the fake player.
+- `bandReload*`: a band chunk is not re-copied in time.
+
+**Found: an intermittent boot failure with the engine and MIC.** Registrate reports "Found unused
+register callbacks", and the server fails to start:
+- with the adapters, 4 of 16 boots, none of the 8 since the merge onto Phase 1;
+- without them, 1 of 12 boots.
+
+§11.7 records this.
+
+**Gates:**
+- `./gradlew build test`: tests=292, failures=0, skipped=2.
+- `./gametest.sh -PwrapEngine`: all 19 passed (the Create tests are skipped without Create).
+- `tools/smoke/install.sh mic` (157 mods), then `./gametest.sh -PwithMic`: all 74 passed.
+- `./gametest.sh -PwithMic -PwrapEngine`:
+  - the 4 Create tests pass;
+  - 6 of Phase 1's tests fail, as above.
+
+**Blocked on later phases** (§11.7):
+- band block-entity data on the client: the turned Create tags (`Speed` times the sign, `Source` moved,
+  pipe faces re-keyed);
+- whole-world topologies.
+
+**Assessed, not built:**
+- trains across a half-turn: 13–22 days, through a same-dimension portal edge on Create's portal-track
+  machinery, with "dimension" generalised to "frame", client included; a quarter-turn adds 2–4 days;
+- contraptions: 11–19 days.
+
+**Next:**
+- fold Alternate Current;
+- find the boot race (`-PgametestDebugLog`);
+- band block entities with turned Create tags;
+- refuse piston and gantry movement into the band (`ContraptionCollider.isCollidingWithWorld`).
+
 ### 2026-10-03/04 — Volcanic biomes tied to real volcanoes (Ben's "Tie them to real volcanoes (Recommended)"; agent worktree agent-a3528f881aff2d206, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Asked (decisions log 2026-10-03):** where the pack has volcanic biomes (Terralith's yellowstone, volcanic peaks, volcanic crater, caldera, ashen savanna, basalt cliffs, thermal caves; Biomes O' Plenty's volcano, volcanic plains, hot springs) they go only at real volcanoes and are kept out everywhere else; without them the climate's biome stays.
 - **Design chosen** (Java `worldgen/VolcanicZones`, `climate/VolcanicBiomes`, `climate/VolcanicCensus`; FORMAT.md "Volcanic biomes"; ledger BIO-104 to BIO-114):
