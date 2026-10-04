@@ -129,8 +129,8 @@ wants equal area and seamless, only `peirce.rs` changes, not the gluing.
 1. it is Deep Time's own 2:1 grid with today's x wrap; only the two long edges are new, and they turn;
 2. the equator is a straight east–west walk and north is up along it, as now;
 3. walking over a pole works like the real thing (a half-turn at the long edge);
-4. its singular points sit at 45° latitude, away from the seams' corners where two seams meet on
-   Peirce's south pole;
+4. the south pole is a point on a seam like the north pole, not Peirce's four corners where two
+   turning seams meet;
 5. Distant Horizons, the workbench map and the climate's "rows are parallels" assumption are less
    disturbed (rows are parallels only near the equator, but the picture stays 2:1).
 Against it: the poles are on seams (a portal at the pole), and its singular points are at
@@ -160,8 +160,9 @@ mid-latitudes, where Earth-like land is commoner. The runnable world was built i
 - **The strip.** The output is a strip of circumference C′ = 4b = 32,768 (the 32k preset's): x wraps
   with C′ (two copies of the slide period), and z runs over ±C′/4 = ±b, twice the domain's ±b/2. The
   forward map is defined on the whole plane, so everything outside the domain is the glued neighbour's
-  terrain, the "folded outside". Today's latitude-from-z code (the pole cap, `BeyondPoleDensity`) reads
-  at most 45° inside the domain and never fires there.
+  terrain, the "folded outside". Today's latitude-from-z code (the pole cap, `BeyondPoleDensity`) never fires inside the domain: it reads
+  at most 45° there with the equirectangular frame the run used and 51.8° with master's Lambert frame
+  (asin(4096 / R), R = C′/2π = 5,215), against a cap from 70°.
 - **What the resampler drops**: rivers, folds and faults, volcanoes, craters, deposit sites, bodies
   and events, keyframes (block-space vector data the prototype does not transform). The spawn
   candidates are carried through latitude and longitude. A 60 s resample of the test planet on 8
@@ -210,6 +211,15 @@ summoned over RCON from `deeptime-quincuncial portals`, converted to global port
 restarted (a fresh global portal moves entities only near its centre until then). The client is a real
 NeoForge client under Xvfb with Mesa llvmpipe (portablemc, offline profile), driven with xdotool;
 positions come over RCON every 0.25 s.
+
+The run used this branch on master 9a95c917, whose world data was still equirectangular (format 0.3).
+Master has since switched to Lambert (format 0.4). After merging it, the resampler reads Lambert bakes
+through the same projection module with no change: a fresh earthlike_quick_16k bake of the merged tree
+resampled onto the same Guyou world in 68 s (`review/out/quincuncial/guyou-lambert-domain.png`). That
+picture shows one new flaw: radial streaks round both poles. Lambert's raster resolves the polar caps
+badly (a 2-block L3 row spans 0.5° of latitude at 85° and 2.5° at 89° on the 16k planet, against
+54.5 blocks per degree at Guyou's poles), so near the poles the resampled terrain varies only with
+longitude. The equirectangular bake of the run has no such streaks.
 
 **Maps** (`review/out/quincuncial/`, not committed): `src-equirect.png` (the bake),
 `guyou-domain.png` (the world: the rectangle, equator across the middle, poles and singular points
@@ -348,6 +358,7 @@ Seen in this run [R] or carried from the 2026-10-02 prototype, which tested them
 | Petrolpark/Destroy, CBC Modern Warfare | Crash at mod construction with Immersive Portals ([02]) | [02] |
 | Distant Horizons | Not run. DH draws the raw world in raw coordinates and Immersive Portals does not draw DH terrain through portals ([02]). Here the raw world beyond every seam **is** the folded planet (§5.1), so DH's LODs beyond a seam would show the right terrain from beyond vanilla's render distance on; only the band inside it is the portal's | [I], [02] |
 | Maps, compasses, waypoints | Read raw coordinates: a map at a seam draws the hidden outside (the right terrain, the wrong copy for player edits); "north" is up only along the equator | [I] |
+| Polar streaks from a Lambert bake | Radial streaks round both poles: Lambert's rows resolve the caps badly (§5) | `guyou-lambert-domain.png` |
 | The four singular points | Smooth, stretched terrain round each, a cone of 180° (walking round one takes half the usual distance); placed at sea here | §3 |
 | Corners where two seams meet (Guyou: the rectangle's corners, where a slide meets a half-turn; they are singular points) | A walk aimed exactly at a corner escaped the world in [02]; not re-tested. Here the escape lands in the folded outside, which is the right terrain | [02], §3 |
 | Server load | 1.7 ms/tick idle with four global portals; 6.4 ms/tick with one player at a seam; no matched run without portals | §5.4 |
@@ -366,7 +377,8 @@ Seen in this run [R] or carried from the 2026-10-02 prototype, which tested them
    bake writes the world on the Guyou grid, as this prototype's resampler does, with footprint
    filtering. The vector data must be carried over: rivers (polylines split at seams), structures,
    volcanoes, craters, deposit sites and bodies, events, spawn. The simulation's climate stays
-   per-latitude internally; only the world is projected.
+   per-latitude internally; only the world is projected. The bake must sample the polar caps from
+   something that resolves them (the L0 sphere, or a polar patch): Lambert's rows do not (§5).
 3. **The fold everywhere the game reads world data:** `FarTerrain`/Distant Horizons, the column rule,
    the samplers. The strip trick (C′ = 4b) hides the problem for the rasters, but anything that wraps x
    at C or clamps z must fold at the long edges.
