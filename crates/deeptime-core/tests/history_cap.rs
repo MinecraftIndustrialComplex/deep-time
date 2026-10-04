@@ -157,6 +157,8 @@ fn run(json: &str, cap: u64, name: &str) -> Result<Outcome, CoreError> {
 
 #[test]
 fn a_run_over_its_cap_spills_its_history_and_ends_the_same() {
+    // The history's spill alone: no freed blocks kept for reuse (they would be released first).
+    alloc::set_cache_limit(0);
     let json = preset();
     let free = run(&json, u64::MAX, "unlimited").unwrap();
     assert_eq!(free.spilled_frames, 0);
