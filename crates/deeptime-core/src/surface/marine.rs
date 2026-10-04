@@ -173,6 +173,26 @@ pub fn fill(
 pub const FAILURE_RATE: f64 = 0.05; // ledger: ERO-169
 pub const FAILURE_ITERATIONS: u32 = 40; // ledger: ERO-169
 
+/// Counters of the slope failure's work since the process started (P1-17 diagnostics, printed by
+/// `deeptime bench`; not part of any world): full sweeps, neighbourhood passes, the movers they
+/// started from, and the cells the neighbourhood passes recomputed.
+static FAILURE_COUNTS: [std::sync::atomic::AtomicU64; 4] = [
+    std::sync::atomic::AtomicU64::new(0),
+    std::sync::atomic::AtomicU64::new(0),
+    std::sync::atomic::AtomicU64::new(0),
+    std::sync::atomic::AtomicU64::new(0),
+];
+
+/// The slope failure's counters: (full sweeps, neighbourhood passes, movers summed over the
+/// neighbourhood passes, cells those passes recomputed).
+pub fn failure_counts() -> [u64; 4] {
+    std::array::from_fn(|k| FAILURE_COUNTS[k].load(std::sync::atomic::Ordering::Relaxed))
+}
+
+fn count_failure(k: usize, v: u64) {
+    FAILURE_COUNTS[k].fetch_add(v, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// Parameters of the submarine slope failure ([`slope_failure`]).
 #[derive(Clone, Copy, Debug)]
 pub struct FailureParams {
@@ -280,6 +300,9 @@ pub fn slope_failure(
             Some(from) if from.len() <= dense_above => {
                 let shares = grow(from, &mut mark);
                 let changes = grow(&shares, &mut mark);
+                count_failure(1, 1);
+                count_failure(2, from.len() as u64);
+                count_failure(3, changes.len() as u64);
                 {
                     let hh: &[f64] = h;
                     let av: &[f64] = avail;
@@ -310,6 +333,7 @@ pub fn slope_failure(
                 }
             }
             _ => {
+                count_failure(0, 1);
                 {
                     let hh: &[f64] = h;
                     let av: &[f64] = avail;
