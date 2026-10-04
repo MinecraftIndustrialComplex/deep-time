@@ -838,7 +838,10 @@ fn the_collision_footprint_lives_with_its_collision() {
         "{foreland_steps} steps with a foreland"
     );
     for name in ["plates/collision_mm_yr", "plates/shortening"] {
-        let f = world.fields.get(name).unwrap_or_else(|| panic!("no {name}"));
+        let f = world
+            .fields
+            .get(name)
+            .unwrap_or_else(|| panic!("no {name}"));
         assert!(f.data.iter().all(|v| v.is_finite() && *v >= 0.0), "{name}");
     }
 }

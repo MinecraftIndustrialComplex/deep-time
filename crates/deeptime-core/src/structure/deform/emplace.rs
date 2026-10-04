@@ -747,9 +747,16 @@ pub(crate) mod tests {
         let (r_fast, _, n_fast) = count(5.0 * reference);
         let (r_stop, _, n_stop) = count(0.0);
         assert_eq!(r_full.0, 1.0);
-        assert!((r_half.0 - 0.5).abs() < 1e-6 && (r_half.1 - 0.3).abs() < 1e-6, "{r_half:?}");
+        assert!(
+            (r_half.0 - 0.5).abs() < 1e-6 && (r_half.1 - 0.3).abs() < 1e-6,
+            "{r_half:?}"
+        );
         assert_eq!(r_fast, r_full, "no more than the reference");
-        assert_eq!(r_stop, (0.0, 0.0), "a collision that stopped shortens nothing");
+        assert_eq!(
+            r_stop,
+            (0.0, 0.0),
+            "a collision that stopped shortens nothing"
+        );
         assert!(n_full > 30, "{n_full}");
         assert!(
             n_half < n_full * 3 / 4 && n_half > n_full / 4,
@@ -790,7 +797,10 @@ pub(crate) mod tests {
         // end of the range, the basin's (0.6 of the way between the least and the most) below.
         let a = |e: f64| e.sqrt() / std::f64::consts::PI;
         assert!(young < middle && middle < old, "{young} {middle} {old}");
-        assert!(old < a(e_hi) * 1.0001 && young > a(e_lo) * 0.9999, "{young} {old}");
+        assert!(
+            old < a(e_hi) * 1.0001 && young > a(e_lo) * 0.9999,
+            "{young} {old}"
+        );
         // 100 km over a 400 km belt is 20 %: between the least and the most.
         assert!(middle > a(0.15) && middle < a(0.25), "{middle}");
     }
@@ -806,29 +816,47 @@ pub(crate) mod tests {
         sp.deformation.max_overlap = 16;
         let p = Planet::new();
         let (all, counts) = p.run(&sp, 15, 7);
-        let col = |f: &Feature| crate::structure::plutons::cell_of(&p.grid, f.x, f.z) % p.grid.w as usize;
+        let col =
+            |f: &Feature| crate::structure::plutons::cell_of(&p.grid, f.x, f.z) % p.grid.w as usize;
         let shortened: Vec<&Feature> = all
             .iter()
             .filter(|f| matches!(f.kind, Kind::FoldTrain | Kind::Thrust))
             .collect();
-        let in_belt = shortened.iter().filter(|f| (55..=64).contains(&col(f))).count();
-        let in_basin = shortened.iter().filter(|f| (64..=80).contains(&col(f))).count();
+        let in_belt = shortened
+            .iter()
+            .filter(|f| (55..=64).contains(&col(f)))
+            .count();
+        let in_basin = shortened
+            .iter()
+            .filter(|f| (64..=80).contains(&col(f)))
+            .count();
         let beyond = shortened.iter().filter(|f| col(f) > 80).count();
         assert!(in_belt > 20 && in_basin > 20, "{in_belt} {in_basin}");
-        assert_eq!(beyond, 0, "the forebulge and the plain beyond are undeformed");
-        assert!(counts.shortened_by[3][0] > 5 && counts.shortened_by[3][1] > 5, "{counts:?}");
+        assert_eq!(
+            beyond, 0,
+            "the forebulge and the plain beyond are undeformed"
+        );
+        assert!(
+            counts.shortened_by[3][0] > 5 && counts.shortened_by[3][1] > 5,
+            "{counts:?}"
+        );
         // The basin's cells are the foreland and their strain is gentler than the belt's.
         let mut dry = Planet::new();
         dry.flexure = None;
         let (all, counts) = dry.run(&sp, 15, 7);
         assert!(
-            all.iter().filter(|f| matches!(f.kind, Kind::FoldTrain | Kind::Thrust)).all(|f| col(f) <= 64),
+            all.iter()
+                .filter(|f| matches!(f.kind, Kind::FoldTrain | Kind::Thrust))
+                .all(|f| col(f) <= 64),
             "no flexure, no basin: the foreland has no structures"
         );
         assert_eq!(counts.shortened_by[3], [0, 0]);
         // The behind-the-belt (overriding) side: no foreland (the plate's own flags say which
         // side is the incoming one).
-        let overriding = all.iter().filter(|f| col(f) < 55 && f.kind != Kind::Normal).count();
+        let overriding = all
+            .iter()
+            .filter(|f| col(f) < 55 && f.kind != Kind::Normal)
+            .count();
         assert_eq!(overriding, 0, "{overriding}");
     }
 
@@ -850,7 +878,10 @@ pub(crate) mod tests {
         let near = at(&p, 122);
         let far = at(&p, 139);
         assert_eq!(near.source, Source::Foreland);
-        assert!(near.shortening > far.shortening && far.shortening > 0.0, "{near:?} {far:?}");
+        assert!(
+            near.shortening > far.shortening && far.shortening > 0.0,
+            "{near:?} {far:?}"
+        );
         assert!(near.shortening < 0.6, "{near:?}");
         // The collision regime's own orogen distance (the old rule's input) no longer makes one.
         for j in 30..rows {
