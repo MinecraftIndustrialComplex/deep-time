@@ -8,6 +8,10 @@
     {
       "id": "biomesoplenty:volcanic_plains",
       "required": false
+    },
+    {
+      "id": "wythers:savanna_basaltic_incursions",
+      "required": false
     }
   ]
 }
