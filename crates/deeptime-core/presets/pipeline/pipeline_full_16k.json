@@ -391,6 +391,7 @@
       "normal_rate_km2_myr": 4e-05,
       "strike_slip_rate_km2_myr": 4e-06,
       "foreland_km": 250.0,
+      "collision_reference_mm_yr": 30.0,
       "max_overlap": 3,
       "relief": 0.25,
       "relief_age_myr": 10.0,
