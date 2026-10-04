@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.minecraftindustrialcomplex.deeptime.mixin.wrapspike",
+  "compatibilityLevel": "JAVA_21",
+  "plugin": "com.minecraftindustrialcomplex.deeptime.mixin.DeepTimeMixinPlugin",
+  "mixins": [
+    "LevelWrapMixin",
+    "LevelTicksWrapMixin",
+    "BlockStateBaseWrapMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
