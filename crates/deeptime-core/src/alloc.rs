@@ -294,6 +294,14 @@ impl MemoryGauge for AllocGauge {
     fn peak(&self) -> u64 {
         peak()
     }
+    fn phase(&self, _name: &str, begin: bool) {
+        if begin {
+            start_window();
+        }
+    }
+    fn phase_peak(&self) -> u64 {
+        window_peak()
+    }
 }
 
 // The core's own tests run on this allocator, so every test exercises the large-block path.

@@ -46,9 +46,15 @@ impl MemoryGauge for AllocGauge {
         peak()
     }
     fn phase(&self, name: &str, begin: bool) {
+        if begin {
+            counts::start_window();
+        }
         if let Some(t) = trace() {
             t.phase(name, begin);
         }
+    }
+    fn phase_peak(&self) -> u64 {
+        counts::window_peak()
     }
     fn reserved(&self, needed: u64, granted: bool) {
         if trace().is_some() {
@@ -161,7 +167,6 @@ mod glibc {
 impl Tracer {
     fn phase(&self, name: &str, begin: bool) {
         if begin {
-            counts::start_window();
             RESERVED.store(0, Ordering::Relaxed);
             REFUSED.store(0, Ordering::Relaxed);
             // Resets VmHWM to the current resident size (Linux 4.0+).
