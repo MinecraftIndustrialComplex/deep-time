@@ -76,6 +76,7 @@ public final class TimelapseModel {
     private int index = -1;
     private boolean follow = true;
     private boolean playing;
+    private volatile boolean cancelRequested;
     private long playAccumulator;
     private SimSession.Progress progress = SimSession.Progress.INITIAL;
     private State state = State.RUNNING;
@@ -189,7 +190,13 @@ public final class TimelapseModel {
 
     /** Cancels the run; its staging folder is deleted once it stopped. */
     public void cancel() {
+        cancelRequested = true;
         run.cancel();
+    }
+
+    /** True once {@link #cancel} was called (the run may still be finishing its step). */
+    public boolean cancelRequested() {
+        return cancelRequested;
     }
 
     private void deleteFolder() {

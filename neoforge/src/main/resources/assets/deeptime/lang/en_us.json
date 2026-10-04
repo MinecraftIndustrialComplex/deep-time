@@ -332,6 +332,8 @@
   "deeptime.editor.estimate.error": "No estimate: the preset is not valid",
   "deeptime.editor.machine": "This machine: %s GiB free of %s GiB, game heap %s GiB, %s simulation threads",
   "deeptime.editor.ready": "Ready to run.",
+  "deeptime.editor.run.stopping": "Stopping the cancelled run (it finishes its step first)…",
+  "deeptime.editor.run.going": "A run is going: Timelapse shows it.",
   "deeptime.editor.accepted": "Accepted: %s. The world will be created from this run.",
   "deeptime.editor.problem.natives": "The Deep Time native library is not loaded.",
   "deeptime.editor.problem.start": "Choose how the continents start.",
