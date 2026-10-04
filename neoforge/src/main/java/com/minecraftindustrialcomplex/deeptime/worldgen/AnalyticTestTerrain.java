@@ -5,7 +5,8 @@ package com.minecraftindustrialcomplex.deeptime.worldgen;
  * A closed-form test terrain, periodic in x with period C (plan §7.1). It lets the generator,
  * Toroidal World's wrap and the GameTests run before any Rust or world data exists (P0-05, P0-06).
  *
- * <p>Longitude θ = 2πx/C and latitude φ = πz/(C/2) (z ∈ [-C/4, C/4) spans pole to pole):
+ * <p>Longitude θ = 2πx/C and latitude φ = asin(z/R), R = C/2π (the Lambert projection; z ∈ [-R, R]
+ * spans pole to pole):
  * <pre>
  *   H = 63 + 60·cos(θ − π)·cos φ          one continent straddling the seam (θ = ±π)
  *        + 25·sin(3θ + 0.5)·cos 2φ       smaller lands and seas
@@ -43,9 +44,9 @@ public final class AnalyticTestTerrain implements TerrainSource {
     }
 
     private double latitude(int z) {
-        // Clamp beyond the poles (|z| >= C/4): the terrain holds its polar value there.
-        double phi = Math.PI * z / (c / 2.0);
-        return Math.max(-Math.PI / 2, Math.min(Math.PI / 2, phi));
+        // The Lambert projection (worlddata/Projection): sin φ = z/R, R = C/2π; clamped beyond the
+        // poles (|z| >= R): the terrain holds its polar value there.
+        return Math.asin(Math.max(-1.0, Math.min(1.0, z * (2 * Math.PI) / c)));
     }
 
     @Override

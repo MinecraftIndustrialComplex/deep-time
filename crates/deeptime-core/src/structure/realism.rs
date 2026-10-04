@@ -14,7 +14,7 @@
 //!    metamorphic path records the temperature it never reached (its path's first step: shale
 //!    would be slate above 250 °C). Rock lower in a pile was at least as hot as the rock above it
 //!    whenever both were there, so a horizon whose class was never as hot as a horizon above it
-//!    formed at is an inversion: schist (≥ 450 °C) over shale (< 250 °C). The reverse — shale over
+//!    formed at is an inversion: schist (≥ 525 °C) over shale (< 250 °C). The reverse — shale over
 //!    schist — is cover on basement across an unconformity and is fine. Intrusive rock is never the
 //!    lower member (a pluton can be younger than the metamorphism of its roof), and steps below
 //!    [`METAMORPHIC_FROM_C`] (gypsum → anhydrite) are diagenesis, not grade.
@@ -234,6 +234,14 @@ pub struct Census {
     pub sliver_classes: BTreeMap<String, u64>,
     pub sheet_classes: BTreeMap<String, u64>,
     pub floored_classes: BTreeMap<String, u64>,
+    /// Class name → columns holding it, and blocks of it in all the columns (what the rock-class
+    /// shares in `to_json` are made of).
+    pub class_columns: BTreeMap<String, u64>,
+    pub class_blocks: BTreeMap<String, u64>,
+    /// Class name → columns whose top rock (the first horizon below the ground) it is.
+    pub top_class: BTreeMap<String, u64>,
+    /// Blocks in all the columns.
+    pub blocks: u64,
 }
 
 impl Census {
@@ -258,6 +266,25 @@ impl Census {
             let key = format!("{} over {}", rules.name(up), rules.name(low));
             *self.inversion_pairs.entry(key).or_insert(0) += 1;
         }
+        if let Some(&(_, _, k)) = column.first() {
+            *self.top_class.entry(rules.name(k).to_owned()).or_insert(0) += 1;
+        }
+        let mut seen = Vec::with_capacity(column.len());
+        for &(_, blocks, k) in column {
+            let blocks = u64::try_from(blocks).unwrap_or(0);
+            self.blocks += blocks;
+            *self
+                .class_blocks
+                .entry(rules.name(k).to_owned())
+                .or_insert(0) += blocks;
+            if !seen.contains(&k) {
+                seen.push(k);
+                *self
+                    .class_columns
+                    .entry(rules.name(k).to_owned())
+                    .or_insert(0) += 1;
+            }
+        }
         for (list, map) in [
             (&f.slivers, &mut self.sliver_classes),
             (&f.sheets, &mut self.sheet_classes),
@@ -278,7 +305,11 @@ impl Census {
         self.with_sheet += o.with_sheet;
         self.with_floored += o.with_floored;
         self.with_metamorphic += o.with_metamorphic;
+        self.blocks += o.blocks;
         for (mine, theirs) in [
+            (&mut self.class_columns, &o.class_columns),
+            (&mut self.class_blocks, &o.class_blocks),
+            (&mut self.top_class, &o.top_class),
             (&mut self.inversion_pairs, &o.inversion_pairs),
             (&mut self.sliver_classes, &o.sliver_classes),
             (&mut self.sheet_classes, &o.sheet_classes),
@@ -304,8 +335,27 @@ impl Census {
             v.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
             Value::Array(v.into_iter().take(12).map(|(k, n)| json!([k, n])).collect())
         };
+        // Every class present: the share of columns that hold it, of all the blocks below the
+        // ground, and of columns whose top rock it is.
+        let classes: serde_json::Map<String, Value> = self
+            .class_blocks
+            .iter()
+            .map(|(name, &blocks)| {
+                let cols = self.class_columns.get(name).copied().unwrap_or(0);
+                let top = self.top_class.get(name).copied().unwrap_or(0);
+                (
+                    name.clone(),
+                    json!({
+                        "column_share": self.share(cols),
+                        "block_share": if self.blocks == 0 { 0.0 } else { blocks as f64 / self.blocks as f64 },
+                        "top_share": self.share(top),
+                    }),
+                )
+            })
+            .collect();
         json!({
             "columns": self.columns,
+            "classes": classes,
             "mean_horizons": if self.columns == 0 { 0.0 } else { self.horizons as f64 / self.columns as f64 },
             "share": {
                 "grade_inversion": self.share(self.with_inversion),
@@ -393,9 +443,16 @@ mod tests {
         assert_eq!(bad.inversions.len(), 1, "{bad:?}");
         let (up, low, _) = bad.inversions[0];
         assert_eq!((up, low), (index("schist") as u8, index("shale") as u8));
-        // Schist (450 °C) over greenstone (which would be amphibolite at 500 °C) is no
-        // inversion; schist over basalt (greenstone at 300 °C) is; a pluton below is exempt.
-        assert!(findings(&[("schist", 30), ("greenstone", 30), ("gneiss", 30)]).clean());
+        // Schist (525 °C) over greenstone (which would be amphibolite at 500 °C) is an
+        // inversion, as is schist over basalt (greenstone at 300 °C); phyllite (350 °C) over
+        // greenstone is not; a pluton below is exempt.
+        assert_eq!(
+            findings(&[("schist", 30), ("greenstone", 30), ("gneiss", 30)])
+                .inversions
+                .len(),
+            1
+        );
+        assert!(findings(&[("phyllite", 30), ("greenstone", 30), ("gneiss", 30)]).clean());
         assert_eq!(
             findings(&[("schist", 30), ("basalt", 30)]).inversions.len(),
             1

@@ -5,11 +5,27 @@ use super::*;
 use crate::hydro::HydroParams;
 
 const W: usize = 128;
-const H: usize = 64;
+/// Rows of the grid: they run from z = −384, the multiple of 64 past the Lambert pole at 326.
+const H: usize = 48;
 /// Blocks across the planet: a 16-block cell grid of W × H.
 const C: u32 = (W * 16) as u32;
+/// The map picture's height (the projection's aspect, π : 1: 128 × 41).
+const PH: usize = 41;
 
-/// A planet 128 × 64 cells wide: land sloping south to a sea (rows 54 and on) and in towards a
+/// The picture row of grid row `j` (the picture spans the planet pole to pole; its rows are a
+/// little under a cell apart).
+fn prow(j: usize) -> usize {
+    let g = GridDesc::for_planet("L1", C, 16).unwrap();
+    let z = g.block_z(j as i64) as f64;
+    (g.projection().picture_y(z, PH as u32).round().max(0.0) as usize).min(PH - 1)
+}
+
+/// The pixel of grid cell (i, j).
+fn cell(v: &WaterView, i: usize, j: usize) -> usize {
+    at(v, i, prow(j))
+}
+
+/// A planet 128 × 48 cells wide: land sloping south to a sea (rows 40 and on) and in towards a
 /// valley down column 64, a closed bowl five blocks deep in the north-west, a warm, moderately wet
 /// climate (700 mm, 15 °C: 160 mm of runoff; the bowl gets more than it evaporates, so it fills).
 fn world() -> WorldState {
@@ -24,10 +40,10 @@ fn world_in(rain: f32, t: f32) -> WorldState {
     let elevation: Vec<f32> = (0..W * H)
         .map(|k| {
             let (i, j) = ((k % W) as f32, (k / W) as f32);
-            if j >= 54.0 {
+            if j >= 40.0 {
                 return 40.0;
             }
-            let base = 64.0 + 0.6 * (53.0 - j) + 0.35 * (i - 64.0).abs();
+            let base = 64.0 + 0.6 * (39.0 - j) + 0.35 * (i - 64.0).abs();
             let bowl = (20..=26).contains(&(k % W)) && (10..=16).contains(&(k / W));
             // A bowl with a rim: the cells inside it are sunk 5 blocks (100 m).
             if bowl && (21..=25).contains(&(k % W)) && (11..=15).contains(&(k / W)) {
@@ -52,7 +68,7 @@ fn world_in(rain: f32, t: f32) -> WorldState {
     world
 }
 
-const SIZE: (u32, u32) = (W as u32, H as u32);
+const SIZE: (u32, u32) = (W as u32, PH as u32);
 
 fn at(v: &WaterView, i: usize, j: usize) -> usize {
     assert!(i < v.w && j < v.h);
@@ -73,9 +89,9 @@ fn a_valley_carries_a_river_that_grows_to_the_sea_and_a_bowl_holds_a_lake() {
     assert!(!rivers.chains.is_empty());
     // The river runs down column 64: nothing on the dry slopes, a river in the valley, bigger
     // downstream.
-    let far = at(&v, 5, 30);
+    let far = cell(&v, 5, 30);
     assert_eq!((v.river[far], v.q[far]), (0.0, 0.0));
-    let (upper, lower) = (at(&v, 64, 28), at(&v, 64, 50));
+    let (upper, lower) = (cell(&v, 64, 22), cell(&v, 64, 37));
     assert!(v.river[upper] >= 0.5 && v.river[lower] >= 0.5);
     assert!(
         v.q[lower] > 2.0 * v.q[upper],
@@ -87,13 +103,13 @@ fn a_valley_carries_a_river_that_grows_to_the_sea_and_a_bowl_holds_a_lake() {
         v.q[upper] >= 2.0,
         "a river carries at least the stream threshold"
     );
-    // Not on the sea (rows 54 and on are 23 blocks under it).
-    for j in 56..H {
-        assert_eq!(v.river[at(&v, 64, j)], 0.0, "row {j}");
+    // Not on the sea (rows 40 and on are 23 blocks under it).
+    for y in prow(42)..PH {
+        assert_eq!(v.river[at(&v, 64, y)], 0.0, "picture row {y}");
     }
     // The bowl is a lake, and only the bowl.
-    assert_eq!(v.lake[at(&v, 23, 13)], 1.0);
-    assert_eq!(v.lake[at(&v, 5, 30)], 0.0);
+    assert_eq!(v.lake[cell(&v, 23, 13)], 1.0);
+    assert_eq!(v.lake[cell(&v, 5, 30)], 0.0);
     assert!(
         v.info.lake_px >= 9.0 && v.info.lake_px < 60.0,
         "{}",
@@ -128,8 +144,8 @@ fn thresholds_follow_the_presets_hydrology() {
 fn rivers_are_wider_where_the_flow_is_bigger() {
     let (v, _) = derive_with_rivers(&world(), &ViewScale::default(), SIZE).unwrap();
     // The river's cross-section, in coverage, near the head and near the mouth.
-    let width = |j: usize| (0..W).map(|i| v.river[at(&v, i, j)]).sum::<f32>();
-    assert!(width(50) > width(28), "{} {}", width(50), width(28));
+    let width = |j: usize| (0..W).map(|i| v.river[cell(&v, i, j)]).sum::<f32>();
+    assert!(width(37) > width(22), "{} {}", width(37), width(22));
 }
 
 #[test]
@@ -137,9 +153,9 @@ fn water_is_drawn_over_the_satellite_after_its_shading_and_leaves_dry_land_alone
     let ramps = Ramps::builtin();
     let (v, _) = derive_with_rivers(&world(), &ViewScale::default(), SIZE).unwrap();
     let grey = [120u8, 110, 90, 255];
-    let mut rgba: Vec<u8> = (0..W * H).flat_map(|_| grey).collect();
+    let mut rgba: Vec<u8> = (0..W * PH).flat_map(|_| grey).collect();
     // A pixel without data is left alone.
-    rgba[at(&v, 64, 40) * 4 + 3] = 0;
+    rgba[cell(&v, 64, 30) * 4 + 3] = 0;
     let before = rgba.clone();
     v.overlay(&mut rgba, &ramps);
     let px = |k: usize| {
@@ -151,18 +167,18 @@ fn water_is_drawn_over_the_satellite_after_its_shading_and_leaves_dry_land_alone
         ]
     };
     // Dry land: unchanged.
-    assert_eq!(px(at(&v, 5, 30)), grey);
+    assert_eq!(px(cell(&v, 5, 30)), grey);
     // A river: bluer than the ground, and the larger the river the darker blue it is.
-    let river = px(at(&v, 64, 50));
+    let river = px(cell(&v, 64, 37));
     assert!(river[2] > river[0] + 40 && river[3] == 255, "{river:?}");
     assert_eq!(
-        px(at(&v, 64, 40)),
+        px(cell(&v, 64, 30)),
         [120, 110, 90, 0],
         "no data stays no data"
     );
-    assert_eq!(&before[at(&v, 64, 40) * 4..][..4], &[120, 110, 90, 0]);
+    assert_eq!(&before[cell(&v, 64, 30) * 4..][..4], &[120, 110, 90, 0]);
     // A lake: nearly the lake colour (95 %).
-    let lake = px(at(&v, 23, 13));
+    let lake = px(cell(&v, 23, 13));
     for c in 0..3 {
         let want = f32::from(grey[c]) * 0.05 + f32::from(LAKE[c]) * 0.95;
         assert!((f32::from(lake[c]) - want).abs() <= 1.0, "{lake:?}");
@@ -183,7 +199,7 @@ fn land_ice_hides_the_water_on_the_satellite_view_but_not_in_the_layer() {
         .insert(satellite::input::ICE.into(), Field { grid, data: ice });
     let (v, _) = derive_with_rivers(&w, &view, SIZE).unwrap();
     let grey = [120u8, 110, 90, 255];
-    let mut rgba: Vec<u8> = (0..W * H).flat_map(|_| grey).collect();
+    let mut rgba: Vec<u8> = (0..W * PH).flat_map(|_| grey).collect();
     v.overlay(&mut rgba, &ramps);
     let px = |k: usize| {
         [
@@ -194,15 +210,15 @@ fn land_ice_hides_the_water_on_the_satellite_view_but_not_in_the_layer() {
         ]
     };
     // The lake (x 23) lies under the ice: not drawn. The river (column 64) is just off it: drawn.
-    assert_eq!(px(at(&v, 23, 13)), grey);
+    assert_eq!(px(cell(&v, 23, 13)), grey);
     assert!(
-        v.lake[at(&v, 23, 13)] == 1.0,
+        v.lake[cell(&v, 23, 13)] == 1.0,
         "the lake is there, only hidden"
     );
-    assert_ne!(px(at(&v, 64, 50)), grey);
+    assert_ne!(px(cell(&v, 64, 37)), grey);
     // The layer shows them all.
     let layer = v.render(&ramps, &view).unwrap();
-    assert_eq!(&layer[at(&v, 23, 13) * 4..][..3], &LAKE);
+    assert_eq!(&layer[cell(&v, 23, 13) * 4..][..3], &LAKE);
 }
 
 #[test]
@@ -219,15 +235,15 @@ fn the_layer_has_land_sea_lake_and_a_river_on_the_ramp() {
             rgba[k * 4 + 3],
         ]
     };
-    assert_eq!(&px(at(&v, 23, 13)), &[LAKE[0], LAKE[1], LAKE[2], 255]);
-    assert_eq!(&px(at(&v, 100, 60)), &[SEA[0], SEA[1], SEA[2], 255]);
+    assert_eq!(&px(cell(&v, 23, 13)), &[LAKE[0], LAKE[1], LAKE[2], 255]);
+    assert_eq!(&px(cell(&v, 100, 42)), &[SEA[0], SEA[1], SEA[2], 255]);
     // A river pixel is exactly the ramp's colour at its discharge, so the workbench can read the
     // discharge back from the colour.
-    let k = at(&v, 64, 50);
+    let k = cell(&v, 64, 37);
     let want = ramps.ramps[RAMP].colour(f64::from(v.q[k]).log10());
     assert_eq!(&px(k)[..3], &want);
     // Land is the layer's pale neutral, softly shaded: bright, and not blue.
-    let land = px(at(&v, 5, 30));
+    let land = px(cell(&v, 5, 30));
     assert!(land[0] >= 180 && land[0] >= land[2], "{land:?}");
     assert_eq!(land[3], 255);
     // Every pixel is opaque (all of this planet has terrain).
@@ -277,13 +293,13 @@ fn a_cold_lake_is_drawn_as_ice_on_both_views() {
         w.fields.insert(name.into(), Field::filled(grid.clone(), t));
     }
     let v = derive(&w, &view, SIZE).unwrap();
-    let k = at(&v, 23, 13);
+    let k = cell(&v, 23, 13);
     assert_eq!((v.frozen[k], v.lake[k]), (1.0, 0.0));
     assert!(v.info.frozen_px >= 9.0 && v.info.frozen_px == v.info.lake_px);
     let layer = v.render(&ramps, &view).unwrap();
     assert_eq!(&layer[k * 4..][..3], &FROZEN);
     let grey = [120u8, 110, 90, 255];
-    let mut rgba: Vec<u8> = (0..W * H).flat_map(|_| grey).collect();
+    let mut rgba: Vec<u8> = (0..W * PH).flat_map(|_| grey).collect();
     v.overlay(&mut rgba, &ramps);
     for c in 0..3 {
         let want = f32::from(grey[c]) * 0.05 + f32::from(FROZEN_SATELLITE[c]) * 0.95;
@@ -328,10 +344,10 @@ fn a_desert_bowl_is_a_salt_flat_or_dry_and_the_old_rule_fills_it() {
         .find(|(_, v)| v.info.lake_px == 0.0 && v.info.playa_px >= 1.0)
         .expect("a rainfall that leaves a playa and no lake");
     let w = world_in(*rain, 30.0);
-    let k = (0..W * H)
+    let k = (0..W * PH)
         .max_by(|&a, &b| v.playa[a].total_cmp(&v.playa[b]))
         .unwrap();
-    assert!((21..=25).contains(&(k % W)) && (11..=15).contains(&(k / W)));
+    assert!((21..=25).contains(&(k % W)) && (prow(11)..=prow(15)).contains(&(k / W)));
     let layer = v.render(&ramps, &view).unwrap();
     assert_eq!(&layer[k * 4..][..3], &PLAYA);
     // Drier still: nothing reaches the floor.
@@ -341,7 +357,7 @@ fn a_desert_bowl_is_a_salt_flat_or_dry_and_the_old_rule_fills_it() {
     let mut old = ViewScale::default();
     old.hydro.lake_balance = false;
     let full = derive(&w, &old, SIZE).unwrap();
-    assert_eq!(full.lake[at(&full, 23, 13)], 1.0);
+    assert_eq!(full.lake[cell(&full, 23, 13)], 1.0);
 }
 
 #[test]
@@ -371,8 +387,9 @@ fn the_bakes_file_draws_the_same_rivers_as_the_derivation_wrote() {
 fn a_river_crosses_the_seam() {
     let w = world();
     let view = ViewScale::default();
-    // A chain across the seam at row 20 (block z = -C/4 + 20·16), 8 blocks each side.
-    let z = -(C as f32) / 4.0 + 20.0 * 16.0;
+    // A chain across the seam at row 20 (block z = −Zo + 20·16), 8 blocks each side.
+    let oz = GridDesc::for_planet("L1", C, 16).unwrap().origin_block_z;
+    let z = oz as f32 + 20.0 * 16.0;
     let half = C as f32 / 2.0;
     let mut rivers = Rivers::empty(C);
     for (k, x) in [half - 8.0, half, half + 8.0].into_iter().enumerate() {
@@ -396,37 +413,47 @@ fn a_river_crosses_the_seam() {
     write_rivers(&d, &rivers).unwrap();
     let v = from_bake(&w, &view, &d, None, SIZE).unwrap().unwrap();
     // The river sits at x = 127.5 → 128.5 px: pixels 127 and 0 hold it, the middle of the map not.
-    assert!(v.river[at(&v, 127, 20)] >= 0.5);
-    assert!(v.river[at(&v, 0, 20)] >= 0.5);
-    assert_eq!(v.river[at(&v, 64, 20)], 0.0);
+    assert!(v.river[cell(&v, 127, 20)] >= 0.5);
+    assert!(v.river[cell(&v, 0, 20)] >= 0.5);
+    assert_eq!(v.river[cell(&v, 64, 20)], 0.0);
     let _ = std::fs::remove_dir_all(d);
 }
 
 #[test]
 fn lake_cover_averages_the_cells_under_a_pixel() {
-    // 8 × 4 cells under a 4 × 2 picture: pixel (px, py) is centred on cell (2px, 2py) and covers
-    // the 2 × 2 cells (2px − 1 ..= 2px) × (2py − 1 ..= 2py). Pixel (1, 1): cells (1, 1), (2, 1),
-    // (1, 2) and (2, 2) = 9, 10, 17, 18 of which three are wet.
-    let wet = |c: usize| matches!(c, 9 | 10 | 17);
-    let g8 = GridDesc::for_planet("L", 16, 2).unwrap();
-    assert_eq!((g8.w, g8.h), (8, 4));
-    let cover = lake_cover(&g8, &wet, (4, 2));
-    assert_eq!(cover[4 + 1], 0.75);
+    // 512 × 192 cells under a 256 × 81 picture: pixel (px, py) is centred on its cell
+    // (`GridDesc::picture_cell`) and covers the 2 × 2 cells up and left of it, three of them wet.
+    let g = GridDesc::for_planet("L", 1024, 2).unwrap();
+    assert_eq!((g.w, g.h), (512, 192));
+    let (pw, ph) = (256usize, 81usize);
+    let (px, py) = (100usize, 40usize);
+    let (ci, cj) = g.picture_cell(px as f64, py as f64, pw as u32, ph as u32);
+    let at_cell = |i: i64, j: i64| (j * 512 + i) as usize;
+    let wet_cells = [
+        at_cell(ci - 1, cj - 1),
+        at_cell(ci, cj - 1),
+        at_cell(ci - 1, cj),
+    ];
+    let wet = |c: usize| wet_cells.contains(&c);
+    let cover = lake_cover(&g, &wet, (pw, ph));
+    assert_eq!(cover[py * pw + px], 0.75);
     assert_eq!(cover.iter().filter(|&&c| c > 0.0).count(), 1);
-    // The same grid at the picture's own size is the grid itself.
-    let g4 = GridDesc::for_planet("L", 16, 4).unwrap();
-    let same = lake_cover(&g4, &|c| c == 5, (4, 2));
-    assert_eq!(same, [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]);
+    // A grid at the picture's own width takes the nearest cell.
+    let g4 = GridDesc::for_planet("L", 1024, 4).unwrap();
+    let (ci, cj) = g4.picture_cell(px as f64, py as f64, pw as u32, ph as u32);
+    let one = (cj * i64::from(g4.w) + ci) as usize;
+    let same = lake_cover(&g4, &|c| c == one, (pw, ph));
+    assert_eq!(same[py * pw + px], 1.0);
 }
 
 #[test]
 fn a_fine_grid_is_averaged_down_to_the_working_size() {
-    // L2 of a 16k planet: 2048 × 1024 = 2.1 M cells, over MAX_CELLS.
+    // L2 of a 16k planet: 2048 × 656 = 1.3 M cells, over MAX_CELLS.
     let grid = GridDesc::for_planet("L2", 16384, 8).unwrap();
     assert!(grid.cells() > MAX_CELLS);
     let field = Field::filled(grid, 70.0);
     let (g, elev) = work_terrain(&field, 63 * 16);
-    assert_eq!((g.w, g.h, g.r), (1024, 512, 16));
+    assert_eq!((g.w, g.h, g.r), (1024, 328, 16));
     assert_eq!(elev.len(), g.cells());
     assert!(elev.iter().all(|&e| e == 70 * 16));
 }
