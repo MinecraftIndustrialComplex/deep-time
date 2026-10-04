@@ -1,0 +1,17 @@
+deeptime probe site 2004 39 -1366
+deeptime probe site 2004 38 -1366
+deeptime why 232
+deeptime why 234
+deeptime probe cdg 123 -114
+deeptime probe cdg 122 -114
+deeptime probe cdg 124 -114
+deeptime probe cdg 242 40
+deeptime probe cdg 238 45
+deeptime probe cdg 242 45
+deeptime probe cdg 240 42
+deeptime probe cdg 140 -98
+deeptime probe cdg 125 -86
+deeptime probe cdg 169 -116
+deeptime probe cdg 0 0
+deeptime probe cdg 300 -200
+deeptime probe cdg -300 300
