@@ -16,6 +16,12 @@
 //!   allocator already returns large blocks (Windows' heap and macOS' large allocations).
 //! - **Each block counts what it occupies**: a large block its whole pages, a small one its
 //!   malloc chunk (the size plus glibc's 8-byte header, rounded up to 16, at least 32).
+//!
+//! The stages allocate and free the same grid-sized arrays every step (hundreds of GiB over a
+//! quick run), so mapping each one afresh costs a page fault per page: a quick 16k run took 39 %
+//! longer. A freed large block is therefore kept for the next block of exactly its size, up to
+//! [`CACHE_BYTES`] of them; the kept blocks count as in use (the process holds them), and
+//! [`release_cache`] gives them back when the memory cap needs the room.
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -36,6 +42,89 @@ static PEAK: AtomicU64 = AtomicU64::new(0);
 static EARLIER_PEAK: AtomicU64 = AtomicU64::new(0);
 /// The current large-block threshold ([`set_large_threshold`]; `usize::MAX`: off).
 static LARGE: AtomicUsize = AtomicUsize::new(LARGE_BYTES);
+
+/// At most this many bytes of freed large blocks are kept for reuse.
+pub const CACHE_BYTES: usize = 256 << 20;
+/// The current limit of the kept blocks ([`set_cache_limit`]).
+static CACHE_LIMIT: AtomicUsize = AtomicUsize::new(CACHE_BYTES);
+/// At most this many kept blocks.
+const SLOTS: usize = 64;
+
+/// Freed large blocks kept for reuse, oldest first: `(address, page-rounded length)`.
+struct Cache {
+    blocks: [(usize, usize); SLOTS],
+    n: usize,
+    bytes: usize,
+}
+
+static CACHE: std::sync::Mutex<Cache> = std::sync::Mutex::new(Cache {
+    blocks: [(0, 0); SLOTS],
+    n: 0,
+    bytes: 0,
+});
+
+fn cache() -> std::sync::MutexGuard<'static, Cache> {
+    CACHE.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+impl Cache {
+    /// A kept block of exactly `len` bytes.
+    fn take(&mut self, len: usize) -> Option<*mut u8> {
+        let i = self.blocks[..self.n].iter().rposition(|b| b.1 == len)?;
+        let (p, _) = self.blocks[i];
+        self.blocks.copy_within(i + 1..self.n, i);
+        self.n -= 1;
+        self.bytes -= len;
+        Some(p as *mut u8)
+    }
+
+    /// Unmaps the oldest kept block; its bytes leave the count.
+    fn drop_oldest(&mut self) {
+        let (p, len) = self.blocks[0];
+        self.blocks.copy_within(1..self.n, 0);
+        self.n -= 1;
+        self.bytes -= len;
+        // SAFETY: a kept block is a live mapping of `len` bytes that nothing else refers to.
+        unsafe { os::unmap(p as *mut u8, len) };
+        removed(len);
+    }
+
+    /// Keeps a freed block for reuse, making room by unmapping the oldest; false when it is
+    /// bigger than the whole limit (the caller unmaps it).
+    fn put(&mut self, p: *mut u8, len: usize) -> bool {
+        let limit = CACHE_LIMIT.load(Ordering::Relaxed);
+        if len > limit {
+            return false;
+        }
+        while self.n > 0 && (self.n == SLOTS || self.bytes + len > limit) {
+            self.drop_oldest();
+        }
+        self.blocks[self.n] = (p as usize, len);
+        self.n += 1;
+        self.bytes += len;
+        true
+    }
+}
+
+/// Gives every kept large block back to the OS; returns the bytes released.
+pub fn release_cache() -> u64 {
+    let mut c = cache();
+    let bytes = c.bytes as u64;
+    while c.n > 0 {
+        c.drop_oldest();
+    }
+    bytes
+}
+
+/// Sets how many bytes of freed large blocks are kept for reuse (0: none). For experiments
+/// (`DEEPTIME_LARGE_CACHE` in the CLI); the default is [`CACHE_BYTES`].
+pub fn set_cache_limit(bytes: usize) {
+    CACHE_LIMIT.store(bytes, Ordering::Relaxed);
+    let mut c = cache();
+    while c.n > 0 && c.bytes > bytes {
+        c.drop_oldest();
+    }
+}
 
 /// The counting allocator: [`System`] for small blocks, the OS's own mappings for large ones on
 /// Linux, and two atomics.
@@ -154,6 +243,14 @@ impl CountingAlloc {
     fn alloc_with(&self, layout: Layout, zeroed: bool) -> *mut u8 {
         if is_large(&layout) {
             let len = pages(layout.size());
+            // A kept block is already counted.
+            if let Some(p) = cache().take(len) {
+                if zeroed {
+                    // SAFETY: the kept block is `len` writable bytes nothing else refers to.
+                    unsafe { std::ptr::write_bytes(p, 0, len) };
+                }
+                return p;
+            }
             let p = os::map(len);
             if !p.is_null() {
                 added(len);
@@ -192,9 +289,11 @@ unsafe impl GlobalAlloc for CountingAlloc {
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         if is_large(&layout) {
             let len = pages(layout.size());
-            // SAFETY: `ptr` is the mapping `alloc` made for this layout.
-            unsafe { os::unmap(ptr, len) };
-            removed(len);
+            if !cache().put(ptr, len) {
+                // SAFETY: `ptr` is the mapping `alloc` made for this layout.
+                unsafe { os::unmap(ptr, len) };
+                removed(len);
+            }
             return;
         }
         // SAFETY: `ptr` was allocated by `System` with `layout`.
@@ -302,6 +401,9 @@ impl MemoryGauge for AllocGauge {
     fn phase_peak(&self) -> u64 {
         window_peak()
     }
+    fn release(&self) -> u64 {
+        release_cache()
+    }
 }
 
 // The core's own tests run on this allocator, so every test exercises the large-block path.
@@ -367,6 +469,24 @@ mod tests {
             assert!(own, "a {len}-byte block is not a mapping of its own");
             drop(v);
         }
+    }
+
+    #[test]
+    fn a_kept_block_is_reused_zeroed_and_released() {
+        if !cfg!(target_os = "linux") {
+            return;
+        }
+        // An odd size no other test allocates, so the kept block is this test's.
+        let len = 5 * LARGE_BYTES + 3 * 4096 + 17;
+        let mut v = vec![0u8; len];
+        v.fill(7);
+        let first = v.as_ptr() as usize;
+        drop(v);
+        let v = vec![0u8; len];
+        assert_eq!(v.as_ptr() as usize, first, "the freed block was reused");
+        assert!(v.iter().all(|&b| b == 0), "a reused block is zeroed when asked");
+        drop(v);
+        assert!(release_cache() >= pages(len) as u64);
     }
 
     #[test]

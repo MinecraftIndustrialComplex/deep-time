@@ -21,10 +21,16 @@ pub use deeptime_core::alloc::{in_use, peak, reset_peak};
 #[global_allocator]
 static GLOBAL: CountingAlloc = CountingAlloc;
 
-/// `DEEPTIME_LARGE_ALLOC=<bytes>|off` (an experiment): the size from which blocks are mapped on
-/// their own (`deeptime_core::alloc::LARGE_BYTES` by default). Read before anything large is
+/// `DEEPTIME_LARGE_ALLOC=<bytes>|off` and `DEEPTIME_LARGE_CACHE=<bytes>` (experiments): the size
+/// from which blocks are mapped on their own and how many bytes of freed ones are kept for reuse
+/// (`deeptime_core::alloc::LARGE_BYTES`, `CACHE_BYTES` by default). Read before anything large is
 /// allocated.
 pub fn init_from_env() {
+    if let Some(b) = std::env::var_os("DEEPTIME_LARGE_CACHE")
+        .and_then(|v| v.to_string_lossy().parse::<usize>().ok())
+    {
+        counts::set_cache_limit(b);
+    }
     if let Some(v) = std::env::var_os("DEEPTIME_LARGE_ALLOC") {
         let v = v.to_string_lossy();
         if v == "off" {
@@ -55,6 +61,9 @@ impl MemoryGauge for AllocGauge {
     }
     fn phase_peak(&self) -> u64 {
         counts::window_peak()
+    }
+    fn release(&self) -> u64 {
+        counts::release_cache()
     }
     fn reserved(&self, needed: u64, granted: bool) {
         if trace().is_some() {
