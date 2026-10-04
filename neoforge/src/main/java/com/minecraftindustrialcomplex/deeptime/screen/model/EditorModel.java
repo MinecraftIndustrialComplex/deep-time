@@ -647,6 +647,7 @@ public final class EditorModel {
         }
         launchError = null;
         run = new TimelapseModel(h, id, json, circumference, stages, deps.loader(), deps.io());
+        estimate().ifPresent(run::setEstimate);
         page = Page.RUN;
         return Optional.of(run);
     }

@@ -77,6 +77,7 @@ public final class TimelapseModel {
     private boolean follow = true;
     private boolean playing;
     private volatile boolean cancelRequested;
+    private volatile Estimate estimate;
     private long playAccumulator;
     private SimSession.Progress progress = SimSession.Progress.INITIAL;
     private State state = State.RUNNING;
@@ -534,6 +535,25 @@ public final class TimelapseModel {
     }
 
     /**
+     * The estimate the run was started with (its stages' seconds weight the time left; see
+     * {@link Estimate#timeLeftMs}); without one the session's own figure is used.
+     */
+    public void setEstimate(Estimate estimate) {
+        this.estimate = estimate;
+    }
+
+    /** Milliseconds left: from the estimate while the stages step, else the session's figure. */
+    public long timeLeftMs() {
+        SimSession.Progress p = progress;
+        if (estimate != null && p.state() == SimSession.Progress.RUNNING && estimate.stages().size() == p.stageCount()) {
+            long t = estimate.timeLeftMs(p.stageIndex(), p.stagePermille(), p.elapsedMs());
+            if (t >= 0)
+                return t;
+        }
+        return p.etaMs();
+    }
+
+    /**
      * The progress line: {@code dummy_drift 37% (−312 Ma) · total 18% · 12s elapsed · ~40s left ·
      * native 1.3 MiB of 4.0 GiB} (the server's line, P1-13, with the cap given).
      */
@@ -557,8 +577,10 @@ public final class TimelapseModel {
             case FAILED -> b.append("failed: ").append(failure);
         }
         b.append(" · ").append(Formats.duration(p.elapsedMs())).append(" elapsed");
-        if (state == State.RUNNING && p.stageCount() > 0)
-            b.append(" · ").append(p.etaMs() < 0 ? "time left unknown" : "~" + Formats.duration(p.etaMs()) + " left");
+        if (state == State.RUNNING && p.stageCount() > 0) {
+            long eta = timeLeftMs();
+            b.append(" · ").append(eta < 0 ? "time left unknown" : "~" + Formats.duration(eta) + " left");
+        }
         b.append(" · native ").append(Formats.bytes(state == State.RUNNING ? p.nativeBytesInUse() : p.nativeBytesPeak()))
                 .append(" of ").append(Formats.gib(capBytes)).append(" GiB");
         return b.toString();
