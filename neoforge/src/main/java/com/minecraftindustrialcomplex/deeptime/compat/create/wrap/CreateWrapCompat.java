@@ -8,7 +8,7 @@ import net.minecraft.world.entity.Entity;
 
 /**
  * Wires the wrap engine's Create adapters (docs/design/wrap-engine.md, "Create across turning seams").
- * Called from {@link WrapEngine#init} only when the engine is on and Create is installed; the rest of
+ * Wired by {@link WrapEngine#init} (at server start) only when the engine is on and Create is installed; the rest of
  * the adapters are mixins under {@code mixin.wrapspike.compat.create}, which DeepTimeMixinPlugin
  * applies under the same two conditions.
  */
@@ -16,7 +16,13 @@ public final class CreateWrapCompat {
 
     private CreateWrapCompat() {}
 
-    public static void init() {
+    private static boolean done;
+
+    /** Once, when the first server is about to start (after every registry is built). */
+    public static synchronized void init() {
+        if (done)
+            return;
+        done = true;
         // A contraption's position belongs to its anchor (a bearing, piston or gantry), its cart or its
         // train's graph, which reset it every tick: the engine's carry would only make it jitter, and
         // a carried structure would stay unturned. Contraptions do not cross seams yet; assembly

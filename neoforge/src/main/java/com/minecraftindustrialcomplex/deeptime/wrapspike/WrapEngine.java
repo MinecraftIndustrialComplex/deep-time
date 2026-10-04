@@ -62,8 +62,11 @@ public final class WrapEngine {
         if (!ENABLED)
             return;
         DeepTime.LOGGER.warn("[wrapspike] Deep Time wrap-engine SPIKE is on (-Ddeeptime.wrapspike=true): dev only");
+        // Create's adapters touch Create's classes, so not during mod construction (which runs beside
+        // Create's own, and loading its entity classes early breaks Registrate's registration).
         if (net.neoforged.fml.ModList.get().isLoaded("create"))
-            com.minecraftindustrialcomplex.deeptime.compat.create.wrap.CreateWrapCompat.init();
+            NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.server.ServerAboutToStartEvent.class,
+                    e -> com.minecraftindustrialcomplex.deeptime.compat.create.wrap.CreateWrapCompat.init());
         NeoForge.EVENT_BUS.addListener(LevelTickEvent.Post.class, e -> {
             if (e.getLevel() instanceof ServerLevel sl)
                 carryEntities(sl);
