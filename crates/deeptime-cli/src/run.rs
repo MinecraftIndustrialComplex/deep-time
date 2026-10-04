@@ -1429,6 +1429,27 @@ pub struct BenchOptions {
 /// memory, into `bench.json` and a timing page (the Phase 1 budget gate's skeleton, P1-17).
 pub fn bench(o: &BenchOptions) -> CliResult<()> {
     let preset = load_preset_with(&o.preset, o.start.as_deref(), o.length_myr)?;
+    // What the editor shows a player before the run (plan §5.7.5): the gate compares the
+    // measured peak with it (P1-17).
+    let estimate: Value =
+        serde_json::from_str(&deeptime_core::session::estimate_for(&preset, "", o.mem_cap)?)?;
+    let estimate_seconds: f64 = estimate["stages"]
+        .as_array()
+        .map_or(0.0, |a| a.iter().filter_map(|s| s["seconds"].as_f64()).sum());
+    println!(
+        "deeptime bench: estimate peak_bytes={} seconds={estimate_seconds:.0} stages={}",
+        estimate["peak_bytes"],
+        estimate["stages"].as_array().map_or(String::new(), |a| a
+            .iter()
+            .map(|s| format!(
+                "{}:{}B/{:.0}s",
+                s["name"].as_str().unwrap_or("?"),
+                s["bytes"],
+                s["seconds"].as_f64().unwrap_or(0.0)
+            ))
+            .collect::<Vec<_>>()
+            .join(","))
+    );
     let temp = o.work.is_none();
     let work = o.work.clone().unwrap_or_else(|| temp_work("bench"));
     let mut runs = Vec::new();
@@ -1512,6 +1533,7 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
             std::thread::available_parallelism().map_or(1, |n| n.get())
         ),
         "created_utc": rfc3339_utc(SystemTime::now()),
+        "estimate": estimate,
         "runs": runs,
     });
     let mut text = serde_json::to_vec_pretty(&bench)?;
