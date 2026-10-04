@@ -12,7 +12,7 @@
 #
 # Run it from the laptop, detached (a client walk on a real preset takes 10 to 30 minutes):
 #
-#   tools/remote/mac.sh -- tools/remote/detach.sh start p1-11-client tools/client/vm-client.sh --name p1-11
+#   tools/remote/mac.sh -- tools/remote/detach.sh start p1-11-client --kind client:editor tools/client/vm-client.sh --name p1-11 --prop length=250
 #   tools/remote/mac.sh --no-sync -- tools/remote/detach.sh wait p1-11-client
 #   tools/remote/mac.sh --no-sync --pull review/out/p1-11 -- true
 #
