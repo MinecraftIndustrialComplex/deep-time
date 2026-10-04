@@ -11,7 +11,7 @@ import java.util.Set;
 
 /**
  * Where the pack has a peatland biome for cold wetland (Ben, 2026-10-03, "Taiga instead, peatland
- * if present"; ledger BIO-117, BIO-118). The bake flags boreal wetland (`climate/wetland` = 2) and leaves its
+ * if present"; ledger BIO-135, BIO-136). The bake flags boreal wetland (`climate/wetland` = 2) and leaves its
  * ground in the ordinary land erosion, so vanilla draws the class's own biome, taiga. A pack that has a
  * bog or muskeg shows it where vanilla's swamp row is: the game raises the erosion of the flagged
  * ground to the swamp band (E6) in exactly the regions of the pack that answer there with a
@@ -45,7 +45,7 @@ public record Peatland(double erosion, List<String> regions, List<String> biomes
     public static final String LAYER = "climate/wetland";
 
     /** Share of the cold wetland's climate points at which a region must answer with a peatland biome. */
-    static final double SHARE = 0.5;   // ledger: BIO-117
+    static final double SHARE = 0.5;   // ledger: BIO-135
 
     public Peatland {
         regions = List.copyOf(regions);
@@ -72,10 +72,10 @@ public record Peatland(double erosion, List<String> regions, List<String> biomes
      * @return the verdict (a record with no regions when the pack has no peatland there), never null
      */
     public static Peatland decide(ClimateMapping m, OverworldBands ref, List<String> regionNames, Probe probe) {
-        double erosionRef = 0.5 * (ref.erosion()[6] + 1.0);   // the middle of E6; ledger: BIO-118
+        double erosionRef = 0.5 * (ref.erosion()[6] + 1.0);   // the middle of E6; ledger: BIO-136
         double erosion = m.apply(ClimateMapping.EROSION, erosionRef);
         List<Double> temps = new ArrayList<>(), hums = new ArrayList<>(), conts = new ArrayList<>(), weirds = new ArrayList<>();
-        // The probe's grid of climates (game choice, ledger BIO-117): five temperatures of the cold band, five wet humidities,
+        // The probe's grid of climates (game choice, ledger BIO-135): five temperatures of the cold band, five wet humidities,
         // three inland continentalness values, six weirdness values of both signs.
         for (double c : new double[] {1.1, 1.3, 1.5, 1.7, 1.9})
             temps.add(m.apply(ClimateMapping.TEMPERATURE, value(ref.temperature(), c)));

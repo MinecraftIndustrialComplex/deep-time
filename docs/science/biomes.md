@@ -6,7 +6,7 @@ fixed. The band edges of Minecraft's biome builder were read in its source. The 
 biome is a game choice throughout and is labelled so. The climate that feeds the classifier (monthly
 temperature and rain) is being rewritten and is not checked here.
 
-Ledger ids on this page: `BIO-001` to `BIO-119` (see [ledger/BIO.md](ledger/BIO.md)).
+Ledger ids on this page: `BIO-001` to `BIO-137` (see [ledger/BIO.md](ledger/BIO.md)).
 
 ## What you see in the world
 
@@ -82,8 +82,8 @@ third letter:  a if Thot >= 22; else b if at least four months are above 10; els
 | BIO-021 to BIO-024 | vanilla band edges | temperature, humidity, continentalness, erosion, weirdness | | `OverworldBiomeBuilder`, Minecraft 1.21.1 | `verified` |
 | BIO-038 | aridity anchors 0.03, 0.2, 0.5 | UNEP limits | | Zomer et al. 2022, quoting UNEP 1997 | `verified` |
 | BIO-095 | precipitation seasonality | coefficient of variation | % | O'Donnell and Ignizio 2012 (adds 1 mm to the mean) | `verified` |
-| BIO-026 to BIO-070, BIO-075 to BIO-081, BIO-100 to BIO-103, BIO-115 to BIO-118 | the placement table, knobs, cold wetland and ice cover | see ledger | band coordinate, blocks | none: game choices | `game-choice` |
-| BIO-119 | northern peatland share of the world's peatland | 3.21 of 4.23 million km2, about 76 % | million km2 | Xu et al. 2018 (PEATMAP), through a 2025 study that quotes the 3.21 | `cited-unverified` |
+| BIO-026 to BIO-070, BIO-075 to BIO-081, BIO-100 to BIO-103, BIO-133 to BIO-136 | the placement table, knobs, cold wetland and ice cover | see ledger | band coordinate, blocks | none: game choices | `game-choice` |
+| BIO-137 | northern peatland share of the world's peatland | 3.21 of 4.23 million km2, about 76 % | million km2 | Xu et al. 2018 (PEATMAP), through a 2025 study that quotes the 3.21 | `cited-unverified` |
 
 ## Earth against the mod
 
@@ -179,11 +179,11 @@ Vanilla puts swamp in its cool and temperate rows at the erosion band E6, whatev
 the wetland rule (BIO-066) sends wet, flat, low, thawed land there. On one test planet that made 66 % of
 the Dfc land swamp: a boreal plain of wet ground drawn as a Louisiana bayou. Most of the Earth's peatland
 is boreal: PEATMAP (Xu et al. 2018) has the northern peatlands at 3.21 million km2 of 4.23 million km2
-worldwide, about 76 %, formed "under high precipitation-low temperature climatic regimes" (BIO-119; the
+worldwide, about 76 %, formed "under high precipitation-low temperature climatic regimes" (BIO-137; the
 paper itself could not be fetched, see the ledger row for what was read). Ben's answer (decisions log
 2026-10-03): "Taiga instead, peatland if present".
 
-What the mapping does (BIO-115 to BIO-118, all game choices):
+What the mapping does (BIO-133 to BIO-136, all game choices):
 
 - Wetland of the six subarctic classes (Dfc, Dfd, Dsc, Dsd, Dwc, Dwd: `classes.<code>.cold_wetland` in
   `placement.json`, the classes of Ben's answer and the ones the table lifts to vanilla's taiga humidity) is

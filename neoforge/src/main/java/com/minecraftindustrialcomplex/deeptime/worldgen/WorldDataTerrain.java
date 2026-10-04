@@ -284,7 +284,7 @@ public final class WorldDataTerrain implements TerrainSource {
         if (!m.isIdentity() && ClimateMapping.RIDGES.equals(layer))
             return m.apply(layer, data().layer(layer).bilinearOdd(wrapX(x), z));
         if (ClimateMapping.EROSION.equals(layer) && !m.isIdentity()) {
-            // Cold wetland (BIO-115, BIO-117): taiga in the ordinary erosion; the swamp band, where the pack
+            // Cold wetland (BIO-133, BIO-135): taiga in the ordinary erosion; the swamp band, where the pack
             // draws its bog or muskeg, in the regions of the pack that have one.
             Peatland p = peatlandAt(m, wrapX(x), z);
             if (p != null)

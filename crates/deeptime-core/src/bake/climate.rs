@@ -21,7 +21,7 @@
 //!
 //! **The wetland flag** (`climate/wetland`, L2, u8): 0 none, 1 temperate or warm wetland (vanilla's
 //! swamp band), 2 cold wetland (boreal peatland: taiga in vanilla, the pack's peatland biome where it
-//! has one; BIO-115).
+//! has one; BIO-133).
 //!
 //! **The ice cover** (`climate/ice_cover`, L2, u8, blocks): how much snow and ice the game's surface
 //! pass lays over ground above its equilibrium line, whatever the biome ([`super::ice`]).
@@ -181,7 +181,7 @@ pub fn bake(
             &raw,
         )?;
     }
-    // Which land is wetland (BIO-115): 1 = swamp band (temperate and warm), 2 = cold wetland, where
+    // Which land is wetland (BIO-133): 1 = swamp band (temperate and warm), 2 = cold wetland, where
     // the game puts the pack's peatland biome if it has one.
     out.layer(
         desc(
