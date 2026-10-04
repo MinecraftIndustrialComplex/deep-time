@@ -47,6 +47,12 @@ import java.util.function.Consumer;
  * <p>Both lists are datapack tags, so any mod's biomes can join or leave them. The tag order is read from
  * the server's biome registry; the resolved choice is cached per level and parameter list and dropped when
  * tags reload ({@link #tagsUpdated()}).
+ *
+ * <p>The same query consults Deep Time's biome rules ({@link BiomeRules}, {@link BiomeRuleSet}; decisions log
+ * 2026-10-04, "Build out support for both"): inside a role's zone the role's rules come before its tag (an
+ * icy or a tropical volcano by the climate), then on land the ordinary rules (by the Köppen class, the
+ * climate, wetland, ice, playas, the rock), and the climate search keeps every exclusive candidate out as it
+ * keeps the volcanic biomes out.
  */
 public final class VolcanicBiomes {
 
@@ -98,14 +104,32 @@ public final class VolcanicBiomes {
     /** The plain metric: vanilla's. */
     public static final Climate.DistanceMetric<Holder<Biome>> NEAREST = Climate.RTree.Node::distance;
 
-    /** The keep-out metric: a leaf whose biome is in {@link #KEEP_OUT} is infinitely far away. */
-    public static final Climate.DistanceMetric<Holder<Biome>> NEAREST_KEPT = (node, values) -> {
-        if (node == null)
-            return Long.MAX_VALUE;
-        if (node instanceof Climate.RTree.Leaf<Holder<Biome>> leaf && leaf.value.is(KEEP_OUT))
-            return Long.MAX_VALUE;
-        return node.distance(values);
-    };
+    /**
+     * The keep-out metric: a leaf whose biome is in {@link #KEEP_OUT} or in {@code also} (the biome rules' exclusive
+     * candidates) is infinitely far away.
+     */
+    static Climate.DistanceMetric<Holder<Biome>> nearestKept(Set<Holder<Biome>> also) {
+        return (node, values) -> {
+            if (node == null)
+                return Long.MAX_VALUE;
+            if (node instanceof Climate.RTree.Leaf<Holder<Biome>> leaf && (leaf.value.is(KEEP_OUT) || also.contains(leaf.value)))
+                return Long.MAX_VALUE;
+            return node.distance(values);
+        };
+    }
+
+    /** Whether a biome is kept out of the climate search of this resolution. */
+    private static boolean kept(Resolved r, Holder<Biome> b) {
+        return b.is(KEEP_OUT) || r.rules.exclusive().contains(b);
+    }
+
+    /** What decided the last {@link #find} on this thread ("role:&lt;id&gt;", "rule:&lt;file&gt;/&lt;id&gt;", or null: the climate search). */
+    private static final ThreadLocal<String> LAST = new ThreadLocal<>();
+
+    /** What decided this thread's last biome query of a Deep Time level (for the census); null: the climate search. */
+    public static String lastDecision() {
+        return LAST.get();
+    }
 
     /** One entry of a biome source's parameter list: the ranges a biome answers in. */
     public record Entry(Climate.Parameter temperature, Climate.Parameter humidity, Climate.Parameter depth, Holder<Biome> biome) {}
@@ -136,7 +160,7 @@ public final class VolcanicBiomes {
 
     /** What one level resolved against one parameter list. */
     private record Resolved(Object key, int tags, boolean active, boolean keepOut, Holder<Biome>[] byRole,
-                            Map<Holder<Biome>, List<Entry>> entries) {}
+                            Map<Holder<Biome>, List<Entry>> entries, BiomeRules.Set_ rules, Climate.DistanceMetric<Holder<Biome>> keptMetric) {}
 
     /**
      * One Deep Time level's state (held by its {@code RegionSpawnTarget}): its terrain and the volcanic zones,
@@ -145,6 +169,7 @@ public final class VolcanicBiomes {
     public static final class Level {
         private final WorldDataTerrain terrain;
         private final int cell, minY, seaLevel;
+        private final BiomeRules.LevelData rules;
         private volatile VolcanicZones zones;
         private volatile Resolved resolved;
 
@@ -153,6 +178,13 @@ public final class VolcanicBiomes {
             this.cell = cell;
             this.minY = minY;
             this.seaLevel = seaLevel;
+            this.rules = new BiomeRules.LevelData(terrain);
+        }
+
+        /** The biome rules bound to this level's source by its last biome query ({@link BiomeRules#NONE} before it). */
+        public BiomeRules.Set_ rules() {
+            Resolved r = resolved;
+            return r == null ? BiomeRules.NONE : r.rules;
         }
 
         public WorldDataTerrain terrain() {
@@ -182,7 +214,7 @@ public final class VolcanicBiomes {
             return r == null ? Optional.empty() : Optional.ofNullable(r.byRole[role.ordinal()]);
         }
 
-        /** Whether the last resolution found anything to keep out or to place (false: every query is vanilla's). */
+        /** Whether the last resolution found anything to keep out or to place, or a biome rule (false: every query is vanilla's). */
         public boolean active() {
             Resolved r = resolved;
             return r != null && r.active;
@@ -208,14 +240,18 @@ public final class VolcanicBiomes {
     @SuppressWarnings("unchecked")
     private static Resolved build(Source source, int tags) {
         Set<Holder<Biome>> possible = source.possibleBiomes();
+        Optional<Registry<Biome>> registry = biomeRegistry();
+        BiomeRules.Set_ rules = BiomeRules.NONE;
+        var server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+        if (registry.isPresent() && server != null)
+            rules = BiomeRules.bind(BiomeRules.load(server.getResourceManager()), possible, registry.get());
         int kept = 0;
         for (Holder<Biome> b : possible)
-            if (b.is(KEEP_OUT))
+            if (b.is(KEEP_OUT) || rules.exclusive().contains(b))
                 kept++;
         // Keep-out never empties the search (a tree of nothing but volcanic biomes would answer null).
         boolean keepOut = kept > 0 && kept < possible.size();
         Holder<Biome>[] byRole = new Holder[Role.values().length];
-        Optional<Registry<Biome>> registry = biomeRegistry();
         boolean any = false;
         if (registry.isPresent())
             for (Role role : Role.values()) {
@@ -244,11 +280,16 @@ public final class VolcanicBiomes {
         for (Role role : Role.values())
             roles.append(' ').append(role.id).append('=').append(byRole[role.ordinal()] == null ? "-"
                     : byRole[role.ordinal()].unwrapKey().map(k -> k.location().toString()).orElse("?"));
-        if (registry.isPresent())
+        if (registry.isPresent()) {
             DeepTime.LOGGER.info("[deeptime] volcanic biomes: {} of {} biomes kept out of the climate search; roles:{}", kept,
                     possible.size(), roles);
+            if (!rules.isEmpty())
+                DeepTime.LOGGER.info("[deeptime] biome rules: {}; {} ordinary rules, role rules for {}, {} exclusive biomes", rules.files(),
+                        rules.ordinary().size(), rules.byRole().keySet(), rules.exclusive().size());
+        }
         // Without a registry the roles are retried on the next query.
-        return new Resolved(source.key(), registry.isPresent() ? tags : -1, keepOut || any, keepOut, byRole, entries);
+        return new Resolved(source.key(), registry.isPresent() ? tags : -1, keepOut || any || !rules.isEmpty(), keepOut, byRole, entries,
+                rules, nearestKept(rules.exclusive()));
     }
 
     private static Optional<Registry<Biome>> biomeRegistry() {
@@ -263,22 +304,97 @@ public final class VolcanicBiomes {
      * biome to keep out nor a role biome (the caller then answers as vanilla does, unchanged).
      */
     public static Holder<Biome> find(Level level, Source source, int qx, int qy, int qz, Climate.Sampler sampler) {
+        LAST.remove();
         if (PLAIN.get())
             return null;
         Resolved r = level.resolve(source);
         if (!r.active)
             return null;
         Climate.TargetPoint t = sampler.sample(qx, qy, qz);
-        Holder<Biome> b = role(level, r, qx, qz, t);
+        Query q = new Query(level, r, source, t, QuartPos.toBlock(qx) + 2, QuartPos.toBlock(qz) + 2);
+        Holder<Biome> b = role(q);
         if (b != null)
             return b;
+        // The biome rules: on land at the surface, never on a river's channel (the variant input is exactly 0 there).
+        if (!r.rules.ordinary().isEmpty() && q.surface() && t.weirdness() != 0L && q.land()) {
+            BiomeRules.Column facts = q.facts();
+            for (BiomeRules.Bound rule : r.rules.ordinary()) {
+                if (!rule.rule().matches(facts))
+                    continue;
+                Holder<Biome> h = BiomeRules.search(source, t, rule);
+                if (h != null) {
+                    LAST.set("rule:" + rule.file() + "/" + rule.rule().id());
+                    return h;
+                }
+            }
+        }
+        return q.plain();
+    }
+
+    /** One biome query: its column's facts and its plain answer, each computed on first use. */
+    private static final class Query {
+        final Level level;
+        final Resolved r;
+        final Source source;
+        final Climate.TargetPoint t;
+        final int x, z;
+        private double height = Double.NaN;
+        private int roles = -1;
+        private Holder<Biome> plain;
+        private BiomeRules.Column facts;
+
+        Query(Level level, Resolved r, Source source, Climate.TargetPoint t, int x, int z) {
+            this.level = level;
+            this.r = r;
+            this.source = source;
+            this.t = t;
+            this.x = x;
+            this.z = z;
+        }
+
+        boolean surface() {
+            return t.depth() < SURFACE_DEPTH_Q;
+        }
+
+        double height() {
+            if (Double.isNaN(height))
+                height = level.terrain().height(x, z);
+            return height;
+        }
+
+        boolean land() {
+            return height() >= level.seaLevel();
+        }
+
+        int roles() {
+            if (roles < 0)
+                roles = level.zones().rolesAt(x, z);
+            return roles;
+        }
+
+        BiomeRules.Column facts() {
+            if (facts == null)
+                facts = new BiomeRules.Column(level.rules, x, z, height(), level.seaLevel(), this::roles, this::plain);
+            return facts;
+        }
+
+        /** The climate search with the kept-out biomes set aside. */
+        Holder<Biome> plain() {
+            if (plain == null)
+                plain = keptSearch(r, source, t);
+            return plain;
+        }
+    }
+
+    /** The climate search of {@code t} with every kept-out biome of {@code r} set aside. */
+    private static Holder<Biome> keptSearch(Resolved r, Source source, Climate.TargetPoint t) {
         // The plain nearest first: where it is not kept out, the keep-out search would find the same leaf.
         Holder<Biome> plain = source.find(t, NEAREST);
-        if (!r.keepOut || !plain.is(KEEP_OUT))
+        if (!r.keepOut || !kept(r, plain))
             return plain;
         Holder<Biome> kept;
         try {
-            kept = source.find(t, NEAREST_KEPT);
+            kept = source.find(t, r.keptMetric);
         } catch (NullPointerException emptyTree) {
             // A tree holding nothing but kept-out biomes (a region of volcanic biomes alone) answers null.
             return plain;
@@ -290,7 +406,7 @@ public final class VolcanicBiomes {
             Optional<Source> base = source.base();
             if (base.isPresent()) {
                 try {
-                    Holder<Biome> under = base.get().find(t, NEAREST_KEPT);
+                    Holder<Biome> under = base.get().find(t, r.keptMetric);
                     if (!water(under))
                         return under;
                 } catch (NullPointerException emptyTree) {
@@ -305,24 +421,25 @@ public final class VolcanicBiomes {
         return b.is(net.minecraft.tags.BiomeTags.IS_OCEAN) || b.is(net.minecraft.tags.BiomeTags.IS_RIVER);
     }
 
-    /** The role biome at the column of quart (qx, qz) for climate point t, or null. */
-    private static Holder<Biome> role(Level level, Resolved r, int qx, int qz, Climate.TargetPoint t) {
-        boolean any = false;
+    /** The role biome at the query's column, or null. */
+    private static Holder<Biome> role(Query q) {
+        Resolved r = q.r;
+        boolean any = !r.rules.byRole().isEmpty();
         for (Holder<Biome> b : r.byRole)
             any |= b != null;
         if (!any)
             return null;
-        int x = QuartPos.toBlock(qx) + 2, z = QuartPos.toBlock(qz) + 2;
-        int bits = level.zones().rolesAt(x, z);
+        int bits = q.roles();
         if (bits == 0)
             return null;
-        boolean surface = t.depth() < SURFACE_DEPTH_Q;
-        Boolean land = null;
+        Climate.TargetPoint t = q.t;
+        boolean surface = q.surface();
         for (Role role : Role.values()) {
             if ((bits & (1 << role.ordinal())) == 0)
                 continue;
             Holder<Biome> b = r.byRole[role.ordinal()];
-            if (b == null)
+            List<BiomeRules.Bound> rules = role.cave ? List.of() : r.rules.role(role.id);
+            if (b == null && rules.isEmpty())
                 continue;
             if (role.cave) {
                 if (surface)
@@ -330,6 +447,7 @@ public final class VolcanicBiomes {
                 long low = lowestDepth(r.entries.get(b));
                 if (low == Long.MAX_VALUE || t.depth() < low)
                     continue;
+                LAST.set("role:" + role.id);
                 return b;
             }
             if (!surface)
@@ -337,12 +455,23 @@ public final class VolcanicBiomes {
             // A river channel keeps its river biome (the variant input is exactly 0 there).
             if (t.weirdness() == 0L)
                 return null;
-            if (land == null)
-                land = level.terrain().height(x, z) >= level.seaLevel();
-            if (!land)
+            if (!q.land())
                 return null;
+            // The role's biome rules first: the climate picks among a pack's variants (an icy or a tropical volcano).
+            for (BiomeRules.Bound rule : rules) {
+                if (!rule.rule().matches(q.facts()))
+                    continue;
+                Holder<Biome> h = BiomeRules.search(q.source, t, rule);
+                if (h != null) {
+                    LAST.set("rule:" + rule.file() + "/" + rule.rule().id());
+                    return h;
+                }
+            }
+            if (b == null)
+                continue;
             if (role.climateGated && !fits(r.entries.get(b), t))
                 continue;
+            LAST.set("role:" + role.id);
             return b;
         }
         return null;
