@@ -87,6 +87,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+
+| 2026-10-04 | Wrap engine (design + spike) | **Four choices** (docs/design/wrap-engine.md §8): (1) architecture: one stored copy + folded access + replicated band, vanilla clients join, optional client re-anchor (recommended), or Toroidal World's client frame extended with turned packets; (2) keep Toroidal World for Guyou's slide edges, engine owns only the turning edges (recommended), or engine owns every edge; (3) Create: refuse kinetic, fluid and train connections across turning seams at first (recommended), or adapters in the first version; (4) start Phase 1 now alongside the Immersive Portals work (recommended; the engine takes any layout of translations, half- and quarter-turns), or stop at the spike until the projection survey settles the layout. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | 35 m vertical scale | **Plutons with a floor.** `strata-check` on the 35 m bakes finds plutonic rock with other rock under it in 16 to 17 % of land columns (0.1 % at 20 m) and 5.4 to 5.8 % of the stored stacks (0 at 20 m): the world now reaches 14.5 km below the sea, under the floors of the stored plutonic layers. The rule is measured, not asserted (structure/realism.rs rule 3); a question for the rock/pluton work, not changed here. (a, recommended) Let the column builder carry plutonic rock to the world's floor where a pluton's layer is the lowest stored one (a follow-up task). (b) Accept floored plutons (real plutons have floors). | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-03 | margins and spires | **The margins' remaining step** (build log 2026-10-03, "Margins and spires"; pictures `review/out/margins-spires/index.html`, not committed). Submarine slope failure brought the baked margins from 9.5–10° to 4.2–5.9° between the 500 and 2,000 m isobaths (Earth 2.1°) and narrowed the shelves by about a third (shelf-hosted deposits fell with them). What is left is the plate model's crystalline ocean–continent step, one sample wide and drawn 8.1× narrower than on Earth, which nothing relaxes. (a, recommended) keep the failure at 2.5° and give the plate model an ocean–continent transition of Earth width in map metres (a `plates/` task after the plate work; it also gives back shelf room); (b) let the failure move crust too (5° at L1, but the shelves go: share of the sea under 200 m 0.05 → 0.017); (c) keep loads on old sea floor (the dampening at the age's rate) and recalibrate the sediment budget so the oceans do not fill; (d) leave the margins at about twice Earth's slope. | For the coordinator to put to Ben |
 | 2026-10-02 | P3-04 TW guard | **`/dh pregen` stalls on a square that crosses the seam** (build log 2026-10-02, "far terrain through Toroidal World's guard"). DH's PregenManager files each pending section under its raw position and clears it under the position the retrieval answers with; Toroidal World folds that position into the lap, so a section past the seam is never cleared and the pregen stops (seen twice: section 6*128 folded to 6*-128, no progress for 15 min; the video agent saw it stop at radius 75–76 chunks; 2026-10-03 on the dh set: a square from x = C/2 − 832 stopped at 53 % after 136 sections and did not move in 200 s, DH's two-minute expiry of a pending section never fires because nothing touches its cache, while a square ending at the seam finished all 257 in under 10 s; a square centred on x = C/2 never starts, Toroidal World's command coordinates reject 8192 as outside the world). It does not depend on Deep Time's generator (read in DH's PregenManager and TW's fold; the folded section is generated and stored, and matches far terrain); players' clients do not use /dh pregen. (a) Report it to Toroidal World's author; harnesses pregenerate squares that stay inside the lap (recommended, done in run.py); (b) a Deep Time mixin into DH's PregenManager clearing the raw key too; (c) leave it. | Not asked yet (sub-agent report) |
@@ -119,6 +121,68 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-02 | science WP-14a | **CO₂ forcing above 50,000 ppm and the snowball's escape** (CLM-070, CLM-166; design §4.2). The clock's forcing is Byrne & Goldblatt 2014's fit, stated for 200–10,000 ppm and computed to 50,000 ppm; the code uses it to 10⁶ ppm, and today's snowball escapes near 5.5·10⁵ ppm where Hoffman et al. 2017 expect 10⁴–10⁵ ppm (with cloud forcing of ≥ 10 W/m² that cloud-free models lack). (1, recommended) a short research task finds a published forcing calculation for 0.05–1 bar of CO₂ and the snowball cloud forcing; T6 then applies both, and the escape is measured against 10⁴–10⁵ ppm; (2) cap now: above 50,000 ppm continue the fit as a logarithm with its slope there (no source; escape CO₂ moves, direction to be measured); (3) leave it (escape stays near 0.55 bar). | to be asked by the coordinator (sub-agent report) |
 
 ## Build log
+### 2026-10-03/04 — A wrap engine of Deep Time's own for turning seams: design and server-side spike (Ben's "Immersive portals, begin custom wrap engine concurrently"; agent worktree agent-a9aa7e80efbedcf23, branch `dev/wrap-engine-spike`, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; dev-only, not merged)
+- **Design.** `docs/design/wrap-engine.md` (indexed in docs/research/README.md):
+  - five architectures compared: rotated chunk views; folded access at the `Level` boundary; a
+    replicated band; Toroidal World's client frame extended with turned packets; turned rendering on
+    the client;
+  - for each subsystem, the Minecraft and NeoForge hooks and the risks: block access, the band, light,
+    world generation and caves, entities and AI, client and network, Distant Horizons, the MIC pack;
+  - how Toroidal World 0.19.3 wraps (server canonical copy, unwrapped client frame, chunk-key aliasing,
+    a `PacketTranslator` choke point, byte-identical chunk payloads), read on `mc/1.21` `5ded155` by a
+    Sonnet sub-agent, and why a turn breaks it (`pos & 15` reverses).
+- **Recommended: one stored copy, folded access, a replicated band.**
+  - Every position that crosses the `Level` API is folded to the stored block, and states are turned.
+  - Real chunks beyond each edge hold turned copies, written straight into their sections.
+  - Entities are carried at the seam line, turned.
+  - Vanilla clients join unchanged; an optional client re-anchor removes the reload at a turning
+    crossing.
+- **Effort.** 46–75 agent days without Create trains (9–15 weeks), 56–95 with them. The engine's own
+  share beyond what the Immersive Portals route needs anyway is about 6–9 weeks.
+- **Spike.** Applied only with `-Ddeeptime.wrapspike=true`: `DeepTimeMixinPlugin` gates
+  `mixin.wrapspike.*`, and the tests use their own namespace `deeptime_wrapspike`, enabled only by
+  `./gametest.sh -PwrapSpike`.
+  - Code: `wrapspike/` (`CellIsometry`, `WrapEdge`, `WrapTopology`, `WrapEngine`,
+    `WrapSpikeGameTests`) and three mixins (`Level` get/set/fluid/block-entity, `handleNeighborChanged`,
+    `LevelTicks.schedule`/`hasScheduledTick`).
+  - Implementation choices: the band is depth 8 on the test sites; replica writes go straight into the
+    section, then heightmaps, light, `blockChanged`.
+- **Measured** (test VM, `./gametest.sh -PwrapSpike`, 2026-10-04 02:11): **All 3 required tests
+  passed, 34 of 34 assertions** [R], on one half-turn seam, block (x, z) beyond = (2cx−x−1, 2z0−z−1):
+  - stairs placed beyond the seam stored on the far side facing south; the band storage holds the
+    turned copy;
+  - an armour stand stopped at z0+0.2500 by the far side's block;
+  - water across: far channel amounts 6,5,4,3,2,1,0; a control site with no seam stays dry 7/7;
+  - wire power 15,14,13 | 12,11 across, and the far lamp lit; a repeater driving into the seam lit the
+    far lamp at power 15; both off again;
+  - an armour stand and an item carried across, turned 180°;
+  - block light 14 across the seam (≤ 2 without it).
+  - The first run's item check failed: its forceloaded chunk was not entity-ticking yet. It is fixed
+    by waiting.
+- **Not shown:**
+  - the client (not run);
+  - whole-world Guyou or Peirce dimensions, turn points and corners (unit tests only);
+  - band tickets and copy on load;
+  - players and ghosts;
+  - caves, Distant Horizons, Create, Sable, and Toroidal World on the same level;
+  - performance.
+- **Gates:**
+  - `WrapTopologyTest` passes 6 of 6. It checks the algebra (local isometry, images, Guyou, Peirce, a
+    quarter-turn corner) and failed on 2 bounded-seam edge cases before the fix.
+  - `./gradlew build test`: BUILD SUCCESSFUL, JUnit 271 tests, 0 failures, 2 skipped.
+  - No Rust changed (no cargo gates). The normal `./gametest.sh` was not run (batch rule); the spike
+    is inert there.
+- **Test VM incident.** From 00:59 to 02:00 UTC the admission queue froze, and every job on the VM
+  waited.
+  - The cause: `admit.py`'s wait-loop signal handler (`_install_wait_signals` → `bail`) enters
+    `with store` while the loop already holds `state.lock`. A SIGTERM, SIGINT or SIGHUP arriving
+    inside the loop's locked section therefore deadlocks that process with the lock held.
+  - It was pid 1044950 (`batch.sh`'s `gametest:standalone`, label deep-time). Someone else cleared it
+    at 02:00; this agent killed nothing.
+  - The fix belongs in `tools/remote/vm/admit.py`: the handler should only set a flag, or the lock
+    should be re-entrant.
+- **Next.** Ben's questions (Pending questions). If Phase 1 is approved: whole-world topologies, the
+  fast path, the full fold list and the band manager.
 ### 2026-10-03/04 — Load-based admission on the test VM replaces the M6-era caps (Ben's "No set slots ... Guess load, run if load is less than what is available + 25%"; agent worktree agent-a2e1d18f0b1a34569, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; installed on the VM, not merged)
 - **What it replaces.** The one-server lock (`deeptime-cache/server.lock`, `mac.sh --server`, preview.py,
   detached-server.sh, mic-climate.sh), "two simulations per agent, four of 2 threads on the box", and
