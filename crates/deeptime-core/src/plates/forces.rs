@@ -93,7 +93,7 @@ pub const G_EARTH: f64 = 9.81; // ledger: FRC-001
 /// The reference slab pull, N per metre of trench, at Earth's gravity: a full-length slab of
 /// 80-Myr floor. "About 1–3 × 10¹³ N/m gross" (design §3.2; textbook figure, not confirmed).
 pub const SLAB_PULL_N_M: f64 = 3.0e13; // ledger: FRC-002
-/// The reference trench of `plate_speed_scale_mm_yr`, km (today's `slab_pull_front_km`).
+/// The reference trench of `plate_speed_scale_mm_yr`, km (the old speed law's full-speed front).
 pub const REF_TRENCH_KM: f64 = 3000.0; // ledger: FRC-003
 /// Slab thickness factor: √(age / this), so a slab of this age pulls with weight 1, Myr …
 pub const SLAB_AGE_REF_MYR: f64 = 80.0; // ledger: FRC-004
