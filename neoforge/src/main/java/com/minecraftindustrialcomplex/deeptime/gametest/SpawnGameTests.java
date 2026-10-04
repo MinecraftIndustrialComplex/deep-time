@@ -58,8 +58,12 @@ public final class SpawnGameTests {
             double max = r.get("max_blocks_from_spawn").getAsDouble();
             double best = Double.POSITIVE_INFINITY;
             int bestId = -1;
+            // The core's rule: the material must be a primary product unless the essential says otherwise.
+            boolean primaryOnly = OreData.entries(level.registryAccess(), OreData.ESSENTIALS).stream()
+                    .filter(en -> en.getValue().material().equals(m)).findFirst()
+                    .map(en -> en.getValue().primaryOnly()).orElse(true);
             for (Site s : sites.all()) {
-                if (!s.produces(m))
+                if (primaryOnly ? s.products().stream().noneMatch(p -> p.material().equals(m) && "primary".equals(p.role())) : !s.produces(m))
                     continue;
                 double d = SiteCommands.distance(c, spawn.getX(), spawn.getZ(), s.center().getX(), s.center().getZ());
                 if (d < best) {

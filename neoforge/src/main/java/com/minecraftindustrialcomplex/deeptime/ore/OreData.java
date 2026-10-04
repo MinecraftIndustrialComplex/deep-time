@@ -187,18 +187,20 @@ public final class OreData {
      * One essential material (plan §7.8; decisions file "Playability overrides": a pack-defined
      * list). The core's deposit stage keeps at least {@code minSitesPerRegion} sites of the material
      * in every land region of {@code regionBlocks} (exposed ones when {@code exposed}), and the spawn
-     * is chosen within {@code maxBlocksFromSpawn} of one when set. The field names and meaning are
+     * is chosen within {@code maxBlocksFromSpawn} of one when set; only sites whose product of the
+     * material is a primary one count while {@code primaryOnly} (the default). The field names and meaning are
      * the core's {@code deposits::playability::Essential}; the list goes to the core in the content
      * bundle ({@link #contentJson}).
      */
     public record Essential(ResourceLocation material, int minSitesPerRegion, int regionBlocks, boolean exposed,
-                            Optional<Integer> maxBlocksFromSpawn) {
+                            Optional<Integer> maxBlocksFromSpawn, boolean primaryOnly) {
         public static final Codec<Essential> CODEC = RecordCodecBuilder.create(i -> i.group(
                 ResourceLocation.CODEC.fieldOf("material").forGetter(Essential::material),
                 Codec.intRange(0, 1024).fieldOf("min_sites_per_region").forGetter(Essential::minSitesPerRegion),
                 Codec.intRange(64, 1 << 20).fieldOf("region_blocks").forGetter(Essential::regionBlocks),
                 Codec.BOOL.optionalFieldOf("exposed", false).forGetter(Essential::exposed),
-                Codec.intRange(1, 1 << 20).optionalFieldOf("max_blocks_from_spawn").forGetter(Essential::maxBlocksFromSpawn)
+                Codec.intRange(1, 1 << 20).optionalFieldOf("max_blocks_from_spawn").forGetter(Essential::maxBlocksFromSpawn),
+                Codec.BOOL.optionalFieldOf("primary_only", true).forGetter(Essential::primaryOnly)
         ).apply(i, Essential::new));
     }
 
@@ -254,6 +256,7 @@ public final class OreData {
             o.addProperty("region_blocks", es.regionBlocks());
             o.addProperty("exposed", es.exposed());
             es.maxBlocksFromSpawn().ifPresent(m -> o.addProperty("max_blocks_from_spawn", m));
+            o.addProperty("primary_only", es.primaryOnly());
             list.add(o);
         }
         root.add("essentials", list);
