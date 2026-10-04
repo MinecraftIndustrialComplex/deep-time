@@ -275,7 +275,41 @@ The plate model's height change is its uplift for the surface stage, which carri
 own elevation and flexure; the shelf comes from the sediment the surface brings onto the thinned
 crust, and its slope failure keeps that sediment at most 2.5° steep.
 
-**Earth against the model.** MEASURED_PLACEHOLDER
+**Earth against the model.** Measured 2026-10-04 on `earthlike_quick_16k`
+(coupled pipeline to the volcano stage, `structure.deformation.density=0`; master = the same build with
+`tectonics.transition_width_km=0`, which returns before touching anything; `tools/review/margin-runs.sh`,
+transects by `tools/review/margins.py` with the margins study's definitions, so the ETOPO 2022 figures
+compare). Passive margins are the transects with no trench, arc or collision within 6 L1 cells of the
+coast. Master → the transition (W = 200 km), mean or median over the runs:
+
+| | Earth | master | 200 km | 100 km |
+|---|---|---|---|---|
+| passive slope 500–2,000 m, median (500 Myr, 12 runs) | 2.1° | 4.5° | **2.6°** | 3.0° |
+| passive slope, share under 3° | (median 2.1°) | 0.24 | **0.60** | 0.50 |
+| all slopes 500–2,000 m, median (active ones 11.3° in all three) | 2.1° | 6.3° | 4.8° | 5.0° |
+| passive shelf (shore to the break), median / mean | 88 km mean (Harris) | 1.0 / 16.9 km | **8.0 / 31.8 km** | 2.0 / 20.6 km |
+| passive shore to the 200 m isobath, median / mean | 25 / 51 km (ETOPO) | 7.5 / 18.1 km | **12.5 / 29.0 km** | 9.0 / 20.9 km |
+| land at 500 Myr, seeds 1–3 × both starts (1–6) | 0.29 | 0.235 (0.225) | **0.184 (0.178)** | 0.182 (0.202) |
+| land 50 Myr in, 12 runs | | 0.374 | 0.339 | 0.357 |
+| median sea depth at 500 Myr | 4,062 m | 3,889 m | 3,232 m | 3,643 m |
+| continental crust at 500 Myr (1–6) | 0.41 | 0.390 | 0.387 | 0.360 |
+| land at 1000 Myr, supercontinent seeds 1–4 | | 0.160 | 0.137 | |
+| continental crust at 1000 Myr (lowest step) | | 0.424 (0.36) | 0.395 (0.38) | |
+| plate-check targets met, 1000 Myr | | 27 of 45 | 31 of 45 | |
+
+The slope of passive margins comes to Earth's within half a degree and their shelves widen, but the
+land falls by about 0.04–0.05, early and for good: 50 Myr in, the drop is already 0.035 at 200 km and
+0.017 at 100 km, in proportion to the width. That is geometry, not a defect of the rule. Sea level
+crosses the taper where the crust has lost (z_0 − 0) · f ≈ 2.2 km, 83 km inland of the model's
+boundary at W = 200 km: every rifted margin drowns a band of continent as wide as an Earth shelf. On
+Earth that band (passive shelves, about 105,000 km × 88 km) is about 4 % of the continental crust; on
+the quick 16k planet, whose radius is 782 km (1/8.1 of Earth's), the same band in metres is about
+eight times that share, because a continent's coast shrinks as its size and its area as the square.
+An Earth-width margin on a small planet therefore costs land unless the planet has more continental
+crust. The ocean beside the margin is shallower too (the held floor over a band that is a large
+share of a small ocean). The plate-check gain (27 → 31: the lowest crust step, the largest land gain
+in a step, older ocean floor and the rift families) is partly chance: the rule changes every run's
+course.
 
 **Limits and game choices.**
 - The profile is linear in thickness and the same on every margin; Earth's margins have a necking
@@ -291,6 +325,10 @@ crust, and its slope failure keeps that sediment at most 2.5° steep.
   isostasy with and without water: Airy gives 5.5 (dry) and 3.78 (water-loaded) metres of crust per
   metre of height, and 4.24 lies between; the line is what makes the plate model's continent and
   ocean heights meet.
+- **Land against width.** On a planet much smaller than Earth an Earth-width margin takes a much
+  larger share of the continents (above): the land at 500 Myr falls from 0.235 to 0.184 at 200 km
+  (0.202 at 100 km over 12 runs). Getting Earth's land back needs more continental crust or a
+  narrower margin; that choice is open (STATUS, pending questions).
 - The rule moves crust only within a plate and only between visible samples; the thickened ocean
   side keeps its oceanic type and is subducted with its ocean when the margin later turns active.
 
