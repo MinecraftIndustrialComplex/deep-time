@@ -39,11 +39,11 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p><b>Toroidal World.</b> TW 0.19.3 wraps {@code WorldGeneratorInjector.bind} and refuses every
  * generator that is not Distant Horizons' own on a level it wraps ("only its own generator runs
- * this world's terrain"). With Distant Horizons 3.3.0 that wrap does not apply (TW's mixins target
- * the unsuffixed classes, which the 3.3.0 NeoForge build does not load), so the override registers;
- * with 3.3.1 and later it applies and the registration is refused. A refusal is logged once with
- * TW's message and Distant Horizons keeps generating from real chunks: correct, slower. Deep Time
- * does not work around TW (STATUS.md, P3-04).
+ * this world's terrain"), from DH 3.3.1 on (with 3.3.0 TW's mixins missed that jar's renamed
+ * classes). Deep Time patches that guard to let this generator through, and only it, when the
+ * level's loop is the world data's circumference ({@link TwDhGuard}; Ben, 2026-10-02). If the patch
+ * did not apply or its check says no, the refusal is logged once with TW's message and Distant
+ * Horizons keeps generating from real chunks: correct, slower.
  */
 public final class DhFarTerrain {
 

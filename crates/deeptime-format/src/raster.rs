@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::{FormatError, Result};
+use crate::projection::Projection;
 use crate::strata::{ColumnHorizon, StoredHorizon};
 
 /// Horizon `k` of one `horizon_stack` cell's bytes (K = `depth`, 7K bytes).
@@ -76,16 +77,19 @@ pub enum Codec {
     Lz4Block,
 }
 
-/// An equirectangular raster in block space (plan §5.2). Cell (i, j) is the **point sample** at
-/// block (origin_block_x + i·r, origin_block_z + j·r): cell 0 sits on the seam x = −C/2 and on the
-/// north edge z = −C/4. Indices wrap in x (mod W) and clamp in z to [0, H−1].
+/// A raster in block space (plan §5.2), laid out by the planet's projection
+/// ([`crate::projection`]: Lambert's equal-area cylinder). Cell (i, j) is the **point sample** at
+/// block (origin_block_x + i·r, origin_block_z + j·r): column 0 sits on the seam x = −C/2 and row 0
+/// at z = −Zo, at or just past the north pole ([`Projection::grid_half_extent`]). Rows are uniform
+/// in sin φ, so every cell inside the sphere covers the same area of the planet. Indices wrap in x
+/// (mod W) and clamp in z to [0, H−1].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GridDesc {
     /// The grid's role: `L1`, `L2`, `L3` (plan §5.2).
     pub name: String,
     /// Cells east–west (W = C / r).
     pub w: u32,
-    /// Cells north–south (H = W / 2).
+    /// Cells north–south (H = 2·Zo / r).
     pub h: u32,
     /// Blocks per cell.
     pub r: u32,
@@ -93,13 +97,14 @@ pub struct GridDesc {
     pub wraps_x: bool,
     /// Block x of cell column 0 (−C/2).
     pub origin_block_x: i64,
-    /// Block z of cell row 0 (−C/4).
+    /// Block z of cell row 0 (−Zo).
     pub origin_block_z: i64,
 }
 
 impl GridDesc {
     /// The grid of a planet with circumference `c` blocks at `r` blocks per cell: W = C/r,
-    /// H = W/2, origin (−C/2, −C/4).
+    /// H = 2·Zo/r, origin (−C/2, −Zo), Zo = [`Projection::grid_half_extent`] (the smallest
+    /// multiple of the planet's quantum, 64 blocks, at or past the pole R = C/2π).
     pub fn for_planet(name: &str, c: u32, r: u32) -> Result<GridDesc> {
         if r == 0 || !c.is_multiple_of(2 * r) {
             return Err(FormatError::Invalid(format!(
@@ -107,16 +112,118 @@ impl GridDesc {
                 2 * r
             )));
         }
-        let w = c / r;
+        let p = Projection::new(c);
         Ok(GridDesc {
             name: name.to_owned(),
-            w,
-            h: w / 2,
+            w: c / r,
+            h: p.grid_rows(r),
             r,
             wraps_x: true,
             origin_block_x: -i64::from(c / 2),
-            origin_block_z: -i64::from(c / 4),
+            origin_block_z: p.grid_origin_z(r),
         })
+    }
+
+    /// Every `s`-th cell of this grid as a grid of its own (`name`; W/s × H/s cells, rounded up,
+    /// r·s blocks a cell, the same origin), as thinned copies and previews are taken.
+    pub fn thinned(&self, name: &str, s: u32) -> GridDesc {
+        let s = s.max(1);
+        GridDesc {
+            name: name.to_owned(),
+            w: self.w.div_ceil(s),
+            h: self.h.div_ceil(s),
+            r: self.r * s,
+            wraps_x: self.wraps_x,
+            origin_block_x: self.origin_block_x,
+            origin_block_z: self.origin_block_z,
+        }
+    }
+
+    /// The planet's projection.
+    pub fn projection(&self) -> Projection {
+        Projection::of(self.circumference() as f64)
+    }
+
+    /// The (fractional) row of block z: (z − origin_block_z) / r.
+    pub fn row_of_z(&self, z: f64) -> f64 {
+        (z - self.origin_block_z as f64) / f64::from(self.r)
+    }
+
+    /// Block z of the (fractional) row `v`.
+    pub fn z_of_row(&self, v: f64) -> f64 {
+        self.origin_block_z as f64 + v * f64::from(self.r)
+    }
+
+    /// Latitude of row `j`, degrees (north positive; ±90 past the poles).
+    pub fn lat_of_row(&self, j: u32) -> f64 {
+        self.projection().lat_deg(self.block_z(i64::from(j)) as f64)
+    }
+
+    /// The share of an r × r square that row `j`'s cells cover of the planet: 1 inside, less on
+    /// the rows that reach past a pole, 0 on rows wholly past it. The first and last row take
+    /// everything beyond them (z clamps to them), so the shares sum to 2R / r.
+    pub fn area_share(&self, j: u32) -> f64 {
+        let (z, half) = (self.block_z(i64::from(j)) as f64, 0.5 * f64::from(self.r));
+        let lo = if j == 0 { f64::NEG_INFINITY } else { z - half };
+        let hi = if j + 1 >= self.h {
+            f64::INFINITY
+        } else {
+            z + half
+        };
+        let r = self.projection().radius();
+        ((hi.min(r) - lo.max(-r)).max(0.0) / f64::from(self.r)).min(1.0)
+    }
+
+    /// True area of one cell of row `j`, km², on a planet `m_per_block` metres per block: every
+    /// cell inside the sphere is (r · m)² ([`GridDesc::area_share`] at the poles).
+    pub fn cell_area_km2(&self, j: u32, m_per_block: f64) -> f64 {
+        let side_km = f64::from(self.r) * m_per_block / 1000.0;
+        side_km * side_km * self.area_share(j)
+    }
+
+    /// The area weight of the band from row `j` to row `j + 1`: the share of it on the planet.
+    pub fn band_weight(&self, j: u32) -> f64 {
+        let z = self.block_z(i64::from(j)) as f64;
+        self.projection().band_share(z, z + f64::from(self.r))
+    }
+
+    /// The latitude, degrees, in the middle of the band from row `j` to row `j + 1`.
+    pub fn band_lat_deg(&self, j: u32) -> f64 {
+        let z = self.block_z(i64::from(j)) as f64;
+        self.projection().lat_deg(z + 0.5 * f64::from(self.r))
+    }
+
+    /// [`GridDesc::area_share`] of every row: the rows' weights for true-area means and shares.
+    pub fn row_weights(&self) -> Vec<f64> {
+        (0..self.h).map(|j| self.area_share(j)).collect()
+    }
+
+    /// True size of a cell of row `j` on the planet, metres: (east–west, north–south). East–west
+    /// r·m·cos φ at the row; north–south the arc of its band, R·m·(φ(z − r/2) − φ(z + r/2)),
+    /// which is r·m / cos φ away from the poles (0 for a row wholly past a pole).
+    pub fn true_cell_m(&self, j: u32, m_per_block: f64) -> (f64, f64) {
+        let p = self.projection();
+        let z = self.block_z(i64::from(j)) as f64;
+        let half = 0.5 * f64::from(self.r);
+        let ew = f64::from(self.r) * m_per_block * p.scale_ew(z);
+        let arc = (p.lat_deg(z - half) - p.lat_deg(z + half)).to_radians();
+        (ew, p.radius() * m_per_block * arc)
+    }
+
+    /// The (fractional) row under row coordinate `y` of a map picture `h` rows high that spans the
+    /// planet pole to pole ([`Projection::picture_z`]; the grid reaches a little past the poles).
+    pub fn picture_row(&self, y: f64, h: u32) -> f64 {
+        self.row_of_z(self.projection().picture_z(y, h))
+    }
+
+    /// The cell nearest pixel (px, py) of a `w × h` map picture of the planet (pixel (px, py) is
+    /// centred on column px·W/w and on the row of [`GridDesc::picture_row`]), not yet wrapped or
+    /// clamped.
+    pub fn picture_cell(&self, px: f64, py: f64, w: u32, h: u32) -> (i64, i64) {
+        (
+            (px * f64::from(self.w) / f64::from(w.max(1))).round() as i64,
+            self.picture_row(py, h).round() as i64,
+        )
     }
 
     /// The circumference C = W·r in blocks.
@@ -136,12 +243,12 @@ impl GridDesc {
 
     /// Wraps a column index into [0, W).
     pub fn wrap_i(&self, i: i64) -> u32 {
-        i.rem_euclid(i64::from(self.w)) as u32
+        crate::projection::wrap_col(i, i64::from(self.w)) as u32
     }
 
     /// Clamps a row index into [0, H − 1].
     pub fn clamp_j(&self, j: i64) -> u32 {
-        j.clamp(0, i64::from(self.h) - 1) as u32
+        crate::projection::clamp_row(j, i64::from(self.h)) as u32
     }
 
     /// Cells in the raster.
@@ -490,8 +597,12 @@ mod tests {
     #[test]
     fn grid_geometry() {
         let g = GridDesc::for_planet("L3", 16384, 2).unwrap();
-        assert_eq!((g.w, g.h), (8192, 4096));
-        assert_eq!((g.origin_block_x, g.origin_block_z), (-8192, -4096));
+        // Lambert: pole to pole 2R = C/π = 5,215 blocks, the grid to ±2,624 (a multiple of 64).
+        assert_eq!((g.w, g.h), (8192, 2624));
+        assert_eq!((g.origin_block_x, g.origin_block_z), (-8192, -2624));
+        let l1 = GridDesc::for_planet("L1", 16384, 16).unwrap();
+        assert_eq!((l1.w, l1.h, l1.origin_block_z), (1024, 328, -2624));
+        assert_eq!(l1.h * 8, g.h, "the ladder nests: L3 row 8j is L1 row j");
         assert_eq!(g.circumference(), 16384);
         assert!(GridDesc::for_planet("x", 1000, 16).is_err());
     }
@@ -550,12 +661,12 @@ mod tests {
 
     #[test]
     fn tile_rects_crop_edges() {
-        let grid = GridDesc::for_planet("L1", 16384 * 2, 64).unwrap(); // 512 × 256
+        let grid = GridDesc::for_planet("L1", 16384 * 2, 64).unwrap(); // 512 × 164
         let mut d = LayerDesc::scalar("x", DType::U8, grid, Codec::Raw);
-        d.tile = 200;
-        assert_eq!((d.tiles_x(), d.tiles_z()), (3, 2));
-        assert_eq!(d.tile_rect(0), (0, 0, 200, 200));
-        assert_eq!(d.tile_rect(2), (400, 0, 112, 200));
-        assert_eq!(d.tile_rect(5), (400, 200, 112, 56));
+        d.tile = 100;
+        assert_eq!((d.tiles_x(), d.tiles_z()), (6, 2));
+        assert_eq!(d.tile_rect(0), (0, 0, 100, 100));
+        assert_eq!(d.tile_rect(5), (500, 0, 12, 100));
+        assert_eq!(d.tile_rect(11), (500, 100, 12, 64));
     }
 }

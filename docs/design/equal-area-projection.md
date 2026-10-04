@@ -1,10 +1,13 @@
 # The map projection: one coordinate layer, any projection
 
-**Status (2026-10-02).** Ben first chose Lambert's cylindrical equal-area projection (decisions
-log 2026-10-02: "Use an equal area projects FFS", then "Game world and maps" and "The equator
-(Lambert)"). He has since reopened the choice. He wants the Peirce quincuncial projection and its
-newer relatives looked at: square maps that tile the plane. A research agent is on that. So this
-note covers any projection. It says:
+**Status (2026-10-03).** Ben chose Lambert's cylindrical equal-area projection (decisions log
+2026-10-02: "Use an equal area projects FFS", then "Game world and maps" and "The equator
+(Lambert)"), reopened the choice to look at square tiling maps (Peirce quincuncial and its
+relatives), and then settled on **"Lambert for now"**: a Lambert world, true on the equator,
+wrapping east–west with Toroidal World, the pole cap kept; the portal pillowcase stays a later
+option. Step 1 of §8 (the projection-neutral module) and step 2 (Lambert in it) are built on branch
+`worktree-agent-a3186d42ee9449d3d`. The note still covers any projection, for when the choice comes
+back. It says:
 
 - what the code assumes today;
 - the single projection module, in Rust, Java and JS, that every coordinate conversion should go
@@ -58,8 +61,10 @@ One module per language, with the same formulas in the same order:
 - Rust: `deeptime_format::projection`, in the format crate. `GridDesc`, the event and site readers
   and every crate need it.
 - Java: `worlddata/Projection`.
-- JS: `DT.proj` in `workbench.js` and the same few lines in `viewer.js`. It is fed the
-  projection's parameters by the workbench API, so JS never derives them itself.
+- JS: `window.DTProj` in `crates/deeptime-viewer/assets/projection.js`, loaded first by the
+  workbench and by the viewer bundle (as built; the first plan was a `DT.proj` in `workbench.js`
+  and a copy in `viewer.js`). It takes C from the run, so the pages never derive the layout
+  themselves.
 
 Core's `BlockFrame` keeps its `glam` API and delegates to the module. Every other site in §3 calls
 one of the functions below.
@@ -367,7 +372,7 @@ What changes for the code:
      `inverse`.
    - The four singular points are where map features pinch.
 
-## 6. Lambert in numbers (the cylindrical case as built in the WIP)
+## 6. Lambert in numbers (as built, §8 step 2)
 
 | | C = 16,384 | C = 32,768 |
 |---|---|---|
@@ -417,13 +422,59 @@ this; it is on the WIP branch.
 
 ## 8. Tasks
 
-1. **Projection-neutral refactor, equirect kept.** Write the module of §2 with the equirectangular
+1. **Projection-neutral refactor, equirect kept.** *Built 2026-10-02 (branch
+   `worktree-agent-a3186d42ee9449d3d`): Rust `deeptime_format::projection` with the `GridDesc`
+   helpers, Java `worlddata/Projection`, the pages' `projection.js` (`window.DTProj`).
+   `tools/review/projection-identity.sh` shows the outputs bit-identical to master (355 files:
+   synthetic worlds, the test planet's bake, keyframes, satellite picture, parity fixtures,
+   deposit world).*
+
+   *What the module holds, as built:* `lat_deg`, `lon_deg`, `z_of_lat`, `x_of_lon`, `block_of`,
+   `lat_lon`, `unit` (forward and inverse); `pole_z`, `extent`, `on_planet`, `inside_poles`,
+   `clamp_z`, `grid_origin_z`, `grid_rows` (the extent); `scale_ew`, `scale_ns`, `metric`,
+   `area_scale`, `north`, `great_circle_blocks`, and `GridDesc::cell_area_km2`, `true_cell_m`,
+   `band_weight`, `row_weights` (the metric and the areas); `wrap_col`, `clamp_row`,
+   `neighbour` (the topology: `GridDesc::wrap_i`/`clamp_j`, the surface kernels'
+   `Dims::neighbour` and Java's `GridDesc.wrapI`/`clampJ` call them); `index_origin`,
+   `index_span` (the frame of the river tiles, the structure buckets, the site index and the
+   playability regions, class S of §3); `picture_*` (map pictures, both axes).
+
+   *Not routed yet, for whoever builds step 2 or 3:*
+   - the kernels that wrap x or stop at the rows inline, about 35 Rust files (`box_blur`,
+     flexure's FFT and DCT, the orographic FFT, `advect`, the amplifier's windows, the
+     deposits' regional windows, the ice distance transform, the river network's outlet rows):
+     the fold of §5.3 item 3 is a design pass, not a call-site change;
+   - the x seam written as `c / 2` (block x wrapped into [−C/2, C/2)) at its many sites;
+   - the climate's assumption that rows are parallels (§5.3 item 1): its geometry takes
+     `true_cell_m` and the row weights from the module, the marches along rows stay;
+   - the synthetic test terrain's analytic latitude (`synth/terrain.rs`, Java
+     `AnalyticTestTerrain`: its own formula, twinned) and the CLI's Earth DEM reader
+     (`climate_dem.rs`: the input file's own equirectangular layout);
+   - preset data: every preset's `keyframes.size` (1024 × 512) and `keyframes::DEFAULT_SIZE`;
+   - the workbench globe's texture lookup (u = longitude / 360 in its pixel loop), Java's
+     `ProvinceHints` (a latitude/longitude lattice by definition);
+   - review scripts: `tools/review/grid_audit.py`, `glacial_views.py`, `p2-01-report.py`, the
+     `seams` and `wrap` pages;
+   - the plan's §5.1–5.2 and the POL ledger rows (step 4, with the pick).
+
+   Write the module of §2 with the equirectangular
    projection as its first implementation. Route every site of §3 through it, and add the parity
    fixture's projection block.
    - Output stays bit-identical: same bakes, same pictures, same tests.
    - It can land before Ben picks.
    - It turns every later choice into a module change plus the family-specific work below.
-2. **If cylindrical (Lambert).** Finish the WIP:
+2. **If cylindrical (Lambert).** *Built 2026-10-03 (the same branch, after step 1): the module's
+   bodies are Lambert's in Rust, Java and the pages; world-data format 0.4; grids from −Zo, Zo the
+   multiple of the planet's quantum (64) past the pole, **the same for every grid of a planet**
+   (the WIP's lcm(quantum, r) gave a coarse r of 128 another Zo than its finer levels, and the
+   ladder stopped nesting); H = ⌈2·Zo/r⌉; keyframes 1024 × 326 in every preset; the climate's
+   per-row cell height and the ice distance transform's uneven column pass (from the WIP); the
+   ITCZ by row areas; the hill shades' true pixel size (`Projection::picture_pixel_m`); deposit
+   footprints in block space on the pages; the Earth DEM resampled onto the planet's grid; the
+   workbench's tile pyramid kept as a 2 : 1 frame (`tile_frame_z`) with the pixels past the poles
+   drawn as background; the ice line in `deeptime stage`. The orographic rain keeps its block
+   metric (§4: cylindrical, unchanged). The pole-cap band went to Ben: the cap line moved to 70° (2026-10-03), a 118-block band at 16k.
+   Evidence in the STATUS build log.* Finish the WIP:
    - the remaining tests;
    - the JS (`DT.proj`), the tools and the docs;
    - the keyframe size 1024 × 326 in every preset; format 0.4;

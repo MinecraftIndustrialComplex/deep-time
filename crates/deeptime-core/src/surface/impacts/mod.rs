@@ -133,9 +133,14 @@ pub const EVENT_MIN_KM: f64 = 5.0; // ledger: IMP-137 (game choice)
 /// An impactor the sea stopped gets an event when its crater on land would have been at least
 /// this wide, km.
 pub const OCEAN_EVENT_MIN_KM: f64 = 20.0; // ledger: IMP-070 (game choice)
-/// A crater shows in the finished terrain while its relief is at least this (two blocks at 20 m
-/// per block), m.
-pub const VISIBLE_RELIEF_M: f64 = 40.0; // ledger: IMP-081 (game choice)
+/// A crater shows in the finished terrain while its relief is at least this many blocks (2: one
+/// block is noise of the amplifier's detail term).
+pub const VISIBLE_RELIEF_BLOCKS: f64 = 2.0; // ledger: IMP-081 (game choice)
+
+/// [`VISIBLE_RELIEF_BLOCKS`] in metres at `m_per_block_v` metres a block (70 m at 35 m).
+pub fn visible_relief_m(m_per_block_v: f64) -> f64 {
+    VISIBLE_RELIEF_BLOCKS * m_per_block_v
+}
 /// Diffusion works above this depth below the sea (the surface stage's wave base), m.
 pub const WAVE_BASE_M: f64 = 60.0; // ledger: IMP-076 (the surface stage's value; uncited)
 /// Target (crust) density of the crater scaling, kg/m³. CMM05 (p. 818) uses 2,500 for sedimentary
@@ -264,12 +269,13 @@ impl Crater {
         shape::spread_m(self.kt_m2)
     }
 
-    /// Its relief now (rim crest to floor), m, and its state.
-    pub fn state(&self) -> (f64, Fate) {
+    /// Its relief now (rim crest to floor), m, and its state: it shows (fresh or degraded) while
+    /// the relief is at least `visible_m` ([`visible_relief_m`]).
+    pub fn state(&self, visible_m: f64) -> (f64, Fate) {
         let rim_rho = 1.0 / self.profile.ejecta_radii;
         let aged = self.profile.aged(self.spread_m());
         let relief = self.kept() * shape::relief_m(&aged, rim_rho);
-        let fate = if relief >= VISIBLE_RELIEF_M {
+        let fate = if relief >= visible_m {
             if relief >= 0.75 * self.profile.depth_m {
                 Fate::Fresh
             } else {
@@ -352,6 +358,10 @@ pub struct ImpactState {
     /// Events written, and bodies made at the end.
     pub events_emitted: u64,
     pub bodies: u64,
+    /// The lens body of each crater that has one: (crater id, body id). [`seat_bodies`] moves
+    /// them under the floor the bake drew.
+    #[serde(default)]
+    pub lens_bodies: Vec<(u32, u32)>,
 }
 
 /// Estimate: the catalogue is small; a few L1 arrays per step.
@@ -607,6 +617,107 @@ pub fn to_body(
         });
     }
     Some(body)
+}
+
+/// Where the lens of a crater's breccia sits, in blocks: its original floor, the height the game
+/// draws at the crater's centre (`drawn_y`: the baked terrain, which carries the bowl the
+/// amplifier cut) less what lies over the lens (`Crater::lens_top_below_m`).
+pub fn lens_floor_y(c: &Crater, drawn_y: f64, m_per_block_v: f64) -> f64 {
+    drawn_y - c.lens_top_below_m() / m_per_block_v
+}
+
+/// Seats the craters' lens bodies on the terrain the bake drew. `finish` places each lens from the
+/// deep-time surface, but the amplifier changes the ground there afterwards (its erosion, glacial
+/// and thermal passes moved a crater's ground by 15 blocks on one test planet), so the lens was
+/// centred at the rim's height instead of under the drawn floor. The caller reads the baked terrain
+/// (`drawn_y(x, z)`, block y at the crater's centre) and passes the bodies as written; the lens of
+/// every crater of `st.lens_bodies` is rebuilt under that height (dropped when it now lies below
+/// the world). Returns how many moved by a block or more.
+pub fn seat_bodies(
+    st: &ImpactState,
+    bodies: &mut Vec<Body>,
+    s: &crate::params::ScaleParams,
+    drawn_y: &dyn Fn(f64, f64) -> f64,
+) -> usize {
+    let mut moved = 0;
+    for &(crater, id) in &st.lens_bodies {
+        let (Some(c), Some(at)) = (
+            st.craters.iter().find(|c| c.id == crater),
+            bodies.iter().position(|b| b.id == id),
+        ) else {
+            continue;
+        };
+        let y = drawn_y(c.x, c.z);
+        if !y.is_finite() {
+            continue;
+        }
+        let floor_y = lens_floor_y(c, y, s.m_per_block_v);
+        match to_body(c, id, floor_y, s.m_per_block_h, s.m_per_block_v, s.min_y) {
+            Some(b) => {
+                moved += usize::from((b.center[1] - bodies[at].center[1]).abs() >= 1.0);
+                bodies[at] = b;
+            }
+            None => {
+                bodies.remove(at);
+            }
+        }
+    }
+    moved
+}
+
+/// [`seat_bodies`] on a baked folder whose manifest is written: reads its bodies and terrain,
+/// rewrites the bodies and their manifest entry (the caller writes the manifest) and records
+/// `notes.bake.impact_bodies`. Does nothing in a folder without an impact catalogue or bodies.
+pub fn settle_folder(
+    world: &WorldState,
+    dir: &std::path::Path,
+    p: &PlanetPreset,
+    m: &mut deeptime_format::Manifest,
+) -> Result<Value, CoreError> {
+    use deeptime_format::bodies::{BODIES_PATH, read_bodies, write_bodies};
+    let Some(st) = world
+        .impacts
+        .as_ref()
+        .filter(|st| !st.lens_bodies.is_empty())
+    else {
+        return Ok(json!({"lenses": 0}));
+    };
+    let Some(mut bodies) = read_bodies(dir)? else {
+        return Ok(json!({"lenses": 0, "why": "no bodies in the folder"}));
+    };
+    let terrain = deeptime_format::ColumnWorld::open(dir)?;
+    let before = bodies.len();
+    let moved = seat_bodies(st, &mut bodies, &p.scale, &|x, z| {
+        terrain.height(x.round() as i64, z.round() as i64)
+    });
+    let (bytes, crc32) = write_bodies(dir, &bodies)?;
+    match m.files.iter_mut().find(|f| f.path == BODIES_PATH) {
+        Some(f) => {
+            f.bytes = bytes;
+            f.crc32 = crc32;
+        }
+        None => m.files.push(deeptime_format::FileEntry {
+            path: BODIES_PATH.into(),
+            bytes,
+            crc32,
+        }),
+    }
+    let note = json!({
+        "lenses": st.lens_bodies.len(),
+        "moved_a_block_or_more": moved,
+        "dropped": before - bodies.len(),
+    });
+    if let Some(b) = m.notes.get_mut(crate::bake::NOTES_KEY)
+        && b.is_object()
+    {
+        b["impact_bodies"] = note.clone();
+    }
+    if let Some(run) = m.notes.get_mut("run")
+        && run.is_object()
+    {
+        run["bodies"] = json!(bodies.len());
+    }
+    Ok(note)
 }
 
 /// `impacts/craters.json` (FORMAT.md, "Impact craters"): the craters of the catalogue at the
@@ -984,8 +1095,9 @@ impl ImpactStage {
 
         // The craters' state, the map layer and the closure the structure stage reads.
         let started = Instant::now();
+        let visible_m = visible_relief_m(s.m_per_block_v);
         for c in &mut st.craters {
-            let (relief, fate) = c.state();
+            let (relief, fate) = c.state(visible_m);
             c.relief_m = relief;
             c.fate = fate;
         }
@@ -1099,8 +1211,9 @@ impl ImpactStage {
         // What to write: (time, 0 = a crater in the catalogue, 1 = one that left it, 2 = an ocean
         // impact, its index there).
         let mut order: Vec<(f64, u8, usize)> = Vec::new();
+        let visible_m = visible_relief_m(s.m_per_block_v);
         for (k, c) in st.craters.iter().enumerate() {
-            if c.diameter_m >= EVENT_MIN_KM * 1000.0 || c.relief_m >= VISIBLE_RELIEF_M {
+            if c.diameter_m >= EVENT_MIN_KM * 1000.0 || c.relief_m >= visible_m {
                 order.push((c.t_myr, 0, k));
             }
         }
@@ -1155,8 +1268,11 @@ impl ImpactStage {
             // will draw of the crater; the original floor lies under its cover.
             let ground = sample_at(grid, &surf.elevation_m, c.x, c.z);
             let centre = c.kept() * c.profile.aged(c.spread_m()).at(0.0);
-            let floor_m = ground + centre - c.lens_top_below_m();
-            let floor_y = f64::from(s.sea_level_y) + (floor_m - sea) / mv;
+            // A first estimate from the deep-time surface: the bake's terrain is not drawn yet
+            // (`settle_folder` seats the lens on it).
+            let drawn_m = ground + centre;
+            let drawn_y = f64::from(s.sea_level_y) + (drawn_m - sea) / mv;
+            let floor_y = lens_floor_y(c, drawn_y, mv);
             bodies.push((c.clone(), floor_y));
         }
         for (c, floor_y) in bodies {
@@ -1164,6 +1280,7 @@ impl ImpactStage {
             if let Some(b) = to_body(&c, id, floor_y, s.m_per_block_h, mv, s.min_y) {
                 world.add_body(b)?;
                 st.bodies += 1;
+                st.lens_bodies.push((c.id, id));
             }
         }
         Ok(())
@@ -1179,20 +1296,21 @@ impl ImpactStage {
             }
             standing.insert(fate.name(), by_size);
         }
+        let visible_m = visible_relief_m(self.preset.scale.m_per_block_v);
         let visible = st
             .craters
             .iter()
-            .filter(|c| c.relief_m >= VISIBLE_RELIEF_M)
+            .filter(|c| c.relief_m >= visible_m)
             .count();
         let on_land = st
             .craters
             .iter()
-            .filter(|c| c.relief_m >= VISIBLE_RELIEF_M && !c.oceanic)
+            .filter(|c| c.relief_m >= visible_m && !c.oceanic)
             .count();
         let oldest_visible = st
             .craters
             .iter()
-            .filter(|c| c.relief_m >= VISIBLE_RELIEF_M)
+            .filter(|c| c.relief_m >= visible_m)
             .map(|c| st.t_myr - c.t_myr)
             .fold(0.0f64, f64::max);
         json!({

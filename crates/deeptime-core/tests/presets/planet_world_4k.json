@@ -1,7 +1,7 @@
 {
   "schema": 0,
   "name": "planet_world_4k",
-  "description": "A small real planet for the tests (P1-08): every stage of the pipeline (plates, climate, surface, volcanoes, impacts, structure, deposits, young, amplify) on the calibrated parameters of pipeline_quick_16k at C = 4096 blocks, L0 5000 samples, L1 256x128, L2 512x256, L3 2048x1024, 150 Myr from scattered continents, with ten times the pluton rate and more deposits so the columns cross bodies, and meteor impacts at forty times Earth's rate (craters up to 40 km) so a planet this small has craters to test. Its bake is the world of ColumnParityTest (Gradle testWorldPlanet4k) and of the GameTest level deeptime:test_planet_real (gametest.sh). Not a game preset.",
+  "description": "A small real planet for the tests (P1-08): every stage of the pipeline (plates, climate, surface, volcanoes, impacts, structure, deposits, young, amplify) on the calibrated parameters of pipeline_quick_16k at C = 4096 blocks, L0 5000 samples, L1 256x88, L2 512x176, L3 2048x704, 150 Myr from scattered continents, with ten times the pluton rate and more deposits so the columns cross bodies, and meteor impacts at forty times Earth's rate (craters up to 40 km) so a planet this small has craters to test. Its bake is the world of ColumnParityTest (Gradle testWorldPlanet4k) and of the GameTest level deeptime:test_planet_real (gametest.sh). Not a game preset.",
   "seed": 11,
   "planet": {
     "gravity_m_s2": 9.81,
@@ -14,17 +14,17 @@
   "scale": {
     "circumference_blocks": 4096,
     "m_per_block_h": 300.0,
-    "m_per_block_v": 20.0,
-    "min_y": -352,
+    "m_per_block_v": 35.0,
+    "min_y": -512,
     "max_y": 639,
     "sea_level_y": 63,
-    "pole_cap_deg": 75.0
+    "pole_cap_deg": 70.0
   },
   "keyframes": {
     "every_myr": 50.0,
     "size": [
       256,
-      128
+      81
     ]
   },
   "young": {},
@@ -54,17 +54,19 @@
     "crust_strength_mpa": 140.0,
     "crust_flow_km2_myr": 30000.0,
     "subduction_distance_km": 800.0,
-    "collision_distance_km": 2000.0,
-    "collision_coefficient_per_km": 1.3e-05,
     "max_plate_speed_mm_yr": 100.0,
     "oceanic_damping_mm_yr": 0.05,
     "continental_erosion_mm_yr": 0.0,
     "sediment_accretion_mm_yr": 0.3,
     "subduction_uplift_mm_yr": 0.42,
-    "collision_threshold_km": 300.0,
+    "collision_threshold_km": 100.0,
     "subduction_peak_km": 300.0,
-    "collision_uplift_max_m": 2800.0,
-    "collision_orogen_core": 0.5,
+    "collision_belt_km": 400.0,
+    "collision_stacking_share": 0.5,
+    "wedge_slope_deg": 1.5,
+    "collision_resistance_mm_yr": 200.0,
+    "weld_speed_mm_yr": 5.0,
+    "weld_after_myr": 10.0,
     "slab_pull_rad_per_1000km_myr": 0.002,
     "slab_pull_speed_mm_yr": 80.0,
     "slab_pull_front_km": 3000.0,
@@ -126,7 +128,6 @@
     "terrane_event_min_frac": 0.005,
     "collision_min_frac": 0.1,
     "collision_suture_frac": 0.1,
-    "collision_on_shortening": false,
     "subduction_initiation_age_myr": 150.0,
     "subduction_initiation_rate": 0.3,
     "subduction_initiation_clearance_km": 1000.0,
@@ -162,6 +163,7 @@
     "tidal_range_m": 2.0,
     "marine_fill_depth_m": 0.0,
     "shelf_slope": 0.0005,
+    "submarine_slope_deg": 2.5,
     "carbonate_max_mm_yr": 10.0,
     "carbonate_extinction_per_m": 0.1,
     "carbonate_surface_light": 2000.0,
@@ -315,5 +317,8 @@
     "sea_cutoff_ratio": 8.0,
     "diffusivity_m2_yr": 0.01,
     "degradation": 1.0
+  },
+  "underground": {
+    "geothermal_heat_flow_min_mw_m2": 60.0
   }
 }

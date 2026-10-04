@@ -503,6 +503,11 @@ fn vanilla(material: &str) -> Option<f64> {
         .filter(|v| *v > 0.0)
 }
 
+/// Blocks from pole to pole on a planet `c` blocks round (the projection's north–south extent).
+fn pole_to_pole_blocks(c: i64) -> i64 {
+    deeptime_format::Projection::of(c as f64).extent().1 as i64
+}
+
 /// Runs the audit; returns the JSON report (also written to `--json`).
 pub fn run(o: &Options) -> CliResult<Value> {
     let w = ColumnWorld::open(&o.world_data)?;
@@ -523,8 +528,8 @@ pub fn run(o: &Options) -> CliResult<Value> {
     while land.len() < o.chunks && tries < o.chunks * 200 {
         tries += 1;
         let cx = rng.below((c / 16) as u64) as i64 - c / 32;
-        // Between the pole caps (z in [−C/4, C/4)), away from their last 1/16.
-        let span = (c / 2 / 16) * 7 / 8;
+        // Between the poles, away from their last 1/16.
+        let span = (pole_to_pole_blocks(c) / 16) * 7 / 8;
         let cz = rng.below(span as u64) as i64 - span / 2;
         if w.height(cx * 16 + 8, cz * 16 + 8) >= f64::from(sea) {
             land.push((cx, cz));
@@ -779,7 +784,7 @@ pub fn run(o: &Options) -> CliResult<Value> {
 
     // The planet's ore by where it comes from: every deposit's blocks against the scatter of the
     // land between the caps (the sampled share of land × the chunks there).
-    let band_chunks = (c / 16) as f64 * ((c / 2 / 16) * 7 / 8) as f64;
+    let band_chunks = (c / 16) as f64 * ((pole_to_pole_blocks(c) / 16) * 7 / 8) as f64;
     let land_chunks = band_chunks * land.len() as f64 / tries.max(1) as f64;
     let mut in_deposits: BTreeMap<String, u64> = BTreeMap::new();
     for r in &rows {
@@ -894,7 +899,9 @@ fn access_probe(
                             continue;
                         }
                         let (cx, cz) = ((pcx + dx + nc / 2).rem_euclid(nc) - nc / 2, pcz + dz);
-                        if cz.abs() * 16 > c / 4 {
+                        if !deeptime_format::Projection::of(c as f64)
+                            .on_planet(0.0, (cz * 16) as f64)
+                        {
                             continue;
                         }
                         let key = (mat.to_owned(), cx, cz);

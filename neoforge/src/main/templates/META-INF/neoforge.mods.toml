@@ -9,6 +9,12 @@ config = "deeptime.mixins.json"
 [[mixins]]
 config = "deeptime.gametest.mixins.json"
 
+# Toroidal World's Distant Horizons guard lets Deep Time's far terrain through (Ben, 2026-10-02).
+# Not required: its plugin applies it only when TW and DH are installed and TW's method is as
+# checked, and logs whether it applied (compat/dh/TwDhGuard).
+[[mixins]]
+config = "deeptime.tw_dh.mixins.json"
+
 [[mods]]
 modId       = "${mod_id}"
 version     = "${mod_version}"
@@ -50,7 +56,8 @@ description = '''${mod_description}'''
 # Distant Horizons: its far terrain comes from Deep Time's world data (compat/dh, P3-04; plan §10.5).
 # Optional, and any version loads: the API is bound by name at run time (3.3.0's merged names and
 # the published names of 3.3.1+ were checked), and a version it cannot bind is left to generate
-# its own LODs.
+# its own LODs. On a level Toroidal World wraps, TW refuses foreign generators from DH 3.3.1 on;
+# deeptime.tw_dh.mixins.json lets Deep Time's through.
 [[dependencies.${mod_id}]]
     modId        = "distanthorizons"
     type         = "optional"

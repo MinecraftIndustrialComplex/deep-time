@@ -54,8 +54,8 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
         super(biomeSource, settings);
         this.sourceSettings = settings;
         this.dataRef = dataRef;
-        // Vanilla's picker floods everything below y -54 with lava, which is 298 blocks of a world
-        // whose floor is y -352 (LavaRules). The field is opened by the access transformer; it is
+        // Vanilla's picker floods everything below y -54 with lava, which is 458 blocks of a world
+        // whose floor is y -512 (LavaRules). The field is opened by the access transformer; it is
         // read on first use, when the level's world data can be loaded.
         this.globalFluidPicker = com.google.common.base.Suppliers.memoize(() -> LavaFluids.picker(settings.value(), terrain()));
     }
@@ -117,6 +117,8 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
                              net.minecraft.world.level.levelgen.RandomState random, net.minecraft.world.level.chunk.ChunkAccess chunk) {
         super.buildSurface(region, structures, random, chunk);   // the pack's surface rules repaint the default block
         if (terrain() instanceof WorldDataTerrain w) {
+            // No cave of any kind reaches the underwater face of a sea cliff: a wall of rock is kept (before the strata).
+            SeaCliffPass.apply(chunk, w::height, sourceSettings.value().seaLevel(), w.cliffRules());
             StrataPass.apply(chunk, w.data());
             WaterBodies.apply(chunk, w.data(), waterReach());  // lakes, rivers, banks (plan §7.9, P1-22)
             PlayaPass.apply(chunk, w.data());                  // salt on the floors of basins too dry for a lake

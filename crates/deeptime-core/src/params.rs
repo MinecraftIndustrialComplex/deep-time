@@ -9,7 +9,7 @@
 //!             "star_flux_rel": 1.0, "ocean_fraction": 0.7, "regime": "mobile_lid"},
 //!  "scale": {"circumference_blocks": 16384, "m_per_block_h": 300, …},
 //!  "timeline": {"start": "scattered_continents", "length_myr": 500},
-//!  "keyframes": {"every_myr": 50, "size": [1024, 512]},
+//!  "keyframes": {"every_myr": 50, "size": [1024, 326]},
 //!  "resolution": {"l0_samples": 100000, "l1_r": 16},
 //!  "tectonics": {…every key optional, Cortial et al. 2019 Appendix A by default…}}
 //! ```
@@ -161,10 +161,10 @@ fn d_m_per_block_h() -> f64 {
     300.0
 }
 fn d_m_per_block_v() -> f64 {
-    20.0
+    deeptime_format::DEFAULT_M_PER_BLOCK_V // ledger: SCL-002
 }
 fn d_min_y() -> i32 {
-    -352
+    -512
 }
 fn d_max_y() -> i32 {
     639
@@ -173,7 +173,9 @@ fn d_sea_level_y() -> i32 {
     63
 }
 fn d_pole_cap_deg() -> f64 {
-    75.0
+    // ledger: POL-003 (game-choice, Ben 2026-10-03: the storm band from 70°, so the band stays
+    // 118 blocks wide at 16k on the Lambert map instead of 49).
+    70.0
 }
 fn d_build_limit_band() -> f64 {
     48.0
@@ -299,7 +301,8 @@ fn d_every_myr() -> f64 {
     50.0
 }
 fn d_keyframe_size() -> [u32; 2] {
-    [1024, 512]
+    // The map's aspect (the Lambert projection, π : 1: `Projection::picture_height`).
+    [1024, 326]
 }
 
 /// Timelapse keyframes (plan §6.1).
@@ -387,10 +390,6 @@ pub struct TectonicParams {
     pub crust_flow_km2_myr: f64,
     /// r_s (1,800 km).
     pub subduction_distance_km: f64,
-    /// r_c (4,200 km).
-    pub collision_distance_km: f64,
-    /// Δc (1.3e-5 km⁻¹).
-    pub collision_coefficient_per_km: f64,
     /// v_0 (100 mm/yr).
     pub max_plate_speed_mm_yr: f64,
     /// ε_o (0.04 mm/yr).
@@ -411,19 +410,38 @@ pub struct TectonicParams {
     pub sediment_accretion_mm_yr: f64,
     /// u_0 (0.6 mm/yr).
     pub subduction_uplift_mm_yr: f64,
-    /// What a contact's collision count must reach to transfer its terrane or weld its plates
-    /// (Cortial §6: 300 km of interpenetration). What is counted is `collision_on_shortening`.
+    /// The real shortening (`plates/shortening.rs`) at which a terrane smaller than
+    /// `collision_suture_frac` moves to the overriding plate (Cortial §6: 300 km of
+    /// interpenetration). Continents larger than that weld on stalled convergence instead
+    /// (`weld_speed_mm_yr`, `weld_after_myr`), whatever their shortening.
     pub collision_threshold_km: f64,
 
     /// Where the subduction distance transfer f(d) peaks (design choice).
     pub subduction_peak_km: f64,
-    /// Cap on Δc·A, the discrete collision uplift (design choice; Δc·A of a whole continent
-    /// would be tens of kilometres).
-    pub collision_uplift_max_m: f64,
-    /// Crust lifted by at least this share of a collision's peak uplift becomes a collision
-    /// orogen (Himalayan orogeny, folds, regional metamorphism); the rest of the surge only rises
-    /// (P1-27: Earth's collision belts are a few hundred to ~1,500 km wide, not the whole surge).
-    pub collision_orogen_core: f64,
+    /// Width of the collision belt on the overriding plate behind the front, km
+    /// (Earth-normalized): the crust shortened each step is stacked there (`plates/belts.rs`),
+    /// highest at the front. Crust spreading (`crust_strength_mpa`) widens it into a plateau.
+    pub collision_belt_km: f64,
+    /// Share of the continental crust shortened across a collision front that stays in the
+    /// crust, thickening the belt and its wedge; the rest goes down with the slab or is lost
+    /// from the lower crust (`plates/belts.rs`).
+    pub collision_stacking_share: f64,
+    /// Surface slope of the orogenic wedge on the incoming plate, degrees: the wedge rises
+    /// towards the front at this slope up to the belt's height there (a critical wedge keeps
+    /// its shape as it grows; the Lesser Himalayan wedge's surface slope is 1–1.6°).
+    pub wedge_slope_deg: f64,
+    /// Collision resistance (task 4 of `docs/design/plate-force-balance.md`): the convergence
+    /// across a collision front, mm/yr, that a belt at the strength height
+    /// (`strength_height_m`) cancels along a front as long as the oceanic slab front that pulls
+    /// the incoming plate (or any front, for a plate no slab pulls). It grows with the belt's
+    /// height and acts inside the speed law, over its relaxation time; it can stop two plates
+    /// but never push them apart (`plates/belts.rs`).
+    pub collision_resistance_mm_yr: f64,
+    /// Two plates in collision weld into one when the convergence across their front has stayed
+    /// below this, mm/yr …
+    pub weld_speed_mm_yr: f64,
+    /// … for this long, Myr. The larger plate keeps its id.
+    pub weld_after_myr: f64,
     /// Axis change of a subducting plate towards its fronts per 1,000 km of front and Myr
     /// (slab pull, Cortial §4.1's ε scaled by front length).
     pub slab_pull_rad_per_1000km_myr: f64,
@@ -543,17 +561,6 @@ pub struct TectonicParams {
     /// left its passive margins facing an ocean that kept converging, so they all turned
     /// active); a smaller terrane moves alone (an island arc or microcontinent accretes).
     pub collision_suture_frac: f64,
-    /// What `collision_threshold_km` is compared with (`plates/shortening.rs`). `true`: the
-    /// collision's real shortening, the convergence across its front integrated since continental
-    /// crust first converged there. `false`: the count used before plate-motion task 2, relative
-    /// speed × time over the steps with three or more continental samples in the overlap, which
-    /// also counts plates sliding past each other. An interim setting: `false` in every built-in
-    /// preset until the belt and the weld on stalled convergence land (tasks 3 and 4 of
-    /// `docs/design/plate-force-balance.md`): with it off the planets are master's, and with it on
-    /// the plate-check measures move both ways (docs/design/plate-check-baseline.md, task 2).
-    /// Task 4 removes it.
-    // ledger: PLT-227 (game-choice, interim; the agent of plate-motion task 2, 2026-10-02).
-    pub collision_on_shortening: bool,
     /// Oceanic crust older than this, on a plate that subducts nowhere, can start subducting on
     /// its own (Wilson cycle), Myr.
     pub subduction_initiation_age_myr: f64,
@@ -619,18 +626,20 @@ impl Default for TectonicParams {
             crust_strength_mpa: 140.0,
             crust_flow_km2_myr: 0.0,
             subduction_distance_km: 1800.0,
-            collision_distance_km: 4200.0,
-            collision_coefficient_per_km: 1.3e-5,
             max_plate_speed_mm_yr: 100.0,
             oceanic_damping_mm_yr: 0.04,
             oceanic_floor_elevation_m: -10000.0,
             continental_erosion_mm_yr: 0.03,
             sediment_accretion_mm_yr: 0.3,
             subduction_uplift_mm_yr: 0.6,
-            collision_threshold_km: 300.0,
+            collision_threshold_km: 100.0, // ledger: PLT-068
             subduction_peak_km: 300.0,
-            collision_uplift_max_m: 4000.0,
-            collision_orogen_core: 0.5,
+            collision_belt_km: 400.0,          // ledger: PLT-241
+            collision_stacking_share: 0.5,     // ledger: PLT-242
+            wedge_slope_deg: 1.5,              // ledger: PLT-192
+            collision_resistance_mm_yr: 200.0, // ledger: PLT-245
+            weld_speed_mm_yr: 5.0,             // ledger: PLT-246
+            weld_after_myr: 10.0,              // ledger: PLT-246
             slab_pull_rad_per_1000km_myr: 0.002,
             slab_pull_speed_mm_yr: 80.0,
             slab_pull_front_km: 3000.0,
@@ -677,7 +686,6 @@ impl Default for TectonicParams {
             terrane_event_min_frac: 0.005,
             collision_min_frac: 0.1,
             collision_suture_frac: 0.1,
-            collision_on_shortening: false,
             subduction_initiation_age_myr: 150.0,
             subduction_initiation_rate: 0.3,
             subduction_initiation_clearance_km: 1000.0,
@@ -928,7 +936,22 @@ impl PlanetPreset {
             k.subduction_distance_km,
             "$.tectonics.subduction_distance_km",
         )?;
-        pos(k.collision_distance_km, "$.tectonics.collision_distance_km")?;
+        pos(k.collision_belt_km, "$.tectonics.collision_belt_km")?;
+        check(
+            k.wedge_slope_deg > 0.0 && k.wedge_slope_deg < 45.0,
+            "$.tectonics.wedge_slope_deg",
+            "must be in (0, 45)",
+        )?;
+        for (v, key) in [
+            (
+                k.collision_resistance_mm_yr,
+                "$.tectonics.collision_resistance_mm_yr",
+            ),
+            (k.weld_speed_mm_yr, "$.tectonics.weld_speed_mm_yr"),
+            (k.weld_after_myr, "$.tectonics.weld_after_myr"),
+        ] {
+            check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
+        }
         pos(
             k.collision_threshold_km,
             "$.tectonics.collision_threshold_km",
@@ -1022,7 +1045,10 @@ impl PlanetPreset {
             )?;
         }
         for (v, key) in [
-            (k.collision_orogen_core, "$.tectonics.collision_orogen_core"),
+            (
+                k.collision_stacking_share,
+                "$.tectonics.collision_stacking_share",
+            ),
             (k.min_plate_area_frac, "$.tectonics.min_plate_area_frac"),
             (k.trench_relax, "$.tectonics.trench_relax"),
             (k.lip_probability, "$.tectonics.lip_probability"),
@@ -1375,6 +1401,31 @@ mod tests {
         );
     }
 
+    /// The world's floor (Ben, decisions log 2026-10-02, "Lower min_y to -512"): every built-in
+    /// preset's deepest trench, plate model's trench elevation at the vertical scale, stands above
+    /// the floor and clear of the router's bottom density slide (24 blocks), and the floor is the
+    /// default of an absent key. With the old floor (−352) the trench of −10 km (y −437) was cut.
+    #[test]
+    fn the_floor_holds_the_deepest_trench() {
+        assert_eq!(d_min_y(), -512);
+        assert_eq!(
+            (d_min_y() + 1152 - 1, d_max_y()),
+            (639, 639),
+            "height 1152 ends at the top 639"
+        );
+        for (name, json) in crate::preset::BUILTIN.iter().chain(PIPELINE_BUILTIN.iter()) {
+            let p = planet(json);
+            assert_eq!(p.scale.min_y, -512, "{name}");
+            let trench_y = f64::from(p.scale.sea_level_y)
+                + p.tectonics.trench_elevation_m / p.scale.m_per_block_v;
+            assert!(
+                trench_y > f64::from(p.scale.min_y) + 24.0,
+                "{name}: the trench at y {trench_y} is not clear of the floor {}",
+                p.scale.min_y
+            );
+        }
+    }
+
     /// The build-limit compression (2026-10-01): as simulated below the knee, increasing and
     /// smooth through it, never at the top however high the terrain; and a band too thin is refused.
     #[test]
@@ -1382,8 +1433,9 @@ mod tests {
         let p = planet(PIPELINE_BUILTIN[0].1);
         let fit = p.scale.build_fit();
         assert_eq!((fit.knee_y, fit.top_y), (575.0, 623.0));
-        assert_eq!(p.scale.uncompressed_height_m(), 10_240.0);
-        for y in [-352.0, 63.0, 574.9, 575.0] {
+        // The knee is fixed in blocks: (575 − 63) blocks at 35 m a block.
+        assert_eq!(p.scale.uncompressed_height_m(), 17_920.0);
+        for y in [-512.0, 63.0, 574.9, 575.0] {
             assert_eq!(fit.compress(y), y);
         }
         let mut last = 575.0;

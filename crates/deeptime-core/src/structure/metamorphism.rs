@@ -31,9 +31,9 @@
 //! Barrovian type locality the garnet zone grew at 500–550 °C and the sillimanite zone peaked at
 //! 650–700 °C and about 6 kbar (Baxter et al. 2002). So: slate 250 (the anchizone–epizone,
 //! lowest greenschist), phyllite 350, quartzite, marble and greenstone 300 (greenschist facies),
-//! schist 450 (the mica-schist grade; 50–100 °C below the garnet zone of the type locality),
-//! amphibolite 500, gneiss 650 (upper amphibolite, the sillimanite zone and the onset of
-//! melting). "Gneiss" and "schist" name textures, not facies. Gypsum → anhydrite at 50 °C is
+//! amphibolite 500, schist 525 (the garnet-mica schist: the middle of the 500–550 °C the garnet of
+//! the type locality grew in; Ben, 2026-10-02, "Move schist to 500-550 °C", it was 450 before),
+//! gneiss 650 (upper amphibolite, the sillimanite zone and the onset of melting). "Gneiss" and "schist" name textures, not facies. Gypsum → anhydrite at 50 °C is
 //! diagenesis: about 50 °C, 450–500 m deep, where clastic or carbonate rock accompanies the
 //! sulphate (Ortí et al. 2012); the pure-water equilibrium is 58 ± 2 °C (Hardie 1967). A path
 //! element without a temperature (serpentinite, eclogite) is never reached.
@@ -43,14 +43,15 @@ use crate::surface::strata_log::{ColumnMut, Layer};
 
 /// The temperature (°C) at which `name` forms from the class before it in a metamorphic path.
 pub fn formation_temp_c(name: &str) -> Option<f64> {
-    // ledger: RCK-039 to RCK-045 (the module docs say what each was checked against)
+    // ledger: RCK-039 to RCK-045 (the module docs say what each was checked against; schist is
+    // RCK-042: 525 degC since 2026-10-02, the middle of Baxter et al.'s garnet-zone growth at 500-550)
     Some(match name {
         "anhydrite" => 50.0,
         "slate" => 250.0,
         "quartzite" | "marble" | "greenstone" => 300.0,
         "phyllite" => 350.0,
-        "schist" => 450.0,
         "amphibolite" => 500.0,
+        "schist" => 525.0,
         "gneiss" => 650.0,
         _ => return None,
     })
@@ -185,13 +186,51 @@ mod tests {
     use crate::surface::lithology::index;
     use crate::surface::strata_log::StrataLog;
 
+    /// The pelitic series rises with temperature (slate, phyllite, schist, gneiss), schist sits in the
+    /// garnet zone Baxter et al. 2002 measured (500 to 550 degC) above amphibolite's 500, and the key
+    /// space's grade bands are exactly the formation temperatures, so no two classes share an edge.
+    #[test]
+    fn the_grade_order_and_the_key_bands_follow_the_formation_temperatures() {
+        let t = |n: &str| formation_temp_c(n).unwrap();
+        assert!(
+            t("slate") < t("phyllite") && t("phyllite") < t("schist") && t("schist") < t("gneiss")
+        );
+        assert!((500.0..=550.0).contains(&t("schist")), "{}", t("schist"));
+        assert!(t("amphibolite") < t("schist"));
+        let mut temps: Vec<f64> = [
+            "slate",
+            "quartzite",
+            "phyllite",
+            "amphibolite",
+            "schist",
+            "gneiss",
+        ]
+        .iter()
+        .map(|n| t(n))
+        .collect();
+        temps.sort_by(f64::total_cmp);
+        temps.dedup();
+        let mut edges = vec![0.0];
+        edges.extend(temps);
+        assert_eq!(edges, super::super::columns::key::BAND_FROM_C.to_vec());
+        // The grade index never falls as the temperature rises along the pelitic path.
+        assert!(
+            grade("slate") <= grade("phyllite")
+                && grade("phyllite") <= grade("schist")
+                && grade("schist") <= grade("gneiss")
+        );
+    }
+
     #[test]
     fn layers_step_along_their_paths_with_depth_and_never_back() {
         let paths = Paths::get();
         let shale = index("shale");
         assert_eq!(paths.at(shale, 100.0), shale);
         assert_eq!(paths.at(shale, 260.0), index("slate"));
-        assert_eq!(paths.at(shale, 460.0), index("schist"));
+        // Schist from 525 degC (the garnet zone; it was 450 until 2026-10-02): 460 is still phyllite.
+        assert_eq!(paths.at(shale, 460.0), index("phyllite"));
+        assert_eq!(paths.at(shale, 520.0), index("phyllite"));
+        assert_eq!(paths.at(shale, 530.0), index("schist"));
         assert_eq!(paths.at(shale, 700.0), index("gneiss"));
         assert_eq!(paths.at(index("slate"), 360.0), index("phyllite"));
         assert_eq!(paths.at(index("limestone"), 320.0), index("marble"));

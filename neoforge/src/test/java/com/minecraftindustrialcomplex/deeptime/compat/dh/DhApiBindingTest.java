@@ -22,6 +22,7 @@ import java.util.jar.JarFile;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -127,12 +128,12 @@ class DhApiBindingTest {
 
                     @Override
                     public int minY() {
-                        return -352;
+                        return -512;
                     }
 
                     @Override
                     public int height() {
-                        return 992;
+                        return 1152;
                     }
                 };
                 // Columns whose ground rises with x and z: rock, soil, air, in world y.
@@ -142,7 +143,7 @@ class DhApiBindingTest {
                     for (int j = 0; j < n; j++)
                         for (int i = 0; i < n; i++) {
                             int ground = -300 + ((x0 + i * step) & 255) + ((z0 + j * step) & 127);
-                            bottom[0] = -352;
+                            bottom[0] = -512;
                             top[0] = ground - 3;
                             bottom[1] = ground - 3;
                             top[1] = ground + 1;
@@ -156,6 +157,13 @@ class DhApiBindingTest {
                 assertTrue(api.worldGenerator.isInstance(proxy));
                 // Toroidal World's guard looks at the class name: this must not look like Distant Horizons' own.
                 assertFalse(proxy.getClass().getName().startsWith("com.seibel.distanthorizons."), proxy.getClass().getName());
+                // ...so Deep Time's patch to that guard (TwDhGuard) recognises it by its handler, and nothing else.
+                assertSame(generator, DhLodGenerator.of(proxy));
+                assertEquals("test", generator.levelName());
+                assertNull(DhLodGenerator.of(new Object()));
+                assertNull(DhLodGenerator.of(null));
+                assertNull(DhLodGenerator.of(java.lang.reflect.Proxy.newProxyInstance(api.worldGenerator.getClassLoader(),
+                        new Class<?>[]{api.worldGenerator}, (self, m, a) -> null)), "another mod's proxy generator");
 
                 assertSame(api.returnTypeDataSources, api.worldGenerator.getMethod("getReturnType").invoke(proxy));
                 assertEquals("API_DATA_SOURCES", String.valueOf(api.returnTypeDataSources));
@@ -217,9 +225,9 @@ class DhApiBindingTest {
                                 assertTrue(t > b && t - b < 6095, "a height Distant Horizons accepts");
                                 last = t;
                             }
-                            assertEquals(992, last, "the column reaches the level's top");
+                            assertEquals(1152, last, "the column reaches the level's top");
                             Object soil = points.get(1);
-                            assertEquals(ground + 1 + 352, pointType.getField("topYBlockPos").getInt(soil), "the ground, counted from the bottom");
+                            assertEquals(ground + 1 + 512, pointType.getField("topYBlockPos").getInt(soil), "the ground, counted from the bottom");
                             assertEquals(15, pointType.getField("skyLightLevel").getInt(soil));
                             assertEquals("block soil", String.valueOf(pointType.getField("blockStateWrapper").get(soil)));
                             assertEquals("biome plains", String.valueOf(pointType.getField("biomeWrapper").get(soil)));
@@ -234,6 +242,83 @@ class DhApiBindingTest {
                 } finally {
                     pool.shutdownNow();
                 }
+            }
+        }
+    }
+
+    /**
+     * The curvature slot reaches the real jar's {@code IDhApiConfigValue} by its published names:
+     * a model of Distant Horizons' two value layers stands behind {@code DhApi.Delayed.configs}, and
+     * the controller sets and clears the API layer through the binding without the player's value
+     * ({@code getTrueValue}) ever moving.
+     */
+    @Test
+    void theCurvatureSlotReachesTheRealConfigInterfaces() throws Exception {
+        for (Map.Entry<String, File> e : jars().entrySet()) {
+            try (URLClassLoader loader = new URLClassLoader(new URL[]{e.getValue().toURI().toURL()}, ClassLoader.getPlatformClassLoader())) {
+                DhApiBinding api = DhApiBinding.find(loader, null).orElseThrow();
+                String s = api.suffix(), base = DhApiBinding.API;
+                assertNull(api.earthCurvature(), "before Distant Horizons starts its API there is no setting");
+
+                Class<?> configType = Class.forName(base + "interfaces.config.IDhApiConfig" + s, false, loader);
+                Class<?> graphicsType = Class.forName(base + "interfaces.config.client.IDhApiGraphicsConfig" + s, false, loader);
+                Class<?> valueType = Class.forName(base + "interfaces.config.IDhApiConfigValue" + s, false, loader);
+                // The model of one config entry: the player's value and the API layer.
+                int[] player = {0};
+                Integer[] layer = {null};
+                int[] sets = {0};
+                Object value = Proxy.newProxyInstance(loader, new Class<?>[]{valueType}, (p, m, a) -> switch (m.getName()) {
+                    case "getValue" -> layer[0] != null ? layer[0] : player[0];
+                    case "getTrueValue" -> player[0];
+                    case "getApiValue" -> layer[0];
+                    case "getDefaultValue" -> 0;
+                    case "getCanBeOverrodeByApi" -> true;
+                    case "setValue" -> {
+                        sets[0]++;
+                        layer[0] = (Integer) a[0];
+                        yield true;
+                    }
+                    case "clearValue" -> {
+                        layer[0] = null;
+                        yield true;
+                    }
+                    default -> throw new UnsupportedOperationException(m.getName());
+                });
+                Object graphics = Proxy.newProxyInstance(loader, new Class<?>[]{graphicsType}, (p, m, a) -> {
+                    if (m.getName().equals("earthCurvatureRatio"))
+                        return value;
+                    throw new UnsupportedOperationException(m.getName());
+                });
+                Object configs = Proxy.newProxyInstance(loader, new Class<?>[]{configType}, (p, m, a) -> {
+                    if (m.getName().equals("graphics"))
+                        return graphics;
+                    throw new UnsupportedOperationException(m.getName());
+                });
+                Class.forName(base + "DhApi$Delayed" + s, true, loader).getField("configs").set(null, configs);
+
+                DhCurvature.Slot slot = api.earthCurvature();
+                assertNotNull(slot);
+                assertEquals(0, slot.playerValue());
+                assertEquals(0, slot.defaultValue());
+                assertNull(slot.apiValue());
+                assertTrue(slot.overridable());
+
+                DhCurvature.Controller controller = new DhCurvature.Controller();
+                assertEquals(DhCurvature.Outcome.SET, controller.reconcile(slot, 16_384, true));
+                assertEquals(2443, layer[0], e.getKey() + ": the 16k planet's ratio is on the API layer");
+                assertEquals(0, player[0], "the player's own value never moves");
+                assertEquals(DhCurvature.Outcome.UNCHANGED, controller.reconcile(slot, 16_384, true));
+                assertEquals(1, sets[0], "an unchanged ratio is not set again");
+                assertEquals(DhCurvature.Outcome.SET, controller.reconcile(slot, 32_768, true));
+                assertEquals(1222, layer[0]);
+                assertEquals(DhCurvature.Outcome.CLEARED, controller.release(slot));
+                assertNull(layer[0]);
+                assertEquals(0, player[0]);
+
+                player[0] = 300; // the player typed their own value into Distant Horizons' screen
+                assertEquals(DhCurvature.Outcome.PLAYER_VALUE, controller.reconcile(slot, 16_384, true));
+                assertNull(layer[0], "a player's value is left to show");
+                System.out.printf("[dh] %s: earthCurvatureRatio set, cleared and left alone through %s%n", e.getKey(), valueType.getSimpleName());
             }
         }
     }

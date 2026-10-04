@@ -135,8 +135,9 @@ public final class EditorModelGameTests {
             throw new IllegalStateException("not generating from world data: " + g.terrain());
         AnalyticTestTerrain analytic = AnalyticTestTerrain.of(AnalyticTestTerrain.WRAP_TEST, c);
         double worst = 0;
+        int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);   // the poles (the planet's projection)
         for (int i = 0; i < 64; i++) {
-            int x = -c / 2 + (i * 37) % c, z = ((i * 53) % (c / 2 - 16)) - c / 4 + 8;
+            int x = -c / 2 + (i * 37) % c, z = ((i * 53) % (2 * zp - 16)) - zp + 8;
             worst = Math.max(worst, Math.abs(t.height(x, z) - analytic.height(x, z)));
         }
         return worst;

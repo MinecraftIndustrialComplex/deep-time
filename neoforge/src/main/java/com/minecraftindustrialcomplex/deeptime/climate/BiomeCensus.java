@@ -48,14 +48,26 @@ public final class BiomeCensus {
         return TagKey.create(Registries.BIOME, ResourceLocation.fromNamespaceAndPath("c", path));
     }
 
-    /** A Köppen family and the tags its biomes should carry. */
-    public record Check(String name, String classes, IntPredicate koppen, List<TagKey<Biome>> tags) {}
+    /** Vanilla's cold | temperate temperature edge (the band coordinate 2): colder is the cold band or frozen. */
+    static final double COLD_BAND_TOP = -0.15;
+
+    /**
+     * A Köppen family and the tags its biomes should carry. {@code notColderThan} leaves out the columns
+     * whose baked temperature parameter is below it (null: none are left out): the cold deserts, which are
+     * drawn as cold land on purpose (Ben, 2026-10-02) and have their own check, {@link Forbid}
+     * {@code BWk:cold_not_sand}, instead of being counted against the desert tags.
+     */
+    public record Check(String name, String classes, IntPredicate koppen, List<TagKey<Biome>> tags, Double notColderThan) {
+        public Check(String name, String classes, IntPredicate koppen, List<TagKey<Biome>> tags) {
+            this(name, classes, koppen, tags, null);
+        }
+    }
 
     /** Köppen class indices (`koppen::CODES`): 0–3 A, 4–7 B, 8–16 C, 17–28 D, 29–30 E, 31 sea. */
     public static final List<Check> CHECKS = List.of(
             new Check("A", "Af Am Aw As", k -> k <= 3, List.of(c("is_hot"), c("is_jungle"), c("is_savanna"), c("is_wet"))),
             new Check("Af", "Af", k -> k == 0, List.of(c("is_jungle"), c("is_wet"))),
-            new Check("BW", "BWh BWk", k -> k == 4 || k == 5, List.of(c("is_desert"), c("is_badlands"), c("is_dry"), c("is_sandy"))),
+            new Check("BW", "BWh BWk (not the cold deserts)", k -> k == 4 || k == 5, List.of(c("is_desert"), c("is_badlands"), c("is_dry"), c("is_sandy")), COLD_BAND_TOP),
             new Check("BS", "BSh BSk", k -> k == 6 || k == 7, List.of(c("is_dry"), c("is_savanna"), c("is_plains"), c("is_sparse_vegetation"))),
             new Check("C", "C*", k -> k >= 8 && k <= 16, List.of(c("is_temperate"))),
             new Check("D", "D*", k -> k >= 17 && k <= 28, List.of(c("is_cold"), c("is_temperate"), c("is_taiga"), c("is_tree/coniferous"))),
@@ -64,7 +76,7 @@ public final class BiomeCensus {
             new Check("E", "ET EF", k -> k == 29 || k == 30, List.of(c("is_snowy"), c("is_icy"), c("is_cold"))),
             new Check("sea", "sea (below sea level)", k -> k == 31, List.of(c("is_ocean"), c("is_deep_ocean"), c("is_aquatic"))),
             // The narrow ones Ben asked to see: deserts in BW, rainforest in Af, taiga in Dfc, snow and ice in ET/EF.
-            new Check("BW:desert", "BWh BWk", k -> k == 4 || k == 5, List.of(c("is_desert"), c("is_badlands"))),
+            new Check("BW:desert", "BWh BWk (not the cold deserts)", k -> k == 4 || k == 5, List.of(c("is_desert"), c("is_badlands")), COLD_BAND_TOP),
             new Check("Af:jungle", "Af", k -> k == 0, List.of(c("is_jungle"))),
             new Check("Dfc:taiga", "Dfc", k -> k == 27, List.of(c("is_taiga"), c("is_tree/coniferous"))),
             new Check("E:snow", "ET EF", k -> k == 29 || k == 30, List.of(c("is_snowy"), c("is_icy"))));
@@ -72,9 +84,16 @@ public final class BiomeCensus {
     /**
      * A Köppen family and biomes it must not land on (the share of its columns that do is bounded);
      * {@code glaciated} limits the family to its columns under the ice cover ({@code true}), or to
-     * those without ({@code false}); null is either.
+     * those without ({@code false}); null is either. {@code colderThan} limits the family to the columns
+     * whose baked temperature parameter is below it (null: any), for a class that is only wrong in part of
+     * its range (a cold desert, not a hot one).
      */
-    public record Forbid(String name, String classes, IntPredicate koppen, Boolean glaciated, java.util.Set<String> biomes) {}
+    public record Forbid(String name, String classes, IntPredicate koppen, Boolean glaciated, Double colderThan,
+                         java.util.Set<String> biomes) {
+        public Forbid(String name, String classes, IntPredicate koppen, Boolean glaciated, java.util.Set<String> biomes) {
+            this(name, classes, koppen, glaciated, null, biomes);
+        }
+    }
 
     /**
      * EF is ice cap where the glacier model puts ice and barren frozen ground elsewhere (Ben, 2026-09-29,
@@ -87,7 +106,14 @@ public final class BiomeCensus {
             // Packed-ice canyons only where the ice model says ice (Ben, 2026-09-30, "Fix both").
             new Forbid("EF:no_chasm_on_barren", "EF without ice", k -> k == 30, false, java.util.Set.of("terralith:glacial_chasm")),
             // Cherry groves are positive-weirdness variants: ice caps are steered off them.
-            new Forbid("EF:no_cherry", "EF", k -> k == 30, null, java.util.Set.of("terralith:snowy_cherry_grove", "minecraft:cherry_grove")));
+            new Forbid("EF:no_cherry", "EF", k -> k == 30, null, java.util.Set.of("terralith:snowy_cherry_grove", "minecraft:cherry_grove")),
+            // Cold deserts (Ben, 2026-10-02): a BWk with a mean under 10 degC is in the frozen or cold band
+            // (the placement's cold_desert and polar_ice ramps) and is not drawn as sand desert or badlands.
+            new Forbid("BWk:cold_not_sand", "BWk colder than the cold band's top", k -> k == 5, null, COLD_BAND_TOP,
+                    java.util.Set.of("minecraft:desert", "minecraft:badlands", "minecraft:eroded_badlands", "minecraft:wooded_badlands",
+                            "terralith:ancient_sands", "terralith:desert_canyon", "terralith:desert_spires", "terralith:lush_desert",
+                            "terralith:red_oasis", "terralith:desert_oasis", "terralith:white_mesa", "terralith:warped_mesa",
+                            "terralith:savanna_badlands", "terralith:hot_shrubland")));
 
     public static final String[] KOPPEN = {"Af", "Am", "Aw", "As", "BWh", "BWk", "BSh", "BSk", "Csa", "Csb", "Csc", "Cwa", "Cwb",
             "Cwc", "Cfa", "Cfb", "Cfc", "Dsa", "Dsb", "Dsc", "Dsd", "Dwa", "Dwb", "Dwc", "Dwd", "Dfa", "Dfb", "Dfc", "Dfd", "ET", "EF",
@@ -118,7 +144,7 @@ public final class BiomeCensus {
     }
 
     /**
-     * Samples every {@code step} blocks inside the pole edge (|z| ≤ C/4 − {@code poleMargin}).
+     * Samples every {@code step} blocks inside the pole edge (|z| ≤ R − {@code poleMargin}, R = C/2π the pole).
      *
      * @param mapFile write the whole grid (palette, biome indices, Köppen classes, heights) here as
      *                JSON with base64 arrays, or null
@@ -143,7 +169,8 @@ public final class BiomeCensus {
         RasterSampler iceLayer = wd.has(IceCover.LAYER) ? wd.layer(IceCover.LAYER) : null;
         var sampler = level.getChunkSource().randomState().sampler();
         int c = t.circumference(), sea = g.getSeaLevel();
-        int w = c / step, h = c / (2 * step);
+        int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);   // the poles (the planet's projection)
+        int w = c / step, h = 2 * zp / step;
         short[] biomeIdx = new short[w * h];
         byte[] koppen = new byte[w * h];
         short[] height = new short[w * h];
@@ -159,7 +186,7 @@ public final class BiomeCensus {
         Map<Integer, Map<Integer, Integer>> classBiomes = new HashMap<>();
         int skippedUntagged = 0;
         for (int j = 0; j < h; j++) {
-            int z = -c / 4 + step / 2 + j * step;
+            int z = -zp + step / 2 + j * step;
             for (int i = 0; i < w; i++) {
                 int x = -c / 2 + step / 2 + i * step;
                 int cell = j * w + i;
@@ -181,7 +208,7 @@ public final class BiomeCensus {
                 biomeIdx[cell] = (short) (int) idx;
                 koppen[cell] = (byte) k;
                 height[cell] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(y)));
-                if (Math.abs(z) > c / 4 - poleMargin)
+                if (Math.abs(z) > zp - poleMargin)
                     continue;
                 boolean untagged = !untaggedNamespaces.isEmpty()
                         && untaggedNamespaces.contains(b.unwrapKey().map(key -> key.location().getNamespace()).orElse("?"));
@@ -190,6 +217,8 @@ public final class BiomeCensus {
                 if (!untagged && (k == 31 ? y < sea - 4 : land)) {
                     for (Check ch : CHECKS) {
                         if (!ch.koppen().test(k))
+                            continue;
+                        if (ch.notColderThan() != null && t.raster("climate/temperature", x, z) < ch.notColderThan())
                             continue;
                         int[] n = checks.get(ch.name());
                         n[1]++;
@@ -203,6 +232,8 @@ public final class BiomeCensus {
                         if (!f.koppen().test(k))
                             continue;
                         if (f.glaciated() != null && f.glaciated() != (iceLayer != null && iceLayer.nearest(x, z) > 0))
+                            continue;
+                        if (f.colderThan() != null && !(t.raster("climate/temperature", x, z) < f.colderThan()))
                             continue;
                         int[] n = forbidden.get(f.name());
                         n[1]++;
@@ -272,7 +303,7 @@ public final class BiomeCensus {
             map.addProperty("circumference", c);
             map.addProperty("step", step);
             map.addProperty("x0", -c / 2 + step / 2);
-            map.addProperty("z0", -c / 4 + step / 2);
+            map.addProperty("z0", -zp + step / 2);
             map.addProperty("w", w);
             map.addProperty("h", h);
             map.addProperty("sea_level", sea);

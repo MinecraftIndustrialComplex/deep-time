@@ -26,12 +26,13 @@ Scale used throughout: one block is 300 m across and 20 m up.
 
 ## What you see in the world
 
-Craters are rare. At Earth's rate of impacts on the default planet (1.5 % of Earth's area), a
-500 Myr history makes about 45 craters (one run: 45, of which 5 still existed at the end and
-2 could be seen as landforms), most of the rest lost to the sea (an impactor smaller than about a
-kilometre leaves no crater in deep water), erosion, burial and subduction. A player may never meet one. The impact rate is a setting
-(Terrain: "Meteor impacts"; 10 times Earth's rate is "Heavy"); the question of the default is open
-(see "Open questions").
+Craters are rare. The default rate is 3 times Earth's (Ben, decisions log 2026-10-02, "Go for a 3x
+default": a game choice, Earth's own rate is 1). On the default planet (1.5 % of Earth's area) a
+500 Myr history then makes about 145 craters (one run: 145 formed, 25 still existing at the end, 8
+showing as landforms, 7 of them on continents), most of the rest lost to the sea (an impactor
+smaller than about a kilometre leaves no crater in deep water), erosion, burial and subduction.
+At Earth's own rate the same run made 49 (7 existing, 2 showing). The impact rate is a setting
+(Terrain: "Meteor impacts"; 1 is Earth's rate, 3 the default, 10 "Heavy").
 
 The smallest crater is 2 km across (7 blocks). Up to 3.2 km (11 blocks) a crater is a simple bowl
 with a raised rim. Larger craters are "complex": a flat floor, slumped walls and a central peak
@@ -93,7 +94,10 @@ The impact stage runs once per plate step, after the volcano stage.
 7. **Into the world.** A crater at least two coarse grid cells across (9.6 km on the default
    planet) is cut into the terrain the deep-time simulation erodes, and its breccia and melt are
    written into the rock record. A smaller one is drawn only at block scale, with its breccia as a
-   separate body (IMP-132, IMP-093, IMP-094). A new crater destroys smaller ones inside it (IMP-060).
+   separate body (IMP-132, IMP-093, IMP-094), which the bake seats under the floor the game
+   draws at the crater's centre (the amplifier changes the ground after the impact stage placed
+   the body; the first placement from the deep-time surface was off by up to nine blocks). A new
+   crater destroys smaller ones inside it (IMP-060).
 8. **Ageing.** Each later step, the crater turns with its plate. Sediment laid inside the rim adds
    to its cover; erosion strips the cover and then wears the crater (IMP-078). Soil creep is
    modelled as a blur that widens with time: the profile is smoothed by a width of √(12 κ t), with
@@ -223,6 +227,25 @@ comparisons of kind and size, not of single numbers.
 | impact deposit sites (nickel / hydrothermal / diamond / basin uranium) | 0 / 18 / 0 / 16 | 0 / 14 / 0 / 15 |
 | wall time | 14.5 min | 14.6 min |
 
+### The default rate of 3 (2026-10-02)
+
+The same run (`tools/review/impacts-census.sh`, quick 16k, 500 Myr from scattered continents, seed 1,
+`structure.deformation.density=0`), once at `impacts.flux` 1 and once at the new default 3, on one
+tree. One run each; the histories differ (the stage changes what the later stages see), so the
+columns compare kind and size.
+
+| | flux 1 (Earth's) | flux 3 (default) |
+|---|---|---|
+| impactors drawn | 75 | 228 |
+| craters formed | 49 | 145 |
+| by size, under 5 / 5-10 / 10-20 / 20-50 / 50-100 / over 100 km | 14 / 13 / 13 / 8 / 1 / 0 | 28 / 21 / 47 / 35 / 12 / 2 |
+| formed in the sea floor / impactors stopped by the sea | 18 / 26 | 64 / 83 |
+| in the catalogue at the end (surviving) | 7 | 25 |
+| at the present: fresh / degraded / buried / eroded to roots | 0 / 2 / 4 / 1 | 2 / 6 / 12 / 5 |
+| showing as landforms (fresh or degraded; on continents) | 2 (2) | 8 (7) |
+| largest formed, km | 91 | 209 |
+| wall time | 19.9 min | 16.4 min (a loaded machine; not a cost of the rate) |
+
 The count of craters fell 12 times (the 2 to 20 km craters 17 times, as the new production
 function says; the craters over 20 km are unchanged in rate and came out as 9 against 10).
 The old numbers were not the "right" ones for the quick planet either: they carried a small-crater
@@ -285,7 +308,7 @@ build log of 2026-10-01; flexure alone changed the buried count from 33 to 69.
 | Impacts exist, at a rate that is a setting with Earth's as 1 (IMP-006) | wanted "in full", before phase 3 | Ben, decisions log 2026-09-29; started 2026-10-01 |
 | Craters drawn at half depth (IMP-130) | a true bowl is a shaft at 15 times vertical stretch | agent, following Ben's 2026-09-30 answer for volcano flanks; **an open question for Ben** |
 | Smallest crater 2 km, largest 300 km (IMP-013, IMP-015) | 2 km is 7 blocks; above 300 km the planet-wide effects are not modelled | agent, build log 2026-10-01; the cap is **an open question for Ben** |
-| Default rate stays at Earth's although few craters are then seen (IMP-140) | the decision asked for Earth's rate | agent; **an open question for Ben** (about 5 times was offered; with the corrected rate see below) |
+| Default rate is 3 times Earth's (IMP-006, IMP-140) | Earth's rate leaves about 2 craters showing on a default planet; 3 times shows about 8 | Ben, decisions log 2026-10-02 ("Go for a 3x default") |
 | Applying Earth's rate per area to the small planet (IMP-007) | the simplest assumption | agent, build log 2026-10-01 |
 | The larger of the simple and complex diameter laws (IMP-033) | continuous and increasing; the paper's switch steps down | agent, build log 2026-10-01 |
 | Peak heights (IMP-049), flat-floor radius 0.55 (IMP-051), ring width (IMP-047), ejecta drawn to 3 radii (IMP-056) | shape values chosen for looks within observed ranges | agent, build log 2026-10-01 |
@@ -297,13 +320,10 @@ build log of 2026-10-01; flexure alone changed the buried count from 33 to 69.
 
 ## Open questions
 
-1. **What should the default rate be?** (Ben; STATUS.md "How often should meteors strike by
-   default?", now stronger.) With the corrected production function the default planet makes about
-   45 craters in 500 Myr where it made 548 before and shows 2 where it showed 19: a player may
-   never meet one. Earth's rate is what the decision asked for and is now the observed record's;
-   the old crowd of small craters was an artefact of extending the large-crater slope to 2 km.
-   Recommendation: keep Earth's rate as the default (honest), and offer "Heavy" (10 times: about
-   450 craters) as the setting for players who want craters; or raise the default to about 10.
+1. **Settled (Ben, 2026-10-02, "Go for a 3x default"): the default rate is 3 times Earth's.** With
+   the corrected production function Earth's rate made about 49 craters in 500 Myr and showed 2; 3
+   times gives about 145 and 8 (measured, below). The default is a game choice (IMP-006); 1 is
+   Earth's rate and stays one click away in the editor.
 2. **The diffusivity of 0.01 m²/yr** (IMP-074) and the fade times that follow (a 2 km bowl in about
    10 Myr, a 20 km one in about a billion years) rest on no source read. Fernandes & Dietrich 1997
    and Roering et al. 1999 are open at the publisher but were refused to a script.

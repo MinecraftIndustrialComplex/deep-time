@@ -79,7 +79,7 @@ public interface DeepTimeClimate {
 
     /**
      * The planet's circumference C in blocks (API 2): its east-west period, and the scale of latitude,
-     * φ = −z · 360° / C ({@link #latitudeDeg}). A positive C means {@code level} is a Deep Time planet
+     * φ = asin(−z / R), R = C / 2π ({@link #latitudeDeg}). A positive C means {@code level} is a Deep Time planet
      * (a real one or an analytic test terrain); any other level answers 0.
      *
      * <p>Unlike the rest of this interface it answers on both sides. On the server it is the level's
@@ -94,11 +94,13 @@ public interface DeepTimeClimate {
 
     /**
      * Latitude in degrees at block {@code z} on a planet of circumference {@code circumferenceBlocks}
-     * (API 2): φ = −z · 360° / C, north (−z) positive, the equator at z = 0 and the poles at
-     * |z| = C/4. NaN when the circumference is not positive (not a planet).
+     * (API 2), by the planet's projection ({@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection}: Lambert's
+     * equal-area cylinder): φ = asin(−z / R) with R = C / 2π, north (−z) positive, the equator at z = 0
+     * and the poles at |z| = R, clamped to ±90° past them. NaN when
+     * the circumference is not positive (not a planet).
      */
     static double latitudeDeg(double z, int circumferenceBlocks) {
-        return circumferenceBlocks > 0 ? -z * 360.0 / circumferenceBlocks : Double.NaN;
+        return circumferenceBlocks > 0 ? com.minecraftindustrialcomplex.deeptime.worlddata.Projection.latitudeDeg(circumferenceBlocks, z) : Double.NaN;
     }
 
     /** Year fraction [0, 1) at solar longitude {@code degrees} (0° = northern spring equinox). */

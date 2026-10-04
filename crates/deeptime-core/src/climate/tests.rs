@@ -336,7 +336,9 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
     );
     finish(&s);
     let world = s.checkpoint().unwrap().world;
-    let n = 256 * 128;
+    // C = 16,384 at 64 blocks a cell: 256 × 82, the rows from z = −2,624, past the Lambert pole
+    // at 2,607.6.
+    let n = 256 * 82;
     for name in [
         field::T_MEAN,
         field::PRECIP,
@@ -399,7 +401,7 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
     // The surface read the stage's climate, and the deposit frames carry it.
     let st = world.surface.as_ref().unwrap();
     let grid = st.grid.clone();
-    let d = Dims::new(256, 128, 64.0 * 300.0, true);
+    let d = Dims::new(grid.w as usize, grid.h as usize, 64.0 * 300.0, true);
     let hh: Vec<f64> = st.elevation_m.iter().map(|&z| f64::from(z)).collect();
     let snap = crate::surface::climate::snapshot(
         &world,

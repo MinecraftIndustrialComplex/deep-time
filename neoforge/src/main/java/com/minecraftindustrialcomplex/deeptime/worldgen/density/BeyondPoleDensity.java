@@ -7,7 +7,8 @@ import net.minecraft.util.KeyDispatchDataCodec;
 import net.minecraft.world.level.levelgen.DensityFunction;
 
 /**
- * {@code deeptime:beyond_pole}: 1 where |z| ≥ C/4 (past the pole edge), else 0. Nobody reaches
+ * {@code deeptime:beyond_pole}: 1 where |z| ≥ R = C/2π (past the pole edge, {@link
+ * com.minecraftindustrialcomplex.deeptime.worlddata.Projection#poleZ}), else 0. Nobody reaches
  * it through the soft cap, but chunks there are still generated at view distance; the router
  * uses this mask to turn them into an ice-sheet ocean (plan §7.1, §7.11).
  */
@@ -27,9 +28,9 @@ public final class BeyondPoleDensity extends DeepTimeDensity {
 
     @Override
     public double compute(FunctionContext ctx) {
-        int quarter = source().circumference() / 4;
+        int pole = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(source().circumference());
         int z = ctx.blockZ();
-        return z >= quarter || z < -quarter ? 1.0 : 0.0;
+        return z >= pole || z < -pole ? 1.0 : 0.0;
     }
 
     @Override

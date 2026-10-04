@@ -58,7 +58,9 @@ fn hillshade(hx: f64, hz: f64, step: f64) -> f64 {
 pub fn planet(dir: &Path, out: &Path, step: usize, bbox: Option<[i64; 4]>) -> Result<Value> {
     let w = ColumnWorld::open(dir).map_err(|e| Error(e.to_string()))?;
     let c = w.c;
-    let [x0, z0, x1, z1] = bbox.unwrap_or([-c / 2, -c / 4, c / 2, c / 4]);
+    // Pole to pole (the projection's z of the poles).
+    let zp = deeptime_format::Projection::of(c as f64).pole_z() as i64;
+    let [x0, z0, x1, z1] = bbox.unwrap_or([-c / 2, -zp, c / 2, zp]);
     let step = step.max(1) as i64;
     let (pw, ph) = (((x1 - x0) / step) as usize, ((z1 - z0) / step) as usize);
     if pw == 0 || ph == 0 || pw * ph > 40_000_000 {
@@ -80,7 +82,7 @@ pub fn planet(dir: &Path, out: &Path, step: usize, bbox: Option<[i64; 4]>) -> Re
     for py in 0..ph + 2 {
         for px in 0..pw + 2 {
             let bx = x0 + (px as i64 - 1) * step + step / 2;
-            let bz = (z0 + (py as i64 - 1) * step + step / 2).clamp(-c / 4, c / 4 - 1);
+            let bz = (z0 + (py as i64 - 1) * step + step / 2).clamp(-zp, zp - 1);
             hts[py * (pw + 2) + px] = w.height(bx, bz);
         }
     }

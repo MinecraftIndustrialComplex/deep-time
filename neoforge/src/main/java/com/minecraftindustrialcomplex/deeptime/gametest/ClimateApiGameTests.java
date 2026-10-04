@@ -87,8 +87,9 @@ public final class ClimateApiGameTests {
         int nt = 0, nh = 0, land = 0, lapsed = 0, n = 400;
         for (int i = 0; i < n; i++) {
             int x = -c / 2 + (i * 97) % c;
-            int z = ((i * 61) % (c / 2)) - c / 4;
-            double lat = -z / (c / 4.0) * 90.0;
+            int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);
+            int z = ((i * 61) % (2 * zp)) - zp;
+            double lat = DeepTimeClimate.latitudeDeg(z, c);
             int y = Math.max((int) Math.ceil(t.height(x, z)), sea);
             ClimateSample s = climate.at(x, y, z).orElseThrow();
             if (!s.isSea())
@@ -134,9 +135,11 @@ public final class ClimateApiGameTests {
         helper.assertTrue(c > 0 && c == expected, "the synthetic planet's circumference " + c + " vs its generator's " + expected);
         helper.assertTrue(deep || DeepTimeClimate.circumferenceBlocks(overworld) == 0, "a level Deep Time did not generate has no circumference");
         helper.assertTrue(DeepTimeClimate.circumferenceBlocks(null) == 0, "no level, no circumference");
-        helper.assertTrue(DeepTimeClimate.latitudeDeg(-c / 4.0, c) == 90.0 && DeepTimeClimate.latitudeDeg(c / 8.0, c) == -45.0
+        double pole = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);
+        helper.assertTrue(DeepTimeClimate.latitudeDeg(-pole, c) == 90.0 && Math.abs(DeepTimeClimate.latitudeDeg(pole / 2, c) + 30.0) < 1e-9
+                        && DeepTimeClimate.latitudeDeg(-c / 4.0, c) == 90.0
                         && DeepTimeClimate.latitudeDeg(0, c) == 0.0 && Double.isNaN(DeepTimeClimate.latitudeDeg(100, 0)),
-                "latitude: north is -z, the poles at |z| = C/4");
+                "latitude: north is -z, sin φ = -z/R (Lambert), the poles at |z| = R = C/2π");
         // The year convention: month 0 starts at solar longitude 280°.
         helper.assertTrue(Math.abs(DeepTimeClimate.yearFractionAtSolarLongitude(0) - DeepTimeClimate.NORTHERN_SPRING_EQUINOX) < 1e-12
                         && Math.abs(DeepTimeClimate.yearFractionAtSolarLongitude(90) - DeepTimeClimate.NORTHERN_SUMMER_SOLSTICE) < 1e-12

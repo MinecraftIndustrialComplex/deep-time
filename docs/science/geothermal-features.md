@@ -1,11 +1,13 @@
 # Geothermal features
 
-Status of this page: `stage 2 (written 2026-10-02, WP-16)`. One of the 51 rows is `verified` (the
-sinter and travertine rule, GEO-022); 47 are `game-choice` and 3 are `uncited`. Nothing in the
-feature's numbers comes from a source: the sources checked below support the kinds of feature and
-the order in which they occur, not a size, a count or a threshold.
+Status of this page: `stage 2 (written 2026-10-02, WP-16), extended the same day with the heat-flow
+fields`. Of the 61 rows, `verified` ones are the sinter and travertine rule (GEO-022), the Earth
+heat-flow figures (GEO-059), the model-against-Earth arithmetic (GEO-060) and the threshold hint
+(GEO-057); the rest are `game-choice` or `uncited`. Almost nothing in the feature's numbers comes from
+a source: the sources checked below support the kinds of feature and the order in which they occur,
+and (for the heat-flow threshold) the level of young extended crust, not a size or a count.
 
-Ledger ids on this page: `GEO-001` to `GEO-051` ([ledger/GEO.md](ledger/GEO.md)). The editor hints
+Ledger ids on this page: `GEO-001` to `GEO-061` ([ledger/GEO.md](ledger/GEO.md)). The editor hints
 that describe these settings are rows GEO-047 to GEO-051. The geothermal gradient (the rise of
 temperature with depth that drives metamorphism and the oil window) is a different thing and is
 ledgered under rock and metamorphism and under deposits.
@@ -15,8 +17,9 @@ blocks up.
 
 ## What you see in the world
 
-Around the volcanoes that are still active at the end of the history, the ground changes colour in
-patches a few blocks to a few tens of blocks wide. There are two kinds of place.
+Around the volcanoes that are still active at the end of the history, and on continental ground that
+the plate model heats (rifts, volcanic arcs, hotspot swells), the ground changes colour in patches a
+few blocks to a few tens of blocks wide. There are two kinds of place.
 
 **Hot-spring fields.** A main pool of water with a radius of 2 to 5 blocks (4 to 10 blocks across,
 which is 1.2 to 3 km; at the default size setting), and one to three smaller pools of radius 2 to 3
@@ -41,7 +44,9 @@ fumarole field. Nothing is placed in water, under glacial ice, on ground less th
 sea, or within a few blocks of the lava of a crater lake or plug. A volcano gets from none to seven
 fields: few at small, quiet ones and most at large, active ones. On the 16k quick planet of the P2-14
 build log there were 260 sites around 40 of the 67 volcanoes, of which 23 were pools, 142 vents and
-95 patches of altered ground.
+95 patches of altered ground. On the quick 16k planet of 2026-10-02 (63 active volcanoes), the
+volcanoes alone give 170 sites around 24 volcanoes (11 pools, 97 vents, 62 patches) and the hot
+ground adds 97 (11 pools, 51 vents, 35 patches): 267 together.
 
 There are no geysers. The water does not steam, boil or erupt, and no temperature is stored. A
 separate warm-ground signal lets another mod treat the ground in and beside a site as a few kelvin
@@ -49,10 +54,11 @@ warmer than the climate's temperature (at most 12 K at the heart of a vent).
 
 ## The model in plain words
 
-The feature runs in the game, not in the simulation. The Rust bake writes nothing for it except four
-settings in the `underground` section; the game builds the sites once per level from the list of
-active volcanoes (`volcanoes/active.json`), the baked rain and mean temperature, the ice cover, the
-strata horizons and the terrain height (Java `worldgen/Geothermal`). The block pass
+The feature runs in the game, not in the simulation. The Rust bake writes for it six settings in the
+`underground` section and one layer, `meta/heat_flow_mw_m2` (the plate model's heat flow on
+continental crust); the game builds the sites once per level from the list of active volcanoes
+(`volcanoes/active.json`), that layer, the baked rain and mean temperature, the ice cover, the strata
+horizons and the terrain height (Java `worldgen/Geothermal`). The block pass
 (`GeothermalPass`) runs in the surface step after the magma and before the ice, carvers and
 features.
 
@@ -83,7 +89,15 @@ features.
    top one or two ground blocks. Where two sites claim a column the one with the higher part priority
    wins. All blocks are vanilla ones behind tags (`deeptime:geothermal/<role>`), so a pack can swap
    them. (GEO-033, GEO-035, GEO-037 to GEO-040, GEO-043)
-7. **Warm-ground signal.** `DeepTimeClimate.geothermalWarmthC(x, y, z)` returns the warming in
+7. **Fields on hot ground** (2026-10-02; GEO-052 to GEO-056). Beyond the volcanoes, the world is cut
+   into cells of 10,000 km2 (100 km across at the default density); each cell tries up to six random
+   points and puts one field at the first where the baked heat flow is at least 100 mW/m2 (the setting)
+   and the place is dry land at least 5 blocks above the sea, with no water column and no ice. The
+   field is then built exactly as a volcano's is, as one "away from the summit": hot springs where
+   the rain and the temperature allow, else fumaroles; no cinnabar. At most one field for each
+   10,000 km2 cell, so the fields follow the hot ground: a broad hot province takes about one for
+   each 10,000 km2, a thin belt a field in most of the cells it crosses.
+8. **Warm-ground signal.** `DeepTimeClimate.geothermalWarmthC(x, y, z)` returns the warming in
    kelvin: a peak of 12 (vent), 10 (pool) or 6 (patch) that falls linearly to zero between the edge
    of the site's core and 1.1 times its altered-ground radius plus 4 blocks, within 10 blocks under
    (12 for a pool) and 6 over the ground. No mod reads it yet. (GEO-044 to GEO-046)
@@ -117,6 +131,10 @@ section.
 | GEO-038, GEO-039 | Altered ground | disc of 3 to 11 blocks; about 30 % stained yellow, rest bleached | blocks, share | USGS (alteration colours) | `game-choice` |
 | GEO-040, GEO-041 | Cinnabar | 6 % of altered ground at silicic volcanoes | share | none | `game-choice`, `uncited` |
 | GEO-042 | Keep-clear distance from lava | 3 blocks + the site's hard radius | blocks | none | `game-choice` |
+| GEO-052 | Heat flow for fields beyond the volcanoes | default 100, range 50 to 400 | mW/m2 | Davies and Davies 2010 (Cenozoic extensional 102.4; continents 70.9) | `game-choice` |
+| GEO-053 | Hot-ground cell | 10,000 km2 / heat density; 6 draws a cell | km2, count | none | `game-choice` |
+| GEO-054 | Heat density setting | default 1.0, range 0 to 4 | multiple | none | `game-choice` |
+| GEO-055 | The exported layer | `meta/heat_flow_mw_m2`, u16, 0.1 mW/m2, nodata on oceanic crust | mW/m2 | the plate model (PLT-137) | `uncited` (a format choice) |
 | GEO-044 to GEO-046 | Warm-ground signal | peaks 12, 10, 6; fade to 1.1 x altered radius + 4; band 10 (12 pool) under to 6 over | K, blocks | none | `game-choice` |
 
 ## Earth against the mod
@@ -134,13 +152,21 @@ no geothermal behaviour was changed.
 | Terrace rock | travertine where water rises through limestone (Mammoth); silica sinter in the geyser basins | NPS page above (read); USGS Yellowstone Volcano Observatory page (read through a page-fetch tool) | travertine over carbonate rock, else sinter | P2-14 build log: 1 of 23 pools was travertine |
 | Native sulfur | forms at fumaroles; solid only below 115 degC | USGS Hawaiian Volcano Observatory, Volcano Watch (read through a page-fetch tool) | a yellow-concrete crust around every vent | - |
 | Size of a spring | not read in a source | - | main pool 4 to 10 blocks across, 1.2 to 3 km | - |
+| Mean heat flow of the continents | 70.9 mW/m2 (area 2.073e14 m2, 14.7 TW) | Davies and Davies 2010, Table 7 (full text, read) | the model's continental values run 55 to 200; 72 % of the quick 16k planet's dry land is at 70 or more | measured 2026-10-02, one baked planet (below) |
+| Heat flow of young extended crust | Cenozoic extensional geology 102.4 mW/m2 (standard deviation 29.0; 16 observations); Quaternary 82.0; Tertiary 77.3; arc margins 73.8 | same, Table 3 | threshold 100: reached by an arc, a hotspot or a young rift in the model, not by a young orogen alone (90 at its start) | same |
+| Heat flow against age | q = 102 - 2.25 sqrt(t), t in Myr, continents excluding the Precambrian | same, Eq. 2 (an empirical fit to category means, R squared 0.75) | 55 + 35 e^(-t/60) (+40 arc, +40 hotspot, +30 divergent): 90 at t = 0 against 102, 62 at 100 Myr against 79.5 | arithmetic, GEO-060 |
+| Share of dry land hot enough | not read | - | at or over 70 / 80 / 90 / 100 / 120 / 150 mW/m2: 0.715 / 0.628 / 0.092 / 0.047 / 0.015 / 0.0002 | quick 16k planet, seed 1, 500 Myr, scattered continents (`tools/review/impacts-census.sh`, `GeothermalCensusTest`); another planet of the same preset gave 0.486 / 0.301 / 0.092 / 0.058 / 0.024 / 0 before the resampling fix below |
+| Sites by heat source | - | - | volcanoes only: 170 (11 pools, 97 vents, 62 patches; 24 of 63 volcanoes); with hot ground: 267, the 97 new ones 11 pools, 51 vents, 35 patches | same planet, same code with `geothermal_heat_density` 0 and 1 |
 
 ## Simplifications and limits
 
-- **Heat only at the active volcanoes** (GEO-012). Earth's high-temperature fields also lie along
-  ridges, rifts and extensional provinces. The plate model's heat flow and its rifts are not exported
-  by the bake, so nothing is placed on them. A proposal to export a heat-flow layer is a Pending
-  question (GEO-013).
+- **Heat from volcanoes and continental heat flow only** (GEO-012, GEO-013; changed 2026-10-02).
+  Earth's high-temperature fields lie on arcs, rifts, ridges and hotspots (WEC 2013); the mod now
+  puts them at the active volcanoes and on continental ground whose plate-model heat flow reaches a
+  threshold. Ridges are under the sea and get none. The plate model's continental heat flow is a
+  simple sum (GEO-060) that is cooler than Davies and Davies's fit for young crust, and a young
+  orogen alone reaches only 90 mW/m2, under the default threshold of 100, so collision belts get
+  fields only where an arc, a rift or a hotspot also heats them.
 - **No geysers, no steam, no boiling, no temperature** (GEO-026). Yellowstone alone has more than 500
   geysers. Water in the pools is plain still water; vanilla Minecraft has no hot water.
 - **Sizes are not true scale.** A block cannot be smaller than 300 m across, so a pool of even four
@@ -172,8 +198,13 @@ terracotta for cinnabar) are vanilla choices; Deep Time adds no block.
 
 ## Open questions
 
-- Should fields also come from rifts, ridges and a heat-flow layer (GEO-013; Pending question,
-  recommended: yes, via a heat-flow layer in the bake)?
+- Settled by Ben on 2026-10-02 ("Export heat flow (Recommended)"): the bake exports the plate model's
+  heat flow and fields also stand on continental ground above a threshold (GEO-013, GEO-052 to
+  GEO-056). Left to Ben: whether young orogens should qualify on their own (a threshold near 85
+  would admit belts younger than about 20 Myr, and much of the continental interior would then
+  be hot too: 63 % of dry land is at or over 80 on the planet measured, 30 % on another, because
+  the share of young crust depends on the history), and whether 10,000 km2 a field is the right
+  spacing.
 - Settled by Ben on 2026-10-02 (kept as game choices): 400 mm of rain for springs (GEO-007), no
   pools under a 3 degC mean, whose reason is vanilla's freezing (GEO-020), and pools 4 to 10 blocks
   across (GEO-027).
@@ -199,7 +230,13 @@ Read in full or in part from the project's source library (not distributed):
   (full text; abstract and introduction read): the vertical zoning of steam-heated and chloride
   features.
 - `WEC2013_Geothermal`: World Energy Council, 2013, World Energy Resources, chapter 9 Geothermal
-  (full text; the passage on plate boundaries and hotspots read).
+  (full text; the passage on plate boundaries and hotspots read; the world average surface heat flow
+  of 82 mW/m2 and the list of causes of shallow geothermal resources, among them a high surface heat
+  flow from a thin crust and a high gradient, and the statement that warm springs are more numerous
+  in areas of high regional conductive heat flow and of young tectonic activity).
+- `Davies2010`: Davies, J.H. and Davies, D.R. 2010. Earth's surface heat flux. Solid Earth 1:5-24
+  (full text; Tables 3 and 7 and Eq. 2 read, 2026-10-02): continents 70.9 mW/m2, Cenozoic
+  extensional geology 102.4, the empirical fit q = 102 - 2.25 sqrt(t) (GEO-059).
 
 Read through a page-fetch tool that returned quoted sentences; no copy saved (the agency site
 returns only a script stub to a plain download):

@@ -45,19 +45,21 @@ pub struct Regions {
 impl Regions {
     pub fn new(c: u32, region_blocks: u32) -> Regions {
         let rb = region_blocks.max(64);
+        let (span_x, span_z) = deeptime_format::Projection::new(c).index_span_blocks();
         Regions {
             c: f64::from(c),
             size: f64::from(rb),
-            cols: c.div_ceil(rb),
-            rows: (c / 2).div_ceil(rb),
+            // The regions' frame is the projection's index frame.
+            cols: (span_x as u32).div_ceil(rb),
+            rows: (span_z as u32).div_ceil(rb),
         }
     }
 
     /// The region (col, row) of block (x, z).
     pub fn of(&self, x: f64, z: f64) -> (u32, u32) {
-        let col =
-            (((x + self.c / 2.0) / self.size).floor() as i64).rem_euclid(i64::from(self.cols));
-        let row = ((z + self.c / 4.0) / self.size)
+        let (ox, oz) = deeptime_format::Projection::of(self.c).index_origin();
+        let col = (((x - ox) / self.size).floor() as i64).rem_euclid(i64::from(self.cols));
+        let row = ((z - oz) / self.size)
             .floor()
             .clamp(0.0, f64::from(self.rows - 1));
         (col as u32, row as u32)
@@ -83,7 +85,8 @@ mod tests {
         assert_eq!((r.cols, r.rows), (4, 2));
         assert_eq!(r.of(-8192.0, -4096.0), (0, 0));
         assert_eq!(r.of(8191.0, 4095.0), (3, 1));
-        assert_eq!(r.of(8192.0 + 10.0, 0.0), (0, 1), "x wraps");
+        // Rows from z = −2,624 (the grids' extent past the Lambert pole at 2,607.6).
+        assert_eq!(r.of(8192.0 + 10.0, 2000.0), (0, 1), "x wraps");
         assert_eq!(r.index(0.0, -1.0), 2);
         assert_eq!(r.count(), 8);
     }

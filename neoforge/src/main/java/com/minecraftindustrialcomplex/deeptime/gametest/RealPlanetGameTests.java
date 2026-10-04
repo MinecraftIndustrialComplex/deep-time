@@ -6,6 +6,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.ore.ClaimOresBiomeModifier;
+import com.minecraftindustrialcomplex.deeptime.ore.ClaimRules;
 import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
 import com.minecraftindustrialcomplex.deeptime.server.SpawnHandler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Columns;
@@ -14,21 +16,28 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.StrataPass;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * The generator on a real baked planet (P1-08): the {@code deeptime:test_planet_real} level reads
@@ -183,6 +192,29 @@ public final class RealPlanetGameTests {
     }
 
     /**
+     * The blocks the rock-blob features of {@code level}'s biomes place (vanilla's andesite, diorite,
+     * granite and tuff blobs, a pack's re-stoned blobs: {@link ClaimRules.Verdict#ROCK}), by block id.
+     */
+    static Set<String> rockBlobBlocks(ServerLevel level, ClaimRules rules) {
+        Set<String> out = new HashSet<>();
+        for (Holder<Biome> biome : level.getChunkSource().getGenerator().getBiomeSource().possibleBiomes())
+            for (HolderSet<PlacedFeature> step : biome.value().getGenerationSettings().features())
+                for (Holder<PlacedFeature> f : step)
+                    if (rules.verdict(f) == ClaimRules.Verdict.ROCK)
+                        f.unwrapKey().ifPresent(k -> out.addAll(rules.placedBlocksOf(k.location())));
+        return out;
+    }
+
+    /** How many blocks of the cube of side 7 around {@code pos} are {@code state}: a blob is a cluster. */
+    static int around(ServerLevel level, BlockPos pos, BlockState state) {
+        int n = 0;
+        for (BlockPos p : BlockPos.betweenClosed(pos.offset(-3, -3, -3), pos.offset(3, 3, 3)))
+            if (level.getBlockState(p) == state)
+                n++;
+        return n;
+    }
+
+    /**
      * Placed rock = Rust's decision (plan §9.2: "the same file drives a GameTest that compares placed
      * blocks with the expected classes"). For fixture columns inside the planet's span, at 20, 60 and
      * 150 blocks below the generated surface and in the middle of every body run: the Java
@@ -190,6 +222,15 @@ public final class RealPlanetGameTests {
      * belongs to that class in the palette, and the placed block is that block (or the crust where
      * the class resolves to nothing). Blocks the pack's surface rules placed (not crust, not rock)
      * are counted apart.
+     *
+     * <p>So are the blocks of rock-blob features where the level keeps them. {@code deeptime:claim_ores}
+     * removes the blobs only on a server whose overworld is Deep Time's ({@link ClaimOresBiomeModifier});
+     * this level sits in the GameTest server's vanilla world, so vanilla's andesite, diorite, granite
+     * and tuff blobs still run at the features step, after the strata pass, and replace the base
+     * stone they meet. Where a class's block is plain stone (shale, mudstone and the other classes
+     * whose vanilla stand-in is {@code minecraft:stone}), a blob that crosses a sample replaces the
+     * strata pass's rock: the evaluators agree and the strata pass placed the class, and the blob
+     * came after. A Deep Time world has no such blobs.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 4800)
     public static void realPlanetRockMatchesTheParityFixture(GameTestHelper helper) {
@@ -204,15 +245,17 @@ public final class RealPlanetGameTests {
         }
         RockPalette palette = RockPalette.get();
         int c = wd.circumference();
-        int[] n = new int[5];   // columns, checked, bodyChecks, surface-rule blocks, wrong
-        List<String> detail = new ArrayList<>();
+        int[] n = new int[6];   // columns, checked, bodyChecks, surface-rule blocks, wrong, rock-blob blocks
+        List<String> detail = new ArrayList<>(), blobDetail = new ArrayList<>();
+        Set<String> blobs = ClaimOresBiomeModifier.deepTimeWorld(level.getServer()) ? Set.of()
+                : rockBlobBlocks(level, ClaimRules.dryRun(level.getServer()));
         JsonArray fixture = doc.getAsJsonArray("columns");
         ChunkSampling.forEach(helper, fixture.size(), k -> {
             if (n[0] >= 48)
                 return false;
             JsonObject col = fixture.get(k).getAsJsonObject();
             int x = col.get("wx").getAsInt(), z = col.get("z").getAsInt();
-            if (Math.abs(z) > c / 4 - 32)
+            if (Math.abs(z) > com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c) - 32)
                 return false;   // past the pole edge: the beyond-pole mask, not the bake
             n[0]++;
             ChunkAccess chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.SURFACE, true);
@@ -245,6 +288,13 @@ public final class RealPlanetGameTests {
                     n[3]++;   // a surface rule's block (sand, terracotta, …): not the strata pass's to paint
                     continue;
                 }
+                if (ok && !placed && blobs.contains(BuiltInRegistries.BLOCK.getKey(actual.getBlock()).toString())) {
+                    n[5]++;   // a rock blob the features step put over the strata pass's rock (see above)
+                    if (blobDetail.size() < 8)
+                        blobDetail.add("(" + x + ", " + y + ", " + z + ") " + cls + " expected " + expected + " placed "
+                                + actual + " (" + around(level, new BlockPos(x, y, z), actual) + " of 343 around)");
+                    continue;
+                }
                 if (!ok || !placed) {
                     n[4]++;
                     if (detail.size() < 8)
@@ -255,8 +305,11 @@ public final class RealPlanetGameTests {
             return true;
         }, () -> {
             DeepTime.LOGGER.info("[gametest] realPlanetRockMatchesTheParityFixture columns={} checked={} bodyChecks={} "
-                    + "surfaceRuleBlocks={} wrong={} {}", n[0], n[1], n[2], n[3], n[4], detail);
+                    + "surfaceRuleBlocks={} rockBlobBlocks={} {} wrong={} {}", n[0], n[1], n[2], n[3], n[5], blobDetail,
+                    n[4], detail);
             helper.assertTrue(n[0] >= 32 && n[1] >= 96, "only " + n[0] + " columns, " + n[1] + " samples");
+            // Blobs are rare (one sample in 124 when it happened): many would mean something else.
+            helper.assertTrue(n[5] * 20 <= n[1], n[5] + " of " + n[1] + " samples are rock blobs: " + blobDetail);
             helper.assertTrue(n[4] == 0, n[4] + " samples differ: " + detail);
             helper.succeed();
         });

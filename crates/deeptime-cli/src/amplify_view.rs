@@ -86,11 +86,11 @@ fn quantise(y: f32) -> f32 {
     (y * 16.0).round() / 16.0
 }
 
-/// Cell (i, j) of L3 to a longitude and latitude.
-fn lonlat(gw: usize, gh: usize, i: f64, j: f64) -> (f64, f64) {
+/// Cell (i, j) of the L3 grid to a longitude and latitude (the planet's projection).
+fn lonlat(grid: &deeptime_format::GridDesc, i: f64, j: f64) -> (f64, f64) {
     (
-        (360.0 * i / gw as f64).rem_euclid(360.0),
-        90.0 - 180.0 * j / gh as f64,
+        deeptime_format::Projection::picture_lon_deg(i, grid.w).rem_euclid(360.0),
+        grid.projection().lat_deg(grid.z_of_row(j)),
     )
 }
 
@@ -341,8 +341,7 @@ fn pick_regions(
     let place = |id, title: &str, note: String, x0: i64, y0: i64| -> Region {
         let y0 = y0.clamp(0, gh as i64 - SIDE as i64);
         let (lon, lat) = lonlat(
-            gw,
-            gh,
+            &l3.layer.desc.grid,
             (x0 + SIDE as i64 / 2) as f64,
             (y0 + SIDE as i64 / 2) as f64,
         );
@@ -534,7 +533,8 @@ fn pick_regions(
     let mut best = (0usize, 0i64);
     for j0 in (0..=gh - SIDE).step_by(32) {
         // Within 65° of the equator (the polar caps are flat and D8 draws straight rivers there).
-        let centre_lat = 90.0 - 180.0 * (j0 + SIDE / 2) as f64 / gh as f64;
+        let g = &l3.layer.desc.grid;
+        let centre_lat = g.projection().lat_deg(g.z_of_row((j0 + SIDE / 2) as f64));
         if centre_lat.abs() > 65.0 {
             continue;
         }

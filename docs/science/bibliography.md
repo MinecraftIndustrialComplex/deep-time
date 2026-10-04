@@ -57,7 +57,7 @@ library was used. Nothing in the library is checked against the printed version.
 
 ## Counts
 
-387 works. Stage 1 listed 475 entries, the flexure feature added 13 and the force balance (task 5, 2026-10-02) 2 (Cloos1993, Coblentz1994, both from memory); 103 entries were merged into 385 works (the merged keys are listed below).
+388 works (the margins and spires task added Pratson1996, 2026-10-03). Stage 1 listed 475 entries, the flexure feature added 13 and the force balance (task 5, 2026-10-02) 2 (Cloos1993, Coblentz1994, both from memory); 103 entries were merged into 385 works (the merged keys are listed below).
 
 By access, as recorded for the work (the most open access class among its merged entries):
 
@@ -727,6 +727,33 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Substitute: none found.
 - Read in this pass: abstract fetched
 - Used for: island subsidence rate (VOL-048).
+
+### Edmonds2019
+- Reference: Edmonds, M., Cashman, K. V., Holness, M. and Jackson, M. (2019). Architecture and dynamics of magma reservoirs. Philosophical Transactions of the Royal Society A 377(2139): 20180298.
+- DOI or URL: 10.1098/rsta.2018.0298; https://pmc.ncbi.nlm.nih.gov/articles/PMC6335485/
+- Access: open copy on PubMed Central; the publisher PDF returned 403 to scripted access.
+- Library (the project's source library, not distributed): not fetched as a file (the PDF endpoints returned HTTP 403 or an HTML page; the PMC XML endpoint returned a server error).
+- Read in this pass (2026-10-02): the PMC page through a page-fetch tool that returns a model's answer to a question, not the text; quotes recorded in the ledger are from that answer and were not checked against the PDF: "vertical extent of the crust ... 'trans-crustal mush system'"; "water-rich arc magmatic systems are typically vertically extensive and dominated by mushy super-solidus conditions"; sill thicknesses "must be less than 10 m thick"; "multiple, 'stacked' storage areas for magma...separated by subsolidus material"; "5-15% melt" in upper crustal reservoirs.
+- Ledger ids: MAG-043, MAG-044, MAG-047, MAG-054
+- Used for: the architecture of the crust-deep column.
+
+### Cashman2017
+- Reference: Cashman, K. V., Sparks, R. S. J. and Blundy, J. D. (2017). Vertically extensive and unstable magmatic systems: a unified view of igneous processes. Science 355(6331): eaag3055.
+- DOI or URL: 10.1126/science.aag3055
+- Access: paywalled; no open copy reached.
+- Library (the project's source library, not distributed): not fetched.
+- Read in this pass: nothing; named in Ben's decision (2026-10-02) and in the ledger as the picture followed. Not cited for any number.
+- Ledger ids: MAG-043
+- Used for: the idea of a vertically extensive system.
+
+### Sparks2019
+- Reference: Sparks, R. S. J., Annen, C., Blundy, J. D., Cashman, K. V., Rust, A. C. and Jackson, M. D. (2019). Formation and dynamics of magma reservoirs. Philosophical Transactions of the Royal Society A 377(2139): 20180019.
+- DOI or URL: 10.1098/rsta.2018.0019
+- Access: not open on PubMed Central (Europe PMC flags it not open access).
+- Library (the project's source library, not distributed): not fetched.
+- Read in this pass: nothing; named in Ben's decision.
+- Ledger ids: MAG-043
+- Used for: the idea of a vertically extensive system.
 
 ### Poland2014
 - Reference: Poland, M. P., Miklius, A. and Montgomery-Brown, E. K. (2014). Magma supply, storage, and transport at shield-stage Hawaiian volcanoes. Chapter 5 in Characteristics of Hawaiian Volcanoes, U.S. Geological Survey Professional Paper 1801.
@@ -1781,7 +1808,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Reference: Mouthereau, F., Tensi, J., Bellahsen, N., Lacombe, O., De Boisgrollier, T. & Kargar, S. (2007). Tertiary sequence of deformation in a thin-skinned/thick-skinned collision belt: The Zagros Folded Belt (Fars, Iran). Tectonics 26(5):TC5006.
 - DOI or URL: 10.1029/2007TC002098
 - Cited as: "Mouthereau, Tensi, Bellahsen, Lacombe, De Boisgrollier & Kargar 2007, Tectonics 26:TC5006"
-- Ledger ids: DEF-001, DEF-005
+- Ledger ids: DEF-001, DEF-005, PLT-241, PLT-242 (plate tasks 3 and 4: "the 200-km-width ZFB"; underplating of Arabian crust "represents 75% of the total shortening", abstract)
 - Access: paywalled (abstract only)
 - Library (the project's source library, not distributed): not fetched. Reason: no copy could be fetched: html not the work (title match 0.00, 1010 chars).
 - Substitute: none found.
@@ -1934,7 +1961,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Reference: Schmalholz, S. M. & Mancktelow, N. S. (2016). Folding and necking across the scales: a review of theoretical and experimental results and their applications. Solid Earth 7:1417-1465.
 - DOI or URL: 10.5194/se-7-1417-2016 (open access)
 - Cited as: "Schmalholz & Mancktelow 2016, Solid Earth 7:1417-1465, eq. 13" (added to the code in WP-8)
-- Ledger ids: DEF-002
+- Ledger ids: DEF-002, PLT-245 (plate tasks 3 and 4: the Himalaya-Tibet force of about 7 x 10^12 N/m, Molnar & Lyon-Caen 1988 as cited, text lines 1370-1373)
 - Access: open access
 - Library: fetched WP-8 2026-10-02 (PDF, 49 pages, text layer). Text files: Schmalholz2016.txt, Schmalholz2016_raw.txt (printed page = PDF page + 1416).
 - Read in WP-8 (2026-10-02): full text for the passages used. Eq. (13), p. 1422: "Ld = 2π H (R/6)^(1/3) ... the dominant wavelength is directly proportional to the layer thickness ... first derived by Biot (1957)", Ramberg 1962 identical (p. 1423); p. 1425: lower limit of wavelength to thickness about 4; p. 1442: "common wavelength to thickness ratios are between 2 and 16 with a mean value at ∼ 6.5 (e.g. Hudleston and Treagus, 2010)"; p. 1434: a multilayer of m equal layers raises the wavelength by m^(1/3) (Biot 1961); eq. (32), p. 1436: Ld = 1.9 √(H Htot); pp. 1430-1433: linear theory good to about 20 % shortening and 25° limbs.
@@ -2157,7 +2184,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Reference: Alavi, M. (2007). Structures of the Zagros fold-thrust belt in Iran. American Journal of Science 307(9):1064-1095.
 - DOI or URL: 10.2475/09.2007.02
 - Cited as: not cited by the code; added as evidence for the belt width (STR-030, DEF-027).
-- Ledger ids: DEF-027, STR-030; notes: evidence only
+- Ledger ids: DEF-027, STR-030; notes: evidence only, PLT-241 (plate tasks 3 and 4: the Zagros fold-thrust belt "an average width of ~300 km", p. 1068, as an Earth comparison for the belt width)
 - Access: paywalled (abstract only)
 - Library (the project's source library, not distributed): fetched (PDF, 39 pages, text layer, 97,543 characters). From: https://ajsonline.org/article/65872.pdf. Text file: Alavi2007.txt.
 - Substitute: repository or open copy found by the lookups and saved as above (version not stated: the first pages were matched against the title, not compared with the printed version).
@@ -3469,6 +3496,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read in this pass: (MOI, BIO) full text fetched (decoded PDF text layer: Figure 1 caption, the text on mass flux and Equation 7) (CLM) search result snippet only (citing passages)
 - Reference check: (MOI, BIO) matches. The abstract itself has no percent-per-kelvin figure; the numbers are in the text (Part 2). (CLM) matches.
 
+- Read in WP-14a (2026-10-02): Read WP-14a: saturation vapour pressure about 7 %/K (p. 5686) and column vapour 7.5 %/K in models (Fig. 2, p. 5689), as a consistency check for CLM-144.
 ### Thornthwaite1948
 - Reference: Thornthwaite, C. W. 1948. An approach toward a rational classification of climate. Geographical Review 38(1):55-94. (The end page 94 is from my recollection; OpenAlex lists only the first page.)
 - DOI or URL: https://doi.org/10.2307/210739
@@ -3977,7 +4005,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Copley, A., Avouac, J.-P., Royer, J.-Y. (2010). India-Asia collision and the Cenozoic slowdown of the Indian plate: implications for the forces driving plate motions. Journal of Geophysical Research 115(B3):B03410.
 - DOI or URL: 10.1029/2009JB006634.
 - Cited as: "Copley, Avouac & Royer 2010, JGR 115:B03410".
-- Ledger ids: PLT-154, PLT-177, PLT-200
+- Ledger ids: PLT-154, PLT-177, PLT-200, PLT-245 (plate tasks 3 and 4: India-Asia convergence from about 15 to about 4 cm/yr, thickening of Tibet the dominant cause; abstract)
 - Access: paywalled (abstract only; Wiley).
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Substitute: none found.
@@ -4074,7 +4102,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Nocquet, J.-M., Sue, C., Walpersdorf, A., Tran, T., Lenôtre, N., Vernant, P., Cushing, M., Jouanne, F., Masson, F., Baize, S., Chéry, J., van der Beek, P. A. (2016). Present-day uplift of the western Alps. Scientific Reports 6:28404.
 - DOI or URL: 10.1038/srep28404 (open access).
 - Cited as: "Nocquet et al. 2016, Sci. Rep. 6:28404".
-- Ledger ids: PLT-180
+- Ledger ids: PLT-180, PLT-242 (plate tasks 3 and 4: "as much as 280 km of shortening was accommodated by underthrusting of the European margin")
 - Access: open access.
 - Library (the project's source library, not distributed): fetched (HTML page, 27,074 characters of text). From: https://doi.org/10.1038/srep28404. Text file: Nocquet2016.txt.
 - Read so far (by the project): abstract-only status.
@@ -4213,7 +4241,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: DeCelles, P. G., Giles, K. A. (1996). Foreland basin systems. Basin Research 8(2):105-123.
 - DOI or URL: (PLT) 10.1046/j.1365-2117.1996.01491.x. (ISO) 10.1046/j.1365-2117.1996.01491.x; full text https://pages.uoregon.edu/rdorsey/BasinAnalysis/BasinPapers/DeCelles%20&%20Giles%201996.pdf
 - Cited as: (PLT) "DeCelles & Giles 1996, Basin Research 8:105-123" ("via a secondary source"). (ISO) docs/design/flexure.md section 11
-- Ledger ids: PLT-194; none (the acceptance figures of docs/design/plate-force-balance.md); notes: the acceptance figures of docs/design/plate-force-balance.md
+- Ledger ids: PLT-194; none (the acceptance figures of docs/design/plate-force-balance.md); notes: the acceptance figures of docs/design/plate-force-balance.md, PLT-249 (plate tasks 3 and 4: foredeeps 100-300 km wide and 2-8 km thick, forebulges 60-470 km, for the foreland measure)
 - Access: open copy. [other sections: paywalled (abstract visible).]
 - Library (the project's source library, not distributed): fetched (PDF, 19 pages, text layer, 79,621 characters). From: https://pages.uoregon.edu/rdorsey/BasinAnalysis/BasinPapers/DeCelles%20&%20Giles%201996.pdf. Text file: DeCellesGiles1996.txt.
 - Merged keys: DeCellesGiles1996_flexure
@@ -4314,7 +4342,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Davis, D., Suppe, J., Dahlen, F. A. (1983). Mechanics of fold-and-thrust belts and accretionary wedges. Journal of Geophysical Research 88(B2):1153-1172.
 - DOI or URL: 10.1029/JB088iB02p01153.
 - Cited as: "Davis, Suppe & Dahlen 1983, JGR 88:1153-1172" (from memory).
-- Ledger ids: PLT-192
+- Ledger ids: PLT-192, PLT-244 (plate tasks 3 and 4: a critical wedge grows at constant taper; abstract)
 - Access: paywalled (abstract only).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -4327,7 +4355,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Christensen, N. I., Mooney, W. D. (1995). Seismic velocity structure and composition of the continental crust: a global view. Journal of Geophysical Research 100(B6):9761-9788.
 - DOI or URL: 10.1029/95JB00259.
 - Cited as: not cited by the project; used here as a source for continental crust thickness and density.
-- Ledger ids: (none; supports 121, 122, 131); notes: none; supports 121, 122, 131
+- Ledger ids: (none; supports 121, 122, 131); notes: none; supports 121, 122, 131, PLT-247 (plate tasks 3 and 4: mean continental crust 41.1 km, orogens 46.3 km; abstract)
 - Access: paywalled (abstract only).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -4397,7 +4425,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Li, Y., Liu, L., Li, S., Peng, D., Cao, Z., Li, X. (2024). Cenozoic India-Asia collision driven by mantle dragging the cratonic root. Nature Communications 15:6674.
 - DOI or URL: 10.1038/s41467-024-51107-0; https://pmc.ncbi.nlm.nih.gov/articles/PMC11303558/ (open).
 - Cited as: not cited by the project; used as an open secondary source that cites Turcotte & Schubert for force orders of magnitude.
-- Ledger ids: (supports 183, 187); notes: supports 183, 187
+- Ledger ids: (supports 183, 187); notes: supports 183, 187, PLT-245 (plate tasks 3 and 4: "the late-Cenozoic resistance force due to the gravitational potential energy (GPE) of the Himalayas and Tibetan Plateau ranges from 3 x 10^12 N m-1 to 8 x 10^12 N m-1", text line 111; read for that sentence)
 - Access: open access.
 - Library (the project's source library, not distributed): fetched (HTML page, 60,549 characters of text). From: https://doi.org/10.1038/s41467-024-51107-0. Text file: Li2024.txt.
 - Read so far (by the project): not read.
@@ -4439,6 +4467,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: full text fetched (source only): climlab/model/ebm.py, surface/albedo.py, utils/constants.py at main, v0.9.2 and fcbde37 (ebm.py identical in the defaults below at fcbde37 and v0.9.2; main differs from v0.9.2 at line 101, a docstring-area change, defaults unchanged). The JOSS paper itself was not fetched.
 - Reference check: matches. Citation volume is 3, issue 24, article 659. Note the code's defaults are NOT NCC81: Rose's lecture notes (Albany ATM623, Lecture 14, fetched) say A = 210 m2 and B = 2 m2/degC "we are going to use these values", derived from an NCEP fit (best fit A = 214, B = 1.6), and D = 0.55.
 
+- Read in WP-14a (2026-10-02): WP-14a saved climlab's MIT source files (library climlab_src/: ebm.py, albedo.py, LICENSE) and read the defaults: EBM A 210, B 2, D 0.555, water_depth 10 m, Tf -10, a0 0.3, a2 0.078, ai 0.62, num_lat 90; EBM_seasonal and P2Albedo a0 0.33, a2 0.25 (CLM-001, CLM-007 to CLM-010, CLM-020).
 ### North1981
 - Reference: North, G. R., Cahalan, R. F., & Coakley, J. A., Jr. (1981). Energy balance climate models. Reviews of Geophysics and Space Physics 19(1): 91-121.
 - DOI or URL: 10.1029/RG019I001P00091. Image-only scan at https://eisenman.ucsd.edu/courses/2024-sioc224/files/north-1981.pdf (no text layer; JBIG2 images; I could not OCR it). NASA NTRS record 19820032405 (abstract only, no download).
@@ -4450,6 +4479,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: abstract fetched (NTRS). Full text attempted, unreadable (scan).
 - Reference check: authors, year, venue, pages match. The code's field comment writes "North et al. 1981" for D and ebm.rs writes the full name; same paper. Whether A = 203.3, B = 2.09, D = 0.649 are NCC81's own numbers is NOT confirmed (see Part 2): citing papers disagree on whether A and B originate with Budyko (1969) or North & Coakley (1979).
 
+- Read in WP-14a (2026-10-02): Read WP-14a for the carried-over constants: A 203.3 and B 2.09 (p. 93, eq. 7), co-albedo 0.681 - 0.202 P2 (p. 95, eq. 18), D 0.649 (p. 97), Budyko's ice albedo 0.62 and -10 degC edge (p. 104), C_L 0.16 B years and C_W 4.7 B years (p. 118). CLM-003 to CLM-005, CLM-009, CLM-010, CLM-013, CLM-014, CLM-122, CLM-138.
 ### Berger1978
 - Reference: Berger, A. L. (1978). Long-term variations of daily insolation and Quaternary climatic changes. Journal of the Atmospheric Sciences 35(12): 2362-2367.
 - DOI or URL: 10.1175/1520-0469(1978)035<2362:LTVODI>2.0.CO;2
@@ -4554,6 +4584,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: abstract fetched (Crossref) plus citing passages
 - Reference check: matches. Byrne & Goldblatt's Table 1 prints the same 5.35 form (their row attributes it to "IPCC [1990]" and the adjusted forcing F_a).
 
+- Read in WP-14a (2026-10-02): Not read in WP-14a; its 5.35 was read in IPCC 2001 Table 6.2 (CLM-069).
 ### Byrne2014
 - Reference: Byrne, B., & Goldblatt, C. (2014). Radiative forcing at high concentrations of well-mixed greenhouse gases. Geophysical Research Letters 41(1): 152-160.
 - DOI or URL: 10.1002/2013GL058456; open copy https://dspace.library.uvic.ca/server/api/core/bitstreams/65d2a0aa-a7eb-44ba-b8e7-ac34d0d894d7/content (the article as corrected 17 Apr 2015)
@@ -4565,6 +4596,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: full text fetched (all sections, Tables 1 and 2)
 - Reference check: matches (authors, year, volume, pages, Table 2).
 
+- Read in WP-14a (2026-10-02): Read WP-14a: Table 2 CO2 fit and its range 200-10,000 ppmv; abstract: computed over 100-50,000 ppmv, 38.1 W/m2 at the top (CLM-070, CLM-166).
 ### Hoffman2017
 - Reference: Hoffman, P. F., Abbot, D. S., Ashkenazy, Y., Benn, D. I., Brocks, J. J., Cohen, P. A., Cox, G. M., Creveling, J. R., Donnadieu, Y., Erwin, D. H., Fairchild, I. J., Ferreira, D., Goodman, J. C., Halverson, G. P., Jansen, M. F., Le Hir, G., Love, G. D., Macdonald, F. A., Maloof, A. C., Partin, C. A., Ramstein, G., Rose, B. E. J., Rose, C. V., Sadler, P. M., Tziperman, E., Voigt, A., & Warren, S. G. (2017). Snowball Earth climate dynamics and Cryogenian geology-geobiology. Science Advances 3(11): e1600983.
 - DOI or URL: 10.1126/sciadv.1600983; open copy https://dspace.library.uvic.ca/bitstream/1828/11278/1/hoffman_paul_scienceadvances_2017.pdf
@@ -4576,6 +4608,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: full text fetched (text layer searched for sea level, ppm, bar, CO2 termination, ice thickness; not every section read)
 - Reference check: matches. The paper's CO2 range for termination is 10^4 to 10^5 ppm, and the ~1 km of sea level is stated as an assumption (see Part 2).
 
+- Read in WP-14a (2026-10-02): Read WP-14a: terminations at 10^4 to 10^5 ppm (p. 3 of 43); cloud radiative forcing >= 10 W/m2 and cloud-free FOAM never deglaciating (p. 10 of 43) (CLM-166).
 ### Nye1952
 - Reference: Nye, J. F. (1952). The mechanics of glacier flow. Journal of Glaciology 2(12): 82-93.
 - DOI or URL: 10.3189/S0022143000033967
@@ -4655,6 +4688,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: matches.
 
+- Read in WP-14a (2026-10-02): Read in full (eq. 2, eqs. 5-6, Tables 1-2, pp. 2845-2847) for CLM-119, CLM-120, CLM-122; the design's surface-dependent D was corrected to its eq. 2 (theta in eq. 2 is the colatitude).
 ### Zhuang2017
 - Reference: Zhuang, K., North, G. R., & Stevens, M. J. (2017). A NetCDF version of the two-dimensional energy balance model based on the full multigrid algorithm. SoftwareX 6: 198-202.
 - DOI or URL: 10.1016/j.softx.2017.07.003
@@ -4666,6 +4700,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: matches.
 
+- Read in WP-14a (2026-10-02): The paper could not be fetched (Elsevier refuses scripted access). The release on GitHub (ElsevierSoftwareX/SOFTX-D-16-00023) was read by a sub-agent: its manual is saved (Zhuang2017_manual.txt); the GPL-3 Fortran was read for the constants and not kept or copied (grid 128 x 65, B 2.15, A 210.3 at 315 ppm, Keq 0.65, Kocean 0.40, Kland 0.65, KlandNP 0.28, KlandSP 0.20, the factor sin^5 of the colatitude, soil 2 m, mixed layer 70 m). Ledger ids now also CLM-122.
 ### North1983
 - Reference: North, G. R., Mengel, J. G., & Short, D. A. (1983). Simple energy balance model resolving the seasons and the continents: Application to the astronomical theory of the ice ages. Journal of Geophysical Research 88(C11): 6576-6586.
 - DOI or URL: 10.1029/JC088IC11P06576
@@ -4677,6 +4712,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: matches (DOI as the design doc gives it).
 
+- Read in WP-14a (2026-10-02): Not obtained (AGU/Wiley and ADS refuse scripted access; NASA NTRS holds metadata only). The design's 1.87e6 J/m2/K attributed to this lineage was traced to Zhuang et al.'s land surface (CLM-122).
 ### NorthKim2017
 - Reference: North, G. R., & Kim, K.-Y. (2017). Energy Balance Climate Models. Wiley-VCH.
 - DOI or URL: 10.1002/9783527698844
@@ -4699,6 +4735,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: matches.
 
+- Read in WP-14a (2026-10-02): Not obtained. An open PDF exists only on a course page that re-hosts the publisher's file, which the library rules exclude. Ferreira et al. 2018 (p. 337) is the secondary statement used (CLM-128).
 ### RoseMarshall2009
 - Reference: Rose, B. E. J., & Marshall, J. (2009). Ocean heat transport, sea ice, and multiple climate states: Insights from energy balance models. Journal of the Atmospheric Sciences 66(9): 2828-2843.
 - DOI or URL: 10.1175/2009JAS3039.1; MIT copy http://hdl.handle.net/1721.1/53519
@@ -4721,6 +4758,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: abstract fetched (Crossref/Semantic Scholar)
 - Reference check: EXISTS and the citation is right (46: 327-352). What it is cited for (deep water forms in the narrowest polar-connected basin; basin width selects the Atlantic) is NOT what the abstract leads with: the abstract says the asymmetry occurs "because the Atlantic is more saline". Citing papers also say basin width/continent shape is one proposed control (see Part 2).
 
+- Read in WP-14a (2026-10-02): Fetched and read in full (NSF public access repository, https://par.nsf.gov/servlets/purl/10101075; Ferreira2018.txt): basin width as one cause of Atlantic sinking (section 4.2, pp. 337-338; p. 344). CLM-132 verified; it gives no basin widths, AMOC number or deep-water temperature (CLM-163).
 ### Trenberth2001
 - Reference: Trenberth, K. E., & Caron, J. M. (2001). Estimates of meridional atmosphere and ocean heat transports. Journal of Climate 14(16): 3433-3443.
 - DOI or URL: 10.1175/1520-0442(2001)014<3433:EOMAAO>2.0.CO;2
@@ -4732,6 +4770,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: search result snippet only (citing passages)
 - Reference check: matches.
 
+- Read in WP-14a (2026-10-02): Fetched (a copy deposited on Zenodo, https://zenodo.org/records/1234671, depositor unknown; Trenberth2001.txt) and read: atmosphere 5.0 +/- 0.14 PW at 43 N (abstract); the ocean peak only in Fig. 7, about 2 PW near 15-20 N, read by eye; 1.5-2.0 PW observed at 24 N (p. 3439). CLM-133 verified.
 ### Lindzen1987
 - Reference: Lindzen, R. S., & Nigam, S. (1987). On the role of sea surface temperature gradients in forcing low-level winds and convergence in the tropics. Journal of the Atmospheric Sciences 44(17): 2418-2436.
 - DOI or URL: 10.1175/1520-0469(1987)044<2418:OTROSS>2.0.CO;2
@@ -4744,6 +4783,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: search result snippet only (citing passages)
 - Reference check: EXISTS, citation right. The paper is about SST gradients forcing marine boundary-layer pressure gradients; the design uses the idea for land-sea (monsoon) temperature contrasts. That is an extension, not the paper's subject.
 
+- Read in WP-14a (2026-10-02): Not obtained (AMS refuses scripted access; NASA NTRS record only; no author copy found). Read through Back & Bretherton 2009 instead (CLM-141 stays from-memory).
 ### Dommenget2011
 - Reference: Dommenget, D., & Flöter, J. (2011). Conceptual understanding of climate change with a globally resolved energy balance model. Climate Dynamics 37(11-12): 2143-2165.
 - DOI or URL: 10.1007/s00382-011-1026-0
@@ -4755,6 +4795,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: matches.
 
+- Read in WP-14a (2026-10-02): Fetched (the author's copy, https://users.monash.edu.au/~dietmard/papers/dommenget.and.floeter.greb.paper.cdym2011.pdf; Dommenget2011.txt; correct DOI 10.1007/s00382-011-1026-0) and read: eq. 7 bulk evaporation with a turbulent wind of 3 m/s (ocean) and 2 m/s (land) added to the 850 hPa wind (section 3.3); kappa = 8e5 m2/s in section 3.5 but 2e5 in Table 2 (the paper disagrees with itself); C_w and rho_air not numbered; 3.75 x 3.75 degree grid (CLM-142, CLM-139).
 ### Stassen2019
 - Reference: Stassen, C., Dommenget, D., & Loveday, N. (2019). A hydrological cycle model for the Globally Resolved Energy Balance (GREB) model v1.0. Geoscientific Model Development 12(1): 425-440.
 - DOI or URL: 10.5194/gmd-12-425-2019
@@ -4766,6 +4807,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: matches.
 
+- Read in WP-14a (2026-10-02): Read WP-14a: 3.75 degree grid (p. 426), eq. 2 (p. 427), eqs. 12-16 (c_eva 0.58/0.25, c_turb 5.4/11.5 m/s, p. 431), eq. 18 (f = 2.5) (CLM-119, CLM-142).
 ### Fanning1996
 - Reference: Fanning, A. F., & Weaver, A. J. (1996). An atmospheric energy-moisture balance model: Climatology, interpentadal climate change, and coupling to an ocean general circulation model. Journal of Geophysical Research 101(D10): 15111-15128.
 - DOI or URL: 10.1029/96JD01017
@@ -4799,6 +4841,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: search result snippet only (citing passages)
 - Reference check: EXISTS, citation right. See Part 2 for the 15.6.
 
+- Read in WP-14a (2026-10-02): Fetched (a co-author's copy, https://www.aos.wisc.edu/~lback/wvpprecip.pdf; Bretherton2004.txt) and read: daily fit eq. 1 (a_d 15.6, r_d 0.603, p. 1519), monthly fit eq. 2 (a_m 11.4, r_m 0.522, p. 1521), W*ref 72 mm (p. 1521). The design's rain law was changed to the monthly fit (CLM-145).
 ### Manabe1969
 - Reference: Manabe, S. (1969). Climate and the ocean circulation: I. The atmospheric circulation and the hydrology of the earth's surface. Monthly Weather Review 97(11): 739-774.
 - DOI or URL: 10.1175/1520-0493(1969)097<0739:CATOC>2.3.CO;2
@@ -4811,6 +4854,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: search result snippet only (citing passages)
 - Reference check: EXISTS, citation right (Part I, pp. 739-774; Part II by Manabe & Bryan follows at 775-805).
 
+- Read in WP-14a (2026-10-02): Fetched from GFDL (https://www.gfdl.noaa.gov/bibliography/related_files/sm6901.pdf; Manabe1969.txt, poor text layer, equations read on the page image) and read: eqs. 18 and 20, W_K = 0.75 W_FC, field capacity 15 cm (p. 743). CLM-143 verified.
 ### Siler2018
 - Reference: Siler, N., Roe, G. H., & Armour, K. C. (2018). Insights into the zonal-mean response of the hydrologic cycle to global warming from a diffusive energy balance model. Journal of Climate 31(18): 7481-7493.
 - DOI or URL: 10.1175/JCLI-D-18-0081.1
@@ -4845,6 +4889,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: matches.
 
+- Read in WP-14a (2026-10-02): Fetched (the author's site, https://eisenman.ucsd.edu/papers/Wagner-Eisenman-2015.pdf; library key WagnerEisenman2015) and read: Table 1 (p. 4001), k = 2 W/m/K and L_f of pure ice, a 75 m mixed layer (p. 4002) (notes on CLM-013, CLM-093, CLM-095).
 ### Klein1993
 - Reference: Klein, S. A., & Hartmann, D. L. (1993). The seasonal cycle of low stratiform clouds. Journal of Climate 6(8): 1587-1606.
 - DOI or URL: 10.1175/1520-0442(1993)006<1587:TSCOLS>2.0.CO;2
@@ -4868,6 +4913,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: search result snippet only (citing passages)
 - Reference check: EXISTS, pages right. Author order differs: Crossref gives Serreze, Schnell, Kahl; the code writes Serreze, Kahl & Schnell. The paper is about inversions over the Eurasian Arctic (soundings and drifting stations), which fits "winter surface inversion"; the specific "Siberia's January surface 10-20 K below 850 hPa" could not be checked.
 
+- Read in WP-14a (2026-10-02): Not obtained (AMS refuses scripted access; no author copy found). The inversion size was checked against the NCEP/NCAR reanalysis instead (CLM-165); CLM-134 stays from-memory.
 ### Ramirez2024
 - Reference: Ramirez, R. M. (2024). A new 2D energy balance model for simulating the climates of rapidly and slowly rotating terrestrial planets. The Planetary Science Journal 5(1): 2.
 - DOI or URL: 10.3847/PSJ/AD0729; preprint arXiv 2310.15992
@@ -4879,6 +4925,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched (arxiv.org/html/2310.15992 returned 404; PDF not text-readable)
 - Reference check: IDENTIFIED by title search (the name "PlaHab" returns nothing in Crossref). Year is 2024 in the journal (2023 as a preprint); the design doc's "Ramirez 2023" is the preprint year. I did not confirm that the paper uses 1/25 for the zonal-to-meridional ratio.
 
+- Read in WP-14a (2026-10-02): Read WP-14a: eq. 1 and the diffusion values, p. 3 (Do,1 = 0.5; Do,2 = 0.02 below 45 degrees, 0.0002 above). CLM-121. The design had the year as 2023.
 ### Tetens
 - Reference: UNIDENTIFIED in this pass. The code names only "Tetens" for a saturation-vapour formula. Likely Tetens, O. (1930), "Über einige meteorologische Begriffe", Zeitschrift für Geophysik 6: 297-309; this is my recollection, not verified (no DOI, no lookup possible).
 - DOI or URL: none
@@ -4891,11 +4938,12 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: not fetched
 - Reference check: cannot confirm.
 
+- Read in WP-14a (2026-10-02): Murray 1967 (J. Appl. Meteor. 6: 203) could not be obtained; its coefficients were read only on a CIRES page quoting it (6.1078 hPa, 17.269388 and 35.86 K over water). Not verified (CLM-142).
 ### ETOPO2022
 - Reference: NOAA National Centers for Environmental Information (2022). ETOPO 2022 15 Arc-Second Global Relief Model. NOAA NCEI.
 - DOI or URL: 10.25921/fd45-gt74 (title and year confirmed through the DataCite API)
 - Cited as: "ETOPO 2022"
-- Ledger ids: none
+- Ledger ids: ERO-168, HNT-093 (margins and spires task, 2026-10-03)
 - Access: open access (dataset)
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://doi.org/10.25921/fd45-gt74. File: ETOPO2022.txt.
 - Read so far (by the project): data named
@@ -4935,6 +4983,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read in this pass: full text fetched (the data file header and the annual series, not the paper)
 - Reference check: n/a
 
+- Read in WP-14a (2026-10-02): WP-14a fetched the Berkeley Earth Land/Ocean data file (library BerkeleyEarth_LandOcean/Land_and_Ocean_complete.txt, https://berkeley-earth-temperature.s3.us-west-1.amazonaws.com/Global/Land_and_Ocean_complete.txt) and averaged its monthly anomalies over 1850-1900: -0.306 K (air above sea ice) and -0.296 K (water below), so 13.80 and 14.40 degC (CLM-138).
 ### Kopp2011
 - Reference: Kopp, G., & Lean, J. L. (2011). A new, lower value of total solar irradiance: Evidence and climate significance. Geophysical Research Letters 38(1): L01706.
 - DOI or URL: 10.1029/2010GL045777
@@ -4973,6 +5022,78 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 ---
 
 ---
+
+## Per-cell climate design: sources added in WP-14a (2026-10-02)
+
+### DonohoeBattisti2011
+- Reference: Donohoe, A., & Battisti, D. S. (2011). Atmospheric and surface contributions to planetary albedo. Journal of Climate 24(16): 4402-4418.
+- DOI or URL: 10.1175/2011JCLI3946.1
+- Ledger ids: CLM-123
+- Library: fetched in WP-14a, the accepted manuscript from the co-author's page (https://atmos.uw.edu/~david/Donohoe_Battisti_Albedo.pdf). Text file: DonohoeBattisti2011.txt. Manuscript pagination, not the journal's.
+- Read in WP-14a: in full by a sub-agent: 88 % of planetary albedo is atmospheric; the atmosphere attenuates the surface contribution by about three (68 % globally, about 60 % in the dry subtropics, eq. 10).
+
+### McCarthy2015
+- Reference: McCarthy, G. D., Smeed, D. A., Johns, W. E., et al. (2015). Measuring the Atlantic Meridional Overturning Circulation at 26°N. Progress in Oceanography 130: 91-111.
+- DOI or URL: 10.1016/j.pocean.2014.10.006
+- Ledger ids: CLM-131
+- Library: fetched in WP-14a, the NERC accepted manuscript (http://nora.nerc.ac.uk/id/eprint/508654/). Text file: McCarthy2015.txt.
+- Read in WP-14a: abstract and highlights: 17.2 Sv and 1.22 PW, April 2004 to October 2012.
+
+### FrajkaWilliams2019
+- Reference: Frajka-Williams, E., Ansorge, I. J., Baehr, J., et al. (2019). Atlantic Meridional Overturning Circulation: observed transport and variability. Frontiers in Marine Science 6: 260.
+- DOI or URL: 10.3389/fmars.2019.00260
+- Ledger ids: CLM-131
+- Library: fetched in WP-14a (open access). Text file: FrajkaWilliams2019.txt.
+- Read in WP-14a: section 2.2.4: 17.0 +/- 4.4 Sv, April 2004 to February 2017.
+
+### BackBretherton2009
+- Reference: Back, L. E., & Bretherton, C. S. (2009). On the relationship between SST gradients, boundary layer winds, and convergence over the tropical oceans. Journal of Climate 22(15): 4182-4196.
+- DOI or URL: 10.1175/2009JCLI2392.1
+- Ledger ids: CLM-141
+- Library: fetched in WP-14a, the author's copy (https://www.aos.wisc.edu/~lback/SSTgradients.pdf). Text file: BackBretherton2009.txt.
+- Read in WP-14a: its account of Lindzen & Nigam 1987 (a layer to 700 hPa and a back-pressure term, p. 4183; 850 hPa more realistic, p. 4195).
+
+### LargeYeager2004
+- Reference: Large, W. G., & Yeager, S. G. (2004). Diurnal to decadal global forcing for ocean and sea-ice models: the data sets and flux climatologies. NCAR Technical Note NCAR/TN-460+STR.
+- DOI or URL: 10.5065/D6KK98Q6
+- Ledger ids: CLM-128
+- Library: fetched in WP-14a (https://www.aoml.noaa.gov/ftp/phod/sklee/articles/core2/large_yeager_2004_core.pdf). Text file: LargeYeager2004.txt.
+- Read in WP-14a: eq. 6a, the neutral 10-m drag coefficient (1.06e-3 at 5 m/s, 1.18e-3 at 10 m/s, computed).
+
+### IPCC2001_ch6
+- Reference: Ramaswamy, V., et al. (2001). Radiative forcing of climate change. In Climate Change 2001: The Scientific Basis (IPCC TAR, WG1), chapter 6, pp. 349-416. Cambridge University Press.
+- DOI or URL: https://www.ipcc.ch/site/assets/uploads/2018/03/TAR-06.pdf
+- Ledger ids: CLM-069
+- Library: fetched in WP-14a. Text file: IPCC2001_ch6.txt.
+- Read in WP-14a: Table 6.2 (p. 358), the three CO2 expressions and the footnote crediting Myhre et al. 1998b.
+
+### Kalnay1996
+- Reference: Kalnay, E., et al. (1996). The NCEP/NCAR 40-year reanalysis project. Bulletin of the American Meteorological Society 77: 437-471. Data: NOAA PSL, NCEP/NCAR Reanalysis 1 monthly long-term means 1991-2020.
+- DOI or URL: 10.1175/1520-0477(1996)077<0437:TNYRP>2.0.CO;2; data https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/Monthlies/
+- Ledger ids: CLM-164, CLM-165
+- Library: the data files (uwnd, vwnd, air at pressure levels and sigma 0.995) and the two scripts that read them, folder NCEP_R1_ltm/. The paper itself was not fetched. Public-domain US government data, used for validation only.
+- Read in WP-14a: computed zonal-mean winds and January inversions (see the rows).
+
+### Stull2017
+- Reference: Stull, R. (2017). Practical Meteorology: An Algebra-based Survey of Atmospheric Science, version 1.02b. University of British Columbia. Chapter 2.
+- DOI or URL: https://www.eoas.ubc.ca/books/Practical_Meteorology/
+- Ledger ids: CLM-123
+- Library: fetched in WP-14a (CC BY-NC-SA; chapters 1, 2, 4). Text file: Stull2017_Ch02-radiation.txt.
+- Read in WP-14a: Table 2-5, typical albedos (p. 43).
+
+### Norton1979
+- Reference: Norton, C. C., Mosher, F. R., & Hinton, B. (1979). An investigation of surface albedo variations during the recent Sahel drought. NASA CR-157198 (grant final report).
+- DOI or URL: https://ntrs.nasa.gov/citations/19790021556
+- Ledger ids: CLM-123
+- Library: fetched in WP-14a. Text file: Norton1979.txt.
+- Read in WP-14a: p. 2, Charney et al. 1977's Sahel albedo change from 0.14 to 0.35 (a secondary citation of Charney).
+
+### Guilloteau2000
+- Reference: Guilloteau, S. (2000). Atmospheric absorption: water (section 8.1.4). IRAM Interferometry School lecture notes.
+- DOI or URL: https://web-archives.iram.fr/IS/IS2002/html_1/node86.html
+- Ledger ids: CLM-144
+- Library: fetched in WP-14a. Text file: Guilloteau2000.txt.
+- Read in WP-14a: "The scale height of water ... is small (typically 2 km)". Institutional lecture notes, not peer reviewed.
 
 ## Lithospheric flexure (ISO-040 to ISO-067)
 
@@ -5268,6 +5389,13 @@ Works read for the geothermal page and the hint figure table (2026-10-02). Not c
 - Library: `WEC2013_Geothermal/wec.pdf` and `wec.txt`.
 - Read in this pass: the passage saying high-temperature fields (above 180 degC) lie along plate boundaries (the Pacific ring of fire, Iceland on the Mid-Atlantic Ridge, the East African Rift Valley) and at hotspots such as Hawaii and Yellowstone.
 
+### Davies2010
+- Reference: Davies, J.H. and Davies, D.R. 2010. Earth's surface heat flux. Solid Earth 1:5-24, doi 10.5194/se-1-5-2010 (Creative Commons Attribution 3.0).
+- Ledger ids: GEO-052, GEO-057, GEO-059, GEO-060
+- Access: open.
+- Library: `Davies2010/Davies2010.pdf` and `Davies2010.txt`.
+- Read in this pass (GEO heat flow, 2026-10-02): full text of Tables 3 and 7 and Eq. 2. Continents (2.073e14 m2): 14.7 TW, mean 70.9 mW/m2; oceans 105.4; global 91.6. Mean heat flow by geology: Cenozoic extensional 102.4 (16 observations), Quaternary 82.0, Tertiary 77.3, continental and island arc margins 73.8, Precambrian 59.9. The empirical continental fit q = 102 - 2.25 sqrt(t) (t in Myr, Precambrian excluded; R squared 0.75 for the category means).
+
 ### NASAEarthFactSheet
 - Reference: NASA Space Science Data Coordinated Archive, Earth Fact Sheet. https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 - Ledger ids: HNT-001, HNT-002, HNT-003, HNT-004
@@ -5543,6 +5671,14 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Sclater, J. G. and Christie, P. A. F. (1980), JGR 85:3711, porosity-depth parameters as tabulated in the pyBacktrack documentation (https://pybacktrack.readthedocs.io); Bjorlykke et al. (2009), AAPG Search and Discovery 50192; Sanuade and Kaka (2017), Geological Quarterly 61(1):106-123, on the Niger Delta; Hudec and Jackson (2007) as quoted by the EGU TS blog; Schultz-Ela, Jackson and Vendeville (1994) abstract; Ponce, Denton and Miller (2013), USGS, abstract (Mountain Pass carbonatite density); Christeson et al. (2018), EPSL, abstract (Chicxulub suevite and melt rock density); Devriese, Davis and Oldenburg (2017), Interpretation (kimberlite density, qualitative); RocFall documentation table of the New Zealand PETLAB rock-property database (Tenzer et al. 2011); Wikipedia pages (Carbonate compensation depth, Salt tectonics, Cathedral Peak Granodiorite, Migmatite, Gneiss, Blueschist, Granulite, Petroleum trap, Diamictite, Greisen, Skarn, Travertine); SEPM Strata and LibreTexts pages on the CCD; Greenwood and Berman, "Metamorphic rock", The Canadian Encyclopedia.
 - Closed and not read: Winter 2010, Yardley 1989, Spear 1993, Bucher and Grapes 2011, Warren 2016, Telford et al. 1990, Schon 2015, Cruden 1998, McCaffrey and Petford 1997, Cruden and McCaffrey 2001, Buddington 1959, Haederle and Atherton 2002, Mukasa 1986, Hudec and Jackson 2007, Doust and Omatsola 1990, Pollack et al. 1993, Heimsath et al. 1997, Roering et al. 1999, Kelsey and Hand 2015, Brown 2014.
 
+### Ducea2001
+- Reference: Ducea, M. (2001). The California arc: thick granitic batholiths, eclogitic residues, lithospheric-scale thrusting, and magmatic flare-ups. GSA Today 11(11):4-10.
+- Cited as: "Ducea 2001, GSA Today" (plate tasks 3 and 4, ledger PLT-242)
+- Ledger ids: PLT-242
+- Access: open (GSA Today)
+- Library (the project's source library, not distributed): Ducea2001.pdf, Ducea2001.txt.
+- Read in plate tasks 3 and 4 (2026-10-02): the passage on crustal thickness, p. 5: "The present crust beneath the Sierra Nevada is thin (33 km thick ...) and is probably an effect of Late Cenozoic extension and delamination"; "the Mesozoic crust was at least ~70 km thick". Used only as evidence that thickened crust can lose its root, not for a number in the code.
+
 ## Arc crust and continental crust (PLT-045, PLT-047), added 2026-10-02 with the continental crust fix
 
 ### Stern2010
@@ -5580,3 +5716,60 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Access: paywalled (OpenAlex lists no open copy, 2026-10-02).
 - Library (the project's source library, not distributed): abstract only, 2026-10-02 (OpenAlex record of the GSW page): `JichaJagoutz2015/openalex.json`, text `JichaJagoutz2015/abstract.txt`.
 - Read so far (by the project): abstract, 2026-10-02. It gives no numbers: "Our revised magma production rates for active intraoceanic arcs are consistent with those calculated for mid-ocean ridge segments that have slow to moderate spreading rates. This is surprising because magma production at intraoceanic arcs has traditionally been assumed to be significantly less than that at mid-ocean ridges." No value in the code or the ledger rests on it; the rates PLT-045 is compared with are Stern 2010's and Stern & Scholl 2010's.
+
+## Continental margins (ERO-168 to ERO-170, HNT-093), added 2026-10-03
+
+### Pratson1996
+- Reference: Pratson, L. F. and Haxby, W. F. (1996). What is the slope of the U.S. continental slope? Geology 24(1):3-6.
+- DOI or URL: 10.1130/0091-7613(1996)024<0003:WITSOT>2.3.CO;2
+- Cited as: "Pratson & Haxby 1996" (the regional slope of the steepest clastic margin, 2.5°).
+- Ledger ids: ERO-168, HNT-093
+- Access: paywalled (GSA); the abstract is on Duke Scholars (https://fds.duke.edu/db/pratt/gendell/faculty/lincoln.pratson/publications/279477).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract only, 2026-10-03 (margins and spires task): regional and mean local slopes, West Florida (passive carbonate) 4.4° and 12.0°, New Jersey–Maryland (passive clastic) 2.5° and 7.6°, Louisiana (salt) 0.5° and 2.9°, California (strike-slip) 1.8° and 5.2°, Oregon (convergent) 2.0° and 5.2°, from multibeam bathymetry of five U.S. margins.
+- Reference check: matches (title, journal, volume, pages on the Duke page).
+
+ETOPO 2022 (entry above, under the climate section) was used as data in the same task: the 60 arc-second surface GeoTIFF was downloaded to the test VM and the continental margins measured with the planet's transect code (build log 2026-10-03).
+
+
+## Quincuncial projections (SCL-070 to SCL-075), added 2026-10-03 with the seamless-wrapping prototype
+
+The prototype crate `crates/deeptime-quincuncial` (not shipped) rests on these. None was read in full this session.
+
+### Peirce1879
+- Reference: Peirce, C. S. (1879). A quincuncial projection of the sphere. American Journal of Mathematics 2(4):394-396 (volume and pages from memory).
+- Cited as: "Peirce 1879".
+- Ledger ids: SCL-070, SCL-074
+- Access: JSTOR (paywalled); not fetched.
+- Read so far (by the project): through Wikipedia "Peirce quincuncial projection" (docs/research/notes/world-projection-options.md, 2026-10-02).
+
+### Guyou1887
+- Reference: Guyou, É. (1887). Nouveau système de projection de la sphère: généralisation de la projection de Mercator. Annales Hydrographiques, série 2, 9:16-35 (from memory, not checked).
+- Cited as: "Guyou 1887".
+- Ledger ids: SCL-071, SCL-074
+- Access: not fetched.
+- Read so far (by the project): through Wikipedia "Guyou hemisphere-in-a-square projection", fetched 2026-10-03 by the prototype agent: "an oblique aspect of the Peirce quincuncial projection"; "conformal except for the four corners of each hemisphere's square"; "The Equator is represented by a horizontal line"; "the sphere as a rectangle of aspect ratio 2:1"; developed by Émile Guyou in 1887.
+
+### Lee1976
+- Reference: Lee, L. P. (1976). Conformal Projections Based on Elliptic Functions. Cartographica Monograph 16 (supplement to Canadian Cartographer 13).
+- Cited as: "Lee 1976".
+- Ledger ids: SCL-070
+- Access: not fetched. Read so far: catalogue entry only (via world-projection-options.md).
+
+### AbramowitzStegun1964
+- Reference: Abramowitz, M. and Stegun, I. A. (eds.) (1964). Handbook of Mathematical Functions. National Bureau of Standards Applied Mathematics Series 55. Chapter 16 (Jacobian elliptic functions, L. M. Milne-Thomson) and 17 (elliptic integrals).
+- Cited as: "A&S 16.4", "A&S 16.21.2-4", "A&S 17.6".
+- Ledger ids: SCL-073
+- Access: public domain (US government work); not fetched this session. Read so far: from memory.
+
+### DLMF
+- Reference: NIST Digital Library of Mathematical Functions, §19.36 (Carlson's duplication algorithm), §22.15 (inverse Jacobian functions), §19.25. https://dlmf.nist.gov/
+- Cited as: "DLMF 19.36.1", "DLMF 22.15.13 with 19.25.5".
+- Ledger ids: SCL-073
+- Access: open; not fetched this session. Read so far: from memory.
+
+### Carlson1995
+- Reference: Carlson, B. C. (1995). Numerical computation of real or complex elliptic integrals. Numerical Algorithms 10:13-26. doi:10.1007/BF02198293.
+- Cited as: "Carlson 1995".
+- Ledger ids: SCL-073
+- Access: arXiv math/9409227 (open); not fetched this session. Read so far: from memory.

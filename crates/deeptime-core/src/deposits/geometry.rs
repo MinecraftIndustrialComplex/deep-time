@@ -5,7 +5,7 @@
 //! Volume V = tonnage / ore density; the semi-axes in metres are the type's `aspect` scaled so
 //! the primitive holds V (ellipsoid 4/3·π·abc, cylinder π·ac·2b). In blocks, horizontal axes are
 //! divided by the horizontal scale (300 m) and multiplied by `size_mult_h`, the vertical one by
-//! the vertical scale (20 m) and `size_mult_v`: a median porphyry (240 Mt / 2.6 t/m³ ≈ 9.2e7 m³)
+//! the vertical scale (`scale.m_per_block_v`, 35 m by default) and `size_mult_v`: a median porphyry (240 Mt / 2.6 t/m³ ≈ 9.2e7 m³)
 //! is a few hundred metres across, about 1.5 blocks wide before the multiplier (plan §8.6), so
 //! the horizontal multiplier does most of the work.
 
@@ -24,15 +24,18 @@ pub struct Scales {
     pub m_per_block_v: f64,
     pub min_y: i32,
     pub max_y: i32,
+    /// `scale.sea_level_y`: the block y of elevation 0.
+    pub sea_level_y: i32,
 }
 
 impl Default for Scales {
     fn default() -> Self {
         Scales {
             m_per_block_h: 300.0,
-            m_per_block_v: 20.0,
-            min_y: -352,
+            m_per_block_v: deeptime_format::DEFAULT_M_PER_BLOCK_V,
+            min_y: -512,
             max_y: 639,
+            sea_level_y: 63,
         }
     }
 }
@@ -637,7 +640,12 @@ mod tests {
     fn a_stack_is_held_in_its_sedimentary_cover() {
         let t = coal();
         let k = t.geometry.stack.clone().unwrap();
-        let sc = Scales::default();
+        // Covers and depths below are in blocks set at 20 m a block (where seed 3's gaps keep
+        // every seam apart: under 6 m of real gap, two half-block seams touch at 35 m).
+        let sc = Scales {
+            m_per_block_v: 20.0,
+            ..Scales::default()
+        };
         let plan = seam_plan(&k, 300.0, 1000.0, &mut Rng::new(3));
         // 300 m of measures stand spacing_mult_v · 300 / 20 blocks tall.
         let span = 300.0 * k.spacing_mult_v / sc.m_per_block_v;
@@ -715,7 +723,12 @@ mod tests {
         let t = coal();
         let k = t.geometry.stack.clone().unwrap();
         let grades: Grades = [("c:coal".to_string(), 1.0)].into_iter().collect();
-        let sc = Scales::default();
+        // Covers and depths below are in blocks set at 20 m a block (where seed 3's gaps keep
+        // every seam apart: under 6 m of real gap, two half-block seams touch at 35 m).
+        let sc = Scales {
+            m_per_block_v: 20.0,
+            ..Scales::default()
+        };
         let plan = seam_plan(&k, 500.0, 30.0, &mut Rng::new(3));
         assert!(plan.seams() >= 5);
         let build = |depth: f64| {

@@ -42,6 +42,8 @@
   const cap1 = s => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
   const prettyKind = k => cap1(shortKind(k).replace(/_/g, ' '));
   const D2R = Math.PI / 180;
+  // The planet's projection (projection.js, loaded first): every block ↔ picture ↔ lat/lon here.
+  const proj = window.DTProj;
   const store = {
     get(k, d) { try { const v = localStorage.getItem(`dtwb.${k}`); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(`dtwb.${k}`, JSON.stringify(v)); } catch (e) { /* storage blocked */ } },
@@ -589,7 +591,8 @@
     const axes = !TV && !mob;
     const m = TV ? { l: 0, r: 0, t: 0, b: 0 } : mob ? { l: 8, r: 8, t: 8, b: 8 } : { l: 48, r: 22, t: 18, b: 32 };
     const head = side ? 30 : 0;
-    const fit = (x, y, w, h) => { const mw = Math.max(40, Math.min(w, 2 * h)); const mh = mw / 2; return [x + (w - mw) / 2, y + (h - mh) / 2, mw, mh]; };
+    // The map pane at the map picture's aspect (projection.js: π : 1).
+    const fit = (x, y, w, h) => { const mw = Math.max(40, Math.min(w, proj.aspect * h)); const mh = mw / proj.aspect; return [x + (w - mw) / 2, y + (h - mh) / 2, mw, mh]; };
     const place = (p, [x, y, w, h]) => {
       p.rect = { x, y, w, h };
       Object.assign(p.el.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
@@ -641,8 +644,8 @@
   function buildAxes() {
     for (const p of panes) {
       let h = '';
-      for (const lat of [60, 30, 0, -30, -60]) h += `<span class="lat" style="top:${(90 - lat) / 180 * 100}%">${lat === 0 ? '0°' : `${Math.abs(lat)}°${lat > 0 ? 'N' : 'S'}`}</span>`;
-      for (let lon = 0; lon <= 360; lon += 60) h += `<span class="lon${lon % 360 === 0 ? ' seam' : ''}" style="left:${lon / 360 * 100}%">${lon % 360 === 0 ? 'seam' : `${lon}°`}</span>`;
+      for (const lat of [60, 30, 0, -30, -60]) h += `<span class="lat" style="top:${proj.yOfLat(lat, 100)}%">${lat === 0 ? '0°' : `${Math.abs(lat)}°${lat > 0 ? 'N' : 'S'}`}</span>`;
+      for (let lon = 0; lon <= 360; lon += 60) h += `<span class="lon${lon % 360 === 0 ? ' seam' : ''}" style="left:${proj.xOfLonPic(lon, 100)}%">${lon % 360 === 0 ? 'seam' : `${lon}°`}</span>`;
       p.axes.innerHTML = h;
     }
   }
@@ -667,20 +670,21 @@
   // =================================================================================================
   const FADE_YEARS = 24e6;
   const placeLatLon = e => (e.place && e.place.type === 'point') ? [e.place.lat, e.place.lon] : null;
-  // Keyframe pixel px is centred on lon 360°·px/w (the seam is 0°), py on lat 90° − 180°·py/h.
+  // Keyframe pixel px is centred on lon 360°·px/w (the seam is 0°), py on the latitude the
+  // projection gives row py (proj.yOfLat).
   function mapXY(lat, lon, f, W) {
     const s = W / f.w;
-    return [(((lon % 360) + 360) % 360 / 360 * f.w + 0.5) * s, ((90 - lat) / 180 * f.h + 0.5) * s];
+    return [(proj.xOfLonPic(proj.wrapLon(lon), f.w) + 0.5) * s, (proj.yOfLat(lat, f.h) + 0.5) * s];
   }
-  function llToCanvas(p, lat, lon) { return [(((lon % 360) + 360) % 360) / 360 * p.canvas.width, (90 - lat) / 180 * p.canvas.height]; }
+  function llToCanvas(p, lat, lon) { return [proj.xOfLonPic(proj.wrapLon(lon), p.canvas.width), proj.yOfLat(lat, p.canvas.height)]; }
   function mapLatLon(p, x, y) {
-    return [clamp(90 - y / p.canvas.height * 180, -90, 90), ((x / p.canvas.width * 360) % 360 + 360) % 360];
+    return [clamp(proj.latOfY(y, p.canvas.height), -90, 90), proj.wrapLon(proj.lonOfPicX(x, p.canvas.width))];
   }
-  // Block coordinates of a point (plan §5.2; the static viewer's inspect): x = 360°-longitude
-  // scaled to C, from the seam at −C/2; north is −z.
+  // Block coordinates of a point (the projection; the static viewer's inspect): x from the seam
+  // at −C/2; north is −z.
   function blockXZ(run, lat, lon) {
     const C = (run && run.meta && run.meta.circumference) || 16384;
-    return [Math.round(lon / 360 * C - C / 2), Math.round(-lat / 360 * C)];
+    return [Math.round(proj.xOfLon(C, lon)), Math.round(proj.zOfLat(C, lat))];
   }
   const circ = run => (run && run.meta && run.meta.circumference) || 16384;
   function visibleEvents(run, t) {
@@ -793,13 +797,13 @@
     ctx.save();
     ctx.lineWidth = dpr;
     for (let lat = -60; lat <= 60; lat += 30) {
-      const y = Math.round((90 - lat) / 180 * H) + 0.5;
+      const y = Math.round(proj.yOfLat(lat, H)) + 0.5;
       ctx.strokeStyle = lat === 0 ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.09)';
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
     }
     ctx.strokeStyle = 'rgba(255,255,255,.09)';
     for (let lon = 30; lon < 360; lon += 30) {
-      const x = Math.round(lon / 360 * W) + 0.5;
+      const x = Math.round(proj.xOfLonPic(lon, W)) + 0.5;
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
     }
     // The seam (world x = ±C/2) is the map's left and right edge.
@@ -875,8 +879,8 @@
     if (!pix) return null;
     const dn = displayIndex(r, p.cur), f = r.frames[dn];
     const li = r.layerIndex(f), name = f.layers[li], info = rampInfo(f.ramps && f.ramps[li]);
-    const px = Math.min(pix.w - 1, Math.floor((((lon % 360) + 360) % 360) / 360 * pix.w));
-    const py = clamp(Math.floor((90 - lat) / 180 * pix.h), 0, pix.h - 1);
+    const px = Math.min(pix.w - 1, Math.floor(proj.xOfLonPic(proj.wrapLon(lon), pix.w)));
+    const py = clamp(Math.floor(proj.yOfLat(lat, pix.h)), 0, pix.h - 1);
     const q = (py * pix.w + px) * 4;
     const rgb = [pix.d[q], pix.d[q + 1], pix.d[q + 2]];
     if (pix.d[q + 3] === 0) return { name, rgb, nodata: true };
@@ -898,8 +902,8 @@
     if (!ready(img) || !rinfo) return null;
     if (p.lakeImg !== img) { p.lakePix = pixels(img); p.lakeImg = img; }
     const pix = p.lakePix;
-    const px = Math.min(pix.w - 1, Math.floor((((lon % 360) + 360) % 360) / 360 * pix.w));
-    const py = clamp(Math.floor((90 - lat) / 180 * pix.h), 0, pix.h - 1), q = (py * pix.w + px) * 4;
+    const px = Math.min(pix.w - 1, Math.floor(proj.xOfLonPic(proj.wrapLon(lon), pix.w)));
+    const py = clamp(Math.floor(proj.yOfLat(lat, pix.h)), 0, pix.h - 1), q = (py * pix.w + px) * 4;
     return pix.d[q + 3] === 0 ? null : lakeKind(rinfo, [pix.d[q], pix.d[q + 1], pix.d[q + 2]], 150);
   }
   // The lake colours of a ramp's `keys` (lake, frozen lake, salt flat) and their hover names.
@@ -997,8 +1001,8 @@
       if (tool === 'area') {
         let b = drag.box;
         if (!moved || !b) {   // a click: the largest box a preview makes, 256 × 256 blocks around it
-          const d = 128 / circ(r) * 360;
-          b = boxInfo(r, clamp(lat + d, -90, 90), clamp(lat - d, -90, 90), lon - d, lon + d);
+          const dn = Math.abs(proj.dLatOfDz(circ(r), 128, lat)), de = proj.dLonOfDx(circ(r), 128, lat);
+          b = boxInfo(r, clamp(lat + dn, -90, 90), clamp(lat - dn, -90, 90), lon - de, lon + de);
         }
         p.boxLL = b; mapDirty = true;
         const [x0, z0] = blockXZ(r, b.north, b.west), [x1, z1] = blockXZ(r, b.south, b.east);
@@ -1030,7 +1034,8 @@
   // A box's lat/lon bounds with its size in blocks (a preview is at most 256 × 256; larger is cut).
   function boxInfo(r, north, south, west, east) {
     const C = circ(r);
-    const w = Math.round(Math.abs(east - west) / 360 * C), h = Math.round(Math.abs(north - south) / 360 * C);
+    const mid = (north + south) / 2;
+    const w = Math.round(Math.abs(proj.dxOfDLon(C, east - west, mid))), h = Math.round(Math.abs(proj.dzOfDLat(C, north - south, mid)));
     const cut = w > 256 || h > 256;
     return { north, south, west, east, w, h, cut, text: `${fmtInt(w)} × ${fmtInt(h)} blocks${cut ? ' → cut to 256 × 256' : ''}` };
   }
@@ -1072,15 +1077,15 @@
   // The sites show on the frames where the deposit stage has run.
   const depShown = (r, n) => !!r && !!r.deposits && r.depFrom >= 0 && n >= r.depFrom;
   // The map's pixels for a lat/lon, as the event markers use them.
-  function depView(p, f) {
+  function depView(p, f, r) {
     const c = p.canvas;
-    return { project: (lat, lon) => mapXY(lat, lon, f, c.width), ppdx: c.width / 360, ppdy: c.height / 180, worldW: c.width, dpr: window.devicePixelRatio || 1 };
+    return { project: (lat, lon) => mapXY(lat, lon, f, c.width), ppbx: c.width / circ(r), ppbz: proj.yOfZ(circ(r), 1, c.height) - proj.yOfZ(circ(r), 0, c.height), worldW: c.width, dpr: window.devicePixelRatio || 1 };
   }
   // The site whose forming event the inspector shows is the selected one.
   const depSelected = (p, r) => { const s = p.i === focus && selectedEvent ? r.deposits.byEvent.get(selectedEvent) : null; return s ? s.id : null; };
   function drawDeposits(p, r, f) {
     if (!depositsOn || !depShown(r, p.cur)) return;
-    DTDeposits.draw(p.ctx, r.deposits, depView(p, f), { hidden: depHidden, hover: p.depHover ?? null, selected: depSelected(p, r) });
+    DTDeposits.draw(p.ctx, r.deposits, depView(p, f, r), { hidden: depHidden, hover: p.depHover ?? null, selected: depSelected(p, r) });
   }
   const depAge = (r, s) => { const e = r.byId.get(s.forming_event); return e ? fmtT(e.t_start) : ''; };
 
@@ -1126,7 +1131,7 @@
       const r = p.run;
       if (TV || !depositsOn || !r || p.cur < 0 || !depShown(r, p.cur) || !r.frames[p.cur]) return null;
       const [x, y] = at(ev);
-      return DTDeposits.hit(r.deposits, depView(p, r.frames[p.cur]), x, y, { hidden: depHidden });
+      return DTDeposits.hit(r.deposits, depView(p, r.frames[p.cur], r), x, y, { hidden: depHidden });
     };
     const tip = () => {
       if (!p.depTip) { p.depTip = document.createElement('div'); p.depTip.className = 'dep-tip'; p.depTip.hidden = true; p.frame.appendChild(p.depTip); }
@@ -1419,7 +1424,7 @@
       if (tex) {
         let u = turn + Math.atan2(x, zz) / (2 * Math.PI);
         u -= Math.floor(u);
-        const v = 0.5 - Math.asin(yy < -1 ? -1 : yy > 1 ? 1 : yy) / Math.PI;
+        const v = proj.vOfSinLat(yy);
         const px = Math.floor(u * tex.w) % tex.w, py = Math.min(tex.h - 1, Math.max(0, Math.floor(v * tex.h)));
         const q = (py * tex.w + px) * 4;
         if (tex.d[q + 3] > 0) { R = tex.d[q]; Gn = tex.d[q + 1]; B = tex.d[q + 2]; }
@@ -2019,7 +2024,8 @@
     const f = run.frames[p.cur];
     if (act === 'inspect') { const [bx, bz] = blockXZ(run, pt.lat, pt.lon); Stage2.inspect(run, f, bx, bz, pt.lat, pt.lon); }
     else {
-      const d = 128 / circ(run) * 360, b = boxInfo(run, clamp(pt.lat + d, -90, 90), clamp(pt.lat - d, -90, 90), pt.lon - d, pt.lon + d);
+      const dn = Math.abs(proj.dLatOfDz(circ(run), 128, pt.lat)), de = proj.dLonOfDx(circ(run), 128, pt.lat);
+      const b = boxInfo(run, clamp(pt.lat + dn, -90, 90), clamp(pt.lat - dn, -90, 90), pt.lon - de, pt.lon + de);
       p.boxLL = b; mapDirty = true;
       const [x0, z0] = blockXZ(run, b.north, b.west), [x1, z1] = blockXZ(run, b.south, b.east);
       Stage2.preview(run, f, { x0, z0, x1, z1 }, { north: b.north, south: b.south, west: b.west, east: b.east }, b.text);

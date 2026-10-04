@@ -25,9 +25,10 @@ public record Manifest(String formatVersion, String source, String createdUtc, i
 
     public static final String FILE = "manifest.json";
 
-    /** Plan §5.1 defaults, for manifests that do not name the scales. */
+    /** Plan §5.1 defaults, for manifests that do not name the scales (the vertical one is 35 m since
+     *  Ben's decision of 2026-10-02, as Rust's {@code deeptime_format::DEFAULT_M_PER_BLOCK_V}). */
     public static final double DEFAULT_M_PER_BLOCK_H = 300.0;
-    public static final double DEFAULT_M_PER_BLOCK_V = 20.0;
+    public static final double DEFAULT_M_PER_BLOCK_V = 35.0; // ledger: SCL-002 (game choice, Ben)
 
     /** One tile pack of the folder. */
     public record LayerEntry(String name, String path, String grid, long bytes, long crc32) {}

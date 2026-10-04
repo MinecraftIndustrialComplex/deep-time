@@ -9,17 +9,17 @@ defaults to the one any Gradle build leaves in neoforge/build/moddev/artifacts/.
 
 What it writes (plan §7.1, §7.12):
   data/deeptime/worldgen/noise_settings/planet.json
-      Vanilla's overworld settings with Deep Time's router: the build range -352..639, climate
+      Vanilla's overworld settings with Deep Time's router: the build range -512..639, climate
       from `deeptime:raster`, depth from `deeptime:depth`, and vanilla's final_density graph with
       `minecraft:overworld/sloped_cheese` replaced by `deeptime:terrain` and the slides
-      re-anchored (bottom -352 -> -328, top 624 -> 640). The cave functions stay references
+      re-anchored (bottom -512 -> -488, top 624 -> 640). The cave functions stay references
       (`minecraft:overworld/caves/*`), so a pack's own caves still carve. Vanilla's large ore
       veins are off (decisions file). The surface rule delegates to the pack's
       `minecraft:overworld` settings, resolved when applied (`deeptime:delegate`).
   data/deeptime/worldgen/noise_settings/planet_nocaves.json
       The same without the cave branch and without aquifers, for the GameTest dimensions: the
       density fill then leaves every surface intact, so tests can read heights at NOISE status.
-  data/deeptime/dimension_type/planet_overworld.json   vanilla overworld, y -352..639
+  data/deeptime/dimension_type/planet_overworld.json   vanilla overworld, y -512..639
   data/deeptime/worldgen/world_preset/planet{,_32k}.json and the #minecraft:normal tag entry.
 """
 import copy
@@ -33,7 +33,7 @@ OUT = os.path.join(REPO, "neoforge", "src", "main", "resources", "data")
 JAR = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     REPO, "neoforge/build/moddev/artifacts/neoforge-21.1.249-client-extra-aka-minecraft-resources.jar")
 
-MIN_Y, HEIGHT = -352, 992
+MIN_Y, HEIGHT = -512, 1152
 # Vanilla's slides sit 24 blocks above the floor and 64-80 below the 320 top. The bottom slide
 # keeps its 24-block span at the new floor; the top slide is moved to the last 16 blocks so
 # terrain up to y ~620 is not flattened (cold-read review 2, gap 8).
@@ -174,7 +174,7 @@ def main():
                 # The pole cap's lines (plan §7.11, P1-18): the defaults, written out so a
                 # datapack sees where to change them.
                 "world_data": {"folder": "deeptime", "circumference_blocks": c,
-                               "pole_cap_deg": 75.0, "pole_stop_deg": 80.0},
+                               "pole_cap_deg": 70.0, "pole_stop_deg": 80.0},
             },
         }
         write(f"deeptime/worldgen/world_preset/{name}.json", {"dimensions": dims})
