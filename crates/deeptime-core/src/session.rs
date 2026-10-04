@@ -1763,7 +1763,7 @@ mod tests {
     #[test]
     fn the_estimate_names_the_coupled_groups() {
         let json = crate::preset::with_timeline(
-            crate::params::planet_builtin("earthlike_quick_16k").unwrap(),
+            crate::preset::builtin("earthlike_quick_16k").unwrap(),
             Some("supercontinent"),
             Some(100.0),
         )
