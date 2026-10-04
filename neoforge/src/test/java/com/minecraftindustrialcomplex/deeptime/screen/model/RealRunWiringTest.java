@@ -174,6 +174,7 @@ class RealRunWiringTest {
         awaitStarted(first);
         m.cancelRun();
         assertFalse(m.canRun(), "Run stays disabled until the cancelled run stopped");
+        assertTrue(first.cancelRequested(), "the setup page says the run is stopping");
         pollUntilStopped(first, 30);
         assertEquals(TimelapseModel.State.CANCELLED, first.state());
         awaitGone(first.run().outDir());
