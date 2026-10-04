@@ -138,6 +138,7 @@ public final class WrapEngineGameTests {
                 parts.add(site(k, i).local());
         parts.add(LONG_HALF.local());
         parts.add(LONG_QUARTER.local());
+        parts.addAll(CreateSeamGameTests.topologies()); // the Create adapters' sites (design §11), no Create types
         TOPOLOGY = WrapTopology.union("wrap-engine GameTest sites", parts);
     }
 
