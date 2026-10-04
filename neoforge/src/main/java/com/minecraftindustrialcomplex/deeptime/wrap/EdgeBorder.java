@@ -43,13 +43,13 @@ import java.util.UUID;
 public final class EdgeBorder {
 
     /** How far inside the edge the stop line is, blocks (the layout block's {@code inset_blocks} default). */
-    public static final double INSET = 1.0;
+    public static final double INSET = 1.0; // ledger: POL-022, SCL-088 (game-choice)
     /** The warning band inside the stop line, blocks. */
-    public static final double WARN_BLOCKS = 24.0;
+    public static final double WARN_BLOCKS = 24.0; // ledger: POL-023 (game-choice)
     /** How often the warning repeats while in the band, ticks. */
-    public static final int BAR_EVERY = 40;
+    public static final int BAR_EVERY = 40; // ledger: POL-023 (game-choice)
     /** How far inside the stop line a stopped player or vehicle is put, blocks. */
-    static final double STOP_INSET = 0.05;
+    static final double STOP_INSET = 0.05; // ledger: POL-022 (game-choice)
 
     public static final String KEY_NEAR = "deeptime.edgeborder.near";
     public static final String KEY_STOP = "deeptime.edgeborder.stop";

@@ -50,7 +50,7 @@ public final class SpawnHandler {
      * (the temporary edge border stops players a block inside the edge and warns 24 blocks before it).
      * Game choice (SW-1).
      */
-    public static final int EDGE_MARGIN = 64;
+    public static final int EDGE_MARGIN = 64; // ledger: POL-024 (game-choice)
 
     /** The chosen spawn and the candidate record it came from. */
     public record Choice(BlockPos pos, com.google.gson.JsonObject candidate) {}
