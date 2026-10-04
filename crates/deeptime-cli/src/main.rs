@@ -2113,7 +2113,7 @@ mod tests {
         let doc: serde_json::Value = serde_json::from_slice(&std::fs::read(&out).unwrap()).unwrap();
         let cols = doc["columns"].as_array().unwrap();
         assert_eq!(cols.len(), 60);
-        assert_eq!(doc["circumference"], 4096);
+        assert_eq!(doc["circumference"], 3072, "the 4k planet drawn as a Petroff–Guyou world: 2b, b = 1,536");
         let w = deeptime_format::ColumnWorld::open(&dir.join("world")).unwrap();
         // Compared as text: serde_json's default parser may land a float one ulp off (Java's
         // Double.parseDouble does not), while its writer prints the shortest exact form.
