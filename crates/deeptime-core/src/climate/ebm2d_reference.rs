@@ -3,8 +3,6 @@
 //! once per run and dropped the per-step allocations: kept verbatim for the tests, which compare
 //! the two bit for bit.
 
-use rayon::prelude::*;
-
 use super::*;
 
 pub fn run(
