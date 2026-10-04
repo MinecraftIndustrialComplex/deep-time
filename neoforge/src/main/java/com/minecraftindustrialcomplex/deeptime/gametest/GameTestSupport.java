@@ -47,6 +47,19 @@ public final class GameTestSupport {
 
     public static final BlockPos CENTRE = new BlockPos(2, 1, 2);
 
+    /** The datapacks' {@code minecraft:overworld} stem, which the GameTest world itself never uses (null: none). */
+    private static volatile net.minecraft.world.level.dimension.LevelStem datapackOverworld;
+
+    /** Set by {@code mixin.gametest.GameTestServerMixin} when the GameTest server loads its dimensions. */
+    public static void datapackOverworld(net.minecraft.world.level.dimension.LevelStem stem) {
+        datapackOverworld = stem;
+    }
+
+    /** The datapacks' overworld stem (Expanded Ecosphere's override), or null when no datapack defines one. */
+    public static net.minecraft.world.level.dimension.LevelStem datapackOverworld() {
+        return datapackOverworld;
+    }
+
     /** The analytic test terrain's level (C = 16,384), defined by the gametest pack (plan §9.4). */
     public static final ResourceKey<Level> TEST_PLANET =
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_planet"));

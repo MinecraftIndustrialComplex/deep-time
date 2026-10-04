@@ -105,6 +105,17 @@ public final class OverworldOverride {
         return new Result(outDims, out);
     }
 
+    /**
+     * {@code stem} with the biome source of {@code override} (a datapack's overworld) when that is not Deep Time's own
+     * and {@code stem} is a Deep Time level on vanilla's overworld parameter list; else {@code stem} itself. For the
+     * GameTest server, which bakes the datapacks' Deep Time levels alone ({@code mixin.gametest.GameTestServerMixin}).
+     */
+    public static LevelStem adopt(LevelStem stem, LevelStem override) {
+        if (override == null || override.generator() instanceof GeologicChunkGenerator)
+            return stem;
+        return adopt(stem, override.generator().getBiomeSource());
+    }
+
     /** {@code stem} with {@code biomes} when it is a Deep Time level on vanilla's overworld parameter list; else itself. */
     static LevelStem adopt(LevelStem stem, BiomeSource biomes) {
         if (!(stem.generator() instanceof GeologicChunkGenerator g) || !onOverworldPreset(g.getBiomeSource()))

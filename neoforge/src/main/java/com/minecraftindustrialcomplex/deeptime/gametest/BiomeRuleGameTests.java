@@ -69,18 +69,23 @@ public final class BiomeRuleGameTests {
 
     /**
      * A datapack's overworld never replaces Deep Time's generator in a Deep Time world, and a vanilla-preset world
-     * keeps the datapack's overworld ({@link OverworldOverride}). The server's own dimensions stand in for the
-     * datapacks' (their overworld is a vanilla noise generator: vanilla's own on most profiles, Expanded
-     * Ecosphere's override on {@code -PwithEe}). With Expanded Ecosphere the Deep Time overworld must take its
-     * biome list. On every profile.
+     * keeps the datapack's overworld ({@link OverworldOverride}). The datapacks' own overworld is the override where
+     * one exists (Expanded Ecosphere's on {@code -PwithEe}, recorded by the GameTest server's dimension loading);
+     * elsewhere vanilla's Normal overworld stands in for one. With Expanded Ecosphere the Deep Time overworld must
+     * take its biome list. On every profile.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 200)
     public static void overworldOverrideKeepsDeepTimesGenerator(GameTestHelper helper) {
         RegistryAccess access = helper.getLevel().getServer().registryAccess();
-        Registry<LevelStem> stems = access.registryOrThrow(Registries.LEVEL_STEM);
-        LevelStem datapackOverworld = stems.get(LevelStem.OVERWORLD);
+        WorldDimensions normal = access.registryOrThrow(Registries.WORLD_PRESET).getOrThrow(WorldPresets.NORMAL).createWorldDimensions();
+        LevelStem recorded = GameTestSupport.datapackOverworld();
+        LevelStem datapackOverworld = recorded != null ? recorded : normal.dimensions().get(LevelStem.OVERWORLD);
         helper.assertTrue(datapackOverworld != null && !(datapackOverworld.generator() instanceof GeologicChunkGenerator),
-                "the GameTest server's overworld is not a vanilla-style generator: " + datapackOverworld);
+                "the datapack overworld is not a vanilla-style generator: " + datapackOverworld);
+        net.minecraft.core.MappedRegistry<LevelStem> dp = new net.minecraft.core.MappedRegistry<>(Registries.LEVEL_STEM,
+                com.mojang.serialization.Lifecycle.stable());
+        dp.register(LevelStem.OVERWORLD, datapackOverworld, net.minecraft.core.RegistrationInfo.BUILT_IN);
+        Registry<LevelStem> stems = dp.freeze();
 
         WorldDimensions planet = access.registryOrThrow(Registries.WORLD_PRESET).getOrThrow(PlanetGenerators.PLANET).createWorldDimensions();
         OverworldOverride.Result r = OverworldOverride.apply(planet, stems);
@@ -92,7 +97,6 @@ public final class BiomeRuleGameTests {
         Set<Holder<Biome>> got = ow.generator().getBiomeSource().possibleBiomes();
         helper.assertTrue(got.equals(want), "the Deep Time overworld has " + got.size() + " biomes, the datapack's overworld " + want.size());
 
-        WorldDimensions normal = access.registryOrThrow(Registries.WORLD_PRESET).getOrThrow(WorldPresets.NORMAL).createWorldDimensions();
         OverworldOverride.Result v = OverworldOverride.apply(normal, stems);
         helper.assertTrue(v.dims().dimensions().get(LevelStem.OVERWORLD) == normal.dimensions().get(LevelStem.OVERWORLD),
                 "a vanilla-preset world's own overworld was changed");
@@ -100,10 +104,13 @@ public final class BiomeRuleGameTests {
 
         boolean ee = ee(helper, "overworldOverrideKeepsDeepTimesGenerator");
         long wythers = got.stream().filter(b -> b.unwrapKey().map(k -> k.location().getNamespace().equals("wythers")).orElse(false)).count();
-        DeepTime.LOGGER.info("[gametest] overworldOverrideKeepsDeepTimesGenerator datapackOverworld={} deepTimeBiomes={} wythers={}",
-                datapackOverworld.generator().getClass().getSimpleName(), got.size(), wythers);
-        if (ee)
+        DeepTime.LOGGER.info("[gametest] overworldOverrideKeepsDeepTimesGenerator datapackOverworld={} ({}) deepTimeBiomes={} wythers={}",
+                datapackOverworld.generator().getClass().getSimpleName(), recorded != null ? "the datapacks'" : "vanilla's Normal standing in",
+                got.size(), wythers);
+        if (ee) {
+            helper.assertTrue(recorded != null, "Expanded Ecosphere is loaded but no datapack defines minecraft:overworld");
             helper.assertTrue(wythers >= 150, "with Expanded Ecosphere the Deep Time overworld has only " + wythers + " of its biomes");
+        }
         helper.succeed();
     }
 
