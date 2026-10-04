@@ -392,6 +392,28 @@ pub struct RiftLink {
     pub a: u32,
     pub b: u32,
     pub event: EventId,
+    /// Since when the two plates have moved together (relative speed along their whole shared
+    /// boundary under `weld_speed_mm_yr`), Myr: a rift that did not open heals once this has
+    /// lasted `weld_after_myr` (`rifting::heal`).
+    #[serde(default)]
+    pub quiet_since_myr: Option<f64>,
+}
+
+/// The slab hanging from a subduction zone (`forces.rs`, docs/design/plate-force-balance.md
+/// §3.3): known by its two plates, so a contact that flickers off and on keeps its slab and a
+/// reversed contact starts a new one. Its length, km, grows by the convergence at the oceanic
+/// front each step up to `slab_depth_km`; `blocked_myr` is how long continental crust has held at
+/// least half of its front (it breaks off after `slab_breakoff_myr`), `idle_myr` how long no
+/// oceanic front has fed it: it hangs and pulls along the plates' shared boundary meanwhile and
+/// is gone after `slab_breakoff_myr` (ledger PLT-271). A subduction initiation plants one
+/// (`initiation_slab_km`).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct SlabTrack {
+    pub under: u32,
+    pub over: u32,
+    pub km: f64,
+    pub blocked_myr: f64,
+    pub idle_myr: f64,
 }
 
 /// Counters for the run summary.
@@ -413,6 +435,9 @@ pub struct Counters {
     pub reversals: u32,
     /// Collisions that sutured the subducting plate whole to the receiving one (P1-27).
     pub sutures: u32,
+    /// Rifts that did not open and healed (`rifting::heal`).
+    #[serde(default)]
+    pub healed: u32,
     /// Island-arc samples that emerged and became continental crust (P1-27).
     pub emerged: u32,
     pub ridges: u32,
@@ -448,6 +473,8 @@ pub struct PlateState {
     /// A_0: the average initial plate area, km² (Earth-normalized), for rifting and collisions.
     pub a0_km2: f64,
     pub counters: Counters,
+    /// The slabs of the subduction zones (`forces.rs`), which pull the plates.
+    pub slabs: Vec<SlabTrack>,
     /// The dynamics record (`dynamics.rs`): measurement only, absent when switched off.
     pub dynamics: Option<super::dynamics::Dynamics>,
 }

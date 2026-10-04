@@ -2,8 +2,8 @@
 //! Collision belts and collision resistance: tasks 3 and 4 of the force-balance design
 //! (`docs/design/plate-force-balance.md` §3.5 and §9; the collisions design
 //! `docs/design/plate-collisions-and-welding.md` §4.1, option 1C, and §4.2, option 2B). This is
-//! the stage that lands on the present speed law (the design's fallback state); the force balance
-//! (task 7) is to replace [`resist`].
+//! the stage that landed on the old speed law; since the switch (task 7) the collision's
+//! resistance is a term of the force balance (`forces.rs`).
 //!
 //! # Stacking: uplift is the crust that was shortened
 //! While a contact is in collision (`shortening.rs`) its front shortens each step by
@@ -44,33 +44,12 @@
 //! bends down in front of the wedge, which the surface stage then fills. [`stack`] reads the
 //! basin back from `surface/flexure_m` for the record ([`Foredeep`]).
 //!
-//! # Resistance inside the speed law
-//! A collision resists convergence across its front with
-//!
-//!   r = collision_resistance_mm_yr × (h_belt / h_s) × min(1, L / L_drive),
-//!   L_drive = min(F, slab_pull_front_km),
-//!
-//! `h_belt` the belt's height (its mean above sea level within half its width of the front, or
-//! its relief over the ground it was built on where that is more: a belt raised from a submarine
-//! edge), `h_s` the strength height the crust spreading uses (`crust_strength_mpa / (ρ_c g)`, so
-//! gravity and crust strength enter here too), `L` the front's length and `F` the oceanic slab
-//! front the speed law pulls the incoming plate by this step (`subduction::Pull::front_km`; with
-//! none, the factor is 1). The collisions design wrote `min(1, L / slab_pull_front_km)`, which
-//! holds for a plate pulled by a full slab; measured, collision fronts are a median 400 km long,
-//! so a plate with no other slab would need a belt tens of km high to stop. Against the plate's
-//! own drive, a plate with no slab elsewhere stalls once its belt stands 1 to 2 km high (the
-//! Alps, the Urals) and one pulled by a long slab keeps converging (India), as the design
-//! describes. `collision_resistance_mm_yr` is 200 in the presets (the design's 100 let collisions
-//! consume whole continents before they stopped). It acts like the speed law's own
-//! relaxation: each step the convergence across the front loses `relax · r` (`relax` the speed
-//! law's `1 − e^(−δt/τ)`, τ = `slab_pull_relax_myr`), never more than it has. Against the speed
-//! law's pull back towards each plate's target speed this settles at a convergence of
-//! `v_free − r`, or at none when `r ≥ v_free`: a plastic resistance that can stop two plates and
-//! never pushes them apart. The cut is shared by area, the larger plate changing less, as a change
-//! of each plate's rotation about an axis through the plate's own centre of the sphere at right
-//! angles to the front's centroid. A plate with a long slab elsewhere keeps converging and widens
-//! its belt into a plateau (India), a plate without stalls (the Alps): "crustal thickening in the
-//! Tibetan Plateau was the dominant cause" of India's slowdown (Copley, Avouac & Royer 2010).
+//! # Resistance
+//! A collision resists convergence across its front through the force balance (`forces.rs`,
+//! design §3.4): the belt's gravitational potential energy over the incoming crust's, a force per
+//! metre of front against the convergence, plastic (linearised with the step's convergence). It
+//! can stop two plates and never push them apart. (Until the switch, 2026-10-04, a cut inside the
+//! old speed law, `collision_resistance_mm_yr`, stood in for it.)
 
 use std::collections::BTreeMap;
 
@@ -80,7 +59,7 @@ use super::Env;
 use super::geometry::{Geo, dijkstra};
 use super::kinematics::{quat, tangent, to_group};
 use super::pools::ISOSTATIC_FACTOR;
-use super::shortening::{Front, normal_convergence};
+use super::shortening::Front;
 use super::state::{Belt, CONTINENTAL, OROGENY_HIMALAYAN, PlateState, pool};
 use super::subduction::{MIN_CONTACT, OROGENY_MIN_M_PER_MYR, ceiling};
 
@@ -575,61 +554,6 @@ fn foredeep(d_rad: &[f64], flexure: &[f64], wedge_km: f64, bins: &Bins) -> Fored
     }
 }
 
-/// The collision resistance inside the speed law (see the module docs): cuts each collision's
-/// convergence across its front by `relax · r`, never below none, sharing the cut between the two
-/// plates by area. `omega` holds every plate's rotation after the speed law's update this step
-/// and is changed in place; the caller caps the speeds after.
-///
-/// `front_km` is each plate's subduction front this step (`subduction::Pull::front_km`).
-pub fn resist(state: &PlateState, omega: &mut [DVec3], env: &Env, relax: f64, front_km: &[f64]) {
-    let k = env.k;
-    let h_s = k.strength_height_m(env.gravity);
-    let unit = env.norm.omega_of_speed(1.0);
-    for c in &state.contacts {
-        let Some(col) = &c.collision else { continue };
-        let (u, o) = (c.under as usize, c.over as usize);
-        if u == o || !state.plates[u].alive || !state.plates[o].alive || h_s <= 0.0 {
-            continue;
-        }
-        // ledger: PLT-245 (the resistance law).
-        let drive_km = front_km
-            .get(u)
-            .copied()
-            .unwrap_or(0.0)
-            .min(k.slab_pull_front_km);
-        let reach = if drive_km > 0.0 {
-            (col.front_km / drive_km).min(1.0)
-        } else {
-            1.0
-        };
-        // The belt's height above sea level, or its relief over the ground it was built on where
-        // that was lower (a belt raised from a submarine edge).
-        let h = col.belt.height_m.max(col.belt.relief_m).max(0.0);
-        let r = k.collision_resistance_mm_yr * (h / h_s) * reach;
-        let (at, normal) = (
-            DVec3::from_array(col.centroid),
-            DVec3::from_array(col.normal),
-        );
-        if r <= 0.0 || normal == DVec3::ZERO {
-            continue;
-        }
-        let rel = env.norm.velocity_mm_yr(omega[u] - omega[o], at);
-        let cut = (relax * r).min(normal_convergence(rel, normal).max(0.0));
-        if cut <= 0.0 {
-            continue;
-        }
-        let (a_u, a_o) = (
-            f64::from(state.plates[u].samples.max(1)),
-            f64::from(state.plates[o].samples.max(1)),
-        );
-        // The incoming plate is held back along the outward normal, the overriding one pushed
-        // the other way; the smaller plate takes the larger part.
-        let share_u = a_o / (a_u + a_o);
-        omega[u] += at.cross(normal * (cut * share_u)) * unit;
-        omega[o] -= at.cross(normal * (cut * (1.0 - share_u))) * unit;
-    }
-}
-
 /// The belt's extent: its length is the front's (`length_km`, the longest it was), its width
 /// √(12·variance) of where it rose across the front, weighted by the uplift (belt and wedge
 /// together; exact for a uniform strip, and unaffected by how the front curves).
@@ -655,7 +579,7 @@ mod tests {
     use crate::plates::normalise::Norm;
     use crate::plates::pools::continental_column;
     use crate::plates::shortening::{self, Fired};
-    use crate::plates::state::{Contact, Group, Plate, Sample};
+    use crate::plates::state::{Contact, Group, Plate, Sample, SlabTrack};
     use crate::preset::{Preset, PresetBody, with_timeline};
 
     const N: usize = 16_000;
@@ -770,6 +694,7 @@ mod tests {
             resample_myr: 0.0,
             a0_km2: 1.0,
             counters: Default::default(),
+            slabs: Vec::new(),
             dynamics: None,
         };
         let pos = positions(&st, geo);
@@ -992,76 +917,90 @@ mod tests {
         assert!(st.samples.iter().zip(&z0).all(|(s, &z)| s.elevation_m == z));
     }
 
-    /// The resistance inside the speed law: the incoming plate is pulled towards a fixed motion
-    /// (the speed law's relaxation), the belt grows and holds it back, the convergence falls as
-    /// the belt rises, and the collision is handed over to weld only after it has stayed below
-    /// the weld speed for the weld wait.
+    /// The switch (force-balance design, task 7): a continent arrives at the trench of a plate a
+    /// slab pulls. The plate moves only by the force balance (`forces::step`, relaxed over
+    /// `motion_relax_myr`). The continent holds most of the front, so that stretch pulls nothing
+    /// and the slab breaks off after `slab_breakoff_myr`; the belt grows and resists; the
+    /// convergence falls, the collision stalls under the weld speed and is handed over to weld.
     #[test]
-    fn convergence_slows_as_the_belt_grows_and_stalls() {
+    fn a_continent_on_a_slab_pulled_plate_slows_and_stalls() {
         let mut fx = Fixture::new();
         fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        fx.preset.tectonics.mantle_flow_mm_yr = 0.0;
         let k = fx.preset.tectonics.clone();
-        let free = DVec3::Z * fx.rate(40.0);
-        let mut st = two_plates(&fx.geo, 0.0, free);
-        let relax = 1.0 - (-2.0 / k.slab_pull_relax_myr).exp();
-        let (mut conv, mut height) = (Vec::new(), Vec::new());
+        let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(40.0));
+        // The continent spans two thirds of the converging half of the boundary (y > 0.5), on
+        // both plates; the ocean floor is 100 Myr old, so its slab is heavy.
+        for (s, &p) in st.samples.iter_mut().zip(fx.geo.points()) {
+            if p.y > 0.5 {
+                s.kind = CONTINENTAL;
+                s.pools = continental_column();
+                s.thickness_m = s.pools.iter().sum();
+                s.elevation_m = 300.0;
+            } else {
+                s.formed_myr = -100.0;
+            }
+        }
+        let r = k.model_radius_km;
+        st.a0_km2 = 4.0 * std::f64::consts::PI * r * r / 14.0;
+        st.slabs.push(SlabTrack {
+            under: 1,
+            over: 0,
+            km: k.slab_depth_km,
+            ..SlabTrack::default()
+        });
+        let (mut conv, mut slab_km) = (Vec::new(), Vec::new());
         let mut fired_at = None;
-        for step in 1..=80u64 {
-            // The speed law: the plate relaxes towards its target motion.
-            let w = DVec3::from_array(st.plates[1].omega);
-            st.plates[1].omega = (w + (free - w) * relax).to_array();
+        for step in 1..=100u64 {
             let (_, fired) = fx.step(&mut st, step, None);
             if let Some(f) = fired.first() {
-                assert!(f.stalled);
+                assert!(f.stalled, "handed over without a stall");
                 fired_at = Some(step);
                 break;
             }
-            let col = st.contacts[0].collision.clone().expect("in collision");
-            conv.push(col.convergence_mm_yr);
-            height.push(col.belt.height_m);
-            let mut omega: Vec<DVec3> = st
-                .plates
-                .iter()
-                .map(|p| DVec3::from_array(p.omega))
-                .collect();
-            // The plate's only front is the collision's.
-            let front = st.contacts[0]
-                .collision
-                .as_ref()
-                .map_or(0.0, |c| c.front_km);
-            resist(&st, &mut omega, &fx.env(step), relax, &[0.0, front]);
-            for (p, w) in st.plates.iter_mut().zip(omega) {
-                p.omega = w.to_array();
+            if let Some(col) = &st.contacts[0].collision {
+                conv.push(col.convergence_mm_yr);
+            }
+            let pos = positions(&st, &fx.geo);
+            let env = fx.env(step);
+            let ans = crate::plates::forces::step(&mut st, &fx.geo, &pos, &env, DVec3::Z);
+            assert!(ans.solved);
+            slab_km.push(
+                st.slabs
+                    .iter()
+                    .find(|s| (s.under, s.over) == (1, 0))
+                    .map_or(0.0, |s| s.km),
+            );
+            for p in 0..2 {
+                if let Some(target) = ans.omega[p] {
+                    let w = DVec3::from_array(st.plates[p].omega);
+                    st.plates[p].omega =
+                        crate::plates::forces::relax(w, target, 2.0, k.motion_relax_myr)
+                            .to_array();
+                }
             }
         }
         let fired_at = fired_at.expect("the collision never stalled into a weld");
-        // The convergence fell as the belt rose, and the hand-over came after the stall.
-        assert!(conv[0] > 35.0, "{conv:?}");
-        assert!(height.windows(2).all(|w| w[1] >= w[0] - 1e-6), "{height:?}");
+        assert!(conv.len() >= 5, "{conv:?}");
+        assert!(conv[0] > 10.0, "{conv:?}");
+        // The slab broke off: its length fell to nothing within the break-off time and a step.
+        let broke = slab_km
+            .iter()
+            .position(|&km| km < 0.5 * k.slab_depth_km)
+            .expect("the blocked slab never broke off");
+        assert!(
+            2.0 * (broke + 1) as f64 <= k.slab_breakoff_myr + 2.0,
+            "broke after {broke} steps: {slab_km:?}"
+        );
+        // The convergence fell, under the weld speed, and stayed there for the weld wait.
         let slow = conv
             .iter()
             .position(|&v| v < k.weld_speed_mm_yr)
-            .expect("it stalled");
-        assert!(slow >= 3, "stalled after {slow} steps: {conv:?}");
-        assert!(
-            conv[..slow].windows(2).all(|w| w[1] <= w[0] + 1e-9),
-            "{conv:?}"
-        );
+            .expect("it never stalled");
+        assert!(conv[slow] < 0.5 * conv[0], "{conv:?}");
         let waited = 2.0 * (fired_at as usize - 1 - slow) as f64;
-        assert!(
-            (waited - k.weld_after_myr).abs() <= 2.0,
-            "fired {waited} Myr after the stall"
-        );
-        // The belt that stopped it: at least the height at which it cancels 40 mm/yr on a long
-        // front (h_s × 40 / collision_resistance_mm_yr), and more by what it grew while the
-        // convergence relaxed over the speed law's 20 Myr (the plates here neither erode nor
-        // spread the belt).
-        let h_stop = k.strength_height_m(9.81) * 40.0 / k.collision_resistance_mm_yr;
-        let h = height[slow];
-        assert!(
-            h > 0.8 * h_stop && h < 3.0 * h_stop,
-            "{h} m against {h_stop} m"
-        );
+        assert!(waited >= k.weld_after_myr - 2.0, "fired {waited} Myr after the stall");
+        assert!(st.contacts[0].collision.as_ref().unwrap().belt.height_m > 0.0);
     }
 
     /// The belt rises no higher than the strength height: what the front cannot take widens the

@@ -425,7 +425,7 @@ pub fn confirm(
         SUBDUCTION_ONSET,
         DVec3::from_array(c.centroid),
     )
-    .magnitude((c.onset_convergence_mm_yr / env.k.max_plate_speed_mm_yr) as f32)
+    .magnitude((c.onset_convergence_mm_yr / env.k.convergence_ref_mm_yr) as f32)
     .param("subducting_plate", i64::from(c.under))
     .param("overriding_plate", i64::from(c.over))
     .param(
@@ -458,13 +458,11 @@ struct Source {
 
 /// Slab pull per plate, from its subduction fronts this step.
 pub struct Pull {
-    /// Σ c × q / |c × q| over the plate's front samples, weighted by front length in 1,000 km.
-    pub axis: Vec<DVec3>,
-    /// Front length, km (Earth-normalized).
+    /// Each plate's oceanic subduction front length, km (Earth-normalized; the dynamics record's).
     pub front_km: Vec<f64>,
 }
 
-/// Divergence flags, trenches, fronts, subduction uplift, arcs and slab pull.
+/// Divergence flags, trenches, fronts, subduction uplift and arcs; each plate's oceanic front length.
 pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Pull {
     let (step, t_myr) = (env.step, env.t_myr);
     let k = env.k;
@@ -535,7 +533,6 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
 
     let mut sources: Vec<(u32, f64, u32)> = Vec::new();
     let mut info: Vec<Source> = Vec::new();
-    let mut pull = vec![DVec3::ZERO; state.plates.len()];
     let mut front_len = vec![0.0; state.plates.len()];
     let front_km = norm.km(norm.spacing_rad());
     for (v, b) in boundary.iter().enumerate() {
@@ -567,17 +564,12 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
                 sediment: f64::from(su.pools[pool::SEDIMENT]),
                 oceanic_slab: su.kind != CONTINENTAL,
             });
-            // Only an oceanic slab pulls: continental crust at the front is buoyant, and where it
-            // comes in the collision resists instead (`belts::resist`; plate tasks 3 and 4).
+            // Only an oceanic slab counts as a front that pulls: continental crust at the front
+            // is buoyant, and where it comes in the collision resists instead (`forces.rs`).
             // ledger: PLT-251
             if su.kind != CONTINENTAL {
                 let under = state.contacts[c].under as usize;
                 front_len[under] += front_km;
-                let cu = DVec3::from_array(state.plates[under].centroid);
-                let axis = cu.cross(pos[v]);
-                if axis.length_squared() > 1e-18 {
-                    pull[under] += axis.normalize() * (front_km / 1000.0);
-                }
             }
         }
     }
@@ -601,7 +593,7 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
     let (zt, zc) = (k.trench_elevation_m, k.uplift_reference_m);
     let z_ceiling = k.uplift_ceiling_m;
     let x0 = k.subduction_peak_km / k.subduction_distance_km;
-    let v0 = k.max_plate_speed_mm_yr;
+    let v0 = k.convergence_ref_mm_yr; // ledger: PLT-037
     let smooth = |t: f64| t * t * (3.0 - 2.0 * t);
     let orogeny_m = OROGENY_MIN_M_PER_MYR * env.dt_myr;
     let collision_myr = k.collision_orogeny_myr;
@@ -712,7 +704,6 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
         contact.andean |= andean;
     }
     Pull {
-        axis: pull,
         front_km: front_len,
     }
 }

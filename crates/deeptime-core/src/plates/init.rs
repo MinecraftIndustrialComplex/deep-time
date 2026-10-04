@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! The initial planet (Cortial §3, "Workflow"): plates as noise-warped spherical Voronoi cells of
-//! random centroids, continents shaped by the start configuration the player chose, random plate
-//! motions, oceanic crust aged from the boundaries that diverge, and the first hotspots.
+//! random centroids, continents shaped by the start configuration the player chose, plates at
+//! rest (the force balance sets them moving from the first step, docs/design/plate-force-balance.md
+//! task 7), oceanic crust aged from the boundaries that diverge under a drawn earlier motion, and
+//! the first hotspots.
 //!
 //! Start configurations (plan §5.1, decisions file "Timeline"):
 //! - **supercontinent**: one continent of the whole continental area, centred on the largest
@@ -22,7 +24,7 @@ use rayon::prelude::*;
 
 use super::Env;
 use super::geometry::{Geo, connect_plates, dijkstra};
-use super::kinematics::{arr, cap_speed, random_motion};
+use super::kinematics::{arr, random_motion};
 use super::noise::fbm;
 use super::pools::{continental_column, ocean_elevation, ocean_heat_flow, oceanic_column};
 use super::state::{
@@ -217,8 +219,11 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
     }
     connect_plates(&geo, &mut plate, |_| true);
 
-    // Motions: slower for continental plates.
+    // Plates start at rest. The starting ocean floor still needs ages: they come from an earlier
+    // motion drawn for the purpose (a random pole, a speed of 0.5-1.5 times the speed scale), which
+    // is not kept. ledger: PLT-273
     let mut plates: Vec<Plate> = Vec::with_capacity(np);
+    let mut prior: Vec<DVec3> = Vec::with_capacity(np);
     for (c, &centre) in centres.iter().enumerate() {
         let members: Vec<usize> = (0..n).filter(|&i| plate[i] as usize == c).collect();
         let centroid = members
@@ -231,17 +236,12 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
         } else {
             members.iter().filter(|&&i| continental[i]).count() as f64 / members.len() as f64
         };
-        let v = rng.range(k.plate_speed_mm_yr[0], k.plate_speed_mm_yr[1])
-            * (1.0 - (1.0 - k.continental_speed_factor) * cont);
-        let omega = cap_speed(
-            random_motion(&mut rng, centroid, v, &norm),
-            &norm,
-            k.max_plate_speed_mm_yr,
-        );
+        let v = rng.range(0.5, 1.5) * k.plate_speed_scale_mm_yr; // ledger: PLT-273
+        prior.push(random_motion(&mut rng, centroid, v, &norm));
         plates.push(Plate {
             id: c as u32,
             alive: !members.is_empty(),
-            omega: omega.to_array(),
+            omega: [0.0; 3],
             born_myr: t0,
             died_myr: None,
             birth_event: None,
@@ -254,8 +254,9 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
         });
     }
 
-    // Oceanic ages: distance from the boundaries that diverge, at each plate's own speed.
-    let omega: Vec<DVec3> = plates.iter().map(|p| DVec3::from_array(p.omega)).collect();
+    // Oceanic ages: distance from the boundaries that diverge, at each plate's own speed, under the
+    // earlier motion.
+    let omega = prior;
     let mut sources = Vec::new();
     let mut any_div = vec![false; np];
     for v in 0..n as u32 {
@@ -412,6 +413,7 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
             hotspots: k.hotspots_initial,
             ..Counters::default()
         },
+        slabs: Vec::new(),
         dynamics: None,
     };
     Ok((state, geo))

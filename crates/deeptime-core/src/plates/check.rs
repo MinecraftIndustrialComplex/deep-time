@@ -462,6 +462,13 @@ pub const MEASURES: &[MeasureDef] = &[
         None,
     ),
     m(
+        "deaths_healed",
+        "Plate deaths by a rift that never opened healing",
+        "per run",
+        None,
+        None,
+    ),
+    m(
         "deaths_absorbed",
         "Plate deaths by absorption of a tiny plate",
         "per run",
@@ -1141,7 +1148,7 @@ pub struct Params {
     /// The RMS speed the balance's answers are scaled to, step by step, for the comparison with
     /// the design's open-loop test (its `plate_speed_scale`), mm/yr.
     pub balance_rms_mm_yr: f64,
-    /// The speed guard of the switch (the design raises `max_plate_speed_mm_yr` to it), mm/yr.
+    /// The speed guard (`max_plate_speed_mm_yr` since the switch), mm/yr.
     pub balance_guard_mm_yr: f64,
 }
 
@@ -1391,7 +1398,8 @@ fn rift_welded_back(d: &Dynamics, window_myr: f64, end_myr: f64) -> f64 {
     let mut back: BTreeSet<u32> = BTreeSet::new();
     for p in dead {
         let died = p.died_myr.unwrap_or(f64::NAN);
-        if p.origin == "rift" && p.fate.as_deref() == Some("sutured") {
+        // A weld, or (since the switch to the force balance) a rift that never opened and healed.
+        if p.origin == "rift" && matches!(p.fate.as_deref(), Some("sutured" | "healed")) {
             let siblings: BTreeSet<u32> = d
                 .plates
                 .iter()
@@ -1570,6 +1578,7 @@ pub fn measures_with(
             .count() as f64
     };
     put("deaths_sutured", fate("sutured"));
+    put("deaths_healed", fate("healed"));
     put("deaths_absorbed", fate("absorbed"));
     put("deaths_consumed", fate("consumed"));
     // Of the collisions that welded a plate whole: how often the plate that died was the larger.

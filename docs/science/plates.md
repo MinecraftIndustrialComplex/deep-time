@@ -40,8 +40,9 @@ Rows by status (after the orogenic collapse, 2026-10-03): `verified` 17, `cited-
 ## Collision belts, the wedge and the weld (plate tasks 3 and 4)
 
 Built 2026-10-02 (ledger PLT-241 to PLT-252; rows changed: PLT-029, PLT-030, PLT-038, PLT-053, PLT-068, PLT-078 to
-PLT-080, PLT-192, PLT-202; retired: PLT-069 to PLT-075, PLT-227). This is the first of two stages: it runs on
-today's speed rules for plates, which a balance of forces is to replace (`docs/design/plate-force-balance.md`).
+PLT-080, PLT-192, PLT-202; retired: PLT-069 to PLT-075, PLT-227). This was the first of two stages: it ran on
+the old speed rules for plates. Since 2026-10-04 a balance of forces moves the plates and the belt's
+resistance is a term of it (`docs/design/plate-force-balance.md` task 7; [plate-forces.md](plate-forces.md)).
 
 **What happens on Earth.** When two continents meet at a subduction zone, the continent arriving on
 the sinking plate is too buoyant to go far down. Its crust is scraped off and stacked: on the
@@ -82,12 +83,12 @@ sinking plate standing at the overriding plate's edge and converging, PLT-224):
 5. The surface stage's flexure (`flexure.md`) carries the uplift as a load: the stiff arriving
    plate bends down in front of the weak young wedge into the foreland basin, which the surface
    stage fills.
-6. The belt resists (PLT-245): the convergence across the front loses, over the speed rules' own
-   relaxation time, up to `collision_resistance_mm_yr` (200 mm/yr, calibrated) × (the belt's height ÷ the strength height)
-   × (the front's length ÷ the slab front that pulls the arriving plate, at most 1). A plate pulled
-   by a long slab elsewhere keeps converging and widens its belt; a plate with no slab elsewhere
-   stops once its belt stands about 2 km high. Continental crust at a front does not pull (only
-   oceanic slabs do, PLT-251), and a continent at a front is not dragged down to trench depth (PLT-252).
+6. The belt resists through the force balance (FRC-018; until 2026-10-04 a cut inside the speed
+   rules, PLT-245, retired): per metre of front a force equal to the belt's gravitational potential
+   energy over the arriving crust's, against the convergence, whatever its speed. A plate pulled by
+   a long slab elsewhere keeps converging and widens its belt; a plate whose slab broke off when
+   the continent filled its trench stops. Continental crust at a front does not pull (only oceanic
+   slabs do, PLT-251), and a continent at a front is not dragged down to trench depth (PLT-252).
 7. When the convergence has stayed below `weld_speed_mm_yr` (5 mm/yr) for `weld_after_myr`
    (10 Myr), a continent welds its plate to the other and the larger plate keeps its id (PLT-246,
    PLT-250). A terrane smaller than `collision_suture_frac` moves alone to the overriding plate once
@@ -113,10 +114,9 @@ section "Tasks 3 and 4").
 
 **Limits and game choices.**
 
-- The motion law is still the speed rules, not forces. The resistance is a speed (mm/yr), tuned
-  (200) so that collisions stop before they consume their continents; they then stop sooner than
-  India did. A plate with no slab is driven at 45 mm/yr for no physical reason, and the resistance
-  has to overcome that.
+- The table above was measured on the old speed rules (a resistance of 200 mm/yr tuned so that
+  collisions stopped before they consumed their continents). Since the switch to the force balance
+  see [plate-forces.md](plate-forces.md), "Earth against the mod", for the same rows.
 - Crust that crosses a collision front is lost as continental area; the share that stays (0.8 in
   the pipeline presets, calibrated against the land's height distribution; 0.5 by design; no
   measured value was found) thickens the belt. Per 1000 Myr 0.25 to 0.40 of the sphere's area in
