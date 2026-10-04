@@ -31,6 +31,11 @@ public interface RunHandle {
 
     void cancel();
 
+    /** True while the run waits for an earlier (cancelled) run to stop before it starts. */
+    default boolean waitingForPrevious() {
+        return false;
+    }
+
     /** Completes with the manifest JSON; exceptionally when cancelled or failed. */
     CompletableFuture<String> completion();
 }
