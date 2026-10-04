@@ -61,9 +61,16 @@ public final class PeatlandProbe {
         return Climate.target((float) t, (float) h, (float) c, (float) e, 0f, (float) w);
     }
 
-    /** A swamp and cold: the tags say so, whatever the biome's name or mod. */
+    /** The shared tag of known bogs, fens and muskegs ({@code data/deeptime/tags/worldgen/biome/peatland.json}); every entry optional. */
+    public static final TagKey<Biome> PEATLAND = TagKey.create(Registries.BIOME,
+            ResourceLocation.fromNamespaceAndPath("deeptime", "peatland"));
+
+    /**
+     * In {@code #deeptime:peatland} (the shared list a pack's support adds its fen or bog to), or, for a pack
+     * nobody listed, a swamp and cold by the NeoForge tags, whatever the biome's name or mod.
+     */
     public static boolean isPeatland(Holder<Biome> b) {
-        return b.is(tag("is_swamp")) && (b.is(tag("is_cold/overworld")) || b.is(tag("is_snowy")));
+        return b.is(PEATLAND) || (b.is(tag("is_swamp")) && (b.is(tag("is_cold/overworld")) || b.is(tag("is_snowy"))));
     }
 
     private static TagKey<Biome> tag(String path) {

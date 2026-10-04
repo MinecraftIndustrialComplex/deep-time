@@ -104,4 +104,22 @@ class PeatlandTest {
         Files.delete(f);
         Files.delete(dir);
     }
+
+    /** The shared tag lists the pack bogs the task names, each optional (a missing mod must not break the tag). */
+    @Test
+    void theSharedPeatlandTagListsTheKnownBogsAsOptional() throws Exception {
+        try (var in = PeatlandTest.class.getResourceAsStream("/data/deeptime/tags/worldgen/biome/peatland.json")) {
+            assertNotNull(in, "#deeptime:peatland is shipped");
+            JsonObject tag = com.google.gson.JsonParser.parseReader(new java.io.InputStreamReader(in)).getAsJsonObject();
+            assertFalse(tag.get("replace").getAsBoolean(), "other packs' support adds to it");
+            List<String> ids = new ArrayList<>();
+            for (var e : tag.getAsJsonArray("values")) {
+                JsonObject v = e.getAsJsonObject();
+                assertFalse(v.get("required").getAsBoolean(), v + " must be optional");
+                ids.add(v.get("id").getAsString());
+            }
+            for (String want : List.of("biomesoplenty:bog", "biomesoplenty:muskeg", "expanded_ecosphere:fen", "expanded_ecosphere:snowy_bog"))
+                assertTrue(ids.contains(want), want);
+        }
+    }
 }
