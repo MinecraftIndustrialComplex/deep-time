@@ -93,7 +93,7 @@ public final class Presets {
          * {@code ScaleParams::world_circumference}); empty when the preset names no circumference.
          */
         public OptionalInt worldCircumference() {
-            return circumference.isEmpty() ? circumference : OptionalInt.of(worldCircumference(circumference.getAsInt(), projection));
+            return circumference.isEmpty() ? circumference : OptionalInt.of(Presets.worldCircumference(circumference.getAsInt(), projection));
         }
     }
 

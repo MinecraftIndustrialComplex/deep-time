@@ -87,7 +87,6 @@ public final class EditorModel {
         }
     }
 
-    /** An accepted run: what the world's generator is bound to. */
     /**
      * An accepted run: its staging folder, the simulation's circumference (the preset's), the preset, a
      * label, and the world's shape as the run's bake wrote it (manifest {@code scale.circumference_blocks},
@@ -96,7 +95,6 @@ public final class EditorModel {
      */
     public record Accepted(String stagingId, int circumference, String presetJson, String label, int worldCircumference,
                            String projection) {}
-    }
 
     public static final double DEFAULT_CAP_GIB = 4.0;
     public static final double MIN_CAP_GIB = 0.25;
