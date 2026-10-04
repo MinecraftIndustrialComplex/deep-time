@@ -1084,15 +1084,21 @@ impl ClimateStage {
                     // Bracket (a factor of 1.4 … 10⁴), then halve the bracket four times.
                     let mut lo = 0.0;
                     let mut best: Option<Trial> = None;
-                    for m in [0.35, 0.7, 1.4, 2.8, 5.6, 9.2] {
-                        // ledger: CLM-151
-                        let t = trial(dir * m);
+                    // The bracket's trials are independent (each starts from `saved`), so they
+                    // run side by side and are read in order, as the serial search read them: the
+                    // first that reaches the state ends the bracket, and only the trials up to it
+                    // count (P1-17).
+                    let bracket: Vec<Trial> = [0.35, 0.7, 1.4, 2.8, 5.6, 9.2] // ledger: CLM-151
+                        .into_par_iter()
+                        .map(|m| trial(dir * m))
+                        .collect();
+                    for t in bracket {
                         trials += 1;
                         if reach(&t) {
                             best = Some(t);
                             break;
                         }
-                        lo = m;
+                        lo = t.ln_factor.abs();
                         chosen = t;
                     }
                     if let Some(mut b) = best {
