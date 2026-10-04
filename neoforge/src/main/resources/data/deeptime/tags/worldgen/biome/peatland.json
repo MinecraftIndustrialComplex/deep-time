@@ -1,0 +1,37 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "biomesoplenty:bog",
+      "required": false
+    },
+    {
+      "id": "biomesoplenty:muskeg",
+      "required": false
+    },
+    {
+      "id": "regions_unexplored:fen",
+      "required": false
+    },
+    {
+      "id": "regions_unexplored:cold_fen",
+      "required": false
+    },
+    {
+      "id": "expanded_ecosphere:fen",
+      "required": false
+    },
+    {
+      "id": "expanded_ecosphere:snowy_fen",
+      "required": false
+    },
+    {
+      "id": "expanded_ecosphere:snowy_bog",
+      "required": false
+    },
+    {
+      "id": "expanded_ecosphere:berry_bog",
+      "required": false
+    }
+  ]
+}
