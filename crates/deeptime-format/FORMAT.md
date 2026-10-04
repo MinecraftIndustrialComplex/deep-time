@@ -379,7 +379,12 @@ Deep Time's jar against the screen's data-pack registries. They travel in the co
 `climate_placement_patches` (whole files); `deeptime run --placement-patch <file>` (repeatable) adds to
 it. `Preset::with_content` merges them in order over the base table (the bundle's `climate_placement`,
 else the default), checks the merged table whole (an error names the packs) and the bake records their
-ids. Without a pack table the bake is exactly the default table's.
+ids. Without a pack table the bake is exactly the default table's. A pack table and a biome rule file
+("Biome rules", under the climate interface's game side) are the two halves of one pack's support: the table
+moves the climate coordinates a world is baked with, so the pack's own search lands in the right slots
+(Terralith's jungles for Am); a rule file chooses at the game's biome query, from Deep Time's own facts, where
+no coordinate reaches the right biome or where a biome must be kept to some ground (Expanded Ecosphere's ice cap,
+Terralith's rock-named biomes, `deeptime:rock_named`).
 
 *Class rules.* A table may hold `class_rules`: a list of `{"name", "classes": [codes], "when": [{"of",
 "above" | "below"}, …], "temperature"?, "humidity"?, "erosion"?, "continentalness"?}` (and `_comment`).
