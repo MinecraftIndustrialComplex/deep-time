@@ -828,10 +828,10 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             (Some(s), Some(seed)) => Some((s.clone(), deeptime_format::Noise::for_world(seed, c, wpj))),
             _ => None,
         };
-        fn pair<'a>(
-            amp: Option<&'a LoadedLayer>,
+        fn pair(
+            amp: Option<&LoadedLayer>,
             n: Option<(deeptime_format::DetailSpec, deeptime_format::Noise)>,
-        ) -> Option<(&'a LoadedLayer, deeptime_format::DetailSpec, deeptime_format::Noise)> {
+        ) -> Option<(&LoadedLayer, deeptime_format::DetailSpec, deeptime_format::Noise)> {
             match (amp, n) {
                 (Some(a), Some((s, n))) => Some((a, s, n)),
                 _ => None,
@@ -990,7 +990,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
 /// (`ColumnWorld::height`), from loaded layers; `c` the x period the detail noise wraps with.
 struct Drawn<'a> {
     elev: &'a LoadedLayer,
-    detail: Option<(&'a LoadedLayer, deeptime_format::DetailSpec, deeptime_format::Noise)>,
+    detail: Option<(&LoadedLayer, deeptime_format::DetailSpec, deeptime_format::Noise)>,
     c: f64,
 }
 
