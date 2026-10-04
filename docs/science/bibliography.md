@@ -1351,7 +1351,7 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Reference: Holdridge, Leslie R. 1967. Life Zone Ecology (revised edition). Tropical Science Center, San Jose, Costa Rica.
 - DOI or URL: none (book). A library scan is at https://app.ingemmet.gob.pe/biblioteca/pdf/Amb-56.pdf (title per its listing: "Life Zone Ecology by L.R. Holdridge, with photographic supplement prepared by Joseph A. Tosi Jr."). The scan's text layer starts at the table of contents, so I could not confirm the edition year from the scan itself; Lugo et al. 1999 cite it as "Holdridge, L.R. (1967) Life zone ecology. Tropical Science Center. San Jose, Costa Rica".
 - Cited as: "L. R. Holdridge 1967, Life Zone Ecology, Tropical Science Center: PET = 58.93 x the mean annual biotemperature"
-- Ledger ids: HYD-029, HYD-030, HYD-035, HYD-041
+- Ledger ids: HYD-029, HYD-030, HYD-035, HYD-041, BIO-126 (the dry forest precipitation band, from memory: the band is read off the life-zone chart, which the scan's text layer does not carry; the text says "Most of these savannas are to be found in the Tropical Dry Forest Life Zone", read 2026-10-04)
 - Access: book (not online), plus an unofficial library scan
 - Library (the project's source library, not distributed): fetched (PDF, 149 pages, text layer, 330,833 characters). From: https://app.ingemmet.gob.pe/biblioteca/pdf/Amb-56.pdf. Text file: Holdridge1967.txt.
 - Read so far (by the project): nothing says it was consulted
@@ -5985,3 +5985,17 @@ The survey `docs/research/notes/seamless-projection-survey.md` and its tools (`t
 - Cited as: "Dimitrijević & Strobl 2025".
 - Ledger ids: none (the survey's cross-checks: QSC max a/b 1.555, HEALPix 2.430; continuity classes)
 - Access: open. Read so far: the ranking, continuity and distortion sections read by a sub-agent from a Semantic Scholar copy, 2026-10-03.
+
+## Biome rules for Expanded Ecosphere (BIO-115 to BIO-130), added 2026-10-04
+
+### Walker2005
+- Reference: Walker, D. A.; Raynolds, M. K.; Daniëls, F. J. A.; Einarsson, E.; Elvebakk, A.; Gould, W. A.; Katenin, A. E.; Kholod, S. S.; Markon, C. J.; Melnikov, E. S.; Moskalenko, N. G.; Talbot, S. S.; Yurtsev, B. A. and the CAVM Team (2005). The Circumpolar Arctic vegetation map. Journal of Vegetation Science 16:267-282.
+- Cited as: "Walker et al. 2005 (CAVM), bioclimate subzones by summer warmth".
+- Ledger ids: BIO-124
+- Access: not fetched. Read so far: from memory (the five bioclimate subzones A to E, with July means rising from about 1-3 degC in A to about 9-12 degC in E; the 5 degC split used is near the B/C edge); to be checked against the paper's subzone table.
+
+### Alaback1991
+- Reference: Alaback, P. B. (1991). Comparative ecology of temperate rainforests of the Americas along analogous climatic gradients. Revista Chilena de Historia Natural 64:399-412.
+- Cited as: "Alaback 1991, the climatic limits of temperate rainforest".
+- Ledger ids: BIO-127
+- Access: not fetched. Read so far: from memory (temperate rainforest with annual precipitation over about 1,400 mm, a mean annual temperature of about 4 to 12 degC and cool summers); to be checked.
