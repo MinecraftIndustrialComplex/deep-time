@@ -883,13 +883,14 @@ impl SurfaceStage {
                     gravity,
                     &mut sc.ice,
                 );
-                for c in 0..n {
+                let (kf, cover) = (&sc.kf, &sc.ice.cover);
+                sc.kf_eff.par_iter_mut().enumerate().for_each(|(c, kf_eff)| {
                     // The glacier's share of the cell, or the climate's thick ice.
                     let thick = climate_ice.as_ref().map_or(0.0, |v| {
                         crate::climate::ebm::smoothstep(10.0, 100.0, f64::from(v[c]))
                     });
-                    sc.kf_eff[c] = sc.kf[c] * (1.0 - sc.ice.cover[c].max(thick)).max(0.0);
-                }
+                    *kf_eff = kf[c] * (1.0 - cover[c].max(thick)).max(0.0);
+                });
                 self.time("glacial", started);
             } else {
                 sc.kf_eff.copy_from_slice(&sc.kf);
@@ -908,18 +909,28 @@ impl SurfaceStage {
             if sub + 1 == subs {
                 spl::families(&d, &sc.routing, &input, &fam, dts, &sc.h_new, &mut sc.mix);
             }
-            for c in 0..n {
-                if sc.kind[c] == BASE {
-                    continue;
-                }
-                let dh = sc.h_new[c] - sc.h[c];
-                if dh < 0.0 {
-                    parts.eroded[c] += (-dh) as f32;
-                } else if sc.filled[c] - sc.h[c] > spl::LAKE_TOL_M {
-                    parts.lake[c] += dh as f32;
-                } else {
-                    parts.fluvial[c] += dh as f32;
-                }
+            {
+                // Cell by cell, so in parallel (P1-17).
+                let (kind, h, h_new, filled) = (&sc.kind, &sc.h, &sc.h_new, &sc.filled);
+                parts
+                    .eroded
+                    .par_iter_mut()
+                    .zip(parts.lake.par_iter_mut())
+                    .zip(parts.fluvial.par_iter_mut())
+                    .enumerate()
+                    .for_each(|(c, ((eroded, lake), fluvial))| {
+                        if kind[c] == BASE {
+                            return;
+                        }
+                        let dh = h_new[c] - h[c];
+                        if dh < 0.0 {
+                            *eroded += (-dh) as f32;
+                        } else if filled[c] - h[c] > spl::LAKE_TOL_M {
+                            *lake += dh as f32;
+                        } else {
+                            *fluvial += dh as f32;
+                        }
+                    });
             }
             std::mem::swap(&mut sc.h, &mut sc.h_new);
             self.time("spl", started);
@@ -984,17 +995,24 @@ impl SurfaceStage {
                     &mut sc.h,
                     &mut g,
                 );
-                #[allow(clippy::needless_range_loop)]
-                for c in 0..n {
-                    let e = g.eroded[c] as f32;
-                    parts.eroded[c] += e;
-                    parts.glacial_eroded[c] += e;
-                    parts.till[c] += g.till[c] as f32;
-                    parts.lake[c] += g.lake[c] as f32;
-                    if above[c] && sc.h[c] < sea && g.eroded[c] > 0.0 {
-                        gtot.cut_below_sea_cells += 1;
-                    }
-                }
+                // Cell by cell; the count is an integer sum, so in parallel (P1-17).
+                let h = &sc.h;
+                gtot.cut_below_sea_cells += parts
+                    .eroded
+                    .par_iter_mut()
+                    .zip(parts.glacial_eroded.par_iter_mut())
+                    .zip(parts.till.par_iter_mut())
+                    .zip(parts.lake.par_iter_mut())
+                    .enumerate()
+                    .map(|(c, (((eroded, glacial_eroded), till), lake))| {
+                        let e = g.eroded[c] as f32;
+                        *eroded += e;
+                        *glacial_eroded += e;
+                        *till += g.till[c] as f32;
+                        *lake += g.lake[c] as f32;
+                        u64::from(above[c] && h[c] < sea && g.eroded[c] > 0.0)
+                    })
+                    .sum::<u64>();
                 let sea_mask: Vec<bool> = sc.kind.iter().map(|&k| k == BASE).collect();
                 for m in 0..n {
                     let (ice_load, melt_load) = (g.sea_ice_load[m], g.sea_melt_load[m]);
@@ -1039,82 +1057,102 @@ impl SurfaceStage {
             // Carbonates and evaporites.
             let started = Instant::now();
             let evap_rate = p.evaporite_m_myr * 1.0e-6;
-            #[allow(clippy::needless_range_loop)]
-            for c in 0..n {
-                if sc.kind[c] == BASE {
-                    let z = sea - sc.h[c];
-                    let add = carbonate::produce(
-                        z,
-                        f64::from(clim.sst_c[c]),
-                        f64::from(parts.marine[c]),
-                        dts,
-                        &carb_p,
-                    );
-                    sc.h[c] += add;
-                    parts.carbonate[c] += add as f32;
-                    // The climate's drawdown carbonate (after a snowball: its cap carbonate) on the
-                    // sea floor above the compensation depth, whatever the water's temperature,
-                    // once per plate step.
-                    let z = sea - sc.h[c];
-                    if sub == 0 && cap_m > 0.0 && z > 0.0 && z <= CARBONATE_FLOOR_M {
-                        let extra = cap_m.min(z);
-                        sc.h[c] += extra;
-                        parts.carbonate[c] += extra as f32;
+            // Cell by cell, so in parallel (P1-17).
+            let (kind, filled, marine) = (&sc.kind, &sc.filled, &parts.marine);
+            sc.h.par_iter_mut()
+                .zip(parts.carbonate.par_iter_mut())
+                .zip(parts.evaporite.par_iter_mut())
+                .enumerate()
+                .for_each(|(c, ((h, carb), evaporite))| {
+                    if kind[c] == BASE {
+                        let z = sea - *h;
+                        let add = carbonate::produce(
+                            z,
+                            f64::from(clim.sst_c[c]),
+                            f64::from(marine[c]),
+                            dts,
+                            &carb_p,
+                        );
+                        *h += add;
+                        *carb += add as f32;
+                        // The climate's drawdown carbonate (after a snowball: its cap carbonate)
+                        // on the sea floor above the compensation depth, whatever the water's
+                        // temperature, once per plate step.
+                        let z = sea - *h;
+                        if sub == 0 && cap_m > 0.0 && z > 0.0 && z <= CARBONATE_FLOOR_M {
+                            let extra = cap_m.min(z);
+                            *h += extra;
+                            *carb += extra as f32;
+                        }
+                        let z = sea - *h;
+                        if restricted[c]
+                            && z > 0.0
+                            && z < 200.0
+                            && f64::from(clim.aridity[c]) < facies::limits::EVAPORITE_ARIDITY
+                        {
+                            let e = (evap_rate * dts).min(z);
+                            *h += e;
+                            *evaporite += e as f32;
+                        }
+                    } else if f64::from(clim.aridity[c]) < facies::limits::EVAPORITE_ARIDITY {
+                        let room = filled[c] - *h;
+                        if room > spl::LAKE_TOL_M {
+                            let e = (evap_rate * dts).min(room);
+                            *h += e;
+                            *evaporite += e as f32;
+                        }
                     }
-                    let z = sea - sc.h[c];
-                    if restricted[c]
-                        && z > 0.0
-                        && z < 200.0
-                        && f64::from(clim.aridity[c]) < facies::limits::EVAPORITE_ARIDITY
-                    {
-                        let e = (evap_rate * dts).min(z);
-                        sc.h[c] += e;
-                        parts.evaporite[c] += e as f32;
-                    }
-                } else if f64::from(clim.aridity[c]) < facies::limits::EVAPORITE_ARIDITY {
-                    let room = sc.filled[c] - sc.h[c];
-                    if room > spl::LAKE_TOL_M {
-                        let e = (evap_rate * dts).min(room);
-                        sc.h[c] += e;
-                        parts.evaporite[c] += e as f32;
-                    }
-                }
-            }
+                });
             self.time("carbonate", started);
 
             // Hillslope and marine diffusion.
+            // Every loop here is cell by cell with no carried sum, so running them in parallel
+            // gives the serial loops' values (P1-17; the tanh and exp of `submarine_kd` alone
+            // were ~50 ms a step on the full preset's L1).
             let started = Instant::now();
-            #[allow(clippy::needless_range_loop)]
-            for c in 0..n {
-                let land = p.kd_land_m2_yr * self.diffu[usize::from(class0[c])];
-                sc.kd[c] = marine::submarine_kd(
-                    sea - sc.h[c],
-                    p.kd_marine_m2_yr,
-                    p.wave_base_m,
-                    p.tidal_range_m,
-                    land,
-                );
+            {
+                let (diffu, h) = (&self.diffu, &sc.h);
+                sc.kd.par_iter_mut().enumerate().for_each(|(c, kd)| {
+                    let land = p.kd_land_m2_yr * diffu[usize::from(class0[c])];
+                    *kd = marine::submarine_kd(
+                        sea - h[c],
+                        p.kd_marine_m2_yr,
+                        p.wave_base_m,
+                        p.tidal_range_m,
+                        land,
+                    );
+                });
             }
             let before = sc.h.clone();
             cg_iterations += diffusion::step(&d, &mut sc.h, &sc.kd, dts) as u64;
             if let Some(fp) = &failure {
-                let sea_mask: Vec<bool> = sc.kind.iter().map(|&k| k == BASE).collect();
+                let sea_mask: Vec<bool> = sc.kind.par_iter().map(|&k| k == BASE).collect();
+                let h = &sc.h;
                 let mut avail: Vec<f64> = (0..n)
-                    .map(|c| (avail0[c] + sc.h[c] - h_step0[c]).max(0.0))
+                    .into_par_iter()
+                    .map(|c| (avail0[c] + h[c] - h_step0[c]).max(0.0))
                     .collect();
                 failed_m_cells +=
                     marine::slope_failure(&d, &sea_mask, sea, fp, &mut sc.h, &mut avail);
             }
-            #[allow(clippy::needless_range_loop)]
-            for c in 0..n {
-                let dd = (sc.h[c] - before[c]) as f32;
-                if dd < 0.0 {
-                    parts.eroded[c] -= dd;
-                } else if sc.kind[c] == BASE {
-                    parts.marine[c] += dd;
-                } else {
-                    parts.fluvial[c] += dd;
-                }
+            {
+                let (h, kind) = (&sc.h, &sc.kind);
+                parts
+                    .eroded
+                    .par_iter_mut()
+                    .zip(parts.marine.par_iter_mut())
+                    .zip(parts.fluvial.par_iter_mut())
+                    .enumerate()
+                    .for_each(|(c, ((eroded, marine), fluvial))| {
+                        let dd = (h[c] - before[c]) as f32;
+                        if dd < 0.0 {
+                            *eroded -= dd;
+                        } else if kind[c] == BASE {
+                            *marine += dd;
+                        } else {
+                            *fluvial += dd;
+                        }
+                    });
             }
             self.time("diffusion", started);
         }
