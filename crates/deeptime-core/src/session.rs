@@ -807,8 +807,7 @@ impl Session {
                 };
                 self.gauge.keep_below(s.allowed[k].min(self.mem_cap));
                 let mut at_start = self.gauge.in_use();
-                if at_start.saturating_add(s.working[k]) > self.mem_cap
-                    && self.gauge.release() > 0
+                if at_start.saturating_add(s.working[k]) > self.mem_cap && self.gauge.release() > 0
                 {
                     at_start = self.gauge.in_use();
                 }

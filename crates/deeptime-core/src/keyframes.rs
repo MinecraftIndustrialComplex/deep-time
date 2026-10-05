@@ -265,9 +265,7 @@ impl Packed {
         let (name, _, packed) = &self.layers[k];
         lz4_flex::block::decompress_into(packed, dst)
             .map(|_| ())
-            .map_err(|e| {
-                CoreError::InvalidState(format!("keyframe {} layer {name}: {e}", self.n))
-            })
+            .map_err(|e| CoreError::InvalidState(format!("keyframe {} layer {name}: {e}", self.n)))
     }
 
     fn unpack(&self) -> Result<KeyframeImage, CoreError> {
