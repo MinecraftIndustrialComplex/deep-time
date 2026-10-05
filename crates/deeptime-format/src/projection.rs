@@ -1547,7 +1547,10 @@ mod petroff_guyou_tests {
             assert_eq!((2 * b) % 512, 0, "the x period is whole region files");
             // Within half a quantum of the equal-area side C/√(2π).
             let exact = f64::from(c) / (2.0 * std::f64::consts::PI).sqrt();
-            assert!((f64::from(b) - exact).abs() <= 128.0, "C {c}: b {b} vs {exact}");
+            assert!(
+                (f64::from(b) - exact).abs() <= 128.0,
+                "C {c}: b {b} vs {exact}"
+            );
         }
     }
 
@@ -1559,14 +1562,24 @@ mod petroff_guyou_tests {
             // The western hemisphere's centre is (0°, λc); the eastern one's (0°, λc + 180°).
             let (lat, lon) = g.lat_lon(-h, 0.0);
             assert!(lat.abs() < 1e-9, "{lat}");
-            assert!((wrap_deg(lon - lc + 180.0) - 180.0).abs() < 1e-9, "{lon} vs {lc}");
+            assert!(
+                (wrap_deg(lon - lc + 180.0) - 180.0).abs() < 1e-9,
+                "{lon} vs {lc}"
+            );
             let (lat, lon) = g.lat_lon(h, 0.0);
             assert!(lat.abs() < 1e-9);
             assert!((wrap_deg(lon - lc) - 180.0).abs() < 1e-9, "{lon}");
             // The poles on the long edges at x = ∓b/2, each twice.
             for x in [-h, h] {
-                assert!((g.lat_lon(x, -h).0 - 90.0).abs() < 1e-9, "north pole at ({x}, {})", -h);
-                assert!((g.lat_lon(x, h).0 + 90.0).abs() < 1e-9, "south pole at ({x}, {h})");
+                assert!(
+                    (g.lat_lon(x, -h).0 - 90.0).abs() < 1e-9,
+                    "north pole at ({x}, {})",
+                    -h
+                );
+                assert!(
+                    (g.lat_lon(x, h).0 + 90.0).abs() < 1e-9,
+                    "south pole at ({x}, {h})"
+                );
             }
             // The equator is the line z = 0.
             for k in 0..100 {
@@ -1610,7 +1623,10 @@ mod petroff_guyou_tests {
                 let lat = (2.0 * rng.f() - 1.0).asin().to_degrees();
                 let lon = 360.0 * rng.f();
                 let (x, z) = g.block_of(lat, lon);
-                assert!((-bf..bf).contains(&x) && z.abs() <= h, "({lat}, {lon}) -> ({x}, {z})");
+                assert!(
+                    (-bf..bf).contains(&x) && z.abs() <= h,
+                    "({lat}, {lon}) -> ({x}, {z})"
+                );
                 let d = angle(g.unit(x, z), unit_of_lat_lon(lat, lon));
                 worst_s = worst_s.max(d);
                 assert!(d < 1e-8, "({lat}, {lon}) -> ({x}, {z}): {d} rad");
@@ -1708,7 +1724,9 @@ mod petroff_guyou_tests {
                     let (cx, cz) = ((x0 + x1) / 2.0, (z0 + z1) / 2.0);
                     let near = [(0.0, -h), (0.0, h), (-bf, -h), (-bf, h), (bf, -h), (bf, h)]
                         .iter()
-                        .any(|&(px, pz)| (cx - px).abs() < 3.0 * (x1 - x0) && (cz - pz).abs() < 3.0 * (z1 - z0));
+                        .any(|&(px, pz)| {
+                            (cx - px).abs() < 3.0 * (x1 - x0) && (cz - pz).abs() < 3.0 * (z1 - z0)
+                        });
                     if !near {
                         cell_areas.push(a);
                     }
@@ -1802,7 +1820,11 @@ mod petroff_guyou_tests {
         // CellIsometry.halfTurnAbout(0, −b/2): (x, z) → (−x − 1, −b − z − 1).
         for (x, z) in [(10, -h - 1), (-6_000, -h - 40), (0, -h - 1), (-1, -h - 16)] {
             let (fx, fz, n) = g.fold_cell(x, z);
-            assert_eq!((fx, fz, n), (g_wrap(-x - 1, b), -b - z - 1, 1), "({x}, {z})");
+            assert_eq!(
+                (fx, fz, n),
+                (g_wrap(-x - 1, b), -b - z - 1, 1),
+                "({x}, {z})"
+            );
         }
         for (x, z) in [(10, h), (-6_000, h + 40)] {
             let (fx, fz, n) = g.fold_cell(x, z);
@@ -1857,7 +1879,11 @@ mod petroff_guyou_tests {
             for p in &spec.poles {
                 for im in &p.images {
                     let lat = g.lat_lon(im[0] as f64, im[1] as f64).0;
-                    assert!((lat.abs() - 90.0).abs() < 1e-9, "{} at {im:?}: {lat}", p.name);
+                    assert!(
+                        (lat.abs() - 90.0).abs() < 1e-9,
+                        "{} at {im:?}: {lat}",
+                        p.name
+                    );
                 }
             }
         }
@@ -1998,7 +2024,10 @@ mod parity_fixture {
 
     #[test]
     fn parity_fixture_is_current() {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/projection_parity.json");
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/data/projection_parity.json"
+        );
         let text = fixture();
         if std::env::var_os("DEEPTIME_WRITE_PARITY").is_some() {
             std::fs::create_dir_all(std::path::Path::new(path).parent().unwrap()).unwrap();

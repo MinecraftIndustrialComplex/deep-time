@@ -191,7 +191,11 @@ pub fn atan2(y: f64, x: f64) -> f64 {
     }
     let mut a = if ay <= ax {
         if ax.is_infinite() {
-            if ay.is_infinite() { atan_unit(1.0) } else { 0.0 }
+            if ay.is_infinite() {
+                atan_unit(1.0)
+            } else {
+                0.0
+            }
         } else {
             atan_unit(ay / ax)
         }
@@ -283,7 +287,10 @@ mod tests {
                 );
             }
             let t = tan(x);
-            assert!(ulps(t, x.tan()) <= 8.0 || (t - x.tan()).abs() < 1e-15, "tan {x}");
+            assert!(
+                ulps(t, x.tan()) <= 8.0 || (t - x.tan()).abs() < 1e-15,
+                "tan {x}"
+            );
         }
         assert_eq!(sin(0.0), 0.0);
         assert_eq!(cos(0.0), 1.0);
