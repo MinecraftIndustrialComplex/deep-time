@@ -346,15 +346,15 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     let r = route(
         &wb,
         "/api/runs/baked/rock/section",
-        "x0=2000&z0=0&x1=-2000&z1=0&n=64",
+        "x0=1500&z0=0&x1=-1500&z1=0&n=64",
     )
     .unwrap();
     let v = json_of(&r);
     assert_eq!(
-        v["length_blocks"], 96.0,
-        "C = 4096: 2000 to -2000 is 96 blocks east: {v}"
+        v["length_blocks"], 72.0,
+        "the world's period 3,072: 1500 to -1500 is 72 blocks east: {v}"
     );
-    assert_eq!(v["b"]["x"], 2096);
+    assert_eq!(v["b"]["x"], 1572);
     assert_eq!(v["n"], 64);
     let r = route(&wb, "/api/runs/baked/rock/section", "x0=a&z0=0&x1=1&z1=1").unwrap();
     assert_eq!(r.status, 400);
