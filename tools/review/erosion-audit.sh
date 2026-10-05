@@ -7,7 +7,7 @@
 # Runs ON the test VM, detached:
 #
 #   tools/remote/mac.sh -- tools/review/erosion-audit.sh bake <tag> [500] [1000]
-#   tools/remote/mac.sh --no-sync -- tools/review/erosion-audit.sh report <tag> [500] [1000]
+#   tools/remote/mac.sh --no-sync -- tools/review/erosion-audit.sh report <tag> [500] [1000]   (BIN=<tag> reads with that bake's build)
 #   tools/remote/mac.sh --no-sync -- tools/review/erosion-audit.sh clean
 #
 # Scratch: /Volumes/Graphide/ban/deeptime-runs/erosion-audit (deleted by `clean`). BAKE_EXTRA adds
@@ -39,14 +39,16 @@ bake)
     echo "started $tag: $lengths"
     ;;
 report)
-    cargo build --release -p deeptime-cli
+    # BIN names the build that reads the runs (default: the tag's own, saved by `bake`).
+    bin="$RUNS/deeptime-${BIN:-$tag}"
     for len in $lengths; do
         d="$RUNS/$tag-$len"
         grep -q BAKE-DONE "$d.log" || { echo "$tag-$len: not done"; tail -3 "$d.log"; continue; }
         cp=$(command ls "$d"/checkpoints/0-*.dtcp 2>/dev/null | tail -1 || true)
+        "$bin" erosion-audit --world-data "$d" ${cp:+--checkpoint "$cp"} \
+            --json "$d-audit.json" > "$d-audit.txt" 2>&1 || true
         echo "== $tag-$len (checkpoint ${cp:-none})"
-        target/release/deeptime erosion-audit --world-data "$d" ${cp:+--checkpoint "$cp"} \
-            --json "$d-audit.json"
+        cat "$d-audit.txt"
     done
     ;;
 clean)
