@@ -221,19 +221,39 @@ impl PlatesStage {
         let resolved = subduction::resolve(st, world, &overlaps, &pos, &env)?;
         let (fronts, fired) =
             shortening::advance(st, &cache.geo, &pos, &tree, &env, resolved.seeds);
-        belts::stack(st, &cache.geo, &pos, &env, &fronts, flexure.as_deref());
+        let stacked = belts::stack(st, &cache.geo, &pos, &env, &fronts, flexure.as_deref());
+        // The collisions' crust budget: what crossed their fronts and what the belts and wedges
+        // kept of it, km³ (Earth-normalized).
+        let (crossed, kept) = stacked.values().fold((0.0, 0.0), |a, s| {
+            (
+                a.0 + s.crossed_km2 * s.thickness_m / 1000.0,
+                a.1 + (s.belt_km2_m + s.wedge_km2_m) / 1000.0,
+            )
+        });
+        *world
+            .globals
+            .entry(belts::CROSSED_GLOBAL.to_owned())
+            .or_insert(0.0) += crossed;
+        *world
+            .globals
+            .entry(belts::KEPT_GLOBAL.to_owned())
+            .or_insert(0.0) += kept;
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
         // The boundary mix (measurement only) on the same samples as the fronts, before the
         // collapse below turns any crust over.
         let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
         // Crust beyond the thickest column goes down; thickened crust that nothing raises any
         // more spreads and gives its area back.
-        let foundered = collapse::founder(st, &env);
+        let mut fell = collapse::Collapse::default();
+        let foundered = collapse::founder(st, &cache.geo, &env, &mut fell);
         *world
             .globals
             .entry(collapse::FOUNDERED_GLOBAL.to_owned())
             .or_insert(0.0) += foundered / 1000.0;
-        let fell = collapse::step(st, &cache.geo, &env);
+        let quiet = collapse::step(st, &cache.geo, &env);
+        fell.sources += quiet.sources;
+        fell.moved_km2_m += quiet.moved_km2_m;
+        fell.converted += quiet.converted;
         *world
             .globals
             .entry(collapse::MOVED_GLOBAL.to_owned())

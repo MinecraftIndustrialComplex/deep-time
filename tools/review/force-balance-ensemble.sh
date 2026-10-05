@@ -20,13 +20,18 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 OUT=$1; BIN=$2; LEN=$3; SEEDS=${4//,/ }; STARTS=${5//,/ }; MODE=$6; shift 6
 LABEL=r
 if [ $# -gt 0 ] && [ "${1#--}" = "$1" ]; then LABEL=$1; shift; fi
-SETS=("$@")
+# Arguments of the form +NAME=value are environment variables for the runs (experiment toggles);
+# the rest are passed to the CLI.
+SETS=(); ENVS=()
+for a in "$@"; do
+  if [ "${a#+}" != "$a" ]; then ENVS+=("${a#+}"); else SETS+=("$a"); fi
+done
 PRESET=${PRESET:-earthlike_quick_16k}
 T=${T:-2}
 mkdir -p "$OUT"
 cp "$BIN" "$OUT/deeptime.bin" || exit 1
 BIN=$OUT/deeptime.bin
-printf '%s\n' "$PRESET $LEN [$SEEDS] [$STARTS] $MODE ${SETS[*]:-}" > "$OUT/$LABEL.args"
+printf '%s\n' "$PRESET $LEN [$SEEDS] [$STARTS] $MODE ${ENVS[*]:-} ${SETS[*]:-}" > "$OUT/$LABEL.args"
 pids=()
 for start in $STARTS; do
   for seed in $SEEDS; do
@@ -34,7 +39,7 @@ for start in $STARTS; do
     if [ -s "$f.txt" ]; then continue; fi
     (
       if [ "$MODE" = ck ]; then extra=(--out "$f.ck"); else extra=(); fi
-      env -u DEEPTIME_ADMIT_JOB -u DEEPTIME_ADMIT_PID deeptime-admit run --kind "sim:$PRESET:${T}t" \
+      env -u DEEPTIME_ADMIT_JOB -u DEEPTIME_ADMIT_PID "${ENVS[@]}" deeptime-admit run --kind "sim:$PRESET:${T}t" \
         --label "fb-$LABEL-$start-$seed" -- \
         nice -n 10 "$BIN" stage volcanoes --preset "$PRESET" --start "$start" --length-myr "$LEN" \
         --threads "$T" --set "seed=$seed" --work "$f.work" "${extra[@]}" "${SETS[@]}" > "$f.part" 2>&1 \

@@ -156,6 +156,11 @@ pub struct Sample {
     /// `plates/shortening`).
     pub collision_mm_yr: f32,
     pub shortening_km: f32,
+    /// Continental crust hidden this step under the overriding plate of a contact in collision
+    /// (`subduction::resolve`): the collision stacks its volume into the belt and the wedge, or
+    /// sends it down with the slab (`belts.rs`), so a resampling consumes it instead of accreting
+    /// it a second time to the column on top (`ridges::resample`; ledger PLT-276).
+    pub stacked: bool,
 }
 
 impl Sample {
@@ -184,6 +189,7 @@ impl Sample {
             uplift_mm_yr: 0.0,
             collision_mm_yr: 0.0,
             shortening_km: 0.0,
+            stacked: false,
         }
     }
 
