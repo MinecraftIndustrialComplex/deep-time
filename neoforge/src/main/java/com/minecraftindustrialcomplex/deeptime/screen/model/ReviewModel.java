@@ -70,6 +70,7 @@ public final class ReviewModel {
             WorldData wd = null;
             if (m.layer(WorldData.ELEVATION) != null)
                 wd = WorldData.open(dir);
+            com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection wp = m.projection();
             if (wd != null) {
                 map = elevationMap(wd, ramps.forLayer(WorldData.ELEVATION));
             } else if (lastFrame.isPresent()) {
@@ -78,7 +79,7 @@ public final class ReviewModel {
                 map = new MapImage(f.w(), f.h(), keyframePixels.apply(f, layer), "keyframe");
             }
             spawn = SpawnCandidates.firstDry(dir, m.seaLevelY())
-                    .map(c -> GlobeProjection.latLon(c.x(), c.z(), circumference, new double[2]));
+                    .map(c -> wp.latLon(c.x(), c.z()));
             provinces = ProvinceHints.compute(SiteRecords.read(dir));
         } catch (RuntimeException e) {
             error = e.getMessage() == null ? e.toString() : e.getMessage();
@@ -91,15 +92,18 @@ public final class ReviewModel {
         return o.has(k) && o.get(k).isJsonPrimitive() ? o.get(k).getAsLong() : -1;
     }
 
-    /** Samples the elevation raster at map resolution: pixel centres as keyframes place them. */
+    /**
+     * Samples the elevation raster at map resolution: pixel centres as keyframes place them (a Lambert
+     * picture of latitude and longitude), each at its block in the world's projection.
+     */
     MapImage elevationMap(WorldData wd, Ramps.Ramp ramp) {
         int[] px = new int[MAP_W * MAP_H];
-        double[] b = new double[2];
+        com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection wp = wd.projection();
         for (int y = 0; y < MAP_H; y++) {
             double lat = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureLatitudeDeg(y, MAP_H);
             for (int x = 0; x < MAP_W; x++) {
                 double lon = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureLongitudeDeg(x, MAP_W);
-                GlobeProjection.block(lat, lon, circumference, b);
+                double[] b = wp.blockOf(lat, lon);
                 px[y * MAP_W + x] = ramp.abgr(wd.height(b[0], b[1]));
             }
         }

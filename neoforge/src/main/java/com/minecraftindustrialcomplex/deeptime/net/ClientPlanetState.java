@@ -18,8 +18,9 @@ public final class ClientPlanetState {
     /** The planet the info describes, resolved once so per-block readers do not parse or allocate. */
     private static volatile Planet planet;
 
-    /** A planet level and its circumference, from a {@link WorldInfoPayload} with {@code planet} set. */
-    private record Planet(ResourceKey<Level> dimension, int circumference) {}
+    /** A planet level, its x period and projection, from a {@link WorldInfoPayload} with {@code planet} set. */
+    private record Planet(ResourceKey<Level> dimension, int circumference,
+                          com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection projection) {}
 
     private ClientPlanetState() {}
 
@@ -53,12 +54,33 @@ public final class ClientPlanetState {
         return p != null && level != null && p.dimension() == level.dimension() ? p.circumference() : 0;
     }
 
+    /**
+     * The world projection of the planet {@code level} is (Lambert or Petroff–Guyou), or null when the
+     * info is for another level, is not a planet, or has not arrived. Safe from any thread.
+     */
+    public static com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection projection(Level level) {
+        Planet p = planet;
+        return p != null && level != null && p.dimension() == level.dimension() ? p.projection() : null;
+    }
+
+    /**
+     * The circumference of the sphere the planet's blocks stand for (2πR, R the equal-area radius): C on
+     * a Lambert world, √(2π)·b on a Petroff–Guyou one; 0 as {@link #circumference}. For Distant Horizons'
+     * curvature.
+     */
+    public static int sphereCircumference(Level level) {
+        Planet p = planet;
+        if (p == null || level == null || p.dimension() != level.dimension())
+            return 0;
+        return (int) Math.round(2 * Math.PI * p.projection().radius());
+    }
+
     private static Planet planetOf(WorldInfoPayload info) {
         if (info == null || !info.planet() || info.circumference() <= 0)
             return null;
         ResourceLocation id = ResourceLocation.tryParse(info.dimension());
         // ResourceKey.create interns, so the level's own key is this same instance.
-        return id == null ? null : new Planet(ResourceKey.create(Registries.DIMENSION, id), info.circumference());
+        return id == null ? null : new Planet(ResourceKey.create(Registries.DIMENSION, id), info.circumference(), info.worldProjection());
     }
 
     public static void reset() {

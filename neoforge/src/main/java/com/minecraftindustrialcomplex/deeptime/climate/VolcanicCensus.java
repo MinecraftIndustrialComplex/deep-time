@@ -2,7 +2,6 @@
 package com.minecraftindustrialcomplex.deeptime.climate;
 
 import com.google.gson.JsonObject;
-import com.minecraftindustrialcomplex.deeptime.worlddata.Projection;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.Geothermal;
@@ -120,7 +119,7 @@ public final class VolcanicCensus {
         Side now = new Side(), plain = new Side();
         Map<String, Integer> replaced = new HashMap<>();
         int holes = 0, differ = 0;
-        int zp = (int) Projection.poleZ(c);
+        int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
         TagKey<Biome> ocean = c("is_ocean"), river = c("is_river"), cave = c("is_cave"), underground = c("is_underground");
         for (int z = -zp + step / 2; z < zp; z += step) {
             if (Math.abs(z) > zp - poleMargin)

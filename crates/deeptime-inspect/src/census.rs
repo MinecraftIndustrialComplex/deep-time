@@ -83,7 +83,7 @@ pub fn run(
     let mut t = Tally::default();
     let (mut land, mut sampled) = (0u64, 0u64);
     // Pole to pole (the projection's z of the poles).
-    let zp = deeptime_format::Projection::of(c as f64).pole_z() as i64;
+    let zp = w.manifest.world_projection().z_range().1 as i64;
     let (cols, rows) = (
         ((c / step) as usize).max(1),
         (((2 * zp) / step) as usize).max(1),

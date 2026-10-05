@@ -27,8 +27,8 @@ pub fn run(world: &Path, out: &Path) -> Result<(usize, usize, usize), FormatErro
     let mut rng = SplitMix(0xB0D1_E5D0_0D5E_ED00);
 
     let mut idx = Vec::new();
-    // Pole to pole and 512 blocks past each pole.
-    let zp = deeptime_format::Projection::new(c).pole_z() as i64;
+    // The world's z range (pole to pole, or edge to edge) and 512 blocks past each end.
+    let zp = m.world_projection().z_range().1 as i64;
     for _ in 0..500 {
         let x = rng.below(u64::from(c) * 2) as i64 - i64::from(c);
         let z = rng.below(2 * zp as u64 + 1024) as i64 - zp - 512;
