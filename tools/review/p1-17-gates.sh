@@ -14,14 +14,15 @@ out=$dir/gates.txt
 step() {
     local name="$1"; shift
     "$@" > "$dir/gate-$name.log" 2>&1
-    echo "$(date -u +%T) $name rc=$? $(grep -v '^admit:' "$dir/gate-$name.log" | tail -1 | cut -c1-200)" | tee -a "$out"
+    local rc=$?
+    echo "$(date -u +%T) $name rc=$rc $(grep -v '^admit:' "$dir/gate-$name.log" | tail -1 | cut -c1-200)" | tee -a "$out"
 }
 for s in ${*:-cargo gradle gametest}; do
 case "$s" in
 cargo)
     step fmt cargo fmt --all --check
     step clippy deeptime-admit run --kind cargo:clippy -- cargo clippy --workspace --all-targets -- -D warnings
-    step cargotest deeptime-admit run --kind cargo:test -- cargo test --workspace
+    step cargotest deeptime-admit run --kind cargo:test -- cargo test --workspace --no-fail-fast
     grep -E "^test result" "$dir/gate-cargotest.log" | awk '{p+=$4; f+=$6; i+=$8} END {print "cargo test: " p " passed, " f " failed, " i " ignored"}' | tee -a "$out"
     step deny deeptime-admit run --kind cargo:other -- cargo deny check licenses bans ;;
 gradle)
