@@ -719,6 +719,18 @@ pub fn level_from_world(world: &WorldState, p: &PlanetPreset) -> Result<Level, C
     })
 }
 
+/// The world the run leaves for the bake, `(without the history, the history)` (bytes): the
+/// amplification's base, which is the finished run's memory once its buffers are gone.
+pub fn world_bytes(p: &PlanetPreset) -> (u64, u64) {
+    let c = u64::from(p.scale.circumference_blocks);
+    let l2 = (c / u64::from(p.resolution.l2_r)) * (c / u64::from(p.resolution.l2_r) / 2);
+    let surface = super::estimate(p);
+    (
+        surface.bytes - surface.history_bytes + l2 * LEVEL_BYTES_PER_CELL,
+        surface.history_bytes,
+    )
+}
+
 /// Estimated bytes and seconds of the stage (plan §5.7.5; P1-17 replaces the second).
 pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let a = p.amplify.clone().unwrap_or_default();
