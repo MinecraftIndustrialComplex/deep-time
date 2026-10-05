@@ -665,6 +665,9 @@ tasks.named('processResources', ProcessResources) {
     from(new File(repoRoot, 'crates/deeptime-core/data/climate_mapping')) {
         include 'default.json'
         include 'placement.json'
+        // The pack placement tables (decisions log 2026-10-04): a merge patch on placement.json per biome
+        // mod, chosen by the registered biomes (climate/PlacementPacks).
+        include 'packs/*.json'
         into 'data/deeptime/deeptime/climate_mapping'
     }
     if (project.hasProperty('release')) {

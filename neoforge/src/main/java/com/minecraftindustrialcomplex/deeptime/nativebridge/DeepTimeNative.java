@@ -39,6 +39,19 @@ final class DeepTimeNative {
     /** Returns a session id (never a pointer). {@code threads} 0 = all processors; {@code memCapBytes} 0 = 4 GiB. */
     static native long create(String presetJson, String contentJson, String outDir, int threads, long memCapBytes);
 
+    /** {@link #createWith} flag: write epoch checkpoints into {@code <outDir>/epochs/}. */
+    static final int FLAG_EPOCHS = 1;
+    /**
+     * {@link #createWith} flag: pick up the run already in {@code outDir} at the preset's
+     * {@code timeline.stop_myr}, from its epoch checkpoints (an epoch picked, a run stopped early or
+     * continued; docs/design/playability-steering.md).
+     */
+    static final int FLAG_RESUME = 2;
+
+    /** {@link #create} with {@link #FLAG_EPOCHS} and {@link #FLAG_RESUME}. */
+    static native long createWith(String presetJson, String contentJson, String outDir, int threads, long memCapBytes,
+            int flags);
+
     /** Runs for about {@code budgetMillis}; returns {@link #RUNNING}, {@link #STAGE_DONE}, {@link #DONE} or {@link #CANCELLED}. */
     static native int advance(long session, int budgetMillis);
 

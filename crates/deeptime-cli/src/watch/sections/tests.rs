@@ -43,9 +43,12 @@ fn workbench(name: &str) -> (PathBuf, Arc<Workbench>) {
         start: None,
         length_myr: Some(40.0),
         content: None,
+        placement_patch: Vec::new(),
         out: runs.join("baked/world"),
         viewer: None,
         checkpoints: false,
+        stop_myr: None,
+        epochs: false,
         common: c,
     })
     .unwrap();

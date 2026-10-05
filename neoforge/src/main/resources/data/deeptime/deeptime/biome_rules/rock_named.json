@@ -1,0 +1,13 @@
+{
+ "_comment": "The geology gate (Ben, decisions log 2026-10-04, 'Deep Time-side fixes (Recommended)'; research note biome-mods-survey.md, fix 3): a pack's rock-named biomes stand only on the ground they are named for. Each rule keeps its biomes (the tag #deeptime:geology/<ground>, so another pack's rock-named biomes can join) out of the climate search everywhere (exclusive) and gives them back their own slot (in_slot: where the pack's own search, nothing kept out, puts one of them) only where the column's ground has the role (ground; FORMAT.md 'Biome rules', worldgen/GeologyGround). Off its ground the pack's next-nearest biome answers; the gate never adds a biome where the pack does not put it. Terralith's Shield on shield provinces (BIO-147), Yosemite on granite (BIO-148), White, Granite and Basalt Cliffs on coasts of carbonate, granite and basalt (BIO-149, BIO-152), the red-bed canyons on consolidated sedimentary rock in a dry climate (BIO-150), Stony Spires on carbonate in a humid climate (BIO-151); bedrock under thin loose cover (BIO-153). The file's id sorts after deeptime:peatland, so a rule that places another biome is tried first. Active only when the source can place one of the biomes.",
+ "requires": ["#deeptime:geology"],
+ "rules": [
+  {"id": "shield", "biomes": ["#deeptime:geology/shield"], "ground": "shield", "in_slot": true, "exclusive": true},
+  {"id": "granite", "biomes": ["#deeptime:geology/granite"], "ground": "granite", "in_slot": true, "exclusive": true},
+  {"id": "carbonate_coast", "biomes": ["#deeptime:geology/carbonate_coast"], "ground": "carbonate_coast", "in_slot": true, "exclusive": true},
+  {"id": "granite_coast", "biomes": ["#deeptime:geology/granite_coast"], "ground": "granite_coast", "in_slot": true, "exclusive": true},
+  {"id": "basalt_coast", "biomes": ["#deeptime:geology/basalt_coast"], "ground": "basalt_coast", "in_slot": true, "exclusive": true},
+  {"id": "dry_sedimentary", "biomes": ["#deeptime:geology/dry_sedimentary"], "ground": "dry_sedimentary", "in_slot": true, "exclusive": true},
+  {"id": "humid_karst", "biomes": ["#deeptime:geology/humid_karst"], "ground": "humid_karst", "in_slot": true, "exclusive": true}
+ ]
+}

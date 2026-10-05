@@ -449,3 +449,43 @@ fn a_lambert_preset_keeps_the_cylinder() {
     assert_eq!(m.notes["bake"]["projection"]["kind"], "lambert");
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+/// The projection pass's memory estimate (`project::estimate_bytes`) rests on the bytes per cell
+/// of each grid's layers; the bake must not outgrow them.
+#[test]
+fn the_projection_estimate_covers_the_baked_layers() {
+    let dir = temp_dir("estimate");
+    let json = small_planet(20.0);
+    run_to_folder(&json, &dir);
+    let m = Manifest::read(&dir).unwrap();
+    let mut per_cell = std::collections::BTreeMap::<String, u64>::new();
+    for l in &m.layers {
+        let r = deeptime_format::TilePackReader::open(&dir.join(&l.path)).unwrap();
+        *per_cell.entry(l.grid.clone()).or_default() += r.desc().cell_bytes() as u64;
+    }
+    for &(_, grid, allowed) in &super::project::LAYER_BYTES_PER_CELL {
+        let held = per_cell.get(grid).copied().unwrap_or(0);
+        assert!(
+            held <= allowed,
+            "grid {grid}: the layers take {held} bytes a cell, the estimate allows {allowed}"
+        );
+    }
+    // The estimate is the larger of what the pass holds on each grid: more than the biggest
+    // grid's two copies of its layers, and nothing for a Lambert preset.
+    let crate::preset::PresetBody::Planet(p) =
+        crate::preset::Preset::from_json(&json).unwrap().body
+    else {
+        panic!("a planet preset");
+    };
+    let biggest = m
+        .grids
+        .iter()
+        .map(|(g, d)| 2 * u64::from(d.w) * u64::from(d.h) * per_cell.get(g).copied().unwrap_or(0))
+        .max()
+        .unwrap();
+    assert!(super::project::estimate_bytes(&p) >= biggest);
+    let mut lambert = (*p).clone();
+    lambert.scale.projection = deeptime_format::projection::ProjectionKind::Lambert;
+    assert_eq!(super::project::estimate_bytes(&lambert), 0);
+    std::fs::remove_dir_all(&dir).unwrap();
+}

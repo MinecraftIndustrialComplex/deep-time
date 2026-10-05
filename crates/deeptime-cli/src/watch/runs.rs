@@ -45,6 +45,26 @@ const PROGRESS_EVERY: Duration = Duration::from_millis(250);
 
 const FINAL_STATES: [&str; 4] = ["done", "failed", "cancelled", "interrupted"];
 
+/// The workbench's epoch-checkpoint grid, Myr (its runs draw a frame every step).
+const EPOCH_EVERY_MYR: f64 = 25.0;
+
+/// Hard-links (else copies) every file of `from` into `to`. The epoch checkpoints and keyframes
+/// are written whole and renamed into place, never changed in place, so a link is a safe copy.
+fn link_dir(from: &Path, to: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(to)?;
+    for e in std::fs::read_dir(from)? {
+        let e = e?;
+        if !e.file_type()?.is_file() {
+            continue;
+        }
+        let dst = to.join(e.file_name());
+        if std::fs::hard_link(e.path(), &dst).is_err() {
+            std::fs::copy(e.path(), &dst)?;
+        }
+    }
+    Ok(())
+}
+
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
@@ -59,6 +79,9 @@ pub struct Run {
     preset_json: String,
     share_code: String,
     mem_cap: u64,
+    /// The run picks up the epoch checkpoints its world folder was given (`resume_run`) instead
+    /// of starting from the start (docs/design/playability-steering.md).
+    resume: bool,
     pub live: Arc<Live>,
     /// While it runs: frames come from the session (its ring, else its files).
     session: Mutex<Option<Arc<Session>>>,
@@ -358,7 +381,7 @@ impl Workbench {
             ));
         }
         let run = self
-            .create(&canon, label, mem_cap)
+            .create(&canon, label, mem_cap, false)
             .map_err(|e| (500, e.to_string()))?;
         lock(&self.runs).push(Arc::clone(&run));
         sched.queue.push_back(Arc::clone(&run));
@@ -367,7 +390,13 @@ impl Workbench {
         Ok(run)
     }
 
-    fn create(&self, preset_json: &str, label: Option<&str>, mem_cap: u64) -> CliResult<Arc<Run>> {
+    fn create(
+        &self,
+        preset_json: &str,
+        label: Option<&str>,
+        mem_cap: u64,
+        resume: bool,
+    ) -> CliResult<Arc<Run>> {
         let millis = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_or(0, |d| d.as_millis());
@@ -412,6 +441,7 @@ impl Workbench {
             preset_json: preset_json.to_owned(),
             share_code: deeptime_core::share_code::encode(preset_json)?,
             mem_cap,
+            resume,
             live,
             session: Mutex::new(None),
             cancel: AtomicBool::new(false),
@@ -422,6 +452,48 @@ impl Workbench {
             final_world: Mutex::new(None),
         });
         run.persist();
+        Ok(run)
+    }
+
+    /// `POST /api/runs/<id>/resume`: a new run that picks up finished run `id` at another stop
+    /// (`stop_myr` after the start: earlier picks an epoch, later continues it), from its epoch
+    /// checkpoints, which are hard-linked into the new run's folder with its keyframes (the
+    /// source run stays as it was). Only the steps after the checkpoint that serves the stop run.
+    pub fn resume_run(&self, id: &str, stop_myr: f64) -> Result<Arc<Run>, Refusal> {
+        let src = self.run(id).ok_or((404, format!("no run {id}")))?;
+        if src.state() != "done" {
+            return Err((409, format!("run {id} is not done")));
+        }
+        let epochs = src.world_dir().join(deeptime_core::epochs::EPOCHS_DIR);
+        if !epochs.join(deeptime_core::epochs::INDEX_FILE).exists() {
+            return Err((409, format!("run {id} has no epoch checkpoints")));
+        }
+        let json = deeptime_core::preset::with_stop(&src.preset_json, Some(stop_myr))
+            .map_err(|e| (400, e.to_string()))?;
+        let canon = self.catalog.runnable(&json).map_err(|e| (400, e))?;
+        let mut sched = lock(&self.sched);
+        if sched.closing {
+            return Err((503, "the workbench is stopping".into()));
+        }
+        if sched.queue.len() >= QUEUE_MAX {
+            return Err((409, format!("{QUEUE_MAX} runs are already waiting")));
+        }
+        let label = format!("{} · stop {stop_myr} Myr", src.label);
+        let run = self
+            .create(&canon, Some(&label), src.mem_cap, true)
+            .map_err(|e| (500, e.to_string()))?;
+        let world = run.world_dir();
+        for sub in [
+            deeptime_core::epochs::EPOCHS_DIR,
+            deeptime_format::keyframes::KEYFRAMES_DIR,
+        ] {
+            link_dir(&src.world_dir().join(sub), &world.join(sub))
+                .map_err(|e| (500, format!("linking {sub}: {e}")))?;
+        }
+        lock(&self.runs).push(Arc::clone(&run));
+        sched.queue.push_back(Arc::clone(&run));
+        drop(sched);
+        self.wake.notify_all();
         Ok(run)
     }
 
@@ -569,16 +641,20 @@ impl Workbench {
     fn drive(&self, run: &Arc<Run>) -> CliResult<Vec<String>> {
         let started = Instant::now();
         let preset = live_cadence(&run.preset_json, self.every_myr)?;
-        let s = Arc::new(Session::create(
-            &preset,
-            "",
-            SessionOptions {
-                out_dir: run.world_dir(),
-                threads: self.common.threads,
-                mem_cap: run.mem_cap,
-            },
-            Arc::new(AllocGauge),
-        )?);
+        let options = SessionOptions {
+            out_dir: run.world_dir(),
+            threads: self.common.threads,
+            mem_cap: run.mem_cap,
+        };
+        let mut s = if run.resume {
+            Session::resume_epoch(&preset, "", options, Arc::new(AllocGauge))?
+        } else {
+            Session::create(&preset, "", options, Arc::new(AllocGauge))?
+        };
+        // Epoch checkpoints on a grid of their own: a frame every step would be a checkpoint
+        // every step.
+        s.set_epochs_every(Some(EPOCH_EVERY_MYR * 1.0e6))?;
+        let s = Arc::new(s);
         *lock(&run.session) = Some(Arc::clone(&s));
         *lock(&run.events_file) = Some(BufWriter::new(
             OpenOptions::new()
@@ -800,6 +876,7 @@ fn restore(dir: &Path, ramps: &Ramps) -> CliResult<Run> {
             .as_u64()
             .filter(|&c| c != 0)
             .unwrap_or(DEFAULT_MEM_CAP),
+        resume: false,
         live,
         session: Mutex::new(None),
         cancel: AtomicBool::new(false),

@@ -760,7 +760,9 @@ pub fn close_contacts(
                 events::OROGENY_PHASE,
                 DVec3::from_array(c.centroid),
             )
-            .until(last_myr.max(c.onset_myr))
+            // Years (the event's start is in years too: `events::event` converts); this was Myr
+            // until 2026-10-05, which a run continued past the present exposed.
+            .until(last_myr.max(c.onset_myr) * 1.0e6)
             .magnitude((c.max_uplift_mm_yr / env.k.subduction_uplift_mm_yr) as f32)
             .param("orogeny", "andean")
             .param("plate", i64::from(c.over))

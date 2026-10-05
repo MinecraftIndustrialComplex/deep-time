@@ -190,7 +190,7 @@ itself is read by the design's scratch script only, and no observed data are in 
 | Global mean temperature, 280 ppm | 13.8–14.4 °C (1850–1900) | Berkeley Earth, averaged in WP-14a (CLM-138) | 14.1 ± 0.4 (Ben, 2026-10-02) | 13.8 °C (15.3) |
 | Land mean temperature | – | not recorded | none | 7.9 °C (7.8) |
 | Glaciated share of land | about 0.10 (Antarctica, Greenland) | `ice_sheet_feedback` comment in params.rs (a round value) | none | 0.095 (0.101) |
-| Land sea-level T, along-row std at 30–70°, January north / July south | 6.1 K | design §7.1 (Beck et al. 2023) | ≥ 5.0 K | 4.53 K (2.25) |
+| Land sea-level T, along-row std at 30–70°, January north / July south | 6.1 K in the design; 4.24 K on Beck's 0.5° grid and 3.89 K on the model's, re-measured 2026-10-05 ([upwind-rain.md](upwind-rain.md)) | design §7.1 (Beck et al. 2023); `climate_vs_obs.py --obs` | ≥ 5.0 K (question to Ben) | 4.53 K (2.25) |
 | Same, annual | 3.3 K | same | ≥ 2.0 K | 1.92 K (0.64) |
 | Southern winter ice edge, std over longitudes | "several degrees" (roughly 55–68°S) | design §1.2, not measured | ≥ 2° | 2.5° (0°) |
 | Brest − Vladivostok, January | 20.1 K | design §7.1 | ≥ 12 K | 20.6 K (7.1) |
@@ -219,7 +219,11 @@ Denver and Lhasa (height), Anchorage. Buenos Aires and Mumbai belong to the rain
 for `rain_model = budget`; the others are the temperature model's.
 
 What the table says. The temperature targets are met except two: the along-row spread (4.53 K
-winter and 1.92 K annual against 5.0 and 2.0) and the reference cities (19 against 21). Brest −
+winter and 1.92 K annual against 5.0 and 2.0) and the reference cities (19 against 21). The
+spread's Earth figure could not be reproduced: with the documented method Beck et al. 2023 give
+3.89 K on the model's grid, less than the model's 4.53 K (upwind-rain.md, "The winter spread").
+At their stations' heights instead of the grid cells' the cities give 20 of 24 (Anchorage's cell
+is 534 m above its station); a surface lapse rate of 5.5 K/km gives 20 on the cells. Brest −
 Vladivostok (20.6 K) matches Earth; Yakutsk (−29.0 °C) passes its target only just and is 10 K
 warmer than Earth (on the 0.5° equirectangular grid before Lambert's projection landed it was
 −37.7 °C: the equal-area grid's tall high-latitude rows smooth the interior). Brest is 4 K too warm

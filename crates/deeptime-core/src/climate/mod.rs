@@ -61,6 +61,7 @@ pub mod params;
 pub mod percell;
 pub mod sheet;
 pub mod snapshot;
+pub mod upwind;
 
 #[cfg(test)]
 mod tests;
@@ -233,6 +234,8 @@ struct Saved {
     /// The CO₂ of every snowball's escape, ppm (the run's notes report them beside Earth's
     /// expected 10⁴–10⁵ ppm, design §4.2).
     escape_ppm: Vec<f64>,
+    /// The end-weighted nudges' controllers (`steering`; nothing while it is off or before its tail).
+    steer: crate::steering::SteerState,
 }
 
 /// What `present_climate` did: the CO₂ factor it settled on and the state with and without it.
@@ -302,9 +305,9 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
         crate::plates::estimate(p)
     };
     let steps = p.plate_steps() as f64;
-    let snaps = (p.length_myr() / c.snapshot_every_myr).ceil() + 2.0;
-    let clock = p.length_myr() * 1000.0 / c.carbon_step_kyr;
-    let window = c.orbital_window_myr.min(p.length_myr()) * 1000.0 / c.orbital_step_kyr;
+    let snaps = (p.run_myr() / c.snapshot_every_myr).ceil() + 2.0;
+    let clock = p.run_myr() * 1000.0 / c.carbon_step_kyr;
+    let window = c.orbital_window_myr.min(p.run_myr()) * 1000.0 / c.orbital_step_kyr;
     StageEstimate {
         bytes: group.bytes + cells * BYTES_PER_CELL,
         seconds: cells as f64 * (snaps * 2.0e-6 + steps * 0.3e-6 + window * 0.05e-6)
@@ -499,7 +502,9 @@ fn kernel_of(
 
 impl ClimateStage {
     pub fn new(preset: PlanetPreset) -> ClimateStage {
-        let p = preset.climate.clone().unwrap_or_default();
+        let mut p = preset.climate.clone().unwrap_or_default();
+        // The ice-age window and the orbit are measured from the run's end (its stop).
+        p.run_end_years = preset.t_end_years();
         let total = preset.plate_steps();
         ClimateStage {
             preset,
@@ -512,6 +517,11 @@ impl ClimateStage {
 
     fn time(&mut self, what: &'static str, since: Instant) {
         *self.timings.entry(what).or_insert(0.0) += since.elapsed().as_secs_f64() * 1000.0;
+    }
+
+    /// The end-weighted nudges, when the preset has them on (`steering`).
+    fn steering(&self) -> Option<crate::steering::SteeringParams> {
+        self.preset.steering.filter(|s| s.enabled)
     }
 
     /// The surface section's sea-level curve at `t_myr`.
@@ -628,7 +638,7 @@ impl ClimateStage {
             CoreError::InvalidState("the climate stage runs after a plate step".into())
         })?;
         let t_end_myr = plates.t_myr;
-        let dt_myr = self.preset.length_myr() / self.total.max(1) as f64;
+        let dt_myr = self.preset.dt_myr();
         let t1 = t_end_myr * 1.0e6;
         let t0 = t1 - dt_myr * 1.0e6;
         let omega_now: Vec<[f64; 3]> = plates
@@ -790,7 +800,12 @@ impl ClimateStage {
         let land0 = land_at(sea_prev);
         let land_frac0 = band_land(&land0);
         let activity = self.activity(world, &geo, n, dt_myr * 1.0e6);
-        let degassing = carbon::degassing(&activity, p.degassing_scale);
+        let mut degassing = carbon::degassing(&activity, p.degassing_scale);
+        if self.steering().is_some() && self.s.steer.ln_outgas != 0.0 {
+            // The nudge on volcanic outgassing (`steering`): e^x of the degassing; x is 0 before
+            // the tail.
+            degassing *= self.s.steer.ln_outgas.exp();
+        }
         self.new_provinces(world);
         if !self.s.clock.started {
             let started = Instant::now();
@@ -1200,8 +1215,12 @@ impl ClimateStage {
         let curve = self.curve_sea_level(t_end_myr);
         let ocean_km2 = geo.area_where(&|c| h[c] <= curve);
         let v_pre = geo.volume_km3(&ice_end_pre);
-        let sea =
+        let mut sea =
             curve + p.glacio_eustasy * ice::eustatic_m(v_pre - p.ice_reference_km3, ocean_km2);
+        if self.steering().is_some() && self.s.steer.sea_m != 0.0 {
+            // The nudge on the ocean's water volume (`steering`), as the sea level it moves.
+            sea += self.s.steer.sea_m;
+        }
         world.globals.insert(SEA_LEVEL_GLOBAL.into(), sea);
         let land = land_at(sea);
         // The weathering's drawdown beyond the degassing precipitates as carbonate (after a
@@ -1686,6 +1705,25 @@ impl ClimateStage {
         let sea_ice_frac = er_end
             .as_ref()
             .map_or(0.0, |e| clock::sea_ice_frac(e, &band_land(&land)));
+        let land_frac =
+            geo.area_where(&|c| land[c]) / geo.area.iter().map(|a| a * w as f64).sum::<f64>();
+        // The nudges (`steering`): measured at this step's end, acting from the next step.
+        if let Some(sp) = self.steering() {
+            let wgt = sp.weight(t1, p.run_end_years, self.preset.run_years());
+            crate::steering::step(
+                &sp,
+                &mut self.s.steer,
+                crate::steering::Measured {
+                    t_years: t1,
+                    w: wgt,
+                    dt_myr,
+                    land: land_frac,
+                    temp_c: t_global,
+                    co2: p.carbon_cycle,
+                },
+            );
+            self.s.steer.ocean_km2 = geo.area_where(&|c| !land[c]);
+        }
         self.s.clock.series.push(vec![
             t_end_myr as f32,
             ppm as f32,
@@ -1706,8 +1744,7 @@ impl ClimateStage {
             activity.ridge_km2_yr as f32,
             activity.subduction_km2_yr as f32,
             carbon::Weathering::supply(&self.s.clock.kernel, &self.s.clock.sheet) as f32,
-            (geo.area_where(&|c| land[c]) / geo.area.iter().map(|a| a * w as f64).sum::<f64>())
-                as f32,
+            land_frac as f32,
             (self.s.clock.kernel.band.iter().sum::<f64>() / carbon::KERNEL_EARTH) as f32,
             runoff_mean as f32,
         ]);
@@ -1895,7 +1932,7 @@ impl ClimateStage {
                 })
                 .collect()
         };
-        json!({
+        let mut out = json!({
             "snapshots": self.s.snapshots,
             "triggered_snapshots": self.s.triggered,
             // Hoffman et al. 2017 expect terminations at 10⁴–10⁵ ppm (design §4.2, WP-14a).
@@ -1923,7 +1960,13 @@ impl ClimateStage {
             "series": {"columns": clock::SERIES_COLUMNS, "rows": round(&self.s.clock.series)},
             "window": {"columns": clock::WINDOW_COLUMNS, "rows": round(&self.s.clock.window)},
             "millis": self.timings,
-        })
+        });
+        // The nudges a steered run had (absent when steering is off: the note is the unsteered
+        // run's).
+        if let Some(sp) = self.steering() {
+            out["steering"] = crate::steering::report(&sp, &self.s.steer);
+        }
+        out
     }
 }
 /// Statistics of a snapshot (true-area weighted over land unless stated).
