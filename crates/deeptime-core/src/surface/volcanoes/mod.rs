@@ -657,7 +657,7 @@ impl VolcanoStage {
             CoreError::InvalidState("the volcano stage runs after a plate step".into())
         })?;
         let t = plates.t_myr;
-        let dt = self.preset.length_myr() / self.total.max(1) as f64;
+        let dt = self.preset.dt_myr();
         let omega_now: Vec<[f64; 3]> = plates
             .plates
             .iter()

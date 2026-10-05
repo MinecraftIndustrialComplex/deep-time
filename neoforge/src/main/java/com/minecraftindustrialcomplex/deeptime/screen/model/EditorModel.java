@@ -21,6 +21,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
@@ -63,10 +64,14 @@ public final class EditorModel {
         String estimate(String presetJson);
     }
 
-    /** Starts a run writing into {@code outDir} ({@link SessionRunHandle#launch} in the game). */
+    /**
+     * Starts a run writing into {@code outDir} ({@link SessionRunHandle#launch} in the game). With
+     * {@code resume} it picks up the run already in {@code outDir} at the preset's
+     * {@code timeline.stop_myr}, from its epoch checkpoints (docs/design/playability-steering.md).
+     */
     @FunctionalInterface
     public interface Launcher {
-        RunHandle launch(String presetJson, Path outDir, int threads, long capBytes);
+        RunHandle launch(String presetJson, Path outDir, int threads, long capBytes, boolean resume);
     }
 
     /**
@@ -82,8 +87,17 @@ public final class EditorModel {
 
         /** The game's: the natives through {@link SimSession}. */
         public static Deps game(Path gameDir, Executor loader, Executor io) {
-            return new Deps(json -> SimSession.estimate(json, ""), SessionRunHandle::launch, gameDir, MachineInfo.current(),
-                    loader, io, NativeLoader::isLinked, List::of);
+            return game(gameDir, loader, io, () -> "");
+        }
+
+        /**
+         * The game's, with the content bundle every estimate and run gets ({@code content}, asked at each call: the pack
+         * placement tables of the biome mods the Create World screen's data packs register).
+         */
+        public static Deps game(Path gameDir, Executor loader, Executor io, Supplier<String> content) {
+            return new Deps(json -> SimSession.estimate(json, content.get()),
+                    (json, out, threads, cap) -> SessionRunHandle.launch(json, content.get(), out, threads, cap), gameDir,
+                    MachineInfo.current(), loader, io, NativeLoader::isLinked, List::of);
         }
     }
 
@@ -645,7 +659,7 @@ public final class EditorModel {
         RunHandle h;
         try {
             Files.createDirectories(dir);
-            h = deps.launcher().launch(json, dir, deps.machine().clientThreads(), capBytes());
+            h = deps.launcher().launch(json, dir, deps.machine().clientThreads(), capBytes(), false);
         } catch (IOException | RuntimeException e) {
             launchError = e.getMessage() == null ? e.toString() : e.getMessage();
             deleteLater(dir);
@@ -654,6 +668,105 @@ public final class EditorModel {
         launchError = null;
         run = new TimelapseModel(h, id, json, circumference, stages, deps.loader(), deps.io());
         estimate().ifPresent(run::setEstimate);
+        page = Page.RUN;
+        return Optional.of(run);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Pick the epoch, stop early, continue (docs/design/playability-steering.md; Ben, decisions
+    // log 2026-10-05)
+    // ------------------------------------------------------------------------------------------
+
+    /** Where the current run stops, Myr after its start ({@code timeline.stop_myr}, else its length). */
+    public OptionalDouble runStopMyr() {
+        return run == null ? OptionalDouble.empty() : Presets.stopMyr(Presets.parseObject(run.presetJson()));
+    }
+
+    private double runLengthMyr() {
+        return Presets.info(Presets.parseObject(run.presetJson())).timeline().map(Presets.Timeline::lengthMyr)
+                .orElse(Double.NaN);
+    }
+
+    /**
+     * The stop that bakes the world of keyframe {@code f}, Myr after the start: its time, when the
+     * run is going or done and the frame lies before the run's end (the end itself needs nothing).
+     * Frames of the first plate step have none (nothing to stop at yet).
+     */
+    public OptionalDouble epochStopMyr(KeyframeInfo f) {
+        if (run == null || f == null || (run.state() != TimelapseModel.State.RUNNING && run.state() != TimelapseModel.State.DONE))
+            return OptionalDouble.empty();
+        double length = runLengthMyr();
+        OptionalDouble end = runStopMyr();
+        if (!Double.isFinite(length) || end.isEmpty())
+            return OptionalDouble.empty();
+        // The frame's world time is −length + stop (Myr); rounded to the kyr, as the core rounds
+        // the stop to whole plate steps.
+        double stop = Math.round((f.t() / 1e6 + length) * 1e3) / 1e3;
+        if (!(stop >= MIN_EPOCH_MYR) || stop >= end.getAsDouble() - 1e-6)
+            return OptionalDouble.empty();
+        return OptionalDouble.of(stop);
+    }
+
+    /** The shortest stop worth baking, Myr (one plate step of the built-ins). */
+    public static final double MIN_EPOCH_MYR = 2.0;
+
+    /**
+     * Plays the world of keyframe {@code f}: a running run is stopped there, a finished one is
+     * baked again at that time. The new run picks up the same staging folder from its epoch
+     * checkpoints (only the frame's tail and the end stages run again) and the timelapse keeps the
+     * frames before it. Returns empty (with a warning) when it could not be launched.
+     */
+    public Optional<TimelapseModel> pickEpoch(KeyframeInfo f) {
+        double stop = epochStopMyr(f).orElseThrow(() -> new IllegalStateException("no epoch to pick at that frame"));
+        return relaunch(Presets.withStop(run.presetJson(), stop));
+    }
+
+    /** True when a finished run can be continued past its stop. */
+    public boolean canContinue() {
+        return run != null && run.state() == TimelapseModel.State.DONE && runStopMyr().isPresent();
+    }
+
+    /** The problem with continuing to {@code text} Myr after the start, if any. */
+    public Optional<Problem> continueProblem(String text) {
+        double v = Formats.parse(text);
+        double end = runStopMyr().orElse(Double.NaN);
+        if (!(v > end + 1e-6) || v > Presets.MAX_LENGTH_MYR)
+            return Optional.of(Problem.of("run.continue.range", Formats.number(end), Formats.number(Presets.MAX_LENGTH_MYR)));
+        return Optional.empty();
+    }
+
+    /**
+     * Continues the finished run to {@code stopMyr} after its start: the same run, going on past
+     * its end (the end's tail runs again as ordinary steps), in the same staging folder.
+     */
+    public Optional<TimelapseModel> continueTo(double stopMyr) {
+        if (!canContinue())
+            throw new IllegalStateException("no finished run to continue");
+        if (continueProblem(Formats.number(stopMyr)).isPresent())
+            throw new IllegalArgumentException("cannot continue to " + stopMyr + " Myr");
+        return relaunch(Presets.withStop(run.presetJson(), stopMyr));
+    }
+
+    /** A run that picks up the current one's folder with {@code json}'s stop. */
+    private Optional<TimelapseModel> relaunch(String json) {
+        TimelapseModel old = run;
+        old.supersede();
+        if (old.state() == TimelapseModel.State.RUNNING)
+            old.cancel();
+        review = null;
+        // The accepted run's folder is about to change: it must be accepted again.
+        if (accepted != null && accepted.stagingId().equals(old.stagingId()))
+            accepted = null;
+        RunHandle h;
+        try {
+            h = deps.launcher().launch(json, old.run().outDir(), deps.machine().clientThreads(), capBytes(), true);
+        } catch (RuntimeException e) {
+            launchError = e.getMessage() == null ? e.toString() : e.getMessage();
+            return Optional.empty();
+        }
+        launchError = null;
+        run = new TimelapseModel(h, old.stagingId(), json, old.circumference(), old.stageNames(), deps.loader(), deps.io());
+        old.estimate().ifPresent(run::setEstimate);
         page = Page.RUN;
         return Optional.of(run);
     }

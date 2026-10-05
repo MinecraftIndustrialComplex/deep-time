@@ -410,7 +410,7 @@ impl StructureStage {
             CoreError::InvalidState("the structure stage runs after a plate step".into())
         })?;
         let t_end_myr = plates.t_myr;
-        let dt_myr = self.preset.length_myr() / self.total.max(1) as f64;
+        let dt_myr = self.preset.dt_myr();
         let omega_now: Vec<[f64; 3]> = plates
             .plates
             .iter()

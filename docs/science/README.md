@@ -75,6 +75,7 @@ them in from [_template.md](_template.md).
 | [pole-cap.md](pole-cap.md) | stub | POL |
 | [quincuncial-projection.md](quincuncial-projection.md) | stage 1 (prototype only, not shipped) | SCL-070 to SCL-077 |
 | [geothermal-features.md](geothermal-features.md) | written (stage 2, WP-16) | GEO |
+| [playability-steering.md](playability-steering.md) | written with the feature (2026-10-05): the epoch tools and the end-weighted nudges | STE |
 
 Four ledgers have no page of their own; their rows belong with the pages of the subsystems they touch
 (added in stage 2, package WP-0): PRS (presets other than `earthlike_quick_16k`, the test presets and the

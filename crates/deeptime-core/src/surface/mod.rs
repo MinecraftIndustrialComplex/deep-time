@@ -476,7 +476,7 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
         + 12 * 8 // f64 working arrays
         + log // the log's advected copy
         + 21 * 8; // the glaciers' ice state, loads and passes (`glacial.rs`)
-    let frames = (p.length_myr() / s.frame_every_myr).ceil().max(1.0) as u64;
+    let frames = (p.run_myr() / s.frame_every_myr).ceil().max(1.0) as u64;
     let history = frames * cells * 12; // packed frames, ~12 B/cell after LZ4 (measured in P1-04)
     let steps = p.plate_steps() as f64 * f64::from(s.substeps);
     StageEstimate {
@@ -561,7 +561,7 @@ impl SurfaceStage {
             CoreError::InvalidState("the surface stage runs after a plate step".into())
         })?;
         let t_end_myr = plates.t_myr;
-        let dt_myr = self.preset.length_myr() / self.total.max(1) as f64;
+        let dt_myr = self.preset.dt_myr();
         let dt = dt_myr * 1.0e6;
         let omega_now: Vec<[f64; 3]> = plates
             .plates

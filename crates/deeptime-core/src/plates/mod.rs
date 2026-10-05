@@ -182,7 +182,7 @@ impl PlatesStage {
     }
 
     fn dt_myr(&self) -> f64 {
-        self.preset.length_myr() / self.total.max(1) as f64
+        self.preset.dt_myr()
     }
 
     fn norm(&self) -> Norm {

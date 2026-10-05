@@ -36,32 +36,34 @@ pub struct Options {
 /// Snapshots repeated on the relief when the preset turns the ice-sheet feedback on.
 const FEEDBACK_SNAPSHOTS: usize = 5;
 
-/// Places whose Köppen class is well known (Peel et al. 2007's map), for the printed check.
-const PLACES: [(&str, f64, f64, &str); 24] = [
-    ("London", 51.5, -0.1, "Cfb"),
-    ("Moscow", 55.8, 37.6, "Dfb"),
-    ("Yakutsk", 62.0, 129.7, "Dfd"),
-    ("Cairo", 30.0, 31.2, "BWh"),
-    ("Riyadh", 24.7, 46.7, "BWh"),
-    ("Manaus", -3.1, -60.0, "Af"),
-    ("Kinshasa", -4.3, 15.3, "Aw"),
-    ("Mumbai", 19.1, 72.9, "Am"),
-    ("Beijing", 39.9, 116.4, "Dwa"),
-    ("Tokyo", 35.7, 139.7, "Cfa"),
-    ("Sydney", -33.9, 151.2, "Cfa"),
-    ("Perth", -31.9, 115.9, "Csa"),
-    ("Rome", 41.9, 12.5, "Csa"),
-    ("Denver", 39.7, -105.0, "BSk"),
-    ("Chicago", 41.9, -87.6, "Dfa"),
-    ("Anchorage", 61.2, -149.9, "Dfc"),
-    ("Lima", -12.0, -77.0, "BWh"),
-    ("Buenos Aires", -34.6, -58.4, "Cfa"),
-    ("Cape Town", -33.9, 18.4, "Csb"),
-    ("Singapore", 1.35, 103.8, "Af"),
-    ("Alice Springs", -23.7, 133.9, "BWh"),
-    ("Ulaanbaatar", 47.9, 106.9, "Dwb"),
-    ("Lhasa", 29.7, 91.1, "Dwb"),
-    ("Vostok", -78.5, 106.8, "EF"),
+/// Places whose Köppen class is well known (Peel et al. 2007's map), for the printed check, with
+/// the height of each city's weather station, m (from memory, rounded; validation only: the
+/// grid cell's own height can differ by hundreds of metres from a valley city's).
+const PLACES: [(&str, f64, f64, &str, f64); 24] = [
+    ("London", 51.5, -0.1, "Cfb", 25.0),
+    ("Moscow", 55.8, 37.6, "Dfb", 156.0),
+    ("Yakutsk", 62.0, 129.7, "Dfd", 98.0),
+    ("Cairo", 30.0, 31.2, "BWh", 23.0),
+    ("Riyadh", 24.7, 46.7, "BWh", 612.0),
+    ("Manaus", -3.1, -60.0, "Af", 92.0),
+    ("Kinshasa", -4.3, 15.3, "Aw", 240.0),
+    ("Mumbai", 19.1, 72.9, "Am", 14.0),
+    ("Beijing", 39.9, 116.4, "Dwa", 44.0),
+    ("Tokyo", 35.7, 139.7, "Cfa", 40.0),
+    ("Sydney", -33.9, 151.2, "Cfa", 39.0),
+    ("Perth", -31.9, 115.9, "Csa", 25.0),
+    ("Rome", 41.9, 12.5, "Csa", 21.0),
+    ("Denver", 39.7, -105.0, "BSk", 1609.0),
+    ("Chicago", 41.9, -87.6, "Dfa", 181.0),
+    ("Anchorage", 61.2, -149.9, "Dfc", 31.0),
+    ("Lima", -12.0, -77.0, "BWh", 154.0),
+    ("Buenos Aires", -34.6, -58.4, "Cfa", 25.0),
+    ("Cape Town", -33.9, 18.4, "Csb", 42.0),
+    ("Singapore", 1.35, 103.8, "Af", 15.0),
+    ("Alice Springs", -23.7, 133.9, "BWh", 546.0),
+    ("Ulaanbaatar", 47.9, 106.9, "Dwb", 1350.0),
+    ("Lhasa", 29.7, 91.1, "Dwb", 3650.0),
+    ("Vostok", -78.5, 106.8, "EF", 3488.0),
 ];
 
 #[allow(clippy::needless_range_loop)]
@@ -406,8 +408,8 @@ pub fn run(o: &Options) -> CliResult<()> {
         println!("deeptime climate-dem: fields -> {}", dir.display());
     }
     // The printed check: the class at each known place, and whether its group matches.
-    let (mut same, mut group) = (0, 0);
-    for (name, la, lo, want) in PLACES {
+    let (mut same, mut group, mut group_st, mut have_st) = (0, 0, 0, false);
+    for (name, la, lo, want, z_st) in PLACES {
         let j = (grid
             .row_of_z(grid.projection().z_of_lat(la))
             .round()
@@ -434,10 +436,23 @@ pub fn run(o: &Options) -> CliResult<()> {
         }
         let got = koppen::CODES[s.koppen[c] as usize];
         let g = got.chars().next() == want.chars().next();
+        // The same cell's months at the station's height (its sea-level temperatures less the
+        // lapse rate over the station's height, not the cell's), glaciated cells kept as they are.
+        let at_station = if s.t_sl_month.len() == 12 && s.p_month.len() == 12 && s.glacier[c] == 0 {
+            let t: [f64; 12] = std::array::from_fn(|m| {
+                f64::from(s.t_sl_month[m][c]) - p.lapse_c_per_km / 1000.0 * z_st
+            });
+            let pm: [f64; 12] = std::array::from_fn(|m| f64::from(s.p_month[m][c]) / 12.0);
+            koppen::CODES[koppen::classify(&t, &pm) as usize]
+        } else {
+            got
+        };
+        have_st |= s.t_sl_month.len() == 12;
+        group_st += usize::from(at_station.chars().next() == want.chars().next());
         same += usize::from(got == want);
         group += usize::from(g);
         println!(
-            "deeptime climate-dem: {name:<14} {want:<4} → {got:<4} {} (T {:5.1} °C, {:6.0} mm, z {:5.0} m)",
+            "deeptime climate-dem: {name:<14} {want:<4} → {got:<4} {} (T {:5.1} °C, {:6.0} mm, z {:5.0} m; at the station's {z_st:.0} m: {at_station})",
             if got == want {
                 "same"
             } else if g {
@@ -456,6 +471,12 @@ pub fn run(o: &Options) -> CliResult<()> {
         PLACES.len(),
         group
     );
+    if have_st {
+        println!(
+            "deeptime climate-dem: places at their stations' heights: {group_st} of {} same main group",
+            PLACES.len()
+        );
+    }
     if let Some(dir) = &o.viewer {
         let mut world = WorldState::new(1, o.w, 0.0);
         let put = |world: &mut WorldState, name: &str, data: Vec<f32>| {

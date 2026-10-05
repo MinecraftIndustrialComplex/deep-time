@@ -52,7 +52,7 @@ public final class VolcanicCensus {
 
     /** One placement's counts. */
     public static final class Side {
-        public int columns, volcanic, far, outside, poolsInRole, volcanicCells, specks;
+        public int columns, volcanic, far, outside, poolsInRole, volcanicCells, specks, onGeologicGround;
         public final Map<String, Integer> byBiome = new HashMap<>();
         public final StringBuilder examples = new StringBuilder();
 
@@ -68,6 +68,7 @@ public final class VolcanicCensus {
             o.addProperty("pools_in_role", poolsInRole);
             o.addProperty("volcanic_cells", volcanicCells);
             o.addProperty("specks", specks);
+            o.addProperty("volcanic_on_their_geologic_ground", onGeologicGround);
             JsonObject b = new JsonObject();
             byBiome.entrySet().stream().sorted(Map.Entry.<String, Integer>comparingByValue(Comparator.reverseOrder()))
                     .forEach(e -> b.addProperty(e.getKey(), e.getValue()));
@@ -130,9 +131,17 @@ public final class VolcanicCensus {
                     continue;
                 int qx = QuartPos.fromBlock(x), qy = QuartPos.fromBlock((int) Math.floor(y)), qz = QuartPos.fromBlock(z);
                 Holder<Biome> b = biomes.getNoiseBiome(qx, qy, qz, sampler);
+                String why = VolcanicBiomes.lastDecision();
                 Holder<Biome> p = VolcanicBiomes.plain(() -> biomes.getNoiseBiome(qx, qy, qz, sampler));
                 double near = nearest(sources, x, z, c), out = zones.outsideSurfaceZones(x, z);
-                tally(now, b, near, out, x, z);
+                // A volcanic biome that is also rock-named (Terralith's Basalt Cliffs) may stand on its own ground away
+                // from volcanoes (the geology gate's rule put it there, decisions log 2026-10-04): not counted as volcanic there.
+                if (b.is(VolcanicBiomes.KEEP_OUT) && GeologyBiomes.byGroundRule(why, marker.volcanic().rules())) {
+                    now.columns++;
+                    now.onGeologicGround++;
+                } else {
+                    tally(now, b, near, out, x, z);
+                }
                 tally(plain, p, near, out, x, z);
                 if (b != p)
                     differ++;
