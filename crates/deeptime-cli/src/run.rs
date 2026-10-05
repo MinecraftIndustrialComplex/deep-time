@@ -950,6 +950,19 @@ pub(crate) fn timings_line(
             ));
         }
     }
+    // The plate step's parts (a process-wide gauge, not a world note: P1-17).
+    let plates = deeptime_core::plates::timings();
+    if !plates.is_empty() {
+        parts.push(format!(
+            "{}[{}]",
+            deeptime_core::plates::STAGE_NAME,
+            plates
+                .iter()
+                .map(|(k, ms)| format!("{k}={:.1}s", ms / 1000.0))
+                .collect::<Vec<_>>()
+                .join(",")
+        ));
+    }
     parts.join(" ")
 }
 
@@ -1459,6 +1472,7 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
         let out = work.join(format!("t{threads}"));
         let _ = std::fs::remove_dir_all(&out);
         alloc::reset_peak();
+        deeptime_core::plates::reset_timings();
         let started = Instant::now();
         let s = Session::create(
             &preset,

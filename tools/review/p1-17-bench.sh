@@ -12,20 +12,22 @@
 #
 #   spec      <preset>:<start>:<length_myr>:<threads>, e.g. earthlike_quick_16k:supercontinent:1000:8
 #
-# Each run is one job of the VM's admission tool (sim:<preset>:<threads>t) and writes
+# Each pair is one job of the VM's admission tool (sim:<preset>:<2 x threads>t, so both start
+# together; a scale run sim:<preset>:<threads>t). Start the script itself unadmitted
+# (`detach.sh start <name> --kind light ...`): inside an admitted job the runs would not queue. Each
+# run writes
 # <out root>/<label>-<preset>-<start>-<len>-t<threads>/{log.txt,bench.json,manifest.json}; the world
 # itself is deleted once compared. tools/review/p1-17-table.py turns the logs into the tables of
 # docs/design/p1-17-benchmark-gate.md.
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 
-one() { # one <bin> <label> <root> <spec>: one admitted bench run; prints its out dir
+one() { # one <bin> <label> <root> <spec>: one bench run (admitted by the caller); its out dir
     local bin=$1 label=$2 root=$3 p s l t
     IFS=: read -r p s l t <<< "$4"
     local out="$root/$label-$p-$s-$l-t$t"
     rm -rf "$out"; mkdir -p "$out"
-    deeptime-admit run --kind "sim:$p:${t}t" --label "p1-17-$label-$p-$s-$l-t$t" -- \
-        env RAYON_NUM_THREADS="$t" /usr/bin/time -v "$bin" bench --preset "$p" --start "$s" \
+    env RAYON_NUM_THREADS="$t" /usr/bin/time -v "$bin" bench --preset "$p" --start "$s" \
         --length-myr "$l" --threads "$t" --out "$out/bench.json" --work "$out/work" > "$out/log.txt" 2>&1
     echo "exit $?" >> "$out/log.txt"
     cp "$out/work/t$t/manifest.json" "$out/manifest.json" 2>/dev/null
@@ -34,16 +36,26 @@ summary() { grep -h "total_ms\|Maximum resident\|^exit" "$1/log.txt" | cut -c1-2
 
 verb=${1:-}
 case "$verb" in
+_pair) # inside the admitted job: the two runs at once
+    one "$2" "$3" "$6" "$7" &
+    one "$4" "$5" "$6" "$7" &
+    wait
+    exit 0
+    ;;
+_one) # inside the admitted job: one run
+    one "$2" "$3" "$4" "$5"
+    exit 0
+    ;;
 pair)
-    [ $# -ge 7 ] || { sed -n 4,19p "$0"; exit 2; }
+    [ $# -ge 7 ] || { sed -n 4,21p "$0"; exit 2; }
     binA=$2; labA=$3; binB=$4; labB=$5; root=$6; shift 6
     mkdir -p "$root"
     for spec in "$@"; do
         IFS=: read -r p s l t <<< "$spec"
         echo "== $(date -u +%T) $spec"
-        one "$binA" "$labA" "$root" "$spec" &
-        one "$binB" "$labB" "$root" "$spec" &
-        wait
+        # One admitted job for the pair (twice the threads), so A and B start together.
+        deeptime-admit run --kind "sim:$p:$((2 * t))t" --label "p1-17-$labA-$labB-$p-$s-$l-t$t" -- \
+            "$0" _pair "$binA" "$labA" "$binB" "$labB" "$root" "$spec"
         a="$root/$labA-$p-$s-$l-t$t"; b="$root/$labB-$p-$s-$l-t$t"
         echo "== $(date -u +%T) done $spec"
         summary "$a"; summary "$b"
@@ -52,16 +64,18 @@ pair)
     done
     ;;
 scale)
-    [ $# -ge 5 ] || { sed -n 4,19p "$0"; exit 2; }
+    [ $# -ge 5 ] || { sed -n 4,21p "$0"; exit 2; }
     bin=$2; lab=$3; root=$4; shift 4
     mkdir -p "$root"
     for spec in "$@"; do
-        ( one "$bin" "$lab" "$root" "$spec"; IFS=: read -r p s l t <<< "$spec"
+        ( IFS=: read -r p s l t <<< "$spec"
+          deeptime-admit run --kind "sim:$p:${t}t" --label "p1-17-$lab-$p-$s-$l-t$t" -- \
+              "$0" _one "$bin" "$lab" "$root" "$spec"
           rm -rf "$root/$lab-$p-$s-$l-t$t/work"; echo "== $(date -u +%T) done $spec"
           summary "$root/$lab-$p-$s-$l-t$t" ) &
     done
     wait
     ;;
-*) sed -n 4,19p "$0"; exit 2 ;;
+*) sed -n 4,21p "$0"; exit 2 ;;
 esac
 echo "== $(date -u +%T) ALL DONE"
