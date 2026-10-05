@@ -540,9 +540,9 @@ pub fn compute(
     // the budget dries it along the wind. The first pass sets the mountains' sink and the marks
     // the second uses.
     let mut up_src: (Vec<f64>, Vec<f64>) = (Vec::new(), Vec::new());
-    let mut carry: Option<(Vec<[f64; 12]>, Vec<[f64; 12]>)> = None;
+    let mut carry: Option<Carry> = None;
     let carry_at = |g: &super::coarse::Grid,
-                    cy: &Option<(Vec<[f64; 12]>, Vec<[f64; 12]>)>,
+                    cy: &Option<Carry>,
                     c: usize,
                     m: usize|
      -> Option<(f64, f64)> {
@@ -555,7 +555,7 @@ pub fn compute(
         Some((a, d))
     };
     let pref_of = |g: &super::coarse::Grid,
-                   cy: &Option<(Vec<[f64; 12]>, Vec<[f64; 12]>)>|
+                   cy: &Option<Carry>|
      -> Vec<[f64; 12]> {
         let nc = g.w * g.h;
         let per: Vec<[f64; 12]> = (0..n)
@@ -932,6 +932,10 @@ pub fn compute(
 }
 
 const YEAR_S: f64 = 365.25 * 86_400.0;
+
+/// The upwind rain's monthly sea marks per coarse cell: the highs' side and the sea-surface
+/// departure the vapour carries.
+type Carry = (Vec<[f64; 12]>, Vec<[f64; 12]>);
 
 /// The upwind rain on the snapshot's coarse climate `pcm` (warm-started from its last solution,
 /// whose annual rain then sets the land's recycling; else from `annual`, the last snapshot's).
