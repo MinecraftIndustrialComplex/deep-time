@@ -75,6 +75,12 @@ pub const FOREDEEP_REACH_KM: f64 = 600.0;
 /// (the design's acceptance row: "in front of a belt above 3 km").
 // ledger: PLT-249 (the measure's definition, design `plate-force-balance.md` §7).
 pub const FOREDEEP_BELT_M: f64 = 3000.0;
+/// `WorldState::globals`: continental crust that crossed collision fronts over the run, km³
+/// (shortening × front × the incoming crust's thickness) …
+pub const CROSSED_GLOBAL: &str = "plates/collision_crossed_km3";
+/// … and what the belts and wedges kept of it (`collision_stacking_share`, less what found no
+/// room under the strength height, PLT-253), km³ (Earth-normalized).
+pub const KEPT_GLOBAL: &str = "plates/collision_kept_km3";
 /// The lowest ground the wedge's profile is followed down to, m (the reach of its distance
 /// field; ground lower than this is not continental lowland).
 const WEDGE_FLOOR_M: f64 = -500.0;

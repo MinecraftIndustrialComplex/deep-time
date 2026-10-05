@@ -172,6 +172,13 @@ fn footprint(
     Some(Cover { t, tri, w })
 }
 
+/// `WorldState::globals`: crust accreted at resamplings to the column on top (hidden and
+/// overridden crust, its conserved pools), km³ …
+pub const ACCRETED_GLOBAL: &str = "plates/resample_accreted_km3";
+/// … and the continental crust a collision had hidden, consumed instead (it was stacked into the
+/// belt or went down with the slab; ledger PLT-276), km³ (Earth-normalized).
+pub const STACKED_CONSUMED_GLOBAL: &str = "plates/resample_stacked_km3";
+
 /// Resamples the crust onto a fresh lattice and returns its geometry.
 pub fn resample(
     state: &mut PlateState,
@@ -253,12 +260,17 @@ pub fn resample(
         })
         .collect();
 
-    // Covered samples.
+    // Covered samples. Continental crust a collision hid this step was stacked into its belt or
+    // went down with the slab (`belts.rs`): it is consumed here, not accreted a second time
+    // (ledger: PLT-276). Both are counted, m of rock per new sample.
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
+    let mut tally: Vec<(f64, f64)> = vec![(0.0, 0.0); n];
+    let double = std::env::var_os("DT_EXP_DOUBLE").is_some(); // TEMP-EXP
     let mut samples: Vec<Sample> = found
         .par_iter()
         .zip(plate_new.par_iter_mut())
-        .map(|((top, others), pl)| match top {
+        .zip(tally.par_iter_mut())
+        .map(|(((top, others), pl), tally)| match top {
             None => Sample::blank(0),
             Some((g, c)) => {
                 let mut s = interpolate(src, c, rots[*g as usize]);
@@ -268,7 +280,16 @@ pub fn resample(
                     let p2 = group_plate[*g2 as usize];
                     if under.is_hidden() || p2 == *pl || overrides(*pl, p2) {
                         let u = interpolate(src, c2, rots[*g2 as usize]);
-                        accrete(&mut s.pools, &u.pools);
+                        let conserved: f64 = u.pools[..pool::CONSERVED]
+                            .iter()
+                            .map(|&x| f64::from(x))
+                            .sum();
+                        if under.is_hidden() && under.stacked && !double /* TEMP-EXP */ {
+                            tally.1 += conserved;
+                        } else {
+                            tally.0 += conserved;
+                            accrete(&mut s.pools, &u.pools);
+                        }
                     }
                 }
                 s.thickness_m = thickness(&s.pools);
@@ -276,6 +297,18 @@ pub fn resample(
             }
         })
         .collect();
+    let area_km2 = norm.sample_area_km2();
+    let (accreted_m, consumed_m) = tally
+        .iter()
+        .fold((0.0, 0.0), |a, &(x, y)| (a.0 + x, a.1 + y));
+    *world
+        .globals
+        .entry(ACCRETED_GLOBAL.to_owned())
+        .or_insert(0.0) += accreted_m * area_km2 / 1000.0;
+    *world
+        .globals
+        .entry(STACKED_CONSUMED_GLOBAL.to_owned())
+        .or_insert(0.0) += consumed_m * area_km2 / 1000.0;
 
     // Gaps: fresh oceanic crust between diverging plates.
     let gap: Vec<bool> = plate_new.iter().map(|&p| p == u32::MAX).collect();

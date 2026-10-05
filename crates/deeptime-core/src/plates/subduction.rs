@@ -149,6 +149,7 @@ pub fn resolve(
         // The collisions' footprint is stamped again each step they have a front (`belts.rs`).
         s.collision_mm_yr = 0.0;
         s.shortening_km = 0.0;
+        s.stacked = false;
     }
     // A collision's own belt and wedge are stamped as a collision orogeny each step (`belts.rs`):
     // that crust is not locked against the collision that stamps it.
@@ -297,6 +298,8 @@ pub fn resolve(
         if a == state.contacts[k].under {
             let s = &mut state.samples[o.i as usize];
             s.flags |= HIDDEN;
+            // ledger: PLT-276 (crust a collision stacks is not accreted again at a resampling).
+            s.stacked = own.is_some() && s.kind == CONTINENTAL;
             if let Some(was) = &was_hidden
                 && s.kind == CONTINENTAL
                 && !was[o.i as usize]

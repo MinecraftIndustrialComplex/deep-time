@@ -98,16 +98,33 @@ const ROOT_ORDER: [usize; pool::COUNT] = [
     pool::SEDIMENT,
 ];
 
-/// Continental crust thicker than `crust_max_km` loses the excess from the bottom of its column
-/// to the mantle (see the module docs, "The thickest crust"); returns the crust lost, km² × m.
-/// Runs every step, before [`step`], whether or not an orogeny raises the sample.
-pub fn founder(state: &mut PlateState, env: &Env) -> f64 {
+/// Continental crust thicker than `crust_max_km` spreads the excess to the nearest room on its
+/// plate at once (as the collapse moves crust, [`spread`], whether or not an orogeny holds it
+/// up), and what finds no room goes to the mantle from the bottom of its column (see the module
+/// docs, "The thickest crust"); returns the crust lost, km² × m, and adds what spread to `out`.
+/// Runs every step, before [`step`].
+pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse) -> f64 {
     let k = env.k;
     if k.crust_max_km.is_nan() || k.crust_max_km <= 0.0 {
         return 0.0;
     }
     // ledger: PLT-258.
     let t_max = (k.crust_max_km * 1000.0).max(normal_thickness_m());
+    if spreads(k) && std::env::var_os("DT_EXP_NO_SPREAD").is_none() /* TEMP-EXP */ {
+        // ledger: PLT-277 (the excess spreads before any of it founders).
+        let mut by_plate: BTreeMap<u32, Vec<(usize, f64)>> = BTreeMap::new();
+        for (i, s) in state.samples.iter().enumerate() {
+            if s.kind == CONTINENTAL && !s.is_hidden() && f64::from(s.thickness_m) > t_max {
+                by_plate
+                    .entry(state.plate_of(i))
+                    .or_default()
+                    .push((i, f64::from(s.thickness_m) - t_max));
+            }
+        }
+        if !by_plate.is_empty() {
+            spread(state, geo, env, by_plate, out);
+        }
+    }
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
     let normal = normal_thickness_m();
     let mut lost = 0.0;
@@ -157,19 +174,12 @@ pub struct Collapse {
 /// (collision belts and subduction), so a sample raised this step is known.
 pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
     let k = env.k;
-    if k.collapse_myr.is_nan()
-        || k.collapse_myr <= 0.0
-        || !k.collapse_reach_km.is_finite()
-        || k.collapse_reach_km <= 0.0
-    {
+    if !spreads(k) {
         return Collapse::default();
     }
     let rate = 1.0 - (-env.dt_myr / k.collapse_myr).exp();
     let normal = normal_thickness_m();
     let t_c = (k.collapse_thickness_km * 1000.0).max(normal);
-    let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
-    let n = state.samples.len();
-    let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
     // A sample raised by an orogeny carries the time of the step that raised it; it is held up
     // until no orogeny has raised it for `collapse_quiet_myr` (at least this step). ledger: PLT-259
     let quiet_before = (env.t_myr - k.collapse_quiet_myr.max(0.5 * env.dt_myr)) as f32;
@@ -183,11 +193,39 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
         // ledger: PLT-254, PLT-255, PLT-256.
         let q = rate * (f64::from(s.thickness_m) - t_c);
         if q > 0.0 {
-            by_plate.entry(plate_of[i]).or_default().push((i, q));
+            by_plate.entry(state.plate_of(i)).or_default().push((i, q));
         }
     }
-
     let mut out = Collapse::default();
+    spread(state, geo, env, by_plate, &mut out);
+    out
+}
+
+/// Whether the collapse's settings let crust spread at all.
+fn spreads(k: &crate::params::TectonicParams) -> bool {
+    !(k.collapse_myr.is_nan()
+        || k.collapse_myr <= 0.0
+        || !k.collapse_reach_km.is_finite()
+        || k.collapse_reach_km <= 0.0)
+}
+
+/// Moves crust from each plate's `sources` (sample, m of thickness to release) to the nearest
+/// room on the same plate within `collapse_reach_km` (see the module docs, "The rule"), thinning
+/// the sources in proportion to what found room; returns the share of each plate's release that
+/// was placed (sources of a plate whose release found no room keep their crust).
+fn spread(
+    state: &mut PlateState,
+    geo: &Geo,
+    env: &Env,
+    by_plate: BTreeMap<u32, Vec<(usize, f64)>>,
+    out: &mut Collapse,
+) -> BTreeMap<u32, f64> {
+    let k = env.k;
+    let normal = normal_thickness_m();
+    let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
+    let n = state.samples.len();
+    let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
+    let mut shares = BTreeMap::new();
     // At least to the next ring of samples: on a coarse lattice the reach may be shorter than a
     // sample spacing, and a column always borders its neighbours.
     let reach = env
@@ -196,6 +234,9 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
         .max(REACH_MIN_SPACINGS * env.norm.spacing_rad());
     for (p, sources) in by_plate {
         let budget: f64 = sources.iter().map(|&(_, q)| q).sum();
+        if budget <= 0.0 {
+            continue;
+        }
         let src: Vec<(u32, f64, u32)> = sources.iter().map(|&(i, _)| (i as u32, 0.0, 0)).collect();
         let samples = &state.samples;
         let on_plate = |v: u32| plate_of[v as usize] == p && !samples[v as usize].is_hidden();
@@ -222,9 +263,11 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
         }
         let placed = budget - left.max(0.0);
         if placed <= 0.0 {
+            shares.insert(p, 0.0);
             continue;
         }
         let share = placed / budget;
+        shares.insert(p, share);
 
         // Thin the sources in proportion (pure shear) and pool what they gave.
         let mut mix = [0.0f64; pool::COUNT];
@@ -272,7 +315,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
         }
         out.moved_km2_m += placed * env.norm.sample_area_km2();
     }
-    out
+    shares
 }
 
 #[cfg(test)]
@@ -567,7 +610,7 @@ mod tests {
             }
         }
         let before = st.samples.clone();
-        let lost = founder(&mut st, &fx.env(1));
+        let lost = founder(&mut st, &fx.geo, &fx.env(1), &mut Collapse::default());
         let t_max = fx.k.crust_max_km * 1000.0;
         let mut n = 0;
         for (i, s) in st.samples.iter().enumerate() {
