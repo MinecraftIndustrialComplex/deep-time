@@ -43,49 +43,62 @@ const METAMORPHOSE_PA: f64 = 300.0e6;
 /// Rock removed per metre of surface lowering: ρ_m / (ρ_m − ρ_c) with 3,300 and 2,700 kg/m³.
 pub const ISOSTATIC_FACTOR: f64 = 3300.0 / (3300.0 - 2700.0);
 
-/// Density of the crust and the mantle of the isostatic column, kg/m³ (the two of
-/// [`ISOSTATIC_FACTOR`]).
-const RHO_CRUST_ISO: f64 = 2700.0;
-const RHO_MANTLE_ISO: f64 = 3300.0;
+/// The mantle's density under the isostatic column, kg/m³ (the surface stage's flexure uses the
+/// same, ISO-043) …
+const RHO_MANTLE_ISO: f64 = 3300.0; // ledger: ISO-043
+/// … and the continental crust's mean density, kg/m³: "The mean crustal density calculated from
+/// our model is 2830 kg/m3" (Christensen & Mooney 1995, abstract). It sets how high a whole
+/// column stands for its thickness when crust is stacked onto it or spread from it (belts,
+/// collapse, foundering): `ρ_m / (ρ_m − ρ̄_c)` = 7.0 m of crust per m of height, 142 m of height
+/// per km of crust, where Hyndman & Currie (2011, full text) measure 131 ± 12 m/km (Cordillera)
+/// and 141 ± 27 m/km (stable areas). [`ISOSTATIC_FACTOR`] (upper crust, 2,700 kg/m³) stays for
+/// rock eroded from the top of a column.
+pub const RHO_CRUST_MEAN: f64 = 2830.0; // ledger: PLT-281
+/// Crust per metre of height for a whole column, ρ_m / (ρ_m − ρ̄_c) (see [`RHO_CRUST_MEAN`]).
+pub const COLUMN_ISOSTATIC_FACTOR: f64 = RHO_MANTLE_ISO / (RHO_MANTLE_ISO - RHO_CRUST_MEAN);
 
 /// The eclogite root (2026-10-06, Ben: "Fix isostasy first"): mafic lower crust carried deeper
 /// than the pressure at which it turns to eclogite becomes denser than the mantle, so a thickened
-/// column stands lower than Airy isostasy with one crustal density gives it. The pressure at which
-/// mafic lower crust enters the eclogite facies, Pa …
-pub const ECLOGITE_PA: f64 = 1.5e9; // ledger: PLT-278 (placeholder until sourced)
-/// … the density of eclogitized mafic crust, kg/m³ …
+/// column stands lower than Airy isostasy with one crustal density gives it. The pressure past
+/// which mafic lower crust eclogitizes, Pa: "~15 to ~20 kbars" at "~60 km depth beneath southern
+/// Tibet" (Wittlinger et al. 2009, full text), the lower end; "below ~60 km the lower crust may
+/// have reached roughly 30% eclogitization" (Shi F. et al. 2018, full text) …
+pub const ECLOGITE_PA: f64 = 1.5e9; // ledger: PLT-278
+/// … the density of eclogitized mafic crust, kg/m³: "mafic eclogite (3,450 kg/m3)" (Shi D. et
+/// al. 2020, full text, after Hetényi et al. 2007; Krystopowicz & Currie 2013 use 3,450) …
 pub const RHO_ECLOGITE: f64 = 3450.0; // ledger: PLT-279
-/// … and the share of the mafic crust beyond that pressure that has turned to eclogite (the
-/// transformation is kinetically delayed without fluids).
+/// … and the share of the mafic crust beyond that pressure that is eclogite: the transformation
+/// is kinetically delayed without fluids, and the Indian lower crust under southern Tibet is "only
+/// ~30% eclogitized so gravitationally stable" (Shi D. et al. 2020, full text).
 pub const ECLOGITE_SHARE: f64 = 0.3; // ledger: PLT-280
 
 /// The thickness of eclogite in a continental column, m: the share [`ECLOGITE_SHARE`] of its mafic
 /// pools (the bottom of the column) that lies deeper than the eclogite pressure (depth
-/// `ECLOGITE_PA / (ρ_c g)`).
+/// `ECLOGITE_PA / (ρ̄_c g)`, 54 km at Earth's gravity).
 pub fn eclogite_m(pools: &[f32; pool::COUNT], gravity: f64) -> f64 {
     let t: f64 = pools.iter().map(|&x| f64::from(x.max(0.0))).sum();
     let mafic = f64::from(pools[pool::MAFIC_PLUTONIC].max(0.0))
         + f64::from(pools[pool::MAFIC_VOLCANIC].max(0.0));
-    let depth = ECLOGITE_PA / (RHO_CRUST_ISO * gravity.max(1e-3));
+    let depth = ECLOGITE_PA / (RHO_CRUST_MEAN * gravity.max(1e-3));
     ECLOGITE_SHARE * mafic.min((t - depth).max(0.0))
 }
 
 /// How far an eclogite root of `eclogite_m` metres pulls the surface down below its height under
-/// Airy isostasy with one crustal density, m: `E (ρ_e − ρ_c) / ρ_m`.
+/// Airy isostasy with the crust's mean density, m: `E (ρ_e − ρ̄_c) / ρ_m`.
 pub fn root_drop_m(eclogite_m: f64) -> f64 {
-    eclogite_m * (RHO_ECLOGITE - RHO_CRUST_ISO) / RHO_MANTLE_ISO
+    eclogite_m * (RHO_ECLOGITE - RHO_CRUST_MEAN) / RHO_MANTLE_ISO
 }
 
 /// The change of a continental column's surface when its pools go from `before` to `after`, m:
-/// the Airy change of its thickness (`ΔT / ISOSTATIC_FACTOR`) less the change of its eclogite
-/// root's pull ([`root_drop_m`]).
+/// the Airy change of its thickness (`ΔT / COLUMN_ISOSTATIC_FACTOR`) less the change of its
+/// eclogite root's pull ([`root_drop_m`]).
 pub fn isostatic_change_m(
     before: &[f32; pool::COUNT],
     after: &[f32; pool::COUNT],
     gravity: f64,
 ) -> f64 {
     let t = |p: &[f32; pool::COUNT]| -> f64 { p.iter().map(|&x| f64::from(x.max(0.0))).sum() };
-    (t(after) - t(before)) / ISOSTATIC_FACTOR
+    (t(after) - t(before)) / COLUMN_ISOSTATIC_FACTOR
         - (root_drop_m(eclogite_m(after, gravity)) - root_drop_m(eclogite_m(before, gravity)))
 }
 
@@ -346,7 +359,7 @@ mod tests {
         let normal = continental_column();
         assert_eq!(eclogite_m(&normal, 9.81), 0.0);
         let scaled = |f: f32| normal.map(|x| x * f);
-        let depth = ECLOGITE_PA / (RHO_CRUST_ISO * 9.81);
+        let depth = ECLOGITE_PA / (RHO_CRUST_MEAN * 9.81);
         // A column thickened in proportion until its base lies below the eclogite depth.
         let total: f32 = normal.iter().sum();
         let f = ((depth + 10_000.0) / f64::from(total)) as f32;
@@ -357,9 +370,9 @@ mod tests {
         assert!((e - ECLOGITE_SHARE * mafic.min(t - depth)).abs() < 1.0, "{e}");
         assert!(e > 0.0);
         let change = isostatic_change_m(&normal, &thick, 9.81);
-        let airy = (t - f64::from(total)) / ISOSTATIC_FACTOR;
+        let airy = (t - f64::from(total)) / COLUMN_ISOSTATIC_FACTOR;
         assert!(
-            (airy - change - e * (RHO_ECLOGITE - RHO_CRUST_ISO) / RHO_MANTLE_ISO).abs() < 1e-6,
+            (airy - change - e * (RHO_ECLOGITE - RHO_CRUST_MEAN) / RHO_MANTLE_ISO).abs() < 1e-6,
             "{airy} {change}"
         );
         // Lower gravity: the eclogite depth is deeper, the root smaller.
@@ -369,6 +382,6 @@ mod tests {
         let ta: f64 = a.iter().map(|&x| f64::from(x)).sum();
         assert!(ta < depth);
         let plain = isostatic_change_m(&normal, &a, 9.81);
-        assert!((plain - (ta - f64::from(total)) / ISOSTATIC_FACTOR).abs() < 1e-6);
+        assert!((plain - (ta - f64::from(total)) / COLUMN_ISOSTATIC_FACTOR).abs() < 1e-6);
     }
 }
