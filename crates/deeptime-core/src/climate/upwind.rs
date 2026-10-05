@@ -855,8 +855,8 @@ mod tests {
         let s = solve_month(&mesh, &k, &mo, None);
         let ones = vec![[1.0f64]; n];
         let t = tracers(&mesh, &k, &mo, &s, &ones);
-        for c in 0..n {
-            assert!((t[c][0] - 1.0).abs() < 1e-6, "cell {c}: {}", t[c][0]);
+        for (c, tc) in t.iter().enumerate() {
+            assert!((tc[0] - 1.0).abs() < 1e-6, "cell {c}: {}", tc[0]);
         }
         // With recycling the sea's share falls inland, downwind of the coast.
         let mo = month(n, 60, 8.0, 0.6);
