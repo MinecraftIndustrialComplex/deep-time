@@ -179,10 +179,30 @@ new, reversed or reopened, and today's contacts flicker. Without boundary resist
 run away (1 % of plate-steps above 250 mm/yr). The mega-plate is close to neutral, not in the strong
 tension the supercontinent models find. The balance costs 0-2 % of the plates stage.
 
+**Closed loop, since the switch** (the balance moves the plates; `earthlike_quick_16k`, 1000 Myr,
+seeds 1-4, both starts, 2026-10-05; master 2e07d954 on the old speed law against the branch;
+`tools/review/force-balance-ensemble.sh` and `plate-check`):
+
+| Quantity | Earth | The balance (closed loop) | Old speed law (master) |
+|---|---|---|---|
+| Plate speed, area-weighted RMS | about 47 mm/yr today; 50-100 over 200 Myr | 41.2 mm/yr | 57.9 |
+| Plate speeds, 10th / 50th / 90th percentile | 11 / 33 / 80 mm/yr | 12 / 42 / 79 | 36 / 66 / 84 |
+| Oceanic over continental plates, median speed | 2-3 | 2.27 | 1.61 |
+| Slab-attached over slab-free plates | about 3-4 | 1.84 | 1.69 |
+| Speed against slab share, rank correlation | 0.71 | 0.44 | 0.54 |
+| Convergence 20 Myr after a collision's onset over at onset | India about 0.27 in 15 Myr (Copley et al. 2010) | 0.47 | 0.07 |
+| Plate-steps where the speed guard (250 mm/yr) binds | — | 0 | 1,015 (the old cap, 100 mm/yr) |
+| A plate's rotation change per step, median / 90th percentile | — | 5.9 / 25 % | 5.1 / 9.6 % |
+
+The spread of speeds and the oceanic-continental contrast come out of the forces; the slab
+correlation is weaker than Earth's and weaker than the open-loop test's, and the 90th percentile of
+the step-to-step change is still above the design's 20 %. See `docs/design/plate-force-balance.md`
+§13, "Tasks 7 and 8", for the rest.
+
 ## Simplifications and limits
 
-- Open loop: the forces are computed on plates that the old rules move. Nothing here tests the
-  closed loop, where the balance moves the plates that make the forces.
+- The open-loop table above computed the forces on plates that the old rules moved; the closed-loop
+  table is the switch.
 - One slab length per contact; along-trench tears are not represented. A slab's age is that of the
   crust at the trench now, not the history of what went down.
 - Rigid plates: the balance cannot break a plate. The stress is an index of the edge forces (flat
@@ -201,7 +221,7 @@ tension the supercontinent models find. The balance costs 0-2 % of the plates st
 - The mantle flow's shape: two antipodal upwellings, fixed for the run, axis from the seed (FRC-015;
   the term itself is Ben's choice, decisions log 2026-10-02).
 - A slab's trench counts as blocked when continental crust holds half its front (FRC-019).
-- The collision drag's floor of 5 mm/yr (FRC-011), until the collisions design's weld speed exists.
+- The collision drag's floor of 1 mm/yr (FRC-011), under the weld speed so that held collisions weld.
 
 ## Open questions
 
