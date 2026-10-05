@@ -6112,8 +6112,8 @@ The research note `docs/research/notes/sphere-native-grids.md` and its benchmark
 
 ### HergartenRobl2022
 - Reference: Hergarten, S. and Robl, J. (2022). The linear feedback precipitation model (LFPM 1.0): a simple and efficient model for orographic precipitation in the context of landform evolution modeling. Geoscientific Model Development 15:2063-2084. doi:10.5194/gmd-15-2063-2022.
-- Ledger ids: none (§5: a non-spectral orographic rain model; §11 question 3)
-- Access: open. Read so far: full text by a sub-agent.
+- Ledger ids: CLM-193, CLM-194, CLM-195, CLM-198, CLM-200 (the upwind rain, P1-26 T9; also §5 of the sphere-grids note: a non-spectral orographic rain model; §11 question 3)
+- Access: open. Read so far: full text by a sub-agent; the article page (WebFetch) by the P1-26 T9 agent on 2026-10-04: equations 10-11 (vapour and cloud water, condensation, fallout, re-evaporation beta), 27 (L_l L_s = L_c L_f), 42-43 (evapotranspiration returns epsilon of the rain) and section 7's lengths (L_c = L_f = 25 km, L_l = 500 km, L_d = 25 km). Written from the paper, not from OpenLEM's code (GPL).
 
 ## Rifted margins: the ocean–continent transition (PLT-261 to PLT-264), added 2026-10-04
 
