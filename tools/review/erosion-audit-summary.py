@@ -27,6 +27,11 @@ def main():
                 print(f"  {k:10s} {e['area_share']:6} | {e['mean']:7} {e['p50']:7} {e['p90']:7} "
                       f"{e['p99']:7} | {d['mean']:7} {d['p50']:7} {d['p90']:7} | "
                       f"{v['erosion_share_above_100_m_myr']} {v['erosion_share_above_500_m_myr']}")
+            bands = h.get("land_erosion_by_elevation_m", {})
+            if bands:
+                print("land erosion by elevation band, m/Myr: band  area-time share | mean p50 p90")
+                for k, v in bands.items():
+                    print(f"  {k:10s} {v['area_share']:6} | {v['mean']:7} {v['p50']:7} {v['p90']:7}")
             print("parcel totals, km: region  eroded mean p50 p90 | deposited mean p50 p90 | "
                   "eroded last 500 Myr mean | share eroded >10 km | peak frame erosion p50 p90 m/Myr")
             for k, v in h["parcel_totals_by_final_region"].items():
