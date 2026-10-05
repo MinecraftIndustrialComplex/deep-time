@@ -775,9 +775,9 @@ pub fn compute(
                         }
                         Some(pc) => match pc.rain_at(c, m) {
                             Some((pbg, qq)) => (pbg, qq, 1.0),
-                            None => (base, q, hydro),
+                            None => (base * p.belts_rain_scale, q, hydro),
                         },
-                        None => (base, q, hydro),
+                        None => (base * p.belts_rain_scale, q, hydro),
                     };
                     let oro_mm = o * oro_scale * q * cc;
                     // Windward rain adds; the lee's negative rate dries the background

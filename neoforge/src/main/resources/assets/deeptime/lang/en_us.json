@@ -190,6 +190,7 @@
   "deeptime.editor.field.monsoon_strength": "Monsoon strength",
   "deeptime.editor.field.rain_efficiency": "Rain efficiency",
   "deeptime.editor.field.soil_water": "Soil water",
+  "deeptime.editor.field.belts_rain": "Belt rain amount",
   "deeptime.editor.field.rain_spread": "Rain spread across the wind",
   "deeptime.editor.field.rain_wind": "Rain carried by the wind",
   "deeptime.editor.field.rain_recycling": "Rain recycled by land",
