@@ -43,8 +43,9 @@ pub const MAGIC: [u8; 4] = *b"DTCP";
 /// 7: `WorldState::globals` and the climate's carbon cycle, fine clock and ice state, deep-time
 /// climate; 8: the world's volcano catalogue, P1-21; 9: the world's crater catalogue, P2-08; 10: the
 /// climate's ice sheet, weathering supply and snowball list, 2026-09-30; 11: the per-cell climate's
-/// state, P1-26; 12: its flux correction and triggered snapshots, P1-26 T6).
-pub const CHECKPOINT_SCHEMA: u32 = 12;
+/// state, P1-26; 12: its flux correction and triggered snapshots, P1-26 T6; 13: the climate's
+/// steering controllers, docs/design/playability-steering.md).
+pub const CHECKPOINT_SCHEMA: u32 = 13;
 const FIXED_BYTES: usize = 8;
 /// The sections before the history's frames.
 const HEAD_SECTIONS: usize = 2;

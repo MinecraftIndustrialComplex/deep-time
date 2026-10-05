@@ -379,6 +379,11 @@ pub struct ClimateParams {
     /// Antarctica and Greenland hold ~3.0·10⁷ km³, 65 m, Fretwell et al. 2013, Morlighem et al.
     /// 2017.)
     pub ice_reference_km3: f64,
+    /// World time at the run's end, years: not a preset key, set by the stage from the timeline
+    /// (`PlanetPreset::t_end_years`). The ice-age window and the orbit are measured from it
+    /// (docs/design/playability-steering.md §2); 0 for a run to its planned length.
+    #[serde(skip)]
+    pub run_end_years: f64,
 }
 
 impl Default for ClimateParams {
@@ -496,6 +501,7 @@ impl Default for ClimateParams {
             ice_relax_kyr: 30.0,                        // ledger: GLA-074
             glacio_eustasy: 1.0,
             ice_reference_km3: 1.0e7,
+            run_end_years: 0.0,
         }
     }
 }

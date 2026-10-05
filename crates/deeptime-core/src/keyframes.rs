@@ -409,6 +409,45 @@ impl KeyframeStore {
     pub fn index(&self) -> KeyframeIndex {
         self.lock().index.clone()
     }
+
+    /// A run resumed in the folder of the run it continues (docs/design/playability-steering.md
+    /// §4): the frames that run drew up to `until_t` (world years) are kept as this store's first
+    /// frames, the later ones are deleted (files and index), and the next frame is numbered on
+    /// from the kept ones. Without an index (or none kept) the folder is cleaned as for a new run.
+    /// Returns the number of frames kept. Call before the first frame is pushed.
+    pub fn adopt(&self, until_t: f64) -> Result<u32, CoreError> {
+        let mut ring = self.lock();
+        let index = match KeyframeIndex::read(&self.dir) {
+            Ok(i) => i,
+            Err(_) => return Ok(0),
+        };
+        // The kept frames are a prefix: numbered 0, 1, … and no later than the resume point.
+        let kept: Vec<_> = index
+            .frames
+            .iter()
+            .enumerate()
+            .take_while(|(k, f)| f.n as usize == *k && f.t <= until_t)
+            .map(|(_, f)| f.clone())
+            .collect();
+        for f in &index.frames[kept.len()..] {
+            let path = self.dir.join(&f.path);
+            match std::fs::remove_file(&path) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(CoreError::io(path, e)),
+            }
+        }
+        ring.index = KeyframeIndex {
+            frames: kept,
+            ..index
+        };
+        ring.index.write(&self.dir)?;
+        ring.cleaned = true;
+        ring.frames.clear();
+        let n = ring.index.frames.len() as u32;
+        self.count.store(n, Ordering::Release);
+        Ok(n)
+    }
 }
 
 #[cfg(test)]
