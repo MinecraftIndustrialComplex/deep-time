@@ -342,6 +342,17 @@ final class ScreenshotDriver {
                                 return;
                             }
                             if (Boolean.getBoolean(PROP + ".epochs")) {
+                                // The latest frame before the run's end (the end's own frames
+                                // have nothing to pick), shown before it is picked.
+                                int pick = -1;
+                                for (int i = 0; i < run.frameCount(); i++)
+                                    if (model.epochStopMyr(run.frames().get(i)).isPresent())
+                                        pick = i;
+                                if (pick >= 0) {
+                                    run.scrubTo(pick);
+                                    ed.refresh();
+                                    shot("07a-epoch-to-pick");
+                                }
                                 var f = run.current().orElseThrow();
                                 var stop = model.epochStopMyr(f);
                                 DeepTime.LOGGER.info("[deeptime-shot] epoch: frame {} at t={} → stop {}", f.n(), f.t(), stop);
