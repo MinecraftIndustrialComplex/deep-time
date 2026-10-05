@@ -42,7 +42,8 @@ def main():
             for row in p["rows"]:
                 if row["site"] >= 0:
                     print("  site", row["site"], "formed", row["formed_ma"], "Ma", row["fate"],
-                          "eroded", row["eroded_m"], "buried", row["buried_m"], "ledger centre",
+                          "eroded", row["eroded_m"], "buried", row["buried_m"], "most net erosion",
+                          row.get("exhumed_max_m"), "ledger centre",
                           row["ledger_centre_depth_m"], "m; centre",
                           row["centre_depth_blocks"], "blocks under the ground")
             bur = sorted(r2["buried_m"] for r2 in p["rows"] if r2["buried_m"] is not None)
