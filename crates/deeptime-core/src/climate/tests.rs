@@ -130,6 +130,10 @@ fn idealised_zones(p: ClimateParams) {
     assert!(range(50.0, 120.0) > range(50.0, 250.0) + 10.0);
     // Precipitation: the ITCZ over the ocean is wetter than the subtropical high.
     assert!(at(&s.precip, 2.0, 250.0) > 2.0 * at(&s.precip, 25.0, 250.0));
+    // Nowhere wetter than Earth's wettest places (about 12 m a year), the rows at and past the
+    // poles included (the upwind rain once divided by a polar cell's zero circulation rain).
+    let wettest = s.precip.iter().cloned().fold(0.0f32, f32::max);
+    assert!(wettest.is_finite() && wettest < 15_000.0, "wettest {wettest} mm");
     // The westerlies' rain shadow: the range's windward (west) side is wetter than its lee.
     let windward = at(&s.precip, 45.0, 68.0);
     let lee = at(&s.precip, 45.0, 80.0);
