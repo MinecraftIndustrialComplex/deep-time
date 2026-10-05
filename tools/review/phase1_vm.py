@@ -498,29 +498,45 @@ def cmd_scale_preset(a):
 
 
 def cmd_scale_region(a):
-    """The window every scale is rendered over: land, high relief, off the poles and the seam, chosen on
-    the 1:300 bake (all three share the plate history, so it is the same patch of planet)."""
-    wd = os.path.join(a.work, "h300", "planet", "deeptime")
-    m = json.load(open(os.path.join(wd, "manifest.json")))
-    c = m["scale"]["circumference_blocks"]
-    sea = m["scale"].get("sea_level_y", 63)
-    step = 32
-    zp = c // 4
-    box = (-c // 2, -zp, c // 2, zp)
-    rows, cols, h = heights(wd, box, step, os.path.join(a.work, "h300-coarse.npy"))
+    """The window every scale is rendered over: land at every scale, high relief, off the poles and the seam. The scales share
+    seed, start and length, so the plates agree, but the hydrology and the sea level the solvers settle on differ with the
+    block's size (a 2026-10-05 run's window on the 1:300 bake was open sea at 1:100), so the window is chosen on all three
+    bakes: at least `want` land in each (0.6, then 0.4), the most relief summed over the scales."""
+    maps = []
+    for label, m in SCALES:
+        wd = os.path.join(a.work, f"h{int(m)}", "planet", "deeptime")
+        mf = json.load(open(os.path.join(wd, "manifest.json")))
+        c = mf["scale"]["circumference_blocks"]
+        sea = mf["scale"].get("sea_level_y", 63)
+        step = 32
+        zp = c // 4
+        box = (-c // 2, -zp, c // 2, zp)
+        rows, cols, h = heights(wd, box, step, os.path.join(a.work, f"h{int(m)}-coarse.npy"))
+        maps.append((rows, cols, h, sea))
+    rows, cols = maps[0][0], maps[0][1]
+    assert all((r, cc) == (rows, cols) for r, cc, _, _ in maps), "the bakes' grids differ"
     win = REGION // step
     best = None
-    for r0 in range(int(rows * 0.2), rows - win - int(rows * 0.2), win // 4):
-        for c0 in range(win, cols - 2 * win, win // 4):   # off the seam
-            v = [h[r * cols + cc] for r in range(r0, r0 + win) for cc in range(c0, c0 + win)]
-            land = sum(1 for x in v if x > sea) / len(v)
-            if land < 0.8:
-                continue
-            score = pct(v, 0.95) - pct(v, 0.5)
-            if best is None or score > best[0]:
-                best = (score, r0, c0, land, pct(v, 0.95))
+    for want in (0.6, 0.4):
+        for r0 in range(int(rows * 0.2), rows - win - int(rows * 0.2), win // 4):
+            for c0 in range(win, cols - 2 * win, win // 4):   # off the seam
+                score = 0.0
+                land_min = 1.0
+                p95 = 0.0
+                for rr, cc, h, sea in maps:
+                    v = [h[r * cc + k] for r in range(r0, r0 + win) for k in range(c0, c0 + win)]
+                    land = sum(1 for x in v if x > sea) / len(v)
+                    land_min = min(land_min, land)
+                    score += pct(v, 0.95) - pct(v, 0.5)
+                    p95 = max(p95, pct(v, 0.95))
+                if land_min < want:
+                    continue
+                if best is None or score > best[0]:
+                    best = (score, r0, c0, land_min, p95)
+        if best:
+            break
     if best is None:
-        sys.exit("scale-region: no 2048-block window on land")
+        sys.exit("scale-region: no 2048-block window on land at every scale")
     _, r0, c0, land, p95 = best
     x0 = box[0] + c0 * step
     z0 = box[1] + r0 * step

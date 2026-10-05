@@ -327,7 +327,7 @@ def step_scale(a):
         s = stats.get(lab) or stats.get("earth" if m == 1221 else lab) or {}
         kids.append(kid(len(have) == 2, f"BlueMap render at {lab} ({m} m per block)",
                         *[f"review/out/phase1/scale/{f}" for f in have] or ["not rendered"],
-                        *([f"radius {s['radius_km']:,} km, median land slope {s['median_slope']:.2f}, land steeper than 45 deg {100 * s['steep_share']:.1f} %"] if s else [])))
+                        *([f"radius {s['radius_km']:,} km, land share of the window {100 * s['land_share']:.0f} %, median land slope {s['median_slope'] if s['median_slope'] is not None else float('nan'):.2f}, land steeper than 45 deg {100 * s['steep_share']:.1f} %"] if s else [])))
     kids.append(kid(os.path.exists(os.path.join(sc, "index.html")), "side-by-side page section built", "review/out/phase1/scale/index.html"))
     return [Row("scale", 7, "Scale comparison: the same planet region at 1:100, 1:300 and Earth proportions, vertical scale unchanged", status_of(kids) if rc == 0 else "FAIL",
                 [f"log: review/out/phase1-src/logs/scale.log (exit {rc})"], kids, time.time() - t0)]
