@@ -8,6 +8,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
@@ -43,7 +44,15 @@ final class RunPage implements PlanetEditorScreen.Page {
     private long uploaded = -1;
     private GlobeWidget globeWidget;
     private Scrubber scrubber;
-    private Button play, cancel, review;
+    private Button play, cancel, review, epoch, continueB;
+    private EditBox continueBox;
+    /** Whether the page was laid out for a finished run. */
+    private boolean builtDone;
+    /** The continue box's text, kept across rebuilds of the same run's page. */
+    private static String continueText;
+    private static String continueFor = "";
+    /** What the continue box suggests past the current stop, Myr. */
+    private static final double CONTINUE_STEP_MYR = 100.0;
     private final List<Button> layerButtons = new ArrayList<>();
     private final List<String> layerNames = new ArrayList<>();
     private List<String> layersShown = List.of();
@@ -79,7 +88,42 @@ final class RunPage implements PlanetEditorScreen.Page {
 
         int sy = s.height - 48;
         play = s.add(Button.builder(Component.literal("▶"), b -> model.togglePlay()).bounds(6, sy, 20, 20).build());
-        scrubber = s.add(new Scrubber(30, sy, s.width - 36, 20));
+        // Pick the epoch / stop here, and continue (docs/design/playability-steering.md): at the
+        // scrubber's right end.
+        boolean done = model.state() == TimelapseModel.State.DONE;
+        builtDone = done;
+        boolean roomForContinue = done && s.width >= 420;
+        int epochW = 96, boxW = 48, contW = 72;
+        int right = 6 + epochW + (roomForContinue ? 4 + boxW + 4 + contW : 0);
+        int rx = s.width - right;
+        scrubber = s.add(new Scrubber(30, sy, rx - 34, 20));
+        epoch = s.add(Button.builder(Lang.tr(done ? "run.epoch" : "run.stop_here"), b -> {
+            model.current().ifPresent(f -> {
+                if (screen.model().epochStopMyr(f).isPresent()) {
+                    screen.model().pickEpoch(f);
+                    screen.refresh();
+                }
+            });
+        }).bounds(rx, sy, epochW, 20).build());
+        continueBox = null;
+        continueB = null;
+        if (roomForContinue) {
+            EditBox box = new EditBox(screen.font(), rx + epochW + 4, sy, boxW, 20, Lang.tr("run.continue.to"));
+            if (continueText == null || !continueFor.equals(model.stagingId()))
+                continueText = screen.model().runStopMyr().stream().mapToObj(v -> Formats.number(v + CONTINUE_STEP_MYR))
+                        .findFirst().orElse("");
+            continueFor = model.stagingId();
+            box.setValue(continueText);
+            box.setResponder(t -> continueText = t);
+            box.setTooltip(net.minecraft.client.gui.components.Tooltip.create(Lang.tr("run.continue.hint")));
+            continueBox = s.add(box);
+            continueB = s.add(Button.builder(Lang.tr("run.continue"), b -> {
+                if (screen.model().continueProblem(continueText).isEmpty()) {
+                    screen.model().continueTo(Formats.parse(continueText));
+                    screen.refresh();
+                }
+            }).bounds(rx + epochW + 4 + boxW + 4, sy, contW, 20).build());
+        }
 
         int by = s.height - 24;
         int bw = Math.min(90, (s.width - 40) / 5);
@@ -190,6 +234,18 @@ final class RunPage implements PlanetEditorScreen.Page {
         boolean running = model.state() == TimelapseModel.State.RUNNING;
         cancel.setMessage(running ? Lang.tr("run.cancel") : Lang.tr("run.discard"));
         review.active = screen.model().canAccept();
+        if (!builtDone && model.state() == TimelapseModel.State.DONE) {
+            screen.refresh(); // the run finished: Play this epoch and Continue replace Stop here
+            return;
+        }
+        java.util.OptionalDouble stop = model.current().map(f -> screen.model().epochStopMyr(f))
+                .orElse(java.util.OptionalDouble.empty());
+        epoch.active = stop.isPresent();
+        epoch.setTooltip(net.minecraft.client.gui.components.Tooltip.create(stop.isPresent()
+                ? Lang.tr(running ? "run.stop_here.hint" : "run.epoch.hint", Formats.number(stop.getAsDouble()))
+                : Lang.tr("run.epoch.none")));
+        if (continueB != null)
+            continueB.active = screen.model().continueProblem(continueText == null ? "" : continueText).isEmpty();
         play.setMessage(Component.literal(model.playing() ? "❚❚" : "▶"));
         play.active = model.frameCount() > 1;
         String current = model.layer().orElse("");

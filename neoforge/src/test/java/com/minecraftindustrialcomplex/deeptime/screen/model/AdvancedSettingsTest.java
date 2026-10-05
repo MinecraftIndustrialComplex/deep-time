@@ -44,7 +44,7 @@ class AdvancedSettingsTest {
 
     EditorModel model() {
         return new EditorModel(new EditorModel.Deps(json -> "{\"peak_bytes\":1000,\"stages\":[{\"bytes\":1,\"name\":\"plates\",\"seconds\":5.0}]}",
-                (json, out, threads, cap) -> new FakeRunHandle(out), gameDir, new MachineInfo(8 * GIB, 16 * GIB, 4 * GIB, 8),
+                (json, out, threads, cap, resume) -> new FakeRunHandle(out), gameDir, new MachineInfo(8 * GIB, 16 * GIB, 4 * GIB, 8),
                 Runnable::run, Runnable::run, () -> true, List::of));
     }
 

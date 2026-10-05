@@ -77,6 +77,7 @@ public final class TimelapseModel {
     private boolean follow = true;
     private boolean playing;
     private volatile boolean cancelRequested;
+    private volatile boolean superseded;
     private volatile Estimate estimate;
     private long playAccumulator;
     private SimSession.Progress progress = SimSession.Progress.INITIAL;
@@ -107,11 +108,33 @@ public final class TimelapseModel {
         this.loader = loader;
         this.io = io;
         // A cancelled or failed run leaves nothing worth keeping: delete its folder once it stopped,
-        // whether or not anyone still polls this model.
+        // whether or not anyone still polls this model (unless a run picking it up took it over).
         run.completion().whenComplete((manifest, error) -> {
-            if (error != null)
+            if (error != null && !superseded)
                 deleteFolder();
         });
+    }
+
+    /**
+     * Another run picks this one up in the same folder (an epoch picked, a stop, a continue;
+     * docs/design/playability-steering.md): when this one is cancelled its folder stays.
+     */
+    public void supersede() {
+        superseded = true;
+    }
+
+    public boolean superseded() {
+        return superseded;
+    }
+
+    /** The stage names the progress line names. */
+    public List<String> stageNames() {
+        return stageNames;
+    }
+
+    /** The estimate the run was started with, if any. */
+    public Optional<Estimate> estimate() {
+        return Optional.ofNullable(estimate);
     }
 
     public String stagingId() {
