@@ -83,8 +83,13 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
         TerrainSource t = terrain;
         if (t == null) {
             synchronized (this) {
-                if (terrain == null)
-                    terrain = TerrainSources.forRef(dataRef);
+                if (terrain == null) {
+                    TerrainSource made = TerrainSources.forRef(dataRef);
+                    if (made instanceof WorldDataTerrain w)
+                        w.peatlandDecider(() -> com.minecraftindustrialcomplex.deeptime.climate.PeatlandProbe.decide(
+                                getBiomeSource(), w.mapping(), w.data()));
+                    terrain = made;
+                }
                 t = terrain;
             }
         }

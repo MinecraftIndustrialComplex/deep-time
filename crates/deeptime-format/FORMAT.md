@@ -84,6 +84,7 @@ refused.
   rasters/climate/p_mm.dtr      L1, u16, mm/yr              │ a baked planet run only
   rasters/climate/koppen.dtr    L1, u8, Köppen code index   │ (P1-08, "The bake" below)
   rasters/climate/ice_cover.dtr L2, u8, blocks of snow/ice  │ ("The ice cover")
+  rasters/climate/wetland.dtr   L2, u8, 0 none 1 swamp 2 cold │ ("The wetland flag")
   rasters/climate/month/*.dtr   L1: t_sl_c_NN i16 0.01 °C,  │ the twelve months (0.2, P1-25)
                                 p_share_NN u8 1/40          │
   rasters/surface/*.dtr         L2, u8                      │
@@ -184,6 +185,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `climate/p_mm` | L1 | u16 | 1, mm/yr | — | annual precipitation |
 | `climate/koppen` | L1 | u8 | 1, code index | 255 | `notes.bake.climate.koppen_codes[i]` (31 = sea) |
 | `climate/ice_cover` | L2 | u8 | 1, blocks | — | blocks of snow and ice the surface pass lays over glaciated ground ("The ice cover"); absent without the climate stage |
+| `climate/wetland` | L2 | u8 | 1, flag | — | 0 not wetland, 1 temperate or warm wetland (vanilla's swamp band E6), 2 cold wetland: boreal peatland ("The wetland flag") |
 | `climate/month/t_sl_c_{01..12}` | L1 | i16 | 0.01, degC | — | each month's mean temperature at sea level (the lapse rate taken out: `+ lapse_c_per_km · max(0, h − sea)`), from the climate stage's last snapshot (0.2) |
 | `climate/month/p_share_{01..12}` | L1 | u8 | 1/40, ratio | — | each month's precipitation rate over the twelve's mean (0–6.375; they sum to 12 within the quantum) (0.2) |
 | `climate/{temperature,vegetation,continents,erosion,ridges}` | L2 | i16 | 1e-4, vanilla_param | — | the router's five biome inputs, placed against the reference bands and vanilla's land distributions (P1-09, "The climate mapping") |
@@ -491,6 +493,23 @@ glaciated ground regardless of biome. The contract between the climate and that 
   fluid blocks, are left alone. Vanilla's `freeze_top_layer` feature then lays its snow layer on the snow block.
   The layer is not part of the column evaluator: Java alone reads it, and Rust's `inspect-column`
   prints it with the other layers.
+
+### The wetland flag (Ben, 2026-10-03, "Taiga instead, peatland if present")
+
+Wet, flat, low, thawed land (BIO-066) is vanilla's swamp (erosion E6) in temperate and warm
+climates; in the subarctic classes the placement table marks `cold_wetland` (Dfc, Dfd, Dsc, Dsd, Dwc,
+Dwd; the table's `classes.<code>.cold_wetland`, default false) it is boreal peatland, which vanilla does
+not have. `climate/wetland` (L2, u8) says which: 0 none, 1 the swamp
+band, 2 cold wetland. A cold wetland cell keeps its class's temperature and humidity and its erosion is
+held under E5, so vanilla draws the class's ordinary biome there (taiga); the bake's note records
+`cold_wetland_cells` and `cold_wetland_cells_by_class` beside `wetland_cells`. Java alone reads the layer: where the pack's own biome source answers
+with a peatland biome (tagged `c:is_swamp` and `c:is_cold/overworld` or `c:is_snowy`: Biomes O' Plenty's
+bog and muskeg) at the swamp row of the cold band, `WorldDataTerrain` returns an erosion inside E6 for
+flagged cells of that region, and the pack draws its biome there. The verdict
+(`Peatland`, `PeatlandProbe`) is decided once per world, per TerraBlender region of its province table
+(`""` when it has none), at the first biome query of a flagged cell, and stored in
+`climate_mapping.json` as `peatland: {erosion, regions, biomes}` so a pack update does not move
+explored biomes; `regions: []` means the pack has none and cold wetland is taiga everywhere.
 
 ## Grids
 

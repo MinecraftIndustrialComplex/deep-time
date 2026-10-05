@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.function.IntPredicate;
 
 /**
@@ -168,6 +169,7 @@ public final class BiomeCensus {
         WorldData wd = t.data();
         RasterSampler kp = wd.layer("climate/koppen");
         RasterSampler iceLayer = wd.has(IceCover.LAYER) ? wd.layer(IceCover.LAYER) : null;
+        RasterSampler wetlandLayer = wd.has(Peatland.LAYER) ? wd.layer(Peatland.LAYER) : null;
         var sampler = level.getChunkSource().randomState().sampler();
         int c = t.circumference(), sea = g.getSeaLevel();
         int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
@@ -186,8 +188,14 @@ public final class BiomeCensus {
             forbidden.put(f.name(), new int[2]);
         Map<Integer, Map<Integer, Integer>> classBiomes = new HashMap<>();
         int skippedUntagged = 0, landColumns = 0, wetlands = 0, wetlandSwamp = 0;
+        // Cold wetland (BIO-133, BIO-135): the bake's flagged boreal wetland, counted over every land column
+        // (a mod's untagged biomes too: its bog is the point): on the pack's peatland biome, on taiga, on
+        // another swamp (which it must not be), or elsewhere.
+        int coldWet = 0, coldPeat = 0, coldTaiga = 0, coldSwamp = 0;
+        Map<String, Integer> coldBiomes = new TreeMap<>();
         // The bake's wetlands (BIO-066): wet, flat, low, thawed land put in vanilla's swamp band E6 on
         // purpose (the relief's own erosion stays below it), so swamp there whatever the Köppen family.
+        // The pack's peatland regions put cold wetland there too (Peatland), and it is set aside likewise.
         double e6 = OverworldBands.defaults().erosion()[6];
         // The biome rules (decisions log 2026-10-04): what decided each land column, with the level's bound rules.
         VolcanicBiomes.Level rules = sampler.spawnTarget() instanceof com.minecraftindustrialcomplex.deeptime.worldgen.RegionSpawnTarget m
@@ -220,6 +228,16 @@ public final class BiomeCensus {
                 height[cell] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(y)));
                 if (Math.abs(z) > zp - poleMargin)
                     continue;
+                if (land && wetlandLayer != null && Math.round(wetlandLayer.nearest(x, z)) == Peatland.COLD_WETLAND) {
+                    coldWet++;
+                    coldBiomes.merge(nameOf(b), 1, Integer::sum);
+                    if (PeatlandProbe.isPeatland(b))
+                        coldPeat++;
+                    else if (b.is(c("is_swamp")))
+                        coldSwamp++;
+                    else if (b.is(c("is_taiga")) || b.is(c("is_tree/coniferous")))
+                        coldTaiga++;
+                }
                 boolean untagged = !untaggedNamespaces.isEmpty()
                         && untaggedNamespaces.contains(b.unwrapKey().map(key -> key.location().getNamespace()).orElse("?"));
                 if (untagged && (k == 31 ? y < sea - 4 : land))
@@ -228,9 +246,9 @@ public final class BiomeCensus {
                 if (land && !untagged && rules != null) {
                     if (ruleCensus == null)
                         ruleCensus = new RuleCensus(rules.rules());
-                    boolean coldWet = wetFlag != null ? wetFlag.nearest(x, z) >= 1.5
+                    boolean ruleColdWet = wetFlag != null ? wetFlag.nearest(x, z) >= 1.5
                             : wetland && BiomeRules.COLD_WETLAND_CLASSES.contains(KOPPEN[k]);
-                    ruleCensus.add(b, decision, KOPPEN[k], coldWet);
+                    ruleCensus.add(b, decision, KOPPEN[k], ruleColdWet);
                 }
                 if (land && !untagged) {
                     landColumns++;
@@ -329,6 +347,17 @@ public final class BiomeCensus {
         wj.addProperty("wetland_columns", wetlands);
         wj.addProperty("on_swamp", wetlandSwamp);
         o.add("wetlands_set_aside", wj);
+        JsonObject cw = new JsonObject();
+        cw.addProperty("layer", wetlandLayer != null);
+        cw.addProperty("columns", coldWet);
+        cw.addProperty("on_peatland", coldPeat);
+        cw.addProperty("on_taiga", coldTaiga);
+        cw.addProperty("on_swamp", coldSwamp);
+        JsonObject cb = new JsonObject();
+        coldBiomes.entrySet().stream().sorted(Map.Entry.<String, Integer>comparingByValue(Comparator.reverseOrder())).limit(8)
+                .forEach(e -> cb.addProperty(e.getKey(), e.getValue()));
+        cw.add("top_biomes", cb);
+        o.add("cold_wetland", cw);
         // The volcanic biomes against the real volcanoes, now and as the plain climate search placed them
         // (decisions log 2026-10-03).
         o.add("volcanic", VolcanicCensus.run(level, step, poleMargin).json());

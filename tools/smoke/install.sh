@@ -305,6 +305,10 @@ JAR="$(find "$REPO/neoforge/build/libs" -maxdepth 1 -name 'deeptime-1.21.1-*.jar
 [ -n "$JAR" ] || { echo "install.sh: no Deep Time jar -- run (cd neoforge && nix develop -c ./gradlew build) first" >&2; exit 1; }
 cp "$JAR" "$SERVER/mods/"
 say "installed $(basename "$JAR")"
+# run.py's probe-vs-world-data check asks the CLI's column evaluator (an independent reader of the
+# world data) for the same columns the server's probes answer (P1-13 acceptance, exit test item 2).
+say "building the deeptime CLI"
+( cd "$REPO" && dev cargo build --release -q -p deeptime-cli ) 8>&- 9>&-
 
 # Exclusions -- recorded, never silent (excluded.txt: jar names; excluded-why.txt: jar and reason).
 mkdir -p "$SERVER/mods-excluded"
