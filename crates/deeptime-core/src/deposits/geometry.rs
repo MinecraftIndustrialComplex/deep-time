@@ -138,18 +138,33 @@ pub fn bodies_for(
     let axes = to_blocks(semi_m, t, sc);
     let centre_y = at.surface_y - at.centre_depth_m / sc.m_per_block_v;
     let surface_clip = at.surface_y.floor() as i32;
-    let clip = if at.truncated { surface_clip } else { NO_CLIP };
-    let mut ore = Body::new(
-        next_id(),
-        Some(site),
-        shape,
-        "ore",
-        [at.x, centre_y, at.z],
-        axes,
-        at.yaw,
-        at.dip,
-        clip,
-    );
+    let id = next_id();
+    let body = |clip: i32| {
+        Body::new(
+            id,
+            Some(site),
+            shape,
+            "ore",
+            [at.x, centre_y, at.z],
+            axes,
+            at.yaw,
+            at.dip,
+            clip,
+        )
+    };
+    let mut ore = if at.truncated {
+        body(surface_clip)
+    } else {
+        // Buried by the ledger, in true metres; drawn taller (`size_mult_v`), its top can still
+        // reach the ground: it stays under it, a block of cover over it (2026-10-05: a shallow
+        // sandstone-uranium body broke through a salt flat on the test planet).
+        let b = body(NO_CLIP);
+        if b.aabb[1][1] >= surface_clip {
+            body(surface_clip - 1)
+        } else {
+            b
+        }
+    };
     ore.rock_class = t.geometry.rock_class.clone();
     ore.zones = t
         .geometry
@@ -595,6 +610,28 @@ mod tests {
         );
         assert!(ore.validate().is_ok());
         assert!(b.iter().all(|x| x.id > 10));
+        // Buried by the ledger but drawn taller than it is: kept a block under the ground.
+        let shallow = Placement {
+            truncated: false,
+            centre_depth_m: ore_half_m(&t) * 1.01,
+            ..at
+        };
+        let b = bodies_for(&t, 5, 240.0e6, &grades, &shallow, &Scales::default(), &mut next);
+        assert_eq!(b[0].clip_top_y, 119);
+        assert!(b[0].aabb[1][1] <= 119);
+        // Deep: not clipped.
+        let deep = Placement {
+            truncated: false,
+            centre_depth_m: 5000.0,
+            ..at
+        };
+        let b = bodies_for(&t, 6, 240.0e6, &grades, &deep, &Scales::default(), &mut next);
+        assert_eq!(b[0].clip_top_y, NO_CLIP);
+    }
+
+    /// The true half-height of a 240 Mt body of `t`, m.
+    fn ore_half_m(t: &DepositType) -> f64 {
+        half_height_m(t, 240.0e6)
     }
 
     fn coal() -> DepositType {
