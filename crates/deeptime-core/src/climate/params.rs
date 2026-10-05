@@ -119,10 +119,6 @@ pub struct ClimateParams {
     /// The upwind rain: the near-surface relative humidity over the sea under a column holding
     /// the reference water (the bulk evaporation's humidity deficit).
     pub sea_surface_rh: f64,
-    /// The upwind rain: the summer flow round the subtropical highs, m/s (poleward on a sea
-    /// basin's western side, equatorward on its eastern side, carried a Rossby radius inland;
-    /// 0: none): what brings the sea's air to the humid subtropical east coasts.
-    pub rain_highs_m_s: f64,
     /// The upwind rain: how sharply condensation grows with the column's relative humidity (the
     /// e-folding a in e^(a (r − r_ref)); 0: linear, as LFPM). The budget's `precip_rh_slope`
     /// plays this part for `rain_model = budget`.
@@ -422,11 +418,10 @@ impl Default for ClimateParams {
             precip_rh_slope: 11.4,             // ledger: CLM-145
             bucket_mm: 150.0,                  // ledger: CLM-143
             rain_diffusivity_m2_s: 5.0e5,      // ledger: CLM-190
-            rain_wind_share: 0.5,              // ledger: CLM-191
+            rain_wind_share: 0.3,              // ledger: CLM-191
             rain_recycling: 1.0,               // ledger: CLM-195
             sea_surface_rh: 0.8,               // ledger: CLM-196
-            rain_highs_m_s: 0.0,               // ledger: CLM-200
-            rain_rh_slope: 1.0,                // ledger: CLM-202
+            rain_rh_slope: 0.0,                // ledger: CLM-200
             gyre_heat_efficiency: 1.0,         // ledger: CLM-130
             overturning_sv: 30.0,              // ledger: CLM-131
             winter_inversion_c: 15.0,          // ledger: CLM-134
@@ -578,7 +573,6 @@ impl ClimateParams {
             (self.rain_recycling, "rain_recycling", 0.0, 1.0),
             (self.rain_wind_share, "rain_wind_share", 0.0, 2.0),
             (self.sea_surface_rh, "sea_surface_rh", 0.3, 0.99),
-            (self.rain_highs_m_s, "rain_highs_m_s", 0.0, 20.0),
             (self.rain_rh_slope, "rain_rh_slope", 0.0, 40.0),
             (self.west_flank_wet, "west_flank_wet", 0.0, 5.0),
             (self.gyre_heat_efficiency, "gyre_heat_efficiency", 0.0, 5.0),
