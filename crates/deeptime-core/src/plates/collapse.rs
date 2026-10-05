@@ -126,8 +126,10 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
                     .push((i, f64::from(s.thickness_m) - t_max));
             }
         }
+        // The excess goes to continental crust thinner than the limit (the plateau widens at
+        // the thickest column) and to ocean floor up to the normal column.
         if !by_plate.is_empty() {
-            spread(state, geo, env, by_plate, out);
+            spread(state, geo, env, by_plate, t_max, out);
         }
     }
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
@@ -202,7 +204,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
         }
     }
     let mut out = Collapse::default();
-    spread(state, geo, env, by_plate, &mut out);
+    spread(state, geo, env, by_plate, normal, &mut out);
     out
 }
 
@@ -215,7 +217,9 @@ fn spreads(k: &crate::params::TectonicParams) -> bool {
 }
 
 /// Moves crust from each plate's `sources` (sample, m of thickness to release) to the nearest
-/// room on the same plate within `collapse_reach_km` (see the module docs, "The rule"), thinning
+/// room on the same plate within `collapse_reach_km` (see the module docs, "The rule": continental
+/// crust thinner than `continental_to_m`, filled up to it, and ocean floor, filled up to the
+/// normal column), thinning
 /// the sources in proportion to what found room; returns the share of each plate's release that
 /// was placed (sources of a plate whose release found no room keep their crust).
 fn spread(
@@ -223,6 +227,7 @@ fn spread(
     geo: &Geo,
     env: &Env,
     by_plate: BTreeMap<u32, Vec<(usize, f64)>>,
+    continental_to_m: f64,
     out: &mut Collapse,
 ) -> BTreeMap<u32, f64> {
     let k = env.k;
@@ -246,12 +251,18 @@ fn spread(
         let samples = &state.samples;
         let on_plate = |v: u32| plate_of[v as usize] == p && !samples[v as usize].is_hidden();
         let (dist, _) = dijkstra(geo, &src, |_, b| on_plate(b), reach);
-        // The room, nearest first: thinner than the normal column, not at a trench.
+        // The room, nearest first, not at a trench: continental crust thinner than
+        // `continental_to_m`, ocean floor up to the normal column.
         let mut room: Vec<(f64, usize, f64)> = (0..n)
             .filter(|&j| dist[j].is_finite() && on_plate(j as u32))
             .filter_map(|j| {
                 let s = &samples[j];
-                let r = normal - f64::from(s.thickness_m);
+                let to = if s.kind == CONTINENTAL {
+                    continental_to_m
+                } else {
+                    normal
+                };
+                let r = to - f64::from(s.thickness_m);
                 (r > 0.0 && s.flags & TRENCH == 0).then_some((dist[j], j, r))
             })
             .collect();
