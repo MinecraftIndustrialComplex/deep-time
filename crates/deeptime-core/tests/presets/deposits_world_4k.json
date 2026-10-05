@@ -1,5 +1,5 @@
 {
-  "scale": {"circumference_blocks": 4096},
+  "scale": {"circumference_blocks": 4096, "projection": "lambert"},
   "deposits_synthetic": {
     "seed": 11,
     "circumference": 4096,

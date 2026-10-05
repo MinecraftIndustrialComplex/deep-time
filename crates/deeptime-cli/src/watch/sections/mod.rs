@@ -309,7 +309,7 @@ fn slice_reply(run: &Run, query: &str) -> Reply {
     let slice = world.slice(
         depth,
         w,
-        deeptime_format::Projection::picture_height(w),
+        slice::picture_height(&world.cw.manifest.world_projection(), w),
         threads(),
     );
     let png = match deeptime_viewer::encode_png(slice.w, slice.h, &slice.rgba(&world.colours)) {
@@ -387,9 +387,13 @@ fn section_reply(run: &Run, query: &str) -> Reply {
     let s = &m.scale;
     let point = |p: (i64, i64)| {
         let wx = world.cw.wrap_x(p.0);
-        let proj = deeptime_format::Projection::of(c as f64);
-        json!({ "x": p.0, "z": p.1, "lat": proj.lat_deg(p.1 as f64),
-                "lon": proj.lon_deg(wx as f64) })
+        let (lat, lon) = world
+            .cw
+            .manifest
+            .world_projection()
+            .lat_lon(wx as f64, p.1 as f64);
+        let _ = c;
+        json!({ "x": p.0, "z": p.1, "lat": lat, "lon": lon })
     };
     // The bodies the section crosses, with what they are.
     let mut ids: Vec<u32> = sec

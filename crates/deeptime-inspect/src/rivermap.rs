@@ -59,7 +59,7 @@ pub fn planet(dir: &Path, out: &Path, step: usize, bbox: Option<[i64; 4]>) -> Re
     let w = ColumnWorld::open(dir).map_err(|e| Error(e.to_string()))?;
     let c = w.c;
     // Pole to pole (the projection's z of the poles).
-    let zp = deeptime_format::Projection::of(c as f64).pole_z() as i64;
+    let zp = w.manifest.world_projection().z_range().1 as i64;
     let [x0, z0, x1, z1] = bbox.unwrap_or([-c / 2, -zp, c / 2, zp]);
     let step = step.max(1) as i64;
     let (pw, ph) = (((x1 - x0) / step) as usize, ((z1 - z0) / step) as usize);
