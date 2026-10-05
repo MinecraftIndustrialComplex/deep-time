@@ -57,7 +57,7 @@ library was used. Nothing in the library is checked against the printed version.
 
 ## Counts
 
-393 works (the margins and spires task added Pratson1996, 2026-10-03; P1-26 T6 added HEXTOR, Kopparapu2013, Abbot2012, Hu2011 and Pierrehumbert2011 the same day: the tables below were not recounted for them). Stage 1 listed 475 entries, the flexure feature added 13 and the force balance (task 5, 2026-10-02) 2 (Cloos1993, Coblentz1994, both from memory); 103 entries were merged into 385 works (the merged keys are listed below).
+394 works (the margins and spires task added Pratson1996 and the cold wetland task Xu2018, 2026-10-03; P1-26 T6 added HEXTOR, Kopparapu2013, Abbot2012, Hu2011 and Pierrehumbert2011 the same day: the tables below were not recounted for them). Stage 1 listed 475 entries, the flexure feature added 13 and the force balance (task 5, 2026-10-02) 2 (Cloos1993, Coblentz1994, both from memory); 103 entries were merged into 385 works (the merged keys are listed below).
 
 By access, as recorded for the work (the most open access class among its merged entries):
 
@@ -5987,6 +5987,11 @@ The survey `docs/research/notes/seamless-projection-survey.md` and its tools (`t
 - Ledger ids: none (the survey's cross-checks: QSC max a/b 1.555, HEALPix 2.430; continuity classes)
 - Access: open. Read so far: the ranking, continuity and distortion sections read by a sub-agent from a Semantic Scholar copy, 2026-10-03.
 
+### Xu2018
+- Reference: Xu, J., Morris, P. J., Liu, J. and Holden, J. (2018). PEATMAP: Refining estimates of global peatland distribution based on a meta-analysis. CATENA 160:134-140. doi:10.1016/j.catena.2017.09.010 (DOI from the publisher URL S0341816217303004; not checked in Crossref).
+- Cited as: "PEATMAP (Xu et al. 2018)".
+- Ledger ids: BIO-137
+- Access: paywalled at the publisher (an open copy exists at CORE, record 227455185); the paper's text was not fetched: ScienceDirect, CORE and Semantic Scholar all answered 403 (2026-10-03). Read so far: a search-result summary of the abstract (global peatland 4.23 million km2, 2.84 % of the land; northern peatlands 3.21 million km2), and two secondary pages: PMC11718193 (a 2025 study of Holocene peatland area, which writes "we used an area of 3.21 Mkm2 for the modern northern peatlands from PEATMAP by Xu et al.") and the International Peatland Society page "Where can peatlands be found?" (continent shares: Asia 38.4 %, North America 31.6 %, Europe 12.5 %; boreal and temperate northern peatlands "formed under high precipitation-low temperature climatic regimes").
 ## Biome rules for Expanded Ecosphere (BIO-115 to BIO-130), added 2026-10-04
 
 ### Walker2005

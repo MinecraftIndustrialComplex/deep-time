@@ -25,6 +25,12 @@ final class RunPage implements PlanetEditorScreen.Page {
     /** Map or globe, remembered across rebuilds. */
     private static boolean globe;
     private static boolean markersOn = true;
+    /** The page of the shown group's layer list (when it has more layers than fit). */
+    private static int layerPage;
+
+    /** The smallest event ticker the side panel keeps under the layer list. */
+    private static final int TICKER_MIN = 64;
+    private static final int ROW = 18;
 
     /** The screenshot driver's switch (dev only). */
     static void setGlobe(boolean g) {
@@ -39,7 +45,10 @@ final class RunPage implements PlanetEditorScreen.Page {
     private Scrubber scrubber;
     private Button play, cancel, review;
     private final List<Button> layerButtons = new ArrayList<>();
+    private final List<String> layerNames = new ArrayList<>();
     private List<String> layersShown = List.of();
+    private String groupShown = "";
+    private Button groupButton;
     private int viewX, viewY, viewW, viewH, sideX, sideW;
     private long lastTick = System.currentTimeMillis();
 
@@ -48,7 +57,7 @@ final class RunPage implements PlanetEditorScreen.Page {
         screen = s;
         model = s.model().run().orElseThrow();
         int top = 34, bottom = s.height - 52;
-        sideW = s.width >= 420 ? 150 : 110;
+        sideW = s.width >= 560 ? 170 : s.width >= 420 ? 150 : 110;
         sideX = s.width - sideW - 6;
         int availW = sideX - 12, availH = bottom - top;
         if (globe) {
@@ -65,8 +74,7 @@ final class RunPage implements PlanetEditorScreen.Page {
             viewH = fit[1];
             s.add(new MapWidget(viewX, viewY, viewW, viewH, mapTexture, this::markers, List::of));
         }
-        buildLayerButtons();
-        int tickerY = top + 24 * Math.max(1, (layersShown.size() + 1) / 2) + 2;
+        int tickerY = buildLayerButtons(top, bottom);
         s.add(new EventTicker(sideX, tickerY, sideW, bottom - tickerY, model));
 
         int sy = s.height - 48;
@@ -103,17 +111,50 @@ final class RunPage implements PlanetEditorScreen.Page {
         tick();
     }
 
-    private void buildLayerButtons() {
-        layerButtons.forEach(b -> b.visible = false);
+    /**
+     * The side panel's layer list: a group button (Planet, Climate, …; a click shows the next group,
+     * as the workbench groups its layers) and the group's layers in two columns, paged when they do
+     * not fit above the smallest ticker. Returns the y where the ticker starts.
+     */
+    private int buildLayerButtons(int top, int bottom) {
         layerButtons.clear();
+        layerNames.clear();
         layersShown = List.copyOf(model.layers());
+        groupShown = model.group();
+        if (layersShown.isEmpty())
+            return top;
+        List<String> groups = model.groups();
+        groupButton = screen.add(Button.builder(Component.empty().append(Lang.layerGroup(groupShown))
+                        .append(" (" + (groups.indexOf(groupShown) + 1) + "/" + groups.size() + ") ▸"), b -> {
+                    model.cycleGroup(1);
+                    layerPage = 0;
+                    screen.refresh();
+                }).bounds(sideX, top, sideW, ROW).build());
+        List<String> names = model.groupLayers();
+        int rows = Math.max(1, Math.min((names.size() + 1) / 2, (bottom - top - ROW - 2 - TICKER_MIN) / (ROW + 2)));
+        int slots = rows * 2;
+        boolean paged = names.size() > slots;
+        int perPage = paged ? slots - 1 : slots;
+        int pages = Math.max(1, (names.size() + perPage - 1) / perPage);
+        layerPage = Math.floorMod(layerPage, pages);
         int bw = (sideW - 4) / 2;
-        for (int i = 0; i < layersShown.size(); i++) {
-            String name = layersShown.get(i);
+        int y0 = top + ROW + 2;
+        int slot = 0;
+        for (int i = layerPage * perPage; i < names.size() && slot < perPage; i++, slot++) {
+            String name = names.get(i);
             Button b = screen.add(Button.builder(Lang.layer(name), btn -> model.setLayer(name))
-                    .bounds(sideX + (i % 2) * (bw + 4), 34 + (i / 2) * 22, bw, 20).build());
+                    .bounds(sideX + (slot % 2) * (bw + 4), y0 + (slot / 2) * (ROW + 2), bw, ROW).build());
             layerButtons.add(b);
+            layerNames.add(name);
         }
+        if (paged) {
+            int p = layerPage;
+            screen.add(Button.builder(Component.literal("▸ " + (p + 1) + "/" + pages), b -> {
+                layerPage = p + 1;
+                screen.refresh();
+            }).bounds(sideX + (slot % 2) * (bw + 4), y0 + (slot / 2) * (ROW + 2), bw, ROW).build());
+        }
+        return y0 + rows * (ROW + 2) + 2;
     }
 
     private int[] currentPixels() {
@@ -135,8 +176,8 @@ final class RunPage implements PlanetEditorScreen.Page {
         long now = System.currentTimeMillis();
         model.tick(now - lastTick);
         lastTick = now;
-        if (!model.layers().equals(layersShown)) {
-            screen.refresh(); // new layers arrived: a new page lays the side panel out again
+        if (!model.layers().equals(layersShown) || !model.group().equals(groupShown)) {
+            screen.refresh(); // new layers arrived (or the shown layer's group changed): lay the side panel out again
             return;
         }
         long v = model.displayVersion();
@@ -152,8 +193,15 @@ final class RunPage implements PlanetEditorScreen.Page {
         play.setMessage(Component.literal(model.playing() ? "❚❚" : "▶"));
         play.active = model.frameCount() > 1;
         String current = model.layer().orElse("");
-        for (int i = 0; i < layerButtons.size(); i++)
-            layerButtons.get(i).active = !layersShown.get(i).equals(current);
+        for (int i = 0; i < layerButtons.size(); i++) {
+            String name = layerNames.get(i);
+            Button b = layerButtons.get(i);
+            b.active = !name.equals(current);
+            // A layer the displayed frame does not carry is greyed; a click picks the nearest frame that has it.
+            boolean has = model.currentHas(name);
+            b.setMessage(has ? Lang.layer(name) : Lang.layer(name).copy().withStyle(net.minecraft.ChatFormatting.DARK_GRAY));
+            b.setTooltip(has ? null : net.minecraft.client.gui.components.Tooltip.create(Lang.tr("run.layer_missing")));
+        }
         scrubber.sync();
     }
 
@@ -179,8 +227,8 @@ final class RunPage implements PlanetEditorScreen.Page {
         }
         Optional<KeyframeInfo> f = model.current();
         if (f.isPresent()) {
-            String label = (model.index() + 1) + "/" + model.frameCount() + " · " + Formats.time(f.get().t()) + " · " + f.get().stage()
-                    + (model.following() ? " · live" : "");
+            String label = (model.index() + 1) + "/" + model.frameCount() + " · " + Formats.time(f.get().t()) + " · "
+                    + model.layer().map(l -> Lang.layer(l).getString()).orElse("") + (model.following() ? " · live" : "");
             g.drawString(font, font.plainSubstrByWidth(label, viewW - 6), viewX + 3, viewY + 3, 0xffffffff, true);
         }
         model.failure().ifPresent(msg -> g.drawCenteredString(font, font.plainSubstrByWidth(msg, w - 20), w / 2, viewY + viewH / 2 + 8, 0xffff7070));

@@ -1,0 +1,39 @@
+deeptime sites near 2704 -1854 3100
+deeptime probe site 2255 -472 -1553
+deeptime probe site 2255 -443 -1553
+deeptime probe site 2255 80 -1553
+deeptime probe site 2004 18 -1366
+deeptime probe site 2004 40 -1366
+deeptime probe site 2004 45 -1366
+deeptime probe site 2110 -22 -1381
+deeptime probe site 2110 0 -1381
+deeptime probe site 2215 88 -1650
+deeptime probe site 2704 64 -1854
+deeptime why 6
+deeptime why 19
+deeptime why 20
+deeptime why 4
+deeptime why 13
+deeptime why 232
+deeptime probe claims
+deeptime probe coe 140 -98
+deeptime probe coe 139 -98
+deeptime probe coe 125 -86
+deeptime probe coe 124 -86
+deeptime probe coe 131 -87
+deeptime probe coe 138 -104
+deeptime probe coe 169 -116
+deeptime probe coe 0 0
+deeptime probe coe -300 300
+deeptime probe coe 3000 3000
+deeptime probe coe 235 32
+deeptime probe coe 300 -200
+deeptime probe cdg 131 -117
+deeptime probe cdg 145 -92
+deeptime probe cdg 235 32
+deeptime probe cdg 236 35
+deeptime probe cdg 458 27
+deeptime probe cdg 140 -98
+deeptime probe cdg 169 -116
+deeptime probe cdg 0 0
+deeptime probe cdg 300 -200

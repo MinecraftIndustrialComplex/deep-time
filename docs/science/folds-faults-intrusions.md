@@ -82,7 +82,7 @@ keeps a list of structures that ride on their plates.
    side, beyond the wedge: 0.6 of the belt's strength where the surface stage's flexure lies more
    than 100 m below local isostasy, nothing on the forebulge or beyond it (DEF-076). **An Andean
    margin** shortens up to 0.5 where the plate model is lifting the arc or back-arc, and its
-   foreland up to 0.6 fading to 0 across 250 km (measured on the plate model's Earth-sized
+   foreland up to 0.6 fading to 0 across 140 km, the Subandean belt's upper end (measured on the plate model's Earth-sized
    sphere) from the arc (DEF-026, DEF-027).
 2. **New structures.** For each kind the expected number in the step is the sum over cells of
    strain times area times the kind's rate times the step's length; the actual number is drawn from a
@@ -130,7 +130,7 @@ keeps a list of structures that ride on their plates.
 | DEF-019 | normal fault dip | 55 to 70 | degrees | Anderson 1905; Collettini & Sibson 2001 | `verified` |
 | DEF-020 | thrust dip | 20 to 40 | degrees | Anderson 1905; Collettini & Sibson 2001 | `verified` |
 | DEF-021 | strike-slip dip | 90 (stored 89.999) | degrees | Anderson 1905 | `verified` |
-| DEF-027 | foreland belt width of an Andean margin (not of a collision since plate task 6) | 250, on the plate model's sphere | km | Alavi 2007: 200 to 300 km | `verified` |
+| DEF-027 | foreland belt width of an Andean margin (not of a collision since plate task 6) | 140 (250 until 2026-10-05), on the plate model's sphere | km | Hérail et al.: Subandean belt of Bolivia 60 to 140 km; 250 was the Zagros (Alavi 2007: 200 to 300 km), a collision | `verified` |
 | DEF-075 | collision strength | min(1, convergence / 30 mm/yr) | - | rates set for a Zagros-sized collision; Arabia-Eurasia 22 +/- 2 mm/yr (Vernant et al. 2004, from a search summary, not read) | `game-choice` |
 | DEF-076 | collision foreland | 0.6 x strength where the plate is flagged foreland and flexure < -100 m | - | Davis, Suppe & Dahlen 1983; DeCelles & Giles 1996 (as read for PLT-249) | `game-choice` |
 | DEF-077 | fold strain in a collision | e = S / (S + W), clamped to 0.08 to 0.30 | fraction | geometry of pure shortening; Zagros 16 to 30 % | `game-choice` |
@@ -194,7 +194,7 @@ built twice, before (stretch 1, the old intrusion sizes and relief 1) and after;
 | Thrust displacement over length | about 7 % | Elliott 1976 p. 297, full text | 0.031 to 0.075 in metres; throw median 82 m at 1:1, about 330 m at 4 | base (median slip 8.2 blocks); x4 (16.7) |
 | Normal fault dip | over 45°, about 60°; active ruptures 30° to 65° | Anderson 1905 pp. 389, 402; Waldron & Snyder 2020 p. 152; Collettini & Sibson 2001 abstract | at 4: 80° to 85° in blocks, 21° to 36° in metres (at 1:1 55° to 70° and 5° to 10°) | code |
 | Thrust dip | under 45°, about 30°; peak 30° ± 5° | Anderson 1905; Collettini & Sibson 2001 abstract | at 4: 55° to 73° in blocks, 5.5° to 12.6° in metres (at 1:1 20° to 40° and 1° to 3°) | code |
-| Fold-thrust belt width | 200 to 300 km (Zagros); 60 to 140 km (Subandean, Bolivia) | Alavi 2007 abstract; Mouthereau et al. 2007 §[7]; Hérail et al. pp. 179-180 (poor scan) | 250 km on the plate model's sphere, 102 blocks = 31 km on the map | code (DEF-027) |
+| Fold-thrust belt width | 200 to 300 km (Zagros); 60 to 140 km (Subandean, Bolivia) | Alavi 2007 abstract; Mouthereau et al. 2007 §[7]; Hérail et al. pp. 179-180 (poor scan) | 140 km on the plate model's sphere (Andean margins only), 57 blocks = 17 km on the map | code (DEF-027) |
 | Bed offset at a structure | throws of about 1 km on 40 km faults (from the rows above) | derived | median 2 blocks (40 m), p90 7 (140 m), max 166 (base); median 2, p90 8, max 252 (`x1`); median 8 (160 m), p90 29 (580 m), max 265 (`x4`) | `strata-check`, 20,000 columns |
 | Dyke thickness | 2.3 m average (Ship Rock); 1 to 150 m, mean 30 m (Mackenzie giant swarm) | Delaney & Pollard 1981; Bunger et al. 2013, full text | 1.7 to 3 blocks (510 to 900 m) at depth, 1 to 1.8 blocks where they crop out (were 2 to 5 blocks) | code (DEF-048) |
 | Dyke length | 1 to 9 km (Ship Rock); over 2,000 km (Mackenzie) | Delaney & Pollard 1981; Bunger et al. 2013 | median 50 blocks = 15 km | base |
@@ -216,8 +216,8 @@ built twice, before (stretch 1, the old intrusion sizes and relief 1) and after;
   sedimentary cover of most of the planet a real fold would be shorter, and over the 7 to 12 km of
   the Zagros cover it is about right.
 - **Belts are narrower than their folds.** Belt widths are measured on the plate model's
-  Earth-sized sphere and shrink with the planet (a 250 km foreland is 31 km on the 16k map), while
-  the folds in them keep their Earth size, so a foreland belt holds about two fold wavelengths
+  Earth-sized sphere and shrink with the planet (a 140 km foreland is 17 km on the 16k map), while
+  the folds in them keep their Earth size, so an Andean foreland belt holds about one fold wavelength
   across where the Zagros holds about thirteen.
 - **A collision's foreland is only as wide as the plate model's basin.** It is the flexure the
   surface stage solves under the belt and wedge, so a collision whose belt is low or whose wedge is
