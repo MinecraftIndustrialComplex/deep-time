@@ -1396,3 +1396,33 @@ fn a_rift_that_does_not_open_heals_and_one_that_opens_does_not() {
         }
     }
 }
+
+/// TEMP-SWEEP: which seeds weld and suture in 300 Myr on the 8000-sample test planet.
+#[test]
+#[ignore]
+fn temp_sweep_welds() {
+    use rayon::prelude::*;
+    let cases: Vec<(&str, u64)> = ["supercontinent", "scattered_continents"]
+        .iter()
+        .flat_map(|&s| (1u64..=12).map(move |k| (s, k)).chain([(s, 21), (s, 22), (s, 23)]))
+        .collect();
+    let out: Vec<String> = cases
+        .par_iter()
+        .map(|&(start, seed)| {
+            let p = preset(8000, 300.0, start, seed);
+            let world = run_stage(&p, |_, _, _| {});
+            let st = world.plates.as_ref().unwrap();
+            let d = st.dynamics.as_ref().unwrap();
+            format!(
+                "SWEEP {start} {seed}: sutures {} collisions {} sutured {} accretions {}",
+                st.counters.sutures,
+                d.collisions.len(),
+                d.collisions.iter().filter(|c| c.sutured).count(),
+                st.counters.accretions
+            )
+        })
+        .collect();
+    for l in out {
+        eprintln!("{l}");
+    }
+}

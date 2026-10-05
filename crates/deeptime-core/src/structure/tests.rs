@@ -75,7 +75,7 @@ fn finish(s: &Session) {
 
 #[test]
 fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
-    let json = pipeline_json(3000, 60.0, 7);
+    let json = pipeline_json(3000, 100.0, 7);
     let dir = temp_dir("bake");
     let s = session(&json, &dir, 2);
     assert_eq!(
@@ -682,7 +682,7 @@ fn the_stage_never_panics_however_dense_the_structures() {
         let json = with_timeline(
             planet_builtin("pipeline_quick_16k").unwrap(),
             Some(start),
-            Some(80.0),
+            Some(120.0),
         )
         .unwrap();
         let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
