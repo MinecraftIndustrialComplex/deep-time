@@ -1235,6 +1235,59 @@ fn resampling_conserves_continental_area() {
     }
 }
 
+/// Continental crust hidden under the overriding plate accretes to the column on top at a
+/// resampling (forced-subducted continental crust is not lost), unless a collision hid it: then
+/// the belt already stacked its volume (`belts.rs`) and the resampling consumes it instead of
+/// adding it a second time (ledger PLT-276). Each is counted in its global.
+#[test]
+fn a_resampling_accretes_hidden_continent_once() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo, pos) = two_plates(&p, &env, 0.1);
+    let mut hidden = 0.0;
+    for s in st.samples.iter_mut().filter(|s| s.is_hidden()) {
+        s.kind = CONTINENTAL;
+        s.pools = pools::continental_column();
+        s.thickness_m = pools::thickness(&s.pools);
+        hidden += f64::from(s.thickness_m);
+    }
+    assert!(hidden > 0.0);
+    let conserved = |st: &PlateState| -> f64 {
+        st.samples
+            .iter()
+            .map(|s| s.pools[..state::pool::CONSERVED].iter().map(|&x| f64::from(x)).sum::<f64>())
+            .sum()
+    };
+    let mut out = Vec::new();
+    for stacked in [false, true] {
+        let mut s2 = st.clone();
+        for s in s2.samples.iter_mut().filter(|s| s.is_hidden()) {
+            s.stacked = stacked;
+        }
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        ridges::resample(&mut s2, &mut world, &pos, &geo, &env).unwrap();
+        let g = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
+        out.push((
+            conserved(&s2),
+            g(ridges::ACCRETED_GLOBAL),
+            g(ridges::STACKED_CONSUMED_GLOBAL),
+        ));
+    }
+    let (accreted, consumed) = (out[0], out[1]);
+    let area = env.norm.sample_area_km2();
+    // What the hidden continent adds when it accretes: most of its conserved column.
+    let gap = (accreted.0 - consumed.0) * area / 1000.0;
+    assert!(gap > 0.0, "the consumed run keeps less crust: {gap} km³");
+    assert!(consumed.2 > 0.0 && accreted.2 == 0.0);
+    assert!(
+        (consumed.2 - gap).abs() < 0.05 * gap,
+        "the consumed global {} km³ is what was not accreted, {gap} km³",
+        consumed.2
+    );
+    assert!((accreted.1 - consumed.1 - gap).abs() < 0.05 * gap);
+}
+
 /// Island-arc crust turns continental by the arc crust it has built (`arc_maturity_myr` of arc
 /// magma), not by its height: a mature arc below the sea becomes continent, a young arc whose
 /// cones stand above it does not, and neither does a mature arc's crust hidden in a trench.
