@@ -106,7 +106,10 @@ host rock in the top 2 km) and three global clocks.
    1980) above 80 °C, migrates up to 50 km to the nearest trap with a seal, and charges it in order.
 9. **Playability.** Regional minimums for essential materials can add the smallest plausible
    deposit of the best type; placer gold is moved, at the bake, into the nearest real river channel
-   within 30 km as gravel bars.
+   within 30 km as gravel bars. A site counts toward an essential, and toward the spawn's reach of it,
+   only when the material is its primary product (DEP-206): on the real planet of 2026-10-04 a 0.07 Mt
+   impact deposit with copper as a co-product had satisfied the copper essential and drawn the spawn
+   to itself.
 
 ## Equations and constants
 
