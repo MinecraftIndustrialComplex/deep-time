@@ -14,10 +14,17 @@
 //!   ledger follows a deposit (`origins`): the erosion and deposition the crust now at each cell
 //!   saw over the whole run and over its last 500 Myr, grouped by the parcel's region type in the
 //!   last frame;
-//! - **hypsometry** of the last frame's land.
+//! - **hypsometry** of the deep-time surface at the end.
 //!
 //! From a world-data folder, every porphyry's ledger (`deposit_formation`: formation depth,
-//! `eroded_m`, `buried_m`, fate) and each surviving site's centre depth under the ground.
+//! `eroded_m`, `buried_m`, `exhumed_max_m`, fate) and each surviving site's centre depth under
+//! the ground.
+//!
+//! Earth's rates are reference lines to read the numbers against, never targets (decisions log
+//! 2026-10-05): cosmogenic outcrops 12 m/Myr mean, 5.4 median; drainage basins 218 mean, 54
+//! median, seismically active 367, inactive 182 (Portenga & Bierman 2011; ledger: ERO-171);
+//! quiet land about 0.2 mm/yr per km of local relief, active ranges above it (Montgomery &
+//! Brandon 2002; ledger: ERO-172).
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -31,7 +38,7 @@ use serde_json::{Value, json};
 /// Region types, in report order.
 const CLASSES: [&str; 6] = ["orogen", "basin", "shield", "other_land", "shelf", "ocean"];
 
-/// A frame's region type of one cell (see the module doc).
+/// A frame's region type of one cell (see the module doc; diagnostic classes, ledger: ERO-173).
 fn classify(elev_m: f32, thick_km: f32, uplift: f32, fault: f32, e: f32, d: f32) -> usize {
     let continental = thick_km > 25.0;
     if elev_m <= 0.0 {
@@ -144,16 +151,17 @@ pub fn history(ckpt: &Path) -> Result<Value, String> {
     let ck = deeptime_core::checkpoint::Checkpoint::read(ckpt).map_err(|e| e.to_string())?;
     let preset: Value = serde_json::from_str(&ck.preset_json).map_err(|e| e.to_string())?;
     let m_per_block_h = preset["scale"]["m_per_block_h"].as_f64().unwrap_or(300.0);
-    let hist = ck
-        .world
-        .history
-        .as_ref()
-        .ok_or("the checkpoint has no recorded history (a checkpoint after the surface stage)")?;
+    let hist =
+        ck.world.history.as_ref().ok_or(
+            "the checkpoint has no recorded history (a checkpoint after the surface stage)",
+        )?;
     let grid = hist.grid().clone();
     let (w, h) = (grid.w as usize, grid.h as usize);
     let n = w * h;
     let area: Vec<f64> = (0..n)
-        .map(|c| deeptime_core::deposits::fields::cell_area_km2(&grid, (c / w) as u32, m_per_block_h))
+        .map(|c| {
+            deeptime_core::deposits::fields::cell_area_km2(&grid, (c / w) as u32, m_per_block_h)
+        })
         .collect();
     let frames = hist.frame_count();
     let t_end = hist.frame(frames - 1).map_err(|e| e.to_string())?.t_years;
@@ -194,7 +202,9 @@ pub fn history(ckpt: &Path) -> Result<Value, String> {
             get(&f, "deeptime:deposition_rate_m_myr"),
             get(&f, "deeptime:elevation_m"),
         ) else {
-            return Err(format!("frame {k} lacks the erosion, deposition or elevation field"));
+            return Err(format!(
+                "frame {k} lacks the erosion, deposition or elevation field"
+            ));
         };
         let zero = vec![0.0f32; n];
         let thick = get(&f, "deeptime:crust_thickness_km").unwrap_or(&zero);
@@ -270,14 +280,30 @@ pub fn history(ckpt: &Path) -> Result<Value, String> {
             }),
         );
     }
-    // Hypsometry of the last frame (m above the sea of the time).
+    // Hypsometry of the deep-time surface at the end (the stage's `elevation` field, blocks, read
+    // back to metres above the sea of the time), not a frame's time mean.
+    let sea_y = preset["scale"]["sea_level_y"].as_f64().unwrap_or(63.0);
+    let m_v = preset["scale"]["m_per_block_v"].as_f64().unwrap_or(35.0);
+    let final_z: Vec<f32> = match ck
+        .world
+        .fields
+        .get("elevation")
+        .filter(|f| f.data.len() == n)
+    {
+        Some(f) => f
+            .data
+            .iter()
+            .map(|&y| ((f64::from(y) - sea_y) * m_v) as f32)
+            .collect(),
+        None => last_elev.clone(),
+    };
     let mut land = Hist::new();
     let mut land_a = 0.0;
     let mut all_a = 0.0;
     let mut above = [0.0f64; 5];
     for c in 0..n {
         all_a += area[c];
-        let z = last_elev[c];
+        let z = final_z[c];
         if z.is_finite() && z > 0.0 {
             land_a += area[c];
             land.add(f64::from(z), area[c]);
@@ -363,6 +389,7 @@ pub fn porphyries(world: &Path) -> Result<Value, String> {
             "formation_depth_m": zf,
             "eroded_m": er.map(|x| x.round()),
             "buried_m": bu.map(|x| x.round()),
+            "exhumed_max_m": num(&e.params, "exhumed_max_m").map(|x| x.round()),
             "ledger_centre_depth_m": match (er, bu) {
                 (Some(er), Some(bu)) => json!((zf + bu - er).round()),
                 _ => Value::Null,
@@ -374,7 +401,11 @@ pub fn porphyries(world: &Path) -> Result<Value, String> {
     // Destroyed ones carry eroded_m on their exhumation event (also before formation events did).
     let mut exhumed_km: Vec<f64> = log
         .of_kind("deeptime:deposit_exhumation")
-        .filter(|e| text(&e.params, "deposit_type").unwrap_or("").contains("porphyry"))
+        .filter(|e| {
+            text(&e.params, "deposit_type")
+                .unwrap_or("")
+                .contains("porphyry")
+        })
         .filter_map(|e| num(&e.params, "eroded_m"))
         .map(|x| x / 1000.0)
         .collect();

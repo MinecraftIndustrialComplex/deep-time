@@ -1358,7 +1358,22 @@ fn since(series: &[ColumnSample], t_form: f64) -> (f64, f64) {
     (e, b)
 }
 
-/// When cumulative erosion after `t_form` first exceeded `depth_m` (years), if it did.
+/// The most net erosion (erosion − deposition) at a column at any time after `t_form` (m, ≥ 0),
+/// frame by frame as [`survival::ColumnNet`] reads it: how far the surface came down towards a
+/// deposit formed then, whatever burial came after.
+fn exhumed_max(series: &[ColumnSample], t_form: f64) -> f64 {
+    let mut net = 0.0f64;
+    let mut most = 0.0f64;
+    for s in series {
+        let lo = s.t_years - s.dt_years;
+        let overlap = (s.t_years - lo.max(t_form)).clamp(0.0, s.dt_years) / 1.0e6;
+        net += (s.erosion_m_myr - s.deposition_m_myr) * overlap;
+        most = most.max(net);
+    }
+    most
+}
+
+/// When the net erosion after `t_form` first reached `depth_m` (years), if it did.
 fn time_eroded_to(series: &[ColumnSample], t_form: f64, depth_m: f64) -> Option<f64> {
     let mut e = 0.0;
     for s in series {
@@ -1366,7 +1381,7 @@ fn time_eroded_to(series: &[ColumnSample], t_form: f64, depth_m: f64) -> Option<
         if s.t_years <= lo {
             continue;
         }
-        let rate = s.erosion_m_myr;
+        let rate = s.erosion_m_myr - s.deposition_m_myr;
         let add = rate * (s.t_years - lo) / 1.0e6;
         if rate > 0.0 && e + add >= depth_m {
             return Some(lo + (depth_m - e) / rate * 1.0e6);
@@ -2346,6 +2361,7 @@ impl DepositStage {
             half_height_m: half_m,
             eroded_m,
             buried_m,
+            exhumed_max_m: exhumed_max(col, t_form),
         };
         let fate = ledger.apply(t.preservation.erosion_behavior, t.shape().metric());
         if matches!(fate, Fate::Eroded) {
@@ -2388,8 +2404,9 @@ impl DepositStage {
         let placement = Placement {
             x,
             z,
-            surface_y: surf,
-            centre_depth_m: centre_depth,
+            // A truncated body buried again is placed under the surface that cut it.
+            surface_y: surf - fate.cut_depth_m() / sc.m_per_block_v,
+            centre_depth_m: centre_depth - fate.cut_depth_m(),
             yaw: pt.ellipse.map_or(yaw_draw, |e| e[2]) as f32,
             dip: dip as f32,
             truncated: matches!(fate, Fate::Truncated { .. }),
@@ -2467,6 +2484,7 @@ impl DepositStage {
             half_height_m: half_m,
             eroded_m,
             buried_m,
+            exhumed_max_m: exhumed_max(col, t_form),
         };
         let fate = ledger.apply(t.preservation.erosion_behavior, t.shape().metric());
         let surf = f.surface_at(x, z);
@@ -2508,6 +2526,7 @@ impl DepositStage {
                 // The ledger: erosion and burial of the column since formation.
                 .param("eroded_m", eroded_m)
                 .param("buried_m", buried_m)
+                .param("exhumed_max_m", ledger.exhumed_max_m)
                 .param("province_endowment", cand.endowment)
                 .magnitude(cand.size.tonnage_q as f32);
             for id in &causes {
@@ -2617,8 +2636,9 @@ impl DepositStage {
         let placement = Placement {
             x,
             z,
-            surface_y: surf,
-            centre_depth_m: centre_depth,
+            // A truncated body buried again is placed under the surface that cut it.
+            surface_y: surf - fate.cut_depth_m() / sc.m_per_block_v,
+            centre_depth_m: centre_depth - fate.cut_depth_m(),
             // An adjoining deposit's footprint was placed with its yaw.
             yaw: cand.point.ellipse.map_or(yaw_draw, |e| e[2]) as f32,
             dip: dip as f32,
