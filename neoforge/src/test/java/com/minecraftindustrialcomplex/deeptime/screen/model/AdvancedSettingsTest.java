@@ -129,6 +129,7 @@ class AdvancedSettingsTest {
                 new Num("sea_humidity", "sea_surface_rh", 0.8, false),
                 new Num("rain_humidity", "rain_rh_slope", 0, false),
                 new Num("east_coast_rain", "west_flank_wet", 0.4, false),
+                new Num("belts_rain", "belts_rain_scale", 1.45, false),
                 new Num("ocean_gyres", "gyre_heat_efficiency", 1.0, false),
                 new Num("ocean_overturning", "overturning_sv", 30, false),
                 new Num("ocean_mixing", "ocean_diffusivity_w_m2_k", 0.3, false),
