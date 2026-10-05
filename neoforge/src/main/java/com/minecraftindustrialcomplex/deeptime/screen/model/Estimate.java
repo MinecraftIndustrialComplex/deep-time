@@ -22,7 +22,16 @@ import java.util.List;
  */
 public record Estimate(long peakBytes, long baseBytes, long historyBytes, List<Stage> stages) {
 
-    public record Stage(String name, long bytes, double seconds) {}
+    /**
+     * One stage: its peak bytes, its seconds on an unloaded machine, and the stage it steps with
+     * ({@code coupled_to}: a running session reports a group of coupled stages under its lead's
+     * index), or null.
+     */
+    public record Stage(String name, long bytes, double seconds, String coupledTo) {
+        public Stage(String name, long bytes, double seconds) {
+            this(name, bytes, seconds, null);
+        }
+    }
 
     public Estimate {
         stages = List.copyOf(stages);
@@ -39,7 +48,9 @@ public record Estimate(long peakBytes, long baseBytes, long historyBytes, List<S
         if (o.has("stages"))
             for (JsonElement e : o.getAsJsonArray("stages")) {
                 JsonObject s = e.getAsJsonObject();
-                stages.add(new Stage(s.get("name").getAsString(), s.get("bytes").getAsLong(), s.get("seconds").getAsDouble()));
+                JsonElement to = s.get("coupled_to");
+                stages.add(new Stage(s.get("name").getAsString(), s.get("bytes").getAsLong(), s.get("seconds").getAsDouble(),
+                        to == null || to.isJsonNull() ? null : to.getAsString()));
             }
         long peak = o.get("peak_bytes").getAsLong();
         long base = o.has("base_bytes") ? o.get("base_bytes").getAsLong() : peak;
@@ -53,6 +64,39 @@ public record Estimate(long peakBytes, long baseBytes, long historyBytes, List<S
         for (Stage st : stages)
             s += st.seconds();
         return s;
+    }
+
+    /**
+     * Milliseconds a running session has left, from the stages' estimated seconds: the stages
+     * before the running group are done, the group (its lead at {@code stageIndex} and the
+     * coupled stages after it, reported together) is {@code stagePermille} done. The estimate is
+     * for an unloaded machine, so once 2 % of the run is done the rest is scaled by the run's own
+     * pace ({@code elapsedMs} against the estimated seconds done). -1 when the stage is unknown.
+     * The session's own figure weights every group alike, a coupled group of three stages as one
+     * ninth of a nine-stage run: on the VM that read "~55 min left" for a 5-min run.
+     */
+    public long timeLeftMs(int stageIndex, int stagePermille, long elapsedMs) {
+        if (stageIndex < 0 || stageIndex >= stages.size())
+            return -1;
+        int end = stageIndex + 1;
+        while (end < stages.size() && stages.get(end).coupledTo() != null)
+            end++;
+        double before = 0, group = 0, total = 0;
+        for (int i = 0; i < stages.size(); i++) {
+            double s = Math.max(0, stages.get(i).seconds());
+            total += s;
+            if (i < stageIndex)
+                before += s;
+            else if (i < end)
+                group += s;
+        }
+        if (total <= 0)
+            return -1;
+        double done = before + group * Math.min(1000, Math.max(0, stagePermille)) / 1000.0;
+        double left = total - done;
+        if (done >= 0.02 * total && elapsedMs > 0)
+            left *= elapsedMs / 1000.0 / done;
+        return Math.round(left * 1000);
     }
 
     /** True when the run cannot fit {@code capBytes}: its base alone is above it. */
