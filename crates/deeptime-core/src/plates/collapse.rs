@@ -667,9 +667,15 @@ mod tests {
                 assert!(f64::from(s.thickness_m) <= t_max + 1.0);
             }
         }
-        assert!(out.converted > 0, "ocean floor beside the belt turned continental");
+        assert!(
+            out.converted > 0,
+            "ocean floor beside the belt turned continental"
+        );
         assert_eq!(continental(&st, 0), c0 + out.converted as usize);
-        assert_eq!(continental(&st, 1), continental(&planet(&fx.geo, belt, 0.0), 1));
+        assert_eq!(
+            continental(&st, 1),
+            continental(&planet(&fx.geo, belt, 0.0), 1)
+        );
         let n_belt = (0..st.samples.len())
             .filter(|&i| belt(fx.geo.points()[i]))
             .count();

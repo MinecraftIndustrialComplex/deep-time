@@ -485,7 +485,11 @@ fn earlier_slabs(
         let frac = |s: &Side| f64::from(s.cont) / f64::from(s.seen.max(1));
         let mean_age = |s: &Side| {
             let oceanic = s.seen - s.cont;
-            if oceanic == 0 { 0.0 } else { s.age / f64::from(oceanic) }
+            if oceanic == 0 {
+                0.0
+            } else {
+                s.age / f64::from(oceanic)
+            }
         };
         let (c0, c1) = (frac(&sides[0]) >= 0.5, frac(&sides[1]) >= 0.5);
         let under_lo = match (c0, c1) {
