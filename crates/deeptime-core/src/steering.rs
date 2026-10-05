@@ -130,16 +130,16 @@ impl Default for SteeringParams {
         SteeringParams {
             enabled: true,
             target: Target::Temperate,
-            tail_fraction: 0.1,        // ledger: STE-002 (game-choice)
-            shape: Shape::Smoothstep,  // ledger: STE-003 (game-choice)
-            land_min: 0.25,            // ledger: STE-004 (game-choice)
-            land_max: 0.35,            // ledger: STE-004 (game-choice)
-            temp_min_c: 10.0,          // ledger: STE-005 (game-choice)
-            temp_max_c: 20.0,          // ledger: STE-005 (game-choice)
-            sea_rate_m_myr: 2.0,       // ledger: STE-006 (game-choice)
-            sea_max_m: 200.0,          // ledger: STE-006 (game-choice)
-            co2_rate_per_myr: 0.2,     // ledger: STE-007 (game-choice)
-            co2_factor_max: 2.0,       // ledger: STE-007 (game-choice)
+            tail_fraction: 0.1,       // ledger: STE-002 (game-choice)
+            shape: Shape::Smoothstep, // ledger: STE-003 (game-choice)
+            land_min: 0.25,           // ledger: STE-004 (game-choice)
+            land_max: 0.35,           // ledger: STE-004 (game-choice)
+            temp_min_c: 10.0,         // ledger: STE-005 (game-choice)
+            temp_max_c: 20.0,         // ledger: STE-005 (game-choice)
+            sea_rate_m_myr: 2.0,      // ledger: STE-006 (game-choice)
+            sea_max_m: 200.0,         // ledger: STE-006 (game-choice)
+            co2_rate_per_myr: 0.2,    // ledger: STE-007 (game-choice)
+            co2_factor_max: 2.0,      // ledger: STE-007 (game-choice)
         }
     }
 }
@@ -177,9 +177,7 @@ impl SteeringParams {
             "must be in [-50, 60]",
         )?;
         check(
-            fin(self.temp_max_c)
-                && self.temp_min_c <= self.temp_max_c
-                && self.temp_max_c <= 60.0,
+            fin(self.temp_max_c) && self.temp_min_c <= self.temp_max_c && self.temp_max_c <= 60.0,
             "temp_max_c",
             "must be in [temp_min_c, 60]",
         )?;
@@ -213,7 +211,12 @@ impl SteeringParams {
             Target::Temperate => (0.25, 0.35, 10.0, 20.0),
             Target::Warm => (0.25, 0.35, 18.0, 26.0),
             Target::Cool => (0.25, 0.35, 6.0, 13.0),
-            Target::Custom => (self.land_min, self.land_max, self.temp_min_c, self.temp_max_c),
+            Target::Custom => (
+                self.land_min,
+                self.land_max,
+                self.temp_min_c,
+                self.temp_max_c,
+            ),
         }
     }
 
@@ -492,10 +495,7 @@ mod tests {
             ..p
         };
         assert_eq!(c.bands(), (0.5, 0.6, 10.0, 20.0));
-        let bad = SteeringParams {
-            land_min: 0.7,
-            ..c
-        };
+        let bad = SteeringParams { land_min: 0.7, ..c };
         assert!(bad.validate().is_err());
         assert!(SteeringParams::default().validate().is_ok());
     }

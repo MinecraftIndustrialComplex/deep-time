@@ -5,8 +5,8 @@
 // The stage runner and its persistence (P1-01).
 pub mod checkpoint;
 // Epoch checkpoints: pick the epoch, continue, stop early (docs/design/playability-steering.md).
-pub mod epochs;
 pub mod dummy;
+pub mod epochs;
 
 // Deposits (P1-14).
 pub mod deposits;
