@@ -10099,5 +10099,5 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
   | 4 | 34 | 34 (0) | 39,781, 39,781 | (-4352, 65.6, 1746), 4,689 | (-8, 65.4, 10), 13 |
 
   The cut-porphyry placers are small (a few percent of the planet's placer gold); seed 4 has no cut porphyry. Spawns before were placed up to 8 km out (one at y 148 on a mountain); now they sit near (0, 0) on flat land at y 65-66.
-- **Gates** (test VM): `cargo fmt --check` clean (rustfmt on the changed files), clippy -D warnings ok, `cargo test --workspace` all pass (core 608 + 3 ignored, cli 54, format 72), `./gradlew build test` ok, `./gametest.sh` All 80 required tests passed (spawnFollowsTheStandardRules spawn (40, 68, -134)). `cargo deny` and `-PwithMic`: see the report.
+- **Gates** (test VM): `cargo fmt --check` clean (rustfmt on the changed files), clippy -D warnings ok, `cargo test --workspace` all pass (core 608 + 3 ignored, cli 54, format 72), `./gradlew build test` ok, `./gametest.sh` All 80 required tests passed (spawnFollowsTheStandardRules spawn (40, 68, -134)). `cargo deny check licenses bans` ok; `./gametest.sh -PwithMic` All 80 required tests passed. Scratch deleted.
 - **Next.** The coordinator merges. Scratch `/Volumes/Graphide/ban/deeptime-runs/placer-spawn` to delete after.
