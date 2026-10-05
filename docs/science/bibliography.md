@@ -6176,3 +6176,30 @@ Not read: Péron-Pinvidic, Manatschal & Osmundsen 2013 (Marine and Petroleum Geo
 - Ledger ids: ERO-174
 - Access: open (PubMed Central).
 - Read so far (by the project): full text, 2026-10-05: exhumation over 1.0 km/Ma from 17-16 Ma for about 5 Myr, then below 0.01 km/Ma (under 750 m in total) from 12-11 Ma to the present; cosmogenic rates in the Indus and Yarlung drainages typically below 100 m/Ma.
+## Playability steering (STE)
+
+### CharetteSmith2010
+- Reference: Charette, M. A. and Smith, W. H. F. (2010). The volume of Earth's ocean. Oceanography 23(2):112-114.
+- DOI or URL: 10.5670/oceanog.2010.51; https://tos.org/oceanography/article/the-volume-of-earths-ocean ; the institution's release: https://www.whoi.edu/press-room/news-release/whoi-study-calculates-volume-and-depth-of-the-worlds-oceans/
+- Cited as: "Charette & Smith 2010" (Earth's ocean volume, against which a steered sea-level offset's water is reported).
+- Ledger ids: STE-009
+- Access: open (the journal page shows the abstract; the numbers are in the PDF).
+- Read so far (by the project): 2026-10-05, the WHOI release only: "1.332 billion cubic kilometers", mean depth "3,682.2 meters". The paper itself was not opened.
+
+### HaqSchutter2008
+- Reference: Haq, B. U. and Schutter, S. R. (2008). A chronology of Paleozoic sea-level changes. Science 322:64-68.
+- Cited as: "Haq & Schutter 2008" (the size of long-term sea-level change, a reference for the steering's sea rate).
+- Ledger ids: STE-013
+- Access: paywalled. Read so far (by the project): from memory.
+
+### Miller2005
+- Reference: Miller, K. G. et al. (2005). The Phanerozoic record of global sea-level change. Science 310:1293-1298.
+- Cited as: "Miller et al. 2005" (as above).
+- Ledger ids: STE-013
+- Access: paywalled. Read so far (by the project): from memory.
+
+### Berner2004
+- Reference: Berner, R. A. (2004). The Phanerozoic Carbon Cycle: CO2 and O2. Oxford University Press.
+- Cited as: "Berner 2004, GEOCARB f_G" (how far volcanic and metamorphic degassing varied, a reference for the steering's outgassing bound).
+- Ledger ids: STE-014
+- Access: book. Read so far (by the project): from memory.

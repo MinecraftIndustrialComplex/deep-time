@@ -32,9 +32,14 @@ public final class SessionRunHandle implements RunHandle {
         this.session = session;
     }
 
-    /** Launches a run; see {@link SimSession#launch}. */
-    public static SessionRunHandle launch(String presetJson, Path outDir, int threads, long capBytes) {
-        return new SessionRunHandle(SimSession.launch(presetJson, "", outDir, threads, capBytes, true));
+    /**
+     * Launches a run that writes epoch checkpoints; see {@link SimSession#launch}. With {@code resume}
+     * it picks up the run already in {@code outDir} at the preset's {@code timeline.stop_myr} (an
+     * epoch picked, a run stopped early or continued; docs/design/playability-steering.md).
+     */
+    public static SessionRunHandle launch(String presetJson, Path outDir, int threads, long capBytes, boolean resume) {
+        return new SessionRunHandle(SimSession.launch(presetJson, "", outDir, threads, capBytes, true,
+                resume ? SimSession.Mode.RESUME : SimSession.Mode.EPOCHS));
     }
 
     @Override

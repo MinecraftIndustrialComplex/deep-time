@@ -621,16 +621,27 @@ fn post(app: &App, req: &Request) -> Response {
                             beside this page; it is not available yet.",
             }),
         ),
-        _ => match path
-            .strip_prefix("/api/runs/")
-            .and_then(|r| r.strip_suffix("/cancel"))
-        {
-            Some(id) => match app.wb.cancel(id) {
-                Ok(()) => Response::json(200, &json!({ "ok": true })),
-                Err((status, msg)) => Response::error(status, msg),
-            },
-            None => Response::error(404, "not found"),
-        },
+        _ => {
+            let rest = path.strip_prefix("/api/runs/");
+            if let Some(id) = rest.and_then(|r| r.strip_suffix("/cancel")) {
+                return match app.wb.cancel(id) {
+                    Ok(()) => Response::json(200, &json!({ "ok": true })),
+                    Err((status, msg)) => Response::error(status, msg),
+                };
+            }
+            // Pick an epoch or continue (docs/design/playability-steering.md): a new run from the
+            // finished run's epoch checkpoints, to `stop_myr` after its start.
+            if let Some(id) = rest.and_then(|r| r.strip_suffix("/resume")) {
+                let Some(stop) = body["stop_myr"].as_f64() else {
+                    return Response::error(400, "give stop_myr (Myr after the start)");
+                };
+                return match app.wb.resume_run(id, stop) {
+                    Ok(run) => Response::json(200, &json!({ "ok": true, "id": run.id })),
+                    Err((status, msg)) => Response::error(status, msg),
+                };
+            }
+            Response::error(404, "not found")
+        }
     }
 }
 

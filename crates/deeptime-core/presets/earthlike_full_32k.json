@@ -538,5 +538,19 @@
     "sea_cutoff_ratio": 8.0,
     "diffusivity_m2_yr": 0.01,
     "degradation": 1.0
+  },
+  "steering": {
+    "enabled": true,
+    "target": "temperate",
+    "tail_fraction": 0.1,
+    "shape": "smoothstep",
+    "land_min": 0.25,
+    "land_max": 0.35,
+    "temp_min_c": 10.0,
+    "temp_max_c": 20.0,
+    "sea_rate_m_myr": 2.0,
+    "sea_max_m": 200.0,
+    "co2_rate_per_myr": 0.2,
+    "co2_factor_max": 2.0
   }
 }

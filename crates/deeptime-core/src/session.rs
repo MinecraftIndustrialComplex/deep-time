@@ -41,6 +41,11 @@ pub use crate::stage::{Stage, StageContext, StageEstimate};
 /// Number of `long`s `progress` fills (plan §6.1).
 pub const PROGRESS_FIELDS: usize = 12;
 
+/// About how many epoch checkpoints a run keeps (`Session::set_epochs`; docs/design/
+/// playability-steering.md §8.2): the grid is the keyframe interval or the run over this,
+/// whichever is longer.
+pub const EPOCH_CHECKPOINTS: f64 = 10.0;
+
 /// The default native memory cap, 4 GiB (plan §5.7.5).
 pub const DEFAULT_MEM_CAP: u64 = 4 << 30;
 
@@ -344,6 +349,28 @@ struct Stepper {
     /// without the history. Before a stage steps, the history's frames in memory give way until
     /// they fit beside it under the cap.
     base: Vec<u64>,
+    /// The epoch checkpoints this run writes (`set_epochs`; docs/design/playability-steering.md).
+    epochs: Option<EpochWriter>,
+}
+
+/// What a session with epochs on writes, and where it stands.
+struct EpochWriter {
+    /// The plate steps after which to write a checkpoint (`epochs::plan`).
+    plan: std::collections::BTreeSet<u64>,
+    index: crate::epochs::EpochIndex,
+}
+
+/// Where a resumed run ([`Session::resume_epoch`]) started from.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Resumed {
+    /// The plate step of the checkpoint it resumed from (0: none served, the run started over).
+    pub from_step: u64,
+    /// Its world time, years.
+    pub from_t_years: f64,
+    /// The plate steps the run takes in all (the steps it reruns are `steps - from_step`).
+    pub steps: u64,
+    /// Keyframes kept from the run it continues.
+    pub keyframes_kept: u32,
 }
 
 impl Stepper {
@@ -404,6 +431,8 @@ pub struct Session {
     /// The most any stage's reservation asked for: bytes in use plus bytes reserved, with and
     /// without the history's frames then in memory.
     needed_peak: [AtomicU64; 2],
+    /// Set when the run resumed from an epoch checkpoint (or started over for want of one).
+    resumed: Option<Resumed>,
 }
 
 /// The share of the memory cap kept free after a step: the history is trimmed to
@@ -496,6 +525,245 @@ impl Session {
             checkpoint.next_stage as usize,
             &checkpoint.stage_state,
         )
+    }
+
+    /// A run that picks up an earlier run in the same folder with another stop (`preset_json`'s
+    /// `timeline.stop_myr`): an epoch picked, a run stopped early, a run continued
+    /// (docs/design/playability-steering.md §4–§6). It resumes from the latest epoch checkpoint in
+    /// `<out_dir>/epochs/` whose preset key matches and that lies at or before this stop's last
+    /// free step, keeps the earlier run's keyframes up to it, and deletes the folder's manifest (the
+    /// folder is complete again only when this run finalizes). With no such checkpoint it starts
+    /// over, as [`Session::create`] does. The world it ends with is the world of a run planned to
+    /// this stop.
+    pub fn resume_epoch(
+        preset_json: &str,
+        content_json: &str,
+        options: SessionOptions,
+        gauge: Arc<dyn MemoryGauge>,
+    ) -> Result<Session, CoreError> {
+        let preset = Preset::from_json(preset_json)?;
+        preset.check_runnable()?;
+        check_content(content_json)?;
+        let canonical = preset.clone().with_content(content_json)?;
+        let crate::preset::PresetBody::Planet(p) = &canonical.body else {
+            return Err(CoreError::InvalidArgument(
+                "only a planet run can be resumed at another stop".into(),
+            ));
+        };
+        let need = p.last_free_step();
+        let steps = p.plate_steps();
+        let out = options.out_dir.clone();
+        let manifest = out.join(MANIFEST);
+        match std::fs::remove_file(&manifest) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(CoreError::io(manifest, e)),
+        }
+        let key = crate::epochs::key(&canonical);
+        let dir = crate::epochs::EpochIndex::dir(&out);
+        let index = crate::epochs::EpochIndex::read(&out)?.filter(|i| i.key == key);
+        // The folder's keyframes are those of the run that last wrote the index (`set_epochs`
+        // records its preset): the frames it drew in its own tail, and after it, are not frames
+        // of the shared trajectory. So a checkpoint is taken no later than that run's last free
+        // step too, and every kept frame is one a run planned to this stop draws.
+        let previous_free = index
+            .as_ref()
+            .and_then(|i| Preset::from_json(&i.preset.to_string()).ok())
+            .and_then(|prev| match prev.body {
+                crate::preset::PresetBody::Planet(pp) => Some(pp.last_free_step()),
+                _ => None,
+            });
+        let need = need.min(previous_free.unwrap_or(need));
+        let chosen = index.as_ref().and_then(|i| {
+            let e = i.choose(need)?;
+            let chain: Vec<PathBuf> = i.chain(e)?.iter().map(|c| dir.join(&c.file)).collect();
+            Some((e.clone(), chain))
+        });
+        let Some((entry, chain)) = chosen else {
+            let mut s = Session::create(preset_json, content_json, options, gauge)?;
+            s.resumed = Some(Resumed {
+                from_step: 0,
+                from_t_years: s.preset.initial_world().t_years,
+                steps,
+                keyframes_kept: 0,
+            });
+            s.log.push(
+                Level::Info,
+                format!(
+                    "no epoch checkpoint serves this stop (its last free step is {need}): the run \
+                     starts over"
+                ),
+            );
+            return Ok(s);
+        };
+        let mut ck = Checkpoint::read_chain(&chain)?;
+        ck.preset_json = preset_json.to_owned();
+        ck.content_json = content_json.to_owned();
+        let mut s = Session::resume(ck, options, gauge)?;
+        let kept = s.keyframes.adopt(entry.t_years)?;
+        s.resumed = Some(Resumed {
+            from_step: entry.step,
+            from_t_years: entry.t_years,
+            steps,
+            keyframes_kept: kept,
+        });
+        s.log.push(
+            Level::Info,
+            format!(
+                "resumed from the epoch checkpoint after plate step {} (t = {:.1} Myr): {} of {} \
+                 steps to run, {kept} keyframes kept",
+                entry.step,
+                entry.t_years / 1.0e6,
+                steps - entry.step.min(steps),
+                steps
+            ),
+        );
+        Ok(s)
+    }
+
+    /// Where this run resumed from, if it was made by [`Session::resume_epoch`].
+    pub fn resumed(&self) -> Option<&Resumed> {
+        self.resumed.as_ref()
+    }
+
+    /// Turns on the epoch checkpoints (docs/design/playability-steering.md §3): after the coupled
+    /// group's plate steps of `epochs::plan`, a checkpoint goes to `<out_dir>/epochs/`. An index
+    /// already there under the same preset key is kept (it holds states of the same trajectory);
+    /// one of another key is replaced. Only planet presets have epochs; on the others this does
+    /// nothing.
+    pub fn set_epochs(&mut self, on: bool) -> Result<(), CoreError> {
+        if !on {
+            return self.set_epochs_every(None);
+        }
+        // The keyframe grid, but at most about `EPOCH_CHECKPOINTS` checkpoints a run: each holds
+        // the whole world (some 150–300 MB on the quick 16k planet), and a frame between two of
+        // them reruns at most one interval. Without keyframes: only the stop's checkpoint.
+        let run_years = match &self.preset.body {
+            crate::preset::PresetBody::Planet(p) => p.run_years(),
+            _ => 0.0,
+        };
+        let every = self
+            .policy
+            .every_years
+            .map_or(f64::INFINITY, |e| e.max(run_years / EPOCH_CHECKPOINTS));
+        self.set_epochs_every(Some(every))
+    }
+
+    /// [`Session::set_epochs`] on a grid of its own: a checkpoint for every `every_years` of the
+    /// run (and its stop) instead of every keyframe (the workbench draws a frame every step, far
+    /// too many to keep a checkpoint each); `None` turns them off.
+    pub fn set_epochs_every(&mut self, every_years: Option<f64>) -> Result<(), CoreError> {
+        let s = self.stepper.get_mut().map_err(|_| CoreError::Poisoned)?;
+        let Some(every) = every_years else {
+            s.epochs = None;
+            return Ok(());
+        };
+        let crate::preset::PresetBody::Planet(p) = &self.preset.body else {
+            return Ok(());
+        };
+        let plan = crate::epochs::plan(p, every.is_finite().then_some(every));
+        let key = crate::epochs::key(&self.preset);
+        let preset: Value = serde_json::from_str(&self.preset_json)
+            .map_err(|e| CoreError::InvalidState(format!("preset serialisation: {e}")))?;
+        let index = match crate::epochs::EpochIndex::read(&self.out_dir)? {
+            Some(mut i) if i.key == key => {
+                // Entries whose file is gone (a crash between file and index) are dropped.
+                let dir = crate::epochs::EpochIndex::dir(&self.out_dir);
+                i.entries.retain(|e| dir.join(&e.file).exists());
+                i.preset = preset;
+                i.content = self.content_json.clone();
+                i
+            }
+            other => {
+                if other.is_some() {
+                    let dir = crate::epochs::EpochIndex::dir(&self.out_dir);
+                    std::fs::remove_dir_all(&dir).map_err(|e| CoreError::io(&dir, e))?;
+                }
+                crate::epochs::EpochIndex {
+                    schema: crate::epochs::INDEX_SCHEMA,
+                    key,
+                    preset,
+                    content: self.content_json.clone(),
+                    entries: Vec::new(),
+                }
+            }
+        };
+        self.log.push(
+            Level::Info,
+            format!(
+                "epoch checkpoints after plate steps {:?} ({} already in the folder)",
+                plan,
+                index.entries.len()
+            ),
+        );
+        // Written now, so the folder names the run whose keyframes it holds (`resume_epoch`).
+        index.write(&self.out_dir)?;
+        s.epochs = Some(EpochWriter { plan, index });
+        Ok(())
+    }
+
+    /// The epoch checkpoint due after the step just taken, if any (the coupled group led by the
+    /// plates, after every member stepped).
+    fn write_epoch(&self, s: &mut Stepper) -> Result<(), CoreError> {
+        let Some(ep) = &s.epochs else {
+            return Ok(());
+        };
+        if s.group().start != 0 || s.stages.is_empty() {
+            return Ok(());
+        }
+        let k = s.stages[0].steps_done();
+        if !ep.plan.contains(&k) || ep.index.entries.iter().any(|e| e.step == k) {
+            return Ok(());
+        }
+        let file = crate::epochs::file_name(k);
+        let dir = crate::epochs::EpochIndex::dir(&self.out_dir);
+        std::fs::create_dir_all(&dir).map_err(|e| CoreError::io(&dir, e))?;
+        let path = dir.join(&file);
+        let started = Instant::now();
+        // Only the history's frames since the store's latest checkpoint (`epochs.rs`, the chain).
+        let frames = s
+            .world
+            .history
+            .as_ref()
+            .map_or(0, crate::deposits::recorded::RecordedHistory::frame_count);
+        let frames_from = ep.index.frames_from(k, frames);
+        let stage_state = self.stage_state_of(s)?;
+        CheckpointRef {
+            preset_json: &self.preset_json,
+            content_json: &self.content_json,
+            stage_names: &self.stage_names,
+            next_stage: s.current as u32,
+            stage_state: &stage_state,
+            world: &s.world,
+        }
+        .write_from(&path, frames_from)?;
+        let bytes = std::fs::metadata(&path)
+            .map_err(|e| CoreError::io(&path, e))?
+            .len();
+        let secs = started.elapsed().as_secs_f64();
+        let t_years = s.world.t_years;
+        let ep = s.epochs.as_mut().expect("checked above");
+        ep.index.put(crate::epochs::EpochEntry {
+            step: k,
+            t_years,
+            file,
+            bytes,
+            write_seconds: secs,
+            frames_from,
+            frames_to: frames,
+        });
+        ep.index.write(&self.out_dir)?;
+        self.log.push(
+            Level::Info,
+            format!(
+                "epoch checkpoint after plate step {k} (t = {:.1} Myr): {:.1} MiB in {secs:.2} s; \
+                 the store holds {:.1} MiB",
+                t_years / 1.0e6,
+                bytes as f64 / 1_048_576.0,
+                ep.index.bytes() as f64 / 1_048_576.0
+            ),
+        );
+        Ok(())
     }
 
     fn build(
@@ -625,6 +893,7 @@ impl Session {
                 allowed,
                 base,
                 timings,
+                epochs: None,
             }),
             policy,
             view,
@@ -635,6 +904,7 @@ impl Session {
             history_budget: None,
             spill_logged: AtomicBool::new(false),
             needed_peak: [AtomicU64::new(0), AtomicU64::new(0)],
+            resumed: None,
         };
         session.log.push(
             Level::Info,
@@ -859,6 +1129,13 @@ impl Session {
             let result = self.after_step(s);
             self.gauge.phase("keyframes", false);
             result.map_err(|e| self.fail("keyframe or event publishing", e))?;
+            // An epoch checkpoint that cannot be written (a full disk) costs the player the
+            // epoch tools of this run, not the run.
+            if let Err(e) = self.write_epoch(s) {
+                self.log
+                    .push(Level::Warn, format!("epoch checkpoints turned off: {e}"));
+                s.epochs = None;
+            }
             // A stage's time includes publishing its events and drawing its keyframes (a group's
             // go to its last member that stepped).
             s.timings[last].millis += stepped.elapsed().as_secs_f64() * 1000.0;
@@ -1422,10 +1699,22 @@ impl Session {
         });
         let header = &self.preset.header;
         if let Some(t) = header.timeline {
-            run["timeline"] = json!({ "start": t.start.name(), "length_myr": t.length_myr });
+            run["timeline"] = t.to_json();
         }
         if header.placeholder {
             run["placeholder"] = json!(true);
+        }
+        if let Some(r) = &self.resumed {
+            run["resumed"] = json!({
+                "from_step": r.from_step, "from_t_years": r.from_t_years, "steps": r.steps,
+                "keyframes_kept": r.keyframes_kept,
+            });
+        }
+        if let Some(ep) = &s.epochs {
+            run["epochs"] = json!({
+                "checkpoints": ep.index.entries.len(), "bytes": ep.index.bytes(),
+                "write_seconds": ep.index.entries.iter().map(|e| e.write_seconds).sum::<f64>(),
+            });
         }
         if let Some(h) = self.history_note(world) {
             run["history"] = h;
