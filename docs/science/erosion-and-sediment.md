@@ -167,6 +167,15 @@ of the planet, land median 613 m, 90th percentile 2,054 m, 11.2 % of land above 
 above 2 km). Rivers and lakes come from the same terrain and are unchanged (lakes 503 and 292, river chains 1,189
 and 1,049 in every bake).
 
+**High ground, a reference line for plateaus** (land erosion by the frame's elevation band, after the fixes, the
+same in both runs within a few m/Myr): land 0 to 1 km erodes at 36 m/Myr on average (median 6), 1 to 2 km at 146 to
+155 (median 77 to 92), and every band above 2 km at 116 to 144 (median 49 to 69, 90th percentile 325 to 410).
+These bands mix ranges and plateaus; the model has no plateau that wears more slowly than a range of the same height.
+Earth's reference: southern Tibet's plateau surface has been exhumed by less than 0.01 km/Myr (under 750 m in all)
+since 12 to 11 Ma, and its rivers' cosmogenic rates are mostly under 100 m/Myr (Tremblay et al. 2015, ERO-174). So
+the surface stage wears land above 2 km five to ten times faster than a plateau interior on Earth (medians 50 to 70
+against under 10 m/Myr); a plateau the plate model holds up is being worn at range rates.
+
 **Left as it is.** The rates are the stream-power and isostasy physics as calibrated before (ERO-001 to ERO-021,
 ISO rows); with the bookkeeping fixed they sit inside Earth's ranges per setting, and the decisions log of
 2026-10-05 rules out tuning them towards a depth or hypsometry. A parcel's total over hundreds of Myr is large
