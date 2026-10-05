@@ -22,12 +22,14 @@
 //!    100 Myr forms deposits throughout those 100 Myr.
 //! 3. **Preservation.** A deposit formed at time t at depth z_f with half-height h(T) (T its
 //!    tonnage) lies at D = z_f + B − E below today's surface, B and E the burial and erosion its
-//!    column saw since (`ledger.rs`). It survives — becomes a site — when D > −h (not eroded
-//!    away; D ≥ h for a type that any erosion into destroys) and its body still reaches the build
-//!    range (`too_deep`). p(c) is that probability for a deposit formed in cell c: averaged over
+//!    column saw since (`ledger.rs`). It survives — becomes a site — when the surface never came
+//!    down through it: D_min > −h, D_min = z_f + the lowest running net burial since formation
+//!    (D_min ≥ h for a type that any erosion into destroys; a deposit eroded away and then buried
+//!    again is gone, 2026-10-05) — and its body still reaches the build range (`too_deep`). p(c) is that probability for a deposit formed in cell c: averaged over
 //!    the formation-time distribution (the hazard, and uniform within a frame, as the engine
 //!    draws it), and over the tonnage distribution at [`TONNAGE_NODES`] quantiles. Within a frame
-//!    D is linear in the formation instant, so that part is exact. p̄_i averages p over tract i
+//!    D is linear in the formation instant, and D_min is the smaller of z_f and a linear function
+//!    of it, so that part is exact. p̄_i averages p over tract i
 //!    with the position weights.
 //! 4. **Formation rate.** One number per type: λ_i = N* · φ_i / Σ_j φ_j p̄_j, so the expected
 //!    survivors Σ λ_i p̄_i are exactly N*. Formation concentrates nowhere; survival decides where
@@ -75,37 +77,50 @@ impl FateModel {
         }
     }
 
-    /// Survives a body of half-height `h` whose centre is `d` below the surface, with `limit_m` the
-    /// depth below which a body's top misses the build range ([`too_deep_limit_m`])? Mirrors
-    /// `Ledger::apply` and the stage's too-deep check. With `counted`, the survivor must also have
-    /// its top within the assessment depth to count toward the density.
-    pub fn survives(&self, d: f64, h: f64, limit_m: f64, counted: bool) -> bool {
+    /// Survives a body of half-height `h` whose centre is `d` below the surface now and was
+    /// `d_min` below it at its shallowest since it formed, with `limit_m` the depth below which a
+    /// body's top misses the build range ([`too_deep_limit_m`])? Mirrors `Ledger::apply` and the
+    /// stage's too-deep check. With `counted`, the survivor must also have its top within the
+    /// assessment depth to count toward the density.
+    pub fn survives(&self, d: f64, d_min: f64, h: f64, limit_m: f64, counted: bool) -> bool {
         let kept = match self.behavior {
-            ErosionBehavior::Destroy => d - h >= 0.0,
-            ErosionBehavior::Truncate | ErosionBehavior::SpawnPlacer => d + h > 0.0,
+            ErosionBehavior::Destroy => d_min - h >= 0.0,
+            ErosionBehavior::Truncate | ErosionBehavior::SpawnPlacer => d_min + h > 0.0,
         };
         kept && d - h * self.size_mult_v <= limit_m
             && (!counted || d - h <= self.assessment_depth_m)
     }
 
     /// The share of tonnage nodes and of the formation instants U ∈ [0, 1] of one frame for which
-    /// a deposit survives, its centre depth being `a + b·U` (a: depth for a deposit formed at the
-    /// frame's end, b: the frame's own net burial, m).
-    pub fn survival_in_frame(&self, a: f64, b: f64, limit_m: f64, counted: bool) -> f64 {
+    /// a deposit survives, its centre depth now being `a + b·U` and at its shallowest
+    /// min(z_f, `low` + b·U) (a: today's depth of a deposit formed at the frame's end, `low`: its
+    /// shallowest depth since, b: the frame's own net burial, m).
+    pub fn survival_in_frame(&self, a: f64, low: f64, b: f64, limit_m: f64, counted: bool) -> f64 {
         let mut s = 0.0;
         for &h in &self.half_heights_m {
+            // Kept: the surface never reached the body's base (any of it, for `destroy`).
+            let kept = match self.behavior {
+                ErosionBehavior::Destroy if self.formation_depth_m < h => None,
+                ErosionBehavior::Destroy => u_range(low, b, h, f64::INFINITY),
+                ErosionBehavior::Truncate | ErosionBehavior::SpawnPlacer => {
+                    u_range(low, b, -h, f64::INFINITY)
+                }
+            };
             let (lo, hi) = self.window(h, limit_m, counted);
-            s += fraction_between(a, b, lo, hi);
+            if let (Some(k), Some(w)) = (kept, u_range(a, b, lo, hi)) {
+                s += (k.1.min(w.1) - k.0.max(w.0)).max(0.0);
+            }
         }
         s / self.half_heights_m.len().max(1) as f64
     }
 
-    /// The share of tonnage nodes for which a deposit at depth `d` survives.
-    pub fn survival_at(&self, d: f64, limit_m: f64, counted: bool) -> f64 {
+    /// The share of tonnage nodes for which a deposit `d` deep now and `d_min` deep at its
+    /// shallowest survives.
+    pub fn survival_at(&self, d: f64, d_min: f64, limit_m: f64, counted: bool) -> f64 {
         let n = self
             .half_heights_m
             .iter()
-            .filter(|&&h| self.survives(d, h, limit_m, counted))
+            .filter(|&&h| self.survives(d, d_min, h, limit_m, counted))
             .count();
         n as f64 / self.half_heights_m.len().max(1) as f64
     }
@@ -132,6 +147,20 @@ pub fn too_deep_limit_m(surface_y: f64, min_y: i32, m_per_block_v: f64) -> f64 {
     (surface_y - f64::from(min_y + 4)) * m_per_block_v
 }
 
+/// The range of U ∈ [0, 1] with lo < a + b·U ≤ hi (its ends; None when empty).
+fn u_range(a: f64, b: f64, lo: f64, hi: f64) -> Option<(f64, f64)> {
+    if hi <= lo {
+        return None;
+    }
+    if b == 0.0 {
+        return (a > lo && a <= hi).then_some((0.0, 1.0));
+    }
+    let (u1, u2) = ((lo - a) / b, (hi - a) / b);
+    let (from, to) = if u1 < u2 { (u1, u2) } else { (u2, u1) };
+    let (from, to) = (from.max(0.0), to.min(1.0));
+    (to > from).then_some((from, to))
+}
+
 /// The measure of U ∈ [0, 1] with lo < a + b·U ≤ hi.
 pub fn fraction_between(a: f64, b: f64, lo: f64, hi: f64) -> f64 {
     if hi <= lo {
@@ -153,22 +182,48 @@ pub struct ColumnNet {
     pub net_m: Vec<f64>,
     /// Σ of `net_m` over the frames after each frame.
     after_m: Vec<f64>,
+    /// The lowest the running net burial after the end of each frame gets, at a frame's end (m,
+    /// ≤ 0): how far the surface came down towards what lay under it then, whatever burial
+    /// followed.
+    low_after_m: Vec<f64>,
 }
 
 impl ColumnNet {
     pub fn new(net_m: Vec<f64>) -> ColumnNet {
-        let mut after_m = vec![0.0; net_m.len()];
+        let n = net_m.len();
+        let mut after_m = vec![0.0; n];
+        let mut low_after_m = vec![0.0; n];
         let mut s = 0.0;
-        for k in (0..net_m.len()).rev() {
+        let mut low = 0.0f64;
+        for k in (0..n).rev() {
             after_m[k] = s;
+            low_after_m[k] = low;
             s += net_m[k];
+            low = (net_m[k] + low).min(0.0);
         }
-        ColumnNet { net_m, after_m }
+        ColumnNet {
+            net_m,
+            after_m,
+            low_after_m,
+        }
     }
 
     /// Net burial after the end of frame `k`.
     pub fn after(&self, k: usize) -> f64 {
         self.after_m[k]
+    }
+
+    /// The lowest running net burial after the end of frame `k` (≤ 0).
+    pub fn low_after(&self, k: usize) -> f64 {
+        self.low_after_m[k]
+    }
+
+    /// The lowest running net burial over the whole history (≤ 0).
+    pub fn low_total(&self) -> f64 {
+        match self.net_m.first() {
+            Some(&n0) => (n0 + self.low_after_m[0]).min(0.0),
+            None => 0.0,
+        }
     }
 
     /// Net burial over the whole history.
@@ -209,16 +264,26 @@ pub fn preservation(
                     continue;
                 }
                 den += hk;
-                num +=
-                    hk * model.survival_in_frame(z + col.after(k), col.net_m[k], limit_m, counted);
+                num += hk
+                    * model.survival_in_frame(
+                        z + col.after(k),
+                        z + col.low_after(k),
+                        col.net_m[k],
+                        limit_m,
+                        counted,
+                    );
             }
             if den > 0.0 { num / den } else { 0.0 }
         }
         Formation::At { k, u } => {
-            let d = z + col.after(k) + u.clamp(0.0, 1.0) * col.net_m[k];
-            model.survival_at(d, limit_m, counted)
+            let bu = u.clamp(0.0, 1.0) * col.net_m[k];
+            let d = z + col.after(k) + bu;
+            let d_min = z + (bu + col.low_after(k)).min(0.0);
+            model.survival_at(d, d_min, limit_m, counted)
         }
-        Formation::Start => model.survival_at(z + col.total(), limit_m, counted),
+        Formation::Start => {
+            model.survival_at(z + col.total(), z + col.low_total(), limit_m, counted)
+        }
     }
 }
 
@@ -309,23 +374,30 @@ mod tests {
             for &h in &m.half_heights_m {
                 for d10 in -400..=900 {
                     let d = f64::from(d10) * 10.0;
-                    let ledger = Ledger {
-                        formation_depth_m: d,
-                        half_height_m: h,
-                        eroded_m: 0.0,
-                        buried_m: 0.0,
-                    };
-                    let fate = ledger.apply(m.behavior, t.shape().metric());
-                    let too_deep = d - h * m.size_mult_v > limit;
-                    if (d + h).abs() < 1e-6 || (d - h).abs() < 1e-6 {
-                        continue;
+                    // Formed at 2 km (when that is deeper), exhumed to d, or exhumed to d − 1 km
+                    // and buried 1 km again.
+                    let z = d.max(2000.0);
+                    for (eroded, buried) in [(z - d, 0.0), (z - d + 1000.0, 1000.0)] {
+                        let ledger = Ledger {
+                            formation_depth_m: z,
+                            half_height_m: h,
+                            eroded_m: eroded,
+                            buried_m: buried,
+                            exhumed_max_m: eroded,
+                        };
+                        let fate = ledger.apply(m.behavior, t.shape().metric());
+                        let too_deep = d - h * m.size_mult_v > limit;
+                        let d_min = z - eroded;
+                        if (d_min + h).abs() < 1e-6 || (d_min - h).abs() < 1e-6 {
+                            continue;
+                        }
+                        assert_eq!(
+                            m.survives(d, d_min, h, limit, false),
+                            is_site(fate, too_deep),
+                            "{} d={d} d_min={d_min} h={h}",
+                            t.id
+                        );
                     }
-                    assert_eq!(
-                        m.survives(d, h, limit, false),
-                        is_site(fate, too_deep),
-                        "{} d={d} h={h}",
-                        t.id
-                    );
                 }
             }
         }
@@ -379,6 +451,50 @@ mod tests {
             / m.half_heights_m.len() as f64;
         assert!((counted - want_c).abs() < 1e-9, "{counted} vs {want_c}");
         assert!(counted < p);
+    }
+
+    /// A deposit the surface reached and that was buried again is gone: erosion of 5 km then
+    /// burial of 5 km leaves a porphyry formed at 1.5 km "at 1.5 km" by the net, but it was
+    /// eroded away in between; formed after the erosion, it survives. The frame integration
+    /// agrees with the per-instant rule (the erosion and burial audit, 2026-10-05).
+    #[test]
+    fn eroded_then_buried_is_gone() {
+        let t = builtin().unwrap().remove(0); // porphyry: z_f 1.5 km
+        let m = FateModel::new(&t);
+        // 20 frames: 10 of 500 m of erosion each, then 10 of 500 m of burial.
+        let mut net = vec![-500.0; 10];
+        net.extend(vec![500.0; 10]);
+        let col = ColumnNet::new(net);
+        assert_eq!(col.total(), 0.0);
+        assert_eq!(col.low_total(), -5000.0);
+        assert_eq!(col.low_after(4), -2500.0);
+        assert_eq!(col.low_after(12), 0.0);
+        let limit = 1.0e9;
+        // Formed before the erosion: the net says 1.5 km down, the path says gone.
+        assert_eq!(
+            preservation(&m, &col, Formation::Start, limit, false),
+            0.0,
+            "eroded away, then buried"
+        );
+        // Formed at the trough (the end of frame 9): buried 5 km since, kept.
+        let at_trough = preservation(&m, &col, Formation::At { k: 9, u: 0.0 }, limit, false);
+        assert_eq!(at_trough, 1.0);
+        // Hazard in frame 5 only: what survives is what formed late enough in it that the
+        // remaining 2–2.5 km of erosion left its base under ground; the frame integration equals
+        // the mean of the per-instant rule.
+        let mut hz = vec![0.0f32; 20];
+        hz[5] = 1.0;
+        let p = preservation(&m, &col, Formation::Hazard(&hz), limit, false);
+        let n = 2000;
+        let mean = (0..n)
+            .map(|i| {
+                let u = (i as f64 + 0.5) / n as f64;
+                preservation(&m, &col, Formation::At { k: 5, u }, limit, false)
+            })
+            .sum::<f64>()
+            / n as f64;
+        assert!((p - mean).abs() < 2e-3, "{p} vs {mean}");
+        assert!(p < 1.0, "{p}");
     }
 
     #[test]
