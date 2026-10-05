@@ -1247,14 +1247,11 @@ list, so a class added to the vocabulary changes no bytes a reader depends on.
 Block coordinates of L3 sample points that are dry land, gently sloping, spread apart, ordered by
 distance from (0, 0).
 
-A world whose essentials set `max_blocks_from_spawn` (P1-15, plan §7.8; a synthetic deposit world
-today) ranks its candidates instead (`deeptime_core::deposits::spawn`): points on a 16-block lattice
-that are dry, at least sea level + 2 and within one block of their L3 neighbours, ordered by the
-number of such essentials whose nearest site is out of reach (`unmet`), then
-`score` = Σ min(d / max_blocks_from_spawn, 4), then distance from (0, 0); at most 10, 64 blocks apart.
-The file then also has `ranked_by` (`[{material, max_blocks_from_spawn, sites}]`) and each candidate
-`unmet`, `score` and `essentials` (`[{material, site, distance, max_blocks_from_spawn}]`). The game
-takes the dry candidate with the fewest `unmet`, file order breaking ties (`SpawnHandler`).
+Every world's candidates follow this one rule (`synth::spawn_candidates`: an 8-block lattice, dry,
+at least sea level + 2, within one block of the L3 neighbours, 64 blocks apart, at most 8). They are
+not ranked by the essentials (Ben, decisions log 2026-10-05: spawn follows the normal rules); the
+`ranked_by`, `unmet`, `score` and `essentials` keys of P1-15 no longer exist. The game takes the first
+candidate that is dry land once generated (`SpawnHandler`).
 
 ## Sectioned files (`DTEV`, `DTSR`, `DTSI`, `DTKF`, `DTCP`)
 
@@ -1699,8 +1696,7 @@ survives in, the finished folder. The manifest's `notes.run.history` reports wha
   sites, bodies and events. `elevation` = round(16·(63 + h/20)) of the synthetic history's present
   elevation h (m) sampled bilinearly on L1 at each L3 point — the same surface the deposit stage
   placed and clipped the bodies against (`deposits::bilinear_cells`, `surface_y`); `water_level` all
-  nodata; climate as wrap-test's formulas on this terrain; spawn candidates ranked by the preset's
-  (or the content bundle's) essentials. `crates/deeptime-core/tests/presets/deposits_world_{4k,16k}.json`
+  nodata; climate as wrap-test's formulas on this terrain; the standard spawn candidates. `crates/deeptime-core/tests/presets/deposits_world_{4k,16k}.json`
   are the GameTest and smoke worlds.
 - All: a three-horizon strata placeholder on L1 (`notes.strata`); with `--strata every-class`
   (P1-12) eight horizons 10 blocks apart holding all 62 rock classes, horizon h of L1 cell column

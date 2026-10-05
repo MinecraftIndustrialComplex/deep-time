@@ -1182,26 +1182,13 @@ impl Session {
                     )?,
                 ),
                 // P1-15: a synthetic deposit world's terrain follows the history's present
-                // elevation, and its spawn candidates are ranked by the essentials.
-                crate::preset::Bake::DepositHistory {
-                    params,
-                    strata,
-                    essentials,
-                } => {
+                // elevation; its spawn candidates are the standard ones.
+                crate::preset::Bake::DepositHistory { params, strata } => {
                     let history = crate::deposits::synthetic::SyntheticHistory::new(params)?;
                     let terrain = crate::deposits::synthetic::HistoryTerrain::new(&history);
                     let kind = crate::synth::Kind::DepositHistory;
-                    let mut baked =
+                    let baked =
                         crate::synth::build_with(&terrain, kind, strata, c, Codec::Lz4Block)?;
-                    if let Some(ranked) = crate::deposits::spawn::ranked_candidates(
-                        &baked.layers[0],
-                        &baked.layers[1],
-                        m.scale.sea_level_y,
-                        &world.sites,
-                        &essentials,
-                    ) {
-                        baked.spawn = ranked;
-                    }
                     (kind, baked)
                 }
             };
