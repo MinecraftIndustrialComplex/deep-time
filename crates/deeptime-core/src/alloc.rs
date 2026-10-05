@@ -568,16 +568,18 @@ mod tests {
         drop(v);
         let kept = |c: &Cache| c.blocks[..c.n].iter().any(|b| b.0 == at);
         assert!(kept(&cache()), "the freed block is kept");
-        // A ceiling just over the count now; then 4 MiB of small blocks pass it.
-        keep_below(in_use() + (1 << 20));
-        assert!(kept(&cache()), "under the ceiling the block stays");
-        let small: Vec<Vec<u8>> = (0..1024).map(|_| vec![2u8; 4000]).collect();
+        // A ceiling under the count, set without `keep_below`'s own release (other test threads
+        // allocate and free concurrently, so a ceiling near the count would race them); then one
+        // small block passes it.
+        CEILING.store(0, Ordering::Relaxed);
+        assert!(kept(&cache()), "setting the ceiling alone releases nothing");
+        let small = std::hint::black_box(vec![2u8; 4000]);
         let gone = !kept(&cache());
         keep_below(u64::MAX);
         drop(small);
         assert!(
             gone,
-            "small blocks past the ceiling gave the kept block back"
+            "a small block past the ceiling gave the kept block back"
         );
     }
 
