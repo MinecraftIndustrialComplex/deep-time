@@ -154,9 +154,15 @@ is run again as ordinary steps, without being a tail, which is exactly what a ru
 does. A continue reruns τ(S) of the old run plus S' − S of new time. With steering off this is
 3 Myr extra; with steering at f = 0.1 on a 500-Myr run, 50 Myr extra.
 
-The player may change the steering when continuing (the editor keeps the setup page's fields;
-changing them between runs is allowed, since they are outside the preset key). A stricter steering
-needs an earlier checkpoint: the session takes the latest that serves it, or starts over.
+The game continues (and picks, and stops) with the run's own preset: only the stop changes. The
+core also accepts other steering settings and present-day climate for a resume (they are outside
+the preset key; `deeptime resume --set steering.…`), and a stricter steering then needs an earlier
+checkpoint: the session takes the latest that serves it, or starts over.
+
+**The workbench.** Its runs write epoch checkpoints every 25 Myr (a frame every step would be a
+checkpoint every step). A finished run's card has **Stop / continue**: it asks for a stop and
+queues a new run that hard-links the source run's checkpoints and keyframes into its own folder and
+resumes from them (`POST /api/runs/<id>/resume {"stop_myr": N}`); the source run stays as it was.
 
 ## 6. Stop early
 

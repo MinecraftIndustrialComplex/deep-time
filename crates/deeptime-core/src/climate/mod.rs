@@ -800,7 +800,7 @@ impl ClimateStage {
         let land_frac0 = band_land(&land0);
         let activity = self.activity(world, &geo, n, dt_myr * 1.0e6);
         let mut degassing = carbon::degassing(&activity, p.degassing_scale);
-        if self.steering().is_some() {
+        if self.steering().is_some() && self.s.steer.ln_outgas != 0.0 {
             // The nudge on volcanic outgassing (`steering`): e^x of the degassing; x is 0 before
             // the tail.
             degassing *= self.s.steer.ln_outgas.exp();
@@ -1216,7 +1216,7 @@ impl ClimateStage {
         let v_pre = geo.volume_km3(&ice_end_pre);
         let mut sea =
             curve + p.glacio_eustasy * ice::eustatic_m(v_pre - p.ice_reference_km3, ocean_km2);
-        if self.steering().is_some() {
+        if self.steering().is_some() && self.s.steer.sea_m != 0.0 {
             // The nudge on the ocean's water volume (`steering`), as the sea level it moves.
             sea += self.s.steer.sea_m;
         }
