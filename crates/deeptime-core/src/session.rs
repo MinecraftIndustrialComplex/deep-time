@@ -212,7 +212,8 @@ const OWN_ONLY_ESTIMATES: [&str; 4] = [
 /// the cap, or the run fails cleanly), `history_bytes` the history at the end of the stage (it
 /// stays in memory while the cap allows and spills to the run's folder after that), `bytes`
 /// = base + the history held in memory under this cap (its peak) and `spill_bytes` the rest (the
-/// disk it uses). The run's figures are the stages' maxima: `peak_bytes` ≈ base + what of the
+/// disk it uses); `own_bytes` is the stage's own `Stage::estimate` (with its history, before the
+/// world it runs beside is added; the figure this function used before memacct). The run's figures are the stages' maxima: `peak_bytes` ≈ base + what of the
 /// history fits, so a run whose `peak_bytes` is over its cap is one whose base does not fit.
 /// Seconds include the spill's disk time.
 pub fn estimate_for(
@@ -247,7 +248,7 @@ pub fn estimate_for(
                 "name": s.name(), "bytes": b + held,
                 "seconds": e.seconds + spilled as f64 * SPILL_SECONDS_PER_BYTE,
                 "base_bytes": b, "history_bytes": hist, "spill_bytes": spilled,
-                "coupled_to": s.coupled_to(),
+                "own_bytes": e.bytes, "coupled_to": s.coupled_to(),
             })
         })
         .collect();

@@ -57,16 +57,17 @@ def table(d):
         a = rows[p]
         live, rss = a["live"] / M, a["rss"] / M
         e = est.get(p, peak_est)
+        es = "-" if e is None else f"{e:.0f}{'' if p in est else ' (run)'}"
+        er = "-" if e is None else f"{e / rss:.2f}"
         print(
             f"| {p} | {a['n']} | {live:.0f} | {rss:.0f} | {live / rss:.2f} | "
-            f"{a['reserved'] / M:.0f} | {e:.0f}{'' if p in est else ' (run)'} | {e / rss:.2f} |"
+            f"{a['reserved'] / M:.0f} | {es} | {er} |"
         )
     live = max(a["live"] for a in rows.values()) / M
     rss = max(a["rss"] for a in rows.values()) / M
-    print(
-        f"| **run** | | **{live:.0f}** | **{rss:.0f}** | {live / rss:.2f} | | "
-        f"**{peak_est:.0f}** | {peak_est / rss:.2f} |"
-    )
+    pe = "-" if peak_est is None else f"**{peak_est:.0f}**"
+    pr = "-" if peak_est is None else f"{peak_est / rss:.2f}"
+    print(f"| **run** | | **{live:.0f}** | **{rss:.0f}** | {live / rss:.2f} | | {pe} | {pr} |")
     print()
     print(f"Sampled cgroup anonymous memory peak: {anon:.0f} MiB; run time {total.group(1) if total else '?'} s.")
     print()
