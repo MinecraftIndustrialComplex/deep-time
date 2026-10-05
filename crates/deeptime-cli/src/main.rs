@@ -6,6 +6,7 @@ mod amplify_view;
 mod climate_dem;
 mod deposit_audit;
 mod dump;
+mod erosion_audit;
 mod heightmap;
 mod hydro;
 mod margins_view;
@@ -465,6 +466,21 @@ enum Command {
         /// The .npy file to write (and <out>.json).
         #[arg(long)]
         out: PathBuf,
+    },
+    /// How much rock the surface stage took off and laid on, per region type (orogen, basin,
+    /// shield, other land, shelf, ocean) and per crust parcel followed with the crust, the last
+    /// frame's land hypsometry (from a checkpoint with the recorded history), and every porphyry's
+    /// ledger and depth (from a world-data folder).
+    ErosionAudit {
+        /// World-data folder a planet run baked (the porphyries).
+        #[arg(long)]
+        world_data: Option<PathBuf>,
+        /// A checkpoint carrying the recorded history (`run --checkpoints`).
+        #[arg(long)]
+        checkpoint: Option<PathBuf>,
+        /// Also write the report (every porphyry) as JSON.
+        #[arg(long)]
+        json: Option<PathBuf>,
     },
     /// Run the bake's projection pass (SW-1) on a copy of a baked Lambert world-data folder, with
     /// its own preset and `--set scale.KEY=VALUE` overrides (`scale.projection` is petroff_guyou):
@@ -1268,6 +1284,49 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::ErosionAudit {
+            world_data,
+            checkpoint,
+            json,
+        }) => {
+            let mut report = serde_json::Map::new();
+            if let Some(ck) = &checkpoint {
+                match erosion_audit::history(ck) {
+                    Ok(v) => {
+                        report.insert("history".into(), v);
+                    }
+                    Err(e) => {
+                        eprintln!("deeptime erosion-audit: {e}");
+                        return ExitCode::FAILURE;
+                    }
+                }
+            }
+            if let Some(w) = &world_data {
+                match erosion_audit::porphyries(w) {
+                    Ok(v) => {
+                        report.insert("porphyries".into(), v);
+                    }
+                    Err(e) => {
+                        eprintln!("deeptime erosion-audit: {e}");
+                        return ExitCode::FAILURE;
+                    }
+                }
+            }
+            let v = serde_json::Value::Object(report);
+            if let Some(p) = &json
+                && let Err(e) = std::fs::write(p, serde_json::to_vec_pretty(&v).expect("JSON"))
+            {
+                eprintln!("deeptime erosion-audit: {}: {e}", p.display());
+                return ExitCode::FAILURE;
+            }
+            // The summary without the per-porphyry rows.
+            let mut short = v.clone();
+            if let Some(p) = short.get_mut("porphyries").and_then(|p| p.as_object_mut()) {
+                p.remove("rows");
+            }
+            println!("{}", serde_json::to_string_pretty(&short).expect("JSON"));
+            ExitCode::SUCCESS
+        }
         Some(Command::DumpDeposits { world, out }) => match dump::run(&world, &out) {
             Ok((sites, bodies, inside)) => {
                 println!(
