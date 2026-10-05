@@ -1,6 +1,7 @@
 # Force-balance plate motion: design
 
-Status: **design approved 2026-10-02; tasks 2, 3, 4 and 5 built** (see "As built: task 2" and
+Status: **design approved 2026-10-02; tasks 2 to 7 built, task 8 first pass** (see section 13,
+"Tasks 7 and 8", for the switch; and "As built: task 2" and
 "As built: tasks 3 and 4" at the end of section 9, and section 13 for task 5, the forces recorded
 and not applied). It extends
 `docs/design/plate-collisions-and-welding.md` (the "collisions design" below) after Ben's decisions
@@ -897,3 +898,61 @@ slab across that flicker (key it to the trench, or let a reopened contact inheri
 boundary resistance small plates run away (1 % of plate-steps above 250 mm/yr); the mantle flow at 5
 mm/yr changes nothing measurable. The reference slab pull (3 × 10¹³ N/m) is about twice WP-13a's 1.4
 × 10¹³; speeds do not depend on it, the ridge push's share and the stresses do.
+
+### Tasks 7 and 8 (first pass): the switch (2026-10-05)
+
+Branch of the plate task 7 agent (continued twice after stops); master 2e07d954 merged. The plates
+move by the balance; the old speed law and its settings are gone. Where it departs from the plan:
+
+- **Motion.** Each step every plate's rotation relaxes towards the balance's answer over
+  `motion_relax_myr` (6). The guard `max_plate_speed_mm_yr` (250) holds a plate's own fastest
+  point (`kinematics::guard_speed`, not the speed 90° from the pole) and is counted
+  (`plates/guard_bound_plate_steps`): it bound on no plate-step in eight 1000 Myr runs. Steps the
+  solve fails on are counted too (`plates/balance_unsolved_steps`).
+- **Start.** Plates start at rest. The starting floor is aged by an earlier motion drawn for the
+  purpose and not kept (PLT-273), and the slabs that motion was sinking hang at full length from
+  the start (PLT-274), so the planet does not wait for its first subduction initiation.
+- **Slabs** survive a contact's flicker (task 5's finding); a slab no front feeds hangs and pulls
+  for `slab_breakoff_myr` (PLT-271). An initiation plants `initiation_slab_km` (150, PLT-270).
+- **Rifts** keep the parent's motion; rifts whose sides move together for `weld_after_myr` heal
+  (PLT-272).
+- **Collision resistance** is the belt's edge energy plus the buoyancy of the continental
+  lithosphere the collision has dragged down (`collision_buoyancy`, 1 = Cloos 1993's density
+  contrast, FRC-028 to FRC-030, PLT-275): the belt's weight alone did not stop collisions of
+  plates that slabs elsewhere pull. Its drag floor is 1 mm/yr (FRC-011), under the weld speed, so
+  held collisions weld. `collision_resistance_mm_yr` (200 on the old law) no longer exists.
+- **`convergence_ref_mm_yr`** (100) is Cortial's v_0, which was also the speed cap: it now only
+  sets the rate of subduction uplift and arc magma (PLT-037), with its own editor field.
+- **Crust budget (task 8, first pass).** See `docs/science/plates.md`, "The continental crust
+  budget under the force balance": a collision's hidden crust is no longer accreted a second time
+  at a resampling (PLT-276); crust beyond `crust_max_km` widens the plateau before any of it
+  founders (PLT-277); `collapse_thickness_km` 50, the sources' figure (PLT-256). Under Ben's
+  validation policy of 2026-10-05 the land share is reported against Earth, not tuned.
+  `collision_stacking_share` (0.8) and `arc_maturity_myr` (20) were held as briefed;
+  `collision_buoyancy` 2 and 3 were measured and changed neither crust nor land beyond the noise.
+
+**Measured** (`plate-check`, `earthlike_quick_16k`, 1000 Myr, seeds 1–4, both starts; master
+2e07d954 against the branch head; tables in the build log of 2026-10-05):
+
+| Measure | Master | Branch | Target |
+|---|---|---|---|
+| plate-check targets met | 30 of 45 | 30 of 45 | |
+| Speed RMS; 10th / 50th / 90th percentile, mm/yr | 57.9; 36 / 66 / 84 | 41.2; 12 / 42 / 79 | 40–100; ≤20 / 30–60 / 70–110 |
+| Oceanic ÷ continental plates; slab ÷ free plates | 1.61; 1.69 | 2.27; 1.84 | ≥2; ≥2.5 |
+| Speed against slab share, rank correlation | 0.54 | 0.44 | ≥0.65 |
+| Plate-steps where the speed guard binds | 1,015 | 0 | 0 |
+| Rotation change per step, median / 90th pct | 5.1 / 9.6 % | 5.9 / 25.3 % | ≤8 / ≤20 % |
+| Convergence 20 Myr after a collision's onset ÷ at onset | 0.07 | 0.47 | 0.2–0.6 |
+| Collisions per 100 Myr; length, median | 5.2; 30 Myr | 0.93; 51 Myr | 2–6; 15–50 |
+| Largest plate, median share; steps with one above 50 % | 0.27; 5.7 % | 0.17; 0 | 0.15–0.35; ≤10 |
+| Continental crust, lowest step; at the end | 0.37; 0.40 | 0.26; 0.30 | ≥0.37; — |
+| Active share of the continental margin | 0.38 | 0.46 | 0.25–0.40 |
+| Supercontinent tenure, median; assembly-to-assembly period, median | 12 Myr; 34 Myr | 8.5 Myr; 78 Myr | 100–300; 400–800 |
+| Land (surface stage) at 1000 Myr | 0.136 | 0.226 | reported (Earth 0.18–0.30 over the Phanerozoic) |
+
+**Not delivered.** The slab correlation, the step-to-step noise, the collision rate, the active
+margin share and the supercontinent cycle miss their targets; the wedge and foredeep stay under
+one sample of the quick preset. The crust ends 1000 Myr at 0.30 of the planet against master's
+0.40: collisions consume about twice as much continental crust as under the old law, and a fifth
+of what crosses a front goes into the mantle (the stacking share).
+
