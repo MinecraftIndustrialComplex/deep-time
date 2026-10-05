@@ -31,8 +31,8 @@ echo "exit $?" >> "$out/log.txt"
 sudo chown "$(id -un)" "$out/perf.data"
 fi
 cd "$out" || exit 1
-# Samples per thread (the comm column is the thread's name; the tid follows the pid).
-perf report -i perf.data --no-children --sort tid --stdio -g none -n > tid-report.txt 2>&1
+# Samples per thread (perf's "pid" key is the thread id).
+perf report -i perf.data --no-children --sort pid --stdio -g none -n > tid-report.txt 2>&1
 grep "%" tid-report.txt | head -12 > threads.txt
 perf report -i perf.data --no-children --sort symbol --stdio -g none --percent-limit 0.3 2>/dev/null | grep "%" > self.txt
 mapfile -t tids < <(grep "%" tid-report.txt | sort -k2 -n -r | grep -o "[0-9]*:" | tr -d : | head -2)
