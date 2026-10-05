@@ -592,6 +592,6 @@ land share over the Phanerozoic was about 18–30 % (Ben's reference range, 2026
 **Limits.**
 - A plateau widened by the excess stands at the Airy height of its column (up to about 6 km for
   70 km of crust), so collision belts make broad high ground: land above 2 km is 0.32 of the land
-  at 500 Myr (master 0.08; Earth about a tenth). The surface stage's spreading and erosion are what
+  at 500 Myr (master 0.08; Earth about a tenth, from memory). The surface stage's spreading and erosion are what
   lower it.
 - Which of spreading and foundering comes first, and the reach, are the model's.
