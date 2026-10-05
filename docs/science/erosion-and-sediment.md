@@ -90,3 +90,85 @@ ocean–continent transition of Earth width in map metres in the plate model or 
 old sea floor (the withdrawn change, recalibrated). The land side is unchanged: the continents stand 400 to 800 m
 high 10 to 30 km from the coast (Earth: 61 and 144 m), the same Earth-normalized compression on land.
 
+
+## The erosion and burial audit (2026-10-05)
+
+**What was reported.** On a baked `earthlike_quick_16k` planet a porphyry formed at 1.5 km (its
+`formation_depth_m`, DEP-017) sat 560 blocks (19.6 km) under the ground, and the porphyries that
+were eroded away had lost 19 to 35 km of rock. Porphyries are emplaced 1 to 4 km deep and exhumed
+by a few kilometres; Ben asked for the cause to be found and fixed (decisions log 2026-10-05).
+
+**How it was measured.** `deeptime erosion-audit` (`tools/review/erosion-audit.sh`) reads a run's
+recorded history as the deposit ledger reads it and reports, per region type (ERO-173: orogen,
+basin, shield, other land, shelf, ocean), the area-weighted erosion and deposition rates of every
+frame; per crust parcel, followed with the plate, the totals over the run; and every porphyry's
+ledger. Earth's rates are printed beside them as reference lines, never as targets (decisions log
+2026-10-05): cosmogenic outcrops erode at 12 m/Myr on average (median 5.4), drainage basins at 218
+(median 54), seismically active basins at 367 and quiet ones at 182 (Portenga and Bierman 2011,
+ERO-171; 10Be samples favour steep, eroding places); quiet land erodes at about 0.2 mm/yr per km of
+local relief and active ranges faster (Montgomery and Brandon 2002, ERO-172).
+
+**The causes: bookkeeping, not the rates.** Three things, none of them the stream-power or
+isostasy physics:
+
+1. *The frames were summed at fixed cells.* The surface stage averages its deposit fields over a
+   10-Myr frame, and the ledger reads frame k where each deposit's crust is at the frame's end. The
+   sums were kept per L1 cell, but the crust moves 7 to 18 cells in a frame on the 16k map (30 to 70
+   mm/yr; the plate model's 200 km arc-to-trench distance is 5 cells there), so an arc's frames
+   carried the trench's fill and the forearc's stripping that other crust went through. Now
+   `FrameAcc::compose_back` carries the sums with the crust each step: a frame's value at a cell is
+   what the crust now there went through. Over all porphyries of the 1000-Myr planet the median
+   burial fell from 9.5 to 2.5 km and the 90th percentile from 30.5 to 15.6 km.
+2. *The fate ignored the order of erosion and burial.* The ledger and the survival integral used
+   the net z_f + B − E, so a body the surface went through and that was buried again counted as
+   whole: on the planet above, porphyries with 16 to 22 km of erosion and as much burial survived
+   at 1 to 6 km. The fate now follows the deepest the surface ever cut towards the body (DEP-168):
+   eroded through means gone; cut and then covered is placed under its old erosion surface.
+3. *"Lost 19 to 35 km" is the erosion to today, not to destruction.* A destroyed porphyry's
+   `deposit_exhumation` event carries all the erosion since formation, hundreds of Myr of it; the
+   body itself was gone once the net erosion passed its base (about 1.5 km plus its half-height).
+   EVENTS.md now says so.
+
+**The rates themselves** sit inside Earth's ranges per region type and are not changed: on the
+500-Myr planet (frames, after fix 1) orogens erode at 135 m/Myr on average (median 73, 90th
+percentile 365; 4.5 % of orogen area-time above 500 m/Myr), shields at 17 (median 7), basins at 1
+with 8.5 m/Myr of deposition, shelves take 44 m/Myr of deposition. Over a crust parcel's whole
+history the totals are large because the time is long: parcels now in orogens lost 20 km over 500
+Myr (40 m/Myr on average) and 28 km over 1000 Myr; parcels now in shields lost 11 and 19 km, most
+of it while they were orogens (their peak frame rates have a median of 100 to 160 m/Myr).
+
+**Before and after** (`earthlike_quick_16k`, scattered continents, the preset's seed; `tools/review/erosion-audit.sh
+bake|report`; "before" is master 2e07d954 with the ledger recorded on the events, fix 1 the frames carried with the
+crust, fix 2 also the fate by the deepest cut). The terrain is the same in all three: the fixes change the bookkeeping
+the deposit engine reads, not the surface processes.
+
+| | 500 Myr before | fix 1 | fix 2 | 1000 Myr before | fix 1 | fix 2 |
+|---|---|---|---|---|---|---|
+| Porphyries formed | 79 | 352 | 484 | 249 | 973 | 975 |
+| Porphyry sites (counted / target N\*) | 7 (5 / 6.2) | 25 (21 / 25.0) | 27 (21 / 25.0) | 25 (7 / 15.5) | 68 (19 / 61.5) | 28 (17 / 61.5) |
+| Site centre depth under the ground, blocks: median, 90th pct, max | 16, 81, 318 | 28, 175, 356 | 23, 51, 166 | 81, 475, 507 | 45, 221, 537 | 26, 133, 369 |
+| Sites deeper than 100 blocks (3.5 km) | 1 | 4 | 2 | 11 | 19 | 5 |
+| Burial since formation, all porphyries, km: median, 90th pct | 0.4, 7.6 | 0.5, 5.0 | 0.5, 5.3 | 9.5, 30.5 | 2.5, 15.6 | 2.5, 15.8 |
+
+The formation count and N\* change with fix 1 because the favourability the engine integrates is read along the
+crust too: an arc's fields stay with the arc, its tracts are larger and the target follows the area (USGS density
+times permissive area, DEP-166). At 1000 Myr the formation hits the cap (20 formed per survivor), so the counted
+survivors stay under N\*; that is reported, not tuned.
+
+The deepest sites left are old porphyries under thick sediment: at 1000 Myr site 91 formed 337 Ma, was cut 1.9 km
+down and then buried under 15 km of sediment (45 m/Myr), now 369 blocks (12.9 km) down; at 500 Myr the deepest is a
+porphyry formed 85.5 Ma, cut, then covered by 9.7 km (166 blocks). Shelves and basins take 42 to 44 and 8 m/Myr of
+deposition on average in the frames; Earth's thickest basin fills are 15 to 20 km (from memory, not checked), so these
+are deep burials, not impossible ones.
+
+**Hypsometry, a reference line** (the deep-time surface at the end, the same in every run above): 500 Myr: land 0.150
+of the planet, land median 613 m, 90th percentile 2,054 m, 11.2 % of land above 2 km; 1000 Myr: land 0.128, median
+410 m, 90th percentile 1,830 m, 7.8 % above 2 km (Earth, HYP rows: about 0.29 land, median about 430 m, about 10 %
+above 2 km). Rivers and lakes come from the same terrain and are unchanged (lakes 503 and 292, river chains 1,189
+and 1,049 in every bake).
+
+**Left as it is.** The rates are the stream-power and isostasy physics as calibrated before (ERO-001 to ERO-021,
+ISO rows); with the bookkeeping fixed they sit inside Earth's ranges per setting, and the decisions log of
+2026-10-05 rules out tuning them towards a depth or hypsometry. A parcel's total over hundreds of Myr is large
+because it spends part of that time in orogens; how much a stable craton is exhumed over 1 Gyr on Earth (a few km in
+the thermochronology literature, from memory, not checked) is the next reference line to source.

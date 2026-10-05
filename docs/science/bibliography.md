@@ -6152,3 +6152,19 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Read so far (by the project): full text (OCR; the equations partly garbled), 2026-10-04: "a unit length of continental lithosphere is suddenly extended to a length β, causing upwelling of hot asthenosphere"; "The slow subsidence and the heat flow depend only on the amount of stretching"; Table 1: τ = 62.8 My, E0 = 3.2 km, ρ_c 2.8, ρ_m 3.33, ρ_w 1.0 g/cm³; thermal subsidence S_t ≈ E0 r (1 − e^(−t/τ)), r = (β/π) sin(π/β).
 
 Not read: Péron-Pinvidic, Manatschal & Osmundsen 2013 (Marine and Petroleum Geology 43:21-47), Sutra et al. 2013 (G-cubed 14:2575), Mohn et al. 2012 (Tectonics 31:TC1012), Chenin et al. 2017 (Geosphere 13:559; a search summary gives magma-poor margins "approximately 165 km on average", unverified).
+
+### Portenga2011
+- Reference: Portenga, E. W. and Bierman, P. R. (2011). Understanding Earth's eroding surface with 10Be. GSA Today 21(8):4-10.
+- DOI or URL: 10.1130/G111A.1 (the DOI from memory, not checked); https://www.geosociety.org/gsatoday/archive/21/8/article/i1052-5173-21-8-4.htm
+- Cited as: "Portenga & Bierman 2011" (global compilation of cosmogenic erosion rates; the erosion audit's reference line).
+- Ledger ids: ERO-171
+- Access: open (GSA Today).
+- Read so far (by the project): full text, 2026-10-05: outcrops 12 ± 1.3 m/Myr mean, 5.4 median (n = 450); drainage basins 218 ± 35 mean, 54 median (n = 1,149); seismically active basins 367 ± 55 (n = 221), inactive 182 ± 30 (n = 928); active and inactive outcrops alike (14 ± 1.6 and 13 ± 1.4).
+
+### Montgomery2002
+- Reference: Montgomery, D. R. and Brandon, M. T. (2002). Topographic controls on erosion rates in tectonically active mountain ranges. Earth and Planetary Science Letters 201(3-4):481-489.
+- DOI or URL: 10.1016/S0012-821X(02)00725-2 (the DOI from memory, not checked); copy https://repository.geologyscience.ru/bitstream/handle/123456789/28097/Mont_02.pdf
+- Cited as: "Montgomery & Brandon 2002" (erosion rate against mean local relief; the erosion audit's reference line).
+- Ledger ids: ERO-172
+- Access: copy on a repository, open.
+- Read so far (by the project): full text, 2026-10-05: tectonically inactive areas E = 0.2 Rz (mm/yr, Rz in km); active ranges above that line with mean local relief 1,000-2,000 m; E0 = 0.01 mm/yr from the chemical denudation of the 35 largest rivers; Olympic Mountains E0 0.016-0.059 mm/yr; rates above 10 mm/yr rare.
