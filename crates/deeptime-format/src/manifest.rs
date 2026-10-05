@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::FORMAT_VERSION;
 use crate::error::{FormatError, Result};
 use crate::fsutil::write_atomic;
+use crate::projection::{ProjectionSpec, WorldProjection};
 use crate::raster::{Codec, DType, GridDesc};
 
 /// The manifest's file name.
@@ -120,6 +121,10 @@ pub struct Manifest {
     #[serde(default)]
     pub planet: BTreeMap<String, serde_json::Value>,
     pub scale: Scale,
+    /// The world's projection and layout (FORMAT.md "The world's layout"): the edges, their
+    /// motions, the cone points and the poles. Absent: a Lambert world of `scale.circumference_blocks`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projection: Option<ProjectionSpec>,
     /// Grid descriptors by name (`L1`, `L2`, `L3`).
     pub grids: BTreeMap<String, GridDesc>,
     pub layers: Vec<LayerEntry>,
@@ -142,12 +147,18 @@ impl Manifest {
             preset_hash: None,
             planet: BTreeMap::new(),
             scale,
+            projection: None,
             grids: BTreeMap::new(),
             layers: Vec::new(),
             files: Vec::new(),
             created_utc: rfc3339_utc(SystemTime::now()),
             notes: BTreeMap::new(),
         }
+    }
+
+    /// The world's projection ([`Manifest::projection`]; Lambert when absent).
+    pub fn world_projection(&self) -> WorldProjection {
+        WorldProjection::from_spec(self.projection.as_ref(), self.scale.circumference_blocks)
     }
 
     /// The entry of layer `name`.
@@ -265,6 +276,56 @@ mod tests {
         assert_eq!(rfc3339_utc(t), "2026-09-21T14:13:20Z");
         let leap = UNIX_EPOCH + Duration::from_secs(951_782_400); // 2000-02-29
         assert_eq!(rfc3339_utc(leap), "2000-02-29T00:00:00Z");
+    }
+
+    #[test]
+    fn the_layout_block_round_trips_and_names_the_projection() {
+        use crate::projection::{EdgeKind, PetroffGuyou, ProjectionKind};
+        let g = PetroffGuyou::new(6_656, 31.25);
+        let mut m = Manifest::new("test", Writer::this("unit"), Scale::default_for(13_312));
+        assert_eq!(
+            m.world_projection().kind(),
+            ProjectionKind::Lambert,
+            "absent: Lambert"
+        );
+        m.projection = Some(g.spec(None));
+        let json = String::from_utf8(m.to_json_bytes().unwrap()).unwrap();
+        assert!(json.contains("\"kind\": \"petroff_guyou\""), "{json}");
+        let back: Manifest = serde_json::from_str(&json).unwrap();
+        // serde_json's default parser may land a float one ulp off (the cone points' latitudes and
+        // longitudes): everything else is compared exactly, those to 1e-12.
+        let (a, b) = (
+            back.projection.as_ref().unwrap(),
+            m.projection.as_ref().unwrap(),
+        );
+        assert_eq!(
+            (&a.edges, &a.poles, &a.domain, &a.border, a.kind),
+            (&b.edges, &b.poles, &b.domain, &b.border, b.kind)
+        );
+        assert_eq!(
+            (a.hemisphere_blocks, a.lambda_c_deg),
+            (b.hemisphere_blocks, b.lambda_c_deg)
+        );
+        for (p, q) in a.cone_points.iter().zip(&b.cone_points) {
+            assert_eq!((&p.name, &p.images), (&q.name, &q.images));
+            assert!((p.lat_deg - q.lat_deg).abs() < 1e-12 && (p.lon_deg - q.lon_deg).abs() < 1e-12);
+        }
+        let spec = back.projection.as_ref().unwrap();
+        assert_eq!(spec.edges.len(), 4);
+        assert_eq!(
+            spec.edges
+                .iter()
+                .filter(|e| e.kind == EdgeKind::HalfTurn)
+                .count(),
+            2
+        );
+        match back.world_projection() {
+            crate::projection::WorldProjection::PetroffGuyou(p) => {
+                assert_eq!(p.hemisphere(), 6_656);
+                assert_eq!(p.lambda_c_deg(), 31.25);
+            }
+            other => panic!("{other:?}"),
+        }
     }
 
     #[test]

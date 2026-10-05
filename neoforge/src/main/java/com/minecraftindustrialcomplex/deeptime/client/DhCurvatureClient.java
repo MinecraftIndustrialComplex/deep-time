@@ -50,7 +50,7 @@ public final class DhCurvatureClient {
         if (broken || ++ticks % POLL_TICKS != 0)
             return;
         Minecraft mc = Minecraft.getInstance();
-        int circumference = mc.level == null ? 0 : ClientPlanetState.circumference(mc.level);
+        int circumference = mc.level == null ? 0 : ClientPlanetState.sphereCircumference(mc.level);
         apply(circumference, ClientConfig.dhAutoCurvature());
     }
 

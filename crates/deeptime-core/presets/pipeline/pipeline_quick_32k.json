@@ -19,6 +19,9 @@
     "max_y": 639,
     "sea_level_y": 63,
     "pole_cap_deg": 70.0,
+    "projection": "petroff_guyou",
+    "lambda_c_deg": -1.0,
+    "edge_border": "stop",
     "build_limit_band_blocks": 48.0,
     "feature_scale": {
       "deposits": 1.0,
