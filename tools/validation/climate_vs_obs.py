@@ -35,6 +35,7 @@ Each model cell takes the observed 0.5° cell under its centre; land is where bo
   along_row_std_winter_height(_obs): the model's and the observed spread at the ground's height;
 - regions: model and observed annual precipitation over named land boxes.
 
+- global_p_mm: the planet's mean rain over land and sea (a reference line, not a target).
 - t_global_c: the 2-D model's global mean (meta.json); target 14.1 ± 0.4 °C (Ben, 2026-10-02).
 - along_row_std_winter / _annual, eta2_winter / _annual: land temperature at sea level (the
   monthly t_sl fields), rows 30–70°, as `tools/review/percell_metrics.py`; winter is January north
@@ -227,6 +228,9 @@ def main():
     out["glaciated_land"] = meta["glaciated_land"]
     out["land_t_mean_c"] = float(np.average(rd("t_mean")[land], weights=wgt[land]))
     out["land_p_mm"] = float(np.average(rd("precip")[land], weights=wgt[land]))
+    # The whole planet's mean rain (land and sea): a reference line against Earth's, about
+    # 2.7 mm/day = 990 mm/yr in GPCP (from memory; not a target).
+    out["global_p_mm"] = float(np.average(rd("precip"), weights=wgt))
     groups = {}
     codes = meta["koppen_codes"]
     for g in "ABCDE":
