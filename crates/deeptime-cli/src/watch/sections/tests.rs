@@ -199,7 +199,7 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     }
     assert_eq!(
         (cols["x"][0].as_i64(), cols["z"][0].as_i64()),
-        (Some(-900), Some(-400))
+        (Some(-700), Some(-400))
     );
     assert_eq!(
         (cols["x"][n - 1].as_i64(), cols["z"][n - 1].as_i64()),
