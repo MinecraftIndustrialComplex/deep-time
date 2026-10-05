@@ -812,9 +812,9 @@ mod tests {
     fn a_head_on_collision_builds_a_belt_over_many_steps() {
         let mut fx = Fixture::new();
         fx.preset.tectonics.collision_threshold_km = 1.0e9;
-        // A share under the default 0.95, so twelve steps stay under the strength height (PLT-253)
+        // The old default share (0.5), so twelve steps stay under the strength height (PLT-253)
         // and every step's rise shows in the belt's height.
-        fx.preset.tectonics.collision_stacking_share = 0.8;
+        fx.preset.tectonics.collision_stacking_share = 0.5;
         let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
         let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
         let mut heights = Vec::new();
