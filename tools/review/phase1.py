@@ -314,7 +314,7 @@ def step_scale(a):
     log = os.path.join(LOGS, "scale.log")
     os.makedirs(LOGS, exist_ok=True)
     with open(log, "w") as f:
-        rc = subprocess.run([sys.executable, os.path.join(REPO, "tools", "review", "phase1_scale.py")] + (["--only", os.environ["PHASE1_SCALE_ONLY"]] if os.environ.get("PHASE1_SCALE_ONLY") else []), cwd=REPO, stdout=f, stderr=subprocess.STDOUT).returncode
+        rc = subprocess.run([sys.executable, os.path.join(REPO, "tools", "review", "phase1_scale.py")] + (["--only", os.environ["PHASE1_SCALE_ONLY"]] if os.environ.get("PHASE1_SCALE_ONLY") else []) + (["--scales", os.environ["PHASE1_SCALE_SCALES"]] if os.environ.get("PHASE1_SCALE_SCALES") else []), cwd=REPO, stdout=f, stderr=subprocess.STDOUT).returncode
     sc = os.path.join(REPO, "review", "out", "phase1", "scale")
     kids = []
     stats = {}
