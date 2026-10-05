@@ -7,7 +7,6 @@ import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.preset.Presets;
 import com.minecraftindustrialcomplex.deeptime.preset.ShareCode;
 import com.minecraftindustrialcomplex.deeptime.screen.model.EditorModel;
-import com.minecraftindustrialcomplex.deeptime.screen.model.GlobeProjection;
 import com.minecraftindustrialcomplex.deeptime.screen.model.MachineInfo;
 import com.minecraftindustrialcomplex.deeptime.screen.model.ReviewModel;
 import com.minecraftindustrialcomplex.deeptime.screen.model.SessionRunHandle;
@@ -358,14 +357,17 @@ public final class EditorModelGameTests {
 
             EditorModel.Accepted a = m.accept();
             RegistryAccess registries = helper.getLevel().getServer().registryAccess();
-            WorldDimensions dims = PlanetGenerators.withStaging(registries, planetDimensions(registries), a.stagingId(), a.circumference());
+            WorldDimensions dims = PlanetGenerators.withStaging(registries, planetDimensions(registries), a.stagingId(), a.worldCircumference(), a.projection());
             GeologicChunkGenerator accepted = PlanetGenerators.overworld(dims).orElseThrow();
-            helper.assertTrue(accepted.dataRef().circumferenceBlocks() == 4096, "bound at the run's circumference");
+            // The world's x period: the planet's 4,096 drawn as a Petroff–Guyou world of two 1,536-block squares.
+            helper.assertTrue(accepted.dataRef().circumferenceBlocks() == a.worldCircumference() && a.worldCircumference() == 3072,
+                    "bound at the world's period: " + accepted.dataRef().circumferenceBlocks());
             helper.assertTrue(PlanetGenerators.createBlock(dims, gameDir(), true) == PlanetGenerators.CreateBlock.NONE, "Create enabled");
 
             Path world = helper.getLevel().getServer().getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
             WorldDataRef ref = new WorldDataRef("deeptime-e2e-real", accepted.dataRef().circumferenceBlocks(), Optional.empty(),
-                    accepted.dataRef().stagingId(), accepted.dataRef().poleCapDeg(), accepted.dataRef().poleStopDeg());
+                    accepted.dataRef().stagingId(), accepted.dataRef().poleCapDeg(), accepted.dataRef().poleStopDeg(),
+                    accepted.dataRef().projection());
             try {
                 Staging.deleteTree(world.resolve(ref.folder()));
                 var r = WorldDataBinder.moveStaged(gameDir(), world, ref, false).orElseThrow();
@@ -380,9 +382,9 @@ public final class EditorModelGameTests {
                 return;
             }
             int sea = t.data().manifest().seaLevelY(), land = 0, n = 0;
-            int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(4096);
+            int c = t.circumference(), zp = (int) t.zHalf();   // the turning edges of the Petroff–Guyou world
             for (int i = 0; i < 400; i++) {
-                int x = -2048 + (i * 97) % 4096, z = ((i * 61) % (2 * zp - 32)) - zp + 16;
+                int x = -c / 2 + (i * 97) % c, z = ((i * 61) % (2 * zp - 32)) - zp + 16;
                 double h = t.height(x, z);
                 helper.assertTrue(Double.isFinite(h), "height at " + x + "," + z);
                 n++;
@@ -394,7 +396,7 @@ public final class EditorModelGameTests {
             double share = land / (double) n;
             helper.assertTrue(share > 0.02 && share < 0.6, "land share " + share + " (the preset's ocean fraction is 0.7)");
             double[] sp = review.spawn().orElseThrow();
-            double[] sb = GlobeProjection.block(sp[0], sp[1], 4096, new double[2]);
+            double[] sb = t.data().projection().blockOf(sp[0], sp[1]);
             double spawnH = t.height((int) Math.floor(sb[0]), (int) Math.floor(sb[1]));
             helper.assertTrue(spawnH > sea, "the review's spawn " + (int) sb[0] + "," + (int) sb[1] + " is dry land (height " + spawnH + ", sea " + sea + ")");
             DeepTime.LOGGER.info("[gametest] realPlanetThroughTheEditor {} s: frames={} events={} layers={} groups={} native peak {} MiB, "
