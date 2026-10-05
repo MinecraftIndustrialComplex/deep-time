@@ -616,7 +616,8 @@ mod tests {
             centre_depth_m: ore_half_m(&t) * 1.01,
             ..at
         };
-        let b = bodies_for(&t, 5, 240.0e6, &grades, &shallow, &Scales::default(), &mut next);
+        let sc = Scales::default();
+        let b = bodies_for(&t, 5, 240.0e6, &grades, &shallow, &sc, &mut next);
         assert_eq!(b[0].clip_top_y, 119);
         assert!(b[0].aabb[1][1] <= 119);
         // Deep: not clipped.
@@ -625,7 +626,7 @@ mod tests {
             centre_depth_m: 5000.0,
             ..at
         };
-        let b = bodies_for(&t, 6, 240.0e6, &grades, &deep, &Scales::default(), &mut next);
+        let b = bodies_for(&t, 6, 240.0e6, &grades, &deep, &sc, &mut next);
         assert_eq!(b[0].clip_top_y, NO_CLIP);
     }
 
