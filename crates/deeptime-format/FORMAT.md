@@ -220,9 +220,12 @@ baked and gets a Lambert layout block.
   Continuous layers are averaged over a **footprint isotropic on the sphere**, as wide as the world
   cell's own footprint and as the Lambert rows' spacing there (near the poles a Lambert row spans many
   blocks of planet north–south and its columns a fraction of a block east–west; read at a point, that
-  anisotropy draws radial streaks round the poles). Categories (`climate/koppen`, `surface/class_top`,
-  `meta/plate_id`, `meta/province`), horizon stacks and any footprint touching no-data take the
-  nearest cell. The two edge rows are made exactly self-glued (cell i = cell w − i).
+  anisotropy draws radial streaks round the poles). Poleward of 60° the footprint is also widened
+  along the parallel, by (cos 60° / cos φ)² up to 16 times: the simulation's solvers work in Lambert
+  blocks, so its polar terrain has the grid's shape (long north–south, thin east–west on the
+  planet), which an isotropic footprint only shortens. Categories (`climate/koppen`,
+  `climate/wetland`, `surface/class_top`, `meta/plate_id`, `meta/province`, and any layer whose
+  `units` is `flag`), horizon stacks and any footprint touching no-data take the nearest cell. The two edge rows are made exactly self-glued (cell i = cell w − i).
 - **Vector data**: rivers (vertices through the projection, x continuous along a chain; a chain
   crossing a turning edge is split there, the parts before the edge ending as at the sea, and
   confluences re-pointed; the index rebuilt in the world's frame), structural events (the window's
@@ -638,7 +641,7 @@ A **Lambert** world's block is `{"kind": "lambert", "layout_version": 1, "domain
 the world). A manifest without `projection` is read as Lambert.
 
 **The projection's formulas** (Rust `deeptime_format::projection::PetroffGuyou`, Java
-`worlddata/Projection` with `worlddata/Petroff`, JS `DTProj` in `projection.js`; the three give the
+`worlddata/PetroffGuyou` with `worlddata/Petroff`, JS `DTProj` in `projection.js`; the three give the
 same bits, being written on the same portable trigonometry, `deeptime_format::portable_math`,
 Java `PortableMath`, JS `DTMath`):
 
