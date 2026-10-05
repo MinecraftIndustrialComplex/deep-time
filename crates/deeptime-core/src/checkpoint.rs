@@ -161,8 +161,13 @@ impl CheckpointRef<'_> {
 
     /// The JSON summary stored beside the body.
     pub fn summary(&self) -> Value {
+        self.summary_from(0)
+    }
+
+    fn summary_from(&self, first_frame: usize) -> Value {
         let h = self.world.history.as_ref();
         json!({
+            "history_first_frame": first_frame,
             "core_version": crate::VERSION,
             "schema": CHECKPOINT_SCHEMA,
             "stage_names": self.stage_names,
@@ -180,9 +185,24 @@ impl CheckpointRef<'_> {
 
     /// Streams the checkpoint into `w` (`path` names it in errors).
     pub fn write_to<W: Write + Seek>(&self, path: &Path, w: W) -> Result<W, CoreError> {
+        self.write_to_from(path, w, 0)
+    }
+
+    /// [`CheckpointRef::write_to`] holding only the history's frames from `first_frame` on (the
+    /// head still lists them all): a link of a chain whose earlier files hold the earlier frames
+    /// (`epochs.rs`; [`Checkpoint::read_chain`]). The recorded history only grows, so each epoch
+    /// checkpoint stores only what is new since the one before.
+    pub fn write_to_from<W: Write + Seek>(
+        &self,
+        path: &Path,
+        w: W,
+        first_frame: usize,
+    ) -> Result<W, CoreError> {
         let history = self.world.history.as_ref();
-        let frames = history.map_or(0, RecordedHistory::frame_count);
-        let summary = serde_json::to_vec(&self.summary())
+        let total = history.map_or(0, RecordedHistory::frame_count);
+        let first = first_frame.min(total);
+        let frames = total - first;
+        let summary = serde_json::to_vec(&self.summary_from(first))
             .map_err(|e| CoreError::InvalidState(format!("checkpoint summary: {e}")))?;
         let mut out = StreamWriter::new(path, w, MAGIC, &fixed(frames)?, HEAD_SECTIONS + frames)?;
         out.section(|s| s.write_all(&summary))?;
@@ -201,7 +221,7 @@ impl CheckpointRef<'_> {
                 .map_err(|e| std::io::Error::other(format!("checkpoint serialisation: {e}")))
         })?;
         if let Some(h) = history {
-            for k in 0..frames {
+            for k in first..total {
                 out.section(|s| {
                     h.write_record(k, s)
                         .map_err(|e| std::io::Error::other(e.to_string()))
@@ -213,9 +233,14 @@ impl CheckpointRef<'_> {
 
     /// Writes the checkpoint to `path` atomically (`<path>.tmp`, fsync, rename), streamed.
     pub fn write(&self, path: &Path) -> Result<(), CoreError> {
+        self.write_from(path, 0)
+    }
+
+    /// [`CheckpointRef::write`] with the history's frames from `first_frame` on only.
+    pub fn write_from(&self, path: &Path, first_frame: usize) -> Result<(), CoreError> {
         write_atomic_with(path, |f| {
             let w = std::io::BufWriter::with_capacity(1 << 20, &mut *f);
-            let w = self.write_to(path, w)?;
+            let w = self.write_to_from(path, w, first_frame)?;
             w.into_inner()
                 .map(|_| ())
                 .map_err(|e| CoreError::io(path, e.into_error()))
@@ -311,47 +336,83 @@ impl Checkpoint {
     /// Reads a checkpoint: the body into memory, every frame section's CRC checked, the frames
     /// left in the file for the history to read on demand.
     pub fn read(path: &Path) -> Result<Checkpoint, CoreError> {
-        let file = File::open(path).map_err(|e| CoreError::io(path, e))?;
-        let t = container::read_table(path, &file, MAGIC, FIXED_BYTES, sections_of)?;
-        let summary = container::read_section(path, &file, &t.sections[0], "section 0")?;
-        check_version(path, &t.fixed, &summary)?;
-        let body = decode_body(
-            path,
-            &container::read_section(path, &file, &t.sections[1], "section 1")?,
-        )?;
-        let frames = &t.sections[HEAD_SECTIONS..];
+        Checkpoint::read_chain(&[path.to_owned()])
+    }
+
+    /// Reads the last checkpoint of `chain`, its history's frames taken from every file of the
+    /// chain in order (each written by [`CheckpointRef::write_from`] from the frame where the one
+    /// before it stops; the first from frame 0). A chain of one file is [`Checkpoint::read`].
+    pub fn read_chain(chain: &[std::path::PathBuf]) -> Result<Checkpoint, CoreError> {
+        let Some(target) = chain.last() else {
+            return Err(CoreError::InvalidArgument(
+                "an empty checkpoint chain".into(),
+            ));
+        };
+        let mut records = Vec::new();
+        let mut lens = Vec::new();
+        let mut body = None;
+        for (i, path) in chain.iter().enumerate() {
+            let file = File::open(path).map_err(|e| CoreError::io(path, e))?;
+            let t = container::read_table(path, &file, MAGIC, FIXED_BYTES, sections_of)?;
+            let summary = container::read_section(path, &file, &t.sections[0], "section 0")?;
+            check_version(path, &t.fixed, &summary)?;
+            let first = serde_json::from_slice::<Value>(&summary)
+                .ok()
+                .and_then(|v| v["history_first_frame"].as_u64())
+                .unwrap_or(0) as usize;
+            if first != records.len() {
+                return Err(corrupt(
+                    path,
+                    format!(
+                        "its history frames start at {first}, the files before it hold {}",
+                        records.len()
+                    ),
+                ));
+            }
+            if i + 1 == chain.len() {
+                body = Some(decode_body(
+                    path,
+                    &container::read_section(path, &file, &t.sections[1], "section 1")?,
+                )?);
+            }
+            let frames = &t.sections[HEAD_SECTIONS..];
+            for (k, s) in frames.iter().enumerate() {
+                container::check_section(
+                    path,
+                    &file,
+                    s,
+                    &format!(
+                        "section {} (history frame {})",
+                        HEAD_SECTIONS + k,
+                        first + k
+                    ),
+                )?;
+            }
+            let source = Arc::new(FrameFile::read_only(file, path));
+            for s in frames {
+                lens.push(u64::from(s.len));
+                records.push(Record::File {
+                    file: source.clone(),
+                    offset: s.offset,
+                    crc32: s.crc32,
+                });
+            }
+        }
+        let body = body.expect("the chain's last file is read");
         if let Some(head) = &body.history {
-            for (k, (s, fh)) in frames.iter().zip(&head.frames).enumerate() {
-                if u64::from(s.len) != fh.record_len() {
+            for (k, (len, fh)) in lens.iter().zip(&head.frames).enumerate() {
+                if *len != fh.record_len() {
                     return Err(corrupt(
-                        path,
+                        target,
                         format!(
-                            "history frame {k}: {} bytes, its head says {}",
-                            s.len,
+                            "history frame {k}: {len} bytes, its head says {}",
                             fh.record_len()
                         ),
                     ));
                 }
             }
         }
-        for (k, s) in frames.iter().enumerate() {
-            container::check_section(
-                path,
-                &file,
-                s,
-                &format!("section {} (history frame {k})", HEAD_SECTIONS + k),
-            )?;
-        }
-        let source = Arc::new(FrameFile::read_only(file, path));
-        let records = frames
-            .iter()
-            .map(|s| Record::File {
-                file: source.clone(),
-                offset: s.offset,
-                crc32: s.crc32,
-            })
-            .collect();
-        Checkpoint::assemble(path, body, records)
+        Checkpoint::assemble(target, body, records)
     }
 }
 
@@ -403,6 +464,27 @@ mod tests {
             stage_state: vec![7],
             world,
         }
+    }
+
+    /// Epoch checkpoints (docs/design/playability-steering.md §3): each holds only the frames
+    /// since the one before; read as a chain they are the whole checkpoint, and a link out of
+    /// order is refused.
+    #[test]
+    fn a_chain_of_checkpoints_holds_each_frame_once() {
+        let dir = std::env::temp_dir().join(format!("dt-checkpoint-chain-{}", std::process::id()));
+        let (early, late) = (checkpoint(3), checkpoint(5));
+        let (a, b) = (dir.join("a.dtcp"), dir.join("b.dtcp"));
+        early.as_ref().write_from(&a, 0).unwrap();
+        late.as_ref().write_from(&b, 3).unwrap();
+        let whole = dir.join("whole.dtcp");
+        late.write(&whole).unwrap();
+        let len = |p: &Path| std::fs::metadata(p).unwrap().len();
+        assert!(len(&b) < len(&whole), "the link holds two frames, not five");
+        assert_eq!(Checkpoint::read_chain(&[a.clone(), b.clone()]).unwrap(), late);
+        assert_eq!(Checkpoint::read(&a).unwrap(), early);
+        assert!(Checkpoint::read(&b).is_err(), "frames 0-2 are missing");
+        assert!(Checkpoint::read_chain(&[b.clone(), a.clone()]).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

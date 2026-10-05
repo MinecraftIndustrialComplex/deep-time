@@ -474,10 +474,14 @@ impl Session {
             Err(e) => return Err(CoreError::io(manifest, e)),
         }
         let key = crate::epochs::key(&canonical);
-        let chosen = crate::epochs::EpochIndex::read(&out)?
-            .filter(|i| i.key == key)
-            .and_then(|i| i.choose(need).cloned());
-        let Some(entry) = chosen else {
+        let dir = crate::epochs::EpochIndex::dir(&out);
+        let index = crate::epochs::EpochIndex::read(&out)?.filter(|i| i.key == key);
+        let chosen = index.as_ref().and_then(|i| {
+            let e = i.choose(need)?;
+            let chain: Vec<PathBuf> = i.chain(e)?.iter().map(|c| dir.join(&c.file)).collect();
+            Some((e.clone(), chain))
+        });
+        let Some((entry, chain)) = chosen else {
             let mut s = Session::create(preset_json, content_json, options, gauge)?;
             s.resumed = Some(Resumed {
                 from_step: 0,
@@ -494,8 +498,7 @@ impl Session {
             );
             return Ok(s);
         };
-        let path = crate::epochs::EpochIndex::dir(&out).join(&entry.file);
-        let mut ck = Checkpoint::read(&path)?;
+        let mut ck = Checkpoint::read_chain(&chain)?;
         ck.preset_json = preset_json.to_owned();
         ck.content_json = content_json.to_owned();
         let mut s = Session::resume(ck, options, gauge)?;
@@ -607,7 +610,23 @@ impl Session {
         std::fs::create_dir_all(&dir).map_err(|e| CoreError::io(&dir, e))?;
         let path = dir.join(&file);
         let started = Instant::now();
-        self.write_checkpoint_of(s, &path)?;
+        // Only the history's frames since the store's latest checkpoint (`epochs.rs`, the chain).
+        let frames = s
+            .world
+            .history
+            .as_ref()
+            .map_or(0, crate::deposits::recorded::RecordedHistory::frame_count);
+        let frames_from = ep.index.frames_from(k, frames);
+        let stage_state = self.stage_state_of(s)?;
+        CheckpointRef {
+            preset_json: &self.preset_json,
+            content_json: &self.content_json,
+            stage_names: &self.stage_names,
+            next_stage: s.current as u32,
+            stage_state: &stage_state,
+            world: &s.world,
+        }
+        .write_from(&path, frames_from)?;
         let bytes = std::fs::metadata(&path)
             .map_err(|e| CoreError::io(&path, e))?
             .len();
@@ -620,6 +639,8 @@ impl Session {
             file,
             bytes,
             write_seconds: secs,
+            frames_from,
+            frames_to: frames,
         });
         ep.index.write(&self.out_dir)?;
         self.log.push(

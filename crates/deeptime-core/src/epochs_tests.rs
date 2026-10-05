@@ -130,6 +130,10 @@ fn a_continued_run_is_the_run_planned_to_its_new_stop() {
         run(&base, &a, true);
         let idx = EpochIndex::read(&a).unwrap().expect("an epochs index");
         assert!(!idx.entries.is_empty());
+        let held: usize = idx.entries.iter().map(|e| e.frames_to - e.frames_from).sum();
+        let last = idx.entries.iter().map(|e| e.frames_to).max().unwrap();
+        assert!(last > 0);
+        assert_eq!(held, last, "{name}: each history frame is stored once");
         let longer = with_stop(&base, Some(60.0)).unwrap();
         let s = resume(&longer, &a);
         let r = s.resumed().unwrap().clone();
@@ -216,8 +220,15 @@ fn steering_off_changes_nothing_and_on_changes_only_the_tail() {
     let mut shared = 0;
     for e in &ic.entries {
         if let Some(u) = ia.entries.iter().find(|u| u.step == e.step) {
-            let x = Checkpoint::read(&a.join(EPOCHS_DIR).join(&u.file)).unwrap();
-            let y = Checkpoint::read(&c.join(EPOCHS_DIR).join(&e.file)).unwrap();
+            let chain = |dir: &Path, i: &EpochIndex, e: &super::EpochEntry| -> Vec<PathBuf> {
+                i.chain(e)
+                    .unwrap()
+                    .iter()
+                    .map(|c| dir.join(EPOCHS_DIR).join(&c.file))
+                    .collect()
+            };
+            let x = Checkpoint::read_chain(&chain(&a, &ia, u)).unwrap();
+            let y = Checkpoint::read_chain(&chain(&c, &ic, e)).unwrap();
             assert_eq!(x.world, y.world, "step {}", e.step);
             shared += 1;
         }
