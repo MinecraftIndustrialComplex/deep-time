@@ -239,8 +239,10 @@ baked and gets a Lambert layout block.
   moved up or down by the change of the drawn terrain height between their old and new column, so a
   crater's lens stays under the drawn floor), sites (centre; box from their bodies; the index in the
   world's frame), `volcanoes/active.json` and `impacts/craters.json` (`x`, `z`), and
-  `spawn/candidates.json` (moved to the nearest world L3 point, `surface_y` from the world's
-  elevation, reordered by distance from (0, 0) unless ranked).
+  `spawn/candidates.json` (ranked candidates moved to the nearest world L3 point,
+  `surface_y` from the world's elevation, those past the simulation's pole or within 64 blocks of a
+  turning edge dropped; unranked ones, dry land nearest (0, 0), picked again on the world's own
+  grids by the same rule, `picked_in_the_world` true).
 - **Unchanged**: events (latitude and longitude; their L1 masks and paths are in the simulation's
   frame), keyframes (the simulation's Lambert pictures, π : 1), `preset.json`, `strata/classes.json`.
 - **The manifest**: `scale.circumference_blocks` = 2b, `scale.m_per_block_h` = the world block's

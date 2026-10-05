@@ -866,6 +866,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     // The world's elevation and ice cover, kept for the spawn candidates and the evidence.
     let mut world_elev: Option<LoadedLayer> = None;
     let mut world_amp: Option<LoadedLayer> = None;
+    let mut world_water: Option<LoadedLayer> = None;
     // The world's horizon stacks (entry, descriptor, cells), raised over the world's terrain below.
     let mut world_stack: Option<(usize, LayerDesc, Vec<u8>)> = None;
     let mut shares = serde_json::Map::new();
@@ -914,6 +915,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                     world_elev = Some(world);
                 }
                 "detail/amplitude" => world_amp = Some(world),
+                "water_level" => world_water = Some(world),
                 "climate/ice_cover" => {
                     shares.insert(
                         "ice_cover_map".into(),
@@ -1147,7 +1149,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             &std::fs::read(&path).map_err(|e| CoreError::io(path.clone(), e))?,
         )
         .map_err(|e| err(format!("{spawn_rel}: {e}")))?;
-        project_spawn(&map, we, &mut v);
+        project_spawn(&map, we, world_water.as_ref(), m.scale.sea_level_y, &mut v);
         let crc = write_json(dir, spawn_rel, &v)?;
         set_file(m, spawn_rel, crc.0, crc.1);
     }
@@ -1486,17 +1488,37 @@ pub fn project_site(
     out
 }
 
-/// The spawn candidates in the world: each moved to the world L3 point nearest its image, its
-/// surface read from the world's elevation; reordered by distance from (0, 0) unless ranked.
-fn project_spawn(map: &Mapping, elev: &LoadedLayer, v: &mut Value) {
+/// No spawn candidate within this many blocks of the north and south edges (the game's
+/// `SpawnHandler.EDGE_MARGIN`, POL-024).
+const SPAWN_EDGE_MARGIN: f64 = 64.0; // ledger: POL-024
+
+/// The spawn candidates in the world. Ranked ones (by the essentials) are each moved to the world
+/// L3 point nearest their image, their surface read from the world's elevation; any that lay past
+/// the simulation's pole (the Lambert rows beyond z = ±R, one point of the planet each) or land
+/// within [`SPAWN_EDGE_MARGIN`] of a turning edge are dropped. Unranked ones (dry land nearest
+/// (0, 0)) are picked again on the world's own grids by the same rule
+/// (`synth::spawn_candidates`), since "nearest the centre" is the world's centre now; so are ranked
+/// ones when none is left.
+fn project_spawn(
+    map: &Mapping,
+    elev: &LoadedLayer,
+    water: Option<&LoadedLayer>,
+    sea_level_y: i32,
+    v: &mut Value,
+) {
     let g = &elev.desc.grid;
     let cb = elev.desc.cell_bytes();
+    let zmax = map.g.hemisphere() as f64 / 2.0 - SPAWN_EDGE_MARGIN;
     let ranked = v.get("ranked_by").is_some();
-    if let Some(list) = v["candidates"].as_array_mut() {
-        for c in list.iter_mut() {
+    if ranked && let Some(list) = v["candidates"].as_array_mut() {
+        let rs = map.rs;
+        list.retain_mut(|c| {
             let (Some(x), Some(z)) = (c["x"].as_f64(), c["z"].as_f64()) else {
-                continue;
+                return false;
             };
+            if z.abs() >= rs {
+                return false;
+            }
             let (wx, wz) = map.to_world(x, z);
             let i = ((wx - g.origin_block_x as f64) / f64::from(g.r)).round() as i64;
             let j = ((wz - g.origin_block_z as f64) / f64::from(g.r)).round() as i64;
@@ -1504,24 +1526,30 @@ fn project_spawn(map: &Mapping, elev: &LoadedLayer, v: &mut Value) {
             let at = (cj as usize * g.w as usize + ci as usize) * cb;
             let y = elev.desc.dtype.decode_scalar(&elev.bytes[at..at + cb]) * elev.desc.scale
                 + elev.desc.offset;
+            let bz = g.block_z(i64::from(cj));
             c["x"] = json!(g.block_x(i64::from(ci)));
-            c["z"] = json!(g.block_z(i64::from(cj)));
+            c["z"] = json!(bz);
             c["cell"] = json!([ci, cj]);
             c["surface_y"] = json!(y);
-        }
-        if !ranked {
-            list.sort_by(|a, b| {
-                let d = |o: &Value| {
-                    let (x, z) = (
-                        o["x"].as_f64().unwrap_or(0.0),
-                        o["z"].as_f64().unwrap_or(0.0),
-                    );
-                    x * x + z * z
-                };
-                d(a).partial_cmp(&d(b)).unwrap_or(std::cmp::Ordering::Equal)
-            });
+            (bz as f64).abs() <= zmax
+        });
+        if !list.is_empty() {
+            return;
         }
     }
+    let Some(water) = water else {
+        return;
+    };
+    let mut fresh = crate::synth::spawn_candidates(elev, water, sea_level_y);
+    if let Some(list) = fresh["candidates"].as_array_mut() {
+        list.retain(|c| c["z"].as_f64().is_some_and(|z| z.abs() <= zmax));
+    }
+    v["candidates"] = fresh["candidates"].take();
+    v["rule"] = fresh["rule"].take();
+    if let Some(o) = v.as_object_mut() {
+        o.remove("ranked_by");
+    }
+    v["picked_in_the_world"] = json!(true);
 }
 
 /// The pass's log line (`projection …`).
