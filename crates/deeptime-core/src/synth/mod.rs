@@ -515,8 +515,8 @@ fn strata_notes(kind: Strata) -> Value {
 }
 
 /// Land cells for spawn: dry, above sea level + 2, locally flat (≤ 1 block to each L3 neighbour),
-/// at least 64 blocks apart, nearest to (0, 0) first; at most 8. The bake of a planet run uses it
-/// too when no essential sets a reach (`bake::terrain`).
+/// at least 64 blocks apart, nearest to (0, 0) first; at most 8. Every world's spawn candidates
+/// (the planet bake, `bake::terrain`, and the synthetic worlds) come from it.
 pub fn spawn_candidates(
     elevation: &impl RasterRead,
     water: &impl RasterRead,
