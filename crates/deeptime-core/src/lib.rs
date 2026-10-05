@@ -2,6 +2,9 @@
 //! The Deep Time simulation core (plan §8). Depends on the format crate only; no Minecraft and
 //! no JNI types, so the civ module and future planets can reuse it as a plain library.
 
+// The counting allocator behind the memory cap (plan §5.7.5).
+pub mod alloc;
+
 // The stage runner and its persistence (P1-01).
 pub mod checkpoint;
 // Epoch checkpoints: pick the epoch, continue, stop early (docs/design/playability-steering.md).

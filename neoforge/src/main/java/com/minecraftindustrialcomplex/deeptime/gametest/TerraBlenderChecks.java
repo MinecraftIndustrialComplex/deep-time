@@ -73,7 +73,7 @@ final class TerraBlenderChecks {
         int samples = 0, outside = 0, mismatch = 0, land = 0;
         String first = null;
         int c = t.circumference();
-        int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);   // the poles (the planet's projection)
+        int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
         for (int j = 0; j < rows; j++) {
             for (int i = 0; i < cols; i++) {
                 int x = -c / 2 + (int) ((i + 0.5) * c / cols);

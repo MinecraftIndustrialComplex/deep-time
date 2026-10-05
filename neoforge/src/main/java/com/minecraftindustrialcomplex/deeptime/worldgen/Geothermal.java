@@ -136,6 +136,14 @@ public final class Geothermal {
          * The plate model's heat flow at the column, mW/m2, on continental crust; NaN on oceanic
          * crust and in a world without the layer (then the ground has no heat of its own).
          */
+        /**
+         * The half-extent of the world in z, blocks: the poles of a Lambert world (R), the turning
+         * edges of a Petroff–Guyou one (b/2); NaN to take the Lambert poles of the circumference.
+         */
+        default double zHalf() {
+            return Double.NaN;
+        }
+
         default double heatFlowMwM2(int x, int z) {
             return Double.NaN;
         }
@@ -441,7 +449,8 @@ public final class Geothermal {
         if (rules.heatDensity() <= 0.0 || c.circumference <= 0)
             return;
         double side = Math.sqrt(HEAT_FIELD_AREA_KM2 / rules.heatDensity()) * 1000.0 / c.mH;   // blocks
-        double pole = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c.circumference);
+        double pole = Double.isNaN(c.env.zHalf())
+                ? com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c.circumference) : c.env.zHalf();
         int nx = Math.max(1, (int) Math.round(c.circumference / side)), nz = Math.max(1, (int) Math.round(2 * pole / side));
         double wx = (double) c.circumference / nx, wz = 2 * pole / nz;
         double z0 = -pole;

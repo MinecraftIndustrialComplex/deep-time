@@ -8,10 +8,14 @@
 //! type's most favourable land cell in the region, and records it as
 //! `deeptime:guaranteed_occurrence` so "Why here?" stays honest.
 //!
-//! A site counts toward an essential (here and in the spawn ranking) only when the material is one
-//! of its **primary** products ([`Essential::counts`]; `primary_only`, default on). Counting
-//! co-products and by-products let a 0.07 Mt impact Cu-Zn-Au deposit satisfy the copper essential of
-//! a planet with two porphyries, and ranked the spawn beside it (P1-15 on real planets).
+//! A site counts toward an essential only when the material is one of its **primary** products
+//! ([`Essential::counts`]; `primary_only`, default on). Counting co-products and by-products let a
+//! 0.07 Mt impact Cu-Zn-Au deposit satisfy the copper essential of a planet with two porphyries
+//! (P1-15 on real planets).
+//!
+//! Essentials no longer pull the spawn toward them (Ben, 2026-10-05: "I don't believe we need spawn
+//! selectoin since we have some passive iron gen like vanilla"): spawn is the standard dry, flat
+//! land nearest (0, 0) (`synth::spawn_candidates`).
 //!
 //! The essentials list is a pack's to define: the game passes its `deeptime:essentials` registry
 //! (P1-15) in the content bundle (`{"essentials": [...]}`), which replaces the preset's list
@@ -33,12 +37,8 @@ pub struct Essential {
     pub region_blocks: u32,
     #[serde(default)]
     pub exposed: bool,
-    /// The spawn must lie within this many blocks of a site of the material (plan §7.8); the
-    /// spawn ranking ([`super::spawn`]) scores candidates by it. `None`: no spawn requirement.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_blocks_from_spawn: Option<u32>,
     /// Only a site whose product of the material has the role `primary` counts toward the regional
-    /// minimum and the spawn's reach (default true); off, a co-product or by-product counts too.
+    /// minimum (default true); off, a co-product or by-product counts too.
     #[serde(default = "primary_only_default")] // ledger: DEP-206
     pub primary_only: bool,
 }

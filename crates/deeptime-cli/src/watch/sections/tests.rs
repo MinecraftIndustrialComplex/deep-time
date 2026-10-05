@@ -90,7 +90,10 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     // What the run offers.
     let info = json_of(&route(&wb, "/api/runs/baked/rock", "").unwrap());
     assert_eq!(info["available"], true, "{info}");
-    assert_eq!(info["circumference"], 4096);
+    assert_eq!(
+        info["circumference"], 3072,
+        "the Petroff–Guyou world's x period 2b"
+    );
     assert_eq!(info["depths"][0], 0);
     assert_eq!(info["depths"].as_array().unwrap().last().unwrap(), "floor");
     let classes = info["classes"].as_array().unwrap();
@@ -130,8 +133,8 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     );
     assert_eq!(
         u32::from_be_bytes(slice.body[20..24].try_into().unwrap()),
-        41,
-        "the map's aspect, π : 1"
+        64,
+        "the world's aspect, 2 : 1 (the Petroff–Guyou world)"
     );
     assert!(kept(&dir, "slice-d60-w128.png"), "the slice is kept");
     let again = route(&wb, "/api/runs/baked/rock/slice.png", q).unwrap();
@@ -155,7 +158,8 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
         let s = rw.slice(depth, 128, 64, 2);
         for py in (0..64).step_by(3) {
             for px in (0..128).step_by(5) {
-                let (x, z) = slice::pixel_block(c, 128, 64, px, py);
+                let (x, z) =
+                    slice::pixel_block(&world.manifest.world_projection(), c, 128, 64, px, py);
                 let col = world.sample(x, z);
                 let y = match depth {
                     Depth::Below(d) => (col.top_y - d as i32).max(min_y),
@@ -179,15 +183,17 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     assert!(compared > 1000);
 
     // A section: JSON along the line, kept, and each column is what the evaluator says.
-    let q = "x0=-900&z0=-400&x1=700&z1=500";
+    // (Inside the 3,072-block world's half period, so the line does not take the short way round.)
+    let q = "x0=-700&z0=-400&x1=700&z1=500";
     let sec = route(&wb, "/api/runs/baked/rock/section", q).unwrap();
     assert_eq!(sec.status, 200, "{}", String::from_utf8_lossy(&sec.body));
     let v = json_of(&sec);
     assert_eq!(v["available"], true);
     let n = v["n"].as_u64().unwrap() as usize;
-    let len = (1600f64.powi(2) + 900f64.powi(2)).sqrt();
+    let len = (1400f64.powi(2) + 900f64.powi(2)).sqrt();
     assert!((v["length_blocks"].as_f64().unwrap() - len).abs() < 1e-6);
-    assert!((v["length_km"].as_f64().unwrap() - len * 0.3).abs() < 1e-6);
+    let km_per_block = world.manifest.scale.m_per_block_h / 1000.0;
+    assert!((v["length_km"].as_f64().unwrap() - len * km_per_block).abs() < 1e-6);
     assert_eq!(n, len.ceil() as usize + 1);
     let cols = &v["columns"];
     for key in ["x", "z", "ground", "water", "runs", "bodies"] {
@@ -195,7 +201,7 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     }
     assert_eq!(
         (cols["x"][0].as_i64(), cols["z"][0].as_i64()),
-        (Some(-900), Some(-400))
+        (Some(-700), Some(-400))
     );
     assert_eq!(
         (cols["x"][n - 1].as_i64(), cols["z"][n - 1].as_i64()),
@@ -268,7 +274,7 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     assert!(checked > 500, "{checked}");
     eprintln!("sections test: {checked} blocks and {spans} body spans compared");
     assert!(
-        kept(&dir, "section--900_-400_700_500-n"),
+        kept(&dir, "section--700_-400_700_500-n"),
         "the section is kept"
     );
     assert_eq!(
@@ -342,15 +348,15 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     let r = route(
         &wb,
         "/api/runs/baked/rock/section",
-        "x0=2000&z0=0&x1=-2000&z1=0&n=64",
+        "x0=1500&z0=0&x1=-1500&z1=0&n=64",
     )
     .unwrap();
     let v = json_of(&r);
     assert_eq!(
-        v["length_blocks"], 96.0,
-        "C = 4096: 2000 to -2000 is 96 blocks east: {v}"
+        v["length_blocks"], 72.0,
+        "the world's period 3,072: 1500 to -1500 is 72 blocks east: {v}"
     );
-    assert_eq!(v["b"]["x"], 2096);
+    assert_eq!(v["b"]["x"], 1572);
     assert_eq!(v["n"], 64);
     let r = route(&wb, "/api/runs/baked/rock/section", "x0=a&z0=0&x1=1&z1=1").unwrap();
     assert_eq!(r.status, 400);

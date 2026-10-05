@@ -998,6 +998,44 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         s.set_checkpoint_dir(Some(o.out.join("checkpoints")));
     }
     s.set_epochs(o.epochs)?;
+    // What the editor would show for this run, beside what the run then measures.
+    if let Ok(e) = deeptime_core::session::estimate_for(&preset, &content, o.common.mem_cap)
+        && let Ok(e) = serde_json::from_str::<Value>(&e)
+    {
+        let mib = |v: &Value, k: &str| v[k].as_f64().unwrap_or(0.0) / 1048576.0;
+        let stages = e["stages"].as_array().map_or(String::new(), |st| {
+            st.iter()
+                .map(|x| {
+                    format!(
+                        "{}={:.0}",
+                        x["name"].as_str().unwrap_or("?"),
+                        mib(x, "bytes")
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        });
+        let own = e["stages"].as_array().map_or(String::new(), |st| {
+            st.iter()
+                .map(|x| {
+                    format!(
+                        "{}={:.0}",
+                        x["name"].as_str().unwrap_or("?"),
+                        mib(x, "own_bytes")
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        });
+        println!(
+            "deeptime run: estimate peak_mib={:.0} base_mib={:.0} history_mib={:.0} spill_mib={:.0} cap_mib={:.0} stages_mib[{stages}] own_mib[{own}]",
+            mib(&e, "peak_bytes"),
+            mib(&e, "base_bytes"),
+            mib(&e, "history_bytes"),
+            mib(&e, "spill_bytes"),
+            mib(&e, "mem_cap"),
+        );
+    }
     s.set_history_budget(o.common.history_mem);
     drive(&s, o.common.verbose, |_, st| st == AdvanceStatus::Done)?;
     s.finalize_write()?;
@@ -1090,6 +1128,17 @@ fn report_run(
         alloc::peak() as f64 / 1048576.0,
         started.elapsed().as_secs_f64()
     );
+    for (name, a) in alloc::trace_summary() {
+        println!(
+            "deeptime run: memtrace phase={name} count={} seconds={:.1} live_peak_mib={:.1} rss_peak_mib={:.1} rss_end_mib={:.1} reserved_mib={:.1}",
+            a.count,
+            a.seconds,
+            a.live_peak as f64 / 1048576.0,
+            a.rss_peak as f64 / 1048576.0,
+            a.rss_end as f64 / 1048576.0,
+            a.reserved as f64 / 1048576.0,
+        );
+    }
     // The world as it stands, not a copy of it (a 32k full world is gigabytes).
     let timings = s.stage_timings()?;
     let lines = s.with_world(|world| {

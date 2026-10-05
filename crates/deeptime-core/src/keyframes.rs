@@ -3,7 +3,9 @@
 //! RGBA8 images (with the shared `ramps.json`), keeps the newest in a bounded ring for
 //! `copyKeyframe`, and writes every frame to `keyframes/kf-<n>.dtk` plus `keyframes/index.json`
 //! as it is produced, so the ring can drop old frames without losing them (a dropped frame is read
-//! back from disk on demand).
+//! back from disk on demand). The ring holds each layer LZ4-packed (memacct, 2026-10-04: a frame of
+//! the coupled stages is 26 layers of 1024 × 326 RGBA, 35 MiB raw and about 4 MiB packed, so the
+//! raw ring of 16 held up to 550 MiB); `copyKeyframe` unpacks the one layer it is asked for.
 //!
 //! Threading: the stepping thread renders and pushes; the render thread (Java) reads counts, info
 //! and pixels at any time. The ring's mutex is held only to copy or swap `Arc`s, never while
@@ -16,7 +18,7 @@ use std::sync::{Arc, Mutex};
 
 use deeptime_format::Ramps;
 use deeptime_format::keyframes::{
-    KEYFRAMES_DIR, KeyframeImage, KeyframeIndex, read_keyframe, write_keyframe,
+    KEYFRAMES_DIR, KeyframeEntry, KeyframeImage, KeyframeIndex, read_keyframe, write_keyframe,
 };
 use serde_json::json;
 
@@ -231,8 +233,61 @@ pub fn add_derived(layers: &mut Vec<&'static str>) {
     }
 }
 
+/// A frame in the ring: its layers LZ4-packed.
+struct Packed {
+    n: u32,
+    t: f64,
+    stage: String,
+    w: u32,
+    h: u32,
+    /// (name, raw length, packed bytes).
+    layers: Vec<(String, usize, Vec<u8>)>,
+}
+
+impl Packed {
+    fn pack(f: &KeyframeImage) -> Packed {
+        Packed {
+            n: f.n,
+            t: f.t,
+            stage: f.stage.clone(),
+            w: f.w,
+            h: f.h,
+            layers: f
+                .layers
+                .iter()
+                .map(|(name, rgba)| (name.clone(), rgba.len(), lz4_flex::block::compress(rgba)))
+                .collect(),
+        }
+    }
+
+    /// Layer `k` into `dst` (exactly its raw length).
+    fn unpack_layer(&self, k: usize, dst: &mut [u8]) -> Result<(), CoreError> {
+        let (name, _, packed) = &self.layers[k];
+        lz4_flex::block::decompress_into(packed, dst)
+            .map(|_| ())
+            .map_err(|e| CoreError::InvalidState(format!("keyframe {} layer {name}: {e}", self.n)))
+    }
+
+    fn unpack(&self) -> Result<KeyframeImage, CoreError> {
+        let mut layers = Vec::with_capacity(self.layers.len());
+        for (k, (name, len, _)) in self.layers.iter().enumerate() {
+            let mut rgba = vec![0u8; *len];
+            self.unpack_layer(k, &mut rgba)?;
+            layers.push((name.clone(), rgba));
+        }
+        Ok(KeyframeImage {
+            n: self.n,
+            t: self.t,
+            stage: self.stage.clone(),
+            w: self.w,
+            h: self.h,
+            layers,
+        })
+    }
+}
+
 struct Ring {
-    frames: VecDeque<Arc<KeyframeImage>>,
+    frames: VecDeque<Arc<Packed>>,
     index: KeyframeIndex,
     /// Stale frames of an earlier run into the same folder have been removed.
     cleaned: bool,
@@ -314,10 +369,12 @@ impl KeyframeStore {
             self.clean(&mut ring)?;
         }
         let entry = write_keyframe(&self.dir, &frame)?;
+        let packed = Arc::new(Packed::pack(&frame));
+        drop(frame);
         let mut ring = self.lock();
         ring.index.frames.push(entry);
         ring.index.write(&self.dir)?;
-        ring.frames.push_back(Arc::new(frame));
+        ring.frames.push_back(packed);
         while ring.frames.len() > self.capacity {
             ring.frames.pop_front();
         }
@@ -331,11 +388,12 @@ impl KeyframeStore {
     pub fn replace(&self, frame: KeyframeImage) -> Result<(), CoreError> {
         self.check(frame.n)?;
         let entry = write_keyframe(&self.dir, &frame)?;
+        let packed = Arc::new(Packed::pack(&frame));
         let mut ring = self.lock();
         ring.index.frames[frame.n as usize] = entry;
         ring.index.write(&self.dir)?;
         if let Some(slot) = ring.frames.iter_mut().find(|f| f.n == frame.n) {
-            *slot = Arc::new(frame);
+            *slot = packed;
         }
         Ok(())
     }
@@ -361,15 +419,20 @@ impl KeyframeStore {
 
     /// Frame `n`, from the ring or, if it was dropped, from disk.
     pub fn get(&self, n: u32) -> Result<Arc<KeyframeImage>, CoreError> {
+        match self.find(n)? {
+            Ok(p) => Ok(Arc::new(p.unpack()?)),
+            Err(entry) => Ok(Arc::new(read_keyframe(&self.dir, &entry)?)),
+        }
+    }
+
+    /// Frame `n` in the ring, or its index entry when it left the ring.
+    fn find(&self, n: u32) -> Result<Result<Arc<Packed>, KeyframeEntry>, CoreError> {
         self.check(n)?;
-        let entry = {
-            let ring = self.lock();
-            if let Some(f) = ring.frames.iter().find(|f| f.n == n) {
-                return Ok(Arc::clone(f));
-            }
-            ring.index.frames[n as usize].clone()
-        };
-        Ok(Arc::new(read_keyframe(&self.dir, &entry)?))
+        let ring = self.lock();
+        Ok(match ring.frames.iter().find(|f| f.n == n) {
+            Some(f) => Ok(Arc::clone(f)),
+            None => Err(ring.index.frames[n as usize].clone()),
+        })
     }
 
     /// `keyframeInfo`: `{"n", "t", "stage", "w", "h", "layers"}` (plan §6.1).
@@ -384,6 +447,25 @@ impl KeyframeStore {
 
     /// `copyKeyframe`: layer `layer` of frame `n` into `dst` (at least `w·h·4` bytes).
     pub fn copy(&self, n: u32, layer: u32, dst: &mut [u8]) -> Result<(), CoreError> {
+        // From the ring: only the layer asked for is unpacked.
+        if let Ok(p) = self.find(n)? {
+            let Some((_, len, _)) = p.layers.get(layer as usize) else {
+                return Err(CoreError::InvalidArgument(format!(
+                    "keyframe {n} has {} layers, not {}",
+                    p.layers.len(),
+                    layer + 1
+                )));
+            };
+            if dst.len() < *len {
+                return Err(CoreError::InvalidArgument(format!(
+                    "the buffer holds {} bytes, keyframe {n} needs {len} ({}×{}×4)",
+                    dst.len(),
+                    p.w,
+                    p.h
+                )));
+            }
+            return p.unpack_layer(layer as usize, &mut dst[..*len]);
+        }
         let f = self.get(n)?;
         let Some((_, rgba)) = f.layers.get(layer as usize) else {
             return Err(CoreError::InvalidArgument(format!(
@@ -508,6 +590,24 @@ mod tests {
             &[0x3f, 0x7f, 0x3a, 255],
             "y 63 is the land colour"
         );
+        // Frame 4 is in the ring, packed: it comes back as it was drawn, whole or by layer.
+        let drawn = render(
+            &world,
+            &ramps,
+            &view,
+            "s",
+            &["elevation", "missing"],
+            4,
+            (32, 16),
+        )
+        .unwrap();
+        let kept = store.get(4).unwrap();
+        assert_eq!(kept.layers, drawn.layers);
+        assert_eq!((kept.n, kept.t, kept.w, kept.h), (4, drawn.t, 32, 16));
+        store.copy(4, 0, &mut buf).unwrap();
+        assert_eq!(buf, drawn.layers[0].1);
+        assert!(store.copy(4, 1, &mut buf).is_err());
+        assert!(store.copy(4, 0, &mut buf[..10]).is_err());
         assert!(store.copy(5, 0, &mut buf).is_err());
         assert!(store.copy(0, 1, &mut buf).is_err());
         assert!(store.copy(0, 0, &mut buf[..10]).is_err());

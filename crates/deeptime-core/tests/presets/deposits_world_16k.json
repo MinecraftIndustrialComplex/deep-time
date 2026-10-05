@@ -1,5 +1,5 @@
 {
-  "scale": {"circumference_blocks": 16384},
+  "scale": {"circumference_blocks": 16384, "projection": "lambert"},
   "deposits_synthetic": {
     "seed": 7,
     "circumference": 16384,
@@ -15,9 +15,9 @@
       "province_km": 800.0,
       "types": [],
       "essentials": [
-        {"material": "c:iron", "min_sites_per_region": 1, "region_blocks": 8192, "exposed": false, "max_blocks_from_spawn": 3072},
-        {"material": "c:copper", "min_sites_per_region": 1, "region_blocks": 8192, "exposed": false, "max_blocks_from_spawn": 3072},
-        {"material": "c:coal", "min_sites_per_region": 1, "region_blocks": 8192, "exposed": true, "max_blocks_from_spawn": 3072},
+        {"material": "c:iron", "min_sites_per_region": 1, "region_blocks": 8192, "exposed": false},
+        {"material": "c:copper", "min_sites_per_region": 1, "region_blocks": 8192, "exposed": false},
+        {"material": "c:coal", "min_sites_per_region": 1, "region_blocks": 8192, "exposed": true},
         {"material": "c:zinc", "min_sites_per_region": 1, "region_blocks": 16384, "exposed": false}
       ]
     },

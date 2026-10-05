@@ -30,12 +30,20 @@ fn mix(mut x: u64) -> u64 {
     x ^ (x >> 31)
 }
 
+/// The width of the band inside a Petroff–Guyou world's north and south edges where the detail
+/// noise is blended towards its half-turn-symmetric mean, blocks ([`DetailSpec::noise`]).
+pub const EDGE_BLEND_BLOCKS: f64 = 32.0; // ledger: SCL-089 (game-choice)
+
 /// Periodic value noise (see the module documentation for the exact definition).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Noise {
     pub seed: u64,
     /// C, blocks: the period in x.
     pub circumference: u32,
+    /// b of a Petroff–Guyou world (format 0.5): the north and south edges z = ∓b/2 are glued onto
+    /// themselves by half-turns, and [`DetailSpec::noise`] folds and blends there. `None`: a
+    /// Lambert world or a synthetic one.
+    pub half_turn_b: Option<i64>,
 }
 
 impl Noise {
@@ -43,7 +51,21 @@ impl Noise {
         Noise {
             seed,
             circumference,
+            half_turn_b: None,
         }
+    }
+
+    /// The noise of a world laid out by `wp`: a Petroff–Guyou world's has its half-turn edges.
+    pub fn for_world(
+        seed: u64,
+        circumference: u32,
+        wp: &crate::projection::WorldProjection,
+    ) -> Noise {
+        let mut n = Noise::new(seed, circumference);
+        if let crate::projection::WorldProjection::PetroffGuyou(g) = wp {
+            n.half_turn_b = Some(g.hemisphere());
+        }
+        n
     }
 
     /// The lattice value at (ix, jz) for `salt`, in [−1, 1].
@@ -161,8 +183,47 @@ impl DetailSpec {
     }
 
     /// N at block (x, z) for a planet of circumference `c`.
+    ///
+    /// On a Petroff–Guyou world (`noise.half_turn_b` = b, FORMAT.md "The detail layer") a point past
+    /// the north or south edge is first folded through the edge's half-turn ((x, z) → (−x, −b − z)
+    /// north, (−x, b − z) south, repeated), so the terrain past an edge is the glued inside. Within
+    /// [`EDGE_BLEND_BLOCKS`] of an edge (d = z + b/2 north of the equator, b/2 − z south) the noise
+    /// is blended towards its half-turn-symmetric mean S = ½(N(x, z) + N(m)) with m the point's
+    /// mirror past the edge, (−x, −b − z) or (−x, b − z): t = d / 32, w = t²(3 − 2t), result
+    /// S + (N − S)·w. On the edge (d = 0) the result is S, which the half-turn maps to itself, so the
+    /// detail term is continuous through the seam.
     pub fn noise(&self, noise: &Noise, x: f64, z: f64) -> f64 {
-        noise.fbm(x, z, self.wavelength_blocks, self.octaves, self.salt)
+        let Some(b) = noise.half_turn_b else {
+            return noise.fbm(x, z, self.wavelength_blocks, self.octaves, self.salt);
+        };
+        let b = b as f64;
+        let h = 0.5 * b;
+        let (mut x, mut z) = (x, z);
+        for _ in 0..64 {
+            if z < -h {
+                x = -x;
+                z = -b - z;
+            } else if z > h {
+                x = -x;
+                z = b - z;
+            } else {
+                break;
+            }
+        }
+        let n = noise.fbm(x, z, self.wavelength_blocks, self.octaves, self.salt);
+        let (d, mz) = if z < 0.0 {
+            (z + h, -b - z)
+        } else {
+            (h - z, b - z)
+        };
+        if d >= EDGE_BLEND_BLOCKS {
+            return n;
+        }
+        let m = noise.fbm(-x, mz, self.wavelength_blocks, self.octaves, self.salt);
+        let s = 0.5 * (n + m);
+        let t = d / EDGE_BLEND_BLOCKS;
+        let w = t * t * (3.0 - 2.0 * t);
+        s + (n - s) * w
     }
 }
 
@@ -247,5 +308,35 @@ mod tests {
         assert_eq!(spec.seed().unwrap(), seed);
         let json = serde_json::to_value(&spec).unwrap();
         assert_eq!(json["seed"], "18446744073709551610");
+    }
+
+    #[test]
+    fn the_noise_is_continuous_through_the_half_turn_edges() {
+        let b = 6_656i64;
+        let n = Noise {
+            half_turn_b: Some(b),
+            ..Noise::new(3, 13_312)
+        };
+        let spec = DetailSpec::new(3, 1729, 3, 32.0);
+        let h = b as f64 / 2.0;
+        for k in 0..400 {
+            let x = -6_656.0 + 33.27 * f64::from(k);
+            // On each edge the two images (x, ∓h) and (−x, ∓h) of one planet point agree.
+            for e in [-h, h] {
+                let (a, c) = (spec.noise(&n, x, e), spec.noise(&n, -x, e));
+                assert!((a - c).abs() < 1e-12, "edge {e} at x {x}: {a} vs {c}");
+            }
+            // Past the edge is the glued inside: (x, −h − d) is (−x, −h + d).
+            for d in [0.25, 3.0, 17.0, 40.0] {
+                let out = spec.noise(&n, x, -h - d);
+                let inside = spec.noise(&n, -x, -h + d);
+                assert!((out - inside).abs() < 1e-12);
+                let out = spec.noise(&n, x, h + d);
+                let inside = spec.noise(&n, -x, h - d);
+                assert!((out - inside).abs() < 1e-12);
+            }
+            // Away from the edges the plain noise.
+            assert_eq!(spec.noise(&n, x, 0.0), n.fbm(x, 0.0, 32.0, 3, 1729));
+        }
     }
 }

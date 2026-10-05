@@ -92,7 +92,7 @@ fn world_data(dir: &Path, o: &Options<'_>) -> CliResult<Value> {
     let (mut all, mut land) = (Census::default(), Census::default());
     let mut rng = SplitMix(o.seed);
     let mut picks = Vec::with_capacity(o.columns);
-    let zp = deeptime_format::Projection::of(w.c as f64).pole_z() as i64;
+    let zp = w.manifest.world_projection().z_range().1 as i64;
     for _ in 0..o.columns {
         let x = rng.below(w.c as u64) as i64 - w.c / 2;
         let z = rng.below(2 * zp as u64) as i64 - zp;

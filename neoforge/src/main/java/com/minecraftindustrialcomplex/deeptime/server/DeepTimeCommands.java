@@ -143,6 +143,9 @@ public final class DeepTimeCommands {
             o.addProperty("terrain", terrain.getClass().getSimpleName());
             o.addProperty("circumference", terrain.circumference());
             o.addProperty("terrainH", terrain.height(x, z));
+            o.addProperty("projection", g.dataRef().projection());
+            o.addProperty("latitude", com.minecraftindustrialcomplex.deeptime.api.climate.DeepTimeClimate.latitudeDeg(level, x, z));
+            o.addProperty("longitude", com.minecraftindustrialcomplex.deeptime.api.climate.DeepTimeClimate.longitudeDeg(level, x, z));
             o.addProperty("surfaceY", generator.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level,
                     level.getChunkSource().randomState()) - 1);
             for (String layer : new String[]{"temperature", "vegetation", "continents", "erosion", "ridges"})
@@ -298,6 +301,17 @@ public final class DeepTimeCommands {
             o.addProperty("storm", cap.storm(z));
             o.addProperty("push", cap.push(z));
             o.addProperty("wind", cap.wind(z));
+        }
+        // A Petroff–Guyou world has no pole cap: its temporary edge border instead (NaN: none now).
+        if (level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g && g.dataRef().petroffGuyou()) {
+            double stop = com.minecraftindustrialcomplex.deeptime.wrap.EdgeBorder.stopZ(level);
+            o.addProperty("projection", g.dataRef().projection());
+            o.addProperty("edgeBorder", !Double.isNaN(stop));
+            if (!Double.isNaN(stop)) {
+                o.addProperty("edgeStopZ", stop);
+                o.addProperty("z", z);
+                o.addProperty("edgeZone", com.minecraftindustrialcomplex.deeptime.wrap.EdgeBorder.zone(stop, z));
+            }
         }
         return emit(source, o);
     }

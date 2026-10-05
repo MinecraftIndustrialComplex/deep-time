@@ -65,6 +65,36 @@ final class LevelClimate implements DeepTimeClimate {
         return 0;
     }
 
+    /** {@link DeepTimeClimate#projectionKind}. */
+    static String projectionKind(Level level) {
+        if (level == null)
+            return "";
+        if (level.isClientSide()) {
+            var p = ClientPlanetState.projection(level);
+            return p == null ? "" : p.kind().id();
+        }
+        if (level instanceof ServerLevel server && server.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g)
+            return g.dataRef().projection();
+        return "";
+    }
+
+    /**
+     * The world projection of {@code level}: the world data's on a server (Lambert of the generator's C
+     * on a test terrain), the planet info's on a client; null for anything else.
+     */
+    static com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection projection(Level level) {
+        if (level == null)
+            return null;
+        if (level.isClientSide())
+            return ClientPlanetState.projection(level);
+        if (level instanceof ServerLevel server && server.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g) {
+            if (g.terrain() instanceof WorldDataTerrain t)
+                return t.data().projection();
+            return new com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Lambert(g.dataRef().circumferenceBlocks());
+        }
+        return null;
+    }
+
     @Override
     public boolean isDeepTimeLevel() {
         return deepTime;

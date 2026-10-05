@@ -11,6 +11,7 @@ mod hydro;
 mod margins_view;
 mod parity;
 mod plate_check;
+mod project;
 mod provinces;
 mod run;
 mod satellite_view;
@@ -20,6 +21,7 @@ mod structure_view;
 mod synth;
 mod volcano_view;
 mod watch;
+mod world_map;
 
 use std::net::IpAddr;
 use std::path::PathBuf;
@@ -493,6 +495,33 @@ enum Command {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Run the bake's projection pass (SW-1) on a copy of a baked Lambert world-data folder, with
+    /// its own preset and `--set scale.KEY=VALUE` overrides (`scale.projection` is petroff_guyou):
+    /// tuning the pass without re-running the history.
+    Project {
+        /// A Lambert world-data folder a planet run baked (`--set scale.projection=lambert`).
+        #[arg(long)]
+        world_data: PathBuf,
+        /// The projected copy (replaced if it exists).
+        #[arg(long)]
+        out: PathBuf,
+        /// Sets a preset value first, `--set scale.lambda_c_deg=30` (repeatable).
+        #[arg(long = "set", value_name = "PATH=VALUE")]
+        set: Vec<String>,
+    },
+    /// Whole-world pictures of a baked world-data folder in the world's own block space
+    /// (satellite.png, provinces.png with the layout's cone points and poles, world-map.json).
+    WorldMap {
+        /// World-data folder.
+        #[arg(long)]
+        world_data: PathBuf,
+        /// The satellite picture's zoom: 2^(z+1) × 2^z tiles of 256 pixels.
+        #[arg(long, default_value_t = 2)]
+        zoom: u32,
+        /// Folder to write into.
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// Dump a world's sites, index lookups, body evaluations and cause chains as JSON (the Java
     /// parity-test fixture, P1-15).
     DumpDeposits {
@@ -690,6 +719,7 @@ fn finish(what: &str, r: run::CliResult<()>) -> ExitCode {
 }
 
 fn main() -> ExitCode {
+    alloc::init_from_env();
     let cli = Cli::parse();
     match cli.command {
         None | Some(Command::Version) => {
@@ -1094,6 +1124,46 @@ fn main() -> ExitCode {
                 }
             }
         }
+        Some(Command::Project {
+            world_data,
+            out,
+            set,
+        }) => {
+            let started = std::time::Instant::now();
+            match project::run(&world_data, &out, &set) {
+                Ok(note) => {
+                    println!(
+                        "deeptime project: {} in {:.2}s",
+                        deeptime_core::bake::project::summary_line(&note),
+                        started.elapsed().as_secs_f64()
+                    );
+                    println!("{}", serde_json::to_string(&note).unwrap_or_default());
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime project: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        Some(Command::WorldMap {
+            world_data,
+            zoom,
+            out,
+        }) => match world_map::run(&world_data, zoom, &out) {
+            Ok(v) => {
+                println!(
+                    "deeptime world-map: {} pixels -> {}",
+                    v["pixels"],
+                    out.display()
+                );
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("deeptime world-map: {e}");
+                ExitCode::FAILURE
+            }
+        },
         Some(Command::Heightmap {
             world_data,
             area,
@@ -2119,7 +2189,7 @@ mod tests {
         })
         .unwrap();
         let m = deeptime_format::Manifest::read(&dir.join("world")).unwrap();
-        assert_eq!(m.format_version, "0.4");
+        assert_eq!(m.format_version, "0.5");
         assert_eq!(m.notes["bake"]["baked"], true);
         // The bake says how much of its terrain stands above the build limit (whatever the planet).
         let limit = &m.notes["bake"]["terrain"]["build_limit"];
@@ -2136,7 +2206,10 @@ mod tests {
         let doc: serde_json::Value = serde_json::from_slice(&std::fs::read(&out).unwrap()).unwrap();
         let cols = doc["columns"].as_array().unwrap();
         assert_eq!(cols.len(), 60);
-        assert_eq!(doc["circumference"], 4096);
+        assert_eq!(
+            doc["circumference"], 3072,
+            "the 4k planet drawn as a Petroff–Guyou world: 2b, b = 1,536"
+        );
         let w = deeptime_format::ColumnWorld::open(&dir.join("world")).unwrap();
         // Compared as text: serde_json's default parser may land a float one ulp off (Java's
         // Double.parseDouble does not), while its writer prints the shortest exact form.
@@ -2172,8 +2245,9 @@ mod tests {
             let p: f64 = fresh.p_month.iter().sum();
             assert!((p - fresh.p_annual).abs() < 1e-6 * fresh.p_annual.max(1.0));
         }
-        let v = w.inspect(-2047, 300);
-        assert_eq!(v["wx"], -2047);
+        // (The 4k planet's world is 3,072 blocks round: x in [−1,536, 1,536).)
+        let v = w.inspect(-1500, 300);
+        assert_eq!(v["wx"], -1500);
         assert!(v["layers"]["climate/temperature"]["bilinear"].is_number());
         assert!(v["strata"].as_array().is_some_and(|a| !a.is_empty()));
         // `--why`: a column inside a site's box gets the site's forming event and chain.
