@@ -91,7 +91,6 @@ pub enum ZEdges {
     HalfTurn,
 }
 
-
 /// A raster in block space (plan §5.2), laid out by the world's projection
 /// ([`crate::projection`]). Cell (i, j) is the **point sample** at block
 /// (origin_block_x + i·r, origin_block_z + j·r). On the simulation's grids and Lambert worlds
