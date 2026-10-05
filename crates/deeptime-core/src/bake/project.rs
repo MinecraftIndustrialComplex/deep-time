@@ -122,6 +122,12 @@ enum Kind {
     Continuous,
     /// The nearest cell's value.
     Categorical,
+    /// The bilinear field at the point, no footprint: the climate's band coordinates
+    /// (`units` `vanilla_param`), which the bake sets per Köppen class; averaged across a wide
+    /// polar footprint they would drift off the class the nearest `climate/koppen` cell names
+    /// (a Dfc column read Dfa's humidity and drew forest, not taiga). The Lambert world's game read
+    /// them the same way, bilinear at the block.
+    Point,
     /// The nearest cell's bytes (horizon stacks).
     Stack,
 }
@@ -131,6 +137,8 @@ fn kind_of(desc: &LayerDesc) -> Kind {
         Kind::Stack
     } else if CATEGORICAL.contains(&desc.name.as_str()) || desc.units == "flag" {
         Kind::Categorical
+    } else if desc.units == "vanilla_param" {
+        Kind::Point
     } else {
         Kind::Continuous
     }
@@ -528,6 +536,21 @@ fn resample_grid(map: &Mapping, srcs: &[Src], wg: &GridDesc) -> Vec<Vec<u8>> {
                         Kind::Categorical => {
                             let (ci, cj) = s.nearest_cell(f.xs, f.zs);
                             let v = s.raw(i64::from(ci), i64::from(cj));
+                            let v = if v.is_nan() {
+                                s.layer.desc.nodata.unwrap_or(0.0)
+                            } else {
+                                v
+                            };
+                            put_raw(s.layer.desc.dtype, v, cell);
+                        }
+                        Kind::Point => {
+                            let v = s.bilinear(f.xs, f.zs);
+                            let v = if v.is_nan() {
+                                let (ci, cj) = s.nearest_cell(f.xs, f.zs);
+                                s.raw(i64::from(ci), i64::from(cj))
+                            } else {
+                                v
+                            };
                             let v = if v.is_nan() {
                                 s.layer.desc.nodata.unwrap_or(0.0)
                             } else {
@@ -1639,5 +1662,7 @@ mod tests {
         }
         assert_eq!(kind_of(&desc("some/mask", "flag")), Kind::Categorical);
         assert_eq!(kind_of(&desc("elevation", "block")), Kind::Continuous);
+        // The climate's band coordinates are read at the point, as the Köppen class beside them.
+        assert_eq!(kind_of(&desc("climate/vegetation", "vanilla_param")), Kind::Point);
     }
 }
