@@ -115,6 +115,10 @@ pub trait MemoryGauge: Send + Sync {
     fn release(&self) -> u64 {
         0
     }
+    /// The most the allocator should hold while the next step runs: memory it keeps for reuse is
+    /// given back rather than take the count above `bytes` (the session passes the stage's
+    /// estimate, so what the allocator keeps stays inside it). The default does nothing.
+    fn keep_below(&self, _bytes: u64) {}
 }
 
 /// A gauge that reports nothing allocated.
@@ -149,6 +153,35 @@ pub fn estimate(preset_json: &str, content_json: &str) -> Result<String, CoreErr
 /// Seconds to write and read back a byte of spilled history: written once, read by the deposit
 /// engine's two passes (an SSD at ~1 GB/s; P1-17 measures it).
 const SPILL_SECONDS_PER_BYTE: f64 = 3.0e-9;
+
+/// Each stage's estimated working set and recorded history, `(base, history)` (bytes): the world
+/// the stages before it built is counted in (it stays in memory under the stages after them), and
+/// a coupled group's stages, which step in turn over the same world, each hold the group's most.
+fn stage_sets(list: &[Box<dyn Stage>]) -> Result<Vec<(u64, u64)>, CoreError> {
+    let (mut world, mut world_history) = (0u64, 0u64);
+    let mut sets: Vec<(u64, u64)> = list
+        .iter()
+        .map(|s| {
+            let e = s.estimate();
+            let mut hist = e.history_bytes.min(e.bytes);
+            let mut b = e.bytes - hist;
+            if OWN_ONLY_ESTIMATES.contains(&s.name()) {
+                b += world;
+                hist = hist.max(world_history);
+            }
+            world = world.max(b);
+            world_history = world_history.max(hist);
+            (b, hist)
+        })
+        .collect();
+    for g in stage_groups(list)? {
+        let most = sets[g.clone()]
+            .iter()
+            .fold((0, 0), |a, &(b, h)| (a.0.max(b), a.1.max(h)));
+        sets[g].iter_mut().for_each(|x| *x = most);
+    }
+    Ok(sets)
+}
 
 /// The stages whose `Stage::estimate` is their own working set only; the others count the world
 /// they run beside (the plates, the surface, the climate, the young landscape and the
@@ -193,31 +226,7 @@ pub fn estimate_for(
     };
     let (mut peak, mut base, mut history, mut spill) = (0u64, 0u64, 0u64, 0u64);
     let list = preset.stages();
-    // Each stage's working set and history: the world the stages so far built (their largest
-    // base and history) stays in memory under the stages after them.
-    let (mut world, mut world_history) = (0u64, 0u64);
-    let mut sets: Vec<(u64, u64)> = list
-        .iter()
-        .map(|s| {
-            let e = s.estimate();
-            let mut hist = e.history_bytes.min(e.bytes);
-            let mut b = e.bytes - hist;
-            if OWN_ONLY_ESTIMATES.contains(&s.name()) {
-                b += world;
-                hist = hist.max(world_history);
-            }
-            world = world.max(b);
-            world_history = world_history.max(hist);
-            (b, hist)
-        })
-        .collect();
-    // A coupled group's stages step in turn over the same world: each holds the group's most.
-    for g in stage_groups(&list)? {
-        let most = sets[g.clone()]
-            .iter()
-            .fold((0, 0), |a, &(b, h)| (a.0.max(b), a.1.max(h)));
-        sets[g].iter_mut().for_each(|x| *x = most);
-    }
+    let sets = stage_sets(&list)?;
     let stages: Vec<Value> = list
         .iter()
         .zip(&sets)
@@ -320,6 +329,10 @@ struct Stepper {
     /// room under the cap, so what a stage allocates without reserving it stays within the cap
     /// from its second step on (memacct, 2026-10-04).
     working: Vec<u64>,
+    /// Per stage: what its estimate allows the run to hold (the process's count at the session's
+    /// start + the stage's working set + the history the cap leaves in memory), for
+    /// `MemoryGauge::keep_below`.
+    allowed: Vec<u64>,
 }
 
 impl Stepper {
@@ -503,6 +516,11 @@ impl Session {
         };
         let mut stages = preset.stages();
         let groups = stage_groups(&stages)?;
+        let at_start = gauge.in_use();
+        let allowed = stage_sets(&stages)?
+            .into_iter()
+            .map(|(b, h)| at_start + b + h.min(mem_cap.saturating_sub(b)))
+            .collect();
         if next_stage < stages.len() && !groups.iter().any(|g| g.start == next_stage) {
             return Err(CoreError::InvalidState(format!(
                 "the checkpoint stops inside a group of coupled stages (at {})",
@@ -591,6 +609,7 @@ impl Session {
                 next_kf,
                 last_kf_t: None,
                 working: vec![0; timings.len()],
+                allowed,
                 timings,
             }),
             policy,
@@ -732,6 +751,9 @@ impl Session {
             let group = s.group();
             if s.stages[group.clone()].iter().all(|st| st.is_done()) {
                 let name = group_label(&s.stages, &group);
+                // The next stage's arrays have other sizes: what the allocator kept for this
+                // one's goes back.
+                self.gauge.release();
                 self.gauge.phase("finish", true);
                 let result = self.finish_stage(s);
                 self.gauge.phase("finish", false);
@@ -770,6 +792,7 @@ impl Session {
                     history: history.as_ref(),
                     needed_peak: Some(&self.needed_peak),
                 };
+                self.gauge.keep_below(s.allowed[k].min(self.mem_cap));
                 let mut at_start = self.gauge.in_use();
                 if at_start.saturating_add(s.working[k]) > self.mem_cap
                     && self.gauge.release() > 0
