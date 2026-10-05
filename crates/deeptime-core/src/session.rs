@@ -95,6 +95,30 @@ pub trait MemoryGauge: Send + Sync {
     fn in_use(&self) -> u64;
     /// The highest `in_use` seen.
     fn peak(&self) -> u64;
+    /// The session marks where the run is: `begin` true before a phase (a stage's step by the
+    /// stage's name, `keyframes`, `finish`, `bake`) and false after it, so a gauge can trace memory
+    /// per phase (`deeptime run --mem-trace`). Phases never nest. The default does nothing.
+    fn phase(&self, _name: &str, _begin: bool) {}
+    /// A stage asked for room: `needed` = bytes in use + bytes reserved, `granted` whether it fit
+    /// (after any history spill). For the trace; the default does nothing.
+    fn reserved(&self, _needed: u64, _granted: bool) {}
+    /// The highest `in_use` since the current phase began. The session learns from it how much
+    /// a stage's step holds beyond what it reserved, and makes that room before the stage's next
+    /// step. A gauge that does not track phases returns `in_use` (the session then learns
+    /// nothing).
+    fn phase_peak(&self) -> u64 {
+        self.in_use()
+    }
+    /// Gives memory the allocator keeps for reuse back to the system (its count drops by as
+    /// much); returns the bytes released. Called before the history spills to make room under
+    /// the cap. The default releases nothing.
+    fn release(&self) -> u64 {
+        0
+    }
+    /// The most the allocator should hold while the next step runs: memory it keeps for reuse is
+    /// given back rather than take the count above `bytes` (the session passes the stage's
+    /// estimate, so what the allocator keeps stays inside it). The default does nothing.
+    fn keep_below(&self, _bytes: u64) {}
 }
 
 /// A gauge that reports nothing allocated.
@@ -130,6 +154,48 @@ pub fn estimate(preset_json: &str, content_json: &str) -> Result<String, CoreErr
 /// engine's two passes (an SSD at ~1 GB/s; P1-17 measures it).
 const SPILL_SECONDS_PER_BYTE: f64 = 3.0e-9;
 
+/// Each stage's estimated working set and recorded history, `(base, history)` (bytes): the world
+/// the stages before it built is counted in (it stays in memory under the stages after them), and
+/// a coupled group's stages, which step in turn over the same world, each hold the group's most.
+fn stage_sets(list: &[Box<dyn Stage>]) -> Result<Vec<(u64, u64)>, CoreError> {
+    let (mut world, mut world_history) = (0u64, 0u64);
+    let mut sets: Vec<(u64, u64)> = list
+        .iter()
+        .map(|s| {
+            let e = s.estimate();
+            let mut hist = e.history_bytes.min(e.bytes);
+            let mut b = e.bytes - hist;
+            if OWN_ONLY_ESTIMATES.contains(&s.name()) {
+                b += world;
+                hist = hist.max(world_history);
+            }
+            world = world.max(b);
+            world_history = world_history.max(hist);
+            (b, hist)
+        })
+        .collect();
+    for g in stage_groups(list)? {
+        let most = sets[g.clone()]
+            .iter()
+            .fold((0, 0), |a, &(b, h)| (a.0.max(b), a.1.max(h)));
+        sets[g].iter_mut().for_each(|x| *x = most);
+    }
+    Ok(sets)
+}
+
+/// The stages whose `Stage::estimate` is their own working set only; the others count the world
+/// they run beside (the plates, the surface, the climate, the young landscape and the
+/// amplification each include the stages before them). In [`estimate_for`] these add the world
+/// the stages before them left, so every stage's figure is the run's memory while it runs
+/// (memacct, 2026-10-04: the deposits stage listed 178 MiB on quick 16k while the run held
+/// 1.4 GiB).
+const OWN_ONLY_ESTIMATES: [&str; 4] = [
+    crate::structure::STAGE_NAME,
+    crate::surface::volcanoes::STAGE_NAME,
+    crate::surface::impacts::STAGE_NAME,
+    crate::deposits::STAGE_NAME,
+];
+
 /// The memory and time estimate for a preset run under a memory cap of `mem_cap` bytes (0: the
 /// default), as JSON (plan §5.7.5; P1-17's history spill):
 ///
@@ -141,11 +207,13 @@ const SPILL_SECONDS_PER_BYTE: f64 = 3.0e-9;
 /// running session reports a group of coupled stages as its lead's index and permille, so a
 /// caller weighting progress by the stages' seconds needs the groups.
 ///
-/// A stage's `base_bytes` is its working set without the recorded history (what must fit under
+/// A stage's `base_bytes` is the run's working set while it runs (the world the stages before it
+/// built included) without the recorded history (what must fit under
 /// the cap, or the run fails cleanly), `history_bytes` the history at the end of the stage (it
 /// stays in memory while the cap allows and spills to the run's folder after that), `bytes`
 /// = base + the history held in memory under this cap (its peak) and `spill_bytes` the rest (the
-/// disk it uses). The run's figures are the stages' maxima: `peak_bytes` ≈ base + what of the
+/// disk it uses); `own_bytes` is the stage's own `Stage::estimate` (with its history, before the
+/// world it runs beside is added; the figure this function used before memacct). The run's figures are the stages' maxima: `peak_bytes` ≈ base + what of the
 /// history fits, so a run whose `peak_bytes` is over its cap is one whose base does not fit.
 /// Seconds include the spill's disk time.
 pub fn estimate_for(
@@ -163,13 +231,13 @@ pub fn estimate_for(
         mem_cap
     };
     let (mut peak, mut base, mut history, mut spill) = (0u64, 0u64, 0u64, 0u64);
-    let stages: Vec<Value> = preset
-        .stages()
+    let list = preset.stages();
+    let sets = stage_sets(&list)?;
+    let stages: Vec<Value> = list
         .iter()
-        .map(|s| {
+        .zip(&sets)
+        .map(|(s, &(b, hist))| {
             let e = s.estimate();
-            let hist = e.history_bytes.min(e.bytes);
-            let b = e.bytes - hist;
             let held = hist.min(cap.saturating_sub(b));
             let spilled = hist - held;
             peak = peak.max(b + held);
@@ -180,7 +248,7 @@ pub fn estimate_for(
                 "name": s.name(), "bytes": b + held,
                 "seconds": e.seconds + spilled as f64 * SPILL_SECONDS_PER_BYTE,
                 "base_bytes": b, "history_bytes": hist, "spill_bytes": spilled,
-                "coupled_to": s.coupled_to(),
+                "own_bytes": e.bytes, "coupled_to": s.coupled_to(),
             })
         })
         .collect();
@@ -263,6 +331,19 @@ struct Stepper {
     /// its own.
     last_kf_t: Option<(f64, usize)>,
     timings: Vec<StageTiming>,
+    /// Per stage: the most one of its steps added to the memory in use at its start, reserved or
+    /// not (`MemoryGauge::phase_peak`). Before a stage steps, the history's frames make that much
+    /// room under the cap, so what a stage allocates without reserving it stays within the cap
+    /// from its second step on (memacct, 2026-10-04).
+    working: Vec<u64>,
+    /// Per stage: what its estimate allows the run to hold (the process's count at the session's
+    /// start + the stage's working set + the history the cap leaves in memory), for
+    /// `MemoryGauge::keep_below`.
+    allowed: Vec<u64>,
+    /// Per stage: the process's count at the session's start + the stage's estimated working set
+    /// without the history. Before a stage steps, the history's frames in memory give way until
+    /// they fit beside it under the cap.
+    base: Vec<u64>,
 }
 
 impl Stepper {
@@ -446,6 +527,13 @@ impl Session {
         };
         let mut stages = preset.stages();
         let groups = stage_groups(&stages)?;
+        let at_start = gauge.in_use();
+        let sets = stage_sets(&stages)?;
+        let allowed = sets
+            .iter()
+            .map(|&(b, h)| at_start + b + h.min(mem_cap.saturating_sub(b)))
+            .collect();
+        let base = sets.iter().map(|&(b, _)| at_start + b).collect();
         if next_stage < stages.len() && !groups.iter().any(|g| g.start == next_stage) {
             return Err(CoreError::InvalidState(format!(
                 "the checkpoint stops inside a group of coupled stages (at {})",
@@ -477,7 +565,7 @@ impl Session {
             }
         }
         let stage_names: Vec<String> = stages.iter().map(|s| s.name().to_owned()).collect();
-        let timings = stage_names
+        let timings: Vec<StageTiming> = stage_names
             .iter()
             .map(|n| StageTiming {
                 name: n.clone(),
@@ -533,6 +621,9 @@ impl Session {
                 kf_origin,
                 next_kf,
                 last_kf_t: None,
+                working: vec![0; timings.len()],
+                allowed,
+                base,
                 timings,
             }),
             policy,
@@ -674,8 +765,13 @@ impl Session {
             let group = s.group();
             if s.stages[group.clone()].iter().all(|st| st.is_done()) {
                 let name = group_label(&s.stages, &group);
-                self.finish_stage(s)
-                    .map_err(|e| self.fail(&format!("finishing stage {name}"), e))?;
+                // The next stage's arrays have other sizes: what the allocator kept for this
+                // one's goes back.
+                self.gauge.release();
+                self.gauge.phase("finish", true);
+                let result = self.finish_stage(s);
+                self.gauge.phase("finish", false);
+                result.map_err(|e| self.fail(&format!("finishing stage {name}"), e))?;
                 self.stage_permille.store(0, Ordering::Release);
                 if s.current >= s.stages.len() {
                     return Ok(self.complete());
@@ -710,8 +806,39 @@ impl Session {
                     history: history.as_ref(),
                     needed_peak: Some(&self.needed_peak),
                 };
+                self.gauge.keep_below(s.allowed[k].min(self.mem_cap));
+                let mut at_start = self.gauge.in_use();
+                if at_start.saturating_add(s.working[k]) > self.mem_cap && self.gauge.release() > 0
+                {
+                    at_start = self.gauge.in_use();
+                }
+                if let Some(h) = &history {
+                    // Room for the stage's estimated working set beside the history's frames,
+                    // and for what its last step held.
+                    let resident = h.resident_bytes();
+                    let over = resident
+                        .saturating_sub(self.mem_cap.saturating_sub(s.base[k]))
+                        .max((at_start + s.working[k]).saturating_sub(self.mem_cap));
+                    if over > 0 {
+                        match h.evict(over) {
+                            Ok(e) => log_evicted(
+                                &self.log,
+                                &e,
+                                self.gauge.as_ref(),
+                                self.mem_cap,
+                                "the stage's working set",
+                            ),
+                            Err(e) => return Err(self.fail("spilling the recorded history", e)),
+                        }
+                    }
+                }
+                let at_start = self.gauge.in_use();
                 let stepped = Instant::now();
-                if let Err(e) = stage.step(&mut s.world, &ctx) {
+                self.gauge.phase(stage.name(), true);
+                let result = stage.step(&mut s.world, &ctx);
+                self.gauge.phase(stage.name(), false);
+                s.working[k] = s.working[k].max(self.gauge.phase_peak().saturating_sub(at_start));
+                if let Err(e) = result {
                     let what = format!("stage {}", stage.name());
                     return Err(self.fail(&what, e));
                 }
@@ -728,8 +855,10 @@ impl Session {
                 Ordering::Release,
             );
             let stepped = Instant::now();
-            self.after_step(s)
-                .map_err(|e| self.fail("keyframe or event publishing", e))?;
+            self.gauge.phase("keyframes", true);
+            let result = self.after_step(s);
+            self.gauge.phase("keyframes", false);
+            result.map_err(|e| self.fail("keyframe or event publishing", e))?;
             // A stage's time includes publishing its events and drawing its keyframes (a group's
             // go to its last member that stepped).
             s.timings[last].millis += stepped.elapsed().as_secs_f64() * 1000.0;
@@ -758,7 +887,10 @@ impl Session {
             }
         }
         let target = self.mem_cap - self.mem_cap / TRIM_HEADROOM;
-        let in_use = self.gauge.in_use();
+        let mut in_use = self.gauge.in_use();
+        if in_use > target && self.gauge.release() > 0 {
+            in_use = self.gauge.in_use();
+        }
         if in_use > target {
             let e = handle.evict(in_use - target)?;
             if e.frames > 0 {
@@ -1129,6 +1261,13 @@ impl Session {
     /// After `Done`: writes the world data and `manifest.json` last (tmp, fsync, rename; plan
     /// §6.3), and returns the manifest.
     pub fn finalize_write(&self) -> Result<String, CoreError> {
+        self.gauge.phase("bake", true);
+        let result = self.finalize_write_inner();
+        self.gauge.phase("bake", false);
+        result
+    }
+
+    fn finalize_write_inner(&self) -> Result<String, CoreError> {
         let s = self.lock_stepper()?;
         match self.state() {
             SessionState::Done | SessionState::Finalized => {}
@@ -1736,7 +1875,7 @@ mod tests {
         ));
         assert_eq!(
             estimate(r#"{"dummy":{"steps":1,"sleep_ms":0}}"#, "").unwrap(),
-            r#"{"base_bytes":0,"history_bytes":0,"mem_cap":4294967296,"peak_bytes":0,"spill_bytes":0,"stages":[{"base_bytes":0,"bytes":0,"coupled_to":null,"history_bytes":0,"name":"dummy","seconds":0.0,"spill_bytes":0}]}"#
+            r#"{"base_bytes":0,"history_bytes":0,"mem_cap":4294967296,"peak_bytes":0,"spill_bytes":0,"stages":[{"base_bytes":0,"bytes":0,"coupled_to":null,"history_bytes":0,"name":"dummy","own_bytes":0,"seconds":0.0,"spill_bytes":0}]}"#
         );
         let world: Value = serde_json::from_str(&estimate(DUMMY_WORLD, "").unwrap()).unwrap();
         // 256 × 88 cells (rows from z = −704, past the Lambert pole at 651.9).
@@ -1815,12 +1954,14 @@ mod tests {
         assert_eq!(big["spill_bytes"], 0);
         assert_eq!(big["peak_bytes"].as_u64().unwrap(), base + history);
         assert_eq!(big["mem_cap"], 64u64 << 30);
-        let four = at(4 << 30);
-        assert_eq!(four, at(0), "0 is the default cap, 4 GiB");
+        assert_eq!(at(4 << 30), at(0), "0 is the default cap, 4 GiB");
+        // A cap that holds the base and half the history (memacct, 2026-10-04: with the world
+        // the deposits run beside counted, this planet's base is over 4 GiB).
+        let mid = base + history / 2;
+        let four = at(mid);
         let peak = four["peak_bytes"].as_u64().unwrap();
         let spill = four["spill_bytes"].as_u64().unwrap();
-        assert!(base < 4 << 30, "the base fits 4 GiB: {base}");
-        assert!(peak <= 4 << 30 && spill > 0, "{four}");
+        assert!(peak <= mid && spill > 0, "{four}");
         assert_eq!(four["base_bytes"], big["base_bytes"]);
         let secs = |v: &Value| -> f64 {
             v["stages"]
@@ -1843,9 +1984,9 @@ mod tests {
         }
         // A cap under the base: the peak is the base, over the cap (the run would fail cleanly),
         // and the whole history would be disk.
-        let tiny = at(1 << 30);
+        let tiny = at(base / 2);
         assert_eq!(tiny["peak_bytes"], tiny["base_bytes"]);
-        assert!(tiny["peak_bytes"].as_u64().unwrap() > 1 << 30);
+        assert!(tiny["peak_bytes"].as_u64().unwrap() > base / 2);
         assert_eq!(tiny["spill_bytes"], tiny["history_bytes"]);
     }
 
