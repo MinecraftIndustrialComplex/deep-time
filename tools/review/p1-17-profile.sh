@@ -7,12 +7,16 @@
 # busiest (a Rayon worker): what the driver does while the workers wait.
 #
 #   tools/review/p1-17-profile.sh <out dir> <preset> <start> <length_myr> [threads]
+#   tools/review/p1-17-profile.sh analyse <out dir>     (the reports again, from <out>/perf.data)
 #
 # Run on the test VM (perf needs sudo there); the run is admitted as sim:<preset>:<threads>t.
 # Writes <out>/{log.txt,bench.json,perf.data,threads.txt,serial.txt,self.txt}.
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-[ $# -ge 4 ] || { sed -n 4,13p "$0"; exit 2; }
+if [ "${1:-}" = analyse ]; then
+    out=$2
+else
+[ $# -ge 4 ] || { sed -n 4,14p "$0"; exit 2; }
 out=$1; preset=$2; start=$3; len=$4; t=${5:-8}
 mkdir -p "$out"
 tdir="$out/../target-fp"
@@ -25,11 +29,13 @@ deeptime-admit run --kind "sim:$preset:${t}t" --label "p1-17-profile-$preset-$le
     --out "$out/bench.json" > "$out/log.txt" 2>&1
 echo "exit $?" >> "$out/log.txt"
 sudo chown "$(id -un)" "$out/perf.data"
+fi
 cd "$out" || exit 1
-perf report -i perf.data --no-children --sort tid --stdio -g none 2>/dev/null | grep "%" | head -12 > threads.txt
+# Samples per thread (the comm column is the thread's name; the tid follows the pid).
+perf report -i perf.data --no-children --sort tid --stdio -g none -n > tid-report.txt 2>&1
+grep "%" tid-report.txt | head -12 > threads.txt
 perf report -i perf.data --no-children --sort symbol --stdio -g none --percent-limit 0.3 2>/dev/null | grep "%" > self.txt
-mapfile -t tids < <(perf report -i perf.data --no-children --sort tid --stdio -g none -n 2>/dev/null \
-    | grep "%" | sort -k2 -n -r | awk '{print $3}' | sed 's/:.*//' | head -2)
+mapfile -t tids < <(grep "%" tid-report.txt | sort -k2 -n -r | grep -o "[0-9]*:" | tr -d : | head -2)
 for tid in "${tids[@]}"; do
     perf report -i perf.data --no-children --tid "$tid" --sort symbol --stdio -g none -n --percent-limit 0 2>/dev/null \
         | grep "%" | awk '{n=$2; $1="";$2="";$3=""; print n"\t"substr($0,1,140)}' > "tid-$tid.txt"
