@@ -125,12 +125,19 @@ def step_render(a):
 def step_stats(a):
     rc, out, _ = vm(f"python3 tools/review/phase1_vm.py scale-stats --work {WORK}", flags=["--no-sync"], log=os.path.join(OUT, "logs", "stats.log"))
     print(out.strip()[-1200:])
-    # The statistics file lives next to the bakes: bring it back through the shell.
-    rc2, txt, _ = vm(f"cat {WORK}/scale-stats.json", flags=["--no-sync"])
-    try:
-        json.dump(json.loads(txt[txt.index("["):]), open(os.path.join(OUT, "scale-stats.json"), "w"), indent=1)
-    except ValueError:
+    # `scale-stats` prints one JSON object per scale (the same as WORK/scale-stats.json): take them from its output.
+    stats = []
+    for line in out.splitlines():
+        line = line.strip()
+        if line.startswith('{"label"'):
+            try:
+                stats.append(json.loads(line))
+            except ValueError:
+                pass
+    if len(stats) < len(chosen(a)):
         return False
+    os.makedirs(OUT, exist_ok=True)
+    json.dump(stats, open(os.path.join(OUT, "scale-stats.json"), "w"), indent=1)
     return rc == 0
 
 
