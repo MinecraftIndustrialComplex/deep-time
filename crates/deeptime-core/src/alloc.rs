@@ -575,7 +575,10 @@ mod tests {
         let gone = !kept(&cache());
         keep_below(u64::MAX);
         drop(small);
-        assert!(gone, "small blocks past the ceiling gave the kept block back");
+        assert!(
+            gone,
+            "small blocks past the ceiling gave the kept block back"
+        );
     }
 
     #[test]
