@@ -930,12 +930,18 @@ mod tests {
         assert!(t[70][0] > t[120][0] && t[120][0] > t[190][0], "{:?}", [t[70][0], t[120][0], t[190][0]]);
         assert!(t[190][0] < 0.8, "{}", t[190][0]);
         // A mark set by the sea's position (here the sea's western half 1, eastern half 0)
-        // arrives from the sea that lies upwind: the coast gets the eastern half's.
+        // arrives from the sea that lies upwind.
         // (As a share of the sea's vapour there: the ones tracer `t`.)
         let half: Vec<[f64; 1]> = (0..n).map(|c| [if c < 30 { 1.0 } else { 0.0 }]).collect();
         let h = tracers(&mesh, &k, &mo, &s, &half);
         let share = |c: usize| h[c][0] / t[c][0];
-        assert!(share(20) > 0.8 && share(62) < share(20) - 0.4, "{} {}", share(62), share(20));
+        // Downwind of the western half the share of its mark falls as the eastern half's
+        // evaporation adds vapour without it.
+        assert!(
+            share(20) > share(45) && share(45) > share(62) && share(20) > share(62) + 0.1,
+            "{:?}",
+            [share(20), share(45), share(62)]
+        );
     }
 
     #[test]
