@@ -11,8 +11,9 @@
 //! crust (`L`: the front's length) crosses the front. Of its volume `s · L · H` (`H`: the mean
 //! thickness of the incoming crust at the front) the share `collision_stacking_share` stays in
 //! the crust; the rest goes down with the slab. Thickening the crust by `T` raises the ground by
-//! `T / 5.5` (Airy, `pools::ISOSTATIC_FACTOR`), so the step's ground to raise is
-//! `share · s · L · H / 5.5` (km² × m). Nothing is created: the stacked rock is the consumed
+//! `T / 7.0` (Airy with the crust's mean density, `pools::COLUMN_ISOSTATIC_FACTOR`), less what an
+//! eclogite root pulls down once the column is thick enough (`pools::isostatic_change_m`), so
+//! the step's ground to raise is `share · s · L · H / 7.0` (km² × m). Nothing is created: the stacked rock is the consumed
 //! crust's, by its mix of rock pools (its sediment and sedimentary rock buried and metamorphosed),
 //! and the volume added is the volume that crossed times the share ([`Stacked`]).
 //!
@@ -58,7 +59,7 @@ use glam::DVec3;
 use super::Env;
 use super::geometry::{Geo, dijkstra};
 use super::kinematics::{quat, tangent, to_group};
-use super::pools::{ISOSTATIC_FACTOR, isostatic_change_m};
+use super::pools::{COLUMN_ISOSTATIC_FACTOR, isostatic_change_m};
 use super::shortening::Front;
 use super::state::{Belt, CONTINENTAL, FORELAND, OROGENY_HIMALAYAN, PlateState, pool};
 use super::subduction::{MIN_CONTACT, OROGENY_MIN_M_PER_MYR, ceiling};
@@ -302,8 +303,8 @@ fn stack_front(
             .sum::<f64>()
             / f.crust.len() as f64
     };
-    // ledger: PLT-242 (the share), PLT-121 (Airy, ISOSTATIC_FACTOR).
-    let rise_km2_m = k.collision_stacking_share * crossed_km2 * thickness_m / ISOSTATIC_FACTOR;
+    // ledger: PLT-242 (the share), PLT-281 (Airy with the crust's mean density).
+    let rise_km2_m = k.collision_stacking_share * crossed_km2 * thickness_m / COLUMN_ISOSTATIC_FACTOR;
     let fill = if deficit_km2_m > 0.0 {
         (rise_km2_m / deficit_km2_m).min(1.0)
     } else {
@@ -393,7 +394,7 @@ fn stack_front(
         if airy_dz <= 0.0 {
             continue;
         }
-        let added = airy_dz * ISOSTATIC_FACTOR;
+        let added = airy_dz * COLUMN_ISOSTATIC_FACTOR;
         let before = s.pools;
         for (p, m) in s.pools.iter_mut().zip(mix.iter()) {
             *p += (added * m) as f32;

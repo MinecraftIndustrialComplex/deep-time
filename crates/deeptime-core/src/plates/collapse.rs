@@ -41,11 +41,12 @@
 //! Volume is conserved: the rock moved is the collapsing column's own mix, thinned in
 //! proportion, as pure-shear extension does.
 //!
-//! The surface follows by Airy (`pools::ISOSTATIC_FACTOR`, 5.5 m of crust per m of height),
-//! within the Airy height of the column, z_A(T) = z_0 + (T − T_n) / 5.5 (z_0 the middle of
-//! `continent_elevation_m`): a source sinks by q / 5.5 but not below z_A of the crust it keeps,
+//! The surface follows by Airy (`pools::COLUMN_ISOSTATIC_FACTOR`, 7.0 m of crust per m of height,
+//! less the pull of an eclogite root, `pools::isostatic_change_m`; PLT-278 to PLT-281),
+//! within the Airy height of the column, z_A(T) = z_0 + (T − T_n) / 7.0 (z_0 the middle of
+//! `continent_elevation_m`): a source sinks by q / 7.0 but not below z_A of the crust it keeps,
 //! so a root that never raised its surface (an overlap stack) does not drag it down as it
-//! spreads; a receiver rises by g / 5.5 but not above z_A of its new column, so ocean floor
+//! spreads; a receiver rises by g / 7.0 but not above z_A of its new column, so ocean floor
 //! filled to T_n stands at a continent's height and thin crust that the surface already holds
 //! high is not raised further.
 //!
@@ -82,7 +83,7 @@ use std::collections::BTreeMap;
 use super::Env;
 use super::geometry::{Geo, dijkstra};
 use super::pools::{
-    ISOSTATIC_FACTOR, continental_column, eclogite_m, isostatic_change_m, root_drop_m,
+    COLUMN_ISOSTATIC_FACTOR, continental_column, eclogite_m, isostatic_change_m, root_drop_m,
 };
 use super::state::{CONTINENTAL, OCEANIC, PlateState, TRENCH, pool};
 
@@ -169,10 +170,10 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
 
 /// A continental column's isostatic height, m: the middle of `continent_elevation_m` (`z_0`) for
 /// the normal column, plus the Airy height of the thickness beyond it, less its eclogite root's
-/// pull (PLT-121, PLT-278).
+/// pull (PLT-281, PLT-278).
 fn iso_height(pools: &[f32; pool::COUNT], z_0: f64, gravity: f64) -> f64 {
     let t: f64 = pools.iter().map(|&x| f64::from(x.max(0.0))).sum();
-    z_0 + (t - normal_thickness_m()) / ISOSTATIC_FACTOR - root_drop_m(eclogite_m(pools, gravity))
+    z_0 + (t - normal_thickness_m()) / COLUMN_ISOSTATIC_FACTOR - root_drop_m(eclogite_m(pools, gravity))
 }
 
 /// Moves a surface at `z` by `change` towards the column's isostatic height `iso`, never past it:
@@ -325,7 +326,7 @@ fn spread(
                 *m += before - f64::from(*x);
             }
             s.thickness_m = s.pools.iter().sum();
-            // Isostasy (PLT-121, PLT-278): down by take / 5.5 less the root's change, not below
+            // Isostasy (PLT-281, PLT-278): down by take / 7.0 less the root's change, not below
             // the height the crust kept holds up.
             let z = f64::from(s.elevation_m);
             let change = isostatic_change_m(&pools_before, &s.pools, env.gravity);
@@ -347,7 +348,7 @@ fn spread(
                 *x += (g * m) as f32;
             }
             s.thickness_m = s.pools.iter().sum();
-            // Isostasy (PLT-121, PLT-278): up by g / 5.5 less the root's change, not above the
+            // Isostasy (PLT-281, PLT-278): up by g / 7.0 less the root's change, not above the
             // height the crust now holds up.
             let z = f64::from(s.elevation_m);
             let change = isostatic_change_m(&pools_before, &s.pools, env.gravity);
@@ -393,7 +394,7 @@ mod tests {
 
     /// Plate 0 is x < 0, plate 1 x ≥ 0. A continent (35.1 km, 300 m) within 40° of +y on both,
     /// ocean floor at −4.5 km elsewhere; on the continent a belt (`belt(p)`) thickened by
-    /// `thick_m` and raised by `thick_m` / 5.5.
+    /// `thick_m` and raised by `thick_m` / 7.0.
     fn planet(geo: &Geo, belt: impl Fn(DVec3) -> bool, thick_m: f32) -> PlateState {
         let samples: Vec<Sample> = geo
             .points()
@@ -406,7 +407,7 @@ mod tests {
                     s.elevation_m = 300.0;
                     if belt(p) {
                         s.pools[pool::METAMORPHIC] += thick_m;
-                        s.elevation_m += thick_m / ISOSTATIC_FACTOR as f32;
+                        s.elevation_m += thick_m / COLUMN_ISOSTATIC_FACTOR as f32;
                     }
                 } else {
                     s.pools[pool::MAFIC_VOLCANIC] = 2000.0;
@@ -533,7 +534,7 @@ mod tests {
         // Airy height.
         let t_c = fx.k.collapse_thickness_km * 1000.0;
         let airy = 0.5 * (fx.k.continent_elevation_m[0] + fx.k.continent_elevation_m[1])
-            + (t_c - normal_thickness_m()) / ISOSTATIC_FACTOR;
+            + (t_c - normal_thickness_m()) / COLUMN_ISOSTATIC_FACTOR;
         let in_belt: Vec<usize> = (0..st.samples.len())
             .filter(|&i| belt(fx.geo.points()[i]))
             .collect();
@@ -556,7 +557,7 @@ mod tests {
                 assert!(p.y.acos() - 0.766f64.acos() < reach, "{p}");
                 // Raised to a continent's height, not above the Airy height of its column.
                 let z_a = 0.5 * (fx.k.continent_elevation_m[0] + fx.k.continent_elevation_m[1])
-                    + (f64::from(s.thickness_m) - normal_thickness_m()) / ISOSTATIC_FACTOR;
+                    + (f64::from(s.thickness_m) - normal_thickness_m()) / COLUMN_ISOSTATIC_FACTOR;
                 assert!(s.elevation_m > z0[i] && f64::from(s.elevation_m) <= z_a + 1.0);
             }
         }
