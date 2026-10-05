@@ -178,6 +178,10 @@ pub const ACCRETED_GLOBAL: &str = "plates/resample_accreted_km3";
 /// … and the continental crust a collision had hidden, consumed instead (it was stacked into the
 /// belt or went down with the slab; ledger PLT-276), km³ (Earth-normalized).
 pub const STACKED_CONSUMED_GLOBAL: &str = "plates/resample_stacked_km3";
+/// Of the crust accreted: hidden continental crust (not a collision's) and visible crust of the
+/// same or a subducting plate, km³ (the rest is the sediment of hidden ocean floor).
+pub const ACCRETED_HIDDEN_CONTINENT_GLOBAL: &str = "plates/resample_accreted_continent_km3";
+pub const ACCRETED_VISIBLE_GLOBAL: &str = "plates/resample_accreted_visible_km3";
 
 /// Resamples the crust onto a fresh lattice and returns its geometry.
 pub fn resample(
@@ -264,7 +268,7 @@ pub fn resample(
     // went down with the slab (`belts.rs`): it is consumed here, not accreted a second time
     // (ledger: PLT-276). Both are counted, m of rock per new sample.
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
-    let mut tally: Vec<(f64, f64)> = vec![(0.0, 0.0); n];
+    let mut tally: Vec<[f64; 4]> = vec![[0.0; 4]; n];
     let double = std::env::var_os("DT_EXP_DOUBLE").is_some(); // TEMP-EXP
     let mut samples: Vec<Sample> = found
         .par_iter()
@@ -285,9 +289,16 @@ pub fn resample(
                             .map(|&x| f64::from(x))
                             .sum();
                         if under.is_hidden() && under.stacked && !double /* TEMP-EXP */ {
-                            tally.1 += conserved;
+                            tally[1] += conserved;
                         } else {
-                            tally.0 += conserved;
+                            // What accretes: hidden continental crust, hidden ocean floor's
+                            // sediment, or visible crust of the same or a subducting plate.
+                            tally[0] += conserved;
+                            if !under.is_hidden() {
+                                tally[3] += conserved;
+                            } else if under.kind == CONTINENTAL {
+                                tally[2] += conserved;
+                            }
                             accrete(&mut s.pools, &u.pools);
                         }
                     }
@@ -298,17 +309,15 @@ pub fn resample(
         })
         .collect();
     let area_km2 = norm.sample_area_km2();
-    let (accreted_m, consumed_m) = tally
-        .iter()
-        .fold((0.0, 0.0), |a, &(x, y)| (a.0 + x, a.1 + y));
-    *world
-        .globals
-        .entry(ACCRETED_GLOBAL.to_owned())
-        .or_insert(0.0) += accreted_m * area_km2 / 1000.0;
-    *world
-        .globals
-        .entry(STACKED_CONSUMED_GLOBAL.to_owned())
-        .or_insert(0.0) += consumed_m * area_km2 / 1000.0;
+    let sum = |k: usize| tally.iter().map(|t| t[k]).sum::<f64>() * area_km2 / 1000.0;
+    for (name, k) in [
+        (ACCRETED_GLOBAL, 0),
+        (STACKED_CONSUMED_GLOBAL, 1),
+        (ACCRETED_HIDDEN_CONTINENT_GLOBAL, 2),
+        (ACCRETED_VISIBLE_GLOBAL, 3),
+    ] {
+        *world.globals.entry(name.to_owned()).or_insert(0.0) += sum(k);
+    }
 
     // Gaps: fresh oceanic crust between diverging plates.
     let gap: Vec<bool> = plate_new.iter().map(|&p| p == u32::MAX).collect();
