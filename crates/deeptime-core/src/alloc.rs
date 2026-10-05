@@ -187,8 +187,14 @@ mod os {
     const MAP_FAILED: *mut c_void = !0usize as *mut c_void;
 
     unsafe extern "C" {
-        fn mmap(addr: *mut c_void, len: usize, prot: i32, flags: i32, fd: i32, off: i64)
-        -> *mut c_void;
+        fn mmap(
+            addr: *mut c_void,
+            len: usize,
+            prot: i32,
+            flags: i32,
+            fd: i32,
+            off: i64,
+        ) -> *mut c_void;
         fn munmap(addr: *mut c_void, len: usize) -> i32;
         fn mremap(old: *mut c_void, old_len: usize, new_len: usize, flags: i32, ...)
         -> *mut c_void;
@@ -445,7 +451,10 @@ mod tests {
         let v = vec![0u8; (64 << 20) + 1];
         assert!(v.iter().step_by(4096).all(|&b| b == 0), "not zeroed");
         // Other test threads allocate concurrently, so only check the order of magnitude.
-        assert!(in_use() >= before + (64 << 20) - (8 << 20), "in_use did not grow");
+        assert!(
+            in_use() >= before + (64 << 20) - (8 << 20),
+            "in_use did not grow"
+        );
         assert!(peak() >= 64 << 20);
         drop(v);
         // The freed block is kept for reuse, and counted, until the cache is released.
@@ -510,7 +519,10 @@ mod tests {
         drop(v);
         let v = vec![0u8; len];
         assert_eq!(v.as_ptr() as usize, first, "the freed block was reused");
-        assert!(v.iter().all(|&b| b == 0), "a reused block is zeroed when asked");
+        assert!(
+            v.iter().all(|&b| b == 0),
+            "a reused block is zeroed when asked"
+        );
         drop(v);
         assert!(release_cache() >= pages(len) as u64);
     }

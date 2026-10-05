@@ -3,8 +3,8 @@
 //! before a stage allocates and the peak is reported in the progress block. It counts every
 //! allocation of the library (all sessions together); the JVM heap is separate.
 
-pub use deeptime_core::alloc::{AllocGauge, in_use, peak};
 use deeptime_core::alloc::CountingAlloc;
+pub use deeptime_core::alloc::{AllocGauge, in_use, peak};
 
 #[global_allocator]
 static GLOBAL: CountingAlloc = CountingAlloc;

@@ -81,8 +81,7 @@ fn preset() -> String {
 fn no_stage_holds_more_than_its_estimate() {
     let json = preset();
     let estimate: Value =
-        serde_json::from_str(&deeptime_core::session::estimate_for(&json, "", 0).unwrap())
-            .unwrap();
+        serde_json::from_str(&deeptime_core::session::estimate_for(&json, "", 0).unwrap()).unwrap();
     let dir: PathBuf =
         std::env::temp_dir().join(format!("deeptime-memory-estimate-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -143,7 +142,11 @@ fn no_stage_holds_more_than_its_estimate() {
         mib(peaks.get("bake").copied().unwrap_or(0)),
     );
     if run_peak > est_peak {
-        over.push(format!("the run: {:.1} > {:.1} MiB", mib(run_peak), mib(est_peak)));
+        over.push(format!(
+            "the run: {:.1} > {:.1} MiB",
+            mib(run_peak),
+            mib(est_peak)
+        ));
     }
     assert!(over.is_empty(), "held more than estimated: {over:?}");
 }

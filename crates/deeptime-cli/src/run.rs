@@ -996,7 +996,13 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         let mib = |v: &Value, k: &str| v[k].as_f64().unwrap_or(0.0) / 1048576.0;
         let stages = e["stages"].as_array().map_or(String::new(), |st| {
             st.iter()
-                .map(|x| format!("{}={:.0}", x["name"].as_str().unwrap_or("?"), mib(x, "bytes")))
+                .map(|x| {
+                    format!(
+                        "{}={:.0}",
+                        x["name"].as_str().unwrap_or("?"),
+                        mib(x, "bytes")
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join(" ")
         });
