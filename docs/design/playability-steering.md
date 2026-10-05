@@ -298,34 +298,88 @@ them, as targets of the same controllers plus one more control:
 
 The climate note gains `steering`: the settings, the weight's start, the final sea-level offset
 (m and km³, and as a share of the ocean), the final outgassing factor, the land share and
-temperature at the start of the tail and at the end, and whether each target was met. The climate
-series (one row per plate step) gains three columns: `steer_weight`, `steer_sea_m`,
-`steer_ln_outgas`, beside the land share. The steering is part of a world's provenance: the
-manifest's notes say a world was steered and how hard.
+temperature at the start of the tail and at the end, whether each target was met, the artefact
+counters (largest step of each control, reversals of direction) and one row per steered plate step
+(`t_myr, weight, land_frac, t_global_c, sea_offset_m, ln_outgassing`). The climate's own series is
+left as it was, so an unsteered run's notes are unchanged. The steering is part of a world's
+provenance: the manifest's notes say a world was steered and how hard.
 
 ## 8. Measurements
 
 ### 8.1 Method
 
-Test VM, `deeptime run` (release), quick 16k preset, 4 threads, scattered start 500 Myr and
-supercontinent 1,000 Myr, seeds as listed. Scratch under `/Volumes/Graphide/ban/deeptime-runs/
-steering/`, deleted after.
+**Measured** on the test VM, 2026-10-05: `deeptime run` (release, this branch before the merge of
+master 6489d4a5), quick 16k preset, scattered start, 500 Myr, 4 threads, seeds 1 and 2;
+`tools/review/steering-measure.sh` runs steering off, at its defaults and strong (tail 0.2, 10
+m/Myr up to 600 m, outgassing 0.5/Myr up to ×4), each with `--epochs`, then picks the 250-Myr
+epoch, stops at 120 Myr and continues to 700 Myr from copies of the seed-1 default run;
+`tools/review/steering-report.py` summarises. Master's binary (e102343b) ran the same two seeds for
+the identity check. Scratch under `/Volumes/Graphide/ban/deeptime-runs/steering/`, deleted after.
 
 ### 8.2 Epoch checkpoints (size, time)
 
-(filled in from the runs; see STATUS.md build log 2026-10-05, "Playability tools")
+| run | checkpoints | store on disk | writing them | the run |
+|---|---|---|---|---|
+| seed 1, steering off | 10 | 2.85 GiB | 12.5 s | 662 s |
+| seed 1, default steering | 10 | 2.64 GiB | 12.4 s | 655 s |
+| seed 2, default steering | 10 | 2.65 GiB | 11.2 s | 649 s |
+
+One checkpoint is about 250 MB of world body (the L1 fields, the plate samples, the surface's
+strata log); the recorded history (222 MB at 500 Myr, 50 frames) is stored once across the chain.
+Writing costs about 2 % of the run. Without the chain the store would have held the history ten
+times (about 1.2 GB more at these sizes, growing with the square of the run's length). The cap of
+about ten checkpoints (`EPOCH_CHECKPOINTS`) bounds the store at about ten bodies whatever the
+length: on a 1,000-Myr run the grid becomes 100 Myr, so a frame between two checkpoints reruns at
+most 100 Myr plus its tail.
 
 ### 8.3 What the nudges cost
 
-(filled in)
+Nothing measurable: steering off 662 s and 655 s against 655 s and 649 s with the defaults (the
+VM's noise is larger). The controllers are two area sums over L1 per plate step.
+
+**Steering off changes nothing.** The seed 1 and 2 runs with `steering.enabled: false` against
+master's binary: 24 of the 27 files the manifest lists are byte-identical; the others are `preset.json`
+(it names the section) and the event log (`events/1-0.dtev` and its index), which differ by a bug
+this task fixed in passing (inferred: it is the only change to how events are written; every
+other file being identical shows the worlds are):
+the Andean orogeny event's end time was written in Myr instead of years (`plates/subduction.rs`;
+on a run ending at the present it read as a few years before 0; a run continued past the present
+made it end before it began, and the event validator refused it).
 
 ### 8.4 Pick, stop and continue: what reruns
 
-(filled in)
+| what (seed 1, default steering, 500-Myr run of 655 s) | resumed from | steps run | keyframes kept | wall time |
+|---|---|---|---|---|
+| pick the 250-Myr epoch | step 112 (224 Myr) | 13 of 125 | 5 | 119 s |
+| stop at 120 Myr | step 45 (90 Myr) | 15 of 60 | 2 | 116 s |
+| continue to 700 Myr | step 225 (450 Myr) | 125 of 350 | 10 | 302 s |
+
+About 90 s of each is the end stages and the bake (deposits, young landscape, amplification,
+the bake: as in a run of that length). A continue reruns the old tail (50 Myr with the default
+10 %) plus the new span; a planned 700-Myr run would take about 900 s.
 
 ### 8.5 How hard the nudges can steer, and the defaults
 
-(filled in)
+| run | land at the tail's start | land at the end | unsteered end | sea offset | as Earth's ocean | largest step | reversals | mean T at end |
+|---|---|---|---|---|---|---|---|---|
+| seed 1, default (2 m/Myr, ≤ 200 m, 10 %) | 0.171 | 0.160 | 0.151 | −52 m | 2.4 % | 4 m | 0 | 17.1 °C |
+| seed 2, default | 0.216 | 0.183 | 0.176 | −41 m | 1.9 % | 4 m | 0 | 16.4 °C |
+| seed 1, strong (10 m/Myr, ≤ 600 m, 20 %) | 0.183 | 0.211 | 0.151 | −473 m | 20.8 % | 18 m | 0 | 14.0 °C |
+| seed 2, strong | 0.188 | 0.217 | 0.176 | −269 m | 11.7 % | 13 m | 0 | 15.9 °C |
+
+- **Land.** These planets lose land through their last 50–100 Myr (seed 2: 0.216 → 0.183 even
+  steered) and end far below the 25 % the band asks; the plate model's crust budget is the cause
+  (decisions log 2026-10-05, plate tasks 7–8). The default nudge adds 0.7–0.9 points of land; the
+  strong one 4–6 points, but only by drawing 12–21 % of an Earth ocean's water into the mantle
+  (270–470 m of sea level, beyond the ±250 m of Earth's Phanerozoic). Neither reaches the band.
+- **Artefacts.** No reversal of either control in any run; the sea moves at most `rate × dt` a
+  step (4 m and 13–18 m a 2-Myr step), smoothly ramped.
+- **Temperature.** All six ended between 14 and 17 °C, inside the temperate band, so the
+  outgassing controller never acted (factor 1.0). The warm and cool targets measure it (below).
+- **Defaults kept gentle** (2 m/Myr, at most 200 m, outgassing 0.2/Myr up to ×2, 10 % of the run):
+  within Earth's long-term eustatic rates and its outgassing range, so a steered world is still a
+  world its physics could have made. Reaching the land band on today's planets would take
+  unphysical amounts of water; that is a question for Ben (STATUS.md, Pending questions).
 
 ## 9. Tests
 
