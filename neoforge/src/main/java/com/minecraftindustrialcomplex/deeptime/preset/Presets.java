@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.regex.Pattern;
 
@@ -206,6 +207,30 @@ public final class Presets {
         tl.addProperty("length_myr", t.lengthMyr()); // a double, "1000.0", as Rust's with_timeline writes it
         copy.add("timeline", tl);
         return canonical(copy);
+    }
+
+    /**
+     * Sets {@code timeline.stop_myr} (Myr after the start at which the run stops: less than the
+     * length stops it early, more continues it; docs/design/playability-steering.md) and returns
+     * the canonical JSON. The preset must carry a timeline.
+     */
+    public static String withStop(String presetJson, double stopMyr) {
+        JsonObject copy = parseObject(presetJson);
+        if (!copy.has("timeline") || !copy.get("timeline").isJsonObject())
+            throw new PresetException("a stop needs a timeline");
+        copy.getAsJsonObject("timeline").addProperty("stop_myr", stopMyr);
+        return canonical(copy);
+    }
+
+    /** Where a preset's run stops, Myr after its start: {@code timeline.stop_myr}, else its length. */
+    public static OptionalDouble stopMyr(JsonObject preset) {
+        if (!preset.has("timeline") || !preset.get("timeline").isJsonObject())
+            return OptionalDouble.empty();
+        JsonObject t = preset.getAsJsonObject("timeline");
+        Optional<Double> stop = number(t, "stop_myr");
+        if (stop.isPresent())
+            return OptionalDouble.of(stop.get());
+        return number(t, "length_myr").map(OptionalDouble::of).orElse(OptionalDouble.empty());
     }
 
     private static Optional<String> string(JsonObject o, String key) {
