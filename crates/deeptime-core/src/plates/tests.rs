@@ -497,8 +497,8 @@ fn sutures_and_initiations_keep_continents_whole() {
     let mut sutures = 0;
     let mut initiations = 0;
     // Seeds where the force balance welds a collision within 300 Myr on this small planet (a
-    // sweep of 30 runs, 2026-10-05: 11 welded).
-    for (start, seed) in [("supercontinent", 7), ("scattered_continents", 3)] {
+    // sweep of 32 runs, 2026-10-05, stacking share 0.95: 12 welded).
+    for (start, seed) in [("supercontinent", 2), ("scattered_continents", 7)] {
         let p = preset(8000, 300.0, start, seed);
         let mut seen = 0usize;
         let world = run_stage(&p, |stage, world, st| {
@@ -755,7 +755,7 @@ impl CollisionLives {
 fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // A seed whose collisions weld (two in 300 Myr; under the force balance a held collision
     // welds less often than under the old speed law, and most 300-Myr runs of this planet have none).
-    let p = preset(8000, 300.0, "scattered_continents", 1);
+    let p = preset(8000, 300.0, "scattered_continents", 8);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -859,7 +859,7 @@ fn the_collision_footprint_lives_with_its_collision() {
 fn recording_does_not_change_the_world_and_matches_the_run() {
     // A seed with welds, so the collision record is tested (as in
     // `collisions_weld_on_stall_and_transfer_on_shortening`).
-    let p = preset(8000, 300.0, "scattered_continents", 1);
+    let p = preset(8000, 300.0, "scattered_continents", 13);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
@@ -1400,34 +1400,5 @@ fn a_rift_that_does_not_open_heals_and_one_that_opens_does_not() {
             assert_eq!(healed_at, None, "a rift that opened healed");
             assert_eq!(st.alive().count(), 2);
         }
-    }
-}
-
-/// TEMP-SWEEP: which seeds weld and suture in 300 Myr on the 8000-sample test planet.
-#[test]
-#[ignore]
-fn temp_sweep_welds() {
-    use rayon::prelude::*;
-    let cases: Vec<(&str, u64)> = ["supercontinent", "scattered_continents"]
-        .iter()
-        .flat_map(|&s| (1u64..=16).map(move |k| (s, k)))
-        .collect();
-    let out: Vec<String> = cases
-        .par_iter()
-        .map(|&(start, seed)| {
-            let p = preset(8000, 300.0, start, seed);
-            let world = run_stage(&p, |_, _, _| {});
-            let st = world.plates.as_ref().unwrap();
-            let d = st.dynamics.as_ref().unwrap();
-            format!(
-                "SWEEP {start} {seed}: sutures {} collisions {} sutured {}",
-                st.counters.sutures,
-                d.collisions.len(),
-                d.collisions.iter().filter(|c| c.sutured).count()
-            )
-        })
-        .collect();
-    for l in out {
-        eprintln!("{l}");
     }
 }
