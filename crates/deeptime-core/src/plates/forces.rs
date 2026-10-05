@@ -746,7 +746,12 @@ fn sig4(x: f64) -> f64 {
 /// thickness `t_m` over [`CONTINENT_BUOYANCY_CRUST_KM`]. So continental crust "resists
 /// subduction" (Cloos 1993): a collision slows as it shortens and stalls once nothing else pulls
 /// hard enough.
-pub fn collision_buoyancy_n_m(pull_n_m: f64, slab_depth_km: f64, t_m: f64, shortening_km: f64) -> f64 {
+pub fn collision_buoyancy_n_m(
+    pull_n_m: f64,
+    slab_depth_km: f64,
+    t_m: f64,
+    shortening_km: f64,
+) -> f64 {
     let d = slab_depth_km.max(1.0);
     CONTINENT_BUOYANCY_RATIO // ledger: FRC-030
         * pull_n_m
@@ -766,13 +771,7 @@ pub fn relax(omega: DVec3, target: DVec3, dt_myr: f64, tau_myr: f64) -> DVec3 {
 /// updated). Updates the slabs (`PlateState::slabs`) and, when the dynamics record is on, its
 /// memory of the last answers; returns each plate's balance rotation, which the plates step
 /// relaxes the plates' motion towards.
-pub fn step(
-    st: &mut PlateState,
-    geo: &Geo,
-    pos: &[DVec3],
-    env: &Env<'_>,
-    flow: DVec3,
-) -> Answer {
+pub fn step(st: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>, flow: DVec3) -> Answer {
     let mut slabs = std::mem::take(&mut st.slabs);
     let (omega, solved, out) = balance_step(st, geo, pos, env, flow, &mut slabs);
     st.slabs = slabs;
@@ -1573,18 +1572,22 @@ mod tests {
             let w = bal.solve().unwrap();
             // The known answer, from the same sums about the y axis.
             let d = bal.acc[0].drag.col(1).y;
-            let kk: f64 = bal
-                .links
-                .iter()
-                .map(|l| bal.link_matrix(l).col(1).y)
-                .sum();
+            let kk: f64 = bal.links.iter().map(|l| bal.link_matrix(l).col(1).y).sum();
             let t = bal.acc[0].t_pull.y;
             let det = d * (d + 2.0 * kk);
             let (w0, w1) = (t * (d + kk) / det, t * kk / det);
             // (The 2 × 2 answer leaves out the lattice's small cross terms about the other axes;
             // under stiff coupling they shift the answer by a few parts in a million.)
-            assert!((w[0].y - w0).abs() < 1e-4 * w0.abs(), "{br}: {} {w0}", w[0].y);
-            assert!((w[1].y - w1).abs() < 1e-4 * w0.abs(), "{br}: {} {w1}", w[1].y);
+            assert!(
+                (w[0].y - w0).abs() < 1e-4 * w0.abs(),
+                "{br}: {} {w0}",
+                w[0].y
+            );
+            assert!(
+                (w[1].y - w1).abs() < 1e-4 * w0.abs(),
+                "{br}: {} {w1}",
+                w[1].y
+            );
             if br == 0.0 {
                 assert!(w[1].length() < 1e-12 * w[0].length());
             }
@@ -1645,7 +1648,10 @@ mod tests {
         assert_eq!(collision_buoyancy_n_m(f, d, 30_000.0, 0.0), 0.0);
         let f100 = collision_buoyancy_n_m(f, d, 30_000.0, 100.0);
         assert!((f100 / collision_buoyancy_n_m(f, d, 30_000.0, 50.0) - 2.0).abs() < 1e-12);
-        assert!((f100 / (2.25 * f * 100.0 / 700.0) - 1.0).abs() < 1e-12, "{f100}");
+        assert!(
+            (f100 / (2.25 * f * 100.0 / 700.0) - 1.0).abs() < 1e-12,
+            "{f100}"
+        );
         assert!((f100 / f - 0.3214).abs() < 1e-3);
         // Thicker crust, more buoyancy.
         let thick = collision_buoyancy_n_m(f, d, 45_000.0, 100.0);

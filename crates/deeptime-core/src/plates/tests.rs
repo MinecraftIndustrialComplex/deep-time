@@ -1000,7 +1000,11 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     assert_eq!(balance_steps, total, "a balance every step");
     // The switch (force-balance design, task 7): the balance was solved every step and the speed
     // guard never bound in 300 Myr; plates started at rest and the balance set them moving.
-    assert_eq!(with.globals.get(UNSOLVED_GLOBAL), None, "an unsolved balance");
+    assert_eq!(
+        with.globals.get(UNSOLVED_GLOBAL),
+        None,
+        "an unsolved balance"
+    );
     assert_eq!(
         with.globals.get(GUARD_BOUND_GLOBAL),
         None,
@@ -1021,7 +1025,10 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
                 .collect(),
         );
         assert!(late > 10.0, "the plates hardly move: median {late} mm/yr");
-        assert!(first < late, "plates did not start at rest: {first} against {late}");
+        assert!(
+            first < late,
+            "plates did not start at rest: {first} against {late}"
+        );
     }
     assert!(longest_slab > 0.0, "no slab grew in 300 Myr");
     assert!(mix_seen > 0.0, "no plate boundary recorded in 300 Myr");
@@ -1256,7 +1263,12 @@ fn a_resampling_accretes_hidden_continent_once() {
     let conserved = |st: &PlateState| -> f64 {
         st.samples
             .iter()
-            .map(|s| s.pools[..state::pool::CONSERVED].iter().map(|&x| f64::from(x)).sum::<f64>())
+            .map(|s| {
+                s.pools[..state::pool::CONSERVED]
+                    .iter()
+                    .map(|&x| f64::from(x))
+                    .sum::<f64>()
+            })
             .sum()
     };
     let mut out = Vec::new();

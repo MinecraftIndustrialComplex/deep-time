@@ -1089,8 +1089,7 @@ mod tests {
                 if let Some(target) = ans.omega[p] {
                     let w = DVec3::from_array(st.plates[p].omega);
                     st.plates[p].omega =
-                        crate::plates::forces::relax(w, target, 2.0, k.motion_relax_myr)
-                            .to_array();
+                        crate::plates::forces::relax(w, target, 2.0, k.motion_relax_myr).to_array();
                 }
             }
         }
@@ -1115,7 +1114,10 @@ mod tests {
             .expect("it never stalled");
         assert!(conv[slow] < 0.5 * conv[0], "{conv:?}");
         let waited = 2.0 * (fired_at as usize - 1 - slow) as f64;
-        assert!(waited >= k.weld_after_myr - 2.0, "fired {waited} Myr after the stall");
+        assert!(
+            waited >= k.weld_after_myr - 2.0,
+            "fired {waited} Myr after the stall"
+        );
         assert!(st.contacts[0].collision.as_ref().unwrap().belt.height_m > 0.0);
     }
 

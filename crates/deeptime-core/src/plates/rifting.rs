@@ -28,9 +28,9 @@ use super::geometry::{Geo, coast_split, connect_plates};
 use super::noise::fbm;
 use super::state::{CONTINENTAL, Group, HIDDEN, Plate, PlateState, RiftLink, SlabTrack, TRENCH};
 use crate::error::CoreError;
-use deeptime_format::EventId;
 use crate::sphere::kdtree::angle_of_chord2;
 use crate::world::WorldState;
+use deeptime_format::EventId;
 
 /// Plates below this many samples never rift.
 const MIN_RIFT_SAMPLES: u32 = 64;
@@ -556,10 +556,8 @@ pub fn heal(
     let mut due: Vec<(u32, u32, EventId)> = Vec::new();
     for l in &mut state.rift_links {
         let key = (l.a, l.b);
-        let quiet = !touching.contains(&key)
-            && fastest
-                .get(&key)
-                .is_some_and(|&v| v < k.weld_speed_mm_yr); // ledger: PLT-272, PLT-246
+        let quiet =
+            !touching.contains(&key) && fastest.get(&key).is_some_and(|&v| v < k.weld_speed_mm_yr); // ledger: PLT-272, PLT-246
         if quiet {
             let since = *l.quiet_since_myr.get_or_insert(t - env.dt_myr);
             if t - since >= k.weld_after_myr - 1e-9 {
