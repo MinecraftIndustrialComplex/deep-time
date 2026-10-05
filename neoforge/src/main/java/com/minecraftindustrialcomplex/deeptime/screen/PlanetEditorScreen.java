@@ -77,7 +77,26 @@ public final class PlanetEditorScreen extends Screen {
 
     /** The model of a Create World screen (created on first use). */
     static EditorModel model(WorldCreationUiState ui) {
-        return MODELS.computeIfAbsent(ui, k -> new EditorModel(EditorModel.Deps.game(FMLPaths.GAMEDIR.get(), LOADER, IO)));
+        return MODELS.computeIfAbsent(ui, k -> new EditorModel(EditorModel.Deps.game(FMLPaths.GAMEDIR.get(), LOADER, IO,
+                () -> packContent(ui))));
+    }
+
+    /**
+     * The content bundle of a run started here: the pack placement tables in Deep Time's jar whose biomes the Create
+     * World screen's data packs register (decisions log 2026-10-04; {@code climate.PlacementPacks}). Empty when none
+     * apply or they cannot be read (the run then uses the default table; the log says why).
+     */
+    private static String packContent(WorldCreationUiState ui) {
+        try {
+            var chosen = com.minecraftindustrialcomplex.deeptime.climate.ClimatePlacement.chosen(
+                    com.minecraftindustrialcomplex.deeptime.climate.ClimatePlacement.jarPacks(),
+                    ui.getSettings().worldgenLoadContext());
+            // The bake records the ones it used (notes.bake.climate.placement.patches).
+            return com.minecraftindustrialcomplex.deeptime.climate.PlacementPacks.addTo("", chosen);
+        } catch (java.io.IOException | RuntimeException e) {
+            DeepTime.LOGGER.warn("[deeptime] pack placement tables not used: {}", e.toString());
+            return "";
+        }
     }
 
     /**

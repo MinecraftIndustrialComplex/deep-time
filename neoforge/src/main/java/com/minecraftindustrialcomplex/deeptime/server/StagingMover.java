@@ -39,6 +39,8 @@ public final class StagingMover {
 
     /** The partial copy's suffix, next to the target. */
     static final String COPY_SUFFIX = ".staging-copy";
+    /** The epoch checkpoints' folder of a run (Rust `epochs::EPOCHS_DIR`). */
+    static final String EPOCHS_DIR = "epochs";
 
     private StagingMover() {}
 
@@ -75,6 +77,10 @@ public final class StagingMover {
             if (Files.exists(target))
                 Staging.deleteTree(target); // a partial folder without a manifest: never valid data
             Files.createDirectories(target.toAbsolutePath().getParent());
+            // The epoch checkpoints (pick the epoch, stop, continue; docs/design/
+            // playability-steering.md) end with the editor: a world never needs them, and they are
+            // the largest files of a staging folder.
+            Staging.deleteTree(staging.resolve(EPOCHS_DIR));
         } catch (IOException e) {
             throw new StagingException("cannot prepare " + target + ": " + e, e);
         }

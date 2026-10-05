@@ -151,6 +151,59 @@ class BiomeRuleSetTest {
         assertTrue(parse.apply("{\"rules\": [{\"biomes\": \"a:b\", \"p_mm\": {}}]}").getMessage().contains("neither"));
     }
 
+    /** A column for the geology gate: its ground role bits and the biome its own slot holds. */
+    private record G(String koppen, int groundBits, String slot) implements Facts {
+        public double tMean() { return 10; }
+        public double tWarm() { return 18; }
+        public double tCold() { return 2; }
+        public double pMm() { return 900; }
+        public double elevationM() { return 200; }
+        public Wetland wetland() { return Wetland.NONE; }
+        public boolean ice() { return false; }
+        public boolean playa() { return false; }
+        public boolean volcanic() { return false; }
+        public String topRock() { return ""; }
+        public boolean plainIn(List<String> ids) { return false; }
+
+        @Override
+        public int ground() {
+            return groundBits;
+        }
+
+        @Override
+        public boolean slotIn(List<String> ids) {
+            return ids.contains(slot);
+        }
+    }
+
+    @Test
+    void theGeologyGateKeepsRockNamedBiomesToTheirGround() throws IOException {
+        BiomeRuleSet.File gate = shipped("rock_named");
+        assertEquals(List.of("#deeptime:geology"), gate.requires());
+        assertEquals(com.minecraftindustrialcomplex.deeptime.worldgen.GeologyGround.Role.values().length, gate.rules().size(),
+                "one rule per ground role");
+        for (Rule r : gate.rules()) {
+            var role = com.minecraftindustrialcomplex.deeptime.worldgen.GeologyGround.Role.byId(r.id());
+            assertTrue(role != null, r.id() + " is a ground role");
+            assertEquals(role.bit(), r.ground(), r.id() + " asks for its own ground");
+            assertEquals(List.of("#deeptime:geology/" + r.id()), r.biomes(), r.id() + " takes its role's tag");
+            assertTrue(r.exclusive() && r.inSlot(), r.id() + " is a gate: exclusive, in its own slot");
+        }
+        int shield = com.minecraftindustrialcomplex.deeptime.worldgen.GeologyGround.Role.SHIELD.bit();
+        int granite = com.minecraftindustrialcomplex.deeptime.worldgen.GeologyGround.Role.GRANITE.bit();
+        // Shield's slot on a shield province: the rule gives it back. Off the province, or another biome's slot: no rule.
+        assertEquals("shield", first(gate, new G("Dfc", shield, "#deeptime:geology/shield"), null));
+        assertEquals(null, first(gate, new G("Dfc", granite, "#deeptime:geology/shield"), null));
+        assertEquals(null, first(gate, new G("Dfc", shield, "minecraft:taiga"), null), "the gate never adds a biome");
+        assertEquals("granite", first(gate, new G("Dfb", shield | granite, "#deeptime:geology/granite"), null));
+        // An unknown ground is refused, and the keys mean nothing to a rule that does not name them.
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> BiomeRuleSet.parse("t:x",
+                JsonParser.parseString("{\"rules\": [{\"biomes\": \"a:b\", \"ground\": \"marble\"}]}").getAsJsonObject()));
+        assertTrue(e.getMessage().contains("unknown ground 'marble'"), e.getMessage());
+        Rule plain = BiomeRuleSet.parse("t:x", JsonParser.parseString("{\"rules\": [{\"biomes\": \"a:b\"}]}").getAsJsonObject()).rules().get(0);
+        assertTrue(plain.ground() == 0 && !plain.inSlot() && plain.matches(land("Cfb")));
+    }
+
     @Test
     void rangesAndWetlandStatesMeanWhatTheySay() {
         BiomeRuleSet.Range r = new BiomeRuleSet.Range(5, Double.NaN);

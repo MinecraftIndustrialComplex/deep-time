@@ -974,10 +974,48 @@ pub struct RunOptions {
     /// `timeline.length_myr`.
     pub length_myr: Option<f64>,
     pub content: Option<PathBuf>,
+    /// Pack placement tables (`data/climate_mapping/packs/*.json`) added to the content bundle's
+    /// `climate_placement_patches`, in order: what the game passes when their biome mod is
+    /// installed.
+    pub placement_patch: Vec<PathBuf>,
     pub out: PathBuf,
     pub viewer: Option<PathBuf>,
     pub checkpoints: bool,
+    /// `timeline.stop_myr`.
+    pub stop_myr: Option<f64>,
+    /// Write epoch checkpoints into `<out>/epochs/`.
+    pub epochs: bool,
     pub common: Common,
+}
+
+/// `content` (a JSON object, or empty) with the pack placement tables in `patches` appended to its
+/// `climate_placement_patches` list.
+fn with_placement_patches(content: String, patches: &[PathBuf]) -> CliResult<String> {
+    if patches.is_empty() {
+        return Ok(content);
+    }
+    let mut root: serde_json::Value = if content.trim().is_empty() {
+        serde_json::json!({})
+    } else {
+        serde_json::from_str(&content)
+            .map_err(|e| format!("the content bundle is not valid JSON: {e}"))?
+    };
+    let key = deeptime_core::bake::placement::PATCHES_KEY;
+    let list = root
+        .as_object_mut()
+        .ok_or("the content bundle is not a JSON object")?
+        .entry(key)
+        .or_insert_with(|| serde_json::json!([]));
+    let list = list
+        .as_array_mut()
+        .ok_or_else(|| format!("the content bundle's {key} is not a list"))?;
+    for p in patches {
+        let text = read_text(p, "placement patch")?;
+        let v: serde_json::Value = serde_json::from_str(&text)
+            .map_err(|e| format!("{} is not valid JSON: {e}", p.display()))?;
+        list.push(v);
+    }
+    Ok(root.to_string())
 }
 
 /// `deeptime run`: a whole planet into `--out`.
@@ -988,11 +1026,16 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         o.start.as_deref(),
         o.length_myr,
     )?;
+    let preset = match o.stop_myr {
+        Some(s) => deeptime_core::preset::with_stop(&preset, Some(s))?,
+        None => preset,
+    };
     let preset = apply_overrides(&preset, &o.common.set)?;
     let content = match &o.content {
         Some(p) => read_text(p, "content bundle")?,
         None => String::new(),
     };
+    let content = with_placement_patches(content, &o.placement_patch)?;
     let mut s = Session::create(
         &preset,
         &content,
@@ -1002,6 +1045,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
     if o.checkpoints {
         s.set_checkpoint_dir(Some(o.out.join("checkpoints")));
     }
+    s.set_epochs(o.epochs)?;
     // What the editor would show for this run, beside what the run then measures.
     if let Ok(e) = deeptime_core::session::estimate_for(&preset, &content, o.common.mem_cap)
         && let Ok(e) = serde_json::from_str::<Value>(&e)
@@ -1044,7 +1088,80 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
     drive(&s, o.common.verbose, |_, st| st == AdvanceStatus::Done)?;
     s.finalize_write()?;
     forward_log(&s, o.common.verbose);
-    let manifest = deeptime_format::Manifest::read(&o.out)?;
+    report_run(&s, &o.out, &o.preset, o.viewer.as_deref(), started)
+}
+
+pub struct ResumeOptions {
+    /// The run's folder (it holds `epochs/`).
+    pub out: PathBuf,
+    /// The new stop; `None` keeps the run's own.
+    pub stop_myr: Option<f64>,
+    /// Keep writing epoch checkpoints.
+    pub epochs: bool,
+    pub viewer: Option<PathBuf>,
+    pub common: Common,
+}
+
+/// `deeptime resume`: the run in `--out` again to another stop, from its epoch checkpoints.
+pub fn resume(o: &ResumeOptions) -> CliResult<()> {
+    let started = Instant::now();
+    let index = deeptime_core::epochs::EpochIndex::read(&o.out)?.ok_or_else(|| {
+        format!(
+            "{} has no epoch checkpoints (run it with --epochs)",
+            o.out.display()
+        )
+    })?;
+    let preset = deeptime_core::preset::with_stop(&index.preset.to_string(), None)?;
+    let preset = match o.stop_myr {
+        Some(s) => deeptime_core::preset::with_stop(&preset, Some(s))?,
+        None => index
+            .preset
+            .pointer("/timeline/stop_myr")
+            .and_then(serde_json::Value::as_f64)
+            .map_or(Ok(preset.clone()), |s| {
+                deeptime_core::preset::with_stop(&preset, Some(s))
+            })?,
+    };
+    let preset = apply_overrides(&preset, &o.common.set)?;
+    let mut s = Session::resume_epoch(
+        &preset,
+        &index.content,
+        session_options(&o.out, &o.common),
+        Arc::new(AllocGauge),
+    )?;
+    s.set_epochs(o.epochs)?;
+    s.set_history_budget(o.common.history_mem);
+    if let Some(r) = s.resumed() {
+        println!(
+            "deeptime resume: from plate step {} (t = {:.1} Myr), {} of {} steps to run, {} keyframes kept",
+            r.from_step,
+            r.from_t_years / 1.0e6,
+            r.steps.saturating_sub(r.from_step),
+            r.steps,
+            r.keyframes_kept
+        );
+    }
+    drive(&s, o.common.verbose, |_, st| st == AdvanceStatus::Done)?;
+    s.finalize_write()?;
+    forward_log(&s, o.common.verbose);
+    report_run(
+        &s,
+        &o.out,
+        &o.out.display().to_string(),
+        o.viewer.as_deref(),
+        started,
+    )
+}
+
+/// What `run` and `resume` print once the world data is written.
+fn report_run(
+    s: &Session,
+    out: &Path,
+    label: &str,
+    viewer: Option<&Path>,
+    started: Instant,
+) -> CliResult<()> {
+    let manifest = deeptime_format::Manifest::read(out)?;
     if let Some(c) = manifest.notes.get(deeptime_core::deposits::STAGE_NAME) {
         print_census(c);
     }
@@ -1052,7 +1169,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
     println!(
         "deeptime run: {} -> {} ({} stages, {} events, {} keyframes, peak {:.1} MiB) in {:.2}s",
         s.preset().name(),
-        o.out.display(),
+        out.display(),
         p.stage_count,
         p.events_total,
         p.keyframes_ready,
@@ -1096,15 +1213,15 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
     for line in lines {
         println!("deeptime run: {line}");
     }
-    if let Some(line) = spill_line(&s)? {
+    if let Some(line) = spill_line(s)? {
         println!("deeptime run: {line}");
     }
     if let Some(b) = manifest.notes.get(deeptime_core::bake::NOTES_KEY) {
         println!("deeptime run: {}", deeptime_core::bake::summary_line(b));
     }
-    if let Some(dir) = &o.viewer {
-        let title = format!("Deep Time — run {} ({})", s.preset().name(), o.preset);
-        deeptime_viewer::write_world_bundle(dir, &o.out, &title)?;
+    if let Some(dir) = viewer {
+        let title = format!("Deep Time — run {} ({label})", s.preset().name());
+        deeptime_viewer::write_world_bundle(dir, out, &title)?;
         println!(
             "deeptime run: viewer -> {}",
             dir.join("index.html").display()

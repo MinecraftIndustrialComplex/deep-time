@@ -122,7 +122,17 @@ impl FrameAcc {
     /// Adds one step's crust motion: `nearest[c]` is the cell the material now at `c` came from
     /// (the same nearest-cell map that carries the strata log), `newborn[c]` marks crust made in
     /// this step. Composes it with the motion so far, so `back[c]` names the cell that held this
-    /// crust when the frame began.
+    /// crust when the frame began, and carries the sums with the crust (crust made this step
+    /// starts from nothing).
+    ///
+    /// The sums are the crust's, not the cell's: a frame is read where each cell's crust is at its
+    /// end (`deposits::fields`, the deposit ledger follows a deposit's crust frame by frame), so a
+    /// frame's value at a cell must be what *that crust* went through. Summed at fixed cells, a
+    /// frame mixed the crust that crossed the cell during the frame: crust moves 7 to 18 L1 cells
+    /// in a 10-Myr frame at 30 to 70 mm/yr on the 16k map (the plate model's 200 km arc distance
+    /// is 5 cells there), so an arc's frames carried the trench's fill and the forearc's
+    /// stripping, and porphyries were buried and exhumed by tens of kilometres they never saw
+    /// (2026-10-05, the erosion and burial audit).
     pub fn compose_back(&mut self, nearest: &[usize], newborn: &[bool]) {
         let n = nearest.len();
         if self.back.len() != n {
@@ -134,6 +144,17 @@ impl FrameAcc {
             .zip(newborn.par_iter())
             .map(|(&q, &born)| if born { NO_ORIGIN } else { prev[q] })
             .collect();
+        for sum in self.sums.values_mut() {
+            if sum.len() != n {
+                continue;
+            }
+            let old = std::mem::take(sum);
+            *sum = nearest
+                .par_iter()
+                .zip(newborn.par_iter())
+                .map(|(&q, &born)| if born { 0.0 } else { old[q] })
+                .collect();
+        }
     }
 
     /// Bytes held.
@@ -641,6 +662,46 @@ mod tests {
             }
         }
         assert_eq!(cases, 28);
+    }
+
+    /// A frame's value at a cell is what the crust now there went through, not what crossed the
+    /// cell: crust moving one cell a step towards a trench that moves with it (two cells ahead)
+    /// never sees the trench's fill, although its final cell held the trench at the frame's start
+    /// (the erosion and burial audit, 2026-10-05).
+    #[test]
+    fn frame_sums_follow_the_crust() {
+        let n = 8;
+        let dt = 2.0e6;
+        let mut acc = FrameAcc::default();
+        let no_birth = vec![false; n];
+        // Material at c came from c − 1 (the first cell is new crust each step).
+        let nearest: Vec<usize> = (0..n).map(|c| c.saturating_sub(1)).collect();
+        let mut born = no_birth.clone();
+        born[0] = true;
+        for s in 0..3usize {
+            if s > 0 {
+                acc.compose_back(&nearest, &born);
+            }
+            // 1000 m/Myr of trench fill two cells ahead of the parcel (the parcel is at s + 1).
+            let mut dep = vec![0.0f32; n];
+            dep[s + 3] = 1000.0;
+            // The parcel's own arc erosion, 50 m/Myr.
+            let mut ero = vec![0.0f32; n];
+            ero[s + 1] = 50.0;
+            acc.add("deeptime:deposition_rate_m_myr", &dep, dt);
+            acc.add("deeptime:erosion_rate_m_myr", &ero, dt);
+            acc.span_years += dt;
+        }
+        let mean = |name: &str, c: usize| acc.sums[name][c] / acc.span_years as f32;
+        // The parcel ends at cell 3, which held the trench at the frame's start: summed at the
+        // cell, its frame would show 333 m/Myr of fill.
+        assert_eq!(mean("deeptime:deposition_rate_m_myr", 3), 0.0);
+        assert!((mean("deeptime:erosion_rate_m_myr", 3) - 50.0).abs() < 1e-3);
+        // The trench's own crust (now at cell 5) saw its fill all frame long.
+        assert!((mean("deeptime:deposition_rate_m_myr", 5) - 1000.0).abs() < 1e-2);
+        // Where each cell's crust was when the frame began.
+        assert_eq!(acc.back[3], 1);
+        assert_eq!(acc.back[1], NO_ORIGIN);
     }
 
     /// A frame of `span_myr` ending at `t_end_myr` with two craton cells of four, the first of

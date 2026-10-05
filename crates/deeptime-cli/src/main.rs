@@ -6,6 +6,7 @@ mod amplify_view;
 mod climate_dem;
 mod deposit_audit;
 mod dump;
+mod erosion_audit;
 mod heightmap;
 mod hydro;
 mod margins_view;
@@ -59,6 +60,11 @@ enum Command {
         /// Content bundle JSON (rock classes, deposit types; plan §5.4). Optional for now.
         #[arg(long)]
         content: Option<PathBuf>,
+        /// A pack placement table (`crates/deeptime-core/data/climate_mapping/packs/<id>.json`)
+        /// to bake with, as the game does when that biome mod is installed; repeatable, applied
+        /// in order.
+        #[arg(long)]
+        placement_patch: Vec<PathBuf>,
         /// World-data folder to write (`<world>/deeptime`).
         #[arg(long)]
         out: PathBuf,
@@ -68,6 +74,35 @@ enum Command {
         /// Also write a checkpoint after every stage into <out>/checkpoints/.
         #[arg(long)]
         checkpoints: bool,
+        /// Where the run stops, Myr after its start (timeline.stop_myr: less than the length
+        /// stops it early, more continues it past the present).
+        #[arg(long)]
+        stop_myr: Option<f64>,
+        /// Write epoch checkpoints into <out>/epochs/, so `deeptime resume` can bake another
+        /// keyframe's world, stop the run earlier or continue it (docs/design/
+        /// playability-steering.md).
+        #[arg(long)]
+        epochs: bool,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+    /// Run a finished (or stopped) run's folder again to another stop, from its epoch
+    /// checkpoints (`run --epochs`): an epoch picked, a run stopped early or continued. Only the
+    /// steps after the checkpoint that serves the stop run again; the world is the world of a run
+    /// planned to that stop.
+    Resume {
+        /// The run's folder (it holds epochs/).
+        #[arg(long)]
+        out: PathBuf,
+        /// The new stop, Myr after the start (default: the run's own).
+        #[arg(long)]
+        stop_myr: Option<f64>,
+        /// Keep writing epoch checkpoints (on by default; --no-epochs turns them off).
+        #[arg(long)]
+        no_epochs: bool,
+        /// Also write an HTML viewer bundle here.
+        #[arg(long)]
+        viewer: Option<PathBuf>,
         #[command(flatten)]
         common: CommonArgs,
     },
@@ -466,6 +501,21 @@ enum Command {
         #[arg(long)]
         out: PathBuf,
     },
+    /// How much rock the surface stage took off and laid on, per region type (orogen, basin,
+    /// shield, other land, shelf, ocean) and per crust parcel followed with the crust, the last
+    /// frame's land hypsometry (from a checkpoint with the recorded history), and every porphyry's
+    /// ledger and depth (from a world-data folder).
+    ErosionAudit {
+        /// World-data folder a planet run baked (the porphyries).
+        #[arg(long)]
+        world_data: Option<PathBuf>,
+        /// A checkpoint carrying the recorded history (`run --checkpoints`).
+        #[arg(long)]
+        checkpoint: Option<PathBuf>,
+        /// Also write the report (every porphyry) as JSON.
+        #[arg(long)]
+        json: Option<PathBuf>,
+    },
     /// Run the bake's projection pass (SW-1) on a copy of a baked Lambert world-data folder, with
     /// its own preset and `--set scale.KEY=VALUE` overrides (`scale.projection` is petroff_guyou):
     /// tuning the pass without re-running the history.
@@ -706,9 +756,12 @@ fn main() -> ExitCode {
             start,
             length_myr,
             content,
+            placement_patch,
             out,
             viewer,
             checkpoints,
+            stop_myr,
+            epochs,
             common,
         }) => finish(
             "run",
@@ -717,9 +770,28 @@ fn main() -> ExitCode {
                 start,
                 length_myr,
                 content,
+                placement_patch,
                 out,
                 viewer,
                 checkpoints,
+                stop_myr,
+                epochs,
+                common: common.common(),
+            }),
+        ),
+        Some(Command::Resume {
+            out,
+            stop_myr,
+            no_epochs,
+            viewer,
+            common,
+        }) => finish(
+            "resume",
+            run::resume(&run::ResumeOptions {
+                out,
+                stop_myr,
+                epochs: !no_epochs,
+                viewer,
                 common: common.common(),
             }),
         ),
@@ -1268,6 +1340,49 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::ErosionAudit {
+            world_data,
+            checkpoint,
+            json,
+        }) => {
+            let mut report = serde_json::Map::new();
+            if let Some(ck) = &checkpoint {
+                match erosion_audit::history(ck) {
+                    Ok(v) => {
+                        report.insert("history".into(), v);
+                    }
+                    Err(e) => {
+                        eprintln!("deeptime erosion-audit: {e}");
+                        return ExitCode::FAILURE;
+                    }
+                }
+            }
+            if let Some(w) = &world_data {
+                match erosion_audit::porphyries(w) {
+                    Ok(v) => {
+                        report.insert("porphyries".into(), v);
+                    }
+                    Err(e) => {
+                        eprintln!("deeptime erosion-audit: {e}");
+                        return ExitCode::FAILURE;
+                    }
+                }
+            }
+            let v = serde_json::Value::Object(report);
+            if let Some(p) = &json
+                && let Err(e) = std::fs::write(p, serde_json::to_vec_pretty(&v).expect("JSON"))
+            {
+                eprintln!("deeptime erosion-audit: {}: {e}", p.display());
+                return ExitCode::FAILURE;
+            }
+            // The summary without the per-porphyry rows.
+            let mut short = v.clone();
+            if let Some(p) = short.get_mut("porphyries").and_then(|p| p.as_object_mut()) {
+                p.remove("rows");
+            }
+            println!("{}", serde_json::to_string_pretty(&short).expect("JSON"));
+            ExitCode::SUCCESS
+        }
         Some(Command::DumpDeposits { world, out }) => match dump::run(&world, &out) {
             Ok((sites, bodies, inside)) => {
                 println!(
@@ -1633,9 +1748,12 @@ mod tests {
             start: None,
             length_myr: None,
             content: None,
+            placement_patch: Vec::new(),
             out: dir.join("dummy"),
             viewer: Some(dir.join("viewer")),
             checkpoints: true,
+            stop_myr: None,
+            epochs: false,
             common: quiet(),
         })
         .unwrap();
@@ -1703,9 +1821,12 @@ mod tests {
             start: None,
             length_myr: None,
             content: None,
+            placement_patch: Vec::new(),
             out: dir.join("w"),
             viewer: None,
             checkpoints: false,
+            stop_myr: None,
+            epochs: false,
             common: quiet(),
         })
         .unwrap();
@@ -2130,9 +2251,12 @@ mod tests {
             start: None,
             length_myr: Some(40.0),
             content: None,
+            placement_patch: Vec::new(),
             out: dir.join("world"),
             viewer: None,
             checkpoints: false,
+            stop_myr: None,
+            epochs: false,
             common,
         })
         .unwrap();
