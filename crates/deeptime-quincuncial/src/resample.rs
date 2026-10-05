@@ -88,6 +88,7 @@ fn out_grid(src: &GridDesc, c_out: u32) -> Result<GridDesc, String> {
         wraps_x: true,
         origin_block_x: -(i64::from(c_out) / 2),
         origin_block_z: -(i64::from(c_out) / 4),
+        z_edges: Default::default(),
     })
 }
 

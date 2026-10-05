@@ -120,7 +120,7 @@ pub const PLANET_KEYS: [&str; 18] = [
 ];
 
 /// The `scale` keys a planet preset may carry (the header reads `circumference_blocks`).
-pub const SCALE_KEYS: [&str; 9] = [
+pub const SCALE_KEYS: [&str; 12] = [
     "circumference_blocks",
     "m_per_block_h",
     "m_per_block_v",
@@ -130,6 +130,9 @@ pub const SCALE_KEYS: [&str; 9] = [
     "pole_cap_deg",
     "feature_scale",
     "build_limit_band_blocks",
+    "projection",
+    "lambda_c_deg",
+    "edge_border",
 ];
 
 /// The most of the planet the initial continental crust, (1 − ocean_fraction)/(1 − shelf share),
@@ -180,6 +183,25 @@ fn d_pole_cap_deg() -> f64 {
 }
 fn d_build_limit_band() -> f64 {
     48.0
+}
+fn d_lambda_c_deg() -> f64 {
+    // −1: the bake chooses λc for the planet (the cone points in open sea).
+    LAMBDA_C_AUTO
+}
+
+/// `scale.lambda_c_deg`'s "choose it for this planet" value.
+pub const LAMBDA_C_AUTO: f64 = -1.0;
+
+/// What the game does at the world's north and south edges until the wrap engine joins them
+/// (`scale.edge_border`; FORMAT.md "The world's layout", `border`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum EdgeBorder {
+    /// Players, their vehicles and Sable ships stop a block inside the edge (the default).
+    #[default]
+    Stop,
+    /// No border: the folded terrain continues past the edge, but nothing joins it.
+    None,
 }
 
 /// The most the detail term adds to the baked elevation, blocks (`detail/amplitude` is a u8 of
@@ -238,6 +260,19 @@ pub struct ScaleParams {
     /// as simulated.
     #[serde(default = "d_build_limit_band")]
     pub build_limit_band_blocks: f64,
+    /// The world's projection (Ben, decisions log 2026-10-04: Petroff–Guyou, the seamless world;
+    /// `lambert` keeps the cylinder with pole caps, which he may swap back to). The simulation keeps
+    /// its own grid either way; the bake projects the world ("Bake only", 2026-10-03).
+    #[serde(default)]
+    pub projection: deeptime_format::projection::ProjectionKind,
+    /// The longitude of the western hemisphere square's centre, degrees in [0, 360), or −1
+    /// ([`LAMBDA_C_AUTO`], the default): the bake chooses it so the four cone points lie in open
+    /// sea. Petroff–Guyou only.
+    #[serde(default = "d_lambda_c_deg")]
+    pub lambda_c_deg: f64,
+    /// The temporary border at the north and south edges (Petroff–Guyou only).
+    #[serde(default)]
+    pub edge_border: EdgeBorder,
 }
 
 /// Multipliers of feature sizes in blocks (plan §5.1 `feature_scale`; the editor's Multipliers
@@ -295,6 +330,19 @@ impl ScaleParams {
     /// radius_m = C · m_per_block_h / 2π (plan §5.1).
     pub fn radius_m(&self) -> f64 {
         f64::from(self.circumference_blocks) * self.m_per_block_h / std::f64::consts::TAU
+    }
+
+    /// The world's east–west period in blocks, what the world data's
+    /// `scale.circumference_blocks` and Toroidal World's loop hold: C on a Lambert world, 2b on a
+    /// Petroff–Guyou one (b = [`deeptime_format::projection::PetroffGuyou::hemisphere_for`]).
+    pub fn world_circumference(&self) -> u32 {
+        use deeptime_format::projection::{PetroffGuyou, ProjectionKind};
+        match self.projection {
+            ProjectionKind::Lambert => self.circumference_blocks,
+            ProjectionKind::PetroffGuyou => {
+                2 * PetroffGuyou::hemisphere_for(self.circumference_blocks)
+            }
+        }
     }
 }
 
@@ -958,6 +1006,12 @@ impl PlanetPreset {
             s.circumference_blocks / r.l1_r <= 8192,
             "$.resolution.l1_r",
             "L1 would be more than 8192 cells wide",
+        )?;
+        check(
+            s.lambda_c_deg == LAMBDA_C_AUTO
+                || (s.lambda_c_deg.is_finite() && (0.0..360.0).contains(&s.lambda_c_deg)),
+            "$.scale.lambda_c_deg",
+            "must be -1 (choose for the planet) or in [0, 360)",
         )?;
         check(
             s.build_limit_band_blocks.is_finite() && s.build_limit_band_blocks >= 8.0,

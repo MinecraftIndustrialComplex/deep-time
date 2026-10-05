@@ -73,7 +73,11 @@ PROFILES = ("standalone", "mic", "mic-ev", "terrablender", "ev", "ee")
 MAX_SIDE = 256
 DEEP_TIME_Y = (-512, 639)
 VANILLA_Y = (-64, 319)
-LEVEL_TYPES = {16384: "deeptime:planet", 32768: "deeptime:planet_32k"}
+# The level types by the world's east-west period (manifest scale.circumference_blocks): the
+# Petroff-Guyou worlds of the 16k and 32k planets (format 0.5, the default) and the Lambert ones
+# (synthetic worlds, Lambert presets, the deposit preview world).
+LEVEL_TYPES = {13312: "deeptime:planet", 26112: "deeptime:planet_32k",
+               16384: "deeptime:planet_lambert", 32768: "deeptime:planet_lambert_32k"}
 # The test VM's shared cache (tools/remote/mac.sh): the dev-shell profiles.
 MAC_CACHE = "/Volumes/Graphide/ban/deeptime-cache"
 
@@ -120,8 +124,15 @@ def fold(x, c):
 # §2): Lambert's equal-area cylinder, R = C/2π; the seam x = −C/2 is longitude 0°, north is −z,
 # latitude φ = asin(−z/R), the poles at z = ∓R.
 def pole_z(c):
-    """|z| of the poles, whole blocks (inside them)."""
+    """|z| of the poles, whole blocks (inside them); on a Petroff-Guyou world (its period 2b in
+    PETROFF_PERIODS) the half height b/2 less the border's block, the north and south edges."""
+    if c in PETROFF_PERIODS:
+        return c // 4 - 1
     return int(c / (2 * math.pi))
+
+
+# The east-west periods of Petroff-Guyou worlds (13,312 = 2 x 6,656 at 16k, 26,112 at 32k).
+PETROFF_PERIODS = {13312, 26112}
 
 
 
@@ -156,7 +167,7 @@ def normalise_spec(spec, max_side=MAX_SIDE):
         raise ValueError(f"profile must be one of {', '.join(PROFILES)}")
     s["size"] = int(s.get("size", 16384))
     if s["size"] not in LEVEL_TYPES:
-        raise ValueError("size must be 16384 or 32768")
+        raise ValueError(f"size must be one of {sorted(LEVEL_TYPES)}")
     boxes = s.pop("boxes", None) or ([s.pop("box")] if "box" in s else [])
     w0 = s.get("world", {})
     locate = [str(b) for b in (w0.get("locate") or [])]
@@ -979,6 +990,10 @@ def box_on_world(req, c=PREVIEW_C):
     """The request's box on the planet of circumference c (from lat_lon when given), at most
     256 × 256 around its centre; returns (box, a note about any shrinking)."""
     ll = req.get("lat_lon") or {}
+    # A Petroff-Guyou world's blocks are not Lambert's: the page sends the box in the world's own
+    # blocks (workbench.js boxBlocks), so it wins there.
+    if c in PETROFF_PERIODS and isinstance(req.get("box"), dict):
+        ll = {}
     if all(isinstance(ll.get(k), (int, float)) for k in ("north", "south", "west", "east")):
         x0, z0 = latlon_to_block(ll["north"], ll["west"], c)
         x1, z1 = latlon_to_block(ll["south"], ll["east"], c)

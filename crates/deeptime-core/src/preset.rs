@@ -531,7 +531,6 @@ impl Preset {
             PresetBody::DepositsSynthetic(p) => p.terrain.as_ref().map(|t| Bake::DepositHistory {
                 params: p.synthetic(),
                 strata: t.strata(),
-                essentials: p.deposits.essentials.clone(),
             }),
             PresetBody::Planet(_) => None,
         }
@@ -579,11 +578,10 @@ pub enum Bake {
     /// A P0-09 synthetic terrain (`"synth": "wrap-test"` of a dummy preset, P1-13).
     Analytic(synth::Kind),
     /// A synthetic deposit world's terrain (`deposits_synthetic.terrain`, P1-15): the history's
-    /// present elevation, the given horizons, and spawn candidates ranked by the essentials.
+    /// present elevation and the given horizons.
     DepositHistory {
         params: crate::deposits::synthetic::SyntheticParams,
         strata: synth::Strata,
-        essentials: Vec<crate::deposits::playability::Essential>,
     },
 }
 
@@ -625,11 +623,24 @@ fn parse_header(obj: &Map<String, Value>, planet: bool) -> Result<PresetHeader, 
         let s = v
             .as_object()
             .ok_or_else(|| CoreError::preset("$.scale", "expected a JSON object"))?;
-        // A planet preset's scale carries more keys (`params::ScaleParams` checks them).
+        // A planet preset's scale carries more keys (`params::ScaleParams` checks them). Any
+        // preset may name its world's projection; a synthetic world (not a planet) is Lambert, and
+        // says so for the game, which reads the key to know the world's east–west period.
         if let Some(k) = s.keys().find(|k| {
-            k.as_str() != "circumference_blocks" && !(planet && SCALE_KEYS.contains(&k.as_str()))
+            k.as_str() != "circumference_blocks"
+                && k.as_str() != "projection"
+                && !(planet && SCALE_KEYS.contains(&k.as_str()))
         }) {
             return Err(CoreError::preset(format!("$.scale.{k}"), "unknown key"));
+        }
+        if !planet
+            && let Some(v) = s.get("projection")
+            && v.as_str() != Some("lambert")
+        {
+            return Err(CoreError::preset(
+                "$.scale.projection",
+                "a synthetic world is laid out in \"lambert\"",
+            ));
         }
         if let Some(c) = s.get("circumference_blocks") {
             let p = "$.scale.circumference_blocks";

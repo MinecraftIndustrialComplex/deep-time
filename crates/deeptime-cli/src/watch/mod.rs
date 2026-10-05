@@ -35,7 +35,7 @@ mod runs;
 mod sections;
 pub mod stage2;
 mod tiles;
-mod worldmap;
+pub(crate) mod worldmap;
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
