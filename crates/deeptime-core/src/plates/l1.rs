@@ -170,22 +170,39 @@ pub fn sample(
     };
 
     let links = coupling.links();
-    let elevation_m = coupling.interpolate(mesh, |v| f64::from(samples[v as usize].elevation_m));
-    let uplift = coupling.interpolate(mesh, |v| f64::from(samples[v as usize].uplift_mm_yr));
-    let oxidation = coupling.interpolate(mesh, |v| f64::from(samples[v as usize].oxidation));
-    let heat = coupling.interpolate(mesh, |v| f64::from(samples[v as usize].heat_flow_mw_m2));
-    let thick = coupling.interpolate(mesh, |v| f64::from(samples[v as usize].thickness_m));
-    // The continental heat flow alone (the bake's `meta/heat_flow_mw_m2`): interpolated over the
-    // continental corners only, so a coast cell does not mix in the sea floor's age law (up to
-    // 300 mW/m²) from an oceanic corner of its triangle.
+    // Every interpolated field in one pass (P1-17; each field's values are those of its own
+    // `Coupling::interpolate`): elevation, uplift, oxidation, heat flow, thickness, the
+    // continental weight and heat flow (the bake's `meta/heat_flow_mw_m2`: interpolated over the
+    // continental corners only, so a coast cell does not mix in the sea floor's age law, up to
+    // 300 mW/m², from an oceanic corner of its triangle), then the rock pools.
+    const ELEV: usize = 0;
+    const UPLIFT: usize = 1;
+    const OXID: usize = 2;
+    const HEAT: usize = 3;
+    const THICK: usize = 4;
+    const CONT_W: usize = 5;
+    const CONT_HEAT: usize = 6;
+    const POOL0: usize = 7;
     let continental = |v: u32| samples[v as usize].kind == CONTINENTAL;
-    let cont_weight = coupling.interpolate(mesh, |v| if continental(v) { 1.0 } else { 0.0 });
-    let cont_heat = coupling.interpolate(mesh, |v| {
-        if continental(v) {
-            f64::from(samples[v as usize].heat_flow_mw_m2)
+    let interp = coupling.interpolate_each(mesh, |v| {
+        let s = &samples[v as usize];
+        let cont = continental(v);
+        let mut out = [0.0f64; POOL0 + POOL_FIELDS.len()];
+        out[ELEV] = f64::from(s.elevation_m);
+        out[UPLIFT] = f64::from(s.uplift_mm_yr);
+        out[OXID] = f64::from(s.oxidation);
+        out[HEAT] = f64::from(s.heat_flow_mw_m2);
+        out[THICK] = f64::from(s.thickness_m);
+        out[CONT_W] = if cont { 1.0 } else { 0.0 };
+        out[CONT_HEAT] = if cont {
+            f64::from(s.heat_flow_mw_m2)
         } else {
             0.0
+        };
+        for k in 0..POOL_FIELDS.len() {
+            out[POOL0 + k] = f64::from(s.pools[k]);
         }
+        out
     });
     let cells = links.len();
     // The deposit engine's inputs and the surface's basement (P1-04): the nearest sample's flags,
@@ -219,15 +236,15 @@ pub fn sample(
             [
                 f32::from(s.flags),
                 top,
-                oxidation[c] as f32,
+                interp[c][OXID] as f32,
                 s.convergence_mm_yr,
                 s.obliquity_deg,
                 s.slab_age_myr,
-                heat[c] as f32,
-                thick[c] as f32,
+                interp[c][HEAT] as f32,
+                interp[c][THICK] as f32,
                 s.group as f32,
-                if s.kind == CONTINENTAL && cont_weight[c] > 1.0e-6 {
-                    (cont_heat[c] / cont_weight[c]) as f32
+                if s.kind == CONTINENTAL && interp[c][CONT_W] > 1.0e-6 {
+                    (interp[c][CONT_HEAT] / interp[c][CONT_W]) as f32
                 } else {
                     f32::NAN
                 },
@@ -239,16 +256,13 @@ pub fn sample(
     // The rock pools, interpolated like the other thicknesses (P1-07's basement columns,
     // `structure::columns`: the nearest sample's pools changed every other L1 cell and built
     // columns of alternating crust); gap cells get the fresh ridge crust the next resampling makes.
-    let pool_values: Vec<Vec<f64>> = (0..POOL_FIELDS.len())
-        .map(|k| coupling.interpolate(mesh, |v| f64::from(samples[v as usize].pools[k])))
-        .collect();
     let pools: Vec<[f32; POOL_FIELDS.len()]> = (0..cells)
         .into_par_iter()
         .map(|c| {
             if info[c].mode == GAP {
                 super::pools::oceanic_column()
             } else {
-                std::array::from_fn(|k| pool_values[k][c].max(0.0) as f32)
+                std::array::from_fn(|k| interp[c][POOL0 + k].max(0.0) as f32)
             }
         })
         .collect();
@@ -260,8 +274,8 @@ pub fn sample(
             let v = l.nearest;
             let s = &samples[v as usize];
             let plate = plate_of(v);
-            let mut z = elevation_m[c];
-            let mut up = uplift[c];
+            let mut z = interp[c][ELEV];
+            let mut up = interp[c][UPLIFT];
             let mut kind = f64::from(s.kind);
             let mut orogeny = f64::from(s.orogeny);
             let mut orogeny_age = if s.orogeny == OROGENY_NONE {
