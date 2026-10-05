@@ -504,9 +504,18 @@ shrubland 42; ET snowy plains 15 → 5 %, gravel desert 14 → 25 %; cloud fores
 rock-named, 1,654 off their ground → 1,234, 0 off (White Mesa 941, Shield 189, Painted Mountains 103); with the
 table Shield's own slot covers only 3 columns, all off shield ground, so it has none.
 
-Without Terralith the table and the rule file are not used: vanilla (the standalone GameTests: no pack table
-recorded, no rule file, 0 of 4,322 columns changed), Biomes O' Plenty under TerraBlender and Expanded Ecosphere
-(their GameTests: GATES_SETS).
+Without Terralith the table and the rule file are not used (GameTests on the 4k test planet, 4,322 sampled land
+columns, 2026-10-05): vanilla records no pack table and no rule, and no column differs from the plain search;
+Biomes O' Plenty under TerraBlender and Expanded Ecosphere record no pack table and sample no rock-named biome (the
+211 and 618 columns that differ from the plain search are the volcanic layer's and, with Expanded Ecosphere, its own
+rule file's). With MIC the same test planet bakes with Terralith's table; the plain search there puts a rock-named
+biome on 141 columns, 120 of them off their ground, and the level 21, none off their ground.
+
+The retry that keeps land from turning into water (a kept-out biome whose next-nearest leaf is ocean or river is
+searched again without the water leaves) runs only on land. At sea the water is the right answer: Expanded
+Ecosphere's island biomes, kept out of Deep Time's deep-sea slots (BIO-132), would otherwise come back as land biomes
+on the sea floor (the test planet's sea fell to 0.685 ocean biomes with Expanded Ecosphere before this was fixed; 1.0
+after).
 
 ## Simplifications and limits
 
