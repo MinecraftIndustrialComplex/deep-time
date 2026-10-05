@@ -3,8 +3,9 @@
 """Compare two Deep Time world-data folders (P1-17: a speed-up must leave the same world).
 
 Every file is compared by SHA-256, except manifest.json, whose JSON is compared without the fields
-that record time or the memory accounting (wall times, creation time, the history's reserved-bytes
-peaks and spill timings): those differ between two runs of the same binary. A differing manifest
+that record time or the memory accounting (wall times, creation time, and the history's
+`reserved*`, `spill*` and `frames_on_disk` figures: when frames go to disk follows the allocator's
+count, which another thread schedule changes, while the frames themselves are the same). A differing manifest
 prints the paths of the keys that differ.
 
     tools/review/p1-17-cmp.py <world A> <world B>      exit 0 when they are the same
@@ -19,9 +20,14 @@ DROP = {"millis", "created_utc", "elapsed_ms", "timings", "passes", "detail_ms",
         "spill_write_seconds"}
 
 
+def dropped(k):
+    return k in DROP or k.startswith("spill") or k.startswith("reserved") or k == "frames_on_disk" \
+        or k == "in_memory_bytes"
+
+
 def strip(v):
     if isinstance(v, dict):
-        return {k: strip(x) for k, x in v.items() if k not in DROP}
+        return {k: strip(x) for k, x in v.items() if not dropped(k)}
     if isinstance(v, list):
         return [strip(x) for x in v]
     if isinstance(v, str) and v.startswith("{") and "millis" in v:
