@@ -220,8 +220,8 @@ baked and gets a Lambert layout block.
   Continuous layers are averaged over a **footprint isotropic on the sphere**, as wide as the world
   cell's own footprint and as the Lambert rows' spacing there (near the poles a Lambert row spans many
   blocks of planet north–south and its columns a fraction of a block east–west; read at a point, that
-  anisotropy draws radial streaks round the poles). Poleward of 60° the footprint is also widened
-  along the parallel, by (cos 60° / cos φ)² up to 16 times: the simulation's solvers work in Lambert
+  anisotropy draws radial streaks round the poles). Poleward of about 59° the footprint is also
+  widened along the parallel, by (0.52 / cos φ)⁴, at most 8 times (reached near 72°): the simulation's solvers work in Lambert
   blocks, so its polar terrain has the grid's shape (long north–south, thin east–west on the
   planet), which an isotropic footprint only shortens. Categories (`climate/koppen`,
   `climate/wetland`, `surface/class_top`, `meta/plate_id`, `meta/province`, and any layer whose

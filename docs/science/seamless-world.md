@@ -59,9 +59,9 @@ its axis so these four points lie as far from land as the planet allows.
    are resolved alike. That alone is not enough: the simulation's solvers work in Lambert blocks,
    so its polar terrain itself has the grid's shape, each feature long north–south and thin
    east–west on the planet, and the round patch only shortens the streaks (to a thirteenth of the
-   slope energy the point sample had, still thirteen times the radial slope). Poleward of 60° the
-   patch is therefore also stretched along the parallel, by (cos 60° / cos φ)² and at most 16
-   times, which leaves only what the simulation resolved in both directions. Categories and rock
+   slope energy the point sample had, still thirteen times the radial slope). Poleward of about 59°
+   the patch is therefore also stretched along the parallel, by (0.52 / cos φ)⁴ and at most 8
+   times (from about 72°), which leaves only what the simulation resolved in both directions. Categories and rock
    stacks take the nearest cell.
 7. **Things with a position** (rivers, folds and faults, ore bodies, sites, volcanoes, craters, spawn
    points) move through the projection; directions and lengths through its local stretch. A river
@@ -77,7 +77,7 @@ its axis so these four points lie as far from land as the planet allows.
 | SCL-087 | λc search | 0.25° steps, distances to land to 20° | degrees | — | `game-choice` |
 | SCL-088 | temporary border | 1 block inside the north and south edges | blocks | — | `game-choice` |
 | SCL-089 | detail noise at the edges | blend over 32 blocks to the half-turn-symmetric mean | blocks | — | `game-choice` |
-| SCL-090 | footprint | D = max(stretch·r, r / cos φ), stretch ≤ 8; along the parallel × min(16, max(1, (cos 60° / cos φ)²)) | blocks | — | `game-choice` |
+| SCL-090 | footprint | D = max(stretch·r, r / cos φ), stretch ≤ 8; along the parallel × min(8, max(1, (0.52 / cos φ)⁴)) | blocks | — | `game-choice` |
 | POL-022 | the game's edge border; no pole cap | stop 1 block inside the north and south edges; spectators pass; off when the wrap engine joins the edges | blocks | — | `game-choice` |
 | POL-023 | the border's warning | 24 blocks before the stop line, every 40 ticks | blocks, ticks | — | `game-choice` |
 | POL-024 | spawn clear of the edges | candidates within 64 blocks of an edge are passed over | blocks | — | `game-choice` |
@@ -100,9 +100,16 @@ and the pole anisotropy with and without the round footprint.
   detail the simulation did not resolve near the poles, so the polar regions are smoother than the
   rest (they are no longer streaked).
 - Footprint averaging softens the terrain a little everywhere (a box of a fraction of a cell at the
-  equator), and the polar caps much more along the parallels (up to 16 rows' length east–west), so
+  equator), and the polar caps much more along the parallels (up to 8 times the row spacing east–west), so
   above about 75° the terrain is smooth on the scale of a few hundred blocks; the game's detail
   noise, drawn in the world's own blocks, is what gives it texture there.
+- The widening removes the fine streaks, not the broad ones: features the simulation drew many
+  rows long (its solvers work in Lambert blocks, so a valley or ridge a few cells across at 70° is
+  several times longer north–south than east–west on the planet) still fan out from the poles at
+  65–80° latitude, softened (the tangential-over-radial slope ratio at 70–80° falls from 14 for a
+  point sample to about 3; at 80–88° from 47 to the mid-latitudes' 1.4). The same striation is in
+  the Lambert world, where it runs north–south. Removing it needs solvers that work in the planet's
+  metric (the sphere-native grids research, decisions log 2026-10-04).
 - River chains crossing the north or south edge are cut there; a river does not yet continue through
   the seam.
 - Until the wrap engine joins the north and south edges, the poles are reachable only up to the
