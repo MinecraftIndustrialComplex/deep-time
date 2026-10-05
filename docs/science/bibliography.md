@@ -6152,3 +6152,31 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Read so far (by the project): full text (OCR; the equations partly garbled), 2026-10-04: "a unit length of continental lithosphere is suddenly extended to a length β, causing upwelling of hot asthenosphere"; "The slow subsidence and the heat flow depend only on the amount of stretching"; Table 1: τ = 62.8 My, E0 = 3.2 km, ρ_c 2.8, ρ_m 3.33, ρ_w 1.0 g/cm³; thermal subsidence S_t ≈ E0 r (1 − e^(−t/τ)), r = (β/π) sin(π/β).
 
 Not read: Péron-Pinvidic, Manatschal & Osmundsen 2013 (Marine and Petroleum Geology 43:21-47), Sutra et al. 2013 (G-cubed 14:2575), Mohn et al. 2012 (Tectonics 31:TC1012), Chenin et al. 2017 (Geosphere 13:559; a search summary gives magma-poor margins "approximately 165 km on average", unverified).
+
+## Playability steering (STE)
+
+### CharetteSmith2010
+- Reference: Charette, M. A. and Smith, W. H. F. (2010). The volume of Earth's ocean. Oceanography 23(2):112-114.
+- DOI or URL: 10.5670/oceanog.2010.51; https://tos.org/oceanography/article/the-volume-of-earths-ocean ; the institution's release: https://www.whoi.edu/press-room/news-release/whoi-study-calculates-volume-and-depth-of-the-worlds-oceans/
+- Cited as: "Charette & Smith 2010" (Earth's ocean volume, against which a steered sea-level offset's water is reported).
+- Ledger ids: STE-009
+- Access: open (the journal page shows the abstract; the numbers are in the PDF).
+- Read so far (by the project): 2026-10-05, the WHOI release only: "1.332 billion cubic kilometers", mean depth "3,682.2 meters". The paper itself was not opened.
+
+### HaqSchutter2008
+- Reference: Haq, B. U. and Schutter, S. R. (2008). A chronology of Paleozoic sea-level changes. Science 322:64-68.
+- Cited as: "Haq & Schutter 2008" (the size of long-term sea-level change, a reference for the steering's sea rate).
+- Ledger ids: STE-013
+- Access: paywalled. Read so far (by the project): from memory.
+
+### Miller2005
+- Reference: Miller, K. G. et al. (2005). The Phanerozoic record of global sea-level change. Science 310:1293-1298.
+- Cited as: "Miller et al. 2005" (as above).
+- Ledger ids: STE-013
+- Access: paywalled. Read so far (by the project): from memory.
+
+### Berner2004
+- Reference: Berner, R. A. (2004). The Phanerozoic Carbon Cycle: CO2 and O2. Oxford University Press.
+- Cited as: "Berner 2004, GEOCARB f_G" (how far volcanic and metamorphic degassing varied, a reference for the steering's outgassing bound).
+- Ledger ids: STE-014
+- Access: book. Read so far (by the project): from memory.
