@@ -571,20 +571,31 @@ pub fn compute(
                 })
             })
             .collect();
+        // Weighted by the L1 rows' areas; a coarse cell made only of rows past a pole (no area)
+        // takes its cells' plain mean, so no coarse cell is left without a circulation rain.
         let rw = inp.grid.row_weights();
         let (mut s, mut a) = (vec![[0.0f64; 12]; nc], vec![0.0f64; nc]);
+        let (mut s0, mut a0) = (vec![[0.0f64; 12]; nc], vec![0.0f64; nc]);
         for c in 0..n {
             let cc = g.coarse_of(c);
             let wt = rw[c / w];
             a[cc] += wt;
+            a0[cc] += 1.0;
             for m in 0..12 {
                 s[cc][m] += wt * per[c][m];
+                s0[cc][m] += per[c][m];
             }
         }
         let hydro = ln_hydro.exp();
-        s.iter()
-            .zip(&a)
-            .map(|(s, a)| s.map(|v| v / a.max(1e-300) * hydro / YEAR_S))
+        (0..nc)
+            .map(|cc| {
+                let (s, a) = if a[cc] > 0.0 {
+                    (s[cc], a[cc])
+                } else {
+                    (s0[cc], a0[cc])
+                };
+                s.map(|v| v / a.max(1e-300) * hydro / YEAR_S)
+            })
             .collect()
     };
     if let Some(pcm) = pc.as_mut()

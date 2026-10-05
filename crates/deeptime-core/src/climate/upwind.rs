@@ -508,6 +508,8 @@ const EPS_START: f64 = 0.6; // ledger: CLM-197
 /// Fu's potential evaporation stand-in, mm/yr per °C of annual mean (the surface stage's).
 const PET_MM_PER_C: f64 = 60.0; // ledger: HYD-029
 const YEAR_S: f64 = 365.25 * 86_400.0;
+/// The circulation rain below which a cell counts as having none, kg/m²/s (0.03 mm/yr).
+const P_REF_MIN: f64 = 1e-12; // game-choice: numerical floor
 
 /// What the upwind rain needs of the snapshot's coarse climate (rows north first on the coarse
 /// grid; every per-cell slice has the grid's length).
@@ -571,10 +573,13 @@ impl Rain {
 
     /// How much of the circulation's rain coarse cell `c` gets in month `m` (its rain over the
     /// rain at its reference water) and its moisture W_v/W_ref.
+    /// Where the circulation gives no rain at all (under 0.03 mm/yr) the share is 1: the L1
+    /// cells keep their own (none), rather than a ratio over nothing.
     pub fn dry(&self, c: usize, m: usize) -> (f64, f64) {
         let s = &self.months[m];
+        let pr = self.p_ref[c][m];
         (
-            s.p[c] / self.p_ref[c][m].max(1e-15),
+            if pr > P_REF_MIN { s.p[c] / pr } else { 1.0 },
             s.w_v[c] / self.w_ref[c][m].max(1e-9),
         )
     }
