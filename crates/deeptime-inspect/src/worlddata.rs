@@ -44,7 +44,11 @@ impl WorldData {
             Some(spec) => {
                 let amp = load_layer(dir, &manifest, &spec.layer)?
                     .ok_or_else(|| Error(format!("{}: no {} layer", dir.display(), spec.layer)))?;
-                let noise = Noise::new(spec.seed()?, manifest.scale.circumference_blocks);
+                let noise = Noise::for_world(
+                    spec.seed()?,
+                    manifest.scale.circumference_blocks,
+                    &manifest.world_projection(),
+                );
                 Some((spec, noise, amp))
             }
             None => None,

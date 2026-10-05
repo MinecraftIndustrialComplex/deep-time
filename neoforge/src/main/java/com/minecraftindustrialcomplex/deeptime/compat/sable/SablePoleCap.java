@@ -62,6 +62,36 @@ public final class SablePoleCap {
     }
 
     /**
+     * One tick of the temporary edge border of a Petroff–Guyou world ({@code wrap/EdgeBorder}): a hull
+     * whose outer edge is past |z| = {@code stopZ} loses its outward velocity and is blown back at
+     * {@link PoleCapCurve#WIND_MAX} per tick, like the pole cap's hard stop. Returns how many it acted on.
+     */
+    public static int tickEdge(ServerLevel level, double stopZ) {
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
+        if (container == null)
+            return 0;
+        int acted = 0;
+        for (ServerSubLevel s : container.getAllSubLevels()) {
+            if (s.isRemoved())
+                continue;
+            double z = s.logicalPose().position().z();
+            if (Math.abs(polewardEdge(s, z)) <= stopZ)
+                continue;
+            RigidBodyHandle body = RigidBodyHandle.of(s);
+            if (body == null || !body.isValid())
+                continue;
+            double dir = PoleCapCurve.equatorward(z);
+            double dvz = dir * PoleCapCurve.WIND_MAX;
+            Vector3dc v = body.getLinearVelocity();
+            if (v.z() * dir < 0)
+                dvz -= v.z();
+            body.addLinearAndAngularVelocity(new Vector3d(0, 0, dvz), new Vector3d());
+            acted++;
+        }
+        return acted;
+    }
+
+    /**
      * The hull's z furthest toward its pole: the global bounds' edge on the pose's side of the
      * equator, or the pose itself when the bounds look unset (Sable fills them after the first
      * physics step).

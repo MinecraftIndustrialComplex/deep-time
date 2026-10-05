@@ -10,9 +10,8 @@
 //!   (h − sea) / m_per_block_v, stored ×16 (i16).
 //! - **water_level.** Every cell nodata here; the water part (`super::water`, P1-22) replaces it
 //!   with the lakes after the climate is baked (and leaves it so when `hydro.enabled` is false).
-//! - **spawn/candidates.json** ([`spawn`], called after the water part). Ranked by the essentials that set `max_blocks_from_spawn` (the game
-//!   passes the pack's list in the content bundle, P1-15), else the synthetic worlds' rule
-//!   (`synth::spawn_candidates`): dry land nearest to (0, 0).
+//! - **spawn/candidates.json** ([`spawn`], called after the water part): the standard rule
+//!   (`synth::spawn_candidates`), dry flat land nearest to (0, 0).
 
 use std::path::PathBuf;
 
@@ -138,16 +137,10 @@ pub fn bake(
     })
 }
 
-/// `spawn/candidates.json`, after the water part: ranked by the essentials that set
-/// `max_blocks_from_spawn` (the game passes the pack's list in the content bundle, P1-15), else the
-/// synthetic worlds' rule (`synth::spawn_candidates`): dry land nearest to (0, 0). Returns the
-/// number of candidates and whether they were ranked.
-pub fn spawn(
-    world: &WorldState,
-    p: &PlanetPreset,
-    terrain: &Terrain,
-    out: &mut Out<'_>,
-) -> Result<(usize, bool), CoreError> {
+/// `spawn/candidates.json`, after the water part: the standard rule (`synth::spawn_candidates`),
+/// dry flat land at least two blocks above sea level, nearest to (0, 0) first (Ben, 2026-10-05: no
+/// ranking by the essentials). Returns the number of candidates.
+pub fn spawn(p: &PlanetPreset, terrain: &Terrain, out: &mut Out<'_>) -> Result<usize, CoreError> {
     let s = &p.scale;
     let elev = LazyLayer::open(&terrain.elevation)?;
     let wl = out
@@ -155,25 +148,8 @@ pub fn spawn(
         .layer("water_level")
         .ok_or_else(|| CoreError::InvalidState("no water_level layer".into()))?;
     let water = LazyLayer::open(&out.dir.join(&wl.path))?;
-    let essentials = p
-        .deposits
-        .as_ref()
-        .map(|d| d.essentials.clone())
-        .unwrap_or_default();
-    let (spawn, ranked) = match crate::deposits::spawn::ranked_candidates(
-        &elev,
-        &water,
-        s.sea_level_y,
-        &world.sites,
-        &essentials,
-    ) {
-        Some(v) => (v, true),
-        None => (
-            crate::synth::spawn_candidates(&elev, &water, s.sea_level_y),
-            false,
-        ),
-    };
+    let spawn = crate::synth::spawn_candidates(&elev, &water, s.sea_level_y);
     let n = spawn["candidates"].as_array().map_or(0, Vec::len);
     out.json("spawn/candidates.json", &spawn)?;
-    Ok((n, ranked))
+    Ok(n)
 }

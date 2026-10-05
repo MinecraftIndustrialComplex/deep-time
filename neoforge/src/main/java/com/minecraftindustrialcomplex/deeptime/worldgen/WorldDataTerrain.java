@@ -41,6 +41,10 @@ public final class WorldDataTerrain implements TerrainSource {
             if (d.circumference() != ref.circumferenceBlocks())
                 throw new IllegalStateException("world data '" + ref.folder() + "' has C = " + d.circumference()
                         + " but its generator says circumference_blocks = " + ref.circumferenceBlocks());
+            if (!d.projection().kind().id().equals(ref.projection()))
+                throw new IllegalStateException("world data '" + ref.folder() + "' is a " + d.projection().kind().id()
+                        + " world but its generator says projection = " + ref.projection()
+                        + " (the level type must match the preset's scale.projection)");
             data = d;
         }
         return d;
@@ -107,7 +111,7 @@ public final class WorldDataTerrain implements TerrainSource {
                             (x, z) -> com.minecraftindustrialcomplex.deeptime.worlddata.Water.column(wd, spec, wrapX(x), z).kind() != none,
                             wd.circumference(), seaLevel, lava().floodY(minY, seaLevel), minY, wd.manifest().mPerBlockH(),
                             wd.manifest().mPerBlockV(),
-                            (int) Math.abs(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(wd.circumference(), ref.poleCapDeg())));
+                            lakeMaxAbsZ(wd));
                     long lakes = magma.bodies().stream().filter(Magma.Body::lake).count();
                     long molten = magma.bodies().stream().filter(b -> b.chamberRh() > 0).count();
                     com.minecraftindustrialcomplex.deeptime.DeepTime.LOGGER.info(
@@ -118,6 +122,16 @@ public final class WorldDataTerrain implements TerrainSource {
             }
         }
         return m;
+    }
+
+    /**
+     * The |z| up to which a volcano may hold a crater lava lake: the pole cap's line on a Lambert world;
+     * the whole world on a Petroff–Guyou one (no pole cap there: its poles are ordinary ground).
+     */
+    private int lakeMaxAbsZ(WorldData wd) {
+        if (ref.petroffGuyou())
+            return (int) Math.ceil(wd.projection().zMax()) + 1;
+        return (int) Math.abs(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(wd.circumference(), ref.poleCapDeg()));
     }
 
     /** The world's settings for geothermal features. */
@@ -258,6 +272,11 @@ public final class WorldDataTerrain implements TerrainSource {
     @Override
     public int circumference() {
         return ref.circumferenceBlocks();
+    }
+
+    @Override
+    public boolean seamless() {
+        return ref.petroffGuyou();
     }
 
     @Override
