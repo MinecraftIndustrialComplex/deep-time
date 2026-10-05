@@ -3145,7 +3145,7 @@ impl DepositStage {
             let regions = Regions::new(world.circumference, ess.region_blocks);
             let mut have = vec![0u32; regions.count()];
             for s in &world.sites {
-                if !s.products.iter().any(|p| p.material == ess.material) {
+                if !ess.counts(&s.products) {
                     continue;
                 }
                 if ess.exposed {

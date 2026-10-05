@@ -19,7 +19,7 @@ import java.util.function.Supplier;
  */
 class MapWidget extends AbstractWidget {
 
-    /** A marker: a dot, or (with {@code fresh}) a larger white dot. */
+    /** A marker: a dot in its event kind's colour, larger and ringed in white when {@code fresh}. */
     record Marker(double lat, double lon, int colour, boolean fresh) {}
 
     /** A tinted latitude–longitude box (province hints). */
@@ -70,7 +70,8 @@ class MapWidget extends AbstractWidget {
             GlobeProjection.mapPixel(m.lat(), m.lon(), w, h, p);
             int cx = x + (int) p[0], cy = y + (int) p[1];
             int r = m.fresh() ? 2 : 1;
-            g.fill(cx - r - 1, cy - r - 1, cx + r + 2, cy + r + 2, 0xff000000);
+            // Fresh events (after the previous frame) get a white ring, older ones a dark one (workbench colours by kind).
+            g.fill(cx - r - 1, cy - r - 1, cx + r + 2, cy + r + 2, m.fresh() ? 0xffffffff : 0xff000000);
             g.fill(cx - r, cy - r, cx + r + 1, cy + r + 1, m.colour());
         }
         if (isHovered()) {
@@ -86,7 +87,7 @@ class MapWidget extends AbstractWidget {
             java.util.function.Predicate<com.minecraftindustrialcomplex.deeptime.screen.model.GeoEvent> fresh) {
         List<Marker> out = new ArrayList<>();
         for (var e : events)
-            out.add(new Marker(e.lat(), e.lon(), fresh.test(e) ? 0xffffffff : 0x99ffffff, fresh.test(e)));
+            out.add(new Marker(e.lat(), e.lon(), com.minecraftindustrialcomplex.deeptime.screen.model.EventStyle.colour(e.kind()), fresh.test(e)));
         return out;
     }
 

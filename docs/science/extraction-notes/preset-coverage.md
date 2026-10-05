@@ -294,7 +294,7 @@ Keys the code accepts but the preset leaves at their defaults (not exhaustive: I
 | `structure.deformation.thrust_rate_km2_myr` | `0.00002` | structure |
 | `structure.deformation.normal_rate_km2_myr` | `0.00004` | structure |
 | `structure.deformation.strike_slip_rate_km2_myr` | `0.000004` | structure |
-| `structure.deformation.foreland_km` | `250.0` | structure |
+| `structure.deformation.foreland_km` | `140.0` | structure |
 | `structure.deformation.max_overlap` | `3` | structure |
 | `structure.deformation.relief` | `1.0` | structure |
 | `structure.deformation.relief_age_myr` | `10.0` | structure |
