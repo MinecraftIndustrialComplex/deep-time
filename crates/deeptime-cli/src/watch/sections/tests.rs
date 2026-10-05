@@ -181,15 +181,17 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     assert!(compared > 1000);
 
     // A section: JSON along the line, kept, and each column is what the evaluator says.
-    let q = "x0=-900&z0=-400&x1=700&z1=500";
+    // (Inside the 3,072-block world's half period, so the line does not take the short way round.)
+    let q = "x0=-700&z0=-400&x1=700&z1=500";
     let sec = route(&wb, "/api/runs/baked/rock/section", q).unwrap();
     assert_eq!(sec.status, 200, "{}", String::from_utf8_lossy(&sec.body));
     let v = json_of(&sec);
     assert_eq!(v["available"], true);
     let n = v["n"].as_u64().unwrap() as usize;
-    let len = (1600f64.powi(2) + 900f64.powi(2)).sqrt();
+    let len = (1400f64.powi(2) + 900f64.powi(2)).sqrt();
     assert!((v["length_blocks"].as_f64().unwrap() - len).abs() < 1e-6);
-    assert!((v["length_km"].as_f64().unwrap() - len * 0.3).abs() < 1e-6);
+    let km_per_block = world.manifest.scale.m_per_block_h / 1000.0;
+    assert!((v["length_km"].as_f64().unwrap() - len * km_per_block).abs() < 1e-6);
     assert_eq!(n, len.ceil() as usize + 1);
     let cols = &v["columns"];
     for key in ["x", "z", "ground", "water", "runs", "bodies"] {
