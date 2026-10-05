@@ -85,6 +85,12 @@ x = ln(degassing factor) with the global mean temperature, 5 K and r_co2, x with
 | Long-term sea-level change rate | about 1–2.5 m/Myr over 100–200 Myr | Haq & Schutter 2008; Miller et al. 2005 (from memory, STE-013) | at most 2 m/Myr by default | see the build log 2026-10-05 |
 | Outgassing variation | about ×2 over the Phanerozoic | Berner 2004, GEOCARB (from memory, STE-014) | at most ×2 by default | see the build log 2026-10-05 |
 
+Measured (quick 16k, scattered start, 500 Myr, 2026-10-05; design §8): the default nudges
+lowered the sea by 41–52 m (about 2 % of an Earth ocean's water) and added 0.7–0.9 points of land
+to planets that end at 15–18 % land; strong settings (10 m/Myr, 20 % of the run) added 4–6 points
+for 270–470 m of sea level. The outgassing nudge moved a 17.3 °C planet to 18.7 °C (warm target,
+×1.36) and to 13.7 °C (cool target, ÷2, its limit). No control reversed direction in any run.
+
 The measured effect of the nudges (land and temperature at the end with and without them, the
 artefact counters, the cost) is in the design note's §8 and STATUS.md's build log of 2026-10-05.
 

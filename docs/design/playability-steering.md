@@ -375,7 +375,12 @@ the bake: as in a run of that length). A continue reruns the old tail (50 Myr wi
 - **Artefacts.** No reversal of either control in any run; the sea moves at most `rate × dt` a
   step (4 m and 13–18 m a 2-Myr step), smoothly ramped.
 - **Temperature.** All six ended between 14 and 17 °C, inside the temperate band, so the
-  outgassing controller never acted (factor 1.0). The warm and cool targets measure it (below).
+  outgassing controller never acted (factor 1.0). The warm and cool targets (seed 1, default
+  rates) measure it: unsteered the planet ends at 17.3 °C (708 ppm); **warm** (18–26 °C) raised
+  outgassing ×1.36 and ended at 18.7 °C, 1,139 ppm (met); **cool** (6–13 °C) lowered it to its
+  limit ÷2 and ended at 13.7 °C, 215 ppm (0.7 K short). Largest step 0.07 of ln(factor) per
+  2 Myr, no reversals. The carbon cycle answers within a plate step, so the CO₂ nudge is strong
+  where the sea nudge is weak; ×2 is what bounds it.
 - **Defaults kept gentle** (2 m/Myr, at most 200 m, outgassing 0.2/Myr up to ×2, 10 % of the run):
   within Earth's long-term eustatic rates and its outgassing range, so a steered world is still a
   world its physics could have made. Reaching the land band on today's planets would take
