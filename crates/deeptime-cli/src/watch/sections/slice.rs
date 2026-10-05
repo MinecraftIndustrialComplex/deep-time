@@ -4,7 +4,8 @@
 //! Pixel (px, py) of a w × h map is what a keyframe pixel is: centred on longitude 360°·px/w (the
 //! seam is 0°) and on the row the projection gives py (`Projection::picture_z`: Lambert, sin φ =
 //! 1 − 2·py/h), i.e. block x = −C/2 + C·px/w, z = −R + 2R·py/h,
-//! so the picture sits under the workbench's map exactly. The depth is below the terrain's top
+//! so the picture sits under the workbench's map exactly. On a Petroff–Guyou world (format 0.5) the
+//! map is the world itself, 2 : 1: z = −b/2 + b·py/h with C = 2b. The depth is below the terrain's top
 //! block there (⌈H⌉ − 1, the evaluator's `top_y`), H the generated terrain height; `Floor` is the
 //! lowest block of the world.
 
@@ -47,18 +48,42 @@ pub struct Slice {
     pub class: Vec<u16>,
 }
 
-/// The block (x, z) of pixel (px, py) on a w × h map.
-pub fn pixel_block(c: i64, w: u32, h: u32, px: u32, py: u32) -> (i64, i64) {
+/// The block (x, z) of pixel (px, py) on a w × h map of a world laid out by `wp`.
+pub fn pixel_block(
+    wp: &deeptime_format::projection::WorldProjection,
+    c: i64,
+    w: u32,
+    h: u32,
+    px: u32,
+    py: u32,
+) -> (i64, i64) {
+    use deeptime_format::projection::WorldProjection;
     let x = -c / 2 + c * i64::from(px) / i64::from(w);
-    let p = deeptime_format::Projection::of(c as f64);
-    let z = p.picture_z(f64::from(py), h).floor() as i64;
+    let z = match wp {
+        WorldProjection::Lambert(p) => p.picture_z(f64::from(py), h).floor() as i64,
+        WorldProjection::PetroffGuyou(g) => {
+            let b = g.hemisphere() as f64;
+            (-b / 2.0 + b * f64::from(py) / f64::from(h.max(1))).floor() as i64
+        }
+    };
     (x, z)
+}
+
+/// The height of a whole-world map `w` pixels wide: π : 1 on Lambert, 2 : 1 on Petroff–Guyou.
+pub fn picture_height(wp: &deeptime_format::projection::WorldProjection, w: u32) -> u32 {
+    match wp {
+        deeptime_format::projection::WorldProjection::Lambert(_) => {
+            deeptime_format::Projection::picture_height(w)
+        }
+        deeptime_format::projection::WorldProjection::PetroffGuyou(_) => (w / 2).max(1),
+    }
 }
 
 impl RockWorld {
     /// The rock at `depth` over a w × h map, rows split among `threads` workers.
     pub fn slice(&self, depth: Depth, w: u32, h: u32, threads: usize) -> Slice {
         let c = self.cw.c;
+        let wp = self.cw.manifest.world_projection();
         let (min_y, max_y) = (self.cw.min_y, self.cw.max_y);
         let mut class = vec![NONE; w as usize * h as usize];
         // Rows are claimed one at a time, so a slow row (mountains, many bodies) does not hold a
@@ -72,7 +97,7 @@ impl RockWorld {
                         let next = queue.lock().unwrap_or_else(|e| e.into_inner()).next();
                         let Some((py, row)) = next else { break };
                         for px in 0..w {
-                            let (x, z) = pixel_block(c, w, h, px, py as u32);
+                            let (x, z) = pixel_block(&wp, c, w, h, px, py as u32);
                             let surface = self.cw.height(x, z);
                             if !surface.is_finite() {
                                 continue;
@@ -125,9 +150,18 @@ mod tests {
     fn pixels_sit_where_keyframe_pixels_do() {
         // Pixel 0 is the seam (x = −C/2) and the north pole row (z = −R, R = C/2π = 2,607.6); the
         // middle pixel is x = 0, z = 0 (the map is π : 1, 1024 × 326).
-        assert_eq!(pixel_block(16384, 1024, 326, 0, 0), (-8192, -2608));
-        assert_eq!(pixel_block(16384, 1024, 326, 512, 163), (0, 0));
-        assert_eq!(pixel_block(16384, 1024, 326, 1023, 325), (8176, 2591));
+        let l = deeptime_format::projection::WorldProjection::Lambert(
+            deeptime_format::Projection::new(16384),
+        );
+        assert_eq!(pixel_block(&l, 16384, 1024, 326, 0, 0), (-8192, -2608));
+        assert_eq!(pixel_block(&l, 16384, 1024, 326, 512, 163), (0, 0));
+        assert_eq!(pixel_block(&l, 16384, 1024, 326, 1023, 325), (8176, 2591));
+        let g = deeptime_format::projection::WorldProjection::PetroffGuyou(
+            deeptime_format::projection::PetroffGuyou::new(6656, 0.0),
+        );
+        assert_eq!(picture_height(&g, 1024), 512);
+        assert_eq!(pixel_block(&g, 13312, 1024, 512, 0, 0), (-6656, -3328));
+        assert_eq!(pixel_block(&g, 13312, 1024, 512, 512, 256), (0, 0));
     }
 
     #[test]

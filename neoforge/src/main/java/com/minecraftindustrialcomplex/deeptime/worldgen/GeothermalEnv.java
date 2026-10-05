@@ -39,6 +39,11 @@ final class GeothermalEnv implements Geothermal.Env {
     }
 
     @Override
+    public double zHalf() {
+        return wd.projection().zMax();
+    }
+
+    @Override
     public double precipMm(int x, int z) {
         return precip == null ? Double.NaN : precip.bilinear(x, z);
     }

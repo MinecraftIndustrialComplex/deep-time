@@ -48,7 +48,8 @@ import java.util.Optional;
  *
  * <p><b>Wrapping.</b> Every sample folds x into the canonical lap first, as Toroidal World folds
  * the chunks it generates, so an area on any lap, or across the seam, is the planet's terrain.
- * Past the pole edge the rasters clamp, exactly as the real generator reads them.
+ * Past the pole edge (Lambert) the rasters clamp, past a Petroff–Guyou world's turning edges they fold
+ * (GridDesc.cell), exactly as the real generator reads them.
  *
  * <p><b>What is not here.</b> Trees and other features, caves, and the exact surface rules of the
  * pack. Thread-safe: one scratch per thread, everything read is immutable.
