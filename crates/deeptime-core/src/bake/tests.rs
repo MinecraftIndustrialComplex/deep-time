@@ -192,6 +192,18 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
         (lm - lt).abs() < 0.01,
         "land on the map {lm}, on the planet {lt}"
     );
+    // The spawn candidates are distinct places of the world, clear of the turning edges (none
+    // collapsed onto a pole from the Lambert rows past it).
+    let cands: Value =
+        serde_json::from_slice(&std::fs::read(dir.join("spawn/candidates.json")).unwrap()).unwrap();
+    let list = cands["candidates"].as_array().unwrap();
+    assert!(!list.is_empty(), "spawn candidates: {cands}");
+    let mut seen = std::collections::BTreeSet::new();
+    for c in list {
+        let (x, z) = (c["x"].as_i64().unwrap(), c["z"].as_i64().unwrap());
+        assert!(seen.insert((x, z)), "a repeated candidate ({x}, {z}): {cands}");
+        assert!(z.abs() <= 6_656 / 2 - 64, "({x}, {z}) is within 64 blocks of an edge");
+    }
     let spec = m.projection.as_ref().expect("the layout block");
     assert_eq!(spec.edges.len(), 4);
     assert!(spec.border.as_ref().is_some_and(|b| b.temporary));
