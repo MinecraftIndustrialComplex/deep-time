@@ -35,6 +35,9 @@ use deeptime_format::sites::read_sites;
 use deeptime_format::{ColumnWorld, EventLog, Manifest};
 use serde_json::{Value, json};
 
+/// Lower ends of the land elevation bands, m above the sea of the time.
+const BANDS_M: [f64; 5] = [0.0, 1000.0, 2000.0, 3000.0, 4000.0];
+
 /// Region types, in report order.
 const CLASSES: [&str; 6] = ["orogen", "basin", "shield", "other_land", "shelf", "ocean"];
 
@@ -168,6 +171,8 @@ pub fn history(ckpt: &Path) -> Result<Value, String> {
 
     // Per class: rates (m/Myr) of erosion and deposition, area × time weighted.
     let mut ero: Vec<Hist> = vec![Hist::new(); CLASSES.len()];
+    // Land erosion by the frame's elevation band (how fast high ground, plateaus included, wears).
+    let mut by_band: Vec<Hist> = vec![Hist::new(); BANDS_M.len()];
     let mut dep: Vec<Hist> = vec![Hist::new(); CLASSES.len()];
     // Per crust parcel, carried: totals over the run and over its last 500 Myr (m), frames as orogen.
     let mut cum_e = vec![0.0f64; n];
@@ -215,6 +220,13 @@ pub fn history(ckpt: &Path) -> Result<Value, String> {
             let cl = classify(z[c], thick[c], upl[c], fault[c], ec, dc);
             let wgt = area[c] * dt_myr;
             ero[cl].add(f64::from(ec), wgt);
+            if z[c] > 0.0 {
+                let b = BANDS_M
+                    .iter()
+                    .rposition(|&lo| f64::from(z[c]) >= lo)
+                    .unwrap_or(0);
+                by_band[b].add(f64::from(ec), wgt);
+            }
             dep[cl].add(f64::from(dc), wgt);
             cum_e[c] += f64::from(ec) * dt_myr;
             cum_d[c] += f64::from(dc) * dt_myr;
@@ -320,6 +332,15 @@ pub fn history(ckpt: &Path) -> Result<Value, String> {
         "frames": frames,
         "span_myr": span_myr,
         "rates_by_region": rates,
+        "land_erosion_by_elevation_m": BANDS_M
+            .iter()
+            .enumerate()
+            .map(|(i, lo)| {
+                let mut v = by_band[i].json(1.0);
+                v["area_share"] = json!((by_band[i].total / total_w * 1000.0).round() / 1000.0);
+                (format!("from_{lo}"), v)
+            })
+            .collect::<serde_json::Map<String, Value>>(),
         "parcel_totals_by_final_region": totals,
         "hypsometry": {
             "land_share": r3(land_a / all_a),
