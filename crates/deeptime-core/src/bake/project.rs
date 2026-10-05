@@ -706,7 +706,7 @@ fn raise_world_tops(
     let g1 = &desc.grid;
     let (w1, h1) = (g1.w as usize, g1.h as usize);
     let g3 = &elev.desc.grid;
-    if g3.r == 0 || g1.r % g3.r != 0 {
+    if g3.r == 0 || !g1.r.is_multiple_of(g3.r) {
         return (0, 0.0);
     }
     let ratio = (g1.r / g3.r) as usize;
