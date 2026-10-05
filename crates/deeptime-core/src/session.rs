@@ -201,12 +201,35 @@ const OWN_ONLY_ESTIMATES: [&str; 4] = [
     crate::deposits::STAGE_NAME,
 ];
 
+/// The bake's working set, `(base, history, projection)` (bytes): the world the amplification
+/// leaves plus the projection pass's working set ([`crate::bake::project::estimate_bytes`]); all
+/// zero for a preset without the amplify stage (the plate-only and placeholder presets, whose
+/// bake is small or absent).
+fn bake_set(preset: &Preset, list: &[Box<dyn Stage>]) -> (u64, u64, u64) {
+    let crate::preset::PresetBody::Planet(p) = &preset.body else {
+        return (0, 0, 0);
+    };
+    if !list
+        .iter()
+        .any(|s| s.name() == crate::surface::amplify::STAGE_NAME)
+    {
+        return (0, 0, 0);
+    }
+    let (world, hist) = crate::surface::amplify::world_bytes(p);
+    let projection = crate::bake::project::estimate_bytes(p);
+    (world + projection, hist, projection)
+}
+
 /// The memory and time estimate for a preset run under a memory cap of `mem_cap` bytes (0: the
 /// default), as JSON (plan §5.7.5; P1-17's history spill):
 ///
 /// `{"peak_bytes", "base_bytes", "history_bytes", "spill_bytes", "mem_cap",
 ///   "stages": [{"name", "bytes", "seconds", "base_bytes", "history_bytes", "spill_bytes",
 ///   "coupled_to"}, …]}`
+///
+/// `bake_bytes` (only for a preset with the amplify stage) is the bake's peak after the last stage:
+/// the finished world and the projection pass's working set (`bake_projection_bytes`). It counts
+/// in `peak_bytes`, not in the base (which a stage's own working set decides).
 ///
 /// `coupled_to` is the stage a coupled stage steps with (`Stage::coupled_to`), or null: a
 /// running session reports a group of coupled stages as its lead's index and permille, so a
@@ -257,11 +280,25 @@ pub fn estimate_for(
             })
         })
         .collect();
-    Ok(json!({
+    // The bake after the last stage (`finalize_write`): the finished world, which stays in memory
+    // beside it, and the projection pass's working set (the Lambert bake itself has stayed inside
+    // the stages' peak so far; `tests/memory_estimate.rs` checks the run's peak).
+    let (bake_base, bake_hist, projection) = bake_set(&preset, &list);
+    let bake_bytes = if bake_base > 0 {
+        bake_base + bake_hist.min(cap.saturating_sub(bake_base))
+    } else {
+        0
+    };
+    peak = peak.max(bake_bytes);
+    let mut out = json!({
         "peak_bytes": peak, "base_bytes": base, "history_bytes": history,
         "spill_bytes": spill, "mem_cap": cap, "stages": stages,
-    })
-    .to_string())
+    });
+    if bake_bytes > 0 {
+        out["bake_bytes"] = json!(bake_bytes);
+        out["bake_projection_bytes"] = json!(projection);
+    }
+    Ok(out.to_string())
 }
 
 /// How a session is created.
@@ -1780,6 +1817,9 @@ impl Session {
                 .get(crate::bake::NOTES_KEY)
                 .is_some_and(|b| b["baked"] == json!(true));
             if baked {
+                // The blocks the bake freed and the allocator keeps are the wrong sizes for this
+                // pass's arrays: they would sit in the count beside them.
+                self.gauge.release();
                 let note = self
                     .pool
                     .install(|| crate::bake::project::project_folder(dir, p, &mut m))?;
