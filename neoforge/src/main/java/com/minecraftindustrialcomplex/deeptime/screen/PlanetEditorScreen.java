@@ -99,6 +99,24 @@ public final class PlanetEditorScreen extends Screen {
         }
     }
 
+    /**
+     * The Create World flow ended (title screen, world list, server list, or the new world
+     * loading): every editor's run that was not accepted stops ({@link EditorModel#abandon}).
+     */
+    static void abandonAll() {
+        java.util.List<EditorModel> models;
+        synchronized (MODELS) {
+            models = java.util.List.copyOf(MODELS.values());
+            MODELS.clear();
+        }
+        for (EditorModel m : models) {
+            if (m.run().map(r -> r.state() == com.minecraftindustrialcomplex.deeptime.screen.model.TimelapseModel.State.RUNNING).orElse(false)
+                    && m.accepted().map(a -> !a.stagingId().equals(m.run().get().stagingId())).orElse(true))
+                com.minecraftindustrialcomplex.deeptime.DeepTime.LOGGER.info("Deep Time: the Create World screen closed; cancelling the run that was not accepted");
+            m.abandon();
+        }
+    }
+
     /** Every live editor model's staging ids (kept by the abandoned-folder cleanup). */
     static java.util.Set<String> heldStagingIds() {
         java.util.Set<String> out = new java.util.HashSet<>();

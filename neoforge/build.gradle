@@ -236,6 +236,8 @@ neoForge {
             // -PwrapCompatSkip=<Mixin>[,<Mixin>…]: leave those adapter mixins out (bisecting).
             if (project.hasProperty('wrapCompatSkip')) systemProperty 'deeptime.wrapengine.compat.skip', project.property('wrapCompatSkip').toString()
             systemProperty 'deeptime.gametest', 'true'
+            // P1-11: EditorModelGameTests.realPlanetThroughTheEditor reads tests/presets/planet_world_4k.json.
+            systemProperty 'deeptime.repoRoot', repoRoot.absolutePath
             if (extraDatapack) systemProperty 'deeptime.extraDatapack', extraDatapack.toString()
             // -PgametestOnly=<name>[,<name>…]: run only those tests (GameTestServerMixin).
             if (project.hasProperty('gametestOnly')) systemProperty 'deeptime.gametestOnly', project.property('gametestOnly').toString()
