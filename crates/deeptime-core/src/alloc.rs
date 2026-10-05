@@ -53,6 +53,8 @@ static CACHE_LIMIT: AtomicUsize = AtomicUsize::new(CACHE_BYTES);
 const SLOTS: usize = 128;
 /// Kept blocks never hold the count above this ([`keep_below`]).
 static CEILING: AtomicU64 = AtomicU64::new(u64::MAX);
+/// The bytes of the kept blocks (`Cache::bytes`, readable without the lock).
+static KEPT: AtomicUsize = AtomicUsize::new(0);
 
 /// Freed large blocks kept for reuse, oldest first: `(address, page-rounded length)`.
 struct Cache {
@@ -79,6 +81,7 @@ impl Cache {
         self.blocks.copy_within(i + 1..self.n, i);
         self.n -= 1;
         self.bytes -= len;
+        KEPT.store(self.bytes, Ordering::Relaxed);
         Some(p as *mut u8)
     }
 
@@ -88,6 +91,7 @@ impl Cache {
         self.blocks.copy_within(1..self.n, 0);
         self.n -= 1;
         self.bytes -= len;
+        KEPT.store(self.bytes, Ordering::Relaxed);
         // SAFETY: a kept block is a live mapping of `len` bytes that nothing else refers to.
         unsafe { os::unmap(p as *mut u8, len) };
         removed(len);
@@ -106,6 +110,7 @@ impl Cache {
         self.blocks[self.n] = (p as usize, len);
         self.n += 1;
         self.bytes += len;
+        KEPT.store(self.bytes, Ordering::Relaxed);
         true
     }
 }
@@ -275,12 +280,7 @@ impl CountingAlloc {
             let p = os::map(len);
             if !p.is_null() {
                 added(len);
-                if in_use() > CEILING.load(Ordering::Relaxed) {
-                    let mut c = cache();
-                    while c.n > 0 && in_use() > CEILING.load(Ordering::Relaxed) {
-                        c.drop_oldest();
-                    }
-                }
+                hold_ceiling();
             }
             return p;
         }
@@ -294,8 +294,24 @@ impl CountingAlloc {
         };
         if !p.is_null() {
             added(small_footprint(layout.size()));
+            hold_ceiling();
         }
         p
+    }
+}
+
+/// After the count grew: while kept blocks hold it over the ceiling ([`keep_below`]), the oldest
+/// go back to the OS. Small blocks and growth in place count too, not only fresh large blocks,
+/// so a step that allocates many small blocks cannot pass the ceiling while kept blocks are still
+/// held. Two relaxed loads when nothing is kept or the count is under the ceiling.
+#[inline]
+fn hold_ceiling() {
+    if KEPT.load(Ordering::Relaxed) == 0 || in_use() <= CEILING.load(Ordering::Relaxed) {
+        return;
+    }
+    let mut c = cache();
+    while c.n > 0 && in_use() > CEILING.load(Ordering::Relaxed) {
+        c.drop_oldest();
     }
 }
 
@@ -338,6 +354,7 @@ unsafe impl GlobalAlloc for CountingAlloc {
                 if !p.is_null() {
                     removed(small_footprint(layout.size()));
                     added(small_footprint(new_size));
+                    hold_ceiling();
                 }
                 p
             }
@@ -351,6 +368,7 @@ unsafe impl GlobalAlloc for CountingAlloc {
                 if !p.is_null() {
                     if new > old {
                         added(new - old);
+                        hold_ceiling();
                     } else {
                         removed(old - new);
                     }
@@ -445,8 +463,16 @@ static TEST_GLOBAL: CountingAlloc = CountingAlloc;
 mod tests {
     use super::*;
 
+    /// The tests that release or limit the kept blocks run one at a time.
+    static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn serial() -> std::sync::MutexGuard<'static, ()> {
+        SERIAL.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
     #[test]
     fn counts_a_large_allocation_by_its_pages() {
+        let _serial = serial();
         let before = in_use();
         let v = vec![0u8; (64 << 20) + 1];
         assert!(v.iter().step_by(4096).all(|&b| b == 0), "not zeroed");
@@ -508,6 +534,7 @@ mod tests {
 
     #[test]
     fn a_kept_block_is_reused_zeroed_and_released() {
+        let _serial = serial();
         if !cfg!(target_os = "linux") {
             return;
         }
@@ -525,6 +552,30 @@ mod tests {
         );
         drop(v);
         assert!(release_cache() >= pages(len) as u64);
+    }
+
+    #[test]
+    fn small_blocks_past_the_ceiling_give_back_kept_blocks() {
+        let _serial = serial();
+        if !cfg!(target_os = "linux") {
+            return;
+        }
+        // An odd size no other test allocates, so the kept block is this test's.
+        let len = 7 * LARGE_BYTES + 5 * 4096 + 3;
+        let v = vec![1u8; len];
+        let at = v.as_ptr() as usize;
+        keep_below(u64::MAX);
+        drop(v);
+        let kept = |c: &Cache| c.blocks[..c.n].iter().any(|b| b.0 == at);
+        assert!(kept(&cache()), "the freed block is kept");
+        // A ceiling just over the count now; then 4 MiB of small blocks pass it.
+        keep_below(in_use() + (1 << 20));
+        assert!(kept(&cache()), "under the ceiling the block stays");
+        let small: Vec<Vec<u8>> = (0..1024).map(|_| vec![2u8; 4000]).collect();
+        let gone = !kept(&cache());
+        keep_below(u64::MAX);
+        drop(small);
+        assert!(gone, "small blocks past the ceiling gave the kept block back");
     }
 
     #[test]
