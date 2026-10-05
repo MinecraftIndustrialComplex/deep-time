@@ -541,22 +541,17 @@ pub fn compute(
     // the second uses.
     let mut up_src: (Vec<f64>, Vec<f64>) = (Vec::new(), Vec::new());
     let mut carry: Option<Carry> = None;
-    let carry_at = |g: &super::coarse::Grid,
-                    cy: &Option<Carry>,
-                    c: usize,
-                    m: usize|
-     -> Option<(f64, f64)> {
-        let (ba, da) = cy.as_ref()?;
-        let (mut a, mut d) = (0.0, 0.0);
-        for (cc, wt) in g.corners(c) {
-            a += wt * ba[cc][m];
-            d += wt * da[cc][m];
-        }
-        Some((a, d))
-    };
-    let pref_of = |g: &super::coarse::Grid,
-                   cy: &Option<Carry>|
-     -> Vec<[f64; 12]> {
+    let carry_at =
+        |g: &super::coarse::Grid, cy: &Option<Carry>, c: usize, m: usize| -> Option<(f64, f64)> {
+            let (ba, da) = cy.as_ref()?;
+            let (mut a, mut d) = (0.0, 0.0);
+            for (cc, wt) in g.corners(c) {
+                a += wt * ba[cc][m];
+                d += wt * da[cc][m];
+            }
+            Some((a, d))
+        };
+    let pref_of = |g: &super::coarse::Grid, cy: &Option<Carry>| -> Vec<[f64; 12]> {
         let nc = g.w * g.h;
         let per: Vec<[f64; 12]> = (0..n)
             .into_par_iter()
@@ -661,7 +656,14 @@ pub fn compute(
             }
         }
         if pcm.upwind.is_some() {
-            let r = upwind_rain(pcm, p, &pref_of(&g, &carry), &up_src, Some(&sink_ref), &cell.rain_mm);
+            let r = upwind_rain(
+                pcm,
+                p,
+                &pref_of(&g, &carry),
+                &up_src,
+                Some(&sink_ref),
+                &cell.rain_mm,
+            );
             cell.rain_mm = r.annual_mm.clone();
             pcm.upwind = Some(r);
         } else {

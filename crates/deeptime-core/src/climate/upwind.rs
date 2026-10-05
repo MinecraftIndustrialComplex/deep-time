@@ -688,7 +688,9 @@ pub fn rain(
         .zip(&months)
         .map(|(mo, s)| tracers(&mesh, &k, mo, s, &src))
         .collect();
-    let dsst_air = (0..n).map(|c| std::array::from_fn(|m| carried[m][c][0])).collect();
+    let dsst_air = (0..n)
+        .map(|c| std::array::from_fn(|m| carried[m][c][0]))
+        .collect();
     // Which side of the highs a place lies under is the place's (`flank_position`).
     let flank = flank_position(&mesh, inp.basin, &sea);
     let basin_air = (0..n).map(|c| [flank[c]; 12]).collect();
@@ -869,7 +871,11 @@ mod tests {
             "{:?}",
             [t[5][0], t[30][0], t[55][0]]
         );
-        assert!(t[70][0] > t[120][0] && t[120][0] > t[190][0], "{:?}", [t[70][0], t[120][0], t[190][0]]);
+        assert!(
+            t[70][0] > t[120][0] && t[120][0] > t[190][0],
+            "{:?}",
+            [t[70][0], t[120][0], t[190][0]]
+        );
         assert!(t[190][0] < 0.8, "{}", t[190][0]);
         // A mark set by the sea's position (here the sea's western half 1, eastern half 0)
         // arrives from the sea that lies upwind.
@@ -911,14 +917,25 @@ mod tests {
         let mesh = ring(n);
         let sea: Vec<f64> = (0..n).map(|c| if c < 40 { 0.0 } else { 1.0 }).collect();
         let basin: Vec<f64> = (0..n)
-            .map(|c| if c < 40 { 0.0 } else { (c as f64 - 120.0) / 80.0 })
+            .map(|c| {
+                if c < 40 {
+                    0.0
+                } else {
+                    (c as f64 - 120.0) / 80.0
+                }
+            })
             .collect();
         let a = flank_position(&mesh, &basin, &sea);
         assert!(a[1] > 0.6 && a[38] < -0.6, "{} {}", a[1], a[38]);
         assert!(a[5] > a[15] && a[15] > a[20], "{:?}", [a[5], a[15], a[20]]);
         assert!(a[20].abs() < 0.2, "{}", a[20]);
         // Over the open sea it is the basin's own position.
-        assert!((a[120] - basin[120]).abs() < 0.05 && a[190] > 0.8, "{} {}", a[120], a[190]);
+        assert!(
+            (a[120] - basin[120]).abs() < 0.05 && a[190] > 0.8,
+            "{} {}",
+            a[120],
+            a[190]
+        );
     }
 
     #[test]
