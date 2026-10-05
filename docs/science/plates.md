@@ -550,51 +550,65 @@ work (plate tasks 3-5), not a calibration of the arc rule.
 
 ## The continental crust budget under the force balance (plate tasks 7 and 8, 2026-10-05)
 
-Ledger PLT-256 (value changed), PLT-276 and PLT-277 (new). Ben's answers of 2026-10-05 ("Keep
-200 km, raise crust in 7–8"; and the validation policy of the same day: physics from sources, the
-land share reported against Earth's history, not tuned towards a target).
+Ledger PLT-242 and PLT-256 (values changed), PLT-276 and PLT-277 (new). Ben's answers of
+2026-10-05 ("Keep 200 km, raise crust in 7–8"; and the validation policy of the same day: physics
+from sources, the land share reported against Earth's history, not tuned towards a target), and
+the coordinator's choices of the same night (the stacking share from Stern & Scholl 2010; the
+plateau rule checked for physics).
 
 **What the switch did to the budget.** Under the force balance a collision keeps converging after
 its onset (the convergence 20 Myr in is 0.3–0.5 of the onset's, inside the 0.2–0.6 that India
 gives), so about twice as much continental crust crosses collision fronts as under the old speed
-law (`plate-check`, 1000 Myr, eight runs: 17 + 21 million km² per 100 Myr in collisions that end
-without and with a transfer or weld, against 8 + 7 on master). Three things then destroyed that
-crust much faster than Earth does:
+law (`plate-check`, 1000 Myr, eight runs: 17 + 19 million km² per 100 Myr in collisions that end
+without and with a transfer or weld, against 8 + 7 on master). Four things destroyed that crust
+much faster than Earth does:
 
 1. *Counted twice* (fixed, PLT-276). The belt stacks `collision_stacking_share` of the crust that
    crosses the front; the crust itself, hidden under the overriding plate, was also accreted to the
    column on top at the next resampling. Up to 1.8 times the crossed volume reached the overriding
    plate, and the thickest-crust limit removed the excess.
-2. *Foundered with nowhere to go* (changed, PLT-277). Crust beyond `crust_max_km` (70 km) went to
+2. *A fifth sent down at every front* (PLT-242, 0.8 → 0.95). Stern & Scholl (2010, after Scholl &
+   von Huene 2009) put the recycling at suture zones at about 115 km³ per km of suture per Myr, of
+   which 50 is deeply subducted lower-plate crust; about 1,600 km³ per km per Myr crosses a model
+   front at 40 mm/yr, so a retained share of 0.93–0.97.
+3. *Foundered with nowhere to go* (changed, PLT-277). Crust beyond `crust_max_km` (70 km) went to
    the mantle at once; the collapse could only move crust that no orogeny was raising. Now the
-   excess first widens the plateau: it fills continental crust thinner than the limit, and ocean
-   floor up to the normal column, within `collapse_reach_km`, and only what finds no room founders.
-3. *Collapse stopping at 55 km* (PLT-256 now 50 km, the figure the sources state).
+   excess first spreads: it fills continental crust up to `collapse_thickness_km` and ocean floor
+   up to the normal column within `collapse_reach_km`, and only what finds no room founders.
+   Filling neighbours up to the 70 km limit itself was tried and dropped: every long collision
+   then widened into a 70 km plateau (0.35 of the land above 2 km at 500 Myr, 0.41 at 1000 Myr).
+4. *Collapse stopping at 55 km* (PLT-256 now 50 km, the figure the sources state).
 
-| `earthlike_quick_16k`, 500 Myr (km³ a year, Earth-normalized) | Before (branch head, 4 runs) | Now (6 runs) | Earth today |
+| `earthlike_quick_16k`, 500 Myr (km³ a year, Earth-normalized) | Branch as found (4 runs) | Now (6 runs) | Earth today |
 |---|---|---|---|
-| Continental crust crossing collision fronts | 13.4 | 12.9 | — |
-| Lost at the front (the share not stacked) | 3.0 | 3.5 | — |
-| Foundered beyond the thickest column | 14.4 | 2.5 | deep continental crust lost at collision zones about 0.3; all collision-zone losses about 0.7 |
-| Accreted at resamplings (of it, a collision's crust a second time) | 36.8 (about 9) | 22 (0) | — |
+| Continental crust crossing collision fronts | 13.4 | 15.0 | — |
+| Lost at the front (not stacked) | 3.0 | 2.3 | deep lower-plate crust at sutures about 0.3 |
+| Foundered beyond the thickest column | 14.4 | 5.7 | (included above) |
+| Accreted at resamplings (of it, a collision's crust a second time) | 36.8 (about 9) | 23.8 (0) | — |
 | All crustal losses | — | — | more than about 3.2 (subduction erosion 1.5, sediment subduction 1.0, collision zones 0.7) |
 | All crustal additions | — | — | about 3.2 (oceanic arcs 1.5, continental arcs 1.0, rifts and hotspots 0.5, collision zones 0.2) |
 
-Earth's column: Stern & Scholl 2010 (full text, Figure 3 and p. 19), after Scholl & von Huene
-2009. The model still loses continental crust at collision zones several times faster than Earth:
-the stacking share (0.8, `collision_stacking_share`, kept by the coordinator's brief) sends a fifth
-of all crossing crust into the mantle, about 3.5 km³ a year, where Stern & Scholl's 50 km³ per km of
-suture per Myr of deeply subducted lower-plate crust is a few per cent of what crosses. That is an
-open question (STATUS.md).
+Earth's column: Stern & Scholl 2010 (full text, Figure 3 and pp. 18–19). The model still loses
+continental crust at collision zones many times faster than Earth: about 8 km³ a year in all,
+mostly what founders because a long collision stacks crust faster than 200 km of reach can
+take it.
 
-**What it gives** (500 Myr, seeds 1–3, both starts; reported against Earth, not tuned): continental
-crust 0.31 of the planet (master 0.38), of it 0.64 dry (master 0.46), land 0.21 (master 0.18). Earth's
-land share over the Phanerozoic was about 18–30 % (Ben's reference range, 2026-10-05); today's is
-29 % with continental crust (shelves included) about 41 %.
+**What it gives** (reported against Earth, not tuned). 500 Myr, seeds 1–3, both starts:
+continental crust 0.30 of the planet (master 0.38), 0.57 of it dry (master 0.46), land 0.18
+(master 0.18), median land 900 m (master 410), land above 2 km 0.25 of the land (master 0.08).
+1000 Myr, seeds 1–4: crust 0.31 (master 0.40), land 0.19 (master 0.14), land above 2 km 0.27.
+Earth's land share over the Phanerozoic was about 18–30 % (Ben's reference range, 2026-10-05);
+today's is 29 % with continental crust (shelves included) about 41 %, and about a tenth of the
+land stands above 2 km (from memory).
+
+**Why the high ground (a model issue, open).** Collapse thins quiet crust only to 50 km, and a
+50 km column stands at its Airy height, about 3.2 km (the middle of `continent_elevation_m` plus
+15 km / 5.5; PLT-121). Earth's crust of that thickness under an old orogen stands about a
+kilometre high (the Urals keep 50–56 km, Carbonell et al. 2000), because its root is dense and
+its lithosphere cold, which pure Airy isostasy with one crustal density leaves out. So every
+collapsed orogen in the model stays above 2 km until erosion takes it down. The fix is in the
+isostasy of thick crust or the erosion (the erosion and burial investigation of 2026-10-05), not
+in the plate model's budget.
 
 **Limits.**
-- A plateau widened by the excess stands at the Airy height of its column (up to about 6 km for
-  70 km of crust), so collision belts make broad high ground: land above 2 km is 0.32 of the land
-  at 500 Myr (master 0.08; Earth about a tenth, from memory). The surface stage's spreading and erosion are what
-  lower it.
 - Which of spreading and foundering comes first, and the reach, are the model's.
