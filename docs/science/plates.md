@@ -164,13 +164,16 @@ adds a whole column to the one on top (PLT-228). None of that crust gave area ba
 
 **What the model does now.** Each 2 Myr step, after the collision belts and subduction uplift:
 
-1. *The thickest crust* (PLT-258): a visible continental column thicker than `crust_max_km`
-   (70 km) loses the excess from the bottom of the column (mafic root first) to the mantle. It
+1. *The thickest crust* (PLT-258, PLT-277): a visible continental column thicker than
+   `crust_max_km` (70 km) spreads the excess at once to the nearest room on its plate, by the
+   collapse's transport below but without waiting for the orogeny to end (since 2026-10-05: a
+   plateau that a long collision thickens widens while the convergence goes on). What finds no
+   room within reach goes to the mantle from the bottom of the column (mafic root first) and
    gives no area.
 2. *Collapse* (PLT-254): a visible continental sample that no orogeny has raised for
    `collapse_quiet_myr` (10 Myr, PLT-259: collapse follows the end of the thickening) and whose
-   crust is thicker than `collapse_thickness_km` (55 km, PLT-256) releases
-   (1 − e^(−δt/τ)) × (T − 55 km) of its thickness, τ = `collapse_myr` (15 Myr, PLT-255). The
+   crust is thicker than `collapse_thickness_km` (50 km since 2026-10-05, was 55; PLT-256) releases
+   (1 − e^(−δt/τ)) × (T − 50 km) of its thickness, τ = `collapse_myr` (15 Myr, PLT-255). The
    crust released (its own rock, thinned in proportion) fills the nearest samples of the same
    plate that are thinner than the model's normal column (35.1 km), within `collapse_reach_km`
    (200 km, PLT-257), nearest first: thinned continental crust, then the plate's own ocean floor
@@ -192,7 +195,7 @@ measured tables (`plate-check` at 1000 Myr and the 500 Myr hypsometry ensemble).
   before a weld (PLT-246). The sources say when collapse starts (as thickening ends, Variscan; with
   a change of the plate boundary, Nevada) but not how long after; on Earth thinning can lag
   thickening by tens of Myr (the Basin and Range: Lundstern & Miller 2021, abstract).
-- The threshold (55 km) and the quiet time were chosen among values the sources allow by the
+- The threshold (55 km at first, 50 km since the force balance, 2026-10-05) and the quiet time were chosen among values the sources allow by the
   1000 Myr crust share (build log): with 50 km the crust ended at 0.52 of the planet, over the
   check's ceiling of 0.45. That is a calibration inside the sources' range, not a measured value.
 - Thickness beyond `crust_max_km` is removed whether the crust is felsic or mafic. Felsic crust

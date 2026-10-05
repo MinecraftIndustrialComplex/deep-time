@@ -60,8 +60,13 @@
 //! belt's cap reads the surface's height (PLT-253), which the surface stage lowers by flexure and
 //! erosion while the stacked thickness stays, and an overlap at a resampling adds a whole column
 //! to the one on top. [`founder`] takes every visible continental column thicker than
-//! `crust_max_km` back to it, from the bottom of the column; the crust taken is gone (it gives no
-//! area back).
+//! `crust_max_km` back to it: the excess first spreads at once to the nearest room on its plate,
+//! as the collapse moves crust but whether or not an orogeny holds the column up (a growing
+//! plateau widens while the collision goes on); what finds no room goes down from the bottom of
+//! the column and is gone (it gives no area back). Since 2026-10-05 (plate task 7, ledger
+//! PLT-277); until then all of the excess foundered, and a collision's crust, also accreted a
+//! second time at each resampling (PLT-276), foundered at three times the old motion law's rate
+//! under the force balance.
 //!
 //! # What it is not
 //! A lower-crustal flow solve. The surface stage's spreading (`surface::spread`) moves the surface
@@ -110,7 +115,7 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
     }
     // ledger: PLT-258.
     let t_max = (k.crust_max_km * 1000.0).max(normal_thickness_m());
-    if spreads(k) && std::env::var_os("DT_EXP_NO_SPREAD").is_none() /* TEMP-EXP */ {
+    if spreads(k) {
         // ledger: PLT-277 (the excess spreads before any of it founders).
         let mut by_plate: BTreeMap<u32, Vec<(usize, f64)>> = BTreeMap::new();
         for (i, s) in state.samples.iter().enumerate() {
