@@ -41,6 +41,11 @@ pub use crate::stage::{Stage, StageContext, StageEstimate};
 /// Number of `long`s `progress` fills (plan §6.1).
 pub const PROGRESS_FIELDS: usize = 12;
 
+/// About how many epoch checkpoints a run keeps (`Session::set_epochs`; docs/design/
+/// playability-steering.md §8.2): the grid is the keyframe interval or the run over this,
+/// whichever is longer.
+pub const EPOCH_CHECKPOINTS: f64 = 10.0;
+
 /// The default native memory cap, 4 GiB (plan §5.7.5).
 pub const DEFAULT_MEM_CAP: u64 = 4 << 30;
 
@@ -537,8 +542,18 @@ impl Session {
         if !on {
             return self.set_epochs_every(None);
         }
-        // Without keyframes: only the stop's checkpoint (an infinite grid has no points).
-        self.set_epochs_every(Some(self.policy.every_years.unwrap_or(f64::INFINITY)))
+        // The keyframe grid, but at most about `EPOCH_CHECKPOINTS` checkpoints a run: each holds
+        // the whole world (some 150–300 MB on the quick 16k planet), and a frame between two of
+        // them reruns at most one interval. Without keyframes: only the stop's checkpoint.
+        let run_years = match &self.preset.body {
+            crate::preset::PresetBody::Planet(p) => p.run_years(),
+            _ => 0.0,
+        };
+        let every = self
+            .policy
+            .every_years
+            .map_or(f64::INFINITY, |e| e.max(run_years / EPOCH_CHECKPOINTS));
+        self.set_epochs_every(Some(every))
     }
 
     /// [`Session::set_epochs`] on a grid of its own: a checkpoint for every `every_years` of the
