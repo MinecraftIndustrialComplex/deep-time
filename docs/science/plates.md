@@ -606,9 +606,12 @@ land stands above 2 km (from memory).
 15 km / 5.5; PLT-121). Earth's crust of that thickness under an old orogen stands about a
 kilometre high (the Urals keep 50–56 km, Carbonell et al. 2000; their height of about a kilometre is from memory), because its root is dense and
 its lithosphere cold, which pure Airy isostasy with one crustal density leaves out. So every
-collapsed orogen in the model stays above 2 km until erosion takes it down. The fix is in the
-isostasy of thick crust or the erosion (the erosion and burial investigation of 2026-10-05), not
-in the plate model's budget.
+collapsed orogen in the model stays above 2 km until erosion takes it down. Erosion is not what
+holds it up: the erosion audit of 2026-10-05 finds land above 2 km eroding at 116–144 m/Myr
+(mean), the rate of mountain ranges and 5–10 times faster than a real plateau interior (southern
+Tibet under 0.01 km/Myr since about 11 Ma, Tremblay et al. 2015, ERO-174). The high ground is the
+crust supply: the 50 km collapse floor and the belts held at up to 70 km, at their pure Airy
+heights. The levers are the collapse floor and the isostasy of thick crust (open).
 
 **Limits.**
 - Which of spreading and foundering comes first, and the reach, are the model's.
