@@ -21,8 +21,20 @@ import com.google.gson.JsonObject;
  * @param salt          the salt of the first octave (a u32)
  * @param octaves       octaves of {@link #fbm}
  * @param wavelength    the first octave's wavelength, blocks
+ * @param halfTurnB     b of a Petroff–Guyou world (format 0.5), whose north and south edges are glued
+ *                      onto themselves by half-turns and {@link #at} folds and blends there; 0 on a
+ *                      Lambert or synthetic world
  */
-public record DetailNoise(long seed, int circumference, int salt, int octaves, double wavelength) {
+public record DetailNoise(long seed, int circumference, int salt, int octaves, double wavelength, long halfTurnB) {
+
+    /** The width of the band inside a Petroff–Guyou world's turning edges where the noise is blended
+     *  towards its half-turn-symmetric mean, blocks (Rust {@code EDGE_BLEND_BLOCKS}; ledger: SCL-089, game-choice). */
+    public static final double EDGE_BLEND_BLOCKS = 32.0; // ledger: SCL-089 (game-choice)
+
+    /** A world without turning edges. */
+    public DetailNoise(long seed, int circumference, int salt, int octaves, double wavelength) {
+        this(seed, circumference, salt, octaves, wavelength, 0L);
+    }
 
     /** The layer the amplitude comes from ({@code notes.bake.detail.layer}). */
     public static final String DEFAULT_LAYER = "detail/amplitude";
@@ -44,7 +56,9 @@ public record DetailNoise(long seed, int circumference, int salt, int octaves, d
             double wavelength = d.get("wavelength_blocks").getAsDouble();
             if (octaves < 1 || octaves > 16 || !(wavelength > 0) || Double.isInfinite(wavelength))
                 throw new WorldDataException("notes.bake.detail: octaves " + octaves + ", wavelength " + wavelength);
-            return new DetailNoise(seed, m.circumference(), salt, octaves, wavelength);
+            WorldProjection wp = m.projection();
+            long b = wp instanceof PetroffGuyou g ? g.hemisphere() : 0L;
+            return new DetailNoise(seed, m.circumference(), salt, octaves, wavelength, b);
         } catch (RuntimeException e) {
             if (e instanceof WorldDataException w)
                 throw w;
@@ -114,8 +128,43 @@ public record DetailNoise(long seed, int circumference, int salt, int octaves, d
         return sum / norm;
     }
 
-    /** N at block (x, z) with this world's octaves, wavelength and salt. */
+    /**
+     * N at block (x, z) with this world's octaves, wavelength and salt (Rust {@code DetailSpec::noise}).
+     * On a Petroff–Guyou world a point past the north or south edge is first folded through the edge's
+     * half-turn, and within {@link #EDGE_BLEND_BLOCKS} of an edge the noise is blended towards its
+     * half-turn-symmetric mean S = ½(N + N(mirror)), so the detail term is continuous through the seam.
+     */
     public double at(double x, double z) {
-        return fbm(x, z, wavelength, octaves, salt);
+        if (halfTurnB == 0L)
+            return fbm(x, z, wavelength, octaves, salt);
+        double b = (double) halfTurnB;
+        double h = 0.5 * b;
+        for (int k = 0; k < 64; k++) {
+            if (z < -h) {
+                x = -x;
+                z = -b - z;
+            } else if (z > h) {
+                x = -x;
+                z = b - z;
+            } else {
+                break;
+            }
+        }
+        double n = fbm(x, z, wavelength, octaves, salt);
+        double d, mz;
+        if (z < 0.0) {
+            d = z + h;
+            mz = -b - z;
+        } else {
+            d = h - z;
+            mz = b - z;
+        }
+        if (d >= EDGE_BLEND_BLOCKS)
+            return n;
+        double m = fbm(-x, mz, wavelength, octaves, salt);
+        double s = 0.5 * (n + m);
+        double t = d / EDGE_BLEND_BLOCKS;
+        double w = t * t * (3.0 - 2.0 * t);
+        return s + (n - s) * w;
     }
 }

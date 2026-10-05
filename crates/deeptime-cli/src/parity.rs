@@ -33,8 +33,10 @@ pub const DEFAULT_SEED: u64 = 0x5EED_0C01_0B0E;
 /// The columns to sample.
 pub fn pick(w: &ColumnWorld, n: usize, seed: u64) -> Vec<(i64, i64)> {
     let c = w.c;
-    // The z of the poles (the planet's projection).
-    let zp = deeptime_format::Projection::of(c as f64).pole_z() as i64;
+    // The world's z range (the poles on Lambert, the turning edges on Petroff–Guyou), taken
+    // symmetric about the equator.
+    let (z0, z1) = w.manifest.world_projection().z_range();
+    let zp = (z1.min(-z0)) as i64;
     let mut rng = SplitMix(seed);
     let mut out = Vec::with_capacity(n);
     let (seam, poles, bodies) = (n / 10, n / 10, if w.bodies.is_empty() { 0 } else { n / 5 });
@@ -174,23 +176,50 @@ pub fn run(world: &Path, out: &Path, n: usize, seed: u64) -> Result<(usize, usiz
         .iter()
         .filter(|c| c["bodies"].as_array().is_some_and(|b| !b.is_empty()))
         .count();
-    // The projection (`deeptime_format::projection`): latitude, longitude and area scale of every
-    // picked column, the z of every 5° of latitude, the extent and the spatial indexes' frame,
-    // for the Java twin (`worlddata/Projection`).
-    let proj = deeptime_format::Projection::of(w.c as f64);
+    // The world's projection (`deeptime_format::projection::WorldProjection`, from the manifest):
+    // latitude and longitude of every picked column, the block of a lattice of latitudes and
+    // longitudes, the z range and the spatial indexes' frame, for the Java twin; on a Lambert world
+    // also its pole, extent and the z of every 5° of latitude.
+    let wp = w.manifest.world_projection();
     let points: Vec<Value> = pick(&w, n, seed)
         .into_iter()
         .map(|(x, z)| {
-            let (lat, lon) = proj.lat_lon(x as f64, z as f64);
-            json!([x, z, lat, lon, proj.area_scale(z as f64)])
+            let (lat, lon) = wp.lat_lon(x as f64, z as f64);
+            json!([x, z, lat, lon])
         })
         .collect();
-    let lats: Vec<Value> = (0..=36)
-        .map(|k| {
+    let inverse: Vec<Value> = (0..=36)
+        .flat_map(|k| {
             let lat = -90.0 + 5.0 * f64::from(k);
-            json!([lat, proj.z_of_lat(lat)])
+            (0..12).map(move |m| (lat, 30.0 * f64::from(m) + 7.5))
+        })
+        .map(|(lat, lon)| {
+            let (x, z) = wp.block_of(lat, lon);
+            json!([lat, lon, x, z])
         })
         .collect();
+    let frame = wp.index_frame();
+    let mut projection = json!({
+        "kind": wp.kind().name(),
+        "z_range": [wp.z_range().0, wp.z_range().1],
+        "index_origin": [frame.origin.0, frame.origin.1],
+        "index_span": [frame.span.0, frame.span.1],
+        "points": points,
+        "inverse": inverse,
+    });
+    if let deeptime_format::projection::WorldProjection::Lambert(proj) = wp {
+        let lats: Vec<Value> = (0..=36)
+            .map(|k| {
+                let lat = -90.0 + 5.0 * f64::from(k);
+                json!([lat, proj.z_of_lat(lat)])
+            })
+            .collect();
+        projection["lambert"] = json!({
+            "pole_z": proj.pole_z(),
+            "extent": [proj.extent().0, proj.extent().1],
+            "latitudes": lats,
+        });
+    }
     let doc = json!({
         "format_version": w.manifest.format_version,
         "world": w.manifest.source,
@@ -202,14 +231,7 @@ pub fn run(world: &Path, out: &Path, n: usize, seed: u64) -> Result<(usize, usiz
         "structure_events": w.structure().map_or(0, |d| d.structure.events.len()),
         "deformed_columns": deformed,
         "columns": columns,
-        "projection": {
-            "pole_z": proj.pole_z(),
-            "extent": [proj.extent().0, proj.extent().1],
-            "index_origin": [proj.index_origin().0, proj.index_origin().1],
-            "index_span": [proj.index_span().0, proj.index_span().1],
-            "points": points,
-            "latitudes": lats,
-        },
+        "projection": projection,
     });
     let bytes = serde_json::to_vec(&doc).map_err(|e| FormatError::Invalid(e.to_string()))?;
     if let Some(parent) = out.parent() {

@@ -87,8 +87,14 @@ public final class EditorModel {
         }
     }
 
-    /** An accepted run: what the world's generator is bound to. */
-    public record Accepted(String stagingId, int circumference, String presetJson, String label) {}
+    /**
+     * An accepted run: its staging folder, the simulation's circumference (the preset's), the preset, a
+     * label, and the world's shape as the run's bake wrote it (manifest {@code scale.circumference_blocks},
+     * the x period 2b of a Petroff–Guyou world, and {@code projection.kind}): what the level's generator
+     * and Toroidal World's loop take.
+     */
+    public record Accepted(String stagingId, int circumference, String presetJson, String label, int worldCircumference,
+                           String projection) {}
 
     public static final double DEFAULT_CAP_GIB = 4.0;
     public static final double MIN_CAP_GIB = 0.25;
@@ -688,7 +694,18 @@ public final class EditorModel {
         Presets.Info i = Presets.info(Presets.parseObject(run.presetJson()));
         String label = i.name().orElse(presetName()) + " · " + run.circumference() + " blocks"
                 + i.timeline().map(t -> " · " + t).orElse("");
-        Accepted a = new Accepted(run.stagingId(), run.circumference(), run.presetJson(), label);
+        int worldC;
+        String projection;
+        try {
+            com.minecraftindustrialcomplex.deeptime.worlddata.Manifest m =
+                    com.minecraftindustrialcomplex.deeptime.worlddata.Manifest.read(run.run().outDir());
+            worldC = m.circumference();
+            projection = m.projection().kind().id();
+        } catch (RuntimeException e) {
+            projection = i.projection();
+            worldC = Presets.worldCircumference(run.circumference(), projection);
+        }
+        Accepted a = new Accepted(run.stagingId(), run.circumference(), run.presetJson(), label, worldC, projection);
         if (accepted != null && !accepted.stagingId().equals(a.stagingId()))
             deleteLater(Staging.dir(deps.gameDir(), accepted.stagingId()));
         accepted = a;

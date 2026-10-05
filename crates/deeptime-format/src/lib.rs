@@ -16,6 +16,8 @@ pub mod fsutil;
 pub mod keyframes;
 pub mod lazy;
 pub mod manifest;
+pub mod petroff;
+pub mod portable_math;
 pub mod projection;
 pub mod ramps;
 pub mod raster;
@@ -51,7 +53,7 @@ pub use water::{WaterColumn, WaterKind, WaterSpec};
 pub const FORMAT_VERSION: &str = env!("DEEPTIME_FORMAT_VERSION");
 
 /// The minor part of [`FORMAT_VERSION`], written into every file header (plan §5.7.2).
-pub const FORMAT_MINOR: u16 = 4;
+pub const FORMAT_MINOR: u16 = 5;
 
 #[cfg(test)]
 mod tests {

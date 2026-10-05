@@ -16,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * An essential counts only sites whose product of the material is a primary one (P1-15 on real
  * planets, ledger DEP-206): every shipped essential says so in the core's field name
  * ({@code primary_only}, which {@link OreData#contentJson} passes on). The codec's default and the
- * core's rule are covered by the Rust tests and the SpawnGameTests (the registry against the
- * bake's recorded candidates).
+ * core's rule are covered by the Rust tests. No essential draws the spawn toward it any more (Ben,
+ * 2026-10-05): none carries {@code max_blocks_from_spawn}.
  */
 class ShippedEssentialsTest {
 
@@ -29,6 +29,7 @@ class ShippedEssentialsTest {
                 assertTrue(in != null, "the jar ships " + res);
                 JsonObject o = JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8)).getAsJsonObject();
                 assertTrue(o.has("primary_only") && o.get("primary_only").getAsBoolean(), name + " says primary_only: true");
+                assertTrue(!o.has("max_blocks_from_spawn"), name + " no longer sets a spawn reach");
                 assertTrue(o.has("material") && o.has("min_sites_per_region") && o.has("region_blocks"), name + " has its fields");
             }
         }
