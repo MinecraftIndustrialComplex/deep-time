@@ -21,6 +21,13 @@ public final class SessionRunHandle implements RunHandle {
 
     private final SimSession session;
 
+    /**
+     * One direct buffer per loader thread, grown to the largest frame seen: a direct buffer per copy
+     * (2 MiB for a 1024 × 512 frame) would pile up outside the heap until the GC got round to
+     * freeing it.
+     */
+    private static final ThreadLocal<ByteBuffer> BUFFER = new ThreadLocal<>();
+
     private SessionRunHandle(SimSession session) {
         this.session = session;
     }
@@ -65,7 +72,12 @@ public final class SessionRunHandle implements RunHandle {
     public int[] pixels(KeyframeInfo f, int layer) {
         if (!session.isFinished()) {
             try {
-                ByteBuffer buf = ByteBuffer.allocateDirect(f.pixels() * 4);
+                ByteBuffer buf = BUFFER.get();
+                if (buf == null || buf.capacity() < f.pixels() * 4) {
+                    buf = ByteBuffer.allocateDirect(f.pixels() * 4);
+                    BUFFER.set(buf);
+                }
+                buf.clear();
                 session.copyKeyframe(f.n(), layer, buf);
                 return KeyframeFiles.abgr(buf, f.pixels());
             } catch (IllegalStateException e) {
@@ -73,6 +85,11 @@ public final class SessionRunHandle implements RunHandle {
             }
         }
         return KeyframeFiles.readAbgr(session.outDir(), f.n(), layer);
+    }
+
+    @Override
+    public boolean waitingForPrevious() {
+        return session.waitingForPrevious();
     }
 
     @Override

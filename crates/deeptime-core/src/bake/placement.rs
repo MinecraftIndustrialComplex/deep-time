@@ -365,6 +365,8 @@ pub struct Placement {
     weirdness: Vec<Weirdness>,
     /// The class rules, in order.
     class_rules: Vec<ClassRule>,
+    /// By Köppen index 0 … 30: wet lowland of the class is cold wetland (boreal peatland), not swamp (BIO-133).
+    cold_wetland: Vec<bool>,
     ice_cover: IceCoverSpec,
     /// The table as written (without `_comment`): what `notes.bake.climate.placement` records.
     table: Value,
@@ -898,6 +900,7 @@ impl Placement {
         let mut erosion: Vec<Option<ErosionLimit>> = vec![None; land];
         let mut continentalness: Vec<Option<Limit>> = vec![None; land];
         let mut weirdness = vec![Weirdness::Noise; land];
+        let mut cold_wetland = vec![false; land];
         for (code, c) in classes {
             let p = format!("classes.{code}");
             let k = match koppen::index(code) {
@@ -914,9 +917,15 @@ impl Placement {
                     "erosion",
                     "continentalness",
                     "weirdness",
+                    "cold_wetland",
                 ],
                 &p,
             )?;
+            if let Some(f) = o.get("cold_wetland") {
+                cold_wetland[k] = f
+                    .as_bool()
+                    .ok_or_else(|| err(&format!("{p}.cold_wetland"), "expected true or false"))?;
+            }
             if let Some(w) = o.get("weirdness") {
                 weirdness[k] = parse_weirdness(w, &format!("{p}.weirdness"))?;
             }
@@ -1082,6 +1091,7 @@ impl Placement {
             continentalness,
             weirdness,
             class_rules,
+            cold_wetland,
             ice_cover,
             table: Value::Object(table),
             patches: Vec::new(),
@@ -1272,6 +1282,15 @@ impl Placement {
             weirdness: self.weirdness(k),
             rule,
         }
+    }
+
+    /// Whether wet lowland of class `k` is cold wetland, boreal peatland, instead of swamp (the table's
+    /// `cold_wetland`; Ben, 2026-10-03: Dfc, Dfd, Dsc, Dsd, Dwc, Dwd; ledger BIO-133).
+    pub fn cold_wetland(&self, k: u8) -> bool {
+        self.cold_wetland
+            .get(usize::from(k))
+            .copied()
+            .unwrap_or(false)
     }
 
     /// The branch of the variant noise class `k`'s land takes (the positive one is vanilla's

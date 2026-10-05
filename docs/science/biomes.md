@@ -6,7 +6,7 @@ fixed. The band edges of Minecraft's biome builder were read in its source. The 
 biome is a game choice throughout and is labelled so. The climate that feeds the classifier (monthly
 temperature and rain) is being rewritten and is not checked here.
 
-Ledger ids on this page: `BIO-001` to `BIO-114` (see [ledger/BIO.md](ledger/BIO.md)).
+Ledger ids on this page: `BIO-001` to `BIO-137` (see [ledger/BIO.md](ledger/BIO.md)).
 
 ## What you see in the world
 
@@ -82,7 +82,8 @@ third letter:  a if Thot >= 22; else b if at least four months are above 10; els
 | BIO-021 to BIO-024 | vanilla band edges | temperature, humidity, continentalness, erosion, weirdness | | `OverworldBiomeBuilder`, Minecraft 1.21.1 | `verified` |
 | BIO-038 | aridity anchors 0.03, 0.2, 0.5 | UNEP limits | | Zomer et al. 2022, quoting UNEP 1997 | `verified` |
 | BIO-095 | precipitation seasonality | coefficient of variation | % | O'Donnell and Ignizio 2012 (adds 1 mm to the mean) | `verified` |
-| BIO-026 to BIO-070, BIO-075 to BIO-081, BIO-100 to BIO-103 | the placement table, knobs and ice cover | see ledger | band coordinate, blocks | none: game choices | `game-choice` |
+| BIO-026 to BIO-070, BIO-075 to BIO-081, BIO-100 to BIO-103, BIO-133 to BIO-136 | the placement table, knobs, cold wetland and ice cover | see ledger | band coordinate, blocks | none: game choices | `game-choice` |
+| BIO-137 | northern peatland share of the world's peatland | 3.21 of 4.23 million km2, about 76 % | million km2 | Xu et al. 2018 (PEATMAP), through a 2025 study that quotes the 3.21 | `cited-unverified` |
 
 ## Earth against the mod
 
@@ -171,6 +172,82 @@ columns out (`BiomeCensus.Check.notColderThan`), because they are not meant to b
 change. On the 4k test planet (201 columns left in BW): BW 0.692 standalone, 0.766 MIC (floor 0.57), BW:desert 0.502 and
 0.592 (floor 0.37). Without the exclusion the same planet read BW 0.457 and BW:desert 0.297 standalone and BW 0.543 MIC,
 which failed the floors: the shares fell because 65 of 266 columns became plains by design, not because the mapping broke.
+
+## Cold wetland
+
+Vanilla puts swamp in its cool and temperate rows at the erosion band E6, whatever the temperature, and
+the wetland rule (BIO-066) sends wet, flat, low, thawed land there. On one test planet that made 66 % of
+the Dfc land swamp: a boreal plain of wet ground drawn as a Louisiana bayou. Most of the Earth's peatland
+is boreal: PEATMAP (Xu et al. 2018) has the northern peatlands at 3.21 million km2 of 4.23 million km2
+worldwide, about 76 %, formed "under high precipitation-low temperature climatic regimes" (BIO-137; the
+paper itself could not be fetched, see the ledger row for what was read). Ben's answer (decisions log
+2026-10-03): "Taiga instead, peatland if present".
+
+What the mapping does (BIO-133 to BIO-136, all game choices):
+
+- Wetland of the six subarctic classes (Dfc, Dfd, Dsc, Dsd, Dwc, Dwd: `classes.<code>.cold_wetland` in
+  `placement.json`, the classes of Ben's answer and the ones the table lifts to vanilla's taiga humidity) is
+  **cold wetland**. Dfa, Dfb and the C classes keep the swamp even though the table puts all of D on the same
+  boreal temperature ramp. It is not put in E6. The
+  cell keeps its class's temperature and humidity and its erosion is held under E5, so without a mod vanilla
+  draws what it draws for the class: taiga (or its old growth and snowy variants). The bake flags it in
+  `climate/wetland` (2; 1 for temperate and warm wetland, which stays swamp, mangrove where hot).
+- Where the pack has a peatland biome, the flagged ground goes there. A peatland biome is a biome in the
+  shared tag `#deeptime:peatland` (every entry optional, shared with the biome rules, BIO-129: Expanded Ecosphere's
+  fen, berry bog, snowy bog and snowy fen, BOP's bog and muskeg, Regions Unexplored's fen, CliffTree's bog; the
+  rules place a member directly, and this probe is what makes a pack's own biome source draw one where no
+  rule does), or, for a pack nobody listed, one the NeoForge tags call a swamp (`c:is_swamp`) and cold
+  (`c:is_cold/overworld` or `c:is_snowy`): BOP's bog and muskeg are both, vanilla's and Terralith's swamps and
+  BOP's wetland are neither. A pack's support adds its biome to the tag; no biome name is in the code, and a
+  tagged biome only counts where the pack's biome source puts it at the swamp row (below).
+  At a world's first flagged cell the game asks the pack's biome source, in each TerraBlender region of the
+  province table, what it puts at the swamp row of the cold band (450 climates: five temperatures of the band,
+  five wet humidities, three inland continentalness values, six weirdness values). A region that answers
+  with a peatland biome at half of them or more has its flagged ground raised into E6 (mid-band), so the pack's
+  biome source draws its own bog. The verdict is stored in `climate_mapping.json`, so installing or removing a
+  biome mod later does not move explored ground.
+- `climateConsistent` counts it: the census leaves E6 land out of the Köppen families as before (that is where
+  a peatland region's flagged ground is), and counts the flagged columns apart (`cold_wetland`: on a peatland
+  biome, on taiga, on another swamp). Cold wetland on a swamp that is not a peatland fails the test; on the
+  old rule it was all of it.
+
+MIC's set (Terralith, Terralith ReStoned) has no peatland biome at the cold band's swamp row: its swamps there
+are vanilla's `swamp` and `orchid_swamp`, neither cold. It does have `terralith:ice_marsh`, a frozen-band E6
+biome, which thawed wetland never reaches. So with MIC cold wetland is taiga. With Biomes O' Plenty it is
+`bog` in the provinces of BOP's secondary region and taiga in its primary region, where the swamp row holds
+`wetland`, which is not cold (read in the class files of `BOPOverworldBiomeBuilder` and
+`BOPSecondaryOverworldBiomeBuilder`, 2026-10-03; BOP's `muskeg` sits in the frozen band of its middle biomes).
+
+Measured on one `earthlike_quick_16k` planet (scattered continents, 500 Myr, the preset's seed, test machine,
+2026-10-04, after master's plate, 35 m and Expanded Ecosphere merges): the same simulation baked with the old rule
+(swamp wherever wet, flat, low land is thawed: the placement table without `cold_wetland`) and the new one,
+`/deeptime probe biomes 16` through each profile's biome source (`tools/review/peat-runs.sh`, `peat-biomes.sh`).
+The six subarctic classes are 6,979 of the sampled land columns (Dfc 6,335, Dfb 5,157); the bake flags 97
+columns of the probe grid as cold wetland (0.1 % of the 94,659 land columns; the wet, flat, low land of this
+planet's subarctic belt is small, and 1,135 columns of wetland become 1,037 in E6, the rest of it flagged).
+Columns of the six classes on a wetland biome (swamp, marsh, bog, fen, wetland), old rule to new rule:
+
+| Profile | Old rule | New rule |
+|---|---|---|
+| standalone | swamp 30 | none |
+| MIC (Terralith) | swamp 65 (ice marsh 561, both rules: a frozen-band biome the wetland rule never reaches) | none (ice marsh 561) |
+| Biomes O' Plenty | BOP wetland 25, swamp 5 | none |
+| Expanded Ecosphere | fen 40 | fen 68 |
+
+The class shares move by the same amounts: Dfc taiga standalone 50.4 to 50.7 %, MIC 36.2 to 36.6 %, EE 61.6 to
+61.3 %; Dfc swamp standalone 0.5 to 0 %. Dfb and the C classes are unchanged (Dfb swamp: 448 columns standalone and
+BOP, 316 MIC, EE's birch swamp 138, old growth taiga swamp 163, fen 49). The 97 flagged columns end on (new rule):
+standalone, taiga 36, old growth spruce taiga 25, beach 36; MIC, old growth spruce taiga 45, taiga 42, beach 10;
+BOP, field 46, gravel beach 20, beach 16, old growth spruce taiga 13, taiga 2; EE, fen 95, cold ocean 2. None is on a
+swamp that is not a peatland. A third of them are shore (beach, gravel beach: wet coastal plain is where the wetland
+rule puts them, and the continentalness band beside the sea is beach in vanilla's table, before and after). In
+the BOP world the verdict is `biomesoplenty:overworld_secondary` only (bog; 6 of the 25 provinces): cold wetland is
+bog in those provinces and taiga, or whatever BOP draws on the ground below E5 (field), in the others, because BOP's
+primary region puts its `wetland`, which is not cold, at the swamp row; none of this planet's 97 columns lay in a
+secondary province (an earlier planet had 9 bog columns). Standalone and MIC have no peatland region
+(`regions: []`). Expanded Ecosphere's verdict is also empty (its biome source puts no tagged biome at the cold
+swamp row through the probe), and its fen comes from the biome rule (`deeptime:peatland`, BIO-129), which reads the
+same flag: 95 of 97 columns.
 
 ## Volcanic biomes
 

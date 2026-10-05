@@ -7,6 +7,7 @@ import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.preset.Presets;
 import com.minecraftindustrialcomplex.deeptime.preset.ShareCode;
 import com.minecraftindustrialcomplex.deeptime.screen.model.EditorModel;
+import com.minecraftindustrialcomplex.deeptime.screen.model.GlobeProjection;
 import com.minecraftindustrialcomplex.deeptime.screen.model.MachineInfo;
 import com.minecraftindustrialcomplex.deeptime.screen.model.ReviewModel;
 import com.minecraftindustrialcomplex.deeptime.screen.model.SessionRunHandle;
@@ -293,6 +294,112 @@ public final class EditorModelGameTests {
             DeepTime.LOGGER.info("[gametest] editorRunsAcceptsAndBinds frames={} events={} layers={} spawn={} provinces={} staging={} "
                             + "moved+bound, max |H - analytic| = {}", run.frameCount(), run.events().size(), run.layers(),
                     review.spawn().map(s -> s[0] + "," + s[1]).orElse("-"), review.provinces().size(), a.stagingId(), err);
+            helper.succeed();
+        });
+    }
+
+    /**
+     * P1-11 on the real stages: the editor runs a real planet (every stage and the bake, through the
+     * JNI as the Create World screen does; the tests' small planet, C = 4,096, cut to 100 Myr) on 3
+     * simulation threads, the timelapse shows its real layers (satellite first, grouped) and events,
+     * the review reads the staged world data, Accept binds the generator, and the world's start
+     * moves the folder into the world and generates from it: the terrain's land share follows the
+     * preset's ocean fraction.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 20 * 60 * 20)
+    public static void realPlanetThroughTheEditor(GameTestHelper helper) {
+        if (!NativeLoader.isLinked())
+            helper.fail("natives not linked: " + NativeLoader.status().map(s -> s.describe()).orElse("never loaded"));
+        String json;
+        try {
+            json = Files.readString(Path.of(System.getProperty("deeptime.repoRoot", ".."), "crates/deeptime-core/tests/presets/planet_world_4k.json"));
+        } catch (IOException e) {
+            helper.fail("cannot read planet_world_4k.json (deeptime.repoRoot): " + e);
+            return;
+        }
+        MachineInfo small = new MachineInfo(8L << 30, 16L << 30, Runtime.getRuntime().maxMemory(), 4);
+        EditorModel m = new EditorModel(new EditorModel.Deps(j -> SimSession.estimate(j, ""), SessionRunHandle::launch, gameDir(), small,
+                Runnable::run, Runnable::run, NativeLoader::isLinked, List::of));
+        helper.assertTrue(m.importShareCode(ShareCode.encode(json)).isEmpty(), "the real preset imports");
+        m.setStart("scattered_continents");
+        m.setLengthText("100");
+        m.refreshEstimate();
+        helper.assertTrue(m.canRun(), "Run is enabled: " + m.problems());
+        List<String> stages = m.estimate().orElseThrow().stages().stream().map(s -> s.name()).toList();
+        helper.assertTrue(stages.equals(List.of("plates", "climate", "surface", "volcanoes", "impacts", "structure", "deposits", "young",
+                "amplify")), "the real stages: " + stages);
+        TimelapseModel run = m.startRun().orElseThrow(() -> new IllegalStateException("launch failed: " + m.problems()));
+        long started = System.currentTimeMillis();
+        AtomicBoolean finished = new AtomicBoolean();
+        helper.onEachTick(() -> {
+            if (finished.get())
+                return;
+            run.poll();
+            if (run.state() == TimelapseModel.State.RUNNING)
+                return;
+            finished.set(true);
+            run.poll();
+            helper.assertTrue(run.state() == TimelapseModel.State.DONE, "run " + run.state() + " " + run.failure().orElse(""));
+            SimSession.Progress p = run.progress();
+            helper.assertTrue(run.frameCount() == p.keyframesReady() && run.frameCount() >= 3, "keyframes " + run.frameCount());
+            helper.assertTrue(run.events().size() == p.eventsTotal() && run.events().size() > 0, "events " + run.events().size());
+            helper.assertTrue(run.layers().containsAll(List.of("satellite", "plates", "climate/koppen", "deposits/sites")),
+                    "real layers: " + run.layers());
+            helper.assertTrue("satellite".equals(run.layer().orElse("")), "the satellite view first: " + run.layer());
+            helper.assertTrue(run.markers().size() <= TimelapseModel.MAX_MARKERS, "markers bounded");
+            run.scrubTo(0);
+            helper.assertTrue(run.displayed().isPresent(), "frame 0 decodes");
+
+            ReviewModel review = m.openReview();
+            helper.assertTrue(review.ready() && review.error().isEmpty(), "review: " + review.error().orElse(""));
+            helper.assertTrue(review.map().map(ReviewModel.MapImage::source).orElse("").equals("world_data"), "final map from world data");
+            helper.assertTrue(review.spawn().isPresent(), "a spawn marker");
+
+            EditorModel.Accepted a = m.accept();
+            RegistryAccess registries = helper.getLevel().getServer().registryAccess();
+            WorldDimensions dims = PlanetGenerators.withStaging(registries, planetDimensions(registries), a.stagingId(), a.circumference());
+            GeologicChunkGenerator accepted = PlanetGenerators.overworld(dims).orElseThrow();
+            helper.assertTrue(accepted.dataRef().circumferenceBlocks() == 4096, "bound at the run's circumference");
+            helper.assertTrue(PlanetGenerators.createBlock(dims, gameDir(), true) == PlanetGenerators.CreateBlock.NONE, "Create enabled");
+
+            Path world = helper.getLevel().getServer().getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
+            WorldDataRef ref = new WorldDataRef("deeptime-e2e-real", accepted.dataRef().circumferenceBlocks(), Optional.empty(),
+                    accepted.dataRef().stagingId(), accepted.dataRef().poleCapDeg(), accepted.dataRef().poleStopDeg());
+            try {
+                Staging.deleteTree(world.resolve(ref.folder()));
+                var r = WorldDataBinder.moveStaged(gameDir(), world, ref, false).orElseThrow();
+                helper.assertTrue(r.kind() == StagingMover.Kind.RENAMED, "renamed: " + r);
+            } catch (StagingMover.StagingException | IOException e) {
+                helper.fail(e.toString());
+            }
+            helper.assertTrue(WorldDataBinder.bindLevel(world, ref), "bound");
+            GeologicChunkGenerator g = new GeologicChunkGenerator(accepted.getBiomeSource(), accepted.sourceSettings(), ref);
+            if (!(g.terrain() instanceof WorldDataTerrain t)) {
+                helper.fail("not generating from world data: " + g.terrain());
+                return;
+            }
+            int sea = t.data().manifest().seaLevelY(), land = 0, n = 0;
+            int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(4096);
+            for (int i = 0; i < 400; i++) {
+                int x = -2048 + (i * 97) % 4096, z = ((i * 61) % (2 * zp - 32)) - zp + 16;
+                double h = t.height(x, z);
+                helper.assertTrue(Double.isFinite(h), "height at " + x + "," + z);
+                n++;
+                if (h > sea)
+                    land++;
+            }
+            // Land and sea both (planet_world_4k cut to 100 Myr has about a tenth land: 0.09 on
+            // 2026-10-04), and the review's spawn stands on dry land in the moved world's terrain.
+            double share = land / (double) n;
+            helper.assertTrue(share > 0.02 && share < 0.6, "land share " + share + " (the preset's ocean fraction is 0.7)");
+            double[] sp = review.spawn().orElseThrow();
+            double[] sb = GlobeProjection.block(sp[0], sp[1], 4096, new double[2]);
+            double spawnH = t.height((int) Math.floor(sb[0]), (int) Math.floor(sb[1]));
+            helper.assertTrue(spawnH > sea, "the review's spawn " + (int) sb[0] + "," + (int) sb[1] + " is dry land (height " + spawnH + ", sea " + sea + ")");
+            DeepTime.LOGGER.info("[gametest] realPlanetThroughTheEditor {} s: frames={} events={} layers={} groups={} native peak {} MiB, "
+                            + "spawn={} land share {} staging={} moved+bound", (System.currentTimeMillis() - started) / 1000, run.frameCount(),
+                    run.events().size(), run.layers().size(), run.groups(), p.nativeBytesPeak() >> 20,
+                    review.spawn().map(s -> s[0] + "," + s[1]).orElse("-"), share, a.stagingId());
             helper.succeed();
         });
     }
