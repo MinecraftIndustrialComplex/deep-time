@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # Force-balance task 8: build this checkout's CLI once, then run one force-balance-ensemble.sh per
-# variant side by side (each simulation admitted on its own). Start through detach.sh from the
+# variant side by side (each simulation and the build admitted on their own, so the wrapper itself is `--kind light`). Start through detach.sh from the
 # repo root; the variants file holds one line per variant: `<label> [--set k=v ...]`.
 #
-#   tools/remote/mac.sh -- tools/remote/detach.sh start <job> tools/review/force-balance-variants.sh \
+#   tools/remote/mac.sh -- tools/remote/detach.sh start <job> --kind light tools/review/force-balance-variants.sh \
 #       <out dir> <variants file> <length Myr> <seeds,...> <starts,...> <ck|hyps>
 set -uo pipefail
 OUT=$1; VARIANTS=$2; LEN=$3; SEEDS=$4; STARTS=$5; MODE=$6

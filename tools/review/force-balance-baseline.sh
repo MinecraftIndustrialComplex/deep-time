@@ -5,7 +5,7 @@
 # ("ck") and one hypsometry ensemble ("hyps") of it with force-balance-ensemble.sh. Start through
 # detach.sh from the repo root:
 #
-#   tools/remote/mac.sh -- tools/remote/detach.sh start <job> tools/review/force-balance-baseline.sh \
+#   tools/remote/mac.sh -- tools/remote/detach.sh start <job> --kind light tools/review/force-balance-baseline.sh \
 #       <source dir> <out dir> <ck length> <ck seeds,...> <hyps length> <hyps seeds,...>
 set -uo pipefail
 SRC=$1; OUT=$2; CKLEN=$3; CKSEEDS=$4; HLEN=$5; HSEEDS=$6

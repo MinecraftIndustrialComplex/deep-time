@@ -269,7 +269,6 @@ pub fn resample(
     // (ledger: PLT-276). Both are counted, m of rock per new sample.
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
     let mut tally: Vec<[f64; 4]> = vec![[0.0; 4]; n];
-    let double = std::env::var_os("DT_EXP_DOUBLE").is_some(); // TEMP-EXP
     let mut samples: Vec<Sample> = found
         .par_iter()
         .zip(plate_new.par_iter_mut())
@@ -288,7 +287,7 @@ pub fn resample(
                             .iter()
                             .map(|&x| f64::from(x))
                             .sum();
-                        if under.is_hidden() && under.stacked && !double /* TEMP-EXP */ {
+                        if under.is_hidden() && under.stacked {
                             tally[1] += conserved;
                         } else {
                             // What accretes: hidden continental crust, hidden ocean floor's
