@@ -191,7 +191,7 @@ public final class BiomeCensus {
         for (Forbid f : FORBIDDEN)
             forbidden.put(f.name(), new int[2]);
         Map<Integer, Map<Integer, Integer>> classBiomes = new HashMap<>();
-        int skippedUntagged = 0, landColumns = 0, wetlands = 0, wetlandSwamp = 0;
+        int skippedUntagged = 0, landColumns = 0, wetlands = 0, wetlandSwamp = 0, coastColumns = 0;
         // Cold wetland (BIO-133, BIO-135): the bake's flagged boreal wetland, counted over every land column
         // (a mod's untagged biomes too: its bog is the point): on the pack's peatland biome, on taiga, on
         // another swamp (which it must not be), or elsewhere.
@@ -247,6 +247,15 @@ public final class BiomeCensus {
                 if (untagged && (k == 31 ? y < sea - 4 : land))
                     skippedUntagged++;
                 boolean wetland = land && !untagged && wd.raster(ClimateMapping.EROSION, x, z) >= e6;
+                // The coast band: the bake puts land at the shore into vanilla's coast continentalness
+                // by its distance to the sea, so its biome is a beach, a stony shore or a sea biome
+                // whatever the climate. Set apart from the families like the wetlands (2026-10-05: on
+                // the L2 Köppen classes, a cold upland's few columns are mostly coast, and its family's
+                // share measured the coastline, not the mapping).
+                boolean coast = land && !untagged && !wetland
+                        && (b.is(c("is_beach")) || b.is(c("is_stony_shores")) || b.is(c("is_ocean")));
+                if (coast)
+                    coastColumns++;
                 if (land && !untagged && rules != null) {
                     if (ruleCensus == null)
                         ruleCensus = new RuleCensus(rules.rules());
@@ -264,7 +273,7 @@ public final class BiomeCensus {
                 }
                 if (!untagged && (k == 31 ? y < sea - 4 : land)) {
                     for (Check ch : CHECKS) {
-                        if (wetland)
+                        if (wetland || coast)
                             break;   // counted apart (above), not against the family's tags
                         if (!ch.koppen().test(k))
                             continue;
@@ -351,6 +360,7 @@ public final class BiomeCensus {
         wj.addProperty("wetland_columns", wetlands);
         wj.addProperty("on_swamp", wetlandSwamp);
         o.add("wetlands_set_aside", wj);
+        o.addProperty("coast_set_aside", coastColumns);
         JsonObject cw = new JsonObject();
         cw.addProperty("layer", wetlandLayer != null);
         cw.addProperty("columns", coldWet);
