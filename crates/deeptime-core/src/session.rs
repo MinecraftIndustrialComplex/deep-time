@@ -1481,6 +1481,35 @@ impl Session {
                 write_atomic(&dir.join(MANIFEST), &bytes)?;
             }
         }
+        // The world's projection (Ben, decisions log 2026-10-04: Petroff–Guyou; "Bake only",
+        // 2026-10-03): the last step rewrites the finished Lambert folder in the preset's world
+        // projection, reading it as the game would (`bake::project`). A Lambert preset only gets
+        // its layout block.
+        if let crate::preset::PresetBody::Planet(p) = &self.preset.body {
+            let baked = m
+                .notes
+                .get(crate::bake::NOTES_KEY)
+                .is_some_and(|b| b["baked"] == json!(true));
+            if baked {
+                let note = self
+                    .pool
+                    .install(|| crate::bake::project::project_folder(dir, p, &mut m))?;
+                self.log
+                    .push(Level::Info, crate::bake::project::summary_line(&note));
+                if let Some(b) = m.notes.get_mut(crate::bake::NOTES_KEY) {
+                    b["projection"] = note;
+                }
+            } else {
+                m.projection = Some(
+                    deeptime_format::projection::WorldProjection::Lambert(
+                        deeptime_format::Projection::new(c),
+                    )
+                    .spec(None),
+                );
+            }
+            bytes = m.to_json_bytes()?;
+            write_atomic(&dir.join(MANIFEST), &bytes)?;
+        }
         self.state
             .store(SessionState::Finalized as u8, Ordering::Release);
         self.log.push(
@@ -1659,9 +1688,9 @@ mod tests {
         assert!(matches!(s.keyframe_info(0), Err(CoreError::Unsupported(_))));
         let manifest = s.finalize_write().unwrap();
         let v: Value = serde_json::from_str(&manifest).unwrap();
-        assert_eq!(v["format_version"], "0.4");
+        assert_eq!(v["format_version"], "0.5");
         assert_eq!(v["layers"], json!([]));
-        assert!(manifest.contains("\"format_version\": \"0.4\""));
+        assert!(manifest.contains("\"format_version\": \"0.5\""));
         assert!(manifest.contains("\"layers\": []"));
         let on_disk = std::fs::read_to_string(dir.join("manifest.json")).unwrap();
         assert_eq!(on_disk, manifest);

@@ -115,15 +115,23 @@
     }, 500);
   }
   const C = () => S.info.circumference;
+  // The world's projection (the manifest's layout block, world.json `projection`): Petroff–Guyou
+  // by default (format 0.5), where the tile frame is exactly the world, or Lambert.
+  const Wp = () => {
+    if (!S.info) return proj.world(null, 16384);
+    if (!S.info._wp) S.info._wp = proj.world(S.info.projection, S.info.circumference);
+    return S.info._wp;
+  };
+  const zLim = () => Wp().zRange[1];
   const s0 = () => C() / (2 * T);                    // blocks per tile pixel at zoom 0
   const minBpp = () => 1 / MAG;
-  const maxBpp = () => Math.max(C() / Math.max(S.w, 1), (2 * proj.poleZ(C())) / Math.max(S.h, 1));
+  const maxBpp = () => Math.max(C() / Math.max(S.w, 1), (2 * zLim()) / Math.max(S.h, 1));
 
   function setView(cx, cz, bpp) {
     S.bpp = clamp(bpp, minBpp(), maxBpp());
     const halfH = S.h * S.bpp / 2;
     // Vertically the view stays on the planet (or centred when it is taller than the planet).
-    const lim = proj.poleZ(C());
+    const lim = zLim();
     S.cz = halfH >= lim ? 0 : clamp(cz, -lim + halfH, lim - halfH);
     const c = C();
     S.cx = ((cx + c / 2) % c + c) % c - c / 2;
@@ -275,7 +283,8 @@
     const hw = Math.min(128, S.w * S.bpp / 2), hh = Math.min(128, S.h * S.bpp / 2);
     const x0 = Math.round(S.cx - hw), z0 = Math.round(S.cz - hh);
     const x1 = Math.round(S.cx + hw), z1 = Math.round(S.cz + hh);
-    const lim = proj.poleZ(c);
+    const lim = zLim();
+    void c;
     const zz0 = clamp(z0, -lim, lim - 1), zz1 = clamp(z1, zz0 + 1, lim);
     return { x0, z0: zz0, x1: Math.max(x1, x0 + 1), z1: zz1 };
   }
@@ -341,7 +350,7 @@
     const [bx, bz] = toWorld(S.cursor[0], S.cursor[1]);
     const c = C();
     const x = Math.floor(((bx + c / 2) % c + c) % c - c / 2), zz = Math.floor(bz);
-    const lat = proj.latOfZ(c, bz), lon = proj.lonOfX(c, bx);
+    const [lat, lon] = Wp().latLon(bx, bz);
     let h = `x <b>${fmtInt(x)}</b> z <b>${fmtInt(zz)}</b><span class="dim"> · </span><b>${esc(latText(lat))}</b> ${esc(lonText(lon))}`;
     const s = S.sample && S.sample.x === x && S.sample.z === zz ? S.sample : null;
     if (s) {
@@ -479,8 +488,16 @@
     const c = C(), b = previewBox();
     const x0 = ((b.x0 + c / 2) % c + c) % c - c / 2;       // folded; a box across the seam is split by the runner
     const box = { x0, z0: b.z0, x1: x0 + (b.x1 - b.x0), z1: b.z1 };
-    const west = proj.lonOfX(c, box.x0);
-    const ll = { north: proj.latOfZ(c, box.z0), south: proj.latOfZ(c, box.z1), west, east: west + proj.dLonOfDx(c, box.x1 - box.x0, proj.latOfZ(c, (box.z0 + box.z1) / 2)) };
+    let ll;
+    if (Wp().isPetroff) {
+      // A block box of the Petroff–Guyou world is no lat/lon box: its corners' latitudes and
+      // longitudes, for the preview's label.
+      const c0 = Wp().latLon(box.x0, box.z0), c1 = Wp().latLon(box.x1, box.z1);
+      ll = { north: Math.max(c0[0], c1[0]), south: Math.min(c0[0], c1[0]), west: c0[1], east: c1[1] };
+    } else {
+      const west = proj.lonOfX(c, box.x0);
+      ll = { north: proj.latOfZ(c, box.z0), south: proj.latOfZ(c, box.z1), west, east: west + proj.dLonOfDx(c, box.x1 - box.x0, proj.latOfZ(c, (box.z0 + box.z1) / 2)) };
+    }
     const w = box.x1 - box.x0, h = box.z1 - box.z0;
     DT.preview(S.run, box, ll, `${fmtInt(w)} × ${fmtInt(h)} blocks, from the final world map`);
   });

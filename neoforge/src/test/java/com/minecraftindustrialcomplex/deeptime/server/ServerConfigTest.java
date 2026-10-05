@@ -72,6 +72,9 @@ class ServerConfigTest {
         assertEquals("writing world data · total 100% · 1h02m elapsed · native 0.0/4.0 GiB",
                 FirstStartGenerator.progressLine(done, List.of(), 4L << 30));
         assertEquals("0 Ma", FirstStartGenerator.ma(0));
-        assertEquals("deeptime:planet_32k", FirstStartGenerator.levelTypeFor(32_768));
+        assertEquals("deeptime:planet_32k", FirstStartGenerator.levelTypeFor(26_112, "petroff_guyou"));
+        assertEquals("deeptime:planet", FirstStartGenerator.levelTypeFor(13_312, "petroff_guyou"));
+        assertEquals("deeptime:planet_lambert_32k", FirstStartGenerator.levelTypeFor(32_768, "lambert"));
+        assertEquals("13,312-block Petroff–Guyou world", FirstStartGenerator.describe(13_312, "petroff_guyou"));
     }
 }
