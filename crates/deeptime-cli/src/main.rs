@@ -69,6 +69,35 @@ enum Command {
         /// Also write a checkpoint after every stage into <out>/checkpoints/.
         #[arg(long)]
         checkpoints: bool,
+        /// Where the run stops, Myr after its start (timeline.stop_myr: less than the length
+        /// stops it early, more continues it past the present).
+        #[arg(long)]
+        stop_myr: Option<f64>,
+        /// Write epoch checkpoints into <out>/epochs/, so `deeptime resume` can bake another
+        /// keyframe's world, stop the run earlier or continue it (docs/design/
+        /// playability-steering.md).
+        #[arg(long)]
+        epochs: bool,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+    /// Run a finished (or stopped) run's folder again to another stop, from its epoch
+    /// checkpoints (`run --epochs`): an epoch picked, a run stopped early or continued. Only the
+    /// steps after the checkpoint that serves the stop run again; the world is the world of a run
+    /// planned to that stop.
+    Resume {
+        /// The run's folder (it holds epochs/).
+        #[arg(long)]
+        out: PathBuf,
+        /// The new stop, Myr after the start (default: the run's own).
+        #[arg(long)]
+        stop_myr: Option<f64>,
+        /// Keep writing epoch checkpoints (on by default; --no-epochs turns them off).
+        #[arg(long)]
+        no_epochs: bool,
+        /// Also write an HTML viewer bundle here.
+        #[arg(long)]
+        viewer: Option<PathBuf>,
         #[command(flatten)]
         common: CommonArgs,
     },
@@ -725,6 +754,8 @@ fn main() -> ExitCode {
             out,
             viewer,
             checkpoints,
+            stop_myr,
+            epochs,
             common,
         }) => finish(
             "run",
@@ -736,6 +767,24 @@ fn main() -> ExitCode {
                 out,
                 viewer,
                 checkpoints,
+                stop_myr,
+                epochs,
+                common: common.common(),
+            }),
+        ),
+        Some(Command::Resume {
+            out,
+            stop_myr,
+            no_epochs,
+            viewer,
+            common,
+        }) => finish(
+            "resume",
+            run::resume(&run::ResumeOptions {
+                out,
+                stop_myr,
+                epochs: !no_epochs,
+                viewer,
                 common: common.common(),
             }),
         ),
@@ -1695,6 +1744,8 @@ mod tests {
             out: dir.join("dummy"),
             viewer: Some(dir.join("viewer")),
             checkpoints: true,
+            stop_myr: None,
+            epochs: false,
             common: quiet(),
         })
         .unwrap();
@@ -1765,6 +1816,8 @@ mod tests {
             out: dir.join("w"),
             viewer: None,
             checkpoints: false,
+            stop_myr: None,
+            epochs: false,
             common: quiet(),
         })
         .unwrap();
@@ -2189,6 +2242,8 @@ mod tests {
             out: dir.join("world"),
             viewer: None,
             checkpoints: false,
+            stop_myr: None,
+            epochs: false,
             common,
         })
         .unwrap();

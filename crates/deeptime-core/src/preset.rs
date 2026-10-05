@@ -132,6 +132,27 @@ pub fn with_timeline(
     Ok(v.to_string())
 }
 
+/// Sets `timeline.stop_myr` in a preset's JSON (the CLI's `--stop-myr`; the editor's Continue,
+/// Stop here and Play this epoch); `None` removes it. The timeline must exist. Returns canonical
+/// JSON.
+pub fn with_stop(json: &str, stop_myr: Option<f64>) -> Result<String, CoreError> {
+    let mut v: Value = serde_json::from_str(json)
+        .map_err(|e| CoreError::preset("$", format!("not valid JSON: {e}")))?;
+    let t = v
+        .get_mut("timeline")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| CoreError::preset("$.timeline", "a stop needs a timeline"))?;
+    match stop_myr {
+        Some(s) => {
+            t.insert("stop_myr".into(), json!(s));
+        }
+        None => {
+            t.remove("stop_myr");
+        }
+    }
+    Ok(v.to_string())
+}
+
 /// How the continents start (plan §5.1, the editor's "start configuration").
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StartConfig {
@@ -167,7 +188,28 @@ pub const LENGTH_MYR_RANGE: (f64, f64) = (1.0, 4600.0);
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Timeline {
     pub start: StartConfig,
+    /// The planned length: the run starts `length_myr` before the present (world time 0).
     pub length_myr: f64,
+    /// Where the run stops, Myr after its start (`timeline.stop_myr`; docs/design/
+    /// playability-steering.md §1): `None` is the planned length. Less stops the run early (world
+    /// time ends before the present), more continues it past the present.
+    pub stop_myr: Option<f64>,
+}
+
+impl Timeline {
+    /// Myr from the start to the stop.
+    pub fn run_myr(&self) -> f64 {
+        self.stop_myr.unwrap_or(self.length_myr)
+    }
+
+    /// The timeline's JSON.
+    pub fn to_json(&self) -> Value {
+        let mut v = json!({ "start": self.start.name(), "length_myr": self.length_myr });
+        if let Some(s) = self.stop_myr {
+            v["stop_myr"] = json!(s);
+        }
+        v
+    }
 }
 
 /// The keys every preset may carry next to its pipeline.
@@ -263,7 +305,7 @@ impl Preset {
             }
             if let Some(t) = header.timeline {
                 p.t_start_years = -t.length_myr * 1e6;
-                p.t_end_years = 0.0;
+                p.t_end_years = (t.run_myr() - t.length_myr) * 1e6;
             }
             p.stages()?;
             return Ok(Preset {
@@ -292,7 +334,7 @@ impl Preset {
         }
         if let (Some(t), Some(w)) = (header.timeline, params.world.as_mut()) {
             w.t_start_years = -t.length_myr * 1e6;
-            w.t_end_years = 0.0;
+            w.t_end_years = (t.run_myr() - t.length_myr) * 1e6;
             w.keyframe_every_years = t.length_myr * 1e6 / 8.0;
         }
         Ok(Preset {
@@ -331,10 +373,7 @@ impl Preset {
             obj.insert("scale".into(), json!({ "circumference_blocks": c }));
         }
         if let Some(t) = h.timeline {
-            obj.insert(
-                "timeline".into(),
-                json!({ "start": t.start.name(), "length_myr": t.length_myr }),
-            );
+            obj.insert("timeline".into(), t.to_json());
         }
         v
     }
@@ -627,7 +666,7 @@ fn parse_timeline(v: &Value) -> Result<Timeline, CoreError> {
         .ok_or_else(|| CoreError::preset(path, "expected a JSON object"))?;
     if let Some(k) = t
         .keys()
-        .find(|k| !matches!(k.as_str(), "start" | "length_myr"))
+        .find(|k| !matches!(k.as_str(), "start" | "length_myr" | "stop_myr"))
     {
         return Err(CoreError::preset(format!("{path}.{k}"), "unknown key"));
     }
@@ -654,7 +693,24 @@ fn parse_timeline(v: &Value) -> Result<Timeline, CoreError> {
                 format!("expected a number of million years from {lo} to {hi}"),
             )
         })?;
-    Ok(Timeline { start, length_myr })
+    let stop_myr = match t.get("stop_myr") {
+        None => None,
+        Some(v) => Some(
+            v.as_f64()
+                .filter(|s| s.is_finite() && *s > 0.0 && *s <= hi)
+                .ok_or_else(|| {
+                    CoreError::preset(
+                        format!("{path}.stop_myr"),
+                        format!("expected a number of million years above 0, at most {hi}"),
+                    )
+                })?,
+        ),
+    };
+    Ok(Timeline {
+        start,
+        length_myr,
+        stop_myr,
+    })
 }
 
 #[cfg(test)]
@@ -779,7 +835,8 @@ mod tests {
             p.header.timeline,
             Some(Timeline {
                 start: StartConfig::ScatteredContinents,
-                length_myr: 800.0
+                length_myr: 800.0,
+                stop_myr: None
             })
         );
         let PresetBody::Dummy(d) = &p.body else {
