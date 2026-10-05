@@ -291,6 +291,19 @@ impl Mapping {
 
     /// Where world point (x, z), a cell of `r_w` blocks, samples a source grid of `r_s` blocks.
     pub fn footprint(&self, x: f64, z: f64, r_w: f64, r_s: f64) -> Footprint {
+        self.footprint_widened(x, z, r_w, r_s, &polar_widening)
+    }
+
+    /// [`Mapping::footprint`] with the widening along the parallel given as a function of the
+    /// latitude's cosine.
+    fn footprint_widened(
+        &self,
+        x: f64,
+        z: f64,
+        r_w: f64,
+        r_s: f64,
+        widen: &dyn Fn(f64) -> f64,
+    ) -> Footprint {
         let v = self.g.unit(x, z);
         let (xs, zs, cos) = self.src_block(v);
         let cos = cos.max(1e-6);
@@ -300,7 +313,7 @@ impl Mapping {
         // Lambert blocks per planet block: 1/cos east–west, cos north–south; the bilinear read
         // already covers one source cell. Round the poles the footprint is also widened along
         // the parallel ([`polar_widening`]).
-        let hx = ((d * polar_widening(cos) / cos - r_s).max(0.0) * 0.5)
+        let hx = ((d * widen(cos) / cos - r_s).max(0.0) * 0.5)
             .min(0.5 * self.src.circumference());
         let hz = (d * cos - r_s).max(0.0) * 0.5;
         Footprint { xs, zs, hx, hz }
@@ -619,10 +632,18 @@ fn area_share(layer: &LoadedLayer, world: bool, pred: impl Fn(f64) -> bool) -> f
 /// streaks radiating from the pole. Also returns the same ratio at mid-latitudes (30°–60°) for
 /// reference, where no streaks can form.
 fn pole_anisotropy(map: &Mapping, h: &(dyn Fn(f64, f64) -> f64 + Sync)) -> (f64, f64, usize) {
+    pole_anisotropy_n(map, h, 4_000)
+}
+
+/// [`pole_anisotropy`] on `n` points per band.
+fn pole_anisotropy_n(
+    map: &Mapping,
+    h: &(dyn Fn(f64, f64) -> f64 + Sync),
+    n: usize,
+) -> (f64, f64, usize) {
     let g = &map.g;
     let b = g.hemisphere() as f64;
     let ring = |lat0: f64, lat1: f64, pole: bool| -> (f64, f64, usize) {
-        let n = 4_000;
         let res: Vec<(f64, f64)> = (0..n)
             .into_par_iter()
             .filter_map(|k| {
@@ -1379,4 +1400,95 @@ pub fn summary_line(v: &Value) -> String {
         f(&v["millis"]["vector"]),
         f(&v["millis"]["total"]),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The footprint mean of a continuous field over the simulation's Lambert blocks, sampled as
+    /// [`resample_grid`] samples a layer (its spacing the source cell `r_s`).
+    fn mean(f: &dyn Fn(f64, f64) -> f64, fp: &Footprint, r_s: f64) -> f64 {
+        let nx = (1 + (2.0 * fp.hx / r_s).ceil() as usize).min(MAX_SAMPLES_X);
+        let nz = (1 + (2.0 * fp.hz / r_s).ceil() as usize).min(MAX_SAMPLES_Z);
+        let at = |k: usize, n: usize, h: f64| {
+            if n == 1 {
+                0.0
+            } else {
+                -h + 2.0 * h * k as f64 / (n - 1) as f64
+            }
+        };
+        let mut sum = 0.0;
+        for kz in 0..nz {
+            for kx in 0..nx {
+                sum += f(fp.xs + at(kx, nx, fp.hx), fp.zs + at(kz, nz, fp.hz));
+            }
+        }
+        sum / (nx * nz) as f64
+    }
+
+    /// The simulation's solvers work in Lambert blocks, so its polar terrain has the grid's shape
+    /// (features a few cells across, k cos φ planet blocks wide and k / cos φ long). Resampled
+    /// with a footprint isotropic on the sphere, such terrain still streaks radially round the
+    /// poles (the tangential slope far above the radial one); widened along the parallels, it does
+    /// not. A field of random plane waves of 6 to 24 Lambert blocks stands in for the terrain.
+    #[test]
+    fn lambert_shaped_polar_terrain_does_not_streak() {
+        let c_sim = 4096;
+        let g = PetroffGuyou::new(PetroffGuyou::hemisphere_for(c_sim), 30.0);
+        let map = Mapping::new(g, c_sim, 16);
+        let mut seed = 0x5EED_u64;
+        let mut rnd = || {
+            seed = seed
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (seed >> 11) as f64 / (1u64 << 53) as f64
+        };
+        let waves: Vec<(f64, f64, f64)> = (0..12)
+            .map(|_| {
+                let len = 6.0 + 18.0 * rnd();
+                let dir = std::f64::consts::TAU * rnd();
+                let k = std::f64::consts::TAU / len;
+                (k * dir.cos(), k * dir.sin(), std::f64::consts::TAU * rnd())
+            })
+            .collect();
+        let field = |xs: f64, zs: f64| -> f64 {
+            waves
+                .iter()
+                .map(|&(a, b, ph)| (a * xs + b * zs + ph).sin())
+                .sum()
+        };
+        let (r_w, r_s) = (2.0, 2.0);
+        let isotropic = |x: f64, z: f64| {
+            mean(&field, &map.footprint_widened(x, z, r_w, r_s, &|_| 1.0), r_s)
+        };
+        let widened = |x: f64, z: f64| mean(&field, &map.footprint(x, z, r_w, r_s), r_s);
+        let (pole_iso, mid_iso, n) = pole_anisotropy_n(&map, &isotropic, 300);
+        let (pole_wide, mid_wide, _) = pole_anisotropy_n(&map, &widened, 300);
+        eprintln!(
+            "tangential / radial slope round the poles: isotropic footprint {pole_iso:.2}, widened \
+             {pole_wide:.2} (mid-latitudes {mid_iso:.2}, {mid_wide:.2}; {n} points)"
+        );
+        assert!(n > 200, "{n} points");
+        assert!(pole_iso > 4.0, "the isotropic footprint streaks: {pole_iso}");
+        assert!(
+            pole_wide < 2.5 && pole_wide > 0.2,
+            "widened, no streaks and no rings: {pole_wide}"
+        );
+        // Below 60° nothing changes.
+        assert!((mid_iso - mid_wide).abs() < 0.2 * mid_iso, "{mid_iso} vs {mid_wide}");
+    }
+
+    /// Flags and codes take the nearest cell: the wetland flag (0 none, 1 swamp, 2 cold) must not
+    /// be averaged into swamp between cold wetland and dry land.
+    #[test]
+    fn flags_and_codes_are_categories() {
+        let grid = deeptime_format::GridDesc::for_planet("L2", 1024, 8).unwrap();
+        let desc = |name: &str, units: &str| crate::bake::desc(name, DType::U8, &grid, 1.0, units, None);
+        for name in ["climate/wetland", "climate/koppen", "meta/province", "surface/class_top"] {
+            assert_eq!(kind_of(&desc(name, "")), Kind::Categorical, "{name}");
+        }
+        assert_eq!(kind_of(&desc("some/mask", "flag")), Kind::Categorical);
+        assert_eq!(kind_of(&desc("elevation", "block")), Kind::Continuous);
+    }
 }
