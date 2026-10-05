@@ -47,14 +47,17 @@ import java.util.List;
  * then a second run starts), and {@code .vista=x,y,z,yaw,pitch[;…]} adds, after the in-world
  * shot, one screenshot per viewpoint: the player is put there in spectator mode, the render
  * distance raised to 16 chunks, and the shot taken once the terrain around has had time to
- * generate and draw ({@code 11-vista-<n>}).
+ * generate and draw ({@code 11-vista-<n>}). With {@code .epochs=true} the walk also plays the
+ * scrubbed frame's epoch once the run is done ({@code 07b-epoch-picked}) and continues that run by
+ * {@code .continue=<Myr>} (default 50; {@code 07c-continued}) before the review (docs/design/
+ * playability-steering.md).
  */
 final class ScreenshotDriver {
 
     private static final String PROP = "deeptime.dev.screenshots";
     private static final int STEP_TIMEOUT_TICKS = 20 * 180;
 
-    private enum Step { TITLE, CREATE_SCREEN, EDITOR, ADVANCED, TIMELINE, CANCEL, RUNNING, LAYERS, GLOBE, DONE, REVIEW, ACCEPTED, CREATING, IN_WORLD, VISTA, QUIT }
+    private enum Step { TITLE, CREATE_SCREEN, EDITOR, ADVANCED, TIMELINE, CANCEL, RUNNING, LAYERS, GLOBE, DONE, EPOCH, CONTINUE, REVIEW, ACCEPTED, CREATING, IN_WORLD, VISTA, QUIT }
 
     /** Layers shot mid-run ({@code .layers=a,b,…}; those the run has). */
     private static final String DEFAULT_LAYERS = "plates,climate/koppen,structure/rock,provinces";
@@ -338,6 +341,45 @@ final class ScreenshotDriver {
                                 go(Step.QUIT);
                                 return;
                             }
+                            if (Boolean.getBoolean(PROP + ".epochs")) {
+                                var f = run.current().orElseThrow();
+                                var stop = model.epochStopMyr(f);
+                                DeepTime.LOGGER.info("[deeptime-shot] epoch: frame {} at t={} → stop {}", f.n(), f.t(), stop);
+                                if (stop.isPresent()) {
+                                    model.pickEpoch(f);
+                                    ed.refresh();
+                                    go(Step.EPOCH);
+                                    return;
+                                }
+                            }
+                            model.openReview();
+                            ed.refresh();
+                            go(Step.REVIEW);
+                        }
+                    }
+                }
+                case EPOCH, CONTINUE -> {
+                    TimelapseModel run = model.run().orElseThrow();
+                    if (run.state() == TimelapseModel.State.RUNNING || !(screen instanceof PlanetEditorScreen ed)) {
+                        stepTicks = 0;
+                        return;
+                    }
+                    if (stepTicks == 40) {
+                        var p = run.progress();
+                        DeepTime.LOGGER.info("[deeptime-shot] {} run {}: stop {} Myr, {} keyframes, {} s", step, run.state(),
+                                model.runStopMyr(), run.frameCount(), p.elapsedMs() / 1000);
+                        shot(step == Step.EPOCH ? "07b-epoch-picked" : "07c-continued");
+                        if (run.state() != TimelapseModel.State.DONE) {
+                            DeepTime.LOGGER.error("[deeptime-shot] FAILED: {} run ended {} {}", step, run.state(), run.failure().orElse(""));
+                            go(Step.QUIT);
+                            return;
+                        }
+                        if (step == Step.EPOCH) {
+                            double more = Double.parseDouble(System.getProperty(PROP + ".continue", "50"));
+                            model.continueTo(model.runStopMyr().orElseThrow() + more);
+                            ed.refresh();
+                            go(Step.CONTINUE);
+                        } else {
                             model.openReview();
                             ed.refresh();
                             go(Step.REVIEW);
