@@ -115,6 +115,7 @@ def cmd_pick(a):
             "essentials": ranked, "manifest_essentials": (manifest.get("notes") or {}).get("essentials"),
             "counts": {short(t): sum(1 for s in sites if short(s["deposit_type"]) == short(t))
                        for t in {s["deposit_type"] for s in sites}},
+            "placers": {"total": len(of(PLACER)), "with_parent": sum(1 for k in of(PLACER) if k.get("parent") is not None)},
             "porphyry": None, "gossan": None, "placer": None, "others": [], "traps": [], "empty": [],
             "chunky": [], "rcon": []}
     if por:
@@ -324,7 +325,8 @@ def cmd_geology(a):
               f"site {pla['site']} (parent {por['site']}) {pla['distance_to_parent']:.0f} blocks away, centre y {pla['center'][1]} vs porphyry y "
               f"{por['center'][1]} ({'lower' if down else 'NOT lower'}); {gold} gold ore blocks in its footprint")
     else:
-        check(False, "placer gold downstream, a child of the porphyry", f"no {PLACER} site has parent {por['site']}")
+        check(False, "placer gold downstream, a child of the porphyry", f"no {PLACER} site has parent {por['site']} ({plan.get('placers', {}).get('with_parent', '?')} of "
+              f"{plan.get('placers', {}).get('total', '?')} placer sites have any parent: the placers come from the channel engine, not from a porphyry)")
 
 
 def cmd_compat(a):
