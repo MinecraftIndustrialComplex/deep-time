@@ -11,6 +11,7 @@ mod hydro;
 mod margins_view;
 mod parity;
 mod plate_check;
+mod project;
 mod provinces;
 mod run;
 mod satellite_view;
@@ -464,6 +465,20 @@ enum Command {
         /// The .npy file to write (and <out>.json).
         #[arg(long)]
         out: PathBuf,
+    },
+    /// Run the bake's projection pass (SW-1) on a copy of a baked Lambert world-data folder, with
+    /// its own preset and `--set scale.KEY=VALUE` overrides (`scale.projection` is petroff_guyou):
+    /// tuning the pass without re-running the history.
+    Project {
+        /// A Lambert world-data folder a planet run baked (`--set scale.projection=lambert`).
+        #[arg(long)]
+        world_data: PathBuf,
+        /// The projected copy (replaced if it exists).
+        #[arg(long)]
+        out: PathBuf,
+        /// Sets a preset value first, `--set scale.lambda_c_deg=30` (repeatable).
+        #[arg(long = "set", value_name = "PATH=VALUE")]
+        set: Vec<String>,
     },
     /// Whole-world pictures of a baked world-data folder in the world's own block space
     /// (satellite.png, provinces.png with the layout's cone points and poles, world-map.json).
@@ -1055,6 +1070,28 @@ fn main() -> ExitCode {
                 }
                 Err(e) => {
                     eprintln!("deeptime hydro: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        Some(Command::Project {
+            world_data,
+            out,
+            set,
+        }) => {
+            let started = std::time::Instant::now();
+            match project::run(&world_data, &out, &set) {
+                Ok(note) => {
+                    println!(
+                        "deeptime project: {} in {:.2}s",
+                        deeptime_core::bake::project::summary_line(&note),
+                        started.elapsed().as_secs_f64()
+                    );
+                    println!("{}", serde_json::to_string(&note).unwrap_or_default());
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime project: {e}");
                     ExitCode::FAILURE
                 }
             }
