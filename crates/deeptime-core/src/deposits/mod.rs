@@ -69,7 +69,6 @@ pub mod regional;
 pub mod rules;
 pub mod sites;
 pub mod sizing;
-pub mod spawn;
 pub mod spill;
 pub mod survival;
 pub mod synthetic;
@@ -80,7 +79,7 @@ pub mod usgs;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Mutex, OnceLock};
 
-use deeptime_format::{Body, Event, EventId, Extraction, GridDesc, Place, Product, Site};
+use deeptime_format::{Body, Event, EventId, Extraction, GridDesc, Place, Product, Site, SiteId};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -246,7 +245,7 @@ pub struct SyntheticPreset {
     /// P1-15: bake a playable terrain into the run's world data at `finalize_write`: the
     /// history's present elevation as the ground (the surface the bodies were placed against,
     /// [`synthetic::HistoryTerrain`]), the synthetic climate and horizons, and spawn candidates
-    /// ranked by the essentials ([`spawn`]). Without it the world data holds sites, bodies and
+    /// (dry flat land nearest (0, 0)). Without it the world data holds sites, bodies and
     /// events only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terrain: Option<TerrainBake>,
@@ -2560,6 +2559,10 @@ impl DepositStage {
                             gone,
                             t_gone,
                             receivers,
+                            Shed {
+                                eroded_fraction: 1.0,
+                                parent_site: None,
+                            },
                             &mut rng,
                         )?;
                     }
@@ -2733,6 +2736,7 @@ impl DepositStage {
         }
         let forming = f.emit(world, e, x, z)?;
         let mut exhumation = None;
+        let mut t_exhumed = t_form;
         if truncated {
             // When erosion first reached the body's top.
             let t_exp = time_eroded_to(col, t_form, t.preservation.formation_depth_m - half_m)
@@ -2751,6 +2755,7 @@ impl DepositStage {
                 ex = ex.caused_by(id);
             }
             exhumation = Some(f.emit(world, ex, x, z)?);
+            t_exhumed = t_exp;
         }
         // Supergene child (the parent's copper is conserved: the leached part becomes cap).
         let mut child_site = None;
@@ -2900,6 +2905,34 @@ impl DepositStage {
             f.census[ct].sites += 1;
             f.census[ti].children += 1;
         }
+        // A porphyry cut by the surface sheds placer gold in proportion to the share of it that
+        // erosion has taken (Ben, 2026-10-05, "Reword check + partial shedding").
+        if let (true, Some(ex), ErosionBehavior::SpawnPlacer) =
+            (truncated, exhumation, t.preservation.erosion_behavior)
+        {
+            let eroded_fraction = 1.0 - fate.fraction_left();
+            for child in t
+                .geometry
+                .children
+                .iter()
+                .filter(|c| c.relation == Relation::Downstream)
+            {
+                self.spawn_placer(
+                    f,
+                    world,
+                    cand,
+                    &child.type_id,
+                    ex,
+                    t_exhumed,
+                    receivers,
+                    Shed {
+                        eroded_fraction,
+                        parent_site: Some(site_id),
+                    },
+                    &mut rng,
+                )?;
+            }
+        }
         Ok(())
     }
 
@@ -2914,6 +2947,7 @@ impl DepositStage {
         gone_event: EventId,
         t_gone: f64,
         receivers: Option<&[u32]>,
+        shed: Shed,
         rng: &mut Rng,
     ) -> Result<(), CoreError> {
         let parent = &self.types[cand.ty];
@@ -2925,7 +2959,8 @@ impl DepositStage {
         }
         let child = &self.types[ct];
         let rules = child.placer.as_ref().expect("validated");
-        // The resistate metal the parent lost.
+        // The resistate metal the parent held (the part in what eroded is taken in
+        // `shed_tonnage_mt`).
         let mut lost_t = 0.0;
         for p in &parent.products {
             if !parent.preservation.resistates.contains(&p.material) {
@@ -2957,18 +2992,28 @@ impl DepositStage {
         );
         let model = SizeModel::new(&child.sizing);
         let mut size = model.draw(rng);
-        // Cap the placer's gold at the captured share of what the parent lost.
+        // The gravel scales with the share of the parent that eroded, then the placer's gold is
+        // capped at the captured share of what the parent lost (so the whole is proportional).
         let key = child
             .products
             .iter()
             .find_map(|p| p.grade_key.clone())
             .unwrap_or_default();
-        if let Some(g) = size.grades.get(&key).copied() {
-            let held = size.tonnage_mt * 1.0e6 * mass_fraction(&key, g);
-            let cap = rules.capture_fraction * lost_t;
-            if held > cap && held > 0.0 {
-                size.tonnage_mt *= cap / held;
-            }
+        let grade = size
+            .grades
+            .get(&key)
+            .map_or(0.0, |g| mass_fraction(&key, *g));
+        size.tonnage_mt = shed_tonnage_mt(
+            size.tonnage_mt,
+            grade,
+            lost_t,
+            rules.capture_fraction,
+            shed.eroded_fraction,
+        );
+        // A trickle below the smallest recorded placer is not a deposit (a parent the surface
+        // only grazes; a fully eroded one draws from the whole curve as before).
+        if shed.eroded_fraction < 1.0 && size.tonnage_mt < child.sizing.tonnage_mt.p90 {
+            return Ok(());
         }
         let tonnage_t = size.tonnage_mt * 1.0e6;
         let radius = geometry::radius_blocks(child, tonnage_t, &sc);
@@ -3057,7 +3102,7 @@ impl DepositStage {
             body: bodies.first().map(|b| b.id),
             products: self.products(child, &size, tonnage_t),
             forming_event: ev,
-            parent: None,
+            parent: shed.parent_site,
             extraction: self.extraction(child, tonnage_t),
         };
         world.add_site(site)?;
@@ -3419,6 +3464,38 @@ pub fn sites_of<'a>(
         .filter(move |s| s.deposit_type == type_id)
 }
 
+/// The tonnage (Mt of gravel) of a placer shed from a parent that erosion has taken `eroded_fraction`
+/// of (by volume; 1 for one eroded away): the drawn tonnage times that fraction, held to the
+/// captured share of the resistate metal in the eroded part (the gold spread through the body, so
+/// `parent_metal_t` times the fraction). Both the draw and the cap scale with the fraction, so a
+/// half-eroded parent sheds half the placer of a wholly eroded one, capped or not.
+/// `grade` is the placer's gold as a mass fraction. Game choice, ledger DEP-207.
+fn shed_tonnage_mt(
+    drawn_mt: f64,
+    grade: f64,
+    parent_metal_t: f64,
+    capture_fraction: f64,
+    eroded_fraction: f64,
+) -> f64 {
+    let f = eroded_fraction.clamp(0.0, 1.0);
+    let mut mt = drawn_mt * f;
+    let held = mt * 1.0e6 * grade;
+    let cap = capture_fraction * parent_metal_t * f;
+    if held > cap && held > 0.0 {
+        mt *= cap / held;
+    }
+    mt
+}
+
+/// How much of a parent a placer is shed from.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Shed {
+    /// The share of the parent (by volume) erosion has taken: 1 for a parent eroded away.
+    eroded_fraction: f64,
+    /// The parent's site when it survives (a cut porphyry), the placer's `parent` link.
+    parent_site: Option<SiteId>,
+}
+
 #[cfg(test)]
 mod recorded_tests;
 
@@ -3428,6 +3505,72 @@ mod spill_tests;
 #[cfg(test)]
 mod tests {
     use super::types::DepositType;
+
+    /// Partial shedding (Ben, 2026-10-05): a placer's size follows the share of its porphyry that
+    /// erosion took. Half eroded gives half the tonnage of fully eroded, whether or not the gold
+    /// cap binds; an uneroded one gives none.
+    #[test]
+    fn a_placer_is_shed_in_proportion_to_the_eroded_fraction() {
+        let types = super::types::builtin().unwrap();
+        let porphyry = types
+            .iter()
+            .find(|t| t.id == "deeptime:porphyry_cu_mo_au")
+            .unwrap();
+        assert_eq!(
+            porphyry.preservation.erosion_behavior,
+            ErosionBehavior::SpawnPlacer
+        );
+        let rules = types
+            .iter()
+            .find(|t| t.id == "deeptime:placer_au")
+            .unwrap()
+            .placer
+            .clone()
+            .unwrap();
+        let cut = |left: f64, drawn_mt: f64, metal_t: f64| {
+            // The eroded share the way `materialise` takes it from the ledger's fate.
+            let fate = Fate::Truncated {
+                centre_depth_m: 0.0,
+                fraction_left: left,
+            };
+            shed_tonnage_mt(
+                drawn_mt,
+                0.2e-6,
+                metal_t,
+                rules.capture_fraction,
+                1.0 - fate.fraction_left(),
+            )
+        };
+        // Uncapped: 1.1 Mt of gravel at 0.2 g/t holds 220 kg; the parent held 30 t of gold.
+        let full = cut(0.0, 1.1, 30.0);
+        let half = cut(0.5, 1.1, 30.0);
+        assert!((full - 1.1).abs() < 1e-12);
+        assert!((half / full - 0.5).abs() < 1e-9, "{half} of {full}");
+        // Capped: a parent that held only 0.2 t of gold caps the placer at 0.1 t.
+        let full = cut(0.0, 1.1, 0.2);
+        let half = cut(0.5, 1.1, 0.2);
+        assert!(
+            full < 1.1 && (half / full - 0.5).abs() < 1e-9,
+            "{half} {full}"
+        );
+        let held_t = full * 1.0e6 * 0.2e-6;
+        assert!(
+            (held_t - rules.capture_fraction * 0.2).abs() < 1e-9,
+            "{held_t}"
+        );
+        // A tenth eroded sheds a tenth.
+        assert!((cut(0.9, 1.1, 30.0) / 1.1 - 0.1).abs() < 1e-9);
+        // Uneroded: nothing.
+        assert_eq!(cut(1.0, 1.1, 30.0), 0.0);
+        assert_eq!(
+            Fate::Buried {
+                centre_depth_m: 900.0
+            }
+            .fraction_left(),
+            1.0,
+            "a buried body is not cut, so it sheds nothing"
+        );
+    }
 
     /// The surface's block y follows the world's sea level and vertical scale (2026-10-02: it read
     /// sea level 63 whatever the world said).
@@ -3668,8 +3811,8 @@ mod tests {
     }
 
     /// P1-15: a `terrain` preset bakes a playable world whose ground is the surface the bodies
-    /// were placed against, with spawn candidates ranked by the essentials; the content bundle's
-    /// essentials replace the preset's.
+    /// were placed against, with the standard spawn candidates (dry, flat land nearest (0, 0)); the
+    /// content bundle's essentials replace the preset's.
     #[test]
     fn world_preset_bakes_terrain_under_the_bodies() {
         use deeptime_format::{Manifest, RasterRead, TilePackReader};
@@ -3715,9 +3858,11 @@ mod tests {
             &std::fs::read_to_string(dir.join("spawn/candidates.json")).unwrap(),
         )
         .unwrap();
-        assert_eq!(spawn["ranked_by"].as_array().unwrap().len(), 3);
+        // Spawn follows the standard rules (Ben, 2026-10-05): no ranking by the essentials.
+        assert!(spawn.get("ranked_by").is_none(), "{spawn}");
         let first = &spawn["candidates"][0];
-        assert_eq!(first["unmet"], 0, "{first}");
+        assert!(first.get("unmet").is_none(), "{first}");
+        assert!(first["surface_y"].as_f64().unwrap() >= 65.0, "{first}");
         let _ = std::fs::remove_dir_all(&dir);
 
         // The content bundle's essentials win over the preset's.
@@ -3725,10 +3870,10 @@ mod tests {
             .unwrap()
             .with_content(r#"{"essentials": [{"material": "c:gold", "min_sites_per_region": 1, "region_blocks": 4096}]}"#)
             .unwrap();
-        match p.bake().unwrap() {
-            crate::preset::Bake::DepositHistory { essentials, .. } => {
-                assert_eq!(essentials.len(), 1);
-                assert_eq!(essentials[0].material, "c:gold");
+        match &p.body {
+            crate::preset::PresetBody::DepositsSynthetic(d) => {
+                assert_eq!(d.deposits.essentials.len(), 1);
+                assert_eq!(d.deposits.essentials[0].material, "c:gold");
             }
             other => panic!("{other:?}"),
         }

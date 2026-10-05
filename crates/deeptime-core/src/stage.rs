@@ -67,11 +67,27 @@ impl StageContext<'_> {
     /// of failing); only what does not fit even then fails.
     pub fn reserve(&self, bytes: u64) -> Result<(), CoreError> {
         let needed = self.gauge.in_use().saturating_add(bytes);
+        let r = self.reserve_inner(bytes);
+        self.gauge.reserved(needed, r.is_ok());
+        r
+    }
+
+    fn reserve_inner(&self, bytes: u64) -> Result<(), CoreError> {
+        let needed = self.gauge.in_use().saturating_add(bytes);
         if let Some(p) = self.needed_peak {
             p[0].fetch_max(needed, Ordering::Relaxed);
             let history = self.history.map_or(0, HistoryHandle::resident_bytes);
             p[1].fetch_max(needed.saturating_sub(history), Ordering::Relaxed);
         }
+        if needed <= self.mem_cap {
+            return Ok(());
+        }
+        // What the allocator keeps for reuse goes first, then the history's frames.
+        let needed = if self.gauge.release() > 0 {
+            self.gauge.in_use().saturating_add(bytes)
+        } else {
+            needed
+        };
         if needed <= self.mem_cap {
             return Ok(());
         }
