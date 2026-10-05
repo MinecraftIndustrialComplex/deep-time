@@ -343,7 +343,7 @@ final class ScreenshotDriver {
                             }
                             if (Boolean.getBoolean(PROP + ".epochs")) {
                                 // The latest frame before the run's end (the end's own frames
-                                // have nothing to pick), shown before it is picked.
+                                // have nothing to pick): shown now, shot and picked next.
                                 int pick = -1;
                                 for (int i = 0; i < run.frameCount(); i++)
                                     if (model.epochStopMyr(run.frames().get(i)).isPresent())
@@ -351,21 +351,23 @@ final class ScreenshotDriver {
                                 if (pick >= 0) {
                                     run.scrubTo(pick);
                                     ed.refresh();
-                                    shot("07a-epoch-to-pick");
-                                }
-                                var f = run.current().orElseThrow();
-                                var stop = model.epochStopMyr(f);
-                                DeepTime.LOGGER.info("[deeptime-shot] epoch: frame {} at t={} → stop {}", f.n(), f.t(), stop);
-                                if (stop.isPresent()) {
-                                    model.pickEpoch(f);
-                                    ed.refresh();
-                                    go(Step.EPOCH);
                                     return;
                                 }
                             }
                             model.openReview();
                             ed.refresh();
                             go(Step.REVIEW);
+                        } else if (stepTicks == 160) {
+                            shot("07a-epoch-to-pick");
+                            var f = run.current().orElseThrow();
+                            var stop = model.epochStopMyr(f);
+                            DeepTime.LOGGER.info("[deeptime-shot] epoch: frame {} at t={} → stop {}", f.n(), f.t(), stop);
+                            if (stop.isPresent())
+                                model.pickEpoch(f);
+                            else
+                                model.openReview();
+                            ed.refresh();
+                            go(stop.isPresent() ? Step.EPOCH : Step.REVIEW);
                         }
                     }
                 }

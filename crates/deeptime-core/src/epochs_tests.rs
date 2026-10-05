@@ -254,6 +254,7 @@ fn an_epoch_pick_and_a_stop_bake_the_run_planned_to_that_time() {
     let base = small_planet(60.0, Some(steering(json!({}))));
     let a = temp_dir("pick");
     run(&base, &a, true);
+    let original = files(&a);
     let frames = deeptime_format::keyframes::KeyframeIndex::read(&a).unwrap();
     // The keyframe at 30 Myr after the start (t = −30 Myr).
     let pick = frames
@@ -279,6 +280,16 @@ fn an_epoch_pick_and_a_stop_bake_the_run_planned_to_that_time() {
         "the pick's folder"
     );
     drop(s);
+    // Back to the planned end from the picked epoch: the original run again, frame for frame
+    // (the frames the pick drew in its tail are not kept).
+    let back = resume(&base, &a);
+    assert!(back.resumed().unwrap().from_step <= 12, "{:?}", back.resumed());
+    drop(back);
+    assert_eq!(
+        files_diff(&files(&a), &original),
+        Vec::<String>::new(),
+        "picked, then continued back to the planned end"
+    );
 
     // Stop early: a run cancelled after its 50-Myr frame, then stopped at 40 Myr.
     let c = temp_dir("stop");

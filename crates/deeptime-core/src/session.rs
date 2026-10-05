@@ -562,6 +562,18 @@ impl Session {
         let key = crate::epochs::key(&canonical);
         let dir = crate::epochs::EpochIndex::dir(&out);
         let index = crate::epochs::EpochIndex::read(&out)?.filter(|i| i.key == key);
+        // The folder's keyframes are those of the run that last wrote the index (`set_epochs`
+        // records its preset): the frames it drew in its own tail, and after it, are not frames
+        // of the shared trajectory. So a checkpoint is taken no later than that run's last free
+        // step too, and every kept frame is one a run planned to this stop draws.
+        let previous_free = index
+            .as_ref()
+            .and_then(|i| Preset::from_json(&i.preset.to_string()).ok())
+            .and_then(|prev| match prev.body {
+                crate::preset::PresetBody::Planet(pp) => Some(pp.last_free_step()),
+                _ => None,
+            });
+        let need = need.min(previous_free.unwrap_or(need));
         let chosen = index.as_ref().and_then(|i| {
             let e = i.choose(need)?;
             let chain: Vec<PathBuf> = i.chain(e)?.iter().map(|c| dir.join(&c.file)).collect();
@@ -684,6 +696,8 @@ impl Session {
                 index.entries.len()
             ),
         );
+        // Written now, so the folder names the run whose keyframes it holds (`resume_epoch`).
+        index.write(&self.out_dir)?;
         s.epochs = Some(EpochWriter { plan, index });
         Ok(())
     }
