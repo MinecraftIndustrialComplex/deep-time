@@ -114,6 +114,10 @@ pub struct Ocean {
     pub sinking: Option<Sinking>,
     /// Gauss–Seidel sweeps the gyres took.
     pub sweeps: u32,
+    /// [`Ocean::substeps`] of the first step length asked for, `(dt's bits, result)`: the flows
+    /// and volumes are fixed once built, and a run steps with one dt (P1-17: the scan over every
+    /// cell ran each of the 2-D model's steps).
+    substep_cache: std::sync::OnceLock<(u64, Option<(usize, f64)>)>,
 }
 
 impl Ocean {
@@ -178,6 +182,7 @@ impl Ocean {
             vol,
             sinking: None,
             sweeps: 0,
+            substep_cache: std::sync::OnceLock::new(),
         };
         if s.gyre_efficiency > 0.0 {
             o.gyres(s);
@@ -355,8 +360,15 @@ impl Ocean {
             };
             let lab = components(&in_band);
             let count = lab.iter().flatten().max().map_or(0, |m| m + 1);
-            for b in 0..count {
-                let cells: Vec<usize> = (0..n).filter(|&c| lab[c] == Some(b)).collect();
+            // Each basin's cells in ascending order, from one pass (P1-17: a scan of every cell
+            // per basin was quadratic in the band's many small seas).
+            let mut by_label: Vec<Vec<usize>> = vec![Vec::new(); count];
+            for (c, l) in lab.iter().enumerate() {
+                if let Some(b) = *l {
+                    by_label[b].push(c);
+                }
+            }
+            for cells in by_label {
                 let reach = cells.iter().any(|&c| lat[c / w].abs() <= BASIN_REACH_LAT);
                 let sink: Vec<usize> = cells
                     .iter()
@@ -627,8 +639,20 @@ impl OceanTransport for Ocean {
 
 impl Ocean {
     /// The sub-steps of a step of `dt` seconds (Courant ≤ 0.5 on every cell's outflow) and their
-    /// length; `None` when nothing flows.
+    /// length; `None` when nothing flows. Computed once for the first `dt` (the flows do not
+    /// change after [`Ocean::build`]); another `dt` is computed afresh.
     fn substeps(&self, dt: f64) -> Option<(usize, f64)> {
+        let &(bits, cached) = self
+            .substep_cache
+            .get_or_init(|| (dt.to_bits(), self.substeps_uncached(dt)));
+        if bits == dt.to_bits() {
+            cached
+        } else {
+            self.substeps_uncached(dt)
+        }
+    }
+
+    fn substeps_uncached(&self, dt: f64) -> Option<(usize, f64)> {
         let (w, h) = (self.w, self.h);
         let mut worst = 0.0f64;
         for c in 0..w * h {
@@ -760,6 +784,55 @@ mod tests {
                 }
             })
             .collect()
+    }
+
+    /// P1-17: the cached sub-steps are the computed ones, for the step length cached and for
+    /// another; a copy of the ocean keeps them.
+    #[test]
+    fn the_cached_substeps_are_the_computed_ones() {
+        let g = grid();
+        let land = land_of(&g, &|lat, i| lat < -40.0 || (10..60).contains(&i));
+        let u = belt_wind_u(&ClimateParams::default(), &g, 23.4);
+        let o = Ocean::build(&setup(&g, &land, &u, 15.0));
+        let year = 365.25 * 86_400.0;
+        for dt in [year / 72.0, year, year / 72.0, 3.0 * year, year / 72.0] {
+            assert_eq!(o.substeps(dt), o.substeps_uncached(dt), "dt {dt}");
+        }
+        let copy = o.clone();
+        assert_eq!(copy.substeps(year / 72.0), o.substeps_uncached(year / 72.0));
+    }
+
+    /// P1-17: the conveyor's basins are bucketed in one pass; the ocean it builds is the one
+    /// the per-basin scan built, on a coast with many small seas in the sinking band.
+    #[test]
+    fn the_conveyor_on_many_small_seas_is_unchanged() {
+        let g = grid();
+        // Two open basins and, north of 50°, a sea broken into many small inlets.
+        let land = land_of(&g, &|lat, i| {
+            lat < -40.0
+                || ((-40.0..50.0).contains(&lat) && ((10..30).contains(&i) || (50..95).contains(&i)))
+                || (lat >= 50.0 && lat < 75.0 && (i % 3 == 0 || (i * 7) % 11 == 0))
+        });
+        let u = belt_wind_u(&ClimateParams::default(), &g, 23.4);
+        let o = Ocean::build(&setup(&g, &land, &u, 15.0));
+        // The per-basin scan, as it was: every basin's cells by a filter over all cells.
+        let lab: Vec<Option<usize>> = (0..g.w * g.h)
+            .map(|c| (c % 5 != 0).then_some(c % 7))
+            .collect();
+        let count = 7;
+        let mut by_label: Vec<Vec<usize>> = vec![Vec::new(); count];
+        for (c, l) in lab.iter().enumerate() {
+            if let Some(b) = *l {
+                by_label[b].push(c);
+            }
+        }
+        for (b, cells) in by_label.iter().enumerate() {
+            let scanned: Vec<usize> = (0..lab.len()).filter(|&c| lab[c] == Some(b)).collect();
+            assert_eq!(cells, &scanned, "basin {b}");
+        }
+        // And the built ocean has its conveyor (a sinking region, flows that close).
+        assert!(o.sinking.is_some(), "the conveyor found a basin");
+        assert!(o.c_north.iter().any(|&x| x != 0.0));
     }
 
     #[test]
