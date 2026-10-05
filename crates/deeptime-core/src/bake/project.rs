@@ -63,6 +63,39 @@ pub const BORDER_INSET_BLOCKS: f64 = 1.0; // ledger: SCL-088 (game-choice)
 /// stretch grows without bound; the cone points are put in open sea).
 pub const MAX_STRETCH: f64 = 8.0; // ledger: SCL-090 (game-choice)
 
+/// Where the footprint starts widening along the parallels: the cosine of the latitude (60°).
+pub const POLAR_WIDEN_FROM_COS: f64 = 0.5; // ledger: SCL-090 (game-choice)
+
+/// The most the footprint is widened along the parallels round the poles.
+pub const POLAR_WIDEN_MAX: f64 = 16.0; // ledger: SCL-090 (game-choice)
+
+/// How much wider than its isotropic diameter the footprint is along the parallel at a point
+/// whose latitude has cosine `cos`: 1 up to [`POLAR_WIDEN_FROM_COS`], then (cos₀ / cos)², the
+/// growth of the Lambert grid's own aspect, up to [`POLAR_WIDEN_MAX`]. The simulation's solvers
+/// work in Lambert blocks, so its polar terrain has the grid's shape: a feature k cells across is
+/// k cos φ planet blocks wide east–west and k / cos φ long north–south. The isotropic footprint
+/// removes only the features shorter than one row; the longer ones stay as streaks radiating from
+/// the pole. Averaging along the parallel over several rows' length leaves only what the
+/// simulation resolved in both directions there.
+pub fn polar_widening(cos: f64) -> f64 {
+    let (c0, max) = polar_widening_params();
+    (c0 / cos.max(1e-9)).powi(2).clamp(1.0, max)
+}
+
+fn polar_widening_params() -> (f64, f64) {
+    // Tuning only: DEEPTIME_POLAR_WIDEN="cos0,max" overrides the constants.
+    static P: std::sync::OnceLock<(f64, f64)> = std::sync::OnceLock::new();
+    *P.get_or_init(|| {
+        std::env::var("DEEPTIME_POLAR_WIDEN")
+            .ok()
+            .and_then(|v| {
+                let mut it = v.split(',').map(|t| t.trim().parse::<f64>().ok());
+                Some((it.next()??, it.next()??))
+            })
+            .unwrap_or((POLAR_WIDEN_FROM_COS, POLAR_WIDEN_MAX))
+    })
+}
+
 /// The most samples a footprint takes east–west and north–south.
 const MAX_SAMPLES_X: usize = 2048;
 const MAX_SAMPLES_Z: usize = 64;
@@ -265,8 +298,10 @@ impl Mapping {
         // north–south spacing, whichever is wider.
         let d = (self.stretch_at(x, z) * r_w).max(r_s / cos);
         // Lambert blocks per planet block: 1/cos east–west, cos north–south; the bilinear read
-        // already covers one source cell.
-        let hx = ((d / cos - r_s).max(0.0) * 0.5).min(0.5 * self.src.circumference());
+        // already covers one source cell. Round the poles the footprint is also widened along
+        // the parallel ([`polar_widening`]).
+        let hx = ((d * polar_widening(cos) / cos - r_s).max(0.0) * 0.5)
+            .min(0.5 * self.src.circumference());
         let hz = (d * cos - r_s).max(0.0) * 0.5;
         Footprint { xs, zs, hx, hz }
     }
