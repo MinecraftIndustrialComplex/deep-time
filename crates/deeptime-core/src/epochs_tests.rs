@@ -92,6 +92,77 @@ fn world(s: &Session) -> WorldState {
     w
 }
 
+/// What differs between two worlds, by part (empty: the same), so a failure names the part
+/// instead of printing two worlds.
+fn world_diff(a: &WorldState, b: &WorldState) -> Vec<String> {
+    // Bit for bit (NaN marks "none" in many fields, and NaN != NaN): through postcard.
+    fn bits<T: serde::Serialize>(x: &T) -> Vec<u8> {
+        postcard::to_stdvec(x).unwrap()
+    }
+    let mut out = Vec::new();
+    if a.t_years.to_bits() != b.t_years.to_bits() {
+        out.push(format!("t_years {} vs {}", a.t_years, b.t_years));
+    }
+    let keys: std::collections::BTreeSet<&String> = a.fields.keys().chain(b.fields.keys()).collect();
+    for k in keys {
+        if a.fields.get(k).map(bits) != b.fields.get(k).map(bits) {
+            out.push(format!("field {k}"));
+        }
+    }
+    if bits(&a.globals) != bits(&b.globals) {
+        out.push(format!("globals {:?} vs {:?}", a.globals, b.globals));
+    }
+    if bits(&a.events) != bits(&b.events) {
+        let first = a.events.iter().zip(&b.events).position(|(x, y)| bits(x) != bits(y));
+        out.push(format!(
+            "events ({} vs {}, first difference at {first:?}: {:?} vs {:?})",
+            a.events.len(),
+            b.events.len(),
+            first.map(|i| &a.events[i]),
+            first.map(|i| &b.events[i])
+        ));
+    }
+    let parts = [
+        ("sites", bits(&a.sites) == bits(&b.sites)),
+        ("bodies", bits(&a.bodies) == bits(&b.bodies)),
+        ("plates", bits(&a.plates) == bits(&b.plates)),
+        ("surface", bits(&a.surface) == bits(&b.surface)),
+        ("volcanoes", bits(&a.volcanoes) == bits(&b.volcanoes)),
+        ("impacts", bits(&a.impacts) == bits(&b.impacts)),
+        (
+            "structure",
+            bits(&a.structure) == bits(&b.structure)
+                && bits(&a.structure_relief) == bits(&b.structure_relief),
+        ),
+        ("history", a.history == b.history),
+        ("whole (ids)", bits(a) == bits(b)),
+    ];
+    for (name, same) in parts {
+        if !same {
+            out.push(name.to_owned());
+        }
+    }
+    out
+}
+
+/// What differs between two folders' world-data files (path: CRC or absent).
+fn files_diff(a: &[(String, u32)], b: &[(String, u32)]) -> Vec<String> {
+    let mut out = Vec::new();
+    for (p, c) in a {
+        match b.iter().find(|(q, _)| q == p) {
+            Some((_, d)) if d == c => {}
+            Some(_) => out.push(format!("{p} differs")),
+            None => out.push(format!("{p} only in the first")),
+        }
+    }
+    for (p, _) in b {
+        if !a.iter().any(|(q, _)| q == p) {
+            out.push(format!("{p} only in the second"));
+        }
+    }
+    out
+}
+
 /// The run in `dir` again, to the stop of `json`; returns the session after it finished.
 fn resume(json: &str, dir: &Path) -> Session {
     let mut s = Session::resume_epoch(json, "", options(dir), Arc::new(NoGauge)).unwrap();
@@ -157,11 +228,16 @@ fn a_continued_run_is_the_run_planned_to_its_new_stop() {
         assert_eq!((r.from_step, r.steps), (want_from, 30), "{name}");
         let b = temp_dir(&format!("planned-{name}"));
         let planned = run(&longer, &b, false);
-        assert_eq!(files(&a), files(&b), "{name}: the folders differ");
+        let w = world(&s);
         assert_eq!(
-            world(&s),
-            planned,
-            "{name}: the worlds differ"
+            world_diff(&w, &planned),
+            Vec::<String>::new(),
+            "{name}: the worlds"
+        );
+        assert_eq!(
+            files_diff(&files(&a), &files(&b)),
+            Vec::<String>::new(),
+            "{name}: the folders"
         );
         assert_eq!(notes(&a)["run"]["resumed"]["from_step"], json!(want_from));
         let _ = std::fs::remove_dir_all(&a);
@@ -192,8 +268,16 @@ fn an_epoch_pick_and_a_stop_bake_the_run_planned_to_that_time() {
     assert!(r.keyframes_kept > 0 && r.keyframes_kept <= pick.n + 1);
     let b = temp_dir("pick-planned");
     let planned = run(&at, &b, false);
-    assert_eq!(files(&a), files(&b));
-    assert_eq!(world(&s), planned);
+    assert_eq!(
+        world_diff(&world(&s), &planned),
+        Vec::<String>::new(),
+        "the pick's world"
+    );
+    assert_eq!(
+        files_diff(&files(&a), &files(&b)),
+        Vec::<String>::new(),
+        "the pick's folder"
+    );
     drop(s);
 
     // Stop early: a run cancelled after its 50-Myr frame, then stopped at 40 Myr.
@@ -210,8 +294,16 @@ fn an_epoch_pick_and_a_stop_bake_the_run_planned_to_that_time() {
     assert!(s.resumed().unwrap().from_step > 0);
     let d = temp_dir("stop-planned");
     let planned = run(&early, &d, false);
-    assert_eq!(files(&c), files(&d));
-    assert_eq!(world(&s), planned);
+    assert_eq!(
+        world_diff(&world(&s), &planned),
+        Vec::<String>::new(),
+        "the stop's world"
+    );
+    assert_eq!(
+        files_diff(&files(&c), &files(&d)),
+        Vec::<String>::new(),
+        "the stop's folder"
+    );
     for dir in [a, b, c, d] {
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -235,8 +327,16 @@ fn steering_off_changes_nothing_and_on_changes_only_the_tail() {
             .filter(|(p, _)| p != "preset.json")
             .collect()
     };
-    assert_eq!(no_preset(&a), no_preset(&b));
-    assert_eq!(wa, wb);
+    assert_eq!(
+        world_diff(&wa, &wb),
+        Vec::<String>::new(),
+        "off: the worlds"
+    );
+    assert_eq!(
+        files_diff(&no_preset(&a), &no_preset(&b)),
+        Vec::<String>::new(),
+        "off: the folders"
+    );
     assert!(notes(&b)["climate"].get("steering").is_none());
     run(&on, &c, true);
     let ia = EpochIndex::read(&a).unwrap().unwrap();
@@ -256,7 +356,7 @@ fn steering_off_changes_nothing_and_on_changes_only_the_tail() {
             let mut y = Checkpoint::read_chain(&chain(&c, &ic, e)).unwrap().world;
             x.notes.clear();
             y.notes.clear();
-            assert_eq!(x, y, "step {}", e.step);
+            assert_eq!(world_diff(&x, &y), Vec::<String>::new(), "step {}", e.step);
             shared += 1;
         }
     }
