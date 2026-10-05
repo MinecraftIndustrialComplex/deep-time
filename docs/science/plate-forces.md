@@ -185,14 +185,14 @@ seeds 1-4, both starts, 2026-10-05; master 2e07d954 on the old speed law against
 
 | Quantity | Earth | The balance (closed loop) | Old speed law (master) |
 |---|---|---|---|
-| Plate speed, area-weighted RMS | about 47 mm/yr today; 50-100 over 200 Myr | 41.2 mm/yr | 57.9 |
-| Plate speeds, 10th / 50th / 90th percentile | 11 / 33 / 80 mm/yr | 12 / 42 / 79 | 36 / 66 / 84 |
-| Oceanic over continental plates, median speed | 2-3 | 2.27 | 1.61 |
-| Slab-attached over slab-free plates | about 3-4 | 1.84 | 1.69 |
-| Speed against slab share, rank correlation | 0.71 | 0.44 | 0.54 |
-| Convergence 20 Myr after a collision's onset over at onset | India about 0.27 in 15 Myr (Copley et al. 2010) | 0.47 | 0.07 |
+| Plate speed, area-weighted RMS | about 47 mm/yr today; 50-100 over 200 Myr | 41.4 mm/yr | 57.9 |
+| Plate speeds, 10th / 50th / 90th percentile | 11 / 33 / 80 mm/yr | 13 / 41 / 78 | 36 / 66 / 84 |
+| Oceanic over continental plates, median speed | 2-3 | 2.37 | 1.61 |
+| Slab-attached over slab-free plates | about 3-4 | 1.87 | 1.69 |
+| Speed against slab share, rank correlation | 0.71 | 0.45 | 0.54 |
+| Convergence 20 Myr after a collision's onset over at onset | India about 0.27 in 15 Myr (Copley et al. 2010) | 0.46 | 0.07 |
 | Plate-steps where the speed guard (250 mm/yr) binds | — | 0 | 1,015 (the old cap, 100 mm/yr) |
-| A plate's rotation change per step, median / 90th percentile | — | 5.9 / 25 % | 5.1 / 9.6 % |
+| A plate's rotation change per step, median / 90th percentile | — | 5.8 / 25 % | 5.1 / 9.6 % |
 
 The spread of speeds and the oceanic-continental contrast come out of the forces; the slab
 correlation is weaker than Earth's and weaker than the open-loop test's, and the 90th percentile of
