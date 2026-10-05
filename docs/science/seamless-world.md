@@ -87,9 +87,19 @@ The world block's true size is √(4πR²/2b²) metres (294.6 m at 16k, 300.4 m 
 
 ## Earth against the mod
 
-Not a model of Earth: these are properties of a map. Measured on the bake (see the STATUS build log,
-SW-1, for the run and its numbers): the map's land and ice shares against the planet's true shares,
-and the pole anisotropy with and without the round footprint.
+Not a model of Earth: these are properties of a map. Measured on the bake (STATUS build log, SW-1;
+earthlike_quick_16k, scattered_continents, 500 Myr, seed 1, `tools/review/seamless-evidence.sh`):
+
+| Quantity | On the planet | On the Petroff–Guyou world |
+|---|---|---|
+| land share | 0.13168 | 0.13174 |
+| ice cover share | 0.0072 | 0.0093 (the ice layer is coarse, L2, and its footprint wide near the poles) |
+| tangential over radial slope, 80–88° | — | 1.84 (point sample 77.5; mid-latitudes 1.36) |
+| tangential over radial slope, 70–80° | — | 4.04 (point sample 26.5) |
+| cone points' distance to land | — | 7.0° at the least (λc 42.5°; 39 % of candidates put all four at sea) |
+
+On the earlier bake of the same preset the isotropic footprint alone gave 13.4 at 80–88° and 10.3 at
+70–80° (point sample 47.4 and 14.1); the widening brings them to 1.39 and 3.2.
 
 ## Simplifications and limits
 
@@ -106,8 +116,8 @@ and the pole anisotropy with and without the round footprint.
 - The widening removes the fine streaks, not the broad ones: features the simulation drew many
   rows long (its solvers work in Lambert blocks, so a valley or ridge a few cells across at 70° is
   several times longer north–south than east–west on the planet) still fan out from the poles at
-  65–80° latitude, softened (the tangential-over-radial slope ratio at 70–80° falls from 14 for a
-  point sample to about 3; at 80–88° from 47 to the mid-latitudes' 1.4). The same striation is in
+  65–80° latitude, softened (the tangential-over-radial slope ratio at 70–80° falls from 14–26 for a
+  point sample to 3–4; at 80–88° from 47–78 to 1.4–1.8, the mid-latitudes' 1.3–1.4). The same striation is in
   the Lambert world, where it runs north–south. Removing it needs solvers that work in the planet's
   metric (the sphere-native grids research, decisions log 2026-10-04).
 - River chains crossing the north or south edge are cut there; a river does not yet continue through

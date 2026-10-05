@@ -272,7 +272,7 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     assert!(checked > 500, "{checked}");
     eprintln!("sections test: {checked} blocks and {spans} body spans compared");
     assert!(
-        kept(&dir, "section--900_-400_700_500-n"),
+        kept(&dir, "section--700_-400_700_500-n"),
         "the section is kept"
     );
     assert_eq!(

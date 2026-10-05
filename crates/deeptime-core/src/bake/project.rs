@@ -689,6 +689,98 @@ fn band_anisotropy(
     (if sr > 0.0 { st / sr } else { f64::NAN }, res.len())
 }
 
+/// Raises the first horizon of every world stack cell to the bake's top rule: at least the highest
+/// world elevation plus detail amplitude over the L3 cells of the 5 × 5 stack cells round it, plus
+/// `TOP_MARGIN_BLOCKS`, capped at `max_y` (`bake::strata::raise_tops` on the simulation's grid).
+/// Beyond a turning edge the window reads the glued cells (row −k is row k at column w − i).
+/// Returns (cells raised, largest raise in blocks).
+fn raise_world_tops(
+    desc: &LayerDesc,
+    bytes: &mut [u8],
+    elev: &LoadedLayer,
+    amp: Option<&LoadedLayer>,
+    max_y: i32,
+) -> (u64, f64) {
+    use crate::bake::strata::TOP_MARGIN_BLOCKS;
+    use crate::structure::bake_horizons::NO_TOP;
+    let g1 = &desc.grid;
+    let (w1, h1) = (g1.w as usize, g1.h as usize);
+    let g3 = &elev.desc.grid;
+    if g3.r == 0 || g1.r % g3.r != 0 {
+        return (0, 0.0);
+    }
+    let ratio = (g1.r / g3.r) as usize;
+    let (w3, h3) = (g3.w as usize, g3.h as usize);
+    // Per stack cell, the highest value of the L3 cells it holds (cells i·ratio .. i·ratio + ratio).
+    let square = |l: &LoadedLayer| -> Vec<f64> {
+        let cb = l.desc.cell_bytes();
+        let mut best = vec![f64::NEG_INFINITY; w1 * h1];
+        for j3 in 0..h3 {
+            let j = (j3 / ratio).min(h1 - 1);
+            for i3 in 0..w3 {
+                let i = (i3 / ratio).min(w1 - 1);
+                let at = (j3 * w3 + i3) * cb;
+                let raw = l.desc.dtype.decode_scalar(&l.bytes[at..at + cb]);
+                if l.desc.nodata == Some(raw) {
+                    continue;
+                }
+                let v = raw * l.desc.scale + l.desc.offset;
+                let c = &mut best[j * w1 + i];
+                if v > *c {
+                    *c = v;
+                }
+            }
+        }
+        best
+    };
+    let e = square(elev);
+    let a = amp.map_or_else(|| vec![0.0; w1 * h1], square);
+    let at = |v: &[f64], i: i64, j: i64| -> f64 {
+        // Rows past an edge are the glued rows: (i, −k) is (w − i, k); (i, h − 1 + k) is
+        // (w − i, h − 1 − k).
+        let (mut i, mut j) = (i, j);
+        if j < 0 {
+            j = -j;
+            i = w1 as i64 - i;
+        } else if j > h1 as i64 - 1 {
+            j = 2 * (h1 as i64 - 1) - j;
+            i = w1 as i64 - i;
+        }
+        let j = j.clamp(0, h1 as i64 - 1) as usize;
+        let i = i.rem_euclid(w1 as i64) as usize;
+        v[j * w1 + i]
+    };
+    let cb = desc.cell_bytes();
+    let (mut raised, mut max_raise) = (0u64, 0.0f64);
+    for j in 0..h1 {
+        for i in 0..w1 {
+            let (mut me, mut ma) = (f64::NEG_INFINITY, 0.0f64);
+            // A window symmetric about the cell (the bake's is i − 2 ..= i + 1 on square cells;
+            // these are point samples), so the self-glued edge rows stay glued.
+            for dj in -2i64..=2 {
+                for di in -2i64..=2 {
+                    me = me.max(at(&e, i as i64 + di, j as i64 + dj));
+                    ma = ma.max(at(&a, i as i64 + di, j as i64 + dj));
+                }
+            }
+            if !me.is_finite() {
+                continue;
+            }
+            let need = ((me + ma).ceil() as i32 + TOP_MARGIN_BLOCKS).min(max_y) * 16;
+            let off = (j * w1 + i) * cb;
+            let top = i16::from_le_bytes([bytes[off], bytes[off + 1]]);
+            if top == NO_TOP || i32::from(top) >= need {
+                continue;
+            }
+            let new = need.clamp(i32::from(i16::MIN) + 1, i32::from(i16::MAX)) as i16;
+            bytes[off..off + 2].copy_from_slice(&new.to_le_bytes());
+            raised += 1;
+            max_raise = max_raise.max(f64::from(need - i32::from(top)) / 16.0);
+        }
+    }
+    (raised, max_raise)
+}
+
 /// Rewrites the Lambert world folder `dir` (its manifest `m`) in the preset's world projection.
 /// A Lambert preset gets only its layout block. Returns `notes.bake.projection`.
 pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<Value, CoreError> {
@@ -751,6 +843,8 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     // The world's elevation and ice cover, kept for the spawn candidates and the evidence.
     let mut world_elev: Option<LoadedLayer> = None;
     let mut world_amp: Option<LoadedLayer> = None;
+    // The world's horizon stacks (entry, descriptor, cells), raised over the world's terrain below.
+    let mut world_stack: Option<(usize, LayerDesc, Vec<u8>)> = None;
     let mut shares = serde_json::Map::new();
     for (gname, entries) in &by_grid {
         let src_grid = m
@@ -780,6 +874,9 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             entry.bytes = written.bytes;
             entry.crc32 = written.crc32;
             layer_notes.push(json!([desc.name, format!("{:?}", s.kind).to_lowercase()]));
+            if s.kind == Kind::Stack && world_stack.is_none() {
+                world_stack = Some((s.entry, desc.clone(), bytes.clone()));
+            }
             let world = LoadedLayer::new(desc, bytes)?;
             match world.desc.name.as_str() {
                 "elevation" => {
@@ -810,6 +907,21 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         new_grids.insert(gname.clone(), wg);
     }
     m.grids = new_grids;
+    // The first horizon covers the world's terrain (the bake's top rule, `bake::strata`): the
+    // stacks come from the nearest cell and the terrain from a footprint mean, so a stack can sit
+    // under the drawn ground where the footprint is wide.
+    let mut tops_note = json!(null);
+    if let (Some((entry, desc, mut bytes)), Some(we)) = (world_stack, &world_elev) {
+        let (raised, max_raise) =
+            raise_world_tops(&desc, &mut bytes, we, world_amp.as_ref(), m.scale.max_y);
+        if raised > 0 {
+            let e = &mut m.layers[entry];
+            let written = write_tile_pack(&dir.join(&e.path), &desc, &bytes)?;
+            e.bytes = written.bytes;
+            e.crc32 = written.crc32;
+        }
+        tops_note = json!({"raised_cells": raised, "max_raise_blocks": max_raise});
+    }
     let raster_ms = ms(t);
 
     // --- the evidence: streaks round the poles -----------------------------------------------
@@ -1054,6 +1166,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         "layers": layer_notes,
         "shares": Value::Object(shares),
         "pole_anisotropy": aniso,
+        "top_raise": tops_note,
         "vector": Value::Object(vec_note),
         "millis": {
             "lambda_c": lambda_ms, "stretch": stretch_ms, "rasters": raster_ms,
