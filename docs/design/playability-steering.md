@@ -108,11 +108,14 @@ The epochs folder is not world data: the manifest does not list it, and the stag
 it before moving a staging folder into a world (Accept ends what a player can still change).
 
 **The recorded history inside each checkpoint.** A checkpoint carries the deposit engine's
-recorded history (P1-04's frames). Written whole into every epoch checkpoint, the history would
-make the epochs folder grow with the square of the run's length. §8.2 measures what it is; the
-format option kept in reserve is a chained epoch store (each checkpoint holding only the frames
-since the previous one, read back as one history), which `Record::File` already allows (a frame
-is read from any file at an offset).
+recorded history (P1-04's frames, about 4–8 MB each on the quick 16k planet, one per 10 Myr).
+Written whole into every epoch checkpoint, the history would make the epochs folder grow with the
+square of the run's length. **Decided here: a chain.** The history only grows, so each epoch
+checkpoint holds only the frames since the store's previous one (`CheckpointRef::write_from`; its
+summary says where its frames start), and the index records each file's frame range
+(`frames_from`, `frames_to`). Reading checkpoint *k* reads the body of *k* and the frame sections
+of every file of its chain (`Checkpoint::read_chain`); the frames stay in their files and are read
+on demand (`Record::File`). Every frame is stored once.
 
 ## 4. Pick the epoch
 

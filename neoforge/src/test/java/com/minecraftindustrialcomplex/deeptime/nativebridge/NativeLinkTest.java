@@ -136,6 +136,26 @@ class NativeLinkTest {
         throw new AssertionError("session never settled");
     }
 
+    /**
+     * {@code createWith} (docs/design/playability-steering.md): epoch checkpoints are a no-op on a
+     * pipeline without plates, a resume needs a planet, and an unknown flag is refused.
+     */
+    @Test
+    void createWithTakesTheEpochFlags() {
+        String dummy = "{\"dummy\":{\"steps\":2,\"sleep_ms\":0}}";
+        long epochs = DeepTimeNative.createWith(dummy, "", gameDir.resolve("epochs").toString(), 1, 0,
+                DeepTimeNative.FLAG_EPOCHS);
+        try {
+            assertEquals(DeepTimeNative.DONE, advanceUntilSettled(epochs));
+        } finally {
+            DeepTimeNative.destroy(epochs);
+        }
+        assertThrows(IllegalArgumentException.class, () -> DeepTimeNative.createWith(dummy, "",
+                gameDir.resolve("resume").toString(), 1, 0, DeepTimeNative.FLAG_RESUME));
+        assertThrows(IllegalArgumentException.class, () -> DeepTimeNative.createWith(dummy, "",
+                gameDir.resolve("bad").toString(), 1, 0, 8));
+    }
+
     @Test
     void errorsMapToTheirExceptions() {
         PresetInvalidException invalid = assertThrows(PresetInvalidException.class,
