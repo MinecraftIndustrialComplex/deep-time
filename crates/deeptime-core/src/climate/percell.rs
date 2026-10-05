@@ -40,6 +40,9 @@ pub struct PerCell {
     pub late_ice: Vec<f64>,
     /// The moisture budget's soil bucket.
     pub bucket: Vec<f64>,
+    /// The upwind rain's last annual rain per coarse cell, mm/yr (the land's recycling).
+    #[serde(default)]
+    pub rain_mm: Vec<f64>,
     /// The last sinking region: (latitude, longitude, hemisphere).
     pub sinking: Option<(f64, f64, i8)>,
 }
@@ -87,6 +90,8 @@ pub struct Coarse {
     pub psi_max_sv: f64,
     pub gyre_sweeps: u32,
     pub moisture: Option<Moisture>,
+    /// The upwind rain (`rain_model = upwind`; solved by the snapshot, which knows the basins).
+    pub upwind: Option<super::upwind::Rain>,
     /// Monthly land and sea tiles and sea ice, [month][coarse cell].
     tl: Vec<Vec<f64>>,
     to: Vec<Vec<f64>>,
@@ -161,16 +166,40 @@ impl Coarse {
             .collect()
     }
 
-    /// The budget's precipitation rate (mm/yr) and relative humidity of month `m` at L1 cell `c`
-    /// (bilinear).
-    pub fn budget_at(&self, c: usize, m: usize) -> Option<(f64, f64)> {
+    /// The upwind rain's share of the circulation's rain and its moisture W_v/W_ref in month `m`
+    /// at L1 cell `c` (bilinear; (1, 1) without the upwind rain).
+    pub fn upwind_at(&self, c: usize, m: usize) -> (f64, f64) {
+        let Some(up) = &self.upwind else {
+            return (1.0, 1.0);
+        };
+        let (mut d, mut q) = (0.0, 0.0);
+        for (cc, wt) in self.grid.corners(c) {
+            let (dd, qq) = up.dry(cc, m);
+            d += wt * dd;
+            q += wt * qq;
+        }
+        (d, q)
+    }
+
+    /// The coarse rain's precipitation rate (mm/yr) and moisture of month `m` at L1 cell `c`
+    /// (bilinear), from the moisture budget (moisture: its relative humidity over `r_ref`) or
+    /// the upwind rain (moisture: the vapour over its reference water); `None` under the belts.
+    pub fn rain_at(&self, c: usize, m: usize) -> Option<(f64, f64)> {
+        let (mut p, mut q) = (0.0, 0.0);
+        if let Some(up) = &self.upwind {
+            for (cc, wt) in self.grid.corners(c) {
+                let (pr, qq) = up.at(cc, m);
+                p += wt * pr;
+                q += wt * qq;
+            }
+            return Some((p * YEAR_S, q));
+        }
         let mo = self.moisture.as_ref()?;
-        let (mut p, mut rh) = (0.0, 0.0);
         for (cc, wt) in self.grid.corners(c) {
             p += wt * mo.p[cc][m];
-            rh += wt * mo.rh[cc][m];
+            q += wt * mo.rh[cc][m];
         }
-        Some((p * YEAR_S, rh))
+        Some((p * YEAR_S, q / self.mp.r_ref))
     }
 }
 
@@ -361,6 +390,7 @@ pub fn run(inp: &Inputs<'_>, cell: &mut PerCell) -> Coarse {
         sinking: ocean.sinking.clone(),
         r,
         moisture: None,
+        upwind: None,
         tl,
         to,
         ice,

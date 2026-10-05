@@ -67,6 +67,9 @@ pub enum RainModel {
     Belts,
     /// The monthly moisture budget on the coarse grid (`moisture.rs`).
     Budget,
+    /// The belts' circulation with an upwind budget of vapour and cloud water for the drying
+    /// (`upwind.rs`; Ben, decisions log 2026-10-04, "S&B + upwind moisture budget").
+    Upwind,
 }
 
 /// The climate section.
@@ -104,6 +107,22 @@ pub struct ClimateParams {
     pub precip_rh_slope: f64,
     /// The budget's soil water: what the land stores and evaporates again, mm.
     pub bucket_mm: f64,
+    /// The upwind rain (`rain_model = upwind`): eddy diffusivity of the vapour and cloud water
+    /// across the wind, m²/s (LFPM's transversal dispersion at the climate grid's scale).
+    pub rain_diffusivity_m2_s: f64,
+    /// The upwind rain: the share of the low-level wind's speed at which the vapour and cloud
+    /// water move (the month's mean transport is slower than its mean wind).
+    pub rain_wind_share: f64,
+    /// The upwind rain: how much of the land's evapotranspiration (Fu's Budyko curve on its rain
+    /// and potential evaporation) goes back into the air that carries the rain inland (1: all).
+    pub rain_recycling: f64,
+    /// The upwind rain: the near-surface relative humidity over the sea under a column holding
+    /// the reference water (the bulk evaporation's humidity deficit).
+    pub sea_surface_rh: f64,
+    /// The upwind rain: how sharply condensation grows with the column's relative humidity (the
+    /// e-folding a in e^(a (r − r_ref)); 0: linear, as LFPM). The budget's `precip_rh_slope`
+    /// plays this part for `rain_model = budget`.
+    pub rain_rh_slope: f64,
     /// How much heat the wind-driven gyres carry (`ocean2d.rs`; 0: none).
     pub gyre_heat_efficiency: f64,
     /// The overturning conveyor that sinks in the narrowest polar-connected basin, Sv (0: off;
@@ -215,6 +234,9 @@ pub struct ClimateParams {
     pub sst_midlatitude_cold_c: f64,
     /// Drying under the eastern side of the subtropical highs (west coasts), 0–1.
     pub subsidence: f64,
+    /// Wetting under the western side of the subtropical highs (east coasts): the circulation's
+    /// rain there is up to 1 + this times the belt's.
+    pub west_flank_wet: f64,
     /// Summer onshore (easterly) moisture on east coasts from 15° to 45° — the highs' western
     /// flanks and the monsoons that make Earth's humid subtropical east coasts, 0–1.
     pub onshore: f64,
@@ -400,6 +422,11 @@ impl Default for ClimateParams {
             thermal_wind_pa_k: 60.0,           // ledger: CLM-141
             precip_rh_slope: 11.4,             // ledger: CLM-145
             bucket_mm: 150.0,                  // ledger: CLM-143
+            rain_diffusivity_m2_s: 5.0e5,      // ledger: CLM-190
+            rain_wind_share: 0.3,              // ledger: CLM-191
+            rain_recycling: 1.0,               // ledger: CLM-195
+            sea_surface_rh: 0.8,               // ledger: CLM-196
+            rain_rh_slope: 0.0,                // ledger: CLM-200
             gyre_heat_efficiency: 1.0,         // ledger: CLM-130
             overturning_sv: 30.0,              // ledger: CLM-131
             winter_inversion_c: 15.0,          // ledger: CLM-134
@@ -445,6 +472,7 @@ impl Default for ClimateParams {
             sst_midlatitude_warm_c: 6.0,
             sst_midlatitude_cold_c: 5.0,
             subsidence: 0.55,
+            west_flank_wet: 0.4, // ledger: MOI-022
             onshore: 1.0,
             oro_conv_time_s: 1000.0,
             oro_fall_time_s: 1000.0,
@@ -542,6 +570,17 @@ impl ClimateParams {
             (self.thermal_wind_pa_k, "thermal_wind_pa_k", 0.0, 500.0),
             (self.precip_rh_slope, "precip_rh_slope", 1.0, 40.0),
             (self.bucket_mm, "bucket_mm", 1.0, 2000.0),
+            (
+                self.rain_diffusivity_m2_s,
+                "rain_diffusivity_m2_s",
+                0.0,
+                1.0e7,
+            ),
+            (self.rain_recycling, "rain_recycling", 0.0, 1.0),
+            (self.rain_wind_share, "rain_wind_share", 0.0, 2.0),
+            (self.sea_surface_rh, "sea_surface_rh", 0.3, 0.99),
+            (self.rain_rh_slope, "rain_rh_slope", 0.0, 40.0),
+            (self.west_flank_wet, "west_flank_wet", 0.0, 5.0),
             (self.gyre_heat_efficiency, "gyre_heat_efficiency", 0.0, 5.0),
             (self.overturning_sv, "overturning_sv", 0.0, 100.0),
             (self.winter_inversion_c, "winter_inversion_c", 0.0, 40.0),

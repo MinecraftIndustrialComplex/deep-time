@@ -61,6 +61,7 @@ pub mod params;
 pub mod percell;
 pub mod sheet;
 pub mod snapshot;
+pub mod upwind;
 
 #[cfg(test)]
 mod tests;
