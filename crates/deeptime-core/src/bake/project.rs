@@ -1691,6 +1691,9 @@ mod tests {
         assert_eq!(kind_of(&desc("some/mask", "flag")), Kind::Categorical);
         assert_eq!(kind_of(&desc("elevation", "block")), Kind::Continuous);
         // The climate's band coordinates are read at the point, as the Köppen class beside them.
-        assert_eq!(kind_of(&desc("climate/vegetation", "vanilla_param")), Kind::Point);
+        assert_eq!(
+            kind_of(&desc("climate/vegetation", "vanilla_param")),
+            Kind::Point
+        );
     }
 }

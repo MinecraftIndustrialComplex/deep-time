@@ -201,8 +201,14 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     let mut seen = std::collections::BTreeSet::new();
     for c in list {
         let (x, z) = (c["x"].as_i64().unwrap(), c["z"].as_i64().unwrap());
-        assert!(seen.insert((x, z)), "a repeated candidate ({x}, {z}): {cands}");
-        assert!(z.abs() <= 6_656 / 2 - 64, "({x}, {z}) is within 64 blocks of an edge");
+        assert!(
+            seen.insert((x, z)),
+            "a repeated candidate ({x}, {z}): {cands}"
+        );
+        assert!(
+            z.abs() <= 6_656 / 2 - 64,
+            "({x}, {z}) is within 64 blocks of an edge"
+        );
     }
     let spec = m.projection.as_ref().expect("the layout block");
     assert_eq!(spec.edges.len(), 4);
