@@ -318,8 +318,7 @@ impl Mapping {
         // Lambert blocks per planet block: 1/cos east–west, cos north–south; the bilinear read
         // already covers one source cell. Round the poles the footprint is also widened along
         // the parallel ([`polar_widening`]).
-        let hx = ((d * widen(cos) / cos - r_s).max(0.0) * 0.5)
-            .min(0.5 * self.src.circumference());
+        let hx = ((d * widen(cos) / cos - r_s).max(0.0) * 0.5).min(0.5 * self.src.circumference());
         let hz = (d * cos - r_s).max(0.0) * 0.5;
         Footprint { xs, zs, hx, hz }
     }
@@ -1481,7 +1480,11 @@ mod tests {
         };
         let (r_w, r_s) = (2.0, 2.0);
         let isotropic = |x: f64, z: f64| {
-            mean(&field, &map.footprint_widened(x, z, r_w, r_s, &|_| 1.0), r_s)
+            mean(
+                &field,
+                &map.footprint_widened(x, z, r_w, r_s, &|_| 1.0),
+                r_s,
+            )
         };
         let widened = |x: f64, z: f64| mean(&field, &map.footprint(x, z, r_w, r_s), r_s);
         let (pole_iso, mid_iso, n) = pole_anisotropy_n(&map, &isotropic, 300);
@@ -1491,13 +1494,19 @@ mod tests {
              {pole_wide:.2} (mid-latitudes {mid_iso:.2}, {mid_wide:.2}; {n} points)"
         );
         assert!(n > 200, "{n} points");
-        assert!(pole_iso > 4.0, "the isotropic footprint streaks: {pole_iso}");
+        assert!(
+            pole_iso > 4.0,
+            "the isotropic footprint streaks: {pole_iso}"
+        );
         assert!(
             pole_wide < 2.5 && pole_wide > 0.2,
             "widened, no streaks and no rings: {pole_wide}"
         );
         // Below 60° nothing changes.
-        assert!((mid_iso - mid_wide).abs() < 0.2 * mid_iso, "{mid_iso} vs {mid_wide}");
+        assert!(
+            (mid_iso - mid_wide).abs() < 0.2 * mid_iso,
+            "{mid_iso} vs {mid_wide}"
+        );
     }
 
     /// Flags and codes take the nearest cell: the wetland flag (0 none, 1 swamp, 2 cold) must not
@@ -1505,8 +1514,14 @@ mod tests {
     #[test]
     fn flags_and_codes_are_categories() {
         let grid = deeptime_format::GridDesc::for_planet("L2", 1024, 8).unwrap();
-        let desc = |name: &str, units: &str| crate::bake::desc(name, DType::U8, &grid, 1.0, units, None);
-        for name in ["climate/wetland", "climate/koppen", "meta/province", "surface/class_top"] {
+        let desc =
+            |name: &str, units: &str| crate::bake::desc(name, DType::U8, &grid, 1.0, units, None);
+        for name in [
+            "climate/wetland",
+            "climate/koppen",
+            "meta/province",
+            "surface/class_top",
+        ] {
             assert_eq!(kind_of(&desc(name, "")), Kind::Categorical, "{name}");
         }
         assert_eq!(kind_of(&desc("some/mask", "flag")), Kind::Categorical);
