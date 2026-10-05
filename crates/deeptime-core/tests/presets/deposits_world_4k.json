@@ -13,9 +13,9 @@
       "count_mult": 25.0,
       "province": "weak",
       "essentials": [
-        {"material": "c:iron", "min_sites_per_region": 1, "region_blocks": 2048, "exposed": true, "max_blocks_from_spawn": 1024},
-        {"material": "c:copper", "min_sites_per_region": 1, "region_blocks": 2048, "exposed": false, "max_blocks_from_spawn": 1024},
-        {"material": "c:coal", "min_sites_per_region": 1, "region_blocks": 2048, "exposed": true, "max_blocks_from_spawn": 1536}
+        {"material": "c:iron", "min_sites_per_region": 1, "region_blocks": 2048, "exposed": true},
+        {"material": "c:copper", "min_sites_per_region": 1, "region_blocks": 2048, "exposed": false},
+        {"material": "c:coal", "min_sites_per_region": 1, "region_blocks": 2048, "exposed": true}
       ]
     },
     "terrain": {"strata": "placeholder"}

@@ -492,7 +492,6 @@ impl Preset {
             PresetBody::DepositsSynthetic(p) => p.terrain.as_ref().map(|t| Bake::DepositHistory {
                 params: p.synthetic(),
                 strata: t.strata(),
-                essentials: p.deposits.essentials.clone(),
             }),
             PresetBody::Planet(_) => None,
         }
@@ -540,11 +539,10 @@ pub enum Bake {
     /// A P0-09 synthetic terrain (`"synth": "wrap-test"` of a dummy preset, P1-13).
     Analytic(synth::Kind),
     /// A synthetic deposit world's terrain (`deposits_synthetic.terrain`, P1-15): the history's
-    /// present elevation, the given horizons, and spawn candidates ranked by the essentials.
+    /// present elevation and the given horizons.
     DepositHistory {
         params: crate::deposits::synthetic::SyntheticParams,
         strata: synth::Strata,
-        essentials: Vec<crate::deposits::playability::Essential>,
     },
 }
 
