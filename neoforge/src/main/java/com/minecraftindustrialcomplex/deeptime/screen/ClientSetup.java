@@ -35,7 +35,20 @@ public final class ClientSetup {
             MachineInfo.prime();
         });
         CreateWorldGuard.init();
+        // Leaving the Create World flow stops runs nobody can reach any more (threads, native memory).
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.ScreenEvent.Opening.class, e -> {
+            if (endsCreateWorld(e.getNewScreen()))
+                PlanetEditorScreen.abandonAll();
+        });
         ScreenshotDriver.init();
+    }
+
+    /** Screens that mean the Create World screen is gone for good. */
+    static boolean endsCreateWorld(net.minecraft.client.gui.screens.Screen s) {
+        return s instanceof net.minecraft.client.gui.screens.TitleScreen
+                || s instanceof net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
+                || s instanceof net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen
+                || s instanceof net.minecraft.client.gui.screens.LevelLoadingScreen;
     }
 
     private static void cleanupInBackground() {

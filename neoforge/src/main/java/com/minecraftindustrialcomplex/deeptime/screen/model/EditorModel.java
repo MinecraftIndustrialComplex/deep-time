@@ -653,6 +653,7 @@ public final class EditorModel {
         }
         launchError = null;
         run = new TimelapseModel(h, id, json, circumference, stages, deps.loader(), deps.io());
+        estimate().ifPresent(run::setEstimate);
         page = Page.RUN;
         return Optional.of(run);
     }
@@ -710,6 +711,21 @@ public final class EditorModel {
         accepted = a;
         page = Page.SETUP;
         return a;
+    }
+
+    /**
+     * The Create World screen this model belongs to is gone (back to the title or the world list,
+     * or the world is being created): a run that is not the accepted one is cancelled, or deleted
+     * when it finished, so nothing keeps simulating (CPU, native memory) for a screen nobody can
+     * reach again. The accepted run's folder stays for the server to move.
+     */
+    public void abandon() {
+        if (run != null && (accepted == null || !accepted.stagingId().equals(run.stagingId()))) {
+            dropRun();
+            run = null;
+            review = null;
+        }
+        page = Page.SETUP;
     }
 
     /** Discards the current (finished or failed) run: its folder is deleted unless it is the accepted one. */

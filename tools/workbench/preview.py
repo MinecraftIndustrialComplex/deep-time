@@ -69,7 +69,7 @@ import instance  # noqa: E402  (tools/smoke/instance.py: private server instance
 import jarstate  # noqa: E402  (tools/smoke/jarstate.py: the jar comparison install.sh's record shares)
 
 VIEWER = os.path.join(REPO, "tools", "review", "pages", "area3d")
-PROFILES = ("standalone", "mic", "mic-ev", "terrablender", "ev")
+PROFILES = ("standalone", "mic", "mic-ev", "terrablender", "ev", "ee")
 MAX_SIDE = 256
 DEEP_TIME_Y = (-512, 639)
 VANILLA_Y = (-64, 319)
