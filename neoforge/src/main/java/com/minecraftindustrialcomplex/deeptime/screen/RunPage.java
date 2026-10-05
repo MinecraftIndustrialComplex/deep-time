@@ -109,10 +109,10 @@ final class RunPage implements PlanetEditorScreen.Page {
         continueB = null;
         if (roomForContinue) {
             EditBox box = new EditBox(screen.font(), rx + epochW + 4, sy, boxW, 20, Lang.tr("run.continue.to"));
-            if (continueText == null || !continueFor.equals(model.stagingId()))
+            if (continueText == null || !continueFor.equals(model.stagingId() + ":" + model.presetJson().hashCode()))
                 continueText = screen.model().runStopMyr().stream().mapToObj(v -> Formats.number(v + CONTINUE_STEP_MYR))
                         .findFirst().orElse("");
-            continueFor = model.stagingId();
+            continueFor = model.stagingId() + ":" + model.presetJson().hashCode(); // a new stop suggests anew
             box.setValue(continueText);
             box.setResponder(t -> continueText = t);
             box.setTooltip(net.minecraft.client.gui.components.Tooltip.create(Lang.tr("run.continue.hint")));
