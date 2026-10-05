@@ -2505,6 +2505,9 @@ impl DepositStage {
                 .param("tonnage_quantile", cand.size.tonnage_q)
                 .param("p_survive", cand.p_survive)
                 .param("formation_depth_m", t.preservation.formation_depth_m)
+                // The ledger: erosion and burial of the column since formation.
+                .param("eroded_m", eroded_m)
+                .param("buried_m", buried_m)
                 .param("province_endowment", cand.endowment)
                 .magnitude(cand.size.tonnage_q as f32);
             for id in &causes {
