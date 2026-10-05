@@ -438,15 +438,16 @@ pub fn run(o: &Options) -> CliResult<()> {
         let g = got.chars().next() == want.chars().next();
         // The same cell's months at the station's height (its sea-level temperatures less the
         // lapse rate over the station's height, not the cell's), glaciated cells kept as they are.
-        let at_station = (s.t_sl_month.len() == 12 && s.p_month.len() == 12 && s.glacier[c] == 0)
-            .then(|| {
+        let at_station =
+            if s.t_sl_month.len() == 12 && s.p_month.len() == 12 && s.glacier[c] == 0 {
                 let t: [f64; 12] = std::array::from_fn(|m| {
                     f64::from(s.t_sl_month[m][c]) - p.lapse_c_per_km / 1000.0 * z_st
                 });
                 let pm: [f64; 12] = std::array::from_fn(|m| f64::from(s.p_month[m][c]) / 12.0);
                 koppen::CODES[koppen::classify(&t, &pm) as usize]
-            })
-            .unwrap_or(got);
+            } else {
+                got
+            };
         have_st |= s.t_sl_month.len() == 12;
         group_st += usize::from(at_station.chars().next() == want.chars().next());
         same += usize::from(got == want);
