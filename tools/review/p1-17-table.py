@@ -60,6 +60,14 @@ def parse(path):
     return r
 
 
+def plate_keys(runs):
+    """The plate step's parts (plates.*), in the order the first run that has them lists them."""
+    for r in runs:
+        if r and any(k.startswith("plates.") for k in r):
+            return [k for k in r if k.startswith("plates.")]
+    return []
+
+
 def fmt(k, z):
     if z is None:
         return "–"
@@ -75,7 +83,7 @@ def pair(root, a, b, length, threads):
         print(f"\n#### {preset}, {length} Myr, {threads} threads (seconds; before {a}, after {b})\n")
         print("| stage | scattered before | after | × | supercontinent before | after | × |")
         print("|---|---:|---:|---:|---:|---:|---:|")
-        for k in STAGES + SUBS + EXTRA:
+        for k in STAGES + SUBS + plate_keys([r for p in rs.values() for r in p]) + EXTRA:
             row = [k if k in STAGES or k in EXTRA else "  " + k]
             seen = False
             for s in STARTS:
@@ -104,7 +112,7 @@ def scale(root, length, cols):
         print(f"\n#### {preset}, scattered continents, {length} Myr: seconds by thread count\n")
         print("| stage | " + " | ".join(f"{t} t" for t in ts) + f" | {ts[0]} → {ts[-1]} t |")
         print("|---|" + "---:|" * (len(ts) + 1))
-        for k in STAGES + SUBS + ["user s", "cpu %"]:
+        for k in STAGES + SUBS + plate_keys([r for _, r in runs]) + ["user s", "cpu %"]:
             v = [r.get(k) for _, r in runs]
             if any(x is None for x in v):
                 continue
