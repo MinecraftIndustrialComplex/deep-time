@@ -38,7 +38,7 @@ esac
 threads=$((ncpu - 1)); nice=0
 [ "$profile" = bg2 ] && { threads=2; nice=19; }
 [ -n "$cpus" ] || cpus="0-$((ncpu - 1))"
-bin="$REPO/target/release/deeptime"
+bin="${P124_BIN:-$REPO/target/release/deeptime}"  # P124_BIN: another build (P1-17 compares two)
 [ -x "$bin" ] || { echo "build first: cargo build --release -p deeptime-cli" >&2; exit 2; }
 
 if [ -z "${DEEPTIME_ADMIT_JOB:-}" ] && command -v deeptime-admit >/dev/null; then
