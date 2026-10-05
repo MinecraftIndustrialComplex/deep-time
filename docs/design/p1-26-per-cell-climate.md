@@ -1138,7 +1138,7 @@ Licence) and GPCP precipitation (NOAA, public).
 
 | Metric | Today | Observed | Target |
 |---|---|---|---|
-| Land T at sea level, along-row std, winter / annual | 3.4 / 0.9 K | 6.1 / 3.3 K | ≥ 5.0 / ≥ 2.0 K |
+| Land T at sea level, along-row std, winter / annual | 3.4 / 0.9 K | 6.1 / 3.3 K (winter re-measured 2026-10-06: 3.89 K on the model's grid, note below) | ≥ 0.83 × observed on the same grid (was ≥ 5.0) / ≥ 2.0 K |
 | Same, η² winter / annual | 0.974 / 0.996 | 0.942 / 0.968 | ≤ 0.960 / ≤ 0.985 |
 | Monthly T over land, RMSE vs observed | 6.6 K | — | ≤ 5.0 K |
 | Winter land T on the 2.5° grid (block means): RMSE / along-row std / η² | 7.2 K / 3.3 K / 0.975 (prototype run L: 4.9 / 5.4 / 0.949) | — / 6.0 K / 0.944 | ≤ 5.0 K / ≥ 5.0 K / ≤ 0.955 |
@@ -1150,6 +1150,15 @@ Licence) and GPCP precipitation (NOAA, public).
 | Mumbai / Bangladesh annual P | 531 / 278 mm | 3,096 / 2,194 | ≥ 1,500 / ≥ 1,200 mm |
 | Sahara / Atacama annual P | 265 / 154 mm | 11 / 16 | ≤ 80 / ≤ 80 mm |
 | Reference cities in the right main group (`climate-dem` list) | 19 / 24 | — | ≥ 21 / 24 |
+
+**The winter spread's target, restated (2026-10-06).** The 6.1 K above could not be reproduced:
+Beck et al. 2023 measured with this section's method (sea level by 6.5 K/km on GMT's relief, rows
+at 30–70°, January north and July south) give 4.24 K on Beck's own 0.5° grid and 3.89 K on the
+model's grid (`tools/validation/climate_vs_obs.py --obs`, `along_row_std_winter_obs`). The target is
+therefore relative: the model's winter spread is at least 0.83 × the observed spread on the same grid
+(0.83 = 5.0 / 6.1, the original ratio). On Earth's relief the model gives 4.53 K against 3.89 K: met.
+Decided by the coordinator on 2026-10-06 (STATUS build log, P1-26 belts rain), on the T9 agent's
+recommendation; docs/science/upwind-rain.md, "The winter spread".
 
 The temperature, sea-ice and contrast rows apply to the first per-cell default, which keeps today's
 rain on the new temperatures (`rain_model = belts`). The rain rows are the bar the moisture budget
