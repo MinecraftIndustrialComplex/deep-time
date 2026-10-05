@@ -693,18 +693,18 @@ impl Default for TectonicParams {
             subduction_uplift_mm_yr: 0.6,
             collision_threshold_km: 100.0, // ledger: PLT-068
             subduction_peak_km: 300.0,
-            collision_belt_km: 400.0,      // ledger: PLT-241
+            collision_belt_km: 400.0,       // ledger: PLT-241
             collision_stacking_share: 0.95, // ledger: PLT-242
-            wedge_slope_deg: 1.5,          // ledger: PLT-192
-            weld_speed_mm_yr: 5.0,         // ledger: PLT-246
-            weld_after_myr: 10.0,          // ledger: PLT-246
-            collapse_myr: 15.0,            // ledger: PLT-255
-            collapse_thickness_km: 50.0,   // ledger: PLT-256
-            collapse_quiet_myr: 10.0,      // ledger: PLT-259
-            collapse_reach_km: 200.0,      // ledger: PLT-257
-            crust_max_km: 70.0,            // ledger: PLT-258
-            transition_width_km: 200.0,    // ledger: PLT-262
-            transition_myr: 20.0,          // ledger: PLT-263
+            wedge_slope_deg: 1.5,           // ledger: PLT-192
+            weld_speed_mm_yr: 5.0,          // ledger: PLT-246
+            weld_after_myr: 10.0,           // ledger: PLT-246
+            collapse_myr: 15.0,             // ledger: PLT-255
+            collapse_thickness_km: 50.0,    // ledger: PLT-256
+            collapse_quiet_myr: 10.0,       // ledger: PLT-259
+            collapse_reach_km: 200.0,       // ledger: PLT-257
+            crust_max_km: 70.0,             // ledger: PLT-258
+            transition_width_km: 200.0,     // ledger: PLT-262
+            transition_myr: 20.0,           // ledger: PLT-263
             initial_plates: 14,
             plate_size_variety_rad: 0.35,
             continent_elevation_m: [150.0, 900.0],
