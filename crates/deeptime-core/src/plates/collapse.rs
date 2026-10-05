@@ -595,12 +595,14 @@ mod tests {
         assert_eq!(step_once(&fx, &mut st, 1), Collapse::default());
     }
 
-    /// A column thicker than `crust_max_km` loses the excess from its bottom (mafic root first)
-    /// and keeps its surface rock; its surface stays where it stood when it is lower than the
-    /// column it keeps would hold up. Columns at or under the limit, and ocean floor, keep all.
+    /// With nowhere to spread (the collapse off), a column thicker than `crust_max_km` loses the
+    /// excess from its bottom (mafic root first) and keeps its surface rock; its surface stays
+    /// where it stood when it is lower than the column it keeps would hold up. Columns at or
+    /// under the limit, and ocean floor, keep all.
     #[test]
     fn crust_beyond_the_thickest_column_founders_from_the_bottom() {
-        let fx = Fx::new();
+        let mut fx = Fx::new();
+        fx.k.collapse_myr = f64::NAN;
         let belt = |p: DVec3| p.x < -0.1 && p.y > 0.766 && p.y < 0.85;
         let mut st = planet(&fx.geo, belt, 0.0);
         for (i, s) in st.samples.iter_mut().enumerate() {
@@ -628,5 +630,50 @@ mod tests {
         }
         let expect = n as f64 * (135_100.0 - t_max) * fx.norm.sample_area_km2();
         assert!((lost - expect).abs() < 1e-3 * expect, "{lost} vs {expect}");
+    }
+
+    /// The excess over `crust_max_km` spreads at once to the nearest room on the plate, even while
+    /// an orogeny holds the belt up (PLT-277): ocean floor beside the continent fills and turns
+    /// continental, and only what finds no room within reach founders. Volume is kept except
+    /// what founders; the column ends at the limit either way.
+    #[test]
+    fn the_thickest_crust_spreads_before_it_founders() {
+        let mut fx = Fx::new();
+        // The shortest reach (1.5 spacings): only the ocean floor right beside the belt is room.
+        fx.k.collapse_reach_km = 1.0;
+        let belt = |p: DVec3| p.x < -0.1 && p.y > 0.766 && p.y < 0.85;
+        let mut st = planet(&fx.geo, belt, 0.0);
+        for (i, s) in st.samples.iter_mut().enumerate() {
+            if belt(fx.geo.points()[i]) {
+                s.pools[pool::FELSIC_PLUTONIC] += 100_000.0;
+                s.thickness_m += 100_000.0;
+                // Raised by an orogeny this step: the collapse would hold it, the limit does not.
+                s.orogeny_myr = 2.0;
+            }
+        }
+        let crust0 = crust_m(&st);
+        let c0 = continental(&st, 0);
+        let mut out = Collapse::default();
+        let lost = founder(&mut st, &fx.geo, &fx.env(1), &mut out);
+        let area = fx.norm.sample_area_km2();
+        let t_max = fx.k.crust_max_km * 1000.0;
+        for (i, s) in st.samples.iter().enumerate() {
+            if belt(fx.geo.points()[i]) {
+                assert!(f64::from(s.thickness_m) <= t_max + 1.0);
+            }
+        }
+        assert!(out.converted > 0, "ocean floor beside the belt turned continental");
+        assert_eq!(continental(&st, 0), c0 + out.converted as usize);
+        assert_eq!(continental(&st, 1), continental(&planet(&fx.geo, belt, 0.0), 1));
+        let n_belt = (0..st.samples.len())
+            .filter(|&i| belt(fx.geo.points()[i]))
+            .count();
+        let excess = n_belt as f64 * (135_100.0 - t_max) * area;
+        assert!(lost > 0.0 && lost < excess, "{lost} of {excess} foundered");
+        assert!(
+            (crust_m(&st) * area + lost - crust0 * area).abs() < 1e-5 * crust0 * area,
+            "volume kept but for what foundered"
+        );
+        assert!((out.moved_km2_m - (excess - lost)).abs() < 1e-3 * excess);
     }
 }
