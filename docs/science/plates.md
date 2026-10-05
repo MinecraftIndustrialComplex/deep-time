@@ -166,10 +166,11 @@ adds a whole column to the one on top (PLT-228). None of that crust gave area ba
 
 1. *The thickest crust* (PLT-258, PLT-277): a visible continental column thicker than
    `crust_max_km` (70 km) spreads the excess at once to the nearest room on its plate, by the
-   collapse's transport below but without waiting for the orogeny to end (since 2026-10-05: a
-   plateau that a long collision thickens widens while the convergence goes on). What finds no
-   room within reach goes to the mantle from the bottom of the column (mafic root first) and
-   gives no area.
+   collapse's transport below but without waiting for the orogeny to end (since 2026-10-05: the
+   lower crust of a belt that a long collision thickens flows out while the convergence goes
+   on). It fills continental crust only up to `collapse_thickness_km` and ocean floor up to the
+   normal column. What finds no room within reach goes to the mantle from the bottom of the
+   column (mafic root first) and gives no area.
 2. *Collapse* (PLT-254): a visible continental sample that no orogeny has raised for
    `collapse_quiet_myr` (10 Myr, PLT-259: collapse follows the end of the thickening) and whose
    crust is thicker than `collapse_thickness_km` (50 km since 2026-10-05, was 55; PLT-256) releases
@@ -200,12 +201,14 @@ measured tables (`plate-check` at 1000 Myr and the 500 Myr hypsometry ensemble).
   is 50 km, the figure Mooney et al. state, under Ben's validation policy of that day: physics
   from sources, and the land and crust shares reported against Earth rather than tuned. The quiet
   time is still the stall time before a weld, not a sourced value.
-- Since 2026-10-05 crust beyond `crust_max_km` first widens the plateau (PLT-277): it fills
-  continental crust thinner than the limit and ocean floor up to the normal column within
-  `collapse_reach_km`, and only what finds no room founders. Earth loses about 0.7 km³ of
-  continental crust a year at all collision zones, about 0.3 km³/yr of it deep continental crust
-  (Stern & Scholl 2010, after Scholl & von Huene 2009); the model's foundering was several km³ a
-  year under the force balance before this rule (build log 2026-10-05).
+- Since 2026-10-05 crust beyond `crust_max_km` first spreads (PLT-277): it fills continental
+  crust up to `collapse_thickness_km` and ocean floor up to the normal column within
+  `collapse_reach_km`, and only what finds no room founders. Filling to the limit itself (70 km)
+  was tried and dropped: every long collision then widened into a 70 km plateau. Earth loses
+  about 0.7 km³ of continental crust a year at all collision zones, about 0.3 km³/yr of it deep
+  continental crust (Stern & Scholl 2010, after Scholl & von Huene 2009); the model founders about
+  6 km³ a year under the force balance (14 before this rule; build log 2026-10-05), so the reach
+  and the room are still too small for the crust a long collision stacks.
 - Thickness beyond `crust_max_km` is removed whether the crust is felsic or mafic. Felsic crust
   does not founder by itself (Wang et al. 2021); in the model the limit stands for continental
   subduction at the front as much as for foundering.

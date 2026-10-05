@@ -61,8 +61,10 @@
 //! erosion while the stacked thickness stays, and an overlap at a resampling adds a whole column
 //! to the one on top. [`founder`] takes every visible continental column thicker than
 //! `crust_max_km` back to it: the excess first spreads at once to the nearest room on its plate,
-//! as the collapse moves crust but whether or not an orogeny holds the column up (a growing
-//! plateau widens while the collision goes on); what finds no room goes down from the bottom of
+//! as the collapse moves crust but whether or not an orogeny holds the column up, filling
+//! continental crust only up to `collapse_thickness_km` (lower crust flows out of the thickened
+//! belt, but crust thicker than that does not stay, so it builds no second plateau around the
+//! belt) and ocean floor up to the normal column; what finds no room goes down from the bottom of
 //! the column and is gone (it gives no area back). Since 2026-10-05 (plate task 7, ledger
 //! PLT-277); until then all of the excess foundered, and a collision's crust, also accreted a
 //! second time at each resampling (PLT-276), foundered at three times the old motion law's rate
@@ -130,7 +132,6 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
         // thicker than that does not stay, PLT-256: lower crust flows out of the thickened belt
         // but does not build a second one around it) and to ocean floor up to the normal column.
         let to = (k.collapse_thickness_km * 1000.0).clamp(normal_thickness_m(), t_max);
-        let to = if std::env::var_os("DT_EXP_FILL70").is_some() { t_max } else { to }; // TEMP-EXP
         if !by_plate.is_empty() {
             spread(state, geo, env, by_plate, to, out);
         }
