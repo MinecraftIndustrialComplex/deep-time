@@ -370,11 +370,12 @@ pub fn dist_to_edge(d: &Dims, craton: &[f32]) -> Vec<f32> {
     let inf = f32::INFINITY;
     let mut dist = vec![inf; w * h];
     let on = |c: usize| craton[c] >= 0.5;
-    for (c, x) in dist.iter_mut().enumerate() {
+    // The edge cells, in parallel (P1-17).
+    dist.par_iter_mut().enumerate().for_each(|(c, x)| {
         if d.neighbours(c).any(|(m, _)| on(m) != on(c)) {
             *x = 0.0;
         }
-    }
+    });
     let (a, b) = (1.0f32, std::f32::consts::SQRT_2);
     let at = |i: i64, j: i64| -> Option<usize> {
         if j < 0 || j >= h as i64 {
@@ -383,30 +384,41 @@ pub fn dist_to_edge(d: &Dims, craton: &[f32]) -> Vec<f32> {
             Some(j as usize * w + i.rem_euclid(w as i64) as usize)
         }
     };
-    // Two sweeps each way; the wrap needs a second pass for distances across the seam.
-    for _ in 0..2 {
-        for j in 0..h as i64 {
-            for i in 0..w as i64 {
-                let c = j as usize * w + i as usize;
-                let mut v = dist[c];
-                for (di, dj, s) in [(-1, 0, a), (-1, -1, b), (0, -1, a), (1, -1, b)] {
-                    if let Some(m) = at(i + di, j + dj) {
-                        v = v.min(dist[m] + s);
-                    }
+    // One cell of a sweep: the cell's value against its four already-swept neighbours, in the
+    // order given. Cells away from the x edges reach them by index steps (P1-17: the same reads
+    // and the same `min`s in the same order as through `at`, so the same bits).
+    type Nb = [(i64, i64, f32); 4];
+    let relax = |dist: &mut [f32], i: usize, j: usize, nb: &Nb, inner_row: bool| {
+        let c = j * w + i;
+        let mut v = dist[c];
+        if i >= 1 && i + 1 < w && inner_row {
+            for &(di, dj, s) in nb {
+                let m = (c as i64 + dj * w as i64 + di) as usize;
+                v = v.min(dist[m] + s);
+            }
+        } else {
+            for &(di, dj, s) in nb {
+                if let Some(m) = at(i as i64 + di, j as i64 + dj) {
+                    v = v.min(dist[m] + s);
                 }
-                dist[c] = v;
             }
         }
-        for j in (0..h as i64).rev() {
-            for i in (0..w as i64).rev() {
-                let c = j as usize * w + i as usize;
-                let mut v = dist[c];
-                for (di, dj, s) in [(1, 0, a), (1, 1, b), (0, 1, a), (-1, 1, b)] {
-                    if let Some(m) = at(i + di, j + dj) {
-                        v = v.min(dist[m] + s);
-                    }
-                }
-                dist[c] = v;
+        dist[c] = v;
+    };
+    let fwd: Nb = [(-1, 0, a), (-1, -1, b), (0, -1, a), (1, -1, b)];
+    let bwd: Nb = [(1, 0, a), (1, 1, b), (0, 1, a), (-1, 1, b)];
+    // Two sweeps each way; the wrap needs a second pass for distances across the seam.
+    for _ in 0..2 {
+        for j in 0..h {
+            let inner_row = j >= 1;
+            for i in 0..w {
+                relax(&mut dist, i, j, &fwd, inner_row);
+            }
+        }
+        for j in (0..h).rev() {
+            let inner_row = j + 1 < h;
+            for i in (0..w).rev() {
+                relax(&mut dist, i, j, &bwd, inner_row);
             }
         }
     }
@@ -530,6 +542,106 @@ pub fn row_lat(grid: &deeptime_format::GridDesc, j: usize) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The craton-edge distance as it was before P1-17 (every neighbour through the wrapping
+    /// index function, the edge cells found serially).
+    fn dist_to_edge_reference(d: &Dims, craton: &[f32]) -> Vec<f32> {
+        let (w, h) = (d.w, d.h);
+        let mut dist = vec![f32::INFINITY; w * h];
+        let on = |c: usize| craton[c] >= 0.5;
+        for (c, x) in dist.iter_mut().enumerate() {
+            if d.neighbours(c).any(|(m, _)| on(m) != on(c)) {
+                *x = 0.0;
+            }
+        }
+        let (a, b) = (1.0f32, std::f32::consts::SQRT_2);
+        let at = |i: i64, j: i64| -> Option<usize> {
+            if j < 0 || j >= h as i64 {
+                None
+            } else {
+                Some(j as usize * w + i.rem_euclid(w as i64) as usize)
+            }
+        };
+        for _ in 0..2 {
+            for j in 0..h as i64 {
+                for i in 0..w as i64 {
+                    let c = j as usize * w + i as usize;
+                    let mut v = dist[c];
+                    for (di, dj, s) in [(-1, 0, a), (-1, -1, b), (0, -1, a), (1, -1, b)] {
+                        if let Some(m) = at(i + di, j + dj) {
+                            v = v.min(dist[m] + s);
+                        }
+                    }
+                    dist[c] = v;
+                }
+            }
+            for j in (0..h as i64).rev() {
+                for i in (0..w as i64).rev() {
+                    let c = j as usize * w + i as usize;
+                    let mut v = dist[c];
+                    for (di, dj, s) in [(1, 0, a), (1, 1, b), (0, 1, a), (-1, 1, b)] {
+                        if let Some(m) = at(i + di, j + dj) {
+                            v = v.min(dist[m] + s);
+                        }
+                    }
+                    dist[c] = v;
+                }
+            }
+        }
+        let km = (d.dx / 1000.0) as f32;
+        dist.iter()
+            .map(|&x| if x.is_finite() { x * km } else { 3000.0 })
+            .collect()
+    }
+
+    /// P1-17: the craton-edge distance gives the reference's bits on random masks (blobs and
+    /// salt-and-pepper), wrapping or not, on grids one to many cells wide, on any thread count.
+    #[test]
+    fn the_edge_distance_equals_the_reference_bit_for_bit() {
+        let mut rng = crate::sphere::SplitMix64::new(17);
+        let mut cases = 0;
+        for &(w, h, wrap) in &[
+            (64usize, 32usize, true),
+            (65, 33, false),
+            (1, 9, true),
+            (2, 7, true),
+            (9, 1, true),
+            (3, 3, false),
+            (200, 70, true),
+        ] {
+            for k in 0..4 {
+                let d = Dims::new(w, h, 4800.0, wrap);
+                let craton: Vec<f32> = match k {
+                    0 => (0..w * h)
+                        .map(|_| (rng.next_f64() < 0.5) as u8 as f32)
+                        .collect(),
+                    1 => (0..w * h)
+                        .map(|_| (rng.next_f64() < 0.03) as u8 as f32)
+                        .collect(),
+                    2 => vec![1.0; w * h],
+                    _ => (0..w * h)
+                        .map(|c| {
+                            let (i, j) = ((c % w) as f64, (c / w) as f64);
+                            ((i - 0.3 * w as f64).hypot(j - 0.5 * h as f64) < 0.25 * w as f64) as u8
+                                as f32
+                        })
+                        .collect(),
+                };
+                let want = dist_to_edge_reference(&d, &craton);
+                for threads in [1, 4] {
+                    let pool = rayon::ThreadPoolBuilder::new()
+                        .num_threads(threads)
+                        .build()
+                        .unwrap();
+                    let got = pool.install(|| dist_to_edge(&d, &craton));
+                    let bits = |v: &[f32]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+                    assert_eq!(bits(&got), bits(&want), "{w}x{h} wrap {wrap} mask {k}");
+                }
+                cases += 1;
+            }
+        }
+        assert_eq!(cases, 28);
+    }
 
     /// A frame of `span_myr` ending at `t_end_myr` with two craton cells of four, the first of
     /// them in an inherited iron-formation basin (`deposits::bif_basins`).
