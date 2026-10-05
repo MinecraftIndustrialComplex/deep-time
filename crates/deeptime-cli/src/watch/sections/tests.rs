@@ -46,6 +46,8 @@ fn workbench(name: &str) -> (PathBuf, Arc<Workbench>) {
         out: runs.join("baked/world"),
         viewer: None,
         checkpoints: false,
+        stop_myr: None,
+        epochs: false,
         common: c,
     })
     .unwrap();

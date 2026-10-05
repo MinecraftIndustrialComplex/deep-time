@@ -1615,6 +1615,8 @@ mod tests {
             out: dir.join("dummy"),
             viewer: Some(dir.join("viewer")),
             checkpoints: true,
+            stop_myr: None,
+            epochs: false,
             common: quiet(),
         })
         .unwrap();
@@ -1685,6 +1687,8 @@ mod tests {
             out: dir.join("w"),
             viewer: None,
             checkpoints: false,
+            stop_myr: None,
+            epochs: false,
             common: quiet(),
         })
         .unwrap();
@@ -2109,6 +2113,8 @@ mod tests {
             out: dir.join("world"),
             viewer: None,
             checkpoints: false,
+            stop_myr: None,
+            epochs: false,
             common,
         })
         .unwrap();

@@ -1116,7 +1116,7 @@ fn report_run(
     for line in lines {
         println!("deeptime run: {line}");
     }
-    if let Some(line) = spill_line(&s)? {
+    if let Some(line) = spill_line(s)? {
         println!("deeptime run: {line}");
     }
     if let Some(b) = manifest.notes.get(deeptime_core::bake::NOTES_KEY) {

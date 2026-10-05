@@ -47,6 +47,13 @@ pub struct EpochEntry {
     pub bytes: u64,
     /// Seconds it took to write.
     pub write_seconds: f64,
+    /// The recorded history's frames the file holds, `[frames_from, frames_to)`: the frames
+    /// before come from the entry whose `frames_to` is `frames_from` ([`EpochIndex::chain`]), so
+    /// every frame is stored once.
+    #[serde(default)]
+    pub frames_from: usize,
+    #[serde(default)]
+    pub frames_to: usize,
 }
 
 /// `epochs/index.json`.
@@ -99,9 +106,42 @@ impl EpochIndex {
         Ok(())
     }
 
-    /// The latest entry at or before step `need` (`None`: none, start over).
+    /// The latest entry at or before step `need` whose chain is whole (`None`: none, start
+    /// over).
     pub fn choose(&self, need: u64) -> Option<&EpochEntry> {
-        self.entries.iter().filter(|e| e.step <= need).max_by_key(|e| e.step)
+        self.entries
+            .iter()
+            .filter(|e| e.step <= need && self.chain(e).is_some())
+            .max_by_key(|e| e.step)
+    }
+
+    /// The entries whose files hold `e`'s history, in frame order, `e` last: each one's
+    /// `frames_from` is the `frames_to` of the one before (an earlier step), the first's is 0.
+    /// `None` when a link is missing.
+    pub fn chain<'a>(&'a self, e: &'a EpochEntry) -> Option<Vec<&'a EpochEntry>> {
+        let mut out = vec![e];
+        let mut cur = e;
+        while cur.frames_from > 0 {
+            cur = self
+                .entries
+                .iter()
+                .filter(|p| p.step < cur.step && p.frames_to == cur.frames_from)
+                .max_by_key(|p| p.step)?;
+            out.push(cur);
+        }
+        out.reverse();
+        Some(out)
+    }
+
+    /// Where a new checkpoint after step `step`, whose history holds `frames` frames, starts its
+    /// frames: the `frames_to` of the latest earlier entry with a whole chain that does not pass
+    /// `frames`, else 0.
+    pub fn frames_from(&self, step: u64, frames: usize) -> usize {
+        self.entries
+            .iter()
+            .filter(|p| p.step < step && p.frames_to <= frames && self.chain(p).is_some())
+            .max_by_key(|p| p.step)
+            .map_or(0, |p| p.frames_to)
     }
 
     /// Adds (or replaces) an entry, keeping step order.
@@ -263,6 +303,8 @@ mod tests {
                     file: file_name(s),
                     bytes: 1,
                     write_seconds: 0.0,
+                    frames_from: 0,
+                    frames_to: 0,
                 })
                 .collect(),
         };
