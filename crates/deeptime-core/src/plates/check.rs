@@ -3651,7 +3651,12 @@ mod tests {
             .map(|(i, &l)| with_pieces(2.0 * (i + 1) as f64, 100, &[l]))
             .collect();
         let d = dynamics(steps);
-        let m = measures(&d, &[]);
+        // With no dispersal hold (the hold has its own test below): every dispersal counts.
+        let no_hold = Params {
+            dispersal_hold_myr: 0.0,
+            ..Params::default()
+        };
+        let m = measures_with(&d, &[], &no_hold);
         // Tenures 8 and 4 (the third assembly is cut off by the run's end): median 6. Starts at
         // 0, 12 and 20: gaps 12 and 8, median 10. Held at 2, 4, 6, 12, 14 and 20: 60 %.
         assert_eq!(get(&m, "supercontinent_tenure_myr"), 6.0);
@@ -3661,7 +3666,7 @@ mod tests {
         // A looser definition: assembled from 55 %, dispersed under 50 %.
         let p = Params {
             assembled_share: 0.55,
-            ..Params::default()
+            ..no_hold
         };
         let m = measures_with(&d, &[], &p);
         assert_eq!(get(&m, "supercontinent_episodes"), 3.0);
