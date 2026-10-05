@@ -191,7 +191,7 @@ public final class BiomeCensus {
         for (Forbid f : FORBIDDEN)
             forbidden.put(f.name(), new int[2]);
         Map<Integer, Map<Integer, Integer>> classBiomes = new HashMap<>();
-        int skippedUntagged = 0, landColumns = 0, wetlands = 0, wetlandSwamp = 0, coastColumns = 0;
+        int skippedUntagged = 0, landColumns = 0, wetlands = 0, wetlandSwamp = 0, coastColumns = 0, ruledColumns = 0;
         // Cold wetland (BIO-133, BIO-135): the bake's flagged boreal wetland, counted over every land column
         // (a mod's untagged biomes too: its bog is the point): on the pack's peatland biome, on taiga, on
         // another swamp (which it must not be), or elsewhere.
@@ -256,6 +256,11 @@ public final class BiomeCensus {
                         && (b.is(c("is_beach")) || b.is(c("is_stony_shores")) || b.is(c("is_ocean")));
                 if (coast)
                     coastColumns++;
+                // A column a biome rule decided (a volcano zone's biome, a role), not the climate
+                // search: the families check the climate mapping, so it is counted apart too.
+                boolean ruled = land && !untagged && !wetland && !coast && decision != null;
+                if (ruled)
+                    ruledColumns++;
                 if (land && !untagged && rules != null) {
                     if (ruleCensus == null)
                         ruleCensus = new RuleCensus(rules.rules());
@@ -273,7 +278,7 @@ public final class BiomeCensus {
                 }
                 if (!untagged && (k == 31 ? y < sea - 4 : land)) {
                     for (Check ch : CHECKS) {
-                        if (wetland || coast)
+                        if (wetland || coast || ruled)
                             break;   // counted apart (above), not against the family's tags
                         if (!ch.koppen().test(k))
                             continue;
@@ -361,6 +366,7 @@ public final class BiomeCensus {
         wj.addProperty("on_swamp", wetlandSwamp);
         o.add("wetlands_set_aside", wj);
         o.addProperty("coast_set_aside", coastColumns);
+        o.addProperty("rule_decided_set_aside", ruledColumns);
         JsonObject cw = new JsonObject();
         cw.addProperty("layer", wetlandLayer != null);
         cw.addProperty("columns", coldWet);
