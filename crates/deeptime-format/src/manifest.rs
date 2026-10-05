@@ -292,7 +292,18 @@ mod tests {
         let json = String::from_utf8(m.to_json_bytes().unwrap()).unwrap();
         assert!(json.contains("\"kind\": \"petroff_guyou\""), "{json}");
         let back: Manifest = serde_json::from_str(&json).unwrap();
-        assert_eq!(back, m);
+        // serde_json's default parser may land a float one ulp off (the cone points' latitudes and
+        // longitudes): everything else is compared exactly, those to 1e-12.
+        let (a, b) = (back.projection.as_ref().unwrap(), m.projection.as_ref().unwrap());
+        assert_eq!(
+            (&a.edges, &a.poles, &a.domain, &a.border, a.kind),
+            (&b.edges, &b.poles, &b.domain, &b.border, b.kind)
+        );
+        assert_eq!((a.hemisphere_blocks, a.lambda_c_deg), (b.hemisphere_blocks, b.lambda_c_deg));
+        for (p, q) in a.cone_points.iter().zip(&b.cone_points) {
+            assert_eq!((&p.name, &p.images), (&q.name, &q.images));
+            assert!((p.lat_deg - q.lat_deg).abs() < 1e-12 && (p.lon_deg - q.lon_deg).abs() < 1e-12);
+        }
         let spec = back.projection.as_ref().unwrap();
         assert_eq!(spec.edges.len(), 4);
         assert_eq!(

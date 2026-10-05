@@ -91,11 +91,6 @@ pub enum ZEdges {
     HalfTurn,
 }
 
-impl ZEdges {
-    fn is_clamp(&self) -> bool {
-        *self == ZEdges::Clamp
-    }
-}
 
 /// A raster in block space (plan §5.2), laid out by the world's projection
 /// ([`crate::projection`]). Cell (i, j) is the **point sample** at block
@@ -121,8 +116,9 @@ pub struct GridDesc {
     pub origin_block_x: i64,
     /// Block z of cell row 0 (−Zo).
     pub origin_block_z: i64,
-    /// What a row past the first or the last means (absent: clamp).
-    #[serde(default, skip_serializing_if = "ZEdges::is_clamp")]
+    /// What a row past the first or the last means (absent: clamp). Always written: the
+    /// checkpoints encode grids with postcard, which cannot skip a field.
+    #[serde(default)]
     pub z_edges: ZEdges,
 }
 

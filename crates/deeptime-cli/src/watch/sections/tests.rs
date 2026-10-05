@@ -131,8 +131,8 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     );
     assert_eq!(
         u32::from_be_bytes(slice.body[20..24].try_into().unwrap()),
-        41,
-        "the map's aspect, π : 1"
+        64,
+        "the world's aspect, 2 : 1 (the Petroff–Guyou world)"
     );
     assert!(kept(&dir, "slice-d60-w128.png"), "the slice is kept");
     let again = route(&wb, "/api/runs/baked/rock/slice.png", q).unwrap();
