@@ -118,9 +118,12 @@ pub const DELTA_T_K: f64 = 1300.0; // ledger: FRC-008
 pub const EDGE_ENERGY_PHYSICAL: f64 = 0.1; // ledger: FRC-009
 /// The thickness over which edge forces are spread to give a mean stress, km.
 pub const LITHOSPHERE_KM: f64 = 100.0; // ledger: FRC-010
-/// The collision drag's least convergence floor, mm/yr: the floor is `weld_speed_mm_yr`, and at
-/// least this.
-pub const COLLISION_FLOOR_MM_YR: f64 = 5.0; // ledger: FRC-011
+/// The collision drag's convergence floor, mm/yr: the plastic resistance enters the linear solve as
+/// its force over max(convergence, floor). A collision whose resistance exceeds what drives it then
+/// converges at no more than floor × drive / resistance, so the floor sits well under
+/// `weld_speed_mm_yr` (5): with the floor at the weld speed (task 5's choice) a held collision
+/// converges just under the weld speed at best, and welds were rare (plate task 7, 2026-10-05).
+pub const COLLISION_FLOOR_MM_YR: f64 = 1.0; // ledger: FRC-011
 /// Cloos 1993 (abstract): 80-Myr oceanic lithosphere is about 0.04 g/cm³ denser than the
 /// asthenosphere, and 100 km of lithosphere with a 30 km granitic crust "resists subduction
 /// because it is ∼0.09 gm/cm3 less dense": the buoyancy of continental lithosphere dragged down a
@@ -1006,9 +1009,9 @@ fn balance_step(
         .collect();
 
     let ell = c.spacing_m;
-    // The collision drag's convergence floor: the weld speed (design §3.4), at least
-    // `COLLISION_FLOOR_MM_YR`.
-    let floor = k.weld_speed_mm_yr.max(COLLISION_FLOOR_MM_YR); // ledger: FRC-011
+    // The collision drag's convergence floor (design §3.4 linearises with the weld speed; it sits
+    // under it, so a held collision stalls).
+    let floor = COLLISION_FLOOR_MM_YR.min(k.weld_speed_mm_yr); // ledger: FRC-011
     for e in &edges {
         let v = e.v as usize;
         let sv = &samples[v];

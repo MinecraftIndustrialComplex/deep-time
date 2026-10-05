@@ -100,7 +100,7 @@ with U the gravitational potential energy of the column (Ū the plate's mean):
     continental crust: U = ρ g h (H + h (1 + ρ / (ρ_m − ρ_c)) / 2),  h its height above sea level
 
 **Collision resistance** per metre of collision front, against the convergence (plastic: put into
-the linear solve as a drag of this force over max(convergence, 5 mm/yr)):
+the linear solve as a drag of this force over max(convergence, 1 mm/yr)):
 
     (U(belt) − U(incoming))⁺ · edge_energy / 0.1  +  collision_buoyancy · 2.25 · F_sp · (T / 30 km) · min(S, D) / D
 
@@ -137,7 +137,7 @@ plate's centroid, f the edge forces at the balance's answer, b the basal drag, h
 | PLT-190, FRC-015 | Mantle flow: degree-2, from two antipodal upwellings | 5 | mm/yr | Ben, decisions log 2026-10-02 | `game-choice` |
 | FRC-016 | Basal drag coefficient c_b (defaults) | 2.5 × 10¹⁴ | Pa s/m | defined by the speed scale | `game-choice` |
 | FRC-010 | Lithosphere thickness for the stress | 100 | km | Conrad & Lithgow-Bertelloni 2006's reference (read) | `verified` |
-| FRC-011 | Collision drag's speed floor | 5 | mm/yr | stand-in for the collisions design's weld speed | `game-choice` |
+| FRC-011 | Collision drag's speed floor | 1 | mm/yr | under the weld speed (5), so a held collision can weld | `game-choice` |
 | FRC-028 | Continental lithosphere's buoyancy over 80-Myr slab's weight | 0.09 / 0.04 = 2.25 | ratio | Cloos 1993 (abstract, read) | `abstract-only` |
 | FRC-029 | Crust thickness of that figure (buoyancy in proportion to thickness) | 30 | km | Cloos 1993 (abstract, read); the proportion is a game choice | `abstract-only` |
 | FRC-030, PLT-275 | Collision buoyancy law and strength `collision_buoyancy` | 1 | relative | Cloos 1993 (abstract): continental lithosphere "resists subduction" | `game-choice` (the law's form) |
