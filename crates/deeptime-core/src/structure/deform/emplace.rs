@@ -649,7 +649,7 @@ pub(crate) mod tests {
                 shortening_km: &self.shortened,
                 flexure_m: self.flexure.as_deref(),
                 collision_belt_km: 400.0,
-                // The default 250 km of foreland is 600 blocks here (37 cells).
+                // The default 140 km of foreland is 336 blocks here (21 cells).
                 blocks_per_model_km: 2.4,
             }
         }
@@ -883,6 +883,10 @@ pub(crate) mod tests {
             "{near:?} {far:?}"
         );
         assert!(near.shortening < 0.6, "{near:?}");
+        // The default belt is the Subandean 140 km: 150 km from the arc there is no foreland.
+        assert_eq!(sp.deformation.foreland_km, 140.0);
+        p.arc_km[60 * w + 150] = 150.0;
+        assert_eq!(at(&p, 150).shortening, 0.0, "{:?}", at(&p, 150));
         // The collision regime's own orogen distance (the old rule's input) no longer makes one.
         for j in 30..rows {
             for i in 64..100 {
