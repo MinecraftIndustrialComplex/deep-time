@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use deeptime_format::{ColumnWorld, DetailSpec, FORMAT_VERSION, Manifest, Noise, RasterRead};
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::params::planet_builtin;
 use crate::preset::with_timeline;
