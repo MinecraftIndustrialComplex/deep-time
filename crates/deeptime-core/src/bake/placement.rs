@@ -1284,6 +1284,13 @@ impl Placement {
         }
     }
 
+    /// Whether any class or class rule holds land to continentalness limits (the default table has none: the bake
+    /// then keeps no per-cell limits).
+    pub fn has_continentalness(&self) -> bool {
+        self.continentalness.iter().any(Option::is_some)
+            || self.class_rules.iter().any(|r| r.continentalness.is_some())
+    }
+
     /// Whether wet lowland of class `k` is cold wetland, boreal peatland, instead of swamp (the table's
     /// `cold_wetland`; Ben, 2026-10-03: Dfc, Dfd, Dsc, Dsd, Dwc, Dwd; ledger BIO-133).
     pub fn cold_wetland(&self, k: u8) -> bool {
