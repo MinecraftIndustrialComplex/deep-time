@@ -463,33 +463,50 @@ Ecosphere's (section above), `deeptime:rock_named`: per ground a rule whose cand
 where the column's ground has the role (`ground`), so another pack's rock-named biomes can join by tag and a
 datapack can replace the file (FORMAT.md, "Biome rules" and "The geology gate").
 
-Measured on one `earthlike_quick_16k` planet (scattered continents, 500 Myr, seed 1; test machine, 2026-10-04),
-baked twice from the same simulation, without and with Terralith's table (all other rasters byte-identical; without
-the table all 43 rasters are byte-identical to master's), `/deeptime probe biomes 16` with MIC:
+Measured on one `earthlike_quick_16k` planet (scattered continents, 500 Myr, seed 1; test machine, 2026-10-05, on
+master 2e07d954 with this work merged: the plate transition, the 140 km foreland and cold wetland included), baked
+twice from the same simulation, without and with Terralith's table, `/deeptime probe biomes 16` with MIC (43,834
+sampled land columns). The world without the table is the "before": without a pack table the bake is the default
+table's, byte for byte (checked against master's CLI on the earlier planet: all 43 rasters identical; with the
+table only the five biome inputs differ).
 
-| Class (sampled land columns) | Before (master): top biomes, % | After: top biomes, % |
+| Class (sampled land columns) | Before: top biomes, % | After (Terralith's table): top biomes, % |
 |---|---|---|
-| Am (1,507) | shrubland 29, jungle 27, brushland 21, sparse jungle 6, hot shrubland 3, tropical jungle 2 | sparse jungle 44, tropical jungle 21, jungle 14, rocky jungle 4, brushland 4, bamboo jungle 3 |
-| Csa (1,469) | plains 46, highlands 25, blooming plateau 14, forest 6 | shrubland 52, steppe 26, fractured savanna 8, windswept savanna 7 |
-| Csb (2,921) | plains 61, birch taiga 10, old-growth birch forest 8, forest 8 | shrubland 80, steppe 3, snowy slopes 3, forest 2 |
-| BSk (14,077) | plains 57, highlands 14, blooming plateau 7, shield 5 | steppe 44, shrubland 42, plains 2, beach 2 |
-| ET (9,952) | cold shrubland 24, snowy slopes 17, snowy plains 15, gravel desert 14, frozen peaks 4, snowy badlands 4, scarlet mountains 4 | gravel desert 25, cold shrubland 23, snowy slopes 16, frozen peaks 8, snowy plains 5, snowy badlands 4 |
-| Cfb (7,501), Cwb (970) | cloud forest 0 | cloud forest 9.7 and 9.8; of the 1,351 columns of the rule's ground (class, latitude, height; P/PET not checked), 49 % |
+| Am (719) | brushland 32.5, jungle 28.5, beach 8.9, sparse jungle 7.5, tropical jungle 7.1, mangrove swamp 4.7 | tropical jungle 33.1, jungle 27.3, bamboo jungle 10.3, brushland 9.5, beach 7.2, mangrove swamp 4.7 |
+| Csa (367) | plains 71.4, forest 7.9, gravel beach 6.3, beach 5.4, highlands 2.7 | shrubland 77.4, gravel beach 6.3, beach 5.4, steppe 4.6, savanna 2.5 |
+| Csb (1,764) | plains 54.0, forest 9.1, old-growth birch forest 6.4, birch taiga 4.8, brushland 3.9 | shrubland 68.5, snowy slopes 3.7, brushland 3.6, forest 3.3, frozen peaks 3.3 |
+| BSk (4,650) | plains 50.8, snowy slopes 7.6, frozen peaks 5.2, rocky mountains 4.6, forest 3.8, highlands 3.7 | shrubland 55.8, steppe 12.3, plains 7.1, beach 3.3, frozen peaks 2.5 |
+| ET (5,588) | cold shrubland 21.7, gravel desert 15.6, snowy slopes 14.0, snowy plains 9.8, taiga 5.9, frozen peaks 3.0 | gravel desert 23.4, cold shrubland 21.6, snowy slopes 13.7, taiga 5.9, frozen peaks 5.7, snowy plains 2.0 |
+| Cfb (5,322), Cwb (499) | cloud forest 0 | cloud forest 6.4 and 8.8 |
 
-Terralith's names; "plains", "forest", "jungle" and the like are vanilla's. The census's checks for the table (BIO-154):
-Am on jungles 0.858, Cs on shrubland and steppe 0.794, BSk on steppe and dry shrublands 0.860 and on the steppe
-itself 0.436, ET on snowy plains 0.048. The geology gate (as the rule file `deeptime:rock_named`, measured
-2026-10-04 after the merge with the biome rules), the census's plain search (no gate, no volcanic layer) against the
-level's: on the world without the table 2,888 sampled land columns carried a rock-named biome and 1,654 of them
-stood off their ground (Shield on orogens and platforms, Granite and White Cliffs on andesite and mudstone coasts,
-Stony Spires off carbonate); with the gate none does, and 1,234 remain (White Mesa 941, Shield 189, Painted
-Mountains 103, Sandstone Valley 1; every one placed by its rule), no land column turned to water. On the world with
-the table: 2,162 and 1,117 off their ground (Yosemite Cliffs 202 off granite among them) → 1,045, 0 off (White Mesa
-941, Painted Mountains 103, Sandstone Valley 1); Shield's own slot covers only 3 columns there, all off shield
-ground, so it has none. (The gate's first version, a metric of its own, let a rock-named biome come in as the
-second choice where another was kept out, which gave that world 271 Shield columns; as a rule file each keeps to its
-own slot.) The ground on that planet: 8,891 shield columns, 7 granite, 57 carbonate coast, 6 granite coast, 853
-basalt coast, 27,885 dry sedimentary, 280 humid karst. Vanilla on the same world: no pack table chosen, the gate inactive, 0 columns changed.
+Terralith's names; "plains", "forest", "jungle" and the like are vanilla's. The census's checks for the table
+(BIO-154; mountains and volcanic biomes left out, near-coast land left out of the steppe check), before → after:
+Am on jungles 0.475 → 0.773 (at least 0.6); Cs on shrubland and steppe 0.001 → 0.775 (0.5); BSk on steppe and dry
+shrublands 0.017 → 0.782 (0.5); BSk mid and far inland on the steppe itself 0.003 → 0.848 (0.1); ET on snowy plains
+0.100 → 0.022 (at most 0.1). Cold wetland (the subarctic classes' wet lowland) is the same in both: 40 columns, 30 on
+taiga, none on swamp (Terralith has no peatland biome).
+
+The geology gate (the rule file `deeptime:rock_named`), the census's plain search (no gate, no volcanic layer)
+against the level's. Without the table 1,564 sampled land columns carried a rock-named biome and 844 of them stood
+off their ground: Shield 456 of 456 (this planet has no shield province), Granite Cliffs 173 of 173 (no granite
+coast), Painted Mountains 118 of 215, White Cliffs 53 of 53, White Mesa 27 of 650, Snowy Shield 12, Bryce Canyon 4,
+Basalt Cliffs 1. With the gate none does, and 720 remain, every one placed by its rule: White Mesa 623, Painted
+Mountains 97. With the table: 1,079 and 359 off their ground → the same 720, 0 off. No land column turned to water
+(holes 0); the rule census's not-candidate, wrong-class and leaked-exclusive counts are 0. What took the kept-out
+biomes' places (without the table): badlands 162, snowy slopes 153, plains 118, eroded badlands 114, forest 113,
+Terralith's rocky mountains 49. The ground on that planet: no shield, no granite and no granite coast; 218 carbonate
+coast, 367 basalt coast, 13,010 dry sedimentary, 280 humid karst columns.
+
+On the first planet measured (the same preset and seed on master 449a3ae2, before the plate transition; two Shield
+provinces, 8,891 shield columns) the shares moved the same way: Am shrubland 29 / jungle 27 / brushland 21 → sparse
+jungle 44 / tropical jungle 21 / jungle 14; Csa plains 46 → shrubland 52, steppe 26; BSk plains 57 → steppe 44,
+shrubland 42; ET snowy plains 15 → 5 %, gravel desert 14 → 25 %; cloud forest 9.7 % of Cfb. The gate there: 2,888
+rock-named, 1,654 off their ground → 1,234, 0 off (White Mesa 941, Shield 189, Painted Mountains 103); with the
+table Shield's own slot covers only 3 columns, all off shield ground, so it has none.
+
+Without Terralith the table and the rule file are not used: vanilla (the standalone GameTests: no pack table
+recorded, no rule file, 0 of 4,322 columns changed), Biomes O' Plenty under TerraBlender and Expanded Ecosphere
+(their GameTests: GATES_SETS).
 
 ## Simplifications and limits
 
