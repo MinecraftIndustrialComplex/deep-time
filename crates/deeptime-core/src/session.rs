@@ -339,6 +339,10 @@ struct Stepper {
     /// start + the stage's working set + the history the cap leaves in memory), for
     /// `MemoryGauge::keep_below`.
     allowed: Vec<u64>,
+    /// Per stage: the process's count at the session's start + the stage's estimated working set
+    /// without the history. Before a stage steps, the history's frames in memory give way until
+    /// they fit beside it under the cap.
+    base: Vec<u64>,
 }
 
 impl Stepper {
@@ -523,10 +527,12 @@ impl Session {
         let mut stages = preset.stages();
         let groups = stage_groups(&stages)?;
         let at_start = gauge.in_use();
-        let allowed = stage_sets(&stages)?
-            .into_iter()
-            .map(|(b, h)| at_start + b + h.min(mem_cap.saturating_sub(b)))
+        let sets = stage_sets(&stages)?;
+        let allowed = sets
+            .iter()
+            .map(|&(b, h)| at_start + b + h.min(mem_cap.saturating_sub(b)))
             .collect();
+        let base = sets.iter().map(|&(b, _)| at_start + b).collect();
         if next_stage < stages.len() && !groups.iter().any(|g| g.start == next_stage) {
             return Err(CoreError::InvalidState(format!(
                 "the checkpoint stops inside a group of coupled stages (at {})",
@@ -616,6 +622,7 @@ impl Session {
                 last_kf_t: None,
                 working: vec![0; timings.len()],
                 allowed,
+                base,
                 timings,
             }),
             policy,
@@ -805,18 +812,24 @@ impl Session {
                 {
                     at_start = self.gauge.in_use();
                 }
-                if let Some(h) = &history
-                    && at_start.saturating_add(s.working[k]) > self.mem_cap
-                {
-                    match h.evict(at_start + s.working[k] - self.mem_cap) {
-                        Ok(e) => log_evicted(
-                            &self.log,
-                            &e,
-                            self.gauge.as_ref(),
-                            self.mem_cap,
-                            "the working set of the stage's last step",
-                        ),
-                        Err(e) => return Err(self.fail("spilling the recorded history", e)),
+                if let Some(h) = &history {
+                    // Room for the stage's estimated working set beside the history's frames,
+                    // and for what its last step held.
+                    let resident = h.resident_bytes();
+                    let over = resident
+                        .saturating_sub(self.mem_cap.saturating_sub(s.base[k]))
+                        .max((at_start + s.working[k]).saturating_sub(self.mem_cap));
+                    if over > 0 {
+                        match h.evict(over) {
+                            Ok(e) => log_evicted(
+                                &self.log,
+                                &e,
+                                self.gauge.as_ref(),
+                                self.mem_cap,
+                                "the stage's working set",
+                            ),
+                            Err(e) => return Err(self.fail("spilling the recorded history", e)),
+                        }
                     }
                 }
                 let at_start = self.gauge.in_use();
@@ -1954,12 +1967,14 @@ mod tests {
         assert_eq!(big["spill_bytes"], 0);
         assert_eq!(big["peak_bytes"].as_u64().unwrap(), base + history);
         assert_eq!(big["mem_cap"], 64u64 << 30);
-        let four = at(4 << 30);
-        assert_eq!(four, at(0), "0 is the default cap, 4 GiB");
+        assert_eq!(at(4 << 30), at(0), "0 is the default cap, 4 GiB");
+        // A cap that holds the base and half the history (memacct, 2026-10-04: with the world
+        // the deposits run beside counted, this planet's base is over 4 GiB).
+        let mid = base + history / 2;
+        let four = at(mid);
         let peak = four["peak_bytes"].as_u64().unwrap();
         let spill = four["spill_bytes"].as_u64().unwrap();
-        assert!(base < 4 << 30, "the base fits 4 GiB: {base}");
-        assert!(peak <= 4 << 30 && spill > 0, "{four}");
+        assert!(peak <= mid && spill > 0, "{four}");
         assert_eq!(four["base_bytes"], big["base_bytes"]);
         let secs = |v: &Value| -> f64 {
             v["stages"]
@@ -1982,9 +1997,9 @@ mod tests {
         }
         // A cap under the base: the peak is the base, over the cap (the run would fail cleanly),
         // and the whole history would be disk.
-        let tiny = at(1 << 30);
+        let tiny = at(base / 2);
         assert_eq!(tiny["peak_bytes"], tiny["base_bytes"]);
-        assert!(tiny["peak_bytes"].as_u64().unwrap() > 1 << 30);
+        assert!(tiny["peak_bytes"].as_u64().unwrap() > base / 2);
         assert_eq!(tiny["spill_bytes"], tiny["history_bytes"]);
     }
 
