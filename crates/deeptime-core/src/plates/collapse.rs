@@ -81,7 +81,9 @@ use std::collections::BTreeMap;
 
 use super::Env;
 use super::geometry::{Geo, dijkstra};
-use super::pools::{ISOSTATIC_FACTOR, continental_column};
+use super::pools::{
+    ISOSTATIC_FACTOR, continental_column, eclogite_m, isostatic_change_m, root_drop_m,
+};
 use super::state::{CONTINENTAL, OCEANIC, PlateState, TRENCH, pool};
 
 /// `WorldState::globals`: crust moved by the collapse over the run, km³ …
@@ -137,13 +139,13 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
         }
     }
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
-    let normal = normal_thickness_m();
     let mut lost = 0.0;
     for s in state.samples.iter_mut() {
         if s.kind != CONTINENTAL || s.is_hidden() || f64::from(s.thickness_m) <= t_max {
             continue;
         }
         let mut left = f64::from(s.thickness_m) - t_max;
+        let pools_before = s.pools;
         for &p in &ROOT_ORDER {
             let take = f64::from(s.pools[p]).min(left);
             s.pools[p] = (f64::from(s.pools[p]) - take) as f32;
@@ -156,12 +158,32 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
         s.thickness_m = s.pools.iter().sum();
         let gone = before - f64::from(s.thickness_m);
         lost += gone;
-        // Airy, as in the collapse: never below the height of the column kept.
+        // Isostasy, as in the collapse: towards the height of the column kept, never past it (a
+        // root that founders takes its eclogite with it, so the column may rise).
         let z = f64::from(s.elevation_m);
-        let airy = z_0 + (f64::from(s.thickness_m) - normal) / ISOSTATIC_FACTOR;
-        s.elevation_m = (z - (gone / ISOSTATIC_FACTOR).min((z - airy).max(0.0))) as f32;
+        let change = isostatic_change_m(&pools_before, &s.pools, env.gravity);
+        s.elevation_m = toward(z, change, iso_height(&s.pools, z_0, env.gravity)) as f32;
     }
     lost * env.norm.sample_area_km2()
+}
+
+/// A continental column's isostatic height, m: the middle of `continent_elevation_m` (`z_0`) for
+/// the normal column, plus the Airy height of the thickness beyond it, less its eclogite root's
+/// pull (PLT-121, PLT-278).
+fn iso_height(pools: &[f32; pool::COUNT], z_0: f64, gravity: f64) -> f64 {
+    let t: f64 = pools.iter().map(|&x| f64::from(x.max(0.0))).sum();
+    z_0 + (t - normal_thickness_m()) / ISOSTATIC_FACTOR - root_drop_m(eclogite_m(pools, gravity))
+}
+
+/// Moves a surface at `z` by `change` towards the column's isostatic height `iso`, never past it:
+/// a sinking column stops at it (a root that never raised its surface does not drag it down), a
+/// rising one stops at it (thin crust the surface already holds high is not raised further).
+fn toward(z: f64, change: f64, iso: f64) -> f64 {
+    if change < 0.0 {
+        z + change.max(-(z - iso).max(0.0))
+    } else {
+        z + change.min((iso - z).max(0.0))
+    }
 }
 
 /// The model's normal continental column, m: what a collapsing orogen thins towards and what it
@@ -296,17 +318,18 @@ fn spread(
             let take = q * share;
             let t = f64::from(s.thickness_m);
             let keep = ((t - take) / t).max(0.0);
+            let pools_before = s.pools;
             for (m, x) in mix.iter_mut().zip(s.pools.iter_mut()) {
                 let before = f64::from(*x);
                 *x = (before * keep) as f32;
                 *m += before - f64::from(*x);
             }
             s.thickness_m = s.pools.iter().sum();
-            // Airy (PLT-121): down by take / 5.5, not below the height the crust kept holds up.
+            // Isostasy (PLT-121, PLT-278): down by take / 5.5 less the root's change, not below
+            // the height the crust kept holds up.
             let z = f64::from(s.elevation_m);
-            let airy = z_0 + (f64::from(s.thickness_m) - normal) / ISOSTATIC_FACTOR;
-            let drop = (take / ISOSTATIC_FACTOR).min((z - airy).max(0.0));
-            s.elevation_m = (z - drop) as f32;
+            let change = isostatic_change_m(&pools_before, &s.pools, env.gravity);
+            s.elevation_m = toward(z, change, iso_height(&s.pools, z_0, env.gravity)) as f32;
             out.sources += 1;
         }
         let total: f64 = mix.iter().sum();
@@ -319,15 +342,16 @@ fn spread(
         // Fill the receivers; an ocean sample filled to the normal column is continent now.
         for (j, g) in given {
             let s = &mut state.samples[j];
+            let pools_before = s.pools;
             for (x, m) in s.pools.iter_mut().zip(mix.iter()) {
                 *x += (g * m) as f32;
             }
             s.thickness_m = s.pools.iter().sum();
-            // Airy (PLT-121): up by g / 5.5, not above the height the crust now holds up.
+            // Isostasy (PLT-121, PLT-278): up by g / 5.5 less the root's change, not above the
+            // height the crust now holds up.
             let z = f64::from(s.elevation_m);
-            let airy = z_0 + (f64::from(s.thickness_m) - normal) / ISOSTATIC_FACTOR;
-            let rise = (g / ISOSTATIC_FACTOR).min((airy - z).max(0.0));
-            s.elevation_m = (z + rise) as f32;
+            let change = isostatic_change_m(&pools_before, &s.pools, env.gravity);
+            s.elevation_m = toward(z, change, iso_height(&s.pools, z_0, env.gravity)) as f32;
             if s.kind == OCEANIC && f64::from(s.thickness_m) >= normal - 1.0 {
                 s.kind = CONTINENTAL;
                 out.converted += 1;
