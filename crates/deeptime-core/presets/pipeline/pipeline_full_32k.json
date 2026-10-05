@@ -303,7 +303,7 @@
     "sst_midlatitude_cold_c": 5.0,
     "subsidence": 0.55,
     "west_flank_wet": 0.4,
-    "belts_rain_scale": 1.45,
+    "belts_rain_scale": 1.42,
     "onshore": 1.0,
     "oro_conv_time_s": 1000.0,
     "oro_fall_time_s": 1000.0,
