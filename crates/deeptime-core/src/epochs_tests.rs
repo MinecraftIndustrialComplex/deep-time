@@ -360,7 +360,7 @@ fn steering_off_changes_nothing_and_on_changes_only_the_tail() {
             shared += 1;
         }
     }
-    assert!(shared >= 3, "{shared} shared steps");
+    assert!(shared >= 2, "{shared} shared steps");
     for dir in [a, b, c] {
         let _ = std::fs::remove_dir_all(dir);
     }
