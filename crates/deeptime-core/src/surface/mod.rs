@@ -472,16 +472,10 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let r = u64::from(p.resolution.l1_r);
     let cells = (c / r) * (c / r / 2);
     let log = StrataLog::bytes_per_cell(s.log_layers);
-    let per_cell = 12 * 8 // f64 working arrays
-        + 2 * log // the log and its advected copy
-        + 30 * 4 // fields
-        + (fields::STEP_FIELDS.len() as u64) * 4 // the frame accumulator
-        + 24 // mix, weights, kinds
-        + 21 * 8 // the glaciers' ice state, loads and passes (`glacial.rs`)
-        // The plate's state (`flexure.rs`) and its solver's transforms, which stay; the solve's
-        // own vectors (some 30 more per cell) live only inside a surface step, far under the
-        // later stages' peak that this estimate is added to.
-        + if s.flexure.active() { 6 * 4 + 12 * 8 } else { 0 };
+    let per_cell = retained_per_cell(&s)
+        + 12 * 8 // f64 working arrays
+        + log // the log's advected copy
+        + 21 * 8; // the glaciers' ice state, loads and passes (`glacial.rs`)
     let frames = (p.length_myr() / s.frame_every_myr).ceil().max(1.0) as u64;
     let history = frames * cells * 12; // packed frames, ~12 B/cell after LZ4 (measured in P1-04)
     let steps = p.plate_steps() as f64 * f64::from(s.substeps);
@@ -490,6 +484,33 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
         seconds: cells as f64 * steps * 1.0e-6,
         history_bytes: history,
     }
+}
+
+/// What of the surface stage's per-cell estimate stays in the world after its last step: the
+/// strata log, the fields, the frame accumulator, mix, weights and kinds, and the plate's state
+/// (`flexure.rs`) and its solver's transforms. The solve's own vectors (some 30 more per cell)
+/// live only inside a surface step, far under the later stages' peak.
+fn retained_per_cell(s: &SurfaceParams) -> u64 {
+    StrataLog::bytes_per_cell(s.log_layers) // the log
+        + 30 * 4 // fields
+        + (fields::STEP_FIELDS.len() as u64) * 4 // the frame accumulator
+        + 24 // mix, weights, kinds
+        + if s.flexure.active() { 6 * 4 + 12 * 8 } else { 0 }
+}
+
+/// The world the coupled stages leave for the stages after them, without the recorded history:
+/// the plates' estimate, the surface's retained part per L1 cell ([`estimate`] less the step's
+/// working arrays, the log's advected copy and the glaciers' passes) and the climate's 24 monthly
+/// maps of its last snapshot (P1-25; 96 B per L1 cell). P1-17 (2026-10-05, 500 Myr, scattered
+/// continents, history excluded): 651 MiB on quick 16k against the 576 MiB the run held before
+/// the young stage, 2,127 MiB on full 16k against 2,010 MiB.
+pub fn retained_bytes(p: &PlanetPreset) -> u64 {
+    let s = p.surface.clone().unwrap_or_default();
+    let c = u64::from(p.scale.circumference_blocks);
+    let r = u64::from(p.resolution.l1_r);
+    let cells = (c / r) * (c / r / 2);
+    let monthly = if p.climate.is_some() { 24 * 4 } else { 0 };
+    cells * (retained_per_cell(&s) + monthly) + crate::plates::estimate(p).bytes
 }
 
 impl SurfaceStage {
