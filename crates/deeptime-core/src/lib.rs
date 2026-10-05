@@ -7,7 +7,9 @@ pub mod alloc;
 
 // The stage runner and its persistence (P1-01).
 pub mod checkpoint;
+// Epoch checkpoints: pick the epoch, continue, stop early (docs/design/playability-steering.md).
 pub mod dummy;
+pub mod epochs;
 
 // Deposits (P1-14).
 pub mod deposits;
@@ -43,6 +45,9 @@ pub mod hydro;
 
 // What the game puts in the open space below ground: the lava floor and lava lakes.
 pub mod underground;
+
+// End-weighted nudges toward a playable end (docs/design/playability-steering.md).
+pub mod steering;
 
 // Presets, share codes and the synthetic terrains of the placeholder presets (P1-13).
 pub mod preset;

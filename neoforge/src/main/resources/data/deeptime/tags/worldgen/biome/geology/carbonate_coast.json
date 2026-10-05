@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "terralith:white_cliffs",
+      "required": false
+    }
+  ]
+}

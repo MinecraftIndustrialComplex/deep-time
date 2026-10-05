@@ -524,7 +524,7 @@ impl DepositStage {
         let every = preset.surface.as_ref().map_or(10.0, |s| s.frame_every_myr);
         // The surface stage's frame count is known only from its history; this is the estimate
         // the stage reports until set-up reads the real one.
-        let frames = (preset.length_myr() / every).ceil().max(1.0) as usize;
+        let frames = (preset.run_myr() / every).ceil().max(1.0) as usize;
         let sc = &preset.scale;
         let scales = Scales {
             m_per_block_h: sc.m_per_block_h,
