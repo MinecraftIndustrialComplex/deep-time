@@ -107,7 +107,7 @@ def cmd_pick(a):
         """A porphyry with a gossan body: the one item 3 can show in full (its placer is another site: below)."""
         return any(b["role"] == "gossan" for b in by_site.get(s["id"], []))
 
-    # The porphyry shown: one whose gossan top sits at the baked terrain (within 12 blocks), nearest to spawn first; then the rest.
+    # The porphyry shown: one on dry land whose gossan top sits at the baked terrain (within 12 blocks), nearest to spawn first; then the rest.
     def gap(s):
         """How far the gossan's top (`clip_top_y`, the surface at formation) is from the baked terrain above the body: a gossan
         'where the body is exposed' sits at the ground; one the bake's erosion or burial left far above or below does not."""
@@ -121,7 +121,9 @@ def cmd_pick(a):
             return 1e9
         try:
             _, _, _, data = read_npy(out)
-            return abs(data[0] - g["clip_top_y"])
+            sea = manifest["scale"].get("sea_level_y", 63)
+            # Exposed means on dry land: a body under the sea (a 2026-10-05 run's first pick, y -24) is not "exposed".
+            return abs(data[0] - g["clip_top_y"]) if data[0] > sea + 1 else 1e9
         except Exception:
             return 1e9
 
