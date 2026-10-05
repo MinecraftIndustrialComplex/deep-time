@@ -2452,11 +2452,12 @@
     if (!inA && !inB) acts.push(['compare', 'Compare', 'split', 'btn-sm btn-ghost']);
     acts.push(['settings', 'Settings', 'sliders', 'btn-sm btn-ghost']);
     if (r.state === 'queued' || r.state === 'running') acts.push(['cancel', 'Cancel', 'stop', 'btn-sm btn-ghost btn-danger']);
+    if (r.state === 'done') acts.push(['resume', 'Stop / continue', 'play', 'btn-sm btn-ghost']);
     const key = acts.map(a => a[0]).join(',');
     const box = el.querySelector('.acts');
     if (box.dataset.key !== key) {
       box.dataset.key = key;
-      box.innerHTML = acts.map(([a, t, i, c]) => `<button class="btn ${c}" data-act="${a}" data-tip="${esc({ view: 'Open in the map (A)', compare: 'Compare with the open run (B)', settings: 'Load its settings into the editor', cancel: 'Stop this run' }[a])}">${ic(i, 'ic-s')}${t}</button>`).join('');
+      box.innerHTML = acts.map(([a, t, i, c]) => `<button class="btn ${c}" data-act="${a}" data-tip="${esc({ view: 'Open in the map (A)', compare: 'Compare with the open run (B)', settings: 'Load its settings into the editor', cancel: 'Stop this run', resume: 'A new run from this one\'s epoch checkpoints, stopped at another time: earlier bakes that epoch, later continues it' }[a])}">${ic(i, 'ic-s')}${t}</button>`).join('');
     }
     return el;
   }
@@ -2504,6 +2505,14 @@
       cf.innerHTML = `<div><b>Cancel ${esc(r ? r.label : id)}?</b> ${r && r.state === 'running' ? 'It stops after its current step and keeps the frames it made.' : 'It leaves the queue.'}</div>` +
         '<div class="row"><button class="btn btn-sm btn-ghost" data-cact="no">Keep it</button><button class="btn btn-sm btn-danger" data-cact="yes">Cancel run</button></div>';
       cf.hidden = false;
+    } else if (act === 'resume') {
+      // Pick the epoch or continue (docs/design/playability-steering.md).
+      const t = window.prompt('Stop at how many Myr after the start? Less than the run picks that epoch; more continues it.', '');
+      if (t === null || t.trim() === '') return;
+      const res = await api(`api/runs/${encodeURIComponent(id)}/resume`, { stop_myr: Number(t) });
+      if (!res.ok) toast(res.body.error || 'Could not resume', 'bad');
+      else toast(`Queued: ${r ? r.label : id} stopped at ${t} Myr`, 'ok');
+      poll();
     } else if (act === 'settings' && r) { await importCode(r.share_code); sideTab('new'); if (narrow.matches) setMTab('new'); toast(`Loaded the settings of ${r.label}`, 'ok'); }
   });
   $('runlist').addEventListener('keydown', ev => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.classList.contains('runcard')) { ev.preventDefault(); ev.target.click(); } });
