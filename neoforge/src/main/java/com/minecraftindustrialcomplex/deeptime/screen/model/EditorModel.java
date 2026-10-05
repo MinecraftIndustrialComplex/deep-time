@@ -96,7 +96,7 @@ public final class EditorModel {
          */
         public static Deps game(Path gameDir, Executor loader, Executor io, Supplier<String> content) {
             return new Deps(json -> SimSession.estimate(json, content.get()),
-                    (json, out, threads, cap) -> SessionRunHandle.launch(json, content.get(), out, threads, cap), gameDir,
+                    (json, out, threads, cap, resume) -> SessionRunHandle.launch(json, content.get(), out, threads, cap, resume), gameDir,
                     MachineInfo.current(), loader, io, NativeLoader::isLinked, List::of);
         }
     }
