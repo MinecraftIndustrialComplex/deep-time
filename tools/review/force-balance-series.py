@@ -81,6 +81,15 @@ def main():
             eps.append((start, s["t"]))
     if on:
         eps.append((start, None))
+    # A re-assembly within 20 Myr of a dispersal is the same stay (plate-check's
+    # dispersal_hold_myr, CHK-060).
+    merged = []
+    for a, b in eps:
+        if merged and merged[-1][1] is not None and a - merged[-1][1] < 20.0:
+            merged[-1] = (merged[-1][0], b)
+        else:
+            merged.append((a, b))
+    eps = merged
     print("supercontinent episodes (assembled, dispersed):",
           ", ".join(f"{a:.0f}-{'' if b is None else f'{b:.0f}'}" for a, b in eps) or "none")
     gaps = [eps[i + 1][0] - eps[i][0] for i in range(len(eps) - 1)]

@@ -126,10 +126,13 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
                     .push((i, f64::from(s.thickness_m) - t_max));
             }
         }
-        // The excess goes to continental crust thinner than the limit (the plateau widens at
-        // the thickest column) and to ocean floor up to the normal column.
+        // The excess goes to continental crust thinner than the collapse thickness (crust
+        // thicker than that does not stay, PLT-256: lower crust flows out of the thickened belt
+        // but does not build a second one around it) and to ocean floor up to the normal column.
+        let to = (k.collapse_thickness_km * 1000.0).clamp(normal_thickness_m(), t_max);
+        let to = if std::env::var_os("DT_EXP_FILL70").is_some() { t_max } else { to }; // TEMP-EXP
         if !by_plate.is_empty() {
-            spread(state, geo, env, by_plate, t_max, out);
+            spread(state, geo, env, by_plate, to, out);
         }
     }
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);

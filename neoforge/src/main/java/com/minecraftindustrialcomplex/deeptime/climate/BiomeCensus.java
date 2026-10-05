@@ -167,7 +167,11 @@ public final class BiomeCensus {
         if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g) || !(g.terrain() instanceof WorldDataTerrain t))
             throw new IllegalStateException(level.dimension().location() + " is not a Deep Time level on world data");
         WorldData wd = t.data();
-        RasterSampler kp = wd.layer("climate/koppen");
+        // The class the biome inputs were placed by (L2, lapsed to each cell's height) when the bake
+        // wrote it; the climate stage's L1 class otherwise. Against the L1 class, the high and low
+        // ground of one L1 cell (a plateau's edge) count as one class, and a column a lapse rate
+        // makes C or D under an L1 cell that is ET counted as a misplaced ET (2026-10-05).
+        RasterSampler kp = wd.layer(wd.has("climate/koppen_l2") ? "climate/koppen_l2" : "climate/koppen");
         RasterSampler iceLayer = wd.has(IceCover.LAYER) ? wd.layer(IceCover.LAYER) : null;
         RasterSampler wetlandLayer = wd.has(Peatland.LAYER) ? wd.layer(Peatland.LAYER) : null;
         var sampler = level.getChunkSource().randomState().sampler();

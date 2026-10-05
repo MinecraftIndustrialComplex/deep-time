@@ -1125,6 +1125,9 @@ pub struct Params {
     /// ... and stays so until it holds less than this ("until it holds under 50 %"): a plain
     /// threshold would count every flicker around it as a break-up.
     pub dispersed_share: f64,
+    /// ... and a dispersal counts only if the supercontinent does not assemble again within this
+    /// many Myr (two large pieces touching and parting are not a break-up), Myr.
+    pub dispersal_hold_myr: f64,
     /// A plate is a mega-plate while it holds more than this share of the visible planet.
     pub mega_plate_share: f64,
     /// Speeds, rotation changes and the pole test count plates of at least this many visible
@@ -1157,6 +1160,7 @@ impl Default for Params {
         Params {
             assembled_share: 0.70,
             dispersed_share: 0.50,
+            dispersal_hold_myr: 20.0, // ledger: CHK-060
             mega_plate_share: 0.40,
             min_plate_samples: 30.0,
             fast_mm_yr: 150.0,
@@ -1176,6 +1180,7 @@ impl Params {
     pub const KEYS: &'static [&'static str] = &[
         "assembled_share",
         "dispersed_share",
+        "dispersal_hold_myr",
         "mega_plate_share",
         "min_plate_samples",
         "fast_mm_yr",
@@ -1196,6 +1201,7 @@ impl Params {
         match key {
             "assembled_share" => self.assembled_share = value,
             "dispersed_share" => self.dispersed_share = value,
+            "dispersal_hold_myr" => self.dispersal_hold_myr = value,
             "mega_plate_share" => self.mega_plate_share = value,
             "min_plate_samples" => self.min_plate_samples = value,
             "fast_mm_yr" => self.fast_mm_yr = value,
@@ -2034,8 +2040,32 @@ pub struct Assembly {
 }
 
 /// The assemblies in a series of `(time at the end of a step, largest piece's share)`. A run that
-/// begins assembled has an assembly starting at `t0_myr`, the time before its first step.
+/// begins assembled has an assembly starting at `t0_myr`, the time before its first step. A
+/// supercontinent that assembles again less than `hold_myr` after it dispersed never dispersed:
+/// the two stays are one (two large pieces that touch and part at a sample's width, as stalled
+/// collisions do under the force balance, are not a break-up and a new assembly).
 pub fn assemblies(
+    shares: &[(f64, f64)],
+    t0_myr: f64,
+    assemble: f64,
+    disperse: f64,
+    hold_myr: f64,
+) -> Vec<Assembly> {
+    let raw = assemblies_raw(shares, t0_myr, assemble, disperse);
+    let mut out: Vec<Assembly> = Vec::with_capacity(raw.len());
+    for a in raw {
+        if let Some(last) = out.last_mut()
+            && last.end_myr.is_some_and(|e| a.start_myr - e < hold_myr)
+        {
+            last.end_myr = a.end_myr;
+            continue;
+        }
+        out.push(a);
+    }
+    out
+}
+
+fn assemblies_raw(
     shares: &[(f64, f64)],
     t0_myr: f64,
     assemble: f64,
@@ -2109,6 +2139,7 @@ fn continents(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static str, 
         d.t0_myr,
         params.assembled_share,
         params.dispersed_share,
+        params.dispersal_hold_myr,
     );
     if d.steps.is_empty() || d.steps.iter().all(|s| s.pieces.is_empty()) {
         // Not recorded: no data, not "no supercontinent".
@@ -3560,7 +3591,7 @@ mod tests {
             (18.0, 0.3),
             (20.0, 0.71),
         ];
-        let eps = assemblies(&shares, 0.0, 0.7, 0.5);
+        let eps = assemblies(&shares, 0.0, 0.7, 0.5, 0.0);
         // Assembled at the start (time 0), dispersed at 8; 12 to 16; 20 and still.
         assert_eq!(
             eps,
@@ -3580,14 +3611,34 @@ mod tests {
             ]
         );
         // No hysteresis: the first break-up comes at 6 Myr (60 %), not at 8 (45 %).
-        let flat = assemblies(&shares, 0.0, 0.7, 0.7);
+        let flat = assemblies(&shares, 0.0, 0.7, 0.7, 0.0);
         assert_eq!(flat.len(), 3);
         assert_eq!(flat[0].end_myr, Some(6.0));
         // Never assembled; a missing share is a zero.
-        assert!(assemblies(&[(2.0, 0.6), (4.0, f64::NAN)], 0.0, 0.7, 0.5).is_empty());
+        assert!(assemblies(&[(2.0, 0.6), (4.0, f64::NAN)], 0.0, 0.7, 0.5, 0.0).is_empty());
         // A run that starts dispersed has its first assembly at the step it forms.
-        let late = assemblies(&[(2.0, 0.3), (4.0, 0.8)], 0.0, 0.7, 0.5);
+        let late = assemblies(&[(2.0, 0.3), (4.0, 0.8)], 0.0, 0.7, 0.5, 0.0);
         assert_eq!(late[0].start_myr, 4.0);
+    }
+
+    /// Two large pieces that touch and part are not a break-up: a dispersal followed by a new
+    /// assembly within `dispersal_hold_myr` is one stay; one followed by a longer gap is two.
+    #[test]
+    fn a_supercontinent_that_reassembles_within_the_hold_never_dispersed() {
+        let shares = [
+            (2.0, 0.9),
+            (4.0, 0.45),
+            (6.0, 0.8),
+            (8.0, 0.4),
+            (10.0, 0.4),
+            (40.0, 0.4),
+            (42.0, 0.9),
+        ];
+        let eps = assemblies(&shares, 0.0, 0.7, 0.5, 20.0);
+        assert_eq!(eps.len(), 2, "{eps:?}");
+        assert_eq!((eps[0].start_myr, eps[0].end_myr), (0.0, Some(8.0)));
+        assert_eq!((eps[1].start_myr, eps[1].end_myr), (42.0, None));
+        assert_eq!(assemblies(&shares, 0.0, 0.7, 0.5, 0.0).len(), 3);
     }
 
     #[test]
