@@ -161,25 +161,20 @@ impl SteeringParams {
             "tail_fraction",
             "must be in [0.02, 0.5]",
         )?;
-        check(
-            fin(self.land_min) && fin(self.land_max) && 0.0 <= self.land_min,
-            "land_min",
-            "must be ≥ 0",
-        )?;
-        check(
-            self.land_min <= self.land_max && self.land_max <= 1.0,
-            "land_max",
-            "must be in [land_min, 1]",
-        )?;
+        // Each bound is valid on its own (the editor sets one at a time); the band is the two in
+        // either order.
+        for (v, key) in [(self.land_min, "land_min"), (self.land_max, "land_max")] {
+            check(fin(v) && (0.0..=1.0).contains(&v), key, "must be in [0, 1]")?;
+        }
         check(
             fin(self.temp_min_c) && (-50.0..=60.0).contains(&self.temp_min_c),
             "temp_min_c",
             "must be in [-50, 60]",
         )?;
         check(
-            fin(self.temp_max_c) && self.temp_min_c <= self.temp_max_c && self.temp_max_c <= 60.0,
+            fin(self.temp_max_c) && (-50.0..=60.0).contains(&self.temp_max_c),
             "temp_max_c",
-            "must be in [temp_min_c, 60]",
+            "must be in [-50, 60]",
         )?;
         check(
             fin(self.sea_rate_m_myr) && (0.0..=20.0).contains(&self.sea_rate_m_myr),
@@ -212,10 +207,10 @@ impl SteeringParams {
             Target::Warm => (0.25, 0.35, 18.0, 26.0),
             Target::Cool => (0.25, 0.35, 6.0, 13.0),
             Target::Custom => (
-                self.land_min,
-                self.land_max,
-                self.temp_min_c,
-                self.temp_max_c,
+                self.land_min.min(self.land_max),
+                self.land_min.max(self.land_max),
+                self.temp_min_c.min(self.temp_max_c),
+                self.temp_min_c.max(self.temp_max_c),
             ),
         }
     }
@@ -495,7 +490,10 @@ mod tests {
             ..p
         };
         assert_eq!(c.bands(), (0.5, 0.6, 10.0, 20.0));
-        let bad = SteeringParams { land_min: 0.7, ..c };
+        let swapped = SteeringParams { land_min: 0.7, ..c };
+        assert!(swapped.validate().is_ok());
+        assert_eq!(swapped.bands(), (0.6, 0.7, 10.0, 20.0), "either order");
+        let bad = SteeringParams { land_min: 1.5, ..c };
         assert!(bad.validate().is_err());
         assert!(SteeringParams::default().validate().is_ok());
     }
