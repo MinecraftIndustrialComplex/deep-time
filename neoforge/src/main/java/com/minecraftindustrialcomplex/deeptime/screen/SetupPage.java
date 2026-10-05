@@ -8,6 +8,7 @@ import com.minecraftindustrialcomplex.deeptime.screen.model.Estimate;
 import com.minecraftindustrialcomplex.deeptime.screen.model.Formats;
 import com.minecraftindustrialcomplex.deeptime.screen.model.MachineInfo;
 import com.minecraftindustrialcomplex.deeptime.screen.model.Problem;
+import com.minecraftindustrialcomplex.deeptime.screen.model.TimelapseModel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -294,9 +295,14 @@ final class SetupPage implements PlanetEditorScreen.Page {
         Optional<Problem> first = ps.stream().filter(Problem::blocking).findFirst().or(() -> ps.stream().findFirst());
         Component line;
         int colour;
+        Optional<TimelapseModel> going = model.run().filter(r -> r.state() == TimelapseModel.State.RUNNING);
         if (first.isPresent()) {
             line = Lang.problem(first.get());
             colour = first.get().blocking() ? 0xffff7070 : 0xffffd060;
+        } else if (going.isPresent()) {
+            // Run stays disabled while a run goes: say why (a cancelled one finishes its step first).
+            line = Lang.tr(going.get().cancelRequested() ? "editor.run.stopping" : "editor.run.going");
+            colour = 0xffffd060;
         } else {
             line = Lang.tr("editor.ready");
             colour = 0xff80ff80;

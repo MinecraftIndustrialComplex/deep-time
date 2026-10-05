@@ -128,15 +128,16 @@ pub struct DeformationParams {
     pub strike_slip_rate_km2_myr: f64,
 
     /// How far into the foreland of an Andean margin (a continental arc) the crust still
-    /// shortens, km on the plate model's (Earth-normalized) sphere: the Subandean belt of Bolivia
-    /// is 60 to 140 km wide (Hérail et al., ORSTOM symposium paper, pp. 179–180, a poor scan), the
-    /// Zagros fold-thrust belt "a ~200 to 300 km-wide zone" (Alavi 2007, abstract), its Fars
-    /// sector 200 km (Mouthereau et al. 2007, §2). **A collision's foreland is not this width:**
-    /// since plate task 6 it is the flexural basin on the incoming plate beyond the collision's
-    /// wedge (`surface/flexure_m` below 100 m under local isostasy, within reach of the collision's
-    /// front), with none on the forebulge (design `docs/design/plate-force-balance.md` §3.5). On a
-    /// 16,384-block planet 250 km is about 100 blocks (30 km on the map, where the folds keep
-    /// their Earth size). ledger: DEF-027
+    /// shortens, km on the plate model's (Earth-normalized) sphere. The default is 140 km, the
+    /// upper end of the Subandean belt of Bolivia, 60 to 140 km wide (Hérail et al., ORSTOM
+    /// symposium paper, pp. 179–180, a poor scan; Ben chose 140 km on 2026-10-05). The Zagros
+    /// fold-thrust belt, "a ~200 to 300 km-wide zone" (Alavi 2007, abstract; its Fars sector
+    /// 200 km, Mouthereau et al. 2007, §2), is a collision, not this margin: **a collision's
+    /// foreland is not this width.** Since plate task 6 it is the flexural basin on the incoming
+    /// plate beyond the collision's wedge (`surface/flexure_m` below 100 m under local isostasy,
+    /// within reach of the collision's front), with none on the forebulge (design
+    /// `docs/design/plate-force-balance.md` §3.5). On a 16,384-block planet 140 km is about 57
+    /// blocks (17 km on the map, where the folds keep their Earth size). ledger: DEF-027
     pub foreland_km: f64,
     /// The convergence across a collision's front at which its folds and thrusts form at the
     /// rates above, mm/yr (Earth-normalized); slower collisions make proportionally fewer, faster
@@ -255,7 +256,7 @@ impl Default for DeformationParams {
             thrust_rate_km2_myr: 2.0e-5,           // ledger: DEF-022
             normal_rate_km2_myr: 4.0e-5,           // ledger: DEF-022
             strike_slip_rate_km2_myr: 4.0e-6,      // ledger: DEF-022
-            foreland_km: 250.0,                    // ledger: DEF-027
+            foreland_km: 140.0,                    // ledger: DEF-027
             collision_reference_mm_yr: 30.0,       // ledger: DEF-075
             arc_uplift_mm_yr: 0.1,                 // ledger: DEF-026
             max_overlap: 3,                        // ledger: DEF-032
