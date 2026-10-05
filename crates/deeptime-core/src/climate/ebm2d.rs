@@ -48,7 +48,7 @@ use serde::{Deserialize, Serialize};
 use super::belts;
 use super::coarse::Grid;
 use super::ebm::{
-    EbmParams, EbmState, FULL_ICE_M, ICE_J_M3, ICE_W_M_K, OPEN_WATER_W_M2_K, SEA_ICE_CAP_M,
+    EbmParams, EbmState, FULL_ICE_M, ICE_J_M3, ICE_W_M_K, OPEN_WATER_W_M2_K, SEA_ICE_CAP_M, Tri,
     freeze_melt, smoothstep,
 };
 use super::insolation;
@@ -615,47 +615,6 @@ fn northward(w: usize, k: &[f64], t: &[f64], scale: f64, acc: &mut [f64]) {
             })
             .sum();
         *a += s * scale;
-    }
-}
-
-/// A tridiagonal system lo[j]·x[j−1] + di[j]·x[j] + up[j]·x[j+1] = r[j] with its forward
-/// elimination done (`ebm::thomas`'s multipliers c and pivots m, which depend on the coefficients
-/// only): solving is the substitutions, each the same expression `thomas` evaluates.
-struct Tri {
-    lo: Vec<f64>,
-    c: Vec<f64>,
-    m: Vec<f64>,
-}
-
-impl Tri {
-    fn new(lo: &[f64], di: &[f64], up: &[f64]) -> Tri {
-        let n = di.len();
-        let mut c = vec![0.0; n];
-        let mut m = vec![0.0; n];
-        c[0] = up[0] / di[0];
-        m[0] = di[0];
-        for j in 1..n {
-            let mj = di[j] - lo[j] * c[j - 1];
-            c[j] = up[j] / mj;
-            m[j] = mj;
-        }
-        Tri {
-            lo: lo.to_vec(),
-            c,
-            m,
-        }
-    }
-
-    /// x = the solution for right-hand side `r` (`ebm::thomas(lo, di, up, r)`, bit for bit).
-    fn solve(&self, r: &[f64], x: &mut [f64]) {
-        let n = r.len();
-        x[0] = r[0] / self.m[0];
-        for j in 1..n {
-            x[j] = (r[j] - self.lo[j] * x[j - 1]) / self.m[j];
-        }
-        for j in (0..n - 1).rev() {
-            x[j] -= self.c[j] * x[j + 1];
-        }
     }
 }
 
