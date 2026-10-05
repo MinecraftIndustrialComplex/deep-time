@@ -178,7 +178,7 @@ public final class VolcanicBiomes {
             this.cell = cell;
             this.minY = minY;
             this.seaLevel = seaLevel;
-            this.rules = new BiomeRules.LevelData(terrain);
+            this.rules = new BiomeRules.LevelData(terrain, seaLevel);
         }
 
         /** The biome rules bound to this level's source by its last biome query ({@link BiomeRules#NONE} before it). */
@@ -189,6 +189,11 @@ public final class VolcanicBiomes {
 
         public WorldDataTerrain terrain() {
             return terrain;
+        }
+
+        /** The ground the biome rules' {@code ground} condition reads ({@link BiomeRules.LevelData#geology()}). */
+        public com.minecraftindustrialcomplex.deeptime.worldgen.GeologyGround geology() {
+            return rules.geology();
         }
 
         /** The level's zones (built on first use). */
@@ -340,7 +345,7 @@ public final class VolcanicBiomes {
         final int x, z;
         private double height = Double.NaN;
         private int roles = -1;
-        private Holder<Biome> plain;
+        private Holder<Biome> plain, slot;
         private BiomeRules.Column facts;
 
         Query(Level level, Resolved r, Source source, Climate.TargetPoint t, int x, int z) {
@@ -366,6 +371,23 @@ public final class VolcanicBiomes {
             return height() >= level.seaLevel();
         }
 
+        /**
+         * Land somewhere in the quart: its centre or one of its corners at or above sea level. A coastal quart whose
+         * centre is under water still holds land columns (the census samples a quart's first block), and the deep-sea
+         * slots are nowhere near the shore.
+         */
+        boolean shore() {
+            if (land())
+                return true;
+            WorldDataTerrain terrain = level.terrain();
+            int sea = level.seaLevel();
+            for (int dz = -2; dz <= 1; dz += 3)
+                for (int dx = -2; dx <= 1; dx += 3)
+                    if (terrain.height(x + dx, z + dz) >= sea)
+                        return true;
+            return false;
+        }
+
         int roles() {
             if (roles < 0)
                 roles = level.zones().rolesAt(x, z);
@@ -374,22 +396,32 @@ public final class VolcanicBiomes {
 
         BiomeRules.Column facts() {
             if (facts == null)
-                facts = new BiomeRules.Column(level.rules, x, z, height(), level.seaLevel(), this::roles, this::plain);
+                facts = new BiomeRules.Column(level.rules, x, z, height(), level.seaLevel(), this::roles, this::plain, this::slot);
             return facts;
+        }
+
+        /** The source's own climate search, nothing kept out: the biome whose slot the column's climate point is in. */
+        Holder<Biome> slot() {
+            if (slot == null)
+                slot = source.find(t, NEAREST);
+            return slot;
         }
 
         /** The climate search with the kept-out biomes set aside. */
         Holder<Biome> plain() {
             if (plain == null)
-                plain = keptSearch(r, source, t);
+                plain = keptSearch(r, source, t, slot(), this::shore);
             return plain;
         }
     }
 
-    /** The climate search of {@code t} with every kept-out biome of {@code r} set aside. */
-    private static Holder<Biome> keptSearch(Resolved r, Source source, Climate.TargetPoint t) {
-        // The plain nearest first: where it is not kept out, the keep-out search would find the same leaf.
-        Holder<Biome> plain = source.find(t, NEAREST);
+    /**
+     * The climate search of {@code t} with every kept-out biome of {@code r} set aside; {@code plain} is the search with
+     * nothing set aside (where it is not kept out, the keep-out search would find the same leaf); {@code land} whether
+     * the column's ground is land or shore ({@link Query#shore()}).
+     */
+    private static Holder<Biome> keptSearch(Resolved r, Source source, Climate.TargetPoint t, Holder<Biome> plain,
+                                            java.util.function.BooleanSupplier land) {
         if (!r.keepOut || !kept(r, plain))
             return plain;
         Holder<Biome> kept;
@@ -412,6 +444,22 @@ public final class VolcanicBiomes {
                 } catch (NullPointerException emptyTree) {
                     // keep the region's answer
                 }
+            }
+            // Without a tree under it (a plain parameter list: Terralith's in MIC), the same tree once more with its
+            // ocean and river leaves set aside too: a land biome kept out of a slot next to the river slice (a
+            // rock-named biome off its ground, Terralith's white mesa across it) must not turn land into river (118
+            // land columns on the quick 16k planet before this retry). Only on land: at sea the water is right (Expanded
+            // Ecosphere's island biomes, kept out, sit in Deep Time's deep-sea slots: BIO-132). Shore counts as land.
+            if (!land.getAsBoolean())
+                return kept;
+            Climate.DistanceMetric<Holder<Biome>> keptMetric = r.keptMetric;
+            try {
+                Holder<Biome> dry = source.find(t, (node, values) -> node instanceof Climate.RTree.Leaf<Holder<Biome>> leaf
+                        && water(leaf.value) ? Long.MAX_VALUE : keptMetric.distance(node, values));
+                if (dry != null && !water(dry))
+                    return dry;
+            } catch (NullPointerException emptyTree) {
+                // keep the water
             }
         }
         return kept;

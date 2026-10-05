@@ -4,6 +4,7 @@ package com.minecraftindustrialcomplex.deeptime.climate;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.minecraftindustrialcomplex.deeptime.worldgen.GeologyGround;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -94,6 +95,22 @@ public final class BiomeRuleSet {
 
         /** Whether the biome the plain climate search gives the column is in this list of ids and {@code #tags}. */
         boolean plainIn(List<String> ids);
+
+        /**
+         * The geology roles of the column's ground, a bit per {@link GeologyGround.Role} (shield province, granite,
+         * coasts of carbonate, granite or basalt, dry sedimentary rock, humid carbonate); 0 when unknown.
+         */
+        default int ground() {
+            return 0;
+        }
+
+        /**
+         * Whether the biome the source's own climate search gives the column with nothing kept out (the slot its climate
+         * point is in) is in this list of ids and {@code #tags}; false when unknown.
+         */
+        default boolean slotIn(List<String> ids) {
+            return false;
+        }
     }
 
     /**
@@ -105,11 +122,16 @@ public final class BiomeRuleSet {
      * @param role      a volcanic role id ({@code cone}, {@code crater}, ...): the rule is consulted only inside
      *                  that role's zones; null: an ordinary rule
      * @param koppen    Köppen class codes or their prefixes ({@code "Cs"} is Csa, Csb and Csc; {@code "E"} is ET and EF)
+     * @param ground    the geology roles of which the column's ground must have one, a bit per
+     *                  {@link GeologyGround.Role}; 0: no condition
+     * @param inSlot    true: the rule holds only where the source's own climate search, with nothing kept out, gives
+     *                  one of {@code biomes} (with {@code exclusive}, a gate: the candidates keep their own slots, but
+     *                  only where the other conditions hold)
      * @param exclusive the candidates go only where this rule (or another rule naming them) places them
      */
     public record Rule(String id, List<String> biomes, String role, List<String> koppen, Range tMean, Range tWarm,
                        Range tCold, Range pMm, Range elevationM, String wetland, Boolean ice, Boolean playa, Boolean volcanic,
-                       List<String> rock, List<String> replaces, List<String> keeps, boolean exclusive) {
+                       List<String> rock, int ground, boolean inSlot, List<String> replaces, List<String> keeps, boolean exclusive) {
 
         public Rule {
             biomes = List.copyOf(biomes);
@@ -149,6 +171,10 @@ public final class BiomeRuleSet {
                 return false;
             if (!rock.isEmpty() && !rock.contains(f.topRock()))
                 return false;
+            if (inSlot && !f.slotIn(biomes))
+                return false;
+            if (ground != 0 && (f.ground() & ground) == 0)
+                return false;
             if (!replaces.isEmpty() && !f.plainIn(replaces))
                 return false;
             return keeps.isEmpty() || !f.plainIn(keeps);
@@ -169,7 +195,7 @@ public final class BiomeRuleSet {
     }
 
     private static final Set<String> RULE_KEYS = Set.of("id", "biomes", "role", "koppen", "t_mean_c", "t_warm_c", "t_cold_c", "p_mm",
-            "elevation_m", "wetland", "ice", "playa", "volcanic", "rock", "replaces", "keeps", "exclusive", "_comment");
+            "elevation_m", "wetland", "ice", "playa", "volcanic", "rock", "ground", "in_slot", "replaces", "keeps", "exclusive", "_comment");
     private static final Set<String> WETLAND = Set.of("any", "warm", "cold", "none");
     private static final Set<String> ROLES = Set.of("hot_spring_field", "caldera", "crater", "cone", "ash_field", "lava_field",
             "thermal_caves");
@@ -211,10 +237,17 @@ public final class BiomeRuleSet {
         String wetland = o.has("wetland") ? o.get("wetland").getAsString().toLowerCase(Locale.ROOT) : null;
         if (wetland != null && !WETLAND.contains(wetland))
             throw new IllegalArgumentException(where + ": wetland must be one of " + WETLAND);
+        int ground = 0;
+        for (String g : strings(o, "ground", where)) {
+            GeologyGround.Role r = GeologyGround.Role.byId(g);
+            if (r == null)
+                throw new IllegalArgumentException(where + ": unknown ground '" + g + "' (one of " + GeologyGround.Role.ids() + ")");
+            ground |= r.bit();
+        }
         return new Rule(id, biomes, role, strings(o, "koppen", where), range(o, "t_mean_c", where), range(o, "t_warm_c", where),
                 range(o, "t_cold_c", where), range(o, "p_mm", where), range(o, "elevation_m", where), wetland, bool(o, "ice"),
-                bool(o, "playa"), bool(o, "volcanic"), strings(o, "rock", where), strings(o, "replaces", where), strings(o, "keeps", where),
-                o.has("exclusive") && o.get("exclusive").getAsBoolean());
+                bool(o, "playa"), bool(o, "volcanic"), strings(o, "rock", where), ground, o.has("in_slot") && o.get("in_slot").getAsBoolean(),
+                strings(o, "replaces", where), strings(o, "keeps", where), o.has("exclusive") && o.get("exclusive").getAsBoolean());
     }
 
     private static Boolean bool(JsonObject o, String key) {

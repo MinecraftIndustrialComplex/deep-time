@@ -60,6 +60,11 @@ enum Command {
         /// Content bundle JSON (rock classes, deposit types; plan §5.4). Optional for now.
         #[arg(long)]
         content: Option<PathBuf>,
+        /// A pack placement table (`crates/deeptime-core/data/climate_mapping/packs/<id>.json`)
+        /// to bake with, as the game does when that biome mod is installed; repeatable, applied
+        /// in order.
+        #[arg(long)]
+        placement_patch: Vec<PathBuf>,
         /// World-data folder to write (`<world>/deeptime`).
         #[arg(long)]
         out: PathBuf,
@@ -751,6 +756,7 @@ fn main() -> ExitCode {
             start,
             length_myr,
             content,
+            placement_patch,
             out,
             viewer,
             checkpoints,
@@ -764,6 +770,7 @@ fn main() -> ExitCode {
                 start,
                 length_myr,
                 content,
+                placement_patch,
                 out,
                 viewer,
                 checkpoints,
@@ -1741,6 +1748,7 @@ mod tests {
             start: None,
             length_myr: None,
             content: None,
+            placement_patch: Vec::new(),
             out: dir.join("dummy"),
             viewer: Some(dir.join("viewer")),
             checkpoints: true,
@@ -1813,6 +1821,7 @@ mod tests {
             start: None,
             length_myr: None,
             content: None,
+            placement_patch: Vec::new(),
             out: dir.join("w"),
             viewer: None,
             checkpoints: false,
@@ -2239,6 +2248,7 @@ mod tests {
             start: None,
             length_myr: Some(40.0),
             content: None,
+            placement_patch: Vec::new(),
             out: dir.join("world"),
             viewer: None,
             checkpoints: false,
