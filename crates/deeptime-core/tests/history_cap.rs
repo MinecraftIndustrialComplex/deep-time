@@ -7,7 +7,7 @@
 //! else.
 
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use deeptime_core::CoreError;
@@ -21,6 +21,10 @@ static GLOBAL: CountingAlloc = CountingAlloc;
 
 struct Gauge;
 
+/// Each phase's highest count in the current run (name, bytes), for the report of where a run
+/// went over its cap.
+static PHASES: Mutex<Vec<(String, u64)>> = Mutex::new(Vec::new());
+
 impl MemoryGauge for Gauge {
     fn in_use(&self) -> u64 {
         alloc::in_use()
@@ -28,9 +32,16 @@ impl MemoryGauge for Gauge {
     fn peak(&self) -> u64 {
         alloc::peak()
     }
-    fn phase(&self, _name: &str, begin: bool) {
+    fn phase(&self, name: &str, begin: bool) {
         if begin {
             alloc::start_window();
+            return;
+        }
+        let peak = alloc::window_peak();
+        let mut p = PHASES.lock().unwrap();
+        match p.iter_mut().find(|(n, _)| n == name) {
+            Some(e) => e.1 = e.1.max(peak),
+            None => p.push((name.to_owned(), peak)),
         }
     }
     fn phase_peak(&self) -> u64 {
@@ -38,6 +49,9 @@ impl MemoryGauge for Gauge {
     }
     fn release(&self) -> u64 {
         alloc::release_cache()
+    }
+    fn keep_below(&self, bytes: u64) {
+        alloc::keep_below(bytes);
     }
 }
 
@@ -89,6 +103,8 @@ fn without_times(text: &str) -> Value {
 struct Outcome {
     world: WorldState,
     peak: u64,
+    /// Each phase's peak (above the run's start).
+    phases: Vec<(String, u64)>,
     /// The most a reservation asked for, without the history's frames then in memory.
     needed: u64,
     spilled_frames: u64,
@@ -103,6 +119,7 @@ fn run(json: &str, cap: u64, name: &str) -> Result<Outcome, CoreError> {
     ));
     let _ = std::fs::remove_dir_all(&dir);
     alloc::reset_peak();
+    PHASES.lock().unwrap().clear();
     let s = Session::create(
         json,
         "",
@@ -140,6 +157,12 @@ fn run(json: &str, cap: u64, name: &str) -> Result<Outcome, CoreError> {
         }
     };
     let peak = alloc::peak() - start;
+    let phases = PHASES
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(n, b)| (n.clone(), b.saturating_sub(start)))
+        .collect();
     eprintln!("[{name}] {spills} spill lines");
     result?;
     let world = s.with_world(Clone::clone)?;
@@ -150,6 +173,7 @@ fn run(json: &str, cap: u64, name: &str) -> Result<Outcome, CoreError> {
     Ok(Outcome {
         world,
         peak,
+        phases,
         needed,
         spilled_frames,
     })
@@ -191,9 +215,15 @@ fn a_run_over_its_cap_spills_its_history_and_ends_the_same() {
     assert!(capped.spilled_frames > 0, "frames went to disk");
     assert!(capped.peak < free.peak, "the spill kept the peak down");
     // The cap holds: the run never held more than it (memacct, 2026-10-04).
+    let over: Vec<String> = capped
+        .phases
+        .iter()
+        .filter(|(_, b)| *b > cap)
+        .map(|(n, b)| format!("{n} {:.1} MiB", *b as f64 / 1048576.0))
+        .collect();
     assert!(
         capped.peak <= cap,
-        "the run held {:.1} MiB under a {:.1} MiB cap",
+        "the run held {:.1} MiB under a {:.1} MiB cap (over it in: {over:?})",
         capped.peak as f64 / 1048576.0,
         cap as f64 / 1048576.0
     );

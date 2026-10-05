@@ -43,12 +43,16 @@ static EARLIER_PEAK: AtomicU64 = AtomicU64::new(0);
 /// The current large-block threshold ([`set_large_threshold`]; `usize::MAX`: off).
 static LARGE: AtomicUsize = AtomicUsize::new(LARGE_BYTES);
 
-/// At most this many bytes of freed large blocks are kept for reuse.
-pub const CACHE_BYTES: usize = 256 << 20;
+/// At most this many bytes of freed large blocks are kept for reuse. Measured on quick 16k
+/// (memacct, 2026-10-04, CPU time against glibc's malloc): none +27 %, 256 MiB +16 %, 1 GiB +5 %;
+/// the coupled stages free and reallocate up to ~1 GiB of grids a step.
+pub const CACHE_BYTES: usize = 1 << 30;
 /// The current limit of the kept blocks ([`set_cache_limit`]).
 static CACHE_LIMIT: AtomicUsize = AtomicUsize::new(CACHE_BYTES);
 /// At most this many kept blocks.
-const SLOTS: usize = 64;
+const SLOTS: usize = 128;
+/// Kept blocks never hold the count above this ([`keep_below`]).
+static CEILING: AtomicU64 = AtomicU64::new(u64::MAX);
 
 /// Freed large blocks kept for reuse, oldest first: `(address, page-rounded length)`.
 struct Cache {
@@ -93,7 +97,7 @@ impl Cache {
     /// bigger than the whole limit (the caller unmaps it).
     fn put(&mut self, p: *mut u8, len: usize) -> bool {
         let limit = CACHE_LIMIT.load(Ordering::Relaxed);
-        if len > limit {
+        if len > limit || in_use() > CEILING.load(Ordering::Relaxed) {
             return false;
         }
         while self.n > 0 && (self.n == SLOTS || self.bytes + len > limit) {
@@ -103,6 +107,16 @@ impl Cache {
         self.n += 1;
         self.bytes += len;
         true
+    }
+}
+
+/// Kept blocks never hold the count above `bytes`: the oldest go back to the OS now until it is
+/// under, and a freed block is not kept while it is over (`MemoryGauge::keep_below`).
+pub fn keep_below(bytes: u64) {
+    CEILING.store(bytes, Ordering::Relaxed);
+    let mut c = cache();
+    while c.n > 0 && in_use() > bytes {
+        c.drop_oldest();
     }
 }
 
@@ -255,6 +269,12 @@ impl CountingAlloc {
             let p = os::map(len);
             if !p.is_null() {
                 added(len);
+                if in_use() > CEILING.load(Ordering::Relaxed) {
+                    let mut c = cache();
+                    while c.n > 0 && in_use() > CEILING.load(Ordering::Relaxed) {
+                        c.drop_oldest();
+                    }
+                }
             }
             return p;
         }
@@ -404,6 +424,9 @@ impl MemoryGauge for AllocGauge {
     }
     fn release(&self) -> u64 {
         release_cache()
+    }
+    fn keep_below(&self, bytes: u64) {
+        keep_below(bytes);
     }
 }
 

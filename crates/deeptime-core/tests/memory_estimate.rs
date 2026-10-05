@@ -36,6 +36,9 @@ impl MemoryGauge for Gauge {
     fn release(&self) -> u64 {
         alloc::release_cache()
     }
+    fn keep_below(&self, bytes: u64) {
+        alloc::keep_below(bytes);
+    }
     fn phase(&self, name: &str, begin: bool) {
         if begin {
             alloc::start_window();

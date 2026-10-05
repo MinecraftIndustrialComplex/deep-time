@@ -65,6 +65,9 @@ impl MemoryGauge for AllocGauge {
     fn release(&self) -> u64 {
         counts::release_cache()
     }
+    fn keep_below(&self, bytes: u64) {
+        counts::keep_below(bytes);
+    }
     fn reserved(&self, needed: u64, granted: bool) {
         if trace().is_some() {
             RESERVED.fetch_max(needed, Ordering::Relaxed);
