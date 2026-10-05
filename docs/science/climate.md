@@ -17,6 +17,7 @@ The constants of the per-cell design were checked against their sources before t
 | [CLM](ledger/CLM.md) | land ice and sea ice | CLM-092 to CLM-112, CLM-135 (22) |
 | [CLM](ledger/CLM.md) | mountain glaciers | CLM-113 to CLM-118 (6) |
 | [CLM](ledger/CLM.md) | moisture budget (built behind `rain_model = budget`, not the default) | CLM-139 to CLM-146 (8) |
+| [CLM](ledger/CLM.md) | the belts' rain amount (`belts_rain_scale`); the upwind rain is on [upwind-rain.md](upwind-rain.md) | CLM-201 (1) |
 | [CLM](ledger/CLM.md) | ice branch: the flowing-sheet switch, present-day climate, supply-limited and seafloor weathering (merged 2026-10-02) | CLM-147 to CLM-162 (16) |
 | [GLA](ledger/GLA.md) | the flowing ice sheet (`climate/sheet.rs`, off by default) and the ice mass balance for the hydrology; on the glacial page | GLA-067 to GLA-076 (10) |
 | [MOI](ledger/MOI.md) | wind and rain belts | MOI-001 to MOI-033 (33) |
@@ -63,6 +64,36 @@ OLR(T)  = A + B T − F(C, T) − c_snow · frozen share       A = 203.3 W/m², 
 - A + B T already carries about 20 W/m² of longwave cloud greenhouse at snowball temperatures. Extra cloud forcing on frozen surfaces is a setting (`climate.snowball_cloud_w_m2`, default 0, range 0 to 20 W/m²; Ben, decisions log 2026-10-02).
 - Not modelled: CO₂ condensation, Rayleigh scattering of a dense CO₂ atmosphere, clouds' state dependence. The source states no error for the table; Kopparapu et al. say the method tends to overestimate the greenhouse effect of dense CO₂ atmospheres. The research note puts it at about ±10 % in forcing at 0.1 to 1 bar from the radiation alone.
 - Expected effect: the escape CO₂ of a snowball falls (the note's 1-D stand-in: about 1.9·10⁵ ppm at today's Sun against 3.3·10⁵ with the old law; the real clock's escapes are listed in each run's notes beside Hoffman et al. 2017's 10⁴ to 10⁵ ppm, CLM-166).
+
+## The belts' rain amount, 2026-10-06
+
+On Earth's own relief and CO₂ (`deeptime climate-dem`, scored by `tools/validation/climate_vs_obs.py --obs`
+against Beck et al. 2023) the belts rained 532 mm a year over land, against Earth's 773 mm. Ben chose to
+keep the belts as the default rain and scale their amount to Earth's (decisions log 2026-10-06, "Belts,
+scaled up to Earth's amount (Recommended)"): `climate.belts_rain_scale` multiplies every L1 cell's
+circulation rain before the mountains' rain is added, so the pattern stays the belts' (CLM-201, a
+calibration on Earth's own inputs, which the 2026-10-05 validation policy allows). Its value, 1.42, gives
+773 mm; 1.40 gave 762 and 1.45 790.
+
+| Earth's relief, 280 ppm | Earth (Beck) | Factor 1.0 | Factor 1.42 |
+|---|---|---|---|
+| Land rain, mm | 773 | 532 | 773 |
+| ln annual rain over land, RMSE; bias | – | 1.135; −0.05 | 1.173; +0.33 |
+| Köppen exact class; main group | – | 33.8 %; 63.7 % | 30.9 %; 61.8 % |
+| Köppen land shares A / B / C / D / E | 0.19 / 0.32 / 0.11 / 0.23 / 0.15 | 0.14 / 0.29 / 0.14 / 0.22 / 0.21 | 0.17 / 0.16 / 0.24 / 0.23 / 0.20 |
+| Reference cities in the right main group (target 21 of 24) | – | 19 | 21 |
+| Global mean temperature (target 14.1 ± 0.4 °C) | – | 13.82 °C | 14.41 °C |
+| The planet's mean rain, land and sea (reference line) | about 990 mm (GPCP, from memory) | 764 mm | 1,095 mm |
+| Mumbai; Sahara; Atacama, mm | 3,096; 11; 16 | 623; 244; 179 | 904; 359; 252 |
+
+What it does. Earth's amount is now right, and the reference cities gain two: Mumbai, Buenos Aires and
+Anchorage reach their main group, Cairo (now Csa, 436 mm) leaves its desert. The belts' errors are spread differently, not removed: their deserts were already too wet
+(the Sahara 280 mm against 25), and a uniform factor wets them further, so the desert share of the land
+falls from 0.29 to 0.16 (Earth 0.32) and the Köppen agreement drops by two points. The global mean warms by
+0.6 K because fewer bright deserts reflect sunlight (`desert_albedo`, CLM-123). The pattern's errors
+(no monsoons, wet deserts) are the follow-up Ben named for both rain models.
+
+PLANETS-PENDING
 
 ## Known before the page is written
 
