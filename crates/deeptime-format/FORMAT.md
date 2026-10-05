@@ -72,6 +72,7 @@ position derived from a latitude changed. 0.3 worlds are refused.
   rasters/climate/p_mm.dtr      L1, u16, mm/yr              │ a baked planet run only
   rasters/climate/koppen.dtr    L1, u8, Köppen code index   │ (P1-08, "The bake" below)
   rasters/climate/ice_cover.dtr L2, u8, blocks of snow/ice  │ ("The ice cover")
+  rasters/climate/koppen_l2.dtr L2, u8, the biome inputs' Köppen │
   rasters/climate/wetland.dtr   L2, u8, 0 none 1 swamp 2 cold │ ("The wetland flag")
   rasters/climate/month/*.dtr   L1: t_sl_c_NN i16 0.01 °C,  │ the twelve months (0.2, P1-25)
                                 p_share_NN u8 1/40          │
@@ -173,6 +174,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `climate/p_mm` | L1 | u16 | 1, mm/yr | — | annual precipitation |
 | `climate/koppen` | L1 | u8 | 1, code index | 255 | `notes.bake.climate.koppen_codes[i]` (31 = sea) |
 | `climate/ice_cover` | L2 | u8 | 1, blocks | — | blocks of snow and ice the surface pass lays over glaciated ground ("The ice cover"); absent without the climate stage |
+| `climate/koppen_l2` | L2 | u8 | 1, code index | 255 | the Köppen class the biome inputs were placed by (each L2 cell's temperatures lapsed to its own height); absent when the class was decided on L1. Checks of biomes against classes read this, not the L1 `climate/koppen` |
 | `climate/wetland` | L2 | u8 | 1, flag | — | 0 not wetland, 1 temperate or warm wetland (vanilla's swamp band E6), 2 cold wetland: boreal peatland ("The wetland flag") |
 | `climate/month/t_sl_c_{01..12}` | L1 | i16 | 0.01, degC | — | each month's mean temperature at sea level (the lapse rate taken out: `+ lapse_c_per_km · max(0, h − sea)`), from the climate stage's last snapshot (0.2) |
 | `climate/month/p_share_{01..12}` | L1 | u8 | 1/40, ratio | — | each month's precipitation rate over the twelve's mean (0–6.375; they sum to 12 within the quantum) (0.2) |

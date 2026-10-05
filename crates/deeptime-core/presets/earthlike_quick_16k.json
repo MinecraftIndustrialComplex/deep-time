@@ -83,7 +83,7 @@
     "collision_threshold_km": 100.0,
     "subduction_peak_km": 300.0,
     "collision_belt_km": 400.0,
-    "collision_stacking_share": 0.8,
+    "collision_stacking_share": 0.95,
     "wedge_slope_deg": 1.5,
     "weld_speed_mm_yr": 5.0,
     "weld_after_myr": 10.0,
