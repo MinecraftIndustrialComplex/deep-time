@@ -501,7 +501,7 @@ def cmd_scale_region(a):
     """The window every scale is rendered over: land at every scale, high relief, off the poles and the seam. The scales share
     seed, start and length, so the plates agree, but the hydrology and the sea level the solvers settle on differ with the
     block's size (a 2026-10-05 run's window on the 1:300 bake was open sea at 1:100), so the window is chosen on all three
-    bakes: at least `want` land in each (0.6, then 0.4), the most relief summed over the scales."""
+    bakes: at least `want` land in each (0.6, then lower down the ladder), the most relief summed over the scales."""
     maps = []
     for label, m in SCALES:
         wd = os.path.join(a.work, f"h{int(m)}", "planet", "deeptime")
@@ -517,7 +517,7 @@ def cmd_scale_region(a):
     assert all((r, cc) == (rows, cols) for r, cc, _, _ in maps), "the bakes' grids differ"
     win = REGION // step
     best = None
-    for want in (0.6, 0.4):
+    for want in (0.6, 0.4, 0.25, 0.15, 0.05):   # the 1:100 planet is ~10 % land: the ladder goes down
         for r0 in range(int(rows * 0.2), rows - win - int(rows * 0.2), win // 4):
             for c0 in range(win, cols - 2 * win, win // 4):   # off the seam
                 score = 0.0
