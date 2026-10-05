@@ -13,7 +13,7 @@ here is heavy except what `serve` execs (tools/smoke/run.py admits itself) and `
 calls (a few chunks each). Standard library only.
 
 `pick` reads a first-start world's sites (deeptime dump-deposits), chooses the porphyry nearest to spawn
-with its gossan, its placer child, three more porphyries of other tonnages, petroleum traps and empty
+with its gossan, the nearest placer shed by a porphyry, three more porphyries of other tonnages, petroleum traps and empty
 chunks, and writes the plan: the Chunky squares and the RCON probes a second server run executes. `serve`
 runs that second boot (the world stays; no --fresh). `geology` and `compat` read the probes it recorded
 (smoke/<profile>/rcon.jsonl) and `deeptime-inspect`, and print one line per check:
@@ -104,18 +104,27 @@ def cmd_pick(a):
         return wdist(c, sx, sz, s["center"][0], s["center"][2])
 
     def complete(s):
-        """A porphyry with a gossan body and a placer-gold child: the one item 3 can show in full."""
-        return any(b["role"] == "gossan" for b in by_site.get(s["id"], [])) and any(k.get("parent") == s["id"] for k in of(PLACER))
+        """A porphyry with a gossan body: the one item 3 can show in full (its placer is another site: below)."""
+        return any(b["role"] == "gossan" for b in by_site.get(s["id"], []))
 
-    # Nearest first among the porphyries within the essentials reach that show the whole chain (gossan, placer child),
-    # then the others in reach, then the rest: a body that lacks a gossan or a child is a finding, but one that has
-    # them elsewhere in reach should be the one shown.
+    # Nearest first among the porphyries within the essentials reach (when the preset still has one) that show a gossan,
+    # then the others in reach, then the rest: a body that lacks a gossan is a finding, but one that has it elsewhere
+    # in reach should be the one shown.
     por = sorted(of(PORPHYRY), key=lambda s: (reach is not None and dist(s) > reach, not complete(s), dist(s)))
+    # The placer (Ben, 2026-10-05: "a placer whose why-chain ends in an eroded porphyry"): a placer site whose forming
+    # event names a porphyry as its parent type, the nearest to spawn first. Its `deeptime why` chain is read in the game.
+    forming = {e["id"]: e for e in d["events"]["forming"]}
+
+    def porphyry_placer(s):
+        e = forming.get(s["forming_event"]) or {}
+        return short((e.get("params") or {}).get("parent_type", "")) == PORPHYRY
+
+    placers = sorted((s for s in of(PLACER) if porphyry_placer(s)), key=dist)
     plan = {"circumference": c, "spawn": {"x": sx, "z": sz}, "essentials_reach": reach,
             "essentials": ranked, "manifest_essentials": (manifest.get("notes") or {}).get("essentials"),
             "counts": {short(t): sum(1 for s in sites if short(s["deposit_type"]) == short(t))
                        for t in {s["deposit_type"] for s in sites}},
-            "placers": {"total": len(of(PLACER)), "with_parent": sum(1 for k in of(PLACER) if k.get("parent") is not None)},
+            "placers": {"total": len(of(PLACER)), "from_porphyry": len(placers)},
             "porphyry": None, "gossan": None, "placer": None, "others": [], "traps": [], "empty": [],
             "chunky": [], "rcon": []}
     if por:
@@ -126,15 +135,15 @@ def cmd_pick(a):
                                        for b in by_site.get(p["id"], [])]}
         g = next((b for b in by_site.get(p["id"], []) if b["role"] == "gossan"), None)
         plan["gossan"] = g
-        kids = [s for s in of(PLACER) if s.get("parent") == p["id"]]
-        if kids:
-            k = min(kids, key=lambda s: wdist(c, p["center"][0], p["center"][2], s["center"][0], s["center"][2]))
-            plan["placer"] = {"site": k["id"], "center": k["center"], "aabb": k["aabb"], "tonnage_t": tonnage(k),
-                              "distance_to_parent": round(wdist(c, p["center"][0], p["center"][2], k["center"][0], k["center"][2]), 1)}
         # Three more porphyries across the tonnage range (for "yield follows tonnage").
         rest = sorted((s for s in por[1:] if tonnage(s) > 0), key=tonnage)
         picks = [rest[int(i * (len(rest) - 1) / 2)] for i in range(3)] if len(rest) >= 3 else rest
         plan["others"] = [{"site": s["id"], "center": s["center"], "tonnage_t": tonnage(s)} for s in picks]
+    if placers:
+        k = placers[0]
+        ep = (forming.get(k["forming_event"]) or {}).get("params") or {}
+        plan["placer"] = {"site": k["id"], "center": k["center"], "aabb": k["aabb"], "tonnage_t": tonnage(k),
+                          "distance_to_spawn": round(dist(k), 1), "transport_km": ep.get("transport_km")}
     traps = sorted(of(TRAP), key=tonnage, reverse=True)
     plan["traps"] = [{"site": s["id"], "center": s["center"], "tonnage_t": tonnage(s)} for s in traps[:3]]
     # Empty chunks: the spots of a 512-block grid over the planet (a 2026-10-04 run found that the spawn candidates
@@ -178,7 +187,8 @@ def cmd_pick(a):
     if plan["placer"]:
         x, y, z = (int(v) for v in plan["placer"]["center"])
         chunky.append([x, z, 96])
-        rc += [f"forceload add {x} {z}", "sleep 3", f"deeptime sites near {x} {z} 400", f"deeptime probe site {x} {y} {z}"]
+        rc += [f"forceload add {x} {z}", "sleep 3", f"deeptime sites near {x} {z} 400", f"deeptime why {plan['placer']['site']}",
+               f"deeptime probe site {x} {y} {z}"]
         ring_probes("coe", chunk_of(x), chunk_of(z))
     for o in plan["others"]:
         ring_probes("coe", chunk_of(int(o["center"][0])), chunk_of(int(o["center"][2])))
@@ -261,8 +271,8 @@ def cmd_geology(a):
         check(por["distance_to_spawn"] <= reach, "a porphyry site within the essentials reach of spawn",
               f"site {por['site']} is {por['distance_to_spawn']:.0f} blocks from spawn {plan['spawn']['x']},{plan['spawn']['z']}; reach {reach}")
     if not por:
-        for t in ("`probe site` returns the body", "copper ore inside the body", "a gossan where the body is exposed",
-                  "placer gold downstream, a child of the porphyry"):
+        for t in ("`probe site` returns the porphyry's body", "`deeptime-inspect` shows copper ore inside the body", "a gossan where the body is exposed",
+                  "a placer whose why-chain ends in an eroded porphyry"):
             check(False, t, "no porphyry site")
         return
 
@@ -315,18 +325,35 @@ def cmd_geology(a):
         check(False, "a gossan where the body is exposed",
               f"site {por['site']} has no gossan body (a body that is not exposed has none; bodies: {[b['role'] for b in por['bodies']]})")
 
-    # 3e: placer gold, a child, downstream
-    if pla:
-        down = pla["center"][1] < por["center"][1]
-        lo, hi = pla["aabb"]
-        pb = blocks_in(a.world, lo[0], lo[2], hi[0], hi[2])
-        gold = count(pb, ("gold_ore", "raw_gold_block"))
-        check(down and gold > 0, "placer gold downstream, a child of the porphyry",
-              f"site {pla['site']} (parent {por['site']}) {pla['distance_to_parent']:.0f} blocks away, centre y {pla['center'][1]} vs porphyry y "
-              f"{por['center'][1]} ({'lower' if down else 'NOT lower'}); {gold} gold ore blocks in its footprint")
-    else:
-        check(False, "placer gold downstream, a child of the porphyry", f"no {PLACER} site has parent {por['site']} ({plan.get('placers', {}).get('with_parent', '?')} of "
-              f"{plan.get('placers', {}).get('total', '?')} placer sites have any parent: the placers come from the channel engine, not from a porphyry)")
+    # 3e: a placer whose why-chain ends in an eroded porphyry (Ben, 2026-10-05; a placer is shed by a porphyry that
+    # erosion took, so the chain, not a surviving parent site, is the evidence), with gold in its footprint.
+    title = "a placer whose why-chain ends in an eroded porphyry"
+    if not pla:
+        check(False, title, f"no {PLACER} site has a porphyry as its parent type ({plan.get('placers', {}).get('from_porphyry', '?')} of "
+              f"{plan.get('placers', {}).get('total', '?')} placer sites do)")
+        return
+    why = [p for p in probes(rows, "why") if p.get("site") == pla["site"]]
+    chain = (why[0].get("chain") or []) if why else []
+    if not why:
+        check(False, title, f"no `deeptime why {pla['site']}` answer (did the second boot run?)")
+        return
+
+    def kind(e):
+        return short(e.get("kind", ""))
+
+    exh = next((e for e in chain if kind(e) == "deposit_exhumation"), None)
+    form = next((e for e in chain if kind(e) == "deposit_formation" and short((e.get("params") or {}).get("deposit_type", "")) == PORPHYRY), None)
+    ex_p = (exh or {}).get("params") or {}
+    eroded = exh is not None and (ex_p.get("eroded_m") or 0) > 0 and (ex_p.get("destroyed") == 1 or (ex_p.get("fraction_left") if ex_p.get("fraction_left") is not None else 1) < 1)
+    in_chain = exh is not None and short(ex_p.get("deposit_type", "")) == PORPHYRY and form is not None
+    lo, hi = pla["aabb"]
+    pb = blocks_in(a.world, lo[0], lo[2], hi[0], hi[2])
+    gold = count(pb, ("gold_ore", "raw_gold_block"))
+    kinds = " <- ".join(kind(e) for e in [why[0].get("forming_event") or {}] + chain)
+    check(eroded and in_chain and gold > 0, title,
+          f"site {pla['site']} ({pla['distance_to_spawn']:.0f} blocks from spawn): {kinds}; the porphyry lost {ex_p.get('eroded_m', 0) / 1000:.1f} km "
+          f"({'destroyed' if ex_p.get('destroyed') == 1 else 'fraction left ' + str(ex_p.get('fraction_left'))}), placer gold carried {pla.get('transport_km')} km; "
+          f"{gold} gold ore blocks in its footprint")
 
 
 def cmd_compat(a):

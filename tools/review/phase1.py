@@ -11,7 +11,8 @@ Steps (ids), in the order they run; each item of the plan is one or more rows:
   build           (no row) cargo build --release of deeptime and deeptime-inspect on the VM
   bench           item 1: `deeptime bench` quick 16k <= 300 s, full 16k <= 900 s at 8 threads, peak memory <= the estimate
   smoke-mic       item 2: MIC smoke from an empty world with earthlike_quick_16k: first start, boot, every mixin, probes
-  geology         items 3 and 4: porphyry within the essentials reach, `probe site`, copper ore, gossan, placer,
+  geology         items 3 and 4: porphyry (within the essentials reach while the preset names one), `probe site`, copper ore, gossan, a placer whose
+                  why-chain ends in an eroded porphyry (Ben, 2026-10-05),
                   BlueMap; COE and CDG over sites and over nothing  (tools/review/phase1_vm.py: pick, serve, geology, compat)
   gametest-mic    item 5: `climateConsistent` (MIC)
   gametest-tb     item 5: `regionsFollowProvinces` (TerraBlender)
@@ -266,7 +267,7 @@ def step_geology(a):
     ck = [("PASS" if k[0] else "FAIL", k[1], [k[2]]) for k in com]
     boot = kid(boot_ok, "the second boot (Chunky over the sites, the probes) finished without a failed check", srv.strip().splitlines()[-1] if srv.strip() else "no output")
     secs = time.time() - t0
-    return [Row("geology", 3, "Geology in the world: porphyry within reach of spawn, `probe site`, copper ore, gossan, placer gold, BlueMap",
+    return [Row("geology", 3, "Geology in the world: porphyry within reach of spawn, `probe site`, copper ore, gossan, a placer whose why-chain ends in an eroded porphyry, BlueMap",
                 status_of(gk + [boot], need=6), [f"plan: review/out/phase1/plan.json", "pictures and JSON: review/out/phase1/geology/"], gk + [boot], secs),
             Row("compat", 4, "COE reports the copper vein over the porphyry and nothing elsewhere, yield follows tonnage; CDG reports oil over a trap and none elsewhere",
                 status_of(ck, need=5), ["probes: smoke/mic/rcon.jsonl"], ck, 0.0)]
