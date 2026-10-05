@@ -19,6 +19,10 @@
 //! (P1-09; the preset's `biomes` section holds its knobs). The game maps them once more per world
 //! onto the pack's bands and distributions (`ClimateMappingBuilder`, `climate_mapping.json`).
 //!
+//! **The wetland flag** (`climate/wetland`, L2, u8): 0 none, 1 temperate or warm wetland (vanilla's
+//! swamp band), 2 cold wetland (boreal peatland: taiga in vanilla, the pack's peatland biome where it
+//! has one; BIO-133).
+//!
 //! **The ice cover** (`climate/ice_cover`, L2, u8, blocks): how much snow and ice the game's surface
 //! pass lays over ground above its equilibrium line, whatever the biome ([`super::ice`]).
 
@@ -177,6 +181,19 @@ pub fn bake(
             &raw,
         )?;
     }
+    // Which land is wetland (BIO-133): 1 = swamp band (temperate and warm), 2 = cold wetland, where
+    // the game puts the pack's peatland biome if it has one.
+    out.layer(
+        desc(
+            "climate/wetland",
+            DType::U8,
+            &l2,
+            1.0,
+            "0 none, 1 swamp band (E6), 2 cold wetland (peatland)",
+            None,
+        ),
+        &mapped.wetland,
+    )?;
     // The ice cover of the surface pass (`ice.rs`): blocks of snow and ice over glaciated ground,
     // from the climate's land-ice thickness when it has one (the deep-time climate's ice sheets and
     // glaciers), else from the height above the equilibrium line; without either there is none.
