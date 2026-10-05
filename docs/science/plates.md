@@ -195,9 +195,17 @@ measured tables (`plate-check` at 1000 Myr and the 500 Myr hypsometry ensemble).
   before a weld (PLT-246). The sources say when collapse starts (as thickening ends, Variscan; with
   a change of the plate boundary, Nevada) but not how long after; on Earth thinning can lag
   thickening by tens of Myr (the Basin and Range: Lundstern & Miller 2021, abstract).
-- The threshold (55 km at first, 50 km since the force balance, 2026-10-05) and the quiet time were chosen among values the sources allow by the
-  1000 Myr crust share (build log): with 50 km the crust ended at 0.52 of the planet, over the
-  check's ceiling of 0.45. That is a calibration inside the sources' range, not a measured value.
+- The threshold was 55 km at first, chosen among the sources' values by the 1000 Myr crust share
+  on the old motion law (with 50 km the crust ended at 0.52 of the planet). Since 2026-10-05 it
+  is 50 km, the figure Mooney et al. state, under Ben's validation policy of that day: physics
+  from sources, and the land and crust shares reported against Earth rather than tuned. The quiet
+  time is still the stall time before a weld, not a sourced value.
+- Since 2026-10-05 crust beyond `crust_max_km` first widens the plateau (PLT-277): it fills
+  continental crust thinner than the limit and ocean floor up to the normal column within
+  `collapse_reach_km`, and only what finds no room founders. Earth loses about 0.7 km³ of
+  continental crust a year at all collision zones, about 0.3 km³/yr of it deep continental crust
+  (Stern & Scholl 2010, after Scholl & von Huene 2009); the model's foundering was several km³ a
+  year under the force balance before this rule (build log 2026-10-05).
 - Thickness beyond `crust_max_km` is removed whether the crust is felsic or mafic. Felsic crust
   does not founder by itself (Wang et al. 2021); in the model the limit stands for continental
   subduction at the front as much as for foundering.
