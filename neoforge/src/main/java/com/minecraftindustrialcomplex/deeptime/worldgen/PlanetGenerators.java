@@ -36,6 +36,11 @@ public final class PlanetGenerators {
             ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "planet"));
     public static final ResourceKey<WorldPreset> PLANET_32K = ResourceKey.create(Registries.WORLD_PRESET,
             ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "planet_32k"));
+    /** Lambert's map (Ben, 2026-10-04: Petroff–Guyou by default, Lambert kept as a setting). */
+    public static final ResourceKey<WorldPreset> PLANET_LAMBERT = ResourceKey.create(Registries.WORLD_PRESET,
+            ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "planet_lambert"));
+    public static final ResourceKey<WorldPreset> PLANET_LAMBERT_32K = ResourceKey.create(Registries.WORLD_PRESET,
+            ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "planet_lambert_32k"));
 
     private PlanetGenerators() {}
 
@@ -46,18 +51,21 @@ public final class PlanetGenerators {
     }
 
     /**
-     * The dimensions with the overworld bound to staging folder {@code stagingId} and circumference
-     * {@code circumference}. The biome source and noise settings are the current Deep Time
-     * overworld's, else those of the {@code deeptime:planet} world preset.
+     * The dimensions with the overworld bound to staging folder {@code stagingId}, the world's x period
+     * {@code circumference} and its {@code projection} ({@code petroff_guyou} or {@code lambert}: the
+     * accepted run's, {@link com.minecraftindustrialcomplex.deeptime.preset.Presets.Info#worldCircumference}).
+     * The biome source and noise settings are the current Deep Time overworld's, else those of the
+     * {@code deeptime:planet} world preset.
      */
-    public static WorldDimensions withStaging(RegistryAccess registries, WorldDimensions dims, String stagingId, int circumference) {
+    public static WorldDimensions withStaging(RegistryAccess registries, WorldDimensions dims, String stagingId, int circumference,
+                                              String projection) {
         if (!Staging.isId(stagingId))
             throw new IllegalArgumentException("not a staging id: " + stagingId);
         GeologicChunkGenerator base = overworld(dims).orElseGet(() -> presetOverworld(registries));
         WorldDataRef old = base.dataRef();
         // The pole cap lines stay the world preset's (P1-18); folder likewise.
         WorldDataRef ref = new WorldDataRef(old.folder(), circumference, Optional.empty(), Optional.of(stagingId),
-                old.poleCapDeg(), old.poleStopDeg());
+                old.poleCapDeg(), old.poleStopDeg(), projection);
         ChunkGenerator generator = new GeologicChunkGenerator(base.getBiomeSource(), base.sourceSettings(), ref);
         return dims.replaceOverworldGenerator(registries, generator);
     }

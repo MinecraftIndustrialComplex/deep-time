@@ -165,9 +165,42 @@ pub fn m_per_block_h(preset_json: &str) -> f64 {
 
 /// The view of a finished run's world data (`sites/` and `bodies/`), or `None` when the run has no
 /// sites file (a run that ended before the deposit stage, or was cut short).
+///
+/// The overlay is drawn over the simulation's Lambert pictures (circumference `circumference`), so a
+/// Petroff–Guyou bake's sites and bodies (format 0.5) are brought back to the simulation's frame: each
+/// position through the world's projection to latitude and longitude, then to the Lambert block.
 pub fn from_bake(world: &Path, circumference: u32, m_per_block_h: f64) -> Option<Value> {
-    let (sites, _) = read_sites(world).ok()??;
-    let bodies = read_bodies(world).ok()?.unwrap_or_default();
+    let (mut sites, _) = read_sites(world).ok()??;
+    let mut bodies = read_bodies(world).ok()?.unwrap_or_default();
+    if let Ok(m) = deeptime_format::Manifest::read(world) {
+        let wp = m.world_projection();
+        if let deeptime_format::projection::WorldProjection::PetroffGuyou(_) = wp {
+            let sim = deeptime_format::Projection::new(circumference);
+            let back = |x: f64, z: f64| {
+                let (lat, lon) = wp.lat_lon(x, z);
+                sim.block_of(lat, lon)
+            };
+            for s in &mut sites {
+                let (x, z) = sim.block_of(f64::from(s.lat_lon[0]), f64::from(s.lat_lon[1]));
+                let (dx, dz) = (
+                    x.round() as i32 - s.center[0],
+                    z.round() as i32 - s.center[2],
+                );
+                s.center[0] += dx;
+                s.center[2] += dz;
+                for k in 0..2 {
+                    s.aabb[k][0] += dx;
+                    s.aabb[k][2] += dz;
+                }
+            }
+            for b in &mut bodies {
+                let (x, z) = back(b.center[0], b.center[2]);
+                b.center[0] = x;
+                b.center[2] = z;
+                b.aabb = b.computed_aabb();
+            }
+        }
+    }
     Some(view(&sites, &bodies, circumference, m_per_block_h, BAKE))
 }
 

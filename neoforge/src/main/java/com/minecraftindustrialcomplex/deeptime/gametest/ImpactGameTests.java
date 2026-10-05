@@ -70,7 +70,7 @@ public final class ImpactGameTests {
         Set<String> fates = Set.of("fresh", "degraded", "buried", "eroded_to_roots");
         for (Craters.Crater k : all) {
             if (!(k.diameterM() > 0) || !fates.contains(k.fate()) || k.reliefM() > 1.01 * k.depthM() + 1 || k.reliefM() < 0
-                    || Math.abs(k.x()) > c / 2.0 || Math.abs(k.z()) > com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c)) {
+                    || Math.abs(k.x()) > c / 2.0 || Math.abs(k.z()) > wd.projection().zMax()) {
                 helper.fail("crater " + k.id() + " is not sane: " + k);
                 return;
             }
@@ -80,7 +80,7 @@ public final class ImpactGameTests {
         // its lens at least three blocks thick, drawn by the amplifier with a body under it.
         Craters.Crater best = all.stream()
                 .filter(k -> k.shows() && !k.inSurface() && k.reliefM() >= 3 * mV && k.brecciaM() >= 3 * mV)
-                .filter(k -> Math.abs(k.z()) < com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c) - 64 - 3 * k.diameterM() / mH)
+                .filter(k -> Math.abs(k.z()) < wd.projection().zMax() - 64 - 3 * k.diameterM() / mH)
                 .filter(k -> t.height((int) Math.round(k.x()), (int) Math.round(k.z())) > sea + 2)
                 .max(Comparator.comparingDouble(Craters.Crater::reliefM)).orElse(null);
         if (best == null) {
