@@ -11,7 +11,7 @@
 set -uo pipefail
 OUT="${1:?usage: steering-measure.sh <out> [seeds...]}"; shift
 SEEDS=("${@:-1 2}")
-BIN="$(pwd)/target/release/deeptime"
+BIN="${DEEPTIME_BIN:-$(pwd)/target/release/deeptime}"
 ADMIT="${DEEPTIME_ADMIT:-/usr/local/lib/deeptime/admit.py}"
 mkdir -p "$OUT"
 run() { # name, then deeptime arguments
