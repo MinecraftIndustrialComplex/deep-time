@@ -160,6 +160,65 @@ pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge
     })
 }
 
+/// `createWith` flag: write epoch checkpoints into `<outDir>/epochs/` (docs/design/
+/// playability-steering.md §3).
+const FLAG_EPOCHS: jint = 1;
+/// `createWith` flag: pick up the run already in `outDir` at the preset's stop, from its epoch
+/// checkpoints (`Session::resume_epoch`): an epoch picked, a run stopped early or continued.
+const FLAG_RESUME: jint = 2;
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge_DeepTimeNative_createWith<
+    'l,
+>(
+    mut env: EnvUnowned<'l>,
+    _class: JClass<'l>,
+    preset_json: JString<'l>,
+    content_json: JString<'l>,
+    out_dir: JString<'l>,
+    threads: jint,
+    mem_cap_bytes: jlong,
+    flags: jint,
+) -> jlong {
+    guard(&mut env, |env| {
+        let preset = string_arg(env, &preset_json, "presetJson")?;
+        let content = string_arg(env, &content_json, "contentJson")?;
+        let out_dir = string_arg(env, &out_dir, "outDir")?;
+        if threads < 0 {
+            return Err(BridgeError::IllegalArgument(format!(
+                "threads must be ≥ 0 (0 = all processors), got {threads}"
+            )));
+        }
+        if mem_cap_bytes < 0 {
+            return Err(BridgeError::IllegalArgument(format!(
+                "memCapBytes must be ≥ 0 (0 = default), got {mem_cap_bytes}"
+            )));
+        }
+        if flags & !(FLAG_EPOCHS | FLAG_RESUME) != 0 {
+            return Err(BridgeError::IllegalArgument(format!(
+                "unknown flags {flags:#x} (1 = epochs, 2 = resume)"
+            )));
+        }
+        let options = SessionOptions {
+            out_dir: PathBuf::from(out_dir),
+            threads: threads as usize,
+            mem_cap: mem_cap_bytes as u64,
+        };
+        let mut session = if flags & FLAG_RESUME != 0 {
+            Session::resume_epoch(&preset, &content, options, Arc::new(alloc::AllocGauge))?
+        } else {
+            Session::create(&preset, &content, options, Arc::new(alloc::AllocGauge))?
+        };
+        session.set_epochs(flags & FLAG_EPOCHS != 0)?;
+        let id = SESSIONS.insert(SessionEntry::new(session));
+        GLOBAL_LOG.push(
+            Level::Debug,
+            format!("session {id} created (flags {flags:#x})"),
+        );
+        Ok(id as jlong)
+    })
+}
+
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge_DeepTimeNative_advance<
     'l,
