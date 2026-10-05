@@ -134,7 +134,12 @@ const SPILL_SECONDS_PER_BYTE: f64 = 3.0e-9;
 /// default), as JSON (plan §5.7.5; P1-17's history spill):
 ///
 /// `{"peak_bytes", "base_bytes", "history_bytes", "spill_bytes", "mem_cap",
-///   "stages": [{"name", "bytes", "seconds", "base_bytes", "history_bytes", "spill_bytes"}, …]}`
+///   "stages": [{"name", "bytes", "seconds", "base_bytes", "history_bytes", "spill_bytes",
+///   "coupled_to"}, …]}`
+///
+/// `coupled_to` is the stage a coupled stage steps with (`Stage::coupled_to`), or null: a
+/// running session reports a group of coupled stages as its lead's index and permille, so a
+/// caller weighting progress by the stages' seconds needs the groups.
 ///
 /// A stage's `base_bytes` is its working set without the recorded history (what must fit under
 /// the cap, or the run fails cleanly), `history_bytes` the history at the end of the stage (it
@@ -175,6 +180,7 @@ pub fn estimate_for(
                 "name": s.name(), "bytes": b + held,
                 "seconds": e.seconds + spilled as f64 * SPILL_SECONDS_PER_BYTE,
                 "base_bytes": b, "history_bytes": hist, "spill_bytes": spilled,
+                "coupled_to": s.coupled_to(),
             })
         })
         .collect();
@@ -1176,26 +1182,13 @@ impl Session {
                     )?,
                 ),
                 // P1-15: a synthetic deposit world's terrain follows the history's present
-                // elevation, and its spawn candidates are ranked by the essentials.
-                crate::preset::Bake::DepositHistory {
-                    params,
-                    strata,
-                    essentials,
-                } => {
+                // elevation; its spawn candidates are the standard ones.
+                crate::preset::Bake::DepositHistory { params, strata } => {
                     let history = crate::deposits::synthetic::SyntheticHistory::new(params)?;
                     let terrain = crate::deposits::synthetic::HistoryTerrain::new(&history);
                     let kind = crate::synth::Kind::DepositHistory;
-                    let mut baked =
+                    let baked =
                         crate::synth::build_with(&terrain, kind, strata, c, Codec::Lz4Block)?;
-                    if let Some(ranked) = crate::deposits::spawn::ranked_candidates(
-                        &baked.layers[0],
-                        &baked.layers[1],
-                        m.scale.sea_level_y,
-                        &world.sites,
-                        &essentials,
-                    ) {
-                        baked.spawn = ranked;
-                    }
                     (kind, baked)
                 }
             };
@@ -1743,12 +1736,54 @@ mod tests {
         ));
         assert_eq!(
             estimate(r#"{"dummy":{"steps":1,"sleep_ms":0}}"#, "").unwrap(),
-            r#"{"base_bytes":0,"history_bytes":0,"mem_cap":4294967296,"peak_bytes":0,"spill_bytes":0,"stages":[{"base_bytes":0,"bytes":0,"history_bytes":0,"name":"dummy","seconds":0.0,"spill_bytes":0}]}"#
+            r#"{"base_bytes":0,"history_bytes":0,"mem_cap":4294967296,"peak_bytes":0,"spill_bytes":0,"stages":[{"base_bytes":0,"bytes":0,"coupled_to":null,"history_bytes":0,"name":"dummy","seconds":0.0,"spill_bytes":0}]}"#
         );
         let world: Value = serde_json::from_str(&estimate(DUMMY_WORLD, "").unwrap()).unwrap();
         // 256 × 88 cells (rows from z = −704, past the Lambert pole at 651.9).
         assert_eq!(world["peak_bytes"], 256 * 88 * 4);
         assert_eq!(world["stages"][1]["name"], "dummy_erode");
+    }
+
+    /// The estimate names each stage's coupling (P1-11's time left weights a running group of
+    /// coupled stages by all of their seconds): followers name a stage of the group just before
+    /// them, uncoupled stages null, the same groups the session steps.
+    #[test]
+    fn the_estimate_names_the_coupled_groups() {
+        let json = crate::preset::with_timeline(
+            crate::preset::builtin("earthlike_quick_16k").unwrap(),
+            Some("supercontinent"),
+            Some(100.0),
+        )
+        .unwrap();
+        let est: Value = serde_json::from_str(&estimate(&json, "").unwrap()).unwrap();
+        let stages = est["stages"].as_array().unwrap();
+        let names: Vec<&str> = stages.iter().map(|s| s["name"].as_str().unwrap()).collect();
+        assert!(
+            stages[0]["coupled_to"].is_null(),
+            "the first stage leads: {est}"
+        );
+        let mut followers = 0;
+        for (i, s) in stages.iter().enumerate() {
+            if let Some(to) = s["coupled_to"].as_str() {
+                followers += 1;
+                assert!(
+                    names[..i].contains(&to),
+                    "{} is coupled to {to}, which comes before it",
+                    names[i]
+                );
+            }
+        }
+        assert!(
+            followers >= 1,
+            "the real pipeline couples stages: {names:?}"
+        );
+        let preset = Preset::from_json(&json).unwrap();
+        let groups = stage_groups(&preset.stages()).unwrap();
+        assert_eq!(
+            groups.len(),
+            stages.len() - followers,
+            "one group per uncoupled stage"
+        );
     }
 
     /// The estimate under a cap (P1-17): the recorded history is held while the cap allows and

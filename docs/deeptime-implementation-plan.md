@@ -141,7 +141,7 @@ history worldgen mod/` until P0-01 and in `docs/research/notes/` after it.
 | **Deposit type** | A data-driven definition (datapack JSON) of a mineral system: genesis rules, sizing, geometry, blocks (§5.4.3). |
 | **Claimed material** | A material Deep Time places itself (copper, iron, coal, zinc, lead, gold, …). Its scatter features from all mods are removed in Deep Time worlds. |
 | **Background scatter** | Deep Time's own low-density ore feature that guarantees small finds everywhere, gated by host rock. |
-| **Essentials list** | A pack-defined list of materials with regional minimums and spawn requirements (§7.8). |
+| **Essentials list** | A pack-defined list of materials with regional minimums (§7.8; no spawn requirements since 2026-10-05). |
 | **TW** | Toroidal World, the MIT wrap mod Deep Time depends on. |
 | **TW cylinder** | A TW world shape where X loops and Z does not. Deep Time registers its own shape through TW's API. |
 | **Seam** | The longitude where x = −C/2 meets x = C/2 − 1 (C = circumference in blocks). With TW it is invisible; without TW it would be a teleport line. |
@@ -660,7 +660,7 @@ pub struct Preset {
     pub climate: ClimateParams,
     pub deposits: DepositParams,          // global count/size/richness multipliers, province strength
     pub fantasy: FantasyParams,           // enabled fantasy fields, sky islands, exotic landforms
-    pub playability: PlayabilityParams,   // essentials list id, minimums, spawn rules
+    pub playability: PlayabilityParams,   // essentials list id, minimums
     pub constraints: Vec<Constraint>,     // paint-and-pin ("later", after Phase 3; empty until then)
     pub limits: RunLimits,                // memory cap, thread count
     pub seed: u64,
@@ -1718,16 +1718,19 @@ gold-bearing gravel without EV. Without either, the stone ore stays (decisions f
   the world data's surface (0) to the bottom of the world (1) — the playable crust — and the rules
   are the `deeptime:scatter` registry.)
 - **Playability minimums.** The `deeptime:essentials` registry lists materials with
-  `min_sites_per_region`, `region_blocks`, `max_blocks_from_spawn` and `exposed`. The core's deposit
+  `min_sites_per_region`, `region_blocks`, `primary_only` and `exposed`. The core's deposit
   stage adds, after natural placement, the smallest plausible deposit at the most favourable cell of
   any region short of its minimum, and records it as event kind `deeptime:guaranteed_occurrence`,
   so "Why here?" stays honest. Deep Time ships a vanilla essentials list; MIC's datapack ships its
   own (pack-specific fudging is expected).
-- **Spawn.** The core ranks spawn candidates (land, temperate Köppen C or mild D, low slope, fresh
-  water within reach, every essential within its `max_blocks_from_spawn`) and stores the top ten.
-  The adapter handles `LevelEvent.CreateSpawnPosition` (cancellable; fired once for a new level): it
-  cancels vanilla's search, sets the spawn to the best candidate that is not under water after chunk
-  generation, and leaves the world border as §7.10 decides.
+- **Spawn.** The core stores the standard spawn candidates: dry flat land at least two blocks above
+  sea level, nearest (0, 0) first, at most eight (`synth::spawn_candidates`). They are **not**
+  ranked by the essentials: Ben dropped that (decisions log 2026-10-05, "I don't believe we need
+  spawn selectoin since we have some passive iron gen like vanilla"), so the earlier ranking by
+  Köppen class, fresh water and `max_blocks_from_spawn` is gone. The adapter handles
+  `LevelEvent.CreateSpawnPosition` (cancellable; fired once for a new level): it cancels vanilla's
+  search, sets the spawn to the first candidate that is not under water after chunk generation, and
+  leaves the world border as §7.10 decides.
 
 ### 7.9 Water above sea level
 
@@ -2593,7 +2596,9 @@ exists to reuse; this is Deep Time's own engine.
    deposit's column (exhumation rates of 158 m/Myr for porphyry, 167 for epithermal, 63 for orogenic
    gold, Kesler & Wilkinson 2006). Fully eroded → spawn placer children downstream along the drainage
    routing of §8.2 (receivers on L1/L2; river vectors arrive in Phase 2): gold and cassiterite travel
-   a few km, diamond up to 1,000 km. Partly eroded → truncate. Top within a few hundred metres, with
+   a few km, diamond up to 1,000 km. Partly eroded → truncate, and a truncated body of a type that
+   spawns placers (porphyry) also sheds a placer in proportion to its eroded fraction (Ben,
+   2026-10-05; the same size model scaled by the fraction). Top within a few hundred metres, with
    the water table lowered, an eligible climate and 0.5–9 Myr of stability → supergene blanket at
    2–3× grade (Sillitoe 2005).
 7. **The four Phase 1 families.**
@@ -3763,6 +3768,31 @@ a smoke benchmark and again at the end.
   check is `tools/client/screenshots.sh` (HeadlessMC under Xvfb, `-Ddeeptime.dev.screenshots=true`
   drives the editor and takes screenshots). Rerun with the real presets after P1-08, and add the
   review page's biome names with P1-09.
+- **As built (2026-10-04, on the real stages).** A real planet's frames carry some sixty layers (24
+  on every step of the coupled stages, then one frame each from deposits, young and amplify) and a
+  1,000-Myr run logs about 10,000 events, so the timelapse follows the workbench: `screen/model/
+  LayerCatalog` (the satellite view first, layers grouped by their prefix in the workbench's order,
+  names from `deeptime.layer.<name>` or the word for the last part, `deeptime.layer.word.*`), the
+  run page shows one group at a time (a group button, two paged columns, a layer the displayed frame
+  lacks is greyed and picking it moves to the nearest frame that has it), map markers fade 24 Myr
+  after an event ends and are capped at 400, and `EventStyle` colours events by kind as the
+  workbench does. Bounded on a player's machine: `SimSession.launch` sessions run one at a time (a
+  run started while another is still stopping waits for it), leaving the Create World flow (title
+  screen, world list, server list, or the new world loading) cancels a run nobody accepted
+  (`EditorModel.abandon`), the simulation keeps its processors − 1 Rayon threads (the bake runs in
+  the session's pool), the keyframe ring stays at 64 MiB and pixel copies reuse one direct buffer
+  per loader thread. Tests: `RealRunWiringTest` (JUnit, natives: `planet_world_4k` cut to 100 Myr
+  through the editor, the timelapse, review, Accept; cancel, restart and abandon with the launch
+  gate), `LayerCatalogTest`, `TimelapseModelTest.{realLayersGroupsAndJumps, markersFadeAndAreCapped}`,
+  GameTest `EditorModelGameTests.realPlanetThroughTheEditor` (the same run inside the server, then
+  the staging move, the bind and the terrain). The client check runs on the test VM:
+  `tools/client/vm-client.sh` (the dev client on Xvfb with Mesa's llvmpipe), screenshots and a
+  contact sheet in `review/out/<name>/`. The run page's time left comes from the editor's
+  estimate (`Estimate.timeLeftMs`: the stages' estimated seconds, a group of coupled stages
+  counted as all of its stages since the session reports it under its lead, scaled by the run's
+  own pace once 2 % is done; the estimate JSON names each stage's `coupled_to`): the session's
+  own figure weights every group alike and read "~55 min left" for a run that took 5. While Run
+  is disabled by a run still going, the setup page says so ("Stopping the cancelled run …").
 - **Ben reviews.** The same keyframes in the viewer (the screen itself is unverifiable, §9.8).
 
 #### P1-12 Strata pass with rock tags and `rock_states`
@@ -3838,7 +3868,8 @@ a smoke benchmark and again at the end.
   `globaldata/deeptime/excavated_variants/`, the biome-modifier JSON, `-PwithEv` runtime,
   `DepositGameTests.{bodyHasOre, vanillaOreBlock, evVariantWhenInstalled}`,
   `ClaimGameTests.claimOffWhenOverworldNotGeologic` (GameTest server) and
-  `ClaimGameTests.claimOnInPlanetWorld` (planet server), `SpawnGameTests.essentialsWithinReach`.
+  `ClaimGameTests.claimOnInPlanetWorld` (planet server), `SpawnGameTests.spawnFollowsTheStandardRules`
+  (was `essentialsWithinReach` until 2026-10-05).
 - **Depends on.** P1-12, P1-14.
 - **Acceptance.** `./gametest.sh`, `./gametest.sh -PwithEv` and `./gametest-planet.sh -PwithMic` →
   all listed tests pass; `deeptime-inspect ore` render shows ore only inside site bodies plus scatter.
@@ -3909,9 +3940,11 @@ a smoke benchmark and again at the end.
    this laptop, or a per-stage report for Ben's decision; peak memory within the estimate.
 2. MIC smoke from an empty world with `earthlike_quick_16k`: first-start generation, boot, every
    mixin (including COE and CDG) applied, probes consistent with the world data.
-3. Geology in the world: a porphyry site within the essentials reach of spawn; `probe site` returns
-   its body; `deeptime-inspect ore` and `section` show copper ore inside the body, a gossan where it
-   is exposed, and its placer-gold child downstream; BlueMap shows the arc range and the deposit.
+3. Geology in the world: a porphyry site; `probe site` returns its body; `deeptime-inspect ore` and
+   `section` show copper ore inside the body, a gossan where it is exposed, and a placer whose
+   why-chain ends in an eroded porphyry (a partly eroded porphyry also sheds placer gold downstream,
+   in proportion to its eroded fraction; Ben, 2026-10-05); BlueMap shows the arc range and the
+   deposit.
 4. COE reports the copper vein over the porphyry and nothing claimed where there is no site; yield
    follows tonnage. CDG reports oil over a trap and none elsewhere.
 5. `climateConsistent` (MIC) and `regionsFollowProvinces` (TerraBlender) pass.
