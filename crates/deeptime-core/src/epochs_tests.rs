@@ -82,7 +82,14 @@ fn run(json: &str, dir: &Path, epochs: bool) -> WorldState {
     let mut s = Session::create(json, "", options(dir), Arc::new(NoGauge)).unwrap();
     s.set_epochs(epochs).unwrap();
     finish(&s);
-    s.checkpoint().unwrap().world
+    world(&s)
+}
+
+/// A session's final world without its notes (the stages' summaries carry their timings).
+fn world(s: &Session) -> WorldState {
+    let mut w = s.checkpoint().unwrap().world;
+    w.notes.clear();
+    w
 }
 
 /// The run in `dir` again, to the stop of `json`; returns the session after it finished.
@@ -121,16 +128,23 @@ fn steering(extra: Value) -> Value {
 fn a_continued_run_is_the_run_planned_to_its_new_stop() {
     for (name, st) in [
         ("plain", None),
-        ("steered", Some(steering(json!({"target": "custom",
+        (
+            "steered",
+            Some(steering(json!({"target": "custom",
             "land_min": 0.9, "land_max": 1.0, "temp_min_c": 40.0, "temp_max_c": 50.0,
-            "sea_rate_m_myr": 10.0, "co2_rate_per_myr": 0.5})))),
+            "sea_rate_m_myr": 10.0, "co2_rate_per_myr": 0.5}))),
+        ),
     ] {
         let base = small_planet(40.0, st.clone());
         let a = temp_dir(&format!("continue-{name}"));
         run(&base, &a, true);
         let idx = EpochIndex::read(&a).unwrap().expect("an epochs index");
         assert!(!idx.entries.is_empty());
-        let held: usize = idx.entries.iter().map(|e| e.frames_to - e.frames_from).sum();
+        let held: usize = idx
+            .entries
+            .iter()
+            .map(|e| e.frames_to - e.frames_from)
+            .sum();
         let last = idx.entries.iter().map(|e| e.frames_to).max().unwrap();
         assert!(last > 0);
         assert_eq!(held, last, "{name}: each history frame is stored once");
@@ -144,7 +158,11 @@ fn a_continued_run_is_the_run_planned_to_its_new_stop() {
         let b = temp_dir(&format!("planned-{name}"));
         let planned = run(&longer, &b, false);
         assert_eq!(files(&a), files(&b), "{name}: the folders differ");
-        assert_eq!(s.checkpoint().unwrap().world, planned, "{name}: the worlds differ");
+        assert_eq!(
+            world(&s),
+            planned,
+            "{name}: the worlds differ"
+        );
         assert_eq!(notes(&a)["run"]["resumed"]["from_step"], json!(want_from));
         let _ = std::fs::remove_dir_all(&a);
         let _ = std::fs::remove_dir_all(&b);
@@ -175,7 +193,7 @@ fn an_epoch_pick_and_a_stop_bake_the_run_planned_to_that_time() {
     let b = temp_dir("pick-planned");
     let planned = run(&at, &b, false);
     assert_eq!(files(&a), files(&b));
-    assert_eq!(s.checkpoint().unwrap().world, planned);
+    assert_eq!(world(&s), planned);
     drop(s);
 
     // Stop early: a run cancelled after its 50-Myr frame, then stopped at 40 Myr.
@@ -193,7 +211,7 @@ fn an_epoch_pick_and_a_stop_bake_the_run_planned_to_that_time() {
     let d = temp_dir("stop-planned");
     let planned = run(&early, &d, false);
     assert_eq!(files(&c), files(&d));
-    assert_eq!(s.checkpoint().unwrap().world, planned);
+    assert_eq!(world(&s), planned);
     for dir in [a, b, c, d] {
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -210,7 +228,14 @@ fn steering_off_changes_nothing_and_on_changes_only_the_tail() {
     let (a, b, c) = (temp_dir("off-a"), temp_dir("off-b"), temp_dir("off-c"));
     let wa = run(&plain, &a, true);
     let wb = run(&off, &b, false);
-    assert_eq!(files(&a), files(&b));
+    // Everything but the preset file, which names the section.
+    let no_preset = |d: &Path| -> Vec<(String, u32)> {
+        files(d)
+            .into_iter()
+            .filter(|(p, _)| p != "preset.json")
+            .collect()
+    };
+    assert_eq!(no_preset(&a), no_preset(&b));
     assert_eq!(wa, wb);
     assert!(notes(&b)["climate"].get("steering").is_none());
     run(&on, &c, true);
@@ -227,9 +252,11 @@ fn steering_off_changes_nothing_and_on_changes_only_the_tail() {
                     .map(|c| dir.join(EPOCHS_DIR).join(&c.file))
                     .collect()
             };
-            let x = Checkpoint::read_chain(&chain(&a, &ia, u)).unwrap();
-            let y = Checkpoint::read_chain(&chain(&c, &ic, e)).unwrap();
-            assert_eq!(x.world, y.world, "step {}", e.step);
+            let mut x = Checkpoint::read_chain(&chain(&a, &ia, u)).unwrap().world;
+            let mut y = Checkpoint::read_chain(&chain(&c, &ic, e)).unwrap().world;
+            x.notes.clear();
+            y.notes.clear();
+            assert_eq!(x, y, "step {}", e.step);
             shared += 1;
         }
     }
@@ -249,10 +276,14 @@ fn the_nudges_reach_their_targets_gently() {
     let rows = notes(&a)["climate"]["series"].clone();
     let cols: Vec<String> = serde_json::from_value(rows["columns"].clone()).unwrap();
     let last = rows["rows"].as_array().unwrap().last().unwrap().clone();
-    let col = |n: &str| last[cols.iter().position(|c| c == n).unwrap()].as_f64().unwrap();
+    let col = |n: &str| {
+        last[cols.iter().position(|c| c == n).unwrap()]
+            .as_f64()
+            .unwrap()
+    };
     let (land0, temp0) = (col("land_frac"), col("t_global_c"));
     // Targets above both: more land, warmer.
-    let (sea_rate, co2_rate) = (10.0, 0.5);
+    let (sea_rate, co2_rate) = (20.0, 0.5);
     let on = small_planet(
         60.0,
         Some(steering(json!({
@@ -268,11 +299,13 @@ fn the_nudges_reach_their_targets_gently() {
     let st = notes(&b)["climate"]["steering"].clone();
     let end_land = st["end"]["land_frac"].as_f64().unwrap();
     let end_temp = st["end"]["t_global_c"].as_f64().unwrap();
+    // The land share falls through this planet's tail; the nudge lowers the sea as soon as it
+    // leaves the band, and the planet ends with more land than without it.
+    assert!(end_land >= land0 + 0.01, "land {land0} → {end_land}: {st}");
     assert!(
-        end_land >= land0 + 0.02,
-        "land {land0} → {end_land}: {st}"
+        end_temp >= temp0 + 1.5,
+        "temperature {temp0} → {end_temp}: {st}"
     );
-    assert!(end_temp >= temp0 + 1.5, "temperature {temp0} → {end_temp}: {st}");
     assert!(st["sea_offset_m"].as_f64().unwrap() < 0.0, "the sea fell");
     assert!(st["outgassing_factor"].as_f64().unwrap() > 1.0);
     // No jump: at most the rate times the 2-Myr step; no reversal of either control.

@@ -989,10 +989,8 @@ impl Session {
             // An epoch checkpoint that cannot be written (a full disk) costs the player the
             // epoch tools of this run, not the run.
             if let Err(e) = self.write_epoch(s) {
-                self.log.push(
-                    Level::Warn,
-                    format!("epoch checkpoints turned off: {e}"),
-                );
+                self.log
+                    .push(Level::Warn, format!("epoch checkpoints turned off: {e}"));
                 s.epochs = None;
             }
             // A stage's time includes publishing its events and drawing its keyframes (a group's

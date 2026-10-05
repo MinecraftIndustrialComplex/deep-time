@@ -266,7 +266,11 @@ mod tests {
     fn the_plan_has_one_checkpoint_per_keyframe_and_one_for_the_stop() {
         let p = planet(&quick(500.0, true));
         let plan = plan(&p, Some(50.0e6));
-        assert_eq!(super::plan(&p, None).len(), 1, "without a grid: the stop's alone");
+        assert_eq!(
+            super::plan(&p, None).len(),
+            1,
+            "without a grid: the stop's alone"
+        );
         // Keyframes at 0 (after step 1: none earlier is free), 50, 100, … 500 Myr; each one's
         // checkpoint is 10 % of its length earlier: 45 Myr = step 22, 90 = 45, …; the stop's is
         // step 225 (450 Myr).

@@ -480,7 +480,10 @@ mod tests {
         late.write(&whole).unwrap();
         let len = |p: &Path| std::fs::metadata(p).unwrap().len();
         assert!(len(&b) < len(&whole), "the link holds two frames, not five");
-        assert_eq!(Checkpoint::read_chain(&[a.clone(), b.clone()]).unwrap(), late);
+        assert_eq!(
+            Checkpoint::read_chain(&[a.clone(), b.clone()]).unwrap(),
+            late
+        );
         assert_eq!(Checkpoint::read(&a).unwrap(), early);
         assert!(Checkpoint::read(&b).is_err(), "frames 0-2 are missing");
         assert!(Checkpoint::read_chain(&[b.clone(), a.clone()]).is_err());
