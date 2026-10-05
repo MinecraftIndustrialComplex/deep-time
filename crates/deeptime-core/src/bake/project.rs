@@ -627,10 +627,9 @@ fn area_share(layer: &LoadedLayer, world: bool, pred: impl Fn(f64) -> bool) -> f
     if den > 0.0 { num / den } else { 0.0 }
 }
 
-/// Mean squared tangential over radial elevation slope round the poles (2°–10° from each), on a
-/// sampler of world points: about 1 for terrain with no preferred direction, far above 1 for
-/// streaks radiating from the pole. Also returns the same ratio at mid-latitudes (30°–60°) for
-/// reference, where no streaks can form.
+/// Mean squared tangential over radial elevation slope round the poles (80°–88°), on a sampler of
+/// world points: about 1 for terrain with no preferred direction, far above 1 for streaks
+/// radiating from the pole. Also returns the same ratio at mid-latitudes (30°–60°) for reference.
 fn pole_anisotropy(map: &Mapping, h: &(dyn Fn(f64, f64) -> f64 + Sync)) -> (f64, f64, usize) {
     pole_anisotropy_n(map, h, 4_000)
 }
@@ -641,39 +640,49 @@ fn pole_anisotropy_n(
     h: &(dyn Fn(f64, f64) -> f64 + Sync),
     n: usize,
 ) -> (f64, f64, usize) {
+    let (p, pn) = band_anisotropy(map, h, 80.0, 88.0, true, n);
+    let (m, _) = band_anisotropy(map, h, 30.0, 60.0, false, n);
+    (p, m, pn)
+}
+
+/// Mean squared tangential over radial elevation slope over `n` points of the latitude band
+/// [lat0, lat1] of both hemispheres (radial: towards the pole when `pole`, else north), and the
+/// number of points measured.
+fn band_anisotropy(
+    map: &Mapping,
+    h: &(dyn Fn(f64, f64) -> f64 + Sync),
+    lat0: f64,
+    lat1: f64,
+    pole: bool,
+    n: usize,
+) -> (f64, usize) {
     let g = &map.g;
     let b = g.hemisphere() as f64;
-    let ring = |lat0: f64, lat1: f64, pole: bool| -> (f64, f64, usize) {
-        let res: Vec<(f64, f64)> = (0..n)
-            .into_par_iter()
-            .filter_map(|k| {
-                // Points spread over the band of both hemispheres (a golden-angle spiral).
-                let t = (k as f64 + 0.5) / n as f64;
-                let north = k % 2 == 0;
-                let lat = lat0 + (lat1 - lat0) * t;
-                let lat = if north { lat } else { -lat };
-                let lon = (k as f64 * 137.507_764_05) % 360.0;
-                let (x, z) = g.block_of(lat, lon);
-                if z.abs() > b / 2.0 - 4.0 {
-                    return None;
-                }
-                // The world direction of north (towards the pole for a northern point).
-                let (nx, nz) = g.north(x, z);
-                let (rx, rz) = if north || !pole { (nx, nz) } else { (-nx, -nz) };
-                let (tx, tz) = (-rz, rx);
-                let d = 2.0;
-                let dr = (h(x + d * rx, z + d * rz) - h(x - d * rx, z - d * rz)) / (2.0 * d);
-                let dt = (h(x + d * tx, z + d * tz) - h(x - d * tx, z - d * tz)) / (2.0 * d);
-                (dr.is_finite() && dt.is_finite()).then_some((dr * dr, dt * dt))
-            })
-            .collect();
-        let (sr, st) = res.iter().fold((0.0, 0.0), |a, v| (a.0 + v.0, a.1 + v.1));
-        (st, sr, res.len())
-    };
-    let (pt, pr, pn) = ring(80.0, 88.0, true);
-    let (mt, mr, _) = ring(30.0, 60.0, false);
-    let r = |t: f64, r: f64| if r > 0.0 { t / r } else { f64::NAN };
-    (r(pt, pr), r(mt, mr), pn)
+    let res: Vec<(f64, f64)> = (0..n)
+        .into_par_iter()
+        .filter_map(|k| {
+            // Points spread over the band of both hemispheres (a golden-angle spiral).
+            let t = (k as f64 + 0.5) / n as f64;
+            let north = k % 2 == 0;
+            let lat = lat0 + (lat1 - lat0) * t;
+            let lat = if north { lat } else { -lat };
+            let lon = (k as f64 * 137.507_764_05) % 360.0;
+            let (x, z) = g.block_of(lat, lon);
+            if z.abs() > b / 2.0 - 4.0 {
+                return None;
+            }
+            // The world direction of north (towards the pole for a northern point).
+            let (nx, nz) = g.north(x, z);
+            let (rx, rz) = if north || !pole { (nx, nz) } else { (-nx, -nz) };
+            let (tx, tz) = (-rz, rx);
+            let d = 2.0;
+            let dr = (h(x + d * rx, z + d * rz) - h(x - d * rx, z - d * rz)) / (2.0 * d);
+            let dt = (h(x + d * tx, z + d * tz) - h(x - d * tx, z - d * tz)) / (2.0 * d);
+            (dr.is_finite() && dt.is_finite()).then_some((dr * dr, dt * dt))
+        })
+        .collect();
+    let (sr, st) = res.iter().fold((0.0, 0.0), |a, v| (a.0 + v.0, a.1 + v.1));
+    (if sr > 0.0 { st / sr } else { f64::NAN }, res.len())
 }
 
 /// Rewrites the Lambert world folder `dir` (its manifest `m`) in the preset's world projection.
@@ -846,8 +855,12 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         };
         let (pw, mw, n) = pole_anisotropy(&map, &h_world);
         let (pp, mp, _) = pole_anisotropy(&map, &h_point);
+        let (sw, _) = band_anisotropy(&map, &h_world, 70.0, 80.0, true, 4_000);
+        let (sp, _) = band_anisotropy(&map, &h_point, 70.0, 80.0, true, 4_000);
         aniso = json!({
             "points": n,
+            "subpolar_tangential_over_radial": sw,
+            "point_sampled_subpolar": sp,
             "poles_tangential_over_radial": pw,
             "mid_latitudes_tangential_over_radial": mw,
             "point_sampled_poles": pp,
@@ -1381,7 +1394,8 @@ pub fn summary_line(v: &Value) -> String {
     let a = &v["pole_anisotropy"];
     format!(
         "projection petroff_guyou b={} lambda_c={:.2} cones_from_land_deg={:.2} lambda_share_at_sea={:.3} \
-         land_map={:.4} land_true={:.4} ice_map={:.4} ice_true={:.4} poles_t/r={:.2} (point-sampled {:.2}) mid_t/r={:.2} \
+         land_map={:.4} land_true={:.4} ice_map={:.4} ice_true={:.4} poles_t/r={:.2} (point-sampled {:.2}) \
+         subpolar_t/r={:.2} (point-sampled {:.2}) mid_t/r={:.2} \
          m_per_block_h={:.2} millis[lambda={:.0} rasters={:.0} vector={:.0} total={:.0}]",
         v["hemisphere_blocks"],
         f(&v["lambda_c_deg"]),
@@ -1393,6 +1407,8 @@ pub fn summary_line(v: &Value) -> String {
         f(&s["ice_cover_true"]),
         f(&a["poles_tangential_over_radial"]),
         f(&a["point_sampled_poles"]),
+        f(&a["subpolar_tangential_over_radial"]),
+        f(&a["point_sampled_subpolar"]),
         f(&a["mid_latitudes_tangential_over_radial"]),
         f(&v["m_per_block_h"]),
         f(&v["millis"]["lambda_c"]),
