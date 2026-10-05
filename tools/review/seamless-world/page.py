@@ -91,7 +91,8 @@ south edge. Until the wrap engine joins those two edges a temporary border stops
 <div class="grid">
 <div class="stat"><b>{f(sh['land_map'], 4)}</b><span>land share on the map (planet: {f(sh['land_true'], 4)})</span></div>
 <div class="stat"><b>{f(sh['ice_cover_map'], 4)}</b><span>ice share on the map (planet: {f(sh['ice_cover_true'], 4)})</span></div>
-<div class="stat"><b>{f(pa['poles_tangential_over_radial'], 1)}</b><span>polar streaking, 80–88° (point sampling: {f(pa['point_sampled_poles'], 1)}; mid-latitudes {f(pa['mid_latitudes_tangential_over_radial'], 2)})</span></div>
+<div class="stat"><b>{f(pa['poles_tangential_over_radial'], 2)}</b><span>polar streaking, 80–88°: tangential over radial slope (point sampling: {f(pa['point_sampled_poles'], 1)}; mid-latitudes {f(pa['mid_latitudes_tangential_over_radial'], 2)}; 1 = no preferred direction)</span></div>
+<div class="stat"><b>{f(pa.get('subpolar_tangential_over_radial', float('nan')), 2)}</b><span>the same at 70–80° (point sampling: {f(pa.get('point_sampled_subpolar', float('nan')), 1)})</span></div>
 <div class="stat"><b>{f(bp['lambda_c_deg'], 2)}°</b><span>λc chosen; nearest land to a cone point {f(lam['min_distance_to_land_deg'], 1)}°</span></div>
 <div class="stat"><b>{f(bp['m_per_block_h'], 1)} m</b><span>true size of a block (Lambert world: 300 m)</span></div>
 <div class="stat"><b>{bp['millis']['total'] / 1000:.1f} s</b><span>projection pass</span></div>
