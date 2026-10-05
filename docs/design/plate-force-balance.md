@@ -925,34 +925,46 @@ move by the balance; the old speed law and its settings are gone. Where it depar
   sets the rate of subduction uplift and arc magma (PLT-037), with its own editor field.
 - **Crust budget (task 8, first pass).** See `docs/science/plates.md`, "The continental crust
   budget under the force balance": a collision's hidden crust is no longer accreted a second time
-  at a resampling (PLT-276); crust beyond `crust_max_km` widens the plateau before any of it
+  at a resampling (PLT-276); `collision_stacking_share` 0.95 from Stern & Scholl 2010 (PLT-242);
+  crust beyond `crust_max_km` spreads to neighbours up to `collapse_thickness_km` before any of it
   founders (PLT-277); `collapse_thickness_km` 50, the sources' figure (PLT-256). Under Ben's
   validation policy of 2026-10-05 the land share is reported against Earth, not tuned.
-  `collision_stacking_share` (0.8) and `arc_maturity_myr` (20) were held as briefed;
-  `collision_buoyancy` 2 and 3 were measured and changed neither crust nor land beyond the noise.
+  `arc_maturity_myr` (20) was held as briefed; `collision_buoyancy` 2 and 3 were measured and
+  changed neither crust nor land beyond the noise.
+- **The supercontinent measure** (`plate-check`, CHK-060): a dispersal followed by a new assembly
+  within 20 Myr is one stay. Under the balance two large pieces touch and part at a sample's width
+  for tens of Myr (stalled collisions), and the old measure counted each touch as an assembly and
+  each parting as a break-up: the supercontinent start held its first supercontinent 140–540 Myr
+  while the median "tenure" read 8.5 Myr.
 
 **Measured** (`plate-check`, `earthlike_quick_16k`, 1000 Myr, seeds 1–4, both starts; master
-2e07d954 against the branch head; tables in the build log of 2026-10-05):
+2e07d954 against the branch, simulation unchanged by the later master merge, which is bake and game
+side; tables in the build log of 2026-10-05):
 
 | Measure | Master | Branch | Target |
 |---|---|---|---|
 | plate-check targets met | 30 of 45 | 30 of 45 | |
-| Speed RMS; 10th / 50th / 90th percentile, mm/yr | 57.9; 36 / 66 / 84 | 41.2; 12 / 42 / 79 | 40–100; ≤20 / 30–60 / 70–110 |
-| Oceanic ÷ continental plates; slab ÷ free plates | 1.61; 1.69 | 2.27; 1.84 | ≥2; ≥2.5 |
-| Speed against slab share, rank correlation | 0.54 | 0.44 | ≥0.65 |
+| Speed RMS; 10th / 50th / 90th percentile, mm/yr | 57.9; 36 / 66 / 84 | 41.4; 13 / 41 / 78 | 40–100; ≤20 / 30–60 / 70–110 |
+| Oceanic ÷ continental plates; slab ÷ free plates | 1.61; 1.69 | 2.37; 1.87 | ≥2; ≥2.5 |
+| Speed against slab share, rank correlation | 0.54 | 0.45 | ≥0.65 |
 | Plate-steps where the speed guard binds | 1,015 | 0 | 0 |
-| Rotation change per step, median / 90th pct | 5.1 / 9.6 % | 5.9 / 25.3 % | ≤8 / ≤20 % |
-| Convergence 20 Myr after a collision's onset ÷ at onset | 0.07 | 0.47 | 0.2–0.6 |
-| Collisions per 100 Myr; length, median | 5.2; 30 Myr | 0.93; 51 Myr | 2–6; 15–50 |
+| Rotation change per step, median / 90th pct | 5.1 / 9.6 % | 5.8 / 25.1 % | ≤8 / ≤20 % |
+| Convergence 20 Myr after a collision's onset ÷ at onset | 0.07 | 0.46 | 0.2–0.6 |
+| Collisions per 100 Myr; length, median | 5.2; 30 Myr | 0.90; 44 Myr | 2–6; 15–50 |
 | Largest plate, median share; steps with one above 50 % | 0.27; 5.7 % | 0.17; 0 | 0.15–0.35; ≤10 |
-| Continental crust, lowest step; at the end | 0.37; 0.40 | 0.26; 0.30 | ≥0.37; — |
-| Active share of the continental margin | 0.38 | 0.46 | 0.25–0.40 |
-| Supercontinent tenure, median; assembly-to-assembly period, median | 12 Myr; 34 Myr | 8.5 Myr; 78 Myr | 100–300; 400–800 |
-| Land (surface stage) at 1000 Myr | 0.136 | 0.226 | reported (Earth 0.18–0.30 over the Phanerozoic) |
+| Continental crust, lowest step; at the end | 0.37; 0.40 | 0.26; 0.31 | ≥0.37; — |
+| Active share of the continental margin | 0.38 | 0.47 | 0.25–0.40 |
+| Supercontinent tenure; period, medians (20 Myr hold, pooled episodes, `force-balance-series.py`) | 67; 139 Myr | 46; 213 Myr | 100–300; 400–800 |
+| Supercontinent assemblies per run | 11.6 | 2.1 | |
+| Land (surface stage) at 1000 Myr; above 2 km of it | 0.136; — | 0.185; 0.27 | reported (Earth 0.18–0.30 over the Phanerozoic) |
 
 **Not delivered.** The slab correlation, the step-to-step noise, the collision rate, the active
 margin share and the supercontinent cycle miss their targets; the wedge and foredeep stay under
-one sample of the quick preset. The crust ends 1000 Myr at 0.30 of the planet against master's
-0.40: collisions consume about twice as much continental crust as under the old law, and a fifth
-of what crosses a front goes into the mantle (the stacking share).
+one sample of the quick preset. The crust ends 1000 Myr at 0.31 of the planet against master's
+0.40: collisions consume about twice as much continental crust as under the old law, and what a
+long collision stacks beyond 70 km still founders at about 6 km³ a year, many times Earth's rate.
+A quarter of the land stands above 2 km: collapsed orogens keep 50 km of crust at its pure Airy
+height (plates.md). Supercontinents assemble rarely (2 a run against master's 12): continental
+plates move at less than half the speed of oceanic ones, as on Earth, and collisions stall rather
+than surge.
 
