@@ -10,7 +10,8 @@
 #   tools/review/p1-17-bench.sh scale <bin> <label> <out root> <spec>...
 #       every spec at the same time (thread-count scaling)
 #
-#   spec      <preset>:<start>:<length_myr>:<threads>, e.g. earthlike_quick_16k:supercontinent:1000:8
+#   spec      <preset>:<start>:<length_myr>:<threads>[:<mem cap bytes>], e.g.
+#             earthlike_quick_16k:supercontinent:1000:8 (the cap defaults to bench's, 4 GiB)
 #
 # Each pair is one job of the VM's admission tool (sim:<preset>:<2 x threads>t, so both start
 # together; a scale run sim:<preset>:<threads>t). Start the script itself unadmitted
@@ -23,12 +24,13 @@ set -uo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 
 one() { # one <bin> <label> <root> <spec>: one bench run (admitted by the caller); its out dir
-    local bin=$1 label=$2 root=$3 p s l t
-    IFS=: read -r p s l t <<< "$4"
+    local bin=$1 label=$2 root=$3 p s l t cap
+    IFS=: read -r p s l t cap <<< "$4"
     local out="$root/$label-$p-$s-$l-t$t"
     rm -rf "$out"; mkdir -p "$out"
     env RAYON_NUM_THREADS="$t" /usr/bin/time -v "$bin" bench --preset "$p" --start "$s" \
-        --length-myr "$l" --threads "$t" --out "$out/bench.json" --work "$out/work" > "$out/log.txt" 2>&1
+        --length-myr "$l" --threads "$t" ${cap:+--mem-cap "$cap"} --out "$out/bench.json" \
+        --work "$out/work" > "$out/log.txt" 2>&1
     echo "exit $?" >> "$out/log.txt"
     cp "$out/work/t$t/manifest.json" "$out/manifest.json" 2>/dev/null
 }
@@ -51,7 +53,7 @@ pair)
     binA=$2; labA=$3; binB=$4; labB=$5; root=$6; shift 6
     mkdir -p "$root"
     for spec in "$@"; do
-        IFS=: read -r p s l t <<< "$spec"
+        IFS=: read -r p s l t _ <<< "$spec"
         echo "== $(date -u +%T) $spec"
         # One admitted job for the pair (twice the threads), so A and B start together.
         deeptime-admit run --kind "sim:$p:$((2 * t))t" --label "p1-17-$labA-$labB-$p-$s-$l-t$t" -- \
@@ -68,7 +70,7 @@ scale)
     bin=$2; lab=$3; root=$4; shift 4
     mkdir -p "$root"
     for spec in "$@"; do
-        ( IFS=: read -r p s l t <<< "$spec"
+        ( IFS=: read -r p s l t _ <<< "$spec"
           deeptime-admit run --kind "sim:$p:${t}t" --label "p1-17-$lab-$p-$s-$l-t$t" -- \
               "$0" _one "$bin" "$lab" "$root" "$spec"
           rm -rf "$root/$lab-$p-$s-$l-t$t/work"; echo "== $(date -u +%T) done $spec"
