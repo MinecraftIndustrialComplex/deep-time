@@ -1888,7 +1888,7 @@ mod tests {
         ));
         assert_eq!(
             estimate(r#"{"dummy":{"steps":1,"sleep_ms":0}}"#, "").unwrap(),
-            r#"{"base_bytes":0,"history_bytes":0,"mem_cap":4294967296,"peak_bytes":0,"spill_bytes":0,"stages":[{"base_bytes":0,"bytes":0,"coupled_to":null,"history_bytes":0,"name":"dummy","seconds":0.0,"spill_bytes":0}]}"#
+            r#"{"base_bytes":0,"history_bytes":0,"mem_cap":4294967296,"peak_bytes":0,"spill_bytes":0,"stages":[{"base_bytes":0,"bytes":0,"coupled_to":null,"history_bytes":0,"name":"dummy","own_bytes":0,"seconds":0.0,"spill_bytes":0}]}"#
         );
         let world: Value = serde_json::from_str(&estimate(DUMMY_WORLD, "").unwrap()).unwrap();
         // 256 × 88 cells (rows from z = −704, past the Lambert pole at 651.9).
