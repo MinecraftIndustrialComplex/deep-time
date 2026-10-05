@@ -18,6 +18,8 @@ from pathlib import Path
 ev, out = Path(sys.argv[1]), Path(sys.argv[2])
 gates = json.loads(Path(sys.argv[3]).read_text()) if len(sys.argv) > 3 else {}
 out.mkdir(parents=True, exist_ok=True)
+if (ev / "polar-crops.png").exists():
+    shutil.copy(ev / "polar-crops.png", out / "polar-crops.png")
 for w in ("pg", "lambert"):
     for f in ("satellite.png", "provinces.png"):
         src = ev / f"{w}-map" / f
@@ -48,6 +50,15 @@ cones = "".join(
     f"<tr><td>{html.escape(c['name'])}</td><td>{f(c['lat_deg'], 2)}°</td><td>{f(c['lon_deg'], 2)}°</td>"
     f"<td>{f(d, 1)}°</td></tr>"
     for c, d in zip(proj.get("cone_points", []), lam["cone_distances_deg"]))
+polar = ""
+if (ev / "polar-crops.png").exists():
+    polar = """<h2>The polar streaks</h2>
+<div class="map"><img src="polar-crops.png" alt="Six resamplings of one south polar region"></div>
+<p class="cap">One south polar region of an earlier bake, resampled six ways (<code>deeptime project</code>). Top left: a
+footprint round on the planet only, the radial streaks of the simulation's grid-shaped polar terrain (slope ratio 13.4 at
+80–88°). The others widen it along the parallels poleward of about 60° (left to right, top to bottom: (0.5/cos φ)² up to 8;
+(0.52/cos φ)⁴ up to 8, the setting kept; the same up to 12; (0.6/cos φ)⁴ up to 8; (0.6/cos φ)³ up to 12): the fine streaks go
+(ratio 1.39 at 80–88°, the mid-latitudes' 1.32). The broad fan of valleys at 65–80° is the simulation's own terrain and stays.</p>"""
 gate_rows = "".join(f"<tr><td>{html.escape(k)}</td><td>{html.escape(str(v))}</td></tr>" for k, v in gates.items())
 
 page = f"""<!doctype html>
@@ -98,6 +109,7 @@ south edge. Until the wrap engine joins those two edges a temporary border stops
 <div class="stat"><b>{bp['millis']['total'] / 1000:.1f} s</b><span>projection pass</span></div>
 </div>
 
+{polar}
 <h2>The Lambert world (still a setting)</h2>
 <div class="map"><img src="lambert-satellite.png" alt="Satellite view of the same planet on the Lambert world"></div>
 <p class="cap">The same planet as a Lambert world (<code>scale.projection = lambert</code>, level type
