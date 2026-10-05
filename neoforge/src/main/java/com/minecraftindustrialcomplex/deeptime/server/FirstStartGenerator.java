@@ -131,6 +131,7 @@ public final class FirstStartGenerator {
 
     private static void generate(MinecraftServer server, WorldDataRef ref, Path world, Path dir) throws Stop {
         int c = ref.circumferenceBlocks();
+        String projection = ref.projection();
         if (Files.exists(dir))
             throw new Stop(dir + " exists but has no " + Manifest.FILE,
                     "An incomplete copy of world data? Finish copying it (the manifest is written last), or remove\n"
@@ -152,7 +153,8 @@ public final class FirstStartGenerator {
             throw new Stop("this Deep Time world has no world data and no " + configFile,
                     "Wrote a template to " + configFile + ".\n"
                             + "Fill in \"preset\" and \"timeline\" there (the _ keys explain them), then start the server again.\n"
-                            + "The level-type in server.properties sets the size: " + levelTypeFor(c) + " gives C = " + c + ".");
+                            + "The level-type in server.properties sets the size and map: " + levelTypeFor(c, projection) + " gives a "
+                            + describe(c, projection) + ".");
         }
         ServerConfig config;
         try {
@@ -196,12 +198,13 @@ public final class FirstStartGenerator {
             throw new Stop("the preset " + resolved.label() + " names no circumference (scale.circumference_blocks)",
                     "Use a built-in preset, or a preset or share code from this version of Deep Time.");
         int presetC = info.circumference().getAsInt();
-        if (presetC != c)
-            throw new Stop("circumference mismatch: the preset " + name + " is for C = " + presetC
-                            + " blocks, but this world's level-type gives C = " + c + " blocks",
-                    "The level-type in server.properties (" + levelTypeFor(c) + ") fixes the world's size before the first start.\n"
-                            + "Either choose a preset for C = " + c + " (" + presetsFor(c) + "),\n"
-                            + "or set level-type=" + levelTypeFor(presetC).replace(":", "\\:") + " in server.properties and delete the world folder "
+        int presetWorldC = info.worldCircumference().getAsInt();
+        if (presetWorldC != c || !info.projection().equals(projection))
+            throw new Stop("world shape mismatch: the preset " + name + " makes a " + describe(presetWorldC, info.projection())
+                            + " (C = " + presetC + "), but this world's level-type gives a " + describe(c, projection),
+                    "The level-type in server.properties (" + levelTypeFor(c, projection) + ") fixes the world's size and map before the first start.\n"
+                            + "Either choose a preset for it (" + presetsFor(c, projection) + "),\n"
+                            + "or set level-type=" + levelTypeFor(presetWorldC, info.projection()).replace(":", "\\:") + " in server.properties and delete the world folder "
                             + world.getFileName() + "\n(it holds no world yet, but its level.dat already records the old level-type).");
 
         // 3. The natives (plan §6.6).
@@ -397,19 +400,27 @@ public final class FirstStartGenerator {
         return String.format(Locale.ROOT, "%.1f", bytes / GIB);
     }
 
-    static String levelTypeFor(int c) {
-        return switch (c) {
-            case 16_384 -> "deeptime:planet";
-            case 32_768 -> "deeptime:planet_32k";
-            default -> "a Deep Time world preset with circumference_blocks " + c;
-        };
+    /** The built-in level type of a world shape (x period and projection). */
+    static String levelTypeFor(int c, String projection) {
+        boolean lambert = "lambert".equals(projection);
+        if (c == Presets.worldCircumference(16_384, projection))
+            return lambert ? "deeptime:planet_lambert" : "deeptime:planet";
+        if (c == Presets.worldCircumference(32_768, projection))
+            return lambert ? "deeptime:planet_lambert_32k" : "deeptime:planet_32k";
+        return "a Deep Time world preset with circumference_blocks " + c + " and projection " + projection;
     }
 
-    private static String presetsFor(int c) {
+    /** "13,312-block Petroff–Guyou world" / "16,384-block Lambert world". */
+    static String describe(int c, String projection) {
+        return String.format(Locale.ROOT, "%,d-block %s world", c, "lambert".equals(projection) ? "Lambert" : "Petroff–Guyou");
+    }
+
+    private static String presetsFor(int c, String projection) {
         List<String> names = new ArrayList<>();
         for (String n : Presets.BUILTIN) {
             Presets.builtin(n).map(Presets::parseObject).map(Presets::info)
-                    .filter(i -> i.circumference().isPresent() && i.circumference().getAsInt() == c)
+                    .filter(i -> i.worldCircumference().isPresent() && i.worldCircumference().getAsInt() == c
+                            && i.projection().equals(projection))
                     .ifPresent(i -> names.add(n));
         }
         return names.isEmpty() ? "no built-in preset has that size" : String.join(", ", names);

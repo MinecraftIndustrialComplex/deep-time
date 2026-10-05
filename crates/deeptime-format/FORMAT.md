@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
-# Deep Time world-data format 0.4
+# Deep Time world-data format 0.5
 
 The contract between the Rust writer (`crates/deeptime-format`) and the Java reader
 (`neoforge/src/main/java/com/minecraftindustrialcomplex/deeptime/worlddata`). Plan §5.3 and §5.7
@@ -56,6 +56,18 @@ multiple of 64 at or past the pole: 2,624 at 16k, 5,248 at 32k) and H = 2·Zo / 
 Lambert maps, π : 1 ("Keyframes"); the rivers', structure and site indexes are framed from z = −Zo
 over 2·Zo. Every raster, every latitude in events, sites and the climate API, and every block
 position derived from a latitude changed. 0.3 worlds are refused.
+
+**0.5** over 0.4 (the seamless world; Ben, decisions log 2026-10-04: "We'll proceed w/
+Petroff–Guyou, if I think distortion is too bad in gameplay, I'll swap later."): every header's
+minor is 5. A world is laid out in the projection its preset chose (`projection.kind`, default
+`petroff_guyou`; `lambert` keeps 0.4's world). The manifest gains **`projection`**, the world's
+projection and the gluing of its edges ("The world's layout"), the data the wrap engine reads. A
+Petroff–Guyou world is 2b × b blocks (13,312 × 6,656 at 16k), `scale.circumference_blocks` is its
+x period 2b and `scale.m_per_block_h` the true size of its blocks; its grids span the domain edge to
+edge and fold through the north and south edges' half-turns (`z_edges`, "Grids"). The bake samples
+the simulation on the sphere for every world cell ("The bake's projection pass"); events and
+keyframes stay in the simulation's frame (latitude and longitude; Lambert pictures). 0.4 worlds are
+refused.
 
 ## Folder layout
 
@@ -189,6 +201,59 @@ what it did, `millis` per part, `bytes` and `layers` written, and **`detail`** �
 term: `{"layer": "detail/amplitude", "seed": "<u64, decimal>", "salt": 1729, "octaves": 3,
 "wavelength_blocks": 32.0}` (present exactly when `detail/amplitude` is). A preset without the
 deep-time surface (plate-only) bakes nothing (`baked: false`).
+
+### The bake's projection pass (format 0.5)
+
+The simulation runs on its own Lambert grid (`crates/deeptime-core`; Ben, 2026-10-03: "Bake only").
+`Session::finalize_write` bakes the world in Lambert as above, settles the crater lenses and placers,
+and then, when the preset's `scale.projection` is `petroff_guyou` (the default), **rewrites the whole
+folder in the world's projection** (`deeptime_core::bake::project`). A Lambert preset's folder stays as
+baked and gets a Lambert layout block.
+
+- **The world**: b from the simulation's C ("The world's layout"); λc chosen per planet when
+  `scale.lambda_c_deg` is −1 (the default): candidates 0.25° apart, each cone point's distance to the
+  nearest land (the baked elevation at or above sea level) measured up to 20°, the best by the
+  largest least distance, then the largest sum, then the smallest λc; or the value the preset sets.
+- **Rasters**: every layer is rewritten on the world grid of its own cell size (`L1`, `L2`, `L3`,
+  `L3h` keep their names and r; "Grids"). A world cell is the point sample at its block; the block's
+  sphere point is found through the projection and the layer is read at the matching Lambert block.
+  Continuous layers are averaged over a **footprint isotropic on the sphere**, as wide as the world
+  cell's own footprint and as the Lambert rows' spacing there (near the poles a Lambert row spans many
+  blocks of planet north–south and its columns a fraction of a block east–west; read at a point, that
+  anisotropy draws radial streaks round the poles). Poleward of about 59° the footprint is also
+  widened along the parallel, by (0.52 / cos φ)⁴, at most 8 times (reached near 72°): the simulation's solvers work in Lambert
+  blocks, so its polar terrain has the grid's shape (long north–south, thin east–west on the
+  planet), which an isotropic footprint only shortens. Categories (`climate/koppen`,
+  `climate/wetland`, `surface/class_top`, `meta/plate_id`, `meta/province`, and any layer whose
+  `units` is `flag`), horizon stacks and any footprint touching no-data take the nearest cell. The
+  climate's band coordinates (`units` `vanilla_param`: `climate/temperature`, `vegetation`,
+  `continents`, `erosion`, `ridges`), which the bake sets per Köppen class, are read bilinear at the
+  point, as the game read them on the Lambert world, so they stay with the class beside them. The two edge rows are made exactly self-glued (cell i = cell w − i). The first horizon of every stack cell is then raised to
+  the bake's top rule over the world's own terrain (`notes.bake.projection.top_raise`): the stacks
+  come from the nearest cell and the terrain from the footprint mean.
+- **Vector data**: rivers (vertices through the projection, x continuous along a chain; a chain
+  crossing a turning edge is split there, the parts before the edge ending as at the sea, and
+  confluences re-pointed; the index rebuilt in the world's frame), structural events (the window's
+  centre through the projection, its axes, sizes, a fold's wavelength and a fault's slip and plane
+  through the local Jacobian), bodies (centre, horizontal axes and yaw through the Jacobian, and
+  moved up or down by the change of the drawn terrain height between their old and new column, so a
+  crater's lens stays under the drawn floor), sites (centre; box from their bodies; the index in the
+  world's frame), `volcanoes/active.json` and `impacts/craters.json` (`x`, `z`), and
+  `spawn/candidates.json` (ranked candidates moved to the nearest world L3 point,
+  `surface_y` from the world's elevation, those past the simulation's pole or within 64 blocks of a
+  turning edge dropped; unranked ones, dry land nearest (0, 0), picked again on the world's own
+  grids by the same rule, `picked_in_the_world` true).
+- **Unchanged**: events (latitude and longitude; their L1 masks and paths are in the simulation's
+  frame), keyframes (the simulation's Lambert pictures, π : 1), `preset.json`, `strata/classes.json`.
+- **The manifest**: `scale.circumference_blocks` = 2b, `scale.m_per_block_h` = the world block's
+  true size √(4πR²/2b²) (`planet.radius_m` unchanged), `projection` (the layout block, with the
+  border the preset's `scale.edge_border` asks for), and `notes.bake.projection`: `hemisphere_blocks`,
+  `world_blocks`, `lambda_c_deg`, `lambda_c` (the search: least and per-cone distances to land, the
+  share of candidates with all four cone points at sea and 3° from land), `layers` (each layer's
+  sampling), `shares` (`land_map` / `land_true`, `ice_cover_map` / `ice_cover_true`: the share of the
+  world's cells, edge rows at half weight, against the simulation's true area share), `pole_anisotropy`
+  (mean squared tangential over radial elevation slope 80°–88° from the equator, and at 30°–60° for
+  reference, for the world and for point sampling), `vector` and `millis`.
 
 ### The climate at a block (0.2, P1-25)
 
@@ -523,6 +588,122 @@ area, (r·m)² for m metres per block, less only on the rows that reach past a p
   result `a + (b − a)·fv` on physical values, in exactly this order (both sides agree bit for bit).
   Any nodata corner makes the result NaN.
 - Nearest sampling: the cell `(floor(u + 0.5), floor(v + 0.5))`.
+- **Petroff–Guyou worlds** ("The world's layout"): `w = 2b / r`, `h = b / r + 1`, origin `(−b, −b/2)`
+  and **`"z_edges": "half_turn"`** in the descriptor: row 0 lies on the north edge and row `h − 1` on
+  the south edge, column `w/2` on x = 0 (the half-turns' pivots). A row index past either edge
+  **folds** instead of clamping: row `−k` is row `k` and row `h − 1 + k` is row `h − 1 − k`, both at
+  column `w − i` (then wrapped), which is exactly the point the edge's half-turn takes it to. So the
+  bilinear and stencil reads above, and every reader's terrain past an edge, are the glued planet,
+  continuous through the seam. Rust `GridDesc::cell`, Java `GridDesc.cell`. A descriptor without
+  `z_edges` clamps (`"clamp"`, the simulation's grids and Lambert worlds; writers always write the key, since the checkpoints encode grids with postcard, which cannot leave a field out). Rows are not uniform in
+  latitude; every cell still covers the same area of the planet ((r·m)², m = `m_per_block_h`).
+  `scale.circumference_blocks` = 2b, so x wraps with period W·r = 2b as before.
+
+## The world's layout (`manifest.json` `projection`, format 0.5)
+
+The world's projection and how its edges are glued. **This block is the contract the wrap engine
+reads to install its topology** (`docs/design/wrap-engine.md` §9, Phase 2); it is stable from 0.5,
+and a change to it bumps `layout_version`. Rust: `deeptime_format::projection::ProjectionSpec`
+(`PetroffGuyou::spec`, `lambert_spec`); Java: `worlddata/WorldLayout`.
+
+A **Petroff–Guyou** world (the default from 0.5; Ben, decisions log 2026-10-04: "We'll proceed w/
+Petroff–Guyou"), here the 16k one with λc = 31.25°:
+
+```json
+"projection": {
+  "kind": "petroff_guyou",
+  "layout_version": 1,
+  "hemisphere_blocks": 6656,
+  "lambda_c_deg": 31.25,
+  "domain": {"x_min": -6656.0, "x_max": 6656.0, "z_min": -3328.0, "z_max": 3328.0},
+  "edges": [
+    {"name": "west",  "kind": "slide",     "axis": "x", "side": "min", "coord": -6656, "span": [-3328, 3328],
+     "iso": [0, 13312, 0],  "owner": "toroidal_world"},
+    {"name": "east",  "kind": "slide",     "axis": "x", "side": "max", "coord": 6656,  "span": [-3328, 3328],
+     "iso": [0, -13312, 0], "owner": "toroidal_world"},
+    {"name": "north", "kind": "half_turn", "axis": "z", "side": "min", "coord": -3328, "span": [-6656, 6656],
+     "iso": [2, 0, -6656],  "pivot": [0, -3328], "owner": "wrap_engine"},
+    {"name": "south", "kind": "half_turn", "axis": "z", "side": "max", "coord": 3328,  "span": [-6656, 6656],
+     "iso": [2, 0, 6656],   "pivot": [0, 3328],  "owner": "wrap_engine"}
+  ],
+  "cone_points": [
+    {"name": "north-midpoint", "cone_deg": 180.0, "lat_deg": 45.0,  "lon_deg": 121.25, "images": [[0, -3328]]},
+    {"name": "north-corner",   "cone_deg": 180.0, "lat_deg": 45.0,  "lon_deg": 301.25, "images": [[-6656, -3328], [6656, -3328]]},
+    {"name": "south-midpoint", "cone_deg": 180.0, "lat_deg": -45.0, "lon_deg": 121.25, "images": [[0, 3328]]},
+    {"name": "south-corner",   "cone_deg": 180.0, "lat_deg": -45.0, "lon_deg": 301.25, "images": [[-6656, 3328], [6656, 3328]]}
+  ],
+  "poles": [
+    {"name": "north", "images": [[-3328, -3328], [3328, -3328]]},
+    {"name": "south", "images": [[-3328, 3328], [3328, 3328]]}
+  ],
+  "border": {"kind": "edge_stop", "edges": ["north", "south"], "inset_blocks": 1.0, "temporary": true}
+}
+```
+
+(The cone points' longitudes depend on λc; the bake writes the computed values.)
+
+- **`kind`**: `petroff_guyou` or `lambert`. **`layout_version`**: 1.
+- **`hemisphere_blocks`** b and **`lambda_c_deg`** λc (petroff_guyou only). The world is two
+  hemisphere squares of side b side by side. b is the planet's equal-area side C/√(2π) for the
+  simulation's circumference C, rounded to a multiple of 256 (so the x period 2b is whole region
+  files and every grid's r divides b): **6,656 at 16k (a 13,312 × 6,656 world), 13,056 at 32k
+  (26,112 × 13,056)**. λc is the longitude (the simulation's frame) of the western square's centre
+  (x = −b/2, z = 0); the bake chooses it per planet ("The bake's projection pass").
+- **`domain`**: the fundamental domain, x in [x_min, x_max), z in [z_min, z_max]. Every stored
+  block lies in it; what lies beyond an edge is a copy of something inside, by that edge's motion.
+- **`edges`**: one entry per edge of the domain, in the wrap engine's terms (`WrapEdge`):
+  - `axis` `x` (an east or west edge, the line x = `coord`) or `z` (north or south, z = `coord`);
+    `side` `min` (beyond is v < coord) or `max` (beyond is v ≥ coord); `coord` is a block boundary;
+    `span` [first, one past the last] block along the edge;
+  - `iso` = `[k, tx, tz]` maps a block beyond the edge to the block inside that it is, as the wrap
+    engine's `CellIsometry(quarterTurns = k, tx, tz)`: k clockwise quarter-turns seen from above,
+    then the translation. On block **cells** (the block at integer (x, z) spans [x, x+1) × [z, z+1)):
+    k = 0: (x + tx, z + tz); k = 2: (−x − 1 + tx, −z − 1 + tz). On **points** (entities) k = 2 is
+    (−x + tx, −z + tz). So the north edge's `[2, 0, −b]` is the half-turn about its `pivot`
+    (0, −b/2): the point (x, −b/2 − d) beyond it is (−x, −b/2 + d) inside, a heading turns 180°;
+  - `kind` `slide` (k = 0) or `half_turn` (k = 2, about `pivot`, a block corner: the edge is glued
+    onto itself, its two halves onto each other);
+  - `owner`: who joins it in the game, `toroidal_world` (the east–west slide, period 2b, as today;
+    Ben, 2026-10-03: "TW slides, engine turns") or `wrap_engine`.
+- **`cone_points`**: the four places whose surroundings the flat world covers with half a turn
+  (`cone_deg` 180): walking round one takes half the usual distance, and a heading coming back
+  round it is reversed. They are the long edges' midpoints and the domain's corners, at ±45°
+  latitude on the meridians λc ± 90°. `images`: every block corner of the domain's closure that is
+  the point (a corner appears at x = −b and x = b).
+- **`poles`**: the block corners that are each pole: on the long edges, a quarter of the way in
+  (x = ∓b/2), twice each (the edge's half-turn takes one image to the other). Lambert worlds list
+  none (the poles lie past the domain, behind the pole cap).
+- **`border`**: what the game does at edges nothing joins yet. `edge_stop` (the preset's
+  `projection.edge_border` = `stop`, the default): players, the vehicles they ride and Sable ships
+  are stopped `inset_blocks` inside the named edges, like the pole cap's hard stop. It is
+  **temporary**: it goes when the wrap engine installs this layout's topology on the level. Absent
+  (`edge_border` = `none`): no border; the terrain past the edge is the folded copy ("Grids"), but
+  nothing joins the edge.
+
+A **Lambert** world's block is `{"kind": "lambert", "layout_version": 1, "domain": {x ±C/2, z ±R},
+"edges": [west, east slides with iso [0, ±C, 0], span [−Zo, Zo]], "cone_points": [], "poles":
+[{"name": "north", "images": []}, …]}` and no border (the pole cap of `notes`/the generator ends
+the world). A manifest without `projection` is read as Lambert.
+
+**The projection's formulas** (Rust `deeptime_format::projection::PetroffGuyou`, Java
+`worlddata/PetroffGuyou` with `worlddata/Petroff`, JS `DTProj` in `projection.js`; the three give the
+same bits, being written on the same portable trigonometry, `deeptime_format::portable_math`,
+Java `PortableMath`, JS `DTMath`):
+
+- Tile coordinates X = 2x/b + 1 ∈ [−1, 3), Y = −2z/b ∈ [−1, 1] (north up).
+- The western tile (X ≤ 1): (u, v) = (X, Y); the point is Petroff's (2021) square point
+  (x_m, y_m) = ((u + v)/2, (v − u)/2), whose inverse gives the polar-aspect (λ_p, φ_p) (north pole
+  at the tile centre; the tile edges are the polar-aspect equator). The eastern tile (X > 1): (u, v)
+  = (2 − X, Y), then φ_p ↦ −φ_p.
+- The rotation to the world: with e the polar-aspect unit vector of Petroff's (0.5, 0.5) (the
+  western tile's top-edge midpoint, on the equator), a = (0, 0, 1), f = a × e, and a2 =
+  (cos λc, sin λc, 0), e2 = (0, 0, 1), f2 = a2 × e2: v = a2·(a·v_p) + e2·(e·v_p) + f2·(f·v_p).
+  Latitude and longitude of v as in "Grids": unit vector (cos φ cos λ, cos φ sin λ, sin φ).
+- The forward map (sphere → block) inverts each step; φ_p ≥ 0 lands in the western tile.
+- Properties (tested in `projection.rs`, ledger SCL-086): every block covers the same area of the
+  planet (2b² = 4πR², R = b/√(2π)); glued edge points are one planet point to 10⁻¹² rad; the map
+  continues smoothly through every seam; round trips to 10⁻⁸ rad and 10⁻⁶ blocks; the equator is the
+  line z = 0, north is −z along it, east +x.
 
 ## Tile pack (`.dtr`)
 
@@ -530,7 +711,7 @@ area, (r·m)² for m metres per block, less only on the rows that reach past a p
 offset        size  field
 0             4     magic "DTR1" (0x44 0x54 0x52 0x31)
 4             4     u32 header_len = 16 + json_len (bytes from file start to the end of the JSON)
-8             2     u16 format_minor (4 for "0.4")
+8             2     u16 format_minor (5 for "0.5")
 10            2     u16 flags, reserved, 0
 12            4     u32 CRC32 of bytes 0..12 followed by the JSON bytes
 16            json  LayerDesc, UTF-8 JSON, no BOM
@@ -750,6 +931,15 @@ it did (cells changed, mean and largest change, the flood after it, milliseconds
 carry the youth and fold strength it read (`amplify/youth`, `amplify/fold`, L1).
 
 ## The detail layer (`rasters/detail/amplitude.dtr`, P1-06)
+
+**Petroff–Guyou worlds (0.5).** The noise N is read through the world's half-turn edges
+(`DetailSpec::noise`, Java `DetailNoise`): a point past the north or south edge is first folded
+((x, z) → (−x, −b − z) north, (−x, b − z) south, repeated), and within 32 blocks of an edge
+(d = z + b/2 for z < 0, b/2 − z otherwise) N is blended towards its half-turn-symmetric mean:
+m = N at (−x, −b − z) north or (−x, b − z) south, S = 0.5·(N + m), t = d / 32, w = t·t·(3 − 2t),
+result S + (N − S)·w (in that order). On the edge the result is the same at both images of a planet
+point, so the detail term is continuous through the seam. Lambert and synthetic worlds: N as below.
+
 
 `deeptime:terrain` (plan §7.1) adds **A(x, z) · N(x, z)** to the L3 height, where A is this layer
 (u8, physical = raw / 16 blocks, L3 grid, sampled bilinearly like `elevation`) and N the noise
@@ -1321,14 +1511,11 @@ list, so a class added to the vocabulary changes no bytes a reader depends on.
 Block coordinates of L3 sample points that are dry land, gently sloping, spread apart, ordered by
 distance from (0, 0).
 
-A world whose essentials set `max_blocks_from_spawn` (P1-15, plan §7.8; a synthetic deposit world
-today) ranks its candidates instead (`deeptime_core::deposits::spawn`): points on a 16-block lattice
-that are dry, at least sea level + 2 and within one block of their L3 neighbours, ordered by the
-number of such essentials whose nearest site is out of reach (`unmet`), then
-`score` = Σ min(d / max_blocks_from_spawn, 4), then distance from (0, 0); at most 10, 64 blocks apart.
-The file then also has `ranked_by` (`[{material, max_blocks_from_spawn, sites}]`) and each candidate
-`unmet`, `score` and `essentials` (`[{material, site, distance, max_blocks_from_spawn}]`). The game
-takes the dry candidate with the fewest `unmet`, file order breaking ties (`SpawnHandler`).
+Every world's candidates follow this one rule (`synth::spawn_candidates`: an 8-block lattice, dry,
+at least sea level + 2, within one block of the L3 neighbours, 64 blocks apart, at most 8). They are
+not ranked by the essentials (Ben, decisions log 2026-10-05: spawn follows the normal rules); the
+`ranked_by`, `unmet`, `score` and `essentials` keys of P1-15 no longer exist. The game takes the first
+candidate that is dry land once generated (`SpawnHandler`).
 
 ## Sectioned files (`DTEV`, `DTSR`, `DTSI`, `DTKF`, `DTCP`)
 
@@ -1773,8 +1960,7 @@ survives in, the finished folder. The manifest's `notes.run.history` reports wha
   sites, bodies and events. `elevation` = round(16·(63 + h/20)) of the synthetic history's present
   elevation h (m) sampled bilinearly on L1 at each L3 point — the same surface the deposit stage
   placed and clipped the bodies against (`deposits::bilinear_cells`, `surface_y`); `water_level` all
-  nodata; climate as wrap-test's formulas on this terrain; spawn candidates ranked by the preset's
-  (or the content bundle's) essentials. `crates/deeptime-core/tests/presets/deposits_world_{4k,16k}.json`
+  nodata; climate as wrap-test's formulas on this terrain; the standard spawn candidates. `crates/deeptime-core/tests/presets/deposits_world_{4k,16k}.json`
   are the GameTest and smoke worlds.
 - All: a three-horizon strata placeholder on L1 (`notes.strata`); with `--strata every-class`
   (P1-12) eight horizons 10 blocks apart holding all 62 rock classes, horizon h of L1 cell column

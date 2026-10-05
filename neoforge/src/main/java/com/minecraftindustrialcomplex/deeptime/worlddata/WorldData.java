@@ -51,12 +51,15 @@ public final class WorldData {
     private volatile Craters craters;
     /** The ice cover, resolved on first use. */
     private volatile Optional<IceCover> iceCover;
+    /** The world's projection (manifest {@code projection}; Lambert when absent). */
+    private final WorldProjection projection;
 
     private WorldData(Path folder, Manifest manifest, TileCache cache, Map<String, RasterSampler> layers) {
         this.folder = folder;
         this.manifest = manifest;
         this.cache = cache;
         this.layers = layers;
+        this.projection = manifest.projection();
         DetailNoise d = DetailNoise.of(manifest);
         if (d != null) {
             String name = DetailNoise.layerOf(manifest);
@@ -106,7 +109,17 @@ public final class WorldData {
         return cache;
     }
 
-    /** C, the east-west period in blocks. */
+    /** The world's projection: block ↔ latitude and longitude, the fold through the edges, the index frame. */
+    public WorldProjection projection() {
+        return projection;
+    }
+
+    /** The world's layout block (manifest {@code projection}), or null for a Lambert world without one. */
+    public WorldLayout layout() {
+        return manifest.layout();
+    }
+
+    /** C, the east-west period in blocks (2b on a Petroff–Guyou world). */
     public int circumference() {
         return manifest.circumference();
     }
@@ -134,7 +147,7 @@ public final class WorldData {
         if (st == null) {
             synchronized (this) {
                 if (structure == null) {
-                    Structure read = Structure.read(folder, circumference());
+                    Structure read = Structure.read(folder, circumference(), projection);
                     structure = read == null ? NO_STRUCTURE : read;
                 }
                 st = structure;

@@ -181,7 +181,7 @@ pub fn stack_at_with(
         for (a, &wu) in bu.iter().enumerate() {
             let n = b * 4 + a;
             w[n] = wu * wv;
-            let (ci, cj) = (g.wrap_i(i0 - 1 + a as i64), g.clamp_j(j0 - 1 + b as i64));
+            let (ci, cj) = g.cell(i0 - 1 + a as i64, j0 - 1 + b as i64);
             corners[n].clear();
             corners[n].extend(
                 (0..k)
@@ -629,7 +629,7 @@ mod tests {
         for (b, &wv) in bv.iter().enumerate() {
             for (a, &wu) in bu.iter().enumerate() {
                 w[b * 4 + a] = wu * wv;
-                let (ci, cj) = (g.wrap_i(i0 - 1 + a as i64), g.clamp_j(j0 - 1 + b as i64));
+                let (ci, cj) = g.cell(i0 - 1 + a as i64, j0 - 1 + b as i64);
                 corners.push(
                     (0..k)
                         .map(|h| l.horizon(ci, cj, h))

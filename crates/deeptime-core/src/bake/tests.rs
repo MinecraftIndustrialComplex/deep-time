@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use deeptime_format::{ColumnWorld, DetailSpec, FORMAT_VERSION, Manifest, Noise, RasterRead};
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::params::planet_builtin;
 use crate::preset::with_timeline;
@@ -81,7 +81,7 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     let m = Manifest::read(&dir).unwrap();
     m.verify(&dir).unwrap();
     assert_eq!(m.format_version, FORMAT_VERSION);
-    assert_eq!(FORMAT_VERSION, "0.4");
+    assert_eq!(FORMAT_VERSION, "0.5");
     for name in [
         "elevation",
         "detail/amplitude",
@@ -166,12 +166,53 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     );
     assert!(bake["meta"]["provinces"]["count"].as_u64().unwrap() >= 1);
     assert!(bake["terrain"]["spawn_candidates"].as_u64().unwrap() >= 1);
-    let spec = DetailSpec::of(&m).unwrap().expect("a detail term");
-    assert_eq!(spec.seed().unwrap(), 5);
-    assert_eq!(spec.salt, super::DETAIL_SALT);
-    assert_eq!(m.grids["L1"].w, 256);
-    assert_eq!(m.grids["L2"].w, 512);
-    assert_eq!(m.grids["L3"].w, 1024);
+    let detail = DetailSpec::of(&m).unwrap().expect("a detail term");
+    assert_eq!(detail.seed().unwrap(), 5);
+    assert_eq!(detail.salt, super::DETAIL_SALT);
+    // The world is Petroff–Guyou (the default): 13,312 × 6,656 blocks for the 16k planet, its
+    // grids edge to edge at the simulation's cell sizes.
+    let wp = m.world_projection();
+    assert_eq!(
+        wp.kind(),
+        deeptime_format::projection::ProjectionKind::PetroffGuyou
+    );
+    assert_eq!(m.scale.circumference_blocks, 13_312);
+    assert_eq!(m.grids["L1"], wp.grid("L1", 64).unwrap());
+    assert_eq!(m.grids["L2"], wp.grid("L2", 32).unwrap());
+    assert_eq!(m.grids["L3"], wp.grid("L3", 16).unwrap());
+    assert_eq!(m.grids["L1"].w, 208);
+    let proj = &bake["projection"];
+    assert_eq!(proj["hemisphere_blocks"], 6_656);
+    // Equal area: the map's land share is the planet's (to the resampling's few cells).
+    let (lm, lt) = (
+        proj["shares"]["land_map"].as_f64().unwrap(),
+        proj["shares"]["land_true"].as_f64().unwrap(),
+    );
+    assert!(
+        (lm - lt).abs() < 0.01,
+        "land on the map {lm}, on the planet {lt}"
+    );
+    // The spawn candidates are distinct places of the world, clear of the turning edges (none
+    // collapsed onto a pole from the Lambert rows past it).
+    let cands: Value =
+        serde_json::from_slice(&std::fs::read(dir.join("spawn/candidates.json")).unwrap()).unwrap();
+    let list = cands["candidates"].as_array().unwrap();
+    assert!(!list.is_empty(), "spawn candidates: {cands}");
+    let mut seen = std::collections::BTreeSet::new();
+    for c in list {
+        let (x, z) = (c["x"].as_i64().unwrap(), c["z"].as_i64().unwrap());
+        assert!(
+            seen.insert((x, z)),
+            "a repeated candidate ({x}, {z}): {cands}"
+        );
+        assert!(
+            z.abs() <= 6_656 / 2 - 64,
+            "({x}, {z}) is within 64 blocks of an edge"
+        );
+    }
+    let spec = m.projection.as_ref().expect("the layout block");
+    assert_eq!(spec.edges.len(), 4);
+    assert!(spec.border.as_ref().is_some_and(|b| b.temporary));
     // The climate layers carry the vanilla range.
     let t = deeptime_format::TilePackReader::open(&dir.join("rasters/climate/temperature.dtr"))
         .unwrap()
@@ -242,13 +283,13 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
 
     // The column evaluator reads the folder; the first horizon covers the terrain everywhere.
     let w = ColumnWorld::open(&dir).unwrap();
-    let noise = Noise::new(5, 16_384);
-    let c = 16_384i64;
+    let c = i64::from(m.scale.circumference_blocks);
+    let noise = Noise::for_world(5, c as u32, &m.world_projection());
     let mut rng = SplitMix(9);
     let (mut with_bodies, mut covered) = (0, 0);
+    let zp = m.world_projection().z_range().1 as i64;
     for _ in 0..400 {
         let x = rng.below(2 * c as u64) as i64 - c;
-        let zp = deeptime_format::Projection::of(c as f64).pole_z() as i64;
         let z = rng.below(2 * zp as u64) as i64 - zp;
         let col = w.sample(x, z);
         assert!(!col.horizons.is_empty(), "({x}, {z}) has horizons");
@@ -264,7 +305,7 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
         let (e, d) = w.height_parts(x, z);
         assert_eq!(e, col.elevation);
         assert_eq!(col.surface, e + d);
-        let n = spec.noise(&noise, col.wx as f64, z as f64);
+        let n = detail.noise(&noise, col.wx as f64, z as f64);
         assert!(d == 0.0 || (d / n).is_finite());
         // The rock runs cover the column from its top block to the floor without gaps.
         let mut y = col.top_y;
@@ -381,5 +422,30 @@ fn a_craters_lens_is_seated_under_the_drawn_floor() {
         "of {seated} lenses read, {off} are not under the drawn floor"
     );
     assert!(m.notes["bake"]["impact_bodies"]["lenses"].as_u64().unwrap() > 0);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// `scale.projection: "lambert"` keeps the cylinder (Ben may swap back, decisions log 2026-10-04):
+/// the folder is the simulation's Lambert grids, with a Lambert layout block and no border.
+#[test]
+fn a_lambert_preset_keeps_the_cylinder() {
+    let dir = temp_dir("lambert");
+    let mut v: serde_json::Value = serde_json::from_str(&small_planet(20.0)).unwrap();
+    v["scale"]["projection"] = json!("lambert");
+    v.as_object_mut().unwrap().remove("deposits");
+    run_to_folder(&v.to_string(), &dir);
+    let m = Manifest::read(&dir).unwrap();
+    m.verify(&dir).unwrap();
+    assert_eq!(m.scale.circumference_blocks, 16_384);
+    assert_eq!(m.grids["L1"].w, 256);
+    assert_eq!(m.grids["L3"].w, 1024);
+    let spec = m.projection.as_ref().expect("a layout block");
+    assert_eq!(
+        spec.kind,
+        deeptime_format::projection::ProjectionKind::Lambert
+    );
+    assert_eq!(spec.edges.len(), 2);
+    assert!(spec.border.is_none());
+    assert_eq!(m.notes["bake"]["projection"]["kind"], "lambert");
     std::fs::remove_dir_all(&dir).unwrap();
 }
