@@ -219,29 +219,36 @@ biome, which thawed wetland never reaches. So with MIC cold wetland is taiga. Wi
 `BOPSecondaryOverworldBiomeBuilder`, 2026-10-03; BOP's `muskeg` sits in the frozen band of its middle biomes).
 
 Measured on one `earthlike_quick_16k` planet (scattered continents, 500 Myr, the preset's seed, test machine,
-2026-10-04): the same simulation baked with the old rule (swamp wherever wet, flat, low land is thawed) and the new
-one, `/deeptime probe biomes 16` through each profile's biome source. Dfc is 4,219 of the 43,162 sampled land
-columns (Dfb 3,760); the bake flags 1,413 Dfc cells as cold wetland (of 178,818 land cells) and the probe finds 336
-flagged columns (0.8 % of the land). Dfc columns, share of the class:
+2026-10-04, after master's plate, 35 m and Expanded Ecosphere merges): the same simulation baked with the old rule
+(swamp wherever wet, flat, low land is thawed: the placement table without `cold_wetland`) and the new one,
+`/deeptime probe biomes 16` through each profile's biome source (`tools/review/peat-runs.sh`, `peat-biomes.sh`).
+The six subarctic classes are 6,979 of the sampled land columns (Dfc 6,335, Dfb 5,157); the bake flags 97
+columns of the probe grid as cold wetland (0.1 % of the 94,659 land columns; the wet, flat, low land of this
+planet's subarctic belt is small, and 1,135 columns of wetland become 1,037 in E6, the rest of it flagged).
+Columns of the six classes on a wetland biome (swamp, marsh, bog, fen, wetland), old rule to new rule:
 
-| Dfc columns on | Old rule | New rule |
+| Profile | Old rule | New rule |
 |---|---|---|
-| standalone: swamp / taiga / old growth pine taiga / old growth spruce taiga | 5.5 / 38.5 / 22.5 / 12.5 % | 0 / 41.5 / 23.7 / 13.5 % |
-| MIC (Terralith): swamp / taiga / old growth pine taiga / old growth spruce taiga | 4.6 / 26.6 / 15.6 / 12.0 % | 0 / 28.2 / 16.8 / 13.1 % |
-| MIC: forested highlands / alpine highlands / lush valley / ice marsh | 14.4 / 3.3 / 2.3 / 1.3 % | 14.5 / 4.0 / 2.7 / 1.3 % |
-| Biomes O' Plenty: swamp / BOP wetland / taiga / BOP bog | 1.5 / 3.8 / 15.5 / 0.2 % | 0 / 0 / 16.7 / 0.2 % |
-| Biomes O' Plenty: BOP field / forested field / muskeg | 16.5 / 13.8 / 2.0 % | 19.1 / 15.0 / 2.0 % |
+| standalone | swamp 30 | none |
+| MIC (Terralith) | swamp 65 (ice marsh 561, both rules: a frozen-band biome the wetland rule never reaches) | none (ice marsh 561) |
+| Biomes O' Plenty | BOP wetland 25, swamp 5 | none |
+| Expanded Ecosphere | fen 40 | fen 68 |
 
-Dfb and the C classes are unchanged (Dfb: swamp 4.5 % standalone, 1.6 % MIC, 3.8 % BOP, both rules). The 336
-cold wetland columns end on (new rule): standalone, taiga 126, beach 100, old growth pine taiga 53, old growth spruce
-taiga 41, river 16; MIC, taiga 71, old growth pine taiga 70, beach 49, old growth spruce taiga 47, alpine
-highlands 28, windswept forest 22; BOP, field 109, gravel beach 89, forested field 53, taiga 51, river 14, beach
-11, bog 9. None is on a swamp that is not a peatland. A third of them are shore (beach, gravel beach: wet coastal
-plain is where the wetland rule puts them, and the continentalness band beside the sea is beach in vanilla's table,
-before and after). In the BOP world the verdict is `biomesoplenty:overworld_secondary` only (bog; 6 of the 25
-provinces): cold wetland is bog in those provinces and taiga, or whatever BOP draws on the ground below E5 (field,
-forested field), in the others, because BOP's primary region puts its `wetland`, which is not cold, at the swamp row.
-Standalone and MIC have no peatland region (`regions: []`).
+The class shares move by the same amounts: Dfc taiga standalone 50.4 to 50.7 %, MIC 36.2 to 36.6 %, EE 61.6 to
+61.3 %; Dfc swamp standalone 0.5 to 0 %. Dfb and the C classes are unchanged (Dfb swamp: 448 columns standalone and
+BOP, 316 MIC, EE's birch swamp 138, old growth taiga swamp 163, fen 49). The 97 flagged columns end on (new rule):
+standalone, taiga 36, old growth spruce taiga 25, beach 36; MIC, old growth spruce taiga 45, taiga 42, beach 10;
+BOP, field 46, gravel beach 20, beach 16, old growth spruce taiga 13, taiga 2; EE, fen 95, cold ocean 2. None is on a
+swamp that is not a peatland. A third of them are shore (beach, gravel beach: wet coastal plain is where the wetland
+rule puts them, and the continentalness band beside the sea is beach in vanilla's table, before and after). In
+the BOP world the verdict is `biomesoplenty:overworld_secondary` only (bog; 6 of the 25 provinces): cold wetland is
+bog in those provinces and taiga, or whatever BOP draws on the ground below E5 (field), in the others, because BOP's
+primary region puts its `wetland`, which is not cold, at the swamp row; none of this planet's 97 columns lay in a
+secondary province (an earlier planet had 9 bog columns). Standalone and MIC have no peatland region
+(`regions: []`). Expanded Ecosphere's verdict is also empty (its biome source puts no tagged biome at the cold
+swamp row through the probe), and its fen comes from the biome rule (`deeptime:peatland`, BIO-129), which reads the
+same flag: 95 of 97 columns.
+
 ## Volcanic biomes
 
 Biome mods bring volcanic biomes: Terralith (shipped by MIC) has yellowstone (hot springs and geysers),
