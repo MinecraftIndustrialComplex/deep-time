@@ -17,12 +17,14 @@ import java.nio.file.Files;
 import java.util.Optional;
 
 /**
- * Spawn on a Deep Time planet (plan §7.8): of the world data's ranked spawn candidates
- * ({@code spawn/candidates.json}), the first whose generated surface is above sea level among those
- * with the fewest essentials out of reach ({@code unmet}, written by the core's spawn ranking,
- * P1-15; a file without it counts every candidate as 0). Replaces vanilla's spawn search through the
- * cancellable {@code LevelEvent.CreateSpawnPosition}, which fires once when a new overworld is
- * created.
+ * Spawn on a Deep Time planet (plan §7.8): the first of the world data's spawn candidates
+ * ({@code spawn/candidates.json}: dry, flat land at least two blocks above sea level, nearest to
+ * (0, 0) first) whose generated surface is above sea level. The candidates are not ranked by the
+ * essentials: Ben dropped that on 2026-10-05 ("I don't believe we need spawn selectoin since we
+ * have some passive iron gen like vanilla"). Deep Time still chooses the spot itself, from
+ * candidates the bake checked as dry flat land (the safe-land guard), and re-checks the first
+ * against the generated surface. It replaces vanilla's spawn search through the cancellable
+ * {@code LevelEvent.CreateSpawnPosition}, which fires once when a new overworld is created.
  */
 public final class SpawnHandler {
 
@@ -40,15 +42,14 @@ public final class SpawnHandler {
         choose(level, w.data()).ifPresent(choice -> {
             level.setDefaultSpawnPos(choice.pos(), 0.0F);
             event.setCanceled(true);
-            DeepTime.LOGGER.info("Deep Time spawn at {} (from the world data's spawn candidates; essentials {})", choice.pos(),
-                    choice.candidate().has("essentials") ? choice.candidate().get("essentials") : "not ranked");
+            DeepTime.LOGGER.info("Deep Time spawn at {} (from the world data's spawn candidates)", choice.pos());
         });
     }
 
     /** The chosen spawn and the candidate record it came from. */
     public record Choice(BlockPos pos, com.google.gson.JsonObject candidate) {}
 
-    /** The candidate that is dry land once generated, fewest unmet essentials first, then file order. */
+    /** The first candidate (file order: nearest to (0, 0)) that is dry land once generated. */
     public static Optional<BlockPos> chooseSpawn(ServerLevel level, WorldData wd) {
         return choose(level, wd).map(Choice::pos);
     }
@@ -58,23 +59,14 @@ public final class SpawnHandler {
             var root = JsonParser.parseString(Files.readString(wd.folder().resolve("spawn/candidates.json"))).getAsJsonObject();
             var generator = level.getChunkSource().getGenerator();
             int sea = generator.getSeaLevel();
-            Choice best = null;
-            int bestUnmet = Integer.MAX_VALUE;
             for (var e : root.getAsJsonArray("candidates")) {
                 var c = e.getAsJsonObject();
-                int unmet = c.has("unmet") ? c.get("unmet").getAsInt() : 0;
-                if (unmet >= bestUnmet)
-                    continue;
                 int x = c.get("x").getAsInt(), z = c.get("z").getAsInt();
                 int y = generator.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, level.getChunkSource().randomState());
-                if (y > sea) {
-                    best = new Choice(new BlockPos(x, y, z), c);
-                    bestUnmet = unmet;
-                    if (unmet == 0)
-                        break;
-                }
+                if (y > sea)
+                    return Optional.of(new Choice(new BlockPos(x, y, z), c));
             }
-            return Optional.ofNullable(best);
+            return Optional.empty();
         } catch (Exception e) {
             DeepTime.LOGGER.error("Deep Time: no usable spawn candidates in {}", wd.folder(), e);
         }

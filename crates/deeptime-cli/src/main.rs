@@ -661,6 +661,7 @@ fn finish(what: &str, r: run::CliResult<()>) -> ExitCode {
 }
 
 fn main() -> ExitCode {
+    alloc::init_from_env();
     let cli = Cli::parse();
     match cli.command {
         None | Some(Command::Version) => {
