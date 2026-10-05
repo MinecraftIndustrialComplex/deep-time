@@ -58,7 +58,7 @@ use glam::DVec3;
 use super::Env;
 use super::geometry::{Geo, dijkstra};
 use super::kinematics::{quat, tangent, to_group};
-use super::pools::ISOSTATIC_FACTOR;
+use super::pools::{ISOSTATIC_FACTOR, isostatic_change_m};
 use super::shortening::Front;
 use super::state::{Belt, CONTINENTAL, FORELAND, OROGENY_HIMALAYAN, PlateState, pool};
 use super::subduction::{MIN_CONTACT, OROGENY_MIN_M_PER_MYR, ceiling};
@@ -389,16 +389,20 @@ fn stack_front(
         let s = &mut state.samples[i];
         let z = f64::from(s.elevation_m);
         let z1 = (z + raw * ceiling(z, k.uplift_ceiling_m)).min(k.max_elevation_m);
-        let dz = z1 - z;
-        if dz <= 0.0 {
+        let airy_dz = z1 - z;
+        if airy_dz <= 0.0 {
             continue;
         }
-        s.elevation_m = z1 as f32;
-        let added = dz * ISOSTATIC_FACTOR;
+        let added = airy_dz * ISOSTATIC_FACTOR;
+        let before = s.pools;
         for (p, m) in s.pools.iter_mut().zip(mix.iter()) {
             *p += (added * m) as f32;
         }
         s.thickness_m = s.pools.iter().sum();
+        // The surface rises by the Airy height of the crust added, less what the column's
+        // eclogite root (its mafic crust beyond the eclogite pressure) pulls down. ledger: PLT-278
+        let dz = isostatic_change_m(&before, &s.pools, env.gravity);
+        s.elevation_m = (z + dz) as f32;
         if in_wedge {
             out.stacked.wedge_km2_m += added * area;
         } else {
@@ -407,9 +411,10 @@ fn stack_front(
         out.stacked.max_dz_m = out.stacked.max_dz_m.max(dz);
         out.lifted10 += u32::from(dz > 10.0);
         out.lifted100 += u32::from(dz > 100.0);
-        out.emerged += u32::from(z <= 0.0 && z1 > 0.0);
-        // ledger: PLT-247 (the stamp), PLT-079 (the regime it makes).
-        if dz >= stamp_m {
+        out.emerged += u32::from(z <= 0.0 && z + dz > 0.0);
+        // ledger: PLT-247 (the stamp), PLT-079 (the regime it makes). The crust stacked, not the
+        // surface's rise, marks the orogeny (a belt whose root turns to eclogite is still one).
+        if airy_dz >= stamp_m {
             s.orogeny = OROGENY_HIMALAYAN;
             s.orogeny_myr = env.t_myr as f32;
             let at = pos[i];
@@ -417,9 +422,10 @@ fn stack_front(
         }
         // Where the collision raised ground across the front, weighted by how much.
         let x = across(i, in_wedge);
-        out.weight += dz;
-        out.across_sum += dz * x;
-        out.across_sq += dz * x * x;
+        let w = dz.max(0.0);
+        out.weight += w;
+        out.across_sum += w * x;
+        out.across_sq += w * x * x;
     }
 
     // The collision's footprint, for the structure stage (`structure::deform::emplace`): every
