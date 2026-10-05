@@ -9,7 +9,8 @@
 //! mild D, fresh water within reach) need the climate and hydrology stages (P1-05, Phase 2); a
 //! world without them is ranked on what exists. Ranking: fewest essentials out of reach, then the
 //! smallest Σ min(d / max_blocks_from_spawn, 4) over the essentials that set a reach, then the
-//! nearest to (0, 0); picks are at least 64 blocks apart.
+//! nearest to (0, 0); picks are at least 64 blocks apart. A site is within reach of an essential
+//! only when the material is its primary product ([`Essential::counts`]).
 
 use deeptime_format::{RasterRead, Site};
 use rayon::prelude::*;
@@ -83,7 +84,7 @@ pub fn ranked_candidates(
                 max: f64::from(max.max(1)),
                 sites: sites
                     .iter()
-                    .filter(|s| s.products.iter().any(|p| p.material == e.material))
+                    .filter(|s| e.counts(&s.products))
                     .map(|s| (f64::from(s.center[0]), f64::from(s.center[2]), s.id))
                     .collect(),
             })
@@ -195,6 +196,10 @@ mod tests {
     use deeptime_format::{Codec, SiteKind};
 
     fn site(id: u32, x: i32, z: i32, material: &str) -> Site {
+        site_with_role(id, x, z, material, "primary")
+    }
+
+    fn site_with_role(id: u32, x: i32, z: i32, material: &str, role: &str) -> Site {
         Site {
             id,
             kind: SiteKind::Deposit,
@@ -207,7 +212,7 @@ mod tests {
                 material: material.into(),
                 grade: 0.01,
                 tonnage_t: 1.0e6,
-                role: "primary".into(),
+                role: role.into(),
             }],
             forming_event: deeptime_format::EventId(1),
             parent: None,
@@ -237,6 +242,7 @@ mod tests {
             region_blocks: 1024,
             exposed: false,
             max_blocks_from_spawn: max,
+            primary_only: true,
         };
         assert!(
             ranked_candidates(
@@ -276,5 +282,47 @@ mod tests {
                 assert!(wrapped_dx(1024.0, dx).hypot(dz) >= 64.0);
             }
         }
+    }
+
+    /// P1-15 on real planets: a small deposit with copper as a co-product sat beside the best
+    /// spawn candidates and satisfied the copper essential, so the spawn was never ranked toward
+    /// the porphyry. The copper that counts is a primary product.
+    #[test]
+    fn a_coproduct_is_not_a_source_of_the_essential() {
+        let w = crate::synth::build(
+            crate::synth::Kind::LakeTest,
+            crate::synth::Strata::Placeholder,
+            1024,
+            Codec::Raw,
+        )
+        .unwrap();
+        let sites = vec![
+            site_with_role(1, 320, 120, "c:copper", "coproduct"),
+            site_with_role(2, -300, -100, "c:copper", "primary"),
+        ];
+        let ess = |primary_only: bool| Essential {
+            material: "c:copper".into(),
+            min_sites_per_region: 1,
+            region_blocks: 1024,
+            exposed: false,
+            max_blocks_from_spawn: Some(100),
+            primary_only,
+        };
+        let first = |primary_only: bool| {
+            let v = ranked_candidates(&w.layers[0], &w.layers[1], 63, &sites, &[ess(primary_only)])
+                .unwrap();
+            (
+                v["ranked_by"][0]["sites"].as_u64().unwrap(),
+                v["candidates"][0].clone(),
+            )
+        };
+        let (n, c) = first(true);
+        assert_eq!(n, 1, "only the primary site is a copper source");
+        assert_eq!(c["essentials"][0]["site"], 2, "{c}");
+        assert_eq!(c["unmet"], 0, "{c}");
+        assert!(c["x"].as_i64().unwrap() < 0, "{c}");
+        let (n, c) = first(false);
+        assert_eq!(n, 2);
+        assert_eq!(c["unmet"], 0, "{c}");
     }
 }
