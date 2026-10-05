@@ -2,7 +2,9 @@
 //! The estimate is honest (memacct, 2026-10-04): on a small planet through every stage and the
 //! bake, measured by the game's own counting allocator, the memory the run holds while a stage
 //! steps is never more than that stage's estimate, and the run's peak never more than the
-//! estimate's peak. One test in its own binary, so the allocator counts nothing else.
+//! estimate's peak; and what the allocator counts is what the process holds (on Linux, the
+//! resident peak of the run is within 10 % of the counted peak). One test in its own binary, so
+//! the allocator counts nothing else.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -85,9 +87,10 @@ fn no_stage_holds_more_than_its_estimate() {
     let dir: PathBuf =
         std::env::temp_dir().join(format!("deeptime-memory-estimate-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    // The model's figures, without the freed blocks the allocator keeps for reuse (at most
-    // `alloc::CACHE_BYTES`, which the estimate adds on its own).
-    alloc::set_cache_limit(0);
+    // With the freed blocks the allocator keeps for reuse, as in the game: the session keeps
+    // them inside each stage's estimate (`MemoryGauge::keep_below`).
+    alloc::release_cache();
+    let rss_start = rss_reset();
     let start = alloc::in_use();
     alloc::reset_peak();
     let gauge = Arc::new(Gauge {
@@ -114,6 +117,7 @@ fn no_stage_holds_more_than_its_estimate() {
     }
     s.finalize_write().unwrap();
     let run_peak = alloc::peak().saturating_sub(start);
+    let rss_peak = rss_hwm().map(|h| h.saturating_sub(rss_start.unwrap_or(0)));
     drop(s);
     let _ = std::fs::remove_dir_all(&dir);
 
@@ -149,4 +153,48 @@ fn no_stage_holds_more_than_its_estimate() {
         ));
     }
     assert!(over.is_empty(), "held more than estimated: {over:?}");
+    // The count is the process's memory: the resident peak above the start is within 10 % of
+    // the counted peak (plus 16 MiB for thread stacks and the C library's own buffers). Before
+    // memacct the resident peak was a third over the count (glibc kept freed grids).
+    if let (Some(rss), true) = (rss_peak, rss_start.is_some()) {
+        eprintln!("resident peak {:.1} MiB, counted peak {:.1} MiB", mib(rss), mib(run_peak));
+        let slack = (16u64 << 20) + run_peak / 10;
+        assert!(
+            rss <= run_peak + slack,
+            "the process held {:.1} MiB, the count said {:.1} MiB",
+            mib(rss),
+            mib(run_peak)
+        );
+        assert!(
+            run_peak <= rss + slack,
+            "the count said {:.1} MiB, the process held {:.1} MiB",
+            mib(run_peak),
+            mib(rss)
+        );
+    }
+}
+
+/// `/proc/self/status` field `key` in bytes (Linux).
+fn status_bytes(key: &str) -> Option<u64> {
+    let s = std::fs::read_to_string("/proc/self/status").ok()?;
+    let kb: u64 = s
+        .lines()
+        .find_map(|l| l.strip_prefix(key))?
+        .split_whitespace()
+        .next()?
+        .parse()
+        .ok()?;
+    Some(kb * 1024)
+}
+
+/// Resets the resident peak (`VmHWM`) to the resident size now and returns that size; `None`
+/// where the kernel does not allow it (not Linux).
+fn rss_reset() -> Option<u64> {
+    std::fs::write("/proc/self/clear_refs", "5").ok()?;
+    status_bytes("VmRSS:")
+}
+
+/// The resident peak since [`rss_reset`].
+fn rss_hwm() -> Option<u64> {
+    status_bytes("VmHWM:")
 }
