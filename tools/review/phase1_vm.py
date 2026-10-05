@@ -107,10 +107,26 @@ def cmd_pick(a):
         """A porphyry with a gossan body: the one item 3 can show in full (its placer is another site: below)."""
         return any(b["role"] == "gossan" for b in by_site.get(s["id"], []))
 
-    # Nearest first among the porphyries within the essentials reach (when the preset still has one) that show a gossan,
-    # then the others in reach, then the rest: a body that lacks a gossan is a finding, but one that has it elsewhere
-    # in reach should be the one shown.
-    por = sorted(of(PORPHYRY), key=lambda s: (reach is not None and dist(s) > reach, not complete(s), dist(s)))
+    # The porphyry shown: one whose gossan top sits at the baked terrain (within 12 blocks), nearest to spawn first; then the rest.
+    def gap(s):
+        """How far the gossan's top (`clip_top_y`, the surface at formation) is from the baked terrain above the body: a gossan
+        'where the body is exposed' sits at the ground; one the bake's erosion or burial left far above or below does not."""
+        g = next((b for b in by_site.get(s["id"], []) if b["role"] == "gossan"), None)
+        if g is None or g.get("clip_top_y") is None:
+            return 1e9
+        x, z = int(g["center"][0]), int(g["center"][2])
+        out = os.path.join(os.path.dirname(a.out) or ".", f"_elev-{s['id']}.npy")
+        r = run([DEEPTIME, "heightmap", "--world-data", wd, f"--box={x},{z},{x + 4},{z + 4}", "--step", "4", "--out", out])
+        if r.returncode:
+            return 1e9
+        try:
+            _, _, _, data = read_npy(out)
+            return abs(data[0] - g["clip_top_y"])
+        except Exception:
+            return 1e9
+
+    gaps = {s["id"]: gap(s) for s in of(PORPHYRY)}
+    por = sorted(of(PORPHYRY), key=lambda s: (gaps[s["id"]] > 12, dist(s)))
     # The placer (Ben, 2026-10-05: "a placer whose why-chain ends in an eroded porphyry"): a placer site whose forming
     # event names a porphyry as its parent type, the nearest to spawn first. Its `deeptime why` chain is read in the game.
     forming = {e["id"]: e for e in d["events"]["forming"]}
@@ -125,7 +141,7 @@ def cmd_pick(a):
             "counts": {short(t): sum(1 for s in sites if short(s["deposit_type"]) == short(t))
                        for t in {s["deposit_type"] for s in sites}},
             "placers": {"total": len(of(PLACER)), "from_porphyry": len(placers)},
-            "porphyry": None, "gossan": None, "placer": None, "others": [], "traps": [], "empty": [],
+            "gossan_gaps": gaps, "porphyry": None, "gossan": None, "placer": None, "others": [], "traps": [], "empty": [],
             "chunky": [], "rcon": []}
     if por:
         p = por[0]
@@ -319,7 +335,8 @@ def cmd_geology(a):
         ok_d = bool(gp) and (iron > 0 or any(b and re.search(r"ochrum|ironstone|gossan|limonite", b) for b in blocks))
         check(ok_d, "a gossan where the body is exposed",
               f"gossan body {gos['id']} ({gos.get('rock_class')}, clip_top_y {gos.get('clip_top_y')}); probe found it at {len(gp)} point(s), "
-              f"blocks there {blocks[:2]}; ironstone-class blocks in its footprint: {iron}")
+              f"blocks there {blocks[:2]}; ironstone-class blocks in its footprint: {iron}; gossan top vs terrain gaps of the {len(plan.get('gossan_gaps', {}))} porphyries (blocks): "
+              f"{ {k: round(v) if v < 1e8 else None for k, v in plan.get('gossan_gaps', {}).items()} }")
     else:
         check(False, "a gossan where the body is exposed",
               f"site {por['site']} has no gossan body (a body that is not exposed has none; bodies: {[b['role'] for b in por['bodies']]})")
