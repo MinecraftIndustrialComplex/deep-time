@@ -167,6 +167,22 @@ pub const HIGHS_REACH_M: f64 = 1.0e6; // ledger: CLM-201
 /// The share of sea within the reach below which the highs' flow fades inland.
 const HIGHS_SEA_MIN: f64 = 0.25; // game-choice: where the flow fades over a continent
 
+/// Where each cell lies under the subtropical highs, in [−1, 1] (east positive): over the sea its
+/// basin position (`basin`, over the cell's sea share `sea`), over land the sea's within the
+/// highs' reach, so a coast and the land behind it take the side of the basin they border and the
+/// value fades a few reaches inland. A property of the place, not of where its air came from.
+pub fn flank_position(mesh: &Mesh, basin: &[f64], sea: &[f64]) -> Vec<f64> {
+    let n = mesh.cells();
+    let num = mesh.smooth(
+        &(0..n).map(|c| basin[c] * sea[c]).collect::<Vec<_>>(),
+        HIGHS_REACH_M,
+    );
+    let den = mesh.smooth(sea, HIGHS_REACH_M);
+    (0..n)
+        .map(|c| (num[c] / den[c].max(HIGHS_SEA_MIN)).clamp(-1.0, 1.0))
+        .collect()
+}
+
 /// The summer flow round the subtropical highs, m/s northward per cell and month: poleward under
 /// a sea basin's western side and equatorward under its eastern side (`basin` the cells' basin
 /// position in [−1, 1], east positive, over their sea; `sea` their sea share), carried over the
@@ -187,14 +203,7 @@ pub fn highs_flow(
     if speed_m_s <= 0.0 {
         return vec![[0.0; 12]; n];
     }
-    let num = mesh.smooth(
-        &(0..n).map(|c| -basin[c] * sea[c]).collect::<Vec<_>>(),
-        HIGHS_REACH_M,
-    );
-    let den = mesh.smooth(sea, HIGHS_REACH_M);
-    let west: Vec<f64> = (0..n)
-        .map(|c| (num[c] / den[c].max(HIGHS_SEA_MIN)).clamp(-1.0, 1.0))
-        .collect();
+    let west: Vec<f64> = flank_position(mesh, basin, sea).iter().map(|a| -a).collect();
     (0..n)
         .map(|c| {
             let phi = lat_deg[c];
@@ -577,9 +586,9 @@ pub struct Rain {
     /// The winds, m/s (east, north).
     pub u: Vec<[f64; 12]>,
     pub v: Vec<[f64; 12]>,
-    /// The basin position and the sea-surface departure the vapour carries (mixing ratios: the
-    /// sea's values times the share of the vapour that evaporated from the sea), per cell and
-    /// month.
+    /// Where each cell lies under the subtropical highs ([`flank_position`], the same every
+    /// month), and the sea-surface departure the vapour carries (a mixing ratio: the sea's value
+    /// times the share of the vapour that evaporated from the sea), per cell and month.
     pub basin_air: Vec<[f64; 12]>,
     pub dsst_air: Vec<[f64; 12]>,
     /// Annual rain per cell, mm/yr, and the land's recycled share ε used.
@@ -719,16 +728,18 @@ pub fn rain(
             .collect();
         eps = (0..n).map(|c| eps_of(c, &annual)).collect();
     }
-    // Where each month's vapour evaporated: the basin position and sea-surface departure it
-    // carries (the share from the land's recycling carries neither).
-    let src: Vec<[f64; 2]> = (0..n).map(|c| [inp.basin[c], inp.dsst[c]]).collect();
-    let carried: Vec<Vec<[f64; 2]>> = year
+    // The sea surface the month's vapour evaporated from (its departure from its row, carried
+    // as a tracer; the land's recycled share carries none) sets the rain's stability over land.
+    let src: Vec<[f64; 1]> = (0..n).map(|c| [inp.dsst[c]]).collect();
+    let carried: Vec<Vec<[f64; 1]>> = year
         .par_iter()
         .zip(&months)
         .map(|(mo, s)| tracers(&mesh, &k, mo, s, &src))
         .collect();
-    let basin_air = (0..n).map(|c| std::array::from_fn(|m| carried[m][c][0])).collect();
-    let dsst_air = (0..n).map(|c| std::array::from_fn(|m| carried[m][c][1])).collect();
+    let dsst_air = (0..n).map(|c| std::array::from_fn(|m| carried[m][c][0])).collect();
+    // Which side of the highs a place lies under is the place's (`flank_position`).
+    let flank = flank_position(&mesh, inp.basin, &sea);
+    let basin_air = (0..n).map(|c| [flank[c]; 12]).collect();
     Rain {
         basin_air,
         dsst_air,
@@ -937,6 +948,25 @@ mod tests {
         assert!((r / (-1.0f64).exp() - 1.0).abs() < 0.25, "{r}");
         let c = mesh.smooth(&vec![2.0; n], 300_000.0);
         assert!(c.iter().all(|v| (v - 2.0).abs() < 1e-6));
+    }
+
+    #[test]
+    fn land_takes_the_flank_of_the_basin_it_borders() {
+        // Land on cells 0..40 of a ring, a basin on 40..200 (west side −1, east side +1): the
+        // land's west coast (cell 0) borders the basin's eastern side, its east coast (39) the
+        // western side; the middle, 2,000 km from both, keeps little of either.
+        let n = 200;
+        let mesh = ring(n);
+        let sea: Vec<f64> = (0..n).map(|c| if c < 40 { 0.0 } else { 1.0 }).collect();
+        let basin: Vec<f64> = (0..n)
+            .map(|c| if c < 40 { 0.0 } else { (c as f64 - 120.0) / 80.0 })
+            .collect();
+        let a = flank_position(&mesh, &basin, &sea);
+        assert!(a[1] > 0.6 && a[38] < -0.6, "{} {}", a[1], a[38]);
+        assert!(a[5] > a[15] && a[15] > a[20], "{:?}", [a[5], a[15], a[20]]);
+        assert!(a[20].abs() < 0.2, "{}", a[20]);
+        // Over the open sea it is the basin's own position.
+        assert!((a[120] - basin[120]).abs() < 0.05 && a[190] > 0.8, "{} {}", a[120], a[190]);
     }
 
     #[test]
