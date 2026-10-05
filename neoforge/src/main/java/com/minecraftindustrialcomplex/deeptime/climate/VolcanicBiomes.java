@@ -393,16 +393,18 @@ public final class VolcanicBiomes {
         /** The climate search with the kept-out biomes set aside. */
         Holder<Biome> plain() {
             if (plain == null)
-                plain = keptSearch(r, source, t, slot());
+                plain = keptSearch(r, source, t, slot(), this::land);
             return plain;
         }
     }
 
     /**
      * The climate search of {@code t} with every kept-out biome of {@code r} set aside; {@code plain} is the search with
-     * nothing set aside (where it is not kept out, the keep-out search would find the same leaf).
+     * nothing set aside (where it is not kept out, the keep-out search would find the same leaf); {@code land} whether
+     * the column's ground is at or above sea level.
      */
-    private static Holder<Biome> keptSearch(Resolved r, Source source, Climate.TargetPoint t, Holder<Biome> plain) {
+    private static Holder<Biome> keptSearch(Resolved r, Source source, Climate.TargetPoint t, Holder<Biome> plain,
+                                            java.util.function.BooleanSupplier land) {
         if (!r.keepOut || !kept(r, plain))
             return plain;
         Holder<Biome> kept;
@@ -429,7 +431,10 @@ public final class VolcanicBiomes {
             // Without a tree under it (a plain parameter list: Terralith's in MIC), the same tree once more with its
             // ocean and river leaves set aside too: a land biome kept out of a slot next to the river slice (a
             // rock-named biome off its ground, Terralith's white mesa across it) must not turn land into river (118
-            // land columns on the quick 16k planet before this retry).
+            // land columns on the quick 16k planet before this retry). Only on land: at sea the water is right (Expanded
+            // Ecosphere's island biomes, kept out, sit in Deep Time's deep-sea slots: BIO-132).
+            if (!land.getAsBoolean())
+                return kept;
             Climate.DistanceMetric<Holder<Biome>> keptMetric = r.keptMetric;
             try {
                 Holder<Biome> dry = source.find(t, (node, values) -> node instanceof Climate.RTree.Leaf<Holder<Biome>> leaf
