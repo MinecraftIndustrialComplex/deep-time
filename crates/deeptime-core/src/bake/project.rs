@@ -67,9 +67,11 @@ pub const MAX_STRETCH: f64 = 8.0; // ledger: SCL-090 (game-choice)
 const MAX_SAMPLES_X: usize = 2048;
 const MAX_SAMPLES_Z: usize = 64;
 
-/// The layers sampled as categories (the nearest cell): class and id codes.
-const CATEGORICAL: [&str; 4] = [
+/// The layers sampled as categories (the nearest cell): class and id codes, and flags (a layer whose
+/// `units` is `flag` is one too, named here or not).
+const CATEGORICAL: [&str; 5] = [
     "climate/koppen",
+    "climate/wetland",
     "surface/class_top",
     "meta/plate_id",
     "meta/province",
@@ -89,7 +91,7 @@ enum Kind {
 fn kind_of(desc: &LayerDesc) -> Kind {
     if desc.dtype == DType::HorizonStack {
         Kind::Stack
-    } else if CATEGORICAL.contains(&desc.name.as_str()) {
+    } else if CATEGORICAL.contains(&desc.name.as_str()) || desc.units == "flag" {
         Kind::Categorical
     } else {
         Kind::Continuous
