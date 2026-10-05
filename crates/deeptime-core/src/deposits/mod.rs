@@ -3470,7 +3470,7 @@ pub fn sites_of<'a>(
 /// captured share of the resistate metal in the eroded part (the gold spread through the body, so
 /// `parent_metal_t` times the fraction). Both the draw and the cap scale with the fraction, so a
 /// half-eroded parent sheds half the placer of a wholly eroded one, capped or not.
-/// `grade` is the placer's gold as a mass fraction. Game choice, ledger DEP-110.
+/// `grade` is the placer's gold as a mass fraction. Game choice, ledger DEP-207.
 fn shed_tonnage_mt(
     drawn_mt: f64,
     grade: f64,
@@ -3542,21 +3542,21 @@ mod tests {
                 1.0 - fate.fraction_left(),
             )
         };
-        // Uncapped: 1.1 Mt of gravel at 0.2 g/t holds 220 kg; the parent held 30 t.
-        let full = cut(0.0, 1.1, 30.0e3 * 1.0e3);
-        let half = cut(0.5, 1.1, 30.0e3 * 1.0e3);
+        // Uncapped: 1.1 Mt of gravel at 0.2 g/t holds 220 kg; the parent held 30 t of gold.
+        let full = cut(0.0, 1.1, 30.0);
+        let half = cut(0.5, 1.1, 30.0);
         assert!((full - 1.1).abs() < 1e-12);
         assert!((half / full - 0.5).abs() < 1e-9, "{half} of {full}");
         // Capped: a parent that held only 0.2 t of gold caps the placer at 0.1 t.
-        let full = cut(0.0, 1.1, 200.0e3);
-        let half = cut(0.5, 1.1, 200.0e3);
+        let full = cut(0.0, 1.1, 0.2);
+        let half = cut(0.5, 1.1, 0.2);
         assert!(full < 1.1 && (half / full - 0.5).abs() < 1e-9, "{half} {full}");
         let held_t = full * 1.0e6 * 0.2e-6;
-        assert!((held_t - rules.capture_fraction * 200.0e3 * 1.0e-3).abs() < 1e-6);
+        assert!((held_t - rules.capture_fraction * 0.2).abs() < 1e-9, "{held_t}");
         // A tenth eroded sheds a tenth.
-        assert!((cut(0.9, 1.1, 30.0e6) / 1.1 - 0.1).abs() < 1e-9);
+        assert!((cut(0.9, 1.1, 30.0) / 1.1 - 0.1).abs() < 1e-9);
         // Uneroded: nothing.
-        assert_eq!(cut(1.0, 1.1, 30.0e6), 0.0);
+        assert_eq!(cut(1.0, 1.1, 30.0), 0.0);
         assert_eq!(
             Fate::Buried { centre_depth_m: 900.0 }.fraction_left(),
             1.0,
