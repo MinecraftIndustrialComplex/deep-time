@@ -89,7 +89,11 @@ host rock in the top 2 km) and three global clocks.
    deposit is replayed through the history of its column: buried by sediment, uplifted and eroded.
    A deposit eroded away is lost (a porphyry leaves placer gold downstream); one cut into is
    truncated; one buried below the build range is dropped; one deeper than the assessment depth
-   but inside the build range is placed but not counted. The formation rate is chosen so that the
+   but inside the build range is placed but not counted. The fate follows the order of events:
+   the deepest the surface ever cut towards the body decides it, so a deposit exhumed through and
+   buried again is gone, and one cut and then covered is placed under its old erosion surface
+   (an unconformity). The column's history is the crust's own, followed frame by frame with the
+   plate (2026-10-05, [erosion-and-sediment.md](erosion-and-sediment.md#the-erosion-and-burial-audit-2026-10-05)). The formation rate is chosen so that the
    expected counted survivors equal N\*.
 5. **Positions.** Within a tract, deposits are drawn in clusters (a Thomas process: camps of
    deposits) at least the USGS same-deposit distance apart (2 km for porphyry). Coal fields instead

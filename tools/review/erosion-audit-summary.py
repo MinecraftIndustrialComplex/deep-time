@@ -46,6 +46,13 @@ def main():
                           row.get("exhumed_max_m"), "ledger centre",
                           row["ledger_centre_depth_m"], "m; centre",
                           row["centre_depth_blocks"], "blocks under the ground")
+            dep = sorted(r2["centre_depth_blocks"] for r2 in p["rows"]
+                         if r2["site"] >= 0 and r2["centre_depth_blocks"] is not None)
+            if dep:
+                q = lambda f: dep[round((len(dep) - 1) * f)]
+                print(f"  sites {len(dep)}: centre depth under the ground, blocks p50 {q(0.5)} "
+                      f"p90 {q(0.9)} max {dep[-1]}; deeper than 100 blocks: "
+                      f"{sum(1 for x in dep if x > 100)}")
             bur = sorted(r2["buried_m"] for r2 in p["rows"] if r2["buried_m"] is not None)
             if bur:
                 q = lambda f: bur[round((len(bur) - 1) * f)]
