@@ -146,17 +146,86 @@ pub fn box_blur(d: &Dims, v: &mut [f64], r: usize, passes: usize) {
                 out
             })
             .collect();
-        for (i, col) in cols.iter().enumerate() {
-            for (j, &x) in col.iter().enumerate() {
-                v[j * w + i] = x;
+        // Back into the rows, rows in parallel (P1-17: the strided serial copy was a tenth of the
+        // blur's time on 8 threads).
+        v.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
+            for (x, col) in row.iter_mut().zip(&cols) {
+                *x = col[j];
             }
-        }
+        });
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// P1-17: the box blur gives the bits of the blur that copied its columns back serially.
+    #[test]
+    fn the_box_blur_equals_the_serial_copy_back() {
+        fn reference(d: &Dims, v: &mut [f64], r: usize, passes: usize) {
+            let (w, h) = (d.w, d.h);
+            let norm = 1.0 / (2 * r + 1) as f64;
+            for _ in 0..passes {
+                for row in v.chunks_mut(w) {
+                    let src = row.to_vec();
+                    let at = |i: i64| -> f64 {
+                        if d.wrap_x {
+                            src[i.rem_euclid(w as i64) as usize]
+                        } else {
+                            src[i.clamp(0, w as i64 - 1) as usize]
+                        }
+                    };
+                    let mut acc: f64 = (-(r as i64)..=r as i64).map(at).sum();
+                    for (i, x) in row.iter_mut().enumerate() {
+                        *x = acc * norm;
+                        acc += at(i as i64 + r as i64 + 1) - at(i as i64 - r as i64);
+                    }
+                }
+                let cols: Vec<Vec<f64>> = (0..w)
+                    .map(|i| {
+                        let src: Vec<f64> = (0..h).map(|j| v[j * w + i]).collect();
+                        let at = |j: i64| -> f64 {
+                            let j = if j < 0 {
+                                -j - 1
+                            } else if j >= h as i64 {
+                                2 * h as i64 - j - 1
+                            } else {
+                                j
+                            };
+                            src[j.clamp(0, h as i64 - 1) as usize]
+                        };
+                        let mut out = vec![0.0; h];
+                        let mut acc: f64 = (-(r as i64)..=r as i64).map(at).sum();
+                        for (j, o) in out.iter_mut().enumerate() {
+                            *o = acc * norm;
+                            acc += at(j as i64 + r as i64 + 1) - at(j as i64 - r as i64);
+                        }
+                        out
+                    })
+                    .collect();
+                for (i, col) in cols.iter().enumerate() {
+                    for (j, &x) in col.iter().enumerate() {
+                        v[j * w + i] = x;
+                    }
+                }
+            }
+        }
+        let mut rng = crate::sphere::SplitMix64::new(5);
+        for &(w, h, wrap, r) in &[
+            (50usize, 30usize, true, 3usize),
+            (7, 40, false, 5),
+            (1, 5, true, 2),
+        ] {
+            let d = Dims::new(w, h, 1000.0, wrap);
+            let v0: Vec<f64> = (0..w * h).map(|_| rng.next_f64() * 100.0 - 20.0).collect();
+            let (mut a, mut b) = (v0.clone(), v0);
+            box_blur(&d, &mut a, r, 2);
+            reference(&d, &mut b, r, 2);
+            let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+            assert_eq!(bits(&a), bits(&b), "{w}x{h}");
+        }
+    }
 
     #[test]
     fn neighbours_wrap_in_x_and_stop_at_the_rows() {
