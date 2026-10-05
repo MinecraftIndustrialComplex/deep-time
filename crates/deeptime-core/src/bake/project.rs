@@ -63,36 +63,41 @@ pub const BORDER_INSET_BLOCKS: f64 = 1.0; // ledger: SCL-088 (game-choice)
 /// stretch grows without bound; the cone points are put in open sea).
 pub const MAX_STRETCH: f64 = 8.0; // ledger: SCL-090 (game-choice)
 
-/// Where the footprint starts widening along the parallels: the cosine of the latitude (60°).
-pub const POLAR_WIDEN_FROM_COS: f64 = 0.5; // ledger: SCL-090 (game-choice)
+/// Where the footprint starts widening along the parallels: the cosine of the latitude (about 59°).
+pub const POLAR_WIDEN_FROM_COS: f64 = 0.52; // ledger: SCL-090 (game-choice)
 
 /// The most the footprint is widened along the parallels round the poles.
-pub const POLAR_WIDEN_MAX: f64 = 16.0; // ledger: SCL-090 (game-choice)
+pub const POLAR_WIDEN_MAX: f64 = 8.0; // ledger: SCL-090 (game-choice)
+
+/// How fast the widening grows poleward: the power of cos₀ / cos φ.
+pub const POLAR_WIDEN_POWER: f64 = 4.0; // ledger: SCL-090 (game-choice)
 
 /// How much wider than its isotropic diameter the footprint is along the parallel at a point
-/// whose latitude has cosine `cos`: 1 up to [`POLAR_WIDEN_FROM_COS`], then (cos₀ / cos)², the
-/// growth of the Lambert grid's own aspect, up to [`POLAR_WIDEN_MAX`]. The simulation's solvers
-/// work in Lambert blocks, so its polar terrain has the grid's shape: a feature k cells across is
-/// k cos φ planet blocks wide east–west and k / cos φ long north–south. The isotropic footprint
-/// removes only the features shorter than one row; the longer ones stay as streaks radiating from
-/// the pole. Averaging along the parallel over several rows' length leaves only what the
-/// simulation resolved in both directions there.
+/// whose latitude has cosine `cos`: 1 up to [`POLAR_WIDEN_FROM_COS`], then (cos₀ / cos)^p
+/// ([`POLAR_WIDEN_POWER`]) up to [`POLAR_WIDEN_MAX`] (reached at about 72°). The simulation's
+/// solvers work in Lambert blocks, so its polar terrain has the grid's shape: a feature k cells
+/// across is k cos φ planet blocks wide east–west and k / cos φ long north–south. The isotropic
+/// footprint removes only the features shorter than one row; the longer ones stay as streaks
+/// radiating from the pole. Averaging along the parallel over several rows' length leaves only
+/// what the simulation resolved in both directions there. The constants were fitted on an
+/// earthlike_quick_16k bake so the tangential-over-radial slope ratio round the poles comes down
+/// to the mid-latitudes' (STATUS build log, SW-1).
 pub fn polar_widening(cos: f64) -> f64 {
-    let (c0, max) = polar_widening_params();
-    (c0 / cos.max(1e-9)).powi(2).clamp(1.0, max)
+    let (c0, max, p) = polar_widening_params();
+    (c0 / cos.max(1e-9)).powf(p).clamp(1.0, max)
 }
 
-fn polar_widening_params() -> (f64, f64) {
-    // Tuning only: DEEPTIME_POLAR_WIDEN="cos0,max" overrides the constants.
-    static P: std::sync::OnceLock<(f64, f64)> = std::sync::OnceLock::new();
+fn polar_widening_params() -> (f64, f64, f64) {
+    // Tuning only: DEEPTIME_POLAR_WIDEN="cos0,max,power" overrides the constants.
+    static P: std::sync::OnceLock<(f64, f64, f64)> = std::sync::OnceLock::new();
     *P.get_or_init(|| {
         std::env::var("DEEPTIME_POLAR_WIDEN")
             .ok()
             .and_then(|v| {
                 let mut it = v.split(',').map(|t| t.trim().parse::<f64>().ok());
-                Some((it.next()??, it.next()??))
+                Some((it.next()??, it.next()??, it.next()??))
             })
-            .unwrap_or((POLAR_WIDEN_FROM_COS, POLAR_WIDEN_MAX))
+            .unwrap_or((POLAR_WIDEN_FROM_COS, POLAR_WIDEN_MAX, POLAR_WIDEN_POWER))
     })
 }
 
