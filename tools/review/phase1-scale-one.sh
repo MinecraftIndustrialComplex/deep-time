@@ -25,8 +25,9 @@ rm -rf "$SERVER/planet"
 mkdir -p "$SERVER/planet"
 cp -r "$BAKE" "$SERVER/planet/deeptime"
 # No --fresh: the world is the bake alone (its manifest is there, so the server does not generate).
-python3 tools/smoke/run.py --profile standalone --timeout 3000 --chunky-at "$CX,$CZ,$R" 2>&1 \
-    | grep -E '\[(PASS|FAIL)\]|^(PASS|FAIL)|world data present|chunky' | cut -c1-200
+python3 tools/smoke/run.py --profile standalone --timeout 3000 --chunky-at "$CX,$CZ,$R" > "$WORK/run-h$H.log" 2>&1 || true
+grep -E '\[(PASS|FAIL)\]|^(PASS|FAIL)|world data present|chunky' "$WORK/run-h$H.log" | cut -c1-200
+grep -q '^PASS' "$WORK/run-h$H.log" || { echo "phase1-scale-one: the server run failed; the log's tail:"; tail -n 60 "$WORK/run-h$H.log" | cut -c1-300; exit 1; }
 
 X0=$((CX - R)); X1=$((CX + R - 1)); Z0=$((CZ - R)); Z1=$((CZ + R - 1))
 BLUEMAP_BOX="$X0 $X1 $Z0 $Z1" BLUEMAP_MAP_LABEL="Deep Time 1:$H" \
