@@ -767,8 +767,10 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
     let mut t_sea = vec![f32::NAN; n];
     let mut e_lo = vec![f32::NAN; n];
     let mut e_hi = vec![f32::NAN; n];
-    let mut c_lo = vec![-2.0f32; n];
-    let mut c_hi = vec![2.0f32; n];
+    // Per-cell continentalness limits only where the table has any (none in the default table).
+    let limits = placement.has_continentalness();
+    let mut c_lo = if limits { vec![-2.0f32; n] } else { Vec::new() };
+    let mut c_hi = if limits { vec![2.0f32; n] } else { Vec::new() };
     let mut rule_cells = vec![0u64; placement.rule_names().len()];
     let mut w_thr = vec![f32::NAN; n];
     let mut w_noise = vec![1.0f32; n];
@@ -806,9 +808,11 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         let lim = placed.erosion;
         e_lo[k] = lim.map_or(-2.0, |l| l.min as f32);
         e_hi[k] = lim.map_or(2.0, |l| l.max as f32);
-        let cl = placed.continentalness;
-        c_lo[k] = cl.map_or(-2.0, |l| l.min as f32);
-        c_hi[k] = cl.map_or(2.0, |l| l.max as f32);
+        if limits {
+            let cl = placed.continentalness;
+            c_lo[k] = cl.map_or(-2.0, |l| l.min as f32);
+            c_hi[k] = cl.map_or(2.0, |l| l.max as f32);
+        }
         if let Some(r) = placed.rule {
             rule_cells[r] += 1;
         }
@@ -912,6 +916,7 @@ fn coords_l2(
     let l2 = g.l2;
     let (w, h) = (l2.w as usize, l2.h as usize);
     let n = w * h;
+    let limits = placement.has_continentalness();
     let gamma = mo.lapse_c_per_km / 1000.0;
     struct Cell {
         class: u8,
@@ -1028,8 +1033,8 @@ fn coords_l2(
         t_sea: Vec::with_capacity(n),
         e_lo: Vec::with_capacity(n),
         e_hi: Vec::with_capacity(n),
-        c_lo: Vec::with_capacity(n),
-        c_hi: Vec::with_capacity(n),
+        c_lo: Vec::with_capacity(if limits { n } else { 0 }),
+        c_hi: Vec::with_capacity(if limits { n } else { 0 }),
         rule_cells: vec![0; placement.rule_names().len()],
         w_thr: Vec::with_capacity(n),
         w_noise: Vec::with_capacity(n),
@@ -1049,8 +1054,10 @@ fn coords_l2(
             if let Some(r) = x.rule {
                 co.rule_cells[r] += 1;
             }
-            co.c_lo.push(x.c.0);
-            co.c_hi.push(x.c.1);
+            if limits {
+                co.c_lo.push(x.c.0);
+                co.c_hi.push(x.c.1);
+            }
             class.push(x.class);
             co.class.push(if x.class == koppen::SEA {
                 f32::NAN
@@ -1138,8 +1145,9 @@ pub fn map(
     // Temperature and humidity.
     let mut class_l2 = Vec::new();
     let mut rule_cells = vec![0u64; placement.rule_names().len()];
-    let mut c_lo = vec![-2.0f32; n];
-    let mut c_hi = vec![2.0f32; n];
+    // Empty: no continentalness limits (the default table), else filled per L2 cell below.
+    let mut c_lo = Vec::new();
+    let mut c_hi = Vec::new();
     let (t_land, h_land, (h_wet, class), t_sea, (e_lo, e_hi, w_thr, w_noise, w_cap), by_class) =
         match climate {
             Some(c) if c.months.is_some() => {
@@ -1179,7 +1187,10 @@ pub fn map(
                         true,
                     )
                 };
-                (c_lo, c_hi, rule_cells) = (near(co.c_lo), near(co.c_hi), co.rule_cells);
+                if !co.c_lo.is_empty() {
+                    (c_lo, c_hi) = (near(co.c_lo), near(co.c_hi));
+                }
+                rule_cells = co.rule_cells;
                 (
                     up(co.t_land),
                     up(co.h_land),
@@ -1253,7 +1264,7 @@ pub fn map(
         continents[k] = band_value(&bands.continents, b) as f32;
         // A class's (or class rule's) limits, on land inland of the beach strip (band 4 starts at
         // `beach_blocks`): a coast keeps its beach (Terralith's cloud forest is far inland).
-        if land[k] && b >= 4.0 {
+        if land[k] && b >= 4.0 && !c_lo.is_empty() {
             continents[k] = continents[k].clamp(c_lo[k], c_hi[k].max(c_lo[k]));
         }
     }
