@@ -77,7 +77,7 @@ customizable unless stated otherwise; the listed value is the default.
 | Regional specialization | Configurable (assumed default: strong provinces) |
 | Unlimited-mining sites | A future system limits unlimited mining to locations fixed by generation. The engine exports a **site registry + Java API** (location, extent, grade, type, forming event) |
 | COE / CDG | Optional compat mixins inside Deep Time: `OreVeinGenerator.pick(LevelChunk)` and `OilChunksSavedData.getBaseOilAmount` |
-| Playability overrides | Regional minimums for essentials; a spawn chosen for its essentials; a pack-defined list of essentials (datapack/config); background ore scatter. Pack-specific fudging is expected |
+| Playability overrides | Regional minimums for essentials; a spawn chosen for its essentials (dropped, see log 2026-10-05); a pack-defined list of essentials (datapack/config); background ore scatter. Pack-specific fudging is expected |
 
 ## UI and servers
 | Topic | Decision |
