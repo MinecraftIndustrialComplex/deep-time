@@ -167,7 +167,7 @@ def section_html(rel=""):
         cols.append(f'<div class="col"><h3>{esc(lab)}</h3>{pics}{facts}</div>')
     note = (f"Window {REGION:,} × {REGION:,} blocks centred on block {region['cx']:,}, {region['cz']:,} (land {100 * region['land']:.0f} %), the same longitude and "
             f"latitude at every scale." if region else "")
-    return (f'<div class="scale"><p>One planet (seed, start and length equal), C = {C:,} blocks, vertical scale 35 m per block at every scale: only '
+    return (f'<div class="scale"><p>One planet (seed, start and length equal), simulation C = {C:,} blocks (the Petroff-Guyou world is a little smaller: 26,112 x 13,056 blocks), vertical scale 35 m per block at every scale: only '
             f'the metres a block stands for change. {esc(note)} Wider features take more blocks at 1:100; at Earth proportions a mountain range '
             f'a few hundred kilometres wide is a few hundred blocks and a plain is the size of a Minecraft village.</p>'
             f'<div class="cols">{"".join(cols)}</div></div>')

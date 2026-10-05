@@ -88,8 +88,8 @@ def cmd_pick(a):
     cands_path = os.path.join(wd, "spawn", "candidates.json")
     cands = json.load(open(cands_path)) if os.path.exists(cands_path) else {"candidates": []}
     cl = cands.get("candidates", [])
-    # The game takes the dry candidate with the fewest unmet essentials, file order breaking ties.
-    spawn = min(enumerate(cl), key=lambda it: (it[1].get("unmet", 0), it[0]))[1] if cl else {"x": 0, "z": 0}
+    # The game takes the first candidate (nearest (0, 0)) whose generated surface is above sea level (2026-10-05: no essentials ranking).
+    spawn = cl[0] if cl else {"x": 0, "z": 0}
     sx, sz = spawn["x"], spawn["z"]
     ranked = cands.get("ranked_by", [])
     reach = next((r["max_blocks_from_spawn"] for r in ranked if "copper" in r["material"]), None)
@@ -149,7 +149,8 @@ def cmd_pick(a):
     # Empty chunks: the spots of a 512-block grid over the planet (a 2026-10-04 run found that the spawn candidates
     # alone had no spot farther than 150 blocks from every site) farthest from every site, at least 600 blocks away
     # and 2,000 apart; the spawn candidates are the fallback.
-    grid = [{"x": x, "z": z} for x in range(-c // 2, c // 2, 512) for z in range(-c // 4, c // 4, 512)]
+    # (A Petroff-Guyou world is c x c/2 blocks, z in +-c/4; the north and south edges carry a border: stay 512 blocks off them.)
+    grid = [{"x": x, "z": z} for x in range(-c // 2, c // 2, 512) for z in range(-c // 4 + 512, c // 4 - 511, 512)]
     far = []
     for cd in grid + cl:
         dmin = min((wdist(c, cd["x"], cd["z"], s["center"][0], s["center"][2]) for s in sites), default=1e9)
@@ -260,16 +261,14 @@ def cmd_geology(a):
     por, gos, pla = plan["porphyry"], plan["gossan"], plan["placer"]
     reach = plan.get("essentials_reach")
 
-    # 3a
+    # 3a: the plan said "within the essentials reach of spawn"; Ben dropped the essentials-based spawn on 2026-10-05
+    # (spawn follows the standard rules), so there is no reach any more: a porphyry exists, and its distance is shown.
     if not por:
         check(False, "a porphyry site exists on the planet", f"no {PORPHYRY} site in the bake (counts {plan['counts']})")
-    elif reach is None:
-        check(False, "a porphyry site within the essentials reach of spawn",
-              f"the preset names no copper essential (no max_blocks_from_spawn in spawn/candidates.json); nearest porphyry "
-              f"{por['distance_to_spawn']:.0f} blocks from spawn")
     else:
-        check(por["distance_to_spawn"] <= reach, "a porphyry site within the essentials reach of spawn",
-              f"site {por['site']} is {por['distance_to_spawn']:.0f} blocks from spawn {plan['spawn']['x']},{plan['spawn']['z']}; reach {reach}")
+        check(True, "a porphyry site exists on the planet",
+              f"site {por['site']} is {por['distance_to_spawn']:.0f} blocks from spawn {plan['spawn']['x']},{plan['spawn']['z']} "
+              f"(the world is {plan['circumference']} blocks round); {plan['counts'].get(PORPHYRY, 0)} porphyries in all")
     if not por:
         for t in ("`probe site` returns the porphyry's body", "`deeptime-inspect` shows copper ore inside the body", "a gossan where the body is exposed",
                   "a placer whose why-chain ends in an eroded porphyry"):
@@ -537,9 +536,12 @@ def cmd_scale_stats(a):
                 tot += 1
                 steep += g >= 1.0
         sl.sort()
-        out.append({"label": label, "m_per_block_h": m, "m_per_block_v": mf["scale"].get("m_per_block_v"), "circumference_blocks": mf["scale"]["circumference_blocks"],
-                    "radius_km": round(mf["scale"]["circumference_blocks"] * m / 1000 / (2 * math.pi)),
-                    "region_km": round(REGION * m / 1000, 1),
+        # A Petroff-Guyou world's block is not exactly the preset's m_per_block_h (b is rounded to 256): the manifest has the true one.
+        mb = mf["scale"].get("m_per_block_h") or m
+        rad = (mf.get("planet") or {}).get("radius_m")
+        out.append({"label": label, "m_per_block_h": round(mb, 1), "m_per_block_v": mf["scale"].get("m_per_block_v"), "circumference_blocks": mf["scale"]["circumference_blocks"],
+                    "radius_km": round(rad / 1000) if rad else round(32768 * m / 1000 / (2 * math.pi)),
+                    "region_km": round(REGION * mb / 1000, 1),
                     "land_share": round(len(land) / len(h), 3), "max_y": round(max(h)), "p95_y": round(pct(h, 0.95)), "median_land_y": round(pct(land, 0.5)) if land else None,
                     "median_slope": round(sl[len(sl) // 2], 3) if sl else None, "p95_slope": round(sl[int(0.95 * (len(sl) - 1))], 3) if sl else None,
                     "steep_share": round(steep / max(tot, 1), 3)})
