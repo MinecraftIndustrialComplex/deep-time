@@ -213,4 +213,35 @@ class ModelHelpersTest {
         assertEquals("NOT_LOADED", none.failureClass());
         assertFalse(none.platform().isEmpty());
     }
+    /**
+     * Time left weights a coupled group by all of its stages' seconds (the session reports the group
+     * under its lead's index) and scales by the run's own pace. The 2026-10-04 client walk: 250 Myr
+     * of earthlike_quick_16k, estimate 296 s, plates/climate/surface coupled for 211 s of it; at
+     * "plates 36 %" after 79 s the session said ~32 min left and the run ended 214 s later.
+     */
+    @Test
+    void timeLeftWeightsCoupledGroupsAndThePace() {
+        Estimate e = Estimate.parse("{\"peak_bytes\":1,\"stages\":["
+                + "{\"name\":\"plates\",\"bytes\":1,\"seconds\":45.0,\"coupled_to\":null},"
+                + "{\"name\":\"climate\",\"bytes\":1,\"seconds\":101.0,\"coupled_to\":\"plates\"},"
+                + "{\"name\":\"surface\",\"bytes\":1,\"seconds\":65.0,\"coupled_to\":\"plates\"},"
+                + "{\"name\":\"deposits\",\"bytes\":1,\"seconds\":85.0}]}");
+        assertEquals("plates", e.stages().get(1).coupledTo());
+        assertNull(e.stages().get(3).coupledTo());
+        // Unloaded pace (elapsed as estimated): what is left of the estimate.
+        long fresh = e.timeLeftMs(0, 0, 0);
+        assertEquals(296_000, fresh);
+        // The group 36 % done = 76 s of 211; 79 s elapsed is about the estimated pace: ~220 s left.
+        long mid = e.timeLeftMs(0, 360, 79_000);
+        assertTrue(mid > 190_000 && mid < 250_000, "time left " + mid);
+        // Twice as slow as estimated: twice the time left.
+        long slow = e.timeLeftMs(0, 360, 2 * 75_960);
+        assertEquals(2 * (296_000 - 75_960), slow, 1_000);
+        // After the group: the deposits stage alone remains.
+        assertEquals(42_500, e.timeLeftMs(3, 500, 253_500), 1_000);
+        assertEquals(-1, e.timeLeftMs(4, 0, 1));
+        // Stages without coupling count on their own.
+        Estimate plain = new Estimate(1, List.of(new Estimate.Stage("a", 1, 10), new Estimate.Stage("b", 1, 30)));
+        assertEquals(35_000, plain.timeLeftMs(0, 500, 0));
+    }
 }

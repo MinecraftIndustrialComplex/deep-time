@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.screen;
 
 import com.minecraftindustrialcomplex.deeptime.screen.model.Formats;
+import com.minecraftindustrialcomplex.deeptime.screen.model.LayerCatalog;
 import com.minecraftindustrialcomplex.deeptime.screen.model.Problem;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
@@ -34,8 +35,21 @@ final class Lang {
         return Language.getInstance().has(key) ? Component.translatable(key) : Component.literal(Formats.humanize(id));
     }
 
+    /** A layer's name: its own key, else the word for its last part (as the workbench names layers), else humanised. */
     static Component layer(String name) {
-        return dynamic("deeptime.layer." + name.replace('/', '.'), name);
+        Language lang = Language.getInstance();
+        String key = LayerCatalog.key(name);
+        if (lang.has(key))
+            return Component.translatable(key);
+        String word = LayerCatalog.wordKey(name);
+        if (lang.has(word))
+            return Component.translatable(word);
+        return Component.literal(Formats.humanize(name.substring(name.lastIndexOf('/') + 1)));
+    }
+
+    /** A layer group's name (Planet, Climate, …). */
+    static Component layerGroup(String group) {
+        return dynamic(LayerCatalog.groupKey(group), group.isEmpty() ? "planet" : group);
     }
 
     static Component eventKind(String kind) {
