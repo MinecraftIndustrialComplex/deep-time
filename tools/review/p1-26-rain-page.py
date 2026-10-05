@@ -123,6 +123,8 @@ ROWS = [
     ("Köppen vs Beck 2018: exact class", "koppen_exact", "{:.1%}"),
     ("Köppen vs Beck 2018: main group", "koppen_group", "{:.1%}"),
     ("Reference cities in the right main group, of 24 (target ≥ 21)", "places_group", "{}"),
+    ("Same, each city at its station's height", "places_group_station", "{}"),
+    ("The planet's mean rain, land and sea, mm (Earth about 990, GPCP, from memory)", "global_p_mm", "{:.0f}"),
     ("Mumbai, mm (observed 3,096; target ≥ 1,500)", "mumbai_mm", "{:.0f}"),
     ("Dhaka, mm (observed 2,194; target ≥ 1,200)", "dhaka_mm", "{:.0f}"),
     ("Sahara 20–28° N, mm (observed 11; target ≤ 80)", "sahara_mm", "{:.0f}"),
@@ -198,7 +200,7 @@ def main():
         )
     ens_html = ""
     if ens and os.path.exists(ens):
-        ens_html = f"<h2>12-run ensemble (planets, not Earth)</h2><pre>{html.escape(open(ens).read())}</pre>"
+        ens_html = f"<h2>12-run ensemble (planets, not Earth): earthlike_quick_16k, 500 Myr, seeds 1–3, scattered and supercontinent</h2><pre>{html.escape(open(ens).read())}</pre>"
     note_html = open(note).read() if note and os.path.exists(note) else ""
     proj = meta.get("projection") or "rows from north to south, as the run's meta.json lists their latitudes"
     page = f"""<!doctype html>
