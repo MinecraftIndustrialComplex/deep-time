@@ -165,9 +165,7 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
         .unwrap_or((c / r) * (c / r / 2));
     let surface = super::estimate(p);
     StageEstimate {
-        bytes: super::retained_bytes(p)
-            + surface.history_bytes
-            + cells * OWN_BYTES_PER_L2_CELL,
+        bytes: super::retained_bytes(p) + surface.history_bytes + cells * OWN_BYTES_PER_L2_CELL,
         seconds: cells as f64 * f64::from(y.steps) * 1.0e-6,
         history_bytes: surface.history_bytes,
     }
@@ -904,7 +902,10 @@ mod tests {
             )
             .unwrap()
         };
-        for (name, held_mib) in [("earthlike_quick_16k", 1105u64), ("earthlike_full_16k", 4143)] {
+        for (name, held_mib) in [
+            ("earthlike_quick_16k", 1105u64),
+            ("earthlike_full_16k", 4143),
+        ] {
             let crate::preset::PresetBody::Planet(p) =
                 crate::preset::Preset::from_json(&json(name)).unwrap().body
             else {
