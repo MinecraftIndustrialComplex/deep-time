@@ -79,9 +79,7 @@ pub mod usgs;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Mutex, OnceLock};
 
-use deeptime_format::{
-    Body, Event, EventId, Extraction, GridDesc, Place, Product, Site, SiteId,
-};
+use deeptime_format::{Body, Event, EventId, Extraction, GridDesc, Place, Product, Site, SiteId};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -3550,15 +3548,24 @@ mod tests {
         // Capped: a parent that held only 0.2 t of gold caps the placer at 0.1 t.
         let full = cut(0.0, 1.1, 0.2);
         let half = cut(0.5, 1.1, 0.2);
-        assert!(full < 1.1 && (half / full - 0.5).abs() < 1e-9, "{half} {full}");
+        assert!(
+            full < 1.1 && (half / full - 0.5).abs() < 1e-9,
+            "{half} {full}"
+        );
         let held_t = full * 1.0e6 * 0.2e-6;
-        assert!((held_t - rules.capture_fraction * 0.2).abs() < 1e-9, "{held_t}");
+        assert!(
+            (held_t - rules.capture_fraction * 0.2).abs() < 1e-9,
+            "{held_t}"
+        );
         // A tenth eroded sheds a tenth.
         assert!((cut(0.9, 1.1, 30.0) / 1.1 - 0.1).abs() < 1e-9);
         // Uneroded: nothing.
         assert_eq!(cut(1.0, 1.1, 30.0), 0.0);
         assert_eq!(
-            Fate::Buried { centre_depth_m: 900.0 }.fraction_left(),
+            Fate::Buried {
+                centre_depth_m: 900.0
+            }
+            .fraction_left(),
             1.0,
             "a buried body is not cut, so it sheds nothing"
         );
