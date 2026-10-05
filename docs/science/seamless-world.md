@@ -62,7 +62,8 @@ its axis so these four points lie as far from land as the planet allows.
    slope energy the point sample had, still thirteen times the radial slope). Poleward of about 59°
    the patch is therefore also stretched along the parallel, by (0.52 / cos φ)⁴ and at most 8
    times (from about 72°), which leaves only what the simulation resolved in both directions. Categories and rock
-   stacks take the nearest cell.
+   stacks take the nearest cell; the climate's band coordinates, set per Köppen class, are read at
+   the point so they keep to the class (a wide polar patch would mix neighbouring classes' values).
 7. **Things with a position** (rivers, folds and faults, ore bodies, sites, volcanoes, craters, spawn
    points) move through the projection; directions and lengths through its local stretch. A river
    that crosses a turning edge is cut there.
