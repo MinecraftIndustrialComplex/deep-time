@@ -101,7 +101,10 @@ serve, bytes, and the preset key. The key is a CRC of the canonical preset with
 only change the tail, so a checkpoint serves any preset that differs from its run only in them.
 
 A checkpoint is written only at a free step of the run that writes it, so it never holds anything
-the end shaped. It serves a new stop *S'* when its step is at most k_free(S') under the new
+the end shaped. A resume also takes no checkpoint later than the last free step of the run whose
+keyframes the folder holds (the index names that run as soon as it starts): the frames that run
+drew in its own tail are not frames of the shared trajectory, and a pick followed by a continue
+back to the planned end gives the original run's files exactly (tested; found by the client walk). It serves a new stop *S'* when its step is at most k_free(S') under the new
 preset (a stricter steering, a longer tail, falls back to an earlier checkpoint, or to the start).
 
 The epochs folder is not world data: the manifest does not list it, and the staging mover deletes
