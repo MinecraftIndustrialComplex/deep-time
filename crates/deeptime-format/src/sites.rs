@@ -359,17 +359,25 @@ pub struct SiteIndex {
 }
 
 impl SiteIndex {
-    /// Builds the index of `sites` on a planet of circumference `c`.
+    /// Builds the index of `sites` on a Lambert planet of circumference `c`.
     pub fn build(c: u32, sites: &[Site]) -> Result<SiteIndex> {
+        SiteIndex::build_in(c, crate::projection::IndexFrame::lambert(c), sites)
+    }
+
+    /// Builds the index of `sites` for a world of x period `c` over `frame` (the world
+    /// projection's index frame).
+    pub fn build_in(
+        c: u32,
+        frame: crate::projection::IndexFrame,
+        sites: &[Site],
+    ) -> Result<SiteIndex> {
         if c == 0 || !c.is_multiple_of(4) {
             return Err(FormatError::Invalid(format!(
                 "circumference {c} is not a positive multiple of 4"
             )));
         }
         let cb = INDEX_CELL_BLOCKS;
-        // The index's frame is the projection's index frame.
-        let p = crate::Projection::new(c);
-        let ((ox, oz), (span_x, span_z)) = (p.index_origin_blocks(), p.index_span_blocks());
+        let ((ox, oz), (span_x, span_z)) = (frame.origin, frame.span);
         let cols = (span_x as u32).div_ceil(cb);
         let rows = (span_z as u32).div_ceil(cb);
         let (origin_x, origin_z) = (ox as i32, oz as i32);
@@ -487,10 +495,21 @@ pub struct SitesWritten {
     pub index_crc32: u32,
 }
 
-/// Writes `sites/sites.dtsr` and `sites/index.dtsi` under `world` (atomically, each).
+/// Writes `sites/sites.dtsr` and `sites/index.dtsi` under `world` (atomically, each), indexed
+/// in a Lambert planet's frame.
 pub fn write_sites(world: &Path, c: u32, sites: &[Site]) -> Result<SitesWritten> {
+    write_sites_in(world, c, crate::projection::IndexFrame::lambert(c), sites)
+}
+
+/// [`write_sites`] with the index over `frame` (the world projection's index frame).
+pub fn write_sites_in(
+    world: &Path,
+    c: u32,
+    frame: crate::projection::IndexFrame,
+    sites: &[Site],
+) -> Result<SitesWritten> {
     let records = encode_sites(sites)?;
-    let index = SiteIndex::build(c, sites)?.encode()?;
+    let index = SiteIndex::build_in(c, frame, sites)?.encode()?;
     let sites_crc32 = write_atomic(&world.join(SITES_PATH), &records)?;
     let index_crc32 = write_atomic(&world.join(INDEX_PATH), &index)?;
     Ok(SitesWritten {

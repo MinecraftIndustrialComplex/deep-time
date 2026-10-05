@@ -1,57 +1,57 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! The memory cap spills the recorded history instead of failing (P1-17; decisions log
-//! 2026-09-29, "Spill history to the SSD"), measured by a counting allocator as in the game and
-//! the CLI: a run whose cap is below its all-in-memory peak by half its history finishes, with
-//! frames on disk, to the same world byte for byte; a cap the rest of the run cannot fit still
-//! fails cleanly. One test in its own binary, so the allocator counts nothing else.
+//! 2026-09-29, "Spill history to the SSD"), measured by the game's and the CLI's counting
+//! allocator: a run whose cap is below its all-in-memory peak by half its history finishes, with
+//! frames on disk, never over its cap, to the same world byte for byte; a cap the rest of the run
+//! cannot fit still fails cleanly. One test in its own binary, so the allocator counts nothing
+//! else.
 
-use std::alloc::{GlobalAlloc, Layout, System};
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use deeptime_core::CoreError;
+use deeptime_core::alloc::{self, CountingAlloc};
 use deeptime_core::session::{AdvanceStatus, MemoryGauge, Session, SessionOptions};
 use deeptime_core::world::WorldState;
 use serde_json::{Value, json};
 
-static IN_USE: AtomicU64 = AtomicU64::new(0);
-static PEAK: AtomicU64 = AtomicU64::new(0);
-
-struct Counting;
-
-// SAFETY: every method forwards to `System` with the caller's layout and only updates counters.
-unsafe impl GlobalAlloc for Counting {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        // SAFETY: forwarded unchanged.
-        let p = unsafe { System.alloc(layout) };
-        if !p.is_null() {
-            let now =
-                IN_USE.fetch_add(layout.size() as u64, Ordering::Relaxed) + layout.size() as u64;
-            PEAK.fetch_max(now, Ordering::Relaxed);
-        }
-        p
-    }
-
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        // SAFETY: `ptr` came from `alloc` with `layout`.
-        unsafe { System.dealloc(ptr, layout) };
-        IN_USE.fetch_sub(layout.size() as u64, Ordering::Relaxed);
-    }
-}
-
 #[global_allocator]
-static GLOBAL: Counting = Counting;
+static GLOBAL: CountingAlloc = CountingAlloc;
 
 struct Gauge;
 
+/// Each phase's highest count in the current run (name, bytes), for the report of where a run
+/// went over its cap.
+static PHASES: Mutex<Vec<(String, u64)>> = Mutex::new(Vec::new());
+
 impl MemoryGauge for Gauge {
     fn in_use(&self) -> u64 {
-        IN_USE.load(Ordering::Relaxed)
+        alloc::in_use()
     }
     fn peak(&self) -> u64 {
-        PEAK.load(Ordering::Relaxed)
+        alloc::peak()
+    }
+    fn phase(&self, name: &str, begin: bool) {
+        if begin {
+            alloc::start_window();
+            return;
+        }
+        let peak = alloc::window_peak();
+        let mut p = PHASES.lock().unwrap();
+        match p.iter_mut().find(|(n, _)| n == name) {
+            Some(e) => e.1 = e.1.max(peak),
+            None => p.push((name.to_owned(), peak)),
+        }
+    }
+    fn phase_peak(&self) -> u64 {
+        alloc::window_peak()
+    }
+    fn release(&self) -> u64 {
+        alloc::release_cache()
+    }
+    fn keep_below(&self, bytes: u64) {
+        alloc::keep_below(bytes);
     }
 }
 
@@ -103,6 +103,8 @@ fn without_times(text: &str) -> Value {
 struct Outcome {
     world: WorldState,
     peak: u64,
+    /// Each phase's peak (above the run's start).
+    phases: Vec<(String, u64)>,
     /// The most a reservation asked for, without the history's frames then in memory.
     needed: u64,
     spilled_frames: u64,
@@ -110,13 +112,14 @@ struct Outcome {
 
 /// Runs `json` with `cap` bytes on top of what the process holds now.
 fn run(json: &str, cap: u64, name: &str) -> Result<Outcome, CoreError> {
-    let start = IN_USE.load(Ordering::Relaxed);
+    let start = alloc::in_use();
     let dir: PathBuf = std::env::temp_dir().join(format!(
         "deeptime-history-cap-{name}-{}",
         std::process::id()
     ));
     let _ = std::fs::remove_dir_all(&dir);
-    PEAK.store(IN_USE.load(Ordering::Relaxed), Ordering::Relaxed);
+    alloc::reset_peak();
+    PHASES.lock().unwrap().clear();
     let s = Session::create(
         json,
         "",
@@ -153,7 +156,13 @@ fn run(json: &str, cap: u64, name: &str) -> Result<Outcome, CoreError> {
             Err(e) => break Err(e),
         }
     };
-    let peak = PEAK.load(Ordering::Relaxed) - start;
+    let peak = alloc::peak() - start;
+    let phases = PHASES
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(n, b)| (n.clone(), b.saturating_sub(start)))
+        .collect();
     eprintln!("[{name}] {spills} spill lines");
     result?;
     let world = s.with_world(Clone::clone)?;
@@ -164,6 +173,7 @@ fn run(json: &str, cap: u64, name: &str) -> Result<Outcome, CoreError> {
     Ok(Outcome {
         world,
         peak,
+        phases,
         needed,
         spilled_frames,
     })
@@ -171,6 +181,8 @@ fn run(json: &str, cap: u64, name: &str) -> Result<Outcome, CoreError> {
 
 #[test]
 fn a_run_over_its_cap_spills_its_history_and_ends_the_same() {
+    // The history's spill alone: no freed blocks kept for reuse (they would be released first).
+    alloc::set_cache_limit(0);
     let json = preset();
     let free = run(&json, u64::MAX, "unlimited").unwrap();
     assert_eq!(free.spilled_frames, 0);
@@ -202,6 +214,19 @@ fn a_run_over_its_cap_spills_its_history_and_ends_the_same() {
     );
     assert!(capped.spilled_frames > 0, "frames went to disk");
     assert!(capped.peak < free.peak, "the spill kept the peak down");
+    // The cap holds: the run never held more than it (memacct, 2026-10-04).
+    let over: Vec<String> = capped
+        .phases
+        .iter()
+        .filter(|(_, b)| *b > cap)
+        .map(|(n, b)| format!("{n} {:.1} MiB", *b as f64 / 1048576.0))
+        .collect();
+    assert!(
+        capped.peak <= cap,
+        "the run held {:.1} MiB under a {:.1} MiB cap (over it in: {over:?})",
+        capped.peak as f64 / 1048576.0,
+        cap as f64 / 1048576.0
+    );
     let (a, b) = (&free.world, &capped.world);
     assert_eq!(a.sites, b.sites);
     assert_eq!(a.bodies, b.bodies);

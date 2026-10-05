@@ -46,7 +46,8 @@ fn cell_stack(strata: &LoadedLayer, x: i64, z: i64, out: &mut Vec<(i32, u8, u16)
     let i = ((wx - g.origin_block_x) as f64 / f64::from(g.r) + 0.5).floor() as i64;
     let j = ((z - g.origin_block_z) as f64 / f64::from(g.r) + 0.5).floor() as i64;
     for h in 0..d.stack_depth.unwrap_or(0) {
-        let s = strata.horizon(g.wrap_i(i), g.clamp_j(j), h);
+        let (ci, cj) = g.cell(i, j);
+        let s = strata.horizon(ci, cj, h);
         if !s.is_used() {
             break;
         }

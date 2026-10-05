@@ -45,11 +45,13 @@ public final class Structure {
     private final float[][] profiles;
     private final double margin;
     private final double c;
+    /** The buckets' origin (the world projection's index frame). */
+    private final double ox, oz;
     private final int w, h;
     private final double[] radius;
     private final int[][] buckets;
 
-    private Structure(int n, int[] kind, int[] profile, int[] key, double[][] win, double[][] tail, float[][] profiles,
+    private Structure(WorldProjection frame, int n, int[] kind, int[] profile, int[] key, double[][] win, double[][] tail, float[][] profiles,
                       double margin, int circumference) {
         this.n = n;
         this.kind = kind;
@@ -67,8 +69,10 @@ public final class Structure {
         this.profiles = profiles;
         this.margin = margin;
         this.c = circumference;
+        this.ox = frame.indexOriginBlockX();
+        this.oz = frame.indexOriginBlockZ();
         this.w = Math.max(1, (int) Math.ceil(c / BUCKET));
-        this.h = Math.max(1, (int) Math.ceil(Projection.indexSpanZ(c) / BUCKET));
+        this.h = Math.max(1, (int) Math.ceil((double) frame.indexSpanBlockZ() / BUCKET));
         this.radius = new double[n];
         int[] counts = new int[w * h];
         int[][] lists = new int[w * h][];
@@ -76,8 +80,7 @@ public final class Structure {
             for (int e = 0; e < n; e++) {
                 double r = Math.sqrt(halfAlong[e] * halfAlong[e] + halfAcross[e] * halfAcross[e]) + margin;
                 radius[e] = r;
-                // The buckets' frame is the projection's index frame.
-                double ox = Projection.indexOriginX(c), oz = Projection.indexOriginZ(c);
+                // The buckets' frame is the world projection's index frame (fields ox, oz).
                 long j0 = (long) Math.floor((cz[e] - r - oz) / BUCKET);
                 long j1 = (long) Math.floor((cz[e] + r - oz) / BUCKET);
                 long i0 = (long) Math.floor((cx[e] - r - ox) / BUCKET);
@@ -101,8 +104,16 @@ public final class Structure {
         this.buckets = lists;
     }
 
-    /** Reads {@code structure/} of {@code folder}; null when the world has no structural events. */
+    /** Reads {@code structure/} of a Lambert world-data folder; null when the world has no structural events. */
     public static Structure read(Path folder, int circumference) {
+        return read(folder, circumference, new WorldProjection.Lambert(circumference));
+    }
+
+    /**
+     * Reads {@code structure/} of {@code folder}, its index over the frame of the world's projection
+     * {@code frame} (Rust {@code Deformer::read_in}); null when the world has no structural events.
+     */
+    public static Structure read(Path folder, int circumference, WorldProjection frame) {
         Path path = folder.resolve(FILE);
         if (!Files.isRegularFile(path))
             return null;
@@ -156,7 +167,7 @@ public final class Structure {
             if (e > 0 && key[e - 1] > key[e])
                 throw Sectioned.corrupt(path, "events are not youngest first");
         }
-        return new Structure(n, kind, profile, key, win, tail, profiles, margin, circumference);
+        return new Structure(frame, n, kind, profile, key, win, tail, profiles, margin, circumference);
     }
 
     /** Events in the world. */
@@ -281,8 +292,8 @@ public final class Structure {
     /** The candidates of the column at block position (x, z), youngest first (Rust {@code StructIndex::candidates}). */
     private void candidates(double x, double z, Scratch s) {
         s.nc = 0;
-        int i = (int) Math.floorMod((long) Math.floor((x - Projection.indexOriginX(c)) / BUCKET), (long) w);
-        long jl = (long) Math.floor((z - Projection.indexOriginZ(c)) / BUCKET);
+        int i = (int) Math.floorMod((long) Math.floor((x - ox) / BUCKET), (long) w);
+        long jl = (long) Math.floor((z - oz) / BUCKET);
         int j = (int) Math.max(0, Math.min(h - 1L, jl));
         for (int e : buckets[j * w + i]) {
             double dx = x - cx[e];

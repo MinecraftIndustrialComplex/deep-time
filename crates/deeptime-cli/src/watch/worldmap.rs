@@ -11,8 +11,11 @@
 //! is the one where `s` reaches one block (C = 16,384: zoom 5; C = 32,768: zoom 6). Pixel `(i, j)`
 //! of a tile samples block `(x0 + i·s, z0 + j·s)`, the top left of the block it draws at one block
 //! a pixel, so block columns line up with pixels there. x wraps. The frame spans z ∈ [−C/4, C/4)
-//! (`Projection::tile_frame_z`), wider than the planet: on the Lambert equal-area projection the
-//! poles are at z = ∓R = ∓C/2π, and pixels past them are drawn as the page's background.
+//! (`Projection::tile_frame_z`). On a Lambert world it is wider than the planet: the poles are at
+//! z = ∓R = ∓C/2π, and pixels past them are drawn as the page's background. On a Petroff–Guyou
+//! world (format 0.5, the default) the frame is exactly the world: x ∈ [−b, b) with C = 2b, z from
+//! −b/2 to b/2, every pixel on the planet; rows past the north and south edges fold through their
+//! half-turns (`GridDesc::cell`), so the map continues through the seams.
 //!
 //! # What the pixels are
 //! The finest data the bake has is the **terrain height** `H = E + A·N` (FORMAT.md "The terrain
@@ -271,10 +274,11 @@ impl LayerStore {
         let mut data = vec![0f32; w * h];
         let mut tile_for: Option<(usize, Arc<Vec<u8>>)> = None;
         for jj in 0..h {
-            let j = g.clamp_j(j0 + jj as i64) as i64;
             let row = &mut data[jj * w..(jj + 1) * w];
             for (ii, out) in row.iter_mut().enumerate() {
-                let i = i64::from(g.wrap_i(i0 + ii as i64));
+                // Columns wrap; rows clamp (Lambert) or fold through the edges (Petroff–Guyou).
+                let (ci, cj) = g.cell(i0 + ii as i64, j0 + jj as i64);
+                let (i, j) = (i64::from(ci), i64::from(cj));
                 let t = ((j / tile) as usize) * d.tiles_x() as usize + (i / tile) as usize;
                 if tile_for.as_ref().is_none_or(|(k, _)| *k != t) {
                     tile_for = Some((t, self.tile(t)?));
@@ -682,6 +686,8 @@ pub struct Meta {
     pub detail: Option<DetailSpec>,
     pub rivers: usize,
     pub lakes: bool,
+    /// The world's projection (the manifest's layout block).
+    pub projection: deeptime_format::projection::WorldProjection,
 }
 
 /// Climate fields on L1 and L2, smoothed as the satellite frame smooths them.
@@ -814,7 +820,11 @@ impl BakeMap {
             Some(spec) => {
                 let p = layer(&spec.layer)
                     .ok_or("notes.bake.detail names a layer the manifest lacks")?;
-                let noise = Noise::new(spec.seed().map_err(|e| e.to_string())?, c);
+                let noise = Noise::for_world(
+                    spec.seed().map_err(|e| e.to_string())?,
+                    c,
+                    &manifest.world_projection(),
+                );
                 (Some(LayerStore::open(&p)?), Some((spec.clone(), noise)))
             }
             None => (None, None),
@@ -887,6 +897,7 @@ impl BakeMap {
             detail: detail.clone(),
             rivers: rivers.as_ref().map_or(0, |r| r.rivers.chains.len()),
             lakes: lakes.is_some(),
+            projection: manifest.world_projection(),
         };
         Ok(BakeMap {
             meta,
@@ -1324,14 +1335,27 @@ impl BakeMap {
             }
         };
         let mut out = vec![1f32; TILE * TILE];
-        let proj = deeptime_format::Projection::of(c);
+        let lambert = match self.meta.projection {
+            deeptime_format::projection::WorldProjection::Lambert(p) => Some(p),
+            deeptime_format::projection::WorldProjection::PetroffGuyou(_) => None,
+        };
+        // A Petroff–Guyou world's blocks are what a player walks: slopes in its own block metric,
+        // a block `m_per_block_h` wide.
+        let metres_px = if lambert.is_some() {
+            metres_px
+        } else {
+            g.s * self.meta.m_per_block_h
+        };
         for j in 0..TILE {
             let zj = g.z0 + j as f64 * g.s;
             // On the Lambert map a pixel is s·cos φ blocks of planet wide and s / cos φ high.
-            let (dx, dy) = (
-                metres_px * proj.scale_ew(zj).max(0.15),
-                metres_px * proj.scale_ns(zj).min(1.0 / 0.15),
-            );
+            let (dx, dy) = match lambert {
+                Some(proj) => (
+                    metres_px * proj.scale_ew(zj).max(0.15),
+                    metres_px * proj.scale_ns(zj).min(1.0 / 0.15),
+                ),
+                None => (metres_px, metres_px),
+            };
             for i in 0..TILE {
                 let k = (j + 1) * N + i + 1;
                 let dzdx = f64::from(flat(k + 1) - flat(k - 1)) * mv / (2.0 * dx);
@@ -1358,10 +1382,12 @@ impl BakeMap {
             Layer::Overlay => self.paint_overlay(&hg, cov.as_ref()),
         };
         // Past the poles there is no planet: the page's background (transparent on the overlay).
-        let proj = deeptime_format::Projection::new(self.meta.c);
+        // A Petroff–Guyou frame is all planet.
+        let (zlo, zhi) = self.meta.projection.z_range();
         let beyond: [u8; 4] = if layer.opaque() { BEYOND_POLE } else { [0; 4] };
         for j in 0..TILE {
-            if !proj.on_planet(0.0, g.z0 + j as f64 * g.s) {
+            let zj = g.z0 + j as f64 * g.s;
+            if zj < zlo || zj > zhi {
                 for px in rgba[j * TILE * 4..(j + 1) * TILE * 4].chunks_mut(4) {
                     px.copy_from_slice(&beyond);
                 }
@@ -1601,11 +1627,11 @@ impl BakeMap {
         } else {
             ("land", None)
         };
-        let proj = deeptime_format::Projection::new(self.meta.c);
+        let (lat, lon) = self.meta.projection.lat_lon(bx, bz);
         let mut o = json!({
             "x": wx, "z": z,
-            "lat": proj.lat_deg(bz),
-            "lon": proj.lon_deg(bx),
+            "lat": lat,
+            "lon": lon,
             "terrain_y": (h * 10.0).round() / 10.0,
             "height_m": ((h - sea) * mv).round(),
             "surface": kind,

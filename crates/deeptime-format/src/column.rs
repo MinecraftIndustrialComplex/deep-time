@@ -111,7 +111,11 @@ impl ColumnWorld {
         let detail = match DetailSpec::of(&manifest)? {
             Some(spec) => match layer(&spec.layer)? {
                 Some(l) => {
-                    let noise = Noise::new(spec.seed()?, manifest.scale.circumference_blocks);
+                    let noise = Noise::for_world(
+                        spec.seed()?,
+                        manifest.scale.circumference_blocks,
+                        &manifest.world_projection(),
+                    );
                     Some((spec, noise, l))
                 }
                 None => {
@@ -152,7 +156,11 @@ impl ColumnWorld {
                 others.push((e.name.clone(), LazyLayer::open(&dir.join(&e.path))?));
             }
         }
-        let structure = Deformer::read(dir, manifest.scale.circumference_blocks)?;
+        let structure = Deformer::read_in(
+            dir,
+            manifest.scale.circumference_blocks,
+            manifest.world_projection().index_frame(),
+        )?;
         Ok(ColumnWorld {
             dir: dir.to_owned(),
             structure,
@@ -363,7 +371,6 @@ impl ColumnWorld {
     /// names, the bodies with their roles, and the sites whose box holds the column.
     pub fn inspect(&self, x: i64, z: i64) -> Value {
         let col = self.sample(x, z);
-        let c = self.c as f64;
         let (bx, bz) = (col.wx as f64, z as f64);
         let mut layers = serde_json::Map::new();
         for (name, l) in &self.others {
@@ -421,9 +428,9 @@ impl ColumnWorld {
             None => Vec::new(),
         };
         let mut v = col.to_json();
-        let p = crate::Projection::of(c);
-        v["lat"] = json!(p.lat_deg(bz));
-        v["lon"] = json!(p.lon_deg(bx));
+        let (lat, lon) = self.manifest.world_projection().lat_lon(bx, bz);
+        v["lat"] = json!(lat);
+        v["lon"] = json!(lon);
         v["world"] = json!(self.manifest.source);
         v["layers"] = Value::Object(layers);
         v["strata"] = json!(horizons);
