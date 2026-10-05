@@ -2355,8 +2355,11 @@ comparison): item 1 above is now a per-cell, seasonal, two-dimensional energy ba
 grid (about 128 × 64) with land and sea tiles, a slab ocean with sea ice per cell, surface-dependent
 atmospheric diffusion and wind-carried heat, Stommel gyres and an overturning conveyor, and
 `climate.model = per_cell` is the default (`banded` stays a setting). Item 2's belt rain stays the
-default rain, fed by the per-cell temperatures; the monthly moisture budget is built behind
-`climate.rain_model = budget` and not yet calibrated. The fast clock stays one-dimensional,
+default rain, fed by the per-cell temperatures and scaled by one factor so Earth's relief rains
+Earth's land rain (`climate.belts_rain_scale` 1.42; decisions log 2026-10-06); the monthly moisture
+budget is built behind `climate.rain_model = budget` and not yet calibrated, and the upwind rain
+(Smith & Barstad plus an LFPM-style budget, decisions log 2026-10-04) is a calibrated setting
+(`rain_model = upwind`); monsoons are a follow-up for both. The fast clock stays one-dimensional,
 corrected to the 2-D zonal means and re-snapshotted at snowball and hothouse crossings. The
 CO₂ forcing is a radiative-convective table (HEXTOR) at every tile's temperature. The world
 format and the climate API are unchanged. On Earth's relief the global mean is 14.0 °C and 19 of 24
