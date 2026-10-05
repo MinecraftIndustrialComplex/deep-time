@@ -225,7 +225,9 @@ baked and gets a Lambert layout block.
   blocks, so its polar terrain has the grid's shape (long north–south, thin east–west on the
   planet), which an isotropic footprint only shortens. Categories (`climate/koppen`,
   `climate/wetland`, `surface/class_top`, `meta/plate_id`, `meta/province`, and any layer whose
-  `units` is `flag`), horizon stacks and any footprint touching no-data take the nearest cell. The two edge rows are made exactly self-glued (cell i = cell w − i).
+  `units` is `flag`), horizon stacks and any footprint touching no-data take the nearest cell. The two edge rows are made exactly self-glued (cell i = cell w − i). The first horizon of every stack cell is then raised to
+  the bake's top rule over the world's own terrain (`notes.bake.projection.top_raise`): the stacks
+  come from the nearest cell and the terrain from the footprint mean.
 - **Vector data**: rivers (vertices through the projection, x continuous along a chain; a chain
   crossing a turning edge is split there, the parts before the edge ending as at the sea, and
   confluences re-pointed; the index rebuilt in the world's frame), structural events (the window's
