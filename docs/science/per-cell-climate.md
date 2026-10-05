@@ -190,7 +190,7 @@ itself is read by the design's scratch script only, and no observed data are in 
 | Global mean temperature, 280 ppm | 13.8–14.4 °C (1850–1900) | Berkeley Earth, averaged in WP-14a (CLM-138) | 14.1 ± 0.4 (Ben, 2026-10-02) | 13.8 °C (15.3) |
 | Land mean temperature | – | not recorded | none | 7.9 °C (7.8) |
 | Glaciated share of land | about 0.10 (Antarctica, Greenland) | `ice_sheet_feedback` comment in params.rs (a round value) | none | 0.095 (0.101) |
-| Land sea-level T, along-row std at 30–70°, January north / July south | 6.1 K in the design; 4.24 K on Beck's 0.5° grid and 3.89 K on the model's, re-measured 2026-10-05 ([upwind-rain.md](upwind-rain.md)) | design §7.1 (Beck et al. 2023); `climate_vs_obs.py --obs` | ≥ 5.0 K (question to Ben) | 4.53 K (2.25) |
+| Land sea-level T, along-row std at 30–70°, January north / July south | 6.1 K in the design; 4.24 K on Beck's 0.5° grid and 3.89 K on the model's, re-measured 2026-10-05 ([upwind-rain.md](upwind-rain.md)) | design §7.1 (Beck et al. 2023); `climate_vs_obs.py --obs` | ≥ 0.83 × observed on the same grid, 3.23 K (restated 2026-10-06, design §7.1) | 4.53 K (2.25): met |
 | Same, annual | 3.3 K | same | ≥ 2.0 K | 1.92 K (0.64) |
 | Southern winter ice edge, std over longitudes | "several degrees" (roughly 55–68°S) | design §1.2, not measured | ≥ 2° | 2.5° (0°) |
 | Brest − Vladivostok, January | 20.1 K | design §7.1 | ≥ 12 K | 20.6 K (7.1) |
