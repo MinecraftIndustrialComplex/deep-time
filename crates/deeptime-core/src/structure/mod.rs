@@ -580,8 +580,11 @@ impl StructureStage {
                 deform::wear(&mut self.st.features, &grid, m);
             }
             let flags = field_of(fields, "plates/flags", n)?;
-            let orogen_km = traps::orogen_distance_km(&d, reg, crust, flags);
-            let arc_km = traps::arc_distance_km(&d, reg, crust, flags);
+            // The two distance transforms are serial sweeps: side by side (P1-17).
+            let (orogen_km, arc_km) = rayon::join(
+                || traps::orogen_distance_km(&d, reg, crust, flags),
+                || traps::arc_distance_km(&d, reg, crust, flags),
+            );
             let inputs = deform::Inputs {
                 grid: &grid,
                 m_per_block_h: s.m_per_block_h,
