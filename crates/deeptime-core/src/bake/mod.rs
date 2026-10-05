@@ -24,6 +24,7 @@ pub mod climate;
 pub mod ice;
 pub mod meta;
 pub mod placement;
+pub mod project;
 pub mod strata;
 pub mod surface;
 pub mod terrain;
@@ -316,10 +317,9 @@ pub fn bake(
     let water = water::bake(p, &mut out)?;
     note.insert("water".into(), water.note);
     millis.insert("water".into(), json!(ms(t)));
-    let (n, ranked) = terrain::spawn(world, p, &terrain, &mut out)?;
+    let n = terrain::spawn(p, &terrain, &mut out)?;
     if let Some(tn) = note.get_mut("terrain") {
         tn["spawn_candidates"] = json!(n);
-        tn["spawn_ranked_by_essentials"] = json!(ranked);
     }
 
     let t = Instant::now();

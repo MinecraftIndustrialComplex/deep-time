@@ -57,6 +57,7 @@ public final class DeepTime {
         com.minecraftindustrialcomplex.deeptime.wrapengine.WrapEngine.init();
         DeepTimeNetwork.init(modBus);
         PoleCap.init();
+        com.minecraftindustrialcomplex.deeptime.wrap.EdgeBorder.init();
         // COE and CDG hooks (P1-16): their mixins' targets load now, so a drifted signature fails the boot.
         CompatHooks.preloadTargets();
         // Distant Horizons far terrain (P3-04): LODs from the world data; nothing without Distant Horizons.

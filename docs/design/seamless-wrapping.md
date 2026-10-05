@@ -1,5 +1,13 @@
 # Seamless wrapping: a quincuncial world joined by Immersive Portals (prototype)
 
+**Production (2026-10-04).** Ben chose Petroff–Guyou (decisions log 2026-10-04: "We'll proceed w/
+Petroff–Guyou, if I think distortion is too bad in gameplay, I'll swap later.") and then paused the
+Immersive Portals track ("Engine only; pause IP"): Deep Time's own wrap engine joins the seams. The
+production world is built on branch `worktree-agent-a857faf5aead2df37`: the projection in
+`deeptime_format::projection` (Rust, Java, JS, bit for bit), the bake's projection pass and every
+reader. **The layout data the wrap engine reads is in §11 and FORMAT.md "The world's layout"**
+(stable from world-data format 0.5). The sections below are the prototype's record.
+
 **Status (2026-10-03).** A prototype on branch `worktree-agent-afec00aa80f7be0a6`, asked for by Ben
 (decisions log 2026-10-03: "Send out an agent to begin prototyping implementations for a pierce
 quincuil projection w/ 100% seamless wrappings. For now prototype it w/ immersive portals"), widened
@@ -451,3 +459,27 @@ map adds about 2 days (its forward and inverse in `peirce.rs`; the gluing does n
 - Gates on this branch: cargo fmt, clippy `-D warnings` (workspace), `cargo deny check licenses bans`,
   `cargo test --workspace` (784 passed, 0 failed; the new crate 22), `./gradlew build test` (251 tests,
   0 failures). No GameTest was run: nothing the game reads changed.
+
+## 11. The production layout data (format 0.5, 2026-10-04)
+
+The world's layout is data in every world's `manifest.json`, `projection` (FORMAT.md "The world's
+layout" is the contract; Rust `ProjectionSpec`, Java `worlddata/WorldLayout`). Settled first and kept
+stable for the wrap engine's Phase 2, its only consumer now that the Immersive Portals track is
+paused:
+
+- **The world.** Two hemisphere squares of side b: x ∈ [−b, b), z ∈ [−b/2, b/2]. b is the planet's
+  equal-area side C/√(2π) rounded to a multiple of 256: **13,312 × 6,656 at 16k, 26,112 × 13,056 at
+  32k**, the same blocks per km² as the Lambert world (the prototype's 16,384 × 8,192 drew the 16k
+  planet 1.57 times larger in area). `scale.circumference_blocks` holds the x period 2b.
+- **Edges**, each with the motion beyond → inside in the engine's `CellIsometry` terms
+  (`[quarterTurns, tx, tz]`): west/east slides by ±2b (`owner: toroidal_world`); north and south
+  half-turns about (0, ∓b/2) (`[2, 0, ∓b]`, `owner: wrap_engine`). These are the engine's
+  `WrapLayouts.guyou(h = b, depth, slides = false)` edges exactly.
+- **Cone points**: the long edges' midpoints and the corners, ±45° on the meridians λc ± 90°; the
+  **poles** on the long edges at x = ∓b/2, two images each.
+- **λc**, the western square's centre longitude, is chosen per planet by the bake (the cone points
+  in open sea) or set (`projection.lambda_c_deg`).
+- **The temporary border** (`border`, `edge_stop`): until the engine installs the topology, players,
+  their vehicles and Sable ships stop one block inside the north and south edges; the terrain beyond
+  is the folded copy (the grids fold through the half-turns), so the view past the border is right.
+  The game drops the border on a level the engine has a topology for.

@@ -680,11 +680,40 @@
   function mapLatLon(p, x, y) {
     return [clamp(proj.latOfY(y, p.canvas.height), -90, 90), proj.wrapLon(proj.lonOfPicX(x, p.canvas.width))];
   }
-  // Block coordinates of a point (the projection; the static viewer's inspect): x from the seam
-  // at −C/2; north is −z.
+  // The world a run's bake is laid out in (the manifest's `projection` block, read once from
+  // `api/runs/<id>/world.json`): Petroff–Guyou by default (format 0.5), Lambert for a Lambert
+  // preset or until the bake is there. The keyframes stay the simulation's Lambert pictures; a point
+  // picked on them is a latitude and longitude, and this says which world block it is.
+  function worldOf(run) {
+    if (!run) return proj.world(null, 16384);
+    if (run._world) return run._world;
+    if (!run._worldAsked && run.id && typeof api === 'function') {
+      run._worldAsked = true;
+      api(`api/runs/${encodeURIComponent(run.id)}/world.json`).then(res => {
+        if (res && res.ok && res.body && res.body.available)
+          run._world = proj.world(res.body.projection, res.body.circumference);
+        else run._worldAsked = false;
+      }).catch(() => { run._worldAsked = false; });
+    }
+    return proj.world(null, circ(run));
+  }
+  // Block coordinates of a point in the run's world (the static viewer's inspect, the 3D preview,
+  // sections): Lambert x from the seam at −C/2 and north −z; Petroff–Guyou through its projection.
   function blockXZ(run, lat, lon) {
-    const C = (run && run.meta && run.meta.circumference) || 16384;
-    return [Math.round(proj.xOfLon(C, lon)), Math.round(proj.zOfLat(C, lat))];
+    const [x, z] = worldOf(run).blockOf(lat, lon);
+    return [Math.round(x), Math.round(z)];
+  }
+  // A preview box of a lat/lon box in the run's world: its corners on Lambert; on Petroff–Guyou,
+  // where a lat/lon box is no block box, the same size in blocks round its centre.
+  function boxBlocks(run, b) {
+    const w = worldOf(run);
+    if (!w.isPetroff) {
+      const [x0, z0] = blockXZ(run, b.north, b.west), [x1, z1] = blockXZ(run, b.south, b.east);
+      return { x0, z0, x1, z1 };
+    }
+    const [cx, cz] = blockXZ(run, (b.north + b.south) / 2, b.west + (b.east - b.west) / 2);
+    const hw = Math.max(1, Math.round(Math.min(b.w, 256) / 2)), hh = Math.max(1, Math.round(Math.min(b.h, 256) / 2));
+    return { x0: cx - hw, z0: cz - hh, x1: cx + hw, z1: cz + hh };
   }
   const circ = run => (run && run.meta && run.meta.circumference) || 16384;
   function visibleEvents(run, t) {
@@ -1005,8 +1034,7 @@
           b = boxInfo(r, clamp(lat + dn, -90, 90), clamp(lat - dn, -90, 90), lon - de, lon + de);
         }
         p.boxLL = b; mapDirty = true;
-        const [x0, z0] = blockXZ(r, b.north, b.west), [x1, z1] = blockXZ(r, b.south, b.east);
-        Stage2.preview(r, f, { x0, z0, x1, z1 }, { north: b.north, south: b.south, west: b.west, east: b.east }, b.text);
+        Stage2.preview(r, f, boxBlocks(r, b), { north: b.north, south: b.south, west: b.west, east: b.east }, b.text);
         return;
       }
       if (tool === 'section') { if (window.DTSections) DTSections.click(p, r, lat, lon); return; }
@@ -1992,7 +2020,7 @@
     const { label: ln } = layerLabel(s ? s.name : layer);
     const v = valueText(s);
     $('details').innerHTML =
-      `<div class="dh" style="--c:#fff"><span class="d" style="background:${s ? `rgb(${s.rgb.join(',')})` : '#fff'}"></span><div><h4>${esc(latLonText(lat, lon))}</h4><div class="id">x ${fmtInt(bx)} · z ${fmtInt(bz)} on C = ${fmtInt(circ(r))}</div></div></div>` +
+      `<div class="dh" style="--c:#fff"><span class="d" style="background:${s ? `rgb(${s.rgb.join(',')})` : '#fff'}"></span><div><h4>${esc(latLonText(lat, lon))}</h4><div class="id">x ${fmtInt(bx)} · z ${fmtInt(bz)} on ${worldOf(r).isPetroff ? `the ${fmtInt(worldOf(r).period)} × ${fmtInt(worldOf(r).b)} world` : `C = ${fmtInt(circ(r))}`}</div></div></div>` +
       `<div class="kv"><div>${esc(ln || 'Layer')}</div><div>${esc(v || '—')}</div><div>Latitude</div><div>${esc(latText(lat))}</div><div>Longitude</div><div>${esc(lonText(lon))} of the seam</div>` +
       `<div>Block x, z</div><div class="tnum">${fmtInt(bx)}, ${fmtInt(bz)}</div><div>Run</div><div>${esc(runName(r))}</div></div>` +
       `<div class="callout" style="margin-top:12px">${ic('info')}<div>Values are read back from the map's colours, so they are approximate.</div></div>` +
@@ -2027,8 +2055,7 @@
       const dn = Math.abs(proj.dLatOfDz(circ(run), 128, pt.lat)), de = proj.dLonOfDx(circ(run), 128, pt.lat);
       const b = boxInfo(run, clamp(pt.lat + dn, -90, 90), clamp(pt.lat - dn, -90, 90), pt.lon - de, pt.lon + de);
       p.boxLL = b; mapDirty = true;
-      const [x0, z0] = blockXZ(run, b.north, b.west), [x1, z1] = blockXZ(run, b.south, b.east);
-      Stage2.preview(run, f, { x0, z0, x1, z1 }, { north: b.north, south: b.south, west: b.west, east: b.east }, b.text);
+      Stage2.preview(run, f, boxBlocks(run, b), { north: b.north, south: b.south, west: b.west, east: b.east }, b.text);
     }
   });
   document.body.addEventListener('click', ev => {
@@ -3010,7 +3037,7 @@
   window.DTWB = {
     $, esc, ic, clamp, fmtInt, api, store, toast, modal, closeModal, niceTicks, rampInfo, rampOfLayer, layerLabel, latLonText,
     latText, lonText, runName,
-    panes, blockXZ, circ, llToCanvas, mapLatLon, setTool, setITab, setMTab, setInspBig,
+    panes, blockXZ, worldOf, circ, llToCanvas, mapLatLon, setTool, setITab, setMTab, setInspBig,
     inspectorBig: () => inspBig,
     focused: P, layer: () => layer, tool: () => tool, narrow: () => narrow.matches,
     redraw() { mapDirty = globeDirty = true; },

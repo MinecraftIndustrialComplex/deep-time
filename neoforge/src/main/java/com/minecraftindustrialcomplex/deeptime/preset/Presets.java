@@ -85,7 +85,26 @@ public final class Presets {
 
     /** What the game reads from a preset before running it. */
     public record Info(Optional<String> name, boolean placeholder, OptionalInt circumference,
-                       Optional<Timeline> timeline, Optional<String> description) {}
+                       Optional<Timeline> timeline, Optional<String> description, String projection) {
+
+        /**
+         * The world's x period in blocks, what the level type's {@code circumference_blocks} and Toroidal
+         * World's loop hold: C on a Lambert world, 2b on a Petroff–Guyou one (Rust
+         * {@code ScaleParams::world_circumference}); empty when the preset names no circumference.
+         */
+        public OptionalInt worldCircumference() {
+            return circumference.isEmpty() ? circumference : OptionalInt.of(Presets.worldCircumference(circumference.getAsInt(), projection));
+        }
+    }
+
+    /** The preset's default projection (Rust {@code ProjectionKind::default}; Ben, decisions log 2026-10-04). */
+    public static final String DEFAULT_PROJECTION = "petroff_guyou";
+
+    /** The world's x period for a simulation circumference C and a projection (see {@link Info#worldCircumference}). */
+    public static int worldCircumference(int c, String projection) {
+        return "lambert".equals(projection) ? c
+                : 2 * com.minecraftindustrialcomplex.deeptime.worlddata.PetroffGuyou.hemisphereFor(c);
+    }
 
     /** A resolved preset argument: where it came from, and its JSON. */
     public record Resolved(String label, String json) {}
@@ -195,7 +214,10 @@ public final class Presets {
             JsonObject t = preset.getAsJsonObject("timeline");
             timeline = Optional.of(new Timeline(string(t, "start").orElse(""), number(t, "length_myr").orElse(Double.NaN)));
         }
-        return new Info(name, placeholder, c, timeline, string(preset, "description"));
+        String projection = DEFAULT_PROJECTION;
+        if (preset.has("scale") && preset.get("scale").isJsonObject())
+            projection = string(preset.getAsJsonObject("scale"), "projection").orElse(DEFAULT_PROJECTION);
+        return new Info(name, placeholder, c, timeline, string(preset, "description"), projection);
     }
 
     /** Sets {@code timeline} in a preset and returns its canonical JSON. */
