@@ -301,7 +301,8 @@ pub fn slope_failure(
     let dense_above = n / 8;
     let mut scale = vec![0.0f64; n];
     let mut moved = 0.0;
-    // The cells that moved in the last iteration (ascending), or None for "all of them".
+    // The cells that moved in the last iteration (ascending) when they are few enough for the
+    // sparse path, or None for "all of them".
     let mut movers: Option<Vec<u32>> = None;
     // Neighbourhood marks: `near1[c] == stamp` within one cell of a mover, `near2` within two.
     let mut near1 = vec![0u32; n];
@@ -311,7 +312,7 @@ pub fn slope_failure(
     // Each row's moved cells and their changes, ascending.
     let mut rows: Vec<Vec<(u32, f64)>> = vec![Vec::new(); hgt];
     for _ in 0..p.iterations {
-        let sparse = movers.as_deref().filter(|m| m.len() <= dense_above);
+        let sparse = movers.as_deref();
         if let Some(from) = sparse {
             stamp += 1;
             ring.clear();
@@ -372,21 +373,38 @@ pub fn slope_failure(
                 }
             });
         }
-        let mut moved_now = Vec::new();
+        // The movers' changes, rows in parallel (each row's cells are its own), then the metres
+        // moved summed in ascending cell order as before (P1-17). The movers' list is needed
+        // only when the next iteration takes the sparse path.
+        h.par_chunks_mut(w)
+            .zip(avail.par_chunks_mut(w))
+            .zip(wet.par_chunks_mut(w))
+            .zip(sea.par_chunks(w))
+            .zip(rows.par_iter())
+            .enumerate()
+            .for_each(|(j, ((((hr, ar), wr), sr), row))| {
+                for &(c, dz) in row {
+                    let i = c as usize - j * w;
+                    hr[i] += dz;
+                    ar[i] = (ar[i] + dz).max(0.0);
+                    wr[i] = sr[i] && hr[i] < sea_level;
+                }
+            });
+        let mut count = 0;
         for row in &rows {
-            for &(c, dz) in row {
-                let c = c as usize;
-                h[c] += dz;
-                avail[c] = (avail[c] + dz).max(0.0);
-                wet[c] = sea[c] && h[c] < sea_level;
+            count += row.len();
+            for &(_, dz) in row {
                 moved += dz.abs() * 0.5;
-                moved_now.push(c as u32);
             }
         }
-        if moved_now.is_empty() {
+        if count == 0 {
             break;
         }
-        movers = Some(moved_now);
+        movers = if count <= dense_above {
+            Some(rows.iter().flatten().map(|&(c, _)| c).collect())
+        } else {
+            None
+        };
     }
     moved
 }
