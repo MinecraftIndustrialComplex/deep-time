@@ -88,7 +88,8 @@ host rock in the top 2 km) and three global clocks.
    tracts by area, favourability and province endowment, and in time by the hazard. Each formed
    deposit is replayed through the history of its column: buried by sediment, uplifted and eroded.
    A deposit eroded away is lost (a porphyry leaves placer gold downstream); one cut into is
-   truncated; one buried below the build range is dropped; one deeper than the assessment depth
+   truncated (and a cut porphyry also sheds placer gold downstream, in proportion to the share of
+   it that erosion took: DEP-207); one buried below the build range is dropped; one deeper than the assessment depth
    but inside the build range is placed but not counted. The fate follows the order of events:
    the deepest the surface ever cut towards the body decides it, so a deposit exhumed through and
    buried again is gone, and one cut and then covered is placed under its old erosion surface
@@ -110,10 +111,11 @@ host rock in the top 2 km) and three global clocks.
    1980) above 80 °C, migrates up to 50 km to the nearest trap with a seal, and charges it in order.
 9. **Playability.** Regional minimums for essential materials can add the smallest plausible
    deposit of the best type; placer gold is moved, at the bake, into the nearest real river channel
-   within 30 km as gravel bars. A site counts toward an essential, and toward the spawn's reach of it,
-   only when the material is its primary product (DEP-206): on the real planet of 2026-10-04 a 0.07 Mt
-   impact deposit with copper as a co-product had satisfied the copper essential and drawn the spawn
-   to itself.
+   within 30 km as gravel bars. A site counts toward an essential only when the material is its
+   primary product (DEP-206): on the real planet of 2026-10-04 a 0.07 Mt impact deposit with copper
+   as a co-product had satisfied the copper essential. The spawn is no longer drawn toward
+   essentials (Ben, 2026-10-05, "I don't believe we need spawn selectoin since we have some passive
+   iron gen like vanilla"): it is the dry, flat land nearest (0, 0) (BAK-015).
 
 ## Equations and constants
 
@@ -134,6 +136,8 @@ The main constants by family; the ledgers hold every row.
 | DEP-043 | Supergene enrichment factor | 2 to 3 × | – | SIR 2010-5070-B after Sillitoe 2005 | `abstract-only` |
 | DEP-050 | Placer gold tonnage P90 / P50 / P10 | 0.022 / 1.1 / 50 (n 65) | Mt of gravel | Bulletin 1693 model 39a, Fig. 196 | `verified` |
 | DEP-051 | Placer gold grade | 0.084 / 0.2 / 0.48 | g/t | same, Fig. 197 | `verified` |
+| DEP-207 | Placer shed by a cut porphyry | tonnage = size draw × eroded fraction (1 − fraction left); gold cap × the same fraction | Mt of gravel | none found (game choice, Ben 2026-10-05) | `game-choice` |
+| DEP-208 | Smallest placer shed by a cut porphyry | dropped below 0.022 Mt of gravel (the model's P90, DEP-050) | Mt | the data's own smallest size | `game-choice` |
 | DEP-062 | Banded iron formation tonnage | 11 / 170 / 2,400 (n 66) | Mt | Bulletin 1693 model 34a, Fig. 172 | `verified` |
 | DEP-063 | Banded iron formation grade | 30 / 53 / 66 | % Fe | same, Fig. 173 | `verified` |
 | DEP-065 | Banded iron formation density | 1 / 4 / 12 | per 100,000 km² | none (placeholder) | `uncited` |
@@ -330,7 +334,7 @@ chunks around the point) to gather 24 ore-equivalent within 48 blocks under the 
 40 blocks (median; p90 40 → 56), copper 56 → 72 (72 → 88), iron 56 → 72 (72 → 88). The deposits do
 not move these medians (they are too rare); halving the scatter widens the square by about √2. The
 essentials (`deeptime:essentials`) still guarantee an exposed iron and coal deposit in every
-4,096-block region and within 2,048 blocks of the spawn. The probe assumes every block in the
+4,096-block region (no longer within a set distance of the spawn: 2026-10-05). The probe assumes every block in the
 square is found, so it compares worlds; it is not a mining time.
 
 **Deposits within reach.** Of the 269 sites of the measured planet 196 lie under the sea (land is
@@ -392,6 +396,13 @@ than these figures; that was not measured.
   are 1.75 times the values tuned at 20 m per block, so at 35 m per block bodies keep the height
   in blocks they had (Ben, decisions log 2026-10-03, "Keep today's block height").
 - Placer gold moved into a real river channel within 30 km at the bake (Ben, 2026-10-01).
+- Partial placer shedding (Ben, 2026-10-05, "Reword check + partial shedding"): a porphyry the surface
+  only cuts sheds a placer in proportion to the share of its volume eroded (DEP-207), with a floor
+  at the smallest recorded placer (DEP-208). On Earth a placer's gold does come from the erosion of
+  older lodes, partly eroded ones included, and the placers carry gold of porphyry and epithermal
+  origin (Chapman & Mortensen, found in a search, not read); no source gives a quantitative relation
+  between a lode's eroded fraction and the placer below it, so the linear law is the project's.
+- No spawn selection by essentials (Ben, 2026-10-05; BAK-015).
 - Richer deposits, thinner scatter and raw-ore cores (Ben, 2026-10-02: ORE-262, ORE-265, ORE-266;
   the values are the agent's, against the targets above); inherited iron formation in a basin
   field (Ben, 2026-10-02: ORE-261, ORE-263, ORE-264), at 5 % of the stable interiors rather than

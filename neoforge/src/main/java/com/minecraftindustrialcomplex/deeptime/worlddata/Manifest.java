@@ -21,7 +21,7 @@ import java.util.Map;
  */
 public record Manifest(String formatVersion, String source, String createdUtc, int circumference, int seaLevelY,
                        int minY, int maxY, Map<String, GridDesc> grids, List<LayerEntry> layers,
-                       List<FileEntry> files, JsonObject notes, double mPerBlockH, double mPerBlockV) {
+                       List<FileEntry> files, JsonObject notes, double mPerBlockH, double mPerBlockV, WorldLayout layout) {
 
     public static final String FILE = "manifest.json";
 
@@ -88,7 +88,8 @@ public record Manifest(String formatVersion, String source, String createdUtc, i
                     List.copyOf(files),
                     o.has("notes") ? o.getAsJsonObject("notes") : new JsonObject(),
                     scale.has("m_per_block_h") ? scale.get("m_per_block_h").getAsDouble() : DEFAULT_M_PER_BLOCK_H,
-                    scale.has("m_per_block_v") ? scale.get("m_per_block_v").getAsDouble() : DEFAULT_M_PER_BLOCK_V);
+                    scale.has("m_per_block_v") ? scale.get("m_per_block_v").getAsDouble() : DEFAULT_M_PER_BLOCK_V,
+                    o.has("projection") && o.get("projection").isJsonObject() ? WorldLayout.fromJson(o.getAsJsonObject("projection")) : null);
         } catch (RuntimeException e) {
             throw new WorldDataException(file + ": malformed manifest: " + e.getMessage(), e);
         }
@@ -101,6 +102,15 @@ public record Manifest(String formatVersion, String source, String createdUtc, i
     public String planetName() {
         int colon = source.indexOf(':');
         return colon >= 0 && colon + 1 < source.length() ? source.substring(colon + 1) : source;
+    }
+
+    /**
+     * The world's projection ({@code projection}, FORMAT.md "The world's layout"): Petroff–Guyou or
+     * Lambert; a manifest without the block is a Lambert world of {@link #circumference}. A new object
+     * per call: keep it ({@link WorldData#projection} does).
+     */
+    public WorldProjection projection() {
+        return WorldProjection.of(layout, circumference);
     }
 
     /** The entry of layer {@code name}, or null. */

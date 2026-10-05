@@ -537,7 +537,7 @@ mod tests {
 
     #[test]
     fn sees_format() {
-        assert_eq!(super::FORMAT_VERSION, "0.4");
+        assert_eq!(super::FORMAT_VERSION, "0.5");
     }
 
     #[test]

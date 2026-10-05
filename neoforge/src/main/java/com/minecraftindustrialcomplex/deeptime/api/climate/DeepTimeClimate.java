@@ -53,11 +53,14 @@ public interface DeepTimeClimate {
     /**
      * This interface's version: 1 = P1-25; 2 adds the planet's geometry on both sides
      * ({@link #circumferenceBlocks(Level)}, {@link #latitudeDeg}); 3 adds the warm-ground signal of the
-     * geothermal features ({@link #geothermalWarmthC}). A caller compiled against a newer
+     * geothermal features ({@link #geothermalWarmthC}); 4 adds the seamless world (format 0.5):
+     * {@link #projectionKind}, {@link #latitudeDeg(Level, double, double)} and
+     * {@link #longitudeDeg(Level, double, double)}, whose answers depend on x and z on a Petroff–Guyou
+     * world. A caller compiled against a newer
      * version than the installed Deep Time gets a {@link NoSuchMethodError} from a newer method; read
      * this field reflectively (javac inlines it) or catch that error.
      */
-    int API_VERSION = 3;
+    int API_VERSION = 4;
 
     /** Months in the simulated year. */
     int MONTHS = 12;
@@ -93,8 +96,41 @@ public interface DeepTimeClimate {
     }
 
     /**
-     * Latitude in degrees at block {@code z} on a planet of circumference {@code circumferenceBlocks}
-     * (API 2), by the planet's projection ({@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection}: Lambert's
+     * The projection the planet {@code level} is laid out in (API 4): {@code "petroff_guyou"} (the
+     * seamless world, the default from format 0.5: two hemisphere squares of side b side by side, x in
+     * [−b, b), z in [−b/2, b/2], the north and south edges glued by half-turns; latitude depends on x
+     * and z), {@code "lambert"} (Lambert's equal-area cylinder: latitude from z alone, {@link
+     * #latitudeDeg(double, int)}), or {@code ""} for a level that is not a Deep Time planet. Both sides,
+     * like {@link #circumferenceBlocks(Level)}.
+     */
+    static String projectionKind(Level level) {
+        return LevelClimate.projectionKind(level);
+    }
+
+    /**
+     * Latitude in degrees at block (x, z) of the planet {@code level} (API 4), by its projection,
+     * north positive; NaN for a level that is not a planet (or on a client before the planet info
+     * arrived). Both sides; allocates a little on a Petroff–Guyou world (a few hundred nanoseconds), so
+     * cache it per column if you call it per block.
+     */
+    static double latitudeDeg(Level level, double x, double z) {
+        com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection p = LevelClimate.projection(level);
+        return p == null ? Double.NaN : p.latLon(x, z)[0];
+    }
+
+    /**
+     * Longitude in degrees in [0, 360) at block (x, z) of the planet {@code level} (API 4), in the
+     * simulation's frame (on a Lambert world 0° is the seam x = −C/2); NaN as {@link #latitudeDeg(Level, double, double)}.
+     */
+    static double longitudeDeg(Level level, double x, double z) {
+        com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection p = LevelClimate.projection(level);
+        return p == null ? Double.NaN : p.latLon(x, z)[1];
+    }
+
+    /**
+     * Latitude in degrees at block {@code z} on a <b>Lambert</b> planet of circumference {@code circumferenceBlocks}
+     * (API 2; on a Petroff–Guyou world, {@link #projectionKind} {@code "petroff_guyou"}, latitude depends
+     * on x too: use {@link #latitudeDeg(Level, double, double)}), by the planet's projection ({@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection}: Lambert's
      * equal-area cylinder): φ = asin(−z / R) with R = C / 2π, north (−z) positive, the equator at z = 0
      * and the poles at |z| = R, clamped to ±90° past them. NaN when
      * the circumference is not positive (not a planet).

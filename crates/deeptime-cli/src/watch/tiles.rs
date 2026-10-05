@@ -400,6 +400,9 @@ fn world_json(run_dir: &Path) -> Answer {
             "max_y": m.max_y,
             "m_per_block_h": m.m_per_block_h,
             "m_per_block_v": m.m_per_block_v,
+            // The world's layout block (FORMAT.md "The world's layout"): the page builds its
+            // projection from it (`DTProj.world`).
+            "projection": m.projection.spec(None),
             "blocks_per_px": (0..=m.max_zoom).map(|z| blocks_per_px(m.c, z)).collect::<Vec<_>>(),
             "finest": {
                 "blocks_per_px": blocks_per_px(m.c, m.max_zoom),

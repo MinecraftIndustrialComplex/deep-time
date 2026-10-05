@@ -1,6 +1,8 @@
 {
   "generator.deeptime.planet": "Deep Time Planet",
   "generator.deeptime.planet_32k": "Deep Time Planet (32k)",
+  "generator.deeptime.planet_lambert": "Deep Time Planet (Lambert map)",
+  "generator.deeptime.planet_lambert_32k": "Deep Time Planet (Lambert map, 32k)",
 
   "deeptime.editor.title": "Deep Time — Planet",
   "deeptime.editor.section.preset": "Preset",
@@ -61,6 +63,9 @@
   "deeptime.editor.field.m_per_block_h": "Horizontal scale per block",
   "deeptime.editor.field.m_per_block_v": "Vertical scale per block",
   "deeptime.editor.field.build_limit_band": "Height-limit squeeze band",
+  "deeptime.editor.field.projection": "World map",
+  "deeptime.editor.field.lambda_c_deg": "Map centre longitude",
+  "deeptime.editor.field.edge_border": "North and south edges",
   "deeptime.editor.field.deposit_count": "Deposit count",
   "deeptime.editor.field.deposit_size": "Deposit size",
   "deeptime.editor.field.deposit_richness": "Deposit richness",
@@ -315,6 +320,10 @@
   "deeptime.editor.option.present_climate.natural": "As simulated",
   "deeptime.editor.option.present_climate.ice_age": "Ice age",
   "deeptime.editor.option.present_climate.snowball": "Snowball",
+  "deeptime.editor.option.projection.petroff_guyou": "Petroff–Guyou (seamless)",
+  "deeptime.editor.option.projection.lambert": "Lambert (pole caps)",
+  "deeptime.editor.option.edge_border.stop": "Stop (temporary)",
+  "deeptime.editor.option.edge_border.none": "None",
   "deeptime.editor.option.climate_model.per_cell": "Per cell",
   "deeptime.editor.option.climate_model.banded": "Banded",
   "deeptime.editor.option.rain_model.belts": "Belts",
@@ -540,6 +549,8 @@
   "deeptime.polecap.storm": "Polar storm (%s): the wind is pushing you back toward the equator",
   "deeptime.polecap.storm.no_wind": "Polar storm (%s): the world ends at %s",
   "deeptime.polecap.stop": "You cannot go any further: %s is the edge of the world",
+  "deeptime.edgeborder.near": "Near the world's %s edge: a temporary border stops you here until the seam is built",
+  "deeptime.edgeborder.stop": "The world's %s edge is closed for now: the seam that joins it is not built yet",
 
   "deeptime.wrap.create.refused.custom_kinetic": "Belts, chain conveyors and gantries cannot connect across a turning seam yet",
   "deeptime.wrap.create.refused.belt": "Belts cannot cross or touch a turning seam yet",

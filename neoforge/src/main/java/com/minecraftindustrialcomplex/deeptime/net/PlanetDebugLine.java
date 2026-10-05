@@ -19,8 +19,17 @@ public final class PlanetDebugLine {
         if (info == null || !info.planet() || info.circumference() <= 0)
             return null;
         int c = info.circumference();
-        double lat = PoleCapCurve.latitudeDeg(c, z);
-        double lon = PoleCapCurve.longitudeDeg(c, x);
+        double lat, lon;
+        if (info.petroffGuyou()) {
+            // The seamless world: latitude and longitude depend on x and z (FORMAT.md "The world's
+            // layout"); the longitude in the simulation's frame, shown in [−180°, 180°).
+            double[] ll = info.worldProjection().latLon(x, z);
+            lat = ll[0];
+            lon = ll[1] >= 180.0 ? ll[1] - 360.0 : ll[1];
+        } else {
+            lat = PoleCapCurve.latitudeDeg(c, z);
+            lon = PoleCapCurve.longitudeDeg(c, x);
+        }
         StringBuilder s = new StringBuilder(String.format(Locale.ROOT, "Deep Time: %.3f° %s %.3f° %s · %s (C %d, %.0f m/block)",
                 Math.abs(lat), lat >= 0 ? "N" : "S", Math.abs(lon), lon >= 0 ? "E" : "W",
                 info.planetName(), c, info.mPerBlockH()));
