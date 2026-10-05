@@ -7,7 +7,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * One simulation run (plan §6.1, §6.2). The preset and content are JSON strings. A daemon
@@ -68,8 +70,19 @@ public final class SimSession implements AutoCloseable {
         long create();
     }
 
+    /**
+     * Launched sessions (the Create World screen's) run one at a time: a run started while a
+     * cancelled one is still stopping (a step, the bake, can take a while) waits for it, so a
+     * player's machine never holds two planets' memory at once. The server's {@link #start} is not
+     * gated (it runs one session, on its own thread, before any level exists).
+     */
+    private static final Semaphore LAUNCH_GATE = new Semaphore(1, true);
+    private static final AtomicInteger LAUNCHED_LIVE = new AtomicInteger();
+
     private final Path outDir;
     private final boolean collectTimeline;
+    private final boolean gated;
+    private volatile boolean waitingForGate;
     private final CompletableFuture<String> completion = new CompletableFuture<>();
     private final Thread worker;
     /** The native id; 0 until created (session ids start at 1). */
@@ -85,9 +98,10 @@ public final class SimSession implements AutoCloseable {
     private int keyframesCollected;
     private long eventsCollected;
 
-    private SimSession(Path outDir, boolean collectTimeline, Creator creator) {
+    private SimSession(Path outDir, boolean collectTimeline, boolean gated, Creator creator) {
         this.outDir = outDir;
         this.collectTimeline = collectTimeline;
+        this.gated = gated;
         this.worker = new Thread(() -> run(creator), "deeptime-sim");
         this.worker.setDaemon(true);
     }
@@ -106,7 +120,7 @@ public final class SimSession implements AutoCloseable {
         requireLinked();
         long created = DeepTimeNative.create(presetJson, contentJson == null ? "" : contentJson,
                 outDir.toAbsolutePath().toString(), threads, memCapBytes);
-        SimSession s = new SimSession(outDir, false, () -> created);
+        SimSession s = new SimSession(outDir, false, false, () -> created);
         s.id = created;
         s.worker.start();
         return s;
@@ -127,7 +141,7 @@ public final class SimSession implements AutoCloseable {
         requireLinked();
         String content = contentJson == null ? "" : contentJson;
         String out = outDir.toAbsolutePath().toString();
-        SimSession s = new SimSession(outDir, collectTimeline,
+        SimSession s = new SimSession(outDir, collectTimeline, true,
                 () -> DeepTimeNative.create(presetJson, content, out, threads, memCapBytes));
         s.worker.start();
         return s;
@@ -173,7 +187,26 @@ public final class SimSession implements AutoCloseable {
     private void run(Creator creator) {
         String manifest = null;
         Throwable failure = null;
+        boolean holdsGate = false;
         try {
+            if (gated) {
+                waitingForGate = true;
+                try {
+                    while (!(holdsGate = LAUNCH_GATE.tryAcquire(200, TimeUnit.MILLISECONDS))) {
+                        if (cancelRequested) {
+                            failure = new CancelledException("cancelled before it started");
+                            return;
+                        }
+                    }
+                } finally {
+                    waitingForGate = false;
+                }
+                LAUNCHED_LIVE.incrementAndGet();
+            }
+            if (cancelRequested && id == 0) {
+                failure = new CancelledException("cancelled before it started");
+                return;
+            }
             if (id == 0) {
                 long created = creator.create();
                 synchronized (lifecycle) {
@@ -223,6 +256,10 @@ public final class SimSession implements AutoCloseable {
                 NativeLoader.forwardNativeLog(DeepTimeNative.drainLog(0));
             } catch (RuntimeException ignored) {
                 // the log is best effort
+            }
+            if (holdsGate) {
+                LAUNCHED_LIVE.decrementAndGet();
+                LAUNCH_GATE.release();
             }
             if (failure != null)
                 completion.completeExceptionally(failure);
@@ -313,6 +350,16 @@ public final class SimSession implements AutoCloseable {
                         + "; read keyframe " + index + " from " + outDir.resolve("keyframes"));
             DeepTimeNative.copyKeyframe(id, index, layer, dstRgba);
         }
+    }
+
+    /** True while this launched session waits for an earlier one to stop (see {@code LAUNCH_GATE}). */
+    public boolean waitingForPrevious() {
+        return waitingForGate;
+    }
+
+    /** Launched sessions alive now (created or being created, not yet destroyed): 0 or 1. */
+    public static int launchedLive() {
+        return LAUNCHED_LIVE.get();
     }
 
     /** True once the worker has finished and destroyed the native session. */

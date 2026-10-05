@@ -57,7 +57,7 @@ library was used. Nothing in the library is checked against the printed version.
 
 ## Counts
 
-393 works (the margins and spires task added Pratson1996, 2026-10-03; P1-26 T6 added HEXTOR, Kopparapu2013, Abbot2012, Hu2011 and Pierrehumbert2011 the same day: the tables below were not recounted for them). Stage 1 listed 475 entries, the flexure feature added 13 and the force balance (task 5, 2026-10-02) 2 (Cloos1993, Coblentz1994, both from memory); 103 entries were merged into 385 works (the merged keys are listed below).
+394 works (the margins and spires task added Pratson1996 and the cold wetland task Xu2018, 2026-10-03; P1-26 T6 added HEXTOR, Kopparapu2013, Abbot2012, Hu2011 and Pierrehumbert2011 the same day: the tables below were not recounted for them). Stage 1 listed 475 entries, the flexure feature added 13 and the force balance (task 5, 2026-10-02) 2 (Cloos1993, Coblentz1994, both from memory); 103 entries were merged into 385 works (the merged keys are listed below).
 
 By access, as recorded for the work (the most open access class among its merged entries):
 
@@ -3885,13 +3885,14 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Bradley, D. C. (2008). Passive margins through earth history. Earth-Science Reviews 91(1-4):1-26.
 - DOI or URL: 10.1016/j.earscirev.2008.08.001.
 - Cited as: "Bradley 2008, Earth-Sci. Rev. 91:1-26".
-- Ledger ids: PLT-160, PLT-167, PLT-207
+- Ledger ids: PLT-160, PLT-167, PLT-207, PLT-261
 - Access: paywalled (abstract not obtainable here).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
 - Read so far (by the project): abstract or secondary pages.
 - Read in this pass: metadata only (OpenAlex abstract field is null; ScienceDirect 403).
 - Reference check: correct (author affiliation USGS Anchorage). The figures 105,000 km passive / 53,000 km convergent and 104/181 Myr ages could not be checked.
+- Read 2026-10-04 (the ocean–continent transition task, a research sub-agent, full text from a repository copy, https://repository.geologyscience.ru/server/api/core/bitstreams/2230260d-7a9a-4757-b200-f847df8cec5b/content): "The present-day passive margins have an aggregate length of 105,000 km, even longer than the spreading ridges (65,000 km) or the convergent plate boundaries (53,000 km)"; "a mean age of 104 m.y., and a maximum age of 180 m.y."; lengths "taken as the great-circle distance between endpoints". Ledger PLT-261 (comparison only).
 
 ### Lallemand_EncMarineGeosciences
 - Reference: Lallemand, S. entry in Encyclopedia of Marine Geosciences (Springer). Year and entry title not given in the code and not resolved.
@@ -4943,7 +4944,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Reference: NOAA National Centers for Environmental Information (2022). ETOPO 2022 15 Arc-Second Global Relief Model. NOAA NCEI.
 - DOI or URL: 10.25921/fd45-gt74 (title and year confirmed through the DataCite API)
 - Cited as: "ETOPO 2022"
-- Ledger ids: ERO-168, HNT-093 (margins and spires task, 2026-10-03)
+- Ledger ids: ERO-168, HNT-093 (margins and spires task, 2026-10-03), PLT-265 (the ocean–continent transition, 2026-10-04: the same transects as the comparison)
 - Access: open access (dataset)
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://doi.org/10.25921/fd45-gt74. File: ETOPO2022.txt.
 - Read so far (by the project): data named
@@ -5986,6 +5987,11 @@ The survey `docs/research/notes/seamless-projection-survey.md` and its tools (`t
 - Ledger ids: none (the survey's cross-checks: QSC max a/b 1.555, HEALPix 2.430; continuity classes)
 - Access: open. Read so far: the ranking, continuity and distortion sections read by a sub-agent from a Semantic Scholar copy, 2026-10-03.
 
+### Xu2018
+- Reference: Xu, J., Morris, P. J., Liu, J. and Holden, J. (2018). PEATMAP: Refining estimates of global peatland distribution based on a meta-analysis. CATENA 160:134-140. doi:10.1016/j.catena.2017.09.010 (DOI from the publisher URL S0341816217303004; not checked in Crossref).
+- Cited as: "PEATMAP (Xu et al. 2018)".
+- Ledger ids: BIO-137
+- Access: paywalled at the publisher (an open copy exists at CORE, record 227455185); the paper's text was not fetched: ScienceDirect, CORE and Semantic Scholar all answered 403 (2026-10-03). Read so far: a search-result summary of the abstract (global peatland 4.23 million km2, 2.84 % of the land; northern peatlands 3.21 million km2), and two secondary pages: PMC11718193 (a 2025 study of Holocene peatland area, which writes "we used an area of 3.21 Mkm2 for the modern northern peatlands from PEATMAP by Xu et al.") and the International Peatland Society page "Where can peatlands be found?" (continent shares: Asia 38.4 %, North America 31.6 %, Europe 12.5 %; boreal and temperate northern peatlands "formed under high precipitation-low temperature climatic regimes").
 ## Biome rules for Expanded Ecosphere (BIO-115 to BIO-130), added 2026-10-04
 
 ### Walker2005
@@ -6098,3 +6104,51 @@ The research note `docs/research/notes/sphere-native-grids.md` and its benchmark
 - Reference: Hergarten, S. and Robl, J. (2022). The linear feedback precipitation model (LFPM 1.0): a simple and efficient model for orographic precipitation in the context of landform evolution modeling. Geoscientific Model Development 15:2063-2084. doi:10.5194/gmd-15-2063-2022.
 - Ledger ids: none (§5: a non-spectral orographic rain model; §11 question 3)
 - Access: open. Read so far: full text by a sub-agent.
+
+## Rifted margins: the ocean–continent transition (PLT-261 to PLT-264), added 2026-10-04
+
+Read by a research sub-agent of the transition task (2026-10-04); quotes are verbatim from the text
+it fetched. Many publisher pages refused it (Wiley, ScienceDirect, GeoScienceWorld); what it could
+not open is listed under "Not read". Bradley 2008 (above) was read in full in the same pass.
+
+### Franke2013
+- Reference: Franke, D. (2013). Rifting, lithosphere breakup and volcanism: comparison of magma-poor and volcanic rifted margins. Marine and Petroleum Geology 43:63-87.
+- DOI or URL: 10.1016/j.marpetgeo.2012.11.003; author's accepted manuscript at http://mantleplumes.webspace.durham.ac.uk/wp-content/uploads/sites/129/2021/05/Franke_RiftingMagmatism_MPG.pdf
+- Cited as: "Franke 2013" (the width of crustal thinning at volcanic margins).
+- Ledger ids: PLT-262
+- Access: accepted manuscript, open.
+- Read so far (by the project): full text (accepted manuscript), 2026-10-04: at volcanic margins "Crustal thinning typically occurs over a comparably short distance in the order of only 50 to 100 km"; "Magma-poor rifted margins in contrast show wide domains of extended crust"; volcanic rifted margins are "the majority of passive continental margins worldwide".
+
+### Brune2014
+- Reference: Brune, S., Heine, C., Pérez-Gussinyé, M. and Sobolev, S. V. (2014). Rift migration explains continental margin asymmetry and crustal hyper-extension. Nature Communications 5:4014.
+- DOI or URL: 10.1038/ncomms5014
+- Cited as: "Brune et al. 2014" (hyper-extended crust up to 200 km wide).
+- Ledger ids: PLT-261, PLT-262
+- Access: open access.
+- Read so far (by the project): full text, 2026-10-04: "up to 200 km wide areas of hyper-extended continental crust"; "hyper-extended (with a thickness <10 km) crustal slivers that vary in widths between 70 km offshore Iberia and 200 km off Angola".
+
+### Sapin2021
+- Reference: Sapin, F., Ringenbach, J.-C. and Clerc, C. (2021). Rifted margins classification and forcing parameters. Scientific Reports 11:8199.
+- DOI or URL: 10.1038/s41598-021-87648-3
+- Cited as: "Sapin et al. 2021" (the necking domain's width; crust at the transition).
+- Ledger ids: PLT-261, PLT-262
+- Access: open access.
+- Read so far (by the project): full text, 2026-10-04: "The width of the Necking Domain: this domain is the most variable in terms of width and general shape"; narrow, "~ 50 km", to "extending over more than 110 km across the shelf"; "the Exhumation Domain can reach a width of more than 150 km"; in the Coral Sea "a thinning of the crust from 22 km down to a 7–8 km thick ... in direct contact with the steady oceanic crust of similar thickness".
+
+### Harris2014
+- Reference: Harris, P. T., Macmillan-Lawler, M., Rupp, J. and Baker, E. K. (2014). Geomorphology of the oceans. Marine Geology 352:4-24.
+- DOI or URL: 10.1016/j.margeo.2014.01.011; author copy https://moodle2.units.it/pluginfile.php/486751/mod_folder/content/0/HarrisetalMARGO2014.pdf
+- Cited as: "Harris et al. 2014" (shelf and slope widths of passive margins; shelf, slope and rise areas).
+- Ledger ids: PLT-262, PLT-265
+- Access: author copy, open.
+- Read so far (by the project): full text, 2026-10-04: "continental shelf width of passive margins (88 km) is nearly three times that of active margins (31 km)" (abstract; Table 2: 84 ± 0.66 km, all shelves 57 km); "the average width of active slopes (36 km) is less than the average width of passive margin slopes (46 km)"; slope "a narrow band 41 km wide"; Table 5: shelf 8.91 % of the ocean, slope 5.42 %, rise 8.24 % (superimposed on the abyss); "the Earth's margins are approximately 35% active and 65% passive". No shelf-break depth.
+
+### McKenzie1978
+- Reference: McKenzie, D. (1978). Some remarks on the development of sedimentary basins. Earth and Planetary Science Letters 40:25-32.
+- DOI or URL: 10.1016/0012-821X(78)90071-7 (the DOI from the standard citation, not seen on the scan); scan at http://www.zetaware.com/public/McKenzie_1978.pdf
+- Cited as: "McKenzie 1978" (uniform stretching by β; initial and thermal subsidence).
+- Ledger ids: PLT-261, PLT-263, PLT-264
+- Access: scanned copy, open.
+- Read so far (by the project): full text (OCR; the equations partly garbled), 2026-10-04: "a unit length of continental lithosphere is suddenly extended to a length β, causing upwelling of hot asthenosphere"; "The slow subsidence and the heat flow depend only on the amount of stretching"; Table 1: τ = 62.8 My, E0 = 3.2 km, ρ_c 2.8, ρ_m 3.33, ρ_w 1.0 g/cm³; thermal subsidence S_t ≈ E0 r (1 − e^(−t/τ)), r = (β/π) sin(π/β).
+
+Not read: Péron-Pinvidic, Manatschal & Osmundsen 2013 (Marine and Petroleum Geology 43:21-47), Sutra et al. 2013 (G-cubed 14:2575), Mohn et al. 2012 (Tectonics 31:TC1012), Chenin et al. 2017 (Geosphere 13:559; a search summary gives magma-poor margins "approximately 165 km on average", unverified).
