@@ -604,7 +604,7 @@ land stands above 2 km (from memory).
 **Why the high ground (a model issue, open).** Collapse thins quiet crust only to 50 km, and a
 50 km column stands at its Airy height, about 3.2 km (the middle of `continent_elevation_m` plus
 15 km / 5.5; PLT-121). Earth's crust of that thickness under an old orogen stands about a
-kilometre high (the Urals keep 50–56 km, Carbonell et al. 2000), because its root is dense and
+kilometre high (the Urals keep 50–56 km, Carbonell et al. 2000; their height of about a kilometre is from memory), because its root is dense and
 its lithosphere cold, which pure Airy isostasy with one crustal density leaves out. So every
 collapsed orogen in the model stays above 2 km until erosion takes it down. The fix is in the
 isostasy of thick crust or the erosion (the erosion and burial investigation of 2026-10-05), not
