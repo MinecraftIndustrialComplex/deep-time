@@ -24,6 +24,8 @@ public final class Rivers {
     public static final int MOUTH_SEA = 0, MOUTH_LAKE = 1, MOUTH_RIVER = 2;
 
     private final int c, tile, tilesX, tilesZ;
+    /** Block x and z of the index's first tile: the world projection's index frame (format 0.5). */
+    private final int originX, originZ;
     private final float biomeMinWidth, bankZone, bankRatio;
     /** x, z, w, hw, depth, q per vertex. */
     private final float[] x, z, w, hw, depth, q;
@@ -31,13 +33,15 @@ public final class Rivers {
     private final int[] chainFirst, chainCount, chainMouth, chainInto;
     private final int[] offsets, entries;
 
-    private Rivers(int c, int tile, int tilesX, int tilesZ, float biomeMinWidth, float bankZone, float bankRatio,
+    private Rivers(int c, int tile, int tilesX, int tilesZ, int originX, int originZ, float biomeMinWidth, float bankZone, float bankRatio,
                    float[] x, float[] z, float[] w, float[] hw, float[] depth, float[] q,
                    int[] chainFirst, int[] chainCount, int[] chainMouth, int[] chainInto, int[] offsets, int[] entries) {
         this.c = c;
         this.tile = tile;
         this.tilesX = tilesX;
         this.tilesZ = tilesZ;
+        this.originX = originX;
+        this.originZ = originZ;
         this.biomeMinWidth = biomeMinWidth;
         this.bankZone = bankZone;
         this.bankRatio = bankRatio;
@@ -108,7 +112,7 @@ public final class Rivers {
         for (int t = 0; t < tiles; t++)
             if (offsets[t] > offsets[t + 1])
                 throw Sectioned.corrupt(path, "the tile offsets decrease");
-        return new Rivers(c, tile, tilesX, tilesZ, f.getFloat(28), f.getFloat(32), f.getFloat(36),
+        return new Rivers(c, tile, tilesX, tilesZ, f.getInt(40), f.getInt(44), f.getFloat(28), f.getFloat(32), f.getFloat(36),
                 x, z, w, hw, d, q, first, count, mouth, into, offsets, entries);
     }
 
@@ -135,9 +139,9 @@ public final class Rivers {
 
     /** The tile of canonical column (wx, z). */
     int tileOf(long wx, long z) {
-        // The tiles' frame is the projection's index frame.
-        long tx = Math.floorMod(Math.floorDiv(wx - Projection.indexOriginBlockX(c), (long) tile), (long) tilesX);
-        long tz = Math.max(0, Math.min(tilesZ - 1L, Math.floorDiv(z - Projection.indexOriginBlockZ(c), (long) tile)));
+        // The tiles' frame is the world projection's index frame, as the file states it.
+        long tx = Math.floorMod(Math.floorDiv(wx - originX, (long) tile), (long) tilesX);
+        long tz = Math.max(0, Math.min(tilesZ - 1L, Math.floorDiv(z - originZ, (long) tile)));
         return (int) (tz * tilesX + tx);
     }
 
@@ -152,7 +156,7 @@ public final class Rivers {
      * repeats (Rust {@code Rivers::entries_in}).
      */
     public int[] entriesIn(long x0, long z0, long x1, long z1) {
-        long ox = Projection.indexOriginBlockX(c), oz = Projection.indexOriginBlockZ(c);
+        long ox = originX, oz = originZ;
         long tx0 = Math.floorDiv(x0 - ox, (long) tile), tx1 = Math.floorDiv(x1 - ox, (long) tile);
         long tz0 = Math.max(0, Math.min(tilesZ - 1L, Math.floorDiv(z0 - oz, (long) tile)));
         long tz1 = Math.max(0, Math.min(tilesZ - 1L, Math.floorDiv(z1 - oz, (long) tile)));

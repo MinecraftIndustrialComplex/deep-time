@@ -22,14 +22,15 @@ use std::path::Path;
 use crate::container::{self, f32_at, u32_at};
 use crate::error::{FormatError, Result};
 use crate::fsutil::write_atomic;
-use crate::projection::Projection;
+use crate::projection::IndexFrame;
 
 /// Where the network lives in a world-data folder.
 pub const RIVERS_PATH: &str = "rivers/rivers.dtrv";
 /// The file's magic.
 pub const MAGIC: [u8; 4] = *b"DTRV";
 /// Fixed fields: C, tile, tiles_x, tiles_z, vertices, chains, index entries (u32 each); the biome
-/// width, the bank zone and its ratio (f32); two reserved u32.
+/// width, the bank zone and its ratio (f32); the index's origin x and z (i32; format 0.5, they
+/// were reserved before).
 pub const FIXED_BYTES: usize = 48;
 /// Sections: vertices, chains, tile offsets, tile entries.
 pub const SECTIONS: usize = 4;
@@ -116,6 +117,9 @@ pub struct Rivers {
     /// The bank zone beyond a channel's edge: `bank_zone + bank_ratio · hw` blocks.
     pub bank_zone: f32,
     pub bank_ratio: f32,
+    /// Block x and z of the index's first tile (the world projection's index frame).
+    pub origin_x: i32,
+    pub origin_z: i32,
     pub vertices: Vec<RiverVertex>,
     pub chains: Vec<Chain>,
     /// `tiles_x · tiles_z + 1` offsets into `entries`, tile-major (tz · tiles_x + tx).
@@ -185,11 +189,16 @@ fn lerp(a: f32, b: f32, t: f64) -> f64 {
 }
 
 impl Rivers {
-    /// An empty network for a planet of circumference `c`.
+    /// An empty network for a Lambert planet (or the simulation's frame) of circumference `c`.
     pub fn empty(c: u32) -> Rivers {
+        Rivers::empty_in(c, IndexFrame::lambert(c))
+    }
+
+    /// An empty network of x period `c` whose tiles cover `frame` (the world projection's index
+    /// frame, [`crate::projection::WorldProjection::index_frame`]).
+    pub fn empty_in(c: u32, frame: IndexFrame) -> Rivers {
         let tile = TILE_BLOCKS;
-        // The tiles' frame is the projection's index frame.
-        let (span_x, span_z) = Projection::new(c).index_span_blocks();
+        let (span_x, span_z) = frame.span;
         let tiles_x = (span_x as u32).div_ceil(tile);
         let tiles_z = (span_z as u32).div_ceil(tile);
         Rivers {
@@ -200,6 +209,8 @@ impl Rivers {
             biome_min_width: 6.0,
             bank_zone: 1.0,
             bank_ratio: 0.5,
+            origin_x: frame.origin.0 as i32,
+            origin_z: frame.origin.1 as i32,
             vertices: Vec::new(),
             chains: Vec::new(),
             offsets: vec![0; (tiles_x * tiles_z) as usize + 1],
@@ -227,7 +238,7 @@ impl Rivers {
                 chain_of[v as usize] = k as u32;
             }
         }
-        let (x0, z0) = Projection::new(self.c).index_origin();
+        let (x0, z0) = (f64::from(self.origin_x), f64::from(self.origin_z));
         let tile = f64::from(self.tile);
         let mut lists: Vec<Vec<u32>> = vec![Vec::new(); n_tiles];
         for s in 0..self.vertices.len() {
@@ -266,7 +277,7 @@ impl Rivers {
 
     /// The tile of canonical column (wx, z).
     pub fn tile_of(&self, wx: i64, z: i64) -> usize {
-        let (ox, oz) = Projection::new(self.c).index_origin_blocks();
+        let (ox, oz) = (i64::from(self.origin_x), i64::from(self.origin_z));
         let t = i64::from(self.tile);
         let tx = (wx - ox).div_euclid(t).rem_euclid(i64::from(self.tiles_x));
         let tz = (z - oz).div_euclid(t).clamp(0, i64::from(self.tiles_z) - 1);
@@ -329,7 +340,7 @@ impl Rivers {
     /// The segment ids of every tile touching block box [x0, x1] × [z0, z1] (canonical or not),
     /// ascending and without repeats.
     pub fn entries_in(&self, x0: i64, z0: i64, x1: i64, z1: i64) -> Vec<u32> {
-        let (ox, oz) = Projection::new(self.c).index_origin_blocks();
+        let (ox, oz) = (i64::from(self.origin_x), i64::from(self.origin_z));
         let t = i64::from(self.tile);
         let tx0 = (x0 - ox).div_euclid(t);
         let tx1 = (x1 - ox).div_euclid(t);
@@ -421,7 +432,8 @@ pub fn encode_rivers(r: &Rivers) -> Result<Vec<u8>> {
     for v in [r.biome_min_width, r.bank_zone, r.bank_ratio] {
         fixed.extend_from_slice(&v.to_le_bytes());
     }
-    fixed.extend_from_slice(&[0; 8]);
+    fixed.extend_from_slice(&r.origin_x.to_le_bytes());
+    fixed.extend_from_slice(&r.origin_z.to_le_bytes());
     debug_assert_eq!(fixed.len(), FIXED_BYTES);
     let mut verts = Vec::with_capacity(r.vertices.len() * VERTEX_BYTES);
     for v in &r.vertices {
@@ -491,6 +503,8 @@ pub fn decode_rivers(path: &Path, b: &[u8]) -> Result<Rivers> {
         biome_min_width: f32_at(f, 28),
         bank_zone: f32_at(f, 32),
         bank_ratio: f32_at(f, 36),
+        origin_x: u32_at(f, 40) as i32,
+        origin_z: u32_at(f, 44) as i32,
         vertices,
         chains: out_chains,
         offsets: (0..=n_tiles).map(|t| u32_at(offsets, 4 * t)).collect(),
