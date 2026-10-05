@@ -1006,8 +1006,20 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
                 .collect::<Vec<_>>()
                 .join(" ")
         });
+        let own = e["stages"].as_array().map_or(String::new(), |st| {
+            st.iter()
+                .map(|x| {
+                    format!(
+                        "{}={:.0}",
+                        x["name"].as_str().unwrap_or("?"),
+                        mib(x, "own_bytes")
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        });
         println!(
-            "deeptime run: estimate peak_mib={:.0} base_mib={:.0} history_mib={:.0} spill_mib={:.0} cap_mib={:.0} stages_mib[{stages}]",
+            "deeptime run: estimate peak_mib={:.0} base_mib={:.0} history_mib={:.0} spill_mib={:.0} cap_mib={:.0} stages_mib[{stages}] own_mib[{own}]",
             mib(&e, "peak_bytes"),
             mib(&e, "base_bytes"),
             mib(&e, "history_bytes"),
