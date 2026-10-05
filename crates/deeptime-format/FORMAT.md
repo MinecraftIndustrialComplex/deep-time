@@ -528,7 +528,7 @@ area, (r·m)² for m metres per block, less only on the rows that reach past a p
   column `w − i` (then wrapped), which is exactly the point the edge's half-turn takes it to. So the
   bilinear and stencil reads above, and every reader's terrain past an edge, are the glued planet,
   continuous through the seam. Rust `GridDesc::cell`, Java `GridDesc.cell`. A descriptor without
-  `z_edges` clamps (`"clamp"`, the simulation's grids and Lambert worlds). Rows are not uniform in
+  `z_edges` clamps (`"clamp"`, the simulation's grids and Lambert worlds; writers always write the key, since the checkpoints encode grids with postcard, which cannot leave a field out). Rows are not uniform in
   latitude; every cell still covers the same area of the planet ((r·m)², m = `m_per_block_h`).
   `scale.circumference_blocks` = 2b, so x wraps with period W·r = 2b as before.
 

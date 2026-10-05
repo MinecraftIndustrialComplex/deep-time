@@ -2152,8 +2152,9 @@ mod tests {
             let p: f64 = fresh.p_month.iter().sum();
             assert!((p - fresh.p_annual).abs() < 1e-6 * fresh.p_annual.max(1.0));
         }
-        let v = w.inspect(-2047, 300);
-        assert_eq!(v["wx"], -2047);
+        // (The 4k planet's world is 3,072 blocks round: x in [−1,536, 1,536).)
+        let v = w.inspect(-1500, 300);
+        assert_eq!(v["wx"], -1500);
         assert!(v["layers"]["climate/temperature"]["bilinear"].is_number());
         assert!(v["strata"].as_array().is_some_and(|a| !a.is_empty()));
         // `--why`: a column inside a site's box gets the site's forming event and chain.
