@@ -157,7 +157,11 @@ fn no_stage_holds_more_than_its_estimate() {
     // the counted peak (plus 16 MiB for thread stacks and the C library's own buffers). Before
     // memacct the resident peak was a third over the count (glibc kept freed grids).
     if let (Some(rss), true) = (rss_peak, rss_start.is_some()) {
-        eprintln!("resident peak {:.1} MiB, counted peak {:.1} MiB", mib(rss), mib(run_peak));
+        eprintln!(
+            "resident peak {:.1} MiB, counted peak {:.1} MiB",
+            mib(rss),
+            mib(run_peak)
+        );
         let slack = (16u64 << 20) + run_peak / 10;
         assert!(
             rss <= run_peak + slack,
