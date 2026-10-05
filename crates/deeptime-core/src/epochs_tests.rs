@@ -103,7 +103,8 @@ fn world_diff(a: &WorldState, b: &WorldState) -> Vec<String> {
     if a.t_years.to_bits() != b.t_years.to_bits() {
         out.push(format!("t_years {} vs {}", a.t_years, b.t_years));
     }
-    let keys: std::collections::BTreeSet<&String> = a.fields.keys().chain(b.fields.keys()).collect();
+    let keys: std::collections::BTreeSet<&String> =
+        a.fields.keys().chain(b.fields.keys()).collect();
     for k in keys {
         if a.fields.get(k).map(bits) != b.fields.get(k).map(bits) {
             out.push(format!("field {k}"));
@@ -113,7 +114,11 @@ fn world_diff(a: &WorldState, b: &WorldState) -> Vec<String> {
         out.push(format!("globals {:?} vs {:?}", a.globals, b.globals));
     }
     if bits(&a.events) != bits(&b.events) {
-        let first = a.events.iter().zip(&b.events).position(|(x, y)| bits(x) != bits(y));
+        let first = a
+            .events
+            .iter()
+            .zip(&b.events)
+            .position(|(x, y)| bits(x) != bits(y));
         out.push(format!(
             "events ({} vs {}, first difference at {first:?}: {:?} vs {:?})",
             a.events.len(),
@@ -283,7 +288,11 @@ fn an_epoch_pick_and_a_stop_bake_the_run_planned_to_that_time() {
     // Back to the planned end from the picked epoch: the original run again, frame for frame
     // (the frames the pick drew in its tail are not kept).
     let back = resume(&base, &a);
-    assert!(back.resumed().unwrap().from_step <= 12, "{:?}", back.resumed());
+    assert!(
+        back.resumed().unwrap().from_step <= 12,
+        "{:?}",
+        back.resumed()
+    );
     drop(back);
     assert_eq!(
         files_diff(&files(&a), &original),
