@@ -931,9 +931,11 @@ mod tests {
         assert!(t[190][0] < 0.8, "{}", t[190][0]);
         // A mark set by the sea's position (here the sea's western half 1, eastern half 0)
         // arrives from the sea that lies upwind: the coast gets the eastern half's.
+        // (As a share of the sea's vapour there: the ones tracer `t`.)
         let half: Vec<[f64; 1]> = (0..n).map(|c| [if c < 30 { 1.0 } else { 0.0 }]).collect();
-        let t = tracers(&mesh, &k, &mo, &s, &half);
-        assert!(t[62][0] < 0.2 && t[20][0] > 0.5, "{} {}", t[62][0], t[20][0]);
+        let h = tracers(&mesh, &k, &mo, &s, &half);
+        let share = |c: usize| h[c][0] / t[c][0];
+        assert!(share(20) > 0.8 && share(62) < share(20) - 0.4, "{} {}", share(62), share(20));
     }
 
     #[test]
