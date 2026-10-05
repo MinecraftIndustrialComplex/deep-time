@@ -8,8 +8,9 @@ Each <run dir> is a `tools/review/p1-24-profile.sh` output folder: its run.log (
 `estimate` line) and memtrace.jsonl (DEEPTIME_MEM_TRACE: one line per phase occurrence). For every
 phase: what the run reported (the counting allocator's peak while it ran, the figure the memory cap
 and the editor use), the process's resident peak in the same phase (VmHWM, reset at the phase's
-start), the most a reservation asked for, and the estimate (the stage's own figure; for the
-keyframes, the stage ends and the bake, the run's peak). Then the run's maxima and the sampled
+start), the most a reservation asked for, and the estimate (the stage's figure; the keyframes
+and a stage's end are listed after the stage that stepped before them, with its figure; the bake
+has the run's peak). Then the run's maxima and the sampled
 anonymous memory of its cgroup (mem.log).
 """
 import json
@@ -29,9 +30,15 @@ def table(d):
         for name, v in re.findall(r"(\w+)=(\d+)", m.group(2)):
             est[name] = float(v)
     rows, order = {}, []
+    stepped = None
     for line in open(f"{d}/memtrace.jsonl"):
         r = json.loads(line)
         p = r["phase"]
+        # The keyframes and a stage's end belong to the stage that stepped before them.
+        if p in ("keyframes", "finish") and stepped:
+            p = f"{p} after {stepped}"
+        elif p != "bake":
+            stepped = p
         if p not in rows:
             rows[p] = {"live": 0, "rss": 0, "reserved": 0, "n": 0}
             order.append(p)
@@ -56,8 +63,9 @@ def table(d):
     for p in order:
         a = rows[p]
         live, rss = a["live"] / M, a["rss"] / M
-        e = est.get(p, peak_est)
-        es = "-" if e is None else f"{e:.0f}{'' if p in est else ' (run)'}"
+        owner = p.split(" after ")[-1]
+        e = est.get(owner, peak_est)
+        es = "-" if e is None else f"{e:.0f}{'' if owner in est else ' (run)'}"
         er = "-" if e is None else f"{e / rss:.2f}"
         print(
             f"| {p} | {a['n']} | {live:.0f} | {rss:.0f} | {live / rss:.2f} | "
