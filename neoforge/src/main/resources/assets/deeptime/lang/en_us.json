@@ -123,6 +123,7 @@
   "deeptime.editor.field.subduction_start_age": "Sea floor sinking age",
   "deeptime.editor.field.subduction_start_clearance": "New trench clearance",
   "deeptime.editor.field.initiation_slab": "New trench starting slab",
+  "deeptime.editor.field.convergence_ref": "Full-rate subduction speed",
   "deeptime.editor.field.suture_size": "Continent size that welds plates",
   "deeptime.editor.field.arc_maturity": "Island-arc maturity",
   "deeptime.editor.field.plate_speed": "Plate speed scale",
