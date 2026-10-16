@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-HOST="${DEEPTIME_MAC:-ban@20.120.160.3}"
+HOST="${DEEPTIME_MAC:-ban@deeptime-test-ban.westus2.cloudapp.azure.com}"
 MODS=/Volumes/Graphide/ban/mic/mods
 DRY=0; [ "${1:-}" = --dry-run ] && DRY=1
 SSH=(ssh -o BatchMode=yes -o ConnectTimeout=15 "$HOST")
