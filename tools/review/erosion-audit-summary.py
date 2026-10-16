@@ -41,6 +41,13 @@ def main():
                       f"{d['p50']:6} {d['p90']:6} | {e5['mean']:6} | {v['share_eroded_over_10_km']} | "
                       f"{p['p50']} {p['p90']}")
         p = r.get("porphyries")
+        bp = (p or {}).get("land_erosion_by_process_m_myr") if isinstance(p, dict) else None
+        if bp:
+            print("land erosion by process (surface stage, every step), m/Myr: band  area km2*Myr | "
+                  "stream power (critical slope) glacial diffusion | net")
+            for k, v in bp.items():
+                print(f"  {k:10s} {v['area_km2_myr']:12.0f} | {v['spl_m_myr']:7} ({v['threshold_m_myr']:6}) "
+                      f"{v['glacial_m_myr']:7} {v['diffusion_m_myr']:7} | {v['net_m_myr']:7}")
         if p:
             print("porphyries", p["porphyries"], p["fates"], "eroded km p10/50/90",
                   p["eroded_km_p10_p50_p90"], "at exhumation", p["exhumation_eroded_km_p10_p50_p90"])
