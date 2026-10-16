@@ -41,7 +41,7 @@
 
 set -euo pipefail
 
-HOST="${DEEPTIME_MAC:-ban@20.120.160.3}"
+HOST="${DEEPTIME_MAC:-ban@deeptime-test-ban.westus2.cloudapp.azure.com}"
 SSD=/Volumes/Graphide/ban
 REPO="$(git rev-parse --show-toplevel)"
 NAME="$(basename "$REPO")"

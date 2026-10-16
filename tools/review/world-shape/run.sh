@@ -9,7 +9,7 @@
 # Inputs: a finished 16k Lambert bake (WORLD) and a deeptime binary that can read it (BIN).
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-RUNS="${RUNS:-/data/ban/deeptime-runs/world-shape}"
+RUNS="${RUNS:-/data/ban/deeptime-runs/world-shape-h2h}"
 WORLD="${WORLD:-/data/ban/deeptime-cache/workbench/runs/1a103bb2d2b/world}"
 BIN="${BIN:-/data/ban/mic/mods/deep-time/target/release/deeptime}"
 mkdir -p "$RUNS/out"
