@@ -145,6 +145,15 @@ fn no_stage_holds_more_than_its_estimate() {
         mib(peaks.get("keyframes").copied().unwrap_or(0)),
         mib(peaks.get("bake").copied().unwrap_or(0)),
     );
+    let est_bake = estimate["bake_bytes"]
+        .as_u64()
+        .expect("the bake is in the estimate");
+    eprintln!(
+        "bake      held {:7.1} MiB  estimate {:7.1} MiB (projection pass {:.1})",
+        mib(peaks.get("bake").copied().unwrap_or(0)),
+        mib(est_bake),
+        mib(estimate["bake_projection_bytes"].as_u64().unwrap()),
+    );
     if run_peak > est_peak {
         over.push(format!(
             "the run: {:.1} > {:.1} MiB",

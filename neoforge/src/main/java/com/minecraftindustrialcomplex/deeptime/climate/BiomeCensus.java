@@ -4,6 +4,7 @@ package com.minecraftindustrialcomplex.deeptime.climate;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.worlddata.IceCover;
+import com.minecraftindustrialcomplex.deeptime.worlddata.Projection;
 import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
@@ -117,12 +118,78 @@ public final class BiomeCensus {
                             "terralith:red_oasis", "terralith:desert_oasis", "terralith:white_mesa", "terralith:warped_mesa",
                             "terralith:savanna_badlands", "terralith:hot_shrubland")));
 
+    /**
+     * A pack placement table's check (decisions log 2026-10-04, "Deep Time-side fixes"): the share of a Köppen family's
+     * land columns (wetlands set aside, as for {@link #CHECKS}) whose biome is one of {@code biomes}, at least
+     * {@code bound} (or at most, with {@code atMost}). It counts only where the level's biome source can place
+     * {@code requires} (the pack is installed); elsewhere it is reported inactive. Columns in a volcanic biome (the
+     * volcanic layer's, not the table's) are left out, and so are those whose pack-side continentalness is below
+     * {@code minContinents} or whose erosion is below {@code minErosion} (null: no limit): mountains (vanilla's slopes and
+     * peaks take any class's high relief) and the coast strip are not the table's to place.
+     */
+    public record PackCheck(String name, String classes, IntPredicate koppen, java.util.Set<String> biomes, double bound,
+                            boolean atMost, String requires, Double minErosion, Double minContinents) {}
+
+    /** Below this erosion (vanilla's E1 | E2 edge) a column is mountain relief: slopes and peaks whatever its class. */
+    static final double MOUNTAIN_EROSION = -0.375;
+    /** Vanilla's near | mid inland edge: Terralith's steppe begins there. */
+    static final double MID_INLAND = 0.03;
+
+    /** Terralith's table's checks: each fixed class reaches its intended biomes (bounds: ledger BIO-154, game choices). */
+    public static final List<PackCheck> PACK_CHECKS = List.of(
+            // Am (monsoon forest) in the jungles, not brushland.
+            new PackCheck("terralith:Am_jungle", "Am", k -> k == 1, java.util.Set.of("minecraft:jungle", "minecraft:sparse_jungle",
+                    "minecraft:bamboo_jungle", "terralith:tropical_jungle", "terralith:rocky_jungle", "terralith:jungle_mountains",
+                    "terralith:amethyst_rainforest"), 0.6, false, "terralith:tropical_jungle", MOUNTAIN_EROSION, null),
+            // Cs (Mediterranean) on Terralith's dry shrubland and steppe, not plains.
+            new PackCheck("terralith:Cs_scrub", "Csa Csb Csc", k -> k >= 8 && k <= 10, java.util.Set.of("terralith:shrubland",
+                    "terralith:steppe", "terralith:hot_shrubland", "terralith:cold_shrubland"), 0.5, false, "terralith:shrubland",
+                    MOUNTAIN_EROSION, null),
+            // BSk (cold steppe) on the steppe and the dry shrublands, and, mid and far inland, the steppe itself reached.
+            new PackCheck("terralith:BSk_steppe", "BSk", k -> k == 7, java.util.Set.of("terralith:steppe", "terralith:shrubland",
+                    "terralith:cold_shrubland"), 0.5, false, "terralith:steppe", MOUNTAIN_EROSION, null),
+            new PackCheck("terralith:BSk_reaches_steppe", "BSk mid and far inland", k -> k == 7, java.util.Set.of("terralith:steppe"),
+                    0.1, false, "terralith:steppe", MOUNTAIN_EROSION, MID_INLAND),
+            // ET (tundra) less snowy: snowy plains on at most a tenth of it.
+            new PackCheck("terralith:ET_few_snowy_plains", "ET", k -> k == 29, java.util.Set.of("minecraft:snowy_plains"), 0.10, true,
+                    "terralith:gravel_desert", null, null));
+
+    /**
+     * The cloud forest rule's ground in the census (Terralith's table, class rule {@code cloud_forest}): land columns of
+     * Cwb, Cwc, Cfb or Cfc below {@value #CLOUD_LAT_DEG} degrees of latitude and more than {@value #CLOUD_HEIGHT_M} m
+     * above the sea (the aridity condition is not checked here; wetlands included, since the rule puts these columns in
+     * the swamp band's erosion).
+     */
+    public static final double CLOUD_LAT_DEG = 25.0, CLOUD_HEIGHT_M = 1000.0; // ledger: BIO-144, BIO-145 (game-choice)
+    public static final String CLOUD_FOREST = "terralith:cloud_forest";
+
+    static boolean cloudClass(int k) {
+        return k == 12 || k == 13 || k == 15 || k == 16;
+    }
+
     public static final String[] KOPPEN = {"Af", "Am", "Aw", "As", "BWh", "BWk", "BSh", "BSk", "Csa", "Csb", "Csc", "Cwa", "Cwb",
             "Cwc", "Cfa", "Cfb", "Cfc", "Dsa", "Dsb", "Dsc", "Dsd", "Dwa", "Dwb", "Dwc", "Dwd", "Dfa", "Dfb", "Dfc", "Dfd", "ET", "EF",
             "sea"};
 
-    /** Counts per check: matching columns, columns; the biome rules' census (null when no rule file is active). */
-    public record Result(Map<String, int[]> checks, Map<String, int[]> forbidden, JsonObject json, RuleCensus rules) {
+    /**
+     * Counts per check: matching columns, columns. {@code packs}: per active {@link PackCheck}; {@code cloud}: cloud forest
+     * candidates, of them on {@value #CLOUD_FOREST}, and cloud forest columns that are not candidates; the biome rules'
+     * census (null when no rule file is active).
+     */
+    public record Result(Map<String, int[]> checks, Map<String, int[]> forbidden, Map<String, int[]> packs, int[] cloud,
+                         JsonObject json, RuleCensus rules) {
+
+        /** The share of an active {@link PackCheck}'s columns on its biomes (NaN when inactive or empty). */
+        public double packShare(String name) {
+            int[] c = packs.get(name);
+            return c == null || c[1] == 0 ? Double.NaN : c[0] / (double) c[1];
+        }
+
+        public int packTotal(String name) {
+            int[] c = packs.get(name);
+            return c == null ? 0 : c[1];
+        }
+
         public double share(String check) {
             int[] c = checks.get(check);
             return c == null || c[1] == 0 ? Double.NaN : c[0] / (double) c[1];
@@ -186,6 +253,17 @@ public final class BiomeCensus {
         Map<String, int[]> forbidden = new LinkedHashMap<>();
         for (Forbid f : FORBIDDEN)
             forbidden.put(f.name(), new int[2]);
+        // The pack placement tables' checks whose pack the level's biome source has.
+        java.util.Set<String> placeable = new java.util.HashSet<>();
+        for (Holder<Biome> b : g.getBiomeSource().possibleBiomes())
+            placeable.add(nameOf(b));
+        Map<String, int[]> packs = new LinkedHashMap<>();
+        for (PackCheck pc : PACK_CHECKS)
+            if (placeable.contains(pc.requires()))
+                packs.put(pc.name(), new int[2]);
+        boolean cloudActive = placeable.contains(CLOUD_FOREST);
+        int[] cloud = new int[3];
+        double mV = wd.manifest().mPerBlockV();
         Map<Integer, Map<Integer, Integer>> classBiomes = new HashMap<>();
         int skippedUntagged = 0, landColumns = 0, wetlands = 0, wetlandSwamp = 0;
         // Cold wetland (BIO-133, BIO-135): the bake's flagged boreal wetland, counted over every land column
@@ -258,6 +336,31 @@ public final class BiomeCensus {
                             wetlandSwamp++;
                     }
                 }
+                if (land && cloudActive) {
+                    boolean candidate = cloudClass(k) && Math.abs(Projection.latitudeDeg(c, z)) < CLOUD_LAT_DEG
+                            && (y - sea) * mV > CLOUD_HEIGHT_M;
+                    boolean onCloud = CLOUD_FOREST.equals(nameOf(b));
+                    if (candidate) {
+                        cloud[0]++;
+                        if (onCloud)
+                            cloud[1]++;
+                    } else if (onCloud) {
+                        cloud[2]++;
+                    }
+                }
+                if (land && !untagged && !wetland)
+                    for (PackCheck pc : PACK_CHECKS) {
+                        int[] n = packs.get(pc.name());
+                        if (n == null || !pc.koppen().test(k) || b.is(VolcanicBiomes.KEEP_OUT))
+                            continue;
+                        if (pc.minErosion() != null && t.raster(ClimateMapping.EROSION, x, z) < pc.minErosion())
+                            continue;
+                        if (pc.minContinents() != null && t.raster(ClimateMapping.CONTINENTS, x, z) < pc.minContinents())
+                            continue;
+                        n[1]++;
+                        if (pc.biomes().contains(nameOf(b)))
+                            n[0]++;
+                    }
                 if (!untagged && (k == 31 ? y < sea - 4 : land)) {
                     for (Check ch : CHECKS) {
                         if (wetland)
@@ -324,6 +427,31 @@ public final class BiomeCensus {
             fj.add(f.name(), e);
         }
         o.add("forbidden", fj);
+        JsonObject pj = new JsonObject();
+        for (PackCheck pc : PACK_CHECKS) {
+            int[] n = packs.get(pc.name());
+            JsonObject e = new JsonObject();
+            e.addProperty("classes", pc.classes());
+            e.addProperty("active", n != null);
+            if (n != null) {
+                e.addProperty("columns", n[1]);
+                e.addProperty("matching", n[0]);
+                e.addProperty("share", n[1] == 0 ? null : Math.round(n[0] * 1000.0 / n[1]) / 1000.0);
+            }
+            e.addProperty(pc.atMost() ? "at_most" : "at_least", pc.bound());
+            JsonArray names = new JsonArray();
+            pc.biomes().stream().sorted().forEach(names::add);
+            e.add("biomes", names);
+            pj.add(pc.name(), e);
+        }
+        o.add("pack_checks", pj);
+        JsonObject cj2 = new JsonObject();
+        cj2.addProperty("active", cloudActive);
+        cj2.addProperty("candidates", cloud[0]);
+        cj2.addProperty("on_cloud_forest", cloud[1]);
+        cj2.addProperty("share", cloud[0] == 0 ? null : Math.round(cloud[1] * 1000.0 / cloud[0]) / 1000.0);
+        cj2.addProperty("cloud_forest_elsewhere", cloud[2]);
+        o.add("cloud_forest", cj2);
         // The five commonest biomes of each Köppen class present.
         JsonObject top = new JsonObject();
         for (int k = 0; k < 32; k++) {
@@ -363,6 +491,8 @@ public final class BiomeCensus {
         o.add("volcanic", VolcanicCensus.run(level, step, poleMargin).json());
         if (ruleCensus != null && !rules.rules().isEmpty())
             o.add("rules", ruleCensus.json());
+        // The rock-named biomes against their ground (the geology gate, decisions log 2026-10-04).
+        o.add("geology", GeologyCensus.run(level, step, poleMargin).json());
         if (mapFile != null) {
             JsonObject map = new JsonObject();
             map.addProperty("schema", 1);
@@ -396,7 +526,7 @@ public final class BiomeCensus {
             Files.writeString(mapFile, map.toString(), StandardCharsets.UTF_8);
             o.addProperty("file", mapFile.toString());
         }
-        return new Result(checks, forbidden, o, ruleCensus != null && !rules.rules().isEmpty() ? ruleCensus : null);
+        return new Result(checks, forbidden, packs, cloud, o, ruleCensus != null && !rules.rules().isEmpty() ? ruleCensus : null);
     }
 
     static String nameOf(Holder<Biome> b) {

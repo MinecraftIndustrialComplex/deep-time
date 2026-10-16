@@ -98,7 +98,7 @@ pub fn planet_builtin(name: &str) -> Option<&'static str> {
 }
 
 /// The top-level keys a planet preset adds to the header's.
-pub const PLANET_KEYS: [&str; 17] = [
+pub const PLANET_KEYS: [&str; 18] = [
     "seed",
     "planet",
     "keyframes",
@@ -116,6 +116,7 @@ pub const PLANET_KEYS: [&str; 17] = [
     "underground",
     "provinces",
     "impacts",
+    "steering",
 ];
 
 /// The `scale` keys a planet preset may carry (the header reads `circumference_blocks`).
@@ -831,6 +832,10 @@ pub struct PlanetPreset {
     /// What the bake's geologic provinces are (P1-10): they drive TerraBlender's regions; the bake
     /// uses the defaults when the section is absent.
     pub provinces: Option<crate::provinces::ProvinceParams>,
+    /// End-weighted nudges toward a playable end (`steering`; docs/design/
+    /// playability-steering.md §7); `None` (and `enabled: false`) runs unsteered. It needs a
+    /// `climate` section.
+    pub steering: Option<crate::steering::SteeringParams>,
     /// The climate class placement table a datapack supplied through the content bundle
     /// (`climate_placement`, `bake::placement`); `None` uses the core's default table. Not part
     /// of the preset's JSON: it is pack data, recorded in the world data by the bake.
@@ -884,6 +889,7 @@ impl PlanetPreset {
             section(obj, "underground")?;
         let provinces: Option<crate::provinces::ProvinceParams> = section(obj, "provinces")?;
         let impacts: Option<crate::surface::impacts::ImpactParams> = section(obj, "impacts")?;
+        let steering: Option<crate::steering::SteeringParams> = section(obj, "steering")?;
         let missing = |what: &str| CoreError::preset("$", format!("missing section {what}"));
         let seed = match obj.get("seed") {
             None => 1,
@@ -912,6 +918,7 @@ impl PlanetPreset {
             hydro,
             underground,
             provinces,
+            steering,
             placement: None,
         };
         preset.validate()?;
@@ -920,6 +927,14 @@ impl PlanetPreset {
 
     /// Range checks, each naming its key.
     pub fn validate(&self) -> Result<(), CoreError> {
+        if let Some(s) = &self.steering {
+            s.validate()?;
+            check(
+                !s.enabled || self.climate.is_some(),
+                "$.steering.enabled",
+                "steering acts through the climate stage: it needs a climate section",
+            )?;
+        }
         let p = &self.planet;
         check(
             p.gravity_m_s2 > 0.0 && p.gravity_m_s2 < 100.0,
@@ -1332,6 +1347,9 @@ impl PlanetPreset {
         if let Some(i) = &self.impacts {
             v["impacts"] = json!(i);
         }
+        if let Some(s) = &self.steering {
+            v["steering"] = json!(s);
+        }
         v
     }
 
@@ -1356,16 +1374,98 @@ impl PlanetPreset {
         self.timeline.map_or(0.0, |t| t.length_myr)
     }
 
-    /// Plate steps of the run: length / δt, rounded (δt is stretched to fit).
-    pub fn plate_steps(&self) -> u64 {
+    /// Plate steps of the planned length: length / δt, rounded (δt is stretched to fit).
+    pub fn planned_steps(&self) -> u64 {
         (self.length_myr() / self.tectonics.time_step_myr)
             .round()
             .max(1.0) as u64
     }
 
+    /// The plate step, Myr: the planned length over its steps, whatever the stop.
+    pub fn dt_myr(&self) -> f64 {
+        self.length_myr() / self.planned_steps() as f64
+    }
+
+    /// Myr from the start to the stop (`timeline.stop_myr`, else the planned length; 0 before a
+    /// timeline is chosen).
+    pub fn run_myr(&self) -> f64 {
+        self.timeline.map_or(0.0, |t| t.run_myr())
+    }
+
+    /// Plate steps of the run: the planned ones, or the stop in steps of [`Self::dt_myr`].
+    pub fn plate_steps(&self) -> u64 {
+        match self.timeline.and_then(|t| t.stop_myr) {
+            None => self.planned_steps(),
+            Some(stop) => (stop / self.dt_myr()).round().max(1.0) as u64,
+        }
+    }
+
     /// Years at the start of the history (negative).
     pub fn t_start_years(&self) -> f64 {
         -self.length_myr() * 1.0e6
+    }
+
+    /// World time at the end of plate step `k`, years (as the plates stage computes it).
+    pub fn t_at_step(&self, k: u64) -> f64 {
+        (self.t_start_years() / 1.0e6 + k as f64 * self.dt_myr()) * 1.0e6
+    }
+
+    /// World time at the run's end, years: 0 for a run to its planned length (the present), else
+    /// the end of its last step (negative: stopped early; positive: continued).
+    pub fn t_end_years(&self) -> f64 {
+        let steps = self.plate_steps();
+        if steps == self.planned_steps() {
+            0.0
+        } else {
+            self.t_at_step(steps)
+        }
+    }
+
+    /// Years from the start to the end ([`Self::t_end_years`] − [`Self::t_start_years`]).
+    pub fn run_years(&self) -> f64 {
+        self.t_end_years() - self.t_start_years()
+    }
+
+    /// Whether plate step `k` (1-based) of this run depends on where the run ends: the last step,
+    /// a step inside the climate's ice-age window, or one the steering weighs (docs/design/
+    /// playability-steering.md §2).
+    pub fn step_depends_on_end(&self, k: u64) -> bool {
+        let total = self.plate_steps();
+        if k >= total {
+            return true;
+        }
+        let t = self.t_at_step(k);
+        let end = self.t_end_years();
+        if let Some(c) = &self.climate {
+            let mut c = c.clone();
+            c.run_end_years = end;
+            if crate::climate::clock::in_window(&c, t) {
+                return true;
+            }
+        }
+        self.climate.is_some()
+            && self
+                .steering
+                .is_some_and(|s| s.weight(t, end, self.run_years()) > 0.0)
+    }
+
+    /// The last plate step whose world does not depend on where the run ends (0: none, the
+    /// start). A checkpoint after it serves this stop and every later one (§3 of the design).
+    pub fn last_free_step(&self) -> u64 {
+        let mut k = self.plate_steps().saturating_sub(1);
+        while k > 0 && self.step_depends_on_end(k) {
+            k -= 1;
+        }
+        k
+    }
+
+    /// The same preset with the stop at `stop_myr` (None: the planned length).
+    pub fn with_stop(&self, stop_myr: Option<f64>) -> PlanetPreset {
+        let mut p = self.clone();
+        if let Some(t) = p.timeline.as_mut() {
+            t.stop_myr = stop_myr;
+        }
+        p
     }
 }
 

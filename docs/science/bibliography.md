@@ -6006,6 +6006,16 @@ The survey `docs/research/notes/seamless-projection-survey.md` and its tools (`t
 - Ledger ids: BIO-127
 - Access: not fetched. Read so far: from memory (temperate rainforest with annual precipitation over about 1,400 mm, a mean annual temperature of about 4 to 12 degC and cool summers); to be checked.
 
+## Terralith placement table and geology gate (BIO-140 to BIO-154), added 2026-10-04
+
+### Scatena2010
+- Reference: Scatena, F. N., Bruijnzeel, L. A., Bubb, P. and Das, S. (2010). Setting the stage. In: Bruijnzeel, L. A., Scatena, F. N. and Hamilton, L. S. (eds.), Tropical Montane Cloud Forests: Science for Conservation and Management, Cambridge University Press, pp. 3-13. ISBN 978-0-521-76035-5.
+- DOI or URL: Cambridge's excerpt of Part I, https://www.hydrology.nl/images/docs/ihp/nl/Tropical_Montane_Cloud_Forests.pdf
+- Cited as: "Scatena et al. 2010 (Tropical Montane Cloud Forests, ch. 1)".
+- Ledger ids: BIO-145; BIO-144 (its latitude is not in the excerpt)
+- Access: book; the publisher's excerpt is open.
+- Read in this pass (2026-10-04, excerpt fetched and converted with pdftotext): the change from lowland to lower montane forest "is normally observed at the elevation where the average minimum temperature drops below 18 °C ... On large equatorial inland mountains this transition usually occurs at an altitude of 1200–1500 m.a.s.l. and coincides with the general range of incipient and intermittent cloud formation"; the regional altitude table gives lower limits of cloud forest from 1000 to 2000 m (most 1000–1500 m), and 400–700 m on small islands; the potential-distribution method it describes (Kapos et al. 2000) takes mountain land from 1000 m (300 m where the local relief exceeds 300 m). The latitude limits (about 23° N in Mexico, 25° S in Argentina) come from a search-result snippet of another work, not read.
+
 ## Sphere-native simulation grids, added 2026-10-04 with the sphere-native grids note
 
 The research note `docs/research/notes/sphere-native-grids.md` and its benchmark (`tools/research/sphere-grid-bench/`) rest on these; nothing shipped does yet, so no ledger row cites them. "Sub-agent" means a Sonnet sub-agent of the note's session, whose transcriptions were kept in the session scratchpad (not committed, not in the source library). The note also cites, for their sphere use, works already listed above: [Braun2013] (not read), [Barnes2014], [Cortial2019], [SmithBarstad2004], [Hergarten2021], [Fastscapelib] (its `HealpixGrid`, release 0.3.0, 2025) and [Landlab] (its `IcosphereGlobalGrid`). The note's §13 lists every source with how it was read; the entries below are the ones its conclusions lean on.
@@ -6102,8 +6112,8 @@ The research note `docs/research/notes/sphere-native-grids.md` and its benchmark
 
 ### HergartenRobl2022
 - Reference: Hergarten, S. and Robl, J. (2022). The linear feedback precipitation model (LFPM 1.0): a simple and efficient model for orographic precipitation in the context of landform evolution modeling. Geoscientific Model Development 15:2063-2084. doi:10.5194/gmd-15-2063-2022.
-- Ledger ids: none (§5: a non-spectral orographic rain model; §11 question 3)
-- Access: open. Read so far: full text by a sub-agent.
+- Ledger ids: CLM-193, CLM-194, CLM-195, CLM-198, CLM-200 (the upwind rain, P1-26 T9; also §5 of the sphere-grids note: a non-spectral orographic rain model; §11 question 3)
+- Access: open. Read so far: full text by a sub-agent; the article page (WebFetch) by the P1-26 T9 agent on 2026-10-04: equations 10-11 (vapour and cloud water, condensation, fallout, re-evaporation beta), 27 (L_l L_s = L_c L_f), 42-43 (evapotranspiration returns epsilon of the rain) and section 7's lengths (L_c = L_f = 25 km, L_l = 500 km, L_d = 25 km). Written from the paper, not from OpenLEM's code (GPL).
 
 ## Rifted margins: the ocean–continent transition (PLT-261 to PLT-264), added 2026-10-04
 
@@ -6152,3 +6162,54 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Read so far (by the project): full text (OCR; the equations partly garbled), 2026-10-04: "a unit length of continental lithosphere is suddenly extended to a length β, causing upwelling of hot asthenosphere"; "The slow subsidence and the heat flow depend only on the amount of stretching"; Table 1: τ = 62.8 My, E0 = 3.2 km, ρ_c 2.8, ρ_m 3.33, ρ_w 1.0 g/cm³; thermal subsidence S_t ≈ E0 r (1 − e^(−t/τ)), r = (β/π) sin(π/β).
 
 Not read: Péron-Pinvidic, Manatschal & Osmundsen 2013 (Marine and Petroleum Geology 43:21-47), Sutra et al. 2013 (G-cubed 14:2575), Mohn et al. 2012 (Tectonics 31:TC1012), Chenin et al. 2017 (Geosphere 13:559; a search summary gives magma-poor margins "approximately 165 km on average", unverified).
+
+### Portenga2011
+- Reference: Portenga, E. W. and Bierman, P. R. (2011). Understanding Earth's eroding surface with 10Be. GSA Today 21(8):4-10.
+- DOI or URL: 10.1130/G111A.1 (the DOI from memory, not checked); https://www.geosociety.org/gsatoday/archive/21/8/article/i1052-5173-21-8-4.htm
+- Cited as: "Portenga & Bierman 2011" (global compilation of cosmogenic erosion rates; the erosion audit's reference line).
+- Ledger ids: ERO-171
+- Access: open (GSA Today).
+- Read so far (by the project): full text, 2026-10-05: outcrops 12 ± 1.3 m/Myr mean, 5.4 median (n = 450); drainage basins 218 ± 35 mean, 54 median (n = 1,149); seismically active basins 367 ± 55 (n = 221), inactive 182 ± 30 (n = 928); active and inactive outcrops alike (14 ± 1.6 and 13 ± 1.4).
+
+### Montgomery2002
+- Reference: Montgomery, D. R. and Brandon, M. T. (2002). Topographic controls on erosion rates in tectonically active mountain ranges. Earth and Planetary Science Letters 201(3-4):481-489.
+- DOI or URL: 10.1016/S0012-821X(02)00725-2 (the DOI from memory, not checked); copy https://repository.geologyscience.ru/bitstream/handle/123456789/28097/Mont_02.pdf
+- Cited as: "Montgomery & Brandon 2002" (erosion rate against mean local relief; the erosion audit's reference line).
+- Ledger ids: ERO-172
+- Access: copy on a repository, open.
+- Read so far (by the project): full text, 2026-10-05: tectonically inactive areas E = 0.2 Rz (mm/yr, Rz in km); active ranges above that line with mean local relief 1,000-2,000 m; E0 = 0.01 mm/yr from the chemical denudation of the 35 largest rivers; Olympic Mountains E0 0.016-0.059 mm/yr; rates above 10 mm/yr rare.
+
+### Tremblay2015
+- Reference: Tremblay, M. M. et al. (2015). Erosion in southern Tibet shut down at ∼10 Ma due to enhanced rock uplift within the Himalaya. Proceedings of the National Academy of Sciences 112(39):12030-12035.
+- DOI or URL: https://pmc.ncbi.nlm.nih.gov/articles/PMC4593086
+- Cited as: "Tremblay et al. 2015" (the plateau's slow exhumation; the erosion audit's reference line for high ground).
+- Ledger ids: ERO-174
+- Access: open (PubMed Central).
+- Read so far (by the project): full text, 2026-10-05: exhumation over 1.0 km/Ma from 17-16 Ma for about 5 Myr, then below 0.01 km/Ma (under 750 m in total) from 12-11 Ma to the present; cosmogenic rates in the Indus and Yarlung drainages typically below 100 m/Ma.
+## Playability steering (STE)
+
+### CharetteSmith2010
+- Reference: Charette, M. A. and Smith, W. H. F. (2010). The volume of Earth's ocean. Oceanography 23(2):112-114.
+- DOI or URL: 10.5670/oceanog.2010.51; https://tos.org/oceanography/article/the-volume-of-earths-ocean ; the institution's release: https://www.whoi.edu/press-room/news-release/whoi-study-calculates-volume-and-depth-of-the-worlds-oceans/
+- Cited as: "Charette & Smith 2010" (Earth's ocean volume, against which a steered sea-level offset's water is reported).
+- Ledger ids: STE-009
+- Access: open (the journal page shows the abstract; the numbers are in the PDF).
+- Read so far (by the project): 2026-10-05, the WHOI release only: "1.332 billion cubic kilometers", mean depth "3,682.2 meters". The paper itself was not opened.
+
+### HaqSchutter2008
+- Reference: Haq, B. U. and Schutter, S. R. (2008). A chronology of Paleozoic sea-level changes. Science 322:64-68.
+- Cited as: "Haq & Schutter 2008" (the size of long-term sea-level change, a reference for the steering's sea rate).
+- Ledger ids: STE-013
+- Access: paywalled. Read so far (by the project): from memory.
+
+### Miller2005
+- Reference: Miller, K. G. et al. (2005). The Phanerozoic record of global sea-level change. Science 310:1293-1298.
+- Cited as: "Miller et al. 2005" (as above).
+- Ledger ids: STE-013
+- Access: paywalled. Read so far (by the project): from memory.
+
+### Berner2004
+- Reference: Berner, R. A. (2004). The Phanerozoic Carbon Cycle: CO2 and O2. Oxford University Press.
+- Cited as: "Berner 2004, GEOCARB f_G" (how far volcanic and metamorphic degassing varied, a reference for the steering's outgassing bound).
+- Ledger ids: STE-014
+- Access: book. Read so far (by the project): from memory.

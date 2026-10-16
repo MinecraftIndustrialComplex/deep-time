@@ -136,13 +136,40 @@ public final class SimSession implements AutoCloseable {
      */
     public static SimSession launch(String presetJson, String contentJson, Path outDir, int threads, long memCapBytes,
             boolean collectTimeline) {
+        return launch(presetJson, contentJson, outDir, threads, memCapBytes, collectTimeline, Mode.PLAIN);
+    }
+
+    /** How a launched run starts (docs/design/playability-steering.md). */
+    public enum Mode {
+        /** A new run, no epoch checkpoints. */
+        PLAIN(0),
+        /** A new run that writes epoch checkpoints, so it can be picked at a keyframe, stopped or continued. */
+        EPOCHS(DeepTimeNative.FLAG_EPOCHS),
+        /**
+         * The run already in the folder, to the preset's {@code timeline.stop_myr}, from its epoch
+         * checkpoints (it keeps writing them).
+         */
+        RESUME(DeepTimeNative.FLAG_EPOCHS | DeepTimeNative.FLAG_RESUME);
+
+        final int flags;
+
+        Mode(int flags) {
+            this.flags = flags;
+        }
+    }
+
+    /** {@link #launch(String, String, Path, int, long, boolean)} in a {@link Mode}. */
+    public static SimSession launch(String presetJson, String contentJson, Path outDir, int threads, long memCapBytes,
+            boolean collectTimeline, Mode mode) {
         Objects.requireNonNull(presetJson, "presetJson");
         Objects.requireNonNull(outDir, "outDir");
+        Objects.requireNonNull(mode, "mode");
         requireLinked();
         String content = contentJson == null ? "" : contentJson;
         String out = outDir.toAbsolutePath().toString();
-        SimSession s = new SimSession(outDir, collectTimeline, true,
-                () -> DeepTimeNative.create(presetJson, content, out, threads, memCapBytes));
+        SimSession s = new SimSession(outDir, collectTimeline, true, mode == Mode.PLAIN
+                ? () -> DeepTimeNative.create(presetJson, content, out, threads, memCapBytes)
+                : () -> DeepTimeNative.createWith(presetJson, content, out, threads, memCapBytes, mode.flags));
         s.worker.start();
         return s;
     }

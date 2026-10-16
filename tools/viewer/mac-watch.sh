@@ -49,7 +49,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-HOST="${DEEPTIME_MAC:-ban@20.120.160.3}"
+HOST="${DEEPTIME_MAC:-ban@deeptime-test-ban.westus2.cloudapp.azure.com}"
 TAILNET_NAME="${DEEPTIME_MAC_TAILNET:-mac-mini}"
 CACHE=/Volumes/Graphide/ban/deeptime-cache
 WB="$CACHE/workbench"

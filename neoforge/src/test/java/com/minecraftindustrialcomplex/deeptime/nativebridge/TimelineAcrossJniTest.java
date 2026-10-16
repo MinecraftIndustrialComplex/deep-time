@@ -84,7 +84,7 @@ class TimelineAcrossJniTest {
     void launchedSessionFeedsTheTimelapse() throws Exception {
         Path out = gameDir.resolve("launched");
         Files.createDirectories(out);
-        SessionRunHandle h = SessionRunHandle.launch(WORLD, out, 2, 0);
+        SessionRunHandle h = SessionRunHandle.launch(WORLD, out, 2, 0, false);
         TimelapseModel m = new TimelapseModel(h, "00000000-0000-0000-0000-000000000001", WORLD, 1024, List.of("a", "b"),
                 Runnable::run, Runnable::run);
         h.completion().get(60, TimeUnit.SECONDS);
@@ -105,14 +105,14 @@ class TimelineAcrossJniTest {
         assertTrue(Files.isRegularFile(out.resolve("manifest.json")));
 
         // A preset the core rejects fails the completion (create runs on the worker).
-        SessionRunHandle bad = SessionRunHandle.launch("{\"planet\":{}}", gameDir.resolve("bad"), 1, 0);
+        SessionRunHandle bad = SessionRunHandle.launch("{\"planet\":{}}", gameDir.resolve("bad"), 1, 0, false);
         var e = org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class,
                 () -> bad.completion().get(30, TimeUnit.SECONDS));
         assertTrue(e.getCause() instanceof PresetInvalidException, String.valueOf(e.getCause()));
         assertTrue(bad.newKeyframes().isEmpty());
 
         // Cancel before or during the run.
-        SessionRunHandle slow = SessionRunHandle.launch("{\"dummy\":{\"steps\":100000,\"sleep_ms\":5}}", gameDir.resolve("slow"), 1, 0);
+        SessionRunHandle slow = SessionRunHandle.launch("{\"dummy\":{\"steps\":100000,\"sleep_ms\":5}}", gameDir.resolve("slow"), 1, 0, false);
         slow.cancel();
         var c = org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.ExecutionException.class,
                 () -> slow.completion().get(30, TimeUnit.SECONDS));

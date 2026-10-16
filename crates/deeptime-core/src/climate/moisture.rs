@@ -172,17 +172,25 @@ pub fn meridional(phi_b: f64) -> f64 {
     }
 }
 
-/// Solves the year's twelve monthly budgets, the bucket cycled three times over the year.
+/// The surface winds of every cell and month, m/s (east, north), and the ITCZ of every column
+/// and month, degrees: §3.2's belt, three-cell and thermal winds (shared with `upwind.rs`).
+pub type Winds = (Vec<[f64; 12]>, Vec<[f64; 12]>, Vec<[f64; 12]>);
+
+/// [`Winds`] on grid `g` with land fraction `land` and the monthly tiles.
 #[allow(clippy::needless_range_loop)]
-pub fn solve(prm: &MoistureParams, inp: &Input<'_>) -> Moisture {
-    let g = inp.grid;
+pub fn winds(
+    prm: &MoistureParams,
+    g: &Grid,
+    land: &[f64],
+    t_land: &[[f64; 12]],
+    t_ocean: &[[f64; 12]],
+) -> Winds {
     let (w, h) = (g.w, g.h);
     let n = w * h;
     let r = prm.radius_m;
     let lat: Vec<f64> = (0..h).map(|j| g.lat_c(j)).collect();
-    let area: Vec<f64> = g.areas().iter().map(|a| a * r * r).collect();
-    let f: Vec<f64> = inp.land.iter().map(|x| x.clamp(0.0, 1.0)).collect();
-    let tbar = |c: usize, m: usize| f[c] * inp.t_land[c][m] + (1.0 - f[c]) * inp.t_ocean[c][m];
+    let f: Vec<f64> = land.iter().map(|x| x.clamp(0.0, 1.0)).collect();
+    let tbar = |c: usize, m: usize| f[c] * t_land[c][m] + (1.0 - f[c]) * t_ocean[c][m];
     // ITCZ of every column and month: the soft maximum of T̄ over |φ| ≤ 35°, smoothed along the row.
     let rows35: Vec<usize> = (0..h).filter(|&j| lat[j].abs() <= 35.0).collect();
     let mut itcz = vec![[0.0f64; 12]; w];
@@ -269,6 +277,20 @@ pub fn solve(prm: &MoistureParams, inp: &Input<'_>) -> Moisture {
             v[c][m] = vb + vt;
         }
     }
+    (u, v, itcz)
+}
+
+/// Solves the year's twelve monthly budgets, the bucket cycled three times over the year.
+#[allow(clippy::needless_range_loop)]
+pub fn solve(prm: &MoistureParams, inp: &Input<'_>) -> Moisture {
+    let g = inp.grid;
+    let (w, h) = (g.w, g.h);
+    let n = w * h;
+    let r = prm.radius_m;
+    let area: Vec<f64> = g.areas().iter().map(|a| a * r * r).collect();
+    let f: Vec<f64> = inp.land.iter().map(|x| x.clamp(0.0, 1.0)).collect();
+    let tbar = |c: usize, m: usize| f[c] * inp.t_land[c][m] + (1.0 - f[c]) * inp.t_ocean[c][m];
+    let (u, v, itcz) = winds(prm, g, inp.land, inp.t_land, inp.t_ocean);
     // Face geometry: east faces (length R Δφ) and north faces (R cos φ_edge Δλ), conductances.
     let len_e: Vec<f64> = (0..h).map(|j| r * g.dphi(j)).collect();
     let len_n: Vec<f64> = (0..=h)

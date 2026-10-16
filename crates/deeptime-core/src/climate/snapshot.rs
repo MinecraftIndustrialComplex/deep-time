@@ -442,14 +442,193 @@ pub fn compute(
         barrier_recover: km(p.barrier_recover_km),
     };
     let oro_scale = 365.0 * p.oro_hours_per_day;
-    // The budget's second pass: the mountain rain the L1 terrain takes out of the column (S_oro,
-    // design §3.6), the windward excess over each coarse cell, so less water passes the range.
+    // The hydrological cycle follows the global temperature (Held & Soden 2006).
+    let ln_hydro = hydro_ln(p, er.t_global);
+    // The air's march along every row, both ways; then smoothed over `air_mixing_km` so the
+    // rows' independent marches do not leave streaks (the winds have meridional components and
+    // mix across rows).
+    // (Not under the upwind rain, whose budget carries the moisture and the sea's marks.)
+    let upwind_mode = pc.is_some() && p.rain_model == super::RainModel::Upwind;
+    let air: [Vec<f64>; 8] = if upwind_mode {
+        Default::default()
+    } else {
+        let marches: Vec<(lapse::Carried, lapse::Carried)> = (0..hgt)
+            .into_par_iter()
+            .map(|j| {
+                let r0 = j * w;
+                let ds = dx * inp.lat[j].to_radians().cos().max(1e-3);
+                let (lr, zr) = (&land[r0..r0 + w], &z[r0..r0 + w]);
+                let (br, dr) = (&basin[r0..r0 + w], &dsst[r0..r0 + w]);
+                let wet = belts::belt_precip(inp.lat[j]) / belts::belt_precip(0.0);
+                let mp = MarchParams {
+                    moisture_decay: mp.moisture_decay * (1.0 + p.recycling * wet),
+                    ..mp
+                };
+                (
+                    lapse::march(lr, zr, br, dr, ds, true, &mp),
+                    lapse::march(lr, zr, br, dr, ds, false, &mp),
+                )
+            })
+            .collect();
+        let gather = |f: &dyn Fn(&lapse::Carried) -> &Vec<f64>, east: bool| -> Vec<f64> {
+            let mut v: Vec<f64> = marches
+                .iter()
+                .flat_map(|(e, wv)| f(if east { e } else { wv }).iter().copied())
+                .collect();
+            box_blur(&inp.d, &mut v, cells(p.air_mixing_km), 2);
+            v
+        };
+        [
+            gather(&|c| &c.q, true),
+            gather(&|c| &c.q, false),
+            gather(&|c| &c.maritime, true),
+            gather(&|c| &c.maritime, false),
+            gather(&|c| &c.basin, true),
+            gather(&|c| &c.basin, false),
+            gather(&|c| &c.dsst, true),
+            gather(&|c| &c.dsst, false),
+        ]
+    };
+    // The circulation's rain at L1 cell `c` in month `m` before the air's moisture, mm/yr (the
+    // belt's rain under the subtropical highs' flanks, the cold sea's stability and the plateau
+    // factor), and the moisture the march brings, 0–1.
+    let plateau = |zz: f64| (-(zz - p.plateau_m).max(0.0) / p.plateau_scale_m).exp();
+    let onshore = |phi: f64, m: usize| -> f64 {
+        let h = belts::hemispheric_shift(p, inp.planet.axial_tilt_deg, m);
+        let k = (p.subtropical_shift_deg * inp.planet.axial_tilt_deg.to_radians().sin()
+            / 23.4f64.to_radians().sin())
+        .max(1e-9);
+        (0.5 + 0.5 * h.signum() * phi.signum() * (h.abs() / k).min(1.0)).clamp(0.0, 1.0)
+    };
+    let circ = |c: usize, m: usize, carry: Option<(f64, f64)>| -> (f64, f64) {
+        let (i, j) = (c % w, c / w);
+        let phi = inp.lat[j];
+        let pb = phi - belts::shift(phi, itcz[i][m], hemi[m]);
+        let wt = belts::regime_weights(phi, pb);
+        let fe: f64 = (0..REGIMES).filter(|&r| EASTWARD[r]).map(|r| wt[r]).sum();
+        let fw = 1.0 - fe;
+        // Summer onshore flow round the subtropical highs' western flanks: east coasts from 15°
+        // to 45° get easterly (sea) air for moisture whatever the belt says.
+        let fw_q = fw.max(onshore(phi, m) * p.onshore * belts::bump(pb.abs(), 30.0, 15.0));
+        let fe_q = 1.0 - fw_q;
+        let (q, a_eff, d_eff) = if let (true, Some((a, d))) = (land[c], carry) {
+            (1.0, a, d)
+        } else if land[c] {
+            let q = fe_q * air[0][c] + fw_q * air[1][c];
+            let mar = fe * air[2][c] + fw * air[3][c];
+            let bas_q = fe_q * air[4][c] + fw_q * air[5][c];
+            let mar_q = fe_q * air[2][c] + fw_q * air[3][c];
+            let dcar = fe * air[6][c] + fw * air[7][c];
+            (q, bas_q * mar_q, mar * dcar)
+        } else {
+            let q = if air[0].is_empty() {
+                1.0
+            } else {
+                fe_q * air[0][c] + fw_q * air[1][c]
+            };
+            (q, basin[c], dsst[c])
+        };
+        let base = belts::belt_precip(pb)
+            * belts::subsidence_factor(p, a_eff, pb)
+            * (0.07 * d_eff).exp() // ledger: MOI-063
+            * plateau(z[c]);
+        (base, q)
+    };
+    // The upwind rain (`rain_model = upwind`, `upwind.rs`): the circulation's rain at the
+    // reference water, averaged over each coarse cell (weighted by the L1 rows' areas), kg/m²/s,
+    // its land under the sea marks the budget's vapour carries (`carry`: none on the first pass);
+    // the budget dries it along the wind. The first pass sets the mountains' sink and the marks
+    // the second uses.
+    let mut up_src: (Vec<f64>, Vec<f64>) = (Vec::new(), Vec::new());
+    let mut carry: Option<Carry> = None;
+    let carry_at =
+        |g: &super::coarse::Grid, cy: &Option<Carry>, c: usize, m: usize| -> Option<(f64, f64)> {
+            let (ba, da) = cy.as_ref()?;
+            let (mut a, mut d) = (0.0, 0.0);
+            for (cc, wt) in g.corners(c) {
+                a += wt * ba[cc][m];
+                d += wt * da[cc][m];
+            }
+            Some((a, d))
+        };
+    let pref_of = |g: &super::coarse::Grid, cy: &Option<Carry>| -> Vec<[f64; 12]> {
+        let nc = g.w * g.h;
+        let per: Vec<[f64; 12]> = (0..n)
+            .into_par_iter()
+            .map(|c| {
+                std::array::from_fn(|m| {
+                    let cy = if land[c] {
+                        Some(carry_at(g, cy, c, m).unwrap_or((0.0, 0.0)))
+                    } else {
+                        None
+                    };
+                    circ(c, m, cy).0
+                })
+            })
+            .collect();
+        // Weighted by the L1 rows' areas; a coarse cell made only of rows past a pole (no area)
+        // takes its cells' plain mean, so no coarse cell is left without a circulation rain.
+        let rw = inp.grid.row_weights();
+        let (mut s, mut a) = (vec![[0.0f64; 12]; nc], vec![0.0f64; nc]);
+        let (mut s0, mut a0) = (vec![[0.0f64; 12]; nc], vec![0.0f64; nc]);
+        for c in 0..n {
+            let cc = g.coarse_of(c);
+            let wt = rw[c / w];
+            a[cc] += wt;
+            a0[cc] += 1.0;
+            for m in 0..12 {
+                s[cc][m] += wt * per[c][m];
+                s0[cc][m] += per[c][m];
+            }
+        }
+        let hydro = ln_hydro.exp();
+        (0..nc)
+            .map(|cc| {
+                let (s, a) = if a[cc] > 0.0 {
+                    (s[cc], a[cc])
+                } else {
+                    (s0[cc], a0[cc])
+                };
+                s.map(|v| v / a.max(1e-300) * hydro / YEAR_S)
+            })
+            .collect()
+    };
     if let Some(pcm) = pc.as_mut()
-        && pcm.moisture.is_some()
+        && upwind_mode
     {
         let started = Instant::now();
         let g = pcm.grid.clone();
+        let nc = g.w * g.h;
+        let (mut s, mut a) = (vec![0.0f64; nc], vec![0.0f64; nc]);
+        for c in 0..n {
+            if !land[c] {
+                let cc = g.coarse_of(c);
+                s[cc] += basin[c];
+                a[cc] += 1.0;
+            }
+        }
+        up_src.0 = s
+            .iter()
+            .zip(&a)
+            .map(|(s, a)| if *a > 0.0 { s / a } else { 0.0 })
+            .collect();
+        up_src.1 = pcm.dsst.clone();
+        let r = upwind_rain(pcm, p, &pref_of(&g, &None), &up_src, None, &cell.rain_mm);
+        carry = Some((r.basin_air.clone(), r.dsst_air.clone()));
+        pcm.upwind = Some(r);
+        time(&mut millis, "upwind", started);
+    }
+    // The budget's second pass: the mountain rain the L1 terrain takes out of the column (S_oro,
+    // design §3.6), the windward excess over each coarse cell, so less water passes the range.
+    if let Some(pcm) = pc.as_mut()
+        && (pcm.moisture.is_some() || pcm.upwind.is_some())
+    {
+        let started = Instant::now();
+        let g = pcm.grid.clone();
+        // The sink at the coarse rain's moisture, and at the reference moisture (the upwind
+        // rain's sink is linear in its vapour).
         let mut sink = vec![[0.0f64; 12]; g.w * g.h];
+        let mut sink_ref = vec![[0.0f64; 12]; g.w * g.h];
         let per = (g.k * g.k) as f64;
         for c in 0..n {
             if !land[c] {
@@ -470,17 +649,30 @@ pub fn compute(
                 let (tl, to) = pcm.tiles(c, m);
                 let tsl = tl + sea_near[c] * (to - tl);
                 let ccf = (0.067 * (tsl - p.oro_ref_temp_c)).exp().clamp(0.05, 3.0);
-                let rh = pcm.budget_at(c, m).map_or(pcm.mp.r_ref, |x| x.1);
-                sink[cc][m] += o * oro_scale * (rh / pcm.mp.r_ref) * ccf / YEAR_S / per;
+                let q = pcm.rain_at(c, m).map_or(1.0, |x| x.1);
+                let s_ref = o * oro_scale * ccf / YEAR_S / per;
+                sink[cc][m] += s_ref * q;
+                sink_ref[cc][m] += s_ref;
             }
         }
-        let mo = super::percell::budget(pcm, &pcm.mp, Some(&sink), &cell.bucket);
-        cell.bucket = mo.bucket.clone();
-        pcm.moisture = Some(mo);
+        if pcm.upwind.is_some() {
+            let r = upwind_rain(
+                pcm,
+                p,
+                &pref_of(&g, &carry),
+                &up_src,
+                Some(&sink_ref),
+                &cell.rain_mm,
+            );
+            cell.rain_mm = r.annual_mm.clone();
+            pcm.upwind = Some(r);
+        } else {
+            let mo = super::percell::budget(pcm, &pcm.mp, Some(&sink), &cell.bucket);
+            cell.bucket = mo.bucket.clone();
+            pcm.moisture = Some(mo);
+        }
         time(&mut millis, "budget", started);
     }
-    // The hydrological cycle follows the global temperature (Held & Soden 2006).
-    let ln_hydro = hydro_ln(p, er.t_global);
     let refs = zonal_refs(inp.lat, &er, ln_hydro);
     let hydro = ln_hydro.exp();
     struct Row {
@@ -496,46 +688,6 @@ pub fn compute(
         p_month: Vec<[f32; 12]>,
         ice: Vec<[f32; 3]>,
     }
-    // The air's march along every row, both ways; then smoothed over `air_mixing_km` so the
-    // rows' independent marches do not leave streaks (the winds have meridional components and
-    // mix across rows).
-    let marches: Vec<(lapse::Carried, lapse::Carried)> = (0..hgt)
-        .into_par_iter()
-        .map(|j| {
-            let r0 = j * w;
-            let ds = dx * inp.lat[j].to_radians().cos().max(1e-3);
-            let (lr, zr) = (&land[r0..r0 + w], &z[r0..r0 + w]);
-            let (br, dr) = (&basin[r0..r0 + w], &dsst[r0..r0 + w]);
-            let wet = belts::belt_precip(inp.lat[j]) / belts::belt_precip(0.0);
-            let mp = MarchParams {
-                moisture_decay: mp.moisture_decay * (1.0 + p.recycling * wet),
-                ..mp
-            };
-            (
-                lapse::march(lr, zr, br, dr, ds, true, &mp),
-                lapse::march(lr, zr, br, dr, ds, false, &mp),
-            )
-        })
-        .collect();
-    let gather = |f: &dyn Fn(&lapse::Carried) -> &Vec<f64>, east: bool| -> Vec<f64> {
-        let mut v: Vec<f64> = marches
-            .iter()
-            .flat_map(|(e, wv)| f(if east { e } else { wv }).iter().copied())
-            .collect();
-        box_blur(&inp.d, &mut v, cells(p.air_mixing_km), 2);
-        v
-    };
-    let air: [Vec<f64>; 8] = [
-        gather(&|c| &c.q, true),
-        gather(&|c| &c.q, false),
-        gather(&|c| &c.maritime, true),
-        gather(&|c| &c.maritime, false),
-        gather(&|c| &c.basin, true),
-        gather(&|c| &c.basin, false),
-        gather(&|c| &c.dsst, true),
-        gather(&|c| &c.dsst, false),
-    ];
-    drop(marches);
     let rows: Vec<Row> = (0..hgt)
         .into_par_iter()
         .map(|j| {
@@ -555,15 +707,6 @@ pub fn compute(
                 p_month: Vec::with_capacity(if inp.monthly { w } else { 0 }),
                 ice: vec![[0.0; 3]; w],
             };
-            let plateau = |zz: f64| (-(zz - p.plateau_m).max(0.0) / p.plateau_scale_m).exp();
-            // How much each month is this row's summer (0 winter, 1 summer; follows the tilt).
-            let onshore: [f64; 12] = std::array::from_fn(|m| {
-                let h = belts::hemispheric_shift(p, inp.planet.axial_tilt_deg, m);
-                let k = (p.subtropical_shift_deg * inp.planet.axial_tilt_deg.to_radians().sin()
-                    / 23.4f64.to_radians().sin())
-                .max(1e-9);
-                (0.5 + 0.5 * h.signum() * phi.signum() * (h.abs() / k).min(1.0)).clamp(0.0, 1.0)
-            });
             for i in 0..w {
                 let c = r0 + i;
                 let mut t = [0.0f64; 12];
@@ -573,19 +716,7 @@ pub fn compute(
                 for m in 0..12 {
                     let pb = phi - belts::shift(phi, itcz[i][m], hemi[m]);
                     let wt = belts::regime_weights(phi, pb);
-                    let fe: f64 = (0..REGIMES).filter(|&r| EASTWARD[r]).map(|r| wt[r]).sum();
-                    let fw = 1.0 - fe;
-                    // Summer onshore flow round the subtropical highs' western flanks: east coasts
-                    // from 15° to 45° get easterly (sea) air for moisture whatever the belt says.
-                    let fw_q = fw.max(onshore[m] * p.onshore * belts::bump(pb.abs(), 30.0, 15.0));
-                    let fe_q = 1.0 - fw_q;
-                    let q = fe_q * air[0][c] + fw_q * air[1][c];
-                    let bas_q = fe_q * air[4][c] + fw_q * air[5][c];
-                    let mar_q = fe_q * air[2][c] + fw_q * air[3][c];
-                    let (tsl, a_eff, d_eff) = if land[c] {
-                        let mar = fe * air[2][c] + fw * air[3][c];
-                        let bas = bas_q * mar_q;
-                        let dcar = fe * air[6][c] + fw * air[7][c];
+                    let tsl = if land[c] {
                         match &pc {
                             // Per cell: the land tile, toward the sea's by the coast's sea share,
                             // less the winter inversion.
@@ -593,15 +724,16 @@ pub fn compute(
                                 let (tl, to) = pc.tiles(c, m);
                                 let inv =
                                     super::percell::inversion(p, tl, q_month[j][m], interior[c]);
-                                (tl + sea_near[c] * (to - tl) - inv, bas, mar * dcar)
+                                tl + sea_near[c] * (to - tl) - inv
                             }
                             None => {
+                                let fe: f64 =
+                                    (0..REGIMES).filter(|&r| EASTWARD[r]).map(|r| wt[r]).sum();
+                                let fw = 1.0 - fe;
+                                let mar = fe * air[2][c] + fw * air[3][c];
+                                let dcar = fe * air[6][c] + fw * air[7][c];
                                 let cont = 1.0 - mar.max(sea_near[c]).clamp(0.0, 1.0);
-                                (
-                                    t_o[j][m] + cont * (t_l[j][m] - t_o[j][m]) + mar * dcar,
-                                    bas,
-                                    mar * dcar,
-                                )
+                                t_o[j][m] + cont * (t_l[j][m] - t_o[j][m]) + mar * dcar
                             }
                         }
                     } else {
@@ -611,18 +743,21 @@ pub fn compute(
                                     pc.ice_at(c, m),
                                     p.sea_ice_edge_sharpness,
                                 );
-                                (pc.tiles(c, m).1, basin[c], dsst[c])
+                                pc.tiles(c, m).1
                             }
-                            None => (t_o[j][m] + dsst[c], basin[c], dsst[c]),
+                            None => t_o[j][m] + dsst[c],
                         }
                     };
                     t_sl[m] = tsl;
                     t[m] = tsl - gamma * zr[i];
-                    let base = belts::belt_precip(pb)
-                        * belts::subsidence_factor(p, a_eff, pb)
-                        * q
-                        * (0.07 * d_eff).exp()
-                        * plateau(zr[i]);
+                    let cy = match &pc {
+                        Some(pc) if upwind_mode && land[c] => {
+                            Some(carry_at(&pc.grid, &carry, c, m).unwrap_or((0.0, 0.0)))
+                        }
+                        _ => None,
+                    };
+                    let (base0, q) = circ(c, m, cy);
+                    let base = base0 * q;
                     let mut o = 0.0;
                     for r in 0..REGIMES {
                         if wt[r] > 0.0 && !oro[r].is_empty() {
@@ -630,12 +765,19 @@ pub fn compute(
                         }
                     }
                     let cc = (0.067 * (tsl - p.oro_ref_temp_c)).exp().clamp(0.05, 3.0);
-                    // The moisture budget's background rain and humidity (`rain_model =
-                    // budget`) or the belts'.
-                    let budget = pc.as_ref().and_then(|pc| pc.budget_at(c, m));
-                    let (base, q, k_h) = match (budget, &pc) {
-                        (Some((pbg, rh)), Some(pc)) => (pbg, rh / pc.mp.r_ref, 1.0),
-                        _ => (base, q, hydro),
+                    // The coarse rain and its moisture (`rain_model = budget` or `upwind`; the
+                    // upwind rain's circulation already holds the hydrological scaling) or the
+                    // belts'.
+                    let (base, q, k_h) = match pc.as_ref() {
+                        Some(pc) if pc.upwind.is_some() => {
+                            let (dry, qq) = pc.upwind_at(c, m);
+                            (base0 * dry, qq, hydro)
+                        }
+                        Some(pc) => match pc.rain_at(c, m) {
+                            Some((pbg, qq)) => (pbg, qq, 1.0),
+                            None => (base, q, hydro),
+                        },
+                        None => (base, q, hydro),
                     };
                     let oro_mm = o * oro_scale * q * cc;
                     // Windward rain adds; the lee's negative rate dries the background
@@ -793,6 +935,43 @@ pub fn compute(
 
 const YEAR_S: f64 = 365.25 * 86_400.0;
 
+/// The upwind rain's monthly sea marks per coarse cell: the highs' side and the sea-surface
+/// departure the vapour carries.
+type Carry = (Vec<[f64; 12]>, Vec<[f64; 12]>);
+
+/// The upwind rain on the snapshot's coarse climate `pcm` (warm-started from its last solution,
+/// whose annual rain then sets the land's recycling; else from `annual`, the last snapshot's).
+fn upwind_rain(
+    pcm: &super::percell::Coarse,
+    p: &ClimateParams,
+    p_ref: &[[f64; 12]],
+    src: &(Vec<f64>, Vec<f64>),
+    sink_ref: Option<&[[f64; 12]]>,
+    annual: &[f64],
+) -> super::upwind::Rain {
+    let prev = pcm.upwind.as_ref();
+    let annual_prev: Vec<f64> = prev.map_or_else(|| annual.to_vec(), |r| r.annual_mm.clone());
+    super::upwind::rain(
+        p,
+        &pcm.mp,
+        &super::upwind::ClimateIn {
+            grid: &pcm.grid,
+            land: &pcm.land,
+            z_low: &pcm.z_low,
+            t_land: &pcm.r.t_land,
+            t_ocean: &pcm.r.t_ocean,
+            sea_ice: &pcm.r.sea_ice,
+            p_ref,
+            basin: &src.0,
+            dsst: &src.1,
+            lapse: p.lapse_c_per_km / 1000.0,
+            sink_ref,
+            start: prev,
+            annual_prev: &annual_prev,
+        },
+    )
+}
+
 /// The per-cell climate's figures for the run's notes: its global mean and balance, the zonal
 /// model's against it, the heat transports' northern peaks (PW, and where), the ocean's gyres and
 /// conveyor, the moisture budget's closure.
@@ -833,6 +1012,10 @@ fn cell_stats(pc: &super::percell::Coarse, er: &super::ebm::EbmResult) -> serde_
             "cells": s.cells, "sv": s.sv,
         })),
         "moisture_closure_max": pc.moisture.as_ref().map(|m| m.closure.iter().cloned().fold(0.0, f64::max)),
+        "upwind": pc.upwind.as_ref().map(|r| serde_json::json!({
+            "closure_max": r.closure,
+            "sweeps_max": r.sweeps,
+        })),
     })
 }
 
