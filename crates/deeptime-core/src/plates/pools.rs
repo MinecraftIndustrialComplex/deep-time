@@ -49,7 +49,7 @@ const RHO_MANTLE_ISO: f64 = 3300.0; // ledger: ISO-043
 /// … and the continental crust's mean density, kg/m³: "The mean crustal density calculated from
 /// our model is 2830 kg/m3" (Christensen & Mooney 1995, abstract). It sets how high a whole
 /// column stands for its thickness when crust is stacked onto it or spread from it (belts,
-/// collapse, foundering): `ρ_m / (ρ_m − ρ̄_c)` = 7.0 m of crust per m of height, 142 m of height
+/// collapse, foundering, cordillera roots): `ρ_m / (ρ_m − ρ̄_c)` = 7.0 m of crust per m of height, 142 m of height
 /// per km of crust, where Hyndman & Currie (2011, full text) measure 131 ± 12 m/km (Cordillera)
 /// and 141 ± 27 m/km (stable areas). [`ISOSTATIC_FACTOR`] (upper crust, 2,700 kg/m³) stays for
 /// rock eroded from the top of a column.

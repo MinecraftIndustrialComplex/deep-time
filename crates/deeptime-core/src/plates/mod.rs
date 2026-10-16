@@ -239,6 +239,14 @@ impl PlatesStage {
             .entry(belts::KEPT_GLOBAL.to_owned())
             .or_insert(0.0) += kept;
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
+        *world
+            .globals
+            .entry(subduction::ARC_CONTINENTAL_GLOBAL.to_owned())
+            .or_insert(0.0) += pull.arc_continental_km3;
+        *world
+            .globals
+            .entry(subduction::ARC_OCEANIC_GLOBAL.to_owned())
+            .or_insert(0.0) += pull.arc_oceanic_km3;
         // The boundary mix (measurement only) on the same samples as the fronts, before the
         // collapse below turns any crust over.
         let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
@@ -268,6 +276,17 @@ impl PlatesStage {
             .globals
             .entry(transition::MOVED_GLOBAL.to_owned())
             .or_insert(0.0) += taper.moved_km2_m / 1000.0;
+        // The visible continental crust's volume (measurement: the crust budget, km³).
+        let volume_m: f64 = st
+            .samples
+            .iter()
+            .filter(|s| s.is_continental() && !s.is_hidden())
+            .map(|s| f64::from(s.thickness_m))
+            .sum();
+        world.globals.insert(
+            subduction::CONTINENTAL_VOLUME_GLOBAL.to_owned(),
+            volume_m * env.norm.sample_area_km2() / 1000.0,
+        );
         // The force balance (`forces.rs`): the rotation each plate's motion relaxes towards.
         let balance = forces::step(
             st,
