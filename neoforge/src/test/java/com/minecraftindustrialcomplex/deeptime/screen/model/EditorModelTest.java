@@ -35,6 +35,8 @@ class EditorModelTest {
     boolean natives = true;
     final List<String> estimated = new ArrayList<>();
     final List<FakeRunHandle> launched = new ArrayList<>();
+    /** Each launch's resume flag, in order. */
+    final List<Boolean> resumes = new ArrayList<>();
 
     EditorModel model() {
         return new EditorModel(deps());
@@ -49,8 +51,9 @@ class EditorModelTest {
                     : ",\"base_bytes\":" + (peak - history) + ",\"history_bytes\":" + history;
             return "{\"peak_bytes\":" + peak + spill + ",\"stages\":[{\"bytes\":1,\"name\":\"dummy_drift\",\"seconds\":5.0},"
                     + "{\"bytes\":2,\"name\":\"dummy_erode\",\"seconds\":5.0}]}";
-        }, (json, out, threads, cap) -> {
+        }, (json, out, threads, cap, resume) -> {
             FakeRunHandle h = new FakeRunHandle(out);
+            resumes.add(resume);
             launched.add(h);
             return h;
         }, gameDir, new MachineInfo(8 * GIB, 16 * GIB, 4 * GIB, 8), Runnable::run, Runnable::run, () -> natives, List::of);
@@ -371,10 +374,68 @@ class EditorModelTest {
         assertTrue(Files.isDirectory(dir2));
     }
 
+    static double stopOf(TimelapseModel t) {
+        return Presets.stopMyr(Presets.parseObject(t.presetJson())).orElseThrow();
+    }
+
+    /**
+     * Ben, decisions log 2026-10-05: pick the epoch, stop early and continue. Each one launches a
+     * resume of the run in its own staging folder with another stop; a run stopped for it keeps its
+     * folder.
+     */
+    @Test
+    void stopPickAndContinueResumeTheRunInItsFolder() throws Exception {
+        EditorModel m = ready(); // 1,000 Myr from a supercontinent
+        TimelapseModel run = m.startRun().orElseThrow();
+        FakeRunHandle h = launched.get(0);
+        com.minecraftindustrialcomplex.deeptime.worlddata.KeyframeInfo early = h.frame(-999e6, 8, 4, "elevation");
+        com.minecraftindustrialcomplex.deeptime.worlddata.KeyframeInfo f50 = h.frame(-950e6, 8, 4, "elevation");
+        com.minecraftindustrialcomplex.deeptime.worlddata.KeyframeInfo f500 = h.frame(-500e6, 8, 4, "elevation");
+        run.poll();
+        assertTrue(m.epochStopMyr(early).isEmpty(), "1 Myr: nothing to stop at yet");
+        assertEquals(50.0, m.epochStopMyr(f50).orElseThrow());
+        assertEquals(500.0, m.epochStopMyr(f500).orElseThrow());
+        assertFalse(m.canContinue(), "still running");
+
+        // Stop here, while running: the run is cancelled, its folder kept, a resume launched in it.
+        TimelapseModel stopped = m.pickEpoch(f500).orElseThrow();
+        assertTrue(h.cancelled);
+        assertTrue(run.superseded());
+        assertEquals(2, launched.size());
+        FakeRunHandle h2 = launched.get(1);
+        assertEquals(h.out, h2.out, "the same staging folder");
+        assertEquals(run.stagingId(), stopped.stagingId());
+        assertEquals(List.of(false, true), resumes);
+        assertEquals(500.0, stopOf(stopped));
+        assertTrue(Files.isDirectory(h.out), "the stopped run's folder stays");
+        assertEquals(EditorModel.Page.RUN, m.page());
+
+        // It finishes at 500 Myr: its last frame is the end (nothing to pick), an earlier one is.
+        h2.frame(-950e6, 8, 4, "elevation");
+        com.minecraftindustrialcomplex.deeptime.worlddata.KeyframeInfo end = h2.frame(-500e6, 8, 4, "elevation");
+        h2.completion.complete("{}");
+        stopped.poll();
+        assertEquals(TimelapseModel.State.DONE, stopped.state());
+        assertTrue(m.epochStopMyr(end).isEmpty());
+        assertTrue(m.canContinue());
+        assertTrue(m.continueProblem("400").isPresent(), "not past the end");
+        assertTrue(m.continueProblem("5000").isPresent(), "beyond the longest history");
+        assertTrue(m.continueProblem("abc").isPresent());
+        assertTrue(m.continueProblem("700").isEmpty());
+
+        // Continue to 700 Myr: a resume in the same folder; the finished run is not cancelled.
+        TimelapseModel cont = m.continueTo(700).orElseThrow();
+        assertEquals(List.of(false, true, true), resumes);
+        assertFalse(h2.cancelled);
+        assertEquals(700.0, stopOf(cont));
+        assertEquals(h.out, launched.get(2).out);
+        assertThrows(IllegalStateException.class, () -> m.continueTo(900), "the continued run is not done yet");
+    }
+
     @Test
     void launchFailureIsAWarning() {
         EditorModel.Deps d = deps();
-        EditorModel m = new EditorModel(new EditorModel.Deps(d.estimator(), (json, out, t, cap) -> {
+        EditorModel m = new EditorModel(new EditorModel.Deps(d.estimator(), (json, out, t, cap, resume) -> {
             throw new IllegalStateException("natives vanished");
         }, d.gameDir(), d.machine(), d.loader(), d.io(), d.nativesLinked(), d.essentials()));
         m.setStart("supercontinent");
@@ -390,7 +451,7 @@ class EditorModelTest {
         AtomicReference<String> seen = new AtomicReference<>();
         AtomicReference<Long> cap = new AtomicReference<>();
         EditorModel.Deps d = deps();
-        EditorModel m = new EditorModel(new EditorModel.Deps(d.estimator(), (json, out, t, c) -> {
+        EditorModel m = new EditorModel(new EditorModel.Deps(d.estimator(), (json, out, t, c, resume) -> {
             seen.set(json);
             cap.set(c);
             return new FakeRunHandle(out);

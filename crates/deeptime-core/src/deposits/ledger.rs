@@ -2,12 +2,15 @@
 //! The preservation ledger (plan §8.6 step 6; Kesler & Wilkinson 2006, 2008;
 //! `ore_genesis_modeling.md` Q5): formation depth and time, then burial B and erosion E at the
 //! deposit's column since it formed, from the surface stage's rates. The body's centre now lies at
-//! z_f + B − E below the surface:
+//! z_f + B − E below the surface. Its fate follows the deepest the surface ever cut towards it,
+//! not the net: its centre was shallowest at z_f − X, X the most net erosion the column went
+//! through at any time since formation (2026-10-05: before, a body exhumed through and buried
+//! again counted as whole, the order of erosion and burial lost):
 //!
-//! - its bottom above the surface → **eroded** (gone; resistates may shed placers);
-//! - its top above the surface → **truncated** (cut at the surface; the tonnage left is the
-//!   fraction of the primitive below the cut);
-//! - otherwise **buried** at that depth (reachable or not is the engine's call).
+//! - its bottom ever above the surface → **eroded** (gone; resistates may shed placers);
+//! - its top ever above the surface → **truncated** (cut at that surface; the tonnage left is
+//!   the fraction of the primitive below the cut, which later burial may have covered again);
+//! - otherwise **buried** at its present depth (reachable or not is the engine's call).
 //!
 //! A type with `erosion_behavior: destroy` (a breached oil trap) counts any truncation as eroded.
 //! The erosion history also gives the stability window a supergene blanket needs (`children.rs`).
@@ -27,6 +30,9 @@ pub struct Ledger {
     pub eroded_m: f64,
     /// Burial since formation (m).
     pub buried_m: f64,
+    /// The most net erosion (erosion − burial since formation) at any time since formation (m,
+    /// ≥ 0; at least `eroded_m − buried_m`).
+    pub exhumed_max_m: f64,
 }
 
 /// What survives.
@@ -39,6 +45,9 @@ pub enum Fate {
         centre_depth_m: f64,
         /// Fraction of the body (by volume) left below the surface.
         fraction_left: f64,
+        /// Depth below today's surface of the surface that cut it (m; 0 when that is today's,
+        /// more where burial covered the cut again).
+        cut_depth_m: f64,
     },
     Eroded,
 }
@@ -49,6 +58,15 @@ impl Fate {
             Fate::Buried { .. } => "buried",
             Fate::Truncated { .. } => "truncated",
             Fate::Eroded => "eroded",
+        }
+    }
+
+    /// Depth below today's surface of the surface that cut the body (m; 0 unless truncated and
+    /// buried again). The body is clipped there: an unconformity with the cover above it.
+    pub fn cut_depth_m(&self) -> f64 {
+        match self {
+            Fate::Truncated { cut_depth_m, .. } => *cut_depth_m,
+            _ => 0.0,
         }
     }
 
@@ -78,22 +96,30 @@ impl Ledger {
         self.formation_depth_m + self.buried_m - self.eroded_m
     }
 
+    /// Depth of the centre when the surface was nearest to it since formation (m).
+    pub fn shallowest_centre_depth_m(&self) -> f64 {
+        let net_exhumed = self.eroded_m - self.buried_m;
+        self.formation_depth_m - self.exhumed_max_m.max(net_exhumed).max(0.0)
+    }
+
     pub fn apply(&self, behavior: ErosionBehavior, metric: Metric) -> Fate {
         let d = self.centre_depth_m();
+        let d_min = self.shallowest_centre_depth_m();
         let h = self.half_height_m.max(1e-9);
-        if d + h <= 0.0 {
+        if d_min + h <= 0.0 {
             return Fate::Eroded;
         }
-        if d - h >= 0.0 {
+        if d_min - h >= 0.0 {
             return Fate::Buried { centre_depth_m: d };
         }
         if behavior == ErosionBehavior::Destroy {
             return Fate::Eroded;
         }
-        // The surface cuts the body at height u = d / h above its centre.
+        // The surface cut the body at height u = d_min / h above its centre.
         Fate::Truncated {
             centre_depth_m: d,
-            fraction_left: fraction_below(metric, d / h),
+            fraction_left: fraction_below(metric, d_min / h),
+            cut_depth_m: (d - d_min).max(0.0),
         }
     }
 }
@@ -108,6 +134,7 @@ mod tests {
             half_height_m: 750.0,
             eroded_m: eroded,
             buried_m: buried,
+            exhumed_max_m: 0.0,
         }
     }
 
@@ -135,7 +162,9 @@ mod tests {
             Fate::Truncated {
                 centre_depth_m,
                 fraction_left,
+                cut_depth_m,
             } => {
+                assert_eq!(cut_depth_m, 0.0);
                 assert!((centre_depth_m - 130.0).abs() < 1e-9);
                 let u: f64 = 130.0 / 750.0;
                 assert!((fraction_left - (2.0 + 3.0 * u - u.powi(3)) / 4.0).abs() < 1e-12);
@@ -153,6 +182,35 @@ mod tests {
             ledger(3250.0, 0.0).apply(ErosionBehavior::SpawnPlacer, Metric::Ellipsoid),
             Fate::Eroded
         );
+        // The order counts (2026-10-05): 4 km of erosion and then 4 km of burial leave the net at
+        // zero, but the surface went through the body: it is gone, not buried at 2.5 km.
+        let through = Ledger {
+            exhumed_max_m: 4000.0,
+            ..ledger(4000.0, 4000.0)
+        };
+        assert_eq!(
+            through.apply(ErosionBehavior::Truncate, Metric::Ellipsoid),
+            Fate::Eroded
+        );
+        // 2.37 km of erosion, then 1 km of burial: cut where the 2.37 km left it, now 1 km under
+        // the ground.
+        let covered = Ledger {
+            exhumed_max_m: 2370.0,
+            ..ledger(2370.0, 1000.0)
+        };
+        match covered.apply(ErosionBehavior::Truncate, Metric::Ellipsoid) {
+            Fate::Truncated {
+                centre_depth_m,
+                fraction_left,
+                cut_depth_m,
+            } => {
+                assert!((centre_depth_m - 1130.0).abs() < 1e-9);
+                assert!((cut_depth_m - 1000.0).abs() < 1e-9);
+                let u: f64 = 130.0 / 750.0;
+                assert!((fraction_left - (2.0 + 3.0 * u - u.powi(3)) / 4.0).abs() < 1e-12);
+            }
+            other => panic!("{other:?}"),
+        }
         assert_eq!(fraction_below(Metric::Cylinder, 0.0), 0.5);
         assert_eq!(fraction_below(Metric::Ellipsoid, 1.0), 1.0);
         assert_eq!(fraction_below(Metric::Ellipsoid, -1.0), 0.0);

@@ -6,6 +6,7 @@ import com.google.gson.JsonParser;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.climate.BiomeRuleSet.Rule;
 import com.minecraftindustrialcomplex.deeptime.climate.BiomeRuleSet.Wetland;
+import com.minecraftindustrialcomplex.deeptime.worldgen.GeologyGround;
 import com.minecraftindustrialcomplex.deeptime.worldgen.StrataPass;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import com.minecraftindustrialcomplex.deeptime.worlddata.ClimateLayers;
@@ -192,10 +193,28 @@ public final class BiomeRules {
     /** What a level's rules read from its world data, opened on first use. */
     public static final class LevelData {
         final WorldDataTerrain terrain;
+        final int seaLevel;
         private volatile Opened opened;
+        private volatile GeologyGround geology;
 
-        public LevelData(WorldDataTerrain terrain) {
+        public LevelData(WorldDataTerrain terrain, int seaLevel) {
             this.terrain = terrain;
+            this.seaLevel = seaLevel;
+        }
+
+        /** The ground the {@code ground} condition reads (built on first use, with the server's rock classes' groups). */
+        public GeologyGround geology() {
+            GeologyGround g = geology;
+            if (g == null) {
+                var server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+                Map<String, List<String>> groups = new java.util.HashMap<>();
+                if (server != null)
+                    com.minecraftindustrialcomplex.deeptime.rock.RockClassRegistry.byName(server.registryAccess())
+                            .forEach((n, rc) -> groups.put(n, rc.groups()));
+                g = new GeologyGround(terrain, seaLevel, GeologyGround.groupsOf(groups));
+                geology = g;
+            }
+            return g;
         }
 
         record Opened(WorldData wd, ClimateLayers climate, RasterSampler koppen, Optional<IceCover> ice, RasterSampler playa,
@@ -227,17 +246,19 @@ public final class BiomeRules {
         private final int x, z, seaLevel;
         private final double height;
         private final java.util.function.IntSupplier roles;
-        private final Supplier<Holder<Biome>> plain;
+        private final Supplier<Holder<Biome>> plain, slot;
         private LevelData.Opened o;
         private String koppen;
         private ClimateLayers.Sample climate;
         private boolean climateRead;
         private Wetland wetland;
         private String rock;
-        private Holder<Biome> plainBiome;
+        private Holder<Biome> plainBiome, slotBiome;
+        private int ground = -1;
 
         Column(LevelData data, int x, int z, double height, int seaLevel, java.util.function.IntSupplier roles,
-               Supplier<Holder<Biome>> plain) {
+               Supplier<Holder<Biome>> plain,
+               Supplier<Holder<Biome>> slot) {
             this.data = data;
             this.x = x;
             this.z = z;
@@ -245,6 +266,7 @@ public final class BiomeRules {
             this.seaLevel = seaLevel;
             this.roles = roles;
             this.plain = plain;
+            this.slot = slot;
         }
 
         private LevelData.Opened o() {
@@ -368,6 +390,20 @@ public final class BiomeRules {
             if (plainBiome == null)
                 plainBiome = plain.get();
             return plainBiome != null && in(plainBiome, ids);
+        }
+
+        @Override
+        public boolean slotIn(List<String> ids) {
+            if (slotBiome == null)
+                slotBiome = slot.get();
+            return slotBiome != null && in(slotBiome, ids);
+        }
+
+        @Override
+        public int ground() {
+            if (ground < 0)
+                ground = data.geology().rolesAt(x, z);
+            return ground;
         }
     }
 }

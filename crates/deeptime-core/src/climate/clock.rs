@@ -269,15 +269,16 @@ pub fn sun_at(p: &ClimateParams, t: f64) -> f64 {
     }
 }
 
-/// Whether world time `t` lies inside the recent ice-age window.
+/// Whether world time `t` lies inside the recent ice-age window: the last `orbital_window_myr`
+/// before the run's end (`run_end_years`, 0 for a run to its planned length).
 pub fn in_window(p: &ClimateParams, t: f64) -> bool {
-    p.orbital_window_myr > 0.0 && t > -p.orbital_window_myr * 1.0e6 - 1.0
+    p.orbital_window_myr > 0.0 && t > p.run_end_years - p.orbital_window_myr * 1.0e6 - 1.0
 }
 
-/// The orbit at world time `t`: the series inside the window; the present orbit is circular at
-/// the preset's tilt outside it.
+/// The orbit at world time `t`: the series inside the window (its time measured from the run's
+/// end); the present orbit is circular at the preset's tilt outside it.
 pub fn orbit_at(p: &ClimateParams, tilt: f64, t: f64) -> Option<OrbitAt> {
-    in_window(p, t).then(|| orbit::at(t, tilt, p.orbital_strength))
+    in_window(p, t).then(|| orbit::at(t - p.run_end_years, tilt, p.orbital_strength))
 }
 
 /// EBM parameters at CO₂ `ppm`, world time `t`.

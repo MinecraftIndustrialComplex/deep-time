@@ -27,6 +27,7 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Instant;
 
 use rayon::prelude::*;
@@ -155,7 +156,8 @@ fn ms(t: Instant) -> f64 {
 /// A loaded source layer.
 struct Src {
     entry: usize,
-    layer: LoadedLayer,
+    /// Shared with the pass's own copy of the elevation and amplitude layers (one load of each).
+    layer: Arc<LoadedLayer>,
     kind: Kind,
     cb: usize,
 }
@@ -506,6 +508,56 @@ pub fn world_of(
     }
 }
 
+/// Bytes per cell of the layers the bake writes on each grid (level, name, bytes), summed over the
+/// layers (the pass loads all of one grid's layers at once): L1 holds the horizon stacks, L2 and L3
+/// a few scalars. Measured on a baked planet (`the_projection_estimate_covers_the_baked_layers`
+/// fails if the bake outgrows them); a figure of the memory model, not a physical one.
+pub(crate) const LAYER_BYTES_PER_CELL: [(u32, &str, u64); 3] =
+    [(1, "L1", 288), (2, "L2", 16), (3, "L3", 8)];
+
+/// The memory the projection pass holds beyond the finished world (bytes), for the run's
+/// estimate (`session::estimate_for`): 0 for a Lambert preset (the pass only writes the layout).
+///
+/// The pass takes the grids in turn, holding the grid's source layers, its resampled layers and
+/// one band of rows ([`ROW_BAND`]); beside them stay the Lambert elevation and amplitude it loads
+/// first (L3, shared with that grid's sources) and, once L1 is done, the world's horizon stacks
+/// (kept for the top raise). Memory accounting, 2026-10-05: before this the pass was not in the
+/// estimate and kept a second copy of every resampled layer beside its output.
+pub fn estimate_bytes(p: &PlanetPreset) -> u64 {
+    use deeptime_format::projection::{PetroffGuyou, ProjectionKind};
+    if p.scale.projection == ProjectionKind::Lambert {
+        return 0;
+    }
+    let c = p.scale.circumference_blocks;
+    let b = u64::from(PetroffGuyou::hemisphere_for(c));
+    let radius = |level: u32| match level {
+        1 => p.resolution.l1_r,
+        2 => p.resolution.l2_r,
+        _ => p.resolution.l3_r,
+    };
+    let src_cells =
+        |r: u32| GridDesc::for_planet("", c, r).map_or(0, |g| u64::from(g.w) * u64::from(g.h));
+    let world_width = |r: u32| (2 * b).div_ceil(u64::from(r.max(1)));
+    let world_cells = |r: u32| world_width(r) * (b / u64::from(r.max(1)) + 1);
+    // The Lambert elevation and amplitude, loaded before the first grid (a part of the L3 sources).
+    let kept_sources = src_cells(radius(3)) * LAYER_BYTES_PER_CELL[2].2;
+    let (mut worst, mut stacks) = (0u64, 0u64);
+    for &(level, _, per_cell) in &LAYER_BYTES_PER_CELL {
+        let r = radius(level);
+        let (src, out) = (src_cells(r) * per_cell, world_cells(r) * per_cell);
+        let band = ROW_BAND as u64 * world_width(r) * per_cell;
+        let resident = if level == 3 { 0 } else { kept_sources };
+        worst = worst.max(resident + stacks + src + out + band);
+        if level == 1 {
+            stacks = out;
+        }
+    }
+    worst
+}
+
+/// Rows of the world grid resampled at a time (their results are copied out before the next band).
+const ROW_BAND: usize = 64;
+
 /// Resamples the loaded layers of one source grid onto world grid `wg`; returns each layer's
 /// row-major cell bytes.
 fn resample_grid(map: &Mapping, srcs: &[Src], wg: &GridDesc) -> Vec<Vec<u8>> {
@@ -513,97 +565,102 @@ fn resample_grid(map: &Mapping, srcs: &[Src], wg: &GridDesc) -> Vec<Vec<u8>> {
     let r_w = f64::from(wg.r);
     let r_s = f64::from(srcs[0].layer.desc.grid.r);
     let mut outs: Vec<Vec<u8>> = srcs.iter().map(|s| vec![0u8; w * h * s.cb]).collect();
-    // Rows in parallel: each task fills its row of every layer.
-    let rows: Vec<Vec<Vec<u8>>> = (0..h)
-        .into_par_iter()
-        .map(|j| {
-            let z = wg.block_z(j as i64) as f64;
-            let mut row: Vec<Vec<u8>> = srcs.iter().map(|s| vec![0u8; w * s.cb]).collect();
-            for i in 0..w {
-                let x = wg.block_x(i as i64) as f64;
-                let f = map.footprint(x, z, r_w, r_s);
-                let nx = (1 + (2.0 * f.hx / r_s).ceil() as usize).min(MAX_SAMPLES_X);
-                let nz = (1 + (2.0 * f.hz / r_s).ceil() as usize).min(MAX_SAMPLES_Z);
-                for (s, out) in srcs.iter().zip(row.iter_mut()) {
-                    let cell = &mut out[i * s.cb..(i + 1) * s.cb];
-                    match s.kind {
-                        Kind::Stack => {
-                            let (ci, cj) = s.nearest_cell(f.xs, f.zs);
-                            let g = &s.layer.desc.grid;
-                            let at = (cj as usize * g.w as usize + ci as usize) * s.cb;
-                            cell.copy_from_slice(&s.layer.bytes[at..at + s.cb]);
-                        }
-                        Kind::Categorical => {
-                            let (ci, cj) = s.nearest_cell(f.xs, f.zs);
-                            let v = s.raw(i64::from(ci), i64::from(cj));
-                            let v = if v.is_nan() {
-                                s.layer.desc.nodata.unwrap_or(0.0)
-                            } else {
-                                v
-                            };
-                            put_raw(s.layer.desc.dtype, v, cell);
-                        }
-                        Kind::Point => {
-                            let v = s.bilinear(f.xs, f.zs);
-                            let v = if v.is_nan() {
+    // Rows in parallel, a band of them at a time: each task fills its row of every layer, and a
+    // band's rows are copied into the layers' arrays and dropped before the next band starts, so
+    // the pass never holds a second copy of the whole output beside it (bake memory, 2026-10-05).
+    for band_start in (0..h).step_by(ROW_BAND) {
+        let band_end = (band_start + ROW_BAND).min(h);
+        let rows: Vec<Vec<Vec<u8>>> = (band_start..band_end)
+            .into_par_iter()
+            .map(|j| {
+                let z = wg.block_z(j as i64) as f64;
+                let mut row: Vec<Vec<u8>> = srcs.iter().map(|s| vec![0u8; w * s.cb]).collect();
+                for i in 0..w {
+                    let x = wg.block_x(i as i64) as f64;
+                    let f = map.footprint(x, z, r_w, r_s);
+                    let nx = (1 + (2.0 * f.hx / r_s).ceil() as usize).min(MAX_SAMPLES_X);
+                    let nz = (1 + (2.0 * f.hz / r_s).ceil() as usize).min(MAX_SAMPLES_Z);
+                    for (s, out) in srcs.iter().zip(row.iter_mut()) {
+                        let cell = &mut out[i * s.cb..(i + 1) * s.cb];
+                        match s.kind {
+                            Kind::Stack => {
                                 let (ci, cj) = s.nearest_cell(f.xs, f.zs);
-                                s.raw(i64::from(ci), i64::from(cj))
-                            } else {
-                                v
-                            };
-                            let v = if v.is_nan() {
-                                s.layer.desc.nodata.unwrap_or(0.0)
-                            } else {
-                                v
-                            };
-                            put_raw(s.layer.desc.dtype, v, cell);
-                        }
-                        Kind::Continuous => {
-                            let mut sum = 0.0;
-                            let mut nan = false;
-                            'outer: for kz in 0..nz {
-                                let dz = if nz == 1 {
-                                    0.0
+                                let g = &s.layer.desc.grid;
+                                let at = (cj as usize * g.w as usize + ci as usize) * s.cb;
+                                cell.copy_from_slice(&s.layer.bytes[at..at + s.cb]);
+                            }
+                            Kind::Categorical => {
+                                let (ci, cj) = s.nearest_cell(f.xs, f.zs);
+                                let v = s.raw(i64::from(ci), i64::from(cj));
+                                let v = if v.is_nan() {
+                                    s.layer.desc.nodata.unwrap_or(0.0)
                                 } else {
-                                    -f.hz + 2.0 * f.hz * kz as f64 / (nz - 1) as f64
+                                    v
                                 };
-                                for kx in 0..nx {
-                                    let dx = if nx == 1 {
+                                put_raw(s.layer.desc.dtype, v, cell);
+                            }
+                            Kind::Point => {
+                                let v = s.bilinear(f.xs, f.zs);
+                                let v = if v.is_nan() {
+                                    let (ci, cj) = s.nearest_cell(f.xs, f.zs);
+                                    s.raw(i64::from(ci), i64::from(cj))
+                                } else {
+                                    v
+                                };
+                                let v = if v.is_nan() {
+                                    s.layer.desc.nodata.unwrap_or(0.0)
+                                } else {
+                                    v
+                                };
+                                put_raw(s.layer.desc.dtype, v, cell);
+                            }
+                            Kind::Continuous => {
+                                let mut sum = 0.0;
+                                let mut nan = false;
+                                'outer: for kz in 0..nz {
+                                    let dz = if nz == 1 {
                                         0.0
                                     } else {
-                                        -f.hx + 2.0 * f.hx * kx as f64 / (nx - 1) as f64
+                                        -f.hz + 2.0 * f.hz * kz as f64 / (nz - 1) as f64
                                     };
-                                    let v = s.bilinear(f.xs + dx, f.zs + dz);
-                                    if v.is_nan() {
-                                        nan = true;
-                                        break 'outer;
+                                    for kx in 0..nx {
+                                        let dx = if nx == 1 {
+                                            0.0
+                                        } else {
+                                            -f.hx + 2.0 * f.hx * kx as f64 / (nx - 1) as f64
+                                        };
+                                        let v = s.bilinear(f.xs + dx, f.zs + dz);
+                                        if v.is_nan() {
+                                            nan = true;
+                                            break 'outer;
+                                        }
+                                        sum += v;
                                     }
-                                    sum += v;
                                 }
+                                let v = if nan {
+                                    let (ci, cj) = s.nearest_cell(f.xs, f.zs);
+                                    s.raw(i64::from(ci), i64::from(cj))
+                                } else {
+                                    sum / (nx * nz) as f64
+                                };
+                                let v = if v.is_nan() {
+                                    s.layer.desc.nodata.unwrap_or(0.0)
+                                } else {
+                                    v
+                                };
+                                put_raw(s.layer.desc.dtype, v, cell);
                             }
-                            let v = if nan {
-                                let (ci, cj) = s.nearest_cell(f.xs, f.zs);
-                                s.raw(i64::from(ci), i64::from(cj))
-                            } else {
-                                sum / (nx * nz) as f64
-                            };
-                            let v = if v.is_nan() {
-                                s.layer.desc.nodata.unwrap_or(0.0)
-                            } else {
-                                v
-                            };
-                            put_raw(s.layer.desc.dtype, v, cell);
                         }
                     }
                 }
+                row
+            })
+            .collect();
+        for (j, row) in (band_start..band_end).zip(rows) {
+            for (k, r) in row.into_iter().enumerate() {
+                let cb = srcs[k].cb;
+                outs[k][j * w * cb..(j + 1) * w * cb].copy_from_slice(&r);
             }
-            row
-        })
-        .collect();
-    for (j, row) in rows.into_iter().enumerate() {
-        for (k, r) in row.into_iter().enumerate() {
-            let cb = srcs[k].cb;
-            outs[k][j * w * cb..(j + 1) * w * cb].copy_from_slice(&r);
         }
     }
     // The edge rows are glued onto themselves (cell i is cell w − i): make them exactly so.
@@ -821,9 +878,12 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         .iter()
         .position(|l| l.name == "elevation")
         .ok_or_else(|| err("projection pass: the world has no elevation layer"))?;
-    let elev_src = TilePackReader::open(&dir.join(&m.layers[elev_entry].path))?.load()?;
-    let amp_src = match m.layers.iter().find(|l| l.name == "detail/amplitude") {
-        Some(l) => Some(TilePackReader::open(&dir.join(&l.path))?.load()?),
+    let elev_src = Arc::new(TilePackReader::open(&dir.join(&m.layers[elev_entry].path))?.load()?);
+    let amp_entry = m.layers.iter().position(|l| l.name == "detail/amplitude");
+    let amp_src = match amp_entry {
+        Some(k) => Some(Arc::new(
+            TilePackReader::open(&dir.join(&m.layers[k].path))?.load()?,
+        )),
         None => None,
     };
     let spec = deeptime_format::DetailSpec::of(m)?;
@@ -879,7 +939,14 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         let wg = wp.grid(gname, src_grid.r)?;
         let mut srcs = Vec::new();
         for &k in entries {
-            let layer = TilePackReader::open(&dir.join(&m.layers[k].path))?.load()?;
+            // The elevation and amplitude layers are already loaded: shared, not read again.
+            let layer = if k == elev_entry {
+                elev_src.clone()
+            } else if Some(k) == amp_entry {
+                amp_src.clone().expect("the amplitude layer was loaded")
+            } else {
+                Arc::new(TilePackReader::open(&dir.join(&m.layers[k].path))?.load()?)
+            };
             let kind = kind_of(&layer.desc);
             let cb = layer.desc.cell_bytes();
             srcs.push(Src {
@@ -890,6 +957,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             });
         }
         let outs = resample_grid(&map, &srcs, &wg);
+
         for (s, bytes) in srcs.iter().zip(outs) {
             let mut desc = s.layer.desc.clone();
             desc.grid = wg.clone();
@@ -899,7 +967,9 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             entry.crc32 = written.crc32;
             layer_notes.push(json!([desc.name, format!("{:?}", s.kind).to_lowercase()]));
             if s.kind == Kind::Stack && world_stack.is_none() {
-                world_stack = Some((s.entry, desc.clone(), bytes.clone()));
+                // Kept (moved, not copied) for the top raise below.
+                world_stack = Some((s.entry, desc, bytes));
+                continue;
             }
             let world = LoadedLayer::new(desc, bytes)?;
             match world.desc.name.as_str() {
@@ -1056,7 +1126,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         let old = Drawn {
             elev: &elev_src,
             detail: drawn_detail(
-                amp_src.as_ref(),
+                amp_src.as_deref(),
                 noise(c_sim, &WorldProjection::Lambert(Projection::new(c_sim))),
             ),
             c: f64::from(c_sim),

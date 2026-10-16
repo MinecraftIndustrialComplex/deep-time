@@ -44,7 +44,7 @@ class AdvancedSettingsTest {
 
     EditorModel model() {
         return new EditorModel(new EditorModel.Deps(json -> "{\"peak_bytes\":1000,\"stages\":[{\"bytes\":1,\"name\":\"plates\",\"seconds\":5.0}]}",
-                (json, out, threads, cap) -> new FakeRunHandle(out), gameDir, new MachineInfo(8 * GIB, 16 * GIB, 4 * GIB, 8),
+                (json, out, threads, cap, resume) -> new FakeRunHandle(out), gameDir, new MachineInfo(8 * GIB, 16 * GIB, 4 * GIB, 8),
                 Runnable::run, Runnable::run, () -> true, List::of));
     }
 
@@ -123,6 +123,12 @@ class AdvancedSettingsTest {
                 new Num("monsoon_strength", "thermal_wind_pa_k", 60, false),
                 new Num("rain_efficiency", "precip_rh_slope", 11.4, false),
                 new Num("soil_water", "bucket_mm", 150, false),
+                new Num("rain_spread", "rain_diffusivity_m2_s", 500000, false),
+                new Num("rain_wind", "rain_wind_share", 0.3, false),
+                new Num("rain_recycling", "rain_recycling", 1.0, false),
+                new Num("sea_humidity", "sea_surface_rh", 0.8, false),
+                new Num("rain_humidity", "rain_rh_slope", 0, false),
+                new Num("east_coast_rain", "west_flank_wet", 0.4, false),
                 new Num("ocean_gyres", "gyre_heat_efficiency", 1.0, false),
                 new Num("ocean_overturning", "overturning_sv", 30, false),
                 new Num("ocean_mixing", "ocean_diffusivity_w_m2_k", 0.3, false),
@@ -149,7 +155,7 @@ class AdvancedSettingsTest {
         assertEquals(List.of("per_cell", "banded"), model.options());
         EditorFields.Field rain = EditorFields.byId("rain_model");
         assertEquals("climate.rain_model", rain.path());
-        assertEquals(List.of("belts", "budget"), rain.options());
+        assertEquals(List.of("belts", "budget", "upwind"), rain.options());
         for (JsonObject o : presets) {
             assertEquals("per_cell", model.get(o).orElseThrow().getAsString());
             assertEquals("belts", rain.get(o).orElseThrow().getAsString());
