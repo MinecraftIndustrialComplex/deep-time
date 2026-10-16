@@ -367,7 +367,10 @@ mod tests {
         let t: f64 = thick.iter().map(|&x| f64::from(x)).sum();
         let mafic = f64::from(thick[pool::MAFIC_PLUTONIC] + thick[pool::MAFIC_VOLCANIC]);
         let e = eclogite_m(&thick, 9.81);
-        assert!((e - ECLOGITE_SHARE * mafic.min(t - depth)).abs() < 1.0, "{e}");
+        assert!(
+            (e - ECLOGITE_SHARE * mafic.min(t - depth)).abs() < 1.0,
+            "{e}"
+        );
         assert!(e > 0.0);
         let change = isostatic_change_m(&normal, &thick, 9.81);
         let airy = (t - f64::from(total)) / COLUMN_ISOSTATIC_FACTOR;

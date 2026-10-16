@@ -173,7 +173,8 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
 /// pull (PLT-281, PLT-278).
 fn iso_height(pools: &[f32; pool::COUNT], z_0: f64, gravity: f64) -> f64 {
     let t: f64 = pools.iter().map(|&x| f64::from(x.max(0.0))).sum();
-    z_0 + (t - normal_thickness_m()) / COLUMN_ISOSTATIC_FACTOR - root_drop_m(eclogite_m(pools, gravity))
+    z_0 + (t - normal_thickness_m()) / COLUMN_ISOSTATIC_FACTOR
+        - root_drop_m(eclogite_m(pools, gravity))
 }
 
 /// Moves a surface at `z` by `change` towards the column's isostatic height `iso`, never past it:
