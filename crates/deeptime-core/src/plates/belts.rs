@@ -304,7 +304,8 @@ fn stack_front(
             / f.crust.len() as f64
     };
     // ledger: PLT-242 (the share), PLT-281 (Airy with the crust's mean density).
-    let rise_km2_m = k.collision_stacking_share * crossed_km2 * thickness_m / COLUMN_ISOSTATIC_FACTOR;
+    let rise_km2_m =
+        k.collision_stacking_share * crossed_km2 * thickness_m / COLUMN_ISOSTATIC_FACTOR;
     let fill = if deficit_km2_m > 0.0 {
         (rise_km2_m / deficit_km2_m).min(1.0)
     } else {

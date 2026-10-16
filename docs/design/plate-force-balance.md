@@ -952,11 +952,11 @@ side; tables in the build log of 2026-10-05):
 | Convergence 20 Myr after a collision's onset ÷ at onset | 0.07 | 0.46 | 0.2–0.6 |
 | Collisions per 100 Myr; length, median | 5.2; 30 Myr | 0.90; 44 Myr | 2–6; 15–50 |
 | Largest plate, median share; steps with one above 50 % | 0.27; 5.7 % | 0.17; 0 | 0.15–0.35; ≤10 |
-| Continental crust, lowest step; at the end | 0.37; 0.40 | 0.26; 0.31 | ≥0.37; — |
+| Continental crust, lowest step; at the end | 0.37; 0.40 | 0.26; 0.31 | ≥0.37; n/a |
 | Active share of the continental margin | 0.38 | 0.47 | 0.25–0.40 |
 | Supercontinent tenure; period, medians (20 Myr hold, pooled episodes, `force-balance-series.py`) | 67; 139 Myr | 46; 213 Myr | 100–300; 400–800 |
 | Supercontinent assemblies per run | 11.6 | 2.1 | |
-| Land (surface stage) at 1000 Myr; above 2 km of it | 0.136; — | 0.185; 0.27 | reported (Earth 0.18–0.30 over the Phanerozoic) |
+| Land (surface stage) at 1000 Myr; above 2 km of it | 0.136; n/a | 0.185; 0.27 | reported (Earth 0.18–0.30 over the Phanerozoic) |
 
 **Not delivered.** The slab correlation, the step-to-step noise, the collision rate, the active
 margin share and the supercontinent cycle miss their targets; the wedge and foredeep stay under

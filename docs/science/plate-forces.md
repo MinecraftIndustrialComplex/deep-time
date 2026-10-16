@@ -191,8 +191,8 @@ seeds 1-4, both starts, 2026-10-05; master 2e07d954 on the old speed law against
 | Slab-attached over slab-free plates | about 3-4 | 1.87 | 1.69 |
 | Speed against slab share, rank correlation | 0.71 | 0.45 | 0.54 |
 | Convergence 20 Myr after a collision's onset over at onset | India about 0.27 in 15 Myr (Copley et al. 2010) | 0.46 | 0.07 |
-| Plate-steps where the speed guard (250 mm/yr) binds | — | 0 | 1,015 (the old cap, 100 mm/yr) |
-| A plate's rotation change per step, median / 90th percentile | — | 5.8 / 25 % | 5.1 / 9.6 % |
+| Plate-steps where the speed guard (250 mm/yr) binds | n/a | 0 | 1,015 (the old cap, 100 mm/yr) |
+| A plate's rotation change per step, median / 90th percentile | n/a | 5.8 / 25 % | 5.1 / 9.6 % |
 
 The spread of speeds and the oceanic-continental contrast come out of the forces; the slab
 correlation is weaker than Earth's and weaker than the open-loop test's, and the 90th percentile of

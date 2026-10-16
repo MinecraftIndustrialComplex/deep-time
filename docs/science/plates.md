@@ -581,12 +581,12 @@ much faster than Earth does:
 
 | `earthlike_quick_16k`, 500 Myr (km³ a year, Earth-normalized) | Branch as found (4 runs) | Now (6 runs) | Earth today |
 |---|---|---|---|
-| Continental crust crossing collision fronts | 13.4 | 15.0 | — |
+| Continental crust crossing collision fronts | 13.4 | 15.0 | n/a |
 | Lost at the front (not stacked) | 3.0 | 2.3 | deep lower-plate crust at sutures about 0.3 |
 | Foundered beyond the thickest column | 14.4 | 5.7 | (included above) |
-| Accreted at resamplings (of it, a collision's crust a second time) | 36.8 (about 9) | 23.8 (0) | — |
-| All crustal losses | — | — | more than about 3.2 (subduction erosion 1.5, sediment subduction 1.0, collision zones 0.7) |
-| All crustal additions | — | — | about 3.2 (oceanic arcs 1.5, continental arcs 1.0, rifts and hotspots 0.5, collision zones 0.2) |
+| Accreted at resamplings (of it, a collision's crust a second time) | 36.8 (about 9) | 23.8 (0) | n/a |
+| All crustal losses | n/a | n/a | more than about 3.2 (subduction erosion 1.5, sediment subduction 1.0, collision zones 0.7) |
+| All crustal additions | n/a | n/a | about 3.2 (oceanic arcs 1.5, continental arcs 1.0, rifts and hotspots 0.5, collision zones 0.2) |
 
 Earth's column: Stern & Scholl 2010 (full text, Figure 3 and pp. 18–19). The model still loses
 continental crust at collision zones many times faster than Earth: about 8 km³ a year in all,
