@@ -1,26 +1,26 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
-<!-- Deep Time review page: the world's shape (Lambert, the pillowcase family, the cube family), the cube's face
-     size and net, and how each plays with the seam technology. Source: tools/review/world-shape/ (plan §2.6).
-     Pictures and data come from tools/review/world-shape/compute.py, run on the test VM over a real 16k bake;
-     the distortion numbers are those of docs/research/notes/seamless-projection-survey.md. No network: three.js
-     (MIT) is a local copy, fonts are system faces (spacesheep's viewer blocks web fonts). -->
+<!-- Deep Time review page: Petroff 2021 in the Guyou 2:1 layout against the Moser equal-area cube in the cross net,
+     with gameplay worked through topic by topic and every corner figure computed from the real geometry.
+     Source: tools/review/world-shape/ (plan §2.6). Pictures and data.js come from compute.py, run on the test VM over a
+     real 16k bake. No network: three.js (MIT) is a local copy, fonts are system faces. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Deep Time World Shape</title>
-<meta name="description" content="Lambert, the pillowcase maps or an equal-area cube for Deep Time's world, with the cube's face size and net: real-planet maps, distortion, seams, walks, a folding 3D globe and the seam technology, for Ben's decision.">
+<meta name="description" content="Petroff–Guyou against the Moser equal-area cube for Deep Time's seamless world: gameplay worked through topic by topic, real-planet maps, and computed diagrams of what happens round a corner in each, for Ben's decision.">
 <style>
-/* Layout: one reading column (68ch) with full-width figure bands; the map explorer and the globe are the
-   instruments, everything else is a chart table. Colours are map colours: seam kinds are semantic. */
 :root{
   color-scheme: light;
   --bg:#ECEFEC; --panel:#F8FAF8; --panel-2:#E3E8E5; --ink:#15222A; --ink-2:#43525A; --ink-3:#66757C;
   --rule:#C5CFCC; --rule-2:#D8DFDC; --accent:#1E5AA8; --accent-bg:#DCE6F4;
-  --slide:#0B8577; --quarter:#C9711D; --half:#C0185A; --corner:#F2C230; --corner-ink:#3A2E00;
-  --rec:#17683F; --rec-bg:#D5EDDF; --warn:#9A5B0E; --warn-bg:#F6E6CC; --bad:#A8231B; --bad-bg:#F5DAD7;
-  --walk-eq:#1F63D8; --walk-pole:#7B3FC4; --walk-a:#E5383B; --walk-b:#1B1F3B;
+  --slide:#0B8577; --quarter:#C9711D; --half:#C0185A; --quarter-bg:#F6E3CF; --half-bg:#F4D6E1;
+  --corner:#F2C230; --rec:#17683F; --rec-bg:#D5EDDF; --warn:#9A5B0E; --warn-bg:#F6E6CC; --bad:#A8231B; --bad-bg:#F5DAD7; --bad-hi:#FF4433;
+  --wg:#2F5FC8; --wg-bg:#DCE5F7; --wk:#7A5A12; --wk-bg:#EFE5CC;
+  --walk-eq:#1F63D8; --walk-pole:#7B3FC4; --walk-diag:#0E9F8E; --walk-a:#E5383B; --walk-b:#16203F; --walk-ring:#B04BE0;
+  --gap-bg:#3A3F45; --gap-ink:#5E656D; --gap-label:#FFE08A;
+  --face-a:#DCE5F7; --face-b:#EFE5CC; --face-c:#D5EDDF;
   --stage:#0C1317; --stage-ink:#DCE6E9; --stage-ink-2:#8FA3AA;
   --f-display:"Charter","Bitstream Charter","Sitka Text","Iowan Old Style","Palatino Linotype",Georgia,serif;
   --f-body:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
@@ -30,187 +30,532 @@
   color-scheme: dark;
   --bg:#0F1519; --panel:#161E23; --panel-2:#1D272D; --ink:#E2E9EB; --ink-2:#A8B5BA; --ink-3:#7D8C92;
   --rule:#2C3940; --rule-2:#232E34; --accent:#7FB0F0; --accent-bg:#1B2A3D;
-  --slide:#38C2B0; --quarter:#F2A257; --half:#F2679E; --corner:#F5CF4A; --corner-ink:#2B2200;
-  --rec:#5BCB93; --rec-bg:#16301F; --warn:#E5AE5C; --warn-bg:#33270F; --bad:#F08A80; --bad-bg:#3A1A17;
-  --walk-eq:#6FA3FF; --walk-pole:#B48AF0; --walk-a:#FF6B6E; --walk-b:#F1F3FF;
+  --slide:#38C2B0; --quarter:#F2A257; --half:#F2679E; --quarter-bg:#3A2A18; --half-bg:#3A1A28;
+  --corner:#F5CF4A; --rec:#5BCB93; --rec-bg:#16301F; --warn:#E5AE5C; --warn-bg:#33270F; --bad:#F08A80; --bad-bg:#3A1A17; --bad-hi:#FF5544;
+  --wg:#7FA6F2; --wg-bg:#1A2740; --wk:#D9B65A; --wk-bg:#33290F;
+  --walk-eq:#6FA3FF; --walk-pole:#B48AF0; --walk-diag:#3FD1BE; --walk-a:#FF6B6E; --walk-b:#F1F3FF; --walk-ring:#D58CFF;
+  --gap-bg:#2A2E33; --gap-ink:#454B52; --gap-label:#FFE08A;
+  --face-a:#1E2C47; --face-b:#3A2F14; --face-c:#173322;
 }}
 :root[data-theme="dark"]{
   color-scheme: dark;
   --bg:#0F1519; --panel:#161E23; --panel-2:#1D272D; --ink:#E2E9EB; --ink-2:#A8B5BA; --ink-3:#7D8C92;
   --rule:#2C3940; --rule-2:#232E34; --accent:#7FB0F0; --accent-bg:#1B2A3D;
-  --slide:#38C2B0; --quarter:#F2A257; --half:#F2679E; --corner:#F5CF4A; --corner-ink:#2B2200;
-  --rec:#5BCB93; --rec-bg:#16301F; --warn:#E5AE5C; --warn-bg:#33270F; --bad:#F08A80; --bad-bg:#3A1A17;
-  --walk-eq:#6FA3FF; --walk-pole:#B48AF0; --walk-a:#FF6B6E; --walk-b:#F1F3FF;
+  --slide:#38C2B0; --quarter:#F2A257; --half:#F2679E; --quarter-bg:#3A2A18; --half-bg:#3A1A28;
+  --corner:#F5CF4A; --rec:#5BCB93; --rec-bg:#16301F; --warn:#E5AE5C; --warn-bg:#33270F; --bad:#F08A80; --bad-bg:#3A1A17; --bad-hi:#FF5544;
+  --wg:#7FA6F2; --wg-bg:#1A2740; --wk:#D9B65A; --wk-bg:#33290F;
+  --walk-eq:#6FA3FF; --walk-pole:#B48AF0; --walk-diag:#3FD1BE; --walk-a:#FF6B6E; --walk-b:#F1F3FF; --walk-ring:#D58CFF;
+  --gap-bg:#2A2E33; --gap-ink:#454B52; --gap-label:#FFE08A;
+  --face-a:#1E2C47; --face-b:#3A2F14; --face-c:#173322;
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
 @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body);-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.58 var(--f-body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 .wrap{max-width:1240px;margin:0 auto;padding-inline:20px;padding-block:0 80px}
-.prose{max-width:72ch}
+@media (max-width:600px){.wrap{padding-inline:16px}}
+.prose{max-width:74ch}
 h1,h2,h3{font-family:var(--f-display);font-weight:600;text-wrap:balance;letter-spacing:-.005em}
-h1{font-size:clamp(2rem,4.2vw,3.1rem);line-height:1.08;margin:.2em 0 .25em}
-h2{font-size:1.75rem;line-height:1.2;margin:2.6em 0 .4em;padding-top:.6em;border-top:1px solid var(--rule)}
-h3{font-size:1.18rem;margin:1.6em 0 .4em}
+h1{font-size:clamp(1.9rem,4.4vw,3.1rem);line-height:1.08;margin:.2em 0 .25em}
+h2{font-size:clamp(1.4rem,3vw,1.8rem);line-height:1.2;margin:2.4em 0 .4em;padding-top:.6em;border-top:1px solid var(--rule)}
+h3{font-size:1.2rem;margin:1.7em 0 .4em}
+h4{font:600 .95rem var(--f-body);margin:.2em 0 .4em}
 p{margin:.55em 0}
 a{color:var(--accent)}
 a:focus-visible,button:focus-visible,input:focus-visible,label:focus-within{outline:2px solid var(--accent);outline-offset:2px}
 .eyebrow{font:600 .72rem/1 var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
-.lead{font-size:1.1rem;color:var(--ink-2);max-width:70ch}
+.lead{font-size:1.08rem;color:var(--ink-2);max-width:72ch}
 small,.note{color:var(--ink-3);font-size:.86rem}
-code,.mono{font-family:var(--f-mono);font-size:.88em}
+code,.mono{font-family:var(--f-mono);font-size:.86em}
 .num{font-variant-numeric:tabular-nums}
-nav.toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--rule);margin-inline:-20px;padding:8px 20px;display:flex;gap:4px 14px;flex-wrap:wrap;font-size:.84rem}
+nav.toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--rule);margin-inline:-20px;padding:8px 20px;display:flex;gap:4px 14px;flex-wrap:nowrap;overflow-x:auto;font-size:.84rem;scrollbar-width:thin}
+@media (max-width:600px){nav.toc{margin-inline:-16px;padding-inline:16px}}
 nav.toc a{color:var(--ink-2);text-decoration:none;white-space:nowrap}
 nav.toc a:hover{color:var(--accent)}
 header.top{padding-top:28px}
-/* decision cards */
-.decisions{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px;margin:22px 0 8px}
-.dcard{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;min-width:0}
-.dcard h3{margin:0;font-size:1.05rem}
-.dcard .q{color:var(--ink-3);font-size:.86rem}
-.opt{display:flex;gap:10px;align-items:flex-start;font-size:.92rem;padding:6px 8px;border-radius:6px}
-.opt.rec{background:var(--rec-bg)}
-.opt b{font-weight:600}
-.tag{display:inline-block;font:600 .68rem/1.5 var(--f-body);letter-spacing:.06em;text-transform:uppercase;padding:1px 7px;border-radius:999px;white-space:nowrap}
+.wname{display:inline-block;font-weight:700;padding:0 .35em;border-radius:4px;white-space:nowrap}
+.wname.g{background:var(--wg-bg);color:var(--wg)} .wname.k{background:var(--wk-bg);color:var(--wk)}
+.tag{display:inline-block;font:600 .68rem/1.5 var(--f-body);letter-spacing:.06em;text-transform:uppercase;padding:1px 7px;border-radius:999px;white-space:nowrap;vertical-align:1px}
 .tag.rec{background:var(--rec);color:var(--panel)}
-.tag.run{background:var(--accent-bg);color:var(--accent)}
-.tag.now{background:var(--panel-2);color:var(--ink-2)}
-.tag.out{background:var(--bad-bg);color:var(--bad)}
-.tag.alt{background:var(--warn-bg);color:var(--warn)}
+.ev{display:inline-block;font:600 .64rem/1.45 var(--f-body);letter-spacing:.05em;text-transform:uppercase;padding:0 6px;border-radius:4px;white-space:nowrap;vertical-align:1px}
+.ev.r{background:var(--rec-bg);color:var(--rec)} .ev.c{background:var(--accent-bg);color:var(--accent)} .ev.i{background:var(--panel-2);color:var(--ink-2)} .ev.u{background:var(--warn-bg);color:var(--warn)} .ev.n{background:var(--bad-bg);color:var(--bad)}
+.callout{border-left:3px solid var(--accent);background:var(--accent-bg);padding:12px 16px;border-radius:0 8px 8px 0;margin:14px 0}
+.callout.rec{border-color:var(--rec);background:var(--rec-bg)}
+.callout.warn{border-color:var(--warn);background:var(--warn-bg)}
+.callout h3{margin:.1em 0 .35em}
+/* head-to-head columns */
+.h2h{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin:12px 0}
+@media (max-width:860px){.h2h{grid-template-columns:1fr}}
+.side{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:14px 16px;min-width:0}
+.side.g{border-top:4px solid var(--wg)} .side.k{border-top:4px solid var(--wk)}
+.side > h4:first-child{margin-top:0}
+.side ul,.topic ul{margin:.3em 0;padding-left:1.15em}
+.side li{margin:.3em 0}
+ul.tight li{margin:.15em 0}
+.topic{margin:28px 0 8px}
+.topic > h3{margin-top:0}
+.sub3{font:600 .76rem/1 var(--f-body);letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);margin:1.2em 0 .3em}
+.unk{border:1px dashed var(--warn);background:var(--warn-bg);border-radius:8px;padding:8px 12px;margin:10px 0;font-size:.9rem}
+.unk b{color:var(--warn)}
 /* explorer */
-.explorer{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:18px;align-items:start;margin-top:14px}
-@media (max-width:980px){.explorer{grid-template-columns:1fr}}
-.picker{display:flex;flex-direction:column;gap:6px;margin:10px 0 12px}
-.picker .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.picker .fam{font:600 .7rem/1 var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);width:84px;flex:none}
-.chip{font:500 .84rem/1.2 var(--f-body);border:1px solid var(--rule);background:var(--panel);color:var(--ink);padding:5px 10px;border-radius:999px;cursor:pointer}
-.chip:hover{border-color:var(--accent)}
-.chip[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
-.chip .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px;background:var(--ink-3)}
-.chip .dot.rec{background:var(--rec)}
-.controls{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:.86rem;margin:8px 0}
-.seg{display:inline-flex;border:1px solid var(--rule);border-radius:7px;overflow:hidden}
-.seg button{font:500 .82rem var(--f-body);background:var(--panel);color:var(--ink-2);border:0;border-right:1px solid var(--rule);padding:5px 10px;cursor:pointer}
+.controls{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:.86rem;margin:10px 0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--rule);border-radius:7px;overflow:hidden;max-width:100%}
+.seg button{font:500 .82rem var(--f-body);background:var(--panel);color:var(--ink-2);border:0;border-right:1px solid var(--rule);padding:6px 10px;cursor:pointer;min-height:32px}
 .seg button:last-child{border-right:0}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel)}
 .checks{display:flex;flex-wrap:wrap;gap:4px 12px}
-.checks label{display:inline-flex;gap:5px;align-items:center;cursor:pointer;color:var(--ink-2)}
-.stagebox{background:var(--stage);border-radius:8px;padding:10px;position:relative}
+.checks label{display:inline-flex;gap:5px;align-items:center;cursor:pointer;color:var(--ink-2);min-height:28px}
+.stagebox{background:var(--stage);border-radius:8px;padding:10px;position:relative;min-width:0}
+.stagebox h4{color:var(--stage-ink);margin:0 0 8px}
 .mapbox{position:relative;width:100%;margin:0 auto}
+.mapbox.square{aspect-ratio:1/1}
 .mapbox img,.mapbox svg{position:absolute;inset:0;width:100%;height:100%;display:block}
-.mapbox img.grat{mix-blend-mode:normal}
+.mapbox img.dim{filter:brightness(.62) saturate(.7)}
+.mapbox img.faint{opacity:.55}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;color:var(--stage-ink-2);font-size:.78rem;margin-top:8px}
 .legend .sw{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px}
-.legend .bar{display:inline-block;width:160px;height:10px;border-radius:2px;vertical-align:middle;margin:0 6px}
+.legend .bar{display:inline-block;width:140px;max-width:40vw;height:10px;border-radius:2px;vertical-align:middle;margin:0 6px}
 .legend .cn{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--corner);border:1.5px solid #000;vertical-align:-1px;margin-right:5px}
-.panel{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:16px 18px;min-width:0}
-.panel h3{margin:.1em 0 .2em}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:.86rem;margin:10px 0}
-.kv dt{color:var(--ink-3)}
-.kv dd{margin:0}
-.pc{display:grid;grid-template-columns:1fr;gap:8px;font-size:.88rem}
-.pc ul{margin:.2em 0;padding-left:1.1em}
-.pc li{margin:.2em 0}
-.pc .pro h4,.pc .con h4{margin:.4em 0 0;font:600 .72rem/1 var(--f-body);letter-spacing:.1em;text-transform:uppercase}
-.pc .pro h4{color:var(--rec)} .pc .con h4{color:var(--bad)}
-/* tables */
-.tscroll{overflow-x:auto;margin:12px 0;border:1px solid var(--rule);border-radius:8px;background:var(--panel)}
-table{border-collapse:collapse;width:100%;font-size:.84rem}
-#cmp{min-width:1560px}
-#cmp td:nth-child(1){width:180px}#cmp td:nth-child(2){width:150px}#cmp td:nth-child(4){width:170px}#cmp td:nth-child(5){width:140px}#cmp td:nth-child(7){width:220px}#cmp td:nth-child(8){width:150px;white-space:normal}#cmp td:nth-child(9),#cmp td:nth-child(10){width:210px}
-#tech-table{min-width:1280px}#tech-table td{width:13%}#tech-table td:first-child{width:110px}
-#size-table{min-width:1100px}
-th,td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule-2)}
-th{font-weight:600;color:var(--ink-2);background:var(--panel-2);position:sticky;top:0}
-td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-tr.rec td{background:var(--rec-bg)}
-tr.rec td:first-child{box-shadow:inset 3px 0 0 var(--rec)}
-tr.ref td{color:var(--ink-2)}
-td .sub{display:block;color:var(--ink-3);font-size:.78rem}
-.st{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
-.st.ok{background:var(--rec)} .st.mid{background:var(--quarter)} .st.bad{background:var(--bad)} .st.na{background:var(--ink-3)}
+.wcap{color:var(--stage-ink-2);font-size:.8rem;margin-top:6px}
 /* figures */
-.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin:12px 0}
-.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin:12px 0}
 figure{margin:0;min-width:0}
-figcaption{font-size:.84rem;color:var(--ink-2);margin-top:6px}
+figcaption{font-size:.86rem;color:var(--ink-2);margin-top:8px}
 .fig{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:12px;min-width:0}
-.fig h4{margin:0 0 6px;font:600 .9rem var(--f-body)}
+.fig h4{margin:0 0 6px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px;margin:12px 0}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:14px;margin:12px 0}
 svg text{font-family:var(--f-body)}
-.callout{border-left:3px solid var(--accent);background:var(--accent-bg);padding:10px 14px;border-radius:0 6px 6px 0;margin:14px 0;max-width:80ch}
-.callout.rec{border-color:var(--rec);background:var(--rec-bg)}
-.callout.warn{border-color:var(--warn);background:var(--warn-bg)}
+/* tables */
+.tscroll{overflow-x:auto;margin:12px 0;border:1px solid var(--rule);border-radius:8px;background:var(--panel);-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:.84rem}
+th,td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule-2)}
+th{font-weight:600;color:var(--ink-2);background:var(--panel-2)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+td .sub{display:block;color:var(--ink-3);font-size:.78rem;margin-top:2px}
+.glance td:first-child{font-weight:600;color:var(--ink-2);width:26%}
+.glance td.win{background:var(--rec-bg)}
+.kind{font-weight:600}
+.kind.slide{color:var(--slide)} .kind.quarter{color:var(--quarter)} .kind.half{color:var(--half)}
+.pill{display:inline-block;min-width:1.5em;text-align:center;border-radius:999px;color:#fff;font-weight:700;font-size:.78rem;padding:0 5px;margin-right:4px}
+td.thumb{width:150px;min-width:120px}
+.thumbbox{position:relative;width:100%;background:var(--stage);border-radius:4px;overflow:hidden}
+.thumbbox img{position:absolute;inset:0;width:100%;height:100%}
+#trip-table table,#walks-table table{min-width:640px}
+#seams-guyou table,#seams-cube table{min-width:620px}
+#appx-table table{min-width:760px}
+#mapgrid-table table{min-width:640px}
+/* globe */
 .globe-wrap{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:18px;align-items:start}
 @media (max-width:980px){.globe-wrap{grid-template-columns:1fr}}
 #globe{width:100%;aspect-ratio:4/3;max-height:640px;border-radius:8px;background:radial-gradient(circle at 50% 45%,#1A2830 0%,#0A1014 70%);touch-action:none;cursor:grab;display:block}
 .slider{display:flex;gap:10px;align-items:center;margin-top:10px;font-size:.84rem;color:var(--ink-2)}
 .slider input{width:100%}
 .slider .stops{display:flex;justify-content:space-between;font-size:.74rem;color:var(--ink-3)}
-button.act{font:600 .84rem var(--f-body);background:var(--ink);color:var(--panel);border:0;border-radius:6px;padding:6px 12px;cursor:pointer}
-.findings li{margin:.5em 0}
+button.act,button.chip{font:600 .84rem var(--f-body);border-radius:6px;padding:7px 12px;cursor:pointer;min-height:34px}
+button.act{background:var(--ink);color:var(--panel);border:0}
+button.chip{background:var(--panel);color:var(--ink);border:1px solid var(--rule)}
+button.chip[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:16px 18px;min-width:0}
 .foot{margin-top:60px;color:var(--ink-3);font-size:.82rem;border-top:1px solid var(--rule);padding-top:14px}
-.kind{font-weight:600}
-.kind.slide{color:var(--slide)} .kind.quarter{color:var(--quarter)} .kind.half{color:var(--half)}
+.verdict{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.verdict{grid-template-columns:1fr}}
+ol.findings li{margin:.45em 0}
 </style>
 </head>
 <body>
 <div class="wrap">
 <header class="top">
-  <div class="eyebrow">Deep Time · decision page · 2026-10-03</div>
-  <h1>The world's shape</h1>
-  <p class="lead">Which flat world should hold the planet: today's Lambert strip, a pillowcase (two squares, Guyou's layout) or a cube (six squares)? And if a cube, how big are its faces and how is it unfolded? Every picture below is computed from the survey's own projection code with a real 16k bake (earthlike_quick_16k, workbench run <span class="mono">1a103bb2d2b</span>) resampled onto each world.</p>
+  <div class="eyebrow">Deep Time · decision page · 2026-10-04</div>
+  <h1>Petroff–Guyou or the Moser cube</h1>
+  <p class="lead">Two seamless, equal-area worlds at today's scale: <span class="wname g">Petroff–Guyou</span>, Petroff's 2021 square map in Guyou's 2:1 layout (two hemisphere squares, one slide, two half-turn seams), and the <span class="wname k">Moser cube</span>, the equal-area cube in the cross net (six faces, one slide, four quarter-turn and two half-turn seams). This page works through what players do and feel in each, and draws what happens at a corner of each from the real geometry. Every picture is computed on the test VM from the projection survey's own code, with a real 16k bake (earthlike_quick_16k, workbench run <span class="mono">1a103bb2d2b</span>) resampled onto both worlds.</p>
 </header>
 <nav class="toc" aria-label="Sections">
-  <a href="#decide">Decide</a><a href="#why">Why a cube can win</a><a href="#maps">Maps</a><a href="#globe-sec">3D globe</a><a href="#compare">Compare</a><a href="#tech">Seam technology</a><a href="#size">Face size</a><a href="#net">Net</a><a href="#walks">Walking</a><a href="#sim">Simulation grid</a><a href="#findings">New findings</a><a href="#method">Method</a>
+  <a href="#verdict">Verdict</a><a href="#worlds">The two worlds</a><a href="#corners">Corners up close</a><a href="#tiling">Plane tiling</a><a href="#play">Gameplay</a><a href="#globe-sec">3D globe</a><a href="#sim">Simulation grid</a><a href="#recommend">Recommendation</a><a href="#appendix">Also considered</a><a href="#method">Method</a>
 </nav>
 
-<section id="decide">
-  <h2>The three decisions</h2>
-  <p class="prose">Recommendations follow the projection survey except where this page's own measurements add something (marked in <a href="#findings">New findings</a>). Each option has its fair case further down.</p>
-  <div class="decisions" id="decision-cards"></div>
+<!-- ======================================================================================= -->
+<section id="verdict">
+  <h2>The short answer</h2>
+  <div class="verdict">
+    <div>
+      <div class="callout rec">
+        <h3><span class="tag rec">Recommended</span> The Moser cube, cross net, today's scale, with its eight corners placed at sea where the planet allows and kept clear of building</h3>
+        <p>The cube draws continents with about half the stretch (on this planet <span data-v="stats|cube-moser-cross|land_shape_gt|1.5" data-f="pct"></span> of land is stretched more than 1.5×, against <span data-v="stats|guyou-petroff|land_shape_gt|1.5" data-f="pct"></span> on Petroff–Guyou), puts both poles in the middle of a face instead of on a seam, has no creases, keeps walking distances closer to the planet's, and its faces can be the sphere-native grid the solvers move onto (the research's recommendation; the climate grid itself is still Ben's open choice). It pays at its corners: eight of them instead of four, and unlike Guyou's they cannot be drawn as one consistent picture (below). That cost is real, new on this page, and narrows the gap; it does not reverse it.</p>
+      </div>
+      <p class="prose">What would flip it to Petroff–Guyou: if a single, consistent picture at every corner matters more than shape (Distant Horizons, vanilla maps and the wrap engine's band all see a tear at each cube corner), if Immersive Portals is to stay the long-term route (four portals against fourteen, quarter-turn portals untested), or if the plane-covering client is ever wanted (a cube rules it out for good). See <a href="#recommend">the full case for each side</a>.</p>
+      <p class="prose note">Where this stands: Ben's plan since 2026-10-03 is Guyou, "final after survey", coming back to him only if the survey finds a clearly better layout. On shape, poles, creases and the simulation grid the cube is clearly better; on corners, portals and the plane-covering route it is not. This page is that comeback, and the choice is his.</p>
+    </div>
+    <div class="tscroll" style="margin:0"><table class="glance" aria-label="At a glance">
+      <thead><tr><th></th><th><span class="wname g">Petroff–Guyou</span></th><th><span class="wname k">Moser cube</span></th></tr></thead>
+      <tbody>
+        <tr><td>Shape a/b, median / worst</td><td class="n">1.78 / 2.67</td><td class="n win">1.26 / 1.42</td></tr>
+        <tr><td>Land stretched &gt; 1.5× (this planet)</td><td class="n"><span data-v="stats|guyou-petroff|land_shape_gt|1.5" data-f="pct"></span></td><td class="n win"><span data-v="stats|cube-moser-cross|land_shape_gt|1.5" data-f="pct"></span></td></tr>
+        <tr><td>Corners (cone points)</td><td class="n win">4 × 180°</td><td class="n">8 × 270°</td></tr>
+        <tr><td>Corner renders as one picture</td><td class="win">yes, doubled</td><td>no: a tear</td></tr>
+        <tr><td>All corners at sea, share of turns</td><td class="n win"><span data-v="corner_sea|guyou" data-f="pct"></span></td><td class="n"><span data-v="corner_sea|cube" data-f="pct"></span></td></tr>
+        <tr><td>Seam pairs / portals</td><td class="n win">3 / 4</td><td class="n">7 / 14</td></tr>
+        <tr><td>Turning seam (16k)</td><td class="n win">13,088 blocks</td><td class="n">22,656 blocks</td></tr>
+        <tr><td>F3 north within 15° of true north</td><td class="n win"><span data-v="stats|guyou-petroff|north_within|15" data-f="pct"></span></td><td class="n"><span data-v="stats|cube-moser-cross|north_within|15" data-f="pct"></span></td></tr>
+        <tr><td>Compass &gt; 90° off the way back</td><td class="n win"><span data-v="stats|guyou-petroff|dist|compass_gt_90" data-f="pct"></span></td><td class="n"><span data-v="stats|cube-moser-cross|dist|compass_gt_90" data-f="pct"></span></td></tr>
+        <tr><td>Walking ÷ planet distance, median</td><td class="n"><span data-v="stats|guyou-petroff|dist|ratio_q10_50_90|1" data-f="f2"></span></td><td class="n win"><span data-v="stats|cube-moser-cross|dist|ratio_q10_50_90|1" data-f="f2"></span></td></tr>
+        <tr><td>Equator, once round</td><td class="n"><span data-v="layouts|guyou-petroff|walks|equator|blocks"></span> blocks</td><td class="n win"><span data-v="layouts|cube-moser-cross|walks|equator|blocks"></span> blocks</td></tr>
+        <tr><td>Poles</td><td>on a half-turn seam</td><td class="win">ordinary points, mid-face</td></tr>
+        <tr><td>Creases</td><td>≤ 5° inside each square</td><td class="win">none</td></tr>
+        <tr><td>Toroidal World keeps</td><td class="win">the slide (⅓ of seam)</td><td>the band's slide (⅐ of seam)</td></tr>
+        <tr><td>Projection work</td><td class="n win">1–2 days</td><td class="n">8–11 days</td></tr>
+        <tr><td>Production with portals</td><td class="n win">26–40 days</td><td class="n">31–50 days</td></tr>
+        <tr><td>Same grid as the climate</td><td>no (resampled at the bake)</td><td class="win">yes, at quick 16k</td></tr>
+      </tbody>
+    </table></div>
+  </div>
 </section>
 
-<section id="why">
-  <h2>Why a cube can beat a pillowcase</h2>
+<!-- ======================================================================================= -->
+<section id="worlds">
+  <h2>The two worlds, with the real planet on them</h2>
+  <p class="prose">One set of controls drives both maps. <b>Shape</b> shows how stretched the planet is drawn (coasts in white), <b>North error</b> how far F3's "north" (−z) is from true north, <b>Latitude bands</b> where the climate bands bend, <b>Distance from spawn</b> the walking distance through the seams from a shared spawn (the dot) with the planet's own distance as blue lines, <b>Compass error</b> how wrong a vanilla compass is on the way back. Both worlds are turned about the axis to keep corners off land (λc = <span data-v="lamc_deg" data-f="raw"></span>° for Guyou, λ₀ = <span data-v="lam0_deg" data-f="raw"></span>° for the cube).</p>
+  <div class="controls">
+    <div class="seg" id="layer-seg" role="group" aria-label="Layer"></div>
+    <div class="checks" id="overlay-checks"></div>
+  </div>
+  <div class="h2h">
+    <div class="stagebox"><h4><span class="wname g">Petroff–Guyou</span> <span class="note" style="color:var(--stage-ink-2)">13,088 × 6,544 blocks, b = 6,544</span></h4><div class="mapbox" id="mb-guyou-petroff"></div>
+      <div class="wcap">Two hemisphere squares side by side; the equator runs straight across the middle; each pole is a point on the top or bottom edge, a quarter of the way along.</div></div>
+    <div class="stagebox"><h4><span class="wname k">Moser cube</span> <span class="note" style="color:var(--stage-ink-2)">faces of 3,776 blocks, cross 15,104 × 11,328</span></h4><div class="mapbox" id="mb-cube-moser-cross"></div>
+      <div class="wcap">Four band faces round the equator, the poles at the centres of the two polar faces; the rest of the 4:3 box is outside the world.</div></div>
+  </div>
+  <div class="stagebox" style="padding:8px 12px"><div class="legend" id="worlds-legend" style="margin:0"></div></div>
+  <p class="note prose">Radial streaks round the poles come from the Lambert bake (its rows resolve the polar caps badly), not from either projection; a production bake samples the caps from the simulation's sphere. Pixels exactly on a Petroff square's diagonals used to land in the wrong quadrant (a bug in the boundary handling of Petroff's own quadrant test, fixed in the survey's port while making this page); no published number depended on them.</p>
+</section>
+
+<!-- ======================================================================================= -->
+<section id="corners">
+  <h2>Corners up close</h2>
   <div class="grid2">
     <div class="prose">
-      <p>Glue flat squares of block grid together with slides, half-turns and quarter-turns until they cover the planet once. Walking round almost any point you turn 360°. At a few <b>corners</b> you turn less, and by Gauss–Bonnet the missing angles always add up to <b>720°</b>. Since every glue is a multiple of 90°, a corner can miss 90° or 180° (or 270°, worse).</p>
+      <p>Both worlds are flat everywhere except at a few <b>corners</b> (cone points), where the angle round the point is short. Gauss–Bonnet makes the missing angles add up to 720°, so Guyou has 4 corners each missing 180°, and the cube 8 corners each missing 90°. A player can walk right up to one: it is a place in the world.</p>
+      <p>The figures below are computed from the real maps at one corner of each world: Guyou's at the midpoint of its top edge (where the two hemisphere squares meet the north half-turn seam), the cube's where band faces F0 and F1 meet the north face N. For these close-ups only, each world is turned so a coast runs past the corner (Guyou λc = <span data-v="corners|guyou-petroff|lambda" data-f="raw"></span>°, cube λ₀ = <span data-v="corners|cube-moser-cross|lambda" data-f="raw"></span>°), to show what a corner on land looks like; the turns chosen for the worlds above keep the corners at sea.</p>
+    </div>
+    <figure class="fig"><div id="cone-fig"></div><figcaption>The full turn round an ordinary point, round a cube corner (three quarters of a turn) and round a Guyou corner (half a turn). The same planet area is squeezed into less angle.</figcaption></figure>
+  </div>
+
+  <h3>1. The faces that meet there, and the missing angle</h3>
+  <div class="h2h">
+    <figure class="stagebox"><h4><span class="wname g">Petroff–Guyou</span>: two squares, 180° missing</h4><div id="cn-nbhd-guyou-petroff"></div>
+      <figcaption style="color:var(--stage-ink-2)">The west and east hemisphere squares meet along the dashed hinge. The top edge is the north half-turn seam: the left half is glued to the right half, turned 180° about the corner. Half of the turn round the corner simply is not there (hatched).</figcaption></figure>
+    <figure class="stagebox"><h4><span class="wname k">Moser cube</span>: three faces, 90° missing</h4><div id="cn-nbhd-cube-moser-cross"></div>
+      <figcaption style="color:var(--stage-ink-2)">F0 and F1 (band) and N (polar) meet at a cube vertex. N's east edge is glued to F1's top edge by a quarter-turn about the corner. The fourth quarter (hatched) is outside the world.</figcaption></figure>
+  </div>
+
+  <h3>2. Walking past it, and round it</h3>
+  <div class="h2h">
+    <figure class="stagebox"><h4><span class="wname g">Petroff–Guyou</span></h4><div id="cn-paths-guyou-petroff"></div></figure>
+    <figure class="stagebox"><h4><span class="wname k">Moser cube</span></h4><div id="cn-paths-cube-moser-cross"></div></figure>
+  </div>
+  <div class="h2h">
+    <div class="side g"><h4>Two walkers, 600 blocks apart, heading north either side of the corner</h4>
+      <p>Both reach the half-turn seam and come out heading south, each on the other's track: A emerges where B went in and walks down B's path, B down A's. They stay side by side, but each now walks the opposite way to where the other was walking: the paths diverge by 180°. In F3 both yaws jump by 180°.</p>
+      <h4>A ring of radius 600 blocks round the corner, corner on your left</h4>
+      <p>Back at the start after <b><span data-v="corners|guyou-petroff|ring|blocks"></span> blocks</b> (an ordinary point: 3,770) and only <b><span data-v="corners|guyou-petroff|ring|felt_turn_deg"></span>°</b> of turning; the seam adds the other 180° to your F3 yaw. On the planet the same loop is <span data-v="corners|guyou-petroff|ring|planet_blocks"></span> blocks long: land round the corner is squeezed round and stretched outward.</p></div>
+    <div class="side k"><h4>Two walkers, 600 blocks apart, heading north either side of the corner</h4>
+      <p>A (west) walks straight on into N through an ordinary face edge. B (east) crosses F1's top edge, a quarter-turn seam, and comes out in N heading west. They now walk at right angles and their paths cross: the paths diverge by 90°. Only B's F3 yaw jumps (by 90°).</p>
+      <h4>A ring of radius 600 blocks round the corner, corner on your left</h4>
+      <p>Back at the start after <b><span data-v="corners|cube-moser-cross|ring|blocks"></span> blocks</b> (an ordinary point: 3,770) and <b><span data-v="corners|cube-moser-cross|ring|felt_turn_deg"></span>°</b> of turning; the seam adds 90° to your F3 yaw. On the planet the same loop is <span data-v="corners|cube-moser-cross|ring|planet_blocks"></span> blocks long.</p></div>
+  </div>
+
+  <h3>3. What you see, standing 450 blocks from it and looking at it</h3>
+  <p class="prose">Rays traced straight from the player through the seams (what Immersive Portals draws through its portals, and what any correct renderer would draw). Rays passing left and right of the corner reach the region behind it by two different routes, so part of the world is seen twice: <span style="background:rgba(38,115,255,.34);padding:0 4px;border-radius:3px">blue</span> marks second copies, <span style="background:rgba(255,158,26,.22);padding:0 4px;border-radius:3px">orange</span> the part of the world that is shown twice. Dashed white lines: where the second copy begins.</p>
+  <div class="h2h">
+    <figure class="stagebox"><h4><span class="wname g">Petroff–Guyou</span></h4><div id="cn-view-guyou-petroff"></div>
+      <figcaption style="color:var(--stage-ink-2)">Everything near the corner is seen twice: the half-plane beyond the corner is the near half again, turned 180°, and you see yourself 900 blocks ahead, upside down on the map. The picture is <b>continuous</b> everywhere (no tear: <span data-v="corners|guyou-petroff|view|tear_px"></span> torn pixels): because 180° divides 360°, the two copies fit together. Check: second copies match their first image to <span data-v="corners|guyou-petroff|view|dup_check_blocks|0" data-f="f1"></span> blocks (median).</figcaption></figure>
+    <figure class="stagebox"><h4><span class="wname k">Moser cube</span></h4><div id="cn-view-cube-moser-cross"></div>
+      <figcaption style="color:var(--stage-ink-2)">A 90° wedge straight behind the corner is a second copy of the two 45° wedges beside it. Where the two copies meet, straight behind the corner, the picture <b>tears</b> (red): rays a hair to its left and right land 90° apart round the corner. 270° does not divide 360°, so no arrangement removes it. Check: second copies match their first image to <span data-v="corners|cube-moser-cross|view|dup_check_blocks|0" data-f="f1"></span> blocks (median).</figcaption></figure>
+  </div>
+
+  <h3>4. One raw copy: what the band, the generator and Distant Horizons can show</h3>
+  <p class="prose">The wrap engine's replicated band, Immersive Portals' hidden outside, the terrain generator beyond an edge and Distant Horizons all hold one block per raw position. Here the missing wedge is filled the way the engine's edge table does it (<span class="mono">WrapLayouts</span>, first edge wins, bands made deep), with tears in red.</p>
+  <div class="h2h">
+    <figure class="stagebox"><h4><span class="wname g">Petroff–Guyou</span></h4><div id="cn-raw-guyou-petroff"></div>
+      <figcaption style="color:var(--stage-ink-2)">The missing half is filled by the two squares, each turned 180°. Every boundary matches: <span data-v="corners|guyou-petroff|raw_tear_px"></span> torn pixels. One raw copy is right for every viewer.</figcaption></figure>
+    <figure class="stagebox"><h4><span class="wname k">Moser cube</span></h4><div id="cn-raw-cube-moser-cross"></div>
+      <figcaption style="color:var(--stage-ink-2)">The engine's first edge for this quarter is N-east/F1, so it shows F1 turned 90°: right for a player in N looking east, wrong for a player in F1 looking north, who sees F1's own terrain again across a tear along its top edge (<span data-v="corners|cube-moser-cross|raw_tear_px"></span> torn pixels). Choosing the other edge, or splitting the quarter on its diagonal, only moves the tear.</figcaption></figure>
+  </div>
+
+  <h3>5. Blocks at the corner</h3>
+  <p class="prose">The block grid round each corner with the engine's integer edge table at production size (Guyou h = 6,528, the nearest centred size the engine can align to chunks; cube s = 3,776). Letters name stored blocks; a hatched cell is outside the world and shows the stored block written in it, turned (↻ clockwise, ↺ anticlockwise); a red outline means two edges claim the cell and disagree.</p>
+  <div class="h2h">
+    <figure class="fig"><h4><span class="wname g">Petroff–Guyou</span>: two blocks meet at the corner</h4><div id="cn-blocks-guyou-petroff"></div><div id="cn-notes-guyou-petroff"></div>
+      <figcaption>Each corner block is its own diagonal neighbour, and the two are neighbours twice (side by side, and again across the seam). Every band cell has exactly one stored block, so blocks and fluids work up to the corner; Create's adapter already refuses to connect a block to itself.</figcaption></figure>
+    <figure class="fig"><h4><span class="wname k">Moser cube</span>: three blocks meet at the corner</h4><div id="cn-blocks-cube-moser-cross"></div><div id="cn-notes-cube-moser-cross"></div>
+      <figcaption>The three corner blocks are pairwise side neighbours (a triangle, where a normal grid has a square). The missing cell is claimed by both quarter-turn edges with different blocks, so whatever stands diagonally across the corner differs by who asks. Side neighbours stay consistent; diagonal ones do not, which is why the engine's unit tests leave a neighbourhood of every cube corner out and Create's adapter refuses one-way diagonals.</figcaption></figure>
+  </div>
+  <p class="prose note">Chunks behave the same at 16 times the scale: two chunks meet at a Guyou corner, three at a cube corner, and the band chunk in the cube's missing quarter has two sources.</p>
+</section>
+
+<!-- ======================================================================================= -->
+<section id="tiling">
+  <h2>Plane tiling: Ben's point</h2>
+  <div class="grid2">
+    <div class="prose">
       <ul>
-        <li><b>Pillowcase</b> (Peirce, Guyou, Petroff, Gringorten, Collignon): 4 corners × 180° missing. Half-turn seams make it possible.</li>
-        <li><b>Cube</b> (Moser cube, QSC, HEALPix, the graphics warps): 8 corners × 90° missing. Only quarter-turn seams make it possible, which Immersive Portals and the wrap engine both allow.</li>
+        <li><b>The pillowcase is a flat orbifold.</b> 180° divides 360°, so copies of the Guyou world, some turned 180°, tile the whole plane with no gaps or overlaps (the group p2). Measured: neighbouring pixels of the tiling below are neighbours on the planet everywhere (<span data-v="tiling|guyou|tear_px"></span> torn pixels, largest step <span data-v="tiling|guyou|max_step_blocks"></span> blocks at <span data-v="tiling|guyou|px_blocks"></span> blocks a pixel).</li>
+        <li><b>The cube's 270° corners do not divide 360°.</b> Round each corner the fourth quarter has two candidate pictures (striped below); there is no tiling of the plane.</li>
+        <li><b>Neither Immersive Portals nor the wrap engine needs a tiling.</b> Portals redraw through each seam; the engine folds positions edge by edge. Both work on the cube.</li>
+        <li><b>The cube permanently rules out the plane-covering client route</b>: a client that lives in the unwrapped plane (Toroidal World's design, extended with turns) needs the world to tile the plane. Guyou keeps that door open.</li>
+        <li><b>Can a corner render as one consistent picture?</b> Not as a picture where every place appears once, in either shape: near a Guyou corner every place appears twice. But Guyou's doubled picture is consistent (no tear), so one raw copy serves every viewer; the cube's cannot be (a tear in the traced view, the band, the generator's outside and DH). The page's measurements make this sharper than "neither can".</li>
       </ul>
-      <p>The less a corner misses, the less any map must distort round it. An equal-area map must stretch shapes to at least 2π/θ near a corner of angle θ: <b>2×</b> for the pillowcase, <b>1.33×</b> for the cube. The best measured maps reach 2.67× (Petroff) and 1.42× (Moser cube). A conformal map must instead blow up area: like r⁻² round a pillowcase corner, only r^−⅔ round a cube corner.</p>
     </div>
-    <figure class="fig"><div id="cone-fig"></div><figcaption>What 360° of planet looks like round a corner in each world: a full disc of world (ordinary point), three quarters (cube corner, 270°), half (pillowcase corner, 180°). The same planet area is squeezed into less angle, so shapes stretch.</figcaption></figure>
+    <figure class="fig"><h4>The Guyou corner's full turn: two copies that fit</h4><div class="mapbox square" id="tile-guyou-corner"></div>
+      <figcaption>Round the top-edge corner: the two squares below, the same two turned 180° above. Every edge matches.</figcaption></figure>
   </div>
+  <figure class="stagebox"><h4 style="color:var(--stage-ink)">The plane tiled by copies of the Petroff–Guyou world (gold: the world itself; gold dots: corners)</h4><div class="mapbox" id="tile-guyou"></div></figure>
+  <div class="grid3">
+    <figure class="fig"><h4>A cube corner: the fourth quarter overlaps</h4><div class="mapbox square" id="tile-cube-corner" style="background:var(--stage);border-radius:6px;overflow:hidden"></div>
+      <figcaption>F0, F1 and N round the corner; the top-right quarter shows its two candidates interleaved in stripes.</figcaption></figure>
+    <figure class="fig"><h4>Candidate 1: F1, turned 90°</h4><div class="mapbox square" id="tile-cube-a" style="background:var(--stage);border-radius:6px;overflow:hidden"></div>
+      <figcaption>What a player in N sees looking east (through N's east edge). Torn against F1 below.</figcaption></figure>
+    <figure class="fig"><h4>Candidate 2: N, turned 90° back</h4><div class="mapbox square" id="tile-cube-b" style="background:var(--stage);border-radius:6px;overflow:hidden"></div>
+      <figcaption>What a player in F1 sees looking north (through F1's top edge). Torn against N to the left.</figcaption></figure>
+  </div>
+  <figure class="stagebox"><h4 style="color:var(--stage-ink)">The cube net and the raw world round it under the engine's edge order (red: tears)</h4><div class="mapbox" id="rawext-cube"></div>
+    <figcaption style="color:var(--stage-ink-2)">What a raw-coordinate renderer (Distant Horizons, vanilla maps, the band) would show round the cross if every edge's band were deep. The tears run out from the corners (<span data-v="tiling|cube_rawext|tear_px"></span> torn pixels at <span data-v="tiling|cube_rawext|px_blocks"></span> blocks a pixel). Guyou's equivalent is the tiling above, with none.</figcaption></figure>
 </section>
 
-<section id="maps">
-  <h2>Every candidate, with the real planet on it</h2>
-  <p class="prose">Pick a world. Layers: the planet itself, how many blocks each piece of planet gets (area), how stretched shapes are (shape), and a crease test (a smooth made-up planet, hill-shaded: wherever the map folds, the shading breaks along a line). Overlays: the seams (colour = how the edge is glued, letters and arrows = which edges meet and which way round), the corners, a 15° graticule, Tissot ellipses (each is a 6° disc of planet as the world draws it) and two straight walks.</p>
-  <div class="picker" id="picker"></div>
-  <div class="explorer">
-    <div>
-      <div class="controls">
-        <div class="seg" id="layer-seg" role="group" aria-label="Layer"></div>
-        <div class="checks" id="overlay-checks"></div>
-      </div>
-      <div class="stagebox">
-        <div class="mapbox" id="mapbox"></div>
-        <div class="legend" id="map-legend"></div>
-      </div>
-      <p class="note">Radial streaks round the poles come from the Lambert bake (its rows resolve the polar caps badly), not from the projection; a production bake samples the caps from the simulation's sphere (prototype §5). Longitudes are turned so corners avoid land where they can (λ₀ = <span id="lam0"></span>° for the cubes, λc = <span id="lamc"></span>° for Guyou; see <a href="#walks">placement</a>).</p>
+<!-- ======================================================================================= -->
+<section id="play">
+  <h2>Gameplay, topic by topic</h2>
+  <p class="prose">Badges: <span class="ev r">run</span> seen in a prototype or GameTest; <span class="ev c">computed</span> measured here from the geometry and the real planet; <span class="ev i">inferred</span> reasoned from code or docs; <span class="ev u">unknown</span> not tested by anyone. "v1" is the production world joined by Immersive Portals (Ben's choice for the first version), "the engine" Deep Time's own wrap engine (Phase 1 and the Create adapters built, dev-only).</p>
+
+  <article class="topic" id="t-travel">
+    <h3>Travel</h3>
+    <div class="h2h">
+      <div class="side g"><h4><span class="wname g">Petroff–Guyou</span></h4><ul>
+        <li><b>East–west along the equator</b>: one straight line, <span data-v="layouts|guyou-petroff|walks|equator|blocks"></span> blocks round (20 % short of the planet's 16,384), through one slide; no turn, no corner. The scale swings from about 30 blocks a degree at a hemisphere centre to 46 at its edge (chart) <span class="ev c">computed</span>.</li>
+        <li><b>Over a pole</b>: walking north up a hemisphere's centre line you reach the pole exactly on the half-turn seam, cross it, and walk south down the far meridian, as over a real pole; F3 yaw jumps 180° <span class="ev r">run</span> (prototype). From anywhere else on the equator you cross the same seam beside the pole.</li>
+        <li><b>Diagonal</b> (45° from spawn, 24,000 blocks): see the walk table; slides and half-turns only, F3 yaw jumps 180° at each half-turn <span class="ev c">computed</span>.</li>
+        <li><b>Long boat trips</b>: any course due east or west crosses only the slide, for ever. Every other course meets the half-turn edges, more often the steeper it is (table) <span class="ev c">computed</span>.</li>
+        <li><b>Facing after a seam</b>: slide 0°, half-turn 180°. You keep walking forward; only F3 and the compass notice.</li>
+      </ul></div>
+      <div class="side k"><h4><span class="wname k">Moser cube</span></h4><ul>
+        <li><b>East–west along the equator</b>: one straight line, <span data-v="layouts|cube-moser-cross|walks|equator|blocks"></span> blocks round (8 % short), through one slide and three ordinary face edges; 45.5 blocks a degree at face centres, 17 % fewer at face edges <span class="ev c">computed</span>.</li>
+        <li><b>Over a pole</b>: from F0 you enter N through an ordinary edge, cross the pole in the middle of the face (no seam there), and leave through N's far edge, a half-turn seam onto F2, heading south. From F1 or F3 you enter and leave N through quarter-turn seams: two seams, F3 yaw +90° then +90° <span class="ev c">computed</span>.</li>
+        <li><b>Diagonal</b> (45° from spawn, 24,000 blocks): quarter-turns appear; each turns F3's yaw by 90° and swaps which coordinate is changing <span class="ev c">computed</span>.</li>
+        <li><b>Long boat trips</b>: due east or west inside the band crosses only the slide. Courses that leave the band meet quarter-turn and half-turn seams; at most headings the cube's straight courses cross more seams per 10,000 blocks than Guyou's (table) <span class="ev c">computed</span>.</li>
+        <li><b>Facing after a seam</b>: slide 0°, quarter-turn ±90°, half-turn 180°.</li>
+      </ul></div>
     </div>
-    <aside class="panel" id="cand-panel" aria-live="polite"></aside>
-  </div>
+    <div class="tscroll" id="walks-table"></div>
+    <div class="grid2">
+      <figure class="fig"><h4>Blocks per degree along the equator walk</h4><div id="eq-chart"></div><figcaption>Both worlds are equal-area, so the equator is drawn short where shapes are stretched east–west. The cube stays closer to true scale.</figcaption></figure>
+      <div class="tscroll" id="trip-table" style="align-self:start"></div>
+    </div>
+    <div class="unk"><b>Unknown:</b> boats and player-ridden vehicles across a turning seam. The Immersive Portals prototype sent items, minecarts and arrows across, not boats; the engine carries vehicles with passengers but leaves player-driven vehicles to Phase 2 (wrap-engine.md §10.4). With the engine, a turning crossing reloads chunks for a second or two on a vanilla client until the optional client re-anchor exists <span class="ev i">inferred</span>; Immersive Portals shows no reload.</div>
+  </article>
+
+  <article class="topic" id="t-nav">
+    <h3>Navigation</h3>
+    <div class="h2h">
+      <div class="side g"><h4><span class="wname g">Petroff–Guyou</span></h4><ul>
+        <li><b>Compass and north</b>: F3's north (−z) is within 15° of true north on <span data-v="stats|guyou-petroff|north_within|15" data-f="pct"></span> of the planet; it is good through the middle of each square and fails toward the poles (which sit on the top and bottom edges) and the corners. The sun always rises toward raw +x <span class="ev i">inferred</span> (vanilla sky).</li>
+        <li><b>A vanilla compass</b> points at spawn in raw coordinates: from spawn, it is more than 90° off the true way back on <span data-v="stats|guyou-petroff|dist|compass_gt_90" data-f="pct"></span> of the planet (map layer "Compass error") <span class="ev c">computed</span>.</li>
+        <li><b>Of the two, Guyou's F3 north is right more often</b> (within 15° on <span data-v="stats|guyou-petroff|north_within|15" data-f="pct"></span> against <span data-v="stats|cube-moser-cross|north_within|15" data-f="pct"></span>), and its compass misleads less, because the cube gives a third of the planet (its polar faces) to places with no consistent north <span class="ev c">computed</span>.</li>
+        <li><b>F3 coordinates</b> are continuous inside the world; at the slide x jumps by 13,088, at a half-turn x changes sign and z reflects about the edge (table) <span class="ev c">computed</span>.</li>
+      </ul></div>
+      <div class="side k"><h4><span class="wname k">Moser cube</span></h4><ul>
+        <li><b>Compass and north</b>: F3's north is within 15° of true north on <span data-v="stats|cube-moser-cross|north_within|15" data-f="pct"></span> of the planet. It is good on the band faces; on the polar faces true north points at the face centre, so F3's north is right only on one line through the pole and wrong by up to 180° elsewhere.</li>
+        <li><b>A vanilla compass</b>: more than 90° off the true way back on <span data-v="stats|cube-moser-cross|dist|compass_gt_90" data-f="pct"></span> of the planet <span class="ev c">computed</span>.</li>
+        <li><b>F3 coordinates</b>: at the slide x jumps by 15,104; at a quarter-turn x and z swap roles (walking north, you suddenly see x falling); at a half-turn both reflect (table) <span class="ev c">computed</span>.</li>
+      </ul></div>
+    </div>
+    <div class="h2h">
+      <div class="tscroll" id="seams-guyou" style="margin:0"></div>
+      <div class="tscroll" id="seams-cube" style="margin:0"></div>
+    </div>
+    <div class="tscroll" id="north-table"></div>
+    <h4>Vanilla maps and map walls (both)</h4>
+    <ul class="prose">
+      <li>A map item draws raw chunks. Past a seam it draws what is stored at those raw positions: with Immersive Portals the hidden outside (generated terrain that matches the far side but none of its player edits), with the engine the band's turned copies (player edits included, out to the band's depth) <span class="ev i">inferred</span>.</li>
+      <li>A map wall that crosses a turning seam does not continue: the far side's own maps are turned 180° (Guyou, and the cube's half-turns) or 90° (the cube's quarter-turns) relative to the near side's. On the cube's polar faces a north-up map is not north-up on the planet.</li>
+      <li>Vanilla's map grid (edges at multiples of 128 · 2<sup>scale</sup> minus 64 <span class="ev i">from memory of MapItemSavedData</span>) never lines up with a seam in either world at today's scale:</li>
+    </ul>
+    <div class="tscroll" id="mapgrid-table"></div>
+    <h4>Minimaps, waypoints, /tp and shared coordinates (both)</h4>
+    <ul class="prose">
+      <li>MIC ships no minimap or claim mod (pack mod list read 2026-10-04). Xaero-style minimaps draw loaded chunks and store waypoints in raw coordinates, so a waypoint 50 blocks away across Guyou's north seam at x = −2,000 shows about 4,000 blocks away; across one of the cube's quarter-turns near a corner the raw distance is small, across its half-turns thousands <span class="ev i">inferred</span>. How they behave with Immersive Portals is <span class="ev u">unknown</span>.</li>
+      <li>Every block has exactly one stored coordinate, so coordinates shared between players are unambiguous. <span class="mono">/tp</span> to a raw position beyond an edge lands in the hidden outside with portals; with the engine the entity is carried to the stored block after that tick <span class="ev i">inferred</span> (§9.5).</li>
+      <li>Raw distance is not walking distance near seams; the distance table below gives the spread from spawn.</li>
+    </ul>
+  </article>
+
+  <article class="topic" id="t-build">
+    <h3>Building near seams and corners</h3>
+    <div class="h2h">
+      <div class="side g"><h4><span class="wname g">Petroff–Guyou</span></h4>
+        <div class="sub3">With Immersive Portals (v1)</div><ul>
+        <li>Four global portals: 13,088 blocks of turning seam and 6,544 of slide. Collisions within a block or two of a seam come from the hidden outside, which nobody sees (the prototype's invisible ice wall at the pole) <span class="ev r">run</span>.</li>
+        <li>Water, lava and redstone stop at the portal plane; caves, ores and trees are cut at it <span class="ev r">run</span>. Contraptions and Create networks do not cross.</li>
+        <li>The poles are on the seam: a base at the north pole sits on a portal.</li>
+        <li>Four corners in six places of the net; the 2026-10-02 prototype measured 30–40 % of frame rate at a portal corner and once escaped the world walking exactly into one <span class="ev r">run</span> (not re-tested).</li></ul>
+        <div class="sub3">With the engine (later)</div><ul>
+        <li>Blocks, water, redstone, light and entities cross half-turns; the spike's test site was built round a half-turn point, i.e. a Guyou corner <span class="ev r">run</span>.</li>
+        <li>Create: shafts and cogs connect across, speed sign flipped; pumped water reaches a tank across a half-turn <span class="ev r">run</span>. Belts, chain conveyors, gantries, track within a block of a seam and contraptions reaching across are refused <span class="ev r">run</span>.</li>
+        <li>Corners are locally seamless in the engine: its unit tests check the local isometry on the whole Guyou layout, corners included <span class="ev i">read in WrapTopologyTest's description</span>.</li></ul></div>
+      <div class="side k"><h4><span class="wname k">Moser cube</span></h4>
+        <div class="sub3">With Immersive Portals (v1)</div><ul>
+        <li>Fourteen one-way portals: 22,656 blocks of turning seam and 3,776 of slide, 1.7× Guyou's turning seam, with the same hidden-outside collisions and the same stops for fluids, redstone and caves.</li>
+        <li>Quarter-turn portals are <span class="ev u">untested</span> in Immersive Portals (the rotation NBT is inferred).</li>
+        <li>The poles are ordinary points in the middle of N and S: nothing special to build on.</li>
+        <li>Eight corners in fourteen places of the net, each a three-way meeting of portals <span class="ev u">frame cost unknown</span>.</li></ul>
+        <div class="sub3">With the engine (later)</div><ul>
+        <li>Blocks, water, redstone, light and entities cross quarter-turns too, at a test site built round a bounded quarter-turn corner <span class="ev r">run</span>.</li>
+        <li>Create: a z shaft line crossing a quarter-turn lands as an x line, turning correctly <span class="ev r">run</span>; fluids across a quarter-turn <span class="ev u">untested</span>. Same refusals.</li>
+        <li>Near each corner blocks are not locally seamless (diagonals differ by who asks; figure 5): the engine's tests leave those neighbourhoods out, and Create's adapter refuses one-way diagonal links found there <span class="ev r">run</span>. A small keep-out round each of the 8 corners is the honest fix <span class="ev i">inferred</span>.</li></ul></div>
+    </div>
+    <div class="unk"><b>Known gap in both:</b> with the MIC set, 6 of the engine's 15 Phase 1 tests fail (MIC's Alternate Current replaces redstone propagation, KubeJS sends a payload to the test player, a band reload times out) <span class="ev r">run</span>; and an intermittent boot failure with the engine and MIC remains.</div>
+  </article>
+
+  <article class="topic" id="t-mp">
+    <h3>Multiplayer</h3>
+    <div class="h2h">
+      <div class="side g"><h4><span class="wname g">Petroff–Guyou</span></h4><ul>
+        <li><b>Spawn</b>: the shared spawn used here (lat <span data-v="spawn|lat" data-f="raw"></span>°, lon <span data-v="spawn|lon" data-f="raw"></span>°, chosen as the land point farthest from every seam and corner of both worlds) sits <span data-v="spawn|clearance_blocks"></span> blocks from the nearest seam or corner in the worse of the two.</li>
+        <li><b>Spread</b>: the farthest place is <span data-v="stats|guyou-petroff|dist|max_walk"></span> blocks' walk from spawn (the planet's own: 8,192); half the world is within <span data-v="stats|guyou-petroff|dist|q50_walk"></span>.</li>
+        <li><b>Distances</b>: walking distance against the planet's own: <span data-v="stats|guyou-petroff|dist|ratio_q10_50_90|1" data-f="f2"></span>× at the median; <span data-v="stats|guyou-petroff|dist|ratio_lt_0_85" data-f="pct"></span> of places are more than 15 % nearer than on the planet.</li>
+        <li><b>Claims near seams</b>: fewer seams to worry about (19,632 blocks).</li>
+      </ul></div>
+      <div class="side k"><h4><span class="wname k">Moser cube</span></h4><ul>
+        <li><b>Spawn</b>: the same planet point; on the cube it is at F3 (<span data-v="stats|cube-moser-cross|dist|spawn_mc|0"></span>, <span data-v="stats|cube-moser-cross|dist|spawn_mc|1"></span>).</li>
+        <li><b>Spread</b>: farthest place <span data-v="stats|cube-moser-cross|dist|max_walk"></span> blocks; half the world within <span data-v="stats|cube-moser-cross|dist|q50_walk"></span>.</li>
+        <li><b>Distances</b>: <span data-v="stats|cube-moser-cross|dist|ratio_q10_50_90|1" data-f="f2"></span>× the planet's at the median; <span data-v="stats|cube-moser-cross|dist|ratio_lt_0_85" data-f="pct"></span> of places more than 15 % nearer.</li>
+        <li><b>Claims near seams</b>: 26,432 blocks of seam and 8 three-way corners.</li>
+      </ul></div>
+    </div>
+    <div class="tscroll" id="dist-table"></div>
+    <ul class="prose">
+      <li><b>Claims (both)</b>: any chunk-claim mod checks raw positions. With the engine, clicking a band copy edits the stored block on the far side, so a claim there is bypassed unless the mod compares canonical positions (the engine's API offers <span class="mono">canonical</span>); with portals the hidden outside is unclaimed raw space <span class="ev i">inferred</span>. MIC has no claim mod today.</li>
+      <li><b>Seeing each other across a seam (both)</b>: with portals, yes; with the engine, entities near a seam are not shown in the band until the ghost entities of Phase 3 <span class="ev r">known gap</span>.</li>
+    </ul>
+  </article>
+
+  <article class="topic" id="t-explore">
+    <h3>Exploring: the corners</h3>
+    <div class="h2h">
+      <div class="side g"><h4><span class="wname g">Petroff–Guyou</span>: 4 corners</h4><ul>
+        <li>At ±45° latitude on the two meridians 90° from the hemisphere centres: the midpoints of the top and bottom edges, and the rectangle's corners (where the slide meets the half-turns).</li>
+        <li>All four in open sea within 3° for <span data-v="corner_sea|guyou" data-f="pct"></span> of the possible turns λc on this planet <span class="ev c">computed</span>.</li>
+        <li>At one: no magnification (equal-area), but shapes are forced to stretch at least 2× near it (2.67 at worst). A straight coast through the corner bends by about 90° on the map; a ring round it is half as long as normal.</li>
+      </ul></div>
+      <div class="side k"><h4><span class="wname k">Moser cube</span>: 8 corners</h4><ul>
+        <li>At ±35.3° latitude, every 90° of longitude.</li>
+        <li>All eight in open sea within 3° for only <span data-v="corner_sea|cube" data-f="pct"></span> of the turns λ₀ <span class="ev c">computed</span>. On an equal-area cube a corner magnifies nothing and stretches shapes only to 1.33× (1.42 at worst), so terrain at one looks almost normal; what makes it matter is the tear (figures 3 and 4), not the distortion.</li>
+        <li>At one: a straight coast bends by about 45°; a ring round it is three quarters as long as normal.</li>
+      </ul></div>
+    </div>
+    <div class="grid2">
+      <figure class="fig"><h4>Guyou: land within 3° of the worst corner, by λc</h4><div id="sweep-guyou"></div></figure>
+      <figure class="fig"><h4>Cube: land within 3° of the worst corner, by λ₀</h4><div id="sweep-cube"></div></figure>
+    </div>
+  </article>
+
+  <article class="topic" id="t-dh">
+    <h3>Distant Horizons</h3>
+    <div class="h2h">
+      <div class="side g"><h4><span class="wname g">Petroff–Guyou</span></h4><ul>
+        <li>DH draws raw chunks, and beyond them Deep Time's <span class="mono">FarTerrain</span>. Beyond every edge the raw world is the plane tiling, so far views across seams and across corners are right everywhere, with no tears (the tiling figure) <span class="ev c">computed</span>.</li>
+        <li>Near a corner the far view shows the doubled picture: the terrain behind you again beyond the corner.</li>
+        <li><span class="mono">FarTerrain</span> must fold at the two long edges: a few dozen lines (seamless-wrapping.md §7).</li>
+      </ul></div>
+      <div class="side k"><h4><span class="wname k">Moser cube</span></h4><ul>
+        <li>Beyond the edges the raw world needs a fold rule; with the engine's own edge order every corner throws a tear into the far view, and the polar rows' outside regions hold whichever face the first edge picks (the raw-surroundings figure) <span class="ev c">computed</span>.</li>
+        <li><span class="mono">FarTerrain</span> must fold quarter-turns and the cross: the same principle, more cases.</li>
+      </ul></div>
+    </div>
+    <p class="prose">Both: Immersive Portals does not draw DH's LODs through portals (2026-10-02 prototype), so from inside vanilla's render distance on, a far view across a seam is whatever is stored at the raw positions beyond it. DH's world curvature is on by default with the planet's radius; the same for both.</p>
+  </article>
+
+  <article class="topic" id="t-bands">
+    <h3>Climate and biome bands</h3>
+    <div class="h2h">
+      <div class="side g"><h4><span class="wname g">Petroff–Guyou</span></h4><ul>
+        <li>The equator is a straight line; parallels bow away from it toward the hemisphere edges, and near each pole they become half-circles round the pole point, cut by the half-turn seam (layer "Latitude bands").</li>
+        <li>A latitude band is not straight anywhere except the equator itself.</li>
+      </ul></div>
+      <div class="side k"><h4><span class="wname k">Moser cube</span></h4><ul>
+        <li>The equator is straight; parallels bow across each band face, less than Guyou's; above about 35° they leave the band faces and run round each polar face as rounded squares about the pole.</li>
+        <li>The polar and boreal bands live on N and S, centred and whole.</li>
+      </ul></div>
+    </div>
+    <div class="tscroll" id="bands-table"></div>
+    <p class="prose note">Deep Time's climate is computed on the sphere and looked up by true latitude per block, so bands are always right on the planet; this is only how they lie in block coordinates.</p>
+  </article>
+
+  <article class="topic" id="t-felt">
+    <h3>Felt distortion</h3>
+    <p class="prose">Shapes up to 2.67× against 1.42× (survey). On this planet's actual continents (layer "Shape", coasts in white):</p>
+    <div class="tscroll" id="felt-table"></div>
+    <div class="h2h">
+      <div class="side g"><p>Continents stretch most toward the four corners and along each square's diagonals; a round island near a corner is drawn as an ellipse more than twice as long as it is wide.</p></div>
+      <div class="side k"><p>Stretch is mild everywhere and peaks at the eight corners; nowhere is land drawn more than 1.42× too long.</p></div>
+    </div>
+  </article>
+
+  <article class="topic" id="t-grid">
+    <h3>Grid and tools</h3>
+    <div class="h2h">
+      <div class="side g"><h4><span class="wname g">Petroff–Guyou</span></h4><ul>
+        <li>Hemisphere squares of b = 6,544 = 409 chunks; not region-aligned (6,544 / 512 = 12.8).</li>
+        <li><b>New:</b> the engine's <span class="mono">WrapLayouts.guyou</span> centres the rectangle and is chunk-aligned only when h is a multiple of 32. 6,544 is not (204.5 × 32): today's scale needs b = 6,528 or 6,560 (0.25 % off), or an equator 8 blocks off z = 0 <span class="ev c">computed</span>.</li>
+        <li>The workbench keeps the familiar 2:1 picture; vanilla maps north-up are close to north-up through the middle band.</li>
+      </ul></div>
+      <div class="side k"><h4><span class="wname k">Moser cube</span></h4><ul>
+        <li>Faces of 3,776 = 236 chunks; every edge on a chunk line and every turn centre on a chunk corner; not region-aligned (4,096 would be).</li>
+        <li>Toroidal World's x period becomes 15,104 = 944 chunks; whether TW is happy with a period that is not a multiple of 512 is <span class="ev u">unknown</span>.</li>
+        <li>The workbench draws the cross (half the 4:3 box empty) or six faces; nothing forces the map to be the world, so it may keep drawing the planet in any projection.</li>
+      </ul></div>
+    </div>
+  </article>
+
+  <article class="topic" id="t-mods">
+    <h3>Mod compatibility</h3>
+    <div class="callout warn"><b>Checked: Toroidal World does keep a slide on the cube cross net.</b> The cross net's equator band is one slide, the band's east–west wrap, and the engine already has the layout for it: <span class="mono">WrapLayouts.cubeCross(s, depth, slides = false)</span> leaves that slide to TW, and its quarter-turns onto F3 carry the 4s translation themselves, so they never rely on TW. The statement that TW owns no edge holds only for the 3 × 2 net. Two caveats: TW's wrap is world-wide in z, so in the polar rows (mostly outside the net) it is consistent only if the engine folds before TW does (wrap-engine.md §4.8 assumes this) <span class="ev i">inferred</span>; and TW's share is smaller, 3,776 of 26,432 blocks of seam against Guyou's 6,544 of 19,632.</div>
+    <div class="h2h">
+      <div class="side g"><h4><span class="wname g">Petroff–Guyou</span></h4><ul>
+        <li><b>Toroidal World</b>: keeps the whole world's east–west wrap ("TW slides, engine turns", <span class="mono">guyou(h, depth, false)</span>). Gone with Immersive Portals (they cannot share a world) <span class="ev r">run</span>.</li>
+        <li><b>Sable ships</b>: cross the slide through TW's Sable bridge; do not cross portals and crashed the pack server with Immersive Portals <span class="ev r">run</span>; across the two half-turns the engine needs its own Sable crossing (Phase 4).</li>
+        <li><b>Create</b>: adapters built for half-turns <span class="ev r">run</span>.</li>
+        <li><b>Destroy, CBC Modern Warfare</b>: crash with Immersive Portals <span class="ev r">run</span>; the engine overwrites nothing they clash with <span class="ev i">inferred</span>.</li>
+      </ul></div>
+      <div class="side k"><h4><span class="wname k">Moser cube</span></h4><ul>
+        <li><b>Toroidal World</b>: keeps the band's slide (<span class="mono">cubeCross(s, depth, false)</span>); the engine owns six turning pairs.</li>
+        <li><b>Sable ships</b>: the same, plus quarter-turns that rotate a ship 90°; six turning pairs to carry instead of two.</li>
+        <li><b>Create</b>: adapters built for quarter-turns too <span class="ev r">run</span>; fluids across a quarter-turn <span class="ev u">untested</span>.</li>
+        <li><b>Destroy, CBC Modern Warfare</b>: as Guyou.</li>
+      </ul></div>
+    </div>
+  </article>
+
+  <article class="topic" id="t-effort">
+    <h3>Effort (agent-days)</h3>
+    <div class="tscroll"><table>
+      <thead><tr><th>Piece</th><th class="n">Petroff–Guyou</th><th class="n">Moser cube</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td>Projection in the crate (map, tests)</td><td class="n">1–2</td><td class="n">8–11</td><td>survey §6</td></tr>
+        <tr><td>Production world with Immersive Portals (v1)</td><td class="n">26–40</td><td class="n">31–50</td><td>seamless-wrapping.md §8; survey §6.1 (+5–10 for the cube)</td></tr>
+        <tr><td>Wrap engine, whole (without trains)</td><td class="n">46–75</td><td class="n">≈ 49–83</td><td>wrap-engine.md §6; cube extra 3–8 is this page's estimate <span class="ev i">inferred</span></td></tr>
+        <tr><td>…of which built: Phase 1, Create adapters</td><td colspan="2">both layouts are in <span class="mono">WrapLayouts</span>; GameTests ran a half-turn seam and a quarter-turn corner</td><td>wrap-engine.md §10–11</td></tr>
+        <tr><td>Corner handling (keep-out, band choice)</td><td class="n">none needed</td><td class="n">1–3 <span class="ev i">inferred</span></td><td>this page</td></tr>
+      </tbody>
+    </table></div>
+  </article>
 </section>
 
+<!-- ======================================================================================= -->
 <section id="globe-sec">
   <h2>Folding the world onto the planet</h2>
   <div class="globe-wrap">
     <div>
-      <canvas id="globe" aria-label="3D view: the world's net folding into a cube or pillowcase and inflating into the planet"></canvas>
+      <canvas id="globe" aria-label="3D view: the world's net folding into a cube or a pillowcase and inflating into the planet"></canvas>
       <div class="slider">
         <button class="act" id="g-play" type="button">Play</button>
         <div style="flex:1;min-width:0">
@@ -220,78 +565,97 @@ button.act{font:600 .84rem var(--f-body);background:var(--ink);color:var(--panel
       </div>
     </div>
     <div class="panel">
-      <div class="picker" id="g-picker" style="margin-top:0"></div>
+      <div class="chips" id="g-picker"></div>
+      <div class="chips" id="g-close"></div>
       <div class="checks" id="g-checks"></div>
       <p class="note" id="g-caption" style="margin-top:12px"></p>
-      <p class="note">Drag to turn, scroll or pinch to zoom. The texture is the world map itself, so at "planet" you see exactly where every face, seam and corner lands. Seams and corners appear once the shape is fully inflated.</p>
+      <p class="note">Drag to turn, scroll or pinch to zoom. The texture is the world map itself, so at "planet" you see where every face, seam and corner lands. The close-up buttons look straight down at one corner with the two walkers and the ring of figure 2 drawn on the planet.</p>
     </div>
   </div>
 </section>
 
-<section id="compare">
-  <h2>Side by side</h2>
-  <p class="prose">Distortion numbers are the survey's (300 × 300 samples per face, weighted by planet area). Seam lengths count each glued edge once, at today's 16k scale. Effort is agent-days; "IP" is the production world joined by Immersive Portals, "engine" Deep Time's own wrap engine.</p>
-  <div class="tscroll"><table id="cmp"></table></div>
-</section>
-
-<section id="tech">
-  <h2>How each shape plays with the seam technology</h2>
-  <p class="prose">Immersive Portals is the chosen route for v1; the wrap engine (folded access plus a replicated band) is being built in parallel, with Toroidal World keeping the east–west slide and the engine owning the turning edges (decisions log, 2026-10-03).</p>
-  <div class="tscroll"><table id="tech-table"></table></div>
-</section>
-
-<section id="size">
-  <h2>The cube's face size</h2>
-  <div class="grid2">
-    <div class="prose" id="size-text"></div>
-    <figure class="fig"><h4>The equatorial band at 16k, to scale, over Minecraft's 512-block region grid</h4><div id="size-ruler"></div><figcaption>Faces in alternating tints, seams in their kind's colour. With power-of-two faces every face edge and every seam sits on a region line, and the band is today's 16,384 blocks round.</figcaption></figure>
-  </div>
-  <div class="tscroll"><table id="size-table"></table></div>
-  <div class="grid2">
-    <figure class="fig"><h4>Chunk view of a face corner (3,776 blocks)</h4><div id="size-chunks-a"></div><figcaption>Face edges (236 chunks) and quarter-turn centres fall on chunk corners: the wrap engine can turn whole chunks. Region lines (every 32 chunks) cut through the face.</figcaption></figure>
-    <figure class="fig"><h4>Chunk view of a face corner (4,096 blocks)</h4><div id="size-chunks-b"></div><figcaption>Face edges sit on region lines too: each region file belongs to exactly one face.</figcaption></figure>
-  </div>
-</section>
-
-<section id="net">
-  <h2>The cube's net</h2>
-  <div class="grid2" id="net-maps"></div>
-  <div class="tscroll"><table id="net-table"></table></div>
-</section>
-
-<section id="walks">
-  <h2>What a player walks through</h2>
-  <p class="prose">Every seam is a rigid motion of the block grid, so a straight walk stays straight across every seam; only the heading in raw coordinates changes, and the portal or engine hides that. The maps show two straight walks per world: once round the equator, and north over a pole down to the equator on the far side.</p>
-  <div class="grid4" id="walk-grid"></div>
-  <div class="grid2">
-    <figure class="fig"><h4>Blocks per degree of planet along the equator walk</h4><div id="eq-chart"></div><figcaption>Lambert is true on the equator (45.5 blocks a degree). The Moser cube matches that at each face centre and draws the equator 17 % shorter at the face edges: 15,104 blocks round at today's scale, 8 % short on average (16,384 with 4,096-block faces). Petroff's Guyou world swings from 30 blocks a degree at a hemisphere centre to 46 at its edge.</figcaption></figure>
-    <figure class="fig"><h4>Two walkers either side of a corner</h4><div id="corner-fig"></div><figcaption id="corner-cap"></figcaption></figure>
-  </div>
-  <h3 id="placement">Where the corners land on this planet</h3>
-  <div class="grid2">
-    <figure class="fig"><h4>Cube: land within 3° of the worst corner, by λ₀</h4><div id="sweep-cube"></div></figure>
-    <figure class="fig"><h4>Guyou: land within 3° of the worst singular point, by λc</h4><div id="sweep-guyou"></div></figure>
-  </div>
-  <p class="note prose">The bake can turn the planet about its axis to keep corners off land. On an equal-area cube a corner magnifies nothing, so this matters less than for the conformal Peirce/Guyou map, where the four points must be at sea; it still keeps three-way portal corners away from builds.</p>
-</section>
-
+<!-- ======================================================================================= -->
 <section id="sim">
   <h2>The simulation grid</h2>
-  <div class="callout warn"><b>Research in progress.</b> <span id="sim-status">A separate agent is surveying sphere-native grids for the climate and surface simulation, with benchmarks, in <span class="mono">docs/research/notes/sphere-native-grids.md</span>; that note had not landed when this page was published.</span></div>
   <div class="prose">
-    <p>The plates already run on a sphere mesh; the climate and surface solvers run on the flat Lambert grid, whose polar cells are badly stretched. The world shape and the simulation grid are separate choices (Ben chose to project only at the bake), but they interact at the bake:</p>
+    <p>From <span class="mono">docs/research/notes/sphere-native-grids.md</span> (2026-10-04) and Ben's answers since:</p>
+    <ul>
+      <li><b>Patches of regular arrays cost what the Lambert raster costs.</b> On Deep Time's L1 cell count a diffusion pass on six cube faces with one ghost ring costs 0.89 ns a cell against Lambert's 0.88 (one thread), and a flow-routing pass 14.1 against 14.4. An unstructured Fibonacci mesh costs 3–10× more per stencil pass <span class="ev r">run</span> (benchmark).</li>
+      <li><b>In true distances the cube is faster.</b> An implicit diffusion solve needs 785 conjugate-gradient iterations on Lambert's stretched polar cells against 138 on the cube (1,273 ms against 249 at L1) <span class="ev r">run</span>.</li>
+      <li><b>Ben's open choice for the climate grid</b>: the equal-area cube or HEALPix. They run at the same speed; the equal-area cube distorts shapes to 1.42× (Moser) against HEALPix's 2.41×, and HEALPix has 63° creases across its polar faces where the smooth cube has none.</li>
+      <li><b>Decided</b> (2026-10-04): the surface solvers follow the world ("Follow the world decision"): on Lambert's raster while the world is Lambert, on the cube faces if the world is the cube, resampled at the bake for a 2:1 world; rain shadow uses Smith &amp; Barstad plus an upwind moisture budget.</li>
+    </ul>
   </div>
-  <div class="tscroll"><table id="sim-table"></table></div>
+  <div class="tscroll"><table>
+    <thead><tr><th>World</th><th>Climate grid</th><th>Surface solvers</th><th>The bake</th></tr></thead>
+    <tbody>
+      <tr><td><span class="wname g">Petroff–Guyou</span></td><td>the cube (or HEALPix)</td><td>a grid of their own, resampled to the 2:1 map (shapes up to 2.67×, so block metric and true metric part again)</td><td>a full resample at every bake</td></tr>
+      <tr><td><span class="wname k">Moser cube</span></td><td>the cube</td><td>the same cube faces: at quick 16k, 236 L1 cells of 16 blocks along each 3,776-block face edge</td><td>none: the world is the grid (L3 is the same faces at 2 blocks)</td></tr>
+    </tbody>
+  </table></div>
 </section>
 
-<section id="findings">
-  <h2>What this page found that the survey did not say</h2>
-  <ol class="findings prose" id="findings-list"></ol>
+<!-- ======================================================================================= -->
+<section id="recommend">
+  <h2>Recommendation</h2>
+  <div class="callout rec">
+    <h3><span class="tag rec">Recommended</span> The Moser equal-area cube, cross net, faces of 3,776 blocks (7,552 at 32k)</h3>
+    <p>Place the eight corners at sea where the planet allows (the bake can search λ₀), keep a small no-build zone round each, and let the engine's band show one face there. Petroff–Guyou, Ben's current plan, stays the right choice if corner consistency or portal count is weighed above shape: it is not a bad world, only a more stretched one.</p>
+  </div>
+  <div class="h2h">
+    <div class="side g"><h4>The fair case for <span class="wname g">Petroff–Guyou</span></h4><ul>
+      <li>Corners render consistently: one raw copy is right for every viewer, so the band, the generator's outside, vanilla maps and Distant Horizons need no corner rule; blocks are locally seamless up to the corner.</li>
+      <li>Half the corners, and easier to hide: all four at sea for <span data-v="corner_sea|guyou" data-f="pct"></span> of turns against <span data-v="corner_sea|cube" data-f="pct"></span>.</li>
+      <li>Four portals instead of fourteen, 58 % of the turning seam, no untested quarter-turn portals.</li>
+      <li>Toroidal World keeps the whole east–west wrap and a third of all seam length.</li>
+      <li>F3's north is within 15° of true north on more of the planet (<span data-v="stats|guyou-petroff|north_within|15" data-f="pct"></span> against <span data-v="stats|cube-moser-cross|north_within|15" data-f="pct"></span>) and a vanilla compass points away from home less often.</li>
+      <li>The plane-covering client route stays possible.</li>
+      <li>Cheapest: 1–2 days of projection work on the prototype that already runs.</li>
+    </ul></div>
+    <div class="side k"><h4>The fair case for the <span class="wname k">Moser cube</span></h4><ul>
+      <li>About half the shape distortion everywhere: <span data-v="stats|cube-moser-cross|land_shape_gt|1.5" data-f="pct"></span> of this planet's land stretched over 1.5× against <span data-v="stats|guyou-petroff|land_shape_gt|1.5" data-f="pct"></span>; continents look like themselves.</li>
+      <li>Both poles are ordinary points mid-face; the polar bands are whole and centred.</li>
+      <li>No creases; the equator is 15 % longer, and walking distances stay close to the planet's own (median <span data-v="stats|cube-moser-cross|dist|ratio_q10_50_90|1" data-f="f2"></span>× against <span data-v="stats|guyou-petroff|dist|ratio_q10_50_90|1" data-f="f2"></span>×; on Guyou <span data-v="stats|guyou-petroff|dist|ratio_lt_0_85" data-f="pct"></span> of places are more than 15 % nearer than they should be, on the cube <span data-v="stats|cube-moser-cross|dist|ratio_lt_0_85" data-f="pct"></span>).</li>
+      <li>Its faces are the simulation's climate grid, and the surface solvers move onto them (Ben's "follow the world"): the bake becomes a copy, not a resample.</li>
+      <li>Mild corners: at most 1.42× stretch round one, three quarters of a normal ring.</li>
+      <li>The engine already has the layout, the quarter-turn GameTests and the Create quarter-turn adapter.</li>
+    </ul></div>
+  </div>
+  <h3>What this page found that changes or sharpens the picture</h3>
+  <ol class="findings prose">
+    <li><b>Cube corners tear; Guyou corners do not.</b> Traced views, the band, the generator's outside and DH all show a tear at each cube corner; Guyou's corners show everything twice but consistently. The survey treated cube corners as purely milder; for rendering and building they are harder. This narrows the cube's lead and adds a small corner keep-out to its cost.</li>
+    <li><b>Toroidal World keeps the band's slide on the cross net</b> (<span class="mono">cubeCross(…, slides = false)</span>); the "owns no edge" concern applies to the 3 × 2 net only.</li>
+    <li><b>Guyou at today's scale is not chunk-aligned in the engine's centred layout</b> (b = 6,544 is not a multiple of 32): use 6,528 or 6,560.</li>
+    <li><b>A boundary bug in Petroff's quadrant test</b> put points exactly on two of each square's diagonals in the wrong place; fixed in the survey's port. The survey's numbers do not depend on it.</li>
+  </ol>
+  <h3>Questions for Ben</h3>
+  <ol class="prose">
+    <li>World shape: the Moser cube (recommended) or Petroff–Guyou?</li>
+    <li>If the cube: accept a small no-build zone and a one-sided band at each of the 8 corners (recommended), or invest in a smarter corner rule (it can only move the tear)?</li>
+    <li>The climate grid: equal-area cube (recommended: same speed as HEALPix, 1.42× against 2.41×, no creases) or HEALPix?</li>
+  </ol>
+</section>
+
+<!-- ======================================================================================= -->
+<section id="appendix">
+  <h2>Also considered</h2>
+  <p class="prose">Every other candidate from the survey, on the same planet. Left: the planet; right: the crease test (straight breaks in the shading are creases).</p>
+  <div class="tscroll" id="appx-table"></div>
+  <h3>The cube's own sub-choices</h3>
+  <ul class="prose">
+    <li><b>Net: cross (assumed above) or 3 × 2.</b> The 3 × 2 rectangle packs the raster without waste but has 8 seam pairs, six seam edges on the line between its rows and no world-wide slide for Toroidal World.</li>
+    <li><b>Face size: 3,776 (assumed above) or 4,096.</b> Powers of two put every seam on a region line and make the band exactly 16,384 round (today's wrap), at 1.18× the blocks for the same planet.</li>
+    <li><b>Face map: the smooth Moser table (assumed above) or closed-form QSC</b>, which folds every ridge 41° on each face diagonal.</li>
+  </ul>
 </section>
 
 <section id="method">
   <h2>Method and sources</h2>
-  <div class="prose" id="method-text"></div>
+  <div class="prose">
+    <p><b>Pictures and numbers.</b> <span class="mono">tools/review/world-shape/compute.py</span> on the test VM (<span class="mono">run.sh</span>, through the admission tool) builds both worlds on the survey's code (<span class="mono">tools/research/projection-survey/</span>: Petroff's inverse, the conformal cube by Schwarz triangle maps made equal-area by Moser's flow at 512²) and resamples <span class="mono">deeptime heightmap</span> of the bake onto them. Walks step through the seam motions. Views and walking distances are rays traced through the seams (4,000–4,320 rays, 4–10-block steps). One raw copy round a corner uses the engine's edge tables in <span class="mono">WrapLayouts</span> order, re-implemented in Python and checked against the survey's seams to <span data-v="layouts|cube-moser-cross|engine_vs_survey_rad" data-f="sci"></span> rad (cube) and <span data-v="layouts|guyou-petroff|engine_vs_survey_rad" data-f="sci"></span> rad (Guyou). Tears are neighbouring pixels more than six pixel widths apart on the planet. Every seam closes to <span data-v="layouts|guyou-petroff|seam_closure_rad" data-f="sci"></span> rad (Guyou) and <span data-v="layouts|cube-moser-cross|seam_closure_rad" data-f="sci"></span> rad (cube). Block grids use the engine's cell motions (<span class="mono">CellIsometry</span>) at production sizes.</p>
+    <p><b>Sources.</b> <span class="mono">docs/research/notes/seamless-projection-survey.md</span> (distortion, creases, costs), <span class="mono">docs/design/seamless-wrapping.md</span> (the Immersive Portals prototype), <span class="mono">docs/design/wrap-engine.md</span> §1–11 (the engine, Phase 1, Create), <span class="mono">docs/research/notes/sphere-native-grids.md</span>, the decisions log to 2026-10-04, the engine's source (<span class="mono">WrapLayouts</span>, <span class="mono">WrapTopology</span>, <span class="mono">CellIsometry</span>), the MIC pack's mod list.</p>
+    <p><b>Not done.</b> No game was launched; quarter-turn portals, a whole-world topology in the engine, boats and player vehicles across turning seams, and Xaero-style mods remain untested; the bake is Lambert, so the poles are streaked.</p>
+  </div>
 </section>
 <div class="foot" id="foot"></div>
 </div>
