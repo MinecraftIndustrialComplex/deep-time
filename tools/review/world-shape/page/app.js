@@ -1,10 +1,29 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-// Deep Time world-shape page: maps, tables and charts. Data: data.js (tools/review/world-shape/compute.py).
+// Deep Time world-shape page (head-to-head): maps, corner figures, tables and charts.
+// Data: data.js (tools/review/world-shape/compute.py, run on the test VM). No network.
 'use strict';
 (function () {
 const D = window.WS_DATA;
+if (/debug/.test(location.hash)) {
+  window.addEventListener('error', (e) => document.body.insertAdjacentHTML('afterbegin',
+    `<pre style="background:#600;color:#fff;padding:8px;white-space:pre-wrap">${e.message} ${e.filename}:${e.lineno}:${e.colno}</pre>`));
+}
 if (/(^|[#,])theme-dark/.test(location.hash)) document.documentElement.dataset.theme = 'dark';
+if (/(^|[#,])theme-light/.test(location.hash)) document.documentElement.dataset.theme = 'light';
+// review screenshots only (#from-<id>): hide everything before element <id>, since a headless
+// screenshot cannot scroll to an anchor
+const fromM = /(^|[#,])from-([\w-]+)/.exec(location.hash);
+if (fromM) {
+  window.addEventListener('load', () => {
+    let el = document.getElementById(fromM[2]);
+    while (el && el !== document.body) {
+      for (let p = el.previousElementSibling; p; p = p.previousElementSibling) p.style.display = 'none';
+      el = el.parentElement;
+    }
+  });
+}
 const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const el = (tag, attrs = {}, html) => {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
@@ -19,204 +38,47 @@ const sv = (tag, attrs = {}, text) => {
   return e;
 };
 const fmt = (n, d = 0) => Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = (x, d = 0) => `${fmt(100 * x, d)} %`;
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const KCOL = { slide: '--slide', quarter: '--quarter', half: '--half' };
-const KNAME = { slide: 'slide (translation)', quarter: 'quarter-turn', half: 'half-turn' };
-const R16 = D.R16;
+const KNAME = { slide: 'slide', quarter: 'quarter-turn', half: 'half-turn' };
+const G = 'guyou-petroff', K = 'cube-moser-cross';
+const NAME = { [G]: 'Petroff–Guyou', [K]: 'Moser cube' };
+const LONG = { [G]: 'Petroff 2021 in Guyou\'s 2:1 layout', [K]: 'Moser equal-area cube, cross net' };
+const WCOL = { [G]: '--half', [K]: '--quarter' };
 
 // ---------------------------------------------------------------------------------------------
-// The candidates. Numbers: docs/research/notes/seamless-projection-survey.md §3 (area as blocks per
-// planet area relative to the mean: min / p1 / median / p99 / max; shape ratio a/b median / max).
-const C = {
-  'lambert': {
-    name: 'Lambert cylindrical (today)', short: 'Lambert', fam: 'now', status: 'now', statusText: 'shipped',
-    verdict: 'The reference. Equal-area and simple, but not seamless: the poles are walls.',
-    area: 'exactly 1', areaNum: [1, 1], shape: [1.33, 27], shapeNote: 'at the 80° stop line; p90 4.8',
-    om: '29.0° / 137°',
-    corners: 'none; two pole caps (band from 70°, stop at 80°: 1.5 % of the planet unreachable)',
-    seams: '1 slide (the x wrap)', seamLen: 5136,
-    smooth: 'Smooth across the x wrap; no creases. The pole band is a wall.',
-    effort: ['0', '—', '—'],
-    eq: 'Straight, 16,384 blocks round, through Toroidal World\'s one slide.',
-    pole: 'Storm band from 70°, hard stop at 80° (about 118 blocks of band at 16k). No pole.',
-    pros: ['Shipped and tested; nothing to build.', 'Toroidal World handles the only seam with all its compatibility work (Create, Sable, C2ME, Distant Horizons).',
-      'True scale on the equator; every reader works on a plain 2:1 strip.', 'No portals and no new dependency.'],
-    cons: ['Not seamless: no pole to walk over; 1.5 % of the planet is beyond the stop line.', 'Shapes up to 27× too long near the stop line (4.8× for the worst tenth of the planet).',
-      'Its rows resolve the polar caps badly, which also streaks any later resample (visible on every map here).'],
-  },
-  'guyou-peirce': {
-    name: 'Guyou conformal (the prototype)', short: 'Guyou conformal', fam: 'pill', status: 'run', statusText: 'prototype runs',
-    verdict: 'Runs in game today, but it is not equal-area: land near its four points is drawn without bound larger.',
-    area: '0.46 / 0.46 / 0.79 / 4.6 / ∞', areaNum: [0.46, Infinity], shape: [1, 1], om: '0 (conformal)',
-    corners: '4 × 180° missing, at ±45° latitude (the long edges\' midpoints and the rectangle\'s corners)',
-    seams: '3 pairs: 1 slide + 2 half-turns', seamLen: 19632,
-    smooth: 'Analytic across every seam; no creases.',
-    effort: ['built (prototype)', '26–40', '46–75'],
-    eq: 'Straight, 13,088 blocks round, one slide.',
-    pole: 'The pole is on the long edge: the walk comes out heading south on the far side (half-turn), as over a real pole.',
-    pros: ['Already walked across every seam in a real client (prototype §5).', 'Shapes are true everywhere.', 'Keeps a 2:1 grid and the x wrap; straight equator.'],
-    cons: ['Not equal-area (Ben, 2026-10-02: "Use an equal area projects FFS"): 1 % of the planet drawn more than 4.6× too large, unbounded at the four points.', 'Strong corners: two walkers passing either side of one end up going opposite ways.'],
-  },
-  'peirce-square': {
-    name: 'Peirce quincuncial square', short: 'Peirce square', fam: 'pill', status: 'out', statusText: 'Guyou chosen',
-    verdict: 'The same map as Guyou in its own aspect. Guyou was chosen over it on 2026-10-03.',
-    area: 'as Guyou conformal', areaNum: [0.46, Infinity], shape: [1, 1], om: '0',
-    corners: '4 × 180° on the equator (the edge midpoints); the south pole is the four corners',
-    seams: '4 half-turns (each edge onto itself)', seamLen: 18496,
-    smooth: 'Analytic across every seam.',
-    effort: ['built (prototype)', '≈ Guyou + 4 turning edges', '—'],
-    eq: 'Not a straight walk: four legs with a 90° turn at each singular point.',
-    pole: 'The north pole is an ordinary point in the middle; the south pole is where two turning seams meet.',
-    pros: ['The north pole is an ordinary walkable point.', 'Singular points fall on the equator, where Earth-like planets have less land.'],
-    cons: ['Four turning seams and a square that fits none of Deep Time\'s grids.', 'No straight equator walk.', 'Same area blow-up as Guyou conformal.'],
-  },
-  'guyou-petroff': {
-    name: 'Petroff 2021 in Guyou\'s layout', short: 'Petroff (Guyou)', fam: 'pill', status: 'alt', statusText: 'runner-up',
-    verdict: 'The cheapest seamless equal-area world: the prototype with only its map swapped. Shapes are about twice as distorted as the cube\'s.',
-    area: 'exactly 1', areaNum: [1, 1], shape: [1.78, 2.67], om: '30.9° / 54°',
-    corners: '4 × 180° missing, at ±45° latitude',
-    seams: '3 pairs: 1 slide + 2 half-turns', seamLen: 19632,
-    smooth: 'Smooth across all seams (ε = 0); small creases inside each hemisphere (≤ 5°, ε ≤ 0.09) on the tile midlines and diagonals.',
-    effort: ['1–2', '26–40', '46–75'],
-    eq: 'Straight, 13,088 blocks round (the equator drawn 20 % short), one slide.',
-    pole: 'As the prototype: over the pole through a half-turn, heading south.',
-    pros: ['Only peirce.rs changes: the prototype\'s seams, portal table, resampler and walks all carry over.', 'Exactly equal-area, closed form both ways, CC0 reference code.',
-      'Fewest seams of the seamless options (3 pairs, 19,632 blocks) and only 4 corners: fewer portals, fewer three-way corners.', 'Keeps a 2:1 grid with Toroidal World\'s slide, matching "TW slides, engine turns".'],
-    cons: ['Shapes up to 2.67× too long; half the planet worse than 1.78× (the cube: 1.26 / 1.42).', 'Four strong corners: the 2× bound is forced near each, and walkers either side of one end up going opposite ways.',
-      'The equator is drawn 20 % shorter than today\'s 16,384 blocks.'],
-  },
-  'guyou-gringorten': {
-    name: 'Gringorten 1972 in Guyou\'s layout', short: 'Gringorten', fam: 'pill', status: 'out', statusText: 'ruled out',
-    verdict: 'Equal-area, but creased exactly on its seams.',
-    area: 'exactly 1', areaNum: [1, 1], shape: [1.79, 2.88], om: '29.7° / 57.9°',
-    corners: '4 × 180° at ±45°', seams: '3 pairs: 1 slide + 2 half-turns', seamLen: 19632,
-    smooth: 'A 62° crease along the seams (ε 1.9); diagonals 20°.', effort: ['1–2', '26–40', '46–75'],
-    eq: 'As Petroff.', pole: 'As Petroff.',
-    pros: ['Published, equal-area; ISC-licensed d3 port.'], cons: ['Its crease lies on the seams, where continuity matters most.', 'Worse than Petroff on every number; iterative (2 µs a block).'],
-  },
-  'guyou-collignon': {
-    name: 'Collignon quincuncial in Guyou\'s layout', short: 'Collignon', fam: 'pill', status: 'out', statusText: 'ruled out',
-    verdict: 'Trivial closed form, worst shapes and creases everywhere.',
-    area: 'exactly 1', areaNum: [1, 1], shape: [2.05, 2.98], om: '38.8° / 59.7°',
-    corners: '4 × 180° at ±45°', seams: '3 pairs: 1 slide + 2 half-turns', seamLen: 19632,
-    smooth: '63° creases on every seam and diagonal (ε 2.0).', effort: ['1', '26–40', '46–75'],
-    eq: 'As Petroff.', pole: 'As Petroff.',
-    pros: ['Simplest equal-area square (Lambert azimuthal + a concentric square).'], cons: ['Worst shape distortion of all; folded along every seam and diagonal.'],
-  },
-  'cube-moser-cross': {
-    name: 'Equal-area smooth cube (Moser), cross net', short: 'Moser cube', fam: 'cube', status: 'rec', statusText: 'recommended',
-    verdict: 'The least distortion a block-grid world can have, no creases, mild corners. New: needs its own tests.',
-    area: '1.000 (table error ≤ 0.6 %)', areaNum: [1, 1], shape: [1.26, 1.42], om: '12.1° / 19.9°',
-    corners: '8 × 90° missing, at ±35.3° latitude (λ₀ + 45° + k·90°)',
-    seams: '7 pairs: 1 slide + 4 quarter-turns + 2 half-turns', seamLen: 26432,
-    smooth: 'No creases: slope jumps ≤ 0.02 (0.6°) at every seam and face edge, the table\'s numerical floor.',
-    effort: ['8–11', '31–50', '≈ 49–83'],
-    eq: 'Straight, 15,104 blocks round (four faces), one slide (16,384 with 4,096-block faces).',
-    pole: 'The pole is the polar face\'s centre, an ordinary point. From face 0 the walk crosses it and leaves through a half-turn onto face 2; from faces 1 and 3 it enters and leaves through quarter-turns.',
-    pros: ['Shapes at most 1.42× (bound 1.33×); 2× better than any pillowcase.', 'No creases anywhere: ridges, rivers and coasts never kink.', 'Corners are mild and magnify nothing, so they need not be hidden at sea.',
-      'Straight wrapped equator; both poles are ordinary points.', 'The band\'s east–west wrap is a plain slide: Toroidal World can keep it.'],
-    cons: ['A new construction (conformal cube + Moser\'s flow), never published: convergence and seam tests are on us.', 'More seams: 7 pairs (14 one-way portals), 26,432 blocks of seam, 8 three-way corners.',
-      'Quarter-turn portals are untested in Immersive Portals (the rotation NBT is inferred).', 'Every reader must handle a cross-shaped world: FarTerrain, Distant Horizons, maps, the climate API\'s latitude.', 'Needs a table (≈ 0.4 MB) or its generator in the build.'],
-  },
-  'cube-moser-3x2': {
-    name: 'Equal-area smooth cube, 3 × 2 rectangle', short: 'Moser 3 × 2', fam: 'cube', status: 'alt', statusText: 'net option',
-    verdict: 'The same map packed into a rectangle: no wasted raster, one more seam pair, and seams inside the world.',
-    area: 'as the Moser cube', areaNum: [1, 1], shape: [1.26, 1.42], om: '12.1° / 19.9°',
-    corners: '8 × 90° missing', seams: '8 pairs: 2 slides + 4 quarter-turns + 2 half-turns', seamLen: 30208,
-    smooth: 'As the Moser cube.', effort: ['8–11', '32–52', 'engine owns all 8 pairs'],
-    eq: 'Straight in game, but crosses two seams per lap (into face 3 by a quarter-turn and back to face 0).',
-    pole: 'Two seams on the way over a pole.',
-    pros: ['One 3s × 2s rectangle with no unused raster.', 'Same distortion as the cross.'],
-    cons: ['8 seam pairs (30,208 blocks); the line between the rows carries six seam edges.', 'No world-wide east–west slide: its two slides are pieces of the inner line and a diagonal jump, so Toroidal World cannot own any edge.', 'Two seams per equator lap.'],
-  },
-  'cube-qsc-cross': {
-    name: 'QSC = Roşca–Plonka equal-area cube, cross net', short: 'QSC cube', fam: 'cube', status: 'alt', statusText: 'fallback',
-    verdict: 'Published, closed form, exactly equal-area; folds every ridge 41° on each face diagonal.',
-    area: 'exactly 1', areaNum: [1, 1], shape: [1.32, 1.55], om: '16.0° / 24.8°',
-    corners: '8 × 90° at ±35.3°', seams: '7 pairs: 1 slide + 4 quarter + 2 half', seamLen: 26432,
-    smooth: 'Creased: face diagonals ε 0.87 (41°) everywhere, face edges ≤ 13°. Switch on the crease test to see it.',
-    effort: ['5–8', '31–50', '≈ 49–83'],
-    eq: 'As the Moser cube.', pole: 'As the Moser cube.',
-    pros: ['Published (O\'Neill & Laubscher 1976; Roşca & Plonka 2011), in PROJ (MIT).', 'Exactly equal-area, closed form, 16 ns a block.', 'Same seams as the Moser cube: the natural fallback if the table fails its tests.'],
-    cons: ['A straight ridge or coast crossing a face diagonal kinks by 41°; a volcano on a diagonal becomes a teardrop.', 'Slightly more distortion than the Moser cube (1.32 / 1.55).'],
-  },
-  'cube-healpix-cross': {
-    name: 'HEALPix / rHEALPix cube, cross net', short: 'HEALPix', fam: 'cube', status: 'out', statusText: 'ruled out',
-    verdict: 'Best median shape (its band is cylindrical), worst creases of the equal-area cubes.',
-    area: 'exactly 1', areaNum: [1, 1], shape: [1.18, 2.41], om: '15.7° / 48.9°',
-    corners: '8 × 90° at ±41.8°', seams: '7 pairs (or 9 at 45° in its 2:1 form)', seamLen: 26432,
-    smooth: 'Polar diagonals ε 2.0 (63°), polar face edges ε ≤ 0.96 (44°).', effort: ['5–8', '31–50', '≈ 49–83'],
-    eq: 'As the Moser cube.', pole: 'As the Moser cube.',
-    pros: ['Its tropics are Lambert cylindrical, like today.', 'Standard in astronomy; MIT code in PROJ.'], cons: ['63° creases across the polar faces.', 'Polar shapes up to 2.41×.'],
-  },
-  'cube-eac-cross': {
-    name: 'Equi-angular cube (S2 tangent), cross net', short: 'Equi-angular', fam: 'cube', status: 'out', statusText: 'ruled out',
-    verdict: 'The graphics cube: cheap and close to uniform, but not equal-area and creased at every edge.',
-    area: '0.85 / 0.85 / 1.00 / 1.18 / 1.20', areaNum: [0.85, 1.2], shape: [1.2, 1.73], om: '11.0° / 30.9°',
-    corners: '8 × 90°', seams: '7 pairs', seamLen: 26432,
-    smooth: 'Every face edge creased 44–47° (ε ≈ 1).', effort: ['4–7', '31–50', '≈ 49–83'],
-    eq: 'As the Moser cube.', pole: 'As the Moser cube.',
-    pros: ['Two tangents per block; used by Google\'s VR video and S2 (Apache-2.0).'], cons: ['Not equal-area (±20 %).', 'Kinks at every face edge.'],
-  },
-  'cube-conformal-cross': {
-    name: 'Conformal cube, cross net', short: 'Conformal cube', fam: 'cube', status: 'out', statusText: 'not equal-area',
-    verdict: 'The Moser cube\'s parent: true shapes and smooth, but area grows without bound at the corners.',
-    area: '0.79 / 0.79 / 0.92 / 2.17 / ∞', areaNum: [0.79, Infinity], shape: [1, 1], om: '0',
-    corners: '8 × 90°', seams: '7 pairs', seamLen: 26432,
-    smooth: 'Analytic across every edge.', effort: ['6–9', '31–50', '≈ 49–83'],
-    eq: 'As the Moser cube.', pole: 'As the Moser cube.',
-    pros: ['Conformal and smooth; climate models use it.', 'Much milder corners than Peirce (area like r^−⅔, not r⁻²).'], cons: ['Not equal-area: 13 % of the planet off by more than ×1.25.'],
-  },
-};
-const ORDER = { now: ['lambert'], pill: ['guyou-petroff', 'guyou-peirce', 'peirce-square', 'guyou-gringorten', 'guyou-collignon'],
-  cube: ['cube-moser-cross', 'cube-moser-3x2', 'cube-qsc-cross', 'cube-healpix-cross', 'cube-eac-cross', 'cube-conformal-cross'] };
-const FAMNAME = { now: 'Today', pill: 'Pillowcase', cube: 'Cube' };
-
-// ---------------------------------------------------------------------------------------------
-// decision cards
-function decisionCards() {
-  const box = $('#decision-cards');
-  const cards = [
-    { h: 'World shape', q: 'Which flat world holds the planet?', opts: [
-      ['rec', 'Equal-area smooth cube (Moser)', 'Shapes ≤ 1.42×, no creases, 8 mild corners. QSC is its published fallback.'],
-      ['alt', 'Petroff in Guyou\'s 2:1 layout', 'Least work (1–2 days on the prototype), 3 seam pairs, but shapes up to 2.67× and 4 strong corners.'],
-      ['now', 'Keep Lambert', 'No seamless world: pole band and stop line stay.']] },
-    { h: 'Cube face size', q: 'Blocks along a face edge at 16k (32k).', opts: [
-      ['rec', '3,776 (7,552): today\'s scale', 'Same blocks per km² as today; every calibrated scale stays; edges and turn centres on chunk lines.'],
-      ['alt', '4,096 (8,192): powers of two', 'Region-aligned, band = today\'s 16,384; but 1.18× more blocks for the same planet (300 → 277 m a block).']] },
-    { h: 'Cube net', q: 'How the six faces are unfolded.', opts: [
-      ['rec', 'Cross', '7 seam pairs, straight equator with one slide (Toroidal World can keep it), poles at face centres.'],
-      ['alt', '3 × 2 rectangle', '8 pairs, seams inside the rectangle, two seams per equator lap, no world-wide slide; packs the raster without waste.']] },
-  ];
-  for (const c of cards) {
-    const d = el('div', { class: 'dcard' });
-    d.appendChild(el('h3', {}, c.h));
-    d.appendChild(el('div', { class: 'q' }, c.q));
-    for (const [k, t, s] of c.opts) {
-      const tag = k === 'rec' ? '<span class="tag rec">recommended</span>' : k === 'alt' ? '<span class="tag alt">alternative</span>' : '<span class="tag now">today</span>';
-      d.appendChild(el('div', { class: 'opt' + (k === 'rec' ? ' rec' : '') }, `<div>${tag}<br><b>${t}</b><br><span class="note">${s}</span></div>`));
-    }
-    box.appendChild(d);
+// numbers in the prose: <span data-v="stats|guyou-petroff|land_shape_gt|1.5" data-f="pct">
+function getPath(path) {
+  let o = D;
+  for (const k of path.split('|')) { if (o == null) return undefined; o = o[k]; }
+  return o;
+}
+function bind() {
+  for (const e of $$('[data-v]')) {
+    const v = getPath(e.dataset.v);
+    if (v === undefined || v === null) { e.textContent = '?'; e.title = 'missing: ' + e.dataset.v; continue; }
+    const f = e.dataset.f || 'int';
+    e.textContent = f === 'pct' ? pct(v) : f === 'pct1' ? pct(v, 1) : f === 'f1' ? fmt(v, 1) : f === 'f2' ? fmt(v, 2)
+      : f === 'f3' ? fmt(v, 3) : f === 'deg' ? `${fmt(v, 0)}°` : f === 'sci' ? Number(v).toExponential(0) : f === 'raw' ? String(v) : fmt(v);
   }
 }
 
 // ---------------------------------------------------------------------------------------------
-// cone-point figure
+// the cone-point figure
 function coneFigure() {
   const W = 540, H = 200;
   const s = sv('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img', 'aria-label': 'Discs of 360, 270 and 180 degrees' });
-  const items = [[360, 'ordinary point', '360°'], [270, 'cube corner', '270° (90° missing)'], [180, 'pillowcase corner', '180° (180° missing)']];
+  const items = [[360, 'ordinary point', '360°'], [270, 'cube corner', '270° (90° missing)'], [180, 'Guyou corner', '180° (180° missing)']];
   items.forEach(([deg, lab, sub], i) => {
     const cx = 90 + i * 180, cy = 92, r = 62;
     const a0 = -Math.PI / 2, a1 = a0 + deg * Math.PI / 180;
-    let d;
-    if (deg >= 360) d = `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${2 * r} 0 a ${r} ${r} 0 1 0 ${-2 * r} 0`;
-    else d = `M ${cx} ${cy} L ${cx + r * Math.cos(a0)} ${cy + r * Math.sin(a0)} A ${r} ${r} 0 ${deg > 180 ? 1 : 0} 1 ${cx + r * Math.cos(a1)} ${cy + r * Math.sin(a1)} Z`;
-    s.appendChild(sv('path', { d, fill: i === 0 ? css('--panel-2') : (i === 1 ? css('--accent-bg') : css('--bad-bg')), stroke: css('--ink-2'), 'stroke-width': 1.2 }));
+    const d = deg >= 360 ? `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${2 * r} 0 a ${r} ${r} 0 1 0 ${-2 * r} 0`
+      : `M ${cx} ${cy} L ${cx + r * Math.cos(a0)} ${cy + r * Math.sin(a0)} A ${r} ${r} 0 ${deg > 180 ? 1 : 0} 1 ${cx + r * Math.cos(a1)} ${cy + r * Math.sin(a1)} Z`;
+    s.appendChild(sv('path', { d, fill: i === 0 ? css('--panel-2') : (i === 1 ? css('--quarter-bg') : css('--half-bg')), stroke: css('--ink-2'), 'stroke-width': 1.2 }));
     if (deg < 360) {
       const col = i === 1 ? css('--quarter') : css('--half');
-      s.appendChild(sv('line', { x1: cx, y1: cy, x2: cx + r * Math.cos(a0), y2: cy + r * Math.sin(a0), stroke: col, 'stroke-width': 3 }));
-      s.appendChild(sv('line', { x1: cx, y1: cy, x2: cx + r * Math.cos(a1), y2: cy + r * Math.sin(a1), stroke: col, 'stroke-width': 3 }));
+      for (const a of [a0, a1]) s.appendChild(sv('line', { x1: cx, y1: cy, x2: cx + r * Math.cos(a), y2: cy + r * Math.sin(a), stroke: col, 'stroke-width': 3 }));
       s.appendChild(sv('circle', { cx, cy, r: 5, fill: css('--corner'), stroke: '#000', 'stroke-width': 1.2 }));
     }
     for (let k = 1; k <= 3; k++) s.appendChild(sv('circle', { cx, cy, r: r * k / 4, fill: 'none', stroke: css('--ink-3'), 'stroke-width': .6, 'stroke-dasharray': '2 3' }));
@@ -226,502 +88,484 @@ function coneFigure() {
   $('#cone-fig').appendChild(s);
 }
 
-// ---------------------------------------------------------------------------------------------
-// map overlay builder (world coordinates are blocks with Y up = north; SVG y = -Y)
-function overlaySvg(id, opts) {
-  const L = D.layouts[id];
-  const [bx0, by0, bx1, by1] = L.bbox;
-  const bw = bx1 - bx0, bh = by1 - by0;
-  const u = Math.max(bw, bh);
-  const s = sv('svg', { viewBox: `${bx0} ${-by1} ${bw} ${bh}`, preserveAspectRatio: 'none' });
-  const P = (p) => [p[0], -p[1]];
-  const lw = u / 380;
-  if (opts.tissot) {
-    const g = sv('g', { fill: 'rgba(255,255,255,.18)', stroke: 'rgba(255,255,255,.85)', 'stroke-width': lw * .5 });
-    for (const [x, y, ra, rb, ang] of L.tissot) {
-      g.appendChild(sv('ellipse', { cx: x, cy: -y, rx: ra, ry: rb, transform: `rotate(${-ang} ${x} ${-y})` }));
-    }
-    s.appendChild(g);
-  }
-  if (opts.extra && L.extra && L.extra.band70) {
-    const x0 = L.tiles[0][0], w = L.tiles[0][2];
-    for (const sg of [1, -1]) {
-      const yA = sg * L.extra.band70, yB = sg * L.extra.stop80;
-      s.appendChild(sv('rect', { x: x0, y: Math.min(-yA, -yB), width: w, height: Math.abs(yB - yA), fill: 'rgba(240,120,90,.28)' }));
-      s.appendChild(sv('line', { x1: x0, x2: x0 + w, y1: -yB, y2: -yB, stroke: css('--bad'), 'stroke-width': lw * 1.4 }));
-      s.appendChild(sv('text', { x: x0 + w * 0.01, y: -yB + (sg > 0 ? -1 : 1) * u * 0.012 + (sg > 0 ? 0 : u * 0.02), 'font-size': u * 0.018, fill: '#fff' }, sg > 0 ? 'storm band from 70°, stop at 80° N' : 'stop at 80° S'));
-    }
-  }
-  if (opts.walks && L.walks) {
-    const cols = { equator: css('--walk-eq'), pole: css('--walk-pole'), poleB: css('--walk-pole'), cornerA: css('--walk-a'), cornerB: css('--walk-b') };
-    const which = opts.walks === 'corner' ? ['cornerA', 'cornerB'] : ['equator', 'pole'];
-    for (const k of which) {
-      const w = L.walks[k];
-      if (!w) continue;
-      for (const sg of w.segs) {
-        s.appendChild(sv('polyline', { points: sg.map((p) => P(p).join(',')).join(' '), fill: 'none', stroke: '#000', 'stroke-opacity': .45, 'stroke-width': lw * 3.2, 'stroke-linecap': 'round' }));
-        s.appendChild(sv('polyline', { points: sg.map((p) => P(p).join(',')).join(' '), fill: 'none', stroke: cols[k], 'stroke-width': lw * 1.9, 'stroke-linecap': 'round' }));
-        // heading arrow at the segment's middle
-        if (sg.length > 2) {
-          const m = Math.floor(sg.length / 2);
-          arrowHead(s, P(sg[m - 1]), P(sg[m]), cols[k], u * 0.016);
-        }
-      }
-      w.crossings.forEach((c, i) => {
-        for (const p of [c.at, c.to]) {
-          s.appendChild(sv('circle', { cx: p[0], cy: -p[1], r: u * 0.008, fill: cols[k], stroke: '#fff', 'stroke-width': lw * .7 }));
-        }
-      });
-      if (w.stopped) s.appendChild(sv('rect', { x: w.stopped[0] - u * 0.008, y: -w.stopped[1] - u * 0.008, width: u * 0.016, height: u * 0.016, fill: css('--bad'), stroke: '#fff', 'stroke-width': lw * .7 }));
-    }
-  }
-  if (opts.seams) {
-    const g = sv('g', {});
-    const letters = 'ABCDEFGHIJ';
-    for (const sm of L.seams) {
-      const col = css(KCOL[sm.kind]);
-      let a = P(sm.a0), b = P(sm.a1);
-      g.appendChild(sv('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: '#000', 'stroke-opacity': .55, 'stroke-width': lw * 3.4 }));
-      g.appendChild(sv('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: col, 'stroke-width': lw * 2.2 }));
-      // arrows show which way round the two edges meet: A side a0 -> a1, B side reversed
-      const [p, q] = sm.side === 'A' ? [b, a] : [a, b];
-      const t = 0.62;
-      const m1 = [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
-      const m0 = [p[0] + (q[0] - p[0]) * (t - 0.02), p[1] + (q[1] - p[1]) * (t - 0.02)];
-      arrowHead(g, m0, m1, col, u * 0.02, '#000');
-      // pair letter, just inside the edge
-      const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
-      const nx = dy / len, ny = -dx / len; // in SVG coords (y down) the inside of a ccw edge is to this side
-      const tp = [a[0] + dx * 0.3 + nx * u * 0.022, a[1] + dy * 0.3 + ny * u * 0.022];
-      g.appendChild(sv('circle', { cx: tp[0], cy: tp[1], r: u * 0.014, fill: col, stroke: '#fff', 'stroke-width': lw * .6 }));
-      g.appendChild(sv('text', { x: tp[0], y: tp[1] + u * 0.0055, 'text-anchor': 'middle', 'font-size': u * 0.016, 'font-weight': 700, fill: '#fff' }, letters[sm.pair]));
-    }
-    s.appendChild(g);
-  }
-  if (opts.corners) {
-    const g = sv('g', {});
-    for (const [x, y, v, cone] of L.corners) {
-      g.appendChild(sv('circle', { cx: x, cy: -y, r: u * 0.011, fill: css('--corner'), stroke: '#000', 'stroke-width': lw * .9 }));
-      g.appendChild(sv('text', { x, y: -y + u * 0.004, 'text-anchor': 'middle', 'font-size': u * 0.011, 'font-weight': 700, fill: '#000' }, String(v + 1)));
-    }
-    if (L.extra && L.extra.southpole) {
-      for (const [x, y] of L.extra.southpole) g.appendChild(sv('text', { x: x + (x > 0 ? -1 : 1) * u * 0.035, y: -y + (y > 0 ? 1 : -0.4) * u * 0.03, 'text-anchor': 'middle', 'font-size': u * 0.017, fill: '#fff' }, 'S pole'));
-    }
-    s.appendChild(g);
-  }
-  return s;
-}
 function arrowHead(g, a, b, col, size, stroke) {
   const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
   const ux = dx / L, uy = dy / L, px = -uy, py = ux;
-  const tip = b, bl = [b[0] - ux * size + px * size * 0.55, b[1] - uy * size + py * size * 0.55], br = [b[0] - ux * size - px * size * 0.55, b[1] - uy * size - py * size * 0.55];
-  g.appendChild(sv('polygon', { points: [tip, bl, br].map((p) => p.join(',')).join(' '), fill: col, stroke: stroke || 'none', 'stroke-width': size * 0.08 }));
+  const bl = [b[0] - ux * size + px * size * 0.55, b[1] - uy * size + py * size * 0.55], br = [b[0] - ux * size - px * size * 0.55, b[1] - uy * size - py * size * 0.55];
+  g.appendChild(sv('polygon', { points: [b, bl, br].map((p) => p.join(',')).join(' '), fill: col, stroke: stroke || 'none', 'stroke-width': size * 0.08 }));
+}
+function polyline(g, pts, col, w, extra = {}) {
+  const p = pts.map((q) => q.join(',')).join(' ');
+  g.appendChild(sv('polyline', { points: p, fill: 'none', stroke: '#000', 'stroke-opacity': .5, 'stroke-width': w * 1.7, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+  g.appendChild(sv('polyline', Object.assign({ points: p, fill: 'none', stroke: col, 'stroke-width': w, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, extra)));
 }
 
 // ---------------------------------------------------------------------------------------------
-// explorer
-const state = { id: 'cube-moser-cross', layer: 'map', ov: new Set(['seams', 'corners']) };
-const LAYERS = [['map', 'Planet'], ['area', 'Area'], ['shape', 'Shape'], ['crease', 'Crease test']];
-const OVS = [['seams', 'Seams'], ['corners', 'Corners'], ['grat', 'Graticule'], ['tissot', 'Tissot'], ['walks', 'Walks'], ['corner', 'Corner walkers']];
-function picker(box, ids, onPick, current, idPrefix) {
-  for (const fam of ['now', 'pill', 'cube']) {
-    const row = el('div', { class: 'row' });
-    row.appendChild(el('span', { class: 'fam' }, FAMNAME[fam]));
-    for (const id of ORDER[fam]) {
-      if (!ids.includes(id)) continue;
-      const c = C[id];
-      const b = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(id === current), id: idPrefix + id }, `<span class="dot${c.status === 'rec' ? ' rec' : ''}"></span>${c.short}`);
-      b.addEventListener('click', () => { box.querySelectorAll('.chip').forEach((x) => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true'); onPick(id); });
-      row.appendChild(b);
+// the two worlds side by side
+const WALKCOL = { equator: '--walk-eq', pole: '--walk-pole', poleB: '--walk-pole', diag: '--walk-diag', cornerA: '--walk-a', cornerB: '--walk-b' };
+function seamOverlay(s, L, u, opts) {
+  const lw = u / 380;
+  const P = (p) => [p[0], -p[1]];
+  if (opts.walks && L.walks) {
+    for (const k of ['equator', 'pole', 'poleB', 'diag']) {
+      const w = L.walks[k];
+      if (!w) continue;
+      const col = css(WALKCOL[k]);
+      for (const sg of w.segs) {
+        polyline(s, sg.map(P), col, lw * 1.8);
+        if (sg.length > 2) { const m = Math.floor(sg.length / 2); arrowHead(s, P(sg[m - 1]), P(sg[m]), col, u * 0.016); }
+      }
+      for (const c of w.crossings) for (const p of [c.at, c.to]) s.appendChild(sv('circle', { cx: p[0], cy: -p[1], r: u * 0.007, fill: col, stroke: '#fff', 'stroke-width': lw * .7 }));
     }
-    box.appendChild(row);
+  }
+  if (opts.seams) {
+    const letters = 'ABCDEFGHIJ';
+    for (const sm of L.seams) {
+      const col = css(KCOL[sm.kind]);
+      const a = P(sm.a0), b = P(sm.a1);
+      s.appendChild(sv('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: '#000', 'stroke-opacity': .55, 'stroke-width': lw * 3.4 }));
+      s.appendChild(sv('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: col, 'stroke-width': lw * 2.2 }));
+      const [p, q] = sm.side === 'A' ? [b, a] : [a, b];
+      const m1 = [p[0] + (q[0] - p[0]) * 0.62, p[1] + (q[1] - p[1]) * 0.62], m0 = [p[0] + (q[0] - p[0]) * 0.6, p[1] + (q[1] - p[1]) * 0.6];
+      arrowHead(s, m0, m1, col, u * 0.02, '#000');
+      const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
+      const nx = dy / len, ny = -dx / len;
+      const tp = [a[0] + dx * 0.3 + nx * u * 0.024, a[1] + dy * 0.3 + ny * u * 0.024];
+      s.appendChild(sv('circle', { cx: tp[0], cy: tp[1], r: u * 0.016, fill: col, stroke: '#fff', 'stroke-width': lw * .6 }));
+      s.appendChild(sv('text', { x: tp[0], y: tp[1] + u * 0.006, 'text-anchor': 'middle', 'font-size': u * 0.018, 'font-weight': 700, fill: '#fff' }, letters[sm.pair]));
+    }
+  }
+  if (opts.corners) {
+    for (const [x, y, v] of L.corners) {
+      s.appendChild(sv('circle', { cx: x, cy: -y, r: u * 0.012, fill: css('--corner'), stroke: '#000', 'stroke-width': lw * .9 }));
+      s.appendChild(sv('text', { x, y: -y + u * 0.0045, 'text-anchor': 'middle', 'font-size': u * 0.012, 'font-weight': 700, fill: '#000' }, String(v + 1)));
+    }
   }
 }
-function setupExplorer() {
-  const hx = location.hash.match(/ex-([a-z0-9-]+?)-(map|area|shape|crease)(?:-([a-z,]+))?(?:,|$)/);
-  if (hx && D.layouts[hx[1]]) { state.id = hx[1]; state.layer = hx[2]; if (hx[3]) state.ov = new Set(hx[3].split(',')); }
-  picker($('#picker'), Object.keys(D.layouts), (id) => { state.id = id; renderMap(); }, state.id, 'pick-');
-  const seg = $('#layer-seg');
-  for (const [k, t] of LAYERS) {
-    const b = el('button', { type: 'button', 'aria-pressed': String(k === state.layer), id: 'layer-' + k }, t);
-    b.addEventListener('click', () => { state.layer = k; seg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); renderMap(); });
-    seg.appendChild(b);
+function overlaySvg(id, opts) {
+  const L = D.layouts[id];
+  const [bx0, by0, bx1, by1] = L.bbox;
+  const bw = bx1 - bx0, bh = by1 - by0, u = Math.max(bw, bh);
+  const s = sv('svg', { viewBox: `${bx0} ${-by1} ${bw} ${bh}`, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+  if (opts.tissot) {
+    const g = sv('g', { fill: 'rgba(255,255,255,.18)', stroke: 'rgba(255,255,255,.85)', 'stroke-width': u / 760 });
+    for (const [x, y, ra, rb, ang] of L.tissot) g.appendChild(sv('ellipse', { cx: x, cy: -y, rx: ra, ry: rb, transform: `rotate(${-ang} ${x} ${-y})` }));
+    s.appendChild(g);
   }
-  const ch = $('#overlay-checks');
-  for (const [k, t] of OVS) {
-    const lab = el('label', {}, `<input type="checkbox" id="ov-${k}" ${state.ov.has(k) ? 'checked' : ''}> ${t}`);
-    lab.querySelector('input').addEventListener('change', (e) => { e.target.checked ? state.ov.add(k) : state.ov.delete(k); renderMap(); });
-    ch.appendChild(lab);
+  seamOverlay(s, L, u, opts);
+  if (opts.spawn) {
+    const sp = D.stats[id].dist.spawn_blocks;
+    s.appendChild(sv('circle', { cx: sp[0], cy: -sp[1], r: u * 0.014, fill: '#fff', stroke: '#000', 'stroke-width': u / 400 }));
+    s.appendChild(sv('circle', { cx: sp[0], cy: -sp[1], r: u * 0.005, fill: '#000' }));
   }
-  renderMap();
+  return s;
 }
+const LAYERS = [['map', 'Planet'], ['shape', 'Shape'], ['area', 'Area'], ['north', 'North error'], ['bands', 'Latitude bands'], ['dist', 'Distance from spawn'], ['compass', 'Compass error'], ['crease', 'Crease test']];
+const OVS = [['seams', 'Seams'], ['corners', 'Corners'], ['coast', 'Coast'], ['grat', 'Graticule'], ['walks', 'Walks'], ['tissot', 'Tissot']];
+const ex = { layer: 'map', ov: new Set(['seams', 'corners']) };
 function mapStack(box, id, layer, ov) {
   const L = D.layouts[id];
   const [bx0, by0, bx1, by1] = L.bbox;
   box.innerHTML = '';
   box.style.aspectRatio = `${bx1 - bx0} / ${by1 - by0}`;
-  box.appendChild(el('img', { src: `${id}-${layer}.webp`, alt: `${C[id].name}: ${layer}`, loading: 'lazy' }));
-  if (ov.has('grat')) box.appendChild(el('img', { src: `${id}-grat.webp`, alt: '', class: 'grat', loading: 'lazy' }));
-  box.appendChild(overlaySvg(id, { seams: ov.has('seams'), corners: ov.has('corners'), tissot: ov.has('tissot'), walks: ov.has('walks') ? 'main' : (ov.has('corner') ? 'corner' : null), extra: true }));
+  box.appendChild(el('img', { src: `${id}-${layer}.webp`, alt: `${NAME[id]}: ${layer}`, loading: 'lazy' }));
+  if (layer === 'dist') box.appendChild(el('img', { src: `${id}-pdist.webp`, alt: '', loading: 'lazy' }));
+  if (ov.has('coast') || layer === 'shape' || layer === 'north') box.appendChild(el('img', { src: `${id}-coast.webp`, alt: '', loading: 'lazy', class: layer === 'map' ? '' : 'faint' }));
+  if (ov.has('grat')) box.appendChild(el('img', { src: `${id}-grat.webp`, alt: '', loading: 'lazy' }));
+  box.appendChild(overlaySvg(id, { seams: ov.has('seams'), corners: ov.has('corners'), tissot: ov.has('tissot'), walks: ov.has('walks'), spawn: layer === 'dist' || layer === 'compass' }));
 }
-function renderMap() {
-  const id = state.id, c = C[id], L = D.layouts[id];
-  mapStack($('#mapbox'), id, state.layer, state.ov);
-  if (state.ov.has('walks') && state.ov.has('corner')) {
-    $('#mapbox').appendChild(overlaySvg(id, { walks: 'corner' }));
+const LEG = {
+  map: () => 'Hypsometric colours from the bake; hill shade drawn in world space.',
+  shape: () => `shape ratio a/b: 1<span class="bar" style="background:linear-gradient(90deg,#fafaf0,#fee8a0,#fdae61,#e6613c,#be2846,#78145a,#320a46)"></span>4+ <span>(how many times too long one direction is drawn; white lines: coasts)</span>`,
+  area: () => `blocks per planet area: ¼×<span class="bar" style="background:linear-gradient(90deg,#2166ac,#67a9cf,#d1e5f0,#f7f7f7,#fddbc7,#ef8a62,#b2182b)"></span>4× <span>(both are equal-area: all white)</span>`,
+  north: () => `angle between F3's north (−z) and true north: 0°<span class="bar" style="background:linear-gradient(90deg,#fafaf0,#fee8a0,#fdae61,#e6613c,#be2846,#78145a,#320a46)"></span>180°`,
+  bands: () => ['equatorial (0–10°)', 'tropics (10–23.4°)', 'subtropics (23.4–35°)', 'temperate (35–55°)', 'boreal (55–66.6°)', 'polar (66.6–90°)'].map((t, i) => `<span><span class="sw" style="background:${['#d63c2e', '#f08c32', '#ebcd50', '#5aaa5a', '#3c82aa', '#afa0dc'][i]}"></span>${t}</span>`).join(''),
+  dist: () => `walking distance from spawn (dot), bands every 1,000 blocks: 0<span class="bar" style="background:linear-gradient(90deg,#fff7ec,#fdd49e,#fc8d59,#d7301f,#7f0000,#280028)"></span>9,000 <span><span class="sw" style="background:#1a59f2"></span>the planet's own distance, every 1,000 blocks</span>`,
+  compass: () => `how far a vanilla compass (raw coordinates) points from the true way back to spawn: 0°<span class="bar" style="background:linear-gradient(90deg,#fafaf0,#fee8a0,#fdae61,#e6613c,#be2846,#78145a,#320a46)"></span>180°`,
+  crease: () => 'hill shade of a smooth made-up planet: straight lines of broken shading are creases',
+};
+function renderWorlds() {
+  for (const id of [G, K]) mapStack($(`#mb-${id}`), id, ex.layer, ex.ov);
+  let h = `<span>${LEG[ex.layer]()}</span>`;
+  if (ex.ov.has('seams')) h += ['slide', 'quarter', 'half'].map((k) => `<span><span class="sw" style="background:var(${KCOL[k]})"></span>${KNAME[k]}</span>`).join('') + '<span>letters pair glued edges; arrows run the same way on both</span>';
+  if (ex.ov.has('corners')) h += '<span><span class="cn"></span>corner (copies share a number)</span>';
+  if (ex.ov.has('walks')) h += `<span><span class="sw" style="background:var(--walk-eq)"></span>equator</span><span><span class="sw" style="background:var(--walk-pole)"></span>north over a pole</span><span><span class="sw" style="background:var(--walk-diag)"></span>45° from spawn</span><span>dots: out of and into a seam</span>`;
+  if (ex.ov.has('tissot')) h += '<span>ellipses: a 6° disc of planet as drawn</span>';
+  $('#worlds-legend').innerHTML = h;
+}
+function setupWorlds() {
+  const seg = $('#layer-seg');
+  for (const [k, t] of LAYERS) {
+    const b = el('button', { type: 'button', 'aria-pressed': String(k === ex.layer), 'data-layer': k }, t);
+    b.addEventListener('click', () => { ex.layer = k; $$('button', seg).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); renderWorlds(); });
+    seg.appendChild(b);
   }
-  // legend
-  const lg = $('#map-legend');
-  let h = '';
-  if (state.layer === 'area') h += `<span>blocks per planet area: <span class="note" style="color:inherit">¼×</span><span class="bar" style="background:linear-gradient(90deg,#2166ac,#67a9cf,#d1e5f0,#f7f7f7,#fddbc7,#ef8a62,#b2182b)"></span>4× <span style="opacity:.75">(white = equal-area; red = planet drawn larger)</span></span>`;
-  if (state.layer === 'shape') h += `<span>shape ratio a/b: 1<span class="bar" style="background:linear-gradient(90deg,#fafaf0,#fee8a0,#fdae61,#e6613c,#be2846,#78145a,#320a46)"></span>4+</span>`;
-  if (state.layer === 'crease') h += `<span>hill shade of a smooth made-up planet: straight lines of broken shading are creases</span>`;
-  if (state.ov.has('seams')) h += ['slide', 'quarter', 'half'].map((k) => `<span><span class="sw" style="background:var(${KCOL[k]})"></span>${KNAME[k]}</span>`).join('') + '<span>letters pair the glued edges; arrows run the same way along both</span>';
-  if (state.ov.has('corners')) h += `<span><span class="cn"></span>corner (copies share a number)</span>`;
-  if (state.ov.has('walks')) h += `<span><span class="sw" style="background:var(--walk-eq)"></span>equator walk</span><span><span class="sw" style="background:var(--walk-pole)"></span>over the north pole</span><span>dots: leaving and re-entering through a seam</span>`;
-  if (state.ov.has('corner')) h += `<span><span class="sw" style="background:var(--walk-a)"></span><span class="sw" style="background:var(--walk-b)"></span>two walkers either side of a corner</span>`;
-  if (state.ov.has('tissot')) h += `<span>ellipses: a 6° disc of planet as drawn</span>`;
-  lg.innerHTML = h;
-  // panel
-  const seamA = L.seams.filter((s) => s.side === 'B');
-  const kinds = seamA.reduce((m, s) => (m[s.kind] = (m[s.kind] || 0) + 1, m), {});
-  const tagc = { rec: 'rec', alt: 'alt', run: 'run', now: 'now', out: 'out' }[c.status];
-  $('#cand-panel').innerHTML = `
-    <div class="eyebrow">${FAMNAME[c.fam]} family</div>
-    <h3>${c.name}</h3>
-    <span class="tag ${tagc}">${c.statusText}</span>
-    <p>${c.verdict}</p>
-    <dl class="kv">
-      <dt>Area</dt><dd class="num">${c.area}</dd>
-      <dt>Shape a/b</dt><dd class="num">median ${c.shape[0]} · max ${c.shape[1]}${c.shapeNote ? ` <span class="note">(${c.shapeNote})</span>` : ''}</dd>
-      <dt>Corners</dt><dd>${c.corners}</dd>
-      <dt>Seams</dt><dd>${c.seams}: ${Object.entries(kinds).map(([k, n]) => `<span class="kind ${k}">${n} ${k}</span>`).join(', ')}; <span class="num">${fmt(c.seamLen)}</span> blocks at 16k</dd>
-      <dt>Smoothness</dt><dd>${c.smooth}</dd>
-      <dt>Effort</dt><dd class="num">projection ${c.effort[0]} · IP ${c.effort[1]} · engine ${c.effort[2]} <span class="note">agent-days</span></dd>
-    </dl>
-    <div class="pc"><div class="pro"><h4>For</h4><ul>${c.pros.map((x) => `<li>${x}</li>`).join('')}</ul></div>
-    <div class="con"><h4>Against</h4><ul>${c.cons.map((x) => `<li>${x}</li>`).join('')}</ul></div></div>`;
+  const ch = $('#overlay-checks');
+  for (const [k, t] of OVS) {
+    const lab = el('label', {}, `<input type="checkbox" ${ex.ov.has(k) ? 'checked' : ''}> ${t}`);
+    lab.querySelector('input').addEventListener('change', (e) => { e.target.checked ? ex.ov.add(k) : ex.ov.delete(k); renderWorlds(); });
+    ch.appendChild(lab);
+  }
+  const hx = location.hash.match(/layer-([a-z]+)/);
+  if (hx && LAYERS.some((l) => l[0] === hx[1])) { ex.layer = hx[1]; $$('button', seg).forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.layer === ex.layer))); }
+  if (/ov-walks/.test(location.hash)) ex.ov.add('walks');
+  renderWorlds();
 }
 
 // ---------------------------------------------------------------------------------------------
-// comparison table
-function compareTable() {
-  const t = $('#cmp');
-  t.innerHTML = `<thead><tr><th>Option</th><th>Area (blocks per planet area, min / p1 / median / p99 / max)</th><th class="n">Shape a/b<br>median / max</th><th>Corners</th><th>Seams</th><th class="n">Seam length (16k)</th><th>Smoothness at seams and creases</th><th class="n">Effort, days<br>projection · IP · engine</th><th>Walk the equator</th><th>Cross a pole</th></tr></thead>`;
-  const tb = el('tbody');
-  for (const fam of ['cube', 'pill', 'now']) {
-    for (const id of ORDER[fam]) {
-      const c = C[id];
-      const tr = el('tr', { class: c.status === 'rec' ? 'rec' : (c.status === 'now' ? 'ref' : '') });
-      tr.innerHTML = `<td><b>${c.name}</b><span class="sub"><span class="tag ${c.status === 'rec' ? 'rec' : c.status === 'alt' ? 'alt' : c.status === 'run' ? 'run' : c.status === 'now' ? 'now' : 'out'}">${c.statusText}</span></span></td>
-        <td class="num">${c.area}</td><td class="n">${c.shape[0]} / ${c.shape[1]}</td><td>${c.corners}</td><td>${c.seams}</td><td class="n">${fmt(c.seamLen)}</td>
-        <td>${c.smooth}</td><td class="n">${c.effort.join(' · ')}</td><td>${c.eq}</td><td>${c.pole}</td>`;
-      tb.appendChild(tr);
-    }
-  }
-  t.appendChild(tb);
+// corners up close
+function cornerFrame(id, kind) {
+  const C = D.corners[id];
+  const box = el('div', { class: 'mapbox square' });
+  const [X0, Y0, X1, Y1] = C.window_t;
+  const w = X1 - X0;
+  const s = sv('svg', { viewBox: `${X0} ${-Y1} ${w} ${Y1 - Y0}`, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+  const ub = D.layouts[id].unit_blocks;
+  const T = (p) => [p[0] / ub, -p[1] / ub];   // overlay blocks -> svg (tile units, y down)
+  const lw = w / 300;
+  const defs = sv('defs');
+  const pat = sv('pattern', { id: `hatch-${id}-${kind}`, width: w / 40, height: w / 40, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' });
+  pat.appendChild(sv('rect', { width: w / 40, height: w / 40, fill: css('--gap-bg') }));
+  pat.appendChild(sv('line', { x1: 0, y1: 0, x2: 0, y2: w / 40, stroke: css('--gap-ink'), 'stroke-width': w / 140 }));
+  defs.appendChild(pat);
+  s.appendChild(defs);
+  return { C, box, s, T, lw, w, X0, Y0, X1, Y1, ub, pat: `hatch-${id}-${kind}` };
 }
-
-// ---------------------------------------------------------------------------------------------
-// seam technology
-function techTable() {
-  const cols = ['Immersive Portals (v1)', 'Deep Time wrap engine', 'Toroidal World', 'Distant Horizons', 'Workbench map', 'Chunk and region grid', 'Create and contraptions near seams'];
-  const rows = [
-    ['Lambert (today)', [
-      ['na', 'Not needed.'],
-      ['na', 'Not needed.'],
-      ['ok', 'Owns the only seam, as shipped.'],
-      ['ok', 'Works today (TW guard mixin).'],
-      ['ok', 'The 2:1 picture as today.'],
-      ['ok', 'C = 16,384: the wrap is region-aligned.'],
-      ['ok', 'TW carries Create (126 mixins) and Sable across the slide.']]],
-    ['Petroff, Guyou 2:1', [
-      ['ok', 'Proven in the prototype: 4 global portals, every seam walked, items, carts and arrows cross [R]. TW must go (it cannot share a world with IP); Destroy and CBC Modern Warfare crash with IP; Sable does not cross; collisions come from the hidden outside.'],
-      ['ok', 'Owns 2 half-turn edges; the spike showed blocks, water, redstone, light and entities crossing a half-turn [R].'],
-      ['ok', 'Keeps the slide in the engine route ("TW slides, engine turns").'],
-      ['mid', 'FarTerrain folds the two long edges (a few dozen lines). Under IP, DH draws the raw world beyond seams, which is the folded planet.'],
-      ['ok', 'Still a 2:1 picture.'],
-      ['mid', 'b = 6,544 (409 chunks), not region-aligned (8,192 would be 1.57× larger).'],
-      ['mid', 'IP: no adjacency across a portal; contraptions do not cross. Engine: kinetic and fluid networks refused at turning seams at first, adapters started in parallel; 13,088 blocks of turning seam.']]],
-    ['Moser cube, cross net', [
-      ['mid', '14 one-way portals; quarter-turn portals untested (the rotation NBT is inferred); 8 three-way corners, where the earlier prototype measured 30–40 % frame-rate cost; TW must go; the same mod crashes as Guyou.'],
-      ['ok', 'Owns 6 turning pairs (4 quarter, 2 half). The engine\'s algebra already takes quarter-turns (a quarter-turn corner is among its unit-test layouts); a whole-world cube is not yet run. All turn centres sit on chunk corners at 3,776 or 4,096.'],
-      ['ok', 'Can keep the band\'s east–west slide (period 4s): the band\'s wrap is a plain translation.'],
-      ['mid', 'FarTerrain must fold quarter-turns and a cross shape: the same principle, more cases.'],
-      ['mid', 'A cross picture (half its 4:3 box empty) or six faces; or keep drawing the planet in any projection, since the map need not be the world.'],
-      ['ok', '236 chunks a face at 3,776; region-aligned at 4,096 (see Face size).'],
-      ['bad', 'As Guyou, plus quarter-turns swap a shaft\'s x and z axes (an axis remap, not only a sign) [inference]; 22,656 blocks of turning seam, 1.7× Guyou\'s.']]],
-    ['Moser cube, 3 × 2', [
-      ['mid', '16 one-way portals, six seam edges on the line inside the rectangle (portal planes facing both ways along it).'],
-      ['mid', 'Owns all 8 pairs: no world-wide slide for TW to keep, so the engine must also carry what TW carries today.'],
-      ['bad', 'No role: its two slides are not a world-wide x wrap.'],
-      ['mid', 'As the cross, plus an interior seam line.'],
-      ['ok', 'A full 3 × 2 rectangle.'],
-      ['ok', 'As the cross.'],
-      ['bad', 'As the cross, with 26,416 blocks of turning seam and a seam through the middle of the world.']]],
-  ];
-  const t = $('#tech-table');
-  t.innerHTML = `<thead><tr><th>Shape</th>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead>`;
-  const tb = el('tbody');
-  for (const [name, cells] of rows) {
-    const tr = el('tr', name.startsWith('Moser cube, cross') ? { class: 'rec' } : {});
-    tr.innerHTML = `<td><b>${name}</b></td>` + cells.map(([s, txt]) => `<td><span class="st ${s}"></span>${txt}</td>`).join('');
-    tb.appendChild(tr);
-  }
-  t.appendChild(tb);
-  t.parentElement.insertAdjacentHTML('afterend', '<p class="note"><span class="st ok"></span>works or carries over <span class="st mid" style="margin-left:12px"></span>needs work <span class="st bad" style="margin-left:12px"></span>a real obstacle <span class="st na" style="margin-left:12px"></span>not applicable. [R] = run and seen in the prototype or the spike; the rest is read from the design notes (seamless-wrapping.md §6–8, wrap-engine.md §4–6) or marked as inference.</p>');
+function missingWedge(f, id) {
+  const { C, s, X0, Y0, X1, Y1 } = f;
+  const [vx, vy] = C.V;
+  const pts = id === G ? [[X0, -Y1], [X1, -Y1], [X1, -vy], [X0, -vy]] : [[vx, -Y1], [X1, -Y1], [X1, -vy], [vx, -vy]];
+  s.appendChild(sv('polygon', { points: pts.map((p) => p.join(',')).join(' '), fill: `url(#${f.pat})` }));
 }
-
-// ---------------------------------------------------------------------------------------------
-// face size
-function faceSize() {
-  const L = D.layouts['cube-moser-cross'];
-  const ub = L.unit_blocks;
-  const sizes = [
-    { s: 3776, lab: '3,776 (today\'s scale)', world: '16k' }, { s: 4096, lab: '4,096 (power of two)', world: '16k' },
-    { s: 7552, lab: '7,552 (today\'s scale)', world: '32k' }, { s: 8192, lab: '8,192 (power of two)', world: '32k' }];
-  // fixed points of every seam motion (turn centres) and every face corner, in face units, origin at face 0's centre
-  const pts = [], centres = [];
+function cornerSeams(f, id, withLetters) {
+  const { C, s, T, lw, w } = f;
+  const L = D.layouts[id];
   for (const sm of L.seams) {
-    for (const p of [sm.a0, sm.a1]) pts.push([p[0] / ub - 0.5, p[1] / ub - 0.5]);
-    if (sm.kind !== 'slide' && sm.side === 'B') {
-      // the fixed point of the rotation taking edge A to its partner: solve from the two edges
-      const B = L.seams.find((x) => x.pair === sm.pair && x.side === 'A');
-      const a0 = sm.a0.map((v) => v / ub), a1 = sm.a1.map((v) => v / ub), b0 = B.a0.map((v) => v / ub), b1 = B.a1.map((v) => v / ub);
-      // a0 <-> b1, a1 <-> b0; centre c with |c-a0| = |c-b1|, |c-a1| = |c-b0| (perpendicular bisectors)
-      const c = bisect(a0, b1, a1, b0);
-      if (c) centres.push([c[0] - 0.5, c[1] - 0.5, sm.kind]);
-    }
+    const a = T(sm.a0), b = T(sm.a1);
+    const col = css(KCOL[sm.kind]);
+    s.appendChild(sv('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: '#000', 'stroke-opacity': .5, 'stroke-width': lw * 3.4 }));
+    s.appendChild(sv('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: col, 'stroke-width': lw * 2.2 }));
   }
-  const onGrid = (v, g) => Math.abs(v / g - Math.round(v / g)) < 1e-6;
-  const rows = sizes.map((z) => {
-    const s = z.s;
-    const chunkC = centres.filter((c) => onGrid(c[0] * s, 16) && onGrid(c[1] * s, 16)).length;
-    const regC = centres.filter((c) => onGrid(c[0] * s, 512) && onGrid(c[1] * s, 512)).length;
-    const regE = pts.filter((p) => onGrid(p[0] * s, 512) && onGrid(p[1] * s, 512)).length;
-    // region files touched by the six faces (face 0 centred on the origin; north = -z)
-    const faces = [[0, 0], [1, 0], [2, 0], [3, 0], [0, -1], [0, 1]];
-    const regs = new Set();
-    for (const [fx, fz] of faces) {
-      const x0 = (fx - 0.5) * s, z0 = (fz - 0.5) * s;
-      for (let rx = Math.floor(x0 / 512); rx * 512 < x0 + s; rx++) for (let rz = Math.floor(z0 / 512); rz * 512 < z0 + s; rz++) regs.add(rx + ',' + rz);
-    }
-    const full = (s / 512) ** 2 * 6;
-    const today = z.world === '16k' ? 16384 * 16384 / Math.PI : 32768 * 32768 / Math.PI;
-    return { ...z, chunks: s / 16, regionsPer: s / 512, band: 4 * s, blocks: 6 * s * s, vsToday: 6 * s * s / today,
-      mpb: 300 * (z.world === '16k' ? 3774.2 : 7548.4) / s, regs: regs.size, regsFull: full, chunkC, regC, nC: centres.length, regE, nE: pts.length, seam: 7 * s };
-  });
-  const t = $('#size-table');
-  t.innerHTML = `<thead><tr><th>Face edge</th><th class="n">World</th><th class="n">Chunks a side</th><th class="n">Regions a side</th><th class="n">Equator lap (band)</th><th class="n">Blocks (6 s²)</th><th class="n">vs today</th><th class="n">Metres a block (same planet)</th><th class="n">Region files</th><th class="n">Turn centres on chunk corners</th><th class="n">… on region corners</th><th class="n">Seam length</th></tr></thead>`;
-  const tb = el('tbody');
-  for (const r of rows) {
-    const tr = el('tr', r.s === 3776 || r.s === 7552 ? { class: 'rec' } : {});
-    tr.innerHTML = `<td><b>${r.lab}</b></td><td class="n">${r.world}</td><td class="n">${fmt(r.chunks)}</td><td class="n">${fmt(r.regionsPer, 3)}</td><td class="n">${fmt(r.band)}</td>
-      <td class="n">${fmt(r.blocks / 1e6, 1)} M</td><td class="n">${fmt(r.vsToday, 3)}×</td><td class="n">${fmt(r.mpb, 1)}</td><td class="n">${fmt(r.regs)} <span class="sub">${r.regs === r.regsFull ? 'each inside one face' : 'some straddle face edges'}</span></td>
-      <td class="n">${r.chunkC} / ${r.nC}</td><td class="n">${r.regC} / ${r.nC}</td><td class="n">${fmt(r.seam)}</td>`;
-    tb.appendChild(tr);
+  for (const [a0, a1] of L.internal) {
+    const a = T(a0), b = T(a1);
+    s.appendChild(sv('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: '#fff', 'stroke-opacity': .8, 'stroke-width': lw * 1.2, 'stroke-dasharray': `${w / 60} ${w / 80}` }));
   }
-  t.appendChild(tb);
-  $('#size-text').innerHTML = `
-    <p>The survey sized the faces so a block covers the same planet area as today: s = √(2π/3)·R = 3,774 at 16k, rounded to <b>3,776 = 236 chunks</b> (7,552 = 472 chunks at 32k). The alternative is a power of two, <b>4,096</b> (8,192).</p>
-    <p><b>For today's scale:</b> every calibrated horizontal scale stays (300 m a block at 16k: erosion, feature widths, deposit spacing were tuned at it); the wrap engine only needs edges and turn centres on chunk lines, and 3,776 gives that (with face 0 centred on the origin every edge and every turn centre is a multiple of 1,888 = 118 chunks); 18 % fewer blocks to generate, store and pregenerate.</p>
-    <p><b>For powers of two:</b> every face edge, seam and turn centre lands on a region line, so each region file belongs to one face; the band is exactly <b>16,384</b> blocks round, the same as today's x wrap and Toroidal World's 16k cylinder, so the equator walk is as long as today and the preset names stay literal. The price: the same planet gets 1.18× more blocks (277 m a block instead of 300, slopes 8 % gentler unless retuned), or the planet itself grows 8.5 % in radius.</p>
-    <p class="note">Region alignment is a convenience (per-face storage, tools that select whole regions), not a requirement of either seam technology; Distant Horizons sees 64-block-aligned edges either way (3,776 = 59 × 64) [inference].</p>`;
-  sizeRuler();
-  chunkCorner($('#size-chunks-a'), 3776);
-  chunkCorner($('#size-chunks-b'), 4096);
+  const [vx, vy] = C.V;
+  s.appendChild(sv('circle', { cx: vx, cy: -vy, r: w / 55, fill: css('--corner'), stroke: '#000', 'stroke-width': lw }));
 }
-function bisect(p, q, r, s2) {
-  // intersection of the perpendicular bisectors of pq and rs
-  const m1 = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], d1 = [q[0] - p[0], q[1] - p[1]];
-  const m2 = [(r[0] + s2[0]) / 2, (r[1] + s2[1]) / 2], d2 = [s2[0] - r[0], s2[1] - r[1]];
-  // d1·(c - m1) = 0, d2·(c - m2) = 0
-  const det = d1[0] * d2[1] - d1[1] * d2[0];
-  if (Math.abs(det) < 1e-12) {
-    // a half-turn of an edge onto itself... the two bisectors coincide: the centre is the midpoint of p and q
-    return m1;
-  }
-  const b1 = d1[0] * m1[0] + d1[1] * m1[1], b2 = d2[0] * m2[0] + d2[1] * m2[1];
-  return [(b1 * d2[1] - b2 * d1[1]) / det, (d1[0] * b2 - d2[0] * b1) / det];
+function label(s, x, y, t, size, anchor = 'middle', col = '#fff') {
+  s.appendChild(sv('text', { x, y, 'text-anchor': anchor, 'font-size': size, 'font-weight': 700, fill: col, stroke: 'rgba(0,0,0,.65)', 'stroke-width': size * 0.18, 'paint-order': 'stroke' }, t));
 }
-function sizeRuler() {
-  const W = 620, H = 150, x0 = 20, scale = (W - 40) / 16384;
-  const s = sv('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img', 'aria-label': 'Band rulers' });
-  [[3776, 30, '3,776-block faces: 15,104 round'], [4096, 92, '4,096-block faces: 16,384 round']].forEach(([fs, y, lab]) => {
-    const start = -fs / 2;
-    for (let k = 0; k < 4; k++) {
-      s.appendChild(sv('rect', { x: x0 + (k * fs) * scale, y, width: fs * scale, height: 26, fill: k % 2 ? css('--accent-bg') : css('--panel-2'), stroke: css('--ink-3'), 'stroke-width': .6 }));
-      s.appendChild(sv('text', { x: x0 + (k * fs + fs / 2) * scale, y: y + 17, 'text-anchor': 'middle', 'font-size': 11, fill: css('--ink-2') }, `face ${k}`));
-    }
-    // region lines (world x = start + offset)
-    for (let rx = Math.ceil(start / 512) * 512; rx <= start + 4 * fs + 1; rx += 512) {
-      const X = x0 + (rx - start) * scale;
-      s.appendChild(sv('line', { x1: X, x2: X, y1: y - 5, y2: y + 31, stroke: css('--ink'), 'stroke-width': .7, 'stroke-opacity': .55 }));
-    }
-    // wrap seam at both ends
-    for (const e of [0, 4 * fs]) s.appendChild(sv('line', { x1: x0 + e * scale, x2: x0 + e * scale, y1: y - 6, y2: y + 32, stroke: css('--slide'), 'stroke-width': 3 }));
-    s.appendChild(sv('text', { x: x0, y: y - 9, 'font-size': 11.5, 'font-weight': 600, fill: css('--ink') }, lab));
-  });
-  s.appendChild(sv('text', { x: x0, y: H - 4, 'font-size': 10.5, fill: css('--ink-3') }, 'thin lines: region boundaries (512 blocks) · teal: the band\'s wrap seam · face 0 centred on x = 0'));
-  $('#size-ruler').appendChild(s);
+function faceLabels(f, id) {
+  const { C, s, w } = f;
+  const [vx, vy] = C.V;
+  const o = w * 0.3, z = w * 0.045;
+  if (id === G) {
+    label(s, vx - o, -vy + o, 'west square', z); label(s, vx + o, -vy + o, 'east square', z);
+    label(s, vx, -vy - o * 0.9, 'missing: 180°', z, 'middle', css('--gap-label'));
+  } else {
+    label(s, vx - o, -vy + o, 'F0 (band)', z); label(s, vx + o, -vy + o, 'F1 (band)', z); label(s, vx - o, -vy - o, 'N (polar)', z);
+    label(s, vx + o, -vy - o, 'missing: 90°', z, 'middle', css('--gap-label'));
+  }
 }
-function chunkCorner(box, fs) {
-  // a 1,100 x 600 block window round the corner where face 0, face 1 and the north face meet
-  const cx = fs / 2, cz = -fs / 2; // the corner (north = -z)
-  const wx0 = cx - 640, wz0 = cz - 300, ww = 1280, wh = 600;
-  const W = 600, H = W * wh / ww, k = W / ww;
-  const s = sv('svg', { viewBox: `0 0 ${W} ${H + 16}`, width: '100%', role: 'img', 'aria-label': 'Chunk grid near a face corner' });
-  // faces: band face 0 (x < cx, z > cz), face 1 (x > cx, z > cz), north face (x < cx, z < cz), empty (x > cx, z < cz)
-  const X = (x) => (x - wx0) * k, Z = (z) => (z - wz0) * k;
-  s.appendChild(sv('rect', { x: 0, y: Z(cz), width: X(cx), height: H - Z(cz), fill: css('--panel-2') }));
-  s.appendChild(sv('rect', { x: X(cx), y: Z(cz), width: W - X(cx), height: H - Z(cz), fill: css('--accent-bg') }));
-  s.appendChild(sv('rect', { x: 0, y: 0, width: X(cx), height: Z(cz), fill: css('--rec-bg') }));
-  for (let x = Math.ceil(wx0 / 16) * 16; x < wx0 + ww; x += 16) {
-    const r = x % 512 === 0;
-    s.appendChild(sv('line', { x1: X(x), x2: X(x), y1: 0, y2: H, stroke: css('--ink'), 'stroke-opacity': r ? .7 : .12, 'stroke-width': r ? 1.4 : .5 }));
+function arcLabel(f, id) {
+  const { C, s, w, lw } = f;
+  const [vx, vy] = C.V;
+  const r = w * 0.12;
+  const [a0, a1] = id === G ? [180, 360] : [90, 360];
+  const P = (a) => [vx + r * Math.cos(a * Math.PI / 180), -(vy + r * Math.sin(a * Math.PI / 180))];
+  const p0 = P(a0), p1 = P(a1);
+  s.appendChild(sv('path', { d: `M ${p0[0]} ${p0[1]} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 0 ${p1[0]} ${p1[1]}`, fill: 'none', stroke: css('--corner'), 'stroke-width': lw * 1.6 }));
+}
+function cornerNbhd(id) {
+  const f = cornerFrame(id, 'nbhd');
+  f.box.appendChild(el('img', { src: `corner-${id}-nbhd.webp`, alt: `${NAME[id]}: the faces round a corner`, loading: 'lazy' }));
+  missingWedge(f, id);
+  cornerSeams(f, id);
+  arcLabel(f, id);
+  faceLabels(f, id);
+  scaleBar(f);
+  f.box.appendChild(f.s);
+  return f.box;
+}
+function scaleBar(f) {
+  const { s, X0, Y0, w, ub, lw } = f;
+  const L = 500 / ub;
+  const x = X0 + w * 0.05, y = -Y0 - w * 0.05;
+  s.appendChild(sv('line', { x1: x, y1: y, x2: x + L, y2: y, stroke: '#fff', 'stroke-width': lw * 2 }));
+  label(s, x + L / 2, y - w * 0.02, '500 blocks', w * 0.032);
+}
+function cornerPaths(id) {
+  const f = cornerFrame(id, 'paths');
+  const C = f.C;
+  f.box.appendChild(el('img', { src: `corner-${id}-nbhd.webp`, alt: `${NAME[id]}: walkers and a ring round a corner`, loading: 'lazy', class: 'dim' }));
+  missingWedge(f, id);
+  cornerSeams(f, id);
+  const P = (p) => [p[0], -p[1]];
+  const cols = { A: css('--walk-a'), B: css('--walk-b') };
+  for (const k of ['A', 'B']) {
+    const w = C.walkers[k];
+    w.segs_t.forEach((sg, i) => {
+      polyline(f.s, sg.map(P), cols[k], f.lw * 2.2);
+      if (sg.length > 2) arrowHead(f.s, P(sg[sg.length - 2]), P(sg[sg.length - 1]), cols[k], f.w * 0.035, '#000');
+    });
+    const p0 = w.segs_t[0][0];
+    label(f.s, p0[0], -p0[1] + f.w * 0.05, k, f.w * 0.045, 'middle', cols[k]);
   }
-  for (let z = Math.ceil(wz0 / 16) * 16; z < wz0 + wh; z += 16) {
-    const r = z % 512 === 0;
-    s.appendChild(sv('line', { y1: Z(z), y2: Z(z), x1: 0, x2: W, stroke: css('--ink'), 'stroke-opacity': r ? .7 : .12, 'stroke-width': r ? 1.4 : .5 }));
+  const ring = C.ring;
+  for (const sg of ring.segs_t) {
+    polyline(f.s, sg.map(P), css('--walk-ring'), f.lw * 2.2);
+    if (sg.length > 2) { const m = Math.floor(sg.length / 2); arrowHead(f.s, P(sg[m - 1]), P(sg[m]), css('--walk-ring'), f.w * 0.032, '#000'); }
   }
-  // seams: N east edge (x = cx, z < cz) quarter-turn to face 1's top (z = cz, x > cx)
-  s.appendChild(sv('line', { x1: X(cx), x2: X(cx), y1: 0, y2: Z(cz), stroke: css('--quarter'), 'stroke-width': 4 }));
-  s.appendChild(sv('line', { x1: X(cx), x2: W, y1: Z(cz), y2: Z(cz), stroke: css('--quarter'), 'stroke-width': 4 }));
-  s.appendChild(sv('line', { x1: X(cx), x2: X(cx), y1: Z(cz), y2: H, stroke: css('--ink-2'), 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }));
-  s.appendChild(sv('line', { x1: 0, x2: X(cx), y1: Z(cz), y2: Z(cz), stroke: css('--ink-2'), 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }));
-  s.appendChild(sv('circle', { cx: X(cx), cy: Z(cz), r: 7, fill: css('--corner'), stroke: '#000', 'stroke-width': 1.2 }));
-  const lab = (x, y, t, a = 'start') => s.appendChild(sv('text', { x, y, 'font-size': 12, fill: css('--ink'), 'text-anchor': a, 'font-weight': 600 }, t));
-  lab(8, 16, 'north face');
-  lab(8, H - 8, 'band face 0');
-  lab(W - 8, H - 8, 'band face 1', 'end');
-  lab(W - 8, 16, 'outside the net (folded)', 'end');
-  s.appendChild(sv('text', { x: X(cx) + 10, y: Z(cz) - 8, 'font-size': 11.5, fill: css('--ink') }, `corner at x = ${fmt(cx)}, z = ${fmt(cz)}: quarter-turn centre`));
-  s.appendChild(sv('text', { x: 0, y: H + 13, 'font-size': 10.5, fill: css('--ink-3') }, `faint: chunk lines (16) · dark: region lines (512) · ${fmt(cx / 16, cx % 16 ? 2 : 0)} chunks, ${fmt(cx / 512, 3)} regions from the origin`));
+  for (const c of ring.crossings) for (const p of [c.at, c.to]) f.s.appendChild(sv('circle', { cx: p[0] / f.ub, cy: -p[1] / f.ub, r: f.w / 90, fill: css('--walk-ring'), stroke: '#fff', 'stroke-width': f.lw * .7 }));
+  f.box.appendChild(f.s);
+  return f.box;
+}
+function cornerView(id) {
+  const C = D.corners[id], V = C.view;
+  const [a0, b0, a1, b1] = V.window_ab;
+  const box = el('div', { class: 'mapbox square' });
+  box.style.aspectRatio = `${a1 - a0} / ${b1 - b0}`;
+  box.appendChild(el('img', { src: `corner-${id}-view.webp`, alt: `${NAME[id]}: what a player near a corner sees`, loading: 'lazy' }));
+  box.appendChild(el('img', { src: `corner-${id}-viewtint.webp`, alt: '', loading: 'lazy' }));
+  const w = a1 - a0;
+  const s = sv('svg', { viewBox: `${a0} ${-b1} ${w} ${b1 - b0}`, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+  const lw = w / 300, d = V.d, th = C.cone * Math.PI / 180;
+  const ray = (psi, col, dash) => {
+    const dx = Math.sin(psi), dy = -Math.cos(psi);
+    const L = 4000;
+    s.appendChild(sv('line', { x1: 0, y1: -d, x2: dx * L, y2: -(d + dy * L), stroke: col, 'stroke-width': lw * 1.6, 'stroke-dasharray': dash || 'none' }));
+  };
+  ray(th / 2, '#fff', `${w / 70} ${w / 90}`);
+  ray(-th / 2, '#fff', `${w / 70} ${w / 90}`);
+  if (Math.abs(C.cone - 270) < 1) {
+    s.appendChild(sv('line', { x1: 0, y1: -d, x2: 0, y2: -b1, stroke: css('--bad-hi'), 'stroke-width': lw * 2.4 }));
+    label(s, w * 0.02, -(d + (b1 - d) * 0.8), 'tear', w * 0.032, 'start', css('--bad-hi'));
+  }
+  s.appendChild(sv('circle', { cx: 0, cy: -d, r: w / 70, fill: css('--corner'), stroke: '#000', 'stroke-width': lw }));
+  label(s, w * 0.025, -d + w * 0.012, 'corner', w * 0.03, 'start');
+  // the player and the direction of view
+  s.appendChild(sv('circle', { cx: 0, cy: 0, r: w / 60, fill: '#fff', stroke: '#000', 'stroke-width': lw }));
+  arrowHead(s, [0, 0], [0, -d * 0.55], '#fff', w * 0.03, '#000');
+  label(s, w * 0.03, w * 0.012, 'you', w * 0.032, 'start');
+  if (Math.abs(C.cone - 180) < 1) {
+    s.appendChild(sv('circle', { cx: 0, cy: -2 * d, r: w / 60, fill: 'none', stroke: '#fff', 'stroke-width': lw * 1.6, 'stroke-dasharray': `${w / 120} ${w / 160}` }));
+    label(s, w * 0.03, -2 * d + w * 0.012, 'you again (turned 180°)', w * 0.03, 'start');
+  }
+  const sb = 500, x = a0 + w * 0.05, y = -b0 - w * 0.04;
+  s.appendChild(sv('line', { x1: x, y1: y, x2: x + sb, y2: y, stroke: '#fff', 'stroke-width': lw * 2 }));
+  label(s, x + sb / 2, y - w * 0.018, '500 blocks', w * 0.03);
   box.appendChild(s);
+  return box;
+}
+function cornerRaw(id) {
+  const f = cornerFrame(id, 'raw');
+  f.box.appendChild(el('img', { src: `corner-${id}-raw.webp`, alt: `${NAME[id]}: one raw copy round a corner`, loading: 'lazy' }));
+  f.box.appendChild(el('img', { src: `corner-${id}-rawtear.webp`, alt: '', loading: 'lazy' }));
+  cornerSeams(f, id);
+  const [vx, vy] = f.C.V;
+  const o = f.w * 0.3, z = f.w * 0.04;
+  if (id === G) {
+    label(f.s, vx - o, -vy - o * 1.1, 'east square,', z * 0.9);
+    label(f.s, vx - o, -vy - o * 0.8, 'turned 180°', z * 0.9);
+    label(f.s, vx + o, -vy - o * 1.1, 'west square,', z * 0.9);
+    label(f.s, vx + o, -vy - o * 0.8, 'turned 180°', z * 0.9);
+  } else {
+    label(f.s, vx + o, -vy - o * 1.1, 'F1, turned 90°', z);
+    label(f.s, vx + o, -vy - o * 0.75, '(N-east/F1 is first)', z * 0.8);
+  }
+  f.box.appendChild(f.s);
+  return f.box;
+}
+function blockGrid(id) {
+  const B = D.corners[id].blocks;
+  const [Vx, Vz] = B.V;
+  const n = 8, cs = 46, pad = 18;
+  const W = n * cs + 2 * pad, H = n * cs + 2 * pad;
+  const s = sv('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img', 'aria-label': `${NAME[id]}: block cells round a corner` });
+  const FC = { F0: '--face-a', F1: '--face-b', N: '--face-c', W: '--face-a', E: '--face-b' };
+  const ids = {};
+  let li = 0;
+  const letters = 'abcdefghijklmnopqrstuvwxyz';
+  for (const c of B.cells) if (c.face && Math.abs(c.x + 0.5 - Vx) < 2 && Math.abs(c.z + 0.5 - Vz) < 2) ids[`${c.x},${c.z}`] = letters[li++];
+  const X = (x) => pad + (x - (Vx - 4)) * cs, Z = (z) => pad + (z - (Vz - 4)) * cs;
+  const defs = sv('defs');
+  const pat = sv('pattern', { id: `bh-${id}`, width: 8, height: 8, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' });
+  pat.appendChild(sv('rect', { width: 8, height: 8, fill: css('--gap-bg') }));
+  pat.appendChild(sv('line', { x1: 0, y1: 0, x2: 0, y2: 8, stroke: css('--gap-ink'), 'stroke-width': 2.5 }));
+  defs.appendChild(pat);
+  s.appendChild(defs);
+  for (const c of B.cells) {
+    const x = X(c.x), y = Z(c.z);
+    if (c.face) {
+      s.appendChild(sv('rect', { x, y, width: cs, height: cs, fill: css(FC[c.face] || '--panel-2'), stroke: css('--ink-3'), 'stroke-width': .6 }));
+      const t = ids[`${c.x},${c.z}`];
+      s.appendChild(sv('text', { x: x + cs / 2, y: y + cs / 2 + 4, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': t ? 700 : 400, fill: css('--ink') }, t || c.face));
+    } else {
+      const multi = c.claims.length > 1 && new Set(c.claims.map((q) => q.to.join(','))).size > 1;
+      s.appendChild(sv('rect', { x, y, width: cs, height: cs, fill: `url(#bh-${id})`, stroke: multi ? css('--bad-hi') : css('--ink-3'), 'stroke-width': multi ? 2 : .6 }));
+      c.claims.slice(0, 2).forEach((q, i) => {
+        const t = ids[q.to.join(',')] || q.face || '?';
+        const turn = ['', '↻90', '↻180', '↺90'][q.k];
+        s.appendChild(sv('text', { x: x + cs / 2, y: y + (c.claims.length > 1 ? 17 + i * 16 : cs / 2 + 4), 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 600, fill: i === 0 ? css('--ink') : css('--bad-hi') }, `${t}${turn}`));
+      });
+    }
+  }
+  // face edges (thick) and the corner
+  s.appendChild(sv('line', { x1: X(Vx), y1: pad, x2: X(Vx), y2: H - pad, stroke: css('--ink'), 'stroke-width': 1.4, 'stroke-dasharray': '4 3' }));
+  s.appendChild(sv('line', { x1: pad, y1: Z(Vz), x2: W - pad, y2: Z(Vz), stroke: css('--ink'), 'stroke-width': 1.4, 'stroke-dasharray': '4 3' }));
+  s.appendChild(sv('circle', { cx: X(Vx), cy: Z(Vz), r: 6, fill: css('--corner'), stroke: '#000', 'stroke-width': 1.2 }));
+  s.appendChild(sv('text', { x: pad, y: 12, 'font-size': 11, fill: css('--ink-3') }, `x ${fmt(Vx - 4)}…${fmt(Vx + 3)} →, z ${fmt(Vz - 4)}…${fmt(Vz + 3)} ↓ (north up)`));
+  return s;
+}
+function cornerNotes(id) {
+  const B = D.corners[id].blocks;
+  const items = [];
+  for (const t of B.touching) {
+    const nm = `(${fmt(t.x)}, ${fmt(t.z)}) in ${t.face}`;
+    items.push(`<li><b>${nm}</b>: ${t.notes.length ? t.notes.join('; ') : 'all eight neighbours are ordinary and distinct'}.</li>`);
+  }
+  return `<ul class="tight">${items.join('')}</ul>`;
+}
+function cornersSection() {
+  for (const id of [G, K]) {
+    $(`#cn-nbhd-${id}`).appendChild(cornerNbhd(id));
+    $(`#cn-paths-${id}`).appendChild(cornerPaths(id));
+    $(`#cn-view-${id}`).appendChild(cornerView(id));
+    $(`#cn-raw-${id}`).appendChild(cornerRaw(id));
+    $(`#cn-blocks-${id}`).appendChild(blockGrid(id));
+    $(`#cn-notes-${id}`).innerHTML = cornerNotes(id);
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
-// the net
-function netSection() {
-  const box = $('#net-maps');
-  for (const id of ['cube-moser-cross', 'cube-moser-3x2']) {
-    const f = el('figure', { class: 'fig' });
-    f.appendChild(el('h4', {}, id.endsWith('cross') ? 'Cross net <span class="tag rec">recommended</span>' : '3 × 2 rectangle'));
-    const st = el('div', { class: 'stagebox' });
-    const mb = el('div', { class: 'mapbox' });
-    st.appendChild(mb);
-    f.appendChild(st);
-    mapStack(mb, id, 'map', new Set(['seams', 'corners', 'walks']));
-    const L = D.layouts[id];
-    const kinds = L.seams.filter((s) => s.side === 'B').reduce((m, s) => (m[s.kind] = (m[s.kind] || 0) + 1, m), {});
-    f.appendChild(el('figcaption', {}, id.endsWith('cross')
-      ? `Four faces round the equator, the poles at the centres of the two polar faces. Seams: ${Object.entries(kinds).map(([k, n]) => `${n} ${KNAME[k]}`).join(', ')}. The equator walk (blue) crosses one slide per lap; over the pole (purple) one half-turn.`
-      : `Top row: band faces 0, 1, 2 (north up); bottom row: the north face, face 3 and the south face, turned. Seams: ${Object.entries(kinds).map(([k, n]) => `${n} ${KNAME[k]}`).join(', ')}. The equator walk crosses two seams per lap.`));
-    box.appendChild(f);
+// plane tiling
+function tilingFigure() {
+  const T = D.tiling.guyou;
+  const [X0, Y0, X1, Y1] = T.window_t;
+  const box = $('#tile-guyou');
+  box.style.aspectRatio = `${X1 - X0} / ${Y1 - Y0}`;
+  box.appendChild(el('img', { src: 'tiling-guyou.webp', alt: 'The plane tiled by copies of the Petroff–Guyou world', loading: 'lazy' }));
+  const s = sv('svg', { viewBox: `${X0} ${-Y1} ${X1 - X0} ${Y1 - Y0}`, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+  const lw = (X1 - X0) / 600;
+  for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
+    for (const turned of [false, true]) {
+      const x = -1 + 4 * i, y = (turned ? 1 : -1) + 4 * j;
+      if (x > X1 || x + 4 < X0 || y > Y1 || y + 2 < Y0) continue;
+      const home = !turned && i === 0 && j === 0;
+      s.appendChild(sv('rect', { x, y: -(y + 2), width: 4, height: 2, fill: 'none', stroke: home ? css('--corner') : '#fff', 'stroke-opacity': home ? 1 : .7, 'stroke-width': lw * (home ? 3 : 1.2) }));
+      if (turned) label(s, x + 2, -(y + 1) + 0.06, 'turned 180°', 0.17);
+      else if (home) label(s, x + 2, -(y + 1) + 0.06, 'the world', 0.2, 'middle', css('--corner'));
+    }
   }
-  const t = $('#net-table');
-  const rows = [
-    ['Seam pairs (one-way portals)', '7 (14)', '8 (16)'],
-    ['Seam length at 16k', '26,432 blocks', '30,208 blocks'],
-    ['Seam kinds', '1 slide, 4 quarter-turns, 2 half-turns', '2 slides, 4 quarter-turns, 2 half-turns'],
-    ['Seams inside the world', 'none: every seam is on the outline', 'the line between the rows carries six seam edges (parts of five pairs)'],
-    ['A world-wide east–west wrap for Toroidal World', 'yes: the band\'s wrap (period 4s)', 'no: one slide is a 2-face jump along the inner line, the other a diagonal jump'],
-    ['Equator lap', 'straight in raw coordinates, 1 seam', 'straight in game, 2 seams (a quarter-turn into face 3, then back)'],
-    ['Over a pole', '1 seam (from faces 0 and 2) or 2 (from 1 and 3)', '2 seams'],
-    ['Raster storage', 'six face rasters, or a 4s × 3s box half empty', 'one 3s × 2s rectangle, no waste'],
-    ['Picture for maps and the workbench', 'the familiar band with the poles above and below', 'two strips, the second turned'],
-  ];
-  t.innerHTML = `<thead><tr><th></th><th>Cross <span class="tag rec">recommended</span></th><th>3 × 2</th></tr></thead><tbody>${rows.map((r) => `<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</tbody>`;
+  for (let x = -5; x <= 7; x += 2) for (let y = -3; y <= 3; y += 2) s.appendChild(sv('circle', { cx: x, cy: -y, r: 0.07, fill: css('--corner'), stroke: '#000', 'stroke-width': lw }));
+  box.appendChild(s);
+  // Guyou corner, full turn
+  const gc = $('#tile-guyou-corner');
+  gc.appendChild(el('img', { src: 'tiling-guyou-corner.webp', alt: 'A Guyou corner and its full turn', loading: 'lazy' }));
+  const s2 = sv('svg', { viewBox: '0 -2 2 2', preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+  s2.appendChild(sv('line', { x1: 0, y1: -1, x2: 2, y2: -1, stroke: css('--half'), 'stroke-width': 0.012 }));
+  s2.appendChild(sv('line', { x1: 1, y1: 0, x2: 1, y2: -2, stroke: '#fff', 'stroke-width': 0.006, 'stroke-dasharray': '0.03 0.02' }));
+  s2.appendChild(sv('circle', { cx: 1, cy: -1, r: 0.035, fill: css('--corner'), stroke: '#000', 'stroke-width': 0.006 }));
+  label(s2, 0.5, -0.45, 'west', 0.07); label(s2, 1.5, -0.45, 'east', 0.07);
+  label(s2, 0.5, -1.55, 'east, turned', 0.07); label(s2, 1.5, -1.55, 'west, turned', 0.07);
+  gc.appendChild(s2);
+  // cube corner: three faces and two candidates
+  const cc = $('#tile-cube-corner');
+  cc.appendChild(el('img', { src: 'tiling-cube-mix.webp', alt: 'A cube corner: the missing quarter has two candidate pictures', loading: 'lazy' }));
+  const s3 = sv('svg', { viewBox: '0 -2 2 2', preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+  s3.appendChild(sv('line', { x1: 1, y1: -1, x2: 1, y2: -2, stroke: css('--quarter'), 'stroke-width': 0.012 }));
+  s3.appendChild(sv('line', { x1: 1, y1: -1, x2: 2, y2: -1, stroke: css('--quarter'), 'stroke-width': 0.012 }));
+  s3.appendChild(sv('circle', { cx: 1, cy: -1, r: 0.035, fill: css('--corner'), stroke: '#000', 'stroke-width': 0.006 }));
+  label(s3, 0.5, -0.45, 'F0', 0.08); label(s3, 1.5, -0.45, 'F1', 0.08); label(s3, 0.5, -1.55, 'N', 0.08);
+  label(s3, 1.5, -1.6, 'F1 turned', 0.065); label(s3, 1.5, -1.45, 'or N turned?', 0.065, 'middle', css('--gap-label'));
+  cc.appendChild(s3);
+  for (const k of ['a', 'b']) {
+    const b = $(`#tile-cube-${k}`);
+    b.appendChild(el('img', { src: `tiling-cube-${k}.webp`, alt: '', loading: 'lazy' }));
+  }
+  // the cube net's raw surroundings
+  const R = D.tiling.cube_rawext;
+  const [rx0, ry0, rx1, ry1] = R.window_t;
+  const rb = $('#rawext-cube');
+  rb.style.aspectRatio = `${rx1 - rx0} / ${ry1 - ry0}`;
+  rb.appendChild(el('img', { src: 'rawext-cube.webp', alt: 'The cube net and the raw world round it under the engine\'s edge order', loading: 'lazy' }));
+  rb.appendChild(el('img', { src: 'rawext-cube-tear.webp', alt: '', loading: 'lazy' }));
+  const s4 = sv('svg', { viewBox: `${rx0} ${-ry1} ${rx1 - rx0} ${ry1 - ry0}`, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+  const tiles = [[0, 0, 'F0'], [1, 0, 'F1'], [2, 0, 'F2'], [3, 0, 'F3'], [0, 1, 'N'], [0, -1, 'S']];
+  for (const [x, y, t] of tiles) {
+    s4.appendChild(sv('rect', { x, y: -(y + 1), width: 1, height: 1, fill: 'none', stroke: css('--corner'), 'stroke-width': 0.012 }));
+    label(s4, x + 0.5, -(y + 0.5) + 0.04, t, 0.12, 'middle', css('--corner'));
+  }
+  rb.appendChild(s4);
 }
 
 // ---------------------------------------------------------------------------------------------
-// walking
-function walkSection() {
-  const box = $('#walk-grid');
-  const list = [['lambert', 'Lambert: a strip with walls'], ['guyou-petroff', 'Guyou (Petroff): one slide, two half-turns'], ['cube-moser-cross', 'Cube, cross net'], ['cube-moser-3x2', 'Cube, 3 × 2']];
-  for (const [id, title] of list) {
-    const L = D.layouts[id];
-    const f = el('figure', { class: 'fig' });
-    f.appendChild(el('h4', {}, title));
-    const st = el('div', { class: 'stagebox' });
-    const mb = el('div', { class: 'mapbox' });
-    st.appendChild(mb);
-    f.appendChild(st);
-    mapStack(mb, id, 'map', new Set(['seams', 'walks']));
-    const eq = L.walks.equator, po = L.walks.pole;
-    const cross = (w) => w.crossings.map((c) => `<span class="kind ${c.kind}">${c.kind === 'slide' ? 'slide' : (c.turn === 180 ? 'half-turn' : 'quarter-turn')}</span> at ${fmt(c.dist)}`).join(', ') || 'none';
-    f.appendChild(el('figcaption', {}, `<b>Equator:</b> ${fmt(eq.blocks)} blocks for 360°; seams: ${cross(eq)}.<br><b>North over the pole:</b> ${po.stopped ? `stops at the 80° line after ${fmt(po.blocks)} blocks (${fmt(po.planet_deg)}° of planet)` : `${fmt(po.blocks)} blocks equator to equator; seams: ${cross(po)}`}.`));
-    box.appendChild(f);
-  }
-  eqChart();
-  cornerFig();
-  sweepChart($('#sweep-cube'), D.sweep_cube, D.lam0_deg, 90, 'λ₀ (degrees)');
-  sweepChart($('#sweep-guyou'), D.sweep_guyou, D.lamc_deg, 360, 'λc (degrees)');
+// tables and charts
+function seamTable(id, box) {
+  const L = D.layouts[id];
+  const letters = 'ABCDEFGHIJ';
+  const term = (a, v) => a === 0 ? '' : (a === 1 ? `+${v}` : a === -1 ? `−${v}` : `${a > 0 ? '+' : '−'}${Math.abs(a)}${v}`);
+  const f = (row, t) => {
+    let s = `${term(row[0], 'x')}${term(row[1], 'z')}`.replace(/^\+/, '');
+    if (t) s += ` ${t > 0 ? '+' : '−'} ${fmt(Math.abs(t))}`;
+    return s;
+  };
+  const rows = L.seam_mc.map((m) => `<tr><td><span class="pill" style="background:var(${KCOL[m.kind]})">${letters[m.pair]}</span> ${m.name}</td><td><span class="kind ${m.kind}">${KNAME[m.kind]}</span></td>
+    <td class="mono">x′ = ${f(m.M[0], m.T[0])}<br>z′ = ${f(m.M[1], m.T[1])}</td><td class="n">${m.dyaw > 0 ? '+' : ''}${m.dyaw}°</td>
+    <td class="mono n">(${fmt(m.mid[0])}, ${fmt(m.mid[1])}) → (${fmt(m.mid_to[0])}, ${fmt(m.mid_to[1])})</td></tr>`).join('');
+  box.innerHTML = `<table><thead><tr><th>Seam (edges joined)</th><th>Kind</th><th>F3 coordinates jump to</th><th class="n">Yaw</th><th class="n">Example: edge midpoint</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function tripTable() {
+  const heads = D.layouts[G].trips.map((t) => t.heading);
+  const cell = (t) => {
+    const p = t.per10k;
+    const parts = [];
+    if (p.slide) parts.push(`<span class="kind slide">${fmt(p.slide, 1)} slide</span>`);
+    if (p.half) parts.push(`<span class="kind half">${fmt(p.half, 1)} half</span>`);
+    if (p.quarter) parts.push(`<span class="kind quarter">${fmt(p.quarter, 1)} quarter</span>`);
+    return parts.join('<br>') || 'none';
+  };
+  const rows = heads.map((h, i) => `<tr><td class="n">${h === 0 ? 'due east (0°)' : h === 90 ? 'due north (90°)' : `${h}° north of east`}</td><td>${cell(D.layouts[G].trips[i])}</td><td>${cell(D.layouts[K].trips[i])}</td></tr>`).join('');
+  $('#trip-table').innerHTML = `<table><thead><tr><th class="n">Straight course from spawn (raw heading)</th><th>${NAME[G]}: seams per 10,000 blocks</th><th>${NAME[K]}: seams per 10,000 blocks</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function walkSummary(id, k) {
+  const w = D.layouts[id].walks[k];
+  const cr = w.crossings.map((c) => `<span class="kind ${c.kind}">${KNAME[c.kind]}</span> at ${fmt(c.dist)} (yaw ${c.yaw[0]}° → ${c.yaw[1]}°, F3 (${fmt(c.mc_at[0])}, ${fmt(c.mc_at[1])}) → (${fmt(c.mc_to[0])}, ${fmt(c.mc_to[1])}))`);
+  return { blocks: w.blocks, deg: w.planet_deg, text: cr.length ? cr.join('; ') : 'no seam' };
+}
+function walksTable() {
+  const rows = [['equator', 'Due east along the equator, once round'], ['pole', 'North from the equator, over the pole, to the equator beyond'], ['poleB', 'North from another point of the equator'], ['diag', 'Straight at 45° from spawn, 24,000 blocks']];
+  const cell = (id, k) => { const s = walkSummary(id, k); return `<b>${fmt(s.blocks)} blocks</b> for ${fmt(s.deg, 0)}° of planet<span class="sub">${s.text}</span>`; };
+  $('#walks-table').innerHTML = `<table><thead><tr><th>Walk</th><th>${NAME[G]}</th><th>${NAME[K]}</th></tr></thead><tbody>${rows.map(([k, t]) => `<tr><td><b>${t}</b></td><td>${cell(G, k)}</td><td>${cell(K, k)}</td></tr>`).join('')}</tbody></table>`;
 }
 function eqChart() {
-  const series = [['lambert', 'Lambert (today)', css('--ink-3')], ['guyou-petroff', 'Petroff, Guyou', css('--half')], ['cube-moser-cross', 'Moser cube, 3,776', css('--rec')], ['cube-qsc-cross', 'QSC cube', css('--quarter')]];
-  const W = 600, H = 260, ml = 46, mr = 14, mt = 14, mb = 40;
+  const series = [[G, NAME[G], css('--half')], [K, NAME[K], css('--quarter')]];
+  const W = 600, H = 250, ml = 46, mr = 14, mt = 34, mb = 40;
   const s = sv('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img', 'aria-label': 'Blocks per degree along the equator' });
-  const ymin = 30, ymax = 60;
+  const ymin = 25, ymax = 55;
   const xs = (f) => ml + f * (W - ml - mr), ys = (v) => mt + (1 - (v - ymin) / (ymax - ymin)) * (H - mt - mb);
   for (let v = ymin; v <= ymax; v += 5) {
     s.appendChild(sv('line', { x1: ml, x2: W - mr, y1: ys(v), y2: ys(v), stroke: css('--rule'), 'stroke-width': .7 }));
     s.appendChild(sv('text', { x: ml - 6, y: ys(v) + 4, 'text-anchor': 'end', 'font-size': 11, fill: css('--ink-3') }, v));
   }
-  for (let f = 0; f <= 1.0001; f += 0.25) {
-    s.appendChild(sv('text', { x: xs(f), y: H - mb + 16, 'text-anchor': 'middle', 'font-size': 11, fill: css('--ink-3') }, `${Math.round(f * 360)}°`));
-  }
+  s.appendChild(sv('line', { x1: ml, x2: W - mr, y1: ys(45.51), y2: ys(45.51), stroke: css('--ink-3'), 'stroke-width': 1.2, 'stroke-dasharray': '5 4' }));
+  s.appendChild(sv('text', { x: W - mr, y: ys(45.51) - 5, 'text-anchor': 'end', 'font-size': 11, fill: css('--ink-3') }, 'true scale (today\'s Lambert equator): 45.5'));
+  for (let f = 0; f <= 1.0001; f += 0.25) s.appendChild(sv('text', { x: xs(f), y: H - mb + 16, 'text-anchor': 'middle', 'font-size': 11, fill: css('--ink-3') }, `${Math.round(f * 360)}°`));
   s.appendChild(sv('text', { x: (ml + W - mr) / 2, y: H - 6, 'text-anchor': 'middle', 'font-size': 11, fill: css('--ink-3') }, 'longitude walked along the equator'));
-  s.appendChild(sv('text', { x: 12, y: mt + 4, 'font-size': 11, fill: css('--ink-3'), transform: `rotate(-90 12 ${mt + 4})`, 'text-anchor': 'end' }, 'blocks per degree'));
   series.forEach(([id, lab, col], i) => {
     const w = D.layouts[id].walks.equator;
-    const tot = w.blocks;
-    // convert distance to cumulative planet degrees: integrate blocks/deg
     let deg = 0, prev = 0;
     const pts = [];
     for (const [d, bpd] of w.profile) { deg += (d - prev) / bpd; prev = d; pts.push([deg / 360, bpd]); }
-    s.appendChild(sv('polyline', { points: pts.map(([f, v]) => `${xs(Math.min(f, 1))},${ys(Math.max(ymin, Math.min(ymax, v)))}`).join(' '), fill: 'none', stroke: col, 'stroke-width': 2 }));
-    const mean = tot / 360;
-    s.appendChild(sv('rect', { x: ml + 8 + (i % 2) * 270, y: H - mb - 46 + Math.floor(i / 2) * 18 - 160, width: 12, height: 3, fill: col }));
-    s.appendChild(sv('text', { x: ml + 24 + (i % 2) * 270, y: H - mb - 42 + Math.floor(i / 2) * 18 - 160, 'font-size': 11, fill: css('--ink') }, `${lab}: ${fmt(tot)} round (${fmt(mean, 1)}/°)`));
+    s.appendChild(sv('polyline', { points: pts.map(([f, v]) => `${xs(Math.min(f, 1))},${ys(Math.max(ymin, Math.min(ymax, v)))}`).join(' '), fill: 'none', stroke: col, 'stroke-width': 2.2 }));
+    s.appendChild(sv('rect', { x: ml + 8 + i * 270, y: 10, width: 14, height: 3, fill: col }));
+    s.appendChild(sv('text', { x: ml + 28 + i * 270, y: 15, 'font-size': 11.5, fill: css('--ink') }, `${lab}: ${fmt(w.blocks)} blocks round`));
   });
   $('#eq-chart').appendChild(s);
 }
-function cornerFig() {
-  // zoom round the corner each pair passes, in tile units, both worlds side by side
-  const W = 600, H = 300;
-  const s = sv('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img', 'aria-label': 'Walkers either side of a corner' });
-  const panels = [['cube-moser-cross', 'cube corner (270°)', [0.35, 0.3, 1.75, 1.95]], ['guyou-petroff', 'pillowcase corner (180°)', [0.0, -0.2, 2.0, 1.25]]];
-  panels.forEach(([id, lab, win], pi) => {
-    const L = D.layouts[id], ub = L.unit_blocks;
-    const ox = pi * 300 + 10, pw = 280, ph = 250;
-    const [wx0, wy0, wx1, wy1] = win;
-    const k = Math.min(pw / (wx1 - wx0), ph / (wy1 - wy0));
-    const X = (x) => ox + (x / ub - wx0) * k, Y = (y) => 20 + (wy1 - y / ub) * k;
-    const g = sv('g', {});
-    const clip = sv('clipPath', { id: 'cc' + pi });
-    clip.appendChild(sv('rect', { x: ox, y: 20, width: pw, height: ph }));
-    s.appendChild(clip);
-    g.setAttribute('clip-path', `url(#cc${pi})`);
-    for (const t of L.tiles) g.appendChild(sv('rect', { x: X(t[0]), y: Y(t[1] + t[3]), width: t[2] / ub * k, height: t[3] / ub * k, fill: css('--panel-2'), stroke: css('--ink-3'), 'stroke-width': .8 }));
-    for (const sm of L.seams) g.appendChild(sv('line', { x1: X(sm.a0[0]), y1: Y(sm.a0[1]), x2: X(sm.a1[0]), y2: Y(sm.a1[1]), stroke: css(KCOL[sm.kind]), 'stroke-width': 3 }));
-    for (const [cx, cy] of L.corners) g.appendChild(sv('circle', { cx: X(cx), cy: Y(cy), r: 5, fill: css('--corner'), stroke: '#000' }));
-    for (const [wk, col] of [['cornerA', css('--walk-a')], ['cornerB', css('--walk-b')]]) {
-      const p0 = L.walks[wk].segs[0][0];
-      g.appendChild(sv('text', { x: X(p0[0]) + (wk === 'cornerA' ? -14 : 6), y: Y(p0[1]) + 22, 'font-size': 13, 'font-weight': 700, fill: col }, wk === 'cornerA' ? 'A' : 'B'));
-      for (const sg of L.walks[wk].segs) {
-        g.appendChild(sv('polyline', { points: sg.map((p) => `${X(p[0])},${Y(p[1])}`).join(' '), fill: 'none', stroke: col, 'stroke-width': 2.4 }));
-        if (sg.length > 2) arrowHead(g, [X(sg[sg.length - 2][0]), Y(sg[sg.length - 2][1])], [X(sg[sg.length - 1][0]), Y(sg[sg.length - 1][1])], col, 9);
-      }
-    }
-    s.appendChild(g);
-    s.appendChild(sv('text', { x: ox, y: 13, 'font-size': 12, 'font-weight': 600, fill: css('--ink') }, lab));
-  });
-  $('#corner-fig').appendChild(s);
-  $('#corner-cap').innerHTML = 'Two walkers, A (red) and B, start side by side heading north, one either side of a corner. On the cube A walks straight on into the polar face while B crosses a quarter-turn seam: they now walk at right angles and their paths cross. In the pillowcase both cross the half-turn seam and come back south, each along the other\'s track: seen from one side of the seam they walk in opposite directions. That is what missing 90° and missing 180° mean for a player.';
-}
 function sweepChart(box, rows, chosen, xmax, xl) {
-  const W = 600, H = 180, ml = 40, mr = 10, mt = 10, mb = 34;
+  const W = 600, H = 170, ml = 40, mr = 10, mt = 10, mb = 34;
   const s = sv('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img', 'aria-label': 'Corner placement sweep' });
   const xs = (v) => ml + v / xmax * (W - ml - mr), ys = (v) => mt + (1 - v) * (H - mt - mb);
   for (const v of [0, 0.5, 1]) {
@@ -730,8 +574,8 @@ function sweepChart(box, rows, chosen, xmax, xl) {
   }
   const bw = (W - ml - mr) / rows.length;
   for (const [lam, mx] of rows) {
-    s.appendChild(sv('rect', { x: xs(lam), y: ys(mx), width: Math.max(1, bw - 0.5), height: ys(0) - ys(mx) || 0.0001, fill: mx === 0 ? css('--rec') : css('--ink-3'), 'fill-opacity': mx === 0 ? 0.9 : 0.6 }));
-    if (mx === 0) s.appendChild(sv('rect', { x: xs(lam), y: ys(0) - 3, width: Math.max(1, bw - 0.5), height: 3, fill: css('--rec') }));
+    s.appendChild(sv('rect', { x: xs(lam), y: ys(mx), width: Math.max(1, bw - 0.5), height: Math.max(0.0001, ys(0) - ys(mx)), fill: css('--ink-3'), 'fill-opacity': 0.6 }));
+    if (mx === 0) s.appendChild(sv('rect', { x: xs(lam), y: ys(0) - 4, width: Math.max(1, bw - 0.5), height: 4, fill: css('--rec') }));
   }
   s.appendChild(sv('line', { x1: xs(chosen), x2: xs(chosen), y1: mt, y2: ys(0), stroke: css('--accent'), 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }));
   const ok = rows.filter((r) => r[1] === 0).length / rows.length;
@@ -740,63 +584,95 @@ function sweepChart(box, rows, chosen, xmax, xl) {
   s.appendChild(sv('text', { x: (ml + W) / 2, y: H - 4, 'text-anchor': 'middle', 'font-size': 11, fill: css('--ink-3') }, `${xl} · green: every corner's 3° disc is open sea (${Math.round(ok * 100)} % of turns)`));
   box.appendChild(s);
 }
-
-// ---------------------------------------------------------------------------------------------
-// simulation grid
-function simTable() {
-  const rows = [
-    ['Lambert (today)', 'A copy: the world is the simulation\'s own grid.', 'A full resample (sphere to strip); the strip still cannot reach the poles.'],
-    ['Petroff, Guyou 2:1', 'A full resample; the polar caps come out streaked (Lambert rows resolve them badly) unless sampled from the plates\' sphere.', 'A full resample, but from a grid that resolves the poles evenly: no streaks.'],
-    ['Moser cube (cross or 3 × 2)', 'A full resample, with the poles at face centres, where Lambert\'s streaks show worst.', '<b>Nearly a copy:</b> each world face is one grid face, so the bake is a smooth warp within each face (the equal-area table against the grid\'s own face map), with nothing crossing a seam. If the grid used the same equal-area face map it would be an exact copy at matching resolution [inference].'],
-  ];
-  $('#sim-table').innerHTML = `<thead><tr><th>World shape</th><th>Bake from today\'s Lambert simulation grid</th><th>Bake from a cubed-sphere simulation grid</th></tr></thead><tbody>${rows.map((r, i) => `<tr${i === 2 ? ' class="rec"' : ''}><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</tbody>`;
+function mapGridNote() {
+  // vanilla map grid: a map of scale k covers 128·2^k blocks; its edges sit at multiples of that size minus 64
+  const rows = [];
+  const pos = { [G]: [[6544, 'east/west edges x = ±6,544'], [3272, 'north/south edges z = ±3,272']], [K]: [[3776, 'face edges x, z = multiples of 3,776']] };
+  for (const id of [G, K]) for (const [v, lab] of pos[id]) {
+    const offs = [0, 1, 2, 3, 4].map((k) => { const sz = 128 << k; const o = ((v + 64) % sz + sz) % sz; return Math.min(o, sz - o); });
+    rows.push(`<tr><td>${NAME[id]}: ${lab}</td>${offs.map((o) => `<td class="n">${o === 0 ? '<b>on a map edge</b>' : `${fmt(o)} blocks in`}</td>`).join('')}</tr>`);
+  }
+  $('#mapgrid-table').innerHTML = `<table><thead><tr><th>Seam line</th>${[0, 1, 2, 3, 4].map((k) => `<th class="n">scale ${k} (${fmt(128 << k)})</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
+}
+function statsTables() {
+  const S = D.stats;
+  const r = (lab, f) => `<tr><td>${lab}</td><td class="n">${f(S[G])}</td><td class="n">${f(S[K])}</td></tr>`;
+  $('#felt-table').innerHTML = `<table><thead><tr><th>On this planet (weighted by planet area)</th><th class="n">${NAME[G]}</th><th class="n">${NAME[K]}</th></tr></thead><tbody>
+    ${r('Land drawn with shapes more than 1.25× too long', (s) => pct(s.land_shape_gt['1.25']))}
+    ${r('… more than 1.5×', (s) => pct(s.land_shape_gt['1.5']))}
+    ${r('… more than 2×', (s) => pct(s.land_shape_gt['2.0']))}
+    ${r('Land shape ratio: median / 90th / 99th percentile', (s) => s.land_shape_q50_90_99.map((v) => fmt(v, 2)).join(' / '))}
+    ${r('Whole planet: median / 90th / 99th percentile', (s) => s.all_shape_q50_90_99.map((v) => fmt(v, 2)).join(' / '))}
+  </tbody></table>`;
+  $('#north-table').innerHTML = `<table><thead><tr><th>F3's north (−z) against true north</th><th class="n">${NAME[G]}</th><th class="n">${NAME[K]}</th></tr></thead><tbody>
+    ${r('Planet within 5° of true north', (s) => pct(s.north_within['5']))}
+    ${r('… within 15°', (s) => pct(s.north_within['15']))}
+    ${r('… within 45°', (s) => pct(s.north_within['45']))}
+    ${r('Land within 15°', (s) => pct(s.land_north_within['15']))}
+    ${r('Median / 90th percentile error', (s) => s.north_q50_90.map((v) => `${fmt(v, 0)}°`).join(' / '))}
+  </tbody></table>`;
+  $('#dist-table').innerHTML = `<table><thead><tr><th>Walking from the shared spawn</th><th class="n">${NAME[G]}</th><th class="n">${NAME[K]}</th></tr></thead><tbody>
+    ${r('Spawn in F3 coordinates', (s) => `(${fmt(s.dist.spawn_mc[0])}, ${fmt(s.dist.spawn_mc[1])})`)}
+    ${r('Farthest point (blocks; the planet\'s own: ' + fmt(S[G].dist.planet_max) + ')', (s) => fmt(s.dist.max_walk))}
+    ${r('Median walking distance to a random place', (s) => fmt(s.dist.q50_walk))}
+    ${r('Walk ÷ planet distance: 10th / 50th / 90th percentile', (s) => s.dist.ratio_q10_50_90.map((v) => fmt(v, 2)).join(' / '))}
+    ${r('Places more than 20 % farther to walk than on the planet', (s) => pct(s.dist.ratio_gt_1_2))}
+    ${r('Places more than 15 % nearer to walk', (s) => pct(s.dist.ratio_lt_0_85))}
+    ${r('Compass more than 45° off the way back', (s) => pct(s.dist.compass_gt_45))}
+    ${r('Compass more than 90° off (points away)', (s) => pct(s.dist.compass_gt_90))}
+  </tbody></table>`;
+  const b = (s, i) => `${fmt(s.bow[i].bow_blocks)} blocks (${fmt(s.bow[i].min_blocks_from_eq)} to ${fmt(s.bow[i].max_blocks_from_eq)} from the equator)`;
+  $('#bands-table').innerHTML = `<table><thead><tr><th>How far a parallel strays across the world (z)</th><th class="n">${NAME[G]}</th><th class="n">${NAME[K]}</th></tr></thead><tbody>
+    ${r('15° parallel', (s) => b(s, 0))}${r('30° parallel', (s) => b(s, 1))}</tbody></table>`;
 }
 
 // ---------------------------------------------------------------------------------------------
-// findings, method, footer
-function findings() {
-  const cube = D.sweep_cube, guy = D.sweep_guyou;
-  const okC = Math.round(100 * cube.filter((r) => r[1] === 0).length / cube.length);
-  const okG = Math.round(100 * guy.filter((r) => r[1] === 0).length / guy.length);
-  const items = [
-    '<b>The 3 × 2 net has no world-wide slide, so it breaks "TW slides, engine turns".</b> Its 8 pairs are 2 slides, 4 quarter-turns and 2 half-turns, but neither slide is an east–west wrap of the whole world (one is a two-face jump along the line between the rows, the other a diagonal jump). Toroidal World could own no edge, and the engine would have to carry everything TW carries today. The survey described it only as "one more seam inside the world"; in fact six seam edges lie on the line between the rows. This strengthens the cross net.',
-    '<b>Power-of-two faces make the band exactly today\'s 16,384 blocks round</b> (32,768 at 32k): the equator walk, Toroidal World\'s cylinder period and the preset names all stay as they are, and every seam lands on a region line. At today\'s scale the equal-area cube draws the equator 8 % short (15,104); Petroff\'s Guyou world draws it 20 % short (13,088). This does not overturn the survey\'s choice of today\'s scale, which keeps every calibrated horizontal scale, but it is a better case for powers of two than "the planet drawn 1.18× larger".',
-    `<b>Corner placement on this planet:</b> all eight cube corners have open sea within 3° for ${okC} % of the possible turns λ₀; Guyou's four points for ${okG} % of λc. Eight corners are harder to hide than four, but on an equal-area cube they need not be hidden: they magnify nothing.`,
-    '<b>Lambert-bake streaks land on the cube\'s polar face centres.</b> The pole is in the middle of a face, so the radial streaks the prototype found round Guyou\'s poles are more prominent on every cube map. A production bake must sample the caps from the sphere (or from a cubed-sphere simulation grid, see above) before the cube is reviewed for looks.',
-    '<b>Nothing here changes the shape recommendation.</b> On the real planet the crease test shows the survey\'s numbers as pictures: QSC\'s diagonals and every edge of the graphics warps fold visibly, the Moser cube and Petroff do not, and the cube\'s shapes are visibly closer to true than Petroff\'s.',
-  ];
-  $('#findings-list').innerHTML = items.map((x) => `<li>${x}</li>`).join('');
-}
-function method() {
-  $('#method-text').innerHTML = `
-  <p><b>Pictures.</b> <span class="mono">tools/review/world-shape/compute.py</span> on the test VM (through <span class="mono">run.sh</span> and the admission tool) rebuilds every world on the survey's own projection code (<span class="mono">tools/research/projection-survey/</span>: Petroff, Gringorten, Collignon, Peirce, QSC by Roşca–Plonka, HEALPix, equi-angular, the conformal cube by Schwarz triangle maps and the Moser flow at 512²). Each world pixel goes to its planet point and samples <span class="mono">deeptime heightmap</span> of workbench run 1a103bb2d2b (earthlike_quick_16k, format 0.4, Lambert) at 4 blocks a sample; colours from height, precipitation and ice; hill shade in world space. Area and shape from the world-to-planet Jacobian (differences within one face only). Seam tables are built from the cube's edge adjacency, checked by continuity: every seam of every world closes to ≤ 4·10⁻⁹ rad. Walks step through the seam motions; their planet tracks give the blocks-per-degree profile.</p>
-  <p><b>Numbers.</b> Distortion, crease and cost figures are the survey's (<span class="mono">docs/research/notes/seamless-projection-survey.md</span> §3, §5, §6). Effort: <span class="mono">docs/design/seamless-wrapping.md</span> §8 (26–40 days for Guyou with portals), survey §6.1 (crate 8–11 days, +5–10 outside it for the cube), <span class="mono">docs/design/wrap-engine.md</span> §6 (46–75 days without trains). The engine's extra 3–8 days for the cube (six turning pairs, quarter-turn block-state turns, eight corners) and the 5–8 days for a QSC or HEALPix crate are this page's inference. Seam technology rows: seamless-wrapping.md §5–7, wrap-engine.md §1–4, the decisions log (2026-10-03).</p>
-  <p><b>Not done.</b> No game was launched; quarter-turn portals and a whole-world cube in the engine remain untested; the Moser table's convergence is not studied (512² only); the bake is Lambert, so the poles are streaked.</p>`;
-  $('#foot').innerHTML = `Generated ${D.generated} from <span class="mono">tools/review/world-shape/</span> · Deep Time (LGPL-3.0-or-later) · three.js r128 (MIT), local copy · distortion data: seamless-projection-survey.md (2026-10-03).`;
-  $('#lam0').textContent = D.lam0_deg;
-  $('#lamc').textContent = D.lamc_deg;
+// appendix
+const APPX = [
+  ['lambert', 'Lambert cylindrical (today)', 'Equal-area, shipped, not seamless: poles are walls, shapes up to 27× near the 80° stop.', '1 slide', '1.33 / 27'],
+  ['guyou-peirce', 'Guyou conformal (the prototype)', 'Runs in game today, but not equal-area: land near its 4 points drawn without bound larger.', '1 slide, 2 half', 'area 0.46× to ∞'],
+  ['peirce-square', 'Peirce quincuncial square', 'Same map, square aspect; four turning edges, no straight equator. Guyou chosen 2026-10-03.', '4 half', 'area 0.46× to ∞'],
+  ['guyou-gringorten', 'Gringorten in Guyou\'s layout', 'Equal-area but creased 62° exactly on its seams; worse than Petroff on every number.', '1 slide, 2 half', '1.79 / 2.88'],
+  ['guyou-collignon', 'Collignon quincuncial', 'Simplest equal-area square; worst shapes, 63° creases on every seam and diagonal.', '1 slide, 2 half', '2.05 / 2.98'],
+  ['cube-moser-3x2', 'Moser cube, 3 × 2 net', 'Same map packed into a rectangle; 8 seam pairs, seams inside the world, no world-wide slide for Toroidal World.', '2 slides, 4 quarter, 2 half', '1.26 / 1.42'],
+  ['cube-qsc-cross', 'QSC (= Roşca–Plonka) cube', 'Published closed form, exactly equal-area; folds every ridge 41° on each face diagonal. The cube\'s fallback map.', 'as the cross', '1.32 / 1.55'],
+  ['cube-healpix-cross', 'HEALPix cube', 'Best median shape, worst creases of the equal-area cubes (63° across the polar faces).', 'as the cross', '1.18 / 2.41'],
+  ['cube-eac-cross', 'Equi-angular cube (S2)', 'The graphics cube: cheap, not equal-area (±20 %), creased 44–47° at every face edge.', 'as the cross', '1.20 / 1.73'],
+  ['cube-conformal-cross', 'Conformal cube', 'The Moser cube\'s parent: true shapes, but area grows without bound at the corners.', 'as the cross', 'area 0.79× to ∞'],
+];
+function appendix() {
+  const rows = APPX.map(([id, name, why, seams, shape]) => {
+    const A = D.appendix[id];
+    const ar = A ? `${A.bbox[2] - A.bbox[0]} / ${A.bbox[3] - A.bbox[1]}` : '2 / 1';
+    return `<tr><td class="thumb"><div class="thumbbox" style="aspect-ratio:${ar}">${A ? `<img src="${id}-map.webp" alt="" loading="lazy">` : ''}</div></td>
+      <td><b>${name}</b><span class="sub">${why}</span></td><td>${seams}</td><td class="n">${shape}</td>
+      <td class="thumb"><div class="thumbbox" style="aspect-ratio:${ar}">${A ? `<img src="${id}-crease.webp" alt="" loading="lazy">` : ''}</div></td></tr>`;
+  }).join('');
+  $('#appx-table').innerHTML = `<table><thead><tr><th>Planet</th><th>Candidate and why not</th><th>Seams</th><th class="n">Shape a/b median / max</th><th>Crease test</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // ---------------------------------------------------------------------------------------------
 function init() {
-  const only = (location.hash.match(/only-([a-z-]+(?:\+[a-z-]+)*)/) || [])[1];
-  if (only) document.querySelectorAll('section').forEach((x) => { if (!only.split('+').includes(x.id)) x.hidden = true; });
-  decisionCards();
+  const atSea = (rows) => rows.filter((r) => r[1] === 0).length / rows.length;
+  D.corner_sea = { guyou: atSea(D.sweep_guyou), cube: atSea(D.sweep_cube) };
+  bind();
   coneFigure();
-  setupExplorer();
-  compareTable();
-  techTable();
-  faceSize();
-  netSection();
-  walkSection();
-  simTable();
-  findings();
-  method();
+  setupWorlds();
+  cornersSection();
+  tilingFigure();
+  seamTable(G, $('#seams-guyou'));
+  seamTable(K, $('#seams-cube'));
+  tripTable();
+  walksTable();
+  eqChart();
+  sweepChart($('#sweep-cube'), D.sweep_cube, D.lam0_deg, 90, 'λ₀ (degrees)');
+  sweepChart($('#sweep-guyou'), D.sweep_guyou, D.lamc_deg, 360, 'λc (degrees)');
+  mapGridNote();
+  statsTables();
+  appendix();
+  $('#foot').innerHTML = `Generated ${D.generated} on the test VM from <span class="mono">tools/review/world-shape/</span> · Deep Time (LGPL-3.0-or-later) · three.js r128 (MIT), local copy · distortion figures: seamless-projection-survey.md.`;
 }
 init();
-window.WS = { C, ORDER, FAMNAME, KCOL, css };
-// redraw theme-dependent SVGs when the colour scheme flips
-try {
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => location.reload());
-} catch (e) { /* older browsers */ }
+window.WS = { css, NAME, G, K, D };
+try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => location.reload()); } catch (e) { /* older browsers */ }
 })();
