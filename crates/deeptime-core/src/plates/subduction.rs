@@ -51,7 +51,7 @@ use super::Env;
 use super::events::{self, SUBDUCTION_ONSET};
 use super::geometry::{Cover, Geo, Tree, cover, dijkstra};
 use super::kinematics::{quat, tangent, to_group, to_world};
-use super::pools::ISOSTATIC_FACTOR;
+use super::pools::COLUMN_ISOSTATIC_FACTOR;
 use super::state::{
     ARC, CONTINENTAL, Contact, DIVERGENT, EMERGED, FORELAND, HIDDEN, HOTSPOT, OROGENY_ANDEAN,
     OROGENY_HIMALAYAN, PlateState, SUBDUCTION_ZONE, TRENCH, pool,
@@ -464,9 +464,21 @@ struct Source {
 }
 
 /// Slab pull per plate, from its subduction fronts this step.
+/// World global: crust arcs added to continental crust over the run, km³ (Earth-normalized).
+pub const ARC_CONTINENTAL_GLOBAL: &str = "plates/arc_continental_km3";
+/// World global: arc magma added to oceanic samples (island arcs) over the run, km³.
+pub const ARC_OCEANIC_GLOBAL: &str = "plates/arc_oceanic_km3";
+/// World global: the visible continental crust's volume after the last step, km³ (Earth-normalized).
+pub const CONTINENTAL_VOLUME_GLOBAL: &str = "plates/continental_volume_km3";
+
 pub struct Pull {
     /// Each plate's oceanic subduction front length, km (Earth-normalized; the dynamics record's).
     pub front_km: Vec<f64>,
+    /// Crust this step's arcs added to continental crust (arc magma and the cordillera's root),
+    /// km³ (Earth-normalized; measurement, for the crust budget against Stern & Scholl 2010).
+    pub arc_continental_km3: f64,
+    /// Arc magma this step added to oceanic samples (island arcs), km³ (Earth-normalized).
+    pub arc_oceanic_km3: f64,
 }
 
 /// Divergence flags, trenches, fronts, subduction uplift and arcs; each plate's oceanic front length.
@@ -605,7 +617,7 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
     let orogeny_m = OROGENY_MIN_M_PER_MYR * env.dt_myr;
     let collision_myr = k.collision_orogeny_myr;
     let info = &info;
-    let effects: Vec<Option<(usize, f64, bool)>> = state
+    let effects: Vec<Option<(usize, f64, bool, f64, f64)>> = state
         .samples
         .par_iter_mut()
         .enumerate()
@@ -627,6 +639,7 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
             let zn = ((src.z_sub - zt) / (zc - zt)).clamp(0.0, 1.0);
             let h = zn * zn;
             let z = f64::from(s.elevation_m);
+            let (mut added_continental, mut added_oceanic) = (0.0_f64, 0.0_f64);
             // Cortial's h(z̃) uplift is the oceanic slab's: where continental crust comes in, the
             // collision belt (`belts.rs`) builds the relief from the crust shortened.
             let mut dz = if src.oceanic_slab {
@@ -641,7 +654,9 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
             // The arc's own range (P1-27): continental crust over the arc thickens by arc
             // magmatism and shortening and stands up as a cordillera, so the cones rise from a
             // range (the Andes, the Cascades) rather than from a coastal plain; the root that
-            // holds it up (Airy, `pools::ISOSTATIC_FACTOR` times the uplift) joins the crust.
+            // holds it up joins the crust: Airy for the whole column with the crust's mean
+            // density, `pools::COLUMN_ISOSTATIC_FACTOR` (7.0) times the uplift (PLT-281; arc
+            // crust 2.83-2.87 g/cm3, Luffi & Ducea 2022; 5.5 before 2026-10-06).
             if cord_m > 0.0 && s.kind == CONTINENTAL && src.oceanic_slab {
                 let w = (-((d_km - k.arc_distance_km) / k.cordillera_width_km).powi(2)).exp();
                 // Thickened arc crust spreads under its own weight: the range builds towards
@@ -653,9 +668,10 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
                 };
                 let up = cord_m * w * g * room;
                 dz += up;
-                let root = (up * ISOSTATIC_FACTOR) as f32;
+                let root = (up * COLUMN_ISOSTATIC_FACTOR) as f32;
                 s.pools[pool::FELSIC_PLUTONIC] += 0.6 * root;
                 s.pools[pool::METAMORPHIC] += 0.4 * root;
+                added_continental += f64::from(root);
             }
             s.elevation_m = (z + dz).min(zc) as f32;
             // Arc magma and the deposit accumulators.
@@ -666,7 +682,9 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
                     s.pools[pool::FELSIC_PLUTONIC] += (0.7 * m) as f32;
                     s.pools[pool::FELSIC_VOLCANIC] += (0.3 * m) as f32;
                     s.arc_continental_m += m as f32;
+                    added_continental += m;
                 } else {
+                    added_oceanic += m;
                     s.pools[pool::MAFIC_VOLCANIC] += (0.5 * m) as f32;
                     s.pools[pool::FELSIC_VOLCANIC] += (0.25 * m) as f32;
                     s.pools[pool::FELSIC_PLUTONIC] += (0.25 * m) as f32;
@@ -702,16 +720,24 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
                 src.contact,
                 dz / dt_yr * 1.0e3,
                 andean && s.kind == CONTINENTAL,
+                added_continental,
+                added_oceanic,
             ))
         })
         .collect();
-    for (c, rate, andean) in effects.into_iter().flatten() {
+    let (mut arc_continental_m, mut arc_oceanic_m) = (0.0, 0.0);
+    for (c, rate, andean, cont, ocean) in effects.into_iter().flatten() {
         let contact = &mut state.contacts[c];
         contact.max_uplift_mm_yr = contact.max_uplift_mm_yr.max(rate);
         contact.andean |= andean;
+        arc_continental_m += cont;
+        arc_oceanic_m += ocean;
     }
+    let area = norm.sample_area_km2();
     Pull {
         front_km: front_len,
+        arc_continental_km3: arc_continental_m * area / 1000.0,
+        arc_oceanic_km3: arc_oceanic_m * area / 1000.0,
     }
 }
 
