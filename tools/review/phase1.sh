@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 #
 # The Phase 1 exit (plan §10.3, P1-19): Phase 0's suite again plus items 1 to 8 of the "Phase 1 exit test", each a
-# PASS/FAIL row with its evidence paths, and the draft of the private page "Deep Time — Phase 1 (MVP)".
+# PASS/FAIL row with its evidence paths, and the draft of the private page "Deep Time: Phase 1 (MVP)".
 #
 #   tools/review/phase1.sh [--only <step>[,<step>...]] [--skip-phase0] [--publish] [--list]
 #

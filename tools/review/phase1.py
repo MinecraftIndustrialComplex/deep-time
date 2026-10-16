@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
 """The Phase 1 exit (plan §10.3, P1-19): Phase 0's suite again plus items 1 to 8 of the "Phase 1 exit test",
-one PASS/FAIL line each with its evidence paths, and the draft of the private page "Deep Time — Phase 1 (MVP)".
+one PASS/FAIL line each with its evidence paths, and the draft of the private page "Deep Time: Phase 1 (MVP)".
 
     tools/review/phase1.sh [--only <step>[,<step>...]] [--skip-phase0] [--publish] [--list]
 
@@ -273,7 +273,10 @@ def step_geology(a):
                 status_of(ck, need=5), ["probes: smoke/mic/rcon.jsonl"], ck, 0.0)]
 
 
-def gametest_row(sid, item, title, flags, install, name, pattern):
+def gametest_row(sid, item, title, flags, install, name, pattern, a=None):
+    if a is not None and a.skip_gametest:
+        # The coordinator runs the GameTests per merge batch, not branches: the row waits (PENDING) instead of booting a server.
+        return Row(sid, item, title, "PENDING", ["not run on this branch (--skip-gametest): the coordinator runs GameTests per merge batch; run `tools/review/phase1.sh --only " + sid + "` after the merge"])
     cmd = (f"{install}./gametest.sh {flags} -PgametestOnly={name} 2>&1 | grep -E 'required tests|\\[gametest\\] {name}' | "
            "sed 's/^.*\\[gametest\\]/[gametest]/;s/^.*GameTestServer\\]: //'")
     out, rc, secs = vm(sid, cmd, flags=["--server", "--pack"] if "Mic" in flags else ["--server"])
@@ -284,12 +287,12 @@ def gametest_row(sid, item, title, flags, install, name, pattern):
 
 def step_gametest_mic(a):
     return [gametest_row("gametest-mic", 5, "`climateConsistent` passes (GameTest server with the current MIC pack)", "-PwithMic",
-                         "tools/smoke/install.sh mic >/dev/null 2>&1; ", "climateConsistent", r"\[gametest\] climateConsistent")]
+                         "tools/smoke/install.sh mic >/dev/null 2>&1; ", "climateConsistent", r"\[gametest\] climateConsistent", a)]
 
 
 def step_gametest_tb(a):
     return [gametest_row("gametest-tb", 5, "`regionsFollowProvinces` passes (GameTest server with TerraBlender + Biomes O' Plenty)", "-PwithTerraBlender",
-                         "tools/smoke/install.sh terrablender >/dev/null 2>&1; ", "regionsFollowProvinces", r"\[gametest\] regionsFollowProvinces")]
+                         "tools/smoke/install.sh terrablender >/dev/null 2>&1; ", "regionsFollowProvinces", r"\[gametest\] regionsFollowProvinces", a)]
 
 
 def step_viewer(a):
@@ -371,7 +374,7 @@ def build_page(rows, started, published):
                 out.append(f'<a href="{esc(e[len("review/out/phase1/"):])}"><code>{esc(e)}</code></a>')
             else:
                 out.append(f"<code>{esc(e)}</code>")
-        return "<br>".join(out) or "—"
+        return "<br>".join(out) or "n/a"
 
     trs = []
     for r in rows:
@@ -386,7 +389,7 @@ def build_page(rows, started, published):
                f"{counts['PASS']} of {len(rows)} rows pass; {counts['FAIL'] + counts['ERROR']} do not; {counts['PENDING']} pending.")
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Deep Time — Phase 1 (MVP)</title>
+<title>Deep Time: Phase 1 (MVP)</title>
 <meta name="description" content="Phase 1 exit of Deep Time on {started[:10]}: Phase 0's suite again and the eight Phase 1 checks, with the scale comparison (1:100, 1:300, Earth-proportioned).">
 <style>
 :root{{--bg:#fbfaf7;--fg:#1d1d1b;--mut:#6b6a66;--ok:#1f7a3d;--bad:#b3261e;--pend:#9a6a00;--line:#e3e0d8;--card:#fff}}
@@ -403,7 +406,7 @@ tr.kid td{{font-size:13.5px;background:color-mix(in srgb,var(--card) 92%,var(--f
 img{{max-width:100%}}{scale_css}
 @media (max-width:700px){{table.exit td{{display:block;border-top:none}} table.exit tr{{display:block;border-top:1px solid var(--line)}}}}
 </style></head><body><main>
-<h1>Deep Time — Phase 1 (MVP)</h1>
+<h1>Deep Time: Phase 1 (MVP)</h1>
 <div class="sub">A simulated planet, generated on first start, played as a wrapped world with geology-driven terrain and ore. Re-run end to end on {esc(started)} at commit {esc(commit)} on the Azure test VM (builds, simulation, servers, renders, screenshots).</div>
 <div class="sum">{esc(verdict)}</div>
 {"" if published else '<p class="t">Draft. Not published: the coordinator publishes it when the exit has passed.</p>'}
@@ -443,7 +446,7 @@ def step_page(a):
     if published:
         ev.append(json.load(open(os.path.join(REPO, "tools", "review", "spaces.json"))).get("phase1", {}).get("url", ""))
     status = "PASS" if published else "PENDING"
-    title = '"Deep Time — Phase 1 (MVP)" published privately' if published else '"Deep Time — Phase 1 (MVP)": drafted from the rows, not published (waits for the coordinator)'
+    title = '"Deep Time: Phase 1 (MVP)" published privately' if published else '"Deep Time: Phase 1 (MVP)": drafted from the rows, not published (waits for the coordinator)'
     return [Row("page", 8, title, status, ev)]
 
 
@@ -461,6 +464,7 @@ def main():
     ap.add_argument("--only", help="comma-separated steps (compat is part of geology)")
     ap.add_argument("--skip-phase0", action="store_true", help="reuse the last phase0 rows instead of re-running the suite")
     ap.add_argument("--publish", action="store_true", help="publish the page, only if every row passes (the coordinator's call)")
+    ap.add_argument("--skip-gametest", action="store_true", help="leave the two GameTest rows PENDING (the coordinator runs GameTests per merge batch, not on branches)")
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--quick-myr", type=int, default=QUICK_MYR)
     ap.add_argument("--full-myr", type=int, default=FULL_MYR)
