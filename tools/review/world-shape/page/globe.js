@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-// Deep Time world-shape page: the 3D globe. A world's net (cube or pillowcase tiles, or Lambert's strip) is
-// folded about its internal edges into a cube, a pillowcase or a cylinder, then inflated onto the planet
-// along the projection itself (each mesh vertex carries its planet point from compute.py). Seams, corners
-// and walks are drawn on the planet once it is round. three.js r128 (global THREE), local copy.
+// Deep Time world-shape page: the 3D globe. Each finalist's net (the Guyou squares or the cube's cross) is
+// folded about its internal edges into a pillowcase or a cube, then inflated onto the planet along the
+// projection itself (each mesh vertex carries its planet point from compute.py). Seams, corners, walks and
+// the corner close-ups are drawn on the planet once it is round. three.js r128 (global THREE), local copy.
 'use strict';
 (function () {
 const D = window.WS_DATA, W = window.WS;
 const canvas = document.getElementById('globe');
-if (!window.THREE || !canvas) return;
+if (!window.THREE || !canvas || !W) return;
 const T = THREE;
 let renderer;
 try { renderer = new T.WebGLRenderer({ canvas, antialias: true, alpha: true }); } catch (e) {
@@ -32,11 +32,10 @@ planetGroup.matrixAutoUpdate = false;
 planetGroup.matrix.copy(Dm);
 world.add(foldGroup, planetGroup);
 
-const ids = Object.keys(D.layouts).filter((id) => D.layouts[id].mesh && D.layouts[id].mesh.fold);
-const extra = Object.keys(D.layouts).filter((id) => !ids.includes(id));
+const ids = [W.G, W.K];
 let cur = null;
 let t = 2.0;
-const opts = { seams: true, corners: true, walks: true, corner: false, planetTex: false };
+const opts = { seams: true, corners: true, walks: true, close: true };
 const loader = new T.TextureLoader();
 const texCache = {};
 function tex(url) {
@@ -47,7 +46,6 @@ function tex(url) {
   }
   return texCache[url];
 }
-
 function decode(b64) {
   const bin = atob(b64), n = bin.length >> 1, a = new Float32Array(n);
   for (let i = 0; i < n; i++) {
@@ -62,111 +60,103 @@ function ll2v(ll, r) {
   return new T.Vector3(r * Math.cos(la) * Math.cos(lo), r * Math.cos(la) * Math.sin(lo), r * Math.sin(la));
 }
 const ease = (x) => x < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x);
+function tube(pts, r, color) {
+  if (pts.length < 2) return null;
+  const geo = new T.TubeGeometry(new T.CatmullRomCurve3(pts), Math.min(400, pts.length * 2), r, 5, false);
+  return new T.Mesh(geo, new T.MeshBasicMaterial({ color }));
+}
+function splitTrack(track) {
+  // break a lat/lon track where it jumps (a seam crossing is one point on the planet, so jumps are rare)
+  const out = [[]];
+  for (let i = 0; i < track.length; i++) {
+    if (i && Math.abs(track[i][0] - track[i - 1][0]) + Math.abs(((track[i][1] - track[i - 1][1] + 540) % 360) - 180) > 8) out.push([]);
+    out[out.length - 1].push(track[i]);
+  }
+  return out;
+}
 
-// ------------------------------------------------------------------------------------------
 function build(id) {
-  const L = D.layouts[id], M = L.mesh && L.mesh.fold ? L.mesh : null;
-  const st = { id, L, M, tiles: [], radius: M ? M.radius : 0.8 };
+  const L = D.layouts[id], M = L.mesh;
+  const st = { id, L, M, tiles: [], radius: M.radius };
   foldGroup.clear();
   planetGroup.clear();
-  if (M) {
-    const [bx0, by0, bx1, by1] = L.bbox.map((v) => v / L.unit_blocks);
-    const map = tex(`${id}-map.webp`);
-    for (const tl of M.tiles) {
-      const nx = tl.nx, ny = tl.ny, nv = (nx + 1) * (ny + 1);
-      const sph = decode(tl.xyz);
-      const flat = new Float32Array(nv * 2), uv = new Float32Array(nv * 2);
-      for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) {
-        const k = j * (nx + 1) + i, X = tl.x0 + tl.w * i / nx, Y = tl.y0 + tl.h * j / ny;
-        flat[2 * k] = X; flat[2 * k + 1] = Y;
-        uv[2 * k] = (X - bx0) / (bx1 - bx0); uv[2 * k + 1] = (Y - by0) / (by1 - by0);
-      }
-      const idx = [];
-      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
-        const a = j * (nx + 1) + i, b = a + 1, c = a + nx + 1, d = c + 1;
-        idx.push(a, b, d, a, d, c);
-      }
-      const g = new T.BufferGeometry();
-      g.setAttribute('position', new T.BufferAttribute(new Float32Array(nv * 3), 3));
-      g.setAttribute('uv', new T.BufferAttribute(uv, 2));
-      g.setIndex(idx);
-      const mesh = new T.Mesh(g, new T.MeshLambertMaterial({ map, side: T.DoubleSide }));
-      foldGroup.add(mesh);
-      st.tiles.push({ tl, nx, ny, nv, sph, flat, g, mesh, centre: [tl.x0 + tl.w / 2, tl.y0 + tl.h / 2] });
+  const [bx0, by0, bx1, by1] = L.bbox.map((v) => v / L.unit_blocks);
+  const map = tex(`${id}-map.webp`);
+  for (const tl of M.tiles) {
+    const nx = tl.nx, ny = tl.ny, nv = (nx + 1) * (ny + 1);
+    const sph = decode(tl.xyz);
+    const flat = new Float32Array(nv * 2), uv = new Float32Array(nv * 2);
+    for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) {
+      const k = j * (nx + 1) + i, X = tl.x0 + tl.w * i / nx, Y = tl.y0 + tl.h * j / ny;
+      flat[2 * k] = X; flat[2 * k + 1] = Y;
+      uv[2 * k] = (X - bx0) / (bx1 - bx0); uv[2 * k + 1] = (Y - by0) / (by1 - by0);
     }
-    // hinge tree from tile 0
-    st.parent = new Array(st.tiles.length).fill(-1);
-    st.hinge = new Array(st.tiles.length).fill(null);
-    const seen = new Set([0]), q = [0], order = [0];
-    while (q.length) {
-      const a = q.shift();
-      for (const h of M.hinges) {
-        let b = -1;
-        if (h.parent === a && !seen.has(h.child)) b = h.child; else if (h.child === a && !seen.has(h.parent)) b = h.parent;
-        if (b < 0) continue;
-        seen.add(b); q.push(b); order.push(b);
-        st.parent[b] = a; st.hinge[b] = h;
-      }
+    const idx = [];
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const a = j * (nx + 1) + i, b = a + 1, c = a + nx + 1, d = c + 1;
+      idx.push(a, b, d, a, d, c);
     }
-    st.order = order;
-    st.foldAngle = M.fold === 'cube' ? Math.PI / 2 : Math.PI;
-    // the rotation that takes the final folded shape onto the planet
-    const fin = foldedPositions(st, 1);
-    st.Rk = alignRotation(st, fin);
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.BufferAttribute(new Float32Array(nv * 3), 3));
+    g.setAttribute('uv', new T.BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    const mesh = new T.Mesh(g, new T.MeshLambertMaterial({ map, side: T.DoubleSide }));
+    foldGroup.add(mesh);
+    st.tiles.push({ tl, nx, ny, nv, sph, flat, g, mesh, centre: [tl.x0 + tl.w / 2, tl.y0 + tl.h / 2] });
   }
-  // planet overlays
-  const r = st.radius;
-  const o = L.overlay;
-  if (opts.planetTex || !M) {
-    const sg = new T.SphereGeometry(r * 0.999, 128, 64);
-    // three's sphere: re-map to the planet frame (z north, x at lon 0)
-    const pos = sg.attributes.position, uvs = sg.attributes.uv;
-    for (let i = 0; i < pos.count; i++) {
-      const u = uvs.getX(i), v = uvs.getY(i);
-      const lon = (u - 0.5) * 2 * Math.PI, lat = (v - 0.5) * Math.PI;
-      pos.setXYZ(i, r * 0.999 * Math.cos(lat) * Math.cos(lon), r * 0.999 * Math.cos(lat) * Math.sin(lon), r * 0.999 * Math.sin(lat));
+  st.parent = new Array(st.tiles.length).fill(-1);
+  st.hinge = new Array(st.tiles.length).fill(null);
+  const seen = new Set([0]), q = [0], order = [0];
+  while (q.length) {
+    const a = q.shift();
+    for (const h of M.hinges) {
+      let b = -1;
+      if (h.parent === a && !seen.has(h.child)) b = h.child; else if (h.child === a && !seen.has(h.parent)) b = h.parent;
+      if (b < 0) continue;
+      seen.add(b); q.push(b); order.push(b);
+      st.parent[b] = a; st.hinge[b] = h;
     }
-    sg.computeVertexNormals();
-    st.globe = new T.Mesh(sg, new T.MeshLambertMaterial({ map: tex('globe.webp'), side: T.FrontSide }));
-    planetGroup.add(st.globe);
   }
+  st.order = order;
+  st.foldAngle = M.fold === 'cube' ? Math.PI / 2 : Math.PI;
+  st.Rk = alignRotation(st, foldedPositions(st, 1));
+  const r = st.radius, o = L.overlay;
   const KC = { slide: W.css('--slide'), quarter: W.css('--quarter'), half: W.css('--half') };
   st.seamObjs = [];
+  const add = (m) => { if (m) { planetGroup.add(m); st.seamObjs.push(m); } };
   if (opts.seams) {
-    for (const s of o.seams) {
-      const pts = s.ll.map((ll) => ll2v(ll, r * 1.004));
-      const geo = new T.TubeGeometry(new T.CatmullRomCurve3(pts), 64, r * 0.008, 6, false);
-      const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color: KC[s.kind] }));
-      planetGroup.add(m); st.seamObjs.push(m);
-    }
+    for (const s of o.seams) add(tube(s.ll.map((ll) => ll2v(ll, r * 1.004)), r * 0.008, KC[s.kind]));
     for (const e of o.edges) {
-      const pts = e.map((ll) => ll2v(ll, r * 1.003));
-      const ln = new T.Line(new T.BufferGeometry().setFromPoints(pts), new T.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
-      planetGroup.add(ln); st.seamObjs.push(ln);
+      const ln = new T.Line(new T.BufferGeometry().setFromPoints(e.map((ll) => ll2v(ll, r * 1.003))), new T.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
+      add(ln);
     }
   }
   if (opts.corners) {
     for (const c of o.corners) {
-      const m = new T.Mesh(new T.SphereGeometry(r * 0.022, 16, 12), new T.MeshBasicMaterial({ color: W.css('--corner') }));
+      const m = new T.Mesh(new T.SphereGeometry(r * 0.02, 16, 12), new T.MeshBasicMaterial({ color: W.css('--corner') }));
       m.position.copy(ll2v(c.ll, r * 1.006));
-      planetGroup.add(m); st.seamObjs.push(m);
+      add(m);
     }
   }
-  const walkCols = { equator: W.css('--walk-eq'), pole: W.css('--walk-pole'), poleB: W.css('--walk-pole'), cornerA: W.css('--walk-a'), cornerB: W.css('--walk-b') };
-  const which = [].concat(opts.walks ? ['equator', 'pole'] : [], opts.corner ? ['cornerA', 'cornerB'] : []);
-  for (const k of which) {
-    const w = L.walks && L.walks[k];
-    if (!w || w.track.length < 2) continue;
-    const pts = w.track.map((ll) => ll2v(ll, r * 1.007));
-    const geo = new T.TubeGeometry(new T.CatmullRomCurve3(pts), Math.min(400, pts.length * 2), r * 0.006, 5, false);
-    const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color: walkCols[k] }));
-    planetGroup.add(m); st.seamObjs.push(m);
+  if (opts.walks) {
+    const cols = { equator: W.css('--walk-eq'), pole: W.css('--walk-pole'), diag: W.css('--walk-diag') };
+    for (const k of ['equator', 'pole', 'diag']) {
+      const w = L.walks && L.walks[k];
+      if (!w) continue;
+      for (const part of splitTrack(w.track)) add(tube(part.map((ll) => ll2v(ll, r * 1.007)), r * 0.005, cols[k]));
+    }
+  }
+  if (opts.close) {
+    const C = D.corners[id];
+    const cols = { globe_ring: W.css('--walk-ring'), globe_A: W.css('--walk-a'), globe_B: W.css('--walk-b') };
+    for (const k of ['globe_ring', 'globe_A', 'globe_B']) {
+      for (const part of splitTrack(C[k])) add(tube(part.map((ll) => ll2v(ll, r * 1.008)), r * 0.004, cols[k]));
+    }
   }
   cur = st;
   update();
 }
 
-// rigid fold: each child turns about its hinge (in flat coordinates) by +-a, towards -z
 function tileMatrices(st, a) {
   const mats = new Array(st.tiles.length);
   for (const k of st.order) {
@@ -183,23 +173,8 @@ function tileMatrices(st, a) {
   }
   return mats;
 }
-function cylinder(X, Y, u) {
-  if (u < 1e-4) return new T.Vector3(X, Y, 0);
-  const r = 1 / u, ph = X * u;
-  return new T.Vector3(r * Math.sin(ph), Y, r * Math.cos(ph) - r + u);
-}
-// positions of every vertex at fold fraction f (0 flat .. 1 folded), centred on the folded shape
 function foldedPositions(st, f) {
   const out = [];
-  if (st.M.fold === 'cylinder') {
-    const u = ease(f);
-    for (const tt of st.tiles) {
-      const a = new Float32Array(tt.nv * 3);
-      for (let k = 0; k < tt.nv; k++) { const v = cylinder(tt.flat[2 * k], tt.flat[2 * k + 1], u); a[3 * k] = v.x; a[3 * k + 1] = v.y; a[3 * k + 2] = v.z; }
-      out.push(a);
-    }
-    return out;
-  }
   const mats = tileMatrices(st, st.foldAngle * ease(f));
   const cen = new T.Vector3();
   st.tiles.forEach((tt, i) => cen.add(new T.Vector3(tt.centre[0], tt.centre[1], 0).applyMatrix4(mats[i])));
@@ -226,45 +201,35 @@ function alignRotation(st, fin) {
   };
   const Ff = frame(get(fin[0], kc), get(fin[0], kr));
   const Fs = frame(get(t0.sph, kc), get(t0.sph, kr));
-  // Rk maps folded directions to planet directions: Fs * Ff^T
   return Fs.multiply(Ff.clone().transpose());
 }
-
 const qI = new T.Quaternion();
 function update() {
   const st = cur;
   if (!st) return;
-  if (st.M) {
-    const f = Math.min(t, 1), inflate = ease(Math.max(0, t - 1));
-    const fp = foldedPositions(st, f);
-    const toPlanet = Dm.clone().multiply(st.Rk);
-    const qT = new T.Quaternion().setFromRotationMatrix(toPlanet);
-    const q = qI.clone().slerp(qT, ease(f));
-    const v = new T.Vector3(), s = new T.Vector3();
-    st.tiles.forEach((tt, i) => {
-      const pos = tt.g.attributes.position.array, a = fp[i];
-      for (let k = 0; k < tt.nv; k++) {
-        v.set(a[3 * k], a[3 * k + 1], a[3 * k + 2]).applyQuaternion(q);
-        if (inflate > 0) {
-          s.set(tt.sph[3 * k], tt.sph[3 * k + 1], tt.sph[3 * k + 2]).multiplyScalar(st.radius).applyMatrix4(Dm);
-          v.lerp(s, inflate);
-        }
-        pos[3 * k] = v.x; pos[3 * k + 1] = v.y; pos[3 * k + 2] = v.z;
+  const f = Math.min(t, 1), inflate = ease(Math.max(0, t - 1));
+  const fp = foldedPositions(st, f);
+  const qT = new T.Quaternion().setFromRotationMatrix(Dm.clone().multiply(st.Rk));
+  const q = qI.clone().slerp(qT, ease(f));
+  const v = new T.Vector3(), s = new T.Vector3();
+  st.tiles.forEach((tt, i) => {
+    const pos = tt.g.attributes.position.array, a = fp[i];
+    for (let k = 0; k < tt.nv; k++) {
+      v.set(a[3 * k], a[3 * k + 1], a[3 * k + 2]).applyQuaternion(q);
+      if (inflate > 0) {
+        s.set(tt.sph[3 * k], tt.sph[3 * k + 1], tt.sph[3 * k + 2]).multiplyScalar(st.radius).applyMatrix4(Dm);
+        v.lerp(s, inflate);
       }
-      tt.g.attributes.position.needsUpdate = true;
-      tt.g.computeVertexNormals();
-      tt.g.computeBoundingSphere();
-      tt.mesh.visible = !(opts.planetTex && t >= 1.999);
-    });
-  }
-  const show = !st.M || t >= 1.97;
-  for (const o of st.seamObjs) o.visible = show;
-  if (st.globe) st.globe.visible = !st.M || (opts.planetTex && t >= 1.999);
+      pos[3 * k] = v.x; pos[3 * k + 1] = v.y; pos[3 * k + 2] = v.z;
+    }
+    tt.g.attributes.position.needsUpdate = true;
+    tt.g.computeVertexNormals();
+    tt.g.computeBoundingSphere();
+  });
+  for (const o of st.seamObjs) o.visible = t >= 1.97;
   render();
 }
 
-// ------------------------------------------------------------------------------------------
-// camera orbit
 let az = 0.35, el = 0.25, dist = 4.2;
 function placeCamera() {
   camera.position.set(dist * Math.sin(az) * Math.cos(el), dist * Math.sin(el), dist * Math.cos(az) * Math.cos(el));
@@ -297,7 +262,7 @@ canvas.addEventListener('pointermove', (e) => {
   if (ptrs.size === 2) {
     const [a, b] = [...ptrs.values()];
     const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
-    if (pinch0) dist = Math.max(1.6, Math.min(9, dist * pinch0 / d));
+    if (pinch0) dist = Math.max(1.4, Math.min(9, dist * pinch0 / d));
     pinch0 = d;
   }
   render();
@@ -305,11 +270,9 @@ canvas.addEventListener('pointermove', (e) => {
 const up = (e) => { ptrs.delete(e.pointerId); pinch0 = 0; canvas.style.cursor = 'grab'; };
 canvas.addEventListener('pointerup', up);
 canvas.addEventListener('pointercancel', up);
-canvas.addEventListener('wheel', (e) => { e.preventDefault(); dist = Math.max(1.6, Math.min(9, dist * Math.exp(e.deltaY * 0.001))); render(); }, { passive: false });
+canvas.addEventListener('wheel', (e) => { e.preventDefault(); dist = Math.max(1.4, Math.min(9, dist * Math.exp(e.deltaY * 0.001))); render(); }, { passive: false });
 window.addEventListener('resize', resize);
 
-// ------------------------------------------------------------------------------------------
-// controls
 const slider = document.getElementById('g-t'), play = document.getElementById('g-play');
 slider.addEventListener('input', () => { t = slider.value / 100; update(); });
 let anim = null;
@@ -328,49 +291,48 @@ play.addEventListener('click', () => {
   anim = requestAnimationFrame(step);
 });
 const caps = {
-  'lambert': 'Lambert: the strip rolls into a cylinder and each point moves straight out to the sphere (Archimedes\' equal-area map). The caps above 80° are never reached.',
-  'guyou-petroff': 'Guyou layout (Petroff\'s map): the two hemisphere squares fold together into a pillowcase, glued round all four edges, then inflate. The corners of the pillowcase are the four singular points.',
-  'guyou-peirce': 'The prototype\'s conformal map in the same pillowcase.',
-  'guyou-gringorten': 'Gringorten in the pillowcase.', 'guyou-collignon': 'Collignon in the pillowcase.',
-  'cube-moser-cross': 'Cross net: the four band faces wrap into a ring, the polar faces close the lid and floor, then the cube inflates along the Moser map. Seams (coloured) and the eight corners appear on the planet at the end.',
-  'cube-moser-3x2': '3 × 2 net: the same cube, unfolded as two strips of three. It folds into the same cube; only which edges are seams differs.',
-  'cube-qsc-cross': 'QSC folds the same way; switch the map explorer to its crease test to see where it kinks.',
-  'cube-healpix-cross': 'HEALPix on the cross net: its corners sit at ±41.8° rather than ±35.3°.',
-  'cube-eac-cross': 'The equi-angular cube.', 'cube-conformal-cross': 'The conformal cube, the Moser map\'s starting point.',
-  'peirce-square': 'Peirce\'s square has no fold here: seams and corners shown on the planet.',
+  [W.G]: 'Petroff–Guyou: the two hemisphere squares fold together into a pillowcase, glued round all four edges, then inflate. The pillowcase\'s four corners are the four corners of the world.',
+  [W.K]: 'Moser cube: the four band faces wrap into a ring, the polar faces close the lid and the floor, then the cube inflates along the Moser map. Seams (coloured) and the eight corners appear at the end.',
 };
-function setCaption(id) { document.getElementById('g-caption').textContent = caps[id] || ''; }
-W.FAMNAME && (function () {
-  const box = document.getElementById('g-picker');
-  const all = ids.concat(extra);
-  for (const fam of ['now', 'pill', 'cube']) {
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.innerHTML = `<span class="fam">${W.FAMNAME[fam]}</span>`;
-    for (const id of W.ORDER[fam]) {
-      if (!all.includes(id)) continue;
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'chip'; b.id = 'g-' + id;
-      b.setAttribute('aria-pressed', String(id === 'cube-moser-cross'));
-      b.textContent = W.C[id].short;
-      b.addEventListener('click', () => { box.querySelectorAll('.chip').forEach((x) => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true'); build(id); setCaption(id); });
-      row.appendChild(b);
-    }
-    box.appendChild(row);
-  }
-  const ch = document.getElementById('g-checks');
-  for (const [k, lab] of [['seams', 'Seams'], ['corners', 'Corners'], ['walks', 'Walks'], ['corner', 'Corner walkers'], ['planetTex', 'Bake texture (not the world map)']]) {
-    const l = document.createElement('label');
-    l.innerHTML = `<input type="checkbox" id="g-ov-${k}" ${opts[k] ? 'checked' : ''}> ${lab}`;
-    l.querySelector('input').addEventListener('change', (e) => { opts[k] = e.target.checked; build(cur.id); });
-    ch.appendChild(l);
-  }
-})();
-const hg = location.hash.match(/gt-(\d+)(?:-([a-z0-9-]+?))?(?:,|$)/);
-const startId = hg && hg[2] && D.layouts[hg[2]] ? hg[2] : 'cube-moser-cross';
+const pick = document.getElementById('g-picker');
+const chips = {};
+function choose(id) {
+  for (const [k, b] of Object.entries(chips)) b.setAttribute('aria-pressed', String(k === id));
+  build(id);
+  document.getElementById('g-caption').textContent = caps[id];
+}
+for (const id of ids) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'chip'; b.textContent = W.NAME[id];
+  b.addEventListener('click', () => choose(id));
+  chips[id] = b;
+  pick.appendChild(b);
+}
+const close = document.getElementById('g-close');
+for (const id of ids) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'act'; b.textContent = `${W.NAME[id]}: corner close-up`;
+  b.addEventListener('click', () => {
+    opts.close = true;
+    document.getElementById('g-ov-close').checked = true;
+    t = 2; slider.value = 200;
+    choose(id);
+    const ll = D.corners[id].globe_ll;
+    az = ll[1] * Math.PI / 180; el = ll[0] * Math.PI / 180; dist = 1.9;
+    render();
+  });
+  close.appendChild(b);
+}
+const ch = document.getElementById('g-checks');
+for (const [k, lab] of [['seams', 'Seams'], ['corners', 'Corners'], ['walks', 'Walks'], ['close', 'Corner walkers and ring']]) {
+  const l = document.createElement('label');
+  l.innerHTML = `<input type="checkbox" id="g-ov-${k}" ${opts[k] ? 'checked' : ''}> ${lab}`;
+  l.querySelector('input').addEventListener('change', (e) => { opts[k] = e.target.checked; build(cur.id); });
+  ch.appendChild(l);
+}
+const hg = location.hash.match(/gt-(\d+)(?:-([a-z-]+?))?(?:,|$)/);
+const startId = hg && hg[2] && ids.includes(hg[2]) ? hg[2] : W.K;
 if (hg) { t = Math.min(2, +hg[1] / 100); slider.value = Math.round(t * 100); }
-build(startId);
-setCaption(startId);
-document.querySelectorAll('#g-picker .chip').forEach((x) => x.setAttribute('aria-pressed', String(x.id === 'g-' + startId)));
+choose(startId);
 resize();
 })();
