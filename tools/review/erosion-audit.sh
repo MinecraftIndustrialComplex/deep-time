@@ -11,13 +11,16 @@
 #   tools/remote/mac.sh --no-sync -- tools/review/erosion-audit.sh clean
 #
 # Scratch: /Volumes/Graphide/ban/deeptime-runs/erosion-audit (deleted by `clean`). BAKE_EXTRA adds
-# `deeptime run` arguments (e.g. a --set), THREADS the run's threads (default 6).
+# `deeptime run` arguments, THREADS the run's threads (default 6), RUNS another scratch folder,
+# PRESET a built-in name or a preset file (its admission kind: PRESET_KIND, default the file name).
 set -euo pipefail
-RUNS=/Volumes/Graphide/ban/deeptime-runs/erosion-audit
+RUNS="${RUNS:-/Volumes/Graphide/ban/deeptime-runs/erosion-audit}"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO"
 mkdir -p "$RUNS"
 PRESET="${PRESET:-earthlike_quick_16k}"
+# The admission kind names the built-in preset a preset file was made from (PRESET_KIND).
+PRESET_KIND="${PRESET_KIND:-$(basename "$PRESET" .json)}"
 THREADS="${THREADS:-6}"
 verb="${1:-}"
 tag="${2:-}"
@@ -31,7 +34,7 @@ bake)
         d="$RUNS/$tag-$len"
         rm -rf "$d" "$d.log"
         mkdir -p "$d"
-        setsid nohup sh -c "deeptime-admit run --kind sim:$PRESET:${THREADS}t -- '$RUNS/deeptime-$tag' run \
+        setsid nohup sh -c "deeptime-admit run --kind sim:$PRESET_KIND:${THREADS}t -- '$RUNS/deeptime-$tag' run \
             --preset $PRESET --start scattered_continents --length-myr $len --threads $THREADS \
             --checkpoints --out '$d' ${BAKE_EXTRA:-} > '$d.log' 2>&1; echo BAKE-DONE \$? >> '$d.log'" \
             > /dev/null 2>&1 < /dev/null &

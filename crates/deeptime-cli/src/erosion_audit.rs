@@ -439,8 +439,19 @@ pub fn porphyries(world: &Path) -> Result<Value, String> {
             json!((v[((v.len() - 1) as f64 * p).round() as usize] * 100.0).round() / 100.0)
         }
     };
+    // The surface stage's land erosion by process and elevation band (`surface::erosion_bands`).
+    let surface = m.notes.get("surface").map(|v| match v {
+        Value::String(s) => serde_json::from_str(s).unwrap_or(Value::Null),
+        other => other.clone(),
+    });
+    let by_band = surface
+        .as_ref()
+        .and_then(|s| s.get("land_erosion_by_band_m_myr"))
+        .cloned()
+        .unwrap_or(Value::Null);
     Ok(json!({
         "world_data": world.display().to_string(),
+        "land_erosion_by_process_m_myr": by_band,
         "porphyries": rows.len(),
         "fates": fates,
         "eroded_km_p10_p50_p90": [q(&eroded_km, 0.1), q(&eroded_km, 0.5), q(&eroded_km, 0.9)],
