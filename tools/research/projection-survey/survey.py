@@ -141,7 +141,11 @@ def face_nowell(u, v):  # the "spherified cube" of games (Nowell 2005)
 def petroff_inverse(x_m, y_m):
     pi = math.pi
     phi0 = 3 * pi / 8
-    quadrant = 0 + (y_m >= 0) + (x_m <= 0) + 2 * ((y_m <= 0) & (x_m < 0))
+    # Petroff's own line, 0 + (y >= 0) + (x <= 0) + 2 * ((y <= 0) & (x < 0)), gives quadrant 4 on the ray
+    # y = 0, x < 0 and quadrant 1 on x = 0, y < 0, so points exactly on those two diagonals of a tile came
+    # out at the wrong place (one-pixel lines in symmetric grids; found 2026-10-04 by the world-shape page's
+    # tear check). The same quadrants, with each boundary given to one side:
+    quadrant = np.where((x_m <= 0) & (y_m >= 0), 2, np.where(y_m >= 0, 1, np.where(x_m >= 0, 0, 3)))
     zeta = pi / 4 + quadrant * pi / 2
     x_c = math.sqrt(6) * (x_m * np.cos(zeta) + y_m * np.sin(zeta))
     y_c = 3 * math.sqrt(2) * (y_m * np.cos(zeta) - x_m * np.sin(zeta))
