@@ -117,16 +117,31 @@ def step_phase0(a):
     p0 = os.path.join(REPO, "tools", "review", "phase0.py")
     out_path = os.path.join(LOGS, "phase0.log")
     os.makedirs(LOGS, exist_ok=True)
+    # The coordinator runs GameTests per merge batch, not on branches: --skip-gametest re-runs Phase 0's other steps and
+    # leaves the four GameTest-based rows as they were (marked PENDING below, with the result they last had).
+    gt_steps = ("gametest", "gametest-mic", "gametest-tb", "planet")
+    p0_args = ["--no-publish"] + (["--only", "rust,junit,inspect,smoke-standalone,smoke-mic-32k,smoke-mic-16k"] if a.skip_gametest else [])
     if not a.skip_phase0:
         with open(out_path, "w") as f:
-            subprocess.run([sys.executable, p0, "--no-publish"], cwd=REPO, stdout=f, stderr=subprocess.STDOUT, env={**os.environ, "PHASE0_DETACH": "1"})
+            subprocess.run([sys.executable, p0] + p0_args, cwd=REPO, stdout=f, stderr=subprocess.STDOUT, env={**os.environ, "PHASE0_DETACH": "1"})
     rows_path = os.path.join(REPO, "review", "out", "phase0-src", "rows.json")
     if not os.path.exists(rows_path):
         return [Row("phase0", 0, "Phase 0's suite re-run", "ERROR", ["no review/out/phase0-src/rows.json: phase0.py did not finish (see logs/phase0.log)"])]
     rows = json.load(open(rows_path))
-    kids = [("PASS" if r[2] else "FAIL", r[1], r[3] + [f"log: review/out/phase0-src/logs/{r[0]}.log"]) for r in rows]
+    kids = []
+    for r in rows:
+        if a.skip_gametest and r[0] in gt_steps:
+            kids.append(("PENDING", r[1], [f"not re-run on this branch (the coordinator runs GameTests per merge batch); the last run, on master 6489d4a5: {'PASS' if r[2] else 'FAIL'}"]))
+        else:
+            kids.append(("PASS" if r[2] else "FAIL", r[1], r[3] + [f"log: review/out/phase0-src/logs/{r[0]}.log"]))
     note = " (reused the last run: --skip-phase0)" if a.skip_phase0 else ""
-    return [Row("phase0", 0, f"Phase 0's suite re-run: {sum(1 for k in kids if k[0] == 'PASS')} of {len(kids)} checks{note}", status_of(kids), [], kids, time.time() - t0)]
+    npass, npend = sum(1 for k in kids if k[0] == "PASS"), sum(1 for k in kids if k[0] == "PENDING")
+    if npend and not any(k[0] == "FAIL" for k in kids):
+        status = "PENDING"   # everything that ran passed; the rest waits for the coordinator's GameTest batch
+    else:
+        status = status_of(kids)
+    pend = f", {npend} GameTest checks pending the coordinator's batch" if npend else ""
+    return [Row("phase0", 0, f"Phase 0's suite re-run: {npass} of {len(kids)} checks pass{pend}{note}", status, [], kids, time.time() - t0)]
 
 
 def step_build(a):

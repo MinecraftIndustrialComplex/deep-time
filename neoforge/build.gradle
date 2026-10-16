@@ -40,7 +40,7 @@ configurations {
     }
 }
 dependencies {
-    twBundle "maven.modrinth:toroidal-world:${tw_version}"
+    twBundle "maven.modrinth:exotic-worlds:${tw_version}"
 }
 
 def twInnerDir = layout.buildDirectory.dir('toroidal-world')
