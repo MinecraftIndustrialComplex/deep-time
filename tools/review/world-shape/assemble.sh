@@ -8,7 +8,7 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../../.." && pwd)"
 HOST="${DEEPTIME_MAC:-ban@deeptime-test-ban.westus2.cloudapp.azure.com}"
-RUNS="${RUNS:-/data/ban/deeptime-runs/world-shape}"
+RUNS="${RUNS:-/data/ban/deeptime-runs/world-shape-h2h}"
 src="$repo/review/out/ws-src"
 out="$repo/review/out/world-shape-page"
 mkdir -p "$src" "$out"
