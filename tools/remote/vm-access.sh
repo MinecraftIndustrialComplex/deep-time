@@ -21,7 +21,8 @@ VM_RG="${DEEPTIME_VM_RG:-deeptime-test}"
 VM_NAME="${DEEPTIME_VM_NAME:-deeptime-test}"
 VM_NSG="${DEEPTIME_VM_NSG:-deeptime-testNSG}"
 VM_RULE="${DEEPTIME_VM_RULE:-ssh-from-laptop}"
-VM_AZURE_IP="${DEEPTIME_VM_IP:-20.120.160.3}"
+# The VM's DNS name (its public IP's label, kept across a rebuild); DEEPTIME_VM_IP may be a name or an address.
+VM_AZURE_IP="${DEEPTIME_VM_IP:-deeptime-test-ban.westus2.cloudapp.azure.com}"
 VM_KEEP=8          # addresses kept in the rule (newest last)
 VM_GOING_DOWN=/data/ban/deeptime-cache/DEALLOCATING
 
