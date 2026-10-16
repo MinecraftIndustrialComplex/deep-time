@@ -56,7 +56,9 @@ tools/remote/mac.sh --no-sync -- deeptime-admit status  # the VM's admission too
 
 ## Rules
 - **The test machine is the Azure VM `deeptime-test`** (Ben, 2026-10-01; D32as_v7, 32 vCPU, 125 GiB,
-  x86_64 Ubuntu 24.04, West US 2, resource group `deeptime-test`, pay-as-you-go). The `tools/remote/`
+  x86_64 Ubuntu 24.04, West US 2, resource group `deeptime-test`, pay-as-you-go). Rebuilt from scratch 2026-10-16 after the resource group was deleted (Ben: "feel free to bring
+  it back up"); the scripts reach it by the DNS name `deeptime-test-ban.westus2.cloudapp.azure.com`,
+  which a rebuild can keep, and the gate batch is `tools/remote/vm/gate-batch.sh`. The `tools/remote/`
   scripts and `tools/viewer/mac-watch.sh` default to it (`DEEPTIME_MAC` overrides); its data disk is
   mounted at `/data` with `/Volumes/Graphide -> /data`, so every `/Volumes/Graphide/ban/...` path in
   this file and in tools/ holds there. Where this file says "the Mac", read this machine.

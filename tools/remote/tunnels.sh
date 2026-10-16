@@ -15,7 +15,7 @@
 # about two minutes. They never start the VM: only the remote scripts (vm-access.sh) do, when an
 # agent needs it. Their sessions run no command (`ssh -N`), so the idle watcher does not count them.
 set -euo pipefail
-HOST="${DEEPTIME_MAC:-ban@20.120.160.3}"
+HOST="${DEEPTIME_MAC:-ban@deeptime-test-ban.westus2.cloudapp.azure.com}"
 SSH_BIN=/run/current-system/sw/bin/ssh
 [ -x "$SSH_BIN" ] || SSH_BIN="$(command -v ssh)"
 
