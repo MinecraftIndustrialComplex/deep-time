@@ -1151,7 +1151,11 @@ fn the_gap_budget_changes_nothing_and_adds_up() {
         |_, _, st| {
             let gb = st.gap_budget.as_ref().expect("on");
             let worst = gb.worst_residual_m();
-            assert!(worst < 5.0, "step {}: parts off the gap by {worst} m", st.step);
+            assert!(
+                worst < 5.0,
+                "step {}: parts off the gap by {worst} m",
+                st.step
+            );
         },
     );
     let st = with.plates.as_ref().unwrap();

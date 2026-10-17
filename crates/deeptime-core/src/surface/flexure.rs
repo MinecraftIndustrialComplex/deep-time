@@ -1011,26 +1011,48 @@ fn rock_shares(rock_share: f64) -> (f64, f64) {
     )
 }
 
-/// The local (Airy) answer to one cell's erosion and deposition of the step, m: the elevation
-/// change a plate with no strength would give the load [`step`] adds for it (the rock, and the
-/// sea water that takes or gives up its room). Measurement only (the gap budget,
-/// `plates::gap_budget`); the solve spreads the same load over the plate. `h_start` and
-/// `h_eroded` as in [`StepIn`]; `h_now` the elevation the solve starts from (after the
-/// spreading).
-pub fn local_rebound_m(
-    strength: f64,
-    rock_share: f64,
-    sea: f64,
-    h_start: f64,
-    h_eroded: f64,
-    h_now: f64,
-) -> f64 {
-    let (rock_land, rock_sea) = rock_shares(rock_share);
-    let rock = if h_eroded <= sea { rock_sea } else { rock_land };
-    let water = (sea - h_eroded).max(0.0) - (sea - h_start).max(0.0);
-    let dq = (h_eroded - h_start) * rock + RHO_WATER / RHO_MANTLE * water;
-    let wet = if h_now <= sea { 1.0 } else { 0.0 };
-    -strength * RHO_MANTLE * dq / (RHO_MANTLE - RHO_WATER * strength * wet)
+/// The local (Airy) answers to the loads [`step`] adds, per cell, m: what a plate with no
+/// strength would give them. `.0` for the step's erosion and deposition (the rock, and the sea
+/// water that takes or gives up its room as the surface moves); `.1` for the rest of the change
+/// of sea water and land ice over the cell (the sea rising or falling, the surface carried or
+/// raised under it). Measurement only (the gap budget, `plates::gap_budget`); the solve spreads
+/// the same loads over the plate. `state` is the state before the step, `h` the elevation the
+/// solve starts from (after the spreading).
+pub fn local_answers(
+    p: &FlexureParams,
+    state: Option<&FlexState>,
+    x: &StepIn<'_>,
+    h: &[f64],
+) -> Vec<(f64, f64)> {
+    let n = h.len();
+    let sea = x.sea_level_m;
+    let water_share = RHO_WATER / RHO_MANTLE;
+    let ice_share = RHO_ICE / RHO_MANTLE;
+    let (rock_land, rock_sea) = rock_shares(x.rock_share);
+    let st = state.filter(|st| st.water_m.len() == n);
+    (0..n)
+        .into_par_iter()
+        .map(|c| {
+            // As in `step`: crust new at the place starts from the sea over it, with no ice.
+            let age = x.crust_age_myr[c];
+            let fresh = st.is_none_or(|st| st.water_m[c].is_nan())
+                || (age >= 0.0 && f64::from(age) < x.dt_myr);
+            let (water_ref, ice_prev) = match st {
+                Some(st) if !fresh => (f64::from(st.water_m[c]), f64::from(st.ice_m[c])),
+                _ => ((sea - x.h_start[c]).max(0.0), 0.0),
+            };
+            let (h0, h1) = (x.h_start[c], x.h_eroded[c]);
+            let rock = if h1 <= sea { rock_sea } else { rock_land };
+            let eroded_water = (sea - h1).max(0.0) - (sea - h0).max(0.0);
+            let q_rock = (h1 - h0) * rock + water_share * eroded_water;
+            let ice = x.ice_m.map_or(0.0, |v| f64::from(v[c]).max(0.0));
+            let other_water = (sea - h[c]).max(0.0) - water_ref - eroded_water;
+            let q_water = water_share * other_water + ice_share * (ice - ice_prev);
+            let wet = if h[c] <= sea { 1.0 } else { 0.0 };
+            let answer = -p.strength * RHO_MANTLE / (RHO_MANTLE - RHO_WATER * p.strength * wet);
+            (answer * q_rock, answer * q_water)
+        })
+        .collect()
 }
 
 /// The largest power of two that keeps the solve cell at or under [`SOLVE_CELL_M`] and divides

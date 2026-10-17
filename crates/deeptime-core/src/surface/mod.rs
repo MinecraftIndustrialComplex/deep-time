@@ -1340,6 +1340,7 @@ impl SurfaceStage {
             .as_ref()
             .is_some_and(|st| st.gap_budget.is_some());
         let h_spread = (budget && flex_on).then(|| sc.h.clone());
+        let mut answers: Option<Vec<(f64, f64)>> = None;
         if let (Some(h_eroded), Some(h_before_spread)) = (&h_eroded, &h_before_spread) {
             let started = Instant::now();
             let ice: Option<Vec<f32>> = world
@@ -1347,37 +1348,44 @@ impl SurfaceStage {
                 .get(crate::climate::field::ICE_THICKNESS)
                 .filter(|f| f.data.len() == n)
                 .map(|f| f.data.clone());
+            let x_in = flexure::StepIn {
+                dims: &d,
+                norm_dx_m: std::f64::consts::TAU * self.preset.tectonics.model_radius_km * 1000.0
+                    / w as f64,
+                // The plate model's mean sample spacing on its sphere.
+                plate_spacing_m: (4.0
+                    * std::f64::consts::PI
+                    * (self.preset.tectonics.model_radius_km * 1000.0).powi(2)
+                    / f64::from(self.preset.resolution.l0_samples))
+                .sqrt(),
+                gravity_m_s2: gravity,
+                sea_level_m: sea,
+                dt_myr,
+                h_start: &h_start,
+                h_eroded,
+                h_before_spread,
+                uplift_mm_yr: &pf.uplift,
+                crust_type: &pf.crust_type,
+                crust_age_myr: &pf.crust_age,
+                orogeny_age_myr: &pf.orogeny_age,
+                regime: &pf.regime,
+                plate_id: &pf.plate_id,
+                ice_m: ice.as_deref(),
+                rock_share: p.isostasy,
+            };
+            if budget {
+                answers = Some(flexure::local_answers(
+                    &p.flexure,
+                    st.flexure.as_ref(),
+                    &x_in,
+                    &sc.h,
+                ));
+            }
             let out = flexure::step(
                 &p.flexure,
                 &mut self.flex_solver,
                 &mut st.flexure,
-                &flexure::StepIn {
-                    dims: &d,
-                    norm_dx_m: std::f64::consts::TAU
-                        * self.preset.tectonics.model_radius_km
-                        * 1000.0
-                        / w as f64,
-                    // The plate model's mean sample spacing on its sphere.
-                    plate_spacing_m: (4.0
-                        * std::f64::consts::PI
-                        * (self.preset.tectonics.model_radius_km * 1000.0).powi(2)
-                        / f64::from(self.preset.resolution.l0_samples))
-                    .sqrt(),
-                    gravity_m_s2: gravity,
-                    sea_level_m: sea,
-                    dt_myr,
-                    h_start: &h_start,
-                    h_eroded,
-                    h_before_spread,
-                    uplift_mm_yr: &pf.uplift,
-                    crust_type: &pf.crust_type,
-                    crust_age_myr: &pf.crust_age,
-                    orogeny_age_myr: &pf.orogeny_age,
-                    regime: &pf.regime,
-                    plate_id: &pf.plate_id,
-                    ice_m: ice.as_deref(),
-                    rock_share: p.isostasy,
-                },
+                &x_in,
                 &mut sc.h,
             )?;
             iso += out.sum_change_m;
@@ -1394,28 +1402,17 @@ impl SurfaceStage {
             flexed = Some(out);
             self.time("flexure", started);
         }
-        if let (Some(h_eroded), Some(h_before_spread), Some(h_spread)) =
-            (&h_eroded, &h_before_spread, &h_spread)
+        if let (Some(h_eroded), Some(h_before_spread), Some(h_spread), Some(local)) =
+            (&h_eroded, &h_before_spread, &h_spread, &answers)
         {
             use crate::plates::gap_budget::field as gap;
-            let strength = p.flexure.strength;
-            let local: Vec<f64> = (0..n)
-                .map(|c| {
-                    flexure::local_rebound_m(
-                        strength,
-                        p.isostasy,
-                        sea,
-                        h_start[c],
-                        h_eroded[c],
-                        h_spread[c],
-                    )
-                })
-                .collect();
-            let rebound = (0..n).map(|c| (h_before_spread[c] - h_eroded[c] + local[c]) as f32);
-            let flex = (0..n).map(|c| (sc.h[c] - h_spread[c] - local[c]) as f32);
+            let rebound = (0..n).map(|c| (h_before_spread[c] - h_eroded[c] + local[c].0) as f32);
+            let water = (0..n).map(|c| local[c].1 as f32);
+            let flex = (0..n).map(|c| (sc.h[c] - h_spread[c] - local[c].0 - local[c].1) as f32);
             let spread = (0..n).map(|c| (h_spread[c] - h_before_spread[c]) as f32);
             for (name, data) in [
                 (gap::REBOUND, rebound.collect::<Vec<f32>>()),
+                (gap::WATER, water.collect()),
                 (gap::FLEXURE, flex.collect()),
                 (gap::SPREAD, spread.collect()),
             ] {
