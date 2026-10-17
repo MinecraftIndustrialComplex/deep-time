@@ -51,6 +51,7 @@ pub mod collision;
 pub mod dynamics;
 pub mod events;
 pub mod forces;
+pub mod gap_budget;
 pub mod geometry;
 pub mod hotspots;
 pub mod init;
@@ -130,6 +131,9 @@ pub struct PlatesStage {
     /// Whether to record the plate dynamics (`dynamics.rs`). On, unless `DEEPTIME_NO_PLATE_DYNAMICS`
     /// is set (to time what it costs); the tests that show recording changes nothing turn it off.
     record_dynamics: bool,
+    /// Whether to keep the land's gap budget (`gap_budget.rs`, measurement only). Off, unless
+    /// `DEEPTIME_GAP_BUDGET` is set.
+    record_gap_budget: bool,
 }
 
 impl PlatesStage {
@@ -143,7 +147,15 @@ impl PlatesStage {
             next_output_years,
             cache: None,
             record_dynamics: std::env::var_os(dynamics::OFF_ENV).is_none(),
+            record_gap_budget: gap_budget::enabled(),
         }
+    }
+
+    /// The same stage keeping the land's gap budget (`gap_budget.rs`): the world it makes is the
+    /// same.
+    pub fn with_gap_budget(mut self) -> PlatesStage {
+        self.record_gap_budget = true;
+        self
     }
 
     /// The same stage without the dynamics record (`dynamics.rs`): the world it makes is the same.
@@ -202,6 +214,13 @@ impl PlatesStage {
         let env = self.env(&tectonics, step);
         let k = env.k;
         self.apply_surface_feedback(st, world, &env)?;
+        // The land's gap budget (`gap_budget.rs`, measurement only): each process's change of the
+        // gap between the samples' elevation and their columns' Airy height.
+        let book = |st: &mut PlateState, part: gap_budget::Part| {
+            if let Some(gb) = st.gap_budget.as_mut() {
+                gb.book(&st.samples, part);
+            }
+        };
         // The surface's flexure under the samples, for the foreland basins of the collisions'
         // record (`belts.rs`); measurement only.
         let flexure = if st.contacts.iter().any(|c| c.collision.is_some()) {
@@ -213,15 +232,20 @@ impl PlatesStage {
 
         // Motion, then interactions at the new positions.
         kinematics::advance(st, env.dt_yr);
+        book(st, gap_budget::Part::Other);
         let cache = self.cache.as_mut().expect("built above");
         let mut pos = geometry::positions(st, &cache.geo);
         st.recount(&pos);
         let tree = Tree::over(&pos, |_| true);
         let overlaps = subduction::detect(st, &cache.geo, &pos, &tree);
+        book(st, gap_budget::Part::Other);
         let resolved = subduction::resolve(st, world, &overlaps, &pos, &env)?;
+        book(st, gap_budget::Part::Subduction);
         let (fronts, fired) =
             shortening::advance(st, &cache.geo, &pos, &tree, &env, resolved.seeds);
+        book(st, gap_budget::Part::Shortening);
         let stacked = belts::stack(st, &cache.geo, &pos, &env, &fronts, flexure.as_deref());
+        book(st, gap_budget::Part::Belts);
         // The collisions' crust budget: what crossed their fronts and what the belts and wedges
         // kept of it, km³ (Earth-normalized).
         let (crossed, kept) = stacked.values().fold((0.0, 0.0), |a, s| {
@@ -239,6 +263,7 @@ impl PlatesStage {
             .entry(belts::KEPT_GLOBAL.to_owned())
             .or_insert(0.0) += kept;
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
+        book(st, gap_budget::Part::Arcs);
         *world
             .globals
             .entry(subduction::ARC_CONTINENTAL_GLOBAL.to_owned())
@@ -250,15 +275,18 @@ impl PlatesStage {
         // The boundary mix (measurement only) on the same samples as the fronts, before the
         // collapse below turns any crust over.
         let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
+        book(st, gap_budget::Part::Other);
         // Crust beyond the thickest column goes down; thickened crust that nothing raises any
         // more spreads and gives its area back.
         let mut fell = collapse::Collapse::default();
         let foundered = collapse::founder(st, &cache.geo, &env, &mut fell);
+        book(st, gap_budget::Part::Founder);
         *world
             .globals
             .entry(collapse::FOUNDERED_GLOBAL.to_owned())
             .or_insert(0.0) += foundered / 1000.0;
         let quiet = collapse::step(st, &cache.geo, &env);
+        book(st, gap_budget::Part::Collapse);
         fell.sources += quiet.sources;
         fell.moved_km2_m += quiet.moved_km2_m;
         fell.converted += quiet.converted;
@@ -272,6 +300,7 @@ impl PlatesStage {
             .or_insert(0.0) += f64::from(fell.converted) * env.norm.sample_area_km2();
         // Rifted margins taper from continent to ocean over Earth's width (`transition.rs`).
         let taper = transition::step(st, &cache.geo, &pos, &env);
+        book(st, gap_budget::Part::Transition);
         *world
             .globals
             .entry(transition::MOVED_GLOBAL.to_owned())
@@ -295,6 +324,7 @@ impl PlatesStage {
             &env,
             forces::flow_axis(self.preset.seed),
         );
+        book(st, gap_budget::Part::Other);
         if !balance.solved {
             *world
                 .globals
@@ -317,13 +347,18 @@ impl PlatesStage {
             sutured |= done.sutured;
             merged.extend([under, over]);
         }
+        book(st, gap_budget::Part::Collision);
         // Rifts whose two sides never moved apart heal (design §3.4).
         let healed = rifting::heal(st, world, &cache.geo, &pos, &env)?;
+        book(st, gap_budget::Part::Rifting);
         sutured |= !healed.is_empty();
         merged.extend(healed);
         hotspots::step(st, world, &pos, &tree, &env)?;
+        book(st, gap_budget::Part::Hotspots);
         surface(st, &cache.geo, &env, &taper.floor_m);
+        book(st, gap_budget::Part::PlateSurface);
         finish_samples(st, &cache.geo, &z0, &env);
+        book(st, gap_budget::Part::Finish);
         let arcs = dynamics::arc_heights(st);
 
         // Motion for the next step: each plate's rotation relaxes towards the balance's
@@ -360,8 +395,10 @@ impl PlatesStage {
                 .entry(GUARD_BOUND_GLOBAL.to_owned())
                 .or_insert(0.0) += guarded.len() as f64;
         }
+        book(st, gap_budget::Part::Other);
         rifting::maybe_rift(st, world, &cache.geo, &pos, &env)?;
         rifting::maybe_initiate_subduction(st, world, &cache.geo, &pos, &env)?;
+        book(st, gap_budget::Part::Rifting);
 
         st.t_myr = env.t_myr;
         st.step = step;
@@ -370,6 +407,7 @@ impl PlatesStage {
             causes.entry(under).or_insert(ev);
         }
         ridges::bury(st, world, None, &pos, &env, &causes)?;
+        book(st, gap_budget::Part::Bury);
 
         // Resample when due, and once at the end so the final crust has no gaps or hidden slabs.
         // A suture resamples at once, so the welded plate's subducted slab is consumed (hidden
@@ -384,12 +422,21 @@ impl PlatesStage {
                 .filter_map(|c| c.onset_event.map(|e| (c.under, e)))
                 .collect();
             ridges::bury(st, world, Some(&geo), &pos, &env, &doomed)?;
+            book(st, gap_budget::Part::Bury);
             *cache = Cache {
                 geo,
                 coupling: None,
             };
         }
 
+        book(st, gap_budget::Part::Other);
+        if let Some(gb) = st.gap_budget.as_mut() {
+            gb.end_step(&st.samples);
+            let every = (GAP_SNAPSHOT_MYR / env.dt_myr).round().max(1.0) as u64;
+            if step >= self.total || step.is_multiple_of(every) {
+                gb.snapshot(&st.samples, env.t_myr, env.dt_myr);
+            }
+        }
         dynamics::record_step(
             st,
             world,
@@ -475,10 +522,27 @@ impl PlatesStage {
             return Ok(());
         };
         let material = world.fields.remove(crate::surface::field::MATERIAL);
+        // The surface's parts of the feedback, for the gap budget (`gap_budget.rs`).
+        let parts: Vec<Option<Field>> = [
+            gap_budget::field::REBOUND,
+            gap_budget::field::FLEXURE,
+            gap_budget::field::SPREAD,
+        ]
+        .map(|name| world.fields.remove(name))
+        .into_iter()
+        .collect();
         let grid = self.l1_grid()?;
         if fb.data.len() != grid.cells() {
             return Ok(());
         }
+        let parts: Option<Vec<Field>> = if st.gap_budget.is_some() {
+            parts
+                .into_iter()
+                .map(|f| f.filter(|f| f.data.len() == grid.cells()))
+                .collect()
+        } else {
+            None
+        };
         let cache = self.cache.as_mut().expect("built before the step");
         if cache.coupling.is_none() {
             // After a resume: link the cells exactly as the last sampling did (history-free).
@@ -495,10 +559,14 @@ impl PlatesStage {
         let mut wsum = vec![0.0f64; n];
         let mut zsum = vec![0.0f64; n];
         let mut msum = vec![0.0f64; n];
+        let mut psum = vec![[0.0f64; 3]; if parts.is_some() { n } else { 0 }];
         for (c, l) in coupling.links().iter().enumerate() {
             let t = tris[l.tri as usize];
             let dz = f64::from(fb.data[c]);
             let dm = material.as_ref().map_or(dz, |m| f64::from(m.data[c]));
+            let pc = parts
+                .as_ref()
+                .map(|p| [0, 1, 2].map(|k| f64::from(p[k].data[c])));
             for (&v, &w) in t.iter().zip(l.w.iter()) {
                 let w = f64::from(w);
                 if w > 0.0 {
@@ -506,6 +574,11 @@ impl PlatesStage {
                     wsum[v] += w;
                     zsum[v] += w * dz;
                     msum[v] += w * dm;
+                    if let Some(pc) = pc {
+                        for k in 0..3 {
+                            psum[v][k] += w * pc[k];
+                        }
+                    }
                 }
             }
         }
@@ -538,6 +611,22 @@ impl PlatesStage {
             pools::diagenesis(&mut s.pools, env.gravity);
             s.thickness_m = s.pools.iter().sum();
         });
+        if let Some(gb) = st.gap_budget.as_mut() {
+            let mean = |sum: &dyn Fn(usize) -> f64| -> Vec<f64> {
+                (0..n)
+                    .map(|v| if wsum[v] > 0.0 { sum(v) / wsum[v] } else { 0.0 })
+                    .collect()
+            };
+            let m = mean(&|v| msum[v]);
+            let part = |k: usize| {
+                if psum.is_empty() {
+                    vec![0.0; n]
+                } else {
+                    mean(&|v| psum[v][k])
+                }
+            };
+            gb.book_surface(&st.samples, &m, &part(0), &part(1), &part(2));
+        }
         let applied = coupling.interpolate(mesh, |v| dz[v as usize]);
         world.fields.insert(
             crate::surface::field::FEEDBACK_APPLIED.to_owned(),
@@ -628,6 +717,10 @@ pub const UNSOLVED_GLOBAL: &str = "plates/balance_unsolved_steps";
 
 /// The continental margins are measured this often, Myr (P1-27; `notes.plates.margins`).
 pub const MARGIN_EVERY_MYR: f64 = 10.0;
+
+/// The land's gap budget (`gap_budget.rs`, when on) is recorded this often, Myr (measurement
+/// only).
+pub const GAP_SNAPSHOT_MYR: f64 = 50.0;
 
 /// Appends the continental margins of now ([`stats::margins`]) to the run's note
 /// (`notes.plates.margins`, a series the CLI and the manifest report).
@@ -898,6 +991,15 @@ impl Stage for PlatesStage {
                 let (mut state, geo) = init::initial_state(&self.preset, &env)?;
                 if self.record_dynamics {
                     state.dynamics = Some(dynamics::Dynamics::start(&state, world, &env));
+                }
+                if self.record_gap_budget {
+                    let k = env.k;
+                    let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
+                    state.gap_budget = Some(gap_budget::GapBudget::start(
+                        &state.samples,
+                        z_0,
+                        env.gravity,
+                    ));
                 }
                 world.plates = Some(state);
                 self.cache = Some(Cache {

@@ -1140,6 +1140,41 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     same_world(&strip(with), &strip(without));
 }
 
+/// The land's gap budget (`gap_budget.rs`) changes nothing; its parts add up to every sample's
+/// gap through the run, resamplings included; it records every 50 Myr.
+#[test]
+fn the_gap_budget_changes_nothing_and_adds_up() {
+    let p = preset(8000, 200.0, "scattered_continents", 6);
+    let with = run_stage_with(
+        PlatesStage::new(p.clone()).with_gap_budget(),
+        &p,
+        |_, _, st| {
+            let gb = st.gap_budget.as_ref().expect("on");
+            let worst = gb.worst_residual_m();
+            assert!(worst < 5.0, "step {}: parts off the gap by {worst} m", st.step);
+        },
+    );
+    let st = with.plates.as_ref().unwrap();
+    let gb = st.gap_budget.as_ref().unwrap();
+    assert_eq!(gb.restarts, 0);
+    assert!(st.counters.resamplings > 0);
+    assert_eq!(gb.snapshots.len(), 4);
+    let last = gb.snapshots.last().unwrap();
+    assert!(last.bands.iter().map(|b| b.n).sum::<u64>() > 0);
+    for b in &last.bands {
+        let sum: f64 = b.parts.iter().sum();
+        assert!(b.n == 0 || (sum - b.gap).abs() < 5.0, "{sum} vs {}", b.gap);
+    }
+    let without = run_stage_with(PlatesStage::new(p.clone()), &p, |_, _, st| {
+        assert!(st.gap_budget.is_none())
+    });
+    let strip = |mut w: WorldState| {
+        w.plates.as_mut().unwrap().gap_budget = None;
+        w
+    };
+    same_world(&strip(with), &strip(without));
+}
+
 /// Two plates on the preset's planet: the northern hemisphere continental (plate 0), the southern
 /// oceanic (plate 1), the southern turned by `turn` radians about the x axis since the last
 /// resampling, so it runs under the continent where y > 0 and opens a gap where y < 0. Overlaps
