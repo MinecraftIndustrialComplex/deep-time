@@ -13,9 +13,10 @@
 //! the crust; the rest goes down with the slab. Thickening the crust by `T` raises the ground by
 //! `T / 7.0` (Airy with the crust's mean density, `pools::COLUMN_ISOSTATIC_FACTOR`), less what an
 //! eclogite root pulls down once the column is thick enough (`pools::isostatic_change_m`), so
-//! the step's ground to raise is `share · s · L · H / 7.0` (km² × m). Nothing is created: the stacked rock is the consumed
-//! crust's, by its mix of rock pools (its sediment and sedimentary rock buried and metamorphosed),
-//! and the volume added is the volume that crossed times the share ([`Stacked`]).
+//! the step's ground to raise is `share · s · L · H / 7.0` (km² × m). Nothing is created: the
+//! stacked rock is the consumed crust's, by its mix of rock pools (its sediment and sedimentary
+//! rock buried and metamorphosed), and the volume added is the volume that crossed times the
+//! share ([`Stacked`]).
 //!
 //! It goes to both sides of the suture:
 //!
@@ -854,7 +855,11 @@ mod tests {
         // The wedge: the incoming plate's ground rises towards the front, at the set slope, up
         // to the belt's height at the front; it is as wide as that height over the slope.
         let tan = fx.preset.tectonics.wedge_slope_deg.to_radians().tan();
-        assert!(belt.wedge_km > 0.0, "no wedge");
+        // The wedge took crust. Its width can be under one sample: at 1.5° a belt 3.9 km high
+        // (whole-column isostasy, 2026-10-06) has a wedge of about 140 km, and this planet's
+        // samples are about 180 km apart, so the wedge may be the incoming front's own samples
+        // (width 0); the width is checked against the belt's height within two samples below.
+        assert!(belt.wedge_km2_m > 0.0, "no wedge");
         let pts = fx.geo.points();
         let km = |p: DVec3| fx.norm.km(p.x.asin());
         let spacing = fx.norm.km(fx.norm.spacing_rad());
