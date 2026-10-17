@@ -17,6 +17,7 @@ The constants of the per-cell design were checked against their sources before t
 | [CLM](ledger/CLM.md) | land ice and sea ice | CLM-092 to CLM-112, CLM-135 (22) |
 | [CLM](ledger/CLM.md) | mountain glaciers | CLM-113 to CLM-118 (6) |
 | [CLM](ledger/CLM.md) | moisture budget (built behind `rain_model = budget`, not the default) | CLM-139 to CLM-146 (8) |
+| [CLM](ledger/CLM.md) | the belts' rain amount (`belts_rain_scale`); the upwind rain is on [upwind-rain.md](upwind-rain.md) | CLM-201 (1) |
 | [CLM](ledger/CLM.md) | ice branch: the flowing-sheet switch, present-day climate, supply-limited and seafloor weathering (merged 2026-10-02) | CLM-147 to CLM-162 (16) |
 | [GLA](ledger/GLA.md) | the flowing ice sheet (`climate/sheet.rs`, off by default) and the ice mass balance for the hydrology; on the glacial page | GLA-067 to GLA-076 (10) |
 | [MOI](ledger/MOI.md) | wind and rain belts | MOI-001 to MOI-033 (33) |
@@ -63,6 +64,92 @@ OLR(T)  = A + B T − F(C, T) − c_snow · frozen share       A = 203.3 W/m², 
 - A + B T already carries about 20 W/m² of longwave cloud greenhouse at snowball temperatures. Extra cloud forcing on frozen surfaces is a setting (`climate.snowball_cloud_w_m2`, default 0, range 0 to 20 W/m²; Ben, decisions log 2026-10-02).
 - Not modelled: CO₂ condensation, Rayleigh scattering of a dense CO₂ atmosphere, clouds' state dependence. The source states no error for the table; Kopparapu et al. say the method tends to overestimate the greenhouse effect of dense CO₂ atmospheres. The research note puts it at about ±10 % in forcing at 0.1 to 1 bar from the radiation alone.
 - Expected effect: the escape CO₂ of a snowball falls (the note's 1-D stand-in: about 1.9·10⁵ ppm at today's Sun against 3.3·10⁵ with the old law; the real clock's escapes are listed in each run's notes beside Hoffman et al. 2017's 10⁴ to 10⁵ ppm, CLM-166).
+
+## The belts' rain amount, 2026-10-06
+
+On Earth's own relief and CO₂ (`deeptime climate-dem`, scored by `tools/validation/climate_vs_obs.py --obs`
+against Beck et al. 2023) the belts rained 532 mm a year over land, against Earth's 773 mm. Ben chose to
+keep the belts as the default rain and scale their amount to Earth's (decisions log 2026-10-06, "Belts,
+scaled up to Earth's amount (Recommended)"): `climate.belts_rain_scale` multiplies every L1 cell's
+circulation rain before the mountains' rain is added, so the pattern stays the belts' (CLM-201, a
+calibration on Earth's own inputs, which the 2026-10-05 validation policy allows). Its value, 1.42, gives
+773 mm; 1.40 gave 762 and 1.45 790.
+
+| Earth's relief, 280 ppm | Earth (Beck) | Factor 1.0 | Factor 1.42 |
+|---|---|---|---|
+| Land rain, mm | 773 | 532 | 773 |
+| ln annual rain over land, RMSE; bias | – | 1.135; −0.05 | 1.173; +0.33 |
+| Köppen exact class; main group | – | 33.8 %; 63.7 % | 30.9 %; 61.8 % |
+| Köppen land shares A / B / C / D / E | 0.19 / 0.32 / 0.11 / 0.23 / 0.15 | 0.14 / 0.29 / 0.14 / 0.22 / 0.21 | 0.17 / 0.16 / 0.24 / 0.23 / 0.20 |
+| Reference cities in the right main group (target 21 of 24) | – | 19 | 21 |
+| Global mean temperature (target 14.1 ± 0.4 °C) | – | 13.82 °C | 14.41 °C |
+| The planet's mean rain, land and sea (reference line) | about 990 mm (GPCP, from memory) | 764 mm | 1,095 mm |
+| Mumbai; Sahara; Atacama, mm | 3,096; 11; 16 | 623; 244; 179 | 904; 359; 252 |
+
+What it does. Earth's amount is now right, and the reference cities gain two: Mumbai, Buenos Aires and
+Anchorage reach their main group, Cairo (now Csa, 436 mm) leaves its desert. The belts' errors are spread differently, not removed: their deserts were already too wet
+(the Sahara 280 mm against 25), and a uniform factor wets them further, so the desert share of the land
+falls from 0.29 to 0.16 (Earth 0.32) and the Köppen agreement drops by two points. The global mean warms by
+0.6 K because fewer bright deserts reflect sunlight (`desert_albedo`, CLM-123). The pattern's errors
+(no monsoons, wet deserts) are the follow-up Ben named for both rain models.
+
+**On generated planets (reference lines, 2026-10-16).** Six quick planets (`earthlike_quick_16k`, 500 Myr
+to the deposits stage, seeds 1 to 3 of the scattered-continents and the supercontinent starts;
+`tools/review/p1-17-hyps.sh`, each run admitted as a 2-thread simulation), each run three ways: the factor
+at 1.0 with the weathering kernel measured at 1.0 (`KERNEL_EARTH` 2.475·10⁷, CLM-061); 1.42 with the same
+kernel; and 1.42 with the kernel re-measured on Earth's relief under the scaled rain (5.039·10⁷, the default
+since 2026-10-16). Mean [min, max] of six:
+
+| | Factor 1.0 | 1.42, old kernel | 1.42, re-measured kernel (default) | Earth (reference line) |
+|---|---|---|---|---|
+| Land share | 0.197 [0.159, 0.215] | 0.175 [0.150, 0.193] | 0.183 [0.154, 0.235] | 0.289 today (HYP-001) |
+| Land rain, mm | 770 [658, 1,209] | 999 [883, 1,078] | 997 [879, 1,101] | 773 (Beck et al. 2023) |
+| Land median height, m | 418 [322, 583] | 304 [239, 394] | 256 [204, 352] | 427 (HYP-001's source) |
+| Land 90th percentile, m | 1,816 [1,519, 2,082] | 1,513 [1,337, 1,672] | 1,492 [1,253, 1,729] | 2,022 |
+| Land above 2 km | 0.085 [0.066, 0.112] | 0.053 [0.040, 0.071] | 0.049 [0.030, 0.071] | 0.102 |
+| Global mean temperature, °C | 14.9 [14.0, 16.2] | 12.8 [11.2, 15.4] | 14.9 [12.3, 16.3] | 14.1, preindustrial (CLM-138) |
+| CO₂, ppm | 459 [338, 653] | 198 [111, 423] | 384 [120, 632] | 280, preindustrial |
+| Glaciated share of land | 0.058 [0.025, 0.084] | 0.107 [0.035, 0.167] | 0.058 [0.029, 0.075] | about 0.10 |
+| Köppen B share of land | 0.27 [0.25, 0.30] | 0.15 [0.11, 0.17] | 0.16 [0.08, 0.30] | 0.32 (Beck et al. 2018) |
+| Snowballs; hothouses | 0; 0 | 0; 0 | 0; 0 | |
+
+Per planet (land share, land rain in mm, global mean in °C, CO₂ in ppm; factor 1.0 → 1.42 with the
+re-measured kernel):
+
+| Start, seed | Land | Land rain | Temperature | CO₂ |
+|---|---|---|---|---|
+| scattered, 1 | 0.159 → 0.167 | 697 → 942 | 16.2 → 12.3 | 653 → 120 |
+| scattered, 2 | 0.182 → 0.154 | 659 → 879 | 15.5 → 16.3 | 540 → 632 |
+| scattered, 3 | 0.212 → 0.184 | 726 → 1,032 | 14.8 → 15.0 | 456 → 339 |
+| supercontinent, 1 | 0.212 → 0.235 | 1,209 → 935 | 14.0 → 14.4 | 338 → 283 |
+| supercontinent, 2 | 0.201 → 0.185 | 658 → 1,095 | 14.3 → 15.2 | 387 → 396 |
+| supercontinent, 3 | 0.215 → 0.174 | 673 → 1,101 | 14.5 → 16.1 | 381 → 533 |
+
+What held and what did not:
+
+- The amount scales across seeds and land shares: the land rain rose ×1.33 to ×1.66 on five planets. On the
+  sixth (supercontinent, seed 1) the factor-1.0 run ended unusually wet (1,209 mm), and both 1.42 runs ended
+  at 883 and 935 mm. The planets diverge (the climate feeds the erosion and the erosion the crust's loads), so
+  a run's end at 1.42 is another world, not the same world wetter. Planets rain more over land than Earth's
+  relief at the same factor (about 1,000 against 773 mm): their land is smaller and nearer the sea. Earth's
+  own relief still rains 773 mm at 1.42 (re-run on 2026-10-16 with the climate code unchanged).
+- No planet ran away: no snowball and no hothouse in 18 runs.
+- **The weathering normalisation did not hold** and was re-measured. The scaled rain more than doubles the
+  weathering of Earth's own land (the kernel on Earth's relief goes from 2.327·10⁷ to 5.039·10⁷: under Fu's
+  curve the runoff grows faster than the rain), so with the old kernel every planet weathered as if it had
+  twice Earth's land and drew its CO₂ down to 111 to 423 ppm (four of six below 150), 2.1 K colder on
+  average with nearly twice the land ice. CLM-061 is re-measured whenever the climate's defaults change; with the new
+  value the mean temperature and land ice are back to the factor-1.0 runs'. One planet (scattered, seed 1)
+  still ends cold, at 120 ppm and 12.3 °C.
+- **Wetter land erodes more**, as expected: the land's median height falls from 418 to 256 m, its 90th
+  percentile from 1,816 to 1,492 m and the land above 2 km from 0.085 to 0.049 of the land, further from
+  Earth's 427 m, 2,022 m and 0.102 (the P1-17 hypsometry was calibrated at the unscaled rain). The land share
+  loses 0.014 (0.197 to 0.183), against Earth's 0.289 today. Over the Phanerozoic Earth's sea level rose and
+  fell by some 100 to 250 m (STE-013, from memory), flooding and draining part of the continents; a land
+  share for those high stands has not been read. These are reference lines, not targets (validation policy,
+  2026-10-05).
+- The desert share falls on planets as on Earth's relief (0.27 to 0.16 of the land, Earth 0.32): the belts'
+  deserts are too wet, and a uniform factor wets them further.
 
 ## Known before the page is written
 
