@@ -117,7 +117,7 @@ def main():
     proc = subprocess.Popen(
         find_chromium(a.chromium) + ["--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
                                      f"--remote-debugging-port={port}", f"--user-data-dir={profile}", f"--window-size={w},{h}", "about:blank"],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        stdout=subprocess.DEVNULL, stderr=open(os.path.join(profile, "chromium.err"), "w"))
     try:
         for _ in range(300):
             try:
@@ -229,6 +229,14 @@ def main():
                 page.js(f"document.querySelector('#sites .row[data-site=\"{chains[2][0]}\"]').click()")
                 time.sleep(0.5)
                 page.shot(os.path.join(a.out, "why-here-3.png"))
+    except EOFError as e:
+        # Chromium died under the page (a crash on a loaded box): say why instead of a bare traceback, so the step can be re-run.
+        try:
+            tail = open(os.path.join(profile, "chromium.err")).read()[-600:]
+        except OSError:
+            tail = ""
+        print(f"phase1_viewer_check: {e}; chromium exit {proc.poll()}; stderr tail: {tail!r}")
+        failed.append("chromium crashed")
     finally:
         proc.terminate()
         try:
