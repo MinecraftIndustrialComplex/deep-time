@@ -89,7 +89,9 @@ vm_access_ensure() {
     vm_probe "$host" && return 0
     # Only the Azure VM is started or has this rule; any other host is left alone.
     case "$host" in *"$VM_AZURE_IP") ;; *) ssh -n -o BatchMode=yes -o ConnectTimeout=10 "$host" true 2>/dev/null; return ;; esac
-    command -v az >/dev/null || { echo "vm-access: $host does not answer and az is not installed" >&2; return 1; }
+    # NixOS installs nothing globally: after a laptop restart az is not on PATH, so take it from nixpkgs.
+    command -v az >/dev/null || PATH="$(nix build --no-link --print-out-paths nixpkgs#azure-cli 2>/dev/null)/bin:$PATH"
+    command -v az >/dev/null || { echo "vm-access: $host does not answer and az is not installed (nix build nixpkgs#azure-cli failed)" >&2; return 1; }
     lock="${XDG_RUNTIME_DIR:-/tmp}/deeptime-vm-access.lock"
     (
         # Several agents may find the VM down at once: one starts it, the others wait here.
