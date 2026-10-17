@@ -115,7 +115,7 @@ def main():
     port = free_port()
     profile = tempfile.mkdtemp(prefix="dt-p1view-")
     proc = subprocess.Popen(
-        find_chromium(a.chromium) + ["--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
+        find_chromium(a.chromium) + ["--headless=new", "--no-sandbox", "--hide-scrollbars", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist",
                                      f"--remote-debugging-port={port}", f"--user-data-dir={profile}", f"--window-size={w},{h}", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=open(os.path.join(profile, "chromium.err"), "w"))
     try:
