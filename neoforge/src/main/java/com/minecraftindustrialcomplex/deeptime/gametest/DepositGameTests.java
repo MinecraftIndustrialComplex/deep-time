@@ -42,6 +42,7 @@ import net.minecraft.world.level.block.entity.BrushableBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
 import net.minecraft.world.level.storage.loot.LootParams;
@@ -493,17 +494,22 @@ public final class DepositGameTests {
      * ({@code unsupported}); plain gravel or sand over a solid block ({@code missed}); a Lootr block
      * ({@code converted}); anything else, water, air or a rock the feature skipped ({@code other}).
      *
-     * <p>The block entity is read as the chunk would save it ({@code getBlockEntityNbtForSaving}):
-     * a chunk that was unloaded and is read back below full status is a {@code ProtoChunk} that holds
-     * its block entities only as their saved tags, with no block entity object, until it becomes a
-     * level chunk (the MIC gate batch of 2026-10-17 read these chunks 36 s after the porphyry scan
-     * generated them, and the old scan, which asked for the object, saw none).
+     * <p>The bar's chunks are read as a player gets them, in full ({@code level.getChunk}), and each
+     * block entity as the chunk would save it ({@code getBlockEntityNbtForSaving}: the object, or the
+     * saved tag a full chunk that has not ticked yet still holds). A chunk read back from disk below
+     * full status does not show its block entities: a {@code ProtoChunk} holds them only as saved
+     * tags (the first MIC gate failure of 2026-10-17, chunks saved 36 s after the porphyry scan
+     * generated them), and a chunk that was saved in full is a level chunk inside an
+     * {@code ImposterProtoChunk} whose block entities wait in its post-load step
+     * ({@code ChunkSerializer.postLoadChunk}), which runs only when the chunk is made full again (the
+     * second, where {@code coePicksSiteVein} had loaded chunk -90, 0 in full and the scan at
+     * {@code FEATURES} then saw none of its 37 block entities, all 37 in its saved data).
      */
     static PlacerScan scanPlacer(ServerLevel level, WorldData wd, Body b, boolean panning) {
         int c = wd.circumference();
         OreBlockResolver ores = OreBlockResolver.get();
         BlockState raw = ores.rawBlock(GOLD);
-        Map<Long, ChunkAccess> chunks = new HashMap<>();
+        Map<Long, LevelChunk> chunks = new HashMap<>();
         int minY = Math.max(level.getMinBuildHeight(), b.min()[1]), maxY = Math.min(level.getMaxBuildHeight() - 1, b.max()[1]);
         int due = 0, panned = 0, filled = 0, ore = 0, unsupported = 0, missed = 0, hanging = 0, converted = 0, other = 0;
         List<String> problems = new ArrayList<>(), samples = new ArrayList<>();
@@ -511,8 +517,7 @@ public final class DepositGameTests {
             int xc = canonical(c, x);
             for (int z = b.min()[2]; z <= b.max()[2]; z++) {
                 long key = ChunkPos.asLong(xc >> 4, z >> 4);
-                ChunkAccess chunk = chunks.computeIfAbsent(key,
-                        k -> level.getChunkSource().getChunk(xc >> 4, (int) (k >> 32), ChunkStatus.FEATURES, true));
+                LevelChunk chunk = chunks.computeIfAbsent(key, k -> level.getChunk(xc >> 4, (int) (k >> 32)));
                 for (int y = minY; y <= maxY; y++) {
                     Body.Zone zone = DepositFeature.zoneAt(b, c, x, y, z);
                     if (zone == null || !GOLD.toString().equals(zone.material()))
