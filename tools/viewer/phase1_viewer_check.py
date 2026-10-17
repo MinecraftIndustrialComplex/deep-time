@@ -28,7 +28,7 @@ import time
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from shot import WS, free_port  # noqa: E402
+from shot import WS, ensure_fonts, free_port  # noqa: E402
 
 failed = []
 
@@ -91,25 +91,6 @@ def set_scrub(page, v):
 def set_layer(page, i):
     page.js(f"(() => {{ const s = document.getElementById('kflayer'); s.selectedIndex = {i}; s.dispatchEvent(new Event('change', {{bubbles: true}})); }})()")
     time.sleep(1.2)
-
-
-def ensure_fonts():
-    """The rebuilt test VM has no fonts and no fontconfig file: Chromium aborts when the viewer page lays out text ("Could not find
-    any font", exit -6). Point FONTCONFIG_FILE at DejaVu from nixpkgs (nothing is installed globally; NixOS rule)."""
-    if os.environ.get("FONTCONFIG_FILE") or shutil.which("fc-list") and subprocess.run(["fc-list"], capture_output=True, text=True).stdout.strip():
-        return
-    try:
-        out = subprocess.run(["nix", "build", "nixpkgs#dejavu_fonts", "--no-link", "--print-out-paths"], capture_output=True, text=True, timeout=600).stdout.split()
-        fonts = next(o for o in out if os.path.isdir(os.path.join(o, "share", "fonts")))
-    except Exception as e:
-        print(f"phase1_viewer_check: no fonts available ({e}); Chromium may abort")
-        return
-    d = tempfile.mkdtemp(prefix="dt-fontconfig-")
-    conf = os.path.join(d, "fonts.conf")
-    with open(conf, "w") as f:
-        f.write('<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd"><fontconfig>'
-                f'<dir>{fonts}/share/fonts</dir><cachedir>{d}/cache</cachedir></fontconfig>')
-    os.environ["FONTCONFIG_FILE"] = conf
 
 
 FLAG_SETS = (

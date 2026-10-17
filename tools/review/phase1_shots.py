@@ -28,7 +28,7 @@ import time
 import urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "viewer"))
-from shot import WS, free_port  # noqa: E402
+from shot import WS, ensure_fonts, free_port  # noqa: E402
 
 
 def chromium():
@@ -57,6 +57,7 @@ def main():
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=a.web))
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{srv.server_address[1]}/index.html"
+    ensure_fonts()   # a rebuilt VM has no fonts: Chromium aborts without them
     port = free_port()
     profile = tempfile.mkdtemp(prefix="dt-p1shot-")
     proc = subprocess.Popen(
