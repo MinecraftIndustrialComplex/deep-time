@@ -114,6 +114,36 @@ struct Cache {
     coupling: Option<Coupling>,
 }
 
+/// Wall time of the plate step's parts, milliseconds summed over the steps since the last
+/// [`reset_timings`] (P1-17: `deeptime bench` prints them). A process-wide gauge rather than a
+/// world note, so the world a run leaves is the same with or without it.
+static TIMINGS: std::sync::Mutex<Vec<(&'static str, f64)>> = std::sync::Mutex::new(Vec::new());
+
+/// The plate step's parts and their summed wall time (ms), in the order they first ran.
+pub fn timings() -> Vec<(&'static str, f64)> {
+    TIMINGS.lock().map(|t| t.clone()).unwrap_or_default()
+}
+
+/// Clears [`timings`] (a new run in the same process).
+pub fn reset_timings() {
+    if let Ok(mut t) = TIMINGS.lock() {
+        t.clear();
+    }
+}
+
+/// Adds the time since `*since` to `what` and restarts the clock.
+fn lap(since: &mut std::time::Instant, what: &'static str) {
+    let now = std::time::Instant::now();
+    let ms = (now - *since).as_secs_f64() * 1000.0;
+    *since = now;
+    if let Ok(mut t) = TIMINGS.lock() {
+        match t.iter_mut().find(|e| e.0 == what) {
+            Some(e) => e.1 += ms,
+            None => t.push((what, ms)),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct Saved {
     done: u64,
@@ -199,6 +229,7 @@ impl PlatesStage {
 
     /// One plate step on `st` (taken out of the world while it runs).
     fn advance(&mut self, st: &mut PlateState, world: &mut WorldState) -> Result<(), CoreError> {
+        let mut clock = std::time::Instant::now();
         if self
             .cache
             .as_ref()
@@ -214,6 +245,7 @@ impl PlatesStage {
         let env = self.env(&tectonics, step);
         let k = env.k;
         self.apply_surface_feedback(st, world, &env)?;
+        lap(&mut clock, "feedback");
         // The land's gap budget (`gap_budget.rs`, measurement only): each process's change of the
         // gap between the samples' elevation and their columns' Airy height.
         let book = |st: &mut PlateState, part: gap_budget::Part| {
@@ -229,6 +261,7 @@ impl PlatesStage {
             None
         };
         let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+        lap(&mut clock, "flexure_sample");
 
         // Motion, then interactions at the new positions.
         kinematics::advance(st, env.dt_yr);
@@ -237,13 +270,17 @@ impl PlatesStage {
         let mut pos = geometry::positions(st, &cache.geo);
         st.recount(&pos);
         let tree = Tree::over(&pos, |_| true);
+        lap(&mut clock, "motion");
         let overlaps = subduction::detect(st, &cache.geo, &pos, &tree);
         book(st, gap_budget::Part::Other);
+        lap(&mut clock, "detect");
         let resolved = subduction::resolve(st, world, &overlaps, &pos, &env)?;
         book(st, gap_budget::Part::Subduction);
+        lap(&mut clock, "resolve");
         let (fronts, fired) =
             shortening::advance(st, &cache.geo, &pos, &tree, &env, resolved.seeds);
         book(st, gap_budget::Part::Shortening);
+        lap(&mut clock, "shortening");
         let stacked = belts::stack(st, &cache.geo, &pos, &env, &fronts, flexure.as_deref());
         book(st, gap_budget::Part::Belts);
         // The collisions' crust budget: what crossed their fronts and what the belts and wedges
@@ -262,6 +299,7 @@ impl PlatesStage {
             .globals
             .entry(belts::KEPT_GLOBAL.to_owned())
             .or_insert(0.0) += kept;
+        lap(&mut clock, "belts");
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
         book(st, gap_budget::Part::Arcs);
         *world
@@ -272,10 +310,12 @@ impl PlatesStage {
             .globals
             .entry(subduction::ARC_OCEANIC_GLOBAL.to_owned())
             .or_insert(0.0) += pull.arc_oceanic_km3;
+        lap(&mut clock, "fronts");
         // The boundary mix (measurement only) on the same samples as the fronts, before the
         // collapse below turns any crust over.
         let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
         book(st, gap_budget::Part::Other);
+        lap(&mut clock, "boundary_mix");
         // Crust beyond the thickest column goes down; thickened crust that nothing raises any
         // more spreads and gives its area back.
         let mut fell = collapse::Collapse::default();
@@ -298,9 +338,11 @@ impl PlatesStage {
             .globals
             .entry(collapse::GAINED_GLOBAL.to_owned())
             .or_insert(0.0) += f64::from(fell.converted) * env.norm.sample_area_km2();
+        lap(&mut clock, "collapse");
         // Rifted margins taper from continent to ocean over Earth's width (`transition.rs`).
         let taper = transition::step(st, &cache.geo, &pos, &env);
         book(st, gap_budget::Part::Transition);
+        lap(&mut clock, "transition");
         *world
             .globals
             .entry(transition::MOVED_GLOBAL.to_owned())
@@ -331,6 +373,7 @@ impl PlatesStage {
                 .entry(UNSOLVED_GLOBAL.to_owned())
                 .or_insert(0.0) += 1.0;
         }
+        lap(&mut clock, "forces");
         let mut causes: BTreeMap<u32, EventId> = BTreeMap::new();
         let mut sutured = false;
         // Plates whose motion a weld or a healed rift set this step (the balance takes over at
@@ -353,13 +396,16 @@ impl PlatesStage {
         book(st, gap_budget::Part::Rifting);
         sutured |= !healed.is_empty();
         merged.extend(healed);
+        lap(&mut clock, "collision");
         hotspots::step(st, world, &pos, &tree, &env)?;
         book(st, gap_budget::Part::Hotspots);
+        lap(&mut clock, "hotspots");
         surface(st, &cache.geo, &env, &taper.floor_m);
         book(st, gap_budget::Part::PlateSurface);
         finish_samples(st, &cache.geo, &z0, &env);
         book(st, gap_budget::Part::Finish);
         let arcs = dynamics::arc_heights(st);
+        lap(&mut clock, "surface_finish");
 
         // Motion for the next step: each plate's rotation relaxes towards the balance's
         // (`motion_relax_myr`), under the speed guard on the plate's own fastest point, which is
@@ -399,6 +445,7 @@ impl PlatesStage {
         rifting::maybe_rift(st, world, &cache.geo, &pos, &env)?;
         rifting::maybe_initiate_subduction(st, world, &cache.geo, &pos, &env)?;
         book(st, gap_budget::Part::Rifting);
+        lap(&mut clock, "motion_rifting");
 
         st.t_myr = env.t_myr;
         st.step = step;
@@ -408,6 +455,7 @@ impl PlatesStage {
         }
         ridges::bury(st, world, None, &pos, &env, &causes)?;
         book(st, gap_budget::Part::Bury);
+        lap(&mut clock, "close_bury");
 
         // Resample when due, and once at the end so the final crust has no gaps or hidden slabs.
         // A suture resamples at once, so the welded plate's subducted slab is consumed (hidden
@@ -427,6 +475,7 @@ impl PlatesStage {
                 geo,
                 coupling: None,
             };
+            lap(&mut clock, "resample");
         }
 
         book(st, gap_budget::Part::Other);
@@ -452,6 +501,7 @@ impl PlatesStage {
                 guarded: &guarded,
             },
         );
+        lap(&mut clock, "record");
         self.done = step;
         // How often the elevation cap binds: visible samples standing at `max_elevation_m` after
         // the step, and visible continental samples, summed over the steps (2026-10-01: the cap is
@@ -479,6 +529,7 @@ impl PlatesStage {
         if last || step.is_multiple_of(margin_every) {
             record_margins(st, world, &pos, &env);
         }
+        lap(&mut clock, "stats_margins");
         let kf_every = self.preset.keyframes.every_myr * 1.0e6;
         let kf_due = world.t_years >= self.next_output_years;
         if kf_due {
@@ -490,6 +541,7 @@ impl PlatesStage {
         if last || kf_due || (every > 0 && self.done.is_multiple_of(every)) {
             self.write_l1(st, world, &pos, &env)?;
         }
+        lap(&mut clock, "write_l1");
         if last {
             subduction::close_contacts(st, world, &env, true)?;
             for h in 0..st.hotspots.len() {

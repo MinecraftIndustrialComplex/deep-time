@@ -21,6 +21,11 @@ without a gold ore for gravel (no Excavated Variants), a placer's gold in a grav
 vanilla's suspicious gravel or sand, brushed out as gold nuggets. Section "Placer gold as panning"
 has the rules and the compatibility notes.
 
+Changed on 2026-10-17 by the coordinator's call on Lootr (decisions log 2026-10-17): the nuggets
+are rolled when the block is placed and the block entity holds them with no loot table, so a
+per-player loot mod (Lootr, in MIC) leaves the block alone and each block is brushed once, by
+whoever gets there first.
+
 ## What you see in the world
 
 Ore in a Deep Time world comes in two kinds. **Deposits** are bodies of a known size and shape
@@ -165,7 +170,7 @@ The main constants by family; the ledgers hold every row.
 | ORE-266 | Zone ore densities and raw-ore shares | porphyry core Cu 0.6 (raw 0.05), placer Au 0.25, BIF ore 0.6 (raw 0.04), MVT core Zn 0.65 (raw 0.04), sedex Zn 0.55 (raw 0.03), supergene blanket 0.7 (raw 0.08), coal 0.6 | probability | vanilla OreVeinifier: ore 0.1–0.3 of a vein's solid blocks, raw blocks 0.02 of its ore | `game-choice` |
 | ORE-267 | Placer gold is recovered as flakes and nuggets by washing the gravel (the basis of the panning rule) | gold nuggets from washed gravel | – | none read (general knowledge) | `from-memory` |
 | ORE-268 | Gold nuggets from one brushed placer block | uniform 2 to 5 (mean 3.5) | nuggets | none (a game count) | `game-choice` |
-| ORE-269 | Placer gold in gravel or sand without a gold ore for the rock | suspicious gravel or sand with the loot table; only over support; only gold | – | Ben, decisions log 2026-10-16; 1.21.1 sources for the falling-block rule | `game-choice` |
+| ORE-269 | Placer gold in gravel or sand without a gold ore for the rock | suspicious gravel or sand holding the table's roll for its seed, with no loot table (so Lootr leaves it); only over support; only gold | – | Ben, decisions log 2026-10-16; coordinator, 2026-10-17 (Lootr); 1.21.1 sources for the falling-block rule and the roll; Lootr 1.11.38.125 decompiled | `game-choice` |
 | ORE-258 | Earth's age for the clocks | 4.57 | Gyr | as SCL-039 | `uncited` |
 | ORE-117 | Coal field area P90 / P50 / P10 | 300 / 1,000 / 6,000 (P10 3,000 until 2026-10-02) | km² | the project's estimate; Witbank 5,680, Highveld 7,000 km² | `uncited` |
 | ORE-127 | Coal field tonnage P90 / P50 / P10 | 3,870 / 23,000 / 193,000 (was 3,800 / 19,800 / 115,000) | Mt | area × cumulative thickness × 1.32 t/m³, by simulation | `uncited` |
@@ -366,17 +371,20 @@ sand and gravel it lies in, so panning and sluicing leave it behind as flakes an
 (ORE-267, from memory: no source for this was opened in this work). In a Deep Time world the
 placer's gold in a **gravel** bar is therefore, where the pack has no gold ore for gravel,
 vanilla's `minecraft:suspicious_gravel` (and in a **sand** cell `minecraft:suspicious_sand`), and
-brushing it is the panning. Deep Time ships no block of its own: the block entity of each placer
-cell carries the loot table `deeptime:archaeology/placer_gold`, one stack of 2 to 5 gold nuggets
-(uniform, mean 3.5, about 0.39 of an ingot; ORE-268, a game choice), and a seed that is a hash of
-the world seed and the block's position, so the same world gives the same nuggets for the same
-brush. A median placer of about 150 ore blocks therefore holds about 500 nuggets, about 55 ingots,
+brushing it is the panning. Deep Time ships no block of its own: each placer cell holds the gold
+nuggets that the loot table `deeptime:archaeology/placer_gold` gives it, one stack of 2 to 5
+(uniform, mean 3.5, about 0.39 of an ingot; ORE-268, a game choice), rolled with a seed that is a
+hash of the world seed and the block's position, so the same world gives the same nuggets for the
+same brush. Deep Time rolls the table when it places the block, with the seed and the parameters
+vanilla's brushing would use, and the block entity holds the nuggets as its item and no loot
+table. A median placer of about 150 ore blocks therefore holds about 500 nuggets, about 55 ingots,
 if every block is brushed.
 
 The rules (ORE-269):
 
 - **Only where the pack has no gold ore for the rock.** Where Excavated Variants has a gold ore in
-  gravel or sand (MIC), or a pack lists a gold block in `#c:ores/gold` and
+  gravel or sand (MIC's `deep-time` pack branch; MIC's master pins no Excavated Variants on
+  2026-10-17, so MIC pans), or a pack lists a gold block in `#c:ores/gold` and
   `#c:ores_in_ground/gravel` (or `/sand`), that ore is placed as before and nothing changes.
 - **Only gold, only in gravel and sand cells.** Silver, the placer's by-product zone, keeps the
   ore block. A cell that is not gravel or sand (the soil the surface rules left over the bar, a
@@ -386,10 +394,25 @@ The rules (ORE-269):
   is air, fire, a liquid or a replaceable plant. A cell with such a block under it keeps the plain
   host block and no gold; so a bar's overhanging edge, or a bar over a cave, holds less gold than
   its ore draw said. Bars under water stand on the bed and are supported.
+- **One brushing, for whoever gets there first** (coordinator's call, decisions log 2026-10-17).
+  A placer is a finite natural deposit. Lootr (in MIC; version 1.11.38.125 read decompiled)
+  replaces every block in `#lootr:convert/gravels` or `/sands` (vanilla's suspicious gravel and
+  sand) whose brushable block entity has a loot table with its own block, which every player can
+  brush once, as soon as the block's chunk and the 24 around it are loaded; it skips a block
+  entity without a loot table, which is why the gold is rolled at placement. Nothing in the pack's
+  Lootr config is needed. The GameTest server enables every datapack it finds, Lootr's opt-in
+  `lootr_no_suspicious_blocks` too, which empties both tags, so there Lootr converts no suspicious
+  block at all; `placerBarHoldsPannedGold` shows with a chest control that Lootr ran on the bar's
+  chunks, and checks the opt-out itself as the absence of a loot table on every placer block. A MIC
+  world has that pack off: a feature pack is selected only when a world or server asks for it, and
+  MIC asks nowhere. The roll leaves out NeoForge's global loot modifiers (it runs on a
+  world-generation thread), which brushing a block with a loot table would apply; a pack's
+  modifier that adds to archaeology loot therefore does not reach placer gold.
 - **Compatibility for packs without Excavated Variants.** Nothing is needed from the pack: the
   loot table is in the mod's data, and brushing needs only vanilla's brush. A pack that wants
   another gold-bearing gravel adds its block to `#c:ores/gold` and `#c:ores_in_ground/gravel`, or
-  overrides `data/deeptime/loot_table/archaeology/placer_gold.json` to change the count. The
+  overrides `data/deeptime/loot_table/archaeology/placer_gold.json` to change the count (for
+  chunks generated after the change: the nuggets are in the block once it is placed). The
   `deeptime-inspect` tool counts ore blocks and does not count suspicious blocks as ore.
 
 ## Simplifications and limits
@@ -447,9 +470,11 @@ The rules (ORE-269):
   origin (Chapman & Mortensen, found in a search, not read); no source gives a quantitative relation
   between a lode's eroded fraction and the placer below it, so the linear law is the project's.
 - No spawn selection by essentials (Ben, 2026-10-05; BAK-015).
-- Placer gold as panning in packs without Excavated Variants: suspicious gravel or sand with a
-  gold-nugget loot table, 2 to 5 nuggets a block, only gold, only over support (Ben, 2026-10-16:
-  ORE-267 to ORE-269; the block is Ben's, the count and the rules around it are the agent's).
+- Placer gold as panning in packs without Excavated Variants: suspicious gravel or sand holding
+  2 to 5 gold nuggets rolled from a loot table, only gold, only over support (Ben, 2026-10-16:
+  ORE-267 to ORE-269; the block is Ben's, the count and the rules around it are the agent's);
+  rolled at placement with no loot table left, so one brushing per block and no per-player loot
+  under Lootr (coordinator's call, decisions log 2026-10-17).
 - Richer deposits, thinner scatter and raw-ore cores (Ben, 2026-10-02: ORE-262, ORE-265, ORE-266;
   the values are the agent's, against the targets above); inherited iron formation in a basin
   field (Ben, 2026-10-02: ORE-261, ORE-263, ORE-264), at 5 % of the stable interiors rather than

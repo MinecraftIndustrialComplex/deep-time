@@ -127,9 +127,10 @@ defaults are in `ClimateParams::default()` and the presets.
 | CLM-168 | its scale m so that 2 × CO₂ at 288.15 K gives 5.35 ln 2 | 0.903 | – | Myhre et al. 1998 via IPCC 2001 (CLM-069) | `calibrated` |
 | CLM-170 | the forcing below the table (about 100 ppm) | logarithm, the table's 100–200 ppm slope | W/m² | none | `game-choice` |
 | CLM-172 | `snowball_cloud_w_m2`: extra cloud greenhouse on frozen surfaces | 0 (setting, 0–20) | W/m² | Ben 2026-10-02; Hoffman 2017, Abbot 2012, Hu 2011, Pierrehumbert 2011 | `game-choice` |
-| CLM-061 | `KERNEL_EARTH`, the weathering kernel on Earth's 1° relief | 2.475·10⁷ (banded: 2.845·10⁷) | km² m/yr | re-measured, `deeptime climate-dem` | `calibrated` |
+| CLM-061 | `KERNEL_EARTH`, the weathering kernel on Earth's 0.5° relief | 5.039·10⁷ with the belts' rain scaled (2026-10-16; 2.475·10⁷ at factor 1.0, banded 2.845·10⁷) | km² m/yr | re-measured, `deeptime climate-dem` | `calibrated` |
 | CLM-100 | gravity of the ice | the planet's | m/s² | – | `uncited` |
-| CLM-178 | `rain_model` | `belts`; `budget` is built | – | Ben, decisions log 2026-10-01 (Q2) | `game-choice` |
+| CLM-178 | `rain_model` | `belts`; `budget` and `upwind` are built | – | Ben, decisions log 2026-10-01 (Q2), 2026-10-06 | `game-choice` |
+| CLM-201 | `belts_rain_scale`: one factor on the belts' rain | 1.42 (Earth's relief rains 773 mm over land, Beck 773) | – | Beck et al. 2023 (calibration on Earth's own inputs) | `calibrated` |
 | CLM-139 | eddy moisture diffusivity K_q | 1.5·10⁶ (GREB 2–8·10⁵) | m²/s | none | `uncited` |
 | CLM-140 | three-cell surface meridional wind | 2.5, 1.0, 0.5 m/s | m/s | none; compared with reanalysis (CLM-164) | `uncited` |
 | CLM-141 | thermal wind: κ_p and friction r | 60 Pa/K; 10⁻⁵ s⁻¹ | Pa/K; s⁻¹ | Lindzen & Nigam 1987 not read | `from-memory` |
@@ -180,25 +181,29 @@ Run: `deeptime climate-dem` on Earth's relief (GMT `earth_relief_30m_p`, 720 × 
 resampled onto the planet's grid: Lambert's cylindrical equal-area projection, 720 × 240 cells, a
 144 × 48 climate grid; the ice feedback repeated six times), 280 ppm, the calibrated defaults of
 CLM-121, CLM-125, CLM-131 and CLM-176, build log 2026-10-03 (T9); measured with
-`tools/validation/climate_vs_obs.py`. The banded climate on the same relief is in brackets.
+`tools/validation/climate_vs_obs.py`. Re-run on 2026-10-16 with the belts' rain scaled to Earth's land rain
+(`belts_rain_scale` 1.42, CLM-201): the last column gives that value first, then the value at factor 1.0
+(the T9 calibration), then the banded climate on the same relief; a row with two values in brackets was
+not re-measured at 1.42 and gives the factor 1.0 value and the banded one.
 Earth's temperature and spread figures are the design's section 7.1 table: Beck et al. 2023's
 monthly temperatures (1961–1990, 0.5 degrees), brought to sea level with 6.5 K/km; the grid
 itself is read by the design's scratch script only, and no observed data are in the repository.
 
-| Quantity | Earth | Source of the Earth figure | Design target | The mod (banded) |
+| Quantity | Earth | Source of the Earth figure | Design target | The mod, 1.42 (1.0; banded) |
 |---|---|---|---|---|
-| Global mean temperature, 280 ppm | 13.8–14.4 °C (1850–1900) | Berkeley Earth, averaged in WP-14a (CLM-138) | 14.1 ± 0.4 (Ben, 2026-10-02) | 13.8 °C (15.3) |
-| Land mean temperature | – | not recorded | none | 7.9 °C (7.8) |
-| Glaciated share of land | about 0.10 (Antarctica, Greenland) | `ice_sheet_feedback` comment in params.rs (a round value) | none | 0.095 (0.101) |
-| Land sea-level T, along-row std at 30–70°, January north / July south | 6.1 K in the design; 4.24 K on Beck's 0.5° grid and 3.89 K on the model's, re-measured 2026-10-05 ([upwind-rain.md](upwind-rain.md)) | design §7.1 (Beck et al. 2023); `climate_vs_obs.py --obs` | ≥ 5.0 K (question to Ben) | 4.53 K (2.25) |
-| Same, annual | 3.3 K | same | ≥ 2.0 K | 1.92 K (0.64) |
-| Southern winter ice edge, std over longitudes | "several degrees" (roughly 55–68°S) | design §1.2, not measured | ≥ 2° | 2.5° (0°) |
-| Brest − Vladivostok, January | 20.1 K | design §7.1 | ≥ 12 K | 20.6 K (7.1) |
-| Yakutsk, January | −39 °C | design §7.1 | ≤ −28 °C | −29.0 °C (−15.8) |
-| Reference cities in the right main group (`climate-dem` list of 24) | – | – | ≥ 21 | 19 (18) |
-| Köppen land shares A / B / C / D / E | – | not recorded | none | 0.14 / 0.29 / 0.14 / 0.22 / 0.21 |
-| Mumbai annual rain | 3,096 mm | design §1.2 (Beck et al. 2023) | ≥ 1,500 mm (budget) | 623 mm |
-| Sahara; Atacama annual rain | 11; 16 mm | design §1.2 | ≤ 80 mm (budget) | about 230; about 180 mm |
+| Global mean temperature, 280 ppm | 13.8–14.4 °C (1850–1900) | Berkeley Earth, averaged in WP-14a (CLM-138) | 14.1 ± 0.4 (Ben, 2026-10-02) | 14.4 °C (13.8; 15.3) |
+| Land mean temperature | – | not recorded | none | 8.7 °C (7.9; 7.8) |
+| Glaciated share of land | about 0.10 (Antarctica, Greenland) | `ice_sheet_feedback` comment in params.rs (a round value) | none | 0.094 (0.095; 0.101) |
+| Land sea-level T, along-row std at 30–70°, January north / July south | 6.1 K in the design; 4.24 K on Beck's 0.5° grid and 3.89 K on the model's, re-measured 2026-10-05 ([upwind-rain.md](upwind-rain.md)) | design §7.1 (Beck et al. 2023); `climate_vs_obs.py --obs` | ≥ 0.83 × observed on the same grid, 3.23 K (restated 2026-10-06, design §7.1) | 4.48 K (4.53; 2.25): met |
+| Same, annual | 3.3 K | same | ≥ 2.0 K | 1.92 K (1.92; 0.64) |
+| Southern winter ice edge, std over longitudes | "several degrees" (roughly 55–68°S) | design §1.2, not measured | ≥ 2° | 2.5° (2.5°; 0°) |
+| Brest − Vladivostok, January | 20.1 K | design §7.1 | ≥ 12 K | 20.5 K (20.6; 7.1) |
+| Yakutsk, January | −39 °C | design §7.1 | ≤ −28 °C | −28.2 °C (−29.0; −15.8) |
+| Reference cities in the right main group (`climate-dem` list of 24) | – | – | ≥ 21 | 21: met (19; 18) |
+| Köppen land shares A / B / C / D / E | – | not recorded | none | 0.17 / 0.16 / 0.24 / 0.23 / 0.20 (0.14 / 0.29 / 0.14 / 0.22 / 0.21) |
+| Land rain, the land both call land | 773 mm | Beck et al. 2023 (1961–1990), `climate_vs_obs.py --obs` | Earth's (CLM-201, Ben 2026-10-06) | 773 mm (532) |
+| Mumbai annual rain | 3,096 mm | design §1.2 (Beck et al. 2023) | ≥ 1,500 mm (budget) | 904 mm (623) |
+| Sahara; Atacama annual rain | 11; 16 mm | design §1.2 | ≤ 80 mm (budget) | 359; 252 mm (244; 179) |
 | Ocean heat transport, northern peak | 1.5–2 PW at 15–25°N | Trenberth & Caron 2001 (CLM-133) | 1.5–2 PW | **3.1 PW at 27°N** |
 | Atmosphere heat transport, northern peak | 5.0 ± 0.14 PW at 43°N | Trenberth & Caron 2001 abstract | none | 3.6 PW at 39°N |
 | North Atlantic 55°N 20°W, January / July (sea) | about +9 in January | a round value, no dataset recorded | none | 9.5 / 19.4 °C |

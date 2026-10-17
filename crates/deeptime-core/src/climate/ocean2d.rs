@@ -32,6 +32,8 @@
 //!
 //! Both act on the slab by upwind advection, sub-stepped to a Courant number of 0.5.
 
+use rayon::prelude::*;
+
 use super::coarse::Grid;
 use super::ebm::WATER_J_M3_K;
 use super::ebm2d::OceanTransport;
@@ -112,6 +114,10 @@ pub struct Ocean {
     pub sinking: Option<Sinking>,
     /// Gauss–Seidel sweeps the gyres took.
     pub sweeps: u32,
+    /// [`Ocean::substeps`] of the first step length asked for, `(dt's bits, result)`: the flows
+    /// and volumes are fixed once built, and a run steps with one dt (P1-17: the scan over every
+    /// cell ran each of the 2-D model's steps).
+    substep_cache: std::sync::OnceLock<(u64, Option<(usize, f64)>)>,
 }
 
 impl Ocean {
@@ -176,6 +182,7 @@ impl Ocean {
             vol,
             sinking: None,
             sweeps: 0,
+            substep_cache: std::sync::OnceLock::new(),
         };
         if s.gyre_efficiency > 0.0 {
             o.gyres(s);
@@ -281,8 +288,10 @@ impl Ocean {
                     if fixed[k] {
                         continue;
                     }
-                    let east = psi[e * w + (ii + 1) % w];
-                    let west = psi[e * w + (ii + w - 1) % w];
+                    // The wrapped neighbours without a division (P1-17; the sweep runs up to
+                    // 5000 times per build).
+                    let east = psi[e * w + east_of(ii, w)];
+                    let west = psi[e * w + west_of(ii, w)];
                     let north = psi[(e - 1) * w + ii];
                     let south = psi[(e + 1) * w + ii];
                     let new =
@@ -353,8 +362,15 @@ impl Ocean {
             };
             let lab = components(&in_band);
             let count = lab.iter().flatten().max().map_or(0, |m| m + 1);
-            for b in 0..count {
-                let cells: Vec<usize> = (0..n).filter(|&c| lab[c] == Some(b)).collect();
+            // Each basin's cells in ascending order, from one pass (P1-17: a scan of every cell
+            // per basin was quadratic in the band's many small seas).
+            let mut by_label: Vec<Vec<usize>> = vec![Vec::new(); count];
+            for (c, l) in lab.iter().enumerate() {
+                if let Some(b) = *l {
+                    by_label[b].push(c);
+                }
+            }
+            for cells in by_label {
                 let reach = cells.iter().any(|&c| lat[c / w].abs() <= BASIN_REACH_LAT);
                 let sink: Vec<usize> = cells
                     .iter()
@@ -429,25 +445,29 @@ impl Ocean {
                 }
             })
             .collect();
+        // Row by row, the wrapped neighbours without a division (P1-17: the conjugate gradients
+        // call it thousands of times per build; the same terms in the same order as a map over
+        // the cells with c % w and c / w).
         let apply = |x: &[f64]| -> Vec<f64> {
-            (0..n)
-                .map(|c| {
+            let mut out = vec![0.0; n];
+            for j in 0..h {
+                for i in 0..w {
+                    let c = j * w + i;
                     if !inside[c] {
-                        return 0.0;
+                        continue;
                     }
-                    let (i, j) = (c % w, c / w);
-                    let west = j * w + (i + w - 1) % w;
-                    let mut y =
-                        ge[c] * (x[c] - x[j * w + (i + 1) % w]) + ge[west] * (x[c] - x[west]);
+                    let (east, west) = (j * w + east_of(i, w), j * w + west_of(i, w));
+                    let mut y = ge[c] * (x[c] - x[east]) + ge[west] * (x[c] - x[west]);
                     if j + 1 < h {
                         y += gs[c] * (x[c] - x[c + w]);
                     }
                     if j > 0 {
                         y += gs[c - w] * (x[c] - x[c - w]);
                     }
-                    y
-                })
-                .collect()
+                    out[c] = y;
+                }
+            }
+            out
         };
         let phi = conjugate_gradient(&apply, &src, &inside);
         for c in 0..n {
@@ -480,6 +500,20 @@ impl Ocean {
             sv: s.overturning_sv,
         });
     }
+}
+
+/// The east neighbour of column `i` in a row of `w` columns, wrapping: `(i + 1) % w` without a
+/// division.
+#[inline]
+fn east_of(i: usize, w: usize) -> usize {
+    if i + 1 == w { 0 } else { i + 1 }
+}
+
+/// The west neighbour of column `i` in a row of `w` columns, wrapping: `(i + w − 1) % w` without
+/// a division.
+#[inline]
+fn west_of(i: usize, w: usize) -> usize {
+    if i == 0 { w - 1 } else { i - 1 }
 }
 
 /// Conjugate gradients for the singular, symmetric positive semi-definite Neumann Laplacian:
@@ -526,15 +560,122 @@ fn conjugate_gradient(apply: &dyn Fn(&[f64]) -> Vec<f64>, b: &[f64], inside: &[b
 }
 
 impl OceanTransport for Ocean {
+    /// Upwind advection of the slab's heat, sub-stepped to a Courant number of 0.5. Each
+    /// sub-step first finds the heat every face carries (from the temperatures at its start),
+    /// then gathers each cell's change from its four faces, rows in parallel. A cell takes its
+    /// faces' terms in the order the serial sweep over the faces gave them (the west face, its
+    /// own east and north faces, then its south face; for the first cell of a row its own faces,
+    /// then the wrapped west face, then the south face), so every value is the serial sweep's
+    /// bit for bit (P1-17; the test keeps the sweep).
     fn step(&self, tm: &mut [f64], dt: f64, north_j: &mut [f64]) {
         let (w, h) = (self.w, self.h);
         let n = w * h;
         if self.vol.is_empty() {
             return;
         }
-        // Sub-steps: Courant ≤ 0.5 on every cell's outflow.
-        let mut worst = 0.0f64;
+        if w < 2 {
+            return self.step_serial(tm, dt, north_j);
+        }
+        let Some(ds_subs) = self.substeps(dt) else {
+            return;
+        };
+        let (subs, ds) = ds_subs;
+        let rc = WATER_J_M3_K;
+        let mut th: Vec<f64> = tm.iter().map(|t| t - T_DEEP_C).collect();
+        // The heat each east and north face carries in a sub-step, m³·K (0 where none flows).
+        let mut ce = vec![0.0; n];
+        let mut cn = vec![0.0; n];
+        for _ in 0..subs {
+            {
+                let th = &th;
+                ce.par_chunks_mut(w)
+                    .zip(cn.par_chunks_mut(w))
+                    .enumerate()
+                    .with_min_len(8)
+                    .for_each(|(j, (ce_row, cn_row))| {
+                        for i in 0..w {
+                            let c = j * w + i;
+                            let f = self.f_east[c];
+                            if f != 0.0 {
+                                let e = j * w + (i + 1) % w;
+                                ce_row[i] = f * if f > 0.0 { th[c] } else { th[e] } * ds;
+                            }
+                            let f = self.f_north[c];
+                            if f != 0.0 && j > 0 {
+                                let nn = c - w;
+                                cn_row[i] = f * if f > 0.0 { th[c] } else { th[nn] } * ds;
+                            }
+                        }
+                    });
+            }
+            let (ce, cn) = (&ce, &cn);
+            let gather = |j: usize, row: &mut [f64], north: Option<&mut f64>| {
+                for (i, t) in row.iter_mut().enumerate() {
+                    let c = j * w + i;
+                    let mut dq = 0.0;
+                    if i > 0 && self.f_east[c - 1] != 0.0 {
+                        dq += ce[c - 1];
+                    }
+                    if self.f_east[c] != 0.0 {
+                        dq -= ce[c];
+                    }
+                    if j > 0 && self.f_north[c] != 0.0 {
+                        dq -= cn[c];
+                    }
+                    if i == 0 && self.f_east[c + w - 1] != 0.0 {
+                        dq += ce[c + w - 1];
+                    }
+                    if j + 1 < h && self.f_north[c + w] != 0.0 {
+                        dq += cn[c + w];
+                    }
+                    if self.vol[c] > 0.0 {
+                        *t += dq / self.vol[c];
+                    }
+                }
+                if let Some(acc) = north {
+                    for i in 0..w {
+                        let c = j * w + i;
+                        if self.f_north[c] != 0.0 {
+                            *acc += cn[c] * rc;
+                        }
+                    }
+                }
+            };
+            let (first, rest) = th.split_at_mut(w);
+            gather(0, first, None);
+            rest.par_chunks_mut(w)
+                .zip(north_j.par_iter_mut())
+                .enumerate()
+                .with_min_len(8)
+                .for_each(|(k, (row, acc))| gather(k + 1, row, Some(acc)));
+        }
         for c in 0..n {
+            if self.vol[c] > 0.0 {
+                tm[c] = th[c] + T_DEEP_C;
+            }
+        }
+    }
+}
+
+impl Ocean {
+    /// The sub-steps of a step of `dt` seconds (Courant ≤ 0.5 on every cell's outflow) and their
+    /// length; `None` when nothing flows. Computed once for the first `dt` (the flows do not
+    /// change after [`Ocean::build`]); another `dt` is computed afresh.
+    fn substeps(&self, dt: f64) -> Option<(usize, f64)> {
+        let &(bits, cached) = self
+            .substep_cache
+            .get_or_init(|| (dt.to_bits(), self.substeps_uncached(dt)));
+        if bits == dt.to_bits() {
+            cached
+        } else {
+            self.substeps_uncached(dt)
+        }
+    }
+
+    fn substeps_uncached(&self, dt: f64) -> Option<(usize, f64)> {
+        let (w, h) = (self.w, self.h);
+        let mut worst = 0.0f64;
+        for c in 0..w * h {
             if self.vol[c] <= 0.0 {
                 continue;
             }
@@ -548,10 +689,23 @@ impl OceanTransport for Ocean {
             worst = worst.max(out * dt / self.vol[c]);
         }
         if worst == 0.0 {
-            return;
+            return None;
         }
         let subs = (worst / 0.5).ceil().max(1.0) as usize;
-        let ds = dt / subs as f64;
+        Some((subs, dt / subs as f64))
+    }
+
+    /// The serial sweep over the faces (grids one cell wide, where a cell is its own east
+    /// neighbour, and the tests' reference).
+    fn step_serial(&self, tm: &mut [f64], dt: f64, north_j: &mut [f64]) {
+        let (w, h) = (self.w, self.h);
+        let n = w * h;
+        if self.vol.is_empty() {
+            return;
+        }
+        let Some((subs, ds)) = self.substeps(dt) else {
+            return;
+        };
         let rc = WATER_J_M3_K;
         let mut th: Vec<f64> = tm.iter().map(|t| t - T_DEEP_C).collect();
         let mut dq = vec![0.0; n]; // heat change × (1/ρc_p), m³·K
@@ -650,6 +804,114 @@ mod tests {
                 }
             })
             .collect()
+    }
+
+    /// P1-17: the cached sub-steps are the computed ones, for the step length cached and for
+    /// another; a copy of the ocean keeps them.
+    #[test]
+    fn the_cached_substeps_are_the_computed_ones() {
+        let g = grid();
+        let land = land_of(&g, &|lat, i| lat < -40.0 || (10..60).contains(&i));
+        let u = belt_wind_u(&ClimateParams::default(), &g, 23.4);
+        let o = Ocean::build(&setup(&g, &land, &u, 15.0));
+        let year = 365.25 * 86_400.0;
+        for dt in [year / 72.0, year, year / 72.0, 3.0 * year, year / 72.0] {
+            assert_eq!(o.substeps(dt), o.substeps_uncached(dt), "dt {dt}");
+        }
+        let copy = o.clone();
+        assert_eq!(copy.substeps(year / 72.0), o.substeps_uncached(year / 72.0));
+    }
+
+    /// P1-17: the gyres' sweep and the conveyor's operator find a cell's wrapped neighbours
+    /// without a division; the indices are the modulo forms', so every term is the same.
+    #[test]
+    fn the_wrapped_neighbours_are_the_modulo_forms() {
+        for w in 1..=40usize {
+            for i in 0..w {
+                assert_eq!(east_of(i, w), (i + 1) % w, "east of {i} in {w}");
+                assert_eq!(west_of(i, w), (i + w - 1) % w, "west of {i} in {w}");
+            }
+        }
+    }
+
+    /// P1-17: the conveyor's basins are bucketed in one pass; the ocean it builds is the one
+    /// the per-basin scan built, on a coast with many small seas in the sinking band.
+    #[test]
+    fn the_conveyor_on_many_small_seas_is_unchanged() {
+        let g = grid();
+        // Two open basins and, north of 50°, a sea broken into many small inlets.
+        let land = land_of(&g, &|lat, i| {
+            lat < -40.0
+                || ((-40.0..50.0).contains(&lat)
+                    && ((10..30).contains(&i) || (50..95).contains(&i)))
+                || ((50.0..75.0).contains(&lat) && (i % 3 == 0 || (i * 7) % 11 == 0))
+        });
+        let u = belt_wind_u(&ClimateParams::default(), &g, 23.4);
+        let o = Ocean::build(&setup(&g, &land, &u, 15.0));
+        // The per-basin scan, as it was: every basin's cells by a filter over all cells.
+        let lab: Vec<Option<usize>> = (0..g.w * g.h)
+            .map(|c| (c % 5 != 0).then_some(c % 7))
+            .collect();
+        let count = 7;
+        let mut by_label: Vec<Vec<usize>> = vec![Vec::new(); count];
+        for (c, l) in lab.iter().enumerate() {
+            if let Some(b) = *l {
+                by_label[b].push(c);
+            }
+        }
+        for (b, cells) in by_label.iter().enumerate() {
+            let scanned: Vec<usize> = (0..lab.len()).filter(|&c| lab[c] == Some(b)).collect();
+            assert_eq!(cells, &scanned, "basin {b}");
+        }
+        // And the built ocean has its conveyor (a sinking region, flows that close).
+        assert!(o.sinking.is_some(), "the conveyor found a basin");
+        assert!(o.c_north.iter().any(|&x| x != 0.0));
+    }
+
+    #[test]
+    fn the_parallel_step_is_the_serial_sweep_bit_for_bit() {
+        // Two basins open to a southern ocean, gyres and the conveyor, a step long enough for
+        // several sub-steps; 1, 3 and 8 threads.
+        let g = grid();
+        let land = land_of(&g, &|lat, i| {
+            lat < -40.0
+                || ((-40.0..70.0).contains(&lat)
+                    && ((10..30).contains(&i) || (50..95).contains(&i)))
+        });
+        let u = belt_wind_u(&ClimateParams::default(), &g, 23.4);
+        let o = Ocean::build(&setup(&g, &land, &u, 15.0));
+        let n = g.w * g.h;
+        let tm0: Vec<f64> = (0..n)
+            .map(|c| 28.0 - 30.0 * (g.lat_c(c / g.w) / 90.0).powi(2) + ((c * 7) % 5) as f64 * 0.3)
+            .collect();
+        let dt = 365.25 * 86_400.0;
+        assert!(
+            o.substeps(dt).is_some_and(|(k, _)| k > 1),
+            "{:?}",
+            o.substeps(dt)
+        );
+        let mut a = tm0.clone();
+        let mut na = vec![0.1; g.h - 1];
+        for _ in 0..3 {
+            o.step_serial(&mut a, dt, &mut na);
+        }
+        let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<u64>>();
+        for threads in [1, 3, 8] {
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .unwrap();
+            let (b, nb) = pool.install(|| {
+                let mut b = tm0.clone();
+                let mut nb = vec![0.1; g.h - 1];
+                for _ in 0..3 {
+                    o.step(&mut b, dt, &mut nb);
+                }
+                (b, nb)
+            });
+            assert!(bits(&a) == bits(&b), "{threads} threads: temperatures");
+            assert!(bits(&na) == bits(&nb), "{threads} threads: northward heat");
+        }
     }
 
     #[test]

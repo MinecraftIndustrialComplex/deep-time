@@ -1327,13 +1327,18 @@ impl Session {
         };
         let started = Instant::now();
         let result = (|| -> Result<Option<String>, CoreError> {
-            let water = crate::water_view::from_bake(
-                world,
-                &self.view,
-                dir,
-                m.layer("water_level").map(|l| l.path.as_str()),
-                (entry.w, entry.h),
-            )?;
+            // In the session's own pool, like the redraw below: the water view's hydrology is
+            // parallel, and outside an `install` it ran on Rayon's global pool, every core of the
+            // machine whatever the session's thread count (P1-17, `tests/session_pool.rs`).
+            let water = self.pool.install(|| {
+                crate::water_view::from_bake(
+                    world,
+                    &self.view,
+                    dir,
+                    m.layer("water_level").map(|l| l.path.as_str()),
+                    (entry.w, entry.h),
+                )
+            })?;
             let Some(water) = water else {
                 return Ok(None);
             };
