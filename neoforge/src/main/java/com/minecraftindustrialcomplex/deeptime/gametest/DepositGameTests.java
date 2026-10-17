@@ -6,6 +6,7 @@ import com.minecraftindustrialcomplex.deeptime.api.DeepTimeSites;
 import com.minecraftindustrialcomplex.deeptime.api.Site;
 import com.minecraftindustrialcomplex.deeptime.ore.OreBlockResolver;
 import com.minecraftindustrialcomplex.deeptime.ore.OreData;
+import com.minecraftindustrialcomplex.deeptime.ore.PlacerPanning;
 import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
 import com.minecraftindustrialcomplex.deeptime.server.SiteCommands;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Body;
@@ -13,21 +14,32 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.BackgroundScatterFeature;
 import com.minecraftindustrialcomplex.deeptime.worldgen.DepositFeature;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.worldgen.OreDraws;
 import com.minecraftindustrialcomplex.deeptime.worldgen.StrataPass;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BrushableBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.common.Tags;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -181,6 +193,11 @@ public final class DepositGameTests {
                             placed++;
                             exact++;
                             blocks.merge(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(), 1, Integer::sum);
+                        } else if (raw == null && isPanned(state, mat)) {
+                            // A placer's gold as suspicious gravel or sand (no gold ore for the host in this pack).
+                            placed++;
+                            exact++;
+                            blocks.merge(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(), 1, Integer::sum);
                         } else if (raw == null && OreBlockResolver.isOreOf(state, mat)) {
                             placed++;
                             blocks.merge(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(), 1, Integer::sum);
@@ -193,7 +210,13 @@ public final class DepositGameTests {
                                 problems.add("(" + xc + "," + y + "," + z + ") " + state.getBlock() + " for host " + host.getBlock());
                         } else {
                             RockPalette.Host kind = palette.host(state);
-                            if (kind == RockPalette.Host.ROCK || (kind == RockPalette.Host.LOOSE && loose)) {
+                            if (loose && ores.panned(mat, state, state) != null
+                                    && !PlacerPanning.supported(chunk.getBlockState(new BlockPos(xc, y - 1, z)))) {
+                                // A placer's gold cell over air, water or a plant: left plain gravel or sand (it would fall).
+                                notHost++;
+                                notHostBlocks.merge("unsupported "
+                                        + net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()), 1, Integer::sum);
+                            } else if (kind == RockPalette.Host.ROCK || (kind == RockPalette.Host.LOOSE && loose)) {
                                 missed++;
                                 if (problems.size() < 8)
                                     problems.add("(" + xc + "," + y + "," + z + ") still " + state.getBlock() + ", " + m + " due");
@@ -241,6 +264,11 @@ public final class DepositGameTests {
         return s;
     }
 
+    /** True when {@code state} is the suspicious gravel or sand a placer puts for {@code material} (only gold has a panning table). */
+    static boolean isPanned(BlockState state, ResourceLocation material) {
+        return PlacerPanning.tableOf(material) != null && (state.is(Blocks.SUSPICIOUS_GRAVEL) || state.is(Blocks.SUSPICIOUS_SAND));
+    }
+
     static boolean explainedByScatter(WorldData wd, List<OreData.ScatterRule> rules, Map<Long, Set<Long>> cache, int minY,
                                       int x, int y, int z, String material) {
         for (OreData.ScatterRule r : rules) {
@@ -275,6 +303,266 @@ public final class DepositGameTests {
         helper.assertTrue(s.exact() == s.placed(), (s.placed() - s.exact()) + " ore blocks are not the resolver's block for their host: "
                 + s.problems());
         helper.assertTrue(s.unexplained() == 0, s.unexplained() + " ore blocks are neither a body's nor scatter: " + s.problems());
+        helper.succeed();
+    }
+
+    // ---- placer gold as panning (Ben, 2026-10-16) ------------------------------------------------
+
+    static final ResourceLocation GOLD = ResourceLocation.fromNamespaceAndPath("c", "gold");
+
+    /**
+     * True when the pack makes the placer's gold in gravel or sand something other than suspicious
+     * gravel or sand: Excavated Variants is installed, or a gold ore is in {@code #c:ores_in_ground/gravel}
+     * or {@code /sand}. False in the standalone profile (vanilla ores only).
+     */
+    static boolean packHasGravelGold(OreBlockResolver ores) {
+        BlockState gravel = Blocks.GRAVEL.defaultBlockState(), sand = Blocks.SAND.defaultBlockState();
+        return OreBlockResolver.evLoaded() || ores.blocks(GOLD).stream()
+                .anyMatch(b -> b.is(OreBlockResolver.inGround(gravel)) || b.is(OreBlockResolver.inGround(sand)));
+    }
+
+    /**
+     * The rules of the panned block, without a world: without a gold ore for gravel and sand, a
+     * placer's gold in a gravel cell is suspicious gravel and in a sand cell suspicious sand; soil, rock
+     * and every other material keep the ore block; the block under a suspicious block must hold it up.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE)
+    public static void placerGoldBlockRules(GameTestHelper helper) {
+        OreBlockResolver ores = OreBlockResolver.get();
+        BlockState gravel = Blocks.GRAVEL.defaultBlockState(), sand = Blocks.SAND.defaultBlockState();
+        BlockState inGravel = ores.panned(GOLD, gravel, gravel), inSand = ores.panned(GOLD, sand, sand);
+        boolean gravelGold = packHasGravelGold(ores);
+        DeepTime.LOGGER.info("[gametest] placerGoldBlockRules: gold in gravel {}, in sand {}, in red sand {} (EV {}, pack has gravel gold {})",
+                inGravel, inSand, ores.panned(GOLD, Blocks.RED_SAND.defaultBlockState(), sand), OreBlockResolver.evLoaded(), gravelGold);
+        if (!gravelGold) {
+            helper.assertTrue(inGravel != null && inGravel.is(Blocks.SUSPICIOUS_GRAVEL), "gold in gravel is " + inGravel);
+            helper.assertTrue(inSand != null && inSand.is(Blocks.SUSPICIOUS_SAND), "gold in sand is " + inSand);
+            BlockState inRedSand = ores.panned(GOLD, Blocks.RED_SAND.defaultBlockState(), sand);
+            helper.assertTrue(inRedSand != null && inRedSand.is(Blocks.SUSPICIOUS_SAND), "gold in red sand is " + inRedSand);
+        } else {
+            // With Excavated Variants (or a pack's own gravel gold ore) nothing changes.
+            helper.assertTrue(inGravel == null, "gold in gravel is " + inGravel + " although the pack has a gold ore for gravel");
+        }
+        // Not a gravel or sand cell: soil over the bar and rock keep today's ore block.
+        helper.assertTrue(ores.panned(GOLD, Blocks.DIRT.defaultBlockState(), gravel) == null, "soil over the gravel is panned");
+        helper.assertTrue(ores.panned(GOLD, Blocks.CLAY.defaultBlockState(), gravel) == null, "clay is panned");
+        helper.assertTrue(ores.panned(GOLD, Blocks.STONE.defaultBlockState(), Blocks.STONE.defaultBlockState()) == null, "stone is panned");
+        // Not gold: silver (the placer's by-product zone) and everything else has no table.
+        for (String other : List.of("c:silver", "c:copper", "c:iron", "c:zinc"))
+            helper.assertTrue(ores.panned(ResourceLocation.parse(other), gravel, gravel) == null, other + " in gravel is panned");
+        // Support: stone, gravel and a placed suspicious block hold a suspicious block up; air, water,
+        // fire and plants do not (they would let it fall).
+        for (BlockState holds : List.of(Blocks.STONE.defaultBlockState(), gravel, sand, Blocks.DIRT.defaultBlockState(),
+                Blocks.SUSPICIOUS_GRAVEL.defaultBlockState(), Blocks.DEEPSLATE.defaultBlockState()))
+            helper.assertTrue(PlacerPanning.supported(holds), holds.getBlock() + " does not hold a suspicious block up");
+        for (BlockState lets : List.of(Blocks.AIR.defaultBlockState(), Blocks.CAVE_AIR.defaultBlockState(), Blocks.WATER.defaultBlockState(),
+                Blocks.LAVA.defaultBlockState(), Blocks.SHORT_GRASS.defaultBlockState(), Blocks.FIRE.defaultBlockState()))
+            helper.assertTrue(!PlacerPanning.supported(lets), lets.getBlock() + " holds a suspicious block up");
+        helper.succeed();
+    }
+
+    /**
+     * The loot table and the block entity, in a real level: {@code deeptime:archaeology/placer_gold}
+     * is loaded and gives one stack of 2 to 5 gold nuggets whatever the seed (and both ends occur);
+     * {@link PlacerPanning#setLoot} stores it and the seed in a suspicious gravel's block entity.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE)
+    public static void placerGoldLootTable(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        LootTable table = level.getServer().reloadableRegistries().getLootTable(PlacerPanning.GOLD_TABLE);
+        helper.assertTrue(table != LootTable.EMPTY, PlacerPanning.GOLD_TABLE.location() + " is not loaded");
+        BlockPos at = helper.absolutePos(new BlockPos(2, 2, 2));
+        LootParams params = new LootParams.Builder(level).withParameter(LootContextParams.ORIGIN, Vec3.atCenterOf(at))
+                .create(LootContextParamSets.CHEST);
+        // The seeds the placer really uses (a hash of the position; consecutive small seeds would
+        // all start java.util.Random in nearly the same place and roll nearly the same count).
+        int min = Integer.MAX_VALUE, max = 0, n = 400;
+        long sum = 0;
+        for (int i = 0; i < n; i++) {
+            long seed = OreDraws.panSeed(level.getSeed(), 4096, i, 64, 0);
+            var stacks = table.getRandomItems(params, seed);
+            helper.assertTrue(stacks.size() == 1, "seed " + seed + " gave " + stacks.size() + " stacks");
+            ItemStack stack = stacks.get(0);
+            helper.assertTrue(stack.is(Items.GOLD_NUGGET), "seed " + seed + " gave " + stack);
+            helper.assertTrue(stack.getCount() == table.getRandomItems(params, seed).get(0).getCount(), "seed " + seed + " is not repeatable");
+            min = Math.min(min, stack.getCount());
+            max = Math.max(max, stack.getCount());
+            sum += stack.getCount();
+        }
+        DeepTime.LOGGER.info("[gametest] placerGoldLootTable: {} seeds gave {} to {} gold nuggets, mean {}", n, min, max, sum / (double) n);
+        helper.assertTrue(min == 2 && max == 5, n + " seeds gave " + min + " to " + max + " nuggets, not 2 to 5");
+        helper.assertTrue(Math.abs(sum / (double) n - 3.5) < 0.3, "mean " + sum / (double) n + " nuggets, not about 3.5");
+        // The block entity keeps the table and the seed (on stone: the block would fall off air).
+        level.setBlock(at.below(), Blocks.STONE.defaultBlockState(), 3);
+        level.setBlock(at, Blocks.SUSPICIOUS_GRAVEL.defaultBlockState(), 3);
+        long seed = OreDraws.panSeed(level.getSeed(), 4096, at.getX(), at.getY(), at.getZ());
+        helper.assertTrue(PlacerPanning.setLoot(level, at, PlacerPanning.GOLD_TABLE, seed), "no brushable block entity at " + at);
+        CompoundTag tag = level.getBlockEntity(at).saveWithoutMetadata(level.registryAccess());
+        helper.assertTrue(PlacerPanning.GOLD_TABLE.location().toString().equals(tag.getString("LootTable")), "block entity: " + tag);
+        helper.assertTrue(tag.getLong("LootTableSeed") == seed, "block entity: " + tag);
+        level.setBlock(at, Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(at.below(), Blocks.AIR.defaultBlockState(), 3);
+        helper.succeed();
+    }
+
+    /**
+     * What one scan of a placer body's gold cells found. {@code hanging} counts suspicious blocks
+     * whose block below is free when the scan reads it; {@code problems} are block-entity faults
+     * (always a failure); {@code samples} are the first cells of {@code hanging} and {@code missed}.
+     */
+    record PlacerScan(int due, int panned, int withTable, int ore, int unsupported, int missed, int hanging, int other,
+                      List<String> problems, List<String> samples) {}
+
+    /**
+     * Up to {@code limit} placer bodies (by site id) of the test world that are small enough to
+     * generate and have at least {@code minDue} gold cells due.
+     */
+    static List<Body> placerBodies(ServerLevel level, WorldData wd, int minDue, int limit) {
+        DeepTimeSites sites = DeepTimeSites.of(level);
+        RockPalette palette = RockPalette.get();
+        int c = wd.circumference();
+        List<Body> found = new ArrayList<>();
+        for (Site s : sites.all()) {
+            if (!s.depositType().getPath().equals("placer_au"))
+                continue;
+            for (Body b : wd.deposits().bodies().ofSite(s.id())) {
+                if (found.size() >= limit)
+                    return found;
+                if (!b.role().equals("ore") || b.rockClass() == null || !palette.isLoose(b.rockClass()))
+                    continue;
+                if (b.max()[0] - b.min()[0] > MAX_EXTENT || b.max()[2] - b.min()[2] > MAX_EXTENT
+                        || b.max()[1] < level.getMinBuildHeight() + 8)
+                    continue;
+                int due = 0;
+                for (int x = b.min()[0]; x <= b.max()[0] && due < minDue; x++)
+                    for (int y = Math.max(level.getMinBuildHeight(), b.min()[1]); y <= b.max()[1] && due < minDue; y++)
+                        for (int z = b.min()[2]; z <= b.max()[2] && due < minDue; z++)
+                            if (GOLD.toString().equals(DepositFeature.materialAt(b, c, x, y, z)))
+                                due++;
+                if (due >= minDue)
+                    found.add(b);
+            }
+        }
+        return found;
+    }
+
+    /**
+     * Generates a placer body's chunks and sorts every cell the gold zone draws: suspicious gravel or
+     * sand with the loot table and seed in its block entity ({@code panned}; {@code hanging} when the
+     * block under it is free now); an ore block or raw gold block ({@code ore}); plain gravel or sand
+     * over a free block ({@code unsupported}); plain gravel or sand over a solid block
+     * ({@code missed}); anything else, water, air or a rock the feature skipped ({@code other}).
+     */
+    static PlacerScan scanPlacer(ServerLevel level, WorldData wd, Body b, boolean panning) {
+        int c = wd.circumference();
+        OreBlockResolver ores = OreBlockResolver.get();
+        BlockState raw = ores.rawBlock(GOLD);
+        Map<Long, ChunkAccess> chunks = new HashMap<>();
+        int minY = Math.max(level.getMinBuildHeight(), b.min()[1]), maxY = Math.min(level.getMaxBuildHeight() - 1, b.max()[1]);
+        int due = 0, panned = 0, withTable = 0, ore = 0, unsupported = 0, missed = 0, hanging = 0, other = 0;
+        List<String> problems = new ArrayList<>(), samples = new ArrayList<>();
+        for (int x = b.min()[0]; x <= b.max()[0]; x++) {
+            int xc = canonical(c, x);
+            for (int z = b.min()[2]; z <= b.max()[2]; z++) {
+                long key = ChunkPos.asLong(xc >> 4, z >> 4);
+                ChunkAccess chunk = chunks.computeIfAbsent(key,
+                        k -> level.getChunkSource().getChunk(xc >> 4, (int) (k >> 32), ChunkStatus.FEATURES, true));
+                for (int y = minY; y <= maxY; y++) {
+                    Body.Zone zone = DepositFeature.zoneAt(b, c, x, y, z);
+                    if (zone == null || !GOLD.toString().equals(zone.material()))
+                        continue;
+                    due++;
+                    BlockPos p = new BlockPos(xc, y, z);
+                    BlockState state = chunk.getBlockState(p), below = chunk.getBlockState(p.below());
+                    if (state.is(Blocks.SUSPICIOUS_GRAVEL) || state.is(Blocks.SUSPICIOUS_SAND)) {
+                        panned++;
+                        if (!PlacerPanning.supported(below)) {
+                            hanging++;
+                            if (samples.size() < 8)
+                                samples.add(p.toShortString() + " " + state.getBlock() + " over " + below.getBlock());
+                        }
+                        if (chunk.getBlockEntity(p) instanceof BrushableBlockEntity be) {
+                            CompoundTag tag = be.saveWithoutMetadata(level.registryAccess());
+                            if (PlacerPanning.GOLD_TABLE.location().toString().equals(tag.getString("LootTable"))
+                                    && tag.getLong("LootTableSeed") == OreDraws.panSeed(level.getSeed(), c, x, y, z))
+                                withTable++;
+                            else if (problems.size() < 8)
+                                problems.add(p.toShortString() + " block entity " + tag);
+                        } else if (problems.size() < 8) {
+                            problems.add(p.toShortString() + " has no brushable block entity");
+                        }
+                    } else if (OreBlockResolver.isOreOf(state, GOLD) || (raw != null && state == raw)) {
+                        ore++;
+                    } else if (state.is(Tags.Blocks.GRAVELS) || state.is(Tags.Blocks.SANDS)) {
+                        if (panning && !PlacerPanning.supported(below))
+                            unsupported++;
+                        else {
+                            missed++;
+                            if (samples.size() < 8)
+                                samples.add(p.toShortString() + " still " + state.getBlock() + " over " + below.getBlock() + ", gold due");
+                        }
+                    } else {
+                        other++;
+                    }
+                }
+            }
+        }
+        PlacerScan s = new PlacerScan(due, panned, withTable, ore, unsupported, missed, hanging, other, problems, samples);
+        DeepTime.LOGGER.info("[gametest] placer scan {} body={} aabb={}..{} panning={}: {}", level.dimension().location(), b.id(),
+                java.util.Arrays.toString(b.min()), java.util.Arrays.toString(b.max()), panning, s);
+        return s;
+    }
+
+    /**
+     * A placer bar of the test world holds its gold as the pack makes it. Without a gold ore for
+     * gravel and sand (the standalone profile): suspicious gravel or sand, each with the placer gold
+     * loot table and its position's seed in the block entity, and no gravel or sand cell left plain
+     * over solid ground; soil in the bar keeps the ore block. With Excavated Variants (or a pack's
+     * own gravel gold ore): no suspicious block at all.
+     *
+     * <p>Which blocks a fixture bar's cells are (gravel the strata pass painted into stone, or the
+     * soil the surface rules left on a bench) is the terrain's, not this feature's, so the test scans
+     * up to four placer bodies for the first with a gold cell that is gravel or sand (with gold ore,
+     * any gold ore) and, when none has one, logs that and checks nothing. A few cells may differ
+     * between the moment the feature read the block below and the finished chunk (2 % are allowed in
+     * {@code missed} and {@code hanging}); the block entity of every suspicious block must be right.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 6000)
+    public static void placerBarHoldsPannedGold(GameTestHelper helper) {
+        ServerLevel level = level(helper, GameTestSupport.TEST_DEPOSITS);
+        WorldData wd = data(helper, level);
+        OreBlockResolver ores = OreBlockResolver.get();
+        boolean panning = ores.panned(GOLD, Blocks.GRAVEL.defaultBlockState(), Blocks.GRAVEL.defaultBlockState()) != null;
+        helper.assertTrue(panning != packHasGravelGold(ores), "the resolver " + (panning ? "pans" : "does not pan")
+                + " but the pack " + (packHasGravelGold(ores) ? "has" : "has no") + " gold ore for gravel");
+        List<Body> bodies = placerBodies(level, wd, 30, 4);
+        helper.assertTrue(!bodies.isEmpty(), "no placer body with 30 gold cells among " + DeepTimeSites.of(level).all().size() + " sites");
+        PlacerScan s = null;
+        for (Body b : bodies) {
+            PlacerScan one = scanPlacer(level, wd, b, panning);
+            helper.assertTrue(one.problems().isEmpty(), "body " + b.id() + " problems: " + one.problems());
+            if (panning ? one.panned() + one.unsupported() + one.missed() > 0 : one.ore() > 0) {
+                s = one;
+                break;
+            }
+        }
+        if (s == null) {
+            DeepTime.LOGGER.info("[gametest] placerBarHoldsPannedGold: none of {} placer bodies has a gold cell that is {}; nothing to check",
+                    bodies.size(), panning ? "gravel or sand" : "ore");
+            helper.succeed();
+            return;
+        }
+        int gravelly = s.panned() + s.unsupported() + s.missed();
+        helper.assertTrue(s.missed() * 50 <= gravelly, s.missed() + " of " + gravelly + " gravel or sand cells over solid ground were due gold and are plain: "
+                + s.samples());
+        if (panning) {
+            helper.assertTrue(s.withTable() == s.panned(), (s.panned() - s.withTable()) + " suspicious blocks lack the loot table: " + s.problems());
+            helper.assertTrue(s.hanging() * 50 <= s.panned(), s.hanging() + " of " + s.panned() + " suspicious blocks have a free block under them: "
+                    + s.samples());
+            helper.assertTrue(s.panned() > 0, "no suspicious gravel or sand among " + s.due() + " gold cells: " + s);
+        } else {
+            helper.assertTrue(s.panned() == 0, s.panned() + " suspicious blocks in a pack with gold ore for gravel: " + s);
+        }
         helper.succeed();
     }
 

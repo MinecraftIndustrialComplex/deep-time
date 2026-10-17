@@ -1678,6 +1678,26 @@ stone and deepslate, takes a block of `#c:ores/<material>` that is also in
 `#c:ores_in_ground/<the host block's path>` (`gravel`, `sand`), so a pack can supply its own
 gold-bearing gravel without EV. Without either, the stone ore stays (decisions file, "Ore blocks").
 
+*Placer gold as panning (2026-10-16; decisions log 2026-10-16, Ben: "Could we use suspicious gravel
+w/ a loot table set to a gold nugget?"; ledger ORE-267, ORE-268).* Where neither of those two finds
+a gold ore for the placer's rock (a pack without EV and without its own `#c:ores_in_ground/gravel`
+gold ore), the placer's gold in a **gravel** cell is vanilla's `minecraft:suspicious_gravel` and in a
+**sand** cell `minecraft:suspicious_sand` (`ore/PlacerPanning`, `OreBlockResolver.panned`), whose
+block entity carries the loot table `deeptime:archaeology/placer_gold` (one stack of 2 to 5 gold
+nuggets) and a seed that is a hash of the world seed and the block's canonical position
+(`OreDraws.panSeed`, never 0), so brushing the block is the panning. Deep Time ships no block of
+its own. The block entity is set the way vanilla's desert well sets its own: `WorldGenRegion.setBlock`
+leaves a placeholder in the proto chunk and `getBlockEntity` turns it into the real
+`BrushableBlockEntity`. The bar must sit on support: suspicious gravel and sand fall like their
+plain blocks (`FallingBlock.isFree`: air, fire, a liquid or a replaceable plant below), so a cell
+with such a block under it keeps the plain host block and no gold. Only gold is panned (silver, the
+placer's by-product zone, keeps the ore block); a placer cell that is not gravel or sand (the soil
+the surface rules left over the bar, a rock bench) keeps today's ore block; the raw-ore draw still
+comes first. **Compatibility for packs without EV:** nothing is needed from the pack, and a pack
+that wants a different gold-bearing gravel supplies a gold ore in `#c:ores/gold` and
+`#c:ores_in_ground/gravel` (or `/sand`), which the resolver takes before it pans. With EV (MIC) the
+EV gravel gold ore stays as built.
+
 ### 7.7 Ore claiming
 
 - **Scatter removal.** A custom biome modifier type `deeptime:claim_ores` (serializer in

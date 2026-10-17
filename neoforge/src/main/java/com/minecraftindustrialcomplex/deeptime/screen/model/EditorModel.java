@@ -96,7 +96,7 @@ public final class EditorModel {
          */
         public static Deps game(Path gameDir, Executor loader, Executor io, Supplier<String> content) {
             return new Deps(json -> SimSession.estimate(json, content.get()),
-                    (json, out, threads, cap) -> SessionRunHandle.launch(json, content.get(), out, threads, cap), gameDir,
+                    (json, out, threads, cap, resume) -> SessionRunHandle.launch(json, content.get(), out, threads, cap, resume), gameDir,
                     MachineInfo.current(), loader, io, NativeLoader::isLinked, List::of);
         }
     }
@@ -287,8 +287,20 @@ public final class EditorModel {
 
     /** True when the field can be edited in the selected preset. */
     public boolean available(EditorFields.Field f) {
-        return f.availableIn(base());
+        if (!f.availableIn(base()))
+            return false;
+        // The realistic choice is no steering at all (Ben, decisions log 2026-10-06, "One switch for
+        // both"): with Steer the end off the core ends the history as simulated, so the
+        // present-day climate is greyed out.
+        if (PRESENT_CLIMATE.equals(f.id())) {
+            EditorFields.Field steering = EditorFields.byId(STEERING);
+            return !steering.availableIn(base()) || toggle(steering);
+        }
+        return true;
     }
+
+    /** The steering switch and the setting it governs (editor field ids). */
+    static final String STEERING = "steering", PRESENT_CLIMATE = "present_climate";
 
     /** The field's text: as typed, else the effective value. */
     public String fieldText(EditorFields.Field f) {
