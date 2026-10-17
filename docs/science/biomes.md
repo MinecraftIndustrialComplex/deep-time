@@ -471,7 +471,28 @@ class, dry ones too. On that day's 4k test planet with MIC the old ground held 2
 cloud forest (0.264, under the bound of 0.3). 72 of the 261 are dry (P/PET at most 1, where the rule never fires) and
 9 lie in volcano zones; the rule's ground is the other 180, 67 of them on the cloud forest (0.372). The rest of that
 ground is on Terralith's highlands (28), temperate highlands (18), lavender valley (11), alpine highlands (10), lush
-valley (10) and plains (7); why those columns missed the slot was not examined.
+valley (10) and plains (7).
+
+Why those columns missed the slot showed on the next planet. The P1-26 rain merge (master 68d95f44, the same
+day) changed the test planet: its census holds 11,574 land columns instead of 7,228 and 1,252 volcano cone columns
+instead of 450. The census's ground fell to 34 columns, 8 on the cloud forest (0.235), with 90 left out as volcanic and
+84 as dry. The bake decides the rule per L2 cell (8 blocks on the 4k planet) on the young landscape's height and that
+height's P/PET. The level does not carry that height, so the census's block heights only estimate it, and amplified
+relief puts single blocks above 1,000 m in cells below it and the reverse. The bake marks every cell where the rule
+fired: it clamps the cell's erosion and continentalness to the rule's floors (0.62 and 0.35, continentalness inland
+of the beach strip). Of the 34 columns, only 5 lay in such a cell, and 4 of those 5 were on the cloud forest. Of the
+other 29, 4 were. So since 2026-10-17 the census's ground also asks for the bake's mark, with the floors read from the
+table the bake recorded (`notes.bake.climate.placement`). On P1-26's planet that leaves 5 columns. The check counts
+only from 30 columns (BIO-154), so on this planet it is reported and not counted: here the rule's ground lies mostly
+under volcano zones, whose biomes come first.
+
+The same planet showed a second gap in the pack checks. They counted the coast strip: columns on a beach, a stony
+shore or a sea biome, whose biome comes from the coast band whatever the class. The family checks have set these
+apart since 2026-10-05, and the pack check's own description already said the coast strip is not the table's to
+place. Of Cs's 373 counted columns, 68 were coast and none matched, so Cs on shrubland and steppe read 0.499, under
+its 0.5. Without the coast it reads 186 of 305 (0.610). The other checks change the same way: Am 346 of 385 (0.899),
+BSk 531 of 619 (0.858), ET on snowy plains 10 of 233 (0.043, at most 0.1). Since 2026-10-17 every pack check leaves
+the coast strip out.
 
 **The geology gate.** A rock-named biome stands only on the ground it is named for (BIO-147 to BIO-153): Shield on
 Precambrian shield provinces, Yosemite on exposed granite, the White, Granite and Basalt Cliffs on coasts of
