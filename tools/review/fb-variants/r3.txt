@@ -1,0 +1,4 @@
+old +DT_EXP_NO_SPREAD=1 +DT_EXP_DOUBLE=1
+spread +DT_EXP_DOUBLE=1
+nodbl +DT_EXP_NO_SPREAD=1
+both
