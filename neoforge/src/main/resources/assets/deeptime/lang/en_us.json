@@ -90,7 +90,7 @@
   "deeptime.editor.field.sky_islands": "Sky islands",
   "deeptime.editor.field.exotic_landforms": "Exotic landforms",
   "deeptime.editor.field.essentials": "Essentials list",
-  "deeptime.editor.field.steering": "Steer the end",
+  "deeptime.editor.field.steering": "Steer the end (off: realistic)",
   "deeptime.editor.field.steering_target": "Steering target",
   "deeptime.editor.field.steering_tail": "Steered share of the history",
   "deeptime.editor.field.steering_shape": "Steering ramp",

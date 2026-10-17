@@ -40,7 +40,9 @@ configurations {
     }
 }
 dependencies {
-    twBundle "maven.modrinth:exotic-worlds:${tw_version}"
+    // By Modrinth's project id: the project was renamed (slug toroidal-world, now exotic-worlds,
+    // "Exotic Worlds (Toroidal World)"), and Modrinth's maven no longer answers the old slug.
+    twBundle "maven.modrinth:CdjG7l5z:${tw_version}"
 }
 
 def twInnerDir = layout.buildDirectory.dir('toroidal-world')
