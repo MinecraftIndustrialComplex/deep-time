@@ -129,7 +129,7 @@ def build_page(rows, started):
     esc = html.escape
     trs = []
     for sid, title, ok, ev, secs in rows:
-        evh = "<br>".join(f'<a href="{esc(e)}">{esc(e)}</a>' if e.startswith("http") else f"<code>{esc(e)}</code>" for e in ev) or "—"
+        evh = "<br>".join(f'<a href="{esc(e)}">{esc(e)}</a>' if e.startswith("http") else f"<code>{esc(e)}</code>" for e in ev) or "n/a"
         log = f' · <a href="logs/{sid}.log">log</a>' if os.path.exists(os.path.join(LOGS, f"{sid}.log")) else ""
         trs.append(f'<tr class="{"ok" if ok else "bad"}"><td>{"PASS" if ok else "FAIL"}</td><td>{esc(title)}{log}'
                    f'<div class="t">{secs:.0f} s</div></td><td>{evh}</td></tr>')
@@ -139,8 +139,8 @@ def build_page(rows, started):
     commit = subprocess.run(["git", "-C", REPO, "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Deep Time — Phase 0</title>
-<meta name="description" content="Phase 0 exit of Deep Time: every bridge check re-run on {started[:10]} — natives, generator, Toroidal World wrap, biomes, water, renders.">
+<title>Deep Time: Phase 0</title>
+<meta name="description" content="Phase 0 exit of Deep Time: every bridge check re-run on {started[:10]}: natives, generator, Toroidal World wrap, biomes, water, renders.">
 <style>
 :root{{--bg:#fbfaf7;--fg:#1d1d1b;--mut:#6b6a66;--ok:#1f7a3d;--bad:#b3261e;--line:#e3e0d8;--card:#fff}}
 @media (prefers-color-scheme: dark){{:root:not([data-theme=light]){{--bg:#161614;--fg:#ecebe6;--mut:#a3a19a;--ok:#5cc987;--bad:#ff8a80;--line:#34332f;--card:#1f1e1c}}}}
@@ -154,7 +154,7 @@ tr.ok td:first-child{{color:var(--ok)}} tr.bad td:first-child{{color:var(--bad)}
 code{{font-size:12.5px;overflow-wrap:anywhere}} a{{color:inherit}} ul{{padding-left:20px}}
 @media (max-width:640px){{td{{display:block;border-top:none}} tr{{display:block;border-top:1px solid var(--line)}}}}
 </style></head><body><main>
-<h1>Deep Time — Phase 0</h1>
+<h1>Deep Time: Phase 0</h1>
 <div class="sub">The bridge from a simulated planet to a Minecraft world. Re-run end to end on {esc(started)} at commit {esc(commit)}, on Ben's M6 Mac mini (builds, GameTests, servers) and GitHub Actions (natives).</div>
 <div class="sum">{passed} of {len(rows)} checks pass</div>
 <table>{''.join(trs)}</table>
