@@ -825,7 +825,12 @@ fn threads_and_a_resume_leave_the_volcanoes_unchanged() {
     .unwrap();
     finish(&s3);
     let got = s3.checkpoint().unwrap().world;
-    assert_eq!(got.volcanoes, world.volcanoes);
+    // Compared as text: a record with no continental arc cones (plates start at rest since the
+    // force balance, so the first 10 Myr can have none) keeps NaN percentiles, and NaN != NaN.
+    assert_eq!(
+        format!("{:?}", got.volcanoes),
+        format!("{:?}", world.volcanoes)
+    );
     assert!(!world.volcanoes.as_ref().unwrap().volcanoes.is_empty());
     let ours = |w: &WorldState| -> Vec<deeptime_format::Event> {
         w.events

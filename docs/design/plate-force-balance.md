@@ -1,6 +1,7 @@
 # Force-balance plate motion: design
 
-Status: **design approved 2026-10-02; tasks 2, 3, 4 and 5 built** (see "As built: task 2" and
+Status: **design approved 2026-10-02; tasks 2 to 7 built, task 8 first pass** (see section 13,
+"Tasks 7 and 8", for the switch; and "As built: task 2" and
 "As built: tasks 3 and 4" at the end of section 9, and section 13 for task 5, the forces recorded
 and not applied). It extends
 `docs/design/plate-collisions-and-welding.md` (the "collisions design" below) after Ben's decisions
@@ -897,3 +898,120 @@ slab across that flicker (key it to the trench, or let a reopened contact inheri
 boundary resistance small plates run away (1 % of plate-steps above 250 mm/yr); the mantle flow at 5
 mm/yr changes nothing measurable. The reference slab pull (3 × 10¹³ N/m) is about twice WP-13a's 1.4
 × 10¹³; speeds do not depend on it, the ridge push's share and the stresses do.
+
+### Tasks 7 and 8 (first pass): the switch (2026-10-05)
+
+Branch of the plate task 7 agent (continued twice after stops); master 2e07d954 merged. The plates
+move by the balance; the old speed law and its settings are gone. Where it departs from the plan:
+
+- **Motion.** Each step every plate's rotation relaxes towards the balance's answer over
+  `motion_relax_myr` (6). The guard `max_plate_speed_mm_yr` (250) holds a plate's own fastest
+  point (`kinematics::guard_speed`, not the speed 90° from the pole) and is counted
+  (`plates/guard_bound_plate_steps`): it bound on no plate-step in eight 1000 Myr runs. Steps the
+  solve fails on are counted too (`plates/balance_unsolved_steps`).
+- **Start.** Plates start at rest. The starting floor is aged by an earlier motion drawn for the
+  purpose and not kept (PLT-273), and the slabs that motion was sinking hang at full length from
+  the start (PLT-274), so the planet does not wait for its first subduction initiation.
+- **Slabs** survive a contact's flicker (task 5's finding); a slab no front feeds hangs and pulls
+  for `slab_breakoff_myr` (PLT-271). An initiation plants `initiation_slab_km` (150, PLT-270).
+- **Rifts** keep the parent's motion; rifts whose sides move together for `weld_after_myr` heal
+  (PLT-272).
+- **Collision resistance** is the belt's edge energy plus the buoyancy of the continental
+  lithosphere the collision has dragged down (`collision_buoyancy`, 1 = Cloos 1993's density
+  contrast, FRC-028 to FRC-030, PLT-275): the belt's weight alone did not stop collisions of
+  plates that slabs elsewhere pull. Its drag floor is 1 mm/yr (FRC-011), under the weld speed, so
+  held collisions weld. `collision_resistance_mm_yr` (200 on the old law) no longer exists.
+- **`convergence_ref_mm_yr`** (100) is Cortial's v_0, which was also the speed cap: it now only
+  sets the rate of subduction uplift and arc magma (PLT-037), with its own editor field.
+- **Crust budget (task 8, first pass).** See `docs/science/plates.md`, "The continental crust
+  budget under the force balance": a collision's hidden crust is no longer accreted a second time
+  at a resampling (PLT-276); `collision_stacking_share` 0.95 from Stern & Scholl 2010 (PLT-242);
+  crust beyond `crust_max_km` spreads to neighbours up to `collapse_thickness_km` before any of it
+  founders (PLT-277); `collapse_thickness_km` 50, the sources' figure (PLT-256). Under Ben's
+  validation policy of 2026-10-05 the land share is reported against Earth, not tuned.
+  `arc_maturity_myr` (20) was held as briefed; `collision_buoyancy` 2 and 3 were measured and
+  changed neither crust nor land beyond the noise.
+- **The supercontinent measure** (`plate-check`, CHK-060): a dispersal followed by a new assembly
+  within 20 Myr is one stay. Under the balance two large pieces touch and part at a sample's width
+  for tens of Myr (stalled collisions), and the old measure counted each touch as an assembly and
+  each parting as a break-up: the supercontinent start held its first supercontinent 140–540 Myr
+  while the median "tenure" read 8.5 Myr.
+
+**Measured** (`plate-check`, `earthlike_quick_16k`, 1000 Myr, seeds 1–4, both starts; master
+2e07d954 against the branch, simulation unchanged by the later master merge, which is bake and game
+side; tables in the build log of 2026-10-05):
+
+| Measure | Master | Branch | Target |
+|---|---|---|---|
+| plate-check targets met | 30 of 45 | 30 of 45 | |
+| Speed RMS; 10th / 50th / 90th percentile, mm/yr | 57.9; 36 / 66 / 84 | 41.4; 13 / 41 / 78 | 40–100; ≤20 / 30–60 / 70–110 |
+| Oceanic ÷ continental plates; slab ÷ free plates | 1.61; 1.69 | 2.37; 1.87 | ≥2; ≥2.5 |
+| Speed against slab share, rank correlation | 0.54 | 0.45 | ≥0.65 |
+| Plate-steps where the speed guard binds | 1,015 | 0 | 0 |
+| Rotation change per step, median / 90th pct | 5.1 / 9.6 % | 5.8 / 25.1 % | ≤8 / ≤20 % |
+| Convergence 20 Myr after a collision's onset ÷ at onset | 0.07 | 0.46 | 0.2–0.6 |
+| Collisions per 100 Myr; length, median | 5.2; 30 Myr | 0.90; 44 Myr | 2–6; 15–50 |
+| Largest plate, median share; steps with one above 50 % | 0.27; 5.7 % | 0.17; 0 | 0.15–0.35; ≤10 |
+| Continental crust, lowest step; at the end | 0.37; 0.40 | 0.26; 0.31 | ≥0.37; n/a |
+| Active share of the continental margin | 0.38 | 0.47 | 0.25–0.40 |
+| Supercontinent tenure; period, medians (20 Myr hold, pooled episodes, `force-balance-series.py`) | 67; 139 Myr | 46; 213 Myr | 100–300; 400–800 |
+| Supercontinent assemblies per run | 11.6 | 2.1 | |
+| Land (surface stage) at 1000 Myr; above 2 km of it | 0.136; n/a | 0.185; 0.27 | reported (Earth 0.18–0.30 over the Phanerozoic) |
+
+**Not delivered.** The slab correlation, the step-to-step noise, the collision rate, the active
+margin share and the supercontinent cycle miss their targets; the wedge and foredeep stay under
+one sample of the quick preset. The crust ends 1000 Myr at 0.31 of the planet against master's
+0.40: collisions consume about twice as much continental crust as under the old law, and what a
+long collision stacks beyond 70 km still founders at about 6 km³ a year, many times Earth's rate.
+A quarter of the land stands above 2 km: collapsed orogens keep 50 km of crust at its pure Airy
+height (plates.md). Supercontinents assemble rarely (2 a run against master's 12): continental
+plates move at less than half the speed of oceanic ones, as on Earth, and collisions stall rather
+than surge.
+
+### Task 7 continued: the eclogite root and whole-column isostasy (2026-10-06 to 2026-10-16)
+
+Ben's choice of 2026-10-06 (decisions log, "Fix isostasy first, then land (Recommended)"): thick
+continental crust gets a dense root before task 7 lands, so that a 50 km crust stands near the
+Urals' height rather than 3.2 km. Physics, sources and results: `docs/science/plates.md`, "The
+eclogite root and whole-column isostasy"; ledger PLT-278 to PLT-282, ISO-043, ISO-046.
+
+- **Whole-column isostasy.** Where a column's thickness changes as a whole (belts, collapse,
+  foundering, a cordillera's root) its height changes at the continental crust's mean density,
+  2,830 kg/m³ (PLT-281): 7.0 m of crust per m of height, not 5.5. Erosion from the top keeps 5.5.
+- **The eclogite root.** Mafic pools deeper than 1.5 GPa (54 km) are 30 % eclogite at
+  3,450 kg/m³ and pull the column down by E × 620 / 3,300 (PLT-278 to PLT-280, rule PLT-282).
+- **The surface flexure** infers the crust behind a plate uplift at the same density (ISO-046).
+- **Measurement only:** run-summary globals `plates/arc_continental_km3`, `plates/arc_oceanic_km3`
+  and `plates/continental_volume_km3` for the crust budget against Stern & Scholl 2010.
+
+The root cannot bring a 50 km column to the Urals' height: it has no root (the eclogite depth is
+54 km) and now stands about 2.7 km. The sources put the Urals' low stand on a dense lower crust that
+is not eclogite and a cold lithosphere, neither of which the model carries; the target was not
+tuned for.
+
+**Measured** (`earthlike_quick_16k`, 1000 Myr, seeds 1–4, both starts; mean of the runs, pooled
+episodes for the supercontinent; reported, not tuned):
+
+| Measure | Branch, 2026-10-05 | With the root | Final (also the flexure) | Target |
+|---|---|---|---|---|
+| plate-check targets met | 30 of 45 | 31 of 45 | 31 of 45 | |
+| Speed RMS; 10th / 50th / 90th percentile, mm/yr | 41.4; 13 / 41 / 78 | 41.8; 13 / 41 / 78 | 41.9; 14 / 41 / 78 | 40–100; ≤20 / 30–60 / 70–110 |
+| Rotation change per step, 90th pct | 25.1 % | 24.9 % | 25.2 % | ≤20 % |
+| Convergence 20 Myr after a collision's onset ÷ at onset | 0.46 | 0.50 | 0.40 | 0.2–0.6 |
+| Collisions per 100 Myr; length, median | 0.90; 44 Myr | 1.00; 40 Myr | 0.89; 46 Myr | 2–6; 15–50 |
+| Continental crust, lowest step; at the end | 0.26; 0.31 | 0.26; 0.31 | 0.25; 0.32 | ≥0.37; n/a |
+| Supercontinent tenure; period, medians | 46; 213 Myr | 45; 230 Myr | 48; 267 Myr | 100–300; 400–800 |
+| Supercontinent assemblies per run | 2.1 | 2.25 | 2.5 | |
+| Land at 1000 Myr; above 2 km of it; median land height | 0.185; 0.27; n/a | 0.180; 0.25; 987 m | 0.192; 0.27; 1,004 m | reported (Earth 0.18–0.30; 0.10; 427 m) |
+
+At 500 Myr (seeds 1–3, both starts) the final code has land 0.191, median land height 745 m, land
+above 2 km 0.187 of the land and continental crust 0.307 of the planet (Earth 0.289, 427 m, 0.10,
+about 0.41); master on 2026-10-05 had 0.184, 414 m, 0.083 and 0.382.
+
+**Not delivered, and why.** The plate targets that failed on 2026-10-05 still fail; the root
+changes the surface and leaves the plate motion as it was. The land is still short: most of the
+continental crust stands 0.5–3 km below the Airy height of its own thickness, near sea level
+(plates.md, "The land share: height has fallen behind thickness"), and which process takes the
+height and leaves the crust was not measured. The crust budget is not Earth's: continental arcs
+and cordillera roots add about 8 km³ a year against Earth's 1, collisions destroy many times
+Earth's 0.7, and island arcs add a tenth of Earth's 1.5 (Stern & Scholl 2010).

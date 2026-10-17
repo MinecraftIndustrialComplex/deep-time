@@ -53,9 +53,10 @@ public final class OreDraws {
      * {@code worldSeed} and circumference c (Ben, 2026-10-16: placer gold is brushed out of suspicious
      * gravel and sand). A pure function of the world seed and the canonical position (x wraps, so a
      * block and its copy across the seam get the same seed), so regenerating a chunk, or the same
-     * world on another machine, gives the same nuggets for the same brush. Never 0: the block entity
-     * does not save a zero seed, and a loot table rolled with seed 0 draws from the level's random
-     * sequence instead of the block's own.
+     * world on another machine, gives the same nuggets for the same brush. The nuggets are rolled with
+     * it when the block is placed ({@code PlacerPanning.fill}). Never 0: a loot table rolled with seed
+     * 0 draws from the level's random sequence instead of the block's own (and the brushable block
+     * entity does not save a zero seed).
      */
     public static long panSeed(long worldSeed, int c, int x, int y, int z) {
         int cx = Math.floorMod(x + c / 2, c) - c / 2;

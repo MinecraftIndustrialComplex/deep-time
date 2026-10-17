@@ -1,0 +1,6 @@
+h3
+nb --set tectonics.collision_buoyancy=0
+col --set tectonics.collapse_quiet_myr=2 --set tectonics.collapse_myr=10
+stk --set tectonics.collision_stacking_share=1.0 --set tectonics.crust_max_km=80
+shf --set tectonics.continental_shelf_share=0.45
+all --set tectonics.collapse_quiet_myr=2 --set tectonics.collapse_myr=10 --set tectonics.collision_stacking_share=1.0 --set tectonics.crust_max_km=80 --set tectonics.continental_shelf_share=0.45
