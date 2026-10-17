@@ -121,10 +121,14 @@ def step_phase0(a):
     # leaves the four GameTest-based rows as they were (marked PENDING below, with the result they last had).
     gt_steps = ("gametest", "gametest-mic", "gametest-tb", "planet")
     p0_args = ["--no-publish"] + (["--only", "rust,junit,inspect,smoke-standalone,smoke-mic-32k,smoke-mic-16k"] if a.skip_gametest else [])
+    rows_path = os.path.join(REPO, "review", "out", "phase0-src", "rows.json")
+    before = os.path.getmtime(rows_path) if os.path.exists(rows_path) else None
     if not a.skip_phase0:
         with open(out_path, "w") as f:
             subprocess.run([sys.executable, p0] + p0_args, cwd=REPO, stdout=f, stderr=subprocess.STDOUT, env={**os.environ, "PHASE0_DETACH": "1"})
-    rows_path = os.path.join(REPO, "review", "out", "phase0-src", "rows.json")
+        # phase0.py writes rows.json only when it finishes: a crash leaves the previous run's rows, which must not be read as this run's.
+        if os.path.exists(rows_path) and os.path.getmtime(rows_path) == before:
+            return [Row("phase0", 0, "Phase 0's suite re-run", "ERROR", ["phase0.py did not finish (rows.json is the previous run's): see review/out/phase1-src/logs/phase0.log"])]
     if not os.path.exists(rows_path):
         return [Row("phase0", 0, "Phase 0's suite re-run", "ERROR", ["no review/out/phase0-src/rows.json: phase0.py did not finish (see logs/phase0.log)"])]
     rows = json.load(open(rows_path))
