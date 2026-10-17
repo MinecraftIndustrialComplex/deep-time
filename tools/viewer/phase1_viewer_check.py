@@ -93,6 +93,13 @@ def set_layer(page, i):
     time.sleep(1.2)
 
 
+FLAG_SETS = (
+    ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
+    ["--disable-gpu", "--disable-dev-shm-usage"],
+    ["--disable-gpu", "--disable-software-rasterizer", "--disable-dev-shm-usage", "--no-zygote", "--single-process"],
+)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bundle", required=True)
@@ -112,30 +119,51 @@ def main():
 
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=a.bundle))
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    port = free_port()
-    profile = tempfile.mkdtemp(prefix="dt-p1view-")
-    proc = subprocess.Popen(
-        find_chromium(a.chromium) + ["--headless=new", "--no-sandbox", "--hide-scrollbars", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist",
-                                     f"--remote-debugging-port={port}", f"--user-data-dir={profile}", f"--window-size={w},{h}", "about:blank"],
-        stdout=subprocess.DEVNULL, stderr=open(os.path.join(profile, "chromium.err"), "w"))
-    try:
-        for _ in range(300):
+    # Chromium's GPU flags that work differ between builds: try the software-GL set the BlueMap shots use, then plainer ones, and
+    # keep each failed attempt's stderr (head and tail) for the report.
+    proc = profile = page = up = None
+    tried = []
+    for flags in FLAG_SETS:
+        port = free_port()
+        profile = tempfile.mkdtemp(prefix="dt-p1view-")
+        errf = os.path.join(profile, "chromium.err")
+        proc = subprocess.Popen(
+            find_chromium(a.chromium) + ["--headless=new", "--no-sandbox", "--hide-scrollbars", *flags,
+                                         f"--remote-debugging-port={port}", f"--user-data-dir={profile}", f"--window-size={w},{h}", "about:blank"],
+            stdout=subprocess.DEVNULL, stderr=open(errf, "w"))
+        try:
+            for _ in range(300):
+                try:
+                    targets = json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list", timeout=2))
+                    tgt = next(t for t in targets if t.get("type") == "page")
+                    break
+                except Exception:
+                    time.sleep(0.5)
+            else:
+                raise EOFError("Chromium's DevTools endpoint did not come up")
+            ws = WS(tgt["webSocketDebuggerUrl"])
+            ws.call("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=1, mobile=False)
+            ws.call("Page.enable")
+            ws.call("Runtime.enable")
+            page = Page(ws)
+            ws.call("Page.navigate", url=f"http://127.0.0.1:{srv.server_address[1]}/index.html")
+            up = page.wait("document.getElementById('timelapse') && !document.getElementById('timelapse').hidden", 90)
+            break
+        except EOFError as e:
             try:
-                targets = json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list", timeout=2))
-                tgt = next(t for t in targets if t.get("type") == "page")
-                break
-            except Exception:
-                time.sleep(0.5)
-        else:
-            sys.exit("phase1_viewer_check: Chromium's DevTools endpoint did not come up")
-        ws = WS(tgt["webSocketDebuggerUrl"])
-        ws.call("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=1, mobile=False)
-        ws.call("Page.enable")
-        ws.call("Runtime.enable")
-        page = Page(ws)
-        ws.call("Page.navigate", url=f"http://127.0.0.1:{srv.server_address[1]}/index.html")
-        up = page.wait("document.getElementById('timelapse') && !document.getElementById('timelapse').hidden", 90)
-
+                err = open(errf).read()
+            except OSError:
+                err = ""
+            tried.append(f"{' '.join(flags)}: {e}; chromium exit {proc.poll()}; stderr head {err[:500]!r} tail {err[-300:]!r}")
+            print(f"phase1_viewer_check: attempt failed: {tried[-1]}")
+            proc.kill()
+            proc.wait()
+            shutil.rmtree(profile, ignore_errors=True)
+            proc = None
+    if proc is None:
+        check(False, "the viewer opens in Chromium", " | ".join(tried)[:1800])
+        sys.exit(1)
+    try:
         # 6a. the timelapse: keyframes, a scrubber that moves the picture, a play button.
         if not up:
             check(False, "the viewer shows the timelapse", "the #timelapse section never became visible (no keyframes, events or sites in the bundle?)")
