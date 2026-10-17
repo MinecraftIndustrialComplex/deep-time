@@ -15,7 +15,9 @@ With the Earth-like presets the last tenth of a history is **steered**: if the p
 for too little land or a frozen or overheated end, its ocean slowly loses (or gains) water and its
 volcanoes give off a little more (or less) CO₂, so it ends inside a playable band (by default
 25–35 % land and a global mean of 10–20 °C). A planet already inside the band is not touched.
-Turning steering off is the realistic choice: the planet ends however its physics ends it.
+Turning steering off is the realistic choice: no steering at all, so the present-day climate
+adjustment (`climate.present_climate`) is off too, and the planet ends however its physics ends it
+(Ben, decisions log 2026-10-06).
 
 ## The model in plain words
 
@@ -115,5 +117,7 @@ limits, shape and tail fraction are this task's (build log 2026-10-05), set from
 
 ## Open questions
 
-- Whether the "free" (realistic) choice should also set `climate.present_climate` to natural:
-  today it is a separate setting (STATUS.md, Pending questions).
+- None open. Ben answered the three of 2026-10-05 on 2026-10-06: the nudges stay gentle (the
+  plate work brings land up), stops stay at 50-Myr keyframes, and the realistic choice is no
+  steering at all: with `steering.enabled` false, `climate.present_climate` is off too (see the
+  decisions log).
