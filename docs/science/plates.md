@@ -15,7 +15,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
 | [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228 (19) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
-| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264 (33; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04) |
+| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-282 (39; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221, PLT-265 (41; PLT-265 Earth's passive margins, the transition's comparison) |
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
@@ -601,17 +601,16 @@ Earth's land share over the Phanerozoic was about 18–30 % (Ben's reference ran
 today's is 29 % with continental crust (shelves included) about 41 %, and about a tenth of the
 land stands above 2 km (from memory).
 
-**Why the high ground (a model issue, open).** Collapse thins quiet crust only to 50 km, and a
-50 km column stands at its Airy height, about 3.2 km (the middle of `continent_elevation_m` plus
-15 km / 5.5; PLT-121). Earth's crust of that thickness under an old orogen stands about a
-kilometre high (the Urals keep 50–56 km, Carbonell et al. 2000; their height of about a kilometre is from memory), because its root is dense and
-its lithosphere cold, which pure Airy isostasy with one crustal density leaves out. So every
-collapsed orogen in the model stays above 2 km until erosion takes it down. Erosion is not what
-holds it up: the erosion audit of 2026-10-05 finds land above 2 km eroding at 116–144 m/Myr
-(mean), the rate of mountain ranges and 5–10 times faster than a real plateau interior (southern
-Tibet under 0.01 km/Myr since about 11 Ma, Tremblay et al. 2015, ERO-174). The high ground is the
-crust supply: the 50 km collapse floor and the belts held at up to 70 km, at their pure Airy
-heights. The levers are the collapse floor and the isostasy of thick crust (open).
+**Why the high ground (a model issue; the isostasy part fixed 2026-10-06, see the next section).**
+Collapse thins quiet crust only to 50 km, and a 50 km column stood at its Airy height with the
+upper crust's density, about 3.2 km (the middle of `continent_elevation_m` plus 15 km / 5.5).
+Earth's crust of that thickness under an old orogen stands far lower (the Urals keep 50–58 km,
+Carbonell et al. 1996 and 2000, at a mean altitude of 0.5–0.8 km, Artyushkov et al. 2000, snippet
+only). Erosion is not what holds it up: the erosion audit of 2026-10-05 finds land above 2 km
+eroding at 116–144 m/Myr (mean), the rate of mountain ranges and 5–10 times faster than a real
+plateau interior (southern Tibet under 0.01 km/Myr since about 11 Ma, Tremblay et al. 2015,
+ERO-174). The high ground is the crust supply (the 50 km collapse floor and the belts held at up
+to 70 km) at the height isostasy gives it.
 
 **Limits.**
 - Which of spreading and foundering comes first, and the reach, are the model's.

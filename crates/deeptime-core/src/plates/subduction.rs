@@ -471,6 +471,7 @@ pub const ARC_OCEANIC_GLOBAL: &str = "plates/arc_oceanic_km3";
 /// World global: the visible continental crust's volume after the last step, km³ (Earth-normalized).
 pub const CONTINENTAL_VOLUME_GLOBAL: &str = "plates/continental_volume_km3";
 
+/// What `fronts_and_uplift` measured this step.
 pub struct Pull {
     /// Each plate's oceanic subduction front length, km (Earth-normalized; the dynamics record's).
     pub front_km: Vec<f64>,
@@ -479,6 +480,18 @@ pub struct Pull {
     pub arc_continental_km3: f64,
     /// Arc magma this step added to oceanic samples (island arcs), km³ (Earth-normalized).
     pub arc_oceanic_km3: f64,
+}
+
+/// One subducting-side sample's effect on its contact and on the crust budget.
+struct Effect {
+    contact: usize,
+    rate_mm_yr: f64,
+    /// The sample is continental and rose fast enough for an Andean orogeny.
+    andean: bool,
+    /// Crust added to a continental sample (arc magma and the cordillera's root), m.
+    continental_m: f64,
+    /// Arc magma added to an oceanic sample, m.
+    oceanic_m: f64,
 }
 
 /// Divergence flags, trenches, fronts, subduction uplift and arcs; each plate's oceanic front length.
@@ -617,7 +630,7 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
     let orogeny_m = OROGENY_MIN_M_PER_MYR * env.dt_myr;
     let collision_myr = k.collision_orogeny_myr;
     let info = &info;
-    let effects: Vec<Option<(usize, f64, bool, f64, f64)>> = state
+    let effects: Vec<Option<Effect>> = state
         .samples
         .par_iter_mut()
         .enumerate()
@@ -716,22 +729,22 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
                 s.orogeny = OROGENY_ANDEAN;
                 s.orogeny_myr = t_myr as f32;
             }
-            Some((
-                src.contact,
-                dz / dt_yr * 1.0e3,
-                andean && s.kind == CONTINENTAL,
-                added_continental,
-                added_oceanic,
-            ))
+            Some(Effect {
+                contact: src.contact,
+                rate_mm_yr: dz / dt_yr * 1.0e3,
+                andean: andean && s.kind == CONTINENTAL,
+                continental_m: added_continental,
+                oceanic_m: added_oceanic,
+            })
         })
         .collect();
     let (mut arc_continental_m, mut arc_oceanic_m) = (0.0, 0.0);
-    for (c, rate, andean, cont, ocean) in effects.into_iter().flatten() {
-        let contact = &mut state.contacts[c];
-        contact.max_uplift_mm_yr = contact.max_uplift_mm_yr.max(rate);
-        contact.andean |= andean;
-        arc_continental_m += cont;
-        arc_oceanic_m += ocean;
+    for e in effects.into_iter().flatten() {
+        let contact = &mut state.contacts[e.contact];
+        contact.max_uplift_mm_yr = contact.max_uplift_mm_yr.max(e.rate_mm_yr);
+        contact.andean |= e.andean;
+        arc_continental_m += e.continental_m;
+        arc_oceanic_m += e.oceanic_m;
     }
     let area = norm.sample_area_km2();
     Pull {
