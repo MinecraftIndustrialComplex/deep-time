@@ -59,6 +59,10 @@ def mean(xs):
     return sum(xs) / len(xs) if xs else float("nan")
 
 
+def num(x, digits):
+    return "-" if x != x else f"{x:.{digits}f}"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--t", type=int, action="append")
@@ -74,6 +78,8 @@ def main():
         print(f"# {p}: z0 {head[0]:.0f} m, restarts {head[1]}, worst residual {head[2]:.1f} m")
     times = sorted({t for (t, _) in runs[0][3]})
     ts = a.t or [times[len(times) // 2 - 1], times[-1]]
+    if any(t not in times for t in ts):
+        sys.exit(f"no snapshot at {[t for t in ts if t not in times]}; the summaries have {times}")
     bands = a.bands.split(",")
     for t in ts:
         print(f"\n## t = {t} Myr")
@@ -105,10 +111,13 @@ def main():
                 row = [mean(st), mean(oc), mean(st) - mean(oc), mean(gr), mean(lf),
                        mean(lf) - mean(gr)]
                 tot = [x + (y if y == y else 0.0) for x, y in zip(tot, row)]
-                print(f"| {name} | {row[0]:.0f} [{min(st):.0f}, {max(st):.0f}] | {row[1]:.0f} "
-                      f"| {row[2]:.0f} | {row[3]:.2f} | {row[4]:.2f} | {row[5]:.2f} |")
-            print(f"| sum | {tot[0]:.0f} | {tot[1]:.0f} | {tot[2]:.0f} | {tot[3]:.2f} "
-                  f"| {tot[4]:.2f} | {tot[5]:.2f} |")
+                print(f"| {name} | {row[0]:.0f} [{min(st):.0f}, {max(st):.0f}] | {num(row[1], 0)} "
+                      f"| {num(row[2], 0)} | {row[3]:.2f} | {num(row[4], 2)} | {num(row[5], 2)} |")
+            # Summaries from before the ocean shares and the lift (17806eeb) have neither.
+            old = not any(r[3][(t, b)][2] for r in have)
+            blank = lambda x, d: "-" if old else f"{x:.{d}f}"
+            print(f"| sum | {tot[0]:.0f} | {blank(tot[1], 0)} | {blank(tot[2], 0)} | {tot[3]:.2f} "
+                  f"| {blank(tot[4], 2)} | {blank(tot[5], 2)} |")
 
 
 if __name__ == "__main__":

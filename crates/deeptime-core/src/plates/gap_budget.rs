@@ -18,13 +18,15 @@
 //! (erosion and deposition, which change the column's thickness too), its local isostatic
 //! rebound, the local response to the rest of the change of sea water and ice over the column,
 //! the regional part of the flexure's answer to those loads (the plate spreading them), the
-//! flexure's bending of the roots the plate model and the spreading put in the elevation, the
-//! rest of the flexure (the moment a weakened plate releases, the last solve's unfinished part),
-//! the plateau spreading, and the carry (whatever else the feedback holds: the semi-Lagrangian
-//! advection of the surface on L1, the L0/L1 sampling and the clamps). The surface stage writes the per-cell parts as fields ([`field`]) while the budget is
-//! on. A resampling blends the parts with the same weights as the column it blends, books the
-//! gap its blending adds (the gap is not linear in the pools) and the gap of the crust it accretes
-//! (thickness with no height). A sample born later (new sea floor) starts with its gap in the
+//! flexure's bending of the roots the plate model and the spreading put in the elevation, its
+//! answer to the moment a weakened plate releases, the rest of the flexure (its answer to the
+//! loads later stages laid on the surface, the volcano stage's cones and the impacts, and the
+//! solves' unfinished parts), the plateau spreading, and the carry (whatever else the feedback
+//! holds: the semi-Lagrangian advection of the surface on L1, the L0/L1 sampling, the clamps,
+//! and the heights the cones and impacts added). The surface stage writes the per-cell parts as
+//! fields ([`field`]) while the budget is on. A resampling blends the parts with the same
+//! weights as the column it blends, books the gap its blending adds (the gap is not linear in
+//! the pools) and the gap of the crust it accretes (thickness with no height). A sample born later (new sea floor) starts with its gap in the
 //! `birth` part. Each part also keeps what of it was made while the sample was oceanic crust
 //! (the ocean share), so a continental column's gap splits into what it brought from the ocean
 //! floor and what was made on the continent.
@@ -61,8 +63,13 @@ pub mod field {
     /// The flexure's answer to the roots the plate model's uplift and the plateau spreading put
     /// in the elevation (`flexure.rs`: the plate bends under the root it resolves).
     pub const ROOTS: &str = "surface/gap_roots_m";
-    /// The rest of the flexure's change: the moment a weakened plate releases and the last
-    /// solve's unfinished part (and the split solves' own residuals).
+    /// The flexure's answer to the moment a weakened plate releases (`flexure.rs`: rigidity lost
+    /// to reheating or a plate's broken edge releases the moment in proportion).
+    pub const RELEASED: &str = "surface/gap_released_m";
+    /// The rest of the flexure's change: its answer to the loads later stages laid on the surface
+    /// since the last step (the volcano stage's cones, the impacts; their heights are in the
+    /// carry) and to the last solve's unfinished part, both carried in the unsolved residual,
+    /// less what the step's own solve left unfinished (and the split solves' residuals).
     pub const FLEX_REST: &str = "surface/gap_flex_rest_m";
     /// The plateau spreading's change (`spread.rs`).
     pub const SPREAD: &str = "surface/gap_spread_m";
@@ -84,11 +91,14 @@ pub enum Part {
     Flexure,
     /// Surface: the flexure's bending of the plate model's and the spreading's roots.
     Roots,
-    /// Surface: the rest of the flexure (moment released, unfinished solve).
+    /// Surface: the flexure's answer to the moment a weakened plate releases.
+    Released,
+    /// Surface: the rest of the flexure (other stages' loads, unfinished solves).
     FlexRest,
     /// Surface: the plateau spreading.
     Spread,
-    /// Surface: the rest of the feedback (advection on L1, sampling, clamps).
+    /// Surface: the rest of the feedback (advection on L1, sampling, clamps, the heights later
+    /// stages added: cones, impacts).
     Carry,
     /// `subduction::resolve`.
     Subduction,
@@ -126,17 +136,18 @@ pub enum Part {
 
 /// The surface stage's parts of the feedback and their fields, in the order
 /// [`GapBudget::book_surface`] takes them.
-pub const SURFACE_PARTS: [(Part, &str); 6] = [
+pub const SURFACE_PARTS: [(Part, &str); 7] = [
     (Part::Rebound, field::REBOUND),
     (Part::Water, field::WATER),
     (Part::Flexure, field::FLEXURE),
     (Part::Roots, field::ROOTS),
+    (Part::Released, field::RELEASED),
     (Part::FlexRest, field::FLEX_REST),
     (Part::Spread, field::SPREAD),
 ];
 
 /// The number of parts.
-pub const PARTS: usize = 25;
+pub const PARTS: usize = 26;
 
 /// The parts' names, in order.
 pub const NAMES: [&str; PARTS] = [
@@ -146,6 +157,7 @@ pub const NAMES: [&str; PARTS] = [
     "water",
     "flexure",
     "roots",
+    "released",
     "flex_rest",
     "spread",
     "carry",
