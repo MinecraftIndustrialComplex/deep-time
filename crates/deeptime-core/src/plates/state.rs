@@ -495,6 +495,10 @@ pub struct PlateState {
     pub slabs: Vec<SlabTrack>,
     /// The dynamics record (`dynamics.rs`): measurement only, absent when switched off.
     pub dynamics: Option<super::dynamics::Dynamics>,
+    /// The land's gap budget (`gap_budget.rs`): measurement only, absent unless switched on; not
+    /// kept in checkpoints.
+    #[serde(skip)]
+    pub gap_budget: Option<super::gap_budget::GapBudget>,
 }
 
 impl PlateState {

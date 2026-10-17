@@ -1333,6 +1333,13 @@ impl SurfaceStage {
 
         // 5c. Flexure (`flexure.rs`): the plate bends under the step's loads.
         let mut flexed = None;
+        // The land's gap budget (`plates::gap_budget`, measurement only): the surface's parts of
+        // the feedback, per cell.
+        let budget = world
+            .plates
+            .as_ref()
+            .is_some_and(|st| st.gap_budget.is_some());
+        let h_spread = (budget && flex_on).then(|| sc.h.clone());
         if let (Some(h_eroded), Some(h_before_spread)) = (&h_eroded, &h_before_spread) {
             let started = Instant::now();
             let ice: Option<Vec<f32>> = world
@@ -1386,6 +1393,40 @@ impl SurfaceStage {
             }
             flexed = Some(out);
             self.time("flexure", started);
+        }
+        if let (Some(h_eroded), Some(h_before_spread), Some(h_spread)) =
+            (&h_eroded, &h_before_spread, &h_spread)
+        {
+            use crate::plates::gap_budget::field as gap;
+            let strength = p.flexure.strength;
+            let local: Vec<f64> = (0..n)
+                .map(|c| {
+                    flexure::local_rebound_m(
+                        strength,
+                        p.isostasy,
+                        sea,
+                        h_start[c],
+                        h_eroded[c],
+                        h_spread[c],
+                    )
+                })
+                .collect();
+            let rebound = (0..n).map(|c| (h_before_spread[c] - h_eroded[c] + local[c]) as f32);
+            let flex = (0..n).map(|c| (sc.h[c] - h_spread[c] - local[c]) as f32);
+            let spread = (0..n).map(|c| (h_spread[c] - h_before_spread[c]) as f32);
+            for (name, data) in [
+                (gap::REBOUND, rebound.collect::<Vec<f32>>()),
+                (gap::FLEXURE, flex.collect()),
+                (gap::SPREAD, spread.collect()),
+            ] {
+                world.fields.insert(
+                    name.to_owned(),
+                    Field {
+                        grid: grid.clone(),
+                        data,
+                    },
+                );
+            }
         }
 
         // 6. Outputs.

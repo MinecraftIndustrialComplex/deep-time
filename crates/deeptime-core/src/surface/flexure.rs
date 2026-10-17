@@ -1000,6 +1000,39 @@ pub struct StepOut {
     pub elastic_thickness_km: Vec<f32>,
 }
 
+/// The load share of the step's eroded and deposited rock, on land and under the sea (m of mantle
+/// per m of rock), for the `isostasy` setting `rock_share`.
+fn rock_shares(rock_share: f64) -> (f64, f64) {
+    let water_share = RHO_WATER / RHO_MANTLE;
+    // Sediment under water: the density today's 0.7 factor implies (docs/design/flexure.md 3.2).
+    (
+        rock_share,
+        water_share + 0.7 * rock_share * (1.0 - water_share), // ledger: ISO-047
+    )
+}
+
+/// The local (Airy) answer to one cell's erosion and deposition of the step, m: the elevation
+/// change a plate with no strength would give the load [`step`] adds for it (the rock, and the
+/// sea water that takes or gives up its room). Measurement only (the gap budget,
+/// `plates::gap_budget`); the solve spreads the same load over the plate. `h_start` and
+/// `h_eroded` as in [`StepIn`]; `h_now` the elevation the solve starts from (after the
+/// spreading).
+pub fn local_rebound_m(
+    strength: f64,
+    rock_share: f64,
+    sea: f64,
+    h_start: f64,
+    h_eroded: f64,
+    h_now: f64,
+) -> f64 {
+    let (rock_land, rock_sea) = rock_shares(rock_share);
+    let rock = if h_eroded <= sea { rock_sea } else { rock_land };
+    let water = (sea - h_eroded).max(0.0) - (sea - h_start).max(0.0);
+    let dq = (h_eroded - h_start) * rock + RHO_WATER / RHO_MANTLE * water;
+    let wet = if h_now <= sea { 1.0 } else { 0.0 };
+    -strength * RHO_MANTLE * dq / (RHO_MANTLE - RHO_WATER * strength * wet)
+}
+
 /// The largest power of two that keeps the solve cell at or under [`SOLVE_CELL_M`] and divides
 /// the raster.
 pub fn coarsening(w: usize, h: usize, norm_dx_m: f64) -> usize {
@@ -1035,9 +1068,7 @@ pub fn step(
     let lift = x.dt_myr * 1.0e3; // mm/yr over the step, in m
     let water_share = RHO_WATER / RHO_MANTLE;
     let ice_share = RHO_ICE / RHO_MANTLE;
-    // Sediment under water: the density today's 0.7 factor implies (docs/design/flexure.md 3.2).
-    let rock_land = x.rock_share;
-    let rock_sea = water_share + 0.7 * x.rock_share * (1.0 - water_share); // ledger: ISO-047
+    let (rock_land, rock_sea) = rock_shares(x.rock_share);
 
     // 1. The loads of the step and the roots already in the elevation. Increments only: the
     // carried plate is in equilibrium under the carried load.
