@@ -312,7 +312,11 @@ class AdvancedSettingsTest {
         a.setStart("scattered_continents");
         a.setLengthText("100");
         List<String> edited = new ArrayList<>();
-        for (EditorFields.Field f : EditorFields.ALL) {
+        // The steering switch last: turned off it greys out the present-day climate (Ben,
+        // decisions log 2026-10-06, "One switch for both"), which is then set already.
+        List<EditorFields.Field> order = new ArrayList<>(EditorFields.ALL);
+        order.sort(java.util.Comparator.comparing(f -> f.id().equals(EditorModel.STEERING)));
+        for (EditorFields.Field f : order) {
             if (!a.available(f))
                 continue;
             switch (f.kind()) {
