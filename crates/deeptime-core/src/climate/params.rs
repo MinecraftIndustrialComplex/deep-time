@@ -234,6 +234,10 @@ pub struct ClimateParams {
     pub sst_midlatitude_cold_c: f64,
     /// Drying under the eastern side of the subtropical highs (west coasts), 0–1.
     pub subsidence: f64,
+    /// One factor on the belts' rain (`rain_model = belts`): calibrated so that Earth's relief and
+    /// CO₂ give Earth's observed land rain (Ben, decisions log 2026-10-06, "Belts, scaled up to
+    /// Earth's amount"). Scales the amount only; the pattern is the belts'.
+    pub belts_rain_scale: f64,
     /// Wetting under the western side of the subtropical highs (east coasts): the circulation's
     /// rain there is up to 1 + this times the belt's.
     pub west_flank_wet: f64,
@@ -472,7 +476,8 @@ impl Default for ClimateParams {
             sst_midlatitude_warm_c: 6.0,
             sst_midlatitude_cold_c: 5.0,
             subsidence: 0.55,
-            west_flank_wet: 0.4, // ledger: MOI-022
+            west_flank_wet: 0.4,    // ledger: MOI-022
+            belts_rain_scale: 1.42, // ledger: CLM-201
             onshore: 1.0,
             oro_conv_time_s: 1000.0,
             oro_fall_time_s: 1000.0,
@@ -581,6 +586,7 @@ impl ClimateParams {
             (self.sea_surface_rh, "sea_surface_rh", 0.3, 0.99),
             (self.rain_rh_slope, "rain_rh_slope", 0.0, 40.0),
             (self.west_flank_wet, "west_flank_wet", 0.0, 5.0),
+            (self.belts_rain_scale, "belts_rain_scale", 0.1, 5.0),
             (self.gyre_heat_efficiency, "gyre_heat_efficiency", 0.0, 5.0),
             (self.overturning_sv, "overturning_sv", 0.0, 100.0),
             (self.winter_inversion_c, "winter_inversion_c", 0.0, 40.0),
