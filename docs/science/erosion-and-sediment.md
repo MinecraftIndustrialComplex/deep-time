@@ -232,8 +232,9 @@ slope cuts nothing in any case, the 1-cell escarpment included: the escarpment's
 stream power keeps it below 0.35 (on the planet the cut works on peaks and ridges, where the area is small). A
 terminal lake does not save the plateau: at the centre of a plateau without a rim it changes nothing (132 against
 125 m/Myr), and behind a rim range it lowers the interior's wear only from 146 to 121 m/Myr. The interior's own
-rivers could take no more than its 30 m of noise down to the lake, so the rest is the outer rivers cutting through
-the rim within the 10 Myr and capturing the basin. Only less runoff slows the plateau.
+rivers can take no more than its 30 m of noise down to the lake (the lake holds its base level at 4,000 m), so the
+rest, over a kilometre in 10 Myr, must come from the outer rivers cutting through the rim and capturing the basin.
+Only less runoff slows the plateau.
 
 **The planet** (`earthlike_quick_16k`, scattered continents, the preset's seed, 500 Myr, master 4e6b0022 with the
 diagnostic of ERO-175: every surface step, each land cell's gross lowering by process, area-time weighted in its 1-km
@@ -254,7 +255,7 @@ Above 2 km stream power is 63 to 76 % of the gross lowering and diffusion 21 to 
 is flat, and it wears at 63 m/Myr (37 of it stream power, 26 diffusion): six times southern Tibet's plateau surface
 (under 10 m/Myr, ERO-174), while the steep three quarters wear at 199. The critical-slope cut grows with height, from
 9.6 m/Myr in the 2-km band to 110 of the 123 m/Myr of stream power above 4 km: there it is the process that wears
-the ranges, the one law here that is not the same at every drawn width.
+the ranges, and with diffusion it is one of the two laws here that change with the drawn width.
 
 **κ at a measured value.** The only primary diffusivity read, Roering, Kirchner and Dietrich 1999 (ERO-177), is
 0.0036 m²/yr (0.0031 to 0.0045 per hillslope) for soil creep on Oregon Coast Range hillslopes tens of metres long,
@@ -289,7 +290,7 @@ slower.
 
 **The cause.** The plateaus wear at range rates because of the stream power as calibrated, not because of a
 length scale. K = 3e-9 with n = 2 (ERO-004, ERO-007) was fitted so the planet's hypsometry comes out right, not to
-measured erosion rates, and it wears any plateau that sheds water at a few hundred metres per Myr at either width:
+measured erosion rates, and it wears any plateau that sheds water at a hundred metres or more per Myr at either width:
 with n = 2 a knickpoint's celerity C = 2 K A S is large for the large drainage area an escarpment's rivers collect,
 and on the map the escarpment's knickpoint crosses the controlled plateau within one 2-Myr step, at Earth's width
 too (the law is the same at both widths). The drainage does not change that: the priority flood routes every closed
