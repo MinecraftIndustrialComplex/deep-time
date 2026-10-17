@@ -1522,6 +1522,8 @@ impl SurfaceStage {
                 (gap::RELEASED, (0..n).map(|c| released(c) as f32).collect()),
                 (gap::FLEX_REST, rest.collect()),
                 (gap::SPREAD, spread.collect()),
+                // The volcano stage and the impacts add their changes of the surface to it.
+                (gap::LATER, vec![0.0; n]),
             ] {
                 world.fields.insert(
                     name.to_owned(),

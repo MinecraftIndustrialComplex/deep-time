@@ -21,9 +21,9 @@
 //! flexure's bending of the roots the plate model and the spreading put in the elevation, its
 //! answer to the moment a weakened plate releases, the rest of the flexure (its answer to the
 //! loads later stages laid on the surface, the volcano stage's cones and the impacts, and the
-//! solves' unfinished parts), the plateau spreading, and the carry (whatever else the feedback
-//! holds: the semi-Lagrangian advection of the surface on L1, the L0/L1 sampling, the clamps,
-//! and the heights the cones and impacts added). The surface stage writes the per-cell parts as
+//! solves' unfinished parts), the plateau spreading, what the volcano stage and the impacts
+//! added to the surface, and the carry (whatever else the feedback holds: the semi-Lagrangian
+//! advection of the surface on L1, the L0/L1 sampling and the clamps). The surface stage writes the per-cell parts as
 //! fields ([`field`]) while the budget is on. A resampling blends the parts with the same
 //! weights as the column it blends, books the gap its blending adds (the gap is not linear in
 //! the pools) and the gap of the crust it accretes (thickness with no height). A sample born later (new sea floor) starts with its gap in the
@@ -70,12 +70,16 @@ pub mod field {
     /// to reheating or a plate's broken edge releases the moment in proportion).
     pub const RELEASED: &str = "surface/gap_released_m";
     /// The rest of the flexure's change: its answer to the loads later stages laid on the surface
-    /// since the last step (the volcano stage's cones, the impacts; their heights are in the
-    /// carry) and to the last solve's unfinished part, both carried in the unsolved residual,
+    /// since the last step (the volcano stage's cones, the impacts; their heights are in
+    /// [`LATER`]) and to the last solve's unfinished part, both carried in the unsolved residual,
     /// less what the step's own solve left unfinished (and the split solves' residuals).
     pub const FLEX_REST: &str = "surface/gap_flex_rest_m";
     /// The plateau spreading's change (`spread.rs`).
     pub const SPREAD: &str = "surface/gap_spread_m";
+    /// What the stages after the surface stage added to the surface and handed to the plate
+    /// model with it: the volcano stage's cones and lava, the impacts' craters and ejecta. The
+    /// surface stage lays the field at zero; those stages add their change to it.
+    pub const LATER: &str = "surface/gap_later_m";
 }
 
 /// What changed a gap.
@@ -100,8 +104,9 @@ pub enum Part {
     FlexRest,
     /// Surface: the plateau spreading.
     Spread,
-    /// Surface: the rest of the feedback (advection on L1, sampling, clamps, the heights later
-    /// stages added: cones, impacts).
+    /// Surface: the volcano stage's and the impacts' changes of the surface.
+    Later,
+    /// Surface: the rest of the feedback (advection on L1, sampling, clamps).
     Carry,
     /// `subduction::resolve`.
     Subduction,
@@ -139,7 +144,7 @@ pub enum Part {
 
 /// The surface stage's parts of the feedback and their fields, in the order
 /// [`GapBudget::book_surface`] takes them.
-pub const SURFACE_PARTS: [(Part, &str); 7] = [
+pub const SURFACE_PARTS: [(Part, &str); 8] = [
     (Part::Rebound, field::REBOUND),
     (Part::Water, field::WATER),
     (Part::Flexure, field::FLEXURE),
@@ -147,10 +152,11 @@ pub const SURFACE_PARTS: [(Part, &str); 7] = [
     (Part::Released, field::RELEASED),
     (Part::FlexRest, field::FLEX_REST),
     (Part::Spread, field::SPREAD),
+    (Part::Later, field::LATER),
 ];
 
 /// The number of parts.
-pub const PARTS: usize = 26;
+pub const PARTS: usize = 27;
 
 /// The parts' names, in order.
 pub const NAMES: [&str; PARTS] = [
@@ -163,6 +169,7 @@ pub const NAMES: [&str; PARTS] = [
     "released",
     "flex_rest",
     "spread",
+    "volcanoes_impacts",
     "carry",
     "subduction",
     "shortening",
