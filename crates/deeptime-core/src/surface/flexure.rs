@@ -268,6 +268,35 @@ fn thickening(u: f64, z0: f64, sea: f64) -> (f64, f64) {
     (t * ka, t - u)
 }
 
+/// The rise of the surface below the sea (m, negative for a fall) that the plate model's uplift
+/// of thickened crust and the plateau spreading brought at cell `c` this step, `h_now` the
+/// elevation after the spreading: the sea water they pushed aside, which the step's change of sea
+/// water counts. Measurement only: the gap budget books it with the roots, whose compensation
+/// under the sea it is ([`StepOut::roots_m`], [`local_answers`]).
+fn built_under_sea(x: &StepIn<'_>, c: usize, fresh: bool, h_now: f64) -> f64 {
+    let sea = x.sea_level_m;
+    let part = |u: f64, z0: f64| {
+        let (lo, hi) = if u > 0.0 { (z0, z0 + u) } else { (z0 + u, z0) };
+        (sea.min(hi) - lo).max(0.0) * u.signum()
+    };
+    // As in `step`: crust the plate model thickened, and crust the spreading moved.
+    let u = f64::from(x.uplift_mm_yr[c]) * x.dt_myr * 1.0e3;
+    let reg = x.regime[c] as u8;
+    let builds = x.crust_type[c] as u8 != OCEANIC || reg == regime::ARC || reg == regime::HOTSPOT;
+    let lifted = if !fresh && u > 0.0 && builds {
+        part(u, x.h_start[c] - u)
+    } else {
+        0.0
+    };
+    let ds = h_now - x.h_before_spread[c];
+    lifted
+        + if ds != 0.0 {
+            part(ds, x.h_before_spread[c])
+        } else {
+            0.0
+        }
+}
+
 /// The surface's flexure state, kept with the crust (`SurfaceState::flexure`).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct FlexState {
@@ -1050,8 +1079,9 @@ pub struct StepOut {
     pub elastic_thickness_km: Vec<f32>,
     /// With [`StepIn::parts`], on a solve step: the elevation change, m per cell, the solve gives
     /// the step's loads (rock, sea water, ice) alone, and the one it gives the roots the plate
-    /// model and the spreading put in the elevation alone (their load less the root, and the
-    /// plate's bending of the root), and the one it gives the moment a weakened plate releases.
+    /// model and the spreading put in the elevation alone (their load and the sea water they
+    /// pushed aside, less the root, and the plate's bending of the root: on land and under the
+    /// sea alike only the bending), and the one it gives the moment a weakened plate releases.
     /// The step's change less the three is what the loads carried in the unsolved residual (other
     /// stages' loads, the last solve's unfinished part) moved, less what this solve left
     /// unfinished. Empty otherwise.
@@ -1074,8 +1104,9 @@ fn rock_shares(rock_share: f64) -> (f64, f64) {
 /// The local (Airy) answers to the loads [`step`] adds, per cell, m: what a plate with no
 /// strength would give them. `.0` for the step's erosion and deposition (the rock, and the sea
 /// water that takes or gives up its room as the surface moves); `.1` for the rest of the change
-/// of sea water and land ice over the cell (the sea rising or falling, the surface carried or
-/// raised under it). Measurement only (the gap budget, `plates::gap_budget`); the solve spreads
+/// of sea water and land ice over the cell (the sea rising or falling, the surface carried under
+/// it), less the water the plate model's thickened crust and the spreading pushed aside, which
+/// goes with their roots. Measurement only (the gap budget, `plates::gap_budget`); the solve spreads
 /// the same loads over the plate. `state` is the state before the step, `h` the elevation the
 /// solve starts from (after the spreading).
 pub fn local_answers(
@@ -1106,7 +1137,10 @@ pub fn local_answers(
             let eroded_water = (sea - h1).max(0.0) - (sea - h0).max(0.0);
             let q_rock = (h1 - h0) * rock + water_share * eroded_water;
             let ice = x.ice_m.map_or(0.0, |v| f64::from(v[c]).max(0.0));
-            let other_water = (sea - h[c]).max(0.0) - water_ref - eroded_water;
+            // The water the plate model's thickened crust and the spreading pushed aside goes with
+            // their roots ([`StepOut::roots_m`]).
+            let other_water = (sea - h[c]).max(0.0) - water_ref - eroded_water
+                + built_under_sea(x, c, fresh, h[c]);
             let q_water = water_share * other_water + ice_share * (ice - ice_prev);
             let wet = if h[c] <= sea { 1.0 } else { 0.0 };
             let answer = -p.strength * RHO_MANTLE / (RHO_MANTLE - RHO_WATER * p.strength * wet);
@@ -1163,7 +1197,8 @@ pub fn step(
         root: f64,
         /// The plate model's share of it.
         plate_root: f64,
-        /// The load of the crust the plate model and the spreading thickened, m of mantle.
+        /// The load of the crust the plate model and the spreading thickened, m of mantle, less
+        /// (with `StepIn::parts`) the sea water it pushed aside.
         root_load: f64,
         /// The step's load increment (rock, water, ice), m of mantle.
         dq: f64,
@@ -1221,6 +1256,12 @@ pub fn step(
                 load += q;
                 root += a;
                 root_load += q;
+            }
+            if x.parts {
+                // The sea water the roots' crust pushed aside goes with the roots (it is in `dq`
+                // as a change of water): under the sea their load less their root is then nil
+                // too, and only their bending is left.
+                root_load -= water_share * built_under_sea(x, c, fresh, h[c]);
             }
             let ice = x.ice_m.map_or(0.0, |v| f64::from(v[c]).max(0.0));
             Cell {
@@ -2051,6 +2092,40 @@ mod tests {
         // The overriding plate behind its belt does not feel the incoming plate's bending.
         let behind = (60..110).map(|j| flex(j).abs()).fold(0.0f64, f64::max);
         assert!(behind < 0.5 * basin.abs(), "{behind} behind the belt");
+    }
+
+    /// Under the sea the roots' part of the split is their bending only, as on land: crust the
+    /// plate model raised everywhere alike (nothing to bend) leaves the roots' and the loads'
+    /// answers nil, the sea water it pushed aside going with the roots.
+    #[test]
+    fn under_the_sea_a_root_with_nothing_to_bend_answers_nothing() {
+        let p = on();
+        let (w, h) = (32usize, 256usize);
+        let n = w * h;
+        let mut wd = World::new(w, h, 300.0);
+        let sea = 5000.0;
+        let (mut sv, mut st) = started(&mut wd, &p, sea);
+        wd.uplift = vec![1.0; n]; // 2 km of Airy elevation in the step, all of it under the sea
+        let before = wd.h.clone();
+        let out = wd.step(&p, &mut sv, &mut st, &vec![0.0; n], sea);
+        for j in [5usize, 128, 250] {
+            let c = j * w + 3;
+            let change = wd.h[c] - before[c] - 2000.0;
+            assert!(
+                change.abs() < 1.0,
+                "row {j}: the flexure moved it by {change}"
+            );
+            assert!(
+                out.roots_m[c].abs() < 1.0,
+                "row {j}: roots {}",
+                out.roots_m[c]
+            );
+            assert!(
+                out.loads_m[c].abs() < 1.0,
+                "row {j}: loads {}",
+                out.loads_m[c]
+            );
+        }
     }
 
     /// A belt raised by the plate model on a craton: the plate holds part of its root, so the

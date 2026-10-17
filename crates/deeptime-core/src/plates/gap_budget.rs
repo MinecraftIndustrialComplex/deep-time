@@ -54,14 +54,17 @@ pub mod field {
     /// share and the flexure's local (Airy) answer to the same load.
     pub const REBOUND: &str = "surface/gap_rebound_m";
     /// The local isostatic response to the rest of the step's change of sea water and land ice
-    /// over the cell (the sea rising or falling, the surface carried or raised under it).
+    /// over the cell (the sea rising or falling, the surface carried under it; the water the
+    /// plate model's thickened crust and the spreading push aside goes with [`ROOTS`]).
     pub const WATER: &str = "surface/gap_water_m";
     /// The regional part of the flexure's answer to the step's loads (rock, sea water, ice): its
     /// answer less the local answers of [`REBOUND`] and [`WATER`], what the plate's strength
     /// spreads over its neighbours.
     pub const FLEXURE: &str = "surface/gap_flexure_m";
     /// The flexure's answer to the roots the plate model's uplift and the plateau spreading put
-    /// in the elevation (`flexure.rs`: the plate bends under the root it resolves).
+    /// in the elevation, with the sea water their crust pushed aside (`flexure.rs`: the plate
+    /// bends under the root it resolves; locally, on land and under the sea, they are
+    /// compensated already).
     pub const ROOTS: &str = "surface/gap_roots_m";
     /// The flexure's answer to the moment a weakened plate releases (`flexure.rs`: rigidity lost
     /// to reheating or a plate's broken edge releases the moment in proportion).
