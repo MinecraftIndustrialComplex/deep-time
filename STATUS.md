@@ -117,8 +117,6 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | Check what MIC's early recipes need lava for, now that lava lies only at active volcanoes (a median 658 blocks away on land) and on the world's floor | build log 2026-10-01 "Magma under active volcanoes" | small |
 | A MIC table of top blocks for Terralith's biomes on the pack's deep-time branch, measured with `probe dh check` (far terrain is 55 % right with MIC today, 85 to 96 % on vanilla) | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | medium |
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
-| Placer gold in packs without Excavated Variants: `minecraft:suspicious_gravel` (suspicious sand in sand bars) whose brushable loot table gives gold nuggets, in place of `gold_ore` in the gravel bed (Ben 2026-10-16) | decisions log 2026-10-16; build log 2026-10-01 "The placer bug" | small |
-| Map `impact_breccia` and `impact_melt` to blocks from MIC's mods on the pack's deep-time branch, in place of the cobblestone and smooth basalt stand-ins (Ben 2026-10-16: "Both, pack blocks") | decisions log 2026-10-16; build log P2-08 impacts | small |
 
 ## Build log
 ### 2026-10-16: Placer gold as panning, suspicious gravel and sand with a gold-nugget loot table (Ben, decisions log 2026-10-16; agent worktree agent-a6df0e7b2d44da705, sub-agent of the Deep Time coordinator; branch worktree-agent-a6df0e7b2d44da705 from master b46e2ee0; not merged)
