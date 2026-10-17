@@ -3,6 +3,7 @@ package com.minecraftindustrialcomplex.deeptime.climate;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.minecraftindustrialcomplex.deeptime.worlddata.ClimateLayers;
 import com.minecraftindustrialcomplex.deeptime.worlddata.IceCover;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Projection;
 import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
@@ -156,15 +157,46 @@ public final class BiomeCensus {
 
     /**
      * The cloud forest rule's ground in the census (Terralith's table, class rule {@code cloud_forest}): land columns of
-     * Cwb, Cwc, Cfb or Cfc below {@value #CLOUD_LAT_DEG} degrees of latitude and more than {@value #CLOUD_HEIGHT_M} m
-     * above the sea (the aridity condition is not checked here; wetlands included, since the rule puts these columns in
-     * the swamp band's erosion).
+     * Cwb, Cwc, Cfb or Cfc below {@value #CLOUD_LAT_DEG} degrees of latitude, more than {@value #CLOUD_HEIGHT_M} m above
+     * the sea and humid (P/PET above {@value #CLOUD_ARIDITY}, read from the level's monthly climate as the bake reads
+     * it; wetlands included, since the rule puts these columns in the swamp band's erosion). Columns a volcanic role
+     * decided are left out, as from every pack check: a volcano zone's biome comes before the table (BIO-154). Until
+     * 2026-10-17 the census left P/PET unchecked; that held while it read the L1 class, whose tropical highlands are
+     * few, and stopped holding when it moved to the L2 class (plate task 7's merge), which makes every high column of a
+     * tropical L1 cell a C class, dry ones too.
      */
     public static final double CLOUD_LAT_DEG = 25.0, CLOUD_HEIGHT_M = 1000.0; // ledger: BIO-144, BIO-145 (game-choice)
+    public static final double CLOUD_ARIDITY = 1.0; // ledger: BIO-145 (game-choice: the rule's own cut)
     public static final String CLOUD_FOREST = "terralith:cloud_forest";
 
     static boolean cloudClass(int k) {
         return k == 12 || k == 13 || k == 15 || k == 16;
+    }
+
+    /**
+     * Thornthwaite's potential evapotranspiration from monthly mean temperatures, mm/yr, uncorrected for day length:
+     * the arithmetic of the bake's {@code climate::snapshot::thornthwaite}, which the table's {@code aridity} input
+     * divides the annual precipitation by.
+     */
+    static double thornthwaitePet(double[] t) {
+        double heat = 0;
+        for (double x : t)
+            if (x > 0)
+                heat += Math.pow(x / 5.0, 1.514); // ledger: MOI-065
+        if (heat <= 0)
+            return 0;
+        double a = 6.75e-7 * heat * heat * heat - 7.71e-5 * heat * heat + 1.792e-2 * heat + 0.49239; // ledger: MOI-065
+        double pet = 0;
+        for (double x : t)
+            if (x > 0)
+                pet += x > 26.5 ? -415.85 + 32.24 * x - 0.43 * x * x : 16.0 * Math.pow(10.0 * x / heat, a); // ledger: MOI-065
+        return pet;
+    }
+
+    /** P/PET as the bake computes it (capped at 10, 10 where PET is 0; ledger: MOI-066). */
+    static double aridity(ClimateLayers.Sample s) {
+        double pet = thornthwaitePet(s.tMonth());
+        return pet > 0 ? Math.min(10.0, s.pAnnual() / pet) : 10.0;
     }
 
     public static final String[] KOPPEN = {"Af", "Am", "Aw", "As", "BWh", "BWk", "BSh", "BSk", "Csa", "Csb", "Csc", "Cwa", "Cwb",
@@ -173,8 +205,9 @@ public final class BiomeCensus {
 
     /**
      * Counts per check: matching columns, columns. {@code packs}: per active {@link PackCheck}; {@code cloud}: cloud forest
-     * candidates, of them on {@value #CLOUD_FOREST}, and cloud forest columns that are not candidates; the biome rules'
-     * census (null when no rule file is active).
+     * candidates, of them on {@value #CLOUD_FOREST}, cloud forest columns that are not candidates, and the columns of the
+     * rule's class, latitude and height left out as volcanic and as dry; the biome rules' census (null when no rule file
+     * is active).
      */
     public record Result(Map<String, int[]> checks, Map<String, int[]> forbidden, Map<String, int[]> packs, int[] cloud,
                          JsonObject json, RuleCensus rules) {
@@ -266,7 +299,11 @@ public final class BiomeCensus {
             if (placeable.contains(pc.requires()))
                 packs.put(pc.name(), new int[2]);
         boolean cloudActive = placeable.contains(CLOUD_FOREST);
-        int[] cloud = new int[3];
+        // Candidates, of them on the cloud forest, cloud forest columns off the candidates, and the columns of the
+        // rule's class, latitude and height left out: on a volcanic role's biome, or dry (P/PET at most the rule's cut).
+        int[] cloud = new int[5];
+        Map<String, Integer> cloudOff = new TreeMap<>();
+        ClimateLayers monthly = cloudActive ? ClimateLayers.of(wd) : null;
         double mV = wd.manifest().mPerBlockV();
         Map<Integer, Map<Integer, Integer>> classBiomes = new HashMap<>();
         int skippedUntagged = 0, landColumns = 0, wetlands = 0, wetlandSwamp = 0, coastColumns = 0, ruledColumns = 0;
@@ -357,11 +394,21 @@ public final class BiomeCensus {
                 if (land && cloudActive) {
                     boolean candidate = cloudClass(k) && Math.abs(Projection.latitudeDeg(c, z)) < CLOUD_LAT_DEG
                             && (y - sea) * mV > CLOUD_HEIGHT_M;
+                    if (candidate && b.is(VolcanicBiomes.KEEP_OUT)) {
+                        candidate = false;
+                        cloud[3]++;
+                    } else if (candidate && monthly != null
+                            && !(aridity(monthly.sample(x, (int) Math.floor(y), z)) > CLOUD_ARIDITY)) {
+                        candidate = false;
+                        cloud[4]++;
+                    }
                     boolean onCloud = CLOUD_FOREST.equals(nameOf(b));
                     if (candidate) {
                         cloud[0]++;
                         if (onCloud)
                             cloud[1]++;
+                        else
+                            cloudOff.merge(nameOf(b), 1, Integer::sum);
                     } else if (onCloud) {
                         cloud[2]++;
                     }
@@ -469,6 +516,13 @@ public final class BiomeCensus {
         cj2.addProperty("on_cloud_forest", cloud[1]);
         cj2.addProperty("share", cloud[0] == 0 ? null : Math.round(cloud[1] * 1000.0 / cloud[0]) / 1000.0);
         cj2.addProperty("cloud_forest_elsewhere", cloud[2]);
+        cj2.addProperty("aridity_checked", monthly != null);
+        cj2.addProperty("left_out_volcanic", cloud[3]);
+        cj2.addProperty("left_out_dry", cloud[4]);
+        JsonObject off = new JsonObject();
+        cloudOff.entrySet().stream().sorted(Map.Entry.<String, Integer>comparingByValue().reversed()).limit(6)
+                .forEach(e -> off.addProperty(e.getKey(), e.getValue()));
+        cj2.add("candidates_off_cloud_forest", off);
         o.add("cloud_forest", cj2);
         // The five commonest biomes of each Köppen class present.
         JsonObject top = new JsonObject();

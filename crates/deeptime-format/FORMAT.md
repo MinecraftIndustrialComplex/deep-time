@@ -1438,7 +1438,8 @@ game-side pieces, no world-data layer of their own:
   but `biomes`: `id`; `biomes` (ids and `#tags`: the candidates; those the source cannot place are
   dropped, and a rule left with none is dropped); `role` (a volcanic role id: the rule is tried only inside
   that role's zones, before the role tag's biome; cave roles take no rules); `koppen` (codes or prefixes:
-  `"Cs"` is Csa/Csb/Csc, `"E"` is ET/EF; read from `climate/koppen`, nearest cell); `t_mean_c`, `t_warm_c`,
+  `"Cs"` is Csa/Csb/Csc, `"E"` is ET/EF; read from `climate/koppen_l2`, the class the biome inputs were placed
+  by, where the bake wrote it, else from `climate/koppen`; nearest cell); `t_mean_c`, `t_warm_c`,
   `t_cold_c` and `p_mm` (`{"min", "max"}`, either end optional: the climate at the column's surface,
   lapsed, from the monthly layers; a world without a climate never matches); `elevation_m` (surface above
   sea level); `wetland` (`any`, `warm`, `cold`, `none`: `climate/wetland` 1 or 2 where the world has the

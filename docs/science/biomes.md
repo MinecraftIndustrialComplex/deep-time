@@ -342,7 +342,14 @@ the GameTest planets); EE's surface rule paints the terrain as Terralith's does 
 keeps EE's override, as EE intends. One part of EE's surface rule is left out of Deep Time levels: a layer of smooth
 basalt below y −55, drawn for vanilla's 384-block world, which in a Deep Time world (floor at −512) replaced every
 rock class below −55 (BIO-131; a pack's top-level layers between two fixed heights, other than vanilla's deepslate
-and the bedrock floor, are left out; the strata are the rock there).
+and the bedrock floor, are left out; the strata are the rock there). One of EE's biomes is kept out for the same
+reason (BIO-155): its calcite caverns, a cave biome its list places by depth (0.35 to 0.9) under much of the world,
+the deep sea included, carry a surface rule that paints diorite on every stone block of the biome at every depth.
+The strata pass leaves a surface rule's blocks, so in a Deep Time world a cavern region was diorite from the cave
+level down, whatever the strata held: on the 2026-10-17 test planet 22 of the parity test's 146 rock samples, all
+under the deep sea, were diorite where the strata are gneiss or basalt. Kept out, the next biome of EE's list at
+that depth answers and the strata stay the rock. The same rule paints EE's thermal taiga biomes, which stay: they
+stand only in real volcano zones (Ben, decisions log 2026-10-05, "Leave it, check in game").
 
 **Biome rules.** EE's own list puts biomes where Deep Time's climate coordinates never reach: its ice cap below
 vanilla's lowest temperature (−1.2 to −1.0), its salt lakes, mud pools and Tibesti mountains above the warm end
@@ -352,7 +359,11 @@ temperate rainforest in the wettest cold cells, so 28 % of the humid boreal fore
 rainforest; snowy taiga and ice spikes in the tundra. A rule file (`data/<ns>/deeptime/biome_rules/*.json`,
 FORMAT.md "Biome rules"; Java `climate/BiomeRuleSet`, `climate/BiomeRules`) places a pack's biomes from Deep Time's
 own coordinates: the Köppen class, the climate at the column in °C and mm, the wetland flag, the ice cover, the
-playas, the volcanic zones and the rock at the surface. The first rule that holds runs the pack's own climate
+playas, the volcanic zones and the rock at the surface. The class is the one the bake placed the biome inputs by
+(`climate/koppen_l2`: each L2 cell's months lapsed to its own height) where the bake wrote it. Until 2026-10-17 the
+rules read the climate stage's L1 class, which gives the low ground of an L1 cell the class of the high ground it
+shares the cell with: on that day's test planet 757 of the 3,027 columns a rule decided lay outside the rule's
+classes on the L2 class (tundra on a Csb coast below a plateau, a snow-capped volcano in BSk). The first rule that holds runs the pack's own climate
 search over that rule's biomes alone, so the pack still picks among them by its ranges (a hot-spring field takes
 the snowy or the plain thermal taiga by temperature). A rule's biomes may be exclusive: kept out of the climate
 search elsewhere, as the volcanic biomes are; a file may also keep biomes out without placing them anywhere: EE's
