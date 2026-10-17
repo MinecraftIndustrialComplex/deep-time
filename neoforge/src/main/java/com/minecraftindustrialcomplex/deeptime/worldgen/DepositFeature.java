@@ -35,9 +35,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * body whose own class is unconsolidated (a placer's gravel). The ore block is
  * {@link OreBlockResolver}'s for the host, except a placer's gold in a gravel or sand block where the
  * pack has no gold ore for that rock (no Excavated Variants): vanilla's suspicious gravel or sand
- * with the loot table {@code deeptime:archaeology/placer_gold}, brushed out as panning
- * ({@link PlacerPanning}; a cell over air, water or a plant stays plain gravel or sand, since the
- * block would fall). Only blocks of the chunk being decorated are written.
+ * holding the gold nuggets of the loot table {@code deeptime:archaeology/placer_gold}, rolled when the
+ * block is placed and brushed out as panning ({@link PlacerPanning}; a cell over air, water or a
+ * plant stays plain gravel or sand, since the block would fall). Only blocks of the chunk being
+ * decorated are written.
  * Does nothing unless the chunk's generator is Deep Time's and reads world data.
  */
 public final class DepositFeature extends Feature<NoneFeatureConfiguration> {
@@ -112,15 +113,19 @@ public final class DepositFeature extends Feature<NoneFeatureConfiguration> {
                         BlockState ore = rawAt(b, zone, c, x, y, z) ? ores.rawBlock(mat) : null;
                         if (ore == null && loose) {
                             // Placer gold in a gravel or sand cell with no gold ore made for it
-                            // (no Excavated Variants): suspicious gravel or sand whose loot table
-                            // is gold nuggets (Ben, 2026-10-16). A cell with no support under it
-                            // stays plain gravel or sand: the block would fall.
+                            // (no Excavated Variants): suspicious gravel or sand holding gold
+                            // nuggets (Ben, 2026-10-16), rolled now and stored with no loot table
+                            // so per-player loot mods leave it alone (decisions log 2026-10-17).
+                            // A cell with no support under it stays plain gravel or sand: the
+                            // block would fall.
                             BlockState panned = ores.panned(mat, cell, host);
                             if (panned != null) {
                                 if (PlacerPanning.supported(level.getBlockState(pos.below()))) {
                                     level.setBlock(pos, panned, 2);
-                                    PlacerPanning.setLoot(level, pos, PlacerPanning.tableOf(mat), OreDraws.panSeed(level.getSeed(), c, x, y, z));
-                                    placed++;
+                                    if (PlacerPanning.fill(level, pos, PlacerPanning.tableOf(mat), OreDraws.panSeed(level.getSeed(), c, x, y, z)))
+                                        placed++;
+                                    else
+                                        level.setBlock(pos, cell, 2); // no block entity or no gold: not an empty suspicious block
                                 }
                                 continue;
                             }
