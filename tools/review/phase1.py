@@ -224,8 +224,12 @@ SMOKE_CATS = (
 
 
 def step_smoke_mic(a):
-    cmd = (f"tools/smoke/install.sh mic --preset earthlike_quick_16k --start {START} --length-myr {a.quick_myr} >/dev/null 2>&1; "
-           "python3 tools/smoke/run.py --profile mic --fresh --restart --timeout 3000 2>&1 | grep -E '\\[(PASS|FAIL| -- )\\]|^(PASS|FAIL)|probe (tw|column)'")
+    # A failed install or a run that never reached its verdict prints the tail of its output (a filtered failure hides why).
+    cmd = (f"mkdir -p /tmp/p1-smoke && tools/smoke/install.sh mic --preset earthlike_quick_16k --start {START} --length-myr {a.quick_myr} >/tmp/p1-smoke/install.txt 2>&1 "
+           "|| { echo 'install failed:'; tail -n 25 /tmp/p1-smoke/install.txt; }; "
+           "python3 tools/smoke/run.py --profile mic --fresh --restart --timeout 3000 >/tmp/p1-smoke/run.txt 2>&1; "
+           "grep -E '\\[(PASS|FAIL| -- )\\]|^(PASS|FAIL)|probe (tw|column)' /tmp/p1-smoke/run.txt; "
+           "grep -q -E '^(PASS|FAIL) --' /tmp/p1-smoke/run.txt || { echo 'run.py never reached its verdict:'; tail -n 25 /tmp/p1-smoke/run.txt; }")
     out, rc, secs = vm("smoke-mic", cmd, flags=["--server", "--pack"], pulls=["smoke/mic/report.md", "smoke/mic/rcon.jsonl"])
     lines = [l.strip() for l in out.splitlines()]
     kids = []
