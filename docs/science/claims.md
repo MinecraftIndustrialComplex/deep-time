@@ -28,7 +28,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
 | [DEF](ledger/DEF.md) | folds, faults, intrusions | 77 | 17 | 0 | 0 | 1 | 0 | 59 | 0 | 0 | 0 | 0 |
 | [DEP](ledger/DEP.md) | deposit models, counts, sizes | 168 | 54 | 2 | 0 | 20 | 0 | 65 | 27 | 0 | 0 | 40 |
-| [ERO](ledger/ERO.md) | erosion, sediment, facies | 163 | 3 | 83 | 2 | 4 | 6 | 7 | 58 | 0 | 0 | 11 |
+| [ERO](ledger/ERO.md) | erosion, sediment, facies | 167 | 5 | 83 | 2 | 4 | 6 | 9 | 58 | 0 | 0 | 11 |
 | [FRC](ledger/FRC.md) | plate forces (the force balance, recorded) | 27 | 3 | 0 | 10 | 1 | 0 | 13 | 0 | 0 | 0 | 0 |
 | [GEO](ledger/GEO.md) | geothermal features | 61 | 4 | 0 | 0 | 0 | 0 | 54 | 3 | 0 | 0 | 0 |
 | [GLA](ledger/GLA.md) | glacial erosion and landforms | 74 | 0 | 25 | 1 | 0 | 1 | 28 | 19 | 0 | 0 | 2 |
@@ -50,7 +50,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [STR](ledger/STR.md) | strata, traps, hosts | 46 | 1 | 0 | 0 | 1 | 2 | 42 | 0 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 74 | 0 | 0 | 0 | 1 | 2 | 47 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
-| **all** | | **2,515** | **277** | **323** | **49** | **99** | **87** | **1,150** | **530** | **355** | **16** | **212** |
+| **all** | | **2,519** | **279** | **323** | **49** | **99** | **87** | **1,152** | **530** | **355** | **16** | **212** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),

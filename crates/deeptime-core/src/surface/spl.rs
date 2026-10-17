@@ -163,6 +163,22 @@ pub fn solve(
     h: &mut [f64],
     qin: &mut [f64],
 ) -> SplReport {
+    solve_cut(d, r, input, p, h, qin, None)
+}
+
+/// [`solve`], also returning in `cut` (when given; one value per cell, metres) how far the
+/// critical slope cut each cell below the stream-power solution in the last iteration: the
+/// landslide share of the step's erosion, for the surface stage's erosion diagnostics
+/// (`ErosionBands`). The solution is the same bit for bit with or without it.
+pub fn solve_cut(
+    d: &Dims,
+    r: &Routing,
+    input: &SplInput<'_>,
+    p: &SplParams,
+    h: &mut [f64],
+    qin: &mut [f64],
+    cut: Option<&mut [f64]>,
+) -> SplReport {
     let a = d.cell_area();
     let n = d.cells();
     let f = &r.forest;
@@ -205,6 +221,7 @@ pub fn solve(
     let qs = SharedF64::new(l, 0.0);
     let out = SharedF64::new(l, 0.0);
     let delta = SharedF64::new(l, 0.0);
+    let cuts = cut.as_ref().map(|_| SharedF64::new(l, 0.0));
     let mut report = SplReport::default();
     for it in 0..p.max_iter.max(1) {
         // Downstream first: every receiver is solved before its donors. Sinks and lakes only
@@ -224,6 +241,9 @@ pub fn solve(
             };
             let b = c.h0 + p.g * qs.get(i) / c.ar * p.dt;
             let mut x = incise(b, base, c.factor, p.n);
+            if let Some(cs) = &cuts {
+                cs.set(i, (x - (base + p.sc * c.len)).max(0.0));
+            }
             if x > base + p.sc * c.len {
                 x = base + p.sc * c.len;
             }
@@ -275,6 +295,14 @@ pub fn solve(
     for (i, &c) in r.stack.iter().enumerate() {
         h[c as usize] = hs.get(i);
         qin[c as usize] = qs.get(i);
+    }
+    if let (Some(out), Some(cs)) = (cut, &cuts) {
+        out.iter_mut().for_each(|x| *x = 0.0);
+        for (i, &c) in r.stack.iter().enumerate() {
+            // A cell the flux pass refilled (deposition) lost nothing to the cut.
+            let lost = (input.h0[c as usize] - h[c as usize]).max(0.0);
+            out[c as usize] = cs.get(i).min(lost);
+        }
     }
     // What each basin delivers to its base-level cell.
     for (k, &o) in f.outlets.iter().enumerate() {
