@@ -255,6 +255,26 @@ impl Coupling {
             .collect()
     }
 
+    /// `K` scalar fields at once: `value(v)` gives every field at sample `v`, and each cell gets,
+    /// per field, exactly what [`Coupling::interpolate`] gives it (the same sum in the same
+    /// order), from one pass over the links and one read of each corner (P1-17: the plates' L1
+    /// sampling interpolated 14 fields in 14 passes over 336k cells every step).
+    pub fn interpolate_each<const K: usize>(
+        &self,
+        mesh: &SphereMesh,
+        value: impl Fn(u32) -> [f64; K] + Sync,
+    ) -> Vec<[f64; K]> {
+        let tris = mesh.triangles();
+        self.links
+            .par_iter()
+            .map(|l| {
+                let t = tris[l.tri as usize];
+                let v = [value(t[0]), value(t[1]), value(t[2])];
+                std::array::from_fn(|f| (0..3).map(|k| f64::from(l.w[k]) * v[k][f]).sum())
+            })
+            .collect()
+    }
+
     /// A categorical field sampled onto the grid: the value at each cell's nearest sample.
     pub fn categorical<T: Send>(&self, value: impl Fn(u32) -> T + Sync) -> Vec<T> {
         self.links.par_iter().map(|l| value(l.nearest)).collect()
@@ -341,6 +361,20 @@ mod tests {
             worst = worst.max((zi - q.z).abs());
         }
         assert!(worst < 1e-3, "worst interpolation error {worst}");
+        // Several fields at once give each field's own interpolation, bit for bit.
+        let both = coupling.interpolate_each(&mesh, |v| {
+            let p = pts[v as usize];
+            [p.z, p.x * p.y - 0.3, 1.0]
+        });
+        let xy = coupling.interpolate(&mesh, |v| {
+            let p = pts[v as usize];
+            p.x * p.y - 0.3
+        });
+        for c in 0..both.len() {
+            assert_eq!(both[c][0].to_bits(), z[c].to_bits());
+            assert_eq!(both[c][1].to_bits(), xy[c].to_bits());
+            assert_eq!(both[c][2].to_bits(), ones[c].to_bits());
+        }
         let ids = coupling.categorical(|v| v);
         assert!(
             ids.iter()

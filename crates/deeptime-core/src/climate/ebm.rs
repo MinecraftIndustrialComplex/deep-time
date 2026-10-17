@@ -278,9 +278,48 @@ impl EbmParams {
             years: 0,
         };
         let mut prev_mean: Option<(Vec<f64>, Vec<f64>)> = None;
-        // Tridiagonal scratch.
-        let (mut lo, mut di, mut up, mut rhs) =
-            (vec![0.0; n], vec![0.0; n], vec![0.0; n], vec![0.0; n]);
+        // The two implicit diffusions' systems depend on the bands only: factored once for the
+        // run (P1-17; [`Tri`] solves them as `thomas` did, bit for bit).
+        let per_face = self.d_face.len() == n + 1;
+        let atm = (self.d > 0.0 || per_face).then(|| {
+            let (mut lo, mut di, mut up) = (vec![0.0; n], vec![0.0; n], vec![0.0; n]);
+            for j in 0..n {
+                let k = 1.0 / (span[j] * dphi) * dt / self.c_land;
+                let (dl, du) = if per_face {
+                    (self.d_face[j], self.d_face[j + 1])
+                } else {
+                    (self.d, self.d)
+                };
+                let (kl, ku) = (k * dl * face[j], k * du * face[j + 1]);
+                lo[j] = -kl;
+                up[j] = -ku;
+                di[j] = 1.0 + kl + ku;
+            }
+            Tri::new(&lo, &di, &up)
+        });
+        let slab = (self.d_ocean > 0.0).then(|| {
+            let (mut lo, mut di, mut up) = (vec![0.0; n], vec![0.0; n], vec![0.0; n]);
+            for j in 0..n {
+                let sea = (1.0 - f[j]).max(1e-6);
+                let fl = if j > 0 {
+                    (1.0 - f[j]).min(1.0 - f[j - 1])
+                } else {
+                    0.0
+                };
+                let fu = if j + 1 < n {
+                    (1.0 - f[j]).min(1.0 - f[j + 1])
+                } else {
+                    0.0
+                };
+                let k = self.d_ocean / (span[j] * dphi) * dt / (self.c_ocean * sea);
+                let (kl, ku) = (k * face[j] * fl, k * face[j + 1] * fu);
+                lo[j] = -kl;
+                up[j] = -ku;
+                di[j] = 1.0 + kl + ku;
+            }
+            Tri::new(&lo, &di, &up)
+        });
+        let (mut mean, mut new, mut new_slab) = (vec![0.0; n], vec![0.0; n], vec![0.0; n]);
         for year in 0..years.max(1) {
             let mut mo = vec![[0.0; 12]; n];
             let mut ml = vec![[0.0; 12]; n];
@@ -357,54 +396,34 @@ impl EbmParams {
                 }
                 // 2. Diffusion of the band mean, implicit. Land and the sea's surface have the
                 //    same heat capacity, so both take the band mean's change.
-                let per_face = self.d_face.len() == n + 1;
-                if self.d > 0.0 || per_face {
-                    let mean: Vec<f64> = (0..n)
-                        .map(|j| f[j] * state.t_land[j] + (1.0 - f[j]) * state.t_ocean[j])
-                        .collect();
+                // 3. Ocean heat transport: diffusion of the slab through the sea's share of each
+                //    face between bands (none across land).
+                // The slab's solve reads only the slab, which step 2 leaves alone: with both
+                // diffusions on, the two solves run interleaved (P1-17; the same values).
+                if let (Some(atm), Some(slab)) = (&atm, &slab) {
                     for j in 0..n {
-                        let k = 1.0 / (span[j] * dphi) * dt / self.c_land;
-                        let (dl, du) = if per_face {
-                            (self.d_face[j], self.d_face[j + 1])
-                        } else {
-                            (self.d, self.d)
-                        };
-                        let (kl, ku) = (k * dl * face[j], k * du * face[j + 1]);
-                        lo[j] = -kl;
-                        up[j] = -ku;
-                        di[j] = 1.0 + kl + ku;
-                        rhs[j] = mean[j];
+                        mean[j] = f[j] * state.t_land[j] + (1.0 - f[j]) * state.t_ocean[j];
                     }
-                    let new = thomas(&lo, &di, &up, &rhs);
+                    Tri::solve_pair(atm, &mean, &mut new, slab, &state.t_mixed, &mut new_slab);
                     for j in 0..n {
                         let dtm = new[j] - mean[j];
                         state.t_ocean[j] += dtm;
                         state.t_land[j] += dtm;
                     }
-                }
-                // 3. Ocean heat transport: diffusion of the slab through the sea's share of each
-                //    face between bands (none across land).
-                if self.d_ocean > 0.0 {
+                    state.t_mixed.copy_from_slice(&new_slab);
+                } else if let Some(atm) = &atm {
                     for j in 0..n {
-                        let sea = (1.0 - f[j]).max(1e-6);
-                        let fl = if j > 0 {
-                            (1.0 - f[j]).min(1.0 - f[j - 1])
-                        } else {
-                            0.0
-                        };
-                        let fu = if j + 1 < n {
-                            (1.0 - f[j]).min(1.0 - f[j + 1])
-                        } else {
-                            0.0
-                        };
-                        let k = self.d_ocean / (span[j] * dphi) * dt / (self.c_ocean * sea);
-                        let (kl, ku) = (k * face[j] * fl, k * face[j + 1] * fu);
-                        lo[j] = -kl;
-                        up[j] = -ku;
-                        di[j] = 1.0 + kl + ku;
-                        rhs[j] = state.t_mixed[j];
+                        mean[j] = f[j] * state.t_land[j] + (1.0 - f[j]) * state.t_ocean[j];
                     }
-                    state.t_mixed = thomas(&lo, &di, &up, &rhs);
+                    atm.solve(&mean, &mut new);
+                    for j in 0..n {
+                        let dtm = new[j] - mean[j];
+                        state.t_ocean[j] += dtm;
+                        state.t_land[j] += dtm;
+                    }
+                } else if let Some(slab) = &slab {
+                    slab.solve(&state.t_mixed, &mut new);
+                    state.t_mixed.copy_from_slice(&new);
                 }
                 // 4. Freezing and melting at the slab: it holds at the freezing point while ice
                 //    grows, and melts its ice before it warms (the heat moves, none is lost).
@@ -467,6 +486,72 @@ pub fn freeze_melt(tm: &mut f64, ice: &mut f64, c_ocean: f64) {
     }
 }
 
+/// A tridiagonal system lo[j]·x[j−1] + di[j]·x[j] + up[j]·x[j+1] = r[j] with its forward
+/// elimination done (`ebm::thomas`'s multipliers c and pivots m, which depend on the coefficients
+/// only): solving is the substitutions, each the same expression `thomas` evaluates.
+pub(crate) struct Tri {
+    pub(crate) lo: Vec<f64>,
+    pub(crate) c: Vec<f64>,
+    pub(crate) m: Vec<f64>,
+}
+
+impl Tri {
+    pub(crate) fn new(lo: &[f64], di: &[f64], up: &[f64]) -> Tri {
+        let n = di.len();
+        let mut c = vec![0.0; n];
+        let mut m = vec![0.0; n];
+        c[0] = up[0] / di[0];
+        m[0] = di[0];
+        for j in 1..n {
+            let mj = di[j] - lo[j] * c[j - 1];
+            c[j] = up[j] / mj;
+            m[j] = mj;
+        }
+        Tri {
+            lo: lo.to_vec(),
+            c,
+            m,
+        }
+    }
+
+    /// x = the solution for right-hand side `r` (`ebm::thomas(lo, di, up, r)`, bit for bit).
+    pub(crate) fn solve(&self, r: &[f64], x: &mut [f64]) {
+        let n = r.len();
+        x[0] = r[0] / self.m[0];
+        for j in 1..n {
+            x[j] = (r[j] - self.lo[j] * x[j - 1]) / self.m[j];
+        }
+        for j in (0..n - 1).rev() {
+            x[j] -= self.c[j] * x[j + 1];
+        }
+    }
+
+    /// `a.solve(ra, xa)` and `b.solve(rb, xb)` in one pass over the bands (P1-17): the two
+    /// substitutions are chains of divisions, and interleaved each waits on its own chain only.
+    /// Every value is the one its own [`Tri::solve`] gives; the systems have the same size.
+    pub(crate) fn solve_pair(
+        a: &Tri,
+        ra: &[f64],
+        xa: &mut [f64],
+        b: &Tri,
+        rb: &[f64],
+        xb: &mut [f64],
+    ) {
+        let n = ra.len();
+        assert_eq!(rb.len(), n, "two systems of one size");
+        xa[0] = ra[0] / a.m[0];
+        xb[0] = rb[0] / b.m[0];
+        for j in 1..n {
+            xa[j] = (ra[j] - a.lo[j] * xa[j - 1]) / a.m[j];
+            xb[j] = (rb[j] - b.lo[j] * xb[j - 1]) / b.m[j];
+        }
+        for j in (0..n - 1).rev() {
+            xa[j] -= a.c[j] * xa[j + 1];
+            xb[j] -= b.c[j] * xb[j + 1];
+        }
+    }
+}
+
 /// Solves a tridiagonal system (Thomas algorithm): lo[j]·x[j−1] + di[j]·x[j] + up[j]·x[j+1] = r[j].
 pub fn thomas(lo: &[f64], di: &[f64], up: &[f64], r: &[f64]) -> Vec<f64> {
     let n = di.len();
@@ -494,6 +579,46 @@ mod tests {
 
     pub fn earth() -> EbmParams {
         EbmParams::from_climate(&ClimateParams::default(), 23.4, 1.0)
+    }
+
+    /// P1-17: the zonal model's diffusions are factored once per run; the factored solve gives
+    /// `thomas`'s bits on band systems like the model's (diagonally dominant, zero end faces).
+    #[test]
+    fn the_factored_solve_equals_thomas_bit_for_bit() {
+        let mut rng = crate::sphere::SplitMix64::new(3);
+        for n in [1usize, 2, 3, 90, 180] {
+            let mut lo = vec![0.0; n];
+            let mut up = vec![0.0; n];
+            let mut di = vec![0.0; n];
+            for j in 0..n {
+                let (a, b) = (50.0 * rng.next_f64(), 50.0 * rng.next_f64());
+                let kl = if j > 0 { a } else { 0.0 };
+                let ku = if j + 1 < n { b } else { 0.0 };
+                lo[j] = -kl;
+                up[j] = -ku;
+                di[j] = 1.0 + kl + ku;
+            }
+            let tri = Tri::new(&lo, &di, &up);
+            // A second system of the same size for the interleaved pair.
+            let di2: Vec<f64> = di.iter().map(|d| d + 0.5 + rng.next_f64()).collect();
+            let tri2 = Tri::new(&lo, &di2, &up);
+            for _ in 0..5 {
+                let r: Vec<f64> = (0..n).map(|_| 60.0 * rng.next_f64() - 30.0).collect();
+                let mut x = vec![0.0; n];
+                tri.solve(&r, &mut x);
+                let want = thomas(&lo, &di, &up, &r);
+                let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+                assert_eq!(bits(&x), bits(&want), "n {n}");
+                // P1-17: the interleaved pair gives each system's own solve, bit for bit.
+                let r2: Vec<f64> = (0..n).map(|_| 60.0 * rng.next_f64() - 30.0).collect();
+                let mut x2 = vec![0.0; n];
+                tri2.solve(&r2, &mut x2);
+                let (mut pa, mut pb) = (vec![0.0; n], vec![0.0; n]);
+                Tri::solve_pair(&tri, &r, &mut pa, &tri2, &r2, &mut pb);
+                assert_eq!(bits(&pa), bits(&x), "pair, first, n {n}");
+                assert_eq!(bits(&pb), bits(&x2), "pair, second, n {n}");
+            }
+        }
     }
 
     #[test]
