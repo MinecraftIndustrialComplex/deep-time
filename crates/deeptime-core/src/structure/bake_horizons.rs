@@ -432,9 +432,10 @@ impl Horizons {
                         Vec::new(),
                         Vec::new(),
                         Vec::new(),
+                        Vec::new(),
                     )
                 },
-                |(near, keys, ys, weight, win, hs), (c, ((tc, cc), kc))| {
+                |(near, keys, ys, weight, win, hs, span), (c, ((tc, cc), kc))| {
                     let own = self.cell(c);
                     if own.0.is_empty() {
                         return;
@@ -481,29 +482,33 @@ impl Horizons {
                     }
                     let top0 = f64::from(own.0[0]);
                     let mut hz: Vec<H> = Vec::with_capacity(k);
+                    // span[a·iv + q]: the class of neighbour a's horizon that spans interval q,
+                    // one pass a stack (P1-17: it was a search of the stack for every interval
+                    // and neighbour).
+                    let iv = m.saturating_sub(1);
+                    span.clear();
+                    span.resize(near.len() * iv, NO_CLASS);
+                    for (&(n, _), row) in near.iter().zip(span.chunks_exact_mut(iv.max(1))) {
+                        let (_, classes, nk) = self.cell(n);
+                        spanning_classes(classes, nk, keys, row);
+                    }
                     // The class of every interval: the most weighted thickness in [s0, s1].
                     win.clear();
-                    win.resize(m.saturating_sub(1), NO_CLASS);
-                    for q in 0..m.saturating_sub(1) {
-                        let (s0, s1) = (keys[q], keys[q + 1]);
+                    win.resize(iv, NO_CLASS);
+                    for q in 0..iv {
                         if ys[q + 1] >= ys[q] {
                             continue;
                         }
                         weight.clear();
-                        for (a, &(n, g)) in near.iter().enumerate() {
-                            let (tops, classes, nk) = self.cell(n);
-                            let Some(hh) =
-                                (0..tops.len()).find(|&x| nk[x][0] <= s0 && s1 <= nk[x][1])
-                            else {
+                        for (a, &(_, g)) in near.iter().enumerate() {
+                            let class = span[a * iv + q];
+                            if class == NO_CLASS {
                                 continue;
-                            };
+                            }
                             let th = g * (hs[a * m + q] - hs[a * m + q + 1]);
-                            match weight
-                                .iter_mut()
-                                .find(|e: &&mut (u8, f64)| e.0 == classes[hh])
-                            {
+                            match weight.iter_mut().find(|e: &&mut (u8, f64)| e.0 == class) {
                                 Some(e) => e.1 += th,
-                                None => weight.push((classes[hh], th)),
+                                None => weight.push((class, th)),
                             }
                         }
                         if let Some(&(class, _)) = weight
@@ -631,6 +636,24 @@ impl Horizons {
                 },
             );
         out
+    }
+}
+
+/// `row[q]`: the class of the first horizon (in stack order) whose key span holds the
+/// interval `[keys[q], keys[q + 1]]`, `NO_CLASS` where none does; `keys` sorted ascending, no
+/// repeats. A span holds a run of consecutive intervals (the keys are sorted), so each horizon
+/// fills its run where no earlier horizon has: the same class as searching the stack for every
+/// interval (P1-17).
+fn spanning_classes(classes: &[u8], spans: &[[u16; 2]], keys: &[u16], row: &mut [u8]) {
+    for (&class, &[k0, k1]) in classes.iter().zip(spans) {
+        // Intervals q with k0 <= keys[q] and keys[q + 1] <= k1.
+        let lo = keys.partition_point(|&s| s < k0);
+        let hi = keys.partition_point(|&s| s <= k1).saturating_sub(1);
+        for slot in row.iter_mut().take(hi).skip(lo) {
+            if *slot == NO_CLASS {
+                *slot = class;
+            }
+        }
     }
 }
 
@@ -1328,6 +1351,34 @@ mod tests {
                     }
                     assert_ne!(want.tops, hz.tops, "σ {sigma} changed nothing");
                 }
+            }
+        }
+    }
+
+    /// P1-17: the tabulated spanning class is the first horizon a search of the stack finds,
+    /// for every interval, with spans that overlap, nest, repeat, are empty or reversed, and
+    /// stacks of none to eight horizons.
+    #[test]
+    fn the_spanning_table_is_the_first_match_search() {
+        let mut rng = crate::sphere::SplitMix64::new(11);
+        for _ in 0..2000 {
+            let mut keys: Vec<u16> = (0..rng.below(40)).map(|_| rng.below(600) as u16).collect();
+            keys.sort_unstable();
+            keys.dedup();
+            let n = rng.below(9) as usize;
+            let spans: Vec<[u16; 2]> = (0..n)
+                .map(|_| [rng.below(650) as u16, rng.below(650) as u16])
+                .collect();
+            let classes: Vec<u8> = (0..n).map(|_| rng.below(20) as u8).collect();
+            let iv = keys.len().saturating_sub(1);
+            let mut row = vec![NO_CLASS; iv];
+            spanning_classes(&classes, &spans, &keys, &mut row);
+            for (q, &got) in row.iter().enumerate() {
+                let (s0, s1) = (keys[q], keys[q + 1]);
+                let want = (0..n)
+                    .find(|&x| spans[x][0] <= s0 && s1 <= spans[x][1])
+                    .map_or(NO_CLASS, |x| classes[x]);
+                assert_eq!(got, want, "interval {q} keys {keys:?} spans {spans:?}");
             }
         }
     }
