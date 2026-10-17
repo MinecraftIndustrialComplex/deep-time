@@ -441,6 +441,8 @@ pub fn run(
     let mut mean = vec![0.0; n];
     let mut tb = vec![0.0; n];
     let mut half = vec![0.0; n];
+    // Each cell's T̄ at the step's end, for the global mean.
+    let mut tbar = vec![0.0; n];
     for year in 0..years.max(1) {
         let mut ml = vec![[0.0; 12]; n];
         let mut mo = vec![[0.0; 12]; n];
@@ -454,7 +456,8 @@ pub fn run(
         for (st, qs) in q.iter().enumerate() {
             let month = st / per_month;
             // 1. Local terms, implicit (`ebm.rs`'s 3 × 3 solve), cells in parallel, each writing
-            //    its own tiles and its budget.
+            //    its own tiles, its budget and its new T̄ (`mean`, the atmosphere's diffusion's
+            //    input).
             state
                 .t_land
                 .par_iter_mut()
@@ -462,81 +465,87 @@ pub fn run(
                 .zip(state.t_mixed.par_iter_mut())
                 .zip(state.ice_j_m2.par_iter_mut())
                 .zip(a_sr.par_iter_mut().zip(a_lr.par_iter_mut()))
+                .zip(mean.par_iter_mut())
                 .enumerate()
-                .for_each(|(c, ((((tl_c, to_c), tm_c), ice_c), (sr_c, lr_c)))| {
-                    let j = c / w;
-                    let (to, tl, tm) = (*to_c, *tl_c, *tm_c);
-                    let mut ice = *ice_c;
-                    let h_ice = ice / ICE_J_M3;
-                    let cover = (h_ice / FULL_ICE_M).min(1.0);
-                    let insulated = smoothstep(0.5 * SEA_ICE_CAP_M, SEA_ICE_CAP_M, h_ice);
-                    let gc = OPEN_WATER_W_M2_K * (1.0 - cover)
-                        + (ICE_W_M_K / h_ice.max(0.05)).min(OPEN_WATER_W_M2_K)
-                            * cover
-                            * (1.0 - insulated);
-                    let ao = free_sea[j] + (ep.ai - free_sea[j]) * frozen(to).max(cover);
-                    let al = free_land[c] + (ep.ai - free_land[c]) * frozen(tl).max(sheet[c]);
-                    let so = qs[j] * (1.0 - ao);
-                    let sl = qs[j] * (1.0 - al);
-                    let (cl, cs, cm) = (ep.c_land / dt, ep.c_land / dt, ep.c_ocean / dt);
-                    let (xl, xo) = (ep.exchange * (1.0 - f[c]), ep.exchange * f[c]);
-                    let (a_l, b_l) = super::co2::longwave(
-                        ep.a,
-                        ep.b,
-                        ep.co2.as_ref(),
-                        tl,
-                        ep.snow_cloud,
-                        frozen(tl).max(sheet[c]),
-                    );
-                    let (a_o, b_o) =
-                        super::co2::longwave(ep.a, ep.b, ep.co2.as_ref(), to, ep.snow_cloud, cover);
-                    let (r1, r2, r3) = (cl * tl + sl - a_l, cs * to + so - a_o, cm * tm);
-                    let a33 = cm + gc;
-                    let a11 = cl + b_l + xl;
-                    let a22 = cs + b_o + xo + gc - gc * gc / a33;
-                    let r2 = r2 + gc * r3 / a33;
-                    let det = a11 * a22 - xl * xo;
-                    let tl2 = (r1 * a22 + xl * r2) / det;
-                    let mut to2 = (a11 * r2 + xo * r1) / det;
-                    let mut tm2 = (r3 + gc * to2) / a33;
-                    *sr_c = f[c] * sl + (1.0 - f[c]) * so;
-                    *lr_c = f[c] * (a_l + b_l * tl2) + (1.0 - f[c]) * (a_o + b_o * to2);
-                    if ice > 0.0 && to2 > 0.0 {
-                        let melt = (to2 * ep.c_land).min(ice);
-                        ice -= melt;
-                        to2 -= melt / ep.c_land;
-                    }
-                    // At once, as `ebm.rs` does: the slab's diffusion then never sees a slab
-                    // below the freezing point.
-                    freeze_melt(&mut tm2, &mut ice, ep.c_ocean);
-                    (*tl_c, *to_c, *tm_c, *ice_c) = (tl2, to2, tm2, ice);
-                });
-            for c in 0..n {
-                asr += area[c] * a_sr[c];
-                olr += area[c] * a_lr[c];
-            }
+                .for_each(
+                    |(c, (((((tl_c, to_c), tm_c), ice_c), (sr_c, lr_c)), mean_c))| {
+                        let j = c / w;
+                        let (to, tl, tm) = (*to_c, *tl_c, *tm_c);
+                        let mut ice = *ice_c;
+                        let h_ice = ice / ICE_J_M3;
+                        let cover = (h_ice / FULL_ICE_M).min(1.0);
+                        let insulated = smoothstep(0.5 * SEA_ICE_CAP_M, SEA_ICE_CAP_M, h_ice);
+                        let gc = OPEN_WATER_W_M2_K * (1.0 - cover)
+                            + (ICE_W_M_K / h_ice.max(0.05)).min(OPEN_WATER_W_M2_K)
+                                * cover
+                                * (1.0 - insulated);
+                        let ao = free_sea[j] + (ep.ai - free_sea[j]) * frozen(to).max(cover);
+                        let al = free_land[c] + (ep.ai - free_land[c]) * frozen(tl).max(sheet[c]);
+                        let so = qs[j] * (1.0 - ao);
+                        let sl = qs[j] * (1.0 - al);
+                        let (cl, cs, cm) = (ep.c_land / dt, ep.c_land / dt, ep.c_ocean / dt);
+                        let (xl, xo) = (ep.exchange * (1.0 - f[c]), ep.exchange * f[c]);
+                        let (a_l, b_l) = super::co2::longwave(
+                            ep.a,
+                            ep.b,
+                            ep.co2.as_ref(),
+                            tl,
+                            ep.snow_cloud,
+                            frozen(tl).max(sheet[c]),
+                        );
+                        let (a_o, b_o) = super::co2::longwave(
+                            ep.a,
+                            ep.b,
+                            ep.co2.as_ref(),
+                            to,
+                            ep.snow_cloud,
+                            cover,
+                        );
+                        let (r1, r2, r3) = (cl * tl + sl - a_l, cs * to + so - a_o, cm * tm);
+                        let a33 = cm + gc;
+                        let a11 = cl + b_l + xl;
+                        let a22 = cs + b_o + xo + gc - gc * gc / a33;
+                        let r2 = r2 + gc * r3 / a33;
+                        let det = a11 * a22 - xl * xo;
+                        let tl2 = (r1 * a22 + xl * r2) / det;
+                        let mut to2 = (a11 * r2 + xo * r1) / det;
+                        let mut tm2 = (r3 + gc * to2) / a33;
+                        *sr_c = f[c] * sl + (1.0 - f[c]) * so;
+                        *lr_c = f[c] * (a_l + b_l * tl2) + (1.0 - f[c]) * (a_o + b_o * to2);
+                        if ice > 0.0 && to2 > 0.0 {
+                            let melt = (to2 * ep.c_land).min(ice);
+                            ice -= melt;
+                            to2 -= melt / ep.c_land;
+                        }
+                        // At once, as `ebm.rs` does: the slab's diffusion then never sees a slab
+                        // below the freezing point.
+                        freeze_melt(&mut tm2, &mut ice, ep.c_ocean);
+                        (*tl_c, *to_c, *tm_c, *ice_c) = (tl2, to2, tm2, ice);
+                        *mean_c = f[c] * tl2 + (1.0 - f[c]) * to2;
+                    },
+                );
             // 2. The atmosphere's diffusion of T̄, implicit ADI: rows (cyclic), then columns.
-            for c in 0..n {
-                mean[c] = f[c] * state.t_land[c] + (1.0 - f[c]) * state.t_ocean[c];
-            }
             atm.solve(&mean, &mut half, &mut tb);
             northward(w, &k_ns, &tb, r2 * dt, &mut north_atm);
-            // 3. The prevailing wind's zonal shift of T̄.
+            // 3. The prevailing wind's zonal shift of T̄, then both tiles take T̄'s change; rows
+            //    in parallel.
+            let rows = tb
+                .par_chunks_mut(w)
+                .zip(mean.par_chunks(w))
+                .zip(state.t_land.par_chunks_mut(w))
+                .zip(state.t_ocean.par_chunks_mut(w))
+                .enumerate();
             if p.wind_heat > 0.0 {
                 let hemi = p.hemi_shift[month];
-                tb.par_chunks_mut(w)
-                    .enumerate()
-                    .for_each_init(Vec::new, |src, (j, row)| {
-                        let phi = lat[j];
-                        let pb = phi - belts::shift(phi, itcz[month], hemi);
-                        let u = p.wind_heat * low_level_wind(pb);
-                        shift_row_with(row, u * dt / dx_row[j], src);
-                    });
-            }
-            for c in 0..n {
-                let d = tb[c] - mean[c];
-                state.t_land[c] += d;
-                state.t_ocean[c] += d;
+                rows.for_each_init(Vec::new, |src, (j, (((row, m), tl), to))| {
+                    let phi = lat[j];
+                    let pb = phi - belts::shift(phi, itcz[month], hemi);
+                    let u = p.wind_heat * low_level_wind(pb);
+                    shift_row_with(row, u * dt / dx_row[j], src);
+                    add_change(row, m, tl, to);
+                });
+            } else {
+                rows.for_each(|(_, (((row, m), tl), to))| add_change(row, m, tl, to));
             }
             // 4. The ocean: the slab's diffusion through the sea, then its transport.
             if let Some(slab) = &slab {
@@ -548,18 +557,38 @@ pub fn run(
             if let Some(o) = ocean {
                 o.step(&mut state.t_mixed, dt, &mut north_o);
             }
-            // 5. Freezing and melting at the slab, then the month's means (each cell's own).
+            // 5. Freezing and melting at the slab, then the month's means (each cell's own),
+            //    rows in parallel (a row's zonal sum in cell order, as one loop over the cells
+            //    made it); then the step's global sums, in cell order.
             let pm = per_month as f64;
+            state
+                .t_mixed
+                .par_chunks_mut(w)
+                .zip(state.ice_j_m2.par_chunks_mut(w))
+                .zip(state.t_land.par_chunks(w).zip(state.t_ocean.par_chunks(w)))
+                .zip(ml.par_chunks_mut(w).zip(mo.par_chunks_mut(w)))
+                .zip(mm.par_chunks_mut(w).zip(mi.par_chunks_mut(w)))
+                .zip(tbar.par_chunks_mut(w).zip(row_t.par_iter_mut()))
+                .enumerate()
+                .for_each(
+                    |(j, (((((tm, ice), (tl, to)), (ml, mo)), (mm, mi)), (tbar, rt)))| {
+                        for i in 0..w {
+                            let c = j * w + i;
+                            freeze_melt(&mut tm[i], &mut ice[i], ep.c_ocean);
+                            ml[i][month] += tl[i] / pm;
+                            mo[i][month] += to[i] / pm;
+                            mm[i][month] += tm[i] / pm;
+                            mi[i][month] += (ice[i] / ICE_J_M3 / FULL_ICE_M).min(1.0) / pm;
+                            let t = f[c] * tl[i] + (1.0 - f[c]) * to[i];
+                            tbar[i] = t;
+                            rt[month] += t / pm;
+                        }
+                    },
+                );
             for c in 0..n {
-                freeze_melt(&mut state.t_mixed[c], &mut state.ice_j_m2[c], ep.c_ocean);
-                let (to, tl) = (state.t_ocean[c], state.t_land[c]);
-                ml[c][month] += tl / pm;
-                mo[c][month] += to / pm;
-                mm[c][month] += state.t_mixed[c] / pm;
-                mi[c][month] += (state.ice_j_m2[c] / ICE_J_M3 / FULL_ICE_M).min(1.0) / pm;
-                let tbar = f[c] * tl + (1.0 - f[c]) * to;
-                tg += area[c] * tbar;
-                row_t[c / w][month] += tbar / pm;
+                asr += area[c] * a_sr[c];
+                olr += area[c] * a_lr[c];
+                tg += area[c] * tbar[c];
             }
         }
         let steps = spy as f64 * area_tot;
@@ -602,6 +631,16 @@ pub fn run(
         prev = Some((annual, ice));
     }
     out
+}
+
+/// One row's tiles take the change of T̄ the atmosphere's transport made (`tb`, after; `mean`,
+/// before).
+fn add_change(tb: &[f64], mean: &[f64], tl: &mut [f64], to: &mut [f64]) {
+    for (((t, m), l), o) in tb.iter().zip(mean).zip(tl.iter_mut()).zip(to.iter_mut()) {
+        let d = t - m;
+        *l += d;
+        *o += d;
+    }
 }
 
 /// Adds the northward heat a diffusion moved across every interior row edge (edge e between rows

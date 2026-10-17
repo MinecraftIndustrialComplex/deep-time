@@ -288,8 +288,10 @@ impl Ocean {
                     if fixed[k] {
                         continue;
                     }
-                    let east = psi[e * w + (ii + 1) % w];
-                    let west = psi[e * w + (ii + w - 1) % w];
+                    // The wrapped neighbours without a division (P1-17; the sweep runs up to
+                    // 5000 times per build).
+                    let east = psi[e * w + east_of(ii, w)];
+                    let west = psi[e * w + west_of(ii, w)];
                     let north = psi[(e - 1) * w + ii];
                     let south = psi[(e + 1) * w + ii];
                     let new =
@@ -443,25 +445,29 @@ impl Ocean {
                 }
             })
             .collect();
+        // Row by row, the wrapped neighbours without a division (P1-17: the conjugate gradients
+        // call it thousands of times per build; the same terms in the same order as a map over
+        // the cells with c % w and c / w).
         let apply = |x: &[f64]| -> Vec<f64> {
-            (0..n)
-                .map(|c| {
+            let mut out = vec![0.0; n];
+            for j in 0..h {
+                for i in 0..w {
+                    let c = j * w + i;
                     if !inside[c] {
-                        return 0.0;
+                        continue;
                     }
-                    let (i, j) = (c % w, c / w);
-                    let west = j * w + (i + w - 1) % w;
-                    let mut y =
-                        ge[c] * (x[c] - x[j * w + (i + 1) % w]) + ge[west] * (x[c] - x[west]);
+                    let (east, west) = (j * w + east_of(i, w), j * w + west_of(i, w));
+                    let mut y = ge[c] * (x[c] - x[east]) + ge[west] * (x[c] - x[west]);
                     if j + 1 < h {
                         y += gs[c] * (x[c] - x[c + w]);
                     }
                     if j > 0 {
                         y += gs[c - w] * (x[c] - x[c - w]);
                     }
-                    y
-                })
-                .collect()
+                    out[c] = y;
+                }
+            }
+            out
         };
         let phi = conjugate_gradient(&apply, &src, &inside);
         for c in 0..n {
@@ -494,6 +500,20 @@ impl Ocean {
             sv: s.overturning_sv,
         });
     }
+}
+
+/// The east neighbour of column `i` in a row of `w` columns, wrapping: `(i + 1) % w` without a
+/// division.
+#[inline]
+fn east_of(i: usize, w: usize) -> usize {
+    if i + 1 == w { 0 } else { i + 1 }
+}
+
+/// The west neighbour of column `i` in a row of `w` columns, wrapping: `(i + w − 1) % w` without
+/// a division.
+#[inline]
+fn west_of(i: usize, w: usize) -> usize {
+    if i == 0 { w - 1 } else { i - 1 }
 }
 
 /// Conjugate gradients for the singular, symmetric positive semi-definite Neumann Laplacian:
@@ -802,6 +822,18 @@ mod tests {
         assert_eq!(copy.substeps(year / 72.0), o.substeps_uncached(year / 72.0));
     }
 
+    /// P1-17: the gyres' sweep and the conveyor's operator find a cell's wrapped neighbours
+    /// without a division; the indices are the modulo forms', so every term is the same.
+    #[test]
+    fn the_wrapped_neighbours_are_the_modulo_forms() {
+        for w in 1..=40usize {
+            for i in 0..w {
+                assert_eq!(east_of(i, w), (i + 1) % w, "east of {i} in {w}");
+                assert_eq!(west_of(i, w), (i + w - 1) % w, "west of {i} in {w}");
+            }
+        }
+    }
+
     /// P1-17: the conveyor's basins are bucketed in one pass; the ocean it builds is the one
     /// the per-basin scan built, on a coast with many small seas in the sinking band.
     #[test]
@@ -810,8 +842,9 @@ mod tests {
         // Two open basins and, north of 50°, a sea broken into many small inlets.
         let land = land_of(&g, &|lat, i| {
             lat < -40.0
-                || ((-40.0..50.0).contains(&lat) && ((10..30).contains(&i) || (50..95).contains(&i)))
-                || (lat >= 50.0 && lat < 75.0 && (i % 3 == 0 || (i * 7) % 11 == 0))
+                || ((-40.0..50.0).contains(&lat)
+                    && ((10..30).contains(&i) || (50..95).contains(&i)))
+                || ((50.0..75.0).contains(&lat) && (i % 3 == 0 || (i * 7) % 11 == 0))
         });
         let u = belt_wind_u(&ClimateParams::default(), &g, 23.4);
         let o = Ocean::build(&setup(&g, &land, &u, 15.0));
