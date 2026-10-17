@@ -1028,6 +1028,10 @@ pub struct StepIn<'a> {
     pub ice_m: Option<&'a [f32]>,
     /// The `isostasy` setting: the density of eroded and deposited rock over the mantle's.
     pub rock_share: f64,
+    /// Also solve, apart, for the step's loads and for the roots already in the elevation
+    /// ([`StepOut::loads_m`], [`StepOut::roots_m`]). Measurement only (the gap budget,
+    /// `plates::gap_budget`): the step's own solve and result do not change.
+    pub parts: bool,
 }
 
 /// What a step did.
@@ -1043,6 +1047,13 @@ pub struct StepOut {
     pub flexure_m: Vec<f32>,
     pub deflection_m: Vec<f32>,
     pub elastic_thickness_km: Vec<f32>,
+    /// With [`StepIn::parts`], on a solve step: the elevation change, m per cell, the solve gives
+    /// the step's loads (rock, sea water, ice) alone, and the one it gives the roots the plate
+    /// model and the spreading put in the elevation alone (their load less the root, and the
+    /// plate's bending of the root). The step's change less both is what the moment released
+    /// and the last solve's unfinished part moved. Empty otherwise.
+    pub loads_m: Vec<f32>,
+    pub roots_m: Vec<f32>,
 }
 
 /// The load share of the step's eroded and deposited rock, on land and under the sea (m of mantle
@@ -1148,6 +1159,8 @@ pub fn step(
         root: f64,
         /// The plate model's share of it.
         plate_root: f64,
+        /// The load of the crust the plate model and the spreading thickened, m of mantle.
+        root_load: f64,
         /// The step's load increment (rock, water, ice), m of mantle.
         dq: f64,
         /// The water reference (the depth counted in `load`), m.
@@ -1174,6 +1187,7 @@ pub fn step(
             let mut load = prev;
             let mut root = 0.0;
             let mut plate_root = 0.0;
+            let mut root_load = 0.0;
             // ledger: ISO-061
             // Crust the plate model thickened: orogens, arcs and hotspot volcanism. Subsidence
             // (the ocean floor cooling, a sample pulled to trench depth) is not a load.
@@ -1186,6 +1200,7 @@ pub fn step(
                 load += q;
                 root += a;
                 plate_root = a;
+                root_load += q;
             }
             // Erosion and deposition.
             let dm = x.h_eroded[c] - x.h_start[c];
@@ -1201,6 +1216,7 @@ pub fn step(
                 let (q, a) = thickening(ds, x.h_before_spread[c], sea);
                 load += q;
                 root += a;
+                root_load += q;
             }
             let ice = x.ice_m.map_or(0.0, |v| f64::from(v[c]).max(0.0));
             Cell {
@@ -1208,6 +1224,7 @@ pub fn step(
                 load,
                 root,
                 plate_root,
+                root_load,
                 dq: load - prev + water_share * (depth - water) + ice_share * (ice - ice_prev),
                 water,
             }
@@ -1381,6 +1398,28 @@ pub fn step(
             ));
         }
         out.solve = Some(report);
+        if x.parts {
+            // The step's loads and the roots, each solved alone, more tightly than the step
+            // (the solve is linear; the rest of the step's change is the moment released and the
+            // last solve's unfinished part).
+            let rl = pick(&|c| cells[c].root_load);
+            let dq_step = pick(&|c| cells[c].dq - cells[c].root_load);
+            let r_roots: Vec<f64> = (0..ws * hs)
+                .into_par_iter()
+                .map(|c| RHO_MANTLE * (rl[c] - root[c]) - bend_root[c])
+                .collect();
+            let r_loads: Vec<f64> = dq_step.par_iter().map(|&q| RHO_MANTLE * q).collect();
+            let (tol, iters) = (0.1 * p.tolerance_m, 4 * p.max_iterations);
+            let mut answer = |r: &[f64]| -> Vec<f32> {
+                let (dw, _) = sv.solve(&d_now, &c_rest, r, tol, iters);
+                prolong_linear(&dw, ws, f)
+                    .iter()
+                    .map(|&x| (-p.strength * x) as f32)
+                    .collect()
+            };
+            out.loads_m = answer(&r_loads);
+            out.roots_m = answer(&r_roots);
+        }
         let mut adw = vec![0.0; ws * hs];
         sv.operator(&d_now, &c_rest, &dw, &mut adw);
         let left: Vec<f64> = r
@@ -1862,6 +1901,7 @@ mod tests {
                     plate_id: &self.plate,
                     ice_m: Some(&self.ice),
                     rock_share: 0.8,
+                    parts: true,
                 },
                 &mut h,
             )
@@ -2027,9 +2067,22 @@ mod tests {
                 wd.uplift[c] = 1.0; // 2 km of Airy elevation in the step
             }
         }
+        let before = wd.h.clone();
         let out = wd.step(&p, &mut sv, &mut st, &vec![0.0; n], sea);
         let rep = out.solve.unwrap();
         assert!(rep.converged, "{rep:?}");
+        // The split the gap budget reads: the flexure's change is all the roots' answer here (the
+        // belt held up, the basin pulled down), none of it the loads'.
+        for j in [127usize, 135, 160, 250] {
+            let c = j * w + 3;
+            let change = wd.h[c] - before[c] - f64::from(wd.uplift[c]) * 2000.0;
+            assert!(
+                (f64::from(out.roots_m[c]) - change).abs() < 1.0,
+                "row {j}: roots {} against {change}",
+                out.roots_m[c]
+            );
+            assert!(out.loads_m[c].abs() < 1.0, "row {j}: {}", out.loads_m[c]);
+        }
         let col = |j: usize| wd.h[j * w + 3];
         assert!(
             col(127) > 2300.0 + 500.0,
@@ -2062,7 +2115,19 @@ mod tests {
                 *dm = -2000.0 * (3300.0 / 470.0) * (2830.0 / 3300.0) / 0.8;
             }
         }
-        wd.step(&p, &mut sv, &mut st, &eroded, sea);
+        let before = wd.h.clone();
+        let out = wd.step(&p, &mut sv, &mut st, &eroded, sea);
+        // … and the erosion's answer is all the loads'.
+        for j in [127usize, 137, 160] {
+            let c = j * w + 3;
+            let change = wd.h[c] - before[c] - eroded[c];
+            assert!(
+                (f64::from(out.loads_m[c]) - change).abs() < 1.0,
+                "row {j}: loads {} against {change}",
+                out.loads_m[c]
+            );
+            assert!(out.roots_m[c].abs() < 1.0, "row {j}: {}", out.roots_m[c]);
+        }
         let left = st
             .as_ref()
             .unwrap()
@@ -2349,6 +2414,7 @@ mod tests {
                     plate_id: &plate,
                     ice_m: None,
                     rock_share: 0.8,
+                    parts: false,
                 },
                 &mut hh,
             )
