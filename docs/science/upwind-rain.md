@@ -25,9 +25,9 @@ The rain's fine pattern (the belts of latitude, the highs' flanks, the cold seas
 plateaus) is the same as with the belts; what changes is how much of it the air can still deliver
 where it arrives.
 
-The upwind rain is a setting (`climate.rain_model = upwind`); the default is still the belts
-(CLM-178), because on Earth's relief the upwind rain meets Earth's land rain but not the design's
-bar on the rain's pattern (below). Ben decides the default (STATUS, pending questions).
+The upwind rain is a setting (`climate.rain_model = upwind`). The default stays the belts, scaled
+to Earth's land rain (Ben, decisions log 2026-10-06, "Belts, scaled up to Earth's amount"; CLM-178,
+CLM-201, [climate.md](climate.md)); monsoons are a follow-up for both rain models.
 
 ## The model in plain words
 
@@ -187,8 +187,8 @@ reproduced from Beck et al. 2023 with the documented method: on Beck's own 0.5°
 on the model's grid 3.89 K (rows weighted by their span of latitude: 4.25 K), both brought to sea
 level with 6.5 K/km on GMT's relief. The model gives 4.50–4.53 K on the same grid (4.91 K span
 weighted), already more than Earth's; at the ground's height 6.86 K against Earth's 5.43 K. The
-design's 6.1 K came from a scratch script that is not in the repository. Ben is asked to restate
-the target relative to the observed value on the same grid (STATUS, pending questions).
+design's 6.1 K came from a scratch script that is not in the repository. The target is now relative:
+at least 0.83 × the observed value on the same grid (design §7.1, 2026-10-06): met.
 
 
 
@@ -224,9 +224,8 @@ the target relative to the observed value on the same grid (STATUS, pending ques
 
 ## Open questions
 
-- Which rain is the default (CLM-178): the belts (better pattern, 31 % too dry) or the upwind
-  rain (Earth's amount, worse pattern, a tenth less land on the planets).
-- The winter-spread target's observed value (above).
-- The surface lapse rate (above).
+- Answered 2026-10-06: the default is the belts scaled to Earth's amount (Ben); the winter-spread
+  target is at least 0.83 × the observed spread on the same grid (the coordinator; design §7.1); the
+  surface lapse rate stays 6.5 K/km until a source is read (the coordinator).
 - The budget rain (`rain_model = budget`, not this page's) makes one cell of about 30 m a year on
   the idealised test planet (`climate::tests`).
