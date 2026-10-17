@@ -1519,7 +1519,11 @@ pub fn project_body(map: &Mapping, b: &deeptime_format::Body) -> deeptime_format
     // a zero semi-axis and the body is a few blocks wide wherever it lands.
     let stretch = |v: f32, s: f64| {
         let n = f64::from(v) * s;
-        if n.is_finite() && n > 0.0 { n as f32 } else { v }
+        if n.is_finite() && n > 0.0 {
+            n as f32
+        } else {
+            v
+        }
     };
     out.axes[0] = stretch(b.axes[0], ua.0.hypot(ua.1));
     out.axes[2] = stretch(b.axes[2], uc.0.hypot(uc.1));
@@ -1698,7 +1702,10 @@ mod tests {
         let pole = deeptime_format::Projection::new(c_sim).pole_z();
         for iz in -12..=12 {
             for ix in -8..8 {
-                let (x, z) = (f64::from(ix) * 256.0 + 3.0, f64::from(iz) / 12.0 * (pole + 64.0));
+                let (x, z) = (
+                    f64::from(ix) * 256.0 + 3.0,
+                    f64::from(iz) / 12.0 * (pole + 64.0),
+                );
                 let b = deeptime_format::Body::new(
                     1,
                     None,
@@ -1711,7 +1718,11 @@ mod tests {
                     deeptime_format::bodies::NO_CLIP,
                 );
                 let p = project_body(&map, &b);
-                assert!(p.axes.iter().all(|v| v.is_finite() && *v > 0.0), "{x} {z}: {:?}", p.axes);
+                assert!(
+                    p.axes.iter().all(|v| v.is_finite() && *v > 0.0),
+                    "{x} {z}: {:?}",
+                    p.axes
+                );
             }
         }
     }

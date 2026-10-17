@@ -38,14 +38,18 @@ def step_defs():
     """(id, row title, mac.sh flags, command, [(evidence regex, …)], pass test)."""
     return [
         ("rust", "Rust: fmt, clippy, tests, licences", [],
-         "cargo fmt --all --check && cargo clippy --workspace --all-targets -q -- -D warnings "
-         "&& cargo test --workspace -q 2>&1 | grep -E 'test result' ; cargo deny check licenses bans 2>&1 | tail -1",
-         [r"test result: \w+\. \d+ passed; \d+ failed", r"bans ok, licenses ok"],
-         lambda out, rc: "licenses ok" in out and not re.search(r"test result: FAILED|[1-9]\d* failed", out)),
+         "cargo fmt --all --check >/dev/null 2>&1 && echo 'fmt ok' || echo 'fmt FAILED'; "
+         "cargo clippy --workspace --all-targets -q -- -D warnings >/dev/null 2>&1 && echo 'clippy ok' || echo 'clippy FAILED'; "
+         "cargo test --workspace -q 2>&1 | grep -E 'test result' ; cargo deny check licenses bans 2>&1 | tail -1",
+         [r"fmt ok|fmt FAILED", r"clippy ok|clippy FAILED", r"test result: \w+\. \d+ passed; \d+ failed", r"bans ok, licenses ok"],
+         # fmt, clippy, at least one passing test binary, no failing one, licenses: a run where cargo never started must not pass (2026-10-16)
+         lambda out, rc: ("fmt ok" in out and "clippy ok" in out and "licenses ok" in out and re.search(r"test result: ok\. [1-9]\d* passed", out) is not None
+                          and not re.search(r"test result: FAILED|[1-9]\d* failed", out))),
         ("junit", "Java: build and JUnit", [],
          "cd neoforge && ./gradlew build test --console=plain -q; cd .. && python3 tools/ci/junit-summary.py neoforge/build/test-results/test",
          [r"tests=\d+ failures=\d+ errors=\d+ skipped=\d+"],
-         lambda out, rc: re.search(r"tests=\d+ failures=0 errors=0", out) is not None),
+         # tests > 0 and no failed build: a Gradle build that failed before testing left "tests=0 failures=0 errors=0" and passed (2026-10-16).
+         lambda out, rc: re.search(r"tests=[1-9]\d* failures=0 errors=0", out) is not None and "BUILD FAILED" not in out and "FAILURE:" not in out),
         ("gametest", "GameTest server (Deep Time + Toroidal World)", ["--server"],
          "./gametest.sh 2>&1 | grep -E 'required tests|\\[gametest\\]' | sed 's/^.*\\[gametest\\]/[gametest]/;s/^.*GameTestServer\\]: //'",
          [r"All \d+ required tests passed", r"\[gametest\] (heightMatches\w+|strataClassesResolve|lakeHolds|native|spawnOnLand|oreVeinsDisabled) .*"],
@@ -100,12 +104,18 @@ def run_step(sid, flags, cmd):
 
 
 def natives_row():
-    r = subprocess.run(["gh", "run", "list", "-R", "MinecraftIndustrialComplex/deep-time", "-w", "natives.yml", "-L", "1",
-                        "--json", "databaseId,conclusion,headSha,url,createdAt"], capture_output=True, text=True)
+    args = ["run", "list", "-R", "MinecraftIndustrialComplex/deep-time", "-w", "natives.yml", "-L", "1",
+            "--json", "databaseId,conclusion,headSha,url,createdAt"]
+    # NixOS keeps nothing installed globally: gh comes from nixpkgs when it is not on the PATH.
+    cmd = ["gh", *args] if shutil.which("gh") else ["nix", "run", "nixpkgs#gh", "--", *args]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True)
+    except OSError as e:
+        r = subprocess.CompletedProcess(cmd, 127, "", str(e))
     try:
         run = json.loads(r.stdout)[0]
         ok = run["conclusion"] == "success"
-        ev = [f"natives.yml run {run['databaseId']} ({run['createdAt'][:10]}, {run['headSha'][:7]}): {run['conclusion']} — "
+        ev = [f"natives.yml run {run['databaseId']} ({run['createdAt'][:10]}, {run['headSha'][:7]}): {run['conclusion']}: "
               "8 cross-builds, loaded by NativeSmoke on Windows x64/arm64, macOS arm64/x64, Linux gnu x64/arm64, musl x64/arm64",
               run["url"]]
     except Exception:
