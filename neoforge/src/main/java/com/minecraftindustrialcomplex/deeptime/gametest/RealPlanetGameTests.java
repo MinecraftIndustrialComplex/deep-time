@@ -205,6 +205,15 @@ public final class RealPlanetGameTests {
         return out;
     }
 
+    /**
+     * The biome the chunk holds at block (x, y, z): a cave biome's surface rule can fill a column with a rock-blob
+     * block at every depth (Expanded Ecosphere's calcite caverns: diorite, BIO-155), which the detail tells apart.
+     */
+    static String biomeAt(ChunkAccess chunk, int x, int y, int z) {
+        return chunk.getNoiseBiome(net.minecraft.core.QuartPos.fromBlock(x), net.minecraft.core.QuartPos.fromBlock(y),
+                net.minecraft.core.QuartPos.fromBlock(z)).unwrapKey().map(k -> k.location().toString()).orElse("?");
+    }
+
     /** How many blocks of the cube of side 7 around {@code pos} are {@code state}: a blob is a cluster. */
     static int around(ServerLevel level, BlockPos pos, BlockState state) {
         int n = 0;
@@ -292,7 +301,8 @@ public final class RealPlanetGameTests {
                     n[5]++;   // a rock blob the features step put over the strata pass's rock (see above)
                     if (blobDetail.size() < 8)
                         blobDetail.add("(" + x + ", " + y + ", " + z + ") " + cls + " expected " + expected + " placed "
-                                + actual + " (" + around(level, new BlockPos(x, y, z), actual) + " of 343 around)");
+                                + actual + " (" + around(level, new BlockPos(x, y, z), actual) + " of 343 around) in "
+                                + biomeAt(chunk, x, y, z));
                     continue;
                 }
                 if (!ok || !placed) {

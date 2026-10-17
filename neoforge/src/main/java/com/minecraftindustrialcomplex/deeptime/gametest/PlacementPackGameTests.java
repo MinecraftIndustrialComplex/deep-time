@@ -137,11 +137,15 @@ public final class PlacementPackGameTests {
         }
         int[] cloud = r.cloud();
         if (cloud[0] >= MIN_COLUMNS && cloud[1] < CLOUD_FLOOR * cloud[0])
-            bad.append(String.format(Locale.ROOT, " cloud_forest %d of %d candidates (< %.2f)", cloud[1], cloud[0], CLOUD_FLOOR));
+            bad.append(String.format(Locale.ROOT, " cloud_forest %d of %d candidates (< %.2f; %d volcanic and %d dry left out)",
+                    cloud[1], cloud[0], CLOUD_FLOOR, cloud[3], cloud[4]));
         helper.assertTrue(bad.isEmpty(), "pack table classes off their biomes:" + bad);
         helper.succeed();
     }
 
-    /** The least share of the cloud forest rule's ground on the cloud forest (the census does not check P/PET). */
+    /**
+     * The least share of the cloud forest rule's ground on the cloud forest: its classes, latitude, height and P/PET,
+     * volcano zones left out ({@link BiomeCensus#CLOUD_ARIDITY}; P/PET checked since 2026-10-17).
+     */
     static final double CLOUD_FLOOR = 0.3; // ledger: BIO-154 (game-choice)
 }
