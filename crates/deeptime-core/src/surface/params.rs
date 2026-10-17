@@ -175,8 +175,8 @@ impl Default for SurfaceParams {
             n_spl: 2.0,
             g_deposition: 1.0,
             runoff_ref_m_yr: 0.5,
-            threshold_slope: 0.35,
-            kd_land_m2_yr: 2.0,
+            threshold_slope: 0.35, // ledger: ERO-013 (uncited; see ERO-177)
+            kd_land_m2_yr: 2.0,    // ledger: ERO-023 (uncited; hillslope-scale 0.0036: ERO-177)
             kd_marine_m2_yr: 100.0,
             wave_base_m: 60.0,
             tidal_range_m: 2.0,
