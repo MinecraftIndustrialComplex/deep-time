@@ -1028,8 +1028,9 @@ pub struct StepIn<'a> {
     pub ice_m: Option<&'a [f32]>,
     /// The `isostasy` setting: the density of eroded and deposited rock over the mantle's.
     pub rock_share: f64,
-    /// Also solve, apart, for the step's loads and for the roots already in the elevation
-    /// ([`StepOut::loads_m`], [`StepOut::roots_m`]). Measurement only (the gap budget,
+    /// Also solve, apart, for the step's loads, for the roots already in the elevation and for
+    /// the moment released ([`StepOut::loads_m`], [`StepOut::roots_m`],
+    /// [`StepOut::released_m`]). Measurement only (the gap budget,
     /// `plates::gap_budget`): the step's own solve and result do not change.
     pub parts: bool,
 }
@@ -1050,10 +1051,13 @@ pub struct StepOut {
     /// With [`StepIn::parts`], on a solve step: the elevation change, m per cell, the solve gives
     /// the step's loads (rock, sea water, ice) alone, and the one it gives the roots the plate
     /// model and the spreading put in the elevation alone (their load less the root, and the
-    /// plate's bending of the root). The step's change less both is what the moment released
-    /// and the last solve's unfinished part moved. Empty otherwise.
+    /// plate's bending of the root), and the one it gives the moment a weakened plate releases.
+    /// The step's change less the three is what the loads carried in the unsolved residual (other
+    /// stages' loads, the last solve's unfinished part) moved, less what this solve left
+    /// unfinished. Empty otherwise.
     pub loads_m: Vec<f32>,
     pub roots_m: Vec<f32>,
+    pub released_m: Vec<f32>,
 }
 
 /// The load share of the step's eroded and deposited rock, on land and under the sea (m of mantle
@@ -1399,9 +1403,9 @@ pub fn step(
         }
         out.solve = Some(report);
         if x.parts {
-            // The step's loads and the roots, each solved alone, more tightly than the step
-            // (the solve is linear; the rest of the step's change is the moment released and the
-            // last solve's unfinished part).
+            // The step's loads, the roots and the moment released, each solved alone, more
+            // tightly than the step (the solve is linear; the rest of the step's change is the
+            // loads carried in the unsolved residual less this solve's unfinished part).
             let rl = pick(&|c| cells[c].root_load);
             let dq_step = pick(&|c| cells[c].dq - cells[c].root_load);
             let r_roots: Vec<f64> = (0..ws * hs)
@@ -1419,6 +1423,7 @@ pub fn step(
             };
             out.loads_m = answer(&r_loads);
             out.roots_m = answer(&r_roots);
+            out.released_m = answer(&l_released);
         }
         let mut adw = vec![0.0; ws * hs];
         sv.operator(&d_now, &c_rest, &dw, &mut adw);
@@ -2072,7 +2077,7 @@ mod tests {
         let rep = out.solve.unwrap();
         assert!(rep.converged, "{rep:?}");
         // The split the gap budget reads: the flexure's change is all the roots' answer here (the
-        // belt held up, the basin pulled down), none of it the loads'.
+        // belt held up, the basin pulled down), none of it the loads' or a released moment's.
         for j in [127usize, 135, 160, 250] {
             let c = j * w + 3;
             let change = wd.h[c] - before[c] - f64::from(wd.uplift[c]) * 2000.0;
@@ -2082,6 +2087,12 @@ mod tests {
                 out.roots_m[c]
             );
             assert!(out.loads_m[c].abs() < 1.0, "row {j}: {}", out.loads_m[c]);
+            // The plate kept its stiffness: no moment released.
+            assert!(
+                out.released_m[c].abs() < 1.0,
+                "row {j}: {}",
+                out.released_m[c]
+            );
         }
         let col = |j: usize| wd.h[j * w + 3];
         assert!(
@@ -2127,6 +2138,11 @@ mod tests {
                 out.loads_m[c]
             );
             assert!(out.roots_m[c].abs() < 1.0, "row {j}: {}", out.roots_m[c]);
+            assert!(
+                out.released_m[c].abs() < 1.0,
+                "row {j}: {}",
+                out.released_m[c]
+            );
         }
         let left = st
             .as_ref()
