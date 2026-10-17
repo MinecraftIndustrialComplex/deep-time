@@ -524,8 +524,9 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Reference: Roering, J. J., Kirchner, J. W., and Dietrich, W. E. (1999). Evidence for nonlinear, diffusive sediment transport on hillslopes and implications for landscape morphology. Water Resources Research 35(3):853-870.
 - DOI or URL: (IMP) 10.1029/1998WR900090 (Crossref-verified) (ERO, ISO, HYP) 10.1029/1998WR900090.
 - Cited as: (IMP) "Roering, Kirchner & Dietrich 1999" (ERO, ISO, HYP) "Roering, Kirchner & Dietrich 1999, WRR 35(3):853-870" (rock_class JSON), "hillslope transport coefficient D". (RCK, STR, DEF) "Roering, Kirchner & Dietrich 1999 (WRR 35(3):853-870)"
-- Ledger ids: ERO-101 to ERO-150, ERO-153 to ERO-163, IMP-074, IMP-085, IMP-086, IMP-089, IMP-090, RCK-010
-- Access: paywalled (metadata only) [other sections: paywalled (Wiley); not fetched. / paywalled (abstract only)]
+- Ledger ids: ERO-101 to ERO-150, ERO-153 to ERO-163, ERO-177, IMP-074, IMP-085, IMP-086, IMP-089, IMP-090, RCK-010
+- Read in the plateau erosion task (2026-10-16): full text, from the second author's reprint at https://seismo.berkeley.edu/~kirchner/reprints/1999_29_Roering_nonlinear.pdf (text extracted with pdftotext). The paper's numeric D values are now read: the nonlinear law fitted to Oregon Coast Range topography gives "K = 0.0032 ± 0.0009 m2/yr and Sc = 1.25 ± 0.10"; per hillslope (Table 1) "Values for K range from 0.0031 to 0.0045 m2/yr with an average of 0.0036 m2/yr"; with other fitting choices "K varies between 0.0015 and 0.0045 m2/yr, and Sc varies between 1.0 and 1.4". ERO-177.
+- Access: paywalled (metadata only) [other sections: paywalled (Wiley); not fetched. / paywalled (abstract only)]; the author's reprint above is open.
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Substitute: none found.
 - Read so far (by the project): (IMP) from memory (params.rs); judgment framework (rock-class JSON) (ERO, ISO, HYP) no record. (RCK, STR, DEF) not stated
@@ -6189,6 +6190,19 @@ Not read: Péron-Pinvidic, Manatschal & Osmundsen 2013 (Marine and Petroleum Geo
 - Ledger ids: ERO-174
 - Access: open (PubMed Central).
 - Read so far (by the project): full text, 2026-10-05: exhumation over 1.0 km/Ma from 17-16 Ma for about 5 Myr, then below 0.01 km/Ma (under 750 m in total) from 12-11 Ma to the present; cosmogenic rates in the Indus and Yarlung drainages typically below 100 m/Ma.
+
+## Plateau erosion and the hillslope diffusivity (ERO-175 to ERO-178), added 2026-10-16
+
+Roering1999 (the measured diffusivity, ERO-177) is under "Erosion, isostasy and hypsometry" above; its entry records what was read on 2026-10-16.
+
+### Salles2019
+- Reference: Salles, T. (2019). eSCAPE: Regional to Global Scale Landscape Evolution Model v2.0. Geoscientific Model Development 12:4165-4184.
+- DOI or URL: https://gmd.copernicus.org/articles/12/4165/2019/ (the DOI 10.5194/gmd-12-4165-2019 from the journal's pattern, not checked; the end page from memory)
+- Cited as: "Salles 2019 (eSCAPE)" (the hillslope diffusion coefficient a global landscape evolution model takes at coarse resolution).
+- Ledger ids: ERO-178
+- Access: open (Copernicus).
+- Read so far (by the project): full text through the web fetch tool, 2026-10-16: §3.2.2, "hillslope processes are also accounted for using a diffusion coefficient D of 10−2 m2 yr−1" on a grid "built with a resolution of approximately 200 m"; §3.2.3 (the global run), "the diffusion coefficient D equals 10−1" (no units in that sentence) on meshes "at 16 km resolution". The fetched text does not say that D is adjusted for the resolution.
+
 ## Playability steering (STE)
 
 ### CharetteSmith2010
