@@ -253,27 +253,34 @@ def step_geology(a):
     t0 = time.time()
     plan_path = os.path.join(EV, "plan.json")
     world = "smoke/mic/server/planet"
-    out, rc, _ = vm("geology", f"python3 tools/review/phase1_vm.py pick --world {world} --out review/out/phase1/plan.json",
-                    pulls=["review/out/phase1/plan.json"])
+    # PHASE1_GEOLOGY_ANALYSE_ONLY=1: re-run the checks over the world, plan and RCON answers the last full run left on the VM (the
+    # boot, Chunky and BlueMap take an hour on a busy box; a changed check does not need them). The two kids that need them keep their last result.
+    only_ana = bool(os.environ.get("PHASE1_GEOLOGY_ANALYSE_ONLY"))
+    prev = load_rows().get("geology")
+    prev_kid = {k[1]: k for k in (prev.kids if prev else [])}
+    out, rc = ("", 0) if only_ana else vm("geology", f"python3 tools/review/phase1_vm.py pick --world {world} --out review/out/phase1/plan.json",
+                                           pulls=["review/out/phase1/plan.json"])[:2]
     if rc or not os.path.exists(plan_path):
         e = Row("geology", 3, "Geology in the world: porphyry, gossan, placer", "ERROR", ["pick failed (is smoke/mic's world there? run the smoke-mic step first): " + out.strip()[-300:]])
         e2 = Row("compat", 4, "COE and CDG", "ERROR", ["no plan (see geology)"])
         return [e, e2]
     plan = json.load(open(plan_path))
     # The plan is on the VM already (pick wrote it there); the second boot reads it from review/out/phase1/plan.json.
-    srv, rc, _ = vm("geology", "python3 tools/review/phase1_vm.py serve --profile mic --plan review/out/phase1/plan.json 2>&1 | grep -E '\\[(PASS|FAIL)\\]|^(PASS|FAIL)' | cut -c1-240",
-                    flags=["--server"], pulls=["smoke/mic/report.md", "smoke/mic/rcon.jsonl"])
+    srv, rc = ("", 0) if only_ana else vm("geology", "python3 tools/review/phase1_vm.py serve --profile mic --plan review/out/phase1/plan.json 2>&1 | grep -E '\\[(PASS|FAIL)\\]|^(PASS|FAIL)' | cut -c1-240",
+                                           flags=["--server"], pulls=["smoke/mic/report.md", "smoke/mic/rcon.jsonl"])[:2]
     boot_ok = bool(re.search(r"^PASS --", srv, re.M))
     ana = ("python3 tools/review/phase1_vm.py geology --world smoke/mic/server/planet --plan review/out/phase1/plan.json --rcon smoke/mic/rcon.jsonl "
            "--out review/out/phase1/geology; python3 tools/review/phase1_vm.py compat --plan review/out/phase1/plan.json --rcon smoke/mic/rcon.jsonl")
-    out, rc, _ = vm("geology", ana, flags=["--no-sync"], pulls=["review/out/phase1/geology"])
+    out, rc, _ = vm("geology", ana, flags=[] if only_ana else ["--no-sync"], pulls=["review/out/phase1/geology"])
     allk = checks(out)
     compat_titles = ("COE", "CDG")
     geo = [k for k in allk if not k[1].startswith(compat_titles)]
     com = [k for k in allk if k[1].startswith(compat_titles)]
     # BlueMap over the porphyry and its range (item 3's last clause).
     bm_kid = kid(False, "BlueMap shows the arc range and the deposit", "not rendered")
-    if plan["porphyry"]:
+    if only_ana and "BlueMap shows the arc range and the deposit" in prev_kid:
+        bm_kid = prev_kid["BlueMap shows the arc range and the deposit"]
+    elif plan["porphyry"]:
         cx, cy, cz = (int(v) for v in plan["porphyry"]["center"])
         r = plan["chunky"][0][2]
         env = f"BLUEMAP_BOX='{cx - r} {cx + r - 1} {cz - r} {cz + r - 1}' BLUEMAP_ONLY_PRESENT=1 BLUEMAP_MAP_LABEL='Deep Time phase 1 geology'"
@@ -289,6 +296,8 @@ def step_geology(a):
     gk = [("PASS" if k[0] else "FAIL", k[1], [k[2]]) for k in geo] + [bm_kid]
     ck = [("PASS" if k[0] else "FAIL", k[1], [k[2]]) for k in com]
     boot = kid(boot_ok, "the second boot (Chunky over the sites, the probes) finished without a failed check", srv.strip().splitlines()[-1] if srv.strip() else "no output")
+    if only_ana and "the second boot (Chunky over the sites, the probes) finished without a failed check" in prev_kid:
+        boot = prev_kid["the second boot (Chunky over the sites, the probes) finished without a failed check"]
     secs = time.time() - t0
     return [Row("geology", 3, "Geology in the world: a porphyry, `probe site`, copper ore, gossan, a placer whose why-chain ends in an eroded porphyry, BlueMap",
                 status_of(gk + [boot], need=6), [f"plan: review/out/phase1/plan.json", "pictures and JSON: review/out/phase1/geology/"], gk + [boot], secs),
