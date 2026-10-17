@@ -22,6 +22,12 @@
 //! longer. A freed large block is therefore kept for the next block of exactly its size, up to
 //! [`CACHE_BYTES`] of them; the kept blocks count as in use (the process holds them), and
 //! [`release_cache`] gives them back when the memory cap needs the room.
+//!
+//! Small blocks stay with the system allocator, and glibc keeps the ones freed in each thread's
+//! arena for reuse: that memory is the process's but not in the count. [`release_cache`] gives it
+//! back too (`malloc_trim`), so between stages the process holds what the count says (memory
+//! test, 2026-10-17: on the test planet the session's arenas kept 11 to 15 MiB of freed blocks
+//! from the stages into the bake, more on a busy machine).
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -125,14 +131,36 @@ pub fn keep_below(bytes: u64) {
     }
 }
 
-/// Gives every kept large block back to the OS; returns the bytes released.
+/// Gives every kept large block back to the OS; returns the bytes released (the count drops by
+/// as much). On glibc it also returns the free memory of malloc's arenas ([`trim_system`]), which
+/// the count never included.
 pub fn release_cache() -> u64 {
-    let mut c = cache();
-    let bytes = c.bytes as u64;
-    while c.n > 0 {
-        c.drop_oldest();
-    }
+    let bytes = {
+        let mut c = cache();
+        let bytes = c.bytes as u64;
+        while c.n > 0 {
+            c.drop_oldest();
+        }
+        bytes
+    };
+    trim_system();
     bytes
+}
+
+/// Returns the free memory the system allocator keeps in its arenas to the OS (glibc's
+/// `malloc_trim(0)`: every arena's top and the whole pages of its free chunks); a no-op where the
+/// C library is not glibc. Small blocks freed by the stages' threads otherwise stay resident in
+/// those threads' arenas, uncounted (module docs). The blocks in use are untouched, so the count
+/// does not change.
+pub fn trim_system() {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    {
+        unsafe extern "C" {
+            fn malloc_trim(pad: usize) -> i32;
+        }
+        // SAFETY: malloc_trim takes the arenas' own locks and only releases free memory.
+        unsafe { malloc_trim(0) };
+    }
 }
 
 /// Sets how many bytes of freed large blocks are kept for reuse (0: none). For experiments
