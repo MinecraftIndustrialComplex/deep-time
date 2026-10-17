@@ -46,10 +46,11 @@
 //!
 //! # What ends it in a transfer or weld (tasks 3 and 4)
 //! While the state lives, `belts.rs` stacks each step's shortened crust into a belt and a wedge,
-//! and the belt resists the convergence inside the speed law (`belts::resist`). [`advance`] hands
-//! a contact to `collision::collide` when
+//! and the belt resists the convergence through the force balance (`forces.rs`). [`advance`]
+//! hands a contact to `collision::collide` when
 //!
-//! - its convergence across the front has stayed below `tectonics.weld_speed_mm_yr` for
+//! - its convergence across the front has stayed under `tectonics.weld_speed_mm_yr`, either way,
+//!   for
 //!   `tectonics.weld_after_myr` (the collision has **stalled**): a continent of
 //!   `collision_suture_frac` or more welds its plate to the other one, the larger plate keeping
 //!   its id; a smaller terrane moves alone;
@@ -386,8 +387,11 @@ pub fn step_collision(
     c.centroid = f.centroid().to_array();
     c.normal = f.normal().to_array();
     c.continental_over = f64::from(f.continental_over) / f64::from(f.samples);
-    // ledger: PLT-246 (the stall that welds: below `weld_speed_mm_yr`, timed from its first step).
-    if conv < clock.stall_mm_yr {
+    // ledger: PLT-246 (the stall that welds: under `weld_speed_mm_yr` either way, timed from its
+    // first step). Since the switch to the force balance two plates in collision can also move
+    // apart (a slab pulling one end swings the plate about the collision); that is no stall, and
+    // the state ends as `parted` once the front is gone.
+    if conv.abs() < clock.stall_mm_yr {
         c.stalled_since_myr.get_or_insert(clock.t_myr);
     } else {
         c.stalled_since_myr = None;
@@ -577,6 +581,7 @@ mod tests {
             resample_myr: 0.0,
             a0_km2: 1.0,
             counters: Default::default(),
+            slabs: Vec::new(),
             dynamics: None,
         }
     }
@@ -983,8 +988,9 @@ mod tests {
         assert_eq!(c.onset_convergence_mm_yr, 50.0);
     }
 
-    /// A collision stalls when its convergence stays below `weld_speed_mm_yr`: the clock starts at
-    /// the first slow step, a faster step resets it, a step with no front leaves it; `advance`
+    /// A collision stalls when its convergence stays under `weld_speed_mm_yr` either way: the
+    /// clock starts at the first slow step, a faster step (or the plates moving apart faster)
+    /// resets it, a step with no front leaves it; `advance`
     /// hands the contact over as stalled once it has lasted `weld_after_myr`, whatever its
     /// shortening, and a strike-slip contact neither shortens nor stalls into a weld.
     #[test]
@@ -998,6 +1004,11 @@ mod tests {
         step_collision(&mut col, Some(&front(10, -1.0)), true, clock(4));
         assert_eq!(col.as_ref().unwrap().stalled_since_myr, Some(4.0));
         step_collision(&mut col, Some(&front(10, 12.0)), true, clock(5));
+        assert_eq!(col.as_ref().unwrap().stalled_since_myr, None);
+        // Moving apart faster than the weld speed is no stall.
+        step_collision(&mut col, Some(&front(10, 3.0)), true, clock(6));
+        assert!(col.as_ref().unwrap().stalled_since_myr.is_some());
+        step_collision(&mut col, Some(&front(10, -20.0)), true, clock(7));
         assert_eq!(col.as_ref().unwrap().stalled_since_myr, None);
 
         let mut fx = Fixture::new();

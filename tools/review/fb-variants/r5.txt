@@ -1,0 +1,2 @@
+b2 --set tectonics.collision_buoyancy=2
+b3 --set tectonics.collision_buoyancy=3

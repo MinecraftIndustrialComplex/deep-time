@@ -172,6 +172,17 @@ fn footprint(
     Some(Cover { t, tri, w })
 }
 
+/// `WorldState::globals`: crust accreted at resamplings to the column on top (hidden and
+/// overridden crust, its conserved pools), km³ …
+pub const ACCRETED_GLOBAL: &str = "plates/resample_accreted_km3";
+/// … and the continental crust a collision had hidden, consumed instead (it was stacked into the
+/// belt or went down with the slab; ledger PLT-276), km³ (Earth-normalized).
+pub const STACKED_CONSUMED_GLOBAL: &str = "plates/resample_stacked_km3";
+/// Of the crust accreted: hidden continental crust (not a collision's) and visible crust of the
+/// same or a subducting plate, km³ (the rest is the sediment of hidden ocean floor).
+pub const ACCRETED_HIDDEN_CONTINENT_GLOBAL: &str = "plates/resample_accreted_continent_km3";
+pub const ACCRETED_VISIBLE_GLOBAL: &str = "plates/resample_accreted_visible_km3";
+
 /// Resamples the crust onto a fresh lattice and returns its geometry.
 pub fn resample(
     state: &mut PlateState,
@@ -253,12 +264,16 @@ pub fn resample(
         })
         .collect();
 
-    // Covered samples.
+    // Covered samples. Continental crust a collision hid this step was stacked into its belt or
+    // went down with the slab (`belts.rs`): it is consumed here, not accreted a second time
+    // (ledger: PLT-276). Both are counted, m of rock per new sample.
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
+    let mut tally: Vec<[f64; 4]> = vec![[0.0; 4]; n];
     let mut samples: Vec<Sample> = found
         .par_iter()
         .zip(plate_new.par_iter_mut())
-        .map(|((top, others), pl)| match top {
+        .zip(tally.par_iter_mut())
+        .map(|(((top, others), pl), tally)| match top {
             None => Sample::blank(0),
             Some((g, c)) => {
                 let mut s = interpolate(src, c, rots[*g as usize]);
@@ -268,7 +283,23 @@ pub fn resample(
                     let p2 = group_plate[*g2 as usize];
                     if under.is_hidden() || p2 == *pl || overrides(*pl, p2) {
                         let u = interpolate(src, c2, rots[*g2 as usize]);
-                        accrete(&mut s.pools, &u.pools);
+                        let conserved: f64 = u.pools[..pool::CONSERVED]
+                            .iter()
+                            .map(|&x| f64::from(x))
+                            .sum();
+                        if under.is_hidden() && under.stacked {
+                            tally[1] += conserved;
+                        } else {
+                            // What accretes: hidden continental crust, hidden ocean floor's
+                            // sediment, or visible crust of the same or a subducting plate.
+                            tally[0] += conserved;
+                            if !under.is_hidden() {
+                                tally[3] += conserved;
+                            } else if under.kind == CONTINENTAL {
+                                tally[2] += conserved;
+                            }
+                            accrete(&mut s.pools, &u.pools);
+                        }
                     }
                 }
                 s.thickness_m = thickness(&s.pools);
@@ -276,6 +307,16 @@ pub fn resample(
             }
         })
         .collect();
+    let area_km2 = norm.sample_area_km2();
+    let sum = |k: usize| tally.iter().map(|t| t[k]).sum::<f64>() * area_km2 / 1000.0;
+    for (name, k) in [
+        (ACCRETED_GLOBAL, 0),
+        (STACKED_CONSUMED_GLOBAL, 1),
+        (ACCRETED_HIDDEN_CONTINENT_GLOBAL, 2),
+        (ACCRETED_VISIBLE_GLOBAL, 3),
+    ] {
+        *world.globals.entry(name.to_owned()).or_insert(0.0) += sum(k);
+    }
 
     // Gaps: fresh oceanic crust between diverging plates.
     let gap: Vec<bool> = plate_new.iter().map(|&p| p == u32::MAX).collect();
@@ -414,7 +455,7 @@ pub fn resample(
         }
         let spread = norm.speed_mm_yr(omega[a as usize] - omega[b as usize], at);
         let mut e = events::event(world, t, RIDGE_BIRTH, at)
-            .magnitude((spread / k.max_plate_speed_mm_yr) as f32)
+            .magnitude((spread / k.convergence_ref_mm_yr) as f32)
             .param("plate_a", i64::from(a))
             .param("plate_b", i64::from(b))
             .param("spreading_mm_yr", spread)
