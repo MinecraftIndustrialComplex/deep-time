@@ -663,7 +663,9 @@ mod tests {
     type Row = (f64, f64, f64, f64);
 
     /// A zonal planet for the clock: land fraction per band, a weathering kernel from the EBM's
-    /// present climate (runoff 0.3 m/yr on all land), and an ice callback that puts ice on the
+    /// present climate (runoff on all land 1.8 times the mean behind `KERNEL_EARTH`, so the
+    /// planet weathers the same against today's degassing whatever Earth's kernel is
+    /// re-measured to: 0.30 m/yr at 2.475·10⁷, 0.61 at 5.039·10⁷), and an ice callback that puts ice on the
     /// share of each band's land (ground uniform between 0 and 1 km) above its equilibrium line
     /// (summer temperature at the ELA 1 °C, lapse 6.5 °C/km).
     struct Planet {
@@ -692,11 +694,13 @@ mod tests {
             let er = ep.run(&mut s, &self.land, &[], 60);
             let (mean, summer) = land_temps(&er);
             let km2 = 5.1e8 / self.lat.len() as f64;
+            // Earth's land, 1.48·10⁸ km² (CLM-061).
+            let runoff = 1.8 * carbon::KERNEL_EARTH / 1.48e8;
             let kernel = Kernel {
                 band: (0..self.lat.len())
                     .map(|b| {
                         let a = km2 * self.lat[b].to_radians().cos() * self.land[b] * 1.57;
-                        carbon::cell_kernel(a, 0.3, mean[b], self.p.weathering_temp_per_k)
+                        carbon::cell_kernel(a, runoff, mean[b], self.p.weathering_temp_per_k)
                     })
                     .collect(),
                 ref_t_land: mean.clone(),
