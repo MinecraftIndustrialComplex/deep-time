@@ -1462,7 +1462,13 @@ impl DepositStage {
             present,
             paths: BTreeMap::new(),
             cover: self.planet.as_deref().and_then(|p| {
-                let cover = crate::structure::Cover::new(world, p).ok()?;
+                // In the session's pool: the horizon bake is parallel, and outside an `install`
+                // it ran on Rayon's global pool, every core of the machine whatever the session's
+                // thread count (P1-17, `tests/session_pool.rs`).
+                let cover = ctx
+                    .pool
+                    .install(|| crate::structure::Cover::new(&*world, p))
+                    .ok()?;
                 ctx.reserve(cover.bytes()).ok()?;
                 Some(cover)
             }),
