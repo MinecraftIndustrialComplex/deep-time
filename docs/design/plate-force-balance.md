@@ -968,3 +968,50 @@ height (plates.md). Supercontinents assemble rarely (2 a run against master's 12
 plates move at less than half the speed of oceanic ones, as on Earth, and collisions stall rather
 than surge.
 
+### Task 7 continued: the eclogite root and whole-column isostasy (2026-10-06 to 2026-10-16)
+
+Ben's choice of 2026-10-06 (decisions log, "Fix isostasy first, then land (Recommended)"): thick
+continental crust gets a dense root before task 7 lands, so that a 50 km crust stands near the
+Urals' height rather than 3.2 km. Physics, sources and results: `docs/science/plates.md`, "The
+eclogite root and whole-column isostasy"; ledger PLT-278 to PLT-282, ISO-043, ISO-046.
+
+- **Whole-column isostasy.** Where a column's thickness changes as a whole (belts, collapse,
+  foundering, a cordillera's root) its height changes at the continental crust's mean density,
+  2,830 kg/m³ (PLT-281): 7.0 m of crust per m of height, not 5.5. Erosion from the top keeps 5.5.
+- **The eclogite root.** Mafic pools deeper than 1.5 GPa (54 km) are 30 % eclogite at
+  3,450 kg/m³ and pull the column down by E × 620 / 3,300 (PLT-278 to PLT-280, rule PLT-282).
+- **The surface flexure** infers the crust behind a plate uplift at the same density (ISO-046).
+- **Measurement only:** run-summary globals `plates/arc_continental_km3`, `plates/arc_oceanic_km3`
+  and `plates/continental_volume_km3` for the crust budget against Stern & Scholl 2010.
+
+The root cannot bring a 50 km column to the Urals' height: it has no root (the eclogite depth is
+54 km) and now stands about 2.7 km. The sources put the Urals' low stand on a dense lower crust that
+is not eclogite and a cold lithosphere, neither of which the model carries; the target was not
+tuned for.
+
+**Measured** (`earthlike_quick_16k`, 1000 Myr, seeds 1–4, both starts; mean of the runs, pooled
+episodes for the supercontinent; reported, not tuned):
+
+| Measure | Branch, 2026-10-05 | With the root | Final (also the flexure) | Target |
+|---|---|---|---|---|
+| plate-check targets met | 30 of 45 | 31 of 45 | 31 of 45 | |
+| Speed RMS; 10th / 50th / 90th percentile, mm/yr | 41.4; 13 / 41 / 78 | 41.8; 13 / 41 / 78 | 41.9; 14 / 41 / 78 | 40–100; ≤20 / 30–60 / 70–110 |
+| Rotation change per step, 90th pct | 25.1 % | 24.9 % | 25.2 % | ≤20 % |
+| Convergence 20 Myr after a collision's onset ÷ at onset | 0.46 | 0.50 | 0.40 | 0.2–0.6 |
+| Collisions per 100 Myr; length, median | 0.90; 44 Myr | 1.00; 40 Myr | 0.89; 46 Myr | 2–6; 15–50 |
+| Continental crust, lowest step; at the end | 0.26; 0.31 | 0.26; 0.31 | 0.25; 0.32 | ≥0.37; n/a |
+| Supercontinent tenure; period, medians | 46; 213 Myr | 45; 230 Myr | 48; 267 Myr | 100–300; 400–800 |
+| Supercontinent assemblies per run | 2.1 | 2.25 | 2.5 | |
+| Land at 1000 Myr; above 2 km of it; median land height | 0.185; 0.27; n/a | 0.180; 0.25; 987 m | 0.192; 0.27; 1,004 m | reported (Earth 0.18–0.30; 0.10; 427 m) |
+
+At 500 Myr (seeds 1–3, both starts) the final code has land 0.191, median land height 745 m, land
+above 2 km 0.187 of the land and continental crust 0.307 of the planet (Earth 0.289, 427 m, 0.10,
+about 0.41); master on 2026-10-05 had 0.184, 414 m, 0.083 and 0.382.
+
+**Not delivered, and why.** The plate targets that failed on 2026-10-05 still fail; the root
+changes the surface and leaves the plate motion as it was. The land is still short: most of the
+continental crust stands 0.5–3 km below the Airy height of its own thickness, near sea level
+(plates.md, "The land share: height has fallen behind thickness"), and which process takes the
+height and leaves the crust was not measured. The crust budget is not Earth's: continental arcs
+and cordillera roots add about 8 km³ a year against Earth's 1, collisions destroy many times
+Earth's 0.7, and island arcs add a tenth of Earth's 1.5 (Stern & Scholl 2010).

@@ -497,8 +497,8 @@ fn sutures_and_initiations_keep_continents_whole() {
     let mut sutures = 0;
     let mut initiations = 0;
     // Seeds where the force balance welds a collision within 300 Myr on this small planet (a
-    // sweep of 32 runs, 2026-10-05, stacking share 0.95: 12 welded).
-    for (start, seed) in [("supercontinent", 2), ("scattered_continents", 7)] {
+    // sweep of 32 runs, 2026-10-16, after the eclogite root and whole-column isostasy: 8 welded).
+    for (start, seed) in [("supercontinent", 6), ("scattered_continents", 9)] {
         let p = preset(8000, 300.0, start, seed);
         let mut seen = 0usize;
         let world = run_stage(&p, |stage, world, st| {
@@ -753,9 +753,10 @@ impl CollisionLives {
 /// has shortened by the threshold; the states' life cycle holds; and collisions still happen.
 #[test]
 fn collisions_weld_on_stall_and_transfer_on_shortening() {
-    // A seed whose collisions weld (two in 300 Myr; under the force balance a held collision
-    // welds less often than under the old speed law, and most 300-Myr runs of this planet have none).
-    let p = preset(8000, 300.0, "scattered_continents", 8);
+    // A seed whose collisions weld (one of 24 in 300 Myr; under the force balance a held collision
+    // welds less often than under the old speed law, and most 300-Myr runs of this planet have none:
+    // 8 of 32 welded in the sweep of 2026-10-16).
+    let p = preset(8000, 300.0, "scattered_continents", 14);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -859,7 +860,7 @@ fn the_collision_footprint_lives_with_its_collision() {
 fn recording_does_not_change_the_world_and_matches_the_run() {
     // A seed with welds, so the collision record is tested (as in
     // `collisions_weld_on_stall_and_transfer_on_shortening`).
-    let p = preset(8000, 300.0, "scattered_continents", 13);
+    let p = preset(8000, 300.0, "scattered_continents", 6);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
