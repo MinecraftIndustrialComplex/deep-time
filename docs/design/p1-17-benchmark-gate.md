@@ -21,6 +21,9 @@ Statements are marked **measured** (a run made for this page), **read** (from th
   ratio): quick scattered 895.8 → **559.7 s** (CPU time 1.33×), quick supercontinent 763.4 →
   **488.7 s** (1.33×), full scattered 2,053.5 → **1,251.7 s** (1.39×). Still over the gate: quick
   1.6 to 1.9×, full 1.4×. Ben accepted the miss for V1 (decisions log 2026-10-06).
+- **Re-checked after the second merge of master (5bc63aa5, 2026-10-17; below)**: quick scattered,
+  one run at a time, 761.3 → **574.0 s** (1.33×; CPU time 1.27×); every file the same but one
+  manifest note's last two bits, which is the metamorphism fix.
 - **The memory test passes again** (2026-10-17, below): two parts of a run worked on Rayon's
   global pool, every core of the machine, instead of the session's threads. Both now run in the
   session's pool, and a new test checks it. The resident peak fell from 124 to 133 MiB to 114 MiB,
@@ -147,7 +150,32 @@ note's cell-order sum (below, "What was optimised"), which can move only the las
 `notes.structure.metamorphosed_km3` in the manifest; master's own value of that note changes from
 run to run. The other is a test-only clippy fix. The master merged at the end (85c9cfe2) changes
 in the core only the steering switch, which presets with steering on do not reach, and some tests.
-So the head's worlds are `v7a`'s (read).
+So the head's worlds at that merge were `v7a`'s (read).
+
+The second merge of master (5bc63aa5, 2026-10-17) brings plate task 7, the erosion-by-process
+notes and new preset values, which change the worlds on both sides alike. Its two conflicts in
+code kept master's work and the branch's: the plate step's phase timers around master's new
+crust-budget sums, and the surface step's parallel per-cell loops with master's new arrays of
+erosion by process. So quick scattered was run once more, one run at a time, against that
+master (measured, 8 threads, 1000 Myr, `out9`, labels `m5bc` and `v8h`):
+
+| | master 5bc63aa5 | branch f4f9a7be | × |
+|---|---:|---:|---:|
+| total, s | 761.3 | **574.0** | 1.33 |
+| climate | 168.8 | 117.8 | 1.43 |
+| surface | 263.9 | 192.0 | 1.37 |
+| structure | 64.2 | 40.4 | 1.59 |
+| plates | 123.7 | 137.7 | 0.90 |
+| user s | 3,214.8 | 2,532.0 | 1.27 |
+| cpu % | 446 | 479 | |
+
+84 files, 83 the same byte for byte. The one that differs is the manifest, in one note:
+`notes.structure.metamorphosed_km3` is 59,837,472.25688099 on master and 59,837,472.256881006 on
+the branch, two units in the last place. That is the cell-order sum (master adds the columns in
+parallel, in no fixed order), not a different world. The plate stage is the same code on both
+sides apart from the branch's timers, a lock and a clock read per part per step; its 0.90 is the
+shared VM's load on a mostly serial stage (it was 1.12 the other way in `out7`). Full was not
+run again.
 
 ## Method
 
