@@ -133,6 +133,36 @@ fn coupled_pipeline_reads_its_own_history_and_is_deterministic_across_threads() 
             .collect()
     };
     assert_eq!(bits(&a), bits(&b), "sites layer differs");
+    // Everything else the stages leave is the same bits on any thread count too (P1-17 made
+    // the per-cell loops of the surface, climate, flexure, glacial, slope failure, volcano,
+    // structure and deposit steps parallel and must not change a bit): every field by name,
+    // then the whole world (plates, surface, catalogues, structure). The notes carry wall
+    // times and are left out; the census above is compared on its own.
+    for (name, f) in &a.fields {
+        let g = &b.fields[name];
+        assert!(
+            f.data.len() == g.data.len()
+                && f.data
+                    .iter()
+                    .zip(&g.data)
+                    .all(|(x, y)| x.to_bits() == y.to_bits()),
+            "field {name} differs between 1 and 3 threads"
+        );
+    }
+    assert_eq!(
+        a.fields.keys().collect::<Vec<_>>(),
+        b.fields.keys().collect::<Vec<_>>()
+    );
+    let body = |w: &WorldState| {
+        let mut w = w.clone();
+        w.notes.clear();
+        w.history = None;
+        postcard::to_allocvec(&w).unwrap()
+    };
+    assert!(
+        body(&a) == body(&b),
+        "the world differs between 1 and 3 threads"
+    );
     // The history is still in the world after the stage (a checkpoint carries it).
     assert!(a.history.as_ref().is_some_and(|h| h.frame_count() == 10));
     // The census names its history.

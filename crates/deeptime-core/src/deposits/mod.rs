@@ -901,10 +901,11 @@ impl DepositStage {
             if self.state.acc[i].is_empty() {
                 continue;
             }
-            let data: Vec<f32> = self.state.acc[i]
-                .iter()
-                .map(|a| a.favourability() as f32)
-                .collect();
+            // Cell by cell, so in parallel (P1-17).
+            let acc = &self.state.acc[i];
+            let data: Vec<f32> = ctx
+                .pool
+                .install(|| acc.par_iter().map(|a| a.favourability() as f32).collect());
             world.fields.insert(
                 format!("deposits/favourability/{}", t.short()),
                 Field {
@@ -1461,7 +1462,13 @@ impl DepositStage {
             present,
             paths: BTreeMap::new(),
             cover: self.planet.as_deref().and_then(|p| {
-                let cover = crate::structure::Cover::new(world, p).ok()?;
+                // In the session's pool: the horizon bake is parallel, and outside an `install`
+                // it ran on Rayon's global pool, every core of the machine whatever the session's
+                // thread count (P1-17, `tests/session_pool.rs`).
+                let cover = ctx
+                    .pool
+                    .install(|| crate::structure::Cover::new(&*world, p))
+                    .ok()?;
                 ctx.reserve(cover.bytes()).ok()?;
                 Some(cover)
             }),

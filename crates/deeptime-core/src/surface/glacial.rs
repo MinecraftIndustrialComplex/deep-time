@@ -63,11 +63,15 @@
 //! **Determinism.** The passes are serial walks of the stack (up: donors before receivers;
 //! down: receivers first), so results do not depend on the thread count.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::grid::Dims;
 use super::pflood::{BASE, LAKE_TOL_M};
 use super::routing::Routing;
+use super::routing::forest::{NONE, SharedF64};
 use crate::climate::ebm::smoothstep;
 use crate::error::CoreError;
 
@@ -487,8 +491,183 @@ fn offset(d: &Dims, c: usize, di: i64, dj: i64) -> Option<usize> {
 const Q_MIN: f64 = 1.0e3;
 
 /// Solves the ice of the surface `h` routed by `r` (the step's D8 tree on the filled surface).
+///
+/// The flux pass (donors before receivers) and the surface pass (receivers first) walk the
+/// routing's drainage forest in parallel (`routing::forest`, P1-17): a cell's incoming flux is a
+/// gather over its donors in ascending cell index, the order in which the serial reverse-stack
+/// walk added them, and every other value is the cell's own, so the result is [`ice_serial`]'s bit
+/// for bit (the tests compare them).
 #[allow(clippy::too_many_arguments)]
 pub fn ice(
+    d: &Dims,
+    r: &Routing,
+    kind: &[u8],
+    h: &[f64],
+    filled: &[f64],
+    sea: f64,
+    clim: &IceClimate<'_>,
+    p: &GlacialParams,
+    gravity: f64,
+    st: &mut IceState,
+) {
+    let f = &r.forest;
+    let l = r.stack.len();
+    if f.len() != l || f.pos.len() != d.cells() {
+        return ice_serial(d, r, kind, h, filled, sea, clim, p, gravity, st);
+    }
+    let n = d.cells();
+    let a = d.cell_area();
+    let flow = Flow::new(p, gravity, d.dx);
+    for v in [
+        &mut st.q,
+        &mut st.melt_frac,
+        &mut st.thick,
+        &mut st.cover,
+        &mut st.width,
+        &mut st.sliding,
+        &mut st.slope,
+    ] {
+        v.clear();
+        v.resize(n, 0.0);
+    }
+    st.surface.clear();
+    st.surface.resize(n, f64::NAN);
+    st.footprint.clear();
+    st.footprint.resize(n, f64::NAN);
+    st.cells = 0;
+    // Up: fluxes, by position in the stack. `out` is what a cell passes to its receiver (0 when
+    // nothing reaches it: adding +0 to a sum of non-negative terms changes no bit).
+    let out = SharedF64::new(l, 0.0);
+    let q = SharedF64::new(l, 0.0);
+    let melt_frac = SharedF64::new(l, 0.0);
+    let any = AtomicBool::new(false);
+    f.up(UP_CHUNK, |i| {
+        let c = r.stack[i] as usize;
+        let mut qin = 0.0;
+        for &dp in &f.dpos[f.dptr[i] as usize..f.dptr[i + 1] as usize] {
+            qin += out.get(dp as usize);
+        }
+        let allowed = clim.allowed.is_none_or(|m| m[c] > 0.0);
+        let b = if allowed {
+            balance(p, h[c], clim.ela_z[c], f64::from(clim.precip_m_yr[c]))
+        } else {
+            -p.max_ablation_m_yr
+        };
+        let acc = b * a;
+        let supply = qin + acc.max(0.0);
+        if supply <= 0.0 {
+            return;
+        }
+        any.store(true, Ordering::Relaxed);
+        let melt = (-acc).max(0.0).min(supply);
+        let o = supply - melt;
+        melt_frac.set(i, melt / supply);
+        q.set(i, 0.5 * (supply + o));
+        out.set(i, o);
+    });
+    let pos = &f.pos;
+    let gather = |dst: &mut Vec<f64>, src: &SharedF64| {
+        dst.par_iter_mut().enumerate().for_each(|(c, v)| {
+            let i = pos[c];
+            if i != NONE {
+                *v = src.get(i as usize);
+            }
+        });
+    };
+    gather(&mut st.melt_frac, &melt_frac);
+    if !any.load(Ordering::Relaxed) {
+        gather(&mut st.q, &q);
+        return;
+    }
+    // Down: surfaces, receivers first.
+    let thick = SharedF64::new(l, 0.0);
+    let surface = SharedF64::new(l, f64::NAN);
+    let slope = SharedF64::new(l, 0.0);
+    let width = SharedF64::new(l, 0.0);
+    let cover = SharedF64::new(l, 0.0);
+    let sliding = SharedF64::new(l, 0.0);
+    f.down(DOWN_GRAIN, |i| {
+        let c = r.stack[i] as usize;
+        let qc = q.get(i);
+        if qc < Q_MIN {
+            q.set(i, 0.0);
+            return;
+        }
+        let rc = r.rcv[c] as usize;
+        let rp = f.rpos[i];
+        let (z_ref, len) = if rc == c {
+            (filled[c], d.dx)
+        } else if kind[rc] == BASE {
+            (sea, f64::from(r.len[c]).max(1.0))
+        } else if rp != NONE && thick.get(rp as usize) > 0.0 {
+            (
+                surface.get(rp as usize).max(filled[rc]),
+                f64::from(r.len[c]).max(1.0),
+            )
+        } else {
+            (filled[rc], f64::from(r.len[c]).max(1.0))
+        };
+        let warm_t = smoothstep(p.warm_bed_c[0], p.warm_bed_c[1], f64::from(clim.t_c[c]));
+        let (zs, hh, sl) = solve_surface(&flow, qc, h[c], z_ref, len, warm_t);
+        if hh <= 0.0 {
+            return;
+        }
+        surface.set(i, zs);
+        thick.set(i, hh);
+        slope.set(i, sl);
+        let wd = flow.width(hh);
+        width.set(i, wd);
+        cover.set(i, (wd / d.dx).min(1.0));
+        sliding.set(i, flow.sliding(hh, sl, warm_t));
+    });
+    gather(&mut st.q, &q);
+    gather(&mut st.thick, &thick);
+    gather(&mut st.surface, &surface);
+    gather(&mut st.slope, &slope);
+    gather(&mut st.width, &width);
+    gather(&mut st.cover, &cover);
+    gather(&mut st.sliding, &sliding);
+    st.cells = st.thick.par_iter().filter(|&&x| x > 0.0).count();
+    footprint(d, r, kind, h, p, st);
+}
+
+/// The footprint: every glacier over the cells within half its width that lie under it.
+fn footprint(d: &Dims, r: &Routing, kind: &[u8], h: &[f64], p: &GlacialParams, st: &mut IceState) {
+    for &c in &r.stack {
+        let c = c as usize;
+        let zs = st.surface[c];
+        if !zs.is_finite() {
+            continue;
+        }
+        let half = 0.5 * st.width[c] * p.valley_width / d.dx;
+        let reach = (half - 0.5).ceil().clamp(0.0, MAX_SPREAD as f64) as i64;
+        for dj in -reach..=reach {
+            for di in -reach..=reach {
+                let dist = ((di * di + dj * dj) as f64).sqrt();
+                if dist > half + 0.5 && (di, dj) != (0, 0) {
+                    continue;
+                }
+                let Some(j) = offset(d, c, di, dj) else {
+                    continue;
+                };
+                if kind[j] != BASE
+                    && h[j] < zs
+                    && (st.footprint[j].is_nan() || st.footprint[j] < zs)
+                {
+                    st.footprint[j] = zs;
+                }
+            }
+        }
+    }
+}
+
+/// Positions handed out per task by the parallel passes of [`ice`] (`spl.rs`'s values).
+const DOWN_GRAIN: u32 = 256;
+const UP_CHUNK: usize = 64;
+
+/// [`ice`] by serial walks of the stack: routings without their forest, and the tests' reference.
+#[allow(clippy::too_many_arguments)]
+pub fn ice_serial(
     d: &Dims,
     r: &Routing,
     kind: &[u8],
