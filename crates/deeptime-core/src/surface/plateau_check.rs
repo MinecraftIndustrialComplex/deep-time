@@ -195,18 +195,39 @@ fn plateau_erosion_by_process_and_scale() {
     let earth = MAP * EARTH_OVER_MAP;
     let inf = f64::INFINITY;
     let rows = [
-        ("map, κ 2, S_c 0.35 (presets)", case(MAP, 2.0, 0.35, 1.0, 2, false)),
-        ("Earth, κ 2, S_c 0.35", case(earth, 2.0, 0.35, 1.0, 2, false)),
+        (
+            "map, κ 2, S_c 0.35 (presets)",
+            case(MAP, 2.0, 0.35, 1.0, 2, false),
+        ),
+        (
+            "Earth, κ 2, S_c 0.35",
+            case(earth, 2.0, 0.35, 1.0, 2, false),
+        ),
         ("map, no κ, no S_c", case(MAP, 0.0, inf, 1.0, 2, false)),
         ("Earth, no κ, no S_c", case(earth, 0.0, inf, 1.0, 2, false)),
         ("map, κ 2, no S_c", case(MAP, 2.0, inf, 1.0, 2, false)),
         ("Earth, κ 2, no S_c", case(earth, 2.0, inf, 1.0, 2, false)),
-        ("map, κ 0.0036, S_c 0.35", case(MAP, 0.0036, 0.35, 1.0, 2, false)),
-        ("map, κ 2, S_c 0.35, dry 0.1", case(MAP, 2.0, 0.35, 0.1, 2, false)),
-        ("map, κ 2, S_c 0.35, lake", case(MAP, 2.0, 0.35, 1.0, 2, true)),
+        (
+            "map, κ 0.0036, S_c 0.35",
+            case(MAP, 0.0036, 0.35, 1.0, 2, false),
+        ),
+        (
+            "map, κ 2, S_c 0.35, dry 0.1",
+            case(MAP, 2.0, 0.35, 0.1, 2, false),
+        ),
+        (
+            "map, κ 2, S_c 0.35, lake",
+            case(MAP, 2.0, 0.35, 1.0, 2, true),
+        ),
         ("map, κ 0.0036, lake", case(MAP, 0.0036, 0.35, 1.0, 2, true)),
-        ("map, 1-cell edge, no κ", case(MAP, 0.0, 0.35, 1.0, 1, false)),
-        ("Earth, 1-cell edge, no κ", case(earth, 0.0, 0.35, 1.0, 1, false)),
+        (
+            "map, 1-cell edge, no κ",
+            case(MAP, 0.0, 0.35, 1.0, 1, false),
+        ),
+        (
+            "Earth, 1-cell edge, no κ",
+            case(earth, 0.0, 0.35, 1.0, 1, false),
+        ),
         ("map, rim, drains over it", rimmed(false)),
         ("map, rim, terminal lake", rimmed(true)),
     ];
@@ -228,10 +249,25 @@ fn plateau_erosion_by_process_and_scale() {
     assert!(got[2][1][0] > 0.0 && rel(got[2][1][0], got[3][1][0]) < 0.02);
     assert!(got[2][0][0] > 0.0 && rel(got[2][0][0], got[3][0][0]) < 0.02);
     // ... while diffusion is far stronger on the map (κ Δt / Δx², 66 times).
-    assert!(got[4][1][2] > 10.0 * got[5][1][2], "edge diffusion map/Earth");
+    assert!(
+        got[4][1][2] > 10.0 * got[5][1][2],
+        "edge diffusion map/Earth"
+    );
     // Diffusion does not wear the plateau: it rounds the escarpment's lip, and the interior's
     // stream power falls (map, κ 2 against no κ).
-    assert!(got[0][0][0] < 0.5 * got[2][0][0], "diffusion protects the interior");
+    assert!(
+        got[0][0][0] < 0.5 * got[2][0][0],
+        "diffusion protects the interior"
+    );
     // Runoff does: a plateau at a tenth of the runoff wears at a small part of the rate.
-    assert!(got[7][0][3] < 0.2 * got[0][0][3], "a dry plateau wears slowly");
+    assert!(
+        got[7][0][3] < 0.2 * got[0][0][3],
+        "a dry plateau wears slowly"
+    );
+    // A closed interior behind a rim range barely helps: ending in a terminal lake instead of
+    // spilling over the rim, it still wears at most of the rate (the rim's own rivers cut through).
+    assert!(
+        got[13][0][3] > 0.5 * got[12][0][3],
+        "a terminal lake behind a rim does not save the plateau"
+    );
 }
