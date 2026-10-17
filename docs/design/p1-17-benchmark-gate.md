@@ -14,11 +14,17 @@ Statements are marked **measured** (a run made for this page), **read** (from th
 
 ## Summary
 
-- **Re-measured on the rebuilt VM (2026-10-16; below)**: measured, 8 threads, 1000 Myr, scattered
-  continents, before = master a55f70f6, worlds identical (83 of 83 files): side by side quick
-  774.5 → **577.2 s (1.34×)**, full 2,815.7 → **2,054.5 s (1.37×)**; one run at a time, with this
-  session's passes, quick 895.8 → **559.7 s** (the two runs saw different loads). Still over the
-  gate: quick about 1.9×, full about 2.3×. Ben accepted the miss for V1 (decisions log 2026-10-06).
+- **Re-measured on the rebuilt VM (2026-10-16; below)**: measured, 8 threads, 1000 Myr, before =
+  master a55f70f6, worlds identical (83 of 83 files). Side by side, scattered: quick 774.5 →
+  **577.2 s (1.34×)**, full 2,815.7 → **2,054.5 s (1.37×)**. One run at a time, with this
+  session's passes (the two runs of a pair saw different loads, so their CPU time is the fairer
+  ratio): quick scattered 895.8 → **559.7 s** (CPU time 1.33×), quick supercontinent 763.4 →
+  **488.7 s** (1.33×), full scattered 2,053.5 → **1,251.7 s** (1.39×). Still over the gate: quick
+  1.6 to 1.9×, full 1.4×. Ben accepted the miss for V1 (decisions log 2026-10-06).
+- **The memory test passes again** (2026-10-17, below): two parts of a run worked on Rayon's
+  global pool, every core of the machine, instead of the session's threads. Both now run in the
+  session's pool, and a new test checks it. The resident peak fell from 124 to 133 MiB to 114 MiB,
+  under the 119 MiB bound. The bake's estimate row is explained there.
 - **The 8-thread gate (plan P1-17: quick ≤ 300 s, full ≤ 900 s; 1000 Myr)**: measured, test VM,
   8 threads, before = master 6489d4a5, after = this branch, run side by side, worlds identical:
 
@@ -93,34 +99,55 @@ adds this session's climate and smoothing passes to `v6a`). The two runs of a pa
 the same load, so the wall-time ratio carries the VM's load as well as the code (`cpu %`: how many
 CPUs each run got); the side-by-side ratio above stays the reliable one.
 
-| stage | quick scattered before | after | × |
-|---|---:|---:|---:|
-| plates | 140.7 | 125.2 | 1.12 |
-| climate | 220.5 | 130.6 | 1.69 |
-| surface | 328.0 | 187.1 | 1.75 |
-| volcanoes | 37.0 | 10.6 | 3.50 |
-| impacts | 1.8 | 1.7 | 1.08 |
-| structure | 73.4 | 41.3 | 1.78 |
-| deposits | 33.4 | 18.9 | 1.76 |
-| young | 5.4 | 2.9 | 1.88 |
-| amplify | 23.6 | 21.0 | 1.12 |
-| finalize | 32.0 | 20.3 | 1.57 |
-| **total** | **895.8** | **559.7** | **1.60** |
-|   climate.ebm2d | 106.3 | 49.4 | 2.15 |
-|   climate.clock | 32.8 | 24.4 | 1.34 |
-|   structure.outputs (the horizon smoothing) | 20.3 | 5.8 | 3.50 |
-|   plates.write_l1 | – | 44.4 | |
-|   plates.resample | – | 22.3 | |
-| user s | 3,228 | 2,420 | 1.33 |
-| cpu % | 384 | 471 | |
-| peak GiB (gauge) | 3.17 | 3.16 | |
-| max RSS GiB | 3.34 | 3.36 | |
-| world files equal | 83 of 83 | | |
+| stage | quick scattered before | after | × | full scattered before | after | × |
+|---|---:|---:|---:|---:|---:|---:|
+| plates | 140.7 | 125.2 | 1.12 | 360.2 | 305.3 | 1.18 |
+| climate | 220.5 | 130.6 | 1.69 | 314.7 | 186.4 | 1.69 |
+| surface | 328.0 | 187.1 | 1.75 | 870.2 | 489.9 | 1.78 |
+| volcanoes | 37.0 | 10.6 | 3.50 | 110.3 | 24.5 | 4.49 |
+| impacts | 1.8 | 1.7 | 1.08 | 3.3 | 3.1 | 1.07 |
+| structure | 73.4 | 41.3 | 1.78 | 187.7 | 100.6 | 1.87 |
+| deposits | 33.4 | 18.9 | 1.76 | 104.3 | 74.5 | 1.40 |
+| young | 5.4 | 2.9 | 1.88 | 16.3 | 11.3 | 1.44 |
+| amplify | 23.6 | 21.0 | 1.12 | 21.3 | 21.2 | 1.01 |
+| finalize | 32.0 | 20.3 | 1.57 | 60.5 | 33.8 | 1.79 |
+| **total** | **895.8** | **559.7** | **1.60** | **2,053.5** | **1,251.7** | **1.64** |
+|   climate.ebm2d | 106.3 | 49.4 | 2.15 | 73.8 | 33.2 | 2.22 |
+|   climate.clock | 32.8 | 24.4 | 1.34 | 37.8 | 26.8 | 1.41 |
+|   structure.outputs (the horizon smoothing) | 20.3 | 5.8 | 3.50 | 43.5 | 16.4 | 2.65 |
+|   plates.write_l1 | – | 44.4 | | – | 136.2 | |
+|   plates.resample | – | 22.3 | | – | 45.2 | |
+| user s | 3,228 | 2,420 | 1.33 | 8,689 | 6,240 | 1.39 |
+| cpu % | 384 | 471 | | 438 | 524 | |
+| peak GiB (gauge) | 3.17 | 3.16 | | 4.10 | 4.09 | |
+| max RSS GiB | 3.34 | 3.36 | | 4.25 | 4.26 | |
+| world files equal | 83 of 83 | | | 83 of 83 | | |
 
-Against the side-by-side `v6a` the new passes show in their own timers: the 2-D climate 56.2 →
-49.4 s and the structure stage's outputs 10.1 → 5.8 s on quick (different runs and loads, so
-inferred, not a measured ratio). The before-run got 3.8 CPUs and the after-run 4.7, so most of the
-1.60 is the load; the ratio of CPU time (user s, 1.33×) is close to the side-by-side 1.34.
+**Quick, supercontinent** (the same pair, between the two above): 763.4 → **488.7 s** wall (1.56×),
+user 2,964 → 2,236 s (**1.33×**), cpu % 412 → 497, max RSS 3.31 → 3.32 GiB; the 83 world files
+both runs wrote are equal. Both runs simulated to the end and then failed in the write, so there
+is no `bench.json` and no stage table: `body 2034: semi-axes [0.0, 7.10946, 0.0] must be finite
+and > 0`. That is master's bug, not this branch's: `bake/project.rs`'s `project_body` scales a
+body's horizontal axes by the projection's Jacobian, and at or past the simulation's pole row the
+Jacobian vanishes (read). The P1-19 branch (`worktree-agent-a5f716254d9f81516`, not merged on
+2026-10-17) already keeps the source axes there and adds a test, so this branch leaves that file
+alone.
+
+Against the side-by-side `v6a`, the new passes show in their own timers. On quick the 2-D climate
+went 56.2 → 49.4 s and the structure stage's outputs 10.1 → 5.8 s; these are different runs and
+loads, so the change is inferred, not a measured ratio. Each before-run got fewer CPUs than its
+after-run (3.8 against 4.7 on quick, 4.4 against 5.2 on full), so much of the 1.6× in wall time is
+the load. The ratio of CPU time (user s: 1.33× quick, both starts, and 1.39× full) is the figure to
+compare with the side-by-side 1.34 and 1.37. Full's one-at-a-time after-run, 1,251.7 s, is the
+best full time on this VM so far. It is still 1.39× the 900 s gate, and quick's 488.7 to 559.7 s
+are 1.6 to 1.9× the 300 s gate.
+
+These worlds were made by `v7a`. The branch's head adds two things to it. One is the metamorphism
+note's cell-order sum (below, "What was optimised"), which can move only the last bits of
+`notes.structure.metamorphosed_km3` in the manifest; master's own value of that note changes from
+run to run. The other is a test-only clippy fix. The master merged at the end (85c9cfe2) changes
+in the core only the steering switch, which presets with steering on do not reach, and some tests.
+So the head's worlds are `v7a`'s (read).
 
 ## Method
 
@@ -400,6 +427,8 @@ so they are recorded here and not edited (the coordinator's rule, 2026-10-16):
 | `surface/fields.rs`, `surface/pflood.rs`, `surface/glacial.rs` (erosion) | the craton-edge distance's serial sweep (3 s), the priority flood (10 s, serial by design), the glaciers' step (3 s) | the sweep by rows; the flood stays serial | yes for the sweep |
 | `alloc.rs` (memory accounting) | the counting allocator's global atomics (2 % of the CPU, most of it from the per-query `Vec` above) | per-thread counts folded at a stage's end, keeping the same totals | yes |
 | `bake/project.rs` (the seamless world) | `resample_grid`, the bake's projection pass | not profiled in detail here | |
+| `bake/project.rs` (the seamless world; P1-19 branch) | not speed: `project_body` gives a body zero horizontal axes where the projection's Jacobian vanishes (at or past the simulation's pole row), and the write then fails; quick supercontinent 1000 Myr on master and on this branch | keep the source axes there: done on the P1-19 branch (`worktree-agent-a5f716254d9f81516`) with a test, not merged on 2026-10-17 | changes only worlds that failed to write |
+| `alloc.rs`, `session.rs` (memory accounting) | the session's own threads' glibc arenas: about 8 MiB of the memory test's resident peak above the count after this branch's pool fix | `malloc_trim` when a stage ends, or a cap on arenas | yes |
 | `climate/clock.rs` | the zonal climate clock, one EBM run per carbon step | sequential in time by nature | |
 
 ## What was optimised (all bit-identical, each with a test)
@@ -430,6 +459,16 @@ Branch `worktree-agent-af385527348745fb2`; the tests named are in the files chan
 | tests | the coupled pipeline on 1 and 3 threads: every field and the whole world body, bit for bit | itself |
 | bench | the editor's estimate printed beside the measurement; slope-failure sweep counters; climate, surface and (new) plate sub-timers | none |
 
+**Two fixes that are not optimisations.** The session's threads (2026-10-17): see "The memory
+test and the session's threads" below. The metamorphism note (2026-10-16) is the same on every
+run. `structure/mod.rs` summed each column's metamorphosed thickness with a parallel float
+`sum`. Rayon splits that sum by how the threads steal work, so the terms grouped differently
+from run to run and the last bits of `notes.structure.metamorphosed_km3` changed. The
+`history_cap` test caught it: on the rebuilt VM two runs of one planet differed in that note.
+The columns are now worked in parallel and their thicknesses summed serially in cell order, the
+codebase's rule for float sums. The worlds are unchanged, since the note is all it fed; the
+note's own value is now fixed, where master's moved between runs. `history_cap` is the test.
+
 ## The young stage's memory estimate (tightened here)
 
 The young stage's estimate was the surface stage's whole estimate (its step's working arrays, the
@@ -446,6 +485,68 @@ climate's 24 monthly maps), the history, and 460 B for each cell of the real L2 
 | full 16k | 4,143 MiB | 416 B | 6,049 MiB | 4,485 MiB |
 
 With it, full 16k's whole estimate fits a 5 GiB cap (test `the_estimate_covers_the_measured_hold_closely`).
+
+## The memory test and the session's threads (2026-10-17)
+
+The coordinator's item. `tests/memory_estimate.rs` runs a small planet through every stage and
+the bake on a 2-thread session, under the game's counting allocator. It asserts that no stage
+holds more than its estimate, that the run's peak is inside the estimate's peak, and that the
+resident peak is within the counted peak plus 16 MiB plus a tenth (line 175). On the rebuilt VM
+that last check failed on master and on this branch alike. All measured, `cargo test -p
+deeptime-core --test memory_estimate -- --nocapture`, MiB:
+
+| build | resident peaks | counted peak | bound | result |
+|---|---|---:|---:|---|
+| master a55f70f6 | 133.0, 139.8, 123.1 | 94.1 | 119.5 | fails 3 of 3 |
+| master a55f70f6, `MALLOC_ARENA_MAX=1` | 103.9, 104.4 | 94.1 | 119.5 | passes |
+| master ba8fb5cb (coordinator's gate batch) | 116.3 | 94.1 | 119.5 | passed on a rerun |
+| branch before the fix (070c1548) | 133.3 (gate), 125.6, 128.0 | 94.0 | 119.4 | fails |
+| the same, `MALLOC_ARENA_MAX=1` | 106.7, 105.6 | 94.0 | 119.4 | passes |
+| the same, `RAYON_NUM_THREADS=2` | 114.6, 114.5 | 93.8 | 119.2 | passes |
+| **branch with the fix (15febcde)** | **114.5, 113.7, 113.5** (and the gate) | **93.8** | 119.2 | **passes** |
+
+**The count was right; the threads were not.** The allocator counts every block, and maps the
+ones of 1 MiB or more itself. Smaller blocks go through glibc, which gives each thread an arena
+and keeps freed blocks in it, so the resident set grows with the number of threads that
+allocate. One arena (`MALLOC_ARENA_MAX=1`) brings the resident peak to about 12 MiB over the
+count. `RAYON_NUM_THREADS` sizes only Rayon's global pool, not the session's (the session builds
+its own), yet setting it to 2 took 11 to 13 MiB off the resident peak and even moved the
+counted peak, so some of the run was working on the global pool. gdb on the test binary, with a
+breakpoint where a thread outside every pool asks for the global registry, found two callers.
+Both run on the test's own thread, outside the session's `install`:
+
+- `Session::bake_water_into_last_frame` built the water view (`water_view::from_bake`, the
+  hydrology of `hydro::network`) outside the pool. Only the redraw after it was inside.
+- The deposits stage's finish built its coal seams' cover (`structure::Cover::new`, the horizon
+  bake and smoothing) outside the pool. The stage runs its other parallel work in `install`
+  calls of its own.
+
+On the VM those parts ran on 32 threads beside a 2-thread session. In the game they would use
+every core whatever the player's thread setting. The bench sets `RAYON_NUM_THREADS` to its own
+thread count, so its timings and worlds are unaffected. Both calls now run in the session's pool,
+and `tests/session_pool.rs` keeps it that way. That test gives the global pool one thread and
+keeps that thread busy for the whole run, so a run that sends the global pool any work never
+finishes. Without the fix the test was still waiting after 240 s; with it, it passes in 32 s. The
+1-and-3-thread pipeline test still passes, so those two parts do not depend on the thread count
+(they now run on the session's 1 or 3 threads where before both runs used the global pool).
+
+The resident check now passes with about 5 MiB to spare. The rest of the gap over the count is
+the session's own threads' arenas (one arena: 106 MiB). Trimming them (`malloc_trim` when a
+stage ends, or a cap on arenas) is for whoever owns memory accounting; it is recommended, not
+done here.
+
+**The bake's row** (held 93.8 MiB against its estimate of 75.3, of which the projection pass is
+18.0) is printed but not asserted, by design. `estimate_for` (`session.rs`) counts in
+`bake_bytes` only the finished world and the projection pass's working set. It says that "the
+Lambert bake itself has stayed inside the stages' peak so far; `tests/memory_estimate.rs` checks
+the run's peak". The run's estimate, 96.8 MiB, does cover the bake's 93.8 (3 MiB, 3 %, to
+spare), and the test asserts that. This branch's change in the bake's path, the horizon
+smoothing's per-thread rows, leaves the bake's count where master has it (93.8 to 94.1 on both).
+At 16k the estimate's `bake_bytes` are 1.95 GiB (quick) and 4.24 GiB (full), against run peaks
+of 4.00 and 4.82 GiB estimated and 3.16 and 4.09 GiB counted. The bench records no peak for
+the bake alone, so the estimate is left as it is: raising it without a measured 16k bake peak
+would move the editor's figures on a guess. The margin is thin on the test planet, and a bake
+change that adds a few MiB will fail the run-peak check. That check is the guard.
 
 ## What it would take (inferred)
 
