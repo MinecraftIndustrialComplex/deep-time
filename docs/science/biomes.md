@@ -363,7 +363,10 @@ playas, the volcanic zones and the rock at the surface. The class is the one the
 (`climate/koppen_l2`: each L2 cell's months lapsed to its own height) where the bake wrote it. Until 2026-10-17 the
 rules read the climate stage's L1 class, which gives the low ground of an L1 cell the class of the high ground it
 shares the cell with: on that day's test planet 757 of the 3,027 columns a rule decided lay outside the rule's
-classes on the L2 class (tundra on a Csb coast below a plateau, a snow-capped volcano in BSk). The first rule that holds runs the pack's own climate
+classes on the L2 class (tundra on a Csb coast below a plateau, a snow-capped volcano in BSk). Read on the L2 class,
+the rules decided 2,743 columns of the same planet and none lay outside its rule's classes; the icy volcano fell from
+218 columns to 37 (the other cones take the role tag's plain volcano, 269 → 450), low-arctic tundra from 161 to none,
+and Mediterranean scrub rose from 299 to 423. The first rule that holds runs the pack's own climate
 search over that rule's biomes alone, so the pack still picks among them by its ranges (a hot-spring field takes
 the snowy or the plain thermal taiga by temperature). A rule's biomes may be exclusive: kept out of the climate
 search elsewhere, as the volcanic biomes are; a file may also keep biomes out without placing them anywhere: EE's
@@ -458,6 +461,17 @@ where the mean minimum temperature drops below 18 °C, "on large equatorial inla
 BIO-145). The latitude limit (about 23° N to 25° S) is from a secondary snippet, not read (BIO-144, `from-memory`).
 The Köppen classes C at tropical latitudes are mountain climates by construction (a coldest month under 18 °C at low
 latitude needs height), so the rule asks the classes rather than a temperature.
+
+The census's cloud forest ground (BIO-154) is the rule's own: the four classes, the latitude, the height and P/PET
+above 1, read from the level's monthly climate with the bake's Thornthwaite arithmetic (MOI-065, MOI-066). Columns in
+a volcano zone are left out, as from every pack check, because a volcano zone's biome comes before the table. Until
+2026-10-17 the census did not check P/PET. That held while it read the L1 class, and stopped holding when it moved
+to the L2 class with plate task 7's merge: on the L2 class every column of the tropics that is high enough is a C
+class, dry ones too. On that day's 4k test planet with MIC the old ground held 261 sampled columns, 69 of them on the
+cloud forest (0.264, under the bound of 0.3). 72 of the 261 are dry (P/PET at most 1, where the rule never fires) and
+9 lie in volcano zones; the rule's ground is the other 180, 67 of them on the cloud forest (0.372). The rest of that
+ground is on Terralith's highlands (28), temperate highlands (18), lavender valley (11), alpine highlands (10), lush
+valley (10) and plains (7); why those columns missed the slot was not examined.
 
 **The geology gate.** A rock-named biome stands only on the ground it is named for (BIO-147 to BIO-153): Shield on
 Precambrian shield provinces, Yosemite on exposed granite, the White, Granite and Basalt Cliffs on coasts of
