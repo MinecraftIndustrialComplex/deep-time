@@ -93,6 +93,25 @@ def set_layer(page, i):
     time.sleep(1.2)
 
 
+def ensure_fonts():
+    """The rebuilt test VM has no fonts and no fontconfig file: Chromium aborts when the viewer page lays out text ("Could not find
+    any font", exit -6). Point FONTCONFIG_FILE at DejaVu from nixpkgs (nothing is installed globally; NixOS rule)."""
+    if os.environ.get("FONTCONFIG_FILE") or shutil.which("fc-list") and subprocess.run(["fc-list"], capture_output=True, text=True).stdout.strip():
+        return
+    try:
+        out = subprocess.run(["nix", "build", "nixpkgs#dejavu_fonts", "--no-link", "--print-out-paths"], capture_output=True, text=True, timeout=600).stdout.split()
+        fonts = next(o for o in out if os.path.isdir(os.path.join(o, "share", "fonts")))
+    except Exception as e:
+        print(f"phase1_viewer_check: no fonts available ({e}); Chromium may abort")
+        return
+    d = tempfile.mkdtemp(prefix="dt-fontconfig-")
+    conf = os.path.join(d, "fonts.conf")
+    with open(conf, "w") as f:
+        f.write('<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd"><fontconfig>'
+                f'<dir>{fonts}/share/fonts</dir><cachedir>{d}/cache</cachedir></fontconfig>')
+    os.environ["FONTCONFIG_FILE"] = conf
+
+
 FLAG_SETS = (
     ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
     ["--disable-gpu", "--disable-dev-shm-usage"],
@@ -119,6 +138,7 @@ def main():
 
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=a.bundle))
     threading.Thread(target=srv.serve_forever, daemon=True).start()
+    ensure_fonts()
     # Chromium's GPU flags that work differ between builds: try the software-GL set the BlueMap shots use, then plainer ones, and
     # keep each failed attempt's stderr (head and tail) for the report.
     proc = profile = page = up = None
