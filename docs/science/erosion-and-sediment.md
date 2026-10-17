@@ -33,7 +33,7 @@ Rows by status: `cited-unverified` 86, `from-memory` 2, `abstract-only` 3, `cali
 - The erodibility `k_spl` is 2e-9 in the Rust default and 3e-9 in all eight presets; the comment describes the older value (extraction notes ERO, flag 1).
 - The weathering constants (50 m/Myr, depth scale 5 m) have no source; the research note says the rate constants "were not retrieved" (flag 2).
 - The facies rules are, in the research note's words, "my proposal, not a published scheme that was checked".
-- Stage 1 spot checks: the soil-production depth scale of 5 m is 10 to 20 times the 0.25 to 0.5 m that secondary sources give for Heimsath's law (ERO-070, MISMATCH at secondary level); the hillslope diffusivity of 2 m2/yr is 20 times the only primary value read (ERO-023; Roering et al. 1999, read on 2026-10-16, measured 0.0036 m2/yr on hillslopes, 550 times smaller, ERO-177; see "Plateaus and the hillslope diffusivity"); the Landlab carbonate and marine constants match Landlab's source.
+- Stage 1 spot checks: the soil-production depth scale of 5 m is 10 to 20 times the 0.25 to 0.5 m that secondary sources give for Heimsath's law (ERO-070, MISMATCH at secondary level); the hillslope diffusivity of 2 m2/yr (ERO-023) is 550 times the only primary value read (Roering et al. 1999, read on 2026-10-16: 0.0036 m2/yr measured on hillslopes, ERO-177; kept at the map scale, see "Plateaus and the hillslope diffusivity"); the Landlab carbonate and marine constants match Landlab's source.
 
 ## Continental margins and submarine slope failure (margins and spires task, 2026-10-03)
 
@@ -222,14 +222,18 @@ inside the escarpment's top) and of the escarpment:
 | Map, κ 2, terminal lake at the centre | 126.2, 22.0, 132.4 | 227.4, 13.4, 223.3 |
 | Map, κ 0.0036, terminal lake at the centre | 298.1, 0.1, 297.9 | 271.5, 0.0, 270.9 |
 | 1-cell escarpment, no κ, S_c 0.35 (map and Earth's width alike) | 299.3, 0, 299.0 | 307.0, 0, 306.3 |
-RIM_ROWS
+| Map, κ 2, a rim range 500 m higher; the closed interior spills over it (the deep-time stage's routing) | 142.6, 18.5, 145.7 | 275.5, 17.6, 276.8 |
+| Map, κ 2, the same rim; the closed interior ends in a terminal lake | 116.6, 18.6, 121.1 | 275.2, 14.4, 274.5 |
 
 Without diffusion the two widths give the same numbers to the decimal (stream power is width-invariant); diffusion
 is about 50 times stronger on the map's escarpment (13.3 against 0.2 m/Myr) and lowers the interior's stream power
 from 305 to 118 m/Myr, because it rounds the escarpment's lip and the knickpoint behind it slows. The critical
 slope cuts nothing in any case, the 1-cell escarpment included: the escarpment's rivers carry enough area that
-stream power keeps it below 0.35 (on the planet the cut works on peaks and ridges, where the area is small). Only
-less runoff slows the plateau.
+stream power keeps it below 0.35 (on the planet the cut works on peaks and ridges, where the area is small). A
+terminal lake does not save the plateau: at the centre of a plateau without a rim it changes nothing (132 against
+125 m/Myr), and behind a rim range it lowers the interior's wear only from 146 to 121 m/Myr. The interior's own
+rivers could take no more than its 30 m of noise down to the lake, so the rest is the outer rivers cutting through
+the rim within the 10 Myr and capturing the basin. Only less runoff slows the plateau.
 
 **The planet** (`earthlike_quick_16k`, scattered continents, the preset's seed, 500 Myr, master 4e6b0022 with the
 diagnostic of ERO-175: every surface step, each land cell's gross lowering by process, area-time weighted in its 1-km
@@ -246,7 +250,7 @@ steep). m/Myr; the critical-slope cut is part of the stream power:
 | above 2 km, flat | 20.0 | 37.0 (0.8) | 1.5 | 26.1 | 62.8 |
 | above 2 km, steep | 61.1 | 157.5 (37.3) | 6.6 | 45.1 | 198.6 |
 
-Above 2 km stream power is 75 to 80 % of the gross lowering and diffusion 21 to 33 %. A quarter of the high ground
+Above 2 km stream power is 63 to 76 % of the gross lowering and diffusion 21 to 33 %. A quarter of the high ground
 is flat, and it wears at 63 m/Myr (37 of it stream power, 26 diffusion): six times southern Tibet's plateau surface
 (under 10 m/Myr, ERO-174), while the steep three quarters wear at 199. The critical-slope cut grows with height, from
 9.6 m/Myr in the 2-km band to 110 of the 123 m/Myr of stream power above 4 km: there it is the process that wears
@@ -272,7 +276,10 @@ planet with κ = 0.0036 (every other setting the same; `tools/review/erosion-aud
 | Köppen land A / B / C / D / E | 0.17 / 0.30 / 0.25 / 0.08 / 0.20 | 0.16 / 0.43 / 0.17 / 0.10 / 0.14 | |
 | Land rain, mm/yr; glaciated land | 697; 0.054 | 619; 0.039 | |
 | Snowballs; mass residual, km³ | 0; -7.2e-4 | 0; 1.7e-4 | |
+| Frames (audit): land erosion 2 to 3 / 3 to 4 / above 4 km, mean (median), m/Myr | 131 (55) / 144 (55) / 134 (58) | 115 (29) / 127 (26) / 94 (15) | |
 | Porphyry sites (counted / target) | 22 (14 / 25.0, capped) | 27 (13 / 14.5) | |
+| Site centre depth, blocks: median, p90, max; sites deeper than 100 blocks (3.5 km) | 24.7, 136.1, 388.5; 3 | 38.6, 222.0, 434.8; 10 | emplaced 1 to 4 km deep |
+| Burial since formation, all porphyries, km: median, p90 | 0.5, 4.9 | 0.5, 8.5 | |
 
 With the measured κ diffusion all but stops at 4.8-km cells (a cell's relief relaxes in L² / κ, about 6 Gyr), and
 stream power takes over the slopes diffusion rounded: on flat high ground stream power rises from 37 to 45 m/Myr, so
@@ -280,22 +287,25 @@ the plateau's net falls only from 63 to 46, still about five times Tibet's inter
 plateaus: in the controlled case it protects them, rounding the escarpment's lip so the knickpoint behind it is
 slower.
 
-**The cause.** A plateau drained to the sea wears at stream-power rates whatever κ is. The deep-time stage's
-priority flood fills every closed basin from the sea and routes it over its rim (ERO-080; only land no sea cell
-can reach drains to a sink of its own, ERO-083), so the rivers that cut
-the escarpment carry the whole plateau's drainage area, and with n = 2 a knickpoint's celerity C = 2 K A S is large
-for large A: on the map the escarpment's knickpoint crosses the controlled plateau within one 2-Myr step, and it does
-so at Earth's width too (the law is the same at both widths). On Earth the interior of the Tibetan plateau drains to
-closed lakes (from memory, not checked here), so the escarpment's rivers drain the escarpment only. The controlled
-cases above show the two levers: a terminal lake at the plateau's centre and a dry plateau. The stage-1 hydrology
-already balances terminal lakes (`hydro/network.rs`: a basin whose evaporation takes its inflow does not spill), but
-only in the bake's water stage, not in the deep-time surface. On steep ground above 3 km the critical slope does the
-work, and S_c = 0.35 (ERO-013) has no source at a 4.8-km cell.
+**The cause.** The plateaus wear at range rates because of the stream power as calibrated, not because of a
+length scale. K = 3e-9 with n = 2 (ERO-004, ERO-007) was fitted so the planet's hypsometry comes out right, not to
+measured erosion rates, and it wears any plateau that sheds water at a few hundred metres per Myr at either width:
+with n = 2 a knickpoint's celerity C = 2 K A S is large for the large drainage area an escarpment's rivers collect,
+and on the map the escarpment's knickpoint crosses the controlled plateau within one 2-Myr step, at Earth's width
+too (the law is the same at both widths). The drainage does not change that: the priority flood routes every closed
+basin over its rim (ERO-080; only land no sea cell can reach drains to a sink of its own, ERO-083), but a terminal
+lake in the same place saves little (121 against 146 m/Myr behind a rim range, 132 against 125 without one).
+Diffusion slows the interior rather than wearing it (125 against 305 m/Myr without κ or S_c), and the critical
+slope cuts nothing on the controlled plateau; on the planet it works on peaks and ridges (110 of the 123 m/Myr of
+stream power above 4 km), and S_c = 0.35 (ERO-013) has no source at a 4.8-km cell. In the controlled cases only less
+runoff slows the plateau (10 m/Myr at a tenth of the runoff). The planet's plateaus are wet enough that the
+calibrated law wears them as ranges.
 
 **Left as it is, and why.** κ stays 2 m²/yr and S_c 0.35. The length scale is the decided one and consistent, so
 there is no scaling error to fix; the measured κ does not fix the plateaus (46 against under 10 m/Myr) and moves the
 world's shape away from two calibrated targets (land median 284 m and 6.6 % above 2 km, against the 430 to 640 m and
 0.10 to 0.13 the 3e-9 erodibility, ERO-004, was calibrated for with κ = 2). Changing κ alone would break that joint
-calibration, and the decisions log of 2026-10-05 rules out tuning K back towards the hypsometry. What would make
-plateaus wear like plateaus is internally drained basins in the deep-time stage, a change to the stage's water
-routing; that, the map-scale S_c and the κ are questions for Ben (STATUS.md, build log 2026-10-16).
+calibration, and the decisions log of 2026-10-05 rules out tuning K back towards the hypsometry. Keeping both was the
+coordinator's call (STATUS.md, follow-ups from decided questions). What would make plateaus wear like plateaus is
+calibrating K, n, κ and S_c together against measured erosion rates (ERO-171, ERO-172) instead of the hypsometry;
+that is a question for Ben (STATUS.md, pending questions).
