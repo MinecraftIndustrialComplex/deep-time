@@ -1156,8 +1156,9 @@ Beck et al. 2023 measured with this section's method (sea level by 6.5 K/km on G
 at 30–70°, January north and July south) give 4.24 K on Beck's own 0.5° grid and 3.89 K on the
 model's grid (`tools/validation/climate_vs_obs.py --obs`, `along_row_std_winter_obs`). The target is
 therefore relative: the model's winter spread is at least 0.83 × the observed spread on the same grid
-(0.83 = 5.0 / 6.1, the original ratio). On Earth's relief the model gives 4.53 K against 3.89 K: met.
-Decided by the coordinator on 2026-10-06 (STATUS build log, P1-26 belts rain), on the T9 agent's
+(0.83 = 5.0 / 6.1, the original ratio). On Earth's relief the model gives 4.48 K with the belts' rain
+scaled (`belts_rain_scale` 1.42; 4.53 K at 1.0) against 3.89 K: met (ledger CLM-202).
+Decided by the coordinator on 2026-10-06 (STATUS build log 2026-10-16, P1-26 belts rain), on the T9 agent's
 recommendation; docs/science/upwind-rain.md, "The winter spread".
 
 The temperature, sea-ice and contrast rows apply to the first per-cell default, which keeps today's
