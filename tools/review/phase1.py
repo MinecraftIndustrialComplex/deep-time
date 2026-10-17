@@ -186,6 +186,9 @@ def stage_lines(stages, n=6):
 def step_bench(a):
     kids = []
     t0 = time.time()
+    # The 1/2/4-thread scaling run of a missed gate: the quick preset by default (about 40 minutes); the full one takes hours at 1 thread
+    # (8,312 s on 2026-10-05), so it is opt-in: PHASE1_BENCH_SCALING=quick16k,full16k.
+    scaling_keys = set(os.environ.get("PHASE1_BENCH_SCALING", "quick16k").split(","))
     for key, preset, myr, gate in (("quick16k", "earthlike_quick_16k", a.quick_myr, QUICK_GATE_S), ("full16k", "earthlike_full_16k", a.full_myr, FULL_GATE_S)):
         d = f"review/out/phase1/bench/{key}"
         cmd = (f"mkdir -p review/out/phase1/bench && echo load-start $(cut -d' ' -f1 /proc/loadavg) && target/release/deeptime bench --preset {preset} "
@@ -202,7 +205,9 @@ def step_bench(a):
         ev = [f"{d}.json", f"{d}/index.html", f"VM load average (1 min at start / 1 and 5 min at end; the bench shares the box with other agents' jobs, so a miss under load is a reason to re-run): {load}",
               f"{preset} {myr} Myr from {START}, 8 threads on {doc.get('host')}: {s:.0f} s (gate {gate:.0f} s)",
               "stages: " + stage_lines(stages)]
-        if s > gate:
+        if s > gate and key not in scaling_keys:
+            ev.append("scaling over 1/2/4 threads: not re-measured in this run (PHASE1_BENCH_SCALING=" + ",".join(sorted(scaling_keys)) + "); the full-length one takes hours at 1 thread")
+        if s > gate and key in scaling_keys:
             # The plan's alternative: "a per-stage report for Ben's decision" with the scaling across thread counts.
             sd = f"review/out/phase1/bench/{key}-scaling"
             out2, rc2, _ = vm("bench", f"target/release/deeptime bench --preset {preset} --start {START} --length-myr {myr} --threads 1,2,4 "
