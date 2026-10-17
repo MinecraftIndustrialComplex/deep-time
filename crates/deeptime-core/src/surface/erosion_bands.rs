@@ -21,13 +21,13 @@ use super::grid::Dims;
 /// Bands: lower ends 0, 1, 2, 3 and 4 km above the sea of the step.
 pub const BANDS: usize = 5;
 /// The band width, m.
-pub const BAND_M: f64 = 1000.0;
+pub const BAND_M: f64 = 1000.0; // ledger: ERO-175 (game-choice, diagnostic class)
 /// High ground for the flat / steep split, m above the sea.
-pub const HIGH_M: f64 = 2000.0;
+pub const HIGH_M: f64 = 2000.0; // ledger: ERO-175 (game-choice, diagnostic class)
 /// Relief of a 3 × 3 neighbourhood below which high ground counts as flat (a plateau), m: a
 /// diagnostic class, not a physical threshold (a 4.8-km cell at 16k quick; 500 m over two cells
 /// is a mean slope of about 3°).
-pub const FLAT_RELIEF_M: f64 = 500.0;
+pub const FLAT_RELIEF_M: f64 = 500.0; // ledger: ERO-175 (game-choice, diagnostic class)
 
 /// Area × time and eroded volumes of one class of land.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -166,8 +166,8 @@ mod tests {
     fn bands_split_by_height_and_relief() {
         let d = Dims::new(4, 3, 1000.0, true);
         let n = d.cells();
-        // A flat 3-km plateau, one sea cell, one 1.5-km cell.
-        let mut h0 = vec![3000.0; n];
+        // A flat 2.5-km plateau (band 2000 to 3000 m), one sea cell, one 1.5-km cell.
+        let mut h0 = vec![2500.0; n];
         h0[0] = -10.0;
         h0[5] = 1500.0;
         let one = vec![1.0f32; n];
