@@ -163,15 +163,20 @@ fn no_stage_holds_more_than_its_estimate() {
     }
     assert!(over.is_empty(), "held more than estimated: {over:?}");
     // The count is the process's memory: the resident peak above the start is within 10 % of
-    // the counted peak (plus 16 MiB for thread stacks and the C library's own buffers). Before
-    // memacct the resident peak was a third over the count (glibc kept freed grids).
+    // the counted peak (plus 16 MiB for thread stacks, the code paged in and the C library's own
+    // buffers). Before memacct the resident peak was a third over the count (glibc kept freed
+    // grids). On 2026-10-17 it was over the bound again: parts of the run used Rayon's global
+    // pool, every core (`tests/session_pool.rs`), and the session's threads' glibc arenas kept
+    // the small blocks they freed, more on a busy machine (`alloc::release_cache` now trims
+    // them). The bound is unchanged.
     if let (Some(rss), true) = (rss_peak, rss_start.is_some()) {
-        eprintln!(
-            "resident peak {:.1} MiB, counted peak {:.1} MiB",
-            mib(rss),
-            mib(run_peak)
-        );
         let slack = (16u64 << 20) + run_peak / 10;
+        eprintln!(
+            "resident peak {:.1} MiB, counted peak {:.1} MiB, bound {:.1} MiB",
+            mib(rss),
+            mib(run_peak),
+            mib(run_peak + slack)
+        );
         assert!(
             rss <= run_peak + slack,
             "the process held {:.1} MiB, the count said {:.1} MiB",
