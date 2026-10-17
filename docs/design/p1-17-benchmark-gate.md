@@ -561,7 +561,10 @@ finishes. Without the fix the test was still waiting after 240 s; with it, it pa
 The resident check now passes with about 5 MiB to spare. The rest of the gap over the count is
 the session's own threads' arenas (one arena: 106 MiB). Trimming them (`malloc_trim` when a
 stage ends, or a cap on arenas) is for whoever owns memory accounting; it is recommended, not
-done here.
+done here. (Done later on 2026-10-17, branch worktree-agent-a6726a524e4c6fb75:
+`alloc::release_cache` now also calls `malloc_trim(0)`. On master 1aeb7e4e the test failed 3 of
+5 on a busy VM, with resident peaks of 111.2 to 124.9 MiB against a bound of 116.7. With the trim
+it passed 5 of 5, at 97.1 to 99.7 MiB. See STATUS.md.)
 
 **The bake's row** (held 93.8 MiB against its estimate of 75.3, of which the projection pass is
 18.0) is printed but not asserted, by design. `estimate_for` (`session.rs`) counts in
