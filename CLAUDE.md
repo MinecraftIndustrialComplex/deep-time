@@ -184,8 +184,11 @@ tools/remote/mac.sh --no-sync -- deeptime-admit status  # the VM's admission too
   the source had been read; `verified` needs the source fetched and the value read, with what was
   read recorded in the ledger. Changing a ledgered value means changing its row. New pages start
   from `docs/science/_template.md`.
-- Decisions: ask Ben (AskUserQuestion, at most four questions per call, recommended option first)
-  before anything that outlives the session, unless he said to work autonomously. While a question
+- Decisions (Ben's rule of 2026-10-16): take any choice that can be undone with the recommended
+  option, log it as the coordinator's call and tell him in the final message. Ask Ben only what is
+  his: architecture, public interfaces, data formats, money, anything outward-facing, big scope, and
+  what he said he would decide himself (AskUserQuestion, at most four questions per call,
+  recommended option first, in one batch, early, with other work still running). While a question
   is open, list it under STATUS.md "Pending questions". When he answers, append an entry to the
   decisions file's log (date, question, his answer verbatim), update any table row above it that the
   answer changes with "(see log YYYY-MM-DD)", point the plan's §14 row at the log, and remove it from

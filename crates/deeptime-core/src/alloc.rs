@@ -570,9 +570,10 @@ mod tests {
         assert!(kept(&cache()), "the freed block is kept");
         // A ceiling under the count, set without `keep_below`'s own release (other test threads
         // allocate and free concurrently, so a ceiling near the count would race them); then one
-        // small block passes it.
+        // small block passes it. Whether the store alone releases nothing is not checked here: any
+        // other test thread's small block past the ceiling gives the kept block back too, so that
+        // check failed now and then on a busy machine (gate batch 2026-10-16).
         CEILING.store(0, Ordering::Relaxed);
-        assert!(kept(&cache()), "setting the ceiling alone releases nothing");
         let small = std::hint::black_box(vec![2u8; 4000]);
         let gone = !kept(&cache());
         keep_below(u64::MAX);

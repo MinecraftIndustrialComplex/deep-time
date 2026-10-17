@@ -36,6 +36,10 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>Otherwise any block of {@code #c:ores/<material>}.</li>
  * </ol>
  *
+ * A placer's gold in a gravel or sand cell is the exception to steps 3 and 4 (Ben, 2026-10-16):
+ * where steps 1 and 2 find nothing, the placer puts vanilla's suspicious gravel or sand with a
+ * gold-nugget loot table instead of the stone ore ({@link #panned}, {@link PlacerPanning}).
+ *
  * A material written {@code ns:name} is the tag {@code ns:ores/name}. Answers are cached per
  * (material, host block, below 0) and rebuilt when the server's tags reload. Null means "no block":
  * the material has no ore block in this pack (molybdenum, crude oil, …) and nothing is placed.
@@ -124,6 +128,27 @@ public final class OreBlockResolver {
         List<BlockState> ores = blocks(material);
         if (ores.isEmpty())
             return null;
+        BlockState made = madeFor(ores, host);
+        if (made != null)
+            return made;
+        TagKey<Block> ground = deep ? IN_DEEPSLATE : IN_STONE;
+        for (BlockState b : ores)
+            if (b.is(ground))
+                return b;
+        if (deep)
+            for (BlockState b : ores)
+                if (b.is(IN_STONE))
+                    return b;
+        return ores.get(0);
+    }
+
+    /**
+     * The ore block made for {@code host} itself (steps 1 and 2 of the order above): Excavated
+     * Variants' variant for the host, else a block of {@code ores} in
+     * {@code #c:ores_in_ground/<host>} when the host is neither stone nor deepslate; null when there
+     * is none.
+     */
+    private BlockState madeFor(List<BlockState> ores, BlockState host) {
         if (ev.isPresent()) {
             BlockState v = ev.get().variant(ores, host);
             if (v != null)
@@ -135,15 +160,37 @@ public final class OreBlockResolver {
                 if (b.is(own))
                     return b;
         }
-        TagKey<Block> ground = deep ? IN_DEEPSLATE : IN_STONE;
-        for (BlockState b : ores)
-            if (b.is(ground))
-                return b;
-        if (deep)
-            for (BlockState b : ores)
-                if (b.is(IN_STONE))
-                    return b;
-        return ores.get(0);
+        return null;
+    }
+
+    // ---- placer gold as panning (Ben, 2026-10-16) -------------------------------------------------
+
+    private final Map<String, Optional<BlockState>> panned = new ConcurrentHashMap<>();
+
+    /**
+     * The suspicious block ({@link PlacerPanning}) a placer puts in {@code cell} where the ore of
+     * {@code material} is due, or null when the placer places its ore block ({@link #resolve})
+     * there: the material has no panning table (only gold has), {@code cell} is not gravel or sand
+     * (soil over the bar, a rock bench), or the pack has a gold ore made for {@code host}, the rock
+     * the ore sits in (Excavated Variants' gravel and sand variants, or a block in
+     * {@code #c:ores_in_ground/gravel} or {@code /sand}). With Excavated Variants nothing changes.
+     * The caller sets the block's loot table ({@link PlacerPanning#setLoot}) and checks that the
+     * block under it holds it up ({@link PlacerPanning#supported}).
+     */
+    public BlockState panned(ResourceLocation material, BlockState cell, BlockState host) {
+        var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
+        String key = material + "|" + registry.getKey(cell.getBlock()) + "|" + registry.getKey(host.getBlock());
+        return panned.computeIfAbsent(key, k -> Optional.ofNullable(computePanned(material, cell, host))).orElse(null);
+    }
+
+    private BlockState computePanned(ResourceLocation material, BlockState cell, BlockState host) {
+        if (PlacerPanning.tableOf(material) == null)
+            return null;
+        BlockState suspicious = PlacerPanning.suspiciousFor(cell);
+        if (suspicious == null)
+            return null;
+        List<BlockState> ores = blocks(material);
+        return !ores.isEmpty() && madeFor(ores, host) != null ? null : suspicious;
     }
 
     // ---- raw-ore blocks (vanilla's ore veins; Ben, 2026-10-02) ----------------------------------
