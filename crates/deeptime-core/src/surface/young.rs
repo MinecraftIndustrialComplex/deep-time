@@ -139,17 +139,33 @@ impl YoungParams {
     }
 }
 
-/// Estimate: the L2 fields and the LEM's working arrays; ≈ 1 µs per cell per step (`spl`, flood,
-/// routing and diffusion, plan §8.2's cost model).
+/// The young stage's own peak per L2 cell, bytes: its fields, the LEM's working arrays (routing,
+/// stream power, diffusion and the slope failure), and the glaciers' ice state and passes
+/// (`glacial.rs`). Measured on the real L2 grids (P1-17, 2026-10-05: the counted peak less what
+/// the run held when the stage started, 413 B a cell on quick 16k and 416 B on full 16k,
+/// scattered continents, 500 Myr, the kept-block cache off), with about 10 % to spare.
+pub const OWN_BYTES_PER_L2_CELL: u64 = 460;
+
+/// Estimate: the world the surface and the stages after it leave ([`super::retained_bytes`]),
+/// the recorded history, and the stage's own arrays on the L2 grid; ≈ 1 µs per cell per step
+/// (`spl`, flood, routing and diffusion, plan §8.2's cost model).
+///
+/// P1-17 (2026-10-05): it was the surface stage's whole estimate (the step's working arrays, the
+/// advected copy of the strata log, the glaciers' passes, all freed by the time this stage runs)
+/// plus 352 B for each cell of a 2:1 grid (the Lambert L2 grid has 1/π as many rows as columns,
+/// not 1/2): 6,049 MiB on full 16k against the 4,143 MiB the stage held (the world 2,010 MiB, its
+/// own arrays 2,133 MiB, the history besides), so the editor refused full at a 5 GiB cap it fits
+/// under. Now 4,485 MiB without the history (quick: 1,240 MiB against 1,105 MiB held).
 pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let y = p.young.clone().unwrap_or_default();
     let c = u64::from(p.scale.circumference_blocks);
     let r = u64::from(p.resolution.l2_r);
-    let cells = (c / r) * (c / r / 2);
+    let cells = GridDesc::for_planet("L2", p.scale.circumference_blocks, p.resolution.l2_r)
+        .map(|g| g.cells() as u64)
+        .unwrap_or((c / r) * (c / r / 2));
     let surface = super::estimate(p);
     StageEstimate {
-        // The LEM's arrays, the fields, and the glaciers' ice state and passes (`glacial.rs`).
-        bytes: surface.bytes + cells * (14 * 8 + 12 * 4 + 24 * 8),
+        bytes: super::retained_bytes(p) + surface.history_bytes + cells * OWN_BYTES_PER_L2_CELL,
         seconds: cells as f64 * f64::from(y.steps) * 1.0e-6,
         history_bytes: surface.history_bytes,
     }
@@ -870,6 +886,47 @@ impl Stage for YoungStage {
 mod tests {
     use super::*;
     use crate::synth::SplitMix;
+
+    /// P1-17: the young stage's estimate on the built-in 16k presets covers what the stage was
+    /// measured to hold (the world before it plus its own arrays, the history aside; 500 Myr,
+    /// scattered continents) by at most 15 %, and full 16k's whole estimate fits a 5 GiB cap
+    /// (it listed 6,049 MiB against the 4,143 MiB held, so the editor refused full at 5 GiB).
+    #[test]
+    fn the_estimate_covers_the_measured_hold_closely() {
+        const MIB: u64 = 1 << 20;
+        let json = |name: &str| {
+            crate::preset::with_timeline(
+                crate::preset::builtin(name).unwrap(),
+                Some("scattered_continents"),
+                Some(500.0),
+            )
+            .unwrap()
+        };
+        for (name, held_mib) in [
+            ("earthlike_quick_16k", 1105u64),
+            ("earthlike_full_16k", 4143),
+        ] {
+            let crate::preset::PresetBody::Planet(p) =
+                crate::preset::Preset::from_json(&json(name)).unwrap().body
+            else {
+                panic!("{name} is a planet preset");
+            };
+            let e = estimate(&p);
+            let base = (e.bytes - e.history_bytes) / MIB;
+            assert!(
+                base >= held_mib && base <= held_mib * 115 / 100,
+                "{name}: {base} MiB listed, {held_mib} MiB held"
+            );
+        }
+        let v: serde_json::Value = serde_json::from_str(
+            &crate::session::estimate_for(&json("earthlike_full_16k"), "", 5 << 30).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            v["peak_bytes"].as_u64().unwrap() <= 5 << 30,
+            "full 16k at a 5 GiB cap: {v}"
+        );
+    }
 
     /// P1-23: what the erosion reads of the rock has no L1 cell in it. On a random map of two
     /// rocks the property changes as much between two fine cells of one L1 cell as between two

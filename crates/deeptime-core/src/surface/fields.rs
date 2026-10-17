@@ -275,93 +275,113 @@ fn column(log: &StrataLog, c: usize, cls: &Classes, regolith: f64) -> [f32; 7] {
 /// The step's fields, in [`STEP_FIELDS`] order.
 pub fn step_fields(x: &StepInputs<'_>, cls: &Classes) -> Vec<Vec<f32>> {
     let n = x.flags.len();
-    let rows: Vec<[f32; 26]> = (0..n)
-        .into_par_iter()
-        .map(|c| {
-            let flags = x.flags[c] as u32 as u8;
-            let cont = x.crust_type[c] as u8 == CONTINENTAL;
-            let reg = x.regime[c] as u8;
-            let conv = x.convergence[c];
-            let arc = if flags & ARC != 0 {
-                (conv / 80.0).clamp(0.0, 1.0) * if cont { 1.0 } else { 0.7 }
-            } else {
-                0.0
-            };
-            let zone = flags & SUBDUCTION_ZONE != 0;
-            let fault = match reg {
-                regime::COLLISION => 1.0,
-                regime::RIFT => 0.8,
-                regime::ARC => 0.6,
-                regime::TRENCH => 0.5,
-                regime::BACK_ARC => 0.4,
-                regime::HOTSPOT => 0.3,
-                _ => {
-                    let age = x.orogeny_age[c];
-                    if age.is_finite() {
-                        (0.6 * (-age / 50.0).exp()).max(0.05)
-                    } else {
-                        0.05
-                    }
+    let row = |c: usize| -> [f32; 26] {
+        let flags = x.flags[c] as u32 as u8;
+        let cont = x.crust_type[c] as u8 == CONTINENTAL;
+        let reg = x.regime[c] as u8;
+        let conv = x.convergence[c];
+        let arc = if flags & ARC != 0 {
+            (conv / 80.0).clamp(0.0, 1.0) * if cont { 1.0 } else { 0.7 }
+        } else {
+            0.0
+        };
+        let zone = flags & SUBDUCTION_ZONE != 0;
+        let fault = match reg {
+            regime::COLLISION => 1.0,
+            regime::RIFT => 0.8,
+            regime::ARC => 0.6,
+            regime::TRENCH => 0.5,
+            regime::BACK_ARC => 0.4,
+            regime::HOTSPOT => 0.3,
+            _ => {
+                let age = x.orogeny_age[c];
+                if age.is_finite() {
+                    (0.6 * (-age / 50.0).exp()).max(0.05)
+                } else {
+                    0.05
                 }
-            };
-            let up = x.uplift_mm_yr[c] * 1000.0;
-            let orogenic = if cont && x.orogeny_type[c] as u8 != 0 {
-                up.max(0.0)
-            } else {
-                0.0
-            };
-            let rift = if cont { (-up).max(0.0) } else { 0.0 };
-            let z = x.rel_elev[c];
-            let marine = z < 0.0;
-            let k = x.kind[c];
-            let [carb, evap, eux, toc, src_depth, res, seal] =
-                column(x.log, c, cls, f64::from(x.regolith_m[c]));
-            let step_share = |kind: u8| if k == kind { 1.0 } else { 0.0 };
-            let t_c = x.t_c[c];
-            let geotherm = x.heat_flow[c] / 1000.0 / 2.5; // °C per metre
-            let burial = if src_depth.is_finite() {
-                t_c.max(0.0) + geotherm * src_depth
-            } else {
-                t_c.max(0.0)
-            };
-            let wtd = if marine {
-                0.0
-            } else {
-                5.0 + 150.0 * (1.0 - x.aridity[c].min(1.0)) + 0.05 * x.slope[c] * x.dx as f32
-            };
-            [
-                arc,
-                if arc > 0.0 { x.oxidation[c] } else { 0.0 },
-                if zone { conv } else { 0.0 },
-                if zone { x.obliquity[c] } else { 0.0 },
-                if zone { x.slab_age[c] } else { 0.0 },
-                x.thickness_m[c] / 1000.0,
-                fault,
-                orogenic,
-                rift,
-                x.heat_flow[c],
-                z as f32,
-                x.erosion_m_myr[c],
-                x.deposition_m_myr[c],
-                if marine && z > -200.0 { 1.0 } else { 0.0 },
-                carb.max(step_share(KIND_CARBONATE)),
-                evap.max(step_share(KIND_EVAPORITE)),
-                eux.max(step_share(KIND_EUXINIC)),
-                if x.coal[c] { 1.0 } else { 0.0 },
-                toc,
-                burial,
-                res,
-                seal,
-                wtd,
-                x.precip_mm[c],
-                t_c,
-                if reg == regime::CRATON { 1.0 } else { 0.0 },
-            ]
-        })
+            }
+        };
+        let up = x.uplift_mm_yr[c] * 1000.0;
+        let orogenic = if cont && x.orogeny_type[c] as u8 != 0 {
+            up.max(0.0)
+        } else {
+            0.0
+        };
+        let rift = if cont { (-up).max(0.0) } else { 0.0 };
+        let z = x.rel_elev[c];
+        let marine = z < 0.0;
+        let k = x.kind[c];
+        let [carb, evap, eux, toc, src_depth, res, seal] =
+            column(x.log, c, cls, f64::from(x.regolith_m[c]));
+        let step_share = |kind: u8| if k == kind { 1.0 } else { 0.0 };
+        let t_c = x.t_c[c];
+        let geotherm = x.heat_flow[c] / 1000.0 / 2.5; // °C per metre
+        let burial = if src_depth.is_finite() {
+            t_c.max(0.0) + geotherm * src_depth
+        } else {
+            t_c.max(0.0)
+        };
+        let wtd = if marine {
+            0.0
+        } else {
+            5.0 + 150.0 * (1.0 - x.aridity[c].min(1.0)) + 0.05 * x.slope[c] * x.dx as f32
+        };
+        [
+            arc,
+            if arc > 0.0 { x.oxidation[c] } else { 0.0 },
+            if zone { conv } else { 0.0 },
+            if zone { x.obliquity[c] } else { 0.0 },
+            if zone { x.slab_age[c] } else { 0.0 },
+            x.thickness_m[c] / 1000.0,
+            fault,
+            orogenic,
+            rift,
+            x.heat_flow[c],
+            z as f32,
+            x.erosion_m_myr[c],
+            x.deposition_m_myr[c],
+            if marine && z > -200.0 { 1.0 } else { 0.0 },
+            carb.max(step_share(KIND_CARBONATE)),
+            evap.max(step_share(KIND_EVAPORITE)),
+            eux.max(step_share(KIND_EUXINIC)),
+            if x.coal[c] { 1.0 } else { 0.0 },
+            toc,
+            burial,
+            res,
+            seal,
+            wtd,
+            x.precip_mm[c],
+            t_c,
+            if reg == regime::CRATON { 1.0 } else { 0.0 },
+        ]
+    };
+    // Each task fills its block of cells in all 26 fields at once (P1-17: the cells' rows were
+    // collected and then read back field by field on one thread, 26 strided sweeps of the
+    // whole raster every step).
+    const BLOCK: usize = 4096;
+    let mut fields: Vec<Vec<f32>> = (0..26).map(|_| vec![0.0; n]).collect();
+    let mut blocks: Vec<Vec<&mut [f32]>> = (0..n.div_ceil(BLOCK))
+        .map(|_| Vec::with_capacity(26))
         .collect();
-    (0..26)
-        .map(|f| rows.iter().map(|r| r[f]).collect())
-        .collect()
+    for field in fields.iter_mut() {
+        for (k, part) in field.chunks_mut(BLOCK).enumerate() {
+            blocks[k].push(part);
+        }
+    }
+    blocks
+        .into_par_iter()
+        .enumerate()
+        .for_each(|(k, mut outs)| {
+            let c0 = k * BLOCK;
+            for i in 0..outs[0].len() {
+                let r = row(c0 + i);
+                for (out, v) in outs.iter_mut().zip(r) {
+                    out[i] = v;
+                }
+            }
+        });
+    fields
 }
 
 /// Distance (km, block metric) from every cell to the nearest craton edge (a cell whose
@@ -371,11 +391,12 @@ pub fn dist_to_edge(d: &Dims, craton: &[f32]) -> Vec<f32> {
     let inf = f32::INFINITY;
     let mut dist = vec![inf; w * h];
     let on = |c: usize| craton[c] >= 0.5;
-    for (c, x) in dist.iter_mut().enumerate() {
+    // The edge cells, in parallel (P1-17).
+    dist.par_iter_mut().enumerate().for_each(|(c, x)| {
         if d.neighbours(c).any(|(m, _)| on(m) != on(c)) {
             *x = 0.0;
         }
-    }
+    });
     let (a, b) = (1.0f32, std::f32::consts::SQRT_2);
     let at = |i: i64, j: i64| -> Option<usize> {
         if j < 0 || j >= h as i64 {
@@ -384,30 +405,41 @@ pub fn dist_to_edge(d: &Dims, craton: &[f32]) -> Vec<f32> {
             Some(j as usize * w + i.rem_euclid(w as i64) as usize)
         }
     };
-    // Two sweeps each way; the wrap needs a second pass for distances across the seam.
-    for _ in 0..2 {
-        for j in 0..h as i64 {
-            for i in 0..w as i64 {
-                let c = j as usize * w + i as usize;
-                let mut v = dist[c];
-                for (di, dj, s) in [(-1, 0, a), (-1, -1, b), (0, -1, a), (1, -1, b)] {
-                    if let Some(m) = at(i + di, j + dj) {
-                        v = v.min(dist[m] + s);
-                    }
+    // One cell of a sweep: the cell's value against its four already-swept neighbours, in the
+    // order given. Cells away from the x edges reach them by index steps (P1-17: the same reads
+    // and the same `min`s in the same order as through `at`, so the same bits).
+    type Nb = [(i64, i64, f32); 4];
+    let relax = |dist: &mut [f32], i: usize, j: usize, nb: &Nb, inner_row: bool| {
+        let c = j * w + i;
+        let mut v = dist[c];
+        if i >= 1 && i + 1 < w && inner_row {
+            for &(di, dj, s) in nb {
+                let m = (c as i64 + dj * w as i64 + di) as usize;
+                v = v.min(dist[m] + s);
+            }
+        } else {
+            for &(di, dj, s) in nb {
+                if let Some(m) = at(i as i64 + di, j as i64 + dj) {
+                    v = v.min(dist[m] + s);
                 }
-                dist[c] = v;
             }
         }
-        for j in (0..h as i64).rev() {
-            for i in (0..w as i64).rev() {
-                let c = j as usize * w + i as usize;
-                let mut v = dist[c];
-                for (di, dj, s) in [(1, 0, a), (1, 1, b), (0, 1, a), (-1, 1, b)] {
-                    if let Some(m) = at(i + di, j + dj) {
-                        v = v.min(dist[m] + s);
-                    }
-                }
-                dist[c] = v;
+        dist[c] = v;
+    };
+    let fwd: Nb = [(-1, 0, a), (-1, -1, b), (0, -1, a), (1, -1, b)];
+    let bwd: Nb = [(1, 0, a), (1, 1, b), (0, 1, a), (-1, 1, b)];
+    // Two sweeps each way; the wrap needs a second pass for distances across the seam.
+    for _ in 0..2 {
+        for j in 0..h {
+            let inner_row = j >= 1;
+            for i in 0..w {
+                relax(&mut dist, i, j, &fwd, inner_row);
+            }
+        }
+        for j in (0..h).rev() {
+            let inner_row = j + 1 < h;
+            for i in (0..w).rev() {
+                relax(&mut dist, i, j, &bwd, inner_row);
             }
         }
     }
@@ -531,6 +563,106 @@ pub fn row_lat(grid: &deeptime_format::GridDesc, j: usize) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The craton-edge distance as it was before P1-17 (every neighbour through the wrapping
+    /// index function, the edge cells found serially).
+    fn dist_to_edge_reference(d: &Dims, craton: &[f32]) -> Vec<f32> {
+        let (w, h) = (d.w, d.h);
+        let mut dist = vec![f32::INFINITY; w * h];
+        let on = |c: usize| craton[c] >= 0.5;
+        for (c, x) in dist.iter_mut().enumerate() {
+            if d.neighbours(c).any(|(m, _)| on(m) != on(c)) {
+                *x = 0.0;
+            }
+        }
+        let (a, b) = (1.0f32, std::f32::consts::SQRT_2);
+        let at = |i: i64, j: i64| -> Option<usize> {
+            if j < 0 || j >= h as i64 {
+                None
+            } else {
+                Some(j as usize * w + i.rem_euclid(w as i64) as usize)
+            }
+        };
+        for _ in 0..2 {
+            for j in 0..h as i64 {
+                for i in 0..w as i64 {
+                    let c = j as usize * w + i as usize;
+                    let mut v = dist[c];
+                    for (di, dj, s) in [(-1, 0, a), (-1, -1, b), (0, -1, a), (1, -1, b)] {
+                        if let Some(m) = at(i + di, j + dj) {
+                            v = v.min(dist[m] + s);
+                        }
+                    }
+                    dist[c] = v;
+                }
+            }
+            for j in (0..h as i64).rev() {
+                for i in (0..w as i64).rev() {
+                    let c = j as usize * w + i as usize;
+                    let mut v = dist[c];
+                    for (di, dj, s) in [(1, 0, a), (1, 1, b), (0, 1, a), (-1, 1, b)] {
+                        if let Some(m) = at(i + di, j + dj) {
+                            v = v.min(dist[m] + s);
+                        }
+                    }
+                    dist[c] = v;
+                }
+            }
+        }
+        let km = (d.dx / 1000.0) as f32;
+        dist.iter()
+            .map(|&x| if x.is_finite() { x * km } else { 3000.0 })
+            .collect()
+    }
+
+    /// P1-17: the craton-edge distance gives the reference's bits on random masks (blobs and
+    /// salt-and-pepper), wrapping or not, on grids one to many cells wide, on any thread count.
+    #[test]
+    fn the_edge_distance_equals_the_reference_bit_for_bit() {
+        let mut rng = crate::sphere::SplitMix64::new(17);
+        let mut cases = 0;
+        for &(w, h, wrap) in &[
+            (64usize, 32usize, true),
+            (65, 33, false),
+            (1, 9, true),
+            (2, 7, true),
+            (9, 1, true),
+            (3, 3, false),
+            (200, 70, true),
+        ] {
+            for k in 0..4 {
+                let d = Dims::new(w, h, 4800.0, wrap);
+                let craton: Vec<f32> = match k {
+                    0 => (0..w * h)
+                        .map(|_| (rng.next_f64() < 0.5) as u8 as f32)
+                        .collect(),
+                    1 => (0..w * h)
+                        .map(|_| (rng.next_f64() < 0.03) as u8 as f32)
+                        .collect(),
+                    2 => vec![1.0; w * h],
+                    _ => (0..w * h)
+                        .map(|c| {
+                            let (i, j) = ((c % w) as f64, (c / w) as f64);
+                            ((i - 0.3 * w as f64).hypot(j - 0.5 * h as f64) < 0.25 * w as f64) as u8
+                                as f32
+                        })
+                        .collect(),
+                };
+                let want = dist_to_edge_reference(&d, &craton);
+                for threads in [1, 4] {
+                    let pool = rayon::ThreadPoolBuilder::new()
+                        .num_threads(threads)
+                        .build()
+                        .unwrap();
+                    let got = pool.install(|| dist_to_edge(&d, &craton));
+                    let bits = |v: &[f32]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+                    assert_eq!(bits(&got), bits(&want), "{w}x{h} wrap {wrap} mask {k}");
+                }
+                cases += 1;
+            }
+        }
+        assert_eq!(cases, 28);
+    }
 
     /// A frame's value at a cell is what the crust now there went through, not what crossed the
     /// cell: crust moving one cell a step towards a trench that moves with it (two cells ahead)

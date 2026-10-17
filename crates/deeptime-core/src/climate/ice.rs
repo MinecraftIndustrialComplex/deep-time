@@ -165,12 +165,13 @@ pub fn distance_to_margin(w: usize, h: usize, ice: &[bool], sx: &[f64], sy: &[f6
             d
         })
         .collect();
+    // Back into rows, rows in parallel (P1-17).
     let mut out = vec![0.0; w * h];
-    for (i, col) in cols.iter().enumerate() {
-        for j in 0..h {
-            out[j * w + i] = col[j].min(INF).sqrt();
+    out.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
+        for (x, col) in row.iter_mut().zip(&cols) {
+            *x = col[j].min(INF).sqrt();
         }
-    }
+    });
     out
 }
 
