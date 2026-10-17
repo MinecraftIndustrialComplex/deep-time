@@ -19,8 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 2026-10-16, "Could we use suspicious gravel w/ a loot table set to a gold nugget?"; ledger
  * ORE-267, a game choice). JUnit has no Minecraft bootstrap, so this reads the shipped JSON: the
  * GameTest {@code placerGoldLootTable} rolls the loaded table in a real server. The table must be
- * what {@code BrushableBlockEntity} can use: type {@code minecraft:archaeology}, one pool, one roll,
- * one entry (the block drops only the first stack the table rolls), gold nuggets, a count of 1 to
+ * what a brushable block can hold: type {@code minecraft:archaeology}, one pool, one roll, one
+ * entry (the placer rolls it when it places the block and keeps only the first stack,
+ * {@code PlacerPanning.roll}, as {@code BrushableBlockEntity} does), gold nuggets, a count of 1 to
  * 9 (9 nuggets make an ingot, so one block never pays more than an ingot).
  */
 class PlacerGoldTableTest {
