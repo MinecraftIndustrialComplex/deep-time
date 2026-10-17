@@ -1,54 +1,74 @@
-# Plate forces: the force balance (recorded, not yet applied)
+# Plate forces: the force balance that moves the plates
 
 Status of this page: `stage 2 (constants checked against sources on 2026-10-02)` for the sources
 the project's library holds; the rest is marked `from-memory` in the ledger.
 
-Ledger ids on this page: `FRC-001` to `FRC-027` and `PLT-181` to `PLT-191` (see [claims.md](claims.md)).
+Ledger ids on this page: `FRC-001` to `FRC-030`, `PLT-181` to `PLT-191`, `PLT-022`, `PLT-037`,
+`PLT-270` to `PLT-273` and `PLT-275` (see [claims.md](claims.md)).
 
 ## What you see in the world
 
-Nothing yet. Since 2026-10-02 the plate model works out, every 2-Myr step, the forces on each
-plate and the motion at which they would balance, and writes them into the run's record. Plates
-still move by the older speed rules ([plates.md](plates.md)). The balance becomes the plates' motion
-in a later step of the plate work (task 7 of `docs/design/plate-force-balance.md`, "the switch").
-Until then the worlds are exactly what they were: a test runs the same history with and without the
-balance and finds the same world bit for bit.
+Since the switch (task 7 of `docs/design/plate-force-balance.md`, 2026-10-04) the plates move
+because of the forces on them. Every 2-Myr step the plate model works out the forces on each plate
+and the motion at which they balance, and each plate's motion turns towards that answer over
+`motion_relax_myr` (6 Myr). There is no speed rule any more: no speed handed out at the start, at a
+rift or at a new subduction zone, no base speed for a plate nothing pulls, no slower speed for
+continents, no random walk and no speed cap that the model leans on.
 
-When the switch lands, what a player should notice is in the speeds: plates attached to sinking
-slabs move several times faster than continents with no slab, small plates stop spinning, and
-continents slow down when they collide instead of welding in one step.
+What a player should notice is in the speeds and in what they do to the map: plates attached to
+sinking slabs move several times faster than continents with no slab; a planet starts at rest and
+gets going as its first subduction zones form; a rift opens only where something pulls its sides
+apart, and heals where nothing does; and a continent that reaches a trench slows, the slab that
+pulled it breaks off and the growing mountain belt holds it, until the two plates stop and weld.
 
 ## The model in plain words
 
 The plates stage moves the plates, finds where they overlap and which one sinks (a subduction
-front), and then, with the record switched on (the default), sums the forces:
+front), and then sums the forces:
 
-1. **Slabs.** Every subducting contact keeps the length of slab hanging from it. The slab grows by
-   the convergence at the contact's oceanic front each step, up to `slab_depth_km` (700 km, the
-   upper mantle). When continental crust has filled at least half of the front for
-   `slab_breakoff_myr` (10 Myr), the slab breaks off and its length starts again from zero. A new
-   subduction zone therefore pulls weakly at first and in full after about 10 Myr.
+1. **Slabs.** Every subduction zone keeps the length of slab hanging from it, known by its two
+   plates. The slab grows by the convergence at the oceanic front each step, up to `slab_depth_km`
+   (700 km). When continental crust has filled at least half of the front for `slab_breakoff_myr`
+   (10 Myr), the slab breaks off. A slab that no oceanic front feeds for a step keeps hanging and
+   pulling along the two plates' shared boundary, and is gone after `slab_breakoff_myr` without a
+   front; so a contact that flickers off for a step or two keeps its slab. When old ocean floor
+   breaks away to start a new subduction zone, it starts with a slab of `initiation_slab_km`
+   (150 km): that slab pulls the new plate towards its parent and opens the trench.
 2. **Driving forces.** Along each subduction front where the sinking crust is oceanic, slab pull
    draws the sinking plate towards the trench, in proportion to the slab's length and to the square
-   root of the crust's age (older, colder, thicker plate is heavier); crust younger than 10 Myr
-   does not pull. The overriding plate is drawn towards the trench too (slab suction, 0.3 of the
-   pull). At every plate edge, high ground pushes the plate away from itself and low ground draws
-   it: a mid-ocean ridge pushes ("ridge push"), the edge of a high plateau pushes back. A weak,
-   slow flow of the mantle drags every plate a little.
-3. **Resisting forces.** The mantle drags on the base of each plate, three times more under the
-   deep roots of continents. A sinking slab resists sinking faster. Plates rub against their
-   neighbours along every boundary. Where a continent has reached a trench (a collision), the weight
-   of the mountain belt resists further convergence.
+   root of the crust's age; crust younger than 10 Myr does not pull. The overriding plate is drawn
+   towards the trench too (slab suction, a share of the pull). At every plate edge, high ground
+   pushes the plate away from itself and low ground draws it: a mid-ocean ridge pushes ("ridge
+   push"), the edge of a high plateau pushes back. A weak, slow flow of the mantle drags every plate
+   a little.
+3. **Resisting forces.** The mantle drags on the base of each plate, more under the deep roots of
+   continents. A sinking slab resists sinking faster. Plates rub against their neighbours along
+   every boundary. Where a continent has reached a trench (a collision), two forces resist further
+   convergence, each whatever the speed, so they can stop two plates but never push them apart:
+   the weight of the mountain belt (set by its height), and the buoyancy of the continental
+   lithosphere the collision has already dragged down the trench, which grows as the collision
+   shortens (continental lithosphere is lighter than the mantle, Cloos 1993; `collision_buoyancy`).
 4. **The balance.** A plate has no inertia, so all torques on it add up to zero. Every resisting
-   force grows in proportion to the plates' speeds, so the balance of all plates together is one
-   linear system, solved exactly each step.
-5. **The record.** For each plate: the size of each torque, the plate's mean in-plane stress
-   (tension or compression), and the speed of the balance's answer; for each subducting contact its
-   slab length. `deeptime plate-check` reads them and compares the answer with how the plates
-   actually moved.
+   force grows in proportion to the plates' speeds (the collision's is linearised at the step's
+   convergence), so the balance of all plates together is one linear system, solved exactly each
+   step.
+5. **The motion.** Each plate's rotation moves the share 1 − e^(−δt/τ) of the way towards the
+   balance's answer each step, τ = `motion_relax_myr`: a stand-in for the time slabs and mantle
+   take to respond, and the smoothing of the step-to-step noise of a balance found on a lattice. A
+   speed guard (`max_plate_speed_mm_yr`, 250 mm/yr) caps any plate that would run away and is
+   counted every time it does; it is meant never to bind.
+6. **At the start, rifts and welds.** Plates start at rest (the starting ocean floor's ages come
+   from an earlier motion drawn for the purpose and not kept). Rift fragments keep their parent's
+   motion; the balance decides whether they part. Two plates a rift separated that keep moving
+   together (relative speed under `weld_speed_mm_yr` along their whole shared boundary for
+   `weld_after_myr`) become one again. Two plates whose collision has stalled weld as before
+   ([plates.md](plates.md)).
+7. **The record.** With the dynamics record on (the default), each plate's torques, mean in-plane
+   stress and balance answer, and each subducting contact's slab length, go into the run's record,
+   which `deeptime plate-check` reads.
 
-The stage reads the plates' geometry, crust type, crust age and elevation; it gives nothing to any
-other stage.
+The stage reads the plates' geometry, crust type, crust age and elevation; what it changes is the
+plates' motion.
 
 ## Equations and constants
 
@@ -79,6 +99,16 @@ with U the gravitational potential energy of the column (Ū the plate's mean):
                        C = g (ρ_m − ρ_w)² π / (4 ρ_m α ΔT) · (1 + 2 ρ_m α ΔT / (π (ρ_m − ρ_w)))
     continental crust: U = ρ g h (H + h (1 + ρ / (ρ_m − ρ_c)) / 2),  h its height above sea level
 
+**Collision resistance** per metre of collision front, against the convergence (plastic: put into
+the linear solve as a drag of this force over max(convergence, 1 mm/yr)):
+
+    (U(belt) − U(incoming))⁺ · edge_energy / 0.1  +  collision_buoyancy · 2.25 · F_sp · (T / 30 km) · min(S, D) / D
+
+T the incoming continental crust's thickness, S the collision's shortening so far, D
+`slab_depth_km`: the second term is the up-dip push of S km of continental lithosphere dragged
+down the trench, 0.09 / 0.04 = 2.25 times the down-dip pull of the same length of 80-Myr slab
+(Cloos 1993's density contrasts).
+
 **Basal drag** per square metre: c_b (v − v_flow), times `keel_drag` under continental crust, with
 c_b fixed by the speed scale: (1 + slab_resistance + boundary_resistance) c_b A v_s = F_sp L_ref.
 
@@ -107,7 +137,10 @@ plate's centroid, f the edge forces at the balance's answer, b the basal drag, h
 | PLT-190, FRC-015 | Mantle flow: degree-2, from two antipodal upwellings | 5 | mm/yr | Ben, decisions log 2026-10-02 | `game-choice` |
 | FRC-016 | Basal drag coefficient c_b (defaults) | 2.5 × 10¹⁴ | Pa s/m | defined by the speed scale | `game-choice` |
 | FRC-010 | Lithosphere thickness for the stress | 100 | km | Conrad & Lithgow-Bertelloni 2006's reference (read) | `verified` |
-| FRC-011 | Collision drag's speed floor | 5 | mm/yr | stand-in for the collisions design's weld speed | `game-choice` |
+| FRC-011 | Collision drag's speed floor | 1 | mm/yr | under the weld speed (5), so a held collision can weld | `game-choice` |
+| FRC-028 | Continental lithosphere's buoyancy over 80-Myr slab's weight | 0.09 / 0.04 = 2.25 | ratio | Cloos 1993 (abstract, read) | `abstract-only` |
+| FRC-029 | Crust thickness of that figure (buoyancy in proportion to thickness) | 30 | km | Cloos 1993 (abstract, read); the proportion is a game choice | `abstract-only` |
+| FRC-030, PLT-275 | Collision buoyancy law and strength `collision_buoyancy` | 1 | relative | Cloos 1993 (abstract): continental lithosphere "resists subduction" | `game-choice` (the law's form) |
 | PLT-191 | Relaxation time (used from the switch on) | 6 | Myr | the design | `game-choice` |
 
 Two checks of the formulas against the design's figures (unit test
@@ -146,10 +179,30 @@ new, reversed or reopened, and today's contacts flicker. Without boundary resist
 run away (1 % of plate-steps above 250 mm/yr). The mega-plate is close to neutral, not in the strong
 tension the supercontinent models find. The balance costs 0-2 % of the plates stage.
 
+**Closed loop, since the switch** (the balance moves the plates; `earthlike_quick_16k`, 1000 Myr,
+seeds 1-4, both starts, 2026-10-05; master 2e07d954 on the old speed law against the branch;
+`tools/review/force-balance-ensemble.sh` and `plate-check`):
+
+| Quantity | Earth | The balance (closed loop) | Old speed law (master) |
+|---|---|---|---|
+| Plate speed, area-weighted RMS | about 47 mm/yr today; 50-100 over 200 Myr | 41.4 mm/yr | 57.9 |
+| Plate speeds, 10th / 50th / 90th percentile | 11 / 33 / 80 mm/yr | 13 / 41 / 78 | 36 / 66 / 84 |
+| Oceanic over continental plates, median speed | 2-3 | 2.37 | 1.61 |
+| Slab-attached over slab-free plates | about 3-4 | 1.87 | 1.69 |
+| Speed against slab share, rank correlation | 0.71 | 0.45 | 0.54 |
+| Convergence 20 Myr after a collision's onset over at onset | India about 0.27 in 15 Myr (Copley et al. 2010) | 0.46 | 0.07 |
+| Plate-steps where the speed guard (250 mm/yr) binds | n/a | 0 | 1,015 (the old cap, 100 mm/yr) |
+| A plate's rotation change per step, median / 90th percentile | n/a | 5.8 / 25 % | 5.1 / 9.6 % |
+
+The spread of speeds and the oceanic-continental contrast come out of the forces; the slab
+correlation is weaker than Earth's and weaker than the open-loop test's, and the 90th percentile of
+the step-to-step change is still above the design's 20 %. See `docs/design/plate-force-balance.md`
+§13, "Tasks 7 and 8", for the rest.
+
 ## Simplifications and limits
 
-- Open loop: the forces are computed on plates that the old rules move. Nothing here tests the
-  closed loop, where the balance moves the plates that make the forces.
+- The open-loop table above computed the forces on plates that the old rules moved; the closed-loop
+  table is the switch.
 - One slab length per contact; along-trench tears are not represented. A slab's age is that of the
   crust at the trench now, not the history of what went down.
 - Rigid plates: the balance cannot break a plate. The stress is an index of the edge forces (flat
@@ -168,7 +221,7 @@ tension the supercontinent models find. The balance costs 0-2 % of the plates st
 - The mantle flow's shape: two antipodal upwellings, fixed for the run, axis from the seed (FRC-015;
   the term itself is Ben's choice, decisions log 2026-10-02).
 - A slab's trench counts as blocked when continental crust holds half its front (FRC-019).
-- The collision drag's floor of 5 mm/yr (FRC-011), until the collisions design's weld speed exists.
+- The collision drag's floor of 1 mm/yr (FRC-011), under the weld speed so that held collisions weld.
 
 ## Open questions
 

@@ -1683,10 +1683,14 @@ w/ a loot table set to a gold nugget?"; ledger ORE-267, ORE-268).* Where neither
 a gold ore for the placer's rock (a pack without EV and without its own `#c:ores_in_ground/gravel`
 gold ore), the placer's gold in a **gravel** cell is vanilla's `minecraft:suspicious_gravel` and in a
 **sand** cell `minecraft:suspicious_sand` (`ore/PlacerPanning`, `OreBlockResolver.panned`), whose
-block entity carries the loot table `deeptime:archaeology/placer_gold` (one stack of 2 to 5 gold
-nuggets) and a seed that is a hash of the world seed and the block's canonical position
-(`OreDraws.panSeed`, never 0), so brushing the block is the panning. Deep Time ships no block of
-its own. The block entity is set the way vanilla's desert well sets its own: `WorldGenRegion.setBlock`
+block entity holds the gold nuggets the loot table `deeptime:archaeology/placer_gold` (one stack of
+2 to 5 gold nuggets) rolls with a seed that is a hash of the world seed and the block's canonical
+position (`OreDraws.panSeed`, never 0), so brushing the block is the panning. Deep Time ships no
+block of its own. The table is rolled when the block is placed (`PlacerPanning.fill`, `roll`) and
+the block entity keeps the nuggets as its item with no loot table, so a per-player loot mod
+(Lootr in MIC converts only brushable block entities with a loot table) leaves it: one brushing
+per block, for whoever gets there first (decisions log 2026-10-17). The block entity is set the way
+vanilla's desert well sets its own: `WorldGenRegion.setBlock`
 leaves a placeholder in the proto chunk and `getBlockEntity` turns it into the real
 `BrushableBlockEntity`. The bar must sit on support: suspicious gravel and sand fall like their
 plain blocks (`FallingBlock.isFree`: air, fire, a liquid or a replaceable plant below), so a cell

@@ -421,6 +421,7 @@ mod tests {
             resample_myr: 0.0,
             a0_km2: 1.0,
             counters: Default::default(),
+            slabs: Vec::new(),
             dynamics: None,
         };
         let pos = positions(&st, geo);
