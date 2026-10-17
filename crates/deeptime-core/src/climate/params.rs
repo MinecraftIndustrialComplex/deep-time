@@ -476,7 +476,7 @@ impl Default for ClimateParams {
             sst_midlatitude_warm_c: 6.0,
             sst_midlatitude_cold_c: 5.0,
             subsidence: 0.55,
-            west_flank_wet: 0.4, // ledger: MOI-022
+            west_flank_wet: 0.4,    // ledger: MOI-022
             belts_rain_scale: 1.42, // ledger: CLM-201
             onshore: 1.0,
             oro_conv_time_s: 1000.0,
