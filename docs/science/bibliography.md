@@ -5491,6 +5491,9 @@ these entries.
 ### MinecraftSources: OreVeinifier (ORE-266)
 - See MinecraftSources above. Read 2026-10-02 for ORE-266: `net.minecraft.world.level.levelgen.OreVeinifier`: inside a vein a block is ore with probability 0.1 to 0.3 (`MIN_RICHNESS`, `MAX_RICHNESS`) of the 0.7 that are solid (`VEIN_SOLIDNESS`), and an ore block is the raw-ore block with `CHANCE_OF_RAW_ORE_BLOCK` = 0.02; the rest is filler (granite in copper veins, tuff in iron veins).
 
+### MinecraftSources: falling blocks and brushable block entities (ORE-269)
+- See MinecraftSources above. Read 2026-10-16 for ORE-269 (NeoForge 21.1.249 / Minecraft 1.21.1 decompiled sources): `FallingBlock.isFree` (a block under a gravity block is free when it is air, fire, a liquid or replaceable, so suspicious gravel and sand fall like their plain blocks); `BrushableBlockEntity` (the loot table and its seed are saved as `LootTable` and `LootTableSeed`; `unpackLootTable` rolls the table with the CHEST parameter set and takes only the first stack); `LootTable.getRandomItems(params, seed)` (a seed of 0 is not applied, the level's random sequence is used); `WorldGenRegion.setBlock` and `getBlockEntity` (a block with a block entity set during generation leaves a placeholder that `getBlockEntity` turns into the real block entity). Nothing here is a source for the physics of panning (ORE-267 is `from-memory`).
+
 ## Rock classes, metamorphism, plutons and strata: sources read in WP-7 (RCK, STR)
 
 Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's source library (the test machine's `deeptime-sources` folder, one folder per key; not distributed, never committed) unless it says "no saved copy". "Read" says what was read and at what level; secondary means lecture notes, encyclopedias or a software manual that tabulates a paper.
