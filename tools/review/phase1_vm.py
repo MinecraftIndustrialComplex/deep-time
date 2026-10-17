@@ -335,9 +335,16 @@ def cmd_geology(a):
         gb = blocks_in(a.world, glo[0], glo[2], ghi[0], ghi[2])
         iron = count(gb, ("ochrum", "ironstone", "gossan", "limonite"))
         ok_d = bool(gp) and (iron > 0 or any(b and re.search(r"ochrum|ironstone|gossan|limonite", b) for b in blocks))
+        # The column at the gossan's centre, top block down: where the sheet sits against the soil (2026-10-16: the gossan is about one
+        # block thick at 35 m per block, at the surface of the formation; the soil rule replaces the top blocks of the present surface).
+        gx, gz = int(gos["center"][0]), int(gos["center"][2])
+        col = run([INSPECT, "column", "--world", a.world, "--x", str(gx), "--z", str(gz), "--depth", "10"]).stdout.strip().splitlines()
+        col_s = "; ".join(" ".join(l.split()[:2]).replace("minecraft:", "") for l in col[1:9]) or "no column"
+        ax_y = gos["axes"][1]
         check(ok_d, "a gossan where the body is exposed",
-              f"gossan body {gos['id']} ({gos.get('rock_class')}, clip_top_y {gos.get('clip_top_y')}); probe found it at {len(gp)} point(s), "
-              f"blocks there {blocks[:2]}; ironstone-class blocks in its footprint: {iron}; gossan top vs terrain gaps of the {len(plan.get('gossan_gaps', {}))} porphyries (blocks): "
+              f"gossan body {gos['id']} ({gos.get('rock_class')}, clip_top_y {gos.get('clip_top_y')}, about {2 * ax_y:.1f} blocks thick); probe found it at {len(gp)} point(s), "
+              f"blocks there {blocks[:2]}; ironstone-class blocks in its footprint: {iron}; column at its centre (y block): {col_s}; "
+              f"gossan top vs terrain gaps of the {len(plan.get('gossan_gaps', {}))} porphyries (blocks): "
               f"{ {k: round(v) if v < 1e8 else None for k, v in plan.get('gossan_gaps', {}).items()} }")
     else:
         check(False, "a gossan where the body is exposed",
