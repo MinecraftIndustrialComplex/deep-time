@@ -41,11 +41,12 @@
 //! Volume is conserved: the rock moved is the collapsing column's own mix, thinned in
 //! proportion, as pure-shear extension does.
 //!
-//! The surface follows by Airy (`pools::ISOSTATIC_FACTOR`, 5.5 m of crust per m of height),
-//! within the Airy height of the column, z_A(T) = z_0 + (T − T_n) / 5.5 (z_0 the middle of
-//! `continent_elevation_m`): a source sinks by q / 5.5 but not below z_A of the crust it keeps,
+//! The surface follows by Airy (`pools::COLUMN_ISOSTATIC_FACTOR`, 7.0 m of crust per m of height,
+//! less the pull of an eclogite root, `pools::isostatic_change_m`; PLT-278 to PLT-281),
+//! within the Airy height of the column, z_A(T) = z_0 + (T − T_n) / 7.0 (z_0 the middle of
+//! `continent_elevation_m`): a source sinks by q / 7.0 but not below z_A of the crust it keeps,
 //! so a root that never raised its surface (an overlap stack) does not drag it down as it
-//! spreads; a receiver rises by g / 5.5 but not above z_A of its new column, so ocean floor
+//! spreads; a receiver rises by g / 7.0 but not above z_A of its new column, so ocean floor
 //! filled to T_n stands at a continent's height and thin crust that the surface already holds
 //! high is not raised further.
 //!
@@ -60,8 +61,15 @@
 //! belt's cap reads the surface's height (PLT-253), which the surface stage lowers by flexure and
 //! erosion while the stacked thickness stays, and an overlap at a resampling adds a whole column
 //! to the one on top. [`founder`] takes every visible continental column thicker than
-//! `crust_max_km` back to it, from the bottom of the column; the crust taken is gone (it gives no
-//! area back).
+//! `crust_max_km` back to it: the excess first spreads at once to the nearest room on its plate,
+//! as the collapse moves crust but whether or not an orogeny holds the column up, filling
+//! continental crust only up to `collapse_thickness_km` (lower crust flows out of the thickened
+//! belt, but crust thicker than that does not stay, so it builds no second plateau around the
+//! belt) and ocean floor up to the normal column; what finds no room goes down from the bottom of
+//! the column and is gone (it gives no area back). Since 2026-10-05 (plate task 7, ledger
+//! PLT-277); until then all of the excess foundered, and a collision's crust, also accreted a
+//! second time at each resampling (PLT-276), foundered at three times the old motion law's rate
+//! under the force balance.
 //!
 //! # What it is not
 //! A lower-crustal flow solve. The surface stage's spreading (`surface::spread`) moves the surface
@@ -74,7 +82,9 @@ use std::collections::BTreeMap;
 
 use super::Env;
 use super::geometry::{Geo, dijkstra};
-use super::pools::{ISOSTATIC_FACTOR, continental_column};
+use super::pools::{
+    COLUMN_ISOSTATIC_FACTOR, continental_column, eclogite_m, isostatic_change_m, root_drop_m,
+};
 use super::state::{CONTINENTAL, OCEANIC, PlateState, TRENCH, pool};
 
 /// `WorldState::globals`: crust moved by the collapse over the run, km³ …
@@ -98,24 +108,45 @@ const ROOT_ORDER: [usize; pool::COUNT] = [
     pool::SEDIMENT,
 ];
 
-/// Continental crust thicker than `crust_max_km` loses the excess from the bottom of its column
-/// to the mantle (see the module docs, "The thickest crust"); returns the crust lost, km² × m.
-/// Runs every step, before [`step`], whether or not an orogeny raises the sample.
-pub fn founder(state: &mut PlateState, env: &Env) -> f64 {
+/// Continental crust thicker than `crust_max_km` spreads the excess to the nearest room on its
+/// plate at once (as the collapse moves crust, [`spread`], whether or not an orogeny holds it
+/// up), and what finds no room goes to the mantle from the bottom of its column (see the module
+/// docs, "The thickest crust"); returns the crust lost, km² × m, and adds what spread to `out`.
+/// Runs every step, before [`step`].
+pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse) -> f64 {
     let k = env.k;
     if k.crust_max_km.is_nan() || k.crust_max_km <= 0.0 {
         return 0.0;
     }
     // ledger: PLT-258.
     let t_max = (k.crust_max_km * 1000.0).max(normal_thickness_m());
+    if spreads(k) {
+        // ledger: PLT-277 (the excess spreads before any of it founders).
+        let mut by_plate: BTreeMap<u32, Vec<(usize, f64)>> = BTreeMap::new();
+        for (i, s) in state.samples.iter().enumerate() {
+            if s.kind == CONTINENTAL && !s.is_hidden() && f64::from(s.thickness_m) > t_max {
+                by_plate
+                    .entry(state.plate_of(i))
+                    .or_default()
+                    .push((i, f64::from(s.thickness_m) - t_max));
+            }
+        }
+        // The excess goes to continental crust thinner than the collapse thickness (crust
+        // thicker than that does not stay, PLT-256: lower crust flows out of the thickened belt
+        // but does not build a second one around it) and to ocean floor up to the normal column.
+        let to = (k.collapse_thickness_km * 1000.0).clamp(normal_thickness_m(), t_max);
+        if !by_plate.is_empty() {
+            spread(state, geo, env, by_plate, to, out);
+        }
+    }
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
-    let normal = normal_thickness_m();
     let mut lost = 0.0;
     for s in state.samples.iter_mut() {
         if s.kind != CONTINENTAL || s.is_hidden() || f64::from(s.thickness_m) <= t_max {
             continue;
         }
         let mut left = f64::from(s.thickness_m) - t_max;
+        let pools_before = s.pools;
         for &p in &ROOT_ORDER {
             let take = f64::from(s.pools[p]).min(left);
             s.pools[p] = (f64::from(s.pools[p]) - take) as f32;
@@ -128,12 +159,33 @@ pub fn founder(state: &mut PlateState, env: &Env) -> f64 {
         s.thickness_m = s.pools.iter().sum();
         let gone = before - f64::from(s.thickness_m);
         lost += gone;
-        // Airy, as in the collapse: never below the height of the column kept.
+        // Isostasy, as in the collapse: towards the height of the column kept, never past it (a
+        // root that founders takes its eclogite with it, so the column may rise).
         let z = f64::from(s.elevation_m);
-        let airy = z_0 + (f64::from(s.thickness_m) - normal) / ISOSTATIC_FACTOR;
-        s.elevation_m = (z - (gone / ISOSTATIC_FACTOR).min((z - airy).max(0.0))) as f32;
+        let change = isostatic_change_m(&pools_before, &s.pools, env.gravity);
+        s.elevation_m = toward(z, change, iso_height(&s.pools, z_0, env.gravity)) as f32;
     }
     lost * env.norm.sample_area_km2()
+}
+
+/// A continental column's isostatic height, m: the middle of `continent_elevation_m` (`z_0`) for
+/// the normal column, plus the Airy height of the thickness beyond it, less its eclogite root's
+/// pull (PLT-281, PLT-278).
+fn iso_height(pools: &[f32; pool::COUNT], z_0: f64, gravity: f64) -> f64 {
+    let t: f64 = pools.iter().map(|&x| f64::from(x.max(0.0))).sum();
+    z_0 + (t - normal_thickness_m()) / COLUMN_ISOSTATIC_FACTOR
+        - root_drop_m(eclogite_m(pools, gravity))
+}
+
+/// Moves a surface at `z` by `change` towards the column's isostatic height `iso`, never past it:
+/// a sinking column stops at it (a root that never raised its surface does not drag it down), a
+/// rising one stops at it (thin crust the surface already holds high is not raised further).
+fn toward(z: f64, change: f64, iso: f64) -> f64 {
+    if change < 0.0 {
+        z + change.max(-(z - iso).max(0.0))
+    } else {
+        z + change.min((iso - z).max(0.0))
+    }
 }
 
 /// The model's normal continental column, m: what a collapsing orogen thins towards and what it
@@ -157,19 +209,12 @@ pub struct Collapse {
 /// (collision belts and subduction), so a sample raised this step is known.
 pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
     let k = env.k;
-    if k.collapse_myr.is_nan()
-        || k.collapse_myr <= 0.0
-        || !k.collapse_reach_km.is_finite()
-        || k.collapse_reach_km <= 0.0
-    {
+    if !spreads(k) {
         return Collapse::default();
     }
     let rate = 1.0 - (-env.dt_myr / k.collapse_myr).exp();
     let normal = normal_thickness_m();
     let t_c = (k.collapse_thickness_km * 1000.0).max(normal);
-    let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
-    let n = state.samples.len();
-    let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
     // A sample raised by an orogeny carries the time of the step that raised it; it is held up
     // until no orogeny has raised it for `collapse_quiet_myr` (at least this step). ledger: PLT-259
     let quiet_before = (env.t_myr - k.collapse_quiet_myr.max(0.5 * env.dt_myr)) as f32;
@@ -183,11 +228,42 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
         // ledger: PLT-254, PLT-255, PLT-256.
         let q = rate * (f64::from(s.thickness_m) - t_c);
         if q > 0.0 {
-            by_plate.entry(plate_of[i]).or_default().push((i, q));
+            by_plate.entry(state.plate_of(i)).or_default().push((i, q));
         }
     }
-
     let mut out = Collapse::default();
+    spread(state, geo, env, by_plate, normal, &mut out);
+    out
+}
+
+/// Whether the collapse's settings let crust spread at all.
+fn spreads(k: &crate::params::TectonicParams) -> bool {
+    !(k.collapse_myr.is_nan()
+        || k.collapse_myr <= 0.0
+        || !k.collapse_reach_km.is_finite()
+        || k.collapse_reach_km <= 0.0)
+}
+
+/// Moves crust from each plate's `sources` (sample, m of thickness to release) to the nearest
+/// room on the same plate within `collapse_reach_km` (see the module docs, "The rule": continental
+/// crust thinner than `continental_to_m`, filled up to it, and ocean floor, filled up to the
+/// normal column), thinning
+/// the sources in proportion to what found room; returns the share of each plate's release that
+/// was placed (sources of a plate whose release found no room keep their crust).
+fn spread(
+    state: &mut PlateState,
+    geo: &Geo,
+    env: &Env,
+    by_plate: BTreeMap<u32, Vec<(usize, f64)>>,
+    continental_to_m: f64,
+    out: &mut Collapse,
+) -> BTreeMap<u32, f64> {
+    let k = env.k;
+    let normal = normal_thickness_m();
+    let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
+    let n = state.samples.len();
+    let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
+    let mut shares = BTreeMap::new();
     // At least to the next ring of samples: on a coarse lattice the reach may be shorter than a
     // sample spacing, and a column always borders its neighbours.
     let reach = env
@@ -196,16 +272,25 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
         .max(REACH_MIN_SPACINGS * env.norm.spacing_rad());
     for (p, sources) in by_plate {
         let budget: f64 = sources.iter().map(|&(_, q)| q).sum();
+        if budget <= 0.0 {
+            continue;
+        }
         let src: Vec<(u32, f64, u32)> = sources.iter().map(|&(i, _)| (i as u32, 0.0, 0)).collect();
         let samples = &state.samples;
         let on_plate = |v: u32| plate_of[v as usize] == p && !samples[v as usize].is_hidden();
         let (dist, _) = dijkstra(geo, &src, |_, b| on_plate(b), reach);
-        // The room, nearest first: thinner than the normal column, not at a trench.
+        // The room, nearest first, not at a trench: continental crust thinner than
+        // `continental_to_m`, ocean floor up to the normal column.
         let mut room: Vec<(f64, usize, f64)> = (0..n)
             .filter(|&j| dist[j].is_finite() && on_plate(j as u32))
             .filter_map(|j| {
                 let s = &samples[j];
-                let r = normal - f64::from(s.thickness_m);
+                let to = if s.kind == CONTINENTAL {
+                    continental_to_m
+                } else {
+                    normal
+                };
+                let r = to - f64::from(s.thickness_m);
                 (r > 0.0 && s.flags & TRENCH == 0).then_some((dist[j], j, r))
             })
             .collect();
@@ -222,9 +307,11 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
         }
         let placed = budget - left.max(0.0);
         if placed <= 0.0 {
+            shares.insert(p, 0.0);
             continue;
         }
         let share = placed / budget;
+        shares.insert(p, share);
 
         // Thin the sources in proportion (pure shear) and pool what they gave.
         let mut mix = [0.0f64; pool::COUNT];
@@ -233,17 +320,18 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
             let take = q * share;
             let t = f64::from(s.thickness_m);
             let keep = ((t - take) / t).max(0.0);
+            let pools_before = s.pools;
             for (m, x) in mix.iter_mut().zip(s.pools.iter_mut()) {
                 let before = f64::from(*x);
                 *x = (before * keep) as f32;
                 *m += before - f64::from(*x);
             }
             s.thickness_m = s.pools.iter().sum();
-            // Airy (PLT-121): down by take / 5.5, not below the height the crust kept holds up.
+            // Isostasy (PLT-281, PLT-278): down by take / 7.0 less the root's change, not below
+            // the height the crust kept holds up.
             let z = f64::from(s.elevation_m);
-            let airy = z_0 + (f64::from(s.thickness_m) - normal) / ISOSTATIC_FACTOR;
-            let drop = (take / ISOSTATIC_FACTOR).min((z - airy).max(0.0));
-            s.elevation_m = (z - drop) as f32;
+            let change = isostatic_change_m(&pools_before, &s.pools, env.gravity);
+            s.elevation_m = toward(z, change, iso_height(&s.pools, z_0, env.gravity)) as f32;
             out.sources += 1;
         }
         let total: f64 = mix.iter().sum();
@@ -256,15 +344,16 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
         // Fill the receivers; an ocean sample filled to the normal column is continent now.
         for (j, g) in given {
             let s = &mut state.samples[j];
+            let pools_before = s.pools;
             for (x, m) in s.pools.iter_mut().zip(mix.iter()) {
                 *x += (g * m) as f32;
             }
             s.thickness_m = s.pools.iter().sum();
-            // Airy (PLT-121): up by g / 5.5, not above the height the crust now holds up.
+            // Isostasy (PLT-281, PLT-278): up by g / 7.0 less the root's change, not above the
+            // height the crust now holds up.
             let z = f64::from(s.elevation_m);
-            let airy = z_0 + (f64::from(s.thickness_m) - normal) / ISOSTATIC_FACTOR;
-            let rise = (g / ISOSTATIC_FACTOR).min((airy - z).max(0.0));
-            s.elevation_m = (z + rise) as f32;
+            let change = isostatic_change_m(&pools_before, &s.pools, env.gravity);
+            s.elevation_m = toward(z, change, iso_height(&s.pools, z_0, env.gravity)) as f32;
             if s.kind == OCEANIC && f64::from(s.thickness_m) >= normal - 1.0 {
                 s.kind = CONTINENTAL;
                 out.converted += 1;
@@ -272,7 +361,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
         }
         out.moved_km2_m += placed * env.norm.sample_area_km2();
     }
-    out
+    shares
 }
 
 #[cfg(test)]
@@ -306,7 +395,7 @@ mod tests {
 
     /// Plate 0 is x < 0, plate 1 x ≥ 0. A continent (35.1 km, 300 m) within 40° of +y on both,
     /// ocean floor at −4.5 km elsewhere; on the continent a belt (`belt(p)`) thickened by
-    /// `thick_m` and raised by `thick_m` / 5.5.
+    /// `thick_m` and raised by `thick_m` / 7.0.
     fn planet(geo: &Geo, belt: impl Fn(DVec3) -> bool, thick_m: f32) -> PlateState {
         let samples: Vec<Sample> = geo
             .points()
@@ -319,7 +408,7 @@ mod tests {
                     s.elevation_m = 300.0;
                     if belt(p) {
                         s.pools[pool::METAMORPHIC] += thick_m;
-                        s.elevation_m += thick_m / ISOSTATIC_FACTOR as f32;
+                        s.elevation_m += thick_m / COLUMN_ISOSTATIC_FACTOR as f32;
                     }
                 } else {
                     s.pools[pool::MAFIC_VOLCANIC] = 2000.0;
@@ -358,6 +447,7 @@ mod tests {
             resample_myr: 0.0,
             a0_km2: 1.0,
             counters: Default::default(),
+            slabs: Vec::new(),
             dynamics: None,
         };
         let pos = positions(&st, geo);
@@ -445,7 +535,7 @@ mod tests {
         // Airy height.
         let t_c = fx.k.collapse_thickness_km * 1000.0;
         let airy = 0.5 * (fx.k.continent_elevation_m[0] + fx.k.continent_elevation_m[1])
-            + (t_c - normal_thickness_m()) / ISOSTATIC_FACTOR;
+            + (t_c - normal_thickness_m()) / COLUMN_ISOSTATIC_FACTOR;
         let in_belt: Vec<usize> = (0..st.samples.len())
             .filter(|&i| belt(fx.geo.points()[i]))
             .collect();
@@ -468,7 +558,7 @@ mod tests {
                 assert!(p.y.acos() - 0.766f64.acos() < reach, "{p}");
                 // Raised to a continent's height, not above the Airy height of its column.
                 let z_a = 0.5 * (fx.k.continent_elevation_m[0] + fx.k.continent_elevation_m[1])
-                    + (f64::from(s.thickness_m) - normal_thickness_m()) / ISOSTATIC_FACTOR;
+                    + (f64::from(s.thickness_m) - normal_thickness_m()) / COLUMN_ISOSTATIC_FACTOR;
                 assert!(s.elevation_m > z0[i] && f64::from(s.elevation_m) <= z_a + 1.0);
             }
         }
@@ -551,12 +641,14 @@ mod tests {
         assert_eq!(step_once(&fx, &mut st, 1), Collapse::default());
     }
 
-    /// A column thicker than `crust_max_km` loses the excess from its bottom (mafic root first)
-    /// and keeps its surface rock; its surface stays where it stood when it is lower than the
-    /// column it keeps would hold up. Columns at or under the limit, and ocean floor, keep all.
+    /// With nowhere to spread (the collapse off), a column thicker than `crust_max_km` loses the
+    /// excess from its bottom (mafic root first) and keeps its surface rock; its surface stays
+    /// where it stood when it is lower than the column it keeps would hold up. Columns at or
+    /// under the limit, and ocean floor, keep all.
     #[test]
     fn crust_beyond_the_thickest_column_founders_from_the_bottom() {
-        let fx = Fx::new();
+        let mut fx = Fx::new();
+        fx.k.collapse_myr = f64::NAN;
         let belt = |p: DVec3| p.x < -0.1 && p.y > 0.766 && p.y < 0.85;
         let mut st = planet(&fx.geo, belt, 0.0);
         for (i, s) in st.samples.iter_mut().enumerate() {
@@ -566,7 +658,7 @@ mod tests {
             }
         }
         let before = st.samples.clone();
-        let lost = founder(&mut st, &fx.env(1));
+        let lost = founder(&mut st, &fx.geo, &fx.env(1), &mut Collapse::default());
         let t_max = fx.k.crust_max_km * 1000.0;
         let mut n = 0;
         for (i, s) in st.samples.iter().enumerate() {
@@ -584,5 +676,56 @@ mod tests {
         }
         let expect = n as f64 * (135_100.0 - t_max) * fx.norm.sample_area_km2();
         assert!((lost - expect).abs() < 1e-3 * expect, "{lost} vs {expect}");
+    }
+
+    /// The excess over `crust_max_km` spreads at once to the nearest room on the plate, even while
+    /// an orogeny holds the belt up (PLT-277): ocean floor beside the continent fills and turns
+    /// continental, and only what finds no room within reach founders. Volume is kept except
+    /// what founders; the column ends at the limit either way.
+    #[test]
+    fn the_thickest_crust_spreads_before_it_founders() {
+        let mut fx = Fx::new();
+        // The shortest reach (1.5 spacings): only the ocean floor right beside the belt is room.
+        fx.k.collapse_reach_km = 1.0;
+        let belt = |p: DVec3| p.x < -0.1 && p.y > 0.766 && p.y < 0.85;
+        let mut st = planet(&fx.geo, belt, 0.0);
+        for (i, s) in st.samples.iter_mut().enumerate() {
+            if belt(fx.geo.points()[i]) {
+                s.pools[pool::FELSIC_PLUTONIC] += 100_000.0;
+                s.thickness_m += 100_000.0;
+                // Raised by an orogeny this step: the collapse would hold it, the limit does not.
+                s.orogeny_myr = 2.0;
+            }
+        }
+        let crust0 = crust_m(&st);
+        let c0 = continental(&st, 0);
+        let mut out = Collapse::default();
+        let lost = founder(&mut st, &fx.geo, &fx.env(1), &mut out);
+        let area = fx.norm.sample_area_km2();
+        let t_max = fx.k.crust_max_km * 1000.0;
+        for (i, s) in st.samples.iter().enumerate() {
+            if belt(fx.geo.points()[i]) {
+                assert!(f64::from(s.thickness_m) <= t_max + 1.0);
+            }
+        }
+        assert!(
+            out.converted > 0,
+            "ocean floor beside the belt turned continental"
+        );
+        assert_eq!(continental(&st, 0), c0 + out.converted as usize);
+        assert_eq!(
+            continental(&st, 1),
+            continental(&planet(&fx.geo, belt, 0.0), 1)
+        );
+        let n_belt = (0..st.samples.len())
+            .filter(|&i| belt(fx.geo.points()[i]))
+            .count();
+        let excess = n_belt as f64 * (135_100.0 - t_max) * area;
+        assert!(lost > 0.0 && lost < excess, "{lost} of {excess} foundered");
+        assert!(
+            (crust_m(&st) * area + lost - crust0 * area).abs() < 1e-5 * crust0 * area,
+            "volume kept but for what foundered"
+        );
+        assert!((out.moved_km2_m - (excess - lost)).abs() < 1e-3 * excess);
     }
 }

@@ -44,7 +44,8 @@
     "trench_elevation_m": -10000.0,
     "max_elevation_m": 10000.0,
     "subduction_distance_km": 1800.0,
-    "max_plate_speed_mm_yr": 100.0,
+    "max_plate_speed_mm_yr": 250.0,
+    "convergence_ref_mm_yr": 100.0,
     "oceanic_damping_mm_yr": 0.04,
     "continental_erosion_mm_yr": 0.03,
     "sediment_accretion_mm_yr": 0.3,
@@ -52,30 +53,19 @@
     "collision_threshold_km": 100.0,
     "subduction_peak_km": 300.0,
     "collision_belt_km": 400.0,
-    "collision_stacking_share": 0.5,
+    "collision_stacking_share": 0.95,
     "wedge_slope_deg": 1.5,
-    "collision_resistance_mm_yr": 200.0,
     "weld_speed_mm_yr": 5.0,
     "weld_after_myr": 10.0,
     "collapse_myr": 15.0,
-    "collapse_thickness_km": 55.0,
+    "collapse_thickness_km": 50.0,
     "collapse_quiet_myr": 10.0,
     "collapse_reach_km": 200.0,
     "crust_max_km": 70.0,
     "transition_width_km": 200.0,
     "transition_myr": 20.0,
-    "slab_pull_rad_per_1000km_myr": 0.002,
-    "slab_pull_speed_mm_yr": 80.0,
-    "slab_pull_front_km": 3000.0,
-    "slab_pull_relax_myr": 20.0,
-    "motion_jitter_per_sqrt_myr": 0.02,
     "initial_plates": 14,
     "plate_size_variety_rad": 0.35,
-    "plate_speed_mm_yr": [
-      20.0,
-      70.0
-    ],
-    "continental_speed_factor": 0.6,
     "continent_elevation_m": [
       150.0,
       900.0
@@ -87,10 +77,6 @@
     "rift_fragments": [
       2,
       4
-    ],
-    "rift_speed_mm_yr": [
-      20.0,
-      50.0
     ],
     "rift_warp_rad": 0.2,
     "min_plate_area_frac": 0.003,
@@ -127,10 +113,7 @@
     "subduction_initiation_age_myr": 150.0,
     "subduction_initiation_rate": 0.3,
     "subduction_initiation_clearance_km": 1000.0,
-    "subduction_initiation_speed_mm_yr": [
-      30.0,
-      60.0
-    ],
+    "initiation_slab_km": 150.0,
     "contact_timeout_steps": 12,
     "collision_orogeny_myr": 30.0,
     "l1_every_steps": 0,
@@ -141,6 +124,7 @@
     "slab_resistance": 3.0,
     "slab_suction_share": 0.3,
     "edge_energy": 0.1,
+    "collision_buoyancy": 1.0,
     "keel_drag": 3.0,
     "boundary_resistance": 3.0,
     "mantle_flow_mm_yr": 5.0,

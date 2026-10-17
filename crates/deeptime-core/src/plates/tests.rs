@@ -496,7 +496,9 @@ fn margins_are_measured_and_add_up() {
 fn sutures_and_initiations_keep_continents_whole() {
     let mut sutures = 0;
     let mut initiations = 0;
-    for (start, seed) in [("supercontinent", 21), ("scattered_continents", 22)] {
+    // Seeds where the force balance welds a collision within 300 Myr on this small planet (a
+    // sweep of 32 runs, 2026-10-16, after the eclogite root and whole-column isostasy: 8 welded).
+    for (start, seed) in [("supercontinent", 6), ("scattered_continents", 9)] {
         let p = preset(8000, 300.0, start, seed);
         let mut seen = 0usize;
         let world = run_stage(&p, |stage, world, st| {
@@ -620,8 +622,10 @@ fn arcs_build_a_cordillera() {
         sum.0 / sum.1 as f64
     };
     let (flat, range) = (mean_arc(0.0), mean_arc(0.5));
+    // Plates start at rest since the switch to the force balance, so 60 Myr hold less convergence
+    // than they did under the old speed rules (which asserted 300 m).
     assert!(
-        range > flat + 300.0,
+        range > flat + 150.0,
         "arc crust {range:.0} m with the cordillera vs {flat:.0} m without"
     );
 }
@@ -749,7 +753,10 @@ impl CollisionLives {
 /// has shortened by the threshold; the states' life cycle holds; and collisions still happen.
 #[test]
 fn collisions_weld_on_stall_and_transfer_on_shortening() {
-    let p = preset(8000, 300.0, "scattered_continents", 23);
+    // A seed whose collisions weld (one of 24 in 300 Myr; under the force balance a held collision
+    // welds less often than under the old speed law, and most 300-Myr runs of this planet have none:
+    // 8 of 32 welded in the sweep of 2026-10-16).
+    let p = preset(8000, 300.0, "scattered_continents", 14);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -851,7 +858,9 @@ fn the_collision_footprint_lives_with_its_collision() {
 /// the run's own counters and events.
 #[test]
 fn recording_does_not_change_the_world_and_matches_the_run() {
-    let p = preset(8000, 300.0, "scattered_continents", 23);
+    // A seed with welds, so the collision record is tested (as in
+    // `collisions_weld_on_stall_and_transfer_on_shortening`).
+    let p = preset(8000, 300.0, "scattered_continents", 6);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
@@ -879,7 +888,8 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
             assert!(q.speed_mm_yr >= 0.0 && q.boundary_km >= 0.0 && q.front_km >= 0.0);
         }
         // Task 1b. Rotation change: the vector change since the previous step, for the plates that
-        // were there; the guard: rotation at the cap; the pole: on some plate.
+        // were there; the guard: a plate the guard held has its fastest point at the guard; the
+        // pole: on some plate.
         let cap = stage
             .norm()
             .omega_of_speed(p.tectonics.max_plate_speed_mm_yr);
@@ -895,7 +905,9 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
                 }
                 _ => assert_eq!(q.rot_change, 0.0),
             }
-            assert_eq!(q.guard, w.length() >= cap * (1.0 - 1e-9), "{q:?}");
+            if q.guard {
+                assert!(w.length() >= cap * (1.0 - 1e-9), "{q:?}");
+            }
             let c = glam::DVec3::from_array(st.plates[q.id as usize].centroid);
             assert_eq!(
                 q.spinning,
@@ -993,6 +1005,38 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     });
     assert_eq!(checked, total);
     assert_eq!(balance_steps, total, "a balance every step");
+    // The switch (force-balance design, task 7): the balance was solved every step and the speed
+    // guard never bound in 300 Myr; plates started at rest and the balance set them moving.
+    assert_eq!(
+        with.globals.get(UNSOLVED_GLOBAL),
+        None,
+        "an unsolved balance"
+    );
+    assert_eq!(
+        with.globals.get(GUARD_BOUND_GLOBAL),
+        None,
+        "the speed guard bound"
+    );
+    {
+        let d = with.plates.as_ref().unwrap().dynamics.as_ref().unwrap();
+        let median = |mut v: Vec<f64>| {
+            v.sort_by(f64::total_cmp);
+            v[v.len() / 2]
+        };
+        // After one step from rest a plate has made 1 − e^(−δt/τ) of the way to its answer.
+        let first = median(d.steps[0].plates.iter().map(|q| q.speed_mm_yr).collect());
+        let late = median(
+            d.steps[d.steps.len() / 2..]
+                .iter()
+                .flat_map(|s| s.plates.iter().map(|q| q.speed_mm_yr))
+                .collect(),
+        );
+        assert!(late > 10.0, "the plates hardly move: median {late} mm/yr");
+        assert!(
+            first < late,
+            "plates did not start at rest: {first} against {late}"
+        );
+    }
     assert!(longest_slab > 0.0, "no slab grew in 300 Myr");
     assert!(mix_seen > 0.0, "no plate boundary recorded in 300 Myr");
     assert!(arc_cells_seen > 0, "no arc cell recorded in 300 Myr");
@@ -1026,7 +1070,7 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
             assert!(died >= l.born_myr);
             assert!(matches!(
                 l.fate.as_deref(),
-                Some("sutured" | "absorbed" | "consumed")
+                Some("sutured" | "absorbed" | "consumed" | "healed")
             ));
         }
         if l.origin != "initial" {
@@ -1205,6 +1249,64 @@ fn resampling_conserves_continental_area() {
     }
 }
 
+/// Continental crust hidden under the overriding plate accretes to the column on top at a
+/// resampling (forced-subducted continental crust is not lost), unless a collision hid it: then
+/// the belt already stacked its volume (`belts.rs`) and the resampling consumes it instead of
+/// adding it a second time (ledger PLT-276). Each is counted in its global.
+#[test]
+fn a_resampling_accretes_hidden_continent_once() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo, pos) = two_plates(&p, &env, 0.1);
+    let mut hidden = 0.0;
+    for s in st.samples.iter_mut().filter(|s| s.is_hidden()) {
+        s.kind = CONTINENTAL;
+        s.pools = pools::continental_column();
+        s.thickness_m = pools::thickness(&s.pools);
+        hidden += f64::from(s.thickness_m);
+    }
+    assert!(hidden > 0.0);
+    let conserved = |st: &PlateState| -> f64 {
+        st.samples
+            .iter()
+            .map(|s| {
+                s.pools[..state::pool::CONSERVED]
+                    .iter()
+                    .map(|&x| f64::from(x))
+                    .sum::<f64>()
+            })
+            .sum()
+    };
+    let mut out = Vec::new();
+    for stacked in [false, true] {
+        let mut s2 = st.clone();
+        for s in s2.samples.iter_mut().filter(|s| s.is_hidden()) {
+            s.stacked = stacked;
+        }
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        ridges::resample(&mut s2, &mut world, &pos, &geo, &env).unwrap();
+        let g = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
+        out.push((
+            conserved(&s2),
+            g(ridges::ACCRETED_GLOBAL),
+            g(ridges::STACKED_CONSUMED_GLOBAL),
+        ));
+    }
+    let (accreted, consumed) = (out[0], out[1]);
+    let area = env.norm.sample_area_km2();
+    // What the hidden continent adds when it accretes: most of its conserved column.
+    let gap = (accreted.0 - consumed.0) * area / 1000.0;
+    assert!(gap > 0.0, "the consumed run keeps less crust: {gap} km³");
+    assert!(consumed.2 > 0.0 && accreted.2 == 0.0);
+    assert!(
+        (consumed.2 - gap).abs() < 0.05 * gap,
+        "the consumed global {} km³ is what was not accreted, {gap} km³",
+        consumed.2
+    );
+    assert!((accreted.1 - consumed.1 - gap).abs() < 0.05 * gap);
+}
+
 /// Island-arc crust turns continental by the arc crust it has built (`arc_maturity_myr` of arc
 /// magma), not by its height: a mature arc below the sea becomes continent, a young arc whose
 /// cones stand above it does not, and neither does a mature arc's crust hidden in a trench.
@@ -1244,5 +1346,60 @@ fn arcs_turn_continental_by_their_crust_not_their_height() {
             turns,
             "arc magma {arc} m (mature at {mature} m), elevation {z} m, hidden {hidden}"
         );
+    }
+}
+
+/// A rift that did not open heals (force-balance design §3.4): two plates a rift separated that
+/// move together for `weld_after_myr` become one again, the larger keeping its id; two that move
+/// past each other faster than the weld speed stay two.
+#[test]
+fn a_rift_that_does_not_open_heals_and_one_that_opens_does_not() {
+    let p = preset(6000, 20.0, "supercontinent", 3);
+    let stage = PlatesStage::new(p.clone());
+    let k = &p.tectonics;
+    for apart_mm_yr in [0.0, 20.0] {
+        let env0 = stage.env(&p.tectonics, 1);
+        let (mut st, geo, pos) = two_plates(&p, &env0, 0.0);
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        let e = events::event(&mut world, env0.t_myr, events::RIFT_ONSET, DVec3::Z);
+        let rift = world.emit(e).unwrap();
+        st.rift_links.push(state::RiftLink {
+            a: 0,
+            b: 1,
+            event: rift,
+            quiet_since_myr: None,
+        });
+        // Plate 1 turns about the z axis relative to plate 0: along the equator a strike-slip
+        // of `apart_mm_yr`.
+        st.plates[1].omega = (DVec3::Z * env0.norm.omega_of_speed(apart_mm_yr)).to_array();
+        let steps = (k.weld_after_myr / env0.dt_myr).ceil() as u64 + 2;
+        let mut healed_at = None;
+        for step in 1..=steps {
+            let env = stage.env(&p.tectonics, step);
+            let healed = rifting::heal(&mut st, &mut world, &geo, &pos, &env).unwrap();
+            if !healed.is_empty() {
+                healed_at = Some(step);
+                break;
+            }
+        }
+        if apart_mm_yr == 0.0 {
+            let at = healed_at.expect("a rift that never opened did not heal");
+            assert!(
+                at as f64 * env0.dt_myr >= k.weld_after_myr - 1e-9,
+                "healed at step {at}"
+            );
+            assert_eq!(st.alive().count(), 1);
+            assert!(st.rift_links.is_empty());
+            assert_eq!(st.counters.healed, 1);
+            let died = world
+                .events
+                .iter()
+                .filter(|e| e.kind == events::PLATE_DEATH)
+                .count();
+            assert_eq!(died, 1);
+        } else {
+            assert_eq!(healed_at, None, "a rift that opened healed");
+            assert_eq!(st.alive().count(), 2);
+        }
     }
 }

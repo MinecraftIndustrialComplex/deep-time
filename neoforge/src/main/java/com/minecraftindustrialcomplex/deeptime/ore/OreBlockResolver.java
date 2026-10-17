@@ -37,8 +37,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * </ol>
  *
  * A placer's gold in a gravel or sand cell is the exception to steps 3 and 4 (Ben, 2026-10-16):
- * where steps 1 and 2 find nothing, the placer puts vanilla's suspicious gravel or sand with a
- * gold-nugget loot table instead of the stone ore ({@link #panned}, {@link PlacerPanning}).
+ * where steps 1 and 2 find nothing, the placer puts vanilla's suspicious gravel or sand holding
+ * gold nuggets instead of the stone ore ({@link #panned}, {@link PlacerPanning}).
  *
  * A material written {@code ns:name} is the tag {@code ns:ores/name}. Answers are cached per
  * (material, host block, below 0) and rebuilt when the server's tags reload. Null means "no block":
@@ -174,7 +174,7 @@ public final class OreBlockResolver {
      * (soil over the bar, a rock bench), or the pack has a gold ore made for {@code host}, the rock
      * the ore sits in (Excavated Variants' gravel and sand variants, or a block in
      * {@code #c:ores_in_ground/gravel} or {@code /sand}). With Excavated Variants nothing changes.
-     * The caller sets the block's loot table ({@link PlacerPanning#setLoot}) and checks that the
+     * The caller fills the block with its gold ({@link PlacerPanning#fill}) and checks that the
      * block under it holds it up ({@link PlacerPanning#supported}).
      */
     public BlockState panned(ResourceLocation material, BlockState cell, BlockState host) {

@@ -72,7 +72,7 @@ use serde::{Deserialize, Serialize};
 use super::advect::{self, Carry};
 use super::grid::{Dims, box_blur};
 use crate::error::CoreError;
-use crate::plates::pools::ISOSTATIC_FACTOR;
+use crate::plates::pools::RHO_CRUST_MEAN;
 use crate::plates::state::{OCEANIC, regime};
 
 /// Mantle, sea water and ice, kg/m³.
@@ -241,10 +241,12 @@ pub fn flexural_parameter_m(d_per_g: f64) -> f64 {
     (4.0 * d_per_g / RHO_MANTLE).powf(0.25)
 }
 
-/// Airy share of crust under air and under water: a thickening T sinks k·T.
+/// Airy share of crust under air and under water: a thickening T sinks k·T. The crust is the
+/// plate model's whole column, at the continental crust's mean density (PLT-281, since
+/// 2026-10-06; the upper crust's 2,700 before).
 // ledger: ISO-046
 fn airy_shares() -> (f64, f64) {
-    let rho_c = RHO_MANTLE * (1.0 - 1.0 / ISOSTATIC_FACTOR);
+    let rho_c = RHO_CRUST_MEAN;
     (
         rho_c / RHO_MANTLE,
         (rho_c - RHO_WATER) / (RHO_MANTLE - RHO_WATER),
@@ -1204,7 +1206,7 @@ pub fn step(
     // resolves it. Its uplift is interpolated from samples `plate_spacing_m` apart; what varies
     // from cell to cell below that is the sample lattice, not a load (measured: the uplift field
     // zigzags at the cell scale in about 5 % of margin cells), and a stiff plate passed the whole
-    // thickening behind it, 5.5 times the uplift, where local isostasy had passed the uplift. The
+    // thickening behind it, 7.0 times the uplift, where local isostasy had passed the uplift. The
     // rest stays locally compensated, as the plate model made it.
     let bend_part = {
         let pr = pick(&|c| cells[c].plate_root);
@@ -1581,9 +1583,10 @@ mod tests {
         );
         p.validate().unwrap();
         assert!(FlexureParams { strength: 1.5, ..p }.validate().is_err());
-        // The Airy shares are the plate model's: 1 km of uplift on land is 5.5 km of crust.
+        // The Airy shares are the plate model's: 1 km of uplift on land is 7.0 km of crust.
         let (q, a) = thickening(1000.0, 500.0, 0.0);
-        assert!((a - 4500.0).abs() < 1e-6 && (q - 5500.0 * 2700.0 / 3300.0).abs() < 1e-6);
+        let t = 1000.0 * 3300.0 / (3300.0 - 2830.0);
+        assert!((a - (t - 1000.0)).abs() < 1e-6 && (q - t * 2830.0 / 3300.0).abs() < 1e-6);
         // Under water the root is smaller, and a change that crosses the sea is split.
         let (_, under) = thickening(1000.0, -3000.0, 0.0);
         assert!(under < a && under > 2000.0);
@@ -1857,13 +1860,13 @@ mod tests {
             .sum();
         let sunk: f64 = out.deflection_m.iter().map(|&x| f64::from(x)).sum();
         assert!((sunk / load - 1.0).abs() < 1e-3, "{sunk} against {load}");
-        // Erosion takes the belt away again (the crust thickened, 5.5 × the uplift): no load is
+        // Erosion takes the belt away again (the crust thickened, 7.0 × the uplift): no load is
         // left and the basin is gone.
         wd.uplift = vec![0.0; n];
         let mut eroded = vec![0.0; n];
         for (c, dm) in eroded.iter_mut().enumerate() {
             if belt(c) {
-                *dm = -2000.0 * 5.5 * (2700.0 / 3300.0) / 0.8;
+                *dm = -2000.0 * (3300.0 / 470.0) * (2830.0 / 3300.0) / 0.8;
             }
         }
         wd.step(&p, &mut sv, &mut st, &eroded, sea);
