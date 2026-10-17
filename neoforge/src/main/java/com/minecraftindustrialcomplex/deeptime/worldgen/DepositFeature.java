@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
 import com.minecraftindustrialcomplex.deeptime.ore.OreBlockResolver;
+import com.minecraftindustrialcomplex.deeptime.ore.PlacerPanning;
 import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Body;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
@@ -32,7 +33,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Host rock is what the strata pass leaves as rock: stone, deepslate and every rock class's
  * blocks ({@link RockPalette#host}); unconsolidated rock (sand, gravel, soil, …) hosts ore only in a
  * body whose own class is unconsolidated (a placer's gravel). The ore block is
- * {@link OreBlockResolver}'s for the host. Only blocks of the chunk being decorated are written.
+ * {@link OreBlockResolver}'s for the host, except a placer's gold in a gravel or sand block where the
+ * pack has no gold ore for that rock (no Excavated Variants): vanilla's suspicious gravel or sand
+ * with the loot table {@code deeptime:archaeology/placer_gold}, brushed out as panning
+ * ({@link PlacerPanning}; a cell over air, water or a plant stays plain gravel or sand, since the
+ * block would fall). Only blocks of the chunk being decorated are written.
  * Does nothing unless the chunk's generator is Deep Time's and reads world data.
  */
 public final class DepositFeature extends Feature<NoneFeatureConfiguration> {
@@ -91,7 +96,8 @@ public final class DepositFeature extends Feature<NoneFeatureConfiguration> {
                             continue;
                         String material = zone.material();
                         pos.set(x, y, z);
-                        BlockState host = level.getBlockState(pos);
+                        BlockState cell = level.getBlockState(pos);
+                        BlockState host = cell;
                         RockPalette.Host kind = palette.host(host);
                         if (kind == RockPalette.Host.NONE || (kind == RockPalette.Host.LOOSE && !loose))
                             continue;
@@ -104,6 +110,21 @@ public final class DepositFeature extends Feature<NoneFeatureConfiguration> {
                         }
                         ResourceLocation mat = material(material);
                         BlockState ore = rawAt(b, zone, c, x, y, z) ? ores.rawBlock(mat) : null;
+                        if (ore == null && loose) {
+                            // Placer gold in a gravel or sand cell with no gold ore made for it
+                            // (no Excavated Variants): suspicious gravel or sand whose loot table
+                            // is gold nuggets (Ben, 2026-10-16). A cell with no support under it
+                            // stays plain gravel or sand: the block would fall.
+                            BlockState panned = ores.panned(mat, cell, host);
+                            if (panned != null) {
+                                if (PlacerPanning.supported(level.getBlockState(pos.below()))) {
+                                    level.setBlock(pos, panned, 2);
+                                    PlacerPanning.setLoot(level, pos, PlacerPanning.tableOf(mat), OreDraws.panSeed(level.getSeed(), c, x, y, z));
+                                    placed++;
+                                }
+                                continue;
+                            }
+                        }
                         if (ore == null)
                             ore = ores.resolve(mat, host, y);
                         if (ore == null)
