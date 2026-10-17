@@ -329,13 +329,23 @@ fn an_epoch_pick_and_a_stop_bake_the_run_planned_to_that_time() {
     }
 }
 
-/// Steering off changes nothing: a preset without the section and one with `enabled: false` give
-/// the same files; a steered run's world before its tail is the unsteered run's (its epoch
-/// checkpoints match the unsteered ones step for step).
+/// The realistic ("free") choice is no steering at all (Ben, decisions log 2026-10-06, "One switch
+/// for both"): a preset with `steering.enabled: false` (and the preset's own `present_climate`,
+/// temperate) gives the same world and files as an unsteered run, without the section, with
+/// `present_climate` off (natural). And a steered run's world before its tail is the unsteered
+/// run's (its epoch checkpoints match the unsteered ones step for step).
 #[test]
-fn steering_off_changes_nothing_and_on_changes_only_the_tail() {
-    let plain = small_planet(60.0, None);
+fn the_free_choice_is_the_unsteered_run_and_steering_changes_only_the_tail() {
+    let mut v: Value = serde_json::from_str(&small_planet(60.0, None)).unwrap();
+    v["climate"]["present_climate"] = json!("natural");
+    let plain = v.to_string();
     let off = small_planet(60.0, Some(json!({"enabled": false})));
+    let o: Value = serde_json::from_str(&off).unwrap();
+    assert_eq!(
+        o["climate"]["present_climate"],
+        json!("temperate"),
+        "the free preset keeps its own setting: the switch turns it off"
+    );
     let on = small_planet(60.0, Some(steering(json!({}))));
     let (a, b, c) = (temp_dir("off-a"), temp_dir("off-b"), temp_dir("off-c"));
     let wa = run(&plain, &a, true);
@@ -358,6 +368,11 @@ fn steering_off_changes_nothing_and_on_changes_only_the_tail() {
         "off: the folders"
     );
     assert!(notes(&b)["climate"].get("steering").is_none());
+    assert_eq!(
+        notes(&b)["climate"]["present"]["state"],
+        json!("natural"),
+        "free turns the present-day adjustment off"
+    );
     run(&on, &c, true);
     let ia = EpochIndex::read(&a).unwrap().unwrap();
     let ic = EpochIndex::read(&c).unwrap().unwrap();

@@ -505,6 +505,13 @@ impl ClimateStage {
         let mut p = preset.climate.clone().unwrap_or_default();
         // The ice-age window and the orbit are measured from the run's end (its stop).
         p.run_end_years = preset.t_end_years();
+        // The realistic ("free") choice is no steering at all (Ben, decisions log 2026-10-06,
+        // "One switch for both"): with the nudges switched off the present-day adjustment is off
+        // too, and the history ends as simulated. A preset without a `steering` section keeps its
+        // `present_climate`.
+        if preset.steering.is_some_and(|s| !s.enabled) {
+            p.present_climate = PresentClimate::Natural;
+        }
         let total = preset.plate_steps();
         ClimateStage {
             preset,
