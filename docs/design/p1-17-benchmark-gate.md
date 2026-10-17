@@ -1,7 +1,7 @@
 # The P1-17 benchmark gate (V1): measurements and the per-stage report
 
 Status: **the gate is missed on both presets** (2026-10-05; re-measured on the rebuilt test VM
-2026-10-16, below). Ben's answer (2026-10-16): accept it for V1 and keep optimising. This page is
+2026-10-16, below). Ben's answer (decisions log 2026-10-06): accept it for V1 and keep optimising. This page is
 the per-stage report the plan asks for when a preset misses (§9.1: "Missing it here is reported with
 the per-stage breakdown and the measured scaling across thread counts (1, 2, 4, 8), and the decision
 is Ben's"). Every speed-up on the branch is bit-identical: the worlds before and after are the same
@@ -18,7 +18,7 @@ Statements are marked **measured** (a run made for this page), **read** (from th
   continents, before = master a55f70f6, worlds identical (83 of 83 files): side by side quick
   774.5 → **577.2 s (1.34×)**, full 2,815.7 → **2,054.5 s (1.37×)**; one run at a time, with this
   session's passes, quick 895.8 → **559.7 s** (the two runs saw different loads). Still over the
-  gate: quick about 1.9×, full about 2.3×. Ben accepted the miss for V1 (2026-10-16).
+  gate: quick about 1.9×, full about 2.3×. Ben accepted the miss for V1 (decisions log 2026-10-06).
 - **The 8-thread gate (plan P1-17: quick ≤ 300 s, full ≤ 900 s; 1000 Myr)**: measured, test VM,
   8 threads, before = master 6489d4a5, after = this branch, run side by side, worlds identical:
 
