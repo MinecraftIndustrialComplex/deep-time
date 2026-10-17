@@ -342,6 +342,41 @@ impl Horizons {
         t - (t - b) * (f64::from(s - kt) / f64::from(kb - kt))
     }
 
+    /// [`Horizons::height_at`] of cell `c` at every key of `ss`, which is sorted ascending, into
+    /// `out` (P1-17): the horizon a key falls in only moves down the stack as the key grows, so
+    /// one walk down the stack serves them all instead of one walk from the top per key. Each
+    /// value is the same expression on the same operands, so the same bits.
+    fn heights_at_sorted(&self, c: usize, ss: &[u16], out: &mut [f64]) {
+        let (tops, _, keys) = self.cell(c);
+        let floor = f64::from(self.min_y * 16);
+        if tops.is_empty() {
+            out.fill(floor);
+            return;
+        }
+        let mut h = 0;
+        for (o, &s) in out.iter_mut().zip(ss) {
+            if s <= keys[0][0] {
+                *o = f64::from(tops[0]);
+                continue;
+            }
+            while h + 1 < tops.len() && keys[h + 1][0] <= s {
+                h += 1;
+            }
+            let t = f64::from(tops[h]);
+            let b = if h + 1 < tops.len() {
+                f64::from(tops[h + 1])
+            } else {
+                floor
+            };
+            let [kt, kb] = keys[h];
+            *o = if s >= kb {
+                b
+            } else {
+                t - (t - b) * (f64::from(s - kt) / f64::from(kb - kt))
+            };
+        }
+    }
+
     /// The stacks smoothed laterally, so that neighbouring cells tell one regional story
     /// instead of each its own (the strata log is carried cell by cell and differs a lot between
     /// neighbours): for each cell, the Gaussian-weighted mean (σ `sigma` cells; x wraps, z clamps)
@@ -377,6 +412,11 @@ impl Horizons {
             (a - reach).div_euclid(step) + i64::from((a - reach).rem_euclid(step) != 0)
                 ..=(a + reach).div_euclid(step)
         };
+        // The axis weights of every offset in the window, once (P1-17: two `exp` per call made
+        // them a large share of the smoothing).
+        let axis: Vec<f64> = (-reach..=reach)
+            .map(|d| smooth_axis_weight(d as f64, sigma))
+            .collect();
         let mut out = self.clone();
         out.tops
             .par_chunks_mut(k)
@@ -384,8 +424,18 @@ impl Horizons {
             .zip(out.keys.par_chunks_mut(k))
             .enumerate()
             .for_each_init(
-                || (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-                |(near, keys, ys, weight, win), (c, ((tc, cc), kc))| {
+                || {
+                    (
+                        Vec::new(),
+                        Vec::new(),
+                        Vec::new(),
+                        Vec::new(),
+                        Vec::new(),
+                        Vec::new(),
+                        Vec::new(),
+                    )
+                },
+                |(near, keys, ys, weight, win, hs, span), (c, ((tc, cc), kc))| {
                     let own = self.cell(c);
                     if own.0.is_empty() {
                         return;
@@ -398,8 +448,9 @@ impl Horizons {
                         let jl = lj * step;
                         for li in lattice(i) {
                             let il = li * step;
-                            let (di, dj) = ((il - i) as f64, (jl - j) as f64);
-                            let g = smooth_axis_weight(di, sigma) * smooth_axis_weight(dj, sigma);
+                            // smooth_axis_weight((il − i) as f64, σ) · (the same along z).
+                            let g =
+                                axis[(il - i + reach) as usize] * axis[(jl - j + reach) as usize];
                             if g <= 0.0 {
                                 continue;
                             }
@@ -417,39 +468,47 @@ impl Horizons {
                     keys.sort_unstable();
                     keys.dedup();
                     let m = keys.len();
-                    // ys[q]: the smoothed height at keys[q].
+                    // ys[q]: the smoothed height at keys[q]. hs[a·m + q]: neighbour a's height
+                    // there (`height_at`), kept for the interval weights below (P1-17).
                     ys.clear();
                     ys.resize(m, 0.0f64);
-                    for &(n, g) in near.iter() {
-                        for (q, &s) in keys.iter().enumerate() {
-                            ys[q] += g * self.height_at(n, s);
+                    hs.clear();
+                    hs.resize(near.len() * m, 0.0f64);
+                    for (&(n, g), row) in near.iter().zip(hs.chunks_exact_mut(m.max(1))) {
+                        self.heights_at_sorted(n, keys, row);
+                        for (y, &z) in ys.iter_mut().zip(row.iter()) {
+                            *y += g * z;
                         }
                     }
                     let top0 = f64::from(own.0[0]);
                     let mut hz: Vec<H> = Vec::with_capacity(k);
+                    // span[a·iv + q]: the class of neighbour a's horizon that spans interval q,
+                    // one pass a stack (P1-17: it was a search of the stack for every interval
+                    // and neighbour).
+                    let iv = m.saturating_sub(1);
+                    span.clear();
+                    span.resize(near.len() * iv, NO_CLASS);
+                    for (&(n, _), row) in near.iter().zip(span.chunks_exact_mut(iv.max(1))) {
+                        let (_, classes, nk) = self.cell(n);
+                        spanning_classes(classes, nk, keys, row);
+                    }
                     // The class of every interval: the most weighted thickness in [s0, s1].
                     win.clear();
-                    win.resize(m.saturating_sub(1), NO_CLASS);
-                    for q in 0..m.saturating_sub(1) {
-                        let (s0, s1) = (keys[q], keys[q + 1]);
+                    win.resize(iv, NO_CLASS);
+                    for q in 0..iv {
                         if ys[q + 1] >= ys[q] {
                             continue;
                         }
                         weight.clear();
-                        for &(n, g) in near.iter() {
-                            let (tops, classes, nk) = self.cell(n);
-                            let Some(hh) =
-                                (0..tops.len()).find(|&x| nk[x][0] <= s0 && s1 <= nk[x][1])
-                            else {
+                        for (a, &(_, g)) in near.iter().enumerate() {
+                            let class = span[a * iv + q];
+                            if class == NO_CLASS {
                                 continue;
-                            };
-                            let th = g * (self.height_at(n, s0) - self.height_at(n, s1));
-                            match weight
-                                .iter_mut()
-                                .find(|e: &&mut (u8, f64)| e.0 == classes[hh])
-                            {
+                            }
+                            let th = g * (hs[a * m + q] - hs[a * m + q + 1]);
+                            match weight.iter_mut().find(|e: &&mut (u8, f64)| e.0 == class) {
                                 Some(e) => e.1 += th,
-                                None => weight.push((classes[hh], th)),
+                                None => weight.push((class, th)),
                             }
                         }
                         if let Some(&(class, _)) = weight
@@ -577,6 +636,24 @@ impl Horizons {
                 },
             );
         out
+    }
+}
+
+/// `row[q]`: the class of the first horizon (in stack order) whose key span holds the
+/// interval `[keys[q], keys[q + 1]]`, `NO_CLASS` where none does; `keys` sorted ascending, no
+/// repeats. A span holds a run of consecutive intervals (the keys are sorted), so each horizon
+/// fills its run where no earlier horizon has: the same class as searching the stack for every
+/// interval (P1-17).
+fn spanning_classes(classes: &[u8], spans: &[[u16; 2]], keys: &[u16], row: &mut [u8]) {
+    for (&class, &[k0, k1]) in classes.iter().zip(spans) {
+        // Intervals q with k0 <= keys[q] and keys[q + 1] <= k1.
+        let lo = keys.partition_point(|&s| s < k0);
+        let hi = keys.partition_point(|&s| s <= k1).saturating_sub(1);
+        for slot in row.iter_mut().take(hi).skip(lo) {
+            if *slot == NO_CLASS {
+                *slot = class;
+            }
+        }
     }
 }
 
@@ -967,6 +1044,364 @@ mod tests {
             thickness_m: th,
             source: Source::Log,
             key,
+        }
+    }
+
+    /// P1-17: `smoothed` as it was before the heights at the window's keys were taken in one walk
+    /// per stack and the axis weights tabulated (kept verbatim, `self` → `this`).
+    #[allow(clippy::too_many_lines)]
+    fn smoothed_reference(this: &Horizons, sigma: f64, t: &Tables) -> Horizons {
+        if sigma <= 0.0 {
+            return this.clone();
+        }
+        let (w, h) = (i64::from(this.grid.w), i64::from(this.grid.h));
+        let k = this.k as usize;
+        let step = smooth_stride(sigma);
+        let reach = step * SMOOTH_RADIUS_SAMPLES;
+        let lattice = |a: i64| -> std::ops::RangeInclusive<i64> {
+            // Lattice positions (multiples of step) within a ± reach.
+            (a - reach).div_euclid(step) + i64::from((a - reach).rem_euclid(step) != 0)
+                ..=(a + reach).div_euclid(step)
+        };
+        let mut out = this.clone();
+        out.tops
+            .par_chunks_mut(k)
+            .zip(out.classes.par_chunks_mut(k))
+            .zip(out.keys.par_chunks_mut(k))
+            .enumerate()
+            .for_each_init(
+                || (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                |(near, keys, ys, weight, win), (c, ((tc, cc), kc))| {
+                    let own = this.cell(c);
+                    if own.0.is_empty() {
+                        return;
+                    }
+                    let (i, j) = (c as i64 % w, c as i64 / w);
+                    near.clear();
+                    keys.clear();
+                    let mut wsum = 0.0f64;
+                    for lj in lattice(j) {
+                        let jl = lj * step;
+                        for li in lattice(i) {
+                            let il = li * step;
+                            let (di, dj) = ((il - i) as f64, (jl - j) as f64);
+                            let g = smooth_axis_weight(di, sigma) * smooth_axis_weight(dj, sigma);
+                            if g <= 0.0 {
+                                continue;
+                            }
+                            let n = (jl.clamp(0, h - 1) * w + il.rem_euclid(w)) as usize;
+                            near.push((n, g));
+                            wsum += g;
+                            for key in this.cell(n).2 {
+                                keys.extend_from_slice(key);
+                            }
+                        }
+                    }
+                    for x in near.iter_mut() {
+                        x.1 /= wsum;
+                    }
+                    keys.sort_unstable();
+                    keys.dedup();
+                    let m = keys.len();
+                    // ys[q]: the smoothed height at keys[q].
+                    ys.clear();
+                    ys.resize(m, 0.0f64);
+                    for &(n, g) in near.iter() {
+                        for (q, &s) in keys.iter().enumerate() {
+                            ys[q] += g * this.height_at(n, s);
+                        }
+                    }
+                    let top0 = f64::from(own.0[0]);
+                    let mut hz: Vec<H> = Vec::with_capacity(k);
+                    // The class of every interval: the most weighted thickness in [s0, s1].
+                    win.clear();
+                    win.resize(m.saturating_sub(1), NO_CLASS);
+                    for q in 0..m.saturating_sub(1) {
+                        let (s0, s1) = (keys[q], keys[q + 1]);
+                        if ys[q + 1] >= ys[q] {
+                            continue;
+                        }
+                        weight.clear();
+                        for &(n, g) in near.iter() {
+                            let (tops, classes, nk) = this.cell(n);
+                            let Some(hh) =
+                                (0..tops.len()).find(|&x| nk[x][0] <= s0 && s1 <= nk[x][1])
+                            else {
+                                continue;
+                            };
+                            let th = g * (this.height_at(n, s0) - this.height_at(n, s1));
+                            match weight
+                                .iter_mut()
+                                .find(|e: &&mut (u8, f64)| e.0 == classes[hh])
+                            {
+                                Some(e) => e.1 += th,
+                                None => weight.push((classes[hh], th)),
+                            }
+                        }
+                        if let Some(&(class, _)) = weight
+                            .iter()
+                            .filter(|e| e.1 > 0.0)
+                            .max_by(|a, b| a.1.total_cmp(&b.1).then(b.0.cmp(&a.0)))
+                        {
+                            win[q] = class;
+                        }
+                    }
+                    // The regolith and loose sediment: they lie on the cell's own surface with
+                    // their mean thickness, wherever the mean surface is.
+                    let loose = |q: usize| {
+                        key::domain(keys[q + 1]) == 0
+                            || t.unconsolidated.get(usize::from(win[q])) == Some(&true)
+                    };
+                    // The unit that fills the height of a cell standing over the mean surface:
+                    // the thickest rock unit (a run of intervals of one class in one key domain,
+                    // by its mean thickness) that begins within `RIDGE_SEARCH_BLOCKS` of the
+                    // mean rock surface. The thinner beds over it keep their thickness and rise
+                    // with the ground.
+                    let mut fill: Option<(usize, f64)> = None;
+                    let mut depth = 0.0f64;
+                    let mut q = 0;
+                    while q + 1 < m && depth < f64::from(16 * RIDGE_SEARCH_BLOCKS) {
+                        if win[q] == NO_CLASS || loose(q) {
+                            q += 1;
+                            continue;
+                        }
+                        let (class, dom) = (win[q], key::domain(keys[q]));
+                        let (mut e, mut th) = (q, 0.0f64);
+                        while e + 1 < m
+                            && (win[e] == NO_CLASS
+                                || (win[e] == class
+                                    && key::domain(keys[e]) == dom
+                                    && key::domain(keys[e + 1]) == dom))
+                        {
+                            if win[e] != NO_CLASS {
+                                th += ys[e] - ys[e + 1];
+                            }
+                            e += 1;
+                        }
+                        if fill.is_none_or(|f| th > f.1) {
+                            fill = Some((q, th));
+                        }
+                        depth += th;
+                        q = e.max(q + 1);
+                    }
+                    let fill = fill.map(|f| f.0);
+                    // The loose cover laid on the cell's own surface so far (1/16 block), how far
+                    // the cell's rock surface stands over the mean one, and whether a rock
+                    // horizon has begun.
+                    let (mut cover, mut shift, mut rock) = (0.0f64, 0.0f64, false);
+                    for q in 0..m.saturating_sub(1) {
+                        let class = win[q];
+                        if class == NO_CLASS {
+                            continue;
+                        }
+                        let (s0, s1) = (keys[q], keys[q + 1]);
+                        let drape = !rock && loose(q);
+                        let rock_top = top0 - cover;
+                        if !drape && !rock {
+                            shift = (rock_top - ys[q]).max(0.0);
+                        }
+                        // Boundaries down to the fill unit's top rise with the ground.
+                        let lift = |b: usize| {
+                            if fill.is_some_and(|f| b <= f) {
+                                shift
+                            } else {
+                                0.0
+                            }
+                        };
+                        let (y0, y1) = if drape {
+                            (rock_top, rock_top - (ys[q] - ys[q + 1]))
+                        } else {
+                            (
+                                (ys[q] + lift(q)).min(rock_top),
+                                (ys[q + 1] + lift(q + 1)).min(rock_top),
+                            )
+                        };
+                        if y1 >= y0 {
+                            continue;
+                        }
+                        let top = if hz.is_empty() {
+                            own.0[0].into()
+                        } else if !drape && !rock {
+                            // The first rock unit starts at the cover's base.
+                            rock_top.round() as i32
+                        } else {
+                            y0.round() as i32
+                        };
+                        if drape {
+                            cover += y0 - y1;
+                        } else {
+                            rock = true;
+                        }
+                        match hz.last_mut() {
+                            Some(last)
+                                if last.class == u16::from(class)
+                                    && key::joins(last.key, [s0, s1]) =>
+                            {
+                                last.key[1] = s1
+                            }
+                            _ => hz.push(H {
+                                top,
+                                class: u16::from(class),
+                                key: [s0, s1],
+                            }),
+                        }
+                    }
+                    // Tops strictly falling, none at or below the floor.
+                    for x in 1..hz.len() {
+                        hz[x].top = hz[x].top.min(hz[x - 1].top - 1);
+                    }
+                    hz.retain(|x| x.top > this.min_y * 16);
+                    if hz.is_empty() {
+                        hz.push(H {
+                            top: own.0[0].into(),
+                            class: u16::from(own.1[0]),
+                            key: own.2[0],
+                        });
+                    }
+                    settle(&mut hz, this.min_y * 16, k, &t.min_blocks);
+                    write_cell(&hz, tc, cc, kc);
+                },
+            );
+        out
+    }
+
+    /// Random stacks for the smoothing's parity test: per cell a regolith, loose and rock units
+    /// of random thickness drawn from a few shared key spans (so neighbours share keys, as log
+    /// layers and pool slots do), some cells empty, surfaces of random height.
+    fn random_horizons(seed: u64, k: usize) -> Horizons {
+        let t = Tables::get();
+        let grid = GridDesc::for_planet("L1", 1024, 16).unwrap();
+        let n = grid.cells();
+        let mut rng = crate::sphere::SplitMix64::new(seed);
+        let names = [
+            "sand",
+            "clay",
+            "sandstone",
+            "shale",
+            "limestone",
+            "coal",
+            "schist",
+            "granite",
+        ];
+        let spans: Vec<[u16; 2]> = (0..12u16)
+            .map(|q| [4096 + 300 * q, 4096 + 300 * q + 200 + 50 * (q % 3)])
+            .collect();
+        let mut tops = vec![NO_TOP; n * k];
+        let mut classes = vec![NO_CLASS; n * k];
+        let mut keys = vec![[NO_KEY; 2]; n * k];
+        for c in 0..n {
+            if rng.below(17) == 0 {
+                continue; // an empty stack
+            }
+            let mut units = vec![keyed(
+                "saprolite",
+                5.0 + 60.0 * rng.next_f64() as f32,
+                key::REGOLITH,
+            )];
+            let mut q = rng.below(3) as usize;
+            while q < spans.len() && units.len() < 7 {
+                let name = names[rng.below(names.len() as u64) as usize];
+                units.push(keyed(name, 10.0 + 900.0 * rng.next_f64() as f32, spans[q]));
+                q += 1 + rng.below(3) as usize;
+            }
+            units.push(keyed("granite", 20_000.0, key::pool(6, 5, 0)));
+            bake_cell(
+                &units,
+                60.0 + 140.0 * rng.next_f64(),
+                -352,
+                639,
+                20.0,
+                &t.min_blocks,
+                &mut tops[c * k..(c + 1) * k],
+                &mut classes[c * k..(c + 1) * k],
+                &mut keys[c * k..(c + 1) * k],
+            );
+        }
+        Horizons {
+            grid,
+            k: k as u32,
+            min_y: -352,
+            tops,
+            classes,
+            keys,
+            tongues: (64, 0.15),
+            min_blocks: Vec::new(),
+        }
+    }
+
+    /// P1-17: the faster smoothing writes the same stacks as the old one, bit for bit, at the
+    /// σ the presets use (10) and below, on stacks of every depth, at 1, 2 and 8 threads.
+    #[test]
+    fn the_smoothing_matches_its_reference_exactly() {
+        let t = Tables::get();
+        for seed in 1..=3u64 {
+            for &k in &[8usize, 16] {
+                let hz = random_horizons(seed, k);
+                for &sigma in &[1.0, 2.5, 4.0, 10.0] {
+                    let want = smoothed_reference(&hz, sigma, &t);
+                    for threads in [1, 2, 8] {
+                        let pool = rayon::ThreadPoolBuilder::new()
+                            .num_threads(threads)
+                            .build()
+                            .unwrap();
+                        let got = pool.install(|| hz.smoothed(sigma, &t));
+                        assert_eq!(got.tops, want.tops, "tops seed {seed} K {k} σ {sigma}");
+                        assert_eq!(got.classes, want.classes, "classes seed {seed} σ {sigma}");
+                        assert_eq!(got.keys, want.keys, "keys seed {seed} σ {sigma}");
+                    }
+                    assert_ne!(want.tops, hz.tops, "σ {sigma} changed nothing");
+                }
+            }
+        }
+    }
+
+    /// P1-17: the tabulated spanning class is the first horizon a search of the stack finds,
+    /// for every interval, with spans that overlap, nest, repeat, are empty or reversed, and
+    /// stacks of none to eight horizons.
+    #[test]
+    fn the_spanning_table_is_the_first_match_search() {
+        let mut rng = crate::sphere::SplitMix64::new(11);
+        for _ in 0..2000 {
+            let mut keys: Vec<u16> = (0..rng.below(40)).map(|_| rng.below(600) as u16).collect();
+            keys.sort_unstable();
+            keys.dedup();
+            let n = rng.below(9) as usize;
+            let spans: Vec<[u16; 2]> = (0..n)
+                .map(|_| [rng.below(650) as u16, rng.below(650) as u16])
+                .collect();
+            let classes: Vec<u8> = (0..n).map(|_| rng.below(20) as u8).collect();
+            let iv = keys.len().saturating_sub(1);
+            let mut row = vec![NO_CLASS; iv];
+            spanning_classes(&classes, &spans, &keys, &mut row);
+            for (q, &got) in row.iter().enumerate() {
+                let (s0, s1) = (keys[q], keys[q + 1]);
+                let want = (0..n)
+                    .find(|&x| spans[x][0] <= s0 && s1 <= spans[x][1])
+                    .map_or(NO_CLASS, |x| classes[x]);
+                assert_eq!(got, want, "interval {q} keys {keys:?} spans {spans:?}");
+            }
+        }
+    }
+
+    /// The one-walk heights are `height_at` at every key, including keys above the first span,
+    /// inside spans, in gaps and below the last one, and on an empty stack.
+    #[test]
+    fn heights_at_sorted_keys_are_height_at() {
+        let hz = random_horizons(7, 8);
+        let mut ss: Vec<u16> = (0..200u16).map(|x| x * 40).collect();
+        ss.extend([4095, 4096, 4097, 7695, 7696, 65_000]);
+        ss.sort_unstable();
+        ss.dedup();
+        let mut out = vec![0.0; ss.len()];
+        for c in 0..hz.cells() {
+            hz.heights_at_sorted(c, &ss, &mut out);
+            for (&s, &y) in ss.iter().zip(&out) {
+                assert_eq!(
+                    y.to_bits(),
+                    hz.height_at(c, s).to_bits(),
+                    "cell {c} key {s}"
+                );
+            }
         }
     }
 

@@ -70,10 +70,20 @@ impl Dims {
         }
     }
 
-    /// The eight neighbours of `c` with their distances.
+    /// The eight neighbours of `c` with their distances: [`Dims::neighbour`] and
+    /// [`Dims::step_len`] for k = 0..8, with the cell's column and row found once instead of
+    /// once per neighbour (P1-17: the two integer divisions per neighbour were most of the cost
+    /// of the kernels that walk them).
     #[inline]
     pub fn neighbours(&self, c: usize) -> impl Iterator<Item = (usize, f64)> + '_ {
-        (0..8).filter_map(move |k| self.neighbour(c, k).map(|n| (n, self.step_len(k))))
+        let ij = (c % self.w, c / self.w);
+        (0..8).filter_map(move |k| {
+            let (di, dj, _) = OFFSETS[k];
+            let (ni, nj) =
+                deeptime_format::projection::neighbour(self.w, self.h, self.wrap_x, ij, (di, dj))?;
+            let n = nj * self.w + ni;
+            (n != c).then(|| (n, self.step_len(k)))
+        })
     }
 
     /// Distance between two neighbouring cells, metres (dx or dx·√2).
@@ -136,17 +146,86 @@ pub fn box_blur(d: &Dims, v: &mut [f64], r: usize, passes: usize) {
                 out
             })
             .collect();
-        for (i, col) in cols.iter().enumerate() {
-            for (j, &x) in col.iter().enumerate() {
-                v[j * w + i] = x;
+        // Back into the rows, rows in parallel (P1-17: the strided serial copy was a tenth of the
+        // blur's time on 8 threads).
+        v.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
+            for (x, col) in row.iter_mut().zip(&cols) {
+                *x = col[j];
             }
-        }
+        });
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// P1-17: the box blur gives the bits of the blur that copied its columns back serially.
+    #[test]
+    fn the_box_blur_equals_the_serial_copy_back() {
+        fn reference(d: &Dims, v: &mut [f64], r: usize, passes: usize) {
+            let (w, h) = (d.w, d.h);
+            let norm = 1.0 / (2 * r + 1) as f64;
+            for _ in 0..passes {
+                for row in v.chunks_mut(w) {
+                    let src = row.to_vec();
+                    let at = |i: i64| -> f64 {
+                        if d.wrap_x {
+                            src[i.rem_euclid(w as i64) as usize]
+                        } else {
+                            src[i.clamp(0, w as i64 - 1) as usize]
+                        }
+                    };
+                    let mut acc: f64 = (-(r as i64)..=r as i64).map(at).sum();
+                    for (i, x) in row.iter_mut().enumerate() {
+                        *x = acc * norm;
+                        acc += at(i as i64 + r as i64 + 1) - at(i as i64 - r as i64);
+                    }
+                }
+                let cols: Vec<Vec<f64>> = (0..w)
+                    .map(|i| {
+                        let src: Vec<f64> = (0..h).map(|j| v[j * w + i]).collect();
+                        let at = |j: i64| -> f64 {
+                            let j = if j < 0 {
+                                -j - 1
+                            } else if j >= h as i64 {
+                                2 * h as i64 - j - 1
+                            } else {
+                                j
+                            };
+                            src[j.clamp(0, h as i64 - 1) as usize]
+                        };
+                        let mut out = vec![0.0; h];
+                        let mut acc: f64 = (-(r as i64)..=r as i64).map(at).sum();
+                        for (j, o) in out.iter_mut().enumerate() {
+                            *o = acc * norm;
+                            acc += at(j as i64 + r as i64 + 1) - at(j as i64 - r as i64);
+                        }
+                        out
+                    })
+                    .collect();
+                for (i, col) in cols.iter().enumerate() {
+                    for (j, &x) in col.iter().enumerate() {
+                        v[j * w + i] = x;
+                    }
+                }
+            }
+        }
+        let mut rng = crate::sphere::SplitMix64::new(5);
+        for &(w, h, wrap, r) in &[
+            (50usize, 30usize, true, 3usize),
+            (7, 40, false, 5),
+            (1, 5, true, 2),
+        ] {
+            let d = Dims::new(w, h, 1000.0, wrap);
+            let v0: Vec<f64> = (0..w * h).map(|_| rng.next_f64() * 100.0 - 20.0).collect();
+            let (mut a, mut b) = (v0.clone(), v0);
+            box_blur(&d, &mut a, r, 2);
+            reference(&d, &mut b, r, 2);
+            let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+            assert_eq!(bits(&a), bits(&b), "{w}x{h}");
+        }
+    }
 
     #[test]
     fn neighbours_wrap_in_x_and_stop_at_the_rows() {
@@ -158,6 +237,25 @@ mod tests {
         assert!((d.dist(0, 5) - 10.0 * std::f64::consts::SQRT_2).abs() < 1e-12);
         let closed = Dims::new(4, 3, 10.0, false);
         assert_eq!(closed.neighbours(0).count(), 3);
+    }
+
+    /// `neighbours` is `neighbour` and `step_len` for k = 0..8, cell by cell, on grids that wrap
+    /// and do not, including the one- and two-cell-wide and one-row ones.
+    #[test]
+    fn neighbours_match_the_one_at_a_time_rule() {
+        for &(w, h) in &[(1, 1), (1, 5), (2, 5), (5, 1), (3, 3), (17, 9), (64, 2)] {
+            for wrap in [true, false] {
+                let d = Dims::new(w, h, 7.5, wrap);
+                for c in 0..d.cells() {
+                    let fast: Vec<(usize, u64)> =
+                        d.neighbours(c).map(|(n, l)| (n, l.to_bits())).collect();
+                    let slow: Vec<(usize, u64)> = (0..8)
+                        .filter_map(|k| d.neighbour(c, k).map(|n| (n, d.step_len(k).to_bits())))
+                        .collect();
+                    assert_eq!(fast, slow, "{w}x{h} wrap {wrap} cell {c}");
+                }
+            }
+        }
     }
 
     #[test]
