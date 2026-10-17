@@ -374,6 +374,23 @@ class EditorModelTest {
         assertTrue(Files.isDirectory(dir2));
     }
 
+    /** Ben, decisions log 2026-10-06, "One switch for both": the realistic choice greys out the present-day climate. */
+    @Test
+    void theRealisticChoiceTurnsThePresentDayClimateOff() {
+        EditorModel m = ready();
+        EditorFields.Field steering = EditorFields.byId("steering");
+        EditorFields.Field present = EditorFields.byId("present_climate");
+        assertTrue(m.toggle(steering), "steering is on for the Earth-like presets");
+        assertTrue(m.available(present));
+        m.setToggle(steering, false);
+        assertFalse(m.available(present), "free: no steering at all");
+        assertTrue(m.effectivePresetJson().contains("\"enabled\":false"), m.effectivePresetJson());
+        m.setChoice(present, "snowball");
+        assertTrue(m.choice(present).filter("snowball"::equals).isEmpty(), "not editable while free");
+        m.setToggle(steering, true);
+        assertTrue(m.available(present));
+    }
+
     static double stopOf(TimelapseModel t) {
         return Presets.stopMyr(Presets.parseObject(t.presetJson())).orElseThrow();
     }
