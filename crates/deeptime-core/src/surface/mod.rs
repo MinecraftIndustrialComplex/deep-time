@@ -59,6 +59,7 @@ pub mod carbonate;
 pub mod climate;
 pub mod detail;
 pub mod diffusion;
+pub mod erosion_bands;
 pub mod events;
 pub mod facies;
 pub mod fields;
@@ -80,6 +81,8 @@ pub mod volcanoes;
 pub mod weathering;
 pub mod young;
 
+#[cfg(test)]
+mod plateau_check;
 #[cfg(test)]
 mod tests;
 
@@ -176,6 +179,9 @@ pub struct Totals {
     pub diffusion_iterations: u64,
     pub sinks: u64,
     pub frames: u64,
+    /// Land erosion by process and elevation band (`erosion_bands`).
+    #[serde(default)]
+    pub by_band: erosion_bands::ErosionBands,
 }
 
 /// The surface's state, kept in `WorldState::surface` (checkpoints carry it; later stages read
@@ -220,6 +226,8 @@ struct Scratch {
     routing: routing::Routing,
     area: Vec<f64>,
     qin: Vec<f64>,
+    /// The critical slope's cut of the last solve (`spl::solve_cut`), m.
+    cut: Vec<f64>,
     kf: Vec<f64>,
     kd: Vec<f64>,
     weight: Vec<f32>,
@@ -244,6 +252,7 @@ impl Scratch {
             routing: routing::Routing::default(),
             area: vec![0.0; n],
             qin: vec![0.0; n],
+            cut: vec![0.0; n],
             kf: vec![0.0; n],
             kd: vec![0.0; n],
             weight: vec![1.0; n],
@@ -291,6 +300,12 @@ struct Parts {
     till: Vec<f32>,
     /// Glacial erosion (also in `eroded`).
     glacial_eroded: Vec<f32>,
+    /// Stream-power erosion, the critical slope's cut included (also in `eroded`).
+    spl_eroded: Vec<f32>,
+    /// The critical slope's share of `spl_eroded`.
+    threshold_cut: Vec<f32>,
+    /// Hillslope (and shoreline) diffusion's lowering (also in `eroded`).
+    diffusion_eroded: Vec<f32>,
     prov_marine: Vec<u16>,
 }
 
@@ -305,6 +320,9 @@ impl Parts {
             evaporite: vec![0.0; n],
             till: vec![0.0; n],
             glacial_eroded: vec![0.0; n],
+            spl_eroded: vec![0.0; n],
+            threshold_cut: vec![0.0; n],
+            diffusion_eroded: vec![0.0; n],
             prov_marine: vec![IN_SITU; n],
         }
     }
@@ -473,7 +491,8 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let cells = (c / r) * (c / r / 2);
     let log = StrataLog::bytes_per_cell(s.log_layers);
     let per_cell = retained_per_cell(&s)
-        + 12 * 8 // f64 working arrays
+        + 13 * 8 // f64 working arrays
+        + 3 * 4 // the step's erosion by process (`erosion_bands`)
         + log // the log's advected copy
         + 21 * 8; // the glaciers' ice state, loads and passes (`glacial.rs`)
     let frames = (p.run_myr() / s.frame_every_myr).ceil().max(1.0) as u64;
@@ -941,33 +960,48 @@ impl SurfaceStage {
                 area: &sc.area,
                 kf: &sc.kf_eff,
             };
-            let rep = spl::solve(&d, &sc.routing, &input, &spl_p, &mut sc.h_new, &mut sc.qin);
+            let rep = spl::solve_cut(
+                &d,
+                &sc.routing,
+                &input,
+                &spl_p,
+                &mut sc.h_new,
+                &mut sc.qin,
+                Some(&mut sc.cut),
+            );
             iterations += rep.iterations as u64;
             if sub + 1 == subs {
                 spl::families(&d, &sc.routing, &input, &fam, dts, &sc.h_new, &mut sc.mix);
             }
             {
                 // Cell by cell, so in parallel (P1-17).
-                let (kind, h, h_new, filled) = (&sc.kind, &sc.h, &sc.h_new, &sc.filled);
+                let (kind, h, h_new, filled, cut) =
+                    (&sc.kind, &sc.h, &sc.h_new, &sc.filled, &sc.cut);
                 parts
                     .eroded
                     .par_iter_mut()
+                    .zip(parts.spl_eroded.par_iter_mut())
+                    .zip(parts.threshold_cut.par_iter_mut())
                     .zip(parts.lake.par_iter_mut())
                     .zip(parts.fluvial.par_iter_mut())
                     .enumerate()
-                    .for_each(|(c, ((eroded, lake), fluvial))| {
-                        if kind[c] == BASE {
-                            return;
-                        }
-                        let dh = h_new[c] - h[c];
-                        if dh < 0.0 {
-                            *eroded += (-dh) as f32;
-                        } else if filled[c] - h[c] > spl::LAKE_TOL_M {
-                            *lake += dh as f32;
-                        } else {
-                            *fluvial += dh as f32;
-                        }
-                    });
+                    .for_each(
+                        |(c, ((((eroded, spl_eroded), threshold_cut), lake), fluvial))| {
+                            if kind[c] == BASE {
+                                return;
+                            }
+                            let dh = h_new[c] - h[c];
+                            *threshold_cut += cut[c] as f32;
+                            if dh < 0.0 {
+                                *eroded += (-dh) as f32;
+                                *spl_eroded += (-dh) as f32;
+                            } else if filled[c] - h[c] > spl::LAKE_TOL_M {
+                                *lake += dh as f32;
+                            } else {
+                                *fluvial += dh as f32;
+                            }
+                        },
+                    );
             }
             std::mem::swap(&mut sc.h, &mut sc.h_new);
             self.time("spl", started);
@@ -1182,13 +1216,15 @@ impl SurfaceStage {
                 parts
                     .eroded
                     .par_iter_mut()
+                    .zip(parts.diffusion_eroded.par_iter_mut())
                     .zip(parts.marine.par_iter_mut())
                     .zip(parts.fluvial.par_iter_mut())
                     .enumerate()
-                    .for_each(|(c, ((eroded, marine), fluvial))| {
+                    .for_each(|(c, (((eroded, diffusion_eroded), marine), fluvial))| {
                         let dd = (h[c] - before[c]) as f32;
                         if dd < 0.0 {
                             *eroded -= dd;
+                            *diffusion_eroded -= dd;
                         } else if kind[c] == BASE {
                             *marine += dd;
                         } else {
@@ -1219,6 +1255,19 @@ impl SurfaceStage {
             .into_par_iter()
             .map(|c| sc.h[c] - h_start[c])
             .collect();
+        st.totals.by_band.add(
+            &d,
+            &erosion_bands::StepErosion {
+                h0: &h_start,
+                sea_m: sea,
+                spl: &parts.spl_eroded,
+                threshold: &parts.threshold_cut,
+                glacial: &parts.glacial_eroded,
+                diffusion: &parts.diffusion_eroded,
+                net: &net,
+                dt_myr,
+            },
+        );
         let mut kind_step = vec![fields::KIND_NONE; n];
         let mut coal = vec![false; n];
         let w0_ref = p.weathering_max_m_myr * 1.0e-6;
@@ -1773,6 +1822,7 @@ pub fn summary(
     json!({
         "steps": st.totals.steps,
         "totals": st.totals,
+        "land_erosion_by_band_m_myr": st.totals.by_band.json(),
         "land_frac": land as f64 / n as f64,
         "max_elevation_m": peak,
         "sediment_km3": sediment * dx * dx / 1.0e9,

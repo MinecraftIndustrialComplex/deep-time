@@ -194,6 +194,23 @@ pub fn bake(
         ),
         &mapped.wetland,
     )?;
+    // The Köppen class the biome inputs were placed by, when it was decided on L2 (each cell's
+    // temperatures lapsed to its own height, P1-26): `climate/koppen` is the climate stage's L1
+    // class, which differs from it wherever an L1 cell holds both high and low ground (a plateau's
+    // edge, a mountain belt), so a check of biomes against classes reads this one.
+    if !mapped.class_l2.is_empty() {
+        out.layer(
+            desc(
+                "climate/koppen_l2",
+                DType::U8,
+                &l2,
+                1.0,
+                "koppen code index on L2, the biome inputs' class (notes.bake.climate.koppen_codes)",
+                Some(255.0),
+            ),
+            &mapped.class_l2,
+        )?;
+    }
     // The ice cover of the surface pass (`ice.rs`): blocks of snow and ice over glaciated ground,
     // from the climate's land-ice thickness when it has one (the deep-time climate's ice sheets and
     // glaciers), else from the height above the equilibrium line; without either there is none.
