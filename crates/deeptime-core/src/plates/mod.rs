@@ -525,6 +525,7 @@ impl PlatesStage {
         // The surface's parts of the feedback, for the gap budget (`gap_budget.rs`).
         let parts: Vec<Option<Field>> = [
             gap_budget::field::REBOUND,
+            gap_budget::field::WATER,
             gap_budget::field::FLEXURE,
             gap_budget::field::SPREAD,
         ]
@@ -559,14 +560,14 @@ impl PlatesStage {
         let mut wsum = vec![0.0f64; n];
         let mut zsum = vec![0.0f64; n];
         let mut msum = vec![0.0f64; n];
-        let mut psum = vec![[0.0f64; 3]; if parts.is_some() { n } else { 0 }];
+        let mut psum = vec![[0.0f64; 4]; if parts.is_some() { n } else { 0 }];
         for (c, l) in coupling.links().iter().enumerate() {
             let t = tris[l.tri as usize];
             let dz = f64::from(fb.data[c]);
             let dm = material.as_ref().map_or(dz, |m| f64::from(m.data[c]));
             let pc = parts
                 .as_ref()
-                .map(|p| [0, 1, 2].map(|k| f64::from(p[k].data[c])));
+                .map(|p| [0, 1, 2, 3].map(|k| f64::from(p[k].data[c])));
             for (&v, &w) in t.iter().zip(l.w.iter()) {
                 let w = f64::from(w);
                 if w > 0.0 {
@@ -575,7 +576,7 @@ impl PlatesStage {
                     zsum[v] += w * dz;
                     msum[v] += w * dm;
                     if let Some(pc) = pc {
-                        for k in 0..3 {
+                        for k in 0..4 {
                             psum[v][k] += w * pc[k];
                         }
                     }
@@ -625,7 +626,7 @@ impl PlatesStage {
                     mean(&|v| psum[v][k])
                 }
             };
-            gb.book_surface(&st.samples, &m, &part(0), &part(1), &part(2));
+            gb.book_surface(&st.samples, &m, &part(0), &part(1), &part(2), &part(3));
         }
         let applied = coupling.interpolate(mesh, |v| dz[v as usize]);
         world.fields.insert(
@@ -720,6 +721,7 @@ pub const MARGIN_EVERY_MYR: f64 = 10.0;
 
 /// The land's gap budget (`gap_budget.rs`, when on) is recorded this often, Myr (measurement
 /// only).
+// ledger: PLT-283 (game-choice: a reporting interval, read by no rule; agent, 2026-10-17).
 pub const GAP_SNAPSHOT_MYR: f64 = 50.0;
 
 /// Appends the continental margins of now ([`stats::margins`]) to the run's note

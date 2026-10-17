@@ -16,13 +16,16 @@
 //! sample's ocean share as well while it is oceanic crust). The surface stage's feedback,
 //! applied at the start of the step, is split by what moved the surface: the rock moved
 //! (erosion and deposition, which change the column's thickness too), its local isostatic
-//! rebound, the rest of the flexure, the plateau spreading, and the carry (whatever else the
+//! rebound, the local response to the rest of the change of sea water and ice over the column,
+//! the rest of the flexure, the plateau spreading, and the carry (whatever else the
 //! feedback holds: the semi-Lagrangian advection of the surface on L1, the L0/L1 sampling and the
 //! clamps). The surface stage writes the per-cell parts as fields ([`field`]) while the budget is
 //! on. A resampling blends the parts with the same weights as the column it blends, books the
 //! gap its blending adds (the gap is not linear in the pools) and the gap of the crust it accretes
 //! (thickness with no height). A sample born later (new sea floor) starts with its gap in the
-//! `birth` part.
+//! `birth` part. Each part also keeps what of it was made while the sample was oceanic crust
+//! (the ocean share), so a continental column's gap splits into what it brought from the ocean
+//! floor and what was made on the continent.
 //!
 //! The budget is off unless [`ON_ENV`] is set; it changes nothing the model does.
 
@@ -46,8 +49,11 @@ pub mod field {
     /// The local isostatic response to the step's erosion and deposition: the local isostasy's
     /// share and the flexure's local (Airy) answer to the same load.
     pub const REBOUND: &str = "surface/gap_rebound_m";
-    /// The rest of the flexure's change: regional bending, the plate model's roots, water, ice,
-    /// the unsolved residual.
+    /// The local isostatic response to the rest of the step's change of sea water and land ice
+    /// over the cell (the sea rising or falling, the surface carried or raised under it).
+    pub const WATER: &str = "surface/gap_water_m";
+    /// The rest of the flexure's change: the regional bending (the loads spread over the plate),
+    /// the plate model's roots, the moment a weakened plate releases, the unsolved residual.
     pub const FLEXURE: &str = "surface/gap_flexure_m";
     /// The plateau spreading's change (`spread.rs`).
     pub const SPREAD: &str = "surface/gap_spread_m";
@@ -63,6 +69,8 @@ pub enum Part {
     Erosion,
     /// Surface: the local isostatic rebound of that rock.
     Rebound,
+    /// Surface: the local isostatic response to the rest of the change of sea water and ice.
+    Water,
     /// Surface: the rest of the flexure.
     Flexure,
     /// Surface: the plateau spreading.
@@ -104,13 +112,14 @@ pub enum Part {
 }
 
 /// The number of parts.
-pub const PARTS: usize = 22;
+pub const PARTS: usize = 23;
 
 /// The parts' names, in order.
 pub const NAMES: [&str; PARTS] = [
     "birth",
     "erosion",
     "rebound",
+    "water",
     "flexure",
     "spread",
     "carry",
@@ -133,6 +142,7 @@ pub const NAMES: [&str; PARTS] = [
 ];
 
 /// The thickness bands, km (the crust bins of `deeptime run`, the two thickest merged).
+// ledger: PLT-283 (game-choice: reporting bands, read by no rule; agent, 2026-10-17).
 pub const EDGES_KM: [f64; 6] = [0.0, 30.0, 40.0, 55.0, 70.0, f64::INFINITY];
 
 /// The number of bands.
@@ -141,15 +151,17 @@ pub const BANDS: usize = EDGES_KM.len() - 1;
 /// The band of a thickness in m.
 pub fn band(thickness_m: f32) -> usize {
     let t = f64::from(thickness_m) / 1000.0;
-    (0..BANDS).find(|&b| t < EDGES_KM[b + 1]).unwrap_or(BANDS - 1)
+    (0..BANDS)
+        .find(|&b| t < EDGES_KM[b + 1])
+        .unwrap_or(BANDS - 1)
 }
 
 /// One sample's account.
 #[derive(Clone, Debug, PartialEq)]
 struct Track {
     parts: [f32; PARTS],
-    /// The part of the gap made while the sample was oceanic crust (its birth included).
-    ocean: f32,
+    /// Of each part, what was made while the sample was oceanic crust (its birth included).
+    ocean: [f32; PARTS],
     z: f32,
     iso: f32,
     continental: bool,
@@ -174,14 +186,19 @@ pub struct BandStock {
     pub gap: f64,
     /// The median gap, m.
     pub gap_p50: f64,
-    /// The mean ocean share, m.
+    /// The mean ocean share (the part of the gap made while the sample was oceanic crust), m.
     pub ocean: f64,
+    /// The mean ocean share of each part, m.
+    pub ocean_parts: [f64; PARTS],
     /// The mean of each part, m.
     pub parts: [f64; PARTS],
     /// Since the last snapshot: each process's change of the gap per column of the band, m/Myr
     /// (summed over the samples in the band after the process, over the samples in the band at
     /// the steps' ends).
     pub rate: [f64; PARTS],
+    /// The same for the surface: each process's change of the elevation, m/Myr per column (its
+    /// change of the Airy height is `lift - rate`).
+    pub lift: [f64; PARTS],
 }
 
 /// The budget at one time.
@@ -199,8 +216,8 @@ pub struct GapBudget {
     gravity: f64,
     track: Vec<Track>,
     /// Since the last snapshot: Σ change of gap per band and part, m (one sample's change once
-    /// per process), and the samples per band at the steps' ends.
-    flux: Vec<[f64; PARTS]>,
+    /// per process), then Σ change of elevation; and the samples per band at the steps' ends.
+    flux: Vec<[f64; 2 * PARTS]>,
     sample_steps: Vec<f64>,
     /// Times the sample count changed outside a resampling (the accounts were started again).
     pub restarts: u32,
@@ -208,10 +225,7 @@ pub struct GapBudget {
 }
 
 fn gap_of(s: &Sample, z_0: f64, gravity: f64) -> (f32, f32) {
-    (
-        s.elevation_m,
-        iso_height(&s.pools, z_0, gravity) as f32,
-    )
+    (s.elevation_m, iso_height(&s.pools, z_0, gravity) as f32)
 }
 
 impl GapBudget {
@@ -221,7 +235,7 @@ impl GapBudget {
             z_0,
             gravity,
             track: Vec::new(),
-            flux: vec![[0.0; PARTS]; BANDS],
+            flux: vec![[0.0; 2 * PARTS]; BANDS],
             sample_steps: vec![0.0; BANDS],
             restarts: 0,
             snapshots: Vec::new(),
@@ -240,7 +254,11 @@ impl GapBudget {
                 parts[Part::Birth as usize] = z - iso;
                 Track {
                     parts,
-                    ocean: if s.kind == CONTINENTAL { 0.0 } else { z - iso },
+                    ocean: if s.kind == CONTINENTAL {
+                        [0.0; PARTS]
+                    } else {
+                        parts
+                    },
                     z,
                     iso,
                     continental: s.kind == CONTINENTAL,
@@ -250,10 +268,11 @@ impl GapBudget {
     }
 
     /// Brings every sample's account up to date, `split` dividing its change (dz, the elevation's;
-    /// diso, the Airy height's) among the parts; the band sums take the same.
+    /// diso, the Airy height's) among the parts: the gap's (`d`) and the elevation's (`l`); the
+    /// band sums take the same.
     fn update<F>(&mut self, samples: &[Sample], split: F)
     where
-        F: Fn(usize, f64, f64, &mut [f64; PARTS]) + Sync,
+        F: Fn(usize, f64, f64, &mut [f64; PARTS], &mut [f64; PARTS]) + Sync,
     {
         if samples.len() != self.track.len() {
             self.restarts += 1;
@@ -267,25 +286,26 @@ impl GapBudget {
             .zip(samples.par_iter())
             .enumerate()
             .fold(
-                || vec![[0.0f64; PARTS]; BANDS],
+                || vec![[0.0f64; 2 * PARTS]; BANDS],
                 |mut acc, (v, (t, s))| {
                     let (z, iso) = gap_of(s, z_0, g);
                     let (dz, diso) = (f64::from(z - t.z), f64::from(iso - t.iso));
                     if dz == 0.0 && diso == 0.0 && t.continental == (s.kind == CONTINENTAL) {
                         return acc;
                     }
-                    let mut d = [0.0f64; PARTS];
-                    split(v, dz, diso, &mut d);
-                    let total: f64 = d.iter().sum();
+                    let (mut d, mut l) = ([0.0f64; PARTS], [0.0f64; PARTS]);
+                    split(v, dz, diso, &mut d, &mut l);
                     for (p, x) in t.parts.iter_mut().zip(&d) {
                         *p += *x as f32;
                     }
                     if !t.continental {
-                        t.ocean += total as f32;
+                        for (p, x) in t.ocean.iter_mut().zip(&d) {
+                            *p += *x as f32;
+                        }
                     }
                     if s.kind == CONTINENTAL && !s.is_hidden() {
                         let row = &mut acc[band(s.thickness_m)];
-                        for (a, x) in row.iter_mut().zip(&d) {
+                        for (a, x) in row.iter_mut().zip(d.iter().chain(&l)) {
                             *a += x;
                         }
                     }
@@ -296,7 +316,7 @@ impl GapBudget {
                 },
             )
             .reduce(
-                || vec![[0.0f64; PARTS]; BANDS],
+                || vec![[0.0f64; 2 * PARTS]; BANDS],
                 |mut a, b| {
                     for (ra, rb) in a.iter_mut().zip(&b) {
                         for (x, y) in ra.iter_mut().zip(rb) {
@@ -315,7 +335,10 @@ impl GapBudget {
 
     /// Books every sample's change of gap since the last booking to `part`.
     pub fn book(&mut self, samples: &[Sample], part: Part) {
-        self.update(samples, |_, dz, diso, d| d[part as usize] = dz - diso);
+        self.update(samples, |_, dz, diso, d, l| {
+            d[part as usize] = dz - diso;
+            l[part as usize] = dz;
+        });
     }
 
     /// Books the surface feedback just applied: per sample, the material it took (m, + laid
@@ -326,16 +349,25 @@ impl GapBudget {
         samples: &[Sample],
         material: &[f64],
         rebound: &[f64],
+        water: &[f64],
         flexure: &[f64],
         spread: &[f64],
     ) {
-        self.update(samples, |v, dz, diso, d| {
-            let (m, r, f, s) = (material[v], rebound[v], flexure[v], spread[v]);
+        self.update(samples, |v, dz, diso, d, l| {
+            let (m, r, w, f, s) = (material[v], rebound[v], water[v], flexure[v], spread[v]);
+            let carry = dz - m - r - w - f - s;
             d[Part::Erosion as usize] = m - diso;
-            d[Part::Rebound as usize] = r;
-            d[Part::Flexure as usize] = f;
-            d[Part::Spread as usize] = s;
-            d[Part::Carry as usize] = dz - m - r - f - s;
+            for (part, x) in [
+                (Part::Rebound, r),
+                (Part::Water, w),
+                (Part::Flexure, f),
+                (Part::Spread, s),
+                (Part::Carry, carry),
+            ] {
+                d[part as usize] = x;
+                l[part as usize] = x;
+            }
+            l[Part::Erosion as usize] = m;
         });
     }
 
@@ -344,7 +376,9 @@ impl GapBudget {
     pub fn resampled(&mut self, samples: &[Sample], traces: &[Option<Trace>]) {
         let (z_0, g) = (self.z_0, self.gravity);
         let old = std::mem::take(&mut self.track);
-        let rows: Vec<(Track, [f64; PARTS])> = samples
+        // Per new sample: its account, its change of gap by part and its blend's change of
+        // elevation (accretion leaves the elevation as it is).
+        let rows: Vec<(Track, [f64; PARTS], f64)> = samples
             .par_iter()
             .zip(traces.par_iter())
             .map(|(s, tr)| {
@@ -357,23 +391,26 @@ impl GapBudget {
                     parts[Part::Birth as usize] = z - iso;
                     let t = Track {
                         parts,
-                        ocean: if continental { 0.0 } else { z - iso },
+                        ocean: if continental { [0.0; PARTS] } else { parts },
                         z,
                         iso,
                         continental,
                     };
-                    return (t, d);
+                    return (t, d, 0.0);
                 };
                 let mut parts = [0.0f64; PARTS];
-                let mut ocean = 0.0f64;
-                let mut was = 0.0f64;
+                let mut ocean = [0.0f64; PARTS];
+                let (mut was, mut was_z) = (0.0f64, 0.0f64);
                 for k in 0..3 {
                     let o = &old[tr.tri[k] as usize];
                     for (p, x) in parts.iter_mut().zip(&o.parts) {
                         *p += tr.w[k] * f64::from(*x);
                     }
-                    ocean += tr.w[k] * f64::from(o.ocean);
+                    for (p, x) in ocean.iter_mut().zip(&o.ocean) {
+                        *p += tr.w[k] * f64::from(*x);
+                    }
                     was += tr.w[k] * f64::from(o.z - o.iso);
+                    was_z += tr.w[k] * f64::from(o.z);
                 }
                 let blended = f64::from(z) - iso_height(&tr.pools, z_0, g);
                 d[Part::ResampleBlend as usize] = blended - was;
@@ -382,26 +419,30 @@ impl GapBudget {
                     *p += x;
                 }
                 if !continental {
-                    ocean += d.iter().sum::<f64>();
+                    for (p, x) in ocean.iter_mut().zip(&d) {
+                        *p += x;
+                    }
                 }
                 let t = Track {
                     parts: parts.map(|x| x as f32),
-                    ocean: ocean as f32,
+                    ocean: ocean.map(|x| x as f32),
                     z,
                     iso,
                     continental,
                 };
-                (t, d)
+                (t, d, f64::from(z) - was_z)
             })
             .collect();
-        for ((_, d), s) in rows.iter().zip(samples) {
+        for ((_, d, lift), s) in rows.iter().zip(samples) {
             if s.kind == CONTINENTAL && !s.is_hidden() {
-                for (a, x) in self.flux[band(s.thickness_m)].iter_mut().zip(d) {
+                let row = &mut self.flux[band(s.thickness_m)];
+                for (a, x) in row.iter_mut().zip(d) {
                     *a += x;
                 }
+                row[PARTS + Part::ResampleBlend as usize] += lift;
             }
         }
-        self.track = rows.into_iter().map(|(t, _)| t).collect();
+        self.track = rows.into_iter().map(|(t, _, _)| t).collect();
     }
 
     /// The end of a step: counts the samples in each band (the denominator of the rates).
@@ -428,8 +469,10 @@ impl GapBudget {
                 st.z += f64::from(t.z);
                 st.iso += f64::from(t.iso);
                 st.gap += f64::from(t.z - t.iso);
-                st.ocean += f64::from(t.ocean);
                 for (a, x) in st.parts.iter_mut().zip(&t.parts) {
+                    *a += f64::from(*x);
+                }
+                for (a, x) in st.ocean_parts.iter_mut().zip(&t.ocean) {
                     *a += f64::from(*x);
                 }
                 gaps[b].push(f64::from(t.z - t.iso));
@@ -440,18 +483,22 @@ impl GapBudget {
             st.z /= n;
             st.iso /= n;
             st.gap /= n;
-            st.ocean /= n;
             st.parts.iter_mut().for_each(|x| *x /= n);
+            st.ocean_parts.iter_mut().for_each(|x| *x /= n);
+            st.ocean = st.ocean_parts.iter().sum();
             let g = &mut gaps[b];
             g.sort_by(f64::total_cmp);
             st.gap_p50 = g.get(g.len() / 2).copied().unwrap_or(f64::NAN);
             let per = self.sample_steps[b].max(1.0) * dt_myr;
-            for (r, f) in st.rate.iter_mut().zip(&self.flux[b]) {
+            for (r, f) in st.rate.iter_mut().zip(&self.flux[b][..PARTS]) {
+                *r = f / per;
+            }
+            for (r, f) in st.lift.iter_mut().zip(&self.flux[b][PARTS..]) {
                 *r = f / per;
             }
         }
         self.snapshots.push(Snapshot { t_myr, bands });
-        self.flux = vec![[0.0; PARTS]; BANDS];
+        self.flux = vec![[0.0; 2 * PARTS]; BANDS];
         self.sample_steps = vec![0.0; BANDS];
     }
 
@@ -486,7 +533,7 @@ impl GapBudget {
                         .join("/")
                 };
                 out += &format!(
-                    "\ngap_stock t={:.0} band={}-{}km n={:.3} z={:.0} iso={:.0} gap={:.0} gap_p50={:.0} ocean={:.0} parts={}",
+                    "\ngap_stock t={:.0} band={}-{}km n={:.3} z={:.0} iso={:.0} gap={:.0} gap_p50={:.0} ocean={:.0} parts={} ocean_parts={}",
                     snap.t_myr,
                     EDGES_KM[b],
                     EDGES_KM[b + 1].min(999.0),
@@ -497,13 +544,15 @@ impl GapBudget {
                     st.gap_p50,
                     st.ocean,
                     fmt(&st.parts, 0),
+                    fmt(&st.ocean_parts, 0),
                 );
                 out += &format!(
-                    "\ngap_rate t={:.0} band={}-{}km m_per_myr={}",
+                    "\ngap_rate t={:.0} band={}-{}km m_per_myr={} lift_m_per_myr={}",
                     snap.t_myr,
                     EDGES_KM[b],
                     EDGES_KM[b + 1].min(999.0),
                     fmt(&st.rate, 2),
+                    fmt(&st.lift, 2),
                 );
             }
         }
@@ -553,15 +602,28 @@ mod tests {
             &[0.0, 800.0, 0.0],
             &[0.0; 3],
             &[0.0; 3],
+            &[0.0; 3],
         );
         let t = &b.track[1];
         let erosion = t.parts[Part::Erosion as usize] + t.parts[Part::Rebound as usize];
-        assert!((f64::from(erosion) - (-200.0 + 1000.0 / F)).abs() < 1.0, "{erosion}");
+        assert!(
+            (f64::from(erosion) - (-200.0 + 1000.0 / F)).abs() < 1.0,
+            "{erosion}"
+        );
         assert!(t.parts[Part::Carry as usize].abs() < 0.5);
         // The oceanic sample's change goes to its ocean share as well.
         samples[2].elevation_m -= 100.0;
         b.book(&samples, Part::PlateSurface);
-        assert!((b.track[2].ocean - (b.track[2].z - b.track[2].iso)).abs() < 1.0);
+        let ocean: f32 = b.track[2].ocean.iter().sum();
+        assert!((ocean - (b.track[2].z - b.track[2].iso)).abs() < 1.0);
+        assert_eq!(
+            b.track[2].ocean[Part::PlateSurface as usize],
+            b.track[2].parts[Part::PlateSurface as usize]
+        );
+        assert_eq!(
+            b.track[1].ocean, [0.0; PARTS],
+            "a continental sample has no ocean share"
+        );
         assert!(b.worst_residual_m() < 1.0);
         // A resampling onto two samples: one blended half and half from the first two, one new.
         let mut blended = samples[0];
