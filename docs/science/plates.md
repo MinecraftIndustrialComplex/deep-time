@@ -614,3 +614,162 @@ to 70 km) at the height isostasy gives it.
 
 **Limits.**
 - Which of spreading and foundering comes first, and the reach, are the model's.
+
+## The eclogite root and whole-column isostasy (plate task 7, 2026-10-06 to 2026-10-16)
+
+Ben's choice of 2026-10-06 (decisions log, "Fix isostasy first, then land (Recommended)"): thick
+continental crust gets a dense root before task 7 lands, so that a 50 km crust stands near the
+Urals' height rather than 3.2 km. Ledger PLT-278 to PLT-282, ISO-043 and ISO-046; sources in the
+bibliography, "The eclogite root and whole-column isostasy". Read by a research sub-agent on
+2026-10-05; the rows say which were read in full.
+
+**What happens on Earth.**
+- *Height against thickness.* Hyndman & Currie (2011, full text) measure 131 ± 12 m of elevation
+  per km of crust in the Cordillera and 141 ± 27 m/km in stable areas. Airy isostasy gives
+  (ρ_m − ρ_c) / ρ_m of height per unit of crust: 142 m/km with the continental crust's mean density,
+  2,830 kg/m³ (Christensen & Mooney 1995, abstract), and 182 m/km with the upper crust's 2,700,
+  which the model used for every change of a column's thickness until 2026-10-06.
+- *Eclogite.* Mafic lower crust carried past about 1.5–2.0 GPa (about 60 km under southern
+  Tibet, Wittlinger et al. 2009) can turn to eclogite, 3,450 kg/m³, denser than the mantle. Whether it does depends on temperature, fluids and
+  time, not the pressure alone: the Indian lower crust under southern Tibet, below about 60 km, is
+  about 30 % eclogitized and gravitationally stable (Shi F. et al. 2018 and Shi D. et al. 2020,
+  full texts). Other readings of the same layer differ (Wittlinger et al. 2009: fully eclogitic;
+  Krystopowicz & Currie 2013: 20–90 % for the density contrasts observed).
+- *The Urals.* An old orogen keeps 50–58 km of crust (Carbonell et al. 1996 and 2000, abstracts)
+  at a mean altitude of 0.5–0.8 km (Artyushkov et al. 2000, snippet only). The sources put the low
+  stand down to dense mafic rock at the base of the crust that is not eclogite (Stadtlander,
+  Mechie & Schulze 1999, abstract; Leech 2001, snippet only) and to the cold lithosphere of old
+  orogens: at equal crustal thickness, the thermal state moves elevation by about 1,600 m
+  (Hyndman & Currie 2011, full text).
+
+**What the model does now.**
+1. *Whole-column isostasy* (PLT-281). When crust is stacked onto a column, spread from it or
+   founders (belts, collapse, the thickest-crust limit), and under a cordillera's root (PLT-051),
+   its height changes by the thickness change over ρ_m / (ρ_m − ρ̄_c) = 7.0, not 5.5. Erosion
+   from the top of a column keeps the upper crust's 5.5 (ISO-008): the rock it removes is upper
+   crust.
+2. *The eclogite root* (PLT-278 to PLT-280, the rule PLT-282). The column's mafic pools (mafic
+   plutonic and mafic volcanic, which the model keeps at the bottom) lying deeper than 1.5 GPa
+   (54 km at Earth's gravity) are eclogite at a share of 0.3; a root of E metres lowers the surface
+   by E × (3,450 − 2,830) / 3,300. The root stays crust: at 30 % it is lighter than the mantle.
+3. *The surface flexure* (ISO-046) infers the crust thickened behind a plate uplift with the same
+   mean density, so the thickening it passes to the flexed plate is the one the plate model made
+   (7.0 times the uplift, not 5.5).
+
+**What the root can and cannot do.** The model's 35 km continental column stands at about 525 m
+(the middle of `continent_elevation_m`). A 50 km column now stands at about 2.66 km (3.2 km
+before): it has no root, the eclogite depth being 54 km. A 70 km column made by doubling the
+standard one (9 km of mafic pools) has a 2.7 km root that pulls it down by about 0.5 km, to about
+5.0 km. So the root is small at the thicknesses the model holds; the whole-column density does
+most of the work. The Urals' height at 50 km needs the dense non-eclogite base and the cold
+lithosphere, and the model carries neither (one mean crustal density for every column, no
+lithosphere temperature). The 1 km target is not reached, and nothing was tuned to reach it.
+
+**Measured** (`earthlike_quick_16k`; reported against Earth, not tuned; mean [lowest, highest]
+of the runs). Hypsometry at 500 Myr, seeds 1–3, both starts (`tools/review/force-balance-variants.sh
+… final.txt 500 1,2,3 … hyps`, summarized by `tools/review/p1-17-hyps.py`). Earth's line is the
+project's reading of a relief grid (HYP-001 to HYP-021; its median not confirmed, claims.md):
+
+| | Land | Median land height, m | Land height, 90th pct, m | Land above 2 km (of the land) | Continental crust (of the planet) | Of it dry |
+|---|---|---|---|---|---|---|
+| Earth | 0.289 (0.18–0.30 over the Phanerozoic) | 427 | 2,022 | 0.102 | about 0.41 (shelves included) | about 0.70 |
+| Master, 2026-10-05 | 0.184 | 414 | n/a | 0.083 | 0.382 | 0.46 |
+| Branch before the root, 2026-10-05 | 0.183 | 900 | n/a | 0.25 | 0.299 | 0.57 |
+| With the root and the whole column (2026-10-16) | 0.195 [0.124, 0.231] | 842 [659, 1,016] | 3,427 [2,746, 4,011] | 0.243 [0.190, 0.284] | 0.292 [0.234, 0.314] | 0.62 |
+| Final: also the surface flexure at 2,830 | 0.191 [0.145, 0.214] | 745 [509, 1,058] | 2,907 [2,035, 4,196] | 0.187 [0.103, 0.274] | 0.307 [0.262, 0.335] | 0.58 |
+
+The surface flexure feeds back into the plates (`surface/feedback_applied`), so the last two rows
+are different planets, not one planet with one change; the spread between runs (land above 2 km
+0.10 to 0.27 in the final row) is as large as the change between them.
+
+**Plate-check at 1000 Myr** (the final code; seeds 1–4, both starts;
+`tools/review/force-balance-variants.sh … final.txt 1000 1,2,3,4 … ck`): 31 of 45 targets met (31
+with the root before the flexure change, 30 on 2026-10-05). The 14 that fail are the same with and
+without the flexure change: collisions per 100 Myr 0.89 (target 2–6); continental crust at its
+lowest step 0.25 (at least 0.37); active share of the continental margin 0.46 (0.25–0.40); slab ÷
+free plate speed 1.82 (at least 2.5) and the rank correlation 0.45 (at least 0.65); rotation change
+per step, 90th percentile, 25.2 % (at most 20); ocean floor older than 250 Myr 3.55 % (at most 3);
+supercontinent tenure 53 Myr (100–300) and period 380 Myr (400–800); subducting share of the plate
+boundary 52.6 % (15–25); oceanic arc crest 1,107 m (at most 1,000); the wedge 9 km wide (100–350)
+and the foredeep 41 km wide and 113 m deep (150–450 km, 2–7 km). Pooling the supercontinent
+episodes of the eight runs (`force-balance-series.py`): 2.5 assemblies a run, tenure 48 Myr, period
+267 Myr (45 and 230 with the root alone, 46 and 213 on 2026-10-05). At 1000 Myr the same runs have
+land 0.192 [0.170, 0.221], median land height 1,004 m [797, 1,274], 90th percentile 3,471 m, land
+above 2 km 0.265 [0.182, 0.346] of the land, sea depth median 3,264 m (Earth 4,062), continental
+crust 0.317 of the planet, 0.54 of it dry. The crust budget at 1000 Myr, over the whole run:
+continental arcs 11.2 km³ a year, island arcs 0.18, foundered 12.4, collapse 7.9; 8.4 billion km³
+of continental crust at the end.
+
+**The crust budget against Earth** (km³ a year, Earth-normalized, mean of the six final 500 Myr
+runs; new run-summary globals `plates/arc_continental_km3`, `plates/arc_oceanic_km3` and
+`plates/continental_volume_km3`; Earth from Stern & Scholl 2010, full text):
+
+| | Model, 500 Myr | Earth today |
+|---|---|---|
+| Added at continental arcs (arc magma and the cordillera's root) | 8.5 | about 1.0 |
+| Added at oceanic (island) arcs | 0.14 | about 1.5 |
+| Continental crust crossing collision fronts; kept in the belt | 14.5; 13.3 | n/a |
+| Foundered beyond the thickest column | 7.0 | collision zones lose about 0.7, deeply subducted crust about 0.3 of it |
+| Moved by orogenic collapse | 4.7 | n/a |
+| Continental crust at the end, km³ | 7.3 billion | n/a |
+
+So the model's continental crust is the balance of two rates neither of which is Earth's: the
+cordillera roots create crust about 8 times faster than Earth's continental arcs (the root is 7.0
+times an uplift calibrated to the arcs' height, PLT-048 and PLT-051, not crust shortened or a
+sourced magma rate), and collisions
+destroy it about 10 times faster than Earth's collision zones. Island arcs add a tenth of Earth's
+rate (PLT-045). The model ends with about 7.3 billion km³ over 0.31 of the planet, a mean of about
+47 km; Earth holds a similar volume over about 0.41 at about 40 km (both Earth figures from
+memory). A fifth of the model's continental samples are 55–70 km thick (`crust_bins` in the run
+summary); on Earth crust that thick is confined to the active orogens (from memory). There is
+not too little crust.
+
+**The land share: height has fallen behind thickness.** The run summaries' `crust_bins` give each
+thickness band's share of the continental samples and its median elevation in the plate model. At
+500 Myr (the six final runs, lowest to highest run):
+
+| Crust thickness | Share of the continental samples | Median elevation, m | The model's own Airy height at the band's middle, m |
+|---|---|---|---|
+| 30–40 km | 0.22–0.32 | −72 to +51 | about 510 |
+| 40–55 km | 0.30–0.39 | −71 to +763 | about 2,300 |
+| 55–70 km | 0.17–0.28 | 779 to 2,281 | about 4,200 (the root included) |
+
+The Airy height is the one the collapse already uses (`collapse::iso_height`: 525 m at the normal
+35.1 km column, plus the extra thickness over 7.0, less the eclogite root's pull). So most of the
+continental crust stands half a kilometre to three kilometres below the height its own thickness
+holds it at, near sea level and half flooded (0.58 of the continental crust dry). At 1000 Myr
+(eight runs) it is further behind: 30–40 km at −859 to −71 m, 40–55 km (0.35–0.45 of the samples)
+at −191 to +61 m, 55–70 km (0.25–0.38) at 394 to 1,469 m. At its Airy height almost every
+continental column would be dry and the land would be near the crust's 0.31 of the planet. So the
+land share is set by where the surface has drifted, not by how much crust there is. Which processes
+lower a column's surface faster than they thin it was not measured. Candidates: the surface stage's
+erosion, which lowers the surface by the rock it removes and gives height back only through the
+flexure (`surface/flexure.rs`); the deposits that the surface feeds back as crust at sea level; and
+the processes that change height and thickness by separate rules (the transition, the trench,
+thermal subsidence). The high ground is partly the same effect seen from the other side: land
+above 2 km is 0.19 of the land but about 0.036 of the planet against Earth's 0.029 (0.10 of 0.289),
+so most of its excess over Earth's share is the small land beneath it.
+
+**What is still off.**
+- *The land share.* 0.19 at 500 and at 1000 Myr, inside Earth's Phanerozoic range at its bottom
+  and a third below today's 0.29, with the continental crust at 0.31 of the planet against about
+  0.41. Most continental crust stands 0.5–3 km below its own Airy height, near sea level (above).
+  Finding which process takes the height and not the crust is the next step for the land.
+- *The high ground.* Land above 2 km is 0.19 of the land at 500 Myr and 0.27 at 1000 (Earth 0.10),
+  and the median land 745 m and 1,004 m (Earth 427 m). As a share of the planet it is about 0.036
+  at 500 Myr against Earth's 0.029: the land beneath it is too small. At 1000 Myr it is 0.05, and
+  the share of continental samples at 55–70 km has grown from 0.17–0.28 to 0.25–0.38.
+- *The Urals.* By the model's isostasy a 50 km column stands about 2.7 km, not 0.5–0.8 km.
+  Reaching it from sources needs a lithosphere temperature (old orogens cold and low, young ones
+  hot and high; Hyndman & Currie 2011's 1,600 m) or a lower-crust density per column. Neither
+  exists in the model.
+- *The crust budget.* Creation at cordilleras and destruction at collisions are both unsourced and
+  both many times Earth's; island arcs a tenth of Earth's. Putting all three on sourced rates is
+  one change (each alone moves the land the wrong way).
+
+**Limits.**
+- One eclogite share for every column, at once: the reaction's dependence on temperature, fluids
+  and time is not modelled (PLT-280).
+- The mafic pools stand for the lower crust; the model has no lower-crust density of its own.
+- The root's pull applies only where a column's thickness changes as a whole (belts, collapse,
+  foundering); a column thickened by arc magma or the cordillera's root carries none.

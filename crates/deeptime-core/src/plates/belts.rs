@@ -835,9 +835,12 @@ mod tests {
             assert!(s.crossed_km2 > 0.0 && s.thickness_m >= 35_099.0, "{s:?}");
             heights.push(s.height_m);
         }
-        // Step by step: every step adds, and the first step built a small part of it.
+        // Step by step: every step adds, and the first step built a small part of it (under a
+        // fifth: since whole-column isostasy and the eclogite root, 2026-10-06, each step's rise is
+        // 5.5 / 7.0 of what it was or less, and the first step's 608 m is 0.16 of the twelfth's
+        // 3,866 m).
         assert!(heights.windows(2).all(|w| w[1] > w[0]), "{heights:?}");
-        assert!(heights[0] < 0.15 * heights[11], "{heights:?}");
+        assert!(heights[0] < 0.2 * heights[11], "{heights:?}");
         let belt = &st.contacts[0].collision.as_ref().unwrap().belt;
         assert!(belt.peak_height_m > 1500.0, "{}", belt.peak_height_m);
         // The shape: along the front (6,670 km of it) and narrow across it.

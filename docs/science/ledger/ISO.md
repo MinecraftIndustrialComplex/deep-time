@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [isostasy-and-height-limit.md](../isostasy-and-height-limit.md). Extraction notes with flags: [extraction-notes/ERO.md](../extraction-notes/ERO.md).
 
-Rows: 67 (2 further rows are `merged` into other rows and not counted: see the status table in claims.md). By status: `verified` 3, `cited-unverified` 8, `abstract-only` 6, `calibrated` 6, `game-choice` 14, `uncited` 30.
+Rows: 67 (2 further rows are `merged` into other rows and not counted: see the status table in claims.md). By status: `verified` 3, `cited-unverified` 9, `abstract-only` 7, `calibrated` 6, `game-choice` 14, `uncited` 28 (ISO-043 and ISO-046 sourced 2026-10-06, plate task 7).
 
 Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent. Nothing here has been checked against its source. ISO-040 to ISO-069 (lithospheric flexure) were added with that feature on 2026-10-02 (ISO-068, ISO-069 and the changes to ISO-055 and ISO-056 in its follow-up the same day); their status says how each was read. Paths are relative to the repository root; line numbers are left out on purpose.
 
