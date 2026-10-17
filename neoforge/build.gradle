@@ -40,7 +40,8 @@ configurations {
     }
 }
 dependencies {
-    // By Modrinth project id: the slug was renamed (toroidal-world, now exotic-worlds; the old one 404s since 2026-10)
+    // By Modrinth's project id: the project was renamed (slug toroidal-world, now exotic-worlds,
+    // "Exotic Worlds (Toroidal World)"), and Modrinth's maven no longer answers the old slug.
     twBundle "maven.modrinth:CdjG7l5z:${tw_version}"
 }
 
