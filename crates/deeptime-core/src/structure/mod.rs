@@ -486,6 +486,11 @@ impl StructureStage {
                     let mut col = crate::surface::strata_log::ColumnMut { layers, count };
                     metamorphism::metamorphose(&mut col, f64::from(regolith[c]), &th, paths)
                 })
+                // Summed in cell order: rayon's parallel sum adds in an order that depends on
+                // work stealing, so the total's last digits differed between two runs of one
+                // planet (tests/history_cap.rs, capped against unlimited).
+                .collect::<Vec<f64>>()
+                .iter()
                 .sum()
         };
         let cell_km2 = dx * dx / 1.0e6;
