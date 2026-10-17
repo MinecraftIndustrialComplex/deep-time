@@ -279,7 +279,13 @@ references, not targets).
 | `co2_factor_max` | see §8.5 | 1–10 | F |
 
 A preset without a `steering` section runs unsteered (the core's default is off; tests and the
-plates and pipeline presets). The four built-in Earth-like presets carry it on.
+plates presets). The four built-in Earth-like presets carry it on.
+
+**The realistic choice is no steering at all** (Ben, decisions log 2026-10-06, "One switch for
+both"): with `enabled: false` the climate stage also runs `present_climate` as natural, so the
+present-day CO₂ adjustment of the last 100 kyr is off too and the history ends as simulated. The
+editor puts the present-day climate under Steer the end and greys it out while steering is off. A
+preset without the section keeps its own `present_climate`.
 
 ### 7.6 Later: scenario forcing (not built)
 
