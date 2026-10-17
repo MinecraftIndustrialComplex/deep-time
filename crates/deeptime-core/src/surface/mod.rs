@@ -1463,6 +1463,7 @@ impl SurfaceStage {
                 plate_id: &pf.plate_id,
                 ice_m: ice.as_deref(),
                 rock_share: p.isostasy,
+                parts: budget,
             };
             if budget {
                 answers = Some(flexure::local_answers(
@@ -1497,14 +1498,25 @@ impl SurfaceStage {
             (&h_eroded, &h_before_spread, &h_spread, &answers)
         {
             use crate::plates::gap_budget::field as gap;
+            // The flexure's change split by what it answers: the step's loads (their local
+            // answers apart), the roots already in the elevation, and the rest (moment released,
+            // the last solve's unfinished part). A step without a solve moved nothing.
+            let split = flexed
+                .as_ref()
+                .filter(|o| o.loads_m.len() == n && o.roots_m.len() == n);
+            let loads = |c: usize| split.map_or(0.0, |o| f64::from(o.loads_m[c]));
+            let roots = |c: usize| split.map_or(0.0, |o| f64::from(o.roots_m[c]));
             let rebound = (0..n).map(|c| (h_before_spread[c] - h_eroded[c] + local[c].0) as f32);
             let water = (0..n).map(|c| local[c].1 as f32);
-            let flex = (0..n).map(|c| (sc.h[c] - h_spread[c] - local[c].0 - local[c].1) as f32);
+            let flex = (0..n).map(|c| (loads(c) - local[c].0 - local[c].1) as f32);
+            let rest = (0..n).map(|c| (sc.h[c] - h_spread[c] - loads(c) - roots(c)) as f32);
             let spread = (0..n).map(|c| (h_spread[c] - h_before_spread[c]) as f32);
             for (name, data) in [
                 (gap::REBOUND, rebound.collect::<Vec<f32>>()),
                 (gap::WATER, water.collect()),
                 (gap::FLEXURE, flex.collect()),
+                (gap::ROOTS, (0..n).map(|c| roots(c) as f32).collect()),
+                (gap::FLEX_REST, rest.collect()),
                 (gap::SPREAD, spread.collect()),
             ] {
                 world.fields.insert(

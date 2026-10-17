@@ -17,9 +17,11 @@
 //! applied at the start of the step, is split by what moved the surface: the rock moved
 //! (erosion and deposition, which change the column's thickness too), its local isostatic
 //! rebound, the local response to the rest of the change of sea water and ice over the column,
-//! the rest of the flexure, the plateau spreading, and the carry (whatever else the
-//! feedback holds: the semi-Lagrangian advection of the surface on L1, the L0/L1 sampling and the
-//! clamps). The surface stage writes the per-cell parts as fields ([`field`]) while the budget is
+//! the regional part of the flexure's answer to those loads (the plate spreading them), the
+//! flexure's bending of the roots the plate model and the spreading put in the elevation, the
+//! rest of the flexure (the moment a weakened plate releases, the last solve's unfinished part),
+//! the plateau spreading, and the carry (whatever else the feedback holds: the semi-Lagrangian
+//! advection of the surface on L1, the L0/L1 sampling and the clamps). The surface stage writes the per-cell parts as fields ([`field`]) while the budget is
 //! on. A resampling blends the parts with the same weights as the column it blends, books the
 //! gap its blending adds (the gap is not linear in the pools) and the gap of the crust it accretes
 //! (thickness with no height). A sample born later (new sea floor) starts with its gap in the
@@ -52,9 +54,16 @@ pub mod field {
     /// The local isostatic response to the rest of the step's change of sea water and land ice
     /// over the cell (the sea rising or falling, the surface carried or raised under it).
     pub const WATER: &str = "surface/gap_water_m";
-    /// The rest of the flexure's change: the regional bending (the loads spread over the plate),
-    /// the plate model's roots, the moment a weakened plate releases, the unsolved residual.
+    /// The regional part of the flexure's answer to the step's loads (rock, sea water, ice): its
+    /// answer less the local answers of [`REBOUND`] and [`WATER`], what the plate's strength
+    /// spreads over its neighbours.
     pub const FLEXURE: &str = "surface/gap_flexure_m";
+    /// The flexure's answer to the roots the plate model's uplift and the plateau spreading put
+    /// in the elevation (`flexure.rs`: the plate bends under the root it resolves).
+    pub const ROOTS: &str = "surface/gap_roots_m";
+    /// The rest of the flexure's change: the moment a weakened plate releases and the last
+    /// solve's unfinished part (and the split solves' own residuals).
+    pub const FLEX_REST: &str = "surface/gap_flex_rest_m";
     /// The plateau spreading's change (`spread.rs`).
     pub const SPREAD: &str = "surface/gap_spread_m";
 }
@@ -71,8 +80,12 @@ pub enum Part {
     Rebound,
     /// Surface: the local isostatic response to the rest of the change of sea water and ice.
     Water,
-    /// Surface: the rest of the flexure.
+    /// Surface: the regional part of the flexure's answer to the step's loads.
     Flexure,
+    /// Surface: the flexure's bending of the plate model's and the spreading's roots.
+    Roots,
+    /// Surface: the rest of the flexure (moment released, unfinished solve).
+    FlexRest,
     /// Surface: the plateau spreading.
     Spread,
     /// Surface: the rest of the feedback (advection on L1, sampling, clamps).
@@ -111,8 +124,19 @@ pub enum Part {
     Other,
 }
 
+/// The surface stage's parts of the feedback and their fields, in the order
+/// [`GapBudget::book_surface`] takes them.
+pub const SURFACE_PARTS: [(Part, &str); 6] = [
+    (Part::Rebound, field::REBOUND),
+    (Part::Water, field::WATER),
+    (Part::Flexure, field::FLEXURE),
+    (Part::Roots, field::ROOTS),
+    (Part::FlexRest, field::FLEX_REST),
+    (Part::Spread, field::SPREAD),
+];
+
 /// The number of parts.
-pub const PARTS: usize = 23;
+pub const PARTS: usize = 25;
 
 /// The parts' names, in order.
 pub const NAMES: [&str; PARTS] = [
@@ -121,6 +145,8 @@ pub const NAMES: [&str; PARTS] = [
     "rebound",
     "water",
     "flexure",
+    "roots",
+    "flex_rest",
     "spread",
     "carry",
     "subduction",
@@ -342,32 +368,26 @@ impl GapBudget {
     }
 
     /// Books the surface feedback just applied: per sample, the material it took (m, + laid
-    /// down) and the rebound, flexure and spreading parts of its elevation change (m); the rest of
-    /// the elevation change is the carry.
-    pub fn book_surface(
-        &mut self,
-        samples: &[Sample],
-        material: &[f64],
-        rebound: &[f64],
-        water: &[f64],
-        flexure: &[f64],
-        spread: &[f64],
-    ) {
+    /// down) and the parts of its elevation change (m), `surface[k]` for [`SURFACE_PARTS`]`[k]`;
+    /// the rest of the elevation change is the carry.
+    pub fn book_surface(&mut self, samples: &[Sample], material: &[f64], surface: &[Vec<f64>]) {
+        assert_eq!(
+            surface.len(),
+            SURFACE_PARTS.len(),
+            "one row per surface part"
+        );
         self.update(samples, |v, dz, diso, d, l| {
-            let (m, r, w, f, s) = (material[v], rebound[v], water[v], flexure[v], spread[v]);
-            let carry = dz - m - r - w - f - s;
-            d[Part::Erosion as usize] = m - diso;
-            for (part, x) in [
-                (Part::Rebound, r),
-                (Part::Water, w),
-                (Part::Flexure, f),
-                (Part::Spread, s),
-                (Part::Carry, carry),
-            ] {
-                d[part as usize] = x;
-                l[part as usize] = x;
+            let m = material[v];
+            let mut carry = dz - m;
+            for ((part, _), x) in SURFACE_PARTS.iter().zip(surface) {
+                d[*part as usize] = x[v];
+                l[*part as usize] = x[v];
+                carry -= x[v];
             }
+            d[Part::Erosion as usize] = m - diso;
             l[Part::Erosion as usize] = m;
+            d[Part::Carry as usize] = carry;
+            l[Part::Carry as usize] = carry;
         });
     }
 
@@ -596,14 +616,9 @@ mod tests {
         samples[1].pools[pool::METAMORPHIC] -= 1000.0;
         samples[1].thickness_m -= 1000.0;
         samples[1].elevation_m -= 200.0;
-        b.book_surface(
-            &samples,
-            &[0.0, -1000.0, 0.0],
-            &[0.0, 800.0, 0.0],
-            &[0.0; 3],
-            &[0.0; 3],
-            &[0.0; 3],
-        );
+        let mut surface = vec![vec![0.0; 3]; SURFACE_PARTS.len()];
+        surface[0][1] = 800.0;
+        b.book_surface(&samples, &[0.0, -1000.0, 0.0], &surface);
         let t = &b.track[1];
         let erosion = t.parts[Part::Erosion as usize] + t.parts[Part::Rebound as usize];
         assert!(
