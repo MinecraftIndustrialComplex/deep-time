@@ -1,18 +1,25 @@
 # The P1-17 benchmark gate (V1): measurements and the per-stage report
 
-Status: **the gate is missed on both presets** (2026-10-05). This page is the per-stage report the
-plan asks for when a preset misses (§9.1: "Missing it here is reported with the per-stage breakdown
-and the measured scaling across thread counts (1, 2, 4, 8), and the decision is Ben's"). Every
-speed-up on the branch is bit-identical: the worlds before and after are the same files byte for
-byte. Ben's answer to P1-24 (2026-10-04, "Optimization only") makes optimisation the only route to
-a faster Create World, so the second target, a player's 6-core PC, is measured here too.
+Status: **the gate is missed on both presets** (2026-10-05; re-measured on the rebuilt test VM
+2026-10-16, below). Ben's answer (2026-10-16): accept it for V1 and keep optimising. This page is
+the per-stage report the plan asks for when a preset misses (§9.1: "Missing it here is reported with
+the per-stage breakdown and the measured scaling across thread counts (1, 2, 4, 8), and the decision
+is Ben's"). Every speed-up on the branch is bit-identical: the worlds before and after are the same
+files byte for byte. Ben's answer to P1-24 (2026-10-04, "Optimization only") makes optimisation the
+only route to a faster Create World, so the second target, a player's 6-core PC, is measured here
+too.
 
 Statements are marked **measured** (a run made for this page), **read** (from the code) or
 **inferred**.
 
 ## Summary
 
-- **The 8-thread gate (plan P1-17: quick ≤ 300 s, full ≤ 900 s; 1000 Myr)** — measured, test VM,
+- **Re-measured on the rebuilt VM (2026-10-16; below)**: measured, 8 threads, 1000 Myr, scattered
+  continents, before = master a55f70f6, worlds identical (83 of 83 files): side by side quick
+  774.5 → **577.2 s (1.34×)**, full 2,815.7 → **2,054.5 s (1.37×)**; one run at a time, with this
+  session's passes, quick 895.8 → **559.7 s** (the two runs saw different loads). Still over the
+  gate: quick about 1.9×, full about 2.3×. Ben accepted the miss for V1 (2026-10-16).
+- **The 8-thread gate (plan P1-17: quick ≤ 300 s, full ≤ 900 s; 1000 Myr)**: measured, test VM,
   8 threads, before = master 6489d4a5, after = this branch, run side by side, worlds identical:
 
   | preset | start | before | after | × | gate | result |
@@ -29,7 +36,7 @@ Statements are marked **measured** (a run made for this page), **read** (from th
 - **Memory** (measured): the run's count peaks at 3.17–3.20 GiB (quick) and 4.08–4.09 GiB (full)
   against the editor's estimates of 4.00 and 4.82 GiB; resident memory 3.35–3.38 and 4.28–4.32 GiB
   (master's memory accounting, merged here). **Peak memory is inside the estimate** on every run.
-- **The player's PC (P1-24's mid6 profile: 6 cores / 12 CPUs, 11 threads)** — measured, 500 Myr,
+- **The player's PC (P1-24's mid6 profile: 6 cores / 12 CPUs, 11 threads)**: measured, 500 Myr,
   scattered continents, worlds identical: **quick 342.6 → 287.0 s (1.19×)**, **full 1,404 → 1,067 s
   (1.32×)** (P1-24's baseline 349 s on master of 2026-10-04; full needs 16 GiB in the scope as
   before: 4.0 GiB counted, 6.2 GiB with the page cache of what it writes).
@@ -46,6 +53,74 @@ Statements are marked **measured** (a run made for this page), **read** (from th
   2 threads) is itself about 8 × 890 s. Meeting 300/900 s needs less work per step (fewer
   slope-failure sweeps, fewer climate steps, coarser plate steps: not bit-identical, so Ben's
   call; P1-24 measured some) or a different parallel structure (the stages of one step overlapping).
+
+## Re-measured on the rebuilt VM (2026-10-16)
+
+The test VM was rebuilt (the same class: D32as_v7, 32 vCPU), so the 2026-10-05 times above are
+not comparable with these. Before = master a55f70f6 (`ma55`, the master merged into the branch),
+8 threads, 1000 Myr. All measured.
+
+**Side by side, the first runs after the rebuild** (cold page cache; both builds in one admitted
+job, as on 2026-10-05; after = `v6a`, the branch at d7e9eee2, which adds the L1 sampling's single
+pass and the ocean's caches to the `v4a` of the tables above). Each run got 4.1 to 4.7 CPUs.
+
+| stage | quick before | after | × | full before | after | × |
+|---|---:|---:|---:|---:|---:|---:|
+| plates | 126.0 | 118.6 | 1.06 | 505.1 | 490.2 | 1.03 |
+| climate | 187.3 | 133.7 | 1.40 | 403.8 | 293.9 | 1.37 |
+| surface | 278.4 | 188.1 | 1.48 | 1,215.9 | 857.4 | 1.42 |
+| volcanoes | 34.3 | 10.4 | 3.29 | 128.7 | 38.7 | 3.32 |
+| impacts | 1.6 | 1.6 | 0.96 | 4.6 | 4.6 | 1.00 |
+| structure | 62.7 | 45.6 | 1.37 | 226.3 | 158.5 | 1.43 |
+| deposits | 26.8 | 25.6 | 1.04 | 169.5 | 112.8 | 1.50 |
+| young | 4.6 | 3.1 | 1.45 | 25.5 | 12.9 | 1.98 |
+| amplify | 23.2 | 22.9 | 1.01 | 31.8 | 28.3 | 1.12 |
+| finalize | 29.5 | 27.3 | 1.08 | 98.5 | 55.4 | 1.78 |
+| **total** | **774.5** | **577.2** | **1.34** | **2,815.7** | **2,054.5** | **1.37** |
+|   plates.write_l1 | – | 43.0 | | – | 193.2 | |
+|   plates.resample | – | 20.8 | | – | 83.8 | |
+|   climate.ebm2d | 91.4 | 56.2 | 1.63 | 92.9 | 58.5 | 1.59 |
+|   surface.diffusion (with the slope failure) | 117.8 | 53.5 | 2.20 | 626.7 | 380.5 | 1.65 |
+| user s | 3,052 | 2,427 | | 11,286 | 9,099 | |
+| cpu % | 417 | 459 | | 414 | 465 | |
+| peak GiB (gauge) | 3.17 | 3.16 | | 4.10 | 4.09 | |
+| max RSS GiB | 3.35 | 3.35 | | 4.27 | 4.35 | |
+| world files equal | 83 of 83 | | | 83 of 83 | | |
+
+**One run at a time** (the coordinator's rule of 2026-10-16 for the shared VM: before, then
+after, each its own admitted 8-thread job, `tools/review/p1-17-bench.sh seq`; after = `v7a`, which
+adds this session's climate and smoothing passes to `v6a`). The two runs of a pair no longer see
+the same load, so the wall-time ratio carries the VM's load as well as the code (`cpu %`: how many
+CPUs each run got); the side-by-side ratio above stays the reliable one.
+
+| stage | quick scattered before | after | × |
+|---|---:|---:|---:|
+| plates | 140.7 | 125.2 | 1.12 |
+| climate | 220.5 | 130.6 | 1.69 |
+| surface | 328.0 | 187.1 | 1.75 |
+| volcanoes | 37.0 | 10.6 | 3.50 |
+| impacts | 1.8 | 1.7 | 1.08 |
+| structure | 73.4 | 41.3 | 1.78 |
+| deposits | 33.4 | 18.9 | 1.76 |
+| young | 5.4 | 2.9 | 1.88 |
+| amplify | 23.6 | 21.0 | 1.12 |
+| finalize | 32.0 | 20.3 | 1.57 |
+| **total** | **895.8** | **559.7** | **1.60** |
+|   climate.ebm2d | 106.3 | 49.4 | 2.15 |
+|   climate.clock | 32.8 | 24.4 | 1.34 |
+|   structure.outputs (the horizon smoothing) | 20.3 | 5.8 | 3.50 |
+|   plates.write_l1 | – | 44.4 | |
+|   plates.resample | – | 22.3 | |
+| user s | 3,228 | 2,420 | 1.33 |
+| cpu % | 384 | 471 | |
+| peak GiB (gauge) | 3.17 | 3.16 | |
+| max RSS GiB | 3.34 | 3.36 | |
+| world files equal | 83 of 83 | | |
+
+Against the side-by-side `v6a` the new passes show in their own timers: the 2-D climate 56.2 →
+49.4 s and the structure stage's outputs 10.1 → 5.8 s on quick (different runs and loads, so
+inferred, not a measured ratio). The before-run got 3.8 CPUs and the after-run 4.7, so most of the
+1.60 is the load; the ratio of CPU time (user s, 1.33×) is close to the side-by-side 1.34.
 
 ## Method
 
@@ -298,6 +373,35 @@ one thread to 2,389 s at eight (spinning workers), the wall time does not fall a
   every cell per step), the diffusion solve (21 s; 213 s full), flexure (50 s), advection (24 s),
   the 2-D climate (62 s), the L1 sampling (45 s).
 
+### The profile of 2026-10-16, and what is left to other files' owners
+
+A `perf` profile of `v6a` on the rebuilt VM (`tools/review/p1-17-profile.sh`, quick 1000 Myr,
+8 threads, 594 s): the driver thread 536 s of samples, a worker 325 s, so about 211 s of serial
+work (measured). The serial items, largest first: the zonal climate model (`EbmParams::run`
+12.7 s and `Tri::solve` 6.2 s), the 2-D climate's own loop (`ebm2d::run` 8.8 s), zero-filling new
+vectors (`memset` 7.7 s), the plate mesh rebuild (`hull::orient` 7.2 s, `build_seeded` 5.2 s),
+copies (`memmove` 5.4 s), the plate step's own body (5.3 s), the conveyor's operator (4.2 s), the
+k-d tree build's median split (3.8 s), the priority flood (`open_sea`, `flood` and the heap:
+9.6 s), the glaciers' step (3.3 s), the subduction fronts' Dijkstra (3.2 s), the craton-edge
+distance's serial part (3.2 s), the ocean's build (3.0 s). The two zonal solves now run
+interleaved, the 2-D loop's serial passes are folded into its parallel ones, and the conveyor's
+operator runs by rows without a division (this session's rows in the table below).
+
+The parallel item with the most CPU is the L1 sampling's nearest-sample query
+(`SampleTree::nearest_n`: 7.7 % of all samples with its callees, 4.5 % its own; 59 % of the
+counting allocator's 2 % is the `Vec` each query returns). These are in files other agents own,
+so they are recorded here and not edited (the coordinator's rule, 2026-10-16):
+
+| file (owner) | item | what would help | bit-identical? |
+|---|---|---|---|
+| `plates/l1.rs` (plates) | the relink asks the 6 nearest visible samples for every cell (`vis.nearest_n(q, 6)`), though the nearest sample's group covers the cell almost always | ask the nearest one (no allocation) and run the 6-query only when its group's triangle does not cover the cell | only up to exact distance ties between two samples (which sample the two queries return first); needs the world comparison on both presets |
+| `sphere/kdtree.rs`, kiddo 6.3 | `nearest_n` returns a new `Vec` per query | a query into a caller's buffer (kiddo's API has none; a wrapper keeping a per-thread buffer) | yes |
+| `plates/ridges.rs`, `sphere/hull.rs` (plates) | the mesh rebuild after resampling: the hull's orientation tests and the seeded build, serial, 12 s on quick | in `ridges::resample`, the new lattice's hull (`Geo::build`) and the `found` search, which reads only the new points and the old mesh, side by side (read); a parallel hull | yes for the overlap; a parallel hull if it stays exact (it is checked exactly) |
+| `surface/fields.rs`, `surface/pflood.rs`, `surface/glacial.rs` (erosion) | the craton-edge distance's serial sweep (3 s), the priority flood (10 s, serial by design), the glaciers' step (3 s) | the sweep by rows; the flood stays serial | yes for the sweep |
+| `alloc.rs` (memory accounting) | the counting allocator's global atomics (2 % of the CPU, most of it from the per-query `Vec` above) | per-thread counts folded at a stage's end, keeping the same totals | yes |
+| `bake/project.rs` (the seamless world) | `resample_grid`, the bake's projection pass | not profiled in detail here | |
+| `climate/clock.rs` | the zonal climate clock, one EBM run per carbon step | sequential in time by nature | |
+
 ## What was optimised (all bit-identical, each with a test)
 
 Branch `worktree-agent-af385527348745fb2`; the tests named are in the files changed.
@@ -316,9 +420,15 @@ Branch `worktree-agent-af385527348745fb2`; the tests named are in the files chan
 | climate | the per-cell energy balance factors its implicit solves once per run; the ocean's transport gathers each cell's faces rows in parallel; the present-climate search runs its bracket's six trials side by side; the step's margins, masks and ice fields mapped in parallel; the ice-margin distance copies back in parallel | factored = old loop; ocean = old; pipeline test |
 | climate / ebm | the zonal model's two tridiagonal systems factored once per run | = `thomas` bit for bit |
 | plates | the L1 sampling reads its rows back field by field in parallel | pipeline test |
+| plates / L1 (2026-10-05) | the L1 sampling interpolates its 14 fields in one pass over each cell's three samples and maps the nearest samples in place | = `Coupling::interpolate` bit for bit |
+| climate / ocean (2026-10-05) | the sub-step count cached per build; the conveyor's basins bucketed in one pass | cached = computed for any dt; buckets = per-basin scans |
+| climate / ebm (2026-10-16) | with both diffusions on, the atmosphere's and the slab's tridiagonal solves run interleaved in one pass over the bands (`Tri::solve_pair`) | pair = each system's own solve, bit for bit |
+| climate / ebm2d (2026-10-16) | the step's serial per-cell passes folded into its parallel ones: T̄ made in the energy balance, the tiles' change of T̄ with the zonal shift, freezing with the month's means, by rows; the three global sums in one loop, each in cell order | = the old loop, bit for bit |
+| climate / ocean (2026-10-16) | the gyres' sweep and the conveyor's operator find wrapped neighbours without a division; the operator by rows | neighbours = the modulo forms |
+| structure (2026-10-16) | the horizon smoothing finds each neighbour's spanning class for every interval at once (a binary search over each class's key span) instead of a first-match search per interval | table = first-match search, 2,000 random stacks; smoothing = reference, 1/2/8 threads |
 | deposits | the favourability layers made in parallel | pipeline test |
-| tests | the coupled pipeline on 1 and 3 threads: every field and the whole world body, bit for bit | — |
-| bench | the editor's estimate printed beside the measurement; slope-failure sweep counters; climate, surface and (new) plate sub-timers | — |
+| tests | the coupled pipeline on 1 and 3 threads: every field and the whole world body, bit for bit | itself |
+| bench | the editor's estimate printed beside the measurement; slope-failure sweep counters; climate, surface and (new) plate sub-timers | none |
 
 ## The young stage's memory estimate (tightened here)
 
