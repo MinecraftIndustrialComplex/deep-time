@@ -7,6 +7,8 @@
 # Runs ON the test VM, detached:
 #
 #   tools/remote/mac.sh -- tools/review/erosion-audit.sh bake <tag> [500] [1000]
+#   tools/remote/mac.sh --kind light -- 'BIN=<tag> PRESET=<file> PRESET_KIND=<preset> tools/review/erosion-audit.sh bake <tag2> 500'
+#       (a preset variant with an earlier bake's build: nothing to build, the run admits itself)
 #   tools/remote/mac.sh --no-sync -- tools/review/erosion-audit.sh report <tag> [500] [1000]   (BIN=<tag> reads with that bake's build)
 #   tools/remote/mac.sh --no-sync -- tools/review/erosion-audit.sh clean
 #
@@ -28,8 +30,13 @@ shift 2 || true
 lengths="${*:-500 1000}"
 case "$verb" in
 bake)
-    cargo build --release -p deeptime-cli
-    cp target/release/deeptime "$RUNS/deeptime-$tag"
+    # BIN=<tag> bakes with that earlier bake's build (a preset variant needs no new build).
+    if [ -n "${BIN:-}" ]; then
+        cp "$RUNS/deeptime-$BIN" "$RUNS/deeptime-$tag"
+    else
+        cargo build --release -p deeptime-cli
+        cp target/release/deeptime "$RUNS/deeptime-$tag"
+    fi
     for len in $lengths; do
         d="$RUNS/$tag-$len"
         rm -rf "$d" "$d.log"
