@@ -974,6 +974,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Harel, M.-A., Mudd, S. M. and Attal, M. (2016). Global analysis of the stream power law parameters based on worldwide 10Be denudation rates. Geomorphology 268:184-196.
 - DOI or URL: 10.1016/j.geomorph.2016.05.035; author accepted manuscript https://www.research.ed.ac.uk/files/25670599/25669129._Harel_et_al_2016_author_accepted_manuscript_002_.pdf (403 from both WebFetch and curl).
 - Cited as: "Harel, Mudd & Attal 2016", "worldwide 10Be denudation rates favour n > 1" (params.rs).
+- Read so far (by the project): not read (403). Ruetenik et al. 2023 (read 2026-10-18) report its n as 2.6 ("Our optimised n∼1.3 ... is much lower than the 2.6 reported by Harel et al. (2016)"), a secondary reading only.
 - Ledger ids: ERO-006
 - Access: open copy (author manuscript) at the Edinburgh URL above (not retrievable here); paywalled at Elsevier.
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
@@ -6184,9 +6185,9 @@ Not read: Péron-Pinvidic, Manatschal & Osmundsen 2013 (Marine and Petroleum Geo
 - Reference: Montgomery, D. R. and Brandon, M. T. (2002). Topographic controls on erosion rates in tectonically active mountain ranges. Earth and Planetary Science Letters 201(3-4):481-489.
 - DOI or URL: 10.1016/S0012-821X(02)00725-2 (the DOI from memory, not checked); copy https://repository.geologyscience.ru/bitstream/handle/123456789/28097/Mont_02.pdf
 - Cited as: "Montgomery & Brandon 2002" (erosion rate against mean local relief; the erosion audit's reference line).
-- Ledger ids: ERO-172
+- Ledger ids: ERO-172, ERO-179, ERO-180, ERO-181
 - Access: copy on a repository, open.
-- Read so far (by the project): full text, 2026-10-05: tectonically inactive areas E = 0.2 Rz (mm/yr, Rz in km); active ranges above that line with mean local relief 1,000-2,000 m; E0 = 0.01 mm/yr from the chemical denudation of the 35 largest rivers; Olympic Mountains E0 0.016-0.059 mm/yr; rates above 10 mm/yr rare.
+- Read so far (by the project): full text, 2026-10-05: tectonically inactive areas E = 0.2 Rz (mm/yr, Rz in km); active ranges above that line with mean local relief 1,000-2,000 m; E0 = 0.01 mm/yr from the chemical denudation of the 35 largest rivers; Olympic Mountains E0 0.016-0.059 mm/yr; rates above 10 mm/yr rare. Read again 2026-10-18 (the same copy, text extracted with pdftotext) for the erosion recalibration: eq. 2, E = E0 + K Rz / (1 - (Rz/Rc)^2), fitted with E0 = 0.01 mm/yr, Rc = 1,500 m and K = 2.5e-4 mm/yr (Fig. 4); the power law E = 1.4e-6 Rz^1.8 (E mm/yr, Rz m, Rz above 100 m; R² 0.66; one standard error 1.6 to 2.0 for the exponent), which "underestimates erosion rates at high mean local relief" (Fig. 5); Rz is the range within a 10-km-diameter circle of each 30-arc-second GTOPO30 cell; at most 2 % of the land of Asia, Europe and the Americas has Rz above 1,500 m and at most 5 % above 1,000 m (Fig. 7).
 
 ### Tremblay2015
 - Reference: Tremblay, M. M. et al. (2015). Erosion in southern Tibet shut down at ∼10 Ma due to enhanced rock uplift within the Himalaya. Proceedings of the National Academy of Sciences 112(39):12030-12035.
@@ -6195,6 +6196,14 @@ Not read: Péron-Pinvidic, Manatschal & Osmundsen 2013 (Marine and Petroleum Geo
 - Ledger ids: ERO-174
 - Access: open (PubMed Central).
 - Read so far (by the project): full text, 2026-10-05: exhumation over 1.0 km/Ma from 17-16 Ma for about 5 Myr, then below 0.01 km/Ma (under 750 m in total) from 12-11 Ma to the present; cosmogenic rates in the Indus and Yarlung drainages typically below 100 m/Ma.
+
+### Ruetenik2023
+- Reference: Ruetenik, G. A., Jansen, J. D., Val, P. and Ylä-Mella, L. (2023). Optimising global landscape evolution models with 10Be. Earth Surface Dynamics 11:865-880.
+- DOI or URL: 10.5194/esurf-11-865-2023; https://esurf.copernicus.org/articles/11/865/2023/
+- Cited as: "Ruetenik et al. 2023" (the stream power law's slope exponent n fitted to the world's cosmogenic denudation rates; the source of the shipped n).
+- Ledger ids: ERO-182, ERO-006
+- Access: open (Copernicus, CC BY).
+- Read so far (by the project): full text through the web fetch tool, 2026-10-18: 3,640 catchments on 3-arcsec HydroSHEDS DEMs, the model run for one step and its outlet flux compared with OCTOPUS v.2 rates; stream power alone optimised at n about 1.28 (Q0.01 1.23 to 1.43); with linear hillslope diffusion n about 2.3 (Q0.01 1.59 to 2.70); m/n held at 0.45; no absolute K reported, since K and D covary; their stream-power-only n of about 1.3 is "much lower than the 2.6 reported by Harel et al. (2016)".
 ## The eclogite root and whole-column isostasy (PLT-278 to PLT-282), added 2026-10-06
 
 Read by a research sub-agent on 2026-10-05 for plate task 7 (Ben, 2026-10-06: "Fix isostasy first, then land"). "Full text" means the agent read the paper; "snippet" means only a search tool's excerpt, not checked against the paper.
