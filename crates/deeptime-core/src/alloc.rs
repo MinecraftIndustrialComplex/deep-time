@@ -207,10 +207,13 @@ pub fn set_cache_limit(bytes: usize) {
 /// Linux, and two atomics.
 pub struct CountingAlloc;
 
-/// Counts `bytes` more; returns the count with them.
+/// Counts `bytes` more; returns the count with them. While kept blocks hold the count over the
+/// ceiling, the oldest go back to the OS first ([`hold_ceiling`]) and the peak is taken after: the
+/// caller has not touched the new block yet, so the process never holds it and the blocks that
+/// gave way for it at once, and kept blocks never take the peak over the ceiling (P1-19).
 #[inline]
 fn added(bytes: usize) -> u64 {
-    let now = IN_USE.fetch_add(bytes as u64, Ordering::Relaxed) + bytes as u64;
+    let now = hold_ceiling(IN_USE.fetch_add(bytes as u64, Ordering::Relaxed) + bytes as u64);
     // A read first: the count is mostly under its peak, and an atomic max takes the line for
     // writing even when it leaves the value as it is (P1-19). The peak is the same either way.
     if now > PEAK.load(Ordering::Relaxed) {
@@ -343,7 +346,7 @@ impl CountingAlloc {
             }
             let p = os::map(len);
             if !p.is_null() {
-                hold_ceiling(added(len));
+                added(len);
             }
             return p;
         }
@@ -367,7 +370,7 @@ impl CountingAlloc {
             }
         };
         if !p.is_null() {
-            hold_ceiling(added(small_footprint(layout.size())));
+            added(small_footprint(layout.size()));
         }
         p
     }
@@ -489,16 +492,18 @@ pub fn unpark_thread() {
 /// go back to the OS. Small blocks and growth in place count too, not only fresh large blocks,
 /// so a step that allocates many small blocks cannot pass the ceiling while kept blocks are still
 /// held. `now` is the count the growth left ([`added`]), so the common case reads only the two
-/// settings' lines, not the count's line other threads keep writing (P1-19).
+/// settings' lines, not the count's line other threads keep writing (P1-19). Returns the count
+/// after: `now`, or what is left once kept blocks gave way.
 #[inline]
-fn hold_ceiling(now: u64) {
+fn hold_ceiling(now: u64) -> u64 {
     if KEPT.load(Ordering::Relaxed) == 0 || now <= CEILING.load(Ordering::Relaxed) {
-        return;
+        return now;
     }
     let mut c = cache();
     while c.n > 0 && in_use() > CEILING.load(Ordering::Relaxed) {
         c.drop_oldest();
     }
+    in_use()
 }
 
 // SAFETY: small blocks are forwarded to `System` with the caller's layout; large blocks are
@@ -546,7 +551,7 @@ unsafe impl GlobalAlloc for CountingAlloc {
                 let p = unsafe { System.realloc(ptr, layout, new_size) };
                 if !p.is_null() {
                     removed(small_footprint(layout.size()));
-                    hold_ceiling(added(small_footprint(new_size)));
+                    added(small_footprint(new_size));
                 }
                 p
             }
@@ -559,7 +564,7 @@ unsafe impl GlobalAlloc for CountingAlloc {
                 let p = unsafe { os::remap(ptr, old, new) };
                 if !p.is_null() {
                     if new > old {
-                        hold_ceiling(added(new - old));
+                        added(new - old);
                     } else {
                         removed(old - new);
                     }
