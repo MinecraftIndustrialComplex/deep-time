@@ -2713,7 +2713,13 @@ mod tests {
         wd.d = Dims::new(w, h, 39_000.0, true);
         let (mut sv, mut st) = started(&mut wd, &p, sea);
         let patch = |c: usize| (8..24).contains(&(c % w)) && (8..24).contains(&(c / w));
-        let sign = |c: usize| if (c % w + c / w) % 2 == 0 { 1.0 } else { -1.0 };
+        let sign = |c: usize| {
+            if (c % w + c / w).is_multiple_of(2) {
+                1.0
+            } else {
+                -1.0
+            }
+        };
         for c in (0..n).filter(|&c| patch(c)) {
             wd.h[c] += 300.0 * sign(c);
         }

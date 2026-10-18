@@ -533,8 +533,8 @@ planet (1,222.5 m per block, 39 km cells) it is 144 times weaker per cell, cells
 model lifts stand far above the strength height (D up to 8 D₀), λ for a checkerboard reaches about
 2.5, and the split grew it. Measured on `earthlike_quick_32k` at 1,222.5 m per block (scattered
 start, 100 Myr, a trace of every phase of the step): the start of the trouble is a plate-model
-spike (one cell to 9.2 km, 4.6 mm/yr) 40 Myr in; 30 to 50 Myr in, a craton (Te 80 km, no uplift) holds
-a checkerboard in which the spreading lowers a peak by 8.7 km and raises its neighbour by 12.8 km,
+spike (one cell to 9.2 km, 4.6 mm/yr) 40 Myr in; 30 to 50 Myr in, a craton (Te 80 km, no uplift)
+holds a checkerboard in which the spreading lowers a peak by 8.7 km and raises its neighbour by 12.8 km,
 the flexure turns these into −47 and +56 km, and stream power and marine fill then work on peaks
 of 60 km and pits of −45 km. The solve converges (12 to 14 iterations); it is the coupling that is
 unstable. With the spreading off the same planet stays near 14 km; with the flexure off, 6.6 km.
@@ -545,10 +545,19 @@ bends the plate. The spreading's law is the floating answer of the lower crust's
 is then stable for any cell size. Unit test
 `the_spreading_on_a_stiff_plate_does_not_grow_a_checkerboard` (39 km cells, a plateau at three
 times the strength height with a ±300 m checkerboard: it now flattens; before, the plateau's
-range went from ±300 m to ±1.8 km in the first step), and the guard (`guard.rs`, ISO-072)
-stops any run whose surface leaves five Earth reliefs from the sea.
+range went from ±300 m to ±1.8 km in the first step); unit test
+`a_planet_of_large_cells_keeps_its_surface_physical` (the small coupled planet, seed 11, at
+1,221 m per block, 100 Myr: 29.9 km before, 4.0 km after, asserted within twice Earth's relief of
+the sea); and the guard (`guard.rs`, ISO-072) stops any run whose surface leaves twelve Earth
+reliefs from the sea. With the old coupling and the guard the Earth-sized planet's 500 Myr bake
+stops after 92 s (−388 Myr, a cell at 263.8 km), where it had run 3.56 h to 3.3 × 10²⁹ m.
 
-**What is left.** The plate model now and then lifts a few cells by 15 to 20 km in one step (a
-collision or resampling at a cell); the flexure adds the low-passed root of that uplift (ISO-069)
-for a step, and erosion takes it down within a step or two. That is scale-independent (the plate
-model and the flexure are Earth-normalized) and was there at 1:100 before the fix.
+**What is left.** The plate model now and then lifts a patch by tens of km in one step (up to
+16.5 mm/yr, 33 km a step over hundreds of cells, against its 30 km ceiling); the flexure holds
+part of the root behind it up (ISO-069) for a step or two, and erosion takes it down. That is
+scale-independent (the plate model and the flexure are Earth-normalized) and is there with and
+without the fix: the highest cell after the flexure in four traced 500 Myr runs of
+`earthlike_quick_32k` was 112 km (1:300) and 66 km (1:100) before the fix, 69 km and 92 km after.
+A guard at five Earth reliefs (98.9 km) stopped a shipped bake on such a transient
+(`earthlike_quick_16k`, scattered, seed 2, −272 Myr, 105.8 km), hence twelve. Which plate process
+makes the spikes was not traced.
