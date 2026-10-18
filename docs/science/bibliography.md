@@ -5110,7 +5110,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Library: fetched in WP-14a. Text file: Guilloteau2000.txt.
 - Read in WP-14a: "The scale height of water ... is small (typically 2 km)". Institutional lecture notes, not peer reviewed.
 
-## Lithospheric flexure (ISO-040 to ISO-076)
+## Lithospheric flexure (ISO-040 to ISO-077)
 
 ### Calmant1990
 - Reference: Calmant, S., Francheteau, J., Cazenave, A. (1990). Elastic layer thickening with age of the oceanic lithosphere: a tool for prediction of the age of volcanoes or oceanic crust. Geophysical Journal International 100(1):59-67.
@@ -5366,7 +5366,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Deng, K., Wittmann, H., Yang, S., von Blanckenburg, F. (2021). The upper limit of denudation rate measurement from cosmogenic 10Be(meteoric)/9Be ratios in Taiwan. Journal of Geophysical Research: Earth Surface 126(10):e2021JF006221.
 - DOI or URL: 10.1029/2021JF006221; abstract https://api.crossref.org/works/10.1029/2021JF006221
 - Cited as: "Deng et al. 2021"
-- Ledger ids: ISO-076
+- Ledger ids: ISO-077
 - Access: paywalled (abstract through Crossref).
 - Library (the project's source library, not distributed): not fetched.
 - Read so far (by the project): abstract (Crossref), fetched by a Sonnet sub-agent and read by the polar-holes agent, 2026-10-18: "8.1 to >30 mm/yr in the Liwu mainstem". A GFZ project page ("fastest denudation rates on Earth") corroborates it. The full text was not read.
@@ -5388,7 +5388,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Sella, G. F., Stein, S., Dixon, T. H., Craymer, M., James, T. S., Mazzotti, S., Dokka, R. K. (2007). Observation of glacial isostatic adjustment in "stable" North America with GPS. Geophysical Research Letters 34(2):L02306.
 - DOI or URL: 10.1029/2006GL027081; abstract https://digitalcommons.usf.edu/geo_facpub/447/
 - Cited as: "Sella et al. 2007"
-- Ledger ids: ISO-076
+- Ledger ids: ISO-077
 - Access: paywalled (abstract on the USF repository).
 - Library (the project's source library, not distributed): not fetched.
 - Read so far (by the project): abstract on the USF repository by a Sonnet sub-agent of the polar-holes agent, 2026-10-18: uplift of about 10 mm/yr near Hudson Bay. The full text was not read (Wiley 403).
