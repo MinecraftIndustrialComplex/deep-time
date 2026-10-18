@@ -30,6 +30,16 @@
 //! with T_deep 2 °C: in flux form, so heat is taken up where upwelled water warms and given back
 //! where the surface water cools on its way to sinking, and Σ is conserved.
 //!
+//! **What a sinking region can carry.** The water sinks only as fast as the sea surface it sinks
+//! from can cool it: a region's transformation rate is its surface heat loss over ρc_p ΔT (Walin
+//! 1982's water-mass transformation), so a region of open sea A carries at most A·w_max, w_max =
+//! `SINK_RATE_M_S`. Only basins whose sinking region can carry all of Ψ compete for the
+//! narrowest; when none can, the one that carries the most sinks what it can. Without this a
+//! narrow inlet whose sinking region was one or a few coarse cells took all 30 Sv and the heat of
+//! cooling it (about a petawatt) on those cells: sea tiles at 90–360 °C, rain of 10⁵–10¹¹ mm a
+//! year on the coasts around them and a weathering kernel up to 10¹⁴ times Earth's
+//! (2026-10-18, `per-cell-climate.md` "What a sinking region can carry").
+//!
 //! Both act on the slab by upwind advection, sub-stepped to a Courant number of 0.5.
 
 use rayon::prelude::*;
@@ -59,6 +69,13 @@ pub const BASIN_LAT: (f64, f64) = (20.0, 70.0); // ledger: CLM-132
 pub const BASIN_REACH_LAT: f64 = 30.0; // ledger: CLM-132
 /// A cell is sea for the ocean's transport when its land fraction is below this.
 pub const SEA_BELOW: f64 = 0.5;
+/// The most water a sinking region sinks per square metre of its open sea, m/s: the surface heat
+/// loss that can cool the water over ρc_p times the cooling (Walin 1982; from memory). 8·10⁻⁶ m/s
+/// is about 260 W/m² cooling the water by 8 K. A calibrated ceiling: Earth's model sinks its 30 Sv
+/// over the North Atlantic's 6.4·10¹² m² of open sea poleward of 50° (4.7·10⁻⁶ m/s, so it could
+/// carry 51 Sv), while sinking regions of 1 to 20 coarse cells (at most 1.9·10¹² m²) heated their
+/// sea to 47–360 °C (2026-10-18).
+pub const SINK_RATE_M_S: f64 = 8.0e-6; // ledger: CLM-203
 
 /// What the ocean's transport needs to know of the planet.
 pub struct Setup<'a> {
@@ -92,6 +109,10 @@ pub struct Sinking {
     pub width_km: f64,
     pub hemisphere: i8,
     pub cells: usize,
+    /// The sinking cells' open sea, km² (Earth-normalized).
+    pub sea_km2: f64,
+    /// The transport it sinks, Sv: `overturning_sv`, or less where the region cannot carry it
+    /// (`SINK_RATE_M_S`).
     pub sv: f64,
 }
 
@@ -347,7 +368,13 @@ impl Ocean {
             lab
         };
         let true_w = |j: usize| s.radius_m * lat[j].to_radians().cos() * g.lon_w[0] / 1000.0;
-        let mut best: Option<(f64, i8, Vec<usize>, usize)> = None;
+        let q_set = s.overturning_sv * 1.0e6;
+        // A basin: (mean true width, hemisphere, sinking cells, a cell of it, the most its sinking
+        // region carries in m³/s). The narrowest that carries all of Ψ, and the one that carries
+        // the most in case none does.
+        type Basin = (f64, i8, Vec<usize>, usize, f64);
+        let mut best: Option<Basin> = None;
+        let mut roomiest: Option<Basin> = None;
         for hemi in [1i8, -1] {
             // A row belongs to the band when its centre is past the band's equatorward end and
             // its poleward edge is inside the poleward end: on an equal-area grid the polar rows
@@ -391,16 +418,22 @@ impl Ocean {
                     .map(|&j| per_row[j] as f64 * true_w(j))
                     .sum::<f64>()
                     / rows.len() as f64;
-                let better = match &best {
-                    None => true,
-                    Some((bw, ..)) => width < *bw,
-                };
-                if better {
-                    best = Some((width, hemi, sink, cells[0]));
+                let sea_m2: f64 = sink
+                    .iter()
+                    .map(|&c| (1.0 - s.land[c]) * area[c])
+                    .sum::<f64>()
+                    * s.radius_m
+                    * s.radius_m;
+                let carries = sea_m2 * SINK_RATE_M_S;
+                if carries >= q_set && best.as_ref().is_none_or(|b| width < b.0) {
+                    best = Some((width, hemi, sink.clone(), cells[0], carries));
+                }
+                if roomiest.as_ref().is_none_or(|b| carries > b.4) {
+                    roomiest = Some((width, hemi, sink, cells[0], carries));
                 }
             }
         }
-        let Some((width, hemi, sink, seed)) = best else {
+        let Some((width, hemi, sink, seed, carries)) = best.or(roomiest) else {
             return;
         };
         // The connected sea the basin belongs to: the upwelling.
@@ -412,7 +445,7 @@ impl Ocean {
         if up.is_empty() {
             return;
         }
-        let q = s.overturning_sv * 1.0e6;
+        let q = q_set.min(carries);
         let a_up: f64 = up.iter().map(|&c| area[c]).sum();
         let a_sink: f64 = sink.iter().map(|&c| area[c]).sum();
         let mut src = vec![0.0; n];
@@ -478,7 +511,7 @@ impl Ocean {
                 self.c_north[c] = gs[c - w] * (phi[c] - phi[c - w]);
             }
         }
-        let (mut sx, mut sy, mut sz, mut sa) = (0.0, 0.0, 0.0, 0.0);
+        let (mut sx, mut sy, mut sz) = (0.0, 0.0, 0.0);
         for &c in &sink {
             let (i, j) = (c % w, c / w);
             let (la, lo) = (
@@ -488,16 +521,15 @@ impl Ocean {
             sx += area[c] * la.cos() * lo.cos();
             sy += area[c] * la.cos() * lo.sin();
             sz += area[c] * la.sin();
-            sa += area[c];
         }
-        let _ = sa;
         self.sinking = Some(Sinking {
             lat: sz.atan2(sx.hypot(sy)).to_degrees(),
             lon: sy.atan2(sx).to_degrees().rem_euclid(360.0),
             width_km: width,
             hemisphere: hemi,
             cells: sink.len(),
-            sv: s.overturning_sv,
+            sea_km2: carries / SINK_RATE_M_S / 1.0e6,
+            sv: q / 1.0e6,
         });
     }
 }
@@ -951,6 +983,58 @@ mod tests {
         let div = o.divergence(true);
         let worst = div.iter().fold(0.0f64, |a, b| a.max(b.abs()));
         assert!(worst < 1e-6 * psi * 1e6, "divergence {worst}");
+    }
+
+    /// 2026-10-18: a narrow inlet reaching just past 50° N sank all of Ψ in one coarse cell (the
+    /// narrowest basin wins), and that cell's slab took the heat of cooling 30 Sv (about 3·10⁴
+    /// W/m² of it). A basin competes only when its sinking region's open sea can carry Ψ
+    /// (`SINK_RATE_M_S`); when none can, the roomiest sinks what its sea carries, so its sea gives
+    /// up at most ρc_p·w_max·(28 − 2) K, about 870 W/m².
+    #[test]
+    fn a_sinking_region_carries_only_what_its_sea_can_cool() {
+        let g = grid();
+        // Sea between 45° S and 20° N (no sinking region in the south); a wide northern basin
+        // (120–300° E) open to 72° N, or to 45° N where it has no sinking region; a narrow inlet
+        // one coarse column wide (31.0–33.5° E; a column is 2.8°) from 20° N to the top edge of
+        // the first row past the sinking latitude.
+        let sink_row = (0..g.h)
+            .find(|&j| (SINK_LAT..SINK_LAT + 5.0).contains(&g.lat_c(j)))
+            .unwrap();
+        let inlet_top = g.lat_edge[sink_row] - 0.01;
+        // (`land_of` takes the sea.)
+        let planet = |wide_top: f64| {
+            land_of(&g, &|lat, i| {
+                let lon = (i as f64 + 0.5) * 360.0 / 128.0;
+                (-45.0..20.0).contains(&lat)
+                    || ((120.0..300.0).contains(&lon) && (0.0..wide_top).contains(&lat))
+                    || ((31.0..33.5).contains(&lon) && (0.0..inlet_top).contains(&lat))
+            })
+        };
+        let u = belt_wind_u(&ClimateParams::default(), &g, 23.4);
+        // The inlet's sinking region is one coarse cell, far too small for 30 Sv: the wide basin
+        // sinks it all.
+        let o = Ocean::build(&setup(&g, &planet(72.0), &u, 30.0));
+        let s = o.sinking.clone().expect("a sinking region");
+        assert!(
+            (120.0..300.0).contains(&s.lon),
+            "sinks in the wide basin: {s:?}"
+        );
+        assert_eq!(s.sv, 30.0);
+        assert!(s.sea_km2 * 1.0e6 * SINK_RATE_M_S >= 30.0e6, "{s:?}");
+        // With the wide basin closed south of the sinking latitude the inlet is the only basin:
+        // it sinks what its sea carries, and the flows close on that.
+        let o = Ocean::build(&setup(&g, &planet(45.0), &u, 30.0));
+        let s = o.sinking.clone().expect("a sinking region");
+        assert!((30.0..35.0).contains(&s.lon), "sinks in the inlet: {s:?}");
+        assert_eq!(s.cells, 1, "{s:?}");
+        let carried = s.sea_km2 * 1.0e6 * SINK_RATE_M_S / 1.0e6;
+        assert!(s.sv < 1.0 && (s.sv - carried).abs() < 1e-9, "{s:?}");
+        let div = o.divergence(false);
+        let sinking: f64 = div.iter().filter(|&&x| x < 0.0).sum();
+        assert!(
+            (sinking / 1.0e6 + s.sv).abs() < 1e-3 * s.sv,
+            "sinking {sinking}"
+        );
     }
 
     #[test]

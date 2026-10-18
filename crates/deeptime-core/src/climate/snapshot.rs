@@ -1012,7 +1012,7 @@ fn cell_stats(pc: &super::percell::Coarse, er: &super::ebm::EbmResult) -> serde_
         "gyre_sweeps": pc.gyre_sweeps,
         "sinking": pc.sinking.as_ref().map(|s| serde_json::json!({
             "lat": s.lat, "lon": s.lon, "width_km": s.width_km, "hemisphere": s.hemisphere,
-            "cells": s.cells, "sv": s.sv,
+            "cells": s.cells, "sea_km2": s.sea_km2, "sv": s.sv,
         })),
         "moisture_closure_max": pc.moisture.as_ref().map(|m| m.closure.iter().cloned().fold(0.0, f64::max)),
         "upwind": pc.upwind.as_ref().map(|r| serde_json::json!({
