@@ -176,6 +176,11 @@ def section_html(rel=""):
                      f"<tr><td>median land slope</td><td>{s['median_slope']:.2f} (95th: {s['p95_slope']:.2f}) blocks of rise per block of run</td></tr>"
                      f"<tr><td>land steeper than 45°</td><td>{100 * s['steep_share']:.1f} %</td></tr>"
                      f"<tr><td>highest ground</td><td>y {s['max_y']} ({(s['max_y'] - 63) * s['m_per_block_v'] / 1000:.1f} km above sea level)</td></tr></table>")
+            if not s.get("bake_fits_build_height", True):
+                cells = s.get("build_limit_cells") or {}
+                facts += (f'<p class="bad">This bake does not fit the build height: {cells.get("cells_compressed")} cells compressed under the ceiling, '
+                          f'{cells.get("cells_below_min_y")} below the floor, highest surface {s.get("surface_max_elevation_m")} m. '
+                          f'The world diverged numerically, so these terrain figures describe a clamped world, not a planet.</p>')
         cols.append(f'<div class="col"><h3>{esc(lab)}</h3>{pics}{facts}</div>')
     note = ""
     if region:

@@ -376,6 +376,11 @@ def step_scale(a):
                         f"spread {ag['spread']:.3f} (target share {ag['target']:g})"))
     except (OSError, ValueError, KeyError):
         kids.append(kid(False, "land shares of the window agree within 0.05 across the scales", "scale-agreement.json missing"))
+    # A world that does not fit the build height has no terrain to compare (the Earth-proportioned bake of 2026-10-18 diverged numerically).
+    bad = [s for s in stats.values() if not s.get("bake_fits_build_height", True)]
+    kids.append(kid(bool(stats) and not bad, "each bake fits the build height (no cell compressed under the ceiling or below the floor)",
+                    *([f"{s['label']}: {s['build_limit_cells'].get('cells_compressed')} cells compressed, {s['build_limit_cells'].get('cells_below_min_y')} below the floor, "
+                      f"highest surface {s.get('surface_max_elevation_m')} m" for s in bad] or ["all bakes fit"])))
     kids.append(kid(os.path.exists(os.path.join(sc, "index.html")), "side-by-side page section built", "review/out/phase1/scale/index.html"))
     return [Row("scale", 7, "Scale comparison: a window of each planet at 1:100, 1:300 and Earth proportions, land shares matched, vertical scale unchanged", status_of(kids) if rc == 0 else "FAIL",
                 [f"log: review/out/phase1-src/logs/scale.log (exit {rc})"], kids, time.time() - t0)]
