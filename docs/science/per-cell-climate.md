@@ -267,6 +267,14 @@ Measured with temporary diagnostics (removed) on master 80f72bb0, quick 16k, cou
 | six 500-Myr runs (two starts, seeds 1 to 3), master | 84 of 1,500, in five runs | 8.2·10⁹ mm/yr; 234 °C | 634 m/yr; 1.6·10¹¹ |
 | the same with the fix | 0 of 1,500 | 10,610 mm/yr; 39.2 °C | 0.66 m/yr; 1.93 |
 
+On master 8b2cfb83 (plate task 8 and the erosion recalibration merged, no diagnostics, the run's
+climate series only) the 1000-Myr case is worse: 23 of its 500 steps had a land-mean runoff over
+15 m/yr or a kernel over 100 times Earth's, the highest 2.7·10⁶ m/yr and 8.0·10¹⁷, and CO₂ fell
+to 7 ppm. The run's five snowballs (the global mean below 0 °C in seven steps between −378 and
+−304 Myr) came straight after such steps, which drew CO₂ from 795 ppm to 7–19. With the fix on
+the same master: none of the 500 steps, 0.72 m/yr and 3.2 times Earth's at most, CO₂ never below
+599 ppm, no snowball.
+
 In master's 1000-Myr run every snapshot with a blown-up cell sank on a small region (1 to 20
 coarse cells), and its hottest sea tile was in or beside it (the four hottest sea tiles of every
 snapshot were logged); the snapshots without one sank on 27 to 339 cells, their hottest sea
@@ -313,7 +321,13 @@ removing the blow-ups' extra weathering should move them: each blown-up step dre
 supply limit, and master's five runs with blow-ups fell to 64 to 222 ppm, the fix's same five to
 186 to 430 ppm. The rule also moves the conveyor out of some small regions that had not yet
 overheated (30–38 cells, where 9 of master's 13 snapshots stayed under 45 °C): by Walin's bound
-those regions could not carry 30 Sv either.
+those regions could not carry 30 Sv either. The relief at the end is no different on average
+(land above 2 km 0.198 on master, 0.195 with the fix, the pairs differing by −0.14 to +0.12). Two
+of the fix's runs end at about 14,000 ppm and 27 °C (supercontinent seed 1, at 500 and at
+1000 Myr on master 8b2cfb83): a third of their land stands above 2 km, and the present-day nudge
+(CLM-148, CLM-150) multiplies CO₂ by up to 10.6 to bring its ice sheets down to the target, as it
+does on master's own high planets (scattered seed 2, 0.29 above 2 km, 3,888 ppm). That is the
+nudge on high ground, not this change.
 
 **The tests.** `ocean2d::tests::a_sinking_region_carries_only_what_its_sea_can_cool` (the rule and
 the fallback on a test sea), `climate::tests::a_narrow_inlet_past_the_sinking_latitude_keeps_the_climate_physical`
