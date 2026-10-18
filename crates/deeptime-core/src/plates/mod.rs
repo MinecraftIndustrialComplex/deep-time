@@ -12,9 +12,9 @@
 //! 1. finds where plates overlap and decides who subducts (`subduction.rs`), hiding the
 //!    subducting plate's crust inside the overriding one;
 //! 2. uplifts the overriding plate within r_s of its fronts (Cortial's u_0·f(d)·g(v)·h(z̃)), builds
-//!    arcs, trenches and the deposit accumulators, and turns subducting plates by slab pull;
-//!    With the dynamics record on, it then sums the forces on every plate and solves their
-//!    torque balance, which is recorded and not applied (`forces.rs`);
+//!    arcs, trenches and the deposit accumulators; then sums the forces on every plate (slab
+//!    pull, suction, ridge push and the weight of high ground, drag, slab, boundary and collision
+//!    resistance, a weak mantle flow) and solves their torque balance (`forces.rs`);
 //! 3. keeps each contact's collision state and real shortening (`shortening.rs`), stacks the
 //!    crust each collision shortened into a belt and a wedge (`belts.rs`), and welds two plates
 //!    whose collision has stalled, or moves a small terrane to the other plate once it has
@@ -24,8 +24,9 @@
 //! 4. runs hotspots and large igneous provinces (`hotspots.rs`);
 //! 5. applies continental erosion, oceanic dampening and trench accretion, and the rock-pool
 //!    processes (`pools.rs`);
-//!    The next step's motion relaxes towards the speed law's target, less what the collision
-//!    belts resist (`belts::resist`).
+//!    rifts whose sides never moved apart heal (`rifting::heal`); the next step's motion relaxes
+//!    towards the balance's rotation (`motion_relax_myr`), under a speed guard that is reported
+//!    whenever it binds.
 //! 6. draws Poisson rifts that split plates into 2–4 fragments, and subduction initiations that
 //!    split old oceanic crust off to sink (`rifting.rs`);
 //! 7. every 10–60 steps resamples the crust onto a fresh lattice, making oceanic crust in the gaps
@@ -112,6 +113,36 @@ struct Cache {
     coupling: Option<Coupling>,
 }
 
+/// Wall time of the plate step's parts, milliseconds summed over the steps since the last
+/// [`reset_timings`] (P1-17: `deeptime bench` prints them). A process-wide gauge rather than a
+/// world note, so the world a run leaves is the same with or without it.
+static TIMINGS: std::sync::Mutex<Vec<(&'static str, f64)>> = std::sync::Mutex::new(Vec::new());
+
+/// The plate step's parts and their summed wall time (ms), in the order they first ran.
+pub fn timings() -> Vec<(&'static str, f64)> {
+    TIMINGS.lock().map(|t| t.clone()).unwrap_or_default()
+}
+
+/// Clears [`timings`] (a new run in the same process).
+pub fn reset_timings() {
+    if let Ok(mut t) = TIMINGS.lock() {
+        t.clear();
+    }
+}
+
+/// Adds the time since `*since` to `what` and restarts the clock.
+fn lap(since: &mut std::time::Instant, what: &'static str) {
+    let now = std::time::Instant::now();
+    let ms = (now - *since).as_secs_f64() * 1000.0;
+    *since = now;
+    if let Ok(mut t) = TIMINGS.lock() {
+        match t.iter_mut().find(|e| e.0 == what) {
+            Some(e) => e.1 += ms,
+            None => t.push((what, ms)),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct Saved {
     done: u64,
@@ -186,6 +217,7 @@ impl PlatesStage {
 
     /// One plate step on `st` (taken out of the world while it runs).
     fn advance(&mut self, st: &mut PlateState, world: &mut WorldState) -> Result<(), CoreError> {
+        let mut clock = std::time::Instant::now();
         if self
             .cache
             .as_ref()
@@ -201,6 +233,7 @@ impl PlatesStage {
         let env = self.env(&tectonics, step);
         let k = env.k;
         self.apply_surface_feedback(st, world, &env)?;
+        lap(&mut clock, "feedback");
         // The surface's flexure under the samples, for the foreland basins of the collisions'
         // record (`belts.rs`); measurement only.
         let flexure = if st.contacts.iter().any(|c| c.collision.is_some()) {
@@ -209,6 +242,7 @@ impl PlatesStage {
             None
         };
         let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+        lap(&mut clock, "flexure_sample");
 
         // Motion, then interactions at the new positions.
         kinematics::advance(st, env.dt_yr);
@@ -216,20 +250,58 @@ impl PlatesStage {
         let mut pos = geometry::positions(st, &cache.geo);
         st.recount(&pos);
         let tree = Tree::over(&pos, |_| true);
+        lap(&mut clock, "motion");
         let overlaps = subduction::detect(st, &cache.geo, &pos, &tree);
+        lap(&mut clock, "detect");
         let resolved = subduction::resolve(st, world, &overlaps, &pos, &env)?;
+        lap(&mut clock, "resolve");
         let (fronts, fired) =
             shortening::advance(st, &cache.geo, &pos, &tree, &env, resolved.seeds);
-        belts::stack(st, &cache.geo, &pos, &env, &fronts, flexure.as_deref());
+        lap(&mut clock, "shortening");
+        let stacked = belts::stack(st, &cache.geo, &pos, &env, &fronts, flexure.as_deref());
+        // The collisions' crust budget: what crossed their fronts and what the belts and wedges
+        // kept of it, km³ (Earth-normalized).
+        let (crossed, kept) = stacked.values().fold((0.0, 0.0), |a, s| {
+            (
+                a.0 + s.crossed_km2 * s.thickness_m / 1000.0,
+                a.1 + (s.belt_km2_m + s.wedge_km2_m) / 1000.0,
+            )
+        });
+        *world
+            .globals
+            .entry(belts::CROSSED_GLOBAL.to_owned())
+            .or_insert(0.0) += crossed;
+        *world
+            .globals
+            .entry(belts::KEPT_GLOBAL.to_owned())
+            .or_insert(0.0) += kept;
+        lap(&mut clock, "belts");
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
+        *world
+            .globals
+            .entry(subduction::ARC_CONTINENTAL_GLOBAL.to_owned())
+            .or_insert(0.0) += pull.arc_continental_km3;
+        *world
+            .globals
+            .entry(subduction::ARC_OCEANIC_GLOBAL.to_owned())
+            .or_insert(0.0) += pull.arc_oceanic_km3;
+        lap(&mut clock, "fronts");
+        // The boundary mix (measurement only) on the same samples as the fronts, before the
+        // collapse below turns any crust over.
+        let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
+        lap(&mut clock, "boundary_mix");
         // Crust beyond the thickest column goes down; thickened crust that nothing raises any
         // more spreads and gives its area back.
-        let foundered = collapse::founder(st, &env);
+        let mut fell = collapse::Collapse::default();
+        let foundered = collapse::founder(st, &cache.geo, &env, &mut fell);
         *world
             .globals
             .entry(collapse::FOUNDERED_GLOBAL.to_owned())
             .or_insert(0.0) += foundered / 1000.0;
-        let fell = collapse::step(st, &cache.geo, &env);
+        let quiet = collapse::step(st, &cache.geo, &env);
+        fell.sources += quiet.sources;
+        fell.moved_km2_m += quiet.moved_km2_m;
+        fell.converted += quiet.converted;
         *world
             .globals
             .entry(collapse::MOVED_GLOBAL.to_owned())
@@ -238,26 +310,47 @@ impl PlatesStage {
             .globals
             .entry(collapse::GAINED_GLOBAL.to_owned())
             .or_insert(0.0) += f64::from(fell.converted) * env.norm.sample_area_km2();
+        lap(&mut clock, "collapse");
         // Rifted margins taper from continent to ocean over Earth's width (`transition.rs`).
         let taper = transition::step(st, &cache.geo, &pos, &env);
+        lap(&mut clock, "transition");
         *world
             .globals
             .entry(transition::MOVED_GLOBAL.to_owned())
             .or_insert(0.0) += taper.moved_km2_m / 1000.0;
-        let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
-        // The force balance, recorded and not applied (`forces.rs`; nothing when the record is
-        // off).
-        let balance = forces::record(
+        // The visible continental crust's volume (measurement: the crust budget, km³).
+        let volume_m: f64 = st
+            .samples
+            .iter()
+            .filter(|s| s.is_continental() && !s.is_hidden())
+            .map(|s| f64::from(s.thickness_m))
+            .sum();
+        world.globals.insert(
+            subduction::CONTINENTAL_VOLUME_GLOBAL.to_owned(),
+            volume_m * env.norm.sample_area_km2() / 1000.0,
+        );
+        // The force balance (`forces.rs`): the rotation each plate's motion relaxes towards.
+        let balance = forces::step(
             st,
             &cache.geo,
             &pos,
             &env,
             forces::flow_axis(self.preset.seed),
         );
+        if !balance.solved {
+            *world
+                .globals
+                .entry(UNSOLVED_GLOBAL.to_owned())
+                .or_insert(0.0) += 1.0;
+        }
+        lap(&mut clock, "forces");
         let mut causes: BTreeMap<u32, EventId> = BTreeMap::new();
         let mut sutured = false;
+        // Plates whose motion a weld or a healed rift set this step (the balance takes over at
+        // the next step).
+        let mut merged: Vec<u32> = Vec::new();
         for f in &fired {
-            let under = st.contacts[f.contact].under;
+            let (under, over) = (st.contacts[f.contact].under, st.contacts[f.contact].over);
             let done = collision::collide(
                 st, world, &cache.geo, &pos, &env, f.contact, &f.seeds, f.stalled,
             )?;
@@ -265,51 +358,57 @@ impl PlatesStage {
                 causes.insert(under, ev);
             }
             sutured |= done.sutured;
+            merged.extend([under, over]);
         }
+        // Rifts whose two sides never moved apart heal (design §3.4).
+        let healed = rifting::heal(st, world, &cache.geo, &pos, &env)?;
+        sutured |= !healed.is_empty();
+        merged.extend(healed);
+        lap(&mut clock, "collision");
         hotspots::step(st, world, &pos, &tree, &env)?;
+        lap(&mut clock, "hotspots");
         surface(st, &cache.geo, &env, &taper.floor_m);
         finish_samples(st, &cache.geo, &z0, &env);
         let arcs = dynamics::arc_heights(st);
+        lap(&mut clock, "surface_finish");
 
-        // Motion for the next step: slab pull (axis and speed), the random walk, the collision
-        // resistance, the speed cap.
-        let relax = 1.0 - (-env.dt_myr / k.slab_pull_relax_myr.max(1e-9)).exp();
-        let base = 0.5 * (k.plate_speed_mm_yr[0] + k.plate_speed_mm_yr[1]);
-        let mut omega: Vec<DVec3> = st
-            .plates
-            .iter()
-            .map(|p| DVec3::from_array(p.omega))
-            .collect();
-        #[allow(clippy::needless_range_loop)] // `p` indexes the plates, the pull and `omega`.
-        for p in 0..st.plates.len() {
-            if !st.plates[p].alive {
+        // Motion for the next step: each plate's rotation relaxes towards the balance's
+        // (`motion_relax_myr`), under the speed guard on the plate's own fastest point, which is
+        // counted whenever it binds.
+        let mut next: Vec<Option<DVec3>> = vec![None; st.plates.len()];
+        for (p, w) in next.iter_mut().enumerate() {
+            if !st.plates[p].alive || merged.contains(&(p as u32)) {
                 continue;
             }
-            let mut w = omega[p];
-            w = kinematics::pull_axis(
-                w,
-                pull.axis[p] * k.slab_pull_rad_per_1000km_myr * env.dt_myr,
-            );
-            let c = DVec3::from_array(st.plates[p].centroid);
-            let v = env.norm.speed_mm_yr(w, c);
-            if v > 1e-6 {
-                let slab =
-                    k.slab_pull_speed_mm_yr * (pull.front_km[p] / k.slab_pull_front_km).min(1.0);
-                let target = slab.max(base)
-                    * (1.0 - (1.0 - k.continental_speed_factor) * st.plates[p].continental_frac);
-                w *= (v + (target - v) * relax) / v;
+            if let Some(target) = balance.omega.get(p).copied().flatten() {
+                *w = Some(forces::relax(
+                    DVec3::from_array(st.plates[p].omega),
+                    target,
+                    env.dt_myr,
+                    k.motion_relax_myr,
+                ));
             }
-            omega[p] = kinematics::jitter(&mut st.rng, w, k.motion_jitter_per_sqrt_myr, env.dt_myr);
         }
-        belts::resist(st, &mut omega, &env, relax, &pull.front_km);
-        for (p, w) in omega.into_iter().enumerate() {
-            if st.plates[p].alive {
-                st.plates[p].omega =
-                    kinematics::cap_speed(w, &env.norm, k.max_plate_speed_mm_yr).to_array();
+        let reach = kinematics::reach(st, &pos, &next);
+        let mut guarded: Vec<u32> = Vec::new();
+        for (p, w) in next.into_iter().enumerate() {
+            let Some(w) = w else { continue };
+            let (w, bound) =
+                kinematics::guard_speed(w, reach[p], &env.norm, k.max_plate_speed_mm_yr);
+            if bound {
+                guarded.push(p as u32);
             }
+            st.plates[p].omega = w.to_array();
+        }
+        if !guarded.is_empty() {
+            *world
+                .globals
+                .entry(GUARD_BOUND_GLOBAL.to_owned())
+                .or_insert(0.0) += guarded.len() as f64;
         }
         rifting::maybe_rift(st, world, &cache.geo, &pos, &env)?;
         rifting::maybe_initiate_subduction(st, world, &cache.geo, &pos, &env)?;
+        lap(&mut clock, "motion_rifting");
 
         st.t_myr = env.t_myr;
         st.step = step;
@@ -318,6 +417,7 @@ impl PlatesStage {
             causes.entry(under).or_insert(ev);
         }
         ridges::bury(st, world, None, &pos, &env, &causes)?;
+        lap(&mut clock, "close_bury");
 
         // Resample when due, and once at the end so the final crust has no gaps or hidden slabs.
         // A suture resamples at once, so the welded plate's subducted slab is consumed (hidden
@@ -336,6 +436,7 @@ impl PlatesStage {
                 geo,
                 coupling: None,
             };
+            lap(&mut clock, "resample");
         }
 
         dynamics::record_step(
@@ -349,9 +450,11 @@ impl PlatesStage {
                 front_km: &pull.front_km,
                 mix_km,
                 arcs,
-                forces: balance.as_ref(),
+                forces: balance.recorded.as_ref(),
+                guarded: &guarded,
             },
         );
+        lap(&mut clock, "record");
         self.done = step;
         // How often the elevation cap binds: visible samples standing at `max_elevation_m` after
         // the step, and visible continental samples, summed over the steps (2026-10-01: the cap is
@@ -379,6 +482,7 @@ impl PlatesStage {
         if last || step.is_multiple_of(margin_every) {
             record_margins(st, world, &pos, &env);
         }
+        lap(&mut clock, "stats_margins");
         let kf_every = self.preset.keyframes.every_myr * 1.0e6;
         let kf_due = world.t_years >= self.next_output_years;
         if kf_due {
@@ -390,6 +494,7 @@ impl PlatesStage {
         if last || kf_due || (every > 0 && self.done.is_multiple_of(every)) {
             self.write_l1(st, world, &pos, &env)?;
         }
+        lap(&mut clock, "write_l1");
         if last {
             subduction::close_contacts(st, world, &env, true)?;
             for h in 0..st.hotspots.len() {
@@ -567,6 +672,11 @@ impl PlatesStage {
 /// visible continental sample-steps.
 pub const CAP_BOUND_GLOBAL: &str = "plates/cap_bound_sample_steps";
 pub const CONTINENTAL_GLOBAL: &str = "plates/continental_sample_steps";
+/// `WorldState::globals`: plate-steps on which the speed guard (`max_plate_speed_mm_yr`) bound,
+/// and steps on which the force balance could not be solved (the plates kept their motion).
+/// Both should stay 0 (design `docs/design/plate-force-balance.md` §7).
+pub const GUARD_BOUND_GLOBAL: &str = "plates/guard_bound_plate_steps";
+pub const UNSOLVED_GLOBAL: &str = "plates/balance_unsolved_steps";
 
 /// The continental margins are measured this often, Myr (P1-27; `notes.plates.margins`).
 pub const MARGIN_EVERY_MYR: f64 = 10.0;

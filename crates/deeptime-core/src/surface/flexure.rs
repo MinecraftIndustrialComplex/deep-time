@@ -72,7 +72,7 @@ use serde::{Deserialize, Serialize};
 use super::advect::{self, Carry};
 use super::grid::{Dims, box_blur};
 use crate::error::CoreError;
-use crate::plates::pools::ISOSTATIC_FACTOR;
+use crate::plates::pools::RHO_CRUST_MEAN;
 use crate::plates::state::{OCEANIC, regime};
 
 /// Mantle, sea water and ice, kg/m³.
@@ -241,10 +241,12 @@ pub fn flexural_parameter_m(d_per_g: f64) -> f64 {
     (4.0 * d_per_g / RHO_MANTLE).powf(0.25)
 }
 
-/// Airy share of crust under air and under water: a thickening T sinks k·T.
+/// Airy share of crust under air and under water: a thickening T sinks k·T. The crust is the
+/// plate model's whole column, at the continental crust's mean density (PLT-281, since
+/// 2026-10-06; the upper crust's 2,700 before).
 // ledger: ISO-046
 fn airy_shares() -> (f64, f64) {
-    let rho_c = RHO_MANTLE * (1.0 - 1.0 / ISOSTATIC_FACTOR);
+    let rho_c = RHO_CRUST_MEAN;
     (
         rho_c / RHO_MANTLE,
         (rho_c - RHO_WATER) / (RHO_MANTLE - RHO_WATER),
@@ -465,18 +467,48 @@ impl Spectral {
 
     /// `spec` (nk × h, column-major) ← the transform of `v`: Σ_i Σ_j v e^(−2πi·ik/w)
     /// cos(π(j + ½)m/h). `half` is scratch (h × nk).
+    #[cfg(test)]
     fn forward(&self, v: &[f64], half: &mut [Complex64], spec: &mut [Complex64]) {
+        self.forward_with(v, None, None, half, spec);
+    }
+
+    /// [`Self::forward`] of `v` × `weight` (cell by cell) when given, each coefficient then divided
+    /// by `d`·λ² + `c` when `divide` = (d, c) is given: the same values as weighting, transforming
+    /// and dividing in three passes, in one (P1-17).
+    fn forward_with(
+        &self,
+        v: &[f64],
+        weight: Option<&[f64]>,
+        divide: Option<(f64, f64)>,
+        half: &mut [Complex64],
+        spec: &mut [Complex64],
+    ) {
         let (w, h, nk) = (self.w, self.h, self.nk);
         let zero = Complex64::new(0.0, 0.0);
         // Rows a and b as a + i·b: A[k] = (Z[k] + conj Z[−k]) / 2, B[k] = (Z[k] − conj Z[−k]) / 2i.
         half.par_chunks_mut(2 * nk)
             .zip(v.par_chunks(2 * w))
+            .enumerate()
             .for_each_init(
                 || (vec![zero; w], vec![zero; self.fx.get_inplace_scratch_len()]),
-                |(buf, scratch), (out, rows)| {
+                |(buf, scratch), (pair, (out, rows))| {
                     let (a, b) = rows.split_at(w);
-                    for (i, z) in buf.iter_mut().enumerate() {
-                        *z = Complex64::new(a[i], b.get(i).copied().unwrap_or(0.0));
+                    match weight {
+                        Some(wt) => {
+                            let wr = &wt[2 * pair * w..(2 * pair * w + rows.len())];
+                            let (wa, wb) = wr.split_at(w);
+                            for (i, z) in buf.iter_mut().enumerate() {
+                                *z = Complex64::new(
+                                    a[i] * wa[i],
+                                    b.get(i).map_or(0.0, |&x| x * wb[i]),
+                                );
+                            }
+                        }
+                        None => {
+                            for (i, z) in buf.iter_mut().enumerate() {
+                                *z = Complex64::new(a[i], b.get(i).copied().unwrap_or(0.0));
+                            }
+                        }
                     }
                     self.fx.process_with_scratch(buf, scratch);
                     let (oa, ob) = out.split_at_mut(nk);
@@ -510,12 +542,23 @@ impl Spectral {
                     let q = self.twiddle[h - m] * buf[h - m];
                     col[m] = (p + Complex64::new(-q.im, q.re)) * 0.5;
                 }
+                if let Some((d, c)) = divide {
+                    for (s, &l) in col.iter_mut().zip(&self.lam2[k * h..(k + 1) * h]) {
+                        *s /= d * l + c;
+                    }
+                }
             },
         );
     }
 
     /// `out` ← the inverse transform of `spec` (overwritten).
     fn inverse(&self, spec: &mut [Complex64], out: &mut [f64]) {
+        self.inverse_with(spec, None, out);
+    }
+
+    /// [`Self::inverse`], or with `weight` given, `out` += the inverse transform × `weight` (cell
+    /// by cell): the same values as transforming into a buffer and adding it, in one pass.
+    fn inverse_with(&self, spec: &mut [Complex64], weight: Option<&[f64]>, out: &mut [f64]) {
         let (w, h, nk) = (self.w, self.h, self.nk);
         let zero = Complex64::new(0.0, 0.0);
         let norm_y = 1.0 / h as f64;
@@ -554,10 +597,26 @@ impl Spectral {
                 }
                 self.ix.process_with_scratch(buf, scratch);
                 let (ra, rb) = rows.split_at_mut(w);
-                for (i, z) in buf.iter().enumerate() {
-                    ra[i] = z.re * norm_x;
-                    if let Some(x) = rb.get_mut(i) {
-                        *x = z.im * norm_x;
+                match weight {
+                    Some(wt) => {
+                        let wr = &wt[ja * w..(ja * w + w + rb.len())];
+                        let (wa, wb) = wr.split_at(w);
+                        for (i, z) in buf.iter().enumerate() {
+                            let p = z.re * norm_x;
+                            ra[i] += p * wa[i];
+                            if let Some(x) = rb.get_mut(i) {
+                                let p = z.im * norm_x;
+                                *x += p * wb[i];
+                            }
+                        }
+                    }
+                    None => {
+                        for (i, z) in buf.iter().enumerate() {
+                            ra[i] = z.re * norm_x;
+                            if let Some(x) = rb.get_mut(i) {
+                                *x = z.im * norm_x;
+                            }
+                        }
                     }
                 }
             },
@@ -672,7 +731,6 @@ pub struct Solver {
     half: Vec<Complex64>,
     spec: Vec<Complex64>,
     tmp: Vec<f64>,
-    tmp2: Vec<f64>,
 }
 
 /// A sum whose value does not depend on the thread count: per row, then over the rows in order.
@@ -701,7 +759,6 @@ impl Solver {
             half: vec![zero; h * nk],
             spec: vec![zero; nk * h],
             tmp: vec![0.0; w * h],
-            tmp2: vec![0.0; w * h],
         }
     }
 
@@ -773,34 +830,24 @@ impl Solver {
     fn spectral_solve(&mut self, bank: &Bank, r: &[f64], z: &mut [f64]) {
         let mut half = std::mem::take(&mut self.half);
         let mut spec = std::mem::take(&mut self.spec);
-        let mut part = std::mem::take(&mut self.tmp2);
-        let lam2 = &self.spectral.lam2;
-        let divide = |spec: &mut [Complex64], d: f64| {
-            spec.par_iter_mut()
-                .zip(lam2.par_iter())
-                .for_each(|(s, &l)| *s /= d * l + bank.c_ref);
-        };
+        // Each level is weighted, transformed, divided by d·λ² + c, transformed back and added
+        // in two passes (P1-17: six before), the same values operation for operation.
         if bank.weights.is_empty() {
-            self.spectral.forward(r, &mut half, &mut spec);
-            divide(&mut spec, bank.d[0]);
+            let divide = Some((bank.d[0], bank.c_ref));
+            self.spectral
+                .forward_with(r, None, divide, &mut half, &mut spec);
             self.spectral.inverse(&mut spec, z);
         } else {
             z.par_iter_mut().for_each(|x| *x = 0.0);
             for (k, wk) in bank.weights.iter().enumerate() {
-                part.par_iter_mut()
-                    .zip(r.par_iter().zip(wk.par_iter()))
-                    .for_each(|(p, (&r, &s))| *p = r * s);
-                self.spectral.forward(&part, &mut half, &mut spec);
-                divide(&mut spec, bank.d[k]);
-                self.spectral.inverse(&mut spec, &mut part);
-                z.par_iter_mut()
-                    .zip(part.par_iter().zip(wk.par_iter()))
-                    .for_each(|(z, (&p, &s))| *z += p * s);
+                let divide = Some((bank.d[k], bank.c_ref));
+                self.spectral
+                    .forward_with(r, Some(wk), divide, &mut half, &mut spec);
+                self.spectral.inverse_with(&mut spec, Some(wk), z);
             }
         }
         self.half = half;
         self.spec = spec;
-        self.tmp2 = part;
     }
 
     /// Solves (L D L + C) x = b from x = 0 by preconditioned conjugate gradients: `d` is D / g
@@ -1160,18 +1207,21 @@ pub fn step(
     // the synthetic margin). The boundary cells are blurred instead and the share is taken from
     // that: on a straight boundary the two boundary rows stay at the floor and the next rows
     // carry 0.17 and 0.72 of their stiffness, and along a stepped boundary it varies smoothly.
-    let mut near_edge: Vec<f64> = edge.iter().map(|&e| if e { 1.0 } else { 0.0 }).collect();
+    let mut near_edge: Vec<f64> = edge
+        .par_iter()
+        .map(|&e| if e { 1.0 } else { 0.0 })
+        .collect();
     near_edge = restrict(&near_edge, w, f);
     box_blur(&ds, &mut near_edge, 1, 2);
     let whole: Vec<f64> = near_edge
-        .iter()
+        .par_iter()
         .map(|&b| (1.0 - 2.5 * b).clamp(0.0, 1.0)) // ledger: ISO-055
         .collect();
-    for (t, share) in te.iter_mut().zip(whole) {
-        *t = floor + (*t - floor).max(0.0) * share;
-    }
+    te.par_iter_mut()
+        .zip(whole.par_iter())
+        .for_each(|(t, &share)| *t = floor + (*t - floor).max(0.0) * share);
     let te_out: Vec<f32> = prolong_const(&te, ws, f)
-        .into_iter()
+        .into_par_iter()
         .map(|t| t as f32)
         .collect();
 
@@ -1204,7 +1254,7 @@ pub fn step(
     // resolves it. Its uplift is interpolated from samples `plate_spacing_m` apart; what varies
     // from cell to cell below that is the sample lattice, not a load (measured: the uplift field
     // zigzags at the cell scale in about 5 % of margin cells), and a stiff plate passed the whole
-    // thickening behind it, 5.5 times the uplift, where local isostasy had passed the uplift. The
+    // thickening behind it, 7.0 times the uplift, where local isostasy had passed the uplift. The
     // rest stays locally compensated, as the plate model made it.
     let bend_part = {
         let pr = pick(&|c| cells[c].plate_root);
@@ -1217,6 +1267,7 @@ pub fn step(
             binomial(&mut pf, ws, hs, passes);
         }
         (0..ws * hs)
+            .into_par_iter()
             .map(|c| root[c] - pr[c] + pf[c])
             .collect::<Vec<f64>>()
     };
@@ -1234,6 +1285,7 @@ pub fn step(
     // the stiffer plate. Rigidity lost (reheating, a cell becoming a plate's broken edge)
     // releases the moment in proportion, and the released moment is a force.
     let m_kept: Vec<f64> = (0..ws * hs)
+        .into_par_iter()
         .map(|c| {
             let ratio = d_now[c] / d_prev[c];
             if ratio.is_finite() && ratio < 1.0 {
@@ -1243,16 +1295,21 @@ pub fn step(
             }
         })
         .collect();
-    let released: Vec<f64> = m_old.iter().zip(&m_kept).map(|(a, b)| a - b).collect();
+    let released: Vec<f64> = m_old
+        .par_iter()
+        .zip(m_kept.par_iter())
+        .map(|(a, b)| a - b)
+        .collect();
     let mut l_released = vec![0.0; ws * hs];
     sv.laplacian(&released, &mut l_released);
     let mut bend_root = vec![0.0; ws * hs];
     sv.bend(&d_now, &bend_part, &mut bend_root);
     let r: Vec<f64> = (0..ws * hs)
+        .into_par_iter()
         .map(|c| RHO_MANTLE * (dq[c] - root[c]) - bend_root[c] + l_released[c])
         .collect();
     let c_rest: Vec<f64> = wet
-        .iter()
+        .par_iter()
         .map(|&s| RHO_MANTLE - RHO_WATER * p.strength * s)
         .collect();
 
@@ -1287,10 +1344,15 @@ pub fn step(
         )
     };
     // The moment after the step: what was kept, plus the bending of the root and the sinking.
-    let total: Vec<f64> = bend_part.iter().zip(&dw).map(|(a, b)| a + b).collect();
+    let total: Vec<f64> = bend_part
+        .par_iter()
+        .zip(dw.par_iter())
+        .map(|(a, b)| a + b)
+        .collect();
     let mut curv = vec![0.0; ws * hs];
     sv.laplacian(&total, &mut curv);
     let m_new: Vec<f64> = (0..ws * hs)
+        .into_par_iter()
         .map(|c| m_kept[c] + d_now[c] * curv[c])
         .collect();
     let m_fine = prolong_const(&m_new, ws, f);
@@ -1298,39 +1360,58 @@ pub fn step(
     let left_fine = prolong_const(&left, ws, f);
     let delta = prolong_linear(&dw, ws, f);
 
-    // 4. The elevation takes the sinking that is not yet in it; the state takes the step.
+    // 4. The elevation takes the sinking that is not yet in it; the state takes the step. Cell
+    // by cell, rows in parallel; the sum of the changes is then taken in cell order, as before
+    // (P1-17).
     let mut flex = vec![0.0f32; n];
+    let mut changes = vec![0.0f64; n];
+    (
+        h.par_chunks_mut(w),
+        st.load_m.par_chunks_mut(w),
+        st.deflection_m.par_chunks_mut(w),
+        st.water_m.par_chunks_mut(w),
+        st.ice_m.par_chunks_mut(w),
+        st.moment.par_chunks_mut(w),
+        st.rigidity.par_chunks_mut(w),
+        st.unsolved_m.par_chunks_mut(w),
+        flex.par_chunks_mut(w),
+        changes.par_chunks_mut(w),
+    )
+        .into_par_iter()
+        .enumerate()
+        .for_each(|(j, (hr, lr, dr, wr, ir, mr, rr, ur, fr, cr))| {
+            for i in 0..w {
+                let c = j * w + i;
+                let cell = &cells[c];
+                let change = -p.strength * delta[c];
+                hr[i] += change;
+                cr[i] = change;
+                let depth = (sea - hr[i]).max(0.0);
+                let w_prev = if cell.fresh { 0.0 } else { f64::from(dr[i]) };
+                let w_new = w_prev + cell.root + delta[c];
+                let load = cell.load + water_share * (depth - cell.water);
+                let ice = x.ice_m.map_or(0.0, |v| f64::from(v[c]).max(0.0));
+                lr[i] = load as f32;
+                dr[i] = w_new as f32;
+                wr[i] = depth as f32;
+                ir[i] = ice as f32;
+                mr[i] = m_fine[c] as f32;
+                rr[i] = d_fine[c] as f32;
+                ur[i] = left_fine[c] as f32;
+                let restoring = if hr[i] <= sea {
+                    RHO_MANTLE - RHO_WATER
+                } else {
+                    RHO_MANTLE
+                };
+                fr[i] = (RHO_MANTLE * (load + ice_share * ice - w_new) / restoring) as f32;
+            }
+        });
     let (mut sum, mut peak) = (0.0, 0.0f64);
-    for c in 0..n {
-        let cell = &cells[c];
-        let change = -p.strength * delta[c];
-        h[c] += change;
+    for &change in &changes {
         sum += change;
         peak = peak.max(change.abs());
-        let depth = (sea - h[c]).max(0.0);
-        let w_prev = if cell.fresh {
-            0.0
-        } else {
-            f64::from(st.deflection_m[c])
-        };
-        let w_new = w_prev + cell.root + delta[c];
-        let load = cell.load + water_share * (depth - cell.water);
-        let ice = x.ice_m.map_or(0.0, |v| f64::from(v[c]).max(0.0));
-        st.load_m[c] = load as f32;
-        st.deflection_m[c] = w_new as f32;
-        st.water_m[c] = depth as f32;
-        st.ice_m[c] = ice as f32;
-        st.moment[c] = m_fine[c] as f32;
-        st.rigidity[c] = d_fine[c] as f32;
-        st.unsolved_m[c] = left_fine[c] as f32;
-        let restoring = if h[c] <= sea {
-            RHO_MANTLE - RHO_WATER
-        } else {
-            RHO_MANTLE
-        };
-        flex[c] = (RHO_MANTLE * (load + ice_share * ice - w_new) / restoring) as f32;
     }
-    st.seen_elevation_m = h.iter().map(|&z| z as f32).collect();
+    st.seen_elevation_m = h.par_iter().map(|&z| z as f32).collect();
     out.sum_change_m = sum;
     out.max_change_m = peak;
     out.deflection_m = st.deflection_m.clone();
@@ -1537,6 +1618,67 @@ mod tests {
         assert!(x.iter().cloned().fold(f64::MIN, f64::max) < 4500.0 * airy_wet);
     }
 
+    /// The fused blend of the spectral solves (P1-17) is the six-pass one it replaced, bit for bit,
+    /// on a patchy plate (three levels) and a uniform one (one level), rows odd and even in
+    /// number, at 1, 3 and 8 threads.
+    #[test]
+    fn the_fused_spectral_blend_is_the_six_pass_one_bit_for_bit() {
+        let old = |sp: &Spectral, bank: &Bank, r: &[f64]| -> Vec<f64> {
+            let n = r.len();
+            let zero = Complex64::new(0.0, 0.0);
+            let mut half = vec![zero; sp.h * sp.nk];
+            let mut spec = vec![zero; sp.nk * sp.h];
+            let divide = |spec: &mut [Complex64], d: f64| {
+                for (s, &l) in spec.iter_mut().zip(&sp.lam2) {
+                    *s /= d * l + bank.c_ref;
+                }
+            };
+            let mut z = vec![0.0; n];
+            if bank.weights.is_empty() {
+                sp.forward(r, &mut half, &mut spec);
+                divide(&mut spec, bank.d[0]);
+                sp.inverse(&mut spec, &mut z);
+                return z;
+            }
+            let mut part = vec![0.0; n];
+            for (k, wk) in bank.weights.iter().enumerate() {
+                for c in 0..n {
+                    part[c] = r[c] * wk[c];
+                }
+                sp.forward(&part, &mut half, &mut spec);
+                divide(&mut spec, bank.d[k]);
+                sp.inverse(&mut spec, &mut part);
+                for c in 0..n {
+                    z[c] += part[c] * wk[c];
+                }
+            }
+            z
+        };
+        let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<u64>>();
+        for (w, h) in [(96usize, 48usize), (64, 37)] {
+            let dx = 39_000.0;
+            for te in [patchy(w, h, 6.0, 70.0), vec![30.0; w * h]] {
+                let d: Vec<f64> = te.iter().map(|&t| rigidity_per_g(t, G)).collect();
+                let c = vec![RHO_MANTLE; w * h];
+                let r: Vec<f64> = (0..w * h)
+                    .map(|k| ((k * 37) % 101) as f64 - 50.0 + (k as f64 * 0.01).sin())
+                    .collect();
+                let bank = Bank::new(&d, &c, dx);
+                let mut sv = Solver::new(w, h, dx);
+                let want = bits(&old(&sv.spectral, &bank, &r));
+                for threads in [1, 3, 8] {
+                    let pool = rayon::ThreadPoolBuilder::new()
+                        .num_threads(threads)
+                        .build()
+                        .unwrap();
+                    let mut z = vec![0.0; w * h];
+                    pool.install(|| sv.spectral_solve(&bank, &r, &mut z));
+                    assert!(bits(&z) == want, "{w}×{h}, {threads} threads");
+                }
+            }
+        }
+    }
+
     /// The weakest and the stiffest plates the editor allows (scale 0.25 and 3 on 5–80 km), and
     /// beyond: finite, converged, compensated.
     #[test]
@@ -1581,9 +1723,10 @@ mod tests {
         );
         p.validate().unwrap();
         assert!(FlexureParams { strength: 1.5, ..p }.validate().is_err());
-        // The Airy shares are the plate model's: 1 km of uplift on land is 5.5 km of crust.
+        // The Airy shares are the plate model's: 1 km of uplift on land is 7.0 km of crust.
         let (q, a) = thickening(1000.0, 500.0, 0.0);
-        assert!((a - 4500.0).abs() < 1e-6 && (q - 5500.0 * 2700.0 / 3300.0).abs() < 1e-6);
+        let t = 1000.0 * 3300.0 / (3300.0 - 2830.0);
+        assert!((a - (t - 1000.0)).abs() < 1e-6 && (q - t * 2830.0 / 3300.0).abs() < 1e-6);
         // Under water the root is smaller, and a change that crosses the sea is split.
         let (_, under) = thickening(1000.0, -3000.0, 0.0);
         assert!(under < a && under > 2000.0);
@@ -1857,13 +2000,13 @@ mod tests {
             .sum();
         let sunk: f64 = out.deflection_m.iter().map(|&x| f64::from(x)).sum();
         assert!((sunk / load - 1.0).abs() < 1e-3, "{sunk} against {load}");
-        // Erosion takes the belt away again (the crust thickened, 5.5 × the uplift): no load is
+        // Erosion takes the belt away again (the crust thickened, 7.0 × the uplift): no load is
         // left and the basin is gone.
         wd.uplift = vec![0.0; n];
         let mut eroded = vec![0.0; n];
         for (c, dm) in eroded.iter_mut().enumerate() {
             if belt(c) {
-                *dm = -2000.0 * 5.5 * (2700.0 / 3300.0) / 0.8;
+                *dm = -2000.0 * (3300.0 / 470.0) * (2830.0 / 3300.0) / 0.8;
             }
         }
         wd.step(&p, &mut sv, &mut st, &eroded, sea);

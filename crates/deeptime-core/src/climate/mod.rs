@@ -878,6 +878,7 @@ impl ClimateStage {
         let started = Instant::now();
         let ela0 = ela_all.clone().unwrap_or_else(|| vec![1.0e6; n]);
         let mu0: Vec<f32> = (0..n)
+            .into_par_iter()
             .map(|c| {
                 if land0[c] {
                     (h[c] - sea_prev - f64::from(ela0[c])) as f32
@@ -1106,15 +1107,21 @@ impl ClimateStage {
                     // Bracket (a factor of 1.4 … 10⁴), then halve the bracket four times.
                     let mut lo = 0.0;
                     let mut best: Option<Trial> = None;
-                    for m in [0.35, 0.7, 1.4, 2.8, 5.6, 9.2] {
-                        // ledger: CLM-151
-                        let t = trial(dir * m);
+                    // The bracket's trials are independent (each starts from `saved`), so they
+                    // run side by side and are read in order, as the serial search read them: the
+                    // first that reaches the state ends the bracket, and only the trials up to it
+                    // count (P1-17).
+                    let bracket: Vec<Trial> = [0.35, 0.7, 1.4, 2.8, 5.6, 9.2] // ledger: CLM-151
+                        .into_par_iter()
+                        .map(|m| trial(dir * m))
+                        .collect();
+                    for t in bracket {
                         trials += 1;
                         if reach(&t) {
                             best = Some(t);
                             break;
                         }
-                        lo = m;
+                        lo = t.ln_factor.abs();
                         chosen = t;
                     }
                     if let Some(mut b) = best {
@@ -1215,6 +1222,7 @@ impl ClimateStage {
                 .collect()
         } else {
             mask_pre = (0..n)
+                .into_par_iter()
                 .map(|c| mu0[c].is_finite() && f64::from(mu0[c]) > delta_end[geo.cell_band(c)])
                 .collect();
             ice::thickness(w, hgt, &mask_pre, &geo.sx, &geo.sy, tau, cap, grav)
@@ -1467,6 +1475,7 @@ impl ClimateStage {
             .last()
             .map_or_else(|| vec![0.0; bands], |x| x.1.clone());
         let mu: Vec<f64> = (0..n)
+            .into_par_iter()
             .map(|c| {
                 if land[c] {
                     h[c] - sea - f64::from(ela_all[c])
@@ -1505,8 +1514,12 @@ impl ClimateStage {
                     ice::ShiftTimes::new(&v)
                 })
                 .collect();
-            let end_mask: Vec<bool> = (0..n).map(|c| mu[c] > d_end[geo.cell_band(c)]).collect();
+            let end_mask: Vec<bool> = (0..n)
+                .into_par_iter()
+                .map(|c| mu[c] > d_end[geo.cell_band(c)])
+                .collect();
             let max_mask: Vec<bool> = (0..n)
+                .into_par_iter()
                 .map(|c| {
                     mu[c]
                         > per_band[geo.cell_band(c)]
@@ -1529,6 +1542,7 @@ impl ClimateStage {
                 ice::thickness(w, hgt, &max_mask, &geo.sx, &geo.sy, tau, cap, grav)
             };
             let mut share: Vec<f32> = (0..n)
+                .into_par_iter()
                 .map(|c| {
                     if land[c] {
                         per_band[geo.cell_band(c)].share(mu[c]) as f32
@@ -1586,6 +1600,7 @@ impl ClimateStage {
         };
         let glacier: Vec<bool> = thick.iter().map(|&x| x >= ICE_MIN_M).collect();
         let ela_pub: Vec<f32> = (0..n)
+            .into_par_iter()
             .map(|c| {
                 if land[c] {
                     (f64::from(ela_all[c]) + d_end[geo.cell_band(c)]) as f32
@@ -1635,6 +1650,7 @@ impl ClimateStage {
             .filter(|f| f.data.len() == n)
             .map(|f| f.data.clone());
         let balance: Vec<f32> = (0..n)
+            .into_par_iter()
             .map(|c| {
                 if !glacier[c] {
                     return 0.0;

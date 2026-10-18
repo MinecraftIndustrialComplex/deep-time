@@ -1683,10 +1683,14 @@ w/ a loot table set to a gold nugget?"; ledger ORE-267, ORE-268).* Where neither
 a gold ore for the placer's rock (a pack without EV and without its own `#c:ores_in_ground/gravel`
 gold ore), the placer's gold in a **gravel** cell is vanilla's `minecraft:suspicious_gravel` and in a
 **sand** cell `minecraft:suspicious_sand` (`ore/PlacerPanning`, `OreBlockResolver.panned`), whose
-block entity carries the loot table `deeptime:archaeology/placer_gold` (one stack of 2 to 5 gold
-nuggets) and a seed that is a hash of the world seed and the block's canonical position
-(`OreDraws.panSeed`, never 0), so brushing the block is the panning. Deep Time ships no block of
-its own. The block entity is set the way vanilla's desert well sets its own: `WorldGenRegion.setBlock`
+block entity holds the gold nuggets the loot table `deeptime:archaeology/placer_gold` (one stack of
+2 to 5 gold nuggets) rolls with a seed that is a hash of the world seed and the block's canonical
+position (`OreDraws.panSeed`, never 0), so brushing the block is the panning. Deep Time ships no
+block of its own. The table is rolled when the block is placed (`PlacerPanning.fill`, `roll`) and
+the block entity keeps the nuggets as its item with no loot table, so a per-player loot mod
+(Lootr in MIC converts only brushable block entities with a loot table) leaves it: one brushing
+per block, for whoever gets there first (decisions log 2026-10-17). The block entity is set the way
+vanilla's desert well sets its own: `WorldGenRegion.setBlock`
 leaves a placeholder in the proto chunk and `getBlockEntity` turns it into the real
 `BrushableBlockEntity`. The bar must sit on support: suspicious gravel and sand fall like their
 plain blocks (`FallingBlock.isFree`: air, fire, a liquid or a replaceable plant below), so a cell
@@ -2375,8 +2379,11 @@ comparison): item 1 above is now a per-cell, seasonal, two-dimensional energy ba
 grid (about 128 × 64) with land and sea tiles, a slab ocean with sea ice per cell, surface-dependent
 atmospheric diffusion and wind-carried heat, Stommel gyres and an overturning conveyor, and
 `climate.model = per_cell` is the default (`banded` stays a setting). Item 2's belt rain stays the
-default rain, fed by the per-cell temperatures; the monthly moisture budget is built behind
-`climate.rain_model = budget` and not yet calibrated. The fast clock stays one-dimensional,
+default rain, fed by the per-cell temperatures and scaled by one factor so Earth's relief rains
+Earth's land rain (`climate.belts_rain_scale` 1.42; decisions log 2026-10-06); the monthly moisture
+budget is built behind `climate.rain_model = budget` and not yet calibrated, and the upwind rain
+(Smith & Barstad plus an LFPM-style budget, decisions log 2026-10-04) is a calibrated setting
+(`rain_model = upwind`); monsoons are a follow-up for both. The fast clock stays one-dimensional,
 corrected to the 2-D zonal means and re-snapshotted at snowball and hothouse crossings. The
 CO₂ forcing is a radiative-convective table (HEXTOR) at every tile's temperature. The world
 format and the climate API are unchanged. On Earth's relief the global mean is 14.0 °C and 19 of 24

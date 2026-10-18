@@ -51,7 +51,7 @@ use super::Env;
 use super::events::{self, SUBDUCTION_ONSET};
 use super::geometry::{Cover, Geo, Tree, cover, dijkstra};
 use super::kinematics::{quat, tangent, to_group, to_world};
-use super::pools::ISOSTATIC_FACTOR;
+use super::pools::COLUMN_ISOSTATIC_FACTOR;
 use super::state::{
     ARC, CONTINENTAL, Contact, DIVERGENT, EMERGED, FORELAND, HIDDEN, HOTSPOT, OROGENY_ANDEAN,
     OROGENY_HIMALAYAN, PlateState, SUBDUCTION_ZONE, TRENCH, pool,
@@ -149,6 +149,7 @@ pub fn resolve(
         // The collisions' footprint is stamped again each step they have a front (`belts.rs`).
         s.collision_mm_yr = 0.0;
         s.shortening_km = 0.0;
+        s.stacked = false;
     }
     // A collision's own belt and wedge are stamped as a collision orogeny each step (`belts.rs`):
     // that crust is not locked against the collision that stamps it.
@@ -297,6 +298,8 @@ pub fn resolve(
         if a == state.contacts[k].under {
             let s = &mut state.samples[o.i as usize];
             s.flags |= HIDDEN;
+            // ledger: PLT-276 (crust a collision stacks is not accreted again at a resampling).
+            s.stacked = own.is_some() && s.kind == CONTINENTAL;
             if let Some(was) = &was_hidden
                 && s.kind == CONTINENTAL
                 && !was[o.i as usize]
@@ -429,7 +432,7 @@ pub fn confirm(
         SUBDUCTION_ONSET,
         DVec3::from_array(c.centroid),
     )
-    .magnitude((c.onset_convergence_mm_yr / env.k.max_plate_speed_mm_yr) as f32)
+    .magnitude((c.onset_convergence_mm_yr / env.k.convergence_ref_mm_yr) as f32)
     .param("subducting_plate", i64::from(c.under))
     .param("overriding_plate", i64::from(c.over))
     .param(
@@ -461,14 +464,37 @@ struct Source {
 }
 
 /// Slab pull per plate, from its subduction fronts this step.
+/// World global: crust arcs added to continental crust over the run, km³ (Earth-normalized).
+pub const ARC_CONTINENTAL_GLOBAL: &str = "plates/arc_continental_km3";
+/// World global: arc magma added to oceanic samples (island arcs) over the run, km³.
+pub const ARC_OCEANIC_GLOBAL: &str = "plates/arc_oceanic_km3";
+/// World global: the visible continental crust's volume after the last step, km³ (Earth-normalized).
+pub const CONTINENTAL_VOLUME_GLOBAL: &str = "plates/continental_volume_km3";
+
+/// What `fronts_and_uplift` measured this step.
 pub struct Pull {
-    /// Σ c × q / |c × q| over the plate's front samples, weighted by front length in 1,000 km.
-    pub axis: Vec<DVec3>,
-    /// Front length, km (Earth-normalized).
+    /// Each plate's oceanic subduction front length, km (Earth-normalized; the dynamics record's).
     pub front_km: Vec<f64>,
+    /// Crust this step's arcs added to continental crust (arc magma and the cordillera's root),
+    /// km³ (Earth-normalized; measurement, for the crust budget against Stern & Scholl 2010).
+    pub arc_continental_km3: f64,
+    /// Arc magma this step added to oceanic samples (island arcs), km³ (Earth-normalized).
+    pub arc_oceanic_km3: f64,
 }
 
-/// Divergence flags, trenches, fronts, subduction uplift, arcs and slab pull.
+/// One subducting-side sample's effect on its contact and on the crust budget.
+struct Effect {
+    contact: usize,
+    rate_mm_yr: f64,
+    /// The sample is continental and rose fast enough for an Andean orogeny.
+    andean: bool,
+    /// Crust added to a continental sample (arc magma and the cordillera's root), m.
+    continental_m: f64,
+    /// Arc magma added to an oceanic sample, m.
+    oceanic_m: f64,
+}
+
+/// Divergence flags, trenches, fronts, subduction uplift and arcs; each plate's oceanic front length.
 pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Pull {
     let (step, t_myr) = (env.step, env.t_myr);
     let k = env.k;
@@ -539,7 +565,6 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
 
     let mut sources: Vec<(u32, f64, u32)> = Vec::new();
     let mut info: Vec<Source> = Vec::new();
-    let mut pull = vec![DVec3::ZERO; state.plates.len()];
     let mut front_len = vec![0.0; state.plates.len()];
     let front_km = norm.km(norm.spacing_rad());
     for (v, b) in boundary.iter().enumerate() {
@@ -571,17 +596,12 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
                 sediment: f64::from(su.pools[pool::SEDIMENT]),
                 oceanic_slab: su.kind != CONTINENTAL,
             });
-            // Only an oceanic slab pulls: continental crust at the front is buoyant, and where it
-            // comes in the collision resists instead (`belts::resist`; plate tasks 3 and 4).
+            // Only an oceanic slab counts as a front that pulls: continental crust at the front
+            // is buoyant, and where it comes in the collision resists instead (`forces.rs`).
             // ledger: PLT-251
             if su.kind != CONTINENTAL {
                 let under = state.contacts[c].under as usize;
                 front_len[under] += front_km;
-                let cu = DVec3::from_array(state.plates[under].centroid);
-                let axis = cu.cross(pos[v]);
-                if axis.length_squared() > 1e-18 {
-                    pull[under] += axis.normalize() * (front_km / 1000.0);
-                }
             }
         }
     }
@@ -605,12 +625,12 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
     let (zt, zc) = (k.trench_elevation_m, k.uplift_reference_m);
     let z_ceiling = k.uplift_ceiling_m;
     let x0 = k.subduction_peak_km / k.subduction_distance_km;
-    let v0 = k.max_plate_speed_mm_yr;
+    let v0 = k.convergence_ref_mm_yr; // ledger: PLT-037
     let smooth = |t: f64| t * t * (3.0 - 2.0 * t);
     let orogeny_m = OROGENY_MIN_M_PER_MYR * env.dt_myr;
     let collision_myr = k.collision_orogeny_myr;
     let info = &info;
-    let effects: Vec<Option<(usize, f64, bool)>> = state
+    let effects: Vec<Option<Effect>> = state
         .samples
         .par_iter_mut()
         .enumerate()
@@ -632,6 +652,7 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
             let zn = ((src.z_sub - zt) / (zc - zt)).clamp(0.0, 1.0);
             let h = zn * zn;
             let z = f64::from(s.elevation_m);
+            let (mut added_continental, mut added_oceanic) = (0.0_f64, 0.0_f64);
             // Cortial's h(z̃) uplift is the oceanic slab's: where continental crust comes in, the
             // collision belt (`belts.rs`) builds the relief from the crust shortened.
             let mut dz = if src.oceanic_slab {
@@ -646,7 +667,9 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
             // The arc's own range (P1-27): continental crust over the arc thickens by arc
             // magmatism and shortening and stands up as a cordillera, so the cones rise from a
             // range (the Andes, the Cascades) rather than from a coastal plain; the root that
-            // holds it up (Airy, `pools::ISOSTATIC_FACTOR` times the uplift) joins the crust.
+            // holds it up joins the crust: Airy for the whole column with the crust's mean
+            // density, `pools::COLUMN_ISOSTATIC_FACTOR` (7.0) times the uplift (PLT-281; arc
+            // crust 2.83-2.87 g/cm3, Luffi & Ducea 2022; 5.5 before 2026-10-06).
             if cord_m > 0.0 && s.kind == CONTINENTAL && src.oceanic_slab {
                 let w = (-((d_km - k.arc_distance_km) / k.cordillera_width_km).powi(2)).exp();
                 // Thickened arc crust spreads under its own weight: the range builds towards
@@ -658,9 +681,10 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
                 };
                 let up = cord_m * w * g * room;
                 dz += up;
-                let root = (up * ISOSTATIC_FACTOR) as f32;
+                let root = (up * COLUMN_ISOSTATIC_FACTOR) as f32;
                 s.pools[pool::FELSIC_PLUTONIC] += 0.6 * root;
                 s.pools[pool::METAMORPHIC] += 0.4 * root;
+                added_continental += f64::from(root);
             }
             s.elevation_m = (z + dz).min(zc) as f32;
             // Arc magma and the deposit accumulators.
@@ -671,7 +695,9 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
                     s.pools[pool::FELSIC_PLUTONIC] += (0.7 * m) as f32;
                     s.pools[pool::FELSIC_VOLCANIC] += (0.3 * m) as f32;
                     s.arc_continental_m += m as f32;
+                    added_continental += m;
                 } else {
+                    added_oceanic += m;
                     s.pools[pool::MAFIC_VOLCANIC] += (0.5 * m) as f32;
                     s.pools[pool::FELSIC_VOLCANIC] += (0.25 * m) as f32;
                     s.pools[pool::FELSIC_PLUTONIC] += (0.25 * m) as f32;
@@ -703,21 +729,28 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
                 s.orogeny = OROGENY_ANDEAN;
                 s.orogeny_myr = t_myr as f32;
             }
-            Some((
-                src.contact,
-                dz / dt_yr * 1.0e3,
-                andean && s.kind == CONTINENTAL,
-            ))
+            Some(Effect {
+                contact: src.contact,
+                rate_mm_yr: dz / dt_yr * 1.0e3,
+                andean: andean && s.kind == CONTINENTAL,
+                continental_m: added_continental,
+                oceanic_m: added_oceanic,
+            })
         })
         .collect();
-    for (c, rate, andean) in effects.into_iter().flatten() {
-        let contact = &mut state.contacts[c];
-        contact.max_uplift_mm_yr = contact.max_uplift_mm_yr.max(rate);
-        contact.andean |= andean;
+    let (mut arc_continental_m, mut arc_oceanic_m) = (0.0, 0.0);
+    for e in effects.into_iter().flatten() {
+        let contact = &mut state.contacts[e.contact];
+        contact.max_uplift_mm_yr = contact.max_uplift_mm_yr.max(e.rate_mm_yr);
+        contact.andean |= e.andean;
+        arc_continental_m += e.continental_m;
+        arc_oceanic_m += e.oceanic_m;
     }
+    let area = norm.sample_area_km2();
     Pull {
-        axis: pull,
         front_km: front_len,
+        arc_continental_km3: arc_continental_m * area / 1000.0,
+        arc_oceanic_km3: arc_oceanic_m * area / 1000.0,
     }
 }
 

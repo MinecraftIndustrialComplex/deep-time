@@ -234,7 +234,11 @@ public final class BiomeCensus {
         if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g) || !(g.terrain() instanceof WorldDataTerrain t))
             throw new IllegalStateException(level.dimension().location() + " is not a Deep Time level on world data");
         WorldData wd = t.data();
-        RasterSampler kp = wd.layer("climate/koppen");
+        // The class the biome inputs were placed by (L2, lapsed to each cell's height) when the bake
+        // wrote it; the climate stage's L1 class otherwise. Against the L1 class, the high and low
+        // ground of one L1 cell (a plateau's edge) count as one class, and a column a lapse rate
+        // makes C or D under an L1 cell that is ET counted as a misplaced ET (2026-10-05).
+        RasterSampler kp = wd.layer(wd.has("climate/koppen_l2") ? "climate/koppen_l2" : "climate/koppen");
         RasterSampler iceLayer = wd.has(IceCover.LAYER) ? wd.layer(IceCover.LAYER) : null;
         RasterSampler wetlandLayer = wd.has(Peatland.LAYER) ? wd.layer(Peatland.LAYER) : null;
         var sampler = level.getChunkSource().randomState().sampler();
@@ -265,7 +269,7 @@ public final class BiomeCensus {
         int[] cloud = new int[3];
         double mV = wd.manifest().mPerBlockV();
         Map<Integer, Map<Integer, Integer>> classBiomes = new HashMap<>();
-        int skippedUntagged = 0, landColumns = 0, wetlands = 0, wetlandSwamp = 0;
+        int skippedUntagged = 0, landColumns = 0, wetlands = 0, wetlandSwamp = 0, coastColumns = 0, ruledColumns = 0;
         // Cold wetland (BIO-133, BIO-135): the bake's flagged boreal wetland, counted over every land column
         // (a mod's untagged biomes too: its bog is the point): on the pack's peatland biome, on taiga, on
         // another swamp (which it must not be), or elsewhere.
@@ -321,6 +325,20 @@ public final class BiomeCensus {
                 if (untagged && (k == 31 ? y < sea - 4 : land))
                     skippedUntagged++;
                 boolean wetland = land && !untagged && wd.raster(ClimateMapping.EROSION, x, z) >= e6;
+                // The coast band: the bake puts land at the shore into vanilla's coast continentalness
+                // by its distance to the sea, so its biome is a beach, a stony shore or a sea biome
+                // whatever the climate. Set apart from the families like the wetlands (2026-10-05: on
+                // the L2 Köppen classes, a cold upland's few columns are mostly coast, and its family's
+                // share measured the coastline, not the mapping).
+                boolean coast = land && !untagged && !wetland
+                        && (b.is(c("is_beach")) || b.is(c("is_stony_shores")) || b.is(c("is_ocean")));
+                if (coast)
+                    coastColumns++;
+                // A column a biome rule decided (a volcano zone's biome, a role), not the climate
+                // search: the families check the climate mapping, so it is counted apart too.
+                boolean ruled = land && !untagged && !wetland && !coast && decision != null;
+                if (ruled)
+                    ruledColumns++;
                 if (land && !untagged && rules != null) {
                     if (ruleCensus == null)
                         ruleCensus = new RuleCensus(rules.rules());
@@ -363,7 +381,7 @@ public final class BiomeCensus {
                     }
                 if (!untagged && (k == 31 ? y < sea - 4 : land)) {
                     for (Check ch : CHECKS) {
-                        if (wetland)
+                        if (wetland || coast || ruled)
                             break;   // counted apart (above), not against the family's tags
                         if (!ch.koppen().test(k))
                             continue;
@@ -475,6 +493,8 @@ public final class BiomeCensus {
         wj.addProperty("wetland_columns", wetlands);
         wj.addProperty("on_swamp", wetlandSwamp);
         o.add("wetlands_set_aside", wj);
+        o.addProperty("coast_set_aside", coastColumns);
+        o.addProperty("rule_decided_set_aside", ruledColumns);
         JsonObject cw = new JsonObject();
         cw.addProperty("layer", wetlandLayer != null);
         cw.addProperty("columns", coldWet);

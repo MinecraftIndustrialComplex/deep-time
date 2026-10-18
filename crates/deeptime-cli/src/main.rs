@@ -1907,6 +1907,9 @@ mod tests {
         assert_eq!(bench["runs"].as_array().unwrap().len(), 2);
         assert_eq!(bench["runs"][1]["threads"], 2);
         assert!(bench["runs"][0]["peak_bytes"].as_u64().unwrap() > 0);
+        // The estimate the editor shows sits beside the measurement (P1-17's memory gate).
+        assert!(bench["estimate"]["peak_bytes"].as_u64().unwrap() > 0);
+        assert!(!bench["estimate"]["stages"].as_array().unwrap().is_empty());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
