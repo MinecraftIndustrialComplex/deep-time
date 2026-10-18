@@ -810,19 +810,22 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
 #[test]
 fn the_collision_footprint_lives_with_its_collision() {
     let p = preset(8000, 300.0, "scattered_continents", 23);
-    let (mut marked_steps, mut foreland_steps, mut prev_active, mut onsets) = (0, 0, false, 0);
+    let (mut marked_steps, mut foreland_steps, mut prev_alive, mut onsets) = (0, 0, false, 0);
     let world = run_stage(&p, |_, _, st| {
         let active = st
             .contacts
             .iter()
             .any(|c| c.collision.as_ref().is_some_and(|k| k.last_step == st.step));
+        let alive = st.contacts.iter().any(|c| c.collision.is_some());
         let marked = st.samples.iter().any(|s| s.collision_mm_yr > 0.0);
-        // (A collision that fires or ends in a step is gone from the contacts by its end.)
+        // (A collision that fires or ends in a step is gone from the contacts by its end; it was
+        // alive at the end of the step before, with its front or in its grace steps without one,
+        // since one in its grace steps can find its front again and fire in the same step.)
         // (A collision that fires in the step it began never shows as active.)
         let onset = st.counters.collision_onsets > onsets;
         onsets = st.counters.collision_onsets;
         assert!(
-            !marked || active || prev_active || onset,
+            !marked || active || prev_alive || onset,
             "step {}: a footprint with no collision behind it",
             st.step
         );
@@ -835,7 +838,7 @@ fn the_collision_footprint_lives_with_its_collision() {
         }
         marked_steps += i32::from(marked);
         foreland_steps += i32::from(st.samples.iter().any(|s| s.flags & state::FORELAND != 0));
-        prev_active = active;
+        prev_alive = alive;
     });
     assert!(
         marked_steps > 10,
