@@ -86,6 +86,19 @@ public final class BiomeCensus {
             new Check("E:snow", "ET EF", k -> k == 29 || k == 30, List.of(c("is_snowy"), c("is_icy"))));
 
     /**
+     * Biomes their mod leaves without a climate or vegetation {@code c:} tag, read by {@link #CHECKS} as carrying
+     * the tags named here (the game's tags are not changed). Expanded Ecosphere 3.4.7 tags {@code wythers:ancient_taiga}
+     * only {@code minecraft:is_overworld} and {@code wythers:is_wythers_surface} (its jar's data/{c,minecraft,wythers}/tags,
+     * read 2026-10-18), while its other taigas ({@code old_growth_taiga_crags}, the boreal forests) carry {@code c:is_taiga}
+     * and {@code c:is_tree/coniferous}, and the biome-mods survey puts it in the Dc/Dd row
+     * (docs/research/notes/biome-mods-survey.md). On master 9091c163's test planet with -PwithEe its columns were every
+     * miss of the D family (Dfb 5, Dfc 5: D 0.870 under its floor 0.88), of Dsub and of Dfc:taiga. The columns matched
+     * only through this table are counted in each check's {@code via_tag_gaps}.
+     */
+    static final Map<String, List<TagKey<Biome>>> TAG_GAPS = Map.of(
+            "wythers:ancient_taiga", List.of(c("is_taiga"), c("is_tree/coniferous")));
+
+    /**
      * A Köppen family and biomes it must not land on (the share of its columns that do is bounded);
      * {@code glaciated} limits the family to its columns under the ice cover ({@code true}), or to
      * those without ({@code false}); null is either. {@code colderThan} limits the family to the columns
@@ -321,9 +334,13 @@ public final class BiomeCensus {
         Map<String, Integer> palette = new LinkedHashMap<>();
         Map<Holder<Biome>, Integer> byHolder = new HashMap<>();
         List<Holder<Biome>> holders = new ArrayList<>();
+        // Per check: matching columns, columns, matching only through TAG_GAPS; and the biomes of the columns that miss.
         Map<String, int[]> checks = new LinkedHashMap<>();
-        for (Check ch : CHECKS)
-            checks.put(ch.name(), new int[2]);
+        Map<String, Map<String, Integer>> misses = new HashMap<>();
+        for (Check ch : CHECKS) {
+            checks.put(ch.name(), new int[3]);
+            misses.put(ch.name(), new TreeMap<>());
+        }
         Map<String, int[]> forbidden = new LinkedHashMap<>();
         for (Forbid f : FORBIDDEN)
             forbidden.put(f.name(), new int[2]);
@@ -497,11 +514,18 @@ public final class BiomeCensus {
                             continue;
                         int[] n = checks.get(ch.name());
                         n[1]++;
-                        for (TagKey<Biome> tag : ch.tags())
-                            if (b.is(tag)) {
-                                n[0]++;
-                                break;
-                            }
+                        boolean tagged = false, gap = false;
+                        List<TagKey<Biome>> gapTags = TAG_GAPS.getOrDefault(nameOf(b), List.of());
+                        for (TagKey<Biome> tag : ch.tags()) {
+                            tagged |= b.is(tag);
+                            gap |= gapTags.contains(tag);
+                        }
+                        if (tagged || gap)
+                            n[0]++;
+                        else
+                            misses.get(ch.name()).merge(nameOf(b), 1, Integer::sum);
+                        if (gap && !tagged)
+                            n[2]++;
                     }
                     for (Forbid f : FORBIDDEN) {
                         if (!f.koppen().test(k))
@@ -536,6 +560,13 @@ public final class BiomeCensus {
             JsonArray tags = new JsonArray();
             ch.tags().forEach(tg -> tags.add("#" + tg.location()));
             e.add("tags", tags);
+            e.addProperty("via_tag_gaps", n[2]);
+            // The five biomes the most missing columns are on ("biome columns").
+            JsonArray miss = new JsonArray();
+            misses.get(ch.name()).entrySet().stream()
+                    .sorted(Map.Entry.<String, Integer>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
+                    .limit(5).forEach(en -> miss.add(en.getKey() + " " + en.getValue()));
+            e.add("misses", miss);
             cj.add(ch.name(), e);
         }
         o.add("checks", cj);
