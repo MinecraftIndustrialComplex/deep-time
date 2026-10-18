@@ -499,6 +499,10 @@ pub struct PlateState {
     /// kept in checkpoints.
     #[serde(skip)]
     pub gap_budget: Option<super::gap_budget::GapBudget>,
+    /// The step's thickening limits (`rate.rs`): set when a step begins, cleared when it ends,
+    /// so never in a checkpoint.
+    #[serde(skip)]
+    pub limits: Option<super::rate::Limits>,
 }
 
 impl PlateState {

@@ -283,16 +283,32 @@ pub fn resample(
     // How each new sample was blended, for the gap budget (`gap_budget.rs`) when it is on.
     let tracing = state.gap_budget.is_some();
     let mut traces: Vec<Option<gap_budget::Trace>> = vec![None; n];
+    // The step's limits (`rate.rs`) on the new lattice: a covered sample's ceiling and top are
+    // its corners' blended with its own weights, its floor the blended surface before the
+    // accretion (new sea floor's are set with the gaps below).
+    let old_limits = state.limits.as_ref().filter(|l| {
+        l.ceiling_m.len() == src.len() && l.top_m.len() == src.len()
+    });
+    let mut limits: Vec<[f32; 3]> = vec![[f32::INFINITY, 0.0, f32::INFINITY]; n];
     let mut samples: Vec<Sample> = found
         .par_iter()
         .zip(plate_new.par_iter_mut())
         .zip(tally.par_iter_mut())
         .zip(traces.par_iter_mut())
-        .map(|((((top, others), pl), tally), trace)| match top {
+        .zip(limits.par_iter_mut())
+        .map(|(((((top, others), pl), tally), trace), lim)| match top {
             None => Sample::blank(0),
             Some((g, c)) => {
                 let mut s = interpolate(src, c, rots[*g as usize]);
                 *pl = group_plate[*g as usize];
+                if let Some(old) = old_limits {
+                    let blend = |v: &[f32]| -> f32 {
+                        (0..3)
+                            .map(|k| c.w[k] * f64::from(v[c.tri[k] as usize]))
+                            .sum::<f64>() as f32
+                    };
+                    *lim = [blend(&old.ceiling_m), s.elevation_m, blend(&old.top_m)];
+                }
                 if tracing {
                     *trace = Some(gap_budget::Trace {
                         tri: c.tri,
@@ -475,7 +491,26 @@ pub fn resample(
             }
         };
     }
+    // New sea floor starts the step's limits as it stands.
+    let new_limits = old_limits.map(|_| {
+        let a = super::rate::allowance_m(env).unwrap_or(f64::INFINITY);
+        let r = super::rate::rise_m(env).unwrap_or(f64::INFINITY);
+        let mut l = super::rate::Limits::default();
+        for (s, (x, &g)) in samples.iter().zip(limits.iter().zip(&gap)) {
+            let x = if g {
+                let z = f64::from(s.elevation_m);
+                [(f64::from(s.thickness_m) + a) as f32, z as f32, (z + r) as f32]
+            } else {
+                *x
+            };
+            l.ceiling_m.push(x[0]);
+            l.floor_m.push(x[1]);
+            l.top_m.push(x[2]);
+        }
+        l
+    });
     state.samples = samples;
+    state.limits = new_limits;
     if let Some(gb) = state.gap_budget.as_mut() {
         // Gap points became new sea floor: born now.
         for (t, &g) in traces.iter_mut().zip(&gap) {

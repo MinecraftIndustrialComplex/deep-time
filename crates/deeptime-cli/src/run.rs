@@ -255,11 +255,14 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
     };
     Some(
         format!(
-            "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} foundered_km3={:.3e} collision_crossed_km3={:.3e} collision_kept_km3={:.3e} resample_accreted_km3={:.3e} resample_stacked_km3={:.3e} resample_accreted_continent_km3={:.3e} resample_accreted_visible_km3={:.3e} resample_accreted_rise_km3={:.3e} arc_continental_km3={:.3e} arc_oceanic_km3={:.3e} arc_front_continental_km_myr={:.3e} arc_front_oceanic_km_myr={:.3e} cordillera_shortened_km3={:.3e} hotspot_magma_km3={:.3e} cone_felsic_km3={:.3e} cone_mafic_km3={:.3e} continental_volume_km3={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
+            "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} foundered_km3={:.3e} rate_capped_km3={:.3e} rate_lost_km3={:.3e} rate_held_km3={:.3e} collision_crossed_km3={:.3e} collision_kept_km3={:.3e} resample_accreted_km3={:.3e} resample_stacked_km3={:.3e} resample_accreted_continent_km3={:.3e} resample_accreted_visible_km3={:.3e} resample_accreted_rise_km3={:.3e} arc_continental_km3={:.3e} arc_oceanic_km3={:.3e} arc_front_continental_km_myr={:.3e} arc_front_oceanic_km_myr={:.3e} cordillera_shortened_km3={:.3e} hotspot_magma_km3={:.3e} cone_felsic_km3={:.3e} cone_mafic_km3={:.3e} continental_volume_km3={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
             deeptime_core::plates::stats::summary(st).line(),
             global(collapse::MOVED_GLOBAL),
             global(collapse::GAINED_GLOBAL),
             global(collapse::FOUNDERED_GLOBAL),
+            global(deeptime_core::plates::rate::CAPPED_GLOBAL),
+            global(deeptime_core::plates::rate::LOST_GLOBAL),
+            global(deeptime_core::plates::rate::HELD_GLOBAL),
             global(deeptime_core::plates::belts::CROSSED_GLOBAL),
             global(deeptime_core::plates::belts::KEPT_GLOBAL),
             global(deeptime_core::plates::ridges::ACCRETED_GLOBAL),
@@ -466,7 +469,8 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
          spl_iterations_per_step={:.2} cg_iterations_per_step={:.1} sinks={} erosion_pulses={} basins={} sea_events={} frames={} \
          history_mib={:.1} land_z_p50_m={:.0} land_z_p90_m={:.0} land_z_p99_m={:.0} plate_cap_bound_share={:.5} \
          foreign_crust_cell_steps={:.0} spread_cell_steps={:.0} spread_km3={:.3e} \
-         flexure_solves={:.0} flexure_iterations_per_solve={:.2} flexure_unconverged={:.0}",
+         flexure_solves={:.0} flexure_iterations_per_solve={:.2} flexure_unconverged={:.0} \
+         guard_worst_m={:.0} guard_steps_over_1/2/3/6_reliefs={:.0}/{:.0}/{:.0}/{:.0}",
         t.steps,
         land / n,
         peak,
@@ -500,6 +504,11 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         global(deeptime_core::surface::flexure::ITERATIONS_GLOBAL)
             / global(deeptime_core::surface::flexure::SOLVES_GLOBAL).max(1.0),
         global(deeptime_core::surface::flexure::UNCONVERGED_GLOBAL),
+        global(deeptime_core::surface::guard::WORST_GLOBAL),
+        global(deeptime_core::surface::guard::NEAR_GLOBALS[0]),
+        global(deeptime_core::surface::guard::NEAR_GLOBALS[1]),
+        global(deeptime_core::surface::guard::NEAR_GLOBALS[2]),
+        global(deeptime_core::surface::guard::NEAR_GLOBALS[3]),
     ))
 }
 

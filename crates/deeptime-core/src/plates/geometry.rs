@@ -493,6 +493,7 @@ mod tests {
             slabs: Vec::new(),
             dynamics: None,
             gap_budget: None,
+            limits: None,
         };
         let all: Vec<u32> = (0..n as u32).collect();
         let coast = (0..n)

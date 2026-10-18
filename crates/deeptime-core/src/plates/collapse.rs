@@ -85,7 +85,7 @@ use super::geometry::{Geo, dijkstra};
 use super::pools::{
     COLUMN_ISOSTATIC_FACTOR, continental_column, eclogite_m, isostatic_change_m, root_drop_m,
 };
-use super::state::{CONTINENTAL, OCEANIC, PlateState, TRENCH, pool};
+use super::state::{CONTINENTAL, OCEANIC, PlateState, Sample, TRENCH, pool};
 
 /// `WorldState::globals`: crust moved by the collapse over the run, km³ …
 pub const MOVED_GLOBAL: &str = "plates/collapse_km3";
@@ -136,7 +136,7 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
         // but does not build a second one around it) and to ocean floor up to the normal column.
         let to = (k.collapse_thickness_km * 1000.0).clamp(normal_thickness_m(), t_max);
         if !by_plate.is_empty() {
-            spread(state, geo, env, by_plate, to, out);
+            spread(state, geo, env, by_plate, to, out, None);
         }
     }
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
@@ -145,20 +145,9 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
         if s.kind != CONTINENTAL || s.is_hidden() || f64::from(s.thickness_m) <= t_max {
             continue;
         }
-        let mut left = f64::from(s.thickness_m) - t_max;
+        let left = f64::from(s.thickness_m) - t_max;
         let pools_before = s.pools;
-        for &p in &ROOT_ORDER {
-            let take = f64::from(s.pools[p]).min(left);
-            s.pools[p] = (f64::from(s.pools[p]) - take) as f32;
-            left -= take;
-            if left <= 0.0 {
-                break;
-            }
-        }
-        let before = f64::from(s.thickness_m);
-        s.thickness_m = s.pools.iter().sum();
-        let gone = before - f64::from(s.thickness_m);
-        lost += gone;
+        lost += sink(s, left);
         // Isostasy, as in the collapse: towards the height of the column kept, never past it (a
         // root that founders takes its eclogite with it, so the column may rise).
         let z = f64::from(s.elevation_m);
@@ -166,6 +155,30 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
         s.elevation_m = toward(z, change, iso_height(&s.pools, z_0, env.gravity)) as f32;
     }
     lost * env.norm.sample_area_km2()
+}
+
+/// Takes `left` m of crust from the bottom of a column (mafic pools first, [`ROOT_ORDER`]) to the
+/// mantle and returns what went, m; the caller moves the surface.
+pub(super) fn sink(s: &mut Sample, mut left: f64) -> f64 {
+    for &p in &ROOT_ORDER {
+        let take = f64::from(s.pools[p]).min(left);
+        s.pools[p] = (f64::from(s.pools[p]) - take) as f32;
+        left -= take;
+        if left <= 0.0 {
+            break;
+        }
+    }
+    let before = f64::from(s.thickness_m);
+    s.thickness_m = s.pools.iter().sum();
+    before - f64::from(s.thickness_m)
+}
+
+/// Moves a source's surface at `z` by `change` without raising it or taking it below
+/// min(`z`, `floor`): crust taken off a column that this step thickened lowers it no further
+/// than where the step began (`rate.rs`; a column the surface holds above its Airy height is
+/// not dragged down to it).
+pub(super) fn held(z: f64, change: f64, floor: f64) -> f64 {
+    (z + change).clamp(z.min(floor), z)
 }
 
 /// A continental column's isostatic height, m: the middle of `continent_elevation_m` (`z_0`) for
@@ -232,7 +245,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
         }
     }
     let mut out = Collapse::default();
-    spread(state, geo, env, by_plate, normal, &mut out);
+    spread(state, geo, env, by_plate, normal, &mut out, None);
     out
 }
 
@@ -247,16 +260,19 @@ fn spreads(k: &crate::params::TectonicParams) -> bool {
 /// Moves crust from each plate's `sources` (sample, m of thickness to release) to the nearest
 /// room on the same plate within `collapse_reach_km` (see the module docs, "The rule": continental
 /// crust thinner than `continental_to_m`, filled up to it, and ocean floor, filled up to the
-/// normal column), thinning
-/// the sources in proportion to what found room; returns the share of each plate's release that
-/// was placed (sources of a plate whose release found no room keep their crust).
-fn spread(
+/// normal column; during a plate step never above a receiver's thickening ceiling, `rate.rs`),
+/// thinning the sources in proportion to what found room; returns the share of each plate's
+/// release that was placed (sources of a plate whose release found no room keep their crust).
+/// A source's surface sinks by Airy towards its column's height, or, given `floor`, as
+/// [`held`] moves it.
+pub(super) fn spread(
     state: &mut PlateState,
     geo: &Geo,
     env: &Env,
     by_plate: BTreeMap<u32, Vec<(usize, f64)>>,
     continental_to_m: f64,
     out: &mut Collapse,
+    floor: Option<&[f32]>,
 ) -> BTreeMap<u32, f64> {
     let k = env.k;
     let normal = normal_thickness_m();
@@ -277,10 +293,11 @@ fn spread(
         }
         let src: Vec<(u32, f64, u32)> = sources.iter().map(|&(i, _)| (i as u32, 0.0, 0)).collect();
         let samples = &state.samples;
+        let ceiling = state.limits.as_ref().map(|l| l.ceiling_m.as_slice());
         let on_plate = |v: u32| plate_of[v as usize] == p && !samples[v as usize].is_hidden();
         let (dist, _) = dijkstra(geo, &src, |_, b| on_plate(b), reach);
         // The room, nearest first, not at a trench: continental crust thinner than
-        // `continental_to_m`, ocean floor up to the normal column.
+        // `continental_to_m`, ocean floor up to the normal column, neither above its ceiling.
         let mut room: Vec<(f64, usize, f64)> = (0..n)
             .filter(|&j| dist[j].is_finite() && on_plate(j as u32))
             .filter_map(|j| {
@@ -290,7 +307,10 @@ fn spread(
                 } else {
                     normal
                 };
-                let r = to - f64::from(s.thickness_m);
+                let cap = ceiling
+                    .and_then(|c| c.get(j))
+                    .map_or(f64::INFINITY, |&c| f64::from(c));
+                let r = to.min(cap) - f64::from(s.thickness_m);
                 (r > 0.0 && s.flags & TRENCH == 0).then_some((dist[j], j, r))
             })
             .collect();
@@ -328,10 +348,13 @@ fn spread(
             }
             s.thickness_m = s.pools.iter().sum();
             // Isostasy (PLT-281, PLT-278): down by take / 7.0 less the root's change, not below
-            // the height the crust kept holds up.
+            // the height the crust kept holds up (or the floor).
             let z = f64::from(s.elevation_m);
             let change = isostatic_change_m(&pools_before, &s.pools, env.gravity);
-            s.elevation_m = toward(z, change, iso_height(&s.pools, z_0, env.gravity)) as f32;
+            s.elevation_m = match floor {
+                Some(f) => held(z, change, f64::from(f[i])),
+                None => toward(z, change, iso_height(&s.pools, z_0, env.gravity)),
+            } as f32;
             out.sources += 1;
         }
         let total: f64 = mix.iter().sum();
@@ -450,6 +473,7 @@ mod tests {
             slabs: Vec::new(),
             dynamics: None,
             gap_budget: None,
+            limits: None,
         };
         let pos = positions(&st, geo);
         st.recount(&pos);
