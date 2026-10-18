@@ -401,6 +401,7 @@ fn island_subsidence_defaults_to_nothing_and_the_setting_still_works() {
             mh: 300.0,
             cell_m: 300.0 * 16.0,
             delta: vec![0.0; n],
+            rock: vec![[0.0; 2]; n],
             elev: &elev,
         };
         let mut vs = vec![island(true), island(false)];
@@ -548,6 +549,16 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
         st.counts.shield_born + st.counts.silicic_born > 0,
         "{:?}",
         st.counts
+    );
+    // Plate task 8: the cones' rock reached the plate model's pools, felsic and mafic.
+    let global = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
+    let (felsic, mafic) = (
+        global(crate::plates::CONE_FELSIC_GLOBAL),
+        global(crate::plates::CONE_MAFIC_GLOBAL),
+    );
+    assert!(
+        felsic > 0.0 && mafic > 0.0,
+        "cone rock {felsic} and {mafic} km³"
     );
 
     // The default island subsidence is 0 (Ben, 2026-10-02): no volcano of the run has sunk.
