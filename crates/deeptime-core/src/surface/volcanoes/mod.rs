@@ -1231,6 +1231,7 @@ impl VolcanoStage {
                 continue;
             }
             // Stratovolcanoes and silicic centres are felsic volcanic rock, shields mafic.
+            // ledger: PLT-286
             let kind = usize::from(v.kind == Kind::Shield);
             for (c, wgt) in cells {
                 let dz = (dh * wgt) as f32;

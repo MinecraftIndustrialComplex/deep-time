@@ -104,7 +104,8 @@ pub fn isostatic_change_m(
 
 /// Order in which erosion strips the pools, top first: the conserved pools and the mafic volcanic
 /// rock of lava fields, shields and ocean crust (plate task 8: the volcano stage's cones reach the
-/// pools as volcanic rock, so eroding a basalt cone strips its basalt, not the crust under it).
+/// pools as volcanic rock, so eroding a basalt cone strips its basalt, not the crust under it;
+/// ledger: PLT-286).
 const EROSION_ORDER: [usize; 6] = [
     pool::SEDIMENT,
     pool::SEDIMENTARY,

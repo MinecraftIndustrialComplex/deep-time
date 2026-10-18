@@ -564,7 +564,7 @@ pub struct TectonicParams {
     pub island_arc_km3_per_km_myr: f64,
     /// … and a continental arc (an arc on continental crust, including an island arc grown
     /// continental), km³ per km per Myr at v = v_0: about 35 (Stern & Scholl 2010 after
-    /// Haschke & Günther 2003; 1.0 km³ a year over 27,500 km). ledger: PLT-050
+    /// Haschke & Günther 2003; 1.0 km³ a year over 27,500 km). ledger: PLT-285
     pub continental_arc_km3_per_km_myr: f64,
     /// Island-arc crust counts as continental once it is this thick, km: an oceanic sample turns
     /// continental once the arc crust it has built (`arc_oceanic_m`) on top of normal ocean crust
@@ -731,11 +731,11 @@ impl Default for TectonicParams {
             arc_distance_km: 200.0,
             arc_width_km: 60.0,
             island_arc_km3_per_km_myr: 100.0,     // ledger: PLT-045
-            continental_arc_km3_per_km_myr: 35.0, // ledger: PLT-050
+            continental_arc_km3_per_km_myr: 35.0, // ledger: PLT-285
             arc_mature_crust_km: 15.0,            // ledger: PLT-047
-            cordillera_shortening_mm_yr: 0.0,
+            cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
             cordillera_width_km: 120.0,
-            cordillera_height_m: 2500.0,
+            cordillera_height_m: 2500.0, // ledger: PLT-050
             trench_relax: 0.5,
             pelagic_m_per_myr: 5.0,
             hotspots_initial: 8,

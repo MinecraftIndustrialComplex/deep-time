@@ -690,6 +690,7 @@ impl PlatesStage {
                     s.pools[pool::SEDIMENT] += dm as f32;
                 }
                 // The cones' rock, on top (a caldera's collapse takes back what its summit had).
+                // ledger: PLT-286
                 let before = s.pools;
                 let mut got = [0.0f64; 2];
                 for (k, p) in [pool::FELSIC_VOLCANIC, pool::MAFIC_VOLCANIC].into_iter().enumerate() {

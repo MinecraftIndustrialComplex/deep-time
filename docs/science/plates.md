@@ -507,7 +507,9 @@ large as the whole crust over 1,000 Myr:
   Cloos's lower bound. The model's arc magma (20 m per Myr at the arc axis at full convergence) is
   25-90 times smaller than Earth's arc growth (PLT-045) and is not a thickness, so the rule counts
   Cloos's time in it, at the model's full arc rate. An arc at a trench converging at half of v_0, or
-  off the arc axis, takes longer. No value was tuned against the crust share.
+  off the arc axis, takes longer. No value was tuned against the crust share. (Since plate task 8,
+  2026-10-17, the arc rate is Earth's and a physical thickness, and the rule counts Cloos's 15 km
+  instead: `arc_mature_crust_km`; see "The crust budget on sourced rates" below.)
 
 **Earth against the mod.** `deeptime plate-check`, `earthlike_quick_16k`, supercontinent start,
 1,000 Myr, flexure on, mean of seeds 1-4 (per-seed values in the build log):
