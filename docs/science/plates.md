@@ -1194,13 +1194,47 @@ the fix; mean over six runs, [min, max]; build log 2026-10-18 "Plate spikes"):
 | of which to the mantle (km³ a year) | - | 4.3 |
 | plate checks met (of 45) | 27 | 29 |
 
-MEASURED-1000
+| 1000 Myr | master | the rate limits |
+|---|---|---|
+| highest cell at the end, L1 (m) | 25,248 [21,041, 29,518] | 8,089 [5,917, 13,752] |
+| after the young stage (m) | YOUNG1000 |
+| after the amplifier, highest block (y) | AMP1000 |
+| land share | 0.200 [0.174, 0.225] | 0.180 [0.164, 0.200] |
+| land above 2 km | 0.223 [0.143, 0.265] | 0.231 [0.106, 0.318] |
+| median and 90th percentile land height (m) | 774, 3,277 | 843, 3,323 |
+| continental crust, share of the planet at the end | 0.433 [0.392, 0.467] | 0.405 [0.361, 0.485] |
+| CO2 (ppm) | 2,046 [405, 6,331] | 2,192 [179, 4,469] |
+| present-day nudge's CO2 factor | 2.88 [1.00, 8.17] | 3.31 [1.00, 6.86] |
+| mean surface temperature (°C) | 16.7 [13.2, 21.9] | 17.3 [12.4, 20.2] |
+| the guard's worst (m) | 82,335 [70,106, 98,837] | 32,119 [19,636, 49,599] |
+| steps beyond 1, 2, 3, 6 Earth reliefs (sum of six runs) | 427, 72, 18, 0 | 60, 2, 0, 0 |
+| foundered (km³ a year) | 6.6 | 2.3 |
+| beyond the ceilings, moved or lost (km³ a year) | - | 16.4 |
+| of which to the mantle (km³ a year) | - | 6.3 |
+| plate checks met (of 45) | 26 | 25 |
+
+The 13,752 m at 1000 Myr is the scattered start's seed 2 (not traced; the other five fixed runs end
+between 5.9 and 7.4 km). The plate checks
+change little. At 500 Myr the fix passes four that master fails (rift-born plates welded back
+within 50 Myr, 10.8 to 6.6 %; the collisions' median length, 57 to 45 Myr; speed against plate area;
+oceanic arc cells above sea level) and fails two that master passes (the collisions' 90th
+percentile length, 91 to 132 Myr; supercontinent tenure, 103 to 98 Myr). At 1000 Myr the only
+change of verdict is the most land gained in one step, 1.12 to 1.64 % of the planet against at
+most 1.5: crust a resampling used to pile on one column is now spread over its ring, which lifts
+more cells above the sea at once. The collision wedge's width is 0 km in every fixed run (master:
+13 and 54 km, both far below the 100 to 350 km target): the wedge's thickening is what the
+ceiling holds back most.
 
 **Limits.**
 - One rate for every column, not a strain-rate law: the excess is moved, not deformed, whatever
   the column's thickness or heat (PLT-287).
 - Where no room is within reach (about one ring of samples at 16k), the excess goes to the mantle:
-  MEASURED-LOST
+  4.3 km³ a year over 500 Myr and 6.3 over 1000, against the founder's loss falling by 2.3 and
+  4.4. The crust lost to the mantle in all rose from 4.1 to 6.1 and from 6.6 to 8.5 km³ a year,
+  against about 0.7 km³ a year at Earth's collision zones (PLT-258, Scholl & von Huene 2009 as
+  cited there), and the planet ends with 0.013 and 0.028 less of its area continental. A wider
+  reach for the release, or an accretion that does not stack every footprint on one column, would
+  keep more of it (a follow-up).
 - Falls are not limited: crust that founders or spreads away lowers its surface at once (up to
   about 6.6 km in a step).
 - The surface stage's own excursions are not touched: a polar row of L1 rose 20 to 40 km over a

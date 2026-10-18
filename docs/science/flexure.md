@@ -186,7 +186,7 @@ plate model's; since 2026-10-18 its rate limits bound them (an open question bel
   accretion (up to 36 km of rise and 566 km of crust in one step) and the collision belts (13 km),
   and bounded by the rate limits of [plates.md](plates.md), "The fastest a column thickens and
   rises" (PLT-287, PLT-288): no plate step now raises a column more than 7 km. The guard's worst
-  over six 500 Myr runs of `earthlike_quick_16k` fell from 66.7 to 30.8 km (ISO-073). What is
+  over six 500 Myr runs of `earthlike_quick_16k` fell from 66.7 to 30.8 km, over six 1000 Myr runs from 82.3 to 32.1 km (ISO-073). What is
   left is the surface stage's own: a polar row of L1 that rose 20 to 40 km over a few steps under
   plate uplift of 2.2 km or less, with and without the limits (not traced further).
 - The recovery law of continental `Te` (ISO-051) has no source for its form or its 300 Myr.
