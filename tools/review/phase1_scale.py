@@ -14,7 +14,8 @@ blocks, the same longitude and latitude at every scale) is the same patch of pla
 
   presets  earthlike_quick_32k with scale.m_per_block_h changed       (phase1_vm.py scale-preset)
   bake     deeptime run, three at once through the admission tool     -> <WORK>/h<m>/planet/deeptime
-  region   the window: land, high relief, off the poles and the seam  (phase1_vm.py scale-region)
+  region   the window: land shares that agree across the scales (within 0.05 of each other, as near 0.6
+           as the bakes allow), high relief, off the poles and the seam  (phase1_vm.py scale-region)
   render   standalone server + Chunky over the window, BlueMap, two pictures per scale
            (tools/review/phase1-scale-one.sh, one scale after the other: they share smoke/standalone)
   stats    land share, relief and slope in the window per scale       (phase1_vm.py scale-stats)
@@ -127,6 +128,7 @@ def step_stats(a):
     print(out.strip()[-1200:])
     # `scale-stats` prints one JSON object per scale (the same as WORK/scale-stats.json): take them from its output.
     stats = []
+    agreement = None
     for line in out.splitlines():
         line = line.strip()
         if line.startswith('{"label"'):
@@ -134,10 +136,17 @@ def step_stats(a):
                 stats.append(json.loads(line))
             except ValueError:
                 pass
+        elif line.startswith('{"agreement"'):
+            try:
+                agreement = json.loads(line)["agreement"]
+            except (ValueError, KeyError):
+                pass
     if len(stats) < len(chosen(a)):
         return False
     os.makedirs(OUT, exist_ok=True)
     json.dump(stats, open(os.path.join(OUT, "scale-stats.json"), "w"), indent=1)
+    if agreement:
+        json.dump(agreement, open(os.path.join(OUT, "scale-agreement.json"), "w"), indent=1)
     return rc == 0
 
 
@@ -161,12 +170,18 @@ def section_html(rel=""):
                      f"<tr><td>metres per block</td><td>{s['m_per_block_h']:g} horizontal, {s['m_per_block_v']:g} vertical</td></tr>"
                      f"<tr><td>planet radius</td><td>{s['radius_km']:,} km</td></tr>"
                      f"<tr><td>this picture spans</td><td>{s['region_km']:,.0f} km square ({REGION:,} blocks)</td></tr>"
+                     f"<tr><td>land share of the window</td><td>{100 * s['land_share']:.1f} %</td></tr>"
                      f"<tr><td>median land slope</td><td>{s['median_slope']:.2f} (95th: {s['p95_slope']:.2f}) blocks of rise per block of run</td></tr>"
                      f"<tr><td>land steeper than 45°</td><td>{100 * s['steep_share']:.1f} %</td></tr>"
                      f"<tr><td>highest ground</td><td>y {s['max_y']} ({(s['max_y'] - 63) * s['m_per_block_v'] / 1000:.1f} km above sea level)</td></tr></table>")
         cols.append(f'<div class="col"><h3>{esc(lab)}</h3>{pics}{facts}</div>')
-    note = (f"Window {REGION:,} × {REGION:,} blocks centred on block {region['cx']:,}, {region['cz']:,} (land {100 * region['land']:.0f} %), the same longitude and "
-            f"latitude at every scale." if region else "")
+    note = ""
+    if region:
+        by = region.get("land_by_scale") or {}
+        shares = ", ".join(f"{100 * v:.0f} %" for v in by.values())
+        note = (f"Window {REGION:,} × {REGION:,} blocks centred on block {region['cx']:,}, {region['cz']:,}, the same longitude and latitude at every scale, "
+                f"chosen so the three land shares agree within {100 * region.get('land_tol', 0.05):.0f} points ({shares}; target "
+                f"{100 * region.get('land_target', 0):.0f} %) and the slope statistics compare like with like.")
     return (f'<div class="scale"><p>One planet (seed, start and length equal), simulation C = {C:,} blocks (the Petroff-Guyou world is a little smaller: 26,112 x 13,056 blocks), vertical scale 35 m per block at every scale: only '
             f'the metres a block stands for change. {esc(note)} Wider features take more blocks at 1:100; at Earth proportions a mountain range '
             f'a few hundred kilometres wide is a few hundred blocks and a plain is the size of a Minecraft village.</p>'

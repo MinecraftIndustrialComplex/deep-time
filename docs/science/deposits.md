@@ -7,7 +7,7 @@ active rows, 77 are `verified`, 37 rest on an abstract, 20 name a source nobody 
 contradicted its sources: the secular clocks (below) were never applied to a real history, so no
 banded iron formation could form.
 
-Ledger ids on this page: `DEP-001` to `DEP-205` ([ledger/DEP.md](ledger/DEP.md)) and `ORE-001` to
+Ledger ids on this page: `DEP-001` to `DEP-211` ([ledger/DEP.md](ledger/DEP.md)) and `ORE-001` to
 `ORE-269` ([ledger/ORE.md](ledger/ORE.md)); rows marked `merged` are owned by the row they name.
 
 Changed on 2026-10-02 by the owner's answers on deposits (decisions log 2026-10-02): inherited
@@ -20,6 +20,11 @@ Changed on 2026-10-16 by the owner's answer on placer blocks (decisions log 2026
 without a gold ore for gravel (no Excavated Variants), a placer's gold in a gravel or sand bar is
 vanilla's suspicious gravel or sand, brushed out as gold nuggets. Section "Placer gold as panning"
 has the rules and the compatibility notes.
+
+Changed on 2026-10-17 by the coordinator's call on the gossan (decisions log 2026-10-17, "gossan
+stays at the surface"): the iron cap over an exposed porphyry is as thick as the water table is
+deep (at most 300 m, never under two blocks) and crops out as bare ironstone instead of being
+dressed in soil. Section "The gossan" has the rules, the sources and the limits.
 
 Changed on 2026-10-17 by the coordinator's call on Lootr (decisions log 2026-10-17): the nuggets
 are rolled when the block is placed and the block entity holds them with no loot table, so a
@@ -45,7 +50,9 @@ The deposit families are:
   a granite-like intrusion, under or near old volcanic arcs where plates converged. A median one
   holds 400 to 450 copper ore blocks. Where erosion has cut into one, a **supergene blanket** of
   richer copper can lie at the old water table, and **placer gold** gravel lies in the rivers
-  downstream.
+  downstream. Where one reaches the surface it is capped by a **gossan**, a rust-coloured sheet
+  of ironstone (Create's ochrum in MIC) that shows as bare rock on the ground, two blocks thick or
+  more, with a little gold in it.
 - **Mississippi Valley-type zinc and lead** in limestone and dolostone of platforms near old
   mountain belts, and **sedimentary exhalative (sedex) zinc and lead** in black shale of rift basins.
 - **Banded iron formation**: sheets of iron ore in a few old basins of the stable continental
@@ -113,7 +120,7 @@ host rock in the top 2 km) and three global clocks.
    (P90, P50, P10); grades are drawn with the published correlations (a Gaussian copula).
 7. **Bodies.** Each deposit becomes zoned bodies (porphyry: ore core, phyllic and propylitic halo,
    lithocap, gossan; coal: one body per seam) sized from tonnage and rock density and enlarged by
-   the type's size multipliers. In a zone a host block becomes ore with the zone's density times
+   the type's size multipliers (the gossan's thickness is not a size multiple: see "The gossan"). In a zone a host block becomes ore with the zone's density times
    the richness settings (ORE-262, at most 0.9), and a share of the ore blocks of the richest zone
    is the material's raw-ore block (ORE-266), so the richness reaches the blocks.
 8. **Petroleum** follows its own path: Lopatin's time-temperature index (TTI) accumulates in each
@@ -126,6 +133,49 @@ host rock in the top 2 km) and three global clocks.
    as a co-product had satisfied the copper essential. The spawn is no longer drawn toward
    essentials (Ben, 2026-10-05, "I don't believe we need spawn selectoin since we have some passive
    iron gen like vanilla"): it is the dry, flat land nearest (0, 0) (BAK-015).
+
+## The gossan
+
+A porphyry whose top the surface has reached is oxidised: the sulphides it holds, mostly pyrite,
+make sulphuric acid that dissolves the copper and carries it down to the water table, and the iron
+stays behind as a rust-coloured, porous, hematite, goethite and jarosite rock, the **leached cap**
+or gossan (SIR 2010-5070-B pp. 66 to 67, 120). The copper redeposits in a richer blanket at the top
+of the water table (the supergene blanket above), so the cap ends where the blanket begins.
+
+What the sources say about how thick it is:
+
+| Source | Statement | Where |
+|---|---|---|
+| SIR 2010-5070-B (John et al. 2010) | "The thickness of leached capping is highly variable and ranges from 0 to several hundred meters in most PCDs" | p. 4, again at pp. 64 to 65 |
+| same | supergene-enriched zones "can range from a few meters to more than 200 meters in thickness and generally have a hematitic leached cap as much as tens of meters in thickness" | p. 67 |
+| same | the blanket forms "at the top of the water table", and leaching needs the drawdown of the water table to outrun erosion | pp. 120 to 121 |
+| Cook and Porter 2005 | Inspiration, Arizona: the "remnant leached cap varied from 0 to 300 m in thickness" | PDF p. 19 |
+| same | Tyrone, New Mexico: a blanket "from a few metres to more than 100 m in thickness" under "a comparable remnant thickness of leached capping (60 to 150 m thick)" | PDF p. 26 |
+| same | Silver Bell, El Tiro pit: a "60 m thick" blanket "overlain by a 30 m thick remnant leached capping"; older "hematite capping exposed on ridges and slopes" | PDF p. 14 |
+| same | a deposit "represented at surface by heavily iron stained leached capping outcrops" | PDF p. 24 |
+
+So a cap is tens of metres where the table is shallow and the climate wet, and up to a few hundred
+where it is deep and dry. The model takes the cap's thickness from the column's own water table
+(DEP-209): the surface stage's `deeptime:water_table_depth_m`, which is 5 m plus 150 m times
+(1 − min(1, precipitation over potential evaporation)) plus 5 % of the local relief, so a humid
+valley has a thin cap and an arid plateau a thick one; the supergene child already reads the same
+column. It is at most 300 m (Inspiration's largest, and the data file's placeholder for "several
+hundred", DEP-205). At 35 m per block that is 2 to 9 blocks.
+
+Two rules are the project's, not the sources' (coordinator's calls, decisions log 2026-10-17):
+
+- **Never under two blocks** (DEP-210). The cap was 40 m, 1.1 blocks at 35 m per block, a single
+  sheet. The soil rule (grass and three blocks of dirt) painted over it, so a probe found ironstone
+  in the body and the player never saw any. Two blocks is the least that reads as an outcrop.
+- **Bare rock where it crops out** (DEP-211). Over an exposed cap the soil goes too: every solid
+  block from the ground down to the cap's bottom becomes the gossan's rock. Cook and Porter
+  describe deposits "represented at surface by heavily iron stained leached capping outcrops", so
+  a cap that reaches the ground is rock at the ground. It is a game rule that the whole soil
+  profile goes: the sources say nothing of the soil over a cap, and the generator's surface rules
+  cover stone with grass and dirt. The cap is placed where the simulation's surface was, and
+  the generated terrain differs by a block or three (the amplifier's relief), so "exposed" means
+  the ground is no more than four blocks above the cap's top; a cap buried deeper (one cut by
+  erosion and then covered, placed under the surface that cut it) is left under its cover.
 
 ## Equations and constants
 
@@ -148,6 +198,9 @@ The main constants by family; the ledgers hold every row.
 | DEP-051 | Placer gold grade | 0.084 / 0.2 / 0.48 | g/t | same, Fig. 197 | `verified` |
 | DEP-207 | Placer shed by a cut porphyry | tonnage = size draw × eroded fraction (1 − fraction left); gold cap × the same fraction | Mt of gravel | none found (game choice, Ben 2026-10-05) | `game-choice` |
 | DEP-208 | Smallest placer shed by a cut porphyry | dropped below 0.022 Mt of gravel (the model's P90, DEP-050) | Mt | the data's own smallest size | `game-choice` |
+| DEP-209 | Gossan (leached cap) thickness | water table depth (`deeptime:water_table_depth_m`), at least the file's 40 m, at most 300 m | m | SIR 2010-5070-B pp. 65, 67, 120; Cook and Porter 2005 (Inspiration 0 to 300 m) | `verified` (the ranges and the water-table link); the mapping from depth to thickness is the project's |
+| DEP-210 | Least gossan thickness | 2 blocks (70 m at 35 m per block) | blocks | none (game choice, coordinator 2026-10-17) | `game-choice` |
+| DEP-211 | Exposed gossan crops out as bare rock | solid blocks from the ground to the cap's bottom become its rock when the ground is at most 4 blocks above its top | blocks | none (game choice, coordinator 2026-10-17) | `game-choice` |
 | DEP-062 | Banded iron formation tonnage | 11 / 170 / 2,400 (n 66) | Mt | Bulletin 1693 model 34a, Fig. 172 | `verified` |
 | DEP-063 | Banded iron formation grade | 30 / 53 / 66 | % Fe | same, Fig. 173 | `verified` |
 | DEP-065 | Banded iron formation density | 1 / 4 / 12 | per 100,000 km² | none (placeholder) | `uncited` |
@@ -427,6 +480,12 @@ The rules (ORE-269):
   (its large end, 86 Mt, is twice the MVT-only model's 42 Mt); sedex uses the shale-hosted
   amagmatic group (25 of 179 sedex deposits); banded iron formation is one model for Superior and
   Algoma types, and its 53 % median iron is enriched ore, not primary iron formation.
+- **The gossan is one rock and one thickness rule.** Real caps are hematitic over chalcocite-rich
+  protore, goethitic over chalcopyrite and limonitic over pyrite (SIR p. 120); the model has one
+  class, ironstone. Its thickness follows the present water table, not the history of the
+  water table's descent, which is what actually sets a cap (Cook and Porter 2005 describe
+  several cycles of enrichment and leaching at Tyrone), and its base is flat. Caps that no longer exist (eroded after the table fell)
+  and caps over a body that erosion only cut are not modelled apart.
 - **The clocks are Earth's dates.** They are applied by the planet's age; a planet younger than
   Earth sits earlier in Earth's history. The dates are earliest known occurrences, not physical
   limits.
@@ -463,6 +522,10 @@ The rules (ORE-269):
   are 1.75 times the values tuned at 20 m per block, so at 35 m per block bodies keep the height
   in blocks they had (Ben, decisions log 2026-10-03, "Keep today's block height").
 - Placer gold moved into a real river channel within 30 km at the bake (Ben, 2026-10-01).
+- The gossan: thick as the water table is deep within 2 blocks and 300 m, and bare rock where it
+  crops out (coordinator's calls, decisions log 2026-10-17; DEP-209 to DEP-211). The cap's
+  thickness follows the sources for leached caps; the two-block floor and the bare outcrop are
+  the project's.
 - Partial placer shedding (Ben, 2026-10-05, "Reword check + partial shedding"): a porphyry the surface
   only cuts sheds a placer in proportion to the share of its volume eroded (DEP-207), with a floor
   at the smallest recorded placer (DEP-208). On Earth a placer's gold does come from the erosion of
@@ -518,7 +581,9 @@ How each was read in stage 2 (full entries in [bibliography.md](bibliography.md)
   (OFR 2011-1296), SAIMM-coalfields, Hancox2014, BAP2018, Smolinski2014, Nelsen2016, ICS2023,
   Tuttle2000 (DDS-60 data form), USGS2000b (DDS-60 chapters), Moore2003, Nuccio1994, Nuccio2003,
   Dubiel2003, Spencer1988, Higley2005, Newell1997, Acklam, Hormann1993 (preprint), Blackman2021,
-  AbramowitzStegun1964, Cooke2005 (author's copy), Bliss1992. Added 2026-10-02 for the
+  AbramowitzStegun1964, Cooke2005 (author's copy), Bliss1992. Added 2026-10-17 for the gossan:
+  CookPorter2005 (open author copy, pp. 207 to 242; the three leached-cap thicknesses above) and
+  John2010 pp. 65 to 67 and 120 re-read. Added 2026-10-02 for the
   iron-formation basins: WAEPA1974_HamersleyIronProvince (excerpt), MarshSchlinger1980,
   Pufahl1996, Bunting1986 (excerpts), Abbott2000, Hasterok2022 (areas computed from its open
   data); and MinecraftSources (vanilla's OreVeinifier) for the raw-ore share.

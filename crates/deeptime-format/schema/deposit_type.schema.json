@@ -169,6 +169,7 @@
               "when": {"enum": ["preserved", "exposed"]},
               "scale_h": {"type": "number", "exclusiveMinimum": 0},
               "thickness_m": {"type": "number", "exclusiveMinimum": 0},
+              "thickness_to_water_table": {"type": "boolean", "default": false, "description": "reach down to the site's water table (a leached cap), at most 300 m; thickness_m is the fallback and the floor"},
               "rock_class": {"type": ["string", "null"]},
               "zones": {"type": "array", "items": {"$ref": "#/$defs/zone"}}
             }
