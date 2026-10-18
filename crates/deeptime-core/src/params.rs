@@ -733,7 +733,7 @@ impl Default for TectonicParams {
             island_arc_km3_per_km_myr: 100.0,     // ledger: PLT-045
             continental_arc_km3_per_km_myr: 35.0, // ledger: PLT-285
             arc_mature_crust_km: 15.0,            // ledger: PLT-047
-            cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
+            cordillera_shortening_mm_yr: 0.0,     // ledger: PLT-048
             cordillera_width_km: 120.0,
             cordillera_height_m: 2500.0, // ledger: PLT-050
             trench_relax: 0.5,

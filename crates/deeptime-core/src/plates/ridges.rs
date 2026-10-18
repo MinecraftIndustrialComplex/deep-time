@@ -44,12 +44,12 @@ use glam::{DQuat, DVec3};
 use rayon::prelude::*;
 
 use super::Env;
+use super::collapse::{iso_height, toward};
 use super::events::{self, PLATE_DEATH, RIDGE_BIRTH};
 use super::gap_budget;
 use super::geometry::{Cover, Geo, Tree, dijkstra_two};
 use super::init::random_rotation;
 use super::kinematics::{arr, quat, to_world};
-use super::collapse::{iso_height, toward};
 use super::pools::{
     accrete, isostatic_change_m, ocean_elevation, ocean_heat_flow, oceanic_column, thickness,
 };
@@ -333,9 +333,9 @@ pub fn resample(
                 if s.kind == CONTINENTAL && !s.is_hidden() && s.pools != blended {
                     let z = f64::from(s.elevation_m);
                     let change = isostatic_change_m(&blended, &s.pools, gravity);
-                    let rise =
-                        toward(z, change, iso_height(&s.pools, z_0, gravity)).min(k.max_elevation_m)
-                            - z;
+                    let rise = toward(z, change, iso_height(&s.pools, z_0, gravity))
+                        .min(k.max_elevation_m)
+                        - z;
                     if rise > 0.0 {
                         s.elevation_m = (z + rise) as f32;
                         s.uplift_mm_yr += (rise / env.dt_yr * 1.0e3) as f32;
