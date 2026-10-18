@@ -288,8 +288,7 @@ impl Default for Flats {
 /// (`placement.json`, `ice_cover`; FORMAT.md, "The ice cover").
 #[derive(Clone, Debug, PartialEq)]
 pub struct IceCoverSpec {
-    /// Metres of land ice (or of height above the equilibrium line, without ice fields) per block
-    /// of cover after the first.
+    /// Metres of land ice per block of cover after the first.
     pub step_m: f64,
     /// The thickest cover, blocks.
     pub max_blocks: u8,
@@ -321,8 +320,8 @@ impl Default for IceCoverSpec {
 }
 
 impl IceCoverSpec {
-    /// Blocks of cover for `above_m` metres of ice (or of ground above its equilibrium line): 0 at
-    /// or below 0, 1 at its foot, one more per `step_m`, up to `max_blocks`.
+    /// Blocks of cover for `above_m` metres of ice: 0 at or below 0, 1 for the first `step_m`, one
+    /// more per `step_m`, up to `max_blocks`.
     pub fn blocks(&self, above_m: f64) -> u8 {
         if above_m.is_nan() || above_m <= 0.0 {
             return 0;

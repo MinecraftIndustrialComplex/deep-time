@@ -164,6 +164,13 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
         bake["climate"]["ice_cover"]["source"], "climate/ice_thickness_m",
         "the deep-time climate's land ice drives the cover"
     );
+    // The cover is the climate's extent less the cells its bodies' balance gave up (BIO-157).
+    let ice = &bake["climate"]["ice_cover"];
+    assert_eq!(
+        ice["cells"].as_u64().unwrap() + ice["trimmed_cells"].as_u64().unwrap(),
+        ice["climate_cells"].as_u64().unwrap(),
+        "{ice}"
+    );
     assert!(bake["meta"]["provinces"]["count"].as_u64().unwrap() >= 1);
     assert!(bake["terrain"]["spawn_candidates"].as_u64().unwrap() >= 1);
     let detail = DetailSpec::of(&m).unwrap().expect("a detail term");

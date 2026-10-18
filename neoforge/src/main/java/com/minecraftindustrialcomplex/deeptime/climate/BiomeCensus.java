@@ -322,7 +322,9 @@ public final class BiomeCensus {
         // ground of one L1 cell (a plateau's edge) count as one class, and a column a lapse rate
         // makes C or D under an L1 cell that is ET counted as a misplaced ET (2026-10-05).
         RasterSampler kp = wd.layer(wd.has("climate/koppen_l2") ? "climate/koppen_l2" : "climate/koppen");
-        RasterSampler iceLayer = wd.has(IceCover.LAYER) ? wd.layer(IceCover.LAYER) : null;
+        // The cover as the ice pass lays it (IceCover.of: the cover rule, BIO-159), so a column counts as glaciated
+        // exactly where the game puts ice on it.
+        IceCover ice = wd.iceCover().orElse(null);
         RasterSampler wetlandLayer = wd.has(Peatland.LAYER) ? wd.layer(Peatland.LAYER) : null;
         var sampler = level.getChunkSource().randomState().sampler();
         int c = t.circumference(), sea = g.getSeaLevel();
@@ -496,7 +498,7 @@ public final class BiomeCensus {
                         // Ground under the ice cover (since 2026-10-18): the bake holds glaciated land in the frozen band
                         // whatever its class (BIO-035) and the game lays snow and ice over it (BIO-084), so the table's
                         // class rule does not place it.
-                        if (iceLayer != null && iceLayer.nearest(x, z) > 0) {
+                        if (ice != null && ice.blocks(x, z) > 0) {
                             n[3]++;
                             continue;
                         }
@@ -530,7 +532,7 @@ public final class BiomeCensus {
                     for (Forbid f : FORBIDDEN) {
                         if (!f.koppen().test(k))
                             continue;
-                        if (f.glaciated() != null && f.glaciated() != (iceLayer != null && iceLayer.nearest(x, z) > 0))
+                        if (f.glaciated() != null && f.glaciated() != (ice != null && ice.blocks(x, z) > 0))
                             continue;
                         if (f.colderThan() != null && !(t.raster("climate/temperature", x, z) < f.colderThan()))
                             continue;

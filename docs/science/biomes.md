@@ -23,7 +23,8 @@ desert class gets the driest humidity band, a rainforest class the wettest, tund
 and so on. Wet, flat, low land that is not frozen becomes swamp (or mangrove where it is hot)
 whatever its class, as in vanilla (BIO-066); "wet" is the cell's own rainfall against evaporation
 (the aridity index), not the humidity band its class is lifted to, since 2026-10-03 (before, every
-subarctic Dfc cell counted as wet because its class sits in vanilla's taiga humidity). Land under ice gets a snow and ice cover whatever the biome, frozen lakes follow the
+subarctic Dfc cell counted as wet because its class sits in vanilla's taiga humidity). Land under the climate's ice gets a snow and ice cover whatever the biome and is of class EF (BIO-158), the
+cover lying only as far as each ice body's balance can feed it (BIO-157); frozen lakes follow the
 mean annual temperature, and other mods can read the monthly climate of any block through
 `DeepTimeClimate`.
 
@@ -86,7 +87,8 @@ third letter:  a if Thot >= 22; else b if at least four months are above 10; els
 | BIO-021 to BIO-024 | vanilla band edges | temperature, humidity, continentalness, erosion, weirdness | | `OverworldBiomeBuilder`, Minecraft 1.21.1 | `verified` |
 | BIO-038 | aridity anchors 0.03, 0.2, 0.5 | UNEP limits | | Zomer et al. 2022, quoting UNEP 1997 | `verified` |
 | BIO-095 | precipitation seasonality | coefficient of variation | % | O'Donnell and Ignizio 2012 (adds 1 mm to the mean) | `verified` |
-| BIO-026 to BIO-070, BIO-075 to BIO-081, BIO-100 to BIO-103, BIO-133 to BIO-136 | the placement table, knobs, cold wetland and ice cover | see ledger | band coordinate, blocks | none: game choices | `game-choice` |
+| BIO-026 to BIO-070, BIO-075 to BIO-082, BIO-084, BIO-100 to BIO-103, BIO-133 to BIO-136, BIO-158 to BIO-160 | the placement table, knobs, cold wetland, the ice cover, the class under it and its read rule, the census's tag gaps | see ledger | band coordinate, blocks | none: game choices | `game-choice` |
+| BIO-157 | an ice body's surface balance on its own ground is at least its climate's, min(0, sum T) | the climate's balance law (GLA-069, GLA-070) | m ice/yr | Meier and Post 1962, Porter 1975, Osmaston 2005, Cuffey and Paterson 2010 (none read) | `from-memory` |
 | BIO-137 | northern peatland share of the world's peatland | 3.21 of 4.23 million km2, about 76 % | million km2 | Xu et al. 2018 (PEATMAP), through a 2025 study that quotes the 3.21 | `cited-unverified` |
 
 ## Earth against the mod
@@ -631,6 +633,11 @@ after).
   with fire, soil and grazing in it (Holdridge's own text notes that most savannas lie in his tropical dry
   forest zone). The rock condition reads the first horizon within 6 blocks of the surface, so a beach whose
   sand horizon covers basalt is not "on basalt".
+- The ice cover's balance closure (BIO-157) scores an ice body with the climate's law on its L2 ground and gives
+  up its most negative cells first. It moves no ice: there is no flow model on L2, so an outlet tongue the climate's
+  coarse cell did not reach is not drawn, and the trim takes a body's lowest cells whether or not they are its
+  terminus. Covered cells are EF by choice (BIO-158): Köppen classes a climate, and the ground beside a glacier's
+  tongue keeps its own class.
 - Expanded Ecosphere is tested in its default mode only. Its COMPATIBLE mode (with TerraBlender) registers a
   TerraBlender region instead of the dimension override; Deep Time would deal that region to provinces like
   any other, untested. EE with Terralith is not supported by EE itself (both define the overworld's biomes).
@@ -645,7 +652,8 @@ the glacier cap (BIO-035), the ocean and latitude-only temperature anchors (BIO-
 humidity rules (BIO-039 to BIO-048, BIO-053, BIO-054, BIO-100), the knobs (BIO-049 to BIO-062), the
 continentalness, erosion and weirdness derivations (BIO-063 to BIO-070), the frozen-ground placement
 (BIO-074 to BIO-078: Ben, decisions log 2026-09-29 and 2026-09-30) and the ice cover (BIO-079 to
-BIO-084: Ben, 2026-09-30). The GameTest floors (BIO-072) were set 0.1 under the lowest share
+BIO-084: Ben, 2026-09-30; its balance closure, the class under it and its read rule, BIO-157 to BIO-159, and the
+census's tag gaps, BIO-160, the agent's, 2026-10-18). The GameTest floors (BIO-072) were set 0.1 under the lowest share
 measured over ten test planets and catch a broken mapping, not a wrong climate. The volcanic biomes (BIO-104 to BIO-114) are Ben's in kind
 (decisions log 2026-10-03, "Tie them to real volcanoes") and the agent's in every number: zone sizes, the
 activity needed for fresh ash, the role order and the tags' order. The biome rules (BIO-115 to BIO-132) are Ben's
@@ -684,5 +692,8 @@ agent's in every number, but the cloud forest's height (BIO-145, read in Scatena
 - Holdridge 1967 (`Holdridge1967`): the sentences on the 30 °C cut-off and the factor 58.93 read.
 - Wikipedia, "Köppen climate classification", "Seawater", "Ecliptic coordinate system": secondary
   sources, read.
+- Meier and Post 1962 (`Meier1962`), Porter 1975 (`Porter1975`), Osmaston 2005 (`Osmaston2005`), Cuffey and
+  Paterson 2010 (`Cuffey2010`, section 4.6): the steady-state balance of a glacier and the AAR and AABR methods,
+  from memory, not read (BIO-157).
 - Not read: Beck et al. 2018 (observed Köppen map), the UNEP atlas (Middleton and Thomas 1997, a
   book), Thornthwaite 1948 (paywalled; belongs to the climate package), Fick and Hijmans 2017.

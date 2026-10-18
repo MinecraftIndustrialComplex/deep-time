@@ -393,12 +393,13 @@ impl State {
                     let div = (qx(c, j, i) - qx(at(i - 1, j), j, i - 1)) / g.dx[j]
                         + (qy(c, j, i) * len_n - q_s * len_s) / (g.dx[j] * g.dy[j]);
                     let above = s[c] - f64::from(f.ela[c]);
-                    let acc = p.acc_max * f64::from(f.precip[c]).max(0.0);
-                    let b = if above >= 0.0 {
-                        (p.beta_acc * above).min(acc)
-                    } else {
-                        p.beta_abl * above
-                    };
+                    let b = super::ice::surface_balance(
+                        above,
+                        f64::from(f.precip[c]),
+                        p.beta_acc,
+                        p.beta_abl,
+                        p.acc_max,
+                    );
                     let mut hh = (thick[c] + dt * (b - div)).clamp(0.0, p.cap_m);
                     // Calving: ice that would float where the depressed bed lies below the sea.
                     let bed = f64::from(f.bed[c]) - depress[c];
