@@ -75,7 +75,7 @@ pub const SEA_BELOW: f64 = 0.5;
 /// over the North Atlantic's 6.4·10¹² m² of open sea poleward of 50° (4.7·10⁻⁶ m/s, so it could
 /// carry 51 Sv), while sinking regions of 1 to 20 coarse cells (at most 1.9·10¹² m²) heated their
 /// sea to 47–360 °C (2026-10-18).
-pub const SINK_RATE_M_S: f64 = 8.0e-6; // ledger: CLM-203
+pub const SINK_RATE_M_S: f64 = 8.0e-6; // ledger: CLM-204
 
 /// What the ocean's transport needs to know of the planet.
 pub struct Setup<'a> {

@@ -6440,3 +6440,24 @@ What an ice sheet is, for the temperate present's land-ice target (decisions log
 - Ledger ids: CLM-203
 - Access: open (data and user guide).
 - Read so far (by the project): through the web fetch tool, 2026-10-18: "The RGI excludes the ice sheets of Greenland and Antarctica"; "It includes all glaciers larger than 0.01 km²"; NSIDC-0770, "a snapshot of the world's glaciers outside of ice sheets". The user guide's dataset summary: 215,547 glaciers in RGI 6.0 and 274,531 in 7.0; its terminus-type table's rows sum to about 705,740 km² (6.0) and 706,744 km² (7.0) (the sums are the agent's, from the table as the fetch tool returned it).
+
+## What a conveyor's sinking region can carry (CLM-204, CLM-205), added 2026-10-18
+
+The conveyor's sinking capacity and the tests' physical ceilings on the per-cell climate, added with the fix for the narrow-inlet conveyor (build log 2026-10-18).
+
+### Walin1982
+- Reference: Walin, G. (1982). On the relation between sea-surface heat flow and thermal circulation in the ocean. Tellus 34(2):187-195.
+- DOI or URL: not looked up (from memory).
+- Cited as: "Walin 1982; from memory" (a region's water-mass transformation is its surface heat loss over rho c_p times the cooling).
+- Ledger ids: CLM-204
+- Access: not checked.
+- Library: not fetched.
+- Read so far (by the project): from memory; the paper was not fetched or read. The form of the bound (water a region can sink = surface heat loss / (rho c_p dT)) is the agent's recollection of the water-mass transformation framework; the rate 8e-6 m/s is calibrated, not taken from the paper.
+
+### WMO-Extremes2025
+- Reference: World Meteorological Organization. Records of Weather and Climate Extremes (table of the WMO World Weather and Climate Extremes Archive, as of 31 July 2025).
+- DOI or URL: https://wmo.int/sites/default/files/2025-07/Table_Records_25Jul2025.pdf (from https://wmo.int/site/world-weather-and-climate-extremes-archive)
+- Cited as: "WMO's Records of Weather and Climate Extremes, as of 31 July 2025" (the wettest place on Earth in the long run).
+- Ledger ids: CLM-205
+- Access: open (agency PDF).
+- Read so far (by the project): fetched and read 2026-10-18 (pdftotext of the table), the greatest average annual precipitation of each WMO region: Region II, Asia, 11.872 m (467.4 in.), 38 years, Mawsynram, India, 25 deg 18' N, 91 deg 35' E, 1,431 m; Region V, South-West Pacific, 11.64 m (460.0 in.), 30 years, Mt. Waialeale, Kauai, Hawaii, 1,569 m; Region I, Africa, 10.287 m (405.0 in.), 32 years, Debundscha, Cameroon, 9 m. The other regions' records are lower: Region III, South America, 8.99 m; Region IV, North America, 7 m (Henderson Lake, British Columbia); Region VI, Europe, 4.593 m (Crkvice).
