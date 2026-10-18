@@ -66,6 +66,7 @@ pub mod fields;
 pub mod flexure;
 pub mod glacial;
 pub mod grid;
+pub mod guard;
 pub mod impacts;
 pub mod lithology;
 pub mod marine;
@@ -1540,6 +1541,9 @@ impl SurfaceStage {
                 );
             }
         }
+
+        // 5d. A surface past any planet's relief stops the run (`guard.rs`).
+        guard::check(w, &sc.h, sea, gravity, t_end_myr)?;
 
         // 6. Outputs.
         let started = Instant::now();

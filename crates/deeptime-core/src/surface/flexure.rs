@@ -20,7 +20,7 @@
 //! - the crust the plate model thickened (its uplift is an Airy elevation: the thickening is
 //!   u / (1 − k), k = ρ_c/ρ_m on land and (ρ_c − ρ_w)/(ρ_m − ρ_w) under water), and the crust the
 //!   plateau spreading moved (`spread.rs`): for these the Airy root `a` is already in the
-//!   elevation;
+//!   elevation, and the spreading's stays there (it bends nothing, ISO-070);
 //! - the step's erosion and deposition, the rock other stages laid on the surface since the last
 //!   step (the volcano stage's cones), the sea over the cell against the sea at the reference,
 //!   and land ice: for these nothing has been applied;
@@ -1371,9 +1371,17 @@ pub fn step(
     // zigzags at the cell scale in about 5 % of margin cells), and a stiff plate passed the whole
     // thickening behind it, 7.0 times the uplift, where local isostasy had passed the uplift. The
     // rest stays locally compensated, as the plate model made it.
+    // ledger: ISO-070
+    // The spreading's root does not bend the plate at all (game-choice: numerical, agent
+    // 2026-10-18): its diffusion of the surface is the locally compensated answer of the channel
+    // flow (Clark & Royden's law is derived with local isostasy; from-memory, the paper is not
+    // read), and its load and root cancel in the residual. A stiff plate that took its change as
+    // crust to be held up passed up to 1 / (1 − k) = 7 times it at the cell scale after an
+    // implicit step. That split grows wherever the spreading's step is strong at the cell scale
+    // (D·Δt·k² above about 0.4), which the cells of large planets reach: a checkerboard of ±50 km
+    // a step on the Earth-sized planet (build log 2026-10-18, the surface divergence).
     let bend_part = {
-        let pr = pick(&|c| cells[c].plate_root);
-        let mut pf = pr.clone();
+        let mut pf = pick(&|c| cells[c].plate_root);
         if x.plate_spacing_m > dxs {
             // Binomial passes (1, 2, 1)/4: nothing of the two-cell wave survives; their
             // variance (half a cell² each) reaches that of half the sample spacing.
@@ -1381,10 +1389,7 @@ pub fn step(
             let passes = (2.0 * half * half).ceil().max(1.0) as usize;
             binomial(&mut pf, ws, hs, passes);
         }
-        (0..ws * hs)
-            .into_par_iter()
-            .map(|c| root[c] - pr[c] + pf[c])
-            .collect::<Vec<f64>>()
+        pf
     };
     let wet = pick(&|c| if h[c] <= sea { 1.0 } else { 0.0 });
     let d_prev = pick(&|c| {
@@ -1907,7 +1912,7 @@ mod tests {
             }
         }
 
-        /// One step: `eroded` is the surface's net change, `spread` the spreading's.
+        /// One step: `eroded` is the surface's net change.
         fn step(
             &mut self,
             p: &FlexureParams,
@@ -1915,6 +1920,20 @@ mod tests {
             st: &mut Option<FlexState>,
             eroded: &[f64],
             sea: f64,
+        ) -> StepOut {
+            self.step_spreading(p, sv, st, eroded, sea, None)
+        }
+
+        /// One step with the plateau spreading after the erosion, `spreading` its strength
+        /// height (m) and D₀ (km²/Myr), on the cells of `d` (`spread::step`).
+        fn step_spreading(
+            &mut self,
+            p: &FlexureParams,
+            sv: &mut Option<Solver>,
+            st: &mut Option<FlexState>,
+            eroded: &[f64],
+            sea: f64,
+            spreading: Option<(f64, f64)>,
         ) -> StepOut {
             let dt_myr = 2.0;
             let h_start: Vec<f64> = self
@@ -1925,6 +1944,9 @@ mod tests {
                 .collect();
             let h_eroded: Vec<f64> = h_start.iter().zip(eroded).map(|(a, b)| a + b).collect();
             let mut h = h_eroded.clone();
+            if let Some((hs, d0)) = spreading {
+                super::super::spread::step(&self.d, &mut h, sea, hs, d0, dt_myr * 1.0e6);
+            }
             let out = step(
                 p,
                 sv,
@@ -2671,5 +2693,56 @@ mod tests {
         );
         let raw = zig(0.0);
         assert!(raw > 1500.0, "unfiltered the thickening shows: {raw} m");
+    }
+
+    /// The plateau spreading on a stiff plate, on cells as wide as the Earth-sized planet's
+    /// (39 km), where its implicit step is strong at the cell scale: D·Δt·k² is about 2.3 for a
+    /// checkerboard on a plateau three times the strength height. Its change is the locally
+    /// compensated answer of the channel flow, and the plate leaves it so (ISO-070): the
+    /// checkerboard flattens step by step and nothing leaves the plateau's range. When the plate
+    /// held the spreading's change up as crust (up to 1 / (1 − k) = 7 times it at the cell
+    /// scale) the checkerboard came back larger with its sign flipped, ±1.8 km after the first
+    /// step: the ±50 km checkerboard of the build log 2026-10-18.
+    #[test]
+    fn the_spreading_on_a_stiff_plate_does_not_grow_a_checkerboard() {
+        let p = on();
+        let (w, h) = (32usize, 32usize);
+        let n = w * h;
+        let (sea, hs, top) = (0.0, 5100.0, 15_000.0);
+        let mut wd = World::new(w, h, top);
+        wd.d = Dims::new(w, h, 39_000.0, true);
+        let (mut sv, mut st) = started(&mut wd, &p, sea);
+        let patch = |c: usize| (8..24).contains(&(c % w)) && (8..24).contains(&(c / w));
+        let sign = |c: usize| if (c % w + c / w) % 2 == 0 { 1.0 } else { -1.0 };
+        for c in (0..n).filter(|&c| patch(c)) {
+            wd.h[c] += 300.0 * sign(c);
+        }
+        let amplitude = |h: &[f64]| {
+            let cells: Vec<usize> = (0..n).filter(|&c| patch(c)).collect();
+            cells.iter().map(|&c| sign(c) * (h[c] - top)).sum::<f64>() / cells.len() as f64
+        };
+        let start = amplitude(&wd.h);
+        for k in 0..8 {
+            wd.step_spreading(
+                &p,
+                &mut sv,
+                &mut st,
+                &vec![0.0; n],
+                sea,
+                Some((hs, 30_000.0)),
+            );
+            let (lo, hi) =
+                wd.h.iter()
+                    .fold((f64::MAX, f64::MIN), |m, &z| (m.0.min(z), m.1.max(z)));
+            assert!(
+                lo >= top - 300.0 - 1.0 && hi <= top + 300.0 + 1.0,
+                "step {k}: the plateau left its range, {lo:.0} to {hi:.0} m"
+            );
+        }
+        let end = amplitude(&wd.h);
+        assert!(
+            start == 300.0 && end.abs() < 0.01 * start,
+            "the checkerboard went from {start:.1} to {end:.1} m"
+        );
     }
 }
