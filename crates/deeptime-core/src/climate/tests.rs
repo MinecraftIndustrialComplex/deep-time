@@ -222,6 +222,49 @@ fn finish(s: &Session) {
     }
 }
 
+/// The present-day target counts ice sheets only (decisions log 2026-10-18): a continuous ice body
+/// of 50 000 km² or more is a sheet (Cogley et al. 2011), whatever its shape and across the
+/// east-west seam; a smaller body is mountain ice, and cells touching only at a corner are two
+/// bodies.
+#[test]
+fn ice_bodies_of_fifty_thousand_km2_are_sheets_and_the_rest_mountain_ice() {
+    let (w, h) = (20usize, 10usize);
+    let geo = Geometry {
+        w,
+        h,
+        area: vec![10_000.0; h],
+        sx: vec![100_000.0; h],
+        sy: vec![100_000.0; h],
+        band: vec![0; h],
+        bands: 1,
+    };
+    let mut ice = vec![false; w * h];
+    let mut set = |i: usize, j: usize| ice[j * w + i] = true;
+    // Five cells (50 000 km²) across the seam: a sheet.
+    for i in [18, 19, 0, 1, 2] {
+        set(i, 0);
+    }
+    // Four cells in a column (40 000 km²): mountain ice.
+    for j in 3..7 {
+        set(10, j);
+    }
+    // Two blocks of three meeting at a corner only: two bodies of 30 000 km².
+    for (i, j) in [(5, 5), (6, 5), (6, 6), (7, 7), (8, 7), (7, 8)] {
+        set(i, j);
+    }
+    let sheet = geo.sheet_cells(&|c| ice[c]);
+    for i in [18, 19, 0, 1, 2] {
+        assert!(sheet[i], "cell {i} of the seam's sheet");
+    }
+    let n_sheet = sheet.iter().filter(|&&s| s).count();
+    assert_eq!(n_sheet, 5, "only the seam's body is a sheet");
+    // One cell more on the column makes it a sheet.
+    ice[7 * w + 10] = true;
+    let sheet = geo.sheet_cells(&|c| ice[c]);
+    assert!((3..8).all(|j| sheet[j * w + 10]));
+    assert!(!sheet[5 * w + 5] && !sheet[7 * w + 7]);
+}
+
 /// Ben 2026-10-02, "Merge with ice sheets off": the flowing sheets stay off in the code's default
 /// and in every built-in preset (game and pipeline) until the per-cell climate (P1-26) fixes the
 /// banded climate's cold bias.

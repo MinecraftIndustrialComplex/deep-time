@@ -18,8 +18,9 @@ Through the whole history, rivers cut into rising land (the stream power law: er
 | [ERO](ledger/ERO.md) | facies and lithology | ERO-086 to ERO-163 (78) |
 | [ERO](ledger/ERO.md) | submarine slope failure | ERO-168 to ERO-170 (3) |
 | [ERO](ledger/ERO.md) | erosion audit, plateaus and the measured diffusivity | ERO-171 to ERO-178 (8) |
+| [ERO](ledger/ERO.md) | the erosion law against measured rates | ERO-179 to ERO-182 (4) |
 
-Rows by status: `cited-unverified` 86, `from-memory` 2, `abstract-only` 3, `calibrated` 6, `game-choice` 6, `uncited` 64.
+Rows by status (2026-10-18, `tools/review/claims_counts.py`): `verified` 9, `cited-unverified` 82, `from-memory` 2, `abstract-only` 4, `calibrated` 8, `game-choice` 10, `uncited` 56.
 
 ## Material for the stage 2 writer
 
@@ -30,10 +31,10 @@ Rows by status: `cited-unverified` 86, `from-memory` 2, `abstract-only` 3, `cali
 
 ## Known before the page is written
 
-- The erodibility `k_spl` is 2e-9 in the Rust default and 3e-9 in all eight presets; the comment describes the older value (extraction notes ERO, flag 1).
+- The erodibility `k_spl` was 2e-9 in the Rust default and 3e-9 in all eight presets, the comment describing the older value (extraction notes ERO, flag 1); since 2026-10-18 both are 1.5e-9 and the comment describes it ("The erosion law against measured rates").
 - The weathering constants (50 m/Myr, depth scale 5 m) have no source; the research note says the rate constants "were not retrieved" (flag 2).
 - The facies rules are, in the research note's words, "my proposal, not a published scheme that was checked".
-- Stage 1 spot checks: the soil-production depth scale of 5 m is 10 to 20 times the 0.25 to 0.5 m that secondary sources give for Heimsath's law (ERO-070, MISMATCH at secondary level); the hillslope diffusivity of 2 m2/yr (ERO-023) is 550 times the only primary value read (Roering et al. 1999, read on 2026-10-16: 0.0036 m2/yr measured on hillslopes, ERO-177; kept at the map scale, see "Plateaus and the hillslope diffusivity"); the Landlab carbonate and marine constants match Landlab's source.
+- Stage 1 spot checks: the soil-production depth scale of 5 m is 10 to 20 times the 0.25 to 0.5 m that secondary sources give for Heimsath's law (ERO-070, MISMATCH at secondary level); the hillslope diffusivity of 2 m2/yr (ERO-023) is 550 times the only primary value read (Roering et al. 1999, read on 2026-10-16: 0.0036 m2/yr measured on hillslopes, ERO-177; kept at the map scale, see "Plateaus and the hillslope diffusivity", and checked against Montgomery & Brandon's quiet-land rate in "The erosion law against measured rates"); the Landlab carbonate and marine constants match Landlab's source.
 
 ## Continental margins and submarine slope failure (margins and spires task, 2026-10-03)
 
@@ -309,4 +310,171 @@ world's shape away from two calibrated targets (land median 284 m and 6.6 % abov
 calibration, and the decisions log of 2026-10-05 rules out tuning K back towards the hypsometry. Keeping both was the
 coordinator's call (STATUS.md, follow-ups from decided questions). What would make plateaus wear like plateaus is
 calibrating K, n, κ and S_c together against measured erosion rates (ERO-171, ERO-172) instead of the hypsometry;
-that is a question for Ben (STATUS.md, pending questions).
+that is a question for Ben (STATUS.md, pending questions). Taken up on 2026-10-18 ("The erosion law against
+measured rates", below): the law now erodes at the measured rates, and the plateaus still wear at range rates.
+
+## The erosion law against measured rates (2026-10-18)
+
+**What was asked.** Recalibrate the surface erosion law (K, n with m = n / 2, κ, S_c) against
+measured erosion rates, Portenga & Bierman 2011 (ERO-171) and Montgomery & Brandon 2002 (ERO-172),
+instead of the hypsometry, which becomes a reference line (decisions log 2026-10-17; STATUS.md
+follow-ups). It went on top of plate task 8 (crust at its Airy height), which had raised the land
+above 2 km from 0.18 to 0.27 of the land.
+
+**The sources.**
+
+- Montgomery & Brandon 2002, read in full (ERO-179 to ERO-181). Their local relief Rz is the range
+  of height within a 10-km circle, averaged over a range or a basin; against it erosion follows
+  their eq. 2, E = 0.01 + 2.5·10⁻⁴ Rz / (1 − (Rz / 1500)²) mm/yr (Rz in m), with Rc = 1,500 m a
+  limiting relief where landsliding takes over, and over all their regions the power law
+  E = 1.4·10⁻⁶ Rz^1.8, which in their words underestimates the rates at high relief. Tectonically
+  quiet land erodes at about 0.2 mm/yr per km of relief (ERO-172). At most 2 % of the land has Rz
+  above 1,500 m and at most 5 % above 1,000 m.
+- Portenga & Bierman 2011 (ERO-171): ¹⁰Be basins erode at a median 54 m/Myr (mean 218), outcrops at
+  5.4 (mean 12); the basins are sampled where rivers cut, so they are not a continental average.
+- Ruetenik et al. 2023 (ERO-182), read in full: fitted to 3,640 catchments' cosmogenic rates with
+  linear hillslope diffusion the slope exponent is n ≈ 2.3 (1 % quantiles 1.59 to 2.70), with m/n
+  held at 0.45; without diffusion n ≈ 1.28. They give no absolute K. Harel et al. 2016 (the source
+  ERO-006 named) could not be fetched (403).
+
+**How the planets are read against them** (`erosion_bands`, ERO-175; `tools/review/erosion-recal.py`).
+Every surface step each land cell's relief is the range over it and its four edge neighbours at the
+step's end, after its uplift and erosion, the heights the implicit stream power acts on (at 4.8-km
+cells the stencil spans 9.6 km, about Montgomery & Brandon's 10-km circle). Their points are
+regions, so the planet is read in regions too: 8 x 8-cell windows (38 km) at least half land,
+classed by their land's mean relief, with the net lowering rate of their land. The fit is the RMS
+of the log ratio between the regions' rate and Montgomery & Brandon in six classes from 100 m of
+relief up: eq. 2 below 1 km, the span between eq. 2 and the power law at 1 to 1.5 km, the power law
+above. The share of land with relief above 1 and 1.5 km is read against ERO-181, the regions'
+median rate against Portenga & Bierman.
+
+**The critical slope from Rc.** The cut acts on each receiver link (no cell stands more than S_c
+times the link's length above the cell it drains to, ERO-012), so S_c caps the relief over a span
+of any length at S_c times that length, whatever the cell size. Montgomery & Brandon's Rc over their
+10-km circle gives S_c = 1,500 / 10,000 = 0.15 (ERO-013), at every preset's cell size alike
+(2.4 km full, 4.8 km quick). 0.35 let 10 km of span stand 3.5 km high.
+
+**κ from the quiet-land line.** With linear diffusion a parabolic hill of half-width L and relief
+Rz lowers at 2 κ Rz / L². For Montgomery & Brandon's quiet-land rate, 0.2 mm/yr per km of relief,
+κ = 10⁻⁷ L² m²/yr: 2 m²/yr for hills 9 km across, the size their circle and the map's two-cell
+stencil see. So κ = 2 at the map's scale is consistent with the measured rates (a check, not a
+fit; the hillslope-scale 0.0036 of ERO-177 is for slopes tens of metres long). On the planets
+diffusion carries 9 to 30 m/Myr of the regions' 51 to 201 m/Myr at 100 to 1,000 m of relief; the
+rest is stream power. κ stays 2 (ERO-023).
+
+**K and n.** Candidates on plate task 8's model (`earthlike_quick_16k`, 500 Myr, seeds 1 and 2,
+both starts, the temperate present; `tools/review/force-balance-ensemble.sh` with `--set`). A
+different n is set at the same erosion where sqrt(A) S is 130 m (about 50 m/Myr): K' = K 130^(2−n).
+Regions' net lowering, m/Myr, by their land's mean relief:
+
+| Run | K, n, S_c | Land | Land above 2 km | Crust | T, °C | CO₂, ppm | Land with relief above 1 / 1.5 km | 100–250 m | 250–500 | 500 m–1 km | 1–1.5 km | 1.5–2 km | 2–3 km | RMS log error | Regions' median, m/Myr |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Montgomery & Brandon | | | | | | | at most 0.05 / 0.02 | 54 | 110 | 210–260 | 525–1,033 | 963 | 1,830 | | |
+| Master | 3e-9, 2, 0.35 | 0.175 | 0.196 | 0.307 | 16.2 | 785 | 0.061 / 0.030 | 75 | 143 | 175 | 204 | 261 | 483 | 0.87 | 10 |
+| Task 8 | 3e-9, 2, 0.35 | 0.187 | 0.282 | 0.378 | 22.4 | 6,609 | 0.080 / 0.045 | 65 | 116 | 163 | 243 | 341 | 599 | 0.71 | 13 |
+| S_c 0.15 | 3e-9, 2, 0.15 | 0.195 | 0.258 | 0.380 | 17.7 | 2,105 | 0.067 / 0.017 | 80 | 150 | 241 | 454 | 815 | 1,122 | 0.30 | 17 |
+| n 2.3 | 6.97e-10, 2.3, 0.15 | 0.179 | 0.269 | 0.361 | 22.0 | 5,297 | 0.063 / 0.018 | 70 | 141 | 246 | 460 | 790 | 883 | 0.35 | 13 |
+| n 2.3, S_c 0.2 | 6.97e-10, 2.3, 0.2 | 0.198 | 0.261 | 0.374 | 21.2 | 5,012 | 0.070 / 0.031 | 73 | 138 | 206 | 342 | 545 | 956 | 0.42 | 12 |
+| n 2.5 | 2.63e-10, 2.5, 0.15 | 0.203 | 0.198 | 0.406 | 17.4 | 1,672 | 0.062 / 0.016 | 76 | 156 | 254 | 463 | 793 | 1,229 | 0.27 | 14 |
+| **K 1.5e-9 (chosen)** | 1.5e-9, 2, 0.15 | 0.198 | 0.249 | 0.386 | 18.9 | 2,835 | 0.060 / 0.016 | 51 | 116 | 201 | 420 | 786 | 1,095 | 0.25 | 9 |
+
+(Means of four runs; CO₂ a geometric mean. m = n / 2 in every row. Half the land lies in regions
+under 100 m of relief, which every row erodes at 7 to 12 m/Myr, about eq. 2's floor of 10.)
+
+What the table says: S_c is what held the high ground. At 0.35 the regions above 1 km of relief
+eroded at 0.3 to 0.5 of the power law and 4.5 % of the land had more than 1.5 km of relief, twice
+Earth's most; at 0.15 they erode at 0.6 to 0.9 of it and 1.6 to 1.8 % of the land is that rough.
+K then sets the low-relief land, where most of the land is: at 3e-9 it eroded at 1.3 to 1.5 times
+eq. 2, at 1.5e-9 within 6 %. n 2.3 and 2.5 at the same erosion fitted no better than n 2 (0.35 and
+0.27 against 0.25), and n 2 lies inside Ruetenik et al.'s range, so n stays 2 (ERO-006, ERO-007).
+The regions' median, 9 to 17 m/Myr in every row, is below Portenga & Bierman's basins (54) and
+above their outcrops (5.4): a planet's regions are mostly quiet land, the basins mostly are not.
+The spread between seeds is large (CO₂ from 1,565 to 5,850 ppm in the chosen row), so the rows'
+land, high ground and climate differ within it; the erosion against relief is what separates them.
+
+**The law chosen:** K = 1.5·10⁻⁹ m⁻¹ yr⁻¹, n = 2, m = 1, S_c = 0.15, κ = 2 m²/yr, in all eight
+presets and the Rust default (ERO-004 to ERO-007, ERO-013, ERO-023; the editor hint, HNT-036).
+
+**Plateau wear, still a gap.** The controlled plateau (ERO-176) wears its interior at 98 to 145
+m/Myr under every law tried (K 1e-9 to 6e-9, n 2 or 2.5, S_c 0.15 or 0.2; `DEEPTIME_PLATEAU_LAWS`)
+and at 131 under the chosen one (stream power 126, diffusion 20, the critical slope 0.6), against 125 before; the critical slope cuts nothing there.
+Only less runoff slows it (10 m/Myr at a tenth of the runoff). Tibet's interior wears at under 10
+m/Myr (ERO-174), so the plateau gap of 2026-10-16 stands at about twelve times: it is the knickpoint
+of a wet plateau's escarpment, not the law's constants. On the planets the high ground's flat part
+(3 x 3 relief under 500 m at the step's end) wears at 105 m/Myr with the chosen law, half of it the
+critical-slope cut: measured at the step's end, ground the cut has just flattened counts as flat,
+so this is not the 2026-10-16 measure (63 m/Myr, read before the step's uplift and erosion).
+
+**Measured: master, plate task 8 and the recalibration.** `earthlike_quick_16k`, the temperate
+present, `DEEPTIME_GAP_BUDGET=1`, both starts; master 6ee43e53, task 8 at 70dfb2a3, the
+recalibration on top of task 8 (`tools/review/force-balance-ensemble.sh`, `tools/review/erosion-recal.py`).
+The recalibration's rows are seeds 1 to 3 at 500 Myr (six runs) and 1 to 4 at 1000 Myr (eight);
+master's and task 8's are the same seeds for the world and the climate, seeds 1 and 2 (four runs)
+for the erosion columns. Means; CO₂ a geometric mean; brackets the runs' range.
+
+| | Land | Land median height, m | Land 90th percentile, m | Land above 2 km | Continental crust | 40–55 km crust below its height, m | T, °C | CO₂, ppm |
+|---|---|---|---|---|---|---|---|---|
+| Earth | 0.289 | 427 | 2,022 | 0.102 | about 0.41 | | about 15 | 280 |
+| Master, 500 Myr | 0.178 | 736 | 2,744 | 0.179 | 0.305 | 2,326 | 15.9 | 730 |
+| Task 8, 500 Myr | 0.192 | 836 | 4,287 | 0.274 | 0.380 | 1,623 | 21.7 | 6,100 |
+| Recalibrated, 500 Myr | 0.194 [0.174, 0.211] | 796 | 3,741 | 0.251 [0.203, 0.301] | 0.377 | 1,766 [1,620, 1,869] | 19.6 [16.8, 21.6] | 3,377 [1,565, 5,850] |
+| Master, 1000 Myr | 0.180 | 851 | 3,092 | 0.220 | 0.324 | | 16.6 | 1,110 |
+| Task 8, 1000 Myr | 0.195 | 1,142 | 5,210 | 0.343 | 0.391 | | 25.8 | 18,900 |
+| Recalibrated, 1000 Myr | 0.212 [0.166, 0.260] | 980 | 4,055 | 0.278 [0.195, 0.367] | 0.414 [0.321, 0.479] | 1,821 [1,650, 2,253] | 18.8 [13.7, 23.7] | 3,245 [802, 18,112] |
+
+| | RMS log error against Montgomery & Brandon | Land with relief above 1 / 1.5 km | Regions' median rate, m/Myr | High ground's flat part, m/Myr |
+|---|---|---|---|---|
+| The sources | 0 | at most 0.05 / 0.02 (ERO-181) | basins 54, outcrops 5.4 (ERO-171) | Tibet's interior under 10 (ERO-174) |
+| Master, 500 Myr | 0.87 | 0.061 / 0.030 | 10 | 85 |
+| Task 8, 500 Myr | 0.71 | 0.080 / 0.045 | 13 | 41 |
+| Recalibrated, 500 Myr | 0.21 | 0.064 / 0.016 | 11 | 107 |
+| Master, 1000 Myr | 0.92 | 0.090 / 0.043 | 20 | 75 |
+| Task 8, 1000 Myr | 0.76 | 0.142 / 0.079 | 36 | 45 |
+| Recalibrated, 1000 Myr | 0.19 | 0.103 / 0.027 | 29 | 75 |
+
+The recalibrated regions' net rate, m/Myr, by their land's mean relief (under 100 m, then the six
+classes of the table above): 7.7 / 54 / 122 / 208 / 425 / 807 / 1,199 at 500 Myr and 10 / 58 / 108 /
+192 / 405 / 799 / 1,329 at 1000 Myr, against Montgomery & Brandon's 54 / 110 / 210 to 260 / 525 to
+1,033 / 963 / 1,830: eq. 2 within 10 % and the power law at 0.66 to 0.84.
+
+What the measurements say:
+
+- *The erosion now matches the measured rates* at both lengths (RMS 0.19 to 0.21 against 0.71 to
+  0.92 before), and the roughest land is rare again at 500 Myr (1.6 % above 1.5 km of relief). At
+  1000 Myr it is 2.7 %, above Montgomery & Brandon's 2 %, and the land with relief above 1 km is
+  6 to 10 % in every configuration, above their 5 %.
+- *The high ground fell, but not to Earth's.* Land above 2 km is 0.25 to 0.28 of the land (task 8
+  0.27 to 0.34, master 0.18 to 0.22, Earth 0.10), the 90th percentile 3.7 to 4.1 km (Earth 2.0).
+  With the erosion at the measured rates, what is left is the uplift's and the crust's, not the
+  erosion law's (inferred; the model's subducting boundary is about five times Earth's, plates.md).
+- *The gap is about where task 8 left it.* The 40–55 km crust stands 1,766 m below its height at
+  500 Myr (task 8 1,623, master 2,326), of it 1,376 m made on the ocean floor. Erosion and its
+  rebound together take 512 m of it (erosion 15,784 m, rebound 15,272), against task 8's 344 and
+  master's 401: faster erosion of the thick crust deepens it a little.
+- *CO₂ is lower but still high,* 3,200 to 3,400 ppm against task 8's 6,100 to 18,900. The rise is
+  the present-day nudge holding the land-ice share at 0.15 on high ground (climate.md, "The present-
+  day nudge on high ground"): every run still ends at 0.145 to 0.160 of the land under ice, and the
+  runs with the most land above 2 km need the most CO₂ (18,112 ppm at 0.35 of the land above 2 km,
+  802 ppm at 0.22).
+- *A snowball in one run.* The supercontinent start, seed 1, at 1000 Myr went through five snowball
+  episodes, with the land below 0 °C from about −700 to −450 Myr; none of the other 13 recalibrated
+  runs did, nor master's or task 8's four 1000-Myr runs. One run in eight; not chased.
+- *The plate checks* (`plate-check`, 1000 Myr, seeds 1 to 4, both starts): 25 of 45 targets met,
+  against task 8's 26 and master's 29. Moved to fail: collision length, 90th percentile (107 →
+  125 Myr, at most 120); most land gained in any step (passed before; 1.53 % of the planet, at most
+  1.50, two runs at 2.5). Moved to pass: steps on which the speed guard binds (0.12 → 0). Still
+  failing and moved: supercontinent tenure 21 → 86 Myr and period 82 → 168 Myr (100 to 300, 400 to
+  800), slab ÷ free plates 2.17 → 2.36 (at least 2.5), continental arc median height 1,095 →
+  1,163 m (1,200 to 4,500), the wedge 59 → 48 km, ocean floor older than 250 Myr 4.6 → 5.0 %. The
+  others are close to task 8's. The erosion law reaches the plates through the
+  loads and the crust's height; the moves are of the size that seeds make (inferred).
+- *The structure stage's arcs* (DEF-026, 500 Myr, seeds 1 to 3): mean lift factor 0.259, strain
+  0.107, 180 fold trains and 608 thrusts a run at the Andean margin, 235 collision fold trains
+  (task 8 with the old law, natural climate, seeds 1 and 2: 0.257, 0.105, 180 and 564, 249). The scale stays
+  0.1 mm/yr.
+
+**Left open.** The plateaus' interior wear (131 against under 10 m/Myr) does not move with the law's
+constants. The high ground's excess (0.25 to 0.28 above 2 km against 0.10) and the land's roughness
+at 1000 Myr (2.7 % above 1.5 km of relief) remain with the erosion at the measured rates. The temperate present's target counted mountain ice,
+so on these planets it asked for thousands of ppm of CO₂ (CLM-150). Decided the same day (decisions
+log 2026-10-18): it counts ice sheets only (CLM-203; climate.md, "The target counts ice sheets").

@@ -425,6 +425,14 @@ pub fn report(
             "foreland": {"fold_train": counts.shortened_by[2][0], "thrust": counts.shortened_by[2][1]},
             "basin": {"fold_train": counts.shortened_by[3][0], "thrust": counts.shortened_by[3][1]},
         },
+        // The Andean rule's inputs (DEF-026): continental arc and back-arc cell-steps, their mean
+        // lift factor, the share at full lift, and their mean Andean strain.
+        "arc_rule": {
+            "cell_steps": counts.arc_cell_steps,
+            "mean_lift": counts.arc_lift_sum / counts.arc_cell_steps.max(1) as f64,
+            "lifted_share": counts.arc_lifted_steps as f64 / counts.arc_cell_steps.max(1) as f64,
+            "mean_strain": counts.arc_strain_sum / counts.arc_cell_steps.max(1) as f64,
+        },
         "saturated": counts.saturated,
         "overprinted": counts.overprinted,
         "subducted": counts.subducted,

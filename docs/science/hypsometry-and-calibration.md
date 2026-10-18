@@ -24,3 +24,4 @@ Rows by status: `cited-unverified` 10, `abstract-only` 1, `calibrated` 18, `game
 
 - The accepted band for median land height (430 to 640 m) reaches about 50 % above Earth's 427 m.
 - Volcano volume is a known contributor to land that stands too high; it was kept as a game choice.
+- Since the erosion recalibration of 2026-10-18 the erosion law (K, m, n, κ and S_c: ERO-004 to ERO-007, ERO-013, ERO-023) is set against measured erosion rates (Portenga & Bierman 2011 and Montgomery & Brandon 2002: ERO-171, ERO-172, ERO-179 to ERO-181; n from Ruetenik et al. 2023, ERO-182), no longer against the hypsometry. HYP-001 to HYP-004 stay the reference lines the runs are reported against, as the erosion rates were before; see [erosion-and-sediment.md](erosion-and-sediment.md), "The erosion law against measured rates".

@@ -215,13 +215,15 @@ struct Track {
     continental: bool,
 }
 
-/// How a resampling made a sample: the top cover's old corners and weights, and the pools it
-/// blended before any accretion. `None`: new crust.
+/// How a resampling made a sample: the top cover's old corners and weights, and the pools and
+/// elevation it blended before any accretion (which since plate task 8 raises the surface by the
+/// accreted crust's Airy height). `None`: new crust.
 #[derive(Clone, Copy, Debug)]
 pub struct Trace {
     pub tri: [u32; 3],
     pub w: [f64; 3],
     pub pools: [f32; pool::COUNT],
+    pub z: f32,
 }
 
 /// One band's state at a snapshot: visible continental samples.
@@ -391,8 +393,16 @@ impl GapBudget {
 
     /// Books the surface feedback just applied: per sample, the material it took (m, + laid
     /// down) and the parts of its elevation change (m), `surface[k]` for [`SURFACE_PARTS`]`[k]`;
-    /// the rest of the elevation change is the carry.
-    pub fn book_surface(&mut self, samples: &[Sample], material: &[f64], surface: &[Vec<f64>]) {
+    /// the rest of the elevation change is the carry. `cone_iso` (per sample, m, or empty) is the
+    /// change of Airy height from the volcano stage's cones joining the pools: it is theirs
+    /// ([`Part::Later`]), not the erosion's.
+    pub fn book_surface(
+        &mut self,
+        samples: &[Sample],
+        material: &[f64],
+        surface: &[Vec<f64>],
+        cone_iso: &[f64],
+    ) {
         assert_eq!(
             surface.len(),
             SURFACE_PARTS.len(),
@@ -406,7 +416,9 @@ impl GapBudget {
                 l[*part as usize] = x[v];
                 carry -= x[v];
             }
-            d[Part::Erosion as usize] = m - diso;
+            let cone = cone_iso.get(v).copied().unwrap_or(0.0);
+            d[Part::Later as usize] -= cone;
+            d[Part::Erosion as usize] = m - (diso - cone);
             l[Part::Erosion as usize] = m;
             d[Part::Carry as usize] = carry;
             l[Part::Carry as usize] = carry;
@@ -418,9 +430,9 @@ impl GapBudget {
     pub fn resampled(&mut self, samples: &[Sample], traces: &[Option<Trace>]) {
         let (z_0, g) = (self.z_0, self.gravity);
         let old = std::mem::take(&mut self.track);
-        // Per new sample: its account, its change of gap by part and its blend's change of
-        // elevation (accretion leaves the elevation as it is).
-        let rows: Vec<(Track, [f64; PARTS], f64)> = samples
+        // Per new sample: its account, its change of gap by part and its blend's and accretion's
+        // changes of elevation.
+        let rows: Vec<(Track, [f64; PARTS], [f64; 2])> = samples
             .par_iter()
             .zip(traces.par_iter())
             .map(|(s, tr)| {
@@ -438,7 +450,7 @@ impl GapBudget {
                         iso,
                         continental,
                     };
-                    return (t, d, 0.0);
+                    return (t, d, [0.0; 2]);
                 };
                 let mut parts = [0.0f64; PARTS];
                 let mut ocean = [0.0f64; PARTS];
@@ -454,7 +466,7 @@ impl GapBudget {
                     was += tr.w[k] * f64::from(o.z - o.iso);
                     was_z += tr.w[k] * f64::from(o.z);
                 }
-                let blended = f64::from(z) - iso_height(&tr.pools, z_0, g);
+                let blended = f64::from(tr.z) - iso_height(&tr.pools, z_0, g);
                 d[Part::ResampleBlend as usize] = blended - was;
                 d[Part::ResampleAccrete as usize] = f64::from(z - iso) - blended;
                 for (p, x) in parts.iter_mut().zip(&d) {
@@ -472,7 +484,7 @@ impl GapBudget {
                     iso,
                     continental,
                 };
-                (t, d, f64::from(z) - was_z)
+                (t, d, [f64::from(tr.z) - was_z, f64::from(z - tr.z)])
             })
             .collect();
         for ((_, d, lift), s) in rows.iter().zip(samples) {
@@ -481,7 +493,8 @@ impl GapBudget {
                 for (a, x) in row.iter_mut().zip(d) {
                     *a += x;
                 }
-                row[PARTS + Part::ResampleBlend as usize] += lift;
+                row[PARTS + Part::ResampleBlend as usize] += lift[0];
+                row[PARTS + Part::ResampleAccrete as usize] += lift[1];
             }
         }
         self.track = rows.into_iter().map(|(t, _, _)| t).collect();
@@ -640,7 +653,7 @@ mod tests {
         samples[1].elevation_m -= 200.0;
         let mut surface = vec![vec![0.0; 3]; SURFACE_PARTS.len()];
         surface[0][1] = 800.0;
-        b.book_surface(&samples, &[0.0, -1000.0, 0.0], &surface);
+        b.book_surface(&samples, &[0.0, -1000.0, 0.0], &surface, &[]);
         let t = &b.track[1];
         let erosion = t.parts[Part::Erosion as usize] + t.parts[Part::Rebound as usize];
         assert!(
@@ -669,7 +682,9 @@ mod tests {
         blended.pools = pools;
         blended.pools[pool::SEDIMENT] += 500.0;
         blended.thickness_m = blended.pools.iter().sum();
-        blended.elevation_m = 0.5 * (samples[0].elevation_m + samples[1].elevation_m);
+        // The accretion also raised the surface 50 m (its Airy height, plate task 8).
+        let blend_z = 0.5 * (samples[0].elevation_m + samples[1].elevation_m);
+        blended.elevation_m = blend_z + 50.0;
         let mut fresh = samples[2];
         fresh.elevation_m = -2500.0;
         let new = vec![blended, fresh];
@@ -680,13 +695,14 @@ mod tests {
                     tri: [0, 1, 2],
                     w: [0.5, 0.5, 0.0],
                     pools,
+                    z: blend_z,
                 }),
                 None,
             ],
         );
         assert!(b.worst_residual_m() < 1.0, "{}", b.worst_residual_m());
         let acc = b.track[0].parts[Part::ResampleAccrete as usize];
-        let expect = 0.5 * f64::from(accreted) - 500.0 / F;
+        let expect = 0.5 * f64::from(accreted) - 500.0 / F + 50.0;
         assert!((f64::from(acc) - expect).abs() < 1.0, "{acc} vs {expect}");
         b.end_step(&new);
         b.snapshot(&new, 2.0, 2.0);
