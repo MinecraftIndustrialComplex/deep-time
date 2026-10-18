@@ -158,11 +158,16 @@ def section_html(rel=""):
     stats = {}
     p = os.path.join(OUT, "scale-stats.json")
     if os.path.exists(p):
-        stats = {s["m_per_block_h"]: s for s in json.load(open(p))}
+        # The manifest's metres per block is the world's own (a Petroff-Guyou world's block is not the preset's), so match each
+        # scale to the statistics row nearest its preset value.
+        rows = json.load(open(p))
+        for _, m in SCALES:
+            if rows:
+                stats[m] = min(rows, key=lambda r: abs(r["m_per_block_h"] - m))
     region = json.load(open(os.path.join(OUT, "region.json"))) if os.path.exists(os.path.join(OUT, "region.json")) else None
     cols = []
     for lab, m in SCALES:
-        s = stats.get(float(m))
+        s = stats.get(m)
         have = os.path.exists(os.path.join(OUT, f"h{m}-tilt.png"))
         pics = (f'<a href="{rel}h{m}-tilt.png"><img src="{rel}h{m}-tilt.png" alt="{esc(lab)} from the south, tilted"></a>'
                 f'<a href="{rel}h{m}-flat.png"><img src="{rel}h{m}-flat.png" alt="{esc(lab)} from above"></a>') if have else "<p class=\"bad\">not rendered</p>"
@@ -186,7 +191,8 @@ def section_html(rel=""):
     if region:
         by = region.get("land_by_scale") or {}
         shares = ", ".join(f"{100 * v:.0f} %" for v in by.values())
-        where = "; ".join(f"1:{m} at block {w['cx']:,}, {w['cz']:,}" for m, w in (region.get("windows") or {}).items())
+        names = {str(m): lab for lab, m in SCALES}
+        where = "; ".join(f"{names.get(m, m)} at block {w['cx']:,}, {w['cz']:,}" for m, w in (region.get("windows") or {}).items())
         note = (f"Each window is {REGION:,} × {REGION:,} blocks ({where}), chosen on its own bake so that the three land shares agree within "
                 f"{100 * region.get('land_tol', 0.05):.0f} points ({shares}; target {100 * region.get('land_target', 0):.0f} %) and the slope statistics "
                 f"compare like with like.")
