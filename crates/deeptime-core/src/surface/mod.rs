@@ -1872,6 +1872,10 @@ impl SurfaceStage {
             );
         }
         world.surface = Some(st);
+        if last {
+            // The glaciers' working arrays stay between steps; not past the last (P1-19).
+            sc.glacial.release_work();
+        }
         self.scratch = Some(sc);
         Ok(())
     }
