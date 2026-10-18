@@ -342,7 +342,14 @@ the GameTest planets); EE's surface rule paints the terrain as Terralith's does 
 keeps EE's override, as EE intends. One part of EE's surface rule is left out of Deep Time levels: a layer of smooth
 basalt below y −55, drawn for vanilla's 384-block world, which in a Deep Time world (floor at −512) replaced every
 rock class below −55 (BIO-131; a pack's top-level layers between two fixed heights, other than vanilla's deepslate
-and the bedrock floor, are left out; the strata are the rock there).
+and the bedrock floor, are left out; the strata are the rock there). One of EE's biomes is kept out for the same
+reason (BIO-155): its calcite caverns, a cave biome its list places by depth (0.35 to 0.9) under much of the world,
+the deep sea included, carry a surface rule that paints diorite on every stone block of the biome at every depth.
+The strata pass leaves a surface rule's blocks, so in a Deep Time world a cavern region was diorite from the cave
+level down, whatever the strata held: on the 2026-10-17 test planet 22 of the parity test's 146 rock samples, all
+under the deep sea, were diorite where the strata are gneiss or basalt. Kept out, the next biome of EE's list at
+that depth answers and the strata stay the rock. The same rule paints EE's thermal taiga biomes, which stay: they
+stand only in real volcano zones (Ben, decisions log 2026-10-05, "Leave it, check in game").
 
 **Biome rules.** EE's own list puts biomes where Deep Time's climate coordinates never reach: its ice cap below
 vanilla's lowest temperature (−1.2 to −1.0), its salt lakes, mud pools and Tibesti mountains above the warm end
@@ -352,7 +359,14 @@ temperate rainforest in the wettest cold cells, so 28 % of the humid boreal fore
 rainforest; snowy taiga and ice spikes in the tundra. A rule file (`data/<ns>/deeptime/biome_rules/*.json`,
 FORMAT.md "Biome rules"; Java `climate/BiomeRuleSet`, `climate/BiomeRules`) places a pack's biomes from Deep Time's
 own coordinates: the Köppen class, the climate at the column in °C and mm, the wetland flag, the ice cover, the
-playas, the volcanic zones and the rock at the surface. The first rule that holds runs the pack's own climate
+playas, the volcanic zones and the rock at the surface. The class is the one the bake placed the biome inputs by
+(`climate/koppen_l2`: each L2 cell's months lapsed to its own height) where the bake wrote it. Until 2026-10-17 the
+rules read the climate stage's L1 class, which gives the low ground of an L1 cell the class of the high ground it
+shares the cell with: on that day's test planet 757 of the 3,027 columns a rule decided lay outside the rule's
+classes on the L2 class (tundra on a Csb coast below a plateau, a snow-capped volcano in BSk). Read on the L2 class,
+the rules decided 2,743 columns of the same planet and none lay outside its rule's classes; the icy volcano fell from
+218 columns to 37 (the other cones take the role tag's plain volcano, 269 → 450), low-arctic tundra from 161 to none,
+and Mediterranean scrub rose from 299 to 423. The first rule that holds runs the pack's own climate
 search over that rule's biomes alone, so the pack still picks among them by its ranges (a hot-spring field takes
 the snowy or the plain thermal taiga by temperature). A rule's biomes may be exclusive: kept out of the climate
 search elsewhere, as the volcanic biomes are; a file may also keep biomes out without placing them anywhere: EE's
@@ -447,6 +461,38 @@ where the mean minimum temperature drops below 18 °C, "on large equatorial inla
 BIO-145). The latitude limit (about 23° N to 25° S) is from a secondary snippet, not read (BIO-144, `from-memory`).
 The Köppen classes C at tropical latitudes are mountain climates by construction (a coldest month under 18 °C at low
 latitude needs height), so the rule asks the classes rather than a temperature.
+
+The census's cloud forest ground (BIO-154) is the rule's own: the four classes, the latitude, the height and P/PET
+above 1, read from the level's monthly climate with the bake's Thornthwaite arithmetic (MOI-065, MOI-066). Columns in
+a volcano zone are left out, as from every pack check, because a volcano zone's biome comes before the table. Until
+2026-10-17 the census did not check P/PET. That held while it read the L1 class, and stopped holding when it moved
+to the L2 class with plate task 7's merge: on the L2 class every column of the tropics that is high enough is a C
+class, dry ones too. On that day's 4k test planet with MIC the old ground held 261 sampled columns, 69 of them on the
+cloud forest (0.264, under the bound of 0.3). 72 of the 261 are dry (P/PET at most 1, where the rule never fires) and
+9 lie in volcano zones; the rule's ground is the other 180, 67 of them on the cloud forest (0.372). The rest of that
+ground is on Terralith's highlands (28), temperate highlands (18), lavender valley (11), alpine highlands (10), lush
+valley (10) and plains (7).
+
+Why those columns missed the slot showed on the next planet. The P1-26 rain merge (master 68d95f44, the same
+day) changed the test planet: its census holds 11,574 land columns instead of 7,228 and 1,252 volcano cone columns
+instead of 450. The census's ground fell to 34 columns, 8 on the cloud forest (0.235), with 90 left out as volcanic and
+84 as dry. The bake decides the rule per L2 cell (8 blocks on the 4k planet) on the young landscape's height and that
+height's P/PET. The level does not carry that height, so the census's block heights only estimate it, and amplified
+relief puts single blocks above 1,000 m in cells below it and the reverse. The bake marks every cell where the rule
+fired: it clamps the cell's erosion and continentalness to the rule's floors (0.62 and 0.35, continentalness inland
+of the beach strip). Of the 34 columns, only 5 lay in such a cell, and 4 of those 5 were on the cloud forest. Of the
+other 29, 4 were. So since 2026-10-17 the census's ground also asks for the bake's mark, with the floors read from the
+table the bake recorded (`notes.bake.climate.placement`). On P1-26's planet that leaves 5 columns. The check counts
+only from 30 columns (BIO-154), so on this planet it is reported and not counted: here the rule's ground lies mostly
+under volcano zones, whose biomes come first.
+
+The same planet showed a second gap in the pack checks. They counted the coast strip: columns on a beach, a stony
+shore or a sea biome, whose biome comes from the coast band whatever the class. The family checks have set these
+apart since 2026-10-05, and the pack check's own description already said the coast strip is not the table's to
+place. Of Cs's 373 counted columns, 68 were coast and none matched, so Cs on shrubland and steppe read 0.499, under
+its 0.5. Without the coast it reads 186 of 305 (0.610). The other checks change the same way: Am 346 of 385 (0.899),
+BSk 531 of 619 (0.858), ET on snowy plains 10 of 233 (0.043, at most 0.1). Since 2026-10-17 every pack check leaves
+the coast strip out.
 
 **The geology gate.** A rock-named biome stands only on the ground it is named for (BIO-147 to BIO-153): Shield on
 Precambrian shield provinces, Yosemite on exposed granite, the White, Granite and Basalt Cliffs on coasts of
