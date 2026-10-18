@@ -95,9 +95,10 @@ final class GossanSkin {
     /**
      * Repaints the exposed gossans of the chunk (run after {@link StrataPass}'s horizons and body
      * rock, whose key decides the member). A placer's gravel keeps its place: a cell inside a body
-     * of loose rock that carries ore is not repainted, since the cap would leave the placer no
-     * block to hold its gold (the exit run's placer was shed by the porphyry whose gossan crops out,
-     * carried 0.0 km, and lay under the cap). Returns the number of columns capped.
+     * of loose rock that carries ore is not repainted, since {@link DepositFeature} puts a placer's
+     * gold only into loose blocks and the cap would leave it none (the exit run's placer did not
+     * lie under a cap; this keeps one that does from losing its host). Returns the number of
+     * columns capped.
      */
     static int apply(ChunkAccess chunk, WorldData wd, List<Body> bodies, RockPalette palette) {
         int c = wd.circumference();
