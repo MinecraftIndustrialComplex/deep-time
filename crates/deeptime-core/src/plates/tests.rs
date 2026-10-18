@@ -1443,3 +1443,243 @@ fn a_rift_that_does_not_open_heals_and_one_that_opens_does_not() {
         }
     }
 }
+
+/// The two-plate planet of [`two_plates`] with the ocean converging on the continent at 50 mm/yr
+/// (plate task 8's tests of the arcs and the cordillera).
+fn converging_plates(p: &PlanetPreset, env: &Env<'_>) -> (PlateState, Geo, Vec<DVec3>) {
+    let (mut st, geo, pos) = two_plates(p, env, 0.1);
+    st.plates[1].omega = (DVec3::X * env.norm.omega_of_speed(50.0)).to_array();
+    (st, geo, pos)
+}
+
+/// Plate task 8: the volcano stage's felsic cones over an arc (already in the pools as volcanic
+/// rock) count inside the arc's own rate, so the arc adds that much less crust and its magma is
+/// counted once; the cones it counted are cleared for the hotspots.
+#[test]
+fn arc_cones_are_counted_inside_the_arc_rate() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (st, geo, pos) = converging_plates(&p, &env);
+    let n = st.samples.len();
+    let run = |cone_m: f64| {
+        let mut s2 = st.clone();
+        let mut cones = vec![[cone_m, 0.0]; n];
+        let pull = subduction::fronts_and_uplift(&mut s2, &geo, &pos, &env, &mut cones);
+        (pull, cones)
+    };
+    let (bare, _) = run(0.0);
+    assert!(bare.front_continental_km_myr > 0.0, "no continental arc front");
+    assert!(bare.arc_continental_km3 > 0.0);
+    let (with, left) = run(0.5);
+    let counted = left.iter().filter(|c| c[0] == 0.0).count();
+    assert!(counted > 0 && counted < n, "{counted} of {n} cones counted");
+    let cones_km3 = counted as f64 * 0.5 * env.norm.sample_area_km2() / 1000.0;
+    let less = bare.arc_continental_km3 - with.arc_continental_km3;
+    assert!(
+        (less - cones_km3).abs() < 1e-3 * cones_km3,
+        "the arc added {less} km³ less for {cones_km3} km³ of cones"
+    );
+}
+
+/// Plate task 8: a hotspot's basalt is what the volcano stage's cones over it leave of its rate.
+#[test]
+fn hotspot_cones_are_counted_inside_the_hotspot_rate() {
+    let mut p = preset(6000, 20.0, "supercontinent", 3);
+    p.tectonics.hotspot_births_per_100myr = 0.0;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo) = init::initial_state(&p, &env).unwrap();
+    st.hotspots.clear();
+    let pos = geometry::positions(&st, &geo);
+    let tree = Tree::over(&pos, |_| true);
+    let at = pos[0];
+    st.hotspots.push(state::Hotspot {
+        id: 0,
+        pos: at.to_array(),
+        born_myr: env.t_myr - 1.0,
+        dies_myr: env.t_myr + 100.0,
+        uplift_mm_yr: 0.3,
+        lip_event: None,
+        plates: Vec::new(),
+        track_km: 0.0,
+        closed: false,
+    });
+    let n = st.samples.len();
+    let run = |cone_m: f64| {
+        let mut s2 = st.clone();
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        let mut cones = vec![[0.0, cone_m]; n];
+        hotspots::step(&mut s2, &mut world, &pos, &tree, &env, &mut cones).unwrap();
+        let counted = cones.iter().filter(|c| c[1] == 0.0).count();
+        (world.globals[hotspots::MAGMA_GLOBAL], counted)
+    };
+    let (bare, _) = run(0.0);
+    assert!(bare > 0.0);
+    let (with, counted) = run(1.0);
+    assert!(counted > 0 && counted < n, "{counted}");
+    let cones_km3 = counted as f64 * env.norm.sample_area_km2() / 1000.0;
+    assert!(cones_km3 < bare, "{cones_km3} km³ of cones for {bare} km³");
+    assert!(
+        ((bare - with) - cones_km3).abs() < 1e-3 * cones_km3,
+        "{bare} − {with} vs {cones_km3} km³ of cones"
+    );
+}
+
+/// Plate task 8: the cordillera thickens by crust shortened from the continent behind it, which
+/// thins by as much (volume kept): the step's crust changes by its arc magma alone, and the range
+/// stands higher than without the shortening, the crust behind it no higher.
+#[test]
+fn a_cordillera_takes_its_crust_from_behind_the_range() {
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env0 = stage.env(&p.tectonics, 1);
+    let (st, geo, pos) = converging_plates(&p, &env0);
+    let mut flat = st.clone();
+    let mut cones = vec![[0.0; 2]; st.samples.len()];
+    subduction::fronts_and_uplift(&mut flat, &geo, &pos, &env0, &mut cones);
+    p.tectonics.cordillera_shortening_mm_yr = 6.0;
+    let env = stage.env(&p.tectonics, 1);
+    let total = |st: &PlateState| -> f64 {
+        st.samples
+            .iter()
+            .map(|s| s.pools.iter().map(|&x| f64::from(x)).sum::<f64>())
+            .sum()
+    };
+    let mut s2 = st.clone();
+    let pull = subduction::fronts_and_uplift(&mut s2, &geo, &pos, &env, &mut cones);
+    assert!(pull.cordillera_km3 > 0.0, "no cordillera");
+    let area = env.norm.sample_area_km2();
+    let added = (total(&s2) - total(&st)) * area / 1000.0;
+    let magma = pull.arc_continental_km3 + pull.arc_oceanic_km3;
+    assert!(
+        (added - magma).abs() < 1e-3 * pull.cordillera_km3.max(magma),
+        "crust changed {added} km³ for {magma} km³ of arc magma ({} km³ shortened)",
+        pull.cordillera_km3
+    );
+    // Against the same step without the shortening: thickened samples stand higher, thinned
+    // ones, behind the range, no higher (a column standing below its Airy height keeps it).
+    let (mut up, mut higher, mut down) = (0, 0, 0);
+    for (a, b) in flat.samples.iter().zip(&s2.samples) {
+        if a.is_hidden() || a.kind != CONTINENTAL {
+            continue;
+        }
+        if b.thickness_m > a.thickness_m + 1.0 {
+            assert!(b.elevation_m >= a.elevation_m, "a thickened sample sank");
+            up += 1;
+            higher += usize::from(b.elevation_m > a.elevation_m + 1.0);
+        } else if b.thickness_m < a.thickness_m - 1.0 {
+            assert!(b.elevation_m <= a.elevation_m, "a thinned sample rose");
+            down += 1;
+        }
+    }
+    assert!(up > 0 && higher > 0 && down > 0, "{up} thickened ({higher} higher), {down} thinned");
+}
+
+/// Plate task 8 (the gap budget's recommendation 1): continental crust a resampling accretes
+/// raises the surface by its Airy height, never past the column's, and the surface gets the rise
+/// as uplift; crust a collision already stacked is consumed and raises far less.
+#[test]
+fn accreted_crust_stands_up_by_its_airy_height() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo, pos) = two_plates(&p, &env, 0.1);
+    for s in st.samples.iter_mut().filter(|s| s.is_hidden()) {
+        s.kind = CONTINENTAL;
+        s.pools = pools::continental_column();
+        s.thickness_m = pools::thickness(&s.pools);
+    }
+    let k = &p.tectonics;
+    let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
+    let mut rises = Vec::new();
+    for stacked in [false, true] {
+        let mut s2 = st.clone();
+        for s in s2.samples.iter_mut().filter(|s| s.is_hidden()) {
+            s.stacked = stacked;
+        }
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        ridges::resample(&mut s2, &mut world, &pos, &geo, &env).unwrap();
+        let rise = world
+            .globals
+            .get(ridges::ACCRETED_RISE_GLOBAL)
+            .copied()
+            .unwrap_or(0.0);
+        rises.push(rise);
+        if stacked {
+            continue;
+        }
+        assert!(rise > 0.0, "accreted crust raised nothing");
+        let mut raised = 0;
+        for s in s2
+            .samples
+            .iter()
+            .filter(|s| s.is_continental() && !s.is_hidden())
+        {
+            // The blend's surface stands at most 400 m (the continent's), so anything higher
+            // is the accretion's.
+            if s.elevation_m > 500.0 {
+                raised += 1;
+                let iso = collapse::iso_height(&s.pools, z_0, env.gravity);
+                assert!(
+                    f64::from(s.elevation_m) <= iso.min(k.max_elevation_m) + 1.0,
+                    "raised to {} m over its Airy height {iso:.0} m",
+                    s.elevation_m
+                );
+                assert!(s.uplift_mm_yr > 0.0, "a raised sample without uplift");
+            }
+        }
+        assert!(raised > 0);
+    }
+    // What still rises with the hidden crust consumed is the visible crust the lattice folds
+    // onto itself at the margin.
+    assert!(rises[1] < 0.5 * rises[0], "{rises:?} km³");
+}
+
+/// Plate task 8 (the gap budget's recommendation 3): ocean crust thicker than the ocean's own
+/// cools towards the floor its crust holds up on the transition's height line, no higher than
+/// the half-way column's, outside a margin too; the ocean's own 7 km cools to the bare floor.
+#[test]
+fn thick_ocean_crust_cools_towards_the_floor_it_holds_up() {
+    let mut p = preset(6000, 20.0, "supercontinent", 3);
+    // The pipeline presets' floor (GDH1; the plate-only presets keep Cortial's trench depth).
+    p.tectonics.oceanic_floor_elevation_m = -5600.0;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo) = init::initial_state(&p, &env).unwrap();
+    let k = &p.tectonics;
+    let oceanic: Vec<usize> = (0..st.samples.len())
+        .filter(|&i| st.samples[i].kind == OCEANIC && !st.samples[i].is_hidden())
+        .take(3)
+        .collect();
+    // The ocean's own crust, an arc at maturity (8 km more) and crust stacked at a resampling.
+    let extra = [0.0f32, 8000.0, 60_000.0];
+    for (&i, &x) in oceanic.iter().zip(&extra) {
+        let s = &mut st.samples[i];
+        s.pools = pools::oceanic_column();
+        s.pools[pool::FELSIC_PLUTONIC] += x;
+        s.thickness_m = pools::thickness(&s.pools);
+        s.elevation_m = -3000.0;
+        s.flags = 0;
+    }
+    for _ in 0..800 {
+        surface(&mut st, &geo, &env, &[]);
+    }
+    let per_m = transition::crust_per_metre(&env);
+    let cap = 0.5 * (transition::continental_m() + transition::oceanic_m());
+    let z_f = k.oceanic_floor_elevation_m;
+    let mut last = f64::NEG_INFINITY;
+    for (&i, &x) in oceanic.iter().zip(&extra) {
+        let want =
+            transition::held_floor_m(transition::oceanic_m() + f64::from(x), cap, z_f, per_m);
+        let z = f64::from(st.samples[i].elevation_m);
+        assert!(
+            (z - want).abs() < 50.0,
+            "{x} m more crust: {z:.0} m vs {want:.0} m"
+        );
+        assert!(z >= last - 1.0);
+        last = z;
+    }
+    assert!((f64::from(st.samples[oceanic[0]].elevation_m) - z_f).abs() < 50.0);
+    assert!(last < 0.0 && last > z_f + 2000.0, "{last}");
+}
