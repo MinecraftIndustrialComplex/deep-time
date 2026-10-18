@@ -5,7 +5,7 @@ their sources (ISO-041, ISO-042, ISO-048); the rest are marked in the ledger as 
 uncited, or game choices. The measurements are from small ensembles of four runs; two of them
 were made before the last change of one constant (see "Earth against the mod").
 
-Ledger ids on this page: `ISO-040` to `ISO-069` (see [ledger/ISO.md](ledger/ISO.md)).
+Ledger ids on this page: `ISO-040` to `ISO-072` (see [ledger/ISO.md](ledger/ISO.md)).
 
 ## What you see in the world
 
@@ -43,7 +43,9 @@ and the spreading of over-thick crust.
    how far it sinks or rises under this step's change of load. The plate model's uplift counts
    only as far as the plate model resolves it: its samples are about 71 km apart (in the plate
    model's Earth-sized kilometres), and what changes from cell to cell below that is left to float
-   on its own, as the plate model made it.
+   on its own, as the plate model made it. Crust moved by the spreading floats on its own
+   entirely: the spreading's law already gives the floating answer, and the plate does not hold
+   any of it up (since 2026-10-18, see "The surface guard").
 4. **The result.** The ground is moved by the difference between that sinking and the sinking
    already built into it. The plate model raises ground as if every load floated on its own, so
    that part is already there; erosion, deposition, cones, water and ice have nothing built in.
@@ -87,6 +89,9 @@ The plate equation, as coded (ISO-040):
 | ISO-056 | Stiffening and weakening | the plate carries its bending moment; gained rigidity joins stress-free, lost rigidity releases the moment in proportion | – | principle: Watts 1978 | `abstract-only` |
 | ISO-068 | Increments | each step solves for the step's loads only; the carried plate is in balance; a solve's unfinished part is carried | – | none | `game-choice` (numerical) |
 | ISO-069 | The plate model's resolution | its root bends the plate only low-passed at its sample spacing (two binomial passes on the quick presets) | – | none | `game-choice` (numerical) |
+| ISO-070 | The spreading's root | bends nothing: the spreading's change stays locally compensated | – | none (its physics from memory of Clark & Royden 2000) | `game-choice` (numerical) |
+| ISO-071 | Earth's relief | Everest 8,848.86 m above the sea, the Challenger Deep 10,925 m below | m | Dangol et al. 2020; Stewart & Jamieson 2019 | `verified` |
+| ISO-072 | The surface guard | a cell farther from the sea than 12 × 19,774 m × max(1, g_E/g) stops the run | m | none (a margin) | `game-choice` |
 | ISO-061 to ISO-064 | What counts as a load | see the ledger | | none | `uncited`, one `game-choice` |
 
 Numerical choices (smoothing of `Te`, the solve's cell size, tolerance, the preconditioner) are
@@ -125,6 +130,45 @@ the artifact fixes); the sea-depth row is from the final code (law 2.7, after th
   flexure follow-up; design note section 13): the carried state acting as a force, a stair-stepped
   plate boundary, and the plate model's sample lattice treated as a load.
 
+## The surface guard
+
+**Why it exists.** Until 2026-10-18 the crust moved by the plateau spreading (`spread.rs`) was a
+load like the plate model's uplift: its root bent the plate. The spreading is solved first, as an
+implicit diffusion of the surface, and the plate after it. On a stiff plate a change at the scale
+of a cell cannot sink, so the flexure turned the spreading's floating change into the whole
+thickening behind it, up to 1 / (1 − 0.858) = 7 times larger. Per wave of the surface the two steps
+together multiply its height by 1 − F·λ/(1 + λ), with F up to 7 and λ = D·Δt·k² the strength of the
+spreading's step for that wave: a wave grows once λ passes about 0.4. The spreading works on the
+map's metres, so on a large planet its cells are wide (39 km on the Earth-sized planet at
+1,222.5 m per block, 3.2 km at 1:100) and nothing holds cells near the strength height. Cells far
+above it spread strongly enough (λ about 2.5 for a checkerboard) for the split to grow: peaks
+became pits and pits peaks every step, by 40 to 70 km, and the Earth-sized planet reached
+3.3 × 10²⁹ m in 500 Myr. A milder form showed at 1:300: over a traced 500 Myr run the median
+step's highest cell after the flexure was 11.6 km, and 6.0 km after the fix. 1:100 did not grow
+(6.7 and 5.8 km), because its spreading holds plateaus at the strength height, where the
+spreading barely moves.
+
+**The fix** (ISO-070). The spreading's law is the floating answer of the lower crust's flow, so
+its change now stays locally compensated and the plate answers none of it. The coupling is then
+stable at every cell size. The plate model's uplift still bends the plate as before (ISO-069).
+
+**The guard** (ISO-071, ISO-072). After the flexure, every step, the surface stage stops the run
+with an error when a cell is not finite or stands farther from the sea than twelve times Earth's
+relief (Everest's summit 8,848.86 m to the Challenger Deep 10,925 m: 237 km), times g_E/g below
+Earth's gravity. Nothing is clamped. The error names the time, the cell and the bound. With the
+old coupling put back, the Earth-sized planet's 500 Myr bake stops after 92 s, at −388 Myr with a
+cell 263.8 km above the sea, where it had run 3.56 h to 3.3 × 10²⁹ m.
+
+**What is left, and why the margin is wide.** The plate model now and then lifts a patch by tens
+of km in one step (up to 16.5 mm/yr, 33 km a step, against its 30 km ceiling, ISO-025); a stiff
+plate holds part of the root behind that uplift up (ISO-069), and erosion takes it down within a
+step or two. These transients are there with and without the fix and at every scale: up to
+112 km after the flexure in four traced 500 Myr runs at 1:300 and 1:100. A bound of five Earth
+reliefs (98.9 km), tried first, stopped a shipped bake (`earthlike_quick_16k`, scattered, seed 2,
+at −272 Myr), so the bound sits above them and above the about 210 km a sound step could reach
+(the 30 km ceiling with the whole thickening held up, 7 times). The transients themselves are the
+plate model's to fix (an open question below).
+
 ## Game choices
 
 - **Flexural lengths are Earth-normalized** (ISO-057): the plate's kilometres are the plate
@@ -137,6 +181,9 @@ the artifact fixes); the sea-depth row is from the final code (law 2.7, after th
 
 ## Open questions
 
+- The plate model's one-step uplift spikes (up to 33 km in a step over hundreds of cells) and the
+  tens of km the flexure then holds up for a step: which plate process makes them was not traced
+  (build log 2026-10-18, the surface divergence).
 - The recovery law of continental `Te` (ISO-051) has no source for its form or its 300 Myr.
 - Densities (ISO-043 to ISO-047) are uncited, and the model uses three different crust densities
   elsewhere (see [isostasy-and-height-limit.md](isostasy-and-height-limit.md)).
@@ -156,5 +203,7 @@ By their keys in [bibliography.md](bibliography.md), section "Lithospheric flexu
   `Lu2024`, `KarnerWatts1983`, `LyonCaenMolnar1983`, `WieczerkowskiMitrovicaWolf1999`: abstracts.
 - `BrotchieSilvester1969`: not read; its formula as quoted in `Wickert2016` (full text).
 - `DeCellesGiles1996_flexure`: full text.
+- `StewartJamieson2019`, `Dangol2020`: full text, read 2026-10-18 by the agent that wrote the
+  guard (ISO-071).
 
 All were read by a sub-agent on 2026-10-02, not by the agent that wrote the code.
