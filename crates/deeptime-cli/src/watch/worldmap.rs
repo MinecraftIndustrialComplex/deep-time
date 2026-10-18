@@ -43,6 +43,7 @@ use std::time::Instant;
 use deeptime_core::climate::{glaciers, koppen, snapshot};
 use deeptime_core::satellite::{self, Cell, Light, Look, Palette};
 use deeptime_core::world::Field as CoreField;
+use deeptime_format::raster::cover_of;
 use deeptime_format::rivers::read_rivers;
 use deeptime_format::{
     DetailSpec, GridDesc, LayerDesc, Manifest, Noise, Ramps, Rivers, TilePackReader,
@@ -1129,16 +1130,14 @@ impl BakeMap {
         let ice = match path("climate/ice_cover") {
             Some(p) => {
                 let (g2, blocks) = LayerStore::load_f32(&p)?;
-                // `1 + ⌊t / step⌋` blocks for t metres of ice: the middle of the step.
+                // `1 + ⌊t / step⌋` blocks for t metres of ice: the middle of the step. Not
+                // blurred: the map reads the cells by the game's cover rule (`cell`), so its edge
+                // is the game's, a staircase of L2 cells.
                 let data: Vec<f32> = blocks
                     .iter()
                     .map(|&b| if b >= 1.0 { (b - 0.5) * step_m } else { 0.0 })
                     .collect();
-                // The cover is whole blocks on L2 cells, so its edge is a staircase of cells:
-                // blurred over ±2 cells, the edge is round and the picture shows no squares.
-                let g = Grid::new(&g2, data);
-                let blurred = satellite::box_filter(&g.core(&g2), (2, 2), false, None);
-                Some(Grid::new(&g2, blurred.data))
+                Some(Grid::new(&g2, data))
             }
             None => None,
         };
@@ -1420,16 +1419,12 @@ impl BakeMap {
         c.tree_cover = cm.tree.at(&s1);
         c.sea_ice = cm.sea_ice.at(&s1);
         if let Some(ice) = &cm.ice {
-            // The cover is as coarse as the climate (its cells are squares); the block's own
-            // height decides where in a glaciated cell the ice stands: on the ground above the
-            // equilibrium line, thinning to none 250 m below it. An ice sheet (a line far below
-            // the sea) is whole.
-            let t = ice.at(&ice.stencil(bx, bz));
-            c.ice_m = if c.ela_m.is_finite() {
-                t * smoothstep(c.ela_m - 250.0, c.ela_m + 50.0, z_m)
-            } else {
-                t
-            };
+            // The cover as the game lays it: the layer's cells by the shared cover rule (the
+            // edge half-way between a covered cell and a bare one). Where in the climate's ice
+            // the ground can hold it the bake decided per L2 cell (`bake::ice`).
+            let s = ice.stencil(bx, bz);
+            c.ice_m =
+                cover_of((0..4).map(|q| (f64::from(ice.data[s.k[q]]), f64::from(s.f[q])))) as f32;
         }
         if let Some(rock) = &cm.rock {
             let s2 = rock[0].stencil(bx, bz);

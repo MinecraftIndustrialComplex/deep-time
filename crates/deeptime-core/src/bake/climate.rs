@@ -24,7 +24,8 @@
 //! has one; BIO-133).
 //!
 //! **The ice cover** (`climate/ice_cover`, L2, u8, blocks): how much snow and ice the game's surface
-//! pass lays over ground above its equilibrium line, whatever the biome ([`super::ice`]).
+//! pass lays where the climate's land ice stands, whatever the biome ([`super::ice`]). It is
+//! decided before the biome inputs, which take covered land as glaciated EF.
 
 use deeptime_format::DType;
 use serde_json::{Value, json};
@@ -131,6 +132,31 @@ pub fn bake(
         ),
     };
     let on_l1 = |name: &str| field(world, name).filter(|f| f.grid.w == l1.w && f.grid.h == l1.h);
+    let table = p.placement.as_ref().unwrap_or_else(|| placement::builtin());
+    // The ice cover of the surface pass (`ice.rs`): blocks of snow and ice where the climate's
+    // land ice stands, carried down to L2 by its extent and its bodies' balance. It comes first:
+    // the biome inputs take the covered L2 cells as glaciated EF (BIO-158). A run without the
+    // climate's ice thickness has none.
+    let spec = table.ice_cover();
+    let cover = on_l1(climate::field::ICE_THICKNESS).map(|thickness| {
+        let cp = p.climate.clone().unwrap_or_default();
+        ice::downscale(
+            &ice::Inputs {
+                thickness,
+                ela: on_l1(climate::field::ELA),
+                precip: on_l1(climate::field::PRECIP),
+                elevation_m: &elev,
+                l2: &l2,
+                sea_m: sea,
+                law: ice::Law {
+                    beta_acc: cp.ice_accumulation_gradient,
+                    beta_abl: cp.ice_ablation_gradient,
+                    acc_max: cp.ice_accumulation_max_m_yr,
+                },
+            },
+            spec,
+        )
+    });
     let (t1, k1) = (
         t.filter(|f| f.grid.w == l1.w),
         kp.filter(|f| f.grid.w == l1.w),
@@ -143,6 +169,7 @@ pub fn bake(
             aridity: on_l1(climate::field::ARIDITY),
             koppen,
             glacier: on_l1(climate::field::GLACIER),
+            ice_cover: cover.as_ref().map(|c| c.blocks.as_slice()),
             months: {
                 let t: Vec<&Field> = (0..12)
                     .filter_map(|m| on_l1(&climate::field::t_sl_month(m)))
@@ -160,7 +187,6 @@ pub fn bake(
         _ => None,
     };
     let params = p.biomes.clone().unwrap_or_default();
-    let table = p.placement.as_ref().unwrap_or_else(|| placement::builtin());
     let mapped = biomes::map(
         climate_in.as_ref(),
         &Ground {
@@ -211,33 +237,24 @@ pub fn bake(
             &mapped.class_l2,
         )?;
     }
-    // The ice cover of the surface pass (`ice.rs`): blocks of snow and ice over glaciated ground,
-    // from the climate's land-ice thickness when it has one (the deep-time climate's ice sheets and
-    // glaciers), else from the height above the equilibrium line; without either there is none.
     let mut ice_note = Value::Null;
-    let spec = table.ice_cover();
-    let cover = if let Some(th) = on_l1(climate::field::ICE_THICKNESS) {
-        Some((
-            "climate/ice_thickness_m",
-            ice::cover_from_thickness(&elev, &resample(th, &l2, false), sea, spec),
-        ))
-    } else {
-        on_l1(climate::field::ELA_ALL).map(|ela| {
-            (
-                "climate/anomaly/ela_m",
-                ice::cover_blocks(&elev, &resample(ela, &l2, false), sea, spec),
-            )
-        })
-    };
-    if let Some((source, cover)) = cover {
+    if let Some(cover) = &cover {
         out.layer(
             desc("climate/ice_cover", DType::U8, &l2, 1.0, "blocks", None),
-            &cover,
+            &cover.blocks,
         )?;
         ice_note = spec.record();
-        ice_note["source"] = json!(source);
-        ice_note["cells"] = json!(cover.iter().filter(|&&b| b > 0).count());
-        ice_note["thickest_blocks"] = json!(cover.iter().copied().max().unwrap_or(0));
+        ice_note["source"] = json!(climate::field::ICE_THICKNESS);
+        ice_note["rule"] = json!(
+            "the climate's L1 extent (nearest L1 cell with at least 1 m of ice), its bodies \
+             closed on their surface mass balance (BIO-082, BIO-157)"
+        );
+        ice_note["cells"] = json!(cover.blocks.iter().filter(|&&b| b > 0).count());
+        ice_note["climate_cells"] = json!(cover.climate_cells);
+        ice_note["trimmed_cells"] = json!(cover.trimmed_cells);
+        ice_note["bodies"] = json!(cover.bodies);
+        ice_note["trimmed_bodies"] = json!(cover.trimmed_bodies);
+        ice_note["thickest_blocks"] = json!(cover.blocks.iter().copied().max().unwrap_or(0));
         physical.push("climate/ice_cover");
     }
     let mut note = json!({

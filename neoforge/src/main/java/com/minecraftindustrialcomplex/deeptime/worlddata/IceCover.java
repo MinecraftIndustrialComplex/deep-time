@@ -13,8 +13,8 @@ import java.util.Optional;
  *
  * <p>This is the small interface between the climate and the surface pass. The bake writes the
  * cover's thickness as the layer {@code climate/ice_cover} (L2, u8, blocks) from the climate's land-ice
- * thickness ({@code climate/ice_thickness_m}; an older run without ice fields falls back to the
- * ground's height above its equilibrium line; {@code bake/ice.rs}). The pass reads nothing of the
+ * thickness ({@code climate/ice_thickness_m}: its extent, its bodies closed on their surface mass balance;
+ * {@code bake/ice.rs}; a run without it has no cover). The pass reads nothing of the
  * climate but this layer, so a climate that changes how it carries ice does not change the pass. The table that shaped the cover (the placement file's {@code ice_cover}
  * section: the step, the ceiling, the snow and ice blocks) is recorded in
  * {@code notes.bake.climate.ice_cover}; FORMAT.md, "The ice cover".
@@ -77,10 +77,11 @@ public interface IceCover {
     }
 
     /**
-     * The world's ice cover: its {@code climate/ice_cover} layer read bilinearly (so the edge of a
-     * cover is a slope of the layer's cells, not their 8-block steps) and rounded, with the table
-     * recorded in the manifest; empty when the world has no such layer (no climate stage, or a
-     * synthetic world).
+     * The world's ice cover: its {@code climate/ice_cover} layer read by the cover rule
+     * ({@link RasterSampler#cover}: the edge half-way between a covered cell and a bare one, the depth
+     * the covered cells' blend, so a margin thins over the cells' blocks without spreading past them)
+     * and rounded, with the table recorded in the manifest; empty when the world has no such layer
+     * (no climate stage, or a synthetic world).
      */
     static Optional<IceCover> of(WorldData wd) {
         if (!wd.has(LAYER))
@@ -92,9 +93,7 @@ public interface IceCover {
         return Optional.of(new IceCover() {
             @Override
             public int blocks(int x, int z) {
-                double v = layer.bilinear(x, z);
-                if (Double.isNaN(v))
-                    return 0;
+                double v = layer.cover(x, z);
                 return (int) Math.max(0, Math.min(spec.maxBlocks(), Math.round(v)));
             }
 

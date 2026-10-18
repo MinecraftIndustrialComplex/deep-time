@@ -32,6 +32,10 @@ pub const CODES: [&str; 32] = [
 /// The layer value of the sea.
 pub const SEA: u8 = 31;
 
+/// The layer value of EF (ice cap: the warmest month below 0 °C), the class the bake gives land
+/// under the ice cover.
+pub const EF: u8 = 30;
+
 /// The index of a code.
 pub fn index(code: &str) -> Option<u8> {
     CODES.iter().position(|&c| c == code).map(|i| i as u8)
@@ -157,6 +161,12 @@ mod tests {
 
     fn code(t: [f64; 12], p: [f64; 12]) -> &'static str {
         CODES[classify(&t, &p) as usize]
+    }
+
+    #[test]
+    fn the_named_indices_are_their_codes() {
+        assert_eq!(CODES[usize::from(EF)], "EF");
+        assert_eq!(CODES[usize::from(SEA)], "sea");
     }
 
     #[test]

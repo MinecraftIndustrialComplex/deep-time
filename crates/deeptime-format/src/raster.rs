@@ -556,6 +556,63 @@ pub trait RasterRead {
         let b = v01 + (v11 - v01) * fu;
         a + (b - a) * fv
     }
+
+    /// A cover layer's value at block (bx, bz) (`climate/ice_cover`, FORMAT.md "The ice cover"):
+    /// the four cells of the bilinear blend read by [`cover_of`], so the cover's edge lies half-way
+    /// between a covered cell and a bare one and its depth is the covered cells' blend. A plain
+    /// bilinear read rounded to whole blocks covers every block where the blend passes half a
+    /// block, which put a thick margin's cover most of a cell past it.
+    fn cover(&self, bx: f64, bz: f64) -> f64 {
+        let g = &self.desc().grid;
+        let u = (bx - g.origin_block_x as f64) / f64::from(g.r);
+        let v = (bz - g.origin_block_z as f64) / f64::from(g.r);
+        let fi = u.floor();
+        let fj = v.floor();
+        let fu = u - fi;
+        let fv = v - fj;
+        let (i0, j0) = (fi as i64, fj as i64);
+        let w = bilinear_weights(fu, fv);
+        cover_of([
+            (self.get(i0, j0), w[0]),
+            (self.get(i0 + 1, j0), w[1]),
+            (self.get(i0, j0 + 1), w[2]),
+            (self.get(i0 + 1, j0 + 1), w[3]),
+        ])
+    }
+}
+
+/// The weights of a bilinear blend's four cells at fractions (fu, fv) of the cell step: cells
+/// (i0, j0), (i0 + 1, j0), (i0, j0 + 1), (i0 + 1, j0 + 1).
+#[inline]
+pub fn bilinear_weights(fu: f64, fv: f64) -> [f64; 4] {
+    [
+        (1.0 - fu) * (1.0 - fv),
+        fu * (1.0 - fv),
+        (1.0 - fu) * fv,
+        fu * fv,
+    ]
+}
+
+/// The cover rule, one for every reader of a cover layer (the game's `RasterSampler.cover`, the
+/// bake's projection, the workbench): over weighted samples (value, weight), covered where the
+/// samples with a value above 0 (NaN is none) hold at least half the weight, and then the
+/// weighted mean of those values; 0 elsewhere. On a cell grid the cover's edge lies half-way
+/// between a covered cell and a bare one, as the nearest cell would put it, and its area is the
+/// covered cells' area. ledger: BIO-159 (game-choice)
+pub fn cover_of(samples: impl IntoIterator<Item = (f64, f64)>) -> f64 {
+    let (mut all, mut held, mut sum) = (0.0, 0.0, 0.0);
+    for (v, w) in samples {
+        all += w;
+        if v > 0.0 {
+            held += w;
+            sum += w * v;
+        }
+    }
+    if held > 0.0 && 2.0 * held >= all {
+        sum / held
+    } else {
+        0.0
+    }
 }
 
 /// A whole layer's cells in memory (from [`crate::TilePackReader::load`] or built directly).
@@ -686,6 +743,50 @@ mod tests {
         // Across the seam: between the last column and column 0.
         let seam = l.bilinear(g.block_x(15) as f64 + 2.0, g.block_z(1) as f64);
         assert_eq!(seam, 0.5 * (l.get(15, 1) + l.get(0, 1)));
+    }
+
+    /// The cover rule's vectors; neoforge's IceCoverTest holds the same ones for RasterSampler.
+    #[test]
+    fn cover_is_held_by_half_the_weight() {
+        // Half the weight covered: covered, at the covered samples' mean.
+        assert_eq!(cover_of([(8.0, 0.5), (0.0, 0.5)]), 8.0);
+        // Just under half: bare, however thick the covered side is.
+        assert_eq!(cover_of([(12.0, 0.49), (0.0, 0.51)]), 0.0);
+        // The depth is the covered samples' weighted mean, not the blend with the bare ones.
+        assert_eq!(cover_of([(4.0, 0.25), (8.0, 0.75), (0.0, 0.0)]), 7.0);
+        // NaN (no data) counts as bare, never as cover.
+        assert_eq!(cover_of([(f64::NAN, 0.6), (6.0, 0.4)]), 0.0);
+        assert_eq!(cover_of([(f64::NAN, 0.4), (6.0, 0.6)]), 6.0);
+        // No cover and no weight are both bare.
+        assert_eq!(cover_of([(0.0, 1.0)]), 0.0);
+        assert_eq!(cover_of(std::iter::empty()), 0.0);
+        let w = bilinear_weights(0.25, 0.5);
+        assert_eq!(w, [0.375, 0.125, 0.375, 0.125]);
+        assert_eq!(w.iter().sum::<f64>(), 1.0);
+    }
+
+    #[test]
+    fn a_covers_edge_lies_half_way_between_cells() {
+        // Cells 0..=3 of every row covered with 10 blocks, the rest bare.
+        let grid = GridDesc::for_planet("L", 64, 4).unwrap();
+        let ras = Raster::<u8>::from_fn(grid.clone(), |i, _| if i <= 3 { 10 } else { 0 });
+        let l = LoadedLayer::new(
+            LayerDesc::scalar("c", DType::U8, grid.clone(), Codec::Raw),
+            ras.to_le_bytes(),
+        )
+        .unwrap();
+        let z = grid.block_z(2) as f64;
+        let x3 = grid.block_x(3) as f64;
+        // On the last covered cell, and up to half a step past it: the full depth.
+        assert_eq!(l.cover(x3, z), 10.0);
+        assert_eq!(l.cover(x3 + 2.0, z), 10.0);
+        // Past half-way: bare, where the bilinear blend still rounds to 4 blocks.
+        assert_eq!(l.cover(x3 + 2.5, z), 0.0);
+        assert!((l.bilinear(x3 + 2.5, z) - 3.75).abs() < 1e-12);
+        // Across the seam: the last column is bare, column 0 covered.
+        let x15 = grid.block_x(15) as f64;
+        assert_eq!(l.cover(x15 + 1.0, z), 0.0);
+        assert_eq!(l.cover(x15 + 2.0, z), 10.0);
     }
 
     #[test]
