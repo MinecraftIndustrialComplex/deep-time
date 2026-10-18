@@ -21,7 +21,9 @@ import java.util.concurrent.atomic.LongAdder;
  * <ul>
  *   <li>Chamber and conduit blocks become lava, whatever they were, but never within
  *       {@link Magma#COVER} blocks of the column's ground (the sea bed under the sea), so a
- *       valley, a river's cut or a trench over a chamber never opens it.</li>
+ *       valley, a river's cut or a trench over a chamber never opens it. The exception is the
+ *       conduit under a crater lake, which opens into the lake's floor and is lava up to it however
+ *       low a cave puts the column's ground.</li>
  *   <li>Shell blocks that are open (air, water) become basalt: magma is always walled in.</li>
  *   <li>The plug's solid blocks become magma blocks.</li>
  *   <li>The crust-deep column's lens blocks become lava by the chamber's rule (never within
@@ -121,7 +123,12 @@ public final class MagmaPass {
                                 }
                             }
                             case CONDUIT -> {
-                                if (y <= ground - Magma.BURIED) {
+                                // Under a crater lake the conduit opens into the lake's floor: lava up
+                                // to it whatever the column's ground, which a cave opening into the
+                                // crater can put far below the lake (the lake would hang over an open
+                                // shaft); the conduit shell walls it in. Elsewhere a cave on the
+                                // column leaves the lava capped by magma blocks (ledger: MAG-018).
+                                if (b.lake() || y <= ground - Magma.BURIED) {
                                     if (!here.is(Blocks.LAVA)) {
                                         chunk.setBlockState(pos, LAVA, false);
                                         placed++;

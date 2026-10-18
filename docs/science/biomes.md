@@ -342,7 +342,13 @@ the GameTest planets); EE's surface rule paints the terrain as Terralith's does 
 keeps EE's override, as EE intends. One part of EE's surface rule is left out of Deep Time levels: a layer of smooth
 basalt below y −55, drawn for vanilla's 384-block world, which in a Deep Time world (floor at −512) replaced every
 rock class below −55 (BIO-131; a pack's top-level layers between two fixed heights, other than vanilla's deepslate
-and the bedrock floor, are left out; the strata are the rock there). One of EE's biomes is kept out for the same
+and the bedrock floor, are left out; the strata are the rock there). So is a trim at the sea (BIO-156): EE turns
+all ground above y 63 into air in its beaches, rivers, salt lakes and several oceans, which in vanilla's terrain lie
+at the sea anyway. In a Deep Time world a beach or a river may stand above the sea where the world data puts it,
+and the trim cut it down to y 62, a step at the biome's edge that far terrain does not draw: on the 2026-10-17 test
+planet a black beach east of the seam, its ground at y 65 to 67, was cut to 62. A pack's top-level rule that turns
+everything above a fixed height into air and paints nothing else is left out; EE's band at y 62, which paints the
+top block (water, grass, packed mud, gravel, salt) and removes no ground, stays. One of EE's biomes is kept out for the same
 reason (BIO-155): its calcite caverns, a cave biome its list places by depth (0.35 to 0.9) under much of the world,
 the deep sea included, carry a surface rule that paints diorite on every stone block of the biome at every depth.
 The strata pass leaves a surface rule's blocks, so in a Deep Time world a cavern region was diorite from the cave

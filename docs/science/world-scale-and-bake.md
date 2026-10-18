@@ -157,7 +157,8 @@ are game choices about how far terrain stays the same terrain as the chunks.
   the world data wraps and at which Toroidal World loops the level, so a section west of x = C/2,
   east of it or across it draws what the chunks there have (BAK-042). What far terrain does not
   draw is what is random per chunk on top of the column rule: trees, plants, coral reefs and the
-  carvers' cuts. The checks read the ground under the first three and count a column a carver cut
+  carvers' cuts. The checks read the ground under the first three (a mangrove's roots too, since
+  2026-10-17: they are part of the tree, not of the ground) and count a column a carver cut
   below far terrain's ground apart (at most one in eight); on the MIC set Terralith's canyon, which
   reaches from y −20 to 70, cut a sea bed two blocks under the water down to y −2 (2026-10-03).
 - **Toroidal World's guard** (Ben, 2026-10-02: "Mixin around TW's guard"). TW 0.19.3 (MIT) refuses
@@ -170,7 +171,17 @@ are game choices about how far terrain stays the same terrain as the chunks.
   touched. The mixin is optional: it applies only when TW and DH are installed and TW's method is
   as checked, and logs whether it applied.
 - **How it is checked.** GameTests compare far terrain with generated chunks over the planet and
-  on 64 blocks either side of the seam; `tools/smoke/run.py --dh` has Distant Horizons generate
+  on 64 blocks either side of the seam. The planet-wide test reads 128 scattered columns with their
+  features; the seam test reads each chunk at the carvers, before any feature (Deep Time's terrain
+  is complete by then), and logs the same columns after their features without asserting them.
+  Its 16 columns a side lie 4 blocks apart, so one patch of a feature covers a quarter of a side
+  or more: on the planet of P1-26's rain (2026-10-17) the equator west of the seam, sea on the
+  planet before, became land, and there mangrove trees stood on 4 of the 16 columns (standalone)
+  and Terralith's basalt cliffs stood basalt columns 5 to 10 blocks over the ground on 9 (MIC).
+  Features over the planet are the planet-wide test's to bound; what the seam test checks is the
+  fold. Read before features it found one real difference, which was fixed: Expanded Ecosphere's
+  surface rule cut a black beach east of the seam from y 65 to 67 down to 62 (BIO-156).
+  `tools/smoke/run.py --dh` has Distant Horizons generate
   and store sections beside the spawn and centred on the seam, then compares what it stores with
   far terrain and far terrain with the chunks generated afterwards on 160 blocks either side.
   `tools/client/dh-client-check.sh` joins a real client (software GL on the test machine) and
