@@ -102,11 +102,14 @@ pub fn isostatic_change_m(
         - (root_drop_m(eclogite_m(after, gravity)) - root_drop_m(eclogite_m(before, gravity)))
 }
 
-/// Order in which erosion strips conserved pools, top first.
-const EROSION_ORDER: [usize; 5] = [
+/// Order in which erosion strips the pools, top first: the conserved pools and the mafic volcanic
+/// rock of lava fields, shields and ocean crust (plate task 8: the volcano stage's cones reach the
+/// pools as volcanic rock, so eroding a basalt cone strips its basalt, not the crust under it).
+const EROSION_ORDER: [usize; 6] = [
     pool::SEDIMENT,
     pool::SEDIMENTARY,
     pool::FELSIC_VOLCANIC,
+    pool::MAFIC_VOLCANIC,
     pool::METAMORPHIC,
     pool::FELSIC_PLUTONIC,
 ];
@@ -132,7 +135,7 @@ pub fn oceanic_column() -> [f32; pool::COUNT] {
     p
 }
 
-/// Removes `metres` of rock from the top of the conserved pools; returns what was removed.
+/// Removes `metres` of rock from the top of the column (`EROSION_ORDER`); returns what was removed.
 pub fn strip(pools: &mut [f32; pool::COUNT], metres: f64) -> f64 {
     let mut left = metres.max(0.0) as f32;
     let mut removed = 0.0f32;

@@ -602,13 +602,14 @@ fn sutures_and_initiations_keep_continents_whole() {
     );
 }
 
-/// P1-27: with `cordillera_uplift_mm_yr` the continental crust over an arc stands higher than
-/// without it, over the same history.
+/// P1-27: with `cordillera_shortening_mm_yr` the continental crust over an arc stands higher than
+/// without it, over the same history (since plate task 8 by the crust the shortening thickens it
+/// with, taken from the plate behind the arc).
 #[test]
 fn arcs_build_a_cordillera() {
-    let mean_arc = |uplift: f64| {
+    let mean_arc = |shortening: f64| {
         let mut p = preset(8000, 60.0, "scattered_continents", 31);
-        p.tectonics.cordillera_uplift_mm_yr = uplift;
+        p.tectonics.cordillera_shortening_mm_yr = shortening;
         let mut sum = (0.0, 0usize);
         run_stage(&p, |_, _, st| {
             for s in &st.samples {
@@ -621,7 +622,7 @@ fn arcs_build_a_cordillera() {
         assert!(sum.1 > 0, "no continental arc in 60 Myr");
         sum.0 / sum.1 as f64
     };
-    let (flat, range) = (mean_arc(0.0), mean_arc(0.5));
+    let (flat, range) = (mean_arc(0.0), mean_arc(6.0));
     // Plates start at rest since the switch to the force balance, so 60 Myr hold less convergence
     // than they did under the old speed rules (which asserted 300 m).
     assert!(
@@ -1346,8 +1347,8 @@ fn a_resampling_accretes_hidden_continent_once() {
     assert!((accreted.1 - consumed.1 - gap).abs() < 0.05 * gap);
 }
 
-/// Island-arc crust turns continental by the arc crust it has built (`arc_maturity_myr` of arc
-/// magma), not by its height: a mature arc below the sea becomes continent, a young arc whose
+/// Island-arc crust turns continental by the arc crust it has built (`arc_mature_crust_km` of
+/// crust with the ocean's own), not by its height: a mature arc below the sea becomes continent, a young arc whose
 /// cones stand above it does not, and neither does a mature arc's crust hidden in a trench.
 /// (Until 2026-10-02 only arcs above sea level converted, so flexure, which bends arcs down,
 /// cut the continents' growth.)
@@ -1358,7 +1359,7 @@ fn arcs_turn_continental_by_their_crust_not_their_height() {
     let env = stage.env(&p.tectonics, 1);
     let (mut st, geo) = init::initial_state(&p, &env).unwrap();
     let k = &p.tectonics;
-    let mature = (k.arc_magma_m_per_myr * k.arc_maturity_myr) as f32;
+    let mature = (k.arc_mature_crust_km * 1000.0 - super::transition::oceanic_m()) as f32;
     assert!(mature > 0.0);
     let oceanic: Vec<usize> = (0..st.samples.len())
         .filter(|&i| st.samples[i].kind == OCEANIC)

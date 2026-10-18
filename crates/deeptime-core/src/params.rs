@@ -556,29 +556,36 @@ pub struct TectonicParams {
     pub arc_distance_km: f64,
     /// … and its half-width, km.
     pub arc_width_km: f64,
-    /// Arc volcanic uplift of submarine overriding crust (island arcs), mm/yr at v = v_0.
-    pub arc_uplift_mm_yr: f64,
-    /// New arc crust per Myr at the arc axis at v = v_0, metres.
-    pub arc_magma_m_per_myr: f64,
-    /// How long an island arc must build crust before its crust counts as continental, Myr of
-    /// arc magma at the axis at v = v_0: an oceanic sample turns continental once its
-    /// `arc_oceanic_m` reaches `arc_magma_m_per_myr` × this, whatever its height (2026-10-02;
-    /// before, `arc_continental_m` metres and only above sea level). Island-arc crust thicker
-    /// than about 15 km is too buoyant to subduct, and arcs built on ocean crust need more than
-    /// about 20 Myr of activity to reach it (Cloos 1993); the model's arc magma is not a physical
-    /// thickness, so the rule counts the time (`plates::finish_samples`). 0 turns every sample
-    /// that has received arc magma continental at once. ledger: PLT-047
-    pub arc_maturity_myr: f64,
-    /// Uplift of continental crust over a magmatic arc at v = v_0, mm/yr: the arc's own
-    /// cordillera, built by arc magmatism and crustal thickening (P1-27; 0, the default and the
-    /// plate-only presets' value, leaves only Cortial's subduction uplift; the planet pipeline
-    /// presets use 0.2).
-    pub cordillera_uplift_mm_yr: f64,
+    /// New crust an island arc (an arc on oceanic crust) adds per km of arc per Myr at
+    /// v = v_0, km³ (Earth-normalized): magma intruded and erupted, spread across the arc band
+    /// (`arc_width_km`). Stern & Scholl (2010) put the long-term average of the intra-oceanic
+    /// arcs at about 100 (90–180 for Izu-Bonin-Mariana and the Aleutians; 1.5 km³ a year over
+    /// 14,500 km of arc). The arc stands up by its thickness (`plates::subduction`). ledger: PLT-045
+    pub island_arc_km3_per_km_myr: f64,
+    /// … and a continental arc (an arc on continental crust, including an island arc grown
+    /// continental), km³ per km per Myr at v = v_0: about 35 (Stern & Scholl 2010 after
+    /// Haschke & Günther 2003; 1.0 km³ a year over 27,500 km). ledger: PLT-050
+    pub continental_arc_km3_per_km_myr: f64,
+    /// Island-arc crust counts as continental once it is this thick, km: an oceanic sample turns
+    /// continental once the arc crust it has built (`arc_oceanic_m`) on top of normal ocean crust
+    /// (7 km) reaches it, whatever its height. Cloos (1993): crust thicker than about 15 km is
+    /// too buoyant to subduct, and arcs built on ocean crust need more than about 20 Myr of
+    /// activity to reach it. 0 turns every sample that has received arc magma continental at
+    /// once. ledger: PLT-047
+    pub arc_mature_crust_km: f64,
+    /// Shortening across a continental arc above an oceanic slab at v = v_0, mm/yr: the arc's
+    /// own cordillera thickens by the crust shortened into it, which the model takes from the
+    /// plate's continental crust behind the range (volume kept; `plates::subduction`). About 6 in
+    /// the Bolivian Andes, the chain's largest (about 300 km since 50 Ma, Eichelberger et al.
+    /// 2015). 0, the default and the plate-only presets' value, leaves only Cortial's subduction
+    /// uplift. ledger: PLT-048
+    pub cordillera_shortening_mm_yr: f64,
     /// … the half-width of its band, centred on the arc axis, km (Earth-normalized; the Andes
     /// and Cascades ranges are 100–300 km wide across the arc) …
     pub cordillera_width_km: f64,
-    /// … and the height it builds towards, m: the uplift slows to nothing there (thickened arc
-    /// crust spreads; the Central Andes' plateau stands near 4 km, the Cascades' base 1.2–2 km).
+    /// … and the height it builds towards, m: the shortening thickens the crust under the arc
+    /// less as the column's Airy height nears this and not at all above it (thickened arc crust
+    /// spreads; the Central Andes' plateau stands near 4 km, the Cascades' base 1.2–2 km).
     pub cordillera_height_m: f64,
     /// Fraction of the way to z_t a trench sample moves per step.
     pub trench_relax: f64,
@@ -723,10 +730,10 @@ impl Default for TectonicParams {
             resample_drift_km: 1500.0,
             arc_distance_km: 200.0,
             arc_width_km: 60.0,
-            arc_uplift_mm_yr: 0.1,
-            arc_magma_m_per_myr: 20.0,
-            arc_maturity_myr: 20.0, // ledger: PLT-047
-            cordillera_uplift_mm_yr: 0.0,
+            island_arc_km3_per_km_myr: 100.0,     // ledger: PLT-045
+            continental_arc_km3_per_km_myr: 35.0, // ledger: PLT-050
+            arc_mature_crust_km: 15.0,            // ledger: PLT-047
+            cordillera_shortening_mm_yr: 0.0,
             cordillera_width_km: 120.0,
             cordillera_height_m: 2500.0,
             trench_relax: 0.5,
@@ -1144,10 +1151,18 @@ impl PlanetPreset {
                 "$.tectonics.subduction_initiation_clearance_km",
             ),
             (
-                k.cordillera_uplift_mm_yr,
-                "$.tectonics.cordillera_uplift_mm_yr",
+                k.cordillera_shortening_mm_yr,
+                "$.tectonics.cordillera_shortening_mm_yr",
             ),
-            (k.arc_maturity_myr, "$.tectonics.arc_maturity_myr"),
+            (k.arc_mature_crust_km, "$.tectonics.arc_mature_crust_km"),
+            (
+                k.island_arc_km3_per_km_myr,
+                "$.tectonics.island_arc_km3_per_km_myr",
+            ),
+            (
+                k.continental_arc_km3_per_km_myr,
+                "$.tectonics.continental_arc_km3_per_km_myr",
+            ),
         ] {
             check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
         }

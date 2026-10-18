@@ -49,7 +49,10 @@ use super::gap_budget;
 use super::geometry::{Cover, Geo, Tree, dijkstra_two};
 use super::init::random_rotation;
 use super::kinematics::{arr, quat, to_world};
-use super::pools::{accrete, ocean_elevation, ocean_heat_flow, oceanic_column, thickness};
+use super::collapse::{iso_height, toward};
+use super::pools::{
+    accrete, isostatic_change_m, ocean_elevation, ocean_heat_flow, oceanic_column, thickness,
+};
 use super::state::{
     CONTINENTAL, FORELAND, Group, OCEANIC, PlateState, Ridge, Sample, pool, regime,
 };
@@ -183,6 +186,9 @@ pub const STACKED_CONSUMED_GLOBAL: &str = "plates/resample_stacked_km3";
 /// same or a subducting plate, km³ (the rest is the sediment of hidden ocean floor).
 pub const ACCRETED_HIDDEN_CONTINENT_GLOBAL: &str = "plates/resample_accreted_continent_km3";
 pub const ACCRETED_VISIBLE_GLOBAL: &str = "plates/resample_accreted_visible_km3";
+/// World global: the surface accretion raised at resamplings, km² × m / 1000 (km³ of rise,
+/// Earth-normalized; plate task 8).
+pub const ACCRETED_RISE_GLOBAL: &str = "plates/resample_accreted_rise_km3";
 
 /// Resamples the crust onto a fresh lattice and returns its geometry.
 pub fn resample(
@@ -269,7 +275,11 @@ pub fn resample(
     // went down with the slab (`belts.rs`): it is consumed here, not accreted a second time
     // (ledger: PLT-276). Both are counted, m of rock per new sample.
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
-    let mut tally: Vec<[f64; 4]> = vec![[0.0; 4]; n];
+    let mut tally: Vec<[f64; 5]> = vec![[0.0; 5]; n];
+    let (z_0, gravity) = (
+        0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]),
+        env.gravity,
+    );
     // How each new sample was blended, for the gap budget (`gap_budget.rs`) when it is on.
     let tracing = state.gap_budget.is_some();
     let mut traces: Vec<Option<gap_budget::Trace>> = vec![None; n];
@@ -288,8 +298,10 @@ pub fn resample(
                         tri: c.tri,
                         w: c.w,
                         pools: s.pools,
+                        z: s.elevation_m,
                     });
                 }
+                let blended = s.pools;
                 for (g2, c2) in others {
                     let under = &src[c2.major() as usize];
                     let p2 = group_plate[*g2 as usize];
@@ -314,6 +326,22 @@ pub fn resample(
                         }
                     }
                 }
+                // Accreted crust stands up by its Airy height, capped at the column's, and the
+                // surface gets it as uplift, as the collapse raises its receivers (the gap
+                // budget's recommendation 1; plate task 8; before, accretion added thickness and
+                // no height). ledger: PLT-284
+                if s.kind == CONTINENTAL && !s.is_hidden() && s.pools != blended {
+                    let z = f64::from(s.elevation_m);
+                    let change = isostatic_change_m(&blended, &s.pools, gravity);
+                    let rise =
+                        toward(z, change, iso_height(&s.pools, z_0, gravity)).min(k.max_elevation_m)
+                            - z;
+                    if rise > 0.0 {
+                        s.elevation_m = (z + rise) as f32;
+                        s.uplift_mm_yr += (rise / env.dt_yr * 1.0e3) as f32;
+                        tally[4] += rise;
+                    }
+                }
                 s.thickness_m = thickness(&s.pools);
                 s
             }
@@ -326,6 +354,7 @@ pub fn resample(
         (STACKED_CONSUMED_GLOBAL, 1),
         (ACCRETED_HIDDEN_CONTINENT_GLOBAL, 2),
         (ACCRETED_VISIBLE_GLOBAL, 3),
+        (ACCRETED_RISE_GLOBAL, 4),
     ] {
         *world.globals.entry(name.to_owned()).or_insert(0.0) += sum(k);
     }
