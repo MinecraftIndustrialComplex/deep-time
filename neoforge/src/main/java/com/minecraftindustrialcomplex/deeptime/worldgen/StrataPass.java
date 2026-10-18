@@ -230,7 +230,7 @@ public final class StrataPass {
             }
         }
         // An exposed gossan crops out as bare rock: the soil over it goes too (decisions log 2026-10-17).
-        GossanSkin.apply(chunk, c, bodies, palette);
+        GossanSkin.apply(chunk, wd, bodies, palette);
     }
 
     /**

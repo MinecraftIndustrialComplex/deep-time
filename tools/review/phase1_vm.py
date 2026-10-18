@@ -333,8 +333,20 @@ def cmd_geology(a):
         blocks = [p.get("block") for p in probes(rows, "site") if any(b.get("role") == "gossan" for b in p.get("bodies", []))]
         glo, ghi = gos["aabb"]
         gb = blocks_in(a.world, glo[0], glo[2], ghi[0], ghi[2])
-        iron = count(gb, ("ochrum", "ironstone", "gossan", "limonite"))
-        ok_d = bool(gp) and (iron > 0 or any(b and re.search(r"ochrum|ironstone|gossan|limonite", b) for b in blocks))
+        # The rock the class is in THIS pack (smoke/mic/palette.json from `probe palette`): the MIC datapack's ochrum when it is installed, else
+        # the palette's vanilla backup (2026-10-18: the current pack has none, so ironstone is minecraft:red_sandstone).
+        members = []
+        try:
+            members = [m.split("[")[0] for m in json.load(open(os.path.join(REPO, "smoke", "mic", "palette.json"))).get("classes", {}).get(gos.get("rock_class") or "ironstone", [])]
+        except (OSError, ValueError):
+            pass
+
+        def is_gossan(key):
+            key = key.split("[")[0]
+            return key in members if members else bool(re.search(r"ochrum|ironstone|gossan|limonite", key))
+
+        iron = sum(v for k, v in (gb or {}).items() if is_gossan(k))
+        ok_d = bool(gp)
         # The column at the gossan's centre, top block down: where the sheet sits against the soil (2026-10-16: the gossan is about one
         # block thick at 35 m per block, at the surface of the formation; the soil rule replaces the top blocks of the present surface).
         gx, gz = int(gos["center"][0]), int(gos["center"][2])
@@ -342,31 +354,36 @@ def cmd_geology(a):
         col_s = "; ".join(" ".join(l.split()[:2]).replace("minecraft:", "") for l in col[1:9]) or "no column"
         ax_y = gos["axes"][1]
         # Decisions log 2026-10-17 (a): an exposed gossan is the surface block (a bare ironstone outcrop). The terrain's top block over a
-        # grid of columns inside the body's footprint (half its semi-axes, so a turned blanket is still inside): how many are gossan rock.
-        surf_n = surf_tot = 0
-        surf_seen = {}
-        for ix in range(-2, 3):
-            for iz in range(-2, 3):
-                if ix * ix + iz * iz > 4:
-                    continue
-                sx = int(gos["center"][0] + 0.25 * ix * gos["axes"][0])
-                sz = int(gos["center"][2] + 0.25 * iz * gos["axes"][2])
+        # grid of columns inside the body's footprint (0.6 of its semi-axes at most, so a turned blanket is still inside) against a ring of
+        # columns around it (1.6 and 2.2 times the semi-axes): the share that is the class's rock. The ring says what the biome's own surface
+        # looks like (the vanilla backup, red sandstone, is a badlands block too), so the footprint has to differ from it.
+        def surface_share(points):
+            n = tot = 0
+            seen = {}
+            for sx, sz in points:
                 r = run([INSPECT, "column", "--world", a.world, "--x", str(sx), "--z", str(sz), "--depth", "2"]).stdout.strip().splitlines()
                 m = re.search(r"terrain_top=Some\((-?\d+)\)", r[0]) if r else None
-                if not m:
-                    continue
-                top_line = next((l.split() for l in r[1:] if l.split() and l.split()[0] == m.group(1)), None)
+                top_line = next((l.split() for l in r[1:] if m and l.split() and l.split()[0] == m.group(1)), None)
                 if not top_line:
                     continue
-                surf_tot += 1
-                key = short(top_line[1])
-                surf_seen[key] = surf_seen.get(key, 0) + 1
-                surf_n += bool(re.search(r"ochrum|ironstone|gossan|limonite", top_line[1]))
-        ok_d = ok_d and surf_n > 0
+                tot += 1
+                key = short(top_line[1].split("[")[0])
+                seen[key] = seen.get(key, 0) + 1
+                n += is_gossan(top_line[1])
+            return n, tot, dict(sorted(seen.items(), key=lambda kv: -kv[1])[:4])
+
+        cxg, czg, axg, azg = gos["center"][0], gos["center"][2], gos["axes"][0], gos["axes"][2]
+        fp_pts = [(int(cxg + 0.3 * ix * axg), int(czg + 0.3 * iz * azg)) for ix in range(-2, 3) for iz in range(-2, 3) if ix * ix + iz * iz <= 4]
+        ring_pts = [(int(cxg + f * axg * math.cos(t * math.pi / 4)), int(czg + f * azg * math.sin(t * math.pi / 4))) for f in (1.6, 2.2) for t in range(8)]
+        surf_n, surf_tot, surf_seen = surface_share(fp_pts)
+        ring_n, ring_tot, ring_seen = surface_share(ring_pts)
+        share, ring_share = surf_n / max(surf_tot, 1), ring_n / max(ring_tot, 1)
+        ok_d = ok_d and share >= 0.5 and share > ring_share
         check(ok_d, "a gossan where the body is exposed",
-              f"gossan body {gos['id']} ({gos.get('rock_class')}, clip_top_y {gos.get('clip_top_y')}, about {2 * ax_y:.1f} blocks thick); probe found it at {len(gp)} point(s), "
-              f"blocks there {blocks[:2]}; ironstone-class blocks in its footprint: {iron}; surface block is gossan rock in {surf_n} of {surf_tot} sampled footprint columns "
-              f"(surface blocks seen: {dict(sorted(surf_seen.items(), key=lambda kv: -kv[1])[:5])}); column at its centre (y block): {col_s}; "
+              f"gossan body {gos['id']} ({gos.get('rock_class')} = {members or 'no palette'}, clip_top_y {gos.get('clip_top_y')}, about {2 * ax_y:.1f} blocks thick); probe found it at {len(gp)} point(s), "
+              f"blocks there {blocks[:2]}; class blocks in its footprint box: {iron}; the surface block is the class's rock in {surf_n} of {surf_tot} footprint columns "
+              f"({100 * share:.0f} %, surface blocks {surf_seen}) against {ring_n} of {ring_tot} columns in the ring around it ({100 * ring_share:.0f} %, {ring_seen}); "
+              f"column at its centre (y block): {col_s}; "
               f"gossan top vs terrain gaps of the {len(plan.get('gossan_gaps', {}))} porphyries (blocks): "
               f"{ {k: round(v) if v < 1e8 else None for k, v in plan.get('gossan_gaps', {}).items()} }")
     else:
