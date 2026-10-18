@@ -310,20 +310,22 @@ struct Parts {
 }
 
 impl Parts {
+    /// Every part empty, written in parallel (P1-19).
     fn new(n: usize) -> Parts {
+        use crate::alloc::filled;
         Parts {
-            eroded: vec![0.0; n],
-            fluvial: vec![0.0; n],
-            lake: vec![0.0; n],
-            marine: vec![0.0; n],
-            carbonate: vec![0.0; n],
-            evaporite: vec![0.0; n],
-            till: vec![0.0; n],
-            glacial_eroded: vec![0.0; n],
-            spl_eroded: vec![0.0; n],
-            threshold_cut: vec![0.0; n],
-            diffusion_eroded: vec![0.0; n],
-            prov_marine: vec![IN_SITU; n],
+            eroded: filled(n, 0.0),
+            fluvial: filled(n, 0.0),
+            lake: filled(n, 0.0),
+            marine: filled(n, 0.0),
+            carbonate: filled(n, 0.0),
+            evaporite: filled(n, 0.0),
+            till: filled(n, 0.0),
+            glacial_eroded: filled(n, 0.0),
+            spl_eroded: filled(n, 0.0),
+            threshold_cut: filled(n, 0.0),
+            diffusion_eroded: filled(n, 0.0),
+            prov_marine: filled(n, IN_SITU),
         }
     }
 }
@@ -848,13 +850,20 @@ impl SurfaceStage {
             .into_par_iter()
             .map(|c| surface_class(&st, c))
             .collect();
-        let fam: Vec<u8> = class0.iter().map(|&k| self.fam[usize::from(k)]).collect();
-        #[allow(clippy::needless_range_loop)]
-        for c in 0..n {
-            let k = usize::from(class0[c]);
-            sc.kf[c] = p.k_spl * self.erod[k];
-            sc.weight[c] = (clim.runoff_m_yr[c] / p.runoff_ref_m_yr as f32).max(0.05);
-        }
+        // Cell by cell, so in parallel (P1-19).
+        let fam: Vec<u8> = class0
+            .par_iter()
+            .map(|&k| self.fam[usize::from(k)])
+            .collect();
+        let erod = &self.erod;
+        sc.kf
+            .par_iter_mut()
+            .zip(sc.weight.par_iter_mut())
+            .enumerate()
+            .for_each(|(c, (kf, weight))| {
+                *kf = p.k_spl * erod[usize::from(class0[c])];
+                *weight = (clim.runoff_m_yr[c] / p.runoff_ref_m_yr as f32).max(0.05);
+            });
         self.time("setup", started);
 
         // 3. The LEM steps.
@@ -1009,10 +1018,13 @@ impl SurfaceStage {
             // River loads into the sea.
             let started = Instant::now();
             let sea_mask: Vec<bool> = sc.kind.par_iter().map(|&k| k == BASE).collect();
-            for m in 0..n {
-                if sc.kind[m] != BASE || sc.qin[m] <= 0.0 {
-                    continue;
-                }
+            // The mouths, ascending (found in parallel; the fills change neither test).
+            let (kind, qin) = (&sc.kind, &sc.qin);
+            let mouths: Vec<usize> = (0..n)
+                .into_par_iter()
+                .filter(|&m| kind[m] == BASE && qin[m] > 0.0)
+                .collect();
+            for m in mouths {
                 let vol = sc.qin[m] * dts;
                 to_sea += vol;
                 marine::fill(
@@ -1085,7 +1097,9 @@ impl SurfaceStage {
                     })
                     .sum::<u64>();
                 let sea_mask: Vec<bool> = sc.kind.par_iter().map(|&k| k == BASE).collect();
-                for m in 0..n {
+                // (the base cells with a load, ascending: the others have none)
+                for &m in &g.sea_cells {
+                    let m = m as usize;
                     let (ice_load, melt_load) = (g.sea_ice_load[m], g.sea_melt_load[m]);
                     if ice_load > 0.0 {
                         to_sea += ice_load;
