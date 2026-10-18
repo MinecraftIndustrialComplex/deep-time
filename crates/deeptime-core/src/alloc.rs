@@ -635,6 +635,15 @@ pub fn fill<T: Copy + Send + Sync>(out: &mut Vec<T>, n: usize, v: T) {
     rayon::iter::repeat_n(v, n).collect_into_vec(out);
 }
 
+/// A copy of `src`, written in parallel: `to_vec` and `clone` copy a grid-sized array on the
+/// calling thread, as [`filled`] says of `vec!` (P1-19).
+pub fn copied<T: Copy + Send + Sync>(src: &[T]) -> Vec<T> {
+    use rayon::prelude::*;
+    let mut out = Vec::new();
+    src.par_iter().copied().collect_into_vec(&mut out);
+    out
+}
+
 /// The allocator's counters as the session's [`MemoryGauge`].
 pub struct AllocGauge;
 
