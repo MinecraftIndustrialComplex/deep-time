@@ -167,15 +167,21 @@ Two rules are the project's, not the sources' (coordinator's calls, decisions lo
 - **Never under two blocks** (DEP-210). The cap was 40 m, 1.1 blocks at 35 m per block, a single
   sheet. The soil rule (grass and three blocks of dirt) painted over it, so a probe found ironstone
   in the body and the player never saw any. Two blocks is the least that reads as an outcrop.
-- **Bare rock where it crops out** (DEP-211). Over an exposed cap the soil goes too: every solid
-  block from the ground down to the cap's bottom becomes the gossan's rock. Cook and Porter
-  describe deposits "represented at surface by heavily iron stained leached capping outcrops", so
-  a cap that reaches the ground is rock at the ground. It is a game rule that the whole soil
-  profile goes: the sources say nothing of the soil over a cap, and the generator's surface rules
-  cover stone with grass and dirt. The cap is placed where the simulation's surface was, and
-  the generated terrain differs by a block or three (the amplifier's relief), so "exposed" means
-  the ground is no more than four blocks above the cap's top; a cap buried deeper (one cut by
-  erosion and then covered, placed under the surface that cut it) is left under its cover.
+- **Bare rock where it crops out** (DEP-211). Over an exposed cap the soil goes too: in every
+  column of its footprint the top blocks of the ground, as many as the cap is thick (at least two),
+  become the gossan's rock. Cook and Porter describe deposits "represented at surface by heavily
+  iron stained leached capping outcrops", so a cap that reaches the ground is rock at the ground.
+  It is a game rule that the whole soil profile goes: the sources say nothing of the soil over a
+  cap, and the generator's surface rules cover stone with grass and dirt. Two things make this a
+  rule about the body and not about each column. The body is a flat sheet at the surface the
+  simulation had at its centre, while the terrain the generator builds is that surface plus the
+  amplifier's relief (13 blocks either way across one footprint in the exit run), so a cap cut to
+  the sheet is buried on every rise and hangs over every dip: the cap therefore follows the ground.
+  And whether a cap is exposed is decided once, at the body's centre: the generated ground there
+  is no more than six blocks above the cap's top. A cap that a younger deposit buried again (placed
+  under the surface that cut it) is left under its cover; the exit run measured the gap between
+  the cap's top and the ground at the centre as 1 to 3 blocks for the exposed ones and 14 to 37
+  for the buried ones, and six is above the first and well under the second.
 
 ## Equations and constants
 
@@ -200,7 +206,7 @@ The main constants by family; the ledgers hold every row.
 | DEP-208 | Smallest placer shed by a cut porphyry | dropped below 0.022 Mt of gravel (the model's P90, DEP-050) | Mt | the data's own smallest size | `game-choice` |
 | DEP-209 | Gossan (leached cap) thickness | water table depth (`deeptime:water_table_depth_m`), at least the file's 40 m, at most 300 m | m | SIR 2010-5070-B pp. 65, 67, 120; Cook and Porter 2005 (Inspiration 0 to 300 m) | `verified` (the ranges and the water-table link); the mapping from depth to thickness is the project's |
 | DEP-210 | Least gossan thickness | 2 blocks (70 m at 35 m per block) | blocks | none (game choice, coordinator 2026-10-17) | `game-choice` |
-| DEP-211 | Exposed gossan crops out as bare rock | solid blocks from the ground to the cap's bottom become its rock when the ground is at most 4 blocks above its top | blocks | none (game choice, coordinator 2026-10-17) | `game-choice` |
+| DEP-211 | Exposed gossan crops out as bare rock | the top blocks of the ground (as many as the cap is thick, at least 2) in the cap's footprint become its rock when the ground at its centre is at most 6 blocks above its top | blocks | none (game choice, coordinator 2026-10-17; the 6 is the implementing agent's) | `game-choice` |
 | DEP-062 | Banded iron formation tonnage | 11 / 170 / 2,400 (n 66) | Mt | Bulletin 1693 model 34a, Fig. 172 | `verified` |
 | DEP-063 | Banded iron formation grade | 30 / 53 / 66 | % Fe | same, Fig. 173 | `verified` |
 | DEP-065 | Banded iron formation density | 1 / 4 / 12 | per 100,000 km² | none (placeholder) | `uncited` |
