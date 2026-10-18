@@ -1,8 +1,8 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-22 rivers and lakes done on its branch (worktree-agent-ad204cf8d55ef26f5) · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · P1-21 volcanoes done on its branch (worktree-agent-a348bd3bf6e50dd72) · Next: deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · P1-27 plate margins (sutures, initiation clear of trenches, arc cordilleras) + coherent provinces done on its branch (worktree-agent-ad3b417fd428c1ac2) · Rivers & lakes on the workbench maps (view-only; satellite overlay + a `rivers` layer) done on its branch (worktree-agent-a3d4fadfe3e053b77) · P1-28 stone and deepslate for the common rocks done on its branch (worktree-agent-a72907749021691b5) · Updated: 2026-10-01 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Master 0729e267, test batch on 9091c163: Rust, Gradle and four GameTest sets green, `-PwithEe` fails `climateConsistent` (D 0.870 against 0.880) · In flight (agents): stage overlap for the 900 s full-16k gate (Ben, 2026-10-18), the plate accretion's crust loss, the surface stage's polar rows, ice cover on warm ground with the EE failure, the play world re-bake · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-10-18 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
-MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
+MIC pack tested against: dc49fe7 (pack master; the rock tags live on the pack's unmerged deep-time branch)
 
 ## Tasks
 | ID | Title | State | Date | Commit | Evidence |
@@ -10481,8 +10481,9 @@ he does not report known faults. Older notes are in the build log.
 - An exposed gossan's leached cap holds no ore, by design (DEP-212); the ore lies under it.
 
 **Tests**
-- All GameTests pass on master d006e621: 91 of 91 in each of the five sets (standalone, MIC, Expanded Ecosphere,
-  Excavated Variants, TerraBlender).
+- Master 9091c163 (the plate cap): 91 of 91 GameTests with MIC, standalone, Excavated Variants and TerraBlender;
+  with Expanded Ecosphere `climateConsistent` fails, the continental (D) family matching its biomes in 67 of 77
+  columns (0.870 against 0.880), being fixed with the ice work. Master d006e621 before it passed all five sets.
 - The cloud forest check counts nothing on the 4k test planet (5 columns qualify), so it guards only on a planet with
   more humid tropical highland.
 - "Probe column agrees with the world data" failed once at (8184, 164) and was not reproduced.
