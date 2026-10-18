@@ -524,8 +524,9 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Reference: Roering, J. J., Kirchner, J. W., and Dietrich, W. E. (1999). Evidence for nonlinear, diffusive sediment transport on hillslopes and implications for landscape morphology. Water Resources Research 35(3):853-870.
 - DOI or URL: (IMP) 10.1029/1998WR900090 (Crossref-verified) (ERO, ISO, HYP) 10.1029/1998WR900090.
 - Cited as: (IMP) "Roering, Kirchner & Dietrich 1999" (ERO, ISO, HYP) "Roering, Kirchner & Dietrich 1999, WRR 35(3):853-870" (rock_class JSON), "hillslope transport coefficient D". (RCK, STR, DEF) "Roering, Kirchner & Dietrich 1999 (WRR 35(3):853-870)"
-- Ledger ids: ERO-101 to ERO-150, ERO-153 to ERO-163, IMP-074, IMP-085, IMP-086, IMP-089, IMP-090, RCK-010
-- Access: paywalled (metadata only) [other sections: paywalled (Wiley); not fetched. / paywalled (abstract only)]
+- Ledger ids: ERO-101 to ERO-150, ERO-153 to ERO-163, ERO-177, IMP-074, IMP-085, IMP-086, IMP-089, IMP-090, RCK-010
+- Read in the plateau erosion task (2026-10-16): full text, from the second author's reprint at https://seismo.berkeley.edu/~kirchner/reprints/1999_29_Roering_nonlinear.pdf (text extracted with pdftotext). The paper's numeric D values are now read: the nonlinear law fitted to Oregon Coast Range topography gives "K = 0.0032 ± 0.0009 m2/yr and Sc = 1.25 ± 0.10"; per hillslope (Table 1) "Values for K range from 0.0031 to 0.0045 m2/yr with an average of 0.0036 m2/yr"; with other fitting choices "K varies between 0.0015 and 0.0045 m2/yr, and Sc varies between 1.0 and 1.4". ERO-177.
+- Access: paywalled (metadata only) [other sections: paywalled (Wiley); not fetched. / paywalled (abstract only)]; the author's reprint above is open.
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Substitute: none found.
 - Read so far (by the project): (IMP) from memory (params.rs); judgment framework (rock-class JSON) (ERO, ISO, HYP) no record. (RCK, STR, DEF) not stated
@@ -4324,7 +4325,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 ### Cloos1993
 - Reference: Cloos, M. (1993). Lithospheric buoyancy and collisional orogenesis: subduction of oceanic plateaus, continental margins, island arcs, spreading ridges, and seamounts. Geological Society of America Bulletin 105(6):715-737.
 - DOI or URL: 10.1130/0016-7606(1993)105<0715:LBACOS>2.3.CO;2.
-- Cited as: in ledger FRC-005 as the usual source for oceanic lithosphere becoming denser than the mantle after about 10 Myr; since 2026-10-02 "Cloos 1993" for the island-arc maturity rule (PLT-047, HNT-090).
+- Cited as: in ledger FRC-005 as the usual source for oceanic lithosphere becoming denser than the mantle after about 10 Myr; since 2026-10-02 "Cloos 1993" for the island-arc maturity rule (PLT-047, HNT-090). Since 2026-10-05 for the collision's buoyancy (FRC-028 to FRC-030, PLT-275): 80-Myr oceanic lithosphere about 0.04 g/cm³ denser than the asthenosphere, 100 km of lithosphere with a 30 km continental crust about 0.09 g/cm³ lighter (abstract).
 - Ledger ids: FRC-005, PLT-047, HNT-092
 - Access: paywalled.
 - Library (the project's source library, not distributed): abstract only, 2026-10-02 (OpenAlex record of the GSW page): `Cloos1993/openalex.json`, text `Cloos1993/abstract.txt`.
@@ -5493,6 +5494,11 @@ these entries.
 
 ### MinecraftSources: falling blocks and brushable block entities (ORE-269)
 - See MinecraftSources above. Read 2026-10-16 for ORE-269 (NeoForge 21.1.249 / Minecraft 1.21.1 decompiled sources): `FallingBlock.isFree` (a block under a gravity block is free when it is air, fire, a liquid or replaceable, so suspicious gravel and sand fall like their plain blocks); `BrushableBlockEntity` (the loot table and its seed are saved as `LootTable` and `LootTableSeed`; `unpackLootTable` rolls the table with the CHEST parameter set and takes only the first stack); `LootTable.getRandomItems(params, seed)` (a seed of 0 is not applied, the level's random sequence is used); `WorldGenRegion.setBlock` and `getBlockEntity` (a block with a block entity set during generation leaves a placeholder that `getBlockEntity` turns into the real block entity). Nothing here is a source for the physics of panning (ORE-267 is `from-memory`).
+- Read again 2026-10-17 for ORE-269 (the same sources): `BrushableBlockEntity.loadAdditional` reads `item` only when there is no `LootTable`, and `saveAdditional` writes `item` only when there is no table; `brush` needs 10 strokes at least 10 ticks apart, then `dropContent` drops `item.split(10 to 30)` once and the block becomes its `turnsInto` (gravel, sand); `LootTable.getRandomItems(params, seed)` is `getRandomItemsRaw` through a stack splitter and then `CommonHooks.modifyLoot` (NeoForge's global loot modifiers), with `LootContext.Builder.withOptionalRandomSeed(seed)` = `RandomSource.create(seed)` for a seed that is not 0; `ProtoChunk.getBlockEntity` returns only block entity objects, while `getBlockEntityNbtForSaving` falls back to the pending tag (a chunk read back from disk below full status holds its block entities only as tags); `GameTestServer.create` (NeoForge 21.1.249 sources) selects every available pack (`new DataPackConfig(new ArrayList<>(packRepository.getAvailableIds()), List.of())`), feature packs too.
+- Read again 2026-10-17 for ORE-269, after the second MIC gate failure (NeoForge 21.1.249 sources, read on the test VM): `ChunkSerializer.read` returns a chunk saved in full as `new ImposterProtoChunk((LevelChunk) chunk, false)` and leaves its `block_entities` list inside the `LevelChunk.PostLoadProcessor` of `postLoadChunk` (`loadStatic` and `setBlockEntity`, or `setBlockEntityNbt` for `keepPacked`), which `ChunkStatusTasks.full` runs (`runPostLoad`) only when the chunk is made full again; until then the chunk has no block entity object and no pending tag. `ImposterProtoChunk.isUnsaved` is always false and `ChunkMap.save` returns at once for a chunk that is not unsaved, so such a chunk dropped below full is not written again and its saved block entities stay as they were.
+
+### Lootr 1.21.1-1.11.38.125: what it converts (ORE-269)
+- Lootr (noobanidus), `lootr-neoforge-1.21.1-1.11.38.125.jar` from MIC's server set, decompiled with CFR on the test VM 2026-10-17 (read, not redistributed). `MixinLevelChunk` hooks `LevelChunk.updateBlockEntityTicker` and hands every block entity of a level chunk to `BlockEntityTicker.addEntity` (also `MixinBrushableBlockEntity` on `tryLoadLootTable`), which keeps it unless Lootr is disabled, the dimension is blocked, its type is in `#lootr:convert/blacklist` or it is Lootr's own. On each server tick (`HandleTick`) an entry whose chunk and the 5 by 5 chunks around it are loaded at full status is processed: it is skipped when its loot table is null (silently by default, `skip_logging_no_loot_table_at_generation`), when a structure rule of the config excludes it, when the table is in the config's `loot_table_blacklist` or `loot_modid_blacklist`, or when the block has no Lootr replacement; otherwise the vanilla table is cleared and the block is set to Lootr's block (`#lootr:convert/gravels` holds `minecraft:suspicious_gravel`, `/sands` `minecraft:suspicious_sand`) with the table and seed, per player. The jar has no inter-mod message handler and no API to exempt a block entity; its built-in feature datapack `lootr_no_suspicious_blocks` (off by default) empties both convert tags for every block. `BlockEntityTicker.isValidEntity` admits an entry without looking at its loot table; the table is read when the entry is processed (`replaceEntitiesInChunk`), so a table set after the block was placed still counts. `LoadedChunks` holds the chunks whose `ChunkEvent.Load` came at full status. `HandleResourcePacks` registers `lootr_no_suspicious_blocks` with `PackSource.FEATURE`, not required, at `Pack.Position.TOP`; MIC's pack (branch `deep-time`, read 2026-10-17) has no Lootr config and enables the pack nowhere (no `lootr_no_suspicious_blocks`, no `initial-enabled-packs`). Used for ORE-269: a brushable block entity with no loot table is never converted.
 
 ## Rock classes, metamorphism, plutons and strata: sources read in WP-7 (RCK, STR)
 
@@ -5656,9 +5662,9 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 
 ### ChristensenMooney1995
 - Reference: Christensen, N. I. and Mooney, W. D. (1995). Seismic velocity structure and composition of the continental crust: a global view. Journal of Geophysical Research 100(B6):9761-9788.
-- Ledger ids: RCK-033, PLT-256 (orogenic collapse, 2026-10-03: orogens 46.3 km, global 41.1 km, as comparison)
+- Ledger ids: RCK-033, PLT-256 (orogenic collapse, 2026-10-03: orogens 46.3 km, global 41.1 km, as comparison), PLT-281 (2026-10-06: the mean crustal density, 2830 kg/m3)
 - Library: `ChristensenMooney1995/abstract.json` (the USGS publications record).
-- Read: abstract only. Average crustal thickness 41.1 km (extended 30.5 km, orogens 46.3 km).
+- Read: abstract only. Average crustal thickness 41.1 km (extended 30.5 km, orogens 46.3 km); "The mean crustal density calculated from our model is 2830 kg/m3".
 
 ### BrownJohnson2018_dataset
 - Reference: Brown, M. and Johnson, T. (2018). Global age, temperature and pressure data for secular change in metamorphism. EarthChem Library, doi 10.1594/IEDA/111316; slides of M. Brown's presidential address to the Mineralogical Society of America.
@@ -5809,7 +5815,7 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 ### Carbonell2000
 - Reference: Carbonell, R. and others (2000). [Wide-angle seismic study of the Urals crustal root; title not recorded by the sub-agent.] Journal of Geophysical Research 105(B6):13755-13777. Co-authors and title to be taken from the DOI before quoting.
 - DOI or URL: 10.1029/2000JB900048
-- Ledger ids: PLT-256
+- Ledger ids: PLT-256, PLT-282 (2026-10-06: the Urals' crust, against the eclogite root)
 - Access: paywalled; abstract read.
 - Library: not fetched.
 - Read so far (by the project): abstract, 2026-10-03: "a 50–56 km crustal thickness beneath the central part of the orogen in contrast to Moho depths of ≈ 45 km documented at the edges of the transect". The IGCP 559 transect page (earthscrust.org.au, Urals) adds that the root "is consistent with the preservation of the Urals as an intact, unextended orogen".
@@ -6189,6 +6195,106 @@ Not read: Péron-Pinvidic, Manatschal & Osmundsen 2013 (Marine and Petroleum Geo
 - Ledger ids: ERO-174
 - Access: open (PubMed Central).
 - Read so far (by the project): full text, 2026-10-05: exhumation over 1.0 km/Ma from 17-16 Ma for about 5 Myr, then below 0.01 km/Ma (under 750 m in total) from 12-11 Ma to the present; cosmogenic rates in the Indus and Yarlung drainages typically below 100 m/Ma.
+## The eclogite root and whole-column isostasy (PLT-278 to PLT-282), added 2026-10-06
+
+Read by a research sub-agent on 2026-10-05 for plate task 7 (Ben, 2026-10-06: "Fix isostasy first, then land"). "Full text" means the agent read the paper; "snippet" means only a search tool's excerpt, not checked against the paper.
+
+### Wittlinger2009
+- Reference: Wittlinger, G., Farra, V., Hetényi, G., Vergne, J. and Nábělek, J. (2009). Seismic velocities in Southern Tibet lower crust: a receiver function approach for eclogite detection. Geophysical Journal International 177(3):1037-1049.
+- DOI or URL: http://real.mtak.hu/13079/1/1280309.pdf (open copy)
+- Cited as: "Wittlinger et al. 2009".
+- Ledger ids: PLT-278, PLT-280
+- Access: open repository copy.
+- Read so far (by the project): full text, 2026-10-05: "If the required temperatures (~600° to ~700°) and pressures (~15 to ~20 kbars) are plausible in the lower crust at ~60 km depth beneath southern Tibet (Mechie et al. 2004), the origin of the hydrous fluids remains debatable"; Moho "~75 to ~78 km"; the abstract reads the lower-crust layer as "the about 19 km thick eclogitic layer". Co-authors written from memory; check before quoting.
+
+### ShiF2018
+- Reference: Shi, F., Wang, Y., Yu, T., Zhu, L., Zhang, J., Wen, J., Gasc, J., Incel, S., Schubnel, A., Li, Z., Chen, T., Liu, W., Prakapenka, V. and Jin, Z. (2018). Lower-crustal earthquakes in southern Tibet are linked to eclogitization of dry metastable granulite. Nature Communications 9:3483.
+- DOI or URL: https://pmc.ncbi.nlm.nih.gov/articles/PMC6113232/
+- Cited as: "Shi F. et al. 2018".
+- Ledger ids: PLT-278, PLT-280
+- Access: open (PubMed Central).
+- Read so far (by the project): full text, 2026-10-05: "below ~60 km the lower crust may have reached roughly 30% eclogitization, assuming a homogeneous mixture of granulite- and eclogite-facies minerals"; "Actual degrees of eclogitization depend on temperature, age, and volatiles and therefore vary"; Moho "~80 km". Co-authors written from memory; check before quoting.
+
+### ShiD2020
+- Reference: Shi, D., Klemperer, S. L., Shi, J., Wu, Z. and Zhao, W. (2020). Localized foundering of Indian lower crust in the India-Tibet collision zone. Proceedings of the National Academy of Sciences 117(40):24742-24747.
+- DOI or URL: https://pmc.ncbi.nlm.nih.gov/articles/PMC7547243/
+- Cited as: "Shi D. et al. 2020".
+- Ledger ids: PLT-279, PLT-280, ISO-043
+- Access: open (PubMed Central).
+- Read so far (by the project): full text, 2026-10-05: densities "granulitic rocks (2,850 kg/m3...)", "the mantle (3,300 kg/m3...)", "mafic eclogite (3,450 kg/m3) (values taken from ref. 16)" (Hetényi et al. 2007); "the lower crust being only ~30% eclogitized so gravitationally stable"; "the doublet layer has a density ~3,000-3,100 kg/m3"; Moho locally "~90 km". Co-authors written from memory; check before quoting.
+
+### KrystopowiczCurrie2013
+- Reference: Krystopowicz, N. J. and Currie, C. A. (2013). Crustal eclogitization and lithosphere delamination in orogens. Earth and Planetary Science Letters 361:195-207.
+- DOI or URL: https://sites.ualberta.ca/~ccurrie1/papers/KrystopowiczCurrie_EPSL_2013.pdf
+- Cited as: "Krystopowicz & Currie 2013".
+- Ledger ids: PLT-278, PLT-279, PLT-280
+- Access: author's copy.
+- Read so far (by the project): full text, 2026-10-05: the eclogite field from the basalt diagram of Hacker et al. 2003; "Kinetic hinderance will delay the density change"; water appears required; "Assuming densities of 3000 kg/m3 for mafic granulite and 3500-3600 kg/m3 for mafic eclogite"; Table 1 eclogite 3450, crust 2800, mantle 3250; "7-8% density increase corresponds to ~35-50% eclogitization"; exhumed lower crust of the Urals, Caledonides and Dabie Shan shows partial eclogitization; the South Urals' lithosphere persists through a felsic composition or "kinetic hindrance due to the absence of fluids".
+
+### HyndmanCurrie2011
+- Reference: Hyndman, R. D. and Currie, C. A. (2011). Why is the North America Cordillera high? Hot backarcs, thermal isostasy, and mountain belts. Geology 39(8):783-786.
+- DOI or URL: http://web.uvic.ca/~rhyndman/PublicationPDFs/Hyndman&Currie2011WithFigs&Appendix.pdf
+- Cited as: "Hyndman & Currie 2011".
+- Ledger ids: PLT-281, PLT-282
+- Access: author's copy.
+- Read so far (by the project): full text, 2026-10-05: "The slopes between crustal thickness and elevation provide the crust-mantle density contrast, 131±12 m/km for the Cordillera and 141±27 m/km for stable areas"; the reference crust 2850 and mantle 3260 kg/m3 give 126 m/km; sea-level crustal thickness ~27 km (Cordillera) and ~38 km (craton); thermal state moves elevation by about 1,600 m at equal thickness; "the Himalaya-Tibet region of India-Asia collision where the crust reaches ~70 km and elevations ~5 km".
+
+### LuffiDucea2022
+- Reference: Luffi, P. and Ducea, M. N. (2022). Chemical mohometry: assessing crustal thickness of ancient orogens using geochemical and isotopic data. Reviews of Geophysics 60(2):e2021RG000753.
+- DOI or URL: https://pmc.ncbi.nlm.nih.gov/articles/PMC9788079/
+- Cited as: "Luffi & Ducea 2022".
+- Ledger ids: PLT-281, ISO-043
+- Access: open (PubMed Central).
+- Read so far (by the project): full text, 2026-10-05, the arc relation: "H = 6.79 (±0.95) × h + 26.40 (±1.45), R2 = 0.93"; Airy "requires ρm/ρc = 1.15, which is satisfied by a 2.83-2.87 g/cm3 arc crust underlain by a 3.25-3.30 g/cm3 lithospheric mantle".
+
+### Buntin2021
+- Reference: Buntin, S. and others (2021). [Seismic velocities and densities of mantle rocks and eclogites; title not recorded by the sub-agent.] Nature Communications 12.
+- DOI or URL: https://pmc.ncbi.nlm.nih.gov/articles/PMC8589968/
+- Cited as: "Buntin et al. 2021".
+- Ledger ids: PLT-279
+- Access: open (PubMed Central).
+- Read so far (by the project): full text, 2026-10-05: "3.23-3.39 g/cm3 for peridotites with mean values of 3.31-3.35 g/cm3 and up to 3.75 g/cm3 for eclogites, with common values of 3.45-3.50 g/cm3 reported worldwide". Title and co-authors to be taken from the record before quoting.
+
+### Carbonell1996
+- Reference: Carbonell, R. and others (1996). [Deep seismic profile across the southern Urals; title not recorded by the sub-agent.] Science 274:222.
+- Cited as: "Carbonell et al. 1996".
+- Ledger ids: PLT-282
+- Access: paywalled; abstract read (via Crossref).
+- Read so far (by the project): abstract, 2026-10-05: "12- to 15-kilometer-thick crustal root, yielding a total crustal thickness of 55 to 58 kilometers", with a "sharp" crust-mantle transition.
+
+### Stadtlander1999
+- Reference: Stadtlander, R., Mechie, J. and Schulze, A. (1999). Deep structure of the southern Ural mountains as derived from wide-angle seismic data. Geophysical Journal International 137:501.
+- Cited as: "Stadtlander, Mechie & Schulze 1999".
+- Ledger ids: PLT-282
+- Access: paywalled; abstract read (via OpenAlex).
+- Read so far (by the project): abstract, 2026-10-05: a "15-18 km thick crustal root" centred 50-80 km east of the highest topography; "If the deeper parts of the thickened crust also have high densities (small density contrast of about -0.1 g cm-3 with respect to the uppermost mantle) then this helps to explain the absence of a pronounced gravity minimum"; the high velocities read as mafic or ultramafic rock, not eclogite. Title as recorded by the sub-agent; check before quoting.
+
+### Artyushkov2000
+- Reference: Artyushkov, E. V. and others (2000). [On the Southern Urals' crust and its low altitude.] Tectonophysics 320:271.
+- Cited as: "Artyushkov et al. 2000".
+- Ledger ids: PLT-282
+- Access: paywalled; search snippet only.
+- Read so far (by the project): snippet only, 2026-10-05, not checked against the paper: "Since the mean altitude of the Southern Urals is only 600-800 m, their crust should have a high mean density. A layer of dense mafic rocks, ~20 km thick, still exists at the base of the Uralian crust"; crust "up to ~60 km thick, at a mean altitude ~0.5 km".
+
+### Leech2001
+- Reference: Leech, M. L. (2001). Arrested orogenic development: eclogitization, delamination, and tectonic collapse. Earth and Planetary Science Letters 185:149-159.
+- Cited as: "Leech 2001".
+- Ledger ids: PLT-278, PLT-282
+- Access: paywalled; search snippet only.
+- Read so far (by the project): snippet only, 2026-10-05, not checked against the paper: "it is likely that the base of the Uralian crust has not undergone major eclogitization and therefore is under fluid-absent conditions"; "fluid is required for complete eclogitization".
+
+## Plateau erosion and the hillslope diffusivity (ERO-175 to ERO-178), added 2026-10-16
+
+Roering1999 (the measured diffusivity, ERO-177) is under "Erosion, isostasy and hypsometry" above; its entry records what was read on 2026-10-16.
+
+### Salles2019
+- Reference: Salles, T. (2019). eSCAPE: Regional to Global Scale Landscape Evolution Model v2.0. Geoscientific Model Development 12:4165-4184.
+- DOI or URL: https://gmd.copernicus.org/articles/12/4165/2019/ (the DOI 10.5194/gmd-12-4165-2019 from the journal's pattern, not checked; the end page from memory)
+- Cited as: "Salles 2019 (eSCAPE)" (the hillslope diffusion coefficient a global landscape evolution model takes at coarse resolution).
+- Ledger ids: ERO-178
+- Access: open (Copernicus).
+- Read so far (by the project): full text through the web fetch tool, 2026-10-16: §3.2.2, "hillslope processes are also accounted for using a diffusion coefficient D of 10−2 m2 yr−1" on a grid "built with a resolution of approximately 200 m"; §3.2.3 (the global run), "the diffusion coefficient D equals 10−1" (no units in that sentence) on meshes "at 16 km resolution". The fetched text does not say that D is adjusted for the resolution.
+
 ## Playability steering (STE)
 
 ### CharetteSmith2010

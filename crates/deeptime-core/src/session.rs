@@ -115,8 +115,10 @@ pub trait MemoryGauge: Send + Sync {
         self.in_use()
     }
     /// Gives memory the allocator keeps for reuse back to the system (its count drops by as
-    /// much); returns the bytes released. Called before the history spills to make room under
-    /// the cap. The default releases nothing.
+    /// much); returns the bytes released. The counting allocator also returns what the system
+    /// allocator keeps outside the count (`alloc::release_cache`). Called when a stage ends,
+    /// before the history spills to make room under the cap and before the bake's projection
+    /// pass. The default releases nothing.
     fn release(&self) -> u64 {
         0
     }
@@ -1327,13 +1329,18 @@ impl Session {
         };
         let started = Instant::now();
         let result = (|| -> Result<Option<String>, CoreError> {
-            let water = crate::water_view::from_bake(
-                world,
-                &self.view,
-                dir,
-                m.layer("water_level").map(|l| l.path.as_str()),
-                (entry.w, entry.h),
-            )?;
+            // In the session's own pool, like the redraw below: the water view's hydrology is
+            // parallel, and outside an `install` it ran on Rayon's global pool, every core of the
+            // machine whatever the session's thread count (P1-17, `tests/session_pool.rs`).
+            let water = self.pool.install(|| {
+                crate::water_view::from_bake(
+                    world,
+                    &self.view,
+                    dir,
+                    m.layer("water_level").map(|l| l.path.as_str()),
+                    (entry.w, entry.h),
+                )
+            })?;
             let Some(water) = water else {
                 return Ok(None);
             };

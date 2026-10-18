@@ -255,11 +255,20 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
     };
     Some(
         format!(
-            "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} foundered_km3={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
+            "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} foundered_km3={:.3e} collision_crossed_km3={:.3e} collision_kept_km3={:.3e} resample_accreted_km3={:.3e} resample_stacked_km3={:.3e} resample_accreted_continent_km3={:.3e} resample_accreted_visible_km3={:.3e} arc_continental_km3={:.3e} arc_oceanic_km3={:.3e} continental_volume_km3={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
             deeptime_core::plates::stats::summary(st).line(),
             global(collapse::MOVED_GLOBAL),
             global(collapse::GAINED_GLOBAL),
             global(collapse::FOUNDERED_GLOBAL),
+            global(deeptime_core::plates::belts::CROSSED_GLOBAL),
+            global(deeptime_core::plates::belts::KEPT_GLOBAL),
+            global(deeptime_core::plates::ridges::ACCRETED_GLOBAL),
+            global(deeptime_core::plates::ridges::STACKED_CONSUMED_GLOBAL),
+            global(deeptime_core::plates::ridges::ACCRETED_HIDDEN_CONTINENT_GLOBAL),
+            global(deeptime_core::plates::ridges::ACCRETED_VISIBLE_GLOBAL),
+            global(deeptime_core::plates::subduction::ARC_CONTINENTAL_GLOBAL),
+            global(deeptime_core::plates::subduction::ARC_OCEANIC_GLOBAL),
+            global(deeptime_core::plates::subduction::CONTINENTAL_VOLUME_GLOBAL),
             q(0.1),
             q(0.5),
             q(0.9),
@@ -950,6 +959,19 @@ pub(crate) fn timings_line(
             ));
         }
     }
+    // The plate step's parts (a process-wide gauge, not a world note: P1-17).
+    let plates = deeptime_core::plates::timings();
+    if !plates.is_empty() {
+        parts.push(format!(
+            "{}[{}]",
+            deeptime_core::plates::STAGE_NAME,
+            plates
+                .iter()
+                .map(|(k, ms)| format!("{k}={:.1}s", ms / 1000.0))
+                .collect::<Vec<_>>()
+                .join(",")
+        ));
+    }
     parts.join(" ")
 }
 
@@ -1595,6 +1617,28 @@ pub struct BenchOptions {
 /// memory, into `bench.json` and a timing page (the Phase 1 budget gate's skeleton, P1-17).
 pub fn bench(o: &BenchOptions) -> CliResult<()> {
     let preset = load_preset_with(&o.preset, o.start.as_deref(), o.length_myr)?;
+    // What the editor shows a player before the run (plan §5.7.5): the gate compares the
+    // measured peak with it (P1-17).
+    let estimate: Value = serde_json::from_str(&deeptime_core::session::estimate_for(
+        &preset, "", o.mem_cap,
+    )?)?;
+    let estimate_seconds: f64 = estimate["stages"].as_array().map_or(0.0, |a| {
+        a.iter().filter_map(|s| s["seconds"].as_f64()).sum()
+    });
+    println!(
+        "deeptime bench: estimate peak_bytes={} seconds={estimate_seconds:.0} stages={}",
+        estimate["peak_bytes"],
+        estimate["stages"].as_array().map_or(String::new(), |a| a
+            .iter()
+            .map(|s| format!(
+                "{}:{}B/{:.0}s",
+                s["name"].as_str().unwrap_or("?"),
+                s["bytes"],
+                s["seconds"].as_f64().unwrap_or(0.0)
+            ))
+            .collect::<Vec<_>>()
+            .join(","))
+    );
     let temp = o.work.is_none();
     let work = o.work.clone().unwrap_or_else(|| temp_work("bench"));
     let mut runs = Vec::new();
@@ -1603,6 +1647,7 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
         let out = work.join(format!("t{threads}"));
         let _ = std::fs::remove_dir_all(&out);
         alloc::reset_peak();
+        deeptime_core::plates::reset_timings();
         let started = Instant::now();
         let s = Session::create(
             &preset,
@@ -1632,6 +1677,13 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
         if let Some(line) = plates_line(&world) {
             println!("deeptime bench: threads={threads} {line}");
         }
+        let [dense, sparse, movers, visited] = deeptime_core::surface::marine::failure_counts();
+        println!(
+            "deeptime bench: threads={threads} slope_failure full_sweeps={dense} neighbourhood_passes={sparse} \
+             movers_per_pass={:.0} cells_per_pass={:.0}",
+            movers as f64 / sparse.max(1) as f64,
+            visited as f64 / sparse.max(1) as f64
+        );
         if let Some(line) = surface_line(&world) {
             println!("deeptime bench: threads={threads} {line}");
         }
@@ -1692,6 +1744,7 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
             std::thread::available_parallelism().map_or(1, |n| n.get())
         ),
         "created_utc": rfc3339_utc(SystemTime::now()),
+        "estimate": estimate,
         "runs": runs,
     });
     let mut text = serde_json::to_vec_pretty(&bench)?;

@@ -18,27 +18,40 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.OreDraws;
 import com.minecraftindustrialcomplex.deeptime.worldgen.StrataPass;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BrushableBlockEntity;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.storage.loot.BuiltInLootTables;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.common.Tags;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -362,9 +375,13 @@ public final class DepositGameTests {
     }
 
     /**
-     * The loot table and the block entity, in a real level: {@code deeptime:archaeology/placer_gold}
-     * is loaded and gives one stack of 2 to 5 gold nuggets whatever the seed (and both ends occur);
-     * {@link PlacerPanning#setLoot} stores it and the seed in a suspicious gravel's block entity.
+     * The loot table, the roll and the block entity, in a real level:
+     * {@code deeptime:archaeology/placer_gold} is loaded and {@link PlacerPanning#roll} gives one
+     * stack of 2 to 5 gold nuggets whatever the seed (and both ends occur), the same stack vanilla's
+     * brushing would unpack from the table and the seed ({@code LootTable.getRandomItems(params,
+     * seed)}, its first stack). {@link PlacerPanning#fill} stores that stack in a suspicious
+     * gravel's block entity as its item, with no loot table; brushing the block (ten strokes,
+     * {@code BrushableBlockEntity.brush}) drops exactly that stack and leaves plain gravel.
      */
     @GameTest(template = GameTestSupport.TEMPLATE)
     public static void placerGoldLootTable(GameTestHelper helper) {
@@ -380,11 +397,12 @@ public final class DepositGameTests {
         long sum = 0;
         for (int i = 0; i < n; i++) {
             long seed = OreDraws.panSeed(level.getSeed(), 4096, i, 64, 0);
-            var stacks = table.getRandomItems(params, seed);
-            helper.assertTrue(stacks.size() == 1, "seed " + seed + " gave " + stacks.size() + " stacks");
-            ItemStack stack = stacks.get(0);
+            ItemStack stack = PlacerPanning.roll(level, at, PlacerPanning.GOLD_TABLE, seed);
             helper.assertTrue(stack.is(Items.GOLD_NUGGET), "seed " + seed + " gave " + stack);
-            helper.assertTrue(stack.getCount() == table.getRandomItems(params, seed).get(0).getCount(), "seed " + seed + " is not repeatable");
+            helper.assertTrue(ItemStack.matches(stack, PlacerPanning.roll(level, at, PlacerPanning.GOLD_TABLE, seed)), "seed " + seed + " is not repeatable");
+            var brushed = table.getRandomItems(params, seed);
+            helper.assertTrue(brushed.size() == 1, "seed " + seed + " gave " + brushed.size() + " stacks");
+            helper.assertTrue(ItemStack.matches(stack, brushed.get(0)), "seed " + seed + " rolled " + stack + " but brushing would give " + brushed.get(0));
             min = Math.min(min, stack.getCount());
             max = Math.max(max, stack.getCount());
             sum += stack.getCount();
@@ -392,25 +410,47 @@ public final class DepositGameTests {
         DeepTime.LOGGER.info("[gametest] placerGoldLootTable: {} seeds gave {} to {} gold nuggets, mean {}", n, min, max, sum / (double) n);
         helper.assertTrue(min == 2 && max == 5, n + " seeds gave " + min + " to " + max + " nuggets, not 2 to 5");
         helper.assertTrue(Math.abs(sum / (double) n - 3.5) < 0.3, "mean " + sum / (double) n + " nuggets, not about 3.5");
-        // The block entity keeps the table and the seed (on stone: the block would fall off air).
+        // The block entity holds the stack and no table (on stone: the block would fall off air).
         level.setBlock(at.below(), Blocks.STONE.defaultBlockState(), 3);
         level.setBlock(at, Blocks.SUSPICIOUS_GRAVEL.defaultBlockState(), 3);
         long seed = OreDraws.panSeed(level.getSeed(), 4096, at.getX(), at.getY(), at.getZ());
-        helper.assertTrue(PlacerPanning.setLoot(level, at, PlacerPanning.GOLD_TABLE, seed), "no brushable block entity at " + at);
+        ItemStack gold = PlacerPanning.roll(level, at, PlacerPanning.GOLD_TABLE, seed);
+        helper.assertTrue(PlacerPanning.fill(level, at, PlacerPanning.GOLD_TABLE, seed), "no brushable block entity at " + at);
         CompoundTag tag = level.getBlockEntity(at).saveWithoutMetadata(level.registryAccess());
-        helper.assertTrue(PlacerPanning.GOLD_TABLE.location().toString().equals(tag.getString("LootTable")), "block entity: " + tag);
-        helper.assertTrue(tag.getLong("LootTableSeed") == seed, "block entity: " + tag);
+        helper.assertTrue(!tag.contains("LootTable") && ItemStack.matches(gold, itemOf(level, tag)), "block entity " + tag + ", rolled " + gold);
+        // One brushing, for whoever gets there first: the stack drops once and the block is gravel.
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        BrushableBlockEntity be = (BrushableBlockEntity) level.getBlockEntity(at);
+        long t = level.getGameTime();
+        boolean done = false;
+        for (int i = 0; i < 10 && !done; i++)
+            done = be.brush(t + 10L * i, player, Direction.UP); // a stroke every 10 ticks (the brush's cooldown)
+        helper.assertTrue(done, "ten strokes did not finish brushing " + at);
+        helper.assertTrue(level.getBlockState(at).is(Blocks.GRAVEL), "brushed out, " + at + " is " + level.getBlockState(at).getBlock());
+        List<ItemEntity> drops = level.getEntitiesOfClass(ItemEntity.class, new AABB(at).inflate(2));
+        int nuggets = drops.stream().filter(e -> e.getItem().is(Items.GOLD_NUGGET)).mapToInt(e -> e.getItem().getCount()).sum();
+        drops.forEach(e -> e.discard());
         level.setBlock(at, Blocks.AIR.defaultBlockState(), 3);
         level.setBlock(at.below(), Blocks.AIR.defaultBlockState(), 3);
+        helper.assertTrue(nuggets == gold.getCount(), "brushing dropped " + nuggets + " gold nuggets, the block held " + gold);
         helper.succeed();
     }
 
+    /** The item a saved brushable block entity holds ({@code item}), or {@link ItemStack#EMPTY}. */
+    static ItemStack itemOf(ServerLevel level, CompoundTag tag) {
+        return tag != null && tag.contains("item", Tag.TAG_COMPOUND)
+                ? ItemStack.parse(level.registryAccess(), tag.getCompound("item")).orElse(ItemStack.EMPTY) : ItemStack.EMPTY;
+    }
+
     /**
-     * What one scan of a placer body's gold cells found. {@code hanging} counts suspicious blocks
-     * whose block below is free when the scan reads it; {@code problems} are block-entity faults
-     * (always a failure); {@code samples} are the first cells of {@code hanging} and {@code missed}.
+     * What one scan of a placer body's gold cells found. {@code filled} counts suspicious blocks
+     * whose block entity holds the gold rolled for their position and no loot table;
+     * {@code hanging} those whose block below is free when the scan reads it; {@code converted}
+     * gold cells another mod (Lootr) has replaced with its own block. {@code problems} are
+     * block-entity faults and converted cells (always a failure); {@code samples} are the first
+     * cells of {@code hanging} and {@code missed}.
      */
-    record PlacerScan(int due, int panned, int withTable, int ore, int unsupported, int missed, int hanging, int other,
+    record PlacerScan(int due, int panned, int filled, int ore, int unsupported, int missed, int hanging, int converted, int other,
                       List<String> problems, List<String> samples) {}
 
     /**
@@ -448,25 +488,36 @@ public final class DepositGameTests {
 
     /**
      * Generates a placer body's chunks and sorts every cell the gold zone draws: suspicious gravel or
-     * sand with the loot table and seed in its block entity ({@code panned}; {@code hanging} when the
-     * block under it is free now); an ore block or raw gold block ({@code ore}); plain gravel or sand
-     * over a free block ({@code unsupported}); plain gravel or sand over a solid block
-     * ({@code missed}); anything else, water, air or a rock the feature skipped ({@code other}).
+     * sand ({@code panned}; {@code filled} when its block entity holds {@link PlacerPanning#roll}'s
+     * stack for its position and seed and no loot table; {@code hanging} when the block under it is
+     * free now); an ore block or raw gold block ({@code ore}); plain gravel or sand over a free block
+     * ({@code unsupported}); plain gravel or sand over a solid block ({@code missed}); a Lootr block
+     * ({@code converted}); anything else, water, air or a rock the feature skipped ({@code other}).
+     *
+     * <p>The bar's chunks are read as a player gets them, in full ({@code level.getChunk}), and each
+     * block entity as the chunk would save it ({@code getBlockEntityNbtForSaving}: the object, or the
+     * saved tag a full chunk that has not ticked yet still holds). A chunk read back from disk below
+     * full status does not show its block entities: a {@code ProtoChunk} holds them only as saved
+     * tags (the first MIC gate failure of 2026-10-17, chunks saved 36 s after the porphyry scan
+     * generated them), and a chunk that was saved in full is a level chunk inside an
+     * {@code ImposterProtoChunk} whose block entities wait in its post-load step
+     * ({@code ChunkSerializer.postLoadChunk}), which runs only when the chunk is made full again (the
+     * second, where {@code coePicksSiteVein} had loaded chunk -90, 0 in full and the scan at
+     * {@code FEATURES} then saw none of its 37 block entities, all 37 in its saved data).
      */
     static PlacerScan scanPlacer(ServerLevel level, WorldData wd, Body b, boolean panning) {
         int c = wd.circumference();
         OreBlockResolver ores = OreBlockResolver.get();
         BlockState raw = ores.rawBlock(GOLD);
-        Map<Long, ChunkAccess> chunks = new HashMap<>();
+        Map<Long, LevelChunk> chunks = new HashMap<>();
         int minY = Math.max(level.getMinBuildHeight(), b.min()[1]), maxY = Math.min(level.getMaxBuildHeight() - 1, b.max()[1]);
-        int due = 0, panned = 0, withTable = 0, ore = 0, unsupported = 0, missed = 0, hanging = 0, other = 0;
+        int due = 0, panned = 0, filled = 0, ore = 0, unsupported = 0, missed = 0, hanging = 0, converted = 0, other = 0;
         List<String> problems = new ArrayList<>(), samples = new ArrayList<>();
         for (int x = b.min()[0]; x <= b.max()[0]; x++) {
             int xc = canonical(c, x);
             for (int z = b.min()[2]; z <= b.max()[2]; z++) {
                 long key = ChunkPos.asLong(xc >> 4, z >> 4);
-                ChunkAccess chunk = chunks.computeIfAbsent(key,
-                        k -> level.getChunkSource().getChunk(xc >> 4, (int) (k >> 32), ChunkStatus.FEATURES, true));
+                LevelChunk chunk = chunks.computeIfAbsent(key, k -> level.getChunk(xc >> 4, (int) (k >> 32)));
                 for (int y = minY; y <= maxY; y++) {
                     Body.Zone zone = DepositFeature.zoneAt(b, c, x, y, z);
                     if (zone == null || !GOLD.toString().equals(zone.material()))
@@ -481,16 +532,14 @@ public final class DepositGameTests {
                             if (samples.size() < 8)
                                 samples.add(p.toShortString() + " " + state.getBlock() + " over " + below.getBlock());
                         }
-                        if (chunk.getBlockEntity(p) instanceof BrushableBlockEntity be) {
-                            CompoundTag tag = be.saveWithoutMetadata(level.registryAccess());
-                            if (PlacerPanning.GOLD_TABLE.location().toString().equals(tag.getString("LootTable"))
-                                    && tag.getLong("LootTableSeed") == OreDraws.panSeed(level.getSeed(), c, x, y, z))
-                                withTable++;
-                            else if (problems.size() < 8)
-                                problems.add(p.toShortString() + " block entity " + tag);
-                        } else if (problems.size() < 8) {
-                            problems.add(p.toShortString() + " has no brushable block entity");
-                        }
+                        CompoundTag tag = chunk.getBlockEntityNbtForSaving(p, level.registryAccess());
+                        ItemStack gold = PlacerPanning.roll(level, p, PlacerPanning.GOLD_TABLE, OreDraws.panSeed(level.getSeed(), c, x, y, z));
+                        if (tag != null && "minecraft:brushable_block".equals(tag.getString("id")) && !tag.contains("LootTable")
+                                && !gold.isEmpty() && ItemStack.matches(gold, itemOf(level, tag)))
+                            filled++;
+                        else if (problems.size() < 8)
+                            problems.add(p.toShortString() + " block entity " + tag + " (" + chunk.getClass().getSimpleName() + " "
+                                    + chunk.getPersistedStatus() + "), gold due " + gold);
                     } else if (OreBlockResolver.isOreOf(state, GOLD) || (raw != null && state == raw)) {
                         ore++;
                     } else if (state.is(Tags.Blocks.GRAVELS) || state.is(Tags.Blocks.SANDS)) {
@@ -501,24 +550,38 @@ public final class DepositGameTests {
                             if (samples.size() < 8)
                                 samples.add(p.toShortString() + " still " + state.getBlock() + " over " + below.getBlock() + ", gold due");
                         }
+                    } else if (isLootr(state)) {
+                        converted++;
+                        if (problems.size() < 8)
+                            problems.add(p.toShortString() + " is " + BuiltInRegistries.BLOCK.getKey(state.getBlock()) + ": Lootr took it over");
                     } else {
                         other++;
                     }
                 }
             }
         }
-        PlacerScan s = new PlacerScan(due, panned, withTable, ore, unsupported, missed, hanging, other, problems, samples);
+        PlacerScan s = new PlacerScan(due, panned, filled, ore, unsupported, missed, hanging, converted, other, problems, samples);
         DeepTime.LOGGER.info("[gametest] placer scan {} body={} aabb={}..{} panning={}: {}", level.dimension().location(), b.id(),
                 java.util.Arrays.toString(b.min()), java.util.Arrays.toString(b.max()), panning, s);
         return s;
     }
 
+    static final String LOOTR = "lootr";
+
+    /** True for a block of Lootr's ({@code lootr:*}). */
+    static boolean isLootr(BlockState state) {
+        return BuiltInRegistries.BLOCK.getKey(state.getBlock()).getNamespace().equals(LOOTR);
+    }
+
     /**
      * A placer bar of the test world holds its gold as the pack makes it. Without a gold ore for
-     * gravel and sand (the standalone profile): suspicious gravel or sand, each with the placer gold
-     * loot table and its position's seed in the block entity, and no gravel or sand cell left plain
-     * over solid ground; soil in the bar keeps the ore block. With Excavated Variants (or a pack's
-     * own gravel gold ore): no suspicious block at all.
+     * gravel and sand (the standalone profile): suspicious gravel or sand, each holding the gold its
+     * position's seed rolls from the placer gold loot table and no loot table, and no gravel or sand
+     * cell left plain over solid ground; soil in the bar keeps the ore block. With Excavated Variants
+     * (or a pack's own gravel gold ore): no suspicious block at all. With Lootr (MIC), the bar's
+     * chunks are then loaded in full with two chunks around them, which is when Lootr replaces a
+     * suspicious block whose block entity has a loot table with its own per-player block, and none
+     * of the bar's blocks may be replaced ({@link #lootrLeavesPlacerGold}).
      *
      * <p>Which blocks a fixture bar's cells are (gravel the strata pass painted into stone, or the
      * soil the surface rules left on a bench) is the terrain's, not this feature's, so the test scans
@@ -538,11 +601,13 @@ public final class DepositGameTests {
         List<Body> bodies = placerBodies(level, wd, 30, 4);
         helper.assertTrue(!bodies.isEmpty(), "no placer body with 30 gold cells among " + DeepTimeSites.of(level).all().size() + " sites");
         PlacerScan s = null;
+        Body bar = null;
         for (Body b : bodies) {
             PlacerScan one = scanPlacer(level, wd, b, panning);
             helper.assertTrue(one.problems().isEmpty(), "body " + b.id() + " problems: " + one.problems());
             if (panning ? one.panned() + one.unsupported() + one.missed() > 0 : one.ore() > 0) {
                 s = one;
+                bar = b;
                 break;
             }
         }
@@ -556,14 +621,113 @@ public final class DepositGameTests {
         helper.assertTrue(s.missed() * 50 <= gravelly, s.missed() + " of " + gravelly + " gravel or sand cells over solid ground were due gold and are plain: "
                 + s.samples());
         if (panning) {
-            helper.assertTrue(s.withTable() == s.panned(), (s.panned() - s.withTable()) + " suspicious blocks lack the loot table: " + s.problems());
+            helper.assertTrue(s.filled() == s.panned(), (s.panned() - s.filled()) + " suspicious blocks do not hold their gold: " + s.problems());
             helper.assertTrue(s.hanging() * 50 <= s.panned(), s.hanging() + " of " + s.panned() + " suspicious blocks have a free block under them: "
                     + s.samples());
             helper.assertTrue(s.panned() > 0, "no suspicious gravel or sand among " + s.due() + " gold cells: " + s);
         } else {
             helper.assertTrue(s.panned() == 0, s.panned() + " suspicious blocks in a pack with gold ore for gravel: " + s);
         }
-        helper.succeed();
+        if (!panning || !ModList.get().isLoaded(LOOTR)) {
+            if (panning)
+                DeepTime.LOGGER.info("[gametest] placer lootr: Lootr is not loaded; nothing to check");
+            helper.succeed();
+            return;
+        }
+        lootrLeavesPlacerGold(helper, level, wd, bar, s);
+    }
+
+    /** One of Lootr's block tags of what it converts ({@code data/lootr/tags/block/convert/}). */
+    static TagKey<Block> lootrConverts(String path) {
+        return TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath(LOOTR, "convert/" + path));
+    }
+
+    /**
+     * Lootr (in MIC) replaces a block in {@code #lootr:convert/gravels} or {@code /sands} whose
+     * brushable block entity has a loot table with its own per-player block, once the block's
+     * level chunk and the 24 around it are loaded (its {@code BlockEntityTicker}; decisions log
+     * 2026-10-17). Placer gold is a finite deposit, one brushing for whoever gets there first, so
+     * none of the bar's blocks may be replaced. The bar's chunks and two chunks around them are
+     * forced and loaded in full, and controls go above the bar: a chest with a vanilla loot table,
+     * which Lootr ({@code #lootr:convert/chests}) must turn into its own chest, or the check sees
+     * nothing; and, where Lootr converts suspicious blocks in this server, a suspicious gravel (or
+     * sand) with the placer gold table and a seed (the form the bar's blocks had before
+     * 2026-10-17), which must become a Lootr block too. Then every gold cell is scanned again:
+     * none converted, the same suspicious blocks, each still holding its gold.
+     *
+     * <p>The GameTest server enables every datapack it finds ({@code GameTestServer.create}), so
+     * also Lootr's opt-in feature pack {@code lootr_no_suspicious_blocks}, which empties both tags:
+     * there Lootr converts no suspicious block at all, the suspicious control is left out (logged),
+     * and what keeps the bar's blocks from Lootr in a world is the check above that none has a loot
+     * table ({@code filled == panned}). A MIC world leaves that pack off: a feature pack is not
+     * selected by default, and the pack enables it nowhere (read 2026-10-17).
+     */
+    static void lootrLeavesPlacerGold(GameTestHelper helper, ServerLevel level, WorldData wd, Body bar, PlacerScan before) {
+        int c = wd.circumference();
+        int cx0 = canonical(c, bar.min()[0]) >> 4, cz0 = bar.min()[2] >> 4;
+        int nx = (bar.max()[0] >> 4) - (bar.min()[0] >> 4), nz = (bar.max()[2] >> 4) - cz0;
+        List<ChunkPos> forced = new ArrayList<>();
+        for (int dx = -2; dx <= nx + 2; dx++)
+            for (int dz = -2; dz <= nz + 2; dz++) {
+                ChunkPos cp = new ChunkPos(cx0 + dx, cz0 + dz);
+                if (!level.getForcedChunks().contains(cp.toLong()) && level.setChunkForced(cp.x, cp.z, true))
+                    forced.add(cp);
+                level.getChunk(cp.x, cp.z); // full status, now
+            }
+        int midX = canonical(c, (bar.min()[0] + bar.max()[0]) / 2), midZ = (bar.min()[2] + bar.max()[2]) / 2;
+        BlockPos chest = new BlockPos(midX, level.getMaxBuildHeight() - 2, midZ), grain = chest.east(2);
+        BlockState gravel = Blocks.SUSPICIOUS_GRAVEL.defaultBlockState(), sand = Blocks.SUSPICIOUS_SAND.defaultBlockState();
+        BlockState suspicious = gravel.is(lootrConverts("gravels")) ? gravel : sand.is(lootrConverts("sands")) ? sand : null;
+        List<BlockPos> controls = List.of(chest, grain, grain.below());
+        for (BlockPos p : controls)
+            helper.assertTrue(level.getBlockState(p).isAir(), "no room for the controls at " + p.toShortString());
+        level.setBlock(chest, Blocks.CHEST.defaultBlockState(), 3);
+        helper.assertTrue(level.getBlockEntity(chest) instanceof ChestBlockEntity, "no chest block entity at the control");
+        ((ChestBlockEntity) level.getBlockEntity(chest)).setLootTable(BuiltInLootTables.SIMPLE_DUNGEON, level.getSeed() ^ chest.asLong());
+        if (suspicious != null) {
+            level.setBlock(grain.below(), Blocks.STONE.defaultBlockState(), 3);
+            level.setBlock(grain, suspicious, 3);
+            helper.assertTrue(level.getBlockEntity(grain) instanceof BrushableBlockEntity, "no brushable block entity at the control");
+            ((BrushableBlockEntity) level.getBlockEntity(grain)).setLootTable(PlacerPanning.GOLD_TABLE,
+                    OreDraws.panSeed(level.getSeed(), c, grain.getX(), grain.getY(), grain.getZ()));
+        }
+        long placedAt = level.getGameTime();
+        Runnable cleanUp = () -> {
+            for (BlockPos p : controls)
+                level.setBlock(p, Blocks.AIR.defaultBlockState(), 3);
+            for (ChunkPos cp : forced)
+                level.setChunkForced(cp.x, cp.z, false);
+        };
+        helper.startSequence()
+                .thenWaitUntil(() -> {
+                    helper.assertTrue(isLootr(level.getBlockState(chest)), "Lootr has not replaced the chest control at " + chest.toShortString()
+                            + " (" + level.getBlockState(chest).getBlock() + "): with Lootr loaded but not converting these chunks, this check would see nothing");
+                    if (suspicious != null)
+                        helper.assertTrue(isLootr(level.getBlockState(grain)), "Lootr converts " + suspicious.getBlock()
+                                + " in this server but has not replaced the control at " + grain.toShortString());
+                })
+                .thenIdle(20)
+                .thenExecute(() -> {
+                    PlacerScan after;
+                    String chestNow = BuiltInRegistries.BLOCK.getKey(level.getBlockState(chest).getBlock()).toString();
+                    String grainNow = suspicious == null
+                            ? "left out: Lootr converts no suspicious block in this server (#lootr:convert/gravels and /sands hold neither)"
+                            : suspicious.getBlock() + " became " + BuiltInRegistries.BLOCK.getKey(level.getBlockState(grain).getBlock());
+                    try {
+                        after = scanPlacer(level, wd, bar, true);
+                    } finally {
+                        cleanUp.run();
+                    }
+                    DeepTime.LOGGER.info("[gametest] placer lootr: {} chunks loaded in full ({} forced here); {} ticks after placing, "
+                                    + "chest control became {}; suspicious control {}; bar cells converted={} panned before={} after={} filled after={}",
+                            (nx + 5) * (nz + 5), forced.size(), level.getGameTime() - placedAt, chestNow, grainNow,
+                            after.converted(), before.panned(), after.panned(), after.filled());
+                    helper.assertTrue(after.converted() == 0, after.converted() + " of the bar's blocks became Lootr's: " + after.problems());
+                    helper.assertTrue(after.panned() == before.panned(), "suspicious blocks before " + before.panned() + ", after " + after.panned());
+                    helper.assertTrue(after.filled() == after.panned() && after.problems().isEmpty(),
+                            (after.panned() - after.filled()) + " suspicious blocks lost their gold: " + after.problems());
+                })
+                .thenSucceed();
     }
 
     /**

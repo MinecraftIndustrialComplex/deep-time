@@ -479,3 +479,76 @@ fn the_flow_law_is_the_shallow_ice_approximation() {
     assert!((f.flux(hh, s, 1.0) - 5.0e7).abs() < 1e-3 * 5.0e7);
     assert!((zs - 100.0 - hh).abs() < 1e-9);
 }
+
+/// The forest-parallel ice solve (P1-17) is the serial stack walk bit for bit, on a wrapping
+/// range with closed basins, uneven climate and a mask of allowed ice, at 1, 3 and 8 threads.
+#[test]
+fn the_parallel_ice_solve_is_the_serial_walk_bit_for_bit() {
+    let (w, h) = (96, 41);
+    let d = Dims::new(w, h, 1000.0, true);
+    let mut z = range(w, h, 3200.0, 10, 200.0);
+    for (c, v) in z.iter_mut().enumerate() {
+        let (i, j) = (c % w, c / w);
+        // Dimples (closed basins) and a second, lower ridge.
+        if (i * 13 + j * 7) % 29 == 0 {
+            *v -= 300.0;
+        }
+        *v += 400.0 * ((i as f64 * 0.21).sin() * (j as f64 * 0.17).cos()).max(0.0);
+    }
+    let n = w * h;
+    let rt = route(&d, &z, 0.0);
+    let ela: Vec<f64> = (0..n).map(|c| 1500.0 + ((c * 31) % 400) as f64).collect();
+    let p_m: Vec<f32> = (0..n).map(|c| 0.5 + ((c * 17) % 13) as f32 * 0.2).collect();
+    let t: Vec<f32> = (0..n).map(|c| -15.0 + ((c * 11) % 19) as f32).collect();
+    let allowed: Vec<f32> = (0..n)
+        .map(|c| if c % 23 == 0 { 0.0 } else { 1.0 })
+        .collect();
+    let clim = IceClimate {
+        ela_z: &ela,
+        precip_m_yr: &p_m,
+        t_c: &t,
+        allowed: Some(&allowed),
+        time_share: None,
+    };
+    let p = GlacialParams {
+        form_ratio: 0.1,
+        valley_width: 2.0,
+        ..GlacialParams::default()
+    };
+    let bits = |s: &IceState| -> Vec<u64> {
+        let mut v = Vec::new();
+        for a in [
+            &s.q,
+            &s.melt_frac,
+            &s.thick,
+            &s.surface,
+            &s.footprint,
+            &s.cover,
+            &s.width,
+            &s.sliding,
+            &s.slope,
+        ] {
+            v.extend(a.iter().map(|x| x.to_bits()));
+        }
+        v.push(s.cells as u64);
+        v
+    };
+    let mut want = IceState::default();
+    ice_serial(
+        &d, &rt.r, &rt.kind, &z, &rt.filled, 0.0, &clim, &p, 9.81, &mut want,
+    );
+    assert!(want.cells > 50, "{} glacier cells", want.cells);
+    for threads in [1, 3, 8] {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build()
+            .unwrap();
+        let mut got = IceState::default();
+        pool.install(|| {
+            ice(
+                &d, &rt.r, &rt.kind, &z, &rt.filled, 0.0, &clim, &p, 9.81, &mut got,
+            )
+        });
+        assert!(bits(&got) == bits(&want), "{threads} threads");
+    }
+}

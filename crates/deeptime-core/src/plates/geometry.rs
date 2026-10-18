@@ -174,11 +174,12 @@ impl Tree {
 
     /// The `k` nearest samples, nearest first.
     pub fn nearest_n(&self, q: DVec3, k: usize) -> Vec<(u32, f64)> {
-        self.tree
-            .nearest_n(q, k)
-            .into_iter()
-            .map(|(item, d2)| (self.index[item as usize], d2))
-            .collect()
+        // Mapped in place (P1-17: the L1 sampling asks this for every cell every step).
+        let mut found = self.tree.nearest_n(q, k);
+        for x in &mut found {
+            x.0 = self.index[x.0 as usize];
+        }
+        found
     }
 
     /// Samples within `angle` radians of `q`.
@@ -489,6 +490,7 @@ mod tests {
             resample_myr: 0.0,
             a0_km2: 1.0,
             counters: Default::default(),
+            slabs: Vec::new(),
             dynamics: None,
         };
         let all: Vec<u32> = (0..n as u32).collect();

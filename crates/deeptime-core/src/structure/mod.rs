@@ -451,10 +451,15 @@ impl StructureStage {
         let p = &self.p;
         let paths = &self.paths;
         let k = surface.log.k as usize;
+        // Each column's metamorphosed thickness in parallel, then their sum over the cells in
+        // order: a parallel `sum` of floats groups its terms as the threads split the work, so
+        // its last bits changed from run to run (the history_cap test caught the note differing
+        // between two runs of one planet; P1-17).
         let changed: f64 = {
             let log = &mut surface.log;
             let regolith = &surface.regolith_m;
-            log.layers
+            let per_cell: Vec<f64> = log
+                .layers
                 .par_chunks_mut(k)
                 .zip(log.count.par_iter_mut())
                 .enumerate()
@@ -486,7 +491,8 @@ impl StructureStage {
                     let mut col = crate::surface::strata_log::ColumnMut { layers, count };
                     metamorphism::metamorphose(&mut col, f64::from(regolith[c]), &th, paths)
                 })
-                .sum()
+                .collect();
+            per_cell.iter().sum()
         };
         let cell_km2 = dx * dx / 1.0e6;
         self.st.metamorphosed_km3 += changed * cell_km2 / 1000.0;
@@ -580,8 +586,11 @@ impl StructureStage {
                 deform::wear(&mut self.st.features, &grid, m);
             }
             let flags = field_of(fields, "plates/flags", n)?;
-            let orogen_km = traps::orogen_distance_km(&d, reg, crust, flags);
-            let arc_km = traps::arc_distance_km(&d, reg, crust, flags);
+            // The two distance transforms are serial sweeps: side by side (P1-17).
+            let (orogen_km, arc_km) = rayon::join(
+                || traps::orogen_distance_km(&d, reg, crust, flags),
+                || traps::arc_distance_km(&d, reg, crust, flags),
+            );
             let inputs = deform::Inputs {
                 grid: &grid,
                 m_per_block_h: s.m_per_block_h,
@@ -914,7 +923,7 @@ impl StructureStage {
         for (si, &k) in self.host_classes.iter().enumerate() {
             out.insert(
                 hosts::field_name(k),
-                (0..n).map(|c| fr[c * hc + si]).collect(),
+                (0..n).into_par_iter().map(|c| fr[c * hc + si]).collect(),
             );
         }
         let trap = self.trap_field(src, d, fields);

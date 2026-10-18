@@ -1,0 +1,4 @@
+c50 --set tectonics.collapse_thickness_km=50
+c45 --set tectonics.collapse_thickness_km=45
+c50r --set tectonics.collapse_thickness_km=50 --set tectonics.collapse_reach_km=400
+c50q --set tectonics.collapse_thickness_km=50 --set tectonics.collapse_quiet_myr=4

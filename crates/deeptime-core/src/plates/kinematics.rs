@@ -3,10 +3,10 @@
 //! s(p) = ω w × p (Cortial §3). Standard kinematics (the GPlates concepts), no code ported.
 //!
 //! A plate's motion is its angular-velocity vector Ω = ω·w (rad/yr) in the mantle frame. Every
-//! step turns each of its groups by the rotation of angle |Ω|·δt about Ω/|Ω|. Two slow changes
-//! act on Ω between discrete events: slab pull (Cortial §4.1: the axis of a subducting plate turns
-//! towards its fronts, w_i += ε Σ c_i × q_k / |c_i × q_k| δt, with ε scaled by front length) and
-//! a small random walk standing in for mantle reorganisation. Speeds are capped at v_0.
+//! step turns each of its groups by the rotation of angle |Ω|·δt about Ω/|Ω|. Ω itself comes from
+//! the force balance (`forces.rs`), towards which it relaxes each step; a speed guard
+//! ([`guard_speed`] on the plate's own fastest point, `max_plate_speed_mm_yr`) is reported
+//! whenever it binds; [`cap_speed`] caps the rotation itself (a weld's mixed motion).
 
 use glam::{DQuat, DVec3};
 
@@ -87,8 +87,47 @@ pub fn cap_speed(omega: DVec3, norm: &Norm, v_max_mm_yr: f64) -> DVec3 {
     if w > max { omega * (max / w) } else { omega }
 }
 
+/// Each plate's reach from its pole: the largest sin(angle) between the axis of `omega[p]` and a
+/// visible sample of plate `p` at the positions `pos`, so that the plate's fastest point moves at
+/// |Ω| R × reach (0 for a plate with no rotation or no visible sample).
+pub fn reach(state: &PlateState, pos: &[DVec3], omega: &[Option<DVec3>]) -> Vec<f64> {
+    let axes: Vec<Option<DVec3>> = omega
+        .iter()
+        .map(|w| w.and_then(|w| w.try_normalize()))
+        .collect();
+    let mut out = vec![0.0f64; omega.len()];
+    for (i, s) in state.samples.iter().enumerate() {
+        if s.is_hidden() {
+            continue;
+        }
+        let p = state.plate_of(i) as usize;
+        if let Some(Some(a)) = axes.get(p) {
+            let r = a.cross(pos[i]).length();
+            if r > out[p] {
+                out[p] = r;
+            }
+        }
+    }
+    out
+}
+
+/// The speed guard (`max_plate_speed_mm_yr`; ledger PLT-022): scales Ω down so the plate's fastest
+/// point (its `reach` from the pole, [`reach`]) moves at no more than `v_max`; returns the rotation
+/// and whether the guard bound. A plate spinning about a pole on itself is held by the speed of
+/// its own rim, not by the speed the rotation would have 90° away.
+pub fn guard_speed(omega: DVec3, reach: f64, norm: &Norm, v_max_mm_yr: f64) -> (DVec3, bool) {
+    let max = norm.omega_of_speed(v_max_mm_yr);
+    let w = omega.length() * reach.clamp(0.0, 1.0);
+    if w > max {
+        (omega * (max / w), true)
+    } else {
+        (omega, false)
+    }
+}
+
 /// An Euler pole and angular speed giving speed `v_mm_yr` at `centroid` (the pole is random but
-/// at least 30° from the centroid, so the plate does not merely spin).
+/// at least 30° from the centroid, so the plate does not merely spin): the earlier motion that
+/// ages the starting ocean floor (`init.rs`).
 pub fn random_motion(rng: &mut SplitMix64, centroid: DVec3, v_mm_yr: f64, norm: &Norm) -> DVec3 {
     let mut axis = rng.unit_vector();
     for _ in 0..16 {
@@ -99,27 +138,6 @@ pub fn random_motion(rng: &mut SplitMix64, centroid: DVec3, v_mm_yr: f64, norm: 
     }
     let lever = axis.cross(centroid).length().max(0.3);
     axis * (norm.omega_of_speed(v_mm_yr) / lever)
-}
-
-/// Turns the axis of Ω towards `pull` (a sum of c × q_k directions weighted by front length,
-/// radians), keeping |Ω|: slab pull.
-pub fn pull_axis(omega: DVec3, pull: DVec3) -> DVec3 {
-    let w = omega.length();
-    if w <= 0.0 || pull.length_squared() == 0.0 {
-        return omega;
-    }
-    let axis = (omega / w + pull).normalize_or_zero();
-    if axis == DVec3::ZERO { omega } else { axis * w }
-}
-
-/// The random walk of Ω: a Gaussian nudge of relative size `sigma` (per √Myr) over `dt_myr`.
-pub fn jitter(rng: &mut SplitMix64, omega: DVec3, sigma: f64, dt_myr: f64) -> DVec3 {
-    let w = omega.length();
-    if w <= 0.0 || sigma <= 0.0 {
-        return omega;
-    }
-    let s = sigma * dt_myr.sqrt() * w;
-    omega + DVec3::new(rng.normal(), rng.normal(), rng.normal()) * s
 }
 
 #[cfg(test)]
@@ -155,14 +173,17 @@ mod tests {
     }
 
     #[test]
-    fn speed_cap_and_pull() {
+    fn speed_cap_and_random_motion() {
         let norm = Norm::new(6370.0, 782.0, 1000);
         let fast = DVec3::Z * norm.omega_of_speed(300.0);
         let capped = cap_speed(fast, &norm, 100.0);
         assert!((norm.speed_mm_yr(capped, DVec3::X) - 100.0).abs() < 1e-9);
-        let pulled = pull_axis(capped, DVec3::X * 0.1);
-        assert!((pulled.length() - capped.length()).abs() < 1e-20);
-        assert!(pulled.x > 0.0);
+        // The guard reads the plate's own fastest point: a plate reaching 30° from its pole
+        // moves at half the sphere's speed, so it is held only above twice the guard there.
+        let (w, bound) = guard_speed(fast, 0.5, &norm, 100.0);
+        assert!(bound && (norm.speed_mm_yr(w, DVec3::X) * 0.5 - 100.0).abs() < 1e-9);
+        let slow = DVec3::Z * norm.omega_of_speed(180.0);
+        assert_eq!(guard_speed(slow, 0.5, &norm, 100.0), (slow, false));
         let mut rng = SplitMix64::new(3);
         let m = random_motion(&mut rng, DVec3::Y, 40.0, &norm);
         assert!((norm.speed_mm_yr(m, DVec3::Y) - 40.0).abs() < 1e-6);

@@ -10,25 +10,27 @@
 //! A rift splits the plate into n ∈ `rift_fragments` (Cortial: 2–4) sub-plates: n random, spread
 //! centroids in the plate, noise-warped Voronoi cells around them (irregular fracture lines), the
 //! largest cell keeping the parent's id. Each fragment gets copies of the parent's rigid groups
-//! (the samples stay where they are) and "random diverging directions": the parent's angular
-//! velocity plus a rotation carrying the fragment away from the other fragments' centroid at a
-//! speed drawn from `rift_speed_mm_yr`. Sample membership is only relabelled, so the parent's area
-//! equals the sum of the fragments' areas exactly.
+//! (the samples stay where they are) and the parent's motion: no speed is handed out (Cortial's
+//! "random diverging directions" are gone with the switch to the force balance,
+//! docs/design/plate-force-balance.md task 7). Whether the rift opens is the balance's answer: a
+//! fragment with a slab on its far side is pulled away, and the sides of a rift that nothing pulls
+//! apart move together and heal ([`heal`], design §3.4). Sample membership is only relabelled, so
+//! the parent's area equals the sum of the fragments' areas exactly.
 
 use std::collections::BTreeMap;
 
 use glam::DVec3;
 
 use super::Env;
-use super::events::{self, PLATE_BIRTH, RIFT_ONSET};
+use super::events::{self, PLATE_BIRTH, PLATE_DEATH, RIFT_ONSET};
 use super::geometry::Tree;
 use super::geometry::{Geo, coast_split, connect_plates};
-use super::kinematics::cap_speed;
 use super::noise::fbm;
-use super::state::{CONTINENTAL, Group, Plate, PlateState, RiftLink, TRENCH};
+use super::state::{CONTINENTAL, Group, HIDDEN, Plate, PlateState, RiftLink, SlabTrack, TRENCH};
 use crate::error::CoreError;
 use crate::sphere::kdtree::angle_of_chord2;
 use crate::world::WorldState;
+use deeptime_format::EventId;
 
 /// Plates below this many samples never rift.
 const MIN_RIFT_SAMPLES: u32 = 64;
@@ -228,21 +230,11 @@ pub fn rift(
     let rift_event = world.emit(e)?;
     state.counters.rifts += 1;
 
-    let omega_parent = DVec3::from_array(parent.omega);
+    let omega = DVec3::from_array(parent.omega);
     let pids: Vec<u32> = order.iter().map(|f| plate_of_fragment[f]).collect();
     for &pid in &pids {
         let (s, count, cont) = sum[&pid];
         let c = s.normalize_or(line);
-        let rest = (total - s).normalize_or(-c);
-        let axis = rest.cross(c).normalize_or_zero();
-        let v = state
-            .rng
-            .range(k.rift_speed_mm_yr[0], k.rift_speed_mm_yr[1]);
-        let omega = cap_speed(
-            omega_parent + axis * norm.omega_of_speed(v),
-            &norm,
-            k.max_plate_speed_mm_yr,
-        );
         let plate = &mut state.plates[pid as usize];
         plate.omega = omega.to_array();
         plate.samples = count as u32;
@@ -272,6 +264,7 @@ pub fn rift(
                 a: pa.min(pb),
                 b: pa.max(pb),
                 event: rift_event,
+                quiet_since_myr: None,
             });
         }
     }
@@ -289,9 +282,10 @@ pub fn rift(
 /// plate's old oceanic crust around a random old sample from the rest (a warped Voronoi split
 /// between that sample and the centroid of the rest; continental crust stays on the parent, so
 /// continents are never torn, except slivers stranded inside the old floor, which ride the new
-/// plate) and the old part, a new plate, is set moving towards the rest at
-/// `subduction_initiation_speed_mm_yr`. The convergence opens a subduction zone at the
-/// fracture on the following steps, where the older crust goes down (`subduction.rs`). Emits a
+/// plate) and the old part, a new plate with the parent's motion, gets a slab of
+/// `initiation_slab_km` hanging under the fracture (`PlateState::slabs`): the force balance pulls
+/// it towards the rest, and the convergence opens a subduction zone at the fracture on the
+/// following steps, where the older crust goes down (`subduction.rs`) and the slab grows. Emits a
 /// plate_birth with `origin` "subduction_initiation".
 pub fn maybe_initiate_subduction(
     state: &mut PlateState,
@@ -438,16 +432,15 @@ fn initiate(
         }
     }
     let c = c.normalize_or(c_old);
-    let axis = c.cross(c_young).normalize_or_zero();
-    let v = state.rng.range(
-        k.subduction_initiation_speed_mm_yr[0],
-        k.subduction_initiation_speed_mm_yr[1],
-    );
-    let omega = cap_speed(
-        DVec3::from_array(parent.omega) + axis * norm.omega_of_speed(v),
-        &norm,
-        k.max_plate_speed_mm_yr,
-    );
+    let omega = DVec3::from_array(parent.omega);
+    // The planted slab (design §3.3): the old floor starts to sink under the fracture.
+    // ledger: PLT-270
+    state.slabs.push(SlabTrack {
+        under: new_id,
+        over: id,
+        km: k.initiation_slab_km,
+        ..SlabTrack::default()
+    });
     let count = split.len();
     let cont = count - oceanic;
     state.plates.push(Plate {
@@ -500,4 +493,121 @@ fn membership(members: &[u32], n: usize) -> Vec<bool> {
         m[i as usize] = true;
     }
     m
+}
+
+/// Heals the rifts that did not open (design `docs/design/plate-force-balance.md` §3.4: two plates
+/// that have stopped moving relative to each other are one plate). Two plates a rift separated
+/// (`PlateState::rift_links`) whose relative speed has stayed under `weld_speed_mm_yr` all along
+/// their shared boundary for `weld_after_myr` become one again: the larger keeps its id, the
+/// motion is the area-weighted mean of the two, and the other dies (`plate_death`, fate "healed",
+/// caused by the rift). Plates that overlap anywhere (a contact seen this step) or share no
+/// boundary do not heal and their clock restarts. Returns the plates that healed and the plates
+/// they healed into. Ledger PLT-272.
+pub fn heal(
+    state: &mut PlateState,
+    world: &mut WorldState,
+    geo: &Geo,
+    pos: &[DVec3],
+    env: &Env,
+) -> Result<Vec<u32>, CoreError> {
+    let k = env.k;
+    let t = env.t_myr;
+    if state.rift_links.is_empty() {
+        return Ok(Vec::new());
+    }
+    let alive = |st: &PlateState, p: u32| st.plates.get(p as usize).is_some_and(|q| q.alive);
+    let living: Vec<bool> = state.plates.iter().map(|p| p.alive).collect();
+    let lives = |p: u32| living.get(p as usize).copied().unwrap_or(false);
+    state.rift_links.retain(|l| lives(l.a) && lives(l.b));
+    if state.rift_links.is_empty() {
+        return Ok(Vec::new());
+    }
+    // The fastest relative speed along each linked pair's shared boundary.
+    let mut fastest: BTreeMap<(u32, u32), f64> = BTreeMap::new();
+    let linked: std::collections::BTreeSet<(u32, u32)> =
+        state.rift_links.iter().map(|l| (l.a, l.b)).collect();
+    for (v, (sv, &x)) in state.samples.iter().zip(pos).enumerate() {
+        if sv.flags & HIDDEN != 0 {
+            continue;
+        }
+        let pv = state.plate_of(v);
+        for (u, _) in geo.edges(v as u32) {
+            let pu = state.plate_of(u as usize);
+            if pu <= pv || state.samples[u as usize].flags & HIDDEN != 0 {
+                continue;
+            }
+            let key = (pv, pu);
+            if !linked.contains(&key) {
+                continue;
+            }
+            let w = DVec3::from_array(state.plates[pu as usize].omega)
+                - DVec3::from_array(state.plates[pv as usize].omega);
+            let speed = env.norm.speed_mm_yr(w, x);
+            let e = fastest.entry(key).or_insert(0.0);
+            *e = e.max(speed);
+        }
+    }
+    let touching: std::collections::BTreeSet<(u32, u32)> = state
+        .contacts
+        .iter()
+        .filter(|c| c.last_step + 1 >= env.step)
+        .map(|c| (c.under.min(c.over), c.under.max(c.over)))
+        .collect();
+    let mut due: Vec<(u32, u32, EventId)> = Vec::new();
+    for l in &mut state.rift_links {
+        let key = (l.a, l.b);
+        let quiet =
+            !touching.contains(&key) && fastest.get(&key).is_some_and(|&v| v < k.weld_speed_mm_yr); // ledger: PLT-272, PLT-246
+        if quiet {
+            let since = *l.quiet_since_myr.get_or_insert(t - env.dt_myr);
+            if t - since >= k.weld_after_myr - 1e-9 {
+                due.push((l.a, l.b, l.event));
+            }
+        } else {
+            l.quiet_since_myr = None;
+        }
+    }
+    let mut healed = Vec::new();
+    for (a, b, rift) in due {
+        if !alive(state, a) || !alive(state, b) {
+            continue;
+        }
+        let (na, nb) = (
+            f64::from(state.plates[a as usize].samples),
+            f64::from(state.plates[b as usize].samples),
+        );
+        let (keep, die) = if nb > na { (b, a) } else { (a, b) };
+        for g in state.groups.iter_mut().filter(|g| g.plate == die) {
+            g.plate = keep;
+        }
+        let (wk, wd) = (
+            DVec3::from_array(state.plates[keep as usize].omega),
+            DVec3::from_array(state.plates[die as usize].omega),
+        );
+        let (sk, sd) = (
+            f64::from(state.plates[keep as usize].samples),
+            f64::from(state.plates[die as usize].samples),
+        );
+        state.plates[keep as usize].omega = ((wk * sk + wd * sd) / (sk + sd).max(1.0)).to_array();
+        let at = DVec3::from_array(state.plates[die as usize].centroid);
+        let e = events::event(world, t, PLATE_DEATH, at)
+            .param("plate", i64::from(die))
+            .param("fate", "healed")
+            .param("absorbed_by", i64::from(keep))
+            .caused_by(rift);
+        world.emit(e)?;
+        let dead = &mut state.plates[die as usize];
+        dead.alive = false;
+        dead.died_myr = Some(t);
+        dead.samples = 0;
+        state.plates[keep as usize].samples = (sk + sd) as u32;
+        state.counters.plate_deaths += 1;
+        state.counters.healed += 1;
+        state.rift_links.retain(|l| l.a != die && l.b != die);
+        healed.extend([keep, die]);
+    }
+    if !healed.is_empty() {
+        state.recount(pos);
+    }
+    Ok(healed)
 }
