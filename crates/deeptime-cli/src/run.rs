@@ -785,7 +785,10 @@ fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     };
     Some(format!(
         "climate_final={} t_surface_c={:.1} t_land_c={:.1} precip_land_mm={:.0} koppen_land={} \
-         glaciated_land_frac={:.3} glaciations={} ebm_t_global_c={:.1} ebm_net_toa_w_m2={:.3} \
+         glaciated_land_frac={:.3} ice_sheet_land_frac={:.3} mountain_ice_land_frac={:.3} \
+         present_co2_factor={:.3} present_reached={} present_ice_frac={:.3} present_sheet_frac={:.3} \
+         present_natural_ice_frac={:.3} present_natural_sheet_frac={:.3} glaciations={} \
+         ebm_t_global_c={:.1} ebm_net_toa_w_m2={:.3} \
          itcz_deg={:.1}..{:.1} land_z_p50_m={:.0} land_z_p90_m={:.0} land_above_2km={:.3} \
          co2_ppm={:.0} sea_level_m={:.1} ice_volume_km3={:.3e} sea_ice_frac={:.3} snowballs={} \
          hothouses={}",
@@ -795,6 +798,14 @@ fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
         f(&last["precip_land_mm"]),
         shares,
         f(&last["glaciated_land_frac"]),
+        f(&last["ice_sheet_land_frac"]),
+        f(&last["mountain_ice_land_frac"]),
+        f(&note["present"]["co2_factor"]),
+        note["present"]["reached"],
+        f(&note["present"]["land_ice_frac"]),
+        f(&note["present"]["land_ice_sheet_frac"]),
+        f(&note["present"]["natural_land_ice_frac"]),
+        f(&note["present"]["natural_land_ice_sheet_frac"]),
         note["glaciations"],
         f(&last["ebm_t_global_c"]),
         f(&last["ebm_net_toa_w_m2"]),

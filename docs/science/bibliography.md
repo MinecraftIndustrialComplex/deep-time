@@ -6403,3 +6403,40 @@ Stern & Scholl 2010 (the rates, PLT-045 and PLT-285) and Cloos 1993 (the arcs' m
 - Cited as: "Berner 2004, GEOCARB f_G" (how far volcanic and metamorphic degassing varied, a reference for the steering's outgassing bound).
 - Ledger ids: STE-014
 - Access: book. Read so far (by the project): from memory.
+
+## Ice sheets and mountain ice (CLM-150, CLM-203), added 2026-10-18
+
+What an ice sheet is, for the temperate present's land-ice target (decisions log 2026-10-18: it counts ice sheets only). Fetched and read by the erosion-recalibration agent on 2026-10-18.
+
+### Cogley2011
+- Reference: Cogley, J. G., Hock, R., Rasmussen, L. A., Arendt, A. A., Bauder, A., Braithwaite, R. J., Jansson, P., Kaser, G., Möller, M., Nicholson, L. and Zemp, M. (2011). Glossary of Glacier Mass Balance and Related Terms. IHP-VII Technical Documents in Hydrology No. 86, IACS Contribution No. 2, UNESCO-IHP, Paris.
+- DOI or URL: https://wgms.ch/downloads/Cogley_etal_2011.pdf
+- Cited as: "Cogley et al. 2011, glossary, Ice sheet" (the 50,000 km² that makes an ice body an ice sheet).
+- Ledger ids: CLM-203
+- Access: open (UNESCO technical document, the WGMS copy).
+- Library (the project's source library, not distributed): `Cogley2011/Cogley2011.pdf`, `Cogley2011.txt` (pdftotext), 2026-10-18.
+- Read so far (by the project): full text, 2026-10-18. p. 53, "Ice sheet": "An ice body that covers an area of continental size, generally defined as covering 50 000 km2 or more. Currently there are only two ice sheets, the Greenland Ice Sheet and the Antarctic Ice Sheet." p. 52, "Ice cap": "A dome-shaped ice body with radial flow, largely obscuring the subsurface topography and generally defined as covering less than 50 000 km2 (see ice sheet)"; "Ice body": "Any continuous mass of ice". "Icefield": "A large ice body that covers mountainous terrain but is not thick enough to obscure all of the subsurface topography". "Mountain glacier": "A glacier that is confined by surrounding mountain terrain, also called an alpine glacier."
+
+### NSIDC-IceSheetFacts
+- Reference: National Snow and Ice Data Center. Ice Sheet Quick Facts (web page).
+- DOI or URL: https://nsidc.org/learn/parts-cryosphere/ice-sheets/ice-sheet-quick-facts
+- Cited as: "NSIDC, Ice Sheet Quick Facts" (the 50,000 km² definition; the two sheets' areas).
+- Ledger ids: CLM-150, CLM-203
+- Access: open (web page).
+- Read so far (by the project): through the web fetch tool, 2026-10-18: "An ice sheet is a mass of glacial land ice extending more than 50,000 square kilometers"; "An ice cap covers less than 50,000 square kilometers ... and comprises several merged glaciers"; the Antarctic Ice Sheet "covers almost 14 million square kilometers", Greenland's stretches "across 1.7 million square kilometers"; "Now, Earth has just two ice sheets".
+
+### NSIDC-GlacierFacts
+- Reference: National Snow and Ice Data Center. Glacier Quick Facts (web page).
+- DOI or URL: https://nsidc.org/learn/parts-cryosphere/glaciers/glacier-quick-facts
+- Cited as: "NSIDC, Glacier Quick Facts" (Earth's land under ice today and at the last glacial maximum).
+- Ledger ids: CLM-150
+- Access: open (web page).
+- Read so far (by the project): through the web fetch tool, 2026-10-18: "Presently, 10 percent of land area on Earth is covered with glacial ice", glaciers, ice caps and the ice sheets of Greenland and Antarctica; "Glacierized areas cover over 15 million square kilometers"; at the maximum of the last ice age "glaciers covered about 32 percent of the total land area"; "There are over 200,000 glaciers distinct from the ice sheets".
+
+### RGI
+- Reference: RGI 7.0 Consortium. Randolph Glacier Inventory, a dataset of global glacier outlines, version 7.0 (rgidata.org; NSIDC data set NSIDC-0770, doi:10.5067/f6jmovy5navz).
+- DOI or URL: https://rgidata.org/ ; https://rgidata.org/user_guide/06_dataset_summary.html
+- Cited as: "the Randolph Glacier Inventory" (the glaciers outside the two ice sheets and their area).
+- Ledger ids: CLM-203
+- Access: open (data and user guide).
+- Read so far (by the project): through the web fetch tool, 2026-10-18: "The RGI excludes the ice sheets of Greenland and Antarctica"; "It includes all glaciers larger than 0.01 km²"; NSIDC-0770, "a snapshot of the world's glaciers outside of ice sheets". The user guide's dataset summary: 215,547 glaciers in RGI 6.0 and 274,531 in 7.0; its terminus-type table's rows sum to about 705,740 km² (6.0) and 706,744 km² (7.0) (the sums are the agent's, from the table as the fetch tool returned it).

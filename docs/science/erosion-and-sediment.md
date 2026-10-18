@@ -475,5 +475,6 @@ What the measurements say:
 
 **Left open.** The plateaus' interior wear (131 against under 10 m/Myr) does not move with the law's
 constants. The high ground's excess (0.25 to 0.28 above 2 km against 0.10) and the land's roughness
-at 1000 Myr (2.7 % above 1.5 km of relief) remain with the erosion at the measured rates. The temperate present's target counts mountain ice,
-so on these planets it asks for thousands of ppm of CO₂ (CLM-150; a follow-up for Ben).
+at 1000 Myr (2.7 % above 1.5 km of relief) remain with the erosion at the measured rates. The temperate present's target counted mountain ice,
+so on these planets it asked for thousands of ppm of CO₂ (CLM-150). Decided the same day (decisions
+log 2026-10-18): it counts ice sheets only (CLM-203; climate.md, "The target counts ice sheets").
