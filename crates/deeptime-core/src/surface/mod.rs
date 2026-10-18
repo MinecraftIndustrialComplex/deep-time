@@ -1542,8 +1542,20 @@ impl SurfaceStage {
             }
         }
 
-        // 5d. A surface past any planet's relief stops the run (`guard.rs`).
-        guard::check(w, &sc.h, sea, gravity, t_end_myr)?;
+        // 5d. A surface past any planet's relief stops the run (`guard.rs`); how close it came is
+        // kept (measurement only).
+        let worst = guard::check(w, &sc.h, sea, gravity, t_end_myr)?;
+        let relief = guard::bound_m(gravity) / guard::RELIEF_MULTIPLE;
+        let far = world
+            .globals
+            .entry(guard::WORST_GLOBAL.to_owned())
+            .or_insert(0.0);
+        *far = far.max(worst);
+        for (name, k) in guard::NEAR_GLOBALS.into_iter().zip(guard::NEAR_RELIEFS) {
+            if worst > k * relief {
+                *world.globals.entry(name.to_owned()).or_insert(0.0) += 1.0;
+            }
+        }
 
         // 6. Outputs.
         let started = Instant::now();

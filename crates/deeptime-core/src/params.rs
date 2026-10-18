@@ -507,6 +507,15 @@ pub struct TectonicParams {
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
     /// 0 = no limit.
     pub crust_max_km: f64,
+    /// The fastest a column's crust thickens, mm/yr (km/Myr): no process of a plate step, the
+    /// resampling's accretion included, leaves a visible column thicker than it was when the
+    /// step began plus this rate times the step; the excess goes to the nearest room on its
+    /// plate, and what finds none goes down to the mantle (`plates/rate.rs`). 0 = no limit.
+    pub thickening_max_mm_yr: f64,
+    /// The fastest a column's surface rises, mm/yr (km/Myr): no process of a plate step, the
+    /// resampling's accretion included, leaves a visible column higher than it stood when the
+    /// step began plus this rate times the step (`plates/rate.rs`). 0 = no limit.
+    pub uplift_max_mm_yr: f64,
     /// The ocean–continent transition of rifted margins (`plates/transition.rs`): continental
     /// crust tapers into the ocean floor of its own plate over this width, km **on the planet**
     /// (not Earth-normalized: the margin keeps Earth's width in metres whatever the planet's
@@ -711,6 +720,8 @@ impl Default for TectonicParams {
             collapse_quiet_myr: 10.0,       // ledger: PLT-259
             collapse_reach_km: 200.0,       // ledger: PLT-257
             crust_max_km: 70.0,             // ledger: PLT-258
+            thickening_max_mm_yr: 5.0,      // ledger: PLT-287
+            uplift_max_mm_yr: 3.5,          // ledger: PLT-288
             transition_width_km: 200.0,     // ledger: PLT-262
             transition_myr: 20.0,           // ledger: PLT-263
             initial_plates: 14,
@@ -1037,6 +1048,8 @@ impl PlanetPreset {
             (k.collapse_quiet_myr, "$.tectonics.collapse_quiet_myr"),
             (k.collapse_reach_km, "$.tectonics.collapse_reach_km"),
             (k.crust_max_km, "$.tectonics.crust_max_km"),
+            (k.thickening_max_mm_yr, "$.tectonics.thickening_max_mm_yr"),
+            (k.uplift_max_mm_yr, "$.tectonics.uplift_max_mm_yr"),
             (k.transition_width_km, "$.tectonics.transition_width_km"),
             (k.transition_myr, "$.tectonics.transition_myr"),
         ] {

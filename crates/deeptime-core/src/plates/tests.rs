@@ -755,9 +755,9 @@ impl CollisionLives {
 #[test]
 fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // A seed whose collisions weld (one of 24 in 300 Myr; under the force balance a held collision
-    // welds less often than under the old speed law, and most 300-Myr runs of this planet have none:
-    // 8 of 32 welded in the sweep of 2026-10-16).
-    let p = preset(8000, 300.0, "scattered_continents", 14);
+    // welds less often than under the old speed law: 8 of 32 welded in the sweep of 2026-10-16,
+    // and 13 of seeds 1 to 24 under the thickening limit, `rate.rs`, 2026-10-18).
+    let p = preset(8000, 300.0, "scattered_continents", 5);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
