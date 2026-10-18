@@ -171,14 +171,14 @@ fn idealised_zones(p: ClimateParams) {
 /// (WMO's Records of Weather and Climate Extremes, as of 31 July 2025; verified 2026-10-18), and
 /// no basin's runoff exceeds its rain. A cell's annual rain and runoff stay under this with
 /// room for the model's coarser cells, m/yr.
-const WETTEST_M_YR: f64 = 15.0; // ledger: CLM-204
+const WETTEST_M_YR: f64 = 15.0; // ledger: CLM-205
 /// No annual mean on Earth is hotter than about 35 °C (Dallol, Ethiopia; from memory), nor any
 /// sea surface's than about 33 °C; a hot planet's cell stays under this, °C.
-const HOTTEST_MEAN_C: f32 = 45.0; // ledger: CLM-204
+const HOTTEST_MEAN_C: f32 = 45.0; // ledger: CLM-205
 /// The weathering kernel stays within this many times Earth's (`KERNEL_EARTH`): a test bound,
 /// game-choice (the coordinator's call, 2026-10-18), far above a warm, wet planet's few times
 /// Earth's.
-const KERNEL_CEILING_REL: f64 = 100.0; // ledger: CLM-204
+const KERNEL_CEILING_REL: f64 = 100.0; // ledger: CLM-205
 
 /// Every cell's annual rain, runoff (rain less Fu's evapotranspiration, as the weathering kernel
 /// takes it) and mean temperature under the ceilings, with the cell named when one is not.

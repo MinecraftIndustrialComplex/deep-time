@@ -7,7 +7,7 @@ section 11, "As built"). The Earth comparison below is from the T9 calibration r
 relief; the rain budget is built but not calibrated.
 
 Ledger ids on this page: `CLM-119` to `CLM-146`, `CLM-163` to `CLM-168`, `CLM-170`, `CLM-172`,
-`CLM-175` to `CLM-179`, plus the rows the build changed (CLM-061, CLM-069, CLM-070 and CLM-071
+`CLM-175` to `CLM-179`, `CLM-204` and `CLM-205`, plus the rows the build changed (CLM-061, CLM-069, CLM-070 and CLM-071
 (retired), CLM-072, CLM-100) and the coded rows the model carries over (CLM-001, CLM-003 to
 CLM-005, CLM-007 to CLM-010, CLM-013, CLM-014, CLM-017, CLM-020, CLM-093, CLM-095) (see
 [claims.md](claims.md)). CLM-169, CLM-171, CLM-173 and CLM-174 are unused. The banded climate
@@ -67,7 +67,8 @@ and in between a cheap one-dimensional model keeps time. A snapshot runs in this
    - in the sea part, has slab heat moved by eddy diffusion (not across land), by wind-driven
      gyres (`ocean2d.rs`: Stommel's balance of wind stress, friction and the planet's curvature,
      solved on the real coastlines) and by an overturning conveyor that sinks in the narrowest
-     polar-connected basin and upwells over the sea equatorward of 50 degrees;
+     polar-connected basin whose open sea poleward of 50 degrees is large enough to cool the water
+     it sinks, and upwells over the sea equatorward of 50 degrees;
    - freezes or melts sea ice from its own heat budget.
 4. **Rain.** By default (`rain_model = belts`) the belt rain of the banded model, with the ITCZ
    and the sea's departure from its row taken from the 2-D model. Optionally
@@ -116,6 +117,8 @@ defaults are in `ClimateParams::default()` and the presets.
 | CLM-131 | `overturning_sv` | 30 Sv (Earth 17.2 Sv): compensating | Sv | McCarthy et al. 2015; Frajka-Williams et al. 2019 (Earth) | `calibrated` |
 | CLM-132 | sinking basin: narrowest of 20–70° that reaches 30° and holds ice-free sea poleward of 50° in late winter | 20–70°, 30°, 50° | deg | Ferreira et al. 2018 pp. 337, 344 | `verified` |
 | CLM-163 | deep-water temperature; upwelling area | 2 °C; sea equatorward of 50° | °C; deg | none | `uncited` |
+| CLM-204 | `SINK_RATE_M_S` w_max: a sinking region of open sea A carries at most A w_max; only basins that carry all of Ψ compete for the narrowest | 8·10⁻⁶ (Earth's North Atlantic sinks at 4.7·10⁻⁶) | m/s | Walin 1982 (the form, from memory); calibration on Earth's relief and the quick planets | `calibrated` |
+| CLM-205 | the tests' physical ceilings on every cell and step: annual rain and runoff; annual mean temperature; weathering kernel | 15 m/yr (Mawsynram 11.872 m); 45 °C; 100 × `KERNEL_EARTH` | m/yr; °C; – | WMO records table (as of 31 July 2025); Dallol from memory; the kernel bound a test choice | `verified` (rain) |
 | CLM-133 | northern ocean heat transport target | 1.5–2 PW at 15–25°N; **as built 3.2 PW at 27°N** | PW | Trenberth & Caron 2001 Fig. 7 | `verified` (the target; not met) |
 | CLM-134 | winter inversion `winter_inversion_c` I_max; dark below 150 W/m²; interior = land within 1,000 km | 15 K; 150 W/m²; 1,000 km | K | Serreze et al. 1992 not read; reanalysis (CLM-165) | `from-memory` |
 | CLM-135 | `sea_ice_edge_sharpness` on L1 | logistic slope 4 | – | look | `game-choice` |
@@ -164,7 +167,10 @@ The main equations, as the code computes them:
 - Gyres: r ∇²ψ + β ∂ψ/∂x = curl τ / ρ₀, with τ = ρ_a C_D |u| u, β = 2Ω cos φ / R and r = 1.5 β Δx,
   ψ = 0 on the coasts, poleward of 75° and on rows without land. The conveyor sinks Ψ
   (`overturning_sv`) in the chosen basin and upwells it evenly over the connected sea equatorward
-  of 50°, carrying heat ρ c_p F (T_upwind − T_deep) with T_deep 2 °C.
+  of 50°, carrying heat ρ c_p F (T_upwind − T_deep) with T_deep 2 °C. A basin's sinking region,
+  its ice-free sea poleward of 50° with open-sea area A, carries at most A w_max (CLM-204); the
+  narrowest basin with A w_max ≥ Ψ sinks Ψ, and when no basin has, the one with the largest A
+  sinks A w_max.
 - Rain, when `rain_model = budget`: ∇·(V W) − ∇·(K_q ∇W) = E − P − S_oro, with
   E = ρ_a C_E (|V| + u_t) q_s(T) (1 − W/W_sat) (times β(S) on land) and
   P = stab (W/τ_P) exp(a (W/W_sat − r_ref)).
@@ -235,6 +241,88 @@ warmer than Earth (on the 0.5° equirectangular grid before Lambert's projection
 in January. The ocean's heat transport is about twice Earth's, on purpose (below). The rain rows
 are not targets of the default model and are reported only.
 
+## What a sinking region can carry
+
+**The bug (found 2026-10-18).** On `earthlike_quick_16k`, start `supercontinent`, seed 1, 500
+Myr, the step at −50 Myr had a land runoff of 634 m/yr and a weathering kernel 1.3·10⁸ times
+`KERNEL_EARTH` (CLM-061). The weathering's supply limit (CLM-152 to CLM-157) capped what that
+kernel could draw down, so CO₂ looked ordinary, but the next step fell from 574 to 126 ppm.
+
+**The cause.** The conveyor sinks Ψ = 30 Sv in the sinking region of the narrowest basin, and in
+the flux form the sinking cells take the heat of cooling all of it to the deep water: ρc_p Ψ θ,
+about a petawatt with θ ≈ 8 K. On Earth's relief the region is the North Atlantic poleward of 50°,
+92 to 96 coarse cells with 6.4·10¹² m² of open sea, so about 150 W/m². When the narrowest basin
+was a narrow inlet whose sea just reached past 50°, its region could be one coarse cell or a few
+tens (from 10¹¹ m²) and the same petawatt landed there. The sea tiles of those cells went to
+90–800 °C (the slab of one cell to 943 °C). The coast blend carried that to the land, and the
+belts' e^(0.07 ΔSST) rain (MOI-063) and the kernel's e^(0.09 (T − 15)) did the rest.
+
+Measured with temporary diagnostics (removed) on master 80f72bb0, quick 16k, coupled stages to
+`volcanoes`:
+
+| Case | Steps with a cell over 15 m/yr of rain or 45 °C | Worst cell rain; worst cell T | Highest land runoff; highest kernel (× Earth's) |
+|---|---|---|---|
+| supercontinent, seed 1, 1000 Myr, master | 33 of 500 | 3.2·10¹¹ mm/yr; 286 °C | 3,710 m/yr; 3.8·10¹⁴ |
+| the same with the fix | 0 of 500 | 9,174 mm/yr; 32.8 °C | 0.51 m/yr; 1.43 |
+| six 500-Myr runs (two starts, seeds 1 to 3), master | 84 of 1,500, in five runs | 8.2·10⁹ mm/yr; 234 °C | 634 m/yr; 1.6·10¹¹ |
+| the same with the fix | 0 of 1,500 | 10,610 mm/yr; 39.2 °C | 0.66 m/yr; 1.93 |
+
+In master's 1000-Myr run every snapshot with a blown-up cell sank on a small region (1 to 20
+coarse cells), and its hottest sea tile was in or beside it (the four hottest sea tiles of every
+snapshot were logged); the snapshots without one sank on 27 to 339 cells, their hottest sea
+tropical and at most about 38 °C. Over the six 500-Myr
+runs, master's sinking regions by size: 1–9 coarse cells,
+16 of 17 snapshots had a sea tile over 45 °C (the hottest 805 °C); 10–19 cells, 11 of 15;
+20–29 cells, 6 of 10; 30–38 cells, 4 of 13 (73 °C); 39–49 cells, 0 of 10; 50 cells or more, 1 of
+263 (50 °C). A small region does not always overheat because the heat it takes grows with the
+temperature of the water arriving.
+
+**The fix** (`ocean2d.rs`, `SINK_RATE_M_S`, CLM-204). In Walin's (1982) water-mass transformation
+the rate at which a region turns surface water into deep water is its surface heat loss divided by
+ρc_p times the cooling. A region of open sea A therefore carries at most A w_max. Only basins
+whose sinking region can carry all of Ψ compete for the narrowest; when none can, the one that
+carries the most sinks A w_max. w_max = 8·10⁻⁶ m/s is about 260 W/m² cooling the water by 8 K.
+Earth's North Atlantic sinks at 4.7·10⁻⁶ m/s and could carry 51 Sv, and the North Pacific
+(4.8·10¹² m², 38.5 Sv) also qualifies but is wider (8,574 km against 5,721). At 8·10⁻⁶, 30 Sv
+needs 3.75·10¹² m² of open sea, about 39 quick-planet coarse cells: the size below which
+master's regions overheated. In the fix's runs no snapshot fell back below 30 Sv (0 of 318), the
+smallest region was 41 cells (3.9·10¹² m²) and the hottest sea tile 43.6 °C.
+
+**What else it changes.** Earth's relief (`deeptime climate-dem`, 720 × 360) gives the same
+numbers to the last digit as before: global mean 14.41 °C, land 8.6 °C, land rain 770 mm (the
+belts' calibration, CLM-201, measures 773 mm on the land both call land), kernel
+5.0387·10⁷ km²·m/yr. On the quick planets the coupled runs part from master at the first
+snapshot whose region the rule moves, and the system is chaotic, so the six 500-Myr runs are
+compared as an ensemble (master / the fix, mean ± standard deviation over the six; the paired
+difference):
+
+| Quantity | Master | The fix | Paired difference |
+|---|---|---|---|
+| CO₂ over the run, mean | 876 ± 158 ppm | 976 ± 176 ppm | +100 ± 122 ppm |
+| Global mean T over the run | 14.36 ± 0.52 °C | 14.66 ± 0.63 °C | +0.30 ± 0.34 K |
+| Land share over the run | 0.243 ± 0.017 | 0.244 ± 0.027 | +0.001 ± 0.013 |
+| CO₂ at −2 Myr (before the present-day step) | 632 ± 373 ppm | 726 ± 356 ppm | +94 ± 277 ppm |
+| Global mean T at −2 Myr | 16.4 ± 1.8 °C | 17.0 ± 1.3 °C | +0.55 ± 1.0 K |
+| Land rain at the present | 1,035 ± 151 mm | 960 ± 55 mm | −75 ± 169 mm |
+| Land share at the present | 0.178 ± 0.015 | 0.174 ± 0.022 | −0.005 ± 0.030 |
+| One-step halvings of CO₂ | 5 in 1,500 steps | 0 | |
+| Lowest CO₂ of a run | 64–408 ppm | 186–430 ppm | |
+
+Every difference is inside the run-to-run spread. CO₂ and temperature move up a little, the way
+removing the blow-ups' extra weathering should move them: each blown-up step drew CO₂ down at the
+supply limit, and master's five runs with blow-ups fell to 64 to 222 ppm, the fix's same five to
+186 to 430 ppm. The rule also moves the conveyor out of some small regions that had not yet
+overheated (30–38 cells, where 9 of master's 13 snapshots stayed under 45 °C): by Walin's bound
+those regions could not carry 30 Sv either.
+
+**The tests.** `ocean2d::tests::a_sinking_region_carries_only_what_its_sea_can_cool` (the rule and
+the fallback on a test sea), `climate::tests::a_narrow_inlet_past_the_sinking_latitude_keeps_the_climate_physical`
+(the idealised planet with an inlet to 56° N, on the belts' and the upwind rain: every cell's rain
+and runoff under 15 m/yr and annual mean under 45 °C, CLM-205; on master's conveyor it fails, the
+conveyor sinking 30 Sv on the inlet's two cells at 51° N, 258 °C and 3.5·10¹⁰ mm/yr), and the
+coupled-pipeline test, which now holds every step's land runoff under 15 m/yr and kernel under 100
+times Earth's.
+
 ## Simplifications and limits
 
 - **The conveyor is a compensating choice, not Earth's ocean.** Earth's Atlantic overturning is
@@ -251,7 +339,11 @@ are not targets of the default model and are reported only.
   coastal upwelling, no mountain blocking of the zonal heat transport (CLM-126 is not built).**
   The 20 W/m² of cloud greenhouse that A + B T already holds is implicit (CLM-172).
 - **The sinking basin is chosen by width**, as a stand-in for salinity, which the model does not
-  carry; Ferreira et al. 2018 name salinity as the proximate cause. One sinking region per planet.
+  carry; Ferreira et al. 2018 name salinity as the proximate cause. One sinking region per planet,
+  and only among the basins whose sinking region can carry the whole conveyor (CLM-204, "What a
+  sinking region can carry" above). The capacity is one rate per square metre for every planet:
+  it does not follow the sea's actual heat loss, which would need the climate the conveyor helps
+  to make.
 - **The zonal clock and its correction.** The fast clock (every 200 kyr) is one-dimensional. It is
   held on the 2-D model's zonal means by a fitted diffusivity per face and a flux per band and
   tile (CLM-136). It meets 0.3 K in every band except at ice edges, where a band's snowy tile has
@@ -291,6 +383,9 @@ are not targets of the default model and are reported only.
   thresholds for an extra snapshot (numerics; the design and build agents, build log 2026-09-30 and
   2026-10-03).
 - CLM-170: the CO₂ forcing below the table (numerics; the research agent, 2026-10-03).
+- CLM-205: the tests' ceilings of 15 m/yr, 45 °C and 100 times Earth's weathering kernel (bounds a
+  correct climate stays far inside, not physics of the model; the coordinator's call,
+  2026-10-18).
 - The grid resolution (CLM-119) is Ben's choice (decisions log 2026-10-01, Q4).
 
 ## Open questions
@@ -317,6 +412,10 @@ are not targets of the default model and are reported only.
 - The 50-m slab is shallower than the sources' 70–96 m (CLM-013); T9 may revisit it against the
   seasonal sea-surface amplitude.
 - The deep-water temperature of 2 °C (CLM-163) has no source.
+- The sinking rate w_max (CLM-204) rests on Walin 1982's water-mass transformation, written from
+  memory (the paper was not read), and its value is a calibrated ceiling, not a measured rate.
+  Observed deep-water formation regions would check it: their area, their winter heat loss and
+  the Sverdrups they form.
 - ρ_sea and ρ_air (CLM-177) were written from memory.
 - T9 has not re-measured the real 500-Myr runs (heights, glaciated share, deposit counts, CO₂ at the
   present) under the calibrated defaults; only `KERNEL_EARTH` was re-measured (CLM-061).
@@ -346,3 +445,6 @@ on L2 (Ben 2026-10-02).
 - climlab (Rose2018): the MIT source read for its defaults.
 - Not obtained: Stommel1948, Lindzen1987, Serreze1992, North1983, Murray1967 (Tetens), Large &
   Pond 1981, Abbot 2014, Le Hir et al. 2007 and 2010, Kadoya & Tajika 2019.
+- WMO-Extremes2025 (the records table as of 31 July 2025): fetched and read for the greatest
+  average annual rain of each region (CLM-205). Walin1982: not read; its water-mass
+  transformation is written from memory (CLM-204).
