@@ -47,7 +47,7 @@ public final class FarTerrainCheck {
 
     /** What is over the ground rather than the ground: plants, trees, snow layers, anything a player walks through. */
     static boolean overGround(BlockState s) {
-        return s.isAir() || s.is(BlockTags.LEAVES) || s.is(BlockTags.LOGS) || s.is(Blocks.SNOW) || !s.blocksMotion()
+        return s.isAir() || s.is(BlockTags.LEAVES) || s.is(BlockTags.LOGS) || s.is(Blocks.MANGROVE_ROOTS) || s.is(Blocks.SNOW) || !s.blocksMotion()
                 || s.is(Blocks.BAMBOO) || s.is(Blocks.CACTUS) || s.is(Blocks.MUSHROOM_STEM) || s.is(Blocks.RED_MUSHROOM_BLOCK)
                 || s.is(Blocks.BROWN_MUSHROOM_BLOCK) || s.is(Blocks.BEE_NEST) || s.is(Blocks.PUMPKIN) || s.is(Blocks.MELON);
     }
