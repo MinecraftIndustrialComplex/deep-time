@@ -20,8 +20,9 @@
 //! The stages allocate and free the same grid-sized arrays every step (hundreds of GiB over a
 //! quick run), so mapping each one afresh costs a page fault per page: a quick 16k run took 39 %
 //! longer. A freed large block is therefore kept for the next block of exactly its size, up to
-//! [`CACHE_BYTES`] of them; the kept blocks count as in use (the process holds them), and
-//! [`release_cache`] gives them back when the memory cap needs the room.
+//! [`CACHE_BYTES`] of them; the kept blocks count as in use (the process holds them), go back to
+//! the OS oldest first when a new block would take the count past the ceiling the session sets
+//! ([`keep_below`]), and all go back when a stage ends ([`release_cache`]).
 //!
 //! Small blocks stay with the system allocator, and glibc keeps the ones freed in each thread's
 //! arena for reuse: that memory is the process's but not in the count. [`release_cache`] gives it
@@ -68,12 +69,15 @@ static LARGE: AtomicUsize = AtomicUsize::new(LARGE_BYTES);
 
 /// At most this many bytes of freed large blocks are kept for reuse. Measured on quick 16k
 /// (memacct, 2026-10-04, CPU time against glibc's malloc): none +27 %, 256 MiB +16 %, 1 GiB +5 %;
-/// the coupled stages free and reallocate up to ~1 GiB of grids a step.
-pub const CACHE_BYTES: usize = 1 << 30;
+/// the coupled stages free and reallocate up to ~1 GiB of grids a step. Full 16k frees more
+/// (P1-19, 30 Myr counted per phase): 1 GiB pushed out 2,730 kept blocks (33 GB) to make room
+/// and the surface reused 62 % of its large blocks; 2 GiB pushed out 184 (2.8 GB), 4 GiB none,
+/// with no further gain. Kept blocks count in the memory in use, so the cap bounds them as well.
+pub const CACHE_BYTES: usize = 2 << 30;
 /// The current limit of the kept blocks ([`set_cache_limit`]).
 static CACHE_LIMIT: AtomicUsize = AtomicUsize::new(CACHE_BYTES);
-/// At most this many kept blocks.
-const SLOTS: usize = 128;
+/// At most this many kept blocks (2 GiB of the smallest large blocks).
+const SLOTS: usize = 2048;
 /// Kept blocks never hold the count above this ([`keep_below`]).
 static CEILING: AtomicU64 = AtomicU64::new(u64::MAX);
 /// The bytes of the kept blocks (`Cache::bytes`, readable without the lock).
@@ -164,22 +168,13 @@ pub fn release_cache() -> u64 {
     bytes
 }
 
-/// Gives kept large blocks back to the OS, oldest first, until the count is at most `bytes` or
-/// none is kept; returns the bytes released. Like [`release_cache`] it also trims the system
-/// allocator's arenas. When the session needs room under its cap it sheds only what it needs:
-/// releasing every kept block there gave back up to 3 GiB a few times a step on full 16k, and
-/// the next step mapped and faulted it in again (P1-19).
-pub fn shed_to(bytes: u64) -> u64 {
-    let released = {
-        let mut c = cache();
-        let before = c.bytes;
-        while c.n > 0 && in_use() > bytes {
-            c.drop_oldest();
-        }
-        (before - c.bytes) as u64
-    };
-    trim_system();
-    released
+/// The bytes of the large blocks kept for reuse (in the count, [`in_use`]). They leave by
+/// themselves, oldest first, when the count would pass the ceiling ([`keep_below`]), so the
+/// session asks its history for room by the count without them (P1-19: giving them back whenever
+/// a step might need room returned up to 3 GiB a few times a step on full 16k, and the next step
+/// mapped and faulted it in again).
+pub fn kept_bytes() -> u64 {
+    KEPT.load(Ordering::Relaxed) as u64
 }
 
 /// Returns the free memory the system allocator keeps in its arenas to the OS (glibc's
@@ -645,8 +640,8 @@ impl MemoryGauge for AllocGauge {
     fn release(&self) -> u64 {
         release_cache()
     }
-    fn shed(&self, bytes: u64) -> u64 {
-        shed_to(bytes)
+    fn kept(&self) -> u64 {
+        kept_bytes()
     }
     fn keep_below(&self, bytes: u64) {
         keep_below(bytes);

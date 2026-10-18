@@ -116,18 +116,17 @@ pub trait MemoryGauge: Send + Sync {
     }
     /// Gives memory the allocator keeps for reuse back to the system (its count drops by as
     /// much); returns the bytes released. The counting allocator also returns what the system
-    /// allocator keeps outside the count (`alloc::release_cache`). Called when a stage ends,
-    /// before the history spills to make room under the cap and before the bake's projection
-    /// pass. The default releases nothing.
+    /// allocator keeps outside the count (`alloc::release_cache`). Called when a stage ends and
+    /// before the bake's projection pass. The default releases nothing.
     fn release(&self) -> u64 {
         0
     }
-    /// Gives back memory the allocator keeps for reuse until at most `bytes` are in use (or it
-    /// keeps none); returns the bytes released. Called where the session needs room under its
-    /// cap, so the rest stays for the next step. The default releases everything
-    /// ([`MemoryGauge::release`]).
-    fn shed(&self, _bytes: u64) -> u64 {
-        self.release()
+    /// The part of `in_use` the allocator keeps for reuse and gives back by itself rather than
+    /// pass the bytes of [`MemoryGauge::keep_below`]. The session leaves it out where it decides
+    /// whether the history's frames must make room: a step that needs the room gets it from these
+    /// blocks as it allocates. The default keeps nothing.
+    fn kept(&self) -> u64 {
+        0
     }
     /// The most the allocator should hold while the next step runs: memory it keeps for reuse is
     /// given back rather than take the count above `bytes` (the session passes the stage's
@@ -1125,19 +1124,15 @@ impl Session {
                     needed_peak: Some(&self.needed_peak),
                 };
                 self.gauge.keep_below(s.allowed[k].min(self.mem_cap));
-                let mut at_start = self.gauge.in_use();
-                if at_start.saturating_add(s.working[k]) > self.mem_cap
-                    && self.gauge.shed(self.mem_cap.saturating_sub(s.working[k])) > 0
-                {
-                    at_start = self.gauge.in_use();
-                }
                 if let Some(h) = &history {
                     // Room for the stage's estimated working set beside the history's frames,
-                    // and for what its last step held.
+                    // and for what its last step held. The blocks the allocator keeps give way
+                    // by themselves as the step allocates (`MemoryGauge::kept`).
+                    let live = self.gauge.in_use().saturating_sub(self.gauge.kept());
                     let resident = h.resident_bytes();
                     let over = resident
                         .saturating_sub(self.mem_cap.saturating_sub(s.base[k]))
-                        .max((at_start + s.working[k]).saturating_sub(self.mem_cap));
+                        .max((live + s.working[k]).saturating_sub(self.mem_cap));
                     if over > 0 {
                         match h.evict(over) {
                             Ok(e) => log_evicted(
@@ -1213,10 +1208,8 @@ impl Session {
             }
         }
         let target = self.mem_cap - self.mem_cap / TRIM_HEADROOM;
-        let mut in_use = self.gauge.in_use();
-        if in_use > target && self.gauge.shed(target) > 0 {
-            in_use = self.gauge.in_use();
-        }
+        // The blocks the allocator keeps give way by themselves (`MemoryGauge::kept`).
+        let in_use = self.gauge.in_use().saturating_sub(self.gauge.kept());
         if in_use > target {
             let e = handle.evict(in_use - target)?;
             if e.frames > 0 {
