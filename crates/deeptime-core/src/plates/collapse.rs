@@ -180,7 +180,7 @@ pub fn iso_height(pools: &[f32; pool::COUNT], z_0: f64, gravity: f64) -> f64 {
 /// Moves a surface at `z` by `change` towards the column's isostatic height `iso`, never past it:
 /// a sinking column stops at it (a root that never raised its surface does not drag it down), a
 /// rising one stops at it (thin crust the surface already holds high is not raised further).
-fn toward(z: f64, change: f64, iso: f64) -> f64 {
+pub(super) fn toward(z: f64, change: f64, iso: f64) -> f64 {
     if change < 0.0 {
         z + change.max(-(z - iso).max(0.0))
     } else {

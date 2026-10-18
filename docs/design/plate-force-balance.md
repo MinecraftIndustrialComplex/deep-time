@@ -1,6 +1,7 @@
 # Force-balance plate motion: design
 
-Status: **design approved 2026-10-02; tasks 2 to 7 built, task 8 first pass** (see section 13,
+Status: **design approved 2026-10-02; tasks 2 to 8 built** (task 8, the crust budget on sourced
+rates, 2026-10-17, waits for the erosion recalibration to land with it; see section 13,
 "Tasks 7 and 8", for the switch; and "As built: task 2" and
 "As built: tasks 3 and 4" at the end of section 9, and section 13 for task 5, the forces recorded
 and not applied). It extends
@@ -381,7 +382,7 @@ row in `docs/science/ledger/PLT.md` (PLT-174 to PLT-202) says what was read.
 | Sea-floor age | spreading and subduction rates change; slow plates keep old floor | `subduction_initiation_*`, `slab_pull` |
 | Active margin share (P1-27) | which margins subduct depends on where slabs form and persist | `subduction_initiation_rate`, `_clearance_km` |
 | Hypsometry | subduction uplift scales with convergence speed, whose spread widens; belts replace surges | `subduction_uplift_mm_yr`, `collision_stacking_share`, cordillera |
-| Continental crust budget | shortening per collision is set by the balance | `arc_continental_m` (since 2026-10-02 `arc_maturity_myr`, from Cloos 1993, not tuned), `collision_stacking_share` |
+| Continental crust budget | shortening per collision is set by the balance | `arc_continental_m` (since 2026-10-02 `arc_maturity_myr`, from Cloos 1993, not tuned; since task 8, 2026-10-17, the sourced rates `island_arc_km3_per_km_myr`, `continental_arc_km3_per_km_myr`, `cordillera_shortening_mm_yr` and Cloos's `arc_mature_crust_km`, none tuned), `collision_stacking_share` |
 | Rift rules | a rift opens only if forces open it; failed rifts heal | `rift_lambda0` |
 | Arc and volcano rates, deposits that read convergence | follow speed | re-checked, not retuned first |
 
@@ -930,7 +931,8 @@ move by the balance; the old speed law and its settings are gone. Where it depar
   founders (PLT-277); `collapse_thickness_km` 50, the sources' figure (PLT-256). Under Ben's
   validation policy of 2026-10-05 the land share is reported against Earth, not tuned.
   `arc_maturity_myr` (20) was held as briefed; `collision_buoyancy` 2 and 3 were measured and
-  changed neither crust nor land beyond the noise.
+  changed neither crust nor land beyond the noise. (Task 8 proper, 2026-10-17, put the arc and
+  cordillera rates on sources: "Task 8: the crust budget on sourced rates" below.)
 - **The supercontinent measure** (`plate-check`, CHK-060): a dispersal followed by a new assembly
   within 20 Myr is one stay. Under the balance two large pieces touch and part at a sample's width
   for tens of Myr (stalled collisions), and the old measure counted each touch as an assembly and
@@ -1015,3 +1017,54 @@ continental crust stands 0.5–3 km below the Airy height of its own thickness, 
 height and leaves the crust was not measured. The crust budget is not Earth's: continental arcs
 and cordillera roots add about 8 km³ a year against Earth's 1, collisions destroy many times
 Earth's 0.7, and island arcs add a tenth of Earth's 1.5 (Stern & Scholl 2010).
+
+### Task 8: the crust budget on sourced rates (2026-10-17)
+
+The coordinator's calls of 2026-10-17 (decisions log, "Plate task 7: the crust budget on sourced
+rates" and "The land's gap budget", recommendations 1, 3 and 6). Physics, sources and the full
+tables: `docs/science/plates.md`, "The crust budget on sourced rates"; ledger PLT-045 to PLT-050,
+PLT-264, PLT-284 to PLT-286 (PLT-051 merged into PLT-048, HYP-017 into PLT-045). The erosion
+law is not recalibrated here (Ben's one recalibration after tasks 7 and 8 comes next, on top of
+this branch, and the two land together).
+
+- **Island arcs** add 100 km³ per km of arc and Myr at full convergence (Stern & Scholl 2010) and
+  stand up by that crust on the ocean's height line; no height-only uplift. **Continental arcs**
+  add 35 (the same source) and stand up by its Airy change. Both are split into pools by their
+  intrusive to extrusive ratios (7:1, 5:1). An island arc turns continental at Cloos's 15 km.
+- **The cordillera** thickens by crust shortened into it at 6 mm/yr (Eichelberger et al. 2015),
+  taken from the same plate 440 to 800 km behind the front; the root made from an uplift is gone.
+- **The volcano stage's cones** join the pools as felsic or mafic volcanic rock and count inside
+  the arc and hotspot rates.
+- **A resampling's accretion** stands up by its Airy change, capped at the column's Airy height and
+  handed to the surface as uplift; its volume is in the crust budget.
+- **Oceanic samples** cool towards the floor their own crust holds up, capped at 20 km.
+
+**Measured** (`earthlike_quick_16k`, master 7827e9f0 against the branch; reported, not tuned):
+
+| Measure | Master | Branch | Target or Earth |
+|---|---|---|---|
+| plate-check targets met (1000 Myr, seeds 1–4, both starts) | 29 of 45 | 26 of 45 | |
+| Continental arcs; island arcs, km³ a year (500 Myr, six runs) | 8.77; 0.15 | 1.63; 3.96 | about 1.0; 1.5 |
+| The same per km of arc and Myr | n/a | 19.5; 31.7 | 35; about 100 |
+| Foundered beyond the thickest column, km³ a year | 7.38 | 4.70 | collision losses about 0.7 |
+| Land; above 2 km of it (500 Myr) | 0.178; 0.179 | 0.192; 0.274 | 0.289; 0.10 |
+| Land; above 2 km of it (1000 Myr) | 0.180; 0.220 | 0.195; 0.343 | 0.289; 0.10 |
+| Continental crust, share of the planet; volume (500 Myr) | 0.305; 7.28 × 10⁹ km³ | 0.380; 7.46 × 10⁹ km³ | about 0.41 |
+| The 40–55 km crust's gap (500 Myr) | −2,326 m | −1,623 m | |
+| Speed RMS, mm/yr | 41.6 | 36.5 | 40–100 |
+| Collisions per 100 Myr | 1.05 | 1.61 | 2–6 |
+| Continental crust, lowest step; highest step | 0.26; 0.44 | 0.34; 0.47 | ≥0.37; ≤0.45 |
+| Supercontinent tenure; period; assemblies a run | 46; 285 Myr; 3.3 | 21; 82 Myr; 7.1 | 100–300; 400–800 |
+| Oceanic arc crest; continental arc median, m | 1,077; 2,055 | 332; 1,095 | ≤1,000; 1,200–4,500 |
+
+Moved to pass: collision length (90th percentile), oceanic ÷ continental plate speed, the oceanic
+arc crest. Moved to fail: rift-born plates welded back, continental crust's highest step, speed RMS,
+the speed guard (one step of one run), ocean floor older than 180 Myr, the continental arc median.
+
+**Not delivered, and why.** The arc rates a year are 1.6 to 2.9 times Earth's because the model's
+subducting boundary is about five times Earth's, not because of the rates per km. The land above
+2 km is too high: the thick crust stands near its Airy height now and erosion, not recalibrated,
+does not wear it down (the next task). The climate warms with the high ground (25.8 °C and about
+19,000 ppm CO₂ at 1000 Myr against 16.6 °C and 1,100 ppm; rank correlation of CO₂ with the land
+above 2 km 0.93 over 28 runs). Plates are slower with more continental crust, so the ocean floor
+grows older; supercontinents assemble more often and for shorter stays.

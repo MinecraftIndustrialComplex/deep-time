@@ -152,6 +152,17 @@ pub struct Counts {
     /// collision regime, a lifted Andean margin, the foreland of an Andean margin and the foreland
     /// basin of a collision (`emplace::Source` without `None`, in that order).
     pub shortened_by: [[u64; 2]; 4],
+    /// The Andean rule's inputs over the run (DEF-026, the re-check of 2026-10-18): continental
+    /// arc and back-arc cells × steps, the sum of their lift factor min(uplift / arc_uplift, 1),
+    /// the cell-steps at full lift, and the sum of their Andean strain.
+    #[serde(default)]
+    pub arc_cell_steps: u64,
+    #[serde(default)]
+    pub arc_lift_sum: f64,
+    #[serde(default)]
+    pub arc_lifted_steps: u64,
+    #[serde(default)]
+    pub arc_strain_sum: f64,
 }
 
 impl Counts {

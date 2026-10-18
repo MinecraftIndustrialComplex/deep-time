@@ -5,7 +5,7 @@
 //! meaning on a 4.8 km (16k quick) or 2.4 km (16k full) cell.
 //!
 //! ```json
-//! "surface": {"k_spl": 2e-9, "m_spl": 1.0, "n_spl": 2.0, "g_deposition": 1.0,
+//! "surface": {"k_spl": 1.5e-9, "m_spl": 1.0, "n_spl": 2.0, "g_deposition": 1.0,
 //!             "sea_level": {"base_m": 0, "cycles": [{"amplitude_m": 80, "period_myr": 250}]}}
 //! ```
 
@@ -71,14 +71,16 @@ impl SeaLevel {
 #[serde(deny_unknown_fields, default)]
 pub struct SurfaceParams {
     /// Stream-power K for crystalline basement (erodibility 1), m^(1−2m)/yr (Braun & Willett).
-    /// The defaults are the nonlinear law n = 2, m = 1 (m/n = 0.5; worldwide ¹⁰Be denudation rates
-    /// favour n > 1, Harel, Mudd & Attal 2016): with n = 1, m = 0.5 and any K that keeps orogens
-    /// mountainous, continental rivers on gentle slopes planed whole continents to sea level
-    /// within ~20 Myr in the 100–500-Myr tuning runs (STATUS.md, P1-04); with n = 2 steep orogens
-    /// erode fast and low cratons slowly. K = 2·10⁻⁹ (m·yr)⁻¹ (P1-17 calibration with the real
-    /// climate, Airy isostasy and the narrower Andean uplift of the pipeline presets: the land's
-    /// median ends 0.6 km high and its 90th percentile ~2 km, Earth's 0.43 and 2.0 km; P1-04's
-    /// 3·10⁻¹⁰ was set on the stand-in climate's wetter interiors and left 2.5-km plateaus).
+    /// Set against measured erosion rates (the erosion recalibration of 2026-10-18,
+    /// erosion-and-sediment.md "The erosion law against measured rates"): with n = 2, m = 1 and
+    /// S_c = 0.15 the planets' regions erode against their mean local relief as Montgomery &
+    /// Brandon 2002 measured (their eq. 2 within 10 % below 1 km of relief, their power law within
+    /// a factor 0.6 to 0.85 above; ERO-179, ERO-180). The hypsometry it was tuned to before
+    /// (P1-17, 3·10⁻⁹) is a reference line now (HYP-001 to HYP-004). n = 2 lies inside the range
+    /// fitted to the world's cosmogenic rates with hillslope diffusion (n ≈ 2.3, 1.59 to 2.70,
+    /// Ruetenik et al. 2023, ERO-182), and n = 2.3 or 2.5 at the same erosion fitted no better;
+    /// m = n / 2 keeps stream power the same at any drawn width. With n = 1, m = 0.5 gentle
+    /// continental rivers planed whole continents in ~20 Myr (STATUS.md, P1-04).
     pub k_spl: f64,
     /// Area exponent m.
     pub m_spl: f64,
@@ -88,9 +90,13 @@ pub struct SurfaceParams {
     pub g_deposition: f64,
     /// Runoff at which a cell counts its full area in the drainage area, m/yr.
     pub runoff_ref_m_yr: f64,
-    /// Critical slope S_c (Landlab `ThresholdEroder`), m/m.
+    /// Critical slope S_c (Landlab `ThresholdEroder`), m/m: Montgomery & Brandon's limiting local
+    /// relief, 1,500 m over their 10-km circle (ERO-179), so no 10-km span stands more than Rc
+    /// high at any cell size.
     pub threshold_slope: f64,
-    /// Hillslope diffusivity κ for crystalline basement, m²/yr.
+    /// Hillslope diffusivity κ for crystalline basement, m²/yr: at the map's scale, where it stands
+    /// for every hillslope process below a cell; κ = 2 alone gives Montgomery & Brandon's
+    /// quiet-land rate, 0.2 mm/yr per km of relief, on hills 9 km across (ERO-023, ERO-172).
     pub kd_land_m2_yr: f64,
     /// Shallow-water marine diffusivity D₀ (Landlab `SimpleSubmarineDiffuser`), m²/yr: Landlab's
     /// default 100 (P1-17; P1-04 had 300). Faces take the mean of their cells' diffusivities, so
@@ -170,13 +176,13 @@ pub struct SurfaceParams {
 impl Default for SurfaceParams {
     fn default() -> Self {
         SurfaceParams {
-            k_spl: 2.0e-9,
-            m_spl: 1.0,
-            n_spl: 2.0,
+            k_spl: 1.5e-9, // ledger: ERO-004 (the presets' value, set against ERO-179 and ERO-180)
+            m_spl: 1.0,    // ledger: ERO-005
+            n_spl: 2.0,    // ledger: ERO-006
             g_deposition: 1.0,
             runoff_ref_m_yr: 0.5,
-            threshold_slope: 0.35, // ledger: ERO-013 (uncited; see ERO-177)
-            kd_land_m2_yr: 2.0,    // ledger: ERO-023 (uncited; hillslope-scale 0.0036: ERO-177)
+            threshold_slope: 0.15, // ledger: ERO-013 (Rc 1,500 m over 10 km, ERO-179)
+            kd_land_m2_yr: 2.0,    // ledger: ERO-023 (map scale; hillslope-scale 0.0036: ERO-177)
             kd_marine_m2_yr: 100.0,
             wave_base_m: 60.0,
             tidal_range_m: 2.0,

@@ -109,6 +109,25 @@ pub struct Strain {
     pub source: Source,
 }
 
+/// The Andean rule of cell `c` (continental crust in an arc or back-arc): its lift factor
+/// min(uplift / `arc_uplift_mm_yr`, 1) and its strain. An Andean margin shortens where it is being
+/// lifted: the plate model's back-arc regime reaches the whole subduction distance inland, most of
+/// it undeformed.
+pub fn andean(x: &Inputs<'_>, c: usize, sp: &StructureParams) -> Option<(f64, f64)> {
+    if x.crust_type[c] as u8 != CONTINENTAL {
+        return None;
+    }
+    let reg = x.regime[c] as u8;
+    let flags = x.flags[c] as u32 as u8;
+    if flags & ARC == 0 && reg != regime::ARC && reg != regime::BACK_ARC {
+        return None;
+    }
+    let speed = (f64::from(x.convergence[c].max(0.0)) / 80.0).min(1.0); // ledger: DEF-026
+    let p = &sp.deformation;
+    let lift = (f64::from(x.uplift[c].max(0.0)) / p.arc_uplift_mm_yr.max(1e-9)).min(1.0);
+    Some((lift, 0.5 * speed * lift)) // ledger: DEF-026
+}
+
 /// The strain of cell `c`.
 pub fn strain(x: &Inputs<'_>, c: usize, sp: &StructureParams) -> Strain {
     if x.crust_type[c] as u8 != CONTINENTAL {
@@ -132,14 +151,7 @@ pub fn strain(x: &Inputs<'_>, c: usize, sp: &StructureParams) -> Strain {
     } else {
         (0.0, 0.0, Source::None)
     };
-    // An Andean margin shortens where it is being lifted: the plate model's back-arc regime
-    // reaches the whole subduction distance inland, most of it undeformed.
-    let andean = if flags & ARC != 0 || reg == regime::ARC || reg == regime::BACK_ARC {
-        let lift = f64::from(x.uplift[c].max(0.0)) / p.arc_uplift_mm_yr.max(1e-9);
-        0.5 * speed * lift.min(1.0) // ledger: DEF-026
-    } else {
-        0.0
-    };
+    let andean = andean(x, c, sp).map_or(0.0, |a| a.1);
     // The foreland of an Andean margin fades with the distance from the arc.
     let d = f64::from(x.arc_km[c]) * 1000.0 / x.m_per_block_h;
     let belt = p.foreland_km * x.blocks_per_model_km;
@@ -336,6 +348,12 @@ pub fn emplace(
     let area = side_km * side_km;
     for c in 0..n {
         let s = strain(x, c, sp);
+        if let Some((lift, a)) = andean(x, c, sp) {
+            counts.arc_cell_steps += 1;
+            counts.arc_lift_sum += lift;
+            counts.arc_lifted_steps += u64::from(lift >= 1.0);
+            counts.arc_strain_sum += a;
+        }
         for (k, v) in [s.shortening, s.extension, s.shear].into_iter().enumerate() {
             if v > 0.0 {
                 total[k] += v * area;

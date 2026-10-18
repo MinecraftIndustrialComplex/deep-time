@@ -27,6 +27,10 @@ use crate::world::WorldState;
 const OCEANIC_CEILING_M: f64 = 3000.0;
 const CONTINENTAL_CEILING_M: f64 = 1500.0;
 
+/// World global: basalt the hotspots and their plume heads added to the pools over the run, km³
+/// (Earth-normalized; the volcano stage's cones over them are counted inside, plate task 8).
+pub const MAGMA_GLOBAL: &str = "plates/hotspot_magma_km3";
+
 fn kernel(d: f64, r: f64) -> f64 {
     if d >= r {
         0.0
@@ -43,10 +47,12 @@ pub fn step(
     pos: &[DVec3],
     tree: &Tree,
     env: &Env,
+    cones: &mut [[f64; 2]],
 ) -> Result<(), CoreError> {
     let k = env.k;
     let norm = env.norm;
     let t = env.t_myr;
+    let mut magma_m = 0.0;
     // Births.
     let mut expected = k.hotspot_births_per_100myr * env.dt_myr / 100.0;
     while expected > 0.0 {
@@ -92,8 +98,9 @@ pub fn step(
         }
         let r = norm.rad(k.hotspot_radius_km);
         let uplift = hs.uplift_mm_yr;
+        let mut lifts: Vec<(usize, f64, f64)> = Vec::new();
         for (i, _) in tree.within(at, r) {
-            let s = &mut state.samples[i as usize];
+            let s = &state.samples[i as usize];
             if s.is_hidden() {
                 continue;
             }
@@ -105,9 +112,30 @@ pub fn step(
             };
             let z = f64::from(s.elevation_m);
             let room = ((ceiling - z) / ceiling).clamp(0.0, 1.0);
-            let dz = uplift * dz_rate * w * room;
-            s.elevation_m = (z + dz) as f32;
-            s.pools[pool::MAFIC_VOLCANIC] += (dz * 3.0) as f32;
+            lifts.push((i as usize, w, uplift * dz_rate * w * room));
+        }
+        // The cones the volcano stage built over the hotspot (its shields and silicic centres,
+        // already in the pools as volcanic rock) are its erupted rock: the basalt it adds
+        // itself is what they leave of its rate (plate task 8, counted once). ledger: PLT-286
+        let rock: f64 = lifts.iter().map(|&(_, _, dz)| 3.0 * dz).sum();
+        let mut built = 0.0;
+        for &(i, _, _) in &lifts {
+            if let Some(c) = cones.get_mut(i) {
+                built += c[0] + c[1];
+                *c = [0.0; 2];
+            }
+        }
+        let q = if rock > 0.0 {
+            (rock - built).max(0.0) / rock
+        } else {
+            1.0
+        };
+        for (i, w, dz) in lifts {
+            let s = &mut state.samples[i];
+            s.elevation_m = (f64::from(s.elevation_m) + dz) as f32;
+            s.pools[pool::MAFIC_VOLCANIC] += (dz * 3.0 * q) as f32;
+            s.thickness_m = s.pools.iter().sum();
+            magma_m += dz * 3.0 * q;
             if w > 0.2 {
                 s.flags |= HOTSPOT;
             }
@@ -122,6 +150,8 @@ pub fn step(
             state.hotspots[h].track_km += norm.speed_mm_yr(omega, at) * env.dt_myr;
         }
     }
+    *world.globals.entry(MAGMA_GLOBAL.to_owned()).or_insert(0.0) +=
+        magma_m * norm.sample_area_km2() / 1000.0;
     Ok(())
 }
 
@@ -147,6 +177,7 @@ fn erupt(
         let w = kernel(pos[i as usize].angle_between(at), r);
         let pile = k.lip_thickness_m * w;
         s.pools[pool::MAFIC_VOLCANIC] += pile as f32;
+        s.thickness_m = s.pools.iter().sum();
         s.elevation_m = (f64::from(s.elevation_m) + pile / 3.0).min(k.max_elevation_m) as f32;
         volume_m3_model += pile * norm.sample_area_km2() * 1.0e6;
         count += 1;
@@ -155,6 +186,7 @@ fn erupt(
     let area_km2 = norm.planet_area_km2(count as f64 * norm.sample_area_km2());
     let f = norm.planet_km / norm.model_km;
     let volume_km3 = volume_m3_model * f * f / 1.0e9;
+    *world.globals.entry(MAGMA_GLOBAL.to_owned()).or_insert(0.0) += volume_m3_model / 1.0e9;
     let mut e = events::event(world, env.t_myr, LARGE_IGNEOUS_PROVINCE, at)
         .magnitude((k.lip_thickness_m / 1000.0) as f32)
         .param("area_km2", area_km2)
