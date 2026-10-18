@@ -14,10 +14,20 @@
 //! interior against a range at the map's resolution.
 //!
 //! All land is also split by its local relief `R_z` (`by_relief`, the erosion recalibration of
-//! 2026-10-18): max − min of the cell and its four edge neighbours, the sea counted at sea level.
-//! Their centres lie within 5 km of the cell's at the 4.8-km cells of the 16k planets, so this is
+//! 2026-10-18): max − min of the cell and its four edge neighbours at the step's end, the sea
+//! counted at sea level. The end, not the start: the start holds the plate model's uplift of the
+//! step (up to kilometres in a step where volcanoes build or ranges rise fast), which the step's
+//! own erosion cuts back, while the implicit solve and the critical slope act on the heights
+//! they leave, so the end is the landscape the erosion law made. Their centres lie within 5 km of the cell's at the 4.8-km cells of the 16k planets, so this is
 //! Montgomery & Brandon's (2002) relief "within a 10-km-diameter circle" in map metres, the measure
 //! their erosion rates are plotted against (ledger: ERO-172).
+//!
+//! Montgomery & Brandon's points are regions (a range, a drainage basin), each its mean erosion
+//! rate against its mean local relief, so the same is kept for the map (`by_window_relief`): every
+//! step the map is cut into windows of [`WINDOW_CELLS`] × [`WINDOW_CELLS`] cells, and each window
+//! whose land is at least [`WINDOW_LAND_SHARE`] of it adds its land's sums to the class of its
+//! land's mean `R_z`. Inside one steadily eroding range every cell wears at the uplift rate,
+//! ridge and valley alike, so classing cells one by one flattens the curve; the windows do not.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -41,6 +51,18 @@ pub const FLAT_RELIEF_M: f64 = 500.0; // ledger: ERO-175 (game-choice, diagnosti
 pub const RELIEF_FROM_M: [f64; 7] = [100.0, 250.0, 500.0, 1000.0, 1500.0, 2000.0, 3000.0]; // ledger: ERO-175 (game-choice, diagnostic class)
 /// The number of local-relief classes.
 pub const RELIEF_BINS: usize = RELIEF_FROM_M.len() + 1;
+/// Side of the region windows, cells: 38.4 km at the 16k planets' 4.8-km cells, about 1,500 km²,
+/// the 10⁵ km² of a large drainage basin or a range on Earth once drawn 8.15 times narrower
+/// (a diagnostic class).
+pub const WINDOW_CELLS: usize = 8; // ledger: ERO-175 (game-choice, diagnostic class)
+/// Least land share of a window that counts as a region.
+pub const WINDOW_LAND_SHARE: f64 = 0.5; // ledger: ERO-175 (game-choice, diagnostic class)
+/// Lower ends of the classes of a region's net erosion rate after the first (from 0), m/Myr: the
+/// distribution of region rates, against the cosmogenic basin rates of Portenga & Bierman 2011
+/// (median 54 m/Myr; ledger: ERO-171).
+pub const RATE_FROM_M_MYR: [f64; 9] = [5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0]; // ledger: ERO-175 (game-choice, diagnostic class)
+/// The number of region-rate classes.
+pub const RATE_BINS: usize = RATE_FROM_M_MYR.len() + 1;
 
 /// Area × time and eroded volumes of one class of land.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -61,6 +83,15 @@ pub struct ProcessSums {
 }
 
 impl ProcessSums {
+    fn add(&mut self, o: &ProcessSums) {
+        self.area_km2_myr += o.area_km2_myr;
+        self.spl_km3 += o.spl_km3;
+        self.threshold_km3 += o.threshold_km3;
+        self.glacial_km3 += o.glacial_km3;
+        self.diffusion_km3 += o.diffusion_km3;
+        self.net_km3 += o.net_km3;
+    }
+
     /// Mean rates, m/Myr (volume over area × time).
     pub fn json(&self) -> Value {
         let r = |v: f64| {
@@ -90,6 +121,13 @@ pub struct ErosionBands {
     pub high_steep: ProcessSums,
     /// All land by local relief (`relief5`), classes from 0 and [`RELIEF_FROM_M`].
     pub by_relief: [ProcessSums; RELIEF_BINS],
+    /// The land of region windows by their land's mean local relief, the same classes.
+    pub by_window_relief: [ProcessSums; RELIEF_BINS],
+    /// Window-steps in each class of `by_window_relief`.
+    pub window_steps: [u64; RELIEF_BINS],
+    /// The same windows' land area × time (km²·Myr) by their net erosion rate (classes from 0 and
+    /// [`RATE_FROM_M_MYR`]; a window that gained height counts in the first).
+    pub window_rate: [f64; RATE_BINS],
 }
 
 /// One step's per-cell lowering by process, metres (all ≥ 0).
@@ -111,7 +149,14 @@ impl ErosionBands {
     pub fn add(&mut self, d: &Dims, s: &StepErosion<'_>) {
         let a_km2 = d.cell_area() / 1.0e6;
         let km3 = d.cell_area() / 1.0e9;
+        let class = |rz: f64| RELIEF_FROM_M.iter().filter(|&&lo| rz >= lo).count();
+        let h1: Vec<f64> = s.h0.iter().zip(s.net).map(|(a, b)| a + b).collect();
+        let (ww, wh) = (d.w.div_ceil(WINDOW_CELLS), d.h.div_ceil(WINDOW_CELLS));
+        // Per window: cells, land cells, the land's summed relief and process sums.
+        let mut win = vec![(0usize, 0usize, 0.0f64, ProcessSums::default()); ww * wh];
         for c in 0..d.cells() {
+            let wi = (c / d.w) / WINDOW_CELLS * ww + (c % d.w) / WINDOW_CELLS;
+            win[wi].0 += 1;
             let z = s.h0[c] - s.sea_m;
             if z <= 0.0 {
                 continue;
@@ -126,14 +171,27 @@ impl ErosionBands {
                 p.net_km3 += -s.net[c] * km3;
             };
             add(&mut self.bands[band]);
-            let rz = relief5(d, s.h0, s.sea_m, c);
-            add(&mut self.by_relief[RELIEF_FROM_M.iter().filter(|&&lo| rz >= lo).count()]);
+            let rz = relief5(d, &h1, s.sea_m, c);
+            add(&mut self.by_relief[class(rz)]);
+            win[wi].1 += 1;
+            win[wi].2 += rz;
+            add(&mut win[wi].3);
             if z >= HIGH_M {
                 if relief3(d, s.h0, c) < FLAT_RELIEF_M {
                     add(&mut self.high_flat);
                 } else {
                     add(&mut self.high_steep);
                 }
+            }
+        }
+        for (cells, land, rz_sum, sums) in &win {
+            if *land > 0 && *land as f64 >= WINDOW_LAND_SHARE * *cells as f64 {
+                let k = class(rz_sum / *land as f64);
+                self.by_window_relief[k].add(sums);
+                self.window_steps[k] += 1;
+                let rate = sums.net_km3 / sums.area_km2_myr.max(1e-30) * 1000.0;
+                let r = RATE_FROM_M_MYR.iter().filter(|&&lo| rate >= lo).count();
+                self.window_rate[r] += sums.area_km2_myr;
             }
         }
     }
@@ -152,6 +210,19 @@ impl ErosionBands {
             let mut v = b.json();
             v["area_share"] = json!((b.area_km2_myr / land.max(1e-30) * 1.0e4).round() / 1.0e4);
             m.insert(format!("relief_from_{lo}"), v);
+            let w = &self.by_window_relief[i];
+            let mut v = w.json();
+            v["area_share"] = json!((w.area_km2_myr / land.max(1e-30) * 1.0e4).round() / 1.0e4);
+            v["window_steps"] = json!(self.window_steps[i]);
+            m.insert(format!("window_relief_from_{lo}"), v);
+        }
+        let windows: f64 = self.window_rate.iter().sum();
+        for (i, a) in self.window_rate.iter().enumerate() {
+            let lo = if i == 0 { 0.0 } else { RATE_FROM_M_MYR[i - 1] };
+            m.insert(
+                format!("window_rate_from_{lo}_share"),
+                json!((a / windows.max(1e-30) * 1.0e4).round() / 1.0e4),
+            );
         }
         Value::Object(m)
     }
@@ -258,5 +329,54 @@ mod tests {
         assert!(b.by_relief[0].area_km2_myr > 0.0);
         assert!(b.by_relief[4].area_km2_myr > 0.0 && b.by_relief[6].area_km2_myr > 0.0);
         assert!(j["relief_from_1000"]["area_share"].as_f64().unwrap() > 0.0);
+        // One window (the grid is smaller than a window), all but one cell land: its land's mean
+        // relief puts all 22 km²·Myr in one class.
+        assert_eq!(b.window_steps.iter().sum::<u64>(), 1);
+        let k = b.window_steps.iter().position(|&s| s == 1).unwrap();
+        assert!((b.by_window_relief[k].area_km2_myr - 22.0).abs() < 1e-9);
+        assert!((b.by_window_relief[k].net_km3 - 22.0 * 2.0 / 1000.0).abs() < 1e-9);
+        // Its net lowering is 1 m/Myr: the first rate class.
+        assert!((b.window_rate[0] - 22.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn windows_class_regions_by_their_mean_relief() {
+        // Two windows side by side: a flat lowland and a ridged range; a third mostly sea.
+        let d = Dims::new(3 * WINDOW_CELLS, WINDOW_CELLS, 1000.0, false);
+        let n = d.cells();
+        let mut h0 = vec![50.0; n];
+        for c in 0..n {
+            let x = c % d.w;
+            if (WINDOW_CELLS + 1..2 * WINDOW_CELLS).contains(&x) {
+                h0[c] = if x % 2 == 0 { 2600.0 } else { 1400.0 };
+            } else if x >= 2 * WINDOW_CELLS && (c / d.w) > 0 {
+                h0[c] = -100.0;
+            }
+        }
+        let zero = vec![0.0f32; n];
+        let net = vec![-1.0; n];
+        let mut b = ErosionBands::default();
+        b.add(
+            &d,
+            &StepErosion {
+                h0: &h0,
+                sea_m: 0.0,
+                spl: &zero,
+                threshold: &zero,
+                glacial: &zero,
+                diffusion: &zero,
+                net: &net,
+                dt_myr: 1.0,
+            },
+        );
+        // The lowland has no relief, the range 1,200 m and more between its ridges and valleys:
+        // one window in class 0, one from 1,000 m up; the sea window has too little land to count.
+        assert_eq!(b.window_steps.iter().sum::<u64>(), 2);
+        assert_eq!(b.window_steps[0], 1);
+        let k = 1 + b.window_steps[1..].iter().position(|&s| s == 1).unwrap();
+        assert!(k >= 4, "the range's window is in class {k}");
+        let w = (WINDOW_CELLS * WINDOW_CELLS) as f64;
+        assert!((b.by_window_relief[k].area_km2_myr - w).abs() < 1e-9);
+        assert!((b.by_window_relief[0].area_km2_myr - w).abs() < 1e-9);
     }
 }
