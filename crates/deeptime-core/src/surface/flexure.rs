@@ -33,18 +33,24 @@
 //! # Increments, not the whole load
 //! The carried plate is taken to be in equilibrium under the carried load, as the real one is:
 //! each step solves only for the loads of the step, what the last solve left unfinished (carried
-//! with the crust), and the moment a weakened plate releases. Moving the plate, interpolating its
+//! with the crust), and the load a weakened plate stops holding up. Moving the plate, interpolating its
 //! state on the raster and restarting new crust therefore move nothing. (The first build re-solved
 //! the whole load every step; the interpolation error of the carried state then acted as a force
 //! and moved the ground by up to several kilometres a step along margins and near the poles: the
 //! cell-scale zigzag and the polar stripes of the build log, 2026-10-02.)
 //!
-//! # A plate that stiffens keeps its shape
-//! The plate carries its bending moment m = D·∇²w, built up step by step. Rigidity gained by
-//! cooling joins stress-free: m stays, and later loads meet the stiffer plate. So an old belt's
-//! local root does not turn into relief as its crust cools, and a load records the strength of the
-//! plate at the time of loading (Watts 1978). Rigidity lost (reheating, a cell becoming a plate's
-//! broken edge) releases m in proportion, and the released moment is a force.
+//! # A plate that stiffens keeps its shape; one that weakens settles
+//! Rigidity gained by cooling joins stress-free: nothing moves, and later loads meet the stiffer
+//! plate. So an old belt's local root does not turn into relief as its crust cools, and a load
+//! records the strength of the plate at the time of loading (Watts 1978). Rigidity lost
+//! (reheating, a cell becoming a plate's broken edge) gives up the same share of what the plate
+//! held: where D falls to r·D, the load the plate held away from local isostasy,
+//! ρ_m (Q − w), less r of it, is a force. The ground settles towards local isostasy, which is
+//! where a plate with no strength puts it, and no further. (Until 2026-10-18 the plate carried
+//! its bending moment and released it as a moment: the curvature of a moment released along a
+//! boundary one cell wide, the polar plate fields' edges stepping from row to row, made forces
+//! of several times the load held, and holes and spikes of tens of kilometres near the poles,
+//! build log 2026-10-18.)
 //!
 //! # Lengths
 //! Earth-normalized, as the plate model's (decisions file, "Tectonics scaling"): the solve's cell
@@ -307,9 +313,8 @@ pub struct FlexState {
     /// The depth of sea counted in `load_m`, m; NaN where the crust is new at the place (its
     /// reference is taken at the next step).
     pub water_m: Vec<f32>,
-    /// The bending moment over gravity, D·∇²w / g accumulated step by step, kg.
-    pub moment: Vec<f32>,
-    /// The rigidity over gravity the cell was last solved with, D / g, kg·m.
+    /// The rigidity over gravity the cell was last solved with, D / g, kg·m (carried as its
+    /// logarithm: ISO-075).
     pub rigidity: Vec<f32>,
     /// The land ice the plate carried at the last step, m.
     pub ice_m: Vec<f32>,
@@ -330,7 +335,6 @@ impl FlexState {
             load_m: vec![0.0; n],
             deflection_m: vec![0.0; n],
             water_m: vec![f32::NAN; n],
-            moment: vec![0.0; n],
             rigidity: vec![f32::NAN; n],
             ice_m: vec![0.0; n],
             unsolved_m: vec![0.0; n],
@@ -370,27 +374,32 @@ impl FlexState {
         }
         // Crust that is new at a place starts unloaded and flat (its water is NaN until the
         // next step takes its reference).
+        // ledger: ISO-075
+        // The rigidity is carried as its logarithm (game-choice: numerical, agent 2026-10-18):
+        // it spans three orders of magnitude between a plate's broken edge and a craton, and
+        // a linear blend of the corners reads a cell beside a stiff one as nearly as stiff as
+        // that, so a weak cell carried a fraction of a cell would seem to have lost almost all
+        // of its rigidity.
+        let ln_rigidity: Vec<f32> = self.rigidity.iter().map(|&d| d.ln()).collect();
         let moved = advect::carried_fields(
             x,
             [
                 &self.water_m,
                 &self.load_m,
                 &self.deflection_m,
-                &self.moment,
-                &self.rigidity,
+                &ln_rigidity,
                 &self.ice_m,
                 &self.unsolved_m,
             ],
         );
         for (c, m) in moved.into_iter().enumerate() {
-            let [water, load, sunk, moment, rigidity, ice, unsolved] = m
-                .filter(|m| m[..4].iter().chain(&m[5..]).all(|y| y.is_finite()))
-                .unwrap_or([f32::NAN, 0.0, 0.0, 0.0, f32::NAN, 0.0, 0.0]);
+            let [water, load, sunk, ln_d, ice, unsolved] = m
+                .filter(|m| m[..3].iter().chain(&m[4..]).all(|y| y.is_finite()))
+                .unwrap_or([f32::NAN, 0.0, 0.0, f32::NAN, 0.0, 0.0]);
             self.water_m[c] = water;
             self.load_m[c] = load;
             self.deflection_m[c] = sunk;
-            self.moment[c] = moment;
-            self.rigidity[c] = rigidity;
+            self.rigidity[c] = ln_d.exp();
             self.ice_m[c] = ice;
             self.unsolved_m[c] = unsolved;
         }
@@ -1058,7 +1067,7 @@ pub struct StepIn<'a> {
     /// The `isostasy` setting: the density of eroded and deposited rock over the mantle's.
     pub rock_share: f64,
     /// Also solve, apart, for the step's loads, for the roots already in the elevation and for
-    /// the moment released ([`StepOut::loads_m`], [`StepOut::roots_m`],
+    /// the load a weakened plate let go ([`StepOut::loads_m`], [`StepOut::roots_m`],
     /// [`StepOut::released_m`]). Measurement only (the gap budget,
     /// `plates::gap_budget`): the step's own solve and result do not change.
     pub parts: bool,
@@ -1081,7 +1090,7 @@ pub struct StepOut {
     /// the step's loads (rock, sea water, ice) alone, and the one it gives the roots the plate
     /// model and the spreading put in the elevation alone (their load and the sea water they
     /// pushed aside, less the root, and the plate's bending of the root: on land and under the
-    /// sea alike only the bending), and the one it gives the moment a weakened plate releases.
+    /// sea alike only the bending), and the one it gives the load a weakened plate let go.
     /// The step's change less the three is what the loads carried in the unsolved residual (other
     /// stages' loads, the last solve's unfinished part) moved, less what this solve left
     /// unfinished. Empty otherwise.
@@ -1342,8 +1351,8 @@ pub fn step(
 
     // ledger: ISO-068
     // 3. The residual of the step: ρ_m (ΔQ − a) − L(D L a) for the loads and the roots already
-    // in the elevation, the last solve's unfinished part, and the moment a weakened plate
-    // releases.
+    // in the elevation, the last solve's unfinished part, and the load a weakened plate lets
+    // go.
     if solver
         .as_ref()
         .is_none_or(|s| s.w != ws || s.h != hs || s.dx != dxs)
@@ -1399,34 +1408,42 @@ pub fn step(
             f64::from(st.rigidity[c])
         }
     });
-    let m_old = pick(&|c| carried(c, &st.moment));
     // ledger: ISO-056
-    // Rigidity gained as crust cools joins stress-free: the moment stays and later loads meet
-    // the stiffer plate. Rigidity lost (reheating, a cell becoming a plate's broken edge)
-    // releases the moment in proportion, and the released moment is a force.
-    let m_kept: Vec<f64> = (0..ws * hs)
+    // Rigidity gained as crust cools joins stress-free: nothing moves, and later loads meet the
+    // stiffer plate. Rigidity lost (reheating, a cell becoming a plate's broken edge) gives up
+    // the same share of the stress the plate held: where D falls to r·D the plate stops holding
+    // up (1 − r) of the load it kept away from local isostasy, ρ_m (Q + ice − w − unsolved),
+    // and that is a force. It moves the ground towards local isostasy, where a plate with no
+    // strength puts it, and no further, whatever the cell's size or latitude. (The moment it
+    // replaces, L((1 − r)·M), is the same force where r is uniform; where r changes from cell to
+    // cell, along a plate boundary or the edge of a reheated zone, its curvature made forces of
+    // several times the load held: the polar holes and spikes, build log 2026-10-18.)
+    let held = pick(&|c| {
+        if cells[c].fresh {
+            0.0
+        } else {
+            RHO_MANTLE
+                * (f64::from(st.load_m[c]) + ice_share * f64::from(st.ice_m[c])
+                    - f64::from(st.deflection_m[c])
+                    - f64::from(st.unsolved_m[c]))
+        }
+    });
+    let let_go: Vec<f64> = (0..ws * hs)
         .into_par_iter()
         .map(|c| {
             let ratio = d_now[c] / d_prev[c];
             if ratio.is_finite() && ratio < 1.0 {
-                m_old[c] * ratio
+                (1.0 - ratio) * held[c]
             } else {
-                m_old[c]
+                0.0
             }
         })
         .collect();
-    let released: Vec<f64> = m_old
-        .par_iter()
-        .zip(m_kept.par_iter())
-        .map(|(a, b)| a - b)
-        .collect();
-    let mut l_released = vec![0.0; ws * hs];
-    sv.laplacian(&released, &mut l_released);
     let mut bend_root = vec![0.0; ws * hs];
     sv.bend(&d_now, &bend_part, &mut bend_root);
     let r: Vec<f64> = (0..ws * hs)
         .into_par_iter()
-        .map(|c| RHO_MANTLE * (dq[c] - root[c]) - bend_root[c] + l_released[c])
+        .map(|c| RHO_MANTLE * (dq[c] - root[c]) - bend_root[c] + let_go[c])
         .collect();
     let c_rest: Vec<f64> = wet
         .par_iter()
@@ -1449,7 +1466,7 @@ pub fn step(
         }
         out.solve = Some(report);
         if x.parts {
-            // The step's loads, the roots and the moment released, each solved alone, more
+            // The step's loads, the roots and the load let go, each solved alone, more
             // tightly than the step (the solve is linear; the rest of the step's change is the
             // loads carried in the unsolved residual less this solve's unfinished part).
             let rl = pick(&|c| cells[c].root_load);
@@ -1469,7 +1486,7 @@ pub fn step(
             };
             out.loads_m = answer(&r_loads);
             out.roots_m = answer(&r_roots);
-            out.released_m = answer(&l_released);
+            out.released_m = answer(&let_go);
         }
         let mut adw = vec![0.0; ws * hs];
         sv.operator(&d_now, &c_rest, &dw, &mut adw);
@@ -1486,19 +1503,6 @@ pub fn step(
             r.iter().map(|&v| v / RHO_MANTLE).collect(),
         )
     };
-    // The moment after the step: what was kept, plus the bending of the root and the sinking.
-    let total: Vec<f64> = bend_part
-        .par_iter()
-        .zip(dw.par_iter())
-        .map(|(a, b)| a + b)
-        .collect();
-    let mut curv = vec![0.0; ws * hs];
-    sv.laplacian(&total, &mut curv);
-    let m_new: Vec<f64> = (0..ws * hs)
-        .into_par_iter()
-        .map(|c| m_kept[c] + d_now[c] * curv[c])
-        .collect();
-    let m_fine = prolong_const(&m_new, ws, f);
     let d_fine = prolong_const(&d_now, ws, f);
     let left_fine = prolong_const(&left, ws, f);
     let delta = prolong_linear(&dw, ws, f);
@@ -1514,7 +1518,6 @@ pub fn step(
         st.deflection_m.par_chunks_mut(w),
         st.water_m.par_chunks_mut(w),
         st.ice_m.par_chunks_mut(w),
-        st.moment.par_chunks_mut(w),
         st.rigidity.par_chunks_mut(w),
         st.unsolved_m.par_chunks_mut(w),
         flex.par_chunks_mut(w),
@@ -1522,7 +1525,7 @@ pub fn step(
     )
         .into_par_iter()
         .enumerate()
-        .for_each(|(j, (hr, lr, dr, wr, ir, mr, rr, ur, fr, cr))| {
+        .for_each(|(j, (hr, lr, dr, wr, ir, rr, ur, fr, cr))| {
             for i in 0..w {
                 let c = j * w + i;
                 let cell = &cells[c];
@@ -1538,7 +1541,6 @@ pub fn step(
                 dr[i] = w_new as f32;
                 wr[i] = depth as f32;
                 ir[i] = ice as f32;
-                mr[i] = m_fine[c] as f32;
                 rr[i] = d_fine[c] as f32;
                 ur[i] = left_fine[c] as f32;
                 let restoring = if hr[i] <= sea {
@@ -2174,7 +2176,7 @@ mod tests {
         let rep = out.solve.unwrap();
         assert!(rep.converged, "{rep:?}");
         // The split the gap budget reads: the flexure's change is all the roots' answer here (the
-        // belt held up, the basin pulled down), none of it the loads' or a released moment's.
+        // belt held up, the basin pulled down), none of it the loads' or a weakened plate's.
         for j in [127usize, 135, 160, 250] {
             let c = j * w + 3;
             let change = wd.h[c] - before[c] - f64::from(wd.uplift[c]) * 2000.0;
@@ -2184,7 +2186,7 @@ mod tests {
                 out.roots_m[c]
             );
             assert!(out.loads_m[c].abs() < 1.0, "row {j}: {}", out.loads_m[c]);
-            // The plate kept its stiffness: no moment released.
+            // The plate kept its stiffness: it let nothing go.
             assert!(
                 out.released_m[c].abs() < 1.0,
                 "row {j}: {}",
@@ -2386,7 +2388,10 @@ mod tests {
     /// smooth sediment fan (50 m a step) rides on plate 0 and a smooth arc (0.02 mm/yr) rises
     /// behind the edge of plate 1. The deflection and the flexure field must not zigzag at the
     /// cell scale away from the plate boundaries.
-    fn moving_margin(steps: usize) -> (usize, usize, Vec<f64>, Vec<f64>, Vec<f32>) {
+    /// The margin after `steps` steps: its width and height, the deflection, the flexure field,
+    /// the plates and the load (m of mantle).
+    #[allow(clippy::type_complexity)]
+    fn moving_margin(steps: usize) -> (usize, usize, Vec<f64>, Vec<f64>, Vec<f32>, Vec<f64>) {
         let p = on();
         let (w, h) = (96usize, 16usize);
         let n = w * h;
@@ -2537,12 +2542,16 @@ mod tests {
         }
         let defl = last.deflection_m.iter().map(|&x| f64::from(x)).collect();
         let flex = last.flexure_m.iter().map(|&x| f64::from(x)).collect();
-        (w, h, defl, flex, plate_prev)
+        let load = st
+            .as_ref()
+            .map(|s| s.load_m.iter().map(|&q| f64::from(q)).collect())
+            .unwrap_or_default();
+        (w, h, defl, flex, plate_prev, load)
     }
 
     #[test]
     fn a_moving_margin_bends_smoothly() {
-        let (w, h, defl, flex, plate) = moving_margin(40);
+        let (w, h, defl, flex, plate, load) = moving_margin(40);
         // Away from the plate boundaries (no other plate within two cells), where the plate is
         // broken on purpose.
         let away = |c: usize| {
@@ -2572,8 +2581,13 @@ mod tests {
             out.join("\n")
         };
         // Half a block (10 m): the rows under the arc took on arc crust at different steps and
-        // differ by a few metres in their load history.
-        let zig_d = cell_scale_zigzag(&defl, w, h, 10.0, away);
+        // differ by a few metres in their load history. Where the load itself zigzags by more
+        // (17 m at the trough of the margin's wave, where the arc's edge steps between ARC and
+        // CRATON from row to row), a plate that weakened there settled towards local isostasy
+        // and its deflection follows the load: that is the load's, and the flexure field below
+        // shows the solve made none of it.
+        let load_zig = |c: usize| cell_scale_zigzag(&load, w, h, 10.0, |k| k == c) > 0.0;
+        let zig_d = cell_scale_zigzag(&defl, w, h, 10.0, |c| away(c) && !load_zig(c));
         // The flexure field (load less sinking) also carries each cell's load history: cells the
         // craton took over at different steps hold different loads, a few metres apart.
         let zig_f = cell_scale_zigzag(&flex, w, h, 10.0, away);
@@ -2749,6 +2763,70 @@ mod tests {
         assert!(
             start == 300.0 && end.abs() < 0.01 * start,
             "the checkerboard went from {start:.1} to {end:.1} m"
+        );
+    }
+
+    /// A plate boundary sweeping across a bent plate, stepping between rows as the plate model's
+    /// boundaries do on the raster (near the poles its fields are sampled more than a cell apart
+    /// north to south): each cell the boundary reaches loses its rigidity (ISO-055) and gives up
+    /// the load it held, so it settles towards local isostasy and no further (ISO-056). No step
+    /// moves the ground by more than the plate held it from local isostasy, and nothing is pushed
+    /// far past it. While the plate released its bending moment as a moment, the curvature of a
+    /// moment released along the boundary moved the ground by up to 1.46 times the load held and
+    /// pushed it 4.2 km past local isostasy here (0.55 of the load held): the polar holes and
+    /// spikes of the build log, 2026-10-18.
+    #[test]
+    fn a_plate_that_weakens_settles_towards_local_isostasy() {
+        let p = on();
+        let (w, h) = (64usize, 48usize);
+        let n = w * h;
+        let sea = -1.0e6;
+        let mut wd = World::new(w, h, 300.0);
+        let (mut sv, mut st) = started(&mut wd, &p, sea);
+        // A disc raised in one step on the craton: the plate holds it up, with a basin and a
+        // bulge round it.
+        for c in 0..n {
+            let (i, j) = ((c % w) as f64, (c / w) as f64);
+            if (i - 26.0).powi(2) + (j - 24.0).powi(2) < 16.0 {
+                wd.uplift[c] = 1.0;
+            }
+        }
+        let mut held = wd.step(&p, &mut sv, &mut st, &vec![0.0; n], sea).flexure_m;
+        wd.uplift = vec![0.0; n];
+        let mut let_go = 0.0f64;
+        for k in 0..10 {
+            // A second plate south of a boundary along x that moves three rows a step and steps
+            // two rows back and forth every two columns.
+            for c in 0..n {
+                let (i, j) = (c % w, c / w);
+                let row = 10 + 3 * k + 2 * ((i / 2) % 2);
+                wd.plate[c] = if (row..row + 40).contains(&j) {
+                    1.0
+                } else {
+                    0.0
+                };
+            }
+            let out = wd.step(&p, &mut sv, &mut st, &vec![0.0; n], sea);
+            let most = held.iter().fold(0.0f64, |m, &v| m.max(f64::from(v).abs()));
+            let past = held
+                .iter()
+                .zip(&out.flexure_m)
+                .fold(0.0f64, |m, (&b, &a)| m.max(-f64::from(a * b.signum())));
+            assert!(
+                out.max_change_m <= 1.05 * most,
+                "step {k}: the ground moved {:.0} m, the plate held {most:.0} m",
+                out.max_change_m
+            );
+            assert!(
+                past <= 0.25 * most,
+                "step {k}: {past:.0} m past local isostasy, the plate held {most:.0} m"
+            );
+            let_go = let_go.max(out.max_change_m);
+            held = out.flexure_m;
+        }
+        assert!(
+            let_go > 5000.0,
+            "the boundary crossed the disc: {let_go:.0} m"
         );
     }
 }

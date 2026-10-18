@@ -109,11 +109,14 @@ in them. Flexure is a correction to where the sinking happens. Per step:
 **A plate that stiffens keeps its shape.** A belt built on hot, weak crust has a local root. When
 that crust cools and stiffens, nothing should move: the new stiffness is added stress-free at the
 shape the plate has. Without this, every old belt would slowly rise as its root is "spread".
-The model (as built after section 13): the plate carries its bending moment `m = D ∇²w`, built
-up step by step. When `D` grows, `m` stays and later loads meet the stiffer plate; when it falls
-(reheating, a cell becoming a plate's broken edge), `m` shrinks in proportion and the released
-moment is a force. (The first build kept a frozen moment `M₀` and re-solved the whole load.) This is the observed rule that a load records the plate's
-strength at the time of loading (Watts 1978: seamounts built on young floor keep a low `Te`).
+The model (as built after section 15): when `D` grows nothing moves and later loads meet the
+stiffer plate; when it falls to `r·D` (reheating, a cell becoming a plate's broken edge), the
+plate stops holding up the share `1 − r` of the load it kept away from local isostasy,
+`ρ_m (Q + ice − w − unsolved)`, and that is a force. (The first build kept a frozen moment `M₀`
+and re-solved the whole load; from section 13 to section 15 the plate carried its bending moment
+`m = D ∇²w` and released `L((1 − r)·m)`, which section 15 replaced.) This is the observed rule
+that a load records the plate's strength at the time of loading (Watts 1978: seamounts built on
+young floor keep a low `Te`).
 
 **Water** is a load that depends on the answer (a basin that sinks takes more water). The solve
 handles its own share exactly: cells under the sea get the restoring density ρ_m − ρ_w.
@@ -563,3 +566,96 @@ A guard at five Earth reliefs (98.9 km) stopped a shipped bake on such a transie
 makes the spikes was not traced here; it was on 2026-10-18 (a resampling's accretion and the
 collision belts), and the plate step's rate limits now bound them (docs/science/plates.md, "The
 fastest a column thickens and rises"; build log 2026-10-18 "Plate spikes").
+
+## 15. The polar holes: a weakened plate lets go of its load, not of its moment (2026-10-18)
+
+With the plate step's rate limits in, the guard's worst cells were on L1's polar rows. Over six
+500 Myr runs of `earthlike_quick_16k`, single cells there rose or fell by tens of km within a few
+steps under plate uplift of 2 km or less; the worst was a hole two cells wide that fell to 59.6 km
+below the sea (supercontinent, seed 2). A per-process trace of the surface stage (a temporary
+diagnostic, not kept) put the polar picks on the flexure, and within it on the released moment
+(section 3.3 as built after section 13). At −290 Myr a craton cell at 70° that a plate boundary
+reached (Te from 80 km to the 5 km floor) released 17.2 km of ground in one step.
+
+**Cause.** The released force was `L((1 − r)·M)`, with `r = D_now / D_prev` and `M = D ∇²w`. For a
+plate in balance `L(M) = ρ_m (Q − w)` (in the solve's units, with ice and the unsolved part), so
+where `r` is uniform the release is `(1 − r)` of the load the plate holds from local isostasy.
+Along a boundary `r` jumps from cell to cell: a craton cell keeps (5/80)³ of its rigidity, its
+neighbours all of theirs. The Laplacian of a moment that jumps at the cell scale is several times
+the load held, with opposite signs in neighbouring cells. The polar rows have more of it, for
+three reasons:
+
+- poleward of 60° a row is taller on the planet than the plate model's sample spacing (about
+  71 km), so its boundaries step from row to row;
+- a rotating plate carries crust about ten cells a step east to west there, so boundaries sweep
+  many cells each step;
+- the rigidity was carried by a linear blend, which reads a weak cell beside a stiff one as
+  nearly as stiff, so crust carried far seemed to weaken where nothing changed.
+
+**Fix.** The release is the force `(1 − r) ρ_m (Q + ice − w − unsolved)` at each cell where `D`
+fell (ISO-056). Where `r` is uniform it equals the old force. Where `r` is not uniform, it is
+bounded by the cell's own departure from local isostasy. The ground then moves towards the Airy
+answer, the limit a viscoelastic plate relaxes to (Eshagh & Tenzer 2021; Buoninfante et al.
+2023), and never past it. The moment is no longer carried (`FlexState::moment` removed). The
+rigidity is carried as its logarithm (ISO-075). `StepOut::released_m` now reports the load let go.
+
+Three candidates were tried over the first 110 Myr of two runs (scattered seed 1, supercontinent
+seed 2), with the trace's bands at 45, 60, 70 and 80°: the departure rule; the departure rule
+with the logarithmic carry; and no release at all (a bound, not a candidate). Below 45°, the
+largest per-step total change of the surface stage was:
+
+| Candidate | Scattered seed 1, up and down (km) | Supercontinent seed 2, up and down (km) |
+|---|---|---|
+| Departure rule | 4.7 and 4.6 | 5.2 and 4.5 |
+| With the logarithmic carry | 4.5 and 4.4 | 4.8 and 4.6 |
+| No release | 3.7 and 4.4 | 4.8 and 4.6 |
+
+The polar bands came down to the same size. The departure rule with the logarithmic carry was
+kept.
+
+**Test.** `a_plate_that_weakens_settles_towards_local_isostasy` bends a 64 × 48 plate with a disc
+load. Then, for ten steps, a plate boundary steps between rows across it (`10 + 3k + 2·((i/2) mod 2)`).
+The test asserts three things:
+
+- no step moves the ground by more than 1.05 times the most the plate held (the largest
+  |flexure| of the step before);
+- nothing goes more than a quarter of that past local isostasy;
+- the boundary lets something go.
+
+The old rule fails it at the third step: 11.2 km against 8.0 km, and 4.2 km past against 1.9 km.
+
+`a_moving_margin_bends_smoothly` now leaves out of its deflection check the cells where the load
+itself zigzags by more than 10 m. With the logarithmic carry that is 17 m at the trough of the
+margin's wave. The deflection may follow its load there, and the flexure field (load less
+sinking) stays checked everywhere.
+
+**Measured.** Six runs of `earthlike_quick_16k`, 500 Myr, seeds 1 to 3, both starts. Mean
+[min, max]. Before: master 9091c163 with the step records. After: this branch merged with master
+19cb11e0.
+
+| | Before | After |
+|---|---|---|
+| Guard's worst (m) | 30,814 [19,599, 59,631] | 15,471 [13,187, 18,101] |
+| Steps beyond 1, 2, 3 and 6 Earth reliefs | 25, 8, 1, 0 | none |
+| Largest rise and fall in a step, polar rows (m) | 16,148 and 12,543 | 5,016 and 5,535 |
+| Largest rise and fall in a step, the rest (m) | 15,012 and 15,652 | 6,593 and 5,628 |
+| L1's peak (m) | 7,288 | 7,031 |
+| Land share | 0.199 | 0.207 |
+
+Away from the poles the planets diverge cell by cell (mean |Δh| 2.6 km, and as much in the plate
+model's own elevation) but keep their hypsometry:
+
+| Away from the poles | Before | After |
+|---|---|---|
+| Land share | 0.201 | 0.211 |
+| Land's median (m) | 726 | 715 |
+| Land's 99th percentile (m) | 5,053 | 5,065 |
+
+The full table, and the comparison with Earth's fastest measured rates (ISO-076), are in
+docs/science/flexure.md, "The polar holes".
+
+**What is left.** Single cells still change by 5 to 10 km in a step. In the 110 Myr traces this
+came from the fluvial step, marine fill, the glacial step and the flexure. That is within
+Earth's fastest measured rates, but above what a region sustains over 2 Myr. The release happens
+at once within the step; relaxation takes about 1 Myr (Beaumont 1978). The share `1 − r` is this
+design's own, from the two limits.
