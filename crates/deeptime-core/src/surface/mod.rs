@@ -1570,6 +1570,16 @@ impl SurfaceStage {
                 *world.globals.entry(name.to_owned()).or_insert(0.0) += 1.0;
             }
         }
+        // The largest rise and fall of the step, on the polar rows and the rest (measurement
+        // only).
+        let polar: Vec<bool> = (0..hgt)
+            .map(|j| lat_of(j).abs() >= guard::POLAR_FROM_DEG)
+            .collect();
+        let moved = guard::step_extremes(w, &h_start, &sc.h, &polar);
+        for (name, x) in guard::STEP_GLOBALS.into_iter().zip(moved) {
+            let g = world.globals.entry(name.to_owned()).or_insert(0.0);
+            *g = g.max(x);
+        }
 
         // 6. Outputs.
         let started = Instant::now();
