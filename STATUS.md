@@ -10129,37 +10129,48 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
   `[gametest] native version=… format=… target=… selftest=…`); then P0-08.
 
 ## Known issues and open questions
-- **Mountain heights (2026-10-01).** The 13–20 km "mountains" were bookkeeping (fixed, stage 1); the height limit is
-  now crust spreading over its strength (stage 2, `surface/spread.rs`), with the plate model's cap a 30 km guard that
-  never binds; the stored elevation is squeezed under `max_y` only for extreme settings. Open: sea floors below
-  `min_y` in under 0.1 % of the sea, summits at 6–7 km, the full preset's land still high (pending question above;
-  build log 2026-10-01 stage 2).
-- **One preset, one planet per platform (2026-10-01).** The simulation is not bit-identical across platforms (the
-  platform's libm); it is across runs and thread counts on one machine. Ben does not want it otherwise. Tests on a
-  simulated planet assert properties and floors measured over several planets (`DEEPTIME_TEST_PLANET_SET="seed=N"
-  ./gametest.sh`); an exact number belongs only to tests on baked data.
-- **P1-06 caveats.** (1) A checkpoint carries the preset it was made with, defaults included: to pick up
-  a changed default of a stage that has not run, resume with `--set "amplify={}"` (or the key). (2) Tests
-  that derive a small planet from a `pipeline_*` preset must remove the `young` and `amplify` sections
-  (their L2/L3 are far finer than a test's L1); every existing helper does. (3) The surface stage keeps its
-  L1 scratch after its last step, so the `young`/`amplify` estimates (world + own) exceed 4 GiB on the
-  full presets although the gauge reads ~1 GiB there; P1-17 could drop it. (4) The amplifier's working
-  set is 46 B a cell (67 B while a tile runs), not the plan's 20.
-- **Long runs (parked by Ben, 2026-09-29: "DW about it for now"; memory part solved 2026-09-29, history spill).** The
-  recorded history no longer has to fit in memory: over the cap its oldest frames go to a spill file in the run's folder
-  and the run gets slower instead of failing (build log 2026-09-29, "the recorded history spills to the SSD"). The 1000
-  Myr `pipeline_full_32k` run that failed at 4 GiB now finishes under 4 GiB (40 min on a loaded Mac, 2.3 GiB of disk);
-  `pipeline_quick_16k` 2000 Myr finishes under 4 GiB (24 min, 3.8 GiB gauge peak). A 4,600 Myr 32k full run needs its history on disk (~11 GiB, 12.7 B per L1 cell per frame) plus a base
-  of ~4.2 GiB (the amplifier; ~3 GiB before it), so it fits an 8 GiB cap now; its time (~3 h) is untested. Still open:
-  the physics is tested only over 500 Myr and starts from existing continents (no early-Earth phase); the young and
-  amplify stages allocate ~0.3 GiB at 32k without reserving it.
-- The workbench offered the placeholder `earthlike_*` presets (dummy pipeline) next to the real `pipeline_*`
-  ones; Ben ran one and got a single blob. The UI overhaul hides them behind a dev toggle and marks a
-  placeholder run (build log 2026-09-29, UI overhaul). Since P1-08 the `earthlike_*` built-ins are the real
-  pipeline presets (no placeholder is built in); the workbench lists both families, identical.
-- The plan is at revision 2 plus a partial revision 3 (the decisions-log rule in §1.2). The 29 gaps of
-  docs/plan-reviews/2026-09-28-cold-read-review-2.md are fixed in the plan by the task that hits each
-  one; the build log names each fix as it lands.
+Current as of 2026-10-17 (session f981c0d3-5144-49ec-8686-2946d755872c); the list Ben was given so he does not report
+known faults. Older notes are in the build log.
+
+**The planet**
+- Too little land: 19 % of the surface against Earth's 29 %. Thick crust sits 0.5 to 3 km below where it should float
+  (the land-measurement agent is splitting it by process; plate task 8, crust rates, follows).
+- The land there is runs high: median 745 m against Earth's 427 m, about twice Earth's share above 2 km.
+- Plateaus wear down like mountain ranges (about 6 times Tibet's rate). Erosion recalibration after plate tasks 7 and 8
+  (Ben, decisions log 2026-10-17).
+- Highest peaks 6 to 7 km, not 8 to 10 km. Old belts stand too high (a Urals-like belt at about 2.7 km against 0.5 to
+  0.8 km).
+- Plate statistics off: collision rate, supercontinent tenure and period, foreland basins (14 of 45 plate checks fail).
+- Seeds vary more than many changes under test. Tested only to 500 Myr, starting from existing continents.
+- One preset gives one planet per platform: bit-identical across runs and thread counts on one machine, not across
+  platforms (libm). Tests on simulated planets assert properties measured over several planets; exact numbers belong
+  only to tests on baked data.
+- The bake's memory estimate reads about 20 % low for the bake step itself (the run total still covers it by about 6 %).
+
+**Terrain look**
+- Some lake plains end in straight dams. Rivers and valleys bend in 8 directions only. The fine detail noise has a
+  faint grid alignment.
+
+**In the game world**
+- Lava only at active volcanoes and the world floor (on land a median 658 blocks to the nearest); MIC's early lava
+  recipes are unchecked.
+- Distant Horizons far terrain with MIC shows the right surface block about 55 % of the time (85 to 96 % without MIC).
+- `/dh pregen` stalls on squares that cross the seam (Toroidal World side; draft issue at
+  `docs/upstream/toroidal-world-dh-pregen-issue.md`, Ben posts it). Exotic Worlds 1.0.0 stalls the same way and Deep Time
+  cannot load with it (mod id renamed, no DhGenerators class). DH 3.3.3 crashes on boot with Chunky ("Chunky is not
+  loaded.").
+- Create trains and contraptions cannot cross the north and south seams (borders in V1, Ben's decision).
+- 3D previews with MIC do not show Terralith's biomes.
+- Plutons: in about 16 % of land columns other rock lies under a pluton that should reach the floor.
+- Placer gold in MIC (no Excavated Variants) is suspicious gravel or sand holding 2 to 5 pre-rolled nuggets, brushed
+  once; Lootr leaves it alone (decisions log 2026-10-17). Intended.
+
+**GameTests failing on master (being fixed)**
+- MIC `packtableclassesreachtheirbiomes` (cloud forest 69 of 261 below 0.30), EE `expandedecospherebiomesfollowtheirrules`
+  (757 columns outside their Köppen classes), EE `realplanetrockmatchestheparityfixture` (22 of 146 diorite blobs).
+
+**Not running**
+- The play server: its folder and the old world went with the deleted VM; rebuilt after the next green gate batch.
 
 ### 2026-10-02 — Crust-deep magma system; no arches in underwater sea cliffs (agent worktree agent-ae5dd76f2542ab9e7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; taken over from a stopped agent; not merged)
 - **Ask.** Ben, decisions log 2026-10-02, "Crust-deep magma system (Recommended)" ("the amount of lava inside of them is
