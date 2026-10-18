@@ -14,6 +14,14 @@
 #   --run ID    the workbench run whose world becomes planet/deeptime (<workbench runs>/<ID>/world)
 #   --hash H    the folder's name (default: the first 8 characters of the commit in .sync-rev)
 #   --label S   the motd's text after "Deep Time play test" (default "run <ID>")
+#   --rock-tags DIR   the MIC rock-tag datapack copied into planet/datapacks/ (default: mic/Docs/datapacks/
+#               deeptime-mic-rock-tags next to the checkout's pack, which `mac.sh --pack` syncs; override with
+#               $DEEPTIME_ROCK_TAGS). The pack on master does not ship these tags (only its deep-time branch
+#               does), so without them every rock class shows its vanilla fallback (ironstone as red
+#               sandstone instead of Create's ochrum). Missing datapack = error, never a silent fallback.
+#   --no-rock-tags    skip it (a pack that ships the tags itself)
+#   --ops-from DIR    the folder whose ops.json is carried over (default: the folder /etc/default/deeptime-play
+#               serves now), so the operators (Ben) stay operators across a rebuild; --ops-from none skips it
 #
 # server.properties is Ben's (2026-10-18): port 25765 on 127.0.0.1 (the laptop's deeptime-play-tunnel
 # forwards to it), RCON 25775, creative with force-gamemode, peaceful, no spawn protection, offline
@@ -24,13 +32,17 @@ set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 RUNS="${DEEPTIME_WORKBENCH_RUNS:-/data/ban/deeptime-cache/workbench/runs}"
 PLAY=/data/ban/play
-RUN=""; HASH=""; LABEL=""
+RUN=""; HASH=""; LABEL=""; TAGS="${DEEPTIME_ROCK_TAGS:-$(cd "$REPO/../.." && pwd)/Docs/datapacks/deeptime-mic-rock-tags}"; NO_TAGS=0
+OPS_FROM="$(sed -n 's/^PLAY_DIR=//p' /etc/default/deeptime-play 2>/dev/null || true)"
 while [ $# -gt 0 ]; do
     case "$1" in
         --run) RUN="$2"; shift 2 ;;
         --hash) HASH="$2"; shift 2 ;;
         --label) LABEL="$2"; shift 2 ;;
-        *) echo "usage: play-stage.sh --run <id> [--hash H] [--label S]" >&2; exit 2 ;;
+        --rock-tags) TAGS="$2"; shift 2 ;;
+        --no-rock-tags) NO_TAGS=1; shift ;;
+        --ops-from) OPS_FROM="$2"; shift 2 ;;
+        *) echo "usage: play-stage.sh --run <id> [--hash H] [--label S] [--rock-tags DIR | --no-rock-tags] [--ops-from DIR|none]" >&2; exit 2 ;;
     esac
 done
 [ -n "$RUN" ] || { echo "play-stage.sh: --run <workbench run id> is required" >&2; exit 2; }
@@ -46,6 +58,10 @@ DEST="$PLAY/$HASH"
 [ -f "$SET/server/eula.txt" ] && [ -d "$SET/server/mods" ] || { echo "play-stage.sh: no server set at $SET/server (run tools/smoke/install.sh mic first)" >&2; exit 1; }
 [ -f "$WORLD/deeptime/manifest.json" ] || [ -f "$WORLD/manifest.json" ] || { echo "play-stage.sh: no world data in $WORLD (is the run finished?)" >&2; exit 1; }
 [ ! -e "$DEST" ] || { echo "play-stage.sh: $DEST exists; remove it or pick another --hash" >&2; exit 1; }
+if [ "$NO_TAGS" = 0 ] && [ ! -f "$TAGS/pack.mcmeta" ]; then
+    echo "play-stage.sh: no MIC rock-tag datapack at $TAGS (sync it with 'tools/remote/mac.sh --pack -- true', or pass --rock-tags DIR / --no-rock-tags)" >&2
+    exit 1
+fi
 
 mkdir -p "$PLAY"
 echo "== copying the server set to $DEST"
@@ -88,6 +104,10 @@ difficulty=peaceful
 motd=Deep Time play test ($LABEL)
 EOF
 printf '%s\n' '-Xmx12G' '-XX:+UseG1GC' > "$DEST/user_jvm_args.txt"
+if [ -f "$OPS_FROM/ops.json" ] && [ "$OPS_FROM" != "$DEST" ]; then
+    cp -a "$OPS_FROM/ops.json" "$DEST/ops.json"
+    echo "   operators carried over from $OPS_FROM/ops.json: $(grep -o '"name": *"[^"]*"' "$OPS_FROM/ops.json" | cut -d'"' -f4 | tr '\n' ' ')"
+fi
 mkdir -p "$DEST/config/voicechat"
 VC="$DEST/config/voicechat/voicechat-server.properties"
 if [ -f "$VC" ] && grep -q '^port=' "$VC"; then sed -i 's/^port=.*/port=24464/' "$VC"; else echo 'port=24464' >> "$VC"; fi
@@ -97,4 +117,13 @@ rm -rf "$DEST/planet" && mkdir "$DEST/planet"
 SRC="$WORLD"; [ -f "$WORLD/manifest.json" ] || SRC="$WORLD/deeptime"
 rsync -a --exclude=/epochs/ "$SRC/" "$DEST/planet/deeptime/"
 echo "   $(du -sh "$DEST/planet/deeptime" | cut -f1) in planet/deeptime; level-type $LEVEL_TYPE"
+if [ "$NO_TAGS" = 0 ]; then
+    # A world datapack, as -PwithMic, the MIC smokes and the workbench preview add it (tools/smoke/install.sh --datapack).
+    # Minecraft enables a datapack it finds in <world>/datapacks that level.dat does not list as disabled.
+    mkdir -p "$DEST/planet/datapacks"
+    cp -R "$TAGS" "$DEST/planet/datapacks/$(basename "$TAGS")"
+    echo "== rock tags: $(find "$DEST/planet/datapacks/$(basename "$TAGS")/data" -name '*.json' | wc -l) JSON files from $TAGS in planet/datapacks/$(basename "$TAGS")"
+else
+    echo "== rock tags: skipped (--no-rock-tags)"
+fi
 echo "ready: $DEST (mods: $(find "$DEST/mods" -maxdepth 1 -name '*.jar' | wc -l))"
