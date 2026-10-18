@@ -419,6 +419,113 @@ class EndToEnd(unittest.TestCase):
         with store as s:
             self.assertIn("gametest:fake", s.history)       # the launcher's own record
             self.assertNotIn("gametest:outer", s.history)   # the wrapper's time went to the launcher
+            r = s.history["gametest:fake"][-1]
+        # It runs inside its host's admit.py: measured on its own processes, not as nothing
+        # (2026-10-18: removing the host's whole tree removed the guest too).
+        self.assertGreater(r["cpu_mean"], 0.6)
+        self.assertGreater(r["rss_peak_gib"], 0.0)
+
+    def test_a_job_inside_another_job_is_measured_on_its_own_processes(self):
+        # 2026-10-18: a script run through admission that ran sims through admission (env -u
+        # DEEPTIME_ADMIT_JOB, so each is its own job) measured every inner job at 0.0 cores and 0.0 GiB:
+        # the outer job's admit.py is the inner's ancestor, and "take off the other jobs' trees" took
+        # off the inner job's own tree. The outer job must not count the inner's work either.
+        store = admit.Store(self.tmp.name)
+        inner = (f"import sys\nsys.path.insert(0,{HERE!r})\nimport admit\n"
+                 f"admit.MIN_RECORD_S=1.0\nadmit.SAMPLE_S=0.5\nadmit.RESERVE_CORES=0.0\n"
+                 f"admit.LEGACY_LOCK={admit.LEGACY_LOCK!r}\n"
+                 "admit.capacity=lambda samples, now: {'cpu_total': 32.0, 'load1': 0.0, 'busy30': 0.0, "
+                 "'free_cpu': 32.0, 'mem_total_gib': 125.0, 'mem_avail_gib': 100.0}\n"
+                 f"s=admit.Store({self.tmp.name!r})\n"
+                 f"sys.exit(admit.run('test:inner',[sys.executable,'-c',{BURN.format(s=3)!r}],cpu=0.1,mem=0.1,store=s,quiet=True))\n")
+        outer = ("import os,subprocess,sys,time\n"
+                 "env={k: v for k, v in os.environ.items() if k not in ('DEEPTIME_ADMIT_JOB', 'DEEPTIME_ADMIT_PID')}\n"
+                 f"r=subprocess.run([sys.executable,'-c',{inner!r}],env=env)\n"
+                 "time.sleep(1.5)\nsys.exit(r.returncode)\n")
+        rc = admit.run("test:outer", [sys.executable, "-c", outer], cpu=0.1, mem=0.1, store=store, quiet=True)
+        self.assertEqual(rc, 0)
+        with store as s:
+            ri = s.history["test:inner"][-1]
+            ro = s.history["test:outer"][-1]
+        # The inner job: its one busy core for 3 s, and its interpreter's memory.
+        self.assertGreater(ri["cpu_mean"], 0.6)
+        self.assertLess(ri["cpu_mean"], 1.5)
+        self.assertGreater(ri["rss_peak_gib"], 0.0)
+        # The outer job: waiting for it. The inner's 3 core-seconds, which reach the outer's shell as
+        # cutime when the inner is reaped, are not the outer's (they were double counted before).
+        self.assertLess(ro["cpu_mean"] * ro["wall_s"], 1.5)
+        # (What the inner did after the outer's last look at it, one 0.5 s interval of its one core at
+        # most, still reaches the outer as a blip; the double count was 3 core-seconds in one sample.)
+        self.assertLess(ro["cpu_peak"], 1.5)
+        self.assertGreater(ro["rss_peak_gib"], 0.0)
+
+    def test_attribution_skips_outer_jobs_and_takes_off_inner_ones(self):
+        outer = subprocess.Popen(["sh", "-c", "sleep 30 & wait"])
+        try:
+            time.sleep(0.5)
+            procs = admit.scan()
+            kids = admit.children_map(procs)[outer.pid]
+            self.assertEqual(len(kids), 1)
+            child = kids[0]
+            outer_root = (outer.pid, procs[outer.pid].start)
+            # Seen from the inner job (root = the child): the outer's tree contains it, so nothing is taken off.
+            inner = admit.Sampler("inner", child)
+            self.assertIn(child, inner.attributed(procs, [outer_root]))
+            # Seen from the outer job: the inner job's tree is taken off, the outer's own process stays.
+            top = admit.Sampler("outer", outer.pid)
+            mine = top.attributed(procs, [(child, procs[child].start)])
+            self.assertIn(outer.pid, mine)
+            self.assertNotIn(child, mine)
+            # A pid that belongs to another process now (wrong start time) takes nothing off.
+            self.assertIn(child, admit.Sampler("outer", outer.pid).attributed(procs, [(child, procs[child].start + 1)]))
+        finally:
+            outer.kill()
+            outer.wait()
+            subprocess.run(["pkill", "-f", "^sleep 30$"], check=False)
+
+    def test_a_measurement_that_cannot_be_right_is_not_recorded_and_the_log_says_so(self):
+        store = admit.Store(self.tmp.name)
+        said = []
+        job = {"id": "j1", "kind": "test:zero", "label": "x", "est": {"cpu": 2.0, "mem_gib": 2.0}}
+
+        def finish(kind, **summ):
+            base = {"wall_s": 300.0, "cpu_mean": 0.0, "cpu_p90": 0.0, "cpu_peak": 0.0, "rss_mean_gib": 0.0,
+                    "rss_peak_gib": 0.0, "samples": 60}
+            base.update(summ)
+            with store as s:
+                s.state["jobs"]["j1"] = dict(job, kind=kind)
+            admit._finish(store, "j1", dict(job, kind=kind), base, 0, said.append)
+            with store as s:
+                return s.history.get(kind, [])
+
+        # Five minutes at 0.0 cores and 0.0 GiB: not recorded; stderr and the log say why.
+        self.assertEqual(finish("test:zero"), [])
+        self.assertTrue(any("cannot be right" in m and "not recorded" in m for m in said), said)
+        self.assertIn("cannot be right", open(store.log_path).read())
+        # A bare interpreter's first-sample memory (0.02 GiB) is still no memory.
+        self.assertEqual(finish("test:zero2", rss_peak_gib=0.02), [])
+        # Real use in either dimension is recorded; so is a short run (under the minute).
+        self.assertEqual(len(finish("test:cpu", cpu_mean=0.5)), 1)
+        self.assertEqual(len(finish("test:mem", rss_peak_gib=2.0)), 1)
+        self.assertEqual(len(finish("test:short", wall_s=30.0)), 1)
+        # A quick shell kind still learns that it is quick (zero cores, zero memory, under a minute).
+        self.assertEqual(len(finish("shell:quick.sh", wall_s=5.0, samples=1)), 1)
+        self.assertTrue(admit.implausible_measure({"wall_s": 61.0, "cpu_mean": 0.0, "rss_peak_gib": 0.0}))
+        self.assertFalse(admit.implausible_measure({"wall_s": 59.0, "cpu_mean": 0.0, "rss_peak_gib": 0.0}))
+
+    def test_an_idle_run_over_the_line_is_not_recorded_end_to_end(self):
+        saved = admit.IMPLAUSIBLE_S
+        admit.IMPLAUSIBLE_S = 1.0
+        try:
+            store = admit.Store(self.tmp.name)
+            rc = admit.run("test:idle", [sys.executable, "-c", "import time; time.sleep(2.5)"],
+                           cpu=0.1, mem=0.1, store=store, quiet=True)
+        finally:
+            admit.IMPLAUSIBLE_S = saved
+        self.assertEqual(rc, 0)
+        with store as s:
+            self.assertNotIn("test:idle", s.history)
+        self.assertIn("cannot be right", open(store.log_path).read())
 
     def test_a_job_that_does_not_fit_waits_says_why_and_leaves_the_queue_when_stopped(self):
         # Headroom larger than the box: nothing fits.
