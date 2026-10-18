@@ -273,7 +273,12 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
             q(0.5),
             q(0.9),
             q(0.99),
-        ) + &crust_bins(st),
+        ) + &crust_bins(st)
+            + &st
+                .gap_budget
+                .as_ref()
+                .map(|gb| gb.lines())
+                .unwrap_or_default(),
     )
 }
 

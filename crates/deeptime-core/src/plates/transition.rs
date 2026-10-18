@@ -423,6 +423,7 @@ mod tests {
             counters: Default::default(),
             slabs: Vec::new(),
             dynamics: None,
+            gap_budget: None,
         };
         let pos = positions(&st, geo);
         st.recount(&pos);

@@ -1076,6 +1076,8 @@ impl ImpactStage {
                     }
                 };
                 add(fields, crate::surface::field::FEEDBACK, 1.0);
+                // The gap budget's part for this stage (laid by the surface stage while it is on).
+                add(fields, crate::plates::gap_budget::field::LATER, 1.0);
                 add(fields, crate::surface::field::ELEVATION_M, 1.0);
                 add(fields, "elevation", (1.0 / mv) as f32);
             }

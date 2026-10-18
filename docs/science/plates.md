@@ -742,19 +742,150 @@ holds it at, near sea level and half flooded (0.58 of the continental crust dry)
 at −191 to +61 m, 55–70 km (0.25–0.38) at 394 to 1,469 m. At its Airy height almost every
 continental column would be dry and the land would be near the crust's 0.31 of the planet. So the
 land share is set by where the surface has drifted, not by how much crust there is. Which processes
-lower a column's surface faster than they thin it was not measured. Candidates: the surface stage's
-erosion, which lowers the surface by the rock it removes and gives height back only through the
-flexure (`surface/flexure.rs`); the deposits that the surface feeds back as crust at sea level; and
-the processes that change height and thickness by separate rules (the transition, the trench,
-thermal subsidence). The high ground is partly the same effect seen from the other side: land
-above 2 km is 0.19 of the land but about 0.036 of the planet against Earth's 0.029 (0.10 of 0.289),
-so most of its excess over Earth's share is the small land beneath it.
+take the height and leave the crust is measured below (the gap budget). The high ground is partly
+the same effect seen from the other side: land above 2 km is 0.19 of the land but about 0.036 of
+the planet against Earth's 0.029 (0.10 of 0.289), so most of its excess over Earth's share is the
+small land beneath it.
+
+**Which process holds the gap (the gap budget, 2026-10-17).** The gap budget
+(`plates/gap_budget.rs`, ledger PLT-283; on with `DEEPTIME_GAP_BUDGET=1`, tables by
+`tools/review/gap-budget.py`) keeps each sample's gap, its elevation less the Airy height of its
+own column, split by the process that changed it. Every process of a plate step books its change;
+the surface's feedback is split into the rock eroded or laid down, its local (Airy) rebound, the
+local answer to the change of sea water and ice, the flexure's regional answer to those loads, the
+flexure's bending of the roots the plate model's uplift brings, its answer to the moment a
+weakened plate releases, the rest of the flexure, the spreading, what the volcano stage and the
+impacts add to the surface after the surface stage, and the carry (advection on L1, sampling); a
+resampling books what its blend and its accretion change. Each part also keeps what of it was made while the sample was still ocean
+floor. The parts add up to the gap in every run (worst residual 0.0 m) and the budget changes
+nothing the model does (test `the_gap_budget_changes_nothing_and_adds_up`). The 40–55 km crust, a
+third of the continental samples, at 500 Myr: mean of six runs (seeds 1 to 3, both starts) on the
+code with the rain at Beck's 773 mm, beside four 1000 Myr runs and the four 500 Myr runs from
+before the rain (seeds 1 and 2):
+
+| Part | Stock at 500 Myr, m | of it made on the ocean floor | Rate, last 50 Myr, m/Myr | Stock at 1000 Myr | Stock at 500 Myr before the rain |
+|---|---|---|---|---|---|
+| **The gap** | **−2,326** | **−388** | **−12.8** | **−2,709** | **−2,333** |
+| A resampling's accretion: crust under an overlap stacked onto the column on top, with no height | −4,046 | −395 | −5.7 | −6,809 | −4,039 |
+| The plate model's ocean-floor step (`pools::surface_step`) | −2,142 | −2,142 | 0 | −3,700 | −2,156 |
+| Flexure, and the local answer to the sea water and ice (split below) | −2,086 | −478 | −8.1 | −3,215 | −2,020 |
+| Transition | −420 | +39 | −2.3 | −560 | −455 |
+| Erosion and deposition, net of their local rebound | −401 | +300 | −3.3 | −571 | −360 |
+| Arcs and Andean margins (`subduction::fronts_and_uplift`) | +3,071 | +1,471 | +7.0 | +4,924 | +3,118 |
+| The thickest crust foundering (`collapse::founder`) | +1,786 | −174 | −1.2 | +3,994 | +1,748 |
+| Carry: the volcano stage's cones and the impacts' craters (split below), advection, sampling | +1,383 | +981 | −0.2 | +2,070 | +1,243 |
+| Orogenic collapse | +441 | −164 | +1.3 | +911 | +528 |
+| Birth, spreading, hotspots, a resampling's blend | +87 | +171 | −0.5 | +244 | +61 |
+
+In the other bands at 500 Myr the gap is −930 m (30–40 km) and −3,254 m (55–70 km), with the
+same parts: accretion −842 and −8,420, the ocean-floor step −1,381 and −3,513, the flexure with
+the water's local answer −1,095 and −3,232, erosion net of its rebound +179 and −816, the
+transition −315 and −310; arcs +1,650 and +4,443, founder +220 and +5,739. What it says:
+
+- *The gap is made on the continent.* Of the 40–55 km crust's −2,326 m, −1,937 m was made after
+  the column became continental and −388 m on the ocean floor (30–40 km: −886 and −44; 55–70 km:
+  −2,107 and −1,147). The ocean-floor step damps every oceanic sample towards the floor at
+  −5,600 m whatever its thickness (the transition's held floor apart, PLT-264), and so takes
+  2.1 km from crust that later turns continental (arcs turn continental at any height,
+  `finish_samples`); the arcs' uplift, which raises the surface with no crust (Cortial's slab
+  uplift, PLT-048), and the carry give most of it back.
+- *The largest part is a resampling's accretion.* Where plates overlap at a resampling, the crust
+  under the top cover is stacked onto it (`ridges.rs`, `pools::accrete`) and the column's height
+  stays: −3,652 m of the 40–55 km crust's gap made on the continent, −7,518 m of the 55–70 km
+  crust's. The collapse documents it ("thickens a column without raising it") and is built around
+  it: founder and collapse lower a surface only down to its Airy height, so the crust they remove
+  from a column already below it closes its gap (+1,960 and +605 m on the 40–55 km continent).
+- *Erosion is not the maker.* Erosion lowered the 40–55 km continent by 14.0 km and its local
+  rebound gave 13.3 km back: −701 m on the continent, −401 m all told, 3 % of the depth eroded.
+  The rest is the rebound's share: the surface gives back 0.8 of the depth eroded (`isostasy`,
+  ISO-001, rock at 2,640 kg/m³), while the column's Airy height falls by 1/7.0 of it, as if 0.858
+  came back (the column's mean 2,830 kg/m³, PLT-281); 0.058 of 14.0 km is 810 m. Removing light
+  rock from the top leaves a denser column, so this part is the measure's as much as the
+  surface's. The rain at 1.42 times raised erosion's part of the band's gap rate from −47.0 to
+  −61.4 m/Myr and the rebound with it; the gap did not move (−2,333 to −2,326 m). At 1000 Myr the rain did lower the land (0.189 to 0.174,
+  four runs each), through the thickest crust: the share of continental samples at 55–70 km fell
+  from 0.33 to 0.27 and at 40–55 km rose from 0.37 to 0.46, and 40–55 km crust stands near sea
+  level whatever erodes it.
+- *The rates name the same processes.* Over the last 50 Myr the 40–55 km crust's surface fell by
+  13.1 m/Myr to erosion and its rebound against its Airy height's 9.8, by 5.8 to the transition
+  (heights on a line of 4.24 m of crust per metre, PLT-261/264) against 3.4, and by 8.1 to the
+  flexure and the water's local answer with no change of thickness; accretion raised the Airy height by 5.7 m/Myr and the
+  surface by nothing. The arcs raised the surface by 16.5 m/Myr against the Airy height's 9.5.
+- *Sea level is not it.* It stands at −16 to −25 m at 500 Myr and −58 to −62 m at 1000 Myr.
+
+**The flexure, the sea water and the later stages, split.** Four 500 Myr runs (seeds 1 and 2,
+both starts; the same runs as four of the six above, with the same land, the split being only
+bookkeeping) with the flexure's answer split into three extra solves and the volcano stage's and
+the impacts' changes booked apart:
+
+| Part, stock at 500 Myr, m | 30–40 km | 40–55 km | 55–70 km |
+|---|---|---|---|
+| Flexure: regional answer to the loads (erosion, deposition, sea water and ice) | −223 | −420 | −670 |
+| Flexure: bending of the plate model's roots | +67 | +44 | +99 |
+| Flexure: answer to the moment a weakened plate releases | −47 | −104 | −414 |
+| Flexure: the rest (its answer to the loads the later stages laid, the solves' unfinished parts) | −543 | −1,216 | −1,816 |
+| Sea water and ice, local answer | −372 | −350 | −273 |
+| The volcano stage's cones, lava and calderas, the impacts' craters and ejecta | +552 | +1,270 | +1,888 |
+| Carry (advection on L1, sampling, clamps) | +156 | +60 | −60 |
+| Together | −410 | −716 | −1,246 |
+
+- *The flexure holds little of its own.* The plate model's roots bend nothing (+44 m); the
+  regional answer to erosion and the water spreads the thick crust's rebound onto its neighbours
+  (−420 m), the released moment takes −104 m. The large rest is the answer to the cones and
+  craters: they add 1,270 m of height to the 40–55 km crust over its history and the flexure takes
+  1,216 m of it back (+9 m and +72 m net in the other bands). Net of them, the flexure and the
+  water hold about −830 m of the 40–55 km crust's gap, a third.
+- *The water is the flooding's own answer.* −350 m: a column that has fallen below the sea
+  carries the water, which presses it further down, and the Airy height the gap is measured
+  against is a dry column's. It follows the gap, it does not make it.
+- *The cones are height with no crust under it.* The volcano stage hands its cones, lava and
+  calderas to the plate model as elevation only (`surface/feedback_m`); the rock pools change only
+  by the surface stage's net erosion and deposition (`surface/material_m`). So a cone's rock never
+  joins the column, yet when the surface stage erodes the cone the plate model strips that depth
+  from the column (`pools::strip`) and lays it down as sediment downstream. The +1,270 m counts
+  every rebuild of an active cone as it wore down, so the crust under the cones lost up to about
+  that depth of rock it never gained (inferred: what still stands at the end is not split out),
+  moved from arcs and hotspots to basins and the sea. On the gap the two nearly cancel; on the
+  crust it is a sink of up to about 1.3 km of the band mean over 500 Myr. Not fixed: where the
+  cones' rock belongs is the crust budget's question (the plate model's arc crust is 7.0 times an
+  uplift, not erupted magma, PLT-048 and PLT-051), so it stays a recommendation for plate task 8.
+- *A fix to the split, not to the model.* Under the sea the roots' crust pushes the water aside,
+  and the split first booked the roots' answer to their whole crust (−705 m on the 40–55 km crust)
+  and the water's answer to the water pushed aside (+416 m) apart; their sum is the same
+  (−289 m before, −306 m after). The water pushed aside now goes with the roots (test
+  `under_the_sea_a_root_with_nothing_to_bend_answers_nothing`), so the roots' part is their
+  bending only.
+
+**What-if: accreted crust given its height** (an experiment, not in the code). A resampling's
+accretion onto a visible continental column raised it by the Airy change of the crust added, up
+to the column's Airy height, as the collapse raises its receivers, and handed the rise to the
+surface as uplift. Four 500 Myr runs against the same four without it:
+
+| | Without | With |
+|---|---|---|
+| Gap of 30–40 / 40–55 / 55–70 km crust, m | −975 / −2,382 / −3,196 | −650 / −1,256 / −1,465 |
+| Elevation of the 40–55 km crust, m | −73 | +988 |
+| Land share | 0.175 | 0.201 |
+| Continental crust dry | 0.53 | 0.67 |
+| Continental crust, share of the planet; volume, 10⁹ km³ | 0.31; 7.40 | 0.27; 6.15 |
+| Eroded over the run, 10⁸ km³ | 1.33 | 1.75 |
+| Median land, m (Earth 427) | 760 | 1,244 |
+| Land above 2 km, share of the land (Earth 0.10) | 0.20 | 0.34 |
+
+So the accretion's missing height is half the thick crust's gap, but giving it back moves the land
+share little: the crust it raises is the thick crust, which becomes high ground and erodes faster,
+and the eroded rock leaves the continents (their crust's volume falls by a sixth). Once heights
+follow thickness, the erosion law sets the land.
 
 **What is still off.**
-- *The land share.* 0.19 at 500 and at 1000 Myr, inside Earth's Phanerozoic range at its bottom
-  and a third below today's 0.29, with the continental crust at 0.31 of the planet against about
-  0.41. Most continental crust stands 0.5–3 km below its own Airy height, near sea level (above).
-  Finding which process takes the height and not the crust is the next step for the land.
+- *The land share.* 0.18 at 500 Myr and 0.17 at 1000 Myr with the rain at Beck's 773 mm, inside
+  Earth's Phanerozoic range at its bottom and a third below today's 0.29, with the continental
+  crust at 0.31 of the planet against about 0.41. Most continental crust stands 0.5–3 km below its
+  own Airy height, near sea level (above). The gap budget puts most of it on a resampling's
+  accretion (crust with no height), then the ocean-floor step (which the arcs' uplift gives back)
+  and the flexure with the sea's weight on flooded columns (about a third of the gap, net of the
+  cones it answers); erosion's own share is a few per cent of what it removes. Giving accreted crust its height halves the thick crust's gap but moves the land
+  share only from 0.175 to 0.201 and doubles the high ground (the what-if above).
 - *The high ground.* Land above 2 km is 0.19 of the land at 500 Myr and 0.27 at 1000 (Earth 0.10),
   and the median land 745 m and 1,004 m (Earth 427 m). As a share of the planet it is about 0.036
   at 500 Myr against Earth's 0.029: the land beneath it is too small. At 1000 Myr it is 0.05, and
@@ -765,7 +896,8 @@ so most of its excess over Earth's share is the small land beneath it.
   exists in the model.
 - *The crust budget.* Creation at cordilleras and destruction at collisions are both unsourced and
   both many times Earth's; island arcs a tenth of Earth's. Putting all three on sourced rates is
-  one change (each alone moves the land the wrong way).
+  one change (each alone moves the land the wrong way). The volcano stage's cones belong in it:
+  their rock never joins the column but is stripped from it when they erode (the split above).
 
 **Limits.**
 - One eclogite share for every column, at once: the reaction's dependence on temperature, fluids
