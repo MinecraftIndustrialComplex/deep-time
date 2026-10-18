@@ -2416,6 +2416,7 @@ impl DepositStage {
             yaw: pt.ellipse.map_or(yaw_draw, |e| e[2]) as f32,
             dip: dip as f32,
             truncated: matches!(fate, Fate::Truncated { .. }),
+            water_table_m: children::present_water_table_m(col),
         };
         let mut n = 0;
         !geometry::stack_bodies(
@@ -2653,6 +2654,7 @@ impl DepositStage {
             yaw: cand.point.ellipse.map_or(yaw_draw, |e| e[2]) as f32,
             dip: dip as f32,
             truncated,
+            water_table_m: children::present_water_table_m(col),
         };
         let mut left = fate.fraction_left();
         let mut grades = Grades::new();
@@ -2874,6 +2876,7 @@ impl DepositStage {
                 yaw: placement.yaw,
                 dip: 0.0,
                 truncated: false,
+                water_table_m: 0.0,
             };
             let cgrades: Grades = [("c:copper".to_string(), bg)].into_iter().collect();
             let cbodies =
@@ -3081,6 +3084,7 @@ impl DepositStage {
             yaw: yaw as f32,
             dip: 0.0,
             truncated: false,
+            water_table_m: 0.0,
         };
         let mut grades = Grades::new();
         for p in &child.products {
@@ -3365,6 +3369,7 @@ impl DepositStage {
             yaw: 0.0,
             dip: 0.0,
             truncated: false,
+            water_table_m: 0.0,
         };
         let stacked = if let Some(k) = &t.geometry.stack {
             // No column history here: a typical stack, six seams' worth of measures, its top

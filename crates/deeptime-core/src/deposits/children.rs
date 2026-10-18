@@ -33,6 +33,11 @@ pub struct ColumnSample {
     pub precip_mm: f64,
 }
 
+/// The present water table's depth (m) in a column's newest frame; 0 when the column has no frame.
+pub fn present_water_table_m(series: &[ColumnSample]) -> f64 {
+    series.last().map_or(0.0, |s| s.water_table_m)
+}
+
 /// When a stable supergene window ending at the present began, and how long it lasted (Myr),
 /// if the rules are met: scanning back from the newest frame while the column stays stable.
 pub fn supergene_window(

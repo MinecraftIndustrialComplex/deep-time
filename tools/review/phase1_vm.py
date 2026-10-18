@@ -333,17 +333,57 @@ def cmd_geology(a):
         blocks = [p.get("block") for p in probes(rows, "site") if any(b.get("role") == "gossan" for b in p.get("bodies", []))]
         glo, ghi = gos["aabb"]
         gb = blocks_in(a.world, glo[0], glo[2], ghi[0], ghi[2])
-        iron = count(gb, ("ochrum", "ironstone", "gossan", "limonite"))
-        ok_d = bool(gp) and (iron > 0 or any(b and re.search(r"ochrum|ironstone|gossan|limonite", b) for b in blocks))
+        # The rock the class is in THIS pack (smoke/mic/palette.json from `probe palette`): the MIC datapack's ochrum when it is installed, else
+        # the palette's vanilla backup (2026-10-18: the current pack has none, so ironstone is minecraft:red_sandstone).
+        members = []
+        try:
+            members = [m.split("[")[0] for m in json.load(open(os.path.join(REPO, "smoke", "mic", "palette.json"))).get("classes", {}).get(gos.get("rock_class") or "ironstone", [])]
+        except (OSError, ValueError):
+            pass
+
+        def is_gossan(key):
+            key = key.split("[")[0]
+            return key in members if members else bool(re.search(r"ochrum|ironstone|gossan|limonite", key))
+
+        iron = sum(v for k, v in (gb or {}).items() if is_gossan(k))
+        ok_d = bool(gp)
         # The column at the gossan's centre, top block down: where the sheet sits against the soil (2026-10-16: the gossan is about one
         # block thick at 35 m per block, at the surface of the formation; the soil rule replaces the top blocks of the present surface).
         gx, gz = int(gos["center"][0]), int(gos["center"][2])
         col = run([INSPECT, "column", "--world", a.world, "--x", str(gx), "--z", str(gz), "--depth", "10"]).stdout.strip().splitlines()
         col_s = "; ".join(" ".join(l.split()[:2]).replace("minecraft:", "") for l in col[1:9]) or "no column"
         ax_y = gos["axes"][1]
+        # Decisions log 2026-10-17 (a): an exposed gossan is the surface block (a bare ironstone outcrop). The terrain's top block over a
+        # grid of columns inside the body's footprint (0.6 of its semi-axes at most, so a turned blanket is still inside) against a ring of
+        # columns around it (1.6 and 2.2 times the semi-axes): the share that is the class's rock. The ring says what the biome's own surface
+        # looks like (the vanilla backup, red sandstone, is a badlands block too), so the footprint has to differ from it.
+        def surface_share(points):
+            n = tot = 0
+            seen = {}
+            for sx, sz in points:
+                r = run([INSPECT, "column", "--world", a.world, "--x", str(sx), "--z", str(sz), "--depth", "2"]).stdout.strip().splitlines()
+                m = re.search(r"terrain_top=Some\((-?\d+)\)", r[0]) if r else None
+                top_line = next((l.split() for l in r[1:] if m and l.split() and l.split()[0] == m.group(1)), None)
+                if not top_line:
+                    continue
+                tot += 1
+                key = short(top_line[1].split("[")[0])
+                seen[key] = seen.get(key, 0) + 1
+                n += is_gossan(top_line[1])
+            return n, tot, dict(sorted(seen.items(), key=lambda kv: -kv[1])[:4])
+
+        cxg, czg, axg, azg = gos["center"][0], gos["center"][2], gos["axes"][0], gos["axes"][2]
+        fp_pts = [(int(cxg + 0.3 * ix * axg), int(czg + 0.3 * iz * azg)) for ix in range(-2, 3) for iz in range(-2, 3) if ix * ix + iz * iz <= 4]
+        ring_pts = [(int(cxg + f * axg * math.cos(t * math.pi / 4)), int(czg + f * azg * math.sin(t * math.pi / 4))) for f in (1.6, 2.2) for t in range(8)]
+        surf_n, surf_tot, surf_seen = surface_share(fp_pts)
+        ring_n, ring_tot, ring_seen = surface_share(ring_pts)
+        share, ring_share = surf_n / max(surf_tot, 1), ring_n / max(ring_tot, 1)
+        ok_d = ok_d and share >= 0.5 and share > ring_share
         check(ok_d, "a gossan where the body is exposed",
-              f"gossan body {gos['id']} ({gos.get('rock_class')}, clip_top_y {gos.get('clip_top_y')}, about {2 * ax_y:.1f} blocks thick); probe found it at {len(gp)} point(s), "
-              f"blocks there {blocks[:2]}; ironstone-class blocks in its footprint: {iron}; column at its centre (y block): {col_s}; "
+              f"gossan body {gos['id']} ({gos.get('rock_class')} = {members or 'no palette'}, clip_top_y {gos.get('clip_top_y')}, about {2 * ax_y:.1f} blocks thick); probe found it at {len(gp)} point(s), "
+              f"blocks there {blocks[:2]}; class blocks in its footprint box: {iron}; the surface block is the class's rock in {surf_n} of {surf_tot} footprint columns "
+              f"({100 * share:.0f} %, surface blocks {surf_seen}) against {ring_n} of {ring_tot} columns in the ring around it ({100 * ring_share:.0f} %, {ring_seen}); "
+              f"column at its centre (y block): {col_s}; "
               f"gossan top vs terrain gaps of the {len(plan.get('gossan_gaps', {}))} porphyries (blocks): "
               f"{ {k: round(v) if v < 1e8 else None for k, v in plan.get('gossan_gaps', {}).items()} }")
     else:
@@ -373,12 +413,19 @@ def cmd_geology(a):
     in_chain = exh is not None and short(ex_p.get("deposit_type", "")) == PORPHYRY and form is not None
     lo, hi = pla["aabb"]
     pb = blocks_in(a.world, lo[0], lo[2], hi[0], hi[2])
-    gold = count(pb, ("gold_ore", "raw_gold_block"))
+    # A placer holds its gold in gravel and sand: where no gold ore is made for a loose host, DepositFeature places suspicious
+    # gravel or sand with gold nuggets (PlacerPanning, Ben 2026-10-16), so the gold shows as those blocks, and as ore only in
+    # a rock cell of the body. Count both, against a control box beside the footprint (as for the copper above).
+    w = hi[0] - lo[0] + 1
+    cx0 = lo[0] + 3 * w + 64
+    pc = blocks_in(a.world, cx0, lo[2], cx0 + w - 1, hi[2])
+    ore_n, pan_n = count(pb, ("gold_ore", "raw_gold_block")), count(pb, ("suspicious_gravel", "suspicious_sand"))
+    gold, ctl = ore_n + pan_n, count(pc, ("gold_ore", "raw_gold_block", "suspicious_gravel", "suspicious_sand"))
     kinds = " <- ".join(kind(e) for e in [why[0].get("forming_event") or {}] + chain)
-    check(eroded and in_chain and gold > 0, title,
+    check(eroded and in_chain and gold >= 5 and gold >= 5 * ctl, title,
           f"site {pla['site']} ({pla['distance_to_spawn']:.0f} blocks from spawn): {kinds}; the porphyry lost {ex_p.get('eroded_m', 0) / 1000:.1f} km "
           f"({'destroyed' if ex_p.get('destroyed') == 1 else 'fraction left ' + str(ex_p.get('fraction_left'))}), placer gold carried {pla.get('transport_km')} km; "
-          f"{gold} gold ore blocks in its footprint")
+          f"{ore_n} gold ore blocks and {pan_n} suspicious gravel or sand blocks in its footprint {w}x{hi[2] - lo[2] + 1} (control box beside it: {ctl})")
 
 
 def cmd_compat(a):
@@ -504,53 +551,91 @@ def cmd_scale_preset(a):
         print(path, "radius_km", round(d["scale"]["circumference_blocks"] * m / 1000 / (2 * math.pi), 1))
 
 
+# The three windows are compared on land (slope, relief), so their land shares must agree. The Phase 1 exit run of
+# 2026-10-17 had 0.73, 0.84 and 0.56, which made the three pictures show different amounts of coast and sea
+# (decisions log 2026-10-17, "scale windows matched by land share (coordinator's call)").
+LAND_TOL = 0.05      # the largest spread (max minus min) of the three windows' land shares
+LAND_TARGET = 0.60   # game-choice: land is the clear majority of every picture and a coast is still in view
+FINE_STEP = 4        # blocks between samples of the statistics (and of the final measure of a window's share)
+
+
+def window_share(grid, r0, c0, win):
+    """Land share of the window at (r0, c0) of one scale's grid: (rows, cols, h, sea, integral image of the land mask)."""
+    rows, cols, h, sea, integ = grid
+    n = integ[(r0 + win) * (cols + 1) + c0 + win] - integ[r0 * (cols + 1) + c0 + win] - integ[(r0 + win) * (cols + 1) + c0] + integ[r0 * (cols + 1) + c0]
+    return n / (win * win)
+
+
+def integral(h, rows, cols, sea):
+    """Summed-area table of the land mask (rows + 1) x (cols + 1), so any window's land count is four lookups."""
+    t = [0] * ((rows + 1) * (cols + 1))
+    for r in range(rows):
+        run = 0
+        for c in range(cols):
+            run += 1 if h[r * cols + c] > sea else 0
+            t[(r + 1) * (cols + 1) + c + 1] = t[r * (cols + 1) + c + 1] + run
+    return t
+
+
 def cmd_scale_region(a):
-    """The window every scale is rendered over: land at every scale, high relief, off the poles and the seam. The scales share
-    seed, start and length, so the plates agree, but the hydrology and the sea level the solvers settle on differ with the
-    block's size (a 2026-10-05 run's window on the 1:300 bake was open sea at 1:100), so the window is chosen on all three
-    bakes: at least `want` land in each (0.6, then lower down the ladder), the most relief summed over the scales."""
-    maps = []
+    """One window per scale, 2,048 blocks square, off the poles and the seam, whose land share is within LAND_TOL / 2 of LAND_TARGET (so the
+    three shares agree within LAND_TOL) and that has the most relief among those. The three bakes share seed, start and length but are not the
+    same planet: the block's size changes the hydrology and the sea level the solvers settle on, and the 2026-10-18 bakes hold 12 %, 22 % and
+    95 % land (earlier runs' window was the same longitude and latitude at every scale and had land shares of 0.73, 0.84 and 0.56; a search
+    for a shared window with agreeing shares found none within 0.17). So each scale gets its own window: first the coarse map (every 32 blocks)
+    names the candidates, then the best few are re-measured at the fine step the statistics use."""
+    step = 32
+    win = REGION // step
+    half = LAND_TOL / 2
+    circ = grids_c(a)
+    windows, shares, reliefs = {}, {}, {}
     for label, m in SCALES:
         wd = os.path.join(a.work, f"h{int(m)}", "planet", "deeptime")
         mf = json.load(open(os.path.join(wd, "manifest.json")))
         c = mf["scale"]["circumference_blocks"]
         sea = mf["scale"].get("sea_level_y", 63)
-        step = 32
         zp = c // 4
-        box = (-c // 2, -zp, c // 2, zp)
-        rows, cols, h = heights(wd, box, step, os.path.join(a.work, f"h{int(m)}-coarse.npy"))
-        maps.append((rows, cols, h, sea))
-    rows, cols = maps[0][0], maps[0][1]
-    assert all((r, cc) == (rows, cols) for r, cc, _, _ in maps), "the bakes' grids differ"
-    win = REGION // step
-    best = None
-    for want in (0.6, 0.4, 0.25, 0.15, 0.05):   # the 1:100 planet is ~10 % land: the ladder goes down
+        rows, cols, h = heights(wd, (-c // 2, -zp, c // 2, zp), step, os.path.join(a.work, f"h{int(m)}-coarse.npy"))
+        grid = (rows, cols, h, sea, integral(h, rows, cols, sea))
+        # Candidates: every quarter window, off the poles and the seam. The coarse share may be off the fine one by a few hundredths.
+        cand = []
         for r0 in range(int(rows * 0.2), rows - win - int(rows * 0.2), win // 4):
-            for c0 in range(win, cols - 2 * win, win // 4):   # off the seam
-                score = 0.0
-                land_min = 1.0
-                p95 = 0.0
-                for rr, cc, h, sea in maps:
-                    v = [h[r * cc + k] for r in range(r0, r0 + win) for k in range(c0, c0 + win)]
-                    land = sum(1 for x in v if x > sea) / len(v)
-                    land_min = min(land_min, land)
-                    score += pct(v, 0.95) - pct(v, 0.5)
-                    p95 = max(p95, pct(v, 0.95))
-                if land_min < want:
-                    continue
-                if best is None or score > best[0]:
-                    best = (score, r0, c0, land_min, p95)
-        if best:
-            break
-    if best is None:
-        sys.exit("scale-region: no 2048-block window on land at every scale")
-    _, r0, c0, land, p95 = best
-    x0 = box[0] + c0 * step
-    z0 = box[1] + r0 * step
-    region = {"x0": x0, "z0": z0, "x1": x0 + REGION, "z1": z0 + REGION, "cx": x0 + REGION // 2, "cz": z0 + REGION // 2,
-              "land": round(land, 3), "p95_h": round(p95, 1), "circumference": c}
+            for c0 in range(win, cols - 2 * win, win // 4):
+                sh = window_share(grid, r0, c0, win)
+                if abs(sh - LAND_TARGET) <= half + 0.03:
+                    v = [h[r * cols + k] for r in range(r0, r0 + win) for k in range(c0, c0 + win)]
+                    cand.append((abs(sh - LAND_TARGET) > half, -(pct(v, 0.95) - pct(v, 0.5)), r0, c0, sh))
+        cand.sort()   # the windows near the target first, the most relief first
+        print(f"scale-region: 1:{int(m)}: {len(cand)} candidate windows within {half + 0.03:g} of {LAND_TARGET:g}", file=sys.stderr)
+        best, seen = None, []
+        for _, nrel, r0, c0, sh in cand:
+            if len(seen) >= 10:
+                break
+            if any(abs(r0 - q[0]) < win // 2 and abs(c0 - q[1]) < win // 2 for q in seen):
+                continue   # near one already measured
+            seen.append((r0, c0))
+            x0, z0 = -circ // 2 + c0 * step, -(circ // 4) + r0 * step
+            fr, fc, fh = heights(wd, (x0, z0, x0 + REGION, z0 + REGION), FINE_STEP, os.path.join(a.work, f"h{int(m)}-cand.npy"))
+            fine = sum(1 for v in fh if v > sea) / len(fh)
+            relief = pct(fh, 0.95) - pct(fh, 0.5)
+            print(f"scale-region: 1:{int(m)}: window at x {x0}, z {z0}: coarse {sh:.3f}, fine {fine:.3f}, relief {relief:.0f}", file=sys.stderr)
+            if abs(fine - LAND_TARGET) <= half and (best is None or relief > best[0]):
+                best = (relief, x0, z0, fine)
+        if best is None:
+            sys.exit(f"scale-region: 1:{int(m)} has no window within {half:g} of the land share {LAND_TARGET:g} among its {len(seen)} best candidates")
+        relief, x0, z0, fine = best
+        windows[str(int(m))] = {"x0": x0, "z0": z0, "x1": x0 + REGION, "z1": z0 + REGION, "cx": x0 + REGION // 2, "cz": z0 + REGION // 2}
+        shares[str(int(m))], reliefs[str(int(m))] = round(fine, 3), round(relief, 1)
+    region = {"windows": windows, "land_by_scale": shares, "land_spread": round(max(shares.values()) - min(shares.values()), 3),
+              "land_target": LAND_TARGET, "land_tol": LAND_TOL, "relief_by_scale": reliefs, "circumference": circ}
     json.dump(region, open(os.path.join(a.work, "region.json"), "w"))
     print(json.dumps(region))
+
+
+def grids_c(a):
+    """The circumference in blocks (the same at every scale)."""
+    wd = os.path.join(a.work, f"h{int(SCALES[0][1])}", "planet", "deeptime")
+    return json.load(open(os.path.join(wd, "manifest.json")))["scale"]["circumference_blocks"]
 
 
 def cmd_scale_stats(a):
@@ -563,7 +648,8 @@ def cmd_scale_stats(a):
         mf = json.load(open(os.path.join(wd, "manifest.json")))
         sea = mf["scale"].get("sea_level_y", 63)
         step = 4
-        rows, cols, h = heights(wd, (region["x0"], region["z0"], region["x1"], region["z1"]), step, os.path.join(a.work, f"h{int(m)}-region.npy"))
+        w = region["windows"][str(int(m))]
+        rows, cols, h = heights(wd, (w["x0"], w["z0"], w["x1"], w["z1"]), step, os.path.join(a.work, f"h{int(m)}-region.npy"))
         land = [x for x in h if x > sea]
         # Slope: rise per block of run between neighbouring samples (4 blocks apart), over land.
         steep = tot = 0
@@ -581,14 +667,27 @@ def cmd_scale_stats(a):
         # A Petroff-Guyou world's block is not exactly the preset's m_per_block_h (b is rounded to 256): the manifest has the true one.
         mb = mf["scale"].get("m_per_block_h") or m
         rad = (mf.get("planet") or {}).get("radius_m")
+        # Does the world fit the build height? A sane bake has no cell compressed under the ceiling or sunk below the floor; the
+        # Earth-proportioned bake of 2026-10-18 diverged (peaks of 3e29 m, 5.5 million cells compressed) and a comparison on it shows nothing.
+        notes = mf.get("notes") or {}
+        limit = ((notes.get("bake") or {}).get("terrain") or {}).get("build_limit") or {}
+        fit = {k: limit.get(k) for k in ("cells_above", "cells_compressed", "cells_below_min_y")}
         out.append({"label": label, "m_per_block_h": round(mb, 1), "m_per_block_v": mf["scale"].get("m_per_block_v"), "circumference_blocks": mf["scale"]["circumference_blocks"],
+                    "bake_fits_build_height": all(v == 0 for v in fit.values()), "build_limit_cells": fit,
+                    "surface_max_elevation_m": (notes.get("surface") or {}).get("max_elevation_m"),
                     "radius_km": round(rad / 1000) if rad else round(32768 * m / 1000 / (2 * math.pi)),
-                    "region_km": round(REGION * mb / 1000, 1),
+                    "region_km": round(REGION * mb / 1000, 1), "window_centre": [w["cx"], w["cz"]],
                     "land_share": round(len(land) / len(h), 3), "max_y": round(max(h)), "p95_y": round(pct(h, 0.95)), "median_land_y": round(pct(land, 0.5)) if land else None,
                     "median_slope": round(sl[len(sl) // 2], 3) if sl else None, "p95_slope": round(sl[int(0.95 * (len(sl) - 1))], 3) if sl else None,
                     "steep_share": round(steep / max(tot, 1), 3)})
         print(json.dumps(out[-1]))
     json.dump(out, open(os.path.join(a.work, "scale-stats.json"), "w"), indent=1)
+    shares = [o["land_share"] for o in out]
+    if shares:
+        agree = {"agreement": {"land_shares": shares, "spread": round(max(shares) - min(shares), 3), "tolerance": LAND_TOL,
+                               "within": max(shares) - min(shares) <= LAND_TOL, "target": LAND_TARGET}}
+        json.dump(agree["agreement"], open(os.path.join(a.work, "scale-agreement.json"), "w"), indent=1)
+        print(json.dumps(agree))
 
 
 def main():

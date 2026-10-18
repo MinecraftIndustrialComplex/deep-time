@@ -5,16 +5,18 @@ scale": about 1:300, to be playtested against about 1:100 and Earth-proportioned
 
     python3 tools/review/phase1_scale.py [--only presets,bake,region,render,stats,page] [--scales 100,300,1221]
 
-One planet, three horizontal scales. The circumference stays 32,768 blocks, so a scale changes what a block
-is (100 m, 300 m, 1,221 m = 2π × 6,370 km / 32,768, Earth-proportioned) and with it the planet's radius
-(521 km, 1,565 km, 6,371 km) and how wide features are in blocks; the vertical scale (35 m per block) is
-unchanged. The three bakes share seed, start (scattered continents) and length (500 Myr), and the plate
-history does not depend on the scale (it is Earth-normalized), so one window of the planet (2,048 × 2,048
-blocks, the same longitude and latitude at every scale) is the same patch of planet each time. For each scale:
+Three bakes, one per horizontal scale, from one seed. The circumference stays 32,768 blocks, so a scale changes
+what a block is (100 m, 300 m, 1,221 m = 2π × 6,370 km / 32,768, Earth-proportioned) and with it the planet's
+radius (521 km, 1,565 km, 6,371 km) and how wide features are in blocks; the vertical scale (35 m per block) is
+unchanged. The bakes share seed, start (scattered continents) and length (500 Myr) but are not the same planet:
+the block's size changes the hydrology and the sea level the solvers settle on (the 2026-10-18 bakes hold 12 %,
+22 % and 95 % land), so no 2,048 x 2,048 block window has land shares that agree across them. Each scale gets
+its own window, chosen for the same land share. For each scale:
 
   presets  earthlike_quick_32k with scale.m_per_block_h changed       (phase1_vm.py scale-preset)
   bake     deeptime run, three at once through the admission tool     -> <WORK>/h<m>/planet/deeptime
-  region   the window: land, high relief, off the poles and the seam  (phase1_vm.py scale-region)
+  region   one window per scale whose land share is within 0.025 of 0.6 (so the three agree within 0.05),
+           the most relief among those, off the poles and the seam  (phase1_vm.py scale-region)
   render   standalone server + Chunky over the window, BlueMap, two pictures per scale
            (tools/review/phase1-scale-one.sh, one scale after the other: they share smoke/standalone)
   stats    land share, relief and slope in the window per scale       (phase1_vm.py scale-stats)
@@ -114,7 +116,8 @@ def step_render(a):
     region = load_region()
     ok = True
     for lab, m in chosen(a):
-        cmd = f"WORK={WORK} tools/review/phase1-scale-one.sh {m} {region['cx']} {region['cz']} {REGION // 2}"
+        w = region["windows"][str(m)]
+        cmd = f"WORK={WORK} tools/review/phase1-scale-one.sh {m} {w['cx']} {w['cz']} {REGION // 2}"
         rc, out, secs = vm(cmd, flags=["--server"], pulls=[f"review/out/phase1/scale/h{m}-tilt.png", f"review/out/phase1/scale/h{m}-flat.png"],
                            log=os.path.join(OUT, "logs", f"render-h{m}.log"), name=f"scale-render-h{m}")
         print(f"render {lab}: exit {rc} in {secs:.0f} s")
@@ -127,6 +130,7 @@ def step_stats(a):
     print(out.strip()[-1200:])
     # `scale-stats` prints one JSON object per scale (the same as WORK/scale-stats.json): take them from its output.
     stats = []
+    agreement = None
     for line in out.splitlines():
         line = line.strip()
         if line.startswith('{"label"'):
@@ -134,10 +138,17 @@ def step_stats(a):
                 stats.append(json.loads(line))
             except ValueError:
                 pass
+        elif line.startswith('{"agreement"'):
+            try:
+                agreement = json.loads(line)["agreement"]
+            except (ValueError, KeyError):
+                pass
     if len(stats) < len(chosen(a)):
         return False
     os.makedirs(OUT, exist_ok=True)
     json.dump(stats, open(os.path.join(OUT, "scale-stats.json"), "w"), indent=1)
+    if agreement:
+        json.dump(agreement, open(os.path.join(OUT, "scale-agreement.json"), "w"), indent=1)
     return rc == 0
 
 
@@ -147,11 +158,16 @@ def section_html(rel=""):
     stats = {}
     p = os.path.join(OUT, "scale-stats.json")
     if os.path.exists(p):
-        stats = {s["m_per_block_h"]: s for s in json.load(open(p))}
+        # The manifest's metres per block is the world's own (a Petroff-Guyou world's block is not the preset's), so match each
+        # scale to the statistics row nearest its preset value.
+        rows = json.load(open(p))
+        for _, m in SCALES:
+            if rows:
+                stats[m] = min(rows, key=lambda r: abs(r["m_per_block_h"] - m))
     region = json.load(open(os.path.join(OUT, "region.json"))) if os.path.exists(os.path.join(OUT, "region.json")) else None
     cols = []
     for lab, m in SCALES:
-        s = stats.get(float(m))
+        s = stats.get(m)
         have = os.path.exists(os.path.join(OUT, f"h{m}-tilt.png"))
         pics = (f'<a href="{rel}h{m}-tilt.png"><img src="{rel}h{m}-tilt.png" alt="{esc(lab)} from the south, tilted"></a>'
                 f'<a href="{rel}h{m}-flat.png"><img src="{rel}h{m}-flat.png" alt="{esc(lab)} from above"></a>') if have else "<p class=\"bad\">not rendered</p>"
@@ -161,13 +177,26 @@ def section_html(rel=""):
                      f"<tr><td>metres per block</td><td>{s['m_per_block_h']:g} horizontal, {s['m_per_block_v']:g} vertical</td></tr>"
                      f"<tr><td>planet radius</td><td>{s['radius_km']:,} km</td></tr>"
                      f"<tr><td>this picture spans</td><td>{s['region_km']:,.0f} km square ({REGION:,} blocks)</td></tr>"
+                     f"<tr><td>land share of the window</td><td>{100 * s['land_share']:.1f} %</td></tr>"
                      f"<tr><td>median land slope</td><td>{s['median_slope']:.2f} (95th: {s['p95_slope']:.2f}) blocks of rise per block of run</td></tr>"
                      f"<tr><td>land steeper than 45°</td><td>{100 * s['steep_share']:.1f} %</td></tr>"
                      f"<tr><td>highest ground</td><td>y {s['max_y']} ({(s['max_y'] - 63) * s['m_per_block_v'] / 1000:.1f} km above sea level)</td></tr></table>")
+            if not s.get("bake_fits_build_height", True):
+                cells = s.get("build_limit_cells") or {}
+                facts += (f'<p class="bad">This bake does not fit the build height: {cells.get("cells_compressed")} cells compressed under the ceiling, '
+                          f'{cells.get("cells_below_min_y")} below the floor, highest surface {s.get("surface_max_elevation_m")} m. '
+                          f'The world diverged numerically, so these terrain figures describe a clamped world, not a planet.</p>')
         cols.append(f'<div class="col"><h3>{esc(lab)}</h3>{pics}{facts}</div>')
-    note = (f"Window {REGION:,} × {REGION:,} blocks centred on block {region['cx']:,}, {region['cz']:,} (land {100 * region['land']:.0f} %), the same longitude and "
-            f"latitude at every scale." if region else "")
-    return (f'<div class="scale"><p>One planet (seed, start and length equal), simulation C = {C:,} blocks (the Petroff-Guyou world is a little smaller: 26,112 x 13,056 blocks), vertical scale 35 m per block at every scale: only '
+    note = ""
+    if region:
+        by = region.get("land_by_scale") or {}
+        shares = ", ".join(f"{100 * v:.0f} %" for v in by.values())
+        names = {str(m): lab for lab, m in SCALES}
+        where = "; ".join(f"{names.get(m, m)} at block {w['cx']:,}, {w['cz']:,}" for m, w in (region.get("windows") or {}).items())
+        note = (f"Each window is {REGION:,} × {REGION:,} blocks ({where}), chosen on its own bake so that the three land shares agree within "
+                f"{100 * region.get('land_tol', 0.05):.0f} points ({shares}; target {100 * region.get('land_target', 0):.0f} %) and the slope statistics "
+                f"compare like with like.")
+    return (f'<div class="scale"><p>Three planets from one seed (start and length equal), simulation C = {C:,} blocks (the Petroff-Guyou world is a little smaller: 26,112 x 13,056 blocks), vertical scale 35 m per block at every scale: only '
             f'the metres a block stands for change. {esc(note)} Wider features take more blocks at 1:100; at Earth proportions a mountain range '
             f'a few hundred kilometres wide is a few hundred blocks and a plain is the size of a Minecraft village.</p>'
             f'<div class="cols">{"".join(cols)}</div></div>')
