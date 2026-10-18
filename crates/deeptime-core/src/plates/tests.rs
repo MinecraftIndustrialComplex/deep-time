@@ -756,9 +756,9 @@ impl CollisionLives {
 fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // A seed whose collisions weld in 300 Myr (under the force balance a held collision welds less
     // often than under the old speed law: 8 of 32 welded in the sweep of 2026-10-16, and 12 of
-    // seeds 1 to 24 under the thickening limit, `rate.rs`, 2026-10-18; seed 5 also with the
-    // uplift limit).
-    let p = preset(8000, 300.0, "scattered_continents", 5);
+    // seeds 1 to 24 under the thickening limit, `rate.rs`, 2026-10-18; 7 of seeds 1 to 24 once
+    // crossed crust stays under, PLT-289 to PLT-292, the same day: 3, 7, 8, 12, 15, 20 and 21).
+    let p = preset(8000, 300.0, "scattered_continents", 3);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -865,7 +865,7 @@ fn the_collision_footprint_lives_with_its_collision() {
 fn recording_does_not_change_the_world_and_matches_the_run() {
     // A seed with welds, so the collision record is tested (as in
     // `collisions_weld_on_stall_and_transfer_on_shortening`).
-    let p = preset(8000, 300.0, "scattered_continents", 6);
+    let p = preset(8000, 300.0, "scattered_continents", 3);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
@@ -1412,9 +1412,15 @@ fn a_resampling_consumes_the_visible_crust_a_collision_took() {
         ));
     }
     let (forced, collided) = (out[0], out[1]);
-    assert!(forced.0 > 0.0, "no visible crust of plate 1 in plate 0's footprint");
+    assert!(
+        forced.0 > 0.0,
+        "no visible crust of plate 1 in plate 0's footprint"
+    );
     assert_eq!(forced.1, 0.0);
-    assert!(collided.1 > 0.0 && collided.0 < 0.05 * forced.0, "{collided:?} {forced:?}");
+    assert!(
+        collided.1 > 0.0 && collided.0 < 0.05 * forced.0,
+        "{collided:?} {forced:?}"
+    );
     assert!(
         (collided.1 - forced.0).abs() < 0.05 * forced.0,
         "consumed {} km³ against {} km³ accreted without the collision",
