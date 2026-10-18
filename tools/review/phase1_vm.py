@@ -556,16 +556,14 @@ def cmd_scale_preset(a):
 # (decisions log 2026-10-17, "scale windows matched by land share (coordinator's call)").
 LAND_TOL = 0.05      # the largest spread (max minus min) of the three windows' land shares
 LAND_TARGET = 0.60   # game-choice: land is the clear majority of every picture and a coast is still in view
-LAND_NEAR = 0.05     # a window whose mean land share is within this of the target counts as "at the target"; the most relief wins among them
+FINE_STEP = 4        # blocks between samples of the statistics (and of the final measure of a window's share)
 
 
-def land_shares(grids, r0, c0, win):
-    """Land share of the window at (r0, c0) of each scale's grid: (rows, cols, h, sea, integral image of the land mask)."""
-    out = []
-    for rows, cols, h, sea, integ in grids:
-        n = integ[(r0 + win) * (cols + 1) + c0 + win] - integ[r0 * (cols + 1) + c0 + win] - integ[(r0 + win) * (cols + 1) + c0] + integ[r0 * (cols + 1) + c0]
-        out.append(n / (win * win))
-    return out
+def window_share(grid, r0, c0, win):
+    """Land share of the window at (r0, c0) of one scale's grid: (rows, cols, h, sea, integral image of the land mask)."""
+    rows, cols, h, sea, integ = grid
+    n = integ[(r0 + win) * (cols + 1) + c0 + win] - integ[r0 * (cols + 1) + c0 + win] - integ[(r0 + win) * (cols + 1) + c0] + integ[r0 * (cols + 1) + c0]
+    return n / (win * win)
 
 
 def integral(h, rows, cols, sea):
@@ -580,84 +578,56 @@ def integral(h, rows, cols, sea):
 
 
 def cmd_scale_region(a):
-    """The window every scale is rendered over: land shares that agree within LAND_TOL, as near LAND_TARGET as the three bakes allow,
-    off the poles and the seam, and the most relief among those. The scales share seed, start and length, so the plates agree, but the
-    hydrology and the sea level the solvers settle on differ with the block's size (a 2026-10-05 run's window on the 1:300 bake was open
-    sea at 1:100; 2026-10-17's had shares of 0.73, 0.84 and 0.56), so the window is chosen on all three bakes: first on coarse maps
-    (every 32 blocks) for every candidate, then the best few are re-measured at the fine step the statistics use (every 4 blocks)."""
-    grids = []
+    """One window per scale, 2,048 blocks square, off the poles and the seam, whose land share is within LAND_TOL / 2 of LAND_TARGET (so the
+    three shares agree within LAND_TOL) and that has the most relief among those. The three bakes share seed, start and length but are not the
+    same planet: the block's size changes the hydrology and the sea level the solvers settle on, and the 2026-10-18 bakes hold 12 %, 22 % and
+    95 % land (earlier runs' window was the same longitude and latitude at every scale and had land shares of 0.73, 0.84 and 0.56; a search
+    for a shared window with agreeing shares found none within 0.17). So each scale gets its own window: first the coarse map (every 32 blocks)
+    names the candidates, then the best few are re-measured at the fine step the statistics use."""
     step = 32
+    win = REGION // step
+    half = LAND_TOL / 2
+    circ = grids_c(a)
+    windows, shares, reliefs = {}, {}, {}
     for label, m in SCALES:
         wd = os.path.join(a.work, f"h{int(m)}", "planet", "deeptime")
         mf = json.load(open(os.path.join(wd, "manifest.json")))
         c = mf["scale"]["circumference_blocks"]
         sea = mf["scale"].get("sea_level_y", 63)
         zp = c // 4
-        box = (-c // 2, -zp, c // 2, zp)
-        rows, cols, h = heights(wd, box, step, os.path.join(a.work, f"h{int(m)}-coarse.npy"))
-        grids.append((rows, cols, h, sea, integral(h, rows, cols, sea)))
-    rows, cols = grids[0][0], grids[0][1]
-    assert all((g[0], g[1]) == (rows, cols) for g in grids), "the bakes' grids differ"
-    win = REGION // step
-    circ = grids_c(a)
-    # Candidates: every quarter window, off the poles and the seam. The coarse filter is a point under the tolerance (sampling noise).
-    cand = []
-    for r0 in range(int(rows * 0.2), rows - win - int(rows * 0.2), win // 4):
-        for c0 in range(win, cols - 2 * win, win // 4):
-            sh = land_shares(grids, r0, c0, win)
-            cand.append((max(sh) - min(sh), r0, c0, sh))
-    ok = [t for t in cand if t[0] <= LAND_TOL - 0.01]
-    print(f"scale-region: {len(cand)} windows, {len(ok)} with coarse land shares within {LAND_TOL - 0.01:g}", file=sys.stderr)
-    if not ok:
-        best = min(cand)
-        sys.exit(f"scale-region: no 2048-block window has land shares within {LAND_TOL} at the three scales (best spread {best[0]:.3f} at {best[3]})")
-
-    def coarse_relief(r0, c0):
-        tot = 0.0
-        for rr, cc, h, sea, _ in grids:
-            v = [h[r * cc + k] for r in range(r0, r0 + win) for k in range(c0, c0 + win)]
-            tot += pct(v, 0.95) - pct(v, 0.5)
-        return tot
-
-    def rank(mean, relief):
-        """Windows whose mean land share is within LAND_NEAR of the target first, the most relief first; then the nearest to the target."""
-        near = abs(mean - LAND_TARGET) <= LAND_NEAR
-        return (0, -relief) if near else (1, abs(mean - LAND_TARGET))
-
-    ok.sort(key=lambda t: rank(sum(t[3]) / 3, coarse_relief(t[1], t[2])))
-    # Refine: the best few, each measured at the statistics' step (a different step moves a share by a few hundredths).
-    best = None
-    seen = []
-    for spread, r0, c0, sh in ok:
-        if len(seen) >= 12:
-            break
-        if any(abs(r0 - q[0]) < win // 2 and abs(c0 - q[1]) < win // 2 for q in seen):
-            continue   # near one already measured
-        seen.append((r0, c0))
-        x0, z0 = -circ // 2 + c0 * step, -(circ // 4) + r0 * step
-        fine = []
-        relief = 0.0
-        for label, m in SCALES:
-            wd = os.path.join(a.work, f"h{int(m)}", "planet", "deeptime")
-            sea = json.load(open(os.path.join(wd, "manifest.json")))["scale"].get("sea_level_y", 63)
-            fr, fc, h = heights(wd, (x0, z0, x0 + REGION, z0 + REGION), 4, os.path.join(a.work, f"h{int(m)}-cand.npy"))
-            fine.append(sum(1 for v in h if v > sea) / len(h))
-            relief += pct(h, 0.95) - pct(h, 0.5)
-        fspread = max(fine) - min(fine)
-        print(f"scale-region: window at x {x0}, z {z0}: coarse {[round(v, 3) for v in sh]}, fine {[round(v, 3) for v in fine]}, "
-              f"spread {fspread:.3f}, relief {relief:.0f}", file=sys.stderr)
-        if fspread > LAND_TOL:
-            continue
-        key = rank(sum(fine) / 3, relief)
-        if best is None or key < best[0]:
-            best = (key, x0, z0, fine, relief)
-    if best is None:
-        sys.exit(f"scale-region: none of the {len(seen)} best windows keeps the land shares within {LAND_TOL} at the fine step")
-    _, x0, z0, fine, relief = best
-    region = {"x0": x0, "z0": z0, "x1": x0 + REGION, "z1": z0 + REGION, "cx": x0 + REGION // 2, "cz": z0 + REGION // 2,
-              "land": round(min(fine), 3), "land_by_scale": {str(int(m)): round(v, 3) for (_, m), v in zip(SCALES, fine)},
-              "land_spread": round(max(fine) - min(fine), 3), "land_target": LAND_TARGET, "land_tol": LAND_TOL,
-              "relief_sum": round(relief, 1), "circumference": circ}
+        rows, cols, h = heights(wd, (-c // 2, -zp, c // 2, zp), step, os.path.join(a.work, f"h{int(m)}-coarse.npy"))
+        grid = (rows, cols, h, sea, integral(h, rows, cols, sea))
+        # Candidates: every quarter window, off the poles and the seam. The coarse share may be off the fine one by a few hundredths.
+        cand = []
+        for r0 in range(int(rows * 0.2), rows - win - int(rows * 0.2), win // 4):
+            for c0 in range(win, cols - 2 * win, win // 4):
+                sh = window_share(grid, r0, c0, win)
+                if abs(sh - LAND_TARGET) <= half + 0.03:
+                    v = [h[r * cols + k] for r in range(r0, r0 + win) for k in range(c0, c0 + win)]
+                    cand.append((abs(sh - LAND_TARGET) > half, -(pct(v, 0.95) - pct(v, 0.5)), r0, c0, sh))
+        cand.sort()   # the windows near the target first, the most relief first
+        print(f"scale-region: 1:{int(m)}: {len(cand)} candidate windows within {half + 0.03:g} of {LAND_TARGET:g}", file=sys.stderr)
+        best, seen = None, []
+        for _, nrel, r0, c0, sh in cand:
+            if len(seen) >= 10:
+                break
+            if any(abs(r0 - q[0]) < win // 2 and abs(c0 - q[1]) < win // 2 for q in seen):
+                continue   # near one already measured
+            seen.append((r0, c0))
+            x0, z0 = -circ // 2 + c0 * step, -(circ // 4) + r0 * step
+            fr, fc, fh = heights(wd, (x0, z0, x0 + REGION, z0 + REGION), FINE_STEP, os.path.join(a.work, f"h{int(m)}-cand.npy"))
+            fine = sum(1 for v in fh if v > sea) / len(fh)
+            relief = pct(fh, 0.95) - pct(fh, 0.5)
+            print(f"scale-region: 1:{int(m)}: window at x {x0}, z {z0}: coarse {sh:.3f}, fine {fine:.3f}, relief {relief:.0f}", file=sys.stderr)
+            if abs(fine - LAND_TARGET) <= half and (best is None or relief > best[0]):
+                best = (relief, x0, z0, fine)
+        if best is None:
+            sys.exit(f"scale-region: 1:{int(m)} has no window within {half:g} of the land share {LAND_TARGET:g} among its {len(seen)} best candidates")
+        relief, x0, z0, fine = best
+        windows[str(int(m))] = {"x0": x0, "z0": z0, "x1": x0 + REGION, "z1": z0 + REGION, "cx": x0 + REGION // 2, "cz": z0 + REGION // 2}
+        shares[str(int(m))], reliefs[str(int(m))] = round(fine, 3), round(relief, 1)
+    region = {"windows": windows, "land_by_scale": shares, "land_spread": round(max(shares.values()) - min(shares.values()), 3),
+              "land_target": LAND_TARGET, "land_tol": LAND_TOL, "relief_by_scale": reliefs, "circumference": circ}
     json.dump(region, open(os.path.join(a.work, "region.json"), "w"))
     print(json.dumps(region))
 
@@ -678,7 +648,8 @@ def cmd_scale_stats(a):
         mf = json.load(open(os.path.join(wd, "manifest.json")))
         sea = mf["scale"].get("sea_level_y", 63)
         step = 4
-        rows, cols, h = heights(wd, (region["x0"], region["z0"], region["x1"], region["z1"]), step, os.path.join(a.work, f"h{int(m)}-region.npy"))
+        w = region["windows"][str(int(m))]
+        rows, cols, h = heights(wd, (w["x0"], w["z0"], w["x1"], w["z1"]), step, os.path.join(a.work, f"h{int(m)}-region.npy"))
         land = [x for x in h if x > sea]
         # Slope: rise per block of run between neighbouring samples (4 blocks apart), over land.
         steep = tot = 0
@@ -698,7 +669,7 @@ def cmd_scale_stats(a):
         rad = (mf.get("planet") or {}).get("radius_m")
         out.append({"label": label, "m_per_block_h": round(mb, 1), "m_per_block_v": mf["scale"].get("m_per_block_v"), "circumference_blocks": mf["scale"]["circumference_blocks"],
                     "radius_km": round(rad / 1000) if rad else round(32768 * m / 1000 / (2 * math.pi)),
-                    "region_km": round(REGION * mb / 1000, 1),
+                    "region_km": round(REGION * mb / 1000, 1), "window_centre": [w["cx"], w["cz"]],
                     "land_share": round(len(land) / len(h), 3), "max_y": round(max(h)), "p95_y": round(pct(h, 0.95)), "median_land_y": round(pct(land, 0.5)) if land else None,
                     "median_slope": round(sl[len(sl) // 2], 3) if sl else None, "p95_slope": round(sl[int(0.95 * (len(sl) - 1))], 3) if sl else None,
                     "steep_share": round(steep / max(tot, 1), 3)})
