@@ -167,6 +167,92 @@ fn idealised_zones(p: ClimateParams) {
     assert!(s.ice.frac() > 0.05 && s.ice.lat < -60.0);
 }
 
+/// The wettest place on Earth in the long run: Mawsynram, India, 11.872 m a year over 38 years
+/// (WMO's Records of Weather and Climate Extremes, as of 31 July 2025; verified 2026-10-18), and
+/// no basin's runoff exceeds its rain. A cell's annual rain and runoff stay under this with
+/// room for the model's coarser cells, m/yr.
+const WETTEST_M_YR: f64 = 15.0; // ledger: CLM-205
+/// No annual mean on Earth is hotter than about 35 °C (Dallol, Ethiopia; from memory), nor any
+/// sea surface's than about 33 °C; a hot planet's cell stays under this, °C.
+const HOTTEST_MEAN_C: f32 = 45.0; // ledger: CLM-205
+/// The weathering kernel stays within this many times Earth's (`KERNEL_EARTH`): a test bound,
+/// game-choice (the coordinator's call, 2026-10-18), far above a warm, wet planet's few times
+/// Earth's.
+const KERNEL_CEILING_REL: f64 = 100.0; // ledger: CLM-205
+
+/// Every cell's annual rain, runoff (rain less Fu's evapotranspiration, as the weathering kernel
+/// takes it) and mean temperature under the ceilings, with the cell named when one is not.
+fn assert_physical(s: &snapshot::Snapshot, lat: &[f64], w: usize, what: &str) {
+    for (c, (&t, &p)) in s.t_mean.iter().zip(&s.precip).enumerate() {
+        let (pr, tc) = (f64::from(p), f64::from(t));
+        let pet = (60.0 * tc).max(0.0);
+        let runoff = (pr - crate::surface::climate::fu_et(pr, pet)).max(0.0) / 1000.0;
+        let at = format!("{what}: cell ({}, {}) at {:.1}°", c % w, c / w, lat[c / w]);
+        assert!(p.is_finite() && t.is_finite(), "{at}: {p} mm, {t} °C");
+        assert!(
+            pr / 1000.0 < WETTEST_M_YR && runoff < WETTEST_M_YR,
+            "{at}: rain {pr:.0} mm/yr, runoff {runoff:.1} m/yr"
+        );
+        assert!(t < HOTTEST_MEAN_C, "{at}: {t:.1} °C");
+    }
+}
+
+/// 2026-10-18: a narrow inlet whose sea reached just past 50° N was the narrowest basin, and the
+/// overturning conveyor sank all its 30 Sv there, in one or two coarse cells: their slab took
+/// the heat of cooling that water (about a petawatt), its sea went to hundreds of degrees, the
+/// coasts round it got 10⁵ to 10¹¹ mm of rain a year, and the weathering kernel reached 10¹⁴ times
+/// Earth's (`supercontinent`, seed 1, quick 16k). The idealised planet with such an inlet cut
+/// into its continent (101–107° E, from the equator to 56° N, joined to the open ocean by a strait
+/// at 0–12° N): every cell's rain, runoff and temperature stay physical, on every rain model.
+/// The conveyor before the fix sank its 30 Sv in the inlet's two coarse cells at 51° N here, and
+/// this planet's climate reached 258 °C and 3.5·10¹⁰ mm of rain a year.
+#[test]
+fn a_narrow_inlet_past_the_sinking_latitude_keeps_the_climate_physical() {
+    let (grid, lat, mut z) = idealised();
+    let (w, h) = (grid.w as usize, grid.h as usize);
+    for j in 0..h {
+        for i in 0..w {
+            let lon = i as f64 / w as f64 * 360.0;
+            let inlet = (101.0..107.0).contains(&lon) && (0.0..56.0).contains(&lat[j]);
+            let strait = (101.0..152.0).contains(&lon) && (0.0..12.0).contains(&lat[j]);
+            if inlet || strait {
+                z[j * w + i] = -4000.0;
+            }
+        }
+    }
+    let d = Dims::new(w, h, 64.0 * 300.0, true);
+    for rain_model in [
+        crate::climate::RainModel::Belts,
+        crate::climate::RainModel::Upwind,
+    ] {
+        let p = ClimateParams {
+            rain_model,
+            ..ClimateParams::default()
+        };
+        let inp = snapshot::Input {
+            grid: &grid,
+            d,
+            lat: &lat,
+            h: &z,
+            sea: 0.0,
+            p: &p,
+            planet: planet(),
+            monthly: true,
+            ice_prev: None,
+            koppen_prev: None,
+            correction: &super::percell::Correction::default(),
+        };
+        let mut ebm = EbmState::default();
+        let s = snapshot::compute(&inp, &mut ebm, &[], &mut Default::default());
+        assert_physical(&s, &lat, w, &format!("{rain_model:?}"));
+        // The conveyor sinks its full transport in the open ocean, not in the inlet.
+        let sink = &s.cell.as_ref().unwrap()["sinking"];
+        let lon = sink["lon"].as_f64().unwrap();
+        assert!(!(95.0..115.0).contains(&lon), "sinks in the inlet: {sink}");
+        assert_eq!(sink["sv"].as_f64().unwrap(), p.overturning_sv, "{sink}");
+    }
+}
+
 /// A small coupled planet: `n` L0 samples, L1 r = 64 at 16k (256 × 128), `myr` of history.
 fn pipeline_json(n: u32, myr: f64, seed: u64) -> String {
     let json = with_timeline(
@@ -547,6 +633,22 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
         "degassing {d:e}, weathering {w:e}"
     );
     assert!((last[col("sea_level_m")].as_f64().unwrap() - sea).abs() < 0.01);
+    // Every step's land runoff and weathering kernel (snapshots and the steps carried between
+    // them) stay physical: the mean under the wettest place's rain, the kernel within a hundred
+    // times Earth's (2026-10-18: a conveyor sinking in one coarse cell took them to 3,710 m/yr and
+    // 3.8·10¹⁴).
+    for row in rows {
+        let r = row.as_array().unwrap();
+        let (runoff, kernel) = (
+            r[col("runoff_land_m_yr")].as_f64().unwrap(),
+            r[col("kernel_rel")].as_f64().unwrap(),
+        );
+        assert!(
+            (0.0..WETTEST_M_YR).contains(&runoff) && (0.0..KERNEL_CEILING_REL).contains(&kernel),
+            "step {:?}: runoff {runoff} m/yr, kernel {kernel} × Earth's",
+            r[0]
+        );
+    }
     // The ice goes into the deposit frames.
     assert!(frame.fields.contains_key(history::ICE_THICKNESS));
     assert!(frame.fields.contains_key(history::ICE_COVER));
