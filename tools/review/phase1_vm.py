@@ -413,12 +413,19 @@ def cmd_geology(a):
     in_chain = exh is not None and short(ex_p.get("deposit_type", "")) == PORPHYRY and form is not None
     lo, hi = pla["aabb"]
     pb = blocks_in(a.world, lo[0], lo[2], hi[0], hi[2])
-    gold = count(pb, ("gold_ore", "raw_gold_block"))
+    # A placer holds its gold in gravel and sand: where no gold ore is made for a loose host, DepositFeature places suspicious
+    # gravel or sand with gold nuggets (PlacerPanning, Ben 2026-10-16), so the gold shows as those blocks, and as ore only in
+    # a rock cell of the body. Count both, against a control box beside the footprint (as for the copper above).
+    w = hi[0] - lo[0] + 1
+    cx0 = lo[0] + 3 * w + 64
+    pc = blocks_in(a.world, cx0, lo[2], cx0 + w - 1, hi[2])
+    ore_n, pan_n = count(pb, ("gold_ore", "raw_gold_block")), count(pb, ("suspicious_gravel", "suspicious_sand"))
+    gold, ctl = ore_n + pan_n, count(pc, ("gold_ore", "raw_gold_block", "suspicious_gravel", "suspicious_sand"))
     kinds = " <- ".join(kind(e) for e in [why[0].get("forming_event") or {}] + chain)
-    check(eroded and in_chain and gold > 0, title,
+    check(eroded and in_chain and gold >= 5 and gold >= 5 * ctl, title,
           f"site {pla['site']} ({pla['distance_to_spawn']:.0f} blocks from spawn): {kinds}; the porphyry lost {ex_p.get('eroded_m', 0) / 1000:.1f} km "
           f"({'destroyed' if ex_p.get('destroyed') == 1 else 'fraction left ' + str(ex_p.get('fraction_left'))}), placer gold carried {pla.get('transport_km')} km; "
-          f"{gold} gold ore blocks in its footprint")
+          f"{ore_n} gold ore blocks and {pan_n} suspicious gravel or sand blocks in its footprint {w}x{hi[2] - lo[2] + 1} (control box beside it: {ctl})")
 
 
 def cmd_compat(a):

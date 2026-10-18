@@ -59,6 +59,18 @@ class GossanSkinTest {
     }
 
     @Test
+    void aPlacersGravelKeepsItsPlaceUnderTheCap() {
+        // A placer's cells are not repainted: the cap would leave its gold no loose block to sit in.
+        Body placer = new Body(7, 2, 9, "placer", new double[]{0, 100, 0}, new float[]{10, 3, 10}, 0f, 0f, 103,
+                new int[]{-10, 97, -10}, new int[]{10, 103, 10}, "gravel", List.of());
+        List<Body> placers = List.of(placer);
+        assertTrue(GossanSkin.covered(placers, C, 0, 100, 0));
+        assertFalse(GossanSkin.covered(placers, C, 40, 100, 0), "outside the placer");
+        assertFalse(GossanSkin.covered(placers, C, 0, 130, 0), "above the placer");
+        assertFalse(GossanSkin.covered(List.of(), C, 0, 100, 0));
+    }
+
+    @Test
     void theFootprintIsTheBlanketsExtentAtItsMidPlane() {
         Body b = gossan(2f, 101);
         assertTrue(GossanSkin.inFootprint(b, C, 0, 0));

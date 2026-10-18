@@ -84,15 +84,29 @@ final class GossanSkin {
         return b.locate(c, x, y, z) != null;
     }
 
+    /** Whether some body of {@code placers} holds the block (x, y, z). */
+    static boolean covered(List<Body> placers, int c, int x, int y, int z) {
+        for (Body p : placers)
+            if (p.locate(c, x, y, z) != null)
+                return true;
+        return false;
+    }
+
     /**
      * Repaints the exposed gossans of the chunk (run after {@link StrataPass}'s horizons and body
-     * rock, whose key decides the member). Returns the number of columns capped.
+     * rock, whose key decides the member). A placer's gravel keeps its place: a cell inside a body
+     * of loose rock that carries ore is not repainted, since the cap would leave the placer no
+     * block to hold its gold (the exit run's placer was shed by the porphyry whose gossan crops out,
+     * carried 0.0 km, and lay under the cap). Returns the number of columns capped.
      */
     static int apply(ChunkAccess chunk, WorldData wd, List<Body> bodies, RockPalette palette) {
         int c = wd.circumference();
         int minY = chunk.getMinBuildHeight(), maxY = chunk.getMaxBuildHeight() - 1;
         int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
         int total = 0;
+        List<Body> placers = bodies.stream()
+                .filter(p -> !ROLE.equals(p.role()) && p.rockClass() != null && palette.isLoose(p.rockClass()) && DepositFeature.placesOre(p))
+                .toList();
         for (Body b : bodies) {
             if (!ROLE.equals(b.role()) || b.rockClass() == null)
                 continue;
@@ -122,6 +136,8 @@ final class GossanSkin {
                     Span s = cap(top, thick);
                     capped++;
                     for (int y = Math.min(s.from(), maxY); y >= Math.max(s.to(), minY); y--) {
+                        if (!placers.isEmpty() && covered(placers, c, x, y, z))
+                            continue;
                         LevelChunkSection section = chunk.getSection(chunk.getSectionIndex(y));
                         BlockState here = section.getBlockState(lx, y & 15, lz);
                         if (here != rock && !here.isAir() && here.getFluidState().isEmpty() && !here.is(Blocks.BEDROCK))
