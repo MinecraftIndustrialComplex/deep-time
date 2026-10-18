@@ -84,6 +84,22 @@ public final class LakeIce {
         return Double.isFinite(level) && y == Water.topBlock(level) && !ice.frozen(x, z);
     }
 
+    /**
+     * Whether block (x, y, z) is the surface block of a lake of {@code wd} that the rule freezes: the
+     * lake's top block by the shore rule, as {@link #keepsOpen}, and frozen. {@code worldgen/WaterBodies}
+     * ices exactly that block, also where the lake is a block deep and its ice lies on the bed. False in
+     * a world without the rule.
+     */
+    public static boolean ices(WorldData wd, int reach, int x, int y, int z) {
+        if (!wd.has(WorldData.WATER_LEVEL))
+            return false;
+        LakeIce ice = of(wd);
+        if (ice == null)
+            return false;
+        double level = Water.levelAt(wd.layer(WorldData.WATER_LEVEL), x, z, reach);
+        return Double.isFinite(level) && y == Water.topBlock(level) && ice.frozen(x, z);
+    }
+
     /** The temperature below which a lake is frozen, °C. */
     public double threshold() {
         return threshold;

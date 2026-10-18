@@ -7,6 +7,7 @@ import com.minecraftindustrialcomplex.deeptime.climate.OverworldBands;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.IcePass;
 import com.minecraftindustrialcomplex.deeptime.worlddata.IceCover;
+import com.minecraftindustrialcomplex.deeptime.worlddata.LakeIce;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -319,22 +320,34 @@ public final class BiomeGameTests {
                 continue;
             var chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.SURFACE, true);
             // The ground's top: the surface heightmap's block, below a snow layer or a plant if features ran.
-            int y = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z);
+            int top = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z), y = top;
             var pos = new BlockPos.MutableBlockPos();
             var snow = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(ice.spec().blockId(IceCover.Spec.SNOW)));
             for (int up = 0; up < 6 && y > chunk.getMinBuildHeight() && !chunk.getBlockState(pos.set(x, y, z)).is(snow); up++)
                 y--;
-            if (!chunk.getBlockState(pos.set(x, y, z)).getFluidState().isEmpty()) {
+            if (!chunk.getBlockState(pos.set(x, y, z)).is(snow))
+                y = top;   // no snow near the top: report the top, not the ground six blocks under it
+            // Water, or a frozen lake's ice (on its water, or the world's lake a block deep iced to its bed).
+            var at = chunk.getBlockState(pos.set(x, y, z));
+            if (!at.getFluidState().isEmpty() || at.is(Blocks.ICE)
+                    && (!chunk.getBlockState(pos.set(x, y - 1, z)).getFluidState().isEmpty() || LakeIce.ices(wd, g.waterReach(), x, y, z))) {
                 wet++;
                 continue;
             }
             checked++;
             thick = Math.max(thick, n);
+            // The biome names the pack's surface the cover went on (2026-10-18: Expanded Ecosphere's ice cap,
+            // whose ice the pass took for a frozen lake's).
+            String biome = null;
             for (int i = 0; i < n; i++) {
                 var want = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(ice.spec().blockId(ice.spec().kind(i, n))));
                 var have = chunk.getBlockState(pos.set(x, y - i, z));
-                if (!have.is(want) && bad.length() < 400)
-                    bad.append(String.format(java.util.Locale.ROOT, " (%d,%d) depth %d of %d: %s, want %s;", x, z, i, n, have.getBlock(), want));
+                if (!have.is(want) && bad.length() < 400) {
+                    if (biome == null)
+                        biome = level.getBiome(new BlockPos(x, y, z)).unwrapKey().map(key -> key.location().toString()).orElse("?");
+                    bad.append(String.format(java.util.Locale.ROOT, " (%d,%d) in %s depth %d of %d: %s, want %s;", x, z, biome, i, n,
+                            have.getBlock(), want));
+                }
             }
         }
         DeepTime.LOGGER.info("[gametest] iceCoverLaidOnGlaciatedGround ice columns={} checked={} underWater={} thickest={}", columns.size(), checked, wet, thick);
@@ -349,7 +362,10 @@ public final class BiomeGameTests {
      * under a dirt block; the cover replaces the top {@code n} blocks (so the ground's height is
      * unchanged) with the table's snow on top, packed ice between and blue ice at the base of a
      * thick one; a column under water, one under a frozen lake's ice and one that runs out of ground
-     * after two blocks are the edge cases.
+     * after two blocks are the edge cases, and since 2026-10-18 two more: the pack's ice on its packed
+     * ice (Expanded Ecosphere's ice cap; vanilla's frozen peaks put patches of ice on stone) is ground
+     * and takes the cover, and a frozen lake a block deep (the water pass's ice on its bed, no water
+     * under it), which the world's lakes name, keeps its ice.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 1200)
     public static void icePassLaysTheCover(GameTestHelper helper) {
@@ -376,6 +392,13 @@ public final class BiomeGameTests {
                     for (int y = 81; y <= 84; y++)
                         chunk.setBlockState(pos.set(x, y, z), Blocks.WATER.defaultBlockState(), false);
                     chunk.setBlockState(pos.set(x, 85, z), Blocks.ICE.defaultBlockState(), false);
+                } else if (lz == 12) {   // the pack's ice on its packed ice (Expanded Ecosphere's ice cap)
+                    for (int y = 78; y <= 80; y++)
+                        chunk.setBlockState(pos.set(x, y, z), Blocks.PACKED_ICE.defaultBlockState(), false);
+                    chunk.setBlockState(pos.set(x, 81, z), Blocks.ICE.defaultBlockState(), false);
+                } else if (lz == 11) {   // a frozen lake a block deep: the water pass's ice on its bed
+                    chunk.setBlockState(pos.set(x, 80, z), Blocks.DIRT.defaultBlockState(), false);
+                    chunk.setBlockState(pos.set(x, 81, z), Blocks.ICE.defaultBlockState(), false);
                 } else {
                     chunk.setBlockState(pos.set(x, 81, z), Blocks.DIRT.defaultBlockState(), false);
                 }
@@ -393,7 +416,8 @@ public final class BiomeGameTests {
                 return new Spec(160.0, 12, 3, 9, 2, "minecraft:snow_block", "minecraft:packed_ice", "minecraft:blue_ice");
             }
         };
-        int placed = IcePass.apply(chunk, fake);
+        // The world's lakes: row 11's ice is a frozen lake's top.
+        int placed = IcePass.apply(chunk, fake, (x, y, z) -> z - z0 == 11 && y == 81);
         var snow = Blocks.SNOW_BLOCK;
         var packed = Blocks.PACKED_ICE;
         var blue = Blocks.BLUE_ICE;
@@ -422,6 +446,25 @@ public final class BiomeGameTests {
                         bad += " frozenlake(" + lx + ")";
                     continue;
                 }
+                if (lz == 12) {
+                    // The pack's ice is ground: the cover replaces it as it would stone.
+                    if (n == 0 && !chunk.getBlockState(pos.set(x, 81, z)).is(Blocks.ICE))
+                        bad += " packbare(" + lx + ")";
+                    for (int i = 0; i < n; i++) {
+                        var want = i < 3 ? snow : (n >= 9 && i >= n - 2) ? blue : packed;
+                        if (!chunk.getBlockState(pos.set(x, 81 - i, z)).is(want))
+                            bad += " pack(" + lx + ")@" + i + "of" + n;
+                    }
+                    if (!chunk.getBlockState(pos.set(x, 82, z)).isAir())
+                        bad += " packabove(" + lx + ")";
+                    continue;
+                }
+                if (lz == 11) {
+                    // A frozen lake a block deep: its ice is the lake's surface, left as it is.
+                    if (!chunk.getBlockState(pos.set(x, 81, z)).is(Blocks.ICE) || !chunk.getBlockState(pos.set(x, 80, z)).is(Blocks.DIRT))
+                        bad += " shallowlake(" + lx + ")";
+                    continue;
+                }
                 if (n == 0) {
                     if (!chunk.getBlockState(pos.set(x, 81, z)).is(Blocks.DIRT))
                         bad += " bare(" + lx + "," + lz + ")";
@@ -438,10 +481,11 @@ public final class BiomeGameTests {
                 if (!chunk.getBlockState(pos.set(x, 82, z)).isAir())
                     bad += " above(" + lx + "," + lz + ")";
             }
-        // 13 rows of ground, 4 columns each of 1, 5 and 12 blocks; the thin row: 4 of 1 block and 8 of 2.
+        // 11 rows of ground, 4 columns each of 1, 5 and 12 blocks; the pack's ice row the same less the
+        // packed ice already where the cover puts it (1, 4 and 11); the thin row: 4 of 1 block and 8 of 2.
         DeepTime.LOGGER.info("[gametest] icePassLaysTheCover placed={} bad={}", placed, bad);
         helper.assertTrue(bad.isEmpty(), "the ice pass left:" + bad);
-        helper.assertTrue(placed == 13 * 4 * (1 + 5 + 12) + 4 * 1 + 8 * 2, "blocks placed: " + placed);
+        helper.assertTrue(placed == 11 * 4 * (1 + 5 + 12) + 4 * (1 + 4 + 11) + 4 * 1 + 8 * 2, "blocks placed: " + placed);
         helper.succeed();
     }
 

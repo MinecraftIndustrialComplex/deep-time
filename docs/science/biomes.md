@@ -46,7 +46,11 @@ mean annual temperature, and other mods can read the monthly climate of any bloc
    local relief) and weirdness (from ridge and valley shape) are filled so that vanilla's variants
    appear where the ground suggests them. All are game choices.
 4. **Ice and snow.** Ground above its equilibrium line gets a cover of snow, packed ice and blue ice,
-   up to 12 blocks; lakes with a mean annual temperature below 0 °C freeze.
+   up to 12 blocks; lakes with a mean annual temperature below 0 °C freeze. The game lays the cover
+   last, over whatever the pack's surface was, and leaves only water and a frozen lake's own ice
+   alone (BIO-084). Until 2026-10-18 it took any ice at the top for a lake's, so the ice a pack
+   paints on its own glacier biomes (Expanded Ecosphere's ice cap, vanilla's frozen peaks) went
+   without the cover; it now asks the lake ice rule whether that block is a frozen lake's top.
 
 ## Equations and constants
 
@@ -499,6 +503,25 @@ place. Of Cs's 373 counted columns, 68 were coast and none matched, so Cs on shr
 its 0.5. Without the coast it reads 186 of 305 (0.610). The other checks change the same way: Am 346 of 385 (0.899),
 BSk 531 of 619 (0.858), ET on snowy plains 10 of 233 (0.043, at most 0.1). Since 2026-10-17 every pack check leaves
 the coast strip out.
+
+The class itself was misread on the projected world until 2026-10-18. The bake's projection pass rewrites every
+layer on the Petroff–Guyou grid and takes the nearest cell for categories, but `climate/koppen_l2` came a day after
+the pass's list of categories and was never put on it, so it was averaged over each cell's footprint as a number
+(SCL-090). Where classes meet, the mean of their code indices names a class neither side has: cold steppe (BSk, 7)
+beside humid subtropical (Cfa, 14) reads Mediterranean (8 to 10). The census, the families and the biome rules'
+Köppen conditions all read this layer. On the CLM-203 planet (master 8b2cfb83, warmer and with more high ground)
+Cs on shrubland and steppe read 142 of 383 (0.371): 118 of those columns were Csc, a class the bake had barely
+placed, and the shrubland misses had the humidity of the class beside them, not the Mediterranean squeeze. Read
+nearest, the same planet has 137 Cs columns, none Csc, and 76 on the table's biomes (0.555); Am 280 of 381 (0.735),
+BSk 341 of 523 (0.652), ET on snowy plains 0 of 112. A third of the 137 lie under the ice cover (45, 2 on shrubland),
+where the bake holds the ground in the frozen band whatever its class (BIO-035) and the ice pass lays snow and ice
+on it; the pack checks leave that ground out since the same day, as the forbidden families already split it off,
+and Cs reads 74 of 92 (0.804), Am 277 of 349 (0.794; 32 under the cover), BSk 325 of 475 (0.684; 48), ET on snowy
+plains 0 of 40 (72). In 26 of those 45 the bake's glacier flag froze the band: an L2 cell lapsed to its
+own ground at 490 to 1,630 m, warm enough for Csa or Csb, under an L1 cell whose ice keeps it cold (its mean annual
+temperature −18 to +3 °C, median −11 °C); the other 19 lie at the ice cover's fringe, where the cover's bilinear
+thickness reaches past the flag's nearest cell (L1 mean annual −9 to +14 °C), a cover on ground the climate
+does not freeze that is the bake's to revisit.
 
 **The geology gate.** A rock-named biome stands only on the ground it is named for (BIO-147 to BIO-153): Shield on
 Precambrian shield provinces, Yosemite on exposed granite, the White, Granite and Basalt Cliffs on coasts of

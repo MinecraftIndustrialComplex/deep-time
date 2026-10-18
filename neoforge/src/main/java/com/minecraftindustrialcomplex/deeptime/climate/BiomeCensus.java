@@ -128,7 +128,9 @@ public final class BiomeCensus {
      * {@code minContinents} or whose erosion is below {@code minErosion} (null: no limit): mountains (vanilla's slopes and
      * peaks take any class's high relief) and the coast strip are not the table's to place. The coast strip's columns (on a
      * beach, a stony shore or a sea biome, as the families count them apart) are left out of every check since
-     * 2026-10-17: on P1-26's test planet 68 of Cs's 373 columns were coast and none could match.
+     * 2026-10-17: on P1-26's test planet 68 of Cs's 373 columns were coast and none could match. The columns under the
+     * ice cover are left out since 2026-10-18 (the bake holds glaciated land in the frozen band whatever its class,
+     * BIO-035, and the ice pass covers it): on the CLM-203 test planet 45 of Cs's 137 columns, 2 on the table's biomes.
      */
     public record PackCheck(String name, String classes, IntPredicate koppen, java.util.Set<String> biomes, double bound,
                             boolean atMost, String requires, Double minErosion, Double minContinents) {}
@@ -332,7 +334,7 @@ public final class BiomeCensus {
         Map<String, int[]> packs = new LinkedHashMap<>();
         for (PackCheck pc : PACK_CHECKS)
             if (placeable.contains(pc.requires()))
-                packs.put(pc.name(), new int[3]);
+                packs.put(pc.name(), new int[4]);
         boolean cloudActive = placeable.contains(CLOUD_FOREST);
         // Candidates, of them on the cloud forest, cloud forest columns off the candidates, and the columns of the
         // rule's class, latitude and height left out: on a volcanic role's biome, dry (P/PET at most the rule's cut), or in
@@ -474,6 +476,13 @@ public final class BiomeCensus {
                             n[2]++;
                             continue;
                         }
+                        // Ground under the ice cover (since 2026-10-18): the bake holds glaciated land in the frozen band
+                        // whatever its class (BIO-035) and the game lays snow and ice over it (BIO-084), so the table's
+                        // class rule does not place it.
+                        if (iceLayer != null && iceLayer.nearest(x, z) > 0) {
+                            n[3]++;
+                            continue;
+                        }
                         n[1]++;
                         if (pc.biomes().contains(nameOf(b)))
                             n[0]++;
@@ -555,6 +564,7 @@ public final class BiomeCensus {
                 e.addProperty("matching", n[0]);
                 e.addProperty("share", n[1] == 0 ? null : Math.round(n[0] * 1000.0 / n[1]) / 1000.0);
                 e.addProperty("left_out_coast", n[2]);
+                e.addProperty("left_out_glaciated", n[3]);
             }
             e.addProperty(pc.atMost() ? "at_most" : "at_least", pc.bound());
             JsonArray names = new JsonArray();
