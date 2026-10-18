@@ -619,6 +619,22 @@ pub fn set_large_threshold(bytes: Option<usize>) {
     LARGE.store(bytes.unwrap_or(usize::MAX).max(PAGE), Ordering::Relaxed);
 }
 
+/// `n` copies of `v`, written in parallel. `vec![v; n]` writes them on the calling thread (a zero
+/// `v` comes through `alloc_zeroed`, which clears a kept block there), and for a grid-sized array
+/// that serial pass is what a step's parallel passes wait for (P1-19).
+pub fn filled<T: Copy + Send + Sync>(n: usize, v: T) -> Vec<T> {
+    let mut out = Vec::new();
+    fill(&mut out, n, v);
+    out
+}
+
+/// Makes `out` `n` copies of `v`, written in parallel, in the allocation it has when that is
+/// large enough.
+pub fn fill<T: Copy + Send + Sync>(out: &mut Vec<T>, n: usize, v: T) {
+    use rayon::prelude::*;
+    rayon::iter::repeat_n(v, n).collect_into_vec(out);
+}
+
 /// The allocator's counters as the session's [`MemoryGauge`].
 pub struct AllocGauge;
 

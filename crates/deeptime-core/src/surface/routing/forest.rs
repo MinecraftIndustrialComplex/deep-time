@@ -42,7 +42,7 @@ impl SharedF64 {
     /// `n` values, all `v`.
     pub fn new(n: usize, v: f64) -> Self {
         let bits = v.to_bits();
-        SharedF64((0..n).map(|_| AtomicU64::new(bits)).collect())
+        SharedF64(rayon::iter::repeat_n(bits, n).map(AtomicU64::new).collect())
     }
 
     /// A copy of `src`.

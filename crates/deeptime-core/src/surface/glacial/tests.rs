@@ -531,6 +531,7 @@ fn the_parallel_ice_solve_is_the_serial_walk_bit_for_bit() {
             v.extend(a.iter().map(|x| x.to_bits()));
         }
         v.push(s.cells as u64);
+        v.extend(s.glaciated.iter().map(|&c| u64::from(c)));
         v
     };
     let mut want = IceState::default();
@@ -550,5 +551,90 @@ fn the_parallel_ice_solve_is_the_serial_walk_bit_for_bit() {
             )
         });
         assert!(bits(&got) == bits(&want), "{threads} threads");
+    }
+}
+
+/// The glacial step's walks over the eroding cells and what lies downstream of them, and its last
+/// pass over the cells they wrote (P1-19), are its walks of the whole stack and grid bit for bit:
+/// the same steps on a routing without its forest take those (with lakes, a closed basin and the
+/// sea, on a wrapping grid, four substeps a step, at 1, 3 and 8 threads).
+#[test]
+fn the_sparse_glacial_step_is_the_whole_walk_bit_for_bit() {
+    let (w, h) = (40, 12);
+    let d = Dims::new(w, h, 2000.0, true);
+    let mut z0 = range(w, h, 3000.0, 5, 300.0);
+    for (ci, cj, depth) in [(20usize, 6usize, 400.0), (10, 2, 300.0)] {
+        for j in 0..h {
+            for i in 0..w {
+                let d2 = ((i as f64 - ci as f64).powi(2) + (j as f64 - cj as f64).powi(2)) / 2.0;
+                z0[j * w + i] -= depth * (-d2).exp();
+            }
+        }
+    }
+    let cl = climate(w * h, 1200.0, 0.0);
+    let p = GlacialParams {
+        till_share: 0.4,
+        max_till_m: 30.0,
+        substeps: 4,
+        ..physical()
+    };
+    let go = |sparse: bool, threads: usize| -> (Vec<u64>, [f64; 5]) {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build()
+            .unwrap();
+        pool.install(|| {
+            let mut z = z0.clone();
+            let mut out = GlacialOut::default();
+            let (mut bits, mut tot) = (Vec::new(), [0.0; 5]);
+            for _ in 0..6 {
+                let mut rt = route(&d, &z, 0.0);
+                if !sparse {
+                    rt.r.forest = Default::default();
+                }
+                let clim = IceClimate {
+                    ela_z: &cl.ela,
+                    precip_m_yr: &cl.p,
+                    t_c: &cl.t,
+                    allowed: None,
+                    time_share: None,
+                };
+                step(
+                    &d, &rt.r, &rt.kind, &rt.filled, 0.0, &clim, &p, 9.81, 5.0e5, &mut z, &mut out,
+                );
+                for a in [
+                    &z[..],
+                    &out.eroded,
+                    &out.till,
+                    &out.lake,
+                    &out.sea_ice_load,
+                    &out.sea_melt_load,
+                ] {
+                    bits.extend(a.iter().map(|x| x.to_bits()));
+                }
+                let t = [
+                    out.eroded_m3,
+                    out.till_m3,
+                    out.lake_m3,
+                    out.sink_m3,
+                    out.sea_m3,
+                ];
+                bits.extend(t.map(f64::to_bits));
+                bits.extend(out.sea_cells.iter().map(|&m| u64::from(m)));
+                for (s, x) in tot.iter_mut().zip(t) {
+                    *s += x;
+                }
+            }
+            (bits, tot)
+        })
+    };
+    let (want, tot) = go(false, 1);
+    let [eroded, till, lake, sink, sea] = tot;
+    assert!(
+        eroded > 0.0 && till > 0.0 && sea > 0.0 && lake + sink > 0.0,
+        "the paths are taken: {tot:?}"
+    );
+    for threads in [1, 3, 8] {
+        assert!(go(true, threads).0 == want, "{threads} threads");
     }
 }
