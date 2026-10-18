@@ -703,7 +703,7 @@ pub fn fronts_and_uplift(
     // √π · `arc_width_km`): crust per step at the axis at v_0, m.
     let band_km = std::f64::consts::PI.sqrt() * k.arc_width_km;
     let island_axis_m = k.island_arc_km3_per_km_myr / band_km * 1000.0 * env.dt_myr; // ledger: PLT-045
-    let continental_axis_m = k.continental_arc_km3_per_km_myr / band_km * 1000.0 * env.dt_myr; // ledger: PLT-050
+    let continental_axis_m = k.continental_arc_km3_per_km_myr / band_km * 1000.0 * env.dt_myr; // ledger: PLT-285
     // The cordillera: pure shear of the range at `cordillera_shortening_mm_yr`, the strain spread
     // over its Gaussian band (integral √π · `cordillera_width_km`), fed by the crust behind the
     // range (from twice the band's half-width beyond the arc to r_s), which shortens at the same
@@ -792,6 +792,7 @@ pub fn fronts_and_uplift(
     // Per contact: the arc's own volcanic and plutonic factors once its felsic cones are counted
     // (the cones are its extrusive rock; beyond that share they count against the intrusive), the
     // strain of the crust behind the range and the share of the range's demand it meets.
+    // ledger: PLT-286
     let factors: Vec<(f64, f64, f64, f64)> = budget
         .iter()
         .map(|b| {

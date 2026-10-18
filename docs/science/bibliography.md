@@ -5705,10 +5705,10 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Reference: Stern, R. J. and Scholl, D. W. (2010). Yin and yang of continental crust creation and destruction by plate tectonic processes. International Geology Review 52(1):1-31.
 - DOI or URL: 10.1080/00206810903332322; author copy https://personal.utdallas.edu/~rjstern/pdfs/YinyangIGR10.pdf
 - Cited as: "Stern & Scholl 2010".
-- Ledger ids: PLT-045 (comparison), PLT-258 (2026-10-03: "the bulk of the approximately 40 km-thick crust that must have originally existed is missing" at UHP terranes; continental crust lost at all collision zones "approximately 0.7 km3/year", Scholl & von Huene 2009 as cited)
+- Ledger ids: PLT-045 (since 2026-10-17 the value), PLT-046, PLT-285, PLT-286, HNT-125, HNT-126, PLT-258 (2026-10-03: "the bulk of the approximately 40 km-thick crust that must have originally existed is missing" at UHP terranes; continental crust lost at all collision zones "approximately 0.7 km3/year", Scholl & von Huene 2009 as cited)
 - Access: paywalled at the publisher; author copy open.
 - Library (the project's source library, not distributed): fetched 2026-10-02 (author copy). Text file: `SternScholl2010/SternScholl2010.txt`.
-- Read so far (by the project): full text, 2026-10-02. Abstract: creation and destruction of continental crust "is either in balance (~3.2 km3/year, or 3.2 AU) or more crust is being destroyed than created"; p. 9: the Aleutian and Izu-Bonin-Mariana arcs, "which have evolved since 45-50 Ma", give "crustal growth estimates of 90-180 km3/km-million years"; growth is front-loaded (several hundred km3/km/Myr in the first few Myr, "a few tens or less" for mature arcs); about 2.7 AU of growth at convergent margins (Table 1).
+- Read so far (by the project): full text, 2026-10-02. Abstract: creation and destruction of continental crust "is either in balance (~3.2 km3/year, or 3.2 AU) or more crust is being destroyed than created"; p. 9: the Aleutian and Izu-Bonin-Mariana arcs, "which have evolved since 45-50 Ma", give "crustal growth estimates of 90-180 km3/km-million years"; growth is front-loaded (several hundred km3/km/Myr in the first few Myr, "a few tens or less" for mature arcs); about 2.7 AU of growth at convergent margins (Table 1). Read again 2026-10-17 (plate task 8; the copy at `SternScholl2010/SternScholl2010.txt`): p. 11, intra-oceanic arcs "approximately 100 km3/km-million years (500 km3/million years for first 10 million years plus 30 km3/million years for 60 million years thereafter). At this rate, crustal growth at the present 14,500 km of intra-oceanic arcs" gives 1.5 AU; p. 12, continental arcs after Haschke & Günther 2003: "The 35 km3/km-million years rate is essentially the rate of Reymer and Schubert (1984). It implies a reasonable intrusive : extrusive ratio of approximately 7:1 and is adopted as a useful long-term rate estimate for continental margin arc productivity. The combined length of continental margin arcs is approximately 27,500 km (Scholl and von Huene 2007). The corresponding global addition rate is thus approximately 1.0 AU"; Table 1 (p. 12): oceanic arcs 1.5, continental arcs 1.0, collision zones 0.2, rifts and hotspots 0.5 AU of additions; losses at sutures about 0.7 AU; p. 24, new arcs 300 to 500 km3/km/Myr, mature ones 30 to 35.
 
 ### TetreaultBuiter2014
 - Reference: Tetreault, J. L. and Buiter, S. J. H. (2014). Future accreted terranes: a compilation of island arcs, oceanic plateaus, submarine ridges, seamounts, and continental fragments. Solid Earth 5:1243-1275.
@@ -6294,6 +6294,78 @@ Roering1999 (the measured diffusivity, ERO-177) is under "Erosion, isostasy and 
 - Ledger ids: ERO-178
 - Access: open (Copernicus).
 - Read so far (by the project): full text through the web fetch tool, 2026-10-16: §3.2.2, "hillslope processes are also accounted for using a diffusion coefficient D of 10−2 m2 yr−1" on a grid "built with a resolution of approximately 200 m"; §3.2.3 (the global run), "the diffusion coefficient D equals 10−1" (no units in that sentence) on meshes "at 16 km resolution". The fetched text does not say that D is adjusted for the resolution.
+
+## The crust budget on sourced rates (plate task 8: PLT-045 to PLT-048, PLT-285, HNT-125 to HNT-127), added 2026-10-17
+
+Stern & Scholl 2010 (the rates, PLT-045 and PLT-285) and Cloos 1993 (the arcs' maturity, PLT-047) are above; their entries record what was read on 2026-10-17. Fetched and read by a research sub-agent and checked by the plate task 8 agent against the text files, 2026-10-17; texts in the project's source library on the test VM (`/data/ban/deeptime-sources/<key>/`), not distributed.
+
+### White2006
+- Reference: White, S. M., Crisp, J. A. and Spera, F. J. (2006). Long-term volumetric eruption rates and magma budgets. Geochemistry, Geophysics, Geosystems 7, doi:10.1029/2005GC001002.
+- DOI or URL: 10.1029/2005GC001002
+- Cited as: "White et al. 2006" (the intrusive to extrusive ratio of the island arcs' crust).
+- Ledger ids: PLT-046
+- Access: open copy (the copy read is the journal's proof, with line numbers; issue and article number not recorded).
+- Library (the project's source library, not distributed): `White2006/White2006.pdf`, `White2006.txt` (pdftotext), 2026-10-17.
+- Read so far (by the project): full text, 2026-10-17: "A ratio of 5:1 could be viewed as common to most magmatic systems when the considerable uncertainty is considered. Ratios higher than 10:1 are uncommon in our data set"; "an I:E ratio of 5:1 may be regarded as a better average value"; Table 3: the Aleutians 1:1 to 3:1, Hawaii 6:1; basaltic shields 1:1 to 2:1, oceanic ridges at least 5:1.
+
+### Eichelberger2015
+- Reference: Eichelberger, N., McQuarrie, N., Ryan, J., Karimi, B., Beck, S. and Zandt, G. (2015). Evolution of crustal thickening in the central Andes, Bolivia. Earth and Planetary Science Letters 426:191-203.
+- DOI or URL: 10.1016/j.epsl.2015.06.035 (from the PDF's first page)
+- Cited as: "Eichelberger et al. 2015" (the cordillera's shortening rate).
+- Ledger ids: PLT-048, HYP-018, HNT-127
+- Access: open copy.
+- Library (the project's source library, not distributed): `Eichelberger2015/Eichelberger2015.pdf`, `Eichelberger2015.txt`, 2026-10-17.
+- Read so far (by the project): full text, 2026-10-17: Bolivia has "the largest shortening magnitudes (~300 km, 40%) and crustal thicknesses (up to 75 km) of the entire chain" (p. 191); "As shortening accumulates from the restored state (50 Ma) to the modern state (0 Ma), the area of the mesh elements contracts. Assuming pure shear deformation, the decrease in area leads to a proportional increase in predicted thickness" (p. 193), "calculated in 5 Myr intervals by assuming constant volume"; magmatic addition about 15 % (p. 197) to about 30 % (p. 200) of the crust in the models.
+
+### Clift2009
+- Reference: Clift, P. D., Vannucchi, P. and Phipps Morgan, J. (2009). Crustal redistribution, crust-mantle recycling and Phanerozoic evolution of the continental crust. Earth-Science Reviews 97:80-104.
+- DOI or URL: 10.1016/j.earscirev.2009.10.003; repository copy https://hdl.handle.net/2158/375652 (FLORE, Università degli Studi di Firenze)
+- Cited as: "Clift et al. 2009" (comparison for both arc rates).
+- Ledger ids: PLT-045, PLT-285
+- Access: open (accepted manuscript in the repository).
+- Library (the project's source library, not distributed): `Clift2009/Clift2009.pdf`, `Clift2009.txt`, 2026-10-17.
+- Read so far (by the project): full text, 2026-10-17: "oceanic arcs average rates of 125 km3/Ma/km compared to 81 km3/Ma/km for continental arcs" (p. 84); to keep constant crustal volumes "arc magmatism would have to maintain production of around 3.8 km3/a (or 94 km3/Ma/km of trench)"; continental flood basalts "only around 0.12 km3/a"; accreted oceanic plateaus 1.1 km3/a.
+
+### Parcutela2023
+- Reference: Parcutela, N. E., Austria, R. S., Dimalanta, C. B., Valera, G. T. V., Gabo-Ratio, J. A. S., Payot, B. D., Armada, L. T., Sangalang, K. J. F. and Yumul, G. P. Jr. (2023). Enhanced arc magmatic productivity of the Western Pacific island arcs deduced from gravity-derived arc crustal growth rates. Frontiers in Earth Science 11:1107833.
+- DOI or URL: 10.3389/feart.2023.1107833
+- Cited as: "Parcutela et al. 2023" (a lower island-arc rate).
+- Ledger ids: PLT-045
+- Access: open access.
+- Library (the project's source library, not distributed): `Frontiers2023_WPacificArcs/Frontiers2023_WPacificArcs.pdf`, `.txt`, 2026-10-17. (The volume number 11 is from memory.)
+- Read so far (by the project): full text, 2026-10-17: "the Pacific island arcs (i.e., Bonin, Izu, Kermadec, Mariana, and Vanuatu) recorded higher growth rates (28-60 km3/km/m.y.)"; the arcs over younger, smaller plates grow slower.
+
+### HaschkeGunther2003
+- Reference: Haschke, M. and Günther, A. (2003). Balancing crustal thickening in arcs by tectonic vs. magmatic means. Geology 31(11):933-936.
+- DOI or URL: 10.1130/G19945.1
+- Cited as: "Haschke & Günther 2003" (the continental arcs' 35 km3/km/Myr, through Stern & Scholl 2010).
+- Ledger ids: PLT-285, PLT-048, HNT-126
+- Access: paywalled; abstract only (OpenAlex record, `abstracts_closed_sources_openalex.txt` in the library).
+- Read so far (by the project): abstract, 2026-10-17: the Late Cretaceous to late Eocene arc of North Chile; "a minimum of 9 km of arc-normal shortening" producing "approximately 5.4 km of tec[tonic thickening]" (the record is cut there); the 35 km3/km/Myr and the tectonic to magmatic ratio are read through Stern & Scholl 2010, p. 12.
+
+### KleyMonaldi1998
+- Reference: Kley, J. and Monaldi, C. R. (1998). Tectonic shortening and crustal thickness in the Central Andes: How good is the correlation? Geology 26(8):723-726.
+- DOI or URL: 10.1130/0091-7613(1998)026<0723:TSACTI>2.3.CO;2
+- Cited as: "Kley & Monaldi 1998" (shortening falls short of the Andes' crust).
+- Ledger ids: PLT-048
+- Access: paywalled; the OpenAlex record holds only the landing page's author block (no abstract text).
+- Read so far (by the project): title and record only, 2026-10-17; the shortening magnitudes "<250 km (e.g. Kley and Monaldi, 1998)" are as Eichelberger et al. 2015 cite them; the 70-80 % is Allmendinger et al. 1997's.
+
+### Allmendinger1997
+- Reference: Allmendinger, R. W., Jordan, T. E., Kay, S. M. and Isacks, B. L. (1997). The evolution of the Altiplano-Puna plateau of the Central Andes. Annual Review of Earth and Planetary Sciences 25:139-174. (Co-authors from memory.)
+- DOI or URL: 10.1146/annurev.earth.25.1.139
+- Cited as: "Allmendinger et al. 1997".
+- Ledger ids: PLT-048
+- Access: paywalled; abstract only (OpenAlex record).
+- Read so far (by the project): abstract, 2026-10-17: the plateau "was uplifted primarily because of crustal thickening produced by horizontal shortening of a thermally softened lithosphere. Nonetheless, known shortening at the surface accounts for only 70-80% of the observed crustal thickening, suggesting that magmatic addition and other processes ... may contribute significantly".
+
+### FrancisHawkesworth1994
+- Reference: Francis, P. W. and Hawkesworth, C. J. (1994). Late Cenozoic rates of magmatic activity in the Central Andes and their relationships to continental crust formation and thickening. Journal of the Geological Society 151(5):845-854.
+- DOI or URL: 10.1144/gsjgs.151.5.0845
+- Cited as: "Francis & Hawkesworth 1994" (a lower continental-arc rate).
+- Ledger ids: PLT-285
+- Access: paywalled; abstract only (OpenAlex record).
+- Read so far (by the project): abstract, 2026-10-17: "a consistent rate of effusive volcanism of 3 X 10-6 km3 a-1 km-1" in the Central Volcanic Zone; the overall magmatic addition (about 13 km3/km/Myr) as the research sub-agent read the rest of the abstract (the record is cut in the copy kept).
 
 ## Playability steering (STE)
 

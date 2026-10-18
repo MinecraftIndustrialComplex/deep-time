@@ -116,7 +116,7 @@ pub fn step(
         }
         // The cones the volcano stage built over the hotspot (its shields and silicic centres,
         // already in the pools as volcanic rock) are its erupted rock: the basalt it adds
-        // itself is what they leave of its rate (plate task 8, counted once).
+        // itself is what they leave of its rate (plate task 8, counted once). ledger: PLT-286
         let rock: f64 = lifts.iter().map(|&(_, _, dz)| 3.0 * dz).sum();
         let mut built = 0.0;
         for &(i, _, _) in &lifts {
