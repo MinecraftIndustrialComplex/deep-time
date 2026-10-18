@@ -45,6 +45,7 @@ class LakeIceTest {
         WorldData wd = WorldData.open(Fixtures.world("lake1024"));
         assertNull(LakeIce.of(wd));
         assertFalse(LakeIce.keepsOpen(wd, 4, 0, 119, 0));
+        assertFalse(LakeIce.ices(wd, 4, 0, 119, 0));
     }
 
     @Test
