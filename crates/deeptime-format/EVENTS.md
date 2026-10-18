@@ -364,7 +364,9 @@ it is 1 °C below. Both are global (place `Global`).
 
 **Ocean overturning shifts** (P1-26, the per-cell climate; `climate/mod.rs`, `OCEAN_OVERTURNING_SHIFT`):
 the overturning conveyor sinks in one place per planet, the narrowest polar-connected basin that
-qualifies (`climate.overturning_sv`, ledger CLM-131, CLM-132). At each 2-D snapshot the stage
+qualifies and whose sinking region can carry the whole conveyor (`climate.overturning_sv`, ledger
+CLM-131, CLM-132, CLM-204; when no basin can, the one that carries the most sinks what it can, and
+the transport is below the setting). At each 2-D snapshot the stage
 compares the new sinking point with the last one and writes this event when the sinking has moved
 to another basin: more than 40° of arc away from the previous point, or into the other hemisphere.
 It is instantaneous, at the time of the snapshot (the end of its plate step). Place: a point, the
