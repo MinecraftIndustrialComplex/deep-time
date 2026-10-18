@@ -38,14 +38,18 @@ def step_defs():
     """(id, row title, mac.sh flags, command, [(evidence regex, …)], pass test)."""
     return [
         ("rust", "Rust: fmt, clippy, tests, licences", [],
-         "cargo fmt --all --check && cargo clippy --workspace --all-targets -q -- -D warnings "
-         "&& cargo test --workspace -q 2>&1 | grep -E 'test result' ; cargo deny check licenses bans 2>&1 | tail -1",
-         [r"test result: \w+\. \d+ passed; \d+ failed", r"bans ok, licenses ok"],
-         lambda out, rc: "licenses ok" in out and not re.search(r"test result: FAILED|[1-9]\d* failed", out)),
+         "cargo fmt --all --check >/dev/null 2>&1 && echo 'fmt ok' || echo 'fmt FAILED'; "
+         "cargo clippy --workspace --all-targets -q -- -D warnings >/dev/null 2>&1 && echo 'clippy ok' || echo 'clippy FAILED'; "
+         "cargo test --workspace -q 2>&1 | grep -E 'test result' ; cargo deny check licenses bans 2>&1 | tail -1",
+         [r"fmt ok|fmt FAILED", r"clippy ok|clippy FAILED", r"test result: \w+\. \d+ passed; \d+ failed", r"bans ok, licenses ok"],
+         # fmt, clippy, at least one passing test binary, no failing one, licenses: a run where cargo never started must not pass (2026-10-16)
+         lambda out, rc: ("fmt ok" in out and "clippy ok" in out and "licenses ok" in out and re.search(r"test result: ok\. [1-9]\d* passed", out) is not None
+                          and not re.search(r"test result: FAILED|[1-9]\d* failed", out))),
         ("junit", "Java: build and JUnit", [],
          "cd neoforge && ./gradlew build test --console=plain -q; cd .. && python3 tools/ci/junit-summary.py neoforge/build/test-results/test",
          [r"tests=\d+ failures=\d+ errors=\d+ skipped=\d+"],
-         lambda out, rc: re.search(r"tests=\d+ failures=0 errors=0", out) is not None),
+         # tests > 0 and no failed build: a Gradle build that failed before testing left "tests=0 failures=0 errors=0" and passed (2026-10-16).
+         lambda out, rc: re.search(r"tests=[1-9]\d* failures=0 errors=0", out) is not None and "BUILD FAILED" not in out and "FAILURE:" not in out),
         ("gametest", "GameTest server (Deep Time + Toroidal World)", ["--server"],
          "./gametest.sh 2>&1 | grep -E 'required tests|\\[gametest\\]' | sed 's/^.*\\[gametest\\]/[gametest]/;s/^.*GameTestServer\\]: //'",
          [r"All \d+ required tests passed", r"\[gametest\] (heightMatches\w+|strataClassesResolve|lakeHolds|native|spawnOnLand|oreVeinsDisabled) .*"],
@@ -67,9 +71,9 @@ def step_defs():
          [r"\[(PASS|FAIL)\] .*", r"tw\.\w+: .*", r"^(PASS|FAIL).*"],
          lambda out, rc: re.search(r"^PASS", out, re.M) is not None),
         ("inspect", "deeptime-inspect: generated surface vs world data, seam strip", [],
-         "cargo run -q --release -p deeptime-inspect -- compare --world smoke/standalone/server/planet --world-data smoke/standalone/server/planet/deeptime --out review/out/phase0-inspect | python3 -c \"import json,sys; d=json.load(sys.stdin); print('p99_abs_diff_blocks', d.get('p99_abs_diff_blocks'), 'compared', d.get('compared', d.get('columns')))\"; cargo run -q --release -p deeptime-inspect -- seam --world smoke/standalone/server/planet --out review/out/phase0-inspect | python3 -c \"import json,sys; d=json.load(sys.stdin); print('seam', {k: v for k, v in d.items() if not isinstance(v, (list, dict))})\"",
+         "cargo run -q --release -p deeptime-inspect -- compare --world smoke/standalone/server/planet --world-data smoke/standalone/server/planet/deeptime --out review/out/phase0-inspect | python3 -c \"import json,sys; d=json.load(sys.stdin); print('p99_abs_diff_blocks', d.get('p99_abs_diff_blocks'), 'compared', d.get('columns_compared'), 'of', d.get('columns_total'))\"; cargo run -q --release -p deeptime-inspect -- seam --world smoke/standalone/server/planet --out review/out/phase0-inspect | sed 's/ png=.*//; s/^/seam /'",
          [r"p99_abs_diff_blocks \S+ .*", r"seam .*"],
-         lambda out, rc: re.search(r"p99_abs_diff_blocks (0|1)(\.0)? ", out) is not None),
+         lambda out, rc: re.search(r"p99_abs_diff_blocks (0|1)(\.0)? ", out) is not None and "seam_mismatches=0 " in out),
         ("smoke-mic-32k", "Smoke: current MIC pack at C = 32,768 (test terrain, seam pregenerated)", ["--server", "--pack"],
          "tools/smoke/install.sh mic --size 32768 --test-terrain wrap-test >/dev/null 2>&1; python3 tools/smoke/run.py --profile mic --fresh --chunky 128 --chunky-center seam 2>&1 | grep -E '\\[(PASS|FAIL)\\]|tw\\.|peak RSS|^(PASS|FAIL)'",
          [r"\[(PASS|FAIL)\] .*", r"tw\.\w+: .*", r"^(PASS|FAIL).*"],
@@ -84,8 +88,15 @@ def step_defs():
 def run_step(sid, flags, cmd):
     os.makedirs(LOGS, exist_ok=True)
     t0 = time.time()
-    r = subprocess.run([MAC, *flags, "--", cmd], cwd=REPO, capture_output=True, text=True, errors="replace")
-    out = r.stdout + r.stderr
+    if os.environ.get("PHASE0_DETACH"):
+        # Phase 1's exit re-runs this suite with each step detached on the VM (a dropped ssh session loses a wait, not a step).
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import phase1_detach
+        out, rc, _ = phase1_detach.run("p0-" + sid, cmd, flags=flags)
+        r = subprocess.CompletedProcess([], rc, "", "")
+    else:
+        r = subprocess.run([MAC, *flags, "--", cmd], cwd=REPO, capture_output=True, text=True, errors="replace")
+        out = r.stdout + r.stderr
     noise = re.compile(r"^(copying|building|fetching|these \d|  /nix|warning: Git|trace:|evaluation warning|mac\.sh: waiting)")
     out = "\n".join(l for l in out.splitlines() if not noise.match(l))
     open(os.path.join(LOGS, f"{sid}.log"), "w").write(out + "\n")
@@ -93,12 +104,18 @@ def run_step(sid, flags, cmd):
 
 
 def natives_row():
-    r = subprocess.run(["gh", "run", "list", "-R", "MinecraftIndustrialComplex/deep-time", "-w", "natives.yml", "-L", "1",
-                        "--json", "databaseId,conclusion,headSha,url,createdAt"], capture_output=True, text=True)
+    args = ["run", "list", "-R", "MinecraftIndustrialComplex/deep-time", "-w", "natives.yml", "-L", "1",
+            "--json", "databaseId,conclusion,headSha,url,createdAt"]
+    # NixOS keeps nothing installed globally: gh comes from nixpkgs when it is not on the PATH.
+    cmd = ["gh", *args] if shutil.which("gh") else ["nix", "run", "nixpkgs#gh", "--", *args]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True)
+    except OSError as e:
+        r = subprocess.CompletedProcess(cmd, 127, "", str(e))
     try:
         run = json.loads(r.stdout)[0]
         ok = run["conclusion"] == "success"
-        ev = [f"natives.yml run {run['databaseId']} ({run['createdAt'][:10]}, {run['headSha'][:7]}): {run['conclusion']} — "
+        ev = [f"natives.yml run {run['databaseId']} ({run['createdAt'][:10]}, {run['headSha'][:7]}): {run['conclusion']}: "
               "8 cross-builds, loaded by NativeSmoke on Windows x64/arm64, macOS arm64/x64, Linux gnu x64/arm64, musl x64/arm64",
               run["url"]]
     except Exception:
@@ -112,7 +129,7 @@ def build_page(rows, started):
     esc = html.escape
     trs = []
     for sid, title, ok, ev, secs in rows:
-        evh = "<br>".join(f'<a href="{esc(e)}">{esc(e)}</a>' if e.startswith("http") else f"<code>{esc(e)}</code>" for e in ev) or "—"
+        evh = "<br>".join(f'<a href="{esc(e)}">{esc(e)}</a>' if e.startswith("http") else f"<code>{esc(e)}</code>" for e in ev) or "n/a"
         log = f' · <a href="logs/{sid}.log">log</a>' if os.path.exists(os.path.join(LOGS, f"{sid}.log")) else ""
         trs.append(f'<tr class="{"ok" if ok else "bad"}"><td>{"PASS" if ok else "FAIL"}</td><td>{esc(title)}{log}'
                    f'<div class="t">{secs:.0f} s</div></td><td>{evh}</td></tr>')
@@ -122,8 +139,8 @@ def build_page(rows, started):
     commit = subprocess.run(["git", "-C", REPO, "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Deep Time — Phase 0</title>
-<meta name="description" content="Phase 0 exit of Deep Time: every bridge check re-run on {started[:10]} — natives, generator, Toroidal World wrap, biomes, water, renders.">
+<title>Deep Time: Phase 0</title>
+<meta name="description" content="Phase 0 exit of Deep Time: every bridge check re-run on {started[:10]}: natives, generator, Toroidal World wrap, biomes, water, renders.">
 <style>
 :root{{--bg:#fbfaf7;--fg:#1d1d1b;--mut:#6b6a66;--ok:#1f7a3d;--bad:#b3261e;--line:#e3e0d8;--card:#fff}}
 @media (prefers-color-scheme: dark){{:root:not([data-theme=light]){{--bg:#161614;--fg:#ecebe6;--mut:#a3a19a;--ok:#5cc987;--bad:#ff8a80;--line:#34332f;--card:#1f1e1c}}}}
@@ -137,7 +154,7 @@ tr.ok td:first-child{{color:var(--ok)}} tr.bad td:first-child{{color:var(--bad)}
 code{{font-size:12.5px;overflow-wrap:anywhere}} a{{color:inherit}} ul{{padding-left:20px}}
 @media (max-width:640px){{td{{display:block;border-top:none}} tr{{display:block;border-top:1px solid var(--line)}}}}
 </style></head><body><main>
-<h1>Deep Time — Phase 0</h1>
+<h1>Deep Time: Phase 0</h1>
 <div class="sub">The bridge from a simulated planet to a Minecraft world. Re-run end to end on {esc(started)} at commit {esc(commit)}, on Ben's M6 Mac mini (builds, GameTests, servers) and GitHub Actions (natives).</div>
 <div class="sum">{passed} of {len(rows)} checks pass</div>
 <table>{''.join(trs)}</table>
