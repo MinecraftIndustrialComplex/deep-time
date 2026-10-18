@@ -3,13 +3,17 @@
 //! surface has left any planet's range of heights stops with an error that says so, instead of
 //! baking peaks of 10²⁹ m for hours.
 //!
-//! The bound is several times Earth's whole relief, from Everest's summit to the floor of the
-//! Challenger Deep (19.8 km), measured from the sea; below Earth's gravity it grows as g_E/g, as
-//! the height a crust of given strength holds does (ISO-021), and it does not shrink above it (the
-//! plate model's own guard, ISO-025, does not scale with gravity). It is a stop, not a cap:
-//! nothing is clamped, and a surface inside it is not touched. Real relief on Earth is a fifth
-//! of it, and the shipped presets' highest transient peaks (a plate-model uplift spike lifted by
-//! the flexure, about 30 km for a step) a third.
+//! The bound is twelve times Earth's whole relief, from Everest's summit to the floor of the
+//! Challenger Deep (19.8 km), measured from the sea: 237 km. Below Earth's gravity it grows as
+//! g_E/g, as the height a crust of given strength holds does (ISO-021), and it does not shrink
+//! above it (the plate model's own ceiling, ISO-025, does not scale with gravity). It is a stop,
+//! not a cap: nothing is clamped, and a surface inside it is not touched. Real relief is a
+//! twelfth of it. The plate model now and then lifts a patch by tens of km in one step, and a
+//! stiff plate holds part of the root behind it up for a step or two: transients of up to 112 km
+//! were measured on the 1:300 presets, before the fix and after it (build log 2026-10-18), and a
+//! sound step could reach about 7 x the plate model's 30 km ceiling (the whole thickening held
+//! up, 1 / (1 - k) = 7), 210 km. The bound sits above both; a diverging surface grows past it
+//! within a few steps.
 
 use rayon::prelude::*;
 
@@ -23,7 +27,7 @@ pub const EVEREST_M: f64 = 8848.86; // ledger: ISO-071
 /// The ocean's deepest point below the sea, m: the Challenger Deep in the Mariana Trench.
 pub const CHALLENGER_DEEP_M: f64 = 10_925.0; // ledger: ISO-071
 /// How many times Earth's relief a cell may stand from the sea before the run stops.
-pub const RELIEF_MULTIPLE: f64 = 5.0; // ledger: ISO-072 (game-choice: a margin, agent 2026-10-18)
+pub const RELIEF_MULTIPLE: f64 = 12.0; // ledger: ISO-072 (game-choice: a margin, agent 2026-10-18)
 
 /// The farthest a cell may stand from the sea, up or down, m, at surface gravity `g` (m/s²).
 // ledger: ISO-072
@@ -77,12 +81,12 @@ pub fn check(
 mod tests {
     use super::*;
 
-    /// The bound is five Earth reliefs at Earth's gravity, grows below it and holds above it; a
+    /// The bound is twelve Earth reliefs at Earth's gravity, grows below it and holds above it; a
     /// surface inside it passes, a cell past it or not finite stops the run and is named.
     #[test]
     fn a_surface_past_any_planets_relief_stops_the_run() {
         let earth = bound_m(G_EARTH);
-        assert!((earth - 98_869.3).abs() < 0.1, "{earth}");
+        assert!((earth - 237_286.3).abs() < 0.1, "{earth}");
         assert!((bound_m(0.38 * G_EARTH) - earth / 0.38).abs() < 1e-6);
         assert_eq!(bound_m(2.0 * G_EARTH), earth);
         let (w, sea) = (4, 40.0);
@@ -90,11 +94,11 @@ mod tests {
             -11_000.0, 8_849.0, 30_000.0, -5000.0, 0.0, 2000.0, 300.0, 1.0,
         ];
         assert!(check(w, &h, sea, G_EARTH, -10.0).is_ok());
-        h[6] = 120_000.0;
-        h[5] = -110_000.0;
+        h[6] = 250_000.0;
+        h[5] = -240_000.0;
         let e = check(w, &h, sea, G_EARTH, -10.0).unwrap_err().to_string();
         assert!(e.contains("diverged at -10.0 Myr"), "{e}");
-        assert!(e.contains("cell (2, 1) stands 119960 m"), "{e}");
+        assert!(e.contains("cell (2, 1) stands 249960 m"), "{e}");
         // The same height is inside the bound on a small, light planet.
         assert!(check(w, &h, sea, 0.3 * G_EARTH, -10.0).is_ok());
         h[1] = f64::NAN;

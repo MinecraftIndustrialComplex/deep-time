@@ -91,7 +91,7 @@ The plate equation, as coded (ISO-040):
 | ISO-069 | The plate model's resolution | its root bends the plate only low-passed at its sample spacing (two binomial passes on the quick presets) | – | none | `game-choice` (numerical) |
 | ISO-070 | The spreading's root | bends nothing: the spreading's change stays locally compensated | – | none (its physics from memory of Clark & Royden 2000) | `game-choice` (numerical) |
 | ISO-071 | Earth's relief | Everest 8,848.86 m above the sea, the Challenger Deep 10,925 m below | m | Dangol et al. 2020; Stewart & Jamieson 2019 | `verified` |
-| ISO-072 | The surface guard | a cell farther from the sea than 5 × 19,774 m × max(1, g_E/g) stops the run | m | none (a margin) | `game-choice` |
+| ISO-072 | The surface guard | a cell farther from the sea than 12 × 19,774 m × max(1, g_E/g) stops the run | m | none (a margin) | `game-choice` |
 | ISO-061 to ISO-064 | What counts as a load | see the ledger | | none | `uncited`, one `game-choice` |
 
 Numerical choices (smoothing of `Te`, the solve's cell size, tolerance, the preconditioner) are
@@ -143,20 +143,31 @@ map's metres, so on a large planet its cells are wide (39 km on the Earth-sized 
 1,222.5 m per block, 3.2 km at 1:100) and nothing holds cells near the strength height. Cells far
 above it spread strongly enough (λ about 2.5 for a checkerboard) for the split to grow: peaks
 became pits and pits peaks every step, by 40 to 70 km, and the Earth-sized planet reached
-3.3 × 10²⁹ m in 500 Myr. A milder form showed at 1:300 (35 km); 1:100 did not grow, because its
-spreading holds plateaus at the strength height, where the spreading barely moves.
+3.3 × 10²⁹ m in 500 Myr. A milder form showed at 1:300: over a traced 500 Myr run the median
+step's highest cell after the flexure was 11.6 km, and 6.0 km after the fix. 1:100 did not grow
+(6.7 and 5.8 km), because its spreading holds plateaus at the strength height, where the
+spreading barely moves.
 
 **The fix** (ISO-070). The spreading's law is the floating answer of the lower crust's flow, so
 its change now stays locally compensated and the plate answers none of it. The coupling is then
 stable at every cell size. The plate model's uplift still bends the plate as before (ISO-069).
 
 **The guard** (ISO-071, ISO-072). After the flexure, every step, the surface stage stops the run
-with an error when a cell is not finite or stands farther from the sea than five times Earth's
-relief (Everest's summit 8,848.86 m to the Challenger Deep 10,925 m: 98.9 km), times g_E/g below
-Earth's gravity. Nothing is clamped. The error names the time, the cell and the bound. What is
-left after the fix stays well inside it: the plate model now and then lifts a few cells by 15 to
-20 km in a step, the flexure adds the low-passed root of that uplift for a step, and erosion takes
-it down again.
+with an error when a cell is not finite or stands farther from the sea than twelve times Earth's
+relief (Everest's summit 8,848.86 m to the Challenger Deep 10,925 m: 237 km), times g_E/g below
+Earth's gravity. Nothing is clamped. The error names the time, the cell and the bound. With the
+old coupling put back, the Earth-sized planet's 500 Myr bake stops after 92 s, at −388 Myr with a
+cell 263.8 km above the sea, where it had run 3.56 h to 3.3 × 10²⁹ m.
+
+**What is left, and why the margin is wide.** The plate model now and then lifts a patch by tens
+of km in one step (up to 16.5 mm/yr, 33 km a step, against its 30 km ceiling, ISO-025); a stiff
+plate holds part of the root behind that uplift up (ISO-069), and erosion takes it down within a
+step or two. These transients are there with and without the fix and at every scale: up to
+112 km after the flexure in four traced 500 Myr runs at 1:300 and 1:100. A bound of five Earth
+reliefs (98.9 km), tried first, stopped a shipped bake (`earthlike_quick_16k`, scattered, seed 2,
+at −272 Myr), so the bound sits above them and above the about 210 km a sound step could reach
+(the 30 km ceiling with the whole thickening held up, 7 times). The transients themselves are the
+plate model's to fix (an open question below).
 
 ## Game choices
 
@@ -170,6 +181,9 @@ it down again.
 
 ## Open questions
 
+- The plate model's one-step uplift spikes (up to 33 km in a step over hundreds of cells) and the
+  tens of km the flexure then holds up for a step: which plate process makes them was not traced
+  (build log 2026-10-18, the surface divergence).
 - The recovery law of continental `Te` (ISO-051) has no source for its form or its 300 Myr.
 - Densities (ISO-043 to ISO-047) are uncited, and the model uses three different crust densities
   elsewhere (see [isostasy-and-height-limit.md](isostasy-and-height-limit.md)).
