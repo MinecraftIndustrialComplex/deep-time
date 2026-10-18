@@ -237,15 +237,25 @@ public final class StrataPass {
      * The rock the strata pass paints at (x, y, z) where the crust is: the horizon's block, or a
      * body's where one names a class there (as {@link #paintBodies} decides). Null above the
      * horizons or where nothing resolves (the crust stays). For tests and probes.
+     *
+     * <p>Bodies paint in id order and a body only replaces crust or the horizon's own block, so of
+     * two bodies that hold a block the first to paint keeps it (a gossan's ironstone under a later
+     * placer's gravel stays ironstone), unless its rock is itself crust or the horizon's block.
+     *
+     * <p>Not the skin: the leached cap an exposed gossan paints onto the ground ({@link GossanSkin})
+     * follows the generated surface, which this pure prediction cannot see. The cap's blocks are
+     * known as a window ({@link GossanSkin.Caps#holdsNoOre}), and a test that predicts a host for
+     * ore asks that first: no ore is placed in the cap (DEP-212), so there is no host to predict.
      */
     public static BlockState predictedRock(WorldData wd, int x, int y, int z) {
         RockPalette palette = RockPalette.get();
-        BlockState rock = null;
+        BlockState horizon = null;
         if (wd.has(LAYER)) {
             var h = horizonAt(wd, x, y, z);
             if (h.isPresent())
-                rock = palette.block(h.get().rockClass(), h.get().key());
+                horizon = palette.block(h.get().rockClass(), h.get().key());
         }
+        BlockState rock = horizon;
         int c = wd.circumference();
         for (var b : wd.deposits().bodiesIn(x, y, z, x, y, z)) {
             var at = b.locate(c, x, y, z);
@@ -258,7 +268,7 @@ public final class StrataPass {
             if (cls == null)
                 continue;
             BlockState r = palette.block(cls, bodyKey(b.id()));
-            if (r != null)
+            if (r != null && (rock == null || isCrust(rock) || rock == horizon))
                 rock = r;
         }
         return rock;

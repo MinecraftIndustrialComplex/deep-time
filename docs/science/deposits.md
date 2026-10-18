@@ -7,7 +7,7 @@ active rows, 77 are `verified`, 37 rest on an abstract, 20 name a source nobody 
 contradicted its sources: the secular clocks (below) were never applied to a real history, so no
 banded iron formation could form.
 
-Ledger ids on this page: `DEP-001` to `DEP-211` ([ledger/DEP.md](ledger/DEP.md)) and `ORE-001` to
+Ledger ids on this page: `DEP-001` to `DEP-213` ([ledger/DEP.md](ledger/DEP.md)) and `ORE-001` to
 `ORE-269` ([ledger/ORE.md](ledger/ORE.md)); rows marked `merged` are owned by the row they name.
 
 Changed on 2026-10-02 by the owner's answers on deposits (decisions log 2026-10-02): inherited
@@ -184,6 +184,32 @@ Two rules are the project's, not the sources' (coordinator's calls, decisions lo
   for the buried ones, and six is above the first and well under the second. One exception: a
   block inside a placer's body (loose rock that carries ore) keeps its gravel or sand, because the
   ore step puts a placer's gold only into loose blocks and the cap would leave it none.
+- **A leached cap holds no copper** (DEP-212, coordinator's call, decisions log 2026-10-18). Leached
+  means the copper was dissolved out and carried down to the supergene blanket at the top of the
+  water table (SIR 2010-5070-B p. 67, p. 120). Silver Bell's 30 m remnant leached capping
+  "averaged 300 ppm Cu" (Cook and Porter 2005, PDF p. 14), about 0.03 % against the porphyry's
+  median grade of 0.44 % Cu (DEP-002): a cap is depleted, and the game reads depleted as none. The
+  ore step therefore places none of the porphyry's ore in the cap's blocks. It matters in the pack
+  with Excavated Variants, where the ore block is named for its host rock: the skin repainted the
+  ground over the ore body, the ore step took the painted block for host rock and put the copper
+  block of that rock (the red-sandstone copper, where the pack's ironstone is the fallback red
+  sandstone) into a cap that should hold none. Two kinds of ore stay, because leaching removes copper and not these: the
+  gossan's own gold (its `gossan_gold` zone, density 0.02, the data file's "carries gold": an
+  iron cap over a gold-bearing system is where prospectors looked for gold) and a placer's gold
+  (its gravel is not the cap; the skin leaves it alone). Only the cap's blocks are ore-free, not
+  the whole gossan body: the body's cells below the cap, where the supergene blanket forms, are
+  drawn as before.
+- **The cap is named by a window, not read back** (DEP-213). The ore step cannot read the skin's
+  blocks, because the carvers and the features before it have already changed the column the skin
+  scanned (a cave mouth under a cap, a ravine cut through it). The rule is a pure window of the
+  column instead: from the ground the terrain model gives (the noise cells' interpolated surface,
+  the one the water pass reads as the column's ground), `ground + 3` down to
+  `ground - thickness - 2`, three blocks wider than the cap each way. The skin hangs the cap from
+  the ground it finds, held to the model's ground within three blocks, so every block it repaints
+  is inside the window. The window over-excludes (a block three blocks above the cap's top is
+  ore-free too, wet or dry), which costs a thin skin of the porphyry's ore and is the price of a
+  rule that needs no block read. In the test world the model agreed with the generated ground to
+  within three blocks in all 1,631 capped columns, so the hold never acted.
 
 ## Equations and constants
 
@@ -209,6 +235,8 @@ The main constants by family; the ledgers hold every row.
 | DEP-209 | Gossan (leached cap) thickness | water table depth (`deeptime:water_table_depth_m`), at least the file's 40 m, at most 300 m | m | SIR 2010-5070-B pp. 65, 67, 120; Cook and Porter 2005 (Inspiration 0 to 300 m) | `verified` (the ranges and the water-table link); the mapping from depth to thickness is the project's |
 | DEP-210 | Least gossan thickness | 2 blocks (70 m at 35 m per block) | blocks | none (game choice, coordinator 2026-10-17) | `game-choice` |
 | DEP-211 | Exposed gossan crops out as bare rock | the top blocks of the ground (as many as the cap is thick, at least 2) in the cap's footprint become its rock when the ground at its centre is at most 6 blocks above its top | blocks | none (game choice, coordinator 2026-10-17; the 6 is the implementing agent's) | `game-choice` |
+| DEP-212 | A leached cap holds no ore | no ore of the porphyry's bodies in the cap's window; the gossan's own gold and a placer's gold stay | blocks | SIR 2010-5070-B pp. 67, 120; Cook and Porter 2005 PDF p. 14 (Silver Bell 30 m cap, 300 ppm Cu) | `game-choice` (coordinator 2026-10-18; the sources support a depleted cap) |
+| DEP-213 | Cap held to the terrain model's ground | the skin's cap within 3 blocks of the model's ground; the ore-free window 3 blocks beyond the cap each way | blocks | none (game choice, implementing agent 2026-10-18) | `game-choice` |
 | DEP-062 | Banded iron formation tonnage | 11 / 170 / 2,400 (n 66) | Mt | Bulletin 1693 model 34a, Fig. 172 | `verified` |
 | DEP-063 | Banded iron formation grade | 30 / 53 / 66 | % Fe | same, Fig. 173 | `verified` |
 | DEP-065 | Banded iron formation density | 1 / 4 / 12 | per 100,000 km² | none (placeholder) | `uncited` |
@@ -530,9 +558,10 @@ The rules (ORE-269):
   are 1.75 times the values tuned at 20 m per block, so at 35 m per block bodies keep the height
   in blocks they had (Ben, decisions log 2026-10-03, "Keep today's block height").
 - Placer gold moved into a real river channel within 30 km at the bake (Ben, 2026-10-01).
-- The gossan: thick as the water table is deep within 2 blocks and 300 m, and bare rock where it
-  crops out (coordinator's calls, decisions log 2026-10-17; DEP-209 to DEP-211). The cap's
-  thickness follows the sources for leached caps; the two-block floor and the bare outcrop are
+- The gossan: thick as the water table is deep within 2 blocks and 300 m, bare rock where it
+  crops out, and holding none of the porphyry's ore (coordinator's calls, decisions log 2026-10-17
+  and 2026-10-18; DEP-209 to DEP-213). The cap's thickness and its being leached follow the
+  sources for leached caps; the two-block floor, the bare outcrop and "none" for "depleted" are
   the project's.
 - Partial placer shedding (Ben, 2026-10-05, "Reword check + partial shedding"): a porphyry the surface
   only cuts sheds a placer in proportion to the share of its volume eroded (DEP-207), with a floor
