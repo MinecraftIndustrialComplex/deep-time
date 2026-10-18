@@ -244,7 +244,8 @@ impl PlatesStage {
         let tectonics = self.preset.tectonics.clone();
         let env = self.env(&tectonics, step);
         let k = env.k;
-        self.apply_surface_feedback(st, world, &env)?;
+        let mut cones = self.apply_surface_feedback(st, world, &env)?;
+        cones.resize(st.samples.len(), [0.0; 2]);
         lap(&mut clock, "feedback");
         // The land's gap budget (`gap_budget.rs`, measurement only): each process's change of the
         // gap between the samples' elevation and their columns' Airy height.
@@ -300,7 +301,7 @@ impl PlatesStage {
             .entry(belts::KEPT_GLOBAL.to_owned())
             .or_insert(0.0) += kept;
         lap(&mut clock, "belts");
-        let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
+        let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env, &mut cones);
         book(st, gap_budget::Part::Arcs);
         *world
             .globals
@@ -310,6 +311,16 @@ impl PlatesStage {
             .globals
             .entry(subduction::ARC_OCEANIC_GLOBAL.to_owned())
             .or_insert(0.0) += pull.arc_oceanic_km3;
+        for (name, x) in [
+            (
+                subduction::ARC_FRONT_CONTINENTAL_GLOBAL,
+                pull.front_continental_km_myr,
+            ),
+            (subduction::ARC_FRONT_OCEANIC_GLOBAL, pull.front_oceanic_km_myr),
+            (subduction::CORDILLERA_GLOBAL, pull.cordillera_km3),
+        ] {
+            *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
+        }
         lap(&mut clock, "fronts");
         // The boundary mix (measurement only) on the same samples as the fronts, before the
         // collapse below turns any crust over.
@@ -397,7 +408,7 @@ impl PlatesStage {
         sutured |= !healed.is_empty();
         merged.extend(healed);
         lap(&mut clock, "collision");
-        hotspots::step(st, world, &pos, &tree, &env)?;
+        hotspots::step(st, world, &pos, &tree, &env, &mut cones)?;
         book(st, gap_budget::Part::Hotspots);
         lap(&mut clock, "hotspots");
         surface(st, &cache.geo, &env, &taper.floor_m);
@@ -564,14 +575,24 @@ impl PlatesStage {
     /// the sediment pool); what was applied is sampled back onto L1
     /// (`surface/feedback_applied_m`, a diagnostic). Runs before the step's motion, on the
     /// positions of the last sampling.
+    ///
+    /// The volcano stage's cones (`surface/volcanic_felsic_m`, `surface/volcanic_mafic_m`) join
+    /// the pools as felsic and mafic volcanic rock the same way, after the material (plate task
+    /// 8: before, a cone was elevation only and its erosion stripped the crust under it).
+    /// Returns, per sample, the cone rock it received (felsic, mafic, m; empty without feedback),
+    /// which the arcs and hotspots count inside their own rates.
     fn apply_surface_feedback(
         &mut self,
         st: &mut PlateState,
         world: &mut WorldState,
         env: &Env<'_>,
-    ) -> Result<(), CoreError> {
+    ) -> Result<Vec<[f64; 2]>, CoreError> {
+        let cone_fields = [
+            world.fields.remove(crate::surface::field::VOLCANIC_FELSIC),
+            world.fields.remove(crate::surface::field::VOLCANIC_MAFIC),
+        ];
         let Some(fb) = world.fields.remove(crate::surface::field::FEEDBACK) else {
-            return Ok(());
+            return Ok(Vec::new());
         };
         let material = world.fields.remove(crate::surface::field::MATERIAL);
         // The surface's parts of the feedback, for the gap budget (`gap_budget.rs`).
@@ -582,8 +603,10 @@ impl PlatesStage {
             .collect();
         let grid = self.l1_grid()?;
         if fb.data.len() != grid.cells() {
-            return Ok(());
+            return Ok(Vec::new());
         }
+        let cone_fields: [Option<Field>; 2] =
+            cone_fields.map(|f| f.filter(|f| f.data.len() == grid.cells()));
         let parts: Option<Vec<Field>> = if st.gap_budget.is_some() {
             parts
                 .into_iter()
@@ -608,11 +631,13 @@ impl PlatesStage {
         let mut wsum = vec![0.0f64; n];
         let mut zsum = vec![0.0f64; n];
         let mut msum = vec![0.0f64; n];
+        let mut csum = vec![[0.0f64; 2]; n];
         let mut psum = vec![[0.0f64; SP]; if parts.is_some() { n } else { 0 }];
         for (c, l) in coupling.links().iter().enumerate() {
             let t = tris[l.tri as usize];
             let dz = f64::from(fb.data[c]);
             let dm = material.as_ref().map_or(dz, |m| f64::from(m.data[c]));
+            let cone = [0, 1].map(|k| cone_fields[k].as_ref().map_or(0.0, |f| f64::from(f.data[c])));
             let pc = parts
                 .as_ref()
                 .map(|p| std::array::from_fn::<f64, SP, _>(|k| f64::from(p[k].data[c])));
@@ -623,6 +648,8 @@ impl PlatesStage {
                     wsum[v] += w;
                     zsum[v] += w * dz;
                     msum[v] += w * dm;
+                    csum[v][0] += w * cone[0];
+                    csum[v][1] += w * cone[1];
                     if let Some(pc) = pc {
                         for (a, x) in psum[v].iter_mut().zip(pc) {
                             *a += w * x;
@@ -647,19 +674,40 @@ impl PlatesStage {
                 f64::from(s.elevation_m) - f64::from(z0)
             })
             .collect();
-        st.samples.par_iter_mut().enumerate().for_each(|(v, s)| {
-            if wsum[v] <= 0.0 {
-                return;
-            }
-            let dm = msum[v] / wsum[v];
-            if dm < 0.0 {
-                pools::strip(&mut s.pools, -dm);
-            } else {
-                s.pools[pool::SEDIMENT] += dm as f32;
-            }
-            pools::diagenesis(&mut s.pools, env.gravity);
-            s.thickness_m = s.pools.iter().sum();
-        });
+        let gravity = env.gravity;
+        let applied: Vec<([f64; 2], f64)> = st
+            .samples
+            .par_iter_mut()
+            .enumerate()
+            .map(|(v, s)| {
+                if wsum[v] <= 0.0 {
+                    return ([0.0; 2], 0.0);
+                }
+                let dm = msum[v] / wsum[v];
+                if dm < 0.0 {
+                    pools::strip(&mut s.pools, -dm);
+                } else {
+                    s.pools[pool::SEDIMENT] += dm as f32;
+                }
+                // The cones' rock, on top (a caldera's collapse takes back what its summit had).
+                let before = s.pools;
+                let mut got = [0.0f64; 2];
+                for (k, p) in [pool::FELSIC_VOLCANIC, pool::MAFIC_VOLCANIC].into_iter().enumerate() {
+                    let x = (csum[v][k] / wsum[v]).max(-f64::from(s.pools[p]));
+                    s.pools[p] += x as f32;
+                    got[k] = x;
+                }
+                let cone_iso = pools::isostatic_change_m(&before, &s.pools, gravity);
+                pools::diagenesis(&mut s.pools, gravity);
+                s.thickness_m = s.pools.iter().sum();
+                (got, cone_iso)
+            })
+            .collect();
+        let area = env.norm.sample_area_km2();
+        for (k, name) in [CONE_FELSIC_GLOBAL, CONE_MAFIC_GLOBAL].into_iter().enumerate() {
+            let km3: f64 = applied.iter().map(|(c, _)| c[k]).sum::<f64>() * area / 1000.0;
+            *world.globals.entry(name.to_owned()).or_insert(0.0) += km3;
+        }
         if let Some(gb) = st.gap_budget.as_mut() {
             let mean = |sum: &dyn Fn(usize) -> f64| -> Vec<f64> {
                 (0..n)
@@ -675,17 +723,18 @@ impl PlatesStage {
                 }
             };
             let surface: Vec<Vec<f64>> = (0..SP).map(part).collect();
-            gb.book_surface(&st.samples, &m, &surface);
+            let cone_iso: Vec<f64> = applied.iter().map(|&(_, x)| x).collect();
+            gb.book_surface(&st.samples, &m, &surface, &cone_iso);
         }
-        let applied = coupling.interpolate(mesh, |v| dz[v as usize]);
+        let applied_dz = coupling.interpolate(mesh, |v| dz[v as usize]);
         world.fields.insert(
             crate::surface::field::FEEDBACK_APPLIED.to_owned(),
             Field {
                 grid,
-                data: applied.into_iter().map(|x| x as f32).collect(),
+                data: applied_dz.into_iter().map(|x| x as f32).collect(),
             },
         );
-        Ok(())
+        Ok(applied.into_iter().map(|(c, _)| c.map(|x| x.max(0.0))).collect())
     }
 
     /// The surface's flexure (`surface/flexure_m`) per sample, through the last L1 sampling's
@@ -754,6 +803,12 @@ impl PlatesStage {
         Ok(())
     }
 }
+
+/// `WorldState::globals`: the volcano stage's cones handed to the pools as felsic volcanic rock
+/// over the run, km³ (Earth-normalized; net of calderas' collapse).
+pub const CONE_FELSIC_GLOBAL: &str = "plates/cone_felsic_km3";
+/// … and as mafic volcanic rock (shields, the flood basalts' plateaus), km³.
+pub const CONE_MAFIC_GLOBAL: &str = "plates/cone_mafic_km3";
 
 /// `WorldState::globals`: visible continental sample-steps standing at the elevation cap, and all
 /// visible continental sample-steps.
@@ -828,6 +883,8 @@ fn note_dynamics(st: &PlateState, world: &mut WorldState) {
 /// neighbour of the same rigid group).
 fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32]) {
     let k = env.k;
+    let per_m = transition::crust_per_metre(env);
+    let held_cap = 0.5 * (transition::continental_m() + transition::oceanic_m());
     let rates = SurfaceRates {
         erosion_m: k.continental_erosion_mm_yr * 1.0e-3 * env.dt_yr,
         damping_m: k.oceanic_damping_mm_yr * 1.0e-3 * env.dt_yr,
@@ -843,7 +900,23 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32]) {
         .samples
         .par_iter_mut()
         .enumerate()
-        .map(|(i, s)| surface_step(s, &rates, held_floor.get(i).copied().unwrap_or(f32::NAN)))
+        .map(|(i, s)| {
+            // Thicker ocean crust than the ocean's own (an island arc, a plateau, stacked crust)
+            // cools towards the floor its crust holds up, on the transition's height line,
+            // never above the half-way column's (plate task 8; the gap budget's recommendation
+            // 3: with arcs raised by their thickness, the bare floor would sink them).
+            // ledger: PLT-264
+            let mut held = held_floor.get(i).copied().unwrap_or(f32::NAN);
+            if !held.is_finite() && s.kind == OCEANIC {
+                held = transition::held_floor_m(
+                    transition::crystalline_m(&s.pools),
+                    held_cap,
+                    k.oceanic_floor_elevation_m,
+                    per_m,
+                ) as f32;
+            }
+            surface_step(s, &rates, held)
+        })
         .collect();
     let samples = &st.samples;
     let targets: Vec<(u32, f32)> = (0..samples.len())
@@ -891,18 +964,16 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
         })
         .collect();
     let dt_yr = env.dt_yr;
-    // Island-arc crust becomes continental crust once the arc has built enough of it, whatever
-    // its height (2026-10-02). Continental crust is defined by its thickness and buoyancy: arc
-    // crust thicker than about 15 km is too buoyant to subduct and jams a trench like a
-    // continent, which an arc built on ocean crust reaches after more than about 20 Myr of
-    // activity (Cloos 1993). The model's arc magma (`arc_magma_m_per_myr`, 20 m/Myr at the axis
-    // at v_0) is not a physical thickness (arcs thicken by several hundred m/Myr, Stern 2010), so
-    // the rule counts Cloos's time in it: `arc_maturity_myr` of arc magma at the axis at full
-    // rate (ledger: PLT-047). Until 2026-10-02 a mature arc also had to stand above sea level
-    // that step; most intra-oceanic arcs are submarine (Stern 2010), and the height the plate
-    // model sees is the surface's bent height, so flexure cut the continents' growth (build log
-    // "Continental crust bisect").
-    let mature_m = (env.k.arc_magma_m_per_myr * env.k.arc_maturity_myr) as f32;
+    // Island-arc crust becomes continental crust once it is thick enough, whatever its height
+    // (2026-10-02; by thickness since plate task 8). Continental crust is defined by its
+    // thickness and buoyancy: arc crust thicker than about 15 km is too buoyant to subduct and
+    // jams a trench like a continent, which an arc built on ocean crust reaches after more than
+    // about 20 Myr of activity (Cloos 1993). The arc's crust (`arc_oceanic_m`, at the sourced
+    // rates, `subduction.rs`) on top of the ocean's own 7 km counts (ledger: PLT-047), not the
+    // column's thickness: the plate model keeps crust stacked at resamplings under the oceanic
+    // label (`transition.rs`), and that is no arc. Until 2026-10-02 a mature arc also had to
+    // stand above sea level that step; most intra-oceanic arcs are submarine (Stern 2010).
+    let mature_m = (env.k.arc_mature_crust_km * 1000.0 - transition::oceanic_m()).max(0.0) as f32;
     st.samples.par_iter_mut().enumerate().for_each(|(i, s)| {
         if s.kind == OCEANIC
             && !s.is_hidden()

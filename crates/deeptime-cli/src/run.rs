@@ -255,7 +255,7 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
     };
     Some(
         format!(
-            "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} foundered_km3={:.3e} collision_crossed_km3={:.3e} collision_kept_km3={:.3e} resample_accreted_km3={:.3e} resample_stacked_km3={:.3e} resample_accreted_continent_km3={:.3e} resample_accreted_visible_km3={:.3e} arc_continental_km3={:.3e} arc_oceanic_km3={:.3e} continental_volume_km3={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
+            "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} foundered_km3={:.3e} collision_crossed_km3={:.3e} collision_kept_km3={:.3e} resample_accreted_km3={:.3e} resample_stacked_km3={:.3e} resample_accreted_continent_km3={:.3e} resample_accreted_visible_km3={:.3e} resample_accreted_rise_km3={:.3e} arc_continental_km3={:.3e} arc_oceanic_km3={:.3e} arc_front_continental_km_myr={:.3e} arc_front_oceanic_km_myr={:.3e} cordillera_shortened_km3={:.3e} hotspot_magma_km3={:.3e} cone_felsic_km3={:.3e} cone_mafic_km3={:.3e} continental_volume_km3={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
             deeptime_core::plates::stats::summary(st).line(),
             global(collapse::MOVED_GLOBAL),
             global(collapse::GAINED_GLOBAL),
@@ -266,8 +266,15 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
             global(deeptime_core::plates::ridges::STACKED_CONSUMED_GLOBAL),
             global(deeptime_core::plates::ridges::ACCRETED_HIDDEN_CONTINENT_GLOBAL),
             global(deeptime_core::plates::ridges::ACCRETED_VISIBLE_GLOBAL),
+            global(deeptime_core::plates::ridges::ACCRETED_RISE_GLOBAL),
             global(deeptime_core::plates::subduction::ARC_CONTINENTAL_GLOBAL),
             global(deeptime_core::plates::subduction::ARC_OCEANIC_GLOBAL),
+            global(deeptime_core::plates::subduction::ARC_FRONT_CONTINENTAL_GLOBAL),
+            global(deeptime_core::plates::subduction::ARC_FRONT_OCEANIC_GLOBAL),
+            global(deeptime_core::plates::subduction::CORDILLERA_GLOBAL),
+            global(deeptime_core::plates::hotspots::MAGMA_GLOBAL),
+            global(deeptime_core::plates::CONE_FELSIC_GLOBAL),
+            global(deeptime_core::plates::CONE_MAFIC_GLOBAL),
             global(deeptime_core::plates::subduction::CONTINENTAL_VOLUME_GLOBAL),
             q(0.1),
             q(0.5),
