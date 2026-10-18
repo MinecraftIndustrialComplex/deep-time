@@ -6,7 +6,7 @@ uncited, or game choices. The measurements are from small ensembles of four runs
 were made before the last change of one constant (see "Earth against the mod"). Updated 2026-10-18
 for the polar holes (ISO-056 rewritten, ISO-074 to ISO-076 added; six runs).
 
-Ledger ids on this page: `ISO-040` to `ISO-076` (see [ledger/ISO.md](ledger/ISO.md)).
+Ledger ids on this page: `ISO-040` to `ISO-077` (see [ledger/ISO.md](ledger/ISO.md)).
 
 ## What you see in the world
 
@@ -97,7 +97,8 @@ The plate equation, as coded (ISO-040):
 | ISO-071 | Earth's relief | Everest 8,848.86 m above the sea, the Challenger Deep 10,925 m below | m | Dangol et al. 2020; Stewart & Jamieson 2019 | `verified` |
 | ISO-072 | The surface guard | a cell farther from the sea than 12 × 19,774 m × max(1, g_E/g) stops the run | m | none (a margin) | `game-choice` |
 | ISO-074 | The step records' polar band | rows at 60° of latitude or more | ° | none (a reporting band) | `game-choice` |
-| ISO-076 | Earth's fastest vertical rates | exhumation 9 to 13 mm/yr, denudation 8 to more than 30, rebound 11, subsidence 9 to 12; sustained over millions of years, below 1 mm/yr | mm/yr | Guevara et al. 2022, Govin et al. 2020, Lidberg et al. 2010, Brothers et al. 2009, Garzione et al. 2008, Xie & Heller 2009 and others (the ledger) | `verified` |
+| ISO-076 | Earth's fastest vertical rates | exhumation 9 to 13 mm/yr, rebound 11, subsidence 9 to 12; sustained over millions of years, below 1 mm/yr | mm/yr | Guevara et al. 2022, Govin et al. 2020, Lidberg et al. 2010, Brothers et al. 2009, Garzione et al. 2008, Xie & Heller 2009 and others (the ledger) | `verified` |
+| ISO-077 | Two more fast rates | denudation 8 to more than 30 mm/yr (Taiwan), rebound about 10 (Hudson Bay) | mm/yr | Deng et al. 2021, Sella et al. 2007 | `abstract-only` |
 | ISO-061 to ISO-064 | What counts as a load | see the ledger | | none | `uncited`, one `game-choice` |
 
 Numerical choices (smoothing of `Te`, the solve's cell size, tolerance, the preconditioner) are
@@ -249,13 +250,13 @@ into the plates, and the runs diverge. The surface is not different in kind. Its
 percentiles were 726, 2,965 and 5,053 m before and 715, 2,959 and 5,065 m after. The sea's median
 depth was 3,142 m before and 3,147 m after.
 
-**Against Earth's rates** (ISO-076). A step is 2 Myr, so 1 mm/yr is 2 km a step. The fastest
+**Against Earth's rates** (ISO-076, ISO-077). A step is 2 Myr, so 1 mm/yr is 2 km a step. The fastest
 vertical rates measured on Earth run from a few mm/yr to a few tens:
 
 - exhumation: 9 to 13 mm/yr at Nanga Parbat over the last million years, "the fastest known
   intracontinental exhumation rates" (Guevara et al. 2022), and 8.6 km/Myr at Namche Barwa (Govin
   et al. 2020);
-- denudation: 8 to more than 30 mm/yr in Taiwan (Deng et al. 2021, abstract);
+- denudation: 8 to more than 30 mm/yr in Taiwan (Deng et al. 2021, abstract only, ISO-077);
 - glacial rebound: up to 11 mm/yr (Lidberg et al. 2010);
 - subsidence: 9 to 12 mm/yr at the Salton Sea over 1,200 years (Brothers et al. 2009).
 
