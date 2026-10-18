@@ -188,7 +188,9 @@ plate model's; since 2026-10-18 its rate limits bound them (an open question bel
   rises" (PLT-287, PLT-288): no plate step now raises a column more than 7 km. The guard's worst
   over six 500 Myr runs of `earthlike_quick_16k` fell from 66.7 to 30.8 km, over six 1000 Myr runs from 82.3 to 32.1 km (ISO-073). What is
   left is the surface stage's own: a polar row of L1 that rose 20 to 40 km over a few steps under
-  plate uplift of 2.2 km or less, with and without the limits (not traced further).
+  plate uplift of 2.2 km or less, with and without the limits, and with the limits a hole two cells
+  wide on a row near the pole that fell to 59.7 km below the sea in 16 Myr while the plates raised
+  it (plates.md, "Limits"; not traced into the surface stage).
 - The recovery law of continental `Te` (ISO-051) has no source for its form or its 300 Myr.
 - Densities (ISO-043 to ISO-047) are uncited, and the model uses three different crust densities
   elsewhere (see [isostasy-and-height-limit.md](isostasy-and-height-limit.md)).
