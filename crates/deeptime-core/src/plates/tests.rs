@@ -754,9 +754,10 @@ impl CollisionLives {
 /// has shortened by the threshold; the states' life cycle holds; and collisions still happen.
 #[test]
 fn collisions_weld_on_stall_and_transfer_on_shortening() {
-    // A seed whose collisions weld (one of 24 in 300 Myr; under the force balance a held collision
-    // welds less often than under the old speed law: 8 of 32 welded in the sweep of 2026-10-16,
-    // and 13 of seeds 1 to 24 under the thickening limit, `rate.rs`, 2026-10-18).
+    // A seed whose collisions weld in 300 Myr (under the force balance a held collision welds less
+    // often than under the old speed law: 8 of 32 welded in the sweep of 2026-10-16, and 12 of
+    // seeds 1 to 24 under the thickening limit, `rate.rs`, 2026-10-18; seed 5 also with the
+    // uplift limit).
     let p = preset(8000, 300.0, "scattered_continents", 5);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {

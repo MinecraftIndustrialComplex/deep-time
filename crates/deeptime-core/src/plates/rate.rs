@@ -326,12 +326,8 @@ mod tests {
                 s.elevation_m += isostatic_change_m(&before, &s.pools, env.gravity) as f32;
             }
         }
-        let total = |st: &PlateState| -> f64 {
-            st.samples
-                .iter()
-                .map(|s| f64::from(s.thickness_m))
-                .sum()
-        };
+        let total =
+            |st: &PlateState| -> f64 { st.samples.iter().map(|s| f64::from(s.thickness_m)).sum() };
         let before = total(&state);
         let done = limit(&mut state, &geo, &env);
         assert!(done.columns > 0);

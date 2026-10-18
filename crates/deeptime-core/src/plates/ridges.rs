@@ -286,9 +286,10 @@ pub fn resample(
     // The step's limits (`rate.rs`) on the new lattice: a covered sample's ceiling and top are
     // its corners' blended with its own weights, its floor the blended surface before the
     // accretion (new sea floor's are set with the gaps below).
-    let old_limits = state.limits.as_ref().filter(|l| {
-        l.ceiling_m.len() == src.len() && l.top_m.len() == src.len()
-    });
+    let old_limits = state
+        .limits
+        .as_ref()
+        .filter(|l| l.ceiling_m.len() == src.len() && l.top_m.len() == src.len());
     let mut limits: Vec<[f32; 3]> = vec![[f32::INFINITY, 0.0, f32::INFINITY]; n];
     let mut samples: Vec<Sample> = found
         .par_iter()
@@ -499,7 +500,11 @@ pub fn resample(
         for (s, (x, &g)) in samples.iter().zip(limits.iter().zip(&gap)) {
             let x = if g {
                 let z = f64::from(s.elevation_m);
-                [(f64::from(s.thickness_m) + a) as f32, z as f32, (z + r) as f32]
+                [
+                    (f64::from(s.thickness_m) + a) as f32,
+                    z as f32,
+                    (z + r) as f32,
+                ]
             } else {
                 *x
             };
