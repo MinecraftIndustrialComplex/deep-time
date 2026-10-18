@@ -128,6 +128,9 @@ pub enum Part {
     Rifting,
     /// `hotspots::step`.
     Hotspots,
+    /// `rate::limit`: thickening beyond a step's ceiling released (after the processes above and
+    /// after a resampling).
+    Rate,
     /// The plate model's own surface step (`pools::surface_step`).
     PlateSurface,
     /// `finish_samples`.
@@ -156,7 +159,7 @@ pub const SURFACE_PARTS: [(Part, &str); 8] = [
 ];
 
 /// The number of parts.
-pub const PARTS: usize = 27;
+pub const PARTS: usize = 28;
 
 /// The parts' names, in order.
 pub const NAMES: [&str; PARTS] = [
@@ -181,6 +184,7 @@ pub const NAMES: [&str; PARTS] = [
     "collision",
     "rifting",
     "hotspots",
+    "rate",
     "plate_surface",
     "finish",
     "bury",
@@ -212,7 +216,13 @@ struct Track {
     ocean: [f32; PARTS],
     z: f32,
     iso: f32,
+    /// The column's thickness at the last booking, m (the sum of its pools).
+    thick: f32,
     continental: bool,
+    /// This step's change of elevation and of thickness by part, m ([`GapBudget::begin_step`]
+    /// clears them; the spike record, [`StepSpike`]).
+    step_dz: [f32; PARTS],
+    step_dt: [f32; PARTS],
 }
 
 /// How a resampling made a sample: the top cover's old corners and weights, and the pools and
@@ -259,6 +269,42 @@ pub struct Snapshot {
     pub bands: Vec<BandStock>,
 }
 
+/// One step's largest changes of a visible sample, and what made them (the spike record: build
+/// log 2026-10-18, "which plate process makes the one-step spikes"). Measured from the step's
+/// start, after the surface's feedback, to its end, a resampling included: the change the
+/// surface stage reads as the plate model's uplift.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct StepSpike {
+    pub t_myr: f64,
+    /// The largest rise and fall of a visible sample's elevation, m.
+    pub rise_m: f64,
+    pub fall_m: f64,
+    /// The largest thickening of a visible sample's column, m.
+    pub thicken_m: f64,
+    /// The largest `uplift_mm_yr` of a visible sample times the step, m (what the surface reads).
+    pub uplift_m: f64,
+    /// The sample of `rise_m`: kind, regime, thickness and elevation at the step's end, m, and
+    /// its change of elevation and of thickness by part, m.
+    pub kind: u8,
+    pub regime: u8,
+    pub thickness_m: f64,
+    pub z_m: f64,
+    pub dz: [f32; PARTS],
+    pub dt: [f32; PARTS],
+    /// The sample of `thicken_m`: its change of elevation and of thickness by part, m.
+    pub thick_dz: [f32; PARTS],
+    pub thick_dt: [f32; PARTS],
+    /// Visible samples that rose by more than [`SPIKE_EDGES_M`].
+    pub over: [u32; 4],
+    /// Per part, the largest rise and thickening one visible sample took from it, m.
+    pub part_rise: [f32; PARTS],
+    pub part_thicken: [f32; PARTS],
+}
+
+/// The rises the spike record counts, m.
+// ledger: PLT-283 (game-choice: reporting bands, read by no rule; agent, 2026-10-18).
+pub const SPIKE_EDGES_M: [f32; 4] = [5000.0, 10_000.0, 20_000.0, 30_000.0];
+
 /// The budget (`PlateState::gap_budget`).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GapBudget {
@@ -272,10 +318,20 @@ pub struct GapBudget {
     /// Times the sample count changed outside a resampling (the accounts were started again).
     pub restarts: u32,
     pub snapshots: Vec<Snapshot>,
+    /// Every step's spike record.
+    pub spikes: Vec<StepSpike>,
+    /// Per part: visible sample-steps on which the part alone raised a sample by more than
+    /// [`SPIKE_EDGES_M`], then thickened its column by more than 7 times as much.
+    pub part_over: Vec<[u64; 8]>,
 }
 
 fn gap_of(s: &Sample, z_0: f64, gravity: f64) -> (f32, f32) {
     (s.elevation_m, iso_height(&s.pools, z_0, gravity) as f32)
+}
+
+/// A column's thickness as the Airy height reads it, m.
+fn thick_of(pools: &[f32; pool::COUNT]) -> f32 {
+    pools.iter().map(|&x| x.max(0.0)).sum()
 }
 
 impl GapBudget {
@@ -289,9 +345,81 @@ impl GapBudget {
             sample_steps: vec![0.0; BANDS],
             restarts: 0,
             snapshots: Vec::new(),
+            spikes: Vec::new(),
+            part_over: vec![[0; 8]; PARTS],
         };
         b.begin(samples);
         b
+    }
+
+    /// The start of a step (after the surface's feedback): clears every sample's change of the
+    /// step.
+    pub fn begin_step(&mut self, samples: &[Sample]) {
+        if samples.len() != self.track.len() {
+            self.restarts += 1;
+            self.begin(samples);
+            return;
+        }
+        self.track.par_iter_mut().for_each(|t| {
+            t.step_dz = [0.0; PARTS];
+            t.step_dt = [0.0; PARTS];
+        });
+    }
+
+    /// Records the step's spike ([`StepSpike`]); `samples` as at the step's end, every change
+    /// booked.
+    fn record_spike(&mut self, samples: &[Sample], t_myr: f64, dt_myr: f64) {
+        if samples.len() != self.track.len() {
+            return;
+        }
+        let mut sp = StepSpike {
+            t_myr,
+            ..StepSpike::default()
+        };
+        let (mut rise_at, mut thick_at) = (None, None);
+        for (v, (s, t)) in samples.iter().zip(&self.track).enumerate() {
+            if s.is_hidden() {
+                continue;
+            }
+            let dz = f64::from(t.step_dz.iter().sum::<f32>());
+            let dt = f64::from(t.step_dt.iter().sum::<f32>());
+            if dz > sp.rise_m {
+                sp.rise_m = dz;
+                rise_at = Some(v);
+            }
+            sp.fall_m = sp.fall_m.min(dz);
+            if dt > sp.thicken_m {
+                sp.thicken_m = dt;
+                thick_at = Some(v);
+            }
+            sp.uplift_m = sp.uplift_m.max(f64::from(s.uplift_mm_yr) * dt_myr * 1.0e3);
+            for (n, e) in sp.over.iter_mut().zip(SPIKE_EDGES_M) {
+                *n += u32::from(dz > f64::from(e));
+            }
+            for p in 0..PARTS {
+                let (r, h) = (t.step_dz[p], t.step_dt[p]);
+                sp.part_rise[p] = sp.part_rise[p].max(r);
+                sp.part_thicken[p] = sp.part_thicken[p].max(h);
+                for (k, e) in SPIKE_EDGES_M.iter().enumerate() {
+                    self.part_over[p][k] += u64::from(r > *e);
+                    self.part_over[p][4 + k] += u64::from(h > 7.0 * e);
+                }
+            }
+        }
+        if let Some(v) = rise_at {
+            let (s, t) = (&samples[v], &self.track[v]);
+            sp.kind = s.kind;
+            sp.regime = s.regime;
+            sp.thickness_m = f64::from(t.thick);
+            sp.z_m = f64::from(s.elevation_m);
+            sp.dz = t.step_dz;
+            sp.dt = t.step_dt;
+        }
+        if let Some(v) = thick_at {
+            sp.thick_dz = self.track[v].step_dz;
+            sp.thick_dt = self.track[v].step_dt;
+        }
+        self.spikes.push(sp);
     }
 
     fn begin(&mut self, samples: &[Sample]) {
@@ -311,7 +439,10 @@ impl GapBudget {
                     },
                     z,
                     iso,
+                    thick: thick_of(&s.pools),
                     continental: s.kind == CONTINENTAL,
+                    step_dz: [0.0; PARTS],
+                    step_dt: [0.0; PARTS],
                 }
             })
             .collect();
@@ -319,8 +450,8 @@ impl GapBudget {
 
     /// Brings every sample's account up to date, `split` dividing its change (dz, the elevation's;
     /// diso, the Airy height's) among the parts: the gap's (`d`) and the elevation's (`l`); the
-    /// band sums take the same.
-    fn update<F>(&mut self, samples: &[Sample], split: F)
+    /// band sums take the same. `thick_part` takes the change of the column's thickness.
+    fn update<F>(&mut self, samples: &[Sample], thick_part: Part, split: F)
     where
         F: Fn(usize, f64, f64, &mut [f64; PARTS], &mut [f64; PARTS]) + Sync,
     {
@@ -339,8 +470,13 @@ impl GapBudget {
                 || vec![[0.0f64; 2 * PARTS]; BANDS],
                 |mut acc, (v, (t, s))| {
                     let (z, iso) = gap_of(s, z_0, g);
+                    let thick = thick_of(&s.pools);
                     let (dz, diso) = (f64::from(z - t.z), f64::from(iso - t.iso));
-                    if dz == 0.0 && diso == 0.0 && t.continental == (s.kind == CONTINENTAL) {
+                    if dz == 0.0
+                        && diso == 0.0
+                        && thick == t.thick
+                        && t.continental == (s.kind == CONTINENTAL)
+                    {
                         return acc;
                     }
                     let (mut d, mut l) = ([0.0f64; PARTS], [0.0f64; PARTS]);
@@ -348,6 +484,11 @@ impl GapBudget {
                     for (p, x) in t.parts.iter_mut().zip(&d) {
                         *p += *x as f32;
                     }
+                    for (p, x) in t.step_dz.iter_mut().zip(&l) {
+                        *p += *x as f32;
+                    }
+                    t.step_dt[thick_part as usize] += thick - t.thick;
+                    t.thick = thick;
                     if !t.continental {
                         for (p, x) in t.ocean.iter_mut().zip(&d) {
                             *p += *x as f32;
@@ -385,7 +526,7 @@ impl GapBudget {
 
     /// Books every sample's change of gap since the last booking to `part`.
     pub fn book(&mut self, samples: &[Sample], part: Part) {
-        self.update(samples, |_, dz, diso, d, l| {
+        self.update(samples, part, |_, dz, diso, d, l| {
             d[part as usize] = dz - diso;
             l[part as usize] = dz;
         });
@@ -408,7 +549,7 @@ impl GapBudget {
             SURFACE_PARTS.len(),
             "one row per surface part"
         );
-        self.update(samples, |v, dz, diso, d, l| {
+        self.update(samples, Part::Erosion, |v, dz, diso, d, l| {
             let m = material[v];
             let mut carry = dz - m;
             for ((part, _), x) in SURFACE_PARTS.iter().zip(surface) {
@@ -439,6 +580,7 @@ impl GapBudget {
                 let (z, iso) = gap_of(s, z_0, g);
                 let continental = s.kind == CONTINENTAL;
                 let mut d = [0.0f64; PARTS];
+                let thick = thick_of(&s.pools);
                 let Some(tr) = tr.filter(|tr| tr.tri.iter().all(|&i| (i as usize) < old.len()))
                 else {
                     let mut parts = [0.0; PARTS];
@@ -448,13 +590,18 @@ impl GapBudget {
                         ocean: if continental { [0.0; PARTS] } else { parts },
                         z,
                         iso,
+                        thick,
                         continental,
+                        step_dz: [0.0; PARTS],
+                        step_dt: [0.0; PARTS],
                     };
                     return (t, d, [0.0; 2]);
                 };
                 let mut parts = [0.0f64; PARTS];
                 let mut ocean = [0.0f64; PARTS];
-                let (mut was, mut was_z) = (0.0f64, 0.0f64);
+                let mut step_dz = [0.0f64; PARTS];
+                let mut step_dt = [0.0f64; PARTS];
+                let (mut was, mut was_z, mut was_t) = (0.0f64, 0.0f64, 0.0f64);
                 for k in 0..3 {
                     let o = &old[tr.tri[k] as usize];
                     for (p, x) in parts.iter_mut().zip(&o.parts) {
@@ -463,9 +610,21 @@ impl GapBudget {
                     for (p, x) in ocean.iter_mut().zip(&o.ocean) {
                         *p += tr.w[k] * f64::from(*x);
                     }
+                    for (p, x) in step_dz.iter_mut().zip(&o.step_dz) {
+                        *p += tr.w[k] * f64::from(*x);
+                    }
+                    for (p, x) in step_dt.iter_mut().zip(&o.step_dt) {
+                        *p += tr.w[k] * f64::from(*x);
+                    }
                     was += tr.w[k] * f64::from(o.z - o.iso);
                     was_z += tr.w[k] * f64::from(o.z);
+                    was_t += tr.w[k] * f64::from(o.thick);
                 }
+                let blend_t = f64::from(thick_of(&tr.pools));
+                step_dz[Part::ResampleBlend as usize] += f64::from(tr.z) - was_z;
+                step_dz[Part::ResampleAccrete as usize] += f64::from(z - tr.z);
+                step_dt[Part::ResampleBlend as usize] += blend_t - was_t;
+                step_dt[Part::ResampleAccrete as usize] += f64::from(thick) - blend_t;
                 let blended = f64::from(tr.z) - iso_height(&tr.pools, z_0, g);
                 d[Part::ResampleBlend as usize] = blended - was;
                 d[Part::ResampleAccrete as usize] = f64::from(z - iso) - blended;
@@ -482,7 +641,10 @@ impl GapBudget {
                     ocean: ocean.map(|x| x as f32),
                     z,
                     iso,
+                    thick,
                     continental,
+                    step_dz: step_dz.map(|x| x as f32),
+                    step_dt: step_dt.map(|x| x as f32),
                 };
                 (t, d, [f64::from(tr.z) - was_z, f64::from(z - tr.z)])
             })
@@ -500,8 +662,10 @@ impl GapBudget {
         self.track = rows.into_iter().map(|(t, _, _)| t).collect();
     }
 
-    /// The end of a step: counts the samples in each band (the denominator of the rates).
-    pub fn end_step(&mut self, samples: &[Sample]) {
+    /// The end of a step at `t_myr` (steps of `dt_myr`): records its spike ([`StepSpike`]) and
+    /// counts the samples in each band (the denominator of the rates).
+    pub fn end_step(&mut self, samples: &[Sample], t_myr: f64, dt_myr: f64) {
+        self.record_spike(samples, t_myr, dt_myr);
         for s in samples {
             if s.kind == CONTINENTAL && !s.is_hidden() {
                 self.sample_steps[band(s.thickness_m)] += 1.0;
@@ -611,6 +775,101 @@ impl GapBudget {
                 );
             }
         }
+        out + &self.spike_lines()
+    }
+
+    /// The spike record's lines: the run's summary, then every step whose largest rise passed
+    /// the first of [`SPIKE_EDGES_M`] or whose thickening passed 7 times it.
+    pub fn spike_lines(&self) -> String {
+        let named = |v: &[f32; PARTS], min: f32| {
+            let mut x: Vec<(usize, f32)> = v
+                .iter()
+                .copied()
+                .enumerate()
+                .filter(|(_, x)| x.abs() >= min)
+                .collect();
+            x.sort_by(|a, b| b.1.abs().total_cmp(&a.1.abs()));
+            x.iter()
+                .map(|(p, x)| format!("{}:{x:.0}", NAMES[*p]))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let peak = |f: &dyn Fn(&StepSpike) -> f64| self.spikes.iter().map(f).fold(0.0, f64::max);
+        let steps_over = |e: f32| {
+            self.spikes
+                .iter()
+                .filter(|s| s.rise_m > f64::from(e))
+                .count()
+        };
+        let over = |k: usize| {
+            self.part_over
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| c[k] > 0)
+                .map(|(p, c)| format!("{}:{}", NAMES[p], c[k]))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let mut part_rise = [0.0f32; PARTS];
+        let mut part_thicken = [0.0f32; PARTS];
+        for s in &self.spikes {
+            for p in 0..PARTS {
+                part_rise[p] = part_rise[p].max(s.part_rise[p]);
+                part_thicken[p] = part_thicken[p].max(s.part_thicken[p]);
+            }
+        }
+        let mut out = format!(
+            "\ngap_spikes steps={} rise_max_m={:.0} uplift_max_m={:.0} thicken_max_m={:.0} \
+             steps_rise_over_5/10/20/30km={}/{}/{}/{} part_rise_max_m=[{}] part_thicken_max_m=[{}] \
+             part_rise_over_5km=[{}] part_rise_over_10km=[{}] part_rise_over_20km=[{}] \
+             part_thicken_over_35km=[{}] part_thicken_over_70km=[{}]",
+            self.spikes.len(),
+            peak(&|s| s.rise_m),
+            peak(&|s| s.uplift_m),
+            peak(&|s| s.thicken_m),
+            steps_over(SPIKE_EDGES_M[0]),
+            steps_over(SPIKE_EDGES_M[1]),
+            steps_over(SPIKE_EDGES_M[2]),
+            steps_over(SPIKE_EDGES_M[3]),
+            named(&part_rise, 500.0),
+            named(&part_thicken, 3500.0),
+            over(0),
+            over(1),
+            over(2),
+            over(4),
+            over(5),
+        );
+        for s in &self.spikes {
+            if s.rise_m <= f64::from(SPIKE_EDGES_M[0])
+                && s.thicken_m <= 7.0 * f64::from(SPIKE_EDGES_M[0])
+            {
+                continue;
+            }
+            out += &format!(
+                "\ngap_spike t={:.0} rise_m={:.0} fall_m={:.0} thicken_m={:.0} uplift_m={:.0} \
+                 over_5/10/20/30km={}/{}/{}/{} at[kind={} regime={} T={:.0} z={:.0}] dz=[{}] dT=[{}] \
+                 thickest_dz=[{}] thickest_dT=[{}] part_rise=[{}] part_thicken=[{}]",
+                s.t_myr,
+                s.rise_m,
+                s.fall_m,
+                s.thicken_m,
+                s.uplift_m,
+                s.over[0],
+                s.over[1],
+                s.over[2],
+                s.over[3],
+                s.kind,
+                s.regime,
+                s.thickness_m,
+                s.z_m,
+                named(&s.dz, 100.0),
+                named(&s.dt, 700.0),
+                named(&s.thick_dz, 100.0),
+                named(&s.thick_dt, 700.0),
+                named(&s.part_rise, 1000.0),
+                named(&s.part_thicken, 7000.0),
+            );
+        }
         out
     }
 }
@@ -704,7 +963,7 @@ mod tests {
         let acc = b.track[0].parts[Part::ResampleAccrete as usize];
         let expect = 0.5 * f64::from(accreted) - 500.0 / F + 50.0;
         assert!((f64::from(acc) - expect).abs() < 1.0, "{acc} vs {expect}");
-        b.end_step(&new);
+        b.end_step(&new, 2.0, 2.0);
         b.snapshot(&new, 2.0, 2.0);
         assert_eq!(b.snapshots[0].bands.iter().map(|s| s.n).sum::<u64>(), 1);
         assert!(b.lines().contains("gap_stock t=2"));

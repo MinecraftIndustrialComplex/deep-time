@@ -584,6 +584,7 @@ mod tests {
             slabs: Vec::new(),
             dynamics: None,
             gap_budget: None,
+            limits: None,
         }
     }
 

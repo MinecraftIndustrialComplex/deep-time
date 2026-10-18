@@ -166,8 +166,8 @@ step or two. These transients are there with and without the fix and at every sc
 112 km after the flexure in four traced 500 Myr runs at 1:300 and 1:100. A bound of five Earth
 reliefs (98.9 km), tried first, stopped a shipped bake (`earthlike_quick_16k`, scattered, seed 2,
 at −272 Myr), so the bound sits above them and above the about 210 km a sound step could reach
-(the 30 km ceiling with the whole thickening held up, 7 times). The transients themselves are the
-plate model's to fix (an open question below).
+(the 30 km ceiling with the whole thickening held up, 7 times). The transients themselves were the
+plate model's; since 2026-10-18 its rate limits bound them (an open question below).
 
 ## Game choices
 
@@ -182,8 +182,15 @@ plate model's to fix (an open question below).
 ## Open questions
 
 - The plate model's one-step uplift spikes (up to 33 km in a step over hundreds of cells) and the
-  tens of km the flexure then holds up for a step: which plate process makes them was not traced
-  (build log 2026-10-18, the surface divergence).
+  tens of km the flexure then holds up for a step: traced on 2026-10-18 to a resampling's
+  accretion (up to 36 km of rise and 566 km of crust in one step) and the collision belts (13 km),
+  and bounded by the rate limits of [plates.md](plates.md), "The fastest a column thickens and
+  rises" (PLT-287, PLT-288): no plate step now raises a column more than 7 km. The guard's worst
+  over six 500 Myr runs of `earthlike_quick_16k` fell from 66.7 to 30.8 km, over six 1000 Myr runs from 82.3 to 32.1 km (ISO-073). What is
+  left is the surface stage's own: a polar row of L1 that rose 20 to 40 km over a few steps under
+  plate uplift of 2.2 km or less, with and without the limits, and with the limits a hole two cells
+  wide on a row near the pole that fell to 59.7 km below the sea in 16 Myr while the plates raised
+  it (plates.md, "Limits"; not traced into the surface stage).
 - The recovery law of continental `Te` (ISO-051) has no source for its form or its 300 Myr.
 - Densities (ISO-043 to ISO-047) are uncited, and the model uses three different crust densities
   elsewhere (see [isostasy-and-height-limit.md](isostasy-and-height-limit.md)).

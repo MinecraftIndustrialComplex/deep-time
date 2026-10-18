@@ -560,4 +560,6 @@ without the fix: the highest cell after the flexure in four traced 500 Myr runs 
 `earthlike_quick_32k` was 112 km (1:300) and 66 km (1:100) before the fix, 69 km and 92 km after.
 A guard at five Earth reliefs (98.9 km) stopped a shipped bake on such a transient
 (`earthlike_quick_16k`, scattered, seed 2, −272 Myr, 105.8 km), hence twelve. Which plate process
-makes the spikes was not traced.
+makes the spikes was not traced here; it was on 2026-10-18 (a resampling's accretion and the
+collision belts), and the plate step's rate limits now bound them (docs/science/plates.md, "The
+fastest a column thickens and rises"; build log 2026-10-18 "Plate spikes").

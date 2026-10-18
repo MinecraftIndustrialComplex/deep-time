@@ -62,6 +62,8 @@
     "collapse_quiet_myr": 10.0,
     "collapse_reach_km": 200.0,
     "crust_max_km": 70.0,
+    "thickening_max_mm_yr": 5.0,
+    "uplift_max_mm_yr": 3.5,
     "transition_width_km": 200.0,
     "transition_myr": 20.0,
     "initial_plates": 14,

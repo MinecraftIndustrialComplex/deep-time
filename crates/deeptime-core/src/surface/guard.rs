@@ -35,15 +35,32 @@ pub fn bound_m(gravity_m_s2: f64) -> f64 {
     RELIEF_MULTIPLE * (EVEREST_M + CHALLENGER_DEEP_M) * (G_EARTH / gravity_m_s2).max(1.0)
 }
 
+/// `WorldState::globals`: the farthest any cell stood from the sea after a step, m (measurement:
+/// how close a run came to [`bound_m`]) …
+pub const WORST_GLOBAL: &str = "surface/guard_worst_m";
+/// … and the steps on which the farthest cell stood more than [`NEAR_RELIEFS`] Earth reliefs from
+/// the sea, one global each.
+pub const NEAR_GLOBALS: [&str; 4] = [
+    "surface/guard_steps_over_1_relief",
+    "surface/guard_steps_over_2_reliefs",
+    "surface/guard_steps_over_3_reliefs",
+    "surface/guard_steps_over_6_reliefs",
+];
+/// The Earth reliefs (Everest to the Challenger Deep, at the planet's gravity as [`bound_m`]
+/// scales it) the near counts use: a twelfth, a sixth, a quarter and a half of the bound.
+// ledger: ISO-073 (game-choice: reporting bands, read by no rule; agent, 2026-10-18).
+pub const NEAR_RELIEFS: [f64; 4] = [1.0, 2.0, 3.0, 6.0];
+
 /// Stops the step at `t_myr` when a cell of `h` (m, `w` cells to a row) is not finite or stands
-/// farther than [`bound_m`] from the sea.
+/// farther than [`bound_m`] from the sea; otherwise returns how far the farthest cell stands from
+/// the sea, m.
 pub fn check(
     w: usize,
     h: &[f64],
     sea_level_m: f64,
     gravity_m_s2: f64,
     t_myr: f64,
-) -> Result<(), CoreError> {
+) -> Result<f64, CoreError> {
     let bound = bound_m(gravity_m_s2);
     let off = |z: f64| {
         if z.is_finite() {
@@ -56,11 +73,13 @@ pub fn check(
         .par_iter()
         .enumerate()
         .map(|(c, &z)| (c, off(z)))
-        .filter(|&(_, d)| d > bound)
         .max_by(|a, b| a.1.total_cmp(&b.1).then(b.0.cmp(&a.0)))
     else {
-        return Ok(());
+        return Ok(0.0);
     };
+    if worst <= bound {
+        return Ok(worst);
+    }
     let w = w.max(1);
     let ground = if worst.is_finite() {
         format!("stands {:.0} m from the sea", h[c] - sea_level_m)
@@ -93,7 +112,7 @@ mod tests {
         let mut h = vec![
             -11_000.0, 8_849.0, 30_000.0, -5000.0, 0.0, 2000.0, 300.0, 1.0,
         ];
-        assert!(check(w, &h, sea, G_EARTH, -10.0).is_ok());
+        assert_eq!(check(w, &h, sea, G_EARTH, -10.0).unwrap(), 29_960.0);
         h[6] = 250_000.0;
         h[5] = -240_000.0;
         let e = check(w, &h, sea, G_EARTH, -10.0).unwrap_err().to_string();

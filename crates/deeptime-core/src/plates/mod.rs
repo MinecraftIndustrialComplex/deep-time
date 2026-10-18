@@ -60,6 +60,7 @@ pub mod l1;
 pub mod noise;
 pub mod normalise;
 pub mod pools;
+pub mod rate;
 pub mod ridges;
 pub mod rifting;
 pub mod shortening;
@@ -262,6 +263,11 @@ impl PlatesStage {
             None
         };
         let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+        if let Some(gb) = st.gap_budget.as_mut() {
+            gb.begin_step(&st.samples);
+        }
+        // The fastest a column may thicken this step (`rate.rs`).
+        rate::begin(st, &env, &z0);
         lap(&mut clock, "flexure_sample");
 
         // Motion, then interactions at the new positions.
@@ -414,6 +420,12 @@ impl PlatesStage {
         hotspots::step(st, world, &pos, &tree, &env, &mut cones)?;
         book(st, gap_budget::Part::Hotspots);
         lap(&mut clock, "hotspots");
+        // No column ends the step's processes thicker than its ceiling or higher than its top
+        // (ledger: PLT-287, PLT-288).
+        let limited = rate::limit(st, &cache.geo, &env);
+        book(st, gap_budget::Part::Rate);
+        add_limited(world, limited);
+        lap(&mut clock, "rate");
         surface(st, &cache.geo, &env, &taper.floor_m);
         book(st, gap_budget::Part::PlateSurface);
         finish_samples(st, &cache.geo, &z0, &env);
@@ -477,6 +489,18 @@ impl PlatesStage {
         let final_step = step >= self.total;
         if ridges::due(st, &env) || ((final_step || sutured) && st.resample_step != st.step) {
             let geo = ridges::resample(st, world, &pos, &cache.geo, &env)?;
+            // The accretion is thickening too (ledger: PLT-287); the surface's change counts as
+            // the step's uplift, as the accretion's own rise does.
+            let z: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+            let limited = rate::limit(st, &geo, &env);
+            if limited.columns > 0 {
+                for (s, &z) in st.samples.iter_mut().zip(&z) {
+                    s.uplift_mm_yr +=
+                        ((f64::from(s.elevation_m) - f64::from(z)) / env.dt_yr * 1.0e3) as f32;
+                }
+            }
+            book(st, gap_budget::Part::Rate);
+            add_limited(world, limited);
             pos = geo.points().to_vec();
             let doomed: BTreeMap<u32, EventId> = st
                 .contacts
@@ -491,10 +515,11 @@ impl PlatesStage {
             };
             lap(&mut clock, "resample");
         }
+        rate::end(st);
 
         book(st, gap_budget::Part::Other);
         if let Some(gb) = st.gap_budget.as_mut() {
-            gb.end_step(&st.samples);
+            gb.end_step(&st.samples, env.t_myr, env.dt_myr);
             let every = (GAP_SNAPSHOT_MYR / env.dt_myr).round().max(1.0) as u64;
             if step >= self.total || step.is_multiple_of(every) {
                 gb.snapshot(&st.samples, env.t_myr, env.dt_myr);
@@ -961,6 +986,17 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32]) {
         let s = &mut st.samples[to as usize];
         s.pools[pool::SEDIMENT] += m;
         s.thickness_m += m;
+    }
+}
+
+/// Adds one pass of the thickening limit (`rate.rs`) to the run's globals, km³.
+fn add_limited(world: &mut WorldState, limited: rate::Limited) {
+    for (name, x) in [
+        (rate::CAPPED_GLOBAL, limited.capped_km2_m),
+        (rate::LOST_GLOBAL, limited.lost_km2_m),
+        (rate::HELD_GLOBAL, limited.held_km2_m),
+    ] {
+        *world.globals.entry(name.to_owned()).or_insert(0.0) += x / 1000.0;
     }
 }
 
