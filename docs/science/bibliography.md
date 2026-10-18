@@ -2268,7 +2268,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Reference: John, D.A., ed., Ayuso, R.A., Barton, M.D., Blakely, R.J., Bodnar, R.J., Dilles, J.H., Gray, F., Graybeal, F.T., Mars, J.L., McPhee, D., Seal, R.R., Taylor, R.D., and Vikre, P., 2010, Porphyry copper deposit model, chap. B of Mineral deposit models for resource assessment: U.S. Geological Survey Scientific Investigations Report 2010-5070-B, xii + 169 p.
 - DOI or URL: (DEP) 10.3133/sir20105070B ; https://pubs.usgs.gov/sir/2010/5070/b/ ; PDF https://pubs.usgs.gov/sir/2010/5070/b/pdf/SIR10-5070B.pdf (ORE) https://pubs.usgs.gov/sir/2010/5070/b/ ; PDF .../pdf/SIR10-5070B.pdf (26.3 MB; exceeded the 10 MB fetch limit).
 - Cited as: (DEP) "John, D.A., et al., 2010", "SIR 2010-5070-B". (ORE) "USGS SIR 2010-5070-B (John et al. 2010)" with page numbers (Table E1 p. 28; p. 25; p. 66; pp. 4, 65; p. 68; p. 120).
-- Ledger ids: DEP-016 to DEP-018, DEP-032, DEP-035 to DEP-049, DEP-209, ORE-104
+- Ledger ids: DEP-016 to DEP-018, DEP-032, DEP-035 to DEP-049, DEP-209, DEP-212, ORE-104
 - Access: open access (agency report). [other sections: open copy (agency report) at https://pubs.usgs.gov/sir/2010/5070/b/pdf/SIR10-5070B.pdf]
 - Library (the project's source library, not distributed): fetched (PDF, 186 pages, text layer). From: https://pubs.usgs.gov/sir/2010/5070/b/. Text file: sir5070b.txt.
 - Read so far (by the project): (DEP) printed pages cited (pp. 4, 25, 28, 65-68, 120); text searched for density with no numeric value found. (ORE) page numbers cited (PDF opened).
@@ -2281,7 +2281,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Reference: Cook, S.S., and Porter, T.M., 2005, The geologic history of oxidation and supergene enrichment in the porphyry copper deposits of southwestern North America, in Porter, T.M., ed., Super Porphyry Copper and Gold Deposits: A Global Perspective, v. 1: Adelaide, PGC Publishing, p. 207-242.
 - DOI or URL: https://portergeo.com.au/full_text/Cook_Porter_SW_NAmer_Supergene-PGC_Publishing.pdf (the publisher's open author copy; 13.8 MB, 37 PDF pages, text layer)
 - Cited as: "Cook and Porter 2005".
-- Ledger ids: DEP-209, DEP-211
+- Ledger ids: DEP-209, DEP-211, DEP-212
 - Access: open (author copy)
 - Library (the project's source library, not distributed): fetched 2026-10-17 on the test VM as scratch for the gossan task (not added to the library folder). Text by pdftotext.
 - Read in this pass (2026-10-17, gossan task): searched for every statement of a leached cap's thickness and exposure. Inspiration, Arizona (PDF p. 19): 'Prior to mining, the remnant leached cap varied from 0 to 300 m in thickness', over an oxide zone averaging 60 m. Silver Bell, El Tiro pit (PDF p. 14): a '60 m thick ... supergene enriched sulphide blanket overlain by a 30 m thick remnant leached capping which averaged 300 ppm Cu', its contact with the blanket 'sharp and generally parallel[ing] the current surface'; older 'hematite capping exposed on ridges and slopes'. Tyrone, New Mexico (PDF p. 26): a blanket 'from a few metres to more than 100 m in thickness' 'overlain by a comparable remnant thickness of leached capping (60 to 150 m thick)'; the profile came from several cycles of enrichment and leaching. PDF p. 24: a deposit 'represented at surface by heavily iron stained leached capping outcrops'. Morenci (PDF p. 23): the pyritic zone began 60 to 180 m below the surface and the chalcocite zone was 30 to 120 m thick (not used for the cap).
