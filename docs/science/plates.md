@@ -1058,6 +1058,9 @@ founder +1,786 against +904; erosion net of its rebound −401 against −344; t
   0.18; land above 2 km 0.27 to 0.34 of the land against 0.18 to 0.22 (Earth 0.10), the 90th
   percentile 4.3 to 5.2 km (Earth 2.0). The thick crust now stands near its height, and erosion,
   not recalibrated, does not wear it down: that is the next task's.
+  Taken up on 2026-10-18 (erosion-and-sediment.md, "The erosion law against measured rates"): with
+  the erosion at Montgomery & Brandon's rates land above 2 km is 0.25 to 0.28 of the land and the
+  plate checks meet 25 of 45.
 
 **What is still off.**
 - *The high ground,* above: the erosion recalibration's job (Ben's choice), not tuned here.

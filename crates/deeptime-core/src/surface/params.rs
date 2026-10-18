@@ -74,8 +74,8 @@ pub struct SurfaceParams {
     /// Set against measured erosion rates (the erosion recalibration of 2026-10-18,
     /// erosion-and-sediment.md "The erosion law against measured rates"): with n = 2, m = 1 and
     /// S_c = 0.15 the planets' regions erode against their mean local relief as Montgomery &
-    /// Brandon 2002 measured (their eq. 2 within 6 % below 1 km of relief, their power law within
-    /// a factor 0.6 to 0.8 above; ERO-179, ERO-180). The hypsometry it was tuned to before
+    /// Brandon 2002 measured (their eq. 2 within 10 % below 1 km of relief, their power law within
+    /// a factor 0.6 to 0.85 above; ERO-179, ERO-180). The hypsometry it was tuned to before
     /// (P1-17, 3·10⁻⁹) is a reference line now (HYP-001 to HYP-004). n = 2 lies inside the range
     /// fitted to the world's cosmogenic rates with hillslope diffusion (n ≈ 2.3, 1.59 to 2.70,
     /// Ruetenik et al. 2023, ERO-182), and n = 2.3 or 2.5 at the same erosion fitted no better;

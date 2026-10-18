@@ -334,7 +334,8 @@ mod tests {
         assert_eq!(b.window_steps.iter().sum::<u64>(), 1);
         let k = b.window_steps.iter().position(|&s| s == 1).unwrap();
         assert!((b.by_window_relief[k].area_km2_myr - 22.0).abs() < 1e-9);
-        assert!((b.by_window_relief[k].net_km3 - 22.0 * 2.0 / 1000.0).abs() < 1e-9);
+        // Eleven 1-km² land cells lowered 2 m each.
+        assert!((b.by_window_relief[k].net_km3 - 11.0 * 2.0 / 1000.0).abs() < 1e-9);
         // Its net lowering is 1 m/Myr: the first rate class.
         assert!((b.window_rate[0] - 22.0).abs() < 1e-9);
     }
@@ -345,12 +346,12 @@ mod tests {
         let d = Dims::new(3 * WINDOW_CELLS, WINDOW_CELLS, 1000.0, false);
         let n = d.cells();
         let mut h0 = vec![50.0; n];
-        for c in 0..n {
+        for (c, h) in h0.iter_mut().enumerate() {
             let x = c % d.w;
             if (WINDOW_CELLS + 1..2 * WINDOW_CELLS).contains(&x) {
-                h0[c] = if x % 2 == 0 { 2600.0 } else { 1400.0 };
+                *h = if x.is_multiple_of(2) { 2600.0 } else { 1400.0 };
             } else if x >= 2 * WINDOW_CELLS && (c / d.w) > 0 {
-                h0[c] = -100.0;
+                *h = -100.0;
             }
         }
         let zero = vec![0.0f32; n];
