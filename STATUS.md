@@ -103,7 +103,7 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | Put the three crust rates on sources together, with the land fix below (the gap budget, build log 2026-10-17): the cordillera's root from crust shortened, the continental-arc addition rate and island-arc magma, with the volcano stage's cones handed to the pools as volcanic rock so arc magma is counted once (recommendation 6 of the gap budget; sources still to be read; Stern & Scholl 2010 for Earth's budget: arcs about 1.0 and 1.5 km³/yr, collision losses about 0.7, against the model's 8.5, 0.14 and 7.0). A lithosphere temperature per column (the Urals stand, Hyndman & Currie 2011) waits. Built 2026-10-17 on branch worktree-agent-aae15c33270dffe0b (build log 2026-10-17 "Plate task 8"); it lands with the erosion recalibration, which goes on top of that branch | decisions log 2026-10-17; build log 2026-10-16 "Plate task 7 continued" | medium |
 | Give a resampling's accretion its Airy height (recommendation 1 of the gap budget: capped at the column's Airy height, handed to the surface as uplift, as the collapse raises its receivers), landed together with the crust rates above and the erosion recalibration, never alone (alone it doubles the land above 2 km and erodes a sixth of the continental crust away); with task 8, keep the ocean-floor step's thickness-blind floor only while arcs keep their height-only uplift (recommendation 3). Decided: all six recommendations as recommended, the coordinator's call (decisions log 2026-10-17); built with the held ocean floor on the plate task 8 branch (worktree-agent-aae15c33270dffe0b, build log 2026-10-17 "Plate task 8"), to land with the erosion recalibration | build log 2026-10-17 "The land's gap budget"; `docs/science/plates.md` "Which process holds the gap" | small |
 | The model's subducting boundary is about five times Earth's (245,000 to 259,000 km against 51,310), so arc rates sourced per km of arc (Stern & Scholl 2010) give about 4 times Earth's yearly arc addition; find why (plate count, boundary roughness on the sphere's mesh, or margins counted as subducting that Earth would call transform or passive) and bring it to Earth's length | plate task 8 report, build log 2026-10-17 | medium |
-| **Built on branch worktree-agent-a4f01237ab69a22b1** (build log 2026-10-18 "The erosion law against measured rates": K 1.5e-9, n 2, m 1, S_c 0.15, κ 2); remove this line when it merges together with plate task 8. Recalibrate the surface erosion law (K, n, κ, S_c together) against measured erosion rates (ERO-171 Portenga & Bierman, ERO-172 Montgomery & Brandon); hypsometry (HYP-001/002/004) and plateau wear become reference lines. Starts once plate tasks 7 and 8 have landed | decisions log 2026-10-17; build log 2026-10-16 plateau erosion; erosion-and-sediment.md "Plateaus and the hillslope diffusivity" | large |
+| High plateaus still wear too fast after the erosion recalibration (K 1.5e-9, n 2, m 1, S_c 0.15, κ 2; landed with plate task 8, ERO-171, ERO-172): the controlled plateau's interior at 131 m/Myr and the planets' flat high ground at 75 to 107 m/Myr, against under 10 in southern Tibet's interior (ERO-174). Find which term wears flat high ground (hillslope diffusion, the critical slope on 4.8-km cells, or stream power on plateau drainage) and bring it to the measured rate without moving the hypsometry off HYP-001/002/004 | build log 2026-10-18 "The erosion law against measured rates"; erosion-and-sediment.md "Plateaus and the hillslope diffusivity" | medium |
 | Ben (or anyone on his word) posts docs/upstream/toroidal-world-dh-pregen-issue.md on the Exotic Worlds tracker: the repro was run on Exotic Worlds 1.0.0 on 2026-10-17 and still stalls, the draft is updated for 1.0.0; it needs a fresh `latest.log` attached (`tools/review/ew-dh-pregen-repro.py`, build log 2026-10-17). Agents never post it; remove this line when it is posted or dropped | decisions log 2026-10-17; build log 2026-10-17 "`/dh pregen` across the seam on Exotic Worlds 1.0.0" | small |
 | Hillslope diffusivity: κ stays 2 m²/yr (ERO-023, uncited) as the map-scale value, the coordinator's call under Ben's rule (undoable; the measured 0.0036 m²/yr, ERO-177, lowers flat high ground's wear only 63 → 46 m/Myr and moves the land median to 284 m and land above 2 km to 0.066, outside HYP-002 and HYP-004, which K was calibrated for with κ = 2). Re-decide κ with K if Ben takes the recalibration against measured erosion rates (ERO-171, ERO-172; pending question 2026-10-16 "Plateau erosion"); decisions log 2026-10-16. Re-decided 2026-10-18 on the erosion recalibration's branch: κ 2 kept, now `calibrated` against Montgomery & Brandon's quiet-land line (ERO-023); remove with that merge | build log 2026-10-16 "Plateau erosion and the hillslope diffusion's map scale" | small |
 | Critical slope: S_c stays 0.35 (ERO-013, uncited), the coordinator's call (undoable). Source the slope distribution of 5-km cells in active ranges on Earth as a reference line, then decide whether 0.35 holds at the map's 4.8-km cells (it is 110 of the 123 m/Myr of stream power above 4 km on the quick planet). Done 2026-10-18 on the erosion recalibration's branch: S_c = Rc / 10 km = 0.15 from Montgomery & Brandon's limiting relief (ERO-013, ERO-179), the same at every cell size; remove with that merge | build log 2026-10-16 "Plateau erosion and the hillslope diffusion's map scale" | small |
@@ -10428,29 +10428,38 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
   `[gametest] native version=… format=… target=… selftest=…`); then P0-08.
 
 ## Known issues and open questions
-Current as of 2026-10-17 (session f981c0d3-5144-49ec-8686-2946d755872c); the list Ben was given so he does not report
-known faults. Older notes are in the build log.
+Current as of 2026-10-18 (session f981c0d3-5144-49ec-8686-2946d755872c, master 9091c163); the list Ben was given so
+he does not report known faults. Older notes are in the build log.
 
 **The planet**
-- Too little land: 19 % of the surface against Earth's 29 %. Thick crust sits 0.5 to 3 km below where it should float
-  (the land-measurement agent is splitting it by process; plate task 8, crust rates, follows).
-- The land there is runs high: median 745 m against Earth's 427 m, about twice Earth's share above 2 km.
-- Plateaus wear down like mountain ranges (about 6 times Tibet's rate). Erosion recalibration after plate tasks 7 and 8
-  (Ben, decisions log 2026-10-17).
-- Highest peaks 6 to 7 km, not 8 to 10 km. Old belts stand too high (a Urals-like belt at about 2.7 km against 0.5 to
-  0.8 km).
-- Plate statistics off: collision rate, supercontinent tenure and period, foreland basins (14 of 45 plate checks fail).
-- Seeds vary more than many changes under test. Tested only to 500 Myr, starting from existing continents.
+- Too little land: 18 to 20 % of the surface against Earth's 29 %. The new cap on plate steps (PLT-287, PLT-288) sends
+  crust it cannot place into the mantle: 6.1 to 8.5 km³/yr against Earth's about 0.7 (an agent is fixing the
+  accretion that stacks crust on one column).
+- The land there is runs high: 20 to 23 % of it above 2 km, about twice Earth's share.
+- Plateaus wear down too fast: 75 to 107 m/Myr on the planets' flat high ground against under 10 in Tibet's interior.
+- The surface stage moves a few cells on L1's polar rows by tens of km in a few steps, up and down (one hole reached
+  59.7 km below the sea); an agent is tracing it.
+- Highest peaks in the game about 6 to 7 km, not 8 to 10 km (the plate model's 25 to 33 km spikes were not physical
+  and are gone: L1 peaks now 5.9 to 13.8 km).
+- Plate statistics off: 25 to 29 of 45 plate checks pass. The collision wedge is 0 km wide (target 100 to 350 km). The
+  subducting boundary is about five times Earth's length.
+- Climate runs warm: 15.7 to 17.3 °C and 900 to 2,200 ppm CO₂ (means over six runs). Why the present-day CO₂
+  adjustment varies so much between runs is not traced.
+- Seeds vary more than many changes under test. Tested only to 1000 Myr, starting from existing continents.
 - One preset gives one planet per platform: bit-identical across runs and thread counts on one machine, not across
   platforms (libm). Tests on simulated planets assert properties measured over several planets; exact numbers belong
   only to tests on baked data.
-- The bake's memory estimate reads about 20 % low for the bake step itself (the run total still covers it by about 6 %).
+- Speed: a full 16k planet takes 1,382 s on 8 cores against the 900 s gate. Ben chose to overlap the stages
+  (decisions log 2026-10-18); an agent is building it. The bake's memory estimate reads about 20 % low for the bake
+  step itself (the run total still covers it by about 6 %).
 
 **Terrain look**
 - Some lake plains end in straight dams. Rivers and valleys bend in 8 directions only. The fine detail noise has a
   faint grid alignment.
 
 **In the game world**
+- Ice cover reaches past glaciers onto ground the climate does not freeze, and ground under an ice sheet keeps its own
+  climate class (Csa under ice at -11 °C); the biomes hide it, class-keyed checks see it. An agent is fixing both.
 - Lava only at active volcanoes and the world floor (on land a median 658 blocks to the nearest); MIC's early lava
   recipes are unchecked.
 - Distant Horizons far terrain with MIC shows the right surface block about 55 % of the time (85 to 96 % without MIC).
@@ -10463,13 +10472,18 @@ known faults. Older notes are in the build log.
 - Plutons: in about 16 % of land columns other rock lies under a pluton that should reach the floor.
 - Placer gold in MIC (no Excavated Variants) is suspicious gravel or sand holding 2 to 5 pre-rolled nuggets, brushed
   once; Lootr leaves it alone (decisions log 2026-10-17). Intended.
+- An exposed gossan's leached cap holds no ore, by design (DEP-212); the ore lies under it.
 
-**GameTests failing on master (being fixed)**
-- MIC `packtableclassesreachtheirbiomes` (cloud forest 69 of 261 below 0.30), EE `expandedecospherebiomesfollowtheirrules`
-  (757 columns outside their Köppen classes), EE `realplanetrockmatchestheparityfixture` (22 of 146 diorite blobs).
+**Tests**
+- All GameTests pass on master d006e621: 91 of 91 in each of the five sets (standalone, MIC, Expanded Ecosphere,
+  Excavated Variants, TerraBlender).
+- The cloud forest check counts nothing on the 4k test planet (5 columns qualify), so it guards only on a planet with
+  more humid tropical highland.
+- "Probe column agrees with the world data" failed once at (8184, 164) and was not reproduced.
 
-**Not running**
-- The play server: rebuilt 2026-10-18 on the new VM (`/data/ban/play/e34dbe54`, run 1a14f29f351, with the MIC rock tags; build log 2026-10-18).
+**The play server**
+- The world on it (`/data/ban/play/e34dbe54`, run 1a14f29f351, with the MIC rock tags) predates the climate-class fix,
+  the large-cell divergence fix and the plate cap; it is re-baked after the next green test batch.
 
 ### 2026-10-02 — Crust-deep magma system; no arches in underwater sea cliffs (agent worktree agent-ae5dd76f2542ab9e7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; taken over from a stopped agent; not merged)
 - **Ask.** Ben, decisions log 2026-10-02, "Crust-deep magma system (Recommended)" ("the amount of lava inside of them is
