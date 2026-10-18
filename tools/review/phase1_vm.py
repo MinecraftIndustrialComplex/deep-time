@@ -667,7 +667,14 @@ def cmd_scale_stats(a):
         # A Petroff-Guyou world's block is not exactly the preset's m_per_block_h (b is rounded to 256): the manifest has the true one.
         mb = mf["scale"].get("m_per_block_h") or m
         rad = (mf.get("planet") or {}).get("radius_m")
+        # Does the world fit the build height? A sane bake has no cell compressed under the ceiling or sunk below the floor; the
+        # Earth-proportioned bake of 2026-10-18 diverged (peaks of 3e29 m, 5.5 million cells compressed) and a comparison on it shows nothing.
+        notes = mf.get("notes") or {}
+        limit = ((notes.get("bake") or {}).get("terrain") or {}).get("build_limit") or {}
+        fit = {k: limit.get(k) for k in ("cells_above", "cells_compressed", "cells_below_min_y")}
         out.append({"label": label, "m_per_block_h": round(mb, 1), "m_per_block_v": mf["scale"].get("m_per_block_v"), "circumference_blocks": mf["scale"]["circumference_blocks"],
+                    "bake_fits_build_height": all(v == 0 for v in fit.values()), "build_limit_cells": fit,
+                    "surface_max_elevation_m": (notes.get("surface") or {}).get("max_elevation_m"),
                     "radius_km": round(rad / 1000) if rad else round(32768 * m / 1000 / (2 * math.pi)),
                     "region_km": round(REGION * mb / 1000, 1), "window_centre": [w["cx"], w["cz"]],
                     "land_share": round(len(land) / len(h), 3), "max_y": round(max(h)), "p95_y": round(pct(h, 0.95)), "median_land_y": round(pct(land, 0.5)) if land else None,
