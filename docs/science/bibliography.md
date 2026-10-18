@@ -5920,12 +5920,13 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 - Read so far (by the project): abstract, 2026-10-03 (research sub-agent): the collapse model is "difficult to reconcile with ... moderate regional extension (≤50%) and the discovery that most high-angle, Basin and Range faults slipped rapidly ca. 17 Ma, tens of millions of years after crustal thickening occurred".
 
 ### SundellEtAl2021
-- Reference: Sundell, K. E. and others (2021). Jurassic to Neogene quantitative crustal thickness estimates in southern Tibet. GSA Today 31(6).
-- DOI or URL: GSA Today June 2021 (open, geosociety.org).
-- Ledger ids: PLT-259
+- Reference: Sundell, K. E., Laskowski, A. K., Kapp, P. A., Ducea, M. N. and Chapman, J. B. (2021). Jurassic to Neogene quantitative crustal thickness estimates in southern Tibet. GSA Today 31(6).
+- DOI or URL: 10.1130/GSATG461A.1 (open: https://www.geosociety.org/gsa-today/june-2021/jurassic-to-neogene-quantitative-crustal-thickness-estimates-in-southern-tibet)
+- Ledger ids: PLT-259, PLT-287
 - Access: open; full text read.
 - Library: not fetched.
 - Read so far (by the project): full text, 2026-10-03 (research sub-agent): "crustal thickness increased by ~40 km at ~1.3 mm/a between 60 and 30 Ma to near modern crustal thickness, before the onset of Miocene east-west extension"; "Our results are inconsistent with models that invoke net crustal thinning via orogenic collapse (Dewey, 1988) beginning in the Miocene".
+- Read again (plate spikes, 2026-10-18): the full text through the web fetch tool, for the thickening rate (PLT-287): "thickening at ~1.3 mm/a between 60 and 30 Ma (Fig. 3D)"; the Gaussian kernel model "increases from ~40 to ~70 km between 60 and 40 Ma" and "remains steady-state from 40 Ma to present"; "Paleogene crustal thickness estimates indicate monotonic crustal thickening at rates of ~1.3 mm/a to >60 km". Licence CC-BY-NC; no page numbers on the web page.
 
 ### BaslerEtAl2026
 - Reference: Basler, L. and others (2026). [Paleogene crustal thickness of Nevada.] Tectonics 45. Title and authors to be taken from the DOI before quoting.
@@ -6495,3 +6496,16 @@ The conveyor's sinking capacity and the tests' physical ceilings on the per-cell
 - Ledger ids: CLM-205
 - Access: open (agency PDF).
 - Read so far (by the project): fetched and read 2026-10-18 (pdftotext of the table), the greatest average annual precipitation of each WMO region: Region II, Asia, 11.872 m (467.4 in.), 38 years, Mawsynram, India, 25 deg 18' N, 91 deg 35' E, 1,431 m; Region V, South-West Pacific, 11.64 m (460.0 in.), 30 years, Mt. Waialeale, Kauai, Hawaii, 1,569 m; Region I, Africa, 10.287 m (405.0 in.), 32 years, Debundscha, Cameroon, 9 m. The other regions' records are lower: Region III, South America, 8.99 m; Region IV, North America, 7 m (Henderson Lake, British Columbia); Region VI, Europe, 4.593 m (Crkvice).
+
+## The fastest a column thickens and rises (PLT-287, PLT-288), added 2026-10-18
+
+The rate limits of the plate step, added with the fix for the plate spikes (build log 2026-10-18 "Plate spikes"). Sundell et al. 2021 (above, under the orogenic collapse) gives the second thickening rate.
+
+### GarzioneEtAl2006
+- Reference: Garzione, C. N., Molnar, P., Libarkin, J. C. and MacFadden, B. J. (2006). Rapid late Miocene rise of the Bolivian Altiplano: evidence for removal of mantle lithosphere. Earth and Planetary Science Letters 241(3-4):543-556.
+- DOI or URL: 10.1016/j.epsl.2005.11.026
+- Cited as: "Garzione et al. 2006" (the Altiplano's crustal thickening rate, eq. 2, and its surface uplift rate).
+- Ledger ids: PLT-287, PLT-288
+- Access: paywalled at the publisher; a PDF copy was read.
+- Library: not kept (the PDF and its pdftotext extraction were read in the task's scratch, which was deleted).
+- Read so far (by the project): full text, 2026-10-18 (plate spikes agent). Abstract, p. 543: surface uplift "of ~2.5 to 3.5 km occurred between ~10.3 Ma and 6.8 ± 0.4 Ma"; "Only the removal of dense eclogitic lower crust and mantle lithosphere can generate a change of this magnitude and rapidity". Section 7.2, p. 551: "u H = W dH / dt" (eq. 2 gives dh/dt from it under Airy isostasy, with crust 2.8 and mantle 3.3 × 10³ kg/m³); "Using a maximum long term shortening rate over the past 10 Myr of u = 10 mm/yr [21] over a plateau width of W = 300 km and an initial crustal thickness of H = 50 km, the average rate of elevation change, dh / dt, should be ~3% of the crustal shortening rate, u, or 0.3 mm/yr"; "crustal thickening of 8 km over ~4 Myr could raise the surface ~1.2 km"; "A 2.5 to 3.5 km rise of the Altiplano in a period as short 1 to 4 Myr implies an average vertical speed between 3.5 and 0.6 mm/yr".
