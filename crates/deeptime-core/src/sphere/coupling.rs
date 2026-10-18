@@ -193,22 +193,18 @@ impl Coupling {
     ) -> Vec<T> {
         let (grid, frame) = (&self.grid, self.frame);
         let w = grid.w as usize;
-        let rows: Vec<Vec<T>> = self
-            .links
-            .par_chunks_mut(w)
+        // Collected in place in cell order (P1-19: the rows' results were flattened on one
+        // thread, every plate step on the L1).
+        self.links
+            .par_iter_mut()
             .enumerate()
-            .map(|(j, row)| {
+            .map(|(c, link)| {
+                let (i, j) = (c % w, c / w);
                 let z = grid.block_z(j as i64) as f64;
-                row.iter_mut()
-                    .enumerate()
-                    .map(|(i, link)| {
-                        let q = frame.unit(grid.block_x(i as i64) as f64, z);
-                        f(j * w + i, q, link)
-                    })
-                    .collect()
+                let q = frame.unit(grid.block_x(i as i64) as f64, z);
+                f(c, q, link)
             })
-            .collect();
-        rows.into_iter().flatten().collect()
+            .collect()
     }
 
     /// The grid this coupling serves.

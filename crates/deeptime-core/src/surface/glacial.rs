@@ -314,6 +314,9 @@ pub struct IceState {
     pub slope: Vec<f64>,
     /// Cells with ice.
     pub cells: usize,
+    /// The cells whose thickness is not zero or less (with ice), in stack order: the serial passes
+    /// over the glaciers visit only these (P1-19).
+    pub glaciated: Vec<u32>,
 }
 
 /// Per-cell results of a whole step (every substep added up), m, and the loads that reached base
@@ -330,15 +333,49 @@ pub struct GlacialOut {
     pub sea_melt_load: Vec<f64>,
     /// The last substep's ice.
     pub ice: IceState,
+    /// The base cells with a load, ascending: [`GlacialOut::sea_ice_load`] and
+    /// [`GlacialOut::sea_melt_load`] are 0 everywhere else.
+    pub sea_cells: Vec<u32>,
     /// Totals, m³.
     pub eroded_m3: f64,
     pub till_m3: f64,
     pub lake_m3: f64,
     pub sink_m3: f64,
     pub sea_m3: f64,
+    /// [`step`]'s working arrays, kept between steps; all 0 between them.
+    work: Work,
+}
+
+/// [`step`]'s per-cell working arrays (all 0 between its substeps: each substep clears what it
+/// wrote) and the lists of what it wrote.
+#[derive(Clone, Debug, Default)]
+struct Work {
+    /// Debris and meltwater load coming in from the donors, m³.
+    lin: Vec<f64>,
+    min: Vec<f64>,
+    /// Erosion depth, m.
+    e: Vec<f64>,
+    /// Till and lake deposits, m³.
+    till_add: Vec<f64>,
+    lake_add: Vec<f64>,
+    /// Eroded volume each glacier takes up, m³.
+    src: Vec<f64>,
+    /// Stack positions downstream of an eroding cell, as bits.
+    marked: Vec<u64>,
+    /// Cells that took up debris.
+    eroding: Vec<u32>,
+    /// Cells any array above was written at (repeats allowed until sorted).
+    written: Vec<u32>,
 }
 
 impl GlacialOut {
+    /// Gives back [`step`]'s working arrays. A caller that steps once and then goes on with other
+    /// work (the young stage) would otherwise carry six grids past the step, which used to free
+    /// them as it returned (P1-19).
+    pub fn release_work(&mut self) {
+        self.work = Work::default();
+    }
+
     fn reset(&mut self, n: usize) {
         for v in [
             &mut self.eroded,
@@ -347,9 +384,9 @@ impl GlacialOut {
             &mut self.sea_ice_load,
             &mut self.sea_melt_load,
         ] {
-            v.clear();
-            v.resize(n, 0.0);
+            crate::alloc::fill(v, n, 0.0);
         }
+        self.sea_cells.clear();
         self.eroded_m3 = 0.0;
         self.till_m3 = 0.0;
         self.lake_m3 = 0.0;
@@ -518,23 +555,8 @@ pub fn ice(
     let n = d.cells();
     let a = d.cell_area();
     let flow = Flow::new(p, gravity, d.dx);
-    for v in [
-        &mut st.q,
-        &mut st.melt_frac,
-        &mut st.thick,
-        &mut st.cover,
-        &mut st.width,
-        &mut st.sliding,
-        &mut st.slope,
-    ] {
-        v.clear();
-        v.resize(n, 0.0);
-    }
-    st.surface.clear();
-    st.surface.resize(n, f64::NAN);
-    st.footprint.clear();
-    st.footprint.resize(n, f64::NAN);
     st.cells = 0;
+    st.glaciated.clear();
     // Up: fluxes, by position in the stack. `out` is what a cell passes to its receiver (0 when
     // nothing reaches it: adding +0 to a sum of non-negative terms changes no bit).
     let out = SharedF64::new(l, 0.0);
@@ -565,18 +587,31 @@ pub fn ice(
         q.set(i, 0.5 * (supply + o));
         out.set(i, o);
     });
+    // Every cell in one parallel pass: its stack position's value, `none` off the stack.
     let pos = &f.pos;
-    let gather = |dst: &mut Vec<f64>, src: &SharedF64| {
-        dst.par_iter_mut().enumerate().for_each(|(c, v)| {
-            let i = pos[c];
-            if i != NONE {
-                *v = src.get(i as usize);
-            }
-        });
+    let gather = |dst: &mut Vec<f64>, src: &SharedF64, none: f64| {
+        (0..n)
+            .into_par_iter()
+            .map(|c| {
+                let i = pos[c];
+                if i != NONE { src.get(i as usize) } else { none }
+            })
+            .collect_into_vec(dst);
     };
-    gather(&mut st.melt_frac, &melt_frac);
+    gather(&mut st.melt_frac, &melt_frac, 0.0);
     if !any.load(Ordering::Relaxed) {
-        gather(&mut st.q, &q);
+        gather(&mut st.q, &q, 0.0);
+        for v in [
+            &mut st.thick,
+            &mut st.cover,
+            &mut st.width,
+            &mut st.sliding,
+            &mut st.slope,
+        ] {
+            crate::alloc::fill(v, n, 0.0);
+        }
+        crate::alloc::fill(&mut st.surface, n, f64::NAN);
+        crate::alloc::fill(&mut st.footprint, n, f64::NAN);
         return;
     }
     // Down: surfaces, receivers first.
@@ -620,20 +655,38 @@ pub fn ice(
         cover.set(i, (wd / d.dx).min(1.0));
         sliding.set(i, flow.sliding(hh, sl, warm_t));
     });
-    gather(&mut st.q, &q);
-    gather(&mut st.thick, &thick);
-    gather(&mut st.surface, &surface);
-    gather(&mut st.slope, &slope);
-    gather(&mut st.width, &width);
-    gather(&mut st.cover, &cover);
-    gather(&mut st.sliding, &sliding);
+    gather(&mut st.q, &q, 0.0);
+    gather(&mut st.thick, &thick, 0.0);
+    gather(&mut st.surface, &surface, f64::NAN);
+    gather(&mut st.slope, &slope, 0.0);
+    gather(&mut st.width, &width, 0.0);
+    gather(&mut st.cover, &cover, 0.0);
+    gather(&mut st.sliding, &sliding, 0.0);
     st.cells = st.thick.par_iter().filter(|&&x| x > 0.0).count();
-    footprint(d, r, kind, h, p, st);
+    // (in stack order: rayon's collect keeps it)
+    st.glaciated.par_extend(
+        (0..l)
+            .into_par_iter()
+            .filter(|&i| has_ice(thick.get(i)))
+            .map(|i| r.stack[i]),
+    );
+    crate::alloc::fill(&mut st.footprint, n, f64::NAN);
+    footprint(d, kind, h, p, st);
+}
+
+/// A thickness the serial passes count as ice: not zero or less (NaN too, as their tests
+/// `h <= 0.0` let it through).
+#[inline]
+fn has_ice(h: f64) -> bool {
+    h > 0.0 || h.is_nan()
 }
 
 /// The footprint: every glacier over the cells within half its width that lie under it.
-fn footprint(d: &Dims, r: &Routing, kind: &[u8], h: &[f64], p: &GlacialParams, st: &mut IceState) {
-    for &c in &r.stack {
+///
+/// It walks [`IceState::glaciated`], the stack's cells with ice in stack order: the cells it skips
+/// have no surface, so it writes what a walk of the whole stack would, in the same order.
+fn footprint(d: &Dims, kind: &[u8], h: &[f64], p: &GlacialParams, st: &mut IceState) {
+    for &c in &st.glaciated {
         let c = c as usize;
         let zs = st.surface[c];
         if !zs.is_finite() {
@@ -699,6 +752,7 @@ pub fn ice_serial(
     st.footprint.clear();
     st.footprint.resize(n, f64::NAN);
     st.cells = 0;
+    st.glaciated.clear();
     // Up: fluxes (donors before receivers: the reverse of the stack).
     let mut qin = vec![0.0f64; n];
     let mut any = false;
@@ -758,6 +812,7 @@ pub fn ice_serial(
         st.cover[c] = (st.width[c] / d.dx).min(1.0);
         st.sliding[c] = flow.sliding(hh, s, warm_t);
         st.cells += 1;
+        st.glaciated.push(c as u32);
     }
     // The footprint: every glacier over the cells within half its width that lie under it.
     for &c in &r.stack {
@@ -811,23 +866,51 @@ pub fn step(
     let dts = dt / subs as f64;
     let k = p.erosion_k * p.strength;
     let mut ice_st = std::mem::take(&mut out.ice);
-    let mut lin = vec![0.0f64; n];
-    let mut min = vec![0.0f64; n];
-    let mut e = vec![0.0f64; n];
-    let mut till_add = vec![0.0f64; n];
-    let mut lake_add = vec![0.0f64; n];
-    let mut src = vec![0.0f64; n];
+    let mut wk = std::mem::take(&mut out.work);
+    let l = r.stack.len();
+    // With the forest, the debris pass visits only the positions downstream of an eroding cell
+    // (every other cell has no load: it would skip them); without, every position.
+    let f = &r.forest;
+    let sparse = f.len() == l && f.pos.len() == n;
+    for v in [
+        &mut wk.lin,
+        &mut wk.min,
+        &mut wk.e,
+        &mut wk.till_add,
+        &mut wk.lake_add,
+        &mut wk.src,
+    ] {
+        if v.len() != n {
+            crate::alloc::fill(v, n, 0.0);
+        }
+    }
+    if wk.marked.len() != l.div_ceil(64) {
+        wk.marked.clear();
+        wk.marked.resize(l.div_ceil(64), 0);
+    }
+    let Work {
+        lin,
+        min,
+        e,
+        till_add,
+        lake_add,
+        src,
+        marked,
+        eroding,
+        written,
+    } = &mut wk;
     let mut spread: Vec<(usize, f64)> = Vec::new();
+    let mut sea_cells: Vec<u32> = Vec::new();
     for _ in 0..subs {
         ice(d, r, kind, h, filled, sea, clim, p, gravity, &mut ice_st);
         if ice_st.cells == 0 {
             break;
         }
-        // Erosion of every glaciated cell.
-        e.iter_mut().for_each(|x| *x = 0.0);
-        src.iter_mut().for_each(|x| *x = 0.0);
+        // Erosion of every glaciated cell (the stack's cells with ice, in stack order).
+        eroding.clear();
+        written.clear();
         if k > 0.0 {
-            for &c in &r.stack {
+            for &c in &ice_st.glaciated {
                 let c = c as usize;
                 let hh = ice_st.thick[c];
                 if hh <= 0.0 {
@@ -886,58 +969,93 @@ pub fn step(
                     let depth = (vol * wgt / sum / a).min(p.max_erosion_share * (zs - h[j]));
                     e[j] += depth;
                     src[c] += depth * a;
+                    written.push(j as u32);
+                }
+                if !spread.is_empty() {
+                    eroding.push(c as u32);
                 }
             }
         }
-        // Debris: up the stack (donors first), melting out with the ice.
-        lin.iter_mut().for_each(|x| *x = 0.0);
-        min.iter_mut().for_each(|x| *x = 0.0);
-        till_add.iter_mut().for_each(|x| *x = 0.0);
-        lake_add.iter_mut().for_each(|x| *x = 0.0);
-        for &c in r.stack.iter().rev() {
+        // The positions the debris can reach: down from every eroding cell (a walk stops where
+        // an earlier one passed).
+        if sparse {
+            for &c in eroding.iter() {
+                let mut i = f.pos[c as usize];
+                while i != NONE {
+                    let (w, b) = (i as usize / 64, 1u64 << (i % 64));
+                    if marked[w] & b != 0 {
+                        break;
+                    }
+                    marked[w] |= b;
+                    i = f.rpos[i as usize];
+                }
+            }
+        } else {
+            marked.iter_mut().for_each(|w| *w = u64::MAX);
+            if !l.is_multiple_of(64)
+                && let Some(last) = marked.last_mut()
+            {
+                *last = (1u64 << (l % 64)) - 1;
+            }
+        }
+        // Debris: up the stack (donors first, so positions downwards), melting out with the ice.
+        for w in (0..marked.len()).rev() {
+            let mut bits = std::mem::take(&mut marked[w]);
+            while bits != 0 {
+                let t = 63 - bits.leading_zeros() as usize;
+                bits &= !(1u64 << t);
+                let c = r.stack[w * 64 + t] as usize;
+                written.push(c as u32);
+                let load = lin[c] + src[c];
+                let mut melt_load = min[c];
+                if load <= 0.0 && melt_load <= 0.0 {
+                    continue;
+                }
+                // All of it melts out at a terminus or beyond the ice.
+                let frac = if ice_st.q[c] > 0.0 {
+                    ice_st.melt_frac[c]
+                } else {
+                    1.0
+                };
+                let debris = load * frac;
+                let till_vol = (p.till_share * debris).min(p.max_till_m * a);
+                let carried = load - debris;
+                melt_load += debris - till_vol;
+                till_add[c] += till_vol;
+                out.till_m3 += till_vol;
+                // Meltwater crossing an ice-free lake leaves its load there, up to the lake level.
+                if ice_st.thick[c] <= 0.0 && melt_load > 0.0 {
+                    let room = filled[c] - h[c] + e[c] - till_add[c] / a;
+                    if room > LAKE_TOL_M {
+                        let dep = melt_load.min(room * a);
+                        lake_add[c] += dep;
+                        out.lake_m3 += dep;
+                        melt_load -= dep;
+                    }
+                }
+                let rc = r.rcv[c] as usize;
+                if rc == c {
+                    // A closed basin keeps everything (as till).
+                    till_add[c] += carried + melt_load;
+                    out.sink_m3 += carried + melt_load;
+                } else if kind[rc] == BASE {
+                    out.sea_ice_load[rc] += carried;
+                    out.sea_melt_load[rc] += melt_load;
+                    out.sea_m3 += carried + melt_load;
+                    sea_cells.push(rc as u32);
+                } else {
+                    lin[rc] += carried;
+                    min[rc] += melt_load;
+                    written.push(rc as u32);
+                }
+            }
+        }
+        // Every cell written above, ascending (the cells between have nothing to add), and its
+        // working values cleared for the next substep.
+        written.sort_unstable();
+        written.dedup();
+        for &c in written.iter() {
             let c = c as usize;
-            let load = lin[c] + src[c];
-            let mut melt_load = min[c];
-            if load <= 0.0 && melt_load <= 0.0 {
-                continue;
-            }
-            // All of it melts out at a terminus or beyond the ice.
-            let frac = if ice_st.q[c] > 0.0 {
-                ice_st.melt_frac[c]
-            } else {
-                1.0
-            };
-            let debris = load * frac;
-            let till_vol = (p.till_share * debris).min(p.max_till_m * a);
-            let carried = load - debris;
-            melt_load += debris - till_vol;
-            till_add[c] += till_vol;
-            out.till_m3 += till_vol;
-            // Meltwater crossing an ice-free lake leaves its load there, up to the lake level.
-            if ice_st.thick[c] <= 0.0 && melt_load > 0.0 {
-                let room = filled[c] - h[c] + e[c] - till_add[c] / a;
-                if room > LAKE_TOL_M {
-                    let dep = melt_load.min(room * a);
-                    lake_add[c] += dep;
-                    out.lake_m3 += dep;
-                    melt_load -= dep;
-                }
-            }
-            let rc = r.rcv[c] as usize;
-            if rc == c {
-                // A closed basin keeps everything (as till).
-                till_add[c] += carried + melt_load;
-                out.sink_m3 += carried + melt_load;
-            } else if kind[rc] == BASE {
-                out.sea_ice_load[rc] += carried;
-                out.sea_melt_load[rc] += melt_load;
-                out.sea_m3 += carried + melt_load;
-            } else {
-                lin[rc] += carried;
-                min[rc] += melt_load;
-            }
-        }
-        for c in 0..n {
             if e[c] > 0.0 {
                 h[c] -= e[c];
                 out.eroded[c] += e[c];
@@ -953,9 +1071,23 @@ pub fn step(
                 h[c] += t;
                 out.lake[c] += t;
             }
+            for v in [
+                &mut *lin,
+                &mut *min,
+                &mut *e,
+                &mut *till_add,
+                &mut *lake_add,
+                &mut *src,
+            ] {
+                v[c] = 0.0;
+            }
         }
     }
+    sea_cells.sort_unstable();
+    sea_cells.dedup();
+    out.sea_cells = sea_cells;
     out.ice = ice_st;
+    out.work = wk;
 }
 
 /// `notes` key of the deep-time totals.

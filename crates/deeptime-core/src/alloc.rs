@@ -20,14 +20,18 @@
 //! The stages allocate and free the same grid-sized arrays every step (hundreds of GiB over a
 //! quick run), so mapping each one afresh costs a page fault per page: a quick 16k run took 39 %
 //! longer. A freed large block is therefore kept for the next block of exactly its size, up to
-//! [`CACHE_BYTES`] of them; the kept blocks count as in use (the process holds them), and
-//! [`release_cache`] gives them back when the memory cap needs the room.
+//! [`CACHE_BYTES`] of them; the kept blocks count as in use (the process holds them), go back to
+//! the OS oldest first when a new block would take the count past the ceiling the session sets
+//! ([`keep_below`]), and all go back when a stage ends ([`release_cache`]).
 //!
 //! Small blocks stay with the system allocator, and glibc keeps the ones freed in each thread's
 //! arena for reuse: that memory is the process's but not in the count. [`release_cache`] gives it
 //! back too (`malloc_trim`), so between stages the process holds what the count says (memory
 //! test, 2026-10-17: on the test planet the session's arenas kept 11 to 15 MiB of freed blocks
-//! from the stages into the bake, more on a busy machine).
+//! from the stages into the bake, more on a busy machine). Each thread also keeps its last few
+//! freed small blocks for its own next block of the same size, counted while it keeps them (the
+//! `park` module: a per-cell `Vec` freed and allocated again on one thread then touches neither
+//! malloc nor the shared count).
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -41,9 +45,23 @@ pub const LARGE_BYTES: usize = 1 << 20;
 /// mod runs on; a mapping's real pages are at least this).
 const PAGE: usize = 4096;
 
-static IN_USE: AtomicU64 = AtomicU64::new(0);
+/// A value alone on its cache lines (two 64-byte lines, which the adjacent-line prefetcher fetches
+/// as a pair). Every allocation and free writes `IN_USE`, and a growing count `PEAK`; beside the
+/// settings each allocation reads (`LARGE`, `KEPT`, `CEILING`), each of those writes would make
+/// the next read of them on every other thread a miss (P1-19).
+#[repr(align(128))]
+struct Line<T>(T);
+
+impl<T> std::ops::Deref for Line<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+static IN_USE: Line<AtomicU64> = Line(AtomicU64::new(0));
 /// The highest `IN_USE` since the start of the current window ([`start_window`]).
-static PEAK: AtomicU64 = AtomicU64::new(0);
+static PEAK: Line<AtomicU64> = Line(AtomicU64::new(0));
 /// The highest `IN_USE` of the windows before the current one.
 static EARLIER_PEAK: AtomicU64 = AtomicU64::new(0);
 /// The current large-block threshold ([`set_large_threshold`]; `usize::MAX`: off).
@@ -51,12 +69,15 @@ static LARGE: AtomicUsize = AtomicUsize::new(LARGE_BYTES);
 
 /// At most this many bytes of freed large blocks are kept for reuse. Measured on quick 16k
 /// (memacct, 2026-10-04, CPU time against glibc's malloc): none +27 %, 256 MiB +16 %, 1 GiB +5 %;
-/// the coupled stages free and reallocate up to ~1 GiB of grids a step.
-pub const CACHE_BYTES: usize = 1 << 30;
+/// the coupled stages free and reallocate up to ~1 GiB of grids a step. Full 16k frees more
+/// (P1-19, 30 Myr counted per phase): 1 GiB pushed out 2,730 kept blocks (33 GB) to make room
+/// and the surface reused 62 % of its large blocks; 2 GiB pushed out 184 (2.8 GB), 4 GiB none,
+/// with no further gain. Kept blocks count in the memory in use, so the cap bounds them as well.
+pub const CACHE_BYTES: usize = 2 << 30;
 /// The current limit of the kept blocks ([`set_cache_limit`]).
 static CACHE_LIMIT: AtomicUsize = AtomicUsize::new(CACHE_BYTES);
-/// At most this many kept blocks.
-const SLOTS: usize = 128;
+/// At most this many kept blocks (2 GiB of the smallest large blocks).
+const SLOTS: usize = 2048;
 /// Kept blocks never hold the count above this ([`keep_below`]).
 static CEILING: AtomicU64 = AtomicU64::new(u64::MAX);
 /// The bytes of the kept blocks (`Cache::bytes`, readable without the lock).
@@ -147,6 +168,15 @@ pub fn release_cache() -> u64 {
     bytes
 }
 
+/// The bytes of the large blocks kept for reuse (in the count, [`in_use`]). They leave by
+/// themselves, oldest first, when the count would pass the ceiling ([`keep_below`]), so the
+/// session asks its history for room by the count without them (P1-19: giving them back whenever
+/// a step might need room returned up to 3 GiB a few times a step on full 16k, and the next step
+/// mapped and faulted it in again).
+pub fn kept_bytes() -> u64 {
+    KEPT.load(Ordering::Relaxed) as u64
+}
+
 /// Returns the free memory the system allocator keeps in its arenas to the OS (glibc's
 /// `malloc_trim(0)`: every arena's top and the whole pages of its free chunks); a no-op where the
 /// C library is not glibc. Small blocks freed by the stages' threads otherwise stay resident in
@@ -177,10 +207,19 @@ pub fn set_cache_limit(bytes: usize) {
 /// Linux, and two atomics.
 pub struct CountingAlloc;
 
+/// Counts `bytes` more; returns the count with them. While kept blocks hold the count over the
+/// ceiling, the oldest go back to the OS first ([`hold_ceiling`]) and the peak is taken after: the
+/// caller has not touched the new block yet, so the process never holds it and the blocks that
+/// gave way for it at once, and kept blocks never take the peak over the ceiling (P1-19).
 #[inline]
-fn added(bytes: usize) {
-    let now = IN_USE.fetch_add(bytes as u64, Ordering::Relaxed) + bytes as u64;
-    PEAK.fetch_max(now, Ordering::Relaxed);
+fn added(bytes: usize) -> u64 {
+    let now = hold_ceiling(IN_USE.fetch_add(bytes as u64, Ordering::Relaxed) + bytes as u64);
+    // A read first: the count is mostly under its peak, and an atomic max takes the line for
+    // writing even when it leaves the value as it is (P1-19). The peak is the same either way.
+    if now > PEAK.load(Ordering::Relaxed) {
+        PEAK.fetch_max(now, Ordering::Relaxed);
+    }
+    now
 }
 
 #[inline]
@@ -308,7 +347,17 @@ impl CountingAlloc {
             let p = os::map(len);
             if !p.is_null() {
                 added(len);
-                hold_ceiling();
+            }
+            return p;
+        }
+        if park::fits(&layout)
+            && let Some(p) = park::take(layout.size())
+        {
+            // A parked block is already counted.
+            if zeroed {
+                // SAFETY: the parked block is at least `size` writable bytes nothing else
+                // refers to.
+                unsafe { std::ptr::write_bytes(p, 0, layout.size()) };
             }
             return p;
         }
@@ -322,25 +371,139 @@ impl CountingAlloc {
         };
         if !p.is_null() {
             added(small_footprint(layout.size()));
-            hold_ceiling();
         }
         p
+    }
+}
+
+/// A few freed small blocks each thread keeps for its own next block of the same size (Linux;
+/// P1-19). The L1 sampling asks the k-d tree for the nearest samples of every cell of every plate
+/// step, and each answer is a fresh `Vec` freed a moment later on the same thread: a malloc and a
+/// free each time, and two writes of the process-wide count that every thread's allocations
+/// share (2.8 % of a full-16k run's CPU in the counting allocator, two thirds of it from those
+/// answers, P1-19 profile). A parked block stays counted, as the kept large blocks do, so the
+/// count does not change when it is parked or taken back; a thread holds at most [`park::SLOTS`]
+/// blocks of at most [`park::MAX`] bytes. The session's threads return theirs when they end
+/// ([`unpark_thread`]); a thread that ends without it leaves them allocated and counted (at most
+/// 16 KiB).
+mod park {
+    use std::alloc::Layout;
+    use std::cell::Cell;
+
+    /// Blocks parked per thread.
+    pub const SLOTS: usize = 4;
+    /// The largest block parked.
+    pub const MAX: usize = 4096;
+
+    pub struct Park {
+        ptr: [Cell<usize>; SLOTS],
+        /// The block's requested size; 0: the slot is empty (no block has size 0).
+        size: [Cell<usize>; SLOTS],
+        next: Cell<usize>,
+    }
+
+    // A constant initialiser and no destructor: a plain thread-local static, which allocates
+    // nothing and is valid for the thread's whole life (an allocator must not allocate here).
+    thread_local! {
+        static PARK: Park = const {
+            Park {
+                ptr: [const { Cell::new(0) }; SLOTS],
+                size: [const { Cell::new(0) }; SLOTS],
+                next: Cell::new(0),
+            }
+        };
+    }
+
+    /// True for the blocks that can be parked: the system allocator's plain `malloc` blocks
+    /// (alignment up to its 16 bytes and not above the size), small enough. Any two such blocks
+    /// of one size are interchangeable.
+    #[inline]
+    pub fn fits(layout: &Layout) -> bool {
+        cfg!(target_os = "linux")
+            && layout.size() <= MAX
+            && layout.align() <= 16
+            && layout.align() <= layout.size()
+    }
+
+    /// This thread's parked block of exactly `size` bytes.
+    #[inline]
+    pub fn take(size: usize) -> Option<*mut u8> {
+        PARK.with(|k| {
+            for i in 0..SLOTS {
+                if k.size[i].get() == size {
+                    k.size[i].set(0);
+                    return Some(k.ptr[i].get() as *mut u8);
+                }
+            }
+            None
+        })
+    }
+
+    /// Parks a freed block of `size` bytes; returns the block it pushed out, if any
+    /// (`(address, size)`), which the caller frees.
+    #[inline]
+    pub fn put(p: *mut u8, size: usize) -> Option<(usize, usize)> {
+        PARK.with(|k| {
+            let i = (0..SLOTS)
+                .find(|&i| k.size[i].get() == 0)
+                .unwrap_or_else(|| {
+                    let n = k.next.get();
+                    k.next.set((n + 1) % SLOTS);
+                    n
+                });
+            let out = (k.ptr[i].get(), k.size[i].get());
+            k.ptr[i].set(p as usize);
+            k.size[i].set(size);
+            (out.1 != 0).then_some(out)
+        })
+    }
+
+    /// Empties this thread's slots; returns the blocks that were in them.
+    pub fn drain() -> [(usize, usize); SLOTS] {
+        PARK.with(|k| {
+            std::array::from_fn(|i| {
+                let out = (k.ptr[i].get(), k.size[i].get());
+                k.size[i].set(0);
+                out
+            })
+        })
+    }
+}
+
+/// Frees a block that was parked: the system allocator's, `size` bytes, as [`park::fits`] took.
+fn free_parked(p: usize, size: usize) {
+    // SAFETY: a parked block is a live `System` block of this size and an alignment the
+    // system allocator gives every block (`park::fits`), and nothing else refers to it.
+    unsafe { System.dealloc(p as *mut u8, Layout::from_size_align_unchecked(size, 1)) };
+    removed(small_footprint(size));
+}
+
+/// Gives this thread's parked small blocks back to the system allocator (the session's threads
+/// call it when they end).
+pub fn unpark_thread() {
+    for (p, size) in park::drain() {
+        if size != 0 {
+            free_parked(p, size);
+        }
     }
 }
 
 /// After the count grew: while kept blocks hold it over the ceiling ([`keep_below`]), the oldest
 /// go back to the OS. Small blocks and growth in place count too, not only fresh large blocks,
 /// so a step that allocates many small blocks cannot pass the ceiling while kept blocks are still
-/// held. Two relaxed loads when nothing is kept or the count is under the ceiling.
+/// held. `now` is the count the growth left ([`added`]), so the common case reads only the two
+/// settings' lines, not the count's line other threads keep writing (P1-19). Returns the count
+/// after: `now`, or what is left once kept blocks gave way.
 #[inline]
-fn hold_ceiling() {
-    if KEPT.load(Ordering::Relaxed) == 0 || in_use() <= CEILING.load(Ordering::Relaxed) {
-        return;
+fn hold_ceiling(now: u64) -> u64 {
+    if KEPT.load(Ordering::Relaxed) == 0 || now <= CEILING.load(Ordering::Relaxed) {
+        return now;
     }
     let mut c = cache();
     while c.n > 0 && in_use() > CEILING.load(Ordering::Relaxed) {
         c.drop_oldest();
     }
+    in_use()
 }
 
 // SAFETY: small blocks are forwarded to `System` with the caller's layout; large blocks are
@@ -367,6 +530,13 @@ unsafe impl GlobalAlloc for CountingAlloc {
             }
             return;
         }
+        if park::fits(&layout) {
+            // Parked, it stays counted; the block it pushed out is freed instead.
+            if let Some((p, size)) = park::put(ptr, layout.size()) {
+                free_parked(p, size);
+            }
+            return;
+        }
         // SAFETY: `ptr` was allocated by `System` with `layout`.
         unsafe { System.dealloc(ptr, layout) };
         removed(small_footprint(layout.size()));
@@ -382,7 +552,6 @@ unsafe impl GlobalAlloc for CountingAlloc {
                 if !p.is_null() {
                     removed(small_footprint(layout.size()));
                     added(small_footprint(new_size));
-                    hold_ceiling();
                 }
                 p
             }
@@ -396,7 +565,6 @@ unsafe impl GlobalAlloc for CountingAlloc {
                 if !p.is_null() {
                     if new > old {
                         added(new - old);
-                        hold_ceiling();
                     } else {
                         removed(old - new);
                     }
@@ -456,6 +624,31 @@ pub fn set_large_threshold(bytes: Option<usize>) {
     LARGE.store(bytes.unwrap_or(usize::MAX).max(PAGE), Ordering::Relaxed);
 }
 
+/// `n` copies of `v`, written in parallel. `vec![v; n]` writes them on the calling thread (a zero
+/// `v` comes through `alloc_zeroed`, which clears a kept block there), and for a grid-sized array
+/// that serial pass is what a step's parallel passes wait for (P1-19).
+pub fn filled<T: Copy + Send + Sync>(n: usize, v: T) -> Vec<T> {
+    let mut out = Vec::new();
+    fill(&mut out, n, v);
+    out
+}
+
+/// Makes `out` `n` copies of `v`, written in parallel, in the allocation it has when that is
+/// large enough.
+pub fn fill<T: Copy + Send + Sync>(out: &mut Vec<T>, n: usize, v: T) {
+    use rayon::prelude::*;
+    rayon::iter::repeat_n(v, n).collect_into_vec(out);
+}
+
+/// A copy of `src`, written in parallel: `to_vec` and `clone` copy a grid-sized array on the
+/// calling thread, as [`filled`] says of `vec!` (P1-19).
+pub fn copied<T: Copy + Send + Sync>(src: &[T]) -> Vec<T> {
+    use rayon::prelude::*;
+    let mut out = Vec::new();
+    src.par_iter().copied().collect_into_vec(&mut out);
+    out
+}
+
 /// The allocator's counters as the session's [`MemoryGauge`].
 pub struct AllocGauge;
 
@@ -476,6 +669,9 @@ impl MemoryGauge for AllocGauge {
     }
     fn release(&self) -> u64 {
         release_cache()
+    }
+    fn kept(&self) -> u64 {
+        kept_bytes()
     }
     fn keep_below(&self, bytes: u64) {
         keep_below(bytes);
@@ -613,7 +809,8 @@ mod tests {
         // other test thread's small block past the ceiling gives the kept block back too, so that
         // check failed now and then on a busy machine (gate batch 2026-10-16).
         CEILING.store(0, Ordering::Relaxed);
-        let small = std::hint::black_box(vec![2u8; 4000]);
+        // Larger than a parked block, so it is a fresh one whatever this thread parked.
+        let small = std::hint::black_box(vec![2u8; park::MAX + 1000]);
         let gone = !kept(&cache());
         keep_below(u64::MAX);
         drop(small);
@@ -621,6 +818,53 @@ mod tests {
             gone,
             "a small block past the ceiling gave the kept block back"
         );
+    }
+
+    #[test]
+    fn a_freed_small_block_is_parked_counted_and_reused() {
+        if !cfg!(target_os = "linux") {
+            return;
+        }
+        // Each test runs on a thread of its own, so this thread's slots hold only its blocks.
+        unpark_thread();
+        let size = 777;
+        let v = std::hint::black_box(vec![5u8; size]);
+        let first = v.as_ptr() as usize;
+        drop(v);
+        let parked = park::drain();
+        assert!(
+            parked.contains(&(first, size)),
+            "the freed block was parked"
+        );
+        for (p, n) in parked {
+            if n != 0 {
+                park::put(p as *mut u8, n);
+            }
+        }
+        let v = std::hint::black_box(vec![0u8; size]);
+        assert_eq!(v.as_ptr() as usize, first, "the parked block was reused");
+        assert!(
+            v.iter().all(|&b| b == 0),
+            "a reused block is zeroed when asked"
+        );
+        drop(v);
+        // A full thread's slots push out the oldest (round robin) and free it.
+        let blocks: Vec<Vec<u8>> = (0..park::SLOTS + 2).map(|k| vec![1u8; 100 + k]).collect();
+        drop(blocks);
+        let held = park::drain();
+        assert_eq!(held.iter().filter(|b| b.1 != 0).count(), park::SLOTS);
+        for (p, n) in held {
+            if n != 0 {
+                free_parked(p, n);
+            }
+        }
+        // Blocks that are not plain malloc blocks are never parked.
+        assert!(!park::fits(&Layout::from_size_align(64, 32).unwrap()));
+        assert!(!park::fits(&Layout::from_size_align(4, 8).unwrap()));
+        assert!(!park::fits(
+            &Layout::from_size_align(park::MAX + 1, 8).unwrap()
+        ));
+        assert!(park::fits(&Layout::from_size_align(96, 8).unwrap()));
     }
 
     #[test]
