@@ -165,12 +165,12 @@
     "motion_relax_myr": 6.0
   },
   "surface": {
-    "k_spl": 3e-09,
+    "k_spl": 1.5e-09,
     "m_spl": 1.0,
     "n_spl": 2.0,
     "g_deposition": 1.0,
     "runoff_ref_m_yr": 0.5,
-    "threshold_slope": 0.35,
+    "threshold_slope": 0.15,
     "kd_land_m2_yr": 2.0,
     "kd_marine_m2_yr": 100.0,
     "wave_base_m": 60.0,

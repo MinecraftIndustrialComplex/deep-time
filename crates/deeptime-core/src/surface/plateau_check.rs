@@ -235,6 +235,13 @@ fn plateau_erosion_by_process_and_scale() {
         ),
         ("map, rim, drains over it", rimmed(false)),
         ("map, rim, terminal lake", rimmed(true)),
+        (
+            "map, the presets since 2026-10-18",
+            Case {
+                k: 1.5e-9, // ledger: ERO-004
+                ..case(MAP, 2.0, 0.15, 1.0, 2, false) // ledger: ERO-013, ERO-023
+            },
+        ),
     ];
     // Extra rows for screening a surface law, printed only: DEEPTIME_PLATEAU_LAWS="k:n:sc:kd/..."
     let extra: Vec<(String, Case)> = std::env::var("DEEPTIME_PLATEAU_LAWS")
@@ -248,7 +255,7 @@ fn plateau_erosion_by_process_and_scale() {
                     n: v[1],
                     ..case(MAP, v[3], v[2], 1.0, 2, false)
                 };
-                (format!("map, K {} n {} S_c {} κ {}", v[0], v[1], v[2], v[3]), c)
+                (format!("map, K {:e} n {} S_c {} κ {}", v[0], v[1], v[2], v[3]), c)
             })
         })
         .collect();
@@ -297,5 +304,11 @@ fn plateau_erosion_by_process_and_scale() {
     assert!(
         got[13][0][3] > 0.5 * got[12][0][3],
         "a terminal lake behind a rim does not save the plateau"
+    );
+    // The recalibrated law (2026-10-18) still wears the plateau's interior by stream power, not
+    // by the critical slope, which cuts nothing there at 0.15 either.
+    assert!(
+        got[14][0][0] > 10.0 * got[14][0][1].max(0.1),
+        "the critical slope does not wear the interior"
     );
 }

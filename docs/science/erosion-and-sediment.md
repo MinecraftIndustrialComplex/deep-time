@@ -18,8 +18,9 @@ Through the whole history, rivers cut into rising land (the stream power law: er
 | [ERO](ledger/ERO.md) | facies and lithology | ERO-086 to ERO-163 (78) |
 | [ERO](ledger/ERO.md) | submarine slope failure | ERO-168 to ERO-170 (3) |
 | [ERO](ledger/ERO.md) | erosion audit, plateaus and the measured diffusivity | ERO-171 to ERO-178 (8) |
+| [ERO](ledger/ERO.md) | the erosion law against measured rates | ERO-179 to ERO-182 (4) |
 
-Rows by status: `cited-unverified` 86, `from-memory` 2, `abstract-only` 3, `calibrated` 6, `game-choice` 6, `uncited` 64.
+Rows by status (2026-10-18, `tools/review/claims_counts.py`): `verified` 9, `cited-unverified` 82, `from-memory` 2, `abstract-only` 4, `calibrated` 8, `game-choice` 10, `uncited` 56.
 
 ## Material for the stage 2 writer
 
@@ -30,10 +31,10 @@ Rows by status: `cited-unverified` 86, `from-memory` 2, `abstract-only` 3, `cali
 
 ## Known before the page is written
 
-- The erodibility `k_spl` is 2e-9 in the Rust default and 3e-9 in all eight presets; the comment describes the older value (extraction notes ERO, flag 1).
+- The erodibility `k_spl` was 2e-9 in the Rust default and 3e-9 in all eight presets, the comment describing the older value (extraction notes ERO, flag 1); since 2026-10-18 both are 1.5e-9 and the comment describes it ("The erosion law against measured rates").
 - The weathering constants (50 m/Myr, depth scale 5 m) have no source; the research note says the rate constants "were not retrieved" (flag 2).
 - The facies rules are, in the research note's words, "my proposal, not a published scheme that was checked".
-- Stage 1 spot checks: the soil-production depth scale of 5 m is 10 to 20 times the 0.25 to 0.5 m that secondary sources give for Heimsath's law (ERO-070, MISMATCH at secondary level); the hillslope diffusivity of 2 m2/yr (ERO-023) is 550 times the only primary value read (Roering et al. 1999, read on 2026-10-16: 0.0036 m2/yr measured on hillslopes, ERO-177; kept at the map scale, see "Plateaus and the hillslope diffusivity"); the Landlab carbonate and marine constants match Landlab's source.
+- Stage 1 spot checks: the soil-production depth scale of 5 m is 10 to 20 times the 0.25 to 0.5 m that secondary sources give for Heimsath's law (ERO-070, MISMATCH at secondary level); the hillslope diffusivity of 2 m2/yr (ERO-023) is 550 times the only primary value read (Roering et al. 1999, read on 2026-10-16: 0.0036 m2/yr measured on hillslopes, ERO-177; kept at the map scale, see "Plateaus and the hillslope diffusivity", and checked against Montgomery & Brandon's quiet-land rate in "The erosion law against measured rates"); the Landlab carbonate and marine constants match Landlab's source.
 
 ## Continental margins and submarine slope failure (margins and spires task, 2026-10-03)
 

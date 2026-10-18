@@ -1078,7 +1078,10 @@ founder +1,786 against +904; erosion net of its rebound −401 against −344; t
   cones at −783 m at 500 Myr against +782 m: arcs no longer have a height-only uplift, and their
   crust stands at its Airy height less what erosion takes.
 - *The structure stage's arc strain* (DEF-026) is scaled by the plate uplift over 0.1 mm/yr, and
-  the arcs' uplift changed with this task; it was not re-checked.
+  the arcs' uplift changed with this task. Re-checked by the erosion recalibration (2026-10-18,
+  natural climate, 500 Myr, seeds 1 and 2, both starts): the arcs' mean lift factor fell from 0.365
+  to 0.257 and their strain from 0.145 to 0.105, but the Andean margin and its foreland together
+  made 5 % fewer structures (1,441 → 1,370 a run); the scale stays at 0.1 mm/yr (DEF-026).
 
 **The plate checks** (`plate-check`, 1000 Myr, seeds 1 to 4, both starts): 26 of 45 targets met
 against master's 29 (master 7827e9f0; 31 on 2026-10-16, the difference being collision length

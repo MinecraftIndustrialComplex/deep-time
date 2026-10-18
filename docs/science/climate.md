@@ -42,6 +42,26 @@ Measured on `earthlike_quick_16k` (seeds 1 and 2; scattered start 500 Myr, super
 
 Re-measured on master 35dacc0e (the Lambert world, 35 m per block, plate tasks 3–4) against the merged branch, sheets off, scattered start, 500 Myr, seeds 1–3 (build log 2026-10-02, "Readied for landing"): land 0.181 → 0.174 and continental crust 0.298 → 0.309 of the planet (seed-to-seed scatter larger than either change), mean surface temperature 15.3 → 16.1 degC, land under ice 0.116 → 0.064, CO2 444 → 519 ppm (means).
 
+## The present-day nudge on high ground (2026-10-18)
+
+Plate task 8 (continental crust at its Airy height) raised the temperate worlds' CO2 from 730 to
+6,100 ppm and their temperature from 15.9 to 21.7 degC at 500 Myr (6 runs each, `plates.md`). The
+erosion recalibration traced it (build log 2026-10-18; `earthlike_quick_16k`, 500 Myr, seeds 1 and
+2, both starts; the `carbon_series` line). With the present-day setting off (`natural`) the two
+models end at the same temperature, 15.1 and 15.05 degC, with CO2 at 579 and 1,009 ppm: task 8's
+higher ground holds more ice and so needs more CO2 for the same warmth, but the carbon cycle's
+thermostat is unchanged. The rise is the present-day nudge (CLM-148 to CLM-151): it raises CO2
+until the land ice is at most CLM-150's 0.15 of the land, and that share counts mountain ice. On
+task 8's supercontinent seed 1 the temperate and natural runs are the same to −50 Myr (565 ppm);
+at the end the natural run has 0.315 of its land under ice (916 ppm, 13.7 degC) and 0.371 of its
+land above 2 km, and the temperate run reaches the bracket's top, 30,250 ppm and 28.3 degC, with
+0.156 still under ice. On master the natural end had 0.144 under ice and the nudge did nothing.
+Earth's 0.10 is almost all ice sheet, so a target that counts mountain glaciers bites on a
+mountainous planet; that is a design question for the present-day setting, not a change to the
+deep-time carbon cycle. The recalibrated erosion law (ERO-004 to ERO-007, ERO-013) lowers the high
+ground and with it the nudge's CO2 (erosion-and-sediment.md, "The erosion law against measured
+rates").
+
 ## Material for the stage 2 writer
 
 - Extraction notes (measured Earth-against-mod numbers from the build log, simplifications, flags): [extraction-notes/CLM.md](extraction-notes/CLM.md), [extraction-notes/MOI.md](extraction-notes/MOI.md).
