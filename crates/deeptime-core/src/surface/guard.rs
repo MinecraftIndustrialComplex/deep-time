@@ -60,7 +60,9 @@ pub const POLAR_FROM_DEG: f64 = 60.0;
 /// `WorldState::globals`: the largest rise and the largest fall (both positive, m) the surface
 /// stage gave one cell in one step, on the polar rows and on the rest: the elevation after the
 /// step less where the step began (the carried surface plus the plate model's uplift), so the
-/// plates' own lift is not in it (measurement only).
+/// plates' own lift is not in it (measurement only). They are read against Earth's fastest
+/// measured vertical rates (on the presets' 2 Myr step, 1 mm/yr is 2 km a step).
+// ledger: ISO-074, ISO-076
 pub const STEP_GLOBALS: [&str; 4] = [
     "surface/step_rise_max_polar_m",
     "surface/step_fall_max_polar_m",
