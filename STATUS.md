@@ -126,6 +126,58 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-18: The polar holes: a plate that weakened let go of its bending moment, and along a plate boundary one cell wide the moment's curvature made forces of several times the load held; it now lets go of its share of the load it held (ISO-056), and its rigidity is carried as a logarithm (ISO-075). The guard's worst over six 500 Myr runs fell from 30.8 to 15.5 km, the largest from 59.6 to 18.1 km (coordinator's task; agent worktree agent-a2d3dcd7f6d245dc3, branch worktree-agent-a2d3dcd7f6d245dc3 from master 9091c163, origin/master 19cb11e0 merged before the measurements; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Which process.** A per-process trace of the surface stage (temporary, `DEEPTIME_PTRACE`, not committed) printed each step's largest rise and fall per process and latitude band (0, 45, 60, 70, 80°), plus the polar picks with their parts. It ran on master 9091c163 with the step records added, over the six runs below. The polar picks were the flexure's, and within it the released moment. Example: supercontinent seed 2, −290 Myr, cell (505, 9) at 70°, a craton cell that a plate boundary brought to the Te floor (5 km), released 17.2 km in one step. The other bands had the same on a smaller scale: the step records' "rest" reached 25.5 km in a step.
+- **Why.** The plate carried `M = D ∇²w` and released `L((1 − r)·M)` where `D` fell to `r·D`. For a plate in balance `L(M)` is the load held from local isostasy, so where `r` is uniform the release is that share of the load. Along a boundary `r` jumps from cell to cell: a craton cell keeps (5/80)³ of its rigidity, its neighbours all of theirs. There the Laplacian of the released moment is several times the load held, with opposite signs in neighbouring cells. The polar rows get more of it, for three reasons:
+  - poleward of 60° a row is taller on the planet than the plate model's samples are apart (about 71 km), so boundaries step from row to row;
+  - plates carry crust about ten cells a step east to west there;
+  - the linear carry of `D` read a weak cell beside a stiff one as nearly as stiff, so the next step found it weaker.
+- **Fix** (`surface/flexure.rs`).
+  - Where `D` fell, the force is `(1 − r) ρ_m (Q + ice − w − unsolved)` per cell (`held`, `let_go`). It equals the old release where `r` is uniform and is bounded by the cell's departure from local isostasy, the Airy limit a viscoelastic plate relaxes to (Eshagh & Tenzer 2021, Buoninfante et al. 2023: full text; Beaumont 1978: abstract).
+  - `FlexState::moment` is removed. This changes the checkpoint; no compatibility kept, as the rules say.
+  - The carry blends `ln D` (ISO-075).
+  - `StepOut::released_m` reports the load let go.
+  - Measurement only: `surface/guard.rs` `POLAR_FROM_DEG` (60°, ISO-074), `STEP_GLOBALS` and `step_extremes` (ISO-074, ISO-076); `surface/mod.rs` records them; `deeptime-cli/src/run.rs` prints `step_rise/fall_polar_m` and `step_rise/fall_rest_m` in the summary's surface line.
+- **Tried** (first 110 Myr of scattered seed 1 and supercontinent seed 2, through the trace). Largest per-step total below 45°, up and down: the departure rule 4.7/4.6 and 5.2/4.5 km; with the log carry as well 4.5/4.4 and 4.8/4.6 km; no release at all (a bound) 3.7/4.4 and 4.8/4.6 km. The polar bands came to the same size. Kept: the departure rule with the log carry.
+- **Test.** `a_plate_that_weakens_settles_towards_local_isostasy`: a plate bent by a disc load, then a boundary stepping between rows across it for ten steps. It asserts that no step moves the ground by more than 1.05 times the most held, that nothing goes more than a quarter of that past local isostasy, and that something is let go. The old rule fails it at step 3 (11.2 km against 8.0 km; 4.2 km past against 1.9 km). `a_moving_margin_bends_smoothly` now leaves out of its deflection check the cells where the load itself zigzags by more than 10 m (17 m at the margin's trough with the log carry). The flexure field stays checked everywhere.
+- **Measured.** `earthlike_quick_16k`, 500 Myr, seeds 1 to 3, both starts; mean [min, max] over six runs. Before: 9091c163 with the step records (and the trace, which changes nothing: the guard's worst is the task's 59,631 m). After: a0b3f2f9. Command: `tools/remote/detach.sh start polar-<tag> --kind sim:earthlike_quick_16k:2t tools/review/force-balance-ensemble.sh /data/ban/deeptime-runs/polar/<tag> <bin> 500 1,2,3 scattered_continents,supercontinent ck <prefix> +DEEPTIME_GAP_BUDGET=1`.
+
+  | | Before | After |
+  |---|---|---|
+  | Guard's worst (m) | 30,814 [19,599, 59,631] | 15,471 [13,187, 18,101] |
+  | Steps beyond 1 / 2 / 3 / 6 Earth reliefs, per run | 4.2 [0, 12] / 1.3 [0, 7] / 0.2 [0, 1] / 0 [0, 0] | 0 [0, 0] each |
+  | Largest rise in a step, polar rows (m) | 16,148 [6,359, 39,147] | 5,016 [4,828, 5,338] |
+  | Largest fall in a step, polar rows (m) | 12,543 [6,367, 24,165] | 5,535 [4,925, 6,992] |
+  | Largest rise in a step, the rest (m) | 15,012 [10,974, 25,545] | 6,593 [4,899, 9,747] |
+  | Largest fall in a step, the rest (m) | 15,652 [13,198, 18,228] | 5,628 [4,898, 6,350] |
+  | L1 peak (m) | 7,288 [5,860, 9,958] | 7,031 [6,555, 7,648] |
+  | Land share | 0.199 [0.160, 0.222] | 0.207 [0.155, 0.237] |
+
+  Away from the poles (|lat| < 60°, from the checkpoints with `deeptime dump-fields`) the output changes cell by cell: mean |Δh| is 2.6 km [2.4, 2.7], the plate model's own elevation differs by as much (the runs diverge through the feedback), and 32 % of cells flip between land and sea. The kind of surface does not change:
+
+  | Away from the poles | Before | After |
+  |---|---|---|
+  | Land share | 0.201 [0.175, 0.229] | 0.211 [0.158, 0.256] |
+  | Land's median (m) | 726 | 715 |
+  | Land's 90th percentile (m) | 2,965 | 2,959 |
+  | Land's 99th percentile (m) | 5,053 | 5,065 |
+  | Sea's median depth (m) | 3,142 | 3,147 |
+- **Against Earth's rates** (ISO-076, values read in the fetched texts). The fastest measured rates are exhumation 9 to 13 mm/yr (Guevara et al. 2022), denudation 8 to more than 30 mm/yr (Deng et al. 2021, abstract), rebound 11 mm/yr (Lidberg et al. 2010) and subsidence 9 to 12 mm/yr (Brothers et al. 2009). Over millions of years the surface moves more slowly: the Altiplano rose 0.4 to 0.9 mm/yr (Garzione et al. 2008), and a basin's tectonic subsidence totals 3 to 4 km (Xie & Heller 2009). Before the fix a cell rose 39 km in a step, 20 mm/yr held for 2 Myr. After it the largest change is 9.7 km a step (4.9 mm/yr), and nothing stood farther from the sea than 18.1 km.
+- **Choices** (the agent's, all undoable):
+  - the departure rule, and removing the moment from the flexure state;
+  - the log carry of `D`;
+  - the polar band at 60°;
+  - the summary line in `run.rs`, outside `surface/`;
+  - the margin test's exclusion of load-zigzag cells;
+  - the new test's bounds, 1.05 and 0.25;
+  - the before run on 9091c163 with the reports, so the guard's worst matches the task's 59,631 m;
+  - the experiments' runs stopped after 110 Myr.
+- **Gates** on the VM (`tools/remote/mac.sh`, after the merge and the docs): `cargo fmt --all --check` ok; `cargo clippy --workspace --all-targets --locked -- -D warnings` clean; `cargo deny check licenses bans` ok; `cargo test --workspace --locked` 950 passed, 0 failed, 4 ignored. GameTests are the coordinator's.
+- **Left.**
+  - Single cells still change by 5 to 10 km a step. In the 110 Myr traces this came from the fluvial step (9 to 10 km), marine fill (9 to 12 km), the glacial step (11 km) and the flexure (8.5 km), partly cancelling. That is within Earth's fastest rates but above what a region sustains over 2 Myr; not checked process by process.
+  - The release happens at once within a step. The share `1 − r` is the agent's rule, from the two limits.
+  - `docs/science/plates.md` "Limits" (the plates agent's page) still calls the polar hole untraced.
+  - Next step: the coordinator merges this branch and runs the GameTests.
 ### 2026-10-18: Ben's play world re-baked on master 0729e267 (coordinator's job; agent worktree agent-a5e977549ecb09b46, branch play-rebake-0729e267 from origin/master 0729e267, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What was baked.** Master 0729e267 over the previous bake (e34dbe54): koppen_l2 projected as a class (SCL-090), the IcePass covering a pack's own ice (BIO-084), the large-cell surface divergence fix and guard (ISO-070 to ISO-072), the gossan cap holding no ore (DEP-212/213), the bench speed-ups and the plate-step cap (PLT-287/288). No script changed: `play-stage.sh` (rock tags by default, ops carried over), `play-client-stage.sh`, `play-client-apply.py`, `play-check.sh` and `play-ping.py` were used as merged.
 - **Workbench and world.** Release `deeptime` built from 0729e267 (`cargo build --release -p deeptime-cli` through `detach.sh --kind cargo:other`, 59 s), installed with `tools/viewer/mac-watch.sh --no-build` (no run in progress; the installed binary's sha256 equals the build's, bd291ed23099...). Run `1a150a58769`: earthlike_quick_16k, supercontinent, 1000 Myr, seed 1, 745.9 s, 503 frames, 11,991 events.
