@@ -5,17 +5,18 @@ scale": about 1:300, to be playtested against about 1:100 and Earth-proportioned
 
     python3 tools/review/phase1_scale.py [--only presets,bake,region,render,stats,page] [--scales 100,300,1221]
 
-One planet, three horizontal scales. The circumference stays 32,768 blocks, so a scale changes what a block
-is (100 m, 300 m, 1,221 m = 2π × 6,370 km / 32,768, Earth-proportioned) and with it the planet's radius
-(521 km, 1,565 km, 6,371 km) and how wide features are in blocks; the vertical scale (35 m per block) is
-unchanged. The three bakes share seed, start (scattered continents) and length (500 Myr), and the plate
-history does not depend on the scale (it is Earth-normalized), so one window of the planet (2,048 × 2,048
-blocks, the same longitude and latitude at every scale) is the same patch of planet each time. For each scale:
+Three bakes, one per horizontal scale, from one seed. The circumference stays 32,768 blocks, so a scale changes
+what a block is (100 m, 300 m, 1,221 m = 2π × 6,370 km / 32,768, Earth-proportioned) and with it the planet's
+radius (521 km, 1,565 km, 6,371 km) and how wide features are in blocks; the vertical scale (35 m per block) is
+unchanged. The bakes share seed, start (scattered continents) and length (500 Myr) but are not the same planet:
+the block's size changes the hydrology and the sea level the solvers settle on (the 2026-10-18 bakes hold 12 %,
+22 % and 95 % land), so no 2,048 x 2,048 block window has land shares that agree across them. Each scale gets
+its own window, chosen for the same land share. For each scale:
 
   presets  earthlike_quick_32k with scale.m_per_block_h changed       (phase1_vm.py scale-preset)
   bake     deeptime run, three at once through the admission tool     -> <WORK>/h<m>/planet/deeptime
-  region   the window: land shares that agree across the scales (within 0.05 of each other, as near 0.6
-           as the bakes allow), high relief, off the poles and the seam  (phase1_vm.py scale-region)
+  region   one window per scale whose land share is within 0.025 of 0.6 (so the three agree within 0.05),
+           the most relief among those, off the poles and the seam  (phase1_vm.py scale-region)
   render   standalone server + Chunky over the window, BlueMap, two pictures per scale
            (tools/review/phase1-scale-one.sh, one scale after the other: they share smoke/standalone)
   stats    land share, relief and slope in the window per scale       (phase1_vm.py scale-stats)
@@ -115,7 +116,8 @@ def step_render(a):
     region = load_region()
     ok = True
     for lab, m in chosen(a):
-        cmd = f"WORK={WORK} tools/review/phase1-scale-one.sh {m} {region['cx']} {region['cz']} {REGION // 2}"
+        w = region["windows"][str(m)]
+        cmd = f"WORK={WORK} tools/review/phase1-scale-one.sh {m} {w['cx']} {w['cz']} {REGION // 2}"
         rc, out, secs = vm(cmd, flags=["--server"], pulls=[f"review/out/phase1/scale/h{m}-tilt.png", f"review/out/phase1/scale/h{m}-flat.png"],
                            log=os.path.join(OUT, "logs", f"render-h{m}.log"), name=f"scale-render-h{m}")
         print(f"render {lab}: exit {rc} in {secs:.0f} s")
@@ -179,10 +181,11 @@ def section_html(rel=""):
     if region:
         by = region.get("land_by_scale") or {}
         shares = ", ".join(f"{100 * v:.0f} %" for v in by.values())
-        note = (f"Window {REGION:,} × {REGION:,} blocks centred on block {region['cx']:,}, {region['cz']:,}, the same longitude and latitude at every scale, "
-                f"chosen so the three land shares agree within {100 * region.get('land_tol', 0.05):.0f} points ({shares}; target "
-                f"{100 * region.get('land_target', 0):.0f} %) and the slope statistics compare like with like.")
-    return (f'<div class="scale"><p>One planet (seed, start and length equal), simulation C = {C:,} blocks (the Petroff-Guyou world is a little smaller: 26,112 x 13,056 blocks), vertical scale 35 m per block at every scale: only '
+        where = "; ".join(f"1:{m} at block {w['cx']:,}, {w['cz']:,}" for m, w in (region.get("windows") or {}).items())
+        note = (f"Each window is {REGION:,} × {REGION:,} blocks ({where}), chosen on its own bake so that the three land shares agree within "
+                f"{100 * region.get('land_tol', 0.05):.0f} points ({shares}; target {100 * region.get('land_target', 0):.0f} %) and the slope statistics "
+                f"compare like with like.")
+    return (f'<div class="scale"><p>Three planets from one seed (start and length equal), simulation C = {C:,} blocks (the Petroff-Guyou world is a little smaller: 26,112 x 13,056 blocks), vertical scale 35 m per block at every scale: only '
             f'the metres a block stands for change. {esc(note)} Wider features take more blocks at 1:100; at Earth proportions a mountain range '
             f'a few hundred kilometres wide is a few hundred blocks and a plain is the size of a Minecraft village.</p>'
             f'<div class="cols">{"".join(cols)}</div></div>')
