@@ -10,12 +10,12 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 |---|---|---|
 | [PLT](ledger/PLT.md) | plate setup | PLT-001 to PLT-021, PLT-203, PLT-205, PLT-209 to PLT-211 (26) |
 | [PLT](ledger/PLT.md) | plate motion | PLT-022 to PLT-028 (7) |
-| [PLT](ledger/PLT.md) | subduction | PLT-029 to PLT-067, PLT-206 to PLT-207, PLT-229, PLT-251 to PLT-252 (44) |
+| [PLT](ledger/PLT.md) | subduction | PLT-029 to PLT-067, PLT-206 to PLT-207, PLT-229, PLT-251 to PLT-252, PLT-285 to PLT-286 (46; PLT-285 and PLT-286 the continental arcs and the cones as rock, plate task 8, 2026-10-17) |
 | [PLT](ledger/PLT.md) | collisions | PLT-068 to PLT-081, PLT-222 to PLT-227, PLT-241 to PLT-250, PLT-253 (31; PLT-069 to PLT-075 and PLT-227 retired 2026-10-02) |
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
 | [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228 (19) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
-| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-282 (39; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
+| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284 (41; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221, PLT-265 (41; PLT-265 Earth's passive margins, the transition's comparison) |
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
@@ -907,3 +907,204 @@ follow thickness, the erosion law sets the land.
 - The mafic pools stand for the lower crust; the model has no lower-crust density of its own.
 - The root's pull applies only where a column's thickness changes as a whole (belts, collapse,
   foundering); a column thickened by arc magma or the cordillera's root carries none.
+
+## The crust budget on sourced rates (plate task 8, 2026-10-17)
+
+The coordinator's calls of 2026-10-17 (decisions log, "Plate task 7: the crust budget on sourced
+rates" and "The land's gap budget", recommendations 1, 3 and 6). Ledger PLT-044 to PLT-051,
+PLT-264, PLT-284 to PLT-286, HYP-017 and HYP-018, PRS-015 to PRS-017, PRS-038 and PRS-039,
+HNT-092 and HNT-125 to HNT-127; sources in the bibliography, "The crust budget on sourced rates",
+and its Stern & Scholl 2010 entry. The erosion law was not recalibrated: Ben chose one erosion
+recalibration after plate tasks 7 and 8, which a later task does on top of this one. So the land
+below is this change alone, and it stands too high.
+
+**What happens on Earth.**
+- *Island arcs.* Stern & Scholl (2010, read in full) take intra-oceanic arcs at "approximately
+  100 km3/km-million years" (500 a Myr for the first 10 Myr, 30 a Myr for 60 Myr after), so
+  1.5 km³ a year over today's 14,500 km of them (p. 11 and Table 1). Izu-Bonin-Mariana and the
+  Aleutians grew 90 to 180 per km and Myr. Gravity gives the Western Pacific island arcs 28 to 60
+  (Parcutela et al. 2023, full text). Clift et al. (2009, full text) average 125 for oceanic arcs
+  and 81 for continental ones, their whole magmatic output, recycled crust included.
+- *Continental arcs.* Stern & Scholl adopt 35 km³ per km and Myr (Reymer & Schubert's rate, via
+  Haschke & Günther 2003, abstract only) over 27,500 km: about 1.0 km³ a year. Francis &
+  Hawkesworth (1994, abstract only) give the Central Andes about 13.
+- *Intrusive to extrusive.* The continental arcs' rate "implies a reasonable intrusive : extrusive
+  ratio of approximately 7:1" (Stern & Scholl, p. 12). White et al. (2006, full text) find 5:1
+  "common to most magmatic systems"; the Aleutians 1:1 to 3:1.
+- *Shortening.* Bolivia, the most shortened part of the Andes, took "~300 km, 40%" since 50 Ma,
+  about 6 mm a year, to crust up to 75 km thick, by pure shear at constant volume (Eichelberger et
+  al. 2015, full text). Shortening explains "only 70-80% of the observed crustal thickening" of the
+  Altiplano (Allmendinger et al. 1997, abstract); the arcs' magma is the rest.
+- *Losses at collisions.* About 0.7 km³ a year in Stern & Scholl's Table 1, of which deeply
+  subducted crust is about 0.3.
+- *Maturity.* Only arc crust thicker than about 15 km jams a subduction zone (Cloos 1993, abstract).
+
+**What the model did** (plate task 7, measured 2026-10-16). Island arcs took 20 m of magma a Myr at
+the arc axis (25 to 90 times below Earth's) and stood up by a height-only uplift (HYP-017); they
+matured by time (20 Myr). Continental arcs took arc magma plus a root of 7.0 times a calibrated
+uplift (`cordillera_uplift_mm_yr`, PLT-051): 8.5 km³ a year against Earth's 1.0. The volcano
+stage's cones were height only, and eroding them stripped rock they never added. A resampling's
+accretion added crust and no height. The ocean-floor step damped every oceanic sample to the bare
+floor whatever its thickness.
+
+**What the model does now.**
+1. *Island arcs* (PLT-045): 100 km³ per km of arc and Myr, times g = min(v / v0, 1) with
+   v0 = 100 mm/yr, spread over the arc band (a Gaussian of half-width 60 km whose integral across
+   the arc is √π × 60 = 106 km; 940 m a Myr at the axis at g = 1). The arc stands up by the crust
+   it adds on the ocean's height line (4.24 m of crust per metre, PLT-264), towards the floor its
+   crust holds up. Only an oceanic slab makes an arc.
+2. *Continental arcs* (PLT-285): 35 km³ per km and Myr (329 m a Myr at the axis), standing up by
+   the crust's Airy change towards the column's Airy height (`collapse::iso_height`).
+3. *Into the pools* (PLT-046): continental arcs 1 in 8 felsic volcanic (7:1), island arcs 1 in 6
+   volcanic (5:1; two thirds of it mafic), the rest felsic plutonic.
+4. *Maturity by thickness* (PLT-047): an island arc turns continental once its arc crust reaches
+   Cloos's 15 km less the ocean's 7: 8.5 Myr at the axis at full convergence.
+5. *The cordillera by shortening* (PLT-048 to PLT-050): a range within 440 km of the front on a
+   continental overriding plate shortens at 6 mm a year (Eichelberger et al.) by pure shear, its
+   strain spread as a Gaussian of half-width 120 km, slowing as the column's Airy height nears
+   `cordillera_height_m` (3,000 m in the earthlike presets) and stopping there. The volume comes
+   from the same plate's continental crust 440 to 800 km behind the front, pool by pool, so it is
+   moved, not made. The root from an uplift (PLT-051) and both arc uplifts (HYP-017, PLT-044) are
+   gone.
+6. *Cones are rock* (PLT-286): the volcano stage's stratovolcanoes, silicic centres and ignimbrites
+   add felsic volcanic rock to the pools, shields and flood basalts mafic volcanic, and they count
+   inside the arc and hotspot rates (an arc's cones are its extrusive share), so arc magma is
+   counted once. Erosion strips the mafic volcanic pool too.
+7. *Accretion stands up* (PLT-284): a visible continental column that receives crust at a
+   resampling rises by the Airy change of the crust added, towards and never past its Airy height,
+   handed to the surface as uplift.
+8. *A held floor for thick oceanic crust* (PLT-264): every oceanic sample cools towards the floor
+   its own crust holds up on the ocean's line, capped at 20 km of crystalline crust (about
+   −2,540 m), so arcs raised by their thickness are not sunk again.
+
+The run summary's plates line gains `cordillera_shortened_km3`, `resample_accreted_visible_km3`,
+`resample_accreted_rise_km3`, `hotspot_magma_km3`, `cone_felsic_km3`, `cone_mafic_km3` and the
+arc fronts' length × time by side (`arc_front_continental_km_myr`, `arc_front_oceanic_km_myr`);
+`tools/review/crust-budget.py` prints them as rates.
+
+**Measured** (`earthlike_quick_16k`, `DEEPTIME_GAP_BUDGET=1`, `tools/review/force-balance-ensemble.sh`;
+500 Myr: seeds 1 to 3, both starts; 1000 Myr: seeds 1 to 4, both starts, the plate-check runs;
+master 7827e9f0 against the branch; mean [lowest, highest] of the runs; reported, not tuned).
+The crust budget in km³ a year over the whole run, Earth-normalized (`crust-budget.py`):
+
+| | Master, 500 Myr | Now, 500 Myr | Master, 1000 Myr | Now, 1000 Myr | Earth today (Stern & Scholl 2010) |
+|---|---|---|---|---|---|
+| Continental arcs (master: arc magma and the cordillera's root; now: arc magma less the cones counted in it) | 8.77 | 1.63 | 11.6 | 1.91 | about 1.0 |
+| Island arcs (the same) | 0.15 | 3.96 | 0.18 | 4.41 | about 1.5 |
+| Per km of arc and Myr: continental; island (cones not included) | n/a | 19.5; 31.7 | n/a | 18.7; 31.4 | 35; about 100 |
+| The volcano stage's cones into the pools: felsic; mafic | none (height only) | 1.04; 0.71 | none | 1.15; 0.60 | n/a |
+| The hotspots' own basalt | n/a | 0.048 | n/a | 0.041 | rifts and hotspots 0.5 |
+| Crust shortened into cordilleras (moved within a plate) | none | 3.22 | none | 3.48 | n/a |
+| Foundered beyond the thickest column | 7.38 | 4.70 | 12.6 | 7.75 | collision zones lose about 0.7 |
+| A resampling's accretion; of it onto visible continental crust | 23.3; 6.6 | 22.8; 8.0 | 32.1; 9.4 | 31.0; 10.7 | n/a |
+| Surface the accretion raised over the run, 10⁶ km³ | none | 979 | none | 2,727 | n/a |
+| Continental crust at the end, 10⁹ km³ | 7.28 | 7.46 | 8.41 | 8.33 | n/a |
+
+The rates per km are below Earth's because the model's trenches converge slower than v0 on the
+whole and the cones an arc builds are counted in its rate but not in these columns. The rates a
+year are above Earth's because the model has far more trench: `plate-check` measures 245,000 to
+259,000 km of subducting boundary per step (after the first 100 Myr) against Earth's 51,310 km
+(Bird 2003), and the arc fronts the run summary counts come to about 84,000 km under continental
+crust and 125,000 km under oceanic crust at 500 Myr against Earth's 27,500 and 14,500 (inferred:
+the fronts' km × Myr over the run's length). That is the plate model's boundary mix (the subducting
+share of the boundary fails its 15 to 25 % target at 50 %), not the arc rates.
+
+The surface (`tools/review/p1-17-hyps.py`; Earth from the relief grid, HYP-001 to HYP-021):
+
+| | Land | Median land height, m | 90th pct, m | Land above 2 km (of the land) | Continental crust (of the planet) | Of it dry | Sea depth, median, m | Surface temperature, °C | CO₂, ppm (geometric mean) |
+|---|---|---|---|---|---|---|---|---|---|
+| Earth | 0.289 | 427 | 2,022 | 0.102 | about 0.41 | about 0.70 | 4,062 | about 15 | 280 (pre-industrial) |
+| Master, 500 Myr | 0.178 [0.164, 0.202] | 736 | 2,744 | 0.179 [0.136, 0.268] | 0.305 | 0.54 | 3,307 | 15.9 | 730 |
+| Now, 500 Myr | 0.192 [0.177, 0.224] | 836 | 4,287 | 0.274 [0.173, 0.364] | 0.380 | 0.46 | 3,202 | 21.7 | 6,100 |
+| Master, 1000 Myr | 0.180 [0.167, 0.205] | 851 | 3,092 | 0.220 [0.071, 0.317] | 0.324 | 0.50 | 3,122 | 16.6 | 1,110 |
+| Now, 1000 Myr | 0.195 [0.175, 0.212] | 1,142 | 5,210 | 0.343 [0.263, 0.395] | 0.391 | 0.45 | 2,903 | 25.8 | 18,900 |
+
+The gap budget at 500 Myr (`tools/review/gap-budget.py --t 0`, six runs each; the gap is the
+mean elevation less the column's own Airy height):
+
+| Crust thickness | Share of the continental samples, master; now | Mean elevation, m | The gap, m | Of it made on the ocean floor, m |
+|---|---|---|---|---|
+| 30–40 km | 0.250; 0.360 | −462; −341 | −930; −795 | −44; −556 |
+| 40–55 km | 0.336; 0.255 | −21; +528 | −2,326; −1,623 | −388; −1,370 |
+| 55–70 km | 0.235; 0.101 | 1,072; 2,895 | −3,254; −1,379 | −1,147; −2,268 |
+
+The median elevation of the 40–55 km crust (`crust_bins`) rose from 87 to 396 m at 500 Myr and from
+−105 to +97 m at 1000 Myr. Its parts at 500 Myr, master against now: a resampling's accretion −4,046
+against −902 m; the ocean-floor step −2,142 against −2,097; the arcs +3,071 against +1,612;
+founder +1,786 against +904; erosion net of its rebound −401 against −344; the cones and craters
++1,324 against +1,458; collapse +441 against +229.
+
+**What it means.**
+- *The rates are on sources, and the budget is no longer two churns.* Continental arcs went from
+  nearly nine times Earth's rate to 1.6 to 1.9 times it, island arcs from a tenth to 2.6 to 2.9
+  times, both from the length of the model's trenches, not from the rate per km. Foundering fell by
+  more than a third (less is stacked beyond 70 km now that the cordillera's crust is moved, not
+  made; inferred) and is still 7 to 11 times Earth's collision losses. The crust's volume is about
+  the same; it is spread wider (0.38 to 0.39 of the planet against 0.31 to 0.32) and thinner (the
+  55–70 km share fell from 0.24 to 0.10).
+- *Accretion's height closed most of its gap.* Its part of the 40–55 km crust's gap fell from
+  −4,046 to −902 m and the gap from −2,326 to −1,623 m.
+- *What is left is made on the ocean floor.* −1,370 of the 40–55 km crust's −1,623 m. The
+  ocean-floor step still takes its 2.1 km (ocean floor stands below the dry Airy height of its own
+  thin column: the water's load and the cooled lithosphere), and the arcs no longer give it back
+  with a height-only uplift (+224 m on the ocean floor, against +1,471). So an island arc turns
+  continental at its height on the ocean's line, which lies below the continent's Airy line for any
+  crust thinner than the normal 33 km (1.4 km below at the 15 km of maturity; this page's
+  arithmetic from PLT-264 and `iso_height`). Under the sea the dry Airy height overstates where a
+  column would stand: with the water's load a 15 km column of continental density stands about
+  −3.4 km (Airy under water, 470 / 2,270 m of height per m of crust below sea level), the ocean's
+  line −3.7 km (this page's arithmetic). So much of this part is the measure's.
+- *The land rose a little and the high ground a lot.* Land 0.19 to 0.20 of the planet against
+  0.18; land above 2 km 0.27 to 0.34 of the land against 0.18 to 0.22 (Earth 0.10), the 90th
+  percentile 4.3 to 5.2 km (Earth 2.0). The thick crust now stands near its height, and erosion,
+  not recalibrated, does not wear it down: that is the next task's.
+
+**What is still off.**
+- *The high ground,* above: the erosion recalibration's job (Ben's choice), not tuned here.
+- *The climate follows the high ground.* The branch's runs are warmer (21.7 °C at 500 Myr, 25.8 at
+  1000; CO₂ 6,100 and 18,900 ppm, geometric means). Over all 28 runs, master and branch, CO₂ and
+  temperature rise with the share of land above 2 km (rank correlations 0.93 and 0.91; 0.91 and
+  0.87 over the branch's 14 alone). Degassing reads ridge production, the ocean floor consumed and
+  the large igneous provinces (`carbon::degassing`, `new_provinces`), none of which this task
+  raised by its own code, and the plates are slower; so the warmth is weathering's (inferred), and
+  which part of it the high ground cuts was not traced.
+- *Trenches too long.* The arcs' rates a year are above Earth's because the subducting boundary is
+  about five times Earth's (above).
+- *Foundering,* 4.7 to 7.8 km³ a year against Earth's collision losses of about 0.7.
+- *Cones away from arcs and hotspots* (rift and intraplate volcanoes) add rock beyond the sourced
+  rates; how much of the cones' 1.75 km³ a year that is was not split out.
+- *Continental arcs stand lower.* The median continental arc cell stands 1,095 m against master's
+  2,055 m (`plate-check`, target 1,200 to 4,500 m) and the ground under the volcano stage's arc
+  cones at −783 m at 500 Myr against +782 m: arcs no longer have a height-only uplift, and their
+  crust stands at its Airy height less what erosion takes.
+- *The structure stage's arc strain* (DEF-026) is scaled by the plate uplift over 0.1 mm/yr, and
+  the arcs' uplift changed with this task; it was not re-checked.
+
+**The plate checks** (`plate-check`, 1000 Myr, seeds 1 to 4, both starts): 26 of 45 targets met
+against master's 29 (master 7827e9f0; 31 on 2026-10-16, the difference being collision length
+and the speed ratio by crust, both near their limits). Moved to pass: collision length, 90th
+percentile (128 → 107 Myr, at most 120); speed of oceanic ÷ continental plates (1.95 → 2.52, at
+least 2); oceanic arc crest (1,077 → 332 m, at most 1,000). Moved to fail: rift-born plates welded
+back within 50 Myr (8.8 → 12.0 %, at most 10); continental crust, highest step (0.44 → 0.47, at most
+0.45); plate speed RMS (41.6 → 36.5 mm/yr, 40 to 100); steps on which the speed guard binds
+(0 → 0.12, one step of one run); ocean floor older than 180 Myr (9.6 → 11.5 %, at most 10);
+continental arc median height (2,055 → 1,095 m, 1,200 to 4,500). Still failing and moved: collisions
+per 100 Myr 1.05 → 1.61 (2 to 6); continental crust, lowest step 0.26 → 0.34 (at least 0.37); slab ÷
+free plates 1.84 → 2.17 (at least 2.5); the wedge 4 → 59 km (100 to 350); ocean floor older than
+250 Myr 3.5 → 4.6 % (at most 3); supercontinent tenure 46 → 21 Myr and period 285 → 82 Myr (100 to
+300, 400 to 800; assemblies 3.3 → 7.1 a run: with more continental crust, 70 % of it lies in one
+piece more often and for shorter stays, inferred). Unchanged in effect: active margin share 0.48,
+speed against slab share 0.46 → 0.49, rotation change 90th percentile 25 → 26 %, subducting share
+of the boundary 53 → 50 %, the foredeep. Slower plates go with more continental crust: mostly
+continental plates move at 23.6 mm/yr against 27.9, mostly oceanic ones at 44.7 against 47.7.
+
+**Limits.**
+- One long-term rate for every arc, young or old: a young arc builds slower and an old one faster
+  than Earth's front-loaded arcs (PLT-045).
+- The Andes' largest shortening rate at every continental arc above an oceanic slab, from one
+  source zone behind it (PLT-048).
+- The 2:1 mafic to felsic split of island-arc lavas and the felsic plutonic pool for every arc
+  intrusive are the model's (PLT-046).
+- The held floor's 20 km cap and the accretion's cap at the column's Airy height are rules
+  (PLT-264, PLT-284).
+- The gap is measured against a dry Airy height, which overstates where a flooded column stands.

@@ -13,14 +13,17 @@ over the runs:
   z40-55            median elevation of the 40-55 km crust (`crust_bins`)
 and the crust budget in km^3 a year over the whole run (Earth-normalized; Stern & Scholl 2010,
 Table 1: continental arcs about 1.0, oceanic arcs 1.5, losses at collision zones about 0.7):
-  arc_c, arc_o      crust added at continental and island arcs (arc magma, cones counted inside)
+  arc_c, arc_o      arc magma the plate model added at continental and island arcs, less the
+                    volcano stage's cones it counted inside the rate (those are in cone_f, so an
+                    arc's whole rate lies between arc_c and arc_c plus the arc's share of cone_f)
   cord              crust the cordillera's shortening moved into the range (moved, not added)
   found             crust foundered beyond the thickest column (lost)
   accr, accr_vis    a resampling's accretion: all of it, and of it visible crust (moved, not added)
   rise              surface the accretion raised, 10^6 km^3 (not a crust volume)
   hot               the hotspots' own basalt; cone_f, cone_m the volcano stage's cones
 and per km of arc and Myr (Stern & Scholl: continental arcs 35, island arcs about 100):
-  c/km, o/km        arc crust over the length of oceanic-slab front times the time, by side
+  c/km, o/km        arc_c and arc_o over the length of oceanic-slab front times the time, by side
+                    (the cones not included)
 """
 import re
 import sys
