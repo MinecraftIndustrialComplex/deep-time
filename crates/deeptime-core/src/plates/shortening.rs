@@ -583,6 +583,7 @@ mod tests {
             counters: Default::default(),
             slabs: Vec::new(),
             dynamics: None,
+            gap_budget: None,
         }
     }
 
