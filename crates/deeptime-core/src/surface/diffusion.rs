@@ -57,7 +57,7 @@ use super::grid::Dims;
 /// gradient iterations it took.
 pub fn step(d: &Dims, h: &mut [f64], kd: &[f64], dt: f64) -> usize {
     let live = Live::of(d, h, kd, dt);
-    let b = h.to_vec();
+    let b = crate::alloc::copied(h);
     lod(d, h, kd, dt, &live);
     let its = cg(d, &b, h, kd, dt, &live);
     if live.strips.is_some() && !live.finite(d, h) {
