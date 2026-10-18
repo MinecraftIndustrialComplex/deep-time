@@ -13,7 +13,7 @@ use deeptime_core::session::{AdvanceStatus, NoGauge, Session, SessionOptions};
 use deeptime_core::world::WorldState;
 use serde_json::{Value, json};
 
-/// The history test's small coupled planet (L1 512 × 164) over 60 Myr, with a frame every third
+/// The history test's small coupled planet at L1 256 × 82 over 60 Myr, with a frame every third
 /// plate step: the structure stage publishes into the history on some of the steps it takes
 /// beside the plates and not on others.
 fn preset() -> String {
@@ -25,7 +25,7 @@ fn preset() -> String {
     .unwrap();
     let mut v: Value = serde_json::from_str(&json).unwrap();
     v["resolution"]["l0_samples"] = json!(3000);
-    v["resolution"]["l1_r"] = json!(32);
+    v["resolution"]["l1_r"] = json!(64);
     v["keyframes"]["size"] = json!([32, 16]);
     v["keyframes"]["every_myr"] = json!(20.0);
     v["seed"] = json!(7);
@@ -79,7 +79,7 @@ fn run(json: &str, threads: usize, overlap: bool, name: &str) -> (WorldState, f6
             _ => {}
         }
         calls += 1;
-        if calls % 5 == 0 {
+        if calls.is_multiple_of(5) {
             s.with_world(|w| w.t_years).unwrap();
         }
     }
@@ -100,8 +100,14 @@ fn stepping_beside_the_plates_changes_nothing() {
     let json = preset();
     let (a, alone) = run(&json, 1, false, "alone");
     let (b, beside) = run(&json, 3, true, "beside");
-    assert_eq!(alone, 0.0, "the overlap off steps nothing beside the plates");
-    assert!(beside > 0.0, "the structure stage stepped beside the plates");
+    assert_eq!(
+        alone, 0.0,
+        "the overlap off steps nothing beside the plates"
+    );
+    assert!(
+        beside > 0.0,
+        "the structure stage stepped beside the plates"
+    );
     assert!(
         a.history.as_ref().is_some_and(|h| h.frame_count() >= 8),
         "the planet records frames"
