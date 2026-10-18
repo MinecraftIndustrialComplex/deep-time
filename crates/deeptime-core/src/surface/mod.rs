@@ -136,6 +136,12 @@ pub mod field {
     pub const FEEDBACK: &str = "surface/feedback_m";
     /// Material added (+) or removed (−) by surface processes, m (the plate model's rock pools).
     pub const MATERIAL: &str = "surface/material_m";
+    /// Felsic volcanic rock the volcano stage's cones added (+) or a caldera took back (−) since
+    /// the plate model's last step, m (stratovolcanoes, silicic centres, ignimbrites); the plate
+    /// model adds it to its pools and clears it (plate task 8).
+    pub const VOLCANIC_FELSIC: &str = "surface/volcanic_felsic_m";
+    /// … and mafic volcanic rock (shields, the flood basalts' plateaus), m.
+    pub const VOLCANIC_MAFIC: &str = "surface/volcanic_mafic_m";
     /// Written by the plate model: the feedback it applied, sampled back onto L1, m.
     pub const FEEDBACK_APPLIED: &str = "surface/feedback_applied_m";
     /// Centre-line thickness of the glaciers of the step's last ice solve, m (`glacial.rs`).

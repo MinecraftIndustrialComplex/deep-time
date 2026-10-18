@@ -32,7 +32,7 @@ use deeptime_format::EventId;
 pub const MIN_STEP_YEARS: f64 = 1000.0;
 
 /// One row of the run's climate curve (one per plate step).
-pub const SERIES_COLUMNS: [&str; 22] = [
+pub const SERIES_COLUMNS: [&str; 28] = [
     "t_myr",
     "co2_ppm",
     "co2_min_ppm",
@@ -55,6 +55,16 @@ pub const SERIES_COLUMNS: [&str; 22] = [
     "land_frac",
     "kernel_rel",
     "runoff_land_m_yr",
+    // Where the weathering comes from (the 2026-10-18 CO₂ trace): the land's flux at the step's
+    // end climate with and without the supply limit, the share of the land's kernel and of its
+    // area above 2 km, the land's area-weighted mean temperature, and the kernel (x Earth's) with
+    // each cell's kinetics at its sea-level temperature (its lapse cooling put back).
+    "weathering_land_mol_yr",
+    "weathering_kinetic_mol_yr",
+    "kernel_high_share",
+    "land_high_share",
+    "t_land_mean_c",
+    "kernel_rel_sea_t",
 ];
 
 /// One row of the ice-age window's curve (one per fine-clock step inside the window).

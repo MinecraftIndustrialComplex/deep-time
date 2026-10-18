@@ -368,8 +368,21 @@ def step_scale(a):
         kids.append(kid(len(have) == 2, f"BlueMap render at {lab} ({m} m per block)",
                         *[f"review/out/phase1/scale/{f}" for f in have] or ["not rendered"],
                         *([f"radius {s['radius_km']:,} km, land share of the window {100 * s['land_share']:.0f} %, median land slope {s['median_slope'] if s['median_slope'] is not None else float('nan'):.2f}, land steeper than 45 deg {100 * s['steep_share']:.1f} %"] if s else [])))
+    # Each scale's window is chosen so the three show a like share of land (decisions log 2026-10-17: the exit run's windows had 0.73, 0.84 and 0.56).
+    try:
+        ag = json.load(open(os.path.join(sc, "scale-agreement.json")))
+        kids.append(kid(ag["within"], f"land shares of the window agree within {ag['tolerance']:g} across the scales",
+                        "land share " + ", ".join(f"{s['label']} {s['land_share']:.3f}" for s in stats.values()) if stats else "no statistics",
+                        f"spread {ag['spread']:.3f} (target share {ag['target']:g})"))
+    except (OSError, ValueError, KeyError):
+        kids.append(kid(False, "land shares of the window agree within 0.05 across the scales", "scale-agreement.json missing"))
+    # A world that does not fit the build height has no terrain to compare (the Earth-proportioned bake of 2026-10-18 diverged numerically).
+    bad = [s for s in stats.values() if not s.get("bake_fits_build_height", True)]
+    kids.append(kid(bool(stats) and not bad, "each bake fits the build height (no cell compressed under the ceiling or below the floor)",
+                    *([f"{s['label']}: {s['build_limit_cells'].get('cells_compressed')} cells compressed, {s['build_limit_cells'].get('cells_below_min_y')} below the floor, "
+                      f"highest surface {s.get('surface_max_elevation_m')} m" for s in bad] or ["all bakes fit"])))
     kids.append(kid(os.path.exists(os.path.join(sc, "index.html")), "side-by-side page section built", "review/out/phase1/scale/index.html"))
-    return [Row("scale", 7, "Scale comparison: the same planet region at 1:100, 1:300 and Earth proportions, vertical scale unchanged", status_of(kids) if rc == 0 else "FAIL",
+    return [Row("scale", 7, "Scale comparison: a window of each planet at 1:100, 1:300 and Earth proportions, land shares matched, vertical scale unchanged", status_of(kids) if rc == 0 else "FAIL",
                 [f"log: review/out/phase1-src/logs/scale.log (exit {rc})"], kids, time.time() - t0)]
 
 

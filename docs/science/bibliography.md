@@ -974,6 +974,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Harel, M.-A., Mudd, S. M. and Attal, M. (2016). Global analysis of the stream power law parameters based on worldwide 10Be denudation rates. Geomorphology 268:184-196.
 - DOI or URL: 10.1016/j.geomorph.2016.05.035; author accepted manuscript https://www.research.ed.ac.uk/files/25670599/25669129._Harel_et_al_2016_author_accepted_manuscript_002_.pdf (403 from both WebFetch and curl).
 - Cited as: "Harel, Mudd & Attal 2016", "worldwide 10Be denudation rates favour n > 1" (params.rs).
+- Read so far (by the project): not read (403). Ruetenik et al. 2023 (read 2026-10-18) report its n as 2.6 ("Our optimised n∼1.3 ... is much lower than the 2.6 reported by Harel et al. (2016)"), a secondary reading only.
 - Ledger ids: ERO-006
 - Access: open copy (author manuscript) at the Edinburgh URL above (not retrievable here); paywalled at Elsevier.
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
@@ -2267,13 +2268,24 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Reference: John, D.A., ed., Ayuso, R.A., Barton, M.D., Blakely, R.J., Bodnar, R.J., Dilles, J.H., Gray, F., Graybeal, F.T., Mars, J.L., McPhee, D., Seal, R.R., Taylor, R.D., and Vikre, P., 2010, Porphyry copper deposit model, chap. B of Mineral deposit models for resource assessment: U.S. Geological Survey Scientific Investigations Report 2010-5070-B, xii + 169 p.
 - DOI or URL: (DEP) 10.3133/sir20105070B ; https://pubs.usgs.gov/sir/2010/5070/b/ ; PDF https://pubs.usgs.gov/sir/2010/5070/b/pdf/SIR10-5070B.pdf (ORE) https://pubs.usgs.gov/sir/2010/5070/b/ ; PDF .../pdf/SIR10-5070B.pdf (26.3 MB; exceeded the 10 MB fetch limit).
 - Cited as: (DEP) "John, D.A., et al., 2010", "SIR 2010-5070-B". (ORE) "USGS SIR 2010-5070-B (John et al. 2010)" with page numbers (Table E1 p. 28; p. 25; p. 66; pp. 4, 65; p. 68; p. 120).
-- Ledger ids: DEP-016 to DEP-018, DEP-032, DEP-035 to DEP-049, ORE-104
+- Ledger ids: DEP-016 to DEP-018, DEP-032, DEP-035 to DEP-049, DEP-209, ORE-104
 - Access: open access (agency report). [other sections: open copy (agency report) at https://pubs.usgs.gov/sir/2010/5070/b/pdf/SIR10-5070B.pdf]
 - Library (the project's source library, not distributed): fetched (PDF, 186 pages, text layer). From: https://pubs.usgs.gov/sir/2010/5070/b/. Text file: sir5070b.txt.
 - Read so far (by the project): (DEP) printed pages cited (pp. 4, 25, 28, 65-68, 120); text searched for density with no numeric value found. (ORE) page numbers cited (PDF opened).
 - Read in this pass: (DEP) full text fetched (text layer; searched for every number in the ledger rows; Table E1 itself not extracted, its summary sentences were). (ORE) abstract fetched (USGS page; two different fetches listed the authors in different orders; the series page lists David A. John first as editor).
 - Reference check: (DEP) the USGS catalogue lists David A. John as editor and Ayuso et al. as chapter authors; "John et al. 2010" is the usual short form but strictly John is the series editor. (ORE) matches "John et al. 2010". The report is a descriptive model; the median ore area 0.6 km2 and the 1-1.5 km height could not be read.
 - Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): John2010/sir5070b.txt printed pp. 4, 25, 28 (Table E1), 65-68, 120: ore and alteration areas, hypogene ore height, supergene thicknesses, grades and enrichment factors, the 10 cm/yr passage and its context.
+- Read again 2026-10-17 (gossan task, P1-19 exit): the PDF fetched from https://pubs.usgs.gov/sir/2010/5070/b/pdf/SIR10-5070B.pdf, text by pdftotext on the test VM (scratch, deleted). Printed p. 4 and pp. 64-65: 'The thickness of leached capping is highly variable and ranges from 0 to several hundred meters in most PCDs.' P. 67: supergene enrichment puts 'an upper oxidized leached zone (gossan), a supergene zone beneath the gossan, and hypogene (primary) ore below' (fig. L1), with the enrichment 'below the water table'; supergene-enriched zones 'can range from a few meters to more than 200 meters in thickness and generally have a hematitic leached cap as much as tens of meters in thickness'. P. 120: leaching 'is only possible when the rate of leaching and drawdown of the water table exceed the rate of erosion'; the chalcocite blankets 'are considered to have formed at the top of the water table'; pyrite gives limonitic, chalcopyrite goethitic and chalcocite hematitic leached capping.
+
+### CookPorter2005
+- Reference: Cook, S.S., and Porter, T.M., 2005, The geologic history of oxidation and supergene enrichment in the porphyry copper deposits of southwestern North America, in Porter, T.M., ed., Super Porphyry Copper and Gold Deposits: A Global Perspective, v. 1: Adelaide, PGC Publishing, p. 207-242.
+- DOI or URL: https://portergeo.com.au/full_text/Cook_Porter_SW_NAmer_Supergene-PGC_Publishing.pdf (the publisher's open author copy; 13.8 MB, 37 PDF pages, text layer)
+- Cited as: "Cook and Porter 2005".
+- Ledger ids: DEP-209, DEP-211
+- Access: open (author copy)
+- Library (the project's source library, not distributed): fetched 2026-10-17 on the test VM as scratch for the gossan task (not added to the library folder). Text by pdftotext.
+- Read in this pass (2026-10-17, gossan task): searched for every statement of a leached cap's thickness and exposure. Inspiration, Arizona (PDF p. 19): 'Prior to mining, the remnant leached cap varied from 0 to 300 m in thickness', over an oxide zone averaging 60 m. Silver Bell, El Tiro pit (PDF p. 14): a '60 m thick ... supergene enriched sulphide blanket overlain by a 30 m thick remnant leached capping which averaged 300 ppm Cu', its contact with the blanket 'sharp and generally parallel[ing] the current surface'; older 'hematite capping exposed on ridges and slopes'. Tyrone, New Mexico (PDF p. 26): a blanket 'from a few metres to more than 100 m in thickness' 'overlain by a comparable remnant thickness of leached capping (60 to 150 m thick)'; the profile came from several cycles of enrichment and leaching. PDF p. 24: a deposit 'represented at surface by heavily iron stained leached capping outcrops'. Morenci (PDF p. 23): the pyritic zone began 60 to 180 m below the surface and the chalcocite zone was 30 to 120 m thick (not used for the cap).
+- Reference check: the deposit-by-deposit figures were read as text; the page numbers are PDF pages (the chapter's printed pages are 207 to 242; the PDF's first page carries the chapter's title block).
 
 ### SillitoeMcKee1996
 - Reference: Sillitoe, R.H., and McKee, E.H., 1996, Age of supergene oxidation and enrichment in the Chilean porphyry copper province: Economic Geology 91(1):164-179.
@@ -3014,6 +3026,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: matches (abstract says stocks "vertically elongate (>3 km)", pluton paleodepths 5 to 15 km, life spans ~100,000 to several million years).
 - Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only.
+- Read 2026-10-17 (gossan task): a full open copy exists (Society of Economic Geologists field-trip readings, https://pyrite.utah.edu/fieldtrips/SEGFperu-2012/Readings/Sillitoe%202010.pdf; 4.4 MB, text layer), fetched on the test VM and searched for leached cap and gossan thickness. It gives none: it says 'The economically important results of supergene oxidation and enrichment in porphyry Cu systems have been addressed elsewhere (Sillitoe, 2005)' and mentions only paleowater-table positions at the tops of lithocaps (printed pp. 23-24). The 'Access: paywalled' line above is out of date for a reader with that URL; the lithocap rows (DEP-021, DEP-190) were not re-checked against it in this pass.
 
 ### Seedorff2005
 - Reference: Seedorff, E., Dilles, J.H., Proffett, J.M., Einaudi, M.T., Zurcher, L., Stavast, W.J.A., and others, 2005, Porphyry deposits: characteristics and origin of hypogene features, in One Hundredth Anniversary Volume (Economic Geology): Society of Economic Geologists, p. 251-298.
@@ -5705,10 +5718,10 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Reference: Stern, R. J. and Scholl, D. W. (2010). Yin and yang of continental crust creation and destruction by plate tectonic processes. International Geology Review 52(1):1-31.
 - DOI or URL: 10.1080/00206810903332322; author copy https://personal.utdallas.edu/~rjstern/pdfs/YinyangIGR10.pdf
 - Cited as: "Stern & Scholl 2010".
-- Ledger ids: PLT-045 (comparison), PLT-258 (2026-10-03: "the bulk of the approximately 40 km-thick crust that must have originally existed is missing" at UHP terranes; continental crust lost at all collision zones "approximately 0.7 km3/year", Scholl & von Huene 2009 as cited)
+- Ledger ids: PLT-045 (since 2026-10-17 the value), PLT-046, PLT-285, PLT-286, HNT-125, HNT-126, PLT-258 (2026-10-03: "the bulk of the approximately 40 km-thick crust that must have originally existed is missing" at UHP terranes; continental crust lost at all collision zones "approximately 0.7 km3/year", Scholl & von Huene 2009 as cited)
 - Access: paywalled at the publisher; author copy open.
 - Library (the project's source library, not distributed): fetched 2026-10-02 (author copy). Text file: `SternScholl2010/SternScholl2010.txt`.
-- Read so far (by the project): full text, 2026-10-02. Abstract: creation and destruction of continental crust "is either in balance (~3.2 km3/year, or 3.2 AU) or more crust is being destroyed than created"; p. 9: the Aleutian and Izu-Bonin-Mariana arcs, "which have evolved since 45-50 Ma", give "crustal growth estimates of 90-180 km3/km-million years"; growth is front-loaded (several hundred km3/km/Myr in the first few Myr, "a few tens or less" for mature arcs); about 2.7 AU of growth at convergent margins (Table 1).
+- Read so far (by the project): full text, 2026-10-02. Abstract: creation and destruction of continental crust "is either in balance (~3.2 km3/year, or 3.2 AU) or more crust is being destroyed than created"; p. 9: the Aleutian and Izu-Bonin-Mariana arcs, "which have evolved since 45-50 Ma", give "crustal growth estimates of 90-180 km3/km-million years"; growth is front-loaded (several hundred km3/km/Myr in the first few Myr, "a few tens or less" for mature arcs); about 2.7 AU of growth at convergent margins (Table 1). Read again 2026-10-17 (plate task 8; the copy at `SternScholl2010/SternScholl2010.txt`): p. 11, intra-oceanic arcs "approximately 100 km3/km-million years (500 km3/million years for first 10 million years plus 30 km3/million years for 60 million years thereafter). At this rate, crustal growth at the present 14,500 km of intra-oceanic arcs" gives 1.5 AU; p. 12, continental arcs after Haschke & Günther 2003: "The 35 km3/km-million years rate is essentially the rate of Reymer and Schubert (1984). It implies a reasonable intrusive : extrusive ratio of approximately 7:1 and is adopted as a useful long-term rate estimate for continental margin arc productivity. The combined length of continental margin arcs is approximately 27,500 km (Scholl and von Huene 2007). The corresponding global addition rate is thus approximately 1.0 AU"; Table 1 (p. 12): oceanic arcs 1.5, continental arcs 1.0, collision zones 0.2, rifts and hotspots 0.5 AU of additions; losses at sutures about 0.7 AU; p. 24, new arcs 300 to 500 km3/km/Myr, mature ones 30 to 35.
 
 ### TetreaultBuiter2014
 - Reference: Tetreault, J. L. and Buiter, S. J. H. (2014). Future accreted terranes: a compilation of island arcs, oceanic plateaus, submarine ridges, seamounts, and continental fragments. Solid Earth 5:1243-1275.
@@ -6184,9 +6197,9 @@ Not read: Péron-Pinvidic, Manatschal & Osmundsen 2013 (Marine and Petroleum Geo
 - Reference: Montgomery, D. R. and Brandon, M. T. (2002). Topographic controls on erosion rates in tectonically active mountain ranges. Earth and Planetary Science Letters 201(3-4):481-489.
 - DOI or URL: 10.1016/S0012-821X(02)00725-2 (the DOI from memory, not checked); copy https://repository.geologyscience.ru/bitstream/handle/123456789/28097/Mont_02.pdf
 - Cited as: "Montgomery & Brandon 2002" (erosion rate against mean local relief; the erosion audit's reference line).
-- Ledger ids: ERO-172
+- Ledger ids: ERO-172, ERO-179, ERO-180, ERO-181
 - Access: copy on a repository, open.
-- Read so far (by the project): full text, 2026-10-05: tectonically inactive areas E = 0.2 Rz (mm/yr, Rz in km); active ranges above that line with mean local relief 1,000-2,000 m; E0 = 0.01 mm/yr from the chemical denudation of the 35 largest rivers; Olympic Mountains E0 0.016-0.059 mm/yr; rates above 10 mm/yr rare.
+- Read so far (by the project): full text, 2026-10-05: tectonically inactive areas E = 0.2 Rz (mm/yr, Rz in km); active ranges above that line with mean local relief 1,000-2,000 m; E0 = 0.01 mm/yr from the chemical denudation of the 35 largest rivers; Olympic Mountains E0 0.016-0.059 mm/yr; rates above 10 mm/yr rare. Read again 2026-10-18 (the same copy, text extracted with pdftotext) for the erosion recalibration: eq. 2, E = E0 + K Rz / (1 - (Rz/Rc)^2), fitted with E0 = 0.01 mm/yr, Rc = 1,500 m and K = 2.5e-4 mm/yr (Fig. 4); the power law E = 1.4e-6 Rz^1.8 (E mm/yr, Rz m, Rz above 100 m; R² 0.66; one standard error 1.6 to 2.0 for the exponent), which "underestimates erosion rates at high mean local relief" (Fig. 5); Rz is the range within a 10-km-diameter circle of each 30-arc-second GTOPO30 cell; at most 2 % of the land of Asia, Europe and the Americas has Rz above 1,500 m and at most 5 % above 1,000 m (Fig. 7).
 
 ### Tremblay2015
 - Reference: Tremblay, M. M. et al. (2015). Erosion in southern Tibet shut down at ∼10 Ma due to enhanced rock uplift within the Himalaya. Proceedings of the National Academy of Sciences 112(39):12030-12035.
@@ -6195,6 +6208,14 @@ Not read: Péron-Pinvidic, Manatschal & Osmundsen 2013 (Marine and Petroleum Geo
 - Ledger ids: ERO-174
 - Access: open (PubMed Central).
 - Read so far (by the project): full text, 2026-10-05: exhumation over 1.0 km/Ma from 17-16 Ma for about 5 Myr, then below 0.01 km/Ma (under 750 m in total) from 12-11 Ma to the present; cosmogenic rates in the Indus and Yarlung drainages typically below 100 m/Ma.
+
+### Ruetenik2023
+- Reference: Ruetenik, G. A., Jansen, J. D., Val, P. and Ylä-Mella, L. (2023). Optimising global landscape evolution models with 10Be. Earth Surface Dynamics 11:865-880.
+- DOI or URL: 10.5194/esurf-11-865-2023; https://esurf.copernicus.org/articles/11/865/2023/
+- Cited as: "Ruetenik et al. 2023" (the stream power law's slope exponent n fitted to the world's cosmogenic denudation rates; the source of the shipped n).
+- Ledger ids: ERO-182, ERO-006
+- Access: open (Copernicus, CC BY).
+- Read so far (by the project): full text through the web fetch tool, 2026-10-18: 3,640 catchments on 3-arcsec HydroSHEDS DEMs, the model run for one step and its outlet flux compared with OCTOPUS v.2 rates; stream power alone optimised at n about 1.28 (Q0.01 1.23 to 1.43); with linear hillslope diffusion n about 2.3 (Q0.01 1.59 to 2.70); m/n held at 0.45; no absolute K reported, since K and D covary; their stream-power-only n of about 1.3 is "much lower than the 2.6 reported by Harel et al. (2016)".
 ## The eclogite root and whole-column isostasy (PLT-278 to PLT-282), added 2026-10-06
 
 Read by a research sub-agent on 2026-10-05 for plate task 7 (Ben, 2026-10-06: "Fix isostasy first, then land"). "Full text" means the agent read the paper; "snippet" means only a search tool's excerpt, not checked against the paper.
@@ -6295,6 +6316,78 @@ Roering1999 (the measured diffusivity, ERO-177) is under "Erosion, isostasy and 
 - Access: open (Copernicus).
 - Read so far (by the project): full text through the web fetch tool, 2026-10-16: §3.2.2, "hillslope processes are also accounted for using a diffusion coefficient D of 10−2 m2 yr−1" on a grid "built with a resolution of approximately 200 m"; §3.2.3 (the global run), "the diffusion coefficient D equals 10−1" (no units in that sentence) on meshes "at 16 km resolution". The fetched text does not say that D is adjusted for the resolution.
 
+## The crust budget on sourced rates (plate task 8: PLT-045 to PLT-048, PLT-285, HNT-125 to HNT-127), added 2026-10-17
+
+Stern & Scholl 2010 (the rates, PLT-045 and PLT-285) and Cloos 1993 (the arcs' maturity, PLT-047) are above; their entries record what was read on 2026-10-17. Fetched and read by a research sub-agent and checked by the plate task 8 agent against the text files, 2026-10-17; texts in the project's source library on the test VM (`/data/ban/deeptime-sources/<key>/`), not distributed.
+
+### White2006
+- Reference: White, S. M., Crisp, J. A. and Spera, F. J. (2006). Long-term volumetric eruption rates and magma budgets. Geochemistry, Geophysics, Geosystems 7, doi:10.1029/2005GC001002.
+- DOI or URL: 10.1029/2005GC001002
+- Cited as: "White et al. 2006" (the intrusive to extrusive ratio of the island arcs' crust).
+- Ledger ids: PLT-046
+- Access: open copy (the copy read is the journal's proof, with line numbers; issue and article number not recorded).
+- Library (the project's source library, not distributed): `White2006/White2006.pdf`, `White2006.txt` (pdftotext), 2026-10-17.
+- Read so far (by the project): full text, 2026-10-17: "A ratio of 5:1 could be viewed as common to most magmatic systems when the considerable uncertainty is considered. Ratios higher than 10:1 are uncommon in our data set"; "an I:E ratio of 5:1 may be regarded as a better average value"; Table 3: the Aleutians 1:1 to 3:1, Hawaii 6:1; basaltic shields 1:1 to 2:1, oceanic ridges at least 5:1.
+
+### Eichelberger2015
+- Reference: Eichelberger, N., McQuarrie, N., Ryan, J., Karimi, B., Beck, S. and Zandt, G. (2015). Evolution of crustal thickening in the central Andes, Bolivia. Earth and Planetary Science Letters 426:191-203.
+- DOI or URL: 10.1016/j.epsl.2015.06.035 (from the PDF's first page)
+- Cited as: "Eichelberger et al. 2015" (the cordillera's shortening rate).
+- Ledger ids: PLT-048, HYP-018, HNT-127
+- Access: open copy.
+- Library (the project's source library, not distributed): `Eichelberger2015/Eichelberger2015.pdf`, `Eichelberger2015.txt`, 2026-10-17.
+- Read so far (by the project): full text, 2026-10-17: Bolivia has "the largest shortening magnitudes (~300 km, 40%) and crustal thicknesses (up to 75 km) of the entire chain" (p. 191); "As shortening accumulates from the restored state (50 Ma) to the modern state (0 Ma), the area of the mesh elements contracts. Assuming pure shear deformation, the decrease in area leads to a proportional increase in predicted thickness" (p. 193), "calculated in 5 Myr intervals by assuming constant volume"; magmatic addition about 15 % (p. 197) to about 30 % (p. 200) of the crust in the models.
+
+### Clift2009
+- Reference: Clift, P. D., Vannucchi, P. and Phipps Morgan, J. (2009). Crustal redistribution, crust-mantle recycling and Phanerozoic evolution of the continental crust. Earth-Science Reviews 97:80-104.
+- DOI or URL: 10.1016/j.earscirev.2009.10.003; repository copy https://hdl.handle.net/2158/375652 (FLORE, Università degli Studi di Firenze)
+- Cited as: "Clift et al. 2009" (comparison for both arc rates).
+- Ledger ids: PLT-045, PLT-285
+- Access: open (accepted manuscript in the repository).
+- Library (the project's source library, not distributed): `Clift2009/Clift2009.pdf`, `Clift2009.txt`, 2026-10-17.
+- Read so far (by the project): full text, 2026-10-17: "oceanic arcs average rates of 125 km3/Ma/km compared to 81 km3/Ma/km for continental arcs" (p. 84); to keep constant crustal volumes "arc magmatism would have to maintain production of around 3.8 km3/a (or 94 km3/Ma/km of trench)"; continental flood basalts "only around 0.12 km3/a"; accreted oceanic plateaus 1.1 km3/a.
+
+### Parcutela2023
+- Reference: Parcutela, N. E., Austria, R. S., Dimalanta, C. B., Valera, G. T. V., Gabo-Ratio, J. A. S., Payot, B. D., Armada, L. T., Sangalang, K. J. F. and Yumul, G. P. Jr. (2023). Enhanced arc magmatic productivity of the Western Pacific island arcs deduced from gravity-derived arc crustal growth rates. Frontiers in Earth Science 11:1107833.
+- DOI or URL: 10.3389/feart.2023.1107833
+- Cited as: "Parcutela et al. 2023" (a lower island-arc rate).
+- Ledger ids: PLT-045
+- Access: open access.
+- Library (the project's source library, not distributed): `Frontiers2023_WPacificArcs/Frontiers2023_WPacificArcs.pdf`, `.txt`, 2026-10-17. (The volume number 11 is from memory.)
+- Read so far (by the project): full text, 2026-10-17: "the Pacific island arcs (i.e., Bonin, Izu, Kermadec, Mariana, and Vanuatu) recorded higher growth rates (28-60 km3/km/m.y.)"; the arcs over younger, smaller plates grow slower.
+
+### HaschkeGunther2003
+- Reference: Haschke, M. and Günther, A. (2003). Balancing crustal thickening in arcs by tectonic vs. magmatic means. Geology 31(11):933-936.
+- DOI or URL: 10.1130/G19945.1
+- Cited as: "Haschke & Günther 2003" (the continental arcs' 35 km3/km/Myr, through Stern & Scholl 2010).
+- Ledger ids: PLT-285, PLT-048, HNT-126
+- Access: paywalled; abstract only (OpenAlex record, `abstracts_closed_sources_openalex.txt` in the library).
+- Read so far (by the project): abstract, 2026-10-17: the Late Cretaceous to late Eocene arc of North Chile; "a minimum of 9 km of arc-normal shortening" producing "approximately 5.4 km of tec[tonic thickening]" (the record is cut there); the 35 km3/km/Myr and the tectonic to magmatic ratio are read through Stern & Scholl 2010, p. 12.
+
+### KleyMonaldi1998
+- Reference: Kley, J. and Monaldi, C. R. (1998). Tectonic shortening and crustal thickness in the Central Andes: How good is the correlation? Geology 26(8):723-726.
+- DOI or URL: 10.1130/0091-7613(1998)026<0723:TSACTI>2.3.CO;2
+- Cited as: "Kley & Monaldi 1998" (shortening falls short of the Andes' crust).
+- Ledger ids: PLT-048
+- Access: paywalled; the OpenAlex record holds only the landing page's author block (no abstract text).
+- Read so far (by the project): title and record only, 2026-10-17; the shortening magnitudes "<250 km (e.g. Kley and Monaldi, 1998)" are as Eichelberger et al. 2015 cite them; the 70-80 % is Allmendinger et al. 1997's.
+
+### Allmendinger1997
+- Reference: Allmendinger, R. W., Jordan, T. E., Kay, S. M. and Isacks, B. L. (1997). The evolution of the Altiplano-Puna plateau of the Central Andes. Annual Review of Earth and Planetary Sciences 25:139-174. (Co-authors from memory.)
+- DOI or URL: 10.1146/annurev.earth.25.1.139
+- Cited as: "Allmendinger et al. 1997".
+- Ledger ids: PLT-048
+- Access: paywalled; abstract only (OpenAlex record).
+- Read so far (by the project): abstract, 2026-10-17: the plateau "was uplifted primarily because of crustal thickening produced by horizontal shortening of a thermally softened lithosphere. Nonetheless, known shortening at the surface accounts for only 70-80% of the observed crustal thickening, suggesting that magmatic addition and other processes ... may contribute significantly".
+
+### FrancisHawkesworth1994
+- Reference: Francis, P. W. and Hawkesworth, C. J. (1994). Late Cenozoic rates of magmatic activity in the Central Andes and their relationships to continental crust formation and thickening. Journal of the Geological Society 151(5):845-854.
+- DOI or URL: 10.1144/gsjgs.151.5.0845
+- Cited as: "Francis & Hawkesworth 1994" (a lower continental-arc rate).
+- Ledger ids: PLT-285
+- Access: paywalled; abstract only (OpenAlex record).
+- Read so far (by the project): abstract, 2026-10-17: "a consistent rate of effusive volcanism of 3 X 10-6 km3 a-1 km-1" in the Central Volcanic Zone; the overall magmatic addition (about 13 km3/km/Myr) as the research sub-agent read the rest of the abstract (the record is cut in the copy kept).
+
 ## Playability steering (STE)
 
 ### CharetteSmith2010
@@ -6322,3 +6415,61 @@ Roering1999 (the measured diffusivity, ERO-177) is under "Erosion, isostasy and 
 - Cited as: "Berner 2004, GEOCARB f_G" (how far volcanic and metamorphic degassing varied, a reference for the steering's outgassing bound).
 - Ledger ids: STE-014
 - Access: book. Read so far (by the project): from memory.
+
+## Ice sheets and mountain ice (CLM-150, CLM-203), added 2026-10-18
+
+What an ice sheet is, for the temperate present's land-ice target (decisions log 2026-10-18: it counts ice sheets only). Fetched and read by the erosion-recalibration agent on 2026-10-18.
+
+### Cogley2011
+- Reference: Cogley, J. G., Hock, R., Rasmussen, L. A., Arendt, A. A., Bauder, A., Braithwaite, R. J., Jansson, P., Kaser, G., Möller, M., Nicholson, L. and Zemp, M. (2011). Glossary of Glacier Mass Balance and Related Terms. IHP-VII Technical Documents in Hydrology No. 86, IACS Contribution No. 2, UNESCO-IHP, Paris.
+- DOI or URL: https://wgms.ch/downloads/Cogley_etal_2011.pdf
+- Cited as: "Cogley et al. 2011, glossary, Ice sheet" (the 50,000 km² that makes an ice body an ice sheet).
+- Ledger ids: CLM-203
+- Access: open (UNESCO technical document, the WGMS copy).
+- Library (the project's source library, not distributed): `Cogley2011/Cogley2011.pdf`, `Cogley2011.txt` (pdftotext), 2026-10-18.
+- Read so far (by the project): full text, 2026-10-18. p. 53, "Ice sheet": "An ice body that covers an area of continental size, generally defined as covering 50 000 km2 or more. Currently there are only two ice sheets, the Greenland Ice Sheet and the Antarctic Ice Sheet." p. 52, "Ice cap": "A dome-shaped ice body with radial flow, largely obscuring the subsurface topography and generally defined as covering less than 50 000 km2 (see ice sheet)"; "Ice body": "Any continuous mass of ice". "Icefield": "A large ice body that covers mountainous terrain but is not thick enough to obscure all of the subsurface topography". "Mountain glacier": "A glacier that is confined by surrounding mountain terrain, also called an alpine glacier."
+
+### NSIDC-IceSheetFacts
+- Reference: National Snow and Ice Data Center. Ice Sheet Quick Facts (web page).
+- DOI or URL: https://nsidc.org/learn/parts-cryosphere/ice-sheets/ice-sheet-quick-facts
+- Cited as: "NSIDC, Ice Sheet Quick Facts" (the 50,000 km² definition; the two sheets' areas).
+- Ledger ids: CLM-150, CLM-203
+- Access: open (web page).
+- Read so far (by the project): through the web fetch tool, 2026-10-18: "An ice sheet is a mass of glacial land ice extending more than 50,000 square kilometers"; "An ice cap covers less than 50,000 square kilometers ... and comprises several merged glaciers"; the Antarctic Ice Sheet "covers almost 14 million square kilometers", Greenland's stretches "across 1.7 million square kilometers"; "Now, Earth has just two ice sheets".
+
+### NSIDC-GlacierFacts
+- Reference: National Snow and Ice Data Center. Glacier Quick Facts (web page).
+- DOI or URL: https://nsidc.org/learn/parts-cryosphere/glaciers/glacier-quick-facts
+- Cited as: "NSIDC, Glacier Quick Facts" (Earth's land under ice today and at the last glacial maximum).
+- Ledger ids: CLM-150
+- Access: open (web page).
+- Read so far (by the project): through the web fetch tool, 2026-10-18: "Presently, 10 percent of land area on Earth is covered with glacial ice", glaciers, ice caps and the ice sheets of Greenland and Antarctica; "Glacierized areas cover over 15 million square kilometers"; at the maximum of the last ice age "glaciers covered about 32 percent of the total land area"; "There are over 200,000 glaciers distinct from the ice sheets".
+
+### RGI
+- Reference: RGI 7.0 Consortium. Randolph Glacier Inventory, a dataset of global glacier outlines, version 7.0 (rgidata.org; NSIDC data set NSIDC-0770, doi:10.5067/f6jmovy5navz).
+- DOI or URL: https://rgidata.org/ ; https://rgidata.org/user_guide/06_dataset_summary.html
+- Cited as: "the Randolph Glacier Inventory" (the glaciers outside the two ice sheets and their area).
+- Ledger ids: CLM-203
+- Access: open (data and user guide).
+- Read so far (by the project): through the web fetch tool, 2026-10-18: "The RGI excludes the ice sheets of Greenland and Antarctica"; "It includes all glaciers larger than 0.01 km²"; NSIDC-0770, "a snapshot of the world's glaciers outside of ice sheets". The user guide's dataset summary: 215,547 glaciers in RGI 6.0 and 274,531 in 7.0; its terminus-type table's rows sum to about 705,740 km² (6.0) and 706,744 km² (7.0) (the sums are the agent's, from the table as the fetch tool returned it).
+
+## What a conveyor's sinking region can carry (CLM-204, CLM-205), added 2026-10-18
+
+The conveyor's sinking capacity and the tests' physical ceilings on the per-cell climate, added with the fix for the narrow-inlet conveyor (build log 2026-10-18).
+
+### Walin1982
+- Reference: Walin, G. (1982). On the relation between sea-surface heat flow and thermal circulation in the ocean. Tellus 34(2):187-195.
+- DOI or URL: not looked up (from memory).
+- Cited as: "Walin 1982; from memory" (a region's water-mass transformation is its surface heat loss over rho c_p times the cooling).
+- Ledger ids: CLM-204
+- Access: not checked.
+- Library: not fetched.
+- Read so far (by the project): from memory; the paper was not fetched or read. The form of the bound (water a region can sink = surface heat loss / (rho c_p dT)) is the agent's recollection of the water-mass transformation framework; the rate 8e-6 m/s is calibrated, not taken from the paper.
+
+### WMO-Extremes2025
+- Reference: World Meteorological Organization. Records of Weather and Climate Extremes (table of the WMO World Weather and Climate Extremes Archive, as of 31 July 2025).
+- DOI or URL: https://wmo.int/sites/default/files/2025-07/Table_Records_25Jul2025.pdf (from https://wmo.int/site/world-weather-and-climate-extremes-archive)
+- Cited as: "WMO's Records of Weather and Climate Extremes, as of 31 July 2025" (the wettest place on Earth in the long run).
+- Ledger ids: CLM-205
+- Access: open (agency PDF).
+- Read so far (by the project): fetched and read 2026-10-18 (pdftotext of the table), the greatest average annual precipitation of each WMO region: Region II, Asia, 11.872 m (467.4 in.), 38 years, Mawsynram, India, 25 deg 18' N, 91 deg 35' E, 1,431 m; Region V, South-West Pacific, 11.64 m (460.0 in.), 30 years, Mt. Waialeale, Kauai, Hawaii, 1,569 m; Region I, Africa, 10.287 m (405.0 in.), 32 years, Debundscha, Cameroon, 9 m. The other regions' records are lower: Region III, South America, 8.99 m; Region IV, North America, 7 m (Henderson Lake, British Columbia); Region VI, Europe, 4.593 m (Crkvice).

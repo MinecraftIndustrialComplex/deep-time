@@ -257,6 +257,12 @@ built twice, before (stretch 1, the old intrusion sizes and relief 1) and after;
 - Every rate, overlap and age rule, the strain weights, the fold-train shape, the stock shape and
   depth and the relief rules: design values of the P2-01 agent (build log 2026-10-01, stages A and
   B), listed one by one in the ledger.
+- The Andean rule's uplift scale, 0.1 mm/yr (DEF-026), kept when plate task 8 lowered the arcs'
+  uplift (re-checked 2026-10-18, coordinator's call): the arcs' mean lift factor fell from 0.365 to
+  0.257, the arc's own fold trains and thrusts by a fifth and its foreland's rose, so the Andean
+  margin and its foreland together made 5 % fewer (1,441 → 1,370 a run, 500 Myr, seeds 1 and 2,
+  both starts), inside the seeds' scatter. The scale is the amplifier's active-uplift threshold
+  too.
 
 ## Open questions
 
