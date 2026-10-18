@@ -126,6 +126,101 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-18: Plate spikes: a resampling's accretion stacked every footprint's crust on one column (up to 566 km of crust and 36 km of rise in a 2 Myr step); a plate step now thickens a column by at most 5 mm/yr and raises it by at most 3.5 mm/yr (PLT-287, PLT-288) (coordinator's task after the surface divergence; agent worktree agent-a6453d78f071fb209, branch worktree-agent-a6453d78f071fb209 from master 10c92fe4, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Which process.** The gap budget now keeps a spike record (`plates/gap_budget.rs`, PLT-283): for every bracketed process of a plate step, the largest rise and thickening one visible column took from it, and how many column-steps fell in the bands 5, 10, 20 and 30 km. A temporary per-step print (`DEEPTIME_SPIKE_TRACE`, not committed) gave the step and cell. Runs: `earthlike_quick_16k`, 500 Myr, scattered seed 2 and supercontinent seed 1, master's binary with only the reports added (`build/spikes/trace.sh`, scratch, each sim admitted on its own, `deeptime stage volcanoes` with `DEEPTIME_GAP_BUDGET=1`).
+
+  | Process | Largest rise in one step | Largest thickening in one step | Column-steps rising over 10 km |
+  |---|---|---|---|
+  | A resampling's accretion (PLT-284) | 35.8 km, 33.2 km | 526 km, 566 km | 2,697, 1,272 |
+  | Collision belts and wedge | 13.1 km, 9.9 km | 94 km, 77 km | 5, 0 |
+  | Founder (its receivers) | 5.8 km, 6.0 km | 42 km, 42 km | 0 |
+  | Collapse (its receivers) | 4.3 km, 4.3 km | 30 km, 30 km | 0 |
+  | Hotspots, arcs, transition, the rest | 1.2 km or less | 3.7 km or less | 0 |
+
+  Every step whose largest rise passed 20 km (21 and 16 of 250) was a resampling. So was each run's final peak (29,181 and 26,984 m): the run ends with a forced resampling, and two steps before it the highest cell stood at 5.6 km. The accretion hands one column the crust of every footprint under it at once. The surface's flexure then turns the lift into the 50 to 100 km the guard met (ISO-072).
+- **Physical?** None of the large spikes. On Earth crust thickens at dH/dt = u·H/W (Garzione et al. 2006, EPSL 241:543, eq. 2, full text read): about 1.7 mm/yr for the Altiplano. Southern Tibet thickened by about 40 km at about 1.3 mm/yr between 60 and 30 Ma (Sundell et al. 2021, GSA Today 31(6), full text read). The fastest surface uplift Garzione et al. report is 2.5 to 3.5 km in 1 to 4 Myr (0.6 to 3.5 mm/yr), and it needed the removal of eclogitic lower crust. The accretion's 36 km in a step is 18 mm/yr of uplift, and its 566 km is seven times the thickest crust on Earth. The wedge's 94 km is 47 mm/yr of thickening, about 35 times Tibet's. The belt's 13 km is 6.5 mm/yr of uplift. The founder's and collapse's rises (2.9 and 2.2 mm/yr) are within Garzione's range, but their receivers thickened by up to 21 mm/yr.
+- **Fix** (`plates/rate.rs`, new; `collapse.rs` `spread`, `sink`, `held`; `ridges.rs` carries the limits across the resampling; `mod.rs` calls `rate::begin`, `limit` and `end`).
+  - When a step begins, every sample keeps T₀ and z₀. Its ceiling is T₀ + `thickening_max_mm_yr` (5) × δt (PLT-287, `game-choice`: about three times the regional rates, for one lattice column over one step). Its top is z₀ + `uplift_max_mm_yr` (3.5) × δt (PLT-288, `verified`: Garzione's fastest).
+  - After the thickening processes, and again after a resampling's accretion (limits blended with the column's own resampling weights), a visible column above its ceiling moves the excess to the nearest room on its plate within `collapse_reach_km`. Continental crust fills up to `crust_max_km` and ocean floor up to the normal column, each under its own ceiling. What finds no room goes from the bottom of the column to the mantle (`collapse::sink`, as PLT-258).
+  - A column that releases crust sinks by its Airy change, never below z₀. No visible column ends higher than its top: one lifted faster is left below its Airy height and rises the rest in later steps.
+  - The collapse's and the founder's receivers fill only up to their ceilings.
+  - Counted as the gap budget's `rate` part and in the run summary's `rate_capped_km3`, `rate_lost_km3` and `rate_held_km3`. 0 for either parameter turns that limit off.
+  - The surface guard now also counts steps beyond 1, 2, 3 and 6 Earth reliefs and the worst it met (`surface/guard.rs`, ISO-073; the summary's `guard_worst_m` and `guard_steps_over_1/2/3/6_reliefs`).
+- **Measured.** `earthlike_quick_16k`, seeds 1 to 3, both starts, master (m0: 10c92fe4 with only the reports) against the fix (f2); mean [min, max] over six runs. Ensembles: `tools/remote/detach.sh start ens-<tag>-<len> tools/review/force-balance-ensemble.sh <dir> <bin> <500|1000> 1,2,3 scattered_continents,supercontinent ck <tag>`, then `tools/review/p1-17-hyps.py <dir> <len> "1 2 3" "scattered_continents supercontinent" <tag>`. The young-stage and amplifier peaks come from full `deeptime run`s (`build/spikes/full.sh`, scratch, each run admitted on its own).
+
+  | 500 Myr | Master | Rate limits |
+  |---|---|---|
+  | Highest cell at the end, L1 | 23,544 m [14,259, 29,181] | 7,288 m [5,860, 9,958] |
+  | After the young stage | 8,203 m [7,057, 9,893] | 6,071 m [5,613, 6,338] |
+  | After the amplifier (highest block y) | 313 [279, 360] | 246 [234, 253] |
+  | Largest rise in one plate step (two traced runs) | 35,842, 32,126 m | 7,000, 7,000 m |
+  | Land | 0.196 [0.190, 0.202] | 0.199 [0.160, 0.222] |
+  | Land above 2 km | 0.227 [0.129, 0.320] | 0.200 [0.150, 0.271] |
+  | Continental crust at the end | 0.406 [0.352, 0.458] | 0.393 [0.366, 0.415] |
+  | CO₂ | 3,774 ppm [443, 13,543] | 907 ppm [403, 1,518] |
+  | Present-day nudge's CO₂ factor | 5.31 [1.00, 19.59] | 1.24 [1.00, 2.20] |
+  | Mean surface temperature | 18.2 °C [14.4, 25.0] | 15.7 °C [13.3, 17.3] |
+  | Guard's worst (bound 237,286 m) | 66,669 m [43,693, 101,282] | 30,815 m [19,599, 59,631] |
+  | Steps beyond 1, 2, 3, 6 reliefs (six runs) | 193, 27, 5, 0 | 25, 8, 1, 0 |
+  | Foundered | 4.1 km³/yr | 1.8 km³/yr |
+  | Beyond the ceilings; of it to the mantle | - | 11.6; 4.3 km³/yr |
+  | Plate checks met (of 45) | 27 | 29 |
+
+  | 1000 Myr | Master | Rate limits |
+  |---|---|---|
+  | Highest cell at the end, L1 | 25,248 m [21,041, 29,518] | 8,089 m [5,917, 13,752] |
+  | After the young stage | YOUNG1000 |
+  | After the amplifier (highest block y) | AMP1000 |
+  | Land | 0.200 [0.174, 0.225] | 0.180 [0.164, 0.200] |
+  | Land above 2 km | 0.223 [0.143, 0.265] | 0.231 [0.106, 0.318] |
+  | Continental crust at the end | 0.433 [0.392, 0.467] | 0.405 [0.361, 0.485] |
+  | CO₂ | 2,046 ppm [405, 6,331] | 2,192 ppm [179, 4,469] |
+  | Present-day nudge's CO₂ factor | 2.88 [1.00, 8.17] | 3.31 [1.00, 6.86] |
+  | Mean surface temperature | 16.7 °C [13.2, 21.9] | 17.3 °C [12.4, 20.2] |
+  | Guard's worst | 82,335 m [70,106, 98,837] | 32,119 m [19,636, 49,599] |
+  | Steps beyond 1, 2, 3, 6 reliefs (six runs) | 427, 72, 18, 0 | 60, 2, 0, 0 |
+  | Foundered | 6.6 km³/yr | 2.3 km³/yr |
+  | Beyond the ceilings; of it to the mantle | - | 16.4; 6.3 km³/yr |
+  | Plate checks met (of 45) | 26 | 25 |
+
+  The 500 Myr CO₂ and temperature drop: master's present-day nudge had to cool runs whose spikes had raised land and weathering surfaces. At 1000 Myr the two are inside the spread.
+- **Plate checks.**
+  - At 500 Myr the fix passes four that master fails: rift-born plates welded back within 50 Myr (10.8 to 6.6 %), the collisions' median length (57 to 45 Myr), speed against plate area (rho −0.41 to −0.38) and oceanic arc cells above sea level (9.7 to 10.3 %). It fails two that master passes: the collisions' 90th percentile length (91 to 132 Myr) and supercontinent tenure (103 to 98 Myr).
+  - At 1000 Myr the only verdict that changes is the most land gained in one step: 1.12 to 1.64 % of the planet, against at most 1.5. Crust a resampling used to pile on one column now spreads over its ring and lifts more cells above the sea at once.
+  - The wedge's width is 0 km in every fixed run (master 13 and 54 km, both far below the 100 to 350 km target).
+- **What is left.**
+  - More crust goes to the mantle. Where no room is within reach (about one ring of samples at 16k), the excess sinks. The total loss rose from 4.1 to 6.1 km³/yr (500 Myr) and from 6.6 to 8.5 (1000 Myr), against about 0.7 at Earth's collision zones (PLT-258, Scholl & von Huene 2009 as cited there). Continental crust ends 0.013 and 0.028 lower. Follow-up: a wider reach for the release, or a resampling accretion that does not stack every footprint on one column.
+  - The surface stage's own excursions are untouched. A polar row of L1 rose 20 to 40 km over a few steps with plate uplift of 2.2 km or less, on master and with the fix. POLAR-SC2
+- **Tests.**
+  - `plates::rate::tests::no_column_ends_a_step_thicker_than_its_ceiling`: 20 km stacked on a patch in one step; the patch keeps one step's allowance, the rest widens it.
+  - `plates::rate::tests::no_surface_rises_above_its_top`: a 10 km lift without thickening stands at one step's rise.
+  - `plates::rate::tests::a_zero_rate_limits_nothing`.
+  - `plates::tests::collisions_weld_on_stall_and_transfer_on_shortening` moved from seed 14 to seed 5, which welds with both limits (a sweep of seeds 1 to 24 under the thickening limit: 12 weld in 300 Myr).
+- **Science.**
+  - plates.md: new section "The fastest a column thickens and rises", with the processes, Earth's rates, whether each spike is physical, the four rules, both tables and the limits.
+  - Ledger: PLT-287 (`game-choice`) and PLT-288 (`verified`, its use as one cap a game choice) added. PLT-258, PLT-277, PLT-283 and PLT-284 updated. ISO-025 updated, ISO-073 added (`game-choice`).
+  - Bibliography: GarzioneEtAl2006 added (a PDF copy read; the publisher's page is paywalled). SundellEtAl2021 completed and read again.
+  - flexure.md's open question and design/flexure.md's "was not traced" now point here.
+  - Ran `claims_counts.py --write` (2,547 active rows, 297 verified).
+- **Files touched.**
+  - Code: `crates/deeptime-core/src/plates/{rate.rs (new), collapse.rs, ridges.rs, mod.rs, gap_budget.rs, state.rs, tests.rs}`, `params.rs`, the 12 built-in presets (the two new fields), `surface/{guard.rs, mod.rs}`, `crates/deeptime-cli/src/run.rs`.
+  - Docs: `docs/science/{plates.md, flexure.md, bibliography.md, claims.md, ledger/PLT.md, ledger/ISO.md}`, `docs/design/flexure.md`, STATUS.md.
+  - No Java, no format change, no editor field.
+- **Admission.** Each sim was admitted on its own (`deeptime-admit run` inside the scripts). Started under a detached job, though, the inner admissions measure 0 cores: the outer job's tree takes the measurement. `run:earthlike_quick_16k:4t` now estimates 0.0 cores (12 runs), and so does `sim:earthlike_quick_16k:2t` (20 runs, the ensembles, this task's and earlier ones'). Jobs of those kinds now start whatever the load.
+- **Choices made without asking (all can be undone; the coordinator's call).**
+  - 5 mm/yr of thickening (a margin over the read 1.3 to 1.7 mm/yr) and 3.5 mm/yr of uplift (Garzione's fastest).
+  - One central limiter after the processes, not a rate inside each process.
+  - Excess with no room goes to the mantle rather than being refused.
+  - A releasing column never sinks below where it began the step.
+  - Room up to `crust_max_km`, within `collapse_reach_km`.
+  - Falls are not limited.
+  - Master's baseline built from 10c92fe4 with only the reports added.
+  - No editor field for the two rates.
+  - The weld test on seed 5.
+  - The guard's near counts ledgered as ISO-073.
+- **Gates** (VM, `tools/remote/detach.sh` with `build/spikes/gates.sh`, scratch). `cargo clippy --workspace --all-targets --locked -- -D warnings`: clean. `cargo test --workspace --locked`: 944 passed, 0 failed, 4 ignored (deeptime-core's library 693, in 273 s). `cargo deny check licenses bans`: ok. `cargo fmt --all --check` found five spots in `gap_budget.rs`, `mod.rs`, `rate.rs` and `ridges.rs`; `cargo fmt --all` fixed them (whitespace only, after clippy and the tests ran) and the check is clean. No Java or format change, so no Gradle gate. No GameTest suites.
+- **Next.** The coordinator merges this branch. Then the follow-ups: the loss to the mantle (a wider reach, or a non-stacking accretion), and the polar row's surface excursions. Scratch (`/data/ban/deeptime-runs/spikes`, `build/spikes`) deleted.
+
 ### 2026-10-18: Ben's play world re-baked on master e34dbe54 with the MIC rock tags, and the play scripts check for them (coordinator's follow-up; agent worktree agent-a5e977549ecb09b46, branch play-rebake-rock-tags from master e34dbe54, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **The gap.** The first play server (build log "Ben's play server rebuilt", 8f2b7e79) had no MIC rock tags: the pack on master does not ship them (only its deep-time branch does), the jar carries 17 member tags, so `Rock palette: 62 classes (16 member, 0 fallback, 46 vanilla_fallback, 0 unresolved)` and ironstone was `minecraft:red_sandstone`. `tools/remote/vm/play-check.sh` run against that server reproduced it (ironstone FAIL).
 - **The fix.** `tools/remote/vm/play-stage.sh` now copies the MIC rock-tag datapack (`Docs/datapacks/deeptime-mic-rock-tags`, 126 JSON files; `mac.sh --pack` syncs it to `/data/ban/mic/Docs/datapacks/`) into `planet/datapacks/` by default, as `-PwithMic`, the MIC smokes (`install.sh --datapack`) and the preview do. A missing datapack is an error, not a silent fallback; `--rock-tags DIR` / `$DEEPTIME_ROCK_TAGS` name another, `--no-rock-tags` skips it (a pack that ships the tags itself). It also carries `ops.json` over from the folder the unit serves now (`--ops-from DIR|none`), so Ben stays an operator. New: `tools/remote/vm/play-check.sh` (VM: Done, natives, bound world data, DH far terrain, no Deep Time / Toroidal World WARN or ERROR, RCON `list`, `datapack list enabled`, and `deeptime probe palette` read from the log: ironstone must be Create's ochrum as a member) and `tools/remote/play-ping.py` (laptop: server-list ping through `deeptime-play-tunnel`).
