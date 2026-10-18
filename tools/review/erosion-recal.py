@@ -13,7 +13,8 @@ equally, against Montgomery & Brandon 2002 (ledger ERO-172): the power law E = 1
 E = 0.2 Rz (mm/yr, km); the share of land with relief above 1 and 1.5 km (Earth at most 0.05
 and 0.02); the high ground's flat and steep wear (Tibet's interior under 10 m/Myr, ERO-174);
 the carbon series of the first run (`carbon_series` line); the structure stage's arc rule
-(DEF-026).
+(DEF-026). The same erosion by region (`wz` classes: 8 x 8-cell windows, at least half land,
+classed by their land's mean relief), the form of Montgomery & Brandon's points.
 """
 import math
 import re
@@ -21,6 +22,7 @@ import sys
 
 RELIEF_LO = [0, 100, 250, 500, 1000, 1500, 2000, 3000]
 RELIEF_MID = [50, 175, 375, 750, 1250, 1750, 2500, 3500]
+RATE_LO = [0, 5, 10, 20, 50, 100, 200, 500, 1000, 2000]
 
 
 def mb_power(rz):
@@ -131,6 +133,29 @@ def main():
             print(f"    rz {lo:>4}+  {p[0]:.4f} | {p[1]:6.1f} {p[2]:6.1f} ({p[3]:5.1f}) {p[4]:5.1f} {p[5]:5.1f}"
                   f" | {mb_power(mid):6.0f} {mb_eq2(mid):6.0f} {mb_linear(mid):6.0f}")
         print(f"  land with relief above 1 km {hi1:.4f} (Earth <= 0.05), above 1.5 km {hi15:.4f} (Earth <= 0.02)")
+        if any("wz0" in r.get("bands", {}) for r in runs):
+            print("  regions (8 x 8-cell windows, at least half land) by their land's mean relief:"
+                  " land share | net, stream power (S_c cut), diffusion, glacial m/Myr | M&B power, eq.2, 0.2Rz")
+            for lo, mid in zip(RELIEF_LO, RELIEF_MID):
+                p = pooled(runs, f"wz{lo}")
+                if p is None or p[0] <= 0:
+                    continue
+                print(f"    wz {lo:>4}+  {p[0]:.4f} | {p[1]:6.1f} {p[2]:6.1f} ({p[3]:5.1f}) {p[4]:5.1f} {p[5]:5.1f}"
+                      f" | {mb_power(mid):6.0f} {mb_eq2(mid):6.0f} {mb_linear(mid):6.0f}")
+        rates = [r["bands"]["wrate"] for r in runs if "wrate" in r.get("bands", {})]
+        if rates:
+            sh = [sum(x[i] for x in rates) / len(rates) for i in range(len(RATE_LO))]
+            acc, med = 0.0, None
+            for i, v in enumerate(sh):
+                if med is None and acc + v >= 0.5 and v > 0:
+                    lo = max(RATE_LO[i], 1.0)
+                    hi = RATE_LO[i + 1] if i + 1 < len(RATE_LO) else 2 * RATE_LO[i]
+                    med = lo * (hi / lo) ** ((0.5 - acc) / v)
+                acc += v
+            print("  regions by net rate (m/Myr from " + "/".join(f"{x:g}" for x in RATE_LO) + "): "
+                  + "/".join(f"{v:.3f}" for v in sh)
+                  + f"; median about {med:.0f} m/Myr (Portenga & Bierman basins: median 54, mean 218;"
+                  " outcrops median 5.4, mean 12)" if med else "")
         for name in ["z0", "z1000", "z2000", "z3000", "z4000", "flat", "steep"]:
             p = pooled(runs, name)
             if p is not None:

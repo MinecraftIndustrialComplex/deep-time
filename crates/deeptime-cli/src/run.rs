@@ -919,6 +919,21 @@ fn erosion_bands_line(world: &deeptime_core::world::WorldState) -> Option<String
         };
         parts.push(one(format!("rz{lo}"), p));
     }
+    for (i, p) in b.by_window_relief.iter().enumerate() {
+        let lo = if i == 0 {
+            0.0
+        } else {
+            deeptime_core::surface::erosion_bands::RELIEF_FROM_M[i - 1]
+        };
+        parts.push(one(format!("wz{lo}"), p));
+    }
+    let windows: f64 = b.window_rate.iter().sum();
+    let shares: Vec<String> = b
+        .window_rate
+        .iter()
+        .map(|a| format!("{:.4}", a / windows.max(1e-30)))
+        .collect();
+    parts.push(format!("wrate:{}", shares.join("/")));
     Some(format!("erosion_bands {}", parts.join(" ")))
 }
 
