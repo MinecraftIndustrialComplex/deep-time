@@ -3,7 +3,7 @@
 Status of this page: `stage 2 (written with the code, 2026-10-04; Petroff's paper and code read in
 full, the map's properties tested; the layout and its sizes are game choices)`.
 
-Ledger ids on this page: `SCL-049`, `SCL-083`, `SCL-084`, `SCL-086` to `SCL-090`, `POL-022` to
+Ledger ids on this page: `SCL-049`, `SCL-083`, `SCL-084`, `SCL-086` to `SCL-091`, `POL-022` to
 `POL-024` (see [claims.md](claims.md)).
 
 ## What you see in the world
@@ -79,6 +79,7 @@ its axis so these four points lie as far from land as the planet allows.
 | SCL-088 | temporary border | 1 block inside the north and south edges | blocks | — | `game-choice` |
 | SCL-089 | detail noise at the edges | blend over 32 blocks to the half-turn-symmetric mean | blocks | — | `game-choice` |
 | SCL-090 | footprint | D = max(stretch·r, r / cos φ), stretch ≤ 8; along the parallel × min(8, max(1, (0.52 / cos φ)⁴)) | blocks | — | `game-choice` |
+| SCL-091 | a body's semi-axes through the projection | each axis x the mapping's local scale along it; where that scale is not finite or not > 0 (a body on or past the pole row) the source axis is kept | blocks | the format refuses a zero axis | `game-choice` |
 | POL-022 | the game's edge border; no pole cap | stop 1 block inside the north and south edges; spectators pass; off when the wrap engine joins the edges | blocks | — | `game-choice` |
 | POL-023 | the border's warning | 24 blocks before the stop line, every 40 ticks | blocks, ticks | — | `game-choice` |
 | POL-024 | spawn clear of the edges | candidates within 64 blocks of an edge are passed over | blocks | — | `game-choice` |
@@ -136,6 +137,7 @@ On the earlier bake of the same preset the isotropic footprint alone gave 13.4 a
 - The world size at today's blocks per km² (not the prototype's 16,384 × 8,192): agent, 2026-10-04,
   in STATUS "Pending questions".
 - λc search, border inset, edge blend, footprint: agent, 2026-10-04 (SCL-087 to SCL-090).
+- The legal-axis guard for bodies at the pole row (found as a dead bake on the Earth-proportioned test planet of the Phase 1 exit, 1,221 m per block): agent, 2026-10-05 (SCL-091).
 - The game side of the border (warning band, spectators, Sable hulls, the spawn margin) and turning
   the pole cap off on this world: agent, 2026-10-04 (POL-022 to POL-024).
 - The same bits in Rust, Java and the pages: every projection call runs on the portable trigonometry
