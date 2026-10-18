@@ -10498,8 +10498,9 @@ he does not report known faults. Older notes are in the build log.
 - "Probe column agrees with the world data" failed once at (8184, 164) and was not reproduced.
 
 **The play server**
-- The world on it (`/data/ban/play/e34dbe54`, run 1a14f29f351, with the MIC rock tags) predates the climate-class fix,
-  the large-cell divergence fix and the plate cap; it is re-baked after the next green test batch.
+- Re-baked 2026-10-18 on master 0729e267 (`/data/ban/play/0729e267`, run 1a150a58769, supercontinent seed 1,
+  1000 Myr, with the MIC rock tags); it has the climate-class fix, the divergence fix and the plate cap, not yet the
+  ice and crust fixes in flight.
 
 ### 2026-10-02 — Crust-deep magma system; no arches in underwater sea cliffs (agent worktree agent-ae5dd76f2542ab9e7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; taken over from a stopped agent; not merged)
 - **Ask.** Ben, decisions log 2026-10-02, "Crust-deep magma system (Recommended)" ("the amount of lava inside of them is
