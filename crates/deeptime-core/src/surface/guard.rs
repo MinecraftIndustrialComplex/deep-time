@@ -51,6 +51,55 @@ pub const NEAR_GLOBALS: [&str; 4] = [
 // ledger: ISO-073 (game-choice: reporting bands, read by no rule; agent, 2026-10-18).
 pub const NEAR_RELIEFS: [f64; 4] = [1.0, 2.0, 3.0, 6.0];
 
+/// The latitude from which a row of the raster counts as polar in the step records, degrees:
+/// where a cell is less than half as wide east-west on the planet as on the equator
+/// (cos 60° = ½).
+// ledger: ISO-074 (game-choice: a reporting band, read by no rule; agent, 2026-10-18).
+pub const POLAR_FROM_DEG: f64 = 60.0;
+
+/// `WorldState::globals`: the largest rise and the largest fall (both positive, m) the surface
+/// stage gave one cell in one step, on the polar rows and on the rest: the elevation after the
+/// step less where the step began (the carried surface plus the plate model's uplift), so the
+/// plates' own lift is not in it (measurement only). They are read against Earth's fastest
+/// measured vertical rates (on the presets' 2 Myr step, 1 mm/yr is 2 km a step).
+// ledger: ISO-074, ISO-076, ISO-077
+pub const STEP_GLOBALS: [&str; 4] = [
+    "surface/step_rise_max_polar_m",
+    "surface/step_fall_max_polar_m",
+    "surface/step_rise_max_rest_m",
+    "surface/step_fall_max_rest_m",
+];
+
+/// The step's largest rise and fall, m, polar rows first, then the rest, in the order of
+/// [`STEP_GLOBALS`]; `polar[j]` says whether row j is polar.
+pub fn step_extremes(w: usize, h_start: &[f64], h_end: &[f64], polar: &[bool]) -> [f64; 4] {
+    let w = w.max(1);
+    h_start
+        .par_iter()
+        .zip(h_end.par_iter())
+        .enumerate()
+        .fold(
+            || [0.0f64; 4],
+            |mut acc, (c, (&a, &b))| {
+                let d = b - a;
+                if d.is_finite() {
+                    let k = if polar.get(c / w).copied().unwrap_or(false) {
+                        0
+                    } else {
+                        2
+                    };
+                    acc[k] = acc[k].max(d);
+                    acc[k + 1] = acc[k + 1].max(-d);
+                }
+                acc
+            },
+        )
+        .reduce(
+            || [0.0f64; 4],
+            |a, b| std::array::from_fn(|k| a[k].max(b[k])),
+        )
+}
+
 /// Stops the step at `t_myr` when a cell of `h` (m, `w` cells to a row) is not finite or stands
 /// farther than [`bound_m`] from the sea; otherwise returns how far the farthest cell stands from
 /// the sea, m.
