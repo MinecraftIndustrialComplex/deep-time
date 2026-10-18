@@ -1351,6 +1351,134 @@ fn a_resampling_accretes_hidden_continent_once() {
     assert!((accreted.1 - consumed.1 - gap).abs() < 0.05 * gap);
 }
 
+/// A collision state with nothing measured yet: what `ridges::resample` reads of it is only that
+/// it is there.
+fn a_collision() -> state::Collision {
+    state::Collision {
+        onset_myr: 0.0,
+        onset_step: 0,
+        last_step: 0,
+        last_myr: 0.0,
+        shortening_km: 0.0,
+        area_km2: 0.0,
+        convergence_mm_yr: 0.0,
+        onset_convergence_mm_yr: 0.0,
+        peak_convergence_mm_yr: 0.0,
+        later_convergence_mm_yr: None,
+        front_km: 0.0,
+        peak_front_km: 0.0,
+        centroid: [0.0, 0.0, 1.0],
+        normal: [0.0, 1.0, 0.0],
+        continental_over: 1.0,
+        stalled_since_myr: None,
+        belt: Default::default(),
+    }
+}
+
+/// The visible continental crust of a plate colliding under another, where the overriding
+/// plate's footprint covers it at a resampling, crossed the front and was counted by the belt:
+/// the resampling consumes it as it consumes the hidden part (ledger PLT-292). Without the
+/// collision (forced subduction of a continent, PLT-228) it accretes as before.
+#[test]
+fn a_resampling_consumes_the_visible_crust_a_collision_took() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo, pos) = two_plates(&p, &env, 0.1);
+    // Both plates continental; the hidden part is not `stacked`, so it accretes in both runs and
+    // only the visible part inside the overriding plate's footprint differs.
+    for s in st.samples.iter_mut() {
+        s.kind = CONTINENTAL;
+        s.pools = pools::continental_column();
+        s.thickness_m = pools::thickness(&s.pools);
+        s.stacked = false;
+    }
+    let k = st
+        .contacts
+        .iter()
+        .position(|c| c.under == 1 && c.over == 0)
+        .expect("plate 1 subducts under plate 0");
+    let mut out = Vec::new();
+    for collides in [false, true] {
+        let mut s2 = st.clone();
+        s2.contacts[k].collision = collides.then(a_collision);
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        ridges::resample(&mut s2, &mut world, &pos, &geo, &env).unwrap();
+        let g = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
+        out.push((
+            g(ridges::ACCRETED_VISIBLE_GLOBAL),
+            g(ridges::STACKED_CONSUMED_GLOBAL),
+            g(ridges::ACCRETED_HIDDEN_CONTINENT_GLOBAL),
+        ));
+    }
+    let (forced, collided) = (out[0], out[1]);
+    assert!(forced.0 > 0.0, "no visible crust of plate 1 in plate 0's footprint");
+    assert_eq!(forced.1, 0.0);
+    assert!(collided.1 > 0.0 && collided.0 < 0.05 * forced.0, "{collided:?} {forced:?}");
+    assert!(
+        (collided.1 - forced.0).abs() < 0.05 * forced.0,
+        "consumed {} km³ against {} km³ accreted without the collision",
+        collided.1,
+        forced.0
+    );
+    // The hidden, unstacked crust accretes either way.
+    assert!(forced.2 > 0.0 && (collided.2 - forced.2).abs() < 1e-6 * forced.2);
+}
+
+/// Ocean floor with a normal continental column's crystalline crust (T_n) turns continental
+/// where it meets another plate (ledger PLT-289), whatever stacked its crust. Crust as thick as
+/// the transition's ocean side (20 km) stays ocean floor at the contact, and T_n of it away from
+/// any contact stays ocean floor too.
+#[test]
+fn ocean_floor_as_thick_as_a_continent_turns_continental_at_a_contact() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo, pos) = two_plates(&p, &env, 0.1);
+    assert_eq!(st.counters.buoyant, 0);
+    let buoyant = super::transition::continental_m();
+    let at_contact: Vec<usize> = (0..st.samples.len())
+        .filter(|&i| st.samples[i].is_hidden() && st.samples[i].kind == OCEANIC)
+        .take(2)
+        .collect();
+    let far = (0..st.samples.len())
+        .find(|&i| {
+            let s = &st.samples[i];
+            !s.is_hidden() && s.kind == OCEANIC && pos[i].z < -0.5
+        })
+        .unwrap();
+    // (sample, crystalline crust in m, turns continental)
+    let cases = [
+        (at_contact[0], buoyant + 500.0, true),
+        (at_contact[1], 20_000.0, false),
+        (far, buoyant + 5000.0, false),
+    ];
+    for &(i, crust, _) in &cases {
+        let s = &mut st.samples[i];
+        s.pools = pools::oceanic_column();
+        s.pools[state::pool::METAMORPHIC] +=
+            (crust - super::transition::crystalline_m(&s.pools)) as f32;
+        s.thickness_m = pools::thickness(&s.pools);
+    }
+    let tree = Tree::over(&pos, |_| true);
+    let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    subduction::resolve(&mut st, &mut world, &overlaps, &pos, &env).unwrap();
+    for &(i, crust, turns) in &cases {
+        let place = if i == far {
+            "away from any contact"
+        } else {
+            "at the contact"
+        };
+        assert_eq!(
+            st.samples[i].kind == CONTINENTAL,
+            turns,
+            "{crust} m of crystalline crust {place}"
+        );
+    }
+    assert_eq!(st.counters.buoyant, 1);
+}
+
 /// Island-arc crust turns continental by the arc crust it has built (`arc_mature_crust_km` of
 /// crust with the ocean's own), not by its height: a mature arc below the sea becomes continent, a young arc whose
 /// cones stand above it does not, and neither does a mature arc's crust hidden in a trench.
