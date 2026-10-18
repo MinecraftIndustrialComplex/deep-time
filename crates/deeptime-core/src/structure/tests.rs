@@ -77,7 +77,9 @@ fn finish(s: &Session) {
 fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     // 200 Myr: under the force balance the plates start at rest, and on this small planet the
     // first arcs and collisions (and so the first plutons) come later than under the old speed law.
-    let json = pipeline_json(3000, 200.0, 7);
+    // Seed 8 since the erosion recalibration (2026-10-18): under the new law seed 7 emplaced no
+    // pluton in 200 Myr (under the old law it still does), seeds 8 to 13 all do.
+    let json = pipeline_json(3000, 200.0, 8);
     let dir = temp_dir("bake");
     let s = session(&json, &dir, 2);
     assert_eq!(

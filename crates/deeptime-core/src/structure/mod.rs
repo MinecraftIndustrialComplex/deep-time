@@ -1120,7 +1120,9 @@ pub fn summary_line(note: &serde_json::Value) -> String {
          deformed_frac={:.4} faulted_frac={:.4} max_candidates={} max_shift_blocks={:.1} \
          lattice_s={:.2} noddy_worst={:.1e} noddy_ns_point={:.0} column_ns_point={:.1} \
          covered_craton={:.3} covered_collision={:.3} covered_rift={:.3} covered_passive_margin={:.3} \
-         deform_steps_s={:.2} deform_report_s={:.2}",
+         deform_steps_s={:.2} deform_report_s={:.2} \
+         formed_by_arc={}/{} formed_by_collision={}/{} formed_by_foreland={}/{} \
+         arc_cell_steps={} arc_mean_lift={:.3} arc_lifted_share={:.3} arc_mean_strain={:.4}",
         kinds["fold_train"].as_u64().unwrap_or(0),
         kinds["thrust"].as_u64().unwrap_or(0),
         kinds["normal_fault"].as_u64().unwrap_or(0),
@@ -1155,6 +1157,16 @@ pub fn summary_line(note: &serde_json::Value) -> String {
             .as_f64()
             .unwrap_or(0.0)
             / 1000.0,
+        df["formed_by"]["arc"]["fold_train"],
+        df["formed_by"]["arc"]["thrust"],
+        df["formed_by"]["collision"]["fold_train"],
+        df["formed_by"]["collision"]["thrust"],
+        df["formed_by"]["foreland"]["fold_train"],
+        df["formed_by"]["foreland"]["thrust"],
+        df["arc_rule"]["cell_steps"],
+        df["arc_rule"]["mean_lift"].as_f64().unwrap_or(f64::NAN),
+        df["arc_rule"]["lifted_share"].as_f64().unwrap_or(f64::NAN),
+        df["arc_rule"]["mean_strain"].as_f64().unwrap_or(f64::NAN),
     );
     format!(
         "structure_final={} plutons_emplaced={} plutons_alive={} plutons_eroded={} \

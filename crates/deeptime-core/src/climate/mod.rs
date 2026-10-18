@@ -190,6 +190,11 @@ pub const OCEAN_OVERTURNING_SHIFT: &str = "deeptime:ocean_overturning_shift";
 
 /// Ice thinner than this is no ice, m.
 pub const ICE_MIN_M: f32 = 1.0;
+/// The smallest ice sheet, Earth-normalized km²: "an ice body that covers an area of continental
+/// size, generally defined as covering 50 000 km² or more" (Cogley et al. 2011, glossary, "Ice
+/// sheet"). The smaller bodies (glaciers, ice caps, icefields) are the mountain ice, which the
+/// present-day setting's land-ice share leaves out (decisions log 2026-10-18).
+pub const ICE_SHEET_MIN_KM2: f64 = 50_000.0; // ledger: CLM-203
 /// How far an interglacial's warm summers lift the equilibrium line above its mean, m (about
 /// 2 °C of summer warmth; Earth's early Holocene), in the deep-time sheet's relaxation.
 pub const INTERGLACIAL_RISE_M: f32 = 300.0; // ledger: GLA-074
@@ -210,7 +215,9 @@ struct Saved {
     /// Sea level and grounded ice of the last step (m; Earth-normalized km³).
     sea_level_m: Option<f64>,
     ice_volume_km3: f64,
+    /// The land's share under ice, all of it and the ice sheets' (`ICE_SHEET_MIN_KM2`).
     land_ice_frac: f64,
+    land_sheet_frac: f64,
     /// Oceanic crust area of the last step and the smoothed consumption rate (degassing).
     ocean_km2: Option<f64>,
     subduction_km2_yr: Option<f64>,
@@ -246,10 +253,14 @@ struct Present {
     /// state beyond a factor of 10⁴, is not).
     reached: bool,
     trials: u32,
+    /// The land's share under ice, all of it and the ice sheets' (`ICE_SHEET_MIN_KM2`; the
+    /// target counts the sheets, decisions log 2026-10-18), without and with the factor.
     natural_land_ice: f64,
+    natural_land_sheet: f64,
     natural_sea_ice: f64,
     natural_snowball: bool,
     land_ice: f64,
+    land_sheet: f64,
     sea_ice: f64,
 }
 
@@ -266,12 +277,17 @@ struct IceRun {
     sheet: sheet::State,
     /// (land ice share, volume) of every window step.
     rows: Vec<(f64, f64)>,
+    /// Whether the last clock step was in the window (the ice is `hs`), and outside it the last
+    /// step's shifts of the line (the ice is the land above the shifted line).
+    in_window: bool,
+    delta: Vec<f64>,
 }
 
 /// One run of the last stretch under a CO₂ factor (`present_climate`).
 struct Trial {
     ln_factor: f64,
     land_ice: f64,
+    land_sheet: f64,
     sea_ice: f64,
     snowball: bool,
     clock: ClockState,
@@ -423,6 +439,49 @@ impl Geometry {
         (share, area, vol)
     }
 
+    /// The ice-sheet cells among the cells `ice` selects: every continuous ice body (cells sharing
+    /// an edge, the rows wrapping east to west) that covers at least `ICE_SHEET_MIN_KM2`. The rest
+    /// of the ice is mountain ice.
+    fn sheet_cells(&self, ice: &dyn Fn(usize) -> bool) -> Vec<bool> {
+        let (w, h) = (self.w, self.h);
+        let on: Vec<bool> = (0..w * h).map(ice).collect();
+        let mut seen = vec![false; w * h];
+        let mut sheet = vec![false; w * h];
+        let (mut stack, mut body) = (Vec::new(), Vec::new());
+        for (c0, &o) in on.iter().enumerate() {
+            if !o || seen[c0] {
+                continue;
+            }
+            seen[c0] = true;
+            stack.push(c0);
+            body.clear();
+            let mut area = 0.0;
+            while let Some(c) = stack.pop() {
+                body.push(c);
+                let (i, j) = (c % w, c / w);
+                area += self.area[j];
+                let next = [
+                    Some(j * w + (i + 1) % w),
+                    Some(j * w + (i + w - 1) % w),
+                    (j > 0).then(|| c - w),
+                    (j + 1 < h).then_some(c + w),
+                ];
+                for d in next.into_iter().flatten() {
+                    if on[d] && !seen[d] {
+                        seen[d] = true;
+                        stack.push(d);
+                    }
+                }
+            }
+            if area >= ICE_SHEET_MIN_KM2 {
+                for &c in &body {
+                    sheet[c] = true;
+                }
+            }
+        }
+        sheet
+    }
+
     /// Each band's share of `pick` among the cells `of` selects (0 where there are none).
     fn band_share(&self, pick: &dyn Fn(usize) -> bool, of: &dyn Fn(usize) -> bool) -> Vec<f64> {
         let mut num = vec![0usize; self.bands];
@@ -446,6 +505,10 @@ impl Geometry {
     }
 }
 
+/// Experiment toggle (the 2026-10-18 CO₂ trace; off unless set): the weathering kernel's kinetics
+/// at each cell's sea-level temperature, as if high ground were not cooled by the lapse rate.
+pub const KERNEL_SEA_T_ENV: &str = "DEEPTIME_EXP_KERNEL_SEA_T";
+
 /// The weathering kernel of a step's climate: each band's Σ area·runoff·e^(k_T(T − 15)) over its
 /// land, and each band's EBM land temperature for it.
 ///
@@ -457,6 +520,11 @@ impl Geometry {
 /// planet (the GameTest planet, 9 % land) to 8,500 ppm and 27 °C. Held at the reference climate's
 /// evaporation, the runoff keeps its spatial pattern and rises with the precipitation, as global
 /// runoff does with warming (GEOCARB's ~3.8 %/K, Berner & Kothavala 2001).
+///
+/// `h`, `sea`: the elevation and the sea level, read only by the experiment toggle
+/// [`KERNEL_SEA_T_ENV`] (the kinetics at the cell's sea-level temperature, its lapse cooling put
+/// back; the 2026-10-18 CO₂ trace).
+#[allow(clippy::too_many_arguments)]
 fn kernel_of(
     g: &Geometry,
     land: &[bool],
@@ -465,9 +533,12 @@ fn kernel_of(
     er: &EbmResult,
     p: &ClimateParams,
     erosion: Option<&[f32]>,
+    (h, sea): (&[f64], f64),
 ) -> carbon::Kernel {
     let k_t = p.weathering_temp_per_k;
     let warming = er.t_global - p.hydro_ref_c;
+    let sea_t = std::env::var_os(KERNEL_SEA_T_ENV).is_some();
+    let gamma = p.lapse_c_per_km / 1000.0;
     let mut band = vec![0.0; g.bands];
     let mut supply = vec![0.0; g.bands];
     let limited = p.weathering_supply && erosion.is_some();
@@ -482,7 +553,12 @@ fn kernel_of(
             let pr = f64::from(precip[c]);
             let pet = (60.0 * (t - warming)).max(0.0);
             let runoff = (pr - crate::surface::climate::fu_et(pr, pet)).max(0.0) / 1000.0;
-            band[b] += carbon::cell_kernel(g.area[j], runoff, t, k_t);
+            let t_k = if sea_t {
+                t + gamma * (h[c] - sea).max(0.0)
+            } else {
+                t
+            };
+            band[b] += carbon::cell_kernel(g.area[j], runoff, t_k, k_t);
             if let (true, Some(e)) = (limited, erosion) {
                 supply[b] += carbon::cell_supply(
                     g.area[j],
@@ -842,7 +918,16 @@ impl ClimateStage {
             let er0 = s0.ebm.clone().expect("a snapshot keeps its EBM year");
             let (mean0, summer0) = clock::land_temps(&er0);
             // No erosion yet: the first step weathers without a supply limit.
-            self.s.clock.kernel = kernel_of(&geo, &land0, &s0.t_mean, &s0.precip, &er0, &p, None);
+            self.s.clock.kernel = kernel_of(
+                &geo,
+                &land0,
+                &s0.t_mean,
+                &s0.precip,
+                &er0,
+                &p,
+                None,
+                (&h, sea_prev),
+            );
             self.s.clock.snap_summer = summer0;
             self.s.clock.snap_t_global = er0.t_global;
             self.s.clock.sheet = s0.band_sheet.clone();
@@ -933,6 +1018,8 @@ impl ClimateStage {
             since_eq: f64::MAX,
             sheet: std::mem::take(&mut self.s.sheet),
             rows: Vec::new(),
+            in_window: false,
+            delta: Vec::new(),
         };
         let land0_km2 = geo.area_where(&|c| land0[c]);
         let dynamic = p.carbon_cycle || p.solar_brightening || window_step;
@@ -960,7 +1047,10 @@ impl ClimateStage {
                 correction: &correction,
             };
             let ice_step = |ir: &mut IceRun, s: &clock::IceStep<'_>| -> Vec<f64> {
+                ir.in_window = s.in_window;
                 if !s.in_window {
+                    ir.delta.clear();
+                    ir.delta.extend_from_slice(s.delta);
                     return margins.shares(s.delta);
                 }
                 // Equilibrium ice for this orbit (refreshed every ~5 kyr), then Imbrie's lag.
@@ -1063,15 +1153,31 @@ impl ClimateStage {
                     let out = clock::run(&cin(t_adj, t1, nudge), &mut c, &mut e, &mut |s| {
                         ice_step(&mut i, s)
                     });
-                    let (mut ice, mut all) = (0.0, 0.0);
-                    for (b, lat) in band_lat.iter().enumerate() {
-                        let a = land_frac0[b] * lat.to_radians().cos();
-                        ice += a * c.sheet.get(b).copied().unwrap_or(0.0);
-                        all += a;
-                    }
+                    let land_share = |share: &[f64]| -> f64 {
+                        let (mut ice, mut all) = (0.0, 0.0);
+                        for (b, lat) in band_lat.iter().enumerate() {
+                            let a = land_frac0[b] * lat.to_radians().cos();
+                            ice += a * share.get(b).copied().unwrap_or(0.0);
+                            all += a;
+                        }
+                        if all > 0.0 { ice / all } else { 0.0 }
+                    };
+                    // The ice the clock's share counted, cell by cell, and of it the sheets'.
+                    let iced = |k: usize| -> bool {
+                        land0[k]
+                            && if i.in_window {
+                                i.hs[k] >= ICE_MIN_M
+                            } else {
+                                i.delta
+                                    .get(geo.cell_band(k))
+                                    .is_some_and(|&d| f64::from(mu0[k]) > d)
+                            }
+                    };
+                    let sheet = geo.sheet_cells(&iced);
                     Trial {
                         ln_factor: x,
-                        land_ice: if all > 0.0 { ice / all } else { 0.0 },
+                        land_ice: land_share(&c.sheet),
+                        land_sheet: land_share(&geo.band_share(&|k| sheet[k], &|k| land0[k])),
                         sea_ice: c.sea_ice,
                         snowball: c.snowball.is_some(),
                         clock: c,
@@ -1083,10 +1189,10 @@ impl ClimateStage {
                 let reach = |t: &Trial| -> bool {
                     match mode {
                         PresentClimate::Temperate => {
-                            !t.snowball && t.land_ice <= p.present_interglacial_ice_frac
+                            !t.snowball && t.land_sheet <= p.present_interglacial_ice_frac
                         }
                         PresentClimate::IceAge => {
-                            t.snowball || t.land_ice >= p.present_glacial_ice_frac
+                            t.snowball || t.land_sheet >= p.present_glacial_ice_frac
                         }
                         PresentClimate::Snowball => t.snowball,
                         PresentClimate::Natural => true,
@@ -1098,8 +1204,12 @@ impl ClimateStage {
                     -1.0
                 };
                 let natural = trial(0.0);
-                let (nat_ice, nat_sea, nat_snow) =
-                    (natural.land_ice, natural.sea_ice, natural.snowball);
+                let (nat_ice, nat_sheet, nat_sea, nat_snow) = (
+                    natural.land_ice,
+                    natural.land_sheet,
+                    natural.sea_ice,
+                    natural.snowball,
+                );
                 let mut trials = 1u32;
                 let mut reached = reach(&natural);
                 let mut chosen = natural;
@@ -1149,9 +1259,11 @@ impl ClimateStage {
                     reached,
                     trials,
                     natural_land_ice: nat_ice,
+                    natural_land_sheet: nat_sheet,
                     natural_sea_ice: nat_sea,
                     natural_snowball: nat_snow,
                     land_ice: chosen.land_ice,
+                    land_sheet: chosen.land_sheet,
                     sea_ice: chosen.sea_ice,
                 });
                 self.s.clock = chosen.clock;
@@ -1641,6 +1753,13 @@ impl ClimateStage {
         let volume = geo.volume_km3(&thick);
         self.s.ice_volume_km3 = volume;
         self.s.land_ice_frac = ice_cover.frac();
+        let ice_sheet = geo.sheet_cells(&|c| land[c] && glacier[c]);
+        let land_km2 = geo.area_where(&|c| land[c]);
+        self.s.land_sheet_frac = if land_km2 > 0.0 {
+            geo.area_where(&|c| ice_sheet[c]) / land_km2
+        } else {
+            0.0
+        };
         self.s.sea_level_m = Some(sea);
         // The ice's surface mass balance (for the hydrology: no runoff under the ice, meltwater
         // where the balance is negative): the sheet's law on the ice surface against the line.
@@ -1697,6 +1816,8 @@ impl ClimateStage {
 
         // The next step's weathering reads this step's climate.
         let mut runoff_mean = f64::NAN;
+        let (mut kernel_high, mut land_high, mut t_land_mean) = (f64::NAN, f64::NAN, f64::NAN);
+        let mut kernel_sea_t = f64::NAN;
         if let Some(er) = &er_end {
             let t_mean = &world.fields[field::T_MEAN].data;
             let precip = &world.fields[field::PRECIP].data;
@@ -1706,19 +1827,36 @@ impl ClimateStage {
                 .get(crate::surface::field::EROSION)
                 .filter(|f| f.data.len() == n)
                 .map(|f| f.data.as_slice());
-            self.s.clock.kernel = kernel_of(&geo, &land, t_mean, precip, er, &p, erosion);
+            self.s.clock.kernel =
+                kernel_of(&geo, &land, t_mean, precip, er, &p, erosion, (&h, sea));
             let warming = er.t_global - p.hydro_ref_c;
             let (mut ra, mut rs) = (0.0, 0.0);
+            let (mut kt, mut kh, mut ah, mut ta, mut ks) = (0.0, 0.0, 0.0, 0.0, 0.0);
+            let gamma = p.lapse_c_per_km / 1000.0;
             for c in 0..n {
                 if land[c] {
                     let (t, pr) = (f64::from(t_mean[c]), f64::from(precip[c]));
                     let pet = (60.0 * (t - warming)).max(0.0);
                     let a = geo.area[c / w];
+                    let runoff = (pr - crate::surface::climate::fu_et(pr, pet)).max(0.0) / 1000.0;
                     ra += a;
-                    rs += a * (pr - crate::surface::climate::fu_et(pr, pet)).max(0.0) / 1000.0;
+                    rs += a * runoff;
+                    ta += a * t;
+                    let kc = carbon::cell_kernel(a, runoff, t, p.weathering_temp_per_k);
+                    kt += kc;
+                    let ts = t + gamma * (h[c] - sea).max(0.0);
+                    ks += carbon::cell_kernel(a, runoff, ts, p.weathering_temp_per_k);
+                    if h[c] - sea > 2000.0 {
+                        kh += kc;
+                        ah += a;
+                    }
                 }
             }
             runoff_mean = rs / ra.max(1e-9);
+            kernel_high = kh / kt.max(1e-30);
+            land_high = ah / ra.max(1e-9);
+            t_land_mean = ta / ra.max(1e-9);
+            kernel_sea_t = ks / carbon::KERNEL_EARTH;
         }
         self.time("ice", started);
 
@@ -1747,6 +1885,19 @@ impl ClimateStage {
             );
             self.s.steer.ocean_km2 = geo.area_where(&|c| !land[c]);
         }
+        // The land's weathering at this step's end climate, with and without the supply limit.
+        let (w_land, w_kin) = {
+            let wp = carbon::Weathering::from(&p);
+            let ck = &self.s.clock;
+            let kin = carbon::Kernel {
+                supply: Vec::new(),
+                ..ck.kernel.clone()
+            };
+            (
+                wp.flux(&ck.kernel, &ck.t_land, &ck.sheet, ppm),
+                wp.flux(&kin, &ck.t_land, &ck.sheet, ppm),
+            )
+        };
         self.s.clock.series.push(vec![
             t_end_myr as f32,
             ppm as f32,
@@ -1770,6 +1921,12 @@ impl ClimateStage {
             land_frac as f32,
             (self.s.clock.kernel.band.iter().sum::<f64>() / carbon::KERNEL_EARTH) as f32,
             runoff_mean as f32,
+            w_land as f32,
+            w_kin as f32,
+            kernel_high as f32,
+            land_high as f32,
+            t_land_mean as f32,
+            kernel_sea_t as f32,
         ]);
         self.s.omega = Some(omega_now);
         if last {
@@ -1931,6 +2088,12 @@ impl ClimateStage {
             o.insert("ice_volume_km3".into(), json!(self.s.ice_volume_km3));
             o.insert("sea_level_m".into(), json!(self.s.sea_level_m));
             o.insert("glaciated_land_frac".into(), json!(self.s.land_ice_frac));
+            // Of it, the ice sheets' and the mountain ice's (`ICE_SHEET_MIN_KM2`, CLM-203).
+            o.insert("ice_sheet_land_frac".into(), json!(self.s.land_sheet_frac));
+            o.insert(
+                "mountain_ice_land_frac".into(),
+                json!((self.s.land_ice_frac - self.s.land_sheet_frac).max(0.0)),
+            );
             o.insert("degassing_mol_yr".into(), json!(self.s.clock.degassing));
             o.insert("weathering_mol_yr".into(), json!(self.s.clock.weathering));
             o.insert(
@@ -1973,8 +2136,11 @@ impl ClimateStage {
                     "reached": x.reached,
                     "trials": x.trials,
                     "land_ice_frac": x.land_ice,
+                    "land_ice_sheet_frac": x.land_sheet,
+                    "land_ice_mountain_frac": (x.land_ice - x.land_sheet).max(0.0),
                     "sea_ice_frac": x.sea_ice,
                     "natural_land_ice_frac": x.natural_land_ice,
+                    "natural_land_ice_sheet_frac": x.natural_land_sheet,
                     "natural_sea_ice_frac": x.natural_sea_ice,
                     "natural_snowball": x.natural_snowball,
                 }),

@@ -42,6 +42,82 @@ Measured on `earthlike_quick_16k` (seeds 1 and 2; scattered start 500 Myr, super
 
 Re-measured on master 35dacc0e (the Lambert world, 35 m per block, plate tasks 3–4) against the merged branch, sheets off, scattered start, 500 Myr, seeds 1–3 (build log 2026-10-02, "Readied for landing"): land 0.181 → 0.174 and continental crust 0.298 → 0.309 of the planet (seed-to-seed scatter larger than either change), mean surface temperature 15.3 → 16.1 degC, land under ice 0.116 → 0.064, CO2 444 → 519 ppm (means).
 
+## The present-day nudge on high ground (2026-10-18)
+
+Plate task 8 (continental crust at its Airy height) raised the temperate worlds' CO2 from 730 to
+6,100 ppm and their temperature from 15.9 to 21.7 degC at 500 Myr (6 runs each, `plates.md`). The
+erosion recalibration traced it (build log 2026-10-18; `earthlike_quick_16k`, 500 Myr, seeds 1 and
+2, both starts; the `carbon_series` line). With the present-day setting off (`natural`) the two
+models end at the same temperature, 15.1 and 15.05 degC, with CO2 at 579 and 1,009 ppm: task 8's
+higher ground holds more ice and so needs more CO2 for the same warmth, but the carbon cycle's
+thermostat is unchanged. The rise is the present-day nudge (CLM-148 to CLM-151): it raises CO2
+until the land ice is at most CLM-150's 0.15 of the land, and that share counts mountain ice. On
+task 8's supercontinent seed 1 the temperate and natural runs are the same to −50 Myr (565 ppm);
+at the end the natural run has 0.315 of its land under ice (916 ppm, 13.7 degC) and 0.371 of its
+land above 2 km, and the temperate run reaches the bracket's top, 30,250 ppm and 28.3 degC, with
+0.156 still under ice. On master the natural end had 0.144 under ice and the nudge did nothing.
+Earth's 0.10 is almost all ice sheet, so a target that counts mountain glaciers bites on a
+mountainous planet; that is a design question for the present-day setting, not a change to the
+deep-time carbon cycle. The recalibrated erosion law (ERO-004 to ERO-007, ERO-013) lowers the high
+ground and with it the nudge's CO2 (erosion-and-sediment.md, "The erosion law against measured
+rates").
+
+### The target counts ice sheets (decided 2026-10-18)
+
+The coordinator decided it the same day (decisions log 2026-10-18): the temperate present's share
+counts ice sheets only, as Earth's ~0.10 does, and the mountain ice is left out; the shares stay
+0.15 (temperate, at most) and 0.25 (ice age, at least) (CLM-150). Earth's land is 0.10 under
+glacial ice (NSIDC, glaciers, ice caps and the two sheets); Antarctica's almost 14 million km2 and
+Greenland's 1.7 million are about 0.105 of it (the land area, 149 million km2, from memory), and the
+Randolph Glacier Inventory, which "excludes the ice sheets of Greenland and Antarctica", holds about
+706,000 km2, about 0.5 % of the land.
+
+What an ice sheet is comes from the glossary of glacier terms (Cogley et al. 2011, p. 53): "An ice
+body that covers an area of continental size, generally defined as covering 50 000 km2 or more"; an
+ice cap is the same dome under 50,000 km2, and an icefield covers mountainous terrain without
+burying it (NSIDC gives the same 50,000 km2). The code takes it as written (CLM-203): every
+continuous body of land ice on the climate's grid (cells with at least 1 m of ice sharing an edge,
+the rows wrapping east to west) with an Earth-normalized area of 50,000 km2 or more is an ice sheet;
+the rest, glaciers, ice caps and icefields, is mountain ice. It is not a height cut: a high plateau
+under one body of ice of that size counts as a sheet, and a long range glaciated along its crest
+counts once its ice is continuous over 50,000 km2 (on `earthlike_quick_16k` an L1 cell is about
+1,520 km2, so about 33 cells). The present's trials read the sheets from the clock's own ice (the
+window's thickness, or the land above the shifted line outside the window), so the sheet share is a
+part of the share the clock counted. Only the target changed: the clock's land-ice share, all of the
+ice, still sets the albedo and the weathering, and nothing before the last 100 kyr moves. The run
+reports both parts (`ice_sheet_land_frac`, `mountain_ice_land_frac` beside `glaciated_land_frac`
+in the climate note and the CLI's `climate_final` line; the present's `land_ice_sheet_frac`,
+`land_ice_mountain_frac` and `natural_land_ice_sheet_frac`).
+
+**Measured** (build log 2026-10-18, "The temperate present counts ice sheets"; `earthlike_quick_16k`
+on the erosion recalibration, the temperate present, `DEEPTIME_GAP_BUDGET=1`, both starts;
+`tools/review/force-balance-ensemble.sh ... hyps`; means, CO₂ a geometric mean, brackets the runs'
+range; "before" is the same runs with the target counting all of the land ice, erosion-and-sediment.md):
+
+| | Land | Land above 2 km | T, °C | CO₂, ppm | Land under ice | Under ice sheets | Under mountain ice |
+|---|---|---|---|---|---|---|---|
+| 500 Myr, seeds 1 to 3, before | 0.194 | 0.251 | 19.6 [16.8, 21.6] | 3,377 [1,565, 5,850] | 0.145 to 0.160 | | |
+| 500 Myr, seeds 1 to 3 | 0.195 [0.174, 0.212] | 0.249 [0.201, 0.300] | 17.9 [15.5, 19.9] | 2,110 [1,033, 3,782] | 0.173 [0.166, 0.178] | 0.153 [0.149, 0.160] | 0.019 [0.015, 0.025] |
+| 1000 Myr, seeds 1 to 4, before | 0.212 | 0.278 | 18.8 [13.7, 23.7] | 3,245 [802, 18,112] | 0.145 to 0.160 | | |
+| 1000 Myr, seeds 1 to 4 | 0.213 [0.166, 0.261] | 0.277 [0.193, 0.366] | 17.5 [12.8, 22.1] | 2,318 [623, 12,763] | 0.167 [0.145, 0.177] | 0.147 [0.120, 0.156] | 0.019 [0.015, 0.025] |
+
+- *Mountain ice is a small part of the land ice here,* 0.015 to 0.025 of the land at the end, and
+  0.014 to 0.028 in the natural climate the nudge starts from (500 Myr: 0.182 to 0.239 under ice,
+  0.166 to 0.225 under sheets). The land ice on these planets lies mostly in bodies of 50,000 km2 or
+  more, so dropping the mountain ice lowers CO₂ by about a third (geometric means 3,377 to 2,110 and
+  3,245 to 2,318 ppm) and the temperature by 1.7 and 1.3 degC, and no more.
+- *The high-ground planets still need the most CO₂.* The 1000 Myr supercontinent seed 2 (0.35 of its
+  land above 2 km) ends at 12,763 ppm and 22.0 degC, 11.6 times its natural 1,101 ppm; the
+  scattered seed 4 (0.34) at 9,899 ppm, 6.3 times. Two runs (scattered seed 3, supercontinent seed 4)
+  need almost no nudge (factor 1.02 and 1.00). The natural CO₂ is 525 to 1,576 ppm in all 14 runs.
+- *The target is met as the trials count it:* the present's own sheet share (land at the window's
+  start, band-weighted) is 0.149 to 0.150 in the six 500 Myr runs. The step's end share
+  (`ice_sheet_land_frac`, the final land by area) is 0.149 to 0.160; the two count different land,
+  as the all-ice target's 0.145 to 0.160 did.
+- *Nothing earlier moved:* the 1000 Myr supercontinent seed 1 still has its five snowball episodes,
+  the land below 0 degC from −700 to −450 Myr (−2.1 degC at −700, −6.3 at −650, 4.2 at −450), as
+  before; the change only touches the last 100 kyr. No 500 Myr run had a snowball.
+
 ## Material for the stage 2 writer
 
 - Extraction notes (measured Earth-against-mod numbers from the build log, simplifications, flags): [extraction-notes/CLM.md](extraction-notes/CLM.md), [extraction-notes/MOI.md](extraction-notes/MOI.md).

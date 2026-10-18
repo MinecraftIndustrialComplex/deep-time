@@ -255,7 +255,7 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
     };
     Some(
         format!(
-            "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} foundered_km3={:.3e} collision_crossed_km3={:.3e} collision_kept_km3={:.3e} resample_accreted_km3={:.3e} resample_stacked_km3={:.3e} resample_accreted_continent_km3={:.3e} resample_accreted_visible_km3={:.3e} arc_continental_km3={:.3e} arc_oceanic_km3={:.3e} continental_volume_km3={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
+            "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} foundered_km3={:.3e} collision_crossed_km3={:.3e} collision_kept_km3={:.3e} resample_accreted_km3={:.3e} resample_stacked_km3={:.3e} resample_accreted_continent_km3={:.3e} resample_accreted_visible_km3={:.3e} resample_accreted_rise_km3={:.3e} arc_continental_km3={:.3e} arc_oceanic_km3={:.3e} arc_front_continental_km_myr={:.3e} arc_front_oceanic_km_myr={:.3e} cordillera_shortened_km3={:.3e} hotspot_magma_km3={:.3e} cone_felsic_km3={:.3e} cone_mafic_km3={:.3e} continental_volume_km3={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
             deeptime_core::plates::stats::summary(st).line(),
             global(collapse::MOVED_GLOBAL),
             global(collapse::GAINED_GLOBAL),
@@ -266,8 +266,15 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
             global(deeptime_core::plates::ridges::STACKED_CONSUMED_GLOBAL),
             global(deeptime_core::plates::ridges::ACCRETED_HIDDEN_CONTINENT_GLOBAL),
             global(deeptime_core::plates::ridges::ACCRETED_VISIBLE_GLOBAL),
+            global(deeptime_core::plates::ridges::ACCRETED_RISE_GLOBAL),
             global(deeptime_core::plates::subduction::ARC_CONTINENTAL_GLOBAL),
             global(deeptime_core::plates::subduction::ARC_OCEANIC_GLOBAL),
+            global(deeptime_core::plates::subduction::ARC_FRONT_CONTINENTAL_GLOBAL),
+            global(deeptime_core::plates::subduction::ARC_FRONT_OCEANIC_GLOBAL),
+            global(deeptime_core::plates::subduction::CORDILLERA_GLOBAL),
+            global(deeptime_core::plates::hotspots::MAGMA_GLOBAL),
+            global(deeptime_core::plates::CONE_FELSIC_GLOBAL),
+            global(deeptime_core::plates::CONE_MAFIC_GLOBAL),
             global(deeptime_core::plates::subduction::CONTINENTAL_VOLUME_GLOBAL),
             q(0.1),
             q(0.5),
@@ -778,7 +785,10 @@ fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     };
     Some(format!(
         "climate_final={} t_surface_c={:.1} t_land_c={:.1} precip_land_mm={:.0} koppen_land={} \
-         glaciated_land_frac={:.3} glaciations={} ebm_t_global_c={:.1} ebm_net_toa_w_m2={:.3} \
+         glaciated_land_frac={:.3} ice_sheet_land_frac={:.3} mountain_ice_land_frac={:.3} \
+         present_co2_factor={:.3} present_reached={} present_ice_frac={:.3} present_sheet_frac={:.3} \
+         present_natural_ice_frac={:.3} present_natural_sheet_frac={:.3} glaciations={} \
+         ebm_t_global_c={:.1} ebm_net_toa_w_m2={:.3} \
          itcz_deg={:.1}..{:.1} land_z_p50_m={:.0} land_z_p90_m={:.0} land_above_2km={:.3} \
          co2_ppm={:.0} sea_level_m={:.1} ice_volume_km3={:.3e} sea_ice_frac={:.3} snowballs={} \
          hothouses={}",
@@ -788,6 +798,14 @@ fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
         f(&last["precip_land_mm"]),
         shares,
         f(&last["glaciated_land_frac"]),
+        f(&last["ice_sheet_land_frac"]),
+        f(&last["mountain_ice_land_frac"]),
+        f(&note["present"]["co2_factor"]),
+        note["present"]["reached"],
+        f(&note["present"]["land_ice_frac"]),
+        f(&note["present"]["land_ice_sheet_frac"]),
+        f(&note["present"]["natural_land_ice_frac"]),
+        f(&note["present"]["natural_land_ice_sheet_frac"]),
         note["glaciations"],
         f(&last["ebm_t_global_c"]),
         f(&last["ebm_net_toa_w_m2"]),
@@ -803,6 +821,131 @@ fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
         note["snowballs"],
         note["hothouses"],
     ))
+}
+
+/// The carbon cycle over the run (the 2026-10-18 CO₂ trace): one entry per 50 Myr and the last
+/// plate step, `t_myr:co2_ppm/t_global_c/t_land_c/degassing/weathering/land/kinetic/supply` (the
+/// fluxes in 10¹² mol C a year: the land's with and without the supply limit, and the supply)
+/// `/kernel_rel/kernel_rel_sea_t/kernel_high/land_high/land_frac/runoff_m_yr/ridge/subduction`
+/// (km² a year).
+fn carbon_series_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note: Value =
+        serde_json::from_str(world.notes.get(deeptime_core::climate::STAGE_NAME)?).ok()?;
+    let cols = note["series"]["columns"].as_array()?;
+    let rows = note["series"]["rows"].as_array()?;
+    let at = |name: &str| cols.iter().position(|x| x == name);
+    let names = [
+        "co2_ppm",
+        "t_global_c",
+        "t_land_mean_c",
+        "degassing_mol_yr",
+        "weathering_mol_yr",
+        "weathering_land_mol_yr",
+        "weathering_kinetic_mol_yr",
+        "weathering_supply_mol_yr",
+        "kernel_rel",
+        "kernel_rel_sea_t",
+        "kernel_high_share",
+        "land_high_share",
+        "land_frac",
+        "runoff_land_m_yr",
+        "ridge_km2_yr",
+        "subduction_km2_yr",
+    ];
+    let it = at("t_myr")?;
+    let idx: Vec<Option<usize>> = names.iter().map(|n| at(n)).collect();
+    let mut parts = Vec::new();
+    let mut next = f64::NEG_INFINITY;
+    for (k, r) in rows.iter().enumerate() {
+        let r = r.as_array()?;
+        let t = r[it].as_f64().unwrap_or(f64::NAN);
+        if t + 1e-6 < next && k + 1 != rows.len() {
+            continue;
+        }
+        next = (t / 50.0).floor() * 50.0 + 50.0;
+        let v: Vec<String> = idx
+            .iter()
+            .zip(names)
+            .map(|(i, n)| {
+                let x = i
+                    .and_then(|i| r.get(i))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(f64::NAN);
+                if n.ends_with("mol_yr") {
+                    format!("{:.3}", x / 1.0e12)
+                } else if n == "co2_ppm" {
+                    format!("{x:.0}")
+                } else if n.ends_with("_c") {
+                    format!("{x:.1}")
+                } else {
+                    format!("{x:.3}")
+                }
+            })
+            .collect();
+        parts.push(format!("{t:.0}:{}", v.join("/")));
+    }
+    Some(format!("carbon_series {}", parts.join(" ")))
+}
+
+/// The surface stage's land erosion by elevation band and by local relief (the erosion
+/// recalibration of 2026-10-18, `surface::erosion_bands`): `erosion_bands <class>:<area share of
+/// the land>/<net>/<stream power>/<critical-slope cut>/<diffusion>/<glacial>` in m/Myr, the
+/// classes `z<lower end, m>`, `flat`, `steep` and `rz<lower end of relief, m>`.
+fn erosion_bands_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let st = world.surface.as_ref()?;
+    let b = &st.totals.by_band;
+    let land: f64 = b.bands.iter().map(|p| p.area_km2_myr).sum();
+    if land <= 0.0 {
+        return None;
+    }
+    let one = |name: String, p: &deeptime_core::surface::erosion_bands::ProcessSums| {
+        let r = |v: f64| {
+            if p.area_km2_myr > 0.0 {
+                v / p.area_km2_myr * 1000.0
+            } else {
+                f64::NAN
+            }
+        };
+        format!(
+            "{name}:{:.4}/{:.1}/{:.1}/{:.1}/{:.1}/{:.1}",
+            p.area_km2_myr / land,
+            r(p.net_km3),
+            r(p.spl_km3),
+            r(p.threshold_km3),
+            r(p.diffusion_km3),
+            r(p.glacial_km3)
+        )
+    };
+    let mut parts = Vec::new();
+    for (i, p) in b.bands.iter().enumerate() {
+        parts.push(one(format!("z{}", i * 1000), p));
+    }
+    parts.push(one("flat".into(), &b.high_flat));
+    parts.push(one("steep".into(), &b.high_steep));
+    for (i, p) in b.by_relief.iter().enumerate() {
+        let lo = if i == 0 {
+            0.0
+        } else {
+            deeptime_core::surface::erosion_bands::RELIEF_FROM_M[i - 1]
+        };
+        parts.push(one(format!("rz{lo}"), p));
+    }
+    for (i, p) in b.by_window_relief.iter().enumerate() {
+        let lo = if i == 0 {
+            0.0
+        } else {
+            deeptime_core::surface::erosion_bands::RELIEF_FROM_M[i - 1]
+        };
+        parts.push(one(format!("wz{lo}"), p));
+    }
+    let windows: f64 = b.window_rate.iter().sum();
+    let shares: Vec<String> = b
+        .window_rate
+        .iter()
+        .map(|a| format!("{:.4}", a / windows.max(1e-30)))
+        .collect();
+    parts.push(format!("wrate:{}", shares.join("/")));
+    Some(format!("erosion_bands {}", parts.join(" ")))
 }
 
 /// The per-cell climate's line (P1-26): `climate_cell t_2d_c=… zonal_c=… flux_fit_rms_k=… …`
@@ -1210,7 +1353,9 @@ fn report_run(
             deeptime_core::provinces::coherence_line(world),
             surface_line(world),
             glacial_line(world),
+            erosion_bands_line(world),
             climate_line(world),
+            carbon_series_line(world),
             percell_line(world),
             structure_line(world),
             volcanoes_line(world),
@@ -1407,6 +1552,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     if let Some(line) = glacial_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
+    if let Some(line) = erosion_bands_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
     if let Some(line) = hypsometry_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
@@ -1420,6 +1568,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = climate_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = carbon_series_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = percell_line(&ck.world) {
