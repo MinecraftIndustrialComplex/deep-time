@@ -446,6 +446,12 @@ pub struct ExtraBody {
     /// in metres (y).
     pub scale_h: f64,
     pub thickness_m: f64,
+    /// The body reaches down to the site's water table instead of a fixed thickness (a leached
+    /// cap ends where the enrichment blanket begins, at the water table), at most
+    /// `geometry::LEACHED_CAP_MAX_M`; `thickness_m` is then the thickness used where the table is
+    /// not known and the floor where it is shallower.
+    #[serde(default)]
+    pub thickness_to_water_table: bool,
     #[serde(default)]
     pub rock_class: Option<String>,
     #[serde(default)]
