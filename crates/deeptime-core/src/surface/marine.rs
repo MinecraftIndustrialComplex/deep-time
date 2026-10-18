@@ -220,8 +220,9 @@ pub struct FailureParams {
 /// Cost (P1-17): only the first iteration visits every cell. After it, a cell's share can change
 /// only within one cell of a cell that moved, and its Δh only within two, so each later
 /// iteration recomputes just that neighbourhood of the last iteration's movers (or every cell
-/// again when the movers are many). The neighbourhoods are marked on the raster and the passes
-/// scan it row by row in parallel, which keeps the cells in ascending order without sorting;
+/// again when the movers are many). The neighbourhoods are marked on the raster, each row by its
+/// own task from the movers of the rows around it (P1-19), and the passes scan the raster row by
+/// row in parallel, which keeps the cells in ascending order without sorting;
 /// cells away from the raster's edges reach their neighbours by index steps, and whether a cell
 /// takes part is kept per cell. Each value is computed by the same expression from the same
 /// inputs and the movers are applied in ascending cell order, so the result is bit for bit what
@@ -298,53 +299,75 @@ pub fn slope_failure(
     };
     // Above this many movers every cell is recomputed; below it only their neighbourhoods are
     // (either gives the same values: cells farther away have the inputs they had).
-    let dense_above = n / 8;
+    let dense_above = n / 4;
     let mut scale = vec![0.0f64; n];
     let mut moved = 0.0;
-    // The cells that moved in the last iteration (ascending) when they are few enough for the
-    // sparse path, or None for "all of them".
-    let mut movers: Option<Vec<u32>> = None;
-    // Neighbourhood marks: `near1[c] == stamp` within one cell of a mover, `near2` within two.
+    // Whether the last iteration's movers (`rows`) are few enough for the sparse path, and how
+    // many there were.
+    let (mut sparse, mut movers) = (false, 0usize);
+    // Neighbourhood marks: `near1[c] == stamp` within one row and one column of a mover, `near2`
+    // within two (columns wrapping as the raster does). The raster's neighbours are those eight
+    // offsets, so these hold every cell within one neighbour step of a mover and every cell
+    // within two (on rasters one or two cells wide, a few more; recomputing a cell whose inputs
+    // did not change gives the value it has, so that changes nothing).
     let mut near1 = vec![0u32; n];
     let mut near2 = vec![0u32; n];
     let mut stamp = 0u32;
-    let mut ring = Vec::new();
+    // The column `di` cells from `i`, if the raster has it.
+    let col = |i: usize, di: isize| -> Option<usize> {
+        let k = i as isize + di;
+        if (0..w as isize).contains(&k) {
+            Some(k as usize)
+        } else if d.wrap_x {
+            Some(k.rem_euclid(w as isize) as usize)
+        } else {
+            None
+        }
+    };
     // Each row's moved cells and their changes, ascending.
     let mut rows: Vec<Vec<(u32, f64)>> = vec![Vec::new(); hgt];
     for _ in 0..p.iterations {
-        let sparse = movers.as_deref();
-        if let Some(from) = sparse {
+        if sparse {
+            // Marked rows in parallel (P1-19; the marks were set one mover at a time before):
+            // row j takes the movers of rows j − 2 to j + 2 from `rows`, which still holds the
+            // last iteration's.
             stamp += 1;
-            ring.clear();
-            for &c in from {
-                let c = c as usize;
-                let i = inner(c % w, c / w);
-                for m in std::iter::once(Some(c))
-                    .chain((0..8).map(|k| nbr(c, i, k)))
-                    .flatten()
-                {
-                    if near1[m] != stamp {
-                        near1[m] = stamp;
-                        ring.push(m);
+            let s = stamp;
+            let last: &[Vec<(u32, f64)>] = &rows;
+            let near: usize = near1
+                .par_chunks_mut(w)
+                .zip(near2.par_chunks_mut(w))
+                .enumerate()
+                .map(|(j, (n1, n2))| {
+                    for (jj, row) in last
+                        .iter()
+                        .enumerate()
+                        .take((j + 3).min(hgt))
+                        .skip(j.saturating_sub(2))
+                    {
+                        let close = jj + 1 >= j && jj <= j + 1;
+                        for &(c, _) in row {
+                            let i = c as usize - jj * w;
+                            for di in -2isize..=2 {
+                                if let Some(k) = col(i, di) {
+                                    n2[k] = s;
+                                    if close && di.abs() <= 1 {
+                                        n1[k] = s;
+                                    }
+                                }
+                            }
+                        }
                     }
-                }
-            }
-            for &c in &ring {
-                let i = inner(c % w, c / w);
-                for m in std::iter::once(Some(c))
-                    .chain((0..8).map(|k| nbr(c, i, k)))
-                    .flatten()
-                {
-                    near2[m] = stamp;
-                }
-            }
+                    n1.iter().filter(|&&v| v == s).count()
+                })
+                .sum();
             count_failure(1, 1);
-            count_failure(2, from.len() as u64);
-            count_failure(3, ring.len() as u64);
+            count_failure(2, movers as u64);
+            count_failure(3, near as u64);
         } else {
             count_failure(0, 1);
         }
-        let all = sparse.is_none();
+        let all = !sparse;
         {
             let hh: &[f64] = h;
             let av: &[f64] = avail;
@@ -400,11 +423,7 @@ pub fn slope_failure(
         if count == 0 {
             break;
         }
-        movers = if count <= dense_above {
-            Some(rows.iter().flatten().map(|&(c, _)| c).collect())
-        } else {
-            None
-        };
+        (sparse, movers) = (count <= dense_above, count);
     }
     moved
 }

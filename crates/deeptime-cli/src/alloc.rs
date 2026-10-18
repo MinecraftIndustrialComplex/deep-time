@@ -65,6 +65,9 @@ impl MemoryGauge for AllocGauge {
     fn release(&self) -> u64 {
         counts::release_cache()
     }
+    fn kept(&self) -> u64 {
+        counts::kept_bytes()
+    }
     fn keep_below(&self, bytes: u64) {
         counts::keep_below(bytes);
     }

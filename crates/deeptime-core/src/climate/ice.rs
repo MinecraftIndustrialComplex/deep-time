@@ -196,7 +196,7 @@ pub fn thickness(
     g: f64,
 ) -> Vec<f32> {
     if !ice.iter().any(|&x| x) {
-        return vec![0.0; w * h];
+        return crate::alloc::filled(w * h, 0.0);
     }
     let d = distance_to_margin(w, h, ice, sx, sy);
     d.par_iter()

@@ -317,20 +317,22 @@ struct Parts {
 }
 
 impl Parts {
+    /// Every part empty, written in parallel (P1-19).
     fn new(n: usize) -> Parts {
+        use crate::alloc::filled;
         Parts {
-            eroded: vec![0.0; n],
-            fluvial: vec![0.0; n],
-            lake: vec![0.0; n],
-            marine: vec![0.0; n],
-            carbonate: vec![0.0; n],
-            evaporite: vec![0.0; n],
-            till: vec![0.0; n],
-            glacial_eroded: vec![0.0; n],
-            spl_eroded: vec![0.0; n],
-            threshold_cut: vec![0.0; n],
-            diffusion_eroded: vec![0.0; n],
-            prov_marine: vec![IN_SITU; n],
+            eroded: filled(n, 0.0),
+            fluvial: filled(n, 0.0),
+            lake: filled(n, 0.0),
+            marine: filled(n, 0.0),
+            carbonate: filled(n, 0.0),
+            evaporite: filled(n, 0.0),
+            till: filled(n, 0.0),
+            glacial_eroded: filled(n, 0.0),
+            spl_eroded: filled(n, 0.0),
+            threshold_cut: filled(n, 0.0),
+            diffusion_eroded: filled(n, 0.0),
+            prov_marine: filled(n, IN_SITU),
         }
     }
 }
@@ -758,7 +760,7 @@ impl SurfaceStage {
         sc.h.par_iter_mut()
             .enumerate()
             .for_each(|(c, h)| *h = f64::from(pf.elevation[c]) + f64::from(st.offset_m[c]));
-        let h_start = sc.h.clone();
+        let h_start = crate::alloc::copied(&sc.h);
         // Sea level: the climate stage's when it ran this step (the curve plus glacio-eustasy:
         // ice sheets lower the sea and expose the shelves, `climate::ice`), else the curve.
         let sea = world
@@ -855,13 +857,20 @@ impl SurfaceStage {
             .into_par_iter()
             .map(|c| surface_class(&st, c))
             .collect();
-        let fam: Vec<u8> = class0.iter().map(|&k| self.fam[usize::from(k)]).collect();
-        #[allow(clippy::needless_range_loop)]
-        for c in 0..n {
-            let k = usize::from(class0[c]);
-            sc.kf[c] = p.k_spl * self.erod[k];
-            sc.weight[c] = (clim.runoff_m_yr[c] / p.runoff_ref_m_yr as f32).max(0.05);
-        }
+        // Cell by cell, so in parallel (P1-19).
+        let fam: Vec<u8> = class0
+            .par_iter()
+            .map(|&k| self.fam[usize::from(k)])
+            .collect();
+        let erod = &self.erod;
+        sc.kf
+            .par_iter_mut()
+            .zip(sc.weight.par_iter_mut())
+            .enumerate()
+            .for_each(|(c, (kf, weight))| {
+                *kf = p.k_spl * erod[usize::from(class0[c])];
+                *weight = (clim.runoff_m_yr[c] / p.runoff_ref_m_yr as f32).max(0.05);
+            });
         self.time("setup", started);
 
         // 3. The LEM steps.
@@ -903,7 +912,7 @@ impl SurfaceStage {
             rate: marine::FAILURE_RATE,
             iterations: marine::FAILURE_ITERATIONS,
         });
-        let h_step0 = sc.h.clone();
+        let h_step0 = crate::alloc::copied(&sc.h);
         let avail0: Vec<f64> = (0..n)
             .into_par_iter()
             .map(|c| st.log.total(c) + f64::from(st.regolith_m[c]))
@@ -1016,10 +1025,13 @@ impl SurfaceStage {
             // River loads into the sea.
             let started = Instant::now();
             let sea_mask: Vec<bool> = sc.kind.par_iter().map(|&k| k == BASE).collect();
-            for m in 0..n {
-                if sc.kind[m] != BASE || sc.qin[m] <= 0.0 {
-                    continue;
-                }
+            // The mouths, ascending (found in parallel; the fills change neither test).
+            let (kind, qin) = (&sc.kind, &sc.qin);
+            let mouths: Vec<usize> = (0..n)
+                .into_par_iter()
+                .filter(|&m| kind[m] == BASE && qin[m] > 0.0)
+                .collect();
+            for m in mouths {
                 let vol = sc.qin[m] * dts;
                 to_sea += vol;
                 marine::fill(
@@ -1092,7 +1104,9 @@ impl SurfaceStage {
                     })
                     .sum::<u64>();
                 let sea_mask: Vec<bool> = sc.kind.par_iter().map(|&k| k == BASE).collect();
-                for m in 0..n {
+                // (the base cells with a load, ascending: the others have none)
+                for &m in &g.sea_cells {
+                    let m = m as usize;
                     let (ice_load, melt_load) = (g.sea_ice_load[m], g.sea_melt_load[m]);
                     if ice_load > 0.0 {
                         to_sea += ice_load;
@@ -1201,7 +1215,7 @@ impl SurfaceStage {
                     );
                 });
             }
-            let before = sc.h.clone();
+            let before = crate::alloc::copied(&sc.h);
             let solve = Instant::now();
             cg_iterations += diffusion::step(&d, &mut sc.h, &sc.kd, dts) as u64;
             // The solve's own share of "diffusion" (P1-17's breakdown).
@@ -1275,8 +1289,8 @@ impl SurfaceStage {
                 dt_myr,
             },
         );
-        let mut kind_step = vec![fields::KIND_NONE; n];
-        let mut coal = vec![false; n];
+        let mut kind_step = crate::alloc::filled(n, fields::KIND_NONE);
+        let mut coal = crate::alloc::filled(n, false);
         let w0_ref = p.weathering_max_m_myr * 1.0e-6;
         let mut weathered = 0.0f64;
         {
@@ -1385,7 +1399,7 @@ impl SurfaceStage {
         let started = Instant::now();
         let flex_on = p.flexure.active();
         let local_share = 1.0 - p.flexure.strength;
-        let h_eroded = flex_on.then(|| sc.h.clone());
+        let h_eroded = flex_on.then(|| crate::alloc::copied(&sc.h));
         let mut iso = 0.0;
         if local_share > 0.0 {
             let mut load: Vec<f64> = (0..n)
@@ -1402,7 +1416,7 @@ impl SurfaceStage {
                 iso -= l;
             }
         }
-        let h_before_spread = flex_on.then(|| sc.h.clone());
+        let h_before_spread = flex_on.then(|| crate::alloc::copied(&sc.h));
         self.time("isostasy", started);
 
         // 5b. Crust over its strength spreads (`spread.rs`): it moves crust, not surface rock, so
@@ -1437,7 +1451,7 @@ impl SurfaceStage {
             .plates
             .as_ref()
             .is_some_and(|st| st.gap_budget.is_some());
-        let h_spread = (budget && flex_on).then(|| sc.h.clone());
+        let h_spread = (budget && flex_on).then(|| crate::alloc::copied(&sc.h));
         let mut answers: Option<Vec<(f64, f64)>> = None;
         if let (Some(h_eroded), Some(h_before_spread)) = (&h_eroded, &h_before_spread) {
             let started = Instant::now();
@@ -1628,13 +1642,17 @@ impl SurfaceStage {
             );
         };
         put(world, "elevation", elevation_y);
-        put(world, field::ELEVATION_M, st.elevation_m.clone());
-        put(world, field::EROSION, erosion.clone());
-        put(world, field::DEPOSITION, deposition.clone());
+        put(
+            world,
+            field::ELEVATION_M,
+            crate::alloc::copied(&st.elevation_m),
+        );
+        put(world, field::EROSION, crate::alloc::copied(&erosion));
+        put(world, field::DEPOSITION, crate::alloc::copied(&deposition));
         put(world, field::SEDIMENT, sediment);
         put(world, field::CLASS, class_now);
         put(world, field::DRAINAGE, drainage);
-        put(world, field::REGOLITH, st.regolith_m.clone());
+        put(world, field::REGOLITH, crate::alloc::copied(&st.regolith_m));
         put(world, field::FEEDBACK, feedback);
         put(world, field::MATERIAL, material);
         let ice_now: Vec<f32> = if ela_z.is_some() && sc.glacial.ice.footprint.len() == n {
@@ -1651,11 +1669,11 @@ impl SurfaceStage {
                 })
                 .collect()
         } else {
-            vec![0.0; n]
+            crate::alloc::filled(n, 0.0)
         };
         let g_rate: Vec<f32> = parts
             .glacial_eroded
-            .iter()
+            .par_iter()
             .map(|&e| (f64::from(e) / dt_myr) as f32)
             .collect();
         if ela_z.is_some() {
@@ -1669,9 +1687,13 @@ impl SurfaceStage {
             gtot.write(&mut world.notes);
         }
         put(world, field::ICE, ice_now);
-        put(world, field::CRUST_PLATE, pf.plate_id.clone());
+        put(
+            world,
+            field::CRUST_PLATE,
+            crate::alloc::copied(&pf.plate_id),
+        );
         match &pf.group_id {
-            Some(g) => put(world, field::CRUST_GROUP, g.clone()),
+            Some(g) => put(world, field::CRUST_GROUP, crate::alloc::copied(g)),
             None => {
                 world.fields.remove(field::CRUST_GROUP);
             }
@@ -1810,7 +1832,7 @@ impl SurfaceStage {
                             .map(|&s| (f64::from(s) / acc.span_years.max(1e-9)) as f32)
                             .collect()
                     })
-                    .unwrap_or_else(|| vec![0.0; n])
+                    .unwrap_or_else(|| crate::alloc::filled(n, 0.0))
             };
             let ero = get(&st.acc, "deeptime:erosion_rate_m_myr");
             let dep = get(&st.acc, "deeptime:deposition_rate_m_myr");
@@ -1860,6 +1882,10 @@ impl SurfaceStage {
             );
         }
         world.surface = Some(st);
+        if last {
+            // The glaciers' working arrays stay between steps; not past the last (P1-19).
+            sc.glacial.release_work();
+        }
         self.scratch = Some(sc);
         Ok(())
     }
