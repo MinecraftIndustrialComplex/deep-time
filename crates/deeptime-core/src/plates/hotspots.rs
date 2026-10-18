@@ -150,10 +150,8 @@ pub fn step(
             state.hotspots[h].track_km += norm.speed_mm_yr(omega, at) * env.dt_myr;
         }
     }
-    *world
-        .globals
-        .entry(MAGMA_GLOBAL.to_owned())
-        .or_insert(0.0) += magma_m * norm.sample_area_km2() / 1000.0;
+    *world.globals.entry(MAGMA_GLOBAL.to_owned()).or_insert(0.0) +=
+        magma_m * norm.sample_area_km2() / 1000.0;
     Ok(())
 }
 
@@ -188,10 +186,7 @@ fn erupt(
     let area_km2 = norm.planet_area_km2(count as f64 * norm.sample_area_km2());
     let f = norm.planet_km / norm.model_km;
     let volume_km3 = volume_m3_model * f * f / 1.0e9;
-    *world
-        .globals
-        .entry(MAGMA_GLOBAL.to_owned())
-        .or_insert(0.0) += volume_m3_model / 1.0e9;
+    *world.globals.entry(MAGMA_GLOBAL.to_owned()).or_insert(0.0) += volume_m3_model / 1.0e9;
     let mut e = events::event(world, env.t_myr, LARGE_IGNEOUS_PROVINCE, at)
         .magnitude((k.lip_thickness_m / 1000.0) as f32)
         .param("area_km2", area_km2)

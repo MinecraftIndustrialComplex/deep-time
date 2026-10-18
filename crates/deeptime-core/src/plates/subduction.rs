@@ -54,16 +54,16 @@ use glam::{DQuat, DVec3};
 use rayon::prelude::*;
 
 use super::Env;
+use super::collapse::{iso_height, toward};
 use super::events::{self, SUBDUCTION_ONSET};
 use super::geometry::{Cover, Geo, Tree, cover, dijkstra};
 use super::kinematics::{quat, tangent, to_group, to_world};
-use super::collapse::{iso_height, toward};
 use super::pools::isostatic_change_m;
-use super::transition::{crust_per_metre, crystalline_m, held_floor_m};
 use super::state::{
     ARC, CONTINENTAL, Contact, DIVERGENT, EMERGED, FORELAND, HIDDEN, HOTSPOT, OROGENY_ANDEAN,
     OROGENY_HIMALAYAN, PlateState, SUBDUCTION_ZONE, TRENCH, pool,
 };
+use super::transition::{crust_per_metre, crystalline_m, held_floor_m};
 use crate::error::CoreError;
 use crate::world::WorldState;
 

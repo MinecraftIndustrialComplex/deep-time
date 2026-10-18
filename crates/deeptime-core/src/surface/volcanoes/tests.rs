@@ -556,7 +556,10 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
         global(crate::plates::CONE_FELSIC_GLOBAL),
         global(crate::plates::CONE_MAFIC_GLOBAL),
     );
-    assert!(felsic > 0.0 && mafic > 0.0, "cone rock {felsic} and {mafic} km³");
+    assert!(
+        felsic > 0.0 && mafic > 0.0,
+        "cone rock {felsic} and {mafic} km³"
+    );
 
     // The default island subsidence is 0 (Ben, 2026-10-02): no volcano of the run has sunk.
     assert!(

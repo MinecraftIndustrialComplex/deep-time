@@ -1469,7 +1469,10 @@ fn arc_cones_are_counted_inside_the_arc_rate() {
         (pull, cones)
     };
     let (bare, _) = run(0.0);
-    assert!(bare.front_continental_km_myr > 0.0, "no continental arc front");
+    assert!(
+        bare.front_continental_km_myr > 0.0,
+        "no continental arc front"
+    );
     assert!(bare.arc_continental_km3 > 0.0);
     let (with, left) = run(0.5);
     let counted = left.iter().filter(|c| c[0] == 0.0).count();
@@ -1573,7 +1576,10 @@ fn a_cordillera_takes_its_crust_from_behind_the_range() {
             down += 1;
         }
     }
-    assert!(up > 0 && higher > 0 && down > 0, "{up} thickened ({higher} higher), {down} thinned");
+    assert!(
+        up > 0 && higher > 0 && down > 0,
+        "{up} thickened ({higher} higher), {down} thinned"
+    );
 }
 
 /// Plate task 8 (the gap budget's recommendation 1): continental crust a resampling accretes

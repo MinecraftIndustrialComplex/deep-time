@@ -316,7 +316,10 @@ impl PlatesStage {
                 subduction::ARC_FRONT_CONTINENTAL_GLOBAL,
                 pull.front_continental_km_myr,
             ),
-            (subduction::ARC_FRONT_OCEANIC_GLOBAL, pull.front_oceanic_km_myr),
+            (
+                subduction::ARC_FRONT_OCEANIC_GLOBAL,
+                pull.front_oceanic_km_myr,
+            ),
             (subduction::CORDILLERA_GLOBAL, pull.cordillera_km3),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
@@ -637,7 +640,11 @@ impl PlatesStage {
             let t = tris[l.tri as usize];
             let dz = f64::from(fb.data[c]);
             let dm = material.as_ref().map_or(dz, |m| f64::from(m.data[c]));
-            let cone = [0, 1].map(|k| cone_fields[k].as_ref().map_or(0.0, |f| f64::from(f.data[c])));
+            let cone = [0, 1].map(|k| {
+                cone_fields[k]
+                    .as_ref()
+                    .map_or(0.0, |f| f64::from(f.data[c]))
+            });
             let pc = parts
                 .as_ref()
                 .map(|p| std::array::from_fn::<f64, SP, _>(|k| f64::from(p[k].data[c])));
@@ -693,7 +700,10 @@ impl PlatesStage {
                 // ledger: PLT-286
                 let before = s.pools;
                 let mut got = [0.0f64; 2];
-                for (k, p) in [pool::FELSIC_VOLCANIC, pool::MAFIC_VOLCANIC].into_iter().enumerate() {
+                for (k, p) in [pool::FELSIC_VOLCANIC, pool::MAFIC_VOLCANIC]
+                    .into_iter()
+                    .enumerate()
+                {
                     let x = (csum[v][k] / wsum[v]).max(-f64::from(s.pools[p]));
                     s.pools[p] += x as f32;
                     got[k] = x;
@@ -705,7 +715,10 @@ impl PlatesStage {
             })
             .collect();
         let area = env.norm.sample_area_km2();
-        for (k, name) in [CONE_FELSIC_GLOBAL, CONE_MAFIC_GLOBAL].into_iter().enumerate() {
+        for (k, name) in [CONE_FELSIC_GLOBAL, CONE_MAFIC_GLOBAL]
+            .into_iter()
+            .enumerate()
+        {
             let km3: f64 = applied.iter().map(|(c, _)| c[k]).sum::<f64>() * area / 1000.0;
             *world.globals.entry(name.to_owned()).or_insert(0.0) += km3;
         }
@@ -735,7 +748,10 @@ impl PlatesStage {
                 data: applied_dz.into_iter().map(|x| x as f32).collect(),
             },
         );
-        Ok(applied.into_iter().map(|(c, _)| c.map(|x| x.max(0.0))).collect())
+        Ok(applied
+            .into_iter()
+            .map(|(c, _)| c.map(|x| x.max(0.0)))
+            .collect())
     }
 
     /// The surface's flexure (`surface/flexure_m`) per sample, through the last L1 sampling's
