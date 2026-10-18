@@ -531,6 +531,9 @@ struct L1<'a> {
     cell_m: f64,
     /// Elevation change of the step per cell, m (applied at the end of the step).
     delta: Vec<f32>,
+    /// The rock of that change per cell, felsic and mafic volcanic, m: what the plate model's
+    /// pools receive (`surface/volcanic_felsic_m`, `surface/volcanic_mafic_m`; plate task 8).
+    rock: Vec<[f32; 2]>,
     /// The surface's elevation at the start of the step, m.
     elev: &'a [f32],
 }
@@ -787,6 +790,7 @@ impl VolcanoStage {
             mh,
             cell_m,
             delta: vec![0.0; n],
+            rock: vec![[0.0; 2]; n],
             elev: &elev,
         };
         // Log changes: (cell, thickness (negative = erode), class) in order.
@@ -1226,9 +1230,13 @@ impl VolcanoStage {
             if dh <= 0.0 {
                 continue;
             }
+            // Stratovolcanoes and silicic centres are felsic volcanic rock, shields mafic.
+            // ledger: PLT-286
+            let kind = usize::from(v.kind == Kind::Shield);
             for (c, wgt) in cells {
                 let dz = (dh * wgt) as f32;
                 l1.delta[c] += dz;
+                l1.rock[c][kind] += dz;
                 vol += f64::from(dz);
                 for (class, share) in layers {
                     if share > 0.0 {
@@ -1305,9 +1313,11 @@ impl VolcanoStage {
             let h = v.height_m;
             let mut removed = 0.0;
             let diff = |r: f64| before.body(r) - after.body(r);
+            let kind = usize::from(v.kind == Kind::Shield);
             for (c, wgt) in l1.render(v.x, v.z, v.radius_m, 1.0, &diff) {
                 let dz = (h * wgt) as f32;
                 l1.delta[c] -= dz;
+                l1.rock[c][kind] -= dz;
                 removed += f64::from(dz);
                 log_ops.push((c, -dz, 0));
             }
@@ -1325,6 +1335,7 @@ impl VolcanoStage {
                         let th = (t0 * (1.0 - (r - rc) / span)) as f32;
                         if th > 0.0 {
                             l1.delta[c] += th;
+                            l1.rock[c][0] += th;
                             log_ops.push((c, th, rocks.tuff));
                         }
                     } else {
@@ -1398,6 +1409,9 @@ impl VolcanoStage {
                     log_ops.push((cc, per * 0.12, rocks.tuff));
                 }
                 l1.delta[cc] += ((th / 3.0) * (plateau(r) - dome(r))) as f32;
+                // The plate model's province holds `th` × dome of basalt under a third of it
+                // (`plates::hotspots`): its pools get the rest of the plateau's.
+                l1.rock[cc][1] += (th * (plateau(r) - dome(r))) as f32;
             });
             st.basalts.push(FloodBasalt {
                 id: st.next_id,
@@ -1462,6 +1476,28 @@ impl VolcanoStage {
                 }
             };
             add(fields, crate::surface::field::FEEDBACK, 1.0);
+            // The cones' rock for the plate model's pools (it takes and clears the fields at its
+            // next step, with the feedback).
+            for (k, name) in [
+                crate::surface::field::VOLCANIC_FELSIC,
+                crate::surface::field::VOLCANIC_MAFIC,
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                if l1.rock.iter().all(|r| r[k] == 0.0) {
+                    continue;
+                }
+                let f = fields.entry(name.to_owned()).or_insert_with(|| Field {
+                    grid: grid.clone(),
+                    data: vec![0.0; n],
+                });
+                if f.data.len() == n {
+                    for (x, r) in f.data.iter_mut().zip(&l1.rock) {
+                        *x += r[k];
+                    }
+                }
+            }
             // The gap budget's part for this stage (laid by the surface stage while it is on).
             add(fields, crate::plates::gap_budget::field::LATER, 1.0);
             add(fields, crate::surface::field::ELEVATION_M, 1.0);
