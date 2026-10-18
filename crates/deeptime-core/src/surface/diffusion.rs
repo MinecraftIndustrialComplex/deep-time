@@ -641,7 +641,14 @@ fn pass_direction(
 
 /// Second pass of an iteration: r −= α·A·p and per row the sums `sums[j] = [Σ r·r, Σ r·z]` of
 /// the new r (x += α·p waits for the next direction pass, or the end of the loop).
-fn pass_update(op: &Operator, alpha: f64, ap: &[f64], r: &mut [f64], sums: &mut [[f64; 2]], live: &Live) {
+fn pass_update(
+    op: &Operator,
+    alpha: f64,
+    ap: &[f64],
+    r: &mut [f64],
+    sums: &mut [[f64; 2]],
+    live: &Live,
+) {
     let w = op.w;
     r.par_chunks_mut(STRIP_ROWS * w)
         .zip(sums.par_chunks_mut(STRIP_ROWS))

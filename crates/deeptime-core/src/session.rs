@@ -122,6 +122,13 @@ pub trait MemoryGauge: Send + Sync {
     fn release(&self) -> u64 {
         0
     }
+    /// Gives back memory the allocator keeps for reuse until at most `bytes` are in use (or it
+    /// keeps none); returns the bytes released. Called where the session needs room under its
+    /// cap, so the rest stays for the next step. The default releases everything
+    /// ([`MemoryGauge::release`]).
+    fn shed(&self, _bytes: u64) -> u64 {
+        self.release()
+    }
     /// The most the allocator should hold while the next step runs: memory it keeps for reuse is
     /// given back rather than take the count above `bytes` (the session passes the stage's
     /// estimate, so what the allocator keeps stays inside it). The default does nothing.
@@ -825,6 +832,8 @@ impl Session {
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(threads)
             .thread_name(|i| format!("deeptime-rayon-{i}"))
+            // The few small blocks a thread keeps for reuse go back when it ends (P1-19).
+            .exit_handler(|_| crate::alloc::unpark_thread())
             .build()
             .map_err(|e| CoreError::InvalidState(format!("cannot start the Rayon pool: {e}")))?;
         let mem_cap = if options.mem_cap == 0 {
@@ -1117,7 +1126,8 @@ impl Session {
                 };
                 self.gauge.keep_below(s.allowed[k].min(self.mem_cap));
                 let mut at_start = self.gauge.in_use();
-                if at_start.saturating_add(s.working[k]) > self.mem_cap && self.gauge.release() > 0
+                if at_start.saturating_add(s.working[k]) > self.mem_cap
+                    && self.gauge.shed(self.mem_cap.saturating_sub(s.working[k])) > 0
                 {
                     at_start = self.gauge.in_use();
                 }
@@ -1204,7 +1214,7 @@ impl Session {
         }
         let target = self.mem_cap - self.mem_cap / TRIM_HEADROOM;
         let mut in_use = self.gauge.in_use();
-        if in_use > target && self.gauge.release() > 0 {
+        if in_use > target && self.gauge.shed(target) > 0 {
             in_use = self.gauge.in_use();
         }
         if in_use > target {

@@ -50,6 +50,9 @@ impl MemoryGauge for Gauge {
     fn release(&self) -> u64 {
         alloc::release_cache()
     }
+    fn shed(&self, bytes: u64) -> u64 {
+        alloc::shed_to(bytes)
+    }
     fn keep_below(&self, bytes: u64) {
         alloc::keep_below(bytes);
     }
