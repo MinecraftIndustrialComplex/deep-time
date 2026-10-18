@@ -510,10 +510,21 @@ mod tests {
             "in_use did not grow"
         );
         assert!(peak() >= 64 << 20);
+        let addr = v.as_ptr() as usize;
+        let kept_here = || {
+            let c = cache();
+            c.blocks[..c.n].iter().any(|b| b.0 == addr)
+        };
         drop(v);
-        // The freed block is kept for reuse, and counted, until the cache is released.
-        release_cache();
-        assert!(in_use() < before + (32 << 20));
+        // The freed block is kept for reuse, and counted, until the cache is released. Other
+        // test threads allocate and free while release_cache trims the arenas, so follow this
+        // block rather than the global count (the count check raced them).
+        let kept = kept_here();
+        let released = release_cache();
+        if kept {
+            assert!(released >= 64 << 20, "the kept block was not released");
+        }
+        assert!(!kept_here(), "the block is still kept after the release");
     }
 
     #[test]
