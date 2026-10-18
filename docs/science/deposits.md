@@ -181,7 +181,9 @@ Two rules are the project's, not the sources' (coordinator's calls, decisions lo
   is no more than six blocks above the cap's top. A cap that a younger deposit buried again (placed
   under the surface that cut it) is left under its cover; the exit run measured the gap between
   the cap's top and the ground at the centre as 1 to 3 blocks for the exposed ones and 14 to 37
-  for the buried ones, and six is above the first and well under the second.
+  for the buried ones, and six is above the first and well under the second. One exception: a
+  block inside a placer's body (loose rock that carries ore) keeps its gravel or sand, because the
+  ore step puts a placer's gold only into loose blocks and the cap would leave it none.
 
 ## Equations and constants
 
