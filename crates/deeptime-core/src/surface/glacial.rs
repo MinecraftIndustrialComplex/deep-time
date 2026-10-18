@@ -369,6 +369,13 @@ struct Work {
 }
 
 impl GlacialOut {
+    /// Gives back [`step`]'s working arrays. A caller that steps once and then goes on with other
+    /// work (the young stage) would otherwise carry six grids past the step, which used to free
+    /// them as it returned (P1-19).
+    pub fn release_work(&mut self) {
+        self.work = Work::default();
+    }
+
     fn reset(&mut self, n: usize) {
         for v in [
             &mut self.eroded,

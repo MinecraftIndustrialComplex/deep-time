@@ -616,6 +616,7 @@ impl YoungStage {
             glacial::step(
                 &d, &rt, &kind, &filled, sea, &ic, &gp, gravity, dt, &mut h, &mut gout,
             );
+            gout.release_work();
         }
         self.time("glacial", started);
 
