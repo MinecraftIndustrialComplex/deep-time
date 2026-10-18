@@ -217,6 +217,18 @@ public final class BiomeRules {
             return g;
         }
 
+        /**
+         * The Köppen class a rule's {@code koppen} condition reads: the class the bake placed the biome inputs by
+         * ({@code climate/koppen_l2}, each L2 cell's months lapsed to its own height) when the bake wrote it, as the
+         * census reads it; the climate stage's L1 class otherwise. On the L1 class, the low ground of an L1 cell that
+         * also holds high ground took the high ground's class: a tundra rule placed tundra on a Csb coast below a
+         * plateau, an icy-volcano rule a snow-capped cone in BSk (757 of 3,027 rule columns on the 2026-10-17 test
+         * planet).
+         */
+        static RasterSampler koppenLayer(WorldData wd) {
+            return wd.has("climate/koppen_l2") ? wd.layer("climate/koppen_l2") : wd.has("climate/koppen") ? wd.layer("climate/koppen") : null;
+        }
+
         record Opened(WorldData wd, ClimateLayers climate, RasterSampler koppen, Optional<IceCover> ice, RasterSampler playa,
                       RasterSampler wetland, RasterSampler strata, List<String> classes, double e6, double mPerBlockV) {}
 
@@ -227,7 +239,7 @@ public final class BiomeRules {
                     if (opened == null) {
                         WorldData wd = terrain.data();
                         RasterSampler strata = wd.has(WorldData.HORIZONS) ? wd.layer(WorldData.HORIZONS) : null;
-                        opened = new Opened(wd, ClimateLayers.of(wd), wd.has("climate/koppen") ? wd.layer("climate/koppen") : null,
+                        opened = new Opened(wd, ClimateLayers.of(wd), koppenLayer(wd),
                                 wd.iceCover(), wd.has(Playa.LAYER) ? wd.layer(Playa.LAYER) : null,
                                 wd.has(WETLAND_LAYER) ? wd.layer(WETLAND_LAYER) : null, strata,
                                 strata == null ? List.of() : wd.classes(), OverworldBands.defaults().erosion()[6],
