@@ -115,8 +115,10 @@ pub trait MemoryGauge: Send + Sync {
         self.in_use()
     }
     /// Gives memory the allocator keeps for reuse back to the system (its count drops by as
-    /// much); returns the bytes released. Called before the history spills to make room under
-    /// the cap. The default releases nothing.
+    /// much); returns the bytes released. The counting allocator also returns what the system
+    /// allocator keeps outside the count (`alloc::release_cache`). Called when a stage ends,
+    /// before the history spills to make room under the cap and before the bake's projection
+    /// pass. The default releases nothing.
     fn release(&self) -> u64 {
         0
     }
