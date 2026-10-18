@@ -596,3 +596,36 @@ fn flexure_off_changes_nothing_and_on_bends_the_plate() {
         "sinking {sunk} against load {load} (of {scale})"
     );
 }
+
+/// The surface on large cells (build log 2026-10-18, the surface divergence): the small coupled
+/// planet at 1,221 m a block, the Earth-proportioned scale, whose cells are 78 km wide. While the
+/// plate held the plateau spreading's change up as crust (before ISO-070) this planet grew a
+/// checkerboard of peaks and pits from about 80 Myr in and ended 100 Myr at 29.9 km; now it ends
+/// at 4.0 km. Every cell stays within twice Earth's relief of the sea (Everest's summit and the
+/// Challenger Deep, ISO-071).
+#[test]
+fn a_planet_of_large_cells_keeps_its_surface_physical() {
+    let mut v: serde_json::Value = serde_json::from_str(&pipeline_json(3000, 100.0, 11)).unwrap();
+    v["scale"]["m_per_block_h"] = serde_json::json!(1221.0);
+    let dir = temp_dir("large-cells");
+    let s = session(&v.to_string(), &dir);
+    finish(&s);
+    let world = s.checkpoint().unwrap().world;
+    let _ = std::fs::remove_dir_all(dir);
+    let sea = world
+        .globals
+        .get(crate::climate::SEA_LEVEL_GLOBAL)
+        .copied()
+        .unwrap_or(0.0);
+    let st = world.surface.as_ref().expect("the surface ran");
+    assert_eq!(st.totals.steps, 50);
+    let (lo, hi) = st.elevation_m.iter().fold((f64::MAX, f64::MIN), |m, &z| {
+        (m.0.min(f64::from(z)), m.1.max(f64::from(z)))
+    });
+    assert!(
+        hi - sea < 2.0 * guard::EVEREST_M && sea - lo < 2.0 * guard::CHALLENGER_DEEP_M,
+        "the surface spans {:.0} to {:.0} m from the sea",
+        lo - sea,
+        hi - sea
+    );
+}
