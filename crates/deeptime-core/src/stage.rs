@@ -66,28 +66,25 @@ impl StageContext<'_> {
     /// first, if that makes room (decisions log 2026-09-29: a run over its cap slows down instead
     /// of failing); only what does not fit even then fails.
     pub fn reserve(&self, bytes: u64) -> Result<(), CoreError> {
-        let needed = self.gauge.in_use().saturating_add(bytes);
+        let needed = self.live().saturating_add(bytes);
         let r = self.reserve_inner(bytes);
         self.gauge.reserved(needed, r.is_ok());
         r
     }
 
+    /// The bytes in use less those the allocator keeps for reuse, which give way by themselves as
+    /// the reservation is allocated (`MemoryGauge::kept`).
+    fn live(&self) -> u64 {
+        self.gauge.in_use().saturating_sub(self.gauge.kept())
+    }
+
     fn reserve_inner(&self, bytes: u64) -> Result<(), CoreError> {
-        let needed = self.gauge.in_use().saturating_add(bytes);
+        let needed = self.live().saturating_add(bytes);
         if let Some(p) = self.needed_peak {
             p[0].fetch_max(needed, Ordering::Relaxed);
             let history = self.history.map_or(0, HistoryHandle::resident_bytes);
             p[1].fetch_max(needed.saturating_sub(history), Ordering::Relaxed);
         }
-        if needed <= self.mem_cap {
-            return Ok(());
-        }
-        // What the allocator keeps for reuse goes first, then the history's frames.
-        let needed = if self.gauge.shed(self.mem_cap.saturating_sub(bytes)) > 0 {
-            self.gauge.in_use().saturating_add(bytes)
-        } else {
-            needed
-        };
         if needed <= self.mem_cap {
             return Ok(());
         }
@@ -102,7 +99,7 @@ impl StageContext<'_> {
                     self.mem_cap,
                     "a reservation",
                 );
-                let needed = self.gauge.in_use().saturating_add(bytes);
+                let needed = self.live().saturating_add(bytes);
                 if needed <= self.mem_cap {
                     return Ok(());
                 }
