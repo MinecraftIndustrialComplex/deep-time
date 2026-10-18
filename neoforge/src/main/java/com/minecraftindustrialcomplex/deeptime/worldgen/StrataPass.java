@@ -180,7 +180,8 @@ public final class StrataPass {
      * Bodies override horizons inside their SDF (plan §7.5): where a body (or one of its zones) names
      * a rock class, the crust or horizon rock at that block becomes the class's block (one member
      * per body, {@link #bodyKey}). A zone's class wins over the body's; of several zones the last
-     * that applies. Soil, sand, water and anything the surface rules placed stay, as for horizons.
+     * that applies. Soil, sand, water and anything the surface rules placed stay, as for horizons,
+     * except over an exposed gossan, which crops out as bare rock ({@link GossanSkin}).
      */
     static void paintBodies(ChunkAccess chunk, WorldData wd, int k, int[] runTop, int[] runBottom,
                             BlockState[] runBlock, int[] runs) {
@@ -228,6 +229,8 @@ public final class StrataPass {
                 }
             }
         }
+        // An exposed gossan crops out as bare rock: the soil over it goes too (decisions log 2026-10-17).
+        GossanSkin.apply(chunk, c, bodies, palette);
     }
 
     /**
