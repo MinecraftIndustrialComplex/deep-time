@@ -24,13 +24,15 @@ use crate::error::CoreError;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PresentClimate {
-    /// No ice age and no snowball at the present: an interglacial like Earth's today (ice caps
-    /// may remain; at most `present_interglacial_ice_frac` of the land under ice).
+    /// No ice age and no snowball at the present: an interglacial like Earth's today (ice sheets
+    /// may remain; at most `present_interglacial_ice_frac` of the land under ice sheets, mountain
+    /// ice not counted).
     #[default]
     Temperate,
     /// Whatever the simulation gives.
     Natural,
-    /// A glacial maximum: at least `present_glacial_ice_frac` of the land under ice, no snowball.
+    /// A glacial maximum: at least `present_glacial_ice_frac` of the land under ice sheets, no
+    /// snowball.
     IceAge,
     /// A snowball: the ocean frozen over.
     Snowball,
@@ -371,8 +373,11 @@ pub struct ClimateParams {
     pub present_climate: PresentClimate,
     pub present_adjust_kyr: f64,
     pub present_ramp_kyr: f64,
-    /// `temperate` allows at most this share of the land under ice (Earth today: 0.10);
-    /// `ice_age` wants at least the second (the last glacial maximum: about 0.25).
+    /// `temperate` allows at most this share of the land under ice sheets (Earth today: 0.10,
+    /// Antarctica and Greenland); `ice_age` wants at least the second (a glacial maximum; NSIDC
+    /// gives about 0.32 of the land under glacial ice at the last one). The share counts the ice sheets only, the continuous ice bodies of 50 000 km²
+    /// or more (`climate::ICE_SHEET_MIN_KM2`); the glaciers, ice caps and icefields outside them,
+    /// the mountain ice, are left out (decisions log 2026-10-18).
     pub present_interglacial_ice_frac: f64,
     pub present_glacial_ice_frac: f64,
     /// Glen's flow factor A, Pa⁻³ yr⁻¹ (EISMINT: 10⁻¹⁶).

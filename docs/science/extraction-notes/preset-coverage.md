@@ -6,6 +6,8 @@ The four presets are the "pipeline" presets under their game names (`earthlike_q
 
 **Changed since this note was taken (plate tasks 3 and 4, 2026-10-02):** `tectonics.collision_distance_km`, `collision_coefficient_per_km`, `collision_uplift_max_m`, `collision_orogen_core` and `collision_on_shortening` are gone; `collision_belt_km` (400), `collision_stacking_share` (0.8), `wedge_slope_deg` (1.5), `collision_resistance_mm_yr` (200), `weld_speed_mm_yr` (5) and `weld_after_myr` (10) are new; `collision_threshold_km` is 100 (was 300) and `subduction_uplift_mm_yr` 0.55 on the quick presets and 0.45 on the full ones (were 0.42 and 0.34). The tables below are the snapshot as taken. Ledger: PLT-241 to PLT-252, PLT-039, PLT-068.
 
+**Changed since (plate task 8, 2026-10-17):** `tectonics.arc_uplift_mm_yr`, `arc_magma_m_per_myr`, `arc_continental_m` (already `arc_maturity_myr` since 2026-10-02) and `cordillera_uplift_mm_yr` are gone; `island_arc_km3_per_km_myr` (100), `continental_arc_km3_per_km_myr` (35), `arc_mature_crust_km` (15) and `cordillera_shortening_mm_yr` (6.0; 0.0 in the plate-only presets) are new. Ledger: PLT-045 to PLT-051, PLT-285.
+
 ## Top-level sections and leaf counts (earthlike_quick_16k)
 
 | section | leaves | subsystem | what it is |

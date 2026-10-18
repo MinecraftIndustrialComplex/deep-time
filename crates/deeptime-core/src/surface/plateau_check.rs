@@ -43,6 +43,9 @@ struct Case {
     /// A rim range 500 m above the plateau, `RIM` cells wide, between the escarpment's top and the
     /// interior (a plateau ringed by mountains, so the interior is a closed basin).
     rim: bool,
+    /// Stream-power K, m^(1−2m)/yr, and slope exponent n (the area exponent is n / 2).
+    k: f64,
+    n: f64,
 }
 
 /// Width of the rim range, cells.
@@ -57,6 +60,8 @@ fn case(dx: f64, kd: f64, sc: f64, weight: f32, edge: i64, lake: bool) -> Case {
         edge,
         lake,
         rim: false,
+        k: 3.0e-9, // the presets' K before the 2026-10-18 recalibration (ERO-004)
+        n: 2.0,
     }
 }
 
@@ -124,15 +129,15 @@ fn run(case: &Case) -> [[f64; 4]; 2] {
     let dt = 2.0e6;
     let steps = 5;
     let p = spl::SplParams {
-        m: 1.0,
-        n: 2.0,
+        m: case.n / 2.0,
+        n: case.n,
         g: 1.0,
         dt,
         sc: case.sc,
         max_iter: 6,
         tol_m: 0.01,
     };
-    let kf = vec![3.0e-9; n]; // the built-in presets' K (ERO-004)
+    let kf = vec![case.k; n];
     let kd = vec![case.kd; n];
     let weight = vec![case.weight; n];
     let mut sums = [[0.0f64; 4]; 2];
@@ -230,7 +235,33 @@ fn plateau_erosion_by_process_and_scale() {
         ),
         ("map, rim, drains over it", rimmed(false)),
         ("map, rim, terminal lake", rimmed(true)),
+        (
+            "map, the presets since 2026-10-18",
+            Case {
+                k: 1.5e-9,                             // ledger: ERO-004
+                ..case(MAP, 2.0, 0.15, 1.0, 2, false)  // ledger: ERO-013, ERO-023
+            },
+        ),
     ];
+    // Extra rows for screening a surface law, printed only: DEEPTIME_PLATEAU_LAWS="k:n:sc:kd/..."
+    let extra: Vec<(String, Case)> = std::env::var("DEEPTIME_PLATEAU_LAWS")
+        .unwrap_or_default()
+        .split('/')
+        .filter_map(|law| {
+            let v: Vec<f64> = law.split(':').filter_map(|x| x.parse().ok()).collect();
+            (v.len() == 4).then(|| {
+                let c = Case {
+                    k: v[0],
+                    n: v[1],
+                    ..case(MAP, v[3], v[2], 1.0, 2, false)
+                };
+                (
+                    format!("map, K {:e} n {} S_c {} κ {}", v[0], v[1], v[2], v[3]),
+                    c,
+                )
+            })
+        })
+        .collect();
     let mut got = Vec::new();
     eprintln!(
         "m/Myr over 10 Myr: interior spl threshold diffusion net | edge spl threshold diffusion net"
@@ -242,6 +273,13 @@ fn plateau_erosion_by_process_and_scale() {
             s[0][0], s[0][1], s[0][2], s[0][3], s[1][0], s[1][1], s[1][2], s[1][3]
         );
         got.push(s);
+    }
+    for (name, case) in &extra {
+        let s = run(case);
+        eprintln!(
+            "{name:30} {:8.1} {:8.1} {:8.1} {:8.1} | {:8.1} {:8.1} {:8.1} {:8.1}",
+            s[0][0], s[0][1], s[0][2], s[0][3], s[1][0], s[1][1], s[1][2], s[1][3]
+        );
     }
     let rel = |a: f64, b: f64| ((a - b) / a).abs();
     // Without diffusion and the critical slope, stream power is the same at either size
@@ -269,5 +307,11 @@ fn plateau_erosion_by_process_and_scale() {
     assert!(
         got[13][0][3] > 0.5 * got[12][0][3],
         "a terminal lake behind a rim does not save the plateau"
+    );
+    // The recalibrated law (2026-10-18) still wears the plateau's interior by stream power, not
+    // by the critical slope, which cuts nothing there at 0.15 either.
+    assert!(
+        got[14][0][0] > 10.0 * got[14][0][1].max(0.1),
+        "the critical slope does not wear the interior"
     );
 }
