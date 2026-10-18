@@ -41,9 +41,23 @@ pub const LARGE_BYTES: usize = 1 << 20;
 /// mod runs on; a mapping's real pages are at least this).
 const PAGE: usize = 4096;
 
-static IN_USE: AtomicU64 = AtomicU64::new(0);
+/// A value alone on its cache lines (two 64-byte lines, which the adjacent-line prefetcher fetches
+/// as a pair). Every allocation and free writes `IN_USE`, and a growing count `PEAK`; beside the
+/// settings each allocation reads (`LARGE`, `KEPT`, `CEILING`), each of those writes would make
+/// the next read of them on every other thread a miss (P1-19).
+#[repr(align(128))]
+struct Line<T>(T);
+
+impl<T> std::ops::Deref for Line<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+static IN_USE: Line<AtomicU64> = Line(AtomicU64::new(0));
 /// The highest `IN_USE` since the start of the current window ([`start_window`]).
-static PEAK: AtomicU64 = AtomicU64::new(0);
+static PEAK: Line<AtomicU64> = Line(AtomicU64::new(0));
 /// The highest `IN_USE` of the windows before the current one.
 static EARLIER_PEAK: AtomicU64 = AtomicU64::new(0);
 /// The current large-block threshold ([`set_large_threshold`]; `usize::MAX`: off).
@@ -180,7 +194,11 @@ pub struct CountingAlloc;
 #[inline]
 fn added(bytes: usize) {
     let now = IN_USE.fetch_add(bytes as u64, Ordering::Relaxed) + bytes as u64;
-    PEAK.fetch_max(now, Ordering::Relaxed);
+    // A read first: the count is mostly under its peak, and an atomic max takes the line for
+    // writing even when it leaves the value as it is (P1-19). The peak is the same either way.
+    if now > PEAK.load(Ordering::Relaxed) {
+        PEAK.fetch_max(now, Ordering::Relaxed);
+    }
 }
 
 #[inline]

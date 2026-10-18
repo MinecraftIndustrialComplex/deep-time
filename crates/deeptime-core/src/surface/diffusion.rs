@@ -21,13 +21,33 @@
 //! **Fused passes (P1-17).** The conjugate-gradient loop is memory- and barrier-bound (about 111
 //! iterations a step over ~20 vectors of 4 MB), so an iteration is two parallel passes over strips
 //! of rows instead of seven regions: one forms the direction and A·p and reduces p·A·p, the other
-//! updates x and r, forms z and reduces r·r and r·z. The arithmetic is the textbook loop's, cell
+//! updates r and reduces r·r and r·z. Since P1-19 the preconditioned residual z = r/diag is formed
+//! where it is used instead of stored, and the update x += α·p, which nothing reads until the loop
+//! ends, is taken by the next iteration's first pass (which reads p anyway) or once after the
+//! loop: three of the eighteen vector streams an iteration moved. The arithmetic is the textbook loop's, cell
 //! by cell and operation by operation (no fused multiply-add, no reciprocal in place of a
 //! division, terms of A·p added in the same order); only the schedule differs. Reductions keep
 //! the old scheme exactly: a sum per row in ascending column order, then the row sums added in
 //! ascending row order on one thread. Nothing depends on the strip height or the thread pool, so
 //! results are bit-identical to the textbook loop at any thread count; `diffusion/parity.rs` keeps
 //! that loop verbatim and compares bit patterns.
+//!
+//! **Rows with nothing to diffuse (P1-19).** The crust's spreading (`spread.rs`) diffuses only the
+//! cells above the strength height, a few per cent of the grid, through this same solve. A row
+//! whose diffusivity is +0 everywhere, with its two neighbours' +0 too, is a block of the identity
+//! in (I + Δt·L) that nothing couples to, and the textbook loop leaves its cells as they were:
+//! every term it adds to them is a signed zero (a +0 coupling times a finite value), and h ± 0 = h
+//! when h is not itself zero; its residual, direction and A·p stay +0, and so do its row sums. A
+//! step therefore visits only the strips of [`STRIP_ROWS`] rows that hold a row with something
+//! to diffuse, leaves the others as they are with the row sums (+0) the loop forms for them, and
+//! solves the tridiagonal sweeps along z one run of visited rows at a time (a skipped row cuts a
+//! column's system in two: the elimination passes only signed zeros across it). The reasoning
+//! needs normal elevations (not zero, not subnormal, not within a factor of two of subnormal) in
+//! every row of zero diffusivity, a positive finite Δt and cell size, and finite results; a step
+//! that has another elevation there visits every row, and one that ends with a value that is not
+//! finite is solved again on
+//! every row, so the result is the textbook loop's in every case. The parity tests compare both
+//! with the textbook loop bit for bit on grids that diffuse in a few blobs.
 
 use rayon::prelude::*;
 
@@ -36,19 +56,119 @@ use super::grid::Dims;
 /// One implicit step of Δt years on `h` with diffusivities `kd` (m²/yr); returns the conjugate
 /// gradient iterations it took.
 pub fn step(d: &Dims, h: &mut [f64], kd: &[f64], dt: f64) -> usize {
+    let live = Live::of(d, h, kd, dt);
     let b = h.to_vec();
-    lod(d, h, kd, dt);
-    cg(d, &b, h, kd, dt)
+    lod(d, h, kd, dt, &live);
+    let its = cg(d, &b, h, kd, dt, &live);
+    if live.strips.is_some() && !live.finite(d, h) {
+        // A value that is not finite would reach the skipped rows in the full loop (0 · ∞):
+        // solve on every row instead.
+        h.copy_from_slice(&b);
+        let all = Live::all(d);
+        lod(d, h, kd, dt, &all);
+        return cg(d, &b, h, kd, dt, &all);
+    }
+    its
+}
+
+/// The strips of [`STRIP_ROWS`] rows a step visits: every one, or those that hold a row with
+/// something to diffuse (the module's "Rows with nothing to diffuse").
+struct Live {
+    /// Per strip, whether it is visited; `None`: every strip is.
+    strips: Option<Vec<bool>>,
+    /// The runs of visited rows, `[start, end)`, ascending and apart.
+    runs: Vec<(usize, usize)>,
+}
+
+impl Live {
+    /// Every row.
+    fn all(d: &Dims) -> Live {
+        Live {
+            strips: None,
+            runs: vec![(0, d.h)],
+        }
+    }
+
+    /// The strips a step on `h` with `kd` over `dt` has to visit.
+    fn of(d: &Dims, h: &[f64], kd: &[f64], dt: f64) -> Live {
+        let (w, hh) = (d.w, d.h);
+        let s2 = d.dx * d.dx;
+        if w == 0 || hh == 0 || !(dt.is_finite() && dt > 0.0 && s2.is_finite() && s2 > 0.0) {
+            return Live::all(d);
+        }
+        // Rows whose diffusivity is +0 throughout (not −0, NaN or anything else), so every face
+        // between two of their cells is 0.5 · (+0 + +0) · Δt / Δx² = +0.
+        let zero: Vec<bool> = kd
+            .par_chunks(w)
+            .map(|row| row.iter().all(|k| k.to_bits() == 0))
+            .collect();
+        if !zero.iter().any(|&z| z) {
+            return Live::all(d);
+        }
+        // A row is skipped when it and its neighbours (where it has them) are zero rows.
+        let skip = |j: usize| zero[j] && (j == 0 || zero[j - 1]) && (j + 1 == hh || zero[j + 1]);
+        let strips: Vec<bool> = (0..hh.div_ceil(STRIP_ROWS))
+            .map(|s| (s * STRIP_ROWS..((s + 1) * STRIP_ROWS).min(hh)).any(|j| !skip(j)))
+            .collect();
+        if strips.iter().all(|&v| v) {
+            return Live::all(d);
+        }
+        // The skipped rows and the first and last rows of a run beside them are zero rows; their
+        // elevations must be normal, and so must half of them (the cyclic sweep along x halves
+        // the first cell of a row and doubles it back, exactly only then).
+        let normal = h
+            .par_chunks(w)
+            .zip(zero.par_iter())
+            .all(|(row, &z)| !z || row.iter().all(|v| (0.5 * v).is_normal()));
+        if !normal {
+            return Live::all(d);
+        }
+        let mut runs: Vec<(usize, usize)> = Vec::new();
+        for (s, _) in strips.iter().enumerate().filter(|(_, v)| **v) {
+            let (a, b) = (s * STRIP_ROWS, ((s + 1) * STRIP_ROWS).min(hh));
+            match runs.last_mut() {
+                Some(last) if last.1 == a => last.1 = b,
+                _ => runs.push((a, b)),
+            }
+        }
+        Live {
+            strips: Some(strips),
+            runs,
+        }
+    }
+
+    /// Whether strip `s` is visited.
+    #[inline]
+    fn strip(&self, s: usize) -> bool {
+        self.strips.as_ref().is_none_or(|v| v[s])
+    }
+
+    /// Whether row `j` is visited.
+    #[inline]
+    fn row(&self, j: usize) -> bool {
+        self.strip(j / STRIP_ROWS)
+    }
+
+    /// Whether every visited cell of `x` is finite.
+    fn finite(&self, d: &Dims, x: &[f64]) -> bool {
+        x.par_chunks(d.w)
+            .enumerate()
+            .all(|(j, row)| !self.row(j) || row.iter().all(|v| v.is_finite()))
+    }
 }
 
 /// The locally one-dimensional splitting (the initial guess).
-fn lod(d: &Dims, h: &mut [f64], kd: &[f64], dt: f64) {
+fn lod(d: &Dims, h: &mut [f64], kd: &[f64], dt: f64, live: &Live) {
     let (w, hh) = (d.w, d.h);
     let s2 = d.dx * d.dx;
-    // x sweep, row by row.
+    // x sweep, row by row (on a skipped row it is the identity).
     h.par_chunks_mut(w)
         .zip(kd.par_chunks(w))
-        .for_each(|(row, krow)| {
+        .enumerate()
+        .for_each(|(j, (row, krow))| {
+            if !live.row(j) {
+                return;
+            }
             let face = |i: usize| -> f64 {
                 // Face between i and i + 1 (wrapping when the grid does).
                 if i + 1 < w {
@@ -93,22 +213,29 @@ fn lod(d: &Dims, h: &mut [f64], kd: &[f64], dt: f64) {
     // z sweep, column by column (gathered, solved, scattered). A task takes a block of
     // `COL_BLOCK` neighbouring columns, so the cache line it reads for one is the line it needs
     // for the next seven, and hands the block back row-major; the rows then copy their pieces
-    // back in parallel. Each column is solved as ever.
+    // back in parallel. Each column is solved as ever, one run of visited rows at a time (the
+    // whole column when every row is visited): the face between a run and the skipped row beside
+    // it is +0, so the column's own elimination carries only signed zeros across it (`Live`).
+    let mut slot = vec![usize::MAX; hh];
+    let mut visited = 0;
+    for &(a, e) in &live.runs {
+        for s in &mut slot[a..e] {
+            *s = visited;
+            visited += 1;
+        }
+    }
     let blocks: Vec<Vec<f64>> = (0..w.div_ceil(COL_BLOCK))
         .into_par_iter()
         .map(|blk| {
             let i0 = blk * COL_BLOCK;
             let nb = COL_BLOCK.min(w - i0);
-            let mut out = vec![0.0; hh * nb];
+            let mut out = vec![0.0; visited * nb];
             let mut col = vec![0.0; hh];
             let mut lo = vec![0.0; hh];
             let mut di = vec![0.0; hh];
             let mut up = vec![0.0; hh];
             for b in 0..nb {
                 let i = i0 + b;
-                for (j, c) in col.iter_mut().enumerate() {
-                    *c = h[j * w + i];
-                }
                 let face = |j: usize| -> f64 {
                     if j + 1 < hh {
                         0.5 * (kd[j * w + i] + kd[(j + 1) * w + i]) * dt / s2
@@ -116,26 +243,38 @@ fn lod(d: &Dims, h: &mut [f64], kd: &[f64], dt: f64) {
                         0.0
                     }
                 };
-                for j in 0..hh {
-                    let north = if j == 0 { 0.0 } else { face(j - 1) };
-                    let south = face(j);
-                    lo[j] = -north;
-                    up[j] = -south;
-                    di[j] = 1.0 + north + south;
-                }
-                thomas(&lo, &di, &up, &mut col);
-                for (j, &v) in col.iter().enumerate() {
-                    out[j * nb + b] = v;
+                for &(a, e) in &live.runs {
+                    let len = e - a;
+                    for (jj, c) in col[..len].iter_mut().enumerate() {
+                        *c = h[(a + jj) * w + i];
+                    }
+                    for jj in 0..len {
+                        let j = a + jj;
+                        let north = if j == 0 { 0.0 } else { face(j - 1) };
+                        let south = face(j);
+                        lo[jj] = -north;
+                        up[jj] = -south;
+                        di[jj] = 1.0 + north + south;
+                    }
+                    thomas(&lo[..len], &di[..len], &up[..len], &mut col[..len]);
+                    let k0 = slot[a];
+                    for (jj, &v) in col[..len].iter().enumerate() {
+                        out[(k0 + jj) * nb + b] = v;
+                    }
                 }
             }
             out
         })
         .collect();
     h.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
+        let k = slot[j];
+        if k == usize::MAX {
+            return;
+        }
         for (blk, out) in blocks.iter().enumerate() {
             let i0 = blk * COL_BLOCK;
             let nb = COL_BLOCK.min(w - i0);
-            row[i0..i0 + nb].copy_from_slice(&out[j * nb..(j + 1) * nb]);
+            row[i0..i0 + nb].copy_from_slice(&out[k * nb..(k + 1) * nb]);
         }
     });
 }
@@ -176,8 +315,9 @@ struct Operator {
 impl Operator {
     /// Cell by cell the same expressions as the serial loops it replaced (faces from the arithmetic
     /// mean of the two cells' diffusivities, the diagonal as ((((1 + east) + west) + south) +
-    /// north)); rows are independent, so they run in parallel.
-    fn new(d: &Dims, kd: &[f64], dt: f64) -> Operator {
+    /// north)); rows are independent, so they run in parallel. A skipped row keeps the +0 faces
+    /// and the diagonal of one that those expressions give it (`Live`).
+    fn new(d: &Dims, kd: &[f64], dt: f64, live: &Live) -> Operator {
         let (w, h) = (d.w, d.h);
         let s2 = d.dx * d.dx;
         let n = w * h;
@@ -190,6 +330,9 @@ impl Operator {
             .zip(south.par_chunks_mut(w))
             .enumerate()
             .for_each(|(j, (erow, srow))| {
+                if !live.row(j) {
+                    return;
+                }
                 let krow = &kd[j * w..(j + 1) * w];
                 for i in 0..w {
                     if i + 1 < w {
@@ -207,6 +350,9 @@ impl Operator {
             });
         let mut diag = vec![1.0; n];
         diag.par_chunks_mut(w).enumerate().for_each(|(j, drow)| {
+            if !live.row(j) {
+                return;
+            }
             let c0 = j * w;
             let erow = &east[c0..c0 + w];
             let srow = &south[c0..c0 + w];
@@ -279,10 +425,13 @@ impl Operator {
         }
     }
 
-    /// y = A·x, rows in parallel.
-    fn apply(&self, x: &[f64], y: &mut [f64]) {
+    /// y = A·x on the visited rows, rows in parallel.
+    fn apply(&self, x: &[f64], y: &mut [f64], live: &Live) {
         let (w, h) = (self.w, self.h);
         y.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
+            if !live.row(j) {
+                return;
+            }
             let north = (j > 0).then(|| &x[(j - 1) * w..j * w]);
             let south = (j + 1 < h).then(|| &x[(j + 1) * w..(j + 2) * w]);
             self.apply_row(j, north, &x[j * w..(j + 1) * w], south, row);
@@ -334,22 +483,61 @@ fn row_dots(w: usize, a: &[f64], b: &[f64], out: &mut [f64]) {
     }
 }
 
-/// Setup pass: r = b − A·x, the preconditioned residual z = r/diag, and per row the sums
-/// `sums[j] = [Σ r·r, Σ r·z]`.
+/// Per row k of the strip `r` (rows of `w` cells) with diagonal `g`: `out[k]` = [Σ r·r, Σ r·z]
+/// with the preconditioned residual z = r/g formed cell by cell as it is added (the division and
+/// the product the textbook loop takes, without storing z). Each sum is taken in ascending column
+/// order from [`sum_zero`], as a serial sum over the row would; two rows run side by side, so the
+/// CPU overlaps four chains of additions, which changes the schedule and not the order within any
+/// sum.
+fn row_sums(w: usize, r: &[f64], g: &[f64], out: &mut [[f64; 2]]) {
+    let rows = out.len();
+    debug_assert!(r.len() == rows * w && g.len() == rows * w);
+    let mut k = 0;
+    while k + 2 <= rows {
+        let base = k * w;
+        let (r0, r1) = (&r[base..base + w], &r[base + w..base + 2 * w]);
+        let (g0, g1) = (&g[base..base + w], &g[base + w..base + 2 * w]);
+        let (mut a0, mut b0, mut a1, mut b1) = (sum_zero(), sum_zero(), sum_zero(), sum_zero());
+        for i in 0..w {
+            let (x0, x1) = (r0[i], r1[i]);
+            a0 += x0 * x0;
+            b0 += x0 * (x0 / g0[i]);
+            a1 += x1 * x1;
+            b1 += x1 * (x1 / g1[i]);
+        }
+        out[k] = [a0, b0];
+        out[k + 1] = [a1, b1];
+        k += 2;
+    }
+    if k < rows {
+        let base = k * w;
+        let (mut a, mut b) = (sum_zero(), sum_zero());
+        for (&x, &gv) in r[base..base + w].iter().zip(&g[base..base + w]) {
+            a += x * x;
+            b += x * (x / gv);
+        }
+        out[k] = [a, b];
+    }
+}
+
+/// Setup pass: r = b − A·x and per row the sums `sums[j] = [Σ r·r, Σ r·z]` (z = r/diag, the
+/// preconditioned residual). Every pass leaves a skipped strip as it is (+0, `Live`).
 fn pass_init(
     op: &Operator,
     b: &[f64],
     x: &[f64],
     r: &mut [f64],
-    z: &mut [f64],
     sums: &mut [[f64; 2]],
+    live: &Live,
 ) {
     let (w, h) = (op.w, op.h);
     r.par_chunks_mut(STRIP_ROWS * w)
-        .zip(z.par_chunks_mut(STRIP_ROWS * w))
         .zip(sums.par_chunks_mut(STRIP_ROWS))
         .enumerate()
-        .for_each(|(s, ((rs, zs), ss))| {
+        .for_each(|(s, (rs, ss))| {
+            if !live.strip(s) {
+                return;
+            }
             let rows = ss.len();
             let j0 = s * STRIP_ROWS;
             for jj in 0..rows {
@@ -361,56 +549,70 @@ fn pass_init(
                 for (rv, &bv) in rrow.iter_mut().zip(&b[j * w..(j + 1) * w]) {
                     *rv = bv - *rv;
                 }
-                let zrow = &mut zs[jj * w..(jj + 1) * w];
-                let diag = &op.diag[j * w..(j + 1) * w];
-                for ((zv, &rv), &dv) in zrow.iter_mut().zip(&*rrow).zip(diag) {
-                    *zv = rv / dv;
-                }
             }
-            let (mut rr, mut rz) = ([0.0; STRIP_ROWS], [0.0; STRIP_ROWS]);
-            row_dots(w, rs, rs, &mut rr[..rows]);
-            row_dots(w, rs, zs, &mut rz[..rows]);
-            for (jj, sum) in ss.iter_mut().enumerate() {
-                *sum = [rr[jj], rz[jj]];
-            }
+            let c0 = j0 * w;
+            row_sums(w, rs, &op.diag[c0..c0 + rows * w], ss);
         });
 }
 
-/// First pass of an iteration: the search direction p and A·p with p·A·p per row. The direction is
-/// z on the first iteration and z + β·p_old afterwards; rows j − 1 and j + 1 of it are needed to
-/// apply the operator to row j, so each strip forms its own rows into `pnew` (a separate buffer,
-/// so no strip reads what another writes) and its neighbours' edge rows into a ring of three rows
-/// that stays in cache. It is the same value cell by cell wherever it is formed.
-/// `pap_rows[j]` = Σ p·(A·p) of row j.
+/// First pass of an iteration: the search direction p and A·p with p·A·p per row, and the last
+/// iteration's x += α·p_old (`pending`), which nothing reads before the loop ends, so it rides
+/// on the pass that reads p_old anyway. The direction is z on the first iteration and
+/// z + β·p_old afterwards, with z = r/diag formed where it is used; rows j − 1 and j + 1 of it are
+/// needed to apply the operator to row j, so each strip forms its own rows into `pnew` (a
+/// separate buffer, so no strip reads what another writes) and its neighbours' edge rows into a
+/// ring of three rows that stays in cache. It is the same value cell by cell wherever it is
+/// formed. `pap_rows[j]` = Σ p·(A·p) of row j.
+#[allow(clippy::too_many_arguments)]
 fn pass_direction(
     op: &Operator,
-    z: &[f64],
+    r: &[f64],
     pold: &[f64],
     beta: Option<f64>,
+    pending: Option<f64>,
+    x: &mut [f64],
     pnew: &mut [f64],
     ap: &mut [f64],
     pap_rows: &mut [f64],
+    live: &Live,
 ) {
     let (w, h) = (op.w, op.h);
     pnew.par_chunks_mut(STRIP_ROWS * w)
         .zip(ap.par_chunks_mut(STRIP_ROWS * w))
+        .zip(x.par_chunks_mut(STRIP_ROWS * w))
         .zip(pap_rows.par_chunks_mut(STRIP_ROWS))
         .enumerate()
         .for_each_init(
             || [vec![0.0; w], vec![0.0; w], vec![0.0; w]],
-            |ring, (s, ((pn, aps), pr))| {
+            |ring, (s, (((pn, aps), xs), pr))| {
+                if !live.strip(s) {
+                    return;
+                }
                 let rows = pr.len();
                 let j0 = s * STRIP_ROWS;
+                if let Some(alpha) = pending {
+                    let c0 = j0 * w;
+                    for (xv, &pv) in xs.iter_mut().zip(&pold[c0..c0 + rows * w]) {
+                        *xv += alpha * pv;
+                    }
+                }
                 let fill = |j: usize, dst: &mut [f64]| {
-                    let zrow = &z[j * w..(j + 1) * w];
+                    let rrow = &r[j * w..(j + 1) * w];
+                    let grow = &op.diag[j * w..(j + 1) * w];
                     match beta {
                         Some(beta) => {
                             let prow = &pold[j * w..(j + 1) * w];
-                            for ((d, &zv), &pv) in dst.iter_mut().zip(zrow).zip(prow) {
-                                *d = zv + beta * pv;
+                            for (((d, &rv), &gv), &pv) in
+                                dst.iter_mut().zip(rrow).zip(grow).zip(prow)
+                            {
+                                *d = rv / gv + beta * pv;
                             }
                         }
-                        None => dst.copy_from_slice(zrow),
+                        None => {
+                            for ((d, &rv), &gv) in dst.iter_mut().zip(rrow).zip(grow) {
+                                *d = rv / gv;
+                            }
+                        }
                     }
                 };
                 // ring = [row j − 1, row j, row j + 1] of the direction.
@@ -437,44 +639,37 @@ fn pass_direction(
         );
 }
 
-/// Second pass of an iteration: x += α·p, r −= α·A·p, z = r/diag, and per row the sums
-/// `sums[j] = [Σ r·r, Σ r·z]` of the new r.
-#[allow(clippy::too_many_arguments)]
-fn pass_update(
-    op: &Operator,
-    alpha: f64,
-    p: &[f64],
-    ap: &[f64],
-    x: &mut [f64],
-    r: &mut [f64],
-    z: &mut [f64],
-    sums: &mut [[f64; 2]],
-) {
+/// Second pass of an iteration: r −= α·A·p and per row the sums `sums[j] = [Σ r·r, Σ r·z]` of
+/// the new r (x += α·p waits for the next direction pass, or the end of the loop).
+fn pass_update(op: &Operator, alpha: f64, ap: &[f64], r: &mut [f64], sums: &mut [[f64; 2]], live: &Live) {
     let w = op.w;
-    x.par_chunks_mut(STRIP_ROWS * w)
-        .zip(r.par_chunks_mut(STRIP_ROWS * w))
-        .zip(z.par_chunks_mut(STRIP_ROWS * w))
+    r.par_chunks_mut(STRIP_ROWS * w)
         .zip(sums.par_chunks_mut(STRIP_ROWS))
         .enumerate()
-        .for_each(|(s, (((xs, rs), zs), ss))| {
+        .for_each(|(s, (rs, ss))| {
+            if !live.strip(s) {
+                return;
+            }
             let rows = ss.len();
             let c0 = s * STRIP_ROWS * w;
             let len = rows * w;
-            let (ps, aps, ds) = (&p[c0..c0 + len], &ap[c0..c0 + len], &op.diag[c0..c0 + len]);
-            for (xv, &pv) in xs.iter_mut().zip(ps) {
-                *xv += alpha * pv;
-            }
-            for (rv, &av) in rs.iter_mut().zip(aps) {
+            for (rv, &av) in rs.iter_mut().zip(&ap[c0..c0 + len]) {
                 *rv -= alpha * av;
             }
-            for ((zv, &rv), &dv) in zs.iter_mut().zip(&*rs).zip(ds) {
-                *zv = rv / dv;
-            }
-            let (mut rr, mut rz) = ([0.0; STRIP_ROWS], [0.0; STRIP_ROWS]);
-            row_dots(w, rs, rs, &mut rr[..rows]);
-            row_dots(w, rs, zs, &mut rz[..rows]);
-            for (jj, sum) in ss.iter_mut().enumerate() {
-                *sum = [rr[jj], rz[jj]];
+            row_sums(w, rs, &op.diag[c0..c0 + len], ss);
+        });
+}
+
+/// x += α·p on the visited strips (the last iteration's update, which no direction pass took).
+fn pass_x(w: usize, alpha: f64, p: &[f64], x: &mut [f64], live: &Live) {
+    x.par_chunks_mut(STRIP_ROWS * w)
+        .zip(p.par_chunks(STRIP_ROWS * w))
+        .enumerate()
+        .for_each(|(s, (xs, ps))| {
+            if live.strip(s) {
+                for (xv, &pv) in xs.iter_mut().zip(ps) {
+                    *xv += alpha * pv;
+                }
             }
         });
 }
@@ -483,21 +678,21 @@ fn pass_update(
 /// the residual's sum back so Σx = Σb; returns the iterations.
 ///
 /// Every iteration is two passes over the grid, each a parallel region of strips of rows: one forms
-/// the direction and A·p and reduces p·A·p, the other updates x and r and reduces r·r and r·z
-/// (the textbook loop takes seven regions and about twice the memory traffic). The arithmetic is
-/// the textbook loop's, term for term. **Reductions:** a sum is a sum per row in ascending
-/// column order, then those row sums added in ascending row order, on one thread — never a
-/// tree over threads, never a function of the strip size or the pool — so the result is the same
-/// on any number of threads (`parity.rs` compares bit patterns against the textbook loop).
-fn cg(d: &Dims, b: &[f64], x: &mut [f64], kd: &[f64], dt: f64) -> usize {
+/// the direction and A·p, reduces p·A·p and takes the last iteration's x += α·p, the other
+/// updates r and reduces r·r and r·z (the textbook loop takes seven regions and more than twice
+/// the memory traffic). The arithmetic is the textbook loop's, term for term. **Reductions:** a
+/// sum is a sum per row in ascending column order, then those row sums added in ascending row
+/// order, on one thread (never a tree over threads, never a function of the strip size or the
+/// pool), so the result is the same on any number of threads (`parity.rs` compares bit patterns
+/// against the textbook loop).
+fn cg(d: &Dims, b: &[f64], x: &mut [f64], kd: &[f64], dt: f64, live: &Live) -> usize {
     let n = d.cells();
-    let h = d.h;
-    let op = Operator::new(d, kd, dt);
+    let (w, h) = (d.w, d.h);
+    let op = Operator::new(d, kd, dt, live);
     let mut ap = vec![0.0; n];
     let mut r = vec![0.0; n];
-    let mut z = vec![0.0; n];
     let mut sums = vec![[0.0; 2]; h];
-    pass_init(&op, b, x, &mut r, &mut z, &mut sums);
+    pass_init(&op, b, x, &mut r, &mut sums, live);
     let tol2 = CG_TOL_M * CG_TOL_M * n as f64;
     let mut iterations = 0;
     let rr0: f64 = sums.iter().map(|s| s[0]).sum();
@@ -509,16 +704,30 @@ fn cg(d: &Dims, b: &[f64], x: &mut [f64], kd: &[f64], dt: f64) -> usize {
         let mut pap_rows = vec![0.0; h];
         // The first direction is z itself; afterwards z + β·p.
         let mut beta = None;
+        // The step x += α·p of the last update, not yet taken.
+        let mut pending = None;
         while iterations < CG_MAX_ITER {
             iterations += 1;
-            pass_direction(&op, &z, &pold, beta, &mut pnew, &mut ap, &mut pap_rows);
+            pass_direction(
+                &op,
+                &r,
+                &pold,
+                beta,
+                pending.take(),
+                x,
+                &mut pnew,
+                &mut ap,
+                &mut pap_rows,
+                live,
+            );
             std::mem::swap(&mut pold, &mut pnew);
             let pap: f64 = pap_rows.iter().sum();
             if pap <= 0.0 {
                 break;
             }
             let alpha = rz / pap;
-            pass_update(&op, alpha, &pold, &ap, x, &mut r, &mut z, &mut sums);
+            pass_update(&op, alpha, &ap, &mut r, &mut sums, live);
+            pending = Some(alpha);
             let rr: f64 = sums.iter().map(|s| s[0]).sum();
             if rr <= tol2 {
                 break;
@@ -527,17 +736,42 @@ fn cg(d: &Dims, b: &[f64], x: &mut [f64], kd: &[f64], dt: f64) -> usize {
             beta = Some(rz_new / rz);
             rz = rz_new;
         }
+        if let Some(alpha) = pending {
+            pass_x(w, alpha, &pold, x, live);
+        }
     }
     // Σx = Σb − Σr (the columns of A sum to one): return the residual's sum to the cells that
-    // take part in the diffusion, in proportion to their coupling.
-    op.apply(x, &mut ap);
-    let lost: f64 = b.iter().zip(&ap).map(|(p, q)| p - q).sum();
-    let weight: f64 = op.diag.iter().map(|g| g - 1.0).sum();
+    // take part in the diffusion, in proportion to their coupling. Both sums run over the cells
+    // in order, as `.sum()` does; each cell of a skipped row adds +0 to them (b − A·b and
+    // 1 − 1), which changes nothing but a −0 into +0, so the row adds one +0.
+    op.apply(x, &mut ap, live);
+    let (mut lost, mut weight) = (sum_zero(), sum_zero());
+    for j in 0..h {
+        let cells = j * w..(j + 1) * w;
+        if live.row(j) {
+            for (p, q) in b[cells.clone()].iter().zip(&ap[cells.clone()]) {
+                lost += p - q;
+            }
+            for g in &op.diag[cells] {
+                weight += g - 1.0;
+            }
+        } else {
+            lost += 0.0;
+            weight += 0.0;
+        }
+    }
     if weight > 0.0 && lost != 0.0 {
         let k = lost / weight;
-        x.par_iter_mut()
-            .zip(op.diag.par_iter())
-            .for_each(|(xv, g)| *xv += k * (g - 1.0));
+        x.par_chunks_mut(w)
+            .zip(op.diag.par_chunks(w))
+            .enumerate()
+            .for_each(|(j, (xr, gr))| {
+                if live.row(j) {
+                    for (xv, g) in xr.iter_mut().zip(gr) {
+                        *xv += k * (g - 1.0);
+                    }
+                }
+            });
     }
     iterations
 }
