@@ -1516,7 +1516,7 @@ pub fn project_body(map: &Mapping, b: &deeptime_format::Body) -> deeptime_format
     out.yaw = ua.1.atan2(ua.0) as f32;
     // A body where the mapping is singular (the Jacobian vanishes: a body at or past the simulation's pole row, found on an
     // Earth-proportioned test planet, body 22342 with semi-axes [0, 34.6, 0]) keeps its source axes: the format refuses
-    // a zero semi-axis and the body is a few blocks wide wherever it lands.
+    // a zero semi-axis and the body is a few blocks wide wherever it lands. ledger: SCL-091
     let stretch = |v: f32, s: f64| {
         let n = f64::from(v) * s;
         if n.is_finite() && n > 0.0 {
