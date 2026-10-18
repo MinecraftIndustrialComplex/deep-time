@@ -15,7 +15,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
 | [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228 (19) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
-| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284 (41; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
+| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284, PLT-287 to PLT-288 (43; PLT-287 and PLT-288 the fastest thickening and rise, 2026-10-18; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221, PLT-265 (41; PLT-265 Earth's passive margins, the transition's comparison) |
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
@@ -1114,3 +1114,96 @@ continental plates move at 23.6 mm/yr against 27.9, mostly oceanic ones at 44.7 
 - The held floor's 20 km cap and the accretion's cap at the column's Airy height are rules
   (PLT-264, PLT-284).
 - The gap is measured against a dry Airy height, which overstates where a flooded column stands.
+
+## The fastest a column thickens and rises (the plate spikes, 2026-10-18)
+
+The coordinator's task after the surface divergence (ISO-072): find which plate process lifts a
+column by up to 33 km in one step against the 30 km ceiling (ISO-025), decide whether it is
+physical, and bound it by a sourced rate. Ledger PLT-287 and PLT-288 (and the changes to PLT-258,
+PLT-277, PLT-283, PLT-284 and ISO-025; the guard's near counts ISO-073); sources in the
+bibliography, "The fastest a column thickens and rises", and its Sundell et al. 2021 entry. Code:
+`crates/deeptime-core/src/plates/rate.rs`.
+
+**The processes.** The gap budget's spike record (PLT-283: every process of a plate step
+bracketed, the largest rise and thickening one visible column took from it) on two 500 Myr runs of
+`earthlike_quick_16k` on master (scattered start seed 2, supercontinent seed 1):
+
+| process | largest rise of a column in one 2 Myr step | largest thickening in one step | column-steps rising more than 10 km |
+|---|---|---|---|
+| a resampling's accretion (PLT-284) | 35.8 km, 33.2 km | 526 km, 566 km | 2,697, 1,272 |
+| the collision belts and the wedge | 13.1 km, 9.9 km | 94 km, 77 km | 5, 0 |
+| the founder (its receivers) | 5.8 km, 6.0 km | 42 km, 42 km | 0 |
+| the collapse (its receivers) | 4.3 km, 4.3 km | 30 km, 30 km | 0 |
+| hotspots, arcs, transition, the rest | 1.2 km or less | 3.7 km or less | 0 |
+
+Every step whose largest rise passed 20 km (21 and 16 of 250) was a resampling, and so was the run's
+final peak, 29,181 and 26,984 m: the run ends with a forced resampling, and two steps before it the
+highest cell stood at 5.6 km. The surface's flexure turned these single-step lifts into the 50 to
+100 km the guard met (ISO-072).
+
+**What happens on Earth.** Crust thickens where it shortens, at dH/dt = u·H/W across a region of
+width W shortening at u (Garzione et al. 2006, eq. 2, full text): for the Altiplano, 10 mm/yr over
+300 km of 50 km crust, about 1.7 mm/yr, and the surface rises by about a seventh of it, 0.3 mm/yr.
+Southern Tibet thickened by about 40 km at about 1.3 mm/yr between 60 and 30 Ma (Sundell et al.
+2021, full text). The fastest surface uplift Garzione et al. found, 2.5 to 3.5 km in 1 to 4 Myr
+(0.6 to 3.5 mm/yr), needed "the removal of dense eclogitic lower crust and mantle lithosphere".
+
+**Physical?** None of the large spikes is. The accretion's 36 km in 2 Myr is 18 mm/yr of uplift,
+five times the fastest Altiplano rate, and its 566 km of crust in a step is seven times the
+thickest crust on Earth (about 80 km, PLT-258): it hands one column the crust of every footprint
+under it at once. The wedge's 94 km in a step is 47 mm/yr of thickening, about 35 times Tibet's; the
+belt's 13 km is 6.5 mm/yr of uplift. The founder's and the collapse's rises (2.9 and 2.2 mm/yr)
+are inside Garzione's range, but their receivers thickened by up to 21 mm/yr.
+
+**What the model does now** (rate.rs).
+1. When a plate step begins every sample keeps its thickness T₀ and surface z₀. Its ceiling is
+   T₀ + 5 mm/yr × δt (`thickening_max_mm_yr`, PLT-287: about three times the regional rates, for
+   one lattice column over one step), its top z₀ + 3.5 mm/yr × δt (`uplift_max_mm_yr`, PLT-288,
+   Garzione's fastest rate).
+2. After the step's thickening processes (belts, arcs, founder, collapse, transition, collisions,
+   hotspots) and again after a resampling's accretion (the limits carried across with the
+   column's own resampling weights), a visible column above its ceiling moves the excess to the
+   nearest room on its plate within `collapse_reach_km`, as the collapse moves crust (continental
+   crust up to `crust_max_km`, ocean floor up to the normal column, each under its own ceiling);
+   what finds no room goes down from the bottom of the column, as beyond `crust_max_km`.
+3. A column that releases crust sinks by its Airy change, never below where it stood when the
+   step began; no visible column ends higher than its top. A column lifted faster is left below
+   its Airy height, and later steps let it rise the rest.
+4. The collapse's and the founder's receivers fill only up to their ceilings.
+
+**Measured** (`earthlike_quick_16k`, seeds 1 to 3, both starts; master 10c92fe4 with this
+branch's reports only (the spike record and the guard's near counts, which change nothing) against
+the fix; mean over six runs, [min, max]; build log 2026-10-18 "Plate spikes"):
+
+| 500 Myr | master | the rate limits |
+|---|---|---|
+| highest cell at the end, L1 (m) | 23,544 [14,259, 29,181] | 7,288 [5,860, 9,958] |
+| after the young stage (m) | 8,203 [7,057, 9,893] | 6,071 [5,613, 6,338] |
+| after the amplifier, highest block (y) | 313 [279, 360] | 246 [234, 253] |
+| largest rise of a column in one plate step (two traced runs, m) | 35,842, 32,126 | 7,000, 7,000 |
+| land share | 0.196 [0.190, 0.202] | 0.199 [0.160, 0.222] |
+| land above 2 km | 0.227 [0.129, 0.320] | 0.200 [0.150, 0.271] |
+| continental crust, share of the planet at the end | 0.406 [0.352, 0.458] | 0.393 [0.366, 0.415] |
+| CO2 (ppm) | 3,774 [443, 13,543] | 907 [403, 1,518] |
+| present-day nudge's CO2 factor | 5.31 [1.00, 19.59] | 1.24 [1.00, 2.20] |
+| mean surface temperature (°C) | 18.2 [14.4, 25.0] | 15.7 [13.3, 17.3] |
+| the guard's worst (m; the bound is 237,286) | 66,669 [43,693, 101,282] | 30,815 [19,599, 59,631] |
+| steps beyond 1, 2, 3, 6 Earth reliefs (sum of six runs) | 193, 27, 5, 0 | 25, 8, 1, 0 |
+| foundered (km³ a year, Earth-normalized) | 4.1 | 1.8 |
+| beyond the ceilings, moved or lost (km³ a year) | - | 11.6 |
+| of which to the mantle (km³ a year) | - | 4.3 |
+| plate checks met (of 45) | 27 | 29 |
+
+MEASURED-1000
+
+**Limits.**
+- One rate for every column, not a strain-rate law: the excess is moved, not deformed, whatever
+  the column's thickness or heat (PLT-287).
+- Where no room is within reach (about one ring of samples at 16k), the excess goes to the mantle:
+  MEASURED-LOST
+- Falls are not limited: crust that founders or spreads away lowers its surface at once (up to
+  about 6.6 km in a step).
+- The surface stage's own excursions are not touched: a polar row of L1 rose 20 to 40 km over a
+  few steps with plate uplift of 2.2 km or less, on master and with the fix (a follow-up, outside
+  the plate model).
+

@@ -495,8 +495,8 @@ impl PlatesStage {
             let limited = rate::limit(st, &geo, &env);
             if limited.columns > 0 {
                 for (s, &z) in st.samples.iter_mut().zip(&z) {
-                    s.uplift_mm_yr += ((f64::from(s.elevation_m) - f64::from(z)) / env.dt_yr
-                        * 1.0e3) as f32;
+                    s.uplift_mm_yr +=
+                        ((f64::from(s.elevation_m) - f64::from(z)) / env.dt_yr * 1.0e3) as f32;
                 }
             }
             book(st, gap_budget::Part::Rate);

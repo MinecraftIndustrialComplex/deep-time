@@ -392,9 +392,7 @@ impl GapBudget {
                 sp.thicken_m = dt;
                 thick_at = Some(v);
             }
-            sp.uplift_m = sp
-                .uplift_m
-                .max(f64::from(s.uplift_mm_yr) * dt_myr * 1.0e3);
+            sp.uplift_m = sp.uplift_m.max(f64::from(s.uplift_mm_yr) * dt_myr * 1.0e3);
             for (n, e) in sp.over.iter_mut().zip(SPIKE_EDGES_M) {
                 *n += u32::from(dz > f64::from(e));
             }
