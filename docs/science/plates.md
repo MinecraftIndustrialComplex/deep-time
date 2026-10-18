@@ -1236,8 +1236,13 @@ ceiling holds back most.
   reach for the release, or an accretion that does not stack every footprint on one column, would
   keep more of it (a follow-up).
 - Falls are not limited: crust that founders or spreads away lowers its surface at once (up to
-  about 6.6 km in a step).
+  about 6.6 km in a step, 3.3 mm/yr, under the uplift cap of PLT-288; no source on the fastest
+  subsidence was read).
 - The surface stage's own excursions are not touched: a polar row of L1 rose 20 to 40 km over a
-  few steps with plate uplift of 2.2 km or less, on master and with the fix (a follow-up, outside
-  the plate model).
+  few steps with plate uplift of 2.2 km or less, on master and with the fix. The fixed run with the
+  largest worst (supercontinent seed 2, 500 Myr, 59,631 m) met it as a hole: two neighbouring cells
+  of a row near the pole (rows 8 to 15 of L1) went from 17.1 km below the sea at −290 Myr, beside a
+  cell at +17.3 km, to 59.7 km below at −274 and back to 18.7 km below by −264, moving along the
+  row, while the plates raised them by 0.3 to 2.0 km a step and no plate step lifted any cell more
+  than 5.8 km (a follow-up, outside the plate model).
 
