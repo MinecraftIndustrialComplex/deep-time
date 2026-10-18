@@ -997,7 +997,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Clark, M. K. and Royden, L. H. (2000). Topographic ooze: Building the eastern margin of Tibet by lower crustal flow. Geology 28(8):703-706.
 - DOI or URL: 10.1130/0091-7613(2000)28<703:TOBTEM>2.0.CO;2.
 - Cited as: (ERO, ISO, HYP) "Clark & Royden 2000, Geology 28(8):703-706" (spread.rs). (PLT) "Clark & Royden 2000, Geology 28:703".
-- Ledger ids: ISO-018, ISO-020, ISO-022
+- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy)
 - Access: paywalled (GeoScienceWorld 403); not fetched. [other sections: paywalled (GSA; not tested).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -5273,6 +5273,28 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct; this settles what stage 1 could not see.
 
+
+### StewartJamieson2019
+- Reference: Stewart, H. A., Jamieson, A. J. (2019). The five deeps: The location and depth of the deepest place in each of the world's oceans. Earth-Science Reviews 197:102896.
+- DOI or URL: 10.1016/j.earscirev.2019.102896; open copy (CC BY 4.0) https://nora.nerc.ac.uk/id/eprint/524544/
+- Cited as: "Stewart & Jamieson 2019" (surface/guard.rs)
+- Ledger ids: ISO-071
+- Access: open copy.
+- Library (the project's source library, not distributed): not filed; the NORA PDF was fetched and its first two pages extracted on the laptop, 2026-10-18.
+- Read so far (by the project): full text, pages 1 and 2, by the surface-divergence agent on 2026-10-18. Abstract: "Challenger Deep in the Mariana Trench (Pacific Ocean; 10,925 m, 11.332° N/142.202° E)"; p. 2: "Challenger Deep in the Mariana Trench is not > 11,000 m deep (10,925 m; van Haren et al., 2017)".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct (journal, volume and article number on the PDF's first page).
+
+### Dangol2020
+- Reference: Dangol, S., Joshi, P., KC, S., Thapa, M., Banjara, B., KC, S., Bhandari, S. (2020). Measurement of Height of Mt. Sagarmatha. Journal on Geoinformatics, Nepal 20:59-66 (Survey Department, Nepal).
+- DOI or URL: https://www.nepjol.info/index.php/NJG/article/download/39479/30219/114898
+- Cited as: "Nepal and China, 8 December 2020" (surface/guard.rs)
+- Ledger ids: ISO-071
+- Access: open copy.
+- Library (the project's source library, not distributed): not filed; the NepJOL PDF was fetched and extracted on the laptop, 2026-10-18.
+- Read so far (by the project): full text by the surface-divergence agent on 2026-10-18. Abstract: "orthometric height was determined as 8848.86 m from the ellipsoid height observed at the top of Sagarmatha and precise geoid determined. The height was determined on the base of International Height Reference System (IHRS) and final height was announced jointly from Nepal and China on 8th of December 2020"; p. 64: "The final height was determined as 8848.86 m (IHRS) jointly". The Chinese side's account (Geo-spatial Information Science, doi 10.1080/10095020.2022.2128901) refused scripted access (403).
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct (journal and pages on the PDF's page footers).
 
 ## Force-balance plate motion: sources added in WP-13a (2026-10-02)
 
