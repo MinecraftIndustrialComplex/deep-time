@@ -650,7 +650,10 @@ fn skipping_the_rows_with_nothing_to_diffuse_gives_the_textbook_solve() {
         (64, 41, 5, true, 1.0),
     ] {
         let c = ranges(w, hgt, seed, wrap, top);
-        assert!(skips(&c), "ranges {w}x{hgt} seed {seed}: some rows are skipped");
+        assert!(
+            skips(&c),
+            "ranges {w}x{hgt} seed {seed}: some rows are skipped"
+        );
         let most = check(&c, 1, &format!("ranges {w}x{hgt} seed {seed} top {top} %"));
         assert!(most > 0, "the loop runs");
         check(&c, 3, &format!("ranges {w}x{hgt} seed {seed}, three steps"));
@@ -664,7 +667,9 @@ fn skipping_the_rows_with_nothing_to_diffuse_gives_the_textbook_solve() {
         (64, 48, true, |i, j| j == 0 && i % 3 == 0),
         (64, 47, true, |i, j| j == 46 && i > 50),
         (64, 48, false, |i, j| (j == 7 || j == 8) && i < 5),
-        (64, 48, true, |i, j| (j == 15 && i == 0) || (j == 40 && i == 63)),
+        (64, 48, true, |i, j| {
+            (j == 15 && i == 0) || (j == 40 && i == 63)
+        }),
         (1, 40, true, |_, j| j == 17),
         (2, 40, true, |i, j| j == 9 && i == 1),
         (3, 40, false, |_, j| j == 31),
@@ -684,7 +689,12 @@ fn a_zero_or_subnormal_elevation_or_a_negative_zero_diffusivity_turns_the_skippi
     let on = |i: usize, j: usize| j == 20 && i == 10;
     // Zero, −0, subnormal, and the normal number just above the smallest one, whose half is not
     // exact.
-    let pokes = [0.0, -0.0, 1.0e-310, f64::from_bits(f64::MIN_POSITIVE.to_bits() + 1)];
+    let pokes = [
+        0.0,
+        -0.0,
+        1.0e-310,
+        f64::from_bits(f64::MIN_POSITIVE.to_bits() + 1),
+    ];
     for (k, poke) in pokes.into_iter().enumerate() {
         // In a skipped row, and in the first row of a run below a skipped row.
         for row in [3, 16] {
@@ -719,7 +729,10 @@ fn a_solve_that_ends_with_a_value_that_is_not_finite_is_solved_again_on_every_ro
     let want_its = reference::step(&c.d, &mut want, &c.kd, c.dt);
     same("NaN case", &got, &want);
     assert_eq!(its, want_its, "NaN case: iterations");
-    assert!(got[3 * 64].is_nan(), "the NaN reached a skipped row, as in the full solve");
+    assert!(
+        got[3 * 64].is_nan(),
+        "the NaN reached a skipped row, as in the full solve"
+    );
 }
 
 /// Times each phase of one diffusion step on an L1-sized terrain (`cargo test --release -p
