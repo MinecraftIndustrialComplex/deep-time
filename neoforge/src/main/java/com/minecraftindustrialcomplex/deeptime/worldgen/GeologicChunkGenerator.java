@@ -147,7 +147,7 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
             MagmaPass.apply(chunk, w.magma(waterReach(), settings.noiseSettings().minY(), settings.seaLevel()));
             // Hot springs, terraces, fumaroles and altered ground around the same volcanoes (P2-14).
             GeothermalPass.apply(chunk, w.geothermal(waterReach(), settings.noiseSettings().minY(), settings.seaLevel()));
-            IcePass.apply(chunk, w.data());                    // snow and ice over glaciated ground, whatever the biome
+            IcePass.apply(chunk, w.data(), waterReach());      // snow and ice over glaciated ground, whatever the biome
         }
     }
 

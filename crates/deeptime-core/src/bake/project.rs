@@ -107,9 +107,13 @@ const MAX_SAMPLES_X: usize = 2048;
 const MAX_SAMPLES_Z: usize = 64;
 
 /// The layers sampled as categories (the nearest cell): class and id codes, and flags (a layer whose
-/// `units` is `flag` is one too, named here or not).
-const CATEGORICAL: [&str; 5] = [
+/// `units` is `flag` is one too, named here or not). `climate/koppen_l2` came a day after this list
+/// and was averaged as a number until 2026-10-18: a class border's footprint mean named a class
+/// neither side had (BSk beside Cfa read Csa to Csc), which the census and the biome rules' Köppen
+/// conditions read (ledger SCL-090).
+const CATEGORICAL: [&str; 6] = [
     "climate/koppen",
+    "climate/koppen_l2",
     "climate/wetland",
     "surface/class_top",
     "meta/plate_id",
@@ -1799,6 +1803,7 @@ mod tests {
         for name in [
             "climate/wetland",
             "climate/koppen",
+            "climate/koppen_l2",
             "meta/province",
             "surface/class_top",
         ] {
