@@ -1,7 +1,8 @@
 # The P1-17 benchmark gate (V1): measurements and the per-stage report
 
 Status: **the gate is missed on both presets** (2026-10-05; re-measured on the rebuilt test VM
-2026-10-16, below). Ben's answer (decisions log 2026-10-06): accept it for V1 and keep optimising. This page is
+2026-10-16, and full 16k on eight pinned cores for P1-19 on 2026-10-18, below). Ben's answer
+(decisions log 2026-10-06): accept it for V1 and keep optimising. This page is
 the per-stage report the plan asks for when a preset misses (§9.1: "Missing it here is reported with
 the per-stage breakdown and the measured scaling across thread counts (1, 2, 4, 8), and the decision
 is Ben's"). Every speed-up on the branch is bit-identical: the worlds before and after are the same
@@ -14,6 +15,16 @@ Statements are marked **measured** (a run made for this page), **read** (from th
 
 ## Summary
 
+- **P1-19 exit item 1, full 16k on eight pinned cores (2026-10-18; below)**: measured, 8 threads,
+  1000 Myr, scattered continents, held to one CPU of each of 8 physical cores, worlds identical
+  (84 of 84 files). Side by side with master e34dbe54: 2,255.8 → **1,990.4 s** and 2,316.0 →
+  **2,045.6 s**, 1.13× both ways round (CPU time 1.13 to 1.15×, surface 1.28 to 1.34×, system time
+  halved). Quiet, one run at a time on the same 8 cores: the branch **1,382.3 s** (others' load
+  2.4), master 1,828.6 s (others' load 7.1). Missed: **1.54× the 900 s gate quiet**, 2.2× under
+  the shared VM's usual load. Quiet, the work (6,657 s of CPU) would fit 8 fully busy cores in
+  832 s, but about 630 s of the run is on one core (the plate mesh's hull, the priority flood and
+  the zonal climate clock among it), so the gate needs less work per step or overlapping stages,
+  which is Ben's call.
 - **Re-measured on the rebuilt VM (2026-10-16; below)**: measured, 8 threads, 1000 Myr, before =
   master a55f70f6, worlds identical (83 of 83 files). Side by side, scattered: quick 774.5 →
   **577.2 s (1.34×)**, full 2,815.7 → **2,054.5 s (1.37×)**. One run at a time, with this
@@ -62,6 +73,185 @@ Statements are marked **measured** (a run made for this page), **read** (from th
   2 threads) is itself about 8 × 890 s. Meeting 300/900 s needs less work per step (fewer
   slope-failure sweeps, fewer climate steps, coarser plate steps: not bit-identical, so Ben's
   call; P1-24 measured some) or a different parallel structure (the stages of one step overlapping).
+
+## P1-19 exit item 1: full 16k on eight pinned cores (2026-10-18)
+
+Plan §10 P1-19's first exit item is this page's full 16k gate: 900 s at 8 threads, scattered
+continents, 1000 Myr. The P1-19 exit suite's run took 1,785 s on the loaded VM. The coordinator's
+call (decisions log 2026-10-17) kept the gate: re-measure on a quiet machine with the run held to
+8 cores, then speed up the stages that dominate with the results unchanged, and take the gate to
+Ben only if that cannot reach 900 s. Branch `worktree-agent-a21dc1b3e8bbf4f7e` from master
+8f2b7e79, with master e34dbe54 (plate task 8, the erosion recalibration, the gossan, the
+overturning sinks) merged before the last measurements, as the coordinator asked (2026-10-18).
+**It cannot be reached with the results unchanged: quiet, the branch takes 1,382.3 s, 1.54× the
+gate (2.2× under the VM's usual load), 1.13× faster than master side by side.** All measured
+unless marked.
+
+**Method.**
+
+- `tools/review/bench-quiet.py` (new) runs one `deeptime bench --preset earthlike_full_16k --start
+  scattered_continents --length-myr 1000 --threads 8` with `RAYON_NUM_THREADS=8` under
+  `/usr/bin/time -v`. Its CPU affinity holds it to one logical CPU of each of 8 physical cores,
+  set A: CPUs 0, 16, 2, 18, 4, 20, 6, 22, taken in turn from the VM's two L3 caches. Every 5 s it
+  samples `/proc/stat`, so everyone else's busy CPUs are known for the whole run ("others' load"),
+  and so is the busy share of set A's SMT siblings, which share the run's cores.
+- A run starts once the 1-minute load has stayed under 6 for three minutes (or after a long wait),
+  and is repeated while others' mean load over it was 8 or more. The VM is shared by several
+  agents, whose sweeps come in waves of about fifteen 2-thread jobs, so the load seldom stays low
+  for the half hour a run takes. Two runs met the mark (below): the branch at others' load 2.4,
+  master at 7.1.
+- This branch's builds and tests ran during the benches on the other 8 physical cores and their
+  siblings (`taskset -c 8-15,24-31`), so they did not touch set A.
+- Each world is compared with master's (`tools/review/p1-17-cmp.py`, as in the method below).
+- Each pass's own gain comes from a 100 Myr pair: the binaries before and after it side by side
+  in one job, one on set A and one on set B, so both saw the same load.
+
+**Side by side at 1000 Myr** (seconds; both binaries at once, one on each CPU set, then the
+other way round, so each pair saw the same load; master = e34dbe54, branch = 13f49fd5, its merge
+of that master; others' load 15 to 16 throughout):
+
+| stage | master (A) | branch (B) | × | master (B) | branch (A) | × |
+|---|---:|---:|---:|---:|---:|---:|
+| plates | 535.6 | 481.9 | 1.11 | 585.9 | 515.2 | 1.14 |
+| climate | 277.7 | 284.5 | 0.98 | 282.7 | 286.7 | 0.99 |
+| surface | 1,035.5 | 808.6 | **1.28** | 1,065.0 | 792.4 | **1.34** |
+| volcanoes | 37.4 | 38.7 | 0.97 | 38.6 | 38.3 | 1.01 |
+| impacts | 4.4 | 4.7 | | 4.7 | 4.9 | |
+| structure | 151.0 | 155.8 | 0.97 | 158.2 | 164.1 | 0.96 |
+| deposits | 100.0 | 93.3 | 1.07 | 94.4 | 133.4 | 0.71 |
+| young | 20.8 | 18.3 | | 14.9 | 18.6 | |
+| amplify | 32.6 | 47.2 | | 24.0 | 33.7 | |
+| finalize | 51.0 | 52.6 | | 38.7 | 52.3 | |
+| **wall** | **2,255.8** | **1,990.4** | **1.13** | **2,316.0** | **2,045.6** | **1.13** |
+| CPU time, user + system | 8,371 + 867 | 7,645 + 423 | 1.15 | 9,025 + 920 | 8,388 + 446 | 1.13 |
+| the run's CPUs, mean | 4.10 | 4.05 | | 4.29 | 4.32 | |
+| others' busy CPUs, mean | 15.7 | 16.3 | | 15.1 | 16.2 | |
+| its cores' SMT siblings busy | 50 % | 54 % | | 56 % | 59 % | |
+| peak, MiB (count) | 4,239 | 4,200 | | 4,239 | 4,200 | |
+| world files equal | 84 of 84 | | | 84 of 84 | | |
+
+The surface's own phases (the same runs, master → branch):
+
+| surface phase | master (A) | branch (B) | master (B) | branch (A) |
+|---|---:|---:|---:|---:|
+| diffusion, with its solve and the slope failure | 332.3 | 320.9 | 340.9 | 308.9 |
+|   the diffusion solve | 183.4 | 173.9 | 191.8 | 172.9 |
+|   the slope failure | 144.7 | 144.6 | 144.7 | 133.9 |
+| spread | 120.8 | 57.9 | 120.5 | 56.6 |
+| advect | 94.8 | 59.4 | 96.8 | 57.2 |
+| glacial | 88.9 | 58.1 | 92.5 | 55.6 |
+| flexure | 79.2 | 59.5 | 79.3 | 58.3 |
+| fields and events | 66.0 | 49.1 | 67.6 | 49.2 |
+| SPL | 54.3 | 48.2 | 55.8 | 47.2 |
+| priority flood | 45.3 | 45.1 | 50.3 | 48.3 |
+| marine fill | 40.8 | 35.5 | 42.6 | 35.0 |
+
+The spread, advection and flexure phases have no pass of their own and gained most. They were,
+by inference, mapping in again, page by page, the large blocks the session had given back before
+each step (7fa875f1 keeps them; system time halved, 867 → 423 s and 920 → 446 s), and copying
+grids on the driver (a85d5298). The plate stage's code is master's on both sides; its 1.11 to
+1.14× is, by inference, the allocator (each thread's parked small blocks take kiddo's per-query
+`Vec` off malloc and the shared count, edc3eae4; the counters on their own cache lines, 85cff4e2)
+and the relink collecting in place. The climate, structure and volcano stages are the same code
+on both sides; their 0.96 to 1.01 and the one-off stages' spread (deposits 0.71 to 1.07, amplify,
+finalize) are the load. The two sets give the same ratio to within a per cent.
+
+**The same pair on master 8f2b7e79**, before the merge (branch at a385e758): 2,005.0 → 1,784.5 s
+(1.12×), CPU time 7,922 + 869 → 7,327 + 410 s, surface 926.1 → 733.0 s, 84 of 84 files equal.
+Single runs on set A of that master: 1,889.1 and 1,874.2 s (others' load 11.1, siblings 35 and
+38 % busy); of the branch, 1,849.7 s (others' load 16.5, siblings 64 % busy). Master's CPU time
+moves with the load as much as with the code: 8,437 to 8,791 s on 8f2b7e79 at others' load 11 to
+13, and on e34dbe54 8,635 s at 7.1 and 9,238 to 9,945 s at 15 to 16.
+
+**Single runs on set A, quiet** (after the pairs, each started in a lull; seconds; master =
+e34dbe54, branch = 13f49fd5; both worlds equal master's from the pairs, 84 of 84 files):
+
+| stage | master `bq-1` | branch `fq-1` |
+|---|---:|---:|
+| plates | 424.4 | 325.7 |
+| climate | 220.6 | 208.5 |
+| surface | 782.1 | 529.8 |
+| volcanoes | 29.0 | 27.3 |
+| impacts | 3.7 | 3.8 |
+| structure | 128.1 | 123.3 |
+| deposits | 116.3 | 82.1 |
+| young | 21.1 | 12.3 |
+| amplify | 35.5 | 23.5 |
+| finalize | 61.2 | 37.9 |
+| **wall** | **1,828.6** | **1,382.3** |
+| CPU time, user + system | 7,816 + 818 | 6,294 + 363 |
+| the run's CPUs, mean | 4.72 | 4.82 |
+| others' busy CPUs, mean | 7.1 (p90 16.4) | 2.4 (p90 10.1) |
+| its cores' SMT siblings busy | 29 % | 10 % |
+| peak, MiB (count) | 4,239 | 4,200 |
+
+Both are under the "others' load under about 8" mark, but the branch's run was the quieter (its
+cores' siblings 10 % busy against 29 %), so their 1.32× carries the load as well as the code;
+the side-by-side 1.13× is the code's. A master run as quiet as the branch's would take about
+1,560 s (1,382.3 × 1.13, inferred). A quiet pair side by side waited an hour for a third lull
+and was not run.
+
+**The passes** (each bit-identical; the gains are 100 Myr pairs on master 8f2b7e79's code, before
+→ after, others' load 14 to 18; all of them together at 1000 Myr are the side-by-side table
+above):
+
+| commit | where | change | gain (100 Myr pair) | test |
+|---|---|---|---|---|
+| 85cff4e2, 585fce47 | surface / diffusion, marine; sphere / coupling; alloc | the diffusion solve skips rows with nothing to diffuse, and its conjugate gradient forms z only where it is used and defers x; the slope failure marks its neighbourhoods by rows in parallel; the allocator's counters each on their own cache line; the L1 relink collects in place | surface 82.3 → 78.5 s; wall 290.7 → 280.7 s; CPU 1,391 → 1,329 s | parity tests against the textbook solve; the slope failure's active-set tests |
+| edc3eae4 | alloc, session, stage | where the session needs room it gives back only the kept large blocks it needs, oldest first, not all of them; each thread parks its last four freed small blocks (up to 4 KiB) for its next block of that size, so the k-d tree's per-query `Vec` no longer goes through malloc and the shared count | none to measure: wall 280.7 → 280.7 s, CPU 1,290 → 1,274 s | `history_cap`, `memory_estimate` |
+| 7fa875f1 | alloc, session, stage | kept blocks give way by themselves, oldest first, when the count would pass the ceiling; the before-step check, the history's trim and a stage's reserve count live bytes only; 2 GiB of kept blocks in 2,048 slots (was 1 GiB). At 1 GiB full 16k pushed out 2,730 kept blocks (33 GB) in 30 Myr, to be mapped and faulted in again by the next step; at 2 GiB, 184 | surface 68.4 → 57.1 s; system time 95 → 52 s; wall 265.7 → 255.7 s | `history_cap`, `memory_estimate` |
+| 8350ade2 | surface / glacial | the glacial step walks only the cells with ice, in stack order; its debris pass visits only the stack positions below an eroding cell, its last pass and clearing only the cells written; its working arrays stay between steps; its fills in parallel; the river mouths and the glacial sea loads found in parallel | not isolated (its only 100 Myr run saw others' load 26.8); in the final runs | the step with and without the forest (the old whole walks) at 1, 3 and 8 threads, bit for bit |
+| a85d5298 | surface | the step's grid copies and fills on the pool's threads (`alloc::copied`, `alloc::filled`) instead of `clone`, `to_vec` and `vec!` on the driver: the height snapshots, the output fields, the kind and coal rasters, the empty ice and rate fields, the diffusion's right-hand side; the glacial rate map in parallel | in the final runs | the coupled pipeline, 1 against 3 threads |
+| 6fd0d036, a385e758 | alloc, surface | memory, not speed (below) | | `memory_estimate` |
+
+Tried and left out: transparent huge pages on the large blocks (`madvise(MADV_HUGEPAGE)`, a
+scratch build): 361.4 s without, 356.5 s with, inside the two sets' difference, so not adopted.
+
+**Memory.** The glacial step's working arrays (six grids) stay between steps, so the young stage,
+which makes its own glacial output each step, carried them on: `memory_estimate`'s young row held
+77.2 MiB against its 74.3 MiB estimate (master 71.8 to 73.0). The young stage now gives them back
+after its glacial step, and the surface stage after its last step. The allocator's count also takes
+its peak after kept blocks give way for a new block, not before, so kept blocks never lift the
+counted peak over the ceiling. On the VM, after both: plates 50.7, climate 60.5, surface 56.8,
+volcanoes 46.3, impacts 46.0, structure 55.1, deposits 59.3, young 72.3 (estimate 74.3), amplify
+74.5, run 96.2 (estimate 97.5; master 96.2) MiB held; resident peak 99.7 to 101.1 MiB against the
+121.8 MiB bound (a385e758, before the merge). `history_cap` and `session_pool` pass; after the
+merge, `memory_estimate` passes again in the workspace tests.
+
+**Why 900 s is out of reach without changing results** (measured, and inferred where marked):
+
+- **The work fits; the serial part does not.** Quiet, the branch's run is 6,657 s of CPU (user
+  + system). On 8 cores busy for the whole run that would be 832 s, under the gate. The run keeps
+  4.8 of them busy on average (4.1 to 4.6 under load, where the busy SMT siblings also slow each
+  core: the same run's CPU time is 8,068 to 8,834 s side by side). With the run split into a part
+  on one core (S) and a part spread over all 8, the quiet 1,382 s gives S ≈ 630 s (inferred), and
+  900 s needs S under about 80 s with the work unchanged.
+- **Where the serial part is.** A `perf` profile at 200 Myr (7fa875f1, before the merge, under
+  load) splits the driver thread's samples into time alone and time beside the workers: alone,
+  surface 60.2 s, plates 45.6 s, climate 18.9 s, structure 6.9 s, bake 4.5 s, deposits 3.1 s, so
+  about 650 s per 1000 Myr (inferred, agreeing with the fit above). The largest serial items: the
+  plate mesh's hull (`SphereMesh::insert` and `orient`, 8.2 s per 200 Myr; `plates.resample` is
+  39.2 s in the quiet run), `apply_surface_feedback` and `sample_flexure`'s scatter-adds and the
+  `Group` index (7.1 s per 200 Myr; `plates.feedback` 16.3 s and `plates.flexure_sample` 7.3 s
+  quiet), the priority flood (`surface.pflood` 33.7 s quiet, serial by design), the
+  amplification's `flood_repair`, and the zonal climate clock (`climate.clock` 29.4 s quiet,
+  serial in time). The flood and the clock alone are about 63 s of the 80 s the gate leaves. This
+  branch took the surface's serial copies and fills (`memset` 5.5 s and `memmove` 2.4 s per
+  200 Myr in that profile) and the glacial step's whole-grid walks.
+- **Left to the files' owners** (as in the table below): the plate step's serial items are in
+  `plates/` and `sphere/hull.rs`. `plates/` was plate task 8's while this branch ran (it has been
+  merged since), so the task's rule kept this branch's edits there to none; the L1 relink's
+  nearest-first query and kiddo's per-query `Vec` are left likewise.
+- **What it would take** (inferred). The bit-identical passes left (the serial plate items
+  above, the craton-edge sweep by rows, the relink's nearest-first query) could take perhaps 100
+  to 150 s of the serial part, which would bring the quiet run to about 1,250 to 1,300 s, still
+  1.4× the gate. Getting under 900 s needs either less work per step, at 4.8 busy cores about
+  4,300 s of CPU (a third less), which changes the worlds and is Ben's call (fewer slope-failure
+  iterations or a convergence stop, a diffusion solve with a stronger preconditioner than its
+  Jacobi one or multigrid, a coarser L1 cadence (`l1_every_steps`), a longer plate time step:
+  P1-24 measured 4-Myr steps at 1.6×), or the stages of one step overlapping so the flood, the
+  clock and the hull run beside parallel work (the climate or the structure of step k beside the
+  plates of step k + 1), which is a redesign.
 
 ## Re-measured on the rebuilt VM (2026-10-16)
 
