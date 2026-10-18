@@ -341,9 +341,32 @@ def cmd_geology(a):
         col = run([INSPECT, "column", "--world", a.world, "--x", str(gx), "--z", str(gz), "--depth", "10"]).stdout.strip().splitlines()
         col_s = "; ".join(" ".join(l.split()[:2]).replace("minecraft:", "") for l in col[1:9]) or "no column"
         ax_y = gos["axes"][1]
+        # Decisions log 2026-10-17 (a): an exposed gossan is the surface block (a bare ironstone outcrop). The terrain's top block over a
+        # grid of columns inside the body's footprint (half its semi-axes, so a turned blanket is still inside): how many are gossan rock.
+        surf_n = surf_tot = 0
+        surf_seen = {}
+        for ix in range(-2, 3):
+            for iz in range(-2, 3):
+                if ix * ix + iz * iz > 4:
+                    continue
+                sx = int(gos["center"][0] + 0.25 * ix * gos["axes"][0])
+                sz = int(gos["center"][2] + 0.25 * iz * gos["axes"][2])
+                r = run([INSPECT, "column", "--world", a.world, "--x", str(sx), "--z", str(sz), "--depth", "2"]).stdout.strip().splitlines()
+                m = re.search(r"terrain_top=Some\((-?\d+)\)", r[0]) if r else None
+                if not m:
+                    continue
+                top_line = next((l.split() for l in r[1:] if l.split() and l.split()[0] == m.group(1)), None)
+                if not top_line:
+                    continue
+                surf_tot += 1
+                key = short(top_line[1])
+                surf_seen[key] = surf_seen.get(key, 0) + 1
+                surf_n += bool(re.search(r"ochrum|ironstone|gossan|limonite", top_line[1]))
+        ok_d = ok_d and surf_n > 0
         check(ok_d, "a gossan where the body is exposed",
               f"gossan body {gos['id']} ({gos.get('rock_class')}, clip_top_y {gos.get('clip_top_y')}, about {2 * ax_y:.1f} blocks thick); probe found it at {len(gp)} point(s), "
-              f"blocks there {blocks[:2]}; ironstone-class blocks in its footprint: {iron}; column at its centre (y block): {col_s}; "
+              f"blocks there {blocks[:2]}; ironstone-class blocks in its footprint: {iron}; surface block is gossan rock in {surf_n} of {surf_tot} sampled footprint columns "
+              f"(surface blocks seen: {dict(sorted(surf_seen.items(), key=lambda kv: -kv[1])[:5])}); column at its centre (y block): {col_s}; "
               f"gossan top vs terrain gaps of the {len(plan.get('gossan_gaps', {}))} porphyries (blocks): "
               f"{ {k: round(v) if v < 1e8 else None for k, v in plan.get('gossan_gaps', {}).items()} }")
     else:
