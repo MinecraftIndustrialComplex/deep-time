@@ -107,6 +107,16 @@ pub(crate) fn zone(def: &ZoneDef, grades: &Grades, richness: f64) -> Zone {
     }
 }
 
+/// A leached cap reaches down to the water table and no further than this (m).
+// ledger: DEP-209 (SIR 2010-5070-B p. 65: 0 to several hundred m; Cook and Porter 2005: Inspiration
+// 0 to 300 m).
+pub const LEACHED_CAP_MAX_M: f64 = 300.0;
+
+/// No exposed iron cap is thinner than this many blocks at the vertical scale (a one-block sheet
+/// is skipped by the soil rule and reads as a stain, not an outcrop).
+// ledger: DEP-210 (game-choice, the coordinator's call 2026-10-17)
+pub const GOSSAN_MIN_BLOCKS: f64 = 2.0;
+
 /// Where the ore body sits.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Placement {
@@ -120,6 +130,9 @@ pub struct Placement {
     pub dip: f32,
     /// Whether erosion has cut the body (it is then clipped at the surface).
     pub truncated: bool,
+    /// Depth of the present water table below the surface at the site (m; 0 = not known: a body
+    /// that follows the water table then keeps its fixed thickness).
+    pub water_table_m: f64,
 }
 
 /// The ore body and its extra bodies (lithocap, gossan) for one site. Ids come from `next_id`.
@@ -187,6 +200,23 @@ pub fn bodies_for(
     out
 }
 
+/// Half the vertical thickness of an extra body in blocks. A body that follows the water table is
+/// as thick as the table is deep (the leached cap above an enrichment blanket, which forms at the
+/// top of the water table), at most [`LEACHED_CAP_MAX_M`]; an exposed one is never under
+/// [`GOSSAN_MIN_BLOCKS`] thick.
+fn extra_half_blocks(e: &ExtraBody, at: &Placement, sc: &Scales) -> f64 {
+    let thickness_m = if e.thickness_to_water_table && at.water_table_m > 0.0 {
+        at.water_table_m.min(LEACHED_CAP_MAX_M).max(e.thickness_m)
+    } else {
+        e.thickness_m
+    };
+    let min_half = match e.when {
+        When::Exposed => GOSSAN_MIN_BLOCKS / 2.0,
+        When::Preserved => 0.5,
+    };
+    (thickness_m / sc.m_per_block_v / 2.0).max(min_half)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn extra(
     e: &ExtraBody,
@@ -200,7 +230,7 @@ fn extra(
     t: &DepositType,
 ) -> Body {
     let shape = Shape::from_name(&e.shape).expect("validated");
-    let half = (e.thickness_m / sc.m_per_block_v / 2.0).max(0.5);
+    let half = extra_half_blocks(e, at, sc);
     let (centre_y, clip) = match e.when {
         // A lithocap sits on the ore body's top, clipped at the surface.
         When::Preserved => (ore_top_y + half, at.surface_y.floor() as i32),
@@ -546,6 +576,7 @@ mod tests {
             yaw: 0.0,
             dip: 0.0,
             truncated: false,
+            water_table_m: 0.0,
         };
         let mut rich = t.clone();
         rich.balance.richness_mult *= 1.5;
@@ -596,6 +627,7 @@ mod tests {
             yaw: 0.2,
             dip: 0.0,
             truncated: true,
+            water_table_m: 0.0,
         };
         let b = bodies_for(&t, 4, 240.0e6, &grades, &at, &Scales::default(), &mut next);
         let ore = &b[0];
@@ -628,6 +660,61 @@ mod tests {
         };
         let b = bodies_for(&t, 6, 240.0e6, &grades, &deep, &sc, &mut next);
         assert_eq!(b[0].clip_top_y, NO_CLIP);
+    }
+
+    /// Decisions log 2026-10-17 (gossan): the iron cap of an exposed porphyry is as thick as the
+    /// site's water table is deep (the leached cap sits above the enrichment blanket), at most
+    /// 300 m, never under two blocks, and its top stays at the surface.
+    #[test]
+    fn the_gossan_reaches_the_water_table_within_bounds() {
+        let t = builtin().unwrap().remove(0);
+        assert_eq!(t.id, "deeptime:porphyry_cu_mo_au");
+        let grades: Grades = [("c:copper".to_string(), 0.0044)].into_iter().collect();
+        let sc = Scales::default();
+        let exposed = Placement {
+            x: 0.0,
+            z: 0.0,
+            surface_y: 120.0,
+            centre_depth_m: 100.0,
+            yaw: 0.0,
+            dip: 0.0,
+            truncated: true,
+            water_table_m: 0.0,
+        };
+        let gossan_height = |wt: f64| {
+            let at = Placement {
+                water_table_m: wt,
+                ..exposed
+            };
+            let mut id = 0u32;
+            let bodies = bodies_for(&t, 1, 240.0e6, &grades, &at, &sc, &mut || {
+                id += 1;
+                id
+            });
+            let g = bodies.iter().find(|b| b.role == "gossan").expect("gossan");
+            assert_eq!(g.clip_top_y, 120, "the top stays at the surface");
+            assert!(g.validate().is_ok());
+            // The body's top (centre plus half-height) is the surface.
+            assert!((g.center[1] + f64::from(g.axes[1]) - 120.0).abs() < 1e-4);
+            2.0 * f64::from(g.axes[1])
+        };
+        // Unknown water table: the fixed 40 m, lifted to the two-block floor (70 m).
+        assert!((gossan_height(0.0) - 2.0).abs() < 1e-4);
+        // A shallow table (humid site, 10 m) is below the floor too.
+        assert!((gossan_height(10.0) - 2.0).abs() < 1e-4);
+        // A dry site, table 140 m: 4 blocks of 35 m.
+        assert!((gossan_height(140.0) - 4.0).abs() < 1e-4);
+        // Deeper than a leached cap gets: 300 m, 8.57 blocks.
+        let capped = gossan_height(900.0);
+        assert!((capped - 300.0 / 35.0).abs() < 1e-3, "{capped}");
+        // A buried porphyry has no gossan at all.
+        let buried = Placement {
+            truncated: false,
+            centre_depth_m: 5000.0,
+            ..exposed
+        };
+        let b = bodies_for(&t, 2, 240.0e6, &grades, &buried, &sc, &mut || 99);
+        assert!(b.iter().all(|x| x.role != "gossan"));
     }
 
     /// The true half-height of a 240 Mt body of `t`, m.
@@ -779,6 +866,7 @@ mod tests {
                 yaw: 0.4,
                 dip: 0.0,
                 truncated: false,
+                water_table_m: 0.0,
             };
             stack_bodies(&t, &k, 9, 2.0e10, &grades, &at, &plan, &sc, &mut || {
                 id += 1;
