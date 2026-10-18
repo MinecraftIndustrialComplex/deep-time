@@ -17,7 +17,8 @@ import java.util.TreeMap;
  * The biome rules' part of {@link BiomeCensus} ({@link BiomeRules}; decisions log 2026-10-04): per land column
  * at the surface, what decided its biome ({@link VolcanicBiomes#lastDecision()}: a rule, a volcanic role or the
  * climate search), and three checks the GameTests read: a column a rule decided holds one of that rule's
- * candidates and lies in one of its Köppen classes (read by the census itself, from {@code climate/koppen}); an
+ * candidates and lies in one of its Köppen classes (read by the census itself, from the layer the rules read:
+ * {@code climate/koppen_l2} when the bake wrote it, else {@code climate/koppen}); an
  * exclusive candidate appears only where a rule put it; and the share of cold wetland that took a peatland
  * biome where the pack has one.
  */

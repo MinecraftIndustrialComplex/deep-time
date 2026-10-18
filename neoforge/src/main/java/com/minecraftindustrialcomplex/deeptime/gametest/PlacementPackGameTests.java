@@ -136,12 +136,21 @@ public final class PlacementPackGameTests {
                         pc.bound(), n));
         }
         int[] cloud = r.cloud();
-        if (cloud[0] >= MIN_COLUMNS && cloud[1] < CLOUD_FLOOR * cloud[0])
-            bad.append(String.format(Locale.ROOT, " cloud_forest %d of %d candidates (< %.2f)", cloud[1], cloud[0], CLOUD_FLOOR));
+        if (cloud[0] < MIN_COLUMNS)
+            DeepTime.LOGGER.info("[gametest] packTableClassesReachTheirBiomes: cloud_forest not counted, {} candidates (< {}; {} volcanic,"
+                    + " {} dry and {} outside the bake's rule cells left out)", cloud[0], MIN_COLUMNS, cloud[3], cloud[4], cloud[5]);
+        else if (cloud[1] < CLOUD_FLOOR * cloud[0])
+            bad.append(String.format(Locale.ROOT, " cloud_forest %d of %d candidates (< %.2f; %d volcanic, %d dry and %d outside the"
+                    + " bake's rule cells left out)", cloud[1], cloud[0], CLOUD_FLOOR, cloud[3], cloud[4], cloud[5]));
         helper.assertTrue(bad.isEmpty(), "pack table classes off their biomes:" + bad);
         helper.succeed();
     }
 
-    /** The least share of the cloud forest rule's ground on the cloud forest (the census does not check P/PET). */
+    /**
+     * The least share of the cloud forest rule's ground on the cloud forest: its classes, latitude, height and P/PET,
+     * volcano zones left out ({@link BiomeCensus#CLOUD_ARIDITY}; P/PET checked since 2026-10-17), in cells that carry the
+     * bake's rule ({@link BiomeCensus#cloudFloors}; since 2026-10-17, P1-26's planet: the block-level ground disagreed
+     * with the bake's in 29 of 34 columns). Unchanged at 0.3; a ground under {@link #MIN_COLUMNS} columns is not counted.
+     */
     static final double CLOUD_FLOOR = 0.3; // ledger: BIO-154 (game-choice)
 }
