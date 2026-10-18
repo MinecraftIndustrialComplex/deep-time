@@ -591,6 +591,137 @@ fn the_fused_solve_is_the_textbook_solve_when_there_is_nothing_to_solve_or_too_m
     assert!(most >= 50, "stiff grid took {most} iterations");
 }
 
+/// A fractal terrain (6 km up, so every elevation is a normal float) with the crust's spreading
+/// diffusivity: zero below the strength height, which `top_pct` per cent of the cells pass, so a
+/// few blobs of rows diffuse and the rest are skipped (P1-19).
+fn ranges(w: usize, hgt: usize, seed: u64, wrap: bool, top_pct: f64) -> Case {
+    let d = Dims::new(w, hgt, 4800.0, wrap);
+    let n = d.cells();
+    let h: Vec<f64> = fractal(w, hgt, seed).iter().map(|z| z + 6000.0).collect();
+    let mut sorted = h.clone();
+    sorted.sort_by(f64::total_cmp);
+    let hs = sorted[((n as f64 * (1.0 - top_pct / 100.0)) as usize).min(n - 1)];
+    let kd = h
+        .iter()
+        .map(|&z| super::super::spread::diffusivity(z, hs, 30_000.0))
+        .collect();
+    Case {
+        d,
+        h,
+        kd,
+        dt: 2.0e6,
+        sea: 0.0,
+    }
+}
+
+/// White-noise elevations of 1 to 3 km and a diffusivity of 1,000 m²/yr on the cells `on` picks,
+/// +0 elsewhere.
+fn blobs(w: usize, hgt: usize, wrap: bool, on: impl Fn(usize, usize) -> bool) -> Case {
+    let d = Dims::new(w, hgt, 4800.0, wrap);
+    let mut rng = SplitMix64::new((w * 7919 + hgt) as u64);
+    let n = d.cells();
+    let h = (0..n).map(|_| 1000.0 + rng.next_f64() * 2000.0).collect();
+    let kd = (0..n)
+        .map(|c| if on(c % w, c / w) { 1000.0 } else { 0.0 })
+        .collect();
+    Case {
+        d,
+        h,
+        kd,
+        dt: 2.0e6,
+        sea: 0.0,
+    }
+}
+
+/// Whether a step on `c` skips rows (and so tests the skipping, not the full solve).
+fn skips(c: &Case) -> bool {
+    super::Live::of(&c.d, &c.h, &c.kd, c.dt).strips.is_some()
+}
+
+#[test]
+fn skipping_the_rows_with_nothing_to_diffuse_gives_the_textbook_solve() {
+    // The spreading's diffusivity on a fractal terrain: 0.5 to 5 % of the cells above the
+    // strength height, wrapping and not, heights the strip divides and does not.
+    for (w, hgt, seed, wrap, top) in [
+        (160, 96, 1, true, 2.0),
+        (160, 96, 2, true, 0.5),
+        (160, 96, 3, true, 5.0),
+        (96, 61, 4, false, 2.0),
+        (64, 41, 5, true, 1.0),
+    ] {
+        let c = ranges(w, hgt, seed, wrap, top);
+        assert!(skips(&c), "ranges {w}x{hgt} seed {seed}: some rows are skipped");
+        let most = check(&c, 1, &format!("ranges {w}x{hgt} seed {seed} top {top} %"));
+        assert!(most > 0, "the loop runs");
+        check(&c, 3, &format!("ranges {w}x{hgt} seed {seed}, three steps"));
+    }
+    // Blobs at the edges of strips and of the grid: one cell; the first row; the last row; rows
+    // 7 and 8 (two strips); rows 15 and 40 (two runs); one row of a one-, two- and three-wide
+    // grid; a strip and the one-row strip after it; a one-row last strip alone.
+    type On = fn(usize, usize) -> bool;
+    let cases: [(usize, usize, bool, On); 10] = [
+        (64, 48, true, |i, j| i == 10 && j == 20),
+        (64, 48, true, |i, j| j == 0 && i % 3 == 0),
+        (64, 47, true, |i, j| j == 46 && i > 50),
+        (64, 48, false, |i, j| (j == 7 || j == 8) && i < 5),
+        (64, 48, true, |i, j| (j == 15 && i == 0) || (j == 40 && i == 63)),
+        (1, 40, true, |_, j| j == 17),
+        (2, 40, true, |i, j| j == 9 && i == 1),
+        (3, 40, false, |_, j| j == 31),
+        (33, 25, true, |i, j| j >= 16 && i == 32),
+        (40, 17, true, |i, j| j == 16 && i == 3),
+    ];
+    for (k, (w, hgt, wrap, on)) in cases.into_iter().enumerate() {
+        let c = blobs(w, hgt, wrap, on);
+        let tag = format!("blob case {k}, {w}x{hgt}");
+        assert!(skips(&c), "{tag}: some rows are skipped");
+        check(&c, 2, &tag);
+    }
+}
+
+#[test]
+fn a_zero_or_subnormal_elevation_or_a_negative_zero_diffusivity_turns_the_skipping_off() {
+    let on = |i: usize, j: usize| j == 20 && i == 10;
+    // Zero, −0, subnormal, and the normal number just above the smallest one, whose half is not
+    // exact.
+    let pokes = [0.0, -0.0, 1.0e-310, f64::from_bits(f64::MIN_POSITIVE.to_bits() + 1)];
+    for (k, poke) in pokes.into_iter().enumerate() {
+        // In a skipped row, and in the first row of a run below a skipped row.
+        for row in [3, 16] {
+            let mut c = blobs(64, 48, true, on);
+            c.h[row * 64 + 5] = poke;
+            assert!(!skips(&c), "case {k} row {row}: every row is visited");
+            check(&c, 1, &format!("elevation {poke:e} in row {row}"));
+        }
+    }
+    // A −0 diffusivity is not +0: its row is visited (and the solve is still the textbook one).
+    let mut c = blobs(64, 48, true, on);
+    c.kd[2 * 64 + 7] = -0.0;
+    check(&c, 1, "kd = -0 in row 2");
+    // Nothing to diffuse anywhere: no strip is visited and nothing changes.
+    let mut c = blobs(64, 48, true, on);
+    c.kd.iter_mut().for_each(|k| *k = 0.0);
+    assert!(skips(&c));
+    assert_eq!(check(&c, 1, "kd = 0 everywhere"), 0);
+}
+
+#[test]
+fn a_solve_that_ends_with_a_value_that_is_not_finite_is_solved_again_on_every_row() {
+    // A NaN in a visited row spreads through the run; the full solve would carry it into the
+    // skipped rows too (0 · NaN), so the step is solved again on every row and gives what the
+    // fused solve gives there.
+    let mut c = blobs(64, 48, true, |i, j| j == 20 && i == 10);
+    c.h[20 * 64 + 11] = f64::NAN;
+    assert!(skips(&c));
+    let mut got = c.h.clone();
+    let its = super::step(&c.d, &mut got, &c.kd, c.dt);
+    let mut want = c.h.clone();
+    let want_its = reference::step(&c.d, &mut want, &c.kd, c.dt);
+    same("NaN case", &got, &want);
+    assert_eq!(its, want_its, "NaN case: iterations");
+    assert!(got[3 * 64].is_nan(), "the NaN reached a skipped row, as in the full solve");
+}
+
 /// Times each phase of one diffusion step on an L1-sized terrain (`cargo test --release -p
 /// deeptime-core diffusion_timing -- --ignored --nocapture`, `DEEPTIME_TIMING_REPS` repetitions,
 /// 12 by default): the textbook solver beside the fused one on the earthlike diffusivities, at
@@ -602,6 +733,7 @@ fn the_fused_solve_is_the_textbook_solve_when_there_is_nothing_to_solve_or_too_m
 fn diffusion_timing() {
     let c = shore(1024, 512, 7, true, 78);
     let (d, n) = (c.d, c.d.cells());
+    let all = super::Live::all(&d);
     let reps = std::env::var("DEEPTIME_TIMING_REPS")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -650,7 +782,7 @@ fn diffusion_timing() {
             // The state after the locally one-dimensional guess: what the solves start from.
             let b = c.h.clone();
             let mut x0 = c.h.clone();
-            super::lod(&d, &mut x0, &c.kd, c.dt);
+            super::lod(&d, &mut x0, &c.kd, c.dt, &all);
             let (lod_old, lod_new) = pairs(
                 &mut || {
                     let mut x = c.h.clone();
@@ -659,14 +791,14 @@ fn diffusion_timing() {
                 },
                 &mut || {
                     let mut x = c.h.clone();
-                    super::lod(&d, &mut x, &c.kd, c.dt);
+                    super::lod(&d, &mut x, &c.kd, c.dt, &all);
                     std::hint::black_box(&x);
                 },
             );
             let (op_old, op_new) = pairs(
                 &mut || reference::time_operator(&d, &c.kd, c.dt),
                 &mut || {
-                    std::hint::black_box(super::Operator::new(&d, &c.kd, c.dt));
+                    std::hint::black_box(super::Operator::new(&d, &c.kd, c.dt, &all));
                 },
             );
             let mut its = (0, 0);
@@ -677,7 +809,7 @@ fn diffusion_timing() {
                 },
                 &mut || {
                     let mut x = x0.clone();
-                    its.1 = super::cg(&d, &b, &mut x, &c.kd, c.dt);
+                    its.1 = super::cg(&d, &b, &mut x, &c.kd, c.dt, &all);
                 },
             );
             let (step_old, step_new) = pairs(

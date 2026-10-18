@@ -3,11 +3,13 @@
 """One `deeptime bench` run held to a set of CPUs, with the machine's load from everyone else
 recorded beside it (P1-19 item 1 / the P1-17 gate on the shared test VM).
 
-    tools/review/bench-quiet.py --cpus 0,2,4,6,8,10,12,14 --out <dir> <bin> <preset> <start> <myr> [threads]
+    tools/review/bench-quiet.py [--cpus LIST] --out <dir> <bin> <preset> <start> <myr> [threads]
 
 Runs `env RAYON_NUM_THREADS=<threads> /usr/bin/time -v <bin> bench --preset ... --threads <threads>
 --out <dir>/bench.json --work <dir>/work` with its CPU affinity set to --cpus (the default: one
-logical CPU of each of the first eight physical cores, from /sys's SMT sibling lists), and every
+logical CPU of each of <threads> physical cores, from /sys's SMT sibling lists, taken in turn from
+each L3 cache's cores, which is where an idle machine's scheduler puts <threads> busy threads: on
+the test VM's two L3s, 0,16,2,18,4,20,6,22), and every
 5 s samples /proc/stat, /proc/loadavg and the run's own CPU time, so the busy CPUs of everyone else
 (the machine's busy time less the run's) are known for the whole run. Writes <dir>/log.txt (the
 bench output and time -v), <dir>/load.tsv (the samples) and <dir>/summary.txt (wall time, stages,
@@ -36,6 +38,23 @@ def physical_cores():
         if sib not in seen:
             seen.add(sib)
             out.append(c)
+    return out
+
+
+def spread_cores(n):
+    """`n` physical cores taken in turn from each L3 cache's (index3 shared_cpu_list) cores."""
+    groups = {}
+    for c in physical_cores():
+        try:
+            key = open(f"/sys/devices/system/cpu/cpu{c}/cache/index3/shared_cpu_list").read().strip()
+        except OSError:
+            key = ""
+        groups.setdefault(key, []).append(c)
+    lists, out = list(groups.values()), []
+    while len(out) < n and any(lists):
+        for g in lists:
+            if g and len(out) < n:
+                out.append(g.pop(0))
     return out
 
 
@@ -99,7 +118,7 @@ def main():
     ap.add_argument("threads", nargs="?", default="8")
     a = ap.parse_args()
     t = int(a.threads)
-    cpus = [int(c) for c in a.cpus.split(",")] if a.cpus else physical_cores()[:t]
+    cpus = [int(c) for c in a.cpus.split(",")] if a.cpus else spread_cores(t)
     sibs = sorted({s for c in cpus for s in siblings(c)} - set(cpus))
     os.makedirs(a.out, exist_ok=True)
     cmd = ["env", f"RAYON_NUM_THREADS={t}", "/usr/bin/time", "-v", a.bin, "bench", "--preset", a.preset,
