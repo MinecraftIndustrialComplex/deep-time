@@ -14,6 +14,7 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.BackgroundScatterFeature;
 import com.minecraftindustrialcomplex.deeptime.worldgen.DepositFeature;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.worldgen.GossanSkin;
 import com.minecraftindustrialcomplex.deeptime.worldgen.OreDraws;
 import com.minecraftindustrialcomplex.deeptime.worldgen.StrataPass;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
@@ -160,7 +161,7 @@ public final class DepositGameTests {
 
     /** What one scan of a body's blocks found. */
     record Scan(int due, int placed, int exact, int missed, int notHost, int extra, int unexplained, int scatter,
-                int chunks, Map<String, Integer> blocks, List<String> problems) {}
+                int chunks, Map<String, Integer> blocks, List<String> problems, int leached) {}
 
     private static final Map<ResourceKey<Level>, Scan> SCANS = new HashMap<>();
 
@@ -168,7 +169,10 @@ public final class DepositGameTests {
      * Generates the body's chunks to FEATURES and compares every block of its AABB: where the
      * deposit's draw says ore, a host block must have become that material's ore (the resolver's
      * block for the host the strata pass painted there); elsewhere, every ore block must be
-     * explained by a body or the background scatter.
+     * explained by a body or the background scatter. The blocks of an exposed gossan's leached cap
+     * ({@link GossanSkin.Caps}, DEP-212) are not due: the strata pass painted the cap onto the ground
+     * (the host there is the gossan's rock, which {@code predictedRock} does not know) and the cap
+     * holds no copper, so ore in one is another gossan zone's or the scatter's, never this body's.
      */
     static synchronized Scan scan(GameTestHelper helper, ServerLevel level, WorldData wd, Target t) {
         Scan cached = SCANS.get(level.dimension());
@@ -182,8 +186,10 @@ public final class DepositGameTests {
         List<OreData.ScatterRule> rules = BackgroundScatterFeature.rules(level.registryAccess());
         Map<Long, ChunkAccess> chunks = new HashMap<>();
         Map<Long, Set<Long>> scatterPlan = new HashMap<>();
+        Map<Long, GossanSkin.Caps> capsOf = new HashMap<>();
+        boolean ownCap = GossanSkin.ROLE.equals(b.role()) || loose;   // a gossan's own gold and a placer's are not held back
         int minY = Math.max(level.getMinBuildHeight(), b.min()[1]), maxY = Math.min(level.getMaxBuildHeight() - 1, b.max()[1]);
-        int due = 0, placed = 0, exact = 0, missed = 0, notHost = 0, extra = 0, unexplained = 0, scatter = 0;
+        int due = 0, placed = 0, exact = 0, missed = 0, notHost = 0, extra = 0, unexplained = 0, scatter = 0, leached = 0;
         Map<String, Integer> blocks = new TreeMap<>(), notHostBlocks = new TreeMap<>();
         List<String> problems = new ArrayList<>();
         for (int x = b.min()[0]; x <= b.max()[0]; x++) {
@@ -192,11 +198,19 @@ public final class DepositGameTests {
                 long key = ChunkPos.asLong(xc >> 4, z >> 4);
                 ChunkAccess chunk = chunks.computeIfAbsent(key,
                         k -> level.getChunkSource().getChunk(xc >> 4, (int) (k >> 32), ChunkStatus.FEATURES, true));
+                GossanSkin.Caps caps = capsOf.computeIfAbsent(key, k -> GossanSkin.Caps.of(wd,
+                        wd.deposits().bodiesInChunk(xc >> 4, (int) (k >> 32), level.getMinBuildHeight(), level.getMaxBuildHeight() - 1)));
+                GossanSkin.Span cap = ownCap ? null : caps.window(xc, z);
                 for (int y = minY; y <= maxY; y++) {
                     BlockState state = chunk.getBlockState(new BlockPos(xc, y, z));
                     Body.Zone zone = DepositFeature.zoneAt(b, c, x, y, z);
                     String m = zone == null ? null : zone.material();
                     boolean hasBlock = m != null && t.materials().contains(m);
+                    boolean inCap = cap != null && caps.holdsNoOre(cap, y);
+                    if (hasBlock && inCap) {
+                        leached++;   // the leached cap holds none of this body's ore (DEP-212): not due
+                        hasBlock = false;
+                    }
                     if (hasBlock) {
                         due++;
                         ResourceLocation mat = ResourceLocation.parse(m);
@@ -220,7 +234,9 @@ public final class DepositGameTests {
                             if (state == ores.resolve(mat, host, y))
                                 exact++;
                             else if (problems.size() < 8)
-                                problems.add("(" + xc + "," + y + "," + z + ") " + state.getBlock() + " for host " + host.getBlock());
+                                problems.add("(" + xc + "," + y + "," + z + ") " + state.getBlock() + " for host " + host.getBlock()
+                                        + " window " + cap + " above " + chunk.getBlockState(new BlockPos(xc, y + 1, z)).getBlock()
+                                        + " below " + chunk.getBlockState(new BlockPos(xc, y - 1, z)).getBlock());
                         } else {
                             RockPalette.Host kind = palette.host(state);
                             if (loose && ores.panned(mat, state, state) != null
@@ -257,7 +273,8 @@ public final class DepositGameTests {
                     }
                     boolean otherBody = false;
                     for (Body o : wd.deposits().bodiesIn(xc, y, z, xc, y, z))
-                        if (oreOf.equals(DepositFeature.materialAt(o, c, xc, y, z)))
+                        // In a cap only a gossan's own zones and a placer's gold explain ore: no other body's ore is placed there.
+                        if ((!inCap || explainsInCap(o, palette)) && oreOf.equals(DepositFeature.materialAt(o, c, xc, y, z)))
                             otherBody = true;
                     if (!otherBody) {
                         unexplained++;
@@ -267,14 +284,19 @@ public final class DepositGameTests {
                 }
             }
         }
-        Scan s = new Scan(due, placed, exact, missed, notHost, extra, unexplained, scatter, chunks.size(), blocks, problems);
+        Scan s = new Scan(due, placed, exact, missed, notHost, extra, unexplained, scatter, chunks.size(), blocks, problems, leached);
         DeepTime.LOGGER.info("[gametest] deposit scan {} site={} ({}) body={} {} aabb={}..{} materials={}: due={} placed={} exact={} "
-                        + "missed={} notHost={} {} extraOre={} (scatter {}) unexplained={} chunks={} blocks={} problems={}",
+                        + "missed={} notHost={} {} extraOre={} (scatter {}) unexplained={} leachedCap={} chunks={} blocks={} problems={}",
                 level.dimension().location(), t.site().id(), t.site().depositType(), b.id(), b.shapeName(),
                 java.util.Arrays.toString(b.min()), java.util.Arrays.toString(b.max()), t.materials(), due, placed, exact,
-                missed, notHost, notHostBlocks, extra, scatter, unexplained, chunks.size(), blocks, problems);
+                missed, notHost, notHostBlocks, extra, scatter, unexplained, leached, chunks.size(), blocks, problems);
         SCANS.put(level.dimension(), s);
         return s;
+    }
+
+    /** True when ore a body draws can sit in a leached cap's window: a gossan's own zones and a placer's (loose rock's) gold are not held back. */
+    static boolean explainsInCap(Body o, RockPalette palette) {
+        return GossanSkin.ROLE.equals(o.role()) || (o.rockClass() != null && palette.isLoose(o.rockClass()));
     }
 
     /** True when {@code state} is the suspicious gravel or sand a placer puts for {@code material} (only gold has a panning table). */
@@ -318,6 +340,120 @@ public final class DepositGameTests {
         helper.assertTrue(s.unexplained() == 0, s.unexplained() + " ore blocks are neither a body's nor scatter: " + s.problems());
         helper.succeed();
     }
+
+    /**
+     * An exposed gossan's leached cap holds none of the deposit's ore (DEP-212): the first exposed
+     * gossan of the test world with at least {@link #MIN_CAP_DUE} blocks of its site's ore draw inside
+     * its cap window ({@link GossanSkin.Caps}, a pure count) is generated to FEATURES, and not one
+     * block of the window holds an ore the site's ore bodies draw there, except what the gossan's own
+     * zones or the background scatter explain. The skin repaints the cap onto the ground, so the ore
+     * features once took the painted rock as the host and placed Excavated Variants' variant for
+     * it; the window is the rule that keeps them out, and this test fails when ore comes back.
+     * It also reads the skin's own counters: the cap hangs from the terrain model's ground within the
+     * margin ({@link GossanSkin#GROUND_MARGIN}), and the share of columns the margin had to hold is
+     * small.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 6000)
+    public static void gossanCapHoldsNoOre(GameTestHelper helper) {
+        ServerLevel level = level(helper, GameTestSupport.TEST_DEPOSITS);
+        WorldData wd = data(helper, level);
+        RockPalette palette = RockPalette.get();
+        int c = wd.circumference(), minY = level.getMinBuildHeight(), maxY = level.getMaxBuildHeight() - 1;
+        Body gossan = null;
+        List<Body> oreBodies = List.of();
+        int gossans = 0, exposed = 0, bestDue = 0;
+        for (Body g : wd.deposits().bodies().bodies()) {
+            if (!GossanSkin.ROLE.equals(g.role()) || g.rockClass() == null
+                    || g.max()[0] - g.min()[0] > MAX_EXTENT || g.max()[2] - g.min()[2] > MAX_EXTENT)
+                continue;
+            gossans++;
+            GossanSkin.Caps caps = GossanSkin.Caps.of(wd, List.of(g));
+            if (caps.isEmpty())
+                continue;
+            exposed++;
+            List<Body> ore = wd.deposits().bodies().ofSite(g.site()).stream()
+                    .filter(o -> o.role().equals("ore") && DepositFeature.placesOre(o)).toList();
+            int due = 0;
+            for (int x = g.min()[0]; x <= g.max()[0]; x++)
+                for (int z = g.min()[2]; z <= g.max()[2]; z++) {
+                    GossanSkin.Span w = caps.window(canonical(c, x), z);
+                    if (w == null)
+                        continue;
+                    for (int y = Math.max(minY, w.to()); y <= Math.min(maxY, w.from()); y++)
+                        for (Body o : ore)
+                            if (DepositFeature.materialAt(o, c, x, y, z) != null)
+                                due++;
+                }
+            bestDue = Math.max(bestDue, due);
+            if (due >= MIN_CAP_DUE && gossan == null) {
+                gossan = g;
+                oreBodies = ore;
+            }
+        }
+        helper.assertTrue(gossan != null, "no exposed gossan has " + MIN_CAP_DUE + " blocks of its site's ore draw in its cap ("
+                + gossans + " gossans, " + exposed + " exposed, best " + bestDue + ")");
+        List<OreData.ScatterRule> rules = BackgroundScatterFeature.rules(level.registryAccess());
+        Map<Long, Set<Long>> scatterPlan = new HashMap<>();
+        Map<Long, GossanSkin.Caps> capsOf = new HashMap<>();
+        BlockState rock = palette.block(gossan.rockClass(), StrataPass.bodyKey(gossan.id()));
+        int columns = 0, rocky = 0, cells = 0, drawn = 0, ore = 0;
+        List<String> problems = new ArrayList<>();
+        for (int x = gossan.min()[0]; x <= gossan.max()[0]; x++) {
+            int xc = canonical(c, x);
+            for (int z = gossan.min()[2]; z <= gossan.max()[2]; z++) {
+                long key = ChunkPos.asLong(xc >> 4, z >> 4);
+                GossanSkin.Caps caps = capsOf.computeIfAbsent(key, k -> GossanSkin.Caps.of(wd,
+                        wd.deposits().bodiesInChunk(xc >> 4, (int) (k >> 32), minY, maxY)));
+                GossanSkin.Span w = caps.window(xc, z);
+                if (w == null)
+                    continue;
+                ChunkAccess chunk = level.getChunkSource().getChunk(xc >> 4, z >> 4, ChunkStatus.FEATURES, true);
+                columns++;
+                boolean found = false;
+                for (int y = Math.max(minY, w.to()); y <= Math.min(maxY, w.from()); y++) {
+                    BlockState state = chunk.getBlockState(new BlockPos(xc, y, z));
+                    if (!caps.holdsNoOre(w, y))
+                        continue;
+                    cells++;
+                    found |= state == rock;
+                    for (Body o : oreBodies) {
+                        String m = DepositFeature.materialAt(o, c, x, y, z);
+                        if (m == null)
+                            continue;
+                        drawn++;
+                        if (!OreBlockResolver.isOreOf(state, ResourceLocation.parse(m)))
+                            continue;
+                        ore++;
+                        if (explainedByScatter(wd, rules, scatterPlan, minY, xc, y, z, m))
+                            continue;   // the background scatter
+                        boolean explained = false;
+                        for (Body o2 : wd.deposits().bodiesIn(xc, y, z, xc, y, z))
+                            if (explainsInCap(o2, palette) && m.equals(DepositFeature.materialAt(o2, c, xc, y, z)))
+                                explained = true;   // the gossan's own gold, or a placer's
+                        if (explained)
+                            continue;
+                        if (problems.size() < 8)
+                            problems.add("(" + xc + "," + y + "," + z + ") " + state.getBlock() + " for " + m + " of body " + o.id());
+                    }
+                }
+                if (found)
+                    rocky++;
+            }
+        }
+        GossanSkin.Stats st = GossanSkin.stats();
+        DeepTime.LOGGER.info("[gametest] gossanCapHoldsNoOre gossan={} site={} {} cap columns={} (gossan rock in {}) window cells={} ore drawn there={} "
+                        + "ore blocks there={} problems={}; skin capped {} columns since start, the margin ({}) held {}",
+                gossan.id(), gossan.site(), gossan.rockClass(), columns, rocky, cells, drawn, ore, problems, st.capped(),
+                GossanSkin.GROUND_MARGIN, st.clamped());
+        helper.assertTrue(columns > 0, "no cap column in gossan " + gossan.id() + "'s footprint");
+        helper.assertTrue(problems.isEmpty(), "ore in the leached cap of gossan " + gossan.id() + ": " + problems);
+        helper.assertTrue(st.clamped() * 4 <= st.capped(), "the margin held " + st.clamped() + " of " + st.capped()
+                + " capped columns to the terrain model's ground: the model is off");
+        helper.succeed();
+    }
+
+    /** Blocks of a site's ore draw inside a gossan's cap window that make it a target for {@link #gossanCapHoldsNoOre}. */
+    static final int MIN_CAP_DUE = 20;
 
     // ---- placer gold as panning (Ben, 2026-10-16) ------------------------------------------------
 

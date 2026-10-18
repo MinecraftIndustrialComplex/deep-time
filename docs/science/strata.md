@@ -133,7 +133,9 @@ stored stacks, which have no structures, show none).
   so the gap is only visible as a jump in age and grade (STR-022).
 - **Bodies are painted where they are.** A fault younger than a pluton does not offset it: plutons, alteration
   halos and gossans are bodies painted over the horizons (an exposed gossan also replaces the soil
-  over it, so it crops out as bare rock: DEP-211).
+  over it, so it crops out as bare rock: DEP-211, and the deposit's ore is not placed in that cap:
+  DEP-212). Bodies paint in id order and a body only replaces crust or the horizon's own block, so
+  where two bodies overlap the first to paint keeps the block.
 - **The cover depth of a deposit reads the undeformed stack,** not the folded one (P2-01 stage B, left open).
 - **Grade order is a rule of the look.** In real orogens inverted sequences occur (ophiolite soles, thrust
   zones, the Himalaya), and metamorphic bodies a few hundred metres thick are real. The rule keeps cover on

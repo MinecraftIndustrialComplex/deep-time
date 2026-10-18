@@ -37,8 +37,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * pack has no gold ore for that rock (no Excavated Variants): vanilla's suspicious gravel or sand
  * holding the gold nuggets of the loot table {@code deeptime:archaeology/placer_gold}, rolled when the
  * block is placed and brushed out as panning ({@link PlacerPanning}; a cell over air, water or a
- * plant stays plain gravel or sand, since the block would fall). Only blocks of the chunk being
- * decorated are written.
+ * plant stays plain gravel or sand, since the block would fall). A leached cap holds none of the
+ * deposit's ore: the blocks of an exposed gossan's cap ({@link GossanSkin.Caps}, ledger DEP-212) are
+ * left as the strata pass and the skin made them, except for the gossan's own gold and a placer's. Only blocks of
+ * the chunk being decorated are written.
  * Does nothing unless the chunk's generator is Deep Time's and reads world data.
  */
 public final class DepositFeature extends Feature<NoneFeatureConfiguration> {
@@ -79,21 +81,26 @@ public final class DepositFeature extends Feature<NoneFeatureConfiguration> {
         int c = wd.circumference();
         RockPalette palette = RockPalette.get();
         OreBlockResolver ores = OreBlockResolver.get();
+        GossanSkin.Caps caps = GossanSkin.Caps.of(wd, bodies);
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int x0 = cx << 4, z0 = cz << 4, placed = 0;
         for (Body b : bodies) {
             if (!placesOre(b))
                 continue;
             boolean loose = b.rockClass() != null && palette.isLoose(b.rockClass());
+            // A leached cap holds none of the deposit's ore (DEP-212); the gossan's own gold and a
+            // placer's gold (the skin leaves the placer's gravel alone) stay.
+            boolean leaches = !caps.isEmpty() && !loose && !GossanSkin.ROLE.equals(b.role());
             int yLo = Math.max(minY, b.min()[1]), yHi = Math.min(maxY, b.max()[1]);
             for (int lx = 0; lx < 16; lx++) {
                 for (int lz = 0; lz < 16; lz++) {
                     int x = x0 + lx, z = z0 + lz;
                     if (yLo > yHi || !b.aabbContains(c, x, yLo, z))
                         continue;
+                    GossanSkin.Span cap = leaches ? caps.window(x, z) : null;
                     for (int y = yLo; y <= yHi; y++) {
                         Body.Zone zone = zoneAt(b, c, x, y, z);
-                        if (zone == null)
+                        if (zone == null || (cap != null && caps.holdsNoOre(cap, y)))
                             continue;
                         String material = zone.material();
                         pos.set(x, y, z);
