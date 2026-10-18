@@ -45,6 +45,7 @@ use rayon::prelude::*;
 
 use super::Env;
 use super::events::{self, PLATE_DEATH, RIDGE_BIRTH};
+use super::gap_budget;
 use super::geometry::{Cover, Geo, Tree, dijkstra_two};
 use super::init::random_rotation;
 use super::kinematics::{arr, quat, to_world};
@@ -269,15 +270,26 @@ pub fn resample(
     // (ledger: PLT-276). Both are counted, m of rock per new sample.
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
     let mut tally: Vec<[f64; 4]> = vec![[0.0; 4]; n];
+    // How each new sample was blended, for the gap budget (`gap_budget.rs`) when it is on.
+    let tracing = state.gap_budget.is_some();
+    let mut traces: Vec<Option<gap_budget::Trace>> = vec![None; n];
     let mut samples: Vec<Sample> = found
         .par_iter()
         .zip(plate_new.par_iter_mut())
         .zip(tally.par_iter_mut())
-        .map(|(((top, others), pl), tally)| match top {
+        .zip(traces.par_iter_mut())
+        .map(|((((top, others), pl), tally), trace)| match top {
             None => Sample::blank(0),
             Some((g, c)) => {
                 let mut s = interpolate(src, c, rots[*g as usize]);
                 *pl = group_plate[*g as usize];
+                if tracing {
+                    *trace = Some(gap_budget::Trace {
+                        tri: c.tri,
+                        w: c.w,
+                        pools: s.pools,
+                    });
+                }
                 for (g2, c2) in others {
                     let under = &src[c2.major() as usize];
                     let p2 = group_plate[*g2 as usize];
@@ -435,6 +447,15 @@ pub fn resample(
         };
     }
     state.samples = samples;
+    if let Some(gb) = state.gap_budget.as_mut() {
+        // Gap points became new sea floor: born now.
+        for (t, &g) in traces.iter_mut().zip(&gap) {
+            if g {
+                *t = None;
+            }
+        }
+        gb.resampled(&state.samples, &traces);
+    }
     state.groups = groups;
     state.lattice = lattice;
     state.resample_step = state.step;
