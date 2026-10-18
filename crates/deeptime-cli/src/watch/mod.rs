@@ -28,7 +28,7 @@
 //! over any layer; nothing is added to a step.
 
 mod deposits;
-mod editor;
+pub(crate) mod editor;
 mod http;
 mod live;
 mod runs;

@@ -1514,8 +1514,19 @@ pub fn project_body(map: &Mapping, b: &deeptime_format::Body) -> deeptime_format
     let uc = apply(&j, (-sy, cy));
     out.center = [wx, b.center[1], wz];
     out.yaw = ua.1.atan2(ua.0) as f32;
-    out.axes[0] = (f64::from(b.axes[0]) * ua.0.hypot(ua.1)) as f32;
-    out.axes[2] = (f64::from(b.axes[2]) * uc.0.hypot(uc.1)) as f32;
+    // A body where the mapping is singular (the Jacobian vanishes: a body at or past the simulation's pole row, found on an
+    // Earth-proportioned test planet, body 22342 with semi-axes [0, 34.6, 0]) keeps its source axes: the format refuses
+    // a zero semi-axis and the body is a few blocks wide wherever it lands. ledger: SCL-091
+    let stretch = |v: f32, s: f64| {
+        let n = f64::from(v) * s;
+        if n.is_finite() && n > 0.0 {
+            n as f32
+        } else {
+            v
+        }
+    };
+    out.axes[0] = stretch(b.axes[0], ua.0.hypot(ua.1));
+    out.axes[2] = stretch(b.axes[2], uc.0.hypot(uc.1));
     out.aabb = out.computed_aabb();
     out
 }
@@ -1679,6 +1690,41 @@ mod tests {
             }
         }
         sum / (nx * nz) as f64
+    }
+
+    /// A body anywhere on the simulation's grid, the pole rows and the rows past them included, projects to a body the
+    /// format accepts (positive finite semi-axes): an Earth-proportioned test planet's bake died on one at a singular spot.
+    #[test]
+    fn a_projected_body_always_has_positive_axes() {
+        let c_sim = 4096;
+        let g = PetroffGuyou::new(PetroffGuyou::hemisphere_for(c_sim), 30.0);
+        let map = Mapping::new(g, c_sim, 16);
+        let pole = deeptime_format::Projection::new(c_sim).pole_z();
+        for iz in -12..=12 {
+            for ix in -8..8 {
+                let (x, z) = (
+                    f64::from(ix) * 256.0 + 3.0,
+                    f64::from(iz) / 12.0 * (pole + 64.0),
+                );
+                let b = deeptime_format::Body::new(
+                    1,
+                    None,
+                    deeptime_format::bodies::Shape::Blanket,
+                    "ore",
+                    [x, 40.0, z],
+                    [6.0, 30.0, 9.0],
+                    0.7,
+                    0.0,
+                    deeptime_format::bodies::NO_CLIP,
+                );
+                let p = project_body(&map, &b);
+                assert!(
+                    p.axes.iter().all(|v| v.is_finite() && *v > 0.0),
+                    "{x} {z}: {:?}",
+                    p.axes
+                );
+            }
+        }
     }
 
     /// The simulation's solvers work in Lambert blocks, so its polar terrain has the grid's shape
