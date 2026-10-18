@@ -1220,10 +1220,10 @@ within 50 Myr, 10.8 to 6.6 %; the collisions' median length, 57 to 45 Myr; speed
 oceanic arc cells above sea level) and fails two that master passes (the collisions' 90th
 percentile length, 91 to 132 Myr; supercontinent tenure, 103 to 98 Myr). At 1000 Myr the only
 change of verdict is the most land gained in one step, 1.12 to 1.64 % of the planet against at
-most 1.5: crust a resampling used to pile on one column is now spread over its ring, which lifts
-more cells above the sea at once. The collision wedge's width is 0 km in every fixed run (master:
-13 and 54 km, both far below the 100 to 350 km target): the wedge's thickening is what the
-ceiling holds back most.
+most 1.5 (not traced; likely the crust a resampling used to pile on one column, now spread over
+its ring, lifting more cells above the sea at once). The collision wedge's width is 0 km in every
+fixed run (master: 13 and 54 km, both far below the 100 to 350 km target), probably because the
+wedge's thickening, up to 94 km a step on master, is now held to 10 km.
 
 **Limits.**
 - One rate for every column, not a strain-rate law: the excess is moved, not deformed, whatever
