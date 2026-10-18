@@ -48,6 +48,13 @@ Fairness: waiting jobs are considered oldest first; a smaller job may start ahea
 that does not fit yet, until the bigger one has waited STARVE_MIN minutes: from then nothing behind
 it starts until it fits.
 
+Measuring nested jobs: a job started inside another (a script run through admission whose steps are
+admitted too, with DEEPTIME_ADMIT_JOB unset so each is a job of its own) is measured on its own
+processes. The outer job does not count the inner job's tree or the CPU time that reaches its shell
+when the inner ends; an inner job never takes off the trees of the jobs it runs inside. A run over
+60 s that shows under 0.05 cores and 0.05 GiB is a lost measurement: it is not recorded, and stderr and
+admit.log say so.
+
 The old server lock (deeptime-cache/server.lock, from mac.sh --server before this tool) counts as an
 admitted server job while it exists, so agents still on the old scripts and this tool share the box.
 
@@ -114,6 +121,9 @@ RAMP_S = setting("RAMP_S", 180.0)                  # a CPU reservation lasts unt
 HISTORY_KEEP = setting("HISTORY_KEEP", 20)
 QUICK_S = setting("QUICK_S", 60.0)                 # a kind whose runs are this short and small starts at once
 MIN_RECORD_S = setting("MIN_RECORD_S", 15.0)       # shorter runs are not recorded (too few samples)
+IMPLAUSIBLE_S = setting("IMPLAUSIBLE_S", 60.0)     # a run this long that measured no CPU and no memory lost its processes
+IMPLAUSIBLE_CORES = 0.05                           # "no CPU": below this many mean cores ...
+IMPLAUSIBLE_GIB = 0.05                             # ... and "no memory": below this peak resident (a bare shell is ~0.005)
 PORT_BASE = setting("PORT_BASE", 26000)
 PORT_STRIDE = 10
 SLOTS = setting("SLOTS", 40)
@@ -611,6 +621,9 @@ class Sampler:
     def __init__(self, job_id, root_pid):
         self.job_id, self.root = job_id, root_pid
         self.prev = {}            # pid -> (start, ticks)
+        self.prev_inner = {}      # pid -> (start, ticks, ppid) of the inner jobs' processes at the last sample
+        self.anc = set()          # (pid, start) of the root's ancestors, seen while the root lived
+        self.inner = set()        # pids of the inner jobs' processes in the latest attribution
         self.prev_t = None
         self.env_cache = {}       # (pid, start) -> job id or None
         self.btime = boot_time()
@@ -636,9 +649,27 @@ class Sampler:
         clients = {q for q in mine if procs[q].comm == "java" and "GradleWrapperMain" in cmdline(q)} if mine else set()
         for d in gradle_daemons(clients, procs):
             mine |= subtree(d, kids)
+        # Each job is measured on its own processes. The other admitted jobs' trees are not ours --
+        # except where we are inside one: a job started inside another (a script run through
+        # admission that runs sims through admission) has the outer job's admit.py as an ANCESTOR,
+        # and taking off the outer's whole tree took off the job itself (2026-10-18: every inner job
+        # measured 0.0 cores, 0.0 GiB). So only the jobs that are not our ancestors are taken off:
+        # an outer job does not count its inner jobs, an inner job counts itself.
+        if self.root in procs:
+            q, seen = procs[self.root].ppid, set()
+            while q in procs and q not in seen and q > 1:
+                seen.add(q)
+                self.anc.add((q, procs[q].start))
+                q = procs[q].ppid
+        self.inner = set()
         for r in exclude_roots:
-            if r in procs and r != self.root:
-                mine -= subtree(r, kids)
+            r, start = r if isinstance(r, tuple) else (r, None)
+            if r not in procs or r == self.root or (start is not None and procs[r].start != start):
+                continue    # gone, or the pid belongs to another process now
+            if (r, procs[r].start) in self.anc:
+                continue    # an outer job: we run inside it
+            self.inner |= subtree(r, kids)
+        mine -= self.inner
         return mine
 
     def sample(self, exclude_roots=()):
@@ -661,6 +692,18 @@ class Sampler:
             for q, (st, ticks) in self.prev.items():
                 if cur.get(q, (None,))[0] != st:
                     dticks -= ticks
+            # The same for the inner jobs' processes that ended, none of whose life we counted: the
+            # topmost ended process of a chain is reaped by one of ours (the shell that ran the inner
+            # admit.py), whose cutime then carries the chain's whole life -- each process's own ticks
+            # as of our last look, summed over the chain. Take that off. (What they did after our last
+            # look, at most one SAMPLE_S, stays in.)
+            ended = {q for q, (st, _, _) in self.prev_inner.items() if (procs[q].start != st if q in procs else True)}
+            for q in ended:
+                top = q
+                while self.prev_inner[top][2] in ended:
+                    top = self.prev_inner[top][2]
+                if self.prev_inner[top][2] in self.prev:
+                    dticks -= self.prev_inner[q][1]
             dticks = max(0, dticks)
             dt = now - self.prev_t
             cores = min(dticks / HZ / dt, float(os.cpu_count() or 1)) if dt > 0 else 0.0
@@ -669,6 +712,7 @@ class Sampler:
         else:
             self.samples.append((now, 0.0, rss))
         self.prev, self.prev_t = cur, now
+        self.prev_inner = {q: (procs[q].start, procs[q].ticks, procs[q].ppid) for q in self.inner if q in procs}
         return self.samples[-1]
 
     def current(self, window=30.0):
@@ -1044,6 +1088,17 @@ def _install_wait_signals(store, job_id):
         signal.signal(sig, bail)
 
 
+def _other_jobs(store, job_id):
+    """[(pid, start)] of the admit processes of the other admitted jobs (read without the lock: the
+    file is replaced atomically)."""
+    try:
+        with open(store.state_path) as f:
+            st = json.load(f)
+    except (OSError, ValueError):
+        return []
+    return [(e["pid"], e.get("start")) for k, e in st.get("jobs", {}).items() if k != job_id and e.get("pid")]
+
+
 def _exec_child(cmd, env, job_id, job, store, say):
     """Runs cmd as a child (it sees its own pid as DEEPTIME_ADMIT_PID), samples it while it runs when
     it is a job of its own, records the result. Returns its exit status."""
@@ -1081,10 +1136,7 @@ def _exec_child(cmd, env, job_id, job, store, say):
         def loop():
             while not stop.wait(SAMPLE_S):
                 try:
-                    with open(store.state_path) as f:
-                        st = json.load(f)
-                    others = [e["pid"] for k, e in st.get("jobs", {}).items() if k != job_id]
-                    sampler.sample(exclude_roots=others)
+                    sampler.sample(exclude_roots=_other_jobs(store, job_id))
                     cpu, rss = sampler.current()
                     with store as s:
                         e = s.state["jobs"].get(job_id)
@@ -1114,11 +1166,19 @@ def _exec_child(cmd, env, job_id, job, store, say):
     if job_id:
         stop.set()
         try:
-            sampler.sample(exclude_roots=[])
+            sampler.sample(exclude_roots=_other_jobs(store, job_id))
         except Exception:
             pass
         _finish(store, job_id, job, sampler.summary(), rc, say)
     return rc
+
+
+def implausible_measure(summ):
+    """A job that ran over a minute and shows no CPU and no memory is a measurement that lost its
+    processes, not a job that did nothing: recording it would teach its kind an estimate of zero,
+    and jobs of that kind would start whatever the load (2026-10-18)."""
+    return (summ["wall_s"] >= IMPLAUSIBLE_S and summ["cpu_mean"] < IMPLAUSIBLE_CORES
+            and summ["rss_peak_gib"] < IMPLAUSIBLE_GIB)
 
 
 def _finish(store, job_id, job, summ, rc, say):
@@ -1137,6 +1197,9 @@ def _finish(store, job_id, job, summ, rc, say):
         # launcher (recorded under the launcher's kind): its own record would only be the wrapper.
         if e.get("claimed_s", 0.0) > 0.5 * summ["wall_s"]:
             recorded = False
+        implausible = implausible_measure(summ)
+        if implausible:
+            recorded = False
         if recorded:
             runs = s.history.setdefault(e["kind"], [])
             runs.append(record)
@@ -1144,9 +1207,14 @@ def _finish(store, job_id, job, summ, rc, say):
         s.log(f"finished {job_id} {e['kind']} ({e.get('label')}) rc {rc}: {summ['wall_s']:.0f} s, cpu mean "
               f"{summ['cpu_mean']:.2f} p90 {summ['cpu_p90']:.2f} peak {summ['cpu_peak']:.2f} cores, rss mean "
               f"{summ['rss_mean_gib']:.2f} peak {summ['rss_peak_gib']:.2f} GiB; estimate was "
-              f"{e['est']['cpu']:.1f} cores {e['est']['mem_gib']:.1f} GiB" + ("" if recorded else " (not recorded)"))
+              f"{e['est']['cpu']:.1f} cores {e['est']['mem_gib']:.1f} GiB" + ("" if recorded else " (not recorded)")
+              + (f": {summ['cpu_mean']:.2f} cores and {summ['rss_peak_gib']:.2f} GiB over {summ['wall_s']:.0f} s "
+                 f"cannot be right, the measurement lost the job's processes" if implausible else ""))
         if e.get("server_dir") and e.get("owns_dir") and not os.environ.get("DEEPTIME_KEEP_SERVER_DIR"):
             shutil.rmtree(e["server_dir"], ignore_errors=True)
+    if implausible:
+        say(f"{e['kind']}: measured {summ['cpu_mean']:.2f} cores and {summ['rss_peak_gib']:.2f} GiB over "
+            f"{summ['wall_s']:.0f} s, which cannot be right; not recorded")
     say(f"{e['kind']} done in {summ['wall_s']:.0f} s: {summ['cpu_mean']:.1f} cores mean ({summ['cpu_peak']:.1f} peak), "
         f"{summ['rss_peak_gib']:.1f} GiB peak (estimate {e['est']['cpu']:.1f} cores, {e['est']['mem_gib']:.1f} GiB)")
 
