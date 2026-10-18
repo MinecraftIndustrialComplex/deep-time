@@ -31,10 +31,12 @@ import java.util.List;
  * <p>The thresholds are properties any planet must meet, not one planet's numbers: the ground and
  * the water come from the same column rule the chunk is built by, so they agree but for what
  * features and the pack's surface rules do on top; the top block comes from a table, so its
- * agreement is logged and only a floor is asserted. The ground is read under trees, plants and coral
- * reefs, and a column a carver cut below far terrain's ground is counted apart (at most one in eight:
- * on the MIC set Terralith's canyon, which reaches from y −20 to 70, cut a sea bed two blocks under
- * the water down to y −2 in two of the 64 columns east of the seam, 2026-10-03).
+ * agreement is logged and only a floor is asserted. The ground is read under trees (mangrove roots
+ * included), plants and coral reefs, and a column a carver cut below far terrain's ground is counted
+ * apart (at most one in eight: on the MIC set Terralith's canyon, which reaches from y −20 to 70, cut
+ * a sea bed two blocks under the water down to y −2 in two of the 64 columns east of the seam,
+ * 2026-10-03). The planet-wide test reads chunks with their features, the seam test before them (see
+ * there).
  */
 @GameTestHolder(GameTestSupport.NS)
 @PrefixGameTestTemplate(false)
@@ -139,6 +141,17 @@ public final class FarTerrainGameTests {
      * that lets this generator through Toroidal World's guard): the 64 blocks west of x = C/2 and the
      * 64 blocks east of it (x = −C/2 on, the planet's westernmost columns), on four rows from the
      * equator to mid-latitudes. Each side must meet the planet-wide test's properties on its own.
+     *
+     * <p>What it checks is the fold, so it reads each chunk as the column rule and the carvers left it,
+     * before any feature (Deep Time's terrain is complete by then; the planet-wide test bounds what
+     * features add). A chunk's features write into its neighbours, so every chunk is read at the carvers
+     * before any is taken on to its features, and a chunk something else had already taken further is
+     * not counted. Why not after features, as until 2026-10-17: a side's 16 columns are 4 blocks apart,
+     * so one patch of a feature covers a quarter of a side or more, which the planet-wide test's 128
+     * scattered columns never meet. On the planet of P1-26's rain the equator west of the seam turned
+     * from sea to land, and there mangrove trees stood on 4 of the 16 columns (standalone) and
+     * Terralith's basalt cliffs stood basalt columns 5 to 10 blocks over the ground on 9 (MIC). The same
+     * columns after their features are logged, not asserted.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 4800)
     public static void farTerrainMatchesGeneratedChunksAcrossTheSeam(GameTestHelper helper) {   // ledger: BAK-042
@@ -146,22 +159,32 @@ public final class FarTerrainGameTests {
         ServerLevel level = far.level();
         int c = far.data().circumference();
         int[] rows = {7, c / 16 + 7, -c / 16 + 7, c / 8 + 7};
+        int n = 2 * 16 * rows.length;
         FarTerrainCheck.Tally west = new FarTerrainCheck.Tally(), east = new FarTerrainCheck.Tally();
-        ChunkSampling.forEach(helper, 2 * 16 * rows.length, i -> {
+        FarTerrainCheck.Tally westAfter = new FarTerrainCheck.Tally(), eastAfter = new FarTerrainCheck.Tally();
+        int[] taken = {0};   // chunks something else had already taken past the carvers: not counted before features
+        ChunkSampling.forEach(helper, 2 * n, j -> {
+            int i = j % n;
+            boolean features = j >= n;   // every chunk is read at the carvers first, then all of them after their features
             boolean eastSide = (i & 1) == 1;
             int k = (i >> 1) % 16, row = rows[(i >> 1) / 16];
             int x = eastSide ? -c / 2 + 4 * k + 1 : c / 2 - 64 + 4 * k + 2;
             FarTerrain.Column column = far.column(x, row);
             if (column.ground() < level.getMinBuildHeight() + 32)
                 return false;
-            ChunkAccess chunk = level.getChunkSource().getChunk(x >> 4, row >> 4, ChunkStatus.FEATURES, true);
+            ChunkAccess chunk = level.getChunkSource().getChunk(x >> 4, row >> 4, features ? ChunkStatus.FEATURES : ChunkStatus.CARVERS, true);
+            if (!features && chunk.getPersistedStatus() != ChunkStatus.CARVERS) {
+                taken[0]++;
+                return true;
+            }
             FarTerrainCheck.RealColumn real = FarTerrainCheck.real(chunk, x, row);
-            (eastSide ? east : west).add(column, real, chunk);
-            if (Math.abs(column.ground() - real.ground()) > 2)
-                DeepTime.LOGGER.info("[gametest] seamDiag {}", diag(chunk, column, real, x, row));
+            (features ? (eastSide ? eastAfter : westAfter) : (eastSide ? east : west)).add(column, real, chunk);
+            if (Math.abs(column.ground() - real.ground()) > 2 || column.water() != real.water())
+                DeepTime.LOGGER.info("[gametest] seamDiag {} {}", features ? "after features" : "before features", diag(chunk, column, real, x, row));
             return true;
         }, () -> {
-            DeepTime.LOGGER.info("[gametest] farTerrainMatchesGeneratedChunksAcrossTheSeam C={} west {} east {}", c, west, east);
+            DeepTime.LOGGER.info("[gametest] farTerrainMatchesGeneratedChunksAcrossTheSeam C={} takenFurtherAlready={} west {} east {} "
+                    + "(after features, logged only: west {} east {})", c, taken[0], west, east, westAfter, eastAfter);
             assertAgrees(helper, west, 32, "west of the seam: ");
             assertAgrees(helper, east, 32, "east of the seam: ");
             helper.succeed();
