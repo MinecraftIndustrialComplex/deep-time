@@ -169,8 +169,8 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   | 1000 Myr | Master | Rate limits |
   |---|---|---|
   | Highest cell at the end, L1 | 25,248 m [21,041, 29,518] | 8,089 m [5,917, 13,752] |
-  | After the young stage | YOUNG1000 |
-  | After the amplifier (highest block y) | AMP1000 |
+  | After the young stage | 8,115 m [7,247, 8,848] | 6,196 m [5,919, 6,617] |
+  | After the amplifier (highest block y) | 310 [290, 336] | 249 [241, 261] |
   | Land | 0.200 [0.174, 0.225] | 0.180 [0.164, 0.200] |
   | Land above 2 km | 0.223 [0.143, 0.265] | 0.231 [0.106, 0.318] |
   | Continental crust at the end | 0.433 [0.392, 0.467] | 0.405 [0.361, 0.485] |

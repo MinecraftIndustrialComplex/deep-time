@@ -1197,8 +1197,8 @@ the fix; mean over six runs, [min, max]; build log 2026-10-18 "Plate spikes"):
 | 1000 Myr | master | the rate limits |
 |---|---|---|
 | highest cell at the end, L1 (m) | 25,248 [21,041, 29,518] | 8,089 [5,917, 13,752] |
-| after the young stage (m) | YOUNG1000 |
-| after the amplifier, highest block (y) | AMP1000 |
+| after the young stage (m) | 8,115 [7,247, 8,848] | 6,196 [5,919, 6,617] |
+| after the amplifier, highest block (y) | 310 [290, 336] | 249 [241, 261] |
 | land share | 0.200 [0.174, 0.225] | 0.180 [0.164, 0.200] |
 | land above 2 km | 0.223 [0.143, 0.265] | 0.231 [0.106, 0.318] |
 | median and 90th percentile land height (m) | 774, 3,277 | 843, 3,323 |
