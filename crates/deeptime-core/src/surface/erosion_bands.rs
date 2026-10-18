@@ -12,6 +12,12 @@
 //! against it). High ground (above 2 km) is also split by its local relief: `high_flat` where the
 //! 3 × 3 neighbourhood spans less than [`FLAT_RELIEF_M`], `high_steep` elsewhere: a plateau
 //! interior against a range at the map's resolution.
+//!
+//! All land is also split by its local relief `R_z` (`by_relief`, the erosion recalibration of
+//! 2026-10-18): max − min of the cell and its four edge neighbours, the sea counted at sea level.
+//! Their centres lie within 5 km of the cell's at the 4.8-km cells of the 16k planets, so this is
+//! Montgomery & Brandon's (2002) relief "within a 10-km-diameter circle" in map metres, the measure
+//! their erosion rates are plotted against (ledger: ERO-172).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -28,6 +34,13 @@ pub const HIGH_M: f64 = 2000.0; // ledger: ERO-175 (game-choice, diagnostic clas
 /// diagnostic class, not a physical threshold (a 4.8-km cell at 16k quick; 500 m over two cells
 /// is a mean slope of about 3°).
 pub const FLAT_RELIEF_M: f64 = 500.0; // ledger: ERO-175 (game-choice, diagnostic class)
+
+/// Lower ends of the local-relief classes after the first (which starts at 0), m: a diagnostic
+/// class (the breaks of Montgomery & Brandon's Fig. 4 and the 1 and 1.5 km of their relief
+/// distribution, ledger: ERO-172).
+pub const RELIEF_FROM_M: [f64; 7] = [100.0, 250.0, 500.0, 1000.0, 1500.0, 2000.0, 3000.0]; // ledger: ERO-175 (game-choice, diagnostic class)
+/// The number of local-relief classes.
+pub const RELIEF_BINS: usize = RELIEF_FROM_M.len() + 1;
 
 /// Area × time and eroded volumes of one class of land.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -75,6 +88,8 @@ pub struct ErosionBands {
     pub bands: [ProcessSums; BANDS],
     pub high_flat: ProcessSums,
     pub high_steep: ProcessSums,
+    /// All land by local relief (`relief5`), classes from 0 and [`RELIEF_FROM_M`].
+    pub by_relief: [ProcessSums; RELIEF_BINS],
 }
 
 /// One step's per-cell lowering by process, metres (all ≥ 0).
@@ -111,6 +126,8 @@ impl ErosionBands {
                 p.net_km3 += -s.net[c] * km3;
             };
             add(&mut self.bands[band]);
+            let rz = relief5(d, s.h0, s.sea_m, c);
+            add(&mut self.by_relief[RELIEF_FROM_M.iter().filter(|&&lo| rz >= lo).count()]);
             if z >= HIGH_M {
                 if relief3(d, s.h0, c) < FLAT_RELIEF_M {
                     add(&mut self.high_flat);
@@ -129,8 +146,39 @@ impl ErosionBands {
         }
         m.insert("high_flat".into(), self.high_flat.json());
         m.insert("high_steep".into(), self.high_steep.json());
+        let land: f64 = self.bands.iter().map(|b| b.area_km2_myr).sum();
+        for (i, b) in self.by_relief.iter().enumerate() {
+            let lo = if i == 0 { 0.0 } else { RELIEF_FROM_M[i - 1] };
+            let mut v = b.json();
+            v["area_share"] = json!((b.area_km2_myr / land.max(1e-30) * 1.0e4).round() / 1.0e4);
+            m.insert(format!("relief_from_{lo}"), v);
+        }
         Value::Object(m)
     }
+}
+
+/// Local relief of land cell `c`: max − min of it and its four edge neighbours (wrapping in x when
+/// the grid does), each at least the sea level `sea` (a sea floor counts as the shore), m.
+fn relief5(d: &Dims, h: &[f64], sea: f64, c: usize) -> f64 {
+    let (x, y) = ((c % d.w) as i64, (c / d.w) as i64);
+    let (mut lo, mut hi) = (h[c].max(sea), h[c].max(sea));
+    for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+        let yy = y + dy;
+        if yy < 0 || yy >= d.h as i64 {
+            continue;
+        }
+        let mut xx = x + dx;
+        if xx < 0 || xx >= d.w as i64 {
+            if !d.wrap_x {
+                continue;
+            }
+            xx = xx.rem_euclid(d.w as i64);
+        }
+        let v = h[yy as usize * d.w + xx as usize].max(sea);
+        lo = lo.min(v);
+        hi = hi.max(v);
+    }
+    hi - lo
 }
 
 /// Max − min of the 3 × 3 neighbourhood of `c` (wrapping in x when the grid does), m.
@@ -200,5 +248,15 @@ mod tests {
             (b.high_flat.area_km2_myr + b.high_steep.area_km2_myr - 20.0).abs() < 1e-9,
             "every high cell is flat or steep"
         );
+        // By relief: the sea cell's neighbours span 2,500 m to the shore (class from 2,000 m),
+        // the 1.5-km cell and its other neighbours 1,000 m (from 1,000 m), the rest none.
+        let total: f64 = b.by_relief.iter().map(|p| p.area_km2_myr).sum();
+        assert!(
+            (total - 22.0).abs() < 1e-9,
+            "every land cell has a relief class"
+        );
+        assert!(b.by_relief[0].area_km2_myr > 0.0);
+        assert!(b.by_relief[4].area_km2_myr > 0.0 && b.by_relief[6].area_km2_myr > 0.0);
+        assert!(j["relief_from_1000"]["area_share"].as_f64().unwrap() > 0.0);
     }
 }
