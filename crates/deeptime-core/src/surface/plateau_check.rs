@@ -238,8 +238,8 @@ fn plateau_erosion_by_process_and_scale() {
         (
             "map, the presets since 2026-10-18",
             Case {
-                k: 1.5e-9, // ledger: ERO-004
-                ..case(MAP, 2.0, 0.15, 1.0, 2, false) // ledger: ERO-013, ERO-023
+                k: 1.5e-9,                             // ledger: ERO-004
+                ..case(MAP, 2.0, 0.15, 1.0, 2, false)  // ledger: ERO-013, ERO-023
             },
         ),
     ];
@@ -255,7 +255,10 @@ fn plateau_erosion_by_process_and_scale() {
                     n: v[1],
                     ..case(MAP, v[3], v[2], 1.0, 2, false)
                 };
-                (format!("map, K {:e} n {} S_c {} κ {}", v[0], v[1], v[2], v[3]), c)
+                (
+                    format!("map, K {:e} n {} S_c {} κ {}", v[0], v[1], v[2], v[3]),
+                    c,
+                )
             })
         })
         .collect();
