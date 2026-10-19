@@ -1453,3 +1453,27 @@ row now quotes the abstract; its status stays `cited-unverified`, the paper `abs
   1000 Myr); what they are and whether they should all turn is not traced.
 - The CO₂ of master's 1000 Myr runs reached 22,870 and 18,612 ppm in two runs (28.6 and 25.8 °C);
   the fix's highest was 4,668 ppm (21.4 °C). Why was not traced.
+
+## L1 sampling on a GPU (2026-10-19)
+
+**What changes.** With a usable GPU (`compute` auto or gpu; `docs/design/gpu-compute.md`, section
+12) the relink that `plates/l1.rs` runs before every L1 sampling settles the covered cells on the
+device: for each cell, the nearest visible sample (from a latitude-band bucket grid, ties to the
+lower index), the walk to the lattice triangle holding the cell in
+that sample's rigid group, the test that all three corners are that group's and none is hidden, and
+the barycentric weights. Every other cell (boundary strips, gaps, a walk the device could not
+finish) goes to the CPU's code unchanged, and the layers (the barycentric fields, the nearest
+sample's categories, the gap crust) are written on the CPU from the links. No law, constant or
+threshold changes; no ledger row changes and none is added.
+
+**What that does to the crust.** The device works in f32 on unit vectors, about 1e-7 rad (under a
+metre on Earth's radius), where the CPU works in f64. A link can therefore differ only at a tie:
+two samples equidistant from the cell to that precision, or a cell on a triangle's edge. The
+weights differ by the rounding of f32 directions. The tolerance test
+`plates::l1::gpu::tests::the_gpu_relink_matches_the_cpu_but_at_ties` steps a 6,000-sample planet
+through 60 Myr from a supercontinent and compares six samplings on lavapipe (2026-10-19): of
+125,952 cells the device settled 88.4 % and left 11.6 % to the CPU; no link differed; the weights
+differed by at most 1.6e-5; and every layer value equalled the CPU's to 1e-4 of its layer's
+largest. A world made with a GPU is not byte-identical to one made on the CPU (Ben, 2026-10-18:
+worlds are shared as finished folders); the whole-history comparison of a full 16k planet is in
+the design note, section 10.

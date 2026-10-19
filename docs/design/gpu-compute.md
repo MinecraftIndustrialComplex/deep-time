@@ -7,7 +7,9 @@ share a zip of the finished render or some shit."). Branch `worktree-agent-a1265
 from master 584b1241, masters 5cf2f9bb, e2166684 and c767da2c merged in. The aim is the P1-19
 exit item 1 gate (full 16k, 8 threads, 1000 Myr, 900 s), which the 2026-10-18 profile put at
 1,242.8 s (`docs/design/p1-17-benchmark-gate.md`, "where the full 16k run's time goes";
-`review/pages/sim-time/data.js`).
+`review/pages/sim-time/data.js`). Phase 2 (2026-10-19, branch `gpu-phase2` from master
+b337fa73): the plates' L1 relink and the climate snapshot's cells ported (sections 13 and 14),
+the whole-history comparison and the laptop's benches in section 10.
 
 Statements are marked **measured** (a run made for this note, with its command), **read** (from
 the code) or **estimated**.
@@ -29,8 +31,13 @@ the code) or **estimated**.
   default 4 GiB cap (the GPU then runs it in 8 tiles) and from 25.4 to 14.4 s when the level fits
   whole: 6 to 11 s off a full run. The amplifier was picked because nobody else was editing it;
   the large kernels are on CPU branches in flight.
+- **Phase 2.** The plates' L1 relink (section 13) and the climate snapshot's per-cell months
+  (section 14) run on the device too, each behind one dispatch point, with the CPU path the
+  fallback and the reference. On the laptop's Radeon the relink takes `write_l1` from 14.9 to
+  9.2 s per 100 Myr. A GPU world differs from the CPU's about as much as a CPU world with one
+  weight an ulp off (section 10). WHOLE_RUN_SUMMARY
 - **Headline estimate (section 9).** About 513 s of the run's 1,242.8 s wall is grid work on the
-  critical path that a compute shader can do. On a mid-range GPU (an NVIDIA T4 or the Radeon 8060S
+  critical path that a compute shader can do. On a mid-range GPU (an NVIDIA T4 or the Radeon 8050S
   class, 250 to 320 GB/s) the ten kernels of section 6 would take an estimated **290 to 400 s** off
   the run, to about **845 to 955 s**, a factor of 1.3 to 1.47; even an infinitely fast GPU leaves
   about 730 s, because the plate step, the floods and the serial bookkeeping stay on the CPU. The
@@ -49,6 +56,10 @@ the code) or **estimated**.
 | dispatch point | `surface/amplify/kernels.rs`: `PassDevice`, `run_passes_on` | the CPU path is `middle_cpu`; a device implements `middle` |
 | tile loop | `surface/amplify/tiles.rs` | reserves the device's host memory, runs a tile on the device, reruns it on the CPU when the device fails |
 | the kernels | `surface/amplify/gpu.rs` | WGSL next to the CPU code it mirrors; `AmplifyGpu` |
+| ambient context | `compute.rs`: `Ambient`, `enter`, `ambient`, `ambient_device`, `Ambient::kept` | the session's mode and log on every worker of its pool, for kernels deep inside a stage that get no `StageContext` (the plates' L1 sampling); `kept` holds a kernel's pipeline and buffers until the session ends |
+| dispatch point (L1) | `plates/l1.rs`: `sample` (the device from `ambient_device`), `on_device`, `sample_with` | the device links the covered cells, the CPU every other cell and all the layers (section 13) |
+| the relink kernel | `plates/l1/gpu.rs`: `relink`, `Resident` | WGSL beside the CPU code; tolerance test in `plates/l1/gpu/tests.rs` |
+| compute gauge | `compute.rs`: `add`, `lap`, `timings` | the GPU parts and their CPU twins in milliseconds and counts; `deeptime bench` prints `compute[...]` |
 | CLI | `deeptime run/stage/bench ... --compute auto\|cpu\|gpu` | the flag wins over `DEEPTIME_COMPUTE` |
 | JNI | `createWith` flags 4 (cpu) and 8 (gpu) | neither = auto; both = `IllegalArgumentException` |
 | Java | `SimSession.Compute`, `SimSession.start(..., Compute)`, `server.json` key `compute` | the dedicated server's first start; the Create World screen runs auto |
@@ -103,10 +114,10 @@ WGSL file next to its CPU code and a tolerance test against the CPU path; nothin
   `memory_budget_thresholds.for_resource_creation` of 90 % of what the driver reports, under which
   an allocation fails cleanly instead of paging.
 - **Host side.** Downloads go through a 64 MiB staging buffer (8 bytes a cell reserved for the
-  host copies). On an integrated GPU (the 8060S, Apple silicon, lavapipe) the device's buffers are
-  system memory, so the tile reserves `56 + 8` bytes a cell more against the session's native
-  memory cap, through the same `reserve` that spills history frames; a discrete GPU reserves the
-  8. The stream decision counts that share (section 3), so a tile's reserve fails only when the
+  host copies). On an integrated GPU (the laptop's 8050S, Apple silicon, lavapipe) the device's
+  buffers are system memory, so the tile reserves `56 + 8` bytes a cell more against the
+  session's native memory cap, through the same `reserve` that spills history frames; a discrete
+  GPU reserves the 8. The stream decision counts that share (section 3), so a tile's reserve fails only when the
   run's other memory grew in between; the tile then runs on the CPU with the CPU's own reserve.
 - **The driver's own memory is not counted.** Its code and its heaps are allocated by the
   driver, not through the counting allocator, so the cap does not see them. **Measured** on the
@@ -120,6 +131,15 @@ WGSL file next to its CPU code and a tolerance test against the CPU path; nothin
   inside the cap's headroom, so the cap still bounds the run, and an estimate that counted device
   memory would refuse runs that fit on the CPU path. A stage ported later whose device memory is
   not optional (a resident field the CPU never holds) has to add it there.
+- **The L1 relink (section 13)** keeps on the device, for the session: the lattice mesh, 80 bytes
+  a sample (points 16, triangles' corners and neighbours 64 for about two triangles a sample),
+  20 MB on the full 16k's 250,000 samples; per call, the samples' groups and the buckets, about
+  28 bytes a sample, and the output, 20 bytes an L1 cell (27 MB for 1.34 M cells). The host holds
+  the downloaded 20 bytes a cell while the CPU links its cells. These are optional in the same
+  way (a failed allocation sends the call to the CPU), not reserved against the cap, and not in
+  the plate stage's estimate (`plates/mod.rs`, which another agent was editing); on an
+  integrated GPU they are about 110 MB of system memory beside the cap (54 MB of buffers, the
+  staging copy and the host's words), like the driver's own.
 
 ## 5. Watchdogs (TDR) and backends
 
@@ -147,7 +167,7 @@ step and are off the critical path, so they gain no wall time.
 |---:|---|---:|---|---|---|---:|---|
 | 1 | `surface:slope_failure` | 83.8 / 600.8 | Jacobi gather over open-sea neighbour pairs, 40 iterations (later ones on the last movers only) | h, sediment, sea mask up; dh down; 40 ping-pong dispatches | f32 on differences from the cell: slope tests within 0.3 mm at 5 km; budget 1 mm per step | 70 to 78 | full sweep instead of the sparse worklist; a CPU branch edits `marine.rs` now |
 | 2 | `surface:diffusion_solve` | 109.3 / 840.4 | backward Euler, 5-point flux Laplacian, ADI first guess, Jacobi-preconditioned CG, about 111 iterations, 1e-6 m | h, kd up; dh down; CG vectors resident | f32 cannot hold 1e-6 m on 5 km: solve for the increment against an f64 residual from the CPU (defect correction); budget 1e-6 m on dh | 70 to 90 | two global reductions an iteration; a multigrid branch in flight changes the solver |
-| 3 | `plates:write_l1` | 95.8 / 711.3 | per L1 cell: k-d tree 6-nearest over visible samples, a triangle walk, barycentric interpolation of about 14 fields | samples (250 k x about 30 fields) up; 14 L1 fields down | f32 angles with per-plate offsets; budget: the CPU's nearest-sample choice except at ties | 50 to 75 (less now: plates part 2 cut it to one nearest query and one fused layer pass) | a spatial hash replaces kiddo (different tie-breaks); boundary and gap cells stay on the CPU (section 12; plates part 2 is merged: free) |
+| 3 | `plates:write_l1` (relink **ported**, section 13) | 95.8 / 711.3 | per L1 cell: k-d tree 6-nearest over visible samples, a triangle walk, barycentric interpolation of about 14 fields | samples (250 k x about 30 fields) up; 14 L1 fields down | f32 angles with per-plate offsets; budget: the CPU's nearest-sample choice except at ties | 50 to 75 (less now: plates part 2 cut it to one nearest query and one fused layer pass) | a spatial hash replaces kiddo (different tie-breaks); boundary and gap cells stay on the CPU (section 12; plates part 2 is merged: free) |
 | 4 | `climate snapshot:cells` | 46.1 / 334.7 | per row an air march (a recurrence with floors), then per cell 12 months of T and P, Köppen, glaciers | about 15 fields up; f32 outputs down; 103 calls | per-cell months in f32 (temperatures to 0.01 K); the march stays a row scan; sums that feed the carbon cycle stay f64 (section 12) | 20 to 30 (less now: the merged climate branch cut the row loop about threefold) | the march is serial along a row (656 rows); the model is f64 closures over belts, regimes and two upwind passes |
 | 5 | `surface:advect` | 40.2 / 253.1 | semi-Lagrangian gather, per-plate rotation, bilinear fields, nearest for the 516 MB strata log | fields resident; the log only if its readers move too | rotation in f32 with a per-plate offset; budget one hundredth of a cell in position | 15 to 25 | the log's readers (fields, structure, bake) are on the CPU, so only the continuous fields move |
 | 6 | `surface:flexure` | 38.2 / 275.3 | PCG on the thin plate, FFT-spectral preconditioner, to 2 m or 60 iterations | loads, D, C up; deflection resident | f32 plausible: the stop is 2 m | 20 to 28 | an FFT in WGSL (no vendor FFT in wgpu), sizes not powers of two |
@@ -203,19 +223,22 @@ step and are off the critical path, so they gain no wall time.
   `ServerConfigTest.computeIsAutoCpuOrGpu`; `NativeLinkTest.createWithTakesTheEpochFlags` now
   runs a session with each compute flag and refuses both together (16 is its unknown flag, since
   8 is the GPU's).
+- **Phase 2 tests:** `plates::l1::gpu::tests::the_gpu_relink_matches_the_cpu_but_at_ties`
+  (section 13) and `climate::tests::the_gpu_cells_stay_within_their_error_budget_of_the_cpu`
+  (section 14), both against the CPU path and skipped without an adapter.
 - **Changed:** `tests/memory_estimate.rs` runs on the CPU (`Session::set_compute`), because the
   driver's memory sits outside the count it checks (section 4).
 - **Worlds.** A 100 Myr planet on the CPU and with the GPU forced on lavapipe, compared with
   `tools/review/p1-17-cmp.py` and `p1-17-hyps.py`: section 10.
-- **Speed** only on real GPUs (the laptop's 8060S, Ben's rule of 2026-10-18), GPU against CPU in
+- **Speed** only on real GPUs (the laptop's 8050S, Ben's rule of 2026-10-18), GPU against CPU in
   A/B pairs on the same machine and binary.
 
 ## 9. Amdahl on a mid-range GPU (estimated)
 
 - **Bandwidth.** The heavy kernels already keep 7 to 7.6 of 8 cores busy and are memory-bound
   stencils. Eight VM cores stream perhaps 60 to 100 GB/s; a T4 has 320 GB/s (and PCIe 3 at about
-  12 GB/s for transfers), the 8060S 256 GB/s shared with the CPU (no PCIe). So a resident stencil
-  runs 3 to 6 times faster; one whose fields cross every step, less. **Measured** check (section
+  12 GB/s for transfers), the laptop's 8050S 256 GB/s shared with the CPU (no PCIe). So a
+  resident stencil runs 3 to 6 times faster; one whose fields cross every step, less. **Measured** check (section
   10): the amplifier's passes, resident with one upload and one download, ran 8 to 9 times faster
   on the laptop's 8050S than on its own 8 CPU threads, above that range; the per-step kernels of
   rows 1 to 6 pay transfers every call unless the fields stay resident (section 12, item 1), so
@@ -287,6 +310,58 @@ build log):
 - No whole-run A/B: the GPU path only touches the amplify stage, which runs once at the end, so a
   1000 Myr pair would show the same 6 to 11 s inside the noise of a 20-minute run. The full run's
   figure is therefore 1,242.8 s less 6 to 11 s by arithmetic, not measured.
+
+**Phase 2: the L1 relink and the climate cells** (2026-10-19; branch `gpu-phase2` from master
+b337fa73, the climate sub-agent's branch merged in).
+
+*Correctness on lavapipe*: sections 13 and 14.
+
+*Whole history, CPU against GPU.* The carbon cycle carries a last-bit difference into CO2, so the
+comparison runs a whole history from scratch (section 12): `deeptime stage volcanoes --preset
+earthlike_full_16k --start scattered_continents --length-myr 100 --threads 8 --set seed=1
+--compute cpu|gpu` on the VM (lavapipe held to 8 threads), then `tools/review/p1-17-hyps.py`
+and `p1-17-cmp.py`. To tell a GPU's difference from the model's own sensitivity, the same planet
+also ran on the CPU with one f32 ulp flipped in the first weight of every covered cell (a
+temporary switch, not committed). The laptop's rows are the A/B benches below (their land
+figures from the bench's `surface_final` line, which can differ from the stage's hypsometry in
+the last digit).
+
+| world | CO2 ppm | T °C | glaciated land | sea level m | land | land z50 m | land z90 m | land over 2 km |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| CPU (VM; the merged branch's CPU path gives the same to the digit) | 735 | 15.5 | 0.062 | 36.9 | 0.239 | 463 | 1,785 | 0.088 |
+| CPU, one weight an ulp off (VM) | 653 | 14.5 | 0.083 | 31.4 | 0.263 | 466 | 1,866 | 0.093 |
+| GPU relink, lavapipe (VM) | 619 | 14.8 | 0.058 | 37.5 | 0.257 | 457 | 1,487 | 0.070 |
+| GPU relink and cells, lavapipe (VM) | 597 | 14.7 | 0.054 | 38.3 | 0.259 | 453 | 1,438 | 0.068 |
+| GPU relink, Radeon 8050S (laptop, three runs alike) | 641 | 14.5 | 0.082 | 31.2 | 0.264 | 465 | 1,855 | 0.096 |
+RADEON_ALL_ROW
+
+- A one-ulp change on the CPU moves this planet as far as either GPU does: CO2 by 82 ppm, the
+  mean temperature by 1.0 °C, the glaciated share by a third, the sea level by 5.5 m. So the
+  differences are the model's sensitivity to its last bit, not an error of the kernels, and the
+  GPU worlds sit inside the spread of the CPU's own. The land's 90th percentile is lower in
+  both lavapipe worlds and higher in the Radeon's and the jittered CPU's: no sign of a bias.
+- `p1-17-cmp.py`: the keyframes differ from the first (kf-0), as expected once the first
+  sampling's weights differ in the last bits.
+- Each world is reproducible on its own device: the three Radeon runs of a set ended on the same
+  figures.
+
+*Speed: the laptop's Radeon 8050S*, as in Phase 1 (binary built on the VM, `systemd-run --user
+--scope -p CPUQuota=800% nice -n 19 deeptime bench --preset earthlike_full_16k --start
+scattered_continents --length-myr 100 --threads 8 --compute auto|cpu`, three pairs alternating
+which goes first). Seconds per 100 Myr, mean of three; `auto` also runs the amplifier on the
+GPU (section 10 above).
+
+| set | arm | wall | plates stage | write_l1 | relink (CPU part) | device | tree (beside the device) | layers | amplify |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| relink | CPU | 326.6 | 34.0 | 14.9 | 8.8 | | 1.4 | 3.8 | 52.7 |
+| | GPU | 303.9 | 28.6 | 9.2 | 2.4 | 1.0 | 1.7 | 3.8 | 28.1 |
+CELLS_ROWS
+
+- The relink: 8.8 s on the CPU becomes 1.0 s on the device beside the k-d tree's build and
+  2.4 s of CPU work for the 5.3 % of cells the device leaves (3,566,358 of 67,174,400 over the
+  run); `write_l1` 14.9 to 9.2 s, 1.6 times faster, 5.7 s per 100 Myr.
+- The wall times are of different worlds once the GPU is on (the table above), so they mix the
+  kernels' gain with the world's own cost; the kernels' laps are the cleaner figure.
 
 ## 11. Natives build per platform
 
@@ -368,33 +443,96 @@ after the climate, so its CO2 is the checkpoint's in both arms: 551.208 ppm.)
 3. **`surface:diffusion_solve`** (row 2), after the multigrid branch: if multigrid lands, a GPU
    V-cycle (restriction, smoothing and prolongation are stencils), else the PCG with defect
    correction against an f64 residual. 70 to 90 s.
-4. **`plates:write_l1`** (row 3), free now, and the largest free kernel; the next port. Plates
-   part 2 made it one nearest query per cell, then the cover walk in that sample's group, with
-   the six-nearest search only where that fails, and all 30 layers in one pass (19.5 s per
-   200 Myr on the loaded VM after, 29.6 before). On the device: (a) per step, the visible
-   samples' positions bucketed on a cube-face grid of about one sample a bucket (a counting sort
-   on the CPU, 250 k entries) and their fields uploaded (about 25 MB); the lattice mesh
-   (triangles, a triangle per vertex, the walk's neighbours) once per resampling; (b) one
-   invocation per L1 cell: the nearest visible sample from the 3 x 3 buckets around the cell,
-   the walk (`Mesh::locate`) in that group's frame, the all-the-group's and none-hidden test,
-   the barycentric weights; (c) for covered cells the 30 layers; (d) every other cell (boundary
-   strips and gaps, a small share) flagged and finished on the CPU by today's code, so the rare
-   paths (six and 32 nearest, the gap crust) need no WGSL. f32 on unit vectors resolves about
-   1e-7 rad (under a metre on Earth's radius), so only ties (equidistant samples, a point on a
-   triangle edge) can change a link, which Ben's decision allows; the tolerance test compares
-   the links (equal but for ties) and the layers (f32 rounding). The 30 layers are 160 MB a
-   step to download unless the surface keeps them resident (item 1). First step: time the
-   relink against the layer pass on the CPU, since the split decides whether (c) is worth
-   moving at all. Estimated 50 to 75 s before plates part 2; less now, by its share.
+4. **`plates:write_l1`** (row 3): **the relink is ported** (2026-10-19, section 13); the layers
+   stay on the CPU, since the split measured first gave the relink 5.0 s and the layer pass
+   1.8 s of the CPU's 8.3 s per 100 Myr, and moving the layers would download 160 MB a step.
 5. **`surface:advect` and `climate:topography`** (rows 5 and 9) together: one semi-Lagrangian
    gather kernel for the continuous fields; the strata log stays on the CPU. 23 to 36 s.
-6. **`climate snapshot:cells`** (row 4), free now: the per-cell months on the device, the row
-   march and the sums that feed the carbon cycle on the CPU. The merged CPU work cut the row loop
-   from 12.1 to 3.8 s per 100 Myr (loaded VM), so the gain is now about 10 to 20 s per 1000 Myr;
-   it is a large port (f64 closures over the belts, the regimes and two upwind passes) for that.
+6. **`climate snapshot:cells`** (row 4): **ported** (2026-10-19, section 14): the per-cell months
+   on the device, the row march and the sums that feed the carbon cycle on the CPU in f64.
+   `snapshot:ebm2d` (row 11) stays on the CPU: 864 steps of about seven dependent phases a
+   snapshot are about 6,000 global barriers, its line solves have 41 or 128 lines each, and f32
+   would lose its exact f64 conservation while f64 runs at a sixteenth to a thirty-second of the
+   rate on consumer GPUs; at best 15 to 25 s per 1000 Myr for a rewrite of about 1,900 lines.
    The deposits stage (row 7) is free too and larger, but needs its rule interpreter in WGSL.
 7. **`surface:flexure`** (row 6): needs an FFT in WGSL for sizes that are not powers of two
    (Bluestein, or padding to the next power of two with the preconditioner adjusted). 20 to 28 s.
 8. **The amplifier's mountain character** (7.6 s, no branch in the way): a per-cell noise sum on
    the window already on the device. Small, but it is the rest of the amplify stage's grid work
    and the window is already resident. 5 to 6 s.
+
+## 13. The plates' L1 relink on the GPU (what was ported)
+
+- **Where the time was (measured first).** The compute gauge's laps on a full 16k, 8-thread,
+  100 Myr CPU bench on the VM (`deeptime bench --preset earthlike_full_16k --start
+  scattered_continents --length-myr 100 --threads 8 --compute cpu`, 2026-10-19, loaded VM):
+  `write_l1` 8.3 s, of it the relink 5.0 s, the 30-layer pass 1.8 s and the visible samples'
+  k-d tree 0.9 s. So the relink moved and the layers did not: they are a fifth of the kernel, and
+  on the device they would cost a 160 MB download a step (30 layers of 1.34 M cells) plus about
+  30 per-sample fields up, against 36 ms a step of CPU work on the VM.
+- **Dispatch point (read, `plates/l1.rs`).** `sample` asks `compute::ambient_device` for the
+  session's device (the plates get no `StageContext`; the session's pool carries the mode on each
+  worker, section 2), and `sample_with` runs the device's relink beside the k-d tree's build
+  (`rayon::join`). In `Coupling::relink`'s pass a cell the device settled takes its link and is
+  COVERED; every other cell runs today's CPU code. `plates/mod.rs` is untouched.
+- **Algorithm (read, `plates/l1/gpu.rs`).** Per call, on the CPU: the visible samples
+  counting-sorted into latitude bands one spacing tall, each band cut into as many longitude
+  buckets as its circumference holds spacings; the groups' inverse rotations; each sample's
+  triangle and group (with a hidden bit). Per resampling: the lattice's points, triangles and
+  their neighbours. One invocation per L1 cell: its unit vector from the coupling's own row and
+  column sines and cosines; the nearest visible sample within 1.2 spacings over the buckets the
+  cap touches (ties to the lower index); the cell rotated into that sample's group frame; a walk
+  of at most 48 steps from the sample's triangle, each edge's orientation computed from the lower
+  vertex so two neighbours never disagree; the test that the three corners are that group's and
+  visible; the barycentric weights, and the nearest corner as the CPU picks it (the first largest
+  weight). A cell that finds no sample within the cap, fails the test or does not arrive comes
+  back marked for the CPU. One dispatch over the grid in bands of rows (section 5).
+- **Residency.** The pipeline and the buffers stay in a session-scoped slot
+  (`Ambient::kept`), so a server holds no device memory for a world after its session; the mesh
+  is uploaded again only when the lattice changes. Sizes: section 4.
+- **Precision and error budget.** f32 on unit vectors resolves about 1e-7 rad, so a link differs
+  from the CPU's only at a tie (two samples equally near, or a cell on an edge); the weights
+  differ by f32 rounding. Budget, checked by
+  `plates::l1::gpu::tests::the_gpu_relink_matches_the_cpu_but_at_ties` on a 6,000-sample planet
+  stepped 60 Myr from a supercontinent, six samplings: fewer than a fifth of the cells left to the
+  CPU, fewer than one link in 1,000 different, weights within 1e-4, fewer than one layer value
+  in 1,000 off by more than 1e-4 of its layer's largest (NaN equal to NaN). Measured on lavapipe:
+  125,952 cells, 11.6 % left to the CPU, no link different, weights within 1.6e-5, no value off.
+- **What stays on the CPU.** The k-d tree (for the CPU's cells), the cells the device leaves
+  (5.3 % on the full 16k: boundary strips, gaps, cells another group covers), the six- and
+  32-nearest searches, the gap crust and all 30 layers. Porting the second-group search would
+  take part of the 2.4 s (per 100 Myr on the laptop) the CPU's cells still cost.
+
+## 14. The climate snapshot's cells on the GPU (what was ported)
+
+Ported by a sub-agent (branch `worktree-agent-a0a9401013662f19b`, merged into this branch); the
+science page is `docs/science/per-cell-climate.md`, "Down to L1 on a GPU".
+
+- **Dispatch point (read, `climate/snapshot.rs`).** `snapshot::CellsDevice` (`name`,
+  `host_bytes`, `cells`), called from `compute_on(.., dev)`; `compute` keeps its signature and
+  passes none. The stage finds the device once, at its first snapshot, through
+  `compute::device(ctx.compute, ctx.log)`, and drops it after an error (a warning; the rest of
+  the run's snapshots run on the CPU). The counts are kept in the stage's checkpoint state, so a
+  resumed run's note counts every snapshot.
+- **On the device (`climate/gpu.rs`).** Step 5 of a snapshot, one invocation per L1 cell with
+  its twelve months: the belt rain and the mountain rain, the masked bilinear of the coarse
+  tiles, the coast blend, the winter inversion, sea ice and its sharpened edge, aridity, the
+  equilibrium line, Köppen and the glacier flag. In chunks of 2^18 cells (128 rows; six on the
+  full 16k's L1), equal bit for bit to one dispatch.
+- **On the CPU.** Everything the cells read (the zonal and 2-D models, the coarse tiles, the
+  distances to the sea and the basins, the sea's departure from its row, the air's march along
+  each row, the mountain rain's regimes, each row's and column's factors in f64, uploaded) and
+  everything that reads them: the anomalies, `ice_cover` and `land_terms`, whose sums feed the
+  carbon cycle and stay f64 in their present order (section 12). The banded climate, the
+  moisture budget and the upwind rain stay on the CPU entirely.
+- **Sizes (read, full 16k).** About 32.5 MiB on the device (56.5 MiB on the last snapshot, which
+  keeps the months); 113 MB up and 54 MB down a call (129 MB more on the last). 103 calls per
+  1000 Myr. The buffers are optional like the relink's (section 4).
+- **Precision and error budget.** `climate::tests::the_gpu_cells_stay_within_their_error_budget_of_the_cpu`
+  on the terrain of a 20 Myr scattered-continents run (L1 256 x 82, 5,990 land cells) under
+  today's climate and a cold one: budgets 0.01 K, 1e-4 relative on rain, aridity and the
+  equilibrium line, 1e-4 on sea ice, classes equal but at thresholds. Measured on lavapipe:
+  temperatures within 7.6e-6 K, rain 1.2e-6 relative, aridity 7.1e-7, the equilibrium line
+  1.5 mm, sea ice 2.4e-7, no Köppen class or glacier flag different (cells within rounding of a
+  model threshold are left out of the comparison: 5 for the rain regimes, 110 to 390 for
+  Thornthwaite's steps).
