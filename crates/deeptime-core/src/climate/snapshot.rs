@@ -270,11 +270,54 @@ pub fn compute(
         .collect();
     let mut er = ep.run(ebm, &land_frac, &sheet, years);
     time(&mut millis, "ebm", started);
-    // The per-cell climate (P1-26) on the coarse grid.
-    let mut pc: Option<super::percell::Coarse> = None;
-    if per_cell {
+    // The per-cell climate (P1-26) on the coarse grid, and the zonal model's flux correction to
+    // its zonal means (design §4.1): the clock's model, its references and its state from here
+    // are the corrected ones. P1-19 (#14): beside them run the fields only the land mask decides
+    // (the land and sea nearby, the basins, the winter inversion's continental share and each
+    // row's monthly sunlight), so that their blurs fill the cores the 2-D model's serial parts
+    // leave idle. (The timings of the two sides overlap.)
+    let hemi: [f64; 12] =
+        std::array::from_fn(|m| belts::hemispheric_shift(p, inp.planet.axial_tilt_deg, m));
+    let land_fields = || {
         let started = Instant::now();
-        pc = Some(super::percell::run(
+        let mut land_near: Vec<f64> = land.iter().map(|&l| if l { 1.0 } else { 0.0 }).collect();
+        box_blur(&inp.d, &mut land_near, cells(500.0), 2);
+        let mut sea_near: Vec<f64> = land.iter().map(|&l| if l { 0.0 } else { 1.0 }).collect();
+        box_blur(&inp.d, &mut sea_near, cells(p.coast_km), 2);
+        let true_km = |j: usize| dx * inp.lat[j].to_radians().cos().max(0.0) / (1000.0 * scale);
+        let basin = belts::basin_position(&inp.d, &land, &true_km, cells(300.0));
+        let interior: Vec<f64> = if per_cell {
+            let mut v: Vec<f64> = land.iter().map(|&l| if l { 1.0 } else { 0.0 }).collect();
+            box_blur(&inp.d, &mut v, cells(super::percell::INTERIOR_KM), 2);
+            v
+        } else {
+            Vec::new()
+        };
+        let q_month: Vec<[f64; 12]> = inp
+            .lat
+            .iter()
+            .map(|&l| {
+                std::array::from_fn(|m| {
+                    super::insolation::monthly(ep.s0, l.to_radians(), m, ep.obliquity_rad, 4)
+                })
+            })
+            .collect();
+        (
+            land_near,
+            sea_near,
+            basin,
+            interior,
+            q_month,
+            started.elapsed().as_secs_f64() * 1000.0,
+        )
+    };
+    let per_cell_climate = || {
+        let mut ms: Vec<(&'static str, f64)> = Vec::new();
+        if !per_cell {
+            return (None, None, None, ms);
+        }
+        let started = Instant::now();
+        let c = super::percell::run(
             &super::percell::Inputs {
                 p,
                 w,
@@ -294,21 +337,24 @@ pub fn compute(
                 day_length_h: inp.planet.day_length_h,
             },
             cell,
-        ));
-        time(&mut millis, "ebm2d", started);
-        for &(what, secs) in pc.as_ref().map_or(&[][..], |c| c.timing.as_slice()) {
-            *millis.entry(what).or_insert(0.0) += secs * 1000.0;
+        );
+        ms.push(("ebm2d", started.elapsed().as_secs_f64() * 1000.0));
+        for &(what, secs) in &c.timing {
+            ms.push((what, secs * 1000.0));
         }
-    }
-    // The zonal model's flux correction to the 2-D zonal means (design §4.1): the clock's model,
-    // its references and its state from here are the corrected ones.
-    let mut fit = None;
-    if let Some(c) = &pc {
         let started = Instant::now();
-        let (f, e) = super::percell::fit_flux(c, &ep, &land_frac, &sheet, ebm);
+        let (f, e) = super::percell::fit_flux(&c, &ep, &land_frac, &sheet, ebm);
+        ms.push(("flux_fit", started.elapsed().as_secs_f64() * 1000.0));
+        (Some(c), Some(f), Some(e), ms)
+    };
+    let ((land_near, sea_near, basin, interior, q_month, belts_ms), (mut pc, fit, fitted, pc_ms)) =
+        rayon::join(land_fields, per_cell_climate);
+    for (what, ms) in pc_ms {
+        *millis.entry(what).or_insert(0.0) += ms;
+    }
+    *millis.entry("belts").or_insert(0.0) += belts_ms;
+    if let Some(e) = fitted {
         er = e;
-        fit = Some(f);
-        time(&mut millis, "flux_fit", started);
     }
     let started = Instant::now();
     let t_o: Vec<[f64; 12]> = inp
@@ -323,12 +369,8 @@ pub fn compute(
         .collect();
     time(&mut millis, "ebm", started);
 
-    // 2. Land and sea nearby; the ITCZ; the basins and their gyres.
+    // 2. The ITCZ; the sea's departure from its row.
     let started = Instant::now();
-    let mut land_near: Vec<f64> = land.iter().map(|&l| if l { 1.0 } else { 0.0 }).collect();
-    box_blur(&inp.d, &mut land_near, cells(500.0), 2);
-    let mut sea_near: Vec<f64> = land.iter().map(|&l| if l { 0.0 } else { 1.0 }).collect();
-    box_blur(&inp.d, &mut sea_near, cells(p.coast_km), 2);
     let itcz = match &pc {
         Some(pc) => pc.itcz_l1(),
         None => belts::itcz(
@@ -342,13 +384,10 @@ pub fn compute(
             cells(p.itcz_smooth_km),
         ),
     };
-    let hemi: [f64; 12] =
-        std::array::from_fn(|m| belts::hemispheric_shift(p, inp.planet.axial_tilt_deg, m));
-    let true_km = |j: usize| dx * inp.lat[j].to_radians().cos().max(0.0) / (1000.0 * scale);
-    let basin = belts::basin_position(&inp.d, &land, &true_km, cells(300.0));
     // The sea's departure from its row: the per-cell climate's own (its gyres and conveyor), or
     // the prescribed gyre offsets of the banded climate.
     let dsst: Vec<f64> = (0..n)
+        .into_par_iter()
         .map(|c| {
             if land[c] {
                 0.0
@@ -359,83 +398,74 @@ pub fn compute(
             }
         })
         .collect();
-    // The winter inversion's continental share within 1,000 km and each row's monthly sunlight.
-    let interior: Vec<f64> = if per_cell {
-        let mut v: Vec<f64> = land.iter().map(|&l| if l { 1.0 } else { 0.0 }).collect();
-        box_blur(&inp.d, &mut v, cells(super::percell::INTERIOR_KM), 2);
-        v
-    } else {
-        Vec::new()
-    };
-    let q_month: Vec<[f64; 12]> = inp
-        .lat
-        .iter()
-        .map(|&l| {
-            std::array::from_fn(|m| {
-                super::insolation::monthly(ep.s0, l.to_radians(), m, ep.obliquity_rad, 4)
-            })
-        })
-        .collect();
     time(&mut millis, "belts", started);
 
-    // 3. Orographic precipitation for each wind regime, over the rows it can reach.
-    let started = Instant::now();
-    let need: Vec<[bool; REGIMES]> = (0..hgt)
-        .into_par_iter()
-        .map(|j| {
-            let phi = inp.lat[j];
-            let (mut lo, mut hi) = (f64::MAX, f64::MIN);
-            for s in &itcz {
-                for m in 0..12 {
-                    let sh = belts::shift(phi, s[m], hemi[m]);
-                    lo = lo.min(sh);
-                    hi = hi.max(sh);
+    // 3. Orographic precipitation for each wind regime, over the rows it can reach (P1-19, #14:
+    // run beside the winds' marches of section 4, which need none of it).
+    let oro_stage = || {
+        let started = Instant::now();
+        let need: Vec<[bool; REGIMES]> = (0..hgt)
+            .into_par_iter()
+            .map(|j| {
+                let phi = inp.lat[j];
+                let (mut lo, mut hi) = (f64::MAX, f64::MIN);
+                for s in &itcz {
+                    for m in 0..12 {
+                        let sh = belts::shift(phi, s[m], hemi[m]);
+                        lo = lo.min(sh);
+                        hi = hi.max(sh);
+                    }
                 }
-            }
-            let mut out = [false; REGIMES];
-            let steps = (((hi - lo) / 0.5).ceil() as usize).max(1);
-            for k in 0..=steps {
-                let sh = lo + (hi - lo) * k as f64 / steps as f64;
-                let wt = belts::regime_weights(phi, phi - sh);
-                for r in 0..REGIMES {
-                    out[r] |= wt[r] > 0.0;
+                let mut out = [false; REGIMES];
+                let steps = (((hi - lo) / 0.5).ceil() as usize).max(1);
+                for k in 0..=steps {
+                    let sh = lo + (hi - lo) * k as f64 / steps as f64;
+                    let wt = belts::regime_weights(phi, phi - sh);
+                    for r in 0..REGIMES {
+                        out[r] |= wt[r] > 0.0;
+                    }
                 }
-            }
-            out
-        })
-        .collect();
-    let winds = belts::winds(p);
-    let omega = std::f64::consts::TAU / (inp.planet.day_length_h * 3600.0) * (1.0 + 1.0 / 365.25);
-    let oro_p = OroParams {
-        conv_time_s: p.oro_conv_time_s,
-        fall_time_s: p.oro_fall_time_s,
-        nm: p.oro_nm,
-        hw_m: p.oro_hw_m,
-        cw: p.oro_cw_kg_m3,
+                out
+            })
+            .collect();
+        let winds = belts::winds(p);
+        let omega =
+            std::f64::consts::TAU / (inp.planet.day_length_h * 3600.0) * (1.0 + 1.0 / 365.25);
+        let oro_p = OroParams {
+            conv_time_s: p.oro_conv_time_s,
+            fall_time_s: p.oro_fall_time_s,
+            nm: p.oro_nm,
+            hw_m: p.oro_hw_m,
+            cw: p.oro_cw_kg_m3,
+        };
+        // (The regimes' transforms side by side: P1-19, #14. Each is its own, so the fields are the
+        // serial loop's.)
+        let oro: Vec<Vec<f32>> = (0..REGIMES)
+            .into_par_iter()
+            .map(|r| {
+                let rows: Vec<usize> = (0..hgt).filter(|&j| need[j][r]).collect();
+                let mut field = vec![0.0f32; if rows.is_empty() { 0 } else { n }];
+                if let (Some(&j0), Some(&j1)) = (rows.first(), rows.last()) {
+                    let margin = 12;
+                    let (a, b) = (j0.saturating_sub(margin), (j1 + margin + 1).min(hgt));
+                    let band: Vec<f64> = z[a * w..b * w].to_vec();
+                    let f = 2.0 * omega * REGIME_LAT_DEG[r].to_radians().sin();
+                    let (u, v) = winds[r];
+                    let rate =
+                        orographic::precipitation(&band, w, b - a, dx, dx, u, v, f, &oro_p, 24);
+                    for j in j0..=j1 {
+                        for i in 0..w {
+                            field[j * w + i] = rate[(j - a) * w + i] as f32;
+                        }
+                    }
+                }
+                field
+            })
+            .collect();
+        (oro, started.elapsed().as_secs_f64() * 1000.0)
     };
-    let mut oro: Vec<Vec<f32>> = Vec::with_capacity(REGIMES);
-    for r in 0..REGIMES {
-        let rows: Vec<usize> = (0..hgt).filter(|&j| need[j][r]).collect();
-        let mut field = vec![0.0f32; if rows.is_empty() { 0 } else { n }];
-        if let (Some(&j0), Some(&j1)) = (rows.first(), rows.last()) {
-            let margin = 12;
-            let (a, b) = (j0.saturating_sub(margin), (j1 + margin + 1).min(hgt));
-            let band: Vec<f64> = z[a * w..b * w].to_vec();
-            let f = 2.0 * omega * REGIME_LAT_DEG[r].to_radians().sin();
-            let (u, v) = winds[r];
-            let rate = orographic::precipitation(&band, w, b - a, dx, dx, u, v, f, &oro_p, 24);
-            for j in j0..=j1 {
-                for i in 0..w {
-                    field[j * w + i] = rate[(j - a) * w + i] as f32;
-                }
-            }
-        }
-        oro.push(field);
-    }
-    time(&mut millis, "orographic", started);
 
     // 4. Row by row: the winds' march, twelve months per cell, the annual fields.
-    let started = Instant::now();
     let mp = MarchParams {
         recharge: km(p.ocean_recharge_km),
         moisture_decay: km(p.moisture_decay_km),
@@ -452,9 +482,10 @@ pub fn compute(
     // mix across rows).
     // (Not under the upwind rain, whose budget carries the moisture and the sea's marks.)
     let upwind_mode = pc.is_some() && p.rain_model == super::RainModel::Upwind;
-    let air: [Vec<f64>; 8] = if upwind_mode {
-        Default::default()
-    } else {
+    let air_stage = || -> [Vec<f64>; 8] {
+        if upwind_mode {
+            return Default::default();
+        }
         let marches: Vec<(lapse::Carried, lapse::Carried)> = (0..hgt)
             .into_par_iter()
             .map(|j| {
@@ -473,46 +504,66 @@ pub fn compute(
                 )
             })
             .collect();
-        let gather = |f: &dyn Fn(&lapse::Carried) -> &Vec<f64>, east: bool| -> Vec<f64> {
+        // The eight fields (q, maritime, basin and dsst, east then west) blur side by side
+        // (P1-19, #14); each is its own, so the values are those of one after the other.
+        let gather = |k: usize| -> Vec<f64> {
+            let east = k.is_multiple_of(2);
             let mut v: Vec<f64> = marches
                 .iter()
-                .flat_map(|(e, wv)| f(if east { e } else { wv }).iter().copied())
+                .flat_map(|(e, wv)| {
+                    let c = if east { e } else { wv };
+                    match k / 2 {
+                        0 => &c.q,
+                        1 => &c.maritime,
+                        2 => &c.basin,
+                        _ => &c.dsst,
+                    }
+                    .iter()
+                    .copied()
+                })
                 .collect();
             box_blur(&inp.d, &mut v, cells(p.air_mixing_km), 2);
             v
         };
-        [
-            gather(&|c| &c.q, true),
-            gather(&|c| &c.q, false),
-            gather(&|c| &c.maritime, true),
-            gather(&|c| &c.maritime, false),
-            gather(&|c| &c.basin, true),
-            gather(&|c| &c.basin, false),
-            gather(&|c| &c.dsst, true),
-            gather(&|c| &c.dsst, false),
-        ]
+        let fields: Vec<Vec<f64>> = (0..8).into_par_iter().map(gather).collect();
+        fields.try_into().expect("eight fields")
     };
+    let ((oro, oro_ms), (air, march_ms)) = rayon::join(oro_stage, || {
+        let started = Instant::now();
+        let air = air_stage();
+        (air, started.elapsed().as_secs_f64() * 1000.0)
+    });
+    *millis.entry("orographic").or_insert(0.0) += oro_ms;
+    *millis.entry("march").or_insert(0.0) += march_ms;
+    let started = Instant::now();
     // The circulation's rain at L1 cell `c` in month `m` before the air's moisture, mm/yr (the
     // belt's rain under the subtropical highs' flanks, the cold sea's stability and the plateau
     // factor), and the moisture the march brings, 0–1.
     let plateau = |zz: f64| (-(zz - p.plateau_m).max(0.0) / p.plateau_scale_m).exp();
+    // (P1-19, #14: the hemispheric shift of month `m` is `hemi[m]`, found once; its limit `k` is
+    // the planet's.)
+    let onshore_k = (p.subtropical_shift_deg * inp.planet.axial_tilt_deg.to_radians().sin()
+        / 23.4f64.to_radians().sin())
+    .max(1e-9);
     let onshore = |phi: f64, m: usize| -> f64 {
-        let h = belts::hemispheric_shift(p, inp.planet.axial_tilt_deg, m);
-        let k = (p.subtropical_shift_deg * inp.planet.axial_tilt_deg.to_radians().sin()
-            / 23.4f64.to_radians().sin())
-        .max(1e-9);
-        (0.5 + 0.5 * h.signum() * phi.signum() * (h.abs() / k).min(1.0)).clamp(0.0, 1.0)
+        let h = hemi[m];
+        (0.5 + 0.5 * h.signum() * phi.signum() * (h.abs() / onshore_k).min(1.0)).clamp(0.0, 1.0)
     };
-    let circ = |c: usize, m: usize, carry: Option<(f64, f64)>| -> (f64, f64) {
-        let (i, j) = (c % w, c / w);
-        let phi = inp.lat[j];
-        let pb = phi - belts::shift(phi, itcz[i][m], hemi[m]);
-        let wt = belts::regime_weights(phi, pb);
+    // The circulation's rain at L1 cell `c` given its belt latitude `pb`, the regime weights `wt`
+    // there, the onshore share `on` of its row and month and the plateau factor `plat` of its
+    // height (each found once per row, month or cell by the caller, P1-19).
+    let circ_at = |c: usize,
+                   pb: f64,
+                   wt: &[f64; REGIMES],
+                   on: f64,
+                   plat: f64,
+                   carry: Option<(f64, f64)>|
+     -> (f64, f64) {
         let fe: f64 = (0..REGIMES).filter(|&r| EASTWARD[r]).map(|r| wt[r]).sum();
         let fw = 1.0 - fe;
         // Summer onshore flow round the subtropical highs' western flanks: east coasts from 15°
         // to 45° get easterly (sea) air for moisture whatever the belt says.
-        let fw_q = fw.max(onshore(phi, m) * p.onshore * belts::bump(pb.abs(), 30.0, 15.0));
+        let fw_q = fw.max(on * p.onshore * belts::bump(pb.abs(), 30.0, 15.0));
         let fe_q = 1.0 - fw_q;
         let (q, a_eff, d_eff) = if let (true, Some((a, d))) = (land[c], carry) {
             (1.0, a, d)
@@ -534,8 +585,16 @@ pub fn compute(
         let base = belts::belt_precip(pb)
             * belts::subsidence_factor(p, a_eff, pb)
             * (0.07 * d_eff).exp() // ledger: MOI-063
-            * plateau(z[c]);
+            * plat;
         (base, q)
+    };
+    // The same for one cell and month, finding the rest (the upwind rain's coarse averages).
+    let circ = |c: usize, m: usize, carry: Option<(f64, f64)>| -> (f64, f64) {
+        let (i, j) = (c % w, c / w);
+        let phi = inp.lat[j];
+        let pb = phi - belts::shift(phi, itcz[i][m], hemi[m]);
+        let wt = belts::regime_weights(phi, pb);
+        circ_at(c, pb, &wt, onshore(phi, m), plateau(z[c]), carry)
     };
     // The upwind rain (`rain_model = upwind`, `upwind.rs`): the circulation's rain at the
     // reference water, averaged over each coarse cell (weighted by the L1 rows' areas), kg/m²/s,
@@ -691,6 +750,7 @@ pub fn compute(
         p_month: Vec<[f32; 12]>,
         ice: Vec<[f32; 3]>,
     }
+    let sharp = super::percell::Sharpen::new(p.sea_ice_edge_sharpness);
     let rows: Vec<Row> = (0..hgt)
         .into_par_iter()
         .map(|j| {
@@ -710,26 +770,32 @@ pub fn compute(
                 p_month: Vec::with_capacity(if inp.monthly { w } else { 0 }),
                 ice: vec![[0.0; 3]; w],
             };
+            // The row's onshore share each month (P1-19, #14: found once per row, not per cell).
+            let on_row: [f64; 12] = std::array::from_fn(|m| onshore(phi, m));
             for i in 0..w {
                 let c = r0 + i;
                 let mut t = [0.0f64; 12];
                 let mut t_sl = [0.0f64; 12];
                 let mut pm = [0.0f64; 12];
                 let mut ice = [0.0f64; 12];
+                // The cell's coarse neighbours and weights, and its height's plateau factor, found
+                // once for its twelve months.
+                let taps = pc.as_ref().map(|pc| pc.taps(c));
+                let plat = plateau(zr[i]);
                 for m in 0..12 {
                     let pb = phi - belts::shift(phi, itcz[i][m], hemi[m]);
                     let wt = belts::regime_weights(phi, pb);
                     let tsl = if land[c] {
-                        match &pc {
+                        match (&pc, &taps) {
                             // Per cell: the land tile, toward the sea's by the coast's sea share,
                             // less the winter inversion.
-                            Some(pc) => {
-                                let (tl, to) = pc.tiles(c, m);
+                            (Some(pc), Some(tp)) => {
+                                let (tl, to) = pc.tiles_at(tp, m);
                                 let inv =
                                     super::percell::inversion(p, tl, q_month[j][m], interior[c]);
                                 tl + sea_near[c] * (to - tl) - inv
                             }
-                            None => {
+                            _ => {
                                 let fe: f64 =
                                     (0..REGIMES).filter(|&r| EASTWARD[r]).map(|r| wt[r]).sum();
                                 let fw = 1.0 - fe;
@@ -740,15 +806,12 @@ pub fn compute(
                             }
                         }
                     } else {
-                        match &pc {
-                            Some(pc) => {
-                                ice[m] = super::percell::sharpen(
-                                    pc.ice_at(c, m),
-                                    p.sea_ice_edge_sharpness,
-                                );
-                                pc.tiles(c, m).1
+                        match (&pc, &taps) {
+                            (Some(pc), Some(tp)) => {
+                                ice[m] = sharp.apply(pc.ice_at_taps(tp, m));
+                                pc.sea_tile_at(tp, m)
                             }
-                            None => t_o[j][m] + dsst[c],
+                            _ => t_o[j][m] + dsst[c],
                         }
                     };
                     t_sl[m] = tsl;
@@ -759,7 +822,7 @@ pub fn compute(
                         }
                         _ => None,
                     };
-                    let (base0, q) = circ(c, m, cy);
+                    let (base0, q) = circ_at(c, pb, &wt, on_row[m], plat, cy);
                     let base = base0 * q;
                     let mut o = 0.0;
                     for r in 0..REGIMES {
@@ -875,18 +938,51 @@ pub fn compute(
         }
     }
     let lift = |c: usize| gamma * z[c];
-    s.d_mean = (0..n)
-        .map(|c| (f64::from(s.t_mean[c]) + lift(c) - s.refs.t_mean[c / w]) as f32)
-        .collect();
-    s.d_warm = (0..n)
-        .map(|c| (f64::from(s.t_warm[c]) + lift(c) - s.refs.t_warm[c / w]) as f32)
-        .collect();
-    s.d_cold = (0..n)
-        .map(|c| (f64::from(s.t_cold[c]) + lift(c) - s.refs.t_cold[c / w]) as f32)
-        .collect();
-    s.d_ln_precip = (0..n)
-        .map(|c| (f64::from(s.precip[c]).max(1e-3).ln() - s.refs.ln_precip[c / w]) as f32)
-        .collect();
+    // (The four anomaly fields side by side, cells in parallel: P1-19, #14.)
+    {
+        let (t_mean, t_warm, t_cold, precip) = (&s.t_mean, &s.t_warm, &s.t_cold, &s.precip);
+        let refs = &s.refs;
+        let ((d_mean, d_warm), (d_cold, d_ln_precip)) = rayon::join(
+            || {
+                rayon::join(
+                    || {
+                        (0..n)
+                            .into_par_iter()
+                            .map(|c| (f64::from(t_mean[c]) + lift(c) - refs.t_mean[c / w]) as f32)
+                            .collect::<Vec<f32>>()
+                    },
+                    || {
+                        (0..n)
+                            .into_par_iter()
+                            .map(|c| (f64::from(t_warm[c]) + lift(c) - refs.t_warm[c / w]) as f32)
+                            .collect::<Vec<f32>>()
+                    },
+                )
+            },
+            || {
+                rayon::join(
+                    || {
+                        (0..n)
+                            .into_par_iter()
+                            .map(|c| (f64::from(t_cold[c]) + lift(c) - refs.t_cold[c / w]) as f32)
+                            .collect::<Vec<f32>>()
+                    },
+                    || {
+                        (0..n)
+                            .into_par_iter()
+                            .map(|c| {
+                                (f64::from(precip[c]).max(1e-3).ln() - refs.ln_precip[c / w]) as f32
+                            })
+                            .collect::<Vec<f32>>()
+                    },
+                )
+            },
+        );
+        s.d_mean = d_mean;
+        s.d_warm = d_warm;
+        s.d_cold = d_cold;
+        s.d_ln_precip = d_ln_precip;
+    }
     s.band_sheet = {
         let glac = band_means(inp.lat, w, bands, &|c| f64::from(s.glacier[c]));
         glac.iter()
@@ -902,7 +998,7 @@ pub fn compute(
         reach.iter().cloned().fold(f64::MIN, f64::max),
     );
     let mut lz: Vec<f64> = (0..n).filter(|&c| land[c]).map(|c| z[c]).collect();
-    lz.sort_by(f64::total_cmp);
+    lz.par_sort_unstable_by(f64::total_cmp);
     if !lz.is_empty() {
         let q = |f: f64| lz[((lz.len() - 1) as f64 * f).round() as usize];
         let high = lz.iter().filter(|&&x| x > 2000.0).count() as f64 / lz.len() as f64;
