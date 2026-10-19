@@ -164,6 +164,7 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   - `cargo test --workspace`: all pass, deeptime-core lib 715 passed, 4 ignored.
   - `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo deny check licenses bans` are clean. Clippy's one finding, a type alias for the feedback's result (`Feedback`), was fixed and checked again.
   - `./gradlew build test`: tests=361, failures=0, skipped=2.
+  - After the measurements, master e2166684 (the climate and after-group items, no file in `plates/` or `sphere/`) was merged too. fmt, clippy, the core's plate and sphere tests (155 passed) and `tests/overlap.rs` pass on it.
 - **Not done.**
   - Sharing one visible-sample tree between `stats_margins` and `write_l1`. Each builds its own; they meet in a step only every 10 Myr, so the saving is small and would cost signature changes.
   - A kiddo scratch rewrite (`with_scratch` queries) for the neighbour searches.
