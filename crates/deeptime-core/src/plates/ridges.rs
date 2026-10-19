@@ -2,10 +2,10 @@
 //! Global resampling and oceanic crust generation (Cortial et al. 2019, §4.3 and §6), and the
 //! bookkeeping of plates that die.
 //!
-//! Every `resample_min_steps`–`resample_max_steps` steps (Cortial: 10–60, "depending on the
-//! observed maximum plate speed"; here when the fastest plate has moved `resample_drift_km`) the
-//! crust is resampled onto a fresh lattice: the Fibonacci sphere under a new random rotation,
-//! triangulated again by P1-02's hull.
+//! Every `resample_min_myr`–`resample_max_myr` (Cortial: 10–60 steps, "depending on the
+//! observed maximum plate speed", 20–120 Myr at the 2-Myr step; here when the fastest plate has
+//! moved `resample_drift_km`) the crust is resampled onto a fresh lattice: the Fibonacci sphere
+//! under a new random rotation, triangulated again by P1-02's hull.
 //!
 //! - A new sample inside a plate takes that plate's crust by barycentric interpolation ("the
 //!   parameters of the other sample points are computed using barycentric interpolation of crust
@@ -68,11 +68,12 @@ type Found = (Option<(u32, Cover)>, Vec<(u32, Cover)>);
 /// Whether a resampling is due after this step.
 pub fn due(state: &PlateState, env: &Env) -> bool {
     let k = env.k;
-    let since = state.step - state.resample_step;
-    if since < u64::from(k.resample_min_steps) {
+    // ledger: PLT-098 (the bounds are times: the steps they span follow the step's length)
+    let since_myr = (state.step - state.resample_step) as f64 * env.dt_myr;
+    if since_myr < k.resample_min_myr {
         return false;
     }
-    if since >= u64::from(k.resample_max_steps) {
+    if since_myr >= k.resample_max_myr {
         return true;
     }
     let vmax = state

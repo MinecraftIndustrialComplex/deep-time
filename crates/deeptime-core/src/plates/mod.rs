@@ -981,7 +981,7 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32]) {
         z_c: k.max_elevation_m,
         z_t: k.trench_elevation_m,
         z_floor: k.oceanic_floor_elevation_m,
-        trench_relax: k.trench_relax,
+        trench_relax: pools::trench_share(env.dt_myr, k.trench_half_life_myr),
         gravity: env.gravity,
     };
     let eroded: Vec<f64> = st
