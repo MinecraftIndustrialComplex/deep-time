@@ -674,7 +674,10 @@ fn baked_stacks_and_blended_columns_have_no_grade_inversion_and_no_sliver() {
 /// is not testing the case that used to panic. 80 Myr: on the Lambert planet after plate tasks 3
 /// and 4, 50 Myr reached at most 122 events a column over six seeds; 80 reaches 270 and 135.
 /// Since the force balance (plate task 7, 2026-10-05) the plates start at rest and collisions
-/// fold less: 80 Myr reached 92 and 120 Myr 124, so the runs are 200 Myr.)
+/// fold less: 80 Myr reached 92 and 120 Myr 124, so the runs were 200 Myr. With the climate
+/// snapshot every 20 Myr (P1-19 #27, 2026-10-18) 200 Myr reached 101 over the four runs (210 on
+/// one run with 10-Myr snapshots); 300 Myr reaches 162 to 286 on every run, so the runs are
+/// 300 Myr.)
 #[test]
 fn the_stage_never_panics_however_dense_the_structures() {
     let mut longest = 0u64;
@@ -688,7 +691,7 @@ fn the_stage_never_panics_however_dense_the_structures() {
         let json = with_timeline(
             planet_builtin("pipeline_quick_16k").unwrap(),
             Some(start),
-            Some(200.0),
+            Some(300.0),
         )
         .unwrap();
         let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
