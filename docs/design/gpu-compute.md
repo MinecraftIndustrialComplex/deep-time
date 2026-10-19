@@ -3,8 +3,8 @@
 Status: **infrastructure and the first kernel built and measured** (2026-10-18 to 2026-10-19;
 coordinator's task after Ben's decision of 2026-10-18, decisions log: "I am not worried about
 determinism, performance is far more important, if people want to share a world they can just
-share a zip of the finished render or some shit."). Branch `worktree-agent-a1265f3344b19b0c1` from master 584b1241. The aim is the
-P1-19 exit item 1 gate (full 16k, 8 threads, 1000 Myr, 900 s), which the 2026-10-18 profile put at
+share a zip of the finished render or some shit."). Branch `worktree-agent-a1265f3344b19b0c1`
+from master 584b1241, master e2166684 merged in. The aim is the P1-19 exit item 1 gate (full 16k, 8 threads, 1000 Myr, 900 s), which the 2026-10-18 profile put at
 1,242.8 s (`docs/design/p1-17-benchmark-gate.md`, "where the full 16k run's time goes";
 `review/pages/sim-time/data.js`).
 
@@ -147,10 +147,10 @@ step and are off the critical path, so they gain no wall time.
 | 1 | `surface:slope_failure` | 83.8 / 600.8 | Jacobi gather over open-sea neighbour pairs, 40 iterations (later ones on the last movers only) | h, sediment, sea mask up; dh down; 40 ping-pong dispatches | f32 on differences from the cell: slope tests within 0.3 mm at 5 km; budget 1 mm per step | 70 to 78 | full sweep instead of the sparse worklist; a CPU branch edits `marine.rs` now |
 | 2 | `surface:diffusion_solve` | 109.3 / 840.4 | backward Euler, 5-point flux Laplacian, ADI first guess, Jacobi-preconditioned CG, about 111 iterations, 1e-6 m | h, kd up; dh down; CG vectors resident | f32 cannot hold 1e-6 m on 5 km: solve for the increment against an f64 residual from the CPU (defect correction); budget 1e-6 m on dh | 70 to 90 | two global reductions an iteration; a multigrid branch in flight changes the solver |
 | 3 | `plates:write_l1` | 95.8 / 711.3 | per L1 cell: k-d tree 6-nearest over visible samples, a triangle walk, barycentric interpolation of about 14 fields | samples (250 k x about 30 fields) up; 14 L1 fields down | f32 angles with per-plate offsets; budget: the CPU's nearest-sample choice except at ties | 50 to 75 | a spatial hash replaces kiddo and the mesh walk (different tie-breaks); plates branches in flight |
-| 4 | `climate snapshot:cells` | 46.1 / 334.7 | per row an air march (a recurrence with floors), then per cell 12 months of T and P, Köppen, glaciers | about 15 fields up; f32 outputs down; 103 calls | per-cell months in f32 (temperatures to 0.01 K); the march stays a row scan | 20 to 30 | the march is serial along a row (656 rows); climate branch in flight |
+| 4 | `climate snapshot:cells` | 46.1 / 334.7 | per row an air march (a recurrence with floors), then per cell 12 months of T and P, Köppen, glaciers | about 15 fields up; f32 outputs down; 103 calls | per-cell months in f32 (temperatures to 0.01 K); the march stays a row scan; sums that feed the carbon cycle stay f64 (section 12) | 20 to 30 (less now: the merged climate branch cut the row loop about threefold) | the march is serial along a row (656 rows); the model is f64 closures over belts, regimes and two upwind passes |
 | 5 | `surface:advect` | 40.2 / 253.1 | semi-Lagrangian gather, per-plate rotation, bilinear fields, nearest for the 516 MB strata log | fields resident; the log only if its readers move too | rotation in f32 with a per-plate offset; budget one hundredth of a cell in position | 15 to 25 | the log's readers (fields, structure, bake) are on the CPU, so only the continuous fields move |
 | 6 | `surface:flexure` | 38.2 / 275.3 | PCG on the thin plate, FFT-spectral preconditioner, to 2 m or 60 iterations | loads, D, C up; deflection resident | f32 plausible: the stop is 2 m | 20 to 28 | an FFT in WGSL (no vendor FFT in wgpu), sizes not powers of two |
-| 7 | `deposits` (stage) | 82.0 / 319.0 | per frame: LZ4 decode, octagon window sums, a rule interpreter, TTI; a serial tail | accumulators resident; frames up (160 MB each) | i64 fixed point window sums kept exact in u32 pairs; rules in f32 | 15 to 30 | the rule interpreter has to become WGSL; decode and tail stay CPU |
+| 7 | `deposits` (stage) | 82.0 / 319.0 | per frame: LZ4 decode, octagon window sums, a rule interpreter, TTI; a serial tail | accumulators resident; frames up (160 MB each) | i64 fixed point window sums kept exact in u32 pairs; rules in f32 | 15 to 30 | the rule interpreter has to become WGSL; decode and tail stay CPU (the after-group branch is merged: free) |
 | 8 | `surface:glacial` | 33.5 / 170.4 | ice mass balance, flux down the D8 tree, a per-cell bisection of the SIA law | routing up; ice fields resident | f32 bisection to 0.1 m | 10 to 20 | tree order: level-synchronous dispatches |
 | 9 | `climate:topography` | 14.3 / 112.6 | the same gather as advection, for the ice and ELA fields | as 5 | as 5 | 8 to 11 | as 5 |
 | 10 | amplify middle (**ported**) | 12.0 of 24.0 | stream-power erosion (Jacobi flow), glacial valleys, thermal, deposition on L3 tiles | a window stays on the device for the whole middle | section 7 | measured, section 10 | none left |
@@ -254,7 +254,8 @@ whole). `tools/review/p1-17-cmp.py`: 61 files, 7 differ (the elevation, the deta
 the rivers, the horizons, the keyframe and its index, the manifest), as expected of f32 rounding.
 `tools/review/p1-17-hyps.py`: every figure the same to its printed precision (land 0.226, z50
 455 m, z90 1,908 m, above 2 km 0.094, ice 0.075, T 14.9 °C, ...); the stage's own summary too
-(mean change 37.6 m, eroded 2.458e4 km³, glacial carved 1.203e4 km³). Cell by cell (a scratch
+(mean change 37.6 m, eroded 2.458e4 km³, glacial carved 1.203e4 km³); CO2 551.208 ppm in both,
+as it must be, since the climate ran before the checkpoint. Cell by cell (a scratch
 script reading both worlds' tile packs): the baked elevation (6,656 x 3,329 cells in sixteenths
 of a block) differs in 0.0006 % of cells, by at most 0.12 blocks, and the detail amplitude in
 0.0001 %, by at most 0.06 blocks; no cell by a whole block. Wall time on the VM (not a speed
@@ -329,6 +330,23 @@ Each waits for the CPU branch now editing its code (the CPU result is the refere
 kernel ports the merged algorithm, not today's), and each gets one dispatch point and a tolerance
 test as in section 2.
 
+**Where the branches stand** (coordinator, 2026-10-19, master e2166684, merged into this branch):
+the climate (snapshot cells, ice, the 2-D model in larger pieces, the clock), plates part 1
+(transition, collapse, collision, record, `dijkstra_sparse`) and the after-group work (bake,
+horizons, keyframes, deposits, volcanoes, the allocator) are merged, so rows 4 and 7 are free.
+Still being edited: the surface (flood, diffusion and slope-failure memory, advection, fields and
+events, glacial, flexure), the surface solvers (multigrid, slope failure, the flood), plates part 2
+(feedback, belts, fronts, `write_l1` and its k-d tree) and the plate cadence.
+
+**The carbon cycle amplifies the last bit.** The climate branch found that changing only the
+order of two row-subtotal sums (`land_terms` and `snapshot::ice_cover`) moved a 100 Myr world's
+CO2 from 551 to 570 ppm, its mean temperature from 14.9 to 15.0 °C and its sea level from 32 to
+30 m (build log 2026-10-19). So any climate kernel keeps the sums that feed weathering and the ice
+cover in f64 on the CPU, or compensated (Kahan) in a fixed order on the device, and its CPU against
+GPU comparison runs the whole history, not from a checkpoint after the climate, and reports CO2,
+temperature and sea level beside the hypsometry. (The amplifier's comparison in section 10 starts
+after the climate, so its CO2 is the checkpoint's in both arms: 551.208 ppm.)
+
 1. **Resident surface fields first (infrastructure).** A per-session handle that keeps the L1
    height, sediment, erodibility and sea mask on the device across the surface substeps of one
    plate step, with one upload after advection and one download before the bake's readers. Without
@@ -345,8 +363,11 @@ test as in section 2.
    Ben's decision allows. 50 to 75 s.
 5. **`surface:advect` and `climate:topography`** (rows 5 and 9) together: one semi-Lagrangian
    gather kernel for the continuous fields; the strata log stays on the CPU. 23 to 36 s.
-6. **`climate snapshot:cells`** (row 4), after the climate branch: the per-cell months on the
-   device, the row march on the CPU. 20 to 30 s.
+6. **`climate snapshot:cells`** (row 4), free now: the per-cell months on the device, the row
+   march and the sums that feed the carbon cycle on the CPU. The merged CPU work cut the row loop
+   from 12.1 to 3.8 s per 100 Myr (loaded VM), so the gain is now about 10 to 20 s per 1000 Myr;
+   it is a large port (f64 closures over the belts, the regimes and two upwind passes) for that.
+   The deposits stage (row 7) is free too and larger, but needs its rule interpreter in WGSL.
 7. **`surface:flexure`** (row 6): needs an FFT in WGSL for sizes that are not powers of two
    (Bluestein, or padding to the next power of two with the preconditioner adjusted). 20 to 28 s.
 8. **The amplifier's mountain character** (7.6 s, no branch in the way): a per-cell noise sum on
