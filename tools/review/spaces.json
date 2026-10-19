@@ -83,6 +83,10 @@
     "space": "a5205c2a-4480-4578-8f0d-e9b8f774e326",
     "url": "https://spacesheep.dev/@benmac/deeptime-seams"
   },
+  "sim-time": {
+    "space": "4fb075c2-cd5c-4c64-8390-7762ad206bd0",
+    "url": "https://spacesheep.dev/@benmac/deeptime-sim-time"
+  },
   "world-shape": {
     "space": "09bee406-23d4-4016-8bf3-39d05ca45b83",
     "url": "https://spacesheep.dev/@benmac/deeptime-world-shape"
