@@ -158,7 +158,6 @@ pub fn sample(
 
     let k = env.k;
     let t = env.t_myr;
-    let mesh = &geo.mesh;
     let since = (t - state.resample_myr).max(env.dt_myr);
     let (zr, zf) = (k.ridge_elevation_m, k.oceanic_floor_elevation_m);
     let edge_z = |v: u32| {
@@ -204,7 +203,8 @@ pub fn sample(
     const CONT_HEAT: usize = 6;
     const POOL0: usize = 7;
     let continental = |v: u32| samples[v as usize].kind == CONTINENTAL;
-    let interp = coupling.interpolate_each(mesh, |v| {
+    const INTERP: usize = POOL0 + POOL_FIELDS.len();
+    let value = |v: u32| {
         let s = &samples[v as usize];
         let cont = continental(v);
         let mut out = [0.0f64; POOL0 + POOL_FIELDS.len()];
@@ -223,11 +223,20 @@ pub fn sample(
             out[POOL0 + k] = f64::from(s.pools[k]);
         }
         out
-    });
+    };
+    // A cell's interpolated fields, as `Coupling::interpolate_each` gives them, computed where
+    // the cell's layers are written (P1-19: every cell's row of them was collected first, about
+    // 150 MB a step on the full 16k planet).
+    let interp_at = |c: usize| -> [f64; INTERP] {
+        let l = &links[c];
+        let t = tris[l.tri as usize];
+        let v = [value(t[0]), value(t[1]), value(t[2])];
+        std::array::from_fn(|f| (0..3).map(|k| f64::from(l.w[k]) * v[k][f]).sum())
+    };
     let cells = links.len();
     // The deposit engine's inputs and the surface's basement (P1-04): the nearest sample's flags,
     // top rock pool and trench values; the rest interpolated.
-    let extra = |c: usize| -> [f32; 12] {
+    let extra = |c: usize, interp: &[f64; INTERP]| -> [f32; 12] {
         let s = &samples[links[c].nearest as usize];
         if info[c].mode == GAP {
             let age = gap_of(&info[c], links[c].nearest).1;
@@ -254,15 +263,15 @@ pub fn sample(
         [
             f32::from(s.flags),
             top,
-            interp[c][OXID] as f32,
+            interp[OXID] as f32,
             s.convergence_mm_yr,
             s.obliquity_deg,
             s.slab_age_myr,
-            interp[c][HEAT] as f32,
-            interp[c][THICK] as f32,
+            interp[HEAT] as f32,
+            interp[THICK] as f32,
             s.group as f32,
-            if s.kind == CONTINENTAL && interp[c][CONT_W] > 1.0e-6 {
-                (interp[c][CONT_HEAT] / interp[c][CONT_W]) as f32
+            if s.kind == CONTINENTAL && interp[CONT_W] > 1.0e-6 {
+                (interp[CONT_HEAT] / interp[CONT_W]) as f32
             } else {
                 f32::NAN
             },
@@ -273,21 +282,21 @@ pub fn sample(
     // The rock pools, interpolated like the other thicknesses (P1-07's basement columns,
     // `structure::columns`: the nearest sample's pools changed every other L1 cell and built
     // columns of alternating crust); gap cells get the fresh ridge crust the next resampling makes.
-    let pools = |c: usize| -> [f32; POOL_FIELDS.len()] {
+    let pools = |c: usize, interp: &[f64; INTERP]| -> [f32; POOL_FIELDS.len()] {
         if info[c].mode == GAP {
             super::pools::oceanic_column()
         } else {
-            std::array::from_fn(|k| interp[c][POOL0 + k].max(0.0) as f32)
+            std::array::from_fn(|k| interp[POOL0 + k].max(0.0) as f32)
         }
     };
-    let per_cell = |c: usize| -> [f32; 11] {
+    let per_cell = |c: usize, interp: &[f64; INTERP]| -> [f32; 11] {
         let l = links[c];
         let inf = info[c];
         let v = l.nearest;
         let s = &samples[v as usize];
         let plate = plate_of(v);
-        let mut z = interp[c][ELEV];
-        let mut up = interp[c][UPLIFT];
+        let mut z = interp[ELEV];
+        let mut up = interp[UPLIFT];
         let mut kind = f64::from(s.kind);
         let mut orogeny = f64::from(s.orogeny);
         let mut orogeny_age = if s.orogeny == OROGENY_NONE {
@@ -399,10 +408,11 @@ pub fn sample(
         .for_each(|(b, mut parts)| {
             for i in 0..parts[0].len() {
                 let c = b * BLOCK + i;
-                let values = per_cell(c)
+                let iv = interp_at(c);
+                let values = per_cell(c, &iv)
                     .into_iter()
-                    .chain(extra(c))
-                    .chain(pools(c))
+                    .chain(extra(c, &iv))
+                    .chain(pools(c, &iv))
                     .enumerate();
                 for (f, x) in values {
                     parts[f][i] = x;
