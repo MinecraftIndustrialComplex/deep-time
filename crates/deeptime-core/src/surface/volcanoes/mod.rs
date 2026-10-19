@@ -660,6 +660,8 @@ impl VolcanoStage {
             CoreError::InvalidState("the volcano stage runs after a plate step".into())
         })?;
         let t = plates.t_myr;
+        // The plate model resampled at this step, clearing its flags (below).
+        let resampled = plates.resample_step == plates.step;
         let dt = self.preset.dt_myr();
         let omega_now: Vec<[f64; 3]> = plates
             .plates
@@ -846,11 +848,13 @@ impl VolcanoStage {
         let strong = flux.iter().filter(|&&f| f >= p.arc_min_flux).count() as u64;
         st.counts.arc_flag_cells_max = st.counts.arc_flag_cells_max.max(flagged);
         st.counts.arc_cells_max = st.counts.arc_cells_max.max(strong);
-        // The plate model clears its flags on crust it resamples (every 10–60 steps, and at the
-        // last step): a step with a fifth of the last one's arc cells or fewer says nothing about
-        // the arcs, so the stratovolcanoes keep their state and none are born.
-        let flux_valid = flagged > 0 && flagged * 5 > st.last_flagged; // ledger: VOL-011
-        if flux_valid || st.last_flagged == 0 {
+        // The plate model clears its flags when it resamples (every 10–60 steps, at a suture and
+        // at the last step): that step says nothing about the arcs, so the stratovolcanoes keep
+        // their state and none are born. Any other step's flags are the arcs as they are, none
+        // included. (Until 2026-10-19 a step with a fifth of the last one's arc cells or fewer
+        // was taken for one, which on a coarse lattice also blinded real steps.) ledger: VOL-011
+        let flux_valid = !resampled;
+        if flux_valid {
             st.last_flagged = flagged;
         } else {
             st.counts.blind_steps += 1;
