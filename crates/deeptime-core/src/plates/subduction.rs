@@ -298,7 +298,7 @@ pub fn resolve(
         c.samples = agg.count;
         c.centroid = centroid.to_array();
         if c.onset_event.is_none()
-            && step - c.onset_step >= CONFIRM_STEPS
+            && step - c.onset_step >= confirm_steps(env.dt_myr)
             && agg.count >= confirm_samples
         {
             let conv = env.norm.speed_mm_yr(
@@ -443,8 +443,16 @@ fn reverse(
     Ok(())
 }
 
-/// Steps a contact must last before it is a subduction zone with an onset event …
-pub const CONFIRM_STEPS: u64 = 3;
+/// How long a contact must last before it is a subduction zone with an onset event, Myr (3 steps
+/// at the 2-Myr step) …
+// ledger: PLT-058 (game-choice, P1-03: long enough that a flicker at a transform boundary never
+// gets one).
+pub const CONFIRM_MYR: f64 = 6.0;
+
+/// The steps a contact must last at a step of `dt_myr`: the fewest that span [`CONFIRM_MYR`].
+pub fn confirm_steps(dt_myr: f64) -> u64 {
+    (CONFIRM_MYR / dt_myr).ceil() as u64
+}
 /// … while converging at least this fast (mm/yr) over at least max(3, n/10,000) samples.
 pub const CONFIRM_MM_YR: f64 = 10.0;
 
@@ -997,7 +1005,7 @@ fn w_arc_of(d_km: f64, k: &crate::params::TectonicParams) -> f64 {
     (-((d_km - k.arc_distance_km) / k.arc_width_km).powi(2)).exp()
 }
 
-/// Closes contacts unseen for `contact_timeout_steps` (or all of them when `all`), writing an
+/// Closes contacts unseen for longer than `contact_timeout_myr` (or all of them when `all`), writing an
 /// Andean orogeny_phase for those that uplifted continental crust and ending their collision
 /// states (`dynamics::CLOSED`, or `OPEN` at the end of the run). Returns the closed contacts'
 /// subducting plates with their onset events (the cause of a later plate death).
@@ -1008,16 +1016,17 @@ pub fn close_contacts(
     all: bool,
 ) -> Result<Vec<(u32, EventId)>, CoreError> {
     let (step, t_myr) = (env.step, env.t_myr);
-    let timeout = u64::from(env.k.contact_timeout_steps);
+    // ledger: PLT-059 (a time: the steps it spans follow the step's length)
+    let timeout = (env.k.contact_timeout_myr / env.dt_myr).floor() as u64;
     let mut closed = Vec::new();
     let mut keep = Vec::with_capacity(state.contacts.len());
     let alive: Vec<bool> = state.plates.iter().map(|p| p.alive).collect();
     for c in std::mem::take(&mut state.contacts) {
         let gone = !alive[c.under as usize] || !alive[c.over as usize];
-        // A collision keeps its contact while its front lives (`shortening::GRACE_STEPS`): two
+        // A collision keeps its contact while its front lives (`shortening::GRACE_MYR`): two
         // plates that have stalled against each other overlap no more, and must still weld.
         let colliding = c.collision.as_ref().is_some_and(|col| {
-            step.saturating_sub(col.last_step) <= super::shortening::GRACE_STEPS
+            step.saturating_sub(col.last_step) <= super::shortening::grace_steps(env.dt_myr)
         });
         if !(all || gone || (step.saturating_sub(c.last_step) > timeout && !colliding)) {
             keep.push(c);

@@ -126,6 +126,116 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-18: P1-19 #27, the coupled group's cadence: the rules that counted plate steps now count time, and the pipeline and earthlike presets take a climate snapshot every 20 Myr (SCL-038); coarser plate steps (3 and 4 Myr) were measured and not taken, since they raise the high ground by 1.5 to 2.5 km and warm the present (coordinator's task; agent worktree agent-ad506e74bf79d9520, branch worktree-agent-ad506e74bf79d9520 from master f221b3d3; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Per step to per Myr** (plates.md, "The coupled group's cadence"). `rift_lambda0` 0.012 became `rift_per_myr` 0.006 (PLT-082, PLT-083); `subduction_initiation_rate` 0.3 became `subduction_initiation_per_myr` 0.15 (PLT-063); `trench_relax` 0.5 became `trench_half_life_myr` 2.0, so the share is 1 − 0.5^(dt ÷ 2) (PLT-053); `resample_min_steps`/`_max_steps` 10/60 became `resample_min_myr`/`_max_myr` 20/120 (PLT-098); `contact_timeout_steps` 12 became `contact_timeout_myr` 24 (PLT-059). In the code, `CONFIRM_STEPS` 3 became `CONFIRM_MYR` 6, with a ceiling (PLT-058, CRE-025); `GRACE_STEPS` 3 became `GRACE_MYR` 6, with a floor (PLT-225); `LOST_AFTER_STEPS` 10 became `LOST_AFTER_MYR` 20 (DEF-035); `carbonate_clastic_m` 20 became `carbonate_clastic_m_myr` 10 (ERO-065). The per-step plate checks are scaled to 2 Myr of step (`TARGET_STEP_MYR`, a game-choice; CHK-008, CHK-009, CHK-030, CHK-031, PLT-150, PLT-151). The 13 presets, `planet_world_4k.json`, `editor_fields.json` and the share-code fixture's tuned case use the new keys (no compatibility). At 2 Myr everything is the same: `deeptime stage volcanoes`, `earthlike_quick_16k`, 40 Myr, seed 1, 4 threads, prints master's summary in every line but the timings.
+- **Settings tried.** `tools/review/force-balance-ensemble.sh <dir> <bin> <500|1000> 1,2,3 scattered_continents,supercontinent ck <tag> [--set ...]`, then `tools/review/p1-17-hyps.py` and a scratch table, on the VM (2 threads each, admitted). The settings: P4 `--set tectonics.time_step_myr=4`; P4S2 the same plus `--set surface.substeps=2`; P3 `--set tectonics.time_step_myr=3`; all three on the branch binary. C20 is `--set climate.snapshot_every_myr=20` on master's binary, which equals the branch at 2 Myr. Master is master's binary. The tables are in plates.md and climate.md. In brief (500 and 1000 Myr; highest cell; land above 2 km as a share of land; T; CO₂ as a geometric mean; checks moved out of master's seed range, of 45):
+  - **master:** 6,689 and 6,463 m; 0.206 and 0.215; 15.7 and 17.2 °C; 837 and 1,209 ppm.
+  - **P4:** 8,916 and 8,880 m; 0.290 and 0.329; 20.2 and 22.1 °C; 4,532 and 6,709 ppm; carbonate down 47 and 53 %; 9 and 12 checks moved.
+  - **P4S2:** 8,913 and 8,708 m; 0.231 and 0.347; 15.9 and 21.9 °C; 1,072 and 7,709 ppm; carbonate down 16 and 21 %; 6 and 13 checks moved.
+  - **P3:** 9,144 and 7,981 m; 0.342 and 0.269; 23.1 and 19.2 °C; 7,463 and 2,456 ppm; carbonate down 42 and 37 %; 4 and 5 checks moved.
+  - **C20:** 7,117 and 6,524 m; 0.238 and 0.205; 17.7 and 19.0 °C; 1,810 and 1,704 ppm (Mann–Whitney p ≈ 0.1 and 0.8); 1 check moved at each length.
+- **Every moved check** (mean outside master's run range; target status master → setting):
+  - **P4 at 500 Myr:**
+    - plate_life_p50 104.2 → 120.0 (pass, pass)
+    - land_gain_max 1.03 → 0.72 (pass, pass)
+    - collision_length_p90 118.7 → 161.3 (pass → FAIL)
+    - rot_change_p50 4.66 → 2.17 (pass, pass)
+    - arc_oceanic_emergent 8.6 → 11.3 (FAIL → pass)
+    - arc_oceanic_p90 −287 → 236 (pass, pass)
+    - arc_continental_p50 709 → 1,423 (FAIL → pass)
+    - arc_continental_p90 3,218 → 4,292 (pass, pass)
+    - foredeep_depth_p50 74 → 136 (FAIL, FAIL)
+  - **P4 at 1000 Myr:**
+    - land_gain_max 1.35 → 0.76 (pass, pass)
+    - continental_min 0.332 → 0.354 (FAIL, FAIL)
+    - speed_big_p90 74.3 → 75.2 (pass, pass)
+    - rot_change_p50 3.71 → 1.13 (pass, pass)
+    - rot_change_p90 26.1 → 23.5 (FAIL, FAIL)
+    - boundary_subduction 47.6 → 49.0 (FAIL, FAIL)
+    - arc_oceanic_emergent 10.6 → 13.7 (pass, pass)
+    - arc_oceanic_p90 73 → 593 (pass, pass)
+    - arc_continental_p50 817 → 1,526 (FAIL → pass)
+    - arc_continental_p90 3,425 → 4,438 (pass, pass)
+    - wedge_width_p50 0 → 11 (FAIL, FAIL)
+    - foredeep_depth_p50 78 → 15 (FAIL, FAIL)
+  - **P4S2 at 500 Myr:**
+    - land_gain_max 1.03 → 0.67 (pass, pass)
+    - speed_big_p90 74.6 → 79.1 (pass, pass)
+    - rot_change_p50 4.66 → 2.01 (pass, pass)
+    - arc_oceanic_emergent 8.6 → 11.6 (FAIL → pass)
+    - arc_oceanic_p90 −287 → 247 (pass, pass)
+    - arc_continental_p50 709 → 1,348 (FAIL → pass)
+  - **P4S2 at 1000 Myr:**
+    - collision_land_max 0.089 → 0.055 (pass, pass)
+    - land_gain_max 1.35 → 0.87 (pass, pass)
+    - collision_length_p50 40.7 → 57.7 (pass → FAIL)
+    - speed_big_p90 74.3 → 75.5 (pass, pass)
+    - rot_change_p50 3.71 → 0.74 (pass, pass)
+    - rot_change_p90 26.1 → 23.5 (FAIL, FAIL)
+    - boundary_subduction 47.6 → 49.4 (FAIL, FAIL)
+    - arc_oceanic_emergent 10.6 → 13.5 (pass, pass)
+    - arc_oceanic_p90 73 → 568 (pass, pass)
+    - arc_continental_p50 817 → 1,526 (FAIL → pass)
+    - arc_continental_p90 3,425 → 4,402 (pass, pass)
+    - wedge_width_p50 0 → 19 (FAIL, FAIL)
+    - foredeep_depth_p50 78 → 33 (FAIL, FAIL)
+  - **P3 at 500 Myr:**
+    - largest_over_50 0 → 0.2 (pass, pass)
+    - continental_min 0.379 → 0.342 (pass → FAIL)
+    - rot_change_p50 4.66 → 2.82 (pass, pass)
+    - arc_continental_p50 709 → 1,257 (FAIL → pass)
+  - **P3 at 1000 Myr:**
+    - collision_land_max 0.089 → 0.055 (pass, pass)
+    - collision_length_p50 40.7 → 58.8 (pass → FAIL)
+    - continental_min 0.332 → 0.369 (FAIL, FAIL)
+    - ocean_old250 3.9 → 4.9 (FAIL, FAIL)
+    - wedge_width_p50 0 → 14 (FAIL, FAIL)
+  - **C20:**
+    - at 500 Myr, collision_length_p90 118.7 → 79.0 (pass, pass)
+    - at 1000 Myr, boundary_subduction 47.6 → 48.9 (FAIL, FAIL)
+  - **Status flips with the mean inside the range** (all-runs table):
+    - C20 at 500: rift_welded_back_50 pass → FAIL, collision_length_p50 FAIL → pass.
+    - C20 at 1000: collisions_per_100myr, speed_area_rank_corr and arc_oceanic_emergent pass → FAIL, speed_slab_over_free FAIL → pass.
+- **Diagnosis, not finished.** The higher peaks do not come from the landscape step: P4S2 erodes in master's 2-Myr steps and its peaks match P4's. They do not come from the uplift ceiling either: the pipeline presets set `uplift_ceiling_m` 0 and the belt fill stops at `strength_height_m`. On master's high ground the threshold slope does most of the cutting (`erosion_bands`, supercontinent seed 2, 1000 Myr: 389 of 430 m/Myr above 4 km). One candidate is the once-per-plate-step bilinear advection of the surface (`surface/advect.rs`), whose blur halves when the steps halve; it was not tested. The hotter present is the present-day nudge (CLM-150): more land above 2 km means more ice sheets and so a bigger factor. The arc checks that pass at 3 and 4 Myr are a sampling effect (they are read after the uplift and before the erosion).
+- **Time.** `tools/review/bench-quiet.py` pairs, `earthlike_full_16k`, scattered start, 8 threads, side by side on sets A (0,16,2,...) and B (8,24,10,...), admitted as `sim:earthlike_full_16k:16t` (scratch `build/cad/pair.sh`). The VM was loaded throughout: others' busy CPUs averaged 18 of 32 and load1 peaked at 111 in the 1000 Myr pair.
+  - **P4, 200 Myr:** master 459.4 s (A) against P4 338.1 s (B), ratio 0.736; swapped, P4 549.6 s (A) against master 683.0 s (B), ratio 0.805.
+  - **C20, 1000 Myr, one round:** C20 2,219.0 s (A) against master 2,308.5 s (B), ratio 0.961. The climate stage took 247.0 s against 332.0 s.
+  - **P4S2 and P3 were not timed** (both rejected on the planet). Their ensemble stage sums are 0.54 and 0.63 of master's at 500 Myr; P4's is 0.49.
+  - **Quiet estimate for C20:** about 40 s of the 1,242.8 s, from the profile's snapshot-bound work: the snapshot cells 46.1 s and the 2-D EBM about 35 s. C20 alone does not reach 900 s.
+- **Chosen:** C20, in the four pipeline presets and the four built-in earthlike presets (`climate.snapshot_every_myr` 20; the default and `planet_world_4k` stay at 10). SCL-038's row, climate.md "The climate snapshot every 20 Myr", preset-coverage.md and the field and module docs all say so.
+- **Not landed:**
+  - P4, P4S2 and P3: each makes the planet worse in the ways above. P4S2 would save the most at a modest cost to the checks (about 45 % of the group's stage time), once the high ground no longer depends on the step.
+  - "L1 written less often": `l1_every_steps` must be 1 with a surface or climate stage, so this needs a coarser clock for those stages, which is a session coupling change and was not tried.
+  - Stepping the surface at the plate cadence is master's setting already (`substeps` 1); sub-stepping is P4S2.
+  - A 10-Myr snapshot with 4-Myr steps (P4C20) was not run.
+- **Tests.** `climate::tests::the_climate_runs_in_the_coupled_pipeline_and_resumes` (60 Myr on `pipeline_quick_16k`) now expects 4 due snapshots (t = 2, 20, 40 and 60 Myr) instead of 7.
+- **Determinism.** No test asserting identical output across thread counts or runs was touched or turned into a tolerance test.
+- **Gates.** Run after the rebase onto master (below).
+- **Choices** (mine, can be undone):
+  - per Myr rather than per step for every rule above;
+  - a ceiling on the confirmation span, a floor on the grace and the timeout;
+  - the trench share as a half-life;
+  - the per-step checks scaled to 2 Myr;
+  - mud measured per Myr of the landscape step;
+  - VOL-010's forgiven step left per step;
+  - C20 measured with master's binary;
+  - the earthlike preset descriptions left as committed;
+  - P3 1000 run after the others;
+  - the timing screen of P4S2 and P3 dropped for the 1000-Myr C20 pair, since both were rejected on science and their stage times are in the tables;
+  - one round of the 1000-Myr pair.
+- **Files.**
+  - `crates/deeptime-core/src/{params.rs, plates/{check,dynamics,mod,pools,ridges,rifting,shortening,state,subduction}.rs, structure/deform/feature.rs, surface/{mod,params}.rs, climate/{mod,params,tests}.rs}`
+  - the 13 preset JSONs under `crates/deeptime-core/presets/`
+  - `crates/deeptime-core/tests/{presets/planet_world_4k.json,share-codes.json}`
+  - `crates/deeptime-viewer/assets/editor_fields.json`
+  - `docs/design/plate-force-balance.md`
+  - `docs/science/{plates.md,climate.md,claims.md,extraction-notes/preset-coverage.md,ledger/{PLT,DEF,ERO,CRE,CHK,SCL}.md}`
+  - `tools/review/p1-27-exp.sh`
+  - STATUS.md
+- **Next.**
+  1. Find why the high ground rises with the plate step: test the advection blur by advecting twice per 4-Myr step.
+  2. Then P4S2 (`tectonics.time_step_myr` 4, `surface.substeps` 2) is one preset change.
+
 ### 2026-10-18: Natives: a baseline and an x86-64-v3 build for each x86-64 platform, picked at runtime by a CPU probe, and the `ship` profile (fat LTO, one codegen unit) for everything that ships and for the gate. At 100 Myr on full 16k, ship v3 is 1.08× faster than plain `release` (CPU time 1.10×). Ship baseline matches it in wall time (1.00×) and is 1.03× by CPU time. The worlds are the same files (coordinator's task, Ben's decision of 2026-10-18 "Both, picked at runtime"; agent worktree agent-aa3973505c3dc829a, branch worktree-agent-aa3973505c3dc829a from master f221b3d3; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What ships.** A release jar holds 16 native files, up from 8:
   - the eight platforms' baseline `deeptime_jni`;
