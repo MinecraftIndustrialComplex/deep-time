@@ -200,6 +200,12 @@ pub struct SurfaceRates {
     pub gravity: f64,
 }
 
+/// The share of the way to z_t a trench sample moves in a step of `dt_myr`: it closes half the
+/// distance every `half_life_myr` (0.5 of it per step at the 2-Myr step and a 2-Myr half-life).
+pub fn trench_share(dt_myr: f64, half_life_myr: f64) -> f64 {
+    1.0 - 0.5f64.powf(dt_myr / half_life_myr) // ledger: PLT-053
+}
+
 /// One sample's surface step; returns the rock eroded from it (metres), to be exported downhill.
 /// `held_floor` (finite) is the floor an oceanic sample of an ocean–continent transition cools
 /// towards instead of `z_floor`: its thicker crust holds it up (`transition.rs`, ledger PLT-264).
@@ -251,6 +257,17 @@ pub fn ocean_heat_flow(age_myr: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The trench's pull is a half-life (P1-19 #27): half the way per 2-Myr step, exactly as the
+    /// old per-step share, and one 4-Myr step goes as far as two 2-Myr steps.
+    #[test]
+    fn the_trench_share_follows_the_step_length() {
+        assert_eq!(trench_share(2.0, 2.0), 0.5);
+        let two = 1.0 - (1.0 - trench_share(2.0, 2.0)).powi(2);
+        assert!((trench_share(4.0, 2.0) - two).abs() < 1e-12);
+        let thirds = 1.0 - (1.0 - trench_share(1.0, 2.0)).powi(3);
+        assert!((trench_share(3.0, 2.0) - thirds).abs() < 1e-12);
+    }
 
     #[test]
     fn stripping_and_diagenesis_conserve_felsic_rock() {

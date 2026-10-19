@@ -26,7 +26,8 @@
 //! the plates exactly as the surface carries it. The step's eustatic sea level goes to
 //! `WorldState::globals["climate/sea_level_m"]` (`SEA_LEVEL_GLOBAL`), which the surface uses.
 //!
-//! **Snapshots** (plan §8.3: every 10 Myr, plus the present): a full climate is computed at the
+//! **Snapshots** (plan §8.3: every 10 Myr, plus the present; 20 Myr in the pipeline presets since
+//! P1-19 #27): a full climate is computed at the
 //! first step, every `snapshot_every_myr` of simulated time, and at the last step. Between them
 //! the climate's geographic part — each cell's sea-level departure from its row's zonal reference
 //! (the EBM's ocean temperature; ln of the belts' precipitation), its aridity, its ELA and its

@@ -64,7 +64,9 @@ pub fn maybe_rift(
         } else {
             1.0
         };
-        let lambda = k.rift_lambda0 * f * f64::from(p.samples) * area / state.a0_km2 * boost;
+        // ledger: PLT-082, PLT-083 (per Myr, so the step's λ_0 scales with its length)
+        let lambda0 = k.rift_per_myr * env.dt_myr;
+        let lambda = lambda0 * f * f64::from(p.samples) * area / state.a0_km2 * boost;
         let prob = lambda * (-lambda).exp();
         if state.rng.next_f64() < prob {
             let fragments = state
@@ -296,7 +298,7 @@ pub fn maybe_initiate_subduction(
     env: &Env,
 ) -> Result<(), CoreError> {
     let k = env.k;
-    if k.subduction_initiation_rate <= 0.0 {
+    if k.subduction_initiation_per_myr <= 0.0 {
         return Ok(());
     }
     let t = env.t_myr;
@@ -335,7 +337,9 @@ pub fn maybe_initiate_subduction(
         if o.len() < 16 {
             continue;
         }
-        let lambda = k.subduction_initiation_rate * o.len() as f64 * area / state.a0_km2;
+        // ledger: PLT-063 (per Myr, so the step's rate scales with its length)
+        let rate = k.subduction_initiation_per_myr * env.dt_myr;
+        let lambda = rate * o.len() as f64 * area / state.a0_km2;
         if state.rng.next_f64() < 1.0 - (-lambda).exp() {
             let seed = o[state.rng.below(o.len() as u64) as usize];
             initiate(state, world, geo, pos, env, id, seed, o)?;
