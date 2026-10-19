@@ -6,6 +6,7 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.Rivers;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Water;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.worldgen.Geothermal;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WaterBodies;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
@@ -37,6 +38,10 @@ import java.util.List;
  * floats (air under it) and none leaks (air beside it over ground or over air); every river and
  * lake column's water top is the one {@link Water} decides (none is dry shore, see {@link #count}); then every water block is woken with a
  * fluid tick and after {@value #WAIT_TICKS} ticks no water has reached a column that should be dry.
+ * A hot-spring pool's water is not the water pass's: where a box lies near an active volcano, a
+ * column {@link Water} calls dry may hold a pool the geothermal pass dammed at its site's level
+ * ({@link Geothermal}, P2-14), and such a column is counted apart (on the planet of 2026-10-19 three
+ * columns of the stream's and the lake outlet's boxes, beside the shields 46 and 48).
  *
  * <p>The checks are properties of any planet, not one planet's numbers: the simulation is not
  * bit-identical across platforms, so the boxes sit somewhere else on every machine.
@@ -138,7 +143,7 @@ public final class RiverGameTests {
 
     /** Counts over the boxes. */
     static final class Tally {
-        long waterBlocks, floating, leaks, steps, topMismatch, waterColumns, outside, dryShore, lakeColumns, iced, wrongIce;
+        long waterBlocks, floating, leaks, steps, topMismatch, waterColumns, outside, dryShore, lakeColumns, iced, wrongIce, pools;
         final List<BlockPos> water = new ArrayList<>();
         final StringBuilder detail = new StringBuilder();
 
@@ -170,9 +175,11 @@ public final class RiverGameTests {
      * lake column whose top block is neither water nor ice is {@code dryShore}: ground flush with
      * the water beside it, which the pass must not leave (it was 96 of 898 water columns on the
      * seed-11 test planet of the ice branch before the cut). A lake column whose top block is open
-     * and holds no water is a mismatch, as is any river column below its top.
+     * and holds no water is a mismatch, as is any river column below its top. Water over a column
+     * that should be dry is {@code outside}, unless the column is in a hot-spring pool of
+     * {@code geothermal} and the water's top is the pool's level ({@code pools}).
      */
-    static Tally count(ServerLevel level, WorldData wd, Water.Spec spec, List<Site> sites) {
+    static Tally count(ServerLevel level, WorldData wd, Water.Spec spec, Geothermal geothermal, List<Site> sites) {
         Tally t = new Tally();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         com.minecraftindustrialcomplex.deeptime.worlddata.LakeIce lakeIce = com.minecraftindustrialcomplex.deeptime.worlddata.LakeIce.of(wd);
@@ -251,9 +258,16 @@ public final class RiverGameTests {
                         }
                     } else if (!col.kind().isWater() && highestWater != Integer.MIN_VALUE && highestWater > col.ground() + 1) {
                         // Water above the ground of a column that should be dry (a step's flowing
-                        // block sits in a water column, never here).
-                        t.outside++;
-                        t.note("outside:" + col.kind().id, x, highestWater, z);
+                        // block sits in a water column, never here). A hot-spring pool's water at its
+                        // site's level is the geothermal pass's (P2-14), not the water pass's.
+                        Geothermal.Site pool = geothermal.claim(x, z);
+                        Geothermal.Part part = pool == null ? Geothermal.Part.NONE : pool.part(geothermal.dx(x, pool), z - pool.z());
+                        if (part.pool() && highestWater == pool.level()) {
+                            t.pools++;
+                        } else {
+                            t.outside++;
+                            t.note("outside:" + col.kind().id + (pool == null ? "" : "/" + part + "@" + pool.level()), x, highestWater, z);
+                        }
                     }
                 }
             }
@@ -288,19 +302,21 @@ public final class RiverGameTests {
                     chunks.add(level.getChunk(cx, cz));
                 }
         int ticksAtGeneration = WaterGameTests.pendingFluidTicks(chunks);
-        Tally before = count(level, wd, spec, sites);
+        var settings = g.generatorSettings().value();
+        Geothermal geothermal = w.geothermal(g.waterReach(), settings.noiseSettings().minY(), settings.seaLevel());
+        Tally before = count(level, wd, spec, geothermal, sites);
         long now = level.getGameTime();
         for (BlockPos p : before.water)
             level.getChunkAt(p).getFluidTicks().schedule(new ScheduledTick<>(Fluids.WATER, p, now + 1, level.nextSubTickCount()));
         helper.runAfterDelay(WAIT_TICKS, () -> {
-            Tally after = count(level, wd, spec, sites);
+            Tally after = count(level, wd, spec, geothermal, sites);
             for (LevelChunk c : chunks)
                 level.setChunkForced(c.getPos().x, c.getPos().z, false);
             DeepTime.LOGGER.info("[gametest] riversHold sites={} chunks={} waterColumns={} waterBlocks={}/{} floating={}/{} leaks={}/{} "
-                            + "steps={}/{} topMismatch={} dryShore={} of {} lake columns (iced={} wrongIce={}) outside={}/{} generatedFluidTicks={} chains={} vertices={}",
+                            + "steps={}/{} topMismatch={} dryShore={} of {} lake columns (iced={} wrongIce={}) outside={}/{} hotSpringPoolColumns={}/{} generatedFluidTicks={} chains={} vertices={}",
                     sites.size(), chunks.size(), before.waterColumns, before.waterBlocks, after.waterBlocks, before.floating, after.floating,
                     before.leaks, after.leaks, before.steps, after.steps, before.topMismatch, before.dryShore, before.lakeColumns, before.iced, before.wrongIce,
-                    before.outside, after.outside, ticksAtGeneration, r.chainCount(), r.vertexCount());
+                    before.outside, after.outside, before.pools, after.pools, ticksAtGeneration, r.chainCount(), r.vertexCount());
             DeepTime.LOGGER.info("[gametest] riversHold sites: {}", sites);
             if (!before.detail.isEmpty() || !after.detail.isEmpty())
                 DeepTime.LOGGER.info("[gametest] riversHold detail: atGeneration{} after{}", before.detail, after.detail);

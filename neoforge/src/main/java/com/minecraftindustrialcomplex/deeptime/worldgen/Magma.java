@@ -385,8 +385,13 @@ public final class Magma {
         return out == null ? List.of() : out;
     }
 
-    /** What block (x, y, z) is, over all bodies (the first that claims it). */
+    /**
+     * What block (x, y, z) is, over all bodies: a molten part if any body has one there (the pass
+     * never lets a shell or the mush replace lava, so where two volcanoes' bodies overlap, one's lens
+     * inside the other's shell is lava), else the first body's part that claims it.
+     */
     public Part at(int x, int y, int z) {
+        Part first = Part.NONE;
         for (Body b : bodies) {
             if (b.chamberRh <= 0 || Math.abs(z - b.z) > b.reach)
                 continue;
@@ -394,10 +399,12 @@ public final class Magma {
             if (Math.abs(dx) > b.reach)
                 continue;
             Part p = b.at(dx, z - b.z, y);
-            if (p != Part.NONE)
+            if (p.molten())
                 return p;
+            if (first == Part.NONE)
+                first = p;
         }
-        return Part.NONE;
+        return first;
     }
 
     /** The top block of ground of height h: ⌈h⌉ − 1. */
