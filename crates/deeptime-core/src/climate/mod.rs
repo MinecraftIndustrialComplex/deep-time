@@ -382,7 +382,9 @@ impl Geometry {
 
     /// Ice volume of a thickness field, Earth-normalized km³.
     fn volume_km3(&self, ice: &[f32]) -> f64 {
-        (0..self.h)
+        // The rows' sums side by side (P1-19), added in row order.
+        let rows: Vec<f64> = (0..self.h)
+            .into_par_iter()
             .map(|j| {
                 let row: f64 = ice[j * self.w..(j + 1) * self.w]
                     .iter()
@@ -390,14 +392,18 @@ impl Geometry {
                     .sum();
                 row * self.area[j] / 1000.0
             })
-            .sum()
+            .collect();
+        rows.iter().sum()
     }
 
     /// Area of the cells `pick` selects, Earth-normalized km².
-    fn area_where(&self, pick: &dyn Fn(usize) -> bool) -> f64 {
-        (0..self.h)
+    fn area_where(&self, pick: &(dyn Fn(usize) -> bool + Sync)) -> f64 {
+        // The rows' counts side by side (P1-19), added in row order.
+        let rows: Vec<f64> = (0..self.h)
+            .into_par_iter()
             .map(|j| (0..self.w).filter(|&i| pick(j * self.w + i)).count() as f64 * self.area[j])
-            .sum()
+            .collect();
+        rows.iter().sum()
     }
 
     /// Of the land cells: each band's share under ice (thickness ≥ `ICE_MIN_M`), the ice-covered
@@ -442,9 +448,9 @@ impl Geometry {
     /// The ice-sheet cells among the cells `ice` selects: every continuous ice body (cells sharing
     /// an edge, the rows wrapping east to west) that covers at least `ICE_SHEET_MIN_KM2`. The rest
     /// of the ice is mountain ice.
-    fn sheet_cells(&self, ice: &dyn Fn(usize) -> bool) -> Vec<bool> {
+    fn sheet_cells(&self, ice: &(dyn Fn(usize) -> bool + Sync)) -> Vec<bool> {
         let (w, h) = (self.w, self.h);
-        let on: Vec<bool> = (0..w * h).map(ice).collect();
+        let on: Vec<bool> = (0..w * h).into_par_iter().map(ice).collect();
         let mut seen = vec![false; w * h];
         let mut sheet = vec![false; w * h];
         let (mut stack, mut body) = (Vec::new(), Vec::new());
@@ -483,20 +489,32 @@ impl Geometry {
     }
 
     /// Each band's share of `pick` among the cells `of` selects (0 where there are none).
-    fn band_share(&self, pick: &dyn Fn(usize) -> bool, of: &dyn Fn(usize) -> bool) -> Vec<f64> {
+    fn band_share(
+        &self,
+        pick: &(dyn Fn(usize) -> bool + Sync),
+        of: &(dyn Fn(usize) -> bool + Sync),
+    ) -> Vec<f64> {
         let mut num = vec![0usize; self.bands];
         let mut den = vec![0usize; self.bands];
-        for j in 0..self.h {
-            let b = self.band[j];
-            for i in 0..self.w {
-                let c = j * self.w + i;
-                if of(c) {
-                    den[b] += 1;
-                    if pick(c) {
-                        num[b] += 1;
+        // Each row's counts side by side (P1-19); whole numbers, so any order adds alike.
+        let rows: Vec<(usize, usize)> = (0..self.h)
+            .into_par_iter()
+            .map(|j| {
+                let (mut d, mut n) = (0usize, 0usize);
+                for c in j * self.w..(j + 1) * self.w {
+                    if of(c) {
+                        d += 1;
+                        if pick(c) {
+                            n += 1;
+                        }
                     }
                 }
-            }
+                (d, n)
+            })
+            .collect();
+        for (j, &(d, n)) in rows.iter().enumerate() {
+            den[self.band[j]] += d;
+            num[self.band[j]] += n;
         }
         num.iter()
             .zip(&den)
@@ -509,8 +527,42 @@ impl Geometry {
 /// at each cell's sea-level temperature, as if high ground were not cooled by the lapse rate.
 pub const KERNEL_SEA_T_ENV: &str = "DEEPTIME_EXP_KERNEL_SEA_T";
 
+/// What the land's cells add up to at one step's end climate: the weathering kernel per band, and
+/// the area-weighted sums the ice stage's notes read (land area, runoff, temperature, the kernel
+/// at the cell's temperature and at its sea-level temperature, and the high ground's share).
+struct LandTerms {
+    kernel: carbon::Kernel,
+    /// Land area, km².
+    ra: f64,
+    /// Area × runoff, m·km²/yr.
+    rs: f64,
+    /// Area × temperature.
+    ta: f64,
+    /// The kernel at the cell's temperature, in all and over ground above 2,000 m.
+    kt: f64,
+    kh: f64,
+    /// Land area above 2,000 m, km².
+    ah: f64,
+    /// The kernel at the cell's sea-level temperature (its lapse cooling put back).
+    ks: f64,
+}
+
+/// One land cell's terms (P1-19: found once, side by side, and added in cell order after).
+#[derive(Clone, Copy, Default)]
+struct CellTerms {
+    /// The runoff, m/yr.
+    runoff: f64,
+    /// The kernel at the cell's temperature and at its sea-level temperature.
+    kc: f64,
+    ks: f64,
+    /// The supply the cell adds, when the weathering is supply-limited.
+    supply: f64,
+}
+
 /// The weathering kernel of a step's climate: each band's Σ area·runoff·e^(k_T(T − 15)) over its
-/// land, and each band's EBM land temperature for it.
+/// land, and each band's EBM land temperature for it; and with it the ice stage's sums (P1-19,
+/// #16: the cells' terms are found side by side, each once where the kernel and the notes' loop
+/// each found them before, and added in cell order, so the sums are the serial loops' to the bit).
 ///
 /// The runoff is P − ET (Fu's Budyko curve, the surface stage's), with the potential evaporation
 /// of the cell's temperature *less the planet's global warming against `hydro_ref_c`*: the
@@ -521,9 +573,111 @@ pub const KERNEL_SEA_T_ENV: &str = "DEEPTIME_EXP_KERNEL_SEA_T";
 /// evaporation, the runoff keeps its spatial pattern and rises with the precipitation, as global
 /// runoff does with warming (GEOCARB's ~3.8 %/K, Berner & Kothavala 2001).
 ///
-/// `h`, `sea`: the elevation and the sea level, read only by the experiment toggle
+/// `h`, `sea`: the elevation and the sea level, read by the experiment toggle
 /// [`KERNEL_SEA_T_ENV`] (the kinetics at the cell's sea-level temperature, its lapse cooling put
-/// back; the 2026-10-18 CO₂ trace).
+/// back; the 2026-10-18 CO₂ trace) and by the high-ground and sea-level sums.
+#[allow(clippy::too_many_arguments)]
+fn land_terms(
+    g: &Geometry,
+    land: &[bool],
+    t_mean: &[f32],
+    precip: &[f32],
+    er: &EbmResult,
+    p: &ClimateParams,
+    erosion: Option<&[f32]>,
+    (h, sea): (&[f64], f64),
+) -> LandTerms {
+    let k_t = p.weathering_temp_per_k;
+    let warming = er.t_global - p.hydro_ref_c;
+    let sea_t = std::env::var_os(KERNEL_SEA_T_ENV).is_some();
+    let gamma = p.lapse_c_per_km / 1000.0;
+    let limited = p.weathering_supply && erosion.is_some();
+    // (A row's terms at a time, rows side by side; the cells nobody reads stay zero.)
+    let cells: Vec<Vec<CellTerms>> = (0..g.h)
+        .into_par_iter()
+        .map(|j| {
+            let a = g.area[j];
+            (j * g.w..(j + 1) * g.w)
+                .map(|c| {
+                    if !land[c] {
+                        return CellTerms::default();
+                    }
+                    let t = f64::from(t_mean[c]);
+                    let pr = f64::from(precip[c]);
+                    let pet = (60.0 * (t - warming)).max(0.0);
+                    let runoff = (pr - crate::surface::climate::fu_et(pr, pet)).max(0.0) / 1000.0;
+                    let kc = carbon::cell_kernel(a, runoff, t, k_t);
+                    // The cell's sea-level temperature: the same value where it stands at the sea.
+                    let up = (h[c] - sea).max(0.0);
+                    let ks = if up > 0.0 {
+                        carbon::cell_kernel(a, runoff, t + gamma * up, k_t)
+                    } else {
+                        kc
+                    };
+                    let supply = match (limited, erosion) {
+                        (true, Some(e)) => {
+                            carbon::cell_supply(
+                                a,
+                                f64::from(e[c]).max(0.0),
+                                p.weathering_min_denudation_m_myr,
+                                p.weathering_rock_mol_kg,
+                            ) * p.weathering_supply_scale
+                        }
+                        _ => 0.0,
+                    };
+                    CellTerms {
+                        runoff,
+                        kc,
+                        ks,
+                        supply,
+                    }
+                })
+                .collect()
+        })
+        .collect();
+    let mut band = vec![0.0; g.bands];
+    let mut supply = vec![0.0; g.bands];
+    let (mut ra, mut rs, mut ta) = (0.0, 0.0, 0.0);
+    let (mut kt, mut kh, mut ah, mut ks) = (0.0, 0.0, 0.0, 0.0);
+    for (j, row) in cells.iter().enumerate() {
+        let (b, a) = (g.band[j], g.area[j]);
+        for (i, x) in row.iter().enumerate() {
+            let c = j * g.w + i;
+            if !land[c] {
+                continue;
+            }
+            ra += a;
+            rs += a * x.runoff;
+            ta += a * f64::from(t_mean[c]);
+            kt += x.kc;
+            ks += x.ks;
+            if h[c] - sea > 2000.0 {
+                kh += x.kc;
+                ah += a;
+            }
+            band[b] += if sea_t { x.ks } else { x.kc };
+            if limited {
+                supply[b] += x.supply;
+            }
+        }
+    }
+    LandTerms {
+        kernel: carbon::Kernel {
+            band,
+            ref_t_land: clock::land_temps(er).0,
+            supply: if limited { supply } else { Vec::new() },
+        },
+        ra,
+        rs,
+        ta,
+        kt,
+        kh,
+        ah,
+        ks,
+    }
+}
+
+/// The weathering kernel alone (see [`land_terms`]).
 #[allow(clippy::too_many_arguments)]
 fn kernel_of(
     g: &Geometry,
@@ -533,47 +687,9 @@ fn kernel_of(
     er: &EbmResult,
     p: &ClimateParams,
     erosion: Option<&[f32]>,
-    (h, sea): (&[f64], f64),
+    hs: (&[f64], f64),
 ) -> carbon::Kernel {
-    let k_t = p.weathering_temp_per_k;
-    let warming = er.t_global - p.hydro_ref_c;
-    let sea_t = std::env::var_os(KERNEL_SEA_T_ENV).is_some();
-    let gamma = p.lapse_c_per_km / 1000.0;
-    let mut band = vec![0.0; g.bands];
-    let mut supply = vec![0.0; g.bands];
-    let limited = p.weathering_supply && erosion.is_some();
-    for j in 0..g.h {
-        let b = g.band[j];
-        for i in 0..g.w {
-            let c = j * g.w + i;
-            if !land[c] {
-                continue;
-            }
-            let t = f64::from(t_mean[c]);
-            let pr = f64::from(precip[c]);
-            let pet = (60.0 * (t - warming)).max(0.0);
-            let runoff = (pr - crate::surface::climate::fu_et(pr, pet)).max(0.0) / 1000.0;
-            let t_k = if sea_t {
-                t + gamma * (h[c] - sea).max(0.0)
-            } else {
-                t
-            };
-            band[b] += carbon::cell_kernel(g.area[j], runoff, t_k, k_t);
-            if let (true, Some(e)) = (limited, erosion) {
-                supply[b] += carbon::cell_supply(
-                    g.area[j],
-                    f64::from(e[c]).max(0.0),
-                    p.weathering_min_denudation_m_myr,
-                    p.weathering_rock_mol_kg,
-                ) * p.weathering_supply_scale;
-            }
-        }
-    }
-    carbon::Kernel {
-        band,
-        ref_t_land: clock::land_temps(er).0,
-        supply: if limited { supply } else { Vec::new() },
-    }
+    land_terms(g, land, t_mean, precip, er, p, erosion, hs).kernel
 }
 
 impl ClimateStage {
@@ -990,18 +1106,26 @@ impl ClimateStage {
         let coarse_band: Vec<usize> = (0..sg.h)
             .map(|cj| geo.band[(cj * sg.k + sg.k / 2).min(hgt - 1)])
             .collect();
-        let precip_prev: Vec<f32> = world
-            .fields
-            .get(field::PRECIP)
-            .filter(|f| f.data.len() == n)
-            .map_or_else(|| vec![500.0; n], |f| f.data.clone())
-            .iter()
-            .map(|&x| x / 1000.0)
-            .collect();
-        let bed_fine = |sea: f64| -> Vec<f32> { h.iter().map(|&z| (z - sea) as f32).collect() };
-        let bed0_c = sg.coarsen(&bed_fine(sea_prev), &|_| true);
-        let ela0_c = sg.coarsen(&ela0, &|c| land0[c]);
-        let precip0_c = sg.coarsen(&precip_prev, &|c| land0[c]);
+        let bed_fine = |sea: f64| -> Vec<f32> { h.par_iter().map(|&z| (z - sea) as f32).collect() };
+        // The sheet's inputs, only where the dynamic ice reads them (P1-19, #18).
+        let (bed0_c, ela0_c, precip0_c) = if dyn_ice {
+            let precip_prev: Vec<f32> = world
+                .fields
+                .get(field::PRECIP)
+                .filter(|f| f.data.len() == n)
+                .map_or_else(
+                    // (500 mm/yr, in m.)
+                    || vec![0.5; n],
+                    |f| f.data.par_iter().map(|&x| x / 1000.0).collect(),
+                );
+            (
+                sg.coarsen(&bed_fine(sea_prev), &|_| true),
+                sg.coarsen(&ela0, &|c| land0[c]),
+                sg.coarsen(&precip_prev, &|c| land0[c]),
+            )
+        } else {
+            (Vec::new(), Vec::new(), Vec::new())
+        };
         if dyn_ice
             && window_step
             && (!clock::in_window(&p, t0) || self.s.sheet.thick.len() != sg.w * sg.h)
@@ -1057,6 +1181,7 @@ impl ClimateStage {
                 ir.since_eq += s.dt_kyr;
                 if ir.since_eq >= 5.0 - 1e-9 {
                     let mask: Vec<bool> = (0..n)
+                        .into_par_iter()
                         .map(|c| {
                             mu0[c].is_finite() && f64::from(mu0[c]) > s.delta[geo.cell_band(c)]
                         })
@@ -1710,7 +1835,7 @@ impl ClimateStage {
             }
             (end, max, share)
         };
-        let glacier: Vec<bool> = thick.iter().map(|&x| x >= ICE_MIN_M).collect();
+        let glacier: Vec<bool> = thick.par_iter().map(|&x| x >= ICE_MIN_M).collect();
         let ela_pub: Vec<f32> = (0..n)
             .into_par_iter()
             .map(|c| {
@@ -1730,6 +1855,7 @@ impl ClimateStage {
         {
             let sea_ice: Vec<f32> = match &er_end {
                 Some(er) => (0..n)
+                    .into_par_iter()
                     .map(|c| {
                         if land[c] {
                             0.0
@@ -1747,7 +1873,7 @@ impl ClimateStage {
             &grid,
             self.preset.scale.m_per_block_h,
             &land,
-            &glacier.iter().map(|&g| u8::from(g)).collect::<Vec<_>>(),
+            &glacier.par_iter().map(|&g| u8::from(g)).collect::<Vec<_>>(),
         );
         self.s.clock.sheet = geo.band_share(&|c| glacier[c], &|c| land[c]);
         let volume = geo.volume_km3(&thick);
@@ -1791,13 +1917,16 @@ impl ClimateStage {
         put(
             world,
             field::GLACIER,
-            glacier.iter().map(|&g| f32::from(u8::from(g))).collect(),
+            glacier
+                .par_iter()
+                .map(|&g| f32::from(u8::from(g)))
+                .collect(),
         );
         put(
             world,
             field::ICE_MAX_EXTENT,
             thick_max
-                .iter()
+                .par_iter()
                 .map(|&x| f32::from(u8::from(x >= ICE_MIN_M)))
                 .collect(),
         );
@@ -1828,36 +1957,14 @@ impl ClimateStage {
                 .get(crate::surface::field::EROSION)
                 .filter(|f| f.data.len() == n)
                 .map(|f| f.data.as_slice());
-            self.s.clock.kernel =
-                kernel_of(&geo, &land, t_mean, precip, er, &p, erosion, (&h, sea));
-            let warming = er.t_global - p.hydro_ref_c;
-            let (mut ra, mut rs) = (0.0, 0.0);
-            let (mut kt, mut kh, mut ah, mut ta, mut ks) = (0.0, 0.0, 0.0, 0.0, 0.0);
-            let gamma = p.lapse_c_per_km / 1000.0;
-            for c in 0..n {
-                if land[c] {
-                    let (t, pr) = (f64::from(t_mean[c]), f64::from(precip[c]));
-                    let pet = (60.0 * (t - warming)).max(0.0);
-                    let a = geo.area[c / w];
-                    let runoff = (pr - crate::surface::climate::fu_et(pr, pet)).max(0.0) / 1000.0;
-                    ra += a;
-                    rs += a * runoff;
-                    ta += a * t;
-                    let kc = carbon::cell_kernel(a, runoff, t, p.weathering_temp_per_k);
-                    kt += kc;
-                    let ts = t + gamma * (h[c] - sea).max(0.0);
-                    ks += carbon::cell_kernel(a, runoff, ts, p.weathering_temp_per_k);
-                    if h[c] - sea > 2000.0 {
-                        kh += kc;
-                        ah += a;
-                    }
-                }
-            }
-            runoff_mean = rs / ra.max(1e-9);
-            kernel_high = kh / kt.max(1e-30);
-            land_high = ah / ra.max(1e-9);
-            t_land_mean = ta / ra.max(1e-9);
-            kernel_sea_t = ks / carbon::KERNEL_EARTH;
+            // The kernel and the notes' sums in one pass (the cell's runoff found once).
+            let lt = land_terms(&geo, &land, t_mean, precip, er, &p, erosion, (&h, sea));
+            self.s.clock.kernel = lt.kernel;
+            runoff_mean = lt.rs / lt.ra.max(1e-9);
+            kernel_high = lt.kh / lt.kt.max(1e-30);
+            land_high = lt.ah / lt.ra.max(1e-9);
+            t_land_mean = lt.ta / lt.ra.max(1e-9);
+            kernel_sea_t = lt.ks / carbon::KERNEL_EARTH;
         }
         self.time("ice", started);
 
