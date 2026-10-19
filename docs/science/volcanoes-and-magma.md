@@ -354,6 +354,12 @@ What these runs show:
   crystal-rich mush with 5 to 15 percent melt. The count, spacing, widths and the widening with depth
   are the game's, set so that a volcano is a place with a great deal of lava below it. Nothing in the
   column is simulated: no melt fraction, no heat, no eruption, no cooling.
+- **Neighbouring columns join.** Each active volcano's column is drawn on its own, and where two
+  stand close their lenses and shells overlap: on the test planet of 2026-10-19 the shields 46 and
+  48, 12 km apart, overlap so far that about 650,000 lava blocks in the box of one are lenses of the
+  other. The pass never lets a shell or the altered rock replace lava, so the overlap is one body
+  of lava sealed by the outer shells (the GameTest `magmaUnderActiveVolcanoes` counts it apart as
+  `otherBody`); nothing models a shared plumbing system.
 - **The volcanoes and the share of high land.** With the old, taller cones the volcanoes pushed the
   share of high land above Earth's (land above 2 km 0.124 on average, Earth 0.102); with the cones
   at Earth's heights they build half the relief (1.2 × 10⁷ against 2.4 × 10⁷ km³ in block metric)
