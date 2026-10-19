@@ -354,7 +354,9 @@ at the sea anyway. In a Deep Time world a beach or a river may stand above the s
 and the trim cut it down to y 62, a step at the biome's edge that far terrain does not draw: on the 2026-10-17 test
 planet a black beach east of the seam, its ground at y 65 to 67, was cut to 62. A pack's top-level rule that turns
 everything above a fixed height into air and paints nothing else is left out; EE's band at y 62, which paints the
-top block (water, grass, packed mud, gravel, salt) and removes no ground, stays. One of EE's biomes is kept out for the same
+top block (water, grass, packed mud, gravel, salt) and removes no ground, stays, as does its band from y 58 to 62
+(dead brain coral on warm ocean floors, sand on lukewarm ones); far terrain draws both, since it runs the leading
+part of the level's surface rule that reads no chunk (BAK-048, world-scale-and-bake.md). One of EE's biomes is kept out for the same
 reason (BIO-155): its calcite caverns, a cave biome its list places by depth (0.35 to 0.9) under much of the world,
 the deep sea included, carry a surface rule that paints diorite on every stone block of the biome at every depth.
 The strata pass leaves a surface rule's blocks, so in a Deep Time world a cavern region was diorite from the cave

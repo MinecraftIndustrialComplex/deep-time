@@ -52,7 +52,11 @@ public final class FarTerrainCheck {
                 || s.is(Blocks.BROWN_MUSHROOM_BLOCK) || s.is(Blocks.BEE_NEST) || s.is(Blocks.PUMPKIN) || s.is(Blocks.MELON);
     }
 
-    /** A block of a coral reef: the warm oceans' feature, up to several blocks over the sea bed. */
+    /**
+     * A block of a coral reef: the warm oceans' feature, up to several blocks over the sea bed. Live
+     * coral only (the tags hold no dead coral): a dead coral block is ground where a surface rule
+     * paints it (Expanded Ecosphere's warm ocean floors from y 58 to 62), and far terrain draws it.
+     */
     static boolean coral(BlockState s) {
         return s.is(BlockTags.CORAL_BLOCKS) || s.is(BlockTags.CORALS) || s.is(BlockTags.WALL_CORALS);
     }
@@ -114,7 +118,7 @@ public final class FarTerrainCheck {
     /** How far terrain and generated chunks agree over a set of columns. */
     public static final class Tally {
         public int columns, land, heightExact, heightWithin1, heightWithin2, heightMax;
-        public int waterAgree, waterBoth, waterTopExact, snowAgree, biomeSame, groundBlockSame, landGroundBlockSame;
+        public int waterAgree, waterBoth, waterTopExact, snowAgree, biomeSame, groundBlockSame, landGroundBlockSame, landHeightWithin1;
         public String worstHeight = "";
         private final Map<String, Integer> blockPairs = new HashMap<>(), biomePairs = new HashMap<>();
 
@@ -185,6 +189,8 @@ public final class FarTerrainCheck {
                 land++;
                 if (same)
                     landGroundBlockSame++;
+                if (d <= 1)
+                    landHeightWithin1++;
             }
         }
 
@@ -225,6 +231,7 @@ public final class FarTerrainCheck {
             o.addProperty("ground_block_same", groundBlockSame);
             o.addProperty("land", land);
             o.addProperty("land_ground_block_same", landGroundBlockSame);
+            o.addProperty("land_height_within_1", landHeightWithin1);
             o.add("ground_block_differences", top(blockPairs, 8));
             o.add("biome_differences", top(biomePairs, 4));
             return o;

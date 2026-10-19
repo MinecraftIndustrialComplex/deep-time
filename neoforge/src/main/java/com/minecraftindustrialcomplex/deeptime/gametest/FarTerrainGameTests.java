@@ -30,8 +30,9 @@ import java.util.List;
  *
  * <p>The thresholds are properties any planet must meet, not one planet's numbers: the ground and
  * the water come from the same column rule the chunk is built by, so they agree but for what
- * features and the pack's surface rules do on top; the top block comes from a table, so its
- * agreement is logged and only a floor is asserted. The ground is read under trees (mangrove roots
+ * features and the pack's surface rules do on top; the top block comes from a table where the part
+ * of the pack's surface rule that reads no chunk does not decide it, so its agreement is logged and
+ * only a floor is asserted. The ground is read under trees (mangrove roots
  * included), plants and coral reefs, and a column a carver cut below far terrain's ground is counted
  * apart (at most one in eight: on the MIC set Terralith's canyon, which reaches from y −20 to 70, cut
  * a sea bed two blocks under the water down to y −2 in two of the 64 columns east of the seam,
@@ -152,13 +153,22 @@ public final class FarTerrainGameTests {
      * from sea to land, and there mangrove trees stood on 4 of the 16 columns (standalone) and
      * Terralith's basalt cliffs stood basalt columns 5 to 10 blocks over the ground on 9 (MIC). The same
      * columns after their features are logged, not asserted.
+     *
+     * <p>Four rows are fixed (the equator, two at ±C/16, one at C/8); four more are where far terrain
+     * shows the most dry ground on both sides, so the fold is checked on land whatever the planet has
+     * at the fixed rows: on the planet of 2026-10-18 the seam lies in warm ocean, and the fixed rows
+     * held 3 dry columns west of it and 15 east (two land rows 64 blocks apart brought the west only
+     * to 17, four 32 apart to 25 and the east to 59). Each side must compare at least 16 dry columns
+     * and hold their ground within a block in nine of ten.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 4800)
     public static void farTerrainMatchesGeneratedChunksAcrossTheSeam(GameTestHelper helper) {   // ledger: BAK-042
         FarTerrain far = far(helper);
         ServerLevel level = far.level();
         int c = far.data().circumference();
-        int[] rows = {7, c / 16 + 7, -c / 16 + 7, c / 8 + 7};
+        int[] fixed = {7, c / 16 + 7, -c / 16 + 7, c / 8 + 7};
+        int[] landRows = landRows(far, c, fixed);
+        int[] rows = java.util.stream.IntStream.concat(java.util.Arrays.stream(fixed), java.util.Arrays.stream(landRows)).toArray();
         int n = 2 * 16 * rows.length;
         FarTerrainCheck.Tally west = new FarTerrainCheck.Tally(), east = new FarTerrainCheck.Tally();
         FarTerrainCheck.Tally westAfter = new FarTerrainCheck.Tally(), eastAfter = new FarTerrainCheck.Tally();
@@ -168,7 +178,7 @@ public final class FarTerrainGameTests {
             boolean features = j >= n;   // every chunk is read at the carvers first, then all of them after their features
             boolean eastSide = (i & 1) == 1;
             int k = (i >> 1) % 16, row = rows[(i >> 1) / 16];
-            int x = eastSide ? -c / 2 + 4 * k + 1 : c / 2 - 64 + 4 * k + 2;
+            int x = seamX(c, eastSide, k);
             FarTerrain.Column column = far.column(x, row);
             if (column.ground() < level.getMinBuildHeight() + 32)
                 return false;
@@ -183,12 +193,63 @@ public final class FarTerrainGameTests {
                 DeepTime.LOGGER.info("[gametest] seamDiag {} {}", features ? "after features" : "before features", diag(chunk, column, real, x, row));
             return true;
         }, () -> {
-            DeepTime.LOGGER.info("[gametest] farTerrainMatchesGeneratedChunksAcrossTheSeam C={} takenFurtherAlready={} west {} east {} "
-                    + "(after features, logged only: west {} east {})", c, taken[0], west, east, westAfter, eastAfter);
+            DeepTime.LOGGER.info("[gametest] farTerrainMatchesGeneratedChunksAcrossTheSeam C={} rows={} takenFurtherAlready={} west {} east {} "
+                    + "(after features, logged only: west {} east {})", c, java.util.Arrays.toString(rows), taken[0], west, east, westAfter, eastAfter);
             assertAgrees(helper, west, 32, "west of the seam: ");
             assertAgrees(helper, east, 32, "east of the seam: ");
+            assertLand(helper, west, "west of the seam: ");
+            assertLand(helper, east, "east of the seam: ");
             helper.succeed();
         });
+    }
+
+    /** Column k (0 to 15) of a side of the seam: 4 blocks apart, west of x = C/2 or east of x = −C/2. */
+    static int seamX(int c, boolean eastSide, int k) {
+        return eastSide ? -c / 2 + 4 * k + 1 : c / 2 - 64 + 4 * k + 2;
+    }
+
+    /** How many rows the seam test adds where the land is (a game choice, BAK-042). */
+    static final int LAND_ROWS = 4;   // ledger: BAK-042
+
+    /**
+     * The {@link #LAND_ROWS} rows (z ≡ 7 mod 16, |z| at most C/8 + 7, the fixed rows' span, and 32 blocks
+     * apart) where far terrain shows the most dry columns on the poorer side of the seam; ties go to the
+     * row nearer the equator. Far terrain only: no chunk is generated to choose them.
+     */
+    static int[] landRows(FarTerrain far, int c, int[] fixed) {
+        int minY = far.level().getMinBuildHeight() + 32;
+        List<int[]> scored = new ArrayList<>();   // {z, dry columns on the poorer side}
+        for (int z = -(c / 8) / 16 * 16 + 7; z <= c / 8 + 7; z += 16) {
+            int zz = z;
+            if (java.util.Arrays.stream(fixed).anyMatch(f -> f == zz))
+                continue;
+            int[] dry = new int[2];
+            for (int side = 0; side < 2; side++)
+                for (int k = 0; k < 16; k++) {
+                    FarTerrain.Column col = far.column(seamX(c, side == 1, k), z);
+                    if (!col.water() && col.ground() >= minY)
+                        dry[side]++;
+                }
+            scored.add(new int[]{z, Math.min(dry[0], dry[1])});
+        }
+        scored.sort((a, b) -> a[1] != b[1] ? b[1] - a[1] : Math.abs(a[0]) - Math.abs(b[0]));
+        List<Integer> out = new ArrayList<>();
+        for (int[] s : scored) {
+            if (out.size() == LAND_ROWS || s[1] == 0)
+                break;
+            if (out.stream().allMatch(z -> Math.abs(z - s[0]) >= 32))
+                out.add(s[0]);
+        }
+        DeepTime.LOGGER.info("[gametest] seam land rows {} (dry columns on the poorer side: {})", out,
+                scored.subList(0, Math.min(8, scored.size())).stream().map(s -> s[0] + ":" + s[1]).toList());
+        return out.stream().mapToInt(Integer::intValue).toArray();
+    }
+
+    /** A side of the seam compared enough dry columns, and their ground agrees as the planet-wide floor asks. */
+    static void assertLand(GameTestHelper helper, FarTerrainCheck.Tally tally, String where) {   // ledger: BAK-042
+        helper.assertTrue(tally.land >= 16, where + "only " + tally.land + " dry columns compared: the seam is not checked on land");
+        helper.assertTrue(tally.landHeightWithin1 >= 0.90 * tally.land,
+                where + "the dry ground is within a block in only " + tally.landHeightWithin1 + " of " + tally.land + " dry columns");
     }
 
     /**
