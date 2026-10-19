@@ -342,6 +342,10 @@ pub struct GlacialOut {
     pub lake_m3: f64,
     pub sink_m3: f64,
     pub sea_m3: f64,
+    /// Wall time of [`step`]'s ice solves and of its serial erosion and debris walk, ms (the
+    /// surface's `glacial_ice` and `glacial_walk` timers, P1-19).
+    pub ice_ms: f64,
+    pub walk_ms: f64,
     /// [`step`]'s working arrays, kept between steps; all 0 between them.
     work: Work,
 }
@@ -392,6 +396,8 @@ impl GlacialOut {
         self.lake_m3 = 0.0;
         self.sink_m3 = 0.0;
         self.sea_m3 = 0.0;
+        self.ice_ms = 0.0;
+        self.walk_ms = 0.0;
     }
 }
 
@@ -655,14 +661,46 @@ pub fn ice(
         cover.set(i, (wd / d.dx).min(1.0));
         sliding.set(i, flow.sliding(hh, sl, warm_t));
     });
-    gather(&mut st.q, &q, 0.0);
-    gather(&mut st.thick, &thick, 0.0);
-    gather(&mut st.surface, &surface, f64::NAN);
-    gather(&mut st.slope, &slope, 0.0);
-    gather(&mut st.width, &width, 0.0);
-    gather(&mut st.cover, &cover, 0.0);
-    gather(&mut st.sliding, &sliding, 0.0);
-    st.cells = st.thick.par_iter().filter(|&&x| x > 0.0).count();
+    // The seven gathers and the count in one pass (P1-19: eight before).
+    for v in [
+        &mut st.q,
+        &mut st.thick,
+        &mut st.slope,
+        &mut st.width,
+        &mut st.cover,
+        &mut st.sliding,
+    ] {
+        if v.len() != n {
+            crate::alloc::fill(v, n, 0.0);
+        }
+    }
+    if st.surface.len() != n {
+        crate::alloc::fill(&mut st.surface, n, f64::NAN);
+    }
+    st.cells = (
+        st.q.par_iter_mut(),
+        st.thick.par_iter_mut(),
+        st.surface.par_iter_mut(),
+        st.slope.par_iter_mut(),
+        st.width.par_iter_mut(),
+        st.cover.par_iter_mut(),
+        st.sliding.par_iter_mut(),
+    )
+        .into_par_iter()
+        .enumerate()
+        .map(|(c, (qc, th, zs, sl, wd, cv, sd))| {
+            let i = pos[c];
+            if i == NONE {
+                (*qc, *th, *zs, *sl) = (0.0, 0.0, f64::NAN, 0.0);
+                (*wd, *cv, *sd) = (0.0, 0.0, 0.0);
+            } else {
+                let i = i as usize;
+                (*qc, *th, *zs, *sl) = (q.get(i), thick.get(i), surface.get(i), slope.get(i));
+                (*wd, *cv, *sd) = (width.get(i), cover.get(i), sliding.get(i));
+            }
+            usize::from(*th > 0.0)
+        })
+        .sum();
     // (in stack order: rayon's collect keeps it)
     st.glaciated.par_extend(
         (0..l)
@@ -670,7 +708,6 @@ pub fn ice(
             .filter(|&i| has_ice(thick.get(i)))
             .map(|i| r.stack[i]),
     );
-    crate::alloc::fill(&mut st.footprint, n, f64::NAN);
     footprint(d, kind, h, p, st);
 }
 
@@ -683,36 +720,76 @@ fn has_ice(h: f64) -> bool {
 
 /// The footprint: every glacier over the cells within half its width that lie under it.
 ///
-/// It walks [`IceState::glaciated`], the stack's cells with ice in stack order: the cells it skips
-/// have no surface, so it writes what a walk of the whole stack would, in the same order.
+/// A cell takes the highest surface of the glaciers over it (NaN under none), which does not
+/// depend on the order they come in: so bands of rows in parallel, each visiting the glaciers of
+/// [`IceState::glaciated`] within [`MAX_SPREAD`] rows of it (P1-19: one serial walk of the list
+/// in stack order before, after a fill of its own; the same values).
 fn footprint(d: &Dims, kind: &[u8], h: &[f64], p: &GlacialParams, st: &mut IceState) {
+    let (w, rows, n) = (d.w, d.h, d.cells());
+    // The glaciers with a surface, by row (a counting sort).
+    let surface = &st.surface;
+    let mut start = vec![0usize; rows + 1];
     for &c in &st.glaciated {
-        let c = c as usize;
-        let zs = st.surface[c];
-        if !zs.is_finite() {
-            continue;
-        }
-        let half = 0.5 * st.width[c] * p.valley_width / d.dx;
-        let reach = (half - 0.5).ceil().clamp(0.0, MAX_SPREAD as f64) as i64;
-        for dj in -reach..=reach {
-            for di in -reach..=reach {
-                let dist = ((di * di + dj * dj) as f64).sqrt();
-                if dist > half + 0.5 && (di, dj) != (0, 0) {
-                    continue;
-                }
-                let Some(j) = offset(d, c, di, dj) else {
-                    continue;
-                };
-                if kind[j] != BASE
-                    && h[j] < zs
-                    && (st.footprint[j].is_nan() || st.footprint[j] < zs)
-                {
-                    st.footprint[j] = zs;
-                }
-            }
+        if surface[c as usize].is_finite() {
+            start[c as usize / w + 1] += 1;
         }
     }
+    for j in 0..rows {
+        start[j + 1] += start[j];
+    }
+    let mut by_row = vec![0u32; start[rows]];
+    let mut next = start.clone();
+    for &c in &st.glaciated {
+        if surface[c as usize].is_finite() {
+            let j = c as usize / w;
+            by_row[next[j]] = c;
+            next[j] += 1;
+        }
+    }
+    if st.footprint.len() != n {
+        st.footprint.clear();
+        st.footprint.resize(n, f64::NAN);
+    }
+    let reach_rows = MAX_SPREAD as usize;
+    let width = &st.width;
+    st.footprint
+        .par_chunks_mut(FOOTPRINT_BAND * w)
+        .enumerate()
+        .for_each(|(b, out)| {
+            out.fill(f64::NAN);
+            let j0 = b * FOOTPRINT_BAND;
+            let j1 = j0 + out.len() / w;
+            let (lo, hi) = (j0.saturating_sub(reach_rows), (j1 + reach_rows).min(rows));
+            for &c in &by_row[start[lo]..start[hi]] {
+                let c = c as usize;
+                let zs = surface[c];
+                let half = 0.5 * width[c] * p.valley_width / d.dx;
+                let reach = (half - 0.5).ceil().clamp(0.0, MAX_SPREAD as f64) as i64;
+                let jc = (c / w) as i64;
+                for dj in -reach..=reach {
+                    if jc + dj < j0 as i64 || jc + dj >= j1 as i64 {
+                        continue;
+                    }
+                    for di in -reach..=reach {
+                        let dist = ((di * di + dj * dj) as f64).sqrt();
+                        if dist > half + 0.5 && (di, dj) != (0, 0) {
+                            continue;
+                        }
+                        let Some(j) = offset(d, c, di, dj) else {
+                            continue;
+                        };
+                        let k = j - j0 * w;
+                        if kind[j] != BASE && h[j] < zs && (out[k].is_nan() || out[k] < zs) {
+                            out[k] = zs;
+                        }
+                    }
+                }
+            }
+        });
 }
+
+/// Rows per task of [`footprint`].
+const FOOTPRINT_BAND: usize = 16;
 
 /// Positions handed out per task by the parallel passes of [`ice`] (`spl.rs`'s values).
 const DOWN_GRAIN: u32 = 256;
@@ -902,10 +979,13 @@ pub fn step(
     let mut spread: Vec<(usize, f64)> = Vec::new();
     let mut sea_cells: Vec<u32> = Vec::new();
     for _ in 0..subs {
+        let started = std::time::Instant::now();
         ice(d, r, kind, h, filled, sea, clim, p, gravity, &mut ice_st);
+        out.ice_ms += started.elapsed().as_secs_f64() * 1000.0;
         if ice_st.cells == 0 {
             break;
         }
+        let started = std::time::Instant::now();
         // Erosion of every glaciated cell (the stack's cells with ice, in stack order).
         eroding.clear();
         written.clear();
@@ -1082,6 +1162,7 @@ pub fn step(
                 v[c] = 0.0;
             }
         }
+        out.walk_ms += started.elapsed().as_secs_f64() * 1000.0;
     }
     sea_cells.sort_unstable();
     sea_cells.dedup();
