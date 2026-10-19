@@ -33,6 +33,7 @@ MinecraftIndustrialComplex/deep-time.
 crates/deeptime-format   world-data format (the contract with Java)
 crates/deeptime-core     simulation (no Minecraft, no JNI)
 crates/deeptime-jni      cdylib; the only crate using `jni`
+crates/deeptime-cpuprobe CPU-level probe cdylib (its own JNI class) that picks the baseline or x86-64-v3 native
 crates/deeptime-cli      `deeptime` binary: run, stage, synth, bench, inspect-column
 crates/deeptime-viewer   HTML viewer bundles
 crates/deeptime-inspect  renders Minecraft region files (dev tool)
