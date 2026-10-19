@@ -5110,7 +5110,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Library: fetched in WP-14a. Text file: Guilloteau2000.txt.
 - Read in WP-14a: "The scale height of water ... is small (typically 2 km)". Institutional lecture notes, not peer reviewed.
 
-## Lithospheric flexure (ISO-040 to ISO-067)
+## Lithospheric flexure (ISO-040 to ISO-077)
 
 ### Calmant1990
 - Reference: Calmant, S., Francheteau, J., Cazenave, A. (1990). Elastic layer thickening with age of the oceanic lithosphere: a tool for prediction of the age of volcanoes or oceanic crust. Geophysical Journal International 100(1):59-67.
@@ -5295,6 +5295,138 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Read so far (by the project): full text by the surface-divergence agent on 2026-10-18. Abstract: "orthometric height was determined as 8848.86 m from the ellipsoid height observed at the top of Sagarmatha and precise geoid determined. The height was determined on the base of International Height Reference System (IHRS) and final height was announced jointly from Nepal and China on 8th of December 2020"; p. 64: "The final height was determined as 8848.86 m (IHRS) jointly". The Chinese side's account (Geo-spatial Information Science, doi 10.1080/10095020.2022.2128901) refused scripted access (403).
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct (journal and pages on the PDF's page footers).
+
+### EshaghTenzer2021
+- Reference: Eshagh, M., Tenzer, R. (2021). The temporal viscoelastic model of flexural isostasy for estimating the elastic thickness of the lithosphere. Geophysical Journal International 227(3):1700-1714.
+- DOI or URL: 10.1093/gji/ggab292
+- Cited as: "Eshagh & Tenzer 2021" (the limit a weakened plate tends to)
+- Ledger ids: ISO-056
+- Access: open (publisher).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): the Summary and Section 2.2 in full text (the first 100,000 of 163,909 characters) by a Sonnet sub-agent of the polar-holes agent, 2026-10-18: "The response of a viscoelastic plate on a load yields a flexure with values between those limited based on the Airy-Heiskanen (cf. Heiskanen 1931) and elastic plate theories"; at t = 0 "A viscoelastic plate thus acts as an elastic shell"; as t goes to infinity "the corresponding flexure will be the same as that defined by the Airy-Heiskanen isostatic model". D is fixed in their model and time enters through exp(-t/tau), tau = eta/E; they cite Watts 2001, p. 225, for the viscoelastic equation.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: journal, volume and pages as the sub-agent read them; not checked against the printed version.
+
+### Buoninfante2023
+- Reference: Buoninfante, S., et al. (2023). Gravity evidence for a heterogeneous crust of Mercury. Scientific Reports 13:19854.
+- DOI or URL: 10.1038/s41598-023-46081-4
+- Cited as: "Buoninfante et al. 2023" (the zero-rigidity limit)
+- Ledger ids: ISO-056
+- Access: open (PMC).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): full text (PMC) by a Sonnet sub-agent of the polar-holes agent, 2026-10-18: "the flexural rigidity D→0, and we may assume the local compensation Airy model".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: title, journal and article number as read; the author list after the first not looked up.
+
+### Beaumont1978
+- Reference: Beaumont, C. (1978). The evolution of sedimentary basins on a viscoelastic lithosphere: theory and examples. Geophysical Journal of the Royal Astronomical Society 55(2):471-497.
+- DOI or URL: 10.1111/j.1365-246X.1978.tb04283.x
+- Cited as: "Beaumont 1978"
+- Ledger ids: ISO-056
+- Access: paywalled (abstract visible on OUP).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract by a Sonnet sub-agent of the polar-holes agent, 2026-10-18: "long wavelengths being compensated most rapidly", "flexural rigidity of ~ 5 x 10^25 Nm and relaxation time constant ~ 10^6 yr". The abstract states no Airy limit.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct (the year is 1978, not 1976 as it is sometimes given).
+
+### WattsZhong2000
+- Reference: Watts, A. B., Zhong, S. (2000). Observations of flexure and the rheology of oceanic lithosphere. Geophysical Journal International 142(3):855-875.
+- DOI or URL: 10.1046/j.1365-246x.2000.00189.x
+- Cited as: "Watts & Zhong 2000" (the counterpoint: an oceanic plate stays elastic on long timescales)
+- Ledger ids: ISO-056
+- Access: paywalled (abstract visible).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract by a Sonnet sub-agent of the polar-holes agent, 2026-10-18: rigidity "depends on load age, being large at short times and small at long times"; the plate "behaves as a thin elastic plate on long timescales".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: as read in the abstract.
+
+### Guevara2022
+- Reference: Guevara, V. E., Smye, A. J., Caddick, M. J., Searle, M. P., Olsen, T., Whalen, L., Kylander-Clark, A. R. C., Jercinovic, M. J., Waters, D. J. (2022). A modern pulse of ultrafast exhumation and diachronous crustal melting in the Nanga Parbat Massif. Science Advances 8(31):eabm2689.
+- DOI or URL: 10.1126/sciadv.abm2689; full text https://www.ebi.ac.uk/europepmc/webservices/rest/PMC9355356/fullTextXML
+- Cited as: "Guevara et al. 2022" (Earth's fastest exhumation)
+- Ledger ids: ISO-076
+- Access: open (PMC9355356).
+- Library (the project's source library, not distributed): not filed; fetched to the laptop's scratch by a Sonnet sub-agent of the polar-holes agent, 2026-10-18, and deleted with the task's scratch.
+- Read so far (by the project): full text (Europe PMC XML), fetched by a Sonnet sub-agent and the values read by the polar-holes agent, 2026-10-18: "a pulse of ultrafast exhumation (9 to 13 mm/year) that began ~1 Ma and was preceded by several million years of slower, but still rapid, exhumation (2 to 5 mm/year)"; "the fastest known intracontinental exhumation rates on the modern Earth".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct (title and article number in the XML).
+
+### Govin2020
+- Reference: Govin, G., van der Beek, P., Najman, Y., Millar, I., Gemignani, L., Huyghe, P., Dupont-Nivet, G., Bernet, M., Mark, C., Wijbrans, J. (2020). Early onset and late acceleration of rapid exhumation in the Namche Barwa syntaxis, eastern Himalaya. Geology 48(12):1139-1143.
+- DOI or URL: 10.1130/G47720.1; full text https://nora.nerc.ac.uk/id/eprint/529465/1/1139.pdf
+- Cited as: "Govin et al. 2020"
+- Ledger ids: ISO-076
+- Access: open (gold open access; NORA copy).
+- Library (the project's source library, not distributed): not filed; fetched to the laptop's scratch by a Sonnet sub-agent of the polar-holes agent, 2026-10-18, and deleted with the task's scratch.
+- Read so far (by the project): full text, fetched by a Sonnet sub-agent and the values read by the polar-holes agent, 2026-10-18: "Initial, intermediate, and final exhumation rates are 0.9 ± 0.4, 4.0 ± 2.0, and 8.6 ± 1.0 km/m.y., respectively" (the late acceleration at 1.3 ± 0.8 Ma).
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct (on the PDF).
+
+### Deng2021
+- Reference: Deng, K., Wittmann, H., Yang, S., von Blanckenburg, F. (2021). The upper limit of denudation rate measurement from cosmogenic 10Be(meteoric)/9Be ratios in Taiwan. Journal of Geophysical Research: Earth Surface 126(10):e2021JF006221.
+- DOI or URL: 10.1029/2021JF006221; abstract https://api.crossref.org/works/10.1029/2021JF006221
+- Cited as: "Deng et al. 2021"
+- Ledger ids: ISO-077
+- Access: paywalled (abstract through Crossref).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract (Crossref), fetched by a Sonnet sub-agent and read by the polar-holes agent, 2026-10-18: "8.1 to >30 mm/yr in the Liwu mainstem". A GFZ project page ("fastest denudation rates on Earth") corroborates it. The full text was not read.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: as read in the abstract.
+
+### Lidberg2010
+- Reference: Lidberg, M., Johansson, J. M., Scherneck, H.-G., Milne, G. A. (2010). Recent results based on continuous GPS observations of the GIA process in Fennoscandia from BIFROST. Journal of Geodynamics 50(1):8-18.
+- DOI or URL: 10.1016/j.jog.2009.11.010; author preprint https://www.nordicgeodeticcommission.com/wp-content/uploads/2014/10/7-local_120398.pdf
+- Cited as: "Lidberg et al. 2010" (the fastest glacial rebound measured)
+- Ledger ids: ISO-076
+- Access: paywalled; author preprint open.
+- Library (the project's source library, not distributed): not filed; fetched to the laptop's scratch by a Sonnet sub-agent of the polar-holes agent, 2026-10-18, and deleted with the task's scratch.
+- Read so far (by the project): the author preprint's velocity table, fetched by a Sonnet sub-agent and the values read by the polar-holes agent, 2026-10-18: station SKE0 (64.879 N, 21.048 E), vertical 10.95 mm/yr; OVE0 9.79, OULU 9.59.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct (title and authors on the preprint); the preprint, not the printed version.
+
+### Sella2007
+- Reference: Sella, G. F., Stein, S., Dixon, T. H., Craymer, M., James, T. S., Mazzotti, S., Dokka, R. K. (2007). Observation of glacial isostatic adjustment in "stable" North America with GPS. Geophysical Research Letters 34(2):L02306.
+- DOI or URL: 10.1029/2006GL027081; abstract https://digitalcommons.usf.edu/geo_facpub/447/
+- Cited as: "Sella et al. 2007"
+- Ledger ids: ISO-077
+- Access: paywalled (abstract on the USF repository).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract on the USF repository by a Sonnet sub-agent of the polar-holes agent, 2026-10-18: uplift of about 10 mm/yr near Hudson Bay. The full text was not read (Wiley 403).
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: as read in the abstract.
+
+### Brothers2009
+- Reference: Brothers, D. S., Driscoll, N. W., Kent, G. M., Harding, A. J., Babcock, J. M., Baskin, R. L. (2009). Tectonic evolution of the Salton Sea inferred from seismic reflection data. Nature Geoscience 2:581-584.
+- DOI or URL: 10.1038/NGEO590; full text https://igppweb.ucsd.edu/~dkilb/NG/SaltonSea/Publications_files/brothers_NG_2009.pdf
+- Cited as: "Brothers et al. 2009" (fast subsidence)
+- Ledger ids: ISO-076
+- Access: paywalled; a copy on an author's institution's site.
+- Library (the project's source library, not distributed): not filed; fetched to the laptop's scratch by a Sonnet sub-agent of the polar-holes agent, 2026-10-18, and deleted with the task's scratch.
+- Read so far (by the project): full text, fetched by a Sonnet sub-agent and the values read by the polar-holes agent, 2026-10-18: "Differential subsidence (>10 mm yr−1) in the southern sub-basin"; "Average subsidence measured over the ad 830 time-horizon just south of the hinge zone is between 9 and 12 mm yr−1"; sedimentation "nearly 19 mm yr−1 since ∼ad 1360".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct (on the PDF).
+
+### Garzione2008
+- Reference: Garzione, C. N., et al. (2008). Rise of the Andes. Science 320(5881):1304-1307.
+- DOI or URL: 10.1126/science.1148615; copy https://www.sas.rochester.edu/ees/SIREAL/CAUGHT/css/publication/2008/Garzione%20et%20al_2008.pdf
+- Cited as: "Garzione et al. 2008" (a fast plateau rise sustained over millions of years)
+- Ledger ids: ISO-076
+- Access: paywalled; a copy on the first author's institution's site.
+- Library (the project's source library, not distributed): not filed; fetched to the laptop's scratch by a Sonnet sub-agent of the polar-holes agent, 2026-10-18, and deleted with the task's scratch.
+- Read so far (by the project): full text, fetched by a Sonnet sub-agent and the values read by the polar-holes agent, 2026-10-18: "a pulse of rapid surface uplift of ~1.5 to 3.5 km (2.5 ± 1 km) between ~10 and 6 Ma". A correction to the article exists (Science 321:1295) and was not read.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct (title, volume and first page on the copy's cover page). Not GarzioneEtAl2006, a different paper.
+
+### XieHeller2009
+- Reference: Xie, X., Heller, P. L. (2009). Plate tectonics and basin subsidence history. Geological Society of America Bulletin 121(1-2):55-64.
+- DOI or URL: 10.1130/B26398.1; copy https://serc.carleton.edu/download/files/49990/xie_heller_2009.pdf
+- Cited as: "Xie & Heller 2009" (how much a basin subsides, and for how long)
+- Ledger ids: ISO-076
+- Access: paywalled; a copy on SERC.
+- Library (the project's source library, not distributed): not filed; fetched to the laptop's scratch by a Sonnet sub-agent of the polar-holes agent, 2026-10-18, and deleted with the task's scratch.
+- Read so far (by the project): full text, fetched by a Sonnet sub-agent and the values read by the polar-holes agent, 2026-10-18: foreland basins, "The maximum magnitude of tectonic subsidence seen in compiled curves is ~3 km"; strike-slip basins, "rapid and short-lived (typically <10 m.y.) subsidence", "Tectonic subsidence typically exceeds 2 km and reaches 4 km in exceptional cases". Magnitudes and durations, not rates.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct (on the PDF).
 
 ## Force-balance plate motion: sources added in WP-13a (2026-10-02)
 
@@ -6212,9 +6344,9 @@ Not read: Péron-Pinvidic, Manatschal & Osmundsen 2013 (Marine and Petroleum Geo
 - Reference: Portenga, E. W. and Bierman, P. R. (2011). Understanding Earth's eroding surface with 10Be. GSA Today 21(8):4-10.
 - DOI or URL: 10.1130/G111A.1 (the DOI from memory, not checked); https://www.geosociety.org/gsatoday/archive/21/8/article/i1052-5173-21-8-4.htm
 - Cited as: "Portenga & Bierman 2011" (global compilation of cosmogenic erosion rates; the erosion audit's reference line).
-- Ledger ids: ERO-171
+- Ledger ids: ERO-171, ISO-076
 - Access: open (GSA Today).
-- Read so far (by the project): full text, 2026-10-05: outcrops 12 ± 1.3 m/Myr mean, 5.4 median (n = 450); drainage basins 218 ± 35 mean, 54 median (n = 1,149); seismically active basins 367 ± 55 (n = 221), inactive 182 ± 30 (n = 928); active and inactive outcrops alike (14 ± 1.6 and 13 ± 1.4).
+- Read so far (by the project): full text, 2026-10-05, and again by the polar-holes agent, 2026-10-18 ("Drainage basins erode more quickly (mean = 218 m Myr−1; median = 54 m Myr−1)"): outcrops 12 ± 1.3 m/Myr mean, 5.4 median (n = 450); drainage basins 218 ± 35 mean, 54 median (n = 1,149); seismically active basins 367 ± 55 (n = 221), inactive 182 ± 30 (n = 928); active and inactive outcrops alike (14 ± 1.6 and 13 ± 1.4).
 
 ### Montgomery2002
 - Reference: Montgomery, D. R. and Brandon, M. T. (2002). Topographic controls on erosion rates in tectonically active mountain ranges. Earth and Planetary Science Letters 201(3-4):481-489.

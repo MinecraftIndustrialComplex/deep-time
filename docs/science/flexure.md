@@ -3,9 +3,10 @@
 Status of this page: written with the feature on 2026-10-02. Three constants were checked against
 their sources (ISO-041, ISO-042, ISO-048); the rest are marked in the ledger as read from abstracts,
 uncited, or game choices. The measurements are from small ensembles of four runs; two of them
-were made before the last change of one constant (see "Earth against the mod").
+were made before the last change of one constant (see "Earth against the mod"). Updated 2026-10-18
+for the polar holes (ISO-056 rewritten, ISO-074 to ISO-076 added; six runs).
 
-Ledger ids on this page: `ISO-040` to `ISO-072` (see [ledger/ISO.md](ledger/ISO.md)).
+Ledger ids on this page: `ISO-040` to `ISO-077` (see [ledger/ISO.md](ledger/ISO.md)).
 
 ## What you see in the world
 
@@ -52,8 +53,10 @@ and the spreading of over-thick crust.
 
 When the stiffness is set to nothing, step 4 gives exactly the local floating the model had
 before. When crust cools and stiffens, the plate keeps the shape it has; only loads added later
-meet the stiffer plate. When it weakens (reheated, or becoming a plate's broken edge) its bending
-stress is released and the ground moves to the new balance.
+meet the stiffer plate. When it weakens (reheated, or becoming a plate's broken edge) it stops
+holding up the same share of what it held: a plate that loses nine tenths of its stiffness lets
+go of nine tenths of the load it kept from floating on its own, and the ground moves that far
+towards floating, never past it (see "The polar holes" below).
 
 The plate model then reads the surface's new heights, as it does for erosion.
 
@@ -86,12 +89,16 @@ The plate equation, as coded (ISO-040):
 | ISO-052 | Lowest `Te` | 5 | km | Lu et al. 2024 | `abstract-only` |
 | ISO-053 | Arcs and rifts | at the lowest `Te` | km | none | `uncited` |
 | ISO-055 | Plate boundaries | at the lowest `Te`; the boundary cells blurred, the share of stiffness kept `1 − 2.5 × blur` (0, then 0.17 and 0.72 on a straight boundary) | km | none | `uncited` |
-| ISO-056 | Stiffening and weakening | the plate carries its bending moment; gained rigidity joins stress-free, lost rigidity releases the moment in proportion | – | principle: Watts 1978 | `abstract-only` |
+| ISO-056 | Stiffening and weakening | gained rigidity joins stress-free; where `D` falls to `r·D` the share `1 − r` of the load held from local isostasy, `ρ_m (Q + ice − w − unsolved)`, is a force | kg/m² | principle: Watts 1978; the Airy limit: Eshagh & Tenzer 2021, Buoninfante et al. 2023 | `abstract-only` (the share rule is the agent's) |
+| ISO-075 | Carrying the rigidity | the raster's interpolation blends `ln D`, not `D` | – | none | `game-choice` (numerical) |
 | ISO-068 | Increments | each step solves for the step's loads only; the carried plate is in balance; a solve's unfinished part is carried | – | none | `game-choice` (numerical) |
 | ISO-069 | The plate model's resolution | its root bends the plate only low-passed at its sample spacing (two binomial passes on the quick presets) | – | none | `game-choice` (numerical) |
 | ISO-070 | The spreading's root | bends nothing: the spreading's change stays locally compensated | – | none (its physics from memory of Clark & Royden 2000) | `game-choice` (numerical) |
 | ISO-071 | Earth's relief | Everest 8,848.86 m above the sea, the Challenger Deep 10,925 m below | m | Dangol et al. 2020; Stewart & Jamieson 2019 | `verified` |
 | ISO-072 | The surface guard | a cell farther from the sea than 12 × 19,774 m × max(1, g_E/g) stops the run | m | none (a margin) | `game-choice` |
+| ISO-074 | The step records' polar band | rows at 60° of latitude or more | ° | none (a reporting band) | `game-choice` |
+| ISO-076 | Earth's fastest vertical rates | exhumation 9 to 13 mm/yr, rebound 11, subsidence 9 to 12; sustained over millions of years, below 1 mm/yr | mm/yr | Guevara et al. 2022, Govin et al. 2020, Lidberg et al. 2010, Brothers et al. 2009, Garzione et al. 2008, Xie & Heller 2009 and others (the ledger) | `verified` |
+| ISO-077 | Two more fast rates | denudation 8 to more than 30 mm/yr (Taiwan), rebound about 10 (Hudson Bay) | mm/yr | Deng et al. 2021, Sella et al. 2007 | `abstract-only` |
 | ISO-061 to ISO-064 | What counts as a load | see the ledger | | none | `uncited`, one `game-choice` |
 
 Numerical choices (smoothing of `Te`, the solve's cell size, tolerance, the preconditioner) are
@@ -125,7 +132,8 @@ the artifact fixes); the sea-depth row is from the final code (law 2.7, after th
   prescribed by the plate model.
 - Along active margins the ground still zigzags from cell to cell somewhat more than without
   flexure: narrow loads that are real at this resolution (marine fill of kilometres in trench
-  cells) and the release of bending stress where a plate boundary moves through cells. The first
+  cells) and the load a plate lets go where a plate boundary moves through cells (since
+  2026-10-18 never more than the load it held, "The polar holes"). The first
   build zigzagged far more, for three numerical reasons now fixed (build log 2026-10-02, the
   flexure follow-up; design note section 13): the carried state acting as a force, a stair-stepped
   plate boundary, and the plate model's sample lattice treated as a load.
@@ -169,6 +177,112 @@ at −272 Myr), so the bound sits above them and above the about 210 km a sound 
 (the 30 km ceiling with the whole thickening held up, 7 times). The transients themselves were the
 plate model's; since 2026-10-18 its rate limits bound them (an open question below).
 
+## The polar holes
+
+**What was seen.** With the plate step's rate limits in (2026-10-18), the cells that came closest
+to the guard were on L1's polar rows: a cell there rose or fell by tens of km within a few steps
+while the plates under it rose by 2 km or less. The worst, over six 500 Myr runs of
+`earthlike_quick_16k`, was a hole two cells wide on the supercontinent planet of seed 2 that fell
+to 59.6 km below the sea in 16 Myr, more than five times the Challenger Deep's depth.
+
+**The cause: a weakened plate let go of its bending moment, not of its load** (ISO-056 until
+2026-10-18). The plate carried its bending moment `m = D ∇²w`. Where a cell's rigidity fell to `r`
+times what it was, the plate kept `r·m`, and the rest, `L((1 − r)·m)`, was a force. For a plate in
+balance `L(m)` is exactly the load the plate holds away from local isostasy, so where `r` is the
+same over a region the force is that share of the load. Along a plate boundary `r` changes from
+cell to cell: a cell the boundary reaches drops to the lowest `Te` (5 km, ISO-052, ISO-055), so a
+craton cell keeps (5/80)³ of its rigidity, a four-thousandth, while its neighbours keep theirs.
+The curvature of a released moment that steps from cell to cell is a force several times the
+load the plate held, up in one cell and down in the next. Traced on the worst run at −290 Myr: a
+craton cell at 70° of latitude that a boundary reached released 17.2 km of ground in one step. In a
+controlled test (a boundary stepping between rows across a bent plate) the old rule moved the
+ground by up to 1.46 times the load held and pushed it 4.2 km past local isostasy.
+
+**Why near the poles.** The same rule ran everywhere; the polar rows have more of what sets it
+off. The raster is equal-area, so poleward of 60° a cell is more than twice as tall on the planet
+as on the equator (78 km and more on the quick presets) and less than half as wide. The plate
+model's fields come from samples about 71 km apart, so there its boundaries step from row to row
+at the cell scale, and a plate's rotation carries crust about ten cells a step east to west:
+boundaries sweep across many cells each step, and each cell they reach weakens. The carried
+rigidity was also blended linearly on the raster. Beside a stiff cell, a weak cell carried a
+fraction of a cell read as nearly as stiff, the next step found it weak again, and the rule
+released load that nothing had changed, most where crust moves farthest.
+
+**The fix.** A weakened plate lets go of its share of the load it held (ISO-056): where `D` falls
+to `r·D`, the force is `(1 − r) ρ_m (Q + ice − w − unsolved)`, the cell's own departure from local
+isostasy. Where `r` is uniform this is the old force. Where it is not, the force moves a cell
+towards local isostasy, where a plate with no strength puts it, and no further, whatever the
+cell's size or latitude. Local isostasy is the limit a viscoelastic plate relaxes to: its flexure
+lies between the elastic and the Airy-Heiskanen answers, and reaches the latter as time goes to
+infinity (Eshagh & Tenzer 2021); as `D` goes to 0 the compensation is Airy's (Buoninfante et al.
+2023). That happens in about a million years (Beaumont 1978, abstract), less than a step. The
+bending moment is no longer carried. The rigidity is now carried as its logarithm (ISO-075), so a
+weak cell beside a stiff one no longer seems to weaken when it moves. Unit test
+`a_plate_that_weakens_settles_towards_local_isostasy` (a 64 × 48 plate bent by a disc load, a
+boundary stepping between rows across it for ten steps): no step moves the ground by more than
+1.05 times the most the plate held, and nothing goes more than a quarter of that past local
+isostasy. The old rule fails it on the third step (11.2 km against a bound of 8.0 km, 4.2 km past
+against 1.9 km).
+
+**Measured.** Six runs of `earthlike_quick_16k`, 500 Myr, scattered continents and
+supercontinent, seeds 1 to 3. Mean [min, max] over the runs. Before: master 9091c163 with the
+step records. After: the fix, merged with master 19cb11e0. Command:
+`tools/review/force-balance-ensemble.sh <out> <binary> 500 1,2,3 scattered_continents,supercontinent ck <prefix>`,
+run through `tools/remote/detach.sh` on the test machine.
+
+| | Before | After |
+|---|---|---|
+| Guard's worst (m from the sea) | 30,814 [19,599, 59,631] | 15,471 [13,187, 18,101] |
+| Steps beyond 1, 2, 3 and 6 Earth reliefs (the six runs together) | 25, 8, 1, 0 | 0, 0, 0, 0 |
+| Largest rise in a step, polar rows (m) | 16,148 [6,359, 39,147] | 5,016 [4,828, 5,338] |
+| Largest fall in a step, polar rows (m) | 12,543 [6,367, 24,165] | 5,535 [4,925, 6,992] |
+| Largest rise in a step, the rest (m) | 15,012 [10,974, 25,545] | 6,593 [4,899, 9,747] |
+| Largest fall in a step, the rest (m) | 15,652 [13,198, 18,228] | 5,628 [4,898, 6,350] |
+| L1's highest cell at the end (m) | 7,288 [5,860, 9,958] | 7,031 [6,555, 7,648] |
+| Land share at the end | 0.199 [0.160, 0.222] | 0.207 [0.155, 0.237] |
+
+The step records (ISO-074) are the change of a cell's elevation over the surface stage of one
+step, with the plate model's uplift taken out. After the fix the polar rows move as the rest do.
+Away from the poles (latitude below 60°) the planets come out different cell by cell, by 2.6 km
+on average, and the plate model's own elevation differs by as much: a changed surface feeds back
+into the plates, and the runs diverge. The surface is not different in kind. Its land share was
+0.201 [0.175, 0.229] before and 0.211 [0.158, 0.256] after. Land's median, 90th and 99th
+percentiles were 726, 2,965 and 5,053 m before and 715, 2,959 and 5,065 m after. The sea's median
+depth was 3,142 m before and 3,147 m after.
+
+**Against Earth's rates** (ISO-076, ISO-077). A step is 2 Myr, so 1 mm/yr is 2 km a step. The fastest
+vertical rates measured on Earth run from a few mm/yr to a few tens:
+
+- exhumation: 9 to 13 mm/yr at Nanga Parbat over the last million years, "the fastest known
+  intracontinental exhumation rates" (Guevara et al. 2022), and 8.6 km/Myr at Namche Barwa (Govin
+  et al. 2020);
+- denudation: 8 to more than 30 mm/yr in Taiwan (Deng et al. 2021, abstract only, ISO-077);
+- glacial rebound: up to 11 mm/yr (Lidberg et al. 2010);
+- subsidence: 9 to 12 mm/yr at the Salton Sea over 1,200 years (Brothers et al. 2009).
+
+Over millions of years the surface itself moves more slowly. The Altiplano rose 1.5 to 3.5 km in
+about 4 Myr (Garzione et al. 2008). A basin's tectonic subsidence reaches about 3 km, 4 km in
+exceptional cases, mostly within 10 Myr (Xie & Heller 2009).
+
+Before the fix, single cells rose by 39 km in a step (20 mm/yr held for 2 Myr, beyond any
+measured rate held that long) and sank to 60 km below the sea. After it, no cell changed by more
+than 9.7 km in a step (4.9 mm/yr), or 7.0 km on the polar rows (3.5 mm/yr). That is within the
+range of the fastest rates measured on Earth. Nothing stood farther from the sea than 18.1 km,
+less than Earth's relief (19.8 km).
+
+**What is left.** Per-step changes of 5 to 10 km at single cells are within Earth's fastest rates,
+but above what Earth's surface keeps up over 2 Myr across a region (under 1 mm/yr). Traces of the
+first 110 Myr of two runs, taken while the fix was being tried (the trace is not kept in the
+code), show which processes make them:
+
+- the fluvial step, stream power with its deposition: up to 9 to 10 km either way;
+- marine fill: up to 9 to 12 km into a cell;
+- the glacial step: up to 11 km;
+- the flexure: up to 8.5 km.
+
+They partly cancel within the step. Whether each is right at a single 39 km cell over 2 Myr was
+not checked here.
+
 ## Game choices
 
 - **Flexural lengths are Earth-normalized** (ISO-057): the plate's kilometres are the plate
@@ -186,11 +300,19 @@ plate model's; since 2026-10-18 its rate limits bound them (an open question bel
   accretion (up to 36 km of rise and 566 km of crust in one step) and the collision belts (13 km),
   and bounded by the rate limits of [plates.md](plates.md), "The fastest a column thickens and
   rises" (PLT-287, PLT-288): no plate step now raises a column more than 7 km. The guard's worst
-  over six 500 Myr runs of `earthlike_quick_16k` fell from 66.7 to 30.8 km, over six 1000 Myr runs from 82.3 to 32.1 km (ISO-073). What is
-  left is the surface stage's own: a polar row of L1 that rose 20 to 40 km over a few steps under
-  plate uplift of 2.2 km or less, with and without the limits, and with the limits a hole two cells
-  wide on a row near the pole that fell to 59.7 km below the sea in 16 Myr while the plates raised
-  it (plates.md, "Limits"; not traced into the surface stage).
+  over six 500 Myr runs of `earthlike_quick_16k` fell from 66.7 to 30.8 km, over six 1000 Myr runs from 82.3 to 32.1 km (ISO-073). What was
+  left was the surface stage's own: a polar row of L1 that rose 20 to 40 km over a few steps under
+  plate uplift of 2.2 km or less, and a hole two cells wide on a row near the pole that fell to
+  59.6 km below the sea in 16 Myr while the plates raised it. Traced on 2026-10-18 to the flexure's
+  rule for a plate that weakens and fixed ("The polar holes"): the guard's worst over the same six
+  500 Myr runs is now 15.5 km [13.2, 18.1].
+- Single cells still change by 5 to 10 km in a step (2.5 to 5 mm/yr), by the fluvial step, marine
+  fill, the glacial step and the flexure: within the fastest rates measured on Earth, above what a
+  region sustains over 2 Myr ("The polar holes", "What is left"). Not checked process by process.
+- The rule for a plate that weakens lets go at once, within the step. Relaxation takes about a
+  million years (Beaumont 1978, abstract); Watts & Zhong 2000 (abstract) find oceanic plates
+  elastic on long timescales, which is the stiffening side. That the share let go is `1 − r` of
+  the load held is the agent's rule, from the two limits; no source states it.
 - The recovery law of continental `Te` (ISO-051) has no source for its form or its 300 Myr.
 - Densities (ISO-043 to ISO-047) are uncited, and the model uses three different crust densities
   elsewhere (see [isostasy-and-height-limit.md](isostasy-and-height-limit.md)).
@@ -212,5 +334,10 @@ By their keys in [bibliography.md](bibliography.md), section "Lithospheric flexu
 - `DeCellesGiles1996_flexure`: full text.
 - `StewartJamieson2019`, `Dangol2020`: full text, read 2026-10-18 by the agent that wrote the
   guard (ISO-071).
+- `EshaghTenzer2021` (Summary and Section 2.2), `Buoninfante2023`: full text; `Beaumont1978`,
+  `WattsZhong2000`: abstracts; read 2026-10-18 by a sub-agent of the polar-holes agent (ISO-056).
+- `Guevara2022`, `Govin2020`, `Lidberg2010` (author preprint), `Brothers2009`, `Garzione2008`,
+  `XieHeller2009`, `Portenga2011`: full text; `Deng2021`, `Sella2007`: abstracts; fetched
+  2026-10-18 by a sub-agent of the polar-holes agent, the values read by the agent (ISO-076).
 
-All were read by a sub-agent on 2026-10-02, not by the agent that wrote the code.
+The sources from `TurcotteSchubert_Geodynamics` to `DeCellesGiles1996_flexure` were read by a sub-agent on 2026-10-02, not by the agent that wrote the code.
