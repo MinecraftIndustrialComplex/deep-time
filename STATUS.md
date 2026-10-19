@@ -126,6 +126,71 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-19: P1-19 plates part 1: the plate step's transition, record, collision and collapse in parallel, and resamplings without a new hull (profile items #2, #13, #19; agent worktree agent-a0c387a36d940833e from master be80c6c1)
+- **What changed.**
+  - **Commit 8faa692c (identical).**
+    - `transition.rs`: the plate, eligibility and boundary scans run in parallel. Seeds come from a cube grid (`Near`) instead of a scan of all seeds. Each side's reach is a sparse multi-source Dijkstra (`geometry::dijkstra_sparse`, a thread-local scratch reset only where it was touched), and the two sides run in a `rayon::join`.
+    - `collapse.rs`: the per-plate plans run in parallel and are applied in plate order.
+    - `collision.rs`: the plate lookup is lazy and the flood stops once the terrane welds.
+    - `rifting.rs`: `heal`'s fastest-pair scan is a parallel fold and reduce.
+    - `dynamics.rs`: `record_step`'s tallies, pieces and ocean ages run in parallel.
+    - `ridges::resample` takes the motion lap's all-sample tree.
+    - `deeptime bench` reads `DEEPTIME_BENCH_NO_OVERLAP` (a measurement knob: the structure step after the plates' instead of beside them).
+  - **Commit 6db4f51b (world-changing, bit level).**
+    - Every lattice is the Fibonacci sphere turned. `Geo::build` triangulates the unturned sphere and turns it, and a resampling's lattice is `Geo::turned` from the old one (`SphereMesh::turned`). The serial hull runs once per run, not at every resampling.
+    - Triangle and adjacency order follow the sphere's build, and edge lengths come from the unturned points. Only cocircular ties could flip a diagonal, and either diagonal is Delaunay.
+    - New tests: `a_turned_triangulation_is_the_turned_points_own` (1,000 to 100,000 points, three rotations each, outward and locally Delaunay on the turned points), `a_turned_lattice_is_the_built_one` and `the_sparse_dijkstra_matches_the_dense_one`. Science page: plates.md "The new lattice's triangulation".
+- **Seconds** (plate lap timers, `deeptime bench --preset earthlike_full_16k --start scattered_continents --length-myr 100 --threads 8` through `tools/review/bench-quiet.py`, side by side on CPU sets A and B, then swapped, on a VM loaded by other agents):
+
+  | Lap | ab1: master A → commit 1 B | ab2: master B → both commits A | Saved per 100 Myr |
+  |---|---|---|---|
+  | transition | 2.8 → 1.6 | 3.6 → 1.9 | 1.2 to 1.7 |
+  | collapse | 0.4 → 0.1 | 0.5 → 0.2 | 0.3 |
+  | collision | 0.8 → 0.2 | 1.0 → 0.2 | 0.6 to 0.8 |
+  | record | 1.9 → 1.0 | 2.7 → 1.3 | 0.9 to 1.4 |
+  | resample | 6.7 → 6.7 (the hull alone on the critical path) | 9.3 → 1.5 | 7.8 |
+  | plates stage | 47.5 → 44.8 | 62.2 → 49.2 | 2.7 (commit 1), 13.0 (both) |
+
+  - The resample lap on the branch stays at 0.9 to 1.5 s in every later run (ab3 to ab5). Scaled to 1,000 Myr, the five items save about 100 to 130 s of the gate run. That is an estimate: no full run was made.
+- **#19, the structure step on threads of its own: not landed.**
+  - **ab3** (branch with the overlap off on A, on B; the bench knob above):
+    - plates 39.3 s off, 43.0 s on: the structure work beside costs the plates 3.7 s per 100 Myr.
+    - structure 22.9 s off, 14.4 s on.
+    - So the overlap master already has saves 4.8 s per 100 Myr.
+  - Split pools, a session-pool experiment (`Session::set_beside_threads`), A against the default on B:
+    - **ab4**, plates on 6 threads and structure on 2: plates 43.4 against 41.6 s, structure 10.6 against 10.8 s, so 1.7 s worse.
+    - **ab5**, plates on the session's 8 threads and structure on 2 more: plates 32.3 against 31.9 s, structure 10.2 against 10.0 s, so 0.6 s worse.
+  - The experiment code was dropped. Only the overlap knob stays.
+- **cmp.**
+  - **ab1** (`tools/review/p1-17-cmp.py`, master against commit 1): 65 of 66 files are byte-identical. The other is `manifest.json`, whose differences are all in `notes.amplify`: `mode` in_memory against streamed, `tile_cells` 8192 against 2048, and the halo and last-digit sums that follow. Amplify picks its mode by the memory reservation at that moment (`surface/amplify.rs` `streams`), not from the plates.
+  - **ab2** (master against both commits): 63 of 66 files differ, as a world-changing change does.
+- **Planet check** (`p1-17-hyps.sh` through `p1-17-hyps.py`: 100 Myr, earthlike_full_16k up to the volcanoes, scattered continents, seeds 1 to 6, 4 threads).
+  - Every branch mean sits inside master's six-run range. Seed by seed the worlds diverge, as a bit-level change makes them.
+
+  | Figure | Master mean [range] | Branch mean [range] |
+  |---|---|---|
+  | land | 0.231 [0.197, 0.250] | 0.244 [0.225, 0.265] |
+  | z50 | 416 [390, 455] | 434 [394, 470] |
+  | z90 | 1,529 [923, 2,407] | 1,515 [794, 2,212] |
+  | >2 km | 0.072 [0.043, 0.123] | 0.073 [0.023, 0.115] |
+  | sea50 | 3,374 [3,110, 3,713] | 3,556 [2,940, 3,913] |
+  | crust | 0.413 [0.355, 0.436] | 0.418 [0.384, 0.437] |
+  | dry | 0.56 [0.53, 0.57] | 0.58 [0.54, 0.64] |
+  | T | 15.0 [14.4, 16.4] | 15.1 [14.5, 15.5] |
+  | CO2 | 520 [366, 861] | 552 [377, 735] |
+  | ice | 0.085 [0.039, 0.153] | 0.065 [0.023, 0.132] |
+  | sea level | 32 [13, 39] | 35 [15, 46] |
+  | active | 0.54 [0.46, 0.63] | 0.55 [0.46, 0.62] |
+
+  - The largest shifts are land (+0.013) and sea50 (+182 m). Each is about 1.2 to 1.4 standard errors of the difference of the means, which is noise.
+- **Tolerance tests.** None needed. `tests/overlap.rs` (1 thread against 3, byte for byte) still passes: commit 1's parallel parts keep their order, and the hull turn does not depend on the thread count.
+- **Gates** (on the VM):
+  - `cargo test --workspace`: all pass, deeptime-core lib 712 passed, 4 ignored.
+  - `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo deny check licenses bans` are clean. Clippy's two findings, a type alias in `collapse.rs` and `is_multiple_of` in a test, were fixed and checked again.
+  - `./gradlew build test`: tests=354, failures=0, skipped=2.
+- **Merge note.** `plates/geometry.rs` gains `dijkstra_sparse`, `Geo::turned` and a new `Geo::build`. The plates part 2 branch also works in `plates/` (not in these files' functions), so a conflict there is textual only.
+- **Next.** Merge with the other P1-19 branches, then run the full 16k gate (`deeptime bench --preset earthlike_full_16k --start scattered_continents --length-myr 1000 --threads 8`) on the merged master.
+
 ### 2026-10-18: The ice cover's edge test no longer needs ice on the test planet, and the census reads Expanded Ecosphere's subtropical forests as temperate (BIO-160) (coordinator's follow-up to the batch on master 3efc5ff8; agent worktree agent-a24d995879bff43ce, branch ice-followup-3efc from origin/master 16817738)
 - **Gradle `IceCoverTest.aCoversEdgeLiesHalfWayToItsBareNeighbour`** ("the planet's cover has an eastern edge"). Since the crust fix 25ae6723 the 4k test planet carries no ice at all: its record `notes.bake.climate.ice_cover` counts `cells` 0, `climate_cells` 0, `bodies` 0 (the Gradle fixture on master 3efc5ff8). The test now checks the rule on a layer it writes itself: a raw one-tile u8 pack laid out as FORMAT.md's tile pack (a 4 × 4 sheet of 12, a lone 6, a ramp 3, 7, 11 and a body across the x seam). It checks 34 edges on all four sides, the ramp's blend (5 half-way between 3 and 7) and the seam. Against the old bilinear read the test fails ("inside the half-way line of cell (4, 3) toward (-1, 0): expected 12 but was 8"; a one-core javac run on the VM with RasterSampler.cover swapped back). A second test, `thePlanetsCoverFollowsTheRuleAtEveryEdge`, checks every edge the baked planet has in any direction and fails if a cover has no edge, and checks the layer is bare where the record counts no cell. `IceCover.of(RasterSampler, Spec)` serves both.
 - **-PwithEe `climateConsistent`** ("C 0.628 < 0.630 (164 columns)"). The census's misses: `wythers:subtropical_forest` 49, `wythers:humid_tropical_grassland` 10, `minecraft:savanna` 1, `wythers:highlands` 1. The crust fix warmed the planet: no D, Dsub or E columns, and Cfa 79 land columns.

@@ -536,7 +536,7 @@ mod tests {
     fn the_sparse_dijkstra_matches_the_dense_one() {
         let geo = Geo::build(3000, [0.0, 0.0, 0.0, 1.0]).unwrap();
         let src = [(5, 0.0, 1), (1400, 0.0, 2), (2900, 0.01, 3)];
-        let allow = |a: u32, b: u32| (a + b) % 7 != 0;
+        let allow = |a: u32, b: u32| !(a + b).is_multiple_of(7);
         for _ in 0..2 {
             let (dist, label) = dijkstra(&geo, &src, allow, 0.4);
             let mut sparse = dijkstra_sparse(&geo, &src, allow, 0.4);
