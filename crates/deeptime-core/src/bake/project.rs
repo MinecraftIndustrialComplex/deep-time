@@ -34,6 +34,7 @@ use rayon::prelude::*;
 use serde_json::{Value, json};
 
 use deeptime_format::bodies::{read_bodies, write_bodies};
+use deeptime_format::fsutil::Flusher;
 use deeptime_format::projection::{
     BorderSpec, PetroffGuyou, Projection, ProjectionKind, WorldProjection, lat_lon_of_unit,
 };
@@ -41,10 +42,10 @@ use deeptime_format::raster::{bilinear_weights, cover_of};
 use deeptime_format::rivers::{Chain, Mouth, RiverVertex, Rivers, read_rivers, write_rivers};
 use deeptime_format::sites::{read_sites, write_sites_in};
 use deeptime_format::structure::{Shape, read_structure, write_structure};
-use deeptime_format::{
-    DType, FileEntry, GridDesc, LayerDesc, LoadedLayer, Manifest, TilePackReader, write_tile_pack,
-};
+use deeptime_format::tilepack::write_stored_tiles;
+use deeptime_format::{DType, FileEntry, GridDesc, LayerDesc, LoadedLayer, Manifest, Written};
 
+use crate::bake::{load_layer, stored_tiles};
 use crate::error::CoreError;
 use crate::params::{EdgeBorder, LAMBDA_C_AUTO, PlanetPreset};
 
@@ -597,6 +598,24 @@ pub fn estimate_bytes(p: &PlanetPreset) -> u64 {
 /// Rows of the world grid resampled at a time (their results are copied out before the next band).
 const ROW_BAND: usize = 64;
 
+/// Writes a layer's tile pack (its tiles compressed in parallel) to its temporary name, its fsync
+/// started; `flusher`'s commit puts it in place (P1-19).
+fn write_deferred(
+    flusher: &mut Flusher,
+    path: &Path,
+    desc: &LayerDesc,
+    cells: &[u8],
+) -> Result<Written, CoreError> {
+    let tiles = stored_tiles(desc, cells)?;
+    flusher.write(path, |f| -> Result<Written, CoreError> {
+        use std::io::Write;
+        let mut w = std::io::BufWriter::with_capacity(1 << 20, f);
+        let written = write_stored_tiles(&mut w, desc, &tiles)?;
+        w.flush().map_err(|e| CoreError::io(path, e))?;
+        Ok(written)
+    })
+}
+
 /// Resamples the loaded layers of one source grid onto world grid `wg`; returns each layer's
 /// row-major cell bytes.
 fn resample_grid(map: &Mapping, srcs: &[Src], wg: &GridDesc) -> Vec<Vec<u8>> {
@@ -853,25 +872,33 @@ fn raise_world_tops(
     let ratio = (g1.r / g3.r) as usize;
     let (w3, h3) = (g3.w as usize, g3.h as usize);
     // Per stack cell, the highest value of the L3 cells it holds (cells i·ratio .. i·ratio + ratio).
+    // A stack row in parallel (P1-19): row j holds the L3 rows j·ratio .. j·ratio + ratio, the
+    // last row every L3 row past it as well; a maximum is the same in any order.
     let square = |l: &LoadedLayer| -> Vec<f64> {
         let cb = l.desc.cell_bytes();
         let mut best = vec![f64::NEG_INFINITY; w1 * h1];
-        for j3 in 0..h3 {
-            let j = (j3 / ratio).min(h1 - 1);
-            for i3 in 0..w3 {
-                let i = (i3 / ratio).min(w1 - 1);
-                let at = (j3 * w3 + i3) * cb;
-                let raw = l.desc.dtype.decode_scalar(&l.bytes[at..at + cb]);
-                if l.desc.nodata == Some(raw) {
-                    continue;
-                }
-                let v = raw * l.desc.scale + l.desc.offset;
-                let c = &mut best[j * w1 + i];
-                if v > *c {
-                    *c = v;
+        best.par_chunks_mut(w1).enumerate().for_each(|(j, row)| {
+            let rows = if j + 1 == h1 {
+                j * ratio..h3
+            } else {
+                j * ratio..((j + 1) * ratio).min(h3)
+            };
+            for j3 in rows {
+                for i3 in 0..w3 {
+                    let i = (i3 / ratio).min(w1 - 1);
+                    let at = (j3 * w3 + i3) * cb;
+                    let raw = l.desc.dtype.decode_scalar(&l.bytes[at..at + cb]);
+                    if l.desc.nodata == Some(raw) {
+                        continue;
+                    }
+                    let v = raw * l.desc.scale + l.desc.offset;
+                    let c = &mut row[i];
+                    if v > *c {
+                        *c = v;
+                    }
                 }
             }
-        }
+        });
         best
     };
     let e = square(elev);
@@ -892,34 +919,40 @@ fn raise_world_tops(
         v[j * w1 + i]
     };
     let cb = desc.cell_bytes();
-    let (mut raised, mut max_raise) = (0u64, 0.0f64);
-    for j in 0..h1 {
-        for i in 0..w1 {
-            let (mut me, mut ma) = (f64::NEG_INFINITY, 0.0f64);
-            // A window symmetric about the cell (the bake's is i − 2 ..= i + 1 on square cells;
-            // these are point samples), so the self-glued edge rows stay glued.
-            for dj in -2i64..=2 {
-                for di in -2i64..=2 {
-                    me = me.max(at(&e, i as i64 + di, j as i64 + dj));
-                    ma = ma.max(at(&a, i as i64 + di, j as i64 + dj));
+    // A row in parallel (P1-19): each cell reads only `e` and `a`; the count is a sum of whole
+    // numbers and the largest raise a maximum, so both are the same in any order.
+    bytes
+        .par_chunks_mut(w1 * cb)
+        .enumerate()
+        .map(|(j, row)| {
+            let (mut raised, mut max_raise) = (0u64, 0.0f64);
+            for i in 0..w1 {
+                let (mut me, mut ma) = (f64::NEG_INFINITY, 0.0f64);
+                // A window symmetric about the cell (the bake's is i − 2 ..= i + 1 on square
+                // cells; these are point samples), so the self-glued edge rows stay glued.
+                for dj in -2i64..=2 {
+                    for di in -2i64..=2 {
+                        me = me.max(at(&e, i as i64 + di, j as i64 + dj));
+                        ma = ma.max(at(&a, i as i64 + di, j as i64 + dj));
+                    }
                 }
+                if !me.is_finite() {
+                    continue;
+                }
+                let need = ((me + ma).ceil() as i32 + TOP_MARGIN_BLOCKS).min(max_y) * 16;
+                let off = i * cb;
+                let top = i16::from_le_bytes([row[off], row[off + 1]]);
+                if top == NO_TOP || i32::from(top) >= need {
+                    continue;
+                }
+                let new = need.clamp(i32::from(i16::MIN) + 1, i32::from(i16::MAX)) as i16;
+                row[off..off + 2].copy_from_slice(&new.to_le_bytes());
+                raised += 1;
+                max_raise = max_raise.max(f64::from(need - i32::from(top)) / 16.0);
             }
-            if !me.is_finite() {
-                continue;
-            }
-            let need = ((me + ma).ceil() as i32 + TOP_MARGIN_BLOCKS).min(max_y) * 16;
-            let off = (j * w1 + i) * cb;
-            let top = i16::from_le_bytes([bytes[off], bytes[off + 1]]);
-            if top == NO_TOP || i32::from(top) >= need {
-                continue;
-            }
-            let new = need.clamp(i32::from(i16::MIN) + 1, i32::from(i16::MAX)) as i16;
-            bytes[off..off + 2].copy_from_slice(&new.to_le_bytes());
-            raised += 1;
-            max_raise = max_raise.max(f64::from(need - i32::from(top)) / 16.0);
-        }
-    }
-    (raised, max_raise)
+            (raised, max_raise)
+        })
+        .reduce(|| (0, 0.0), |x, y| (x.0 + y.0, x.1.max(y.1)))
 }
 
 /// Rewrites the Lambert world folder `dir` (its manifest `m`) in the preset's world projection.
@@ -939,14 +972,18 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         .iter()
         .position(|l| l.name == "elevation")
         .ok_or_else(|| err("projection pass: the world has no elevation layer"))?;
-    let elev_src = Arc::new(TilePackReader::open(&dir.join(&m.layers[elev_entry].path))?.load()?);
     let amp_entry = m.layers.iter().position(|l| l.name == "detail/amplitude");
-    let amp_src = match amp_entry {
-        Some(k) => Some(Arc::new(
-            TilePackReader::open(&dir.join(&m.layers[k].path))?.load()?,
-        )),
-        None => None,
-    };
+    // Both at once, each a row of tiles per task (P1-19).
+    let (elev_path, amp_path) = (
+        dir.join(&m.layers[elev_entry].path),
+        amp_entry.map(|k| dir.join(&m.layers[k].path)),
+    );
+    let (elev_src, amp_src) = rayon::join(
+        || load_layer(&elev_path),
+        || amp_path.as_deref().map(load_layer).transpose(),
+    );
+    let elev_src = Arc::new(elev_src?);
+    let amp_src = amp_src?.map(Arc::new);
     let spec = deeptime_format::DetailSpec::of(m)?;
     let spec_seed = spec.as_ref().map(|s| s.seed()).transpose()?;
     let src_proj = Projection::new(c_sim);
@@ -978,6 +1015,10 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
 
     // --- rasters, grid by grid ---------------------------------------------------------------
     let t = Instant::now();
+    // The rewritten layers' fsyncs run while the pass goes on; they reach their names together
+    // before the pass returns (P1-19).
+    let mut flusher = Flusher::new();
+    let (mut load_ms, mut resample_ms, mut write_ms) = (0.0, 0.0, 0.0);
     let mut by_grid: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     for (k, l) in m.layers.iter().enumerate() {
         by_grid.entry(l.grid.clone()).or_default().push(k);
@@ -998,40 +1039,53 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             .cloned()
             .ok_or_else(|| err(format!("projection pass: no grid {gname}")))?;
         let wg = wp.grid(gname, src_grid.r)?;
-        let mut srcs = Vec::new();
-        for &k in entries {
-            // The elevation and amplitude layers are already loaded: shared, not read again.
-            let layer = if k == elev_entry {
-                elev_src.clone()
-            } else if Some(k) == amp_entry {
-                amp_src.clone().expect("the amplitude layer was loaded")
-            } else {
-                Arc::new(TilePackReader::open(&dir.join(&m.layers[k].path))?.load()?)
-            };
-            let kind = kind_of(&layer.desc);
-            let cb = layer.desc.cell_bytes();
-            srcs.push(Src {
-                entry: k,
-                layer,
-                kind,
-                cb,
-            });
-        }
+        let tl = Instant::now();
+        // The grid's layers at once, in entry order (P1-19).
+        let paths: Vec<_> = entries
+            .iter()
+            .map(|&k| (k, dir.join(&m.layers[k].path)))
+            .collect();
+        let srcs: Vec<Src> = paths
+            .par_iter()
+            .map(|(k, path)| -> Result<Src, CoreError> {
+                let k = *k;
+                // The elevation and amplitude layers are already loaded: shared, not read again.
+                let layer = if k == elev_entry {
+                    elev_src.clone()
+                } else if Some(k) == amp_entry {
+                    amp_src.clone().expect("the amplitude layer was loaded")
+                } else {
+                    Arc::new(load_layer(path)?)
+                };
+                let kind = kind_of(&layer.desc);
+                let cb = layer.desc.cell_bytes();
+                Ok(Src {
+                    entry: k,
+                    layer,
+                    kind,
+                    cb,
+                })
+            })
+            .collect::<Result<_, _>>()?;
+        load_ms += ms(tl);
+        let tl = Instant::now();
         let outs = resample_grid(&map, &srcs, &wg);
+        resample_ms += ms(tl);
 
+        let tl = Instant::now();
         for (s, bytes) in srcs.iter().zip(outs) {
             let mut desc = s.layer.desc.clone();
             desc.grid = wg.clone();
-            let entry = &mut m.layers[s.entry];
-            let written = write_tile_pack(&dir.join(&entry.path), &desc, &bytes)?;
-            entry.bytes = written.bytes;
-            entry.crc32 = written.crc32;
             layer_notes.push(json!([desc.name, format!("{:?}", s.kind).to_lowercase()]));
             if s.kind == Kind::Stack && world_stack.is_none() {
-                // Kept (moved, not copied) for the top raise below.
+                // Kept (moved, not copied) for the top raise below, and written once after it.
                 world_stack = Some((s.entry, desc, bytes));
                 continue;
             }
+            let entry = &mut m.layers[s.entry];
+            let written = write_deferred(&mut flusher, &dir.join(&entry.path), &desc, &bytes)?;
+            entry.bytes = written.bytes;
+            entry.crc32 = written.crc32;
             let world = LoadedLayer::new(desc, bytes)?;
             match world.desc.name.as_str() {
                 "elevation" => {
@@ -1061,22 +1115,25 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             }
         }
         new_grids.insert(gname.clone(), wg);
+        write_ms += ms(tl);
     }
     m.grids = new_grids;
     // The first horizon covers the world's terrain (the bake's top rule, `bake::strata`): the
     // stacks come from the nearest cell and the terrain from a footprint mean, so a stack can sit
     // under the drawn ground where the footprint is wide.
     let mut tops_note = json!(null);
-    if let (Some((entry, desc, mut bytes)), Some(we)) = (world_stack, &world_elev) {
-        let (raised, max_raise) =
-            raise_world_tops(&desc, &mut bytes, we, world_amp.as_ref(), m.scale.max_y);
-        if raised > 0 {
-            let e = &mut m.layers[entry];
-            let written = write_tile_pack(&dir.join(&e.path), &desc, &bytes)?;
-            e.bytes = written.bytes;
-            e.crc32 = written.crc32;
+    if let Some((entry, desc, mut bytes)) = world_stack {
+        let tl = Instant::now();
+        if let Some(we) = &world_elev {
+            let (raised, max_raise) =
+                raise_world_tops(&desc, &mut bytes, we, world_amp.as_ref(), m.scale.max_y);
+            tops_note = json!({"raised_cells": raised, "max_raise_blocks": max_raise});
         }
-        tops_note = json!({"raised_cells": raised, "max_raise_blocks": max_raise});
+        let e = &mut m.layers[entry];
+        let written = write_deferred(&mut flusher, &dir.join(&e.path), &desc, &bytes)?;
+        e.bytes = written.bytes;
+        e.crc32 = written.crc32;
+        write_ms += ms(tl);
     }
     let raster_ms = ms(t);
 
@@ -1285,6 +1342,11 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         set_file(m, spawn_rel, crc.0, crc.1);
     }
     let vector_ms = ms(t);
+    // The rewritten rasters reach their names (each fsynced, then renamed) before the manifest
+    // that lists them is written.
+    let t = Instant::now();
+    flusher.commit()?;
+    let commit_ms = ms(t);
 
     // --- the manifest --------------------------------------------------------------------------
     let border = match p.scale.edge_border {
@@ -1326,7 +1388,8 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         "vector": Value::Object(vec_note),
         "millis": {
             "lambda_c": lambda_ms, "stretch": stretch_ms, "rasters": raster_ms,
-            "anisotropy": aniso_ms, "vector": vector_ms, "total": ms(started),
+            "load": load_ms, "resample": resample_ms, "write": write_ms,
+            "anisotropy": aniso_ms, "vector": vector_ms, "commit": commit_ms, "total": ms(started),
         },
     });
     if p.scale.edge_border == EdgeBorder::None {

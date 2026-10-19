@@ -41,11 +41,9 @@ pub struct Written {
     pub crc32: u32,
 }
 
-/// Encodes a tile pack for `desc` from row-major `cells` (`desc.cell_bytes()` each).
-pub fn encode_tile_pack(desc: &LayerDesc, cells: &[u8]) -> Result<Vec<u8>> {
-    desc.validate()?;
-    let cb = desc.cell_bytes();
-    let want = desc.grid.cells() * cb;
+/// Checks that `cells` holds every cell of `desc`'s grid (`desc.cell_bytes()` each).
+pub fn check_cells(desc: &LayerDesc, cells: &[u8]) -> Result<()> {
+    let want = desc.grid.cells() * desc.cell_bytes();
     if cells.len() != want {
         return Err(FormatError::Invalid(format!(
             "layer {}: {} bytes of cells, expected {want}",
@@ -53,6 +51,12 @@ pub fn encode_tile_pack(desc: &LayerDesc, cells: &[u8]) -> Result<Vec<u8>> {
             cells.len()
         )));
     }
+    Ok(())
+}
+
+/// A pack's head: the header, the descriptor and a zeroed tile index (each padded to 8 bytes),
+/// with the index's offset. `reserve` more bytes of capacity are kept for the tiles.
+fn head(desc: &LayerDesc, reserve: usize) -> Result<(Vec<u8>, usize)> {
     let json = serde_json::to_vec(desc).map_err(|source| FormatError::Json {
         what: format!("layer {}", desc.name),
         source,
@@ -61,7 +65,7 @@ pub fn encode_tile_pack(desc: &LayerDesc, cells: &[u8]) -> Result<Vec<u8>> {
     let header_len_u32 = u32::try_from(header_len)
         .map_err(|_| FormatError::Invalid("layer descriptor too large".into()))?;
 
-    let mut out = Vec::with_capacity(align8(header_len) + cells.len() / 2);
+    let mut out = Vec::with_capacity(align8(header_len) + reserve);
     out.extend_from_slice(&MAGIC);
     out.extend_from_slice(&header_len_u32.to_le_bytes());
     out.extend_from_slice(&FORMAT_MINOR.to_le_bytes());
@@ -76,6 +80,92 @@ pub fn encode_tile_pack(desc: &LayerDesc, cells: &[u8]) -> Result<Vec<u8>> {
     let n = desc.tile_count();
     let index_at = out.len();
     out.resize(align8(index_at + n * INDEX_ENTRY_BYTES), 0);
+    Ok((out, index_at))
+}
+
+/// Tile `t`'s stored bytes (LZ4-compressed for `lz4_block`) from the layer's row-major `cells`,
+/// as [`encode_tile_pack`] stores them. Tiles are independent, so a caller with threads can
+/// compress them at once and hand them to [`write_stored_tiles`].
+pub fn stored_tile(desc: &LayerDesc, cells: &[u8], t: usize) -> Vec<u8> {
+    let cb = desc.cell_bytes();
+    let row_bytes = desc.grid.w as usize * cb;
+    let (x0, z0, tw, th) = desc.tile_rect(t);
+    let mut tile = Vec::with_capacity(tw as usize * th as usize * cb);
+    for z in z0..z0 + th {
+        let start = z as usize * row_bytes + x0 as usize * cb;
+        tile.extend_from_slice(&cells[start..start + tw as usize * cb]);
+    }
+    match desc.codec {
+        Codec::Raw => tile,
+        Codec::Lz4Block => lz4_flex::block::compress(&tile),
+    }
+}
+
+/// Writes a pack from its tiles' stored bytes (every tile of `desc`, in order, as
+/// [`stored_tile`] makes them) into `out`; the bytes are those [`encode_tile_pack`] returns for
+/// the same cells. Returns the bytes written and their CRC32.
+pub fn write_stored_tiles(
+    out: &mut impl std::io::Write,
+    desc: &LayerDesc,
+    tiles: &[Vec<u8>],
+) -> Result<Written> {
+    desc.validate()?;
+    let n = desc.tile_count();
+    if tiles.len() != n {
+        return Err(FormatError::Invalid(format!(
+            "layer {}: {} tiles, expected {n}",
+            desc.name,
+            tiles.len()
+        )));
+    }
+    let (mut head, index_at) = head(desc, 0)?;
+    let mut pos = head.len() as u64;
+    for (t, data) in tiles.iter().enumerate() {
+        let length = u32::try_from(data.len())
+            .map_err(|_| FormatError::Invalid("tile larger than 4 GiB".into()))?;
+        let e = index_at + t * INDEX_ENTRY_BYTES;
+        head[e..e + 8].copy_from_slice(&pos.to_le_bytes());
+        head[e + 8..e + 12].copy_from_slice(&length.to_le_bytes());
+        head[e + 12..e + 16].copy_from_slice(&crc32fast::hash(data).to_le_bytes());
+        pos += align8(data.len()) as u64;
+    }
+    let io = |e| FormatError::io(Path::new(&desc.name), e);
+    let mut h = crc32fast::Hasher::new();
+    out.write_all(&head).map_err(io)?;
+    h.update(&head);
+    for data in tiles {
+        let pad = &[0u8; 8][..align8(data.len()) - data.len()];
+        out.write_all(data).map_err(io)?;
+        out.write_all(pad).map_err(io)?;
+        h.update(data);
+        h.update(pad);
+    }
+    Ok(Written {
+        bytes: pos,
+        crc32: h.finalize(),
+    })
+}
+
+/// Writes a pack from its tiles' stored bytes atomically (tmp + fsync + rename, as
+/// [`write_tile_pack`]); the file is the one [`write_tile_pack`] writes for the same cells.
+pub fn write_tile_pack_tiles(path: &Path, desc: &LayerDesc, tiles: &[Vec<u8>]) -> Result<Written> {
+    use std::io::Write;
+    let mut written = None;
+    crate::fsutil::write_atomic_with::<FormatError>(path, |f| {
+        let mut w = std::io::BufWriter::with_capacity(1 << 20, f);
+        written = Some(write_stored_tiles(&mut w, desc, tiles)?);
+        w.flush().map_err(|e| FormatError::io(path, e))
+    })?;
+    Ok(written.expect("a successful write recorded its size"))
+}
+
+/// Encodes a tile pack for `desc` from row-major `cells` (`desc.cell_bytes()` each).
+pub fn encode_tile_pack(desc: &LayerDesc, cells: &[u8]) -> Result<Vec<u8>> {
+    desc.validate()?;
+    check_cells(desc, cells)?;
+    let cb = desc.cell_bytes();
+    let (mut out, index_at) = head(desc, cells.len() / 2)?;
+    let n = desc.tile_count();
 
     let row_bytes = desc.grid.w as usize * cb;
     let mut tile_buf = Vec::with_capacity(desc.tile as usize * desc.tile as usize * cb);
@@ -143,27 +233,8 @@ impl TilePackWriter {
     pub fn create(path: &Path, desc: &LayerDesc) -> Result<TilePackWriter> {
         use std::io::Write;
         desc.validate()?;
-        let json = serde_json::to_vec(desc).map_err(|source| FormatError::Json {
-            what: format!("layer {}", desc.name),
-            source,
-        })?;
-        let header_len = HEADER_BYTES + json.len();
-        let header_len_u32 = u32::try_from(header_len)
-            .map_err(|_| FormatError::Invalid("layer descriptor too large".into()))?;
-        let mut head = Vec::with_capacity(align8(header_len));
-        head.extend_from_slice(&MAGIC);
-        head.extend_from_slice(&header_len_u32.to_le_bytes());
-        head.extend_from_slice(&FORMAT_MINOR.to_le_bytes());
-        head.extend_from_slice(&0u16.to_le_bytes());
-        let mut h = crc32fast::Hasher::new();
-        h.update(&head[..12]);
-        h.update(&json);
-        head.extend_from_slice(&h.finalize().to_le_bytes());
-        head.extend_from_slice(&json);
-        head.resize(align8(head.len()), 0);
+        let (head, index_at) = head(desc, 0)?;
         let n = desc.tile_count();
-        let index_at = head.len();
-        head.resize(align8(index_at + n * INDEX_ENTRY_BYTES), 0);
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| FormatError::io(parent, e))?;
         }
@@ -482,6 +553,23 @@ mod tests {
         for e in r.index() {
             assert_eq!(e.offset % 8, 0, "tiles are 8-byte aligned");
         }
+        // The pack written from its tiles (compressed apart, P1-19) is the same file.
+        let tiles: Vec<Vec<u8>> = (0..desc.tile_count())
+            .map(|t| stored_tile(desc, cells, t))
+            .collect();
+        let q = tmp(&format!("tiles-{name}"));
+        let wt = write_tile_pack_tiles(&q, desc, &tiles).unwrap();
+        assert_eq!(wt, w, "{name}");
+        assert_eq!(
+            std::fs::read(&q).unwrap(),
+            std::fs::read(&p).unwrap(),
+            "{name}"
+        );
+        assert!(
+            write_tile_pack_tiles(&q, desc, &tiles[1..]).is_err(),
+            "a tile short"
+        );
+        std::fs::remove_file(&q).unwrap();
         std::fs::remove_file(&p).unwrap();
     }
 
