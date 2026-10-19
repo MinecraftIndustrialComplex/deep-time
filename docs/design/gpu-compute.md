@@ -8,7 +8,7 @@ from master 584b1241, masters 5cf2f9bb, e2166684 and c767da2c merged in. The aim
 exit item 1 gate (full 16k, 8 threads, 1000 Myr, 900 s), which the 2026-10-18 profile put at
 1,242.8 s (`docs/design/p1-17-benchmark-gate.md`, "where the full 16k run's time goes";
 `review/pages/sim-time/data.js`). Phase 2 (2026-10-19, branch `gpu-phase2` from master
-b337fa73, masters fb38204f and 7d60fc4a merged in): the plates' L1 relink and the climate
+b337fa73, masters fb38204f, 7d60fc4a and 26ce664e merged in): the plates' L1 relink and the climate
 snapshot's cells ported (sections 13 and 14), the whole-history comparisons and the laptop's
 benches in section 10.
 
@@ -158,8 +158,9 @@ WGSL file next to its CPU code and a tolerance test against the CPU path; nothin
   both ports are counted: the relink's words (27 MB on the full 16k) and its per-call tables
   (at most about 18 MB) while `write_l1` runs in the plate stage, the cells' chunk copies (32.5
   to 56.5 MiB) while a snapshot runs in the climate stage. Both are freed before their call
-  returns, and neither port runs in the young stage or the amplifier, so the young stage's
-  counted peak (the one now over the cap) is the same with the GPU on or off. The device buffers, the relink's session-kept ones included,
+  returns, and neither port runs in the young stage, the deposits or the amplifier, so the run's
+  counted peak (the young stage's on master 7d60fc4a, the deposits' since master 26ce664e) is
+  not raised by them (only by the GPU's world being another world). The device buffers, the relink's session-kept ones included,
   are wgpu's and the driver's, outside the counted peak (on an integrated GPU they are system
   memory beside the cap, like the driver's own heaps above); nothing is mirrored into a counted
   host buffer for the session.
@@ -335,7 +336,7 @@ build log):
   figure is therefore 1,242.8 s less 6 to 11 s by arithmetic, not measured.
 
 **Phase 2: the L1 relink and the climate cells** (2026-10-19; branch `gpu-phase2` from master
-b337fa73, the climate sub-agent's branch and masters fb38204f and 7d60fc4a merged in).
+b337fa73, the climate sub-agent's branch and masters fb38204f, 7d60fc4a and 26ce664e merged in).
 
 *Correctness on lavapipe*: sections 13 and 14.
 
@@ -541,10 +542,10 @@ branch): the climate, plates parts 1 and 2, the after-group work, the plate cade
 fb38204f: the shipped presets take a climate snapshot every 20 Myr instead of 10) and the surface
 solvers (master 7d60fc4a: diffusion is a conjugate gradient preconditioned by an f32 multigrid
 V-cycle, about 10 iterations a step against 63; the flood is an order-independent parallel
-priority flood after Barnes 2016) are merged, so rows 2 to 4, 7 and the flood are free. Still
-being edited: the young stage's memory on the full 16k (another agent). The surface kernels
-other than diffusion and the flood (slope failure, advection, flexure, residency) wait for the
-coordinator.
+priority flood after Barnes 2016) are merged, so rows 2 to 4, 7 and the flood are free; so is
+the young stage's memory work (master 26ce664e, also merged into this branch). The surface
+kernels other than diffusion and the flood (slope failure, advection, flexure, residency) wait
+for the coordinator.
 
 **The carbon cycle amplifies the last bit.** The climate branch found that changing only the
 order of two row-subtotal sums (`land_terms` and `snapshot::ice_cover`) moved a 100 Myr world's
