@@ -695,9 +695,9 @@ impl PlatesStage {
                             .as_ref()
                             .map_or(0.0, |f| f64::from(f.data[c]))
                     });
-                    let pc = parts.as_ref().map(|p| {
-                        std::array::from_fn::<f64, SP, _>(|k| f64::from(p[k].data[c]))
-                    });
+                    let pc = parts
+                        .as_ref()
+                        .map(|p| std::array::from_fn::<f64, SP, _>(|k| f64::from(p[k].data[c])));
                     for (&v, &w) in t.iter().zip(l.w.iter()) {
                         let w = f64::from(w);
                         if w > 0.0 {
