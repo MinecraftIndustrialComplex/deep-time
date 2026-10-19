@@ -1144,7 +1144,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Peel, M. C., Finlayson, B. L. and McMahon, T. A. (2007). Updated world map of the Koeppen-Geiger climate classification. Hydrology and Earth System Sciences 11(5):1633-1644.
 - DOI or URL: (ERO, ISO, HYP) 10.5194/hess-11-1633-2007; open access https://hess.copernicus.org/articles/11/1633/2007/. (HYD, YNG) https://doi.org/10.5194/hess-11-1633-2007 (open access) ; https://hess.copernicus.org/articles/11/1633/2007/hess-11-1633-2007.pdf (MOI, BIO) https://doi.org/10.5194/hess-11-1633-2007 ; PDF https://hess.copernicus.org/articles/11/1633/2007/hess-11-1633-2007.pdf ; the author's page with the same table https://people.eng.unimelb.edu.au/mpeel/koppen.html (SCL, PRV, POL, BAK) 10.5194/hess-11-1633-2007 ; https://hess.copernicus.org/articles/11/1633/2007/ (CLM) 10.5194/hess-11-1633-2007
 - Cited as: (ERO, ISO, HYP) "Peel, Finlayson & McMahon 2007 (HESS 11:1633)". (MOI, BIO) "Peel, Finlayson & McMahon 2007, Table 1" (koppen.rs header "the rules the research note cites"; plan §8.3; STATUS P1-05, P1-17) (SCL, PRV, POL, BAK) not cited ("Koppen's dryness threshold (20 T + 140 mm)", no year)
-- Ledger ids: BAK-020, BIO-001 to BIO-017, HYD-046, HYP-025; none (comparison only); notes: BIO-017 is a game-choice about the summer half; and BIO-001 to BIO-016; comparison only; supporting source found in this pass
+- Ledger ids: BAK-020, BIO-001 to BIO-017, BIO-158 (EF under the ice cover, through BIO-003), HYD-046, HYP-025; none (comparison only); notes: BIO-017 is a game-choice about the summer half; and BIO-001 to BIO-016; comparison only; supporting source found in this pass
 - Access: open access. [other sections: open access (gold)]
 - Library (the project's source library, not distributed): fetched (PDF, 12 pages, text layer, 46,987 characters). From: https://hess.copernicus.org/articles/11/1633/2007/hess-11-1633-2007.pdf. Text file: Peel2007.txt.
 - Merged keys: Peel2007 (Koppen-Geiger)
@@ -1409,7 +1409,7 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Reference: Ohmura, Atsumu; Kasser, Peter; Funk, Martin. 1992. Climate at the equilibrium line of glaciers. Journal of Glaciology 38(130):397-411.
 - DOI or URL: (HYD, YNG) https://doi.org/10.3189/S0022143000002276 ; Cambridge Core page https://www.cambridge.org/core/product/identifier/S0022143000002276/type/journal_article (AMP, GLA) 10.3189/S0022143000002276 (Cambridge page https://www.cambridge.org/core/journals/journal-of-glaciology/article/climate-at-the-equilibrium-line-of-glaciers/8DCF1C24E32A6781CC365853535CD16F) (MOI, BIO) https://doi.org/10.3189/S0022143000002276 (CLM) 10.3189/S0022143000002276; open PDF on Cambridge Core (see Unpaywall: bronze)
 - Cited as: (HYD, YNG) "Ohmura et al. 1992 ... about -2 degC" (HYD-039); "Ohmura, Kasser & Funk 1992 (ELA fit P = 645 + 296 T + 9 T^2)" (MOI/BIO) (AMP, GLA) "Ohmura, Kasser & Funk 1992" (MOI, BIO) "Ohmura, Kasser & Funk 1992 (ELA fit P = 645 + 296 T + 9 T^2)" (glaciers.rs header, params.rs) (CLM) "Ohmura, Kasser & Funk 1992" (P = 645 + 296 T + 9 T^2, 70 glaciers)
-- Ledger ids: BIO-083, GLA-031, GLA-037, GLA-039, HYD-039; notes: and HYD-039 in the HYD file; and glaciers.rs
+- Ledger ids: BIO-083 (merged into BIO-082 2026-10-18, the fallback it supported removed), GLA-031, GLA-037, GLA-039, HYD-039; notes: and HYD-039 in the HYD file; and glaciers.rs
 - Access: open access (Cambridge Core) [other sections: open access (Cambridge archive; the page shows the full text) / open access (page readable without login) / open access (bronze)]
 - Library (the project's source library, not distributed): fetched (PDF, 15 pages, text layer, 55,097 characters). From: https://www.cambridge.org/core/services/aop-cambridge-core/content/view/8DCF1C24E32A6781CC365853535CD16F/S0022143000002276a.pdf/div-class-title-climate-at-the-equilibrium-line-of-glaciers-div.pdf. Text file: Ohmura1992.txt.
 - Read so far (by the project): (HYD, YNG) "cited from memory, not re-read" (AMP, GLA) from memory, not re-read (STATUS 2026-10-01) (MOI, BIO) "cited from memory, not re-read" for the -2 degC figure (CLM) the build log says the equilibrium-line summer temperature was "cited from memory, not re-read" (hydrology agent's check of a related number)
@@ -1557,7 +1557,7 @@ Minecraft's OverworldBiomeBuilder and the 1.21.1 carvers (game code), RichDEM (G
 - Reference: Cuffey, K. M. and Paterson, W. S. B. (2010). The Physics of Glaciers, 4th edition. Butterworth-Heinemann (Elsevier/Academic Press), 693 pp. (ISBN 978-0-12-369461-4).
 - DOI or URL: (AMP, GLA) none (CLM) none found (Crossref returned only chapters of the earlier editions). ISBN not looked up.
 - Cited as: (AMP, GLA) "Cuffey & Paterson 2010, The Physics of Glaciers, 4th ed., section 8" (CLM) "Cuffey & Paterson 2010, The Physics of Glaciers, section 8.7"
-- Ledger ids: CLM-101, GLA-010 to GLA-012
+- Ledger ids: CLM-101, GLA-010 to GLA-012, BIO-157 (section 4.6, the steady-state balance of a glacier; from memory, 2026-10-18)
 - Access: book (not online)
 - Library (the project's source library, not distributed): not fetched. Reason: book, no open copy named.
 - Read so far (by the project): not stated
@@ -6641,3 +6641,35 @@ The rate limits of the plate step, added with the fix for the plate spikes (buil
 - Access: paywalled at the publisher; a PDF copy was read.
 - Library: not kept (the PDF and its pdftotext extraction were read in the task's scratch, which was deleted).
 - Read so far (by the project): full text, 2026-10-18 (plate spikes agent). Abstract, p. 543: surface uplift "of ~2.5 to 3.5 km occurred between ~10.3 Ma and 6.8 ± 0.4 Ma"; "Only the removal of dense eclogitic lower crust and mantle lithosphere can generate a change of this magnitude and rapidity". Section 7.2, p. 551: "u H = W dH / dt" (eq. 2 gives dh/dt from it under Airy isostasy, with crust 2.8 and mantle 3.3 × 10³ kg/m³); "Using a maximum long term shortening rate over the past 10 Myr of u = 10 mm/yr [21] over a plateau width of W = 300 km and an initial crustal thickness of H = 50 km, the average rate of elevation change, dh / dt, should be ~3% of the crustal shortening rate, u, or 0.3 mm/yr"; "crustal thickening of 8 km over ~4 Myr could raise the surface ~1.2 km"; "A 2.5 to 3.5 km rise of the Altiplano in a period as short 1 to 4 Myr implies an average vertical speed between 3.5 and 0.6 mm/yr".
+
+## The ice cover's balance on L2 (BIO-157), added 2026-10-18
+
+Cited for the principle that a glacier's net balance summed over its area is zero in a steady state, which fixes its terminus and is what the accumulation-area ratio (AAR) and area-altitude balance ratio (AABR) methods of reconstructing an equilibrium line rest on. All from the agent's memory of the literature on 2026-10-18; none was fetched or read, and the references were not checked against Crossref.
+
+### Meier1962
+- Reference: Meier, M. F. and Post, A. S. (1962). Recent variations in mass net budgets of glaciers in western North America. International Association of Scientific Hydrology Publication 58 (Symposium of Obergurgl), 63-77.
+- DOI or URL: not looked up.
+- Cited as: "Meier & Post 1962" (bake/ice.rs module doc).
+- Ledger ids: BIO-157
+- Access: not looked up.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): from memory (the accumulation-area ratio of glaciers in a steady state, about 0.6 to 0.7).
+
+### Porter1975
+- Reference: Porter, S. C. (1975). Equilibrium-line altitudes of late Quaternary glaciers in the Southern Alps, New Zealand. Quaternary Research 5(1):27-47.
+- DOI or URL: not looked up.
+- Cited as: "Porter 1975" (bake/ice.rs module doc).
+- Ledger ids: BIO-157
+- Access: not looked up.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): from memory (the AAR method, a steady-state ratio of about 0.6 applied to reconstructed glaciers).
+
+### Osmaston2005
+- Reference: Osmaston, H. (2005). Estimates of glacier equilibrium line altitudes by the Area x Altitude, the Area x Altitude Balance Ratio and the Area x Altitude Balance Index methods and their validation. Quaternary International 138-139:22-31.
+- DOI or URL: not looked up.
+- Cited as: "Osmaston 2005" (bake/ice.rs module doc).
+- Ledger ids: BIO-157
+- Access: not looked up.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): from memory (the AABR method: the ablation area's balance gradient times its area-weighted height below the line equals the accumulation area's above it, the balance ratio the ratio of the two gradients).
+

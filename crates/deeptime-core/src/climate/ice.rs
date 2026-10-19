@@ -212,6 +212,26 @@ pub fn thickness(
         .collect()
 }
 
+/// The surface mass balance of ice whose surface stands `above_m` over its equilibrium line, m of
+/// ice/yr, under `precip_m_yr` of precipitation: β_a·above up to `acc_max`·P above the line,
+/// β_m·above below it (Oerlemans 1981's linear balance gradients, GLA-069; the accumulation cap,
+/// GLA-070). One law for the climate's balance field, the ice sheets' step (`sheet.rs`) and the
+/// bake's cover (`bake/ice.rs`).
+#[inline]
+pub fn surface_balance(
+    above_m: f64,
+    precip_m_yr: f64,
+    beta_acc: f64,
+    beta_abl: f64,
+    acc_max: f64,
+) -> f64 {
+    if above_m >= 0.0 {
+        (beta_acc * above_m).min(acc_max * precip_m_yr.max(0.0))
+    } else {
+        beta_abl * above_m
+    }
+}
+
 /// One Imbrie & Imbrie step of `dt_kyr` toward `eq` (m) with response time `tau_kyr`.
 pub fn relax(h: f64, eq: f64, dt_kyr: f64, tau_kyr: f64) -> f64 {
     let tau = if eq > h {
@@ -315,6 +335,20 @@ impl ShiftTimes {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn surface_balance_is_capped_above_the_line_and_steeper_below() {
+        let law = |above, p| surface_balance(above, p, 0.005, 0.01, 0.5);
+        assert_eq!(law(0.0, 1.0), 0.0);
+        assert!((law(100.0, 1.0) - 0.5).abs() < 1e-12);
+        // The cap: 0.5 m/yr per m/yr of precipitation, so a dry sheet gains little.
+        assert!((law(1000.0, 0.2) - 0.1).abs() < 1e-12);
+        assert_eq!(law(1000.0, -1.0), 0.0);
+        // Below the line the melt grows twice as fast per metre.
+        assert!((law(-100.0, 1.0) + 1.0).abs() < 1e-12);
+        // Concave: lowering half of a body by d and raising the other half by d loses balance.
+        assert!(law(50.0 + 200.0, 1.0) + law(50.0 - 200.0, 1.0) < 2.0 * law(50.0, 1.0));
+    }
 
     #[test]
     fn band_margins_and_shift_times_count_ice() {

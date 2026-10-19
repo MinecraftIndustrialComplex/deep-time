@@ -185,7 +185,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
 | `climate/p_mm` | L1 | u16 | 1, mm/yr | — | annual precipitation |
 | `climate/koppen` | L1 | u8 | 1, code index | 255 | `notes.bake.climate.koppen_codes[i]` (31 = sea) |
-| `climate/ice_cover` | L2 | u8 | 1, blocks | — | blocks of snow and ice the surface pass lays over glaciated ground ("The ice cover"); absent without the climate stage |
+| `climate/ice_cover` | L2 | u8 | 1, blocks | — | blocks of snow and ice the surface pass lays over the climate's land ice, read by the cover rule ("The ice cover"); absent without the climate stage or its ice fields |
 | `climate/koppen_l2` | L2 | u8 | 1, code index | 255 | the Köppen class the biome inputs were placed by (each L2 cell's temperatures lapsed to its own height); absent when the class was decided on L1. Checks of biomes against classes read this, not the L1 `climate/koppen` |
 | `climate/wetland` | L2 | u8 | 1, flag | — | 0 not wetland, 1 temperate or warm wetland (vanilla's swamp band E6), 2 cold wetland: boreal peatland ("The wetland flag") |
 | `climate/month/t_sl_c_{01..12}` | L1 | i16 | 0.01, degC | — | each month's mean temperature at sea level (the lapse rate taken out: `+ lapse_c_per_km · max(0, h − sea)`), from the climate stage's last snapshot (0.2) |
@@ -230,6 +230,12 @@ baked and gets a Lambert layout block.
   any layer whose `units` is `flag`), horizon stacks and any footprint touching no-data take the
   nearest cell (`climate/koppen_l2` only since 2026-10-18: averaged as a number, a class border named
   a class neither side had). The
+  `climate/ice_cover` takes the **cover rule** (BIO-159, "The ice cover"): the world cell is covered
+  where its nearest Lambert cell is, the cell the categories beside it read (so a covered world cell
+  is EF in `climate/koppen_l2`), at the mean depth of the footprint's samples that are covered, each
+  the Lambert layer read by the rule at its block (a footprint mean of the blocks covered every world
+  cell that one covered sample reached, so the cover's area grew with the footprint, most at the
+  poles). The
   climate's band coordinates (`units` `vanilla_param`: `climate/temperature`, `vegetation`,
   `continents`, `erosion`, `ridges`), which the bake sets per Köppen class, are read bilinear at the
   point, as the game read them on the Lambert world, so they stay with the class beside them. The two edge rows are made exactly self-glued (cell i = cell w − i). The first horizon of every stack cell is then raised to
@@ -318,7 +324,7 @@ jar ships it and the core compiles the same file in as the default). Band coordi
 {
   "schema": 1,
   "_comment": "…",                       optional, ignored
-  "glacier_cap": 0.35,                   land above its equilibrium line (climate/glacier) is held at or below it
+  "glacier_cap": 0.35,                   glaciated land ("Glaciated land", below) is held at or below it
                                          (a class with a "glaciated" block, below, is not)
   "temperature_ramps": {                 named ramps
     "<name>": {
@@ -366,7 +372,9 @@ jar ships it and the core compiles the same file in as the default). Band coordi
 ```
 
 **Glaciated land.** Without a `glaciated` block a class is held at or below `glacier_cap` wherever
-the glacier flag (`climate/glacier`, land above its equilibrium line) is set. With one, the block
+the land is glaciated: on L2, where the bake lays an ice cover, the covered cells, which are of class
+EF whatever their ground's temperature (BIO-158, "The ice cover"); without a cover, where the glacier
+flag (`climate/glacier`) is set. With one, the block
 decides instead: its temperature ramp (else the class's own, uncapped), its humidity rule (else
 the class's own) and its erosion limits (else the class's own). The default table gives EF one (Ben, 2026-09-29, "Ice only where there's ice"):
 EF above its equilibrium line is **ice cap** (humidity `ice_cap`, the fixed band coordinate 0.5,
@@ -523,21 +531,49 @@ after the pack's surface rules, the strata pass and the water pass) therefore la
 glaciated ground regardless of biome. The contract between the climate and that pass is the layer
 `climate/ice_cover` (L2, u8, blocks; 0 = none) and the record `notes.bake.climate.ice_cover`:
 
-- **The layer** (`deeptime_core::bake::ice`): for each L2 cell whose ground is above the sea and
-  carries ice, `1 + ⌊t / step_m⌋` blocks, at most `max_blocks`; else 0. `t` is the climate's land-ice
-  thickness (`climate/ice_thickness_m`, L1, m: the ice sheets and glaciers of the deep-time climate,
-  "The climate's ice fields"; ice of at least 1 m counts, as for `climate/glacier`) resampled
-  bilinearly to L2, so a cover thins toward an ice edge; a world whose climate has no ice fields
-  (an older run) falls back to `t` = the ground's height above its equilibrium line
-  (`climate/anomaly/ela_m`, L1, every cell: the Ohmura rule of `climate::glaciers`; the ground is the
-  young landscape's elevation the biome inputs were placed on). `notes.bake.climate.ice_cover.source`
-  names the field used. Absent when the world has no climate stage. The pass does not read the climate
-  at all: a climate that changes how it carries ice only has to keep this layer's meaning.
-- **The record** is the placement table's `ice_cover` section, defaults filled in, plus `cells` and
-  `thickest_blocks` and `source`: `step_m`, `max_blocks`, `snow_blocks`, `blue_ice_from_blocks`,
-  `blue_ice_blocks`, and the block ids `snow`, `ice`, `deep_ice`.
-- **The pass** reads the layer bilinearly (so a cover's edge is a slope of cells, not 8-block steps) and
-  rounds, giving `n` blocks for the column. The cover **replaces** the top `n` solid blocks of the
+- **The layer** (`deeptime_core::bake::ice::downscale`) is the climate's land ice
+  (`climate/ice_thickness_m`, L1, m: the ice sheets and glaciers of the deep-time climate, "The
+  climate's ice fields") laid on the L2 cells, in three steps (ledger BIO-082, BIO-157):
+  1. **The extent**: an L2 land cell (ground at or above the sea) is a candidate when its nearest L1
+     cell carries at least 1 m of ice (as for `climate/glacier`), so the candidates are the climate's
+     own ice cells and no more. Its thickness `t` is the bilinear blend of the L1 thickness over the
+     iced corners only (renormalised over them), so the ice keeps its depth up to its edge instead of
+     being blended with the bare cells beside it.
+  2. **Its balance**: each candidate has the climate stage's surface mass balance
+     (`climate::ice::surface_balance`, the law of `climate/ice_thickness_m`: accumulation
+     `min(β_a·Δ, acc_max·P)` above the equilibrium line, ablation `β_m·Δ` below; GLA-069, GLA-070) at
+     its own ice surface, `Δ` = ground above the sea + `t` − ELA, with the published equilibrium
+     line `climate/ela_m` and the precipitation `climate/precip_mm` blended over their known corners
+     (0.5 m/yr where none is), the ground the young landscape's elevation the biome inputs were placed
+     on.
+  3. **The body closes**: the candidates fall into bodies (4-connected, x wrapping). A body's L2
+     balance must not fall below what the climate gave the same ice at the mean height of its L1
+     cells' candidates (`min(0, ΣT)`: a body the climate holds in surplus must be fed, one it holds in
+     deficit, lagged ice the climate has not melted yet, keeps that deficit and no more); while it does,
+     the cell with the most negative balance (ties by index) is given up. So a valley floor far below
+     the line that the climate's coarse cell happened to cover loses its ice, and an outlet glacier fed
+     by its accumulation area (Franz Josef, below 300 m in rain forest) keeps it.
+  Each kept cell is `1 + ⌊t / step_m⌋` blocks, at most `max_blocks`; every other cell is 0. Absent
+  when the world has no climate stage or the run has no ice fields (there is no fallback). The pass
+  does not read the climate at all: a climate that changes how it carries ice only has to keep this
+  layer's meaning. The bake's L2 biome inputs read the same cells: a covered cell is glaciated and of
+  class EF (BIO-158), an uncovered one keeps its ground's class.
+- **The record** is the placement table's `ice_cover` section, defaults filled in (`step_m`,
+  `max_blocks`, `snow_blocks`, `blue_ice_from_blocks`, `blue_ice_blocks`, and the block ids `snow`,
+  `ice`, `deep_ice`), plus `source` (the thickness field), `rule`, `cells` (covered L2 cells),
+  `climate_cells` (the candidates of step 1), `trimmed_cells` (those step 3 gave up; `cells` +
+  `trimmed_cells` = `climate_cells`), `bodies`, `trimmed_bodies` and `thickest_blocks`.
+- **The cover rule** (`deeptime_format::raster::cover_of`, `RasterRead::cover`; Java
+  `RasterSampler.cover`, `coverOf`; ledger BIO-159): every reader of the layer (the ice pass, the
+  far terrain, the census, the bake's projection, the workbench's map) reads it at a block the same
+  way: the block is covered where its nearest cell is (as `RasterRead::nearest`, the read the Köppen
+  class takes, so every covered block is of the class EF), and its depth is then the weighted mean,
+  with the bilinear blend's weights, of the blocks of those of the blend's four cells that are
+  covered (the nearest cell's own where none has weight); else 0. So a cover's edge lies half-way
+  between a covered cell and a bare one, where the class changes too, and its depth thins over the
+  covered cells without spreading past them (a plain bilinear read, rounded, covered every block
+  where the blend passed half a block: most of a cell past a 12-block margin).
+- **The pass** reads the layer by the cover rule and rounds, giving `n` blocks for the column. The cover **replaces** the top `n` solid blocks of the
   ground, so the terrain's height is unchanged: the top `snow_blocks` (at most `n`) are `snow`, the
   last `blue_ice_blocks` of a cover of at least `blue_ice_from_blocks` are `deep_ice`, the blocks
   between `ice`. A column whose surface is fluid (a lake, the sea) or is the ice of a frozen lake
