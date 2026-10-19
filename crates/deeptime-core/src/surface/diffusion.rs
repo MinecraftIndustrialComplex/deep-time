@@ -55,10 +55,12 @@
 //! number by the diagonal only, so its iterations grow with D·Δt/Δx² (about 111 a step on the
 //! 16k shelf), while a V-cycle damps every wavelength at once (Briggs et al. 2000; Tatebe 1993
 //! for multigrid as a CG preconditioner). The PDE, the splitting that gives the first guess, the
-//! stopping rule on the RMS residual and the mass put-back are the same; the preconditioner runs
-//! in single precision and its reductions are unordered, so the result depends on the thread
-//! count in the last bits (Ben, 2026-10-18: performance over determinism). The Jacobi solve
-//! ([`step`]) stays for the crust's spreading, which skips rows, and as the `jacobi` setting.
+//! stopping rule on the RMS residual and the mass put-back are the same, and so is the kept
+//! [`Workspace`] of `f64` vectors; the preconditioner runs in single precision, so the result is
+//! not the Jacobi solve's bit for bit (Ben, 2026-10-18: performance over determinism), though its
+//! sums are per strip of rows added in order and so the same at any thread count. The Jacobi
+//! solve ([`step_in`]) stays for the crust's spreading, which skips rows, and as the `jacobi`
+//! setting.
 
 use rayon::prelude::*;
 

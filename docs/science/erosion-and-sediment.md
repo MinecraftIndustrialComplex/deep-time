@@ -502,8 +502,10 @@ The cycle aggregates 2 × 2 cells, moves values between levels piecewise-constan
 summed fine couplings as the coarse ones (Braess 1995: the plain Galerkin operator of
 piecewise-constant aggregation is about twice too stiff for smooth error), smooths with damped
 Jacobi (ω 0.8, two sweeps before and after) and ends at a level of at most 64 cells with 16
-sweeps. The cycle runs in f32 and the conjugate gradients in f64; its reductions are unordered,
-so the result depends on the thread count in the last bits.
+sweeps. The cycle runs in f32 and the conjugate gradients in f64; its sums are taken per strip
+of rows and added in order, so the result is the same at any thread count. Since the merge with
+the byte-identical speed-ups (2026-10-19) the solve keeps its f64 vectors between steps in the
+stage's workspace, as the Jacobi solve does; the cycle's levels are still built for each solve.
 
 On a 2048 × 1024 synthetic shelf (the test `tune_the_cycle`, 8 threads) the Jacobi solve took
 110 iterations and 0.400 s; the cycle took 8 iterations and 0.087 s to the same 10⁻⁶ m, and 7

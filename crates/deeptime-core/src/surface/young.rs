@@ -913,7 +913,10 @@ mod tests {
     /// `DEEPTIME_MEM_TRACE`, 8 threads, the 4 GiB cap, the kept-block cache off; the stage's
     /// counted peak less the history it kept in memory): quick 1,105 → 1,162 MiB (1,376.5 less
     /// 214.5; master's own run gave 1,322.8 less 214.2 = 1,108.6, so the method matches P1-17's),
-    /// full 4,143 → 4,311 MiB (the history all on disk).
+    /// full 4,143 → 4,311 MiB (the history all on disk). Again after the merge with master
+    /// fb38204f (2026-10-19, the same method, CPU kernels): quick 1,162 → 1,171 MiB (1,390.1 less
+    /// 219.5; master's own run gave 1,344.3 less 222.6 = 1,121.7, 13 MiB above P1-19's 1,108.6),
+    /// full 4,311 → 4,349 MiB.
     #[test]
     fn the_estimate_covers_the_measured_hold_closely() {
         const MIB: u64 = 1 << 20;
@@ -926,8 +929,8 @@ mod tests {
             .unwrap()
         };
         for (name, held_mib) in [
-            ("earthlike_quick_16k", 1162u64),
-            ("earthlike_full_16k", 4311),
+            ("earthlike_quick_16k", 1171u64),
+            ("earthlike_full_16k", 4349),
         ] {
             let crate::preset::PresetBody::Planet(p) =
                 crate::preset::Preset::from_json(&json(name)).unwrap().body
