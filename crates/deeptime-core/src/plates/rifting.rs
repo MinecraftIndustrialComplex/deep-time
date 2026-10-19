@@ -20,6 +20,7 @@
 use std::collections::BTreeMap;
 
 use glam::DVec3;
+use rayon::prelude::*;
 
 use super::Env;
 use super::events::{self, PLATE_BIRTH, PLATE_DEATH, RIFT_ONSET};
@@ -522,31 +523,48 @@ pub fn heal(
     if state.rift_links.is_empty() {
         return Ok(Vec::new());
     }
-    // The fastest relative speed along each linked pair's shared boundary.
-    let mut fastest: BTreeMap<(u32, u32), f64> = BTreeMap::new();
+    // The fastest relative speed along each linked pair's shared boundary (P1-19: in parallel
+    // over the samples; a maximum does not depend on the order it is taken in).
     let linked: std::collections::BTreeSet<(u32, u32)> =
         state.rift_links.iter().map(|l| (l.a, l.b)).collect();
-    for (v, (sv, &x)) in state.samples.iter().zip(pos).enumerate() {
-        if sv.flags & HIDDEN != 0 {
-            continue;
-        }
-        let pv = state.plate_of(v);
-        for (u, _) in geo.edges(v as u32) {
-            let pu = state.plate_of(u as usize);
-            if pu <= pv || state.samples[u as usize].flags & HIDDEN != 0 {
-                continue;
+    let (samples, groups, plates) = (&state.samples, &state.groups, &state.plates);
+    let plate_of = |i: usize| groups[samples[i].group as usize].plate;
+    let fastest: BTreeMap<(u32, u32), f64> = samples
+        .par_iter()
+        .zip(pos)
+        .enumerate()
+        .fold(
+            BTreeMap::<(u32, u32), f64>::new,
+            |mut fastest, (v, (sv, &x))| {
+                if sv.flags & HIDDEN != 0 {
+                    return fastest;
+                }
+                let pv = plate_of(v);
+                for (u, _) in geo.edges(v as u32) {
+                    let pu = plate_of(u as usize);
+                    if pu <= pv || samples[u as usize].flags & HIDDEN != 0 {
+                        continue;
+                    }
+                    let key = (pv, pu);
+                    if !linked.contains(&key) {
+                        continue;
+                    }
+                    let w = DVec3::from_array(plates[pu as usize].omega)
+                        - DVec3::from_array(plates[pv as usize].omega);
+                    let speed = env.norm.speed_mm_yr(w, x);
+                    let e = fastest.entry(key).or_insert(0.0);
+                    *e = e.max(speed);
+                }
+                fastest
+            },
+        )
+        .reduce(BTreeMap::new, |mut a, b| {
+            for (key, speed) in b {
+                let e = a.entry(key).or_insert(0.0);
+                *e = e.max(speed);
             }
-            let key = (pv, pu);
-            if !linked.contains(&key) {
-                continue;
-            }
-            let w = DVec3::from_array(state.plates[pu as usize].omega)
-                - DVec3::from_array(state.plates[pv as usize].omega);
-            let speed = env.norm.speed_mm_yr(w, x);
-            let e = fastest.entry(key).or_insert(0.0);
-            *e = e.max(speed);
-        }
-    }
+            a
+        });
     let touching: std::collections::BTreeSet<(u32, u32)> = state
         .contacts
         .iter()

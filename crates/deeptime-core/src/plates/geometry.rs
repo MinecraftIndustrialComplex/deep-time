@@ -258,6 +258,75 @@ pub fn dijkstra(
     (dist, label)
 }
 
+thread_local! {
+    /// [`dijkstra_sparse`]'s distances and labels, ∞ and `u32::MAX` between calls.
+    static SPARSE: std::cell::RefCell<(Vec<f64>, Vec<u32>)> =
+        const { std::cell::RefCell::new((Vec::new(), Vec::new())) };
+}
+
+/// [`dijkstra`] for a search that reaches a small part of the lattice (P1-19): the same
+/// distances and labels, kept in a per-thread scratch that is put back to ∞ after the call, and
+/// only the vertices reached come back, as `(vertex, distance, label)` in the order they were
+/// first reached. It costs what it reaches, not the lattice's size, so it can run per plate and
+/// in parallel. `allow` must not call it again.
+pub fn dijkstra_sparse(
+    geo: &Geo,
+    sources: &[(u32, f64, u32)],
+    allow: impl Fn(u32, u32) -> bool,
+    max_rad: f64,
+) -> Vec<(u32, f64, u32)> {
+    let n = geo.points().len();
+    SPARSE.with(|cell| {
+        let mut scratch = cell.borrow_mut();
+        let (dist, label) = &mut *scratch;
+        if dist.len() < n {
+            dist.resize(n, f64::INFINITY);
+            label.resize(n, u32::MAX);
+        }
+        let mut reached: Vec<u32> = Vec::new();
+        let mut heap = BinaryHeap::with_capacity(sources.len() * 2);
+        for &(v, d, l) in sources {
+            if d < dist[v as usize] {
+                if dist[v as usize] == f64::INFINITY {
+                    reached.push(v);
+                }
+                dist[v as usize] = d;
+                label[v as usize] = l;
+                heap.push(Entry { d, v, label: l });
+            }
+        }
+        while let Some(Entry { d, v, label: l }) = heap.pop() {
+            if d > dist[v as usize] || label[v as usize] != l {
+                continue;
+            }
+            for (u, len) in geo.edges(v) {
+                let nd = d + f64::from(len);
+                if nd <= max_rad && nd < dist[u as usize] && allow(v, u) {
+                    if dist[u as usize] == f64::INFINITY {
+                        reached.push(u);
+                    }
+                    dist[u as usize] = nd;
+                    label[u as usize] = l;
+                    heap.push(Entry {
+                        d: nd,
+                        v: u,
+                        label: l,
+                    });
+                }
+            }
+        }
+        let out = reached
+            .iter()
+            .map(|&v| (v, dist[v as usize], label[v as usize]))
+            .collect();
+        for &v in &reached {
+            dist[v as usize] = f64::INFINITY;
+            label[v as usize] = u32::MAX;
+        }
+        out
+    })
+}
+
 /// The two nearest distinct classes of source for every vertex (a label-setting Dijkstra where a
 /// vertex accepts at most one distance per class and two classes), over edges `allow` accepts.
 /// `class(label)` maps a source label to its class (a plate). Per vertex: up to two
