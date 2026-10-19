@@ -19,7 +19,7 @@ pub mod fibonacci;
 pub mod hull;
 pub mod kdtree;
 
-pub use coupling::{BlockFrame, CellLink, Coupling, FanIn, lat_lon_deg, unit_from_lat_lon_deg};
+pub use coupling::{BlockFrame, CellLink, Coupling, lat_lon_deg, unit_from_lat_lon_deg};
 pub use fibonacci::{fibonacci_point, fibonacci_sphere, mean_spacing_rad};
 pub use hull::{Adjacency, HullError, SphereMesh};
 pub use kdtree::SampleTree;
