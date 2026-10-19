@@ -40,7 +40,9 @@ the code) or **estimated**.
   about 1.8 s per 100 Myr, some 18 s per 1000 Myr). Run against the CPU on the same plate state
   or the same snapshot, neither port leans any way (no layer, no climate field; section 10), and
   over whole histories the GPU's CO2 lands on either side of the CPU's on five planets (-117 to
-  +70 ppm, mean temperatures equal). WHOLE_RUN_SUMMARY
+  +70 ppm, mean temperatures equal). Over a 1000 Myr full 16k run on the laptop the ported
+  kernels (with Phase 1's amplifier) take about 72 to 86 s off the CPU's 2,402 s (3 to 3.6 %);
+  that pair's walls were set by the laptop's other load, not the GPU (section 10).
 - **Headline estimate (section 9).** About 513 s of the run's 1,242.8 s wall is grid work on the
   critical path that a compute shader can do. On a mid-range GPU (an NVIDIA T4 or the Radeon 8050S
   class, 250 to 320 GB/s) the ten kernels of section 6 would take an estimated **290 to 400 s** off
@@ -441,7 +443,8 @@ laps compare.
 | | GPU | 298.8 | 29.3 | 9.3 | 2.5 | 1.0 | 1.7 | 3.8 | 28.2 |
 | master fb38204f, 100 Myr, loaded | CPU | 538.0 | 56.9 | 22.6 | 12.9 | | 2.1 | 6.1 | 77.8 |
 | | GPU | 529.5 | 52.3 | 15.2 | 4.1 | 2.2 | 2.8 | 6.3 | 39.1 |
-K_ROWS_PLATES
+| 1000 Myr, master 7d60fc4a, loaded (one pair, GPU first) | CPU | 2,402.1 | 524.4 | 200.9 | 127.4 | | 15.1 | 47.6 | 49.7 |
+| | GPU | 2,769.6 | 545.6 | 161.4 | 61.7 | 15.8 | 21.7 | 62.5 | 30.7 |
 
 | set | arm | climate stage | snapshot | cells | cells up | cells down | snapshot's 2-D model |
 |---|---|---:|---:|---:|---:|---:|---:|
@@ -449,7 +452,8 @@ K_ROWS_PLATES
 | | GPU | 54.0 | 12.3 | 0.63 | 0.23 | 0.20 | 7.2 |
 | master fb38204f, 100 Myr, loaded (every 20 Myr) | CPU | 81.2 | 14.8 | 4.00 | | | 6.7 |
 | | GPU | 91.5 | 11.4 | 1.03 | 0.40 | 0.50 | 6.6 |
-K_ROWS_CLIMATE
+| 1000 Myr, master 7d60fc4a, loaded (every 20 Myr) | CPU | 278.2 | 81.9 | 23.30 | | | 35.9 |
+| | GPU | 322.9 | 75.5 | 5.70 | 2.60 | 2.00 | 43.2 |
 
 - **The relink**: 8.9 s on the CPU becomes 1.0 s on the device beside the k-d tree's build and
   2.5 s of CPU work for the 5.3 % of cells the device leaves (3,578,424 of 67,174,400 over the
@@ -461,7 +465,26 @@ K_ROWS_CLIMATE
   the snapshot (the 2-D model, the march along the rows, the ice) stays on the CPU.
 - The wall times are of different worlds once the GPU is on (the tables above), so they mix the
   kernels' gain with the world's own cost; the kernels' laps are the cleaner figure.
-K_BULLETS
+- **The 1000 Myr pair** (master 7d60fc4a, `--length-myr 1000`, the laptop loaded as in the third
+  set). Walls 2,769.6 s with the GPU and 2,402.1 s on the CPU, but the GPU's arm ran in a busier
+  window: the stages neither port touches (surface, volcanoes, impacts, structure, deposits,
+  young, the finish) took 1,865 s against 1,474 s, 27 % longer, and the plate and climate work
+  outside the ports 19 and 23 % longer. So the wall says nothing about the GPU; the kernels'
+  laps do: `write_l1` 200.9 to 161.4 s (the relink with its tree 142.5 to 83.4 s; the layers,
+  which do not move, 47.6 against 62.5 s), the cells 23.3 to 10.3 s with their transfers, the
+  amplifier 49.7 to 30.7 s. That is 72 s less on the ported kernels even in the busier window,
+  about 86 s with the layers at the CPU arm's 47.6 s.
+- **The whole run on a player's machine** (from the laps, not the walls): the GPU takes about
+  72 to 86 s, 3 to 3.6 %, off this laptop's 2,402 s for 1000 Myr of the full 16k. The time is
+  elsewhere: the surface stage is half the run (1,203 s on the CPU arm; slope failure 273 s, the
+  diffusion solve 173 s, flexure 116 s, advection 111 s, the flood 72 s), which is where the next
+  ports go (section 12).
+- Over 1000 Myr the device leaves 10.0 % of the relink's cells to the CPU (67.2 M of 671.7 M),
+  twice the first 100 Myr's share, and they cost 61.7 s against the device's 15.8 s: the
+  second-group search (section 13) is now the larger half of the relink.
+- The two 1000 Myr worlds, CPU / GPU: CO2 10,011 / 7,981 ppm, 22.3 / 20.2 °C, glaciated land
+  0.158 / 0.159, sea level -19.1 / 20.5 m, land 0.215 / 0.220, land z90 4,508 / 4,477 m. Both
+  end far above today's CO2; that is master 7d60fc4a's model at 1000 Myr, not the GPU's.
 
 ## 11. Natives build per platform
 
@@ -540,9 +563,18 @@ after the climate, so its CO2 is the checkpoint's in both arms: 551.208 ppm.)
 2. **`surface:slope_failure`** (row 1), after the world-changing surface branch (its early stop
    changes the iteration count): a full-grid Jacobi gather per iteration instead of the sparse
    worklist. 70 to 78 s.
-3. **`surface:diffusion_solve`** (row 2), after the multigrid branch: if multigrid lands, a GPU
-   V-cycle (restriction, smoothing and prolongation are stencils), else the PCG with defect
-   correction against an f64 residual. 70 to 90 s.
+3. **`surface:diffusion_solve`** (row 2), **free since master 7d60fc4a**: a conjugate gradient
+   preconditioned by an f32 multigrid V-cycle, 18 iterations a step over 1000 Myr of the full
+   16k, 173 s per 1000 Myr on the loaded laptop's CPU arm (section 10), the largest free kernel.
+   The V-cycle goes to the device as it is (smoothing, restriction and prolongation are f32
+   stencils); the CG's f64 vectors and dot products stay on the CPU with the residual up and the
+   correction down each iteration (5.4 MB each way on the full 16k's L1, cheap on an integrated
+   GPU), or move too with compensated sums in a fixed order. Next after this branch.
+   **The flood** (free since the same merge; 72 s per 1000 Myr on the CPU arm, its first call
+   each step beside the advection's carry, so the wall gains less): a priority flood is serial by
+   nature, and a device flood would be another algorithm (iterated minimum propagation) to prove
+   equal; it ranks below the relink's second-group search (61.7 s of CPU cells per 1000 Myr,
+   section 13) and below advection (row 5).
 4. **`plates:write_l1`** (row 3): **the relink is ported** (2026-10-19, section 13); the layers
    stay on the CPU, since the split measured first gave the relink 5.0 s and the layer pass
    1.8 s of the CPU's 8.3 s per 100 Myr, and moving the layers would download 160 MB a step.
@@ -604,9 +636,11 @@ after the climate, so its CO2 is the checkpoint's in both arms: 551.208 ppm.)
   history, lavapipe; section 10): 0.015 % of links on another triangle, weights within about
   7.7e-4 where the triangle agrees, and every layer's signed difference as often up as down.
 - **What stays on the CPU.** The k-d tree (for the CPU's cells), the cells the device leaves
-  (5.3 % on the full 16k: boundary strips, gaps, cells another group covers), the six- and
+  (5.3 % on the full 16k's first 100 Myr, 10.0 % over 1000 Myr: boundary strips, gaps, cells
+  another group covers), the six- and
   32-nearest searches, the gap crust and all 30 layers. Porting the second-group search would
-  take part of the 2.4 s (per 100 Myr on the laptop) the CPU's cells still cost.
+  take part of what the CPU's cells still cost: 2.5 s in the first 100 Myr on the quiet laptop,
+  61.7 s over 1000 Myr on the loaded one, where the share left to the CPU grows to 10 %.
 
 ## 14. The climate snapshot's cells on the GPU (what was ported)
 
