@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Master 902ac987, test batch on 3efc5ff8 plus the ice and EE census fix: Rust, Gradle and the MIC GameTests green; the rock parity fixture (standalone, EV, TerraBlender) and the EE far-terrain seam fail · In flight (agents): a profile of every system in the full 16k run (Ben, 2026-10-18; 1,290 s against the 900 s gate), the parity and seam fixes · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-10-18 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Master 006efee1: Rust, Gradle and all five GameTest sets green · In flight (agents): a profile of every system in the full 16k run (Ben, 2026-10-18; 1,290 s against the 900 s gate) · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-10-18 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: dc49fe7 (pack master; the rock tags live on the pack's unmerged deep-time branch)
 
@@ -10665,7 +10665,7 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
   `[gametest] native version=… format=… target=… selftest=…`); then P0-08.
 
 ## Known issues and open questions
-Current as of 2026-10-18 (session f981c0d3-5144-49ec-8686-2946d755872c, master 902ac987); the list Ben was given so
+Current as of 2026-10-18 (session f981c0d3-5144-49ec-8686-2946d755872c, master 006efee1); the list Ben was given so
 he does not report known faults. Older notes are in the build log.
 
 **The planet**
@@ -10714,12 +10714,12 @@ he does not report known faults. Older notes are in the build log.
 - An exposed gossan's leached cap holds no ore, by design (DEP-212); the ore lies under it.
 
 **Tests**
-- Master 902ac987: the Gradle unit tests pass (354), and with Expanded Ecosphere `climateConsistent` passes again (C
-  0.927; EE tags its subtropical forests hot but places them in vanilla's temperate band, BIO-160). Still failing,
-  being fixed: `realPlanetRockMatchesTheParityFixture` in standalone, Excavated Variants and TerraBlender (one sample:
-  shale, stone expected, dirt placed) and, with Expanded Ecosphere, `farTerrainMatchesGeneratedChunksAcrossTheSeam`
-  (dead coral on the warm ocean floor where the far terrain shows sand). Both appeared when the crust fix changed the
-  4k test planet. The MIC set passed 91 of 91 on 3efc5ff8.
+- Master 006efee1: everything passes: Rust, Gradle (354) and all five GameTest sets (91 of 91 each; MIC on a rerun
+  after the Artifacts boot race). The four failures of 3efc5ff8 are fixed: the ice edge test builds its own layer,
+  the EE census reads its subtropical forests as temperate (EE tags them hot but places them in vanilla's temperate
+  band, BIO-160), the parity test no longer generates the chunk it checks, and far terrain runs the pack's
+  chunk-free surface rules (EE's coral band, BAK-048). Far terrain still shows sand on a few lukewarm coastal floors
+  the aquifer left dry, where the game has dirt.
 - The cloud forest check counts nothing on the 4k test planet (5 columns qualify), so it guards only on a planet with
   more humid tropical highland.
 - "Probe column agrees with the world data" failed once at (8184, 164) and was not reproduced.
