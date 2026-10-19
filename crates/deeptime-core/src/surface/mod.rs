@@ -811,11 +811,11 @@ impl SurfaceStage {
         let mut ice_cells = 0u64;
         self.time("setup", started);
 
-        // The first priority flood needs only the elevation and the sea; it is serial (its result
-        // on flats depends on the order), so the rest of the carry and the setup run beside it,
-        // on the other threads. Neither reads or writes what the flood does (`kind`, `base_z`,
-        // `filled`), and the flood reads only `h` (P1-19: the flood took 32.7 s of the full 16k
-        // gate run on one core, after all of the carry and the setup).
+        // The first priority flood needs only the elevation and the sea, so the rest of the carry
+        // and the setup run beside it, on the other threads. Neither reads or writes what the
+        // flood does (`kind`, `base_z`, `filled`), and the flood reads only `h` (P1-19: the serial
+        // flood took 32.7 s of the full 16k gate run on one core, after all of the carry and the
+        // setup). The parallel flood (`surface.numerics.flood`, ERO-184) shares the pool with them.
         let beside = Instant::now();
         let fam_of = &self.fam;
         let erod = &self.erod;
@@ -833,9 +833,10 @@ impl SurfaceStage {
         let ((sinks0, flood_ms), (setup, carry_ms, setup_ms)) = rayon::join(
             || {
                 let started = Instant::now();
-                pflood::open_sea(&d, sc_h, sea, (n / 500).max(1), sc_kind);
+                let fm = p.numerics.flood;
+                pflood::open_sea_with(fm, &d, sc_h, sea, (n / 500).max(1), sc_kind);
                 sc_base_z.iter_mut().for_each(|b| *b = sea);
-                let sinks = pflood::flood(&d, sc_h, sc_base_z, sc_kind, sc_filled) as u64;
+                let sinks = pflood::flood_with(fm, &d, sc_h, sc_base_z, sc_kind, sc_filled) as u64;
                 (sinks, started.elapsed().as_secs_f64() * 1000.0)
             },
             || {
@@ -1066,9 +1067,11 @@ impl SurfaceStage {
             // The first substep's flood ran beside the setup (above).
             if sub > 0 {
                 let started = Instant::now();
-                pflood::open_sea(&d, &sc.h, sea, (n / 500).max(1), &mut sc.kind);
+                let fm = p.numerics.flood;
+                pflood::open_sea_with(fm, &d, &sc.h, sea, (n / 500).max(1), &mut sc.kind);
                 sc.base_z.iter_mut().for_each(|b| *b = sea);
-                sinks += pflood::flood(&d, &sc.h, &sc.base_z, &mut sc.kind, &mut sc.filled) as u64;
+                sinks += pflood::flood_with(fm, &d, &sc.h, &sc.base_z, &mut sc.kind, &mut sc.filled)
+                    as u64;
                 self.time("pflood", started);
             }
             let started = Instant::now();
@@ -1370,7 +1373,16 @@ impl SurfaceStage {
             }
             let before = crate::alloc::copied(&sc.h);
             let solve = Instant::now();
-            cg_iterations += diffusion::step_in(&mut sc.solve, &d, &mut sc.h, &sc.kd, dts) as u64;
+            let nm = &p.numerics;
+            cg_iterations += diffusion::solve(
+                &mut sc.solve,
+                &d,
+                &mut sc.h,
+                &sc.kd,
+                dts,
+                nm.diffusion_solver,
+                nm.diffusion_tol_m,
+            ) as u64;
             // The solve's own share of "diffusion" (P1-17's breakdown).
             self.time("diffusion_solve", solve);
             let failing = Instant::now();
