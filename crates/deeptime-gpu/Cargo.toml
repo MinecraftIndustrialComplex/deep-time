@@ -1,0 +1,16 @@
+[package]
+name = "deeptime-gpu"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Compute shaders on Vulkan, Metal and DX12 (docs/design/gpu-compute.md): no GL backend (the
+# client's own OpenGL context is left alone) and no WebGPU. Vulkan and DX12 load their drivers at
+# run time; Metal is a system framework. MIT OR Apache-2.0.
+wgpu = { version = "30.0.1", default-features = false, features = ["std", "parking_lot", "vulkan", "metal", "dx12", "wgsl"] }
+# Plain-old-data views of the arrays that cross to the device. Zlib OR Apache-2.0 OR MIT.
+bytemuck = "1.25.2"

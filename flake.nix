@@ -61,6 +61,13 @@
           flite
           udev
         ]);
+
+        # The GPU compute path (docs/design/gpu-compute.md) loads Vulkan at run time: the loader on
+        # LD_LIBRARY_PATH, and Mesa's lavapipe (a CPU Vulkan driver) added to the drivers it finds,
+        # so the GPU tests run on the test VM, which has no GPU. VK_ADD_DRIVER_FILES adds to the
+        # system's drivers instead of replacing them, so a real GPU still wins where there is one.
+        gpuLibs = lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.vulkan-loader ];
+        lavapipe = "${pkgs.mesa}/share/vulkan/icd.d/lvp_icd.${pkgs.stdenv.hostPlatform.parsed.cpu.name}.json";
       in {
         _module.args.pkgs = import inputs.nixpkgs {
           inherit system;
@@ -89,9 +96,10 @@
             pkgs.jq
             pkgs.binutils
           ];
-          buildInputs = clientLibs;
+          buildInputs = clientLibs ++ gpuLibs;
           env = lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
-            LD_LIBRARY_PATH = lib.makeLibraryPath clientLibs;
+            LD_LIBRARY_PATH = lib.makeLibraryPath (clientLibs ++ gpuLibs);
+            VK_ADD_DRIVER_FILES = lavapipe;
           } // {
             JAVA_HOME = "${java.home}";
             RUST_SRC_PATH = "${rust}/lib/rustlib/src/rust/library";
