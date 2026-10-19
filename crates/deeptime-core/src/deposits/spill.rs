@@ -51,11 +51,12 @@ impl std::fmt::Debug for FrameFile {
 static SPILL_SEQ: AtomicU64 = AtomicU64::new(0);
 
 impl FrameFile {
-    /// A new anonymous spill file in `dir` (created if missing).
-    pub fn spill_in(dir: &Path) -> Result<FrameFile, CoreError> {
+    /// A new anonymous spill file in `dir` (created if missing), named after `stem` while it has
+    /// a name.
+    pub fn spill_in(dir: &Path, stem: &str) -> Result<FrameFile, CoreError> {
         std::fs::create_dir_all(dir).map_err(|e| CoreError::io(dir, e))?;
         let path = dir.join(format!(
-            "history-{}-{}.spill",
+            "{stem}-{}-{}.spill",
             std::process::id(),
             SPILL_SEQ.fetch_add(1, Ordering::Relaxed)
         ));
@@ -176,7 +177,7 @@ impl SpillStore {
         if let Some(f) = f.as_ref() {
             return Ok((f.clone(), false));
         }
-        let made = Arc::new(FrameFile::spill_in(&self.dir)?);
+        let made = Arc::new(FrameFile::spill_in(&self.dir, "history")?);
         *f = Some(made.clone());
         Ok((made, true))
     }

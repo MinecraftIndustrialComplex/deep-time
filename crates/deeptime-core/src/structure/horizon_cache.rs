@@ -15,9 +15,17 @@
 //! its amplification write fields of their own), so the later bakes take the kept horizons; the
 //! fingerprint is what makes that safe should a later change write one of them.
 //!
+//! The packed horizons wait in an anonymous file of their own in the run's folder (made like the
+//! history's spill file, `deposits::spill`), not in memory: at full 16k they are tens of MiB, held
+//! from the structure stage to the bake, and in memory they would sit in the count the
+//! amplifier's whole-raster test reads (`StageContext::reserve`), enough to send its last level
+//! into tiles. Without a folder (or when the file cannot be made) they stay in memory.
+//!
 //! The cache is not in checkpoints (a resumed run bakes again) and does not take part in the
 //! world's equality.
 
+use std::borrow::Cow;
+use std::path::Path;
 use std::sync::Arc;
 
 use deeptime_format::GridDesc;
@@ -25,6 +33,7 @@ use rayon::prelude::*;
 
 use super::bake_horizons::Horizons;
 use super::{CellSource, StructureParams};
+use crate::deposits::spill::FrameFile;
 use crate::params::PlanetPreset;
 use crate::surface::strata_log::Layer;
 
@@ -139,7 +148,8 @@ impl CellSource<'_> {
     }
 }
 
-/// The kept horizons: [`Horizons`] with its three arrays LZ4-packed in runs of [`RUN`] values.
+/// The kept horizons: [`Horizons`] with its three arrays LZ4-packed in runs of [`RUN`] values,
+/// the blocks back to back in one run of bytes.
 struct Kept {
     fingerprint: Fingerprint,
     grid: GridDesc,
@@ -148,24 +158,45 @@ struct Kept {
     tongues: (u32, f64),
     min_blocks: Vec<u8>,
     slots: usize,
-    tops: Vec<Vec<u8>>,
-    classes: Vec<Vec<u8>>,
-    keys: Vec<Vec<u8>>,
+    /// Each array's blocks: (start, length) in the packed bytes.
+    tops: Vec<(usize, usize)>,
+    classes: Vec<(usize, usize)>,
+    keys: Vec<(usize, usize)>,
+    packed: Packed,
+}
+
+/// Where the packed bytes are (the module docs).
+enum Packed {
+    Memory(Vec<u8>),
+    /// At this offset, this long, in a file of their own.
+    File(FrameFile, u64, u64),
 }
 
 impl Kept {
     fn bytes(&self) -> u64 {
-        [&self.tops, &self.classes, &self.keys]
-            .iter()
-            .flat_map(|blocks| blocks.iter())
-            .map(|b| b.len() as u64)
-            .sum()
+        match &self.packed {
+            Packed::Memory(b) => b.len() as u64,
+            Packed::File(_, _, len) => *len,
+        }
+    }
+
+    /// The packed bytes (`None`: the file could not be read).
+    fn data(&self) -> Option<Cow<'_, [u8]>> {
+        match &self.packed {
+            Packed::Memory(b) => Some(Cow::Borrowed(b)),
+            Packed::File(f, at, len) => f.read(*at, *len).ok().map(Cow::Owned),
+        }
     }
 }
 
-/// Packs `values` (`B` little-endian bytes each, written by `put`) in runs of [`RUN`].
-fn pack<T: Sync, const B: usize>(values: &[T], put: fn(&T) -> [u8; B]) -> Vec<Vec<u8>> {
-    values
+/// Packs `values` (`B` little-endian bytes each, written by `put`) in runs of [`RUN`], appending
+/// the blocks to `out`; returns where each one went.
+fn pack<T: Sync, const B: usize>(
+    values: &[T],
+    put: fn(&T) -> [u8; B],
+    out: &mut Vec<u8>,
+) -> Vec<(usize, usize)> {
+    let blocks: Vec<Vec<u8>> = values
         .par_chunks(RUN)
         .map(|run| {
             let mut raw = Vec::with_capacity(run.len() * B);
@@ -174,12 +205,20 @@ fn pack<T: Sync, const B: usize>(values: &[T], put: fn(&T) -> [u8; B]) -> Vec<Ve
             }
             lz4_flex::block::compress(&raw)
         })
+        .collect();
+    blocks
+        .iter()
+        .map(|b| {
+            out.extend_from_slice(b);
+            (out.len() - b.len(), b.len())
+        })
         .collect()
 }
 
 /// [`pack`] undone into `slots` values (`None`: a block does not unpack to its run).
 fn unpack<T: Send + Copy + Default, const B: usize>(
-    blocks: &[Vec<u8>],
+    data: &[u8],
+    blocks: &[(usize, usize)],
     slots: usize,
     get: fn([u8; B]) -> T,
 ) -> Option<Vec<T>> {
@@ -187,7 +226,10 @@ fn unpack<T: Send + Copy + Default, const B: usize>(
     let ok = out
         .par_chunks_mut(RUN)
         .zip(blocks.par_iter())
-        .all(|(run, block)| {
+        .all(|(run, &(start, len))| {
+            let Some(block) = data.get(start..start + len) else {
+                return false;
+            };
             let Ok(raw) = lz4_flex::block::decompress(block, run.len() * B) else {
                 return false;
             };
@@ -207,9 +249,26 @@ fn unpack<T: Send + Copy + Default, const B: usize>(
 pub struct HorizonCache(Option<Arc<Kept>>);
 
 impl HorizonCache {
-    /// Keeps `hz`, baked from inputs with `fingerprint`, in place of what was kept.
-    pub fn keep(&mut self, fingerprint: Fingerprint, hz: &Horizons) {
+    /// Keeps `hz`, baked from inputs with `fingerprint`, in place of what was kept: packed into
+    /// an anonymous file in `dir` (the run's folder), or in memory without one.
+    pub fn keep(&mut self, fingerprint: Fingerprint, hz: &Horizons, dir: Option<&Path>) {
         self.0 = None;
+        let mut bytes = Vec::new();
+        let tops = pack(&hz.tops, |v: &i16| v.to_le_bytes(), &mut bytes);
+        let classes = pack(&hz.classes, |v: &u8| [*v], &mut bytes);
+        let keys = pack(
+            &hz.keys,
+            |v: &[u16; 2]| {
+                let (a, b) = (v[0].to_le_bytes(), v[1].to_le_bytes());
+                [a[0], a[1], b[0], b[1]]
+            },
+            &mut bytes,
+        );
+        let filed = dir.and_then(|d| {
+            let f = FrameFile::spill_in(d, "horizons").ok()?;
+            let at = f.append(&[bytes.as_slice()]).ok()?;
+            Some(Packed::File(f, at, bytes.len() as u64))
+        });
         self.0 = Some(Arc::new(Kept {
             fingerprint,
             grid: hz.grid.clone(),
@@ -218,12 +277,10 @@ impl HorizonCache {
             tongues: hz.tongues,
             min_blocks: hz.min_blocks.clone(),
             slots: hz.tops.len(),
-            tops: pack(&hz.tops, |v: &i16| v.to_le_bytes()),
-            classes: pack(&hz.classes, |v: &u8| [*v]),
-            keys: pack(&hz.keys, |v: &[u16; 2]| {
-                let (a, b) = (v[0].to_le_bytes(), v[1].to_le_bytes());
-                [a[0], a[1], b[0], b[1]]
-            }),
+            tops,
+            classes,
+            keys,
+            packed: filed.unwrap_or(Packed::Memory(bytes)),
         }));
     }
 
@@ -233,13 +290,15 @@ impl HorizonCache {
             .0
             .as_deref()
             .filter(|k| k.fingerprint == *fingerprint)?;
+        let data = kept.data()?;
+        let data = &data[..];
         let (tops, (classes, keys)) = rayon::join(
-            || unpack(&kept.tops, kept.slots, i16::from_le_bytes),
+            || unpack(data, &kept.tops, kept.slots, i16::from_le_bytes),
             || {
                 rayon::join(
-                    || unpack(&kept.classes, kept.slots, |[b]: [u8; 1]| b),
+                    || unpack(data, &kept.classes, kept.slots, |[b]: [u8; 1]| b),
                     || {
-                        unpack(&kept.keys, kept.slots, |b: [u8; 4]| {
+                        unpack(data, &kept.keys, kept.slots, |b: [u8; 4]| {
                             [
                                 u16::from_le_bytes([b[0], b[1]]),
                                 u16::from_le_bytes([b[2], b[3]]),
@@ -264,6 +323,13 @@ impl HorizonCache {
     /// Bytes the packed horizons hold.
     pub fn bytes(&self) -> u64 {
         self.0.as_deref().map_or(0, Kept::bytes)
+    }
+
+    /// True when the packed horizons are in their file, not in memory.
+    pub fn on_disk(&self) -> bool {
+        self.0
+            .as_deref()
+            .is_some_and(|k| matches!(k.packed, Packed::File(..)))
     }
 }
 
@@ -307,14 +373,27 @@ mod tests {
         };
         let mut cache = HorizonCache::default();
         assert!(cache.get(&fp).is_none());
-        cache.keep(fp.clone(), &hz);
-        assert!(cache.bytes() > 0);
+        cache.keep(fp.clone(), &hz, None);
+        assert!(cache.bytes() > 0 && !cache.on_disk());
         assert_eq!(cache.get(&fp), Some(hz.clone()));
         let other = Fingerprint {
             head: vec![1, 2, 3],
             runs: vec![7, 9],
         };
         assert!(cache.get(&other).is_none());
+
+        // In a file of their own: the same horizons back, no name left in the folder (Unix).
+        let dir = std::env::temp_dir().join(format!("dt-hzcache-{}", std::process::id()));
+        let mut filed = HorizonCache::default();
+        filed.keep(fp.clone(), &hz, Some(&dir));
+        assert!(filed.on_disk());
+        assert_eq!(filed.bytes(), cache.bytes());
+        assert_eq!(filed.get(&fp), Some(hz.clone()));
+        assert!(filed.get(&other).is_none());
+        #[cfg(unix)]
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0);
+        drop(filed);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

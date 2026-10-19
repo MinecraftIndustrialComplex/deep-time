@@ -1600,7 +1600,7 @@ impl Session {
             self.log.push(
                 Level::Info,
                 format!(
-                    "history after {name}: {} frames, {:.1} MiB ({:.1} MiB in memory, {} frames on disk; {:.1} MiB written to the spill file); {:.0} MiB in use of the {:.0} MiB cap",
+                    "history after {name}: {} frames, {:.1} MiB ({:.1} MiB in memory, {} frames on disk; {:.1} MiB written to the spill file); {:.0} MiB in use of the {:.0} MiB cap ({:.0} MiB of it kept for reuse)",
                     note["frames"],
                     mib("bytes"),
                     mib("resident_bytes"),
@@ -1608,6 +1608,7 @@ impl Session {
                     mib("spilled_bytes"),
                     self.gauge.in_use() as f64 / 1_048_576.0,
                     self.mem_cap as f64 / 1_048_576.0,
+                    self.gauge.kept() as f64 / 1_048_576.0,
                 ),
             );
         }
