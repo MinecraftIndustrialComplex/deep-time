@@ -83,6 +83,7 @@ fn run_stage_with(
             state: &state,
             history: None,
             needed_peak: None,
+            compute: crate::compute::ComputeMode::Cpu,
         };
         stage.step(&mut world, &ctx).unwrap();
         let st = world.plates.as_ref().unwrap();

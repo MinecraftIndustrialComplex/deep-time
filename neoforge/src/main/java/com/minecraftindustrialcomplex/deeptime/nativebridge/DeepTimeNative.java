@@ -47,6 +47,13 @@ final class DeepTimeNative {
      * continued; docs/design/playability-steering.md).
      */
     static final int FLAG_RESUME = 2;
+    /**
+     * {@link #createWith} flags: run the simulation on the CPU only, or on the GPU where one is
+     * usable (falling back to the CPU when it is not). Neither is automatic; both is an error
+     * (docs/design/gpu-compute.md).
+     */
+    static final int FLAG_COMPUTE_CPU = 4;
+    static final int FLAG_COMPUTE_GPU = 8;
 
     /** {@link #create} with {@link #FLAG_EPOCHS} and {@link #FLAG_RESUME}. */
     static native long createWith(String presetJson, String contentJson, String outDir, int threads, long memCapBytes,

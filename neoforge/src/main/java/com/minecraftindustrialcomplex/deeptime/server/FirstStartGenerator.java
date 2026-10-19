@@ -283,14 +283,14 @@ public final class FirstStartGenerator {
         }
         int threads = config.threads() > 0 ? config.threads() : Runtime.getRuntime().availableProcessors();
         DeepTime.LOGGER.info("[deeptime] generating the world's history on first start: preset {}, C = {}, timeline {}, "
-                        + "{} threads, native cap {} GiB, estimate {} GiB, {} stages -> {}",
+                        + "{} threads, compute {}, native cap {} GiB, estimate {} GiB, {} stages -> {}",
                 name.equals(resolved.label()) ? name : name + " (" + resolved.label() + ")", c, timeline, threads,
-                gib(cap), gib(peak), stageNames.size(), dir);
+                config.compute().key(), gib(cap), gib(peak), stageNames.size(), dir);
         long started = System.nanoTime();
         DeepTime.LOGGER.info("[deeptime] content bundle: {}; climate placement table: {}; pack placement tables: {}", essentialsOnly,
                 placement.map(f -> "from pack " + f.packId()).orElse("the core's default"),
                 packs.isEmpty() ? "none" : PlacementPacks.ids(packs));
-        String manifestJson = run(server, presetJson, contentJson, work, threads, cap, stageNames, started);
+        String manifestJson = run(server, presetJson, contentJson, work, threads, cap, config.compute(), stageNames, started);
 
         // 5. Into place, whole.
         try {
@@ -311,10 +311,10 @@ public final class FirstStartGenerator {
 
     /** Runs the session to completion on this (the server) thread's watch; returns the manifest JSON. */
     private static String run(MinecraftServer server, String presetJson, String contentJson, Path work, int threads,
-            long cap, List<String> stageNames, long started) throws Stop {
+            long cap, SimSession.Compute compute, List<String> stageNames, long started) throws Stop {
         SimSession session;
         try {
-            session = SimSession.start(presetJson, contentJson, work, threads, cap);
+            session = SimSession.start(presetJson, contentJson, work, threads, cap, compute);
         } catch (RuntimeException e) {
             deleteQuietly(work);
             throw new Stop("the simulation could not start: " + e.getMessage(), "Nothing was written.");
