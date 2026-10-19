@@ -126,6 +126,49 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-19: P1-19 plates part 2: feedback, flexure, belts and fronts, and the neighbour queries of write_l1, detect and stats_margins. The plate stage is 1.25× faster side by side (15 s per 200 Myr) and the worlds are identical (profile items #3, #5; agent worktree agent-ad646ba0bbca1e26b, branch worktree-agent-ad646ba0bbca1e26b from master be80c6c1, master 32589362 merged before the measurements; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What changed** (every change identical: same files, byte for byte).
+  - **#3, feedback and flexure** (`plates/mod.rs`). The feedback's serial scatter stays. The flexure's sample (`flexure_of`) runs beside it in a `rayon::join`, since both only read the last sampling's links. The `flexure_sample` lap is now only the fallback for a step without feedback.
+    - A parallel gather over the links turned round (`FanIn`, a counting-sort transposition, each sample's additions in the serial order) was built twice and dropped. It lost to the serial scatter under the follower stage's load: feedback +2.35 s per 200 Myr (v1) and +1.9 s (v2, `pairs-fanin`).
+  - **#3, belts** (`plates/belts.rs`). `stack` runs every front's two distance fields at once. Each is plates part 1's `dijkstra_sparse`, sorted by vertex (`geometry::dijkstra_sorted`), so the sums run in the old order. The loops run over the reached set, not every sample. A front stacked after another cuts its field back to the shorter reach, which is exact (see `dijkstra_sorted`), or runs it again.
+  - **#3, fronts** (`plates/subduction.rs`). Split into begin, reach and finish. The read-only reach runs beside `belts::stack`, so the `belts` lap now holds it. The arcs' search from every front runs per rigid group (`geometry::dijkstra_parts`, each group's `dijkstra_sparse` on its own thread, exact because no allowed edge joins two groups).
+  - **#5, write_l1** (`plates/l1.rs`, `sphere/coupling.rs`).
+    - One nearest query finds the nearest visible sample's group first. The six-nearest search runs only where that fails.
+    - The 30 output layers are written in one pass.
+    - Each cell's row is interpolated inside the block loop; before, every cell's row was collected first (about 150 MB a step on full 16k).
+    - The coupling keeps its cells' unit vectors per row and column.
+  - **#5, detect** (`plates/subduction.rs`). Samples whose 5×5×5 block of cubes holds only their own plate are skipped (`Voxels`). This is exact because √3·h < 2h.
+  - **#5, stats_margins** (`plates/stats.rs`). One 8-nearest query per sample serves both the margins and the landmass links.
+  - **Tests.** `sorted_and_split_dijkstras_match_the_dense_one` (dense against sorted, per part and a shorter reach, bit for bit), `voxels_skip_only_samples_whose_nearest_share_their_plate` and `kept_unit_vectors_are_the_frames`.
+  - **Tooling.** `tools/review/p1-19-pair.sh` runs two builds side by side on the VM's sets A and B, then swapped, and compares each pair's worlds.
+- **Merge with plates part 1** (master 32589362): `geometry.rs` takes master's `dijkstra_sparse`. This branch's own kept-scratch search (`Reach`, `dijkstra_reached`) is gone, as the coordinator asked.
+- **Seconds.**
+  - **Setup.** The shipped x86-64-v3 builds (`tools/natives/gate-bins.sh <out> --only x86-64-v3`) of master 32589362 and of this branch, run with `tools/review/p1-19-pair.sh <master bin> master <branch bin> branch <out> earthlike_full_16k scattered_continents 200 8 ab,ba`. Lap timers are from `deeptime bench` through `bench-quiet.py`. The VM was loaded by other agents: others' busy CPUs averaged 14 to 19, load1 peaked at 91 in ba.
+
+  | Lap | ab: master A → branch B | ba: master B → branch A | Saved per 200 Myr (mean) |
+  |---|---|---|---|
+  | feedback + flexure_sample | 8.2 → 4.3 | 10.5 → 9.3 | 2.6 |
+  | belts + fronts | 6.7 → 3.3 | 7.9 → 5.3 | 3.0 |
+  | detect | 5.3 → 3.4 | 9.1 → 9.1 | 1.0 |
+  | stats_margins | 2.0 → 1.5 | 2.8 → 2.6 | 0.35 |
+  | write_l1 | 29.6 → 19.5 | 48.9 → 40.5 | 9.25 |
+  | plates stage | 69.4 → 48.8 | 103.1 → 93.4 | 15.2 (1.25×, geometric mean) |
+  | user CPU time | 1,744.2 → 1,665.6 | 1,644.4 → 1,613.0 | 55 |
+  | wall | 441.1 → 361.0 | 531.5 → 601.6 | not read: set A was the slow set in both orders |
+
+  - The wall times swing with the CPU set, not the build. Set B ran 4.84 and 3.24 CPUs busy against set A's 4.15 and 2.79, and the stages after the plates (amplify, finalize), which this branch does not touch, moved by 17 to 25 s with the set.
+  - Scaled to 1,000 Myr, the plate stage saves about 50 to 100 s. That is an estimate: the plates run beside the structure step, so the gate's wall gains less, and no full run was made.
+- **cmp** (`tools/review/p1-17-cmp.py` per pair): 68 of 68 files are byte-identical in both orders. Before the merge, against be80c6c1, both earlier pairs and the FanIn pair also gave 68 of 68.
+- **Tolerance tests.** None needed: every change is identical, and `tests/overlap.rs` (1 thread against 3, byte for byte) passes.
+- **Gates** (on the VM, the merged code):
+  - `cargo test --workspace`: all pass, deeptime-core lib 715 passed, 4 ignored.
+  - `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo deny check licenses bans` are clean. Clippy's one finding, a type alias for the feedback's result (`Feedback`), was fixed and checked again.
+  - `./gradlew build test`: tests=361, failures=0, skipped=2.
+- **Not done.**
+  - Sharing one visible-sample tree between `stats_margins` and `write_l1`. Each builds its own; they meet in a step only every 10 Myr, so the saving is small and would cost signature changes.
+  - A kiddo scratch rewrite (`with_scratch` queries) for the neighbour searches.
+- **Next.** Merge into master with the other P1-19 branches. Then run the full 16k gate on the merged master: `tools/natives/gate-bins.sh <out>`, then `tools/review/bench-quiet.py ... <out>/deeptime-x86-64-v3 earthlike_full_16k scattered_continents 1000 8` and the same for `deeptime-baseline`.
+
 ### 2026-10-18: Natives: a baseline and an x86-64-v3 build for each x86-64 platform, picked at runtime by a CPU probe, and the `ship` profile (fat LTO, one codegen unit) for everything that ships and for the gate. At 100 Myr on full 16k, ship v3 is 1.08× faster than plain `release` (CPU time 1.10×). Ship baseline matches it in wall time (1.00×) and is 1.03× by CPU time. The worlds are the same files (coordinator's task, Ben's decision of 2026-10-18 "Both, picked at runtime"; agent worktree agent-aa3973505c3dc829a, branch worktree-agent-aa3973505c3dc829a from master f221b3d3; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What ships.** A release jar holds 16 native files, up from 8:
   - the eight platforms' baseline `deeptime_jni`;
