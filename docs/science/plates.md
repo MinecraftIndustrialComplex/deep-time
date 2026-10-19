@@ -488,7 +488,7 @@ unless named. Runs at a fixed thread count were identical.
 | the arc rule alone, seeds 11 to 16 | 6 | 6, 12, 8, 11, 9, 7 (3 to 10 / 0 to 3) | 561 to 1,891 |
 | the arc rule and the exact blind step (this branch), seeds 11 to 16 | 6 | 6 (3 / 3), 12 (9 / 3), 5 (3 / 2), 11 (10 / 1), 9 (9 / 0), 6 (5 / 1) | 524 to 1,891 |
 | earthlike_quick_16k, scattered continents, 150 Myr, seed 1, master 26ce664e | 1 | 49 (48 / 1) | 15,924 |
-| the same, this branch | 1 | EQ16K_FIX | EQ16K_FIX_CELLS |
+| the same, this branch | 1 | 49 (48 / 1), every volcano count the same (3,037 born, 9 blind steps, the resamplings): on 100,000 samples neither change fires | 15,924 |
 
 Master's 4 to 0 is not an arc change: neither planet had an arc. The solvers merge changed the
 surface, and with it which hotspot volcanoes stood at the end (a hotspot's next volcano waits until
