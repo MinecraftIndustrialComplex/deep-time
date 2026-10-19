@@ -192,16 +192,22 @@ public final class RealPlanetGameTests {
     }
 
     /**
-     * The blocks the rock-blob features of {@code level}'s biomes place (vanilla's andesite, diorite,
-     * granite and tuff blobs, a pack's re-stoned blobs: {@link ClaimRules.Verdict#ROCK}), by block id.
+     * The blocks the features step can put into the strata pass's rock in {@code level}, by block id:
+     * what the ore-shaped features its biomes still hold place, as {@code deeptime:claim_ores} reads
+     * them ({@link ClaimRules}). On a server whose overworld is Deep Time's the modifier has taken out
+     * the claimed ores and the rock blobs and kept the rest, the loose-rock pockets among them
+     * (vanilla's {@code ore_dirt} and {@code ore_gravel}: dirt and gravel are unconsolidated rock, not
+     * blobs); on any other server, as the GameTest server's vanilla world, it removes nothing, so the
+     * blobs run too (vanilla's andesite, diorite, granite and tuff, a pack's re-stoned blobs).
      */
-    static Set<String> rockBlobBlocks(ServerLevel level, ClaimRules rules) {
+    static Set<String> featureBlocks(ServerLevel level, ClaimRules rules) {
         Set<String> out = new HashSet<>();
         for (Holder<Biome> biome : level.getChunkSource().getGenerator().getBiomeSource().possibleBiomes())
             for (HolderSet<PlacedFeature> step : biome.value().getGenerationSettings().features())
-                for (Holder<PlacedFeature> f : step)
-                    if (rules.verdict(f) == ClaimRules.Verdict.ROCK)
-                        f.unwrapKey().ifPresent(k -> out.addAll(rules.placedBlocksOf(k.location())));
+                for (Holder<PlacedFeature> f : step) {
+                    rules.verdict(f);   // reads the blocks it places
+                    f.unwrapKey().ifPresent(k -> out.addAll(rules.placedBlocksOf(k.location())));
+                }
         return out;
     }
 
@@ -214,12 +220,18 @@ public final class RealPlanetGameTests {
                 net.minecraft.core.QuartPos.fromBlock(z)).unwrapKey().map(k -> k.location().toString()).orElse("?");
     }
 
-    /** How many blocks of the cube of side 7 around {@code pos} are {@code state}: a blob is a cluster. */
+    /**
+     * How many blocks of the cube of side 7 around {@code pos} are {@code state}: a blob is a cluster.
+     * Read from the chunks as they stand ({@code level.getBlockState} would take each to full, its
+     * neighbours through their features, and change what the later samples near it read).
+     */
     static int around(ServerLevel level, BlockPos pos, BlockState state) {
         int n = 0;
-        for (BlockPos p : BlockPos.betweenClosed(pos.offset(-3, -3, -3), pos.offset(3, 3, 3)))
-            if (level.getBlockState(p) == state)
+        for (BlockPos p : BlockPos.betweenClosed(pos.offset(-3, -3, -3), pos.offset(3, 3, 3))) {
+            ChunkAccess c = level.getChunkSource().getChunk(p.getX() >> 4, p.getZ() >> 4, ChunkStatus.EMPTY, false);
+            if (c != null && c.getBlockState(p) == state)
                 n++;
+        }
         return n;
     }
 
@@ -232,14 +244,23 @@ public final class RealPlanetGameTests {
      * the class resolves to nothing). Blocks the pack's surface rules placed (not crust, not rock)
      * are counted apart.
      *
-     * <p>So are the blocks of rock-blob features where the level keeps them. {@code deeptime:claim_ores}
-     * removes the blobs only on a server whose overworld is Deep Time's ({@link ClaimOresBiomeModifier});
-     * this level sits in the GameTest server's vanilla world, so vanilla's andesite, diorite, granite
-     * and tuff blobs still run at the features step, after the strata pass, and replace the base
-     * stone they meet. Where a class's block is plain stone (shale, mudstone and the other classes
-     * whose vanilla stand-in is {@code minecraft:stone}), a blob that crosses a sample replaces the
-     * strata pass's rock: the evaluators agree and the strata pass placed the class, and the blob
-     * came after. A Deep Time world has no such blobs.
+     * <p>So are the blocks the features step put there ({@link #featureBlocks}). A sample's chunk is
+     * read at the surface step or later: another test may have taken it, or a neighbour, through its
+     * features, and an ore-shaped feature replaces the base stone it meets, in its own chunk and its
+     * neighbours'. Where a class's block is plain stone (shale, mudstone and the other classes whose
+     * vanilla stand-in is {@code minecraft:stone}), a feature that crosses a sample replaces the
+     * strata pass's rock: the evaluators agree and the strata pass placed the class, and the feature
+     * came after. {@code deeptime:claim_ores} removes the rock blobs only on a server whose overworld
+     * is Deep Time's ({@link ClaimOresBiomeModifier}); this level sits in the GameTest server's
+     * vanilla world, so vanilla's andesite, diorite, granite and tuff blobs run. The loose-rock pockets
+     * (vanilla's dirt and gravel) run in every world and count with the blobs. On the planet of
+     * 2026-10-18 (the standalone, Excavated Variants and TerraBlender sets) the seam test had taken its
+     * row z = 391 through the features, a diorite blob among them; this test met that blob and counted
+     * the cube around it with {@code level.getBlockState}, which took the blob's chunk to full and so
+     * ran the features of its neighbour (-95, 25), whose {@code ore_dirt} then put a pocket of 79 dirt
+     * over a shale sample 20 blocks under a lukewarm ocean's floor. The cube is now read from the
+     * chunks as they stand ({@link #around}), so a sample reads what the other tests left, not what
+     * this one caused.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 4800)
     public static void realPlanetRockMatchesTheParityFixture(GameTestHelper helper) {
@@ -254,10 +275,9 @@ public final class RealPlanetGameTests {
         }
         RockPalette palette = RockPalette.get();
         int c = wd.circumference();
-        int[] n = new int[6];   // columns, checked, bodyChecks, surface-rule blocks, wrong, rock-blob blocks
-        List<String> detail = new ArrayList<>(), blobDetail = new ArrayList<>();
-        Set<String> blobs = ClaimOresBiomeModifier.deepTimeWorld(level.getServer()) ? Set.of()
-                : rockBlobBlocks(level, ClaimRules.dryRun(level.getServer()));
+        int[] n = new int[6];   // columns, checked, bodyChecks, surface-rule blocks, wrong, feature blocks
+        List<String> detail = new ArrayList<>(), featureDetail = new ArrayList<>();
+        Set<String> features = featureBlocks(level, ClaimRules.dryRun(level.getServer()));
         JsonArray fixture = doc.getAsJsonArray("columns");
         ChunkSampling.forEach(helper, fixture.size(), k -> {
             if (n[0] >= 48)
@@ -297,29 +317,32 @@ public final class RealPlanetGameTests {
                     n[3]++;   // a surface rule's block (sand, terracotta, …): not the strata pass's to paint
                     continue;
                 }
-                if (ok && !placed && blobs.contains(BuiltInRegistries.BLOCK.getKey(actual.getBlock()).toString())) {
-                    n[5]++;   // a rock blob the features step put over the strata pass's rock (see above)
-                    if (blobDetail.size() < 8)
-                        blobDetail.add("(" + x + ", " + y + ", " + z + ") " + cls + " expected " + expected + " placed "
+                if (ok && !placed && features.contains(BuiltInRegistries.BLOCK.getKey(actual.getBlock()).toString())) {
+                    n[5]++;   // a feature's block the features step put over the strata pass's rock (see above)
+                    if (featureDetail.size() < 8)
+                        featureDetail.add("(" + x + ", " + y + ", " + z + ") " + cls + " expected " + expected + " placed "
                                 + actual + " (" + around(level, new BlockPos(x, y, z), actual) + " of 343 around) in "
-                                + biomeAt(chunk, x, y, z));
+                                + biomeAt(chunk, x, y, z) + ", chunk " + chunk.getPersistedStatus() + ", surface " + surface);
                     continue;
                 }
                 if (!ok || !placed) {
                     n[4]++;
                     if (detail.size() < 8)
                         detail.add("(" + x + ", " + y + ", " + z + ") fixture " + cls + " java " + javaCls + " expected "
-                                + expected + " placed " + actual);
+                                + expected + " placed " + actual + " (" + around(level, new BlockPos(x, y, z), actual)
+                                + " of 343 around) in " + biomeAt(chunk, x, y, z) + ", chunk " + chunk.getPersistedStatus()
+                                + ", surface " + surface);
                 }
             }
             return true;
         }, () -> {
             DeepTime.LOGGER.info("[gametest] realPlanetRockMatchesTheParityFixture columns={} checked={} bodyChecks={} "
-                    + "surfaceRuleBlocks={} rockBlobBlocks={} {} wrong={} {}", n[0], n[1], n[2], n[3], n[5], blobDetail,
+                    + "surfaceRuleBlocks={} featureBlocks={} {} wrong={} {}", n[0], n[1], n[2], n[3], n[5], featureDetail,
                     n[4], detail);
             helper.assertTrue(n[0] >= 32 && n[1] >= 96, "only " + n[0] + " columns, " + n[1] + " samples");
-            // Blobs are rare (one sample in 124 when it happened): many would mean something else.
-            helper.assertTrue(n[5] * 20 <= n[1], n[5] + " of " + n[1] + " samples are rock blobs: " + blobDetail);
+            // Feature blocks are rare (one sample in 124 when a blob was first met, one in 150 on
+            // 2026-10-18): many would mean something else.
+            helper.assertTrue(n[5] * 20 <= n[1], n[5] + " of " + n[1] + " samples are feature blocks: " + featureDetail);
             helper.assertTrue(n[4] == 0, n[4] + " samples differ: " + detail);
             helper.succeed();
         });
