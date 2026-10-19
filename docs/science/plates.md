@@ -1707,3 +1707,18 @@ differed by at most 1.6e-5; and every layer value equalled the CPU's to 1e-4 of 
 largest. A world made with a GPU is not byte-identical to one made on the CPU (Ben, 2026-10-18:
 worlds are shared as finished folders); the whole-history comparison of a full 16k planet is in
 the design note, section 10.
+
+**On a whole planet (2026-10-19).** A temporary switch (not committed) ran both relinks from the
+same state on every one of the 50 samplings of a full 16k planet's 100 Myr history (lavapipe,
+67.2 million cells in all): 0.015 % of the links fell on another triangle and the weights agreed
+to about 8e-4 where the triangle did; a few cells per sampling sat on an edge that the CPU's f64
+test put outside and the device's f32 test inside. Every layer's signed difference was as often
+up as down (elevation 27.29 million cells up and 27.28 million down, mean -4e-5 m; the land count
+off by 2 cells in 19.6 million; continental crust 29 cells up and 24 down), so the relink does
+not lean the crust any way. The world still differs, because the climate's carbon cycle carries
+a last-bit difference forward (`docs/science/per-cell-climate.md`, "Down to L1 on a GPU"): on
+five planets the GPU's land share ended 0 to 0.013 above the CPU's (a mean of +0.006, higher in
+four, equal in one), where one f32 ulp on one weight moved the CPU's own land share on the first
+planet by up to 0.004 and, before the cadence change, by 0.024. The same-state comparison above
+finds no lean, so the four in five is chance or an effect too indirect to show in a single
+sampling; a larger paired ensemble would tell.
