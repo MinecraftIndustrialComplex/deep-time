@@ -27,7 +27,7 @@ final class DeepTimeNative {
 
     private DeepTimeNative() {}
 
-    /** {@code "<semver>+<git sha>;format=<f>;target=<rust triple>"}. */
+    /** {@code "<semver>+<git sha>;format=<f>;target=<rust triple>;cpu=<baseline|x86-64-v3>"}. */
     static native String version();
 
     /** The fixed-input Rayon reduction; must equal {@link NativeLoader#expectedSelfTest()}. */

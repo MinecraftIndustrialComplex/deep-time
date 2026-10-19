@@ -1,13 +1,19 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! Bakes the Rust target triple and the git commit into `version()` (plan §6.1):
-//! `<semver>+<git sha>;format=<f>;target=<rust triple>`. The sha is informational; the loader
-//! compares semver and format only (plan §6.5).
+//! `<semver>+<git sha>;format=<f>;target=<rust triple>;cpu=<level>`. The sha is informational;
+//! the loader compares semver and format only (plan §6.5). On macOS it also gives the dylib a
+//! relocatable install name instead of the build machine's path (the linker's default):
+//! System.load ignores it, but it keeps /home/runner/… out of the shipped library, and the CPU
+//! probe's dylib has its own (deeptime-cpuprobe's build.rs).
 
 use std::process::Command;
 
 fn main() {
     let target = std::env::var("TARGET").expect("TARGET");
     println!("cargo:rustc-env=DEEPTIME_TARGET={target}");
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+        println!("cargo:rustc-cdylib-link-arg=-Wl,-install_name,@rpath/libdeeptime_jni.dylib");
+    }
 
     println!("cargo:rerun-if-env-changed=DEEPTIME_GIT_SHA");
     let sha = std::env::var("DEEPTIME_GIT_SHA")

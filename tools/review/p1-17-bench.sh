@@ -18,6 +18,9 @@
 #   spec      <preset>:<start>:<length_myr>:<threads>[:<mem cap bytes>], e.g.
 #             earthlike_quick_16k:supercontinent:1000:8 (the cap defaults to bench's, 4 GiB)
 #
+# The gate's binaries are the shipped builds (decisions log 2026-10-18): tools/natives/gate-bins.sh
+# builds deeptime-baseline and deeptime-x86-64-v3 with the `ship` profile; report both.
+#
 # Each seq or scale run is one job of the VM's admission tool (sim:<preset>:<threads>t); each pair
 # is one job of twice the threads, so both start together. Start the script itself unadmitted
 # (`detach.sh start <name> --kind light ...`): inside an admitted job the runs would not queue. Each
