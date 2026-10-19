@@ -320,8 +320,6 @@ pub struct VolcanoState {
     /// Events written at the end, and by kind.
     pub events_emitted: u64,
     pub events_by_kind: BTreeMap<String, u64>,
-    /// L1 cells with the arc flag at the last step that had arc information.
-    pub last_flagged: u64,
     /// The ground under active continental arc cones, every 10 Myr (P1-27).
     #[serde(default)]
     pub arc_bases: Vec<ArcBase>,
@@ -854,9 +852,7 @@ impl VolcanoStage {
         // included. (Until 2026-10-19 a step with a fifth of the last one's arc cells or fewer
         // was taken for one, which on a coarse lattice also blinded real steps.) ledger: VOL-011
         let flux_valid = !resampled;
-        if flux_valid {
-            st.last_flagged = flagged;
-        } else {
+        if !flux_valid {
             st.counts.blind_steps += 1;
         }
         let w = grid.w as usize;
