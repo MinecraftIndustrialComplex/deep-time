@@ -265,6 +265,9 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
     out
 }
 
+/// One plate's release plan (`spread`): its budget, what is left of it and the receivers' shares.
+type Plan = (f64, f64, Vec<(usize, f64)>);
+
 /// Whether the collapse's settings let crust spread at all.
 fn spreads(k: &crate::params::TectonicParams) -> bool {
     !(k.collapse_myr.is_nan()
@@ -307,7 +310,7 @@ pub(super) fn spread(
     let samples = &state.samples;
     let groups = &state.groups;
     let ceiling = state.limits.as_ref().map(|l| l.ceiling_m.as_slice());
-    let plans: Vec<Option<(f64, f64, Vec<(usize, f64)>)>> = plates
+    let plans: Vec<Option<Plan>> = plates
         .par_iter()
         .map(|(p, sources)| {
             let p = *p;
