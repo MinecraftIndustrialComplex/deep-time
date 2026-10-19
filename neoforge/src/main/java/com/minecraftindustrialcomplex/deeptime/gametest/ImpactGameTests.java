@@ -38,19 +38,121 @@ public final class ImpactGameTests {
     private static final int[][] FLOOR_COLUMNS = {{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 
     /**
+     * The cosine of the latitude (about 59°) poleward of which the bake's projection pass widens its
+     * footprint along the parallels, up to eight times: a crater there is averaged into the ground
+     * round it by design, so none there is read. On the planet of master 7d60fc4a (2026-10-19) a
+     * fresh crater 3.9 km across with 8.4 blocks of relief in the list, 110 blocks from the north
+     * edge, showed none in the terrain, which sloped through it without a dip.
+     */
+    static final double POLAR_WIDEN_FROM_COS = 0.52;   // ledger: SCL-090 (game-choice)
+
+    /**
+     * The ground a crater was cut into, as the plane fitted (least squares) to the terrain on four
+     * rings of 32 points from 1.25 to 2 rim radii out, beyond the rim; {@code rms} is how far the
+     * terrain there strays from that plane, blocks. A crater on a mountainside is measured against
+     * the slope it sits on: on the planet of 2026-10-19 (master fb38204f) the deepest showing crater
+     * (668, 9 blocks of relief) lay on a flank rising 2.6 blocks a block, whose own gullies and
+     * curvature put the terrain 2.3 blocks off a plane, so its centre stood only 2.5 blocks under the
+     * mean of its rim (3.0 wanted); over the plane its bowl is 3.3 blocks.
+     *
+     * @param x0  the crater's centre, blocks
+     * @param z0  the crater's centre, blocks
+     * @param a   the plane's height at the centre
+     * @param bx  its slope along x, blocks a block
+     * @param bz  its slope along z, blocks a block
+     * @param rms the terrain's spread about the plane on the rings, blocks
+     */
+    record Ground(double x0, double z0, double a, double bx, double bz, double rms) {
+
+        /** Rings, in rim radii, and points on each. */
+        private static final double[] RINGS = {1.25, 1.5, 1.75, 2.0};
+        private static final int POINTS = 32;
+
+        static Ground around(WorldDataTerrain t, double x0, double z0, double rimRadius) {
+            int n = RINGS.length * POINTS;
+            double[] dx = new double[n], dz = new double[n], h = new double[n];
+            double sx = 0, sz = 0, sh = 0;
+            for (int r = 0, i = 0; r < RINGS.length; r++)
+                for (int k = 0; k < POINTS; k++, i++) {
+                    double a = 2 * Math.PI * (k + 0.5 * r) / POINTS;
+                    int x = (int) Math.round(x0 + RINGS[r] * rimRadius * Math.cos(a)), z = (int) Math.round(z0 + RINGS[r] * rimRadius * Math.sin(a));
+                    dx[i] = x - x0;
+                    dz[i] = z - z0;
+                    h[i] = t.height(x, z);
+                    sx += dx[i];
+                    sz += dz[i];
+                    sh += h[i];
+                }
+            double mx = sx / n, mz = sz / n, mh = sh / n;
+            double xx = 0, xz = 0, zz = 0, xh = 0, zh = 0;
+            for (int i = 0; i < n; i++) {
+                double u = dx[i] - mx, v = dz[i] - mz, w = h[i] - mh;
+                xx += u * u;
+                xz += u * v;
+                zz += v * v;
+                xh += u * w;
+                zh += v * w;
+            }
+            double det = xx * zz - xz * xz;
+            double bx = det == 0 ? 0 : (xh * zz - zh * xz) / det, bz = det == 0 ? 0 : (zh * xx - xh * xz) / det;
+            double a = mh - bx * mx - bz * mz, ss = 0;
+            for (int i = 0; i < n; i++) {
+                double e = h[i] - (a + bx * dx[i] + bz * dz[i]);
+                ss += e * e;
+            }
+            return new Ground(x0, z0, a, bx, bz, Math.sqrt(ss / n));
+        }
+
+        /** The terrain at column (x, z) over the plane, blocks. */
+        double over(WorldDataTerrain t, int x, int z) {
+            return t.height(x, z) - (a + bx * (x - x0) + bz * (z - z0));
+        }
+
+        /**
+         * Over the plane: the crater's floor (the mean of the columns within half its rim radius,
+         * so a complex crater's central peak does not stand for it), its rim (the mean of sixteen
+         * points on it) and the floor's column count.
+         */
+        double[] floorAndRim(WorldDataTerrain t, double rimRadius) {
+            double floor = 0, rim = 0;
+            int columns = 0;
+            int cx = (int) Math.round(x0), cz = (int) Math.round(z0), h = (int) Math.ceil(rimRadius / 2);
+            for (int x = cx - h; x <= cx + h; x++)
+                for (int z = cz - h; z <= cz + h; z++)
+                    if (Math.hypot(x - x0, z - z0) <= rimRadius / 2) {
+                        floor += over(t, x, z);
+                        columns++;
+                    }
+            for (int i = 0; i < 16; i++) {
+                double a = 2 * Math.PI * i / 16;
+                rim += over(t, (int) Math.round(x0 + rimRadius * Math.cos(a)), (int) Math.round(z0 + rimRadius * Math.sin(a))) / 16;
+            }
+            return new double[]{floor / Math.max(1, columns), rim, columns};
+        }
+    }
+
+    /**
      * The crater that shows best on the test planet is a bowl in the terrain the game reads, and
      * the rock under its floor is impact breccia:
      * <ul>
      *   <li>the list is sane: every crater has a size, a state the reader knows and no more relief
      *       than it formed with;</li>
-     *   <li>the terrain at its centre lies below the mean of sixteen points on its rim by at least
-     *       a third of the relief the simulation says it has left;</li>
+     *   <li>the one read is, of the craters with a bowl and a breccia lens of three blocks or more,
+     *       the one whose relief stands highest over the spread of the ground around it
+     *       (relief / (spread + 1 block), {@link Ground}; until 2026-10-19 the deepest, which can
+     *       sit on a gullied mountainside), taken among those on land when the planet has any, else
+     *       among those under the sea (on the planet of master 7d60fc4a, 2026-10-19, all 44 such
+     *       craters lay under the sea, most on shelves a few blocks deep, and until then the test
+     *       read nothing there);</li>
+     *   <li>over the plane of that ground, its floor (the mean of the columns within half its rim
+     *       radius) lies below the mean of sixteen points on its rim by at least a third of the
+     *       relief the simulation says it has left;</li>
      *   <li>within its breccia lens under the floor, placed blocks are the block the palette gives
      *       {@code impact_breccia} (a body of the bake for a crater too small for the strata log).</li>
      * </ul>
      * A planet whose craters have all faded, or whose showing craters are all in the strata log's
-     * cells or under water, passes with a line saying so: the shapes themselves are the core's
-     * tests' ({@code surface::amplify::impact}).
+     * cells, passes with a line saying so: the shapes themselves are the core's tests'
+     * ({@code surface::amplify::impact}).
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 1200)
     public static void aCraterIsABowlOverBreccia(GameTestHelper helper) {
@@ -76,27 +178,49 @@ public final class ImpactGameTests {
             }
         }
         long showing = all.stream().filter(Craters.Crater::shows).count();
-        // The best one to read: on land, clear of the poles, its bowl at least three blocks deep and
-        // its lens at least three blocks thick, drawn by the amplifier with a body under it.
-        Craters.Crater best = all.stream()
-                .filter(k -> k.shows() && !k.inSurface() && k.reliefM() >= 3 * mV && k.brecciaM() >= 3 * mV)
+        // The candidates: clear of the world's north and south edges and equatorward of the bake's
+        // polar smoothing (POLAR_WIDEN_FROM_COS), their bowl at least three blocks deep and their lens at
+        // least three blocks thick, drawn by the amplifier with a body under them; those on land when
+        // the planet has any, else those under the sea (the bowl is read in the ground under the water
+        // and the breccia under the sea floor). The one read is the one that shows best against the
+        // ground around it (see Ground).
+        List<Craters.Crater> drawn = all.stream().filter(k -> k.shows() && !k.inSurface()).toList();
+        List<Craters.Crater> deep = drawn.stream().filter(k -> k.reliefM() >= 3 * mV && k.brecciaM() >= 3 * mV).toList();
+        List<Craters.Crater> clear = deep.stream()
                 .filter(k -> Math.abs(k.z()) < wd.projection().zMax() - 64 - 3 * k.diameterM() / mH)
+                .filter(k -> Math.cos(Math.toRadians(wd.projection().latitudeDeg(k.x(), k.z()))) >= POLAR_WIDEN_FROM_COS)
+                .toList();
+        List<Craters.Crater> onLand = clear.stream()
                 .filter(k -> t.height((int) Math.round(k.x()), (int) Math.round(k.z())) > sea + 2)
-                .max(Comparator.comparingDouble(Craters.Crater::reliefM)).orElse(null);
+                .toList();
+        List<Craters.Crater> candidates = onLand.isEmpty() ? clear : onLand;
+        java.util.Map<Craters.Crater, Ground> grounds = new java.util.HashMap<>();
+        for (Craters.Crater k : candidates)
+            grounds.put(k, Ground.around(t, k.x(), k.z(), k.diameterM() / 2 / mH));
+        Craters.Crater best = candidates.stream()
+                .max(Comparator.comparingDouble((Craters.Crater k) -> k.reliefM() / mV / (grounds.get(k).rms() + 1))
+                        .thenComparingDouble(Craters.Crater::reliefM)).orElse(null);
         if (best == null) {
-            DeepTime.LOGGER.info("[gametest] aCraterIsABowlOverBreccia craters={} showing={}: none on land with a bowl of three "
-                    + "blocks and a body; nothing to read back", all.size(), showing);
+            DeepTime.LOGGER.info("[gametest] aCraterIsABowlOverBreccia craters={} showing={}: none with a bowl of three blocks and a "
+                    + "body; nothing to read back (drawn by the amplifier {}, of them with relief and breccia of three blocks {}, of them "
+                    + "clear of the poles 0)", all.size(), showing, drawn.size(), deep.size());
             helper.succeed();
             return;
         }
+        String where = onLand.isEmpty() ? "under the sea, no candidate being on land" : "on land";
         int cx = (int) Math.round(best.x()), cz = (int) Math.round(best.z());
         double rb = best.diameterM() / 2 / mH;
-        double centre = t.height(cx, cz), rim = 0;
-        for (int i = 0; i < 16; i++) {
-            double a = 2 * Math.PI * i / 16;
-            rim += t.height((int) Math.round(best.x() + rb * Math.cos(a)), (int) Math.round(best.z() + rb * Math.sin(a))) / 16;
-        }
-        double bowl = rim - centre, want = best.reliefM() / mV / 3;
+        Ground ground = grounds.get(best);
+        double[] fr = ground.floorAndRim(t, rb);
+        double floor = fr[0], rim = fr[1], centre = t.height(cx, cz), bowl = rim - floor, want = best.reliefM() / mV / 3;
+        int floorColumns = (int) fr[2];
+        StringBuilder others = new StringBuilder();
+        for (Craters.Crater k : candidates)
+            if (k != best) {
+                Ground o = grounds.get(k);
+                double[] f = o.floorAndRim(t, k.diameterM() / 2 / mH);
+                others.append(String.format(" %d (%.1f blocks of relief, ground spread %.1f, bowl %.1f)", k.id(), k.reliefM() / mV, o.rms(), f[1] - f[0]));
+            }
         var result = RockPalette.get().result("impact_breccia").orElse(null);
         if (result == null || result.blocks().isEmpty()) {
             helper.fail("the palette has no block for impact_breccia");
@@ -109,7 +233,6 @@ public final class ImpactGameTests {
         java.util.Map<String, Integer> seen = new java.util.TreeMap<>();
         StringBuilder profile = new StringBuilder();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        double rimF = rim;
         ChunkSampling.forEach(helper, FLOOR_COLUMNS.length, i -> {
             int x = cx + FLOOR_COLUMNS[i][0], z = cz + FLOOR_COLUMNS[i][1];
             ChunkAccess chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.SURFACE, true);
@@ -132,15 +255,18 @@ public final class ImpactGameTests {
                 columns += n > 0 ? 1 : 0;
                 blocks += n;
             }
-            DeepTime.LOGGER.info("[gametest] aCraterIsABowlOverBreccia craters={} showing={} read=crater {} ({} m across, {}, {} Myr, "
-                            + "{} m of {} m relief, lens {} m) at ({}, {}): centre y {} rim y {} bowl {} blocks (want {}); breccia {} "
-                            + "blocks in {} of {} columns, {} read each ({}); read {}; centre column {}", all.size(), showing, best.id(),
-                    Math.round(best.diameterM()), best.fate(), best.ageMyr(), Math.round(best.reliefM()), Math.round(best.depthM()),
-                    Math.round(best.brecciaM()), cx, cz, String.format("%.1f", centre), String.format("%.1f", rimF),
+            DeepTime.LOGGER.info("[gametest] aCraterIsABowlOverBreccia craters={} showing={} candidates={} ({}) read=crater {} ({} m across, {}, "
+                            + "{} Myr, {} m of {} m relief, lens {} m) at ({}, {}): centre y {}; ground around it y {} sloping {} blocks a block, "
+                            + "spread {}; over it the floor {} ({} columns) and the rim {}: bowl {} blocks (want {}); breccia {} blocks in {} of "
+                            + "{} columns, {} read each ({}); read {}; centre column {}; other candidates:{}", all.size(), showing,
+                    candidates.size(), where, best.id(), Math.round(best.diameterM()), best.fate(), best.ageMyr(), Math.round(best.reliefM()),
+                    Math.round(best.depthM()), Math.round(best.brecciaM()), cx, cz, String.format("%.1f", centre),
+                    String.format("%.1f", ground.a()), String.format("%.2f", Math.hypot(ground.bx(), ground.bz())),
+                    String.format("%.1f", ground.rms()), String.format("%.1f", floor), floorColumns, String.format("%.1f", rim),
                     String.format("%.1f", bowl), String.format("%.1f", want), blocks, columns, FLOOR_COLUMNS.length, read[0],
-                    result.blocks().stream().map(StrataGameTests::id).toList(), seen, profile);
+                    result.blocks().stream().map(StrataGameTests::id).toList(), seen, profile, others.isEmpty() ? " none" : others);
             if (bowl < want)
-                helper.fail("crater " + best.id() + ": its centre is " + bowl + " blocks below its rim, " + want + " wanted");
+                helper.fail("crater " + best.id() + ": its floor is " + bowl + " blocks below its rim over the ground around it, " + want + " wanted");
             if (columns == 0)
                 helper.fail("crater " + best.id() + ": no impact breccia in the " + lens + " blocks under its floor");
             helper.succeed();

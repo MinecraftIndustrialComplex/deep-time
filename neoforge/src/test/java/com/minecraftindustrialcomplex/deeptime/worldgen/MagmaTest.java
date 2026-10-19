@@ -253,6 +253,44 @@ class MagmaTest {
 
     // ---- the crust-deep column (Ben, decisions log 2026-10-02) ------------------------------------------------
 
+    private static Volcanoes.Volcano shield(int id, double x, double z) {
+        return new Volcanoes.Volcano(id, "shield", x, z, 45_000, 2_000, 0.9, true, false, 3_600, 120, false);   // the widest chamber
+    }
+
+    /**
+     * Two shields close enough (9 km) that one's deep column runs inside the other's shell (the test
+     * planet's shields 46 and 48, 2026-10-19): where any body is molten the world holds lava, so
+     * {@link Magma#at} says molten there whichever body comes first, and a part that no body calls
+     * molten is still the first body's.
+     */
+    @Test
+    void whereTwoBodiesOverlapEitherOnesLavaIsMolten() {
+        Magma.Heights a = cone(100, 50, 182, 70), c = cone(130, 50, 182, 70);
+        Magma m = Magma.build(List.of(shield(1, 100, 50), shield(2, 130, 50)), new MagmaRules(3.0, 1.0, 0.0, true),
+                (x, z) -> Math.max(a.at(x, z), c.at(x, z)), DRY, C, SEA, LAVA_FLOOR, MH, MV, C / 4);
+        assertEquals(2, m.bodies().size());
+        Magma.Body first = m.bodies().get(0), second = m.bodies().get(1);
+        long overlap = 0, shellOverLava = 0;
+        for (int x = 100; x <= 130; x++)          // between the two centres, where the boxes overlap
+            for (int z = 50 - 60; z <= 50 + 60; z++)
+                for (int y = LAVA_FLOOR - 10; y <= 190; y++) {
+                    Magma.Part p = first.at(m.dx(x, first), z - first.z(), y), q = second.at(m.dx(x, second), z - second.z(), y);
+                    if (p == Magma.Part.NONE || q == Magma.Part.NONE)
+                        continue;
+                    overlap++;
+                    Magma.Part at = m.at(x, y, z);
+                    if (p.molten() || q.molten()) {
+                        assertTrue(at.molten(), "(" + x + ", " + y + ", " + z + "): " + p + " / " + q + " read as " + at);
+                        if (!p.molten())
+                            shellOverLava++;
+                    } else {
+                        assertEquals(p, at, "neither molten: the first body's part");
+                    }
+                }
+        assertTrue(overlap > 0, "the two bodies overlap");
+        assertTrue(shellOverLava > 0, "somewhere the first body's shell holds the second's lava");
+    }
+
     private static final MagmaRules NO_COLUMN = new MagmaRules(3.0, 1.0, 0.0, true).withoutColumn();
     private static final MagmaRules COLUMN = new MagmaRules(3.0, 1.0, 0.0, true);
 
