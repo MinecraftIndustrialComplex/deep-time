@@ -139,48 +139,110 @@ pub fn settle_margin(
     stats
 }
 
+/// The kinds of event that start each kind of structure, as bits of `Cause::kinds`.
+const FOLDS: u8 = 1;
+const RIFTS: u8 = 2;
+const SHEARS: u8 = 4;
+
+/// The bits of `Cause::kinds` for an event kind (0: it starts no structure).
+fn cause_bits(kind: &str) -> u8 {
+    match kind {
+        "deeptime:collision" | "deeptime:orogeny_phase" | "deeptime:terrane_accretion" => FOLDS,
+        "deeptime:subduction_onset" => FOLDS | SHEARS,
+        "deeptime:rift_onset" => RIFTS,
+        _ => 0,
+    }
+}
+
+/// One event that can start a structure: a point event of a kind [`cause_of`] looks for, at its
+/// place on the block grid.
+#[derive(Clone, Copy, Debug)]
+struct Cause {
+    kinds: u8,
+    t_start: f64,
+    x: f64,
+    z: f64,
+    id: u64,
+}
+
+/// The world's events that can start a structure, in the order they were emitted, kept up as
+/// events come ([`Causes::update`]). The structure stage reads them from here, not from the
+/// world's event log, so that its step can run beside the next plate step, which adds events
+/// (P1-19), and so that a structure's cause is not a scan of every event and its kind.
+#[derive(Clone, Debug, Default)]
+pub struct Causes {
+    list: Vec<Cause>,
+    /// Events of the world's log already looked at.
+    seen: usize,
+    circumference: u32,
+}
+
+impl Causes {
+    /// Takes in the events of `events` not looked at yet. Events are only ever appended to the
+    /// world's log, and what is read here (kind, place, start, id) does not change once emitted;
+    /// a log shorter than the one looked at (another world) starts the list again.
+    pub fn update(&mut self, events: &[deeptime_format::Event], circumference: u32) {
+        if self.seen > events.len() || self.circumference != circumference {
+            *self = Causes {
+                circumference,
+                ..Causes::default()
+            };
+        }
+        let proj = deeptime_format::Projection::of(f64::from(circumference));
+        for e in &events[self.seen..] {
+            let kinds = cause_bits(e.kind.as_str());
+            if kinds == 0 {
+                continue;
+            }
+            let deeptime_format::Place::Point { lat, lon } = e.place else {
+                continue;
+            };
+            let (x, z) = proj.block_of(f64::from(lat), f64::from(lon));
+            self.list.push(Cause {
+                kinds,
+                t_start: e.t_start,
+                x,
+                z,
+                id: e.id.0,
+            });
+        }
+        self.seen = events.len();
+    }
+}
+
 /// The tectonic event behind a structure of `kind` started at block position (x, z) at
 /// `t_years`: the nearest event of the kinds that make such structures (a collision, an orogeny
 /// phase, a terrane's accretion or a subduction onset for folds and thrusts; a rift onset for
 /// normal faults; a subduction onset for strike-slip faults) that began in the 150 Myr before,
-/// within an eighth of the planet's circumference. 0 when there is none.
+/// within an eighth of the planet's circumference; of two as near, the one emitted first. 0 when
+/// there is none. `causes` holds the world's events ([`Causes::update`], for `circumference`).
 pub fn cause_of(
-    events: &[deeptime_format::Event],
+    causes: &Causes,
     kind: Kind,
     x: f64,
     z: f64,
     circumference: u32,
     t_years: f64,
 ) -> u64 {
-    let kinds: &[&str] = match kind {
-        Kind::FoldTrain | Kind::Thrust | Kind::Stock => &[
-            "deeptime:collision",
-            "deeptime:orogeny_phase",
-            "deeptime:terrane_accretion",
-            "deeptime:subduction_onset",
-        ],
-        Kind::Normal | Kind::Dyke => &["deeptime:rift_onset"],
-        Kind::StrikeSlip => &["deeptime:subduction_onset"],
+    let bits = match kind {
+        Kind::FoldTrain | Kind::Thrust | Kind::Stock => FOLDS,
+        Kind::Normal | Kind::Dyke => RIFTS,
+        Kind::StrikeSlip => SHEARS,
         // A plug's cause is its volcano's.
         Kind::Plug => return 0,
     };
     let c = f64::from(circumference);
     let mut best = (c / 8.0, 0u64);
-    for e in events {
+    for e in &causes.list {
         // ledger: DEF-036 (150 Myr, an eighth of the circumference)
-        if e.t_start > t_years || e.t_start < t_years - 150.0e6 || !kinds.contains(&e.kind.as_str())
-        {
+        if e.t_start > t_years || e.t_start < t_years - 150.0e6 || e.kinds & bits == 0 {
             continue;
         }
-        let deeptime_format::Place::Point { lat, lon } = e.place else {
-            continue;
-        };
-        let (ex, ez) = deeptime_format::Projection::of(c).block_of(f64::from(lat), f64::from(lon));
-        let mut dx = x - ex;
+        let mut dx = x - e.x;
         dx -= (dx / c + 0.5).floor() * c;
-        let d = dx.hypot(z - ez);
+        let d = dx.hypot(z - e.z);
         if d < best.0 {
-            best = (d, e.id.0);
+            best = (d, e.id);
         }
     }
     best.1

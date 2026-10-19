@@ -1098,6 +1098,15 @@ pub(crate) fn timings_line(
         .iter()
         .map(|t| format!("{}={:.1}s/{}steps", t.name, t.millis / 1000.0, t.steps))
         .collect();
+    // The stages that stepped beside their lead (P1-19): that time is inside the lead's.
+    let beside: Vec<String> = timings
+        .iter()
+        .filter(|t| t.beside_millis > 0.0)
+        .map(|t| format!("{}={:.1}s", t.name, t.beside_millis / 1000.0))
+        .collect();
+    if !beside.is_empty() {
+        parts.push(format!("beside[{}]", beside.join(",")));
+    }
     for stage in [
         deeptime_core::surface::STAGE_NAME,
         deeptime_core::climate::STAGE_NAME,
@@ -1840,7 +1849,12 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
         let mut stages: Vec<Value> = s
             .stage_timings()?
             .iter()
-            .map(|t| json!({ "name": t.name, "steps": t.steps, "millis": t.millis }))
+            .map(|t| {
+                json!({
+                    "name": t.name, "steps": t.steps, "millis": t.millis,
+                    "beside_millis": t.beside_millis,
+                })
+            })
             .collect();
         stages.push(json!({ "name": "finalize", "steps": 1, "millis": finalize_ms }));
         let world = s.checkpoint()?.world;

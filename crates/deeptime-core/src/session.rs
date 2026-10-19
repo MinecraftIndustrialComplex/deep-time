@@ -27,7 +27,7 @@ use deeptime_format::{
 use serde_json::{Value, json};
 
 use crate::checkpoint::{Checkpoint, CheckpointRef};
-use crate::deposits::recorded::Evicted;
+use crate::deposits::recorded::{Evicted, HistoryHandle};
 use crate::deposits::spill::SpillStore;
 use crate::error::CoreError;
 use crate::keyframes::{self, KeyframePolicy, KeyframeStore, RING_CAPACITY, ViewScale};
@@ -170,15 +170,21 @@ const SPILL_SECONDS_PER_BYTE: f64 = 3.0e-9;
 /// Each stage's estimated working set and recorded history, `(base, history)` (bytes): the world
 /// the stages before it built is counted in (it stays in memory under the stages after them), and
 /// a coupled group's stages, which step in turn over the same world, each hold the group's most.
+/// A follower that steps beside the lead's next step (P1-19, `Stage::steps_beside_lead`) holds
+/// its own working set on top of the lead's then.
 fn stage_sets(list: &[Box<dyn Stage>]) -> Result<Vec<(u64, u64)>, CoreError> {
     let (mut world, mut world_history) = (0u64, 0u64);
+    let mut own = Vec::with_capacity(list.len());
     let mut sets: Vec<(u64, u64)> = list
         .iter()
         .map(|s| {
             let e = s.estimate();
             let mut hist = e.history_bytes.min(e.bytes);
             let mut b = e.bytes - hist;
-            if OWN_ONLY_ESTIMATES.contains(&s.name()) {
+            let only = OWN_ONLY_ESTIMATES.contains(&s.name());
+            // Its own working set, without the world before it.
+            own.push(if only { b } else { b.saturating_sub(world) });
+            if only {
                 b += world;
                 hist = hist.max(world_history);
             }
@@ -188,9 +194,15 @@ fn stage_sets(list: &[Box<dyn Stage>]) -> Result<Vec<(u64, u64)>, CoreError> {
         })
         .collect();
     for g in stage_groups(list)? {
-        let most = sets[g.clone()]
+        let mut most = sets[g.clone()]
             .iter()
             .fold((0, 0), |a, &(b, h)| (a.0.max(b), a.1.max(h)));
+        let lead = sets[g.start].0;
+        for k in g.clone().skip(1) {
+            if list[k].steps_beside_lead() {
+                most.0 = most.0.max(lead + own[k]);
+            }
+        }
         sets[g].iter_mut().for_each(|x| *x = most);
     }
     Ok(sets)
@@ -364,6 +376,9 @@ pub struct StageTiming {
     pub name: String,
     pub steps: u64,
     pub millis: f64,
+    /// The part of the lead's `millis` this stage spent stepping beside it (P1-19,
+    /// `Stage::steps_beside_lead`): its own steps there, not counted in its `millis`.
+    pub beside_millis: f64,
 }
 
 struct Stepper {
@@ -396,6 +411,9 @@ struct Stepper {
     base: Vec<u64>,
     /// The epoch checkpoints this run writes (`set_epochs`; docs/design/playability-steering.md).
     epochs: Option<EpochWriter>,
+    /// A follower of the current group whose last step was put off, to run beside the lead's
+    /// next step (P1-19, `Stage::steps_beside_lead`); the world is as if it had not stepped yet.
+    pending: Option<usize>,
 }
 
 /// What a session with epochs on writes, and where it stands.
@@ -478,6 +496,9 @@ pub struct Session {
     needed_peak: [AtomicU64; 2],
     /// Set when the run resumed from an epoch checkpoint (or started over for want of one).
     resumed: Option<Resumed>,
+    /// Whether a group's followers that can step beside the lead's next step do (P1-19;
+    /// [`Session::set_overlap`]).
+    overlap: AtomicBool,
 }
 
 /// The share of the memory cap kept free after a step: the history is trimmed to
@@ -886,6 +907,7 @@ impl Session {
                 name: n.clone(),
                 steps: 0,
                 millis: 0.0,
+                beside_millis: 0.0,
             })
             .collect();
         let policy = preset.keyframe_policy();
@@ -941,6 +963,7 @@ impl Session {
                 base,
                 timings,
                 epochs: None,
+                pending: None,
             }),
             policy,
             view,
@@ -952,6 +975,7 @@ impl Session {
             spill_logged: AtomicBool::new(false),
             needed_peak: [AtomicU64::new(0), AtomicU64::new(0)],
             resumed: None,
+            overlap: AtomicBool::new(true),
         };
         session.log.push(
             Level::Info,
@@ -980,6 +1004,13 @@ impl Session {
         self.history_budget = bytes;
     }
 
+    /// Whether a coupled group's followers that can step beside the lead's next step
+    /// (`Stage::steps_beside_lead`, the structure stage) do (P1-19; on by default). Results do
+    /// not depend on it, only the time a run takes; tests compare the two.
+    pub fn set_overlap(&self, on: bool) {
+        self.overlap.store(on, Ordering::Release);
+    }
+
     /// The spill store: the disk the recorded history used (bytes and frames written).
     pub fn spill(&self) -> &SpillStore {
         &self.spill
@@ -999,8 +1030,19 @@ impl Session {
 
     /// Runs `f` on the world as it stands (between `advance` calls), without copying it.
     pub fn with_world<R>(&self, f: impl FnOnce(&WorldState) -> R) -> Result<R, CoreError> {
-        let s = self.lock_stepper()?;
+        let mut s = self.lock_stepper()?;
+        self.settle_now(&mut s)?;
         Ok(f(&s.world))
+    }
+
+    /// A step put off to run beside the lead's next one (P1-19) runs now, on the world: what
+    /// reads the world between `advance` calls reads it as the run left it.
+    fn settle_now(&self, s: &mut Stepper) -> Result<(), CoreError> {
+        if s.pending.is_none() {
+            return Ok(());
+        }
+        let until = Instant::now() + Duration::from_secs(1);
+        self.settle(s, until)
     }
 
     pub fn threads(&self) -> usize {
@@ -1097,9 +1139,13 @@ impl Session {
                 return Ok(AdvanceStatus::StageDone);
             }
             // One step of the lead, then one of every follower (a group of one: just the stage).
+            // A follower that can step beside the lead's next step (P1-19) is put off to it.
+            if s.pending.is_some() && s.stages[index].is_done() {
+                self.settle(s, until)?;
+            }
             let mut last = index;
             for k in group.clone() {
-                let stage = &mut s.stages[k];
+                let stage = &s.stages[k];
                 if stage.is_done() {
                     continue;
                 }
@@ -1107,60 +1153,18 @@ impl Session {
                     self.log
                         .push(Level::Info, format!("stage {} started", stage.name()));
                 }
-                // The history's frames give way to a stage's reservations (P1-17).
-                let history = s.world.history.as_ref().map(|h| {
-                    h.attach(&self.spill);
-                    h.handle()
-                });
-                let ctx = StageContext {
-                    pool: &self.pool,
-                    log: &self.log,
-                    out_dir: &self.out_dir,
-                    until,
-                    gauge: self.gauge.as_ref(),
-                    mem_cap: self.mem_cap,
-                    state: &self.state,
-                    history: history.as_ref(),
-                    needed_peak: Some(&self.needed_peak),
-                };
-                self.gauge.keep_below(s.allowed[k].min(self.mem_cap));
-                if let Some(h) = &history {
-                    // Room for the stage's estimated working set beside the history's frames,
-                    // and for what its last step held. The blocks the allocator keeps give way
-                    // by themselves as the step allocates (`MemoryGauge::kept`).
-                    let live = self.gauge.in_use().saturating_sub(self.gauge.kept());
-                    let resident = h.resident_bytes();
-                    let over = resident
-                        .saturating_sub(self.mem_cap.saturating_sub(s.base[k]))
-                        .max((live + s.working[k]).saturating_sub(self.mem_cap));
-                    if over > 0 {
-                        match h.evict(over) {
-                            Ok(e) => log_evicted(
-                                &self.log,
-                                &e,
-                                self.gauge.as_ref(),
-                                self.mem_cap,
-                                "the stage's working set",
-                            ),
-                            Err(e) => return Err(self.fail("spilling the recorded history", e)),
-                        }
-                    }
+                if k == index && s.pending.is_some() {
+                    self.step_beside(s, until)?;
+                } else if k != index
+                    && self.overlap.load(Ordering::Acquire)
+                    && stage.steps_beside_lead()
+                    && stage.steps_done() + 1 < stage.total_steps()
+                    && !s.stages[index].is_done()
+                {
+                    s.pending = Some(k);
+                } else {
+                    self.step_one(s, k, until)?;
                 }
-                let at_start = self.gauge.in_use();
-                let stepped = Instant::now();
-                self.gauge.phase(stage.name(), true);
-                let result = stage.step(&mut s.world, &ctx);
-                self.gauge.phase(stage.name(), false);
-                s.working[k] = s.working[k].max(self.gauge.phase_peak().saturating_sub(at_start));
-                if let Err(e) = result {
-                    let what = format!("stage {}", stage.name());
-                    return Err(self.fail(&what, e));
-                }
-                if let Err(e) = self.trim_history(&s.world) {
-                    return Err(self.fail("spilling the recorded history", e));
-                }
-                s.timings[k].steps = stage.steps_done();
-                s.timings[k].millis += stepped.elapsed().as_secs_f64() * 1000.0;
                 last = k;
             }
             let lead = &s.stages[index];
@@ -1168,6 +1172,10 @@ impl Session {
                 permille(lead.steps_done(), lead.total_steps()),
                 Ordering::Release,
             );
+            // What reads the world after the step reads it whole.
+            if s.pending.is_some() && (self.keyframe_due(s) || self.epoch_due(s)) {
+                self.settle(s, until)?;
+            }
             let stepped = Instant::now();
             self.gauge.phase("keyframes", true);
             let result = self.after_step(s);
@@ -1187,6 +1195,197 @@ impl Session {
                 return Ok(AdvanceStatus::Running);
             }
         }
+    }
+
+    /// The history's hold for a step's context, attached to the session's spill file.
+    fn history_handle(&self, world: &WorldState) -> Option<HistoryHandle> {
+        world.history.as_ref().map(|h| {
+            h.attach(&self.spill);
+            h.handle()
+        })
+    }
+
+    /// Before stage `k` steps: the allocator's bound, and room for the stage's estimated working
+    /// set beside the history's frames and for what its last step held. The blocks the allocator
+    /// keeps give way by themselves as the step allocates (`MemoryGauge::kept`).
+    fn make_room(
+        &self,
+        s: &Stepper,
+        k: usize,
+        history: Option<&HistoryHandle>,
+    ) -> Result<(), CoreError> {
+        self.gauge.keep_below(s.allowed[k].min(self.mem_cap));
+        let Some(h) = history else {
+            return Ok(());
+        };
+        let live = self.gauge.in_use().saturating_sub(self.gauge.kept());
+        let resident = h.resident_bytes();
+        let over = resident
+            .saturating_sub(self.mem_cap.saturating_sub(s.base[k]))
+            .max((live + s.working[k]).saturating_sub(self.mem_cap));
+        if over > 0 {
+            match h.evict(over) {
+                Ok(e) => log_evicted(
+                    &self.log,
+                    &e,
+                    self.gauge.as_ref(),
+                    self.mem_cap,
+                    "the stage's working set",
+                ),
+                Err(e) => return Err(self.fail("spilling the recorded history", e)),
+            }
+        }
+        Ok(())
+    }
+
+    fn context<'a>(
+        &'a self,
+        until: Instant,
+        history: Option<&'a HistoryHandle>,
+    ) -> StageContext<'a> {
+        StageContext {
+            pool: &self.pool,
+            log: &self.log,
+            out_dir: &self.out_dir,
+            until,
+            gauge: self.gauge.as_ref(),
+            mem_cap: self.mem_cap,
+            state: &self.state,
+            history,
+            needed_peak: Some(&self.needed_peak),
+        }
+    }
+
+    /// One step of stage `k` on the world.
+    fn step_one(&self, s: &mut Stepper, k: usize, until: Instant) -> Result<(), CoreError> {
+        // The history's frames give way to a stage's reservations (P1-17).
+        let history = self.history_handle(&s.world);
+        let ctx = self.context(until, history.as_ref());
+        self.make_room(s, k, history.as_ref())?;
+        let stage = &mut s.stages[k];
+        let at_start = self.gauge.in_use();
+        let stepped = Instant::now();
+        self.gauge.phase(stage.name(), true);
+        let result = stage.step(&mut s.world, &ctx);
+        self.gauge.phase(stage.name(), false);
+        s.working[k] = s.working[k].max(self.gauge.phase_peak().saturating_sub(at_start));
+        if let Err(e) = result {
+            let what = format!("stage {}", stage.name());
+            return Err(self.fail(&what, e));
+        }
+        if let Err(e) = self.trim_history(&s.world) {
+            return Err(self.fail("spilling the recorded history", e));
+        }
+        s.timings[k].steps = stage.steps_done();
+        s.timings[k].millis += stepped.elapsed().as_secs_f64() * 1000.0;
+        Ok(())
+    }
+
+    /// The pending follower's step, on the world (where the world is read before the lead's next
+    /// step).
+    fn settle(&self, s: &mut Stepper, until: Instant) -> Result<(), CoreError> {
+        match s.pending.take() {
+            Some(k) => self.step_one(s, k, until),
+            None => Ok(()),
+        }
+    }
+
+    /// The lead's next step, with the pending follower's step beside it in the session's pool
+    /// (P1-19): the follower takes what its step reads out of the world first
+    /// (`Stage::detach`), the two run in a `rayon::join`, and the follower puts it back. The
+    /// memory phase is the lead's: its window holds both working sets, as the estimate counts
+    /// them (`stage_sets`).
+    fn step_beside(&self, s: &mut Stepper, until: Instant) -> Result<(), CoreError> {
+        let lead = s.current;
+        let Some(f) = s.pending.take() else {
+            return self.step_one(s, lead, until);
+        };
+        debug_assert!(f > lead, "the follower comes after its lead");
+        // Detach and attach copy and pack grids in parallel: in the session's pool, like a step.
+        let detached = {
+            let (follower, world) = (&mut s.stages[f], &mut s.world);
+            self.pool.install(|| follower.detach(world))
+        };
+        match detached {
+            Ok(true) => {}
+            Ok(false) => {
+                self.step_one(s, f, until)?;
+                return self.step_one(s, lead, until);
+            }
+            Err(e) => {
+                let what = format!("stage {}", s.stages[f].name());
+                return Err(self.fail(&what, e));
+            }
+        }
+        let history = self.history_handle(&s.world);
+        let ctx = self.context(until, history.as_ref());
+        if let Err(e) = self.make_room(s, lead, history.as_ref()) {
+            // The world whole again; the step is not counted.
+            let (follower, world) = (&mut s.stages[f], &mut s.world);
+            let _ = self.pool.install(|| follower.attach(world));
+            return Err(e);
+        }
+        let at_start = self.gauge.in_use();
+        let stepped = Instant::now();
+        let (before, after) = s.stages.split_at_mut(f);
+        let (lead_stage, follower) = (&mut before[lead], &mut after[0]);
+        let world = &mut s.world;
+        self.gauge.phase(lead_stage.name(), true);
+        let (led, (beside, beside_ms)) = self.pool.install(|| {
+            rayon::join(
+                || lead_stage.step(world, &ctx),
+                || {
+                    let t = Instant::now();
+                    let r = follower.step_detached(&ctx);
+                    (r, t.elapsed().as_secs_f64() * 1000.0)
+                },
+            )
+        });
+        // A follower refused the memory beside the lead has changed nothing: it runs again now
+        // that the lead's working set is gone.
+        let (beside, again_ms) = match beside {
+            Err(CoreError::MemoryCap { .. }) if led.is_ok() => {
+                let t = Instant::now();
+                let r = self.pool.install(|| follower.step_detached(&ctx));
+                (r, t.elapsed().as_secs_f64() * 1000.0)
+            }
+            other => (other, 0.0),
+        };
+        let attached = self.pool.install(|| follower.attach(world));
+        self.gauge.phase(lead_stage.name(), false);
+        s.working[lead] = s.working[lead].max(self.gauge.phase_peak().saturating_sub(at_start));
+        for (k, r) in [(lead, led), (f, beside), (f, attached)] {
+            if let Err(e) = r {
+                let what = format!("stage {}", s.stages[k].name());
+                return Err(self.fail(&what, e));
+            }
+        }
+        if let Err(e) = self.trim_history(&s.world) {
+            return Err(self.fail("spilling the recorded history", e));
+        }
+        let millis = stepped.elapsed().as_secs_f64() * 1000.0;
+        s.timings[lead].steps = s.stages[lead].steps_done();
+        s.timings[lead].millis += millis - again_ms;
+        s.timings[f].steps = s.stages[f].steps_done();
+        s.timings[f].beside_millis += beside_ms;
+        s.timings[f].millis += again_ms;
+        Ok(())
+    }
+
+    /// Whether the session draws a keyframe after the step just taken ([`Session::after_step`]).
+    fn keyframe_due(&self, s: &Stepper) -> bool {
+        self.policy.every_years.is_some() && s.world.t_years >= s.next_kf
+    }
+
+    /// Whether an epoch checkpoint is due after the step just taken ([`Session::write_epoch`]).
+    fn epoch_due(&self, s: &Stepper) -> bool {
+        let Some(ep) = &s.epochs else {
+            return false;
+        };
+        s.group().start == 0
+            && s.stages
+                .first()
+                .is_some_and(|l| ep.plan.contains(&l.steps_done()))
     }
 
     /// After a step: the history's oldest frames go to disk while the gauge is over
@@ -1374,6 +1573,7 @@ impl Session {
 
     /// The current stage just finished: a closing keyframe, a checkpoint if asked for, next stage.
     fn finish_stage(&self, s: &mut Stepper) -> Result<(), CoreError> {
+        self.settle_now(s)?;
         let index = s.current;
         let group = s.group();
         let name = group_label(&s.stages, &group);
@@ -1545,7 +1745,8 @@ impl Session {
     /// The run as it stands, written to `path` (between `advance` calls; what
     /// [`Session::checkpoint`] returns, without copying the world).
     pub fn write_checkpoint(&self, path: &Path) -> Result<(), CoreError> {
-        let s = self.lock_stepper()?;
+        let mut s = self.lock_stepper()?;
+        self.settle_now(&mut s)?;
         self.write_checkpoint_of(&s, path)
     }
 
@@ -1578,7 +1779,8 @@ impl Session {
 
     /// The run as it stands, for `deeptime stage` (between `advance` calls).
     pub fn checkpoint(&self) -> Result<Checkpoint, CoreError> {
-        let s = self.lock_stepper()?;
+        let mut s = self.lock_stepper()?;
+        self.settle_now(&mut s)?;
         self.checkpoint_of(&s)
     }
 

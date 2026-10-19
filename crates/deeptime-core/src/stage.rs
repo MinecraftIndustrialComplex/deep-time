@@ -161,6 +161,46 @@ pub trait Stage: Send {
         None
     }
 
+    /// Whether this follower of a group can take a step beside the lead's next step (P1-19):
+    /// the session then puts the step off, and at the lead's next step takes it out of the world
+    /// ([`Stage::detach`]), runs it beside the lead's step in the session's pool
+    /// ([`Stage::step_detached`]) and puts it back ([`Stage::attach`]). The world after the two
+    /// is the world the step and then the lead's step on their own would leave. The session runs
+    /// the step on the world instead (`step`) where anything would read the world in between: a
+    /// keyframe, an epoch checkpoint, a checkpoint or `Session::with_world`. All three run in the
+    /// session's pool, as `step` does with `ctx.pool.install`.
+    fn steps_beside_lead(&self) -> bool {
+        false
+    }
+
+    /// Takes out of `world` what the next step reads and changes, for [`Stage::step_detached`],
+    /// called where `step` would be called next, before the lead's next step. Returns false,
+    /// leaving the world as it is, when that step must run on the world (`step`). What the step
+    /// reads and the lead's step does not touch, or writes anew, is moved out; what both read, or
+    /// the lead's step takes, is copied. The step must change nothing of the world the lead's
+    /// step reads.
+    fn detach(&mut self, _world: &mut WorldState) -> Result<bool, CoreError> {
+        Ok(false)
+    }
+
+    /// Runs the step [`Stage::detach`] took out of the world, beside the lead's step. A step that
+    /// fails with [`CoreError::MemoryCap`] has changed nothing: the session runs it again after
+    /// the lead's step, when the lead's working set is gone.
+    fn step_detached(&mut self, _ctx: &StageContext<'_>) -> Result<(), CoreError> {
+        Err(CoreError::InvalidState(format!(
+            "stage {} takes no step out of the world",
+            self.name()
+        )))
+    }
+
+    /// Puts back into `world`, after the lead's step, what [`Stage::detach`] took out, keeps what
+    /// the step made and counts the step. Called once for every detach that returned true, also
+    /// when a step failed (the world is whole again; the step is then not counted and this
+    /// returns an error).
+    fn attach(&mut self, _world: &mut WorldState) -> Result<(), CoreError> {
+        Ok(())
+    }
+
     /// The stage's private state (postcard bytes), for a checkpoint taken mid-stage.
     fn save_state(&self) -> Result<Vec<u8>, CoreError>;
 
