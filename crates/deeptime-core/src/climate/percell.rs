@@ -16,7 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::coarse::Grid;
+use super::coarse::{Grid, MaskedTaps};
 use super::ebm::{EbmState, smoothstep};
 use super::ebm2d::{self, EARTH_RADIUS_M, Params2d, Result2d, State2d, Surface};
 use super::moisture::{self, Moisture, MoistureParams};
@@ -79,6 +79,15 @@ pub struct Inputs<'a> {
     pub day_length_h: f64,
 }
 
+/// The coarse cells an L1 cell reads for its land and sea tiles and its sea ice, and their
+/// weights (found once for the year's twelve months).
+#[derive(Clone, Copy, Debug)]
+pub struct CellTaps {
+    land: MaskedTaps,
+    sea: MaskedTaps,
+    coarse: usize,
+}
+
 /// The coarse climate of a snapshot.
 pub struct Coarse {
     pub grid: Grid,
@@ -132,6 +141,43 @@ impl Coarse {
                 (self.tl[m][cc], self.to[m][cc])
             }
         }
+    }
+
+    /// The coarse cells L1 cell `c` reads in every month (P1-19, #14: found once for the year's
+    /// twelve reads of its tiles and sea ice).
+    pub fn taps(&self, c: usize) -> CellTaps {
+        CellTaps {
+            land: self.grid.masked_taps(&|cc| self.has_land(cc), c),
+            sea: self.grid.masked_taps(&|cc| self.has_sea(cc), c),
+            coarse: self.grid.coarse_of(c),
+        }
+    }
+
+    /// [`tiles`](Self::tiles) from the cell's taps: the same values.
+    pub fn tiles_at(&self, t: &CellTaps, m: usize) -> (f64, f64) {
+        match (t.land.at(&self.tl[m]), t.sea.at(&self.to[m])) {
+            (Some(l), Some(s)) => (l, s),
+            (Some(l), None) => (l, l),
+            (None, Some(s)) => (s, s),
+            (None, None) => (self.tl[m][t.coarse], self.to[m][t.coarse]),
+        }
+    }
+
+    /// The sea tile of [`tiles_at`](Self::tiles_at) alone (the land's is read only if the sea has
+    /// none around the cell).
+    pub fn sea_tile_at(&self, t: &CellTaps, m: usize) -> f64 {
+        if let Some(s) = t.sea.at(&self.to[m]) {
+            return s;
+        }
+        t.land.at(&self.tl[m]).unwrap_or(self.to[m][t.coarse])
+    }
+
+    /// [`ice_at`](Self::ice_at) from the cell's taps: the same values.
+    pub fn ice_at_taps(&self, t: &CellTaps, m: usize) -> f64 {
+        t.sea
+            .at(&self.ice[m])
+            .unwrap_or_else(|| self.ice[m][t.coarse])
+            .clamp(0.0, 1.0)
     }
 
     /// The sea ice of month `m` at L1 cell `c` (masked bilinear over the coarse cells with sea),
@@ -209,13 +255,38 @@ const YEAR_S: f64 = 365.25 * 86_400.0;
 
 /// Sharpens a cover by a logistic of slope `k` at one half, keeping 0 and 1 (k ≤ 1: unchanged).
 pub fn sharpen(x: f64, k: f64) -> f64 {
-    if k <= 1.0 {
-        return x.clamp(0.0, 1.0);
+    Sharpen::new(k).apply(x)
+}
+
+/// [`sharpen`] with the logistic's two end values found once (P1-19, #14: they were found again
+/// for every cell and month).
+#[derive(Clone, Copy, Debug)]
+pub struct Sharpen {
+    k: f64,
+    a: f64,
+    l0: f64,
+    l1: f64,
+}
+
+impl Sharpen {
+    pub fn new(k: f64) -> Sharpen {
+        let a = 4.0 * k;
+        let l = |v: f64| 1.0 / (1.0 + (-a * (v - 0.5)).exp());
+        Sharpen {
+            k,
+            a,
+            l0: l(0.0),
+            l1: l(1.0),
+        }
     }
-    let a = 4.0 * k;
-    let l = |v: f64| 1.0 / (1.0 + (-a * (v - 0.5)).exp());
-    let (l0, l1) = (l(0.0), l(1.0));
-    ((l(x.clamp(0.0, 1.0)) - l0) / (l1 - l0)).clamp(0.0, 1.0)
+
+    pub fn apply(&self, x: f64) -> f64 {
+        if self.k <= 1.0 {
+            return x.clamp(0.0, 1.0);
+        }
+        let l = |v: f64| 1.0 / (1.0 + (-self.a * (v - 0.5)).exp());
+        ((l(x.clamp(0.0, 1.0)) - self.l0) / (self.l1 - self.l0)).clamp(0.0, 1.0)
+    }
 }
 
 /// The surface of the coarse cells from L1.

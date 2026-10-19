@@ -38,10 +38,12 @@ use std::time::Instant;
 
 use deeptime_format::detail::{BAKE_NOTES, DetailSpec};
 use deeptime_format::fsutil::write_atomic;
+use deeptime_format::tilepack::{check_cells, stored_tile, write_tile_pack_tiles};
 use deeptime_format::{
-    Cell, Codec, DType, FileEntry, GridDesc, LayerDesc, LayerEntry, Manifest, Raster, Scale,
-    write_tile_pack,
+    Cell, Codec, DType, FileEntry, GridDesc, LayerDesc, LayerEntry, LoadedLayer, Manifest, Raster,
+    Scale, TilePackReader, Written,
 };
+use rayon::prelude::*;
 use serde_json::{Map, Value, json};
 
 use crate::error::CoreError;
@@ -77,7 +79,7 @@ impl Out<'_> {
     /// Writes a layer from its row-major cell bytes.
     pub fn layer_bytes(&mut self, desc: LayerDesc, bytes: &[u8]) -> Result<(), CoreError> {
         let rel = layer_path(&desc.name);
-        let w = write_tile_pack(&self.dir.join(&rel), &desc, bytes)?;
+        let w = write_layer(&self.dir.join(&rel), &desc, bytes)?;
         self.listed(&desc, rel, w.bytes, w.crc32);
         Ok(())
     }
@@ -116,6 +118,60 @@ impl Out<'_> {
         self.bytes += bytes.len() as u64;
         Ok(())
     }
+}
+
+/// Every tile of a layer as stored (`tilepack::stored_tile`), compressed in parallel (P1-19).
+pub(crate) fn stored_tiles(desc: &LayerDesc, cells: &[u8]) -> Result<Vec<Vec<u8>>, CoreError> {
+    desc.validate()?;
+    check_cells(desc, cells)?;
+    Ok((0..desc.tile_count())
+        .into_par_iter()
+        .map(|t| {
+            let mut tile = stored_tile(desc, cells, t);
+            // The compressor's buffer is sized for the worst case: only the stored bytes are kept.
+            tile.shrink_to_fit();
+            tile
+        })
+        .collect())
+}
+
+/// Writes a layer's tile pack (atomically, the file `write_tile_pack` writes) with its tiles
+/// compressed in parallel (P1-19).
+pub(crate) fn write_layer(
+    path: &Path,
+    desc: &LayerDesc,
+    cells: &[u8],
+) -> Result<Written, CoreError> {
+    let tiles = stored_tiles(desc, cells)?;
+    Ok(write_tile_pack_tiles(path, desc, &tiles)?)
+}
+
+/// Decodes a tile pack into one row-major raster (`TilePackReader::load`), a row of tiles per
+/// task (P1-19).
+pub(crate) fn load_layer(path: &Path) -> Result<LoadedLayer, CoreError> {
+    let r = TilePackReader::open(path)?;
+    let d = r.desc().clone();
+    let cb = d.cell_bytes();
+    let row_bytes = d.grid.w as usize * cb;
+    let per_row = d.tiles_x() as usize;
+    let mut all = vec![0u8; d.grid.cells() * cb];
+    if row_bytes > 0 {
+        all.par_chunks_mut(d.tile as usize * row_bytes)
+            .enumerate()
+            .try_for_each(|(tz, band)| -> Result<(), CoreError> {
+                for t in tz * per_row..(tz + 1) * per_row {
+                    let tile = r.read_tile(t)?;
+                    let (x0, _, tw, th) = d.tile_rect(t);
+                    let tile_row = tw as usize * cb;
+                    for (k, src) in tile.chunks_exact(tile_row).take(th as usize).enumerate() {
+                        let dst = k * row_bytes + x0 as usize * cb;
+                        band[dst..dst + tile_row].copy_from_slice(src);
+                    }
+                }
+                Ok(())
+            })?;
+    }
+    Ok(LoadedLayer::new(d, all)?)
 }
 
 /// Where a layer's tile pack lives: `strata/…` beside `strata/classes.json`, the rest under
