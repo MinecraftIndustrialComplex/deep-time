@@ -1,14 +1,17 @@
-# The eight natives and the OS load matrix (plan §4.5, §6.4, P0-08). Tags and manual dispatch
+# The natives and the OS load matrix (plan §4.5, §6.4, P0-08). Tags and manual dispatch
 # only: the organisation is on GitHub's free plan (2,000 private-repo minutes a month, macOS
 # minutes billed at about ten Linux minutes), so this never runs on ordinary pushes.
 #
-#   build   one Linux runner cross-compiles all eight libraries (tools/natives/build-natives.sh:
-#           cargo-zigbuild for Linux and macOS, cargo-xwin for Windows, readelf/PE/Mach-O checks),
-#           then packs the release jar (./gradlew jar -Prelease) and uploads both.
+#   build   one Linux runner cross-compiles the 16 files (tools/natives/build-natives.sh: the eight
+#           platforms' baseline libraries, the four x86-64 platforms' x86-64-v3 libraries and CPU
+#           probes, decisions log 2026-10-18; cargo-zigbuild for Linux and macOS, cargo-xwin for
+#           Windows, readelf/PE/Mach-O and CPU-level checks), then packs the release jar
+#           (./gradlew jar -Prelease) and uploads both.
 #   load    runs tools/natives/NativeSmoke.java against that jar on each real OS/arch, so every
-#           platform extracts and links its library from the jar exactly as the mod does. The
-#           musl rows run it in eclipse-temurin:21-jdk-alpine (JavaScript actions do not run in
-#           Alpine containers on arm64 runners, so the container runs only the test).
+#           platform extracts and links its library from the jar exactly as the mod does; the
+#           x86-64 rows run it a second time with the baseline build forced. The musl rows run
+#           it in eclipse-temurin:21-jdk-alpine (JavaScript actions do not run in Alpine
+#           containers on arm64 runners, so the container runs only the test).
 #
 # Run by hand: gh workflow run natives.yml -R MinecraftIndustrialComplex/deep-time [--ref <branch>]
 #              id=$(gh run list -R MinecraftIndustrialComplex/deep-time -w natives.yml -L 1 --json databaseId -q '.[0].databaseId')
@@ -33,7 +36,10 @@ env:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # 12 fat-LTO libraries now (8 release-profile ones took 25 min on 2026-09-28's smaller core).
+    # Each took 2.5 to 4 min on the 32-core test VM, about 43 min in all (2026-10-18), and the
+    # private-repo runner has 2 cores: about 100 min is the estimate (inferred, not run).
+    timeout-minutes: 180
     env:
       # cargo-xwin downloads the Microsoft CRT and Windows SDK here (licence: NOTICE.md).
       XWIN_CACHE_DIR: /home/runner/.cache/cargo-xwin
@@ -73,16 +79,16 @@ jobs:
         with:
           path: /home/runner/.cache/cargo-xwin
           key: xwin-0.23.1
-      - name: Build the eight natives
+      - name: Build the natives
         run: tools/natives/build-natives.sh
       - name: Summary
         run: |
           {
             echo '### natives-dist'
             echo '```'
-            (cd target/natives-dist && file -- */*)
+            (cd target/natives-dist && file -- */*/*)
             echo
-            jq -c '.libraries[] | {platform, size, glibc_floor, sha256: .sha256[0:12]}' target/natives-dist/natives.json
+            jq -c '(.libraries[], (.probes[] | .variant = "probe")) | {platform, variant, size, glibc_floor, sha256: .sha256[0:12]}' target/natives-dist/natives.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/setup-java@v4
@@ -96,14 +102,14 @@ jobs:
             ~/.gradle/wrapper
           key: natives-gradle-${{ hashFiles('neoforge/*.gradle', 'neoforge/gradle.properties') }}
           restore-keys: natives-gradle-
-      # -Prelease packs target/natives-dist (checkReleaseNatives verifies all eight first).
+      # -Prelease packs target/natives-dist (checkReleaseNatives verifies all 16 first).
       - name: Release jar
         working-directory: neoforge
         run: |
           ./gradlew checkVersions jar -Prelease --console=plain
           n=$(unzip -l build/libs/deeptime-*.jar | grep -c 'natives/deeptime/.*\.\(so\|dll\|dylib\)')
-          echo "release jar: $n libraries"
-          [ "$n" = 8 ]
+          echo "release jar: $n native files"
+          [ "$n" = 16 ]
       - uses: actions/upload-artifact@v4
         with:
           name: natives-dist
@@ -146,27 +152,42 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      # smoke <label> [variant]: one NativeSmoke run in its own game directory; a variant forces
+      # that build through DEEPTIME_NATIVES_VARIANT (decisions log 2026-10-18).
       - name: NativeSmoke
         shell: bash
         run: |
           version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version *= *"\(.*\)"/\1/p' Cargo.toml)
           jar=$(echo dist/deeptime-*.jar)
-          if [ "${{ matrix.alpine }}" = true ]; then
-            # libgcc_s is what a Rust musl cdylib usually needs on Alpine (rust-lang/rust#82521).
-            docker run --rm -v "$PWD:/w" -w /w eclipse-temurin:21-jdk-alpine \
-              sh -c "apk add --no-cache libgcc >/dev/null && java -cp $jar tools/natives/NativeSmoke.java /tmp/gd" \
-              > smoke.out 2> smoke.err || true
-          else
-            java -cp "$jar" tools/natives/NativeSmoke.java "$RUNNER_TEMP/gd" > smoke.out 2> smoke.err || true
-          fi
-          cat smoke.err
-          cat smoke.out
-          line=$(grep '^status=' smoke.out || echo 'status=MISSING')
-          echo "**${{ matrix.platform }}** (${{ matrix.runner }}): \`$line\`" >> "$GITHUB_STEP_SUMMARY"
-          case "$line" in
-            "status=OK version=$version "*) ;;
-            *) echo "::error::${{ matrix.platform }}: $line"; exit 1 ;;
+          smoke() {
+            export DEEPTIME_NATIVES_VARIANT="${2:-auto}"
+            if [ "${{ matrix.alpine }}" = true ]; then
+              # libgcc_s is what a Rust musl cdylib usually needs on Alpine (rust-lang/rust#82521).
+              docker run --rm -e DEEPTIME_NATIVES_VARIANT -v "$PWD:/w" -w /w eclipse-temurin:21-jdk-alpine \
+                sh -c "apk add --no-cache libgcc >/dev/null && java -cp $jar tools/natives/NativeSmoke.java /tmp/gd-$1" \
+                > smoke.out 2> smoke.err || true
+            else
+              java -cp "$jar" tools/natives/NativeSmoke.java "$RUNNER_TEMP/gd-$1" > smoke.out 2> smoke.err || true
+            fi
+            cat smoke.err
+            cat smoke.out
+            line=$(grep '^status=' smoke.out || echo 'status=MISSING')
+            echo "**${{ matrix.platform }}** (${{ matrix.runner }}, $1): \`$line\`" >> "$GITHUB_STEP_SUMMARY"
+            case "$line" in
+              "status=OK version=$version "*) ;;
+              *) echo "::error::${{ matrix.platform }} ($1): $line"; exit 1 ;;
+            esac
+            # The loader must have picked this row's library (e.g. musl on Alpine, not gnu).
+            grep -q "platform=${{ matrix.platform }} " smoke.err \
+              || { echo "::error::${{ matrix.platform }} ($1): the loader did not load this platform's library"; exit 1; }
+            if [ -n "$2" ]; then
+              case "$line" in
+                *" build=$2") ;;
+                *) echo "::error::${{ matrix.platform }} ($1): forcing $2 did not load it: $line"; exit 1 ;;
+              esac
+            fi
+          }
+          smoke auto
+          case "${{ matrix.platform }}" in
+            *x86_64*) smoke forced-baseline baseline ;;
           esac
-          # The loader must have picked this row's library (e.g. musl on Alpine, not gnu).
-          grep -q "platform=${{ matrix.platform }} " smoke.err \
-            || { echo "::error::${{ matrix.platform }}: the loader did not load this platform's library"; exit 1; }

@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.nativebridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.ByteBuffer;
@@ -101,24 +102,39 @@ class PlatformKeyTest {
     @Test
     void readsTheNativesJsonSchema() {
         String json = """
-                {"schema": 1, "version": "0.0.1", "format_version": "0.0", "git_sha": "ab12cd3",
-                 "libraries": [{"platform": "linux-x86_64-gnu", "file": "libdeeptime_jni.so",
+                {"schema": 2, "version": "0.0.1", "format_version": "0.0", "git_sha": "ab12cd3",
+                 "libraries": [{"platform": "linux-x86_64-gnu", "variant": "baseline", "file": "libdeeptime_jni.so",
                                 "rust_target": "x86_64-unknown-linux-gnu", "glibc_floor": "2.17",
                                 "sha256": "%s", "size": 42},
-                               {"platform": "windows-x86_64", "file": "deeptime_jni.dll",
+                               {"platform": "linux-x86_64-gnu", "variant": "x86-64-v3", "file": "libdeeptime_jni.so",
+                                "rust_target": "x86_64-unknown-linux-gnu", "glibc_floor": "2.17",
+                                "sha256": "%s", "size": 43},
+                               {"platform": "windows-x86_64", "variant": "baseline", "file": "deeptime_jni.dll",
                                 "rust_target": "x86_64-pc-windows-msvc", "glibc_floor": null,
-                                "sha256": "%s", "size": 7}]}
-                """.formatted("a".repeat(64), "B".repeat(64));
+                                "sha256": "%s", "size": 7}],
+                 "probes": [{"platform": "linux-x86_64-gnu", "file": "libdeeptime_cpuprobe.so",
+                             "rust_target": "x86_64-unknown-linux-gnu", "glibc_floor": "2.2.5",
+                             "sha256": "%s", "size": 5}]}
+                """.formatted("a".repeat(64), "c".repeat(64), "B".repeat(64), "d".repeat(64));
         NativesManifest m = NativesManifest.parse(json);
         assertEquals("0.0.1", m.version());
         assertEquals("0.0", m.formatVersion());
-        assertEquals(2, m.libraries().size());
-        NativesManifest.Library lib = m.library("linux-x86_64-gnu").orElseThrow();
-        assertEquals("linux-x86_64-gnu/libdeeptime_jni.so", lib.resource());
+        assertEquals(3, m.libraries().size());
+        NativesManifest.Library lib = m.library("linux-x86_64-gnu", NativesManifest.BASELINE).orElseThrow();
+        assertEquals("linux-x86_64-gnu/baseline/libdeeptime_jni.so", lib.resource());
         assertEquals("2.17", lib.glibcFloor());
         assertEquals(42, lib.size());
-        assertEquals("b".repeat(64), m.library("windows-x86_64").orElseThrow().sha256());
-        assertEquals(null, m.library("windows-x86_64").orElseThrow().glibcFloor());
+        NativesManifest.Library v3 = m.library("linux-x86_64-gnu", NativesManifest.X86_64_V3).orElseThrow();
+        assertTrue(v3.isV3());
+        assertEquals("linux-x86_64-gnu/x86-64-v3/libdeeptime_jni.so", v3.resource());
+        assertEquals("b".repeat(64), m.library("windows-x86_64", NativesManifest.BASELINE).orElseThrow().sha256());
+        assertEquals(null, m.library("windows-x86_64", NativesManifest.BASELINE).orElseThrow().glibcFloor());
+        assertTrue(m.library("windows-x86_64", NativesManifest.X86_64_V3).isEmpty());
+        assertEquals("linux-x86_64-gnu/probe/libdeeptime_cpuprobe.so",
+                m.probe("linux-x86_64-gnu").orElseThrow().resource());
+        assertTrue(m.probe("windows-x86_64").isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> NativesManifest.parse(json.replace("\"schema\": 2", "\"schema\": 1")));
+        assertThrows(IllegalArgumentException.class, () -> NativesManifest.parse(json.replace("x86-64-v3", "x86-64-v4")));
         assertEquals(Map.of("k", List.of(1L, 2.5, true)), MiniJson.parse("{\"k\": [1, 2.5, true]}"));
         assertEquals("a\"é\n", MiniJson.parse("\"a\\\"\\u00e9\\n\""));
     }
@@ -126,11 +142,12 @@ class PlatformKeyTest {
     @Test
     void versionStringParses() {
         NativeLoader.VersionInfo v = NativeLoader.VersionInfo
-                .parse("0.0.1+ab12cd3;format=0.0;target=x86_64-unknown-linux-gnu").orElseThrow();
+                .parse("0.0.1+ab12cd3;format=0.0;target=x86_64-unknown-linux-gnu;cpu=x86-64-v3").orElseThrow();
         assertEquals("0.0.1", v.semver());
         assertEquals("ab12cd3", v.gitSha());
         assertEquals("0.0", v.format());
         assertEquals("x86_64-unknown-linux-gnu", v.target());
+        assertEquals("x86-64-v3", v.cpu());
         assertTrue(NativeLoader.VersionInfo.parse("garbage").isEmpty());
         assertTrue(NativeLoader.isLibcError(new UnsatisfiedLinkError("version `GLIBC_2.34' not found")));
         assertTrue(NativeLoader.isLibcError(new UnsatisfiedLinkError("Error loading shared library ld-linux-x86-64.so.2")));
