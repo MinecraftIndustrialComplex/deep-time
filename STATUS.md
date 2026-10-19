@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Master 0729e267, test batch on 9091c163: Rust, Gradle and four GameTest sets green, `-PwithEe` fails `climateConsistent` (D 0.870 against 0.880) · In flight (agents): stage overlap for the 900 s full-16k gate (Ben, 2026-10-18), the plate accretion's crust loss, the surface stage's polar rows, ice cover on warm ground with the EE failure, the play world re-bake · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-10-18 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Master 902ac987, test batch on 3efc5ff8 plus the ice and EE census fix: Rust, Gradle and the MIC GameTests green; the rock parity fixture (standalone, EV, TerraBlender) and the EE far-terrain seam fail · In flight (agents): a profile of every system in the full 16k run (Ben, 2026-10-18; 1,290 s against the 900 s gate), the parity and seam fixes · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-10-18 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: dc49fe7 (pack master; the rock tags live on the pack's unmerged deep-time branch)
 
@@ -10645,38 +10645,40 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
   `[gametest] native version=… format=… target=… selftest=…`); then P0-08.
 
 ## Known issues and open questions
-Current as of 2026-10-18 (session f981c0d3-5144-49ec-8686-2946d755872c, master 9091c163); the list Ben was given so
+Current as of 2026-10-18 (session f981c0d3-5144-49ec-8686-2946d755872c, master 902ac987); the list Ben was given so
 he does not report known faults. Older notes are in the build log.
 
 **The planet**
-- Too little land: 18 to 20 % of the surface against Earth's 29 %. The new cap on plate steps (PLT-287, PLT-288) sends
-  crust it cannot place into the mantle: 6.1 to 8.5 km³/yr against Earth's about 0.7 (an agent is fixing the
-  accretion that stacks crust on one column).
-- The land there is runs high: 20 to 23 % of it above 2 km, about twice Earth's share.
+- Too little land: 17 to 19 % of the surface against Earth's 29 % (six runs: 0.191 at 500 Myr, 0.168 at 1000). The
+  crust fix (PLT-289 to PLT-292) cut the crust lost to the mantle from 5.5 to 2.1 km³/yr at 500 Myr and from 8.3 to
+  3.0 at 1000, still three to four times the 0.7 km³/yr of Earth's collision zones. Supercontinent seed 1 at 1000 Myr
+  ends with 0.526 continental crust but only 0.118 land (not traced).
+- The land there is runs high: about 21 % of it above 2 km, about twice Earth's share.
 - Plateaus wear down too fast: 75 to 107 m/Myr on the planets' flat high ground against under 10 in Tibet's interior.
-- The surface stage moves a few cells on L1's polar rows by tens of km in a few steps, up and down (one hole reached
-  59.7 km below the sea); an agent is tracing it.
-- Highest peaks in the game about 6 to 7 km, not 8 to 10 km (the plate model's 25 to 33 km spikes were not physical
-  and are gone: L1 peaks now 5.9 to 13.8 km).
-- Plate statistics off: 25 to 29 of 45 plate checks pass. The collision wedge is 0 km wide (target 100 to 350 km). The
-  subducting boundary is about five times Earth's length.
-- Climate runs warm: 15.7 to 17.3 °C and 900 to 2,200 ppm CO₂ (means over six runs). Why the present-day CO₂
+- The polar holes are fixed (ISO-056): the surface guard's worst cell over six 500 Myr runs fell from 30.8 to 15.5 km
+  from the sea, the largest from 59.6 to 18.1 km. That is still past Earth's relief, so the guard still acts.
+- Highest peaks in the game about 6 to 7 km, not 8 to 10 km (L1 peaks 4.9 to 7.7 km).
+- Plate statistics off: 29 of 45 plate checks pass. The collision wedge is 0 km wide in eleven of twelve runs (target
+  100 to 350 km; it comes with the step cap). The subducting boundary is about five times Earth's length. Continental
+  arcs stand lower since the crust fix (median 709 to 817 m; not traced).
+- Climate runs warm: 15.7 °C mean over six runs (13.2 to 19.3) and up to 2,200 ppm CO₂. Why the present-day CO₂
   adjustment varies so much between runs is not traced.
 - Seeds vary more than many changes under test. Tested only to 1000 Myr, starting from existing continents.
 - One preset gives one planet per platform: bit-identical across runs and thread counts on one machine, not across
   platforms (libm). Tests on simulated planets assert properties measured over several planets; exact numbers belong
   only to tests on baked data.
-- Speed: a full 16k planet takes 1,382 s on 8 cores against the 900 s gate. Ben chose to overlap the stages
-  (decisions log 2026-10-18); an agent is building it. The bake's memory estimate reads about 20 % low for the bake
-  step itself (the run total still covers it by about 6 %).
+- Speed: a full 16k planet takes 1,290 s on 8 cores against the 900 s gate, after the stage overlap Ben chose
+  (decisions log 2026-10-18). Ben asked for a profile of every system in the run before choosing the next step; an
+  agent is building that page. The bake's memory estimate reads about 20 % low for the bake step itself (the run total
+  still covers it by about 6 %).
 
 **Terrain look**
 - Some lake plains end in straight dams. Rivers and valleys bend in 8 directions only. The fine detail noise has a
   faint grid alignment.
 
 **In the game world**
-- Ice cover reaches past glaciers onto ground the climate does not freeze, and ground under an ice sheet keeps its own
-  climate class (Csa under ice at -11 °C); the biomes hide it, class-keyed checks see it. An agent is fixing both.
+- The ice cover now lies only where the climate freezes, and ground under an ice sheet is EF (fixed 2026-10-18). The 4k
+  test planet has had no ice since the crust fix, so the in-world ice checks only see a layer the tests build.
 - Lava only at active volcanoes and the world floor (on land a median 658 blocks to the nearest); MIC's early lava
   recipes are unchecked.
 - Distant Horizons far terrain with MIC shows the right surface block about 55 % of the time (85 to 96 % without MIC).
@@ -10692,12 +10694,12 @@ he does not report known faults. Older notes are in the build log.
 - An exposed gossan's leached cap holds no ore, by design (DEP-212); the ore lies under it.
 
 **Tests**
-- Master 3efc5ff8 (ice cover, crust bookkeeping, stage overlap): the MIC set passes 91 of 91. Failing, being fixed:
-  the Gradle unit test `IceCoverTest.aCoversEdgeLiesHalfWayToItsBareNeighbour` (it needs an ice edge the new test
-  planet lacks); `realPlanetRockMatchesTheParityFixture` in standalone, Excavated Variants and TerraBlender (one
-  sample: shale, stone expected, dirt placed); with Expanded Ecosphere, `climateConsistent` (C 0.628 against 0.630)
-  and `farTerrainMatchesGeneratedChunksAcrossTheSeam` (dead coral on the warm ocean floor where the far terrain shows
-  sand). All four appeared when the crust fix changed the 4k test planet.
+- Master 902ac987: the Gradle unit tests pass (354), and with Expanded Ecosphere `climateConsistent` passes again (C
+  0.927; EE tags its subtropical forests hot but places them in vanilla's temperate band, BIO-160). Still failing,
+  being fixed: `realPlanetRockMatchesTheParityFixture` in standalone, Excavated Variants and TerraBlender (one sample:
+  shale, stone expected, dirt placed) and, with Expanded Ecosphere, `farTerrainMatchesGeneratedChunksAcrossTheSeam`
+  (dead coral on the warm ocean floor where the far terrain shows sand). Both appeared when the crust fix changed the
+  4k test planet. The MIC set passed 91 of 91 on 3efc5ff8.
 - The cloud forest check counts nothing on the 4k test planet (5 columns qualify), so it guards only on a planet with
   more humid tropical highland.
 - "Probe column agrees with the world data" failed once at (8184, 164) and was not reproduced.
@@ -10705,7 +10707,7 @@ he does not report known faults. Older notes are in the build log.
 **The play server**
 - Re-baked 2026-10-18 on master 0729e267 (`/data/ban/play/0729e267`, run 1a150a58769, supercontinent seed 1,
   1000 Myr, with the MIC rock tags); it has the climate-class fix, the divergence fix and the plate cap, not yet the
-  ice and crust fixes in flight.
+  polar, ice and crust fixes.
 
 ### 2026-10-02 — Crust-deep magma system; no arches in underwater sea cliffs (agent worktree agent-ae5dd76f2542ab9e7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; taken over from a stopped agent; not merged)
 - **Ask.** Ben, decisions log 2026-10-02, "Crust-deep magma system (Recommended)" ("the amount of lava inside of them is
