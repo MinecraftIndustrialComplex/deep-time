@@ -42,14 +42,33 @@ public final class VolcanicBiomeGameTests {
      * hot-spring pool, nor more than {@link VolcanicCensus#OUTSIDE} blocks outside the zones the volcanoes
      * give them; the biomes that take the kept-out biomes' places are land biomes (no ocean, river or cave
      * biome at the surface of land); and the placed biomes are areas, not specks (at most
-     * {@link #MAX_SPECK_SHARE} of their surface cells stand alone). On every profile; without volcanic
-     * biomes (vanilla) the counts are all 0 and it passes with a line saying so.
+     * {@link #MAX_SPECK_SHARE} of their surface cells stand alone). The test planet always has active
+     * volcanoes (arcs on its subduction margins) and hot-spring pools (its preset's heat-flow fields), so
+     * where the level places volcanic biomes it must place some for the test to read: none fails (Ben's
+     * rule, decisions log 2026-10-01). A profile without volcanic biomes (vanilla) has nothing of the
+     * kind to place; it passes with a line saying so, and {@link #volcanicBiomesChangeNothingWithoutThem}
+     * checks that profile.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void volcanicBiomesOnlyAtVolcanoes(GameTestHelper helper) {
         ServerLevel level = RealPlanetGameTests.level(helper);
         VolcanicCensus.Result r = census(helper, level);
         DeepTime.LOGGER.info("[gametest] volcanicBiomesOnlyAtVolcanoes {}", r.json());
+        boolean places = placesVolcanicBiomes(level);
+        int activeVolcanoes = r.json().get("active_volcanoes").getAsInt();
+        DeepTime.LOGGER.info("[gametest] volcanicBiomesOnlyAtVolcanoes filters: activeVolcanoes={} pools={} zonesByRole={} "
+                        + "landColumns={} volcanicColumns={} volcanicCells={} levelPlacesThem={}", activeVolcanoes, r.pools(),
+                zoneCounts(r), r.now().columns, r.now().volcanic, r.now().volcanicCells, places);
+        helper.assertTrue(activeVolcanoes > 0 && r.pools() > 0, "the test planet has " + activeVolcanoes + " active volcanoes and "
+                + r.pools() + " hot-spring pools: it should always have both (arcs on its subduction margins, heat-flow fields)");
+        if (!places) {
+            DeepTime.LOGGER.info("[gametest] volcanicBiomesOnlyAtVolcanoes: this profile has no volcanic biome to place "
+                    + "(volcanicBiomesChangeNothingWithoutThem checks it)");
+            helper.succeed();
+            return;
+        }
+        helper.assertTrue(r.now().volcanic > 0 && r.now().volcanicCells > 0, "the level places volcanic biomes but none of the "
+                + r.now().columns + " land columns sampled is in one (zones " + zoneCounts(r) + ")");
         helper.assertTrue(r.now().far == 0, r.now().far + " of " + r.now().volcanic + " volcanic-biome columns lie more than "
                 + VolcanicCensus.FAR + " blocks from every active volcano and hot-spring pool:" + r.now().examples);
         helper.assertTrue(r.now().outside == 0, r.now().outside + " of " + r.now().volcanic + " volcanic-biome columns lie more than "
@@ -63,8 +82,9 @@ public final class VolcanicBiomeGameTests {
 
     /**
      * Every hot-spring pool's centre lies in the hot-spring field's biome when the pack has one
-     * ({@code #deeptime:volcanic/hot_spring_field}: Terralith's yellowstone, Biomes O' Plenty's hot springs). A
-     * planet without pools, or a pack without such a biome, passes with a line saying so.
+     * ({@code #deeptime:volcanic/hot_spring_field}: Terralith's yellowstone, Biomes O' Plenty's hot springs). The
+     * test planet always has pools (its preset's heat-flow fields), so a planet without any fails; a pack without
+     * such a biome has nothing to check and passes with a line saying so.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void hotSpringPoolsSitInTheirBiome(GameTestHelper helper) {
@@ -73,9 +93,10 @@ public final class VolcanicBiomeGameTests {
         String role = r.roles().get(VolcanicZones.Role.HOT_SPRING_FIELD.id);
         DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome pools={} inRole={} (plain search: {}) role={} roles={}", r.pools(),
                 r.now().poolsInRole, r.plain().poolsInRole, role, r.roles());
-        if ("-".equals(role) || r.pools() == 0) {
-            DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome: {}; nothing to check",
-                    r.pools() == 0 ? "this planet has no hot-spring pool" : "the pack has no hot-spring biome");
+        helper.assertTrue(r.pools() > 0, "the test planet has no hot-spring pool: its preset's heat-flow fields should always "
+                + "place some");
+        if ("-".equals(role)) {
+            DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome: the pack has no hot-spring biome; nothing to check");
             helper.succeed();
             return;
         }
@@ -113,5 +134,17 @@ public final class VolcanicBiomeGameTests {
         helper.assertTrue(r.differ() == 0, r.differ() + " of " + r.now().columns + " columns changed biome without volcanic biomes");
         helper.assertTrue(r.now().columns > 100, "only " + r.now().columns + " land columns sampled");
         helper.succeed();
+    }
+
+    /** Whether the level places volcanic biomes (the pack has some and the level's layer is on). */
+    private static boolean placesVolcanicBiomes(ServerLevel level) {
+        return level.getChunkSource().randomState().sampler().spawnTarget() instanceof RegionSpawnTarget m && m.volcanic().active();
+    }
+
+    /** The census's zones as role=count, for the logs. */
+    private static String zoneCounts(VolcanicCensus.Result r) {
+        StringBuilder b = new StringBuilder("{");
+        r.zones().forEach((role, n) -> b.append(b.length() > 1 ? ", " : "").append(role).append('=').append(n[0]));
+        return b.append('}').toString();
     }
 }
