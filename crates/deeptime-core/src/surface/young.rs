@@ -356,10 +356,11 @@ impl YoungStage {
         );
         let h: Vec<f64> = z2.iter().map(|&z| f64::from(z)).collect();
         let mut kind = vec![LAND; n2];
-        pflood::open_sea(&d, &h, sea, (n2 / 500).max(1), &mut kind);
+        let fm = self.sp.numerics.flood;
+        pflood::open_sea_with(fm, &d, &h, sea, (n2 / 500).max(1), &mut kind);
         let base = vec![sea; n2];
         let mut filled = vec![0.0; n2];
-        pflood::flood(&d, &h, &base, &mut kind, &mut filled);
+        pflood::flood_with(fm, &d, &h, &base, &mut kind, &mut filled);
         let mut small = 0usize;
         for c in 0..n2 {
             let depth = filled[c] - h[c];
@@ -527,8 +528,8 @@ impl YoungStage {
                      filled: &mut Vec<f64>,
                      rt: &mut routing::Routing,
                      area: &mut Vec<f64>| {
-            pflood::open_sea(&d, h, sea, (n / 500).max(1), kind);
-            pflood::flood(&d, h, &base_z, kind, filled);
+            pflood::open_sea_with(sp.numerics.flood, &d, h, sea, (n / 500).max(1), kind);
+            pflood::flood_with(sp.numerics.flood, &d, h, &base_z, kind, filled);
             routing::receivers(&d, filled, kind, rt);
             routing::stack(&d, kind, rt);
             routing::accumulate(&d, rt, &wt, area);
@@ -633,7 +634,8 @@ impl YoungStage {
                 )
             })
             .collect();
-        diffusion::step(&d, &mut h, &kd, dt);
+        let nm = &sp.numerics;
+        diffusion::solve(&d, &mut h, &kd, dt, nm.diffusion_solver, nm.diffusion_tol_m);
         if !avail0.is_empty() {
             let sea_mask: Vec<bool> = kind.iter().map(|&k| k == BASE).collect();
             let mut avail: Vec<f64> = (0..n)
@@ -643,6 +645,7 @@ impl YoungStage {
                 critical_slope: sp.submarine_slope_deg.to_radians().tan(),
                 rate: marine::FAILURE_RATE,
                 iterations: marine::FAILURE_ITERATIONS,
+                tol: sp.numerics.failure_tol,
             };
             marine::slope_failure(&d, &sea_mask, sea, &fp, &mut h, &mut avail);
         }

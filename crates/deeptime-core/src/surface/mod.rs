@@ -911,6 +911,7 @@ impl SurfaceStage {
             critical_slope: p.submarine_slope_deg.to_radians().tan(),
             rate: marine::FAILURE_RATE,
             iterations: marine::FAILURE_ITERATIONS,
+            tol: p.numerics.failure_tol,
         });
         let h_step0 = crate::alloc::copied(&sc.h);
         let avail0: Vec<f64> = (0..n)
@@ -920,9 +921,11 @@ impl SurfaceStage {
         let mut failed_m_cells = 0.0f64;
         for sub in 0..subs {
             let started = Instant::now();
-            pflood::open_sea(&d, &sc.h, sea, (n / 500).max(1), &mut sc.kind);
+            let fm = p.numerics.flood;
+            pflood::open_sea_with(fm, &d, &sc.h, sea, (n / 500).max(1), &mut sc.kind);
             sc.base_z.iter_mut().for_each(|b| *b = sea);
-            sinks += pflood::flood(&d, &sc.h, &sc.base_z, &mut sc.kind, &mut sc.filled) as u64;
+            sinks +=
+                pflood::flood_with(fm, &d, &sc.h, &sc.base_z, &mut sc.kind, &mut sc.filled) as u64;
             self.time("pflood", started);
             let started = Instant::now();
             routing::receivers(&d, &sc.filled, &sc.kind, &mut sc.routing);
@@ -1217,7 +1220,15 @@ impl SurfaceStage {
             }
             let before = crate::alloc::copied(&sc.h);
             let solve = Instant::now();
-            cg_iterations += diffusion::step(&d, &mut sc.h, &sc.kd, dts) as u64;
+            let nm = &p.numerics;
+            cg_iterations += diffusion::solve(
+                &d,
+                &mut sc.h,
+                &sc.kd,
+                dts,
+                nm.diffusion_solver,
+                nm.diffusion_tol_m,
+            ) as u64;
             // The solve's own share of "diffusion" (P1-17's breakdown).
             self.time("diffusion_solve", solve);
             let failing = Instant::now();
