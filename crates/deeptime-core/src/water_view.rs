@@ -59,6 +59,7 @@ use std::time::Instant;
 
 use deeptime_format::rivers::{Rivers, read_rivers};
 use deeptime_format::{GridDesc, Ramp, Ramps};
+use rayon::prelude::*;
 
 use crate::bake::water::{halve, load_i16};
 use crate::error::CoreError;
@@ -248,29 +249,35 @@ fn climate_at<'w>(
 /// The share of the cells under each pixel of a `(w, h)` map picture that `wet` marks, for a
 /// raster on `grid` (the mean over the cells a pixel covers when the grid is finer, the nearest
 /// cell when it is not; pixel ↔ cell by `GridDesc::picture_cell`).
-fn lake_cover(grid: &GridDesc, wet: &dyn Fn(usize) -> bool, (w, h): (usize, usize)) -> Vec<f32> {
+fn lake_cover(
+    grid: &GridDesc,
+    wet: &(dyn Fn(usize) -> bool + Sync),
+    (w, h): (usize, usize),
+) -> Vec<f32> {
     let (gw, gh) = (grid.w as usize, grid.h as usize);
     // The picture spans the planet's extent, the grid may reach a little past it.
     let rows = grid.projection().extent().1 / f64::from(grid.r);
     let (rx, ry) = ((gw / w).max(1), ((rows / h as f64) as usize).max(1));
     let norm = 1.0 / (rx * ry) as f32;
     let mut out = vec![0.0f32; w * h];
-    for py in 0..h {
-        for px in 0..w {
-            let (ci, cj) = grid.picture_cell(px as f64, py as f64, w as u32, h as u32);
-            let j0 = cj - (ry / 2) as i64;
-            let i0 = ci - (rx / 2) as i64;
-            let mut n = 0u32;
-            for dj in 0..ry as i64 {
-                let j = (j0 + dj).clamp(0, gh as i64 - 1) as usize;
-                for di in 0..rx as i64 {
-                    let i = (i0 + di).rem_euclid(gw as i64) as usize;
-                    n += u32::from(wet(j * gw + i));
+    out.par_chunks_mut(w.max(1))
+        .enumerate()
+        .for_each(|(py, row)| {
+            for (px, o) in row.iter_mut().enumerate() {
+                let (ci, cj) = grid.picture_cell(px as f64, py as f64, w as u32, h as u32);
+                let j0 = cj - (ry / 2) as i64;
+                let i0 = ci - (rx / 2) as i64;
+                let mut n = 0u32;
+                for dj in 0..ry as i64 {
+                    let j = (j0 + dj).clamp(0, gh as i64 - 1) as usize;
+                    for di in 0..rx as i64 {
+                        let i = (i0 + di).rem_euclid(gw as i64) as usize;
+                        n += u32::from(wet(j * gw + i));
+                    }
                 }
+                *o = n as f32 * norm;
             }
-            out[py * w + px] = n as f32 * norm;
-        }
-    }
+        });
     out
 }
 
@@ -287,6 +294,7 @@ impl WaterView {
         let look = Look::default();
         let ice = match world.fields.get(satellite::input::ICE) {
             Some(f) if f.data.len() == f.grid.cells() && !f.data.is_empty() => (0..w * h)
+                .into_par_iter()
                 .map(|k| {
                     let m = satellite::nearest(f, k % w, k / w, w, h);
                     if m.is_finite() {
@@ -439,52 +447,51 @@ impl WaterView {
             .ramps
             .get(RAMP)
             .unwrap_or_else(|| ramps.for_layer(LAYER).1);
-        let blend = |px: &mut [u8; 4], rgb: [u8; 3], a: f32| {
+        let blend = |px: &mut [u8], rgb: [u8; 3], a: f32| {
             for (p, &c) in px.iter_mut().zip(&rgb) {
                 *p = (f32::from(*p) * (1.0 - a) + f32::from(c) * a)
                     .round()
                     .clamp(0.0, 255.0) as u8;
             }
         };
-        for (k, px) in rgba
-            .as_chunks_mut::<4>()
-            .0
-            .iter_mut()
+        // Each pixel is its own.
+        let n = (rgba.len() / 4).min(self.w * self.h);
+        rgba[..n * 4]
+            .par_chunks_exact_mut(4)
             .enumerate()
-            .take(self.w * self.h)
-        {
-            if px[3] == 0 {
-                continue;
-            }
-            let shown = 1.0 - self.ice[k];
-            if self.river[k] > 0.0 && shown > 0.0 {
-                let q = self.q[k];
-                let grow = ((q / 2.0).max(1.0).log10() / look.alpha_decades).clamp(0.0, 1.0);
-                let a = self.river[k]
-                    * (look.alpha_min + (look.alpha_max - look.alpha_min) * grow)
-                    * shown;
-                blend(px, Self::river_rgb(ramp, q), a);
-            }
-            if shown > 0.0 {
-                if self.playa[k] > 0.0 {
-                    blend(
-                        px,
-                        PLAYA_SATELLITE,
-                        self.playa[k] * look.playa_alpha * shown,
-                    );
+            .for_each(|(k, px)| {
+                if px[3] == 0 {
+                    return;
                 }
-                if self.lake[k] > 0.0 {
-                    blend(px, LAKE, self.lake[k] * look.lake_alpha * shown);
+                let shown = 1.0 - self.ice[k];
+                if self.river[k] > 0.0 && shown > 0.0 {
+                    let q = self.q[k];
+                    let grow = ((q / 2.0).max(1.0).log10() / look.alpha_decades).clamp(0.0, 1.0);
+                    let a = self.river[k]
+                        * (look.alpha_min + (look.alpha_max - look.alpha_min) * grow)
+                        * shown;
+                    blend(px, Self::river_rgb(ramp, q), a);
                 }
-                if self.frozen[k] > 0.0 {
-                    blend(
-                        px,
-                        FROZEN_SATELLITE,
-                        self.frozen[k] * look.lake_alpha * shown,
-                    );
+                if shown > 0.0 {
+                    if self.playa[k] > 0.0 {
+                        blend(
+                            px,
+                            PLAYA_SATELLITE,
+                            self.playa[k] * look.playa_alpha * shown,
+                        );
+                    }
+                    if self.lake[k] > 0.0 {
+                        blend(px, LAKE, self.lake[k] * look.lake_alpha * shown);
+                    }
+                    if self.frozen[k] > 0.0 {
+                        blend(
+                            px,
+                            FROZEN_SATELLITE,
+                            self.frozen[k] * look.lake_alpha * shown,
+                        );
+                    }
                 }
-            }
-        }
+            });
     }
 
     /// The `rivers` layer: land (a soft hill shade), sea, the lakes and the rivers, hard-edged.
@@ -505,11 +512,11 @@ impl WaterView {
             view.radius_m,
             &satellite::Look::default(),
         );
-        let mut rgba = Vec::with_capacity(self.w * self.h * 4);
-        for (k, (&z, &shade)) in self.z.iter().zip(&shade).enumerate() {
+        // Each pixel is its own.
+        let mut rgba = vec![0u8; self.z.len().min(shade.len()) * 4];
+        let pixel = |k: usize, z: f32, shade: f32| -> [u8; 4] {
             if !z.is_finite() {
-                rgba.extend_from_slice(&[0, 0, 0, 0]);
-                continue;
+                return [0, 0, 0, 0];
             }
             let rgb = if self.lake[k] + self.frozen[k] >= 0.5 {
                 if self.frozen[k] > self.lake[k] {
@@ -527,8 +534,11 @@ impl WaterView {
                 let f = (1.0 + look.relief * (shade - 1.0)).clamp(0.6, 1.2);
                 LAND.map(|v| (f32::from(v) * f).round().clamp(0.0, 255.0) as u8)
             };
-            rgba.extend_from_slice(&[rgb[0], rgb[1], rgb[2], 255]);
-        }
+            [rgb[0], rgb[1], rgb[2], 255]
+        };
+        rgba.par_chunks_exact_mut(4)
+            .enumerate()
+            .for_each(|(k, p)| p.copy_from_slice(&pixel(k, self.z[k], shade[k])));
         Some(rgba)
     }
 }

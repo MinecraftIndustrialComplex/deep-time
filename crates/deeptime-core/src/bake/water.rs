@@ -28,7 +28,8 @@
 use std::path::Path;
 
 use deeptime_format::rivers::{RIVERS_PATH, write_rivers};
-use deeptime_format::{DType, FileEntry, GridDesc, LoadedLayer, RasterRead, TilePackReader};
+use deeptime_format::{DType, FileEntry, GridDesc, LoadedLayer, RasterRead};
+use rayon::prelude::*;
 use serde_json::{Value, json};
 
 use super::{Out, desc};
@@ -109,9 +110,9 @@ pub struct Water {
     pub output: Option<network::Output>,
 }
 
-/// Loads an i16 layer whole.
+/// Loads an i16 layer whole (in parallel, P1-19).
 pub(crate) fn load_i16(path: &Path) -> Result<(GridDesc, Vec<i16>), CoreError> {
-    let l = TilePackReader::open(path)?.load()?;
+    let l = crate::bake::load_layer(path)?;
     if l.desc.dtype != DType::I16 {
         return Err(CoreError::InvalidState(format!(
             "{}: expected an i16 layer",
@@ -122,7 +123,7 @@ pub(crate) fn load_i16(path: &Path) -> Result<(GridDesc, Vec<i16>), CoreError> {
         .bytes
         .as_chunks::<2>()
         .0
-        .iter()
+        .par_iter()
         .map(|b| i16::from_le_bytes(*b))
         .collect();
     Ok((l.desc.grid, v))
@@ -133,14 +134,17 @@ pub(crate) fn halve(g: &GridDesc, v: &[i16]) -> (GridDesc, Vec<i16>) {
     let (w, h) = (g.w as usize, g.h as usize);
     let (w2, h2) = (w / 2, h / 2);
     let mut out = vec![0i16; w2 * h2];
-    for j in 0..h2 {
-        for i in 0..w2 {
-            let s: i32 = [(0, 0), (1, 0), (0, 1), (1, 1)]
-                .iter()
-                .map(|&(di, dj)| i32::from(v[(2 * j + dj) * w + 2 * i + di]))
-                .sum();
-            out[j * w2 + i] = s.div_euclid(4) as i16;
-        }
+    // A row in parallel (P1-19; whole numbers, so the same in any order).
+    if w2 > 0 {
+        out.par_chunks_mut(w2).enumerate().for_each(|(j, row)| {
+            for (i, o) in row.iter_mut().enumerate() {
+                let s: i32 = [(0, 0), (1, 0), (0, 1), (1, 1)]
+                    .iter()
+                    .map(|&(di, dj)| i32::from(v[(2 * j + dj) * w + 2 * i + di]))
+                    .sum();
+                *o = s.div_euclid(4) as i16;
+            }
+        });
     }
     let grid = GridDesc {
         name: format!("{}h", g.name),
@@ -206,7 +210,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
     // The L1 climate is small: whole in memory, so the parallel sampling shares no cache lock.
     let layer = |name: &str| -> Result<Option<LoadedLayer>, CoreError> {
         match out.m.layer(name) {
-            Some(l) => Ok(Some(TilePackReader::open(&out.dir.join(&l.path))?.load()?)),
+            Some(l) => Ok(Some(crate::bake::load_layer(&out.dir.join(&l.path))?)),
             None => Ok(None),
         }
     };

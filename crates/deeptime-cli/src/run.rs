@@ -1114,6 +1114,7 @@ pub(crate) fn timings_line(
         deeptime_core::surface::volcanoes::STAGE_NAME,
         deeptime_core::surface::impacts::STAGE_NAME,
         deeptime_core::surface::young::STAGE_NAME,
+        deeptime_core::deposits::STAGE_NAME,
     ] {
         if let Some(note) = world
             .notes

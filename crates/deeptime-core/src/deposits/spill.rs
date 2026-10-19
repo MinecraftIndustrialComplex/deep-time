@@ -4,7 +4,9 @@
 //!
 //! A frame record is its fields' LZ4 blobs back to back, in the frame's field order; what the
 //! blobs are (name, range, bits, length) stays in memory ([`super::recorded`]'s `FrameHead`), so a
-//! reader can fetch one field (the crust-origin offsets) without the rest. Two kinds of file hold
+//! reader can fetch one field (the crust-origin offsets) without the rest. Fields added to a frame
+//! after it was spilled follow as a record of their own (P1-19), and the frame's head says which
+//! record holds each field; a checkpoint still gets each frame as one record in field order. Two kinds of file hold
 //! records:
 //!
 //! - a **spill file**, one per session, in the run's folder (`SessionOptions::out_dir`: the
@@ -49,11 +51,12 @@ impl std::fmt::Debug for FrameFile {
 static SPILL_SEQ: AtomicU64 = AtomicU64::new(0);
 
 impl FrameFile {
-    /// A new anonymous spill file in `dir` (created if missing).
-    pub fn spill_in(dir: &Path) -> Result<FrameFile, CoreError> {
+    /// A new anonymous spill file in `dir` (created if missing), named after `stem` while it has
+    /// a name.
+    pub fn spill_in(dir: &Path, stem: &str) -> Result<FrameFile, CoreError> {
         std::fs::create_dir_all(dir).map_err(|e| CoreError::io(dir, e))?;
         let path = dir.join(format!(
-            "history-{}-{}.spill",
+            "{stem}-{}-{}.spill",
             std::process::id(),
             SPILL_SEQ.fetch_add(1, Ordering::Relaxed)
         ));
@@ -174,7 +177,7 @@ impl SpillStore {
         if let Some(f) = f.as_ref() {
             return Ok((f.clone(), false));
         }
-        let made = Arc::new(FrameFile::spill_in(&self.dir)?);
+        let made = Arc::new(FrameFile::spill_in(&self.dir, "history")?);
         *f = Some(made.clone());
         Ok((made, true))
     }
@@ -182,6 +185,11 @@ impl SpillStore {
     pub(crate) fn wrote(&self, bytes: u64) {
         self.written.fetch_add(bytes, Ordering::Relaxed);
         self.frames.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Fields added to a frame already on disk were written (a record of their own, not a frame).
+    pub(crate) fn wrote_fields(&self, bytes: u64) {
+        self.written.fetch_add(bytes, Ordering::Relaxed);
     }
 
     /// Bytes written to the spill file so far: the disk the session uses for its history.

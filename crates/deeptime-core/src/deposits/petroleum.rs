@@ -114,6 +114,87 @@ pub struct Kitchen {
     pub toc_mean: f64,
     /// The cell nearest its area-weighted centre.
     pub centre: u32,
+    /// Where its cells lie, for [`charge`]'s cuts.
+    pub reach: Reach,
+}
+
+/// Where a kitchen's cells lie (rows and columns of the grid), for [`charge`]'s exact cuts
+/// (P1-19): a trap whose nearest possible kitchen cell is out of range skips the kitchen, and the
+/// distances are taken only to cells in the rows within range.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Reach {
+    /// The first and the last row of its cells.
+    rows: (u32, u32),
+    /// The shortest run of columns, across the seam if need be, that holds every cell: its first
+    /// column and how many columns past that the last one lies.
+    cols: (u32, u32),
+}
+
+impl Reach {
+    /// The reach of `cells` (ascending, at least one).
+    pub fn of(grid: &GridDesc, cells: &[u32]) -> Reach {
+        let w = grid.w;
+        let mut cols: Vec<u32> = cells.iter().map(|c| c % w).collect();
+        cols.sort_unstable();
+        cols.dedup();
+        let (first, last) = (cols[0], cols[cols.len() - 1]);
+        // The widest gap between neighbouring columns (the one across the seam too): the run is
+        // the rest of the circle.
+        let (mut start, mut gap) = (first, first + w - last);
+        for p in cols.windows(2) {
+            if p[1] - p[0] > gap {
+                (start, gap) = (p[1], p[1] - p[0]);
+            }
+        }
+        Reach {
+            rows: (cells[0] / w, cells[cells.len() - 1] / w),
+            cols: (start, w - gap),
+        }
+    }
+
+    /// No fewer blocks than [`distance`] gives from cell (`i`, `j`) to any of the kitchen's cells.
+    /// Exact as a bound: the coordinates are whole blocks, so both are computed without rounding
+    /// up to the square root, which keeps the order.
+    fn least_blocks(&self, grid: &GridDesc, i: u32, j: u32) -> f64 {
+        let w = grid.w;
+        let off = (i + w - self.cols.0) % w;
+        let di = if off <= self.cols.1 {
+            0
+        } else {
+            (off - self.cols.1).min(w - off)
+        };
+        let dj = self
+            .rows
+            .0
+            .saturating_sub(j)
+            .max(j.saturating_sub(self.rows.1));
+        let r = f64::from(grid.r);
+        let (dx, dz) = (f64::from(di) * r, f64::from(dj) * r);
+        (dx * dx + dz * dz).sqrt()
+    }
+}
+
+/// The most rows apart a trap and a kitchen cell within `max_km` can be: a cell `dj` rows off is
+/// at least `dj · r` blocks away (all of the grid's rows when the range spans them).
+fn row_band(grid: &GridDesc, m_per_block_h: f64, max_km: f64) -> u32 {
+    let km = |dj: u32| f64::from(dj) * f64::from(grid.r) * m_per_block_h / 1000.0;
+    if max_km.is_nan() || km(grid.h) <= max_km {
+        return grid.h;
+    }
+    if km(0) > max_km {
+        return 0;
+    }
+    // km(lo) <= max_km < km(hi).
+    let (mut lo, mut hi) = (0, grid.h);
+    while hi - lo > 1 {
+        let mid = lo + (hi - lo) / 2;
+        if km(mid) <= max_km {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    lo
 }
 
 /// The kitchens of a run, largest first among equals in scan order, and how many connected
@@ -189,6 +270,7 @@ fn mature_regions(
                     s(**a).total_cmp(&s(**b))
                 })
                 .expect("a tract has cells");
+            let reach = Reach::of(grid, cells);
             Kitchen {
                 tract,
                 t_onset,
@@ -196,6 +278,7 @@ fn mature_regions(
                 tti_max,
                 toc_mean,
                 centre,
+                reach,
             }
         })
         .collect()
@@ -210,6 +293,11 @@ pub struct Charge {
 }
 
 /// Whether trap cell `cell` (formed at `t_trap`) was charged by a kitchen within range.
+///
+/// The migration distance is the least [`distance`] to the kitchen's cells. Two cuts leave the
+/// answer as it was (P1-19): a kitchen whose [`Reach`] is out of range is skipped, and only cells
+/// in the rows within range are measured (one further away is out of range, so the least distance
+/// is among the measured ones whenever the kitchen is in range).
 pub fn charge(
     grid: &GridDesc,
     kitchens: &[Kitchen],
@@ -218,21 +306,32 @@ pub fn charge(
     r: &PetroleumRules,
     m_per_block_h: f64,
 ) -> Option<Charge> {
+    if t_trap.is_nan() {
+        return None;
+    }
     let c = grid.circumference() as f64;
     let here = cell_xz(grid, cell);
+    let (i, j) = (cell % grid.w, cell / grid.w);
+    let km_of = |blocks: f64| blocks * m_per_block_h / 1000.0;
+    let band = row_band(grid, m_per_block_h, r.migration_km);
+    let rows = (j.saturating_sub(band), j.saturating_add(band));
     let mut best: Option<Charge> = None;
     for (k, kit) in kitchens.iter().enumerate() {
-        if t_trap.is_nan() || t_trap > kit.t_last_gen {
+        if t_trap > kit.t_last_gen || km_of(kit.reach.least_blocks(grid, i, j)) > r.migration_km {
             continue;
         }
-        let km = kit
-            .tract
-            .cells
-            .iter()
-            .map(|o| distance(c, here, cell_xz(grid, *o)))
-            .fold(f64::INFINITY, f64::min)
-            * m_per_block_h
-            / 1000.0;
+        let cells = &kit.tract.cells;
+        let from = cells.partition_point(|&o| o / grid.w < rows.0);
+        let to = cells.partition_point(|&o| o / grid.w <= rows.1);
+        if from == to {
+            continue;
+        }
+        let km = km_of(
+            cells[from..to]
+                .iter()
+                .map(|o| distance(c, here, cell_xz(grid, *o)))
+                .fold(f64::INFINITY, f64::min),
+        );
         if km > r.migration_km {
             continue;
         }
@@ -269,6 +368,106 @@ mod tests {
             min_source: 1.0,
             min_kitchen_km2: 0.0,
         }
+    }
+
+    /// [`charge`] before its cuts: every kitchen, every cell.
+    fn charge_by_scan(
+        grid: &GridDesc,
+        kitchens: &[Kitchen],
+        cell: u32,
+        t_trap: f64,
+        r: &PetroleumRules,
+        m_per_block_h: f64,
+    ) -> Option<Charge> {
+        let c = grid.circumference() as f64;
+        let here = cell_xz(grid, cell);
+        let mut best: Option<Charge> = None;
+        for (k, kit) in kitchens.iter().enumerate() {
+            if t_trap.is_nan() || t_trap > kit.t_last_gen {
+                continue;
+            }
+            let km = kit
+                .tract
+                .cells
+                .iter()
+                .map(|o| distance(c, here, cell_xz(grid, *o)))
+                .fold(f64::INFINITY, f64::min)
+                * m_per_block_h
+                / 1000.0;
+            if km > r.migration_km {
+                continue;
+            }
+            if best.is_none_or(|b| km < b.migration_km) {
+                best = Some(Charge {
+                    kitchen: k,
+                    t_charge: t_trap.max(kit.t_onset),
+                    migration_km: km,
+                });
+            }
+        }
+        best
+    }
+
+    /// The reach and row cuts change no charge: random kitchens (some across the seam, some
+    /// ragged) against every cell of the grid, at ranges from under a cell to the whole planet.
+    #[test]
+    fn the_cuts_leave_every_charge_as_the_scan_finds_it() {
+        let grid = GridDesc::for_planet("L1", 1024, 8).unwrap(); // 128 x 64
+        let (w, h) = (grid.w, grid.h);
+        let mut seed = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = move |m: u32| {
+            seed = seed
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            ((seed >> 33) % u64::from(m)) as u32
+        };
+        let mut kitchens = Vec::new();
+        for k in 0..12 {
+            // A blob of cells around a centre, the seam wrapped; kitchen 0 straddles it.
+            let (ci, cj) = if k == 0 {
+                (w - 1, h / 2)
+            } else {
+                (next(w), next(h))
+            };
+            let mut cells: Vec<u32> = (0..1 + next(40))
+                .map(|_| {
+                    let i = (ci + w + next(9) - 4) % w;
+                    let j = (cj + next(7)).saturating_sub(3).min(h - 1);
+                    j * w + i
+                })
+                .collect();
+            cells.sort_unstable();
+            cells.dedup();
+            let reach = Reach::of(&grid, &cells);
+            kitchens.push(Kitchen {
+                tract: Tract {
+                    cells,
+                    area_km2: 1.0,
+                    mean_f: 1.0,
+                },
+                t_onset: -f64::from(next(100)) * 1.0e6,
+                t_last_gen: -f64::from(next(50)) * 1.0e6,
+                tti_max: 1.0,
+                toc_mean: 1.0,
+                centre: 0,
+                reach,
+            });
+        }
+        let mut charged = 0;
+        for (mph, km) in [(300.0, 2.0), (300.0, 60.0), (2441.0, 60.0), (1000.0, 1.0e9)] {
+            let r = PetroleumRules {
+                migration_km: km,
+                ..rules()
+            };
+            for cell in 0..grid.cells() as u32 {
+                let t_trap = -f64::from(next(120)) * 1.0e6;
+                let a = charge(&grid, &kitchens, cell, t_trap, &r, mph);
+                let b = charge_by_scan(&grid, &kitchens, cell, t_trap, &r, mph);
+                assert_eq!(a, b, "cell {cell} at {mph} m/block, {km} km");
+                charged += usize::from(a.is_some());
+            }
+        }
+        assert!(charged > 1000, "the test charges traps ({charged})");
     }
 
     #[test]
