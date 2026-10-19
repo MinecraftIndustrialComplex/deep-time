@@ -17,6 +17,14 @@
 //! `elevation` (block y), `plates` (a colour index of the plate id), `crust_age` (Myr, −1 on
 //! continental crust) and `regime`, and the outputs P1-04 and later stages read: `plates/*`
 //! (P1-07 added the rock pools, `plates/pool/*`, interpolated, for the basement columns).
+//!
+//! On a GPU (`docs/design/gpu-compute.md` §12): when the session's compute mode gives a device
+//! ([`crate::compute::ambient_device`]), the relink of the cells the nearest visible sample's
+//! group covers runs there ([`gpu`]); the CPU below links every other cell (boundary strips,
+//! gaps, anything the device could not settle) exactly as without one, and writes the layers.
+
+use std::sync::Arc;
+use std::time::Instant;
 
 use glam::{DQuat, DVec3};
 use rayon::prelude::*;
@@ -33,6 +41,19 @@ use crate::sphere::kdtree::angle_of_chord2;
 /// Colours in the `plates` ramp; the layer holds plate id · 7 mod this.
 pub const PLATE_COLOURS: u32 = 20;
 
+#[cfg(feature = "gpu")]
+mod gpu;
+
+/// What the relink runs on besides the CPU: a wgpu device with the `gpu` feature, nothing
+/// without it.
+#[cfg(feature = "gpu")]
+type Device = deeptime_gpu::Gpu;
+#[cfg(not(feature = "gpu"))]
+type Device = std::convert::Infallible;
+
+/// The name the device path logs under and the compute gauge's prefix.
+const KERNEL: &str = "plates:write_l1";
+
 const COVERED: u8 = 0;
 const NEAREST: u8 = 1;
 const GAP: u8 = 2;
@@ -45,7 +66,8 @@ struct Info {
     j2: u32,
 }
 
-/// Samples the crust onto the coupling's grid; returns `(layer name, values)` pairs.
+/// Samples the crust onto the coupling's grid; returns `(layer name, values)` pairs. The one
+/// dispatch point of the GPU path: the session's device, if any, links the covered cells.
 pub fn sample(
     state: &PlateState,
     geo: &Geo,
@@ -54,9 +76,104 @@ pub fn sample(
     env: &Env,
     scale: &ScaleParams,
 ) -> Vec<(&'static str, Vec<f32>)> {
+    #[cfg(feature = "gpu")]
+    let device = crate::compute::ambient_device(KERNEL);
+    #[cfg(not(feature = "gpu"))]
+    let device: Option<Arc<Device>> = None;
+    sample_with(state, geo, coupling, pos, env, scale, device.as_ref())
+}
+
+/// The device's links, five words a cell in the grid's order (triangle, nearest sample, the bits
+/// of the three f32 weights), the triangle [`DeviceLinks::CPU`] where the CPU links the cell:
+/// 20 bytes a cell on the host while the relink runs, decoded as each cell is linked.
+#[cfg_attr(not(feature = "gpu"), allow(dead_code))]
+struct DeviceLinks(Vec<u32>);
+
+#[cfg_attr(not(feature = "gpu"), allow(dead_code))]
+impl DeviceLinks {
+    const CPU: u32 = u32::MAX;
+
+    fn get(&self, c: usize) -> Option<crate::sphere::CellLink> {
+        let o = &self.0[5 * c..5 * c + 5];
+        (o[0] != Self::CPU).then(|| crate::sphere::CellLink {
+            tri: o[0],
+            nearest: o[1],
+            w: [o[2], o[3], o[4]].map(f32::from_bits),
+        })
+    }
+
+    fn len(&self) -> usize {
+        self.0.len() / 5
+    }
+
+    /// The cells left to the CPU.
+    fn left(&self) -> usize {
+        self.0
+            .as_chunks::<5>()
+            .0
+            .iter()
+            .filter(|o| o[0] == Self::CPU)
+            .count()
+    }
+}
+
+/// The covered cells' links from `device`, or None when there is no device or it failed (logged
+/// once; the CPU then links every cell).
+fn on_device(
+    device: Option<&Arc<Device>>,
+    state: &PlateState,
+    geo: &Geo,
+    coupling: &Coupling,
+    pos: &[DVec3],
+    env: &Env,
+) -> Option<DeviceLinks> {
+    #[cfg(feature = "gpu")]
+    {
+        let g = device?;
+        let started = Instant::now();
+        let r = gpu::relink(g, state, geo, coupling, pos, env);
+        crate::compute::lap("l1_device", started);
+        match r {
+            Ok(words) => Some(DeviceLinks(words)),
+            Err(e) => {
+                let msg =
+                    format!("compute: {KERNEL} failed on the GPU, the CPU links every cell ({e})");
+                match crate::compute::ambient() {
+                    Some(a) => a.tell_once("plates:write_l1 failed", crate::log::Level::Warn, msg),
+                    None => eprintln!("{msg}"),
+                }
+                crate::compute::add("l1_fallback_n", 1.0);
+                None
+            }
+        }
+    }
+    #[cfg(not(feature = "gpu"))]
+    {
+        let _ = (state, geo, coupling, pos, env);
+        device.map(|d| match **d {})
+    }
+}
+
+/// [`sample`] with the device given (tests force it).
+pub(super) fn sample_with(
+    state: &PlateState,
+    geo: &Geo,
+    coupling: &mut Coupling,
+    pos: &[DVec3],
+    env: &Env,
+    scale: &ScaleParams,
+    device: Option<&Arc<Device>>,
+) -> Vec<(&'static str, Vec<f32>)> {
+    let started = Instant::now();
     let samples = &state.samples;
     let rots: Vec<DQuat> = state.groups.iter().map(|g| quat(g.rot)).collect();
-    let vis = Tree::over(pos, |i| !samples[i].is_hidden());
+    // The visible samples' k-d tree beside the device's work (the CPU's cells need it).
+    let (vis, from_device) = rayon::join(
+        || Tree::over(pos, |i| !samples[i].is_hidden()),
+        || on_device(device, state, geo, coupling, pos, env),
+    );
+    crate::compute::lap("l1_tree_and_device", started);
+    let relinked = Instant::now();
     let gap_rad = 0.9 * env.norm.spacing_rad();
     let tris = geo.mesh.triangles();
     let plate_of = |v: u32| state.groups[samples[v as usize].group as usize].plate;
@@ -72,7 +189,16 @@ pub fn sample(
             j2: u32::MAX,
         }
     };
-    let info: Vec<Info> = coupling.relink(|_, q, link| {
+    let info: Vec<Info> = coupling.relink(|c, q, link| {
+        if let Some(l) = from_device.as_ref().and_then(|d| d.get(c)) {
+            *link = l;
+            return Info {
+                mode: COVERED,
+                d1: 0.0,
+                d2: 0.0,
+                j2: u32::MAX,
+            };
+        }
         // Most cells lie inside their nearest visible sample's group: the nearest sample alone
         // (one query a third the cost of six) settles them, with the same first cover the six
         // would try (P1-19). The rest take the full search below.
@@ -155,6 +281,12 @@ pub fn sample(
             },
         }
     });
+    crate::compute::lap("l1_relink", relinked);
+    if let Some(d) = &from_device {
+        crate::compute::add("l1_cpu_cells_n", d.left() as f64);
+        crate::compute::add("l1_cells_n", d.len() as f64);
+    }
+    let layered = Instant::now();
 
     let k = env.k;
     let t = env.t_myr;
@@ -419,6 +551,7 @@ pub fn sample(
                 }
             }
         });
+    crate::compute::lap("l1_layers", layered);
     names
         .into_iter()
         .chain(extra_names)
