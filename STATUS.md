@@ -10683,9 +10683,12 @@ he does not report known faults. Older notes are in the build log.
 - An exposed gossan's leached cap holds no ore, by design (DEP-212); the ore lies under it.
 
 **Tests**
-- Master 9091c163 (the plate cap): 91 of 91 GameTests with MIC, standalone, Excavated Variants and TerraBlender;
-  with Expanded Ecosphere `climateConsistent` fails, the continental (D) family matching its biomes in 67 of 77
-  columns (0.870 against 0.880), being fixed with the ice work. Master d006e621 before it passed all five sets.
+- Master 3efc5ff8 (ice cover, crust bookkeeping, stage overlap): the MIC set passes 91 of 91. Failing, being fixed:
+  the Gradle unit test `IceCoverTest.aCoversEdgeLiesHalfWayToItsBareNeighbour` (it needs an ice edge the new test
+  planet lacks); `realPlanetRockMatchesTheParityFixture` in standalone, Excavated Variants and TerraBlender (one
+  sample: shale, stone expected, dirt placed); with Expanded Ecosphere, `climateConsistent` (C 0.628 against 0.630)
+  and `farTerrainMatchesGeneratedChunksAcrossTheSeam` (dead coral on the warm ocean floor where the far terrain shows
+  sand). All four appeared when the crust fix changed the 4k test planet.
 - The cloud forest check counts nothing on the 4k test planet (5 columns qualify), so it guards only on a planet with
   more humid tropical highland.
 - "Probe column agrees with the world data" failed once at (8184, 164) and was not reproduced.
