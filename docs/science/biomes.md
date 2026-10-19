@@ -525,6 +525,20 @@ temperature −18 to +3 °C, median −11 °C); the other 19 lie at the ice cove
 thickness reaches past the flag's nearest cell (L1 mean annual −9 to +14 °C), a cover on ground the climate
 does not freeze that is the bake's to revisit.
 
+Revisited the same day (BIO-157 to BIO-159). The cover now lies on the climate's own extent (the L2 land whose
+nearest L1 cell holds at least 1 m of ice), each ice body closed on its surface balance on its L2 ground, and a
+covered cell is of class EF; every reader takes the cover's extent from the nearest cell, as the class is read, so
+the fringe past the flag's cell is gone. On the world grid, before and after (the 4k test planet with the Terralith
+patch; earthlike_quick_16k, scattered continents, 500 Myr): the cover went from 190 to 131 world cells (3.4 to
+2.3 % of the land) and from 33,087 to 29,553 (16.4 to 14.6 %), its true area by 29 % and 10 %. The covered columns
+not of class EF went from 189 of 190 to none and from 19,385 to none. The share of the cover over ground whose L1
+cell is warmer than 0 °C (mean annual) went from 0.221 to 0.092 and from 0.086 to 0.052; on earthlike_quick_16k
+what is left there is 1,178 world cells at 0 to 5 °C, 317 at 5 to 10 °C and 55 at 10 °C or more (before: 1,853,
+685 and 312), the parts of bodies their higher cells feed (BIO-157), the way an outlet glacier's tongue reaches
+below the snowline on its accumulation area. Over the ground's own temperature (the L2 bed lapsed to its own height,
+without the ice) 60 % and 33 % of the cover lie above 0 °C: under a sheet the bed sits far below the ice surface
+the L1 climate is of, so that measure is no target.
+
 **The geology gate.** A rock-named biome stands only on the ground it is named for (BIO-147 to BIO-153): Shield on
 Precambrian shield provinces, Yosemite on exposed granite, the White, Granite and Basalt Cliffs on coasts of
 carbonate, granite and basalt, Bryce Canyon, the Painted Mountains, White Mesa, Sandstone Valley and Desert Canyon on

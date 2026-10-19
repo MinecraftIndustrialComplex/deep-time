@@ -230,9 +230,10 @@ baked and gets a Lambert layout block.
   any layer whose `units` is `flag`), horizon stacks and any footprint touching no-data take the
   nearest cell (`climate/koppen_l2` only since 2026-10-18: averaged as a number, a class border named
   a class neither side had). The
-  `climate/ice_cover` takes the **cover rule** (BIO-159, "The ice cover") twice: each footprint
-  sample is the Lambert layer read by the rule at its block, and the world cell is covered where at
-  least half the samples are, at their mean depth (a footprint mean of the blocks covered every world
+  `climate/ice_cover` takes the **cover rule** (BIO-159, "The ice cover"): the world cell is covered
+  where its nearest Lambert cell is, the cell the categories beside it read (so a covered world cell
+  is EF in `climate/koppen_l2`), at the mean depth of the footprint's samples that are covered, each
+  the Lambert layer read by the rule at its block (a footprint mean of the blocks covered every world
   cell that one covered sample reached, so the cover's area grew with the footprint, most at the
   poles). The
   climate's band coordinates (`units` `vanilla_param`: `climate/temperature`, `vegetation`,
@@ -564,13 +565,14 @@ glaciated ground regardless of biome. The contract between the climate and that 
   `trimmed_cells` = `climate_cells`), `bodies`, `trimmed_bodies` and `thickest_blocks`.
 - **The cover rule** (`deeptime_format::raster::cover_of`, `RasterRead::cover`; Java
   `RasterSampler.cover`, `coverOf`; ledger BIO-159): every reader of the layer (the ice pass, the
-  far terrain, the census, the bake's projection, the workbench's map) reads it at a block over the
-  four cells of the bilinear blend, with the blend's weights: the block is covered where the cells
-  with a cover hold at least half the weight, and its depth is then the weighted mean of those
-  cells' blocks; else 0. So a cover's edge lies half-way between a covered cell and a bare one, as
-  the nearest cell would put it, and its depth thins over the covered cells without spreading past
-  them (a plain bilinear read, rounded, covered every block where the blend passed half a block:
-  most of a cell past a 12-block margin).
+  far terrain, the census, the bake's projection, the workbench's map) reads it at a block the same
+  way: the block is covered where its nearest cell is (as `RasterRead::nearest`, the read the Köppen
+  class takes, so every covered block is of the class EF), and its depth is then the weighted mean,
+  with the bilinear blend's weights, of the blocks of those of the blend's four cells that are
+  covered (the nearest cell's own where none has weight); else 0. So a cover's edge lies half-way
+  between a covered cell and a bare one, where the class changes too, and its depth thins over the
+  covered cells without spreading past them (a plain bilinear read, rounded, covered every block
+  where the blend passed half a block: most of a cell past a 12-block margin).
 - **The pass** reads the layer by the cover rule and rounds, giving `n` blocks for the column. The cover **replaces** the top `n` solid blocks of the
   ground, so the terrain's height is unchanged: the top `snow_blocks` (at most `n`) are `snow`, the
   last `blue_ice_blocks` of a cover of at least `blue_ice_from_blocks` are `deep_ice`, the blocks

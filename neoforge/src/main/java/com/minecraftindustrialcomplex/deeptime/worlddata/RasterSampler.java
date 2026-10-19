@@ -97,11 +97,11 @@ public final class RasterSampler {
     }
 
     /**
-     * A cover layer's value at block (bx, bz) ({@code climate/ice_cover}, FORMAT.md "The ice cover"): the four cells of
-     * the bilinear blend read by {@link #coverOf}, so the cover's edge lies half-way between a covered cell and a bare
-     * one and its depth is the covered cells' blend. The arithmetic of {@code RasterRead::cover} in deeptime-format
-     * (ledger BIO-159); a plain bilinear read rounded to blocks covered every block where the blend passed half a block,
-     * most of a cell past a thick margin.
+     * A cover layer's value at block (bx, bz) ({@code climate/ice_cover}, FORMAT.md "The ice cover"): {@link #coverOf}
+     * with the {@link #nearest} cell deciding whether the block is covered and the four cells of the bilinear blend its
+     * depth, so the cover's edge lies half-way between a covered cell and a bare one, where the nearest-cell Köppen class
+     * changes too. The arithmetic of {@code RasterRead::cover} in deeptime-format (ledger BIO-159); a plain bilinear read
+     * rounded to blocks covered every block where the blend passed half a block, most of a cell past a thick margin.
      */
     public double cover(double bx, double bz) {
         double u = (bx - (double) grid.originBlockX()) / (double) grid.r();
@@ -111,25 +111,27 @@ public final class RasterSampler {
         double fu = u - fi;
         double fv = v - fj;
         long i0 = (long) fi, j0 = (long) fj;
-        return coverOf(new double[] {get(i0, j0), get(i0 + 1, j0), get(i0, j0 + 1), get(i0 + 1, j0 + 1)},
+        return coverOf(nearest(bx, bz), new double[] {get(i0, j0), get(i0 + 1, j0), get(i0, j0 + 1), get(i0 + 1, j0 + 1)},
                 new double[] {(1 - fu) * (1 - fv), fu * (1 - fv), (1 - fu) * fv, fu * fv});
     }
 
     /**
-     * The cover rule over weighted samples: covered where the samples with a value above 0 (NaN is none) hold at least
-     * half the weight, and then the weighted mean of those values; 0 elsewhere. The arithmetic of {@code cover_of} in
+     * The cover rule: covered where {@code nearest}, the nearest cell's value, is above 0 (NaN is none), and then at the
+     * weighted mean of the samples with a value above 0, or at {@code nearest} where none is; 0 elsewhere. The nearest
+     * cell decides the extent as it decides a block's Köppen class. The arithmetic of {@code cover_of} in
      * deeptime-format (ledger BIO-159).
      */
-    public static double coverOf(double[] values, double[] weights) {
-        double all = 0, held = 0, sum = 0;
+    public static double coverOf(double nearest, double[] values, double[] weights) {
+        if (!(nearest > 0))
+            return 0;
+        double held = 0, sum = 0;
         for (int k = 0; k < values.length; k++) {
-            all += weights[k];
             if (values[k] > 0) {
                 held += weights[k];
                 sum += weights[k] * values[k];
             }
         }
-        return held > 0 && 2 * held >= all ? sum / held : 0;
+        return held > 0 ? sum / held : nearest;
     }
 
     /**
