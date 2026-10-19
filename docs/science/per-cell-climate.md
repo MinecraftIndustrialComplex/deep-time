@@ -379,6 +379,21 @@ shared as finished folders). The whole-history comparison of the two (CO₂, tem
 hypsometry) is in the design note. The climate stage's `compute` note says which device ran the
 cells (`cells_device`, `cells_on_device`, `cells_on_cpu`, `cells_failed`).
 
+**On a whole planet (2026-10-19).** A temporary switch (not committed) ran every snapshot's cells
+twice from the same state, on the CPU and on the device, through a full 16k planet's 100 Myr
+history (lavapipe; 7 snapshots of 355,000 to 435,000 land cells): mean temperature differences
+of -1.3·10⁻⁷ to +5.5·10⁻⁹ K (at most 7.6·10⁻⁶ K in a cell), rain within 1.9·10⁻⁷ relative,
+aridity and the equilibrium line within 10⁻⁷, and sea ice, the glacier flags, the Köppen classes,
+the glaciated area and each band's ice sheet identical. The device's cells lean no way. Over a
+whole history the world nonetheless differs, as any last-bit change makes it differ: one f32 ulp
+in one barycentric weight of the plates' sampling, on the CPU alone, moved the same planet's
+100 Myr CO₂ between 546 and 633 ppm, its mean temperature between 14.0 and 15.1 °C and its
+glaciated land share between 0.060 and 0.106, as the carbon cycle and the ice settled into one
+of a few histories. Across five planets (seeds 1 to 5, 100 Myr, both ports on the GPU) the GPU's
+CO₂ ended 117 ppm lower, equal, 3 lower, 70 higher and 24 lower than the CPU's, the mean
+temperatures were equal (14.6 °C both), and the glaciated share and the sea level went both
+ways (design note, section 10).
+
 ## Simplifications and limits
 
 - **The conveyor is a compensating choice, not Earth's ocean.** Earth's Atlantic overturning is
