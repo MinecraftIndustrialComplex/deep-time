@@ -325,22 +325,17 @@ pub fn slope_failure(
     // Each row's moved cells and their changes, ascending.
     let mut rows: Vec<Vec<(u32, f64)>> = vec![Vec::new(); hgt];
     // The shares of every cell (`all`) or of the cells marked `near1 == s`, rows in parallel.
-    let shares = |scale: &mut [f64],
-                  all: bool,
-                  s: u32,
-                  n1: &[u32],
-                  hh: &[f64],
-                  wt: &[bool],
-                  av: &[f64]| {
-        scale.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
-            for (i, x) in row.iter_mut().enumerate() {
-                let c = j * w + i;
-                if all || n1[c] == s {
-                    *x = share(c, inner(i, j), hh, wt, av);
+    let shares =
+        |scale: &mut [f64], all: bool, s: u32, n1: &[u32], hh: &[f64], wt: &[bool], av: &[f64]| {
+            scale.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
+                for (i, x) in row.iter_mut().enumerate() {
+                    let c = j * w + i;
+                    if all || n1[c] == s {
+                        *x = share(c, inner(i, j), hh, wt, av);
+                    }
                 }
-            }
-        });
-    };
+            });
+        };
     // Marks the neighbourhoods of the movers in `last` with `s`, rows in parallel (P1-19; the
     // marks were set one mover at a time before): row j takes the movers of rows j − 2 to j + 2.
     // Returns the cells within one cell of a mover.
