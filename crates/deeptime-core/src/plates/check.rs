@@ -14,6 +14,11 @@
 //! visible planet, as the design measured them). The definitions follow the throwaway trace the
 //! design's numbers came from (`tools/review/plate-dynamics-trace.patch`, now removed), so a
 //! baseline on master reproduces the design's "Now" column.
+//!
+//! The measures of one step (the land a step gains, the land one collision raises in a step, the
+//! change of a plate's rotation from one step to the next) had their ranges set at the 2-Myr step
+//! ([`TARGET_STEP_MYR`]); a run at another step reports them per 2 Myr of step (times
+//! 2 Myr ÷ its step), so its ranges still apply (P1-19 #27).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -75,6 +80,12 @@ const WAITS_COLLISION: &str = "the collision belts (design tasks 3-4)";
 const WAITS_FORCES: &str = "a run recorded with the force balance (dynamics version 4)";
 const WAITS_MIX: &str = "a run recorded with the boundary mix and arc heights (dynamics version 3)";
 
+/// The plate step the per-step ranges were set at, Myr (Cortial's δt and every run's step before
+/// P1-19 #27). A per-step measure of a run at another step is scaled by this ÷ the run's step.
+// game-choice (agent, P1-19 #27): a linear scaling, exact for a steady rate; for the rotation's
+// change it assumes the change grows with the step's length.
+pub const TARGET_STEP_MYR: f64 = 2.0;
+
 /// The measures in table order: first the ones with the design's §6 ranges, then the ones only
 /// reported (the design's §2.2 figures and what a force-balance plate model will be judged on).
 pub const MEASURES: &[MeasureDef] = &[
@@ -129,14 +140,14 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     m(
         "collision_land_max_pct",
-        "Land raised by one collision in one step, the most",
+        "Land raised by one collision in one step (per 2 Myr of step), the most",
         "% of planet",
         None,
         Some(0.5),
     ),
     m(
         "land_gain_max_pct",
-        "Most land gained in any step (after the first 10 Myr)",
+        "Most land gained in any step, per 2 Myr of step (after the first 10 Myr)",
         "% of planet",
         None,
         Some(1.5),
@@ -287,14 +298,14 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     m(
         "rot_change_p50_pct",
-        "Change of a plate's rotation per step, median",
+        "Change of a plate's rotation per step (per 2 Myr of step), median",
         "%",
         None,
         Some(8.0),
     ),
     m(
         "rot_change_p90_pct",
-        "Change of a plate's rotation per step, 90th percentile",
+        "Change of a plate's rotation per step (per 2 Myr of step), 90th percentile",
         "%",
         None,
         Some(20.0),
@@ -1084,7 +1095,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     waits(
         "balance_rot_change_p50_pct",
-        "Balance: change of a plate's rotation per step, median (target at most 8)",
+        "Balance: change of a plate's rotation per step (per 2 Myr of step), median (target at most 8)",
         "%",
         None,
         None,
@@ -1092,7 +1103,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     waits(
         "balance_rot_change_p90_pct",
-        "Balance: change of a plate's rotation per step, 90th percentile (target at most 20)",
+        "Balance: change of a plate's rotation per step (per 2 Myr of step), 90th percentile (target at most 20)",
         "%",
         None,
         None,
@@ -1493,6 +1504,8 @@ pub fn measures_with(
         out.insert(k, v);
     };
     let n = f64::from(d.samples.max(1));
+    // The per-step measures, per 2 Myr of step (module doc).
+    let per_target_step = TARGET_STEP_MYR / d.dt_myr;
     let first_t = d.steps.first().map_or(d.t0_myr, |s| s.t);
     let end_t = d.steps.last().map_or(d.t0_myr, |s| s.t);
     let span = end_t - d.t0_myr;
@@ -1618,7 +1631,7 @@ pub fn measures_with(
         .steps
         .windows(2)
         .filter(|w| w[1].t >= first_t + 10.0)
-        .map(|w| (f64::from(w[1].land) - f64::from(w[0].land)) / n)
+        .map(|w| (f64::from(w[1].land) - f64::from(w[0].land)) / n * per_target_step)
         .collect();
     put(
         "land_gain_max_pct",
@@ -1662,7 +1675,7 @@ pub fn measures_with(
     let pick = |f: &dyn Fn(&super::dynamics::CollisionRec) -> f64| -> Vec<f64> {
         col.iter().map(|c| f(c)).collect()
     };
-    let emerged = pick(&|c| 100.0 * f64::from(c.emerged.samples) / n);
+    let emerged = pick(&|c| 100.0 * f64::from(c.emerged.samples) / n * per_target_step);
     put(
         "collision_land_max_pct",
         emerged.iter().copied().fold(f64::NAN, f64::max),
@@ -2007,7 +2020,7 @@ fn plate_motion(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static str
     let change: Vec<f64> = big
         .iter()
         .filter(|p| p.rot_known)
-        .map(|p| 100.0 * p.rot_change)
+        .map(|p| 100.0 * p.rot_change * TARGET_STEP_MYR / d.dt_myr)
         .collect();
     put("rot_change_p50_pct", pct(&change, 0.5));
     put("rot_change_p90_pct", pct(&change, 0.9));
@@ -2624,7 +2637,7 @@ fn balance(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static str, f64
     let change: Vec<f64> = pairs
         .iter()
         .filter(|(_, f)| f.rot_known)
-        .map(|(_, f)| 100.0 * f.rot_change)
+        .map(|(_, f)| 100.0 * f.rot_change * TARGET_STEP_MYR / d.dt_myr)
         .collect();
     put("balance_rot_change_p50_pct", pct(&change, 0.5));
     put("balance_rot_change_p90_pct", pct(&change, 0.9));

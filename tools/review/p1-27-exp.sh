@@ -15,9 +15,9 @@ run() {
 for name in "$@"; do
     case "$name" in
         base) run base ;;
-        init0) run init0 --set tectonics.subduction_initiation_rate=0 ;;
+        init0) run init0 --set tectonics.subduction_initiation_per_myr=0 ;;
         jitter0) run jitter0 --set tectonics.motion_jitter_per_sqrt_myr=0 ;;
-        rift_half) run rift_half --set tectonics.rift_lambda0=0.006 ;;
+        rift_half) run rift_half --set tectonics.rift_per_myr=0.003 ;;
         noslab) run noslab --set tectonics.slab_pull_rad_per_1000km_myr=0 --set tectonics.slab_pull_speed_mm_yr=45 ;;
         slowbase) run slowbase --set 'tectonics.plate_speed_mm_yr=[5,25]' ;;
         contslow) run contslow --set tectonics.continental_speed_factor=0.2 ;;

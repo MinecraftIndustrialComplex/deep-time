@@ -34,14 +34,14 @@
 //! A contact is *in collision* ([`Collision`], `Contact::collision`) from the first step its front
 //! has at least [`MIN_CONTACT`] samples and converges, while the contact is live (overlap seen
 //! this step). The state then lives through steps with no front (a resampling consumes the
-//! overlap; it takes a few steps to come back) for up to [`GRACE_STEPS`]. It ends in one of:
+//! overlap; it takes a few steps to come back) for up to [`GRACE_MYR`]. It ends in one of:
 //!
 //! | End | Where | Record |
 //! |---|---|---|
 //! | the crust is transferred or the plates weld | `collision::collide` | a `CollisionRec` |
-//! | no continental crust at the front for more than [`GRACE_STEPS`] steps (`parted`) | [`advance`] | a `PartingRec` |
+//! | no continental crust at the front for longer than [`GRACE_MYR`] (`parted`) | [`advance`] | a `PartingRec` |
 //! | the contact reverses (`reversed`) | `subduction::reverse` | a `PartingRec` |
-//! | the contact closes: no overlap for `contact_timeout_steps`, or a plate died (`closed`) | `subduction::close_contacts` | a `PartingRec` |
+//! | the contact closes: no overlap for longer than `contact_timeout_myr`, or a plate died (`closed`) | `subduction::close_contacts` | a `PartingRec` |
 //! | the run ends (`open`) | `subduction::close_contacts` | a `PartingRec` |
 //!
 //! # What ends it in a transfer or weld (tasks 3 and 4)
@@ -82,9 +82,16 @@ use super::subduction::{CONFIRM_MM_YR, MIN_CONTACT, locked_against};
 /// ratio a median 3-8 (2026-10-02). Once begun, every converging step counts, however slow.
 // ledger: PLT-224 (game-choice: the existing subduction-confirmation rate).
 pub const BEGIN_MM_YR: f64 = CONFIRM_MM_YR;
-/// A collision lives through this many steps without a front before it counts as parted.
+/// A collision lives this long without a front before it counts as parted, Myr (3 steps at the
+/// 2-Myr step).
 // ledger: PLT-225 (game-choice: long enough for an overlap to come back after a resampling).
-pub const GRACE_STEPS: u64 = 3;
+pub const GRACE_MYR: f64 = 6.0;
+
+/// The steps without a front a collision lives through at a step of `dt_myr`: as many as fit in
+/// [`GRACE_MYR`] (3 at 2 Myr, 1 at 4 Myr: it parts after 8 Myr either way).
+pub fn grace_steps(dt_myr: f64) -> u64 {
+    (GRACE_MYR / dt_myr).floor() as u64
+}
 /// Samples looked at around a front sample for the crust that stands at it.
 // ledger: PLT-223 (game-choice: a numerical rule).
 const K_FRONT: usize = 12;
@@ -307,7 +314,7 @@ pub enum Change {
     Began,
     /// The collision went on (with or without a front this step).
     Continued,
-    /// No front for more than [`GRACE_STEPS`] steps: the caller records the parting and clears
+    /// No front for longer than [`GRACE_MYR`]: the caller records the parting and clears
     /// the state.
     Parted,
 }
@@ -337,7 +344,9 @@ pub fn step_collision(
     let front = front.filter(|f| f.samples >= MIN_CONTACT);
     let Some(f) = front else {
         return match collision {
-            Some(c) if clock.step.saturating_sub(c.last_step) > GRACE_STEPS => Change::Parted,
+            Some(c) if clock.step.saturating_sub(c.last_step) > grace_steps(clock.dt_myr) => {
+                Change::Parted
+            }
             Some(_) => Change::Continued,
             None => Change::None,
         };
@@ -835,6 +844,22 @@ mod tests {
         }
     }
 
+    /// The grace is a time (P1-19 #27): 3 steps at 2 Myr, 1 at 4 Myr, 2 at 3 Myr; a collision
+    /// with no front parts once more than 6 Myr have gone, after 8 Myr at 2 and 4 Myr steps.
+    #[test]
+    fn the_grace_is_a_time() {
+        assert_eq!(grace_steps(2.0), 3);
+        assert_eq!(grace_steps(4.0), 1);
+        assert_eq!(grace_steps(3.0), 2);
+        for dt in [2.0, 4.0] {
+            let parted_after = (grace_steps(dt) + 1) as f64 * dt;
+            assert_eq!(parted_after, 8.0);
+        }
+        assert_eq!(super::super::subduction::confirm_steps(2.0), 3);
+        assert_eq!(super::super::subduction::confirm_steps(4.0), 2);
+        assert_eq!(super::super::subduction::confirm_steps(3.0), 2);
+    }
+
     fn clock(step: u64) -> StepClock {
         StepClock {
             step,
@@ -951,7 +976,7 @@ mod tests {
         assert_eq!(c.last_step, 8);
 
         // No front (or too short a one) for the grace steps: it lives; one more: parted.
-        for step in 9..=8 + GRACE_STEPS {
+        for step in 9..=8 + grace_steps(2.0) {
             let f = front(1, 80.0);
             let seen = if step % 2 == 0 { Some(&f) } else { None };
             assert_eq!(
@@ -962,7 +987,7 @@ mod tests {
         assert_eq!(col.as_ref().unwrap().last_step, 8);
         assert_eq!(col.as_ref().unwrap().shortening_km, 220.0);
         assert_eq!(
-            step_collision(&mut col, None, true, clock(9 + GRACE_STEPS)),
+            step_collision(&mut col, None, true, clock(9 + grace_steps(2.0))),
             Change::Parted
         );
 
@@ -1117,7 +1142,7 @@ mod tests {
             s.kind = crate::plates::state::OCEANIC;
         }
         let last = need + 1;
-        for step in last + 1..=last + GRACE_STEPS + 1 {
+        for step in last + 1..=last + grace_steps(2.0) + 1 {
             assert!(st.contacts[0].collision.is_some(), "step {step}");
             advance(
                 &mut st,
