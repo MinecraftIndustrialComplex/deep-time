@@ -19,7 +19,7 @@
 //! a step.) The bilinear smoothing of repeated advection blurs detail that erosion re-cuts every
 //! step.
 
-use glam::DVec3;
+use glam::{DQuat, DVec3};
 use rayon::prelude::*;
 
 use deeptime_format::GridDesc;
@@ -30,24 +30,42 @@ use crate::sphere::BlockFrame;
 /// Where every cell's material was before the step: fractional (i, j) in the grid.
 pub fn sources(grid: &GridDesc, plate_id: &[f32], omega: &[[f64; 3]], dt_yr: f64) -> Vec<[f64; 2]> {
     let frame = BlockFrame::new(grid.circumference() as u32);
+    let proj = frame.projection();
     let w = grid.w as usize;
     let r = f64::from(grid.r);
     let (ox, oz) = (grid.origin_block_x as f64, grid.origin_block_z as f64);
+    // A cell's unit vector is (cos φ cos λ, cos φ sin λ, sin φ) with φ from its row and λ from its
+    // column, so the sines and cosines are taken once per row and column, by the expressions
+    // `BlockFrame::unit` uses; and each plate's rotation once (P1-19: both were per cell).
+    let lat: Vec<(f64, f64)> = (0..grid.h as i64)
+        .map(|j| {
+            let z = grid.block_z(j) as f64;
+            (proj.sin_lat(z), proj.cos_lat(z))
+        })
+        .collect();
+    let lon: Vec<(f64, f64)> = (0..w as i64)
+        .map(|i| proj.lon_deg(grid.block_x(i) as f64).to_radians().sin_cos())
+        .collect();
+    let rot: Vec<Option<DQuat>> = omega
+        .iter()
+        .map(|&om| (om != [0.0; 3]).then(|| rotation(DVec3::from_array(om), -dt_yr)))
+        .collect();
     (0..grid.cells())
         .into_par_iter()
         .map(|c| {
-            let (i, j) = ((c % w) as i64, (c / w) as i64);
+            let (i, j) = (c % w, c / w);
             let p = plate_id[c];
-            let om = if p.is_finite() && p >= 0.0 {
-                omega.get(p as usize).copied().unwrap_or([0.0; 3])
+            let rot = if p.is_finite() && p >= 0.0 {
+                rot.get(p as usize).copied().flatten()
             } else {
-                [0.0; 3]
+                None
             };
-            if om == [0.0; 3] {
+            let Some(rot) = rot else {
                 return [i as f64, j as f64];
-            }
-            let q = frame.unit(grid.block_x(i) as f64, grid.block_z(j) as f64);
-            let back = rotation(DVec3::from_array(om), -dt_yr) * q;
+            };
+            let ((sp, cp), (sl, cl)) = (lat[j], lon[i]);
+            let q = DVec3::new(cp * cl, cp * sl, sp);
+            let back = rot * q;
             let (x, z) = frame.block(back);
             // x in [−C/2, C/2) maps to i = (x − origin_x) / r, wrapped by the samplers.
             [(x - ox) / r, (z - oz) / r]
@@ -260,6 +278,71 @@ pub fn nearest(w: usize, h: usize, fi: f64, fj: f64) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The sources as they were before P1-19: the unit vector and the rotation per cell.
+    fn sources_reference(
+        grid: &GridDesc,
+        plate_id: &[f32],
+        omega: &[[f64; 3]],
+        dt_yr: f64,
+    ) -> Vec<[f64; 2]> {
+        let frame = BlockFrame::new(grid.circumference() as u32);
+        let w = grid.w as usize;
+        let r = f64::from(grid.r);
+        let (ox, oz) = (grid.origin_block_x as f64, grid.origin_block_z as f64);
+        (0..grid.cells())
+            .map(|c| {
+                let (i, j) = ((c % w) as i64, (c / w) as i64);
+                let p = plate_id[c];
+                let om = if p.is_finite() && p >= 0.0 {
+                    omega.get(p as usize).copied().unwrap_or([0.0; 3])
+                } else {
+                    [0.0; 3]
+                };
+                if om == [0.0; 3] {
+                    return [i as f64, j as f64];
+                }
+                let q = frame.unit(grid.block_x(i) as f64, grid.block_z(j) as f64);
+                let back = rotation(DVec3::from_array(om), -dt_yr) * q;
+                let (x, z) = frame.block(back);
+                [(x - ox) / r, (z - oz) / r]
+            })
+            .collect()
+    }
+
+    /// P1-19: the row and column tables and the rotation per plate give the per-cell sources bit
+    /// for bit: plates with and without motion, ids past the list, negative and not finite.
+    #[test]
+    fn the_tabled_sources_equal_the_per_cell_ones() {
+        let grid = GridDesc::for_planet("L1", 4096, 32).unwrap();
+        let n = grid.cells();
+        let mut rng = crate::sphere::SplitMix64::new(7);
+        let omega: Vec<[f64; 3]> = (0..6)
+            .map(|k| {
+                if k == 2 {
+                    [0.0; 3]
+                } else {
+                    std::array::from_fn(|_| (rng.next_f64() - 0.5) * 4.0e-8)
+                }
+            })
+            .collect();
+        let ids: Vec<f32> = (0..n)
+            .map(|c| match c % 11 {
+                0 => f32::NAN,
+                1 => -1.0,
+                2 => 9.0,
+                k => (k % 6) as f32,
+            })
+            .collect();
+        let got = sources(&grid, &ids, &omega, 2.0e6);
+        let want = sources_reference(&grid, &ids, &omega, 2.0e6);
+        let bits = |v: &[[f64; 2]]| {
+            v.iter()
+                .map(|p| [p[0].to_bits(), p[1].to_bits()])
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(bits(&got), bits(&want));
+    }
 
     #[test]
     fn a_rotation_about_the_pole_shifts_columns() {
