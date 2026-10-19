@@ -263,6 +263,57 @@ impl Grid {
             .find(|(cc, _)| has(*cc))
             .map(|&(cc, _)| v[cc])
     }
+
+    /// [`masked_at`](Self::masked_at)'s corners for fine cell `c`, found once for all the fields
+    /// (the twelve months) that are read there (P1-19, #14).
+    pub fn masked_taps(&self, has: &dyn Fn(usize) -> bool, c: usize) -> MaskedTaps {
+        let corners = self.corners(c);
+        let mut t = MaskedTaps {
+            n: 0,
+            cc: [0; 4],
+            wt: [0.0; 4],
+            wsum: 0.0,
+            first: None,
+        };
+        for &(cc, wt) in &corners {
+            if wt > 0.0 && has(cc) {
+                t.cc[t.n] = cc;
+                t.wt[t.n] = wt;
+                t.n += 1;
+                t.wsum += wt;
+            }
+        }
+        if t.wsum <= 0.0 {
+            t.first = corners.iter().find(|(cc, _)| has(*cc)).map(|&(cc, _)| cc);
+        }
+        t
+    }
+}
+
+/// The coarse cells [`Grid::masked_at`] reads for one fine cell, and their weights.
+#[derive(Clone, Copy, Debug)]
+pub struct MaskedTaps {
+    n: usize,
+    cc: [usize; 4],
+    wt: [f64; 4],
+    wsum: f64,
+    /// The one cell with the medium, when no corner has weight to give.
+    first: Option<usize>,
+}
+
+impl MaskedTaps {
+    /// What `masked_at` gives for the field `v`: the same sums in the same order.
+    #[inline]
+    pub fn at(&self, v: &[f64]) -> Option<f64> {
+        if self.wsum > 0.0 {
+            let mut s = 0.0;
+            for k in 0..self.n {
+                s += self.wt[k] * v[self.cc[k]];
+            }
+            return Some(s / self.wsum);
+        }
+        self.first.map(|cc| v[cc])
+    }
 }
 
 #[cfg(test)]
@@ -353,5 +404,27 @@ mod tests {
         let deep = 16 * 64 + 48;
         assert!(g.masked_at(&v, &land, deep).is_none());
         assert!(g.masked_at(&v, &|_| false, deep).is_none());
+    }
+
+    /// P1-19: the corners found once give `masked_at`'s bits, whichever cells have the medium.
+    #[test]
+    fn the_masked_taps_are_the_masked_refine_bit_for_bit() {
+        let g = Grid::new(64, 32, &[1.0; 32], 1.0, 16);
+        let v: Vec<f64> = (0..g.w * g.h)
+            .map(|cc| ((cc * 7919) % 1013) as f64 * 0.37 - 91.0)
+            .collect();
+        let masks: [&dyn Fn(usize) -> bool; 4] = [
+            &|cc| cc % 3 != 0,
+            &|cc| (cc % g.w) < g.w / 2,
+            &|cc| cc % 11 == 0,
+            &|_| false,
+        ];
+        for has in masks {
+            for c in 0..64 * 32 {
+                let a = g.masked_at(&v, has, c);
+                let b = g.masked_taps(has, c).at(&v);
+                assert_eq!(a.map(f64::to_bits), b.map(f64::to_bits), "cell {c}");
+            }
+        }
     }
 }
