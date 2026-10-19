@@ -314,10 +314,16 @@ fn stack_front(
     };
     let belt_rise_km2_m = rise_km2_m - fill * deficit_km2_m;
 
-    // ledger: PLT-243 (the belt's profile, 1 − (d/W)², highest at the front).
+    // ledger: PLT-243 (the belt's profile, 1 − (d/W)², highest at the front). Only continental
+    // crust takes the belt's stack (ledger: PLT-290): an orogen is thickened continental crust,
+    // and ocean floor behind a narrow overriding continent or an island arc stayed ocean floor
+    // under any thickness of it (the dampening pulls its surface back down to the ocean floor, so
+    // it kept its room and took more every step: up to 60 km of metamorphic rock under the
+    // oceanic label, which later subducted as ocean floor and came back as one lump at a
+    // resampling, build log 2026-10-18 "Resampling lumps").
     let w_rad = norm.rad(belt_km);
     let belt: Vec<(usize, f64)> = (0..n)
-        .filter(|&i| d_over[i].is_finite())
+        .filter(|&i| d_over[i].is_finite() && samples[i].kind == CONTINENTAL)
         .map(|i| (i, 1.0 - (d_over[i] / w_rad).powi(2)))
         .filter(|&(_, w)| w > 0.0)
         .collect();
@@ -623,7 +629,7 @@ mod tests {
     use crate::plates::normalise::Norm;
     use crate::plates::pools::continental_column;
     use crate::plates::shortening::{self, Fired};
-    use crate::plates::state::{Contact, Group, Plate, Sample, SlabTrack};
+    use crate::plates::state::{Contact, Group, HIDDEN, Plate, Sample, SlabTrack};
     use crate::preset::{Preset, PresetBody, with_timeline};
 
     const N: usize = 16_000;
@@ -1242,5 +1248,99 @@ mod tests {
         );
         assert!(st.groups.iter().all(|g| g.plate == 1));
         assert_eq!(st.counters.sutures, 1);
+    }
+
+    /// Only continental crust takes the belt's stack (ledger PLT-290): the overriding plate's
+    /// ocean floor beside the continent, within the belt's reach of the front, keeps its crust
+    /// while the continent behind the front thickens.
+    #[test]
+    fn the_belt_stacks_only_on_continental_crust() {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+        let t0: Vec<f32> = st.samples.iter().map(|s| s.thickness_m).collect();
+        for step in 1..=8 {
+            fx.step(&mut st, step, None);
+        }
+        assert!(st.contacts[0].collision.is_some());
+        let belt_km = fx.preset.tectonics.collision_belt_km;
+        let pts = fx.geo.points();
+        let (mut ocean, mut thickened) = (0, 0);
+        for (i, s) in st.samples.iter().enumerate() {
+            let x = fx.norm.km(pts[i].x.asin());
+            // The overriding plate behind the front, within the belt's width, near the cap.
+            if st.plate_of(i) != 0 || -x > belt_km || pts[i].y < 0.8 {
+                continue;
+            }
+            if s.kind == CONTINENTAL {
+                thickened += usize::from(s.thickness_m > t0[i] + 1.0);
+            } else {
+                ocean += 1;
+                assert!(
+                    (s.thickness_m - t0[i]).abs() < 1e-3,
+                    "ocean floor {x} km behind the front took {} m",
+                    s.thickness_m - t0[i]
+                );
+            }
+        }
+        assert!(thickened > 3 && ocean > 3, "{thickened} {ocean}");
+    }
+
+    /// Crust that crossed the front during a collision (`stacked`, hidden under the overriding
+    /// plate) stays under when the collision ends (ledger PLT-291): a transfer moves only the
+    /// terrane's crust that has not gone under, and a weld unhides only that, so the next
+    /// resampling consumes the crossed crust instead of adding it to the column above a second
+    /// time.
+    #[test]
+    fn crossed_crust_stays_under_through_a_transfer_and_a_weld() {
+        for weld in [false, true] {
+            let mut fx = Fixture::new();
+            if !weld {
+                // Every terrane moves alone.
+                fx.preset.tectonics.collision_suture_frac = 1.0e9;
+            }
+            // The incoming plate (1) is the larger, so with a weld it keeps its id.
+            let mut st = two_plates(&fx.geo, -0.3, DVec3::Z * fx.rate(30.0));
+            let mut world = crate::world::WorldState::new(1, 16_384, 0.0);
+            fx.step(&mut st, 1, None);
+            assert!(st.contacts[0].collision.is_some());
+            let pos = positions(&st, &fx.geo);
+            let terrane: Vec<u32> = (0..N as u32)
+                .filter(|&i| {
+                    st.plate_of(i as usize) == 1 && st.samples[i as usize].is_continental()
+                })
+                .collect();
+            let crossed: Vec<u32> = terrane.iter().copied().step_by(7).take(20).collect();
+            for &i in &crossed {
+                let s = &mut st.samples[i as usize];
+                s.flags |= HIDDEN;
+                s.stacked = true;
+            }
+            let seeds: Vec<u32> = terrane
+                .iter()
+                .copied()
+                .filter(|i| !crossed.contains(i))
+                .take(5)
+                .collect();
+            let env = fx.env(1);
+            let done = crate::plates::collision::collide(
+                &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, true,
+            )
+            .unwrap();
+            assert_eq!(done.sutured, weld);
+            // The rest of the terrane is the receiving plate's visible crust.
+            let rest = if weld { 1 } else { 0 };
+            for &i in terrane.iter().filter(|i| !crossed.contains(i)) {
+                assert_eq!(st.plate_of(i as usize), rest);
+                assert!(!st.samples[i as usize].is_hidden());
+            }
+            for &i in &crossed {
+                let s = &st.samples[i as usize];
+                assert!(s.is_hidden() && s.stacked, "weld {weld}: {i} came back up");
+                if !weld {
+                    assert_eq!(st.plate_of(i as usize), 1, "{i} moved with the terrane");
+                }
+            }
+        }
     }
 }

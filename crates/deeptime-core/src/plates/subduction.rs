@@ -63,7 +63,7 @@ use super::state::{
     ARC, CONTINENTAL, Contact, DIVERGENT, EMERGED, FORELAND, HIDDEN, HOTSPOT, OROGENY_ANDEAN,
     OROGENY_HIMALAYAN, PlateState, SUBDUCTION_ZONE, TRENCH, pool,
 };
-use super::transition::{crust_per_metre, crystalline_m, held_floor_m};
+use super::transition::{continental_m, crust_per_metre, crystalline_m, held_floor_m};
 use crate::error::CoreError;
 use crate::world::WorldState;
 
@@ -155,9 +155,29 @@ pub fn resolve(
         s.flags &=
             !(HIDDEN | TRENCH | ARC | HOTSPOT | DIVERGENT | SUBDUCTION_ZONE | EMERGED | FORELAND);
         // The collisions' footprint is stamped again each step they have a front (`belts.rs`).
+        // `stacked` stays while the crust stays under (below).
         s.collision_mm_yr = 0.0;
         s.shortening_km = 0.0;
-        s.stacked = false;
+    }
+    // Ocean floor at a plate contact with at least a normal continental column's crystalline
+    // crust (T_n, 33 km, the transition's PLT-261) is continental crust, whatever stacked it there
+    // (a resampling's accretion, a slab's accreted crust): it collides, stacks into a belt or
+    // moves across as a terrane like any continental crust, instead of going under as ocean
+    // floor and coming back in one lump on the column above it at the next resampling (ledger:
+    // PLT-289; build log 2026-10-18 "Resampling lumps"). Crust that thick is far past the ~15 km
+    // that jams a subduction zone (Cloos 1993, PLT-047); the threshold is T_n and not 15 km so
+    // that the transition's ocean side (up to about 20 km, the thinned margin, ocean floor by
+    // design) keeps its type: at 15 km two traced runs turned ten times as many samples, the
+    // taper forming again behind each converted ring, and grew the continents (build log).
+    let buoyant_m = continental_m();
+    for o in overlaps {
+        for idx in [o.i, o.cover.major()] {
+            let s = &mut state.samples[idx as usize];
+            if s.kind != CONTINENTAL && crystalline_m(&s.pools) >= buoyant_m {
+                s.kind = CONTINENTAL;
+                state.counters.buoyant += 1;
+            }
+        }
     }
     // A collision's own belt and wedge are stamped as a collision orogeny each step (`belts.rs`):
     // that crust is not locked against the collision that stamps it.
@@ -307,7 +327,10 @@ pub fn resolve(
             let s = &mut state.samples[o.i as usize];
             s.flags |= HIDDEN;
             // ledger: PLT-276 (crust a collision stacks is not accreted again at a resampling).
-            s.stacked = own.is_some() && s.kind == CONTINENTAL;
+            // Once stacked it stays so while it is under (ledger: PLT-291): the belt counted it
+            // when it crossed the front, and a collision that ends (a parting, a transfer, a weld)
+            // does not make it crust to accrete again.
+            s.stacked |= own.is_some() && s.kind == CONTINENTAL;
             if let Some(was) = &was_hidden
                 && s.kind == CONTINENTAL
                 && !was[o.i as usize]
@@ -325,6 +348,9 @@ pub fn resolve(
                 seeds.entry(k).or_default().push(m);
             }
         }
+    }
+    for s in &mut state.samples {
+        s.stacked &= s.is_hidden();
     }
     for list in seeds.values_mut() {
         list.sort_unstable();

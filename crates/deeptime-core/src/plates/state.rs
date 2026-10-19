@@ -156,10 +156,12 @@ pub struct Sample {
     /// `plates/shortening`).
     pub collision_mm_yr: f32,
     pub shortening_km: f32,
-    /// Continental crust hidden this step under the overriding plate of a contact in collision
+    /// Continental crust hidden under the overriding plate of a contact in collision
     /// (`subduction::resolve`): the collision stacks its volume into the belt and the wedge, or
     /// sends it down with the slab (`belts.rs`), so a resampling consumes it instead of accreting
-    /// it a second time to the column on top (`ridges::resample`; ledger PLT-276).
+    /// it a second time to the column on top (`ridges::resample`; ledger PLT-276). It stays set
+    /// while the crust stays hidden, after the collision ends too, and a terrane transfer or weld
+    /// leaves such crust where it is (ledger PLT-291).
     pub stacked: bool,
 }
 
@@ -458,6 +460,10 @@ pub struct Counters {
     pub healed: u32,
     /// Island-arc samples that emerged and became continental crust (P1-27).
     pub emerged: u32,
+    /// Ocean-floor samples at a plate contact too thick to subduct, made continental crust
+    /// (`subduction::resolve`, ledger PLT-289).
+    #[serde(default)]
+    pub buoyant: u32,
     pub ridges: u32,
     pub hotspots: u32,
     pub lips: u32,

@@ -4339,7 +4339,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Cloos, M. (1993). Lithospheric buoyancy and collisional orogenesis: subduction of oceanic plateaus, continental margins, island arcs, spreading ridges, and seamounts. Geological Society of America Bulletin 105(6):715-737.
 - DOI or URL: 10.1130/0016-7606(1993)105<0715:LBACOS>2.3.CO;2.
 - Cited as: in ledger FRC-005 as the usual source for oceanic lithosphere becoming denser than the mantle after about 10 Myr; since 2026-10-02 "Cloos 1993" for the island-arc maturity rule (PLT-047, HNT-090). Since 2026-10-05 for the collision's buoyancy (FRC-028 to FRC-030, PLT-275): 80-Myr oceanic lithosphere about 0.04 g/cm³ denser than the asthenosphere, 100 km of lithosphere with a 30 km continental crust about 0.09 g/cm³ lighter (abstract).
-- Ledger ids: FRC-005, PLT-047, HNT-092
+- Ledger ids: FRC-005, PLT-047, HNT-092, PLT-289 (2026-10-18: the context for ocean floor as thick as a continent turning continental at a contact)
 - Access: paywalled.
 - Library (the project's source library, not distributed): abstract only, 2026-10-02 (OpenAlex record of the GSW page): `Cloos1993/openalex.json`, text `Cloos1993/abstract.txt`.
 - Read so far (by the project): FRC-005 from memory (force-balance task 5, 2026-10-02). Abstract read 2026-10-02 (continental crust fix): "Oceanic lithosphere that is ~10 m.y. old is the youngest that is more dense than the asthenosphere"; "Lithosphere that is 100 km thick with a 30-km-thick granitic continental crust resists Subduction because it is ~0.09 gm/cm3 less dense than the asthenosphere"; "only bodies of continental and oceanic island arc crust that are > ~15 km thick make the lithosphere buoyant enough to jam a subduction zone. Oceanic island arc complexes built upon ocean crust typically must be active for more than ~20 m.y. to attain crustal thicknesses so that their attempted subduction causes collisional orogenesis." The reference agrees with the OpenAlex record.
@@ -6673,3 +6673,15 @@ Cited for the principle that a glacier's net balance summed over its area is zer
 - Library (the project's source library, not distributed): not fetched.
 - Read so far (by the project): from memory (the AABR method: the ablation area's balance gradient times its area-weighted height below the line equals the accumulation area's above it, the balance ratio the ratio of the two gradients).
 
+## Resampling lumps: the crust lost to the mantle (PLT-258, PLT-289 to PLT-292), added 2026-10-18
+
+The figure the plate model's loss to the mantle is compared with, read again with the fix for the resampling's lumps (build log 2026-10-18 "Resampling lumps"). Cloos 1993 (above, under the force balance) is the context for PLT-289. PLT-290 to PLT-292 are bookkeeping and cite nothing.
+
+### ScholvonHuene2009
+- Reference: Scholl, D. W. and von Huene, R. (2009). Implications of estimated magmatic additions and recycling losses at the subduction zones of accretionary (non-collisional) and collisional (suturing) orogens. In: Cawood, P. A. and Kröner, A. (eds), Earth Accretionary Systems in Space and Time. Geological Society, London, Special Publications 318:105-125.
+- DOI or URL: 10.1144/SP318.4
+- Cited as: "Scholl & von Huene 2009" (through Stern & Scholl 2010: continental crust lost at collision zones, about 0.7 km3/yr).
+- Ledger ids: PLT-258
+- Access: paywalled.
+- Library: not kept (the abstract was read from the Crossref record, 2026-10-18).
+- Read so far (by the project): cited through Stern & Scholl 2010 since 2026-10-03. Abstract, 2026-10-18 (resampling lumps agent, Crossref record): at ocean-margin subduction zones (OMSZs) "Crustal recycling at Mesozoic and younger OMSZs is assessed at c. 60 km3 Ma−1 km−1 (c. 60% by subduction erosion). The corresponding global recycling rate is c. 2.5 AU"; at crust-suturing subduction zones (CSSZs) "the combined upper and lower plate losses of CIA crust via subduction erosion, sediment subduction, and lower plate crustal detachment and sinking are assessed far less securely at c. 115 km3 Ma−1 km−1. At a global length of 6000 km, recycling at CSSZs is accordingly c. 0.7 AU"; the 6000 km "presumes that in the past the global length of crustal collision zones averaged c. 6000 km, which is one-half that under way since the early Tertiary"; the collective loss is c. 3.2 AU against SZ additions of +2.7 AU, so net growth is about nil; 1 AU is 1 km3 of solid material a year. So the 0.7 km3/yr in PLT-258 is the paper's figure for collision zones alone and was cited correctly; it rests on the assumed past mean length (about 1.4 km3/yr at today's, the agent's arithmetic), and the loss at all subduction zones is 3.2 km3/yr, most of it by subduction erosion at ocean margins, which the plate model does not have.
