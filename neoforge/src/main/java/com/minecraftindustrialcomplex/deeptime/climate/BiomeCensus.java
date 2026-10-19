@@ -92,11 +92,21 @@ public final class BiomeCensus {
      * read 2026-10-18), while its other taigas ({@code old_growth_taiga_crags}, the boreal forests) carry {@code c:is_taiga}
      * and {@code c:is_tree/coniferous}, and the biome-mods survey puts it in the Dc/Dd row
      * (docs/research/notes/biome-mods-survey.md). On master 9091c163's test planet with -PwithEe its columns were every
-     * miss of the D family (Dfb 5, Dfc 5: D 0.870 under its floor 0.88), of Dsub and of Dfc:taiga. The columns matched
-     * only through this table are counted in each check's {@code via_tag_gaps}.
+     * miss of the D family (Dfb 5, Dfc 5: D 0.870 under its floor 0.88), of Dsub and of Dfc:taiga.
+     * <p>
+     * A biome its mod tags against its own placement is read the same way. Expanded Ecosphere 3.4.7 places
+     * {@code wythers:subtropical_forest} (27 entries) and {@code wythers:subtropical_forest_edge} (27) at temperature 0.15
+     * to 0.2 of its overworld parameter list (resources/ee_default/data/minecraft/dimension/overworld.json, read
+     * 2026-10-18), inside vanilla's temperate band (-0.15 to 0.2, BIO-021), in the cell where it also places
+     * {@code minecraft:forest}; it tags both {@code c:is_hot/overworld} and neither {@code c:is_temperate}. A broken
+     * mapping that sent C ground to the warm or hot band would not reach them there. On master 3efc5ff8's test planet
+     * with -PwithEe the subtropical forest was 49 of the C family's 61 misses (C 103 of 164, 0.628 under its floor 0.63).
+     * The columns matched only through this table are counted in each check's {@code via_tag_gaps}.
      */
     static final Map<String, List<TagKey<Biome>>> TAG_GAPS = Map.of(
-            "wythers:ancient_taiga", List.of(c("is_taiga"), c("is_tree/coniferous")));
+            "wythers:ancient_taiga", List.of(c("is_taiga"), c("is_tree/coniferous")),
+            "wythers:subtropical_forest", List.of(c("is_temperate")),
+            "wythers:subtropical_forest_edge", List.of(c("is_temperate")));
 
     /**
      * A Köppen family and biomes it must not land on (the share of its columns that do is bounded);

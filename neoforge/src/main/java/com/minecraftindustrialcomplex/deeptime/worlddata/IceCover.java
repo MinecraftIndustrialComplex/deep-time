@@ -90,8 +90,12 @@ public interface IceCover {
         Spec spec = Spec.read(wd.manifest().notes());
         if (spec == null)
             return Optional.empty();
-        RasterSampler layer = wd.layer(LAYER);
-        return Optional.of(new IceCover() {
+        return Optional.of(of(wd.layer(LAYER), spec));
+    }
+
+    /** The cover of a {@code climate/ice_cover} layer read by the cover rule with the table {@code spec} (as {@link #of(WorldData)}). */
+    static IceCover of(RasterSampler layer, Spec spec) {
+        return new IceCover() {
             @Override
             public int blocks(int x, int z) {
                 double v = layer.cover(x, z);
@@ -102,6 +106,6 @@ public interface IceCover {
             public Spec spec() {
                 return spec;
             }
-        });
+        };
     }
 }
