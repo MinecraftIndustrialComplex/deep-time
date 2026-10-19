@@ -50,6 +50,8 @@ pub mod coarse;
 pub mod ebm;
 pub mod ebm2d;
 pub mod glaciers;
+#[cfg(feature = "gpu")]
+pub mod gpu;
 pub mod ice;
 pub mod insolation;
 pub mod koppen;
@@ -68,6 +70,7 @@ pub mod upwind;
 mod tests;
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::time::Instant;
 
 use deeptime_format::{GridDesc, Place};
@@ -244,6 +247,8 @@ struct Saved {
     escape_ppm: Vec<f64>,
     /// The end-weighted nudges' controllers (`steering`; nothing while it is off or before its tail).
     steer: crate::steering::SteerState,
+    /// Where the snapshots' cells ran over the run (`CellsAccel`).
+    cells: CellsCount,
 }
 
 /// What `present_climate` did: the CO₂ factor it settled on and the state with and without it.
@@ -304,6 +309,120 @@ pub struct ClimateStage {
     total: u64,
     s: Saved,
     timings: BTreeMap<&'static str, f64>,
+    cells: CellsAccel,
+}
+
+/// Where the snapshots' cells loop runs (`gpu.rs`; `docs/design/gpu-compute.md`): the device is
+/// found at the first snapshot under the session's compute mode and dropped after a failure; the
+/// counts go to the run's notes (`compute`). The device is not saved (a resumed run looks again);
+/// the counts are (`CellsCount`), so a resumed run's notes are a whole run's.
+#[derive(Default)]
+struct CellsAccel {
+    probed: bool,
+    dev: Option<Arc<dyn snapshot::CellsDevice>>,
+    device: Option<String>,
+    kernel_ms: f64,
+    failed: Option<String>,
+}
+
+/// The snapshots whose cells ran on the device and on the CPU, and the device's chunks,
+/// dispatches, bytes each way and largest memory, over the run.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+struct CellsCount {
+    on_device: u64,
+    on_cpu: u64,
+    chunks: u64,
+    dispatches: u64,
+    bytes_up: u64,
+    bytes_down: u64,
+    device_bytes: u64,
+}
+
+impl CellsAccel {
+    /// The device for a snapshot on a `w × h` grid, or None for the CPU: only the per-cell
+    /// climate with the belts' rain runs on one, and only when its host arrays fit the cap.
+    fn get(
+        &mut self,
+        ctx: &StageContext<'_>,
+        p: &ClimateParams,
+        w: usize,
+        h: usize,
+        monthly: bool,
+    ) -> Option<Arc<dyn snapshot::CellsDevice>> {
+        if !self.probed {
+            self.probed = true;
+            if p.model == ClimateModel::PerCell && p.rain_model == RainModel::Belts {
+                self.dev = cells_accel(ctx);
+                self.device = self.dev.as_ref().map(|d| d.name());
+            }
+        }
+        let dev = self.dev.clone()?;
+        ctx.reserve(dev.host_bytes(w, h, monthly)).ok()?;
+        Some(dev)
+    }
+
+    /// Counts where a snapshot's cells ran; after a device error the rest of the run is on the
+    /// CPU.
+    fn ran(&mut self, ctx: &StageContext<'_>, n: &mut CellsCount, run: &snapshot::CellsRun) {
+        match run {
+            snapshot::CellsRun::Cpu => n.on_cpu += 1,
+            snapshot::CellsRun::Device(st) => {
+                n.on_device += 1;
+                n.chunks += u64::from(st.chunks);
+                n.dispatches += u64::from(st.dispatches);
+                n.bytes_up += st.bytes_up;
+                n.bytes_down += st.bytes_down;
+                n.device_bytes = n.device_bytes.max(st.device_bytes);
+                self.kernel_ms += st.kernel_ms;
+            }
+            snapshot::CellsRun::Failed(e) => {
+                n.on_cpu += 1;
+                ctx.log.push(
+                    crate::log::Level::Warn,
+                    format!("climate: the cells failed on the GPU, running on the CPU ({e})"),
+                );
+                self.failed = Some(e.clone());
+                self.dev = None;
+            }
+        }
+    }
+
+    fn note(&self, n: &CellsCount) -> serde_json::Value {
+        json!({
+            "cells_device": self.device,
+            "cells_on_device": n.on_device,
+            "cells_on_cpu": n.on_cpu,
+            "cells_chunks": n.chunks,
+            "cells_dispatches": n.dispatches,
+            "cells_bytes_up": n.bytes_up,
+            "cells_bytes_down": n.bytes_down,
+            "cells_device_bytes": n.device_bytes,
+            "cells_kernel_ms": self.kernel_ms,
+            "cells_failed": self.failed,
+        })
+    }
+}
+
+/// The cells loop's device under the session's compute mode (`compute.rs`).
+#[cfg(feature = "gpu")]
+fn cells_accel(ctx: &StageContext<'_>) -> Option<Arc<dyn snapshot::CellsDevice>> {
+    let g = crate::compute::device(ctx.compute, ctx.log)?;
+    match gpu::CellsGpu::new(g) {
+        Ok(c) => Some(Arc::new(c)),
+        Err(e) => {
+            ctx.log.push(
+                crate::log::Level::Warn,
+                format!("climate: the GPU kernel did not build, the cells run on the CPU ({e})"),
+            );
+            None
+        }
+    }
+}
+
+#[cfg(not(feature = "gpu"))]
+fn cells_accel(ctx: &StageContext<'_>) -> Option<Arc<dyn snapshot::CellsDevice>> {
+    crate::compute::warn_without_gpu(ctx.compute, ctx.log);
+    None
 }
 
 /// Memory and time estimate: the group's (surface or plates) plus ~150 B per L1 cell (18 fields,
@@ -712,6 +831,7 @@ impl ClimateStage {
             total,
             s: Saved::default(),
             timings: BTreeMap::new(),
+            cells: CellsAccel::default(),
         }
     }
 
@@ -1050,7 +1170,9 @@ impl ClimateStage {
                 correction: &percell::Correction::default(),
             };
             let mut ebm0 = EbmState::default();
-            let s0 = snapshot::compute(&inp, &mut ebm0, &[], &mut self.s.cell);
+            let dev = self.cells.get(ctx, &p, w, hgt, false);
+            let s0 = snapshot::compute_on(&inp, &mut ebm0, &[], &mut self.s.cell, dev.as_deref());
+            self.cells.ran(ctx, &mut self.s.cells, &s0.cells_on);
             self.s.correction = s0.correction.clone();
             let er0 = s0.ebm.clone().expect("a snapshot keeps its EBM year");
             let (mean0, summer0) = clock::land_temps(&er0);
@@ -1547,7 +1669,15 @@ impl ClimateStage {
             let mut ebm = std::mem::take(&mut self.s.ebm);
             let mut cell = std::mem::take(&mut self.s.cell);
             let sinking_before = cell.sinking;
-            let s = snapshot::compute(&inp, &mut ebm, &self.s.clock.sheet, &mut cell);
+            let dev = self.cells.get(ctx, &p, w, hgt, last);
+            let s = snapshot::compute_on(
+                &inp,
+                &mut ebm,
+                &self.s.clock.sheet,
+                &mut cell,
+                dev.as_deref(),
+            );
+            self.cells.ran(ctx, &mut self.s.cells, &s.cells_on);
             self.s.ebm = ebm;
             // The conveyor moved to another basin: an event (EVENTS.md).
             if let (Some(a), Some(b)) = (sinking_before, cell.sinking) {
@@ -2278,6 +2408,7 @@ impl ClimateStage {
             "series": {"columns": clock::SERIES_COLUMNS, "rows": round(&self.s.clock.series)},
             "window": {"columns": clock::WINDOW_COLUMNS, "rows": round(&self.s.clock.window)},
             "millis": self.timings,
+            "compute": self.cells.note(&self.s.cells),
         });
         // The nudges a steered run had (absent when steering is off: the note is the unsteered
         // run's).

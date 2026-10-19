@@ -714,3 +714,285 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
         let _ = std::fs::remove_dir_all(d);
     }
 }
+
+/// A [`snapshot::CellsDevice`] that notes, before handing the cells to the GPU, where the
+/// model has a step a last-bit difference can cross: the belt latitude at 0 in some month (the
+/// trades change sides, and with them the orographic field).
+#[cfg(feature = "gpu")]
+#[derive(Debug)]
+struct Watched<'a> {
+    dev: &'a dyn snapshot::CellsDevice,
+    /// Per cell: the smallest |belt latitude| of its months and the height; the lapse rate.
+    seen: std::sync::Mutex<(Vec<f64>, Vec<f64>, f64)>,
+}
+
+#[cfg(feature = "gpu")]
+impl snapshot::CellsDevice for Watched<'_> {
+    fn name(&self) -> String {
+        self.dev.name()
+    }
+
+    fn host_bytes(&self, w: usize, h: usize, monthly: bool) -> u64 {
+        self.dev.host_bytes(w, h, monthly)
+    }
+
+    fn cells(
+        &self,
+        ci: &snapshot::CellsInput<'_>,
+        st: &mut snapshot::CellsStats,
+    ) -> Result<snapshot::Cells, String> {
+        let pb: Vec<f64> = (0..ci.w * ci.h)
+            .map(|c| {
+                let (i, phi) = (c % ci.w, ci.lat[c / ci.w]);
+                (0..12)
+                    .map(|m| (phi - belts::shift(phi, ci.itcz[i][m], ci.hemi[m])).abs())
+                    .fold(f64::MAX, f64::min)
+            })
+            .collect();
+        *self.seen.lock().unwrap() = (pb, ci.z.to_vec(), ci.gamma);
+        self.dev.cells(ci, st)
+    }
+}
+
+/// The largest and mean |GPU − CPU| of a field over the cells `keep` admits, and the largest
+/// relative one (to |CPU|, at least `floor`).
+#[cfg(feature = "gpu")]
+fn gap(cpu: &[f32], dev: &[f32], floor: f64, keep: &dyn Fn(usize) -> bool) -> (f64, f64, f64) {
+    assert_eq!(cpu.len(), dev.len());
+    let (mut max, mut sum, mut rel, mut n) = (0.0f64, 0.0, 0.0f64, 0usize);
+    for (c, (&a, &b)) in cpu.iter().zip(dev).enumerate() {
+        if !keep(c) {
+            continue;
+        }
+        assert!(b.is_finite(), "cell {c}: the GPU's value {b} (CPU {a})");
+        let d = (f64::from(a) - f64::from(b)).abs();
+        max = max.max(d);
+        rel = rel.max(d / f64::from(a).abs().max(floor));
+        sum += d;
+        n += 1;
+    }
+    (max, sum / n.max(1) as f64, rel)
+}
+
+/// The snapshot's cells on the GPU (`gpu.rs`) against the CPU loop on a real planet's terrain
+/// (20 Myr of the coupled pipeline on L1 at 16k, r 64), in today's climate and a cold one with
+/// sea ice and glaciers: temperatures within 0.01 K everywhere; precipitation (annual and
+/// monthly), aridity and the ELA within 1e-4 relative (the ELA, or 1 cm); the sea ice within
+/// 1e-4; Köppen and the glacier flag equal; each but where a month of the cell sits on one of the
+/// model's steps (`gpu.rs`, "Precision"). Several row chunks give the one chunk's results bit for
+/// bit. Any adapter, lavapipe included; skipped without one.
+#[cfg(feature = "gpu")]
+#[test]
+fn the_gpu_cells_stay_within_their_error_budget_of_the_cpu() {
+    let g = match deeptime_gpu::shared(true) {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("skipped: {e}");
+            return;
+        }
+    };
+    let whole = super::gpu::CellsGpu::new(g.clone()).unwrap();
+    let chunked = super::gpu::CellsGpu::new(g).unwrap().with_chunk_cells(4096);
+    let dir = temp_dir("gpu-cells");
+    let s = session(&pipeline_json(3000, 20.0, 5), &dir, 2);
+    finish(&s);
+    let world = s.checkpoint().unwrap().world;
+    let _ = std::fs::remove_dir_all(&dir);
+    let grid = GridDesc::for_planet("L1", 16384, 64).unwrap();
+    let (w, h) = (grid.w as usize, grid.h as usize);
+    let n = w * h;
+    let lat: Vec<f64> = (0..h).map(|j| lat_of_row(&grid, j as u32)).collect();
+    let z: Vec<f64> = world.fields[crate::surface::field::ELEVATION_M]
+        .data
+        .iter()
+        .map(|&x| f64::from(x))
+        .collect();
+    assert_eq!(z.len(), n);
+    let sea = world.surface.as_ref().unwrap().sea_level_m;
+    let p = ClimateParams::default();
+    for (what, star, co2) in [("today", 1.0, 280.0), ("cold", 0.97, 180.0)] {
+        let inp = snapshot::Input {
+            grid: &grid,
+            d: Dims::new(w, h, 64.0 * 300.0, true),
+            lat: &lat,
+            h: &z,
+            sea,
+            p: &p,
+            planet: Planet {
+                star_flux_rel: star,
+                co2_ppm: co2,
+                ..planet()
+            },
+            monthly: true,
+            ice_prev: None,
+            koppen_prev: None,
+            correction: &super::percell::Correction::default(),
+        };
+        let run = |dev: Option<&dyn snapshot::CellsDevice>| {
+            snapshot::compute_on(
+                &inp,
+                &mut EbmState::default(),
+                &[],
+                &mut Default::default(),
+                dev,
+            )
+        };
+        let cpu = run(None);
+        assert!(matches!(cpu.cells_on, snapshot::CellsRun::Cpu));
+        let watched = Watched {
+            dev: &whole,
+            seen: Default::default(),
+        };
+        let dev = run(Some(&watched));
+        let st = match &dev.cells_on {
+            snapshot::CellsRun::Device(st) => *st,
+            other => panic!("{what}: the cells did not run on the GPU: {other:?}"),
+        };
+        let many = run(Some(&chunked));
+        let st_many = match &many.cells_on {
+            snapshot::CellsRun::Device(st) => *st,
+            other => panic!("{what}: the chunked cells did not run on the GPU: {other:?}"),
+        };
+        assert!(st_many.chunks > st.chunks, "{st_many:?} against {st:?}");
+        assert_eq!(dev.t_mean, many.t_mean, "{what}: the chunks changed t_mean");
+        assert_eq!(dev.precip, many.precip, "{what}: the chunks changed precip");
+        assert_eq!(
+            dev.aridity, many.aridity,
+            "{what}: the chunks changed aridity"
+        );
+        assert_eq!(dev.ela, many.ela, "{what}: the chunks changed the ELA");
+        assert_eq!(dev.koppen, many.koppen, "{what}: the chunks changed Köppen");
+        assert_eq!(
+            dev.glacier, many.glacier,
+            "{what}: the chunks changed the glaciers"
+        );
+        assert_eq!(
+            dev.sea_ice, many.sea_ice,
+            "{what}: the chunks changed the sea ice"
+        );
+        assert_eq!(
+            dev.t_sl_month, many.t_sl_month,
+            "{what}: the chunks changed t_sl_month"
+        );
+        assert_eq!(
+            dev.p_month, many.p_month,
+            "{what}: the chunks changed p_month"
+        );
+
+        let (pb, zc, gamma) = watched.seen.into_inner().unwrap();
+        let land: Vec<bool> = cpu.koppen.iter().map(|&k| k != koppen::SEA).collect();
+        let land_n = land.iter().filter(|&&l| l).count();
+        // The steps: the belt latitude at 0 in a month (the regimes swap), a month at 26.5 °C
+        // (Thornthwaite hands over to Willmott) or at 0 °C (Thornthwaite's heat index of nearly
+        // nothing).
+        let on_belt_step = |c: usize| pb[c] < 1e-3;
+        let on_pet_step = |c: usize| {
+            (0..12).any(|m| {
+                let t = f64::from(cpu.t_sl_month[m][c]) - gamma * zc[c];
+                (t - 26.5).abs() < 0.01 || t.abs() < 0.01
+            })
+        };
+        let all = |_: usize| true;
+        let off_belt = |c: usize| !on_belt_step(c);
+        let off_steps = |c: usize| !on_belt_step(c) && !on_pet_step(c);
+        let sea_cell = |c: usize| !land[c];
+        println!(
+            "{what}: {w}x{h}, {land_n} land cells, {} on a belt step, {} on a PET step; \
+             device {}: {st:?}; chunked: {st_many:?}",
+            (0..n).filter(|&c| on_belt_step(c)).count(),
+            (0..n).filter(|&c| on_pet_step(c)).count(),
+            snapshot::CellsDevice::name(&whole),
+        );
+        // A field's gaps over the cells `keep` admits, within `abs` or `rel` of the CPU's (at
+        // least `floor`).
+        let check = |name: &str,
+                     a: &[f32],
+                     b: &[f32],
+                     floor: f64,
+                     keep: &dyn Fn(usize) -> bool,
+                     abs: f64,
+                     rel: f64| {
+            let (max, mean, r) = gap(a, b, floor, keep);
+            println!("{what} {name}: max {max:.3e}, mean {mean:.3e}, max relative {r:.3e}");
+            assert!(
+                max <= abs || r <= rel,
+                "{what} {name}: max {max:e} (budget {abs:e}), relative {r:e} (budget {rel:e})"
+            );
+        };
+        check("t_mean", &cpu.t_mean, &dev.t_mean, 1.0, &all, 0.01, 0.0);
+        check("t_warm", &cpu.t_warm, &dev.t_warm, 1.0, &all, 0.01, 0.0);
+        check("t_cold", &cpu.t_cold, &dev.t_cold, 1.0, &all, 0.01, 0.0);
+        check(
+            "precip",
+            &cpu.precip,
+            &dev.precip,
+            1e-3,
+            &off_belt,
+            0.0,
+            1e-4,
+        );
+        check(
+            "aridity",
+            &cpu.aridity,
+            &dev.aridity,
+            1e-3,
+            &off_steps,
+            0.0,
+            1e-4,
+        );
+        check("ela", &cpu.ela, &dev.ela, 100.0, &off_belt, 0.01, 1e-4);
+        check(
+            "sea_ice",
+            &cpu.sea_ice,
+            &dev.sea_ice,
+            1.0,
+            &sea_cell,
+            1e-4,
+            0.0,
+        );
+        let (a, b) = (&cpu.sea_ice_max, &dev.sea_ice_max);
+        check("sea_ice_max", a, b, 1.0, &sea_cell, 1e-4, 0.0);
+        let (a, b) = (&cpu.sea_ice_min, &dev.sea_ice_min);
+        check("sea_ice_min", a, b, 1.0, &sea_cell, 1e-4, 0.0);
+        assert_eq!(cpu.t_sl_month.len(), 12);
+        for (a, b) in cpu.t_sl_month.iter().zip(&dev.t_sl_month) {
+            check("t_sl_month", a, b, 1.0, &all, 0.01, 0.0);
+        }
+        for (a, b) in cpu.p_month.iter().zip(&dev.p_month) {
+            check("p_month", a, b, 1e-3, &off_belt, 0.0, 1e-4);
+        }
+        // Köppen and the glacier flag: equal, but where a criterion sits on its threshold within
+        // the temperatures' and the rain's f32 noise.
+        let koppen_off: Vec<usize> = (0..n)
+            .filter(|&c| off_belt(c) && cpu.koppen[c] != dev.koppen[c])
+            .collect();
+        let glacier_off: Vec<usize> = (0..n)
+            .filter(|&c| off_belt(c) && cpu.glacier[c] != dev.glacier[c])
+            .collect();
+        println!(
+            "{what}: Köppen differs in {} cells, the glacier flag in {} (of {} glacier cells)",
+            koppen_off.len(),
+            glacier_off.len(),
+            cpu.glacier.iter().filter(|&&g| g == 1).count()
+        );
+        assert!(
+            koppen_off.len() <= (land_n / 1000).max(3),
+            "{what}: Köppen differs in {koppen_off:?}"
+        );
+        for &c in &glacier_off {
+            assert!(
+                (zc[c] - f64::from(cpu.ela[c])).abs() < 0.05,
+                "{what}: cell {c}'s glacier flag differs off its threshold: z {} ELA {} / {}",
+                zc[c],
+                cpu.ela[c],
+                dev.ela[c]
+            );
+        }
+        if what == "cold" {
+            assert!(
+                cpu.glacier.contains(&1) && cpu.sea_ice_max.iter().any(|&x| x > 0.5),
+                "the cold climate has no ice to compare"
+            );
+        }
+    }
+}
