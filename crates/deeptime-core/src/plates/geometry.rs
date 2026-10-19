@@ -346,6 +346,58 @@ pub fn dijkstra_sparse(
     })
 }
 
+/// [`dijkstra_sparse`]'s reached vertices sorted by vertex: the order the belts' sums run in
+/// (P1-19: they ran over every sample before, in sample order, for the few thousand reached).
+///
+/// A run to a shorter reach `r` gives the entries of this list with a distance of at most `r`,
+/// when every source lies within `r`: Dijkstra pops in order of distance and a path's sum only
+/// grows, so every entry beyond `r` is popped after all those within it and never changes one.
+pub fn dijkstra_sorted(
+    geo: &Geo,
+    sources: &[(u32, f64, u32)],
+    allow: impl Fn(u32, u32) -> bool,
+    max_rad: f64,
+) -> Vec<(u32, f64, u32)> {
+    let mut reached = dijkstra_sparse(geo, sources, allow, max_rad);
+    reached.sort_unstable_by_key(|x| x.0);
+    reached
+}
+
+/// [`dijkstra`] of sources that `part(v)` splits into parts no allowed edge joins (`allow(a, b)`
+/// implies `part(a) == part(b)`), each part's [`dijkstra_sparse`] on its own thread (P1-19: the
+/// arcs' run from every front of every plate was one serial search). Returns [`dijkstra`]'s
+/// distances and labels, and the reached vertices ascending. Each vertex gets what the single run
+/// gives it: a part's entries are pushed only by its own pops, and the heap pops them in the same
+/// total order (distance, vertex, label) with or without other parts' entries between them.
+pub fn dijkstra_parts(
+    geo: &Geo,
+    sources: &[(u32, f64, u32)],
+    part: impl Fn(u32) -> u32,
+    allow: impl Fn(u32, u32) -> bool + Sync,
+    max_rad: f64,
+) -> (Vec<f64>, Vec<u32>, Vec<u32>) {
+    let n = geo.points().len();
+    let mut parts: std::collections::BTreeMap<u32, Vec<(u32, f64, u32)>> = Default::default();
+    for &s in sources {
+        parts.entry(part(s.0)).or_default().push(s);
+    }
+    let parts: Vec<Vec<(u32, f64, u32)>> = parts.into_values().collect();
+    let found: Vec<Vec<(u32, f64, u32)>> = parts
+        .par_iter()
+        .map(|src| dijkstra_sparse(geo, src, &allow, max_rad))
+        .collect();
+    let mut dist = vec![f64::INFINITY; n];
+    let mut label = vec![u32::MAX; n];
+    let mut reached = Vec::with_capacity(found.iter().map(Vec::len).sum());
+    for &(v, d, l) in found.iter().flatten() {
+        dist[v as usize] = d;
+        label[v as usize] = l;
+        reached.push(v);
+    }
+    reached.par_sort_unstable();
+    (dist, label, reached)
+}
+
 /// The two nearest distinct classes of source for every vertex (a label-setting Dijkstra where a
 /// vertex accepts at most one distance per class and two classes), over edges `allow` accepts.
 /// `class(label)` maps a source label to its class (a plate). Per vertex: up to two
@@ -574,6 +626,50 @@ mod tests {
         );
         assert!(two.iter().all(|b| b[0].1 != u32::MAX && b[1].1 != u32::MAX));
         assert!(two.iter().all(|b| b[0].1 != b[1].1 && b[0].0 <= b[1].0));
+    }
+
+    /// The sorted and per-part runs give exactly the dense run's distances and labels, and a
+    /// shorter reach the longer run's entries within it.
+    #[test]
+    fn sorted_and_split_dijkstras_match_the_dense_one() {
+        let geo = Geo::build(3000, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let pts = geo.points();
+        // Three bands of latitude no allowed edge crosses, sources in each, labelled in order.
+        let part = |v: u32| {
+            let z = pts[v as usize].z;
+            u32::from(z > -0.2) + u32::from(z > 0.4)
+        };
+        let allow = |a: u32, b: u32| part(a) == part(b) && b % 7 != 3;
+        let sources: Vec<(u32, f64, u32)> = [5u32, 400, 1200, 1201, 2500, 2999, 1700]
+            .iter()
+            .enumerate()
+            .map(|(l, &v)| (v, 0.0, l as u32))
+            .collect();
+        for max_rad in [0.05, 0.3, 10.0] {
+            let (dist, label) = dijkstra(&geo, &sources, allow, max_rad);
+            let dense: Vec<(u32, f64, u32)> = (0..pts.len() as u32)
+                .filter(|&v| dist[v as usize].is_finite())
+                .map(|v| (v, dist[v as usize], label[v as usize]))
+                .collect();
+            let got = dijkstra_sorted(&geo, &sources, allow, max_rad);
+            assert_eq!(got.len(), dense.len());
+            for (g, d) in got.iter().zip(&dense) {
+                assert_eq!((g.0, g.1.to_bits(), g.2), (d.0, d.1.to_bits(), d.2));
+            }
+            let (pd, pl, pr) = dijkstra_parts(&geo, &sources, part, allow, max_rad);
+            assert_eq!(pr, dense.iter().map(|x| x.0).collect::<Vec<_>>());
+            for v in 0..pts.len() {
+                assert_eq!(pd[v].to_bits(), dist[v].to_bits(), "{v}");
+                assert_eq!(pl[v], label[v], "{v}");
+            }
+            // A shorter reach: the entries within it.
+            let short = dijkstra_sorted(&geo, &sources, allow, 0.5 * max_rad);
+            let within: Vec<_> = dense.iter().filter(|x| x.1 <= 0.5 * max_rad).collect();
+            assert_eq!(short.len(), within.len());
+            for (s, w) in short.iter().zip(within) {
+                assert_eq!((s.0, s.1.to_bits(), s.2), (w.0, w.1.to_bits(), w.2));
+            }
+        }
     }
 
     #[test]
