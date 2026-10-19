@@ -213,6 +213,59 @@ pub trait OceanTransport: Sync {
     /// adds the northward heat it moved across every interior row edge (edge e between rows e
     /// and e + 1), W, × `dt`, to `north_j`.
     fn step(&self, tm: &mut [f64], dt: f64, north_j: &mut [f64]);
+
+    /// How the year loop can run [`step`](Self::step): `Whole` (the default) as a call of its
+    /// own, or `Rows` as `n` sub-steps of `ds` seconds that [`substep_rows`](Self::substep_rows)
+    /// does for blocks of rows inside the loop's parallel regions, or `Nothing` where the ocean
+    /// moves no heat (P1-19: fewer, larger parallel regions).
+    fn sub_steps(&self, _dt: f64) -> SubSteps {
+        SubSteps::Whole
+    }
+
+    /// One sub-step for a block of rows: the same values and sums as the matching part of
+    /// `step`, bit for bit. Only called when `sub_steps` said `Rows`.
+    fn substep_rows(&self, _a: SubstepRows<'_>) {
+        unreachable!("sub_steps said Whole")
+    }
+}
+
+/// How the year loop runs an ocean's step (see [`OceanTransport::sub_steps`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum SubSteps {
+    Nothing,
+    Whole,
+    Rows { n: usize, ds: f64, off: f64 },
+}
+
+/// A block of rows' scratch for [`OceanTransport::substep_rows`]: the heat the faces carry.
+#[derive(Clone, Debug, Default)]
+pub struct OceanScratch {
+    pub ce: Vec<f64>,
+    pub cn: Vec<f64>,
+}
+
+/// One sub-step of an ocean's step for rows `j0..` (`out.len() / w` of them).
+pub struct SubstepRows<'a> {
+    /// The sub-step's length, s.
+    pub ds: f64,
+    /// The rows of the field the sub-step reads, from row `src_j0` on (it needs the rows of `out`
+    /// and the one above and the one below): the temperatures are `src[c] - off`.
+    pub src: &'a [f64],
+    pub src_j0: usize,
+    pub off: f64,
+    /// The first row of `out`.
+    pub j0: usize,
+    /// The new temperatures of those rows (the shifted ones; with `last`, °C).
+    pub out: &'a mut [f64],
+    /// The rows `own.0..own.1` (inside those of `out`) are the block's own: the heat moved across
+    /// the north face of each of them (the field's row 0 has none) is accumulated into `north`,
+    /// one per own row.
+    pub own: (usize, usize),
+    pub north: &'a mut [f64],
+    pub scratch: &'a mut OceanScratch,
+    /// On a step's last sub-step: the slab's °C before the step, which cells without water keep;
+    /// `out` is then in °C.
+    pub last: Option<&'a [f64]>,
 }
 
 /// Monthly means of the last year run, per cell, and the year's global budget.
@@ -363,7 +416,6 @@ pub fn run(
     let free_land: Vec<f64> = (0..n)
         .map(|c| free_sea[c / w] + p.desert_albedo * desert[c])
         .collect();
-    let frozen = |t: f64| 1.0 - smoothstep(ep.ice_temp_c - 3.0, ep.ice_temp_c + 3.0, t);
     // Insolation of every step and row (the step's midpoint).
     let q: Vec<Vec<f64>> = (0..spy)
         .map(|st| {
@@ -434,13 +486,60 @@ pub fn run(
     };
     let mut itcz = itcz0;
     let mut prev: Option<(Vec<f64>, Vec<f64>)> = None;
-    // The steps' buffers: each cell's absorbed and emitted radiation, T̄ before and after the
-    // atmosphere's transport, and the solves' intermediate.
-    let mut a_sr = vec![0.0; n];
-    let mut a_lr = vec![0.0; n];
+    // The parallel regions work on blocks of whole rows (P1-19): a block is `bs` rows. A step is
+    // one region (and the columns' sweeps beside it), not one per phase: for each block of rows
+    // the zonal shift, the ocean's sub-steps (each block redoing the few rows of halo they need
+    // from their neighbours), the freezing and the month's means, and then the next step's local
+    // terms and row sweeps. Every cell's arithmetic and every sum keep their order, so the
+    // values are those of the phases run one after the other (the tests keep the old loop and
+    // compare bit for bit).
+    let bs = h.div_ceil(2 * rayon::current_num_threads()).max(1);
+    let nb = h.div_ceil(bs);
+    let ctx = Ctx {
+        p,
+        w,
+        h,
+        bs,
+        dt,
+        pm: per_month as f64,
+        lat: &lat,
+        f: &f,
+        free_sea: &free_sea,
+        free_land: &free_land,
+        sheet: &sheet,
+        dx_row: &dx_row,
+        ocean,
+        atm: &atm,
+        slab: slab.as_ref(),
+    };
+    let oc = ocean.map_or(SubSteps::Nothing, |o| o.sub_steps(dt));
+    // The ocean's sub-steps in groups of at most `MAX_GROUP` (each group is one region).
+    let groups: Vec<usize> = match oc {
+        SubSteps::Rows { n: subs, .. } => {
+            let g = subs.div_ceil(MAX_GROUP);
+            (0..g)
+                .map(|i| subs / g + usize::from(i < subs % g))
+                .collect()
+        }
+        _ => vec![],
+    };
+    // The steps' buffers: each cell's absorbed and emitted radiation (this step's and the next
+    // one's), T̄ before and after the atmosphere's transport, and the solves' intermediates (the
+    // slab's own, so that both diffusions can run at once).
+    let mut a_sr = [vec![0.0; n], vec![0.0; n]];
+    let mut a_lr = [vec![0.0; n], vec![0.0; n]];
     let mut mean = vec![0.0; n];
     let mut tb = vec![0.0; n];
-    let mut half = vec![0.0; n];
+    let mut half_a = vec![0.0; n];
+    let slab_n = if slab.is_some() { n } else { 0 };
+    let mut half_s = vec![0.0; slab_n];
+    let mut mean_s = vec![0.0; slab_n];
+    // The ocean's groups of sub-steps pass the field on in one of two buffers and end in a third,
+    // which then becomes the slab (`state.t_mixed` goes back to being the spare).
+    let mut th_a = vec![0.0; if groups.len() > 1 { n } else { 0 }];
+    let mut th_b = vec![0.0; if groups.len() > 1 { n } else { 0 }];
+    let mut tm_new = vec![0.0; if groups.is_empty() { 0 } else { n }];
+    let mut scratch: Vec<BlockScratch> = (0..nb).map(|_| BlockScratch::default()).collect();
     // Each cell's T̄ at the step's end, for the global mean.
     let mut tbar = vec![0.0; n];
     for year in 0..years.max(1) {
@@ -452,142 +551,234 @@ pub fn run(
         let (mut asr, mut olr, mut tg) = (0.0, 0.0, 0.0);
         let mut north_atm = vec![0.0; h.saturating_sub(1)];
         let mut north_od = vec![0.0; h.saturating_sub(1)];
-        let mut north_o = vec![0.0; h.saturating_sub(1)];
-        for (st, qs) in q.iter().enumerate() {
+        // The ocean's, one per row (row j's north face; row 0 has none), so that the blocks
+        // each hold their own.
+        let mut north_o = vec![0.0; h];
+        // The year's first step's local terms and row sweeps (the later steps' run at the end
+        // of the step before).
+        stage(
+            &ctx,
+            &Plan {
+                month: 0,
+                itcz_m: 0.0,
+                shift: false,
+                sub: None,
+                means: false,
+                next: Some(&q[0]),
+            },
+            StageArrays {
+                tb: &mut tb,
+                mean: &mut mean,
+                tl: &mut state.t_land,
+                to: &mut state.t_ocean,
+                ice: &mut state.ice_j_m2,
+                out: &mut state.t_mixed,
+                north: &mut north_o,
+                scratch: &mut scratch,
+                ml: &mut ml,
+                mo: &mut mo,
+                mm: &mut mm,
+                mi: &mut mi,
+                tbar: &mut tbar,
+                rt: &mut row_t,
+                sr: &mut a_sr[0],
+                lr: &mut a_lr[0],
+                half_a: &mut half_a,
+                half_s: &mut half_s,
+            },
+        );
+        for st in 0..q.len() {
             let month = st / per_month;
-            // 1. Local terms, implicit (`ebm.rs`'s 3 × 3 solve), cells in parallel, each writing
-            //    its own tiles, its budget and its new T̄ (`mean`, the atmosphere's diffusion's
-            //    input).
-            state
-                .t_land
-                .par_iter_mut()
-                .zip(state.t_ocean.par_iter_mut())
-                .zip(state.t_mixed.par_iter_mut())
-                .zip(state.ice_j_m2.par_iter_mut())
-                .zip(a_sr.par_iter_mut().zip(a_lr.par_iter_mut()))
-                .zip(mean.par_iter_mut())
-                .enumerate()
-                .for_each(
-                    |(c, (((((tl_c, to_c), tm_c), ice_c), (sr_c, lr_c)), mean_c))| {
-                        let j = c / w;
-                        let (to, tl, tm) = (*to_c, *tl_c, *tm_c);
-                        let mut ice = *ice_c;
-                        let h_ice = ice / ICE_J_M3;
-                        let cover = (h_ice / FULL_ICE_M).min(1.0);
-                        let insulated = smoothstep(0.5 * SEA_ICE_CAP_M, SEA_ICE_CAP_M, h_ice);
-                        let gc = OPEN_WATER_W_M2_K * (1.0 - cover)
-                            + (ICE_W_M_K / h_ice.max(0.05)).min(OPEN_WATER_W_M2_K)
-                                * cover
-                                * (1.0 - insulated);
-                        let ao = free_sea[j] + (ep.ai - free_sea[j]) * frozen(to).max(cover);
-                        let al = free_land[c] + (ep.ai - free_land[c]) * frozen(tl).max(sheet[c]);
-                        let so = qs[j] * (1.0 - ao);
-                        let sl = qs[j] * (1.0 - al);
-                        let (cl, cs, cm) = (ep.c_land / dt, ep.c_land / dt, ep.c_ocean / dt);
-                        let (xl, xo) = (ep.exchange * (1.0 - f[c]), ep.exchange * f[c]);
-                        let (a_l, b_l) = super::co2::longwave(
-                            ep.a,
-                            ep.b,
-                            ep.co2.as_ref(),
-                            tl,
-                            ep.snow_cloud,
-                            frozen(tl).max(sheet[c]),
-                        );
-                        let (a_o, b_o) = super::co2::longwave(
-                            ep.a,
-                            ep.b,
-                            ep.co2.as_ref(),
-                            to,
-                            ep.snow_cloud,
-                            cover,
-                        );
-                        let (r1, r2, r3) = (cl * tl + sl - a_l, cs * to + so - a_o, cm * tm);
-                        let a33 = cm + gc;
-                        let a11 = cl + b_l + xl;
-                        let a22 = cs + b_o + xo + gc - gc * gc / a33;
-                        let r2 = r2 + gc * r3 / a33;
-                        let det = a11 * a22 - xl * xo;
-                        let tl2 = (r1 * a22 + xl * r2) / det;
-                        let mut to2 = (a11 * r2 + xo * r1) / det;
-                        let mut tm2 = (r3 + gc * to2) / a33;
-                        *sr_c = f[c] * sl + (1.0 - f[c]) * so;
-                        *lr_c = f[c] * (a_l + b_l * tl2) + (1.0 - f[c]) * (a_o + b_o * to2);
-                        if ice > 0.0 && to2 > 0.0 {
-                            let melt = (to2 * ep.c_land).min(ice);
-                            ice -= melt;
-                            to2 -= melt / ep.c_land;
-                        }
-                        // At once, as `ebm.rs` does: the slab's diffusion then never sees a slab
-                        // below the freezing point.
-                        freeze_melt(&mut tm2, &mut ice, ep.c_ocean);
-                        (*tl_c, *to_c, *tm_c, *ice_c) = (tl2, to2, tm2, ice);
-                        *mean_c = f[c] * tl2 + (1.0 - f[c]) * to2;
+            let itcz_m = itcz[month];
+            let qn = q.get(st + 1).map(|v| &v[..]);
+            // 2. The columns' sweeps of the atmosphere's diffusion of T̄ (implicit ADI: the rows'
+            //    were done with the local terms) and the slab's, with the heat each moved north,
+            //    side by side (they share nothing).
+            rayon::join(
+                || {
+                    atm.columns(&half_a, &mut tb);
+                    northward(w, &k_ns, &tb, r2 * dt, &mut north_atm);
+                },
+                || {
+                    if let Some(slab) = &slab {
+                        slab.columns(&half_s, &mut mean_s);
+                        northward(w, &ko_ns, &mean_s, r2 * dt, &mut north_od);
+                    }
+                },
+            );
+            if slab.is_some() {
+                // The slab's new temperatures.
+                std::mem::swap(&mut state.t_mixed, &mut mean_s);
+            }
+            // 3.–5. The prevailing wind's zonal shift of T̄ (both tiles then take T̄'s change),
+            //    the ocean's transport of the slab's heat in its sub-steps, freezing and melting
+            //    at the slab and the month's means (each cell's own, a row's zonal sum in cell
+            //    order); then, for the next step, 1. and 2.'s rows; and the step's global sums,
+            //    in cell order.
+            let (cur_sr, nxt_sr) = pick(&mut a_sr, st % 2);
+            let (cur_lr, nxt_lr) = pick(&mut a_lr, st % 2);
+            match oc {
+                SubSteps::Nothing => stage(
+                    &ctx,
+                    &Plan {
+                        month,
+                        itcz_m,
+                        shift: true,
+                        sub: None,
+                        means: true,
+                        next: qn,
                     },
-                );
-            // 2. The atmosphere's diffusion of T̄, implicit ADI: rows (cyclic), then columns.
-            atm.solve(&mean, &mut half, &mut tb);
-            northward(w, &k_ns, &tb, r2 * dt, &mut north_atm);
-            // 3. The prevailing wind's zonal shift of T̄, then both tiles take T̄'s change; rows
-            //    in parallel.
-            let rows = tb
-                .par_chunks_mut(w)
-                .zip(mean.par_chunks(w))
-                .zip(state.t_land.par_chunks_mut(w))
-                .zip(state.t_ocean.par_chunks_mut(w))
-                .enumerate();
-            if p.wind_heat > 0.0 {
-                let hemi = p.hemi_shift[month];
-                rows.for_each_init(Vec::new, |src, (j, (((row, m), tl), to))| {
-                    let phi = lat[j];
-                    let pb = phi - belts::shift(phi, itcz[month], hemi);
-                    let u = p.wind_heat * low_level_wind(pb);
-                    shift_row_with(row, u * dt / dx_row[j], src);
-                    add_change(row, m, tl, to);
-                });
-            } else {
-                rows.for_each(|(_, (((row, m), tl), to))| add_change(row, m, tl, to));
-            }
-            // 4. The ocean: the slab's diffusion through the sea, then its transport.
-            if let Some(slab) = &slab {
-                // `mean` is free again: it takes the slab's new temperatures.
-                slab.solve(&state.t_mixed, &mut half, &mut mean);
-                northward(w, &ko_ns, &mean, r2 * dt, &mut north_od);
-                std::mem::swap(&mut state.t_mixed, &mut mean);
-            }
-            if let Some(o) = ocean {
-                o.step(&mut state.t_mixed, dt, &mut north_o);
-            }
-            // 5. Freezing and melting at the slab, then the month's means (each cell's own),
-            //    rows in parallel (a row's zonal sum in cell order, as one loop over the cells
-            //    made it); then the step's global sums, in cell order.
-            let pm = per_month as f64;
-            state
-                .t_mixed
-                .par_chunks_mut(w)
-                .zip(state.ice_j_m2.par_chunks_mut(w))
-                .zip(state.t_land.par_chunks(w).zip(state.t_ocean.par_chunks(w)))
-                .zip(ml.par_chunks_mut(w).zip(mo.par_chunks_mut(w)))
-                .zip(mm.par_chunks_mut(w).zip(mi.par_chunks_mut(w)))
-                .zip(tbar.par_chunks_mut(w).zip(row_t.par_iter_mut()))
-                .enumerate()
-                .for_each(
-                    |(j, (((((tm, ice), (tl, to)), (ml, mo)), (mm, mi)), (tbar, rt)))| {
-                        for i in 0..w {
-                            let c = j * w + i;
-                            freeze_melt(&mut tm[i], &mut ice[i], ep.c_ocean);
-                            ml[i][month] += tl[i] / pm;
-                            mo[i][month] += to[i] / pm;
-                            mm[i][month] += tm[i] / pm;
-                            mi[i][month] += (ice[i] / ICE_J_M3 / FULL_ICE_M).min(1.0) / pm;
-                            let t = f[c] * tl[i] + (1.0 - f[c]) * to[i];
-                            tbar[i] = t;
-                            rt[month] += t / pm;
-                        }
+                    StageArrays {
+                        tb: &mut tb,
+                        mean: &mut mean,
+                        tl: &mut state.t_land,
+                        to: &mut state.t_ocean,
+                        ice: &mut state.ice_j_m2,
+                        out: &mut state.t_mixed,
+                        north: &mut north_o,
+                        scratch: &mut scratch,
+                        ml: &mut ml,
+                        mo: &mut mo,
+                        mm: &mut mm,
+                        mi: &mut mi,
+                        tbar: &mut tbar,
+                        rt: &mut row_t,
+                        sr: &mut *nxt_sr,
+                        lr: &mut *nxt_lr,
+                        half_a: &mut half_a,
+                        half_s: &mut half_s,
                     },
-                );
+                ),
+                SubSteps::Whole => {
+                    stage(
+                        &ctx,
+                        &Plan {
+                            month,
+                            itcz_m,
+                            shift: true,
+                            sub: None,
+                            means: false,
+                            next: None,
+                        },
+                        StageArrays {
+                            tb: &mut tb,
+                            mean: &mut mean,
+                            tl: &mut state.t_land,
+                            to: &mut state.t_ocean,
+                            ice: &mut state.ice_j_m2,
+                            out: &mut [],
+                            north: &mut north_o,
+                            scratch: &mut scratch,
+                            ml: &mut ml,
+                            mo: &mut mo,
+                            mm: &mut mm,
+                            mi: &mut mi,
+                            tbar: &mut tbar,
+                            rt: &mut row_t,
+                            sr: &mut *nxt_sr,
+                            lr: &mut *nxt_lr,
+                            half_a: &mut half_a,
+                            half_s: &mut half_s,
+                        },
+                    );
+                    if let Some(o) = ocean {
+                        o.step(
+                            &mut state.t_mixed,
+                            dt,
+                            north_o.get_mut(1..).unwrap_or_default(),
+                        );
+                    }
+                    stage(
+                        &ctx,
+                        &Plan {
+                            month,
+                            itcz_m,
+                            shift: false,
+                            sub: None,
+                            means: true,
+                            next: qn,
+                        },
+                        StageArrays {
+                            tb: &mut tb,
+                            mean: &mut mean,
+                            tl: &mut state.t_land,
+                            to: &mut state.t_ocean,
+                            ice: &mut state.ice_j_m2,
+                            out: &mut state.t_mixed,
+                            north: &mut north_o,
+                            scratch: &mut scratch,
+                            ml: &mut ml,
+                            mo: &mut mo,
+                            mm: &mut mm,
+                            mi: &mut mi,
+                            tbar: &mut tbar,
+                            rt: &mut row_t,
+                            sr: &mut *nxt_sr,
+                            lr: &mut *nxt_lr,
+                            half_a: &mut half_a,
+                            half_s: &mut half_s,
+                        },
+                    );
+                }
+                SubSteps::Rows { ds, off: t_off, .. } => {
+                    for (gi, &subs) in groups.iter().enumerate() {
+                        let first = gi == 0;
+                        let last = gi + 1 == groups.len();
+                        // Group g reads the slab (the first) or the field group g − 1 wrote, and
+                        // writes the other field, or, the last, the new slab.
+                        let (src, off) = if first {
+                            (&state.t_mixed, t_off)
+                        } else {
+                            (&th_a, 0.0)
+                        };
+                        let to_out: &mut Vec<f64> = if last { &mut tm_new } else { &mut th_b };
+                        stage(
+                            &ctx,
+                            &Plan {
+                                month,
+                                itcz_m,
+                                shift: first,
+                                sub: Some(Sub {
+                                    src,
+                                    off,
+                                    ds,
+                                    n: subs,
+                                    last: last.then_some(&state.t_mixed[..]),
+                                }),
+                                means: last,
+                                next: if last { qn } else { None },
+                            },
+                            StageArrays {
+                                tb: &mut tb,
+                                mean: &mut mean,
+                                tl: &mut state.t_land,
+                                to: &mut state.t_ocean,
+                                ice: &mut state.ice_j_m2,
+                                out: to_out,
+                                north: &mut north_o,
+                                scratch: &mut scratch,
+                                ml: &mut ml,
+                                mo: &mut mo,
+                                mm: &mut mm,
+                                mi: &mut mi,
+                                tbar: &mut tbar,
+                                rt: &mut row_t,
+                                sr: &mut *nxt_sr,
+                                lr: &mut *nxt_lr,
+                                half_a: &mut half_a,
+                                half_s: &mut half_s,
+                            },
+                        );
+                        if !last {
+                            std::mem::swap(&mut th_a, &mut th_b);
+                        }
+                    }
+                    std::mem::swap(&mut state.t_mixed, &mut tm_new);
+                }
+            }
             for c in 0..n {
-                asr += area[c] * a_sr[c];
-                olr += area[c] * a_lr[c];
+                asr += area[c] * cur_sr[c];
+                olr += area[c] * cur_lr[c];
                 tg += area[c] * tbar[c];
             }
         }
@@ -603,7 +794,7 @@ pub fn run(
         let pw = 1.0e15 * YEAR_S;
         out.heat_atm_pw = north_atm.iter().map(|x| x / pw).collect();
         out.heat_ocean_diff_pw = north_od.iter().map(|x| x / pw).collect();
-        out.heat_ocean_pw = north_o.iter().map(|x| x / pw).collect();
+        out.heat_ocean_pw = north_o.iter().skip(1).map(|x| x / pw).collect();
         // The next year's ITCZ: the thermal equator of each month's zonal-mean T̄.
         for (m, it) in itcz.iter_mut().enumerate() {
             let rt: Vec<f64> = (0..h).map(|j| row_t[j][m] / w as f64).collect();
@@ -633,6 +824,386 @@ pub fn run(
     out
 }
 
+/// The most ocean sub-steps one region does (each block of rows redoes `n − 1` rows of halo on
+/// each side for `n` of them); more go in further regions.
+const MAX_GROUP: usize = 4;
+
+/// What the year loop's regions share.
+struct Ctx<'a> {
+    p: &'a Params2d,
+    w: usize,
+    h: usize,
+    /// Rows per block.
+    bs: usize,
+    dt: f64,
+    /// Steps per month.
+    pm: f64,
+    lat: &'a [f64],
+    /// Land share of every cell.
+    f: &'a [f64],
+    free_sea: &'a [f64],
+    free_land: &'a [f64],
+    sheet: &'a [f64],
+    /// The zonal shift's cell width of every row, m.
+    dx_row: &'a [f64],
+    ocean: Option<&'a dyn OceanTransport>,
+    atm: &'a Adi,
+    slab: Option<&'a Adi>,
+}
+
+/// Ocean sub-steps inside a region: the field they read, [`SubstepRows::src`] and `off`, their
+/// length and number, and, on a step's last, the slab before the step.
+struct Sub<'a> {
+    src: &'a [f64],
+    off: f64,
+    ds: f64,
+    n: usize,
+    last: Option<&'a [f64]>,
+}
+
+/// What one region does for every block of rows, in this order: the zonal shift of T̄ (with both
+/// tiles taking the change), ocean sub-steps, the freezing and melting at the slab and the
+/// month's means, and the next step's local terms and row sweeps (given its insolation).
+struct Plan<'a> {
+    month: usize,
+    /// The month's ITCZ, degrees (it steers the wind's belts).
+    itcz_m: f64,
+    shift: bool,
+    sub: Option<Sub<'a>>,
+    means: bool,
+    next: Option<&'a [f64]>,
+}
+
+/// The fields a region works on, whole; it takes the ones its plan needs, a block's rows each.
+struct StageArrays<'a> {
+    tb: &'a mut [f64],
+    mean: &'a mut [f64],
+    tl: &'a mut [f64],
+    to: &'a mut [f64],
+    ice: &'a mut [f64],
+    /// The slab: the sub-steps' result, or the slab itself where there are none.
+    out: &'a mut [f64],
+    /// The ocean's northward heat, one per row.
+    north: &'a mut [f64],
+    scratch: &'a mut [BlockScratch],
+    ml: &'a mut [[f64; 12]],
+    mo: &'a mut [[f64; 12]],
+    mm: &'a mut [[f64; 12]],
+    mi: &'a mut [[f64; 12]],
+    tbar: &'a mut [f64],
+    rt: &'a mut [[f64; 12]],
+    /// The next step's absorbed and emitted radiation, and the two diffusions' row sweeps.
+    sr: &'a mut [f64],
+    lr: &'a mut [f64],
+    half_a: &'a mut [f64],
+    half_s: &'a mut [f64],
+}
+
+/// A block's scratch: the zonal shift's source row, the ocean's face fluxes and its halo rows.
+#[derive(Default)]
+struct BlockScratch {
+    src: Vec<f64>,
+    oc: OceanScratch,
+    th: [Vec<f64>; 2],
+}
+
+/// A block of rows of a region.
+struct Block<'a> {
+    j0: usize,
+    tb: &'a mut [f64],
+    mean: &'a mut [f64],
+    tl: &'a mut [f64],
+    to: &'a mut [f64],
+    ice: &'a mut [f64],
+    out: &'a mut [f64],
+    north: &'a mut [f64],
+    scr: &'a mut BlockScratch,
+    means: Option<MeansBlock<'a>>,
+    next: Option<NextBlock<'a>>,
+}
+
+struct MeansBlock<'a> {
+    ml: &'a mut [[f64; 12]],
+    mo: &'a mut [[f64; 12]],
+    mm: &'a mut [[f64; 12]],
+    mi: &'a mut [[f64; 12]],
+    tbar: &'a mut [f64],
+    rt: &'a mut [[f64; 12]],
+}
+
+struct NextBlock<'a> {
+    sr: &'a mut [f64],
+    lr: &'a mut [f64],
+    half_a: &'a mut [f64],
+    half_s: &'a mut [f64],
+}
+
+/// The next chunk of a chunked field, or an empty one where the field is not being used.
+fn take<'a, T>(it: &mut Option<std::slice::ChunksMut<'a, T>>) -> &'a mut [T] {
+    it.as_mut().and_then(Iterator::next).unwrap_or_default()
+}
+
+/// The snow factor of a tile at `t` °C.
+fn frozen(ep: &EbmParams, t: f64) -> f64 {
+    1.0 - smoothstep(ep.ice_temp_c - 3.0, ep.ice_temp_c + 3.0, t)
+}
+
+/// Splits a pair of buffers into this step's (`cur`, read) and the next step's (written).
+fn pick(pair: &mut [Vec<f64>; 2], cur: usize) -> (&Vec<f64>, &mut Vec<f64>) {
+    let (x, y) = pair.split_at_mut(1);
+    if cur == 0 {
+        (&x[0], &mut y[0])
+    } else {
+        (&y[0], &mut x[0])
+    }
+}
+
+/// One row's local terms (`ebm.rs`'s implicit 3 × 3 solve per cell): each cell writes its own
+/// tiles, its budget (`sr`, `lr`) and its new T̄ (`mean`, the atmosphere's diffusion's input).
+#[allow(clippy::too_many_arguments)]
+fn local_row(
+    c: &Ctx,
+    j: usize,
+    qj: f64,
+    tl: &mut [f64],
+    to: &mut [f64],
+    tm: &mut [f64],
+    ice: &mut [f64],
+    sr: &mut [f64],
+    lr: &mut [f64],
+    mean: &mut [f64],
+) {
+    let ep = &c.p.ebm;
+    let dt = c.dt;
+    let free_sea = c.free_sea[j];
+    for i in 0..c.w {
+        let cc = j * c.w + i;
+        let f = c.f[cc];
+        let (to_v, tl_v, tm_v) = (to[i], tl[i], tm[i]);
+        let mut ice_v = ice[i];
+        let h_ice = ice_v / ICE_J_M3;
+        let cover = (h_ice / FULL_ICE_M).min(1.0);
+        let insulated = smoothstep(0.5 * SEA_ICE_CAP_M, SEA_ICE_CAP_M, h_ice);
+        let gc = OPEN_WATER_W_M2_K * (1.0 - cover)
+            + (ICE_W_M_K / h_ice.max(0.05)).min(OPEN_WATER_W_M2_K) * cover * (1.0 - insulated);
+        let ao = free_sea + (ep.ai - free_sea) * frozen(ep, to_v).max(cover);
+        let al = c.free_land[cc] + (ep.ai - c.free_land[cc]) * frozen(ep, tl_v).max(c.sheet[cc]);
+        let so = qj * (1.0 - ao);
+        let sl = qj * (1.0 - al);
+        let (cl, cs, cm) = (ep.c_land / dt, ep.c_land / dt, ep.c_ocean / dt);
+        let (xl, xo) = (ep.exchange * (1.0 - f), ep.exchange * f);
+        let (a_l, b_l) = super::co2::longwave(
+            ep.a,
+            ep.b,
+            ep.co2.as_ref(),
+            tl_v,
+            ep.snow_cloud,
+            frozen(ep, tl_v).max(c.sheet[cc]),
+        );
+        let (a_o, b_o) =
+            super::co2::longwave(ep.a, ep.b, ep.co2.as_ref(), to_v, ep.snow_cloud, cover);
+        let (r1, r2, r3) = (cl * tl_v + sl - a_l, cs * to_v + so - a_o, cm * tm_v);
+        let a33 = cm + gc;
+        let a11 = cl + b_l + xl;
+        let a22 = cs + b_o + xo + gc - gc * gc / a33;
+        let r2 = r2 + gc * r3 / a33;
+        let det = a11 * a22 - xl * xo;
+        let tl2 = (r1 * a22 + xl * r2) / det;
+        let mut to2 = (a11 * r2 + xo * r1) / det;
+        let mut tm2 = (r3 + gc * to2) / a33;
+        sr[i] = f * sl + (1.0 - f) * so;
+        lr[i] = f * (a_l + b_l * tl2) + (1.0 - f) * (a_o + b_o * to2);
+        if ice_v > 0.0 && to2 > 0.0 {
+            let melt = (to2 * ep.c_land).min(ice_v);
+            ice_v -= melt;
+            to2 -= melt / ep.c_land;
+        }
+        // At once, as `ebm.rs` does: the slab's diffusion then never sees a slab below the
+        // freezing point.
+        freeze_melt(&mut tm2, &mut ice_v, ep.c_ocean);
+        (tl[i], to[i], tm[i], ice[i]) = (tl2, to2, tm2, ice_v);
+        mean[i] = f * tl2 + (1.0 - f) * to2;
+    }
+}
+
+/// One parallel region of the year loop: `plan`'s parts for every block of rows (see [`Plan`]),
+/// each part the same operations in the same order as it was as a region of its own.
+fn stage(c: &Ctx, plan: &Plan, a: StageArrays) {
+    let (p, w, h, bs, dt, pm) = (c.p, c.w, c.h, c.bs, c.dt, c.pm);
+    let bw = bs * w;
+    let month = plan.month;
+    let StageArrays {
+        tb,
+        mean,
+        tl,
+        to,
+        ice,
+        out,
+        north,
+        scratch,
+        ml,
+        mo,
+        mm,
+        mi,
+        tbar,
+        rt,
+        sr,
+        lr,
+        half_a,
+        half_s,
+    } = a;
+    let needs_ice = plan.means || plan.next.is_some();
+    let mut tb = plan.shift.then(|| tb.chunks_mut(bw));
+    let mut mean = (plan.shift || plan.next.is_some()).then(|| mean.chunks_mut(bw));
+    let mut tl = tl.chunks_mut(bw);
+    let mut to = to.chunks_mut(bw);
+    let mut ice = needs_ice.then(|| ice.chunks_mut(bw));
+    let mut out = (!out.is_empty()).then(|| out.chunks_mut(bw));
+    let mut north = plan.sub.is_some().then(|| north.chunks_mut(bs));
+    let mut ml = plan.means.then(|| ml.chunks_mut(bw));
+    let mut mo = plan.means.then(|| mo.chunks_mut(bw));
+    let mut mm = plan.means.then(|| mm.chunks_mut(bw));
+    let mut mi = plan.means.then(|| mi.chunks_mut(bw));
+    let mut tbar = plan.means.then(|| tbar.chunks_mut(bw));
+    let mut rt = plan.means.then(|| rt.chunks_mut(bs));
+    let nxt = plan.next.is_some();
+    let mut sr = nxt.then(|| sr.chunks_mut(bw));
+    let mut lr = nxt.then(|| lr.chunks_mut(bw));
+    let mut half_a = nxt.then(|| half_a.chunks_mut(bw));
+    let mut half_s = nxt.then(|| half_s.chunks_mut(bw));
+    let mut blocks: Vec<Block> = scratch
+        .iter_mut()
+        .enumerate()
+        .map(|(b, scr)| Block {
+            j0: b * bs,
+            tb: take(&mut tb),
+            mean: take(&mut mean),
+            tl: tl.next().unwrap_or_default(),
+            to: to.next().unwrap_or_default(),
+            ice: take(&mut ice),
+            out: take(&mut out),
+            north: take(&mut north),
+            scr,
+            means: plan.means.then(|| MeansBlock {
+                ml: take(&mut ml),
+                mo: take(&mut mo),
+                mm: take(&mut mm),
+                mi: take(&mut mi),
+                tbar: take(&mut tbar),
+                rt: take(&mut rt),
+            }),
+            next: nxt.then(|| NextBlock {
+                sr: take(&mut sr),
+                lr: take(&mut lr),
+                half_a: take(&mut half_a),
+                half_s: take(&mut half_s),
+            }),
+        })
+        .collect();
+    blocks.par_iter_mut().for_each(|b| {
+        let rows = b.tl.len() / w;
+        if plan.shift {
+            let hemi = p.hemi_shift[month];
+            for k in 0..rows {
+                let j = b.j0 + k;
+                let r = k * w..(k + 1) * w;
+                let row = &mut b.tb[r.clone()];
+                if p.wind_heat > 0.0 {
+                    let phi = c.lat[j];
+                    let pb = phi - belts::shift(phi, plan.itcz_m, hemi);
+                    let u = p.wind_heat * low_level_wind(pb);
+                    shift_row_with(row, u * dt / c.dx_row[j], &mut b.scr.src);
+                }
+                add_change(row, &b.mean[r.clone()], &mut b.tl[r.clone()], &mut b.to[r]);
+            }
+        }
+        if let (Some(s), Some(o)) = (&plan.sub, c.ocean) {
+            // Sub-step k finds the block's rows (and the halo it still needs: `n − 1 − k` rows
+            // on each side) from the rows of sub-step k − 1; the last ends on the block's own.
+            let halo = s.n - 1;
+            let own = (b.j0, b.j0 + rows);
+            let [t0, t1] = &mut b.scr.th;
+            let mut src_j0 = 0;
+            for k in 0..s.n {
+                let a0 = own.0.saturating_sub(halo - k);
+                let a1 = (own.1 + halo - k).min(h);
+                let last = k + 1 == s.n;
+                let (rd, wr) = if k % 2 == 1 {
+                    (&*t0, &mut *t1)
+                } else {
+                    (&*t1, &mut *t0)
+                };
+                let (src, off) = if k == 0 {
+                    (s.src, s.off)
+                } else {
+                    (&rd[..], 0.0)
+                };
+                let dst: &mut [f64] = if last {
+                    &mut *b.out
+                } else {
+                    wr.resize((a1 - a0) * w, 0.0);
+                    &mut wr[..]
+                };
+                o.substep_rows(SubstepRows {
+                    ds: s.ds,
+                    src,
+                    src_j0: if k == 0 { 0 } else { src_j0 },
+                    off,
+                    j0: a0,
+                    out: dst,
+                    north: &mut *b.north,
+                    own,
+                    scratch: &mut b.scr.oc,
+                    last: if last { s.last } else { None },
+                });
+                src_j0 = a0;
+            }
+        }
+        if let Some(m) = &mut b.means {
+            for k in 0..rows {
+                let j = b.j0 + k;
+                for i in 0..w {
+                    let x = k * w + i;
+                    let cc = j * w + i;
+                    freeze_melt(&mut b.out[x], &mut b.ice[x], p.ebm.c_ocean);
+                    m.ml[x][month] += b.tl[x] / pm;
+                    m.mo[x][month] += b.to[x] / pm;
+                    m.mm[x][month] += b.out[x] / pm;
+                    m.mi[x][month] += (b.ice[x] / ICE_J_M3 / FULL_ICE_M).min(1.0) / pm;
+                    let t = c.f[cc] * b.tl[x] + (1.0 - c.f[cc]) * b.to[x];
+                    m.tbar[x] = t;
+                    m.rt[k][month] += t / pm;
+                }
+            }
+        }
+        if let (Some(qn), Some(nx)) = (plan.next, &mut b.next) {
+            for k in 0..rows {
+                let j = b.j0 + k;
+                let r = k * w..(k + 1) * w;
+                local_row(
+                    c,
+                    j,
+                    qn[j],
+                    &mut b.tl[r.clone()],
+                    &mut b.to[r.clone()],
+                    &mut b.out[r.clone()],
+                    &mut b.ice[r.clone()],
+                    &mut nx.sr[r.clone()],
+                    &mut nx.lr[r.clone()],
+                    &mut b.mean[r.clone()],
+                );
+                // 2. The atmosphere's diffusion of T̄, implicit ADI: this row's sweep (cyclic);
+                //    the columns follow. And the slab's, from the slab as the local terms left
+                //    it (the zonal shift never touches it).
+                c.atm.row(j, &b.mean[r.clone()], &mut nx.half_a[r.clone()]);
+                if let Some(slab) = c.slab {
+                    slab.row(j, &b.out[r.clone()], &mut nx.half_s[r]);
+                }
+            }
+        }
+    });
+}
+
 /// One row's tiles take the change of T̄ the atmosphere's transport made (`tb`, after; `mean`,
 /// before).
 fn add_change(tb: &[f64], mean: &[f64], tl: &mut [f64], to: &mut [f64]) {
@@ -646,7 +1217,26 @@ fn add_change(tb: &[f64], mean: &[f64], tl: &mut [f64], to: &mut [f64]) {
 /// Adds the northward heat a diffusion moved across every interior row edge (edge e between rows
 /// e and e + 1), its south faces' conductances `k` over the new field `t`, × `scale`, to `acc`.
 fn northward(w: usize, k: &[f64], t: &[f64], scale: f64, acc: &mut [f64]) {
-    for (e, a) in acc.iter_mut().enumerate() {
+    // Four edges at a time: each edge's sum is still one chain of adds in column order, but the
+    // four chains overlap instead of waiting on each other's adds (P1-19).
+    const LANES: usize = 4;
+    let first = acc.len() - acc.len() % LANES;
+    let (quads, rest) = acc.as_chunks_mut::<LANES>();
+    for (q, a) in quads.iter_mut().enumerate() {
+        let c0 = q * LANES * w;
+        let mut s = [0.0f64; LANES];
+        for i in 0..w {
+            for (l, sl) in s.iter_mut().enumerate() {
+                let c = c0 + l * w + i;
+                *sl += k[c] * (t[c + w] - t[c]);
+            }
+        }
+        for (x, sl) in a.iter_mut().zip(s) {
+            *x += sl * scale;
+        }
+    }
+    for (e, a) in rest.iter_mut().enumerate() {
+        let e = first + e;
         let s: f64 = (0..w)
             .map(|i| {
                 let c = e * w + i;
@@ -802,15 +1392,16 @@ impl Adi {
         }
     }
 
-    /// `out` = v after the row sweep and then the column sweep; `half` holds the row sweep's
-    /// result. Exactly `diffuse_y(diffuse_x(v))` of the loop before P1-17.
-    fn solve(&self, v: &[f64], half: &mut [f64], out: &mut [f64]) {
+    /// Row `j`'s sweep: `out` = the row's new values from `v`'s.
+    fn row(&self, j: usize, v: &[f64], out: &mut [f64]) {
+        self.rows[j].solve(v, out);
+    }
+
+    /// The column sweeps over the field the row sweeps made (`half`): `out` = v after the row
+    /// sweep and then the column sweep. Exactly `diffuse_y(diffuse_x(v))` of the loop before
+    /// P1-17.
+    fn columns(&self, half: &[f64], out: &mut [f64]) {
         let (w, h) = (self.w, self.h);
-        half.par_chunks_mut(w)
-            .zip(v.par_chunks(w))
-            .zip(self.rows.par_iter())
-            .with_min_len(8)
-            .for_each(|((o, row), sys)| sys.solve(row, o));
         // Every column's substitutions at once, a row at a time: each column sees the same
         // operations in the same order as on its own.
         for i in 0..w {
@@ -1125,7 +1716,7 @@ mod tests {
             }
             st
         };
-        let go = |threads: usize, new: bool| {
+        let go = |p: &Params2d, threads: usize, new: bool| {
             let pool = rayon::ThreadPoolBuilder::new()
                 .num_threads(threads)
                 .build()
@@ -1133,16 +1724,32 @@ mod tests {
             pool.install(|| {
                 let mut st = start();
                 let r = if new {
-                    run(&p, &g, &s, &mut st, Some(&oc), 3, [0.0; 12])
+                    run(p, &g, &s, &mut st, Some(&oc), 3, [0.0; 12])
                 } else {
-                    super::reference::run(&p, &g, &s, &mut st, Some(&oc), 3, [0.0; 12])
+                    super::reference::run(p, &g, &s, &mut st, Some(&oc), 3, [0.0; 12])
                 };
                 bits(&r, &st)
             })
         };
-        let old = go(1, false);
+        let old = go(&p, 1, false);
         for threads in [1, 3, 8] {
-            assert!(go(threads, true) == old, "{threads} threads");
+            assert!(go(&p, threads, true) == old, "{threads} threads");
+        }
+        // Monthly steps: the ocean takes many sub-steps, in more than one region (P1-19).
+        let mut pm = p.clone();
+        pm.ebm.steps_per_year = 12;
+        let dt = YEAR_S / 12.0;
+        assert!(
+            matches!(oc.sub_steps(dt), SubSteps::Rows { n, .. } if n > MAX_GROUP),
+            "{:?}",
+            oc.sub_steps(dt)
+        );
+        let old = go(&pm, 1, false);
+        for threads in [1, 3, 8] {
+            assert!(
+                go(&pm, threads, true) == old,
+                "monthly steps, {threads} threads"
+            );
         }
         // Without the slab's diffusion and the wind, on a grid with a row of no conductance.
         let mut q = p.clone();
@@ -1207,17 +1814,34 @@ mod tests {
         let oc = super::super::ocean2d::Ocean::build(&setup);
         let build = t0.elapsed().as_secs_f64();
         let years = 12;
-        let t0 = std::time::Instant::now();
-        let mut st = State2d::from_bands(&g, &p.ebm.initial_state());
-        super::reference::run(&p, &g, &s, &mut st, Some(&oc), years, [0.0; 12]);
-        let old = t0.elapsed().as_secs_f64();
-        let t0 = std::time::Instant::now();
-        let mut st = State2d::from_bands(&g, &p.ebm.initial_state());
-        let r = run(&p, &g, &s, &mut st, Some(&oc), years, [0.0; 12]);
-        let new = t0.elapsed().as_secs_f64();
+        let dt = YEAR_S / p.ebm.steps_per_year.max(12) as f64;
+        let time = |which: u8| {
+            let t0 = std::time::Instant::now();
+            let mut st = State2d::from_bands(&g, &p.ebm.initial_state());
+            let r = match which {
+                0 => super::reference::run(&p, &g, &s, &mut st, Some(&oc), years, [0.0; 12]),
+                _ => run(&p, &g, &s, &mut st, Some(&oc), years, [0.0; 12]),
+            };
+            (t0.elapsed().as_secs_f64(), r.years)
+        };
+        let (mut ms, mut ns) = (vec![], vec![]);
+        for _ in 0..5 {
+            ms.push(time(0).0);
+            ns.push(time(1).0);
+        }
+        let med = |v: &mut Vec<f64>| {
+            v.sort_by(f64::total_cmp);
+            (v[0], v[v.len() / 2])
+        };
+        let (m, n_) = (med(&mut ms), med(&mut ns));
         eprintln!(
-            "ebm2d bench: ocean build {build:.3} s ({} sweeps); {} years: old {old:.3} s, new {new:.3} s",
-            oc.sweeps, r.years
+            "ebm2d bench: ocean build {build:.3} s ({} sweeps), {:?}; {years} years, min/median of 5: old {:.3}/{:.3} s, new {:.3}/{:.3} s",
+            oc.sweeps,
+            oc.sub_steps(dt),
+            m.0,
+            m.1,
+            n_.0,
+            n_.1
         );
     }
 

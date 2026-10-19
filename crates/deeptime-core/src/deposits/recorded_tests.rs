@@ -70,6 +70,16 @@ pub(super) fn finish(s: &Session) {
     }
 }
 
+/// The deposit stage's census in `w`'s notes, without its wall-clock laps (`millis`, a run's
+/// timing, not the world's).
+pub(super) fn census_of(w: &WorldState) -> Value {
+    let mut census: Value = serde_json::from_str(&w.notes[STAGE_NAME]).unwrap();
+    if let Some(o) = census.as_object_mut() {
+        o.remove("millis");
+    }
+    census
+}
+
 /// The whole pipeline on `threads` threads: the world at the end and its census.
 fn run(json: &str, threads: usize, name: &str) -> (WorldState, Value) {
     let dir = temp_dir(name);
@@ -88,7 +98,7 @@ fn run(json: &str, threads: usize, name: &str) -> (WorldState, Value) {
     );
     finish(&s);
     let world = s.checkpoint().unwrap().world;
-    let census: Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
+    let census = census_of(&world);
     let _ = std::fs::remove_dir_all(&dir);
     (world, census)
 }
