@@ -50,7 +50,7 @@ use super::Env;
 use super::collapse::{iso_height, toward};
 use super::events::{self, PLATE_DEATH, RIDGE_BIRTH};
 use super::gap_budget;
-use super::geometry::{Cover, Geo, Tree, dijkstra_two};
+use super::geometry::{Cover, Geo, Tree, dijkstra_two, lattice_points};
 use super::init::random_rotation;
 use super::kinematics::{arr, quat, to_world};
 use super::pools::{
@@ -194,11 +194,13 @@ pub const ACCRETED_VISIBLE_GLOBAL: &str = "plates/resample_accreted_visible_km3"
 /// Earth-normalized; plate task 8).
 pub const ACCRETED_RISE_GLOBAL: &str = "plates/resample_accreted_rise_km3";
 
-/// Resamples the crust onto a fresh lattice and returns its geometry.
+/// Resamples the crust onto a fresh lattice and returns its geometry. `tree` holds every sample
+/// at `pos` (`Tree::over(pos, |_| true)`, the one the step's motion built).
 pub fn resample(
     state: &mut PlateState,
     world: &mut WorldState,
     pos: &[DVec3],
+    tree: &Tree,
     old: &Geo,
     env: &Env,
 ) -> Result<Geo, CoreError> {
@@ -206,11 +208,17 @@ pub fn resample(
     let norm = env.norm;
     let t = env.t_myr;
     let n = state.samples.len();
+    debug_assert_eq!(tree.index.len(), pos.len());
     let lattice = arr(random_rotation(&mut state.rng));
-    let geo = Geo::build(n, lattice)?;
-    let new_pts = geo.points();
+    // P1-19: the new lattice's points are the triangulation's own (`SphereMesh` normalises them
+    // once more), so the crust is carried onto them while the triangulation is built beside it
+    // (the build is serial).
+    let new_pts: Vec<DVec3> = lattice_points(n, lattice)
+        .into_par_iter()
+        .map(|p| p.normalize())
+        .collect();
+    let new_pts = new_pts.as_slice();
     let rots: Vec<DQuat> = state.groups.iter().map(|g| quat(g.rot)).collect();
-    let tree = Tree::over(pos, |_| true);
     let src = &state.samples;
 
     // Which old groups hold each new point in their footprint (`footprint`: the old lattice's
@@ -233,161 +241,168 @@ pub fn resample(
     colliding.sort_unstable();
     colliding.dedup();
     let collides = |over: u32, under: u32| colliding.binary_search(&(under, over)).is_ok();
-    let found: Vec<Found> = new_pts
-        .par_iter()
-        .map(|&q| {
-            let mut covers: Vec<(u32, Cover)> = Vec::new();
-            let mut tried: Vec<u32> = Vec::with_capacity(8);
-            let near = tree.nearest_n(q, 8);
-            for &(j, _) in &near {
-                let g = src[j as usize].group;
-                if tried.contains(&g) {
-                    continue;
-                }
-                tried.push(g);
-                if let Some(c) = footprint(old, src, g, rots[g as usize], q, j) {
-                    covers.push((g, c));
-                }
-            }
-            if covers.is_empty() {
-                return (None, covers);
-            }
-            // On top: visible, then the overriding plate of a subduction contact, then
-            // continental, then higher, then the lower group id.
-            let key = |i: usize| {
-                let (g, c) = &covers[i];
-                let m = &src[c.major() as usize];
-                (
-                    !m.is_hidden(),
-                    group_plate[*g as usize],
-                    m.kind == CONTINENTAL,
-                    m.elevation_m,
-                    *g,
-                )
-            };
-            let best = (0..covers.len())
-                .max_by(|&a, &b| {
-                    let (ka, kb) = (key(a), key(b));
-                    ka.0.cmp(&kb.0)
-                        .then_with(|| {
-                            if overrides(ka.1, kb.1) {
-                                std::cmp::Ordering::Greater
-                            } else if overrides(kb.1, ka.1) {
-                                std::cmp::Ordering::Less
-                            } else {
-                                std::cmp::Ordering::Equal
-                            }
-                        })
-                        .then(ka.2.cmp(&kb.2))
-                        .then(ka.3.total_cmp(&kb.3))
-                        .then(kb.4.cmp(&ka.4))
-                })
-                .unwrap_or(0);
-            let top = covers.swap_remove(best);
-            (Some(top), covers)
-        })
-        .collect();
-
-    // Covered samples. Continental crust a collision took across its front was stacked into its
-    // belt or went down with the slab (`belts.rs`): it is consumed here, not accreted a second
-    // time (ledger: PLT-276, PLT-292). Both are counted, m of rock per new sample.
-    let mut plate_new: Vec<u32> = vec![u32::MAX; n];
-    let mut tally: Vec<[f64; 5]> = vec![[0.0; 5]; n];
     let (z_0, gravity) = (
         0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]),
         env.gravity,
     );
-    // How each new sample was blended, for the gap budget (`gap_budget.rs`) when it is on.
     let tracing = state.gap_budget.is_some();
-    let mut traces: Vec<Option<gap_budget::Trace>> = vec![None; n];
-    // The step's limits (`rate.rs`) on the new lattice: a covered sample's ceiling and top are
-    // its corners' blended with its own weights, its floor the blended surface before the
-    // accretion (new sea floor's are set with the gaps below).
     let old_limits = state
         .limits
         .as_ref()
         .filter(|l| l.ceiling_m.len() == src.len() && l.top_m.len() == src.len());
-    let mut limits: Vec<[f32; 3]> = vec![[f32::INFINITY, 0.0, f32::INFINITY]; n];
-    let mut samples: Vec<Sample> = found
-        .par_iter()
-        .zip(plate_new.par_iter_mut())
-        .zip(tally.par_iter_mut())
-        .zip(traces.par_iter_mut())
-        .zip(limits.par_iter_mut())
-        .map(|(((((top, others), pl), tally), trace), lim)| match top {
-            None => Sample::blank(0),
-            Some((g, c)) => {
-                let mut s = interpolate(src, c, rots[*g as usize]);
-                *pl = group_plate[*g as usize];
-                if let Some(old) = old_limits {
-                    let blend = |v: &[f32]| -> f32 {
-                        (0..3)
-                            .map(|k| c.w[k] * f64::from(v[c.tri[k] as usize]))
-                            .sum::<f64>() as f32
-                    };
-                    *lim = [blend(&old.ceiling_m), s.elevation_m, blend(&old.top_m)];
+    let carry = || {
+        let found: Vec<Found> = new_pts
+            .par_iter()
+            .map(|&q| {
+                let mut covers: Vec<(u32, Cover)> = Vec::new();
+                let mut tried: Vec<u32> = Vec::with_capacity(8);
+                let near = tree.nearest_n(q, 8);
+                for &(j, _) in &near {
+                    let g = src[j as usize].group;
+                    if tried.contains(&g) {
+                        continue;
+                    }
+                    tried.push(g);
+                    if let Some(c) = footprint(old, src, g, rots[g as usize], q, j) {
+                        covers.push((g, c));
+                    }
                 }
-                if tracing {
-                    *trace = Some(gap_budget::Trace {
-                        tri: c.tri,
-                        w: c.w,
-                        pools: s.pools,
-                        z: s.elevation_m,
-                    });
+                if covers.is_empty() {
+                    return (None, covers);
                 }
-                let blended = s.pools;
-                for (g2, c2) in others {
-                    let under = &src[c2.major() as usize];
-                    let p2 = group_plate[*g2 as usize];
-                    if under.is_hidden() || p2 == *pl || overrides(*pl, p2) {
-                        let u = interpolate(src, c2, rots[*g2 as usize]);
-                        let conserved: f64 = u.pools[..pool::CONSERVED]
-                            .iter()
-                            .map(|&x| f64::from(x))
-                            .sum();
-                        // Crust a collision took across its front is consumed, hidden or
-                        // not: the belt stacked its share and the rest went down with the slab.
-                        if (under.is_hidden() && under.stacked)
-                            || (!under.is_hidden()
-                                && under.kind == CONTINENTAL
-                                && p2 != *pl
-                                && collides(*pl, p2))
-                        {
-                            tally[1] += conserved;
-                        } else {
-                            // What accretes: hidden continental crust, hidden ocean floor's
-                            // sediment, or visible crust of the same or a subducting plate.
-                            tally[0] += conserved;
-                            if !under.is_hidden() {
-                                tally[3] += conserved;
-                            } else if under.kind == CONTINENTAL {
-                                tally[2] += conserved;
+                // On top: visible, then the overriding plate of a subduction contact, then
+                // continental, then higher, then the lower group id.
+                let key = |i: usize| {
+                    let (g, c) = &covers[i];
+                    let m = &src[c.major() as usize];
+                    (
+                        !m.is_hidden(),
+                        group_plate[*g as usize],
+                        m.kind == CONTINENTAL,
+                        m.elevation_m,
+                        *g,
+                    )
+                };
+                let best = (0..covers.len())
+                    .max_by(|&a, &b| {
+                        let (ka, kb) = (key(a), key(b));
+                        ka.0.cmp(&kb.0)
+                            .then_with(|| {
+                                if overrides(ka.1, kb.1) {
+                                    std::cmp::Ordering::Greater
+                                } else if overrides(kb.1, ka.1) {
+                                    std::cmp::Ordering::Less
+                                } else {
+                                    std::cmp::Ordering::Equal
+                                }
+                            })
+                            .then(ka.2.cmp(&kb.2))
+                            .then(ka.3.total_cmp(&kb.3))
+                            .then(kb.4.cmp(&ka.4))
+                    })
+                    .unwrap_or(0);
+                let top = covers.swap_remove(best);
+                (Some(top), covers)
+            })
+            .collect();
+
+        // Covered samples. Continental crust a collision took across its front was stacked into its
+        // belt or went down with the slab (`belts.rs`): it is consumed here, not accreted a second
+        // time (ledger: PLT-276, PLT-292). Both are counted, m of rock per new sample.
+        let mut plate_new: Vec<u32> = vec![u32::MAX; n];
+        let mut tally: Vec<[f64; 5]> = vec![[0.0; 5]; n];
+        // How each new sample was blended, for the gap budget (`gap_budget.rs`) when it is on.
+        let mut traces: Vec<Option<gap_budget::Trace>> = vec![None; n];
+        // The step's limits (`rate.rs`) on the new lattice: a covered sample's ceiling and top are
+        // its corners' blended with its own weights, its floor the blended surface before the
+        // accretion (new sea floor's are set with the gaps below).
+        let mut limits: Vec<[f32; 3]> = vec![[f32::INFINITY, 0.0, f32::INFINITY]; n];
+        let samples: Vec<Sample> = found
+            .par_iter()
+            .zip(plate_new.par_iter_mut())
+            .zip(tally.par_iter_mut())
+            .zip(traces.par_iter_mut())
+            .zip(limits.par_iter_mut())
+            .map(|(((((top, others), pl), tally), trace), lim)| match top {
+                None => Sample::blank(0),
+                Some((g, c)) => {
+                    let mut s = interpolate(src, c, rots[*g as usize]);
+                    *pl = group_plate[*g as usize];
+                    if let Some(old) = old_limits {
+                        let blend = |v: &[f32]| -> f32 {
+                            (0..3)
+                                .map(|k| c.w[k] * f64::from(v[c.tri[k] as usize]))
+                                .sum::<f64>() as f32
+                        };
+                        *lim = [blend(&old.ceiling_m), s.elevation_m, blend(&old.top_m)];
+                    }
+                    if tracing {
+                        *trace = Some(gap_budget::Trace {
+                            tri: c.tri,
+                            w: c.w,
+                            pools: s.pools,
+                            z: s.elevation_m,
+                        });
+                    }
+                    let blended = s.pools;
+                    for (g2, c2) in others {
+                        let under = &src[c2.major() as usize];
+                        let p2 = group_plate[*g2 as usize];
+                        if under.is_hidden() || p2 == *pl || overrides(*pl, p2) {
+                            let u = interpolate(src, c2, rots[*g2 as usize]);
+                            let conserved: f64 = u.pools[..pool::CONSERVED]
+                                .iter()
+                                .map(|&x| f64::from(x))
+                                .sum();
+                            // Crust a collision took across its front is consumed, hidden or
+                            // not: the belt stacked its share and the rest went down with the slab.
+                            if (under.is_hidden() && under.stacked)
+                                || (!under.is_hidden()
+                                    && under.kind == CONTINENTAL
+                                    && p2 != *pl
+                                    && collides(*pl, p2))
+                            {
+                                tally[1] += conserved;
+                            } else {
+                                // What accretes: hidden continental crust, hidden ocean floor's
+                                // sediment, or visible crust of the same or a subducting plate.
+                                tally[0] += conserved;
+                                if !under.is_hidden() {
+                                    tally[3] += conserved;
+                                } else if under.kind == CONTINENTAL {
+                                    tally[2] += conserved;
+                                }
+                                accrete(&mut s.pools, &u.pools);
                             }
-                            accrete(&mut s.pools, &u.pools);
                         }
                     }
-                }
-                // Accreted crust stands up by its Airy height, capped at the column's, and the
-                // surface gets it as uplift, as the collapse raises its receivers (the gap
-                // budget's recommendation 1; plate task 8; before, accretion added thickness and
-                // no height). ledger: PLT-284
-                if s.kind == CONTINENTAL && !s.is_hidden() && s.pools != blended {
-                    let z = f64::from(s.elevation_m);
-                    let change = isostatic_change_m(&blended, &s.pools, gravity);
-                    let rise = toward(z, change, iso_height(&s.pools, z_0, gravity))
-                        .min(k.max_elevation_m)
-                        - z;
-                    if rise > 0.0 {
-                        s.elevation_m = (z + rise) as f32;
-                        s.uplift_mm_yr += (rise / env.dt_yr * 1.0e3) as f32;
-                        tally[4] += rise;
+                    // Accreted crust stands up by its Airy height, capped at the column's, and the
+                    // surface gets it as uplift, as the collapse raises its receivers (the gap
+                    // budget's recommendation 1; plate task 8; before, accretion added thickness and
+                    // no height). ledger: PLT-284
+                    if s.kind == CONTINENTAL && !s.is_hidden() && s.pools != blended {
+                        let z = f64::from(s.elevation_m);
+                        let change = isostatic_change_m(&blended, &s.pools, gravity);
+                        let rise = toward(z, change, iso_height(&s.pools, z_0, gravity))
+                            .min(k.max_elevation_m)
+                            - z;
+                        if rise > 0.0 {
+                            s.elevation_m = (z + rise) as f32;
+                            s.uplift_mm_yr += (rise / env.dt_yr * 1.0e3) as f32;
+                            tally[4] += rise;
+                        }
                     }
+                    s.thickness_m = thickness(&s.pools);
+                    s
                 }
-                s.thickness_m = thickness(&s.pools);
-                s
-            }
-        })
-        .collect();
+            })
+            .collect();
+        (samples, plate_new, tally, traces, limits)
+    };
+    let (geo, (mut samples, mut plate_new, tally, mut traces, limits)) =
+        rayon::join(|| Geo::build(n, lattice), carry);
+    let geo = geo?;
+    debug_assert_eq!(geo.points(), new_pts);
     let area_km2 = norm.sample_area_km2();
     let sum = |k: usize| tally.iter().map(|t| t[k]).sum::<f64>() * area_km2 / 1000.0;
     for (name, k) in [
