@@ -30,6 +30,7 @@
 pub mod bake_horizons;
 pub mod columns;
 pub mod deform;
+pub mod horizon_cache;
 pub mod hosts;
 pub mod metamorphism;
 pub mod params;
@@ -74,13 +75,15 @@ pub struct Cover {
     hz: bake_horizons::Horizons,
     desc: deeptime_format::LayerDesc,
     sedimentary: Vec<bool>,
+    /// The stacks were the ones the structure stage kept (`horizon_cache`), not baked again.
+    pub kept: bool,
 }
 
 impl Cover {
     /// Bakes `world`'s horizon stacks the way the bake will (errors where the world lacks the
     /// fields the columns need).
     pub fn new(world: &WorldState, preset: &PlanetPreset) -> Result<Cover, CoreError> {
-        let hz = bake_horizons::bake(world, preset)?;
+        let (hz, kept) = bake_horizons::bake_noting(world, preset)?;
         let desc = hz.desc(deeptime_format::Codec::Raw);
         let sedimentary = crate::surface::lithology::table()
             .iter()
@@ -95,6 +98,7 @@ impl Cover {
             hz,
             desc,
             sedimentary,
+            kept,
         })
     }
 
@@ -507,6 +511,7 @@ impl StructureStage {
             surface,
             history,
             volcanoes,
+            horizons: kept,
             ..
         } = world;
         let surface = surface.as_mut().ok_or_else(|| {
@@ -545,6 +550,8 @@ impl StructureStage {
         }
         let summary = if last {
             let horizons = bake_horizons::bake_with(&src, &self.preset, p, tables);
+            // Kept for the deposit stage's cover and the bake, which read the same inputs.
+            kept.keep(src.fingerprint(&self.preset, p), &horizons);
             Some((horizons.mean_horizons(), horizons.check()))
         } else {
             None
@@ -1481,9 +1488,12 @@ impl Stage for StructureStage {
             ..
         } = *parts;
         world.surface = Some(surface);
+        let mut copies = Vec::new();
         for (name, f) in fields {
             if moved.contains(&name) {
                 world.fields.entry(name).or_insert(f);
+            } else {
+                copies.push(f);
             }
         }
         if !stepped {
@@ -1491,9 +1501,12 @@ impl Stage for StructureStage {
                 "the structure step taken out of the world did not run".into(),
             ));
         }
-        if let Some(out) = out {
-            self.publish(&mut world.history, frames, &out)?;
+        if let Some(out) = &out {
+            self.publish(&mut world.history, frames, out)?;
         }
+        // The copies and the published fields (grid-sized arrays, and the kept blocks they push
+        // out) are unmapped beside the next step, not before it (P1-19: 5.6 s of a full-16k run).
+        crate::alloc::free_beside((copies, out));
         self.st.done += 1;
         Ok(())
     }

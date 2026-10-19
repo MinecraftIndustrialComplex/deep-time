@@ -1028,11 +1028,16 @@ impl Session {
         self.needed_peak[1].load(Ordering::Relaxed)
     }
 
-    /// Runs `f` on the world as it stands (between `advance` calls), without copying it.
-    pub fn with_world<R>(&self, f: impl FnOnce(&WorldState) -> R) -> Result<R, CoreError> {
+    /// Runs `f` on the world as it stands (between `advance` calls), without copying it, in the
+    /// session's pool (what it reads may be parallel: the province map's derivation is).
+    pub fn with_world<R: Send>(
+        &self,
+        f: impl FnOnce(&WorldState) -> R + Send,
+    ) -> Result<R, CoreError> {
         let mut s = self.lock_stepper()?;
         self.settle_now(&mut s)?;
-        Ok(f(&s.world))
+        let world = &s.world;
+        Ok(self.pool.install(|| f(world)))
     }
 
     /// A step put off to run beside the lead's next one (P1-19) runs now, on the world: what
@@ -1497,7 +1502,8 @@ impl Session {
             )
         }) {
             let millis = drawn.elapsed().as_secs_f64() * 1000.0;
-            self.keyframes.push(frame)?;
+            // Its layers are packed in parallel: in the pool too.
+            self.pool.install(|| self.keyframes.push(frame))?;
             s.last_kf_t = Some((s.world.t_years, s.current));
             self.log.push(
                 Level::Debug,
@@ -1552,7 +1558,7 @@ impl Session {
             }) else {
                 return Ok(None);
             };
-            self.keyframes.replace(redrawn)?;
+            self.pool.install(|| self.keyframes.replace(redrawn))?;
             Ok(Some(format!(
                 "keyframe {} drawn again with the bake's water ({} river chains, {:.0} px of lakes) in {:.0} ms",
                 entry.n,

@@ -1161,22 +1161,10 @@ impl VolcanoStage {
         } else {
             Vec::new()
         };
-        let mut bases: Vec<f64> = Vec::new();
-        for v in &mut st.volcanoes {
-            if !v.active() {
-                continue;
-            }
-            // New volcanoes are measured now; the others were measured before the births.
-            let base = l1.base(v.x, v.z, v.radius_m);
-            if record_bases && v.kind == Kind::Strato && big_land[cell_of(&grid, v.x, v.z)] {
-                // The ground under the cone: the surface at its summit less the relief it built
-                // (a ring round a cone wider than the range it stands on would read the
-                // foothills or, at a coast, the sea).
-                let c = cell_of(&grid, v.x, v.z);
-                let here = f64::from(l1.elev[c]) + f64::from(l1.delta[c]);
-                bases.push(here - v.height_m - sea);
-            }
-            let target = match v.kind {
+        // A cone's target height, before the ceiling over its ground (which reads the cones built
+        // before it this step).
+        let target_of = |v: &Volcano| -> f64 {
+            match v.kind {
                 Kind::Strato => {
                     let hk = arc_height_km(&p, v.flux_last);
                     // A cone never outgrows the height (and radius) it was born with.
@@ -1191,7 +1179,38 @@ impl VolcanoStage {
                     };
                     v.target_m * prox.sqrt()
                 }
-            };
+            }
+        };
+        // A cone's footprint reads nothing the cones change, so the footprints of every cone that
+        // can grow this step are rendered first, in parallel (P1-19), and laid in order below.
+        let footprints: Vec<Option<Vec<(usize, f64)>>> = {
+            let l1 = &l1;
+            st.volcanoes
+                .par_iter()
+                .map(|v| {
+                    (v.active() && target_of(v) > v.height_m).then(|| {
+                        let sh = v.shape();
+                        l1.render(v.x, v.z, v.radius_m, 1.0, &|r: f64| sh.body(r))
+                    })
+                })
+                .collect()
+        };
+        let mut bases: Vec<f64> = Vec::new();
+        for (v, footprint) in st.volcanoes.iter_mut().zip(footprints) {
+            if !v.active() {
+                continue;
+            }
+            // New volcanoes are measured now; the others were measured before the births.
+            let base = l1.base(v.x, v.z, v.radius_m);
+            if record_bases && v.kind == Kind::Strato && big_land[cell_of(&grid, v.x, v.z)] {
+                // The ground under the cone: the surface at its summit less the relief it built
+                // (a ring round a cone wider than the range it stands on would read the
+                // foothills or, at a coast, the sea).
+                let c = cell_of(&grid, v.x, v.z);
+                let here = f64::from(l1.elev[c]) + f64::from(l1.delta[c]);
+                bases.push(here - v.height_m - sea);
+            }
+            let target = target_of(v);
             // The ceiling is the same comparison as the crust's (`surface::spread`): an edifice's
             // weight ρ·g·h against the strength under it. `max_elevation_km` is the height that
             // strength holds at Earth's gravity with the default crust (140 MPa), so it scales
@@ -1206,11 +1225,13 @@ impl VolcanoStage {
             if dh <= 0.0 {
                 continue;
             }
-            let sh = v.shape();
-            let prof = |r: f64| sh.body(r);
             let layers = rocks.of(v);
             let mut vol = 0.0;
-            let cells = l1.render(v.x, v.z, v.radius_m, 1.0, &prof);
+            // (Rendered above for every cone whose target is over its height, as this one's is.)
+            let cells = footprint.unwrap_or_else(|| {
+                let sh = v.shape();
+                l1.render(v.x, v.z, v.radius_m, 1.0, &|r: f64| sh.body(r))
+            });
             // No cell the cone stands on passes the ceiling. The target above is measured from the
             // ground round the cone (`base`), and that alone let the surface under a cone ratchet
             // up: every step the surface stage eroded the cone, isostasy gave part of it back,
@@ -1460,19 +1481,25 @@ impl VolcanoStage {
             let surf = surface.as_mut().expect("checked above");
             let mv = s.m_per_block_v;
             let delta = &l1.delta;
-            for (c, &d) in delta.iter().enumerate() {
-                if d != 0.0 {
-                    surf.offset_m[c] += d;
-                    surf.elevation_m[c] += d;
-                }
-            }
+            // Cell by cell, so each grid pass in parallel (P1-19).
+            surf.offset_m
+                .par_iter_mut()
+                .zip(surf.elevation_m.par_iter_mut())
+                .zip(delta.par_iter())
+                .for_each(|((o, e), &d)| {
+                    if d != 0.0 {
+                        *o += d;
+                        *e += d;
+                    }
+                });
             let add = |fields: &mut BTreeMap<String, Field>, name: &str, scale: f32| {
                 if let Some(f) = fields.get_mut(name)
                     && f.data.len() == n
                 {
-                    for (x, &d) in f.data.iter_mut().zip(delta) {
-                        *x += d * scale;
-                    }
+                    f.data
+                        .par_iter_mut()
+                        .zip(delta.par_iter())
+                        .for_each(|(x, &d)| *x += d * scale);
                 }
             };
             add(fields, crate::surface::field::FEEDBACK, 1.0);
@@ -1485,7 +1512,7 @@ impl VolcanoStage {
             .into_iter()
             .enumerate()
             {
-                if l1.rock.iter().all(|r| r[k] == 0.0) {
+                if l1.rock.par_iter().all(|r| r[k] == 0.0) {
                     continue;
                 }
                 let f = fields.entry(name.to_owned()).or_insert_with(|| Field {
@@ -1493,9 +1520,10 @@ impl VolcanoStage {
                     data: vec![0.0; n],
                 });
                 if f.data.len() == n {
-                    for (x, r) in f.data.iter_mut().zip(&l1.rock) {
-                        *x += r[k];
-                    }
+                    f.data
+                        .par_iter_mut()
+                        .zip(l1.rock.par_iter())
+                        .for_each(|(x, r)| *x += r[k]);
                 }
             }
             // The gap budget's part for this stage (laid by the surface stage while it is on).
