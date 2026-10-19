@@ -350,6 +350,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "deeptime-cpuprobe"
+version = "0.0.1"
+
+[[package]]
 name = "deeptime-format"
 version = "0.0.1"
 dependencies = [

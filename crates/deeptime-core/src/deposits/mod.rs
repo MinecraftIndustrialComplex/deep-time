@@ -862,11 +862,17 @@ impl DepositStage {
         let read_s = t0.elapsed().as_secs_f64();
         // The crust moves: carry what each cell has accumulated so far with it (a porphyry formed
         // on an arc travels with its plate), then fold this frame in at the new positions.
-        let origin = if matches!(self.source, Source::Synthetic(_)) {
+        // From the frame just read (P1-19: its two offset fields were unpacked a second time).
+        let origin = if matches!(self.source, Source::Synthetic(_)) || k == 0 {
             None
         } else {
-            ctx.pool
-                .install(|| DepositStage::recorded_of(world)?.origins(k))?
+            match (
+                frame.fields.get(fields::ORIGIN_FIELDS[0]),
+                frame.fields.get(fields::ORIGIN_FIELDS[1]),
+            ) {
+                (Some(di), Some(dj)) => Some(fields::origins_from_offsets(grid.w as usize, di, dj)),
+                _ => None,
+            }
         };
         let types = &self.types;
         let state = &mut self.state;
@@ -896,35 +902,6 @@ impl DepositStage {
                 petroleum::accumulate(&mut state.pet, &frame, temp, pet_rules.as_ref());
             }
         });
-        // Keyframe layers: favourability so far and the inputs.
-        for (i, t) in self.types.iter().enumerate() {
-            if self.state.acc[i].is_empty() {
-                continue;
-            }
-            // Cell by cell, so in parallel (P1-17).
-            let acc = &self.state.acc[i];
-            let data: Vec<f32> = ctx
-                .pool
-                .install(|| acc.par_iter().map(|a| a.favourability() as f32).collect());
-            world.fields.insert(
-                format!("deposits/favourability/{}", t.short()),
-                Field {
-                    grid: grid.clone(),
-                    data,
-                },
-            );
-        }
-        for (name, layer) in INPUT_LAYERS {
-            if let Some(v) = frame.fields.get(*name) {
-                world.fields.insert(
-                    (*layer).to_owned(),
-                    Field {
-                        grid: grid.clone(),
-                        data: v.clone(),
-                    },
-                );
-            }
-        }
         // The last frame's favourability is drawn a year before its end, so the stage's closing
         // keyframe (sites placed, at the frame's end) is a frame of its own. (A recorded history
         // reaches this stage at the end of time already, and the session tells the two keyframes
@@ -934,6 +911,40 @@ impl DepositStage {
         } else {
             frame.t_years
         };
+        // Keyframe layers: favourability so far and the inputs. Drawn when a keyframe can follow
+        // this step, the world's time having moved on (a synthetic history), and for the world the
+        // stage leaves (the last frame); a recorded history, read at the end of time, takes no
+        // keyframe in between (P1-19).
+        if t > world.t_years || k + 1 == self.frames {
+            for (i, t) in self.types.iter().enumerate() {
+                if self.state.acc[i].is_empty() {
+                    continue;
+                }
+                // Cell by cell, so in parallel (P1-17).
+                let acc = &self.state.acc[i];
+                let data: Vec<f32> = ctx
+                    .pool
+                    .install(|| acc.par_iter().map(|a| a.favourability() as f32).collect());
+                world.fields.insert(
+                    format!("deposits/favourability/{}", t.short()),
+                    Field {
+                        grid: grid.clone(),
+                        data,
+                    },
+                );
+            }
+            for (name, layer) in INPUT_LAYERS {
+                if let Some(v) = frame.fields.get(*name) {
+                    world.fields.insert(
+                        (*layer).to_owned(),
+                        Field {
+                            grid: grid.clone(),
+                            data: v.clone(),
+                        },
+                    );
+                }
+            }
+        }
         world.t_years = world.t_years.max(t);
         ctx.log.push(
             crate::log::Level::Debug,
@@ -1209,6 +1220,39 @@ fn trace(
     Ok(out)
 }
 
+/// Wall-clock laps of the finishing step, for its note's `millis` (P1-19).
+struct Laps {
+    started: std::time::Instant,
+    at: std::time::Instant,
+    millis: serde_json::Map<String, Value>,
+}
+
+impl Laps {
+    fn new() -> Laps {
+        let now = std::time::Instant::now();
+        Laps {
+            started: now,
+            at: now,
+            millis: serde_json::Map::new(),
+        }
+    }
+
+    /// Ends lap `name`.
+    fn lap(&mut self, name: &str) {
+        let now = std::time::Instant::now();
+        let ms = (now - self.at).as_secs_f64() * 1000.0;
+        self.millis.insert(name.to_owned(), json!(ms));
+        self.at = now;
+    }
+
+    /// The laps and their total.
+    fn done(mut self) -> Value {
+        let total = self.started.elapsed().as_secs_f64() * 1000.0;
+        self.millis.insert("total".into(), json!(total));
+        Value::Object(self.millis)
+    }
+}
+
 /// Carries per-cell accumulators with the crust into a frame: the cell `c` takes what was at
 /// `origin[c]` (or a fresh value for crust born in the frame).
 fn carry<T: Copy + Send + Sync>(v: &mut Vec<T>, origin: &[u32], fresh: T) {
@@ -1420,6 +1464,7 @@ impl DepositStage {
         ctx: &StageContext<'_>,
         hist: &dyn FieldHistory,
     ) -> Result<(), CoreError> {
+        let mut laps = Laps::new();
         let grid = self.grid();
         let n = grid.cells();
         let c = grid.circumference() as f64;
@@ -1441,6 +1486,7 @@ impl DepositStage {
             count::Provinces::new(&grid, self.seed, self.params.province_km, radius_km)
         });
         let receivers: Option<Vec<u32>> = hist.receivers().map(<[u32]>::to_vec);
+        laps.lap("present");
         let mut f = Finish {
             grid: grid.clone(),
             c,
@@ -1465,14 +1511,28 @@ impl DepositStage {
                 // In the session's pool: the horizon bake is parallel, and outside an `install`
                 // it ran on Rayon's global pool, every core of the machine whatever the session's
                 // thread count (P1-17, `tests/session_pool.rs`).
+                let started = std::time::Instant::now();
                 let cover = ctx
                     .pool
                     .install(|| crate::structure::Cover::new(&*world, p))
                     .ok()?;
+                ctx.log.push(
+                    crate::log::Level::Debug,
+                    format!(
+                        "deposits: the cover's horizons {} in {} ms",
+                        if cover.kept {
+                            "kept from the structure stage"
+                        } else {
+                            "baked"
+                        },
+                        started.elapsed().as_millis()
+                    ),
+                );
                 ctx.reserve(cover.bytes()).ok()?;
                 Some(cover)
             }),
         };
+        laps.lap("cover");
 
         // ---- petroleum kitchens (their events come first so traps can cite them) -------------
         let pet_ty = self.petroleum_type();
@@ -1544,6 +1604,7 @@ impl DepositStage {
                 }
                 kitchen_events.push(f.emit(world, e, x, z)?);
             }
+            laps.lap("kitchens");
             // Charged-trap favourability: charge × trap × seal × reservoir (present values).
             let get = |name: &str| {
                 f.present
@@ -1557,29 +1618,37 @@ impl DepositStage {
                 get(&r.seal_field),
                 get(&r.reservoir_field),
             );
-            pet_f = (0..n)
-                .map(|cell| {
-                    let a = &self.state.pet[cell];
-                    if a.t_trap.is_nan()
-                        || f64::from(seal[cell]) < r.seal_threshold
-                        || f64::from(res[cell]) < r.reservoir_threshold
-                    {
-                        return 0.0;
-                    }
-                    match petroleum::charge(
-                        &grid,
-                        &kitchens,
-                        cell as u32,
-                        f64::from(a.t_trap),
-                        r,
-                        sc.m_per_block_h,
-                    ) {
-                        Some(_) => f64::from(trap[cell] * seal[cell].min(1.0) * res[cell].min(1.0))
-                            .min(1.0),
-                        None => 0.0,
-                    }
-                })
-                .collect();
+            // Cell by cell, so in parallel (P1-19).
+            let pet = &self.state.pet;
+            let kitchens = &kitchens;
+            pet_f = ctx.pool.install(|| {
+                (0..n)
+                    .into_par_iter()
+                    .map(|cell| {
+                        let a = &pet[cell];
+                        if a.t_trap.is_nan()
+                            || f64::from(seal[cell]) < r.seal_threshold
+                            || f64::from(res[cell]) < r.reservoir_threshold
+                        {
+                            return 0.0;
+                        }
+                        match petroleum::charge(
+                            &grid,
+                            kitchens,
+                            cell as u32,
+                            f64::from(a.t_trap),
+                            r,
+                            sc.m_per_block_h,
+                        ) {
+                            Some(_) => {
+                                f64::from(trap[cell] * seal[cell].min(1.0) * res[cell].min(1.0))
+                                    .min(1.0)
+                            }
+                            None => 0.0,
+                        }
+                    })
+                    .collect()
+            });
             world.fields.insert(
                 format!("deposits/favourability/{}", t.short()),
                 Field {
@@ -1587,6 +1656,7 @@ impl DepositStage {
                     data: pet_f.iter().map(|v| *v as f32).collect(),
                 },
             );
+            laps.lap("charge");
         }
 
         // ---- tracts ---------------------------------------------------------------------------
@@ -1651,6 +1721,7 @@ impl DepositStage {
             });
         }
 
+        laps.lap("tracts");
         // ---- pass 2: every tract cell's column through the history -------------------------
         let t_pass = std::time::Instant::now();
         let cols = self.column_pass(&plans, hist, ctx)?;
@@ -1662,6 +1733,7 @@ impl DepositStage {
                 t_pass.elapsed().as_secs_f64()
             ),
         );
+        laps.lap("pass2");
         let t_counts = std::time::Instant::now();
 
         // ---- counts (the survivor formula), sizes, positions --------------------------------
@@ -1977,6 +2049,7 @@ impl DepositStage {
                 t_counts.elapsed().as_secs_f64()
             ),
         );
+        laps.lap("placement");
         // ---- the chosen cells' columns (the ledger, the supergene windows) ---------------------
         let mut series: BTreeMap<u32, Vec<ColumnSample>> = BTreeMap::new();
         for cand in &candidates {
@@ -2003,6 +2076,7 @@ impl DepositStage {
             )?;
         }
 
+        laps.lap("materialise");
         // ---- playability -------------------------------------------------------------------
         self.guarantee(&mut f, world, hist, ctx)?;
         for s in &world.sites {
@@ -2018,6 +2092,7 @@ impl DepositStage {
             }
         }
 
+        laps.lap("playability");
         // ---- the sites layer and the census --------------------------------------------------
         let mut layer = vec![f32::NAN; n];
         for s in &world.sites {
@@ -2053,8 +2128,11 @@ impl DepositStage {
             .filter(|tc| !tc.enabled)
             .map(|tc| json!({ "type": tc.id, "missing": tc.missing }))
             .collect();
+        laps.lap("sites_layer");
         let census = json!({
             "stage": STAGE_NAME,
+            // The finishing step's wall-clock laps (a run's timing, not the world's).
+            "millis": laps.done(),
             "history": {
                 "source": match self.source {
                     Source::Synthetic(_) => "synthetic",

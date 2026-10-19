@@ -488,7 +488,7 @@ impl PlatesStage {
         // crust of one plate under the same plate would surface).
         let final_step = step >= self.total;
         if ridges::due(st, &env) || ((final_step || sutured) && st.resample_step != st.step) {
-            let geo = ridges::resample(st, world, &pos, &cache.geo, &env)?;
+            let geo = ridges::resample(st, world, &pos, &tree, &cache.geo, &env)?;
             // The accretion is thickening too (ledger: PLT-287); the surface's change counts as
             // the step's uplift, as the accretion's own rise does.
             let z: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();

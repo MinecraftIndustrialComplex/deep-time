@@ -106,8 +106,9 @@
           };
         };
 
-        # `nix run .#natives`: the eight natives into target/natives-dist/ with natives.json (plan
-        # §4.4, P0-08), from the checkout the command runs in. It re-enters this flake's dev shell
+        # `nix run .#natives`: the natives (eight platforms' baseline libraries, the x86-64
+        # platforms' x86-64-v3 libraries and CPU probes) into target/natives-dist/ with natives.json
+        # (plan §4.4, §6.4, P0-08), from the checkout the command runs in. It re-enters this flake's dev shell
         # rather than listing the tools again: the build scripts of the workspace need a host C
         # linker, which on macOS only the shell's stdenv sets up.
         apps.natives = {
@@ -118,7 +119,7 @@
               exec nix develop '${inputs.self}#default' -c bash ${./tools/natives/build-natives.sh} "$@"
             '';
           });
-          meta.description = "Cross-build the eight Deep Time natives into target/natives-dist";
+          meta.description = "Cross-build the Deep Time natives (baseline and x86-64-v3) into target/natives-dist";
         };
 
         checks.toolchain-channel = let

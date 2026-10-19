@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,14 +17,17 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Extraction (plan §6.5) in temporary game directories, and one test per failure class through its
- * forcing property (plan §6.6). Only {@link #versionMismatch} links the library; Gradle runs every
- * test class in its own JVM ({@code forkEvery = 1}).
+ * Extraction (plan §6.5) in temporary game directories, the choice between the baseline and the
+ * x86-64-v3 build (decisions log 2026-10-18), and one test per failure class through its forcing
+ * property (plan §6.6). Only {@link #versionMismatch} links the Deep Time library (extraction links
+ * the CPU probe, a library of its own); Gradle runs every test class in its own JVM
+ * ({@code forkEvery = 1}).
  */
 class NativeLoaderTest {
 
@@ -35,11 +39,25 @@ class NativeLoaderTest {
         System.clearProperty(NativeLoader.PROP_FORCE_FAIL);
         System.clearProperty(NativeLoader.PROP_DELETE_AFTER_WRITE);
         System.clearProperty(NativeLoader.PROP_PATH);
+        System.clearProperty(NativeLoader.PROP_VARIANT);
+        System.clearProperty(NativeLoader.PROP_TEST_CPU_FEATURES);
     }
 
-    private static ExtractResult.Extracted only(ExtractResult r) {
+    /** True when the dev jar has an x86-64-v3 build for this host (x86-64, no -PbaselineNativeOnly). */
+    private static boolean jarHasV3() throws Exception {
+        return NativeLoader.readManifest().libraries().stream().anyMatch(NativesManifest.Library::isV3);
+    }
+
+    /**
+     * The first candidate. The dev jar carries the host's library only: its baseline build, and on
+     * an x86-64 host its x86-64-v3 build too, which comes first when the CPU has the level.
+     */
+    private static ExtractResult.Extracted firstCandidate(ExtractResult r) {
         assertTrue(r.isOk(), () -> "extraction failed: " + r.failure().map(NativeStatus::describe).orElse(""));
-        assertEquals(1, r.candidates().size(), "the dev jar carries only the host library");
+        List<String> variants = r.candidates().stream().map(ExtractResult.Extracted::variant).toList();
+        assertEquals(NativesManifest.X86_64_V3.equals(r.variant())
+                ? List.of(NativesManifest.X86_64_V3, NativesManifest.BASELINE) : List.of(NativesManifest.BASELINE),
+                variants, r.variantReason());
         return r.candidates().get(0);
     }
 
@@ -48,7 +66,7 @@ class NativeLoaderTest {
     @Test
     void firstExtractionWritesAVerifiedFile() throws Exception {
         ExtractResult r = NativeLoader.extract(gameDir);
-        ExtractResult.Extracted c = only(r);
+        ExtractResult.Extracted c = firstCandidate(r);
         assertTrue(c.written(), "a fresh game directory must be written");
         assertTrue(Files.isRegularFile(c.file()));
         assertEquals(c.sha256(), NativeLoader.sha256(c.file()));
@@ -64,10 +82,10 @@ class NativeLoaderTest {
 
     @Test
     void secondExtractionReusesWithoutRewriting() throws Exception {
-        ExtractResult.Extracted first = only(NativeLoader.extract(gameDir));
+        ExtractResult.Extracted first = firstCandidate(NativeLoader.extract(gameDir));
         FileTime old = FileTime.fromMillis(1_000_000_000_000L);
         Files.setLastModifiedTime(first.file(), old);
-        ExtractResult.Extracted second = only(NativeLoader.extract(gameDir));
+        ExtractResult.Extracted second = firstCandidate(NativeLoader.extract(gameDir));
         assertFalse(second.written(), "a verified file must be reused");
         assertEquals(first.file(), second.file());
         assertEquals(old, Files.getLastModifiedTime(second.file()), "the reused file was rewritten");
@@ -75,9 +93,9 @@ class NativeLoaderTest {
 
     @Test
     void corruptedFileIsReExtracted() throws Exception {
-        ExtractResult.Extracted first = only(NativeLoader.extract(gameDir));
+        ExtractResult.Extracted first = firstCandidate(NativeLoader.extract(gameDir));
         Files.write(first.file(), new byte[] {1, 2, 3, 4});
-        ExtractResult.Extracted again = only(NativeLoader.extract(gameDir));
+        ExtractResult.Extracted again = firstCandidate(NativeLoader.extract(gameDir));
         assertTrue(again.written(), "a corrupted file must be rewritten");
         assertEquals(again.sha256(), NativeLoader.sha256(again.file()));
     }
@@ -98,7 +116,7 @@ class NativeLoaderTest {
             int written = 0;
             Path file = null;
             for (Future<ExtractResult> f : futures) {
-                ExtractResult.Extracted c = only(f.get(60, TimeUnit.SECONDS));
+                ExtractResult.Extracted c = firstCandidate(f.get(60, TimeUnit.SECONDS));
                 if (c.written())
                     written++;
                 if (file == null)
@@ -107,10 +125,64 @@ class NativeLoaderTest {
             }
             assertEquals(1, written, "exactly one of the concurrent extractions writes the file");
             assertNotNull(file);
-            assertEquals(only(NativeLoader.extract(gameDir)).sha256(), NativeLoader.sha256(file));
+            assertEquals(firstCandidate(NativeLoader.extract(gameDir)).sha256(), NativeLoader.sha256(file));
         } finally {
             pool.shutdownNow();
         }
+    }
+
+    // ------------------------------------------------------------------ the build for this CPU
+
+    @Test
+    void forcedBaselineExtractsOnlyTheBaseline() throws Exception {
+        System.setProperty(NativeLoader.PROP_VARIANT, "baseline");
+        ExtractResult r = NativeLoader.extract(gameDir);
+        assertEquals(NativesManifest.BASELINE, firstCandidate(r).variant());
+        assertEquals(1, r.candidates().size());
+        assertTrue(r.variantReason().startsWith(jarHasV3() ? "forced by -D" + NativeLoader.PROP_VARIANT
+                + "=baseline" : "natives.json has no x86-64-v3 build"), r.variantReason());
+    }
+
+    @Test
+    void aCpuWithoutTheLevelGetsTheBaselineAndAForcedV3IsRefused() throws Exception {
+        assumeTrue(jarHasV3(), "no x86-64-v3 build in this jar");
+        System.setProperty(NativeLoader.PROP_TEST_CPU_FEATURES, "0x" + Integer.toHexString(CpuProbe.ALL & ~(1 << 8)));
+        ExtractResult r = NativeLoader.extract(gameDir);
+        assertEquals(NativesManifest.BASELINE, r.variant());
+        assertEquals("the CPU lacks avx2 of x86-64-v3", r.variantReason());
+        assertEquals(List.of(NativesManifest.BASELINE),
+                r.candidates().stream().map(ExtractResult.Extracted::variant).toList());
+
+        System.setProperty(NativeLoader.PROP_VARIANT, "x86-64-v3");
+        r = NativeLoader.extract(gameDir);
+        assertEquals(NativesManifest.BASELINE, r.variant());
+        assertTrue(r.variantReason().contains("refused: the CPU lacks avx2"), r.variantReason());
+    }
+
+    @Test
+    void aCpuWithTheLevelGetsV3FirstAndTheBaselineAfter() throws Exception {
+        assumeTrue(jarHasV3(), "no x86-64-v3 build in this jar");
+        System.setProperty(NativeLoader.PROP_TEST_CPU_FEATURES, Integer.toString(CpuProbe.ALL));
+        ExtractResult r = NativeLoader.extract(gameDir);
+        assertEquals(NativesManifest.X86_64_V3, firstCandidate(r).variant());
+        assertEquals("the CPU has every x86-64-v3 feature", r.variantReason());
+
+        System.setProperty(NativeLoader.PROP_VARIANT, "v3");
+        r = NativeLoader.extract(gameDir);
+        assertEquals("forced by -D" + NativeLoader.PROP_VARIANT + "=v3; the CPU has every x86-64-v3 feature",
+                r.variantReason());
+    }
+
+    @Test
+    void theOverrideReadsThePropertyThenTheEnvironment() {
+        assertEquals(Optional.empty(), NativeLoader.VariantOverride.parse(null, null));
+        assertEquals(Optional.empty(), NativeLoader.VariantOverride.parse(" ", "auto"));
+        assertEquals(NativesManifest.BASELINE, NativeLoader.VariantOverride.parse(null, "Baseline").orElseThrow().variant());
+        assertEquals(NativeLoader.ENV_VARIANT + "=baseline",
+                NativeLoader.VariantOverride.parse(null, "baseline").orElseThrow().source());
+        assertEquals(NativesManifest.X86_64_V3, NativeLoader.VariantOverride.parse("v3", "baseline").orElseThrow().variant());
+        assertEquals(Optional.empty(), NativeLoader.VariantOverride.parse("auto", "baseline"), "auto cancels the variable");
+        assertEquals(Optional.empty(), NativeLoader.VariantOverride.parse("avx512", null), "unknown: no override");
     }
 
     // ------------------------------------------------------------------ the 5 failure classes

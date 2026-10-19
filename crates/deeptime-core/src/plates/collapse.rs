@@ -80,8 +80,10 @@
 
 use std::collections::BTreeMap;
 
+use rayon::prelude::*;
+
 use super::Env;
-use super::geometry::{Geo, dijkstra};
+use super::geometry::{Geo, dijkstra_sparse};
 use super::pools::{
     COLUMN_ISOSTATIC_FACTOR, continental_column, eclogite_m, isostatic_change_m, root_drop_m,
 };
@@ -123,13 +125,20 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
     if spreads(k) {
         // ledger: PLT-277 (the excess spreads before any of it founders).
         let mut by_plate: BTreeMap<u32, Vec<(usize, f64)>> = BTreeMap::new();
-        for (i, s) in state.samples.iter().enumerate() {
-            if s.kind == CONTINENTAL && !s.is_hidden() && f64::from(s.thickness_m) > t_max {
-                by_plate
-                    .entry(state.plate_of(i))
-                    .or_default()
-                    .push((i, f64::from(s.thickness_m) - t_max));
-            }
+        // P1-19: found in parallel, kept in sample order.
+        let over: Vec<usize> = (0..state.samples.len())
+            .into_par_iter()
+            .filter(|&i| {
+                let s = &state.samples[i];
+                s.kind == CONTINENTAL && !s.is_hidden() && f64::from(s.thickness_m) > t_max
+            })
+            .collect();
+        for i in over {
+            let s = &state.samples[i];
+            by_plate
+                .entry(state.plate_of(i))
+                .or_default()
+                .push((i, f64::from(s.thickness_m) - t_max));
         }
         // The excess goes to continental crust thinner than the collapse thickness (crust
         // thicker than that does not stay, PLT-256: lower crust flows out of the thickened belt
@@ -234,20 +243,30 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
 
     // Each plate's sources and what they would release this step, m of thickness.
     let mut by_plate: BTreeMap<u32, Vec<(usize, f64)>> = BTreeMap::new();
-    for (i, s) in state.samples.iter().enumerate() {
-        if s.kind != CONTINENTAL || s.is_hidden() || s.orogeny_myr >= quiet_before {
-            continue;
-        }
-        // ledger: PLT-254, PLT-255, PLT-256.
-        let q = rate * (f64::from(s.thickness_m) - t_c);
-        if q > 0.0 {
-            by_plate.entry(state.plate_of(i)).or_default().push((i, q));
-        }
+    // P1-19: found in parallel, kept in sample order.
+    let release: Vec<(usize, f64)> = state
+        .samples
+        .par_iter()
+        .enumerate()
+        .filter_map(|(i, s)| {
+            if s.kind != CONTINENTAL || s.is_hidden() || s.orogeny_myr >= quiet_before {
+                return None;
+            }
+            // ledger: PLT-254, PLT-255, PLT-256.
+            let q = rate * (f64::from(s.thickness_m) - t_c);
+            (q > 0.0).then_some((i, q))
+        })
+        .collect();
+    for (i, q) in release {
+        by_plate.entry(state.plate_of(i)).or_default().push((i, q));
     }
     let mut out = Collapse::default();
     spread(state, geo, env, by_plate, normal, &mut out, None);
     out
 }
+
+/// One plate's release plan (`spread`): its budget, what is left of it and the receivers' shares.
+type Plan = (f64, f64, Vec<(usize, f64)>);
 
 /// Whether the collapse's settings let crust spread at all.
 fn spreads(k: &crate::params::TectonicParams) -> bool {
@@ -277,8 +296,6 @@ pub(super) fn spread(
     let k = env.k;
     let normal = normal_thickness_m();
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
-    let n = state.samples.len();
-    let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
     let mut shares = BTreeMap::new();
     // At least to the next ring of samples: on a coarse lattice the reach may be shorter than a
     // sample spacing, and a column always borders its neighbours.
@@ -286,45 +303,66 @@ pub(super) fn spread(
         .norm
         .rad(k.collapse_reach_km)
         .max(REACH_MIN_SPACINGS * env.norm.spacing_rad());
-    for (p, sources) in by_plate {
-        let budget: f64 = sources.iter().map(|&(_, q)| q).sum();
-        if budget <= 0.0 {
-            continue;
-        }
-        let src: Vec<(u32, f64, u32)> = sources.iter().map(|&(i, _)| (i as u32, 0.0, 0)).collect();
-        let samples = &state.samples;
-        let ceiling = state.limits.as_ref().map(|l| l.ceiling_m.as_slice());
-        let on_plate = |v: u32| plate_of[v as usize] == p && !samples[v as usize].is_hidden();
-        let (dist, _) = dijkstra(geo, &src, |_, b| on_plate(b), reach);
-        // The room, nearest first, not at a trench: continental crust thinner than
-        // `continental_to_m`, ocean floor up to the normal column, neither above its ceiling.
-        let mut room: Vec<(f64, usize, f64)> = (0..n)
-            .filter(|&j| dist[j].is_finite() && on_plate(j as u32))
-            .filter_map(|j| {
-                let s = &samples[j];
-                let to = if s.kind == CONTINENTAL {
-                    continental_to_m
-                } else {
-                    normal
-                };
-                let cap = ceiling
-                    .and_then(|c| c.get(j))
-                    .map_or(f64::INFINITY, |&c| f64::from(c));
-                let r = to.min(cap) - f64::from(s.thickness_m);
-                (r > 0.0 && s.flags & TRENCH == 0).then_some((dist[j], j, r))
-            })
-            .collect();
-        room.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
-        let mut left = budget;
-        let mut given: Vec<(usize, f64)> = Vec::new();
-        for (_, j, r) in room {
-            if left <= 0.0 {
-                break;
+    // P1-19: where each plate's release goes is found for every plate at once (a plate's search
+    // reads only its own samples, which no other plate's moves touch), then the moves are made
+    // plate by plate in id order as before.
+    let plates: Vec<(u32, Vec<(usize, f64)>)> = by_plate.into_iter().collect();
+    let samples = &state.samples;
+    let groups = &state.groups;
+    let ceiling = state.limits.as_ref().map(|l| l.ceiling_m.as_slice());
+    let plans: Vec<Option<Plan>> = plates
+        .par_iter()
+        .map(|(p, sources)| {
+            let p = *p;
+            let budget: f64 = sources.iter().map(|&(_, q)| q).sum();
+            if budget <= 0.0 {
+                return None;
             }
-            let g = r.min(left);
-            given.push((j, g));
-            left -= g;
-        }
+            let src: Vec<(u32, f64, u32)> =
+                sources.iter().map(|&(i, _)| (i as u32, 0.0, 0)).collect();
+            let on_plate = |v: u32| {
+                let s = &samples[v as usize];
+                groups[s.group as usize].plate == p && !s.is_hidden()
+            };
+            let reached = dijkstra_sparse(geo, &src, |_, b| on_plate(b), reach);
+            // The room, nearest first, not at a trench: continental crust thinner than
+            // `continental_to_m`, ocean floor up to the normal column, neither above its ceiling.
+            let mut room: Vec<(f64, usize, f64)> = reached
+                .iter()
+                .filter(|&&(j, _, _)| on_plate(j))
+                .filter_map(|&(j, d, _)| {
+                    let j = j as usize;
+                    let s = &samples[j];
+                    let to = if s.kind == CONTINENTAL {
+                        continental_to_m
+                    } else {
+                        normal
+                    };
+                    let cap = ceiling
+                        .and_then(|c| c.get(j))
+                        .map_or(f64::INFINITY, |&c| f64::from(c));
+                    let r = to.min(cap) - f64::from(s.thickness_m);
+                    (r > 0.0 && s.flags & TRENCH == 0).then_some((d, j, r))
+                })
+                .collect();
+            room.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+            let mut left = budget;
+            let mut given: Vec<(usize, f64)> = Vec::new();
+            for (_, j, r) in room {
+                if left <= 0.0 {
+                    break;
+                }
+                let g = r.min(left);
+                given.push((j, g));
+                left -= g;
+            }
+            Some((budget, left, given))
+        })
+        .collect();
+    for ((p, sources), plan) in plates.into_iter().zip(plans) {
+        let Some((budget, left, given)) = plan else {
+            continue;
+        };
         let placed = budget - left.max(0.0);
         if placed <= 0.0 {
             shares.insert(p, 0.0);

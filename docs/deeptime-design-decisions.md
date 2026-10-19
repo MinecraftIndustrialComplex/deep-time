@@ -23,7 +23,7 @@ customizable unless stated otherwise; the listed value is the default.
 | Topic | Decision |
 |---|---|
 | Engine | **A Rust core called through JNI**, following Sable's pattern: a synchronous JNI call on a background thread, with Rayon inside. Java owns the screens, the generator and the Minecraft hooks (grid kernels may also run on the GPU through wgpu, with the CPU path kept: see log 2026-10-18) |
-| Native targets | Windows/macOS/Linux × x64/arm64, plus musl builds for x64 and arm64 (8 in total); conservative CPU baseline. A failed native load shows guidance instead of crashing |
+| Native targets | Windows/macOS/Linux × x64/arm64, plus musl builds for x64 and arm64 (8 in total); conservative CPU baseline, plus an x86-64-v3 build for each x86-64 platform that the loader picks at runtime (see log 2026-10-18). A failed native load shows guidance instead of crashing |
 | Standalone | Every stage also runs standalone through the CLI and writes to an HTML viewer (a development requirement) |
 | Determinism | **Stored data only**: the world folder holds the authoritative data, and a seed need not reproduce a world bit-for-bit (see log 2026-10-18) |
 | History time budget | About 5 min for the quick preset and 15 min for the full one on a 6–8-core PC |
