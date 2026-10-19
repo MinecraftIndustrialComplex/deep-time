@@ -94,8 +94,6 @@ Only what is Ben's to decide stays here (his rule of 2026-10-16): architecture, 
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
-| 2026-10-18 | P1-19 exit item 1 | Ship an x86-64-v3 native (4.5 % faster, measured, worlds identical)? It sets a minimum player CPU unless shipped beside the baseline one. | AskUserQuestion |
-| 2026-10-18 | P1-19 exit item 1 | May agents try the speed-ups that change the worlds (multigrid diffusion, slope failure stopping early, a coarser plate cadence, an order-independent flood)? | AskUserQuestion |
 
 ## Follow-ups from decided questions
 Work left behind by questions decided under Ben's rule of 2026-10-16 (decide what can be undone, then tell; decisions log 2026-10-16). Each line is a task for whoever next touches that area; remove the line when it lands. Sizes: small is under a day, medium is one to three days, large is more.
