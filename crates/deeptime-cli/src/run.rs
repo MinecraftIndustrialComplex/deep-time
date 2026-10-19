@@ -1911,6 +1911,10 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
             movers as f64 / sparse.max(1) as f64,
             visited as f64 / sparse.max(1) as f64
         );
+        // The P1-19 audit of the diffusion solve, when its environment variable is set.
+        if let Some(line) = deeptime_core::surface::diffusion::audit::audit_line() {
+            println!("deeptime bench: threads={threads} {line}");
+        }
         if let Some(line) = surface_line(&world) {
             println!("deeptime bench: threads={threads} {line}");
         }

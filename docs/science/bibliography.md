@@ -917,7 +917,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Barnes, R., Lehman, C. and Mulla, D. (2014). Priority-flood: An optimal depression-filling and watershed-labeling algorithm for digital elevation models. Computers & Geosciences 62:117-127.
 - DOI or URL: (ERO, ISO, HYP) 10.1016/j.cageo.2013.04.024; open preprint https://arxiv.org/abs/1511.04463 (PDF https://arxiv.org/pdf/1511.04463). (HYD, YNG) https://doi.org/10.1016/j.cageo.2013.04.024 ; open preprint https://arxiv.org/abs/1511.04463 and https://richard.science/sci/2014_depressions.pdf (AMP, GLA) 10.1016/j.cageo.2013.04.024; arXiv https://arxiv.org/abs/1511.04463
 - Cited as: (ERO, ISO, HYP) "Barnes, Lehman & Mulla 2014 ... Algorithms 3 and 4" (pflood.rs; plan section 8.2). (HYD, YNG) "Barnes, Lehman & Mulla 2014, Algorithm 3 with the pit queue of Algorithm 4" (hydro/mod.rs module doc); research note gives arXiv 1511.04463 (AMP, GLA) "Barnes, Lehman & Mulla 2014 (Priority-Flood+epsilon)"
-- Ledger ids: AMP-016, AMP-017, ERO-080, HYD-014
+- Ledger ids: AMP-016, AMP-017, ERO-080, ERO-184, HYD-014
 - Access: open copy (arXiv preprint) at https://arxiv.org/pdf/1511.04463. [other sections: open copy (author preprint at the two URLs above); the journal version is paywalled / open copy (arXiv) at https://arxiv.org/abs/1511.04463]
 - Library (the project's source library, not distributed): fetched (PDF, 17 pages, text layer, 49,580 characters). From: https://arxiv.org/pdf/1511.04463. Text file: Barnes2014.txt.
 - Merged keys: Barnes2014a
@@ -6685,3 +6685,43 @@ The figure the plate model's loss to the mantle is compared with, read again wit
 - Access: paywalled.
 - Library: not kept (the abstract was read from the Crossref record, 2026-10-18).
 - Read so far (by the project): cited through Stern & Scholl 2010 since 2026-10-03. Abstract, 2026-10-18 (resampling lumps agent, Crossref record): at ocean-margin subduction zones (OMSZs) "Crustal recycling at Mesozoic and younger OMSZs is assessed at c. 60 km3 Ma−1 km−1 (c. 60% by subduction erosion). The corresponding global recycling rate is c. 2.5 AU"; at crust-suturing subduction zones (CSSZs) "the combined upper and lower plate losses of CIA crust via subduction erosion, sediment subduction, and lower plate crustal detachment and sinking are assessed far less securely at c. 115 km3 Ma−1 km−1. At a global length of 6000 km, recycling at CSSZs is accordingly c. 0.7 AU"; the 6000 km "presumes that in the past the global length of crustal collision zones averaged c. 6000 km, which is one-half that under way since the early Tertiary"; the collective loss is c. 3.2 AU against SZ additions of +2.7 AU, so net growth is about nil; 1 AU is 1 km3 of solid material a year. So the 0.7 km3/yr in PLT-258 is the paper's figure for collision zones alone and was cited correctly; it rests on the assumed past mean length (about 1.4 km3/yr at today's, the agent's arithmetic), and the loss at all subduction zones is 3.2 km3/yr, most of it by subduction erosion at ocean margins, which the plate model does not have.
+
+## The surface stage's numerics: the diffusion solve, the flood (ERO-183, ERO-184), added 2026-10-18
+
+The methods behind the P1-19 changes to the surface stage's solvers (build log 2026-10-18 "Surface numerics"). They set how the same equations are solved, not what the equations are. Barnes, Lehman & Mulla 2014 (above, [Barnes2014]) is the serial flood both floods return to on a tie-free surface.
+
+### Barnes2016
+- Reference: Barnes, R. (2016). Parallel Priority-Flood depression filling for trillion cell digital elevation models on desktops or clusters. Computers & Geosciences 96:56-68.
+- DOI or URL: 10.1016/j.cageo.2016.07.001; open preprint https://arxiv.org/abs/1606.06204 (v2).
+- Cited as: "Barnes 2016, Parallel Priority-Flood depression filling for trillion cell digital elevation models on desktops or clusters (Computers & Geosciences 96:56-68; arXiv 1606.06204)" (surface/pflood/parallel.rs module doc; pflood.rs "Parallelism").
+- Ledger ids: ERO-184
+- Access: open copy (arXiv preprint).
+- Library: not kept (read through the web fetch tool, 2026-10-18).
+- Read so far (by the project): in full, arXiv v2, 2026-10-18 (P1-19 surface agent), and implemented from the paper; the author's code was not opened. Read: the tiles are flooded on their own from their edges with watershed labels, recording for each pair of labels that meet the lowest level of the meeting (Algorithm 1, the per-tile pass, and Algorithm 2, the joining of tile edges); a Priority-Flood over the graph of labels gives each label its spill level; the tiles are then raised to it. The paper's own limit: "This paper considers only the most common case wherein ε = 0. Setting ε > 0 requires more complex methods than those described here", which is why the code adds its second phase (an exact Priority-Flood+ε per group of undecided cells, the project's own).
+
+### Briggs2000
+- Reference: Briggs, W. L., Henson, V. E. and McCormick, S. F. (2000). A Multigrid Tutorial, 2nd edition. SIAM, Philadelphia.
+- DOI or URL: not looked up.
+- Cited as: "Briggs, Henson & McCormick 2000, A Multigrid Tutorial, 2nd ed., SIAM: ch. 2-3" (surface/diffusion/multigrid.rs module doc and `OMEGA`).
+- Ledger ids: ERO-183
+- Access: book (paywalled).
+- Library: not fetched.
+- Read so far (by the project): from memory (the smoothing of high-frequency error by damped Jacobi, the coarse-grid correction of the smooth error, the V-cycle; the damping 2/3 for one dimension, 4/5 for the five-point Laplacian in two).
+
+### Tatebe1993
+- Reference: Tatebe, O. (1993). The multigrid preconditioned conjugate gradient method. In: Proceedings of the Sixth Copper Mountain Conference on Multigrid Methods, NASA Conference Publication 3224, pp. 621-634.
+- DOI or URL: not found (NASA Technical Reports Server, not located).
+- Cited as: "Tatebe 1993, 'The multigrid preconditioned conjugate gradient method', Proc. 6th Copper Mountain Conference on Multigrid Methods, NASA CP-3224, 621-634" (surface/diffusion/multigrid.rs module doc).
+- Ledger ids: ERO-183
+- Access: open (a NASA conference publication), copy not located.
+- Library: not fetched.
+- Read so far (by the project): from memory (a multigrid cycle as the conjugate gradients' preconditioner, which must then be symmetric and positive definite: equal pre- and post-smoothing). The reference itself (volume, pages 621-634, April 1993) was checked against the reference lists of later papers found by web search, 2026-10-18, not against the paper.
+
+### Braess1995
+- Reference: Braess, D. (1995). Towards algebraic multigrid for elliptic problems of second order. Computing 55(4):379-393.
+- DOI or URL: not looked up.
+- Cited as: "Braess 1995, 'Towards algebraic multigrid for elliptic problems of second order', Computing 55:379-393" (surface/diffusion/multigrid.rs module doc).
+- Ledger ids: ERO-183
+- Access: paywalled (Springer).
+- Library: not fetched.
+- Read so far (by the project): from memory (piecewise-constant aggregation makes the Galerkin coarse operator too stiff for smooth error, about twice for the Laplacian, remedied by over-weighting the coarse correction). The project uses the equivalent halving of the coarse couplings (`SCALE` 0.5) and measured the effect itself (ERO-183).
