@@ -1622,3 +1622,64 @@ docs/design/p1-17-benchmark-gate.md), so C20 saves about 40 s of the 1,242.8 s, 
 with more high ground and a hotter, CO₂-richer present, and P4 and P3 also cut the carbonate by 37 to 53 %.
 The rules above count time now, so a coarser step is one preset key once the high ground's
 dependence on the step is found and removed.
+
+**Again on master of 2026-10-19** (fde7e021: plates parts 1 and 2 and the climate, surface and
+after-group speed-ups; build log 2026-10-18, "The coupled group's cadence"). The same ensembles
+with the shipped x86-64-v3 builds (`tools/natives/gate-bins.sh`): master; **C20**, this branch as
+it ships (the per-Myr rules and the 20-Myr snapshot); **P4C20**, the branch with 4-Myr steps. At
+2 Myr with a 10-Myr snapshot the branch still prints master's 40 Myr summary (the words that differ
+are those that differ between two runs of master: memory and timings).
+
+| | master 500 | C20 500 | P4C20 500 | master 1000 | C20 1000 | P4C20 1000 |
+|---|---|---|---|---|---|---|
+| land | 0.184 | 0.192 | 0.191 | 0.186 | 0.184 | 0.194 |
+| land above 2 km | 0.241 [0.184, 0.282] | 0.237 | 0.308 | 0.275 [0.161, 0.322] | 0.261 | 0.351 |
+| continental crust | 0.389 | 0.380 | 0.387 | 0.418 | 0.415 | 0.397 |
+| highest cell, m | 6,903 [6,464, 7,368] | 7,114 | 9,834 | 7,042 [5,778, 8,680] | 6,615 | 9,247 |
+| loss to the mantle, km³/yr (with the slab's) | 2.50 (4.31) | 2.64 (4.96) | 1.89 (4.68) | 3.30 (5.46) | 3.10 (5.08) | 2.79 (5.89) |
+| plateau wear, m/Myr | 158.5 | 144.3 | 119.0 | 116.6 | 121.9 | 98.1 |
+| collision wedge, km (runs above 0) | 36 in one | 68 to 75 in three | 39 to 85 in three | 78 in one | none | none |
+| T, °C | 18.5 [15.5, 24.3] | 16.9 | 20.9 | 17.2 [14.8, 20.3] | 17.5 | 20.1 |
+| CO₂, ppm (geometric mean) | 2,237 | 1,325 | 5,553 | 1,664 | 1,712 | 5,126 |
+| carbonate, km³ | 779,183 | 693,083 | 401,550 | 1,280,800 | 1,292,750 | 708,100 |
+| stratovolcanoes born (standing) | 13,997 (607) | 14,165 (616) | 10,105 (388) | 32,010 (589) | 31,174 (497) | 24,516 (379) |
+| checks met; checks moved | 29 | 30; 3 | 29; 8 | 25 | 26; 4 | 27; 12 |
+| climate stage, s | 91.1 | 68.6 | 59.5 | 157.5 | 118.7 | 95.4 |
+| stage time, s | 450 | 428 | 265 | 867 | 820 | 503 |
+
+- *C20 still leaves the planet alone.* Its moved checks: at 500 Myr the rank correlation of speed
+  against plate area (−0.416 to −0.376, a fail becomes a pass), the supercontinent's tenure (35 to
+  135 Myr, a fail becomes a pass) and the continental arcs' median (659 to 830 m, a fail both); at
+  1000 Myr the largest plate's median share (0.175 to 0.208), the rift-born plates alive after
+  50 Myr (78.7 to 72.6 %) and the fast plates' 90th percentile speed (74.7 to 73.7 mm/yr), passes
+  all three, and the supercontinent period (172.5 to 121.5 Myr, a fail both). The present's CO₂ is now
+  below master's at 500 Myr and level with it at 1000, so the higher means of the first
+  measurement were the nudge's spread, as the Mann–Whitney tests said.
+- *A 4-Myr step still makes the planet worse:* the highest cell 2.2 to 2.9 km higher, more land
+  above 2 km, the present 2.4 to 3.0 °C warmer with 2.5 to 3.1 times the CO₂, 45 to 49 % less
+  carbonate, a quarter fewer stratovolcanoes, and 8 and 12 checks moved. The plates' rewrite did
+  not change the verdict.
+
+**Time on that master** (`tools/review/p1-19-pair.sh`, the full 16k gate run, scattered start,
+1000 Myr, 8 threads, the two shipped builds side by side on CPU sets A and B, then swapped):
+
+| order | set A | set B | branch ÷ master |
+|---|---|---|---|
+| ab | master 1,374.1 s (climate stage 176.3 s) | branch 1,880.5 s (192.7 s) | 1.369 (climate 1.093) |
+| ba | branch 1,598.7 s (155.6 s) | master 2,155.2 s (262.4 s) | 0.742 (climate 0.593) |
+| P4C20, 200 Myr | master 280.8 s | P4C20 210.6 s | 0.750 |
+| P4C20, 200 Myr, swapped | P4C20 215.6 s | master 290.8 s | 0.741 |
+
+The geometric mean of the two orders is 1.008 for the whole run and 0.805 for the climate stage.
+Under the other agents' load set B ran each build about 35 % slower than set A (its runs had 2.5
+and 3.6 CPUs on average, set A's 3.3 and 5.2), so a change of a few % in the whole run is below
+what these pairs resolve; the stages C20 does not touch came out at 1.007 (plates) and 1.044
+(surface), which is that noise. The climate stage's cut is the measured saving: 0.81 of master's
+in the pairs and 0.75 in the ensembles at both lengths. On the quiet gate run, whose climate stage
+after its speed-ups is about 200 s per 1000 Myr (build log 2026-10-19, the climate stage's
+entry: 27.6 s per 100 Myr with the 7.7 s present search once), that is roughly 40 to 50 s.
+
+P4C20 takes 0.746 of master's time over 200 Myr (both orders, geometric mean; the coupled group's
+stages 0.63 and 0.68, the rest of the run fixed), and its ensemble stage sums are 0.59 and 0.58 of
+master's at 500 and 1000 Myr, so at the gate's length it would save about a third of the run. It
+stays out for the planet's sake (above).

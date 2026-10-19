@@ -161,6 +161,25 @@ climate at the last step before the present-day nudge):
   332.0 s and the whole run 0.961 of master's time, about 40 s of the quiet 1,242.8 s (plates.md,
   "The coupled group's cadence").
 
+**Again on master of 2026-10-19** (fde7e021, after the plates', climate's and surface's speed-ups;
+the same ensembles with the shipped x86-64-v3 builds; the "natural" column was not read):
+
+| | T, °C | CO₂, ppm | land under ice | land above 2 km | climate stage, s |
+|---|---|---|---|---|---|
+| 500 Myr, master | 18.5 [15.5, 24.3] | 2,237 [1,269, 11,046] | 0.161 [0.155, 0.169] | 0.241 | 91.1 |
+| 500 Myr, 20 Myr snapshots | 16.9 [14.2, 21.3] | 1,325 [602, 3,868] | 0.154 [0.143, 0.165] | 0.237 | 68.6 |
+| 1000 Myr, master | 17.2 [14.8, 20.3] | 1,664 [634, 3,858] | 0.146 [0.096, 0.159] | 0.275 | 157.5 |
+| 1000 Myr, 20 Myr snapshots | 17.5 [13.8, 22.5] | 1,712 [358, 9,305] | 0.159 [0.151, 0.169] | 0.261 | 118.7 |
+
+- *The CO₂ difference of the first measurement does not come back:* the 20-Myr snapshot's present
+  is cooler and lower in CO₂ than master's at 500 Myr and level with it at 1000, so both
+  measurements sit inside the nudge's spread.
+- *The climate stage takes 25 % less time* at both lengths in the ensembles, and 0.81 of master's
+  in the full 16k gate run's pairs (both orders, geometric mean; plates.md, "Time on that
+  master"). With the stage at about 200 s per 1000 Myr on the quiet gate run after its speed-ups,
+  that is roughly 40 to 50 s; the pairs' whole-run ratio (1.008) is below what the loaded machine
+  resolves.
+
 What it costs: a climate that changes within 20 Myr is seen in the per-cell fields up to 20 Myr
 late instead of 10. A fast change of the clock's climate (a snowball's onset or escape, a hothouse)
 still takes a snapshot when it happens: the per-cell model triggers one when the clock's global
