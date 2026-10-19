@@ -173,7 +173,7 @@ public final class LavaGameTests {
 
     /** What was read back around one body. */
     private static final class Tally {
-        long expected, lava, stray, wetFaces, airFaces, skippedFaces, lensExpected, lensLava, mushBlocks, mushLava, mushOpen;
+        long expected, lava, stray, otherBody, wetFaces, airFaces, skippedFaces, lensExpected, lensLava, mushBlocks, mushLava, mushOpen;
         final StringBuilder detail = new StringBuilder();
     }
 
@@ -191,7 +191,9 @@ public final class LavaGameTests {
      * <ul>
      *   <li>{@code lava}: the chamber, conduit and lake hold lava (at least half of the blocks
      *       {@link Magma} calls molten; the rest is the cover kept under low ground);</li>
-     *   <li>{@code stray}: no lava above the lava-lake zone that is not part of a body;</li>
+     *   <li>{@code stray}: no lava above the lava-lake zone that is not part of a body (lava in a
+     *       neighbouring volcano's body, where two bodies' boxes overlap, is counted apart as
+     *       {@code otherBody});</li>
      *   <li>{@code wetFaces}, {@code airFaces}: no lava block of a body touches water, and none
      *       touches air except a lake's surface: the bodies are sealed, in a sea, a lake, a river
      *       or a cave alike;</li>
@@ -272,7 +274,9 @@ public final class LavaGameTests {
                         if (!lava)
                             continue;
                         if (!part.molten()) {
-                            if (y > lakeZoneTop && !magma.at(x, y, z).molten()) {
+                            if (magma.at(x, y, z).molten()) {
+                                n.otherBody++;      // another volcano's body overlapping this one's box
+                            } else if (y > lakeZoneTop) {
                                 n.stray++;
                                 if (n.detail.length() < 300)
                                     n.detail.append(" stray(").append(x).append(',').append(y).append(',').append(z).append(')');
@@ -321,10 +325,10 @@ public final class LavaGameTests {
                     if (!top || !sky)
                         failure = "volcano " + b.id() + ": its crater lake is " + lake;
                 }
-                line.append(String.format(" [id=%d %s at (%d, %d) floorY=%d chamber y=%d rh=%d rv=%d %s lake=%s molten=%d lava=%d stray=%d "
+                line.append(String.format(" [id=%d %s at (%d, %d) floorY=%d chamber y=%d rh=%d rv=%d %s lake=%s molten=%d lava=%d stray=%d otherBody=%d "
                                 + "wetFaces=%d airFaces=%d lenses=%d lensMolten=%d lensLava=%d mush=%d mushOpen=%d mushLava=%d column y %d..%d%s]",
                         b.id(), b.kind(), b.x(), b.z(), b.floorY(), b.chamberY(), b.chamberRh(),
-                        b.chamberRv(), b.submerged() ? "under water" : "on land", lake, n.expected, n.lava, n.stray, n.wetFaces,
+                        b.chamberRv(), b.submerged() ? "under water" : "on land", lake, n.expected, n.lava, n.stray, n.otherBody, n.wetFaces,
                         n.airFaces, b.lensCount(), n.lensExpected, n.lensLava, n.mushBlocks, n.mushOpen, n.mushLava, b.minY(), b.maxY(),
                         n.detail));
                 if (failure == null && b.lensCount() > 0 && n.lensExpected > 0 && n.lensLava * 2 < n.lensExpected)
