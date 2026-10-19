@@ -61,7 +61,30 @@ pub fn sample(
     let tris = geo.mesh.triangles();
     let plate_of = |v: u32| state.groups[samples[v as usize].group as usize].plate;
 
+    let covered = |link: &mut crate::sphere::CellLink, c: super::geometry::Cover| {
+        link.tri = c.t;
+        link.w = c.w.map(|x| x as f32);
+        link.nearest = c.major();
+        Info {
+            mode: COVERED,
+            d1: 0.0,
+            d2: 0.0,
+            j2: u32::MAX,
+        }
+    };
     let info: Vec<Info> = coupling.relink(|_, q, link| {
+        // Most cells lie inside their nearest visible sample's group: the nearest sample alone
+        // (one query a third the cost of six) settles them, with the same first cover the six
+        // would try (P1-19). The rest take the full search below.
+        let first = vis.nearest(q);
+        if let Some((v, _)) = first {
+            let g = samples[v as usize].group;
+            if let Some(c) = cover(geo, state, g, rots[g as usize], q, v)
+                && c.tri.iter().all(|&x| !samples[x as usize].is_hidden())
+            {
+                return covered(link, c);
+            }
+        }
         let nn = vis.nearest_n(q, 6);
         let Some(&(j, d2)) = nn.first() else {
             return Info {
@@ -73,6 +96,11 @@ pub fn sample(
         };
         let mut tried = [u32::MAX; 6];
         let mut nt = 0;
+        // The nearest sample's group failed above (unless a tie gave the six another first).
+        if first.is_some_and(|(v, _)| v == j) {
+            tried[0] = samples[j as usize].group;
+            nt = 1;
+        }
         for &(v, _) in &nn {
             let g = samples[v as usize].group;
             if tried[..nt].contains(&g) {
@@ -83,15 +111,7 @@ pub fn sample(
             if let Some(c) = cover(geo, state, g, rots[g as usize], q, v)
                 && c.tri.iter().all(|&x| !samples[x as usize].is_hidden())
             {
-                link.tri = c.t;
-                link.w = c.w.map(|x| x as f32);
-                link.nearest = c.major();
-                return Info {
-                    mode: COVERED,
-                    d1: 0.0,
-                    d2: 0.0,
-                    j2: u32::MAX,
-                };
+                return covered(link, c);
             }
         }
         // Nearest visible sample only: a one-hot weight on its corner of one of its triangles.
@@ -207,132 +227,123 @@ pub fn sample(
     let cells = links.len();
     // The deposit engine's inputs and the surface's basement (P1-04): the nearest sample's flags,
     // top rock pool and trench values; the rest interpolated.
-    let extra: Vec<[f32; 12]> = (0..cells)
-        .into_par_iter()
-        .map(|c| {
-            let s = &samples[links[c].nearest as usize];
-            if info[c].mode == GAP {
-                let age = gap_of(&info[c], links[c].nearest).1;
-                return [
-                    0.0,
-                    super::state::pool::MAFIC_VOLCANIC as f32,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    super::pools::ocean_heat_flow(age) as f32,
-                    7000.0,
-                    s.group as f32,
-                    f32::NAN,
-                    0.0,
-                    0.0,
-                ];
-            }
-            let top = TOP_ORDER
-                .iter()
-                .copied()
-                .find(|&k| s.pools[k] > TOP_POOL_M)
-                .map_or(255.0, |k| k as f32);
-            [
-                f32::from(s.flags),
-                top,
-                interp[c][OXID] as f32,
-                s.convergence_mm_yr,
-                s.obliquity_deg,
-                s.slab_age_myr,
-                interp[c][HEAT] as f32,
-                interp[c][THICK] as f32,
+    let extra = |c: usize| -> [f32; 12] {
+        let s = &samples[links[c].nearest as usize];
+        if info[c].mode == GAP {
+            let age = gap_of(&info[c], links[c].nearest).1;
+            return [
+                0.0,
+                super::state::pool::MAFIC_VOLCANIC as f32,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                super::pools::ocean_heat_flow(age) as f32,
+                7000.0,
                 s.group as f32,
-                if s.kind == CONTINENTAL && interp[c][CONT_W] > 1.0e-6 {
-                    (interp[c][CONT_HEAT] / interp[c][CONT_W]) as f32
-                } else {
-                    f32::NAN
-                },
-                s.collision_mm_yr,
-                s.shortening_km,
-            ]
-        })
-        .collect();
+                f32::NAN,
+                0.0,
+                0.0,
+            ];
+        }
+        let top = TOP_ORDER
+            .iter()
+            .copied()
+            .find(|&k| s.pools[k] > TOP_POOL_M)
+            .map_or(255.0, |k| k as f32);
+        [
+            f32::from(s.flags),
+            top,
+            interp[c][OXID] as f32,
+            s.convergence_mm_yr,
+            s.obliquity_deg,
+            s.slab_age_myr,
+            interp[c][HEAT] as f32,
+            interp[c][THICK] as f32,
+            s.group as f32,
+            if s.kind == CONTINENTAL && interp[c][CONT_W] > 1.0e-6 {
+                (interp[c][CONT_HEAT] / interp[c][CONT_W]) as f32
+            } else {
+                f32::NAN
+            },
+            s.collision_mm_yr,
+            s.shortening_km,
+        ]
+    };
     // The rock pools, interpolated like the other thicknesses (P1-07's basement columns,
     // `structure::columns`: the nearest sample's pools changed every other L1 cell and built
     // columns of alternating crust); gap cells get the fresh ridge crust the next resampling makes.
-    let pools: Vec<[f32; POOL_FIELDS.len()]> = (0..cells)
-        .into_par_iter()
-        .map(|c| {
-            if info[c].mode == GAP {
-                super::pools::oceanic_column()
-            } else {
-                std::array::from_fn(|k| interp[c][POOL0 + k].max(0.0) as f32)
-            }
-        })
-        .collect();
-    let per_cell: Vec<[f32; 11]> = (0..cells)
-        .into_par_iter()
-        .map(|c| {
-            let l = links[c];
-            let inf = info[c];
-            let v = l.nearest;
-            let s = &samples[v as usize];
-            let plate = plate_of(v);
-            let mut z = interp[c][ELEV];
-            let mut up = interp[c][UPLIFT];
-            let mut kind = f64::from(s.kind);
-            let mut orogeny = f64::from(s.orogeny);
-            let mut orogeny_age = if s.orogeny == OROGENY_NONE {
-                f64::NAN
-            } else {
-                (t - f64::from(s.orogeny_myr)).max(0.0)
-            };
-            let mut reg = f64::from(s.regime);
-            let mut age = if s.kind == CONTINENTAL {
-                -1.0
-            } else {
-                let tri = tris[l.tri as usize];
-                let (mut sw, mut sa) = (0.0, 0.0);
-                for kk in 0..3 {
-                    let x = &samples[tri[kk] as usize];
-                    if x.kind == OCEANIC {
-                        sw += f64::from(l.w[kk]);
-                        sa += f64::from(l.w[kk]) * x.age_myr(t);
-                    }
+    let pools = |c: usize| -> [f32; POOL_FIELDS.len()] {
+        if info[c].mode == GAP {
+            super::pools::oceanic_column()
+        } else {
+            std::array::from_fn(|k| interp[c][POOL0 + k].max(0.0) as f32)
+        }
+    };
+    let per_cell = |c: usize| -> [f32; 11] {
+        let l = links[c];
+        let inf = info[c];
+        let v = l.nearest;
+        let s = &samples[v as usize];
+        let plate = plate_of(v);
+        let mut z = interp[c][ELEV];
+        let mut up = interp[c][UPLIFT];
+        let mut kind = f64::from(s.kind);
+        let mut orogeny = f64::from(s.orogeny);
+        let mut orogeny_age = if s.orogeny == OROGENY_NONE {
+            f64::NAN
+        } else {
+            (t - f64::from(s.orogeny_myr)).max(0.0)
+        };
+        let mut reg = f64::from(s.regime);
+        let mut age = if s.kind == CONTINENTAL {
+            -1.0
+        } else {
+            let tri = tris[l.tri as usize];
+            let (mut sw, mut sa) = (0.0, 0.0);
+            for kk in 0..3 {
+                let x = &samples[tri[kk] as usize];
+                if x.kind == OCEANIC {
+                    sw += f64::from(l.w[kk]);
+                    sa += f64::from(l.w[kk]) * x.age_myr(t);
                 }
-                if sw > 0.0 { sa / sw } else { s.age_myr(t) }
-            };
-            if inf.mode == GAP {
-                let (gz, ga) = gap_of(&inf, v);
-                z = gz;
-                age = ga;
-                up = 0.0;
-                kind = f64::from(OCEANIC);
-                orogeny = 0.0;
-                orogeny_age = f64::NAN;
-                reg = f64::from(regime::RIDGE);
             }
-            // Fold trend: the axis perpendicular to the shortening direction, in [0°, 180°).
-            let rot = rots[s.group as usize];
-            let fold = to_world(rot, s.fold);
-            let q = rot * geo.points()[v as usize];
-            let trend = if fold.length_squared() > 1e-12 {
-                let axis = q.cross(tangent(q, fold));
-                azimuth_deg(q, axis).rem_euclid(180.0)
-            } else {
-                f64::NAN
-            };
-            [
-                (f64::from(scale.sea_level_y) + z / scale.m_per_block_v) as f32,
-                ((plate * 7) % PLATE_COLOURS) as f32,
-                age as f32,
-                reg as f32,
-                z as f32,
-                up as f32,
-                kind as f32,
-                orogeny as f32,
-                orogeny_age as f32,
-                trend as f32,
-                plate as f32,
-            ]
-        })
-        .collect();
+            if sw > 0.0 { sa / sw } else { s.age_myr(t) }
+        };
+        if inf.mode == GAP {
+            let (gz, ga) = gap_of(&inf, v);
+            z = gz;
+            age = ga;
+            up = 0.0;
+            kind = f64::from(OCEANIC);
+            orogeny = 0.0;
+            orogeny_age = f64::NAN;
+            reg = f64::from(regime::RIDGE);
+        }
+        // Fold trend: the axis perpendicular to the shortening direction, in [0°, 180°).
+        let rot = rots[s.group as usize];
+        let fold = to_world(rot, s.fold);
+        let q = rot * geo.points()[v as usize];
+        let trend = if fold.length_squared() > 1e-12 {
+            let axis = q.cross(tangent(q, fold));
+            azimuth_deg(q, axis).rem_euclid(180.0)
+        } else {
+            f64::NAN
+        };
+        [
+            (f64::from(scale.sea_level_y) + z / scale.m_per_block_v) as f32,
+            ((plate * 7) % PLATE_COLOURS) as f32,
+            age as f32,
+            reg as f32,
+            z as f32,
+            up as f32,
+            kind as f32,
+            orogeny as f32,
+            orogeny_age as f32,
+            trend as f32,
+            plate as f32,
+        ]
+    };
     let names: [&'static str; 11] = [
         "elevation",
         "plates",
@@ -368,22 +379,41 @@ pub fn sample(
         "plates/collision_mm_yr",
         "plates/shortening",
     ];
-    names
-        .iter()
+    // Every layer written in one pass over the cells, each block of cells on one thread (P1-19:
+    // the cells' values were collected per group, then each layer drawn out of them in a pass of
+    // its own, 30 passes over the L1 every step).
+    const FIELDS: usize = 11 + 12 + POOL_FIELDS.len();
+    const BLOCK: usize = 1 << 12;
+    let mut layers: Vec<Vec<f32>> = (0..FIELDS).map(|_| vec![0.0; cells]).collect();
+    let mut blocks: Vec<Vec<&mut [f32]>> = (0..cells.div_ceil(BLOCK))
+        .map(|_| Vec::with_capacity(FIELDS))
+        .collect();
+    for layer in &mut layers {
+        for (b, part) in layer.chunks_mut(BLOCK).enumerate() {
+            blocks[b].push(part);
+        }
+    }
+    blocks
+        .into_par_iter()
         .enumerate()
-        .map(|(f, &name)| (name, per_cell.par_iter().map(|v| v[f]).collect()))
-        .chain(
-            extra_names
-                .iter()
-                .enumerate()
-                .map(|(f, &name)| (name, extra.par_iter().map(|v| v[f]).collect())),
-        )
-        .chain(
-            POOL_FIELDS
-                .iter()
-                .enumerate()
-                .map(|(f, &name)| (name, pools.par_iter().map(|v| v[f]).collect())),
-        )
+        .for_each(|(b, mut parts)| {
+            for i in 0..parts[0].len() {
+                let c = b * BLOCK + i;
+                let values = per_cell(c)
+                    .into_iter()
+                    .chain(extra(c))
+                    .chain(pools(c))
+                    .enumerate();
+                for (f, x) in values {
+                    parts[f][i] = x;
+                }
+            }
+        });
+    names
+        .into_iter()
+        .chain(extra_names)
+        .chain(POOL_FIELDS)
+        .zip(layers)
         .collect()
 }
 

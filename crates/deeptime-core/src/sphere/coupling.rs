@@ -126,6 +126,18 @@ pub struct Coupling {
     grid: GridDesc,
     frame: BlockFrame,
     links: Vec<CellLink>,
+    /// The cells' unit vectors from their row's (sin φ, cos φ) and their column's (sin λ, cos λ),
+    /// each as `Projection::unit` finds it, so a cell's vector is exactly `frame.unit`'s (P1-19:
+    /// the plates relink every cell every step and found both from scratch each time).
+    rows: Vec<(f64, f64)>,
+    cols: Vec<(f64, f64)>,
+}
+
+/// The unit vector from a row's (sin φ, cos φ) and a column's (sin λ, cos λ), in
+/// `Projection::unit`'s order of operations.
+fn unit_of(row: (f64, f64), col: (f64, f64)) -> DVec3 {
+    let ((sp, cp), (sl, cl)) = (row, col);
+    DVec3::new(cp * cl, cp * sl, sp)
 }
 
 impl Coupling {
@@ -134,16 +146,24 @@ impl Coupling {
     /// from the previous cell's triangle.
     pub fn build(grid: &GridDesc, mesh: &SphereMesh, tree: &SampleTree) -> Coupling {
         let frame = BlockFrame::new(grid.circumference() as u32);
+        let p = frame.projection();
+        let rows: Vec<(f64, f64)> = (0..grid.h as i64)
+            .map(|j| {
+                let z = grid.block_z(j) as f64;
+                (p.sin_lat(z), p.cos_lat(z))
+            })
+            .collect();
+        let cols: Vec<(f64, f64)> = (0..grid.w as i64)
+            .map(|i| p.lon_deg(grid.block_x(i) as f64).to_radians().sin_cos())
+            .collect();
         let mut links = vec![CellLink::default(); grid.cells()];
         links
             .par_chunks_mut(grid.w as usize)
             .enumerate()
             .for_each(|(j, row)| {
-                let z = grid.block_z(j as i64) as f64;
                 let mut hint = None;
                 for (i, link) in row.iter_mut().enumerate() {
-                    let q = frame.unit(grid.block_x(i as i64) as f64, z);
-                    *link = link_cell(mesh, tree, q, hint);
+                    *link = link_cell(mesh, tree, unit_of(rows[j], cols[i]), hint);
                     hint = Some(link.tri);
                 }
             });
@@ -151,6 +171,8 @@ impl Coupling {
             grid: grid.clone(),
             frame,
             links,
+            rows,
+            cols,
         }
     }
 
@@ -162,18 +184,16 @@ impl Coupling {
         tree: &SampleTree,
         stale: impl Fn(usize, &CellLink) -> bool + Sync,
     ) -> usize {
-        let (grid, frame) = (&self.grid, self.frame);
-        let w = grid.w as usize;
+        let (rows, cols) = (&self.rows, &self.cols);
+        let w = self.grid.w as usize;
         self.links
             .par_chunks_mut(w)
             .enumerate()
             .map(|(j, row)| {
-                let z = grid.block_z(j as i64) as f64;
                 let mut count = 0;
                 for (i, link) in row.iter_mut().enumerate() {
                     if stale(j * w + i, link) {
-                        let q = frame.unit(grid.block_x(i as i64) as f64, z);
-                        *link = link_cell(mesh, tree, q, None);
+                        *link = link_cell(mesh, tree, unit_of(rows[j], cols[i]), None);
                         count += 1;
                     }
                 }
@@ -191,8 +211,8 @@ impl Coupling {
         &mut self,
         f: impl Fn(usize, DVec3, &mut CellLink) -> T + Sync,
     ) -> Vec<T> {
-        let (grid, frame) = (&self.grid, self.frame);
-        let w = grid.w as usize;
+        let (rows, cols) = (&self.rows, &self.cols);
+        let w = self.grid.w as usize;
         // Collected in place in cell order (P1-19: the rows' results were flattened on one
         // thread, every plate step on the L1).
         self.links
@@ -200,9 +220,7 @@ impl Coupling {
             .enumerate()
             .map(|(c, link)| {
                 let (i, j) = (c % w, c / w);
-                let z = grid.block_z(j as i64) as f64;
-                let q = frame.unit(grid.block_x(i as i64) as f64, z);
-                f(c, q, link)
+                f(c, unit_of(rows[j], cols[i]), link)
             })
             .collect()
     }
@@ -230,12 +248,8 @@ impl Coupling {
 
     /// The unit vector of cell (i, j).
     pub fn cell_unit(&self, i: i64, j: i64) -> DVec3 {
-        let (i, j) = (
-            i64::from(self.grid.wrap_i(i)),
-            i64::from(self.grid.clamp_j(j)),
-        );
-        self.frame
-            .unit(self.grid.block_x(i) as f64, self.grid.block_z(j) as f64)
+        let (i, j) = (self.grid.wrap_i(i) as usize, self.grid.clamp_j(j) as usize);
+        unit_of(self.rows[j], self.cols[i])
     }
 
     /// A scalar field sampled onto the grid: Σ wₖ·value(vertex k) per cell. `value` reads the
@@ -274,6 +288,91 @@ impl Coupling {
     /// A categorical field sampled onto the grid: the value at each cell's nearest sample.
     pub fn categorical<T: Send>(&self, value: impl Fn(u32) -> T + Sync) -> Vec<T> {
         self.links.par_iter().map(|l| value(l.nearest)).collect()
+    }
+}
+
+/// The links turned round: per sample, the cells whose link puts a positive weight on it (the
+/// cell and the corner), in cell order. A sum over the cells that see each sample then runs per
+/// sample, the samples in parallel, and still adds in the cell order of one serial pass over
+/// the links (P1-19: the plates spread the surface's feedback and flexure onto 250k samples
+/// from 1.3M cells on one thread, every step).
+pub struct FanIn {
+    /// The sample count, and the samples per range (a range is the gather's unit of work).
+    n: usize,
+    span: usize,
+    /// Per block of [`FAN_BLOCK`] cells: its entries, by range and within a range by cell (a
+    /// stable counting sort), and where each range's entries start (one offset per range and
+    /// the end). An entry packs the cell's place in its block (bits 18 to 31), the corner (16
+    /// and 17) and the sample's place in its range (0 to 15).
+    blocks: Vec<(Vec<u32>, Vec<u32>)>,
+}
+
+/// Cells per block of a [`FanIn`] (at most 2¹⁴: an entry's cell field).
+const FAN_BLOCK: usize = 1 << 14;
+/// The most samples in one range of a [`FanIn`] (an entry's sample field).
+const FAN_SPAN_MAX: usize = 1 << 16;
+
+impl FanIn {
+    /// The links turned round, for the `n` samples of `tris` (the mesh the links index).
+    pub fn build(links: &[CellLink], tris: &[[u32; 3]], n: usize) -> FanIn {
+        let ranges = n.div_ceil(FAN_SPAN_MAX).max(256).min(n.max(1));
+        let span = n.div_ceil(ranges).max(1);
+        let ranges = n.div_ceil(span);
+        let weighs = |l: &CellLink, k: usize| {
+            let v = tris[l.tri as usize][k] as usize;
+            (l.w[k] > 0.0 && v < n).then_some(v)
+        };
+        let blocks = links
+            .par_chunks(FAN_BLOCK)
+            .map(|block| {
+                let mut off = vec![0u32; ranges + 1];
+                for l in block {
+                    for k in 0..3 {
+                        if let Some(v) = weighs(l, k) {
+                            off[v / span + 1] += 1;
+                        }
+                    }
+                }
+                for r in 0..ranges {
+                    off[r + 1] += off[r];
+                }
+                let mut at = off.clone();
+                let mut entries = vec![0u32; off[ranges] as usize];
+                for (j, l) in block.iter().enumerate() {
+                    for k in 0..3 {
+                        if let Some(v) = weighs(l, k) {
+                            let r = v / span;
+                            entries[at[r] as usize] =
+                                (j as u32) << 18 | (k as u32) << 16 | (v - r * span) as u32;
+                            at[r] += 1;
+                        }
+                    }
+                }
+                (entries, off)
+            })
+            .collect();
+        FanIn { n, span, blocks }
+    }
+
+    /// Calls `add(&mut out[v], cell, corner)` for every sample `v` and every cell whose link
+    /// puts a positive weight on `v` (at that corner), a sample's cells in increasing order;
+    /// ranges of samples run in parallel. `out` holds one entry per sample.
+    ///
+    /// # Panics
+    /// If `out` does not hold one entry per sample.
+    pub fn gather<T: Send>(&self, out: &mut [T], add: impl Fn(&mut T, usize, usize) + Sync) {
+        assert_eq!(out.len(), self.n, "one entry per sample");
+        out.par_chunks_mut(self.span)
+            .enumerate()
+            .for_each(|(r, part)| {
+                for (b, (entries, off)) in self.blocks.iter().enumerate() {
+                    let base = b * FAN_BLOCK;
+                    for &e in &entries[off[r] as usize..off[r + 1] as usize] {
+                        let (j, k, v) = (e >> 18, (e >> 16) & 3, e & 0xffff);
+                        add(&mut part[v as usize], base + j as usize, k as usize);
+                    }
+                }
+            });
     }
 }
 
@@ -402,6 +501,71 @@ mod tests {
             assert_eq!(a.nearest, b.nearest);
         }
         assert_eq!(c.refresh(&mesh, &tree, |_, _| false), 0);
+    }
+
+    /// The kept rows and columns give every cell exactly the frame's unit vector.
+    #[test]
+    fn kept_unit_vectors_are_the_frames() {
+        let pts = fibonacci_sphere(2_000);
+        let mesh = SphereMesh::build(&pts).unwrap();
+        let tree = SampleTree::new(&pts);
+        let grid = GridDesc::for_planet("L1", 16_384, 64).unwrap();
+        let mut c = Coupling::build(&grid, &mesh, &tree);
+        let frame = c.frame();
+        let w = grid.w as usize;
+        let qs = c.relink(|_, q, _| q);
+        for (k, q) in qs.iter().enumerate() {
+            let (i, j) = ((k % w) as i64, (k / w) as i64);
+            let want = frame.unit(grid.block_x(i) as f64, grid.block_z(j) as f64);
+            assert_eq!(
+                q.to_array().map(f64::to_bits),
+                want.to_array().map(f64::to_bits)
+            );
+            assert_eq!(c.cell_unit(i, j), want);
+        }
+    }
+
+    /// The links turned round add, per sample, the same terms in the same order as one serial
+    /// pass over the cells: bit for bit the same sums.
+    #[test]
+    fn fan_in_gathers_as_the_serial_scatter_adds() {
+        let pts = fibonacci_sphere(70_000);
+        let mesh = SphereMesh::build(&pts).unwrap();
+        let tree = SampleTree::new(&pts);
+        let grid = GridDesc::for_planet("L1", 16_384, 16).unwrap();
+        let mut c = Coupling::build(&grid, &mesh, &tree);
+        // Some one-hot links, as the plates' boundary cells have.
+        for l in c.links.iter_mut().step_by(11) {
+            let k = (l.tri % 3) as usize;
+            l.w = [0.0; 3];
+            l.w[k] = 1.0;
+        }
+        let tris = mesh.triangles();
+        let n = pts.len();
+        let mut rng = SplitMix64::new(9);
+        let x: Vec<f64> = (0..c.links().len()).map(|_| rng.next_f64() - 0.5).collect();
+        let (mut wsum, mut sum) = (vec![0.0f64; n], vec![0.0f64; n]);
+        for (cell, l) in c.links().iter().enumerate() {
+            for (&v, &w) in tris[l.tri as usize].iter().zip(&l.w) {
+                let w = f64::from(w);
+                if w > 0.0 {
+                    wsum[v as usize] += w;
+                    sum[v as usize] += w * x[cell];
+                }
+            }
+        }
+        let fan = FanIn::build(c.links(), tris, n);
+        let mut got = vec![(0.0f64, 0.0f64); n];
+        let links = c.links();
+        fan.gather(&mut got, |a, cell, k| {
+            let w = f64::from(links[cell].w[k]);
+            a.0 += w;
+            a.1 += w * x[cell];
+        });
+        for v in 0..n {
+            assert_eq!(got[v].0.to_bits(), wsum[v].to_bits(), "{v}");
+            assert_eq!(got[v].1.to_bits(), sum[v].to_bits(), "{v}");
+        }
     }
 
     // ---- The block ↔ lat/lon ↔ unit-vector mapping (property tests over random inputs). ----

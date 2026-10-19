@@ -56,9 +56,10 @@
 use std::collections::BTreeMap;
 
 use glam::DVec3;
+use rayon::prelude::*;
 
 use super::Env;
-use super::geometry::{Geo, dijkstra};
+use super::geometry::{Geo, dijkstra_reached};
 use super::kinematics::{quat, tangent, to_group};
 use super::pools::{COLUMN_ISOSTATIC_FACTOR, isostatic_change_m};
 use super::shortening::Front;
@@ -135,16 +136,44 @@ pub fn stack(
         return out;
     }
     let n = state.samples.len();
-    let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
-    for c in 0..state.contacts.len() {
+    let plate_of: Vec<u32> = (0..n).into_par_iter().map(|i| state.plate_of(i)).collect();
+    // The fronts that stack (the stacking changes none of what picks them), and their distance
+    // fields, all at once (P1-19): behind each front its overriding plate's, exactly; in front of
+    // it the incoming plate's, to the reach the front's height gives before any front stacks,
+    // which `stack_front` cuts back to the reach of the height it finds then (exact, see
+    // `dijkstra_reached`) or, where a front before it raised its edge higher, runs again.
+    let todo: Vec<(usize, &Front)> = (0..state.contacts.len())
+        .filter_map(|c| {
+            let col = state.contacts[c].collision.as_ref()?;
+            let f = fronts.get(&c)?;
+            (col.last_step == env.step && f.samples >= MIN_CONTACT).then_some((c, f))
+        })
+        .collect();
+    let fields: Vec<Fields> = todo
+        .par_iter()
+        .map(|&(c, f)| {
+            let (under, over) = (state.contacts[c].under, state.contacts[c].over);
+            let reach = Reach::new(state, env, &plate_of, over, under, f);
+            Fields {
+                over: dijkstra_reached(
+                    geo,
+                    &reach.src_over,
+                    |_, b| reach.over_ok(b),
+                    reach.belt_rad,
+                ),
+                under: dijkstra_reached(
+                    geo,
+                    &reach.src_under,
+                    |_, b| reach.under_ok(b),
+                    reach.under_rad,
+                ),
+                under_rad: reach.under_rad,
+            }
+        })
+        .collect();
+    for (&(c, f), fields) in todo.iter().zip(fields) {
         let (under, over) = (state.contacts[c].under, state.contacts[c].over);
-        let Some(col) = state.contacts[c].collision.as_ref() else {
-            continue;
-        };
-        let Some(f) = fronts.get(&c) else { continue };
-        if col.last_step != env.step || f.samples < MIN_CONTACT {
-            continue;
-        }
+        let col = state.contacts[c].collision.as_ref().expect("in collision");
         let (conv, normal) = (col.convergence_mm_yr, DVec3::from_array(col.normal));
         let step = stack_front(
             state,
@@ -161,6 +190,7 @@ pub fn stack(
             },
             f,
             flexure,
+            fields,
         );
         let applied = step.stacked;
         let col = state.contacts[c].collision.as_mut().expect("in collision");
@@ -188,6 +218,95 @@ pub fn stack(
         out.insert(c, applied);
     }
     out
+}
+
+/// A front's distance fields ([`dijkstra_reached`]: the reached samples ascending, with their
+/// distances), behind it and in front of it, and the reach the latter was run to.
+struct Fields {
+    over: Vec<(u32, f64, u32)>,
+    under: Vec<(u32, f64, u32)>,
+    under_rad: f64,
+}
+
+/// The sources, the allowed samples and the reaches of a front's two distance fields, at the
+/// samples' elevations of now.
+struct Reach<'a> {
+    samples: &'a [super::state::Sample],
+    plate_of: &'a [u32],
+    over: u32,
+    under: u32,
+    src_over: Vec<(u32, f64, u32)>,
+    src_under: Vec<(u32, f64, u32)>,
+    belt_rad: f64,
+    /// The front's mean elevation on the overriding plate's edge, m, the wedge's reach, km, and
+    /// the reach of the field in front of the front, rad.
+    z_front: f64,
+    wedge_reach_km: f64,
+    under_rad: f64,
+}
+
+impl<'a> Reach<'a> {
+    fn new(
+        state: &'a PlateState,
+        env: &Env,
+        plate_of: &'a [u32],
+        over: u32,
+        under: u32,
+        f: &Front,
+    ) -> Reach<'a> {
+        let k = env.k;
+        let norm = env.norm;
+        let samples = &state.samples[..];
+        let mut r = Reach {
+            samples,
+            plate_of,
+            over,
+            under,
+            // The overriding plate behind the front: distance from its edge on the front.
+            src_over: f.edge.iter().map(|&v| (v, 0.0, 0)).collect(),
+            // The incoming plate in front of it: distance from its crust at the front.
+            src_under: f.crust.iter().map(|&v| (v, 0.0, 0)).collect(),
+            belt_rad: norm.rad(k.collision_belt_km),
+            z_front: 0.0,
+            wedge_reach_km: 0.0,
+            under_rad: 0.0,
+        };
+        let edge_z: Vec<f64> = f
+            .edge
+            .iter()
+            .filter(|&&v| r.over_ok(v))
+            .map(|&v| f64::from(samples[v as usize].elevation_m))
+            .collect();
+        r.z_front = if edge_z.is_empty() {
+            0.0
+        } else {
+            edge_z.iter().sum::<f64>() / edge_z.len() as f64
+        };
+        // ledger: PLT-192 (the wedge's surface slope), PLT-244 (the wedge's rule).
+        let tan = k.wedge_slope_deg.to_radians().tan();
+        r.wedge_reach_km = ((r.z_front - WEDGE_FLOOR_M).max(0.0) / (1000.0 * tan)).min(
+            // A guard for gentle slopes: the profile never runs out further than the belt is
+            // wide beyond the basin's reach.
+            k.collision_belt_km + FOREDEEP_REACH_KM,
+        );
+        // Beyond the wedge's toe the foreland basin is looked for (`foredeep`) and the structure
+        // stage's foreland is flagged ([`FORELAND`]).
+        let reach_km = r.wedge_reach_km + FOREDEEP_REACH_KM;
+        r.under_rad = norm.rad(reach_km);
+        r
+    }
+
+    fn visible(&self, p: u32, v: u32) -> bool {
+        self.plate_of[v as usize] == p && !self.samples[v as usize].is_hidden()
+    }
+
+    fn over_ok(&self, v: u32) -> bool {
+        self.visible(self.over, v)
+    }
+
+    fn under_ok(&self, v: u32) -> bool {
+        self.visible(self.under, v)
+    }
 }
 
 /// The two plates of a front and what the step moves.
@@ -221,53 +340,42 @@ fn stack_front(
     side: Side,
     f: &Front,
     flexure: Option<&[f64]>,
+    fields: Fields,
 ) -> FrontStep {
     let k = env.k;
     let norm = env.norm;
-    let n = state.samples.len();
     let area = norm.sample_area_km2();
     // ledger: PLT-192 (the wedge's surface slope), PLT-244 (the wedge's rule).
     let tan = k.wedge_slope_deg.to_radians().tan();
-    let samples = &state.samples;
-    let visible_of =
-        |p: u32| move |v: u32| plate_of[v as usize] == p && !samples[v as usize].is_hidden();
-
-    // The overriding plate behind the front: distance from its edge on the front.
-    let over_ok = visible_of(side.over);
-    let src: Vec<(u32, f64, u32)> = f.edge.iter().map(|&v| (v, 0.0, 0)).collect();
     let belt_km = k.collision_belt_km;
-    let (d_over, _) = dijkstra(geo, &src, |_, b| over_ok(b), norm.rad(belt_km));
-    let edge_z: Vec<f64> = f
-        .edge
-        .iter()
-        .filter(|&&v| over_ok(v))
-        .map(|&v| f64::from(samples[v as usize].elevation_m))
-        .collect();
-    let z_front = if edge_z.is_empty() {
-        0.0
+    // The fields `stack` ran (P1-19): behind the front as they are; in front of it cut back to the
+    // reach of the front's height now (a front stacked before this one may have raised its edge),
+    // or run again when that reach is the longer.
+    let reach = Reach::new(state, env, plate_of, side.over, side.under, f);
+    let z_front = reach.z_front;
+    let wedge_reach_km = reach.wedge_reach_km;
+    let d_over = fields.over;
+    let d_under = if reach.under_rad <= fields.under_rad {
+        let mut d = fields.under;
+        d.retain(|&(_, x, _)| x <= reach.under_rad);
+        d
     } else {
-        edge_z.iter().sum::<f64>() / edge_z.len() as f64
+        dijkstra_reached(
+            geo,
+            &reach.src_under,
+            |_, b| reach.under_ok(b),
+            reach.under_rad,
+        )
     };
+    let under_ok = |v: u32| reach.under_ok(v);
+    let samples = &state.samples;
 
-    // The incoming plate in front of it: distance from its crust at the front.
-    let under_ok = visible_of(side.under);
-    let wedge_reach_km = ((z_front - WEDGE_FLOOR_M).max(0.0) / (1000.0 * tan)).min(
-        // A guard for gentle slopes: the profile never runs out further than the belt is wide
-        // beyond the basin's reach.
-        belt_km + FOREDEEP_REACH_KM,
-    );
-    // Beyond the wedge's toe the foreland basin is looked for (`foredeep`) and the structure stage's
-    // foreland is flagged ([`FORELAND`]).
-    let reach_km = wedge_reach_km + FOREDEEP_REACH_KM;
-    let src: Vec<(u32, f64, u32)> = f.crust.iter().map(|&v| (v, 0.0, 0)).collect();
-    let (d_under, _) = dijkstra(geo, &src, |_, b| under_ok(b), norm.rad(reach_km));
-
-    // The wedge's deficit under its profile.
-    let mut wedge: Vec<(usize, f64)> = Vec::new();
+    // The wedge's deficit under its profile, with each sample's distance from the front.
+    let mut wedge: Vec<(usize, f64, f64)> = Vec::new();
     let mut wedge_km = 0.0f64;
-    for i in 0..n {
-        let d = d_under[i];
-        if !d.is_finite() || !under_ok(i as u32) || samples[i].kind != CONTINENTAL {
+    for &(i, d, _) in &d_under {
+        let i = i as usize;
+        if !under_ok(i as u32) || samples[i].kind != CONTINENTAL {
             continue;
         }
         let d_km = norm.km(d);
@@ -276,13 +384,17 @@ fn stack_front(
         }
         let deficit = z_front - d_km * 1000.0 * tan - f64::from(samples[i].elevation_m);
         if deficit > 0.0 {
-            wedge.push((i, deficit));
+            wedge.push((i, deficit, d));
             wedge_km = wedge_km.max(d_km);
         }
     }
-    let deficit_km2_m: f64 = wedge.iter().map(|&(_, x)| x).sum::<f64>() * area;
+    let deficit_km2_m: f64 = wedge.iter().map(|&(_, x, _)| x).sum::<f64>() * area;
     let half = 0.5 * norm.rad(belt_km);
-    let near: Vec<usize> = (0..n).filter(|&i| d_over[i] <= half).collect();
+    let near: Vec<usize> = d_over
+        .iter()
+        .filter(|&&(_, d, _)| d <= half)
+        .map(|&(i, _, _)| i as usize)
+        .collect();
     let mean_of = |z: &dyn Fn(usize) -> f64| {
         if near.is_empty() {
             z_front
@@ -322,11 +434,13 @@ fn stack_front(
     // oceanic label, which later subducted as ocean floor and came back as one lump at a
     // resampling, build log 2026-10-18 "Resampling lumps").
     let w_rad = norm.rad(belt_km);
-    let belt: Vec<(usize, f64)> = (0..n)
-        .filter(|&i| d_over[i].is_finite() && samples[i].kind == CONTINENTAL)
-        .map(|i| (i, 1.0 - (d_over[i] / w_rad).powi(2)))
-        .filter(|&(_, w)| w > 0.0)
+    let belt_d: Vec<(usize, f64, f64)> = d_over
+        .iter()
+        .filter(|&&(i, _, _)| samples[i as usize].kind == CONTINENTAL)
+        .map(|&(i, d, _)| (i as usize, 1.0 - (d / w_rad).powi(2), d))
+        .filter(|&(_, w, _)| w > 0.0)
         .collect();
+    let belt: Vec<(usize, f64)> = belt_d.iter().map(|&(i, w, _)| (i, w)).collect();
     // Spread over the belt a front of this length has behind it (∫(1 − x²) = 2/3 of its width):
     // where the overriding plate is narrower than the belt (a sliver, an arc), the stack does not
     // pile onto the few samples there (below half the belt's area); what has no room goes down
@@ -354,15 +468,15 @@ fn stack_front(
         mix[pool::METAMORPHIC] = 1.0;
     }
 
-    let mut rises: Vec<(usize, f64, bool)> =
-        wedge.iter().map(|&(i, x)| (i, fill * x, true)).collect();
+    // Each rise with its sample's distance from the front (the wedge's in front, the belt's
+    // behind).
+    let mut rises: Vec<(usize, f64, bool, f64)> = wedge
+        .iter()
+        .map(|&(i, x, d)| (i, fill * x, true, d))
+        .collect();
     // Signed distance from the front, km: in front (the wedge) positive, behind negative.
-    let across = |i: usize, in_wedge: bool| {
-        if in_wedge {
-            norm.km(d_under[i])
-        } else {
-            -norm.km(d_over[i])
-        }
+    let across = |d: f64, in_wedge: bool| {
+        if in_wedge { norm.km(d) } else { -norm.km(d) }
     };
     if belt_weight > 0.0 && belt_rise_km2_m > 0.0 {
         let cap_m = k.strength_height_m(env.gravity);
@@ -372,10 +486,11 @@ fn stack_front(
             .collect();
         let given = fill_belt(&belt, &z_of, belt_rise_km2_m, belt_weight, area, cap_m);
         rises.extend(
-            belt.iter()
+            belt_d
+                .iter()
                 .zip(given)
                 .filter(|&(_, g)| g > 0.0)
-                .map(|(&(i, _), g)| (i, g, false)),
+                .map(|(&(i, _, d), g)| (i, g, false, d)),
         );
     }
     let mut out = FrontStep {
@@ -393,7 +508,7 @@ fn stack_front(
         across_sq: 0.0,
     };
     let stamp_m = OROGENY_MIN_M_PER_MYR * env.dt_myr;
-    for (i, raw, in_wedge) in rises {
+    for (i, raw, in_wedge, d) in rises {
         let rot = quat(state.groups[state.samples[i].group as usize].rot);
         let s = &mut state.samples[i];
         let z = f64::from(s.elevation_m);
@@ -430,7 +545,7 @@ fn stack_front(
             s.fold = to_group(rot, tangent(at, side.normal).normalize_or_zero());
         }
         // Where the collision raised ground across the front, weighted by how much.
-        let x = across(i, in_wedge);
+        let x = across(d, in_wedge);
         let w = dz.max(0.0);
         out.weight += w;
         out.across_sum += w * x;
@@ -443,16 +558,28 @@ fn stack_front(
     // beyond the wedge's toe is flagged. Where two collisions meet the larger values stay and a
     // belt or wedge sample is never a foreland one.
     // ledger: PLT-260 (the footprint); PLT-249 (the basin's reach).
-    let marks: Vec<(usize, bool)> = (0..n)
-        .filter_map(|i| {
-            if d_over[i].is_finite() && d_over[i] < w_rad {
-                return Some((i, false));
-            }
-            let d = d_under[i];
-            (d.is_finite() && plate_of[i] == side.under && !state.samples[i].is_hidden())
-                .then(|| (i, norm.km(d) > wedge_km))
-        })
-        .collect();
+    // Over the samples either field reached, ascending (P1-19: over every sample before).
+    let mut marks: Vec<(usize, bool)> = Vec::with_capacity(d_over.len() + d_under.len());
+    let (mut a, mut b) = (d_over.iter().peekable(), d_under.iter().peekable());
+    loop {
+        let i = match (a.peek(), b.peek()) {
+            (None, None) => break,
+            (Some(x), None) => x.0,
+            (None, Some(y)) => y.0,
+            (Some(x), Some(y)) => x.0.min(y.0),
+        };
+        let over_d = a.next_if(|x| x.0 == i).map(|x| x.1);
+        let under_d = b.next_if(|y| y.0 == i).map(|y| y.1);
+        let i = i as usize;
+        if over_d.is_some_and(|d| d < w_rad) {
+            marks.push((i, false));
+        } else if let Some(d) = under_d
+            && plate_of[i] == side.under
+            && !state.samples[i].is_hidden()
+        {
+            marks.push((i, norm.km(d) > wedge_km));
+        }
+    }
     let (conv, shortened) = (side.conv.max(0.0) as f32, side.shortening_km as f32);
     for (i, foreland) in marks {
         let s = &mut state.samples[i];
@@ -554,13 +681,14 @@ fn norm_km(env: &Env) -> Bins {
 /// The foreland basin beyond the wedge's toe (`wedge_km`): the surface's flexure averaged in bins
 /// one sample spacing wide by distance from the front, then the stretch of bins below
 /// [`FOREDEEP_M`] that starts within two bins of the toe.
-fn foredeep(d_rad: &[f64], flexure: &[f64], wedge_km: f64, bins: &Bins) -> Foredeep {
+fn foredeep(d_rad: &[(u32, f64, u32)], flexure: &[f64], wedge_km: f64, bins: &Bins) -> Foredeep {
     let reach = wedge_km + FOREDEEP_REACH_KM;
     let count = (reach / bins.bin_km).ceil() as usize + 1;
     let mut sum = vec![0.0f64; count];
     let mut num = vec![0u32; count];
-    for (i, &d) in d_rad.iter().enumerate() {
-        let x = flexure.get(i).copied().unwrap_or(f64::NAN);
+    // The reached samples, ascending (`dijkstra_reached`; every sample before, P1-19).
+    for &(i, d, _) in d_rad {
+        let x = flexure.get(i as usize).copied().unwrap_or(f64::NAN);
         if !d.is_finite() || !x.is_finite() {
             continue;
         }
@@ -1202,13 +1330,17 @@ mod tests {
         let flex = [
             -800.0, -800.0, -50.0, -400.0, -300.0, -150.0, 40.0, 30.0, -500.0,
         ];
-        let d: Vec<f64> = (0..flex.len()).map(|b| (b as f64 + 0.5) * 0.05).collect();
+        let d: Vec<(u32, f64, u32)> = (0..flex.len())
+            .map(|b| (b as u32, (b as f64 + 0.5) * 0.05, 0))
+            .collect();
         let f = foredeep(&d, &flex, 100.0, &bins);
         assert_eq!(f.width_km, 150.0);
         assert_eq!(f.depth_m, 400.0);
         // No basin: the deepest beyond the toe, and no width.
         let flat = [-800.0, -800.0, 10.0, 20.0, -50.0, 0.0];
-        let d: Vec<f64> = (0..flat.len()).map(|b| (b as f64 + 0.5) * 0.05).collect();
+        let d: Vec<(u32, f64, u32)> = (0..flat.len())
+            .map(|b| (b as u32, (b as f64 + 0.5) * 0.05, 0))
+            .collect();
         let f = foredeep(&d, &flat, 100.0, &bins);
         assert_eq!((f.width_km, f.depth_m), (0.0, 50.0));
     }

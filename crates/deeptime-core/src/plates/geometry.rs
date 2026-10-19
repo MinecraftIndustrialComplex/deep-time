@@ -258,6 +258,136 @@ pub fn dijkstra(
     (dist, label)
 }
 
+/// [`dijkstra`] in arrays kept between runs (one per thread, [`dijkstra_reached`]), listing the
+/// vertices it reached; a new run resets only those.
+#[derive(Default)]
+struct Reach {
+    dist: Vec<f64>,
+    label: Vec<u32>,
+    reached: Vec<u32>,
+    heap: BinaryHeap<Entry>,
+}
+
+impl Reach {
+    /// [`dijkstra`]'s relaxations, in its order, on the kept arrays.
+    fn run(
+        &mut self,
+        geo: &Geo,
+        sources: &[(u32, f64, u32)],
+        allow: impl Fn(u32, u32) -> bool,
+        max_rad: f64,
+    ) {
+        let n = geo.points().len();
+        if self.dist.len() == n {
+            for &v in &self.reached {
+                self.dist[v as usize] = f64::INFINITY;
+                self.label[v as usize] = u32::MAX;
+            }
+        } else {
+            self.dist = vec![f64::INFINITY; n];
+            self.label = vec![u32::MAX; n];
+        }
+        self.reached.clear();
+        self.heap.clear();
+        let (dist, label, reached) = (&mut self.dist, &mut self.label, &mut self.reached);
+        let heap = &mut self.heap;
+        for &(v, d, l) in sources {
+            if d < dist[v as usize] {
+                if dist[v as usize] == f64::INFINITY {
+                    reached.push(v);
+                }
+                dist[v as usize] = d;
+                label[v as usize] = l;
+                heap.push(Entry { d, v, label: l });
+            }
+        }
+        while let Some(Entry { d, v, label: l }) = heap.pop() {
+            if d > dist[v as usize] || label[v as usize] != l {
+                continue;
+            }
+            for (u, len) in geo.edges(v) {
+                let nd = d + f64::from(len);
+                if nd <= max_rad && nd < dist[u as usize] && allow(v, u) {
+                    if dist[u as usize] == f64::INFINITY {
+                        reached.push(u);
+                    }
+                    dist[u as usize] = nd;
+                    label[u as usize] = l;
+                    heap.push(Entry {
+                        d: nd,
+                        v: u,
+                        label: l,
+                    });
+                }
+            }
+        }
+        reached.sort_unstable();
+    }
+}
+
+thread_local! {
+    static SCRATCH: std::cell::RefCell<Reach> = std::cell::RefCell::new(Reach::default());
+}
+
+/// [`dijkstra`]'s reached vertices (a finite distance), ascending, with their distances and
+/// labels: exactly what [`dijkstra`] gives them, from arrays kept per thread (P1-19: the belts
+/// and the arcs allocated two arrays over all 250k samples per run, then looped over every
+/// sample for the few thousand reached).
+///
+/// A run to a shorter reach `r` gives the entries of this list with a distance of at most `r`,
+/// when every source lies within `r`: Dijkstra pops in order of distance and a path's sum only
+/// grows, so every entry beyond `r` is popped after all those within it and never changes one.
+pub fn dijkstra_reached(
+    geo: &Geo,
+    sources: &[(u32, f64, u32)],
+    allow: impl Fn(u32, u32) -> bool,
+    max_rad: f64,
+) -> Vec<(u32, f64, u32)> {
+    SCRATCH.with(|r| {
+        let mut r = r.borrow_mut();
+        r.run(geo, sources, allow, max_rad);
+        r.reached
+            .iter()
+            .map(|&v| (v, r.dist[v as usize], r.label[v as usize]))
+            .collect()
+    })
+}
+
+/// [`dijkstra`] of sources that `part(v)` splits into parts no allowed edge joins (`allow(a, b)`
+/// implies `part(a) == part(b)`), each part's run on its own thread (P1-19: the arcs' run from
+/// every front of every plate was one serial search). Returns [`dijkstra`]'s distances and
+/// labels, and the reached vertices ascending. Each vertex gets what the single run gives it: a
+/// part's entries are pushed only by its own pops, and the heap pops them in the same total
+/// order (distance, vertex, label) with or without other parts' entries between them.
+pub fn dijkstra_parts(
+    geo: &Geo,
+    sources: &[(u32, f64, u32)],
+    part: impl Fn(u32) -> u32,
+    allow: impl Fn(u32, u32) -> bool + Sync,
+    max_rad: f64,
+) -> (Vec<f64>, Vec<u32>, Vec<u32>) {
+    let n = geo.points().len();
+    let mut parts: std::collections::BTreeMap<u32, Vec<(u32, f64, u32)>> = Default::default();
+    for &s in sources {
+        parts.entry(part(s.0)).or_default().push(s);
+    }
+    let parts: Vec<Vec<(u32, f64, u32)>> = parts.into_values().collect();
+    let found: Vec<Vec<(u32, f64, u32)>> = parts
+        .par_iter()
+        .map(|src| dijkstra_reached(geo, src, &allow, max_rad))
+        .collect();
+    let mut dist = vec![f64::INFINITY; n];
+    let mut label = vec![u32::MAX; n];
+    let mut reached = Vec::with_capacity(found.iter().map(Vec::len).sum());
+    for &(v, d, l) in found.iter().flatten() {
+        dist[v as usize] = d;
+        label[v as usize] = l;
+        reached.push(v);
+    }
+    reached.par_sort_unstable();
+    (dist, label, reached)
+}
+
 /// The two nearest distinct classes of source for every vertex (a label-setting Dijkstra where a
 /// vertex accepts at most one distance per class and two classes), over edges `allow` accepts.
 /// `class(label)` maps a source label to its class (a plate). Per vertex: up to two
@@ -450,6 +580,53 @@ mod tests {
         );
         assert!(two.iter().all(|b| b[0].1 != u32::MAX && b[1].1 != u32::MAX));
         assert!(two.iter().all(|b| b[0].1 != b[1].1 && b[0].0 <= b[1].0));
+    }
+
+    /// The kept-array and per-part runs give exactly the dense run's distances and labels, a
+    /// shorter reach the longer run's entries within it, and a reused scratch nothing stale.
+    #[test]
+    fn sparse_and_split_dijkstras_match_the_dense_one() {
+        let geo = Geo::build(3000, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let pts = geo.points();
+        // Three bands of latitude no allowed edge crosses, sources in each, labelled in order.
+        let part = |v: u32| {
+            let z = pts[v as usize].z;
+            u32::from(z > -0.2) + u32::from(z > 0.4)
+        };
+        let allow = |a: u32, b: u32| part(a) == part(b) && b % 7 != 3;
+        let sources: Vec<(u32, f64, u32)> = [5u32, 400, 1200, 1201, 2500, 2999, 1700]
+            .iter()
+            .enumerate()
+            .map(|(l, &v)| (v, 0.0, l as u32))
+            .collect();
+        for max_rad in [0.05, 0.3, 10.0] {
+            let (dist, label) = dijkstra(&geo, &sources, allow, max_rad);
+            let dense: Vec<(u32, f64, u32)> = (0..pts.len() as u32)
+                .filter(|&v| dist[v as usize].is_finite())
+                .map(|v| (v, dist[v as usize], label[v as usize]))
+                .collect();
+            // Twice, so the second run starts from the first's arrays.
+            for _ in 0..2 {
+                let got = dijkstra_reached(&geo, &sources, allow, max_rad);
+                assert_eq!(got.len(), dense.len());
+                for (g, d) in got.iter().zip(&dense) {
+                    assert_eq!((g.0, g.1.to_bits(), g.2), (d.0, d.1.to_bits(), d.2));
+                }
+            }
+            let (pd, pl, pr) = dijkstra_parts(&geo, &sources, part, allow, max_rad);
+            assert_eq!(pr, dense.iter().map(|x| x.0).collect::<Vec<_>>());
+            for v in 0..pts.len() {
+                assert_eq!(pd[v].to_bits(), dist[v].to_bits(), "{v}");
+                assert_eq!(pl[v], label[v], "{v}");
+            }
+            // A shorter reach: the entries within it.
+            let short = dijkstra_reached(&geo, &sources, allow, 0.5 * max_rad);
+            let within: Vec<_> = dense.iter().filter(|x| x.1 <= 0.5 * max_rad).collect();
+            assert_eq!(short.len(), within.len());
+            for (s, w) in short.iter().zip(within) {
+                assert_eq!((s.0, s.1.to_bits(), s.2), (w.0, w.1.to_bits(), w.2));
+            }
+        }
     }
 
     #[test]
