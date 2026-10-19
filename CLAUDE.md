@@ -148,7 +148,7 @@ tools/remote/mac.sh --no-sync -- deeptime-admit status  # the VM's admission too
   `--pull`. If something must run locally: one job at a time, wrapped as
   `systemd-run --user --scope -p CPUQuota=100% nice -n 19 <cmd>`. No parallel local batches; no
   `nix develop` builds on the laptop. **One exception: GPU speed benches** (Ben, 2026-10-18,
-  decisions log): the VM has no GPU, so real-GPU timings run on the laptop's Radeon 8060S (RADV),
+  decisions log): the VM has no GPU, so real-GPU timings run on the laptop's Radeon 8050S (Strix Halo, RADV; the driver's name for it),
   one bench at a time and only when no other local heavy job runs, with a binary built on the VM
   (never build here), 8 sim threads and
   `systemd-run --user --scope -p CPUQuota=800% nice -n 19 <cmd>`; compare GPU against CPU on the
