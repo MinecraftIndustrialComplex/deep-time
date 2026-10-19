@@ -446,6 +446,69 @@ comparison is by cells (area) against Earth's count of volcanoes. The oceanic ar
 (1 km) and the Andean crest limit (6 km) are from memory (PLT-217, PLT-219). The target ranges
 fail today's model by design: they are what the force-balance and belt tasks are to move.
 
+## Arcs on a lattice coarser than the arc band (2026-10-19)
+
+**What was wrong.** The GameTest planet (`tests/presets/planet_world_4k.json`, 5,000 samples) ended
+every run without an active arc volcano, on master and on every earlier commit measured. The arc
+band is where the arc weight w_arc = exp(-((d - 200 km) / 60 km)^2) passes 0.3 (PLT-042, PLT-043):
+d from 134 to 266 km behind the slab front, a band 132 km wide. A front's distance field runs over
+the lattice from its front samples (d = 0), and 5,000 samples on the plate model's sphere (Earth's
+radius) stand about 320 km apart, so the first ring behind the front lies near 320 km and no sample
+fell in the band. No sample took the ARC flag, the volcano stage saw no arc (VOL-002, VOL-003) and
+no stratovolcano was ever born. On Earth 19.7 % of the plate boundary is subduction zone, which
+Bird's model sets apart from the 6.7 % of oceanic convergence without a Benioff zone or arc (section
+"Plate-check" above): where a slab sinks there is an arc, so a mobile-lid planet with subduction and
+no arc is a fault of the lattice, not physics. The game presets are not affected: their 100,000 and
+250,000 samples stand 71 and 45 km apart. The first ring falls beyond the band once the spacing
+passes 266 km, below about 7,000 samples; the preset editor allows down to 2,000 (500 km).
+
+**The change.** Each front sample's strip (the samples its distance field reached) now also flags
+its sample with arc magma nearest the arc axis, when that lies within one lattice spacing of the
+axis (PLT-043). On a lattice finer than the band that sample is inside the band already, so the
+rule adds nothing there. The flag still marks only samples that took arc magma. The magma is not
+changed: on a coarse lattice the arcs still add far less crust than on a fine one (the weight at
+320 km is 0.018 of the axis's), which is left as a limit of coarse lattices.
+
+The volcano stage's blind step changed with it (VOL-011, [volcanoes-and-magma.md](volcanoes-and-magma.md)):
+the stage is blind exactly at the plate model's resampling steps, which clear the flags, and no
+longer at any step with a fifth of the last valid step's arc cells or fewer. The last valid step's
+count only moved on valid steps, so a real fall in the arcs blinded the stage for many steps: on
+seed 16, 24 of 75 steps were blind, 9 of them resamplings.
+
+**Measured.** `deeptime run --threads 8` on the test VM (scratch scripts), active volcanoes in
+`volcanoes/active.json` at the end; planet_world_4k is 150 Myr from scattered continents, seed 11
+unless named. Runs at a fixed thread count were identical.
+
+| Build | Runs | Active volcanoes (arc stratovolcanoes / hotspot shields) | Arc-flagged cells, most in a step |
+|---|---|---|---|
+| master 025676c8 | 6 | 0 (0 / 0) in every run | 0 |
+| fb38204f (the commit before the solvers merge) | 6 | 4 (0 / 4) in every run | 0 |
+| master 26ce664e with the old solvers (`surface.numerics.diffusion_solver=jacobi`, `flood=serial`) | 1 | 4 (0 / 4) | 0 |
+| master at 20,000 samples (`resolution.l0_samples=20000`) | 1 | 21 (19 / 2) | 888 |
+| the arc rule alone, seeds 11 to 16 | 6 | 6, 12, 8, 11, 9, 7 (3 to 10 / 0 to 3) | 561 to 1,891 |
+| the arc rule and the exact blind step (this branch), seeds 11 to 16 | 6 | 6 (3 / 3), 12 (9 / 3), 5 (3 / 2), 11 (10 / 1), 9 (9 / 0), 6 (5 / 1) | 524 to 1,891 |
+| earthlike_quick_16k, scattered continents, 150 Myr, seed 1, master 26ce664e | 1 | 49 (48 / 1) | 15,924 |
+| the same, this branch | 1 | EQ16K_FIX | EQ16K_FIX_CELLS |
+
+Master's 4 to 0 is not an arc change: neither planet had an arc. The solvers merge changed the
+surface, and with it which hotspot volcanoes stood at the end (a hotspot's next volcano waits until
+its earlier ones, dead ones included, have drifted 70 km away, VOL-007, and erosion decides when a
+dead one leaves the catalogue, VOL-049); master with the old solvers has the 4 shields again.
+
+**Also found, not changed: the hotspot population.** Hotspots are born at 3 per 100 Myr and live
+40 to 150 Myr (PLT-109, PLT-110), so a planet holds about 3 live plumes (3 × 95 Myr / 100 Myr) once
+the first 8 (PLT-108) have died, which they all have by 150 Myr. Earth's catalogues hold 26 to 69
+(Davies 26, Sleep 37, Steinberger 44, Courtillot et al. 49, Anderson more than 60, Ito and van
+Keken 69, as listed by King & Adam 2014, read in full; spot check PLT-108/109/110), with "a few
+dozen" the usual view (Wikipedia "Hotspot (geology)", secondary). Sleep's 37 at a mean life of
+95 Myr would take births near 39 per 100 Myr and 37 at the start. Plume heads (LIPs) come with half
+of the births (PLT-117), 1.5 per 100 Myr or one per 67 Myr (the volcano page measured one per
+59 Myr), against Earth's one per 22 Myr (Courtillot & Renne 2003); at 39 births a head share of
+about 0.12 would give Earth's rate (the share of primary hotspots, seven on Wikipedia after
+Courtillot et al. 2003 of the 49 they considered, 0.14, gives one per 18 Myr). This changes every planet, its LIP CO2 and the share codes,
+and touches the carbon cycle under investigation for the hothouse 16k planets, so it is left for
+its own task (STATUS known issues). The rows PLT-108 to PLT-110 and PLT-117 stay `uncited`.
+
 ## The continental crust budget: resampling footprints and island-arc maturity
 
 Added 2026-10-02 (ledger PLT-045, PLT-047, PLT-228, PLT-229; build log "Continental crust fix").
