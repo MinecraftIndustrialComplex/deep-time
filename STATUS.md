@@ -126,7 +126,49 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
-### 2026-10-19: P1-19 surface numerics merged with master 0b7eae42 (fb38204f): both sides' speed-ups kept, the gates pass, a quick sanity run converges, full 16k's young stage peaks 253 MiB over a 4 GiB cap
+### 2026-10-19: The young stage frees each LEM step's arrays once it stops reading them: full 16k's counted peak 4,403.8 → 3,685.6 MiB at 1000 Myr, now in deposits, 410 MiB under the 4 GiB cap; the young stage's own 447 → 275 B a cell, its fields the same to the bit, the run as fast (coordinator's task; agent worktree agent-aa714a3ab1cfa16b9, branch worktree-agent-aa714a3ab1cfa16b9 from master 7d60fc4a; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What changed** (`surface/young.rs` only). `YoungStage::lem` now:
+  - reads its inputs in the world by reference instead of copying them;
+  - drops at its start the outputs it writes again (elevation, drainage, area, lakes, erodibility, ice; it takes the glaciers' erosion and till instead of copying them);
+  - drops the stream power's arrays after its solve, and the routing, the fill, the glaciers' climate and their ice state after the glaciers' step. The last step routes the surface again at its end, as before;
+  - folds the glaciers' erosion and till into their fields before the diffusion solve, not after it;
+  - builds the drainage area, the lakes and the erodibility only on the last step. Only the stages after it read them (amplify, `amplify_view`, `grid_audit.py`).
+  - Small structs (`StepOut`, `GlacialFields`, `LastOut`) carry a step's results out of the borrow of the world.
+  - The arithmetic is unchanged. `OWN_BYTES_PER_L2_CELL` is 500 → 320.
+- **Same to the bit** (`build/ymem/new.sh`, scratch). The young stage alone (`deeptime stage young`) ran from one full 16k 100 Myr deposits checkpoint: master with memory lines, against the branch. All 17 `young/*` fields it writes (`dump-fields`) compare equal byte for byte, and the `young_final` lines match.
+- **Memory, the 1000 Myr pair** (`build/ymem/base.sh`, `runs.sh`; `earthlike_full_16k`, scattered continents, 1000 Myr, 8 threads, `--mem-cap` 4 GiB, `DEEPTIME_LARGE_CACHE=0`, `DEEPTIME_COMPUTE=cpu`, `DEEPTIME_MEM_TRACE`; master.bin and the branch each on its own 8 physical cores, admitted).
+  - Before: the run's counted peak was 4,403.8 MiB, in young's second step. After: 3,685.6 MiB, in deposits.
+  - The young stage's own peak fell from 4,403.8 to 3,526.9 MiB (-877), and moved to its first step.
+  - The world held before the stage is 2,112.6 MiB in both. The history is all on disk in both (100 frames, 1,637 MiB), so the stage's own arrays went from 2,291 to 1,414 MiB.
+  - Every other phase peaks within 2 MiB of master: plates 2,819, climate 3,038, surface 2,983, volcanoes 2,504, impacts 2,471, structure 2,609, keyframes 2,505, deposits 3,686 (master 3,688), amplify 3,073, bake 3,329.
+  - The resident peaks (the trace's `VmHWM`, reset per phase) show the same picture: young 4,456 → 3,562 MiB, and the run 4,456 MiB (young) → 3,694 MiB (deposits).
+  - `/usr/bin/time`'s maximum resident is not the run's peak, because the trace resets the high-water mark at each phase.
+- **Memory, where it went** (the stage alone from the 100 Myr checkpoint, memory lines per step segment; the world 1,592 MiB before it).
+  - Master: setup left 1,940 MiB in use at the first step's start. The step then peaked in the diffusion solve, at 3,884 MiB. At that point 3,357 MiB was in use, holding 1,417 MiB of the step's copies of its inputs and its working arrays: routing, fill, stream power, the glaciers' climate and ice state. The solve itself added about 527 MiB. The glaciers' step reached 3,658 MiB.
+  - Branch: 1,797 MiB at the step's start, after dropping the outputs the step rewrites. The peak moves to the glaciers' step, at 3,000 MiB: 2,660 MiB in use plus about 340 MiB inside `glacial::step`. After it, 1,945 MiB is in use, and the diffusion solve stays under 3,000 MiB.
+  - Own peak: 2,293 → 1,408 MiB, which is 447 → 275 B a cell.
+- **Time** (`tools/review/bench-quiet.py`, the same preset, 1000 Myr, 8 threads; master on CPU set A against the branch on B, side by side; a loaded VM: others' busy CPUs mean 13.2, load mean 23.8, the run cores' SMT siblings 36 % busy).
+  - The run took 1,086.5 s on master and 1,086.6 s on the branch, wall 1,092.6 and 1,092.8 s.
+  - The young stage went from 9.0 to 7.8 s. Every other stage moved within its noise: plates 260.5 / 264.6, surface 525.7 / 527.8, deposits 41.3 / 39.3, amplify 26.2 / 25.2, finalize 23.4 / 22.4.
+  - User CPU was 5,351 against 5,362 s.
+  - In the memory runs, young took 12.1 → 9.9 s (not paired).
+- **Planet.** At 1000 Myr the `surface_final`, `climate_final` and `young_final` lines are identical between master and the branch: land 0.215, CO2 10,011 ppm, highest cell 7,465 m (young: 7,484 → 6,696 m), lakes 71,052 cells, ice 186,755 cells. Nothing upstream of the young stage changed, and the stage's own fields are the same to the bit.
+- **Estimate.**
+  - Full 16k's young estimate without history fell from 4,692 to 3,769 MiB, and quick's from 1,291 to 1,060 MiB.
+  - The holds were measured again by the same method as before: the young stage's counted peak less the history in memory, scattered continents, 500 Myr (`runs.sh`). Quick 1,171 → 947 MiB (1,166.9 less 219.5). Full 4,349 → 3,462 MiB (history all on disk).
+  - `young::tests::the_estimate_covers_the_measured_hold_closely` is re-pinned to those numbers and has a note. Quick lists 12 % over its hold and full 9 %.
+  - `tests/memory_estimate.rs` passes: young holds 60.3 MiB against an estimate of 63.1 (it held 74.4 MiB before, about 285 B a cell there). 320 is 12 % above the larger of the two measured figures.
+  - The run's whole estimate is still 4,978 MiB. That figure is deposits' estimate, while deposits measured 3,686 MiB. So wherever the editor refuses full 16k at 4 GiB, the cause is now deposits' estimate, not young's.
+- **Gates** (VM, admitted; `build/ymem/gates.sh`, `recheck.sh`).
+  - `cargo fmt --all --check`: clean.
+  - `cargo clippy --workspace --all-targets --locked -- -D warnings`: clean.
+  - `cargo test --workspace --locked --no-fail-fast`: 29 binaries, 993 passed, 1 failed, 5 ignored. The failure was the pinned young test before the re-pin.
+  - `cargo deny check licenses bans`: ok.
+  - `./gradlew build test`: 362 tests, 0 failures, 2 skipped.
+  - After the re-pin: fmt clean, `cargo clippy -p deeptime-core --all-targets -- -D warnings` clean, `surface::young::tests` 2 passed, `--test memory_estimate` passed.
+- **Choices** (mine, undoable): the restructure stays inside `lem`, not in `glacial.rs` or `diffusion`, where other agents work. A fresh diffusion `Workspace` per solve, as before. 320 B a cell. The erodibility, area and lakes are written on the last step only.
+- **Next.** The coordinator merges this branch. The run's peak is now deposits' history recording, at 3,686 MiB. Deposits' estimate (4,978 MiB) is 35 % over what it measures, and that estimate is what still holds the whole estimate over 4 GiB. Within the young stage, the next target is `glacial::step`'s own arrays, about 340 MiB.
+ (fb38204f): both sides' speed-ups kept, the gates pass, a quick sanity run converges, full 16k's young stage peaks 253 MiB over a 4 GiB cap
 - **Conflicts** (merge 35a28fba). `surface/mod.rs`: master's first flood beside the carry and the setup stays, and it and the later substeps' floods now run the preset's method (`pflood::open_sea_with`, `flood_with`; parallel by default, ERO-184). The diffusion solve: `diffusion::solve` takes master's kept `Workspace`, so the multigrid-preconditioned solve (default, ERO-183) and the Jacobi one both reuse the kept f64 vectors; `multigrid::cg` uses master's borrowing `Operator`, and its first direction no longer reads the old one, which the workspace holds from another solve. The multigrid levels are still built per solve. `young.rs`: a fresh workspace per solve, as before. STATUS.md: both entries kept. The rest merged by itself; master's ERO rows end at ERO-182, so ERO-183 and ERO-184 do not collide.
 - **Gates** (VM, admitted; `build/p119s/mrg-gates.sh`): `cargo fmt --all --check` clean; `cargo clippy --workspace --all-targets --locked -- -D warnings` clean; `cargo test --workspace --locked --no-fail-fast` 29 binaries, 994 passed, 0 failed, 5 ignored; `cargo deny check licenses bans` ok; `./gradlew build test` 362 tests, 0 failures, 2 skipped. After the re-pin below: fmt clean, `surface::young::tests` 2 passed.
 - **Sanity run** (`build/p119s/mrg-runs.sh`: `force-balance-ensemble.sh` ck mode, `earthlike_quick_16k`, seed 1, scattered continents, 500 Myr, 2 threads, CPU kernels; merged against master fb38204f side by side). The solvers converge: 9.8 CG iterations a step against master's 62.8 (Jacobi), mass residual -0.00018 km3 (master -0.00053), no sinks. Land 0.205 (master 0.178), above 2 km 0.298 (0.203), highest cell 7,003 m (7,791), median land 1,067 m (746), crust 0.367 (0.376), 17.2 C (21.3), CO2 2,140 ppm (3,868), all land 94.4 m/Myr (102.1), flat high ground 137.0 m/Myr (130.5); every one of them inside the range of the six-run ensembles in the entry below, one run each, so chaotic spread is as likely as the merge. Plate checks 29 of 45 met (master 30 of 43): two moved to FAIL (largest plate 0.15 at its target's edge, convergence after collision 0.18 against 0.20) and one to pass. Timers (2 threads): surface 317.2 -> 308.3 s, diffusion_solve 21.5 -> 13.2 s, `flood_beside` 19.5 -> 19.4 s (the parallel flood's own timer reads 7.3 s against the serial 5.1 s because it shares the two threads with the carry; the group's wall time is the same).
