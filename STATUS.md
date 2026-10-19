@@ -126,6 +126,115 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-18: Resampling lumps: crust a collision had taken came back at a resampling and stacked on one column; each volume is now counted once, the belt stacks only on continental crust, and ocean floor as thick as a continent turns continental (PLT-289 to PLT-292): the loss to the mantle falls from 5.5 to 2.1 km³/yr at 500 Myr and from 8.3 to 3.0 at 1000 Myr, the rate limit's part by a factor of eight (coordinator's follow-up to the plate spikes; agent worktree agent-afb3c8f2d4d681610, branch worktree-agent-afb3c8f2d4d681610 from master 9091c163, origin/master 19cb11e0 and then 991354a4 (the polar holes) merged before the measurements; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Which process.** Not many footprints on one column. A temporary trace (not committed) sorted every resampling's accretion by what lay under the column, and by whether the column took more than 10 km at once, on the plate spikes' two traced runs (`earthlike_quick_16k`, 500 Myr, scattered seed 2 and supercontinent seed 1, master 9091c163). Of 13.8 and 9.5 × 10⁹ km³ accreted, 6.7 and 4.3 came in lumps of more than 10 km on one column. The largest parts: crust of hidden ocean floor (8.6 and 5.7, of it 3.4 and 2.0 in lumps), visible continental crust of a plate going under (2.1 and 1.8; 1.5 and 1.3 in lumps), visible ocean floor of a plate going under (1.8 and 1.2). One covered sample carried a lump: at −372 Myr on the scattered run a hidden sample labelled ocean floor held 128 km of rock (32 km metamorphic, 85 km felsic plutonic) and raised the continental column above it from 600 m to 17.9 km. Four ways put a continent's worth of crust where the accretion counted it again:
+  1. The belt stacked on ocean floor. Its receivers were every sample of the overriding plate behind the front; ocean floor among them (beside a narrow continent, or an island arc) took up to 60 km of metamorphic rock, kept its room because the dampening pulled its surface back down, then subducted as ocean floor and came back at a resampling.
+  2. Continental crust of the plate going under, still visible inside the overriding plate's footprint, had crossed the front and been counted by the belt; the resampling added it to the column on top as well.
+  3. `stacked` (PLT-276) was cleared every step, and a terrane transfer or a weld unhid the terrane's crust, so crust that had gone under came back as the receiving plate's crust beneath its own and the next resampling accreted it.
+  4. Crust stacked under the oceanic label by earlier accretions subducted as ocean floor and came back in one lump.
+- **Fix** (`plates/{belts.rs, ridges.rs, subduction.rs, collision.rs, state.rs, stats.rs}`, commit 75b62645).
+  - The belt's receivers are the overriding plate's continental samples only (PLT-290). PLT-243's profile and area floor are unchanged, so behind a narrow continent more of the stack goes down with the slab.
+  - At a resampling, visible continental crust of a plate colliding under the column's plate is consumed, as the hidden crust of PLT-276 is, and counted with it in `resample_stacked_km3` (PLT-292).
+  - `stacked` stays while the sample stays hidden; a transfer moves, and a weld unhides, only the terrane's crust that has not gone under (PLT-291).
+  - Ocean floor at a contact whose crystalline crust is at least a normal continental column's (T_n, 33 km, PLT-261) turns continental before the overlaps are resolved, and then collides or moves as a terrane (PLT-289; the summary's `buoyant`). Cloos (1993) puts the buoyancy that jams a subduction zone above about 15 km of crust; at 15 km the two traced runs turned about ten times as many samples, the transition's ocean side (up to about 20 km, ocean floor by design) turned with them, and continental crust ended at 0.478 and 0.464 (master 0.394 and 0.415). So the threshold is T_n.
+  - The rate limits (PLT-287, PLT-288) stay as the guard.
+- **Ablation** (the two traced runs, 500 Myr, before 991354a4 was merged; "all four" is what landed; "without 4" is the fix without the ocean-floor rule; "without 1" is the fix without the belt rule, with the ocean-floor rule at 15 km):
+
+  | | Master | All four | Without 4 | Without 1 |
+  |---|---|---|---|---|
+  | Accreted in lumps over 10 km (10⁹ km³) | 6.66, 4.25 | 2.82, 1.55 | 3.54, 1.71 | 1.83, 1.30 |
+  | Sent to the mantle by the rate limit (km³/yr) | 5.63, 3.23 | 0.80, 0.34 | 1.44, 0.61 | 0.68, 0.30 |
+  | Founder plus rate limit (km³/yr) | 7.89, 4.92 | 3.15, 1.54 | 4.56, 1.70 | 3.71, 1.48 |
+  | Continental crust at the end | 0.394, 0.415 | 0.413, 0.457 | 0.347, 0.433 | 0.438, 0.391 |
+  | Highest cell at the end (m) | 6,540, 9,958 | 6,595, 6,032 | 11,797, 6,987 | 5,865, 7,146 |
+  | Guard's worst (m) | 40,648, 20,326 | 22,039, 27,305 | 25,951, 29,099 | 122,559, 30,229 |
+
+- **Measured.** `earthlike_quick_16k`, seeds 1 to 3, both starts, master (m1: a git archive of origin/master 991354a4, with the polar holes' fix) against the fix (f2, this branch with 991354a4 merged); mean [min, max] over six runs. Ensembles: `tools/review/force-balance-ensemble.sh <dir> <bin> <500|1000> 1,2,3 scattered_continents,supercontinent ck <tag>` (detached, `build/accr/ens2.sh`, scratch), then `tools/review/p1-17-hyps.py` and `build/accr/table.py` (scratch) on the VM. Mantle loss = (`foundered_km3` + `rate_lost_km3`) / run length; "with the slab" adds the belts' crust that went down with the slab (`collision_crossed_km3` − `collision_kept_km3`).
+
+  | 500 Myr | Master | Fix |
+  |---|---|---|
+  | Highest cell at the end, L1 | 7,031 m [6,555, 7,648] | 6,689 m [5,655, 7,499] |
+  | Land | 0.207 [0.155, 0.237] | 0.191 [0.152, 0.219] |
+  | Land above 2 km (share of the land) | 0.207 [0.161, 0.255] | 0.206 [0.154, 0.239] |
+  | Continental crust at the end | 0.405 [0.360, 0.454] | 0.396 [0.368, 0.418] |
+  | Loss to the mantle, founder and rate limit (km³/yr) | 5.49 [2.44, 7.59] | 2.13 [1.79, 2.80] |
+  | of it the founder | 1.41 [0.71, 1.99] | 1.60 [1.15, 2.23] |
+  | of it the rate limit | 4.07 [1.72, 5.60] | 0.53 [0.37, 0.64] |
+  | With the slab's share (km³/yr) | 6.48 [2.85, 8.87] | 3.81 [2.95, 5.09] |
+  | Past the step ceilings (km³/yr) | 11.9 [7.7, 15.2] | 6.0 [5.0, 7.3] |
+  | A resampling accreted; consumed (km³/yr) | 22.1; 11.5 | 13.8; 15.6 |
+  | Crust that crossed a collision front (km³/yr) | 15.5 [8.2, 19.8] | 16.6 [12.8, 22.2] |
+  | Ocean floor turned continental (samples a run) | - | 4,511 [3,483, 5,466] |
+  | Guard's worst (bound 237,286 m) | 15,471 m [13,187, 18,101] | 15,230 m [13,602, 16,808] |
+  | Steps beyond 1, 2, 3, 6 reliefs (six runs) | 0, 0, 0, 0 | 0, 0, 0, 0 |
+  | CO₂ | 1,058 ppm [532, 1,846] | 1,043 ppm [477, 2,862] |
+  | Present-day nudge's CO₂ factor | 2.09 [1.00, 4.83] | 1.72 [1.00, 3.71] |
+  | Mean surface temperature | 15.9 °C [13.9, 17.9] | 15.7 °C [13.2, 19.3] |
+  | Collision wedge, median width per run | 0 km in all six | 0 km in five, 94 km in one |
+  | Plate checks met (of 45) | 30 | 29 |
+
+  | 1000 Myr | Master | Fix |
+  |---|---|---|
+  | Highest cell at the end, L1 | 7,177 m [6,739, 7,551] | 6,463 m [4,878, 7,682] |
+  | Land | 0.179 [0.164, 0.203] | 0.168 [0.118, 0.211] |
+  | Land above 2 km (share of the land) | 0.277 [0.146, 0.384] | 0.215 [0.050, 0.347] |
+  | Continental crust at the end | 0.420 [0.338, 0.525] | 0.431 [0.346, 0.526] |
+  | Loss to the mantle, founder and rate limit (km³/yr) | 8.26 [5.39, 10.76] | 2.96 [1.70, 4.14] |
+  | of it the founder | 2.21 [1.59, 2.73] | 2.21 [1.22, 3.06] |
+  | of it the rate limit | 6.05 [3.79, 8.17] | 0.75 [0.48, 1.08] |
+  | With the slab's share (km³/yr) | 9.56 [6.53, 12.11] | 5.03 [2.87, 7.15] |
+  | Past the step ceilings (km³/yr) | 16.5 [14.3, 18.4] | 9.2 [7.4, 11.0] |
+  | A resampling accreted; consumed (km³/yr) | 28.8; 13.8 | 19.0; 21.2 |
+  | Crust that crossed a collision front (km³/yr) | 18.9 [15.5, 21.6] | 21.9 [13.4, 29.7] |
+  | Ocean floor turned continental (samples a run) | - | 17,092 [12,675, 21,837] |
+  | Guard's worst (bound 237,286 m) | 16,680 m [15,028, 17,737] | 16,098 m [14,779, 17,379] |
+  | Steps beyond 1, 2, 3, 6 reliefs (six runs) | 0, 0, 0, 0 | 0, 0, 0, 0 |
+  | CO₂ | 8,097 ppm [519, 22,870] | 1,787 ppm [425, 4,668] |
+  | Present-day nudge's CO₂ factor | 10.06 [1.09, 39.45] | 2.22 [1.00, 4.05] |
+  | Mean surface temperature | 20.2 °C [14.4, 28.6] | 17.2 °C [15.2, 21.4] |
+  | Collision wedge, median width per run | 0 km in all six | 0 km in all six |
+  | Plate checks met (of 45) | 25 | 27 |
+
+  The loss to the mantle falls by more than half and the six runs' ranges no longer overlap; the rate limit's part falls by a factor of about eight, the founder's is unchanged within the spread. Crust still passes the step ceilings at about half master's volume, but most of it now finds room within reach. Each crossed volume is counted once: the crust a resampling consumes as a collision's (15.6 and 21.2 km³/yr) matches what crossed a front (16.6 and 21.9), where master consumed 11.5 of 15.5 and 13.8 of 18.9 and accreted the rest again. Continental crust, land, the highest cell and the guard are the same within the spread. Against Earth (PLT-258): the founder and the rate limit lose three to four times the 0.7 km³/yr of collision zones (one and a half to two times the 1.4 at today's length); with the slab's share, about what Earth loses at all subduction zones (3.2).
+- **Plate checks.** At 500 Myr the continental crust's lowest step passes (0.37 to 0.38); the collisions' median length fails (38.7 to 54.5 Myr; its runs span 27 to 85, and at 1000 Myr it passes, 36.2 to 40.7); the oceanic arc cells above sea fail (10.2 to 8.6 %; at 1000 Myr 12.9 to 10.6 %, a pass). At 1000 Myr the most land gained in one step passes (1.53 to 1.35 %) and so do the collisions per 100 Myr (1.73 to 2.17): thick island arcs and stacked ocean floor now collide instead of going under, and more plates die by welding (5.3 to 7.0 a run at 500 Myr, 17.3 to 21.7 at 1000). The continental arcs' median stands lower (941 to 709 m, 1,014 to 817 m; a fail on both sides; not traced).
+- **The collision wedge's 0 km.** It comes with the rate limits, not with this change: master with the limits gives 0 km in all six runs at 500 and at 1000 Myr, and master before them gave 13 and 54 km. The fix gives 0 km in eleven of twelve runs and 94 km in one (supercontinent seed 1, 500 Myr), against 100 to 350 km on Earth (PLT-244's target). The width is the farthest incoming continental sample still below the wedge's 1.5° profile from the front (`belts.rs` `stack_front`), so it comes in steps of one sample (about 70 km on the model sphere), and a one-sample wedge needs the front to stand about 1.9 km above the incoming crust. With the uplift held to 3.5 mm/yr the front seldom does. Not fixed here: the rule is the wedge's (PLT-244), not the accretion's; a follow-up.
+- **The guard's outlier, before the polar holes' fix.** On this branch before 991354a4 was merged, supercontinent seed 3 at 500 Myr met the guard at 129,576 m and spent 67 steps beyond one Earth relief. A traced rerun (a temporary print of the farthest cell, its neighbours and the plates' uplift, not committed) put every one of them on rows 323 to 326 of the 328-row surface grid: a hole of two cells deepened to 129.6 km and moved along the row while the plates' uplift there stayed between −5.9 and +3.5 mm/yr. It was the surface stage's polar-row excursion; after the merge the same run's worst is 13,602 m and no run on either side passes one relief.
+- **The source behind PLT-258.** Scholl & von Huene 2009 (Geol. Soc. London Spec. Publ. 318:105, abstract read through Crossref; the paper is paywalled). The 0.7 km³/yr is the paper's figure for crust-suturing (collision) zones: c. 115 km³ Ma⁻¹ km⁻¹, "assessed far less securely", times an assumed past mean length of 6,000 km, "one-half that under way since the early Tertiary". At today's length it would be about 1.4 km³/yr (my arithmetic). The loss at all subduction zones is c. 3.2 km³/yr (2.5 of it at ocean margins, most by subduction erosion, which the plate model does not have), against 2.7 added. So the row cited the figure correctly; it now quotes the abstract and says what the 0.7 covers. Status stays `cited-unverified`, the paper `abstract-only`.
+- **What is left.**
+  - Lumps remain, at 42 and 36 % of master's in the two traced runs (2.82 and 1.55 × 10⁹ km³ in lumps over 10 km, traced before the merge), mostly the felsic crust of hidden ocean floor (1.62 and 0.81): sediment, arcs and thinned margins under 33 km of crust, which the accretion keeps and puts on the column above in one go. Spreading it over the column's ring, or sending part of it down with the slab, is a follow-up.
+  - The loss to the mantle is still above Earth's collision-zone figure (above).
+  - The wedge's width (PLT-244).
+  - The ocean-floor rule turns more samples later in a run (4,511 by 500 Myr, 17,092 by 1000); what they are was not traced.
+  - The arcs: continental arcs' median lower, oceanic arcs above sea at 8.6 % at 500 Myr; not traced (a guess: the ocean-floor rule moves the thickest island arcs into the continental count).
+  - Master's 1000 Myr CO₂ reached 22,870 and 18,612 ppm in two runs (28.6 and 25.8 °C); the fix's highest was 4,668 ppm (21.4 °C). Not traced.
+  - The fix's supercontinent seed 1 at 1000 Myr ended with continental crust 0.526 and land 0.118 (5 % of it above 2 km); not traced.
+- **Tests.**
+  - `plates::belts::tests::the_belt_stacks_only_on_continental_crust`: ocean floor behind the front takes nothing.
+  - `plates::belts::tests::crossed_crust_stays_under_through_a_transfer_and_a_weld`.
+  - `plates::tests::a_resampling_consumes_the_visible_crust_a_collision_took`: the crust a forced resampling accretes without the collision is consumed with it.
+  - `plates::tests::ocean_floor_as_thick_as_a_continent_turns_continental_at_a_contact`.
+  - `collisions_weld_on_stall_and_transfer_on_shortening` and `recording_does_not_change_the_world_and_matches_the_run` moved to seed 3 (a sweep of seeds 1 to 24, 300 Myr: 7 weld with the fix, 3, 7, 8, 12, 15, 20 and 21; 12 did before it; seeds 5 and 6 no longer weld).
+- **Science.**
+  - plates.md: new section "Resampling lumps: crust a collision took is counted once", with the trace, the four causes, the fix, the ablation, both tables, the wedge and the source behind PLT-258; the id table. In "The fastest a column thickens and rises", Limits: the polar hole is now said to be traced to the surface stage's flexure release and fixed (ISO-056 rewritten, ISO-074 to ISO-077; flexure.md "The polar holes"), at the coordinator's request, and the "follow-up" there points to the new section.
+  - Ledger: PLT-289 to PLT-292 added (`game-choice`). PLT-047, PLT-243, PLT-258, PLT-276, PLT-284 and PLT-287 updated.
+  - Bibliography: ScholvonHuene2009 added (abstract read); Cloos1993's ids gain PLT-289.
+  - Ran `claims_counts.py --write` (2,557 active rows; PLT 230, 91 of them `game-choice`).
+- **Files touched.**
+  - Code: `crates/deeptime-core/src/plates/{belts.rs, collision.rs, ridges.rs, state.rs, stats.rs, subduction.rs, tests.rs}`.
+  - Docs: `docs/science/{plates.md, bibliography.md, claims.md, ledger/PLT.md}`, STATUS.md.
+  - No Java, no format change, no preset or editor field.
+- **Choices made without asking (all can be undone; the coordinator's call).**
+  - The ocean-floor rule's threshold at T_n (33 km of crystalline crust), not Cloos's 15 km.
+  - Visible continental crust of a colliding plate inside the overriding footprint is consumed at a resampling, not accreted.
+  - `stacked` sticky while hidden; transfers and welds leave crossed crust under.
+  - The belt stacks only on continental crust; the rest goes down with the slab.
+  - The rate limits kept unchanged as the guard.
+  - The two weld tests on seed 3.
+  - The wedge left for a follow-up.
+  - PLT-258's 0.7 km³/yr kept, with what it covers.
+  - Master's baseline built from a git archive of origin/master 991354a4.
+- **Gates** (the merged branch, code as committed; `build/accr/gates.sh`, each step admitted, on the VM): `cargo fmt --all --check` clean; `cargo clippy --workspace --all-targets --locked -- -D warnings` clean; `cargo deny check licenses bans` ok; `cargo test --workspace --locked` 954 passed, 0 failed, 4 ignored (deeptime-core lib 703). GameTests are the coordinator's.
+- **Next.** The coordinator merges this branch. Then the follow-ups: the wedge's width (PLT-244), the felsic crust of hidden ocean floor that still comes back in lumps, the ocean-floor rule's growing count, the arcs' heights. Scratch (`/data/ban/deeptime-runs/accretion`, `build/accr`) deleted.
 ### 2026-10-18: The polar holes: a plate that weakened let go of its bending moment, and along a plate boundary one cell wide the moment's curvature made forces of several times the load held; it now lets go of its share of the load it held (ISO-056), and its rigidity is carried as a logarithm (ISO-075). The guard's worst over six 500 Myr runs fell from 30.8 to 15.5 km, the largest from 59.6 to 18.1 km (coordinator's task; agent worktree agent-a2d3dcd7f6d245dc3, branch worktree-agent-a2d3dcd7f6d245dc3 from master 9091c163, origin/master 19cb11e0 merged before the measurements; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Which process.** A per-process trace of the surface stage (temporary, `DEEPTIME_PTRACE`, not committed) printed each step's largest rise and fall per process and latitude band (0, 45, 60, 70, 80°), plus the polar picks with their parts. It ran on master 9091c163 with the step records added, over the six runs below. The polar picks were the flexure's, and within it the released moment. Example: supercontinent seed 2, −290 Myr, cell (505, 9) at 70°, a craton cell that a plate boundary brought to the Te floor (5 km), released 17.2 km in one step. The other bands had the same on a smaller scale: the step records' "rest" reached 25.5 km in a step.
 - **Why.** The plate carried `M = D ∇²w` and released `L((1 − r)·M)` where `D` fell to `r·D`. For a plate in balance `L(M)` is the load held from local isostasy, so where `r` is uniform the release is that share of the load. Along a boundary `r` jumps from cell to cell: a craton cell keeps (5/80)³ of its rigidity, its neighbours all of theirs. There the Laplacian of the released moment is several times the load held, with opposite signs in neighbouring cells. The polar rows get more of it, for three reasons:
