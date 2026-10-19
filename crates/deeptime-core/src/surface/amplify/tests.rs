@@ -135,6 +135,7 @@ fn cfg(drama: f64) -> Config {
         mv: 20.0,
         mh: 300.0,
         l3_r: 2,
+        accel: None,
     }
 }
 
@@ -1084,6 +1085,99 @@ fn auto_streams_when_the_whole_path_peak_would_not_fit_though_the_last_level_alo
     );
 }
 
+/// A device for the stream decision only: its share of host memory and its room.
+#[derive(Debug)]
+struct StubDevice {
+    host_bytes_per_cell: u64,
+    max_cells: usize,
+}
+
+impl PassDevice for StubDevice {
+    fn name(&self) -> String {
+        "stub".into()
+    }
+    fn host_bytes_per_cell(&self) -> u64 {
+        self.host_bytes_per_cell
+    }
+    fn fits(&self, cells: usize) -> bool {
+        cells <= self.max_cells
+    }
+    fn middle(
+        &self,
+        _: &mut kernels::Buf,
+        _: &Physics,
+        _: &Counts,
+        _: &mut Times,
+    ) -> Result<glacial::ShapeStats, String> {
+        Err("the stub runs nothing".into())
+    }
+}
+
+#[test]
+fn auto_tiles_a_level_the_device_could_not_keep_whole() {
+    // The full 16k last level (8192 x 2624) at the 4 GiB default cap with 3.9 GiB in use at
+    // its fullest: it fits whole on the CPU, but not with an integrated GPU's 64 bytes a cell of
+    // host memory, so auto tiles it and the device keeps it (2026-10-19, the 100 Myr check).
+    let cells = 8192 * 2624;
+    let cap = crate::session::DEFAULT_MEM_CAP;
+    let peak = 3_917 << 20;
+    let reserve = gauge_model(0, cap);
+    let integrated = StubDevice {
+        host_bytes_per_cell: 64,
+        max_cells: usize::MAX,
+    };
+    let discrete = StubDevice {
+        host_bytes_per_cell: 8,
+        max_cells: usize::MAX,
+    };
+    let small = StubDevice {
+        host_bytes_per_cell: 8,
+        max_cells: cells - 1,
+    };
+    assert!(!streams_on(StreamMode::Auto, peak, cells, None, &reserve));
+    assert!(streams_on(
+        StreamMode::Auto,
+        peak,
+        cells,
+        Some(&integrated),
+        &reserve
+    ));
+    assert!(!streams_on(
+        StreamMode::Auto,
+        peak,
+        cells,
+        Some(&discrete),
+        &reserve
+    ));
+    // Too big for the device's memory: tiles, whatever the host has.
+    let roomy = gauge_model(0, u64::MAX);
+    assert!(streams_on(
+        StreamMode::Auto,
+        peak,
+        cells,
+        Some(&small),
+        &roomy
+    ));
+    assert!(!streams_on(
+        StreamMode::Auto,
+        peak,
+        cells,
+        Some(&integrated),
+        &roomy
+    ));
+    // never and always are what they say.
+    for d in [&integrated, &small] {
+        assert!(!streams_on(
+            StreamMode::Never,
+            peak,
+            cells,
+            Some(d),
+            &reserve
+        ));
+        assert!(streams_on(StreamMode::Always, peak, cells, Some(d), &roomy));
+    }
+}
+
 #[test]
 fn the_whole_path_peak_is_what_the_last_reservation_sees() {
     // Run the ladder in memory (2 levels) with a reserve that records every request, and rebuild
@@ -1202,4 +1296,99 @@ fn the_stage_streams_under_auto_when_only_the_whole_path_peak_is_over_the_cap() 
         auto_mode_under(held + peak_over_l2 + (1 << 20), held, "auto-roomy"),
         "in_memory"
     );
+}
+
+/// Max |a − b|, the share of cells further apart than `tol`, and the mean |a − b|.
+#[cfg(feature = "gpu")]
+fn diff(a: &[f32], b: &[f32], tol: f32) -> (f32, f64, f64) {
+    assert_eq!(a.len(), b.len());
+    let (mut max, mut over, mut sum) = (0.0f32, 0usize, 0.0f64);
+    for (&x, &y) in a.iter().zip(b) {
+        let d = (x - y).abs();
+        max = max.max(d);
+        over += usize::from(d > tol);
+        sum += f64::from(d);
+    }
+    (max, over as f64 / a.len() as f64, sum / a.len() as f64)
+}
+
+/// The GPU's middle passes (`gpu.rs`) against the CPU's, the reference, within the error budget
+/// of `docs/design/gpu-compute.md`: on one glaciated window directly, then through the ladder in
+/// tiles. Skipped without an adapter (Mesa's lavapipe counts: the test VM has no GPU).
+#[cfg(feature = "gpu")]
+#[test]
+fn the_gpu_passes_stay_within_their_error_budget_of_the_cpu() {
+    let gpu = match deeptime_gpu::shared(true) {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("skipped: {e}");
+            return;
+        }
+    };
+    eprintln!("adapter: {}", gpu.describe());
+    let dev = Arc::new(super::gpu::AmplifyGpu::new(gpu).unwrap());
+    let mut l2 = l2_level();
+    l2.zs =
+        l2.z.iter()
+            .map(|&z| if z > 900.0 { z + 250.0 } else { z - 1.0 })
+            .collect();
+    let c = cfg(1.0);
+
+    // One window, the passes alone.
+    let (gw, gh) = (2 * W2, 2 * H2);
+    let win = Win::full(gw, gh);
+    let (counts, ph, noise) = (c.counts(false), c.physics(l2.fine_dx()), c.noise_cfg(gw));
+    assert!(counts.glacial > 0);
+    let mut times = Times::default();
+    let mut cpu = super::kernels::Buf::new(win, l2.sample(&win));
+    let cs = super::kernels::run_passes(&mut cpu, &ph, &counts, &noise, &mut times);
+    let mut dev_buf = super::kernels::Buf::new(win, l2.sample(&win));
+    let device: &dyn PassDevice = dev.as_ref();
+    let gs =
+        super::kernels::run_passes_on(Some(device), &mut dev_buf, &ph, &counts, &noise, &mut times)
+            .unwrap();
+    let z = diff(&cpu.z, &dev_buf.z, 1.0e-2);
+    let eroded = diff(&cpu.eroded, &dev_buf.eroded, 1.0e-2);
+    let sed = diff(&cpu.sed, &dev_buf.sed, 1.0e-2);
+    let cut = diff(&cpu.cap, &dev_buf.cap, 1.0e-2);
+    eprintln!("window z {z:?} eroded {eroded:?} sed {sed:?} cut {cut:?}");
+    eprintln!("glacial cpu {:?} gpu {:?}", cs.glacial, gs.glacial);
+    eprintln!("flood cpu {:?} gpu {:?}", cs.flood, gs.flood);
+    for (name, (max, over, mean)) in [("z", z), ("eroded", eroded), ("sed", sed), ("cut", cut)] {
+        assert!(
+            over < 1.0e-3,
+            "{name}: {over} of the cells differ by over 1 cm"
+        );
+        assert!(mean < 1.0e-3, "{name}: mean difference {mean} m");
+        assert!(max < 5.0, "{name}: max difference {max} m");
+    }
+    assert!(cs.glacial.glacier_cells > 0);
+    let rel = |a: f64, b: f64| (a - b).abs() / a.abs().max(1.0);
+    assert!(rel(cs.glacial.carved_m_cells, gs.glacial.carved_m_cells) < 1.0e-3);
+    assert!(rel(cs.glacial.raised_m_cells, gs.glacial.raised_m_cells) < 1.0e-3);
+
+    // The ladder in tiles: every window on the device, no new sinks, the same terrain within
+    // the budget.
+    let (cpu_l3, cpu_out) = run_mem(&l2, &c, plan_tiled(&c), 4);
+    let mut cg = c.clone();
+    cg.accel = Some(dev);
+    let (gpu_l3, gpu_out) = run_mem(&l2, &cg, plan_tiled(&cg), 4);
+    assert_eq!(gpu_out.last.device_error, None);
+    assert_eq!(gpu_out.last.device_tiles, gpu_out.last.tiles as u64);
+    assert!(
+        gpu_out
+            .levels
+            .iter()
+            .all(|l| l.stats.device_tiles == l.tiles as u64)
+    );
+    assert_eq!(cpu_out.last.sinks, 0);
+    assert_eq!(gpu_out.last.sinks, 0, "the GPU run drains");
+    let l3 = diff(&cpu_l3.z, &gpu_l3.z, 1.0e-2);
+    eprintln!("ladder z {l3:?}");
+    assert!(
+        l3.1 < 1.0e-2,
+        "{} of the L3 cells differ by over 1 cm",
+        l3.1
+    );
+    assert!(l3.2 < 1.0e-2, "mean L3 difference {} m", l3.2);
 }

@@ -18,6 +18,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use deeptime_core::compute::ComputeMode;
 use deeptime_core::log::Level;
 use deeptime_core::session::{PROGRESS_FIELDS, Session, SessionOptions};
 use deeptime_core::{CoreError, FORMAT_VERSION};
@@ -185,6 +186,10 @@ const FLAG_EPOCHS: jint = 1;
 /// `createWith` flag: pick up the run already in `outDir` at the preset's stop, from its epoch
 /// checkpoints (`Session::resume_epoch`): an epoch picked, a run stopped early or continued.
 const FLAG_RESUME: jint = 2;
+/// `createWith` flags: the compute mode (`deeptime_core::compute`), `cpu` or `gpu`; neither is
+/// `auto` (or `DEEPTIME_COMPUTE` when it is set), both is an error.
+const FLAG_COMPUTE_CPU: jint = 4;
+const FLAG_COMPUTE_GPU: jint = 8;
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge_DeepTimeNative_createWith<
@@ -213,11 +218,22 @@ pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge
                 "memCapBytes must be ≥ 0 (0 = default), got {mem_cap_bytes}"
             )));
         }
-        if flags & !(FLAG_EPOCHS | FLAG_RESUME) != 0 {
+        let known = FLAG_EPOCHS | FLAG_RESUME | FLAG_COMPUTE_CPU | FLAG_COMPUTE_GPU;
+        if flags & !known != 0 {
             return Err(BridgeError::IllegalArgument(format!(
-                "unknown flags {flags:#x} (1 = epochs, 2 = resume)"
+                "unknown flags {flags:#x} (1 = epochs, 2 = resume, 4 = compute cpu, 8 = compute gpu)"
             )));
         }
+        let compute = match (flags & FLAG_COMPUTE_CPU != 0, flags & FLAG_COMPUTE_GPU != 0) {
+            (true, true) => {
+                return Err(BridgeError::IllegalArgument(
+                    "flags 4 (compute cpu) and 8 (compute gpu) exclude each other".into(),
+                ));
+            }
+            (true, false) => Some(ComputeMode::Cpu),
+            (false, true) => Some(ComputeMode::Gpu),
+            (false, false) => None,
+        };
         let options = SessionOptions {
             out_dir: PathBuf::from(out_dir),
             threads: threads as usize,
@@ -229,6 +245,9 @@ pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge
             Session::create(&preset, &content, options, Arc::new(alloc::AllocGauge))?
         };
         session.set_epochs(flags & FLAG_EPOCHS != 0)?;
+        if let Some(m) = compute {
+            session.set_compute(m);
+        }
         let id = SESSIONS.insert(SessionEntry::new(session));
         GLOBAL_LOG.push(
             Level::Debug,

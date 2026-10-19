@@ -14,6 +14,7 @@ fn common() -> Common {
         set: Vec::new(),
         history_mem: None,
         climate_json: None,
+        compute: None,
     }
 }
 

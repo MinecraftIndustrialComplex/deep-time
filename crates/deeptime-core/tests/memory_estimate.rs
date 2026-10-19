@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use deeptime_core::alloc::{self, CountingAlloc};
+use deeptime_core::compute::ComputeMode;
 use deeptime_core::session::{AdvanceStatus, MemoryGauge, Session, SessionOptions};
 use serde_json::{Value, json};
 
@@ -111,6 +112,12 @@ fn no_stage_holds_more_than_its_estimate() {
         gauge.clone(),
     )
     .unwrap();
+    // On the CPU: a GPU's driver (its code and its own heaps) is memory the counting allocator
+    // never sees, so the resident bound below does not hold for it. With `auto` the amplify stage
+    // probes for a device, and on the test VM that loads Mesa's lavapipe (rejected, a software
+    // adapter): 2026-10-19, resident peak 137.5 and 138.8 MiB against 99.9 and 98.3 on the CPU,
+    // the counted peak 95.3 MiB in all four (docs/design/gpu-compute.md, section 4).
+    s.set_compute(ComputeMode::Cpu);
     loop {
         match s.advance(Duration::from_secs(60)).unwrap() {
             AdvanceStatus::Done => break,
