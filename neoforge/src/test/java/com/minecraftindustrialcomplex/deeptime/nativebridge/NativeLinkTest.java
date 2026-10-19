@@ -139,7 +139,8 @@ class NativeLinkTest {
 
     /**
      * {@code createWith} (docs/design/playability-steering.md): epoch checkpoints are a no-op on a
-     * pipeline without plates, a resume needs a planet, and an unknown flag is refused.
+     * pipeline without plates, a resume needs a planet, and an unknown flag is refused. The compute
+     * flags (docs/design/gpu-compute.md) are taken one at a time; both at once are refused.
      */
     @Test
     void createWithTakesTheEpochFlags() {
@@ -154,7 +155,19 @@ class NativeLinkTest {
         assertThrows(IllegalArgumentException.class, () -> DeepTimeNative.createWith(dummy, "",
                 gameDir.resolve("resume").toString(), 1, 0, DeepTimeNative.FLAG_RESUME));
         assertThrows(IllegalArgumentException.class, () -> DeepTimeNative.createWith(dummy, "",
-                gameDir.resolve("bad").toString(), 1, 0, 8));
+                gameDir.resolve("bad").toString(), 1, 0, 16));
+        for (int compute : new int[] {DeepTimeNative.FLAG_COMPUTE_CPU, DeepTimeNative.FLAG_COMPUTE_GPU}) {
+            long s = DeepTimeNative.createWith(dummy, "", gameDir.resolve("compute" + compute).toString(), 1, 0,
+                    compute);
+            try {
+                assertEquals(DeepTimeNative.DONE, advanceUntilSettled(s));
+            } finally {
+                DeepTimeNative.destroy(s);
+            }
+        }
+        assertThrows(IllegalArgumentException.class, () -> DeepTimeNative.createWith(dummy, "",
+                gameDir.resolve("both").toString(), 1, 0,
+                DeepTimeNative.FLAG_COMPUTE_CPU | DeepTimeNative.FLAG_COMPUTE_GPU));
     }
 
     @Test

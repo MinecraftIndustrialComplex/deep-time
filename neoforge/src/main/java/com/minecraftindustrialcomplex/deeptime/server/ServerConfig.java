@@ -3,6 +3,7 @@ package com.minecraftindustrialcomplex.deeptime.server;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.minecraftindustrialcomplex.deeptime.nativebridge.SimSession;
 import com.minecraftindustrialcomplex.deeptime.preset.PresetException;
 import com.minecraftindustrialcomplex.deeptime.preset.Presets;
 
@@ -19,7 +20,7 @@ import java.util.Optional;
  * <pre>{@code
  * {"preset": "earthlike_quick_16k" | "<file>" | "DT1.<share code>",
  *  "timeline": {"start": "supercontinent" | "scattered_continents" | "random", "length_myr": 1000},
- *  "memory_cap_gib": 4, "threads": 0}
+ *  "memory_cap_gib": 4, "threads": 0, "compute": "auto" | "cpu" | "gpu"}
  * }</pre>
  *
  * <p>The timeline has no default (decisions file, "Timeline"; review 2, gap 21): {@code timeline}
@@ -31,8 +32,10 @@ import java.util.Optional;
  * @param timeline     the timeline to run, if this file names one
  * @param memoryCapGib the native memory cap in GiB (plan §5.7.5; default 4)
  * @param threads      simulation threads, 0 = all processors (plan §6.2)
+ * @param compute      where the simulation computes (docs/design/gpu-compute.md; default auto)
  */
-public record ServerConfig(String preset, Optional<Presets.Timeline> timeline, double memoryCapGib, int threads) {
+public record ServerConfig(String preset, Optional<Presets.Timeline> timeline, double memoryCapGib, int threads,
+        SimSession.Compute compute) {
 
     public static final String FILE = "server.json";
     public static final double DEFAULT_MEMORY_CAP_GIB = 4.0;
@@ -71,7 +74,7 @@ public record ServerConfig(String preset, Optional<Presets.Timeline> timeline, d
         List<String> problems = new ArrayList<>();
         for (Map.Entry<String, JsonElement> e : o.entrySet()) {
             String k = e.getKey();
-            if (!k.startsWith("_") && !List.of("preset", "timeline", "memory_cap_gib", "threads").contains(k))
+            if (!k.startsWith("_") && !List.of("preset", "timeline", "memory_cap_gib", "threads", "compute").contains(k))
                 problems.add(k + ": unknown key (keys starting with _ are comments)");
         }
 
@@ -126,9 +129,21 @@ public record ServerConfig(String preset, Optional<Presets.Timeline> timeline, d
                 threads = th.getAsInt();
         }
 
+        SimSession.Compute compute = SimSession.Compute.AUTO;
+        JsonElement co = o.get("compute");
+        if (co != null) {
+            Optional<SimSession.Compute> m = co.isJsonPrimitive() && co.getAsJsonPrimitive().isString()
+                    ? SimSession.Compute.parse(co.getAsString().strip())
+                    : Optional.empty();
+            if (m.isEmpty())
+                problems.add("compute: expected \"auto\", \"cpu\" or \"gpu\" (default auto)");
+            else
+                compute = m.get();
+        }
+
         if (!problems.isEmpty())
             throw new Invalid(problems);
-        return new ServerConfig(preset, timeline, cap, threads);
+        return new ServerConfig(preset, timeline, cap, threads, compute);
     }
 
     /**
@@ -150,7 +165,9 @@ public record ServerConfig(String preset, Optional<Presets.Timeline> timeline, d
                   "memory_cap_gib": 4,
                   "_memory_cap_gib": "Native memory the simulation may use, in GiB (default 4). Raise it freely on a big machine; it is separate from the server's -Xmx.",
                   "threads": 0,
-                  "_threads": "Simulation threads; 0 uses every processor (the server is not running yet)."
+                  "_threads": "Simulation threads; 0 uses every processor (the server is not running yet).",
+                  "compute": "auto",
+                  "_compute": "auto uses a graphics card for the heavy terrain steps when one is usable (Vulkan, DirectX 12 or Metal), else the processor; cpu never uses one; gpu also accepts a software renderer. A run falls back to the processor whenever the card is missing, too small or fails."
                 }
                 """;
     }

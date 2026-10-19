@@ -39,6 +39,8 @@
 
 pub mod character;
 pub mod glacial;
+#[cfg(feature = "gpu")]
+pub mod gpu;
 pub mod impact;
 pub mod kernels;
 pub mod resample;
@@ -51,6 +53,7 @@ pub mod window;
 mod tests;
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::time::Instant;
 
 use deeptime_format::{Codec, DType, GridDesc, LayerEntry, Manifest};
@@ -58,7 +61,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use self::character::{CharacterCtx, CharacterFields, CharacterParams, RUGGEDNESS_MAX};
-use self::kernels::{Counts, NoiseCfg, Physics, Times};
+use self::kernels::{Counts, NoiseCfg, PassDevice, Physics, Times};
 use self::resample::Level;
 use self::tiles::{
     LEVEL_BYTES_PER_CELL, LastStats, LevelSink, PackSink, Preview, TILE_BYTES_PER_CELL, TileCfg,
@@ -161,6 +164,28 @@ pub fn streams(
         StreamMode::Always => true,
         StreamMode::Never => false,
         StreamMode::Auto => reserve(peak_bytes).is_err(),
+    }
+}
+
+/// [`streams`] for a level of `cells` whose middle passes run on `accel`: `auto` also tiles when
+/// the whole level does not fit on the device, or leaves no room under the cap for the device's
+/// share of the host's memory (on an integrated GPU, all of its buffers). Tiles give the terrain
+/// the whole raster gives (`the_levels_before_the_last_agree_tiled_and_whole`), so the device
+/// keeps the level instead of handing it to the CPU (2026-10-19: at the 4 GiB default cap a full
+/// 16k last level ran whole on the CPU with the GPU forced on, `docs/design/gpu-compute.md` §7).
+pub fn streams_on(
+    mode: StreamMode,
+    peak_bytes: u64,
+    cells: usize,
+    accel: Option<&dyn PassDevice>,
+    reserve: &dyn Fn(u64) -> Result<(), CoreError>,
+) -> bool {
+    match accel {
+        Some(d) if mode == StreamMode::Auto => {
+            let share = cells as u64 * d.host_bytes_per_cell();
+            !d.fits(cells) || streams(mode, peak_bytes.saturating_add(share), reserve)
+        }
+        _ => streams(mode, peak_bytes, reserve),
     }
 }
 
@@ -379,6 +404,8 @@ pub struct Config {
     pub mh: f64,
     /// Blocks per cell of the last level (L3).
     pub l3_r: u32,
+    /// Where every level's middle passes run (None: the CPU; `compute.rs`).
+    pub accel: Option<Arc<dyn PassDevice>>,
 }
 
 impl Config {
@@ -552,8 +579,13 @@ pub fn run(
         let counts = cfg.counts(true);
         // The whole raster's buffers, and the next level's arrays which are kept either way.
         let whole_bytes = (gw * gh) as u64 * (TILE_BYTES_PER_CELL + LEVEL_BYTES_PER_CELL);
-        let tiled =
-            streams(cfg.p.stream, whole_bytes, reserve) && (cfg.p.tile_cells as usize) < gw.max(gh);
+        let tiled = streams_on(
+            cfg.p.stream,
+            whole_bytes,
+            gw * gh,
+            cfg.accel.as_deref(),
+            reserve,
+        ) && (cfg.p.tile_cells as usize) < gw.max(gh);
         let level_plan = if tiled {
             TilePlan {
                 gw,
@@ -575,6 +607,7 @@ pub fn run(
             preview_stride: 1,
             last: false,
             character: None,
+            accel: cfg.accel.as_deref(),
         };
         reserve((gw * gh) as u64 * LEVEL_BYTES_PER_CELL)?;
         let mut next = LevelSink::new(gw, gh, dxf);
@@ -602,6 +635,7 @@ pub fn run(
         preview_stride: preview_stride(gw, cfg.p.preview_width as usize),
         last: true,
         character,
+        accel: cfg.accel.as_deref(),
     };
     let (preview, stats) = run_tiles(&level, &last, sink, cancelled, reserve)?;
     Ok(Outcome {
@@ -822,6 +856,7 @@ impl AmplifyStage {
             mv: s.m_per_block_v,
             mh: s.m_per_block_h,
             l3_r: self.preset.resolution.l3_r,
+            accel: None,
         }
     }
 
@@ -848,7 +883,8 @@ impl AmplifyStage {
             })?;
         let c = self.preset.scale.circumference_blocks;
         let l3 = GridDesc::for_planet("L3", c, r.l3_r)?;
-        let cfg = self.config(sea);
+        let mut cfg = self.config(sea);
+        cfg.accel = accel(ctx);
         let mut fields = CharacterFields::from_world(world, r.l1_r, r.l3_r, &self.p.character);
         // Volcanoes (P1-21) keep their cones: no fold ridges over them.
         let shaper = volcano::Shaper::from_world(world, &self.preset);
@@ -900,7 +936,13 @@ impl AmplifyStage {
         // reservations the last level will make, with what the run holds by then.
         let whole_bytes = (gw * gh) as u64 * TILE_BYTES_PER_CELL;
         let peak_bytes = whole_last_level_peak(level.bytes(), n_dbl, gw, gh, self.p.preview_width);
-        let streamed = streams(self.p.stream, peak_bytes, &|b| ctx.reserve(b));
+        let streamed = streams_on(
+            self.p.stream,
+            peak_bytes,
+            gw * gh,
+            cfg.accel.as_deref(),
+            &|b| ctx.reserve(b),
+        );
         let plan = cfg.plan(gw, gh, streamed && self.p.tile_cells < (gw.max(gh)) as u32);
         ctx.log.push(
             crate::log::Level::Info,
@@ -1015,10 +1057,21 @@ impl AmplifyStage {
                     "flood_raised_cells": l.stats.flood_raised_cells,
                     "flood_max_raise_m": l.stats.flood_max_raise_m,
                     "sinks": l.stats.sinks,
+                    "device_tiles": l.stats.device_tiles,
                 })
             })
             .collect();
+        // Where the middle passes ran (`compute.rs`), over every level's windows.
+        let all = || out.levels.iter().map(|l| &l.stats).chain([t]);
+        let compute = json!({
+            "mode": ctx.compute.as_str(),
+            "device": cfg.accel.as_ref().map_or("cpu".to_string(), |d| d.name()),
+            "device_tiles": all().map(|s| s.device_tiles).sum::<u64>(),
+            "tiles": all().map(|s| s.tiles as u64).sum::<u64>(),
+            "error": all().find_map(|s| s.device_error.clone()),
+        });
         let note = json!({
+            "compute": compute,
             "grid": l3,
             "l2": {"r": r.l2_r},
             "doublings": n_dbl,
@@ -1085,10 +1138,33 @@ impl AmplifyStage {
     }
 }
 
+/// The device the middle passes run on under the session's compute mode (`compute.rs`).
+#[cfg(feature = "gpu")]
+fn accel(ctx: &StageContext<'_>) -> Option<Arc<dyn PassDevice>> {
+    let gpu = crate::compute::device(ctx.compute, ctx.log)?;
+    match gpu::AmplifyGpu::new(gpu) {
+        Ok(a) => Some(Arc::new(a)),
+        Err(e) => {
+            ctx.log.push(
+                crate::log::Level::Warn,
+                format!("amplify: the GPU kernels did not build, running on the CPU ({e})"),
+            );
+            None
+        }
+    }
+}
+
+#[cfg(not(feature = "gpu"))]
+fn accel(ctx: &StageContext<'_>) -> Option<Arc<dyn PassDevice>> {
+    crate::compute::warn_without_gpu(ctx.compute, ctx.log);
+    None
+}
+
 fn timing_json(t: &Times) -> Value {
     json!({
         "seed": t.seed_ms, "erode": t.erode_ms, "thermal": t.thermal_ms,
         "deposit": t.deposit_ms, "flood": t.flood_ms, "glacial": t.glacial_ms,
+        "transfer": t.transfer_ms,
     })
 }
 
@@ -1097,7 +1173,9 @@ pub fn summary_line(v: &Value) -> String {
     let f = |k: &str| v[k].as_f64().unwrap_or(0.0);
     let mut per_pass = BTreeMap::new();
     let mut add = |p: &Value| {
-        for k in ["seed", "erode", "thermal", "deposit", "flood", "glacial"] {
+        for k in [
+            "seed", "erode", "thermal", "deposit", "flood", "glacial", "transfer",
+        ] {
             *per_pass.entry(k).or_insert(0.0) += p[k].as_f64().unwrap_or(0.0);
         }
     };
@@ -1153,7 +1231,31 @@ pub fn summary_line(v: &Value) -> String {
         v["last"]["detail_ms"].as_f64().unwrap_or(0.0) / 1000.0,
         v["last"]["sink_ms"].as_f64().unwrap_or(0.0) / 1000.0,
         v["millis"]["total"].as_f64().unwrap_or(0.0) / 1000.0,
-    )
+    ) + &compute_term(&v["compute"])
+}
+
+/// ` compute=<device>:<windows on it>/<windows>` when a device ran any window, ` compute=cpu`
+/// otherwise; the device's error, if it stopped using it, follows in brackets.
+fn compute_term(c: &Value) -> String {
+    let device = c["device"].as_str().unwrap_or("cpu");
+    let mut s = if device == "cpu" {
+        " compute=cpu".to_string()
+    } else {
+        format!(
+            " compute={}:{}/{}",
+            device
+                .split(" (")
+                .next()
+                .unwrap_or(device)
+                .replace(' ', "_"),
+            c["device_tiles"],
+            c["tiles"]
+        )
+    };
+    if let Some(e) = c["error"].as_str() {
+        s += &format!("[fell_back: {e}]");
+    }
+    s
 }
 
 impl Stage for AmplifyStage {

@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
 use deeptime_core::checkpoint::Checkpoint;
+use deeptime_core::compute::ComputeMode;
 use deeptime_core::session::{AdvanceStatus, Session, SessionOptions, SessionState, group_of};
 use deeptime_format::keyframes::{KeyframeIndex, read_keyframe};
 use deeptime_format::manifest::rfc3339_utc;
@@ -33,6 +34,17 @@ pub struct Common {
     /// `--climate-json`: write the climate stage's note (its summary, the run's CO₂/temperature/
     /// ice/sea-level curve and the ice-age window's) here after a `stage` run.
     pub climate_json: Option<std::path::PathBuf>,
+    /// `--compute`: where the kernels with a GPU version run (None: `DEEPTIME_COMPUTE`, else
+    /// auto; `deeptime_core::compute`).
+    pub compute: Option<ComputeMode>,
+}
+
+impl Common {
+    pub fn apply_compute(&self, s: &Session) {
+        if let Some(m) = self.compute {
+            s.set_compute(m);
+        }
+    }
 }
 
 /// The recorded history's line: its size, and what went to the spill file (P1-17).
@@ -1265,6 +1277,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         );
     }
     s.set_history_budget(o.common.history_mem);
+    o.common.apply_compute(&s);
     drive(&s, o.common.verbose, |_, st| st == AdvanceStatus::Done)?;
     s.finalize_write()?;
     forward_log(&s, o.common.verbose);
@@ -1311,6 +1324,7 @@ pub fn resume(o: &ResumeOptions) -> CliResult<()> {
     )?;
     s.set_epochs(o.epochs)?;
     s.set_history_budget(o.common.history_mem);
+    o.common.apply_compute(&s);
     if let Some(r) = s.resumed() {
         println!(
             "deeptime resume: from plate step {} (t = {:.1} Myr), {} of {} steps to run, {} keyframes kept",
@@ -1491,6 +1505,7 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             }
             let mut s = Session::resume(ck, opts, Arc::new(AllocGauge))?;
             s.set_history_budget(o.common.history_mem);
+            o.common.apply_compute(&s);
             s
         }
         (None, Some(preset)) => {
@@ -1498,6 +1513,7 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             let json = apply_overrides(&json, &o.common.set)?;
             let mut s = Session::create(&json, "", opts, Arc::new(AllocGauge))?;
             s.set_history_budget(o.common.history_mem);
+            o.common.apply_compute(&s);
             let stages = s.preset().stages();
             let target = group_of(&stages, &o.name).map(|g| g.start).ok_or_else(|| {
                 format!(
@@ -1790,6 +1806,7 @@ pub struct BenchOptions {
     pub work: Option<PathBuf>,
     pub mem_cap: u64,
     pub verbose: bool,
+    pub compute: Option<ComputeMode>,
 }
 
 /// `deeptime bench`: the preset once per thread count, with per-stage wall time and peak native
@@ -1838,6 +1855,9 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
             },
             Arc::new(AllocGauge),
         )?;
+        if let Some(m) = o.compute {
+            s.set_compute(m);
+        }
         name = s.preset().name().to_owned();
         drive(&s, o.verbose, |_, st| st == AdvanceStatus::Done)?;
         let finalize = Instant::now();

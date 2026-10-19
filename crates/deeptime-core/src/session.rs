@@ -27,6 +27,7 @@ use deeptime_format::{
 use serde_json::{Value, json};
 
 use crate::checkpoint::{Checkpoint, CheckpointRef};
+use crate::compute::ComputeMode;
 use crate::deposits::recorded::{Evicted, HistoryHandle};
 use crate::deposits::spill::SpillStore;
 use crate::error::CoreError;
@@ -499,6 +500,8 @@ pub struct Session {
     /// Whether a group's followers that can step beside the lead's next step do (P1-19;
     /// [`Session::set_overlap`]).
     overlap: AtomicBool,
+    /// The compute mode, as `ComputeMode as u8` ([`Session::set_compute`]).
+    compute: AtomicU8,
 }
 
 /// The share of the memory cap kept free after a step: the history is trimmed to
@@ -976,6 +979,7 @@ impl Session {
             needed_peak: [AtomicU64::new(0), AtomicU64::new(0)],
             resumed: None,
             overlap: AtomicBool::new(true),
+            compute: AtomicU8::new(ComputeMode::from_env() as u8),
         };
         session.log.push(
             Level::Info,
@@ -1009,6 +1013,20 @@ impl Session {
     /// not depend on it, only the time a run takes; tests compare the two.
     pub fn set_overlap(&self, on: bool) {
         self.overlap.store(on, Ordering::Release);
+    }
+
+    /// Where the kernels that have a GPU version run (`compute.rs`; default
+    /// [`ComputeMode::from_env`]). Takes effect from the next stage step.
+    pub fn set_compute(&self, mode: ComputeMode) {
+        self.compute.store(mode as u8, Ordering::Release);
+    }
+
+    pub fn compute(&self) -> ComputeMode {
+        match self.compute.load(Ordering::Acquire) {
+            1 => ComputeMode::Cpu,
+            2 => ComputeMode::Gpu,
+            _ => ComputeMode::Auto,
+        }
     }
 
     /// The spill store: the disk the recorded history used (bytes and frames written).
@@ -1253,6 +1271,7 @@ impl Session {
             state: &self.state,
             history,
             needed_peak: Some(&self.needed_peak),
+            compute: self.compute(),
         }
     }
 

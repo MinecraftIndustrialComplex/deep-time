@@ -115,11 +115,52 @@ public final class SimSession implements AutoCloseable {
      * @throws IllegalStateException  if the native library is not linked
      */
     public static SimSession start(String presetJson, String contentJson, Path outDir, int threads, long memCapBytes) {
+        return start(presetJson, contentJson, outDir, threads, memCapBytes, Compute.AUTO);
+    }
+
+    /**
+     * Where the simulation computes (docs/design/gpu-compute.md). {@link #AUTO} uses a hardware GPU
+     * when one is usable, else the CPU (the {@code DEEPTIME_COMPUTE} environment variable can still
+     * force either); {@link #GPU} also accepts a software adapter; every mode falls back to the CPU
+     * when the GPU is missing, too small or lost.
+     */
+    public enum Compute {
+        AUTO(0),
+        CPU(DeepTimeNative.FLAG_COMPUTE_CPU),
+        GPU(DeepTimeNative.FLAG_COMPUTE_GPU);
+
+        final int flags;
+
+        Compute(int flags) {
+            this.flags = flags;
+        }
+
+        /** The config spelling: {@code auto}, {@code cpu} or {@code gpu}. */
+        public String key() {
+            return name().toLowerCase(java.util.Locale.ROOT);
+        }
+
+        /** The mode a config spelling names, if any. */
+        public static java.util.Optional<Compute> parse(String key) {
+            for (Compute c : values())
+                if (c.key().equals(key))
+                    return java.util.Optional.of(c);
+            return java.util.Optional.empty();
+        }
+    }
+
+    /** {@link #start(String, String, Path, int, long)} with a {@link Compute} mode. */
+    public static SimSession start(String presetJson, String contentJson, Path outDir, int threads, long memCapBytes,
+            Compute compute) {
         Objects.requireNonNull(presetJson, "presetJson");
         Objects.requireNonNull(outDir, "outDir");
+        Objects.requireNonNull(compute, "compute");
         requireLinked();
-        long created = DeepTimeNative.create(presetJson, contentJson == null ? "" : contentJson,
-                outDir.toAbsolutePath().toString(), threads, memCapBytes);
+        String content = contentJson == null ? "" : contentJson;
+        String out = outDir.toAbsolutePath().toString();
+        long created = compute == Compute.AUTO
+                ? DeepTimeNative.create(presetJson, content, out, threads, memCapBytes)
+                : DeepTimeNative.createWith(presetJson, content, out, threads, memCapBytes, compute.flags);
         SimSession s = new SimSession(outDir, false, false, () -> created);
         s.id = created;
         s.worker.start();
