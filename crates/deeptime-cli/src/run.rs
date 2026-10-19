@@ -470,7 +470,8 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
          history_mib={:.1} land_z_p50_m={:.0} land_z_p90_m={:.0} land_z_p99_m={:.0} plate_cap_bound_share={:.5} \
          foreign_crust_cell_steps={:.0} spread_cell_steps={:.0} spread_km3={:.3e} \
          flexure_solves={:.0} flexure_iterations_per_solve={:.2} flexure_unconverged={:.0} \
-         guard_worst_m={:.0} guard_steps_over_1/2/3/6_reliefs={:.0}/{:.0}/{:.0}/{:.0}",
+         guard_worst_m={:.0} guard_steps_over_1/2/3/6_reliefs={:.0}/{:.0}/{:.0}/{:.0} \
+         step_rise/fall_polar_m={:.0}/{:.0} step_rise/fall_rest_m={:.0}/{:.0}",
         t.steps,
         land / n,
         peak,
@@ -509,6 +510,10 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         global(deeptime_core::surface::guard::NEAR_GLOBALS[1]),
         global(deeptime_core::surface::guard::NEAR_GLOBALS[2]),
         global(deeptime_core::surface::guard::NEAR_GLOBALS[3]),
+        global(deeptime_core::surface::guard::STEP_GLOBALS[0]),
+        global(deeptime_core::surface::guard::STEP_GLOBALS[1]),
+        global(deeptime_core::surface::guard::STEP_GLOBALS[2]),
+        global(deeptime_core::surface::guard::STEP_GLOBALS[3]),
     ))
 }
 
