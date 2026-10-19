@@ -542,9 +542,10 @@ pub struct TectonicParams {
     pub scattered_continents: u32,
     /// Coastline irregularity (noise warp of the distance, radians).
     pub coast_warp_rad: f64,
-    /// Rifting: λ_0, expected rifts per step of a plate with the average initial area and
-    /// f(x_P) = 1 (Cortial §4.4).
-    pub rift_lambda0: f64,
+    /// Rifting: expected rifts per Myr of a plate with the average initial area and f(x_P) = 1.
+    /// A step's λ_0 (Cortial §4.4: per step) is this times the step's length: 0.012 at the
+    /// 2-Myr step. Ledger PLT-082.
+    pub rift_per_myr: f64,
     /// f(x_P) = w + (1 − w)·x_P², x_P the plate's continental fraction: oceanic plates rift at w.
     pub rift_ocean_weight: f64,
     /// Fragments of one rift, inclusive (Cortial: 2–4).
@@ -555,10 +556,11 @@ pub struct TectonicParams {
     pub min_plate_area_frac: f64,
     /// No rifting beyond this many plates.
     pub max_plates: u32,
-    /// Global resampling: at least this many steps apart (Cortial: 10–60).
-    pub resample_min_steps: u32,
-    /// … at most this many steps apart.
-    pub resample_max_steps: u32,
+    /// Global resampling: at least this long apart, Myr (Cortial: 10–60 steps, 20–120 Myr at
+    /// the 2-Myr step). Ledger PLT-098.
+    pub resample_min_myr: f64,
+    /// … at most this long apart, Myr.
+    pub resample_max_myr: f64,
     /// … and when the fastest plate has moved this far since the last one.
     pub resample_drift_km: f64,
     /// Magmatic arc: distance from the front of its axis, km.
@@ -596,8 +598,9 @@ pub struct TectonicParams {
     /// less as the column's Airy height nears this and not at all above it (thickened arc crust
     /// spreads; the Central Andes' plateau stands near 4 km, the Cascades' base 1.2–2 km).
     pub cordillera_height_m: f64,
-    /// Fraction of the way to z_t a trench sample moves per step.
-    pub trench_relax: f64,
+    /// A trench sample closes half its distance to z_t in this time, Myr (half of it per step
+    /// at the 2-Myr step). Ledger PLT-053.
+    pub trench_half_life_myr: f64,
     /// Pelagic sedimentation on oceanic crust, m/Myr.
     pub pelagic_m_per_myr: f64,
     /// Hotspots at the start.
@@ -633,8 +636,8 @@ pub struct TectonicParams {
     /// Oceanic crust older than this, on a plate that subducts nowhere, can start subducting on
     /// its own (Wilson cycle), Myr.
     pub subduction_initiation_age_myr: f64,
-    /// Expected subduction initiations per step per A_0 of such old crust.
-    pub subduction_initiation_rate: f64,
+    /// Expected subduction initiations per Myr per A_0 of such old crust. Ledger PLT-063.
+    pub subduction_initiation_per_myr: f64,
     /// Old crust can start subducting only this far from every trench, km (Earth-normalized;
     /// a new subduction zone does not open beside a working one).
     pub subduction_initiation_clearance_km: f64,
@@ -643,8 +646,9 @@ pub struct TectonicParams {
     /// the trench forms and the slab grows by the convergence (design §3.3). Subduction becomes
     /// self-sustaining once some 100-150 km of slab has gone down (ledger PLT-270, from memory).
     pub initiation_slab_km: f64,
-    /// Contacts unseen for this many steps are closed.
-    pub contact_timeout_steps: u32,
+    /// Contacts unseen for longer than this are closed, Myr (12 steps at the 2-Myr step).
+    /// Ledger PLT-059.
+    pub contact_timeout_myr: f64,
     /// Duration recorded for a collision orogeny, Myr.
     pub collision_orogeny_myr: f64,
     /// Sample L1 every this many steps (0 = only for keyframes and at the end).
@@ -730,14 +734,14 @@ impl Default for TectonicParams {
             continental_shelf_share: 0.0,
             scattered_continents: 6,
             coast_warp_rad: 0.25,
-            rift_lambda0: 0.012,
+            rift_per_myr: 0.006, // ledger: PLT-082
             rift_ocean_weight: 0.08,
             rift_fragments: [2, 4],
             rift_warp_rad: 0.2,
             min_plate_area_frac: 0.003,
             max_plates: 40,
-            resample_min_steps: 10,
-            resample_max_steps: 60,
+            resample_min_myr: 20.0,  // ledger: PLT-098
+            resample_max_myr: 120.0, // ledger: PLT-098
             resample_drift_km: 1500.0,
             arc_distance_km: 200.0,
             arc_width_km: 60.0,
@@ -747,7 +751,7 @@ impl Default for TectonicParams {
             cordillera_shortening_mm_yr: 0.0,     // ledger: PLT-048
             cordillera_width_km: 120.0,
             cordillera_height_m: 2500.0, // ledger: PLT-050
-            trench_relax: 0.5,
+            trench_half_life_myr: 2.0,   // ledger: PLT-053
             pelagic_m_per_myr: 5.0,
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
@@ -763,10 +767,10 @@ impl Default for TectonicParams {
             collision_min_frac: 0.1,
             collision_suture_frac: 0.1,
             subduction_initiation_age_myr: 150.0,
-            subduction_initiation_rate: 0.3,
+            subduction_initiation_per_myr: 0.15, // ledger: PLT-063
             subduction_initiation_clearance_km: 1000.0,
             initiation_slab_km: 150.0, // ledger: PLT-270
-            contact_timeout_steps: 12,
+            contact_timeout_myr: 24.0, // ledger: PLT-059
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
             plate_speed_scale_mm_yr: 45.0, // ledger: PLT-181
@@ -1127,10 +1131,16 @@ impl PlanetPreset {
             "[min ≥ 2, max ≥ min]",
         )?;
         check(
-            k.resample_min_steps >= 1 && k.resample_min_steps <= k.resample_max_steps,
-            "$.tectonics.resample_min_steps",
-            "must be in [1, resample_max_steps]",
+            k.resample_min_myr > 0.0 && k.resample_min_myr <= k.resample_max_myr,
+            "$.tectonics.resample_min_myr",
+            "must be in (0, resample_max_myr]",
         )?;
+        for (v, key) in [
+            (k.trench_half_life_myr, "$.tectonics.trench_half_life_myr"),
+            (k.contact_timeout_myr, "$.tectonics.contact_timeout_myr"),
+        ] {
+            check(v.is_finite() && v > 0.0, key, "must be positive")?;
+        }
         for (v, key) in [
             (k.hotspot_lifetime_myr, "$.tectonics.hotspot_lifetime_myr"),
             (k.continent_elevation_m, "$.tectonics.continent_elevation_m"),
@@ -1147,7 +1157,6 @@ impl PlanetPreset {
                 "$.tectonics.collision_stacking_share",
             ),
             (k.min_plate_area_frac, "$.tectonics.min_plate_area_frac"),
-            (k.trench_relax, "$.tectonics.trench_relax"),
             (k.lip_probability, "$.tectonics.lip_probability"),
         ] {
             check((0.0..=1.0).contains(&v), key, "must be in [0, 1]")?;
@@ -1508,6 +1517,23 @@ mod tests {
         assert!((quick.scale.radius_m() - 782_278.4).abs() < 1.0);
         let full = planet(plates_builtin("plates_full_16k").unwrap());
         assert_eq!(full.resolution.l0_samples, 250_000);
+    }
+
+    /// The plate rules that were counted per step are rates and times (P1-19 #27): at the 2-Myr
+    /// step they give exactly the old per-step values, so a 2-Myr run is unchanged.
+    #[test]
+    fn the_per_myr_rules_give_the_old_per_step_values_at_two_myr() {
+        let k = TectonicParams::default();
+        assert_eq!(k.time_step_myr, 2.0);
+        assert_eq!(k.rift_per_myr * k.time_step_myr, 0.012);
+        assert_eq!(k.subduction_initiation_per_myr * k.time_step_myr, 0.3);
+        assert_eq!(k.resample_min_myr / k.time_step_myr, 10.0);
+        assert_eq!(k.resample_max_myr / k.time_step_myr, 60.0);
+        assert_eq!(k.contact_timeout_myr / k.time_step_myr, 12.0);
+        assert_eq!(
+            crate::plates::pools::trench_share(k.time_step_myr, k.trench_half_life_myr),
+            0.5
+        );
     }
 
     /// The settings audit (decisions log 2026-09-29: tuning knobs that shape the world are settings): the

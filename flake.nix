@@ -61,6 +61,13 @@
           flite
           udev
         ]);
+
+        # The GPU compute path (docs/design/gpu-compute.md) loads Vulkan at run time: the loader on
+        # LD_LIBRARY_PATH, and Mesa's lavapipe (a CPU Vulkan driver) added to the drivers it finds,
+        # so the GPU tests run on the test VM, which has no GPU. VK_ADD_DRIVER_FILES adds to the
+        # system's drivers instead of replacing them, so a real GPU still wins where there is one.
+        gpuLibs = lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.vulkan-loader ];
+        lavapipe = "${pkgs.mesa}/share/vulkan/icd.d/lvp_icd.${pkgs.stdenv.hostPlatform.parsed.cpu.name}.json";
       in {
         _module.args.pkgs = import inputs.nixpkgs {
           inherit system;
@@ -89,17 +96,19 @@
             pkgs.jq
             pkgs.binutils
           ];
-          buildInputs = clientLibs;
+          buildInputs = clientLibs ++ gpuLibs;
           env = lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
-            LD_LIBRARY_PATH = lib.makeLibraryPath clientLibs;
+            LD_LIBRARY_PATH = lib.makeLibraryPath (clientLibs ++ gpuLibs);
+            VK_ADD_DRIVER_FILES = lavapipe;
           } // {
             JAVA_HOME = "${java.home}";
             RUST_SRC_PATH = "${rust}/lib/rustlib/src/rust/library";
           };
         };
 
-        # `nix run .#natives`: the eight natives into target/natives-dist/ with natives.json (plan
-        # §4.4, P0-08), from the checkout the command runs in. It re-enters this flake's dev shell
+        # `nix run .#natives`: the natives (eight platforms' baseline libraries, the x86-64
+        # platforms' x86-64-v3 libraries and CPU probes) into target/natives-dist/ with natives.json
+        # (plan §4.4, §6.4, P0-08), from the checkout the command runs in. It re-enters this flake's dev shell
         # rather than listing the tools again: the build scripts of the workspace need a host C
         # linker, which on macOS only the shell's stdenv sets up.
         apps.natives = {
@@ -110,7 +119,7 @@
               exec nix develop '${inputs.self}#default' -c bash ${./tools/natives/build-natives.sh} "$@"
             '';
           });
-          meta.description = "Cross-build the eight Deep Time natives into target/natives-dist";
+          meta.description = "Cross-build the Deep Time natives (baseline and x86-64-v3) into target/natives-dist";
         };
 
         checks.toolchain-channel = let

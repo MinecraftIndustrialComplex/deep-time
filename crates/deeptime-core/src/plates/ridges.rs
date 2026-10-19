@@ -2,10 +2,10 @@
 //! Global resampling and oceanic crust generation (Cortial et al. 2019, §4.3 and §6), and the
 //! bookkeeping of plates that die.
 //!
-//! Every `resample_min_steps`–`resample_max_steps` steps (Cortial: 10–60, "depending on the
-//! observed maximum plate speed"; here when the fastest plate has moved `resample_drift_km`) the
-//! crust is resampled onto a fresh lattice: the Fibonacci sphere under a new random rotation,
-//! triangulated again by P1-02's hull.
+//! Every `resample_min_myr`–`resample_max_myr` (Cortial: 10–60 steps, "depending on the
+//! observed maximum plate speed", 20–120 Myr at the 2-Myr step; here when the fastest plate has
+//! moved `resample_drift_km`) the crust is resampled onto a fresh lattice: the Fibonacci sphere
+//! under a new random rotation, triangulated again by P1-02's hull.
 //!
 //! - A new sample inside a plate takes that plate's crust by barycentric interpolation ("the
 //!   parameters of the other sample points are computed using barycentric interpolation of crust
@@ -68,11 +68,12 @@ type Found = (Option<(u32, Cover)>, Vec<(u32, Cover)>);
 /// Whether a resampling is due after this step.
 pub fn due(state: &PlateState, env: &Env) -> bool {
     let k = env.k;
-    let since = state.step - state.resample_step;
-    if since < u64::from(k.resample_min_steps) {
+    // ledger: PLT-098 (the bounds are times: the steps they span follow the step's length)
+    let since_myr = (state.step - state.resample_step) as f64 * env.dt_myr;
+    if since_myr < k.resample_min_myr {
         return false;
     }
-    if since >= u64::from(k.resample_max_steps) {
+    if since_myr >= k.resample_max_myr {
         return true;
     }
     let vmax = state
@@ -194,11 +195,13 @@ pub const ACCRETED_VISIBLE_GLOBAL: &str = "plates/resample_accreted_visible_km3"
 /// Earth-normalized; plate task 8).
 pub const ACCRETED_RISE_GLOBAL: &str = "plates/resample_accreted_rise_km3";
 
-/// Resamples the crust onto a fresh lattice and returns its geometry.
+/// Resamples the crust onto a fresh lattice and returns its geometry. `tree` holds every sample
+/// at `pos` (`Tree::over(pos, |_| true)`, the one the step's motion built).
 pub fn resample(
     state: &mut PlateState,
     world: &mut WorldState,
     pos: &[DVec3],
+    tree: &Tree,
     old: &Geo,
     env: &Env,
 ) -> Result<Geo, CoreError> {
@@ -206,11 +209,12 @@ pub fn resample(
     let norm = env.norm;
     let t = env.t_myr;
     let n = state.samples.len();
+    debug_assert_eq!(tree.index.len(), pos.len());
     let lattice = arr(random_rotation(&mut state.rng));
-    let geo = Geo::build(n, lattice)?;
+    // P1-19: the old lattice's triangulation, turned (`Geo::turned`), not a new one.
+    let geo = old.turned(lattice);
     let new_pts = geo.points();
     let rots: Vec<DQuat> = state.groups.iter().map(|g| quat(g.rot)).collect();
-    let tree = Tree::over(pos, |_| true);
     let src = &state.samples;
 
     // Which old groups hold each new point in their footprint (`footprint`: the old lattice's
@@ -233,6 +237,15 @@ pub fn resample(
     colliding.sort_unstable();
     colliding.dedup();
     let collides = |over: u32, under: u32| colliding.binary_search(&(under, over)).is_ok();
+    let (z_0, gravity) = (
+        0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]),
+        env.gravity,
+    );
+    let tracing = state.gap_budget.is_some();
+    let old_limits = state
+        .limits
+        .as_ref()
+        .filter(|l| l.ceiling_m.len() == src.len() && l.top_m.len() == src.len());
     let found: Vec<Found> = new_pts
         .par_iter()
         .map(|&q| {
@@ -293,20 +306,11 @@ pub fn resample(
     // time (ledger: PLT-276, PLT-292). Both are counted, m of rock per new sample.
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
     let mut tally: Vec<[f64; 5]> = vec![[0.0; 5]; n];
-    let (z_0, gravity) = (
-        0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]),
-        env.gravity,
-    );
     // How each new sample was blended, for the gap budget (`gap_budget.rs`) when it is on.
-    let tracing = state.gap_budget.is_some();
     let mut traces: Vec<Option<gap_budget::Trace>> = vec![None; n];
     // The step's limits (`rate.rs`) on the new lattice: a covered sample's ceiling and top are
     // its corners' blended with its own weights, its floor the blended surface before the
     // accretion (new sea floor's are set with the gaps below).
-    let old_limits = state
-        .limits
-        .as_ref()
-        .filter(|l| l.ceiling_m.len() == src.len() && l.top_m.len() == src.len());
     let mut limits: Vec<[f32; 3]> = vec![[f32::INFINITY, 0.0, f32::INFINITY]; n];
     let mut samples: Vec<Sample> = found
         .par_iter()

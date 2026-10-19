@@ -14,7 +14,9 @@ the test VM's two L3s, 0,16,2,18,4,20,6,22), and every
 (the machine's busy time less the run's) are known for the whole run. Writes <dir>/log.txt (the
 bench output and time -v), <dir>/load.tsv (the samples) and <dir>/summary.txt (wall time, stages,
 others' load: mean, p90, max; the busy share of the run's CPUs' SMT siblings). Run it admitted
-(`detach.sh start <name> --kind sim:<preset>:<threads>t tools/review/bench-quiet.py ...`).
+(`detach.sh start <name> --kind sim:<preset>:<threads>t tools/review/bench-quiet.py ...`). For the
+gate, <bin> is a shipped build from tools/natives/gate-bins.sh (deeptime-x86-64-v3 and
+deeptime-baseline; the gate reports both, decisions log 2026-10-18).
 Standard library only.
 """
 import argparse

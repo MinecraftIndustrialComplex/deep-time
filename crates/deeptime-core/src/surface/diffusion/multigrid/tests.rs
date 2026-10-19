@@ -6,7 +6,7 @@
 
 use std::time::Instant;
 
-use super::super::{Live, Operator, cg as jacobi_cg, lod};
+use super::super::{Live, Operator, Workspace, lod, step};
 use super::*;
 use crate::sphere::SplitMix64;
 use crate::surface::marine::submarine_kd;
@@ -124,17 +124,26 @@ fn solve_mg(
     if guess {
         lod(d, &mut x, kd, dt, &Live::all(d));
     }
-    let its = cg_with(d, b, &mut x, kd, dt, tol, cy);
+    let mut ws = Workspace::default();
+    ws.fit_rhs(d);
+    ws.b.copy_from_slice(b);
+    ws.fit(d);
+    let its = cg_with(&mut ws, d, &mut x, kd, dt, tol, cy);
     (x, its)
 }
 
-/// The Jacobi-preconditioned solve as `diffusion::step` takes it (every row visited).
+/// The Jacobi-preconditioned solve, `diffusion::step` (every row visited: no diffusivity here is
+/// zero).
 fn solve_jacobi(d: &Dims, b: &[f64], kd: &[f64], dt: f64) -> (Vec<f64>, usize) {
     let mut x = b.to_vec();
-    let all = Live::all(d);
-    lod(d, &mut x, kd, dt, &all);
-    let its = jacobi_cg(d, b, &mut x, kd, dt, &all);
+    let its = step(d, &mut x, kd, dt);
     (x, its)
+}
+
+/// The operator's three vectors for `d`, for [`Operator::new`] to fill.
+fn op_vectors(d: &Dims) -> [Vec<f64>; 3] {
+    let n = d.cells();
+    [vec![0.0; n], vec![0.0; n], vec![0.0; n]]
 }
 
 fn rms(a: &[f64], b: &[f64]) -> f64 {
@@ -146,7 +155,8 @@ fn rms(a: &[f64], b: &[f64]) -> f64 {
 /// residual's sum is put back (the eigenvalues of I + Δt·L are at least one), plus that put-back,
 /// which is at most `tol` times the RMS of the coupling over its mean.
 fn bound(d: &Dims, kd: &[f64], dt: f64, tol: f64) -> f64 {
-    let op = Operator::new(d, kd, dt, &Live::all(d));
+    let [mut east, mut south, mut diag] = op_vectors(d);
+    let op = Operator::new(d, kd, dt, &Live::all(d), &mut east, &mut south, &mut diag);
     let n = op.diag.len() as f64;
     let mean = op.diag.iter().map(|g| g - 1.0).sum::<f64>() / n;
     let rms = (op.diag.iter().map(|g| (g - 1.0) * (g - 1.0)).sum::<f64>() / n).sqrt();
@@ -241,7 +251,9 @@ fn the_cycle_is_a_symmetric_positive_definite_operator() {
         let d = Dims::new(w, h, 2400.0, wrap);
         let z = terrain(w, h, 5);
         let kd = shelf_kd(&z, 5);
-        let op = Operator::new(&d, &kd, 2.0e6, &Live::all(&d));
+        let [mut east, mut south, mut diag] = op_vectors(&d);
+        let live = Live::all(&d);
+        let op = Operator::new(&d, &kd, 2.0e6, &live, &mut east, &mut south, &mut diag);
         for cy in [
             CYCLE,
             Cycle {

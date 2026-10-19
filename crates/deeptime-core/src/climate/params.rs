@@ -78,8 +78,10 @@ pub enum RainModel {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct ClimateParams {
-    /// A full climate snapshot every this many Myr (plan §8.3: 10), plus the first and the last
-    /// plate step; between snapshots the climate's geographic part moves with the plates.
+    /// A full climate snapshot every this many Myr (plan §8.3: 10; the pipeline and earthlike
+    /// presets 20 since P1-19 #27, climate.md "The climate snapshot every 20 Myr"), plus the first
+    /// and the last plate step; between snapshots the climate's geographic part moves with the
+    /// plates. ledger: SCL-038 (game-choice)
     pub snapshot_every_myr: f64,
 
     // --- The per-cell climate (P1-26; `docs/design/p1-26-per-cell-climate.md`).

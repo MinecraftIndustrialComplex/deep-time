@@ -244,6 +244,14 @@ struct Scratch {
     kf_eff: Vec<f64>,
     ice: glacial::IceState,
     glacial: glacial::GlacialOut,
+    /// The diffusion solves' vectors (hillslope and marine diffusion, the crust's spreading), kept
+    /// between solves (P1-19).
+    solve: diffusion::Workspace,
+    /// The last step's strata log, whose memory the next step's carried log is written into
+    /// (P1-19: a new 515 MB log a step at full 16k, every page of it faulted in again).
+    spare_log: StrataLog,
+    /// The step fields' grids (`fields::step_fields`), kept between steps (P1-19).
+    step_fields: Vec<Vec<f32>>,
 }
 
 impl Scratch {
@@ -268,7 +276,81 @@ impl Scratch {
             kf_eff: vec![0.0; n],
             ice: glacial::IceState::default(),
             glacial: glacial::GlacialOut::default(),
+            solve: diffusion::Workspace::default(),
+            spare_log: StrataLog::default(),
+            step_fields: Vec::new(),
         }
+    }
+}
+
+/// What the second half of the carry needs, which runs beside the priority flood (P1-19): the
+/// step's sources, the last step's elevation and the crust born this step.
+struct Moved {
+    src: Vec<[f64; 2]>,
+    prev_elevation: Vec<f32>,
+    newborn: Vec<bool>,
+    known_plates: usize,
+}
+
+impl Moved {
+    /// The step's carry (`advect::Carry`) over the world's fields.
+    fn carry<'a>(
+        &'a self,
+        world: &'a WorldState,
+        pf: &'a PlateFields,
+        parents: &'a [Option<u32>],
+        (w, h): (usize, usize),
+        dt_yr: f64,
+    ) -> advect::Carry<'a> {
+        let prev_ids = |name: &str| {
+            world
+                .fields
+                .get(name)
+                .filter(|f| f.data.len() == w * h)
+                .map(|f| f.data.as_slice())
+        };
+        advect::Carry {
+            w,
+            h,
+            src: &self.src,
+            prev_elevation: &self.prev_elevation,
+            prev_plate: prev_ids(field::CRUST_PLATE),
+            prev_group: prev_ids(field::CRUST_GROUP),
+            plate: &pf.plate_id,
+            group: pf.group_id.as_deref(),
+            plate_elevation: &pf.elevation,
+            uplift_mm_yr: &pf.uplift,
+            parents,
+            known_plates: self.known_plates,
+            dt_yr,
+        }
+    }
+}
+
+/// What the setup, beside the priority flood, hands the LEM steps (P1-19).
+struct Setup {
+    h_start: Vec<f64>,
+    clim: climate::Snapshot,
+    ela_z: Option<Vec<f64>>,
+    ice_allowed: Option<Vec<f32>>,
+    ice_share: Option<Vec<f32>>,
+    climate_ice: Option<Vec<f32>>,
+    precip_m_yr: Vec<f32>,
+    restricted: Vec<bool>,
+    basement: Vec<u16>,
+    class0: Vec<u16>,
+    fam: Vec<u8>,
+}
+
+/// The rock a cell shows and erodes: regolith only where it is thick (a few metres of soil are
+/// gone in the first thousand years of a 2-Myr step), else the log's top, else the basement.
+fn surface_class(cls: &Classes, basement: &[u16], st: &SurfaceState, c: usize) -> u16 {
+    if st.regolith_m[c] >= REGOLITH_SHOWS_M {
+        regolith_class(cls, st.regolith_kind[c])
+    } else if st.log.total(c) >= 0.5 {
+        st.log.top(c).map_or(basement[c], |l| l.class)
+    } else {
+        basement[c]
     }
 }
 
@@ -602,13 +684,25 @@ impl SurfaceStage {
         let cls = self.classes;
         let p = self.p.clone();
 
-        // 1. The state, carried with the plates.
+        // 1. The state, carried with the plates: first what the priority flood needs, the
+        // elevation; the rest of the carry runs beside the flood (P1-19).
         let started = Instant::now();
         // Cells where another plate's crust arrived this step (the offset starts again there).
         let mut foreign_cells = 0u64;
+        let mut moved: Option<Moved> = None;
         let mut st = match world.surface.take() {
             Some(mut st) => {
-                ctx.reserve(StrataLog::bytes_per_cell(st.log.k) * n as u64 + 16 * n as u64)?;
+                // The carried log goes into the last step's, kept in the scratch and so in use
+                // already, when there is one of its size (P1-19).
+                let spare = self.scratch.as_ref().is_some_and(|s| {
+                    s.d == d && s.spare_log.k == st.log.k && s.spare_log.count.len() == n
+                });
+                let log_copy = if spare {
+                    0
+                } else {
+                    StrataLog::bytes_per_cell(st.log.k) * n as u64
+                };
+                ctx.reserve(log_copy + 16 * n as u64)?;
                 // Plates born this step moved with their parent's Ω.
                 let omega: Vec<[f64; 3]> = (0..parents.len())
                     .map(|mut k| {
@@ -624,102 +718,32 @@ impl SurfaceStage {
                         [0.0; 3]
                     })
                     .collect();
-                let src = advect::sources(&grid, &pf.plate_id, &omega, dt);
+                let mut m = Moved {
+                    src: advect::sources(&grid, &pf.plate_id, &omega, dt),
+                    // Back in the state once the flexure carry has read it (below).
+                    prev_elevation: std::mem::take(&mut st.elevation_m),
+                    newborn: Vec::new(),
+                    known_plates: st.omega.len(),
+                };
                 // The elevation moves with its own crust and takes the plate model's uplift
                 // (`advect::carried_elevation`); the offset is what stands over the plate model's
                 // elevation here.
-                let prev_ids = |name: &str| {
-                    world
-                        .fields
-                        .get(name)
-                        .filter(|f| f.data.len() == n)
-                        .map(|f| f.data.as_slice())
-                };
-                let carry = advect::Carry {
-                    w,
-                    h: hgt,
-                    src: &src,
-                    prev_elevation: &st.elevation_m,
-                    prev_plate: prev_ids(field::CRUST_PLATE),
-                    prev_group: prev_ids(field::CRUST_GROUP),
-                    plate: &pf.plate_id,
-                    group: pf.group_id.as_deref(),
-                    plate_elevation: &pf.elevation,
-                    uplift_mm_yr: &pf.uplift,
-                    parents: &parents,
-                    known_plates: st.omega.len(),
-                    dt_yr: dt,
-                };
-                let (carried, foreign) = advect::carried_elevation(&carry);
-                // The plate's load and deflection move with the same crust.
-                if p.flexure.active() {
-                    st.flexure
-                        .get_or_insert_default()
-                        .carry(&carry, &st.elevation_m);
-                } else {
-                    st.flexure = None;
-                }
+                let (carried, foreign) =
+                    advect::carried_elevation(&m.carry(world, &pf, &parents, (w, hgt), dt));
                 foreign_cells = foreign;
+                // Crust born this step starts bare.
+                m.newborn = pf
+                    .crust_age
+                    .par_iter()
+                    .map(|&age| age >= 0.0 && age < dt_myr as f32)
+                    .collect();
                 st.offset_m = carried
                     .par_iter()
                     .zip(pf.elevation.par_iter())
-                    .map(|(h, z)| h - z)
+                    .zip(m.newborn.par_iter())
+                    .map(|((h, z), &born)| if born { 0.0 } else { h - z })
                     .collect();
-                let reg = std::mem::take(&mut st.regolith_m);
-                st.regolith_m = src
-                    .par_iter()
-                    .map(|&[fi, fj]| advect::bilinear(w, hgt, &reg, fi, fj).max(0.0))
-                    .collect();
-                let nearest: Vec<usize> = src
-                    .par_iter()
-                    .map(|&[fi, fj]| advect::nearest(w, hgt, fi, fj))
-                    .collect();
-                let kinds = std::mem::take(&mut st.regolith_kind);
-                st.regolith_kind = nearest.par_iter().map(|&s| kinds[s]).collect();
-                if st.bif_basin.len() == n {
-                    let basin = std::mem::take(&mut st.bif_basin);
-                    st.bif_basin = nearest.par_iter().map(|&s| basin[s]).collect();
-                }
-                // Each layer slot is written once, in parallel: the source column's used layers,
-                // then empty ones (P1-17: `StrataLog::new`'s serial zero fill of the whole log,
-                // 129 MB a step at 16k quick and 515 MB at full, then the copy over it).
-                let k = st.log.k as usize;
-                let old = std::mem::take(&mut st.log);
-                let layers: Vec<strata_log::Layer> = (0..n * k)
-                    .into_par_iter()
-                    .map(|x| {
-                        let (c, i) = (x / k, x % k);
-                        let s = nearest[c];
-                        if i < usize::from(old.count[s]) {
-                            old.layers[s * k + i]
-                        } else {
-                            strata_log::Layer::default()
-                        }
-                    })
-                    .collect();
-                let count: Vec<u8> = nearest.par_iter().map(|&s| old.count[s]).collect();
-                st.log = StrataLog {
-                    k: old.k,
-                    count,
-                    layers,
-                };
-                // Crust born this step starts bare.
-                let mut newborn = vec![false; n];
-                for (c, born) in newborn.iter_mut().enumerate() {
-                    let age = pf.crust_age[c];
-                    if age >= 0.0 && age < dt_myr as f32 {
-                        st.offset_m[c] = 0.0;
-                        st.regolith_m[c] = 0.0;
-                        st.regolith_kind[c] = weathering::SOIL;
-                        st.log.clear(c);
-                        if let Some(b) = st.bif_basin.get_mut(c) {
-                            *b = 0.0;
-                        }
-                        *born = true;
-                    }
-                }
-                // The frame keeps where each cell's crust was when the frame began (P1-14).
-                st.acc.compose_back(&nearest, &newborn);
+                moved = Some(m);
                 st
             }
             None => {
@@ -760,7 +784,6 @@ impl SurfaceStage {
         sc.h.par_iter_mut()
             .enumerate()
             .for_each(|(c, h)| *h = f64::from(pf.elevation[c]) + f64::from(st.offset_m[c]));
-        let h_start = crate::alloc::copied(&sc.h);
         // Sea level: the climate stage's when it ran this step (the curve plus glacio-eustasy:
         // ice sheets lower the sea and expose the shelves, `climate::ice`), else the curve.
         let sea = world
@@ -776,7 +799,6 @@ impl SurfaceStage {
             .filter(|x| x.is_finite() && *x > 0.0)
             .unwrap_or(0.0);
         let lat_of = |j: usize| fields::row_lat(&grid, j);
-        let clim = climate::snapshot(world, &d, &lat_of, &sc.h, sea);
         // The glaciers' climate (`glacial.rs`): the ELA of the climate stage; none without it.
         // The deep-time surface is physics: glaciers as wide as they are (the valley width is the
         // young landscape's readability setting).
@@ -785,93 +807,216 @@ impl SurfaceStage {
             ..p.glacial.clone()
         };
         let gravity = self.preset.planet.gravity_m_s2;
-        let ela_z = if gp.active() {
-            glacial::ela_z_from(
-                world
-                    .fields
-                    .get(glacial::source::ELA)
-                    .map(|f| f.data.as_slice()),
-                n,
-                sea,
-                0.0,
-            )
-        } else {
-            None
-        };
-        // The climate's own ice (FORMAT.md, "The climate's ice fields"), when it has it: glaciers
-        // only where it had ice during the step, eroding for the share of the step it stood, and
-        // no rivers under thick ice.
-        let field_n = |name: &str| -> Option<Vec<f32>> {
-            world
-                .fields
-                .get(name)
-                .filter(|f| f.data.len() == n)
-                .map(|f| f.data.clone())
-        };
-        let ice_allowed = field_n(glacial::source::ICE_MAX_THICKNESS)
-            .or_else(|| field_n(glacial::source::ICE_THICKNESS));
-        let ice_share = field_n(glacial::source::ICE_TIME_SHARE);
-        let climate_ice = field_n(glacial::source::ICE_THICKNESS);
-        let precip_m_yr: Vec<f32> = clim.precip_mm.par_iter().map(|&p| p / 1000.0).collect();
         let mut gtot = glacial::Totals::read(&world.notes);
         let mut ice_cells = 0u64;
-        let mut open: Vec<f64> =
-            sc.h.iter()
-                .map(|&z| if z <= sea { 1.0 } else { 0.0 })
-                .collect();
-        box_blur(&d, &mut open, ((150_000.0 / dx).round() as usize).max(1), 2);
-        let restricted: Vec<bool> = (0..n)
-            .into_par_iter()
-            .map(|c| sc.h[c] <= sea && open[c] < 0.4)
-            .collect();
-        let basement: Vec<u16> = (0..n)
-            .into_par_iter()
-            .map(|c| {
-                basement_class(
-                    &cls,
-                    pf.crust_type[c] as u8,
-                    pf.regime[c] as u8,
-                    pf.orogeny_type[c] as u8,
-                    pf.orogeny_age[c],
-                    if pf.top_pool[c].is_finite() {
-                        pf.top_pool[c] as u8
-                    } else {
-                        255
-                    },
-                )
-            })
-            .collect();
-        // The rock a cell shows and erodes: regolith only where it is thick (a few metres of soil
-        // are gone in the first thousand years of a 2-Myr step), else the log's top, else the
-        // basement.
-        let surface_class = |st: &SurfaceState, c: usize| -> u16 {
-            if st.regolith_m[c] >= REGOLITH_SHOWS_M {
-                regolith_class(&cls, st.regolith_kind[c])
-            } else if st.log.total(c) >= 0.5 {
-                st.log.top(c).map_or(basement[c], |l| l.class)
-            } else {
-                basement[c]
-            }
-        };
-        let class0: Vec<u16> = (0..n)
-            .into_par_iter()
-            .map(|c| surface_class(&st, c))
-            .collect();
-        // Cell by cell, so in parallel (P1-19).
-        let fam: Vec<u8> = class0
-            .par_iter()
-            .map(|&k| self.fam[usize::from(k)])
-            .collect();
-        let erod = &self.erod;
-        sc.kf
-            .par_iter_mut()
-            .zip(sc.weight.par_iter_mut())
-            .enumerate()
-            .for_each(|(c, (kf, weight))| {
-                *kf = p.k_spl * erod[usize::from(class0[c])];
-                *weight = (clim.runoff_m_yr[c] / p.runoff_ref_m_yr as f32).max(0.05);
-            });
         self.time("setup", started);
+
+        // The first priority flood needs only the elevation and the sea, so the rest of the carry
+        // and the setup run beside it, on the other threads. Neither reads or writes what the
+        // flood does (`kind`, `base_z`, `filled`), and the flood reads only `h` (P1-19: the serial
+        // flood took 32.7 s of the full 16k gate run on one core, after all of the carry and the
+        // setup). The parallel flood (`surface.numerics.flood`, ERO-184) shares the pool with them.
+        let beside = Instant::now();
+        let fam_of = &self.fam;
+        let erod = &self.erod;
+        let Scratch {
+            h: sc_h,
+            kind: sc_kind,
+            filled: sc_filled,
+            base_z: sc_base_z,
+            kf: sc_kf,
+            weight: sc_weight,
+            spare_log: sc_spare_log,
+            ..
+        } = &mut sc;
+        let sc_h: &[f64] = sc_h;
+        let ((sinks0, flood_ms), (setup, carry_ms, setup_ms)) = rayon::join(
+            || {
+                let started = Instant::now();
+                let fm = p.numerics.flood;
+                pflood::open_sea_with(fm, &d, sc_h, sea, (n / 500).max(1), sc_kind);
+                sc_base_z.iter_mut().for_each(|b| *b = sea);
+                let sinks = pflood::flood_with(fm, &d, sc_h, sc_base_z, sc_kind, sc_filled) as u64;
+                (sinks, started.elapsed().as_secs_f64() * 1000.0)
+            },
+            || {
+                let started = Instant::now();
+                if let Some(m) = &moved {
+                    let carry = m.carry(world, &pf, &parents, (w, hgt), dt);
+                    // The plate's load and deflection move with the same crust.
+                    if p.flexure.active() {
+                        st.flexure
+                            .get_or_insert_default()
+                            .carry(&carry, &m.prev_elevation);
+                    } else {
+                        st.flexure = None;
+                    }
+                    let src = &m.src;
+                    let reg = std::mem::take(&mut st.regolith_m);
+                    st.regolith_m = src
+                        .par_iter()
+                        .map(|&[fi, fj]| advect::bilinear(w, hgt, &reg, fi, fj).max(0.0))
+                        .collect();
+                    let nearest: Vec<usize> = src
+                        .par_iter()
+                        .map(|&[fi, fj]| advect::nearest(w, hgt, fi, fj))
+                        .collect();
+                    let kinds = std::mem::take(&mut st.regolith_kind);
+                    st.regolith_kind = nearest.par_iter().map(|&s| kinds[s]).collect();
+                    if st.bif_basin.len() == n {
+                        let basin = std::mem::take(&mut st.bif_basin);
+                        st.bif_basin = nearest.par_iter().map(|&s| basin[s]).collect();
+                    }
+                    // Each layer slot is written once, in parallel: the source column's used
+                    // layers, then empty ones (P1-17: `StrataLog::new`'s serial zero fill of the
+                    // whole log, 129 MB a step at 16k quick and 515 MB at full, then the copy over
+                    // it), into the last step's log, kept for it (P1-19).
+                    let k = st.log.k as usize;
+                    let old = std::mem::take(&mut st.log);
+                    let mut next = std::mem::take(sc_spare_log);
+                    (0..n * k)
+                        .into_par_iter()
+                        .map(|x| {
+                            let (c, i) = (x / k, x % k);
+                            let s = nearest[c];
+                            if i < usize::from(old.count[s]) {
+                                old.layers[s * k + i]
+                            } else {
+                                strata_log::Layer::default()
+                            }
+                        })
+                        .collect_into_vec(&mut next.layers);
+                    nearest
+                        .par_iter()
+                        .map(|&s| old.count[s])
+                        .collect_into_vec(&mut next.count);
+                    next.k = old.k;
+                    st.log = next;
+                    *sc_spare_log = old;
+                    // Crust born this step starts bare (its offset is 0 already).
+                    for (c, _) in m.newborn.iter().enumerate().filter(|(_, b)| **b) {
+                        st.regolith_m[c] = 0.0;
+                        st.regolith_kind[c] = weathering::SOIL;
+                        st.log.clear(c);
+                        if let Some(b) = st.bif_basin.get_mut(c) {
+                            *b = 0.0;
+                        }
+                    }
+                    // The frame keeps where each cell's crust was when the frame began (P1-14).
+                    st.acc.compose_back(&nearest, &m.newborn);
+                }
+                let carry_ms = started.elapsed().as_secs_f64() * 1000.0;
+
+                let started = Instant::now();
+                let h_start = crate::alloc::copied(sc_h);
+                let clim = climate::snapshot(world, &d, &lat_of, sc_h, sea);
+                let ela_z = if gp.active() {
+                    glacial::ela_z_from(
+                        world
+                            .fields
+                            .get(glacial::source::ELA)
+                            .map(|f| f.data.as_slice()),
+                        n,
+                        sea,
+                        0.0,
+                    )
+                } else {
+                    None
+                };
+                // The climate's own ice (FORMAT.md, "The climate's ice fields"), when it has it:
+                // glaciers only where it had ice during the step, eroding for the share of the
+                // step it stood, and no rivers under thick ice.
+                let field_n = |name: &str| -> Option<Vec<f32>> {
+                    world
+                        .fields
+                        .get(name)
+                        .filter(|f| f.data.len() == n)
+                        .map(|f| f.data.clone())
+                };
+                let ice_allowed = field_n(glacial::source::ICE_MAX_THICKNESS)
+                    .or_else(|| field_n(glacial::source::ICE_THICKNESS));
+                let ice_share = field_n(glacial::source::ICE_TIME_SHARE);
+                let climate_ice = field_n(glacial::source::ICE_THICKNESS);
+                let precip_m_yr: Vec<f32> =
+                    clim.precip_mm.par_iter().map(|&p| p / 1000.0).collect();
+                let mut open: Vec<f64> = sc_h
+                    .iter()
+                    .map(|&z| if z <= sea { 1.0 } else { 0.0 })
+                    .collect();
+                box_blur(&d, &mut open, ((150_000.0 / dx).round() as usize).max(1), 2);
+                let restricted: Vec<bool> = (0..n)
+                    .into_par_iter()
+                    .map(|c| sc_h[c] <= sea && open[c] < 0.4)
+                    .collect();
+                let basement: Vec<u16> = (0..n)
+                    .into_par_iter()
+                    .map(|c| {
+                        basement_class(
+                            &cls,
+                            pf.crust_type[c] as u8,
+                            pf.regime[c] as u8,
+                            pf.orogeny_type[c] as u8,
+                            pf.orogeny_age[c],
+                            if pf.top_pool[c].is_finite() {
+                                pf.top_pool[c] as u8
+                            } else {
+                                255
+                            },
+                        )
+                    })
+                    .collect();
+                let class0: Vec<u16> = (0..n)
+                    .into_par_iter()
+                    .map(|c| surface_class(&cls, &basement, &st, c))
+                    .collect();
+                // Cell by cell, so in parallel (P1-19).
+                let fam: Vec<u8> = class0.par_iter().map(|&k| fam_of[usize::from(k)]).collect();
+                sc_kf
+                    .par_iter_mut()
+                    .zip(sc_weight.par_iter_mut())
+                    .enumerate()
+                    .for_each(|(c, (kf, weight))| {
+                        *kf = p.k_spl * erod[usize::from(class0[c])];
+                        *weight = (clim.runoff_m_yr[c] / p.runoff_ref_m_yr as f32).max(0.05);
+                    });
+                let setup = Setup {
+                    h_start,
+                    clim,
+                    ela_z,
+                    ice_allowed,
+                    ice_share,
+                    climate_ice,
+                    precip_m_yr,
+                    restricted,
+                    basement,
+                    class0,
+                    fam,
+                };
+                (setup, carry_ms, started.elapsed().as_secs_f64() * 1000.0)
+            },
+        );
+        if let Some(m) = moved {
+            st.elevation_m = m.prev_elevation;
+        }
+        // Each half's own time, and the wall time of the two side by side.
+        *self.timings.entry("pflood").or_insert(0.0) += flood_ms;
+        *self.timings.entry("advect").or_insert(0.0) += carry_ms;
+        *self.timings.entry("setup").or_insert(0.0) += setup_ms;
+        self.time("flood_beside", beside);
+        let Setup {
+            h_start,
+            clim,
+            ela_z,
+            ice_allowed,
+            ice_share,
+            climate_ice,
+            precip_m_yr,
+            restricted,
+            basement,
+            class0,
+            fam,
+        } = setup;
+        let class_of = |st: &SurfaceState, c: usize| surface_class(&cls, &basement, st, c);
 
         // 3. The LEM steps.
         let mut parts = Parts::new(n);
@@ -886,14 +1031,14 @@ impl SurfaceStage {
             max_iter: p.spl_max_iter as usize,
             tol_m: 0.01,
         };
-        let carb_p = carbonate::CarbonateParams {
+        let mut carb_p = carbonate::CarbonateParams {
             max_rate_m_yr: p.carbonate_max_mm_yr * 1.0e-3,
             extinction_per_m: p.carbonate_extinction_per_m,
             surface_light: p.carbonate_surface_light,
             saturating_light: p.carbonate_saturating_light,
             tidal_range_m: p.tidal_range_m,
             min_temp_c: p.carbonate_min_temp_c,
-            clastic_m: p.carbonate_clastic_m,
+            clastic_m: 0.0, // each LEM step's below
         };
         let fill_p = marine::FillParams {
             sea_level: sea,
@@ -904,7 +1049,7 @@ impl SurfaceStage {
         let mut to_sea = 0.0;
         let mut iterations = 0u64;
         let mut cg_iterations = 0u64;
-        let mut sinks = 0u64;
+        let mut sinks = sinks0;
         // Submarine slope failure (`marine::slope_failure`): what each cell may lose, its loose and
         // logged sediment at the start of the step plus what the step lays on it.
         let failure = (p.submarine_slope_deg > 0.0).then(|| marine::FailureParams {
@@ -919,13 +1064,16 @@ impl SurfaceStage {
             .collect();
         let mut failed_m_cells = 0.0f64;
         for sub in 0..subs {
-            let started = Instant::now();
-            let fm = p.numerics.flood;
-            pflood::open_sea_with(fm, &d, &sc.h, sea, (n / 500).max(1), &mut sc.kind);
-            sc.base_z.iter_mut().for_each(|b| *b = sea);
-            sinks +=
-                pflood::flood_with(fm, &d, &sc.h, &sc.base_z, &mut sc.kind, &mut sc.filled) as u64;
-            self.time("pflood", started);
+            // The first substep's flood ran beside the setup (above).
+            if sub > 0 {
+                let started = Instant::now();
+                let fm = p.numerics.flood;
+                pflood::open_sea_with(fm, &d, &sc.h, sea, (n / 500).max(1), &mut sc.kind);
+                sc.base_z.iter_mut().for_each(|b| *b = sea);
+                sinks += pflood::flood_with(fm, &d, &sc.h, &sc.base_z, &mut sc.kind, &mut sc.filled)
+                    as u64;
+                self.time("pflood", started);
+            }
             let started = Instant::now();
             routing::receivers(&d, &sc.filled, &sc.kind, &mut sc.routing);
             routing::stack(&d, &sc.kind, &mut sc.routing);
@@ -1105,6 +1253,9 @@ impl SurfaceStage {
                         u64::from(above[c] && h[c] < sea && g.eroded[c] > 0.0)
                     })
                     .sum::<u64>();
+                *self.timings.entry("glacial_ice").or_insert(0.0) += g.ice_ms;
+                *self.timings.entry("glacial_walk").or_insert(0.0) += g.walk_ms;
+                let sea_started = Instant::now();
                 let sea_mask: Vec<bool> = sc.kind.par_iter().map(|&k| k == BASE).collect();
                 // (the base cells with a load, ascending: the others have none)
                 for &m in &g.sea_cells {
@@ -1137,6 +1288,7 @@ impl SurfaceStage {
                         );
                     }
                 }
+                self.time("glacial_sea", sea_started);
                 let km3 = 1.0e-9;
                 gtot.eroded_km3 += g.eroded_m3 * km3;
                 gtot.till_km3 += g.till_m3 * km3;
@@ -1148,8 +1300,10 @@ impl SurfaceStage {
                 self.time("glacial", started);
             }
 
-            // Carbonates and evaporites.
+            // Carbonates and evaporites. The clastic a cell received since the plate step began
+            // is set against the scale for that time (ledger: ERO-065).
             let started = Instant::now();
+            carb_p.clastic_m = p.carbonate_clastic_m_myr * ((sub + 1) as f64 * dts / 1.0e6);
             let evap_rate = p.evaporite_m_myr * 1.0e-6;
             // Cell by cell, so in parallel (P1-17).
             let (kind, filled, clastic) = (&sc.kind, &sc.filled, &parts.marine);
@@ -1221,6 +1375,7 @@ impl SurfaceStage {
             let solve = Instant::now();
             let nm = &p.numerics;
             cg_iterations += diffusion::solve(
+                &mut sc.solve,
                 &d,
                 &mut sc.h,
                 &sc.kd,
@@ -1433,7 +1588,8 @@ impl SurfaceStage {
         // it comes after the step's net change was logged; the plate model learns of it through
         // the feedback.
         let started = Instant::now();
-        let flow = spread::step(
+        let flow = spread::step_in(
+            &mut sc.solve,
             &d,
             &mut sc.h,
             sea,
@@ -1465,11 +1621,12 @@ impl SurfaceStage {
         let mut answers: Option<Vec<(f64, f64)>> = None;
         if let (Some(h_eroded), Some(h_before_spread)) = (&h_eroded, &h_before_spread) {
             let started = Instant::now();
-            let ice: Option<Vec<f32>> = world
+            // (borrowed: a copy of 14 MB a step before, P1-19)
+            let ice: Option<&[f32]> = world
                 .fields
                 .get(crate::climate::field::ICE_THICKNESS)
                 .filter(|f| f.data.len() == n)
-                .map(|f| f.data.clone());
+                .map(|f| &f.data[..]);
             let x_in = flexure::StepIn {
                 dims: &d,
                 norm_dx_m: std::f64::consts::TAU * self.preset.tectonics.model_radius_km * 1000.0
@@ -1492,7 +1649,7 @@ impl SurfaceStage {
                 orogeny_age_myr: &pf.orogeny_age,
                 regime: &pf.regime,
                 plate_id: &pf.plate_id,
-                ice_m: ice.as_deref(),
+                ice_m: ice,
                 rock_share: p.isostasy,
                 parts: budget,
             };
@@ -1626,7 +1783,7 @@ impl SurfaceStage {
             .collect();
         let class_now: Vec<f32> = (0..n)
             .into_par_iter()
-            .map(|c| f32::from(surface_class(&st, c)))
+            .map(|c| f32::from(class_of(&st, c)))
             .collect();
         let sediment: Vec<f32> = (0..n)
             .into_par_iter()
@@ -1761,7 +1918,7 @@ impl SurfaceStage {
         // The deposit engine's fields for this step.
         let started = Instant::now();
         let rel: Vec<f64> = sc.h.par_iter().map(|&z| z - sea).collect();
-        let step_fields = fields::step_fields(
+        fields::step_fields(
             &fields::StepInputs {
                 flags: &pf.flags,
                 crust_type: &pf.crust_type,
@@ -1789,8 +1946,9 @@ impl SurfaceStage {
                 dx,
             },
             &cls,
+            &mut sc.step_fields,
         );
-        for (name, v) in fields::STEP_FIELDS.iter().zip(&step_fields) {
+        for (name, v) in fields::STEP_FIELDS.iter().zip(&sc.step_fields) {
             st.acc.add(name, v, dt);
         }
         // Inherited iron-formation basins (`deposits::bif_basins`; Ben, 2026-10-02): dealt once,
@@ -1860,7 +2018,7 @@ impl SurfaceStage {
                 acc.sums
                     .get(name)
                     .map(|v| {
-                        v.iter()
+                        v.par_iter()
                             .map(|&s| (f64::from(s) / acc.span_years.max(1e-9)) as f32)
                             .collect()
                     })
@@ -1869,15 +2027,6 @@ impl SurfaceStage {
             let ero = get(&st.acc, "deeptime:erosion_rate_m_myr");
             let dep = get(&st.acc, "deeptime:deposition_rate_m_myr");
             let elev = get(&st.acc, "deeptime:elevation_m");
-            let frame = fields::flush(&mut st.acc, &d, t_end_years, &self.epoch());
-            let history = world
-                .history
-                .get_or_insert_with(|| RecordedHistory::new(grid.clone()));
-            history.push(&frame);
-            st.totals.frames += 1;
-            if last {
-                history.receivers = Some(sc.routing.rcv.clone());
-            }
             let view = events::FrameView {
                 d: &d,
                 grid: &grid,
@@ -1897,8 +2046,25 @@ impl SurfaceStage {
                 min_km2: p.event_min_area_km2,
                 transgression_frac: p.transgression_frac,
             };
+            // The events' regions read only the frame's means, so their serial walks run beside
+            // the frame's closing and packing (P1-19).
+            let history = world
+                .history
+                .get_or_insert_with(|| RecordedHistory::new(grid.clone()));
+            let acc = &mut st.acc;
+            let (found, ()) = rayon::join(
+                || events::find(&view),
+                || {
+                    let frame = fields::flush(acc, &d, t_end_years, &epoch);
+                    history.push(&frame);
+                },
+            );
+            st.totals.frames += 1;
+            if last {
+                history.receivers = Some(sc.routing.rcv.clone());
+            }
             let mut ev = std::mem::take(&mut st.events);
-            events::frame(world, &mut ev, &view, last)?;
+            events::frame_found(world, &mut ev, &view, found, last)?;
             st.events = ev;
         }
         self.time("fields_events", started);
@@ -1915,8 +2081,12 @@ impl SurfaceStage {
         }
         world.surface = Some(st);
         if last {
-            // The glaciers' working arrays stay between steps; not past the last (P1-19).
+            // The glaciers' working arrays stay between steps; not past the last (P1-19). Nor do
+            // the diffusion solves' vectors, the spare strata log or the step fields' grids.
             sc.glacial.release_work();
+            sc.solve = diffusion::Workspace::default();
+            sc.spare_log = StrataLog::default();
+            sc.step_fields = Vec::new();
         }
         self.scratch = Some(sc);
         Ok(())

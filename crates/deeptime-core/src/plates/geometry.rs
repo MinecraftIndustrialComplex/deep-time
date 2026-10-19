@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! The lattice geometry the plate model works on: the spherical Delaunay triangulation of the
-//! current lattice (P1-02's [`SphereMesh`], rebuilt at every global resampling), its vertex
+//! current lattice (P1-02's [`SphereMesh`] of the Fibonacci sphere, turned with the lattice at
+//! every global resampling; [`Geo::build`]), its vertex
 //! adjacency with edge lengths, current sample positions, point location inside a group, and
 //! multi-source Dijkstra distances over the mesh (geodesic distances within rigid groups).
 //!
@@ -37,9 +38,13 @@ pub struct Geo {
 }
 
 impl Geo {
-    /// Triangulates the lattice (P1-02's hull) and derives the adjacency.
+    /// Triangulates the lattice (P1-02's hull) and derives the adjacency. Every lattice of `n`
+    /// points is the one Fibonacci sphere turned, and a rotation keeps a Delaunay triangulation
+    /// Delaunay, so the sphere is triangulated as it stands and the result turned
+    /// ([`Geo::turned`]; P1-19): the geometry of a lattice is the same whether it was built here
+    /// or turned from another lattice's.
     pub fn build(n: usize, lattice: [f64; 4]) -> Result<Geo, CoreError> {
-        let points = lattice_points(n, lattice);
+        let points = fibonacci_sphere(n);
         let mesh = SphereMesh::build(&points).map_err(|e| {
             CoreError::InvalidState(format!("plates: lattice triangulation failed: {e}"))
         })?;
@@ -51,6 +56,7 @@ impl Geo {
         }
         let adj = mesh.vertex_neighbors();
         let pts = mesh.points();
+        // Edge lengths do not change with a rotation.
         let edge_rad: Vec<f32> = (0..n)
             .into_par_iter()
             .flat_map_iter(|v| {
@@ -61,12 +67,25 @@ impl Geo {
                     .collect::<Vec<_>>()
             })
             .collect();
+        let points = lattice_points(n, lattice);
         Ok(Geo {
             lattice,
-            mesh,
+            mesh: mesh.turned(points),
             adj,
             edge_rad,
         })
+    }
+
+    /// The geometry of `lattice`, a lattice of as many points, on this one's triangulation
+    /// turned (P1-19: a resampling's new lattice is not triangulated again; see [`Geo::build`]).
+    pub fn turned(&self, lattice: [f64; 4]) -> Geo {
+        let points = lattice_points(self.mesh.points().len(), lattice);
+        Geo {
+            lattice,
+            mesh: self.mesh.turned(points),
+            adj: self.adj.clone(),
+            edge_rad: self.edge_rad.clone(),
+        }
     }
 
     pub fn points(&self) -> &[DVec3] {
@@ -258,6 +277,127 @@ pub fn dijkstra(
     (dist, label)
 }
 
+thread_local! {
+    /// [`dijkstra_sparse`]'s distances and labels, ∞ and `u32::MAX` between calls.
+    static SPARSE: std::cell::RefCell<(Vec<f64>, Vec<u32>)> =
+        const { std::cell::RefCell::new((Vec::new(), Vec::new())) };
+}
+
+/// [`dijkstra`] for a search that reaches a small part of the lattice (P1-19): the same
+/// distances and labels, kept in a per-thread scratch that is put back to ∞ after the call, and
+/// only the vertices reached come back, as `(vertex, distance, label)` in the order they were
+/// first reached. It costs what it reaches, not the lattice's size, so it can run per plate and
+/// in parallel. `allow` must not call it again.
+pub fn dijkstra_sparse(
+    geo: &Geo,
+    sources: &[(u32, f64, u32)],
+    allow: impl Fn(u32, u32) -> bool,
+    max_rad: f64,
+) -> Vec<(u32, f64, u32)> {
+    let n = geo.points().len();
+    SPARSE.with(|cell| {
+        let mut scratch = cell.borrow_mut();
+        let (dist, label) = &mut *scratch;
+        if dist.len() < n {
+            dist.resize(n, f64::INFINITY);
+            label.resize(n, u32::MAX);
+        }
+        let mut reached: Vec<u32> = Vec::new();
+        let mut heap = BinaryHeap::with_capacity(sources.len() * 2);
+        for &(v, d, l) in sources {
+            if d < dist[v as usize] {
+                if dist[v as usize] == f64::INFINITY {
+                    reached.push(v);
+                }
+                dist[v as usize] = d;
+                label[v as usize] = l;
+                heap.push(Entry { d, v, label: l });
+            }
+        }
+        while let Some(Entry { d, v, label: l }) = heap.pop() {
+            if d > dist[v as usize] || label[v as usize] != l {
+                continue;
+            }
+            for (u, len) in geo.edges(v) {
+                let nd = d + f64::from(len);
+                if nd <= max_rad && nd < dist[u as usize] && allow(v, u) {
+                    if dist[u as usize] == f64::INFINITY {
+                        reached.push(u);
+                    }
+                    dist[u as usize] = nd;
+                    label[u as usize] = l;
+                    heap.push(Entry {
+                        d: nd,
+                        v: u,
+                        label: l,
+                    });
+                }
+            }
+        }
+        let out = reached
+            .iter()
+            .map(|&v| (v, dist[v as usize], label[v as usize]))
+            .collect();
+        for &v in &reached {
+            dist[v as usize] = f64::INFINITY;
+            label[v as usize] = u32::MAX;
+        }
+        out
+    })
+}
+
+/// [`dijkstra_sparse`]'s reached vertices sorted by vertex: the order the belts' sums run in
+/// (P1-19: they ran over every sample before, in sample order, for the few thousand reached).
+///
+/// A run to a shorter reach `r` gives the entries of this list with a distance of at most `r`,
+/// when every source lies within `r`: Dijkstra pops in order of distance and a path's sum only
+/// grows, so every entry beyond `r` is popped after all those within it and never changes one.
+pub fn dijkstra_sorted(
+    geo: &Geo,
+    sources: &[(u32, f64, u32)],
+    allow: impl Fn(u32, u32) -> bool,
+    max_rad: f64,
+) -> Vec<(u32, f64, u32)> {
+    let mut reached = dijkstra_sparse(geo, sources, allow, max_rad);
+    reached.sort_unstable_by_key(|x| x.0);
+    reached
+}
+
+/// [`dijkstra`] of sources that `part(v)` splits into parts no allowed edge joins (`allow(a, b)`
+/// implies `part(a) == part(b)`), each part's [`dijkstra_sparse`] on its own thread (P1-19: the
+/// arcs' run from every front of every plate was one serial search). Returns [`dijkstra`]'s
+/// distances and labels, and the reached vertices ascending. Each vertex gets what the single run
+/// gives it: a part's entries are pushed only by its own pops, and the heap pops them in the same
+/// total order (distance, vertex, label) with or without other parts' entries between them.
+pub fn dijkstra_parts(
+    geo: &Geo,
+    sources: &[(u32, f64, u32)],
+    part: impl Fn(u32) -> u32,
+    allow: impl Fn(u32, u32) -> bool + Sync,
+    max_rad: f64,
+) -> (Vec<f64>, Vec<u32>, Vec<u32>) {
+    let n = geo.points().len();
+    let mut parts: std::collections::BTreeMap<u32, Vec<(u32, f64, u32)>> = Default::default();
+    for &s in sources {
+        parts.entry(part(s.0)).or_default().push(s);
+    }
+    let parts: Vec<Vec<(u32, f64, u32)>> = parts.into_values().collect();
+    let found: Vec<Vec<(u32, f64, u32)>> = parts
+        .par_iter()
+        .map(|src| dijkstra_sparse(geo, src, &allow, max_rad))
+        .collect();
+    let mut dist = vec![f64::INFINITY; n];
+    let mut label = vec![u32::MAX; n];
+    let mut reached = Vec::with_capacity(found.iter().map(Vec::len).sum());
+    for &(v, d, l) in found.iter().flatten() {
+        dist[v as usize] = d;
+        label[v as usize] = l;
+        reached.push(v);
+    }
+    reached.par_sort_unstable();
+    (dist, label, reached)
+}
+
 /// The two nearest distinct classes of source for every vertex (a label-setting Dijkstra where a
 /// vertex accepts at most one distance per class and two classes), over edges `allow` accepts.
 /// `class(label)` maps a source label to its class (a plate). Per vertex: up to two
@@ -426,6 +566,42 @@ pub fn coast_split(
 mod tests {
     use super::*;
 
+    /// A lattice's geometry is the same built or turned from another lattice's (P1-19: a resumed
+    /// run builds the lattice a resampling turned).
+    #[test]
+    fn a_turned_lattice_is_the_built_one() {
+        let a = [0.1, -0.7, 0.3, 0.5];
+        let b = [0.6, 0.2, -0.4, 0.3];
+        let unit = |q: [f64; 4]| quat(q).normalize().to_array();
+        let (a, b) = (unit(a), unit(b));
+        let built = Geo::build(3000, b).unwrap();
+        let turned = Geo::build(3000, a).unwrap().turned(b);
+        assert_eq!(built.points(), turned.points());
+        assert_eq!(built.points(), lattice_points(3000, b).as_slice());
+        assert_eq!(built.mesh.triangles(), turned.mesh.triangles());
+        assert_eq!(built.adj.neighbors, turned.adj.neighbors);
+        assert_eq!(built.edge_rad, turned.edge_rad);
+    }
+
+    /// The sparse Dijkstra finds what the dense one does, and leaves its scratch clean.
+    #[test]
+    fn the_sparse_dijkstra_matches_the_dense_one() {
+        let geo = Geo::build(3000, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let src = [(5, 0.0, 1), (1400, 0.0, 2), (2900, 0.01, 3)];
+        let allow = |a: u32, b: u32| !(a + b).is_multiple_of(7);
+        for _ in 0..2 {
+            let (dist, label) = dijkstra(&geo, &src, allow, 0.4);
+            let mut sparse = dijkstra_sparse(&geo, &src, allow, 0.4);
+            sparse.sort_unstable_by_key(|x| x.0);
+            let dense: Vec<(u32, f64, u32)> = (0..3000u32)
+                .filter(|&v| dist[v as usize].is_finite())
+                .map(|v| (v, dist[v as usize], label[v as usize]))
+                .collect();
+            assert!(dense.len() > 100 && dense.len() < 3000);
+            assert_eq!(sparse, dense);
+        }
+    }
+
     #[test]
     fn dijkstra_distances_follow_the_mesh() {
         let geo = Geo::build(2000, [0.0, 0.0, 0.0, 1.0]).unwrap();
@@ -450,6 +626,50 @@ mod tests {
         );
         assert!(two.iter().all(|b| b[0].1 != u32::MAX && b[1].1 != u32::MAX));
         assert!(two.iter().all(|b| b[0].1 != b[1].1 && b[0].0 <= b[1].0));
+    }
+
+    /// The sorted and per-part runs give exactly the dense run's distances and labels, and a
+    /// shorter reach the longer run's entries within it.
+    #[test]
+    fn sorted_and_split_dijkstras_match_the_dense_one() {
+        let geo = Geo::build(3000, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let pts = geo.points();
+        // Three bands of latitude no allowed edge crosses, sources in each, labelled in order.
+        let part = |v: u32| {
+            let z = pts[v as usize].z;
+            u32::from(z > -0.2) + u32::from(z > 0.4)
+        };
+        let allow = |a: u32, b: u32| part(a) == part(b) && b % 7 != 3;
+        let sources: Vec<(u32, f64, u32)> = [5u32, 400, 1200, 1201, 2500, 2999, 1700]
+            .iter()
+            .enumerate()
+            .map(|(l, &v)| (v, 0.0, l as u32))
+            .collect();
+        for max_rad in [0.05, 0.3, 10.0] {
+            let (dist, label) = dijkstra(&geo, &sources, allow, max_rad);
+            let dense: Vec<(u32, f64, u32)> = (0..pts.len() as u32)
+                .filter(|&v| dist[v as usize].is_finite())
+                .map(|v| (v, dist[v as usize], label[v as usize]))
+                .collect();
+            let got = dijkstra_sorted(&geo, &sources, allow, max_rad);
+            assert_eq!(got.len(), dense.len());
+            for (g, d) in got.iter().zip(&dense) {
+                assert_eq!((g.0, g.1.to_bits(), g.2), (d.0, d.1.to_bits(), d.2));
+            }
+            let (pd, pl, pr) = dijkstra_parts(&geo, &sources, part, allow, max_rad);
+            assert_eq!(pr, dense.iter().map(|x| x.0).collect::<Vec<_>>());
+            for v in 0..pts.len() {
+                assert_eq!(pd[v].to_bits(), dist[v].to_bits(), "{v}");
+                assert_eq!(pl[v], label[v], "{v}");
+            }
+            // A shorter reach: the entries within it.
+            let short = dijkstra_sorted(&geo, &sources, allow, 0.5 * max_rad);
+            let within: Vec<_> = dense.iter().filter(|x| x.1 <= 0.5 * max_rad).collect();
+            assert_eq!(short.len(), within.len());
+            for (s, w) in short.iter().zip(within) {
+                assert_eq!((s.0, s.1.to_bits(), s.2), (w.0, w.1.to_bits(), w.2));
+            }
+        }
     }
 
     #[test]

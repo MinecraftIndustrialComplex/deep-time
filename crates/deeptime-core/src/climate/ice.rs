@@ -260,16 +260,39 @@ pub struct BandMargins {
 
 impl BandMargins {
     /// From the margins `mu` of every cell (NaN at sea) and each cell's band.
-    pub fn new(mu: &[f32], band_of_cell: &dyn Fn(usize) -> usize, bands: usize) -> BandMargins {
-        let mut band = vec![Vec::new(); bands];
-        for (c, &m) in mu.iter().enumerate() {
-            if m.is_finite() {
-                band[band_of_cell(c)].push(m);
-            }
-        }
-        for b in &mut band {
-            b.sort_by(f32::total_cmp);
-        }
+    pub fn new(
+        mu: &[f32],
+        band_of_cell: &(dyn Fn(usize) -> usize + Sync),
+        bands: usize,
+    ) -> BandMargins {
+        // P1-19 (#18): chunks of cells split their finite margins by band side by side, then each
+        // band joins its chunks' and sorts, bands side by side. The sort's order is total, so the
+        // lists are those of one serial pass (equal margins are the same bits).
+        const CHUNK: usize = 1 << 16;
+        let parts: Vec<Vec<Vec<f32>>> = mu
+            .par_chunks(CHUNK)
+            .enumerate()
+            .map(|(k, cells)| {
+                let mut band = vec![Vec::new(); bands];
+                for (i, &m) in cells.iter().enumerate() {
+                    if m.is_finite() {
+                        band[band_of_cell(k * CHUNK + i)].push(m);
+                    }
+                }
+                band
+            })
+            .collect();
+        let band: Vec<Vec<f32>> = (0..bands)
+            .into_par_iter()
+            .map(|b| {
+                let mut v = Vec::with_capacity(parts.iter().map(|p| p[b].len()).sum());
+                for p in &parts {
+                    v.extend_from_slice(&p[b]);
+                }
+                v.par_sort_unstable_by(f32::total_cmp);
+                v
+            })
+            .collect();
         BandMargins { band }
     }
 

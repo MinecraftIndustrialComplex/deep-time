@@ -501,6 +501,11 @@ large as the whole crust over 1,000 Myr:
   crust under an overriding oceanic plate. Neither is a lattice artefact. A subduction initiation
   no longer splits off a plate that is at least half continental (PLT-229). With the fix, one test
   history's initiation had split off a plate that was 0.89 continental.
+- *The new lattice's triangulation* (P1-19, numerics only). Every lattice is the same Fibonacci
+  sphere under a random rotation, and a rotation keeps a Delaunay triangulation Delaunay. A
+  resampling therefore turns the first lattice's triangles, neighbours and edge lengths with the
+  points instead of triangulating them again. Only where four points are cocircular to rounding
+  can a diagonal differ from a fresh build's, and either diagonal is Delaunay.
 - *Island arcs mature by the crust they built* (PLT-047). An oceanic sample becomes continental
   crust once its accumulated island-arc magma reaches `arc_magma_m_per_myr` × `arc_maturity_myr`,
   whatever its height. Hidden crust does not convert. `arc_maturity_myr` is 20 Myr in every preset,
@@ -1448,3 +1453,233 @@ row now quotes the abstract; its status stays `cited-unverified`, the paper `abs
   1000 Myr); what they are and whether they should all turn is not traced.
 - The CO₂ of master's 1000 Myr runs reached 22,870 and 18,612 ppm in two runs (28.6 and 25.8 °C);
   the fix's highest was 4,668 ppm (21.4 °C). Why was not traced.
+
+## The coupled group's cadence (P1-19 #27, 2026-10-18)
+
+The coordinator's task for the 900 s gate (P1-19 exit item 1, profile item #27): the full 16k gate
+run (`earthlike_full_16k`, scattered start, 1000 Myr, 8 threads) took 1,242.8 s, and the plates,
+climate, surface, volcanoes and structure, which run together once per plate step, take most of it.
+Find the cadence that saves the most time for the least change to the planet. Code: `params.rs`,
+`plates/{rifting,pools,ridges,shortening,subduction,check}.rs`, `structure/deform/feature.rs`,
+`surface/{params,mod}.rs`, `climate/params.rs`. Ledger: PLT-053, PLT-058, PLT-059, PLT-063,
+PLT-082, PLT-083, PLT-098, PLT-225, CRE-025, DEF-035, ERO-065, the per-step check targets CHK-008,
+CHK-009, CHK-030, CHK-031, PLT-150 and PLT-151, and SCL-038 (the climate's snapshot interval; its
+section is climate.md, "The climate snapshot every 20 Myr").
+
+**How the group is clocked.** The plate step is the length divided by round(length ÷
+`time_step_myr`) (SCL-034); the climate, the surface, the volcanoes, the impacts and the structure
+run once per plate step; the surface takes `substeps` landscape steps inside it (ERO-018); the
+climate takes a full snapshot every round(`snapshot_every_myr` ÷ step) steps (SCL-038); and with a
+surface or climate stage L1 is written every step (`l1_every_steps` must be 1). Writing L1 less
+often would need the session to run the surface and the climate on a coarser clock than the
+plates, a new coupling that was not tried.
+
+**Rules that counted steps now count time.** At the 2-Myr step every one gives the number it gave
+before: a 40 Myr `earthlike_quick_16k` run (seed 1, 4 threads) prints the same summary as master's
+in every line but the timings.
+
+| rule | before, per step | now | at a 4-Myr step |
+|---|---|---|---|
+| rifting's λ₀ (PLT-082, PLT-083) | `rift_lambda0` 0.012 | `rift_per_myr` 0.006 × the step | 0.024 |
+| spontaneous subduction initiation (PLT-063) | `subduction_initiation_rate` 0.3 | `subduction_initiation_per_myr` 0.15 × the step | 0.6 |
+| a trench sample's pull to the trench depth (PLT-053) | `trench_relax` 0.5 | 1 − 0.5^(step ÷ `trench_half_life_myr` 2.0) | 0.75 |
+| global resampling, at least and at most (PLT-098) | `resample_min_steps` 10, `resample_max_steps` 60 | `resample_min_myr` 20, `resample_max_myr` 120 | 5 and 30 steps |
+| a contact unseen is closed (PLT-059) | `contact_timeout_steps` 12 | `contact_timeout_myr` 24 | 6 steps |
+| a contact is confirmed (PLT-058, CRE-025) | `CONFIRM_STEPS` 3 | `CONFIRM_MYR` 6, the fewest steps that span it | 2 steps (8 Myr) |
+| a collision without a front parts (PLT-225) | `GRACE_STEPS` 3 | `GRACE_MYR` 6, as many steps as fit in it | 1 step |
+| a structure off continental crust is lost (DEF-035) | `LOST_AFTER_STEPS` 10 | `LOST_AFTER_MYR` 20 | 5 steps |
+| mud chokes carbonate (ERO-065) | `carbonate_clastic_m` 20 m | `carbonate_clastic_m_myr` 10 m × the time since the step began | 40 m at the step's end |
+
+The plate checks that measure one step (the most land a step gains, the most land one collision
+raises in a step, the change of a plate's rotation from one step to the next; CHK-008, CHK-009,
+CHK-030, CHK-031, PLT-150, PLT-151) had their ranges set at the 2-Myr step, so a run at another
+step reports them per 2 Myr of step (`TARGET_STEP_MYR`, a game-choice: exact for a steady rate).
+The rotation's change does not grow with the step (the balance is solved anew each step), so at
+4 Myr its scaled median falls from 3.7 % to 0.7 and 1.1 % (1000 Myr); the range still holds, but
+the figure does not compare across steps.
+
+**What stays per step, and why.** The landscape steps per plate step and the solver's iterations
+per landscape step (`substeps`, `spl_max_iter`) are numerical settings. A stratovolcano's one
+forgiven step without arc flux (VOL-010) forgives the arc band's flicker between plate samples, a
+sampling rule. The rest were in time already: the collapse (1 − e^(−step ÷ `collapse_myr`)), the
+rate limits (PLT-287, PLT-288: mm/yr × the step), the arcs' and the cordillera's growth and the
+subduction uplift (× the step), the orogeny stamp (m/Myr × the step), the founder (a thickness),
+the plateau spreading (an implicit diffusion over the step).
+
+**Measured.** `earthlike_quick_16k`, seeds 1 to 3, both starts, 500 and 1000 Myr, 2 threads,
+`tools/review/force-balance-ensemble.sh` and `tools/review/p1-17-hyps.py` (build log 2026-10-18,
+"The coupled group's cadence"); means over six runs, [min, max]; CO₂ the geometric mean; "checks
+moved" counts the 45 plate checks whose mean left master's seed range. Master steps 2 Myr with one
+landscape step and a snapshot every 10 Myr. **P4**: a 4-Myr step with one landscape step of 4 Myr;
+**P4S2**: a 4-Myr step with two of 2 Myr; **P3**: a 3-Myr step with one of 3 Myr; **C20**:
+master's steps with a snapshot every 20 Myr. Stage time is the sum of the plates, climate,
+surface, volcanoes and structure stages on a shared machine, a guide only (the timing pairs are
+below).
+
+| 500 Myr | master | P4 | P4S2 | P3 | C20 |
+|---|---|---|---|---|---|
+| land | 0.191 [0.152, 0.219] | 0.199 | 0.198 | 0.165 | 0.195 |
+| land above 2 km (share of land) | 0.206 [0.154, 0.239] | 0.290 [0.222, 0.351] | 0.231 [0.193, 0.263] | 0.342 [0.230, 0.457] | 0.238 [0.141, 0.348] |
+| continental crust | 0.396 [0.368, 0.418] | 0.397 | 0.401 | 0.361 | 0.404 |
+| highest cell, m | 6,689 [5,655, 7,499] | 8,916 [8,208, 9,752] | 8,913 [8,342, 9,666] | 9,144 [7,885, 11,401] | 7,117 [6,818, 7,511] |
+| loss to the mantle, km³/yr (with the slab's) | 2.13 (3.81) | 1.87 (4.11) | 1.76 (4.72) | 2.06 (5.18) | 2.02 (3.89) |
+| plateau wear, m/Myr | 144.6 | 124.0 | 173.3 | 141.5 | 160.2 |
+| collision wedge, km (runs above 0) | 94 in one run | 34 to 116 in four | 75 and 84 | none | none |
+| T, °C | 15.7 [13.2, 19.3] | 20.2 [16.6, 22.3] | 15.9 [14.4, 18.8] | 23.1 [16.1, 29.9] | 17.7 [15.8, 21.6] |
+| CO₂, ppm | 837 [477, 2,862] | 4,532 [1,474, 9,351] | 1,072 [508, 2,730] | 7,463 [1,273, 34,573] | 1,810 [929, 8,208] |
+| carbonate, km³ | 811,217 | 429,567 | 684,400 | 472,667 | 802,650 |
+| stratovolcanoes born (standing) | 13,252 (489) | 10,228 (366) | 10,791 (367) | 12,525 (489) | 13,432 (576) |
+| checks met; checks moved | 29 | 28; 9 | 30; 6 | 29; 4 | 29; 1 |
+| stage time, s | 751 | 366 | 402 | 476 | 731 |
+
+| 1000 Myr | master | P4 | P4S2 | P3 | C20 |
+|---|---|---|---|---|---|
+| land | 0.168 [0.118, 0.211] | 0.189 | 0.188 | 0.178 | 0.171 |
+| land above 2 km | 0.215 [0.050, 0.347] | 0.329 [0.237, 0.417] | 0.347 [0.317, 0.361] | 0.269 [0.176, 0.347] | 0.205 [0.079, 0.358] |
+| continental crust | 0.431 [0.346, 0.526] | 0.404 | 0.392 | 0.437 | 0.447 |
+| highest cell, m | 6,463 [4,878, 7,682] | 8,880 [8,010, 9,712] | 8,708 [8,286, 9,545] | 7,981 [7,339, 9,153] | 6,524 [5,226, 7,415] |
+| loss to the mantle, km³/yr (with the slab's) | 2.96 (5.03) | 2.50 (5.54) | 2.72 (6.00) | 2.33 (4.63) | 3.02 (5.29) |
+| plateau wear, m/Myr | 121.7 | 106.3 | 150.8 | 119.9 | 109.9 |
+| collision wedge, km (runs above 0) | none | 68 in one | 35 and 77 | 81 in one | none |
+| T, °C | 17.2 [15.2, 21.4] | 22.1 [16.6, 30.7] | 21.9 [18.1, 25.7] | 19.2 [15.0, 24.3] | 19.0 [13.8, 27.6] |
+| CO₂, ppm | 1,209 [425, 4,668] | 6,709 [1,803, 43,973] | 7,709 [2,816, 20,138] | 2,456 [482, 12,396] | 1,704 [331, 23,563] |
+| carbonate, km³ | 1,487,283 | 703,633 | 1,171,217 | 933,950 | 1,481,350 |
+| stratovolcanoes born (standing) | 31,898 (505) | 24,375 (408) | 24,717 (422) | 26,166 (396) | 32,420 (526) |
+| collisions per run | 21.7 | 18.5 | 17.7 | 20.3 | 19.3 |
+| checks met; checks moved | 27 | 27; 12 | 26; 13 | 26; 5 | 25; 1 |
+| stage time, s | 1,266 | 699 | 731 | 845 | 967 |
+
+P3's five moved checks at 1000 Myr: the median collision lasts 58.8 Myr against 40.7 (a pass
+becomes a fail), the most land one collision raises in a step falls from 0.089 to 0.055 % of the
+planet, the lowest continental share rises from 0.332 to 0.369, the ocean floor older than 250 Myr
+grows from 3.9 to 4.9 % of the sea floor, and one run grows a wedge (81 km). P4 and P4S2 move 9
+and 6 checks at 500 Myr and 12 and 13 at 1000. Besides the arc checks (below) and the per-step
+checks (above), those are the collision length (P4's 90th percentile at 500 Myr, 118.7 to 161.3
+Myr, and P4S2's median at 1000, 40.7 to 57.7 Myr: passes become fails), the median plate's life,
+the lowest continental share, the subducting share of the boundary, the fastest plates' speed, the
+foredeep and the wedge (these on the same side of their targets as master's). The full lists are in
+the build log.
+
+- *Every coarser plate step raises the high ground.* The highest cell stands 1.5 to 2.5 km higher
+  at a 3- or 4-Myr step whether the landscape step is 2, 3 or 4 Myr, and the land above 2 km
+  grows (P4S2's mean at 1000 Myr is master's highest run). The landscape step is not the cause:
+  P4S2 erodes in master's 2-Myr steps and its peaks match P4's. On master's high ground the
+  critical slope does most of the work (supercontinent seed 2 at 1000 Myr, `erosion_bands`: 389 of
+  the 430 m/Myr eroded above 4 km is the slope's cut), so the height there is set by the slope and
+  the width of the uplifted ground more than by the river law's rate; P4S2's ground above 4 km
+  erodes at 335 m/Myr over 1.6 times the area. Not traced to one rule. A candidate: the surface
+  carries its elevation with the plates by bilinear semi-Lagrangian advection once per plate step,
+  and the blur that leaves (`surface/advect.rs`: it "blurs detail that erosion re-cuts every
+  step") halves when the steps halve.
+- *The higher ground makes the present hotter.* The temperate present's nudge raises CO₂ until the
+  land under ice sheets is at most 0.15 (CLM-150; climate.md, "The present-day nudge on high
+  ground"), and high ground holds ice: P4S2's six 1000 Myr runs all end with 0.32 to 0.36 of their
+  land above 2 km and need 3.9 to 19.6 times their natural CO₂ (master: 1 to 4 times). A
+  Mann–Whitney test on the six runs each gives p ≈ 0.015 for P4S2's CO₂ at 1000 Myr against
+  master's.
+- *A landscape step longer than 2 Myr cuts the carbonate* (P4 and P3, 37 to 53 % less; P4S2,
+  with 2-Myr landscape steps, 16 to 21 % less), and P4's and P3's CO₂ is high already at 500 Myr.
+- *The arc checks that pass at P4, P4S2 and P3 are a sampling effect.* The arc elevation measures
+  read the arcs after the plates' uplift and before the surface erodes, and an island arc's axis
+  rises by about 330 m per Myr of growth (PLT-045, at v₀): 2 more Myr of step read about 660 m
+  higher (measured: the continental arcs' median 709 m at master, 1,348 at P4S2, 1,257 at P3).
+- *Fewer stratovolcanoes at 4 Myr* (19 to 24 % fewer born, 17 to 25 % fewer standing; at 3 Myr
+  18 % fewer born over 1000 Myr, 5 % over 500). A cone is
+  born where the arc flux is enough and none stands within `arc_spacing_km`, and lives 2 to 8 Myr
+  (VOL-038), one or two steps at 4 Myr. Not traced.
+- *C20 leaves the plates alone:* one check moved at each length (the 90th percentile collision's
+  length at 500 Myr, 118.7 to 79.0 Myr, a pass both; the subducting share of the boundary at 1000
+  Myr, 47.6 to 48.9 %, a fail both). At 1000 Myr 25 checks pass in the all-runs table against
+  master's 27: four checks near a bound flipped (three to a fail, one to a pass) with their means
+  inside master's seed range. Its CO₂'s geometric mean is higher (1,810 against 837 ppm at
+  500 Myr, 1,704 against 1,209 at 1000) but within the nudge's spread: a Mann–Whitney test gives
+  p ≈ 0.1 and 0.8, the natural CO₂ before the nudge is 830 against 550 ppm and 640 against 630,
+  and the high means come from one run at 500 Myr and two at 1000 whose natural end had 0.28 to
+  0.31 of the land under ice sheets (master's most: 0.24).
+
+**Time** (`tools/review/bench-quiet.py` pairs, `earthlike_full_16k`, scattered start, 8 threads,
+master and the setting side by side on CPU sets A and B; build log 2026-10-18). The test machine
+ran the other speed-up agents' jobs throughout (in the 1000 Myr pair the other jobs kept 18 of the
+32 CPUs busy on average, load up to 111), so a pair compares two runs under the same load and the
+absolute times are not the quiet gate's 1,242.8 s.
+
+| pair | set A | set B | setting ÷ master |
+|---|---|---|---|
+| P4, 200 Myr, round 1 | master 459.4 s | P4 338.1 s | 0.736 |
+| P4, 200 Myr, round 2 (swapped) | P4 549.6 s | master 683.0 s | 0.805 |
+| C20, 1000 Myr, one round | C20 2,219.0 s (climate stage 247.0 s) | master 2,308.5 s (climate stage 332.0 s) | 0.961 (climate stage 0.744) |
+
+P4S2 and P3 were not timed in pairs: both change the planet too much, and their summed stage time
+in the ensembles is 0.54 and 0.63 of master's at 500 Myr (P4's 0.49, which the pairs put at 0.74
+to 0.81 of the whole run, since the stages after the group and the bake do not shrink). On the
+quiet gate run the work that scales with the snapshots is about 80 s (the climate snapshot's cells
+46.1 s; the 2-D energy balance about 35 s, five times the 7.0 s measured over 200 Myr;
+docs/design/p1-17-benchmark-gate.md), so C20 saves about 40 s of the 1,242.8 s, 3 to 4 %, as the
+1000 Myr pair's 0.961 says. On its own it does not reach 900 s.
+
+**What was chosen.** C20 in the pipeline and earthlike presets (SCL-038). The plate step stays at
+2 Myr and the landscape step at one per plate step: every coarser plate step tried gives a planet
+with more high ground and a hotter, CO₂-richer present, and P4 and P3 also cut the carbonate by 37 to 53 %.
+The rules above count time now, so a coarser step is one preset key once the high ground's
+dependence on the step is found and removed.
+
+**Again on master of 2026-10-19** (fde7e021: plates parts 1 and 2 and the climate, surface and
+after-group speed-ups; build log 2026-10-18, "The coupled group's cadence"). The same ensembles
+with the shipped x86-64-v3 builds (`tools/natives/gate-bins.sh`): master; **C20**, this branch as
+it ships (the per-Myr rules and the 20-Myr snapshot); **P4C20**, the branch with 4-Myr steps. At
+2 Myr with a 10-Myr snapshot the branch still prints master's 40 Myr summary (the words that differ
+are those that differ between two runs of master: memory and timings).
+
+| | master 500 | C20 500 | P4C20 500 | master 1000 | C20 1000 | P4C20 1000 |
+|---|---|---|---|---|---|---|
+| land | 0.184 | 0.192 | 0.191 | 0.186 | 0.184 | 0.194 |
+| land above 2 km | 0.241 [0.184, 0.282] | 0.237 | 0.308 | 0.275 [0.161, 0.322] | 0.261 | 0.351 |
+| continental crust | 0.389 | 0.380 | 0.387 | 0.418 | 0.415 | 0.397 |
+| highest cell, m | 6,903 [6,464, 7,368] | 7,114 | 9,834 | 7,042 [5,778, 8,680] | 6,615 | 9,247 |
+| loss to the mantle, km³/yr (with the slab's) | 2.50 (4.31) | 2.64 (4.96) | 1.89 (4.68) | 3.30 (5.46) | 3.10 (5.08) | 2.79 (5.89) |
+| plateau wear, m/Myr | 158.5 | 144.3 | 119.0 | 116.6 | 121.9 | 98.1 |
+| collision wedge, km (runs above 0) | 36 in one | 68 to 75 in three | 39 to 85 in three | 78 in one | none | none |
+| T, °C | 18.5 [15.5, 24.3] | 16.9 | 20.9 | 17.2 [14.8, 20.3] | 17.5 | 20.1 |
+| CO₂, ppm (geometric mean) | 2,237 | 1,325 | 5,553 | 1,664 | 1,712 | 5,126 |
+| carbonate, km³ | 779,183 | 693,083 | 401,550 | 1,280,800 | 1,292,750 | 708,100 |
+| stratovolcanoes born (standing) | 13,997 (607) | 14,165 (616) | 10,105 (388) | 32,010 (589) | 31,174 (497) | 24,516 (379) |
+| checks met; checks moved | 29 | 30; 3 | 29; 8 | 25 | 26; 4 | 27; 12 |
+| climate stage, s | 91.1 | 68.6 | 59.5 | 157.5 | 118.7 | 95.4 |
+| stage time, s | 450 | 428 | 265 | 867 | 820 | 503 |
+
+- *C20 still leaves the planet alone.* Its moved checks: at 500 Myr the rank correlation of speed
+  against plate area (−0.416 to −0.376, a fail becomes a pass), the supercontinent's tenure (35 to
+  135 Myr, a fail becomes a pass) and the continental arcs' median (659 to 830 m, a fail both); at
+  1000 Myr the largest plate's median share (0.175 to 0.208), the rift-born plates alive after
+  50 Myr (78.7 to 72.6 %) and the fast plates' 90th percentile speed (74.7 to 73.7 mm/yr), passes
+  all three, and the supercontinent period (172.5 to 121.5 Myr, a fail both). The present's CO₂ is now
+  below master's at 500 Myr and level with it at 1000, so the higher means of the first
+  measurement were the nudge's spread, as the Mann–Whitney tests said.
+- *A 4-Myr step still makes the planet worse:* the highest cell 2.2 to 2.9 km higher, more land
+  above 2 km, the present 2.4 to 3.0 °C warmer with 2.5 to 3.1 times the CO₂, 45 to 49 % less
+  carbonate, a quarter fewer stratovolcanoes, and 8 and 12 checks moved. The plates' rewrite did
+  not change the verdict.
+
+**Time on that master** (`tools/review/p1-19-pair.sh`, the full 16k gate run, scattered start,
+1000 Myr, 8 threads, the two shipped builds side by side on CPU sets A and B, then swapped):
+
+| order | set A | set B | branch ÷ master |
+|---|---|---|---|
+| ab | master 1,374.1 s (climate stage 176.3 s) | branch 1,880.5 s (192.7 s) | 1.369 (climate 1.093) |
+| ba | branch 1,598.7 s (155.6 s) | master 2,155.2 s (262.4 s) | 0.742 (climate 0.593) |
+| P4C20, 200 Myr | master 280.8 s | P4C20 210.6 s | 0.750 |
+| P4C20, 200 Myr, swapped | P4C20 215.6 s | master 290.8 s | 0.741 |
+
+The geometric mean of the two orders is 1.008 for the whole run and 0.805 for the climate stage.
+Under the other agents' load set B ran each build about 35 % slower than set A (its runs had 2.5
+and 3.6 CPUs on average, set A's 3.3 and 5.2), so a change of a few % in the whole run is below
+what these pairs resolve; the stages C20 does not touch came out at 1.007 (plates) and 1.044
+(surface), which is that noise. The climate stage's cut is the measured saving: 0.81 of master's
+in the pairs and 0.75 in the ensembles at both lengths. On the quiet gate run, whose climate stage
+after its speed-ups is about 200 s per 1000 Myr (build log 2026-10-19, the climate stage's
+entry: 27.6 s per 100 Myr with the 7.7 s present search once), that is roughly 40 to 50 s.
+
+P4C20 takes 0.746 of master's time over 200 Myr (both orders, geometric mean; the coupled group's
+stages 0.63 and 0.68, the rest of the run fixed), and its ensemble stage sums are 0.59 and 0.58 of
+master's at 500 and 1000 Myr, so at the gate's length it would save about a third of the run. It
+stays out for the planet's sake (above).

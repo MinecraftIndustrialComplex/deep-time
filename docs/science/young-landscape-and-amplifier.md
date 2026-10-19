@@ -53,3 +53,21 @@ old code left 14. Meant exceptions, not on that planet: a volcano's summit and a
 **Measured** (master f545c0bc before, this change after; land cells over all eight neighbours by more than 8 / 16
 blocks, tallest): planet A 132 / 12 / 41.6 → 3 / 0 / 11.6; planet B 167 / 10 / 19.8 → 0 / 0 / 6.0.
 
+
+## The amplifier on a GPU (2026-10-18)
+
+**What changes.** With a usable GPU (`compute` auto or gpu; `docs/design/gpu-compute.md`) the amplifier's middle
+passes (stream-power erosion and its drainage area, the glacial valleys, thermal erosion, deposition) run as compute
+shaders on each L3 tile. The laws, constants and iteration counts are the CPU's: no ledger row changes and none is
+added. The arithmetic is the CPU's f32, summed over the eight neighbours in the same order, so a pass differs only by
+rounding: fused multiply-adds the shader compiler may form, `pow` for exponents other than 1, 1.5 and 2, and the
+glacial box mean summed as Kahan-compensated differences from the centre cell instead of in f64.
+
+**What that does to the terrain.** Rounding can flip a branch the CPU takes on a comparison (the steepest receiver,
+a positive slope), which moves a little water or sediment to another neighbour. The tolerance test
+`surface::amplify::tests::the_gpu_passes_stay_within_their_error_budget_of_the_cpu` holds one glaciated window to:
+under 0.1 % of cells more than 1 cm from the CPU's elevation, erosion, sediment and incision cap, a mean difference
+under 1 mm, none over 5 m, and the glacial statistics within 0.1 %; through the tiled ladder, under 1 % of L3 cells
+more than 1 cm apart. A world made with a GPU is therefore not byte-identical to one made on the CPU, or on another
+GPU or driver (Ben, 2026-10-18: worlds are shared as finished folders). The measured figures are in the design note,
+section 10.
