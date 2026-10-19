@@ -27,6 +27,7 @@ use deeptime_format::{
 use serde_json::{Value, json};
 
 use crate::checkpoint::{Checkpoint, CheckpointRef};
+use crate::compute::ComputeMode;
 use crate::deposits::recorded::{Evicted, HistoryHandle};
 use crate::deposits::spill::SpillStore;
 use crate::error::CoreError;
@@ -499,6 +500,8 @@ pub struct Session {
     /// Whether a group's followers that can step beside the lead's next step do (P1-19;
     /// [`Session::set_overlap`]).
     overlap: AtomicBool,
+    /// The compute mode, as `ComputeMode as u8` ([`Session::set_compute`]).
+    compute: AtomicU8,
 }
 
 /// The share of the memory cap kept free after a step: the history is trimmed to
@@ -976,6 +979,7 @@ impl Session {
             needed_peak: [AtomicU64::new(0), AtomicU64::new(0)],
             resumed: None,
             overlap: AtomicBool::new(true),
+            compute: AtomicU8::new(ComputeMode::from_env() as u8),
         };
         session.log.push(
             Level::Info,
@@ -1011,6 +1015,20 @@ impl Session {
         self.overlap.store(on, Ordering::Release);
     }
 
+    /// Where the kernels that have a GPU version run (`compute.rs`; default
+    /// [`ComputeMode::from_env`]). Takes effect from the next stage step.
+    pub fn set_compute(&self, mode: ComputeMode) {
+        self.compute.store(mode as u8, Ordering::Release);
+    }
+
+    pub fn compute(&self) -> ComputeMode {
+        match self.compute.load(Ordering::Acquire) {
+            1 => ComputeMode::Cpu,
+            2 => ComputeMode::Gpu,
+            _ => ComputeMode::Auto,
+        }
+    }
+
     /// The spill store: the disk the recorded history used (bytes and frames written).
     pub fn spill(&self) -> &SpillStore {
         &self.spill
@@ -1028,11 +1046,16 @@ impl Session {
         self.needed_peak[1].load(Ordering::Relaxed)
     }
 
-    /// Runs `f` on the world as it stands (between `advance` calls), without copying it.
-    pub fn with_world<R>(&self, f: impl FnOnce(&WorldState) -> R) -> Result<R, CoreError> {
+    /// Runs `f` on the world as it stands (between `advance` calls), without copying it, in the
+    /// session's pool (what it reads may be parallel: the province map's derivation is).
+    pub fn with_world<R: Send>(
+        &self,
+        f: impl FnOnce(&WorldState) -> R + Send,
+    ) -> Result<R, CoreError> {
         let mut s = self.lock_stepper()?;
         self.settle_now(&mut s)?;
-        Ok(f(&s.world))
+        let world = &s.world;
+        Ok(self.pool.install(|| f(world)))
     }
 
     /// A step put off to run beside the lead's next one (P1-19) runs now, on the world: what
@@ -1253,6 +1276,7 @@ impl Session {
             state: &self.state,
             history,
             needed_peak: Some(&self.needed_peak),
+            compute: self.compute(),
         }
     }
 
@@ -1497,7 +1521,8 @@ impl Session {
             )
         }) {
             let millis = drawn.elapsed().as_secs_f64() * 1000.0;
-            self.keyframes.push(frame)?;
+            // Its layers are packed in parallel: in the pool too.
+            self.pool.install(|| self.keyframes.push(frame))?;
             s.last_kf_t = Some((s.world.t_years, s.current));
             self.log.push(
                 Level::Debug,
@@ -1552,7 +1577,7 @@ impl Session {
             }) else {
                 return Ok(None);
             };
-            self.keyframes.replace(redrawn)?;
+            self.pool.install(|| self.keyframes.replace(redrawn))?;
             Ok(Some(format!(
                 "keyframe {} drawn again with the bake's water ({} river chains, {:.0} px of lakes) in {:.0} ms",
                 entry.n,
@@ -1594,7 +1619,7 @@ impl Session {
             self.log.push(
                 Level::Info,
                 format!(
-                    "history after {name}: {} frames, {:.1} MiB ({:.1} MiB in memory, {} frames on disk; {:.1} MiB written to the spill file); {:.0} MiB in use of the {:.0} MiB cap",
+                    "history after {name}: {} frames, {:.1} MiB ({:.1} MiB in memory, {} frames on disk; {:.1} MiB written to the spill file); {:.0} MiB in use of the {:.0} MiB cap ({:.0} MiB of it kept for reuse)",
                     note["frames"],
                     mib("bytes"),
                     mib("resident_bytes"),
@@ -1602,6 +1627,7 @@ impl Session {
                     mib("spilled_bytes"),
                     self.gauge.in_use() as f64 / 1_048_576.0,
                     self.mem_cap as f64 / 1_048_576.0,
+                    self.gauge.kept() as f64 / 1_048_576.0,
                 ),
             );
         }

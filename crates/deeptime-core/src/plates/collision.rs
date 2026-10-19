@@ -77,13 +77,25 @@ pub fn collide(
         return Ok(Collided::default());
     }
     let n = state.samples.len();
-    let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
+    // P1-19: the plate of a sample is read where it is needed (nothing below changes a plate
+    // before the last read), not collected for the whole lattice at every contact.
+    let plate_of = |i: usize| state.groups[state.samples[i].group as usize].plate;
+    // ledger: PLT-078 (a continent welds its plate; a smaller terrane moves alone).
+    let welds = |len: usize| {
+        let area_km2 = len as f64 * norm.sample_area_km2();
+        area_km2 / state.a0_km2 >= p.collision_suture_frac
+    };
+    // A continent goes on converging until its collision stalls.
+    let deferred = Collided {
+        deferred: true,
+        ..Collided::default()
+    };
 
     // The terrane: continental crust of the subducting plate connected to the seeds.
     let mut in_terrane = vec![false; n];
     let mut stack: Vec<u32> = Vec::new();
     for &s in seeds {
-        if plate_of[s as usize] == under && state.samples[s as usize].kind == CONTINENTAL {
+        if plate_of(s as usize) == under && state.samples[s as usize].kind == CONTINENTAL {
             in_terrane[s as usize] = true;
             stack.push(s);
         }
@@ -91,9 +103,14 @@ pub fn collide(
     let mut terrane = Vec::new();
     while let Some(v) = stack.pop() {
         terrane.push(v);
+        // P1-19: once the part found welds the plate (the test only grows with the terrane), an
+        // unstalled collision is deferred whatever the rest of the terrane holds.
+        if !stalled && welds(terrane.len()) {
+            return Ok(deferred);
+        }
         for (u, _) in geo.edges(v) {
             let ui = u as usize;
-            if !in_terrane[ui] && plate_of[ui] == under && state.samples[ui].kind == CONTINENTAL {
+            if !in_terrane[ui] && plate_of(ui) == under && state.samples[ui].kind == CONTINENTAL {
                 in_terrane[ui] = true;
                 stack.push(u);
             }
@@ -105,14 +122,9 @@ pub fn collide(
     }
     terrane.sort_unstable();
     let area_km2 = terrane.len() as f64 * norm.sample_area_km2();
-    // ledger: PLT-078 (a continent welds its plate; a smaller terrane moves alone).
-    let suture = area_km2 / state.a0_km2 >= p.collision_suture_frac;
+    let suture = welds(terrane.len());
     if suture && !stalled {
-        // A continent goes on converging until its collision stalls.
-        return Ok(Collided {
-            deferred: true,
-            ..Collided::default()
-        });
+        return Ok(deferred);
     }
     let over_samples = f64::from(state.plates[over as usize].samples.max(1));
     let under_samples = f64::from(state.plates[under as usize].samples.max(1));
@@ -130,7 +142,7 @@ pub fn collide(
             geo,
             state,
             &terrane,
-            |i| plate_of[i] == under,
+            |i| plate_of(i) == under,
             |i| u32::from(in_terrane[i]),
         )
     };

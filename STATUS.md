@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Master be80c6c1: Rust, Gradle and all five GameTest sets green on 006efee1 · In flight (agents): the profile's byte-identical speed-ups for the 900 s full-16k gate (1,242.8 s now; profile page https://spacesheep.dev/@benmac/deeptime-sim-time): plates part 1, plates part 2, surface, climate, the stages after the group · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-10-18 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Master fb38204f: Rust and Gradle green on 5cf2f9bb; 4 required GameTests fail in every set since the merge batch ending fde7e021 (crater bowl, stray lava under a volcano, water in dry river columns, far terrain at the seam; an agent is on it) · Landed for the 900 s full-16k gate (1,242.8 s on 25ae6723; profile https://spacesheep.dev/@benmac/deeptime-sim-time): byte-identical speed-ups in plates, surface, climate and the stages after the group; baseline and x86-64-v3 natives picked at runtime with fat LTO; the plate cadence with a 20 Myr climate snapshot; GPU path phase 1 (amplifier middle passes; macOS natives CPU-only until Ben sets up M6 build access). Interim estimate on fde7e021 by CPU-time ratio under load: v3 about 950 s, baseline about 1,020 s · In flight (agents): the surface solvers (multigrid diffusion, parallel flood) being merged with master; GPU path phase 2 (write_l1, climate cells, laptop A/B on the Radeon 8050S); the GameTest fixes · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-10-19 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: dc49fe7 (pack master; the rock tags live on the pack's unmerged deep-time branch)
 
@@ -141,6 +141,460 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **Choices** (mine, undoable): multigrid-preconditioned CG over plain multigrid; 2 × 2 aggregation with a coarse scale 0.5; two sweeps; ω 0.8; coarsest 64 cells and 16 sweeps; f32 cycle; tolerance 10⁻⁵ m over 10⁻⁶ m (17.2 against 27.4 iterations, error about one f32 step); the order-free two-phase flood over an order-dependent one; both new methods default; the stopping rule not landed; the second b2 timing pair cancelled once its ensemble failed; the estimate 500 B.
 - **Next.** The slope failure at a rate of 1/16 with 32 iterations (the same relaxation a step, 0.127 against 0.129) would save about a fifth of its time but changes its path and needs its own ensemble. The multigrid solve's setup and first guess are now a large part of its time.
 
+### 2026-10-18: P1-19 #27, the coupled group's cadence: the rules that counted plate steps now count time, and the pipeline and earthlike presets take a climate snapshot every 20 Myr (SCL-038); coarser plate steps (3 and 4 Myr) were measured and not taken, since they raise the high ground by 1.5 to 2.5 km and warm the present (coordinator's task; agent worktree agent-ad506e74bf79d9520, branch worktree-agent-ad506e74bf79d9520 from master f221b3d3; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Per step to per Myr** (plates.md, "The coupled group's cadence"). `rift_lambda0` 0.012 became `rift_per_myr` 0.006 (PLT-082, PLT-083); `subduction_initiation_rate` 0.3 became `subduction_initiation_per_myr` 0.15 (PLT-063); `trench_relax` 0.5 became `trench_half_life_myr` 2.0, so the share is 1 − 0.5^(dt ÷ 2) (PLT-053); `resample_min_steps`/`_max_steps` 10/60 became `resample_min_myr`/`_max_myr` 20/120 (PLT-098); `contact_timeout_steps` 12 became `contact_timeout_myr` 24 (PLT-059). In the code, `CONFIRM_STEPS` 3 became `CONFIRM_MYR` 6, with a ceiling (PLT-058, CRE-025); `GRACE_STEPS` 3 became `GRACE_MYR` 6, with a floor (PLT-225); `LOST_AFTER_STEPS` 10 became `LOST_AFTER_MYR` 20 (DEF-035); `carbonate_clastic_m` 20 became `carbonate_clastic_m_myr` 10 (ERO-065). The per-step plate checks are scaled to 2 Myr of step (`TARGET_STEP_MYR`, a game-choice; CHK-008, CHK-009, CHK-030, CHK-031, PLT-150, PLT-151). The 13 presets, `planet_world_4k.json`, `editor_fields.json` and the share-code fixture's tuned case use the new keys (no compatibility). At 2 Myr everything is the same: `deeptime stage volcanoes`, `earthlike_quick_16k`, 40 Myr, seed 1, 4 threads, prints master's summary in every line but the timings (checked on master f221b3d3 before the rebase).
+- **Settings tried.** `tools/review/force-balance-ensemble.sh <dir> <bin> <500|1000> 1,2,3 scattered_continents,supercontinent ck <tag> [--set ...]`, then `tools/review/p1-17-hyps.py` and a scratch table, on the VM (2 threads each, admitted). The settings: P4 `--set tectonics.time_step_myr=4`; P4S2 the same plus `--set surface.substeps=2`; P3 `--set tectonics.time_step_myr=3`; all three on the branch binary. C20 is `--set climate.snapshot_every_myr=20` on master's binary, which equals the branch at 2 Myr. Master is master's binary. The tables are in plates.md and climate.md. In brief (500 and 1000 Myr; highest cell; land above 2 km as a share of land; T; CO₂ as a geometric mean; checks moved out of master's seed range, of 45):
+  - **master:** 6,689 and 6,463 m; 0.206 and 0.215; 15.7 and 17.2 °C; 837 and 1,209 ppm.
+  - **P4:** 8,916 and 8,880 m; 0.290 and 0.329; 20.2 and 22.1 °C; 4,532 and 6,709 ppm; carbonate down 47 and 53 %; 9 and 12 checks moved.
+  - **P4S2:** 8,913 and 8,708 m; 0.231 and 0.347; 15.9 and 21.9 °C; 1,072 and 7,709 ppm; carbonate down 16 and 21 %; 6 and 13 checks moved.
+  - **P3:** 9,144 and 7,981 m; 0.342 and 0.269; 23.1 and 19.2 °C; 7,463 and 2,456 ppm; carbonate down 42 and 37 %; 4 and 5 checks moved.
+  - **C20:** 7,117 and 6,524 m; 0.238 and 0.205; 17.7 and 19.0 °C; 1,810 and 1,704 ppm (Mann–Whitney p ≈ 0.1 and 0.8); 1 check moved at each length.
+- **Every moved check** (mean outside master's run range; target status master → setting):
+  - **P4 at 500 Myr:**
+    - plate_life_p50 104.2 → 120.0 (pass, pass)
+    - land_gain_max 1.03 → 0.72 (pass, pass)
+    - collision_length_p90 118.7 → 161.3 (pass → FAIL)
+    - rot_change_p50 4.66 → 2.17 (pass, pass)
+    - arc_oceanic_emergent 8.6 → 11.3 (FAIL → pass)
+    - arc_oceanic_p90 −287 → 236 (pass, pass)
+    - arc_continental_p50 709 → 1,423 (FAIL → pass)
+    - arc_continental_p90 3,218 → 4,292 (pass, pass)
+    - foredeep_depth_p50 74 → 136 (FAIL, FAIL)
+  - **P4 at 1000 Myr:**
+    - land_gain_max 1.35 → 0.76 (pass, pass)
+    - continental_min 0.332 → 0.354 (FAIL, FAIL)
+    - speed_big_p90 74.3 → 75.2 (pass, pass)
+    - rot_change_p50 3.71 → 1.13 (pass, pass)
+    - rot_change_p90 26.1 → 23.5 (FAIL, FAIL)
+    - boundary_subduction 47.6 → 49.0 (FAIL, FAIL)
+    - arc_oceanic_emergent 10.6 → 13.7 (pass, pass)
+    - arc_oceanic_p90 73 → 593 (pass, pass)
+    - arc_continental_p50 817 → 1,526 (FAIL → pass)
+    - arc_continental_p90 3,425 → 4,438 (pass, pass)
+    - wedge_width_p50 0 → 11 (FAIL, FAIL)
+    - foredeep_depth_p50 78 → 15 (FAIL, FAIL)
+  - **P4S2 at 500 Myr:**
+    - land_gain_max 1.03 → 0.67 (pass, pass)
+    - speed_big_p90 74.6 → 79.1 (pass, pass)
+    - rot_change_p50 4.66 → 2.01 (pass, pass)
+    - arc_oceanic_emergent 8.6 → 11.6 (FAIL → pass)
+    - arc_oceanic_p90 −287 → 247 (pass, pass)
+    - arc_continental_p50 709 → 1,348 (FAIL → pass)
+  - **P4S2 at 1000 Myr:**
+    - collision_land_max 0.089 → 0.055 (pass, pass)
+    - land_gain_max 1.35 → 0.87 (pass, pass)
+    - collision_length_p50 40.7 → 57.7 (pass → FAIL)
+    - speed_big_p90 74.3 → 75.5 (pass, pass)
+    - rot_change_p50 3.71 → 0.74 (pass, pass)
+    - rot_change_p90 26.1 → 23.5 (FAIL, FAIL)
+    - boundary_subduction 47.6 → 49.4 (FAIL, FAIL)
+    - arc_oceanic_emergent 10.6 → 13.5 (pass, pass)
+    - arc_oceanic_p90 73 → 568 (pass, pass)
+    - arc_continental_p50 817 → 1,526 (FAIL → pass)
+    - arc_continental_p90 3,425 → 4,402 (pass, pass)
+    - wedge_width_p50 0 → 19 (FAIL, FAIL)
+    - foredeep_depth_p50 78 → 33 (FAIL, FAIL)
+  - **P3 at 500 Myr:**
+    - largest_over_50 0 → 0.2 (pass, pass)
+    - continental_min 0.379 → 0.342 (pass → FAIL)
+    - rot_change_p50 4.66 → 2.82 (pass, pass)
+    - arc_continental_p50 709 → 1,257 (FAIL → pass)
+  - **P3 at 1000 Myr:**
+    - collision_land_max 0.089 → 0.055 (pass, pass)
+    - collision_length_p50 40.7 → 58.8 (pass → FAIL)
+    - continental_min 0.332 → 0.369 (FAIL, FAIL)
+    - ocean_old250 3.9 → 4.9 (FAIL, FAIL)
+    - wedge_width_p50 0 → 14 (FAIL, FAIL)
+  - **C20:**
+    - at 500 Myr, collision_length_p90 118.7 → 79.0 (pass, pass)
+    - at 1000 Myr, boundary_subduction 47.6 → 48.9 (FAIL, FAIL)
+  - **Status flips with the mean inside the range** (all-runs table):
+    - C20 at 500: rift_welded_back_50 pass → FAIL, collision_length_p50 FAIL → pass.
+    - C20 at 1000: collisions_per_100myr, speed_area_rank_corr and arc_oceanic_emergent pass → FAIL, speed_slab_over_free FAIL → pass.
+- **Diagnosis, not finished.** The higher peaks do not come from the landscape step: P4S2 erodes in master's 2-Myr steps and its peaks match P4's. They do not come from the uplift ceiling either: the pipeline presets set `uplift_ceiling_m` 0 and the belt fill stops at `strength_height_m`. On master's high ground the threshold slope does most of the cutting (`erosion_bands`, supercontinent seed 2, 1000 Myr: 389 of 430 m/Myr above 4 km). One candidate is the once-per-plate-step bilinear advection of the surface (`surface/advect.rs`), whose blur halves when the steps halve; it was not tested. The hotter present is the present-day nudge (CLM-150): more land above 2 km means more ice sheets and so a bigger factor. The arc checks that pass at 3 and 4 Myr are a sampling effect (they are read after the uplift and before the erosion).
+- **Time.** `tools/review/bench-quiet.py` pairs, `earthlike_full_16k`, scattered start, 8 threads, side by side on sets A (0,16,2,...) and B (8,24,10,...), admitted as `sim:earthlike_full_16k:16t` (scratch `build/cad/pair.sh`). The VM was loaded throughout: others' busy CPUs averaged 18 of 32 and load1 peaked at 111 in the 1000 Myr pair.
+  - **P4, 200 Myr:** master 459.4 s (A) against P4 338.1 s (B), ratio 0.736; swapped, P4 549.6 s (A) against master 683.0 s (B), ratio 0.805.
+  - **C20, 1000 Myr, one round:** C20 2,219.0 s (A) against master 2,308.5 s (B), ratio 0.961. The climate stage took 247.0 s against 332.0 s.
+  - **P4S2 and P3 were not timed** (both rejected on the planet). Their ensemble stage sums are 0.54 and 0.63 of master's at 500 Myr; P4's is 0.49.
+  - **Quiet estimate for C20:** about 40 s of the 1,242.8 s, from the profile's snapshot-bound work: the snapshot cells 46.1 s and the 2-D EBM about 35 s. C20 alone does not reach 900 s. Measured again on master fde7e021 below.
+- **Again on master fde7e021** (the coordinator asked for the cadence numbers against the current plate step after plates parts 1 and 2; master merged into the branch at 5a3b0725, with the climate, surface and after-group speed-ups). Shipped x86-64-v3 builds of master and of the branch (`tools/natives/gate-bins.sh --only x86-64-v3`; master's tree exported with `git archive` and built outside the branch's copy); scratch under `/data/ban/deeptime-runs/cadence2/`.
+  - **2 Myr is still master:** `deeptime stage volcanoes`, `earthlike_quick_16k`, 40 Myr, seed 1, 4 threads, the branch with `--set climate.snapshot_every_myr=10` against master, and master twice: the branch differs from master only in the preset's renamed keys, the work path, memory and timing words, the same kinds of words in which master differs from itself.
+  - **Ensembles** (as before, six runs, 2 threads; C20 is the branch as shipped, P4C20 the branch with `--set tectonics.time_step_myr=4`). 500 and 1000 Myr: highest cell master 6,903 and 7,042 m, C20 7,114 and 6,615, P4C20 9,834 and 9,247; land above 2 km 0.241 and 0.275, 0.237 and 0.261, 0.308 and 0.351; T 18.5 and 17.2 °C, 16.9 and 17.5, 20.9 and 20.1; CO₂ (geometric mean) 2,237 and 1,664 ppm, 1,325 and 1,712, 5,553 and 5,126; carbonate 779k and 1,281k km³, 693k and 1,293k, 402k and 708k; checks met 29 and 25, 30 and 26, 29 and 27; checks moved C20 3 and 4, P4C20 8 and 12; climate stage 91.1 and 157.5 s, 68.6 and 118.7, 59.5 and 95.4; stage sums 450 and 867 s, 428 and 820, 265 and 503.
+  - **C20's moved checks:** 500 Myr: speed_area_rank_corr −0.416 → −0.376 (FAIL → pass), supercontinent_tenure_myr 34.7 → 134.8 (FAIL → pass), arc_continental_p50_m 659 → 830 (FAIL both); 1000 Myr: largest_share_p50 0.175 → 0.208, rift_alive_50_pct 78.7 → 72.6, speed_big_p90_mm_yr 74.7 → 73.7 (pass all three), supercontinent_period_myr 172.5 → 121.5 (FAIL both). Status flips with the mean in range: 500 Myr rift_welded_back_50_pct FAIL → pass, collision_length_p90_myr and continental_min pass → FAIL; 1000 Myr rift_welded_back_50_pct pass → FAIL, collisions_per_100myr and arc_oceanic_emergent_pct FAIL → pass.
+  - **P4C20's moved checks:** 500 Myr: speed_rms_mm_yr 35.7 → 38.3, speed_area_rank_corr −0.416 → −0.371 (FAIL → pass), rot_change_p50_pct 4.28 → 2.70, rot_change_p90_pct 25.6 → 23.6, arc_oceanic_emergent_pct 7.97 → 11.09 (FAIL → pass), arc_oceanic_p90_m −404 → 204, arc_continental_p50_m 659 → 1,474 (FAIL → pass), arc_continental_p90_m 3,049 → 4,292; 1000 Myr: largest_over_50_pct 0.27 → 2.07, dead_within_20_pct 8.1 → 11.7, land_gain_max_pct 1.37 → 0.84, belt_width_km_p50 362.5 → 374.0, collision_length_p90_myr 131.8 → 176.9, speed_big_p90_mm_yr 74.7 → 76.2, rot_change_p50_pct 3.08 → 0.88, rot_change_p90_pct 26.5 → 22.8, arc_oceanic_emergent_pct 9.87 → 13.60 (FAIL → pass), arc_oceanic_p90_m −57 → 619, arc_continental_p50_m 737 → 1,634 (FAIL → pass), arc_continental_p90_m 3,411 → 4,475. Status flips with the mean in range: 500 Myr collision_length_p50_myr, collision_length_p90_myr and continental_min pass → FAIL; 1000 Myr rift_welded_back_50_pct and collision_length_p50_myr pass → FAIL, collisions_per_100myr and speed_area_rank_corr FAIL → pass.
+  - **Time:** `tools/review/p1-19-pair.sh`, the full 16k gate run, scattered start, 1000 Myr, 8 threads, both orders. ab: master 1,374.1 s on set A, branch 1,880.5 s on set B, 1.369 (climate stage 176.3 against 192.7 s, 1.093); ba: branch 1,598.7 s on A, master 2,155.2 s on B, 0.742 (155.6 against 262.4 s, 0.593). Geometric means: whole run 1.008, climate stage 0.805, plates 1.007, surface 1.044. Set B ran each build about 35 % slower than set A under the others' load (its runs had 2.5 and 3.6 CPUs on average, A's 3.3 and 5.2), so the whole run's few-% change is not resolved; the climate stage's cut (0.81 in the pairs, 0.75 in the ensembles at both lengths) is the saving, roughly 40 to 50 s of the quiet gate run (the climate stage about 200 s per 1000 Myr after its speed-ups).
+  - **P4C20's time:** `tools/review/bench-quiet.py` pairs (sets A and B, both orders, a preset file for P4C20), 200 Myr, master's `earthlike_full_16k` against the branch's with `tectonics.time_step_myr` 4: master 280.8 s (A) against P4C20 210.6 s (B), 0.750; swapped, P4C20 215.6 s (A) against master 290.8 s (B), 0.741; geometric mean 0.746 (the group's stages 0.680 and 0.628). With ensemble stage sums of 0.59 and 0.58 at 500 and 1000 Myr, about a third of the gate run; rejected on the planet.
+  - **Verdict unchanged:** C20 leaves the planet within master's seed spread and cuts the climate stage by a fifth to a quarter; a 4-Myr step still raises the high ground by 2.2 to 2.9 km, the present by 2.4 to 3.0 °C and its CO₂ 2.5 to 3.1 times, and cuts the carbonate by 45 to 49 %. Docs: plates.md "Again on master of 2026-10-19" and "Time on that master", climate.md "Again on master of 2026-10-19", the SCL-038 row.
+- **Chosen:** C20, in the four pipeline presets and the four built-in earthlike presets (`climate.snapshot_every_myr` 20; the default and `planet_world_4k` stay at 10). SCL-038's row, climate.md "The climate snapshot every 20 Myr", preset-coverage.md and the field and module docs all say so.
+- **Not landed:**
+  - P4, P4S2 and P3: each makes the planet worse in the ways above. P4S2 would save the most at a modest cost to the checks (about 45 % of the group's stage time), once the high ground no longer depends on the step.
+  - "L1 written less often": `l1_every_steps` must be 1 with a surface or climate stage, so this needs a coarser clock for those stages, which is a session coupling change and was not tried.
+  - Stepping the surface at the plate cadence is master's setting already (`substeps` 1); sub-stepping is P4S2.
+  - A 10-Myr snapshot with 4-Myr steps (P4C20) was not run.
+- **Tests.** `climate::tests::the_climate_runs_in_the_coupled_pipeline_and_resumes` (60 Myr on `pipeline_quick_16k`) now expects 4 due snapshots (t = 2, 20, 40 and 60 Myr) instead of 7. `structure::tests::the_stage_never_panics_however_dense_the_structures` runs 300 Myr instead of 200: with the snapshot every 20 Myr and master's plates part 1, 200 Myr reached a longest history of 101 over the four runs (it needs more than 127); 300 Myr reaches 162 to 286 on every run (with 10-Myr snapshots, 200 Myr reached 210 on one run).
+- **Determinism.** No test asserting identical output across thread counts or runs was touched or turned into a tolerance test.
+- **Gates.** On the test VM after the merge of master b337fa73 (77cb5324, the GPU compute path): `cargo test --workspace --no-fail-fast` all ok (core lib 728 passed, 4 ignored); clippy `-D warnings` clean; `cargo fmt --check` ok; `cargo deny check licenses bans` ok; `./gradlew build test`: tests=362, failures=0, errors=0, skipped=2; `claims_counts.py --write` after the docs: 2,561 active rows, 297 verified, 228 merged, no change. After the merge of master fde7e021 (5a3b0725) the same, with core 725 passed and Gradle tests=361. Earlier, after the rebase onto master 32589362: `cargo test --workspace --no-fail-fast` (core lib 714 passed and 1 failed, the dense-structures test, then changed as above and passing alone in 268 s; every other test binary ok); clippy `-D warnings` clean (again after the test change); `cargo fmt --check` ok (again after the change); `cargo deny check licenses bans` ok; `./gradlew build test`: tests=361, failures=0, errors=0, skipped=2; `claims_counts.py --write`: 2,561 active rows, 297 verified, 228 merged, no change.
+- **Choices** (mine, can be undone):
+  - per Myr rather than per step for every rule above;
+  - a ceiling on the confirmation span, a floor on the grace and the timeout;
+  - the trench share as a half-life;
+  - the per-step checks scaled to 2 Myr;
+  - mud measured per Myr of the landscape step;
+  - VOL-010's forgiven step left per step;
+  - C20 measured with master's binary;
+  - the earthlike preset descriptions left as committed;
+  - P3 1000 run after the others;
+  - the timing screen of P4S2 and P3 dropped for the 1000-Myr C20 pair, since both were rejected on science and their stage times are in the tables;
+  - one round of the 1000-Myr pair (the first measurement);
+  - master merged into the branch the second time (the coordinator's word), after one more rebase onto e2166684 that the merge then built on;
+  - the re-measurement with the shipped x86-64-v3 builds, both orders of the 1000-Myr pair;
+  - P4C20 rather than P4 with 10-Myr snapshots (the setting that would ship), and P4S2 and P3 not re-run (the 4-Myr step still fails on the planet);
+  - my gate job on the rebased tree stopped when the coordinator's message made it stale.
+- **Files.**
+  - `crates/deeptime-core/src/{params.rs, plates/{check,dynamics,mod,pools,ridges,rifting,shortening,state,subduction}.rs, structure/{deform/feature.rs,tests.rs}, surface/{mod,params}.rs, climate/{mod,params,tests}.rs}`
+  - the 13 preset JSONs under `crates/deeptime-core/presets/`
+  - `crates/deeptime-core/tests/{presets/planet_world_4k.json,share-codes.json}`
+  - `crates/deeptime-viewer/assets/editor_fields.json`
+  - `docs/design/plate-force-balance.md`
+  - `docs/science/{plates.md,climate.md,claims.md,extraction-notes/preset-coverage.md,ledger/{PLT,DEF,ERO,CRE,CHK,SCL}.md}`
+  - `tools/review/p1-27-exp.sh`
+  - STATUS.md
+- **Next.**
+  1. Find why the high ground rises with the plate step: test the advection blur by advecting twice per 4-Myr step.
+  2. Then P4S2 (`tectonics.time_step_myr` 4, `surface.substeps` 2) is one preset change.
+
+### 2026-10-19: GPU compute path through wgpu, CPU path kept; the amplifier's middle passes run on the GPU, 8 to 9 times faster on the laptop's Radeon, the amplify stage 6 to 11 s shorter (coordinator's task after Ben's decision of 2026-10-18 "performance is far more important"; agent worktree agent-a1265f3344b19b0c1, branch worktree-agent-a1265f3344b19b0c1 from master 584b1241, masters 5cf2f9bb, e2166684 and c767da2c merged in; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Design note:** `docs/design/gpu-compute.md` (kernel ranking by profile seconds, selection and fallback, memory, TDR, backends, natives per platform, testing, the Amdahl estimate, the measurements, the next kernels). Science page: `docs/science/young-landscape-and-amplifier.md`, "The amplifier on a GPU (2026-10-18)"; no constant or law changed, so no ledger row.
+- **What changed.**
+  - New crate `crates/deeptime-gpu` (wgpu 30.0.1 with Vulkan, Metal and DX12; bytemuck): the device, the adapter ranking and the CPU fallback, buffers, kernels and dispatches split into bands of at most 4 Mi cells for Windows' TDR. No Minecraft, no JNI, no simulation.
+  - `deeptime-core`: feature `gpu`; `compute.rs` (`ComputeMode` auto, cpu, gpu; `DEEPTIME_COMPUTE`); `Session::set_compute`; one dispatch point `amplify::kernels::PassDevice` with `middle_cpu` as the CPU path; `amplify/gpu.rs` (WGSL for the flow normaliser, drainage area, stream-power cut, thermal, deposition and the glacial pass); the tile loop runs a tile on the device and reruns it on the CPU after any device error; `amplify::streams_on` tiles a level the device could not keep whole.
+  - CLI `--compute auto|cpu|gpu` on run, resume, stage and bench. JNI `createWith` flags 4 (cpu) and 8 (gpu), both together an `IllegalArgumentException`. Java: `SimSession.Compute`, `server.json` key `compute` (`ServerConfig`, `FirstStartGenerator`); Create World stays auto.
+  - `notes.json` gains `compute` (mode, device, device tiles, tiles, error); the stage's summary line ends in `compute=...`; the timings gain `transfer`.
+  - `flake.nix`: the Vulkan loader on the dev shell's library path, Mesa's lavapipe added through `VK_ADD_DRIVER_FILES`.
+  - `deeptime-jni` turns the feature on for every target except macOS (design §11).
+- **Found while measuring (contradicts the first design).**
+  - At the default 4 GiB cap the full 16k last level fitted whole for the CPU (3,918 MiB at its fullest) but not with the device's host share, so a forced GPU ran nothing (`device_tiles` 0 of 1). Fix: `streams_on` counts the device's share in the stream decision and tiles the level; the GPU then ran 8 of 8 tiles. Test: `auto_tiles_a_level_the_device_could_not_keep_whole` (a stub device, no GPU).
+  - The driver's memory is outside the allocator's count: `auto`'s probe loading and rejecting lavapipe raised `tests/memory_estimate.rs`'s resident peak from 99.9 and 98.3 MiB to 137.5 and 138.8 MiB with the counted peak 95.3 MiB in all four (`DEEPTIME_COMPUTE` auto and cpu alternating, twice each, on the VM). That test now runs on the CPU. A hardware driver's share is not measured.
+  - The laptop's GPU reports itself as "AMD Radeon 8050S Graphics (RADV STRIX_HALO)", Mesa 26.1.8, integrated; the decisions log and CLAUDE.md call it the 8060S.
+- **Correctness on lavapipe** (VM, `cargo test -p deeptime-core --features gpu gpu -- --nocapture` through `tools/remote/detach.sh`): one glaciated window 192 x 64, z within 1.8e-4 m (mean 2.9e-7), eroded 1.3e-5, sediment 2.2e-5, incision cap 1.7e-4, no cell over 1 cm; glacial carved 3,033.548126 against 3,033.548085 m-cells over the same 1,276 glacier cells; floods identical. The tiled ladder at L3 384 x 128: z within 9.8e-4 m.
+- **A 100 Myr planet, CPU against the GPU forced on lavapipe** (VM; `deeptime stage young --length-myr 100 --threads 8` on `earthlike_full_16k`, scattered, then `deeptime stage amplify --in young100.ckpt --threads 8 --bake --compute cpu|gpu`): the GPU ran 8 of 8 tiles, error null. `tools/review/p1-17-cmp.py`: 61 files, 7 differ (elevation, detail amplitude, rivers, horizons, the keyframe and its index, the manifest). `tools/review/p1-17-hyps.py`: every figure the same (land 0.226, z50 455 m, z90 1,908 m, above 2 km 0.094, ice 0.075, T 14.9 °C; CO2 551.208 ppm in both, the checkpoint's, since the amplifier runs after the climate). Cell by cell: the baked elevation differs in 0.0006 % of cells by at most 0.12 blocks, the detail amplitude in 0.0001 % by at most 0.06 blocks. Walls 63.8 s CPU, 66.5 s GPU (lavapipe on 32 cores; not a speed figure).
+- **Speed on the laptop** (Ben's bench rule of 2026-10-18: binary built on the VM with `cargo zigbuild --release -p deeptime-cli --target x86_64-unknown-linux-gnu.2.35`, the VM's 100 Myr checkpoint, `systemd-run --user --scope -p CPUQuota=800% nice -n 19 deeptime stage amplify --in young100.ckpt --threads 8 --compute gpu|cpu [--mem-cap 8589934592]`, three pairs a set alternating which arm goes first, no other heavy job; load 5 to 7 from desktop services). Wall s, stage total s, ported passes (erode + glacial + thermal + deposit) s:
+  - default cap: GPU 21.0, 21.6, 21.5 (total 16.8, 17.4, 17.3; 8 of 8 tiles); CPU 27.3, 27.7, 28.1 (total 23.2, 23.5, 23.8; whole).
+  - 8 GiB cap: GPU 18.0, 20.2, 18.1 (total 13.6, 15.9, 13.7; whole); CPU 30.2, 29.2, 29.9 (total 25.9, 24.9, 25.5).
+  - Means: the ported passes 11.3 and 12.7 s on the CPU, 1.4 s on the GPU with transfers (8 to 9 times); the stage 23.5 to 17.2 s in tiles, 25.4 to 14.4 s whole. Every run printed the same summary (mean change 37.6 m, eroded 2.458e4 km³, glacial carved 1.203e4 km³).
+  - No 1000 Myr A/B: the path touches only the amplify stage, so a pair would show 6 to 11 s inside a 20-minute run's noise.
+- **Headline (estimated, design §9).** About 513 s of the 1,242.8 s run is grid work on the critical path a compute shader can do; on a mid-range GPU the ten ranked kernels would take an estimated 290 to 400 s off (to about 845 to 955 s); an infinitely fast GPU leaves about 730 s. The amplifier alone is 6 to 11 s of it.
+- **Natives** (design §11; VM, `tools/natives/build-natives.sh`). At the branch point, release profile: all eight libraries built and passed the script's checks with no new build tool, SDK or licence. Linux (gnu, musl): Vulkan, loaded at run time from `libvulkan.so.1`; links as before, GLIBC 2.17 at most. Windows: DX12 and Vulkan; adds `dxgi`, `setupapi`, `oleaut32` and `user32` imports (all part of Windows); loads `d3d12.dll`, `dxcompiler.dll` or else FXC's `d3dcompiler_47.dll`, `vulkan-1.dll`. Size +4.7 MB (+34 %) on linux-x86_64-gnu, +5.9 MB (+35 %) on windows-x86_64. macOS: **off**; the zig cross-build has no Apple SDK, and with the feature forced on the macos-aarch64 link fails, "unable to find dynamic system library 'objc'". After master 5cf2f9bb's script (ship profile, baseline and x86-64-v3): linux-x86_64-gnu 16,445,360 and 16,443,200 bytes, windows-x86_64 21,533,696 and 21,553,664 bytes, every check passed (`build-natives.sh --only linux-x86_64-gnu,windows-x86_64`).
+- **Gates** (VM, through the admission tool). Before the merge of master: `cargo fmt --check` ok; `cargo clippy --workspace --all-targets -- -D warnings` ok; `cargo test --workspace --no-fail-fast`: 968 passed, 0 failed, 4 ignored (deeptime-core 712 including the tolerance test; deeptime-gpu 2); `cargo deny check licenses bans`: bans ok, licenses ok (no new licence); `./gradlew build test`: 355 tests, 0 failures, 2 skipped. After master 5cf2f9bb: the same gates, 978 passed, 0 failed, 4 ignored; Gradle 362 tests, 0 failures, 2 skipped; the natives through the merged script (above). On the final tree (masters e2166684 and c767da2c merged; `tools/remote/detach.sh start gpu-check6` running `cargo metadata --locked`, `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --no-fail-fast`, `cargo deny check licenses bans`, `cd neoforge && ./gradlew build test`): lock file ok, fmt ok, clippy ok, 982 passed, 0 failed, 4 ignored (deeptime-core 723, deeptime-gpu 2), bans ok, licenses ok, Gradle BUILD SUCCESSFUL with 362 tests, 0 failures, 2 skipped. No GameTests (the coordinator's batch).
+- **Tests changed.** `NativeLinkTest.createWithTakesTheEpochFlags`: 8 is now the GPU flag, so its unknown flag is 16; it runs a session with each compute flag and refuses both. `tests/memory_estimate.rs` runs on the CPU (above). New: the tolerance test, the stub-device stream test, `compute::tests::modes_parse_and_print`, two in `deeptime-gpu`, `ServerConfigTest.computeIsAutoCpuOrGpu`.
+- **Coordinator's calls (undoable).** The crate split (`deeptime-gpu`) and the core feature `gpu`; `DEEPTIME_COMPUTE`, `DEEPTIME_GPU_ADAPTER`, `DEEPTIME_GPU_MEM_MIB` (default 3 GiB); auto never takes a software adapter, forced `gpu` takes one and falls back to the CPU with a warning; wgpu's resource-creation budget at 90 %; bands of 4 Mi cells; JNI flags 4 and 8; `server.json` `compute`; Create World on auto; the amplifier's middle as the first port (nobody else was editing it); the static memory estimate unchanged; `streams_on`; `memory_estimate` on the CPU; the macOS natives without the GPU path for now; no 1000 Myr laptop A/B; masters 5cf2f9bb, e2166684 and c767da2c merged into the branch; the climate cells and `write_l1` not ported in this task (both freed during it), `write_l1` recommended as the next port with its design in §12.
+- **Next.** Merge, then the coordinator's GameTest batch. Then `plates:write_l1` (free since c767da2c; design §12 item 4: first time the relink against the layer pass, then the nearest query, the walk and the gather on the device behind one dispatch point in `plates/l1.rs`, boundary and gap cells on the CPU), then design §12's others as their CPU branches land: resident surface fields on the device, slope failure, the diffusion solve, advection with the climate's topography carry, the climate cells (free; sums feeding the carbon cycle in f64), flexure, the amplifier's mountain character. **Open question for Ben (through the coordinator):** how the macOS natives get the GPU path, by building the two macOS libraries on a Mac with Xcode (recommended: CI's macOS runners have it) or with an Apple SDK on the Linux build host (its licence allows use only on Apple hardware), or leaving macOS on the CPU (design §11).
+
+### 2026-10-19: P1-19 plates part 2: feedback, flexure, belts and fronts, and the neighbour queries of write_l1, detect and stats_margins. The plate stage is 1.25× faster side by side (15 s per 200 Myr) and the worlds are identical (profile items #3, #5; agent worktree agent-ad646ba0bbca1e26b, branch worktree-agent-ad646ba0bbca1e26b from master be80c6c1, master 32589362 merged before the measurements; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What changed** (every change identical: same files, byte for byte).
+  - **#3, feedback and flexure** (`plates/mod.rs`). The feedback's serial scatter stays. The flexure's sample (`flexure_of`) runs beside it in a `rayon::join`, since both only read the last sampling's links. The `flexure_sample` lap is now only the fallback for a step without feedback.
+    - A parallel gather over the links turned round (`FanIn`, a counting-sort transposition, each sample's additions in the serial order) was built twice and dropped. It lost to the serial scatter under the follower stage's load: feedback +2.35 s per 200 Myr (v1) and +1.9 s (v2, `pairs-fanin`).
+  - **#3, belts** (`plates/belts.rs`). `stack` runs every front's two distance fields at once. Each is plates part 1's `dijkstra_sparse`, sorted by vertex (`geometry::dijkstra_sorted`), so the sums run in the old order. The loops run over the reached set, not every sample. A front stacked after another cuts its field back to the shorter reach, which is exact (see `dijkstra_sorted`), or runs it again.
+  - **#3, fronts** (`plates/subduction.rs`). Split into begin, reach and finish. The read-only reach runs beside `belts::stack`, so the `belts` lap now holds it. The arcs' search from every front runs per rigid group (`geometry::dijkstra_parts`, each group's `dijkstra_sparse` on its own thread, exact because no allowed edge joins two groups).
+  - **#5, write_l1** (`plates/l1.rs`, `sphere/coupling.rs`).
+    - One nearest query finds the nearest visible sample's group first. The six-nearest search runs only where that fails.
+    - The 30 output layers are written in one pass.
+    - Each cell's row is interpolated inside the block loop; before, every cell's row was collected first (about 150 MB a step on full 16k).
+    - The coupling keeps its cells' unit vectors per row and column.
+  - **#5, detect** (`plates/subduction.rs`). Samples whose 5×5×5 block of cubes holds only their own plate are skipped (`Voxels`). This is exact because √3·h < 2h.
+  - **#5, stats_margins** (`plates/stats.rs`). One 8-nearest query per sample serves both the margins and the landmass links.
+  - **Tests.** `sorted_and_split_dijkstras_match_the_dense_one` (dense against sorted, per part and a shorter reach, bit for bit), `voxels_skip_only_samples_whose_nearest_share_their_plate` and `kept_unit_vectors_are_the_frames`.
+  - **Tooling.** `tools/review/p1-19-pair.sh` runs two builds side by side on the VM's sets A and B, then swapped, and compares each pair's worlds.
+- **Merge with plates part 1** (master 32589362): `geometry.rs` takes master's `dijkstra_sparse`. This branch's own kept-scratch search (`Reach`, `dijkstra_reached`) is gone, as the coordinator asked.
+- **Seconds.**
+  - **Setup.** The shipped x86-64-v3 builds (`tools/natives/gate-bins.sh <out> --only x86-64-v3`) of master 32589362 and of this branch, run with `tools/review/p1-19-pair.sh <master bin> master <branch bin> branch <out> earthlike_full_16k scattered_continents 200 8 ab,ba`. Lap timers are from `deeptime bench` through `bench-quiet.py`. The VM was loaded by other agents: others' busy CPUs averaged 14 to 19, load1 peaked at 91 in ba.
+
+  | Lap | ab: master A → branch B | ba: master B → branch A | Saved per 200 Myr (mean) |
+  |---|---|---|---|
+  | feedback + flexure_sample | 8.2 → 4.3 | 10.5 → 9.3 | 2.6 |
+  | belts + fronts | 6.7 → 3.3 | 7.9 → 5.3 | 3.0 |
+  | detect | 5.3 → 3.4 | 9.1 → 9.1 | 1.0 |
+  | stats_margins | 2.0 → 1.5 | 2.8 → 2.6 | 0.35 |
+  | write_l1 | 29.6 → 19.5 | 48.9 → 40.5 | 9.25 |
+  | plates stage | 69.4 → 48.8 | 103.1 → 93.4 | 15.2 (1.25×, geometric mean) |
+  | user CPU time | 1,744.2 → 1,665.6 | 1,644.4 → 1,613.0 | 55 |
+  | wall | 441.1 → 361.0 | 531.5 → 601.6 | not read: set A was the slow set in both orders |
+
+  - The wall times swing with the CPU set, not the build. Set B ran 4.84 and 3.24 CPUs busy against set A's 4.15 and 2.79, and the stages after the plates (amplify, finalize), which this branch does not touch, moved by 17 to 25 s with the set.
+  - Scaled to 1,000 Myr, the plate stage saves about 50 to 100 s. That is an estimate: the plates run beside the structure step, so the gate's wall gains less, and no full run was made.
+- **cmp** (`tools/review/p1-17-cmp.py` per pair): 68 of 68 files are byte-identical in both orders. Before the merge, against be80c6c1, both earlier pairs and the FanIn pair also gave 68 of 68.
+- **Tolerance tests.** None needed: every change is identical, and `tests/overlap.rs` (1 thread against 3, byte for byte) passes.
+- **Gates** (on the VM, the merged code):
+  - `cargo test --workspace`: all pass, deeptime-core lib 715 passed, 4 ignored.
+  - `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo deny check licenses bans` are clean. Clippy's one finding, a type alias for the feedback's result (`Feedback`), was fixed and checked again.
+  - `./gradlew build test`: tests=361, failures=0, skipped=2.
+  - After the measurements, master e2166684 (the climate and after-group items, no file in `plates/` or `sphere/`) was merged too. fmt, clippy, the core's plate and sphere tests (155 passed) and `tests/overlap.rs` pass on it.
+- **Not done.**
+  - Sharing one visible-sample tree between `stats_margins` and `write_l1`. Each builds its own; they meet in a step only every 10 Myr, so the saving is small and would cost signature changes.
+  - A kiddo scratch rewrite (`with_scratch` queries) for the neighbour searches.
+- **Next.** Merge into master with the other P1-19 branches. Then run the full 16k gate on the merged master: `tools/natives/gate-bins.sh <out>`, then `tools/review/bench-quiet.py ... <out>/deeptime-x86-64-v3 earthlike_full_16k scattered_continents 1000 8` and the same for `deeptime-baseline`.
+### 2026-10-18: Natives: a baseline and an x86-64-v3 build for each x86-64 platform, picked at runtime by a CPU probe, and the `ship` profile (fat LTO, one codegen unit) for everything that ships and for the gate. At 100 Myr on full 16k, ship v3 is 1.08× faster than plain `release` (CPU time 1.10×). Ship baseline matches it in wall time (1.00×) and is 1.03× by CPU time. The worlds are the same files (coordinator's task, Ben's decision of 2026-10-18 "Both, picked at runtime"; agent worktree agent-aa3973505c3dc829a, branch worktree-agent-aa3973505c3dc829a from master f221b3d3; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What ships.** A release jar holds 16 native files, up from 8:
+  - the eight platforms' baseline `deeptime_jni`;
+  - an x86-64-v3 `deeptime_jni` for linux-x86_64-gnu, linux-x86_64-musl, windows-x86_64 and macos-x86_64;
+  - a `deeptime_cpuprobe` for the same four.
+
+  The aarch64 platforms stay single. `natives.json` is schema 2: each library carries `variant` (`baseline` or `x86-64-v3`), and the probes have their own array. Jar paths are `natives/deeptime/<platform>/<variant>/<file>` and `.../<platform>/probe/<file>`. Each file extracts to its own `<version>-<sha12>/` directory (plan §6.4, §6.5).
+- **The probe** is a new crate, `crates/deeptime-cpuprobe`. It has no dependencies and one JNI function, `CpuProbe.probe()`, which returns `ABI << 32 | mask`. The mask covers the 16 features of x86-64-v3: `is_x86_feature_detected!`, which uses CPUID and checks XGETBV for the AVX family, plus CPUID 8000_0001h for LAHF/SAHF.
+  - **Why a library of its own:** the JVM binds a class's natives to the first library that exports them. If the baseline `deeptime_jni` answered the question, every later `DeepTimeNative` call would go to it, so the loader could never load v3.
+  - **Tests:** a Rust test holds Java's feature list to the Rust one.
+  - **Sizes:** 118 kB on Windows, 344 to 347 kB on Linux, 1.26 MB on macOS (the plan said "a few kB"; corrected).
+- **The loader** (`NativeLoader`, plan §6.5 step 6):
+  - **The choice.** It runs the probe from its own directory, once per JVM, and loads v3 only when every feature is present. Otherwise it loads the baseline.
+  - **The log.** The summary line logs the build and the reason, for example `build=x86-64-v3 ... (x86-64-v3: the CPU has every x86-64-v3 feature)` or `(baseline: the CPU lacks avx2, fma of x86-64-v3)`.
+  - **The override.** `-Ddeeptime.natives.variant` or `DEEPTIME_NATIVES_VARIANT` takes `baseline`, `x86-64-v3`/`v3` or `auto`; the property wins.
+    - A forced baseline skips the probe.
+    - A forced v3 is refused with a WARN on a CPU the probe says lacks the level. It is taken on trust only when the probe cannot run.
+  - **The fallback.** If v3 fails to link or answer, the loader logs it and loads the baseline.
+  - **Test hooks.** `-Ddeeptime.natives.forceFail=v3_link` exercises the fallback, and `-Ddeeptime.natives.testCpuFeatures=<mask>` stands in for the probe's answer.
+  - **GameTests.** The native GameTest's log line adds `build=`.
+  - **CI.** The x86-64 rows of `natives.yml` run `NativeSmoke` a second time with the baseline forced.
+- **Building.**
+  - **How v3 is built.** `-C target-cpu=x86-64-v3` goes in through `--config 'target.<triple>.rustflags=[...]'`, which merges with `.cargo/config.toml` (`RUSTFLAGS` would replace it, so the scripts refuse to run with it set). Each build names `--target`, so build scripts stay on the baseline CPU, and uses its own target dir, `target/x86-64-v3`. The shared settings are in `tools/natives/ship.sh`.
+  - **Checks on every v3 file.** Its version string must read `cpu=x86-64-v3`, and it must have at least 500 BMI1/BMI2 instructions (SHLX, SHRX, SARX, RORX, ANDN, MULX, BZHI) and more than four times the baseline's count.
+    - The first check counted FMA/AVX2 instructions. It gave 1,402 and 1,468 for the two builds, because runtime-dispatched dependencies carry those instructions in the baseline too.
+    - The BMI count gives 0 in every baseline build. The v3 builds measured 1,638 on Linux, 1,597 on Windows and 2,962 on macOS.
+  - **macOS install names.** They moved from `.cargo/config.toml` to each library's `build.rs`, so the probe does not claim `libdeeptime_jni.dylib`.
+  - **Gradle.** `hostNatives` builds the probe and the v3 build for an x86-64 host (`-PbaselineNativeOnly` skips v3). The dev jar on the VM held baseline, v3 and probe.
+- **The `ship` profile** (`Cargo.toml`) is `release` plus `lto = "fat"` and `codegen-units = 1`. Two things use it:
+  - `build-natives.sh`;
+  - `tools/natives/gate-bins.sh <out> [--plain]`, which builds `deeptime-baseline` and `deeptime-x86-64-v3` for the gate.
+
+  `p1-17-profile.sh` profiles the ship build (`P117_CPU=x86-64-v3` for v3). Everyday builds, Gradle's host native and the tests stay on `release`. The gate doc's new section "Running the gate: the shipped builds" has the commands and asks for both numbers.
+- **Measured: plain release against ship baseline and ship v3.**
+  - **Setup.** `earthlike_full_16k`, scattered continents, 100 Myr, 8 threads, `tools/review/bench-quiet.py`. Each pair ran side by side on sets A (0,16,2,18,4,20,6,22) and B (8,24,10,26,12,28,14,30), then the other way round. Plain is `release` built from this branch, whose core is master f221b3d3's. The VM was busy throughout: others' busy CPUs 14 to 25, siblings 33 to 88 % busy.
+  - **Speed-ups** (geometric mean of the two orders):
+
+    | build | over | wall | (each order) | CPU time |
+    |---|---|---:|---|---:|
+    | ship v3 | plain | **1.08×** | 1.085, 1.079 | 1.10× |
+    | ship baseline | plain | **1.00×** (second round) | 0.985, 1.019 | **1.03×** |
+    | ship v3 | ship baseline | 1.10× | 1.148, 1.048 | 1.06× |
+
+    The plain and baseline pair ran twice. The first round's orders gave 1.047 and 1.246, because set B was held back in one run (3.57 against 4.26 CPUs busy). The second, quieter round (siblings 14 to 23 % busy) gave 0.985 and 1.019. CPU time was 1.022 to 1.036 in all four pairs.
+
+    So fat LTO is worth about 3 % of the CPU time and v3 about 6 % more. By CPU time they compound: 1.027 × 1.060 = 1.089, against the 1.097 measured directly.
+  - **The worlds.** `p1-17-cmp.py` on every pair: 66 of 66 files equal. At 100 Myr, plain, ship baseline and ship v3 build the same world. Nothing requires it (Ben, 2026-10-18).
+  - **Tables:** docs/design/p1-17-benchmark-gate.md, "Running the gate: the shipped builds".
+- **Build cost** (measured; `CARGO_INCREMENTAL=0`, fresh target dirs, VM load 22 to 77):
+
+  | build | release | ship | ship v3 |
+  |---|---:|---:|---:|
+  | CLI, cold | 81 s | 274 s | 289 s |
+  | `deeptime_jni`, dependencies built | 75 s | 194 s | 259 s |
+  | CLI after a core change | 72 s | 323 s | 305 s |
+  | `deeptime_jni` after a core change | 65 s | 190 s | 245 s |
+
+  So ship costs 2.6 to 4.5× the build time.
+  - **The full cross-build.** `build-natives.sh` built the 16 files in 2,594 s on the loaded VM: 2.5 to 4.1 min per library.
+  - **CI.** The 2026-09-28 run of 8 release builds took 25 min. `natives.yml`'s build job timeout goes from 30 to 180 min; about 100 min is the 2-core runner estimate (inferred).
+- **Sizes.**
+  - **linux-x86_64-gnu `deeptime_jni`** (unstripped `cargo build`): release 19,692,808 B, ship 15,252,816 B (−22.5 %), deflated 5,101,915 → 4,666,210 B (−8.5 %).
+  - **The 16 shipped files** (bytes): Linux gnu 11,952,704 baseline and 11,960,992 v3; musl 11,948,480 and 11,955,984; Windows 15,407,616 and 15,433,216; macOS x86_64 19,665,336 and 19,651,184; aarch64 9.4 / 9.4 / 11.6 / 15.3 MB.
+  - **The release jar** is 57,690,314 B. Its natives deflate to 55.8 MB: baseline 35.5, v3 19.4, probes 0.9. The jar with master's 8 release-profile libraries is estimated at about 40.7 MB, so it grows by about 17 MB (1.42×; inferred, since there is no recent master jar).
+- **Gates** (test VM):
+  - `cargo fmt --check` passes.
+  - `cargo clippy --workspace --all-targets -D warnings` passes.
+  - `cargo test --workspace`: 966 passed, 0 failed, 4 ignored.
+  - `cargo deny check licenses bans`: ok.
+  - `./gradlew build test`: tests=361, failures=0, errors=0, skipped=2. These include the three new variant tests, each in its own JVM:
+    - `NativeVariantTest` loaded v3 and checked the probe against `/proc/cpuinfo`;
+    - `NativeVariantBaselineTest` saw `forced by -Ddeeptime.natives.variant=baseline`;
+    - `NativeVariantFallbackTest` saw the `v3_link` fallback.
+  - `NativeLoaderTest` covers the choice on a CPU without the level (a forced v3 is refused) and the override's order.
+  - `build-natives.sh`: 16 files, all checks passed (glibc floor 2.17, musl, PE, Mach-O install names, cpu level, BMI counts).
+  - No GameTests (the coordinator's).
+- **Choices made here** (all undoable):
+  - the probe is its own crate and library;
+  - schema 2 with a `variant` per library and a `probes` array;
+  - a forced v3 is refused on a CPU without the level;
+  - `-PbaselineNativeOnly`;
+  - the `testCpuFeatures` and `forceFail=v3_link` hooks;
+  - the BMI count as the v3 check, at ≥ 500 and > 4× the baseline;
+  - ship only for shipping and gate builds;
+  - the CI timeout of 180 min;
+  - the build-time job stopped after one incremental round to free the VM.
+- **PGO (#24, not done; what it would take, inferred):**
+  1. An instrumented ship build per variant: `-Cprofile-generate` through the same `--config` rustflags route, because `RUSTFLAGS` is refused.
+  2. Training runs of the CLI on the presets players use (quick and full 16k, both starts, 100 to 200 Myr each), on x86-64 only, so the Windows and macOS builds would reuse the Linux profile.
+  3. `llvm-profdata merge` from rustc's own LLVM (rustup's `llvm-tools`).
+  4. The real build with `-Cprofile-use`.
+
+  Costs and limits:
+  - The profiles go stale with every core change, so it is a per-release CI step: one instrumented build plus training, perhaps 30 to 60 runner minutes more.
+  - aarch64 has no hardware here to train on.
+  - BOLT on top is Linux-only.
+- **GPU (wgpu) later:**
+  - **Fits as is.** The CPU choice stays CPU-only: wgpu picks its adapter at runtime inside Rust. On Linux and Windows the libraries load Vulkan dynamically, and cargo-xwin's SDK has the DX12 import libraries.
+  - **macOS is the awkward one.** The Metal backend links `Metal.framework` and `QuartzCore.framework` at link time. cargo-zigbuild has no Apple SDK, so the Linux cross-build cannot link it. That needs either an SDK on the build host (Apple's licence: Ben's call) or a macOS CI runner (about 10× the minutes; the free plan's 2,000 a month).
+  - **Size.** wgpu inside `deeptime_jni` is carried twice on each x86-64 platform. A separate GPU library would need its own JNI class, as the probe has, or a C ABI that `deeptime_jni` opens.
+- **Scratch:** `/data/ban/deeptime-runs/natives-v3/`, deleted.
+- **Next:**
+  1. The coordinator merges this branch, runs the GameTests, and dispatches `natives.yml` once to see the real CI time and the OS matrix with both builds.
+  2. A 1000 Myr gate run of both ship builds with the commands in the gate doc.
+  3. Add `crates/deeptime-cpuprobe` to CLAUDE.md's Layout list (not edited here).
+### 2026-10-19: P1-19 plates part 1: the plate step's transition, record, collision and collapse in parallel, and resamplings without a new hull (profile items #2, #13, #19; agent worktree agent-a0c387a36d940833e from master be80c6c1)
+- **What changed.**
+  - **Commit 8faa692c (identical).**
+    - `transition.rs`: the plate, eligibility and boundary scans run in parallel. Seeds come from a cube grid (`Near`) instead of a scan of all seeds. Each side's reach is a sparse multi-source Dijkstra (`geometry::dijkstra_sparse`, a thread-local scratch reset only where it was touched), and the two sides run in a `rayon::join`.
+    - `collapse.rs`: the per-plate plans run in parallel and are applied in plate order.
+    - `collision.rs`: the plate lookup is lazy and the flood stops once the terrane welds.
+    - `rifting.rs`: `heal`'s fastest-pair scan is a parallel fold and reduce.
+    - `dynamics.rs`: `record_step`'s tallies, pieces and ocean ages run in parallel.
+    - `ridges::resample` takes the motion lap's all-sample tree.
+    - `deeptime bench` reads `DEEPTIME_BENCH_NO_OVERLAP` (a measurement knob: the structure step after the plates' instead of beside them).
+  - **Commit 6db4f51b (world-changing, bit level).**
+    - Every lattice is the Fibonacci sphere turned. `Geo::build` triangulates the unturned sphere and turns it, and a resampling's lattice is `Geo::turned` from the old one (`SphereMesh::turned`). The serial hull runs once per run, not at every resampling.
+    - Triangle and adjacency order follow the sphere's build, and edge lengths come from the unturned points. Only cocircular ties could flip a diagonal, and either diagonal is Delaunay.
+    - New tests: `a_turned_triangulation_is_the_turned_points_own` (1,000 to 100,000 points, three rotations each, outward and locally Delaunay on the turned points), `a_turned_lattice_is_the_built_one` and `the_sparse_dijkstra_matches_the_dense_one`. Science page: plates.md "The new lattice's triangulation".
+- **Seconds** (plate lap timers, `deeptime bench --preset earthlike_full_16k --start scattered_continents --length-myr 100 --threads 8` through `tools/review/bench-quiet.py`, side by side on CPU sets A and B, then swapped, on a VM loaded by other agents):
+
+  | Lap | ab1: master A → commit 1 B | ab2: master B → both commits A | Saved per 100 Myr |
+  |---|---|---|---|
+  | transition | 2.8 → 1.6 | 3.6 → 1.9 | 1.2 to 1.7 |
+  | collapse | 0.4 → 0.1 | 0.5 → 0.2 | 0.3 |
+  | collision | 0.8 → 0.2 | 1.0 → 0.2 | 0.6 to 0.8 |
+  | record | 1.9 → 1.0 | 2.7 → 1.3 | 0.9 to 1.4 |
+  | resample | 6.7 → 6.7 (the hull alone on the critical path) | 9.3 → 1.5 | 7.8 |
+  | plates stage | 47.5 → 44.8 | 62.2 → 49.2 | 2.7 (commit 1), 13.0 (both) |
+
+  - The resample lap on the branch stays at 0.9 to 1.5 s in every later run (ab3 to ab5). Scaled to 1,000 Myr, the five items save about 100 to 130 s of the gate run. That is an estimate: no full run was made.
+- **#19, the structure step on threads of its own: not landed.**
+  - **ab3** (branch with the overlap off on A, on B; the bench knob above):
+    - plates 39.3 s off, 43.0 s on: the structure work beside costs the plates 3.7 s per 100 Myr.
+    - structure 22.9 s off, 14.4 s on.
+    - So the overlap master already has saves 4.8 s per 100 Myr.
+  - Split pools, a session-pool experiment (`Session::set_beside_threads`), A against the default on B:
+    - **ab4**, plates on 6 threads and structure on 2: plates 43.4 against 41.6 s, structure 10.6 against 10.8 s, so 1.7 s worse.
+    - **ab5**, plates on the session's 8 threads and structure on 2 more: plates 32.3 against 31.9 s, structure 10.2 against 10.0 s, so 0.6 s worse.
+  - The experiment code was dropped. Only the overlap knob stays.
+- **cmp.**
+  - **ab1** (`tools/review/p1-17-cmp.py`, master against commit 1): 65 of 66 files are byte-identical. The other is `manifest.json`, whose differences are all in `notes.amplify`: `mode` in_memory against streamed, `tile_cells` 8192 against 2048, and the halo and last-digit sums that follow. Amplify picks its mode by the memory reservation at that moment (`surface/amplify.rs` `streams`), not from the plates.
+  - **ab2** (master against both commits): 63 of 66 files differ, as a world-changing change does.
+- **Planet check** (`p1-17-hyps.sh` through `p1-17-hyps.py`: 100 Myr, earthlike_full_16k up to the volcanoes, scattered continents, seeds 1 to 6, 4 threads).
+  - Every branch mean sits inside master's six-run range. Seed by seed the worlds diverge, as a bit-level change makes them.
+
+  | Figure | Master mean [range] | Branch mean [range] |
+  |---|---|---|
+  | land | 0.231 [0.197, 0.250] | 0.244 [0.225, 0.265] |
+  | z50 | 416 [390, 455] | 434 [394, 470] |
+  | z90 | 1,529 [923, 2,407] | 1,515 [794, 2,212] |
+  | >2 km | 0.072 [0.043, 0.123] | 0.073 [0.023, 0.115] |
+  | sea50 | 3,374 [3,110, 3,713] | 3,556 [2,940, 3,913] |
+  | crust | 0.413 [0.355, 0.436] | 0.418 [0.384, 0.437] |
+  | dry | 0.56 [0.53, 0.57] | 0.58 [0.54, 0.64] |
+  | T | 15.0 [14.4, 16.4] | 15.1 [14.5, 15.5] |
+  | CO2 | 520 [366, 861] | 552 [377, 735] |
+  | ice | 0.085 [0.039, 0.153] | 0.065 [0.023, 0.132] |
+  | sea level | 32 [13, 39] | 35 [15, 46] |
+  | active | 0.54 [0.46, 0.63] | 0.55 [0.46, 0.62] |
+
+  - The largest shifts are land (+0.013) and sea50 (+182 m). Each is about 1.2 to 1.4 standard errors of the difference of the means, which is noise.
+- **Tolerance tests.** None needed. `tests/overlap.rs` (1 thread against 3, byte for byte) still passes: commit 1's parallel parts keep their order, and the hull turn does not depend on the thread count.
+- **Gates** (on the VM):
+  - `cargo test --workspace`: all pass, deeptime-core lib 712 passed, 4 ignored.
+  - `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo deny check licenses bans` are clean. Clippy's two findings, a type alias in `collapse.rs` and `is_multiple_of` in a test, were fixed and checked again.
+  - `./gradlew build test`: tests=354, failures=0, skipped=2.
+- **Merge note.** `plates/geometry.rs` gains `dijkstra_sparse`, `Geo::turned` and a new `Geo::build`. The plates part 2 branch also works in `plates/` (not in these files' functions), so a conflict there is textual only.
+- **Next.** Merge with the other P1-19 branches, then run the full 16k gate (`deeptime bench --preset earthlike_full_16k --start scattered_continents --length-myr 1000 --threads 8`) on the merged master.
+
+### 2026-10-19: P1-19 exit item 1, the after-group items (#12, #11, #8, #7, #21, #22, #23): full 16k 10 % faster at 100 and 200 Myr, worlds identical (coordinator's task; agent worktree agent-a6f40f6aa1178a003, branch worktree-agent-a6f40f6aa1178a003 from master be80c6c1; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What changed** (commits 4267874a and 94ec11d7; no physical value changed, every change identical in output).
+  - **#12 keyframes** (keyframes.rs core and format, satellite.rs, water_view.rs, provinces.rs, session.rs): the keyframe render runs in parallel and each frame is compressed once.
+  - **#11 horizons** (new `structure/horizon_cache.rs`, bake_horizons.rs, world.rs, bake/strata.rs): the structure stage's last step bakes the horizon stacks once and keeps them LZ4-packed with a fingerprint of what the bake read (settings, scalars, a CRC32 per 65,536 values of every input array). The deposit stage's cover and the bake's strata pass take them when the fingerprint matches and bake their own otherwise. Not in checkpoints. The packed horizons (30.9 MiB at 100 Myr, 39.6 MiB at 200 Myr) wait in an anonymous file in the run's folder, made like the history's spill file: in memory they sent the amplifier's last level into tiles at 100 Myr (below).
+  - **#8 deposits** (deposits/mod.rs, petroleum.rs, recorded.rs): the stage's laps in its note (`millis`, printed on the bench's timings line), the petroleum charge per trap cell in parallel behind an exact bounding-box cut, each frame decoded once, dequantising from a table, the favourability layers built only for the frame that uses them.
+  - **#7 session part** (alloc.rs, structure/mod.rs): kept blocks are unmapped outside the cache's lock, in batches of 32; a block of no kept size takes the nearest kept block within a quarter of its size, resized with `mremap`; the structure step's leftover copies are freed on a thread of their own (`alloc::free_beside`).
+  - **#21 finalize** (bake/mod.rs, bake/project.rs, bake/water.rs, tilepack.rs, fsutil.rs): layers loaded and tiles compressed in parallel and applied in entry order; the projection's rewritten rasters go through `fsutil::Flusher` (each file fsynced on a thread of its own, renamed in the order written and each folder fsynced at the commit, before the manifest), not one syncfs, which would flush every writer on the filesystem; the top raise in parallel.
+  - **#22 volcanoes** (surface/volcanoes/mod.rs): cone footprints rendered in parallel before the serial loop; apply's 8 grid passes in parallel.
+  - **#23 history spill** (deposits/recorded.rs, spill.rs, FORMAT.md): fields added to a frame already on disk are appended as a record of their own; the frame's head says which record holds each field. A checkpoint still gets each frame as one record in field order.
+- **Measured** (`tools/review/bench-quiet.py`, `earthlike_full_16k`, scattered continents, 8 threads, master be80c6c1 and the branch built on the VM, two runs side by side in one `sim:earthlike_full_16k:16t` job, set A = 0,16,2,18,4,20,6,22, set B = 8,24,10,26,12,28,14,30, others' busy CPUs 15 to 21; worlds compared with `tools/review/p1-17-cmp.py`):
+
+  | run | master | branch | saved | cmp |
+  |---|---|---|---|---|
+  | 100 Myr, master A, branch B (4267874a) | 361.0 s | 336.0 s | 25.0 s | manifest differs: amplify in tiles |
+  | 100 Myr, branch A, master B (94ec11d7) | 335.9 s | 300.8 s | 35.1 s (10.4 %) | 66 files, 0 differ |
+  | 200 Myr, master A, branch B (94ec11d7) | 647.0 s | 581.8 s | 65.2 s (10.1 %) | 68 files, 0 differ |
+
+  Per item (stage times and the notes' laps, 100 Myr pair 2 / 200 Myr): #11 bake strata 12.8 to 1.3 s / 18.8 to 1.8 s; deposits 16.9 to 7.1 s / 40.8 to 16.0 s, #11 (the cover no longer bakes the horizons: its lap is 0.13 s) with #8 and #23; finalize 42.7 to 33.9 / 54.8 to 37.2 s, nearly all of it #11; #21's parts (bake water, climate, meta; projection load, write and commit) within noise, about 0 to 1 s; #22 volcano build 0.65 to 0.37 / 2.15 to 0.98 s and apply 0.25 to 0.23 / 0.66 to 0.50 s; structure 15.5 to 14.9 / 28.1 to 23.6 s (#12's keyframes, which count in the group's last stage, #23's appended fields, #7's freeing beside); #23 wrote 300.0 to 118.6 MiB / 643.9 to 256.1 MiB to the spill file. CPU: user 1,047 to 960 s / 2,131 to 1,952 s, system 51.7 to 38.9 s / 99.2 to 69.4 s (#7). Not attributed: plates, climate and surface moved by -6 to +1 s, young and amplify by -7 to -1 s (noise, or #7's allocator).
+- **Found: the amplifier's whole-raster test sits at the cap's edge.** At 100 Myr it ran in memory with about 12 MiB to spare (2,600 to 2,605 MiB in use, 148 MiB of it kept for reuse, 1,634 MiB asked under the 4,096 MiB cap); the 30.9 MiB of packed horizons in memory sent it into tiles, 12.9 s slower and different layers. At 200 Myr both builds run it in tiles. Any change that holds a few tens of MiB more at that point flips it; the session's history line now prints the kept bytes to show it.
+- **Gates** (VM): `cargo test --workspace` (core 713 passed, 4 ignored), `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all -- --check`, `cargo deny check licenses bans`, `./gradlew build test` clean. No test became a tolerance test; the three census tests leave out the deposit note's `millis` (a run's timing, not the world's).
+- **Skipped.** `area_share` in parallel (float order, about 0.15 s); pre-decoding the resample's sources (holds every source layer at once); a portable atan2 (Rust/Java parity).
+- **Coordinator's calls (undoable).** The Flusher over syncfs; the near-size reuse at a quarter with `mremap` and eviction batches of 32; `free_beside` in the structure attach; the horizons in a file of their own (in memory without a folder); `millis` in the deposit note and on the timings line; #23 brings a frame into memory when its history has no spill store.
+- **Next step.** The coordinator merges this branch with the plates, surface and climate branches and runs the 1000 Myr gate (`deeptime bench --preset earthlike_full_16k --start scattered_continents --length-myr 1000 --threads 8`, quiet, set A). #8 and #23 grow with the frame count (100 frames at 1000 Myr against 10 and 20 here).
+### 2026-10-19: P1-19 exit item 1, the climate stage takes a fifth less time (1.28x), bit-identically (coordinator's task; agent worktree agent-a9596de4877bee11c, branch worktree-agent-a9596de4877bee11c from master be80c6c1; Sonnet 5.5)
+- **What changed** (all in `crates/deeptime-core/src/climate/`; Ben's 2026-10-18 rule allowed bit changes with a 100 Myr proof, but every change below came out **identical**, so no ensemble or hyps proof was needed; the two row-subtotal sums I first wrote, in `land_terms` and `snapshot::ice_cover`, changed the last bits, so I put them back to the serial order).
+  - **#10, the 2-D energy balance** (`ebm2d.rs`, `ocean2d.rs`; identical). One rayon region per step instead of many: each block of rows runs the step's local terms, the atmosphere's and the slab's row sweeps and its share of the column sweeps; the two column sweeps run side by side (`rayon::join`); the ocean's sub-steps run in groups of at most `MAX_GROUP` = 4 on blocks that recompute their halo rows (`OceanTransport::sub_steps` / `substep_rows`, `SubstepRows`); the next step's local terms are fused into the last sweep; `northward` sums four edges at a time. Block size `h.div_ceil(2 * threads)`. Same expressions on the same inputs, so the bits do not move (`the_factored_solves_give_the_old_loop_bit_for_bit` now also runs a monthly-steps, multi-group case).
+  - **#16, the climate ice** (`mod.rs`; identical). `land_terms` finds each land cell's runoff, kernel at its temperature and kernel at its sea-level temperature once (the kernel and the notes' loop each found them before), rows side by side, then adds in cell order. `Geometry::volume_km3`, `area_where`, `sheet_cells`, `band_share` and the tail maps run in parallel (row sums collected, added in row order; the counts are whole numbers).
+  - **#14, the climate snapshot** (`snapshot.rs`, `percell.rs`, `coarse.rs`; identical). The fields only the land mask decides (land and sea nearby, basins, the continental share, each row's monthly sunlight) run in `rayon::join` beside the per-cell model and its flux fit; the orographic regimes run side by side and beside the winds' march; the march's eight blurs run side by side. The row loop finds each cell's coarse neighbours once (`CellTaps`, `MaskedTaps`: the corners and weights of `masked_at`, the same sums in the same order), each row's onshore share once per month, each cell's plateau factor once, and the sea-ice logistic's end values once (`Sharpen`). The four anomaly fields and the land sort run in parallel.
+  - **#18, the climate clock** (`ice.rs`, `mod.rs`; identical). `BandMargins::new` splits the margins in 64k-cell chunks, joins each band's and sorts bands side by side (`total_cmp` is a total order, so the lists are the serial pass's). The ice sheet's inputs (`bed_fine`, the coarse bed, snow line and precipitation; the old default `500 / 1000` became `vec![0.5; n]`) are built only when `ice_dynamics` is on (off in this preset).
+  - **Timers:** the snapshot's land fields now run beside the per-cell climate, and the orographic precipitation beside the winds' march, so those timers overlap and no longer add up to the snapshot's. The march has its own timer (`march`; it was inside `cells`).
+- **Measured** (VM, `tools/review/bench-quiet.py`, `deeptime bench --preset earthlike_full_16k --start scattered_continents --length-myr 100 --threads 8`, master binary against this branch's, side by side on set A (0,16,2,18,4,20,6,22) and set B (8,24,10,26,12,28,14,30), then swapped; two such pairs = four master and four branch runs; climate timers from `work/t8/manifest.json` `/notes/climate/millis`). **The VM was never quiet**: others' busy CPUs averaged 12 to 22 (the quiet baseline `base100-A` had 2.1) and the runs' SMT siblings were 14 to 73 % busy, so the absolute seconds are loaded ones; only the ratios between sides of one pair are comparable. Means over the four pairs, seconds per 100 Myr (10 steps and the present search):
+
+  | timer | master | branch | saved | item |
+  |---|---|---|---|---|
+  | climate stage (own timer) | 61.8 | 48.4 | 13.4 (1.28x) | all |
+  | snapshot | 23.5 | 13.8 | 9.7 | #14 + #10 |
+  | cells (the row loop and the march) | 12.1 | 3.8 (+ march 2.3, overlapped) | 8.2 | #14 |
+  | pc_years (2-D year loop) | 5.8 | 4.8 | 1.0 | #10 |
+  | ice | 5.2 | 3.5 | 1.7 | #16 |
+  | clock without the present search | 9.2 | 8.6 | 0.6 | #18 |
+  | present search (once per run) | 14.2 | 13.4 | 0.8 | #18 |
+
+  The quiet baseline's timers times these ratios (the loaded ratios applied to `base100-A`'s 35.3 s): the climate stage goes from 35.3 to about 27.6 s per 100 Myr, i.e. **about 7.7 s per 100 Myr saved, 70 s at 1000 Myr if the steps scale as ten times these** (the present search is a fixed 8 s; the 1000 Myr gate itself was not re-run, so that is an extrapolation, not a measurement). By item at 1000 Myr, the same way: #14 about 45 s, #16 about 10 s, #10 about 7 s, #18 about 4 s (estimates were 8 to 15, 8 to 13, 10 to 18 and 6 to 12). #14 paid more than estimated; #10 paid half what the isolated benchmark promised (30 to 38 % per 12-year run at 8 threads there, 17 % of `pc_years` in the real run, whose busy neighbours take the SMT siblings the halo recomputation wants); #18 hardly pays (the clock outside the present search is 5.6 s per 100 Myr and the sort was a small part of it). I kept all four: each is identical and small in code.
+- **Proof** (`tools/review/p1-17-cmp.py`, worlds of the 100 Myr runs): master set A against master set B, 66 files, 0 differ; master against the branch, on both sets and both orders, 66 files, 0 differ (two binaries: the one built after the row-subtotal sums were put back, and the final one). The first branch binary, with those two sums, had differed in 63 of 66 files after 100 Myr (global mean 15.0 C against 14.9, CO2 570 ppm against 551, sea level 30 m against 32 m): the carbon cycle amplifies a last-bit change in the weathering sum, which is why I put them back rather than argue it is noise. The hyps numbers and the global mean temperature are therefore master's to the digit (T 14.9 C, CO2 551 ppm, glaciated 0.075 of land, sea level 32 m), and no ensemble run was needed. No thread-count test became a tolerance test: `the_result_does_not_depend_on_the_thread_count` still passes bit for bit.
+- **Gates** (VM, admitted): `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace`: deeptime-core 710 passed, 4 ignored, every other crate green. `./gradlew build test`: BUILD SUCCESSFUL, tests=354 failures=0 errors=0 skipped=2.
+- **Not done, and why.** The present search (8 s quiet, 13 s loaded per run, fixed): it reruns the run's last 100 kyr with a bisection of the CO2 factor, and the plan was to leave the clock's physics alone. `thornthwaite`'s `powf` and per-block partial sums for the 2-D model's global means would change bits (allowed) but each is under 1 s per 1000 Myr. I did not touch topography's source, `surface/grid.rs` or the stages after the group.
+- **Choices** (coordinator's call): `MAX_GROUP` = 4 ocean sub-steps per group; block size `h.div_ceil(2 * threads)`; `vec![0.5; n]` as the dynamic-ice precipitation default; overlapping timers (documented in the code and above).
+- **Next:** the coordinator merges and runs the 1000 Myr gate on set A for the combined effect (the climate stage's own timer should fall by roughly 60 to 70 s on top of the other agents' stages). After this, the climate stage's remaining cost per 100 Myr (quiet, estimated): the present search 7.7 s (once), the clock 5.3 s, the snapshot 7.8 s (the 2-D model's year loop 3.2 s of it), the ice 2.1 s.
+### 2026-10-19: P1-19 surface speed-ups, worlds identical: the flood beside the carry, kept solver and log buffers, tabled advection sources, flexure and glacial passes in larger pieces (agent worktree agent-a9b6be484752187ab, branch worktree-agent-a9b6be484752187ab from master be80c6c1, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What changed** (commits dc98dda7, 1de3966e, 07416078). Every change is "identical": the same expressions in the same order, or order-free maxima and integer counts. No world changed, so no p1-17-hyps or ensemble run was needed, and no thread-count test became a tolerance test.
+  - **#4.** The first priority flood runs beside the second half of the carry and the setup (`rayon::join`). Neither touches `kind`, `base_z` or `filled`. New timer `flood_beside` (the join's wall time); `pflood`, `advect` and `setup` keep each half's own time.
+  - **#9.** The diffusion solves keep their vectors in a `diffusion::Workspace` in the scratch (hillslope, marine, spreading), released at the last step. `diffusion::step` (young stage, oracle, plateau check) sizes the solve's vectors after the sweeps, as before. Slope failure's serial moved sum runs beside the apply and the next iteration's marks and shares.
+  - **#7.** The carried strata log is written into the last step's log, kept as a spare (no new 515 MB log a step). The step fields' 26 grids stay in the scratch.
+  - **#15.** `advect::sources` does one rotation per plate and takes the cells' unit vectors from per-row and per-column tables. New test `the_tabled_sources_equal_the_per_cell_ones`.
+  - **#17.** Fields and events: class tags as bits; the frame sum in one pass; the events' region walks beside the frame's closing and packing; the craton distance beside the rest of the frame.
+  - **#20, flexure.** The carry's loops run in parallel. The step restricts its fine fields without building them (`restrict_by`) and reads the coarse rigidity, residual and deflection per cell. It sums the changes beside the copies and writes the seen elevation in place. The solver's Laplacian passes take the scale, the restoring term and the residual in the same pass; x and r are updated in one pass, and the error and r.z come from one.
+  - **#20, glacial.** The ice solve's seven gathers and its count are one pass. The footprint is built by bands of 16 rows in parallel. New sub-timers `glacial_ice`, `glacial_walk` and `glacial_sea`. The surface borrows the ice field for the flexure instead of copying it.
+- **Measured.** `pair.sh <tag> <myr>` on the VM runs `tools/review/bench-quiet.py <dir> <bin> earthlike_full_16k scattered_continents <myr> 8` in one `sim:earthlike_full_16k:16t` job: master (be80c6c1) on set A beside the branch on set B, then swapped. `p1-17-cmp.py` compares each pair's `work/t8`. p4 was one order only, with `DEEPTIME_MEM_TRACE` on both runs.
+
+  | Pair | Branch | Myr | Surface, master / branch s | Saved | Total, master / branch s | cmp |
+  |---|---|---|---|---|---|---|
+  | p1 mA / bB | 1de3966e | 100 | 126.3 / 117.3 | 9.0 s, 7.1 % | 480.7 / 469.8 | 66 of 66 equal |
+  | p1 mB / bA | 1de3966e | 100 | 85.3 / 73.8 | 11.5 s, 13.5 % | 322.7 / 311.8 | 66 of 66 equal |
+  | p2 mA / bB | 1de3966e | 200 | 171.8 / 164.3 | 7.5 s, 4.4 % | 511.4 / 509.7 | 68 of 68 equal |
+  | p2 mB / bA | 1de3966e | 200 | 158.8 / 142.6 | 16.2 s, 10.2 % | 486.3 / 467.7 | 68 of 68 equal |
+  | p4 mA / bB | 07416078 | 200 | 147.7 / 132.4 | 15.3 s, 10.4 % | 500.6 / 482.1 | 68 of 68 equal |
+
+  The VM was loaded throughout: p1's first half had load1 74.5 on average (the runs got 2.7 cores of 8), and the others 27 to 41 (3.4 to 4.7 cores). The saving is 4.4 to 13.5 % of the surface stage, 9.1 % on average. On the gate's 476.1 s surface stage that would be about 43 s (21 to 64 s) if the share holds over 1000 Myr. This was not measured at 1000 Myr or on a quiet machine.
+- **Attribution** (master minus branch, the four p1/p2 comparisons).
+  - **The flood, carry and setup group (#4, #7's log, #15):** 6.4 and 6.4 s at 100 Myr, 9.5 and 10.3 s at 200 Myr. This is what is left of the surface difference once every other timer's difference is taken out; the halves of the join overlap, so they cannot be timed apart.
+  - **`diffusion` (#9):** 0.9, 2.7, -1.2 and 3.0 s. Of that, `diffusion_solve` 1.1, 1.2, -1.4 and 0.8 s, and `slope_failure` -0.1, 1.5, 0.2 and 2.1 s.
+  - **`fields_events` (#17):** 0.3, 1.1, 1.0 and 1.2 s.
+  - **`flexure` and `glacial` (#20):** flexure 0.3, 0.7, 1.0 and 0.8 s; glacial 0.9, 0.5, 0.3 and 1.1 s.
+  - **Glacial sub-timers:** `glacial_ice` 1.9 to 4.8 s, `glacial_walk` 0.2 s per 100 Myr and 1.0 s per 200 Myr, `glacial_sea` 0.2 s at most. The serial erosion walk is too small for a parallel version to pay.
+  - **The other timers** (spl, marine_fill, strata, routing, spread, outputs, carbonate) moved by -1.2 to +0.4 s each: noise.
+- **Memory.**
+  - **Spills unchanged.** 30 frames and 314,621,407 B at 100 Myr; 60 and 675,135,909 B at 200 Myr. `reserved_peak_bytes` is 3 to 17 KB higher.
+  - **Resident peak.** 1de3966e was 12 to 32 MB (0.3 to 0.8 %) above master. 07416078 is level with master on p4: 4,233,608 KiB against 4,233,740.
+  - **Counted peak.** Master's sits at the 4 GiB cap (4,294,966,752 B). 1de3966e went 0.2 MiB over at 100 Myr and 9.3 MiB over at 200 Myr.
+    - **Where.** A diagnostic build (not committed) printed each rise of the peak by surface section: none was in the surface stage. A trace per phase then put it in the young stage, where `diffusion::step` sized all eight solve vectors before the sweeps.
+    - **After the fix (07416078).** Young is at the cap (4,294,965,824 against master's 4,294,967,088). The run's maximum is 4,294,976,304 B: 9 KB over, in climate (master's climate peak was 4,294,886,048).
+  - **The kept buffers raise the coupled phases' live peaks.** The spare log, the step fields and the solve workspace are about 0.95 GB at full 16k. Plates are 177 MiB higher, volcanoes 453, impacts 454 and surface 95, all at or under the cap, because the kept-block cache gives way. At a tighter cap they would send the history to disk sooner; at the 4 GiB default they spill nothing more.
+- **Found.** `surface::diffusion::parity::a_kept_workspace_gives_the_textbook_solve` (new in dc98dda7) failed its precondition: its 64x40 `ranges` case does not skip rows. That case is now `ranges(64, 41, 5, true, 1.0)`, the one the skipping test uses, which also refits the workspace between sizes.
+- **Gates** (VM, on 07416078). `cargo fmt --all --check` clean. `cargo clippy --workspace --all-targets -- -D warnings` clean. `cargo test --workspace --no-fail-fast`: 25 test binaries, 965 passed, 0 failed, 4 ignored. `cargo deny check licenses bans`: bans ok, licenses ok. `./gradlew build test` (neoforge/): 354 tests, 0 failures, 2 skipped.
+- **Not done.**
+  - **#9, the direction updated in place with saved halo rows.** It saves one grid stream per CG iteration, and the solve's algorithm is the world-changing agent's (multigrid).
+  - **#15, sharing the sources and the carried elevation with the climate topography.** That needs a transient slot in the world (world.rs, the session), outside this task's files.
+  - **#20, a parallel glacial erosion walk.** The walk is too small (above).
+  - **Glacial `UP_CHUNK` and `DOWN_GRAIN`.** Not tuned; nothing measured them.
+  - **World-changing extras** (the flexure changes' sum in parallel and the like). Each is under 1 s per 200 Myr.
+- **Choices** (the agent's): kept #7's buffers, since spills and resident peak are unchanged; the `flood_beside` timer; 16-row footprint bands; the diagnostic build stayed off the branch.
+- **Next step.** Merge this branch with the other P1-19 branches and run the full 16k gate (`deeptime bench --preset earthlike_full_16k --start scattered_continents --length-myr 1000 --threads 8`, quiet, set A). The surface's largest costs are now the diffusion solve (37 to 49 s per 200 Myr here) and slope failure (19 to 26 s), both for the world-changing solver work.
 ### 2026-10-18: The ice cover's edge test no longer needs ice on the test planet, and the census reads Expanded Ecosphere's subtropical forests as temperate (BIO-160) (coordinator's follow-up to the batch on master 3efc5ff8; agent worktree agent-a24d995879bff43ce, branch ice-followup-3efc from origin/master 16817738)
 - **Gradle `IceCoverTest.aCoversEdgeLiesHalfWayToItsBareNeighbour`** ("the planet's cover has an eastern edge"). Since the crust fix 25ae6723 the 4k test planet carries no ice at all: its record `notes.bake.climate.ice_cover` counts `cells` 0, `climate_cells` 0, `bodies` 0 (the Gradle fixture on master 3efc5ff8). The test now checks the rule on a layer it writes itself: a raw one-tile u8 pack laid out as FORMAT.md's tile pack (a 4 × 4 sheet of 12, a lone 6, a ramp 3, 7, 11 and a body across the x seam). It checks 34 edges on all four sides, the ramp's blend (5 half-way between 3 and 7) and the seam. Against the old bilinear read the test fails ("inside the half-way line of cell (4, 3) toward (-1, 0): expected 12 but was 8"; a one-core javac run on the VM with RasterSampler.cover swapped back). A second test, `thePlanetsCoverFollowsTheRuleAtEveryEdge`, checks every edge the baked planet has in any direction and fails if a cover has no edge, and checks the layer is bare where the record counts no cell. `IceCover.of(RasterSampler, Spec)` serves both.
 - **-PwithEe `climateConsistent`** ("C 0.628 < 0.630 (164 columns)"). The census's misses: `wythers:subtropical_forest` 49, `wythers:humid_tropical_grassland` 10, `minecraft:savanna` 1, `wythers:highlands` 1. The crust fix warmed the planet: no D, Dsub or E columns, and Cfa 79 land columns.

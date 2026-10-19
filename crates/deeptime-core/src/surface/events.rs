@@ -389,19 +389,91 @@ pub fn frame(
     v: &FrameView<'_>,
     last: bool,
 ) -> Result<(), CoreError> {
-    // Erosion pulses.
+    let found = find(v);
+    frame_found(world, st, v, found, last)
+}
+
+/// What a frame's events are found from, before any is tracked or emitted ([`find`]).
+pub struct Found {
+    pulses: Vec<Region>,
+    basins: Vec<Region>,
+    /// The flooded continental cells, one bit each, and the flooded and continental areas, km².
+    mask: Vec<u8>,
+    flooded: f64,
+    cont: f64,
+}
+
+/// The frame's erosion-pulse and basin regions and the sea over the continents. Reads only the
+/// frame, so the caller can run it beside other work; the three walks run beside one another,
+/// each serial as before (P1-19).
+pub fn find(v: &FrameView<'_>) -> Found {
     let on_pulse =
         |c: usize| v.elevation[c] > 0.0 && f64::from(v.erosion[c]) >= v.erosion_pulse_m_myr;
-    let found = regions(
-        v.d,
-        v.grid,
-        v.m_per_block,
-        &on_pulse,
-        v.erosion,
-        v.span_myr,
-        v.regime,
-        v.min_km2,
+    let on_basin =
+        |c: usize| v.elevation[c] > -2000.0 && f64::from(v.deposition[c]) >= v.basin_m_myr;
+    let found = |on: &dyn Fn(usize) -> bool, rate: &[f32]| {
+        regions(
+            v.d,
+            v.grid,
+            v.m_per_block,
+            on,
+            rate,
+            v.span_myr,
+            v.regime,
+            v.min_km2,
+        )
+    };
+    let sea = || {
+        let n = v.d.cells();
+        let mut mask = vec![0u8; n.div_ceil(8)];
+        let (mut flooded, mut cont) = (0.0, 0.0);
+        for c in 0..n {
+            if v.crust_type[c] as u8 == crate::plates::state::CONTINENTAL {
+                let a = cell_area_km2(v.grid, (c / v.d.w) as u32, v.m_per_block);
+                cont += a;
+                if v.elevation[c] < 0.0 {
+                    flooded += a;
+                    mask[c / 8] |= 1 << (c % 8);
+                }
+            }
+        }
+        (mask, flooded, cont)
+    };
+    let ((pulses, basins), (mask, flooded, cont)) = rayon::join(
+        || {
+            rayon::join(
+                || found(&on_pulse, v.erosion),
+                || found(&on_basin, v.deposition),
+            )
+        },
+        sea,
     );
+    Found {
+        pulses,
+        basins,
+        mask,
+        flooded,
+        cont,
+    }
+}
+
+/// [`frame`] from what [`find`] found in `v`.
+pub fn frame_found(
+    world: &mut WorldState,
+    st: &mut EventState,
+    v: &FrameView<'_>,
+    found: Found,
+    last: bool,
+) -> Result<(), CoreError> {
+    let Found {
+        pulses: found_pulses,
+        basins: found_basins,
+        mask,
+        flooded,
+        cont,
+    } = found;
+    // Erosion pulses.
+    let found = found_pulses;
     let mut pulses = std::mem::take(&mut st.pulses);
     st.counts[0] += track(
         world,
@@ -418,18 +490,7 @@ pub fn frame(
     )?;
     st.pulses = pulses;
     // Subsiding basins.
-    let on_basin =
-        |c: usize| v.elevation[c] > -2000.0 && f64::from(v.deposition[c]) >= v.basin_m_myr;
-    let found = regions(
-        v.d,
-        v.grid,
-        v.m_per_block,
-        &on_basin,
-        v.deposition,
-        v.span_myr,
-        v.regime,
-        v.min_km2,
-    );
+    let found = found_basins;
     let mut basins = std::mem::take(&mut st.basins);
     st.counts[1] += track(
         world,
@@ -448,19 +509,6 @@ pub fn frame(
     )?;
     st.basins = basins;
     // The sea over the continents.
-    let n = v.d.cells();
-    let mut mask = vec![0u8; n.div_ceil(8)];
-    let (mut flooded, mut cont) = (0.0, 0.0);
-    for c in 0..n {
-        if v.crust_type[c] as u8 == crate::plates::state::CONTINENTAL {
-            let a = cell_area_km2(v.grid, (c / v.d.w) as u32, v.m_per_block);
-            cont += a;
-            if v.elevation[c] < 0.0 {
-                flooded += a;
-                mask[c / 8] |= 1 << (c % 8);
-            }
-        }
-    }
     let f = if cont > 0.0 { flooded / cont } else { 0.0 };
     let s = &mut st.sea;
     if !s.started {

@@ -592,11 +592,11 @@ pub struct CollisionRec {
 }
 
 /// Why a collision state ended with no transfer or weld ([`PartingRec::reason`]): no continental
-/// crust at the front for more than `shortening::GRACE_STEPS` steps …
+/// crust at the front for longer than `shortening::GRACE_MYR` …
 pub const PARTED: &str = "parted";
 /// … the contact reversed its polarity …
 pub const REVERSED: &str = "reversed";
-/// … the contact closed (no overlap for `contact_timeout_steps`, or one of its plates died) …
+/// … the contact closed (no overlap for longer than `contact_timeout_myr`, or one of its plates died) …
 pub const CLOSED: &str = "closed";
 /// … its terrane was gone when the transfer fired (another collision of the step took it) …
 pub const EMPTIED: &str = "emptied";
@@ -735,6 +735,16 @@ impl NearestPlate {
         }
     }
 
+    /// Takes what `later` saw, as if its samples had been offered after this one's (P1-19: the
+    /// nearest of both, the earlier on a tie, as [`NearestPlate::offer`] keeps it).
+    pub fn merge(&mut self, later: &NearestPlate) {
+        for (b, l) in self.best.iter_mut().zip(&later.best) {
+            if l.0 > b.0 {
+                *b = *l;
+            }
+        }
+    }
+
     /// The plate nearest to point `k` (`u32::MAX` when nothing was offered).
     pub fn plate(&self, k: usize) -> u32 {
         self.best[k].1
@@ -782,13 +792,14 @@ pub fn piece_sizes(
 
 /// The sea-floor ages of the visible oceanic samples at `t`, sorted.
 pub fn ocean_ages(st: &PlateState, t: f64) -> Vec<f64> {
+    // P1-19: in parallel; `total_cmp` orders every value, so any sort gives the same list.
     let mut ages: Vec<f64> = st
         .samples
-        .iter()
+        .par_iter()
         .filter(|s| !s.is_hidden() && s.kind == OCEANIC)
         .map(|s| s.age_myr(t))
         .collect();
-    ages.sort_by(f64::total_cmp);
+    ages.par_sort_unstable_by(f64::total_cmp);
     ages
 }
 
@@ -1082,6 +1093,17 @@ pub struct Observed<'a> {
     pub guarded: &'a [u32],
 }
 
+/// What [`record_step`] counts over the samples (P1-19: per run of samples, then merged).
+struct Tally {
+    nearest: NearestPlate,
+    vis: Vec<u32>,
+    cont: Vec<u32>,
+    bnd: Vec<u32>,
+    visible: u32,
+    land: u32,
+    continental: u32,
+}
+
 /// Appends this step's record. `seen` is what the step measured (the fronts' lengths per plate,
 /// the boundary mix, the arcs), `pos` the samples' current positions, `last` whether the run's
 /// final step has been taken. Reads the state and the world's new events, changes only the record.
@@ -1098,8 +1120,6 @@ pub fn record_step(
         return;
     };
     let np = st.plates.len();
-    let (mut vis, mut cont, mut bnd) = (vec![0u32; np], vec![0u32; np], vec![0u32; np]);
-    let (mut visible, mut land, mut continental) = (0u32, 0u32, 0u32);
     // Each plate's rotation pole, both ends of its axis: which plate holds the nearest sample.
     let mut pole_of: Vec<Option<usize>> = vec![None; np];
     let mut poles = Vec::new();
@@ -1111,31 +1131,121 @@ pub fn record_step(
             poles.push(-w.normalize());
         }
     }
-    let mut nearest = NearestPlate::new(poles);
-    for (i, s) in st.samples.iter().enumerate() {
-        if s.is_hidden() {
-            continue;
-        }
-        let p = st.plate_of(i);
-        nearest.offer(pos[i], p);
-        vis[p as usize] += 1;
-        visible += 1;
-        if s.kind == CONTINENTAL {
-            cont[p as usize] += 1;
-            continental += 1;
-        }
-        if s.elevation_m > 0.0 {
-            land += 1;
-        }
-        // On the plate's boundary: a neighbour of another plate, or one hidden under another
-        // plate (the plate's own subducted crust: the trench side of a slab).
-        let edge = geo
-            .edges(i as u32)
-            .any(|(u, _)| st.samples[u as usize].is_hidden() || st.plate_of(u as usize) != p);
-        if edge {
-            bnd[p as usize] += 1;
-        }
-    }
+    // P1-19: the counts and the poles' nearest samples are taken in parallel over runs of samples
+    // (counts add up the same in any order; the runs' nearest samples are merged in sample
+    // order), with the continental pieces and the sea floor's ages beside them.
+    let (samples, groups) = (&st.samples, &st.groups);
+    let plate_of = |i: usize| groups[samples[i].group as usize].plate;
+    let tally = || Tally {
+        nearest: NearestPlate::new(poles.clone()),
+        vis: vec![0; np],
+        cont: vec![0; np],
+        bnd: vec![0; np],
+        visible: 0,
+        land: 0,
+        continental: 0,
+    };
+    let count = || {
+        (0..samples.len())
+            .into_par_iter()
+            .with_min_len(4096)
+            .fold(tally, |mut t, i| {
+                let s = &samples[i];
+                if s.is_hidden() {
+                    return t;
+                }
+                let p = plate_of(i);
+                t.nearest.offer(pos[i], p);
+                t.vis[p as usize] += 1;
+                t.visible += 1;
+                if s.kind == CONTINENTAL {
+                    t.cont[p as usize] += 1;
+                    t.continental += 1;
+                }
+                if s.elevation_m > 0.0 {
+                    t.land += 1;
+                }
+                // On the plate's boundary: a neighbour of another plate, or one hidden under
+                // another plate (the plate's own subducted crust: the trench side of a slab).
+                let edge = geo
+                    .edges(i as u32)
+                    .any(|(u, _)| samples[u as usize].is_hidden() || plate_of(u as usize) != p);
+                if edge {
+                    t.bnd[p as usize] += 1;
+                }
+                t
+            })
+            .reduce(tally, |mut a, b| {
+                a.nearest.merge(&b.nearest);
+                for (x, y) in [
+                    (&mut a.vis, &b.vis),
+                    (&mut a.cont, &b.cont),
+                    (&mut a.bnd, &b.bnd),
+                ] {
+                    x.iter_mut().zip(y).for_each(|(x, y)| *x += y);
+                }
+                a.visible += b.visible;
+                a.land += b.land;
+                a.continental += b.continental;
+                a
+            })
+    };
+    // Connected pieces of continental crust: continental samples joined along lattice edges
+    // whose ends are still close (a rift since the last resampling pulls them apart). The
+    // membership and each member's close edges (a bit per edge, the first 32) are found in
+    // parallel first; the walk then reads them.
+    let link = (PIECE_LINK_SPACINGS * env.norm.spacing_rad()).cos();
+    let pieces = || {
+        let member: Vec<bool> = samples
+            .par_iter()
+            .map(|s| !s.is_hidden() && s.kind == CONTINENTAL)
+            .collect();
+        let close: Vec<u32> = (0..samples.len())
+            .into_par_iter()
+            .map(|i| {
+                if !member[i] {
+                    return 0;
+                }
+                geo.edges(i as u32)
+                    .take(32)
+                    .enumerate()
+                    .filter(|&(_, (u, _))| pos[i].dot(pos[u as usize]) >= link)
+                    .fold(0u32, |m, (k, _)| m | (1 << k))
+            })
+            .collect();
+        let mut pieces = piece_sizes(
+            samples.len(),
+            |i| member[i],
+            |i, out| {
+                out.extend(
+                    geo.edges(i as u32)
+                        .enumerate()
+                        .filter(|&(k, (u, _))| {
+                            if k < 32 {
+                                close[i] & (1 << k) != 0
+                            } else {
+                                pos[i].dot(pos[u as usize]) >= link
+                            }
+                        })
+                        .map(|(_, (u, _))| u),
+                );
+            },
+        );
+        pieces.truncate(PIECES_KEPT);
+        pieces
+    };
+    // The sea floor's age, every step.
+    let (tally, (pieces, ages)) =
+        rayon::join(count, || rayon::join(pieces, || ocean_ages(st, env.t_myr)));
+    let Tally {
+        nearest,
+        vis,
+        cont,
+        bnd,
+        visible,
+        land,
+        continental,
+    } = tally;
     let spacing_km = env.norm.km(env.norm.spacing_rad());
     let round = |x: f64, scale: f64| (x * scale).round() / scale;
     let spin_cos = SPIN_ANGLE_DEG.to_radians().cos();
@@ -1170,27 +1280,6 @@ pub fn record_step(
         .collect();
     d.prev_omega = st.alive().map(|p| (p.id, p.omega)).collect();
 
-    // Connected pieces of continental crust: continental samples joined along lattice edges
-    // whose ends are still close (a rift since the last resampling pulls them apart).
-    let link = (PIECE_LINK_SPACINGS * env.norm.spacing_rad()).cos();
-    let mut pieces = piece_sizes(
-        st.samples.len(),
-        |i| {
-            let s = &st.samples[i];
-            !s.is_hidden() && s.kind == CONTINENTAL
-        },
-        |i, out| {
-            out.extend(
-                geo.edges(i as u32)
-                    .filter(|&(u, _)| pos[i].dot(pos[u as usize]) >= link)
-                    .map(|(u, _)| u),
-            );
-        },
-    );
-    pieces.truncate(PIECES_KEPT);
-
-    // The sea floor's age, every step.
-    let ages = ocean_ages(st, env.t_myr);
     let older = |limit: f64| ages.len() - ages.partition_point(|&a| a <= limit);
 
     // Births and deaths: from the events this step wrote.

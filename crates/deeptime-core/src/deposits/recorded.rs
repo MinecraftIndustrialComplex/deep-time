@@ -17,7 +17,9 @@
 //! otherwise fail, or when the gauge nears the cap after a step, and they are read back from disk
 //! when a reader asks. A frame on disk is its fields' LZ4 blobs back to back; its head (names,
 //! ranges, lengths) stays in memory, so the crust-origin offsets are read without the rest of the
-//! frame. A frame read from disk is not cached: memory stays flat, the OS's page cache does the
+//! frame. Fields added to a frame on disk (a stage stepping after the one that closed it) are
+//! appended to the spill file as a record of their own, and the frame stays on disk (P1-19: it was
+//! read back, added to and written again in full). A frame read from disk is not cached: memory stays flat, the OS's page cache does the
 //! caching, and a reader walking frames in order (the deposit engine's two passes) gets the next
 //! frame read ahead on a thread of its own while it works on this one. Where a frame lives never
 //! changes what it holds: the same bytes are written and read back, so a run is bit-identical
@@ -160,32 +162,87 @@ pub(crate) enum Record {
     },
 }
 
-/// A frame whose record is in a file.
+/// A frame whose data is in files: the record it was evicted with (or a checkpoint's), and after
+/// it one record per later [`RecordedHistory::add_fields`], appended to the session's spill file.
 #[derive(Debug)]
 struct DiskFrame {
     head: FrameHead,
+    /// The records holding the frame's fields, in the order written.
+    parts: Vec<Part>,
+    /// Where each of `head.fields` is: (its record in `parts`, its offset in that record).
+    at: Vec<(usize, u64)>,
+}
+
+/// One record of a frame on disk: blobs back to back, with their CRC32.
+#[derive(Clone, Debug)]
+struct Part {
     file: Arc<FrameFile>,
     offset: u64,
+    len: u64,
     crc32: u32,
 }
 
 impl DiskFrame {
-    /// The whole record, checked against its CRC32.
-    fn record(&self) -> Result<Vec<u8>, CoreError> {
-        let b = self.file.read(self.offset, self.head.record_len())?;
-        self.check(&b)?;
-        Ok(b)
+    /// A frame whose record is its fields back to back, in order (an eviction, a checkpoint).
+    fn whole(head: FrameHead, file: Arc<FrameFile>, offset: u64, crc32: u32) -> DiskFrame {
+        let len = head.record_len();
+        let mut o = 0u64;
+        let at = head
+            .fields
+            .iter()
+            .map(|f| {
+                o += f.len;
+                (0, o - f.len)
+            })
+            .collect();
+        DiskFrame {
+            head,
+            parts: vec![Part {
+                file,
+                offset,
+                len,
+                crc32,
+            }],
+            at,
+        }
     }
 
-    fn check(&self, record: &[u8]) -> Result<(), CoreError> {
+    /// The whole record (the fields' blobs back to back, in the head's order), each record read
+    /// checked against its CRC32.
+    fn record(&self) -> Result<Vec<u8>, CoreError> {
+        let parts = self
+            .parts
+            .iter()
+            .map(|p| {
+                let b = p.file.read(p.offset, p.len)?;
+                self.check(p, &b)?;
+                Ok(b)
+            })
+            .collect::<Result<Vec<_>, CoreError>>()?;
+        Ok(self.assemble(parts))
+    }
+
+    /// The record from its parts' bytes.
+    fn assemble(&self, mut parts: Vec<Vec<u8>>) -> Vec<u8> {
+        if parts.len() == 1 {
+            return parts.pop().expect("one part");
+        }
+        let mut out = Vec::with_capacity(self.head.record_len() as usize);
+        for (h, &(p, o)) in self.head.fields.iter().zip(&self.at) {
+            out.extend_from_slice(&parts[p][o as usize..(o + h.len) as usize]);
+        }
+        out
+    }
+
+    fn check(&self, part: &Part, record: &[u8]) -> Result<(), CoreError> {
         let actual = crc32fast::hash(record);
-        if actual != self.crc32 {
+        if actual != part.crc32 {
             return Err(CoreError::InvalidState(format!(
                 "history frame at t={} in {} (offset {}): CRC32 {actual:08x}, expected {:08x}",
                 self.head.t_years,
-                self.file.path().display(),
-                self.offset,
-                self.crc32
+                part.file.path().display(),
+                part.offset,
+                part.crc32
             )));
         }
         Ok(())
@@ -193,8 +250,9 @@ impl DiskFrame {
 
     /// Field `i`'s blob alone (not CRC-checked: the whole record is checked when it is read).
     fn field(&self, i: usize) -> Result<Vec<u8>, CoreError> {
-        let at: u64 = self.head.fields[..i].iter().map(|f| f.len).sum();
-        self.file.read(self.offset + at, self.head.fields[i].len)
+        let (p, o) = self.at[i];
+        let part = &self.parts[p];
+        part.file.read(part.offset + o, self.head.fields[i].len)
     }
 }
 
@@ -292,12 +350,12 @@ impl Frames {
             let head = FrameHead::of(frame);
             let len = head.record_len();
             store.wrote(len);
-            self.slots[k] = Slot::Disk(Arc::new(DiskFrame {
+            self.slots[k] = Slot::Disk(Arc::new(DiskFrame::whole(
                 head,
                 file,
                 offset,
-                crc32: crc.finalize(),
-            }));
+                crc.finalize(),
+            )));
             out.frames += 1;
             out.bytes += len;
         }
@@ -421,13 +479,17 @@ fn unpack(
             (f64::from(lo) + f64::from(code - 1) / (max - 1.0) * span) as f32
         }
     };
+    // Every code's value once, then a lookup per cell (P1-19: the same values, without a
+    // division per cell).
     let out: Vec<f32> = if bits == 8 {
-        raw.iter().map(|&b| value(u32::from(b))).collect()
+        let table: [f32; 256] = std::array::from_fn(|code| value(code as u32));
+        raw.iter().map(|&b| table[usize::from(b)]).collect()
     } else {
+        let table: Vec<f32> = (0..=u32::from(u16::MAX)).map(value).collect();
         raw.as_chunks::<2>()
             .0
             .iter()
-            .map(|b| value(u32::from(u16::from_le_bytes(*b))))
+            .map(|b| table[usize::from(u16::from_le_bytes(*b))])
             .collect()
     };
     if out.len() != cells {
@@ -486,7 +548,8 @@ impl RecordedHistory {
     /// Adds fields to frame `k` (packed like [`RecordedHistory::push`]), replacing fields of the
     /// same name: stages that step after the one that closed the frame publish into it this way
     /// (P1-07's `trap_structure` and host fractions). Keeps the frame's fields in name order. A
-    /// frame on disk comes back into memory.
+    /// frame on disk stays there: the added fields go to the spill file as a record of their own
+    /// (P1-19; a history without a spill store brings the frame back into memory).
     pub fn add_fields(
         &mut self,
         k: usize,
@@ -509,6 +572,56 @@ impl RecordedHistory {
         let mut f = self.lock();
         f.tick += 1;
         let tick = f.tick;
+        let on_disk = match (&f.slots[k], &f.store) {
+            (Slot::Disk(d), Some(store)) => Some((d.clone(), store.clone())),
+            _ => None,
+        };
+        if let Some((d, store)) = on_disk {
+            let (file, _) = store.file()?;
+            let blobs: Vec<&[u8]> = packed.iter().map(|p| p.data.as_slice()).collect();
+            let mut crc = crc32fast::Hasher::new();
+            for b in &blobs {
+                crc.update(b);
+            }
+            let offset = file.append(&blobs)?;
+            let len: u64 = blobs.iter().map(|b| b.len() as u64).sum();
+            store.wrote_fields(len);
+            let (mut head, mut parts, mut at) = (d.head.clone(), d.parts.clone(), d.at.clone());
+            let part = parts.len();
+            parts.push(Part {
+                file,
+                offset,
+                len,
+                crc32: crc.finalize(),
+            });
+            let mut o = 0u64;
+            for p in packed {
+                let fh = FieldHead {
+                    len: p.data.len() as u64,
+                    name: p.name,
+                    lo: p.lo,
+                    hi: p.hi,
+                    bits: p.bits,
+                };
+                let loc = (part, o);
+                o += fh.len;
+                match head
+                    .fields
+                    .binary_search_by(|x| x.name.as_str().cmp(&fh.name))
+                {
+                    Ok(i) => {
+                        head.fields[i] = fh;
+                        at[i] = loc;
+                    }
+                    Err(i) => {
+                        head.fields.insert(i, fh);
+                        at.insert(i, loc);
+                    }
+                }
+            }
+            f.slots[k] = Slot::Disk(Arc::new(DiskFrame { head, parts, at }));
+            return Ok(());
+        }
         if let Slot::Disk(d) = &f.slots[k] {
             let frame = d.head.with_data(&d.record()?);
             f.slots[k] = Slot::Memory {
@@ -670,12 +783,7 @@ impl RecordedHistory {
                     file,
                     offset,
                     crc32,
-                } => Slot::Disk(Arc::new(DiskFrame {
-                    head: fh,
-                    file,
-                    offset,
-                    crc32,
-                })),
+                } => Slot::Disk(Arc::new(DiskFrame::whole(fh, file, offset, crc32))),
             });
         }
         Ok(RecordedHistory {
@@ -764,7 +872,7 @@ impl FieldHistory for RecordedHistory {
                 let read = next.clone();
                 f.prefetch = std::thread::Builder::new()
                     .name("deeptime-history-read".into())
-                    .spawn(move || read.file.read(read.offset, read.head.record_len()))
+                    .spawn(move || read.record())
                     .ok()
                     .map(|job| Prefetch { frame: next, job });
             }
@@ -790,9 +898,8 @@ impl FieldHistory for RecordedHistory {
                     Some(p) => p.job.join().map_err(|_| {
                         CoreError::InvalidState("the history read-ahead thread panicked".into())
                     })??,
-                    None => d.file.read(d.offset, d.head.record_len())?,
+                    None => d.record()?,
                 };
-                d.check(&record)?;
                 let mut at = 0usize;
                 let parts: Vec<(&FieldHead, &[u8])> = d
                     .head
@@ -967,8 +1074,9 @@ mod tests {
     }
 
     /// Frames evicted to a spill file read back as the same frames, origins included; a frame on
-    /// disk that a later stage adds to comes back into memory; a clone shares the frames; the head
-    /// and records rebuild the same history; a damaged record is an error, not a wrong frame.
+    /// disk that a later stage adds to stays there, its added fields a record of their own; a
+    /// clone shares the frames; the head and records rebuild the same history; a damaged record is
+    /// an error, not a wrong frame.
     #[test]
     fn evicted_frames_read_back_identically() {
         let grid = GridDesc::for_planet("L1", 1024, 16).unwrap();
@@ -1016,20 +1124,57 @@ mod tests {
         assert_eq!(h.frame_times(), memory.frame_times());
         assert!(h == memory, "the same history wherever the frames are");
 
-        // A stage adds to a frame on disk: it comes back into memory, newest.
+        // A stage adds to a frame on disk: the added fields go to the spill file as a record of
+        // their own and the frame stays on disk, read as if it had been packed with them (a
+        // field replaced, one inserted between others, one after them all).
         let mut more = BTreeMap::new();
         more.insert("deeptime:trap_structure".to_owned(), vec![0.5f32; n]);
+        let replaced = "deeptime:shelf".to_owned();
+        more.insert(replaced.clone(), vec![0.25f32; n]);
+        more.insert("deeptime:f_between".to_owned(), vec![-1.0f32; n]);
+        more.insert("zz:last".to_owned(), vec![2.0f32; n]);
+        let (written, frames) = (store.written_bytes(), store.written_frames());
         h.add_fields(2, &more).unwrap();
-        assert_eq!(h.frames_on_disk(), 5);
+        assert_eq!(h.frames_on_disk(), 6);
+        assert_eq!(h.resident_bytes(), 0);
+        assert!(
+            store.written_bytes() > written,
+            "the added fields were written"
+        );
+        assert_eq!(store.written_frames(), frames, "no frame was written again");
         let got = h.frame(2).unwrap();
         assert_eq!(got.fields["deeptime:trap_structure"][9], 0.5);
+        assert_eq!(got.fields[&replaced][9], 0.25);
+        assert_eq!(got.fields["zz:last"][9], 2.0);
+        assert_eq!(got.fields["deeptime:f_between"][9], -1.0);
         assert_eq!(
             got.fields["deeptime:elevation_m"],
             want[2].fields["deeptime:elevation_m"]
         );
-        // Evicted again, it is written anew (the old record stays as garbage).
-        assert_eq!(handle.evict(u64::MAX).unwrap().frames, 1);
-        assert!(same(&h.frame(2).unwrap(), &got));
+        assert_eq!(h.origins(2).unwrap(), origins[2], "origins after the add");
+        // The same frame as one packed in memory with the fields.
+        let mut in_memory = memory.clone();
+        in_memory.add_fields(2, &more).unwrap();
+        assert_eq!(h.packed(2).unwrap(), in_memory.packed(2).unwrap());
+        assert!(same(&got, &in_memory.frame(2).unwrap()));
+        // Added to again, the newer field wins; nothing is left in memory to evict.
+        let mut again = BTreeMap::new();
+        again.insert("deeptime:trap_structure".to_owned(), vec![0.75f32; n]);
+        h.add_fields(2, &again).unwrap();
+        in_memory.add_fields(2, &again).unwrap();
+        assert_eq!(
+            h.frame(2).unwrap().fields["deeptime:trap_structure"][9],
+            0.75
+        );
+        assert_eq!(h.packed(2).unwrap(), in_memory.packed(2).unwrap());
+        assert_eq!(handle.evict(u64::MAX).unwrap().frames, 0);
+        let got = h.frame(2).unwrap();
+        // Read in order through it (the read-ahead reads every record of the frame).
+        for (k, w) in want.iter().enumerate() {
+            let f = h.frame(k).unwrap();
+            let w = if k == 2 { &got } else { w };
+            assert!(same(&f, w), "frame {k} after the add");
+        }
 
         // Head + records rebuild it, from bytes (in memory) or from the file (on disk).
         let head = h.head();

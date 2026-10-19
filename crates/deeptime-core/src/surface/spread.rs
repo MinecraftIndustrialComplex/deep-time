@@ -92,6 +92,27 @@ pub fn step(
     d0_km2_myr: f64,
     dt_yr: f64,
 ) -> Spread {
+    step_in(
+        &mut diffusion::Workspace::default(),
+        d,
+        h,
+        sea,
+        strength_height_m,
+        d0_km2_myr,
+        dt_yr,
+    )
+}
+
+/// [`step`] with the solve's vectors in a workspace the caller keeps (P1-19).
+pub fn step_in(
+    ws: &mut diffusion::Workspace,
+    d: &Dims,
+    h: &mut [f64],
+    sea: f64,
+    strength_height_m: f64,
+    d0_km2_myr: f64,
+    dt_yr: f64,
+) -> Spread {
     if d0_km2_myr.is_nan() || d0_km2_myr <= 0.0 {
         return Spread::default();
     }
@@ -103,8 +124,8 @@ pub fn step(
     if cells == 0 {
         return Spread::default();
     }
-    let before = h.to_vec();
-    diffusion::step(d, h, &kd, dt_yr);
+    let before = crate::alloc::copied(h);
+    diffusion::step_in(ws, d, h, &kd, dt_yr);
     let moved_m = h.iter().zip(&before).map(|(a, b)| (a - b).max(0.0)).sum();
     Spread { cells, moved_m }
 }

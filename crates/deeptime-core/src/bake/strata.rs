@@ -36,7 +36,10 @@ pub fn bake(
     out: &mut Out<'_>,
 ) -> Result<Value, CoreError> {
     let sp = p.structure.clone().unwrap_or_default();
-    let mut hz = bake_horizons::bake(world, p)?;
+    let started = std::time::Instant::now();
+    // The structure stage's horizons when it kept them for these inputs (P1-19).
+    let (mut hz, kept) = bake_horizons::bake_noting(world, p)?;
+    let horizons_ms = started.elapsed().as_secs_f64() * 1000.0;
     hz.check()
         .map_err(|e| CoreError::InvalidState(format!("the horizon bake failed its check: {e}")))?;
     // What a geologist would object to in the stacks as written (before the top raise, which
@@ -98,6 +101,9 @@ pub fn bake(
             "tongue_minor_share": sp.strata_minor_share,
             "rule": "each cell's stack is the Gaussian-weighted mean of its neighbours' height functions, cut at every key any of them has, each interval the class of the largest weighted thickness; the cell's own surface stays its first top",
         },
+        // How long the horizons took, and whether they were the structure stage's (a run's
+        // timing, like the bake's own `millis`).
+        "millis": { "horizons": horizons_ms, "horizons_kept": kept },
     }))
 }
 

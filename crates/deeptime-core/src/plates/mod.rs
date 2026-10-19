@@ -80,7 +80,7 @@ pub use state::PlateState;
 
 use crate::error::CoreError;
 use crate::params::{PlanetPreset, TectonicParams};
-use crate::sphere::{Coupling, SampleTree};
+use crate::sphere::{CellLink, Coupling, SampleTree};
 use crate::stage::{Stage, StageContext, StageEstimate, from_state, to_state};
 use crate::world::{Field, WorldState};
 use geometry::{Geo, Tree};
@@ -245,7 +245,10 @@ impl PlatesStage {
         let tectonics = self.preset.tectonics.clone();
         let env = self.env(&tectonics, step);
         let k = env.k;
-        let mut cones = self.apply_surface_feedback(st, world, &env)?;
+        // The surface's flexure under the samples, for the foreland basins of the collisions'
+        // record (`belts.rs`); measurement only. Sampled beside the feedback where it can be.
+        let collisions = st.contacts.iter().any(|c| c.collision.is_some());
+        let (mut cones, flexure) = self.apply_surface_feedback(st, world, &env, collisions)?;
         cones.resize(st.samples.len(), [0.0; 2]);
         lap(&mut clock, "feedback");
         // The land's gap budget (`gap_budget.rs`, measurement only): each process's change of the
@@ -255,10 +258,8 @@ impl PlatesStage {
                 gb.book(&st.samples, part);
             }
         };
-        // The surface's flexure under the samples, for the foreland basins of the collisions'
-        // record (`belts.rs`); measurement only.
-        let flexure = if st.contacts.iter().any(|c| c.collision.is_some()) {
-            self.sample_flexure(world)
+        let flexure = if collisions {
+            flexure.or_else(|| self.sample_flexure(world))
         } else {
             None
         };
@@ -288,7 +289,14 @@ impl PlatesStage {
             shortening::advance(st, &cache.geo, &pos, &tree, &env, resolved.seeds);
         book(st, gap_budget::Part::Shortening);
         lap(&mut clock, "shortening");
-        let stacked = belts::stack(st, &cache.geo, &pos, &env, &fronts, flexure.as_deref());
+        // The arcs' fronts and distance field read nothing the belts change: found beside them
+        // (P1-19).
+        let begun = subduction::fronts_begin(st, &cache.geo, &pos, &env);
+        let geo = &cache.geo;
+        let (stacked, arcs) = rayon::join(
+            || belts::stack(st, geo, &pos, &env, &fronts, flexure.as_deref()),
+            || subduction::fronts_reach(geo, &begun, &env),
+        );
         book(st, gap_budget::Part::Belts);
         // The collisions' crust budget: what crossed their fronts and what the belts and wedges
         // kept of it, km³ (Earth-normalized).
@@ -307,7 +315,7 @@ impl PlatesStage {
             .entry(belts::KEPT_GLOBAL.to_owned())
             .or_insert(0.0) += kept;
         lap(&mut clock, "belts");
-        let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env, &mut cones);
+        let pull = subduction::fronts_finish(st, &cache.geo, &env, &mut cones, begun, arcs);
         book(st, gap_budget::Part::Arcs);
         *world
             .globals
@@ -488,7 +496,7 @@ impl PlatesStage {
         // crust of one plate under the same plate would surface).
         let final_step = step >= self.total;
         if ridges::due(st, &env) || ((final_step || sutured) && st.resample_step != st.step) {
-            let geo = ridges::resample(st, world, &pos, &cache.geo, &env)?;
+            let geo = ridges::resample(st, world, &pos, &tree, &cache.geo, &env)?;
             // The accretion is thickening too (ledger: PLT-287); the surface's change counts as
             // the step's uplift, as the accretion's own rise does.
             let z: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
@@ -608,19 +616,21 @@ impl PlatesStage {
     /// the pools as felsic and mafic volcanic rock the same way, after the material (plate task
     /// 8: before, a cone was elevation only and its erosion stripped the crust under it).
     /// Returns, per sample, the cone rock it received (felsic, mafic, m; empty without feedback),
-    /// which the arcs and hotspots count inside their own rates.
+    /// which the arcs and hotspots count inside their own rates, and, when `flexure` asks, the
+    /// surface's flexure per sample ([`Self::sample_flexure`]), sampled beside the sums.
     fn apply_surface_feedback(
         &mut self,
         st: &mut PlateState,
         world: &mut WorldState,
         env: &Env<'_>,
-    ) -> Result<Vec<[f64; 2]>, CoreError> {
+        flexure: bool,
+    ) -> Result<Feedback, CoreError> {
         let cone_fields = [
             world.fields.remove(crate::surface::field::VOLCANIC_FELSIC),
             world.fields.remove(crate::surface::field::VOLCANIC_MAFIC),
         ];
         let Some(fb) = world.fields.remove(crate::surface::field::FEEDBACK) else {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), None));
         };
         let material = world.fields.remove(crate::surface::field::MATERIAL);
         // The surface's parts of the feedback, for the gap budget (`gap_budget.rs`).
@@ -631,7 +641,7 @@ impl PlatesStage {
             .collect();
         let grid = self.l1_grid()?;
         if fb.data.len() != grid.cells() {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), None));
         }
         let cone_fields: [Option<Field>; 2] =
             cone_fields.map(|f| f.filter(|f| f.data.len() == grid.cells()));
@@ -654,53 +664,73 @@ impl PlatesStage {
         }
         let coupling = cache.coupling.as_ref().expect("built above");
         let mesh = &cache.geo.mesh;
-        let tris = mesh.triangles();
         let n = st.samples.len();
-        let mut wsum = vec![0.0f64; n];
-        let mut zsum = vec![0.0f64; n];
-        let mut msum = vec![0.0f64; n];
-        let mut csum = vec![[0.0f64; 2]; n];
-        let mut psum = vec![[0.0f64; SP]; if parts.is_some() { n } else { 0 }];
-        for (c, l) in coupling.links().iter().enumerate() {
-            let t = tris[l.tri as usize];
-            let dz = f64::from(fb.data[c]);
-            let dm = material.as_ref().map_or(dz, |m| f64::from(m.data[c]));
-            let cone = [0, 1].map(|k| {
-                cone_fields[k]
-                    .as_ref()
-                    .map_or(0.0, |f| f64::from(f.data[c]))
-            });
-            let pc = parts
-                .as_ref()
-                .map(|p| std::array::from_fn::<f64, SP, _>(|k| f64::from(p[k].data[c])));
-            for (&v, &w) in t.iter().zip(l.w.iter()) {
-                let w = f64::from(w);
-                if w > 0.0 {
-                    let v = v as usize;
-                    wsum[v] += w;
-                    zsum[v] += w * dz;
-                    msum[v] += w * dm;
-                    csum[v][0] += w * cone[0];
-                    csum[v][1] += w * cone[1];
-                    if let Some(pc) = pc {
-                        for (a, x) in psum[v].iter_mut().zip(pc) {
-                            *a += w * x;
+        let tris = mesh.triangles();
+        let links = coupling.links();
+        #[derive(Clone, Copy, Default)]
+        struct Sums {
+            w: f64,
+            z: f64,
+            m: f64,
+            c: [f64; 2],
+        }
+        // The flexure's sample (`sample_flexure`) beside the feedback's sums, on another thread:
+        // both read the last sampling's links and neither writes what the other reads (P1-19:
+        // one after the other before). Each stays one pass over the cells in order.
+        let flex_field = world
+            .fields
+            .get(crate::surface::flexure::field::FLEXURE)
+            .filter(|_| flexure);
+        let points = cache.geo.points().len();
+        let ((sums, psum), flexure) = rayon::join(
+            || {
+                let mut sums = vec![Sums::default(); n];
+                let mut psum = vec![[0.0f64; SP]; if parts.is_some() { n } else { 0 }];
+                for (c, l) in links.iter().enumerate() {
+                    let t = tris[l.tri as usize];
+                    let dz = f64::from(fb.data[c]);
+                    let dm = material.as_ref().map_or(dz, |m| f64::from(m.data[c]));
+                    let cone = [0, 1].map(|k| {
+                        cone_fields[k]
+                            .as_ref()
+                            .map_or(0.0, |f| f64::from(f.data[c]))
+                    });
+                    let pc = parts
+                        .as_ref()
+                        .map(|p| std::array::from_fn::<f64, SP, _>(|k| f64::from(p[k].data[c])));
+                    for (&v, &w) in t.iter().zip(l.w.iter()) {
+                        let w = f64::from(w);
+                        if w > 0.0 {
+                            let a = &mut sums[v as usize];
+                            a.w += w;
+                            a.z += w * dz;
+                            a.m += w * dm;
+                            a.c[0] += w * cone[0];
+                            a.c[1] += w * cone[1];
+                            if let Some(pc) = pc {
+                                for (a, x) in psum[v as usize].iter_mut().zip(pc) {
+                                    *a += w * x;
+                                }
+                            }
                         }
                     }
                 }
-            }
-        }
+                (sums, psum)
+            },
+            || flex_field.and_then(|f| flexure_of(links, tris, points, f)),
+        );
+        let wsum = |v: usize| sums[v].w;
         let k = env.k;
         let dz: Vec<f64> = st
             .samples
             .par_iter_mut()
             .enumerate()
             .map(|(v, s)| {
-                if wsum[v] <= 0.0 {
+                if wsum(v) <= 0.0 {
                     return 0.0;
                 }
                 let z0 = s.elevation_m;
-                s.elevation_m = (f64::from(z0) + zsum[v] / wsum[v])
+                s.elevation_m = (f64::from(z0) + sums[v].z / wsum(v))
                     .clamp(k.trench_elevation_m, k.max_elevation_m)
                     as f32;
                 f64::from(s.elevation_m) - f64::from(z0)
@@ -712,10 +742,10 @@ impl PlatesStage {
             .par_iter_mut()
             .enumerate()
             .map(|(v, s)| {
-                if wsum[v] <= 0.0 {
+                if wsum(v) <= 0.0 {
                     return ([0.0; 2], 0.0);
                 }
-                let dm = msum[v] / wsum[v];
+                let dm = sums[v].m / wsum(v);
                 if dm < 0.0 {
                     pools::strip(&mut s.pools, -dm);
                 } else {
@@ -729,7 +759,7 @@ impl PlatesStage {
                     .into_iter()
                     .enumerate()
                 {
-                    let x = (csum[v][k] / wsum[v]).max(-f64::from(s.pools[p]));
+                    let x = (sums[v].c[k] / wsum(v)).max(-f64::from(s.pools[p]));
                     s.pools[p] += x as f32;
                     got[k] = x;
                 }
@@ -750,10 +780,10 @@ impl PlatesStage {
         if let Some(gb) = st.gap_budget.as_mut() {
             let mean = |sum: &dyn Fn(usize) -> f64| -> Vec<f64> {
                 (0..n)
-                    .map(|v| if wsum[v] > 0.0 { sum(v) / wsum[v] } else { 0.0 })
+                    .map(|v| if wsum(v) > 0.0 { sum(v) / wsum(v) } else { 0.0 })
                     .collect()
             };
-            let m = mean(&|v| msum[v]);
+            let m = mean(&|v| sums[v].m);
             let part = |k: usize| {
                 if psum.is_empty() {
                     vec![0.0; n]
@@ -773,10 +803,13 @@ impl PlatesStage {
                 data: applied_dz.into_iter().map(|x| x as f32).collect(),
             },
         );
-        Ok(applied
-            .into_iter()
-            .map(|(c, _)| c.map(|x| x.max(0.0)))
-            .collect())
+        Ok((
+            applied
+                .into_iter()
+                .map(|(c, _)| c.map(|x| x.max(0.0)))
+                .collect(),
+            flexure,
+        ))
     }
 
     /// The surface's flexure (`surface/flexure_m`) per sample, through the last L1 sampling's
@@ -786,36 +819,11 @@ impl PlatesStage {
         let field = world.fields.get(crate::surface::flexure::field::FLEXURE)?;
         let cache = self.cache.as_ref()?;
         let coupling = cache.coupling.as_ref()?;
-        let tris = cache.geo.mesh.triangles();
-        let n = cache.geo.points().len();
-        if coupling.links().len() != field.data.len() {
-            return None;
-        }
-        let mut wsum = vec![0.0f64; n];
-        let mut sum = vec![0.0f64; n];
-        for (c, l) in coupling.links().iter().enumerate() {
-            let x = f64::from(field.data[c]);
-            if !x.is_finite() {
-                continue;
-            }
-            for (&v, &w) in tris[l.tri as usize].iter().zip(l.w.iter()) {
-                let w = f64::from(w);
-                if w > 0.0 && (v as usize) < n {
-                    wsum[v as usize] += w;
-                    sum[v as usize] += w * x;
-                }
-            }
-        }
-        Some(
-            (0..n)
-                .map(|v| {
-                    if wsum[v] > 0.0 {
-                        sum[v] / wsum[v]
-                    } else {
-                        f64::NAN
-                    }
-                })
-                .collect(),
+        flexure_of(
+            coupling.links(),
+            cache.geo.mesh.triangles(),
+            cache.geo.points().len(),
+            field,
         )
     }
 
@@ -844,6 +852,44 @@ impl PlatesStage {
         }
         Ok(())
     }
+}
+
+/// [`PlatesStage::apply_surface_feedback`]'s cone rock per sample and the flexure per sample.
+type Feedback = (Vec<[f64; 2]>, Option<Vec<f64>>);
+
+/// The surface's flexure per sample through the links (`PlatesStage::sample_flexure`), for the
+/// `n` samples of `tris`; `None` where the field is not the links' grid.
+fn flexure_of(links: &[CellLink], tris: &[[u32; 3]], n: usize, field: &Field) -> Option<Vec<f64>> {
+    if links.len() != field.data.len() {
+        return None;
+    }
+    let mut wsum = vec![0.0f64; n];
+    let mut sum = vec![0.0f64; n];
+    for (c, l) in links.iter().enumerate() {
+        let x = f64::from(field.data[c]);
+        if !x.is_finite() {
+            continue;
+        }
+        for (&v, &w) in tris[l.tri as usize].iter().zip(l.w.iter()) {
+            let w = f64::from(w);
+            if w > 0.0 && (v as usize) < n {
+                wsum[v as usize] += w;
+                sum[v as usize] += w * x;
+            }
+        }
+    }
+    Some(
+        (0..n)
+            .into_par_iter()
+            .map(|v| {
+                if wsum[v] > 0.0 {
+                    sum[v] / wsum[v]
+                } else {
+                    f64::NAN
+                }
+            })
+            .collect(),
+    )
 }
 
 /// `WorldState::globals`: the volcano stage's cones handed to the pools as felsic volcanic rock
@@ -935,7 +981,7 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32]) {
         z_c: k.max_elevation_m,
         z_t: k.trench_elevation_m,
         z_floor: k.oceanic_floor_elevation_m,
-        trench_relax: k.trench_relax,
+        trench_relax: pools::trench_share(env.dt_myr, k.trench_half_life_myr),
         gravity: env.gravity,
     };
     let eroded: Vec<f64> = st

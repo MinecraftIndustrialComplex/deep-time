@@ -8,11 +8,9 @@ rustflags = ["-C", "target-feature=-crt-static"]
 [target.aarch64-unknown-linux-musl]
 rustflags = ["-C", "target-feature=-crt-static"]
 
-# Sable needed codegen-units=2 on Intel macOS to avoid a rustc hang; copied as a precaution.
-# Both macOS targets: a relocatable install name instead of the build machine's path (the linker's
-# default); System.load ignores it, but it keeps /home/runner/… out of the shipped library.
+# Sable needed codegen-units=2 on Intel macOS to avoid a rustc hang; copied as a precaution. It
+# outranks the `ship` profile's codegen-units = 1 there (rustflags come after the profile's flags).
+# The macOS install names (`@rpath/<file>` instead of the build machine's path) are set per
+# library by deeptime-jni's and deeptime-cpuprobe's build.rs, so the two dylibs never share one.
 [target.x86_64-apple-darwin]
-rustflags = ["-C", "codegen-units=2", "-C", "link-arg=-Wl,-install_name,@rpath/libdeeptime_jni.dylib"]
-
-[target.aarch64-apple-darwin]
-rustflags = ["-C", "link-arg=-Wl,-install_name,@rpath/libdeeptime_jni.dylib"]
+rustflags = ["-C", "codegen-units=2"]

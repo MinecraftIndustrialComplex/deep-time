@@ -642,7 +642,15 @@ impl YoungStage {
             })
             .collect();
         let nm = &sp.numerics;
-        diffusion::solve(&d, &mut h, &kd, dt, nm.diffusion_solver, nm.diffusion_tol_m);
+        diffusion::solve(
+            &mut diffusion::Workspace::default(),
+            &d,
+            &mut h,
+            &kd,
+            dt,
+            nm.diffusion_solver,
+            nm.diffusion_tol_m,
+        );
         if !avail0.is_empty() {
             let sea_mask: Vec<bool> = kind.iter().map(|&k| k == BASE).collect();
             let mut avail: Vec<f64> = (0..n)

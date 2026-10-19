@@ -41,6 +41,16 @@ class ServerConfigTest {
         assertEquals(Optional.of(new Presets.Timeline("supercontinent", 1000)), c.timeline());
         assertEquals(4L << 30, c.memoryCapBytes());
         assertEquals(0, c.threads());
+        assertEquals(SimSession.Compute.AUTO, c.compute());
+    }
+
+    @Test
+    void computeIsAutoCpuOrGpu() throws ServerConfig.Invalid {
+        assertEquals(SimSession.Compute.AUTO, ServerConfig.parse("{\"preset\": \"x\"}").compute());
+        assertEquals(SimSession.Compute.CPU, ServerConfig.parse("{\"preset\": \"x\", \"compute\": \"cpu\"}").compute());
+        assertEquals(SimSession.Compute.GPU, ServerConfig.parse("{\"preset\": \"x\", \"compute\": \" gpu \"}").compute());
+        assertTrue(problems("{\"preset\": \"x\", \"compute\": \"cuda\"}").get(0).startsWith("compute: expected"));
+        assertTrue(problems("{\"preset\": \"x\", \"compute\": 1}").get(0).startsWith("compute: expected"));
     }
 
     @Test

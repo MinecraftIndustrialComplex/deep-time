@@ -128,8 +128,10 @@ pub struct SurfaceParams {
     pub carbonate_saturating_light: f64,
     /// Water temperature above which carbonate factories run at full rate, °C.
     pub carbonate_min_temp_c: f64,
-    /// Clastic input that cuts carbonate production by e, m per step.
-    pub carbonate_clastic_m: f64,
+    /// Clastic input that cuts carbonate production by e, m per Myr of the plate step so far (the
+    /// clastic it is set against is what the cell received since the step began; 20 m over the
+    /// 2-Myr step). Ledger ERO-065.
+    pub carbonate_clastic_m_myr: f64,
     /// Evaporite precipitation in restricted arid seas and closed lakes, m/Myr.
     pub evaporite_m_myr: f64,
     /// Bare-rock soil production w₀ at 1,000 mm/yr and 15 °C, m/Myr.
@@ -257,7 +259,7 @@ impl Default for SurfaceParams {
             carbonate_surface_light: 2000.0,
             carbonate_saturating_light: 400.0,
             carbonate_min_temp_c: 18.0,
-            carbonate_clastic_m: 20.0,
+            carbonate_clastic_m_myr: 10.0, // ledger: ERO-065
             evaporite_m_myr: 100.0,
             weathering_max_m_myr: 50.0,
             weathering_decay_depth_m: 5.0,
@@ -331,7 +333,7 @@ impl SurfaceParams {
             self.carbonate_saturating_light,
             "carbonate_saturating_light",
         )?;
-        nonneg(self.carbonate_clastic_m, "carbonate_clastic_m")?;
+        nonneg(self.carbonate_clastic_m_myr, "carbonate_clastic_m_myr")?;
         nonneg(self.evaporite_m_myr, "evaporite_m_myr")?;
         nonneg(self.weathering_max_m_myr, "weathering_max_m_myr")?;
         pos(self.weathering_decay_depth_m, "weathering_decay_depth_m")?;

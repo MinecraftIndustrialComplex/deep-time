@@ -29,6 +29,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
+use deeptime_core::compute::ComputeMode;
 
 #[derive(Parser)]
 #[command(
@@ -224,6 +225,10 @@ enum Command {
         /// Print DEBUG log lines too.
         #[arg(long)]
         verbose: bool,
+        /// Where the kernels with a GPU version run (auto, cpu, gpu; default DEEPTIME_COMPUTE,
+        /// else auto).
+        #[arg(long, value_parser = parse_compute)]
+        compute: Option<ComputeMode>,
     },
     /// One climate snapshot (P1-05) on a given relief — e.g. Earth's — to check the climate
     /// against a planet whose Köppen map is known. The raster is raw little-endian f32 metres,
@@ -688,6 +693,14 @@ struct CommonArgs {
     /// Writes the climate stage's note (summary and curves, JSON) to this file after `stage`.
     #[arg(long)]
     climate_json: Option<PathBuf>,
+    /// Where the kernels with a GPU version run: auto (a hardware GPU when there is one), cpu,
+    /// or gpu (a software adapter such as lavapipe counts). Default: DEEPTIME_COMPUTE, else auto.
+    #[arg(long, value_parser = parse_compute)]
+    compute: Option<ComputeMode>,
+}
+
+fn parse_compute(s: &str) -> Result<ComputeMode, String> {
+    ComputeMode::parse(s).ok_or_else(|| format!("{s}: expected auto, cpu or gpu"))
 }
 
 impl CommonArgs {
@@ -699,6 +712,7 @@ impl CommonArgs {
             set: self.set.clone(),
             history_mem: self.history_mem,
             climate_json: self.climate_json.clone(),
+            compute: self.compute,
         }
     }
 }
@@ -869,6 +883,7 @@ fn main() -> ExitCode {
             work,
             mem_cap,
             verbose,
+            compute,
         }) => finish(
             "bench",
             run::bench(&run::BenchOptions {
@@ -881,6 +896,7 @@ fn main() -> ExitCode {
                 work,
                 mem_cap,
                 verbose,
+                compute,
             }),
         ),
         Some(Command::Preset { action }) => finish("preset", preset_command(action)),
@@ -1736,6 +1752,7 @@ mod tests {
             set: Vec::new(),
             history_mem: None,
             climate_json: None,
+            compute: None,
         }
     }
 
@@ -1899,6 +1916,7 @@ mod tests {
             work: None,
             mem_cap: 0,
             verbose: false,
+            compute: None,
         })
         .unwrap();
         let bench: serde_json::Value =

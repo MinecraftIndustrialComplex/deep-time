@@ -20,9 +20,12 @@ public final class NativeStatus {
     private final String target;
     private final String gitSha;
     private final long selfTest;
+    private final String variant;
+    private final String variantReason;
 
     private NativeStatus(FailureClass failure, String platformKey, Path attemptedPath, Throwable cause,
-            String guidance, String version, String format, String target, String gitSha, long selfTest) {
+            String guidance, String version, String format, String target, String gitSha, long selfTest,
+            String variant, String variantReason) {
         this.failure = failure;
         this.platformKey = platformKey;
         this.attemptedPath = attemptedPath;
@@ -33,19 +36,23 @@ public final class NativeStatus {
         this.target = target;
         this.gitSha = gitSha;
         this.selfTest = selfTest;
+        this.variant = variant;
+        this.variantReason = variantReason;
     }
 
-    /** A linked, verified library. */
+    /** A linked, verified library: what it reported, and which build it is and why that one. */
     public static NativeStatus ok(String platformKey, Path path, String version, String format, String target,
-            String gitSha, long selfTest) {
-        return new NativeStatus(null, platformKey, path, null, "", version, format, target, gitSha, selfTest);
+            String gitSha, long selfTest, String variant, String variantReason) {
+        return new NativeStatus(null, platformKey, path, null, "", version, format, target, gitSha, selfTest, variant,
+                variantReason);
     }
 
     /** A failure; the guidance comes from {@link FailureClass#guidance}. */
     public static NativeStatus failure(FailureClass failureClass, String platformKey, Path attemptedPath,
             Throwable cause, String guidance) {
         Objects.requireNonNull(failureClass, "failureClass");
-        return new NativeStatus(failureClass, platformKey, attemptedPath, cause, guidance, null, null, null, null, 0);
+        return new NativeStatus(failureClass, platformKey, attemptedPath, cause, guidance, null, null, null, null, 0,
+                null, null);
     }
 
     static NativeStatus failure(FailureClass failureClass, String platformKey, Path attemptedPath, Throwable cause) {
@@ -106,10 +113,27 @@ public final class NativeStatus {
         return selfTest;
     }
 
-    /** One line for logs and {@code NativeSmoke}: {@code status=OK ...} or {@code status=FAILED class=...}. */
+    /**
+     * The build linked: {@code baseline} or {@code x86-64-v3} (decisions log 2026-10-18), as the
+     * library itself reports it ({@code cpu=} of its version string); {@code null} on failure.
+     */
+    public String variant() {
+        return variant;
+    }
+
+    /** Why that build: the CPU probe's answer, a forced choice or a fallback; {@code null} on failure. */
+    public String variantReason() {
+        return variantReason;
+    }
+
+    /**
+     * One line for logs and {@code NativeSmoke}: {@code status=OK version=... format=... selftest=...
+     * build=...} or {@code status=FAILED class=...}.
+     */
     public String summary() {
         return isOk()
                 ? "status=OK version=" + version + " format=" + format + " selftest=" + Long.toUnsignedString(selfTest)
+                        + " build=" + variant
                 : "status=FAILED class=" + failure;
     }
 
@@ -117,7 +141,7 @@ public final class NativeStatus {
     public String describe() {
         if (isOk()) {
             return "Deep Time natives: " + summary() + " target=" + target + " platform=" + platformKey
-                    + " path=" + attemptedPath;
+                    + " path=" + attemptedPath + " (" + variant + ": " + variantReason + ")";
         }
         StringBuilder b = new StringBuilder();
         b.append("Deep Time natives failed to load: ").append(failure).append('\n');

@@ -36,7 +36,7 @@
 
 use rayon::prelude::*;
 
-use super::{Live, Operator, STRIP_ROWS, sum_zero};
+use super::{Live, Operator, STRIP_ROWS, Workspace, sum_zero};
 use crate::surface::grid::Dims;
 
 /// Damping of the Jacobi smoother (4/5 is the best smoothing factor for the five-point Laplacian
@@ -96,14 +96,14 @@ impl Level {
     fn finest(op: &Operator, omega: f32) -> Level {
         let n = op.w * op.h;
         let to32 = |v: &[f64]| -> Vec<f32> { v.par_iter().map(|&x| x as f32).collect() };
-        let diag = to32(&op.diag);
+        let diag = to32(op.diag);
         let wd = diag.par_iter().map(|&g| omega / g).collect();
         Level {
             w: op.w,
             h: op.h,
             wrap: op.wrap,
-            east: to32(&op.east),
-            south: to32(&op.south),
+            east: to32(op.east),
+            south: to32(op.south),
             diag,
             wd,
             mass: Vec::new(),
@@ -407,16 +407,25 @@ fn vcycle(levels: &mut [Level], cy: &Cycle, dot: Option<&[f64]>) -> f64 {
     acc
 }
 
-/// Refines `x` to the solution of A·x = b to an RMS residual of `tol_m`, by conjugate gradients
-/// preconditioned with one V-cycle, then puts the residual's sum back so Σx = Σb; returns the
-/// iterations.
-pub(super) fn cg(d: &Dims, b: &[f64], x: &mut [f64], kd: &[f64], dt: f64, tol_m: f64) -> usize {
-    cg_with(d, b, x, kd, dt, tol_m, CYCLE)
+/// Refines `x` to the solution of A·x = b (b: the workspace's right-hand side, which the caller
+/// has set and sized; [`Workspace::fit`] has sized the rest) to an RMS residual of `tol_m`, by
+/// conjugate gradients preconditioned with one V-cycle, then puts the residual's sum back so
+/// Σx = Σb; returns the iterations. The `f64` vectors are the workspace's (each written before it
+/// is read); the cycle's levels are built for the solve.
+pub(super) fn cg(
+    ws: &mut Workspace,
+    d: &Dims,
+    x: &mut [f64],
+    kd: &[f64],
+    dt: f64,
+    tol_m: f64,
+) -> usize {
+    cg_with(ws, d, x, kd, dt, tol_m, CYCLE)
 }
 
 pub(super) fn cg_with(
+    ws: &mut Workspace,
     d: &Dims,
-    b: &[f64],
     x: &mut [f64],
     kd: &[f64],
     dt: f64,
@@ -428,10 +437,21 @@ pub(super) fn cg_with(
     if n == 0 {
         return 0;
     }
+    let Workspace {
+        b,
+        east,
+        south,
+        diag,
+        ap,
+        r,
+        pold,
+        pnew,
+        ..
+    } = ws;
+    let b: &[f64] = b;
     let live = Live::all(d);
-    let op = Operator::new(d, kd, dt, &live);
+    let op = Operator::new(d, kd, dt, &live, east, south, diag);
     let mut mg = Hierarchy::new(&op, cy);
-    let mut r = vec![0.0f64; n];
     // r = b − A·x, its f32 copy for the cycle, and r·r.
     let rr0: f64 = {
         let r32 = &mut mg.levels[0].r;
@@ -462,24 +482,34 @@ pub(super) fn cg_with(
     };
     let tol2 = tol_m * tol_m * n as f64;
     let mut iterations = 0;
-    let mut ap = vec![0.0f64; n];
     if rr0 > tol2 {
-        let mut rz = mg.precondition(&r);
-        let mut pold = vec![0.0f64; n];
-        let mut pnew = vec![0.0f64; n];
-        let mut beta = 0.0f64;
+        let mut rz = mg.precondition(r);
+        // The direction, two buffers: an iteration reads the last and writes the next. The first
+        // direction is z itself, so the old one, which the workspace still holds from another
+        // solve, is not read.
+        let (mut pold, mut pnew) = (pold, pnew);
+        let mut beta: Option<f64> = None;
         let mut pending: Option<f64> = None;
         while iterations < super::CG_MAX_ITER {
             iterations += 1;
             // p = z + β·p_old, A·p and p·A·p; and the last iteration's x += α·p_old.
             let pap: f64 = {
                 let z = mg.z();
-                let pold: &[f64] = &pold;
+                let pold: &[f64] = pold;
                 let fill = |j: usize, dst: &mut [f64]| {
                     let c0 = j * w;
-                    for ((d, &zv), &pv) in dst.iter_mut().zip(&z[c0..c0 + w]).zip(&pold[c0..c0 + w])
-                    {
-                        *d = f64::from(zv) + beta * pv;
+                    let zr = &z[c0..c0 + w];
+                    match beta {
+                        Some(beta) => {
+                            for ((d, &zv), &pv) in dst.iter_mut().zip(zr).zip(&pold[c0..c0 + w]) {
+                                *d = f64::from(zv) + beta * pv;
+                            }
+                        }
+                        None => {
+                            for (d, &zv) in dst.iter_mut().zip(zr) {
+                                *d = f64::from(zv);
+                            }
+                        }
                     }
                 };
                 pnew.par_chunks_mut(STRIP_ROWS * w)
@@ -554,11 +584,11 @@ pub(super) fn cg_with(
             if rr <= tol2 {
                 break;
             }
-            let rz_new = mg.precondition(&r);
+            let rz_new = mg.precondition(r);
             if !(rz_new.is_finite() && rz > 0.0) {
                 break;
             }
-            beta = rz_new / rz;
+            beta = Some(rz_new / rz);
             rz = rz_new;
         }
         if let Some(alpha) = pending {
@@ -569,7 +599,7 @@ pub(super) fn cg_with(
     }
     // Σx = Σb − Σr: the residual's sum back to the cells that diffuse, in proportion to their
     // coupling (as the Jacobi solve does).
-    op.apply(x, &mut ap, &live);
+    op.apply(x, ap, &live);
     let (lost, weight): (f64, f64) = b
         .par_chunks(w)
         .zip(ap.par_chunks(w))

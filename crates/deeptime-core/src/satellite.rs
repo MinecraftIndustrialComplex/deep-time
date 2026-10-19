@@ -55,6 +55,7 @@
 //! picture, after the shading, by `keyframes::render` (`crate::water_view`).
 
 use deeptime_format::{Ramp, Ramps};
+use rayon::prelude::*;
 
 use crate::keyframes::ViewScale;
 use crate::world::{Field, WorldState};
@@ -576,24 +577,27 @@ pub fn box_filter(
         }
     }
     // Rows (x wraps), then columns (y clamps).
+    // Each cell's sum is its own (in window order), so the rows run side by side.
     let pass = |a: &[f64], horizontal: bool| -> Vec<f64> {
         let mut out = vec![0.0f64; n];
-        for j in 0..h {
-            for i in 0..w {
-                let mut sum = 0.0;
-                if horizontal {
-                    for d in 0..=2 * rx {
-                        sum += a[j * w + (i + w * (rx / w + 1) + d - rx) % w];
+        out.par_chunks_mut(w.max(1))
+            .enumerate()
+            .for_each(|(j, row)| {
+                for (i, o) in row.iter_mut().enumerate() {
+                    let mut sum = 0.0;
+                    if horizontal {
+                        for d in 0..=2 * rx {
+                            sum += a[j * w + (i + w * (rx / w + 1) + d - rx) % w];
+                        }
+                    } else {
+                        for d in 0..=2 * ry {
+                            let jj = (j + d).saturating_sub(ry).min(h - 1);
+                            sum += a[jj * w + i];
+                        }
                     }
-                } else {
-                    for d in 0..=2 * ry {
-                        let jj = (j + d).saturating_sub(ry).min(h - 1);
-                        sum += a[jj * w + i];
-                    }
+                    *o = sum;
                 }
-                out[j * w + i] = sum;
-            }
-        }
+            });
         out
     };
     let (v, wt) = if rx > 0 {
@@ -607,7 +611,7 @@ pub fn box_filter(
         (v, wt)
     };
     let data = v
-        .iter()
+        .par_iter()
         .zip(&wt)
         .map(|(&s, &c)| match (c > 0.0, log) {
             (false, _) => f32::NAN,
@@ -715,23 +719,25 @@ pub fn hillshade(z: &[f32], w: usize, h: usize, radius_m: f64, look: &Look) -> V
         }
     };
     let mut out = vec![1.0f32; w * h];
-    for j in 0..h {
-        // Slopes true on the sphere (cos φ held at 0.15 or more near the poles).
-        let (dx, dy) = deeptime_format::Projection::picture_pixel_m(
-            j as f64, w as u32, h as u32, radius_m, 0.15,
-        );
-        let (jn, js) = (j.saturating_sub(1), (j + 1).min(h - 1));
-        for i in 0..w {
-            let c = z[j * w + i];
-            if !c.is_finite() {
-                continue;
+    out.par_chunks_mut(w.max(1))
+        .enumerate()
+        .for_each(|(j, row)| {
+            // Slopes true on the sphere (cos φ held at 0.15 or more near the poles).
+            let (dx, dy) = deeptime_format::Projection::picture_pixel_m(
+                j as f64, w as u32, h as u32, radius_m, 0.15,
+            );
+            let (jn, js) = (j.saturating_sub(1), (j + 1).min(h - 1));
+            for (i, o) in row.iter_mut().enumerate() {
+                let c = z[j * w + i];
+                if !c.is_finite() {
+                    continue;
+                }
+                let (iw, ie) = ((i + w - 1) % w, (i + 1) % w);
+                let dzdx = (at(ie, j, c) - at(iw, j, c)) / (2.0 * dx);
+                let dzdy = (at(i, js, c) - at(i, jn, c)) / ((js - jn).max(1) as f64 * dy);
+                *o = light.shade(dzdx, dzdy);
             }
-            let (iw, ie) = ((i + w - 1) % w, (i + 1) % w);
-            let dzdx = (at(ie, j, c) - at(iw, j, c)) / (2.0 * dx);
-            let dzdy = (at(i, js, c) - at(i, jn, c)) / ((js - jn).max(1) as f64 * dy);
-            out[j * w + i] = light.shade(dzdx, dzdy);
-        }
-    }
+        });
     out
 }
 
@@ -747,13 +753,15 @@ pub fn elevation_field(world: &WorldState) -> Option<&Field> {
 /// nearest cell. The satellite view and the water view draw on the same pixels.
 pub fn heights_m(elevation: &Field, view: &ViewScale, size: (u32, u32)) -> Vec<f32> {
     let (w, h) = (size.0 as usize, size.1 as usize);
-    let mut z = Vec::with_capacity(w * h);
-    for py in 0..h {
-        for px in 0..w {
-            let y = mean(elevation, px, py, w, h);
-            z.push(((f64::from(y) - view.sea_level_y) * view.m_per_block_v) as f32);
-        }
-    }
+    let mut z = vec![0.0f32; w * h];
+    z.par_chunks_mut(w.max(1))
+        .enumerate()
+        .for_each(|(py, row)| {
+            for (px, z) in row.iter_mut().enumerate() {
+                let y = mean(elevation, px, py, w, h);
+                *z = ((f64::from(y) - view.sea_level_y) * view.m_per_block_v) as f32;
+            }
+        });
     z
 }
 
@@ -813,19 +821,24 @@ pub fn render(
         );
         let get = |f: Option<&Field>, k: usize| f.map_or(f32::NAN, |f| f.data[k]);
         let n = tm.data.len();
-        let (mut herb, mut tree) = (vec![f32::NAN; n], vec![f32::NAN; n]);
-        for k in 0..n {
-            let mut c = Cell::at(0.0);
-            c.t_mean_c = tm.data[k];
-            c.t_warm_c = get(tw, k);
-            c.t_cold_c = get(tc, k);
-            c.aridity = get(ar, k);
-            c.precip_mm = get(pr, k);
-            c.koppen = get(kp, k);
-            if c.has_climate() {
-                (herb[k], tree[k]) = cover(&c, &look);
-            }
-        }
+        let both: Vec<(f32, f32)> = (0..n)
+            .into_par_iter()
+            .map(|k| {
+                let mut c = Cell::at(0.0);
+                c.t_mean_c = tm.data[k];
+                c.t_warm_c = get(tw, k);
+                c.t_cold_c = get(tc, k);
+                c.aridity = get(ar, k);
+                c.precip_mm = get(pr, k);
+                c.koppen = get(kp, k);
+                if c.has_climate() {
+                    cover(&c, &look)
+                } else {
+                    (f32::NAN, f32::NAN)
+                }
+            })
+            .collect();
+        let (herb, tree): (Vec<f32>, Vec<f32>) = both.into_iter().unzip();
         let land = |k: usize| get(kp, k).round() as u8 != crate::climate::koppen::SEA;
         let smooth = |data: Vec<f32>| {
             let f = Field {
@@ -859,41 +872,46 @@ pub fn render(
             box_filter(&g, (1, 1), false, None)
         })
     });
-    let mut rgba = Vec::with_capacity(w * h * 4);
-    for py in 0..h {
-        for px in 0..w {
-            let k = py * w + px;
-            if !z[k].is_finite() {
-                rgba.extend_from_slice(&[0, 0, 0, 0]);
-                continue;
-            }
-            let at = |f: Option<&Field>| f.map_or(f32::NAN, |f| nearest(f, px, py, w, h));
-            let cell = Cell {
-                z_m: z[k],
-                t_mean_c: at(t_mean.as_ref()),
-                t_warm_c: at(t_warm.as_ref()),
-                t_cold_c: at(t_cold.as_ref()),
-                precip_mm: at(precip.as_ref()),
-                aridity: at(aridity.as_ref()),
-                koppen: at(koppen),
-                ice_m: at(ice),
-                glacier: at(glacier),
-                sea_ice: at(sea_ice.as_ref()),
-                ela_m: at(ela),
-                rock: at(rock),
-                regime: at(regime),
-                herb_cover: at(covers.as_ref().map(|c| &c.0)),
-                tree_cover: at(covers.as_ref().map(|c| &c.1)),
-                rock_rgb: match &rock_rgb {
-                    Some(ch) => [at(Some(&ch[0])), at(Some(&ch[1])), at(Some(&ch[2]))],
-                    None => [f32::NAN; 3],
-                },
-            };
-            let (rgb, strength) = colour(&cell, &pal, &look);
-            rgba.extend_from_slice(&shaded(rgb, strength, shade[k]));
-            rgba.push(255);
+    // Each pixel is its own: the rows run side by side.
+    let mut rgba = vec![0u8; w * h * 4];
+    let pixel = |px: usize, py: usize| -> [u8; 4] {
+        let k = py * w + px;
+        if !z[k].is_finite() {
+            return [0, 0, 0, 0];
         }
-    }
+        let at = |f: Option<&Field>| f.map_or(f32::NAN, |f| nearest(f, px, py, w, h));
+        let cell = Cell {
+            z_m: z[k],
+            t_mean_c: at(t_mean.as_ref()),
+            t_warm_c: at(t_warm.as_ref()),
+            t_cold_c: at(t_cold.as_ref()),
+            precip_mm: at(precip.as_ref()),
+            aridity: at(aridity.as_ref()),
+            koppen: at(koppen),
+            ice_m: at(ice),
+            glacier: at(glacier),
+            sea_ice: at(sea_ice.as_ref()),
+            ela_m: at(ela),
+            rock: at(rock),
+            regime: at(regime),
+            herb_cover: at(covers.as_ref().map(|c| &c.0)),
+            tree_cover: at(covers.as_ref().map(|c| &c.1)),
+            rock_rgb: match &rock_rgb {
+                Some(ch) => [at(Some(&ch[0])), at(Some(&ch[1])), at(Some(&ch[2]))],
+                None => [f32::NAN; 3],
+            },
+        };
+        let (rgb, strength) = colour(&cell, &pal, &look);
+        let [r, g, b] = shaded(rgb, strength, shade[k]);
+        [r, g, b, 255]
+    };
+    rgba.par_chunks_mut((w * 4).max(1))
+        .enumerate()
+        .for_each(|(py, row)| {
+            for (px, p) in row.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+                p.copy_from_slice(&pixel(px, py));
+            }
+        });
     Some(rgba)
 }
 

@@ -12,7 +12,8 @@ name = "deeptime"
 path = "src/main.rs"
 
 [dependencies]
-deeptime-core.workspace = true
+# The GPU compute path on (docs/design/gpu-compute.md): `--compute` picks the device.
+deeptime-core = { workspace = true, features = ["gpu"] }
 deeptime-format.workspace = true
 deeptime-viewer.workspace = true
 clap = { version = "4.5", features = ["derive"] }

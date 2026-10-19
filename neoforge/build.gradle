@@ -511,14 +511,39 @@ def cargoVersion = cargoTomlValue('workspace.package', 'version')
 // ---------------------------------------------------------------------------
 // Natives in the jar (plan §4.3, §6.5). Dev builds pack the host library that
 // hostNatives stages in ../target/natives-host/; nothing else is packed, so a leftover
-// natives-dist/ never leaks into a dev jar.
+// natives-dist/ never leaks into a dev jar. On an x86-64 host that is two builds, the
+// baseline and x86-64-v3, and the CPU probe that picks between them (decisions log
+// 2026-10-18), all on the everyday `release` profile; release jars carry the `ship` profile's
+// builds (tools/natives/build-natives.sh). -PbaselineNativeOnly skips the v3 build for a quicker
+// local loop (the jar then has no v3 build and the loader takes the baseline).
 // ---------------------------------------------------------------------------
 def osName = System.getProperty('os.name').toLowerCase(Locale.ROOT)
-def hostLibName = osName.startsWith('windows') ? 'deeptime_jni.dll'
-                : (osName.startsWith('mac') || osName.contains('darwin')) ? 'libdeeptime_jni.dylib'
-                : 'libdeeptime_jni.so'
+def libFileName = { String stem ->
+    osName.startsWith('windows') ? "${stem}.dll"
+            : (osName.startsWith('mac') || osName.contains('darwin')) ? "lib${stem}.dylib"
+            : "lib${stem}.so"
+}
+def hostLibName = libFileName('deeptime_jni')
+def hostProbeName = libFileName('deeptime_cpuprobe')
 def builtHostLib = new File(repoRoot, "target/release/${hostLibName}")
+def builtHostProbe = new File(repoRoot, "target/release/${hostProbeName}")
 def nativesHostDir = new File(repoRoot, 'target/natives-host')
+def hostIsX86 = System.getProperty('os.arch').toLowerCase(Locale.ROOT) in ['amd64', 'x86_64', 'x86-64', 'x64']
+def buildV3Native = hostIsX86 && !project.hasProperty('baselineNativeOnly')
+// The host's Rust triple, asked of rustc when a task first needs it (never at configuration time).
+def hostTripleCache = null
+def hostTriple = {
+    if (hostTripleCache == null) {
+        def rustc = new ProcessBuilder('rustc', '-vV').redirectErrorStream(true).start()
+        def rustcOut = rustc.inputStream.text
+        if (rustc.waitFor() != 0) throw new GradleException("rustc -vV failed:\n${rustcOut}")
+        hostTripleCache = rustcOut.readLines().find { it.startsWith('host: ') }?.substring(6)?.trim()
+    }
+    hostTripleCache
+}
+// tools/natives/ship.sh's V3_TARGET_DIR: the v3 build's own target dir, so the baseline's
+// artifacts are never rebuilt or overwritten.
+def v3TargetDir = new File(repoRoot, 'target/x86-64-v3')
 
 // Rust target triple -> platform key (plan §6.4).
 def platformKeys = [
@@ -533,75 +558,97 @@ def platformKeys = [
 ]
 
 def cargoBuildJni = tasks.register('cargoBuildJni', Exec) {
-    description = 'cargo build --release -p deeptime-jni (plain cargo: the dev shell locally, rustup in CI).'
+    description = 'cargo build --release -p deeptime-jni -p deeptime-cpuprobe (plain cargo: the dev shell locally, rustup in CI).'
     workingDir repoRoot
-    commandLine 'cargo', 'build', '--release', '-p', 'deeptime-jni'
+    commandLine 'cargo', 'build', '--release', '-p', 'deeptime-jni', '-p', 'deeptime-cpuprobe'
     // cargo keeps its own up-to-date state; running it when nothing changed takes a second.
     outputs.upToDateWhen { false }
 }
 
+// The host's x86-64-v3 build: tools/natives/ship.sh's v3_cargo_args on the release profile. The
+// host triple is named so build scripts stay on the baseline CPU; --config adds to the target's
+// rustflags where RUSTFLAGS would replace them.
+def cargoBuildJniV3 = tasks.register('cargoBuildJniV3', Exec) {
+    description = 'cargo build --release -p deeptime-jni for -C target-cpu=x86-64-v3 into ../target/x86-64-v3 (x86-64 hosts).'
+    onlyIf { buildV3Native }
+    workingDir repoRoot
+    doFirst {
+        def triple = hostTriple()
+        commandLine 'cargo', 'build', '--release', '-p', 'deeptime-jni', '--target', triple,
+                '--target-dir', v3TargetDir.absolutePath,
+                '--config', "target.${triple}.rustflags=[\"-C\", \"target-cpu=x86-64-v3\"]"
+    }
+    outputs.upToDateWhen { false }
+}
+
 def hostNatives = tasks.register('hostNatives') {
-    description = 'Builds the host native library and stages it with natives.json in ../target/natives-host/.'
-    dependsOn cargoBuildJni
+    description = 'Builds the host native library (both builds and the CPU probe on x86-64) and stages them with natives.json in ../target/natives-host/.'
+    dependsOn cargoBuildJni, cargoBuildJniV3
     inputs.file builtHostLib
+    inputs.files({ buildV3Native ? [new File(v3TargetDir, "${hostTriple()}/release/${hostLibName}"), builtHostProbe] : [] })
     inputs.property 'version', cargoVersion
     inputs.property 'formatVersion', formatVersion
+    inputs.property 'v3', buildV3Native
     outputs.dir nativesHostDir
     doLast {
-        def rustc = new ProcessBuilder('rustc', '-vV').redirectErrorStream(true).start()
-        def rustcOut = rustc.inputStream.text
-        if (rustc.waitFor() != 0) throw new GradleException("rustc -vV failed:\n${rustcOut}")
-        def triple = rustcOut.readLines().find { it.startsWith('host: ') }?.substring(6)?.trim()
+        def triple = hostTriple()
         def key = platformKeys[triple]
         if (key == null) throw new GradleException("Host target ${triple} has no platform key (plan §6.4)")
 
         nativesHostDir.deleteDir()
-        def dest = new File(nativesHostDir, key)
-        dest.mkdirs()
-        def staged = new File(dest, hostLibName)
-        java.nio.file.Files.copy(builtHostLib.toPath(), staged.toPath())
+        // One natives.json entry (plan §6.5, schema 2) for a file staged at <key>/<dir>/.
+        def stage = { File built, String dir, String variant ->
+            if (!built.isFile()) throw new GradleException("hostNatives: cargo produced no ${built}")
+            def dest = new File(nativesHostDir, "${key}/${dir}")
+            dest.mkdirs()
+            def staged = new File(dest, built.name)
+            java.nio.file.Files.copy(built.toPath(), staged.toPath())
 
-        def md = java.security.MessageDigest.getInstance('SHA-256')
-        staged.withInputStream { s -> byte[] buf = new byte[65536]; int n; while ((n = s.read(buf)) > 0) md.update(buf, 0, n) }
-        def sha = md.digest().encodeHex().toString()
+            def md = java.security.MessageDigest.getInstance('SHA-256')
+            staged.withInputStream { s -> byte[] buf = new byte[65536]; int n; while ((n = s.read(buf)) > 0) md.update(buf, 0, n) }
+            def sha = md.digest().encodeHex().toString()
 
-        // glibc floor: the highest GLIBC_x.y version the library needs (gnu targets only).
-        String floor = null
-        if (triple.endsWith('-linux-gnu')) {
-            def text = new String(staged.bytes, 'ISO-8859-1')
-            def versions = (text =~ /GLIBC_(\d+)\.(\d+)(?:\.(\d+))?/).collect { m ->
-                [m[1] as int, m[2] as int, (m[3] ?: '0') as int]
+            // glibc floor: the highest GLIBC_x.y version the library needs (gnu targets only).
+            String floor = null
+            if (triple.endsWith('-linux-gnu')) {
+                def text = new String(staged.bytes, 'ISO-8859-1')
+                def versions = (text =~ /GLIBC_(\d+)\.(\d+)(?:\.(\d+))?/).collect { m ->
+                    [m[1] as int, m[2] as int, (m[3] ?: '0') as int]
+                }
+                def max = versions.max { a, b -> a[0] <=> b[0] ?: a[1] <=> b[1] ?: a[2] <=> b[2] }
+                if (max != null) floor = max[2] == 0 ? "${max[0]}.${max[1]}" : "${max[0]}.${max[1]}.${max[2]}"
             }
-            def max = versions.max { a, b -> a[0] <=> b[0] ?: a[1] <=> b[1] ?: a[2] <=> b[2] }
-            if (max != null) floor = max[2] == 0 ? "${max[0]}.${max[1]}" : "${max[0]}.${max[1]}.${max[2]}"
+            logger.lifecycle("hostNatives: ${key}/${dir}/${built.name} (${staged.length()} bytes, sha256 ${sha.substring(0, 12)}…)")
+            def e = [platform: key]
+            if (variant != null) e.variant = variant
+            e + [file: built.name, rust_target: triple, glibc_floor: floor, sha256: sha, size: staged.length()]
         }
 
-        // The natives.json schema of plan §6.5 (schema 1).
+        def libraries = [stage(builtHostLib, 'baseline', 'baseline')]
+        def probes = []
+        if (buildV3Native) {
+            libraries << stage(new File(v3TargetDir, "${triple}/release/${hostLibName}"), 'x86-64-v3', 'x86-64-v3')
+            probes << stage(builtHostProbe, 'probe', null)
+        }
         def manifest = [
-            schema        : 1,
+            schema        : 2,
             version       : cargoVersion,
             format_version: formatVersion,
-            libraries     : [[
-                platform   : key,
-                file       : hostLibName,
-                rust_target: triple,
-                glibc_floor: floor,
-                sha256     : sha,
-                size       : staged.length(),
-            ]],
+            libraries     : libraries,
+            probes        : probes,
         ]
         new File(nativesHostDir, 'natives.json').setText(
             groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(manifest)) + '\n', 'UTF-8')
-        logger.lifecycle("hostNatives: ${key} ${hostLibName} (${staged.length()} bytes, sha256 ${sha.substring(0, 12)}…)")
     }
 }
 
-// Release jars (-Prelease) pack ../target/natives-dist/ instead: all eight libraries and their
+// Release jars (-Prelease) pack ../target/natives-dist/ instead: the eight platforms' baseline
+// libraries, the four x86-64 platforms' x86-64-v3 libraries and CPU probes (16 files), and their
 // natives.json, from `nix run .#natives` (tools/natives/build-natives.sh) or the natives-dist
-// artifact of .github/workflows/natives.yml (plan §4.5, §6.5, P0-08).
+// artifact of .github/workflows/natives.yml (plan §4.5, §6.5, P0-08; decisions log 2026-10-18).
 def nativesDistDir = new File(repoRoot, 'target/natives-dist')
 def checkReleaseNatives = tasks.register('checkReleaseNatives') {
-    description = 'Fails unless ../target/natives-dist holds all eight natives and a matching natives.json.'
+    description = 'Fails unless ../target/natives-dist holds all 16 native files and a matching natives.json.'
     inputs.files(fileTree(nativesDistDir))
     inputs.property 'version', cargoVersion
     inputs.property 'formatVersion', formatVersion
@@ -613,26 +660,35 @@ def checkReleaseNatives = tasks.register('checkReleaseNatives') {
             throw new GradleException("-Prelease: ${manifestFile} is missing; ${hint}")
         def m = new groovy.json.JsonSlurper().parse(manifestFile, 'UTF-8')
         def problems = []
-        if (m.schema != 1) problems << "schema is ${m.schema}, not 1"
+        if (m.schema != 2) problems << "schema is ${m.schema}, not 2"
         if (m.version != cargoVersion) problems << "version is ${m.version}, the Cargo workspace says ${cargoVersion}"
         if (m.format_version != formatVersion) problems << "format_version is ${m.format_version}, Cargo.toml says ${formatVersion}"
+        def x86Keys = platformKeys.findAll { triple, key -> triple.startsWith('x86_64-') }.values() as Set
         def libs = (m.libraries ?: []) as List
-        def listed = libs.collect { it.platform } as Set
-        def expected = platformKeys.values() as Set
+        def probes = (m.probes ?: []) as List
+        def listed = libs.collect { "${it.platform}/${it.variant}".toString() } as Set
+        def expected = ((platformKeys.values().collect { "${it}/baseline".toString() })
+                + (x86Keys.collect { "${it}/x86-64-v3".toString() })) as Set
         if (libs.size() != expected.size() || listed != expected)
             problems << "it lists ${libs.size()} libraries (${listed.sort().join(', ')}); a release needs exactly these ${expected.size()}: ${expected.sort().join(', ')}"
+        def probed = probes.collect { it.platform } as Set
+        if (probes.size() != x86Keys.size() || probed != x86Keys)
+            problems << "it lists ${probes.size()} CPU probes (${probed.sort().join(', ')}); a release needs one per x86-64 platform: ${x86Keys.sort().join(', ')}"
         def packed = ['natives.json'] as Set
-        libs.each { lib ->
-            def f = new File(nativesDistDir, "${lib.platform}/${lib.file}")
-            packed << "${lib.platform}/${lib.file}".toString()
+        (libs.collect { [it, it.variant] } + probes.collect { [it, 'probe'] }).each { pair ->
+            def lib = pair[0]
+            def dir = pair[1]
+            def rel = "${lib.platform}/${dir}/${lib.file}".toString()
+            def f = new File(nativesDistDir, rel)
+            packed << rel
             if (platformKeys[lib.rust_target] != lib.platform)
-                problems << "${lib.platform}: rust_target ${lib.rust_target} does not belong to it"
-            if (!f.isFile()) { problems << "${lib.platform}: ${f} is missing"; return }
-            if (f.length() != lib.size) problems << "${lib.platform}: size ${f.length()}, natives.json says ${lib.size}"
+                problems << "${rel}: rust_target ${lib.rust_target} does not belong to ${lib.platform}"
+            if (!f.isFile()) { problems << "${rel} is missing"; return }
+            if (f.length() != lib.size) problems << "${rel}: size ${f.length()}, natives.json says ${lib.size}"
             def md = java.security.MessageDigest.getInstance('SHA-256')
             f.withInputStream { s -> byte[] buf = new byte[65536]; int n; while ((n = s.read(buf)) > 0) md.update(buf, 0, n) }
             def sha = md.digest().encodeHex().toString()
-            if (sha != lib.sha256) problems << "${lib.platform}: sha256 ${sha}, natives.json says ${lib.sha256}"
+            if (sha != lib.sha256) problems << "${rel}: sha256 ${sha}, natives.json says ${lib.sha256}"
         }
         def extra = fileTree(nativesDistDir).files.collect { nativesDistDir.toPath().relativize(it.toPath()).toString().replace('\\', '/') }
                 .findAll { !(it in packed) }
@@ -640,7 +696,7 @@ def checkReleaseNatives = tasks.register('checkReleaseNatives') {
         if (problems)
             throw new GradleException("-Prelease: ${nativesDistDir} is not a complete release set:\n  - " +
                     problems.join('\n  - ') + "\n${hint}")
-        logger.lifecycle("checkReleaseNatives: ${libs.size()} libraries, version ${m.version}, format ${m.format_version}")
+        logger.lifecycle("checkReleaseNatives: ${libs.size()} libraries and ${probes.size()} CPU probes, version ${m.version}, format ${m.format_version}")
     }
 }
 
@@ -689,6 +745,8 @@ tasks.named('test', Test) {
     forkEvery = 1
     systemProperty 'deeptime.test.version', cargoVersion
     systemProperty 'deeptime.test.formatVersion', formatVersion
+    // NativeVariantTest: the jar carries the x86-64-v3 build and the CPU probe.
+    systemProperty 'deeptime.test.v3Native', buildV3Native
     // DhApiBindingTest: "<Modrinth version id>=<jar>" per Distant Horizons jar (P3-04).
     inputs.files(configurations.dhPinJar, configurations.dhNextJar)
     doFirst {

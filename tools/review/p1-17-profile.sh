@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
 #
-# P1-17: where a bench run's serial time goes. Builds this checkout with frame pointers (its own
-# target dir), records a call-graph profile of one `deeptime bench` run with perf, and lists per
+# P1-17: where a bench run's serial time goes. Builds this checkout as it ships (the `ship` profile,
+# decisions log 2026-10-18) with frame pointers (its own target dir; P117_CPU=x86-64-v3 for the v3
+# build), records a call-graph profile of one `deeptime bench` run with perf, and lists per
 # symbol the samples of the busiest thread (the one driving the stages) less those of the next
 # busiest (a Rayon worker): what the driver does while the workers wait.
 #
@@ -16,13 +17,13 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 if [ "${1:-}" = analyse ]; then
     out=$2
 else
-[ $# -ge 4 ] || { sed -n 4,14p "$0"; exit 2; }
+[ $# -ge 4 ] || { sed -n 4,15p "$0"; exit 2; }
 out=$1; preset=$2; start=$3; len=$4; t=${5:-8}
 mkdir -p "$out"
-tdir="$out/../target-fp"
-( cd "$REPO" && RUSTFLAGS="-C force-frame-pointers=yes" CARGO_TARGET_DIR="$tdir" \
-    deeptime-admit run --kind cargo:build -- cargo build --release -q -p deeptime-cli ) || exit 1
-bin="$tdir/release/deeptime"
+tdir="$out/../target-fp${P117_CPU:+-$P117_CPU}"
+( cd "$REPO" && RUSTFLAGS="-C force-frame-pointers=yes${P117_CPU:+ -C target-cpu=$P117_CPU}" CARGO_TARGET_DIR="$tdir" \
+    deeptime-admit run --kind cargo:build -- cargo build --profile ship -q -p deeptime-cli ) || exit 1
+bin="$tdir/ship/deeptime"
 deeptime-admit run --kind "sim:$preset:${t}t" --label "p1-17-profile-$preset-$len" -- \
     sudo perf record -F 199 -g -o "$out/perf.data" -- sudo -u "$(id -un)" env RAYON_NUM_THREADS="$t" \
     "$bin" bench --preset "$preset" --start "$start" --length-myr "$len" --threads "$t" \
