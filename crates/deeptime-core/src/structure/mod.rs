@@ -357,7 +357,97 @@ pub struct StructureStage {
     /// Class → index into `host_classes` (usize::MAX: not published).
     slot: Vec<usize>,
     timings: BTreeMap<&'static str, f64>,
+    /// The world's events that can start a fold or a fault (not saved: rebuilt from the world).
+    causes: deform::Causes,
+    /// A step taken out of the world to run beside the next plate step (`Stage::detach`).
+    detached: Option<Box<Parts>>,
 }
+
+/// What a step reads of the plate model: its time and every plate's rotation and parent, as the
+/// plate step before it left them.
+struct PlatesNow {
+    t_myr: f64,
+    omega: Vec<[f64; 3]>,
+    parents: Vec<Option<u32>>,
+}
+
+impl PlatesNow {
+    fn of(world: &WorldState) -> Result<PlatesNow, CoreError> {
+        let plates = world.plates.as_ref().ok_or_else(|| {
+            CoreError::InvalidState("the structure stage runs after a plate step".into())
+        })?;
+        Ok(PlatesNow {
+            t_myr: plates.t_myr,
+            omega: plates
+                .plates
+                .iter()
+                .map(|p| if p.alive { p.omega } else { [0.0; 3] })
+                .collect(),
+            parents: plates.plates.iter().map(|p| p.parent).collect(),
+        })
+    }
+}
+
+/// The world fields a step reads ([`StructureStage::step_on`]) that the plate step writes anew
+/// (the L1 fields) or does not touch: moved out of the world while the two run side by side, and
+/// put back after, where the plate step wrote none of the name.
+const MOVED: [&str; 18] = [
+    "plates/heat_flow_mw_m2",
+    "regime",
+    "plates/thickness_m",
+    "plates/orogeny_type",
+    "plates/orogeny_age_myr",
+    "plates/crust_type",
+    "plates/plate_id",
+    "plates/flags",
+    "plates/convergence_mm_yr",
+    "plates/obliquity_deg",
+    "plates/fold_trend_deg",
+    "plates/uplift_mm_yr",
+    "plates/collision_mm_yr",
+    "plates/shortening",
+    "climate/t_mean_c",
+    crate::surface::field::DEPOSITION,
+    crate::surface::field::EROSION,
+    crate::surface::impacts::field::TRAP,
+];
+
+/// The world fields a step reads that the plate step reads or takes itself (the surface's
+/// material, which it takes into its pools, and the flexure it samples): copied.
+const COPIED: [&str; 2] = [
+    crate::surface::field::MATERIAL,
+    crate::surface::flexure::field::FLEXURE,
+];
+
+/// A step taken out of the world to run beside the next plate step (P1-19, `Stage::detach`):
+/// what [`StructureStage::step_on`] reads and the strata log it changes, and, once it ran, the
+/// fields it made for the history.
+struct Parts {
+    now: PlatesNow,
+    fields: BTreeMap<String, Field>,
+    /// The names in `fields` moved out of the world ([`MOVED`]); the others are copies.
+    moved: Vec<String>,
+    surface: SurfaceState,
+    /// The history's frame count when the step was taken out.
+    frames: u64,
+    /// Whether the step ran.
+    stepped: bool,
+    /// The deposit engine's fields for the frames it publishes into, when there are any.
+    out: Option<BTreeMap<String, Vec<f32>>>,
+}
+
+/// The deposit engine's fields for the history's frames, by name, and the trap field among them
+/// ([`StructureStage::frame_fields`]).
+type FrameFields = (BTreeMap<String, Vec<f32>>, Vec<f32>);
+
+/// The last step's folds and faults: the world's structure, the report, each feature's relief
+/// left and the features.
+type Finished = (
+    deeptime_format::structure::Structure,
+    serde_json::Value,
+    Vec<f32>,
+    Vec<deform::Feature>,
+);
 
 /// Estimate: the per-frame host fields and columns (plan §5.7.5 has no line for it yet).
 pub fn estimate(p: &PlanetPreset) -> StageEstimate {
@@ -397,43 +487,194 @@ impl StructureStage {
             host_classes,
             slot,
             timings: BTreeMap::new(),
+            causes: deform::Causes::default(),
+            detached: None,
         }
     }
 
     fn advance(&mut self, world: &mut WorldState, ctx: &StageContext<'_>) -> Result<(), CoreError> {
         let grid = l1_grid(&self.preset)?;
-        let n = grid.cells();
         let s = self.preset.scale.clone();
         let dx = f64::from(grid.r) * s.m_per_block_h;
         let d = Dims::new(grid.w as usize, grid.h as usize, dx, true);
-        let plates = world.plates.as_ref().ok_or_else(|| {
-            CoreError::InvalidState("the structure stage runs after a plate step".into())
-        })?;
-        let t_end_myr = plates.t_myr;
-        let dt_myr = self.preset.dt_myr();
-        let omega_now: Vec<[f64; 3]> = plates
-            .plates
-            .iter()
-            .map(|p| if p.alive { p.omega } else { [0.0; 3] })
-            .collect();
-        let parents: Vec<Option<u32>> = plates.plates.iter().map(|p| p.parent).collect();
+        let now = PlatesNow::of(world)?;
+        let t_end_myr = now.t_myr;
         let last = self.st.done + 1 >= self.total;
+        self.causes.update(&world.events, s.circumference_blocks);
+        let frames = world.history.as_ref().map_or(0, |h| h.frame_count() as u64);
         let WorldState {
             fields,
             surface,
             history,
-            events,
             volcanoes,
             ..
         } = world;
         let surface = surface.as_mut().ok_or_else(|| {
             CoreError::InvalidState("the structure stage runs after the surface stage".into())
         })?;
+        let published = self.step_on(&now, fields, surface, frames, ctx)?;
+        let trap = match published {
+            Some((fields_out, trap)) => {
+                self.publish(history, frames, &fields_out)?;
+                Some(trap)
+            }
+            None => None,
+        };
+        let src = CellSource::with(fields, surface, &self.preset)?;
+        let p = &self.p;
+        let tables = &self.tables;
+
+        // 4. Keyframe layers.
+        let started = Instant::now();
+        let t_end_years = t_end_myr * 1.0e6;
+        let every = self.preset.keyframes.every_myr * 1.0e6;
+        let keyframe = last || self.keyframe_at(t_end_myr);
+        let mut outputs: Vec<(&str, Vec<f32>)> = Vec::new();
+        if keyframe {
+            let trap = match trap {
+                Some(t) => t,
+                None => self.trap_field(&src, &d, fields),
+            };
+            outputs.push((field::ROCK, self.rock_map(&src, &s)));
+            outputs.push((field::LOG_GRADE, self.log_grade(&src.surface.log)));
+            outputs.push((field::TRAP, trap));
+            if every > 0.0 {
+                let t0 = self.preset.t_start_years();
+                self.st.next_kf_years = t0 + (((t_end_years - t0) / every).floor() + 1.0) * every;
+            }
+        }
+        let summary = if last {
+            let horizons = bake_horizons::bake_with(&src, &self.preset, p, tables);
+            Some((horizons.mean_horizons(), horizons.check()))
+        } else {
+            None
+        };
+        let trap_shares = last.then(|| self.trap_shares(&src, &d, fields));
+        add_time(&mut self.timings, "outputs", started);
+        let surface_y: Vec<f64> = if last {
+            self.st
+                .plutons
+                .iter()
+                .map(|pl| src.surface_y(plutons::cell_of(&grid, pl.x, pl.z), &s))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        // The folds and faults as the world's structural events, with a lattice evaluation of
+        // the whole planet (what it finds, and what it costs).
+        let structure = if last {
+            let started = Instant::now();
+            // Everything the run left, with the plugs of the volcanoes that have died (made
+            // here, from the catalogue as it stands: they are not kept in the stage's state).
+            let mut all = self.st.features.clone();
+            let plugs = deform::intrude::plugs(
+                volcanoes
+                    .as_ref()
+                    .map_or(&[][..], |v| v.volcanoes.as_slice()),
+                &p.deformation,
+                s.m_per_block_h,
+                self.st.next_feature,
+            );
+            self.st.deform_counts.plugs = plugs.len() as u64;
+            all.extend(plugs);
+            deform::undo_order(&mut all);
+            let span = (src.now_myr - self.preset.t_start_years() / 1.0e6).max(1.0);
+            let now = src.now_myr;
+            let mut st = deform::finish(
+                &all,
+                |x, z| src.surface_y(plutons::cell_of(&grid, x, z), &s),
+                |f| columns::key::of_age(0, now - f64::from(f.t_myr), span),
+                f64::from(s.min_y),
+            );
+            let relief: Vec<f32> = all
+                .iter()
+                .map(|f| deform::relief_left(f, now, &p.deformation, s.m_per_block_v))
+                .collect();
+            let report = deform::report(
+                &all,
+                &mut st,
+                &self.preset,
+                &self.st.deform_counts,
+                src.regime,
+                src.crust,
+            )?;
+            add_time(&mut self.timings, "deformation_lattice", started);
+            let mut report = report;
+            if let Some(serde_json::Value::Object(timing)) =
+                report.as_object_mut().and_then(|o| o.remove("timing"))
+            {
+                for (key, name) in [
+                    ("lattice_s", "deformation_columns_s"),
+                    ("threads", "deformation_threads"),
+                    ("noddy_ns_point", "deformation_noddy_ns_point"),
+                    ("column_ns_point", "deformation_column_ns_point"),
+                    ("noddy_planet_s", "deformation_noddy_planet_s"),
+                ] {
+                    if let Some(v) = timing.get(key).and_then(serde_json::Value::as_f64) {
+                        self.timings.insert(name, v);
+                    }
+                }
+            }
+            Some((st, report, relief, all))
+        } else {
+            None
+        };
+        drop(src);
+        for (name, data) in outputs {
+            fields.insert(
+                name.to_owned(),
+                Field {
+                    grid: grid.clone(),
+                    data,
+                },
+            );
+        }
+
+        // 5. The end: bodies and the summary.
+        if last {
+            self.finish(world, ctx, &surface_y, summary, structure, trap_shares)?;
+        }
+        Ok(())
+    }
+
+    /// Whether the step that ends at `t_myr` writes the keyframe layers (besides the last).
+    fn keyframe_at(&self, t_myr: f64) -> bool {
+        let every = self.preset.keyframes.every_myr * 1.0e6;
+        every > 0.0 && t_myr * 1.0e6 >= self.st.next_kf_years - 1.0
+    }
+
+    /// Steps 1 to 3 of a step, the part that writes nothing of the world but the strata log
+    /// (P1-19: so it can run beside the next plate step, `Stage::detach`): the metamorphism of the
+    /// strata log, the plutons and the folds and faults, and, when the history has frames the
+    /// stage has not published into (`frames`, the history's count), the deposit engine's fields
+    /// for them with the trap field. `now` is the plate model after the plate step this one
+    /// follows. The stage's own state moves on, except `frames_seen` ([`StructureStage::publish`]).
+    /// The reservation comes first: a step refused the memory has changed nothing.
+    fn step_on(
+        &mut self,
+        now: &PlatesNow,
+        fields: &BTreeMap<String, Field>,
+        surface: &mut SurfaceState,
+        frames: u64,
+        ctx: &StageContext<'_>,
+    ) -> Result<Option<FrameFields>, CoreError> {
+        let grid = l1_grid(&self.preset)?;
+        let n = grid.cells();
+        let s = self.preset.scale.clone();
+        let dx = f64::from(grid.r) * s.m_per_block_h;
+        let d = Dims::new(grid.w as usize, grid.h as usize, dx, true);
+        let t_end_myr = now.t_myr;
+        let dt_myr = self.preset.dt_myr();
+        let parents = &now.parents;
         if surface.log.cells() != n {
             return Err(CoreError::InvalidState(format!(
                 "the strata log has {} cells, L1 has {n}",
                 surface.log.cells()
             )));
+        }
+        let publishes = frames > self.st.frames_seen;
+        if publishes {
+            ctx.reserve((n * (self.host_classes.len() + 2) * 4) as u64)?;
         }
 
         // 1. Metamorphism of the strata log.
@@ -621,9 +862,10 @@ impl StructureStage {
                 step_seed(self.preset.seed, self.st.done),
                 "structure/deform",
             );
+            let causes = &self.causes;
             let cause = |kind: deform::Kind, x: f64, z: f64| {
                 deform::cause_of(
-                    events,
+                    causes,
                     kind,
                     x,
                     z,
@@ -664,209 +906,124 @@ impl StructureStage {
 
         // 3. The deposit engine's fields for frames the surface closed this step.
         let started = Instant::now();
-        let frames = history.as_ref().map_or(0, |h| h.frame_count() as u64);
-        let mut trap: Option<Vec<f32>> = None;
-        if frames > self.st.frames_seen {
-            ctx.reserve((n * (self.host_classes.len() + 2) * 4) as u64)?;
-            let (fields_out, tr) = self.frame_fields(&src, &d, fields, &s);
-            let h = history.as_mut().expect("frames exist");
-            for fk in self.st.frames_seen..frames {
-                h.add_fields(fk as usize, &fields_out)?;
-            }
-            self.st.frames_seen = frames;
-            trap = Some(tr);
-        }
+        let out = publishes.then(|| self.frame_fields(&src, &d, fields, &s));
         add_time(&mut self.timings, "frame_fields", started);
+        self.st.omega = now.omega.clone();
+        Ok(out)
+    }
 
-        // 4. Keyframe layers.
+    /// Publishes the deposit engine's fields (`out`, from [`StructureStage::step_on`]) into the
+    /// history's frames the stage has not published into, up to `frames`.
+    fn publish(
+        &mut self,
+        history: &mut Option<crate::deposits::recorded::RecordedHistory>,
+        frames: u64,
+        out: &BTreeMap<String, Vec<f32>>,
+    ) -> Result<(), CoreError> {
         let started = Instant::now();
-        let t_end_years = t_end_myr * 1.0e6;
-        let every = self.preset.keyframes.every_myr * 1.0e6;
-        let keyframe = last || (every > 0.0 && t_end_years >= self.st.next_kf_years - 1.0);
-        let mut outputs: Vec<(&str, Vec<f32>)> = Vec::new();
-        if keyframe {
-            let trap = match trap {
-                Some(t) => t,
-                None => self.trap_field(&src, &d, fields),
-            };
-            outputs.push((field::ROCK, self.rock_map(&src, &s)));
-            outputs.push((field::LOG_GRADE, self.log_grade(&src.surface.log)));
-            outputs.push((field::TRAP, trap));
-            if every > 0.0 {
-                let t0 = self.preset.t_start_years();
-                self.st.next_kf_years = t0 + (((t_end_years - t0) / every).floor() + 1.0) * every;
-            }
+        let h = history.as_mut().ok_or_else(|| {
+            CoreError::InvalidState("the structure stage's frames have no history".into())
+        })?;
+        for fk in self.st.frames_seen..frames {
+            h.add_fields(fk as usize, out)?;
         }
-        let summary = if last {
-            let horizons = bake_horizons::bake_with(&src, &self.preset, p, tables);
-            Some((horizons.mean_horizons(), horizons.check()))
-        } else {
-            None
-        };
-        let trap_shares = last.then(|| self.trap_shares(&src, &d, fields));
-        add_time(&mut self.timings, "outputs", started);
-        let surface_y: Vec<f64> = if last {
-            self.st
-                .plutons
-                .iter()
-                .map(|pl| src.surface_y(plutons::cell_of(&grid, pl.x, pl.z), &s))
-                .collect()
-        } else {
-            Vec::new()
-        };
-        // The folds and faults as the world's structural events, with a lattice evaluation of
-        // the whole planet (what it finds, and what it costs).
-        let structure = if last {
-            let started = Instant::now();
-            // Everything the run left, with the plugs of the volcanoes that have died (made
-            // here, from the catalogue as it stands: they are not kept in the stage's state).
-            let mut all = self.st.features.clone();
-            let plugs = deform::intrude::plugs(
-                volcanoes
-                    .as_ref()
-                    .map_or(&[][..], |v| v.volcanoes.as_slice()),
-                &p.deformation,
-                s.m_per_block_h,
-                self.st.next_feature,
-            );
-            self.st.deform_counts.plugs = plugs.len() as u64;
-            all.extend(plugs);
-            deform::undo_order(&mut all);
-            let span = (src.now_myr - self.preset.t_start_years() / 1.0e6).max(1.0);
-            let now = src.now_myr;
-            let mut st = deform::finish(
-                &all,
-                |x, z| src.surface_y(plutons::cell_of(&grid, x, z), &s),
-                |f| columns::key::of_age(0, now - f64::from(f.t_myr), span),
-                f64::from(s.min_y),
-            );
-            let relief: Vec<f32> = all
-                .iter()
-                .map(|f| deform::relief_left(f, now, &p.deformation, s.m_per_block_v))
-                .collect();
-            let report = deform::report(
-                &all,
-                &mut st,
-                &self.preset,
-                &self.st.deform_counts,
-                src.regime,
-                src.crust,
-            )?;
-            add_time(&mut self.timings, "deformation_lattice", started);
-            let mut report = report;
-            if let Some(serde_json::Value::Object(timing)) =
-                report.as_object_mut().and_then(|o| o.remove("timing"))
-            {
-                for (key, name) in [
-                    ("lattice_s", "deformation_columns_s"),
-                    ("threads", "deformation_threads"),
-                    ("noddy_ns_point", "deformation_noddy_ns_point"),
-                    ("column_ns_point", "deformation_column_ns_point"),
-                    ("noddy_planet_s", "deformation_noddy_planet_s"),
-                ] {
-                    if let Some(v) = timing.get(key).and_then(serde_json::Value::as_f64) {
-                        self.timings.insert(name, v);
-                    }
-                }
-            }
-            Some((st, report, relief, all))
-        } else {
-            None
-        };
-        drop(src);
-        for (name, data) in outputs {
-            fields.insert(
-                name.to_owned(),
-                Field {
-                    grid: grid.clone(),
-                    data,
-                },
-            );
-        }
+        self.st.frames_seen = frames;
+        add_time(&mut self.timings, "frame_fields", started);
+        Ok(())
+    }
 
-        // 5. The end: bodies and the summary.
-        if last {
-            let mut bodies = 0u64;
-            let plutons = std::mem::take(&mut self.st.plutons);
-            for (pl, &y) in plutons.iter().zip(&surface_y) {
-                let id = world.next_body_id();
-                if let Some(b) = plutons::to_body(
-                    pl,
-                    id,
-                    y,
-                    s.m_per_block_h,
-                    s.m_per_block_v,
-                    s.min_y,
-                    p.aureole_shell,
-                ) {
-                    world.add_body(b)?;
-                    bodies += 1;
-                }
-            }
-            self.st.plutons = plutons;
-            let (mean_horizons, check) = summary.expect("baked on the last step");
-            let (structure, mut deformation, relief, all) =
-                structure.expect("finished on the last step");
-            // The event log's entries: one per fold belt and fault system.
-            let groups = deform::groups(
-                &all,
-                f64::from(s.circumference_blocks),
+    /// The last step's end: the plutons as bodies, the folds and faults as the world's structure
+    /// and its events, and the stage's note.
+    fn finish(
+        &mut self,
+        world: &mut WorldState,
+        ctx: &StageContext<'_>,
+        surface_y: &[f64],
+        summary: Option<(f64, Result<(), String>)>,
+        structure: Option<Finished>,
+        trap_shares: Option<serde_json::Value>,
+    ) -> Result<(), CoreError> {
+        let s = self.preset.scale.clone();
+        let p = &self.p;
+        let mut bodies = 0u64;
+        let plutons = std::mem::take(&mut self.st.plutons);
+        for (pl, &y) in plutons.iter().zip(surface_y) {
+            let id = world.next_body_id();
+            if let Some(b) = plutons::to_body(
+                pl,
+                id,
+                y,
                 s.m_per_block_h,
                 s.m_per_block_v,
-            );
-            deformation["events"] = json!(groups.len());
-            for g in groups {
-                let mut e = world
-                    .event(g.t_start, g.kind, deform::SOURCE)
-                    .until(g.t_end)
-                    .at(deeptime_format::Place::Point {
-                        lat: g.lat,
-                        lon: g.lon,
-                    })
-                    .magnitude(g.magnitude)
-                    .param("setting", g.setting);
-                for (k, v) in g.params {
-                    e = e.param(k, v);
-                }
-                if g.cause != 0 && world.events.iter().any(|x| x.id.0 == g.cause) {
-                    e = e.caused_by(deeptime_format::EventId(g.cause));
-                }
-                world.emit(e)?;
-            }
-            deformation["with_relief"] = json!(relief.iter().filter(|r| **r > 0.01).count());
-            deformation["traps"] = trap_shares.unwrap_or_default();
-            world.structure = Some(structure);
-            world.structure_relief = relief;
-            ctx.log.push(
-                crate::log::Level::Info,
-                format!("structure deformation: {deformation}"),
-            );
-            let note = json!({
-                "steps": self.st.done + 1,
-                "plutons": {
-                    "emplaced": self.st.counts.emplaced,
-                    "alive": self.st.plutons.len(),
-                    "eroded": self.st.counts.eroded,
-                    "subducted": self.st.counts.subducted,
-                    "bodies": bodies,
-                },
-                "metamorphosed_km3": self.st.metamorphosed_km3,
-                "deformation": deformation,
-                "frames_published": self.st.frames_seen,
-                "host_classes": self.host_classes.iter().map(|&k| EVERY_CLASS[usize::from(k)]).collect::<Vec<_>>(),
-                "horizons": {
-                    "k": self.p.horizons,
-                    "mean_per_cell": mean_horizons,
-                    "check": match &check { Ok(()) => "ok".to_owned(), Err(e) => e.clone() },
-                },
-                "millis": self.timings,
-            });
-            world.notes.insert(STAGE_NAME.into(), note.to_string());
-            if let Err(e) = check {
-                return Err(CoreError::InvalidState(format!("horizon bake: {e}")));
+                s.min_y,
+                p.aureole_shell,
+            ) {
+                world.add_body(b)?;
+                bodies += 1;
             }
         }
-        self.st.omega = omega_now;
+        self.st.plutons = plutons;
+        let (mean_horizons, check) = summary.expect("baked on the last step");
+        let (structure, mut deformation, relief, all) =
+            structure.expect("finished on the last step");
+        // The event log's entries: one per fold belt and fault system.
+        let groups = deform::groups(
+            &all,
+            f64::from(s.circumference_blocks),
+            s.m_per_block_h,
+            s.m_per_block_v,
+        );
+        deformation["events"] = json!(groups.len());
+        for g in groups {
+            let mut e = world
+                .event(g.t_start, g.kind, deform::SOURCE)
+                .until(g.t_end)
+                .at(deeptime_format::Place::Point {
+                    lat: g.lat,
+                    lon: g.lon,
+                })
+                .magnitude(g.magnitude)
+                .param("setting", g.setting);
+            for (k, v) in g.params {
+                e = e.param(k, v);
+            }
+            if g.cause != 0 && world.events.iter().any(|x| x.id.0 == g.cause) {
+                e = e.caused_by(deeptime_format::EventId(g.cause));
+            }
+            world.emit(e)?;
+        }
+        deformation["with_relief"] = json!(relief.iter().filter(|r| **r > 0.01).count());
+        deformation["traps"] = trap_shares.unwrap_or_default();
+        world.structure = Some(structure);
+        world.structure_relief = relief;
+        ctx.log.push(
+            crate::log::Level::Info,
+            format!("structure deformation: {deformation}"),
+        );
+        let note = json!({
+            "steps": self.st.done + 1,
+            "plutons": {
+                "emplaced": self.st.counts.emplaced,
+                "alive": self.st.plutons.len(),
+                "eroded": self.st.counts.eroded,
+                "subducted": self.st.counts.subducted,
+                "bodies": bodies,
+            },
+            "metamorphosed_km3": self.st.metamorphosed_km3,
+            "deformation": deformation,
+            "frames_published": self.st.frames_seen,
+            "host_classes": self.host_classes.iter().map(|&k| EVERY_CLASS[usize::from(k)]).collect::<Vec<_>>(),
+            "horizons": {
+                "k": self.p.horizons,
+                "mean_per_cell": mean_horizons,
+                "check": match &check { Ok(()) => "ok".to_owned(), Err(e) => e.clone() },
+            },
+            "millis": self.timings,
+        });
+        world.notes.insert(STAGE_NAME.into(), note.to_string());
+        if let Err(e) = check {
+            return Err(CoreError::InvalidState(format!("horizon bake: {e}")));
+        }
         Ok(())
     }
 
@@ -1212,6 +1369,11 @@ impl Stage for StructureStage {
         if self.st.done >= self.total {
             return Ok(());
         }
+        if self.detached.is_some() {
+            return Err(CoreError::InvalidState(
+                "the structure step is out of the world".into(),
+            ));
+        }
         ctx.pool.install(|| self.advance(world, ctx))?;
         self.st.done += 1;
         Ok(())
@@ -1225,6 +1387,117 @@ impl Stage for StructureStage {
         Some(crate::plates::STAGE_NAME)
     }
 
+    fn steps_beside_lead(&self) -> bool {
+        true
+    }
+
+    /// The steps between keyframes write nothing of the world but the strata log
+    /// ([`StructureStage::step_on`]), and the plate step reads neither the surface nor any field
+    /// the step reads but the two it copies ([`COPIED`]). The last step (bodies, events, the
+    /// note) and the keyframe steps (their layers) run on the world.
+    fn detach(&mut self, world: &mut WorldState) -> Result<bool, CoreError> {
+        if self.detached.is_some() {
+            return Err(CoreError::InvalidState(
+                "the structure step is out of the world already".into(),
+            ));
+        }
+        if self.st.done + 1 >= self.total || world.surface.is_none() {
+            return Ok(false);
+        }
+        let Ok(now) = PlatesNow::of(world) else {
+            return Ok(false);
+        };
+        if self.keyframe_at(now.t_myr) {
+            return Ok(false);
+        }
+        self.causes
+            .update(&world.events, self.preset.scale.circumference_blocks);
+        let frames = world.history.as_ref().map_or(0, |h| h.frame_count() as u64);
+        let mut fields = BTreeMap::new();
+        let mut moved = Vec::new();
+        for &name in MOVED.iter().chain(POOL_FIELDS.iter()) {
+            if let Some(f) = world.fields.remove(name) {
+                fields.insert(name.to_owned(), f);
+                moved.push(name.to_owned());
+            }
+        }
+        for name in COPIED {
+            if let Some(f) = world.fields.get(name) {
+                let copy = Field {
+                    grid: f.grid.clone(),
+                    data: crate::alloc::copied(&f.data),
+                };
+                fields.insert(name.to_owned(), copy);
+            }
+        }
+        let surface = world.surface.take().expect("checked above");
+        self.detached = Some(Box::new(Parts {
+            now,
+            fields,
+            moved,
+            surface,
+            frames,
+            stepped: false,
+            out: None,
+        }));
+        Ok(true)
+    }
+
+    fn step_detached(&mut self, ctx: &StageContext<'_>) -> Result<(), CoreError> {
+        let mut parts = self.detached.take().ok_or_else(|| {
+            CoreError::InvalidState("no structure step is out of the world".into())
+        })?;
+        let p = &mut *parts;
+        let result = if p.stepped {
+            Ok(())
+        } else {
+            match ctx
+                .pool
+                .install(|| self.step_on(&p.now, &p.fields, &mut p.surface, p.frames, ctx))
+            {
+                Ok(out) => {
+                    p.out = out.map(|(fields_out, _)| fields_out);
+                    p.stepped = true;
+                    Ok(())
+                }
+                Err(e) => Err(e),
+            }
+        };
+        self.detached = Some(parts);
+        result
+    }
+
+    fn attach(&mut self, world: &mut WorldState) -> Result<(), CoreError> {
+        let Some(parts) = self.detached.take() else {
+            return Ok(());
+        };
+        let Parts {
+            fields,
+            moved,
+            surface,
+            frames,
+            stepped,
+            out,
+            ..
+        } = *parts;
+        world.surface = Some(surface);
+        for (name, f) in fields {
+            if moved.contains(&name) {
+                world.fields.entry(name).or_insert(f);
+            }
+        }
+        if !stepped {
+            return Err(CoreError::InvalidState(
+                "the structure step taken out of the world did not run".into(),
+            ));
+        }
+        if let Some(out) = out {
+            self.publish(&mut world.history, frames, &out)?;
+        }
+        self.st.done += 1;
+        Ok(())
+    }
+
     fn save_state(&self) -> Result<Vec<u8>, CoreError> {
         to_state(&Saved {
             st: self.st.clone(),
@@ -1234,6 +1507,8 @@ impl Stage for StructureStage {
     fn load_state(&mut self, bytes: &[u8]) -> Result<(), CoreError> {
         let s: Saved = from_state(bytes)?;
         self.st = s.st;
+        self.causes = deform::Causes::default();
+        self.detached = None;
         Ok(())
     }
 }
