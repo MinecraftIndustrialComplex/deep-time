@@ -550,8 +550,21 @@ impl StructureStage {
         }
         let summary = if last {
             let horizons = bake_horizons::bake_with(&src, &self.preset, p, tables);
-            // Kept for the deposit stage's cover and the bake, which read the same inputs.
-            kept.keep(src.fingerprint(&self.preset, p), &horizons);
+            // Kept for the deposit stage's cover and the bake, which read the same inputs: in a
+            // file of their own in the run's folder, so they hold no memory meanwhile.
+            kept.keep(
+                src.fingerprint(&self.preset, p),
+                &horizons,
+                Some(ctx.out_dir),
+            );
+            ctx.log.push(
+                crate::log::Level::Info,
+                format!(
+                    "structure: the horizons kept for the deposit stage and the bake, {:.1} MiB packed, {}",
+                    kept.bytes() as f64 / 1_048_576.0,
+                    if kept.on_disk() { "in a file of their own" } else { "in memory" }
+                ),
+            );
             Some((horizons.mean_horizons(), horizons.check()))
         } else {
             None
