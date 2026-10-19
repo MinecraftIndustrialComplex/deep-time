@@ -338,6 +338,7 @@ fn drive(stage: &mut DepositStage, world: &mut WorldState) -> Vec<String> {
             state: &state,
             history: None,
             needed_peak: None,
+            compute: crate::compute::ComputeMode::Cpu,
         };
         stage.step(world, &ctx).unwrap();
     }
@@ -560,6 +561,7 @@ fn a_world_without_history_is_a_clear_error() {
         state: &state,
         history: None,
         needed_peak: None,
+        compute: crate::compute::ComputeMode::Cpu,
     };
     let e = stage.step(&mut world, &ctx).unwrap_err().to_string();
     assert!(e.contains("field history") && e.contains("surface"), "{e}");

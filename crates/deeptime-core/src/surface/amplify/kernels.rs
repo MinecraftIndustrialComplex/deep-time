@@ -200,6 +200,9 @@ pub struct Times {
     pub deposit_ms: f64,
     pub flood_ms: f64,
     pub glacial_ms: f64,
+    /// Arrays to and from a [`PassDevice`] (0 on the CPU). The device's own work counts in the
+    /// phase it belongs to: the device is waited for at each phase's end.
+    pub transfer_ms: f64,
 }
 
 impl Times {
@@ -210,7 +213,30 @@ impl Times {
         self.deposit_ms += o.deposit_ms;
         self.flood_ms += o.flood_ms;
         self.glacial_ms += o.glacial_ms;
+        self.transfer_ms += o.transfer_ms;
     }
+}
+
+/// Runs the middle of [`run_passes`] (erosion, glacial valleys, thermal erosion, deposition)
+/// somewhere other than the CPU: the GPU (`gpu.rs`, feature `gpu`). The dispatch point of the
+/// amplifier's GPU path (`docs/design/gpu-compute.md`); the CPU's [`middle_cpu`] is the reference.
+pub trait PassDevice: Send + Sync + std::fmt::Debug {
+    /// The device, for the run's notes.
+    fn name(&self) -> String;
+    /// Host bytes per window cell while a window is on the device (its buffers, when the device
+    /// shares the host's memory, and the staging of downloads).
+    fn host_bytes_per_cell(&self) -> u64;
+    /// Whether a window of `cells` fits on the device.
+    fn fits(&self, cells: usize) -> bool;
+    /// What [`middle_cpu`] does, on `buf` after the seeding and the first flood. On `Err` the
+    /// arrays are undefined: the caller samples the window again and runs it on the CPU.
+    fn middle(
+        &self,
+        buf: &mut Buf,
+        ph: &Physics,
+        counts: &Counts,
+        times: &mut Times,
+    ) -> Result<super::glacial::ShapeStats, String>;
 }
 
 /// N(c) = Σ (slope to each lower neighbour)^p for land cells, 0 for the sea.
@@ -687,6 +713,57 @@ pub fn run_passes(
     cfg: &NoiseCfg,
     times: &mut Times,
 ) -> PassStats {
+    match run_passes_on(None, buf, ph, counts, cfg, times) {
+        Ok(stats) => stats,
+        Err(_) => unreachable!("the CPU passes do not fail"),
+    }
+}
+
+/// [`run_passes`] with its middle on `device` when there is one. `Err` when the device failed;
+/// `buf` is then undefined.
+pub fn run_passes_on(
+    device: Option<&dyn PassDevice>,
+    buf: &mut Buf,
+    ph: &Physics,
+    counts: &Counts,
+    cfg: &NoiseCfg,
+    times: &mut Times,
+) -> Result<PassStats, String> {
+    let pre_flood = seed_and_flood(buf, ph, cfg, times);
+    let glacial = match device {
+        Some(d) => d.middle(buf, ph, counts, times)?,
+        None => middle_cpu(buf, ph, counts, times),
+    };
+    let started = Instant::now();
+    let flood = flood_repair(
+        &buf.win,
+        &mut buf.z,
+        &buf.lake,
+        ph.sea,
+        ph.eps_m,
+        &mut buf.z2,
+        buf.core,
+    );
+    times.flood_ms += started.elapsed().as_secs_f64() * 1000.0;
+    Ok(PassStats {
+        pre_flood,
+        flood,
+        glacial,
+    })
+}
+
+/// Zeroes the eroded thickness, sets each cell's incision cap and damps the erodibility under
+/// the glaciers; returns the erodibility to restore once the erosion is done (`glacial::damp`).
+pub fn erosion_setup(buf: &mut Buf, ph: &Physics) -> Option<Vec<f32>> {
+    buf.eroded.iter_mut().for_each(|e| *e = 0.0);
+    incision_cap(&buf.win, &buf.z, ph, &mut buf.cap);
+    // Rivers cut little where the glaciers were (`glacial.rs`); the rates come back after.
+    super::glacial::damp(&ph.glacial, &buf.z, &buf.zs, &mut buf.kfac)
+}
+
+/// The relief seeding, the threshold-angle field and the flood after them (which marks the
+/// cells it raised as frozen).
+fn seed_and_flood(buf: &mut Buf, ph: &Physics, cfg: &NoiseCfg, times: &mut Times) -> FloodStats {
     let win = buf.win;
     let started = Instant::now();
     seed_step(&win, &buf.z, ph, cfg, &mut buf.z2);
@@ -708,12 +785,19 @@ pub fn run_passes(
         *f = u8::from(z > z0 + 1.0e-3);
     }
     times.flood_ms += started.elapsed().as_secs_f64() * 1000.0;
+    pre_flood
+}
 
+/// Erosion, glacial valleys, thermal erosion and deposition on the CPU.
+pub fn middle_cpu(
+    buf: &mut Buf,
+    ph: &Physics,
+    counts: &Counts,
+    times: &mut Times,
+) -> super::glacial::ShapeStats {
+    let win = buf.win;
     let started = Instant::now();
-    buf.eroded.iter_mut().for_each(|e| *e = 0.0);
-    incision_cap(&win, &buf.z, ph, &mut buf.cap);
-    // Rivers cut little where the glaciers were (`glacial.rs`); the rates come back after.
-    let kfac_saved = super::glacial::damp(&ph.glacial, &buf.z, &buf.zs, &mut buf.kfac);
+    let kfac_saved = erosion_setup(buf, ph);
     for _ in 0..counts.erode {
         norms(&win, &buf.z, ph, &mut buf.norm);
         area_step(&win, &buf.z, &buf.norm, &buf.a, &buf.own, ph, &mut buf.a2);
@@ -798,23 +882,7 @@ pub fn run_passes(
         std::mem::swap(&mut buf.sed, &mut buf.sed2);
     }
     times.deposit_ms += started.elapsed().as_secs_f64() * 1000.0;
-
-    let started = Instant::now();
-    let flood = flood_repair(
-        &win,
-        &mut buf.z,
-        &buf.lake,
-        ph.sea,
-        ph.eps_m,
-        &mut buf.z2,
-        buf.core,
-    );
-    times.flood_ms += started.elapsed().as_secs_f64() * 1000.0;
-    PassStats {
-        pre_flood,
-        flood,
-        glacial,
-    }
+    glacial
 }
 
 #[cfg(test)]

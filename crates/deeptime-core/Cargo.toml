@@ -29,3 +29,10 @@ lz4_flex = "0.14.0"
 # Orographic precipitation (P1-05, plan §8.3 item 4): Smith & Barstad's transfer function is
 # applied in Fourier space. MIT OR Apache-2.0.
 rustfft = "6.4.1"
+# The GPU compute path (docs/design/gpu-compute.md): kernels that mirror CPU passes, used when the
+# session's compute mode and the machine allow. Off by default, so the core builds and tests
+# without a GPU stack; the CLI and the natives (macOS aside, for now) turn it on.
+deeptime-gpu = { workspace = true, optional = true }
+
+[features]
+gpu = ["dep:deeptime-gpu"]

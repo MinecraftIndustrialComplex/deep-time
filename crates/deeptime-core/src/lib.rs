@@ -7,6 +7,7 @@ pub mod alloc;
 
 // The stage runner and its persistence (P1-01).
 pub mod checkpoint;
+pub mod compute;
 // Epoch checkpoints: pick the epoch, continue, stop early (docs/design/playability-steering.md).
 pub mod dummy;
 pub mod epochs;
