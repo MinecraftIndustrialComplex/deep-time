@@ -236,6 +236,50 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   1. Find why the high ground rises with the plate step: test the advection blur by advecting twice per 4-Myr step.
   2. Then P4S2 (`tectonics.time_step_myr` 4, `surface.substeps` 2) is one preset change.
 
+### 2026-10-19: P1-19 plates part 2: feedback, flexure, belts and fronts, and the neighbour queries of write_l1, detect and stats_margins. The plate stage is 1.25× faster side by side (15 s per 200 Myr) and the worlds are identical (profile items #3, #5; agent worktree agent-ad646ba0bbca1e26b, branch worktree-agent-ad646ba0bbca1e26b from master be80c6c1, master 32589362 merged before the measurements; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What changed** (every change identical: same files, byte for byte).
+  - **#3, feedback and flexure** (`plates/mod.rs`). The feedback's serial scatter stays. The flexure's sample (`flexure_of`) runs beside it in a `rayon::join`, since both only read the last sampling's links. The `flexure_sample` lap is now only the fallback for a step without feedback.
+    - A parallel gather over the links turned round (`FanIn`, a counting-sort transposition, each sample's additions in the serial order) was built twice and dropped. It lost to the serial scatter under the follower stage's load: feedback +2.35 s per 200 Myr (v1) and +1.9 s (v2, `pairs-fanin`).
+  - **#3, belts** (`plates/belts.rs`). `stack` runs every front's two distance fields at once. Each is plates part 1's `dijkstra_sparse`, sorted by vertex (`geometry::dijkstra_sorted`), so the sums run in the old order. The loops run over the reached set, not every sample. A front stacked after another cuts its field back to the shorter reach, which is exact (see `dijkstra_sorted`), or runs it again.
+  - **#3, fronts** (`plates/subduction.rs`). Split into begin, reach and finish. The read-only reach runs beside `belts::stack`, so the `belts` lap now holds it. The arcs' search from every front runs per rigid group (`geometry::dijkstra_parts`, each group's `dijkstra_sparse` on its own thread, exact because no allowed edge joins two groups).
+  - **#5, write_l1** (`plates/l1.rs`, `sphere/coupling.rs`).
+    - One nearest query finds the nearest visible sample's group first. The six-nearest search runs only where that fails.
+    - The 30 output layers are written in one pass.
+    - Each cell's row is interpolated inside the block loop; before, every cell's row was collected first (about 150 MB a step on full 16k).
+    - The coupling keeps its cells' unit vectors per row and column.
+  - **#5, detect** (`plates/subduction.rs`). Samples whose 5×5×5 block of cubes holds only their own plate are skipped (`Voxels`). This is exact because √3·h < 2h.
+  - **#5, stats_margins** (`plates/stats.rs`). One 8-nearest query per sample serves both the margins and the landmass links.
+  - **Tests.** `sorted_and_split_dijkstras_match_the_dense_one` (dense against sorted, per part and a shorter reach, bit for bit), `voxels_skip_only_samples_whose_nearest_share_their_plate` and `kept_unit_vectors_are_the_frames`.
+  - **Tooling.** `tools/review/p1-19-pair.sh` runs two builds side by side on the VM's sets A and B, then swapped, and compares each pair's worlds.
+- **Merge with plates part 1** (master 32589362): `geometry.rs` takes master's `dijkstra_sparse`. This branch's own kept-scratch search (`Reach`, `dijkstra_reached`) is gone, as the coordinator asked.
+- **Seconds.**
+  - **Setup.** The shipped x86-64-v3 builds (`tools/natives/gate-bins.sh <out> --only x86-64-v3`) of master 32589362 and of this branch, run with `tools/review/p1-19-pair.sh <master bin> master <branch bin> branch <out> earthlike_full_16k scattered_continents 200 8 ab,ba`. Lap timers are from `deeptime bench` through `bench-quiet.py`. The VM was loaded by other agents: others' busy CPUs averaged 14 to 19, load1 peaked at 91 in ba.
+
+  | Lap | ab: master A → branch B | ba: master B → branch A | Saved per 200 Myr (mean) |
+  |---|---|---|---|
+  | feedback + flexure_sample | 8.2 → 4.3 | 10.5 → 9.3 | 2.6 |
+  | belts + fronts | 6.7 → 3.3 | 7.9 → 5.3 | 3.0 |
+  | detect | 5.3 → 3.4 | 9.1 → 9.1 | 1.0 |
+  | stats_margins | 2.0 → 1.5 | 2.8 → 2.6 | 0.35 |
+  | write_l1 | 29.6 → 19.5 | 48.9 → 40.5 | 9.25 |
+  | plates stage | 69.4 → 48.8 | 103.1 → 93.4 | 15.2 (1.25×, geometric mean) |
+  | user CPU time | 1,744.2 → 1,665.6 | 1,644.4 → 1,613.0 | 55 |
+  | wall | 441.1 → 361.0 | 531.5 → 601.6 | not read: set A was the slow set in both orders |
+
+  - The wall times swing with the CPU set, not the build. Set B ran 4.84 and 3.24 CPUs busy against set A's 4.15 and 2.79, and the stages after the plates (amplify, finalize), which this branch does not touch, moved by 17 to 25 s with the set.
+  - Scaled to 1,000 Myr, the plate stage saves about 50 to 100 s. That is an estimate: the plates run beside the structure step, so the gate's wall gains less, and no full run was made.
+- **cmp** (`tools/review/p1-17-cmp.py` per pair): 68 of 68 files are byte-identical in both orders. Before the merge, against be80c6c1, both earlier pairs and the FanIn pair also gave 68 of 68.
+- **Tolerance tests.** None needed: every change is identical, and `tests/overlap.rs` (1 thread against 3, byte for byte) passes.
+- **Gates** (on the VM, the merged code):
+  - `cargo test --workspace`: all pass, deeptime-core lib 715 passed, 4 ignored.
+  - `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo deny check licenses bans` are clean. Clippy's one finding, a type alias for the feedback's result (`Feedback`), was fixed and checked again.
+  - `./gradlew build test`: tests=361, failures=0, skipped=2.
+  - After the measurements, master e2166684 (the climate and after-group items, no file in `plates/` or `sphere/`) was merged too. fmt, clippy, the core's plate and sphere tests (155 passed) and `tests/overlap.rs` pass on it.
+- **Not done.**
+  - Sharing one visible-sample tree between `stats_margins` and `write_l1`. Each builds its own; they meet in a step only every 10 Myr, so the saving is small and would cost signature changes.
+  - A kiddo scratch rewrite (`with_scratch` queries) for the neighbour searches.
+- **Next.** Merge into master with the other P1-19 branches. Then run the full 16k gate on the merged master: `tools/natives/gate-bins.sh <out>`, then `tools/review/bench-quiet.py ... <out>/deeptime-x86-64-v3 earthlike_full_16k scattered_continents 1000 8` and the same for `deeptime-baseline`.
+
 ### 2026-10-18: Natives: a baseline and an x86-64-v3 build for each x86-64 platform, picked at runtime by a CPU probe, and the `ship` profile (fat LTO, one codegen unit) for everything that ships and for the gate. At 100 Myr on full 16k, ship v3 is 1.08× faster than plain `release` (CPU time 1.10×). Ship baseline matches it in wall time (1.00×) and is 1.03× by CPU time. The worlds are the same files (coordinator's task, Ben's decision of 2026-10-18 "Both, picked at runtime"; agent worktree agent-aa3973505c3dc829a, branch worktree-agent-aa3973505c3dc829a from master f221b3d3; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What ships.** A release jar holds 16 native files, up from 8:
   - the eight platforms' baseline `deeptime_jni`;
@@ -454,6 +498,50 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **Not done, and why.** The present search (8 s quiet, 13 s loaded per run, fixed): it reruns the run's last 100 kyr with a bisection of the CO2 factor, and the plan was to leave the clock's physics alone. `thornthwaite`'s `powf` and per-block partial sums for the 2-D model's global means would change bits (allowed) but each is under 1 s per 1000 Myr. I did not touch topography's source, `surface/grid.rs` or the stages after the group.
 - **Choices** (coordinator's call): `MAX_GROUP` = 4 ocean sub-steps per group; block size `h.div_ceil(2 * threads)`; `vec![0.5; n]` as the dynamic-ice precipitation default; overlapping timers (documented in the code and above).
 - **Next:** the coordinator merges and runs the 1000 Myr gate on set A for the combined effect (the climate stage's own timer should fall by roughly 60 to 70 s on top of the other agents' stages). After this, the climate stage's remaining cost per 100 Myr (quiet, estimated): the present search 7.7 s (once), the clock 5.3 s, the snapshot 7.8 s (the 2-D model's year loop 3.2 s of it), the ice 2.1 s.
+### 2026-10-19: P1-19 surface speed-ups, worlds identical: the flood beside the carry, kept solver and log buffers, tabled advection sources, flexure and glacial passes in larger pieces (agent worktree agent-a9b6be484752187ab, branch worktree-agent-a9b6be484752187ab from master be80c6c1, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What changed** (commits dc98dda7, 1de3966e, 07416078). Every change is "identical": the same expressions in the same order, or order-free maxima and integer counts. No world changed, so no p1-17-hyps or ensemble run was needed, and no thread-count test became a tolerance test.
+  - **#4.** The first priority flood runs beside the second half of the carry and the setup (`rayon::join`). Neither touches `kind`, `base_z` or `filled`. New timer `flood_beside` (the join's wall time); `pflood`, `advect` and `setup` keep each half's own time.
+  - **#9.** The diffusion solves keep their vectors in a `diffusion::Workspace` in the scratch (hillslope, marine, spreading), released at the last step. `diffusion::step` (young stage, oracle, plateau check) sizes the solve's vectors after the sweeps, as before. Slope failure's serial moved sum runs beside the apply and the next iteration's marks and shares.
+  - **#7.** The carried strata log is written into the last step's log, kept as a spare (no new 515 MB log a step). The step fields' 26 grids stay in the scratch.
+  - **#15.** `advect::sources` does one rotation per plate and takes the cells' unit vectors from per-row and per-column tables. New test `the_tabled_sources_equal_the_per_cell_ones`.
+  - **#17.** Fields and events: class tags as bits; the frame sum in one pass; the events' region walks beside the frame's closing and packing; the craton distance beside the rest of the frame.
+  - **#20, flexure.** The carry's loops run in parallel. The step restricts its fine fields without building them (`restrict_by`) and reads the coarse rigidity, residual and deflection per cell. It sums the changes beside the copies and writes the seen elevation in place. The solver's Laplacian passes take the scale, the restoring term and the residual in the same pass; x and r are updated in one pass, and the error and r.z come from one.
+  - **#20, glacial.** The ice solve's seven gathers and its count are one pass. The footprint is built by bands of 16 rows in parallel. New sub-timers `glacial_ice`, `glacial_walk` and `glacial_sea`. The surface borrows the ice field for the flexure instead of copying it.
+- **Measured.** `pair.sh <tag> <myr>` on the VM runs `tools/review/bench-quiet.py <dir> <bin> earthlike_full_16k scattered_continents <myr> 8` in one `sim:earthlike_full_16k:16t` job: master (be80c6c1) on set A beside the branch on set B, then swapped. `p1-17-cmp.py` compares each pair's `work/t8`. p4 was one order only, with `DEEPTIME_MEM_TRACE` on both runs.
+
+  | Pair | Branch | Myr | Surface, master / branch s | Saved | Total, master / branch s | cmp |
+  |---|---|---|---|---|---|---|
+  | p1 mA / bB | 1de3966e | 100 | 126.3 / 117.3 | 9.0 s, 7.1 % | 480.7 / 469.8 | 66 of 66 equal |
+  | p1 mB / bA | 1de3966e | 100 | 85.3 / 73.8 | 11.5 s, 13.5 % | 322.7 / 311.8 | 66 of 66 equal |
+  | p2 mA / bB | 1de3966e | 200 | 171.8 / 164.3 | 7.5 s, 4.4 % | 511.4 / 509.7 | 68 of 68 equal |
+  | p2 mB / bA | 1de3966e | 200 | 158.8 / 142.6 | 16.2 s, 10.2 % | 486.3 / 467.7 | 68 of 68 equal |
+  | p4 mA / bB | 07416078 | 200 | 147.7 / 132.4 | 15.3 s, 10.4 % | 500.6 / 482.1 | 68 of 68 equal |
+
+  The VM was loaded throughout: p1's first half had load1 74.5 on average (the runs got 2.7 cores of 8), and the others 27 to 41 (3.4 to 4.7 cores). The saving is 4.4 to 13.5 % of the surface stage, 9.1 % on average. On the gate's 476.1 s surface stage that would be about 43 s (21 to 64 s) if the share holds over 1000 Myr. This was not measured at 1000 Myr or on a quiet machine.
+- **Attribution** (master minus branch, the four p1/p2 comparisons).
+  - **The flood, carry and setup group (#4, #7's log, #15):** 6.4 and 6.4 s at 100 Myr, 9.5 and 10.3 s at 200 Myr. This is what is left of the surface difference once every other timer's difference is taken out; the halves of the join overlap, so they cannot be timed apart.
+  - **`diffusion` (#9):** 0.9, 2.7, -1.2 and 3.0 s. Of that, `diffusion_solve` 1.1, 1.2, -1.4 and 0.8 s, and `slope_failure` -0.1, 1.5, 0.2 and 2.1 s.
+  - **`fields_events` (#17):** 0.3, 1.1, 1.0 and 1.2 s.
+  - **`flexure` and `glacial` (#20):** flexure 0.3, 0.7, 1.0 and 0.8 s; glacial 0.9, 0.5, 0.3 and 1.1 s.
+  - **Glacial sub-timers:** `glacial_ice` 1.9 to 4.8 s, `glacial_walk` 0.2 s per 100 Myr and 1.0 s per 200 Myr, `glacial_sea` 0.2 s at most. The serial erosion walk is too small for a parallel version to pay.
+  - **The other timers** (spl, marine_fill, strata, routing, spread, outputs, carbonate) moved by -1.2 to +0.4 s each: noise.
+- **Memory.**
+  - **Spills unchanged.** 30 frames and 314,621,407 B at 100 Myr; 60 and 675,135,909 B at 200 Myr. `reserved_peak_bytes` is 3 to 17 KB higher.
+  - **Resident peak.** 1de3966e was 12 to 32 MB (0.3 to 0.8 %) above master. 07416078 is level with master on p4: 4,233,608 KiB against 4,233,740.
+  - **Counted peak.** Master's sits at the 4 GiB cap (4,294,966,752 B). 1de3966e went 0.2 MiB over at 100 Myr and 9.3 MiB over at 200 Myr.
+    - **Where.** A diagnostic build (not committed) printed each rise of the peak by surface section: none was in the surface stage. A trace per phase then put it in the young stage, where `diffusion::step` sized all eight solve vectors before the sweeps.
+    - **After the fix (07416078).** Young is at the cap (4,294,965,824 against master's 4,294,967,088). The run's maximum is 4,294,976,304 B: 9 KB over, in climate (master's climate peak was 4,294,886,048).
+  - **The kept buffers raise the coupled phases' live peaks.** The spare log, the step fields and the solve workspace are about 0.95 GB at full 16k. Plates are 177 MiB higher, volcanoes 453, impacts 454 and surface 95, all at or under the cap, because the kept-block cache gives way. At a tighter cap they would send the history to disk sooner; at the 4 GiB default they spill nothing more.
+- **Found.** `surface::diffusion::parity::a_kept_workspace_gives_the_textbook_solve` (new in dc98dda7) failed its precondition: its 64x40 `ranges` case does not skip rows. That case is now `ranges(64, 41, 5, true, 1.0)`, the one the skipping test uses, which also refits the workspace between sizes.
+- **Gates** (VM, on 07416078). `cargo fmt --all --check` clean. `cargo clippy --workspace --all-targets -- -D warnings` clean. `cargo test --workspace --no-fail-fast`: 25 test binaries, 965 passed, 0 failed, 4 ignored. `cargo deny check licenses bans`: bans ok, licenses ok. `./gradlew build test` (neoforge/): 354 tests, 0 failures, 2 skipped.
+- **Not done.**
+  - **#9, the direction updated in place with saved halo rows.** It saves one grid stream per CG iteration, and the solve's algorithm is the world-changing agent's (multigrid).
+  - **#15, sharing the sources and the carried elevation with the climate topography.** That needs a transient slot in the world (world.rs, the session), outside this task's files.
+  - **#20, a parallel glacial erosion walk.** The walk is too small (above).
+  - **Glacial `UP_CHUNK` and `DOWN_GRAIN`.** Not tuned; nothing measured them.
+  - **World-changing extras** (the flexure changes' sum in parallel and the like). Each is under 1 s per 200 Myr.
+- **Choices** (the agent's): kept #7's buffers, since spills and resident peak are unchanged; the `flood_beside` timer; 16-row footprint bands; the diagnostic build stayed off the branch.
+- **Next step.** Merge this branch with the other P1-19 branches and run the full 16k gate (`deeptime bench --preset earthlike_full_16k --start scattered_continents --length-myr 1000 --threads 8`, quiet, set A). The surface's largest costs are now the diffusion solve (37 to 49 s per 200 Myr here) and slope failure (19 to 26 s), both for the world-changing solver work.
 ### 2026-10-18: The ice cover's edge test no longer needs ice on the test planet, and the census reads Expanded Ecosphere's subtropical forests as temperate (BIO-160) (coordinator's follow-up to the batch on master 3efc5ff8; agent worktree agent-a24d995879bff43ce, branch ice-followup-3efc from origin/master 16817738)
 - **Gradle `IceCoverTest.aCoversEdgeLiesHalfWayToItsBareNeighbour`** ("the planet's cover has an eastern edge"). Since the crust fix 25ae6723 the 4k test planet carries no ice at all: its record `notes.bake.climate.ice_cover` counts `cells` 0, `climate_cells` 0, `bodies` 0 (the Gradle fixture on master 3efc5ff8). The test now checks the rule on a layer it writes itself: a raw one-tile u8 pack laid out as FORMAT.md's tile pack (a 4 × 4 sheet of 12, a lone 6, a ramp 3, 7, 11 and a body across the x seam). It checks 34 edges on all four sides, the ramp's blend (5 half-way between 3 and 7) and the seam. Against the old bilinear read the test fails ("inside the half-way line of cell (4, 3) toward (-1, 0): expected 12 but was 8"; a one-core javac run on the VM with RasterSampler.cover swapped back). A second test, `thePlanetsCoverFollowsTheRuleAtEveryEdge`, checks every edge the baked planet has in any direction and fails if a cover has no edge, and checks the layer is bare where the record counts no cell. `IceCover.of(RasterSampler, Spec)` serves both.
 - **-PwithEe `climateConsistent`** ("C 0.628 < 0.630 (164 columns)"). The census's misses: `wythers:subtropical_forest` 49, `wythers:humid_tropical_grassland` 10, `minecraft:savanna` 1, `wythers:highlands` 1. The crust fix warmed the planet: no D, Dsub or E columns, and Cfa 79 land columns.

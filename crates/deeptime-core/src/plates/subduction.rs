@@ -56,7 +56,7 @@ use rayon::prelude::*;
 use super::Env;
 use super::collapse::{iso_height, toward};
 use super::events::{self, SUBDUCTION_ONSET};
-use super::geometry::{Cover, Geo, Tree, cover, dijkstra};
+use super::geometry::{Cover, Geo, Tree, cover, dijkstra_parts};
 use super::kinematics::{quat, tangent, to_group, to_world};
 use super::pools::isostatic_change_m;
 use super::state::{
@@ -90,10 +90,20 @@ pub struct Overlap {
 /// Finds every overlap (parallel over samples).
 pub fn detect(state: &PlateState, geo: &Geo, pos: &[DVec3], tree: &Tree) -> Vec<Overlap> {
     let rots: Vec<DQuat> = state.groups.iter().map(|g| quat(g.rot)).collect();
+    let plate_of: Vec<u32> = (0..state.samples.len())
+        .into_par_iter()
+        .map(|i| state.plate_of(i))
+        .collect();
+    let inland = Voxels::new(pos, &plate_of);
     (0..state.samples.len())
         .into_par_iter()
         .filter_map(|i| {
-            let pi = state.plate_of(i);
+            let pi = plate_of[i];
+            // Every sample its nearest K_NEAR could hold is its own plate's: nothing to try
+            // (P1-19; see `Voxels`).
+            if inland.only(pos[i], pi) {
+                return None;
+            }
             let mut tried = [u32::MAX; K_NEAR];
             let mut nt = 0;
             for (j, _) in tree.nearest_n(pos[i], K_NEAR) {
@@ -114,6 +124,81 @@ pub fn detect(state: &PlateState, geo: &Geo, pos: &[DVec3], tree: &Tree) -> Vec<
             None
         })
         .collect()
+}
+
+/// A grid of cubes over the unit sphere, about four sample spacings a side: per cube, its
+/// samples and the one plate that every sample of the 5 × 5 × 5 cubes around it belongs to (if
+/// they share one). A sample whose own cube holds at least [`K_NEAR`] samples has its `K_NEAR`
+/// nearest within the cube's diagonal, √3 sides, so inside those 125 cubes, whose faces lie at
+/// least two sides away. When they are all its own plate's, so are its `K_NEAR` nearest, ties
+/// and all, and [`detect`] would skip every one of them: it can skip the query (P1-19: every
+/// sample asked the k-d tree, though only those near another plate find anything).
+struct Voxels {
+    /// Cubes per axis, and the inverse of a cube's side.
+    m: usize,
+    inv_h: f64,
+    count: Vec<u32>,
+    block: Vec<u32>,
+}
+
+/// [`Voxels`]' marks: no sample, and samples of two plates or more.
+const VOXEL_EMPTY: u32 = u32::MAX;
+const VOXEL_MIXED: u32 = u32::MAX - 1;
+
+/// The plate two sets of samples share ([`VOXEL_EMPTY`] when both are empty, [`VOXEL_MIXED`]
+/// when they hold two plates).
+fn voxel_merge(a: u32, b: u32) -> u32 {
+    if a == VOXEL_EMPTY {
+        b
+    } else if b == VOXEL_EMPTY || a == b {
+        a
+    } else {
+        VOXEL_MIXED
+    }
+}
+
+impl Voxels {
+    fn new(pos: &[DVec3], plate_of: &[u32]) -> Voxels {
+        let h = 4.0 * (4.0 * std::f64::consts::PI / pos.len().max(1) as f64).sqrt();
+        let m = (2.0 / h).ceil() as usize + 1;
+        let mut v = Voxels {
+            m,
+            inv_h: 1.0 / h,
+            count: vec![0; m * m * m],
+            block: Vec::new(),
+        };
+        let cells: Vec<usize> = pos.par_iter().map(|&p| v.cell(p)).collect();
+        let mut own = vec![VOXEL_EMPTY; m * m * m];
+        for (i, &c) in cells.iter().enumerate() {
+            v.count[c] += 1;
+            own[c] = voxel_merge(own[c], plate_of[i]);
+        }
+        // The 5-wide window along each axis in turn.
+        for stride in [1, m, m * m] {
+            own = (0..own.len())
+                .into_par_iter()
+                .map(|c| {
+                    let a = (c / stride) % m;
+                    let base = c - a * stride;
+                    (a.saturating_sub(2)..=(a + 2).min(m - 1))
+                        .fold(VOXEL_EMPTY, |x, b| voxel_merge(x, own[base + b * stride]))
+                })
+                .collect();
+        }
+        v.block = own;
+        v
+    }
+
+    fn cell(&self, p: DVec3) -> usize {
+        let f = |x: f64| (((x + 1.0) * self.inv_h) as usize).min(self.m - 1);
+        (f(p.z) * self.m + f(p.y)) * self.m + f(p.x)
+    }
+
+    /// Whether the [`K_NEAR`] nearest samples to the sample at `q` are all of `plate`'s.
+    fn only(&self, q: DVec3, plate: u32) -> bool {
+        let c = self.cell(q);
+        self.count[c] >= K_NEAR as u32 && self.block[c] == plate
+    }
 }
 
 #[derive(Default)]
@@ -593,11 +678,40 @@ pub fn fronts_and_uplift(
     env: &Env,
     cones: &mut [[f64; 2]],
 ) -> Pull {
-    let (step, t_myr) = (env.step, env.t_myr);
-    let k = env.k;
+    let begun = fronts_begin(state, geo, pos, env);
+    let reach = fronts_reach(geo, &begun, env);
+    fronts_finish(state, geo, env, cones, begun, reach)
+}
+
+/// Per sample: divergence, trench, and at most one front (the fastest-converging neighbour).
+struct Boundary {
+    divergent: bool,
+    trench: bool,
+    front: Option<(u32, usize, DVec3, DVec3)>,
+}
+
+/// The first part of [`fronts_and_uplift`]: what it reads of the plates, their groups, the
+/// hidden flags, the positions, the motions and the contacts, none of which the belts' stacking
+/// (`belts::stack`) changes, so the arcs' distance field ([`fronts_reach`]) can run beside it
+/// (P1-19).
+pub struct FrontsBegun {
+    plate_of: Vec<u32>,
+    boundary: Vec<Boundary>,
+    /// The fronts as the distance field's sources (sample, 0, the front's number).
+    sources: Vec<(u32, f64, u32)>,
+    /// Per sample: its group, with [`HIDDEN_KEY`] added when it is hidden.
+    key: Vec<u32>,
+}
+
+/// [`FrontsBegun::key`]'s mark of a hidden sample.
+const HIDDEN_KEY: u32 = 1 << 31;
+
+/// Each sample's boundary and the step's fronts (see [`FrontsBegun`]).
+pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> FrontsBegun {
+    let step = env.step;
     let norm = env.norm;
     let n = state.samples.len();
-    let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
+    let plate_of: Vec<u32> = (0..n).into_par_iter().map(|i| state.plate_of(i)).collect();
     let omega: Vec<DVec3> = state
         .plates
         .iter()
@@ -612,12 +726,6 @@ pub fn fronts_and_uplift(
         }
     }
 
-    // Per sample: divergence, trench, and at most one front (the fastest-converging neighbour).
-    struct Boundary {
-        divergent: bool,
-        trench: bool,
-        front: Option<(u32, usize, DVec3, DVec3)>,
-    }
     let samples = &state.samples;
     let boundary: Vec<Boundary> = (0..n)
         .into_par_iter()
@@ -659,8 +767,60 @@ pub fn fronts_and_uplift(
             b
         })
         .collect();
-
     let mut sources: Vec<(u32, f64, u32)> = Vec::new();
+    for (v, b) in boundary.iter().enumerate() {
+        if b.front.is_some() {
+            sources.push((v as u32, 0.0, sources.len() as u32));
+        }
+    }
+    debug_assert!(state.groups.len() < HIDDEN_KEY as usize);
+    let key: Vec<u32> = samples
+        .par_iter()
+        .map(|s| s.group | if s.is_hidden() { HIDDEN_KEY } else { 0 })
+        .collect();
+    FrontsBegun {
+        plate_of,
+        boundary,
+        sources,
+        key,
+    }
+}
+
+/// The arcs' distance field: from the fronts over their own groups' visible samples, to
+/// `subduction_distance_km` ([`geometry::dijkstra`]'s distances, labels and the reached samples,
+/// ascending), each group's run on its own thread (no edge it may cross joins two groups).
+pub fn fronts_reach(geo: &Geo, begun: &FrontsBegun, env: &Env) -> (Vec<f64>, Vec<u32>, Vec<u32>) {
+    let rs = env.norm.rad(env.k.subduction_distance_km);
+    let key = &begun.key;
+    // The edge a → b is allowed when b is visible and of a's group (a, reached, is visible).
+    dijkstra_parts(
+        geo,
+        &begun.sources,
+        |v| key[v as usize] & !HIDDEN_KEY,
+        |a, b| key[b as usize] == key[a as usize] & !HIDDEN_KEY,
+        rs,
+    )
+}
+
+/// The rest of [`fronts_and_uplift`], after the belts' stacking, with the fronts and the
+/// distance field found before it.
+pub fn fronts_finish(
+    state: &mut PlateState,
+    geo: &Geo,
+    env: &Env,
+    cones: &mut [[f64; 2]],
+    begun: FrontsBegun,
+    reach: (Vec<f64>, Vec<u32>, Vec<u32>),
+) -> Pull {
+    let t_myr = env.t_myr;
+    let k = env.k;
+    let norm = env.norm;
+    let FrontsBegun {
+        plate_of, boundary, ..
+    } = begun;
+    let (dist, label, reached) = reach;
+    let rots: Vec<DQuat> = state.groups.iter().map(|g| quat(g.rot)).collect();
+    let pts = geo.points();
     let mut info: Vec<Source> = Vec::new();
     let mut front_len = vec![0.0; state.plates.len()];
     let (mut front_continental, mut front_oceanic) = (0.0_f64, 0.0_f64);
@@ -683,7 +843,6 @@ pub fn fronts_and_uplift(
             } else {
                 0.0
             };
-            sources.push((v as u32, 0.0, info.len() as u32));
             info.push(Source {
                 contact: c,
                 rel,
@@ -708,18 +867,6 @@ pub fn fronts_and_uplift(
             }
         }
     }
-    let rs = norm.rad(k.subduction_distance_km);
-    let (dist, label) = if sources.is_empty() {
-        (vec![f64::INFINITY; n], vec![u32::MAX; n])
-    } else {
-        let s = &state.samples;
-        dijkstra(
-            geo,
-            &sources,
-            |a, b| s[a as usize].group == s[b as usize].group && !s[b as usize].is_hidden(),
-            rs,
-        )
-    };
 
     let dt_yr = env.dt_yr;
     let u0_m = k.subduction_uplift_mm_yr * 1.0e-3 * dt_yr;
@@ -794,7 +941,11 @@ pub fn fronts_and_uplift(
         })
         .collect();
     let mut budget = vec![Budget::default(); contacts.len()];
-    for (i, plan) in plans.iter().enumerate() {
+    // Over the reached samples, ascending (P1-19: over every sample before; the others add
+    // nothing).
+    for &i in &reached {
+        let i = i as usize;
+        let plan = &plans[i];
         let s = &state.samples[i];
         if !dist[i].is_finite() || s.is_hidden() {
             continue;
@@ -854,11 +1005,11 @@ pub fn fronts_and_uplift(
     let factors = &factors;
     let plans = &plans;
 
-    let effects: Vec<Option<Effect>> = state
+    let effects: Vec<Effect> = state
         .samples
         .par_iter_mut()
         .enumerate()
-        .map(|(i, s)| {
+        .filter_map(|(i, s)| {
             let d = dist[i];
             if !d.is_finite() || s.is_hidden() {
                 return None;
@@ -981,7 +1132,7 @@ pub fn fronts_and_uplift(
         })
         .collect();
     let (mut arc_continental_m, mut arc_oceanic_m, mut cordillera_m) = (0.0, 0.0, 0.0);
-    for e in effects.into_iter().flatten() {
+    for e in effects {
         let contact = &mut state.contacts[e.contact];
         contact.max_uplift_mm_yr = contact.max_uplift_mm_yr.max(e.rate_mm_yr);
         contact.andean |= e.andean;
@@ -1067,4 +1218,53 @@ pub fn close_contacts(
     }
     state.contacts = keep;
     Ok(closed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sphere::{SplitMix64, fibonacci_sphere};
+
+    /// Wherever the cubes say a sample's nearest are all its plate's, brute force agrees, on a
+    /// lattice and on random samples, with plates cut along wavy bands and a gap left open.
+    #[test]
+    fn voxels_skip_only_samples_whose_nearest_share_their_plate() {
+        let mut rng = SplitMix64::new(17);
+        let random: Vec<DVec3> = (0..30_000)
+            .map(|_| rng.unit_vector())
+            .filter(|p| p.x.abs() > 0.05)
+            .collect();
+        for pts in [fibonacci_sphere(40_000), random] {
+            let plate: Vec<u32> = pts
+                .iter()
+                .map(|p| ((p.z + 0.2 * (5.0 * p.x).sin() + 1.0) * 3.0) as u32)
+                .collect();
+            let vox = Voxels::new(&pts, &plate);
+            let mut skipped = 0;
+            for (i, &q) in pts.iter().enumerate() {
+                if !vox.only(q, plate[i]) {
+                    continue;
+                }
+                skipped += 1;
+                let mut d: Vec<(f64, usize)> = pts
+                    .iter()
+                    .enumerate()
+                    .map(|(j, p)| (p.distance_squared(q), j))
+                    .collect();
+                d.select_nth_unstable_by(K_NEAR - 1, |a, b| a.0.total_cmp(&b.0));
+                let cut = d[K_NEAR - 1].0;
+                // Every sample as near as the K_NEAR-th (ties included) is of the same plate.
+                assert!(
+                    d.iter()
+                        .filter(|x| x.0 <= cut)
+                        .all(|x| plate[x.1] == plate[i]),
+                    "sample {i}"
+                );
+                if skipped >= 600 {
+                    break;
+                }
+            }
+            assert!(skipped >= 600, "{skipped}");
+        }
+    }
 }
