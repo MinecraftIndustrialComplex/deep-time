@@ -150,6 +150,106 @@ pub struct Snapshot {
     /// The zonal model's correction fitted to the per-cell climate (design §4.1; empty under the
     /// banded climate): the clock runs with it until the next snapshot.
     pub correction: super::percell::Correction,
+    /// Where the cells loop ran ([`CellsDevice`]).
+    pub cells_on: CellsRun,
+}
+
+/// What the cells loop of [`compute_on`] reads in the case a [`CellsDevice`] runs: the per-cell
+/// climate with the belts' rain (`rain_model = belts`). Every array is the CPU loop's own.
+pub struct CellsInput<'a> {
+    pub p: &'a ClimateParams,
+    pub w: usize,
+    pub h: usize,
+    /// Latitude of every row, degrees.
+    pub lat: &'a [f64],
+    pub land: &'a [bool],
+    /// Height above the sea, m (0 at sea).
+    pub z: &'a [f64],
+    /// The sea's share within `coast_km`.
+    pub sea_near: &'a [f64],
+    /// The land's share within `percell::INTERIOR_KM` (the winter inversion's).
+    pub interior: &'a [f64],
+    pub basin: &'a [f64],
+    /// The sea's departure from its row, °C.
+    pub dsst: &'a [f64],
+    /// The air's march, smoothed: moisture, maritime share, basin and ΔSST, each east then west.
+    pub air: &'a [Vec<f64>; 8],
+    /// Each wind regime's orographic rate (empty where the regime blows on no row).
+    pub oro: &'a [Vec<f32>],
+    /// The ITCZ of every column and month, degrees.
+    pub itcz: &'a [[f64; 12]],
+    /// Each month's hemispheric shift of the subtropical highs, degrees.
+    pub hemi: [f64; 12],
+    /// Each row's monthly insolation, W/m².
+    pub q_month: &'a [[f64; 12]],
+    /// Each row's onshore share in each month.
+    pub onshore: Vec<[f64; 12]>,
+    pub pc: &'a super::percell::Coarse,
+    /// The lapse rate, °C/m.
+    pub gamma: f64,
+    pub oro_scale: f64,
+    /// e^ln_hydro, the hydrological cycle's scaling.
+    pub hydro: f64,
+    pub sharp: super::percell::Sharpen,
+    pub monthly: bool,
+}
+
+/// The cells loop's results, per cell: [`Snapshot`]'s fields of the same names.
+#[derive(Clone, Debug, Default)]
+pub struct Cells {
+    pub t_mean: Vec<f32>,
+    pub t_warm: Vec<f32>,
+    pub t_cold: Vec<f32>,
+    pub precip: Vec<f32>,
+    pub aridity: Vec<f32>,
+    pub ela: Vec<f32>,
+    pub koppen: Vec<u8>,
+    pub glacier: Vec<u8>,
+    pub sea_ice: Vec<f32>,
+    pub sea_ice_max: Vec<f32>,
+    pub sea_ice_min: Vec<f32>,
+    pub t_sl_month: Vec<Vec<f32>>,
+    pub p_month: Vec<Vec<f32>>,
+}
+
+/// What one call of a [`CellsDevice`] moved and dispatched.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CellsStats {
+    /// Row chunks (each one upload, one dispatch per band, one download).
+    pub chunks: u32,
+    pub dispatches: u32,
+    pub bytes_up: u64,
+    pub bytes_down: u64,
+    /// The largest device memory held at once, bytes.
+    pub device_bytes: u64,
+    /// Packing and queueing the arrays; running the kernel; reading the results back and
+    /// unpacking them.
+    pub upload_ms: f64,
+    pub kernel_ms: f64,
+    pub download_ms: f64,
+}
+
+/// Where a snapshot's cells loop ran.
+#[derive(Clone, Debug, Default)]
+pub enum CellsRun {
+    #[default]
+    Cpu,
+    Device(CellsStats),
+    /// The device failed (the message); the CPU loop ran.
+    Failed(String),
+}
+
+/// Runs the cells loop of [`compute_on`] somewhere other than the CPU: the GPU (`gpu.rs`,
+/// feature `gpu`). The climate's dispatch point of the GPU path (`docs/design/gpu-compute.md`);
+/// the CPU loop is the fallback and the reference.
+pub trait CellsDevice: Send + Sync + std::fmt::Debug {
+    /// The device, for the run's notes.
+    fn name(&self) -> String;
+    /// Host bytes a call on a `w × h` grid holds beyond the CPU loop's (its packed arrays and
+    /// read-back copies, and on a device sharing the host's memory its buffers).
+    fn host_bytes(&self, w: usize, h: usize, monthly: bool) -> u64;
+    /// The cells loop's results for `ci`; on `Err` the caller runs the CPU loop.
+    fn cells(&self, ci: &CellsInput<'_>, stats: &mut CellsStats) -> Result<Cells, String>;
 }
 
 /// Thornthwaite's (1948) potential evapotranspiration from monthly mean temperatures, mm/yr
@@ -228,13 +328,25 @@ fn time(millis: &mut BTreeMap<&'static str, f64>, what: &'static str, since: Ins
     *millis.entry(what).or_insert(0.0) += since.elapsed().as_secs_f64() * 1000.0;
 }
 
-/// Computes a snapshot. `ebm` carries the EBM's state between snapshots (empty: spin up);
-/// `sheet` is the previous snapshot's `band_sheet` (empty at the first).
+/// Computes a snapshot on the CPU. `ebm` carries the EBM's state between snapshots (empty: spin
+/// up); `sheet` is the previous snapshot's `band_sheet` (empty at the first).
 pub fn compute(
     inp: &Input<'_>,
     ebm: &mut EbmState,
     sheet: &[f64],
     cell: &mut super::percell::PerCell,
+) -> Snapshot {
+    compute_on(inp, ebm, sheet, cell, None)
+}
+
+/// [`compute`], with the cells loop on `dev` where it can run it (the per-cell climate with the
+/// belts' rain; the banded climate, the moisture budget and the upwind rain stay on the CPU).
+pub fn compute_on(
+    inp: &Input<'_>,
+    ebm: &mut EbmState,
+    sheet: &[f64],
+    cell: &mut super::percell::PerCell,
+    dev: Option<&dyn CellsDevice>,
 ) -> Snapshot {
     let mut millis = BTreeMap::new();
     let p = inp.p;
@@ -751,7 +863,59 @@ pub fn compute(
         ice: Vec<[f32; 3]>,
     }
     let sharp = super::percell::Sharpen::new(p.sea_ice_edge_sharpness);
-    let rows: Vec<Row> = (0..hgt)
+    // The loop below on the device (`CellsDevice`), for the per-cell climate with the belts' rain;
+    // the banded climate, the moisture budget and the upwind rain stay on the CPU. After a device
+    // error the CPU loop runs, the reference.
+    let mut cells_on = CellsRun::Cpu;
+    let mut on_device: Option<Cells> = None;
+    if let (Some(dev), Some(pcr)) = (dev, pc.as_ref())
+        && !upwind_mode
+        && pcr.upwind.is_none()
+        && pcr.moisture.is_none()
+        && air.iter().all(|a| a.len() == n)
+    {
+        let ci = CellsInput {
+            p,
+            w,
+            h: hgt,
+            lat: inp.lat,
+            land: &land,
+            z: &z,
+            sea_near: &sea_near,
+            interior: &interior,
+            basin: &basin,
+            dsst: &dsst,
+            air: &air,
+            oro: &oro,
+            itcz: &itcz,
+            hemi,
+            q_month: &q_month,
+            onshore: inp
+                .lat
+                .iter()
+                .map(|&phi| std::array::from_fn(|m| onshore(phi, m)))
+                .collect(),
+            pc: pcr,
+            gamma,
+            oro_scale,
+            hydro,
+            sharp,
+            monthly: inp.monthly,
+        };
+        let mut st = CellsStats::default();
+        match dev.cells(&ci, &mut st) {
+            Ok(c) => {
+                *millis.entry("cells_upload").or_insert(0.0) += st.upload_ms;
+                *millis.entry("cells_download").or_insert(0.0) += st.download_ms;
+                on_device = Some(c);
+                cells_on = CellsRun::Device(st);
+            }
+            Err(e) => cells_on = CellsRun::Failed(e),
+        }
+    }
+    // (No rows when the device ran them.)
+    let cpu_rows = if on_device.is_some() { 0 } else { hgt };
+    let rows: Vec<Row> = (0..cpu_rows)
         .into_par_iter()
         .map(|j| {
             let phi = inp.lat[j];
@@ -914,6 +1078,22 @@ pub fn compute(
         ebm: Some(er.clone()),
         ..Snapshot::default()
     };
+    if let Some(c) = on_device {
+        s.t_mean = c.t_mean;
+        s.t_warm = c.t_warm;
+        s.t_cold = c.t_cold;
+        s.precip = c.precip;
+        s.aridity = c.aridity;
+        s.ela = c.ela;
+        s.koppen = c.koppen;
+        s.glacier = c.glacier;
+        s.sea_ice = c.sea_ice;
+        s.sea_ice_max = c.sea_ice_max;
+        s.sea_ice_min = c.sea_ice_min;
+        s.t_sl_month = c.t_sl_month;
+        s.p_month = c.p_month;
+    }
+    s.cells_on = cells_on;
     for r in rows {
         s.t_mean.extend(r.t_mean);
         s.t_warm.extend(r.t_warm);
