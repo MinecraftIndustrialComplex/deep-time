@@ -111,7 +111,15 @@ fn shelf_kd(z: &[f64], seed: u64) -> Vec<f64> {
 
 /// The surface stage's solve with the multigrid preconditioner: the splitting, then the cycle's
 /// conjugate gradients.
-fn solve_mg(d: &Dims, b: &[f64], kd: &[f64], dt: f64, tol: f64, cy: Cycle, guess: bool) -> (Vec<f64>, usize) {
+fn solve_mg(
+    d: &Dims,
+    b: &[f64],
+    kd: &[f64],
+    dt: f64,
+    tol: f64,
+    cy: Cycle,
+    guess: bool,
+) -> (Vec<f64>, usize) {
     let mut x = b.to_vec();
     if guess {
         lod(d, &mut x, kd, dt, &Live::all(d));
@@ -179,11 +187,17 @@ fn the_multigrid_solve_meets_its_tolerance_and_keeps_the_mass() {
                     assert!(err <= lim, "{label}: RMS error {err:.3e} above {lim:.3e}");
                     let (sb, sx): (f64, f64) = (b.iter().sum(), x.iter().sum());
                     let scale: f64 = b.iter().map(|v| v.abs()).sum::<f64>().max(1.0);
-                    assert!((sb - sx).abs() <= 1e-12 * scale, "{label}: mass {sb} vs {sx}");
+                    assert!(
+                        (sb - sx).abs() <= 1e-12 * scale,
+                        "{label}: mass {sb} vs {sx}"
+                    );
                     // Without the splitting's first guess, too.
                     let (x0, _) = solve_mg(&d, &b, &kd, dt, tol, CYCLE, false);
                     let err0 = rms(&x0, &exact);
-                    assert!(err0 <= lim, "{label}, no guess: RMS error {err0:.3e} above {lim:.3e}");
+                    assert!(
+                        err0 <= lim,
+                        "{label}, no guess: RMS error {err0:.3e} above {lim:.3e}"
+                    );
                     solved += 1;
                 }
             }
@@ -205,7 +219,10 @@ fn the_multigrid_and_jacobi_solves_agree_within_their_tolerance() {
             let (xj, _) = solve_jacobi(&d, &b, &kd, dt);
             let lim = 2.0 * bound(&d, &kd, dt, tol);
             let diff = rms(&xm, &xj);
-            assert!(diff <= lim, "{w}x{h} wrap {wrap}: RMS {diff:.3e} above {lim:.3e}");
+            assert!(
+                diff <= lim,
+                "{w}x{h} wrap {wrap}: RMS {diff:.3e} above {lim:.3e}"
+            );
         }
     }
 }
@@ -247,7 +264,10 @@ fn the_cycle_is_a_symmetric_positive_definite_operator() {
             let (z1, rz1) = z_of(&r1);
             let (z2, rz2) = z_of(&r2);
             let dot = |a: &[f64], b: &[f64]| a.iter().zip(b).map(|(p, q)| p * q).sum::<f64>();
-            assert!(rz1 > 0.0 && rz2 > 0.0, "{w}x{h}: not positive ({rz1}, {rz2})");
+            assert!(
+                rz1 > 0.0 && rz2 > 0.0,
+                "{w}x{h}: not positive ({rz1}, {rz2})"
+            );
             assert!((rz1 - dot(&z1, &r1)).abs() <= 1e-9 * rz1.abs().max(1e-30));
             let (a, b) = (dot(&z1, &r2), dot(&r1, &z2));
             let lim = 1e-4 * (rz1 * rz2).sqrt();
@@ -276,8 +296,14 @@ fn the_cycle_takes_far_fewer_iterations_than_jacobi_on_a_shelf() {
 #[ignore]
 fn tune_the_cycle() {
     let (w, h) = (
-        std::env::var("MG_W").ok().and_then(|v| v.parse().ok()).unwrap_or(2048usize),
-        std::env::var("MG_H").ok().and_then(|v| v.parse().ok()).unwrap_or(1024usize),
+        std::env::var("MG_W")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(2048usize),
+        std::env::var("MG_H")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1024usize),
     );
     let d = Dims::new(w, h, 2400.0, true);
     let b = terrain(w, h, 3);

@@ -396,10 +396,7 @@ fn vcycle(levels: &mut [Level], cy: &Cycle, dot: Option<&[f64]>) -> f64 {
     l.restrict_into(&mut rest[0]);
     vcycle(rest, cy, None);
     let wc = rest[0].w;
-    let mut acc = l.sweep(
-        Some((&rest[0].z, wc)),
-        if cy.nu == 1 { dot } else { None },
-    );
+    let mut acc = l.sweep(Some((&rest[0].z, wc)), if cy.nu == 1 { dot } else { None });
     for k in 1..cy.nu {
         acc = l.sweep(None, if k + 1 == cy.nu { dot } else { None });
     }
@@ -476,7 +473,8 @@ pub(super) fn cg_with(
                 let pold: &[f64] = &pold;
                 let fill = |j: usize, dst: &mut [f64]| {
                     let c0 = j * w;
-                    for ((d, &zv), &pv) in dst.iter_mut().zip(&z[c0..c0 + w]).zip(&pold[c0..c0 + w]) {
+                    for ((d, &zv), &pv) in dst.iter_mut().zip(&z[c0..c0 + w]).zip(&pold[c0..c0 + w])
+                    {
                         *d = f64::from(zv) + beta * pv;
                     }
                 };

@@ -286,7 +286,14 @@ fn union(p: &mut [u32], a: u32, b: u32) {
 
 /// Phase 1: `wf` = W, `lab` = global watershed labels. Returns the cells that must become sinks
 /// (empty when every watershed drains to base level).
-fn fill_w(d: &Dims, fx: &Fixed, h: &[f64], rows: usize, wf: &mut [f64], lab: &mut [u32]) -> Vec<usize> {
+fn fill_w(
+    d: &Dims,
+    fx: &Fixed,
+    h: &[f64],
+    rows: usize,
+    wf: &mut [f64],
+    lab: &mut [u32],
+) -> Vec<usize> {
     let (w, hgt) = (d.w, d.h);
     let strips: Vec<Strip> = wf
         .par_chunks_mut(rows * w)
@@ -347,11 +354,7 @@ fn fill_w(d: &Dims, fx: &Fixed, h: &[f64], rows: usize, wf: &mut [f64], lab: &mu
     for j in joins {
         edges.extend(j);
     }
-    edges.par_sort_unstable_by(|x, y| {
-        x.0.cmp(&y.0)
-            .then(x.1.cmp(&y.1))
-            .then(x.2.total_cmp(&y.2))
-    });
+    edges.par_sort_unstable_by(|x, y| x.0.cmp(&y.0).then(x.1.cmp(&y.1)).then(x.2.total_cmp(&y.2)));
     edges.dedup_by(|x, y| x.0 == y.0 && x.1 == y.1);
     // Adjacency (CSR) of the labels 0..=total.
     let nl = total as usize + 1;
@@ -481,27 +484,25 @@ pub(crate) fn flood_rows(
     let k = n as f64;
     {
         let wf: &[f64] = filled;
-        lab.par_chunks_mut(d.w)
-            .enumerate()
-            .for_each(|(j, row)| {
-                let mut nb = [0usize; 8];
-                for (i, v) in row.iter_mut().enumerate() {
-                    let c = j * d.w + i;
-                    if fx.level(c).is_some() {
-                        *v = KNOWN;
-                        continue;
-                    }
-                    let cnt = nbrs(d, c, 0, d.h, &mut nb);
-                    let drains = nb[..cnt].iter().any(|&m| {
-                        let up = match fx.level(m) {
-                            Some(z) => z,
-                            None => ulp_bound(wf[m], k),
-                        };
-                        up < h[c]
-                    });
-                    *v = if drains { KNOWN } else { PENDING };
+        lab.par_chunks_mut(d.w).enumerate().for_each(|(j, row)| {
+            let mut nb = [0usize; 8];
+            for (i, v) in row.iter_mut().enumerate() {
+                let c = j * d.w + i;
+                if fx.level(c).is_some() {
+                    *v = KNOWN;
+                    continue;
                 }
-            });
+                let cnt = nbrs(d, c, 0, d.h, &mut nb);
+                let drains = nb[..cnt].iter().any(|&m| {
+                    let up = match fx.level(m) {
+                        Some(z) => z,
+                        None => ulp_bound(wf[m], k),
+                    };
+                    up < h[c]
+                });
+                *v = if drains { KNOWN } else { PENDING };
+            }
+        });
     }
     // The pending cells' connected groups (8 neighbours), in ascending order of their first cell.
     let pending: Vec<u32> = lab
@@ -555,7 +556,12 @@ pub(crate) fn flood_rows(
             let mut seeds: Vec<u32> = Vec::new();
             for &c in members {
                 let cnt = nbrs(d, c as usize, 0, d.h, &mut nb);
-                seeds.extend(nb[..cnt].iter().filter(|&&m| lab[m] != g).map(|&m| m as u32));
+                seeds.extend(
+                    nb[..cnt]
+                        .iter()
+                        .filter(|&&m| lab[m] != g)
+                        .map(|&m| m as u32),
+                );
             }
             seeds.sort_unstable();
             seeds.dedup();
@@ -690,7 +696,11 @@ pub fn open_sea(d: &Dims, h: &[f64], sea_level: f64, min_cells: usize, kind: &mu
         .map(|l| size[find(&mut parent, l) as usize] >= min_cells as u64)
         .collect();
     kind.par_iter_mut().zip(lab.par_iter()).for_each(|(k, &l)| {
-        *k = if l != NONE && big[l as usize] { BASE } else { LAND };
+        *k = if l != NONE && big[l as usize] {
+            BASE
+        } else {
+            LAND
+        };
     });
 }
 
