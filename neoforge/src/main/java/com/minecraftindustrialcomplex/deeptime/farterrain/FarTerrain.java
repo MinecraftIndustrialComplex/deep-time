@@ -9,8 +9,10 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.IceCover;
 import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Water;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
+import com.minecraftindustrialcomplex.deeptime.worldgen.DelegatingRuleSource;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.StrataPass;
+import com.minecraftindustrialcomplex.deeptime.worldgen.WaterBodies;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -41,7 +43,10 @@ import java.util.Optional;
  *       top, at the quart cell a real chunk stores it in;</li>
  *   <li><b>the soil</b>, from the surface table ({@link FarSurface}) for that biome, and whether
  *       the biome freezes there ({@code Biome.coldEnoughToSnow}: ice on water, a snow layer on
- *       ground, as vanilla's {@code freeze_top_layer} lays them);</li>
+ *       ground, as vanilla's {@code freeze_top_layer} lays them); the top block of dry ground, of
+ *       the sea bed and of a lake's bed from the level's own surface rule wherever the part of it
+ *       that reads no chunk decides it ({@link PackSurfaceRule}: Expanded Ecosphere's coral and sand
+ *       at y 58 to 62);</li>
  *   <li><b>the blocks</b>: rock classes through the {@link RockPalette} with the strata pass's
  *       member choice ({@link StrataPass#horizonKey}), so a bed is the same block far and near.</li>
  * </ul>
@@ -51,8 +56,9 @@ import java.util.Optional;
  * Past the pole edge (Lambert) the rasters clamp, past a Petroff–Guyou world's turning edges they fold
  * (GridDesc.cell), exactly as the real generator reads them.
  *
- * <p><b>What is not here.</b> Trees and other features, caves, and the exact surface rules of the
- * pack. Thread-safe: one scratch per thread, everything read is immutable.
+ * <p><b>What is not here.</b> Trees and other features, caves, and the parts of the pack's surface
+ * rules that read a chunk (its noise, its heightmap). Thread-safe: one scratch per thread, everything
+ * read is immutable.
  */
 public final class FarTerrain {
 
@@ -78,18 +84,26 @@ public final class FarTerrain {
     private final BiomeSource biomes;
     private final Climate.Sampler sampler;
     private final FarSurface surface;
+    /** The part of the level's surface rule run here (null: none can run without a chunk, the table gives every top block). */
+    private final PackSurfaceRule packRule;
     private final int levelMinY, levelMaxY;
     private final int cell;
 
     private FarTerrain(ServerLevel level, GeologicChunkGenerator generator, WorldDataTerrain terrain, FarSurface surface) {
         this.level = level;
         this.terrain = terrain;
-        this.biomes = generator.getBiomeSource();
-        this.sampler = level.getChunkSource().randomState().sampler();
+        BiomeSource source = generator.getBiomeSource();
+        Climate.Sampler climate = level.getChunkSource().randomState().sampler();
+        this.biomes = source;
+        this.sampler = climate;
         this.surface = surface;
         this.levelMinY = level.getMinBuildHeight();
         this.levelMaxY = level.getMaxBuildHeight() - 1;
         this.cell = generator.waterReach();
+        // The rule SurfaceSystem paints this level's chunks with (NoiseBasedChunkGenerator.buildSurface
+        // reads the registry settings), seeing the biomes the chunks store: x folded into the lap.
+        this.packRule = PackSurfaceRule.of(level, generator, DelegatingRuleSource.levelRule(generator.sourceSettings().value().surfaceRule()),
+                (qx, qy, qz) -> source.getNoiseBiome(QuartPos.fromBlock(terrain.wrapX(QuartPos.toBlock(qx))), qy, qz, climate));
     }
 
     /** Far terrain for {@code level}, when it is a Deep Time level generating from world data. */
@@ -212,8 +226,25 @@ public final class FarTerrain {
                     biome = biomeAt(wx, topY, z);
                 }
                 FarSurface.Choice soil = surface.of(biome);
-                s.soil.depth = soil.depth();
-                s.soil.bare = soil.bare();
+                // The top block where the part of the level's surface rule run here decides it: on
+                // dry ground, the sea bed and a lake's bed (the water pass fills a lake after the
+                // rule, so the rule saw it dry, and leaves its bed as the rule painted it, grass as
+                // dirt); a river's bed is the water pass's own sand or gravel.
+                BlockState packTop = null;   // ledger: BAK-048
+                if (packRule != null && shape.ground >= levelMinY && shape.ground <= levelMaxY
+                        && (!shape.water() || shape.kind == Water.Kind.SEA || shape.kind == Water.Kind.LAKE))
+                    packTop = packRule.top(wx, shape.ground, z, shape.water() && shape.kind == Water.Kind.SEA ? shape.waterTop + 1 : Integer.MIN_VALUE);
+                boolean bare = soil.bare();
+                int depth = soil.depth();
+                if (packTop != null && StrataPass.isCrust(packTop)) {
+                    bare = true;   // the rule leaves the stone: the strata pass paints it
+                    packTop = null;
+                } else if (packTop != null && bare) {
+                    bare = false;  // a bare biome's top block painted: one block over the rock
+                    depth = 1;
+                }
+                s.soil.depth = depth;
+                s.soil.bare = bare;
                 s.soil.frozen = topY < spec.maxY() && biome.value().coldEnoughToSnow(s.pos.set(wx, topY + 1, z));
 
                 int exposure = FarColumn.exposure(s.shapes, n, i, j);
@@ -221,7 +252,7 @@ public final class FarTerrain {
                 // The strata column rule is most of a narrow column's cost, so it is spent where
                 // rock shows: at the surface (a bare biome) or on a side that drops below the soil.
                 // A column whose rock is buried takes its nearest strata cell's stack.
-                boolean rockShows = soil.bare() || exposure >= soil.depth();
+                boolean rockShows = bare || exposure >= depth;
                 if (strata != null)
                     FarColumn.rock(wd, strata, wx, z, step <= FarColumn.FULL_RULE_MAX_STEP && rockShows, s.stack);
                 FarColumn.layers(levelMinY, levelMaxY, shape, s.soil, strata == null ? null : s.stack, rockDepth, cover.spec(), layers);
@@ -236,7 +267,7 @@ public final class FarTerrain {
                 int openFrom = shape.ground - exposure;
                 int waterDepth = shape.water() ? Math.min(shape.waterTop, spec.maxY()) - shape.ground : 0;
                 for (int k = 0; k < layers.count; k++) {
-                    s.blocks[k] = block(layers, k, soil, cover, rocks);
+                    s.blocks[k] = block(layers, k, soil, packTop, cover, rocks);
                     int light;
                     if (k > topSolid)
                         light = 15;
@@ -251,7 +282,8 @@ public final class FarTerrain {
         }
     }
 
-    private static BlockState block(FarColumn.Layers layers, int k, FarSurface.Choice soil, Cover cover,
+    /** Layer k's block; {@code packTop}, when not null, is the top block the level's surface rule gives (dry ground, sea bed, lake bed). */
+    private static BlockState block(FarColumn.Layers layers, int k, FarSurface.Choice soil, BlockState packTop, Cover cover,
                                     PaletteRules.Result<BlockState>[] rocks) {
         switch (layers.material[k]) {
             case FarColumn.AIR:
@@ -263,13 +295,13 @@ public final class FarTerrain {
                 return rock == null ? STONE : rock;   // the unclassified crust
             }
             case FarColumn.SOIL_TOP:
-                return soil.top();
+                return packTop != null ? packTop : soil.top();
             case FarColumn.SOIL_UNDER:
                 return soil.under();
             case FarColumn.SEA_BED:
-                return soil.seaBed();
+                return packTop != null ? packTop : soil.seaBed();
             case FarColumn.LAKE_BED:
-                return soil.lakeBed();
+                return packTop != null ? WaterBodies.underWater(packTop) : soil.lakeBed();
             case FarColumn.RIVER_GRAVEL:
                 return GRAVEL;
             case FarColumn.RIVER_SAND:

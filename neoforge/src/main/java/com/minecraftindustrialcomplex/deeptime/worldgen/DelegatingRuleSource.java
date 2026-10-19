@@ -51,10 +51,21 @@ public record DelegatingRuleSource(Holder<NoiseGeneratorSettings> settings) impl
 
     @Override
     public SurfaceRules.SurfaceRule apply(SurfaceRules.Context context) {
-        SurfaceRules.RuleSource target = settings.value().surfaceRule();
+        return levelRule(this).apply(context);
+    }
+
+    /**
+     * The rule a level's chunks are painted by when its noise settings hold {@code rule}: a delegate's
+     * pack rule, resolved now and less its world-depth layers and sea-level trims, any other rule
+     * itself. {@link #apply} paints with it; far terrain runs part of it ({@code farterrain.PackSurfaceRule}).
+     */
+    public static SurfaceRules.RuleSource levelRule(SurfaceRules.RuleSource rule) {
+        if (!(rule instanceof DelegatingRuleSource d))
+            return rule;
+        SurfaceRules.RuleSource target = d.settings.value().surfaceRule();
         if (target instanceof DelegatingRuleSource)
-            throw new IllegalStateException("deeptime:delegate points at another delegate: " + settings);
-        return planetRule(target).apply(context);
+            throw new IllegalStateException("deeptime:delegate points at another delegate: " + d.settings);
+        return planetRule(target);
     }
 
     /** {@code target} without its world-depth layers (cached by identity). */

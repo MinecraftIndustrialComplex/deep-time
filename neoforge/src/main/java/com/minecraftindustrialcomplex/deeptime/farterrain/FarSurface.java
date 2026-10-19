@@ -6,6 +6,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.worldgen.WaterBodies;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -15,7 +16,6 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.SpreadingSnowyDirtBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.io.IOException;
@@ -35,8 +35,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * terrain has none, so it reads the datapack file {@code data/deeptime/deeptime/far_terrain/surface.json}
  * (the jar ships a default, a pack overrides it): rules of biome ids and {@code #tags}, the first
  * that holds the biome wins, each giving the top block, the block under it, the soil depth, the
- * sea-bed block, or {@code bare} (the rock is the surface). Everything else a far column shows —
- * the rock, water, the ice cover, snow — comes from the world data, as in real chunks.
+ * sea-bed block, or {@code bare} (the rock is the surface). The leading rules of the pack's surface
+ * rule that read no chunk run first ({@link PackSurfaceRule}); this table stands for the rest.
+ * Everything else a far column shows (the rock, water, the ice cover, snow) comes from the world
+ * data, as in real chunks.
  *
  * <p>Immutable after {@link #read}; {@link #of} caches per biome and is thread-safe.
  */
@@ -111,7 +113,7 @@ public final class FarSurface {
     }
 
     private static Choice choice(BlockState top, BlockState under, int depth, BlockState seaBed, boolean bare) {
-        BlockState lakeBed = top.getBlock() instanceof SpreadingSnowyDirtBlock ? Blocks.DIRT.defaultBlockState() : top;
+        BlockState lakeBed = WaterBodies.underWater(top);
         return new Choice(top, under, Math.max(1, Math.min(64, depth)), seaBed, lakeBed, bare);
     }
 
