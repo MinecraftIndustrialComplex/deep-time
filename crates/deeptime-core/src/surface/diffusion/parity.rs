@@ -439,15 +439,46 @@ fn old(c: &Case, steps: usize, threads: usize) -> (Vec<f64>, Vec<usize>) {
     })
 }
 
-/// The same with the fused solver.
+/// The same with the fused solver, its vectors in one workspace across the steps (P1-19).
 fn new(c: &Case, steps: usize, threads: usize) -> (Vec<f64>, Vec<usize>) {
     in_pool(threads, || {
         let mut h = c.h.clone();
+        let mut ws = super::Workspace::default();
         let its = (0..steps)
-            .map(|_| super::step(&c.d, &mut h, &c.kd, c.dt))
+            .map(|_| super::step_in(&mut ws, &c.d, &mut h, &c.kd, c.dt))
             .collect();
         (h, its)
     })
+}
+
+/// A kept workspace changes nothing whatever the solves before it left there (P1-19): one
+/// workspace, solves that skip rows and solves that do not, in turn, each the textbook solve.
+#[test]
+fn a_kept_workspace_gives_the_textbook_solve() {
+    let cases = [
+        rough(64, 40, 11, true),
+        ranges(64, 40, 12, true, 2.0),
+        blobs(64, 40, true, |i, j| j == 21 && i < 9),
+        shore(64, 40, 13, true, 40),
+        ranges(64, 40, 14, true, 0.5),
+    ];
+    assert!(skips(&cases[1]) && skips(&cases[2]) && !skips(&cases[0]));
+    for threads in [1, 4] {
+        in_pool(threads, || {
+            let mut ws = super::Workspace::default();
+            for round in 0..2 {
+                for (k, c) in cases.iter().enumerate() {
+                    let mut want = c.h.clone();
+                    let want_its = reference::step(&c.d, &mut want, &c.kd, c.dt);
+                    let mut got = c.h.clone();
+                    let its = super::step_in(&mut ws, &c.d, &mut got, &c.kd, c.dt);
+                    let tag = format!("{threads} threads, round {round}, case {k}");
+                    same(&tag, &got, &want);
+                    assert_eq!(its, want_its, "{tag}: iterations");
+                }
+            }
+        });
+    }
 }
 
 /// Compares the two on pools of 1, 2, 4 and 8 threads (and the textbook solver with itself: the
@@ -808,10 +839,18 @@ fn diffusion_timing() {
                     std::hint::black_box(&x);
                 },
             );
+            let mut ws = super::Workspace::default();
+            ws.fit(&d);
+            ws.b.copy_from_slice(&b);
             let (op_old, op_new) = pairs(
                 &mut || reference::time_operator(&d, &c.kd, c.dt),
                 &mut || {
-                    std::hint::black_box(super::Operator::new(&d, &c.kd, c.dt, &all));
+                    let super::Workspace {
+                        east, south, diag, ..
+                    } = &mut ws;
+                    std::hint::black_box(super::Operator::new(
+                        &d, &c.kd, c.dt, &all, east, south, diag,
+                    ));
                 },
             );
             let mut its = (0, 0);
@@ -822,7 +861,7 @@ fn diffusion_timing() {
                 },
                 &mut || {
                     let mut x = x0.clone();
-                    its.1 = super::cg(&d, &b, &mut x, &c.kd, c.dt, &all);
+                    its.1 = super::cg(&mut ws, &d, &mut x, &c.kd, c.dt, &all);
                 },
             );
             let (step_old, step_new) = pairs(

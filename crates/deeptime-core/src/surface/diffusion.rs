@@ -56,17 +56,71 @@ use super::grid::Dims;
 /// One implicit step of Δt years on `h` with diffusivities `kd` (m²/yr); returns the conjugate
 /// gradient iterations it took.
 pub fn step(d: &Dims, h: &mut [f64], kd: &[f64], dt: f64) -> usize {
+    step_in(&mut Workspace::default(), d, h, kd, dt)
+}
+
+/// The solve's grid-sized vectors, kept between the solves of a caller that solves every step
+/// (P1-19: eight vectors, 86 MB at full 16k, were allocated for every solve and most of them
+/// zeroed on one thread). A solve writes every element it reads, so what a workspace held before
+/// changes nothing: the result is [`step`]'s bit for bit (`diffusion/parity.rs` reuses one
+/// across grids that skip different rows).
+#[derive(Default)]
+pub struct Workspace {
+    b: Vec<f64>,
+    east: Vec<f64>,
+    south: Vec<f64>,
+    diag: Vec<f64>,
+    ap: Vec<f64>,
+    r: Vec<f64>,
+    pold: Vec<f64>,
+    pnew: Vec<f64>,
+    sums: Vec<[f64; 2]>,
+    pap_rows: Vec<f64>,
+}
+
+impl Workspace {
+    /// Sized for `d` (allocated, written in parallel, when the size changes).
+    fn fit(&mut self, d: &Dims) {
+        let (n, h) = (d.cells(), d.h);
+        for v in [
+            &mut self.b,
+            &mut self.east,
+            &mut self.south,
+            &mut self.diag,
+            &mut self.ap,
+            &mut self.r,
+            &mut self.pold,
+            &mut self.pnew,
+        ] {
+            if v.len() != n {
+                *v = crate::alloc::filled(n, 0.0);
+            }
+        }
+        if self.sums.len() != h {
+            self.sums = vec![[0.0; 2]; h];
+        }
+        if self.pap_rows.len() != h {
+            self.pap_rows = vec![0.0; h];
+        }
+    }
+}
+
+/// [`step`] in a workspace the caller keeps.
+pub fn step_in(ws: &mut Workspace, d: &Dims, h: &mut [f64], kd: &[f64], dt: f64) -> usize {
     let live = Live::of(d, h, kd, dt);
-    let b = crate::alloc::copied(h);
+    ws.fit(d);
+    ws.b.par_iter_mut()
+        .zip(h.par_iter())
+        .for_each(|(b, &v)| *b = v);
     lod(d, h, kd, dt, &live);
-    let its = cg(d, &b, h, kd, dt, &live);
+    let its = cg(ws, d, h, kd, dt, &live);
     if live.strips.is_some() && !live.finite(d, h) {
         // A value that is not finite would reach the skipped rows in the full loop (0 · ∞):
         // solve on every row instead.
-        h.copy_from_slice(&b);
+        h.copy_from_slice(&ws.b);
         let all = Live::all(d);
         lod(d, h, kd, dt, &all);
-        return cg(d, &b, h, kd, dt, &all);
+        return cg(ws, d, h, kd, dt, &all);
     }
     its
 }
@@ -301,36 +355,46 @@ fn sum_zero() -> f64 {
 }
 
 /// The five-point operator of (I + Δt·L): east and south face couplings per cell.
-struct Operator {
+struct Operator<'a> {
     w: usize,
     h: usize,
     wrap: bool,
     /// Coupling across the east face of each cell (0 where there is no east neighbour).
-    east: Vec<f64>,
+    east: &'a [f64],
     /// Coupling across the south face (0 on the last row).
-    south: Vec<f64>,
-    diag: Vec<f64>,
+    south: &'a [f64],
+    diag: &'a [f64],
 }
 
-impl Operator {
+impl<'a> Operator<'a> {
     /// Cell by cell the same expressions as the serial loops it replaced (faces from the arithmetic
     /// mean of the two cells' diffusivities, the diagonal as ((((1 + east) + west) + south) +
     /// north)); rows are independent, so they run in parallel. A skipped row keeps the +0 faces
-    /// and the diagonal of one that those expressions give it (`Live`).
-    fn new(d: &Dims, kd: &[f64], dt: f64, live: &Live) -> Operator {
+    /// and the diagonal of one that those expressions give it (`Live`). Every element of the
+    /// three vectors is written (+0 for a face with no neighbour), so they can come from a
+    /// [`Workspace`] whatever it held.
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        d: &Dims,
+        kd: &[f64],
+        dt: f64,
+        live: &Live,
+        east: &'a mut [f64],
+        south: &'a mut [f64],
+        diag: &'a mut [f64],
+    ) -> Operator<'a> {
         let (w, h) = (d.w, d.h);
         let s2 = d.dx * d.dx;
-        let n = w * h;
         // On a two-cell ring both faces join the same pair; one cell wide, the only x face is the
         // cell itself and there is none.
         let wrap = d.wrap_x && w > 1;
-        let mut east = vec![0.0; n];
-        let mut south = vec![0.0; n];
         east.par_chunks_mut(w)
             .zip(south.par_chunks_mut(w))
             .enumerate()
             .for_each(|(j, (erow, srow))| {
                 if !live.row(j) {
+                    erow.fill(0.0);
+                    srow.fill(0.0);
                     return;
                 }
                 let krow = &kd[j * w..(j + 1) * w];
@@ -339,6 +403,8 @@ impl Operator {
                         erow[i] = 0.5 * (krow[i] + krow[i + 1]) * dt / s2;
                     } else if wrap {
                         erow[i] = 0.5 * (krow[i] + krow[0]) * dt / s2;
+                    } else {
+                        erow[i] = 0.0;
                     }
                 }
                 if j + 1 < h {
@@ -346,11 +412,14 @@ impl Operator {
                     for i in 0..w {
                         srow[i] = 0.5 * (krow[i] + below[i]) * dt / s2;
                     }
+                } else {
+                    srow.fill(0.0);
                 }
             });
-        let mut diag = vec![1.0; n];
+        let (east, south): (&'a [f64], &'a [f64]) = (east, south);
         diag.par_chunks_mut(w).enumerate().for_each(|(j, drow)| {
             if !live.row(j) {
+                drow.fill(1.0);
                 return;
             }
             let c0 = j * w;
@@ -536,6 +605,9 @@ fn pass_init(
         .enumerate()
         .for_each(|(s, (rs, ss))| {
             if !live.strip(s) {
+                // +0, as a fresh vector held (a workspace may hold anything).
+                rs.fill(0.0);
+                ss.fill([0.0; 2]);
                 return;
             }
             let rows = ss.len();
@@ -586,6 +658,11 @@ fn pass_direction(
             || [vec![0.0; w], vec![0.0; w], vec![0.0; w]],
             |ring, (s, (((pn, aps), xs), pr))| {
                 if !live.strip(s) {
+                    // +0, as fresh vectors held: the next iteration reads this strip's edge rows
+                    // of the direction, and the sums add its rows (a workspace may hold anything).
+                    pn.fill(0.0);
+                    aps.fill(0.0);
+                    pr.fill(0.0);
                     return;
                 }
                 let rows = pr.len();
@@ -692,23 +769,33 @@ fn pass_x(w: usize, alpha: f64, p: &[f64], x: &mut [f64], live: &Live) {
 /// order, on one thread (never a tree over threads, never a function of the strip size or the
 /// pool), so the result is the same on any number of threads (`parity.rs` compares bit patterns
 /// against the textbook loop).
-fn cg(d: &Dims, b: &[f64], x: &mut [f64], kd: &[f64], dt: f64, live: &Live) -> usize {
+fn cg(ws: &mut Workspace, d: &Dims, x: &mut [f64], kd: &[f64], dt: f64, live: &Live) -> usize {
     let n = d.cells();
     let (w, h) = (d.w, d.h);
-    let op = Operator::new(d, kd, dt, live);
-    let mut ap = vec![0.0; n];
-    let mut r = vec![0.0; n];
-    let mut sums = vec![[0.0; 2]; h];
-    pass_init(&op, b, x, &mut r, &mut sums, live);
+    // Every vector is written before it is read (the first direction pass reads no old
+    // direction), so the workspace's contents do not matter.
+    let Workspace {
+        b,
+        east,
+        south,
+        diag,
+        ap,
+        r,
+        pold,
+        pnew,
+        sums,
+        pap_rows,
+    } = ws;
+    let b: &[f64] = b;
+    let op = Operator::new(d, kd, dt, live, east, south, diag);
+    pass_init(&op, b, x, r, sums, live);
     let tol2 = CG_TOL_M * CG_TOL_M * n as f64;
     let mut iterations = 0;
     let rr0: f64 = sums.iter().map(|s| s[0]).sum();
     if rr0 > tol2 {
         let mut rz: f64 = sums.iter().map(|s| s[1]).sum();
         // The direction, two buffers: an iteration reads the last and writes the next.
-        let mut pold = vec![0.0; n];
-        let mut pnew = vec![0.0; n];
-        let mut pap_rows = vec![0.0; h];
+        let (mut pold, mut pnew) = (pold, pnew);
         // The first direction is z itself; afterwards z + β·p.
         let mut beta = None;
         // The step x += α·p of the last update, not yet taken.
@@ -717,14 +804,14 @@ fn cg(d: &Dims, b: &[f64], x: &mut [f64], kd: &[f64], dt: f64, live: &Live) -> u
             iterations += 1;
             pass_direction(
                 &op,
-                &r,
-                &pold,
+                r,
+                pold,
                 beta,
                 pending.take(),
                 x,
-                &mut pnew,
-                &mut ap,
-                &mut pap_rows,
+                pnew,
+                ap,
+                pap_rows,
                 live,
             );
             std::mem::swap(&mut pold, &mut pnew);
@@ -733,7 +820,7 @@ fn cg(d: &Dims, b: &[f64], x: &mut [f64], kd: &[f64], dt: f64, live: &Live) -> u
                 break;
             }
             let alpha = rz / pap;
-            pass_update(&op, alpha, &ap, &mut r, &mut sums, live);
+            pass_update(&op, alpha, ap, r, sums, live);
             pending = Some(alpha);
             let rr: f64 = sums.iter().map(|s| s[0]).sum();
             if rr <= tol2 {
@@ -744,14 +831,14 @@ fn cg(d: &Dims, b: &[f64], x: &mut [f64], kd: &[f64], dt: f64, live: &Live) -> u
             rz = rz_new;
         }
         if let Some(alpha) = pending {
-            pass_x(w, alpha, &pold, x, live);
+            pass_x(w, alpha, pold, x, live);
         }
     }
     // Σx = Σb − Σr (the columns of A sum to one): return the residual's sum to the cells that
     // take part in the diffusion, in proportion to their coupling. Both sums run over the cells
     // in order, as `.sum()` does; each cell of a skipped row adds +0 to them (b − A·b and
     // 1 − 1), which changes nothing but a −0 into +0, so the row adds one +0.
-    op.apply(x, &mut ap, live);
+    op.apply(x, ap, live);
     let (mut lost, mut weight) = (sum_zero(), sum_zero());
     for j in 0..h {
         let cells = j * w..(j + 1) * w;
