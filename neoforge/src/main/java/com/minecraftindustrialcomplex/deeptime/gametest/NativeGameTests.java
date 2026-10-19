@@ -37,8 +37,9 @@ public final class NativeGameTests {
         }
         long again = NativeLoader.selfTest();
         long expected = NativeLoader.expectedSelfTest();
-        DeepTime.LOGGER.info("[gametest] native version={} format={} target={} selftest={}", status.version(),
-                status.format(), status.target(), Long.toUnsignedString(again));
+        DeepTime.LOGGER.info("[gametest] native version={} format={} target={} selftest={} build={} ({})",
+                status.version(), status.format(), status.target(), Long.toUnsignedString(again), status.variant(),
+                status.variantReason());
         if (again != expected || status.selfTest() != expected)
             helper.fail("self-test " + Long.toUnsignedString(again) + " (at load " + Long.toUnsignedString(status.selfTest())
                     + ") != Java's " + Long.toUnsignedString(expected));

@@ -15,6 +15,11 @@ Statements are marked **measured** (a run made for this page), **read** (from th
 
 ## Summary
 
+- **The shipped builds (2026-10-18; below).** Measured: full 16k, 100 Myr, 8 threads, pairs run both
+  ways round. Against plain `release`, the `ship` profile's x86-64-v3 build is **1.08×** faster
+  in wall time (1.10× in CPU time). Its baseline build matches plain in wall time (1.00×) and is
+  1.03× faster in CPU time. All eight pairs built the same worlds (66 of 66 files). The gate now
+  times both ship builds (`tools/natives/gate-bins.sh`) and reports both numbers.
 - **P1-19 exit item 1, the stages of one step side by side (2026-10-18; below)**: measured, the
   same run on master 991354a4. The structure step now runs beside the next plate step, the only
   pair of a step's stages with no data between them. Side by side: 1,485.8 → **1,430.5 s
@@ -80,6 +85,126 @@ Statements are marked **measured** (a run made for this page), **read** (from th
   2 threads) is itself about 8 × 890 s. Meeting 300/900 s needs less work per step (fewer
   slope-failure sweeps, fewer climate steps, coarser plate steps: not bit-identical, so Ben's
   call; P1-24 measured some) or a different parallel structure (the stages of one step overlapping).
+
+## Running the gate: the shipped builds (2026-10-18)
+
+The gate times what players run (decisions log 2026-10-18, "Both, picked at runtime"): the `ship`
+profile (`release` plus fat LTO in one codegen unit, `Cargo.toml`), built twice, once for the
+x86-64 baseline and once for x86-64-v3, the two builds an x86-64 player's machine can load (plan
+§6.4). **Report both numbers**: v3 is what the test VM's EPYC and every x86-64 CPU since about
+2013 (Intel) or 2015 (AMD) loads; the baseline is the floor for the rest. Commands (test VM):
+
+```sh
+# both binaries (and, with --plain, the everyday release build for comparison), admitted as cargo:build
+tools/remote/mac.sh --kind cargo:build -- tools/natives/gate-bins.sh /data/ban/deeptime-runs/<task>/bins
+# one run each, side by side: v3 on set A, the baseline on set B (then the other way round)
+B=/data/ban/deeptime-runs/<task>
+tools/remote/mac.sh --no-sync -- tools/remote/detach.sh start gate-v3 --kind sim:earthlike_full_16k:8t \
+    tools/review/bench-quiet.py --cpus 0,16,2,18,4,20,6,22 --out $B/v3 $B/bins/deeptime-x86-64-v3 \
+    earthlike_full_16k scattered_continents 1000 8
+tools/remote/mac.sh --no-sync -- tools/remote/detach.sh start gate-baseline --kind sim:earthlike_full_16k:8t \
+    tools/review/bench-quiet.py --cpus 8,24,10,26,12,28,14,30 --out $B/baseline $B/bins/deeptime-baseline \
+    earthlike_full_16k scattered_continents 1000 8
+```
+
+`tools/review/p1-17-bench.sh seq <bins>/deeptime-x86-64-v3 v3 <bins>/deeptime-baseline baseline
+...` takes the same two binaries. `tools/review/p1-17-profile.sh` profiles the ship build
+(`P117_CPU=x86-64-v3` for v3). The worlds of the two builds need not match (Ben, 2026-10-18: "I
+am not worried about determinism, performance is far more important").
+
+### Plain release against the two shipped builds (measured, 2026-10-18)
+
+`earthlike_full_16k`, scattered continents, **100 Myr**, 8 threads, `bench-quiet.py` on the test
+VM. Each pair ran side by side, the first build on set A (0,16,2,18,4,20,6,22) and the second on
+set B (8,24,10,26,12,28,14,30), and then the other way round. "Plain" is the everyday `release`
+profile (thin LTO, 16 codegen units) built from the natives branch, whose `deeptime-core` is
+master f221b3d3's. "Ship baseline" and "ship v3" are `gate-bins.sh`'s two binaries.
+
+The VM was shared with 8 to 20 other jobs throughout: others' busy CPUs were 14 to 25 of 32, and
+the runs' cores' SMT siblings were 33 to 88 % busy. So wall time moves with the load from pair to
+pair. Within a pair both runs see the same load, and the two orders cancel the sets' difference.
+CPU time (user + system) moved least. The speed-up column is the slower build's time over the
+faster's.
+
+| A | B | A wall | B wall | speed-up | A CPU | B CPU | speed-up | others' busy CPUs | siblings busy |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| plain | ship baseline | 480.7 s | 459.3 s | 1.047 | 1,311.0 s | 1,282.8 s | 1.022 | 24.8, 25.0 | 81, 81 % |
+| ship baseline | plain | 250.5 s | 312.0 s | 1.246 | 1,089.5 s | 1,129.0 s | 1.036 | 13.9, 14.4 | 33, 36 % |
+| plain | ship v3 | 321.4 s | 296.3 s | 1.085 | 1,286.5 s | 1,166.7 s | 1.103 | 20.7, 21.0 | 71, 73 % |
+| ship v3 | plain | 360.0 s | 388.5 s | 1.079 | 1,238.7 s | 1,351.2 s | 1.091 | 24.9, 23.6 | 88, 85 % |
+| ship baseline | ship v3 | 266.1 s | 231.7 s | 1.148 | 1,190.8 s | 1,123.0 s | 1.060 | 16.0, 15.2 | 50, 55 % |
+| ship v3 | ship baseline | 272.8 s | 285.9 s | 1.048 | 1,087.8 s | 1,153.3 s | 1.060 | 20.1, 19.2 | 67, 65 % |
+| plain (second round) | ship baseline | 316.6 s | 321.5 s | 0.985 | 1,072.2 s | 1,044.1 s | 1.027 | 14.2, 14.2 | 23, 23 % |
+| ship baseline (second round) | plain | 309.1 s | 315.0 s | 1.019 | 1,025.2 s | 1,053.3 s | 1.027 | 12.7, 12.3 | 14, 14 % |
+
+The plain and ship baseline pair ran a second time because the first round's two orders
+disagreed (1.047 and 1.246). In the 1.246 run, the plain build on set B had 3.57 CPUs busy on
+average against its partner's 4.26: something else held set B back. The second round ran with the
+siblings 14 to 23 % busy.
+
+The speed-ups are the geometric mean of the two orders:
+
+| build | over | wall | CPU time |
+|---|---|---:|---:|
+| ship v3 | plain | **1.08×** (1.085, 1.079) | 1.10× (1.103, 1.091) |
+| ship baseline | plain | **1.00×** in the second round (0.985, 1.019); 1.07× over all four pairs | 1.03× (1.022 to 1.036, all four pairs) |
+| ship v3 | ship baseline | 1.10× (1.148, 1.048) | 1.06× (1.060, 1.060) |
+
+Fat LTO in one codegen unit saves about 3 % of the CPU time, which is inside the wall-time
+noise here. x86-64-v3 saves about 6 % more, and it showed in wall time too (1.05 to 1.15). By
+CPU time the two compound: 1.027 × 1.060 = 1.089, against the 1.097 measured directly. Each
+shipped build's speed-up over plain `release`:
+
+- **v3: 1.08× in wall time**, 1.10× in CPU time.
+- **Baseline: 1.00× in wall time** (the quieter round), 1.03× in CPU time.
+
+All of these are at 100 Myr. A 1000 Myr gate run of both builds has not been made yet.
+
+**The worlds.** `p1-17-cmp.py` compared every pair: 66 of 66 files were equal in all eight.
+At 100 Myr, plain, ship baseline and ship v3 build the same world byte for byte. Nothing requires
+it.
+
+**The build cost** was measured on the test VM with `CARGO_INCREMENTAL=0`, each profile in its own
+fresh target directory, while other agents held the load at 22 to 77. The `deeptime_jni` builds
+followed the CLI's in the same directory, so the dependencies were already built.
+
+| build | release | ship | ship v3 |
+|---|---:|---:|---:|
+| `deeptime` CLI, cold | 81.2 s | 273.8 s (3.4×) | 289.1 s (3.6×) |
+| `deeptime_jni`, dependencies built | 75.5 s | 193.6 s (2.6×) | 259.1 s (3.4×) |
+| CLI after touching `deeptime-core/src/lib.rs` | 71.7 s | 323.3 s (4.5×) | 305.4 s (4.3×) |
+| `deeptime_jni` after the same touch | 64.9 s | 189.5 s (2.9×) | 244.6 s (3.8×) |
+
+`gate-bins.sh` itself took 320.3 s and 305.8 s for its two builds. Fat LTO in one codegen unit
+optimises the whole program again after every change, in one thread. That is why everyday builds,
+Gradle's host native and the tests stay on `release`.
+
+The whole cross-build, `tools/natives/build-natives.sh` with its 16 files, took 2,594 s on the
+loaded VM: 2.4 to 4.1 min for each of the 12 libraries. The last CI run, of 2026-09-28, built 8
+release-profile libraries of a much smaller core in 25 min. So `natives.yml`'s build job timeout
+went from 30 to 180 min; the estimate on the 2-core private-repo runner is about 100 min
+(inferred, not run).
+
+**The sizes** (bytes; linux-x86_64-gnu):
+
+| file | release | ship baseline | ship v3 |
+|---|---:|---:|---:|
+| `libdeeptime_jni.so` | 19,692,808 | 15,252,816 (−22.5 %) | 15,215,144 |
+| the same, deflated (`gzip -6`, as in the jar) | 5,101,915 | 4,666,210 (−8.5 %) | 4,715,010 |
+| `deeptime` CLI | 24,337,712 | 18,534,552 (−23.8 %) | 18,545,280 |
+
+**The release jar** (`./gradlew jar -Prelease` after `build-natives.sh`, measured) is
+**57,690,314 B**. Its 16 native files deflate to 55.8 MB:
+
+- the eight baseline libraries, 35.5 MB;
+- the four x86-64-v3 libraries, 19.4 MB;
+- the four probes, 0.9 MB.
+
+There is no comparable jar from master: the last CI artifacts date from 2026-09-28. The jar with
+master's eight release-profile libraries is estimated at about 40.7 MB (inferred: the jar's 1.9 MB
+of non-native content, plus the eight baseline libraries scaled by the release-to-ship ratio of
+the deflated linux-gnu library, 1.093). So the jar grows by about 17 MB (1.42×). The v3 builds
+add 19.4 MB, and the ship profile saves about 3.3 MB.
 
 ## P1-19 exit item 1: full 16k on eight pinned cores (2026-10-18)
 
