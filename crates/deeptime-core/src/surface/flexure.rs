@@ -360,17 +360,23 @@ impl FlexState {
             *self = FlexState::fresh(n);
             return;
         }
+        // Each loop here is cell by cell, so it runs in parallel with the same values (P1-19).
         if self.seen_elevation_m.len() == n {
             let (ka, _) = airy_shares();
-            for (c, (&z, &seen)) in elevation_m.iter().zip(&self.seen_elevation_m).enumerate() {
-                let added = z - seen;
-                if added.is_finite() && added.abs() > 1.0e-3 {
-                    // A load the plate has not answered yet: it waits in the unsolved residual.
-                    let q = added * ka as f32;
-                    self.load_m[c] += q;
-                    self.unsolved_m[c] += q;
-                }
-            }
+            self.load_m
+                .par_iter_mut()
+                .zip(self.unsolved_m.par_iter_mut())
+                .zip(elevation_m.par_iter().zip(self.seen_elevation_m.par_iter()))
+                .for_each(|((load, unsolved), (&z, &seen))| {
+                    let added = z - seen;
+                    if added.is_finite() && added.abs() > 1.0e-3 {
+                        // A load the plate has not answered yet: it waits in the unsolved
+                        // residual.
+                        let q = added * ka as f32;
+                        *load += q;
+                        *unsolved += q;
+                    }
+                });
         }
         // Crust that is new at a place starts unloaded and flat (its water is NaN until the
         // next step takes its reference).
@@ -380,7 +386,7 @@ impl FlexState {
         // a linear blend of the corners reads a cell beside a stiff one as nearly as stiff as
         // that, so a weak cell carried a fraction of a cell would seem to have lost almost all
         // of its rigidity.
-        let ln_rigidity: Vec<f32> = self.rigidity.iter().map(|&d| d.ln()).collect();
+        let ln_rigidity: Vec<f32> = self.rigidity.par_iter().map(|&d| d.ln()).collect();
         let moved = advect::carried_fields(
             x,
             [
@@ -392,17 +398,25 @@ impl FlexState {
                 &self.unsolved_m,
             ],
         );
-        for (c, m) in moved.into_iter().enumerate() {
-            let [water, load, sunk, ln_d, ice, unsolved] = m
-                .filter(|m| m[..3].iter().chain(&m[4..]).all(|y| y.is_finite()))
-                .unwrap_or([f32::NAN, 0.0, 0.0, f32::NAN, 0.0, 0.0]);
-            self.water_m[c] = water;
-            self.load_m[c] = load;
-            self.deflection_m[c] = sunk;
-            self.rigidity[c] = ln_d.exp();
-            self.ice_m[c] = ice;
-            self.unsolved_m[c] = unsolved;
-        }
+        self.water_m
+            .par_iter_mut()
+            .zip(self.load_m.par_iter_mut())
+            .zip(self.deflection_m.par_iter_mut())
+            .zip(self.rigidity.par_iter_mut())
+            .zip(self.ice_m.par_iter_mut())
+            .zip(self.unsolved_m.par_iter_mut())
+            .zip(moved.into_par_iter())
+            .for_each(|((((((w, l), s), r), i), u), m)| {
+                let [water, load, sunk, ln_d, ice, unsolved] = m
+                    .filter(|m| m[..3].iter().chain(&m[4..]).all(|y| y.is_finite()))
+                    .unwrap_or([f32::NAN, 0.0, 0.0, f32::NAN, 0.0, 0.0]);
+                *w = water;
+                *l = load;
+                *s = sunk;
+                *r = ln_d.exp();
+                *i = ice;
+                *u = unsolved;
+            });
     }
 }
 
@@ -771,6 +785,16 @@ pub struct Solver {
     tmp: Vec<f64>,
 }
 
+/// What [`Solver::laplacian_then`] does to each value after the Laplacian.
+#[derive(Clone, Copy)]
+enum Then<'a> {
+    Nothing,
+    /// × the value per cell.
+    Scale(&'a [f64]),
+    /// + c·u per cell, then (with `from`) `from` − that.
+    Add(&'a [f64], &'a [f64], Option<&'a [f64]>),
+}
+
 /// A sum whose value does not depend on the thread count: per row, then over the rows in order.
 fn dot(w: usize, a: &[f64], b: &[f64]) -> f64 {
     let rows: Vec<f64> = a
@@ -783,6 +807,20 @@ fn dot(w: usize, a: &[f64], b: &[f64]) -> f64 {
 
 fn max_abs(v: &[f64]) -> f64 {
     v.par_iter().map(|x| x.abs()).reduce(|| 0.0, f64::max)
+}
+
+/// [`max_abs`] of `b` and [`dot`] of `a` and `b` in one pass (P1-19): the same values.
+fn max_abs_and_dot(w: usize, a: &[f64], b: &[f64]) -> (f64, f64) {
+    let rows: Vec<(f64, f64)> = a
+        .par_chunks(w)
+        .zip(b.par_chunks(w))
+        .map(|(x, y)| {
+            let peak = y.iter().map(|q| q.abs()).fold(0.0, f64::max);
+            (peak, x.iter().zip(y).map(|(p, q)| p * q).sum::<f64>())
+        })
+        .collect();
+    let peak = rows.iter().map(|r| r.0).fold(0.0, f64::max);
+    (peak, rows.iter().map(|r| r.1).sum())
 }
 
 impl Solver {
@@ -802,6 +840,12 @@ impl Solver {
 
     /// out ← the 5-point Laplacian of `v` (x wraps, the first and last row are closed), 1/m².
     pub fn laplacian(&self, v: &[f64], out: &mut [f64]) {
+        self.laplacian_then(v, Then::Nothing, out);
+    }
+
+    /// [`Self::laplacian`], each value then put through `then` in the same pass (P1-19: a pass
+    /// of its own before): the same operations in the same order.
+    fn laplacian_then(&self, v: &[f64], then: Then<'_>, out: &mut [f64]) {
         let (w, h) = (self.w, self.h);
         let inv = 1.0 / (self.dx * self.dx);
         out.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
@@ -812,26 +856,53 @@ impl Solver {
                 let east = mid[if i + 1 == w { 0 } else { i + 1 }];
                 row[i] = (west + east + north[i] + south[i] - 4.0 * mid[i]) * inv;
             }
+            let cells = j * w..(j + 1) * w;
+            match then {
+                Then::Nothing => {}
+                Then::Scale(d) => {
+                    for (x, &d) in row.iter_mut().zip(&d[cells]) {
+                        *x *= d;
+                    }
+                }
+                Then::Add(c, u, from) => {
+                    for (k, x) in cells.zip(row.iter_mut()) {
+                        *x += c[k] * u[k];
+                        if let Some(r) = from {
+                            *x = r[k] - *x;
+                        }
+                    }
+                }
+            }
         });
     }
 
     /// out ← L(D·L v): the plate's elastic restoring force over gravity, kg/m².
     pub fn bend(&mut self, d: &[f64], v: &[f64], out: &mut [f64]) {
         let mut m = std::mem::take(&mut self.tmp);
-        self.laplacian(v, &mut m);
-        m.par_iter_mut()
-            .zip(d.par_iter())
-            .for_each(|(x, &d)| *x *= d);
+        self.laplacian_then(v, Then::Scale(d), &mut m);
         self.laplacian(&m, out);
         self.tmp = m;
     }
 
     /// out ← (L D L + C) v.
     fn operator(&mut self, d: &[f64], c: &[f64], v: &[f64], out: &mut [f64]) {
-        self.bend(d, v, out);
-        out.par_iter_mut()
-            .zip(c.par_iter().zip(v.par_iter()))
-            .for_each(|(o, (&c, &v))| *o += c * v);
+        self.operator_from(d, c, v, None, out);
+    }
+
+    /// [`Self::operator`], or with `from` given, out ← `from` − (L D L + C) v: in two passes
+    /// (P1-19: four, five with `from`).
+    fn operator_from(
+        &mut self,
+        d: &[f64],
+        c: &[f64],
+        v: &[f64],
+        from: Option<&[f64]>,
+        out: &mut [f64],
+    ) {
+        let mut m = std::mem::take(&mut self.tmp);
+        self.laplacian_then(v, Then::Scale(d), &mut m);
+        self.laplacian_then(&m, Then::Add(c, v, from), out);
+        self.tmp = m;
     }
 
     /// z ← the preconditioner applied to `r`: the blended spectral solves between two damped
@@ -848,10 +919,7 @@ impl Solver {
         z.par_iter_mut()
             .zip(r.par_iter().zip(pre.jacobi.par_iter()))
             .for_each(|(z, (&r, &j))| *z = r * j);
-        self.operator(pre.d, pre.c, z, &mut left);
-        left.par_iter_mut()
-            .zip(r.par_iter())
-            .for_each(|(l, &r)| *l = r - *l);
+        self.operator_from(pre.d, pre.c, z, Some(r), &mut left);
         self.spectral_solve(&pre.bank, &left, &mut part);
         z.par_iter_mut()
             .zip(part.par_iter())
@@ -927,20 +995,23 @@ impl Solver {
                 break;
             }
             let alpha = rz / pap;
+            // (x and r in one pass, P1-19)
             x.par_iter_mut()
-                .zip(p.par_iter())
-                .for_each(|(x, &p)| *x += alpha * p);
-            r.par_iter_mut()
-                .zip(ap.par_iter())
-                .for_each(|(r, &a)| *r -= alpha * a);
+                .zip(r.par_iter_mut())
+                .zip(p.par_iter().zip(ap.par_iter()))
+                .for_each(|((x, r), (&p, &a))| {
+                    *x += alpha * p;
+                    *r -= alpha * a;
+                });
             self.precondition(&mut pre, &r, &mut z);
             report.iterations = it;
-            report.error_m = max_abs(&z);
+            // (the error and the next r·z in one pass, P1-19: r·z unused when this was the last)
+            let (error, rz_new) = max_abs_and_dot(w, &r, &z);
+            report.error_m = error;
             if report.error_m < tolerance_m {
                 report.converged = true;
                 break;
             }
-            let rz_new = dot(w, &r, &z);
             let beta = rz_new / rz;
             rz = rz_new;
             p.par_iter_mut()
@@ -972,13 +1043,21 @@ fn binomial(v: &mut [f64], w: usize, h: usize, passes: usize) {
     }
 }
 
-/// The mean of each `f` × `f` block of `v` (w × h).
+/// The mean of each `f` × `f` block of `v` (w × h; the tests' reference for [`restrict_by`]).
+#[cfg(test)]
 fn restrict(v: &[f64], w: usize, f: usize) -> Vec<f64> {
+    restrict_by(w, v.len() / w, f, |c| v[c])
+}
+
+/// [`restrict`] of the values `get` gives the cells of a w × h raster, without the raster: the
+/// same sums in the same order, in one pass (P1-19: the step built each fine raster, then
+/// restricted it, or copied it where `f` = 1).
+fn restrict_by(w: usize, h: usize, f: usize, get: impl Fn(usize) -> f64 + Send + Sync) -> Vec<f64> {
     if f == 1 {
-        return v.to_vec();
+        return (0..w * h).into_par_iter().map(get).collect();
     }
     let ws = w / f;
-    let hs = v.len() / w / f;
+    let hs = h / f;
     let norm = 1.0 / (f * f) as f64;
     (0..ws * hs)
         .into_par_iter()
@@ -987,7 +1066,7 @@ fn restrict(v: &[f64], w: usize, f: usize) -> Vec<f64> {
             let mut s = 0.0;
             for dj in 0..f {
                 for di in 0..f {
-                    s += v[(j * f + dj) * w + i * f + di];
+                    s += get((j * f + dj) * w + i * f + di);
                 }
             }
             s * norm
@@ -995,7 +1074,14 @@ fn restrict(v: &[f64], w: usize, f: usize) -> Vec<f64> {
         .collect()
 }
 
-/// Each coarse value on its `f` × `f` cells.
+/// The coarse cell (`ws` wide, `f` × `f` fine cells each) over fine cell (i, j).
+#[inline]
+fn coarse_cell(ws: usize, f: usize, i: usize, j: usize) -> usize {
+    (j / f) * ws + i / f
+}
+
+/// Each coarse value on its `f` × `f` cells (the tests; the step reads [`coarse_cell`]).
+#[cfg(test)]
 fn prolong_const(v: &[f64], ws: usize, f: usize) -> Vec<f64> {
     if f == 1 {
         return v.to_vec();
@@ -1004,7 +1090,7 @@ fn prolong_const(v: &[f64], ws: usize, f: usize) -> Vec<f64> {
     let w = ws * f;
     (0..w * hs * f)
         .into_par_iter()
-        .map(|c| v[(c / w / f) * ws + (c % w) / f])
+        .map(|c| v[coarse_cell(ws, f, c % w, c / w)])
         .collect()
 }
 
@@ -1017,20 +1103,26 @@ fn prolong_linear(v: &[f64], ws: usize, f: usize) -> Vec<f64> {
     let w = ws * f;
     (0..w * hs * f)
         .into_par_iter()
-        .map(|c| {
-            let (i, j) = (c % w, c / w);
-            let x = (i as f64 + 0.5) / f as f64 - 0.5;
-            let y = ((j as f64 + 0.5) / f as f64 - 0.5).clamp(0.0, (hs - 1) as f64);
-            let (x0, y0) = (x.floor(), y.floor());
-            let (tx, ty) = (x - x0, y - y0);
-            let i0 = (x0 as i64).rem_euclid(ws as i64) as usize;
-            let i1 = (i0 + 1) % ws;
-            let j0 = y0 as usize;
-            let j1 = (j0 + 1).min(hs - 1);
-            (v[j0 * ws + i0] * (1.0 - tx) + v[j0 * ws + i1] * tx) * (1.0 - ty)
-                + (v[j1 * ws + i0] * (1.0 - tx) + v[j1 * ws + i1] * tx) * ty
-        })
+        .map(|c| linear_at(v, ws, hs, f, c % w, c / w))
         .collect()
+}
+
+/// [`prolong_linear`]'s value at fine cell (i, j) (`v` itself where `f` = 1).
+#[inline]
+fn linear_at(v: &[f64], ws: usize, hs: usize, f: usize, i: usize, j: usize) -> f64 {
+    if f == 1 {
+        return v[j * ws + i];
+    }
+    let x = (i as f64 + 0.5) / f as f64 - 0.5;
+    let y = ((j as f64 + 0.5) / f as f64 - 0.5).clamp(0.0, (hs - 1) as f64);
+    let (x0, y0) = (x.floor(), y.floor());
+    let (tx, ty) = (x - x0, y - y0);
+    let i0 = (x0 as i64).rem_euclid(ws as i64) as usize;
+    let i1 = (i0 + 1) % ws;
+    let j0 = y0 as usize;
+    let j1 = (j0 + 1).min(hs - 1);
+    (v[j0 * ws + i0] * (1.0 - tx) + v[j0 * ws + i1] * tx) * (1.0 - ty)
+        + (v[j1 * ws + i0] * (1.0 - tx) + v[j1 * ws + i1] * tx) * ty
 }
 
 /// What [`step`] reads besides the state. Slices are per L1 cell.
@@ -1289,19 +1381,15 @@ pub fn step(
     let f = coarsening(w, hgt, x.norm_dx_m);
     let (ws, hs) = (w / f, hgt / f);
     let dxs = x.norm_dx_m * f as f64;
-    let te_fine: Vec<f64> = (0..n)
-        .into_par_iter()
-        .map(|c| {
-            let reg = x.regime[c] as u8;
-            p.elastic_thickness_km(
-                x.crust_type[c] as u8 == OCEANIC,
-                f64::from(x.crust_age_myr[c]),
-                f64::from(x.orogeny_age_myr[c]),
-                reg == regime::ARC || reg == regime::RIFT,
-            )
-        })
-        .collect();
-    let mut te = restrict(&te_fine, w, f);
+    let mut te = restrict_by(w, hgt, f, |c| {
+        let reg = x.regime[c] as u8;
+        p.elastic_thickness_km(
+            x.crust_type[c] as u8 == OCEANIC,
+            f64::from(x.crust_age_myr[c]),
+            f64::from(x.orogeny_age_myr[c]),
+            reg == regime::ARC || reg == regime::RIFT,
+        )
+    });
     let ds = Dims::new(ws, hs, dxs, x.dims.wrap_x);
     box_blur(&ds, &mut te, 2, 2); // ledger: ISO-054 (game-choice: numerical)
     // ledger: ISO-055
@@ -1316,14 +1404,11 @@ pub fn step(
             (j + 1).min(hgt - 1) * w + i,
         ]
     };
-    let edge: Vec<bool> = (0..n)
-        .into_par_iter()
-        .map(|c| {
-            neighbours(c)
-                .iter()
-                .any(|&m| x.plate_id[m] != x.plate_id[c])
-        })
-        .collect();
+    let edge = |c: usize| {
+        neighbours(c)
+            .iter()
+            .any(|&m| x.plate_id[m] != x.plate_id[c])
+    };
     let floor = p.te_min_km * p.elastic_thickness_scale;
     // The break as the grid can carry it. A boundary steps from row to row on the raster; a
     // break drawn cell by cell (boundary cells at the floor, their neighbours half way) is that
@@ -1331,11 +1416,7 @@ pub fn step(
     // the synthetic margin). The boundary cells are blurred instead and the share is taken from
     // that: on a straight boundary the two boundary rows stay at the floor and the next rows
     // carry 0.17 and 0.72 of their stiffness, and along a stepped boundary it varies smoothly.
-    let mut near_edge: Vec<f64> = edge
-        .par_iter()
-        .map(|&e| if e { 1.0 } else { 0.0 })
-        .collect();
-    near_edge = restrict(&near_edge, w, f);
+    let mut near_edge = restrict_by(w, hgt, f, |c| if edge(c) { 1.0 } else { 0.0 });
     box_blur(&ds, &mut near_edge, 1, 2);
     let whole: Vec<f64> = near_edge
         .par_iter()
@@ -1344,9 +1425,9 @@ pub fn step(
     te.par_iter_mut()
         .zip(whole.par_iter())
         .for_each(|(t, &share)| *t = floor + (*t - floor).max(0.0) * share);
-    let te_out: Vec<f32> = prolong_const(&te, ws, f)
+    let te_out: Vec<f32> = (0..n)
         .into_par_iter()
-        .map(|t| t as f32)
+        .map(|c| te[coarse_cell(ws, f, c % w, c / w)] as f32)
         .collect();
 
     // ledger: ISO-068
@@ -1360,10 +1441,7 @@ pub fn step(
         *solver = Some(Solver::new(ws, hs, dxs));
     }
     let sv = solver.as_mut().expect("built above");
-    let pick = |get: &(dyn Fn(usize) -> f64 + Sync)| -> Vec<f64> {
-        let fine: Vec<f64> = (0..n).into_par_iter().map(get).collect();
-        restrict(&fine, w, f)
-    };
+    let pick = |get: &(dyn Fn(usize) -> f64 + Sync)| -> Vec<f64> { restrict_by(w, hgt, f, get) };
     let d_now: Vec<f64> = te
         .par_iter()
         .map(|&t| rigidity_per_g(t, x.gravity_m_s2))
@@ -1503,9 +1581,8 @@ pub fn step(
             r.iter().map(|&v| v / RHO_MANTLE).collect(),
         )
     };
-    let d_fine = prolong_const(&d_now, ws, f);
-    let left_fine = prolong_const(&left, ws, f);
-    let delta = prolong_linear(&dw, ws, f);
+    // (the coarse rigidity, residual and deflection read per cell below: `prolong_const` and
+    // `prolong_linear` without their fine rasters, P1-19)
 
     // 4. The elevation takes the sinking that is not yet in it; the state takes the step. Cell
     // by cell, rows in parallel; the sum of the changes is then taken in cell order, as before
@@ -1529,20 +1606,22 @@ pub fn step(
             for i in 0..w {
                 let c = j * w + i;
                 let cell = &cells[c];
-                let change = -p.strength * delta[c];
+                let coarse = coarse_cell(ws, f, i, j);
+                let delta = linear_at(&dw, ws, hs, f, i, j);
+                let change = -p.strength * delta;
                 hr[i] += change;
                 cr[i] = change;
                 let depth = (sea - hr[i]).max(0.0);
                 let w_prev = if cell.fresh { 0.0 } else { f64::from(dr[i]) };
-                let w_new = w_prev + cell.root + delta[c];
+                let w_new = w_prev + cell.root + delta;
                 let load = cell.load + water_share * (depth - cell.water);
                 let ice = x.ice_m.map_or(0.0, |v| f64::from(v[c]).max(0.0));
                 lr[i] = load as f32;
                 dr[i] = w_new as f32;
                 wr[i] = depth as f32;
                 ir[i] = ice as f32;
-                rr[i] = d_fine[c] as f32;
-                ur[i] = left_fine[c] as f32;
+                rr[i] = d_now[coarse] as f32;
+                ur[i] = left[coarse] as f32;
                 let restoring = if hr[i] <= sea {
                     RHO_MANTLE - RHO_WATER
                 } else {
@@ -1551,15 +1630,40 @@ pub fn step(
                 fr[i] = (RHO_MANTLE * (load + ice_share * ice - w_new) / restoring) as f32;
             }
         });
-    let (mut sum, mut peak) = (0.0, 0.0f64);
-    for &change in &changes {
-        sum += change;
-        peak = peak.max(change.abs());
-    }
-    st.seen_elevation_m = h.par_iter().map(|&z| z as f32).collect();
+    // The sum in cell order on this thread, beside the copies (P1-19). The seen elevation is
+    // written over the last one where it has the size, so the copy of the deflection is the only
+    // new grid here (two side by side went over the memory cap).
+    let hh: &[f64] = h;
+    let mut seen = std::mem::take(&mut st.seen_elevation_m);
+    let deflection_now: &[f32] = &st.deflection_m;
+    let ((sum, peak), ((), deflection)) = rayon::join(
+        || {
+            let (mut sum, mut peak) = (0.0, 0.0f64);
+            for &change in &changes {
+                sum += change;
+                peak = peak.max(change.abs());
+            }
+            (sum, peak)
+        },
+        || {
+            rayon::join(
+                || {
+                    if seen.len() == hh.len() {
+                        seen.par_iter_mut()
+                            .zip(hh.par_iter())
+                            .for_each(|(s, &z)| *s = z as f32);
+                    } else {
+                        seen = hh.par_iter().map(|&z| z as f32).collect();
+                    }
+                },
+                || crate::alloc::copied(deflection_now),
+            )
+        },
+    );
+    st.seen_elevation_m = seen;
     out.sum_change_m = sum;
     out.max_change_m = peak;
-    out.deflection_m = st.deflection_m.clone();
+    out.deflection_m = deflection;
     out.flexure_m = flex;
     Ok(out)
 }

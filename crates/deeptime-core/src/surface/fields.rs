@@ -103,16 +103,23 @@ pub struct FrameAcc {
 
 impl FrameAcc {
     pub fn add(&mut self, name: &str, v: &[f32], dt: f64) {
-        let s = self
-            .sums
-            .entry(name.to_owned())
-            .or_insert_with(|| vec![0.0; v.len()]);
         let w = dt as f32;
-        s.par_iter_mut().zip(v.par_iter()).for_each(|(a, &x)| {
-            if x.is_finite() {
-                *a += x * w;
+        match self.sums.get_mut(name) {
+            Some(s) => s.par_iter_mut().zip(v.par_iter()).for_each(|(a, &x)| {
+                if x.is_finite() {
+                    *a += x * w;
+                }
+            }),
+            // A new sum in one pass, the same values as zeros and then the add (P1-19: the zeros
+            // were written on one thread). `0.0 +` keeps a product of −0 at +0, as the add did.
+            None => {
+                let s = v
+                    .par_iter()
+                    .map(|&x| if x.is_finite() { 0.0 + x * w } else { 0.0 })
+                    .collect();
+                self.sums.insert(name.to_owned(), s);
             }
-        });
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -199,8 +206,36 @@ pub const KIND_CARBONATE: u8 = 1;
 pub const KIND_EVAPORITE: u8 = 2;
 pub const KIND_EUXINIC: u8 = 3;
 
+/// The tags [`column`] asks about, as bits by class ([`tag_bits`]).
+const TAG_KARST: u8 = 1;
+const TAG_SOLUBLE: u8 = 2;
+const TAG_RESERVOIR: u8 = 4;
+const TAG_SEAL: u8 = 8;
+
+/// Each class's [`column`] tags as bits (P1-19: each was looked up by name, per layer, before).
+fn tag_bits() -> &'static [u8] {
+    static BITS: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    BITS.get_or_init(|| {
+        let tags = [
+            (TAG_KARST, "karst"),
+            (TAG_SOLUBLE, "soluble"),
+            (TAG_RESERVOIR, "reservoir"),
+            (TAG_SEAL, "seal"),
+        ];
+        (0..super::lithology::table().len())
+            .map(|k| {
+                tags.iter()
+                    .filter(|(_, t)| has_tag(k as u16, t))
+                    .fold(0u8, |b, (bit, _)| b | bit)
+            })
+            .collect()
+    })
+}
+
 /// The column's facies shares in its top 1 km, and the petroleum-system layers.
-fn column(log: &StrataLog, c: usize, cls: &Classes, regolith: f64) -> [f32; 7] {
+fn column(log: &StrataLog, c: usize, cls: &Classes, bits: &[u8], regolith: f64) -> [f32; 7] {
+    // A class outside the table carries no tag, as `has_tag` says.
+    let has = |k: u16, bit: u8| bits.get(usize::from(k)).is_some_and(|&b| b & bit != 0);
     let col = log.column(c);
     let (mut carb, mut evap, mut eux, mut seen) = (0.0f64, 0.0f64, 0.0f64, 0.0f64);
     // Top-down.
@@ -214,10 +249,10 @@ fn column(log: &StrataLog, c: usize, cls: &Classes, regolith: f64) -> [f32; 7] {
             let part = t.min(1000.0 - seen);
             seen += part;
             let k = l.class;
-            if k == cls.limestone || k == cls.dolostone || has_tag(k, "karst") {
+            if k == cls.limestone || k == cls.dolostone || has(k, TAG_KARST) {
                 carb += part;
             }
-            if k == cls.halite || k == cls.gypsum || has_tag(k, "soluble") {
+            if k == cls.halite || k == cls.gypsum || has(k, TAG_SOLUBLE) {
                 evap += part;
             }
             if k == cls.black_shale {
@@ -247,7 +282,7 @@ fn column(log: &StrataLog, c: usize, cls: &Classes, regolith: f64) -> [f32; 7] {
     let mut reservoir = 0.0f64;
     let mut top_res = usize::MAX;
     for (i, l) in col.iter().enumerate().skip(above) {
-        if has_tag(l.class, "reservoir") {
+        if has(l.class, TAG_RESERVOIR) {
             reservoir += f64::from(l.thickness_m);
             top_res = i;
         }
@@ -255,7 +290,7 @@ fn column(log: &StrataLog, c: usize, cls: &Classes, regolith: f64) -> [f32; 7] {
     let mut seal = 0.0f64;
     if top_res != usize::MAX {
         for l in &col[top_res + 1..] {
-            if has_tag(l.class, "seal") {
+            if has(l.class, TAG_SEAL) {
                 seal += f64::from(l.thickness_m);
             }
         }
@@ -272,9 +307,11 @@ fn column(log: &StrataLog, c: usize, cls: &Classes, regolith: f64) -> [f32; 7] {
     ]
 }
 
-/// The step's fields, in [`STEP_FIELDS`] order.
-pub fn step_fields(x: &StepInputs<'_>, cls: &Classes) -> Vec<Vec<f32>> {
+/// The step's fields, in [`STEP_FIELDS`] order, into `fields`: 26 grids that the caller keeps
+/// between steps and every cell of which is written (P1-19: 26 new zeroed grids a step before).
+pub fn step_fields(x: &StepInputs<'_>, cls: &Classes, fields: &mut Vec<Vec<f32>>) {
     let n = x.flags.len();
+    let bits = tag_bits();
     let row = |c: usize| -> [f32; 26] {
         let flags = x.flags[c] as u32 as u8;
         let cont = x.crust_type[c] as u8 == CONTINENTAL;
@@ -313,7 +350,7 @@ pub fn step_fields(x: &StepInputs<'_>, cls: &Classes) -> Vec<Vec<f32>> {
         let marine = z < 0.0;
         let k = x.kind[c];
         let [carb, evap, eux, toc, src_depth, res, seal] =
-            column(x.log, c, cls, f64::from(x.regolith_m[c]));
+            column(x.log, c, cls, bits, f64::from(x.regolith_m[c]));
         let step_share = |kind: u8| if k == kind { 1.0 } else { 0.0 };
         let t_c = x.t_c[c];
         let geotherm = x.heat_flow[c] / 1000.0 / 2.5; // °C per metre
@@ -360,7 +397,10 @@ pub fn step_fields(x: &StepInputs<'_>, cls: &Classes) -> Vec<Vec<f32>> {
     // collected and then read back field by field on one thread, 26 strided sweeps of the
     // whole raster every step).
     const BLOCK: usize = 4096;
-    let mut fields: Vec<Vec<f32>> = (0..26).map(|_| vec![0.0; n]).collect();
+    fields.resize_with(26, Vec::new);
+    for f in fields.iter_mut().filter(|f| f.len() != n) {
+        *f = crate::alloc::filled(n, 0.0);
+    }
     let mut blocks: Vec<Vec<&mut [f32]>> = (0..n.div_ceil(BLOCK))
         .map(|_| Vec::with_capacity(26))
         .collect();
@@ -381,7 +421,6 @@ pub fn step_fields(x: &StepInputs<'_>, cls: &Classes) -> Vec<Vec<f32>> {
                 }
             }
         });
-    fields
 }
 
 /// Distance (km, block metric) from every cell to the nearest craton edge (a cell whose
@@ -451,7 +490,7 @@ pub fn dist_to_edge(d: &Dims, craton: &[f32]) -> Vec<f32> {
 
 /// Gradient magnitude of the frame-mean land elevation, smoothed over ~50 km, m/km (0 at sea).
 pub fn regional_gradient(d: &Dims, elev: &[f32]) -> Vec<f32> {
-    let mut z: Vec<f64> = elev.iter().map(|&e| f64::from(e.max(0.0))).collect();
+    let mut z: Vec<f64> = elev.par_iter().map(|&e| f64::from(e.max(0.0))).collect();
     let r = ((25_000.0 / d.dx).round() as usize).max(1);
     box_blur(d, &mut z, r, 2);
     let (w, h) = (d.w, d.h);
@@ -494,51 +533,36 @@ pub fn flush(acc: &mut FrameAcc, d: &Dims, t_end_years: f64, epoch: &Epoch) -> F
     }
     let n = d.cells();
     let window = epoch.inherited_bif_window() as f32; // ledger: ORE-020
-    if craton.len() == n {
-        fields.insert(FRAME_FIELDS[0].into(), dist_to_edge(d, &craton));
+    // The distance transform's sweeps are serial; the rest of the frame is made beside them
+    // (P1-19).
+    let (dist, (gradient, origin)) = rayon::join(
+        || (craton.len() == n).then(|| dist_to_edge(d, &craton)),
+        || {
+            let gradient = fields
+                .get(&format!("{P}elevation_m"))
+                .map(|e| regional_gradient(d, e));
+            (gradient, origin_offsets(acc, d))
+        },
+    );
+    if let Some(dist) = dist {
+        fields.insert(FRAME_FIELDS[0].into(), dist);
     }
     // Inherited BIF: the basins under a stable interior (`deposits::bif_basins`), × the share of
     // the acme before the run.
     fields.insert(
         FRAME_FIELDS[1].into(),
         if basin.len() == n {
-            basin.iter().map(|&b| b * window).collect()
+            basin.par_iter().map(|&b| b * window).collect()
         } else {
-            vec![0.0; n]
+            crate::alloc::filled(n, 0.0)
         },
     );
-    if let Some(e) = fields.get(&format!("{P}elevation_m")) {
-        let g = regional_gradient(d, e);
+    if let Some(g) = gradient {
         fields.insert(FRAME_FIELDS[2].into(), g);
     }
-    // The crust's motion over the frame, as offsets (small integers: exact in the 16-bit packing).
-    if acc.back.len() == n {
-        let w = d.w as i64;
-        let (di, dj): (Vec<f32>, Vec<f32>) = acc
-            .back
-            .par_iter()
-            .enumerate()
-            .map(|(c, &b)| {
-                if b == NO_ORIGIN {
-                    return (f32::NAN, f32::NAN);
-                }
-                let (bi, bj) = (i64::from(b) % w, i64::from(b) / w);
-                let (ci, cj) = (c as i64 % w, c as i64 / w);
-                let mut di = bi - ci;
-                if di >= w / 2 {
-                    di -= w;
-                } else if di < -w / 2 {
-                    di += w;
-                }
-                (di as f32, (bj - cj) as f32)
-            })
-            .unzip();
-        fields.insert(ORIGIN_FIELDS[0].into(), di);
-        fields.insert(ORIGIN_FIELDS[1].into(), dj);
-    } else {
-        fields.insert(ORIGIN_FIELDS[0].into(), vec![0.0; n]);
-        fields.insert(ORIGIN_FIELDS[1].into(), vec![0.0; n]);
-    }
+    let [di, dj] = origin;
+    fields.insert(ORIGIN_FIELDS[0].into(), di);
+    fields.insert(ORIGIN_FIELDS[1].into(), dj);
     acc.back.clear();
     let frame = FieldFrame {
         t_years: t_end_years,
@@ -553,6 +577,36 @@ pub fn flush(acc: &mut FrameAcc, d: &Dims, t_end_years: f64, epoch: &Epoch) -> F
     acc.t_start_years = t_end_years;
     acc.span_years = 0.0;
     frame
+}
+
+/// The crust's motion over the frame, as offsets (small integers: exact in the 16-bit packing):
+/// columns and rows from each cell back to where its crust was when the frame began.
+fn origin_offsets(acc: &FrameAcc, d: &Dims) -> [Vec<f32>; 2] {
+    let n = d.cells();
+    if acc.back.len() != n {
+        return [crate::alloc::filled(n, 0.0), crate::alloc::filled(n, 0.0)];
+    }
+    let w = d.w as i64;
+    let (di, dj): (Vec<f32>, Vec<f32>) = acc
+        .back
+        .par_iter()
+        .enumerate()
+        .map(|(c, &b)| {
+            if b == NO_ORIGIN {
+                return (f32::NAN, f32::NAN);
+            }
+            let (bi, bj) = (i64::from(b) % w, i64::from(b) / w);
+            let (ci, cj) = (c as i64 % w, c as i64 / w);
+            let mut di = bi - ci;
+            if di >= w / 2 {
+                di -= w;
+            } else if di < -w / 2 {
+                di += w;
+            }
+            (di as f32, (bj - cj) as f32)
+        })
+        .unzip();
+    [di, dj]
 }
 
 /// Latitude of row `j` of the planet grid.

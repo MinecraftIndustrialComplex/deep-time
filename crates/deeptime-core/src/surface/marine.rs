@@ -300,18 +300,16 @@ pub fn slope_failure(
     // Above this many movers every cell is recomputed; below it only their neighbourhoods are
     // (either gives the same values: cells farther away have the inputs they had).
     let dense_above = n / 4;
-    let mut scale = vec![0.0f64; n];
+    // Every cell's share is written by the first iteration before anything reads it.
+    let mut scale = crate::alloc::filled(n, 0.0f64);
     let mut moved = 0.0;
-    // Whether the last iteration's movers (`rows`) are few enough for the sparse path, and how
-    // many there were.
-    let (mut sparse, mut movers) = (false, 0usize);
     // Neighbourhood marks: `near1[c] == stamp` within one row and one column of a mover, `near2`
     // within two (columns wrapping as the raster does). The raster's neighbours are those eight
     // offsets, so these hold every cell within one neighbour step of a mover and every cell
     // within two (on rasters one or two cells wide, a few more; recomputing a cell whose inputs
     // did not change gives the value it has, so that changes nothing).
-    let mut near1 = vec![0u32; n];
-    let mut near2 = vec![0u32; n];
+    let mut near1 = crate::alloc::filled(n, 0u32);
+    let mut near2 = crate::alloc::filled(n, 0u32);
     let mut stamp = 0u32;
     // The column `di` cells from `i`, if the raster has it.
     let col = |i: usize, di: isize| -> Option<usize> {
@@ -326,53 +324,9 @@ pub fn slope_failure(
     };
     // Each row's moved cells and their changes, ascending.
     let mut rows: Vec<Vec<(u32, f64)>> = vec![Vec::new(); hgt];
-    for _ in 0..p.iterations {
-        if sparse {
-            // Marked rows in parallel (P1-19; the marks were set one mover at a time before):
-            // row j takes the movers of rows j − 2 to j + 2 from `rows`, which still holds the
-            // last iteration's.
-            stamp += 1;
-            let s = stamp;
-            let last: &[Vec<(u32, f64)>] = &rows;
-            let near: usize = near1
-                .par_chunks_mut(w)
-                .zip(near2.par_chunks_mut(w))
-                .enumerate()
-                .map(|(j, (n1, n2))| {
-                    for (jj, row) in last
-                        .iter()
-                        .enumerate()
-                        .take((j + 3).min(hgt))
-                        .skip(j.saturating_sub(2))
-                    {
-                        let close = jj + 1 >= j && jj <= j + 1;
-                        for &(c, _) in row {
-                            let i = c as usize - jj * w;
-                            for di in -2isize..=2 {
-                                if let Some(k) = col(i, di) {
-                                    n2[k] = s;
-                                    if close && di.abs() <= 1 {
-                                        n1[k] = s;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    n1.iter().filter(|&&v| v == s).count()
-                })
-                .sum();
-            count_failure(1, 1);
-            count_failure(2, movers as u64);
-            count_failure(3, near as u64);
-        } else {
-            count_failure(0, 1);
-        }
-        let all = !sparse;
-        {
-            let hh: &[f64] = h;
-            let av: &[f64] = avail;
-            let wt: &[bool] = &wet;
-            let (n1, s) = (&near1, stamp);
+    // The shares of every cell (`all`) or of the cells marked `near1 == s`, rows in parallel.
+    let shares =
+        |scale: &mut [f64], all: bool, s: u32, n1: &[u32], hh: &[f64], wt: &[bool], av: &[f64]| {
             scale.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
                 for (i, x) in row.iter_mut().enumerate() {
                     let c = j * w + i;
@@ -381,8 +335,52 @@ pub fn slope_failure(
                     }
                 }
             });
+        };
+    // Marks the neighbourhoods of the movers in `last` with `s`, rows in parallel (P1-19; the
+    // marks were set one mover at a time before): row j takes the movers of rows j − 2 to j + 2.
+    // Returns the cells within one cell of a mover.
+    let mark = |near1: &mut [u32], near2: &mut [u32], s: u32, last: &[Vec<(u32, f64)>]| -> usize {
+        near1
+            .par_chunks_mut(w)
+            .zip(near2.par_chunks_mut(w))
+            .enumerate()
+            .map(|(j, (n1, n2))| {
+                for (jj, row) in last
+                    .iter()
+                    .enumerate()
+                    .take((j + 3).min(hgt))
+                    .skip(j.saturating_sub(2))
+                {
+                    let close = jj + 1 >= j && jj <= j + 1;
+                    for &(c, _) in row {
+                        let i = c as usize - jj * w;
+                        for di in -2isize..=2 {
+                            if let Some(k) = col(i, di) {
+                                n2[k] = s;
+                                if close && di.abs() <= 1 {
+                                    n1[k] = s;
+                                }
+                            }
+                        }
+                    }
+                }
+                n1.iter().filter(|&&v| v == s).count()
+            })
+            .sum()
+    };
+    // The first iteration takes every cell; each later one the last one's neighbourhoods when
+    // its movers were few (`sparse`), every cell again when they were many. An iteration's marks
+    // and shares are made at the end of the one before it (P1-19).
+    count_failure(0, 1);
+    shares(&mut scale, true, stamp, &near1, &*h, &wet, &*avail);
+    let mut sparse = false;
+    for it in 0..p.iterations {
+        let all = !sparse;
+        {
+            let hh: &[f64] = h;
+            let wt: &[bool] = &wet;
             let sc: &[f64] = &scale;
-            let n2: &[u32] = &near2;
+            let (n2, s): (&[u32], u32) = (&near2, stamp);
             rows.par_iter_mut().enumerate().for_each(|(j, out)| {
                 out.clear();
                 for i in 0..w {
@@ -396,34 +394,54 @@ pub fn slope_failure(
                 }
             });
         }
-        // The movers' changes, rows in parallel (each row's cells are its own), then the metres
-        // moved summed in ascending cell order as before (P1-17). The movers' list is needed
-        // only when the next iteration takes the sparse path.
-        h.par_chunks_mut(w)
-            .zip(avail.par_chunks_mut(w))
-            .zip(wet.par_chunks_mut(w))
-            .zip(sea.par_chunks(w))
-            .zip(rows.par_iter())
-            .enumerate()
-            .for_each(|(j, ((((hr, ar), wr), sr), row))| {
-                for &(c, dz) in row {
-                    let i = c as usize - j * w;
-                    hr[i] += dz;
-                    ar[i] = (ar[i] + dz).max(0.0);
-                    wr[i] = sr[i] && hr[i] < sea_level;
+        let count: usize = rows.iter().map(Vec::len).sum();
+        let next = count > 0 && it + 1 < p.iterations;
+        sparse = count <= dense_above;
+        // The metres moved, summed in ascending cell order as before (P1-17) on this thread,
+        // beside the movers' changes (rows in parallel, each row's cells its own) and the next
+        // iteration's marks and shares, which the sum waited for before (P1-19). The marks need
+        // the movers' list only when the next iteration takes the sparse path.
+        let last: &[Vec<(u32, f64)>] = &rows;
+        rayon::join(
+            || {
+                for row in last {
+                    for &(_, dz) in row {
+                        moved += dz.abs() * 0.5;
+                    }
                 }
-            });
-        let mut count = 0;
-        for row in &rows {
-            count += row.len();
-            for &(_, dz) in row {
-                moved += dz.abs() * 0.5;
-            }
-        }
+            },
+            || {
+                h.par_chunks_mut(w)
+                    .zip(avail.par_chunks_mut(w))
+                    .zip(wet.par_chunks_mut(w))
+                    .zip(sea.par_chunks(w))
+                    .zip(last.par_iter())
+                    .enumerate()
+                    .for_each(|(j, ((((hr, ar), wr), sr), row))| {
+                        for &(c, dz) in row {
+                            let i = c as usize - j * w;
+                            hr[i] += dz;
+                            ar[i] = (ar[i] + dz).max(0.0);
+                            wr[i] = sr[i] && hr[i] < sea_level;
+                        }
+                    });
+                if next {
+                    if sparse {
+                        stamp += 1;
+                        let near = mark(&mut near1, &mut near2, stamp, last);
+                        count_failure(1, 1);
+                        count_failure(2, count as u64);
+                        count_failure(3, near as u64);
+                    } else {
+                        count_failure(0, 1);
+                    }
+                    shares(&mut scale, !sparse, stamp, &near1, &*h, &wet, &*avail);
+                }
+            },
+        );
         if count == 0 {
             break;
         }
-        (sparse, movers) = (count <= dense_above, count);
     }
     moved
 }

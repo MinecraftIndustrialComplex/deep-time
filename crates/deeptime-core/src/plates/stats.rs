@@ -247,7 +247,10 @@ pub fn margin_classes(
 ) -> (Margins, Vec<u8>) {
     let t = state.t_myr;
     let samples = &state.samples;
-    let plate_of: Vec<u32> = (0..samples.len()).map(|i| state.plate_of(i)).collect();
+    let plate_of: Vec<u32> = (0..samples.len())
+        .into_par_iter()
+        .map(|i| state.plate_of(i))
+        .collect();
     let vis = Tree::over(pos, |i| !samples[i].is_hidden());
     let adjacent = MARGIN_ADJACENT_SPACINGS * norm.spacing_rad();
     // Confirmed subduction zones seen in the last step.
@@ -275,7 +278,10 @@ pub fn margin_classes(
         front: Option<usize>,
         over: bool,
     }
-    let near: Vec<Near> = (0..samples.len())
+    let land = |i: usize| samples[i].kind == CONTINENTAL && !samples[i].is_hidden();
+    // One query per visible sample serves both its margin and its landmass links (P1-19: two
+    // identical queries before).
+    let (near, links): (Vec<Near>, Vec<Vec<u32>>) = (0..samples.len())
         .into_par_iter()
         .map(|i| {
             let s = &samples[i];
@@ -287,9 +293,21 @@ pub fn margin_classes(
                 over: false,
             };
             if s.is_hidden() {
-                return out;
+                return (out, Vec::new());
             }
-            for (j, d2) in vis.nearest_n(pos[i], 8) {
+            let nn = vis.nearest_n(pos[i], 8);
+            // Landmasses: connected continental crust (any plate), linked to adjacent samples.
+            let links: Vec<u32> = if land(i) {
+                nn.iter()
+                    .filter(|&&(j, d2)| {
+                        j as usize > i && land(j as usize) && angle_of_chord2(d2) <= adjacent
+                    })
+                    .map(|&(j, _)| j)
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            for (j, d2) in nn {
                 if j as usize == i || angle_of_chord2(d2) > adjacent {
                     continue;
                 }
@@ -319,9 +337,9 @@ pub fn margin_classes(
                     }
                 }
             }
-            out
+            (out, links)
         })
-        .collect();
+        .unzip();
     // Landmasses: connected continental crust (any plate), by union–find over adjacent samples.
     let n = samples.len();
     let mut parent: Vec<u32> = (0..n as u32).collect();
@@ -332,22 +350,6 @@ pub fn margin_classes(
         }
         i
     }
-    let land = |i: usize| samples[i].kind == CONTINENTAL && !samples[i].is_hidden();
-    let links: Vec<Vec<u32>> = (0..n)
-        .into_par_iter()
-        .map(|i| {
-            if !land(i) {
-                return Vec::new();
-            }
-            vis.nearest_n(pos[i], 8)
-                .into_iter()
-                .filter(|&(j, d2)| {
-                    j as usize > i && land(j as usize) && angle_of_chord2(d2) <= adjacent
-                })
-                .map(|(j, _)| j)
-                .collect()
-        })
-        .collect();
     for (i, l) in links.iter().enumerate() {
         for &j in l {
             let (a, b) = (root(&mut parent, i as u32), root(&mut parent, j));
