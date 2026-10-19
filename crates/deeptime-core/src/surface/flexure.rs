@@ -2596,6 +2596,7 @@ mod tests {
                 parents: &parents,
                 known_plates: 3,
                 dt_yr: dt_myr * 1.0e6,
+                blur_ref_yr: 2.0e6,
             };
             if let Some(s) = st.as_mut() {
                 s.carry(&carry, &elev);
@@ -2767,6 +2768,7 @@ mod tests {
                 parents: &parents,
                 known_plates: 1,
                 dt_yr: 2.0e6,
+                blur_ref_yr: 2.0e6,
             };
             st.as_mut().unwrap().carry(&carry, &elev);
             let (carried, _) = advect::carried_elevation(&carry);
