@@ -1,0 +1,433 @@
+EXPERIMENT, not part of the build (sim-time page, 2026-10-18). The span instrumentation the
+profile on review/pages/sim-time/ was taken with: DEEPTIME_TRACE=<file> makes the bench write
+one line per timer span (cat, what, start ns, end ns, process CPU ns at the end, tid, call site)
+on CLOCK_MONOTONIC. It applies to master 25ae6723 (apply it with the usual patch tool, -p1).
+
+diff --git a/crates/deeptime-core/src/trace.rs b/crates/deeptime-core/src/trace.rs
+new file mode 100644
+index 00000000..189bb2b3
+--- /dev/null
++++ b/crates/deeptime-core/src/trace.rs
+@@ -0,0 +1,106 @@
++// SPDX-License-Identifier: LGPL-3.0-or-later
++//! EXPERIMENT, not for merge (the sim-time measurement, 2026-10-18): a span log.
++//!
++//! With `DEEPTIME_TRACE=<file>` set, every timer the stages already keep also writes one line
++//! per span: `cat \t what \t start_ns \t end_ns \t cpu_ns_at_end \t tid \t file:line`, the times
++//! on CLOCK_MONOTONIC (so they line up with `perf record -k CLOCK_MONOTONIC`) and the CPU time
++//! the whole process had used when the span ended (CLOCK_PROCESS_CPUTIME_ID). Without the
++//! variable nothing is written. The worlds do not change either way.
++
++use std::io::Write;
++use std::sync::{Mutex, OnceLock};
++use std::time::Instant;
++
++#[repr(C)]
++struct Timespec {
++    sec: i64,
++    nsec: i64,
++}
++
++unsafe extern "C" {
++    fn clock_gettime(clk: i32, ts: *mut Timespec) -> i32;
++    fn gettid() -> i32;
++}
++
++const CLOCK_MONOTONIC: i32 = 1;
++const CLOCK_PROCESS_CPUTIME_ID: i32 = 2;
++
++fn now_ns(clk: i32) -> i64 {
++    let mut ts = Timespec { sec: 0, nsec: 0 };
++    // SAFETY: a valid pointer to a timespec on the stack.
++    unsafe { clock_gettime(clk, &raw mut ts) };
++    ts.sec * 1_000_000_000 + ts.nsec
++}
++
++struct Sink {
++    out: std::io::BufWriter<std::fs::File>,
++    base_instant: Instant,
++    base_mono: i64,
++}
++
++static SINK: OnceLock<Option<Mutex<Sink>>> = OnceLock::new();
++
++fn sink() -> Option<&'static Mutex<Sink>> {
++    SINK.get_or_init(|| {
++        let path = std::env::var_os("DEEPTIME_TRACE")?;
++        let file = std::fs::File::create(path).ok()?;
++        let base_instant = Instant::now();
++        let base_mono = now_ns(CLOCK_MONOTONIC);
++        Some(Mutex::new(Sink {
++            out: std::io::BufWriter::with_capacity(1 << 20, file),
++            base_instant,
++            base_mono,
++        }))
++    })
++    .as_ref()
++}
++
++fn mono(s: &Sink, t: Instant) -> i64 {
++    match t.checked_duration_since(s.base_instant) {
++        Some(d) => s.base_mono + d.as_nanos() as i64,
++        None => s.base_mono - s.base_instant.duration_since(t).as_nanos() as i64,
++    }
++}
++
++/// Whether spans are being written.
++pub fn on() -> bool {
++    sink().is_some()
++}
++
++/// One span from `since` to now.
++#[track_caller]
++pub fn span(cat: &str, what: &str, since: Instant) {
++    let Some(m) = sink() else { return };
++    let end = Instant::now();
++    let cpu = now_ns(CLOCK_PROCESS_CPUTIME_ID);
++    // SAFETY: gettid has no preconditions.
++    let tid = unsafe { gettid() };
++    let loc = std::panic::Location::caller();
++    if let Ok(mut s) = m.lock() {
++        let (a, b) = (mono(&s, since), mono(&s, end));
++        let _ = writeln!(
++            s.out,
++            "{cat}\t{what}\t{a}\t{b}\t{cpu}\t{tid}\t{}:{}",
++            loc.file(),
++            loc.line()
++        );
++    }
++}
++
++/// A mark (a span of no length) with the process CPU time now: the cumulative CPU curve gets a
++/// point at a span's start.
++#[track_caller]
++pub fn mark(cat: &str, what: &str) {
++    if sink().is_some() {
++        span(cat, what, Instant::now());
++    }
++}
++
++/// Writes what is buffered (the CLI calls it before it exits).
++pub fn flush() {
++    if let Some(m) = sink()
++        && let Ok(mut s) = m.lock()
++    {
++        let _ = s.out.flush();
++    }
++}
+diff --git a/crates/deeptime-cli/src/run.rs b/crates/deeptime-cli/src/run.rs
+index 90f6e19c..b1a81a05 100644
+--- a/crates/deeptime-cli/src/run.rs
++++ b/crates/deeptime-cli/src/run.rs
+@@ -1839,11 +1839,16 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
+             Arc::new(AllocGauge),
+         )?;
+         name = s.preset().name().to_owned();
++        deeptime_core::trace::span("cli", "create", started);
++        let driven = Instant::now();
+         drive(&s, o.verbose, |_, st| st == AdvanceStatus::Done)?;
++        deeptime_core::trace::span("cli", "drive", driven);
+         let finalize = Instant::now();
+         s.finalize_write()?;
+         let finalize_ms = finalize.elapsed().as_secs_f64() * 1000.0;
++        deeptime_core::trace::span("cli", "finalize", finalize);
+         forward_log(&s, o.verbose);
++        deeptime_core::trace::flush();
+         let total_ms = started.elapsed().as_secs_f64() * 1000.0;
+         let peak = alloc::peak();
+         let mut stages: Vec<Value> = s
+@@ -1952,5 +1957,7 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
+     if temp {
+         let _ = std::fs::remove_dir_all(&work);
+     }
++    deeptime_core::trace::mark("cli", "end");
++    deeptime_core::trace::flush();
+     Ok(())
+ }
+diff --git a/crates/deeptime-core/src/bake/mod.rs b/crates/deeptime-core/src/bake/mod.rs
+index 005760bc..742d2052 100644
+--- a/crates/deeptime-core/src/bake/mod.rs
++++ b/crates/deeptime-core/src/bake/mod.rs
+@@ -209,7 +209,9 @@ pub(crate) fn grids(p: &PlanetPreset) -> Result<(GridDesc, GridDesc), CoreError>
+     ))
+ }
+ 
++#[track_caller]
+ fn ms(t: Instant) -> f64 {
++    crate::trace::span("bake", "pass", t);
+     (t.elapsed().as_secs_f64() * 1000.0 * 10.0).round() / 10.0
+ }
+ 
+diff --git a/crates/deeptime-core/src/climate/mod.rs b/crates/deeptime-core/src/climate/mod.rs
+index 5cd121d3..fcf9ccb8 100644
+--- a/crates/deeptime-core/src/climate/mod.rs
++++ b/crates/deeptime-core/src/climate/mod.rs
+@@ -599,6 +599,7 @@ impl ClimateStage {
+     }
+ 
+     fn time(&mut self, what: &'static str, since: Instant) {
++        crate::trace::span("climate", what, since);
+         *self.timings.entry(what).or_insert(0.0) += since.elapsed().as_secs_f64() * 1000.0;
+     }
+ 
+diff --git a/crates/deeptime-core/src/climate/percell.rs b/crates/deeptime-core/src/climate/percell.rs
+index 67a653a9..cb3c3224 100644
+--- a/crates/deeptime-core/src/climate/percell.rs
++++ b/crates/deeptime-core/src/climate/percell.rs
+@@ -306,6 +306,7 @@ pub fn run(inp: &Inputs<'_>, cell: &mut PerCell) -> Coarse {
+     let g = climate_grid(inp.w, inp.h, p.grid_columns as usize);
+     let n = g.w * g.h;
+     let (s, z_low) = surface(inp, &g);
++    crate::trace::span("percell", "pc_surface", started);
+     timing.push(("pc_surface", started.elapsed().as_secs_f64()));
+     let started = std::time::Instant::now();
+     let omega = std::f64::consts::TAU / (inp.day_length_h * 3600.0) * (1.0 + 1.0 / 365.25);
+@@ -322,6 +323,7 @@ pub fn run(inp: &Inputs<'_>, cell: &mut PerCell) -> Coarse {
+         overturning_sv: p.overturning_sv,
+         late_winter_ice: late,
+     });
++    crate::trace::span("percell", "pc_ocean_build", started);
+     timing.push(("pc_ocean_build", started.elapsed().as_secs_f64()));
+     let started = std::time::Instant::now();
+     let prm = Params2d::from_climate(p, inp.ep.clone(), inp.tilt_deg);
+@@ -343,6 +345,7 @@ pub fn run(inp: &Inputs<'_>, cell: &mut PerCell) -> Coarse {
+         p.ebm_spinup_years
+     };
+     let r = ebm2d::run(&prm, &g, &s, &mut cell.state, Some(&ocean), years, itcz0);
++    crate::trace::span("percell", "pc_years", started);
+     timing.push(("pc_years", started.elapsed().as_secs_f64()));
+     let started = std::time::Instant::now();
+     cell.itcz = r.itcz.to_vec();
+@@ -414,6 +417,7 @@ pub fn run(inp: &Inputs<'_>, cell: &mut PerCell) -> Coarse {
+         let m = budget(&out, &out.mp, None, &cell.bucket);
+         out.moisture = Some(m);
+     }
++    crate::trace::span("percell", "pc_rest", started);
+     timing.push(("pc_rest", started.elapsed().as_secs_f64()));
+     out.timing = timing;
+     cell.sinking = out.sinking.as_ref().map(|s| (s.lat, s.lon, s.hemisphere));
+diff --git a/crates/deeptime-core/src/climate/snapshot.rs b/crates/deeptime-core/src/climate/snapshot.rs
+index cd5e3005..02a23d51 100644
+--- a/crates/deeptime-core/src/climate/snapshot.rs
++++ b/crates/deeptime-core/src/climate/snapshot.rs
+@@ -225,6 +225,7 @@ pub fn at_lat(lat_deg: &[f64], v: &[[f64; 12]], lat: f64) -> [f64; 12] {
+ }
+ 
+ fn time(millis: &mut BTreeMap<&'static str, f64>, what: &'static str, since: Instant) {
++    crate::trace::span("snapshot", what, since);
+     *millis.entry(what).or_insert(0.0) += since.elapsed().as_secs_f64() * 1000.0;
+ }
+ 
+diff --git a/crates/deeptime-core/src/lib.rs b/crates/deeptime-core/src/lib.rs
+index 2bde80c8..ae46cd93 100644
+--- a/crates/deeptime-core/src/lib.rs
++++ b/crates/deeptime-core/src/lib.rs
+@@ -4,6 +4,8 @@
+ 
+ // The counting allocator behind the memory cap (plan §5.7.5).
+ pub mod alloc;
++/// EXPERIMENT (sim-time measurement): span log, not for merge.
++pub mod trace;
+ 
+ // The stage runner and its persistence (P1-01).
+ pub mod checkpoint;
+diff --git a/crates/deeptime-core/src/plates/mod.rs b/crates/deeptime-core/src/plates/mod.rs
+index 82d67267..42967b69 100644
+--- a/crates/deeptime-core/src/plates/mod.rs
++++ b/crates/deeptime-core/src/plates/mod.rs
+@@ -134,6 +134,7 @@ pub fn reset_timings() {
+ 
+ /// Adds the time since `*since` to `what` and restarts the clock.
+ fn lap(since: &mut std::time::Instant, what: &'static str) {
++    crate::trace::span("plates", what, *since);
+     let now = std::time::Instant::now();
+     let ms = (now - *since).as_secs_f64() * 1000.0;
+     *since = now;
+diff --git a/crates/deeptime-core/src/session.rs b/crates/deeptime-core/src/session.rs
+index cb814f38..520d6c30 100644
+--- a/crates/deeptime-core/src/session.rs
++++ b/crates/deeptime-core/src/session.rs
+@@ -1128,7 +1128,9 @@ impl Session {
+                 // one's goes back.
+                 self.gauge.release();
+                 self.gauge.phase("finish", true);
++                let finish_t = Instant::now();
+                 let result = self.finish_stage(s);
++                crate::trace::span("finish", &name, finish_t);
+                 self.gauge.phase("finish", false);
+                 result.map_err(|e| self.fail(&format!("finishing stage {name}"), e))?;
+                 self.stage_permille.store(0, Ordering::Release);
+@@ -1179,6 +1181,7 @@ impl Session {
+             let stepped = Instant::now();
+             self.gauge.phase("keyframes", true);
+             let result = self.after_step(s);
++            crate::trace::span("session", "after_step", stepped);
+             self.gauge.phase("keyframes", false);
+             result.map_err(|e| self.fail("keyframe or event publishing", e))?;
+             // An epoch checkpoint that cannot be written (a full disk) costs the player the
+@@ -1261,21 +1264,26 @@ impl Session {
+         // The history's frames give way to a stage's reservations (P1-17).
+         let history = self.history_handle(&s.world);
+         let ctx = self.context(until, history.as_ref());
++        let room = Instant::now();
+         self.make_room(s, k, history.as_ref())?;
++        crate::trace::span("session", "make_room", room);
+         let stage = &mut s.stages[k];
+         let at_start = self.gauge.in_use();
+         let stepped = Instant::now();
+         self.gauge.phase(stage.name(), true);
+         let result = stage.step(&mut s.world, &ctx);
++        crate::trace::span("stage", stage.name(), stepped);
+         self.gauge.phase(stage.name(), false);
+         s.working[k] = s.working[k].max(self.gauge.phase_peak().saturating_sub(at_start));
+         if let Err(e) = result {
+             let what = format!("stage {}", stage.name());
+             return Err(self.fail(&what, e));
+         }
++        let trim = Instant::now();
+         if let Err(e) = self.trim_history(&s.world) {
+             return Err(self.fail("spilling the recorded history", e));
+         }
++        crate::trace::span("session", "trim_history", trim);
+         s.timings[k].steps = stage.steps_done();
+         s.timings[k].millis += stepped.elapsed().as_secs_f64() * 1000.0;
+         Ok(())
+@@ -1302,10 +1310,12 @@ impl Session {
+         };
+         debug_assert!(f > lead, "the follower comes after its lead");
+         // Detach and attach copy and pack grids in parallel: in the session's pool, like a step.
++        let detach_t = Instant::now();
+         let detached = {
+             let (follower, world) = (&mut s.stages[f], &mut s.world);
+             self.pool.install(|| follower.detach(world))
+         };
++        crate::trace::span("session", "detach", detach_t);
+         match detached {
+             Ok(true) => {}
+             Ok(false) => {
+@@ -1333,14 +1343,21 @@ impl Session {
+         self.gauge.phase(lead_stage.name(), true);
+         let (led, (beside, beside_ms)) = self.pool.install(|| {
+             rayon::join(
+-                || lead_stage.step(world, &ctx),
++                || {
++                    let t = Instant::now();
++                    let r = lead_stage.step(world, &ctx);
++                    crate::trace::span("stage", lead_stage.name(), t);
++                    r
++                },
+                 || {
+                     let t = Instant::now();
+                     let r = follower.step_detached(&ctx);
++                    crate::trace::span("beside", follower.name(), t);
+                     (r, t.elapsed().as_secs_f64() * 1000.0)
+                 },
+             )
+         });
++        crate::trace::span("session", "join", stepped);
+         // A follower refused the memory beside the lead has changed nothing: it runs again now
+         // that the lead's working set is gone.
+         let (beside, again_ms) = match beside {
+@@ -1351,7 +1368,9 @@ impl Session {
+             }
+             other => (other, 0.0),
+         };
++        let attach_t = Instant::now();
+         let attached = self.pool.install(|| follower.attach(world));
++        crate::trace::span("session", "attach", attach_t);
+         self.gauge.phase(lead_stage.name(), false);
+         s.working[lead] = s.working[lead].max(self.gauge.phase_peak().saturating_sub(at_start));
+         for (k, r) in [(lead, led), (f, beside), (f, attached)] {
+@@ -1360,9 +1379,11 @@ impl Session {
+                 return Err(self.fail(&what, e));
+             }
+         }
++        let trim = Instant::now();
+         if let Err(e) = self.trim_history(&s.world) {
+             return Err(self.fail("spilling the recorded history", e));
+         }
++        crate::trace::span("session", "trim_history", trim);
+         let millis = stepped.elapsed().as_secs_f64() * 1000.0;
+         s.timings[lead].steps = s.stages[lead].steps_done();
+         s.timings[lead].millis += millis - again_ms;
+@@ -1497,7 +1518,10 @@ impl Session {
+             )
+         }) {
+             let millis = drawn.elapsed().as_secs_f64() * 1000.0;
++            crate::trace::span("session", "keyframe_render", drawn);
++            let pushed = Instant::now();
+             self.keyframes.push(frame)?;
++            crate::trace::span("session", "keyframe_push", pushed);
+             s.last_kf_t = Some((s.world.t_years, s.current));
+             self.log.push(
+                 Level::Debug,
+@@ -1788,7 +1812,9 @@ impl Session {
+     /// §6.3), and returns the manifest.
+     pub fn finalize_write(&self) -> Result<String, CoreError> {
+         self.gauge.phase("bake", true);
++        let t = Instant::now();
+         let result = self.finalize_write_inner();
++        crate::trace::span("session", "finalize_write", t);
+         self.gauge.phase("bake", false);
+         result
+     }
+diff --git a/crates/deeptime-core/src/structure/mod.rs b/crates/deeptime-core/src/structure/mod.rs
+index 5f5af38e..d84dd9d1 100644
+--- a/crates/deeptime-core/src/structure/mod.rs
++++ b/crates/deeptime-core/src/structure/mod.rs
+@@ -1257,6 +1257,7 @@ enum TrapSource {
+ }
+ 
+ fn add_time(timings: &mut BTreeMap<&'static str, f64>, what: &'static str, since: Instant) {
++    crate::trace::span("structure", what, since);
+     *timings.entry(what).or_insert(0.0) += since.elapsed().as_secs_f64() * 1000.0;
+ }
+ 
+diff --git a/crates/deeptime-core/src/surface/impacts/mod.rs b/crates/deeptime-core/src/surface/impacts/mod.rs
+index f1b7d80e..f7842c4a 100644
+--- a/crates/deeptime-core/src/surface/impacts/mod.rs
++++ b/crates/deeptime-core/src/surface/impacts/mod.rs
+@@ -771,6 +771,7 @@ impl ImpactStage {
+     }
+ 
+     fn time(&mut self, what: &'static str, since: Instant) {
++        crate::trace::span("impacts", what, since);
+         *self.timings.entry(what).or_insert(0.0) += since.elapsed().as_secs_f64() * 1000.0;
+     }
+ 
+diff --git a/crates/deeptime-core/src/surface/mod.rs b/crates/deeptime-core/src/surface/mod.rs
+index 95476643..3ddf77ec 100644
+--- a/crates/deeptime-core/src/surface/mod.rs
++++ b/crates/deeptime-core/src/surface/mod.rs
+@@ -575,6 +575,7 @@ impl SurfaceStage {
+     }
+ 
+     fn time(&mut self, what: &'static str, since: Instant) {
++        crate::trace::span("surface", what, since);
+         *self.timings.entry(what).or_insert(0.0) += since.elapsed().as_secs_f64() * 1000.0;
+     }
+ 
+diff --git a/crates/deeptime-core/src/surface/volcanoes/mod.rs b/crates/deeptime-core/src/surface/volcanoes/mod.rs
+index 0873329e..7ed2d5d8 100644
+--- a/crates/deeptime-core/src/surface/volcanoes/mod.rs
++++ b/crates/deeptime-core/src/surface/volcanoes/mod.rs
+@@ -643,6 +643,7 @@ impl VolcanoStage {
+     }
+ 
+     fn time(&mut self, what: &'static str, since: Instant) {
++        crate::trace::span("volcanoes", what, since);
+         *self.timings.entry(what).or_insert(0.0) += since.elapsed().as_secs_f64() * 1000.0;
+     }
+ 
+diff --git a/crates/deeptime-core/src/surface/young.rs b/crates/deeptime-core/src/surface/young.rs
+index 9556a68d..13f2d6e9 100644
+--- a/crates/deeptime-core/src/surface/young.rs
++++ b/crates/deeptime-core/src/surface/young.rs
+@@ -247,6 +247,7 @@ impl YoungStage {
+     }
+ 
+     fn time(&mut self, what: &'static str, since: Instant) {
++        crate::trace::span("young", what, since);
+         *self.timings.entry(what).or_insert(0.0) += since.elapsed().as_secs_f64() * 1000.0;
+     }
+ 
