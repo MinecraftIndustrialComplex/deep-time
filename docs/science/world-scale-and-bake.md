@@ -208,9 +208,14 @@ and BAK-048) are game choices about how far terrain stays the same terrain as th
   fold. Read before features it found one real difference, which was fixed: Expanded Ecosphere's
   surface rule cut a black beach east of the seam from y 65 to 67 down to 62 (BIO-156). The seam
   can lie in the sea, as it did on the planet of 2026-10-18 (its four fixed rows held 3 dry
-  columns west of the seam and 15 east), so the test adds the four rows within C/8 of the equator (the fixed
-  rows' span) where far terrain shows the most dry ground on both sides and asserts that each side compares at least 16
-  dry columns and holds their ground within a block in nine of ten (BAK-042).
+  columns west of the seam and 15 east), so the test adds up to eight rows, searched up to 7/8 of
+  the way to the world's z edge (the poles on a Lambert world, the turning edges on a Petroff–Guyou
+  one), chosen for the dry ground each side still lacks, and asserts that each side compares at least 16 dry columns and holds their ground
+  within a block in nine of ten (BAK-042). Until 2026-10-19 it took four rows within C/8 of the
+  equator, which on that day's planet held only 14 dry columns east of the seam; the wider search
+  found 24. A side whose rows hold fewer than 16 dry columns must compare every one of them: on
+  the planet of master 7d60fc4a the west of the seam is sea to 7/8 of the edges, so that side
+  compares its sea bed only.
   `tools/smoke/run.py --dh` has Distant Horizons generate
   and store sections beside the spawn and centred on the seam, then compares what it stores with
   far terrain and far terrain with the chunks generated afterwards on 160 blocks either side.
