@@ -16,26 +16,29 @@
 //! Land that no base-level cell can reach (a closed continent with no sea) is drained through its
 //! lowest cell, which becomes a sink.
 //!
-//! **Parallelism (P1-17): the flood stays serial, on purpose.** On an L1 raster (0.52 M cells,
-//! 116 k land) it costs about 10 ms per step, with `open_sea` another 5 ms: 5 % of a step at one
-//! thread, and the largest serial piece left at twelve (STATUS.md, P1-17 partial). It is not tiled
-//! (Barnes 2016) because its *result* depends on the order it runs in. A cell in a flat or a pit
-//! takes `next_up` of whichever neighbour the FIFO pit queue popped first, so where a flat is fed
-//! from two sides at exactly the same elevation the serial order shows in the ulps. A flood that is
-//! independent of its own order (tiled with a spill graph, or Dijkstra with exact ties; both compute
-//! the least fixed point of the ε relaxation) equals the serial one on generic heights (a test in
-//! `routing/parity.rs` checks it) but not on flats, and lakes are flats by construction: a lake's
-//! sediment fill leaves its cells within ulps of one another. Measured on the 500-Myr
-//! `pipeline_quick_16k` run, the least fixed point differs from this flood in 168 of 250 steps, in
-//! about 170 of the ~13 000 raised cells per step. Every checkpoint is compared bit for bit, so the
-//! serial order is the definition. (A radix heap and a parallel seed scan made it no faster either:
-//! `routing/parity.rs::surface_timing`.) The routing (`routing.rs`) and the stream-power solve
-//! (`spl.rs`) next to it are parallel and bit-identical to their serial loops.
+//! **Parallelism (P1-19, ledger ERO-184).** The surface stages flood through [`flood_with`] and
+//! [`open_sea_with`], which take the preset's `surface.numerics.flood`: `parallel` (the default)
+//! runs the order-independent flood of [`parallel`] (Barnes 2016's tiled Priority-Flood for the
+//! ε = 0 fill, then an exact ε pass per group of undecided cells), `serial` this module's flood.
+//! P1-17 kept the flood serial because its result depends on the order it runs in: a cell in a
+//! flat or a pit takes `next_up` of whichever neighbour the FIFO pit queue popped first, so where
+//! a flat is fed from two sides at the same elevation the serial order shows in the ulps, and
+//! lakes are flats by construction (a lake's sediment fill leaves its cells within ulps of one
+//! another). Measured on the 500-Myr `pipeline_quick_16k` run, the least fixed point the parallel
+//! flood computes differs from this flood in 168 of 250 steps, in about 170 of the ~13 000 raised
+//! cells per step, by ulps. Since 2026-10-18 the checkpoints need not match bit for bit (Ben: "I
+//! am not worried about determinism, performance is far more important"), and the parallel flood
+//! is itself one function of the terrain. Both give a filled surface on which every land cell has
+//! a strictly lower neighbour. The routing (`routing.rs`) and the stream-power solve (`spl.rs`)
+//! next to it are parallel and bit-identical to their serial loops.
 
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
 
 use super::grid::Dims;
+use super::params::FloodMethod;
+
+pub mod parallel;
 
 /// A fill deeper than this makes a lake cell, metres.
 pub const LAKE_TOL_M: f64 = 0.01;
@@ -175,6 +178,36 @@ pub fn flood(d: &Dims, h: &[f64], base_z: &[f64], kind: &mut [u8], filled: &mut 
         }
     }
     sinks
+}
+
+/// [`open_sea`] or its parallel form ([`parallel::open_sea`]; the same cells either way).
+pub fn open_sea_with(
+    m: FloodMethod,
+    d: &Dims,
+    h: &[f64],
+    sea_level: f64,
+    min_cells: usize,
+    kind: &mut [u8],
+) {
+    match m {
+        FloodMethod::Serial => open_sea(d, h, sea_level, min_cells, kind),
+        FloodMethod::Parallel => parallel::open_sea(d, h, sea_level, min_cells, kind),
+    }
+}
+
+/// [`flood`] or the order-independent parallel flood ([`parallel::flood`]).
+pub fn flood_with(
+    m: FloodMethod,
+    d: &Dims,
+    h: &[f64],
+    base_z: &[f64],
+    kind: &mut [u8],
+    filled: &mut [f64],
+) -> usize {
+    match m {
+        FloodMethod::Serial => flood(d, h, base_z, kind, filled),
+        FloodMethod::Parallel => parallel::flood(d, h, base_z, kind, filled),
+    }
 }
 
 #[cfg(test)]

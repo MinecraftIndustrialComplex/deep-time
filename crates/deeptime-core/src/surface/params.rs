@@ -173,6 +173,69 @@ pub struct SurfaceParams {
     pub glacial: super::glacial::GlacialParams,
     /// The plate's stiffness (`flexure.rs`; Ben, 2026-10-02: "General flexure everywhere").
     pub flexure: super::flexure::FlexureParams,
+    /// How the stage's solvers run (P1-19): numerics that change no law.
+    pub numerics: Numerics,
+}
+
+/// The diffusion solve's preconditioner (`diffusion.rs`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DiffusionSolver {
+    /// Conjugate gradients preconditioned by one multigrid V-cycle (P1-19).
+    Multigrid,
+    /// Conjugate gradients preconditioned by the diagonal (P1-04 to P1-19).
+    Jacobi,
+}
+
+/// The depression flood (`pflood.rs`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FloodMethod {
+    /// The order-independent parallel flood (`pflood/parallel.rs`, P1-19).
+    Parallel,
+    /// The serial Priority-Flood+ε with its FIFO pit queue (P1-04 to P1-19).
+    Serial,
+}
+
+/// The surface stage's numerical methods (P1-19, the 900-s gate run): each switch keeps the
+/// method it replaced, so the two can be run side by side. None of them changes a law; they
+/// change how closely, and how fast, the laws are solved.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct Numerics {
+    /// The diffusion solve's preconditioner (`diffusion.rs`).
+    pub diffusion_solver: DiffusionSolver,
+    /// RMS residual of (I + Δt·L)h = h⁰ at which the multigrid diffusion solve stops, metres.
+    /// The error of the solution is at most the residual (the matrix's eigenvalues are ≥ 1).
+    /// 10⁻⁵ m leaves an RMS error of about 1.5·10⁻⁶ m and a largest of about 0.7 mm on the
+    /// full 16k planet, against 3·10⁻⁷ m and 0.02 mm for the Jacobi solve at its 10⁻⁶ m
+    /// (`CG_TOL_M`). The largest is about one step of the f32 the stage stores its elevations in
+    /// (0.49 mm from 4 to 8 km), the RMS about a hundredth of one.
+    pub diffusion_tol_m: f64, // ledger: ERO-183
+    /// The depression flood (`pflood.rs`).
+    pub flood: FloodMethod, // ledger: ERO-184
+}
+
+impl Default for Numerics {
+    fn default() -> Self {
+        Numerics {
+            diffusion_solver: DiffusionSolver::Multigrid,
+            diffusion_tol_m: 1.0e-5,      // ledger: ERO-183
+            flood: FloodMethod::Parallel, // ledger: ERO-184
+        }
+    }
+}
+
+impl Numerics {
+    fn validate(&self) -> Result<(), CoreError> {
+        check(
+            self.diffusion_tol_m.is_finite()
+                && self.diffusion_tol_m > 0.0
+                && self.diffusion_tol_m <= 1.0,
+            "numerics.diffusion_tol_m",
+            "must be in (0, 1] m",
+        )
+    }
 }
 
 impl Default for SurfaceParams {
@@ -214,6 +277,7 @@ impl Default for SurfaceParams {
             drama: 1.0,
             glacial: super::glacial::GlacialParams::default(),
             flexure: super::flexure::FlexureParams::default(),
+            numerics: Numerics::default(),
         }
     }
 }
@@ -306,6 +370,7 @@ impl SurfaceParams {
         )?;
         self.glacial.validate()?;
         self.flexure.validate()?;
+        self.numerics.validate()?;
         for c in &self.sea_level.cycles {
             check(
                 c.amplitude_m.is_finite() && c.period_myr > 0.0,
