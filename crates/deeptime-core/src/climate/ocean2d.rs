@@ -46,7 +46,7 @@ use rayon::prelude::*;
 
 use super::coarse::Grid;
 use super::ebm::WATER_J_M3_K;
-use super::ebm2d::OceanTransport;
+use super::ebm2d::{OceanTransport, SubSteps, SubstepRows};
 
 /// Density of sea water for the stress balance, kg/m³ (from memory, about 1,025).
 pub const RHO_SEA: f64 = 1025.0; // ledger: CLM-177
@@ -684,6 +684,116 @@ impl OceanTransport for Ocean {
         for c in 0..n {
             if self.vol[c] > 0.0 {
                 tm[c] = th[c] + T_DEEP_C;
+            }
+        }
+    }
+
+    fn sub_steps(&self, dt: f64) -> SubSteps {
+        if self.vol.is_empty() {
+            return SubSteps::Nothing;
+        }
+        if self.w < 2 {
+            return SubSteps::Whole;
+        }
+        match self.substeps(dt) {
+            None => SubSteps::Nothing,
+            Some((n, ds)) => SubSteps::Rows {
+                n,
+                ds,
+                off: T_DEEP_C,
+            },
+        }
+    }
+
+    /// One sub-step of [`step`](Self::step) for a block of whole rows, the same expressions on
+    /// the same inputs as the sweep there: the heat every east face of the block's rows and every
+    /// north face of the block's rows and of the row below it carries is found from `src` (the
+    /// block's rows' and their neighbours' temperatures), then each cell gathers its faces' terms
+    /// in the sweep's order. Reads `src`, writes only the block (P1-19).
+    fn substep_rows(&self, a: SubstepRows<'_>) {
+        let (w, h) = (self.w, self.h);
+        let SubstepRows {
+            ds,
+            src,
+            src_j0,
+            off,
+            j0,
+            out,
+            own,
+            north,
+            scratch,
+            last,
+        } = a;
+        let rc = WATER_J_M3_K;
+        let rows = out.len() / w;
+        let j1 = j0 + rows;
+        // The south faces of the block's last row belong to the row below.
+        let crows = rows + usize::from(j1 < h);
+        scratch.ce.resize(rows * w, 0.0);
+        scratch.cn.resize(crows * w, 0.0);
+        let (ce, cn) = (&mut scratch.ce, &mut scratch.cn);
+        for k in 0..crows {
+            let j = j0 + k;
+            let l = k * w;
+            for i in 0..w {
+                let c = j * w + i;
+                // The cell's place in `src`, and its neighbours'.
+                let s = (j - src_j0) * w + i;
+                if k < rows {
+                    let f = self.f_east[c];
+                    if f != 0.0 {
+                        let e = (j - src_j0) * w + east_of(i, w);
+                        let t = if f > 0.0 { src[s] - off } else { src[e] - off };
+                        ce[l + i] = f * t * ds;
+                    }
+                }
+                let f = self.f_north[c];
+                if f != 0.0 && j > 0 {
+                    let nn = s - w;
+                    let t = if f > 0.0 { src[s] - off } else { src[nn] - off };
+                    cn[l + i] = f * t * ds;
+                }
+            }
+        }
+        for k in 0..rows {
+            let j = j0 + k;
+            let l = k * w;
+            for i in 0..w {
+                let c = j * w + i;
+                let mut dq = 0.0;
+                if i > 0 && self.f_east[c - 1] != 0.0 {
+                    dq += ce[l + i - 1];
+                }
+                if self.f_east[c] != 0.0 {
+                    dq -= ce[l + i];
+                }
+                if j > 0 && self.f_north[c] != 0.0 {
+                    dq -= cn[l + i];
+                }
+                if i == 0 && self.f_east[c + w - 1] != 0.0 {
+                    dq += ce[l + w - 1];
+                }
+                if j + 1 < h && self.f_north[c + w] != 0.0 {
+                    dq += cn[l + w + i];
+                }
+                let t = src[(j - src_j0) * w + i] - off;
+                out[l + i] = if self.vol[c] > 0.0 {
+                    let t = t + dq / self.vol[c];
+                    if last.is_some() { t + T_DEEP_C } else { t }
+                } else {
+                    match last {
+                        Some(tm) => tm[c],
+                        None => t,
+                    }
+                };
+            }
+            if j > 0 && j >= own.0 && j < own.1 {
+                let acc = &mut north[j - own.0];
+                for i in 0..w {
+                    if self.f_north[j * w + i] != 0.0 {
+                        *acc += cn[l + i] * rc;
+                    }
+                }
             }
         }
     }
