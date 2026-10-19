@@ -455,14 +455,17 @@ fn new(c: &Case, steps: usize, threads: usize) -> (Vec<f64>, Vec<usize>) {
 /// workspace, solves that skip rows and solves that do not, in turn, each the textbook solve.
 #[test]
 fn a_kept_workspace_gives_the_textbook_solve() {
+    // Two sizes, so the workspace is also refitted between solves.
     let cases = [
         rough(64, 40, 11, true),
-        ranges(64, 40, 12, true, 2.0),
+        ranges(64, 41, 5, true, 1.0),
         blobs(64, 40, true, |i, j| j == 21 && i < 9),
         shore(64, 40, 13, true, 40),
         ranges(64, 40, 14, true, 0.5),
     ];
-    assert!(skips(&cases[1]) && skips(&cases[2]) && !skips(&cases[0]));
+    assert!(!skips(&cases[0]), "case 0 solves every row");
+    assert!(skips(&cases[1]), "case 1 skips rows");
+    assert!(skips(&cases[2]), "case 2 skips rows");
     for threads in [1, 4] {
         in_pool(threads, || {
             let mut ws = super::Workspace::default();

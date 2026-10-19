@@ -79,11 +79,19 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    /// Sized for `d` (allocated, written in parallel, when the size changes).
+    /// The right-hand side sized for `d` (allocated, written in parallel, when the size changes).
+    fn fit_rhs(&mut self, d: &Dims) {
+        if self.b.len() != d.cells() {
+            self.b = crate::alloc::filled(d.cells(), 0.0);
+        }
+    }
+
+    /// The conjugate gradient's vectors sized for `d`, the same way. Called after the sweeps, so
+    /// a fresh workspace ([`step`]) holds during them only what the solve held before P1-19 (all
+    /// eight at once took the young stage over the memory cap).
     fn fit(&mut self, d: &Dims) {
         let (n, h) = (d.cells(), d.h);
         for v in [
-            &mut self.b,
             &mut self.east,
             &mut self.south,
             &mut self.diag,
@@ -108,11 +116,12 @@ impl Workspace {
 /// [`step`] in a workspace the caller keeps.
 pub fn step_in(ws: &mut Workspace, d: &Dims, h: &mut [f64], kd: &[f64], dt: f64) -> usize {
     let live = Live::of(d, h, kd, dt);
-    ws.fit(d);
+    ws.fit_rhs(d);
     ws.b.par_iter_mut()
         .zip(h.par_iter())
         .for_each(|(b, &v)| *b = v);
     lod(d, h, kd, dt, &live);
+    ws.fit(d);
     let its = cg(ws, d, h, kd, dt, &live);
     if live.strips.is_some() && !live.finite(d, h) {
         // A value that is not finite would reach the skipped rows in the full loop (0 · ∞):
