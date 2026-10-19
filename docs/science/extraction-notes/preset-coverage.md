@@ -8,6 +8,8 @@ The four presets are the "pipeline" presets under their game names (`earthlike_q
 
 **Changed since (plate task 8, 2026-10-17):** `tectonics.arc_uplift_mm_yr`, `arc_magma_m_per_myr`, `arc_continental_m` (already `arc_maturity_myr` since 2026-10-02) and `cordillera_uplift_mm_yr` are gone; `island_arc_km3_per_km_myr` (100), `continental_arc_km3_per_km_myr` (35), `arc_mature_crust_km` (15) and `cordillera_shortening_mm_yr` (6.0; 0.0 in the plate-only presets) are new. Ledger: PLT-045 to PLT-051, PLT-285.
 
+**Changed since (P1-19 #27, the coupled group's cadence, 2026-10-18):** the keys counted per plate step are now per Myr or a time, so a coarser `tectonics.time_step_myr` keeps the rates: `tectonics.rift_lambda0` (0.012 per step) is `rift_per_myr` (0.006), `subduction_initiation_rate` (0.3) is `subduction_initiation_per_myr` (0.15), `trench_relax` (0.5 per step) is `trench_half_life_myr` (2.0), `resample_min_steps` and `resample_max_steps` (10, 60) are `resample_min_myr` and `resample_max_myr` (20, 120), `contact_timeout_steps` (12) is `contact_timeout_myr` (24), and `surface.carbonate_clastic_m` (20 m per step) is `carbonate_clastic_m_myr` (10). `climate.snapshot_every_myr` is 20 (was 10; the plate step stays 2 Myr and `surface.substeps` 1). Ledger: PLT-053, PLT-059, PLT-063, PLT-082, PLT-098, ERO-065, SCL-038.
+
 ## Top-level sections and leaf counts (earthlike_quick_16k)
 
 | section | leaves | subsystem | what it is |
@@ -199,7 +201,7 @@ Keys the code accepts but the preset leaves at their defaults (not exhaustive: I
 | `surface.glacial.strength` | `1.0` | surface |
 | `surface.glacial.young_ela_drop_m` | `500.0` | surface |
 | `surface.glacial.valley_width` | `3.0` | surface |
-| `climate.snapshot_every_myr` | `10.0` | climate |
+| `climate.snapshot_every_myr` | `20.0` (10.0 until P1-19 #27) | climate |
 | `climate.solar_constant_w_m2` | `1365.2` | climate |
 | `climate.olr_a_w_m2` | `203.3` | climate |
 | `climate.olr_b_w_m2_k` | `2.09` | climate |

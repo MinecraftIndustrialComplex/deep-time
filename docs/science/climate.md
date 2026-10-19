@@ -118,6 +118,57 @@ range; "before" is the same runs with the target counting all of the land ice, e
   the land below 0 degC from −700 to −450 Myr (−2.1 degC at −700, −6.3 at −650, 4.2 at −450), as
   before; the change only touches the last 100 kyr. No 500 Myr run had a snowball.
 
+## The climate snapshot every 20 Myr (P1-19 #27, 2026-10-18)
+
+A cost choice for the 900 s gate (plates.md, "The coupled group's cadence"): the pipeline presets
+(`earthlike_quick_16k`, `earthlike_full_16k`, `earthlike_quick_32k`, `earthlike_full_32k`) and the
+built-in earthlike presets take a full climate snapshot every 20 Myr instead of 10 (SCL-038,
+`climate.snapshot_every_myr`; the parameter's default and `planet_world_4k` stay at 10). Nothing
+else changed: the first and the last plate step still take a full snapshot, between snapshots the
+climate's geographic part still moves with the plates, and the present-day nudge still works from
+the last step's natural climate. The plate step stays 2 Myr, so the fine clock (its EBM, the carbon
+cycle and the ice) and the erosion still step every 2 Myr; only the per-cell climate fields are
+recomputed half as often.
+
+**Measured** (`earthlike_quick_16k`, seeds 1 to 3, both starts, 2 threads, the temperate present;
+`tools/review/force-balance-ensemble.sh` and `tools/review/p1-17-hyps.py`; build log 2026-10-18,
+"The coupled group's cadence"; means, [min, max], CO₂ a geometric mean; "natural" is the run's own
+climate at the last step before the present-day nudge):
+
+| | T, °C | CO₂, ppm | natural CO₂, ppm | land under ice | land above 2 km | climate stage, s |
+|---|---|---|---|---|---|---|
+| 500 Myr, master | 15.7 [13.2, 19.3] | 837 [477, 2,862] | 550 | 0.142 [0.068, 0.169] | 0.206 | 158.9 |
+| 500 Myr, 20 Myr snapshots | 17.7 [15.8, 21.6] | 1,810 [929, 8,208] | 830 | 0.158 [0.146, 0.167] | 0.238 | 124.6 |
+| 1000 Myr, master | 17.2 [15.2, 21.4] | 1,209 [425, 4,668] | 630 | 0.139 [0.034, 0.173] | 0.215 | 249.6 |
+| 1000 Myr, 20 Myr snapshots | 19.0 [13.8, 27.6] | 1,704 [331, 23,563] | 640 | 0.143 [0.094, 0.168] | 0.205 | 149.8 |
+
+- *The present's CO₂ is higher on average, inside the nudge's spread.* A Mann–Whitney test on the
+  six runs each gives p ≈ 0.1 (500 Myr) and 0.8 (1000 Myr). The high means come from three runs
+  (one at 500 Myr, 8,208 ppm; two at 1000, 23,563 and 8,409 ppm) whose natural end had 0.28 to
+  0.31 of the land under ice sheets, more than any master run (0.24 at most), so the nudge raised
+  CO₂ the most there (CLM-150; "The present-day nudge on high ground" above). The natural CO₂ the
+  nudge starts from is 830 against 550 ppm at 500 Myr and 640 against 630 at 1000: the carbon
+  cycle's thermostat holds at the coarser snapshot.
+- *The temperature follows the CO₂,* 2.0 and 1.9 degC warmer on average, with the same three runs
+  at the top of the range.
+- *The plates do not notice:* one of the 45 plate checks left master's seed range at each length
+  (plates.md).
+- *The climate stage takes 22 % and 40 % less time* on a shared machine (a guide; the two lengths
+  ran at different loads). The per-step part (the fine clock, the fields moved with the plates) is
+  untouched and the present-day nudge's trials cost the same at any length, so the share saved
+  grows with the run's length. On the full 16k gate run (`earthlike_full_16k`, 1000 Myr,
+  8 threads, side by side with master on a loaded machine) the climate stage took 247.0 s against
+  332.0 s and the whole run 0.961 of master's time, about 40 s of the quiet 1,242.8 s (plates.md,
+  "The coupled group's cadence").
+
+What it costs: a climate that changes within 20 Myr is seen in the per-cell fields up to 20 Myr
+late instead of 10. A fast change of the clock's climate (a snowball's onset or escape, a hothouse)
+still takes a snapshot when it happens: the per-cell model triggers one when the clock's global
+temperature or sea ice moves far from the last snapshot's (P1-26 design §4.2), at any interval.
+In the runs above the triggered snapshots barely changed: none on the scattered start and two on
+every supercontinent run with either interval, except two 1000 Myr supercontinent runs at 20 Myr
+with three.
+
 ## Material for the stage 2 writer
 
 - Extraction notes (measured Earth-against-mod numbers from the build log, simplifications, flags): [extraction-notes/CLM.md](extraction-notes/CLM.md), [extraction-notes/MOI.md](extraction-notes/MOI.md).

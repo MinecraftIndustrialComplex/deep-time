@@ -886,14 +886,14 @@ impl SurfaceStage {
             max_iter: p.spl_max_iter as usize,
             tol_m: 0.01,
         };
-        let carb_p = carbonate::CarbonateParams {
+        let mut carb_p = carbonate::CarbonateParams {
             max_rate_m_yr: p.carbonate_max_mm_yr * 1.0e-3,
             extinction_per_m: p.carbonate_extinction_per_m,
             surface_light: p.carbonate_surface_light,
             saturating_light: p.carbonate_saturating_light,
             tidal_range_m: p.tidal_range_m,
             min_temp_c: p.carbonate_min_temp_c,
-            clastic_m: p.carbonate_clastic_m,
+            clastic_m: 0.0, // each LEM step's below
         };
         let fill_p = marine::FillParams {
             sea_level: sea,
@@ -1146,8 +1146,10 @@ impl SurfaceStage {
                 self.time("glacial", started);
             }
 
-            // Carbonates and evaporites.
+            // Carbonates and evaporites. The clastic a cell received since the plate step began
+            // is set against the scale for that time (ledger: ERO-065).
             let started = Instant::now();
+            carb_p.clastic_m = p.carbonate_clastic_m_myr * ((sub + 1) as f64 * dts / 1.0e6);
             let evap_rate = p.evaporite_m_myr * 1.0e-6;
             // Cell by cell, so in parallel (P1-17).
             let (kind, filled, clastic) = (&sc.kind, &sc.filled, &parts.marine);
