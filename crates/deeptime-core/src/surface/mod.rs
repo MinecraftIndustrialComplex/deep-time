@@ -969,10 +969,7 @@ impl SurfaceStage {
                     .map(|c| surface_class(&cls, &basement, &st, c))
                     .collect();
                 // Cell by cell, so in parallel (P1-19).
-                let fam: Vec<u8> = class0
-                    .par_iter()
-                    .map(|&k| fam_of[usize::from(k)])
-                    .collect();
+                let fam: Vec<u8> = class0.par_iter().map(|&k| fam_of[usize::from(k)]).collect();
                 sc_kf
                     .par_iter_mut()
                     .zip(sc_weight.par_iter_mut())
@@ -1253,6 +1250,9 @@ impl SurfaceStage {
                         u64::from(above[c] && h[c] < sea && g.eroded[c] > 0.0)
                     })
                     .sum::<u64>();
+                *self.timings.entry("glacial_ice").or_insert(0.0) += g.ice_ms;
+                *self.timings.entry("glacial_walk").or_insert(0.0) += g.walk_ms;
+                let sea_started = Instant::now();
                 let sea_mask: Vec<bool> = sc.kind.par_iter().map(|&k| k == BASE).collect();
                 // (the base cells with a load, ascending: the others have none)
                 for &m in &g.sea_cells {
@@ -1285,6 +1285,7 @@ impl SurfaceStage {
                         );
                     }
                 }
+                self.time("glacial_sea", sea_started);
                 let km3 = 1.0e-9;
                 gtot.eroded_km3 += g.eroded_m3 * km3;
                 gtot.till_km3 += g.till_m3 * km3;
@@ -1606,11 +1607,12 @@ impl SurfaceStage {
         let mut answers: Option<Vec<(f64, f64)>> = None;
         if let (Some(h_eroded), Some(h_before_spread)) = (&h_eroded, &h_before_spread) {
             let started = Instant::now();
-            let ice: Option<Vec<f32>> = world
+            // (borrowed: a copy of 14 MB a step before, P1-19)
+            let ice: Option<&[f32]> = world
                 .fields
                 .get(crate::climate::field::ICE_THICKNESS)
                 .filter(|f| f.data.len() == n)
-                .map(|f| f.data.clone());
+                .map(|f| &f.data[..]);
             let x_in = flexure::StepIn {
                 dims: &d,
                 norm_dx_m: std::f64::consts::TAU * self.preset.tectonics.model_radius_km * 1000.0
@@ -1633,7 +1635,7 @@ impl SurfaceStage {
                 orogeny_age_myr: &pf.orogeny_age,
                 regime: &pf.regime,
                 plate_id: &pf.plate_id,
-                ice_m: ice.as_deref(),
+                ice_m: ice,
                 rock_share: p.isostasy,
                 parts: budget,
             };
