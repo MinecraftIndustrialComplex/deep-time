@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Master 006efee1: Rust, Gradle and all five GameTest sets green · In flight (agents): a profile of every system in the full 16k run (Ben, 2026-10-18; 1,290 s against the 900 s gate) · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-10-18 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Master be80c6c1: Rust, Gradle and all five GameTest sets green on 006efee1 · In flight (agents): the profile's byte-identical speed-ups for the 900 s full-16k gate (1,242.8 s now; profile page https://spacesheep.dev/@benmac/deeptime-sim-time): plates part 1, plates part 2, surface, climate, the stages after the group · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-10-18 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: dc49fe7 (pack master; the rock tags live on the pack's unmerged deep-time branch)
 
@@ -94,6 +94,8 @@ Only what is Ben's to decide stays here (his rule of 2026-10-16): architecture, 
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+| 2026-10-18 | P1-19 exit item 1 | Ship an x86-64-v3 native (4.5 % faster, measured, worlds identical)? It sets a minimum player CPU unless shipped beside the baseline one. | AskUserQuestion |
+| 2026-10-18 | P1-19 exit item 1 | May agents try the speed-ups that change the worlds (multigrid diffusion, slope failure stopping early, a coarser plate cadence, an order-independent flood)? | AskUserQuestion |
 
 ## Follow-ups from decided questions
 Work left behind by questions decided under Ben's rule of 2026-10-16 (decide what can be undone, then tell; decisions log 2026-10-16). Each line is a task for whoever next touches that area; remove the line when it lands. Sizes: small is under a day, medium is one to three days, large is more.
