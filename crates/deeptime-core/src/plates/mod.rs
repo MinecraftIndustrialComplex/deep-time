@@ -80,7 +80,7 @@ pub use state::PlateState;
 
 use crate::error::CoreError;
 use crate::params::{PlanetPreset, TectonicParams};
-use crate::sphere::{Coupling, SampleTree};
+use crate::sphere::{Coupling, FanIn, SampleTree};
 use crate::stage::{Stage, StageContext, StageEstimate, from_state, to_state};
 use crate::world::{Field, WorldState};
 use geometry::{Geo, Tree};
@@ -159,6 +159,9 @@ pub struct PlatesStage {
     /// The next keyframe time, on the session's grid (plan §6.1).
     next_output_years: f64,
     cache: Option<Cache>,
+    /// The links of the last L1 sampling turned round (built at most once a step, for the
+    /// surface's feedback and flexure; P1-19).
+    fan_in: Option<FanIn>,
     /// Whether to record the plate dynamics (`dynamics.rs`). On, unless `DEEPTIME_NO_PLATE_DYNAMICS`
     /// is set (to time what it costs); the tests that show recording changes nothing turn it off.
     record_dynamics: bool,
@@ -177,6 +180,7 @@ impl PlatesStage {
             done: 0,
             next_output_years,
             cache: None,
+            fan_in: None,
             record_dynamics: std::env::var_os(dynamics::OFF_ENV).is_none(),
             record_gap_budget: gap_budget::enabled(),
         }
@@ -245,6 +249,7 @@ impl PlatesStage {
         let tectonics = self.preset.tectonics.clone();
         let env = self.env(&tectonics, step);
         let k = env.k;
+        self.fan_in = None;
         let mut cones = self.apply_surface_feedback(st, world, &env)?;
         cones.resize(st.samples.len(), [0.0; 2]);
         lap(&mut clock, "feedback");
@@ -288,7 +293,14 @@ impl PlatesStage {
             shortening::advance(st, &cache.geo, &pos, &tree, &env, resolved.seeds);
         book(st, gap_budget::Part::Shortening);
         lap(&mut clock, "shortening");
-        let stacked = belts::stack(st, &cache.geo, &pos, &env, &fronts, flexure.as_deref());
+        // The arcs' fronts and distance field read nothing the belts change: found beside them
+        // (P1-19).
+        let begun = subduction::fronts_begin(st, &cache.geo, &pos, &env);
+        let geo = &cache.geo;
+        let (stacked, arcs) = rayon::join(
+            || belts::stack(st, geo, &pos, &env, &fronts, flexure.as_deref()),
+            || subduction::fronts_reach(geo, &begun, &env),
+        );
         book(st, gap_budget::Part::Belts);
         // The collisions' crust budget: what crossed their fronts and what the belts and wedges
         // kept of it, km³ (Earth-normalized).
@@ -307,7 +319,7 @@ impl PlatesStage {
             .entry(belts::KEPT_GLOBAL.to_owned())
             .or_insert(0.0) += kept;
         lap(&mut clock, "belts");
-        let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env, &mut cones);
+        let pull = subduction::fronts_finish(st, &cache.geo, &env, &mut cones, begun, arcs);
         book(st, gap_budget::Part::Arcs);
         *world
             .globals
@@ -654,15 +666,23 @@ impl PlatesStage {
         }
         let coupling = cache.coupling.as_ref().expect("built above");
         let mesh = &cache.geo.mesh;
-        let tris = mesh.triangles();
         let n = st.samples.len();
-        let mut wsum = vec![0.0f64; n];
-        let mut zsum = vec![0.0f64; n];
-        let mut msum = vec![0.0f64; n];
-        let mut csum = vec![[0.0f64; 2]; n];
-        let mut psum = vec![[0.0f64; SP]; if parts.is_some() { n } else { 0 }];
-        for (c, l) in coupling.links().iter().enumerate() {
-            let t = tris[l.tri as usize];
+        // Each sample's weighted sums over the cells that see it, the samples in parallel, each
+        // in cell order (P1-19: a serial pass over the cells before, which added in that order).
+        let fan = self
+            .fan_in
+            .get_or_insert_with(|| FanIn::build(coupling.links(), mesh.triangles(), n));
+        let links = coupling.links();
+        #[derive(Clone, Copy, Default)]
+        struct Sums {
+            w: f64,
+            z: f64,
+            m: f64,
+            c: [f64; 2],
+        }
+        let mut sums = vec![Sums::default(); n];
+        fan.gather(&mut sums, |a, c, j| {
+            let w = f64::from(links[c].w[j]);
             let dz = f64::from(fb.data[c]);
             let dm = material.as_ref().map_or(dz, |m| f64::from(m.data[c]));
             let cone = [0, 1].map(|k| {
@@ -670,37 +690,33 @@ impl PlatesStage {
                     .as_ref()
                     .map_or(0.0, |f| f64::from(f.data[c]))
             });
-            let pc = parts
-                .as_ref()
-                .map(|p| std::array::from_fn::<f64, SP, _>(|k| f64::from(p[k].data[c])));
-            for (&v, &w) in t.iter().zip(l.w.iter()) {
-                let w = f64::from(w);
-                if w > 0.0 {
-                    let v = v as usize;
-                    wsum[v] += w;
-                    zsum[v] += w * dz;
-                    msum[v] += w * dm;
-                    csum[v][0] += w * cone[0];
-                    csum[v][1] += w * cone[1];
-                    if let Some(pc) = pc {
-                        for (a, x) in psum[v].iter_mut().zip(pc) {
-                            *a += w * x;
-                        }
-                    }
+            a.w += w;
+            a.z += w * dz;
+            a.m += w * dm;
+            a.c[0] += w * cone[0];
+            a.c[1] += w * cone[1];
+        });
+        let mut psum = vec![[0.0f64; SP]; if parts.is_some() { n } else { 0 }];
+        if let Some(p) = parts.as_ref() {
+            fan.gather(&mut psum, |a, c, j| {
+                let w = f64::from(links[c].w[j]);
+                for (a, f) in a.iter_mut().zip(p) {
+                    *a += w * f64::from(f.data[c]);
                 }
-            }
+            });
         }
+        let wsum = |v: usize| sums[v].w;
         let k = env.k;
         let dz: Vec<f64> = st
             .samples
             .par_iter_mut()
             .enumerate()
             .map(|(v, s)| {
-                if wsum[v] <= 0.0 {
+                if wsum(v) <= 0.0 {
                     return 0.0;
                 }
                 let z0 = s.elevation_m;
-                s.elevation_m = (f64::from(z0) + zsum[v] / wsum[v])
+                s.elevation_m = (f64::from(z0) + sums[v].z / wsum(v))
                     .clamp(k.trench_elevation_m, k.max_elevation_m)
                     as f32;
                 f64::from(s.elevation_m) - f64::from(z0)
@@ -712,10 +728,10 @@ impl PlatesStage {
             .par_iter_mut()
             .enumerate()
             .map(|(v, s)| {
-                if wsum[v] <= 0.0 {
+                if wsum(v) <= 0.0 {
                     return ([0.0; 2], 0.0);
                 }
-                let dm = msum[v] / wsum[v];
+                let dm = sums[v].m / wsum(v);
                 if dm < 0.0 {
                     pools::strip(&mut s.pools, -dm);
                 } else {
@@ -729,7 +745,7 @@ impl PlatesStage {
                     .into_iter()
                     .enumerate()
                 {
-                    let x = (csum[v][k] / wsum[v]).max(-f64::from(s.pools[p]));
+                    let x = (sums[v].c[k] / wsum(v)).max(-f64::from(s.pools[p]));
                     s.pools[p] += x as f32;
                     got[k] = x;
                 }
@@ -750,10 +766,10 @@ impl PlatesStage {
         if let Some(gb) = st.gap_budget.as_mut() {
             let mean = |sum: &dyn Fn(usize) -> f64| -> Vec<f64> {
                 (0..n)
-                    .map(|v| if wsum[v] > 0.0 { sum(v) / wsum[v] } else { 0.0 })
+                    .map(|v| if wsum(v) > 0.0 { sum(v) / wsum(v) } else { 0.0 })
                     .collect()
             };
-            let m = mean(&|v| msum[v]);
+            let m = mean(&|v| sums[v].m);
             let part = |k: usize| {
                 if psum.is_empty() {
                     vec![0.0; n]
@@ -782,39 +798,31 @@ impl PlatesStage {
     /// The surface's flexure (`surface/flexure_m`) per sample, through the last L1 sampling's
     /// links as [`Self::apply_surface_feedback`] spreads the feedback (NaN for a sample no cell
     /// sees); `None` without the field or the links.
-    fn sample_flexure(&self, world: &WorldState) -> Option<Vec<f64>> {
+    fn sample_flexure(&mut self, world: &WorldState) -> Option<Vec<f64>> {
         let field = world.fields.get(crate::surface::flexure::field::FLEXURE)?;
         let cache = self.cache.as_ref()?;
         let coupling = cache.coupling.as_ref()?;
-        let tris = cache.geo.mesh.triangles();
         let n = cache.geo.points().len();
         if coupling.links().len() != field.data.len() {
             return None;
         }
-        let mut wsum = vec![0.0f64; n];
-        let mut sum = vec![0.0f64; n];
-        for (c, l) in coupling.links().iter().enumerate() {
+        // Per sample in parallel, each in cell order, as the feedback (P1-19).
+        let fan = self
+            .fan_in
+            .get_or_insert_with(|| FanIn::build(coupling.links(), cache.geo.mesh.triangles(), n));
+        let links = coupling.links();
+        let mut sums = vec![(0.0f64, 0.0f64); n];
+        fan.gather(&mut sums, |a, c, j| {
             let x = f64::from(field.data[c]);
-            if !x.is_finite() {
-                continue;
+            if x.is_finite() {
+                let w = f64::from(links[c].w[j]);
+                a.0 += w;
+                a.1 += w * x;
             }
-            for (&v, &w) in tris[l.tri as usize].iter().zip(l.w.iter()) {
-                let w = f64::from(w);
-                if w > 0.0 && (v as usize) < n {
-                    wsum[v as usize] += w;
-                    sum[v as usize] += w * x;
-                }
-            }
-        }
+        });
         Some(
-            (0..n)
-                .map(|v| {
-                    if wsum[v] > 0.0 {
-                        sum[v] / wsum[v]
-                    } else {
-                        f64::NAN
-                    }
-                })
+            sums.into_par_iter()
+                .map(|(wsum, sum)| if wsum > 0.0 { sum / wsum } else { f64::NAN })
                 .collect(),
         )
     }
