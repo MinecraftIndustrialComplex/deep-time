@@ -4,7 +4,8 @@ Status: **infrastructure and the first kernel built and measured** (2026-10-18 t
 coordinator's task after Ben's decision of 2026-10-18, decisions log: "I am not worried about
 determinism, performance is far more important, if people want to share a world they can just
 share a zip of the finished render or some shit."). Branch `worktree-agent-a1265f3344b19b0c1`
-from master 584b1241, master e2166684 merged in. The aim is the P1-19 exit item 1 gate (full 16k, 8 threads, 1000 Myr, 900 s), which the 2026-10-18 profile put at
+from master 584b1241, masters 5cf2f9bb, e2166684 and c767da2c merged in. The aim is the P1-19
+exit item 1 gate (full 16k, 8 threads, 1000 Myr, 900 s), which the 2026-10-18 profile put at
 1,242.8 s (`docs/design/p1-17-benchmark-gate.md`, "where the full 16k run's time goes";
 `review/pages/sim-time/data.js`).
 
@@ -146,7 +147,7 @@ step and are off the critical path, so they gain no wall time.
 |---:|---|---:|---|---|---|---:|---|
 | 1 | `surface:slope_failure` | 83.8 / 600.8 | Jacobi gather over open-sea neighbour pairs, 40 iterations (later ones on the last movers only) | h, sediment, sea mask up; dh down; 40 ping-pong dispatches | f32 on differences from the cell: slope tests within 0.3 mm at 5 km; budget 1 mm per step | 70 to 78 | full sweep instead of the sparse worklist; a CPU branch edits `marine.rs` now |
 | 2 | `surface:diffusion_solve` | 109.3 / 840.4 | backward Euler, 5-point flux Laplacian, ADI first guess, Jacobi-preconditioned CG, about 111 iterations, 1e-6 m | h, kd up; dh down; CG vectors resident | f32 cannot hold 1e-6 m on 5 km: solve for the increment against an f64 residual from the CPU (defect correction); budget 1e-6 m on dh | 70 to 90 | two global reductions an iteration; a multigrid branch in flight changes the solver |
-| 3 | `plates:write_l1` | 95.8 / 711.3 | per L1 cell: k-d tree 6-nearest over visible samples, a triangle walk, barycentric interpolation of about 14 fields | samples (250 k x about 30 fields) up; 14 L1 fields down | f32 angles with per-plate offsets; budget: the CPU's nearest-sample choice except at ties | 50 to 75 | a spatial hash replaces kiddo and the mesh walk (different tie-breaks); plates branches in flight |
+| 3 | `plates:write_l1` | 95.8 / 711.3 | per L1 cell: k-d tree 6-nearest over visible samples, a triangle walk, barycentric interpolation of about 14 fields | samples (250 k x about 30 fields) up; 14 L1 fields down | f32 angles with per-plate offsets; budget: the CPU's nearest-sample choice except at ties | 50 to 75 (less now: plates part 2 cut it to one nearest query and one fused layer pass) | a spatial hash replaces kiddo (different tie-breaks); boundary and gap cells stay on the CPU (section 12; plates part 2 is merged: free) |
 | 4 | `climate snapshot:cells` | 46.1 / 334.7 | per row an air march (a recurrence with floors), then per cell 12 months of T and P, Köppen, glaciers | about 15 fields up; f32 outputs down; 103 calls | per-cell months in f32 (temperatures to 0.01 K); the march stays a row scan; sums that feed the carbon cycle stay f64 (section 12) | 20 to 30 (less now: the merged climate branch cut the row loop about threefold) | the march is serial along a row (656 rows); the model is f64 closures over belts, regimes and two upwind passes |
 | 5 | `surface:advect` | 40.2 / 253.1 | semi-Lagrangian gather, per-plate rotation, bilinear fields, nearest for the 516 MB strata log | fields resident; the log only if its readers move too | rotation in f32 with a per-plate offset; budget one hundredth of a cell in position | 15 to 25 | the log's readers (fields, structure, bake) are on the CPU, so only the continuous fields move |
 | 6 | `surface:flexure` | 38.2 / 275.3 | PCG on the thin plate, FFT-spectral preconditioner, to 2 m or 60 iterations | loads, D, C up; deflection resident | f32 plausible: the stop is 2 m | 20 to 28 | an FFT in WGSL (no vendor FFT in wgpu), sizes not powers of two |
@@ -322,7 +323,14 @@ added: wgpu's backends are Rust crates that load their drivers at run time.
   Ben. Apple silicon has a capable integrated GPU, so this is the largest gap the path has.
 - **The CLI** (`deeptime`, a developer tool) turns the feature on for every host it builds on.
 - **After master's natives change** (`ship` profile with fat LTO, a baseline and an x86-64-v3
-  library per x86-64 platform; merged into this branch at 5cf2f9bb): NATIVES_MERGE_PLACEHOLDER
+  library per x86-64 platform; merged into this branch at 5cf2f9bb): **measured** with the
+  merged script (`build-natives.sh --only linux-x86_64-gnu,windows-x86_64`), all four libraries
+  built and passed its checks. Sizes with the GPU path: linux-x86_64-gnu 16,445,360 (baseline)
+  and 16,443,200 bytes (x86-64-v3), windows-x86_64 21,533,696 and 21,553,664 bytes, smaller than
+  the release build's above; the ship profile without the GPU path was not built, so wgpu's share
+  of these is not measured. The Linux libraries still need GLIBC 2.17 at most; the Windows
+  ones still import `dxgi.dll`, `setupapi.dll`, `user32.dll` and `oleaut32.dll` beside the old
+  set. The CPU probe crate (`deeptime-cpuprobe`) does not depend on the GPU feature.
 
 ## 12. The next kernels, in order, once the CPU branches land
 
@@ -330,13 +338,15 @@ Each waits for the CPU branch now editing its code (the CPU result is the refere
 kernel ports the merged algorithm, not today's), and each gets one dispatch point and a tolerance
 test as in section 2.
 
-**Where the branches stand** (coordinator, 2026-10-19, master e2166684, merged into this branch):
-the climate (snapshot cells, ice, the 2-D model in larger pieces, the clock), plates part 1
-(transition, collapse, collision, record, `dijkstra_sparse`) and the after-group work (bake,
-horizons, keyframes, deposits, volcanoes, the allocator) are merged, so rows 4 and 7 are free.
-Still being edited: the surface (flood, diffusion and slope-failure memory, advection, fields and
-events, glacial, flexure), the surface solvers (multigrid, slope failure, the flood), plates part 2
-(feedback, belts, fronts, `write_l1` and its k-d tree) and the plate cadence.
+**Where the branches stand** (coordinator, 2026-10-19; master c767da2c, merged into this
+branch): the climate (snapshot cells, ice, the 2-D model in larger pieces, the clock), plates
+parts 1 and 2 (transition, collapse, collision, record, `dijkstra_sparse`; feedback, belts,
+fronts, `write_l1`, detect, `stats_margins`) and the after-group work (bake, horizons, keyframes,
+deposits, volcanoes, the allocator) are merged, so rows 3, 4 and 7 are free. Still being edited:
+the surface (flood, diffusion and slope-failure memory, advection, fields and events, glacial,
+flexure), the surface solvers (multigrid, slope failure, the flood) and the plate cadence (which
+may touch `plates/mod.rs` and the step constants, so a `write_l1` port keeps to one dispatch
+point inside `plates/l1.rs`).
 
 **The carbon cycle amplifies the last bit.** The climate branch found that changing only the
 order of two row-subtotal sums (`land_terms` and `snapshot::ice_cover`) moved a 100 Myr world's
@@ -358,9 +368,24 @@ after the climate, so its CO2 is the checkpoint's in both arms: 551.208 ppm.)
 3. **`surface:diffusion_solve`** (row 2), after the multigrid branch: if multigrid lands, a GPU
    V-cycle (restriction, smoothing and prolongation are stencils), else the PCG with defect
    correction against an f64 residual. 70 to 90 s.
-4. **`plates:write_l1`** (row 3), after the plates branches: a spatial hash on the sphere for the
-   6 nearest samples, then the barycentric gather. Tie-breaks differ from the k-d tree's, which
-   Ben's decision allows. 50 to 75 s.
+4. **`plates:write_l1`** (row 3), free now, and the largest free kernel; the next port. Plates
+   part 2 made it one nearest query per cell, then the cover walk in that sample's group, with
+   the six-nearest search only where that fails, and all 30 layers in one pass (19.5 s per
+   200 Myr on the loaded VM after, 29.6 before). On the device: (a) per step, the visible
+   samples' positions bucketed on a cube-face grid of about one sample a bucket (a counting sort
+   on the CPU, 250 k entries) and their fields uploaded (about 25 MB); the lattice mesh
+   (triangles, a triangle per vertex, the walk's neighbours) once per resampling; (b) one
+   invocation per L1 cell: the nearest visible sample from the 3 x 3 buckets around the cell,
+   the walk (`Mesh::locate`) in that group's frame, the all-the-group's and none-hidden test,
+   the barycentric weights; (c) for covered cells the 30 layers; (d) every other cell (boundary
+   strips and gaps, a small share) flagged and finished on the CPU by today's code, so the rare
+   paths (six and 32 nearest, the gap crust) need no WGSL. f32 on unit vectors resolves about
+   1e-7 rad (under a metre on Earth's radius), so only ties (equidistant samples, a point on a
+   triangle edge) can change a link, which Ben's decision allows; the tolerance test compares
+   the links (equal but for ties) and the layers (f32 rounding). The 30 layers are 160 MB a
+   step to download unless the surface keeps them resident (item 1). First step: time the
+   relink against the layer pass on the CPU, since the split decides whether (c) is worth
+   moving at all. Estimated 50 to 75 s before plates part 2; less now, by its share.
 5. **`surface:advect` and `climate:topography`** (rows 5 and 9) together: one semi-Lagrangian
    gather kernel for the continuous fields; the strata log stays on the CPU. 23 to 36 s.
 6. **`climate snapshot:cells`** (row 4), free now: the per-cell months on the device, the row
