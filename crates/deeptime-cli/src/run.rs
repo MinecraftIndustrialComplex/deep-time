@@ -1156,6 +1156,23 @@ pub(crate) fn timings_line(
                 .join(",")
         ));
     }
+    // The GPU kernels' parts and their CPU twins (a process-wide gauge too; `compute.rs`):
+    // seconds, and plain counts for the names ending in `_n`.
+    let compute = deeptime_core::compute::timings();
+    if !compute.is_empty() {
+        parts.push(format!(
+            "compute[{}]",
+            compute
+                .iter()
+                .map(|(k, v)| if k.ends_with("_n") {
+                    format!("{k}={v:.0}")
+                } else {
+                    format!("{k}={:.1}s", v / 1000.0)
+                })
+                .collect::<Vec<_>>()
+                .join(",")
+        ));
+    }
     parts.join(" ")
 }
 
@@ -1845,6 +1862,7 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
         let _ = std::fs::remove_dir_all(&out);
         alloc::reset_peak();
         deeptime_core::plates::reset_timings();
+        deeptime_core::compute::reset_timings();
         let started = Instant::now();
         let s = Session::create(
             &preset,
