@@ -20,11 +20,14 @@
 //!   higher crust; the conserved rock pools of hidden crust, of the same plate's and of the
 //!   subducting plate's crust are added to it — tectonics.js's `Crust.overlap` (see `pools.rs`):
 //!   trench sediment and forced-subducted continental crust accrete to the overriding plate
-//!   instead of vanishing. (Until 2026-10-02 only whole triangles of one group counted, and points
-//!   on a boundary strip copied the nearest visible sample within 0.75 spacings: where a plate
-//!   overrode another, the subducting crust under the strip won it, and the overriding plate lost
-//!   its outer half-spacing at every resampling, while the edges of diverging plates grew into
-//!   the gap by up to a quarter-spacing; build log "Resampling crust loss".)
+//!   instead of vanishing. Continental crust a collision took across its front is consumed
+//!   instead, hidden (`stacked`, PLT-276) or still visible in the overriding plate's footprint
+//!   (PLT-292): the belt stacked its share when it crossed. (Until 2026-10-02 only whole
+//!   triangles of one group counted, and points on a boundary strip copied the nearest visible
+//!   sample within 0.75 spacings: where a plate overrode another, the subducting crust under the
+//!   strip won it, and the overriding plate lost its outer half-spacing at every resampling,
+//!   while the edges of diverging plates grew into the gap by up to a quarter-spacing; build log
+//!   "Resampling crust loss".)
 //! - A new sample in no footprint (a gap between diverging plates) becomes fresh oceanic crust of
 //!   the nearest plate. With d_P the distance to the nearest plate and d_Γ to the ridge (midway
 //!   to the second nearest plate), α = d_Γ/(d_Γ + d_P) and the elevation is Cortial's
@@ -179,8 +182,9 @@ fn footprint(
 /// `WorldState::globals`: crust accreted at resamplings to the column on top (hidden and
 /// overridden crust, its conserved pools), km³ …
 pub const ACCRETED_GLOBAL: &str = "plates/resample_accreted_km3";
-/// … and the continental crust a collision had hidden, consumed instead (it was stacked into the
-/// belt or went down with the slab; ledger PLT-276), km³ (Earth-normalized).
+/// … and the continental crust a collision took across its front, consumed instead (it was
+/// stacked into the belt or went down with the slab; ledger PLT-276, PLT-292), km³
+/// (Earth-normalized).
 pub const STACKED_CONSUMED_GLOBAL: &str = "plates/resample_stacked_km3";
 /// Of the crust accreted: hidden continental crust (not a collision's) and visible crust of the
 /// same or a subducting plate, km³ (the rest is the sediment of hidden ocean floor).
@@ -216,6 +220,19 @@ pub fn resample(
     subducts.sort_unstable();
     subducts.dedup();
     let overrides = |over: u32, under: u32| subducts.binary_search(&(under, over)).is_ok();
+    // Contacts in collision: the subducting plate's continental crust inside the overriding
+    // plate's footprint crossed the front, and the belt counted it when it did (ledger: PLT-292;
+    // until 2026-10-18 the part still visible at a resampling accreted to the column above it
+    // as well, in lumps of a whole continental column, build log "Resampling lumps").
+    let mut colliding: Vec<(u32, u32)> = state
+        .contacts
+        .iter()
+        .filter(|c| c.collision.is_some())
+        .map(|c| (c.under, c.over))
+        .collect();
+    colliding.sort_unstable();
+    colliding.dedup();
+    let collides = |over: u32, under: u32| colliding.binary_search(&(under, over)).is_ok();
     let found: Vec<Found> = new_pts
         .par_iter()
         .map(|&q| {
@@ -271,9 +288,9 @@ pub fn resample(
         })
         .collect();
 
-    // Covered samples. Continental crust a collision hid this step was stacked into its belt or
-    // went down with the slab (`belts.rs`): it is consumed here, not accreted a second time
-    // (ledger: PLT-276). Both are counted, m of rock per new sample.
+    // Covered samples. Continental crust a collision took across its front was stacked into its
+    // belt or went down with the slab (`belts.rs`): it is consumed here, not accreted a second
+    // time (ledger: PLT-276, PLT-292). Both are counted, m of rock per new sample.
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
     let mut tally: Vec<[f64; 5]> = vec![[0.0; 5]; n];
     let (z_0, gravity) = (
@@ -328,7 +345,14 @@ pub fn resample(
                             .iter()
                             .map(|&x| f64::from(x))
                             .sum();
-                        if under.is_hidden() && under.stacked {
+                        // Crust a collision took across its front is consumed, hidden or
+                        // not: the belt stacked its share and the rest went down with the slab.
+                        if (under.is_hidden() && under.stacked)
+                            || (!under.is_hidden()
+                                && under.kind == CONTINENTAL
+                                && p2 != *pl
+                                && collides(*pl, p2))
+                        {
                             tally[1] += conserved;
                         } else {
                             // What accretes: hidden continental crust, hidden ocean floor's

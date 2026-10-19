@@ -146,17 +146,31 @@ pub fn collide(
     } else {
         (over, under)
     };
+    // The terrane's crust that crossed the front during the collision (`stacked`, under the
+    // overriding plate) was stacked into the belt or went down with the slab when it crossed
+    // (`belts.rs`): it stays under, and the next resampling consumes it (ledger: PLT-276,
+    // PLT-291). Until 2026-10-18 the transfer and the weld brought it back up as crust of the
+    // receiving plate, under that plate's own crust, and the resampling then added it to the
+    // column on top: the crossed crust counted twice, in lumps of a whole continental column.
     if suture {
         for g in state.groups.iter_mut().filter(|g| g.plate == die) {
             g.plate = keep;
         }
         for &i in &terrane {
-            state.samples[i as usize].flags &= !HIDDEN;
+            let s = &mut state.samples[i as usize];
+            if !s.stacked {
+                s.flags &= !HIDDEN;
+            }
         }
     } else {
         // Transfer: each of the terrane's groups gets a twin in the receiving plate.
         let mut twin: BTreeMap<u32, u32> = BTreeMap::new();
-        for &i in &terrane {
+        let moving: Vec<u32> = terrane
+            .iter()
+            .copied()
+            .filter(|&i| !state.samples[i as usize].stacked)
+            .collect();
+        for i in moving {
             let g = state.samples[i as usize].group;
             let new = *twin.entry(g).or_insert_with(|| {
                 let rot = state.groups[g as usize].rot;
