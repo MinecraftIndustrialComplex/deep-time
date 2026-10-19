@@ -58,6 +58,8 @@ pub struct StageContext<'a> {
     /// (bytes in use + bytes reserved), for the session's report of what the run needed of its
     /// cap.
     pub(crate) needed_peak: Option<&'a [AtomicU64; 2]>,
+    /// Where the kernels that have a GPU version run (`compute.rs`).
+    pub compute: crate::compute::ComputeMode,
 }
 
 impl StageContext<'_> {

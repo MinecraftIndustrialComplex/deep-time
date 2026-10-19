@@ -13,7 +13,8 @@ use deeptime_format::{Codec, DType, GridDesc, LayerDesc, TilePackWriter, Written
 
 use super::character::{self, CharacterCtx, CharacterStats, Scratch};
 use super::kernels::{
-    Buf, Counts, NoiseCfg, Physics, Times, count_sinks, flood_repair, relief5, run_passes,
+    Buf, Counts, NoiseCfg, PassDevice, Physics, Times, count_sinks, flood_repair, relief5,
+    run_passes, run_passes_on,
 };
 use super::resample::Level;
 use super::window::Win;
@@ -366,6 +367,10 @@ pub struct LastStats {
     pub character_flood_max_raise_m: f32,
     pub character_ms: f64,
     pub sink_ms: f64,
+    /// Windows whose middle passes ran on the [`TileCfg::accel`] device.
+    pub device_tiles: u64,
+    /// Why the device stopped being used (the first error), if it did.
+    pub device_error: Option<String>,
 }
 
 /// What [`run_tiles`] needs besides the level.
@@ -384,6 +389,9 @@ pub struct TileCfg<'a> {
     pub last: bool,
     /// The mountain character the last level gets after its passes (None: ruggedness 0).
     pub character: Option<CharacterCtx<'a>>,
+    /// Where the middle passes run (`kernels::PassDevice`; None: the CPU). A window it has no room
+    /// for runs on the CPU, and after its first error every window does.
+    pub accel: Option<&'a dyn PassDevice>,
 }
 
 /// Runs one ×2 level tile by tile from `level` into `sink`: the last level into the L3 layers,
@@ -418,7 +426,19 @@ pub fn run_tiles(
             return Err(CoreError::Cancelled);
         }
         let (win, cx, cy) = plan.window(core);
-        reserve(win.cells() as u64 * TILE_BYTES_PER_CELL)?;
+        let tile_bytes = win.cells() as u64 * TILE_BYTES_PER_CELL;
+        // The device's host memory (all of its buffers on an integrated GPU) is reserved with
+        // the window's; without room for both the window runs on the CPU.
+        let device = match cfg.accel {
+            Some(d) if stats.device_error.is_none() && d.fits(win.cells()) => {
+                let extra = win.cells() as u64 * d.host_bytes_per_cell();
+                reserve(tile_bytes + extra).ok().map(|()| d)
+            }
+            _ => None,
+        };
+        if device.is_none() {
+            reserve(tile_bytes)?;
+        }
         stats.tiles += 1;
         stats.window_cells_max = stats.window_cells_max.max(win.cells());
         let started = Instant::now();
@@ -427,7 +447,21 @@ pub fn run_tiles(
         let mut buf = Buf::new(win, fine);
         buf.core = (cx, cy, core.2, core.3);
         let before = buf.z.clone();
-        let pass = run_passes(&mut buf, &cfg.ph, &cfg.counts, &cfg.noise, &mut stats.times);
+        let (ph, counts, noise) = (&cfg.ph, &cfg.counts, &cfg.noise);
+        let pass = match run_passes_on(device, &mut buf, ph, counts, noise, &mut stats.times) {
+            Ok(pass) => {
+                stats.device_tiles += u64::from(device.is_some());
+                pass
+            }
+            Err(e) => {
+                // The device left the arrays half done: the window starts over on the CPU, and
+                // so do the windows after it.
+                stats.device_error = Some(e);
+                buf = Buf::new(win, level.sample(&win));
+                buf.core = (cx, cy, core.2, core.3);
+                run_passes(&mut buf, ph, counts, noise, &mut stats.times)
+            }
+        };
         if let (true, Some(cc)) = (cfg.last, cfg.character.as_ref()) {
             // Mountain character, then a flood so the surface still drains (the arrays the
             // passes are done with are its scratch).
