@@ -201,109 +201,6 @@ pub struct FailureParams {
     /// Share of a pair's excess over the critical drop moved per iteration (≤ 1/16 is stable).
     pub rate: f64,
     pub iterations: u32,
-    /// Stop once no pair that can move is steeper than its critical drop by more than this share
-    /// of it (P1-19, ledger ERO-184; 0: run every iteration, the rule before P1-19).
-    pub tol: f64,
-}
-
-/// The opt-in record of how fast the slope failure's excess falls (P1-19, `DEEPTIME_FAILURE_TRACE`,
-/// printed by `deeptime bench`; not part of any world): per iteration, the largest relative
-/// excess over the critical drop among the pairs that can move, and the metres moved.
-pub mod trace {
-    use std::sync::{Mutex, OnceLock};
-
-    /// The relative excesses the trace reports the first iteration at or below.
-    pub const TOLS: [f64; 7] = [0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5];
-    /// Iterations kept per call.
-    const KEEP: usize = 64;
-
-    pub(super) fn on() -> bool {
-        static ON: OnceLock<bool> = OnceLock::new();
-        *ON.get_or_init(|| std::env::var_os("DEEPTIME_FAILURE_TRACE").is_some())
-    }
-
-    #[derive(Default)]
-    struct Sums {
-        calls: u64,
-        iterations: u64,
-        moved: f64,
-        /// Per tolerance: iterations a stop at it would have run, summed over the calls, and the
-        /// metres the iterations after it moved.
-        stop_its: [u64; 7],
-        moved_after: [f64; 7],
-        /// Per iteration: calls that reached it, their largest relative excess summed and the
-        /// largest of all.
-        reached: Vec<u64>,
-        ex_sum: Vec<f64>,
-        ex_max: Vec<f64>,
-    }
-
-    static SUMS: Mutex<Option<Sums>> = Mutex::new(None);
-
-    /// One call's iterations: (largest relative excess before it, metres it moved).
-    pub(super) fn record(its: &[(f64, f64)]) {
-        let mut g = SUMS.lock().unwrap_or_else(|e| e.into_inner());
-        let s = g.get_or_insert_with(|| Sums {
-            reached: vec![0; KEEP],
-            ex_sum: vec![0.0; KEEP],
-            ex_max: vec![0.0; KEEP],
-            ..Sums::default()
-        });
-        s.calls += 1;
-        s.iterations += its.len() as u64;
-        for (k, &(ex, m)) in its.iter().enumerate() {
-            s.moved += m;
-            if k < KEEP {
-                s.reached[k] += 1;
-                s.ex_sum[k] += ex;
-                s.ex_max[k] = s.ex_max[k].max(ex);
-            }
-        }
-        for (t, &tol) in TOLS.iter().enumerate() {
-            let stop = its
-                .iter()
-                .position(|&(ex, _)| ex <= tol)
-                .unwrap_or(its.len());
-            s.stop_its[t] += stop as u64;
-            s.moved_after[t] += its[stop..].iter().map(|&(_, m)| m).sum::<f64>();
-        }
-    }
-
-    /// The record so far; `None` when the trace is off or saw nothing.
-    pub fn trace_lines() -> Option<Vec<String>> {
-        let g = SUMS.lock().unwrap_or_else(|e| e.into_inner());
-        let s = g.as_ref()?;
-        let calls = s.calls.max(1) as f64;
-        let mut out = vec![format!(
-            "failure_trace calls={} its_per_call={:.2} moved_m_cells={:.4e}",
-            s.calls,
-            s.iterations as f64 / calls,
-            s.moved
-        )];
-        for (t, &tol) in TOLS.iter().enumerate() {
-            out.push(format!(
-                "failure_trace_tol tol={tol} its_per_call={:.2} moved_after_share={:.3e}",
-                s.stop_its[t] as f64 / calls,
-                s.moved_after[t] / s.moved.max(f64::MIN_POSITIVE)
-            ));
-        }
-        let per: Vec<String> = (0..KEEP)
-            .take_while(|&k| s.reached[k] > 0)
-            .map(|k| {
-                format!(
-                    "{k}:{}:{:.3}:{:.3}",
-                    s.reached[k],
-                    s.ex_sum[k] / s.reached[k] as f64,
-                    s.ex_max[k]
-                )
-            })
-            .collect();
-        out.push(format!(
-            "failure_trace_decay it:calls:mean_max_excess:max_excess {}",
-            per.join(" ")
-        ));
-        Some(out)
-    }
 }
 
 /// Submarine slope failure (margins and spires task, 2026-10-03): sediment on the sea floor
@@ -354,9 +251,6 @@ pub fn slope_failure(
     // S_c·d for each neighbour offset, and the offset as an index step for cells away from the
     // raster's edges (the same neighbours `Dims::neighbour` gives them).
     let crit: [f64; 8] = std::array::from_fn(|k| p.critical_slope * d.step_len(k));
-    // 1 / (S_c·d), for the relative excess the stopping rule reads (P1-19).
-    let inv_crit: [f64; 8] =
-        std::array::from_fn(|k| if crit[k] > 0.0 { 1.0 / crit[k] } else { 0.0 });
     let step: [isize; 8] =
         std::array::from_fn(|k| OFFSETS[k].1 as isize * w as isize + OFFSETS[k].0 as isize);
     let inner = |i: usize, j: usize| i >= 1 && i + 1 < w && j >= 1 && j + 1 < hgt;
@@ -386,13 +280,9 @@ pub fn slope_failure(
             0.0
         }
     };
-    // A cell's change, and the largest excess over the critical drop, as a share of it, of the
-    // pairs it gives to (none when it has nothing to give).
-    let change = |c: usize, inner: bool, hh: &[f64], wet: &[bool], sc: &[f64]| -> (f64, f64) {
+    let change = |c: usize, inner: bool, hh: &[f64], wet: &[bool], sc: &[f64]| -> f64 {
         let mut dz = 0.0;
-        let mut ex = 0.0f64;
         if wet[c] {
-            let gives = sc[c] > 0.0;
             for (k, &ck) in crit.iter().enumerate() {
                 let Some(m) = nbr(c, inner, k) else {
                     continue;
@@ -403,12 +293,9 @@ pub fn slope_failure(
                 let out = (hh[c] - hh[m] - ck).max(0.0);
                 let inn = (hh[m] - hh[c] - ck).max(0.0);
                 dz += p.rate * (inn * sc[m] - out * sc[c]);
-                if gives {
-                    ex = ex.max(out * inv_crit[k]);
-                }
             }
         }
-        (dz, ex)
+        dz
     };
     // Above this many movers every cell is recomputed; below it only their neighbourhoods are
     // (either gives the same values: cells farther away have the inputs they had).
@@ -439,12 +326,6 @@ pub fn slope_failure(
     };
     // Each row's moved cells and their changes, ascending.
     let mut rows: Vec<Vec<(u32, f64)>> = vec![Vec::new(); hgt];
-    // Per row, the largest relative excess of a pair that can move (the stopping rule's residual,
-    // P1-19). A cell that can move is a mover or beside one, so the rows' recomputed cells hold
-    // every such pair: the cells not recomputed kept inputs under which they did not move.
-    let mut row_ex = vec![0.0f64; hgt];
-    let tracing = trace::on();
-    let mut traced: Vec<(f64, f64)> = Vec::new();
     for _ in 0..p.iterations {
         if sparse {
             // Marked rows in parallel (P1-19; the marks were set one mover at a time before):
@@ -502,30 +383,18 @@ pub fn slope_failure(
             });
             let sc: &[f64] = &scale;
             let n2: &[u32] = &near2;
-            rows.par_iter_mut()
-                .zip(row_ex.par_iter_mut())
-                .enumerate()
-                .for_each(|(j, (out, rx))| {
-                    out.clear();
-                    let mut ex = 0.0f64;
-                    for i in 0..w {
-                        let c = j * w + i;
-                        if all || n2[c] == s {
-                            let (dz, e) = change(c, inner(i, j), hh, wt, sc);
-                            ex = ex.max(e);
-                            if dz != 0.0 {
-                                out.push((c as u32, dz));
-                            }
+            rows.par_iter_mut().enumerate().for_each(|(j, out)| {
+                out.clear();
+                for i in 0..w {
+                    let c = j * w + i;
+                    if all || n2[c] == s {
+                        let dz = change(c, inner(i, j), hh, wt, sc);
+                        if dz != 0.0 {
+                            out.push((c as u32, dz));
                         }
                     }
-                    *rx = ex;
-                });
-        }
-        // The stopping rule (P1-19, ledger ERO-184): no pair that can move is steeper than its
-        // critical drop by more than `tol` of it, so this iteration is not taken.
-        let excess = row_ex.iter().fold(0.0f64, |a, &b| a.max(b));
-        if p.tol > 0.0 && excess <= p.tol {
-            break;
+                }
+            });
         }
         // The movers' changes, rows in parallel (each row's cells are its own), then the metres
         // moved summed in ascending cell order as before (P1-17). The movers' list is needed
@@ -545,23 +414,16 @@ pub fn slope_failure(
                 }
             });
         let mut count = 0;
-        let before = moved;
         for row in &rows {
             count += row.len();
             for &(_, dz) in row {
                 moved += dz.abs() * 0.5;
             }
         }
-        if tracing {
-            traced.push((excess, moved - before));
-        }
         if count == 0 {
             break;
         }
         (sparse, movers) = (count <= dense_above, count);
-    }
-    if tracing {
-        trace::record(&traced);
     }
     moved
 }
@@ -715,7 +577,6 @@ mod tests {
                         critical_slope: s_c,
                         rate: FAILURE_RATE,
                         iterations,
-                        tol: 0.0,
                     };
                     let (mut hr, mut ar) = (h0.clone(), a0.clone());
                     let mr = slope_failure_reference(&d, &sea, 0.0, &p, &mut hr, &mut ar);
@@ -752,7 +613,6 @@ mod tests {
             critical_slope: 2.5f64.to_radians().tan(),
             rate: FAILURE_RATE,
             iterations: 1,
-            tol: 0.0,
         };
         let before = h.clone();
         slope_failure(&d, &sea, 0.0, &p, &mut h, &mut avail);
@@ -787,7 +647,6 @@ mod tests {
             critical_slope: s_c,
             rate: 0.05,
             iterations: 30_000,
-            tol: 0.0,
         };
         let before: f64 = h.iter().sum();
         slope_failure(&d, &sea, 0.0, &p, &mut h, &mut avail);

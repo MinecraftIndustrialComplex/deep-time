@@ -911,7 +911,6 @@ impl SurfaceStage {
             critical_slope: p.submarine_slope_deg.to_radians().tan(),
             rate: marine::FAILURE_RATE,
             iterations: marine::FAILURE_ITERATIONS,
-            tol: p.numerics.failure_tol,
         });
         let h_step0 = crate::alloc::copied(&sc.h);
         let avail0: Vec<f64> = (0..n)

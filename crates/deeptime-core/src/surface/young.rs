@@ -143,8 +143,15 @@ impl YoungParams {
 /// stream power, diffusion and the slope failure), and the glaciers' ice state and passes
 /// (`glacial.rs`). Measured on the real L2 grids (P1-17, 2026-10-05: the counted peak less what
 /// the run held when the stage started, 413 B a cell on quick 16k and 416 B on full 16k,
-/// scattered continents, 500 Myr, the kept-block cache off), with about 10 % to spare.
-pub const OWN_BYTES_PER_L2_CELL: u64 = 460;
+/// scattered continents, 500 Myr, the kept-block cache off), with about 10 % to spare. P1-19
+/// (2026-10-19): the multigrid diffusion solve's hierarchy beside the conjugate gradients' arrays
+/// (`diffusion/multigrid.rs`: the finest level's seven f32 arrays, 28 B, and the coarser levels'
+/// eight on a third as many cells, 11 B) raised the stage's counted peak on quick 16k from
+/// 1,322.8 to 1,376.5 MiB (master against the branch, the same run and trace otherwise), 42 B a
+/// cell, so its own arrays are 448 B a cell (445 B on full 16k); 460 left
+/// `tests/memory_estimate.rs` 0.1 MiB short (74.4 MiB held against 74.3). 500 keeps about 10 %
+/// to spare again.
+pub const OWN_BYTES_PER_L2_CELL: u64 = 500;
 
 /// Estimate: the world the surface and the stages after it leave ([`super::retained_bytes`]),
 /// the recorded history, and the stage's own arrays on the L2 grid; ≈ 1 µs per cell per step
@@ -645,7 +652,6 @@ impl YoungStage {
                 critical_slope: sp.submarine_slope_deg.to_radians().tan(),
                 rate: marine::FAILURE_RATE,
                 iterations: marine::FAILURE_ITERATIONS,
-                tol: sp.numerics.failure_tol,
             };
             marine::slope_failure(&d, &sea_mask, sea, &fp, &mut h, &mut avail);
         }
@@ -895,6 +901,11 @@ mod tests {
     /// measured to hold (the world before it plus its own arrays, the history aside; 500 Myr,
     /// scattered continents) by at most 15 %, and full 16k's whole estimate fits a 5 GiB cap
     /// (it listed 6,049 MiB against the 4,143 MiB held, so the editor refused full at 5 GiB).
+    /// The holds were measured again for P1-19's multigrid diffusion solve (2026-10-19,
+    /// `DEEPTIME_MEM_TRACE`, 8 threads, the 4 GiB cap, the kept-block cache off; the stage's
+    /// counted peak less the history it kept in memory): quick 1,105 → 1,162 MiB (1,376.5 less
+    /// 214.5; master's own run gave 1,322.8 less 214.2 = 1,108.6, so the method matches P1-17's),
+    /// full 4,143 → 4,311 MiB (the history all on disk).
     #[test]
     fn the_estimate_covers_the_measured_hold_closely() {
         const MIB: u64 = 1 << 20;
@@ -907,8 +918,8 @@ mod tests {
             .unwrap()
         };
         for (name, held_mib) in [
-            ("earthlike_quick_16k", 1105u64),
-            ("earthlike_full_16k", 4143),
+            ("earthlike_quick_16k", 1162u64),
+            ("earthlike_full_16k", 4311),
         ] {
             let crate::preset::PresetBody::Planet(p) =
                 crate::preset::Preset::from_json(&json(name)).unwrap().body

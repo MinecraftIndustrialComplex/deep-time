@@ -40,16 +40,20 @@ use super::{Live, Operator, STRIP_ROWS, sum_zero};
 use crate::surface::grid::Dims;
 
 /// Damping of the Jacobi smoother (4/5 is the best smoothing factor for the five-point Laplacian
-/// in two dimensions; Briggs et al. 2000, ch. 2, give 2/3 for one dimension).
-pub(super) const OMEGA: f32 = 0.8;
-/// Smoothing sweeps before and after each coarse correction.
-pub(super) const NU: usize = 1;
-/// Coarse couplings as a share of the fine couplings summed across the coarse face.
-pub(super) const SCALE: f32 = 0.5;
+/// in two dimensions; Briggs et al. 2000, ch. 2, give 2/3 for one dimension). The tuning sweep
+/// (`tune_the_cycle`, 2026-10-18, 2048 x 1024 shelf at 8 threads) found 0.8 fastest of 0.6 to 1.0.
+pub(super) const OMEGA: f32 = 0.8; // ledger: ERO-183
+/// Smoothing sweeps before and after each coarse correction: two took 6 to 8 outer iterations
+/// where one took 10 to 13 and were 10 to 20 % faster in the same sweep.
+pub(super) const NU: usize = 2; // ledger: ERO-183
+/// Coarse couplings as a share of the fine couplings summed across the coarse face (1/2: the
+/// piecewise-constant aggregation's Galerkin operator is about twice too stiff for smooth error,
+/// Braess 1995; the sweep found 0.5 to 0.6 fastest of 0.5 to 1.0).
+pub(super) const SCALE: f32 = 0.5; // ledger: ERO-183
 /// A level this small is the coarsest.
-const COARSEST: usize = 64;
+const COARSEST: usize = 64; // ledger: ERO-183
 /// Sweeps on the coarsest level.
-const COARSE_SWEEPS: usize = 16;
+const COARSE_SWEEPS: usize = 16; // ledger: ERO-183
 
 /// The cycle's settings (the tests vary them).
 #[derive(Clone, Copy, Debug)]

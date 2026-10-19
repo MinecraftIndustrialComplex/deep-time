@@ -19,8 +19,9 @@ Through the whole history, rivers cut into rising land (the stream power law: er
 | [ERO](ledger/ERO.md) | submarine slope failure | ERO-168 to ERO-170 (3) |
 | [ERO](ledger/ERO.md) | erosion audit, plateaus and the measured diffusivity | ERO-171 to ERO-178 (8) |
 | [ERO](ledger/ERO.md) | the erosion law against measured rates | ERO-179 to ERO-182 (4) |
+| [ERO](ledger/ERO.md) | surface numerics: the diffusion solve, the parallel flood | ERO-183 to ERO-184 (2) |
 
-Rows by status (2026-10-18, `tools/review/claims_counts.py`): `verified` 9, `cited-unverified` 82, `from-memory` 2, `abstract-only` 4, `calibrated` 8, `game-choice` 10, `uncited` 56.
+Rows by status (2026-10-18, `tools/review/claims_counts.py`): `verified` 10, `cited-unverified` 82, `from-memory` 2, `abstract-only` 4, `calibrated` 8, `game-choice` 11, `uncited` 56.
 
 ## Material for the stage 2 writer
 
@@ -478,3 +479,163 @@ constants. The high ground's excess (0.25 to 0.28 above 2 km against 0.10) and t
 at 1000 Myr (2.7 % above 1.5 km of relief) remain with the erosion at the measured rates. The temperate present's target counted mountain ice,
 so on these planets it asked for thousands of ppm of CO₂ (CLM-150). Decided the same day (decisions
 log 2026-10-18): it counts ice sheets only (CLM-203; climate.md, "The target counts ice sheets").
+
+## Surface numerics: the diffusion solve, the flood, and the slope failure's stopping (P1-19, 2026-10-18)
+
+**What was asked.** Three of the surface stage's costs in the full 16k gate run (P1-19 exit item
+1: 1,242.8 s against 900): the implicit diffusion solve (109.3 s, about 111 conjugate-gradient
+iterations a solve), the submarine slope failure (83.8 s, 40 iterations a step) and the serial
+Priority-Flood+ε (32.7 s). Each change is a setting under the preset's `surface.numerics`, so the
+old and the new method can run side by side. Determinism is not asked for (Ben, 2026-10-18: "I am
+not worried about determinism, performance is far more important"). None of the three changes a
+law; they change how closely, and how fast, the laws are solved.
+
+**The diffusion solve (ERO-183).** The equation is the same, (I + Δt·L)h¹ = h⁰ with L the
+Laplacian of the cells' diffusivities (ERO-022 to ERO-024, ERO-046), solved by conjugate gradients
+from the same split first guess and with the same mass put-back. Only the preconditioner changed:
+one geometric multigrid V-cycle instead of the diagonal. Jacobi preconditioning leaves the
+condition number growing with D·Δt/Δx², which the sea's 100 m²/yr over a 2-Myr step on 2.4-km
+cells makes about 35, so its iterations grow with it; a V-cycle damps every wavelength at once
+(Briggs, Henson & McCormick 2000), and as a preconditioner of conjugate gradients it need only be
+symmetric and positive definite (Tatebe 1993; the test `the_cycle_is_a_symmetric_positive_definite_operator`).
+The cycle aggregates 2 × 2 cells, moves values between levels piecewise-constant, takes half the
+summed fine couplings as the coarse ones (Braess 1995: the plain Galerkin operator of
+piecewise-constant aggregation is about twice too stiff for smooth error), smooths with damped
+Jacobi (ω 0.8, two sweeps before and after) and ends at a level of at most 64 cells with 16
+sweeps. The cycle runs in f32 and the conjugate gradients in f64; its reductions are unordered,
+so the result depends on the thread count in the last bits.
+
+On a 2048 × 1024 synthetic shelf (the test `tune_the_cycle`, 8 threads) the Jacobi solve took
+110 iterations and 0.400 s; the cycle took 8 iterations and 0.087 s to the same 10⁻⁶ m, and 7
+iterations and 0.069 s to 10⁻⁵ m. Two sweeps took 6 to 8 iterations against one sweep's 10 to 13,
+10 to 20 % faster; coarse couplings of 0.5 to 0.6 of the Galerkin sum were the fastest.
+
+On the planet the solve is checked against both the old solve and a tight one
+(`DEEPTIME_DIFFUSION_AUDIT=1`, `earthlike_full_16k`, scattered continents, 100 Myr, 8 threads,
+54 solves; each multigrid solve also run by the Jacobi solve and to 10⁻⁹ m):
+
+| Solve | Iterations | Against the Jacobi solve, largest | RMS | Error, largest | RMS | Worst solve's RMS error |
+|---|---|---|---|---|---|---|
+| Jacobi, 10⁻⁶ m (before) | 127.2 | | | 0.024 mm | 3.0 × 10⁻⁷ m | 3.7 × 10⁻⁷ m |
+| Multigrid, 10⁻⁶ m, one sweep | 27.4 | 0.038 mm | 3.1 × 10⁻⁷ m | 0.032 mm | 1.0 × 10⁻⁷ m | 1.7 × 10⁻⁷ m |
+| Multigrid, 10⁻⁵ m, two sweeps (the default) | 17.2 | 0.68 mm | 1.5 × 10⁻⁶ m | 0.67 mm | 1.5 × 10⁻⁶ m | 2.5 × 10⁻⁶ m |
+
+The default's error is five times the old solve's in RMS and 28 times at its largest, 0.67 mm in
+one solve. The stage stores its elevations as f32, whose step is 0.49 mm from 4 to 8 km: the largest error is about one stored step and the RMS about a hundredth
+of one. The planet takes 17 iterations against the synthetic shelf's 7 (the shelf's diffusivity
+jumps fifty-fold at the shore); the solve's time in the stage fell by 58 % in the timing pairs
+(8 threads) and 42 % in the ensemble's runs (2 threads) (below), less than the iterations, since
+the cycle's setup and the first guess are paid every solve.
+
+**The flood (ERO-184).** The serial flood (ERO-080, Barnes, Lehman & Mulla 2014, their improved
+variant with a FIFO queue for pits) depends on the order it runs in: a cell in a flat or a pit
+takes `next_up` of whichever neighbour the pit queue popped first. The parallel flood computes
+the unique least fixed point of the ε relaxation (proof in `pflood/parallel.rs`), which is the
+plain Priority-Flood+ε's result in any order. First the ε = 0 fill by Barnes 2016's parallel
+Priority-Flood (strips of rows flooded on their own with watershed labels, the strips' edges
+joined into a graph of watersheds, a Priority-Flood over the graph for each watershed's spill
+level); then the ε fill, exact, by a plain Priority-Flood+ε over each connected group of cells
+the first phase cannot settle, the groups in parallel. Barnes 2016 treats ε = 0 only; the second
+phase is the project's own. On the 500-Myr `pipeline_quick_16k` run the two floods differ in 168
+of 250 steps, in about 170 of the ~13,000 raised cells a step, by ulps. The tests compare the
+parallel flood with a plain Priority-Flood+ε bit for bit over several strip heights and thread
+counts (`the_parallel_flood_is_the_plain_priority_flood_bit_for_bit`), and check that every land
+cell of the filled surface has a strictly lower neighbour (`every_land_cell_drains_on_the_filled_surface`).
+
+**The slope failure's stopping rule (not landed).** The failure (ERO-168, ERO-169) moves 5 % of
+each pair's excess over S_c·d per iteration, 40 iterations a step. The asked change was to stop
+once what is left is within a physical tolerance of the critical slope. A pair's residual was
+taken as the drop its giver's sediment can still remove, min(h_a − h_b − S_c·d, 2·avail_a), in
+units of S_c·d (105 m on 2.4-km cells at 2.5°), with a tolerance of 0.1 (0.25° on 2.5°, a tenth of
+the spread of measured S_c, ERO-168). A trace of every call (`earthlike_full_16k`, 100 Myr,
+54 calls) found that no tolerance from 0.005 to 0.5 ever stops a call early: all ran 40
+iterations. The largest residual on the grid, averaged over the calls, fell from 65.8 critical
+drops before the first iteration to 8.9 before the last (the largest in any call from 74.9 to
+15.4), the 0.95³⁹ = 0.135 of a relaxation limited by its rate; about 200,000 cells moved in every
+iteration. The failure is far from the critical slope when the budget runs out, so a stopping rule
+cannot save time; the residual carries to the next step. A second form, which also left each pair
+alone once its own residual was within the tolerance, cut the cells that moved per pass by a
+quarter (251,000 to 188,000) but did not run faster (slope failure 22.8 s against master's 18.8 s
+in one 150-Myr timing pair), and its ensemble moved the planet (below). Neither form landed; the
+failure is as before. Its cost is set by the 40 iterations at 5 % (ERO-169, a game-choice
+"the slope relaxes over a few steps whatever they are"): the same relaxation per step in fewer,
+larger iterations, up to the stability limit 1/16 (32 iterations, 0.9375³² = 0.127 against
+0.95⁴⁰ = 0.129), would save about a fifth of it, but that changes the relaxation's path and needs
+its own ensemble.
+
+**Time.** Two timing pairs (`tools/review/bench-quiet.py`, `earthlike_full_16k`, scattered
+continents, 150 Myr, 8 threads each), two runs side by side on the CPU sets A (0, 16, 2, 18, 4,
+20, 6, 22) and B (8, 24, 10, 26, 12, 28, 14, 30): master on A and the branch on B, then swapped.
+The VM was shared and loaded (other jobs held 19 to 23 CPUs on average, load up to 93), so the
+times are slower than the gate's and each pair is one sample. Seconds:
+
+| Timer | Pair 1: master (A) | branch (B) | Pair 2: branch (A) | master (B) | Saved, mean of the pairs |
+|---|---|---|---|---|---|
+| `diffusion_solve` | 56.4 | 20.2 | 20.8 | 40.3 | 27.9 (58 %) |
+| `pflood` | 7.9 | 3.3 | 3.4 | 7.7 | 4.5 (57 %) |
+| `slope_failure` (the same code) | 33.6 | 26.3 | 28.3 | 30.1 | (4.6, load) |
+| `diffusion` (the whole term) | 90.7 | 47.0 | 49.8 | 71.0 | 32.5 |
+| young stage's `diffusion` | 10.5 | 7.5 | 5.8 | 6.9 | 2.1 |
+| Surface stage | 194.3 | 126.9 | 136.8 | 166.4 | 48.5 |
+| Run | 546.2 | 466.6 | 464.2 | 485.5 | 50.5 (10 %) |
+
+Applied to the full 16k gate run's timers (1,242.8 s: `diffusion_solve` 109.3 s, `pflood`
+32.7 s), the pairs' fractions would save about 63 s and 19 s, 82 s of the 343 s the gate needs
+(inferred; the gate itself was not rerun). The slope failure's code is unchanged; its 4.6 s is the
+load's.
+
+**The planet.** Six runs a binary (`tools/review/force-balance-ensemble.sh`, `earthlike_quick_16k`,
+seeds 1 to 3, scattered continents and supercontinent, 500 Myr, `DEEPTIME_GAP_BUDGET=1`;
+`tools/review/p1-17-hyps.py`, `tools/review/erosion-recal.py`): master (584b1241, the code of the
+branch's base f221b3d3); the branch as landed (multigrid, parallel flood, the old failure); the
+branch with the multigrid solve only (`--set surface.numerics.flood=serial`); the branch with the
+second stopping form; and the branch with all three settings at their old values
+(`--set surface.numerics.diffusion_solver=jacobi --set surface.numerics.flood=serial`, the
+stopping form off), which gave master's six worlds figure for figure. Means; brackets the runs'
+range.
+
+| | Master | Landed | Multigrid only (serial flood) | With the stopping form |
+|---|---|---|---|---|
+| Land | 0.191 [0.152, 0.219] | 0.190 [0.143, 0.223] | 0.189 [0.149, 0.222] | 0.161 [0.151, 0.169] |
+| Land above 2 km | 0.206 [0.154, 0.239] | 0.177 [0.082, 0.239] | 0.217 [0.145, 0.304] | 0.241 [0.168, 0.282] |
+| Highest cell, m | 6,689 [5,655, 7,499] | 6,875 [5,961, 7,575] | 6,683 [6,074, 7,242] | 6,717 |
+| Land median height, m | 662 [446, 820] | 588 [396, 804] | 766 [597, 1,033] | 838 [555, 963] |
+| Shelf, share of the sea | 0.064 [0.059, 0.070] | 0.061 [0.048, 0.076] | 0.064 [0.036, 0.080] | 0.057 [0.043, 0.087] |
+| Continental crust | 0.396 [0.368, 0.418] | 0.423 [0.371, 0.507] | 0.412 [0.378, 0.438] | 0.376 [0.358, 0.426] |
+| CO₂, ppm | 1,043 [477, 2,862] | 942 [282, 2,078] | 1,209 [361, 2,431] | 3,237 [335, 14,177] |
+| T, °C | 15.7 [13.2, 19.3] | 15.6 [14.0, 19.2] | 16.0 [13.9, 19.1] | 17.7 |
+| High ground's flat part, m/Myr | 139.0 | 145.2 | 130.7 | 140.3 |
+| All land, m/Myr | 76.8 | 66.6 | 78.8 | |
+| Land with relief above 1 / 1.5 km | 0.059 / 0.014 | 0.052 / 0.013 | 0.068 / 0.018 | |
+| RMS log error against Montgomery & Brandon | 0.19 | 0.21 | 0.20 | 0.24 |
+| Plate checks met (of 45) | 29 | 28 | 27 | 27 |
+| Conjugate-gradient iterations a step | 62.2 | 9.5 | 9.6 | 9.5 |
+
+The landed branch's runs stay inside master's range on every surface figure but the continental
+crust, whose mean is 0.423 against master's largest 0.418, from one run (supercontinent seed 3,
+0.507, which also has the least high ground, 0.082 of its land above 2 km). Its plate checks moved
+both ways, every branch mean inside master's runs: three to fail (rift-born plates welded back
+9.2 → 14.9 %, at most 10; speed against area −0.36 → −0.42, −0.40 to 0.20; ocean floor older than
+180 Myr 8.7 → 10.1 %, at most 10) and two to pass (collision length median 54.5 → 37.3 Myr, 15 to
+50; slab ÷ free plate speed 2.29 → 2.57, at least 2.5). Eleven plate figures of
+`p1-17-hyps.py` had a branch mean outside master's six runs, all inside their targets where they
+have one: the largest plate's median share 0.18 → 0.25 (0.15 to 0.35), steps with one plate above
+half the planet 0 → 1.5 % (at most 10), the collision length's 90th percentile 119 → 83 Myr (at
+most 120), plate-steps above 150 mm/yr 0 → 0.003 % (at most 0.5; also counted as plate-steps,
+0 → 0.17); and, with no target, the largest continental piece 0.16 → 0.24 of the crust, steps
+with a supercontinent 28.6 → 49.9 %, a large plate's in-plane stress 2.07 → 0.62 MPa and the
+steps it is in tension 100 → 75 %, the balance's scaled speed median 41.3 → 43.9 and 90th
+percentile 94.8 → 101 mm/yr.
+
+The planets diverge from master's from the first step that differs (a chaotic system: the flood
+alone differs in ulps). The multigrid-only ensemble, whose solve differs from master's by at most
+0.68 mm a solve, tests what such a difference does: its surface figures also stay inside master's
+runs, it meets 27 plate checks, and eleven plate figures again fall outside master's runs, but
+mostly others (plate speed median 33.7 → 38.3 mm/yr, foredeep width 29 → 83 km, collision
+length's 90th percentile 119 → 173 Myr, now failing). Only the largest plate's share (0.21) and
+the balance's scaled speed median (43.9) moved outside in both. Moves of this size come with any
+perturbation, so the landed branch's are read as the spread a different first step makes, not an
+effect of the flood (inferred from the two ensembles). The stopping form moved the surface outside
+master's runs (land above 2 km, median height, shelf, CO₂ with one run at 14,177 ppm) and failed
+two plate checks (rift-born welds 12.7 %; the lowest continental crust 0.36, at least 0.37);
+it was not landed.

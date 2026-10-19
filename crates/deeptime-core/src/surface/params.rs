@@ -203,24 +203,23 @@ pub enum FloodMethod {
 pub struct Numerics {
     /// The diffusion solve's preconditioner (`diffusion.rs`).
     pub diffusion_solver: DiffusionSolver,
-    /// RMS residual of (I + Δt·L)h = h⁰ at which the diffusion solve stops, metres. The error
-    /// of the solution is at most the residual (the matrix's eigenvalues are ≥ 1).
+    /// RMS residual of (I + Δt·L)h = h⁰ at which the multigrid diffusion solve stops, metres.
+    /// The error of the solution is at most the residual (the matrix's eigenvalues are ≥ 1).
+    /// 10⁻⁵ m leaves an RMS error of about 1.5·10⁻⁶ m and a largest of about 0.7 mm on the
+    /// full 16k planet, against 3·10⁻⁷ m and 0.02 mm for the Jacobi solve at its 10⁻⁶ m
+    /// (`CG_TOL_M`). The largest is about one step of the f32 the stage stores its elevations in
+    /// (0.49 mm from 4 to 8 km), the RMS about a hundredth of one.
     pub diffusion_tol_m: f64, // ledger: ERO-183
-    /// The submarine slope failure (`marine::slope_failure`) stops once no pair of cells that
-    /// can still move stands more than this share of the critical drop S_c·d above it; 0 runs
-    /// every iteration (P1-04 to P1-19).
-    pub failure_tol: f64, // ledger: ERO-184
     /// The depression flood (`pflood.rs`).
-    pub flood: FloodMethod, // ledger: ERO-185
+    pub flood: FloodMethod, // ledger: ERO-184
 }
 
 impl Default for Numerics {
     fn default() -> Self {
         Numerics {
             diffusion_solver: DiffusionSolver::Multigrid,
-            diffusion_tol_m: 1.0e-6,      // ledger: ERO-183
-            failure_tol: 0.0,             // ledger: ERO-184
-            flood: FloodMethod::Parallel, // ledger: ERO-185
+            diffusion_tol_m: 1.0e-5,      // ledger: ERO-183
+            flood: FloodMethod::Parallel, // ledger: ERO-184
         }
     }
 }
@@ -233,11 +232,6 @@ impl Numerics {
                 && self.diffusion_tol_m <= 1.0,
             "numerics.diffusion_tol_m",
             "must be in (0, 1] m",
-        )?;
-        check(
-            self.failure_tol.is_finite() && (0.0..=1.0).contains(&self.failure_tol),
-            "numerics.failure_tol",
-            "must be in [0, 1]",
         )
     }
 }

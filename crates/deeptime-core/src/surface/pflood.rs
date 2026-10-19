@@ -16,7 +16,7 @@
 //! Land that no base-level cell can reach (a closed continent with no sea) is drained through its
 //! lowest cell, which becomes a sink.
 //!
-//! **Parallelism (P1-19, ledger ERO-185).** The surface stages flood through [`flood_with`] and
+//! **Parallelism (P1-19, ledger ERO-184).** The surface stages flood through [`flood_with`] and
 //! [`open_sea_with`], which take the preset's `surface.numerics.flood`: `parallel` (the default)
 //! runs the order-independent flood of [`parallel`] (Barnes 2016's tiled Priority-Flood for the
 //! ε = 0 fill, then an exact ε pass per group of undecided cells), `serial` this module's flood.
