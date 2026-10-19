@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! The lattice geometry the plate model works on: the spherical Delaunay triangulation of the
-//! current lattice (P1-02's [`SphereMesh`], rebuilt at every global resampling), its vertex
+//! current lattice (P1-02's [`SphereMesh`] of the Fibonacci sphere, turned with the lattice at
+//! every global resampling; [`Geo::build`]), its vertex
 //! adjacency with edge lengths, current sample positions, point location inside a group, and
 //! multi-source Dijkstra distances over the mesh (geodesic distances within rigid groups).
 //!
@@ -37,9 +38,13 @@ pub struct Geo {
 }
 
 impl Geo {
-    /// Triangulates the lattice (P1-02's hull) and derives the adjacency.
+    /// Triangulates the lattice (P1-02's hull) and derives the adjacency. Every lattice of `n`
+    /// points is the one Fibonacci sphere turned, and a rotation keeps a Delaunay triangulation
+    /// Delaunay, so the sphere is triangulated as it stands and the result turned
+    /// ([`Geo::turned`]; P1-19): the geometry of a lattice is the same whether it was built here
+    /// or turned from another lattice's.
     pub fn build(n: usize, lattice: [f64; 4]) -> Result<Geo, CoreError> {
-        let points = lattice_points(n, lattice);
+        let points = fibonacci_sphere(n);
         let mesh = SphereMesh::build(&points).map_err(|e| {
             CoreError::InvalidState(format!("plates: lattice triangulation failed: {e}"))
         })?;
@@ -51,6 +56,7 @@ impl Geo {
         }
         let adj = mesh.vertex_neighbors();
         let pts = mesh.points();
+        // Edge lengths do not change with a rotation.
         let edge_rad: Vec<f32> = (0..n)
             .into_par_iter()
             .flat_map_iter(|v| {
@@ -61,12 +67,25 @@ impl Geo {
                     .collect::<Vec<_>>()
             })
             .collect();
+        let points = lattice_points(n, lattice);
         Ok(Geo {
             lattice,
-            mesh,
+            mesh: mesh.turned(points),
             adj,
             edge_rad,
         })
+    }
+
+    /// The geometry of `lattice`, a lattice of as many points, on this one's triangulation
+    /// turned (P1-19: a resampling's new lattice is not triangulated again; see [`Geo::build`]).
+    pub fn turned(&self, lattice: [f64; 4]) -> Geo {
+        let points = lattice_points(self.mesh.points().len(), lattice);
+        Geo {
+            lattice,
+            mesh: self.mesh.turned(points),
+            adj: self.adj.clone(),
+            edge_rad: self.edge_rad.clone(),
+        }
     }
 
     pub fn points(&self) -> &[DVec3] {
@@ -494,6 +513,42 @@ pub fn coast_split(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A lattice's geometry is the same built or turned from another lattice's (P1-19: a resumed
+    /// run builds the lattice a resampling turned).
+    #[test]
+    fn a_turned_lattice_is_the_built_one() {
+        let a = [0.1, -0.7, 0.3, 0.5];
+        let b = [0.6, 0.2, -0.4, 0.3];
+        let unit = |q: [f64; 4]| quat(q).normalize().to_array();
+        let (a, b) = (unit(a), unit(b));
+        let built = Geo::build(3000, b).unwrap();
+        let turned = Geo::build(3000, a).unwrap().turned(b);
+        assert_eq!(built.points(), turned.points());
+        assert_eq!(built.points(), lattice_points(3000, b).as_slice());
+        assert_eq!(built.mesh.triangles(), turned.mesh.triangles());
+        assert_eq!(built.adj.neighbors, turned.adj.neighbors);
+        assert_eq!(built.edge_rad, turned.edge_rad);
+    }
+
+    /// The sparse Dijkstra finds what the dense one does, and leaves its scratch clean.
+    #[test]
+    fn the_sparse_dijkstra_matches_the_dense_one() {
+        let geo = Geo::build(3000, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let src = [(5, 0.0, 1), (1400, 0.0, 2), (2900, 0.01, 3)];
+        let allow = |a: u32, b: u32| (a + b) % 7 != 0;
+        for _ in 0..2 {
+            let (dist, label) = dijkstra(&geo, &src, allow, 0.4);
+            let mut sparse = dijkstra_sparse(&geo, &src, allow, 0.4);
+            sparse.sort_unstable_by_key(|x| x.0);
+            let dense: Vec<(u32, f64, u32)> = (0..3000u32)
+                .filter(|&v| dist[v as usize].is_finite())
+                .map(|v| (v, dist[v as usize], label[v as usize]))
+                .collect();
+            assert!(dense.len() > 100 && dense.len() < 3000);
+            assert_eq!(sparse, dense);
+        }
+    }
 
     #[test]
     fn dijkstra_distances_follow_the_mesh() {

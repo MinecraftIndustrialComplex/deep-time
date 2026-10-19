@@ -212,6 +212,29 @@ impl SphereMesh {
         Ok(mesh)
     }
 
+    /// The same triangulation over `points`, this mesh's points turned by one rotation (unit
+    /// vectors, one per point, in the same order). A rotation keeps every face's orientation and
+    /// its empty circumcircle, so the triangles, their neighbours and the skipped points carry
+    /// over; only where four points are cocircular to rounding may the diagonal differ from the
+    /// one [`SphereMesh::build`] would pick for the turned points, and either is Delaunay
+    /// (P1-19: the plate model's resamplings turn one lattice instead of triangulating each).
+    pub fn turned(&self, points: Vec<DVec3>) -> SphereMesh {
+        assert_eq!(
+            points.len(),
+            self.points.len(),
+            "one turned point per point"
+        );
+        let fixed = points.par_iter().map(|&p| snap(p)).collect();
+        SphereMesh {
+            points,
+            fixed,
+            triangles: self.triangles.clone(),
+            neighbors: self.neighbors.clone(),
+            vertex_triangle: self.vertex_triangle.clone(),
+            skipped: self.skipped.clone(),
+        }
+    }
+
     /// The points, normalised; vertex indices refer to this slice.
     pub fn points(&self) -> &[DVec3] {
         &self.points
@@ -866,6 +889,31 @@ mod tests {
             t
         };
         assert_eq!(canon(&a), canon(&b));
+    }
+
+    /// A turned triangulation is the turned points' (P1-19): it faces outward and is locally
+    /// Delaunay on the turned points' own snapped coordinates, and point location works on it.
+    #[test]
+    fn a_turned_triangulation_is_the_turned_points_own() {
+        let mut rng = SplitMix64::new(23);
+        for n in [1_000, 20_000, 100_000] {
+            let mesh = SphereMesh::build(&fibonacci_sphere(n)).unwrap();
+            for _ in 0..3 {
+                let axis = rng.unit_vector();
+                let q = glam::DQuat::from_axis_angle(axis, 0.3 + 2.0 * rng.unit_vector().x.abs());
+                let pts: Vec<DVec3> = mesh.points().iter().map(|&p| (q * p).normalize()).collect();
+                let turned = mesh.turned(pts.clone());
+                assert_eq!(euler_characteristic(&turned), 2, "n={n}");
+                check_mesh(&turned);
+                for (i, &p) in pts.iter().enumerate().step_by(97) {
+                    let t = turned.locate(p, 0);
+                    assert!(
+                        turned.triangles()[t as usize].contains(&(i as u32))
+                            || turned.contains(t, p)
+                    );
+                }
+            }
+        }
     }
 
     /// Brute force on a small set: every point lies on or below every face's plane.
