@@ -124,9 +124,9 @@ pub struct Feature {
     pub rock: u16,
 }
 
-/// A structure that has had no continental crust under or beside it for this many plate steps is
-/// lost (its crust went under another plate).
-pub const LOST_AFTER_STEPS: u8 = 10; // ledger: DEF-035
+/// A structure that has had no continental crust under or beside it for longer than this is lost
+/// (its crust went under another plate), Myr (10 plate steps at the 2-Myr step).
+pub const LOST_AFTER_MYR: f64 = 20.0; // ledger: DEF-035
 
 /// How far (L1 cells) a structure over oceanic crust looks for its continent's edge.
 const EDGE_CELLS: i64 = 3; // ledger: DEF-035
@@ -142,7 +142,7 @@ pub struct Counts {
     pub saturated: u64,
     /// Old structures that gave way to a new one at a place that was full.
     pub overprinted: u64,
-    /// Lost: no continental crust under them for [`LOST_AFTER_STEPS`] plate steps.
+    /// Lost: no continental crust under them for longer than [`LOST_AFTER_MYR`].
     pub subducted: u64,
     pub stocks: u64,
     pub dykes: u64,
@@ -376,7 +376,7 @@ pub fn wear(features: &mut [Feature], grid: &GridDesc, material_m: &[f32]) {
 /// plate a collision welded it to). A structure is born on continental crust, so oceanic crust
 /// under it means it sits at its continent's edge or left a boundary cell with the wrong plate:
 /// it takes the plate of the nearest continental cell within three cells. Only one with no
-/// continent that near for [`LOST_AFTER_STEPS`] steps is dropped.
+/// continent that near for longer than [`LOST_AFTER_MYR`] is dropped.
 pub fn advance(
     features: &mut Vec<Feature>,
     grid: &GridDesc,
@@ -438,7 +438,7 @@ pub fn advance(
             return true;
         }
         f.adrift = f.adrift.saturating_add(1);
-        if f.adrift > LOST_AFTER_STEPS {
+        if f64::from(f.adrift) * dt_yr > LOST_AFTER_MYR * 1.0e6 {
             counts.subducted += 1;
             return false;
         }
@@ -532,18 +532,44 @@ mod tests {
         let other = vec![3.0f32; n];
         let ocean = vec![0.0f32; n];
         let alive = |_: u32| [0.0, 0.0, 1.0e-12];
-        advance(&mut fs, &grid, &alive, 0.0, &other, &ocean, &mut counts);
+        let step = 2.0e6;
+        advance(&mut fs, &grid, &alive, step, &other, &ocean, &mut counts);
         assert_eq!((fs.len(), fs[0].plate, fs[0].adrift), (1, 0, 1));
         // Back on continental crust: the count starts again.
-        advance(&mut fs, &grid, &alive, 0.0, &plate, &crust, &mut counts);
+        advance(&mut fs, &grid, &alive, step, &plate, &crust, &mut counts);
         assert_eq!(fs[0].adrift, 0);
-        // Off continental crust for good: lost after LOST_AFTER_STEPS steps.
-        for _ in 0..LOST_AFTER_STEPS {
-            advance(&mut fs, &grid, &alive, 0.0, &other, &ocean, &mut counts);
+        // Off continental crust for good: lost once that has lasted longer than LOST_AFTER_MYR
+        // (10 steps of 2 Myr kept, the 11th drops it) ...
+        for _ in 0..10 {
+            advance(&mut fs, &grid, &alive, step, &other, &ocean, &mut counts);
             assert_eq!(fs.len(), 1);
         }
-        advance(&mut fs, &grid, &alive, 0.0, &other, &ocean, &mut counts);
+        advance(&mut fs, &grid, &alive, step, &other, &ocean, &mut counts);
         assert!(fs.is_empty() && counts.subducted == 1);
+        // ... and at 4-Myr steps after the same time: 5 kept, the 6th drops it.
+        let mut fs4 = vec![fold(100.0, 50.0, 0.0)];
+        for _ in 0..5 {
+            advance(
+                &mut fs4,
+                &grid,
+                &alive,
+                2.0 * step,
+                &other,
+                &ocean,
+                &mut counts,
+            );
+            assert_eq!(fs4.len(), 1);
+        }
+        advance(
+            &mut fs4,
+            &grid,
+            &alive,
+            2.0 * step,
+            &other,
+            &ocean,
+            &mut counts,
+        );
+        assert!(fs4.is_empty() && counts.subducted == 2);
         // Its plate gone and oceanic crust under it, a continent one cell away: that plate.
         let mut fs = vec![fold(100.0, 50.0, 0.0)];
         let c0 = cell_of(&grid, 100.0, 50.0);

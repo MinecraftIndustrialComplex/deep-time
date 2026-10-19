@@ -255,7 +255,7 @@ pub struct Contact {
     pub onset_myr: f64,
     /// The step it was first seen.
     pub onset_step: u64,
-    /// Its subduction_onset event, written once the contact has lasted `CONFIRM_STEPS` (short
+    /// Its subduction_onset event, written once the contact has lasted `CONFIRM_MYR` (short
     /// flickers at transform boundaries never get one).
     pub onset_event: Option<EventId>,
     /// Slab age at the onset, Myr.
