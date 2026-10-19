@@ -1630,9 +1630,13 @@ pub fn step(
                 fr[i] = (RHO_MANTLE * (load + ice_share * ice - w_new) / restoring) as f32;
             }
         });
-    // The sum in cell order on this thread, beside the copies (P1-19).
+    // The sum in cell order on this thread, beside the copies (P1-19). The seen elevation is
+    // written over the last one where it has the size, so the copy of the deflection is the only
+    // new grid here (two side by side went over the memory cap).
     let hh: &[f64] = h;
-    let ((sum, peak), (seen, deflection)) = rayon::join(
+    let mut seen = std::mem::take(&mut st.seen_elevation_m);
+    let deflection_now: &[f32] = &st.deflection_m;
+    let ((sum, peak), ((), deflection)) = rayon::join(
         || {
             let (mut sum, mut peak) = (0.0, 0.0f64);
             for &change in &changes {
@@ -1643,8 +1647,16 @@ pub fn step(
         },
         || {
             rayon::join(
-                || hh.par_iter().map(|&z| z as f32).collect(),
-                || crate::alloc::copied(&st.deflection_m),
+                || {
+                    if seen.len() == hh.len() {
+                        seen.par_iter_mut()
+                            .zip(hh.par_iter())
+                            .for_each(|(s, &z)| *s = z as f32);
+                    } else {
+                        seen = hh.par_iter().map(|&z| z as f32).collect();
+                    }
+                },
+                || crate::alloc::copied(deflection_now),
             )
         },
     );
