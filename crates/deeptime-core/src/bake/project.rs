@@ -37,6 +37,7 @@ use deeptime_format::bodies::{read_bodies, write_bodies};
 use deeptime_format::projection::{
     BorderSpec, PetroffGuyou, Projection, ProjectionKind, WorldProjection, lat_lon_of_unit,
 };
+use deeptime_format::raster::{bilinear_weights, cover_of};
 use deeptime_format::rivers::{Chain, Mouth, RiverVertex, Rivers, read_rivers, write_rivers};
 use deeptime_format::sites::{read_sites, write_sites_in};
 use deeptime_format::structure::{Shape, read_structure, write_structure};
@@ -135,11 +136,24 @@ enum Kind {
     Point,
     /// The nearest cell's bytes (horizon stacks).
     Stack,
+    /// A cover layer (`climate/ice_cover`), by the cover rule (`deeptime_format::raster::cover_of`):
+    /// the world cell is covered where the nearest cell is, the same cell the categories beside it
+    /// read (so a covered world cell is of the cover's class, `climate/koppen_l2` EF), at the mean
+    /// depth of the footprint's samples that are covered, each read by the rule at its block. The
+    /// footprint mean of the blocks covered every world cell that one covered sample reached (one
+    /// block from a 12-block margin's twelfth), so the cover's area grew with the footprint, most
+    /// where it is widest, at the poles (ledger BIO-159, SCL-090).
+    Cover,
 }
+
+/// The layers read by the cover rule ([`Kind::Cover`]).
+const COVER: [&str; 1] = ["climate/ice_cover"];
 
 fn kind_of(desc: &LayerDesc) -> Kind {
     if desc.dtype == DType::HorizonStack {
         Kind::Stack
+    } else if COVER.contains(&desc.name.as_str()) {
+        Kind::Cover
     } else if CATEGORICAL.contains(&desc.name.as_str()) || desc.units == "flag" {
         Kind::Categorical
     } else if desc.units == "vanilla_param" {
@@ -209,6 +223,27 @@ impl Src {
         let a = v00 + (v10 - v00) * fu;
         let b = v01 + (v11 - v01) * fu;
         a + (b - a) * fv
+    }
+
+    /// The cover rule's raw value at block (x, z) (the arithmetic of `RasterRead::cover`).
+    #[inline]
+    fn cover(&self, x: f64, z: f64) -> f64 {
+        let g = &self.layer.desc.grid;
+        let u = (x - g.origin_block_x as f64) / f64::from(g.r);
+        let v = (z - g.origin_block_z as f64) / f64::from(g.r);
+        let (fi, fj) = (u.floor(), v.floor());
+        let (i0, j0) = (fi as i64, fj as i64);
+        let w = bilinear_weights(u - fi, v - fj);
+        let (ci, cj) = self.nearest_cell(x, z);
+        cover_of(
+            self.raw(i64::from(ci), i64::from(cj)),
+            [
+                (self.raw(i0, j0), w[0]),
+                (self.raw(i0 + 1, j0), w[1]),
+                (self.raw(i0, j0 + 1), w[2]),
+                (self.raw(i0 + 1, j0 + 1), w[3]),
+            ],
+        )
     }
 }
 
@@ -617,6 +652,28 @@ fn resample_grid(map: &Mapping, srcs: &[Src], wg: &GridDesc) -> Vec<Vec<u8>> {
                                     v
                                 };
                                 put_raw(s.layer.desc.dtype, v, cell);
+                            }
+                            Kind::Cover => {
+                                // Covered where the nearest cell is, as the class beside it
+                                // (`Categorical`), at the footprint's covered samples' depth.
+                                let (ci, cj) = s.nearest_cell(f.xs, f.zs);
+                                let nearest = s.raw(i64::from(ci), i64::from(cj));
+                                let samples = (0..nz).flat_map(|kz| {
+                                    let dz = if nz == 1 {
+                                        0.0
+                                    } else {
+                                        -f.hz + 2.0 * f.hz * kz as f64 / (nz - 1) as f64
+                                    };
+                                    (0..nx).map(move |kx| {
+                                        let dx = if nx == 1 {
+                                            0.0
+                                        } else {
+                                            -f.hx + 2.0 * f.hx * kx as f64 / (nx - 1) as f64
+                                        };
+                                        (s.cover(f.xs + dx, f.zs + dz), 1.0)
+                                    })
+                                });
+                                put_raw(s.layer.desc.dtype, cover_of(nearest, samples), cell);
                             }
                             Kind::Continuous => {
                                 let mut sum = 0.0;
@@ -1793,6 +1850,74 @@ mod tests {
         );
     }
 
+    /// The ice cover keeps its area through the projection (BIO-159): the footprint mean of the
+    /// blocks covered every world cell one covered sample reached, so the map's cover outgrew the
+    /// simulation's, most round the poles where the footprint is widest.
+    #[test]
+    fn the_ice_cover_keeps_its_area_on_the_world_grid() {
+        let c_sim = 4096;
+        let g = PetroffGuyou::new(PetroffGuyou::hemisphere_for(c_sim), 30.0);
+        let map = Mapping::new(g, c_sim, 16);
+        let l2 = GridDesc::for_planet("L2", c_sim, 8).unwrap();
+        let (w, h) = (l2.w as usize, l2.h as usize);
+        // A polar cap past 70° and mid-latitude glaciers (blocks of 3 × 3 cells), 12 blocks deep
+        // with a thinner margin cell.
+        let bytes: Vec<u8> = (0..w * h)
+            .map(|k| {
+                let (i, j) = (k % w, k / w);
+                let lat = l2.band_lat_deg(j as u32).abs();
+                if lat > 70.0 || (lat < 55.0 && i % 24 < 3 && j % 24 < 3) {
+                    if i % 24 == 0 { 4 } else { 12 }
+                } else {
+                    0
+                }
+            })
+            .collect();
+        let desc = crate::bake::desc("climate/ice_cover", DType::U8, &l2, 1.0, "blocks", None);
+        let layer = Arc::new(LoadedLayer::new(desc.clone(), bytes).unwrap());
+        let wg = WorldProjection::PetroffGuyou(g).grid("L2", 8).unwrap();
+        let project = |kind: Kind| {
+            let src = Src {
+                entry: 0,
+                layer: layer.clone(),
+                kind,
+                cb: 1,
+            };
+            resample_grid(&map, &[src], &wg).remove(0)
+        };
+        let share = |kind: Kind| {
+            let mut d = desc.clone();
+            d.grid = wg.clone();
+            let world = LoadedLayer::new(d, project(kind)).unwrap();
+            area_share(&world, true, |v| v > 0.0)
+        };
+        // The cover lies on exactly the world cells whose nearest L2 cell is covered, the cells
+        // the class (`climate/koppen_l2`, read nearest) makes EF there (BIO-158), at a depth
+        // between the thinnest and the thickest of its cells.
+        let (cover, nearest) = (project(Kind::Cover), project(Kind::Categorical));
+        let mismatched = cover
+            .iter()
+            .zip(&nearest)
+            .filter(|(c, n)| (**c > 0) != (**n > 0))
+            .count();
+        assert_eq!(mismatched, 0, "cover and nearest class disagree");
+        assert!(cover.iter().all(|&c| c == 0 || (4..=12).contains(&c)));
+        let truth = area_share(&layer, false, |v| v > 0.0);
+        let (cover, mean) = (share(Kind::Cover), share(Kind::Continuous));
+        eprintln!(
+            "ice cover share: simulation {truth:.4}, cover rule {cover:.4}, footprint mean {mean:.4}"
+        );
+        assert!(truth > 0.05, "{truth}");
+        assert!(
+            (cover / truth - 1.0).abs() < 0.05,
+            "cover rule {cover} against {truth}"
+        );
+        assert!(
+            mean / truth > 1.1,
+            "the footprint mean grew it: {mean} against {truth}"
+        );
+    }
+
     /// Flags and codes take the nearest cell: the wetland flag (0 none, 1 swamp, 2 cold) must not
     /// be averaged into swamp between cold wetland and dry land.
     #[test]
@@ -1811,6 +1936,8 @@ mod tests {
         }
         assert_eq!(kind_of(&desc("some/mask", "flag")), Kind::Categorical);
         assert_eq!(kind_of(&desc("elevation", "block")), Kind::Continuous);
+        // The ice cover is read by the cover rule, not averaged (BIO-159).
+        assert_eq!(kind_of(&desc("climate/ice_cover", "blocks")), Kind::Cover);
         // The climate's band coordinates are read at the point, as the Köppen class beside them.
         assert_eq!(
             kind_of(&desc("climate/vegetation", "vanilla_param")),

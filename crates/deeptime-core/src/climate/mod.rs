@@ -1776,12 +1776,13 @@ impl ClimateStage {
                 }
                 let above = h[c] - sea + f64::from(thick[c]) - f64::from(ela_pub[c]);
                 let pr = precip_m.as_ref().map_or(0.5, |v| f64::from(v[c]) / 1000.0);
-                if above >= 0.0 {
-                    (p.ice_accumulation_gradient * above)
-                        .min(p.ice_accumulation_max_m_yr * pr.max(0.0)) as f32
-                } else {
-                    (p.ice_ablation_gradient * above) as f32
-                }
+                ice::surface_balance(
+                    above,
+                    pr,
+                    p.ice_accumulation_gradient,
+                    p.ice_ablation_gradient,
+                    p.ice_accumulation_max_m_yr,
+                ) as f32
             })
             .collect();
         put(world, field::ICE_BALANCE, balance);

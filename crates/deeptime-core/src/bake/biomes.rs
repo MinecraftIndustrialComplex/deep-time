@@ -31,10 +31,14 @@
 //! | BWk, mean at or below 0 °C | 0.6 … 0.8 by the warmest month, humidity 1.5 (like barren EF) | snowy plains; Terralith's gravel desert, cold shrubland |
 //! | BSk | as C or D by its coldest month | plains, meadow |
 //!
-//! Land above its equilibrium line (`climate/glacier`) is capped at 0.35 (ice), except a class with a
-//! `glaciated` block in the placement table: EF (ice-cap climate) is held at 0.6 … 0.8 whether
-//! glaciated or not, because Terralith puts its dry cold biomes (gravel desert, cold shrubland) above
-//! band 0.5 and its red, terracotta snowy badlands below it; what differs is the humidity, below.
+//! Glaciated land is capped at 0.35 (ice), except a class with a `glaciated` block in the placement
+//! table: EF (ice-cap climate) is held at 0.6 … 0.8 whether glaciated or not, because Terralith puts
+//! its dry cold biomes (gravel desert, cold shrubland) above band 0.5 and its red, terracotta snowy
+//! badlands below it; what differs is the humidity, below. Where the class is decided on L2 the
+//! glaciated land is the ice cover's (`climate/ice_cover`, [`super::ice`]), and a covered cell is
+//! EF whatever its ground's months say: the ice surface is the climate the biome stands in, and a
+//! valley glacier's tongue in a temperate class is still ice (BIO-158). Where it is decided on L1
+//! the climate's glacier flag (`climate/glacier`) says which land is glaciated.
 //! The sea's own
 //! temperature (sea ice below −2 °C → frozen, 6, 18, 25 °C → cold, temperate, warm, hot oceans)
 //! drives the ocean biomes.
@@ -685,6 +689,11 @@ pub struct Climate<'a> {
     pub aridity: Option<&'a Field>,
     pub koppen: &'a Field,
     pub glacier: Option<&'a Field>,
+    /// The ice cover on L2 (`climate/ice_cover`, blocks; [`super::ice`]): where the L2 class is
+    /// decided, a covered land cell is glaciated and EF, whatever its ground's months say (the ice
+    /// surface is the climate there; BIO-158), and an uncovered one is not glaciated. Without it
+    /// the L1 glacier flag decides.
+    pub ice_cover: Option<&'a [u8]>,
     /// The twelve monthly sea-level temperatures and precipitation rates on L1 (the climate's
     /// last snapshot, P1-25) and the lapse rate: with them the Köppen class is decided on L2
     /// (P1-26, Ben 2026-10-02, "classify on L2"), so biome borders do not step with the L1 cells.
@@ -963,7 +972,13 @@ fn coords_l2(
                     let pm: [f64; 12] = std::array::from_fn(|m| {
                         f64::from(super::bilinear(mo.p[m], bx, bz)).max(0.0) / 12.0
                     });
-                    let class = koppen::classify(&t, &pm);
+                    // Under the cover the class is the ice's (BIO-158); off it, the ground's.
+                    let covered = c.ice_cover.map(|cv| cv[k] > 0);
+                    let class = if covered == Some(true) {
+                        koppen::EF
+                    } else {
+                        koppen::classify(&t, &pm)
+                    };
                     let tm = t.iter().sum::<f64>() / 12.0;
                     let tw = t.iter().cloned().fold(f64::MIN, f64::max);
                     let tc = t.iter().cloned().fold(f64::MAX, f64::min);
@@ -973,7 +988,9 @@ fn coords_l2(
                     } else {
                         10.0
                     };
-                    let glacier = c.glacier.is_some_and(|f| super::nearest(f, bx, bz) >= 0.5);
+                    let glacier = covered.unwrap_or_else(|| {
+                        c.glacier.is_some_and(|f| super::nearest(f, bx, bz) >= 0.5)
+                    });
                     let placed = placement.place(
                         class,
                         &Site {
@@ -1759,6 +1776,7 @@ mod tests {
             koppen: &kp,
             months: None,
             glacier: Some(&gl),
+            ice_cover: None,
         };
         let g = Ground {
             elevation_m: &elev,
@@ -1811,6 +1829,7 @@ mod tests {
             aridity: None,
             koppen: &kp,
             glacier: None,
+            ice_cover: None,
             months: Some(Months {
                 t_sl: std::array::from_fn(|m| &t_sl[m]),
                 p: std::array::from_fn(|m| &p_m[m]),
@@ -1866,6 +1885,101 @@ mod tests {
         assert!(
             same as f64 >= 0.9 * all as f64,
             "{same} of {all} agree at the L1 centres"
+        );
+    }
+
+    /// The class under the ice is the ice's (BIO-158): with the L2 cover given, a covered cell is
+    /// EF and glaciated whatever its ground's months say, and the L1 glacier flag no longer
+    /// glaciates the uncovered ground around it.
+    #[test]
+    fn covered_l2_cells_are_glaciated_ef_and_the_rest_keep_their_ground_s_class() {
+        let c = 1024u32;
+        let l1 = GridDesc::for_planet("L1", c, 16).unwrap();
+        let l2 = GridDesc::for_planet("L2", c, 8).unwrap();
+        let (w1, h1) = (l1.w as usize, l1.h as usize);
+        let (w2, h2) = (l2.w as usize, l2.h as usize);
+        let field = |v: &dyn Fn(usize) -> f32| Field {
+            grid: l1.clone(),
+            data: (0..w1 * h1).map(v).collect(),
+        };
+        // A mild oceanic climate everywhere (Cfb on low ground), the glacier flag set everywhere.
+        let t_sl: Vec<Field> = (0..12)
+            .map(|m| {
+                let s = (std::f64::consts::TAU * (m as f64 - 0.5) / 12.0).cos();
+                field(&|_| (10.0 - 6.0 * s) as f32)
+            })
+            .collect();
+        let p_m: Vec<Field> = (0..12).map(|_| field(&|_| 1200.0)).collect();
+        let kp = field(&|_| f32::from(koppen::index("Cfb").unwrap()));
+        let tm = field(&|_| 10.0);
+        let gl = field(&|_| 1.0);
+        let elev = vec![50.0f32; w2 * h2];
+        // The cover: an 8 × 8 block of L2 cells.
+        let inside = |i: usize, j: usize| (20..28).contains(&i) && (20..28).contains(&j);
+        let cover: Vec<u8> = (0..w2 * h2)
+            .map(|k| if inside(k % w2, k / w2) { 6 } else { 0 })
+            .collect();
+        let months = || Months {
+            t_sl: std::array::from_fn(|m| &t_sl[m]),
+            p: std::array::from_fn(|m| &p_m[m]),
+            lapse_c_per_km: 6.5,
+        };
+        let climate = Climate {
+            t_mean: &tm,
+            t_warm: None,
+            t_cold: None,
+            aridity: None,
+            koppen: &kp,
+            glacier: Some(&gl),
+            ice_cover: Some(&cover),
+            months: Some(months()),
+        };
+        let g = Ground {
+            elevation_m: &elev,
+            sea_level_m: 0.0,
+            l1: &l1,
+            l2: &l2,
+            seed: 3,
+            circumference: c,
+        };
+        let m = map(
+            Some(&climate),
+            &g,
+            &BiomeParams::default(),
+            placement::builtin(),
+        );
+        let k2 = &m.class_l2;
+        let cfb = koppen::index("Cfb").unwrap();
+        for j in 0..h2 {
+            for i in 0..w2 {
+                let want = if inside(i, j) { koppen::EF } else { cfb };
+                assert_eq!(k2[j * w2 + i], want, "L2 cell ({i}, {j})");
+            }
+        }
+        // Covered: the frozen band, as glaciated EF is placed. Off the cover the flag no longer
+        // caps the ground at the ice band: it keeps its class's temperate band.
+        let b = &reference().bands;
+        let t_band = |i: usize, j: usize| {
+            band_coord(&b.temperature, f64::from(m.layers[0][j * w2 + i])).floor() as usize
+        };
+        assert_eq!(t_band(24, 24), 0, "under the cover");
+        assert!(t_band(4, 24) >= 2, "off the cover: {}", t_band(4, 24));
+        // Without the cover the flag decides, as before: glaciated Cfb is capped at the ice band.
+        let flagged = Climate {
+            ice_cover: None,
+            months: Some(months()),
+            ..climate
+        };
+        let m = map(
+            Some(&flagged),
+            &g,
+            &BiomeParams::default(),
+            placement::builtin(),
+        );
+        assert!(m.class_l2.iter().all(|&k| k == cfb));
+        assert_eq!(
+            band_coord(&b.temperature, f64::from(m.layers[0][24 * w2 + 4])).floor() as usize,
+            0
         );
     }
 

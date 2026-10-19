@@ -13,9 +13,54 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The ice cover (Ben, 2026-09-30, "Force snow/ice cover"): the layer the bake writes from the climate
- * stage's equilibrium line, the table recorded beside it, and the block mix of a cover.
+ * stage's land ice, the table recorded beside it, the rule it is read by, and the block mix of a cover.
  */
 class IceCoverTest {
+
+    /** The cover rule's vectors: deeptime-format's {@code the_nearest_cell_decides_and_the_covered_cells_blend} holds the same ones. */
+    @Test
+    void theNearestCellDecidesAndTheCoveredCellsBlend() {
+        assertEquals(8.0, RasterSampler.coverOf(8, new double[] {8, 0}, new double[] {0.5, 0.5}));
+        assertEquals(7.0, RasterSampler.coverOf(4, new double[] {4, 8, 0}, new double[] {0.25, 0.75, 0}));
+        assertEquals(0.0, RasterSampler.coverOf(0, new double[] {12, 0}, new double[] {0.75, 0.25}));
+        assertEquals(12.0, RasterSampler.coverOf(12, new double[] {12, 0}, new double[] {0.25, 0.75}));
+        assertEquals(0.0, RasterSampler.coverOf(Double.NaN, new double[] {6}, new double[] {1}));
+        assertEquals(6.0, RasterSampler.coverOf(6, new double[] {Double.NaN, 6}, new double[] {0.75, 0.25}));
+        assertEquals(5.0, RasterSampler.coverOf(5, new double[] {0}, new double[] {1}));
+        assertEquals(5.0, RasterSampler.coverOf(5, new double[] {}, new double[] {}));
+        assertEquals(0.0, RasterSampler.coverOf(0, new double[] {}, new double[] {}));
+    }
+
+    /**
+     * On the baked planet a cover's edge lies half-way between a covered cell and its bare neighbour: a bilinear read
+     * rounded to blocks put a 12-block cell's cover most of a cell past it.
+     */
+    @Test
+    void aCoversEdgeLiesHalfWayToItsBareNeighbour() {
+        WorldData wd = WorldData.open(Fixtures.world("planet4k"));
+        IceCover cover = wd.iceCover().orElseThrow();
+        RasterSampler layer = wd.layer(IceCover.LAYER);
+        var g = layer.desc().grid();
+        int edges = 0;
+        for (int j = 0; j < g.h(); j++) {
+            for (int i = 0; i + 1 < g.w(); i++) {
+                int v = (int) layer.get(i, j);
+                if (v == 0 || layer.get(i + 1, j) != 0)
+                    continue;
+                edges++;
+                int x = (int) (g.originBlockX() + (long) i * g.r()), z = (int) (g.originBlockZ() + (long) j * g.r());
+                int r = g.r();
+                assertEquals(v, cover.blocks(x + r / 2 - 1, z), "inside the half-way line of cell (" + i + ", " + j + ")");
+                assertEquals(0, cover.blocks(x + r / 2 + 1, z), "past the half-way line of cell (" + i + ", " + j + ")");
+                // The nearest cell decides, as it decides the block's class: covered exactly where it is covered.
+                for (int d = -r; d <= 2 * r; d++)
+                    for (int e = -r; e <= r; e += r / 2)
+                        assertEquals(layer.nearest(x + d, z + e) > 0, cover.blocks(x + d, z + e) > 0,
+                                "the nearest cell decides at (" + (x + d) + ", " + (z + e) + ")");
+            }
+        }
+        assertTrue(edges > 0, "the planet's cover has an eastern edge");
+    }
 
     private static final String RECORD = """
             {"bake": {"climate": {"ice_cover": {"step_m": 160.0, "max_blocks": 12, "snow_blocks": 3,
@@ -63,7 +108,7 @@ class IceCoverTest {
         assertEquals("SSSSD", mix(thin, 5));
     }
 
-    /** The baked 4k planet has the layer, the record and a cover that reads the layer bilinearly. */
+    /** The baked 4k planet has the layer, the record and a cover that reads each cell's value at its own block. */
     @Test
     void theBakedPlanetHasItsCover() {
         WorldData wd = WorldData.open(Fixtures.world("planet4k"));
@@ -78,7 +123,7 @@ class IceCoverTest {
                 int v = (int) layer.get(i, j);
                 thickest = Math.max(thickest, v);
                 if (v > 0) {
-                    // At a cell's own block the bilinear read is the cell.
+                    // At a cell's own block the cover rule reads the cell.
                     int x = (int) (g.originBlockX() + (long) i * g.r()), z = (int) (g.originBlockZ() + (long) j * g.r());
                     assertEquals(v, cover.get().blocks(x, z), "cell (" + i + ", " + j + ")");
                 }
