@@ -288,7 +288,40 @@ build log):
 
 ## 11. Natives build per platform
 
-(pending: the cross-build checks)
+**Measured** on the VM (2026-10-19) with `tools/natives/build-natives.sh` as it stood at the branch
+point (release profile; cargo-zigbuild for Linux and macOS, cargo-xwin for Windows): all eight
+libraries built and passed the script's own checks, unchanged. No build tool, SDK or licence was
+added: wgpu's backends are Rust crates that load their drivers at run time.
+
+| platform | GPU path | backends | linked at build time | loaded at run time |
+|---|---|---|---|---|
+| linux x86_64, aarch64 (gnu) | on | Vulkan | libc, libm, libpthread, libdl, as before; highest GLIBC symbol still 2.17 | `libvulkan.so.1`, the system's Vulkan loader (wgpu-hal through ash's `Entry::load`) |
+| linux x86_64, aarch64 (musl) | on | Vulkan | `libc.so` only, as before | the same |
+| windows x86_64, aarch64 | on | DX12, Vulkan | adds `dxgi.dll`, `setupapi.dll`, `oleaut32.dll` and `user32.dll` (all part of Windows) to the imports it had (ntdll, kernel32, bcryptprimitives, `VCRUNTIME140.dll`, the CRT's api sets) | `d3d12.dll`; `dxcompiler.dll` when it is on the PATH, else `d3dcompiler_47.dll` (FXC, part of Windows 10 and 11); `vulkan-1.dll` |
+| macos x86_64, aarch64 | **off** | none built | libSystem, libiconv, libcharset, as before; minimum macOS 11.7.1 | nothing |
+
+- **Run time.** A machine without the loader or a driver opens no adapter, and `auto` runs on the
+  CPU (section 3); nothing is shipped for it. DX12 and FXC are part of Windows; Vulkan's loader
+  comes with the GPU vendors' drivers, and on Linux with the distribution's Mesa or vendor driver.
+- **Size** (measured: the same release build of the branch with the feature off in
+  `deeptime-jni`, `cargo tree` then listing no wgpu crate): linux-x86_64-gnu 13,778,008 to
+  18,456,896 bytes (+4.7 MB, +34 %), windows-x86_64 16,842,240 to 22,758,912 bytes (+5.9 MB,
+  +35 %); the other Linux and Windows libraries alike. The jar carries one library per platform
+  and CPU level, so it grows by about 5 MB a library before compression.
+- **macOS: off, and why.** wgpu's Metal backend (objc2-metal, objc2-quartz-core,
+  objc2-foundation) links Apple's frameworks Metal, QuartzCore and Foundation at build time. The
+  natives are cross-built from Linux with zig's libSystem stubs and no Apple SDK (the build warns
+  that `xcrun` is missing), so the frameworks are not there to link against. **Measured:** the
+  same zig build of macos-aarch64 with the feature forced on fails at the link, "unable to find
+  dynamic system library 'objc'" (objc2's runtime, the first of the Apple libraries it needs).
+  `deeptime-jni`'s `Cargo.toml` turns the feature on for every target except macOS, so the dylibs
+  are as before. Turning it on needs one of: building the two macOS libraries on a Mac with Xcode
+  (CI's macOS runners have it), or an Apple SDK on the build host, whose licence allows use only on
+  Apple hardware. Either is a change to how the natives are built (plan §6.4), so it waits for
+  Ben. Apple silicon has a capable integrated GPU, so this is the largest gap the path has.
+- **The CLI** (`deeptime`, a developer tool) turns the feature on for every host it builds on.
+- **After master's natives change** (`ship` profile with fat LTO, a baseline and an x86-64-v3
+  library per x86-64 platform; merged into this branch at 5cf2f9bb): NATIVES_MERGE_PLACEHOLDER
 
 ## 12. The next kernels, in order, once the CPU branches land
 
