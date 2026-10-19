@@ -15,6 +15,13 @@ Statements are marked **measured** (a run made for this page), **read** (from th
 
 ## Summary
 
+- **P1-19 exit item 1, the stages of one step side by side (2026-10-18; below)**: measured, the
+  same run on master 991354a4. The structure step now runs beside the next plate step, the only
+  pair of a step's stages with no data between them. Side by side: 1,485.8 → **1,430.5 s
+  (1.039×)** at others' load 4.8, 1,883.5 → 1,864.7 s (1.010×) under load; worlds identical (84
+  of 84 files). Quiet on set A: **1,290.1 s**, 1.43× the gate. The other overlaps (deposits
+  beside young and amplify, keyframes beside the next step, the deposit stage beside the group)
+  would take at most about 110 s more (estimated), so the gate still needs less work per step.
 - **P1-19 exit item 1, full 16k on eight pinned cores (2026-10-18; below)**: measured, 8 threads,
   1000 Myr, scattered continents, held to one CPU of each of 8 physical cores, worlds identical
   (84 of 84 files). Side by side with master e34dbe54: 2,255.8 → **1,990.4 s** and 2,316.0 →
@@ -359,7 +366,8 @@ shares the threads with the plate step's own spread part. The bounds are 60 s (o
 part hidden) and 123 s (all of it). Rayon's stealing lets a plate thread that waits in a join pick
 up structure work, which lengthens the plate step's own one-core path, so the lower end is the
 likelier: **45 to 65 s per 1000 Myr (estimated)**, the quiet run from 1,382 s to about 1,315 to
-1,340 s. The 20 keyframe steps and the last one (21 of 500) run on the world as before.
+1,340 s. The 20 keyframe steps (every 50 Myr, the last step among them) run on the world as
+before, so 480 of the 500 steps run beside the plates.
 
 Its cost: the session (the put-off step, the join, the `Stage` methods for detaching) and the
 structure stage (its step split from its outputs; its fold and fault causes cached instead of
@@ -385,6 +393,68 @@ or are outside one step, so A is the one implemented here.
   working set is gone.
 - At full 16k the history is mostly on disk (14.8 MiB resident at the end), so the extra working
   set comes out of the run's headroom under its cap, not out of the history's frames (inferred).
+
+### Measured (A, 2026-10-18)
+
+Method as in the section above: `tools/review/bench-quiet.py`, full 16k, scattered continents,
+1000 Myr, 8 threads; set A = CPUs 0, 16, 2, 18, 4, 20, 6, 22 and set B = 8, 24, 10, 26, 12, 28,
+14, 30. Each pair was one admitted job (`sim:earthlike_full_16k:16t`), the quiet run one
+`sim:earthlike_full_16k:8t` job started once the 1-minute load had stayed under 6 for three
+minutes. Master = 991354a4 (the polar-holes flexure fix), branch = cb270657, its merge of that
+master. Every branch world equals master's, **84 of 84 files** in both pairs and in the quiet run
+(`tools/review/p1-17-cmp.py`; the quiet run against the second pair's master world).
+
+| stage (s) | master (A) | branch (B) | master (B) | branch (A) | branch (A), quiet |
+|---|---:|---:|---:|---:|---:|
+| plates (the structure steps beside it included on the branch) | 487.7 | 532.2 | 354.6 | 373.6 | 321.9 |
+| climate | 270.5 | 277.1 | 216.0 | 212.9 | 197.5 |
+| surface | 747.4 | 768.1 | 572.6 | 575.7 | 515.7 |
+| volcanoes | 40.0 | 41.1 | 30.3 | 30.2 | 28.4 |
+| impacts | 4.3 | 4.3 | 3.4 | 3.4 | 3.3 |
+| structure (on the world) | 150.1 | 56.6 | 129.0 | 50.1 | 47.6 |
+| structure beside the plates | | 101 | | 79 | 74 |
+| deposits | 101.6 | 101.5 | 100.7 | 102.9 | 97.0 |
+| young | 13.2 | 13.7 | 12.9 | 12.7 | 12.8 |
+| amplify | 25.4 | 26.0 | 24.5 | 24.5 | 24.2 |
+| finalize | 40.6 | 41.3 | 39.6 | 42.3 | 39.4 |
+| **total** | **1,883.5** | **1,864.7** | **1,485.8** | **1,430.5** | **1,290.1** |
+| × master | | **1.010** | | **1.039** | |
+| plates + structure | 637.8 | 588.8 | 483.6 | 423.7 | 369.5 |
+| CPU time, user + system | 8,154 + 441 | 8,385 + 448 | 6,725 + 376 | 6,750 + 367 | 6,111 + 337 |
+| the run's CPUs, mean | 4.55 | 4.72 | 4.76 | 4.96 | 4.98 |
+| others' busy CPUs, mean | 14.6 | 14.6 | 4.8 | 4.8 | 0.0 |
+| its cores' SMT siblings busy | 51 % | 59 % | 0 % | 0 % | 0 % |
+| peak, MiB (count) | 4,198 | 4,198 | 4,198 | 4,198 | 4,198 |
+| peak resident (`time -v`), MiB | 4,245 | 4,529 | 4,239 | 4,521 | 4,495 |
+
+- **The gain is the estimate's** (measured): the plate and structure stages together take 49 s
+  (under load) and 60 s (others' load 4.8) less, against the estimated 45 to 65 s. Of master's
+  129 to 150 s structure stage, the 480 steps beside the plates took 74 to 101 s; the 20 steps
+  still taken on the world (the keyframe steps with their layers, and the last with its folds,
+  faults and bodies) take 48 to 57 s.
+- **The run:** 1.039× at others' load 4.8 (1,485.8 → 1,430.5 s) and 1.010× under load (1,883.5
+  → 1,864.7 s, the branch on the set whose siblings were the busier). Under load the cores the
+  plate step leaves idle are fewer, and the stages other than plates and structure moved by up
+  to 21 s between the sets, more than the gain. The pair at the lower load is the better
+  measure of the code.
+- **Quiet: 1,290.1 s** (process wall 1,292.3 s; others' load 0.0, its siblings 0 % busy; CPU
+  6,448 s, 4.98 cores busy). The quiet run of the section above (1,382.3 s) was on older code
+  and a little less quiet, so the 92 s between them is not all this change; a master run as quiet
+  would take about 1,340 s (1,290.1 × 1.039, inferred).
+- **Memory** (measured): the run's estimate is unchanged (peak 4.86 GiB; the coupled group's
+  4.17 GiB, master's too, is one member's own set, above the plate step's plus the
+  structure's), and so is the counted peak (4,198 MiB). The peak resident set rose by about 280 MiB (4,239 to 4,245 → 4,495
+  to 4,529 MiB, 6.6 %), still under the estimate; by inference the allocator's arenas, since the
+  two stages now allocate on the pool's threads at the same time. On the memory test's small
+  planet the resident peak was 101.0 MiB against its 121.1 MiB bound, and every stage held less
+  than its estimate (plates 51.2 against 72.8 MiB); `memory_estimate`, `history_cap` and
+  `session_pool` pass.
+- **What is left to 900 s:** 390 s quiet (1.43× the gate). B, C and D together would take, at
+  their estimates, at most about 110 s, so the gate still needs less work per step (fewer
+  slope-failure iterations, a stronger diffusion preconditioner, a coarser L1 cadence or a longer
+  plate step, all of which change the worlds and are Ben's call) or the one-core items left to
+  `plates/`, `surface/` and `climate/` (the hull, the feedback scatter, the priority flood, the
+  climate clock; about 100 to 150 s, inferred above).
 
 ## Re-measured on the rebuilt VM (2026-10-16)
 
