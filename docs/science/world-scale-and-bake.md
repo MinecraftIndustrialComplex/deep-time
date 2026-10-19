@@ -16,10 +16,10 @@ A Deep Time planet is small. Its circumference is 16,384 or 32,768 blocks, and o
 | [BAK](ledger/BAK.md) | spawn placement | BAK-014 to BAK-016 (3) |
 | [BAK](ledger/BAK.md) | satellite view | BAK-017 to BAK-032 (16) |
 | [BAK](ledger/BAK.md) | synthetic worlds | BAK-033 to BAK-038 (6) |
-| [BAK](ledger/BAK.md) | far terrain | BAK-039 to BAK-042 (4) |
+| [BAK](ledger/BAK.md) | far terrain | BAK-039 to BAK-042, BAK-048 (5) |
 | [BAK](ledger/BAK.md) | Distant Horizons curvature | BAK-043 to BAK-047 (5) |
 
-Rows by status: `verified` 2, `cited-unverified` 6, `calibrated` 2, `game-choice` 76, `uncited` 12.
+Rows by status: `verified` 2, `cited-unverified` 6, `calibrated` 2, `game-choice` 77, `uncited` 12.
 
 ## Material for the stage 2 writer
 
@@ -150,8 +150,8 @@ carries plutonic rock to the world's floor where a pluton's layer is the lowest 
 ## Distant Horizons far terrain and Toroidal World's seam
 
 Far terrain (P3-04) gives Distant Horizons its distant LODs from the baked world data instead of
-from chunks generated far away. Nothing physical is decided here; the rows (BAK-039 to BAK-042)
-are game choices about how far terrain stays the same terrain as the chunks.
+from chunks generated far away. Nothing physical is decided here; the rows (BAK-039 to BAK-042
+and BAK-048) are game choices about how far terrain stays the same terrain as the chunks.
 
 - **The seam.** Every far column folds x into the planet's lap [-C/2, C/2), the period at which
   the world data wraps and at which Toroidal World loops the level, so a section west of x = C/2,
@@ -161,6 +161,32 @@ are game choices about how far terrain stays the same terrain as the chunks.
   2026-10-17: they are part of the tree, not of the ground) and count a column a carver cut
   below far terrain's ground apart (at most one in eight); on the MIC set Terralith's canyon, which
   reaches from y −20 to 70, cut a sea bed two blocks under the water down to y −2 (2026-10-03).
+- **The top block** (BAK-048). A chunk's top blocks come from the pack's surface rule, which runs
+  over the generated chunk; far terrain has no chunk, so a table of soils by biome
+  (`far_terrain/surface.json`) gives them. Since 2026-10-18 far terrain first runs, in the game's own
+  surface-rule code, the leading rules of the level's surface rule that ask nothing of a chunk (the
+  biome, the block's height, the water over it, noise, the random state), and the table stands for
+  the rest. It does so on dry ground, on the sea bed and on a lake's bed: the water pass fills a
+  lake after the surface rule, so the rule saw the ground dry, and keeps the bed as the rule painted
+  it, grass turned to dirt (`WaterBodies.underWater`, which the table's lake beds share); a river's
+  bed is the pass's own sand or gravel. The first rule that reads the chunk ends that part:
+  vanilla's second rule, `above_preliminary_surface`, reads the chunk's noise, so a vanilla world
+  runs only its bedrock floor there and its top blocks are the table's. Expanded Ecosphere paints
+  before that rule: dead brain coral on every warm ocean floor from y 58 to 62 and sand on lukewarm
+  ones, which the seam test met when the planet of 2026-10-18 put the seam in warm ocean (43 of 64
+  columns west of it and 44 east were coral where far terrain drew sand). Run on the sea bed, the
+  rule left 9 of 128 columns west and 16 east coral where far terrain drew sand, all of them lake
+  beds at the coast; run on lake beds too, it left none, and 126 of 128 columns a side had the same
+  top block. The table follows vanilla's rule where it can (since 2026-10-18 a lukewarm ocean's dry
+  ground is grass, as vanilla paints it, and its floor under water sand; only a warm ocean's dry
+  ground is sand). What it cannot say stays a difference: on the same planet 8 of 128 columns west
+  of the seam and 16 east (standalone) were dirt where far terrain drew sand, lukewarm sea floors 3
+  to 7 blocks under the water at the coast. Vanilla's rule makes such a floor sand when the water
+  is over it and grass when it is dry; near land the noise aquifer sets its own water level and had
+  left these dry when the rule ran, and the water pass then filled the sea to its top and turned the
+  grass to dirt. Where the aquifer leaves a floor dry it decides from the chunk's noise (the
+  preliminary surface of the chunks around it), so far terrain cannot run it, and only a floor on
+  the top block's agreement is asserted.
 - **Toroidal World's guard** (Ben, 2026-10-02: "Mixin around TW's guard"). TW 0.19.3 (MIT) refuses
   every Distant Horizons world generator but DH's own on a level it wraps, from DH 3.3.1 on: TW
   makes the seam seamless by reshaping the level's chunk generator and folding DH's section keys,
@@ -180,7 +206,11 @@ are game choices about how far terrain stays the same terrain as the chunks.
   and Terralith's basalt cliffs stood basalt columns 5 to 10 blocks over the ground on 9 (MIC).
   Features over the planet are the planet-wide test's to bound; what the seam test checks is the
   fold. Read before features it found one real difference, which was fixed: Expanded Ecosphere's
-  surface rule cut a black beach east of the seam from y 65 to 67 down to 62 (BIO-156).
+  surface rule cut a black beach east of the seam from y 65 to 67 down to 62 (BIO-156). The seam
+  can lie in the sea, as it did on the planet of 2026-10-18 (its four fixed rows held 3 dry
+  columns west of the seam and 15 east), so the test adds the four rows within C/8 of the equator (the fixed
+  rows' span) where far terrain shows the most dry ground on both sides and asserts that each side compares at least 16
+  dry columns and holds their ground within a block in nine of ten (BAK-042).
   `tools/smoke/run.py --dh` has Distant Horizons generate
   and store sections beside the spawn and centred on the seam, then compares what it stores with
   far terrain and far terrain with the chunks generated afterwards on 160 blocks either side.
