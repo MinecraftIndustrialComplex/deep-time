@@ -149,9 +149,12 @@ impl YoungParams {
 /// eight on a third as many cells, 11 B) raised the stage's counted peak on quick 16k from
 /// 1,322.8 to 1,376.5 MiB (master against the branch, the same run and trace otherwise), 42 B a
 /// cell, so its own arrays are 448 B a cell (445 B on full 16k); 460 left
-/// `tests/memory_estimate.rs` 0.1 MiB short (74.4 MiB held against 74.3). 500 keeps about 10 %
-/// to spare again.
-pub const OWN_BYTES_PER_L2_CELL: u64 = 500;
+/// `tests/memory_estimate.rs` 0.1 MiB short (74.4 MiB held against 74.3). 500 kept about 10 %
+/// to spare again. 2026-10-19, the step's arrays freed as soon as it stops reading them
+/// (`YoungStage::lem`): 275 B a cell on full 16k (the stage alone from a 100 Myr checkpoint,
+/// 2,293 → 1,408 MiB above the world it started with) and about 285 B on the test's small planet
+/// (74.4 → 60.3 MiB held), so 320, 12 % above the larger.
+pub const OWN_BYTES_PER_L2_CELL: u64 = 320;
 
 /// Estimate: the world the surface and the stages after it leave ([`super::retained_bytes`]),
 /// the recorded history, and the stage's own arrays on the L2 grid; ≈ 1 µs per cell per step
@@ -162,7 +165,8 @@ pub const OWN_BYTES_PER_L2_CELL: u64 = 500;
 /// plus 352 B for each cell of a 2:1 grid (the Lambert L2 grid has 1/π as many rows as columns,
 /// not 1/2): 6,049 MiB on full 16k against the 4,143 MiB the stage held (the world 2,010 MiB, its
 /// own arrays 2,133 MiB, the history besides), so the editor refused full at a 5 GiB cap it fits
-/// under. Now 4,485 MiB without the history (quick: 1,240 MiB against 1,105 MiB held).
+/// under. Now 4,485 MiB without the history (quick: 1,240 MiB against 1,105 MiB held); 3,769 MiB
+/// since 2026-10-19 (quick 1,060), against 3,462 and 947 MiB held.
 pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let y = p.young.clone().unwrap_or_default();
     let c = u64::from(p.scale.circumference_blocks);
@@ -431,12 +435,32 @@ impl YoungStage {
 
     /// One LEM step on L2 (the same physics as `SurfaceStage::advance` step 3, without the strata
     /// log, the plates or the climate stage's cadence).
+    ///
+    /// **Memory** (2026-10-19). A step was the run's counted peak on full 16k (4,096 × 1,312 L2
+    /// cells: a byte a cell is 5.1 MiB), so each working array lives only while the step still
+    /// reads it. The step reads its inputs in the world instead of copying them; drops at its start
+    /// the outputs it writes again; lets the stream power's arrays go after its solve, and the
+    /// routing, the fill, the glaciers' climate and their ice state after the glaciers' step (the
+    /// last step routes the surface again at its end, as before); folds the glaciers' erosion and
+    /// till into their fields before the diffusion solve; and writes the drainage area, the lakes
+    /// and the erodibility, which only the stages after it read, on its last step only. The
+    /// arithmetic is unchanged: from one full 16k checkpoint the stage's 17 fields come out the
+    /// same to the bit. Its own peak there fell from 2,293 to 1,408 MiB (447 to 275 B a cell),
+    /// and moved from the diffusion solve to the glaciers' step.
     fn lem(
         &mut self,
         world: &mut WorldState,
         ctx: &StageContext<'_>,
         last: bool,
     ) -> Result<(), CoreError> {
+        /// A field of the step's grid (`n` values), else nothing.
+        fn read<'a>(world: &'a WorldState, name: &str, n: usize) -> &'a [f32] {
+            world
+                .fields
+                .get(name)
+                .filter(|f| f.data.len() == n)
+                .map_or(&[], |f| f.data.as_slice())
+        }
         let g2 = self.l2()?;
         let n = g2.cells();
         ctx.reserve(n as u64 * 16 * 8)?;
@@ -448,230 +472,424 @@ impl YoungStage {
             .as_ref()
             .map(|s| s.sea_level_m)
             .ok_or_else(|| CoreError::InvalidState("the young stage needs the surface".into()))?;
-        let get = |name: &str| -> Result<Vec<f32>, CoreError> {
-            world
-                .fields
-                .get(name)
-                .filter(|f| f.data.len() == n)
-                .map(|f| f.data.clone())
-                .ok_or_else(|| CoreError::InvalidState(format!("the young stage lost {name}")))
+        let has = |world: &WorldState, name: &str| {
+            world.fields.get(name).is_some_and(|f| f.data.len() == n)
         };
-        let z0 = get(field::ELEVATION_M)?;
-        let class = get(field::CLASS)?;
-        let weight = get(field::WEIGHT)?;
-        let uplift = get(field::UPLIFT)?;
+        for name in [
+            field::ELEVATION_M,
+            field::CLASS,
+            field::WEIGHT,
+            field::UPLIFT,
+        ] {
+            if !has(world, name) {
+                return Err(CoreError::InvalidState(format!(
+                    "the young stage lost {name}"
+                )));
+            }
+        }
+        // The glaciers of the glacial state (`glacial.rs`), when the setup found their climate.
+        let glaciated = [field::GLACIAL_ELA, field::T_SEA_LEVEL, field::PRECIP]
+            .iter()
+            .all(|name| has(world, name));
+        // What the step writes again at its end goes now: the step does not read it.
+        for name in [
+            field::ELEVATION,
+            field::DRAINAGE,
+            field::AREA_M2,
+            field::LAKE_M,
+            field::ERODIBILITY,
+            field::ICE,
+        ] {
+            world.fields.remove(name);
+        }
+        if glaciated {
+            world.fields.remove(field::ICE_SURFACE);
+        }
+        // The glaciers' erosion and till so far, which the step adds to (back as they were
+        // without glaciers).
+        let mut take = |name: &str| -> Option<Vec<f32>> {
+            if has(world, name) {
+                world.fields.remove(name).map(|f| f.data)
+            } else {
+                None
+            }
+        };
+        let mut ero_prev = take(field::GLACIAL_EROSION);
+        let mut till = take(field::TILL);
+
         let sp = self.sp.clone();
         let k_scale = self.p.k_scale;
         let dt_myr = self.p.myr / f64::from(self.p.steps);
         let dt = dt_myr * 1.0e6;
-        // The rock's erodibility and diffusivity: L1's, interpolated ([`rock_property`]), and the
-        // till's own where this stage's glaciers left enough of it to be the surface rock.
-        let till_at = world
-            .fields
-            .get(field::TILL)
-            .filter(|f| f.data.len() == n)
-            .map(|f| f.data.clone());
-        let till_class = usize::from(lithology::index("till"));
-        let rock = |table: Vec<f64>| -> Vec<f64> {
-            let k = doublings(self.preset.resolution.l1_r, g2.r).unwrap_or(0);
-            let (w1, h1) = (w >> k, hgt >> k);
-            let smooth: Vec<f32> = match world
-                .fields
-                .get(super::field::CLASS)
-                .filter(|f| f.data.len() == w1 * h1)
-            {
-                Some(c1) => rock_property(&c1.data, w1, h1, k, &table),
-                // No L1 class (a world built by hand): the cell's own class.
-                None => rock_property(&class, w, hgt, 0, &table),
-            };
-            (0..n)
-                .map(|c| match &till_at {
-                    Some(t) if t[c] >= TILL_SHOWS_M => table[till_class.min(table.len() - 1)],
-                    _ => f64::from(smooth[c]),
-                })
-                .collect()
-        };
-        let erod = rock(lithology::erodibility());
-        let diffu = rock(lithology::diffusivity());
+        let gp = sp.glacial.clone();
+        let gravity = self.preset.planet.gravity_m_s2;
+        let mv = self.preset.scale.m_per_block_v;
+        let sea_y = f64::from(self.preset.scale.sea_level_y);
+        let fm = sp.numerics.flood;
+        // L1's doublings to L2.
+        let k1 = doublings(self.preset.resolution.l1_r, g2.r).unwrap_or(0);
 
-        // The sediment each L2 cell may lose to submarine slope failure: L1's log and loose
-        // sediment over the L1 cell it lies in (`marine::slope_failure`).
-        let avail0: Vec<f64> = match world.surface.as_ref() {
-            Some(st) if sp.submarine_slope_deg > 0.0 => {
-                let k = doublings(self.preset.resolution.l1_r, g2.r).unwrap_or(0);
-                let w1 = st.grid.w as usize;
+        // The step reads the world and writes it only at its end (`started`: the routing again and
+        // the outputs, timed together as before).
+        let (out, started) = {
+            let world: &WorldState = world;
+            let z0 = read(world, field::ELEVATION_M, n);
+            let class = read(world, field::CLASS, n);
+            let weight = read(world, field::WEIGHT, n);
+            let uplift = read(world, field::UPLIFT, n);
+            // The rock's erodibility and diffusivity: L1's, interpolated ([`rock_property`]), and
+            // the till's own where this stage's glaciers left enough of it (before this step's
+            // glaciers add theirs) to be the surface rock.
+            let till_class = usize::from(lithology::index("till"));
+            let rock = |table: Vec<f64>, till_at: Option<&[f32]>| -> Vec<f64> {
+                let (w1, h1) = (w >> k1, hgt >> k1);
+                let smooth: Vec<f32> = match world
+                    .fields
+                    .get(super::field::CLASS)
+                    .filter(|f| f.data.len() == w1 * h1)
+                {
+                    Some(c1) => rock_property(&c1.data, w1, h1, k1, &table),
+                    // No L1 class (a world built by hand): the cell's own class.
+                    None => rock_property(class, w, hgt, 0, &table),
+                };
+                (0..n)
+                    .map(|c| match till_at {
+                        Some(t) if t[c] >= TILL_SHOWS_M => table[till_class.min(table.len() - 1)],
+                        _ => f64::from(smooth[c]),
+                    })
+                    .collect()
+            };
+            let (kf, erodibility) = {
+                let erod = rock(lithology::erodibility(), till.as_deref());
+                let kf: Vec<f64> = (0..n).map(|c| sp.k_spl * k_scale * erod[c]).collect();
+                let erodibility = last.then(|| erod.iter().map(|&e| e as f32).collect::<Vec<_>>());
+                (kf, erodibility)
+            };
+
+            let started = Instant::now();
+            let mut h: Vec<f64> = (0..n)
+                .map(|c| {
+                    let z = f64::from(z0[c]);
+                    if z > sea {
+                        z + f64::from(uplift[c]) * dt_myr
+                    } else {
+                        z
+                    }
+                })
+                .collect();
+            let route = |h: &[f64],
+                         base_z: &[f64],
+                         kind: &mut Vec<u8>,
+                         filled: &mut Vec<f64>,
+                         rt: &mut routing::Routing,
+                         area: &mut Vec<f64>| {
+                pflood::open_sea_with(fm, &d, h, sea, (n / 500).max(1), kind);
+                pflood::flood_with(fm, &d, h, base_z, kind, filled);
+                routing::receivers(&d, filled, kind, rt);
+                routing::stack(&d, kind, rt);
+                routing::accumulate(&d, rt, weight, area);
+            };
+            let mut kind = vec![LAND; n];
+            let mut filled = vec![0.0; n];
+            let base_z = vec![sea; n];
+            let mut rt = routing::Routing::default();
+            let mut area = Vec::new();
+            route(&h, &base_z, &mut kind, &mut filled, &mut rt, &mut area);
+            self.time("route", started);
+
+            let started = Instant::now();
+            let glacial_clim = glaciated.then(|| {
+                let (ela, t_sl, pr) = (
+                    read(world, field::GLACIAL_ELA, n),
+                    read(world, field::T_SEA_LEVEL, n),
+                    read(world, field::PRECIP, n),
+                );
+                let ela_z: Vec<f64> = ela
+                    .iter()
+                    .map(|&e| {
+                        if e.is_finite() {
+                            sea + f64::from(e)
+                        } else {
+                            f64::NAN
+                        }
+                    })
+                    .collect();
+                let t_c: Vec<f32> = (0..n)
+                    .map(|c| {
+                        (f64::from(t_sl[c]) - climate::LAPSE_C_PER_M * (h[c] - sea).max(0.0)) as f32
+                    })
+                    .collect();
+                let p_m: Vec<f32> = pr.iter().map(|&p| p / 1000.0).collect();
+                (ela_z, t_c, p_m)
+            });
+            // Unlike the deep-time surface, rivers keep their K under the glacial state's ice:
+            // that ice stood only through part of each ice-age cycle, subglacial meltwater cuts
+            // too, and the `balance` uplift assumes the rivers' erosion goes on (taking it away
+            // under thin, cold ice lifted whole lowlands by the uplift of 2 Myr in the first runs).
+            self.time("glacial", started);
+
+            let started = Instant::now();
+            {
+                let mut h_new = vec![0.0; n];
+                let mut qin = vec![0.0; n];
+                let spl_p = spl::SplParams {
+                    m: sp.m_spl,
+                    n: sp.n_spl,
+                    g: sp.g_deposition,
+                    dt,
+                    sc: sp.threshold_slope,
+                    max_iter: sp.spl_max_iter as usize,
+                    tol_m: 0.01,
+                };
+                let input = spl::SplInput {
+                    kind: &kind,
+                    h0: &h,
+                    filled: &filled,
+                    base_z: &base_z,
+                    area: &area,
+                    kf: &kf,
+                };
+                spl::solve(&d, &rt, &input, &spl_p, &mut h_new, &mut qin);
+                h = h_new;
+            }
+            drop(kf);
+            drop(base_z);
+            let drainage = |kind: &[u8], area: &[f64]| -> Vec<f32> {
                 (0..n)
                     .map(|c| {
-                        let c1 = ((c / w) >> k) * w1 + ((c % w) >> k);
-                        if c1 < st.log.cells() {
+                        if kind[c] == BASE {
+                            f32::NAN
+                        } else {
+                            (area[c] / 1.0e6).max(1e-3).log10() as f32
+                        }
+                    })
+                    .collect()
+            };
+            // A step before the last keeps the drainage of the routing it started from (the last
+            // routes the surface again).
+            let mut drained = (!last).then(|| drainage(&kind, &area));
+            drop(area);
+            self.time("spl", started);
+
+            // Glacial erosion and till (their loads to the sea leave the grid, as the rivers' do
+            // here).
+            let started = Instant::now();
+            let mut gout = glacial::GlacialOut::default();
+            if let Some((ela_z, t_c, p_m)) = &glacial_clim {
+                let ic = glacial::IceClimate {
+                    ela_z,
+                    precip_m_yr: p_m,
+                    t_c,
+                    allowed: world
+                        .fields
+                        .get(field::ICE_ALLOWED)
+                        .filter(|f| f.data.len() == n)
+                        .map(|f| f.data.as_slice()),
+                    time_share: None,
+                };
+                glacial::step(
+                    &d, &rt, &kind, &filled, sea, &ic, &gp, gravity, dt, &mut h, &mut gout,
+                );
+                gout.release_work();
+            }
+            drop(glacial_clim);
+            drop(rt);
+            drop(filled);
+            // The ice over the glaciers' whole width (`IceState::footprint`), what the outputs
+            // read of the glaciers' state.
+            let footprint = std::mem::take(&mut gout.ice.footprint);
+            let ice_cells = if footprint.len() == n {
+                gout.ice.cells
+            } else {
+                0
+            };
+            gout.ice = glacial::IceState::default();
+            self.time("glacial", started);
+
+            let started = Instant::now();
+            let diffu = rock(lithology::diffusivity(), till.as_deref());
+            // What the glaciers cut and left over the stage.
+            let glacial_sums = if glaciated {
+                let mut ero = ero_prev.take().unwrap_or_else(|| vec![0.0; n]);
+                let mut t = till.take().unwrap_or_else(|| vec![0.0; n]);
+                if gout.eroded.len() == n {
+                    for c in 0..n {
+                        ero[c] += gout.eroded[c] as f32;
+                        t[c] += (gout.till[c] + gout.lake[c]) as f32;
+                    }
+                }
+                Some((ero, t))
+            } else {
+                None
+            };
+            let glacial_m3 = (
+                gout.eroded_m3,
+                gout.till_m3 + gout.sink_m3 + gout.lake_m3,
+                gout.sea_m3,
+            );
+            drop(gout);
+            let kd: Vec<f64> = (0..n)
+                .map(|c| {
+                    let land = sp.kd_land_m2_yr * diffu[c];
+                    marine::submarine_kd(
+                        sea - h[c],
+                        sp.kd_marine_m2_yr,
+                        sp.wave_base_m,
+                        sp.tidal_range_m,
+                        land,
+                    )
+                })
+                .collect();
+            drop(diffu);
+            let nm = &sp.numerics;
+            diffusion::solve(
+                &mut diffusion::Workspace::default(),
+                &d,
+                &mut h,
+                &kd,
+                dt,
+                nm.diffusion_solver,
+                nm.diffusion_tol_m,
+            );
+            drop(kd);
+            // The sediment each L2 cell may lose to submarine slope failure: L1's log and loose
+            // sediment over the L1 cell it lies in (`marine::slope_failure`), and what the step
+            // laid down on it.
+            if let Some(st) = world
+                .surface
+                .as_ref()
+                .filter(|_| sp.submarine_slope_deg > 0.0 && n > 0)
+            {
+                let w1 = st.grid.w as usize;
+                let sea_mask: Vec<bool> = kind.iter().map(|&k| k == BASE).collect();
+                let mut avail: Vec<f64> = (0..n)
+                    .map(|c| {
+                        let c1 = ((c / w) >> k1) * w1 + ((c % w) >> k1);
+                        let avail0 = if c1 < st.log.cells() {
                             st.log.total(c1) + f64::from(st.regolith_m[c1])
+                        } else {
+                            0.0
+                        };
+                        (avail0 + h[c] - f64::from(z0[c])).max(0.0)
+                    })
+                    .collect();
+                let fp = marine::FailureParams {
+                    critical_slope: sp.submarine_slope_deg.to_radians().tan(),
+                    rate: marine::FAILURE_RATE,
+                    iterations: marine::FAILURE_ITERATIONS,
+                };
+                marine::slope_failure(&d, &sea_mask, sea, &fp, &mut h, &mut avail);
+            }
+            self.time("diffusion", started);
+
+            // The routing of the surface as it now is: areas, lakes.
+            let started = Instant::now();
+            let mut last_out = None;
+            if last {
+                let mut filled = vec![0.0; n];
+                let mut rt = routing::Routing::default();
+                let mut area = Vec::new();
+                let base_z = vec![sea; n];
+                route(&h, &base_z, &mut kind, &mut filled, &mut rt, &mut area);
+                drop(base_z);
+                drop(rt);
+                drained = Some(drainage(&kind, &area));
+                let area32: Vec<f32> = area.iter().map(|&a| a as f32).collect();
+                drop(area);
+                let lake: Vec<f32> = (0..n)
+                    .map(|c| {
+                        let depth = filled[c] - h[c];
+                        if kind[c] == SINK {
+                            (2.0 * LAKE_TOL_M) as f32
+                        } else if kind[c] == LAND && depth > LAKE_TOL_M {
+                            depth as f32
                         } else {
                             0.0
                         }
                     })
-                    .collect()
+                    .collect();
+                let lakes = (0..n)
+                    .filter(|&c| {
+                        kind[c] == SINK || (kind[c] == LAND && filled[c] - h[c] > LAKE_TOL_M)
+                    })
+                    .count();
+                let sinks = kind.iter().filter(|&&k| k == SINK).count();
+                last_out = Some(LastOut {
+                    area: area32,
+                    lake,
+                    lakes,
+                    sinks,
+                });
             }
-            _ => Vec::new(),
-        };
-        let started = Instant::now();
-        let mut h: Vec<f64> = (0..n)
-            .map(|c| {
-                let z = f64::from(z0[c]);
-                if z > sea {
-                    z + f64::from(uplift[c]) * dt_myr
-                } else {
-                    z
-                }
-            })
-            .collect();
-        let mut kind = vec![LAND; n];
-        let mut filled = vec![0.0; n];
-        let base_z = vec![sea; n];
-        let mut rt = routing::Routing::default();
-        let mut area = Vec::new();
-        let wt: Vec<f32> = weight.clone();
-        let route = |h: &[f64],
-                     kind: &mut Vec<u8>,
-                     filled: &mut Vec<f64>,
-                     rt: &mut routing::Routing,
-                     area: &mut Vec<f64>| {
-            pflood::open_sea_with(sp.numerics.flood, &d, h, sea, (n / 500).max(1), kind);
-            pflood::flood_with(sp.numerics.flood, &d, h, &base_z, kind, filled);
-            routing::receivers(&d, filled, kind, rt);
-            routing::stack(&d, kind, rt);
-            routing::accumulate(&d, rt, &wt, area);
-        };
-        route(&h, &mut kind, &mut filled, &mut rt, &mut area);
-        self.time("route", started);
-
-        // The glaciers of the glacial state (`glacial.rs`), when the setup found their climate.
-        let glacial_in = match (
-            get(field::GLACIAL_ELA),
-            get(field::T_SEA_LEVEL),
-            get(field::PRECIP),
-        ) {
-            (Ok(ela), Ok(t_sl), Ok(pr)) => Some((ela, t_sl, pr, get(field::ICE_ALLOWED).ok())),
-            _ => None,
-        };
-        let ero_prev = get(field::GLACIAL_EROSION).unwrap_or_else(|_| vec![0.0; n]);
-        let till_prev = get(field::TILL).unwrap_or_else(|_| vec![0.0; n]);
-        let gp = sp.glacial.clone();
-        let gravity = self.preset.planet.gravity_m_s2;
-        let started = Instant::now();
-        let glacial_clim = glacial_in.as_ref().map(|(ela, t_sl, pr, _)| {
-            let ela_z: Vec<f64> = ela
-                .iter()
-                .map(|&e| {
-                    if e.is_finite() {
-                        sea + f64::from(e)
+            let z_out: Vec<f32> = h.iter().map(|&z| z as f32).collect();
+            let block_y: Vec<f32> = h.iter().map(|&z| (sea_y + (z - sea) / mv) as f32).collect();
+            // The glaciers: where they are now (the amplifier shapes valleys under them), what they
+            // cut and left over the stage; thick till becomes the surface rock.
+            let surface: Vec<f32> = if footprint.len() == n {
+                (0..n)
+                    .map(|c| {
+                        let s = footprint[c];
+                        if s.is_finite() && s > h[c] {
+                            s as f32
+                        } else {
+                            f32::NAN
+                        }
+                    })
+                    .collect()
+            } else {
+                vec![f32::NAN; n]
+            };
+            drop(footprint);
+            let ice_now: Vec<f32> = (0..n)
+                .map(|c| {
+                    if surface[c].is_finite() {
+                        (f64::from(surface[c]) - h[c]) as f32
                     } else {
-                        f64::NAN
+                        0.0
                     }
                 })
                 .collect();
-            let t_c: Vec<f32> = (0..n)
-                .map(|c| {
-                    (f64::from(t_sl[c]) - climate::LAPSE_C_PER_M * (h[c] - sea).max(0.0)) as f32
-                })
-                .collect();
-            let p_m: Vec<f32> = pr.iter().map(|&p| p / 1000.0).collect();
-            (ela_z, t_c, p_m)
-        });
-        // Unlike the deep-time surface, rivers keep their K under the glacial state's ice: that ice
-        // stood only through part of each ice-age cycle, subglacial meltwater cuts too, and the
-        // `balance` uplift assumes the rivers' erosion goes on (taking it away under thin, cold
-        // ice lifted whole lowlands by the uplift of 2 Myr in the first runs).
-        let ice_st = glacial::IceState::default();
-        self.time("glacial", started);
-
-        let started = Instant::now();
-        let kf: Vec<f64> = (0..n).map(|c| sp.k_spl * k_scale * erod[c]).collect();
-        let mut h_new = vec![0.0; n];
-        let mut qin = vec![0.0; n];
-        let spl_p = spl::SplParams {
-            m: sp.m_spl,
-            n: sp.n_spl,
-            g: sp.g_deposition,
-            dt,
-            sc: sp.threshold_slope,
-            max_iter: sp.spl_max_iter as usize,
-            tol_m: 0.01,
-        };
-        let input = spl::SplInput {
-            kind: &kind,
-            h0: &h,
-            filled: &filled,
-            base_z: &base_z,
-            area: &area,
-            kf: &kf,
-        };
-        spl::solve(&d, &rt, &input, &spl_p, &mut h_new, &mut qin);
-        h = h_new;
-        self.time("spl", started);
-
-        // Glacial erosion and till (their loads to the sea leave the grid, as the rivers' do
-        // here).
-        let started = Instant::now();
-        let mut gout = glacial::GlacialOut::default();
-        if let (Some((ela_z, t_c, p_m)), Some((_, _, _, allowed))) = (&glacial_clim, &glacial_in) {
-            let ic = glacial::IceClimate {
-                ela_z,
-                precip_m_yr: p_m,
-                t_c,
-                allowed: allowed.as_deref(),
-                time_share: None,
+            let glacial = glacial_sums.map(|(ero, t)| {
+                let till_class = f32::from(lithology::index("till"));
+                let class_now: Vec<f32> = (0..n)
+                    .map(|c| {
+                        if t[c] >= TILL_SHOWS_M {
+                            till_class
+                        } else {
+                            class[c]
+                        }
+                    })
+                    .collect();
+                let a_km2 = dx * dx / 1.0e9;
+                let note = json!({
+                    "ice_cells": ice_cells,
+                    "eroded_km3": glacial_m3.0 / 1.0e9,
+                    "till_km3": glacial_m3.1 / 1.0e9,
+                    "sea_km3": glacial_m3.2 / 1.0e9,
+                    "total_eroded_km3": ero.iter().map(|&e| f64::from(e)).sum::<f64>() * a_km2,
+                    "till_cells": t.iter().filter(|&&x| x >= TILL_SHOWS_M).count(),
+                });
+                GlacialFields {
+                    surface,
+                    erosion: ero,
+                    till: t,
+                    class: class_now,
+                    note,
+                }
+            });
+            let out = StepOut {
+                land: last.then(|| land_stats(&z_out, sea)),
+                z_out,
+                block_y,
+                drainage: drained.unwrap_or_default(),
+                erodibility,
+                ice_now,
+                glacial,
+                last: last_out,
             };
-            glacial::step(
-                &d, &rt, &kind, &filled, sea, &ic, &gp, gravity, dt, &mut h, &mut gout,
-            );
-            gout.release_work();
-        }
-        self.time("glacial", started);
+            (out, started)
+        };
 
-        let started = Instant::now();
-        let kd: Vec<f64> = (0..n)
-            .map(|c| {
-                let land = sp.kd_land_m2_yr * diffu[c];
-                marine::submarine_kd(
-                    sea - h[c],
-                    sp.kd_marine_m2_yr,
-                    sp.wave_base_m,
-                    sp.tidal_range_m,
-                    land,
-                )
-            })
-            .collect();
-        let nm = &sp.numerics;
-        diffusion::solve(
-            &mut diffusion::Workspace::default(),
-            &d,
-            &mut h,
-            &kd,
-            dt,
-            nm.diffusion_solver,
-            nm.diffusion_tol_m,
-        );
-        if !avail0.is_empty() {
-            let sea_mask: Vec<bool> = kind.iter().map(|&k| k == BASE).collect();
-            let mut avail: Vec<f64> = (0..n)
-                .map(|c| (avail0[c] + h[c] - f64::from(z0[c])).max(0.0))
-                .collect();
-            let fp = marine::FailureParams {
-                critical_slope: sp.submarine_slope_deg.to_radians().tan(),
-                rate: marine::FAILURE_RATE,
-                iterations: marine::FAILURE_ITERATIONS,
-            };
-            marine::slope_failure(&d, &sea_mask, sea, &fp, &mut h, &mut avail);
-        }
-        self.time("diffusion", started);
-
-        // The routing of the surface as it now is: areas, lakes.
-        let started = Instant::now();
-        if last {
-            route(&h, &mut kind, &mut filled, &mut rt, &mut area);
-        }
-        let mv = self.preset.scale.m_per_block_v;
-        let sea_y = f64::from(self.preset.scale.sea_level_y);
         let put = |world: &mut WorldState, name: &str, data: Vec<f32>| {
             world.fields.insert(
                 name.to_owned(),
@@ -681,140 +899,84 @@ impl YoungStage {
                 },
             );
         };
-        let z_out: Vec<f32> = h.iter().map(|&z| z as f32).collect();
-        put(
-            world,
-            field::ELEVATION,
-            h.iter().map(|&z| (sea_y + (z - sea) / mv) as f32).collect(),
-        );
-        put(
-            world,
-            field::DRAINAGE,
-            (0..n)
-                .map(|c| {
-                    if kind[c] == BASE {
-                        f32::NAN
-                    } else {
-                        (area[c] / 1.0e6).max(1e-3).log10() as f32
-                    }
-                })
-                .collect(),
-        );
-        put(
-            world,
-            field::AREA_M2,
-            area.iter().map(|&a| a as f32).collect(),
-        );
-        put(
-            world,
-            field::LAKE_M,
-            (0..n)
-                .map(|c| {
-                    let depth = filled[c] - h[c];
-                    if kind[c] == SINK {
-                        (2.0 * LAKE_TOL_M) as f32
-                    } else if kind[c] == LAND && depth > LAKE_TOL_M {
-                        depth as f32
-                    } else {
-                        0.0
-                    }
-                })
-                .collect(),
-        );
-        put(
-            world,
-            field::ERODIBILITY,
-            erod.iter().map(|&e| e as f32).collect(),
-        );
-        // The glaciers: where they are now (the amplifier shapes valleys under them), what they
-        // cut and left over the stage; thick till becomes the surface rock.
-        // The ice over the glaciers' whole width (`IceState::footprint`), on the ground as it now
-        // is.
-        let th = if gout.ice.footprint.len() == n {
-            &gout.ice
-        } else {
-            &ice_st
-        };
-        let surface: Vec<f32> = if th.footprint.len() == n {
-            (0..n)
-                .map(|c| {
-                    let s = th.footprint[c];
-                    if s.is_finite() && s > h[c] {
-                        s as f32
-                    } else {
-                        f32::NAN
-                    }
-                })
-                .collect()
-        } else {
-            vec![f32::NAN; n]
-        };
-        let ice_now: Vec<f32> = (0..n)
-            .map(|c| {
-                if surface[c].is_finite() {
-                    (f64::from(surface[c]) - h[c]) as f32
-                } else {
-                    0.0
-                }
-            })
-            .collect();
+        put(world, field::ELEVATION, out.block_y);
+        put(world, field::DRAINAGE, out.drainage);
+        if let Some(e) = out.erodibility {
+            put(world, field::ERODIBILITY, e);
+        }
         let mut glacial_note = None;
-        if glacial_in.is_some() {
-            let (mut ero, mut till) = (ero_prev, till_prev);
-            if gout.eroded.len() == n {
-                for c in 0..n {
-                    ero[c] += gout.eroded[c] as f32;
-                    till[c] += (gout.till[c] + gout.lake[c]) as f32;
+        match out.glacial {
+            Some(g) => {
+                put(world, field::ICE_SURFACE, g.surface);
+                put(world, field::GLACIAL_EROSION, g.erosion);
+                put(world, field::TILL, g.till);
+                put(world, field::CLASS, g.class);
+                glacial_note = Some(g.note);
+            }
+            None => {
+                if let Some(e) = ero_prev {
+                    put(world, field::GLACIAL_EROSION, e);
+                }
+                if let Some(t) = till {
+                    put(world, field::TILL, t);
                 }
             }
-            let till_class = f32::from(lithology::index("till"));
-            let class_now: Vec<f32> = (0..n)
-                .map(|c| {
-                    if till[c] >= TILL_SHOWS_M {
-                        till_class
-                    } else {
-                        class[c]
-                    }
-                })
-                .collect();
-            let a_km2 = dx * dx / 1.0e9;
-            glacial_note = Some(json!({
-                "ice_cells": th.cells,
-                "eroded_km3": gout.eroded_m3 / 1.0e9,
-                "till_km3": (gout.till_m3 + gout.sink_m3 + gout.lake_m3) / 1.0e9,
-                "sea_km3": gout.sea_m3 / 1.0e9,
-                "total_eroded_km3": ero.iter().map(|&e| f64::from(e)).sum::<f64>() * a_km2,
-                "till_cells": till.iter().filter(|&&t| t >= TILL_SHOWS_M).count(),
-            }));
-            put(world, field::ICE_SURFACE, surface);
-            put(world, field::GLACIAL_EROSION, ero);
-            put(world, field::TILL, till);
-            put(world, field::CLASS, class_now);
         }
-        put(world, field::ICE, ice_now);
-        if last {
-            let (p50, p90, max) = land_stats(&z_out, sea);
-            let lakes = (0..n)
-                .filter(|&c| kind[c] == SINK || (kind[c] == LAND && filled[c] - h[c] > LAKE_TOL_M))
-                .count();
+        put(world, field::ICE, out.ice_now);
+        if let (Some(lo), Some((p50, p90, max))) = (out.last, out.land) {
+            put(world, field::AREA_M2, lo.area);
+            put(world, field::LAKE_M, lo.lake);
             let mut note: Value = world
                 .notes
                 .get(STAGE_NAME)
                 .and_then(|t| serde_json::from_str(t).ok())
                 .unwrap_or_else(|| json!({}));
             note["after"] = json!({"land_z_p50_m": p50, "land_z_p90_m": p90, "land_z_max_m": max});
-            note["lake_cells"] = json!(lakes);
+            note["lake_cells"] = json!(lo.lakes);
             if let Some(g) = glacial_note {
                 note["glacial"] = g;
             }
-            note["sinks"] = json!(kind.iter().filter(|&&k| k == SINK).count());
+            note["sinks"] = json!(lo.sinks);
             note["millis"] = json!(self.timings);
             world.notes.insert(STAGE_NAME.into(), note.to_string());
         }
-        put(world, field::ELEVATION_M, z_out);
+        put(world, field::ELEVATION_M, out.z_out);
         self.time("outputs", started);
         Ok(())
     }
+}
+
+/// What a step of [`YoungStage::lem`] writes into the world.
+struct StepOut {
+    z_out: Vec<f32>,
+    block_y: Vec<f32>,
+    drainage: Vec<f32>,
+    /// The last step's.
+    erodibility: Option<Vec<f32>>,
+    ice_now: Vec<f32>,
+    glacial: Option<GlacialFields>,
+    /// The last step's land elevations above sea: median, 90th percentile, maximum.
+    land: Option<(f64, f64, f64)>,
+    last: Option<LastOut>,
+}
+
+/// The glaciers' fields after a step: the ice surface, the glacial erosion and till over the
+/// stage, the surface rock class and the note.
+struct GlacialFields {
+    surface: Vec<f32>,
+    erosion: Vec<f32>,
+    till: Vec<f32>,
+    class: Vec<f32>,
+    note: Value,
+}
+
+/// What the last step's routing gives: the drainage area, the lakes and the count of lake and
+/// sink cells.
+struct LastOut {
+    area: Vec<f32>,
+    lake: Vec<f32>,
+    lakes: usize,
+    sinks: usize,
 }
 
 /// `young_final=…` (the CLI's line).
@@ -916,7 +1078,10 @@ mod tests {
     /// full 4,143 → 4,311 MiB (the history all on disk). Again after the merge with master
     /// fb38204f (2026-10-19, the same method, CPU kernels): quick 1,162 → 1,171 MiB (1,390.1 less
     /// 219.5; master's own run gave 1,344.3 less 222.6 = 1,121.7, 13 MiB above P1-19's 1,108.6),
-    /// full 4,311 → 4,349 MiB.
+    /// full 4,311 → 4,349 MiB. Again once the step freed its arrays as soon as it stopped reading
+    /// them (2026-10-19, the same method): quick 1,171 → 947 MiB (1,166.9 less 219.5), full
+    /// 4,349 → 3,462 MiB (the history all on disk); they list 1,060 and 3,769 MiB with 320 B a
+    /// cell.
     #[test]
     fn the_estimate_covers_the_measured_hold_closely() {
         const MIB: u64 = 1 << 20;
@@ -929,8 +1094,8 @@ mod tests {
             .unwrap()
         };
         for (name, held_mib) in [
-            ("earthlike_quick_16k", 1171u64),
-            ("earthlike_full_16k", 4349),
+            ("earthlike_quick_16k", 947u64),
+            ("earthlike_full_16k", 3462),
         ] {
             let crate::preset::PresetBody::Planet(p) =
                 crate::preset::Preset::from_json(&json(name)).unwrap().body
