@@ -9,7 +9,10 @@
 //!
 //! Threading: the stepping thread renders and pushes; the render thread (Java) reads counts, info
 //! and pixels at any time. The ring's mutex is held only to copy or swap `Arc`s, never while
-//! rendering or writing files.
+//! rendering or writing files. A frame's layers are drawn side by side (each pixel is its own, so
+//! the picture is the same bytes as drawn one by one) and packed once, in parallel, for both the
+//! ring and the file: [`render`], [`KeyframeStore::push`] and [`KeyframeStore::replace`] run in
+//! the session's pool (P1-19).
 
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
@@ -18,8 +21,10 @@ use std::sync::{Arc, Mutex};
 
 use deeptime_format::Ramps;
 use deeptime_format::keyframes::{
-    KEYFRAMES_DIR, KeyframeEntry, KeyframeImage, KeyframeIndex, read_keyframe, write_keyframe,
+    KEYFRAMES_DIR, KeyframeEntry, KeyframeImage, KeyframeIndex, PackedKeyframe, check_image,
+    read_keyframe, write_packed_keyframe,
 };
+use rayon::prelude::*;
 use serde_json::json;
 
 use crate::error::CoreError;
@@ -99,41 +104,31 @@ pub fn render(
     size: (u32, u32),
 ) -> Option<KeyframeImage> {
     let (w, h) = size;
+    // The water view's hydrology beside the layers, and the layers side by side, each by rows.
+    let wants_water = layers.iter().any(|l| WATER_LAYERS.contains(l));
+    let (water, drawn) = rayon::join(
+        || {
+            wants_water
+                .then(|| crate::water_view::derive(world, view, size))
+                .flatten()
+        },
+        || {
+            layers
+                .par_iter()
+                .map(|&name| draw_dry(world, ramps, view, name, size))
+                .collect::<Vec<_>>()
+        },
+    );
     let mut out = Vec::new();
-    let water = layers
-        .iter()
-        .any(|l| WATER_LAYERS.contains(l))
-        .then(|| crate::water_view::derive(world, view, size))
-        .flatten();
-    for &name in layers {
-        if WATER_LAYERS.contains(&name) {
-            if let Some(rgba) = water_layer(world, ramps, view, name, size, water.as_ref()) {
-                out.push((name.to_owned(), rgba));
-            }
-            continue;
-        }
-        // A view layer derived from the fields at render time (`provinces`) is drawn like any
-        // other; it is never stored in the world.
-        let derived;
-        let field = match world.fields.get(name) {
-            Some(f) => f,
-            None => match derived_field(world, name) {
-                Some(f) => {
-                    derived = f;
-                    &derived
-                }
-                None => continue,
-            },
+    for (&name, dry) in layers.iter().zip(drawn) {
+        let rgba = if WATER_LAYERS.contains(&name) {
+            with_water(ramps, view, name, dry, water.as_ref())
+        } else {
+            dry
         };
-        let (_, ramp) = ramps.for_layer(name);
-        let mut rgba = Vec::with_capacity(w as usize * h as usize * 4);
-        for py in 0..h {
-            for px in 0..w {
-                let (i, j) = field.grid.picture_cell(f64::from(px), f64::from(py), w, h);
-                rgba.extend_from_slice(&ramp.rgba(f64::from(field.get(i, j))));
-            }
+        if let Some(rgba) = rgba {
+            out.push((name.to_owned(), rgba));
         }
-        out.push((name.to_owned(), rgba));
     }
     if out.is_empty() {
         return None;
@@ -158,6 +153,66 @@ pub const DERIVED_LAYERS: [&str; 3] = [
 /// The layers that show the water of the terrain (`crate::water_view`): the satellite view draws
 /// it over the land, `rivers` is the water on a quiet map.
 const WATER_LAYERS: [&str; 2] = [crate::satellite::LAYER, crate::water_view::LAYER];
+
+/// Layer `name` at `size` as far as it needs no water: the satellite view before its water is
+/// drawn on it, nothing for `rivers` (drawn from the water alone), the field's ramp picture for
+/// any other layer (`None` when it does not exist yet).
+fn draw_dry(
+    world: &WorldState,
+    ramps: &Ramps,
+    view: &ViewScale,
+    name: &str,
+    size: (u32, u32),
+) -> Option<Vec<u8>> {
+    if name == crate::satellite::LAYER {
+        return crate::satellite::render(world, ramps, view, size);
+    }
+    if WATER_LAYERS.contains(&name) {
+        return None;
+    }
+    // A view layer derived from the fields at render time (`provinces`) is drawn like any
+    // other; it is never stored in the world.
+    let derived;
+    let field = match world.fields.get(name) {
+        Some(f) => f,
+        None => {
+            derived = derived_field(world, name)?;
+            &derived
+        }
+    };
+    let (_, ramp) = ramps.for_layer(name);
+    let (w, h) = size;
+    let mut rgba = vec![0u8; w as usize * h as usize * 4];
+    rgba.par_chunks_mut((w as usize * 4).max(1))
+        .enumerate()
+        .for_each(|(py, row)| {
+            for (px, p) in row.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+                let (i, j) = field.grid.picture_cell(px as f64, py as f64, w, h);
+                p.copy_from_slice(&ramp.rgba(f64::from(field.get(i, j))));
+            }
+        });
+    Some(rgba)
+}
+
+/// The water layer `name` finished from its dry picture ([`draw_dry`]) and `water`, as
+/// [`water_layer`] draws it.
+fn with_water(
+    ramps: &Ramps,
+    view: &ViewScale,
+    name: &str,
+    dry: Option<Vec<u8>>,
+    water: Option<&crate::water_view::WaterView>,
+) -> Option<Vec<u8>> {
+    if name == crate::satellite::LAYER {
+        let mut rgba = dry?;
+        if let Some(water) = water {
+            water.overlay(&mut rgba, ramps);
+        }
+        Some(rgba)
+    } else {
+        water?.render(ramps, view)
+    }
+}
 
 /// The RGBA picture of the water layer `name` (`satellite` or `rivers`) at `size`, with `water`
 /// (derived from the terrain, or read from the bake; `None`: no water to draw, the satellite view
@@ -233,57 +288,45 @@ pub fn add_derived(layers: &mut Vec<&'static str>) {
     }
 }
 
-/// A frame in the ring: its layers LZ4-packed.
-struct Packed {
-    n: u32,
-    t: f64,
-    stage: String,
-    w: u32,
-    h: u32,
-    /// (name, raw length, packed bytes).
-    layers: Vec<(String, usize, Vec<u8>)>,
+/// A frame in the ring: its layers LZ4-packed, the blocks its file holds.
+type Packed = PackedKeyframe;
+
+/// `f` packed for the ring and its file, the layers compressed side by side (in the caller's
+/// pool).
+fn pack(f: &KeyframeImage) -> Result<Packed, CoreError> {
+    check_image(f)?;
+    let blocks = f
+        .layers
+        .par_iter()
+        .map(|(_, rgba)| lz4_flex::block::compress(rgba))
+        .collect();
+    Ok(PackedKeyframe::with_blocks(f, blocks))
 }
 
-impl Packed {
-    fn pack(f: &KeyframeImage) -> Packed {
-        Packed {
-            n: f.n,
-            t: f.t,
-            stage: f.stage.clone(),
-            w: f.w,
-            h: f.h,
-            layers: f
-                .layers
-                .iter()
-                .map(|(name, rgba)| (name.clone(), rgba.len(), lz4_flex::block::compress(rgba)))
-                .collect(),
-        }
-    }
+/// Layer `k` of `p` into `dst` (exactly its raw length).
+fn unpack_layer(p: &Packed, k: usize, dst: &mut [u8]) -> Result<(), CoreError> {
+    let (name, packed) = &p.layers[k];
+    lz4_flex::block::decompress_into(packed, dst)
+        .map(|_| ())
+        .map_err(|e| CoreError::InvalidState(format!("keyframe {} layer {name}: {e}", p.n)))
+}
 
-    /// Layer `k` into `dst` (exactly its raw length).
-    fn unpack_layer(&self, k: usize, dst: &mut [u8]) -> Result<(), CoreError> {
-        let (name, _, packed) = &self.layers[k];
-        lz4_flex::block::decompress_into(packed, dst)
-            .map(|_| ())
-            .map_err(|e| CoreError::InvalidState(format!("keyframe {} layer {name}: {e}", self.n)))
+fn unpack(p: &Packed) -> Result<KeyframeImage, CoreError> {
+    let len = p.layer_len();
+    let mut layers = Vec::with_capacity(p.layers.len());
+    for (k, (name, _)) in p.layers.iter().enumerate() {
+        let mut rgba = vec![0u8; len];
+        unpack_layer(p, k, &mut rgba)?;
+        layers.push((name.clone(), rgba));
     }
-
-    fn unpack(&self) -> Result<KeyframeImage, CoreError> {
-        let mut layers = Vec::with_capacity(self.layers.len());
-        for (k, (name, len, _)) in self.layers.iter().enumerate() {
-            let mut rgba = vec![0u8; *len];
-            self.unpack_layer(k, &mut rgba)?;
-            layers.push((name.clone(), rgba));
-        }
-        Ok(KeyframeImage {
-            n: self.n,
-            t: self.t,
-            stage: self.stage.clone(),
-            w: self.w,
-            h: self.h,
-            layers,
-        })
-    }
+    Ok(KeyframeImage {
+        n: p.n,
+        t: p.t,
+        stage: p.stage.clone(),
+        w: p.w,
+        h: p.h,
+        layers,
+    })
 }
 
 struct Ring {
@@ -368,9 +411,9 @@ impl KeyframeStore {
             let mut ring = self.lock();
             self.clean(&mut ring)?;
         }
-        let entry = write_keyframe(&self.dir, &frame)?;
-        let packed = Arc::new(Packed::pack(&frame));
+        let packed = Arc::new(pack(&frame)?);
         drop(frame);
+        let entry = write_packed_keyframe(&self.dir, &packed)?;
         let mut ring = self.lock();
         ring.index.frames.push(entry);
         ring.index.write(&self.dir)?;
@@ -387,12 +430,14 @@ impl KeyframeStore {
     /// stage and size must be the old one's; the caller holds the stepper, so nothing else writes.
     pub fn replace(&self, frame: KeyframeImage) -> Result<(), CoreError> {
         self.check(frame.n)?;
-        let entry = write_keyframe(&self.dir, &frame)?;
-        let packed = Arc::new(Packed::pack(&frame));
+        let packed = Arc::new(pack(&frame)?);
+        drop(frame);
+        let entry = write_packed_keyframe(&self.dir, &packed)?;
         let mut ring = self.lock();
-        ring.index.frames[frame.n as usize] = entry;
+        let n = packed.n;
+        ring.index.frames[n as usize] = entry;
         ring.index.write(&self.dir)?;
-        if let Some(slot) = ring.frames.iter_mut().find(|f| f.n == frame.n) {
+        if let Some(slot) = ring.frames.iter_mut().find(|f| f.n == n) {
             *slot = packed;
         }
         Ok(())
@@ -420,7 +465,7 @@ impl KeyframeStore {
     /// Frame `n`, from the ring or, if it was dropped, from disk.
     pub fn get(&self, n: u32) -> Result<Arc<KeyframeImage>, CoreError> {
         match self.find(n)? {
-            Ok(p) => Ok(Arc::new(p.unpack()?)),
+            Ok(p) => Ok(Arc::new(unpack(&p)?)),
             Err(entry) => Ok(Arc::new(read_keyframe(&self.dir, &entry)?)),
         }
     }
@@ -449,13 +494,14 @@ impl KeyframeStore {
     pub fn copy(&self, n: u32, layer: u32, dst: &mut [u8]) -> Result<(), CoreError> {
         // From the ring: only the layer asked for is unpacked.
         if let Ok(p) = self.find(n)? {
-            let Some((_, len, _)) = p.layers.get(layer as usize) else {
+            let len = &p.layer_len();
+            if p.layers.get(layer as usize).is_none() {
                 return Err(CoreError::InvalidArgument(format!(
                     "keyframe {n} has {} layers, not {}",
                     p.layers.len(),
                     layer + 1
                 )));
-            };
+            }
             if dst.len() < *len {
                 return Err(CoreError::InvalidArgument(format!(
                     "the buffer holds {} bytes, keyframe {n} needs {len} ({}×{}×4)",
@@ -464,7 +510,7 @@ impl KeyframeStore {
                     p.h
                 )));
             }
-            return p.unpack_layer(layer as usize, &mut dst[..*len]);
+            return unpack_layer(&p, layer as usize, &mut dst[..*len]);
         }
         let f = self.get(n)?;
         let Some((_, rgba)) = f.layers.get(layer as usize) else {

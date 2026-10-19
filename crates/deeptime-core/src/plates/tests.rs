@@ -1254,7 +1254,15 @@ fn continental_area_through_resampling(turn: f64, tries: u64) -> (PlateState, f6
             let mut s2 = st.clone();
             s2.rng = crate::sphere::SplitMix64::new(1000 + k);
             let mut world = WorldState::new(1, 16_384, p.t_start_years());
-            ridges::resample(&mut s2, &mut world, &pos, &geo, &env).unwrap();
+            ridges::resample(
+                &mut s2,
+                &mut world,
+                &pos,
+                &Tree::over(&pos, |_| true),
+                &geo,
+                &env,
+            )
+            .unwrap();
             continental(&s2)
         })
         .collect();
@@ -1330,7 +1338,15 @@ fn a_resampling_accretes_hidden_continent_once() {
             s.stacked = stacked;
         }
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
-        ridges::resample(&mut s2, &mut world, &pos, &geo, &env).unwrap();
+        ridges::resample(
+            &mut s2,
+            &mut world,
+            &pos,
+            &Tree::over(&pos, |_| true),
+            &geo,
+            &env,
+        )
+        .unwrap();
         let g = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
         out.push((
             conserved(&s2),
@@ -1404,7 +1420,15 @@ fn a_resampling_consumes_the_visible_crust_a_collision_took() {
         let mut s2 = st.clone();
         s2.contacts[k].collision = collides.then(a_collision);
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
-        ridges::resample(&mut s2, &mut world, &pos, &geo, &env).unwrap();
+        ridges::resample(
+            &mut s2,
+            &mut world,
+            &pos,
+            &Tree::over(&pos, |_| true),
+            &geo,
+            &env,
+        )
+        .unwrap();
         let g = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
         out.push((
             g(ridges::ACCRETED_VISIBLE_GLOBAL),
@@ -1744,7 +1768,15 @@ fn accreted_crust_stands_up_by_its_airy_height() {
             s.stacked = stacked;
         }
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
-        ridges::resample(&mut s2, &mut world, &pos, &geo, &env).unwrap();
+        ridges::resample(
+            &mut s2,
+            &mut world,
+            &pos,
+            &Tree::over(&pos, |_| true),
+            &geo,
+            &env,
+        )
+        .unwrap();
         let rise = world
             .globals
             .get(ridges::ACCRETED_RISE_GLOBAL)

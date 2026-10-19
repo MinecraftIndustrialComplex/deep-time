@@ -19,10 +19,15 @@
 //!
 //! The stages allocate and free the same grid-sized arrays every step (hundreds of GiB over a
 //! quick run), so mapping each one afresh costs a page fault per page: a quick 16k run took 39 %
-//! longer. A freed large block is therefore kept for the next block of exactly its size, up to
+//! longer. A freed large block is therefore kept for the next block of its size, up to
 //! [`CACHE_BYTES`] of them; the kept blocks count as in use (the process holds them), go back to
 //! the OS oldest first when a new block would take the count past the ceiling the session sets
-//! ([`keep_below`]), and all go back when a stage ends ([`release_cache`]).
+//! ([`keep_below`]), and all go back when a stage ends ([`release_cache`]). A block of no kept
+//! block's exact size takes one within a [`NEAR`]th of it (P1-19: arrays sized by the plates'
+//! cells or by a step's events differ a little every step), resized with `mremap`: the pages it
+//! keeps are already in, and a longer one's tail goes back at once, so the count stays exact.
+//! Kept blocks are unmapped with the cache's lock released, so no other thread's large block
+//! waits for an unmapping (P1-19).
 //!
 //! Small blocks stay with the system allocator, and glibc keeps the ones freed in each thread's
 //! arena for reuse: that memory is the process's but not in the count. [`release_cache`] gives it
@@ -78,6 +83,11 @@ pub const CACHE_BYTES: usize = 2 << 30;
 static CACHE_LIMIT: AtomicUsize = AtomicUsize::new(CACHE_BYTES);
 /// At most this many kept blocks (2 GiB of the smallest large blocks).
 const SLOTS: usize = 2048;
+/// A block with no kept block of its exact length takes one within `len / NEAR` of it ([`Cache::take`]).
+const NEAR: usize = 4;
+/// Kept blocks leave the cache this many at a time, then are unmapped with its lock released
+/// ([`shed`]).
+const BATCH: usize = 32;
 /// Kept blocks never hold the count above this ([`keep_below`]).
 static CEILING: AtomicU64 = AtomicU64::new(u64::MAX);
 /// The bytes of the kept blocks (`Cache::bytes`, readable without the lock).
@@ -101,69 +111,151 @@ fn cache() -> std::sync::MutexGuard<'static, Cache> {
 }
 
 impl Cache {
-    /// A kept block of exactly `len` bytes.
-    fn take(&mut self, len: usize) -> Option<*mut u8> {
-        let i = self.blocks[..self.n].iter().rposition(|b| b.1 == len)?;
-        let (p, _) = self.blocks[i];
+    /// A kept block for a block of `len` bytes, out of the cache: `(address, its length)`. The
+    /// newest of exactly `len`, else the nearest within `len / NEAR` (a longer one before a
+    /// shorter one as near, since shortening faults in no pages); the caller resizes it.
+    fn take(&mut self, len: usize) -> Option<(*mut u8, usize)> {
+        let kept = &self.blocks[..self.n];
+        let i = kept.iter().rposition(|b| b.1 == len).or_else(|| {
+            let (lo, hi) = (len - len / NEAR, len + len / NEAR);
+            let mut best: Option<(usize, usize)> = None;
+            for (i, b) in kept.iter().enumerate().rev() {
+                if b.1 < lo || b.1 > hi {
+                    continue;
+                }
+                let gap = if b.1 > len {
+                    2 * (b.1 - len)
+                } else {
+                    2 * (len - b.1) + 1
+                };
+                if best.is_none_or(|(g, _)| gap < g) {
+                    best = Some((gap, i));
+                }
+            }
+            best.map(|(_, i)| i)
+        })?;
+        let (p, kept_len) = self.blocks[i];
         self.blocks.copy_within(i + 1..self.n, i);
         self.n -= 1;
-        self.bytes -= len;
+        self.bytes -= kept_len;
         KEPT.store(self.bytes, Ordering::Relaxed);
-        Some(p as *mut u8)
+        Some((p as *mut u8, kept_len))
     }
 
-    /// Unmaps the oldest kept block; its bytes leave the count.
-    fn drop_oldest(&mut self) {
+    /// Takes the oldest kept block out of the cache, its bytes out of the count; the caller unmaps
+    /// it once the lock is released.
+    fn pop_oldest(&mut self) -> (usize, usize) {
         let (p, len) = self.blocks[0];
         self.blocks.copy_within(1..self.n, 0);
         self.n -= 1;
         self.bytes -= len;
         KEPT.store(self.bytes, Ordering::Relaxed);
-        // SAFETY: a kept block is a live mapping of `len` bytes that nothing else refers to.
-        unsafe { os::unmap(p as *mut u8, len) };
         removed(len);
+        (p, len)
     }
+}
 
-    /// Keeps a freed block for reuse, making room by unmapping the oldest; false when it is
-    /// bigger than the whole limit (the caller unmaps it).
-    fn put(&mut self, p: *mut u8, len: usize) -> bool {
-        let limit = CACHE_LIMIT.load(Ordering::Relaxed);
-        if len > limit || in_use() > CEILING.load(Ordering::Relaxed) {
-            return false;
-        }
-        while self.n > 0 && (self.n == SLOTS || self.bytes + len > limit) {
-            self.drop_oldest();
-        }
-        self.blocks[self.n] = (p as usize, len);
-        self.n += 1;
-        self.bytes += len;
-        KEPT.store(self.bytes, Ordering::Relaxed);
-        true
+/// Unmaps blocks taken out of the cache ([`Cache::pop_oldest`]), its lock released.
+fn unmap_all(blocks: &[(usize, usize)]) {
+    for &(p, len) in blocks {
+        // SAFETY: a block out of the cache is a live mapping of `len` bytes that nothing else
+        // refers to.
+        unsafe { os::unmap(p as *mut u8, len) };
     }
+}
+
+/// Gives kept blocks back to the OS, oldest first, while `more` says so; returns their bytes.
+/// They leave the cache (and the count) [`BATCH`] at a time under its lock and are unmapped after
+/// it is released, so other threads' large blocks never wait for the unmapping (P1-19: an
+/// unmapping takes up to milliseconds a block, and the session freed a stage's outputs while the
+/// pool's threads allocated).
+fn shed(mut more: impl FnMut(&Cache) -> bool) -> u64 {
+    let mut total = 0u64;
+    loop {
+        let mut out = [(0usize, 0usize); BATCH];
+        let mut k = 0;
+        {
+            let mut c = cache();
+            while k < BATCH && c.n > 0 && more(&c) {
+                out[k] = c.pop_oldest();
+                total += out[k].1 as u64;
+                k += 1;
+            }
+        }
+        unmap_all(&out[..k]);
+        if k < BATCH {
+            return total;
+        }
+    }
+}
+
+/// Keeps a freed block for reuse, making room by giving back the oldest; false when it is bigger
+/// than the whole limit or the count is over the ceiling (the caller unmaps it).
+fn keep(p: *mut u8, len: usize) -> bool {
+    let limit = CACHE_LIMIT.load(Ordering::Relaxed);
+    if len > limit || in_use() > CEILING.load(Ordering::Relaxed) {
+        return false;
+    }
+    loop {
+        let mut out = [(0usize, 0usize); BATCH];
+        let mut k = 0;
+        let kept = {
+            let mut c = cache();
+            while k < BATCH && c.n > 0 && (c.n == SLOTS || c.bytes + len > limit) {
+                out[k] = c.pop_oldest();
+                k += 1;
+            }
+            // An empty cache always has room: `len` is within the limit.
+            let room = c.n < SLOTS && c.bytes + len <= limit;
+            if room {
+                let n = c.n;
+                c.blocks[n] = (p as usize, len);
+                c.n += 1;
+                c.bytes += len;
+                KEPT.store(c.bytes, Ordering::Relaxed);
+            }
+            room
+        };
+        unmap_all(&out[..k]);
+        if kept {
+            return true;
+        }
+    }
+}
+
+/// A kept block of `kept` bytes made `len` long: shortened in place (the tail goes back to the
+/// OS) or lengthened (the new pages zero; the mapping may move). Null when it cannot be
+/// lengthened: the kept block is then unmapped.
+fn resize_kept(p: *mut u8, kept: usize, len: usize) -> *mut u8 {
+    if kept == len {
+        return p;
+    }
+    // SAFETY: a block out of the cache is a live mapping of `kept` bytes nothing else refers to.
+    let q = unsafe { os::remap(p, kept, len) };
+    if q.is_null() {
+        // SAFETY: as above; the failed remap left it untouched.
+        unsafe { os::unmap(p, kept) };
+        removed(kept);
+    } else if len > kept {
+        added(len - kept);
+    } else {
+        removed(kept - len);
+    }
+    q
 }
 
 /// Kept blocks never hold the count above `bytes`: the oldest go back to the OS now until it is
 /// under, and a freed block is not kept while it is over (`MemoryGauge::keep_below`).
 pub fn keep_below(bytes: u64) {
     CEILING.store(bytes, Ordering::Relaxed);
-    let mut c = cache();
-    while c.n > 0 && in_use() > bytes {
-        c.drop_oldest();
-    }
+    shed(|_| in_use() > bytes);
 }
 
 /// Gives every kept large block back to the OS; returns the bytes released (the count drops by
 /// as much). On glibc it also returns the free memory of malloc's arenas ([`trim_system`]), which
 /// the count never included.
 pub fn release_cache() -> u64 {
-    let bytes = {
-        let mut c = cache();
-        let bytes = c.bytes as u64;
-        while c.n > 0 {
-            c.drop_oldest();
-        }
-        bytes
-    };
+    let bytes = shed(|_| true);
     trim_system();
     bytes
 }
@@ -197,10 +289,7 @@ pub fn trim_system() {
 /// (`DEEPTIME_LARGE_CACHE` in the CLI); the default is [`CACHE_BYTES`].
 pub fn set_cache_limit(bytes: usize) {
     CACHE_LIMIT.store(bytes, Ordering::Relaxed);
-    let mut c = cache();
-    while c.n > 0 && c.bytes > bytes {
-        c.drop_oldest();
-    }
+    shed(|c| c.bytes > bytes);
 }
 
 /// The counting allocator: [`System`] for small blocks, the OS's own mappings for large ones on
@@ -335,14 +424,18 @@ impl CountingAlloc {
     fn alloc_with(&self, layout: Layout, zeroed: bool) -> *mut u8 {
         if is_large(&layout) {
             let len = pages(layout.size());
-            // A kept block is already counted.
+            // A kept block is already counted (its resize counts the difference).
             let kept = cache().take(len);
-            if let Some(p) = kept {
-                if zeroed {
-                    // SAFETY: the kept block is `len` writable bytes nothing else refers to.
-                    unsafe { std::ptr::write_bytes(p, 0, len) };
+            if let Some((p, kept_len)) = kept {
+                let p = resize_kept(p, kept_len, len);
+                if !p.is_null() {
+                    if zeroed {
+                        // SAFETY: the block is `len` writable bytes nothing else refers to; the
+                        // pages past `kept_len` are fresh, so zero already.
+                        unsafe { std::ptr::write_bytes(p, 0, len.min(kept_len)) };
+                    }
+                    return p;
                 }
-                return p;
             }
             let p = os::map(len);
             if !p.is_null() {
@@ -499,10 +592,7 @@ fn hold_ceiling(now: u64) -> u64 {
     if KEPT.load(Ordering::Relaxed) == 0 || now <= CEILING.load(Ordering::Relaxed) {
         return now;
     }
-    let mut c = cache();
-    while c.n > 0 && in_use() > CEILING.load(Ordering::Relaxed) {
-        c.drop_oldest();
-    }
+    shed(|_| in_use() > CEILING.load(Ordering::Relaxed));
     in_use()
 }
 
@@ -523,7 +613,7 @@ unsafe impl GlobalAlloc for CountingAlloc {
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         if is_large(&layout) {
             let len = pages(layout.size());
-            if !cache().put(ptr, len) {
+            if !keep(ptr, len) {
                 // SAFETY: `ptr` is the mapping `alloc` made for this layout.
                 unsafe { os::unmap(ptr, len) };
                 removed(len);
@@ -622,6 +712,18 @@ pub fn window_peak() -> u64 {
 /// in the CLI); the default is [`LARGE_BYTES`].
 pub fn set_large_threshold(bytes: Option<usize>) {
     LARGE.store(bytes.unwrap_or(usize::MAX).max(PAGE), Ordering::Relaxed);
+}
+
+/// Frees `value` on a thread of its own, so the caller does not wait while its large blocks (and
+/// the kept blocks they push out) are unmapped; the count drops as they go (P1-19). Freed here
+/// when no thread can be started.
+pub fn free_beside<T: Send + 'static>(value: T) {
+    let _ = std::thread::Builder::new()
+        .name("deeptime-free".into())
+        .spawn(move || {
+            drop(value);
+            unpark_thread();
+        });
 }
 
 /// `n` copies of `v`, written in parallel. `vec![v; n]` writes them on the calling thread (a zero
@@ -773,10 +875,11 @@ mod tests {
         if !cfg!(target_os = "linux") {
             return;
         }
-        // An odd size no other test allocates, so the kept block is this test's.
-        let len = 5 * LARGE_BYTES + 3 * 4096 + 17;
+        // An odd size no other test allocates, nor any within a quarter of it, so the kept block
+        // is this test's.
+        let len = 157 * LARGE_BYTES + 3 * 4096 + 17;
         let mut v = vec![0u8; len];
-        v.fill(7);
+        v.iter_mut().step_by(1000).for_each(|b| *b = 7);
         let first = v.as_ptr() as usize;
         drop(v);
         let v = vec![0u8; len];
@@ -790,14 +893,65 @@ mod tests {
     }
 
     #[test]
+    fn a_near_kept_block_is_resized_for_a_new_one() {
+        let _serial = serial();
+        if !cfg!(target_os = "linux") {
+            return;
+        }
+        let kept_at = |at: usize| {
+            let c = cache();
+            c.blocks[..c.n].iter().find(|b| b.0 == at).map(|b| b.1)
+        };
+        // Odd sizes no other test allocates, nor any within a quarter of them, so the kept blocks
+        // are this test's.
+        let len = 211 * LARGE_BYTES + 7 * 4096;
+        let mut v = vec![0u8; len];
+        v.iter_mut().step_by(1000).for_each(|b| *b = 3);
+        let first = v.as_ptr() as usize;
+        drop(v);
+        assert_eq!(kept_at(first), Some(len), "the freed block is kept");
+        // A little shorter: the same block, shortened in place, zeroed.
+        let shorter = len - 5 * 4096 - 100;
+        let v = vec![0u8; shorter];
+        assert_eq!(v.as_ptr() as usize, first, "the near block was reused");
+        assert!(v.iter().all(|&b| b == 0), "a reused block is zeroed");
+        drop(v);
+        assert_eq!(
+            kept_at(first),
+            Some(pages(shorter)),
+            "kept at its new length"
+        );
+        // A little longer: the same pages, lengthened (perhaps moved), zeroed.
+        let mut v = vec![0u8; shorter];
+        v.iter_mut().step_by(1000).for_each(|b| *b = 9);
+        drop(v);
+        let longer = len + 3 * 4096;
+        let v = vec![0u8; longer];
+        assert!(v.iter().all(|&b| b == 0), "a lengthened block is zeroed");
+        let at = v.as_ptr() as usize;
+        drop(v);
+        assert_eq!(kept_at(at), Some(pages(longer)));
+        // Far from every kept block: a fresh mapping, the kept one left as it is.
+        let far = std::hint::black_box(vec![0u8; 2 * len]);
+        assert_eq!(
+            kept_at(at),
+            Some(pages(longer)),
+            "a far block takes no kept one"
+        );
+        drop(far);
+        assert!(release_cache() >= pages(longer) as u64);
+    }
+
+    #[test]
     fn small_blocks_past_the_ceiling_give_back_kept_blocks() {
         let _serial = serial();
         if !cfg!(target_os = "linux") {
             return;
         }
-        // An odd size no other test allocates, so the kept block is this test's.
-        let len = 7 * LARGE_BYTES + 5 * 4096 + 3;
-        let v = vec![1u8; len];
+        // An odd size no other test allocates, nor any within a quarter of it, so the kept block
+        // is this test's.
+        let len = 181 * LARGE_BYTES + 5 * 4096 + 3;
+        let v = std::hint::black_box(vec![0u8; len]);
         let at = v.as_ptr() as usize;
         keep_below(u64::MAX);
         drop(v);

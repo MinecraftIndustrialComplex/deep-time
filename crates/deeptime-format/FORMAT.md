@@ -1965,8 +1965,8 @@ content bundle, the pipeline, the next stage, that stage's saved state when take
 `WorldState` without its recorded history, and the history's head (`deeptime_core::deposits::recorded::
 HistoryHead`: grid, drainage receivers, and per frame its time, span, clocks and each field's name, range,
 bits and blob length). Sections 2 … F + 1 are the history's frames, oldest first, one frame's record
-each: its fields' LZ4 blobs back to back in the head's order (the same record the session's spill file
-holds). The next stage is always a group's lead: inside a group of coupled stages (plates + surface,
+each: its fields' LZ4 blobs back to back in the head's order (the record the session's spill file
+holds, put together in that order when a stage added fields to the frame after it was spilled). The next stage is always a group's lead: inside a group of coupled stages (plates + surface,
 P1-04) the saved state is the postcard `Vec<Vec<u8>>` of every member's state, in pipeline order.
 Schema 4 (P1-04) added the surface state and the recorded field history to `WorldState`; schema 6
 (P1-17) moved the history's frames out of the body into sections of their own (schema 12, P1-26 T6, added the zonal model's correction to the 2-D climate and the triggered-snapshot counters; schema 11, P1-26, added
@@ -1983,7 +1983,9 @@ never part of a world's contract with Java.
 
 **The history spill file** (P1-17, not a world-data file). A session whose recorded history does not fit
 its memory cap writes the oldest frames' records to `history-<pid>-<n>.spill` in its output folder and
-reads them back from there. The file is anonymous (unlinked as soon as it is created on Unix,
+reads them back from there. Fields a later stage adds to a frame already there are appended as a
+record of their own (P1-19), so a frame may span several records of the file; its head, in memory,
+says where each field is. The file is anonymous (unlinked as soon as it is created on Unix,
 delete-on-close on Windows): it uses disk only while the session lives and never appears in, or
 survives in, the finished folder. The manifest's `notes.run.history` reports what it held
 (`spilled_bytes`, `spilled_frames`, `spill_read_bytes`, …).

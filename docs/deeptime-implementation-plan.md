@@ -514,12 +514,14 @@ segments and read sites) and on `deeptime-core` only if it needs the planet mode
   Modrinth maven at the pack's pins (P1-16).
 - **Natives in the jar.** `processResources` copies `../crates/deeptime-viewer/assets/ramps.json` into
   `assets/deeptime/ramps.json` and the natives into `natives/deeptime/`:
-  - **Dev builds** (the default): task `hostNatives` runs plain `cargo build --release -p deeptime-jni`
-    (the dev shell's cargo locally, rustup's in CI; §4.5), stages the host library in
-    `../target/natives-host/<platform>/`, and writes `../target/natives-host/natives.json` (the §6.5
+  - **Dev builds** (the default): task `hostNatives` runs plain `cargo build --release -p deeptime-jni
+    -p deeptime-cpuprobe` (the dev shell's cargo locally, rustup's in CI; §4.5) and, on an x86-64
+    host, the x86-64-v3 build of `deeptime-jni` into `../target/x86-64-v3/` (§6.4; `-PbaselineNativeOnly`
+    skips it), stages them in `../target/natives-host/<platform>/<baseline|x86-64-v3|probe>/`, and writes `../target/natives-host/natives.json` (the §6.5
     schema). Only this folder is packed, so a leftover `natives-dist/` never leaks into a dev jar.
   - **Release builds** (`-Prelease`): `natives-dist/` from `nix run .#natives` or from the
-    `natives.yml` artifacts, all eight libraries, and its `natives.json`.
+    `natives.yml` artifacts: the 16 files of §6.4 (eight baseline libraries, four x86-64-v3
+    libraries, four CPU probes) and its `natives.json`.
   - The format version has one source, the workspace `Cargo.toml`
     (`[workspace.metadata.deeptime] format_version`, §6.5): `deeptime-format`'s `build.rs` turns it
     into `FORMAT_VERSION`, and Gradle reads the same line with the same line scan rather than keeping
@@ -592,8 +594,9 @@ segments and read sites) and on `deeptime-core` only if it needs the planet mode
     and a full LLVM install; it downloads only the Windows SDK and CRT itself.
   - `cargo-deny`, `jdk21`, `gradle`, `python3`, `mcrcon`, `unzip`, `jq`, `binutils` (`readelf`), and
     the GL/X libraries mic-climate's shell sets on `LD_LIBRARY_PATH` for client runs.
-- `apps.natives`: builds all eight natives into `target/natives-dist/<platform>/` and writes
-  `natives.json` (§6.5).
+- `apps.natives`: builds the natives (§6.4: eight baseline libraries, four x86-64-v3 libraries,
+  four CPU probes) into `target/natives-dist/<platform>/<variant>/` with the `ship` profile and
+  writes `natives.json` (§6.5).
 - `apps.cli`: `nix run .#cli -- run --preset …`.
 - `apps.bluemap`: runs the pinned BlueMap CLI jar on `jdk25` (§9.6).
 - `apps.publish`: `tools/review/publish.sh`.
@@ -625,7 +628,9 @@ macOS minute costs about ten Linux minutes. The workflows are shaped around that
     `macos-14` (arm64), `macos-15-intel` (x64; `macos-13` was retired on 2025-12-04), `ubuntu-24.04`,
     `ubuntu-24.04-arm`, and `docker run eclipse-temurin:21-jdk-alpine` for musl on x64 and on
     `ubuntu-24.04-arm` (JavaScript actions do not run inside Alpine containers on arm64 runners, so the
-    container only runs the test). Each job also checks that the loader picked its own platform key.
+    container only runs the test). Each job also checks that the loader picked its own platform key;
+    the x86-64 jobs run a second time with `DEEPTIME_NATIVES_VARIANT=baseline` and check that the
+    baseline linked.
     This is the only way to test the
     macOS extraction path that breaks Sable (§6.5); this laptop cannot.
   - `workflow_dispatch` finds a workflow only once it is on `master`; before that, a run needs a
@@ -1256,10 +1261,40 @@ all processors at server first start and in the CLI. Rust threads never attach t
 | `macos-x86_64` | `x86_64-apple-darwin` | same | cargo-zigbuild | Sable needed `codegen-units=2` here to avoid a rustc hang; copy the setting |
 | `macos-aarch64` | `aarch64-apple-darwin` | same | cargo-zigbuild | |
 
-- **Conservative CPU baseline.** No `-C target-cpu` and no `+avx*` features anywhere. The default
-  targets are already conservative: generic x86-64 on Linux, x86-64 plus SSE3/CMPXCHG16B on Windows,
-  Penryn on Intel macOS, Armv8-A on Linux arm64, Apple M1 on macOS arm64 (rustc target specs). This
-  avoids Power Grid's SIGILL on a QEMU virtual CPU (PowerGrid #457), which no Java code could catch.
+- **Conservative CPU baseline.** The baseline libraries have no `-C target-cpu` and no `+avx*`
+  features. The default targets are already conservative: generic x86-64 on Linux, x86-64 plus
+  SSE3/CMPXCHG16B on Windows, Penryn on Intel macOS, Armv8-A on Linux arm64, Apple M1 on macOS
+  arm64 (rustc target specs). This avoids Power Grid's SIGILL on a QEMU virtual CPU (PowerGrid
+  #457), which no Java code could catch.
+- **A second, x86-64-v3 build on x86-64** (decisions log 2026-10-18, "Both, picked at runtime").
+  Each of the four x86-64 platform keys also ships the same source built with
+  `-C target-cpu=x86-64-v3` (AVX2, FMA, BMI1/2, F16C, LZCNT, MOVBE: Intel from 2013, AMD from
+  2015), which the loader takes only when the CPU has the whole level (§6.5); arm64 stays single.
+  The flag goes in as `--config 'target.<triple>.rustflags=["-C", "target-cpu=x86-64-v3"]'`, which
+  cargo merges with `.cargo/config.toml`'s per-target flags (musl's `-crt-static`, macOS's
+  `codegen-units`); `RUSTFLAGS` would replace them, so `build-natives.sh` and `gate-bins.sh` refuse
+  to run with it set. The v3 build always names `--target` (build scripts and proc macros stay
+  baseline for the build host) and has its own target directory, `target/x86-64-v3`, so the two
+  builds never invalidate each other. Every v3 file is checked: `version()` ends `;cpu=x86-64-v3`
+  (`deeptime-jni`'s `CPU_LEVEL`, from the compiler's `target_feature` cfg) and `llvm-objdump`
+  finds at least 500 BMI1/BMI2 instructions (SHLX, SHRX, SARX, RORX, ANDN, MULX, BZHI), more than
+  four times the baseline's count (measured on linux-x86_64-gnu: 1,620 against 0). Rust does not contract a multiply and an add into an FMA by itself,
+  but the two builds' worlds are not required to match (Ben, 2026-10-18: "I am not worried about
+  determinism, performance is far more important"; decisions log 2026-10-01, "Stored data only").
+- **The CPU probe.** The x86-64 keys also ship `deeptime_cpuprobe` (crate `deeptime-cpuprobe`, no
+  dependencies; 118 kB on Windows, 344 to 347 kB on Linux, 1.26 MB on macOS, mostly the standard
+  library's linked pieces), whose one JNI function, `CpuProbe.probe()`, returns the 16 features of
+  x86-64-v3 as a bit mask: the standard library's `is_x86_feature_detected!` (CPUID, and XGETBV for
+  the AVX family, so an OS that does not save the YMM registers reads as lacking them) plus CPUID
+  8000_0001h ECX bit 0 for LAHF/SAHF. It is a library of its own because the JVM binds a class's
+  natives to the first loaded library that exports them: asking the baseline `deeptime_jni` would
+  make it the library every `DeepTimeNative` call goes to. A release jar so carries 16 native files:
+  eight baseline libraries, four v3 libraries and four probes.
+- **The `ship` profile** (`Cargo.toml`): `release` plus `lto = "fat"` and `codegen-units = 1`.
+  `build-natives.sh` and the gate's builds (`tools/natives/gate-bins.sh`) use it; everyday builds,
+  Gradle's host native and the tests stay on `release`. Cost and gain: STATUS.md build log
+  2026-10-18 (natives). On `x86_64-apple-darwin`, `.cargo/config.toml`'s `codegen-units=2` (above)
+  outranks it.
 - **Toolchain.** Stable Rust 1.98.1 (the latest stable on 2026-09-28), no nightly features. zig 0.13.0
   for cargo-zigbuild 0.23.4, wired in through the package override of §4.4 (nixpkgs' own pairing is
   zig 0.16.0, which cargo-zigbuild's documentation does not yet cover; if 0.13 ever blocks a build,
@@ -1273,44 +1308,54 @@ all processors at server first start and in the CLI. Rust threads never attach t
   included: a plain `cargo build` inside the Nix dev shell on macOS links the Nix store's
   `libiconv.2.dylib`, which no player's Mac has. zig 0.13 raises the minimum macOS of both macOS
   libraries to 11.7.1 (its own floor; rustc's defaults are 10.12 and 11.0). They link only
-  `/usr/lib/lib{System.B,iconv.2,charset.1}.dylib`, and `.cargo/config.toml` gives them the install
-  name `@rpath/libdeeptime_jni.dylib` instead of the build path. The zig-built musl libraries need
+  `/usr/lib/lib{System.B,iconv.2,charset.1}.dylib`, and each library's `build.rs` gives it the
+  install name `@rpath/<file>` instead of the build path (per library, so the probe never claims
+  `deeptime_jni`'s). The zig-built musl libraries need
   only `libc.so` (musl's loader itself; no `libgcc_s`). The Windows DLLs import `VCRUNTIME140.dll`
   and the UCRT; every JVM loads `VCRUNTIME140.dll` itself, so no static CRT flag is needed.
   nixpkgs carries cargo-xwin 0.23.1; CI pins the same with cargo-zigbuild 0.23.4.
 
 ### 6.5 Native loading and extraction
 
-The jar carries `natives/deeptime/<platform key>/<file>` and `natives/deeptime/natives.json`
-(per file: sha256, size, Rust target, glibc floor; plus the Cargo workspace version and the format
-version). Its schema (schema 1; written by Gradle `hostNatives` and by `build-natives.sh`, read by
-`NativeLoader`; P0-07):
+The jar carries `natives/deeptime/<platform key>/<variant>/<file>` (variant `baseline` or
+`x86-64-v3`, §6.4), the x86-64 keys' CPU probes at `natives/deeptime/<platform key>/probe/<file>`,
+and `natives/deeptime/natives.json` (per file: variant, sha256, size, Rust target, glibc floor;
+plus the Cargo workspace version and the format version). Its schema (schema 2 since the
+x86-64-v3 builds, decisions log 2026-10-18; written by Gradle `hostNatives` and by
+`build-natives.sh`, read by `NativeLoader`; P0-07):
 
 ```json
 {
-  "schema": 1,
+  "schema": 2,
   "version": "0.0.1",
   "format_version": "0.0",
   "libraries": [
     {
       "platform": "linux-x86_64-gnu",
+      "variant": "baseline",
       "file": "libdeeptime_jni.so",
       "rust_target": "x86_64-unknown-linux-gnu",
       "glibc_floor": "2.17",
       "sha256": "<64 lowercase hex digits>",
       "size": 1234567
-    }
+    },
+    { "platform": "linux-x86_64-gnu", "variant": "x86-64-v3", "file": "libdeeptime_jni.so", "...": "..." }
+  ],
+  "probes": [
+    { "platform": "linux-x86_64-gnu", "file": "libdeeptime_cpuprobe.so", "...": "..." }
   ]
 }
 ```
 
-- `schema` is 1; the loader refuses any other value (reported as `VERSION_MISMATCH`: reinstall).
+- `schema` is 2; the loader refuses any other value (reported as `VERSION_MISMATCH`: reinstall).
 - `version` is the Cargo `[workspace.package] version`; `format_version` is
   `[workspace.metadata.deeptime] format_version`, the format version's one source (the writers read
   it from `Cargo.toml`; `deeptime-format`'s `build.rs` makes it `FORMAT_VERSION`, so the Rust constant
   and the JSON cannot drift).
-- `libraries` has one entry per platform key of §6.4 (one in a dev jar, eight in a release jar);
-  the file sits at `natives/deeptime/<platform>/<file>`.
+- `libraries` has one `baseline` entry per platform key of §6.4 and one `x86-64-v3` entry per
+  x86-64 key (a dev jar: the host's one or two; a release jar: twelve); `variant` is required and
+  must be one of the two. `probes` (optional) has one entry per x86-64 key, with the same fields
+  and no `variant`. A release jar carries 16 files; Gradle's `checkReleaseNatives` holds it to that.
 - `glibc_floor` is the highest `GLIBC_x.y` symbol version the library needs (the writer scans the
   file), `null` for non-gnu targets. `size` is in bytes. An optional `git_sha` is informational.
 
@@ -1328,7 +1373,7 @@ per JVM (P0-07).
    `/proc/self/exe` (the JVM's own dynamic loader — `ld-musl-*` means musl). If that fails, try the
    gnu build, then the musl build.
 2. **Override.** `-Ddeeptime.natives.path=<file>` loads a user-supplied library (for antivirus
-   exclusions or unusual systems) and skips extraction.
+   exclusions or unusual systems) and skips extraction and the build choice of step 6.
 3. **Target directory.** `<gamedir>/deeptime/natives/<version>-<first 12 hex of sha256>/`, where
    `<version>` is the Cargo workspace version. The version-and-hash directory means a file that
    another running instance has loaded is never overwritten (Windows locks loaded DLLs, and Sable's
@@ -1342,11 +1387,31 @@ per JVM (P0-07).
    `<file>.tmp`, fsync, verify the sha256, `Files.move(…, ATOMIC_MOVE)` (fall back to
    `REPLACE_EXISTING`), then re-verify: a file that vanishes or changes between write and load is
    the antivirus-quarantine signature (Sable #691).
-6. **Link** with `System.load(absolutePath)`, then call `version()` and `selfTest()`. The version
+6. **The build for this CPU** (decisions log 2026-10-18). With no `x86-64-v3` entry for the
+   platform key, the baseline. Otherwise the loader extracts the key's probe (steps 3 to 5: its
+   own version-and-hash directory, like each build), links it (`System.load`, its own class
+   `CpuProbe`) and asks for the feature mask
+   once per JVM; it takes v3 when every one of the 16 features is there, the baseline when any is
+   missing (the reason names them) or the probe cannot run. The override: the system property
+   `deeptime.natives.variant`, else the environment variable `DEEPTIME_NATIVES_VARIANT`, set to
+   `baseline`, `x86-64-v3` (or `v3`) or `auto`; an unknown value is logged and ignored. A forced
+   baseline skips the probe. A forced v3 still asks it and is **refused** (WARN, baseline) when
+   the CPU lacks a feature, since v3 there would kill the JVM with SIGILL, which no Java code can
+   catch; it is honoured when the probe cannot run. When v3 is chosen, both builds are extracted,
+   v3 first.
+7. **Link** with `System.load(absolutePath)`, then call `version()` and `selfTest()`. The version
    check compares **semver and format only** (never the git sha): the library's
    `<semver>;format=<f>` must equal the pair recorded in `natives.json`, which the build wrote from
    the same Cargo workspace, and `selfTest()` must return the sum Java computes itself (§6.1).
-7. **Prune** other versions' directories best-effort (ignore locked files).
+   `version()` ends `;cpu=<baseline|x86-64-v3>`; the loader logs a WARN if that disagrees with the
+   manifest's variant. **Fallback:** a v3 file that fails to extract, changes on disk or fails to
+   link (an `UnsatisfiedLinkError` that names no libc) is logged as a WARN and the baseline is
+   linked instead; nothing has bound to the v3 file then, so the baseline can still link. A v3
+   library that links but then fails the version or self-test check cannot fall back (its natives
+   are bound) and fails as `VERSION_MISMATCH`. The INFO line and `NativeStatus.describe()` name the
+   build and why, e.g. `build=x86-64-v3 ... (x86-64-v3: the CPU has every x86-64-v3 feature)` or
+   `(baseline: the CPU lacks avx2, fma of x86-64-v3)`.
+8. **Prune** other versions' directories best-effort (ignore locked files).
 
 **One version source.** The Cargo `[workspace.package] version` is the version. `gradle.properties`
 `mod_version` must equal it; the Gradle task `checkVersions` (a dependency of `build`) fails the build
@@ -1377,6 +1442,12 @@ The five failure classes, how each is detected, its guidance, and how tests forc
 | `ANTIVIRUS_SUSPECTED` | the extracted file vanishes or changes between write and load | add an exclusion for the printed directory, or use `-Ddeeptime.natives.path` | `-Ddeeptime.natives.testDeleteAfterWrite=true` |
 | `IO_ERROR` | any `IOException` while creating, locking, writing or moving | the directory and the exception text | `-Ddeeptime.natives.forceFail=io` (the target directory is made read-only) |
 | `VERSION_MISMATCH` | the linked library's semver/format differs from `natives.json`, or its self-test sum differs from Java's | reinstall the mod; a stray `-Ddeeptime.natives.path` library is the usual cause | `-Ddeeptime.natives.forceFail=version_mismatch` (checks against a deliberately wrong expected version) |
+
+The x86-64-v3 build's fallback (§6.5 step 7) is not a failure class: the baseline links and the
+status is OK, with the v3 failure in its reason. Tests force it with
+`-Ddeeptime.natives.forceFail=v3_link` (a synthetic `UnsatisfiedLinkError` for the v3 file only),
+and a CPU without the level with `-Ddeeptime.natives.testCpuFeatures=<mask>` (replaces the
+probe's answer; `CpuProbe.FEATURES` gives the bit order).
 
 ---
 

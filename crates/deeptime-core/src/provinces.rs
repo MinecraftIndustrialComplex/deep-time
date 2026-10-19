@@ -50,6 +50,7 @@
 use deeptime_format::ParamValue;
 
 use deeptime_format::GridDesc;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::error::CoreError;
@@ -293,30 +294,33 @@ pub fn generalise(classes: &[f32], w: usize, h: usize, radius: usize) -> Vec<f32
     let continental = |v: f32| v.is_finite() && (v as u8) <= EXTENDED && (v as u8) != LIP;
     let mut out = classes.to_vec();
     let r = radius as i64;
-    for j in 0..h {
-        for i in 0..w {
-            let own = classes[j * w + i];
-            if !continental(own) {
-                continue;
-            }
-            let mut count = [0u32; 6];
-            for dj in -r..=r {
-                let jj = (j as i64 + dj).clamp(0, h as i64 - 1) as usize;
-                for di in -r..=r {
-                    let ii = (i as i64 + di).rem_euclid(w as i64) as usize;
-                    let v = classes[jj * w + ii];
-                    if continental(v) {
-                        count[v as usize] += 1;
+    // Each cell reads `classes` only: the rows run side by side.
+    out.par_chunks_mut(w.max(1))
+        .enumerate()
+        .for_each(|(j, row)| {
+            for (i, o) in row.iter_mut().enumerate() {
+                let own = classes[j * w + i];
+                if !continental(own) {
+                    continue;
+                }
+                let mut count = [0u32; 6];
+                for dj in -r..=r {
+                    let jj = (j as i64 + dj).clamp(0, h as i64 - 1) as usize;
+                    for di in -r..=r {
+                        let ii = (i as i64 + di).rem_euclid(w as i64) as usize;
+                        let v = classes[jj * w + ii];
+                        if continental(v) {
+                            count[v as usize] += 1;
+                        }
                     }
                 }
+                let best = *count.iter().max().expect("six classes");
+                if count[own as usize] < best {
+                    let k = count.iter().position(|&c| c == best).expect("a maximum");
+                    *o = k as f32;
+                }
             }
-            let best = *count.iter().max().expect("six classes");
-            if count[own as usize] < best {
-                let k = count.iter().position(|&c| c == best).expect("a maximum");
-                out[j * w + i] = k as f32;
-            }
-        }
-    }
+        });
     out
 }
 
@@ -347,7 +351,7 @@ pub fn derive(world: &WorldState) -> Option<Field> {
 pub fn derive_with(world: &WorldState, r: &Rules) -> Option<Field> {
     let (cells, lip, grid) = cells(world, r)?;
     let raw: Vec<f32> = cells
-        .iter()
+        .par_iter()
         .map(|c| c.map_or(f32::NAN, |c| f32::from(classify(&c, lip, r))))
         .collect();
     let (w, h) = (grid.w as usize, grid.h as usize);
@@ -526,6 +530,7 @@ fn cells(world: &WorldState, r: &Rules) -> Option<(Vec<Option<Cell>>, Option<f32
     let lip = lip_min_m(world, r);
     let at = |v: Option<&[f32]>, c: usize| v.map_or(f32::NAN, |v| v[c]);
     let cells: Vec<Option<Cell>> = (0..n)
+        .into_par_iter()
         .map(|c| {
             let continental = kind[c] >= 0.5;
             if !regime_f.data[c].is_finite() || (!continental && !age[c].is_finite()) {

@@ -10,8 +10,7 @@ use std::time::Duration;
 
 use serde_json::Value;
 
-use super::STAGE_NAME;
-use super::recorded_tests::{finish, pipeline_json, temp_dir};
+use super::recorded_tests::{census_of, finish, pipeline_json, temp_dir};
 use crate::checkpoint::Checkpoint;
 use crate::session::{NoGauge, Session, SessionOptions};
 use crate::world::WorldState;
@@ -39,7 +38,7 @@ fn run(json: &str, threads: usize, budget: Option<u64>, name: &str) -> Outcome {
     s.set_history_budget(budget);
     finish(&s);
     let world = s.checkpoint().unwrap().world;
-    let census: Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
+    let census = census_of(&world);
     let h = world.history.as_ref().unwrap();
     let out = Outcome {
         on_disk: h.frames_on_disk(),
@@ -211,7 +210,6 @@ fn a_checkpoint_with_a_spilled_history_resumes_to_the_same_result() {
         &resumed,
         "resumed twice from spilled checkpoints",
     );
-    let census: Value = serde_json::from_str(&resumed.notes[STAGE_NAME]).unwrap();
-    assert_eq!(census, straight.census);
+    assert_eq!(census_of(&resumed), straight.census);
     let _ = std::fs::remove_dir_all(&dir);
 }

@@ -37,6 +37,16 @@ serde_json = "1"
 panic = "unwind"
 lto = "thin"
 
+[profile.ship]
+# What ships and what the P1-17/P1-19 gate bench measures (decisions log 2026-10-18; plan §6.4):
+# release plus fat LTO in one codegen unit. On full 16k at 100 Myr the baseline build was 1.03x
+# faster than `release` by CPU time and the x86-64-v3 build 1.10x, with the same world files; the
+# libraries are 22 % smaller, and it builds 2.6 to 4.5x slower (STATUS.md build log 2026-10-18, natives). Used by
+# tools/natives/build-natives.sh and tools/natives/gate-bins.sh; everyday builds stay on `release`.
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+
 [profile.dev]
 # The workspace's own crates at -O1 in dev and test builds (Ben, 2026-09-30): at -O0 the core's
 # test suite took ~38 min on the Mac, because the simulation kernels live in deeptime-core itself.

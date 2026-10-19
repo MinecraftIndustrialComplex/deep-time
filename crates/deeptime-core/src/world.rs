@@ -86,6 +86,11 @@ pub struct WorldState {
     /// their own, streamed (`checkpoint.rs`), since frames may be on disk (P1-17).
     #[serde(skip)]
     pub history: Option<crate::deposits::recorded::RecordedHistory>,
+    /// The horizon stacks the structure stage's last step baked, kept for the deposit stage's
+    /// cover and the bake (P1-19, `structure::horizon_cache`). Not in checkpoints, and not part
+    /// of the world's equality.
+    #[serde(skip)]
+    pub horizons: crate::structure::horizon_cache::HorizonCache,
     next_event_seq: u64,
     next_site_id: SiteId,
     next_body_id: BodyId,
@@ -110,6 +115,7 @@ impl WorldState {
             structure: None,
             structure_relief: Vec::new(),
             history: None,
+            horizons: Default::default(),
             next_event_seq: 0,
             next_site_id: 0,
             next_body_id: 0,

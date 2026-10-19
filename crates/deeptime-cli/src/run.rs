@@ -1126,6 +1126,7 @@ pub(crate) fn timings_line(
         deeptime_core::surface::volcanoes::STAGE_NAME,
         deeptime_core::surface::impacts::STAGE_NAME,
         deeptime_core::surface::young::STAGE_NAME,
+        deeptime_core::deposits::STAGE_NAME,
     ] {
         if let Some(note) = world
             .notes
@@ -1859,6 +1860,10 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
             s.set_compute(m);
         }
         name = s.preset().name().to_owned();
+        // P1-19 measurement: the structure step after the plates' instead of beside them.
+        if std::env::var_os("DEEPTIME_BENCH_NO_OVERLAP").is_some() {
+            s.set_overlap(false);
+        }
         drive(&s, o.verbose, |_, st| st == AdvanceStatus::Done)?;
         let finalize = Instant::now();
         s.finalize_write()?;

@@ -1,0 +1,17 @@
+[package]
+name = "deeptime-cpuprobe"
+description = "The CPU probe the native loader runs before it picks the baseline or the x86-64-v3 native"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+
+[lib]
+name = "deeptime_cpuprobe"
+# cdylib: the shipped probe; rlib: its tests.
+crate-type = ["cdylib", "rlib"]
+
+# No dependencies, not even `jni`: one exported function returning a number.
+[dependencies]

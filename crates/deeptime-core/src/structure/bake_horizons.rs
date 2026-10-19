@@ -820,10 +820,23 @@ impl Horizons {
 
 /// Bakes every cell of the world's L1 grid at the end of a run (or at any step after the
 /// structure stage ran).
+/// The horizons the structure stage's last step kept (`world.horizons`) are taken when they were
+/// baked from what this bake would read (`structure::horizon_cache`).
 pub fn bake(world: &WorldState, preset: &PlanetPreset) -> Result<Horizons, CoreError> {
+    bake_noting(world, preset).map(|(hz, _)| hz)
+}
+
+/// [`bake`], and whether the horizons were the kept ones.
+pub fn bake_noting(
+    world: &WorldState,
+    preset: &PlanetPreset,
+) -> Result<(Horizons, bool), CoreError> {
     let p = preset.structure.clone().unwrap_or_default();
     let src = CellSource::new(world, preset)?;
-    Ok(bake_with(&src, preset, &p, &Tables::get()))
+    if let Some(hz) = world.horizons.get(&src.fingerprint(preset, &p)) {
+        return Ok((hz, true));
+    }
+    Ok((bake_with(&src, preset, &p, &Tables::get()), false))
 }
 
 /// [`bake`] from an assembled source.

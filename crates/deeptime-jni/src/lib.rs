@@ -37,9 +37,28 @@ pub const TARGET: &str = env!("DEEPTIME_TARGET");
 /// The git commit it was built from (informational; never compared).
 pub const GIT_SHA: &str = env!("DEEPTIME_GIT_SHA");
 
-/// `version()`'s string: `<semver>+<git sha>;format=<f>;target=<rust triple>` (plan §6.1).
+/// The CPU level the library was compiled for: `x86-64-v3` for the second x86-64 native, built
+/// with `-C target-cpu=x86-64-v3` (decisions log 2026-10-18; plan §6.4), `baseline` otherwise. The
+/// loader logs it beside the build it chose, so a v3 file that is not a v3 build shows.
+pub const CPU_LEVEL: &str = if cfg!(all(
+    target_arch = "x86_64",
+    target_feature = "avx2",
+    target_feature = "bmi1",
+    target_feature = "bmi2",
+    target_feature = "f16c",
+    target_feature = "fma",
+    target_feature = "lzcnt",
+    target_feature = "movbe",
+)) {
+    "x86-64-v3"
+} else {
+    "baseline"
+};
+
+/// `version()`'s string: `<semver>+<git sha>;format=<f>;target=<rust triple>;cpu=<level>`
+/// (plan §6.1).
 pub fn version_string() -> String {
-    format!("{VERSION}+{GIT_SHA};format={FORMAT_VERSION};target={TARGET}")
+    format!("{VERSION}+{GIT_SHA};format={FORMAT_VERSION};target={TARGET};cpu={CPU_LEVEL}")
 }
 
 type BridgeResult<T> = Result<T, BridgeError>;
@@ -495,7 +514,10 @@ mod tests {
         let (semver_sha, rest) = v.split_once(';').unwrap();
         assert!(semver_sha.starts_with("0.0.1+"), "{v}");
         assert!(rest.starts_with("format=0.5;target="), "{v}");
-        assert!(rest.ends_with(TARGET), "{v}");
+        assert!(
+            rest.ends_with(&format!("target={TARGET};cpu={CPU_LEVEL}")),
+            "{v}"
+        );
     }
 
     #[test]
