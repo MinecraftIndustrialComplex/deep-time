@@ -67,12 +67,13 @@
 //! ocean beside it gets what there is).
 // ledger: PLT-261 (the rule), PLT-262 (the width), PLT-263 (τ), PLT-264 (the height line).
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use glam::DVec3;
+use rayon::prelude::*;
 
 use super::Env;
-use super::geometry::{Geo, dijkstra};
+use super::geometry::{Geo, dijkstra_sparse};
 use super::pools::{continental_column, oceanic_column};
 use super::state::{ARC, CONTINENTAL, HIDDEN, OCEANIC, PlateState, SUBDUCTION_ZONE, TRENCH, pool};
 
@@ -140,6 +141,52 @@ pub fn width_rad(env: &Env) -> f64 {
     env.k.transition_width_km / n.planet_km.max(1e-9)
 }
 
+/// The seeds near a point (P1-19): seed numbers hashed by the cube of side `cell` they fall in,
+/// `cell` no less than the chord of the seed spacing W/2, so every seed whose direction is within
+/// W/2 of a point (dot product at least `cos_sep`) is in one of the 27 cubes round it. A filter
+/// only: the caller makes the exact test on what it visits, so the seeds and catchments are the
+/// ones a scan over every seed finds.
+struct Near {
+    cell: f64,
+    cubes: HashMap<[i32; 3], Vec<u32>>,
+}
+
+impl Near {
+    fn new(cos_sep: f64) -> Near {
+        // The chord of the angle whose cosine is `cos_sep` on the unit sphere, with room for the
+        // rounding of positions a few ulps off unit length.
+        let cell = (2.0 * (1.0 - cos_sep) + 1e-9).max(0.0).sqrt() + 1e-9;
+        Near {
+            cell,
+            cubes: HashMap::new(),
+        }
+    }
+
+    fn cube(&self, p: DVec3) -> [i32; 3] {
+        let c = |x: f64| ((x + 1.0) / self.cell).floor() as i32;
+        [c(p.x), c(p.y), c(p.z)]
+    }
+
+    fn insert(&mut self, p: DVec3, seed: u32) {
+        let key = self.cube(p);
+        self.cubes.entry(key).or_default().push(seed);
+    }
+
+    /// Calls `f` with every seed in the 27 cubes round `p`.
+    fn visit(&self, p: DVec3, mut f: impl FnMut(u32)) {
+        let [x, y, z] = self.cube(p);
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                for dz in -1..=1 {
+                    if let Some(list) = self.cubes.get(&[x + dx, y + dy, z + dz]) {
+                        list.iter().for_each(|&i| f(i));
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// One step of the transition on `state` at positions `pos` (see the module docs). Runs after the
 /// step's uplift and collapse, before the surface processes.
 pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Transition {
@@ -158,15 +205,20 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
     let (t_n, t_o) = (continental_m(), oceanic_m());
     let f = crust_per_metre(env);
     let quiet_before = (env.t_myr - k.collapse_quiet_myr.max(0.5 * env.dt_myr)) as f32;
-    let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
     let samples = &state.samples;
+    let groups = &state.groups;
+    // P1-19: the per-sample reads are parallel collects (each keeps the samples' order).
+    let plate_of: Vec<u32> = samples
+        .par_iter()
+        .map(|s| groups[s.group as usize].plate)
+        .collect();
     // Who takes part: visible, not at a trench, in a subduction zone or on an arc; continental
     // crust not raised by an orogeny lately (an active margin or a belt is not a rifted margin);
     // oceanic crust no thicker than the continent's (the plate model keeps crust stacked at
     // resamplings and accreted from slabs under the oceanic label, up to hundreds of km on
     // master: that is not the ocean floor beside a rifted margin, and it neither gives nor takes).
     let eligible: Vec<bool> = samples
-        .iter()
+        .par_iter()
         .map(|s| {
             s.flags & (HIDDEN | TRENCH | SUBDUCTION_ZONE | ARC) == 0
                 && if s.kind == OCEANIC {
@@ -181,6 +233,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
     };
     // Boundary samples: eligible, with an eligible neighbour of the other crust on the same plate.
     let boundary: Vec<u32> = (0..n as u32)
+        .into_par_iter()
         .filter(|&v| {
             eligible[v as usize]
                 && geo.edges(v).any(|(u, _)| {
@@ -192,86 +245,101 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         return out;
     }
     // Seeds along each plate's boundary, at least W/2 apart (index order), and each boundary
-    // sample's seed (of its own plate: crust never moves between plates).
+    // sample's seed (of its own plate: crust never moves between plates). P1-19: a seed only
+    // looks at the seeds of the cubes round it (`Near`), which hold every seed within W/2.
     let cos_sep = (0.5 * w).min(std::f64::consts::PI).cos();
     let mut seeds: Vec<u32> = Vec::new();
+    let mut near = Near::new(cos_sep);
     for &v in &boundary {
         let p = pos[v as usize];
         let pl = plate_of[v as usize];
-        if seeds
-            .iter()
-            .all(|&s| plate_of[s as usize] != pl || pos[s as usize].dot(p) < cos_sep)
-        {
+        let mut far = true;
+        near.visit(p, |i| {
+            let s = seeds[i as usize];
+            far &= plate_of[s as usize] != pl || pos[s as usize].dot(p) < cos_sep;
+        });
+        if far {
+            near.insert(p, seeds.len() as u32);
             seeds.push(v);
         }
     }
+    // The seed of `v`: the nearest seed of its plate, the first in index order on a tie. It is
+    // never farther than W/2 (a boundary sample is a seed or has one that near), so the cubes
+    // round `v` hold it.
     let seed_of = |v: u32| -> u32 {
         let p = pos[v as usize];
         let pl = plate_of[v as usize];
         let mut best = (f64::NEG_INFINITY, u32::MAX);
-        for (i, &s) in seeds.iter().enumerate() {
+        near.visit(p, |i| {
+            let s = seeds[i as usize];
             if plate_of[s as usize] != pl {
-                continue;
+                return;
             }
             let c = pos[s as usize].dot(p);
-            if c > best.0 {
-                best = (c, i as u32);
+            if c > best.0 || (c == best.0 && i < best.1) {
+                best = (c, i);
             }
-        }
+        });
         best.1
     };
-    // Distances from the boundary on each side, through each side's own crust of the plate.
+    let seed_at: Vec<u32> = boundary.par_iter().map(|&v| seed_of(v)).collect();
+    // Distances from the boundary on each side, through each side's own crust of the plate (the
+    // two sides reach disjoint samples, so they run at once; P1-19).
     let reach = 0.5 * w + half;
-    let side = |kind: u8| -> (Vec<f64>, Vec<u32>) {
+    let side = |kind: u8| -> Vec<(u32, f64, u32)> {
         let src: Vec<(u32, f64, u32)> = boundary
             .iter()
-            .filter(|&&v| samples[v as usize].kind == kind)
-            .map(|&v| (v, 0.0, seed_of(v)))
+            .zip(&seed_at)
+            .filter(|&(&v, _)| samples[v as usize].kind == kind)
+            .map(|(&v, &seed)| (v, 0.0, seed))
             .collect();
-        dijkstra(
+        dijkstra_sparse(
             geo,
             &src,
             |a, b| same(a, b) && samples[b as usize].kind == kind,
             reach,
         )
     };
-    let (dist_c, label_c) = side(CONTINENTAL);
-    let (dist_o, label_o) = side(OCEANIC);
+    let (reach_c, reach_o) = rayon::join(|| side(CONTINENTAL), || side(OCEANIC));
 
-    // The zone: signed distance and target, per sample.
+    // The zone: signed distance and target, per sample, in sample order (a sample reached from
+    // the continental side is continental, from the oceanic side oceanic).
     struct Member {
         i: usize,
         seed: u32,
         target: f64,
         excess: f64,
     }
-    let mut members: Vec<Member> = Vec::new();
-    for (i, s) in samples.iter().enumerate() {
-        let (d, seed) = if s.kind == CONTINENTAL && dist_c[i].is_finite() {
-            (dist_c[i] + half, label_c[i])
-        } else if s.kind == OCEANIC && dist_o[i].is_finite() {
-            (-(dist_o[i] + half), label_o[i])
-        } else {
-            continue;
-        };
+    let member = |i: u32, d: f64, seed: u32| -> Option<Member> {
         if d.abs() >= 0.5 * w || seed == u32::MAX {
-            continue;
+            return None;
         }
+        let i = i as usize;
         // ledger: PLT-261.
         let target = t_o + (t_n - t_o) * (0.5 + d / w).clamp(0.0, 1.0);
-        members.push(Member {
+        Some(Member {
             i,
             seed,
             target,
-            excess: crystalline_m(&s.pools) - target,
-        });
-    }
+            excess: crystalline_m(&samples[i].pools) - target,
+        })
+    };
+    let mut members: Vec<Member> = reach_c
+        .par_iter()
+        .filter_map(|&(i, d, seed)| member(i, d + half, seed))
+        .chain(
+            reach_o
+                .par_iter()
+                .filter_map(|&(i, d, seed)| member(i, -(d + half), seed)),
+        )
+        .collect();
+    members.par_sort_unstable_by_key(|m| m.i);
     out.zone = members.len() as u32;
 
-    // Each stretch: sources against sinks.
-    let mut stretch: BTreeMap<u32, (f64, f64)> = BTreeMap::new();
+    // Each stretch: sources against sinks (per seed, summed in the members' order).
+    let mut stretch: Vec<(f64, f64)> = vec![(0.0, 0.0); seeds.len()];
     for m in &members {
-        let e = stretch.entry(m.seed).or_default();
+        let e = &mut stretch[m.seed as usize];
         if m.excess > 0.0 {
             e.0 += m.excess;
         } else {
@@ -279,11 +347,11 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         }
     }
     // The rock the sources give, per stretch, and the share each side moves this step.
-    let mut mix: BTreeMap<u32, [f64; pool::COUNT]> = BTreeMap::new();
+    let mut mix: Vec<Option<[f64; pool::COUNT]>> = vec![None; seeds.len()];
     let lo = k.trench_elevation_m;
     let hi = k.max_elevation_m;
     for m in &members {
-        let (give, take) = stretch[&m.seed];
+        let (give, take) = stretch[m.seed as usize];
         let moved = rate * give.min(take);
         if moved <= 0.0 || m.excess <= 0.0 {
             continue;
@@ -292,7 +360,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         let s = &mut state.samples[m.i];
         let cryst = crystalline_m(&s.pools);
         let keep = ((cryst - g) / cryst).clamp(0.0, 1.0);
-        let acc = mix.entry(m.seed).or_insert([0.0; pool::COUNT]);
+        let acc = mix[m.seed as usize].get_or_insert([0.0; pool::COUNT]);
         for &p in &CRYSTALLINE {
             let before = f64::from(s.pools[p]);
             s.pools[p] = (before * keep) as f32;
@@ -306,14 +374,14 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         if m.excess >= 0.0 {
             continue;
         }
-        let Some(acc) = mix.get(&m.seed) else {
+        let Some(acc) = &mix[m.seed as usize] else {
             continue;
         };
         let total: f64 = acc.iter().sum();
         if total <= 0.0 {
             continue;
         }
-        let (give, take) = stretch[&m.seed];
+        let (give, take) = stretch[m.seed as usize];
         let moved = rate * give.min(take);
         let g = -m.excess * moved / take;
         let s = &mut state.samples[m.i];

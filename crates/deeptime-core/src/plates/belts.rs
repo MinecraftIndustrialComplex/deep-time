@@ -59,7 +59,7 @@ use glam::DVec3;
 use rayon::prelude::*;
 
 use super::Env;
-use super::geometry::{Geo, dijkstra_reached};
+use super::geometry::{Geo, dijkstra_sorted};
 use super::kinematics::{quat, tangent, to_group};
 use super::pools::{COLUMN_ISOSTATIC_FACTOR, isostatic_change_m};
 use super::shortening::Front;
@@ -141,7 +141,7 @@ pub fn stack(
     // fields, all at once (P1-19): behind each front its overriding plate's, exactly; in front of
     // it the incoming plate's, to the reach the front's height gives before any front stacks,
     // which `stack_front` cuts back to the reach of the height it finds then (exact, see
-    // `dijkstra_reached`) or, where a front before it raised its edge higher, runs again.
+    // `dijkstra_sorted`) or, where a front before it raised its edge higher, runs again.
     let todo: Vec<(usize, &Front)> = (0..state.contacts.len())
         .filter_map(|c| {
             let col = state.contacts[c].collision.as_ref()?;
@@ -155,13 +155,13 @@ pub fn stack(
             let (under, over) = (state.contacts[c].under, state.contacts[c].over);
             let reach = Reach::new(state, env, &plate_of, over, under, f);
             Fields {
-                over: dijkstra_reached(
+                over: dijkstra_sorted(
                     geo,
                     &reach.src_over,
                     |_, b| reach.over_ok(b),
                     reach.belt_rad,
                 ),
-                under: dijkstra_reached(
+                under: dijkstra_sorted(
                     geo,
                     &reach.src_under,
                     |_, b| reach.under_ok(b),
@@ -220,7 +220,7 @@ pub fn stack(
     out
 }
 
-/// A front's distance fields ([`dijkstra_reached`]: the reached samples ascending, with their
+/// A front's distance fields ([`dijkstra_sorted`]: the reached samples ascending, with their
 /// distances), behind it and in front of it, and the reach the latter was run to.
 struct Fields {
     over: Vec<(u32, f64, u32)>,
@@ -360,7 +360,7 @@ fn stack_front(
         d.retain(|&(_, x, _)| x <= reach.under_rad);
         d
     } else {
-        dijkstra_reached(
+        dijkstra_sorted(
             geo,
             &reach.src_under,
             |_, b| reach.under_ok(b),
@@ -686,7 +686,7 @@ fn foredeep(d_rad: &[(u32, f64, u32)], flexure: &[f64], wedge_km: f64, bins: &Bi
     let count = (reach / bins.bin_km).ceil() as usize + 1;
     let mut sum = vec![0.0f64; count];
     let mut num = vec![0u32; count];
-    // The reached samples, ascending (`dijkstra_reached`; every sample before, P1-19).
+    // The reached samples, ascending (`dijkstra_sorted`; every sample before, P1-19).
     for &(i, d, _) in d_rad {
         let x = flexure.get(i as usize).copied().unwrap_or(f64::NAN);
         if !d.is_finite() || !x.is_finite() {
