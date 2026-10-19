@@ -8,6 +8,7 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.IcePass;
 import com.minecraftindustrialcomplex.deeptime.worlddata.IceCover;
 import com.minecraftindustrialcomplex.deeptime.worlddata.LakeIce;
+import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -304,12 +305,22 @@ public final class BiomeGameTests {
         int c = t.circumference(), sea = g.getSeaLevel();
         java.util.List<int[]> columns = new java.util.ArrayList<>();
         int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
+        // Every covered column is of the cover's class, EF (BIO-158), read as the biome rules and the census read
+        // it: the cover and the class both take the nearest cell (BIO-159; the bilinear read put the cover on Cfb
+        // and BWk ground beside the sheet, and L2 cells under an L1 sheet kept their own class).
+        RasterSampler kp = wd.has("climate/koppen_l2") ? wd.layer("climate/koppen_l2") : null;
+        int notEf = 0;
+        StringBuilder notEfAt = new StringBuilder();
         for (int z = -zp + 8; z < zp; z += 16)
             for (int x = -c / 2 + 8; x < c / 2; x += 16) {
                 int n = ice.blocks(x, z);
+                long k = n > 0 && kp != null ? Math.round(kp.nearest(x, z)) : 30;
+                if (k != 30 && notEf++ < 8)
+                    notEfAt.append(String.format(java.util.Locale.ROOT, " (%d,%d) class %d;", x, z, k));
                 if (n > 0 && t.height(x, z) > sea + 2)
                     columns.add(new int[] {x, z, n});
             }
+        helper.assertTrue(notEf == 0, notEf + " covered columns not of class EF:" + notEfAt);
         int stride = Math.max(1, columns.size() / 24);
         int checked = 0, wet = 0, thick = 0;
         StringBuilder bad = new StringBuilder();
@@ -350,7 +361,7 @@ public final class BiomeGameTests {
                 }
             }
         }
-        DeepTime.LOGGER.info("[gametest] iceCoverLaidOnGlaciatedGround ice columns={} checked={} underWater={} thickest={}", columns.size(), checked, wet, thick);
+        DeepTime.LOGGER.info("[gametest] iceCoverLaidOnGlaciatedGround ice columns={} checked={} underWater={} thickest={} notEf={}", columns.size(), checked, wet, thick, notEf);
         helper.assertTrue(columns.isEmpty() || checked + wet > 0, "no column of ice cover could be checked (of " + columns.size() + ")");
         helper.assertTrue(bad.isEmpty(), "columns without their ice cover:" + bad);
         helper.succeed();

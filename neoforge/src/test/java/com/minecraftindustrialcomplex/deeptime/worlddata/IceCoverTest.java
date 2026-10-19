@@ -17,16 +17,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class IceCoverTest {
 
-    /** The cover rule's vectors: deeptime-format's {@code cover_is_held_by_half_the_weight} holds the same ones. */
+    /** The cover rule's vectors: deeptime-format's {@code the_nearest_cell_decides_and_the_covered_cells_blend} holds the same ones. */
     @Test
-    void theCoverIsHeldByHalfTheWeight() {
-        assertEquals(8.0, RasterSampler.coverOf(new double[] {8, 0}, new double[] {0.5, 0.5}));
-        assertEquals(0.0, RasterSampler.coverOf(new double[] {12, 0}, new double[] {0.49, 0.51}));
-        assertEquals(7.0, RasterSampler.coverOf(new double[] {4, 8, 0}, new double[] {0.25, 0.75, 0}));
-        assertEquals(0.0, RasterSampler.coverOf(new double[] {Double.NaN, 6}, new double[] {0.6, 0.4}));
-        assertEquals(6.0, RasterSampler.coverOf(new double[] {Double.NaN, 6}, new double[] {0.4, 0.6}));
-        assertEquals(0.0, RasterSampler.coverOf(new double[] {0}, new double[] {1}));
-        assertEquals(0.0, RasterSampler.coverOf(new double[] {}, new double[] {}));
+    void theNearestCellDecidesAndTheCoveredCellsBlend() {
+        assertEquals(8.0, RasterSampler.coverOf(8, new double[] {8, 0}, new double[] {0.5, 0.5}));
+        assertEquals(7.0, RasterSampler.coverOf(4, new double[] {4, 8, 0}, new double[] {0.25, 0.75, 0}));
+        assertEquals(0.0, RasterSampler.coverOf(0, new double[] {12, 0}, new double[] {0.75, 0.25}));
+        assertEquals(12.0, RasterSampler.coverOf(12, new double[] {12, 0}, new double[] {0.25, 0.75}));
+        assertEquals(0.0, RasterSampler.coverOf(Double.NaN, new double[] {6}, new double[] {1}));
+        assertEquals(6.0, RasterSampler.coverOf(6, new double[] {Double.NaN, 6}, new double[] {0.75, 0.25}));
+        assertEquals(5.0, RasterSampler.coverOf(5, new double[] {0}, new double[] {1}));
+        assertEquals(5.0, RasterSampler.coverOf(5, new double[] {}, new double[] {}));
+        assertEquals(0.0, RasterSampler.coverOf(0, new double[] {}, new double[] {}));
     }
 
     /**
@@ -50,6 +52,11 @@ class IceCoverTest {
                 int r = g.r();
                 assertEquals(v, cover.blocks(x + r / 2 - 1, z), "inside the half-way line of cell (" + i + ", " + j + ")");
                 assertEquals(0, cover.blocks(x + r / 2 + 1, z), "past the half-way line of cell (" + i + ", " + j + ")");
+                // The nearest cell decides, as it decides the block's class: covered exactly where it is covered.
+                for (int d = -r; d <= 2 * r; d++)
+                    for (int e = -r; e <= r; e += r / 2)
+                        assertEquals(layer.nearest(x + d, z + e) > 0, cover.blocks(x + d, z + e) > 0,
+                                "the nearest cell decides at (" + (x + d) + ", " + (z + e) + ")");
             }
         }
         assertTrue(edges > 0, "the planet's cover has an eastern edge");

@@ -78,8 +78,9 @@ public interface IceCover {
 
     /**
      * The world's ice cover: its {@code climate/ice_cover} layer read by the cover rule
-     * ({@link RasterSampler#cover}: the edge half-way between a covered cell and a bare one, the depth
-     * the covered cells' blend, so a margin thins over the cells' blocks without spreading past them)
+     * ({@link RasterSampler#cover}: covered where the nearest cell is, as the block's Köppen class is read,
+     * so the edge lies half-way between a covered cell and a bare one; the depth the covered cells' blend,
+     * so a margin thins over the cells' blocks without spreading past them)
      * and rounded, with the table recorded in the manifest; empty when the world has no such layer
      * (no climate stage, or a synthetic world).
      */

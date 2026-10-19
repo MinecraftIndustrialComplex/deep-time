@@ -401,12 +401,14 @@ impl Grid {
         if wt > 1e-6 { sum / wt } else { f32::NAN }
     }
 
-    /// The nearest cell's value.
+    /// The nearest cell's value; a tie goes to the later cell, as the game's `RasterRead::nearest`
+    /// (floor(u + 0.5)) has it, so the class and the cover (both read nearest) change where the
+    /// game's do.
     #[inline]
     fn nearest(&self, s: &Stencil) -> f32 {
         let mut best = 0;
         for q in 1..4 {
-            if s.f[q] > s.f[best] {
+            if s.f[q] >= s.f[best] {
                 best = q;
             }
         }
@@ -1419,12 +1421,14 @@ impl BakeMap {
         c.tree_cover = cm.tree.at(&s1);
         c.sea_ice = cm.sea_ice.at(&s1);
         if let Some(ice) = &cm.ice {
-            // The cover as the game lays it: the layer's cells by the shared cover rule (the
-            // edge half-way between a covered cell and a bare one). Where in the climate's ice
-            // the ground can hold it the bake decided per L2 cell (`bake::ice`).
+            // The cover as the game lays it: the layer's cells by the shared cover rule (covered
+            // where the nearest cell is, as the class, at the covered cells' blend). Where in the
+            // climate's ice the ground can hold it the bake decided per L2 cell (`bake::ice`).
             let s = ice.stencil(bx, bz);
-            c.ice_m =
-                cover_of((0..4).map(|q| (f64::from(ice.data[s.k[q]]), f64::from(s.f[q])))) as f32;
+            c.ice_m = cover_of(
+                f64::from(ice.nearest(&s)),
+                (0..4).map(|q| (f64::from(ice.data[s.k[q]]), f64::from(s.f[q]))),
+            ) as f32;
         }
         if let Some(rock) = &cm.rock {
             let s2 = rock[0].stencil(bx, bz);

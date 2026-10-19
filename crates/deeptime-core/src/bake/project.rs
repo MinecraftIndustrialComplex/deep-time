@@ -136,12 +136,13 @@ enum Kind {
     Point,
     /// The nearest cell's bytes (horizon stacks).
     Stack,
-    /// A cover layer (`climate/ice_cover`): each footprint sample read by the cover rule
-    /// (`deeptime_format::raster::cover_of` over its four cells), and the world cell covered where
-    /// at least half its samples are, at their mean depth. The footprint mean of the blocks covered
-    /// every world cell that one covered sample reached (one block from a 12-block margin's
-    /// twelfth), so the cover's area grew with the footprint, most where it is widest, at the poles
-    /// (ledger BIO-159, SCL-090).
+    /// A cover layer (`climate/ice_cover`), by the cover rule (`deeptime_format::raster::cover_of`):
+    /// the world cell is covered where the nearest cell is, the same cell the categories beside it
+    /// read (so a covered world cell is of the cover's class, `climate/koppen_l2` EF), at the mean
+    /// depth of the footprint's samples that are covered, each read by the rule at its block. The
+    /// footprint mean of the blocks covered every world cell that one covered sample reached (one
+    /// block from a 12-block margin's twelfth), so the cover's area grew with the footprint, most
+    /// where it is widest, at the poles (ledger BIO-159, SCL-090).
     Cover,
 }
 
@@ -233,12 +234,16 @@ impl Src {
         let (fi, fj) = (u.floor(), v.floor());
         let (i0, j0) = (fi as i64, fj as i64);
         let w = bilinear_weights(u - fi, v - fj);
-        cover_of([
-            (self.raw(i0, j0), w[0]),
-            (self.raw(i0 + 1, j0), w[1]),
-            (self.raw(i0, j0 + 1), w[2]),
-            (self.raw(i0 + 1, j0 + 1), w[3]),
-        ])
+        let (ci, cj) = self.nearest_cell(x, z);
+        cover_of(
+            self.raw(i64::from(ci), i64::from(cj)),
+            [
+                (self.raw(i0, j0), w[0]),
+                (self.raw(i0 + 1, j0), w[1]),
+                (self.raw(i0, j0 + 1), w[2]),
+                (self.raw(i0 + 1, j0 + 1), w[3]),
+            ],
+        )
     }
 }
 
@@ -649,6 +654,10 @@ fn resample_grid(map: &Mapping, srcs: &[Src], wg: &GridDesc) -> Vec<Vec<u8>> {
                                 put_raw(s.layer.desc.dtype, v, cell);
                             }
                             Kind::Cover => {
+                                // Covered where the nearest cell is, as the class beside it
+                                // (`Categorical`), at the footprint's covered samples' depth.
+                                let (ci, cj) = s.nearest_cell(f.xs, f.zs);
+                                let nearest = s.raw(i64::from(ci), i64::from(cj));
                                 let samples = (0..nz).flat_map(|kz| {
                                     let dz = if nz == 1 {
                                         0.0
@@ -664,7 +673,7 @@ fn resample_grid(map: &Mapping, srcs: &[Src], wg: &GridDesc) -> Vec<Vec<u8>> {
                                         (s.cover(f.xs + dx, f.zs + dz), 1.0)
                                     })
                                 });
-                                put_raw(s.layer.desc.dtype, cover_of(samples), cell);
+                                put_raw(s.layer.desc.dtype, cover_of(nearest, samples), cell);
                             }
                             Kind::Continuous => {
                                 let mut sum = 0.0;
@@ -1867,18 +1876,32 @@ mod tests {
         let desc = crate::bake::desc("climate/ice_cover", DType::U8, &l2, 1.0, "blocks", None);
         let layer = Arc::new(LoadedLayer::new(desc.clone(), bytes).unwrap());
         let wg = WorldProjection::PetroffGuyou(g).grid("L2", 8).unwrap();
-        let share = |kind: Kind| {
+        let project = |kind: Kind| {
             let src = Src {
                 entry: 0,
                 layer: layer.clone(),
                 kind,
                 cb: 1,
             };
-            let out = resample_grid(&map, &[src], &wg).remove(0);
+            resample_grid(&map, &[src], &wg).remove(0)
+        };
+        let share = |kind: Kind| {
             let mut d = desc.clone();
             d.grid = wg.clone();
-            area_share(&LoadedLayer::new(d, out).unwrap(), true, |v| v > 0.0)
+            let world = LoadedLayer::new(d, project(kind)).unwrap();
+            area_share(&world, true, |v| v > 0.0)
         };
+        // The cover lies on exactly the world cells whose nearest L2 cell is covered, the cells
+        // the class (`climate/koppen_l2`, read nearest) makes EF there (BIO-158), at a depth
+        // between the thinnest and the thickest of its cells.
+        let (cover, nearest) = (project(Kind::Cover), project(Kind::Categorical));
+        let mismatched = cover
+            .iter()
+            .zip(&nearest)
+            .filter(|(c, n)| (**c > 0) != (**n > 0))
+            .count();
+        assert_eq!(mismatched, 0, "cover and nearest class disagree");
+        assert!(cover.iter().all(|&c| c == 0 || (4..=12).contains(&c)));
         let truth = area_share(&layer, false, |v| v > 0.0);
         let (cover, mean) = (share(Kind::Cover), share(Kind::Continuous));
         eprintln!(
