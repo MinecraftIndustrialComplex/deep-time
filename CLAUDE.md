@@ -33,6 +33,7 @@ MinecraftIndustrialComplex/deep-time.
 crates/deeptime-format   world-data format (the contract with Java)
 crates/deeptime-core     simulation (no Minecraft, no JNI)
 crates/deeptime-jni      cdylib; the only crate using `jni`
+crates/deeptime-cpuprobe CPU-level probe cdylib (its own JNI class) that picks the baseline or x86-64-v3 native
 crates/deeptime-cli      `deeptime` binary: run, stage, synth, bench, inspect-column
 crates/deeptime-viewer   HTML viewer bundles
 crates/deeptime-inspect  renders Minecraft region files (dev tool)
@@ -146,7 +147,12 @@ tools/remote/mac.sh --no-sync -- deeptime-admit status  # the VM's admission too
   analysis, image processing — all on the Mac via `tools/remote/mac.sh`, results pulled back with
   `--pull`. If something must run locally: one job at a time, wrapped as
   `systemd-run --user --scope -p CPUQuota=100% nice -n 19 <cmd>`. No parallel local batches; no
-  `nix develop` builds on the laptop.
+  `nix develop` builds on the laptop. **One exception: GPU speed benches** (Ben, 2026-10-18,
+  decisions log): the VM has no GPU, so real-GPU timings run on the laptop's Radeon 8060S (RADV),
+  one bench at a time and only when no other local heavy job runs, with a binary built on the VM
+  (never build here), 8 sim threads and
+  `systemd-run --user --scope -p CPUQuota=800% nice -n 19 <cmd>`; compare GPU against CPU on the
+  laptop in A/B pairs, never against VM numbers. GPU correctness tests stay on the VM (lavapipe).
 - **Mac disk hygiene** (2026-09-30: the SSD filled to 100 % with ~60 worktree copies, each with its own
   target/; Ben: "Be more efficient about mac storage usage in the future"): after every merge run
   `tools/remote/mac-gc.sh`, which deletes the Mac copies of merged, idle worktrees and prunes stale

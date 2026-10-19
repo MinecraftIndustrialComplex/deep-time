@@ -1839,6 +1839,10 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
             Arc::new(AllocGauge),
         )?;
         name = s.preset().name().to_owned();
+        // P1-19 measurement: the structure step after the plates' instead of beside them.
+        if std::env::var_os("DEEPTIME_BENCH_NO_OVERLAP").is_some() {
+            s.set_overlap(false);
+        }
         drive(&s, o.verbose, |_, st| st == AdvanceStatus::Done)?;
         let finalize = Instant::now();
         s.finalize_write()?;

@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //
 // Loads the Deep Time native library on a bare JVM, the way the mod does, and prints one line:
-//   status=OK version=<semver> format=<f> selftest=<checksum>
+//   status=OK version=<semver> format=<f> selftest=<checksum> build=<baseline|x86-64-v3>
 //   status=FAILED class=<FailureClass>
-// It always exits 0: the line is the result (plan P0-07, P0-08's OS load matrix).
+// It always exits 0: the line is the result (plan P0-07, P0-08's OS load matrix). The loader's
+// INFO line on stderr says which build it linked and why (decisions log 2026-10-18).
 //
 // Run with only the mod jar on the classpath (NativeLoader is JDK-only):
 //   java -cp neoforge/build/libs/deeptime-1.21.1-0.0.1.jar tools/natives/NativeSmoke.java <gamedir>
-// Forcing properties (plan §6.6): -Ddeeptime.natives.forceFail=unsupported|libc_mismatch|io|version_mismatch,
+// The build: -Ddeeptime.natives.variant=baseline|x86-64-v3|auto (or DEEPTIME_NATIVES_VARIANT).
+// Forcing properties (plan §6.6): -Ddeeptime.natives.forceFail=unsupported|libc_mismatch|io|version_mismatch|v3_link,
 // -Ddeeptime.natives.testDeleteAfterWrite=true; -Ddeeptime.natives.path=<file> loads a given library.
 
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeLoader;

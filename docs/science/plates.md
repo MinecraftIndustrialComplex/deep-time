@@ -501,6 +501,11 @@ large as the whole crust over 1,000 Myr:
   crust under an overriding oceanic plate. Neither is a lattice artefact. A subduction initiation
   no longer splits off a plate that is at least half continental (PLT-229). With the fix, one test
   history's initiation had split off a plate that was 0.89 continental.
+- *The new lattice's triangulation* (P1-19, numerics only). Every lattice is the same Fibonacci
+  sphere under a random rotation, and a rotation keeps a Delaunay triangulation Delaunay. A
+  resampling therefore turns the first lattice's triangles, neighbours and edge lengths with the
+  points instead of triangulating them again. Only where four points are cocircular to rounding
+  can a diagonal differ from a fresh build's, and either diagonal is Delaunay.
 - *Island arcs mature by the crust they built* (PLT-047). An oceanic sample becomes continental
   crust once its accumulated island-arc magma reaches `arc_magma_m_per_myr` × `arc_maturity_myr`,
   whatever its height. Hidden crust does not convert. `arc_maturity_myr` is 20 Myr in every preset,
