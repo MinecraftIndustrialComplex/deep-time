@@ -48,10 +48,156 @@
 //! finite is solved again on
 //! every row, so the result is the textbook loop's in every case. The parity tests compare both
 //! with the textbook loop bit for bit on grids that diffuse in a few blobs.
+//!
+//! **Multigrid preconditioner (P1-19, ledger ERO-183).** The surface stage's solves ([`solve`],
+//! the preset's `surface.numerics.diffusion_solver`) precondition the same conjugate gradients
+//! with one geometric multigrid V-cycle (`diffusion/multigrid.rs`): Jacobi lowers the condition
+//! number by the diagonal only, so its iterations grow with D·Δt/Δx² (about 111 a step on the
+//! 16k shelf), while a V-cycle damps every wavelength at once (Briggs et al. 2000; Tatebe 1993
+//! for multigrid as a CG preconditioner). The PDE, the splitting that gives the first guess, the
+//! stopping rule on the RMS residual and the mass put-back are the same, and so is the kept
+//! [`Workspace`] of `f64` vectors; the preconditioner runs in single precision, so the result is
+//! not the Jacobi solve's bit for bit (Ben, 2026-10-18: performance over determinism), though its
+//! sums are per strip of rows added in order and so the same at any thread count. The Jacobi
+//! solve ([`step_in`]) stays for the crust's spreading, which skips rows, and as the `jacobi`
+//! setting.
 
 use rayon::prelude::*;
 
 use super::grid::Dims;
+use super::params::DiffusionSolver;
+
+/// One implicit step by the preset's solver (`surface.numerics`): conjugate gradients
+/// preconditioned by a multigrid V-cycle to an RMS residual of `tol_m` metres
+/// (`diffusion/multigrid.rs`), or the Jacobi-preconditioned solve of [`step_in`] (whose tolerance
+/// stays [`CG_TOL_M`]). Both start from the same splitting and keep their grid-sized `f64`
+/// vectors in the caller's [`Workspace`] (the multigrid levels are built for each solve). Returns
+/// the iterations. With `DEEPTIME_DIFFUSION_AUDIT` set, each multigrid solve is also compared with
+/// the Jacobi solve and with a tight one ([`audit::audit_line`]).
+pub fn solve(
+    ws: &mut Workspace,
+    d: &Dims,
+    h: &mut [f64],
+    kd: &[f64],
+    dt: f64,
+    solver: DiffusionSolver,
+    tol_m: f64,
+) -> usize {
+    match solver {
+        DiffusionSolver::Jacobi => step_in(ws, d, h, kd, dt),
+        DiffusionSolver::Multigrid => {
+            let h0 = audit::on().then(|| crate::alloc::copied(h));
+            let its = multigrid_in(ws, d, h, kd, dt, tol_m);
+            if let Some(h0) = h0 {
+                audit::record(d, &h0, h, kd, dt, its);
+            }
+            its
+        }
+    }
+}
+
+/// The multigrid-preconditioned step on every row, in a workspace: `h` becomes the right-hand
+/// side, the splitting's first guess, then the conjugate gradients to `tol_m`.
+fn multigrid_in(
+    ws: &mut Workspace,
+    d: &Dims,
+    h: &mut [f64],
+    kd: &[f64],
+    dt: f64,
+    tol_m: f64,
+) -> usize {
+    ws.fit_rhs(d);
+    ws.b.par_iter_mut()
+        .zip(h.par_iter())
+        .for_each(|(b, &v)| *b = v);
+    lod(d, h, kd, dt, &Live::all(d));
+    ws.fit(d);
+    multigrid::cg(ws, d, h, kd, dt, tol_m)
+}
+
+/// The opt-in comparison of the multigrid solve with the Jacobi one (P1-19): per solve, the
+/// largest and the RMS elevation difference between the two, and of each from a solve to
+/// [`audit::TIGHT_M`] (the old solve's own error at its tolerance beside the new one's).
+pub mod audit {
+    use std::sync::{Mutex, OnceLock};
+
+    use super::{Dims, Workspace, multigrid_in, step};
+
+    /// RMS residual of the reference solve, m.
+    pub const TIGHT_M: f64 = 1.0e-9;
+
+    pub(super) fn on() -> bool {
+        static ON: OnceLock<bool> = OnceLock::new();
+        *ON.get_or_init(|| std::env::var_os("DEEPTIME_DIFFUSION_AUDIT").is_some())
+    }
+
+    #[derive(Default)]
+    struct Sums {
+        solves: u64,
+        its_new: u64,
+        its_old: u64,
+        /// For [new − old, old − exact, new − exact]: the largest |difference| of any cell of
+        /// any solve, the largest RMS of a solve, and the sum of squares over every solve.
+        max: [f64; 3],
+        max_rms: [f64; 3],
+        sq: [f64; 3],
+        cells: f64,
+    }
+
+    static SUMS: Mutex<Option<Sums>> = Mutex::new(None);
+
+    pub(super) fn record(d: &Dims, h0: &[f64], new: &[f64], kd: &[f64], dt: f64, its: usize) {
+        let mut old = h0.to_vec();
+        let its_old = step(d, &mut old, kd, dt);
+        let mut exact = h0.to_vec();
+        multigrid_in(&mut Workspace::default(), d, &mut exact, kd, dt, TIGHT_M);
+        let n = new.len() as f64;
+        let mut g = SUMS.lock().unwrap_or_else(|e| e.into_inner());
+        let s = g.get_or_insert_with(Sums::default);
+        s.solves += 1;
+        s.its_new += its as u64;
+        s.its_old += its_old as u64;
+        s.cells += n;
+        let pairs: [(&[f64], &[f64]); 3] = [(new, &old), (&old, &exact), (new, &exact)];
+        for (k, (a, b)) in pairs.into_iter().enumerate() {
+            let (mut mx, mut sq) = (0.0f64, 0.0f64);
+            for (x, y) in a.iter().zip(b) {
+                let e = (x - y).abs();
+                mx = mx.max(e);
+                sq += e * e;
+            }
+            s.max[k] = s.max[k].max(mx);
+            s.max_rms[k] = s.max_rms[k].max((sq / n).sqrt());
+            s.sq[k] += sq;
+        }
+    }
+
+    /// The comparison so far, for `deeptime bench`; `None` when the audit is off or saw nothing.
+    pub fn audit_line() -> Option<String> {
+        let g = SUMS.lock().unwrap_or_else(|e| e.into_inner());
+        let s = g.as_ref()?;
+        let rms = |k: usize| (s.sq[k] / s.cells.max(1.0)).sqrt();
+        let per = |v: u64| v as f64 / s.solves.max(1) as f64;
+        Some(format!(
+            "diffusion_audit solves={} its_multigrid={:.1} its_jacobi={:.1} \
+             new_vs_old_max_m={:.3e} new_vs_old_rms_m={:.3e} new_vs_old_worst_rms_m={:.3e} \
+             old_err_max_m={:.3e} old_err_rms_m={:.3e} old_err_worst_rms_m={:.3e} \
+             new_err_max_m={:.3e} new_err_rms_m={:.3e} new_err_worst_rms_m={:.3e}",
+            s.solves,
+            per(s.its_new),
+            per(s.its_old),
+            s.max[0],
+            rms(0),
+            s.max_rms[0],
+            s.max[1],
+            rms(1),
+            s.max_rms[1],
+            s.max[2],
+            rms(2),
+            s.max_rms[2],
+        ))
+    }
+}
 
 /// One implicit step of Δt years on `h` with diffusivities `kd` (m²/yr); returns the conjugate
 /// gradient iterations it took.
@@ -923,6 +1069,8 @@ fn cyclic(lo: &[f64], di: &[f64], up: &[f64], alpha: f64, beta: f64, b: &mut [f6
         b[i] = x[i] - fact * z[i];
     }
 }
+
+mod multigrid;
 
 #[cfg(test)]
 mod parity;

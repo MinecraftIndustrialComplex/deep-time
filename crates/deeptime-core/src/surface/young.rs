@@ -143,8 +143,15 @@ impl YoungParams {
 /// stream power, diffusion and the slope failure), and the glaciers' ice state and passes
 /// (`glacial.rs`). Measured on the real L2 grids (P1-17, 2026-10-05: the counted peak less what
 /// the run held when the stage started, 413 B a cell on quick 16k and 416 B on full 16k,
-/// scattered continents, 500 Myr, the kept-block cache off), with about 10 % to spare.
-pub const OWN_BYTES_PER_L2_CELL: u64 = 460;
+/// scattered continents, 500 Myr, the kept-block cache off), with about 10 % to spare. P1-19
+/// (2026-10-19): the multigrid diffusion solve's hierarchy beside the conjugate gradients' arrays
+/// (`diffusion/multigrid.rs`: the finest level's seven f32 arrays, 28 B, and the coarser levels'
+/// eight on a third as many cells, 11 B) raised the stage's counted peak on quick 16k from
+/// 1,322.8 to 1,376.5 MiB (master against the branch, the same run and trace otherwise), 42 B a
+/// cell, so its own arrays are 448 B a cell (445 B on full 16k); 460 left
+/// `tests/memory_estimate.rs` 0.1 MiB short (74.4 MiB held against 74.3). 500 keeps about 10 %
+/// to spare again.
+pub const OWN_BYTES_PER_L2_CELL: u64 = 500;
 
 /// Estimate: the world the surface and the stages after it leave ([`super::retained_bytes`]),
 /// the recorded history, and the stage's own arrays on the L2 grid; ≈ 1 µs per cell per step
@@ -356,10 +363,11 @@ impl YoungStage {
         );
         let h: Vec<f64> = z2.iter().map(|&z| f64::from(z)).collect();
         let mut kind = vec![LAND; n2];
-        pflood::open_sea(&d, &h, sea, (n2 / 500).max(1), &mut kind);
+        let fm = self.sp.numerics.flood;
+        pflood::open_sea_with(fm, &d, &h, sea, (n2 / 500).max(1), &mut kind);
         let base = vec![sea; n2];
         let mut filled = vec![0.0; n2];
-        pflood::flood(&d, &h, &base, &mut kind, &mut filled);
+        pflood::flood_with(fm, &d, &h, &base, &mut kind, &mut filled);
         let mut small = 0usize;
         for c in 0..n2 {
             let depth = filled[c] - h[c];
@@ -527,8 +535,8 @@ impl YoungStage {
                      filled: &mut Vec<f64>,
                      rt: &mut routing::Routing,
                      area: &mut Vec<f64>| {
-            pflood::open_sea(&d, h, sea, (n / 500).max(1), kind);
-            pflood::flood(&d, h, &base_z, kind, filled);
+            pflood::open_sea_with(sp.numerics.flood, &d, h, sea, (n / 500).max(1), kind);
+            pflood::flood_with(sp.numerics.flood, &d, h, &base_z, kind, filled);
             routing::receivers(&d, filled, kind, rt);
             routing::stack(&d, kind, rt);
             routing::accumulate(&d, rt, &wt, area);
@@ -633,7 +641,16 @@ impl YoungStage {
                 )
             })
             .collect();
-        diffusion::step(&d, &mut h, &kd, dt);
+        let nm = &sp.numerics;
+        diffusion::solve(
+            &mut diffusion::Workspace::default(),
+            &d,
+            &mut h,
+            &kd,
+            dt,
+            nm.diffusion_solver,
+            nm.diffusion_tol_m,
+        );
         if !avail0.is_empty() {
             let sea_mask: Vec<bool> = kind.iter().map(|&k| k == BASE).collect();
             let mut avail: Vec<f64> = (0..n)
@@ -892,6 +909,14 @@ mod tests {
     /// measured to hold (the world before it plus its own arrays, the history aside; 500 Myr,
     /// scattered continents) by at most 15 %, and full 16k's whole estimate fits a 5 GiB cap
     /// (it listed 6,049 MiB against the 4,143 MiB held, so the editor refused full at 5 GiB).
+    /// The holds were measured again for P1-19's multigrid diffusion solve (2026-10-19,
+    /// `DEEPTIME_MEM_TRACE`, 8 threads, the 4 GiB cap, the kept-block cache off; the stage's
+    /// counted peak less the history it kept in memory): quick 1,105 → 1,162 MiB (1,376.5 less
+    /// 214.5; master's own run gave 1,322.8 less 214.2 = 1,108.6, so the method matches P1-17's),
+    /// full 4,143 → 4,311 MiB (the history all on disk). Again after the merge with master
+    /// fb38204f (2026-10-19, the same method, CPU kernels): quick 1,162 → 1,171 MiB (1,390.1 less
+    /// 219.5; master's own run gave 1,344.3 less 222.6 = 1,121.7, 13 MiB above P1-19's 1,108.6),
+    /// full 4,311 → 4,349 MiB.
     #[test]
     fn the_estimate_covers_the_measured_hold_closely() {
         const MIB: u64 = 1 << 20;
@@ -904,8 +929,8 @@ mod tests {
             .unwrap()
         };
         for (name, held_mib) in [
-            ("earthlike_quick_16k", 1105u64),
-            ("earthlike_full_16k", 4143),
+            ("earthlike_quick_16k", 1171u64),
+            ("earthlike_full_16k", 4349),
         ] {
             let crate::preset::PresetBody::Planet(p) =
                 crate::preset::Preset::from_json(&json(name)).unwrap().body
