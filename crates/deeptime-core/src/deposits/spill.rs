@@ -4,7 +4,9 @@
 //!
 //! A frame record is its fields' LZ4 blobs back to back, in the frame's field order; what the
 //! blobs are (name, range, bits, length) stays in memory ([`super::recorded`]'s `FrameHead`), so a
-//! reader can fetch one field (the crust-origin offsets) without the rest. Two kinds of file hold
+//! reader can fetch one field (the crust-origin offsets) without the rest. Fields added to a frame
+//! after it was spilled follow as a record of their own (P1-19), and the frame's head says which
+//! record holds each field; a checkpoint still gets each frame as one record in field order. Two kinds of file hold
 //! records:
 //!
 //! - a **spill file**, one per session, in the run's folder (`SessionOptions::out_dir`: the
@@ -182,6 +184,11 @@ impl SpillStore {
     pub(crate) fn wrote(&self, bytes: u64) {
         self.written.fetch_add(bytes, Ordering::Relaxed);
         self.frames.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Fields added to a frame already on disk were written (a record of their own, not a frame).
+    pub(crate) fn wrote_fields(&self, bytes: u64) {
+        self.written.fetch_add(bytes, Ordering::Relaxed);
     }
 
     /// Bytes written to the spill file so far: the disk the session uses for its history.
