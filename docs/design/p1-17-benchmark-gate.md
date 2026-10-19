@@ -15,6 +15,13 @@ Statements are marked **measured** (a run made for this page), **read** (from th
 
 ## Summary
 
+- **P1-19 exit item 1, the stages of one step side by side (2026-10-18; below)**: measured, the
+  same run on master 991354a4. The structure step now runs beside the next plate step, the only
+  pair of a step's stages with no data between them. Side by side: 1,485.8 → **1,430.5 s
+  (1.039×)** at others' load 4.8, 1,883.5 → 1,864.7 s (1.010×) under load; worlds identical (84
+  of 84 files). Quiet on set A: **1,290.1 s**, 1.43× the gate. The other overlaps (deposits
+  beside young and amplify, keyframes beside the next step, the deposit stage beside the group)
+  would take at most about 110 s more (estimated), so the gate still needs less work per step.
 - **P1-19 exit item 1, full 16k on eight pinned cores (2026-10-18; below)**: measured, 8 threads,
   1000 Myr, scattered continents, held to one CPU of each of 8 physical cores, worlds identical
   (84 of 84 files). Side by side with master e34dbe54: 2,255.8 → **1,990.4 s** and 2,316.0 →
@@ -252,6 +259,202 @@ merge, `memory_estimate` passes again in the workspace tests.
   P1-24 measured 4-Myr steps at 1.6×), or the stages of one step overlapping so the flood, the
   clock and the hull run beside parallel work (the climate or the structure of step k beside the
   plates of step k + 1), which is a redesign.
+
+## P1-19 exit item 1: the stages of one step side by side (design, 2026-10-18)
+
+Ben's decision of 2026-10-18: overlap the stages of one step. The aim is the same 900 s gate
+(full 16k, scattered continents, 1000 Myr, 8 threads), with the worlds unchanged byte for byte.
+Branch `worktree-agent-a429a6a924e26ae78` from master 0729e267. This section was written before
+the implementation. The measured results come at its end. Statements are marked as on the rest of
+this page; **estimated** marks a gain worked out before it was measured.
+
+**The work to hide** (measured; the quiet branch run `fq-1` above and a 200 Myr run of the same
+preset with each stage's process CPU time counted, `scratch1`, under load):
+
+| stage | wall, quiet 1000 Myr (s) | wall, 200 Myr (s) | CPU, 200 Myr (s) | busy cores |
+|---|---:|---:|---:|---:|
+| plates | 325.7 | 64.9 | 249.6 | 3.84 |
+| climate | 208.5 | 58.4 | 276.4 | 4.74 |
+| surface | 529.8 | 98.7 | 560.4 | 5.68 |
+| volcanoes | 27.3 | 4.5 | 14.3 | 3.14 |
+| impacts | 3.8 | 0.6 | 1.1 | 1.75 |
+| structure | 123.3 | 25.9 | 119.7 | 4.62 |
+| deposits | 82.1 | 17.5 | 98.6 | 5.63 |
+| young | 12.3 | 11.4 | 56.8 | 4.98 |
+| amplify | 23.5 | 23.2 | 128.3 | 5.52 |
+| keyframes and the history's trim (after each step) | | 4.2 | 4.2 | 1.00 |
+| finalize (the bake) | 37.9 | | | |
+
+### The dependency map (read)
+
+The session runs the coupled group of a plate step in this order: plates (the lead), climate,
+surface, volcanoes, impacts, structure. Then come the stages after the group (deposits, young,
+amplify) and the bake. What each step of the group reads and writes:
+
+| step | reads | writes |
+|---|---|---|
+| plates k + 1 | its plate model; the globals; the surface's feedback fields, which it takes out of the world (`surface/volcanic_felsic_m` and `_mafic_m`, `surface/feedback_m`, the surface's material `surface/material_m`, the gap budget's `surface/gap_*` parts); the flexure `surface/flexure_m` | the plate model; `world.t_years`; every L1 field anew each step (`regime`, `plates/*`, the pool fields); `surface/feedback_applied_m`; events (appended); notes |
+| climate k + 1 | the L1 fields; `crust_age`; the surface's elevation (`world.surface`); the crust's plate and group the surface stage left; the new events; its own last fields | `climate/*`; the sea level and cap carbonate globals |
+| surface k + 1 | the L1 fields; `climate/*`; the whole surface state (elevation, the strata log, ice) | the surface state and its strata log; `surface/*` fields, the feedback the next plate step takes among them; the recorded history's frames (every 10 Myr); events |
+| volcanoes, impacts k + 1 | the surface state; the L1 fields; events | the surface and its strata log (edifices, craters); `surface/volcanic_*` (which the next plate step takes); the trap field; events |
+| structure k | the strata log; 14 L1 fields; `climate/t_mean_c`; the surface's deposition, erosion, material and flexure; the impacts' trap field; the pool fields; the plate model's time, rotations and parents; the events (its fold and fault causes) | the strata log (metamorphism, plutons, folds and faults); its fields in the history's new frames; on keyframe steps its keyframe layers; on its last step the bodies, its events and its note |
+
+The edges that order a step after another:
+
+- plates k + 1 after surface, volcanoes and impacts k: it takes their feedback fields and samples
+  their flexure.
+- climate k + 1 after plates k + 1 (the L1 fields), surface k + 1 after climate k + 1 (its
+  fields), volcanoes, impacts and structure k + 1 after surface k + 1 (the strata log), structure
+  after volcanoes and impacts (their edifices and craters are in the log it reads).
+- surface k + 1 after structure k: both change the strata log.
+- **Nothing in step k + 1 before the surface reads what structure k writes.** The plate step
+  reads neither the surface state nor the history, and it writes nothing structure k reads
+  except fields it writes anew (the L1 fields) and two it takes or reads (the material, the
+  flexure). Structure k's events, bodies and note come only on its last step; events are
+  append-only, so structure k's causes are the events up to the end of step k.
+- The deposits stage reads the whole recorded history (setup reads the frame count; each frame
+  is folded in in order); young and amplify read the last surface; the bake reads everything.
+
+### What can overlap
+
+- **A. Structure k beside plates k + 1.** The only edge that leaves a step's sink free. Detaching
+  the structure step's inputs is enough: the L1 fields and the fields the plate step does not
+  touch move out of the world, the material and the flexure are copied (the plate step takes or
+  reads them), the strata log moves out with the surface state (the plate step never reads it),
+  and the events seen are fixed before the plate step appends to them. The structure step then
+  runs in a `rayon::join` beside the plate step, in the session's pool, and its fields go into the
+  history's frames after the join, as they would have before the plate step. Keyframe steps
+  (their layers are read by the keyframe) and the last step (bodies, events, the note) run on the
+  world as before. Anything that reads the world between `advance` calls (a keyframe, an epoch
+  checkpoint, a checkpoint, `with_world`) runs a put-off step on the world first.
+- **Not climate k + 1 beside structure k** (only a little more): climate k + 1 needs the surface's
+  elevation (structure k would have to leave it in the world) and rewrites `climate/t_mean_c`,
+  which structure k reads (a copy). It is possible, but the structure step is already shorter
+  than the plate step it hides behind (123 against 326 s), so carrying it on into the climate
+  step gains little.
+- **Not the chain plates, climate, surface, volcanoes, impacts:** each needs the step before it
+  (above). Splitting one stage's step to start part of it early (the climate clock, the priority
+  flood) is work inside `climate/` and `surface/`, not between stages.
+- **B. Deposits beside young and amplify** (not done). Neither reads the other's output, so the
+  deposit stage's 82 s and the 36 s of young and amplify could run together. They are separate
+  stages outside a group, so the session needs a second way to run stages side by side, and
+  their peaks add: deposits' accumulators beside the amplification's tiles, the run's peak today.
+  Both are mostly parallel (5.6 and 5.0 to 5.5 busy cores), so the gain is the one-core parts:
+  **10 to 20 s (estimated)**.
+- **C. A keyframe drawn beside the next plate step** (not done). The 20 keyframes at full 16k
+  (every 50 Myr) and the history's trim take about 4 s of one core per 200 Myr, so about 20 s per
+  1000 Myr, half of it the keyframes. Drawing a keyframe beside the next step needs a frozen copy
+  of the layers it draws (a few hundred MiB at full 16k). **About 10 s (estimated).**
+- **D. The deposit stage folding in each frame beside the coupled group** (not done; not one step
+  but one stage beside another, so outside this task). Its ingest reads frame k once the
+  structure stage has published into it, in order, so it could keep pace with the group on the
+  cores the group leaves idle (about 3 of 8). It needs the setup split (the frame count is known
+  only at the end), the ingest's writes to the world held until its stage, and its accumulators
+  (each type's `CellAcc` per cell) held for the whole group instead of only at its end, at full
+  16k several hundred MiB on top of the group's peak. **Up to most of the 82 s (estimated, the
+  ingest's share not measured).**
+- **The bake** reads everything: it can overlap nothing of the run.
+
+### The expected gain of A (estimated)
+
+Split each stage's wall into a one-core part S and a part spread over all 8 threads, from its wall
+and CPU time (S + P/8 = wall, S + P = CPU): over 1000 Myr the structure stage is about 60 s on
+one core and 510 core-seconds spread; the plate step about 190 s on one core, when 7 of the 8
+threads are idle. Beside the plate step, the structure step's one-core part is hidden as long as
+the plate step lasts, and its spread part runs on the threads the plate step leaves idle or
+shares the threads with the plate step's own spread part. The bounds are 60 s (only the one-core
+part hidden) and 123 s (all of it). Rayon's stealing lets a plate thread that waits in a join pick
+up structure work, which lengthens the plate step's own one-core path, so the lower end is the
+likelier: **45 to 65 s per 1000 Myr (estimated)**, the quiet run from 1,382 s to about 1,315 to
+1,340 s. The 20 keyframe steps (every 50 Myr, the last step among them) run on the world as
+before, so 480 of the 500 steps run beside the plates.
+
+Its cost: the session (the put-off step, the join, the `Stage` methods for detaching) and the
+structure stage (its step split from its outputs; its fold and fault causes cached instead of
+read from the world in the step; no change to what it computes). B, C and D gain less per effort
+or are outside one step, so A is the one implemented here.
+
+### The memory cost of A (read; inferred where marked)
+
+- **The working sets add.** The structure step's working set (its reservations: the metamorphism
+  and pluton scratch, and on the 1 in 5 steps that publish, the frame fields, about 172 MiB at
+  full 16k) now coincides with the plate step's. The estimate counts it: a coupled group's
+  stages each hold the group's most, and the most now also takes the lead's set plus the
+  follower's own (`stage_sets`). The memory test keys its phase peaks by stage name and the join
+  runs under the plate step's phase, so the plate row is the one that holds both.
+- **Copies:** the material and the flexure, 2 × 4 bytes per L1 cell (about 11 MiB at full 16k).
+- **Held longer:** the frame fields stay with the detached step until the join ends (one step's
+  worth, at most about 180 MiB at full 16k); the old L1 fields stay with it until the plate step
+  has written the new ones, which is when the plate step would have dropped them anyway.
+- **Frames in flight:** none more. The history gets the structure fields of the frames the
+  surface recorded before the plate step, after it, and its trim runs after the join.
+- **A refused reservation:** the structure step reserves first, so a refusal beside the plate
+  step changes nothing, and the session runs it again after the join, when the plate step's
+  working set is gone.
+- At full 16k the history is mostly on disk (14.8 MiB resident at the end), so the extra working
+  set comes out of the run's headroom under its cap, not out of the history's frames (inferred).
+
+### Measured (A, 2026-10-18)
+
+Method as in the section above: `tools/review/bench-quiet.py`, full 16k, scattered continents,
+1000 Myr, 8 threads; set A = CPUs 0, 16, 2, 18, 4, 20, 6, 22 and set B = 8, 24, 10, 26, 12, 28,
+14, 30. Each pair was one admitted job (`sim:earthlike_full_16k:16t`), the quiet run one
+`sim:earthlike_full_16k:8t` job started once the 1-minute load had stayed under 6 for three
+minutes. Master = 991354a4 (the polar-holes flexure fix), branch = cb270657, its merge of that
+master. Every branch world equals master's, **84 of 84 files** in both pairs and in the quiet run
+(`tools/review/p1-17-cmp.py`; the quiet run against the second pair's master world).
+
+| stage (s) | master (A) | branch (B) | master (B) | branch (A) | branch (A), quiet |
+|---|---:|---:|---:|---:|---:|
+| plates (the structure steps beside it included on the branch) | 487.7 | 532.2 | 354.6 | 373.6 | 321.9 |
+| climate | 270.5 | 277.1 | 216.0 | 212.9 | 197.5 |
+| surface | 747.4 | 768.1 | 572.6 | 575.7 | 515.7 |
+| volcanoes | 40.0 | 41.1 | 30.3 | 30.2 | 28.4 |
+| impacts | 4.3 | 4.3 | 3.4 | 3.4 | 3.3 |
+| structure (on the world) | 150.1 | 56.6 | 129.0 | 50.1 | 47.6 |
+| structure beside the plates | | 101 | | 79 | 74 |
+| deposits | 101.6 | 101.5 | 100.7 | 102.9 | 97.0 |
+| young | 13.2 | 13.7 | 12.9 | 12.7 | 12.8 |
+| amplify | 25.4 | 26.0 | 24.5 | 24.5 | 24.2 |
+| finalize | 40.6 | 41.3 | 39.6 | 42.3 | 39.4 |
+| **total** | **1,883.5** | **1,864.7** | **1,485.8** | **1,430.5** | **1,290.1** |
+| × master | | **1.010** | | **1.039** | |
+| plates + structure | 637.8 | 588.8 | 483.6 | 423.7 | 369.5 |
+| CPU time, user + system | 8,154 + 441 | 8,385 + 448 | 6,725 + 376 | 6,750 + 367 | 6,111 + 337 |
+| the run's CPUs, mean | 4.55 | 4.72 | 4.76 | 4.96 | 4.98 |
+| others' busy CPUs, mean | 14.6 | 14.6 | 4.8 | 4.8 | 0.0 |
+| its cores' SMT siblings busy | 51 % | 59 % | 0 % | 0 % | 0 % |
+| peak, MiB (count) | 4,198 | 4,198 | 4,198 | 4,198 | 4,198 |
+| peak resident (`time -v`), MiB | 4,245 | 4,529 | 4,239 | 4,521 | 4,495 |
+
+- **The gain is the estimate's** (measured): the plate and structure stages together take 49 s
+  (under load) and 60 s (others' load 4.8) less, against the estimated 45 to 65 s. Of master's
+  129 to 150 s structure stage, the 480 steps beside the plates took 74 to 101 s; the 20 steps
+  still taken on the world (the keyframe steps with their layers, and the last with its folds,
+  faults and bodies) take 48 to 57 s.
+- **The run:** 1.039× at others' load 4.8 (1,485.8 → 1,430.5 s) and 1.010× under load (1,883.5
+  → 1,864.7 s, the branch on the set whose siblings were the busier). Under load the cores the
+  plate step leaves idle are fewer, and the stages other than plates and structure moved by up
+  to 21 s between the sets, more than the gain. The pair at the lower load is the better
+  measure of the code.
+- **Quiet: 1,290.1 s** (process wall 1,292.3 s; others' load 0.0, its siblings 0 % busy; CPU
+  6,448 s, 4.98 cores busy). The quiet run of the section above (1,382.3 s) was on older code
+  and a little less quiet, so the 92 s between them is not all this change; a master run as quiet
+  would take about 1,340 s (1,290.1 × 1.039, inferred).
+- **Memory** (measured): the run's estimate is unchanged (peak 4.86 GiB; the coupled group's
+  4.17 GiB, master's too, is one member's own set, above the plate step's plus the
+  structure's), and so is the counted peak (4,198 MiB). The peak resident set rose by about 280 MiB (4,239 to 4,245 → 4,495
+  to 4,529 MiB, 6.6 %), still under the estimate; by inference the allocator's arenas, since the
+  two stages now allocate on the pool's threads at the same time. On the memory test's small
+  planet the resident peak was 101.0 MiB against its 121.1 MiB bound, and every stage held less
+  than its estimate (plates 51.2 against 72.8 MiB); `memory_estimate`, `history_cap` and
+  `session_pool` pass.
+- **What is left to 900 s:** 390 s quiet (1.43× the gate). B, C and D together would take, at
+  their estimates, at most about 110 s, so the gate still needs less work per step (fewer
+  slope-failure iterations, a stronger diffusion preconditioner, a coarser L1 cadence or a longer
+  plate step, all of which change the worlds and are Ben's call) or the one-core items left to
+  `plates/`, `surface/` and `climate/` (the hull, the feedback scatter, the priority flood, the
+  climate clock; about 100 to 150 s, inferred above).
 
 ## Re-measured on the rebuilt VM (2026-10-16)
 
