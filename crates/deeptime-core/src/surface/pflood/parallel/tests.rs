@@ -149,8 +149,13 @@ fn check(d: &Dims, h: &[f64], sea: Option<f64>, label: &str) -> usize {
             let s = in_pool(threads, || flood_rows(d, h, &base_z, &mut k, &mut f, rows));
             assert_eq!(s, sref, "{label}: sinks, rows {rows}, {threads} threads");
             assert_eq!(k, kref, "{label}: kinds, rows {rows}, {threads} threads");
-            let bad = (0..n).filter(|&c| f[c].to_bits() != fref[c].to_bits()).count();
-            assert_eq!(bad, 0, "{label}: F differs in {bad} cells, rows {rows}, {threads} threads");
+            let bad = (0..n)
+                .filter(|&c| f[c].to_bits() != fref[c].to_bits())
+                .count();
+            assert_eq!(
+                bad, 0,
+                "{label}: F differs in {bad} cells, rows {rows}, {threads} threads"
+            );
             let fx = Fixed {
                 kind: &kw,
                 base_z: &bw,
@@ -161,7 +166,9 @@ fn check(d: &Dims, h: &[f64], sea: Option<f64>, label: &str) -> usize {
             let mut lab = vec![NONE; n];
             let sinks = in_pool(threads, || fill_w(d, &fx, h, rows, &mut wf, &mut lab));
             assert!(sinks.is_empty(), "{label}: W found sinks");
-            let bad = (0..n).filter(|&c| wf[c].to_bits() != wref[c].to_bits()).count();
+            let bad = (0..n)
+                .filter(|&c| wf[c].to_bits() != wref[c].to_bits())
+                .count();
             assert_eq!(bad, 0, "{label}: W differs in {bad} cells, rows {rows}");
         }
     }
@@ -187,7 +194,10 @@ fn the_parallel_flood_is_the_plain_priority_flood_bit_for_bit() {
             }
         }
     }
-    assert!(raised > 1000, "the cases have lakes and flats ({raised} raised cells)");
+    assert!(
+        raised > 1000,
+        "the cases have lakes and flats ({raised} raised cells)"
+    );
 }
 
 #[test]

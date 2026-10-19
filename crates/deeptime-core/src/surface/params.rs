@@ -218,8 +218,8 @@ impl Default for Numerics {
     fn default() -> Self {
         Numerics {
             diffusion_solver: DiffusionSolver::Multigrid,
-            diffusion_tol_m: 1.0e-6, // ledger: ERO-183
-            failure_tol: 0.0,        // ledger: ERO-184
+            diffusion_tol_m: 1.0e-6,      // ledger: ERO-183
+            failure_tol: 0.0,             // ledger: ERO-184
             flood: FloodMethod::Parallel, // ledger: ERO-185
         }
     }
@@ -228,7 +228,9 @@ impl Default for Numerics {
 impl Numerics {
     fn validate(&self) -> Result<(), CoreError> {
         check(
-            self.diffusion_tol_m.is_finite() && self.diffusion_tol_m > 0.0 && self.diffusion_tol_m <= 1.0,
+            self.diffusion_tol_m.is_finite()
+                && self.diffusion_tol_m > 0.0
+                && self.diffusion_tol_m <= 1.0,
             "numerics.diffusion_tol_m",
             "must be in (0, 1] m",
         )?;

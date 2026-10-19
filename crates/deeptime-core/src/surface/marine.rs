@@ -260,7 +260,10 @@ pub mod trace {
             }
         }
         for (t, &tol) in TOLS.iter().enumerate() {
-            let stop = its.iter().position(|&(ex, _)| ex <= tol).unwrap_or(its.len());
+            let stop = its
+                .iter()
+                .position(|&(ex, _)| ex <= tol)
+                .unwrap_or(its.len());
             s.stop_its[t] += stop as u64;
             s.moved_after[t] += its[stop..].iter().map(|&(_, m)| m).sum::<f64>();
         }
@@ -295,7 +298,10 @@ pub mod trace {
                 )
             })
             .collect();
-        out.push(format!("failure_trace_decay it:calls:mean_max_excess:max_excess {}", per.join(" ")));
+        out.push(format!(
+            "failure_trace_decay it:calls:mean_max_excess:max_excess {}",
+            per.join(" ")
+        ));
         Some(out)
     }
 }
@@ -349,9 +355,8 @@ pub fn slope_failure(
     // raster's edges (the same neighbours `Dims::neighbour` gives them).
     let crit: [f64; 8] = std::array::from_fn(|k| p.critical_slope * d.step_len(k));
     // 1 / (S_c·d), for the relative excess the stopping rule reads (P1-19).
-    let inv_crit: [f64; 8] = std::array::from_fn(|k| {
-        if crit[k] > 0.0 { 1.0 / crit[k] } else { 0.0 }
-    });
+    let inv_crit: [f64; 8] =
+        std::array::from_fn(|k| if crit[k] > 0.0 { 1.0 / crit[k] } else { 0.0 });
     let step: [isize; 8] =
         std::array::from_fn(|k| OFFSETS[k].1 as isize * w as isize + OFFSETS[k].0 as isize);
     let inner = |i: usize, j: usize| i >= 1 && i + 1 < w && j >= 1 && j + 1 < hgt;
