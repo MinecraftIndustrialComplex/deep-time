@@ -456,6 +456,140 @@ master. Every branch world equals master's, **84 of 84 files** in both pairs and
   `plates/`, `surface/` and `climate/` (the hull, the feedback scatter, the priority flood, the
   climate clock; about 100 to 150 s, inferred above).
 
+## P1-19 exit item 1: where the full 16k run's time goes (profile, 2026-10-18)
+
+Ben asked for every system that takes part in the gate run and what each one costs ("I am almost
+positive you are missing out on some optimizations, please make a space sheep showing me all
+systems which are interacting with this system and contributing time"). The page is
+`review/pages/sim-time/` (title "Full 16k Run Profile"; the coordinator publishes it). Branch
+`worktree-agent-a6302ca9dc7ca54f4` from master 25ae6723; no simulation code changed. All measured
+unless marked.
+
+**Method.**
+
+- `tools/review/sim-time-run.py` (new) runs `deeptime bench --preset earthlike_full_16k --start
+  scattered_continents --length-myr 1000 --threads 8` under `taskset` on set A (CPUs 0, 16, 2, 18,
+  4, 20, 6, 22), after everyone else's busy CPUs have stayed under 1.5 for 30 to 120 s. It samples
+  `/proc/stat` and every thread's `/proc/<pid>/task/*/stat` every 0.5 s. Others' busy CPUs
+  averaged 0.04 to 0.16 over every run.
+- Two full runs of master 25ae6723: the plain release build (the gate's) for the wall time, and a
+  build with frame pointers and span timers (`tools/review/sim-time-trace.patch`, an experiment
+  file, not applied to master) under `perf record -F 199 -g -k CLOCK_MONOTONIC` (cpu-clock; the
+  VM has no hardware counters), decoded as root with `perf script -f --no-inline`.
+  `tools/review/sim-time-analyse.py` (new) charges every sample to the deepest span running on
+  its thread, sorts it into work, kernel and rayon's wait loop, and writes the page's `data.js`.
+- Thread scaling: the same preset for 200 Myr on the traced build at 1, 2, 4, 8 and 16 threads,
+  fitted with T(n) = S + P / n over 1 to 8; the 16-thread run (sets A and B) checks the fit.
+- Build settings: plain, fat LTO with one codegen unit, and `-C target-cpu=x86-64-v3`, 100 Myr
+  each, twice, alternating; worlds compared with `tools/review/p1-17-cmp.py`.
+- Four Opus reviewers read the plates and structure, surface and volcanoes, climate, and the
+  stages after the group with the session's machinery, given the measured times, for changes that
+  keep the worlds byte-identical. No change was made.
+
+| stage (s) | plain | profiled |
+|---|---:|---:|
+| plates (the structure steps beside it included) | 333.6 | 338.8 |
+| climate | 199.2 | 204.7 |
+| surface | 476.1 | 480.8 |
+| volcanoes | 24.9 | 24.8 |
+| impacts | 3.4 | 3.5 |
+| structure (on the world) | 50.1 | 51.2 |
+| deposits | 80.4 | 82.1 |
+| young | 12.3 | 12.8 |
+| amplify | 23.8 | 24.5 |
+| finalize | 36.8 | 38.2 |
+| **total** | **1,242.8** | **1,263.7** |
+| CPU time, user + system | 5,955 + 326 | 6,048 + 338 |
+| the run's CPUs, mean | 5.05 | 5.03 |
+| minor page faults | 68.5 million | 68.4 million |
+| peak resident (`time -v`), MiB | 4,531 | 4,525 |
+
+The profiled world equals the plain one, 84 of 84 files. The quiet 1,290.1 s above was cb270657;
+today's master is 47.3 s faster.
+
+**What the profile shows.**
+
+- **Half of the 8-thread wall is serial.** The 200 Myr runs fit T(n) = 156 s + 1,215 s / n within
+  1 % (1,371.9, 759.8, 460.0, 308.7 s at 1, 2, 4, 8 threads); 16 threads take 250.6 s, 19 s more
+  than the fit. The run keeps 5.05 of 8 cores busy.
+- **243 s of the critical path runs on about one core:** the priority flood (32.7 s), the plate
+  transition (26.2 s), fronts (21.8 s, 1.5 cores), marine fill (16.8 s), the keyframe render
+  (16.1 s), belts (15.4 s), record (12.6 s), climate's untimed code (11.7 s), collision (11.6 s),
+  collapse (9.2 s), the volcano build (8.9 s), the plates' flexure sample (7.1 s) and smaller spans.
+- **The heavy kernels already scale:** the diffusion solve keeps 7.6 cores busy (109.3 s), the L1
+  write 7.4 (95.8 s), slope failure 7.1 (83.8 s), the climate snapshot's cells 7.3 (46.1 s). Only
+  less work per call helps them.
+- **The plate step is the critical arm.** 316.1 s over 479 steps; the structure step beside it
+  (77.0 s) always finishes first (0.02 s of waiting in all). Fifteen of its 22 laps keep two cores
+  or fewer busy: 178.5 s.
+- **Kernel time is 313 s of CPU:** futex wake-ups 150 s (66 s of it in the 2-D energy balance),
+  page faults 121 s (31 s in surface advect, which collects a fresh 515 MB strata log each step),
+  munmap 23 s (11 s on one core), file writes 1.8 s. On the critical path: about 25 s of faults,
+  16 s of munmap and 24 s of wake-ups.
+- **The 2-D energy balance is slower on 8 threads than on 4** (7.0 s against 6.0 s at 200 Myr;
+  10.5 s on 1): 864 short steps per snapshot, 105 s of work against 66 s of wake-ups and 36 s of
+  spinning.
+- **The same horizons are baked three times** (the structure stage's last step, deposits, the
+  bake's strata pass), about 100 s of CPU each in `Horizons::smoothed`.
+- **Build settings, measured** (100 Myr, two runs each): plain 181.0 and 180.6 s, fat LTO 179.2
+  and 176.6 s (−1.6 %), x86-64-v3 173.1 and 172.1 s (−4.5 %); every world equals plain's, 66 of 66
+  files. Rust does not contract a multiply and an add into an FMA by itself, so v3 changes no
+  value. Not measured together.
+
+**Ranked opportunities** (gains in s on the 1,242.8 s plain run; estimated, from the profile and
+the code read, except the two build rows; "yes" = keeps the worlds byte-identical by construction,
+still to be proven with `p1-17-cmp.py`; "check" = probably, to be confirmed first; "no" = changes
+the worlds, Ben's call):
+
+| # | change | systems | gain (s) | identical | effort |
+|---:|---|---|---:|---|---|
+| 1 | build for x86-64-v3 (measured) | all | 45 to 60 | yes | small; the CPUs it needs are Ben's call |
+| 2 | plate transition, record, collision, collapse in parallel | plates | 27 to 37 | yes | large |
+| 3 | plate feedback, flexure sample, belts, fronts | plates | 25 to 33 | yes | medium |
+| 4 | priority flood beside advect and setup (`rayon::join`) | surface | 20 to 27 | yes | medium |
+| 5 | cheaper k-d tree queries in the L1 write, detect, margins | plates | 15 to 30 | check | medium |
+| 6 | fat LTO, one codegen unit (measured) | all | 15 to 25 | yes | trivial |
+| 7 | fewer page faults and unmaps (persistent strata log, block size classes) | surface, structure, memory, climate | 10 to 25 | yes | medium |
+| 8 | deposits: serial parts in parallel, frames decoded once | deposits | 10 to 20 | yes | medium |
+| 9 | diffusion solve and slope failure: less memory traffic | surface | 10 to 20 | yes | medium |
+| 10 | 2-D energy balance in larger pieces | climate | 10 to 18 | yes | small |
+| 11 | bake the horizons once, not three times | structure, deposits, finalize | 12 to 28 | check | medium |
+| 12 | keyframe render in parallel | keyframes | 11 to 14 | yes | small |
+| 13 | plate resample: the hull beside the rest | plates | 10 to 15 | yes | medium |
+| 14 | climate snapshot: tables per row, serial pieces overlapped | climate | 8 to 15 | yes | medium |
+| 15 | advection sources: one rotation per plate | surface, climate | 8 to 14 | yes | small |
+| 16 | climate ice: weathering loops in parallel | climate | 8 to 13 | yes | small |
+| 17 | fields and events: zeroed grids, tag lookups | surface | 6 to 12 | yes | small |
+| 18 | climate clock and untimed climate code | climate | 6 to 12 | yes | small |
+| 19 | the structure step beside the plates on its own threads | plates, structure | 0 to 15 | yes | small |
+| 20 | glacial and surface flexure in larger pieces | surface | 4 to 10 | yes | medium |
+| 21 | finalize: parallel tile packs and layer writes | finalize | 4 to 8 | yes | small |
+| 22 | volcanoes: render the cones in parallel first | volcanoes | 5 to 7 | check | small |
+| 23 | history spill: stop reading frames back | memory, keyframes | 3 to 6 | yes | medium |
+| 24 | profile-guided optimisation (not built) | all | 35 to 100 | check | medium |
+| 25 | multigrid or stronger preconditioner for diffusion | surface, young | 40 to 80 | no | large |
+| 26 | stop slope failure early | surface | 20 to 50 | no | small |
+| 27 | coarser L1 cadence or longer plate step | plates, structure | 50 to 150 | no | medium |
+| 28 | order-independent parallel flood | surface, young | 25 to 30 | no | large |
+
+The "yes" rows add up to **240 to 399 s** (estimated) against the 342.8 s between the run and the
+gate; the "check" rows add 67 to 165 s more (PGO included). The sum overstates: the build
+percentages apply to a shorter run once the code changes land (4.5 % of 900 s is 41 s), and a
+one-core span parallelised helps less where the structure step beside the plates already fills
+the idle cores. **So 900 s with the worlds unchanged looks reachable (inferred), but only if most
+of the "yes" rows land.**
+
+**Not measured:** every gain except the two build rows; hardware counters (none on the VM); the
+plate laps' own time apart from structure work their threads steal (needs a run with the overlap
+off); PGO, and fat LTO with v3 together; an allocator swap (the counting allocator owns the memory
+cap); time inside closures inlined into rayon's plumbing (442 s of CPU stay unattributed); sub-steps
+of deposits and amplify (no timers; perf only); scaling at full length (200 Myr runs; the
+after-group stages are 27.5 % of the 200 Myr run against 12.5 % of the full run); the player's PC.
+
+**Scratch.** The perf data, the run folders and the trace binaries were deleted on the VM; the
+trace patch stays as `tools/review/sim-time-trace.patch` to repeat the profile (`git apply`, then
+build with `RUSTFLAGS="-C force-frame-pointers=yes"`).
+
 ## Re-measured on the rebuilt VM (2026-10-16)
 
 The test VM was rebuilt (the same class: D32as_v7, 32 vCPU), so the 2026-10-05 times above are

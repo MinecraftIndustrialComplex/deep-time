@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Full 16k Run Profile</title>
+<meta name="description" content="Where the 1,000 Myr full 16k gate run spends its time on eight cores: every system and sub-system measured with perf and span timers, the core-use timeline, thread scaling, and the ranked speed-ups against the 900 s gate.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one reading column of report sections; charts break out to a wider measure; the system map pairs with a detail panel that stacks under it on phones. */
+:root {
+  --bg: #eef2f0;
+  --surface: #ffffff;
+  --sunk: #e3e9e6;
+  --fg: #16201c;
+  --muted: #56645e;
+  --rule: #cdd6d1;
+  --accent: #2c5aa6;
+  --accent-soft: #dbe5f6;
+  --good: #23784a;
+  --good-soft: #dcefe3;
+  --warn: #a35f00;
+  --warn-soft: #f7e7cf;
+  --work: #3f6f5c;
+  --kernel: #b0573d;
+  --spin: #b9c4bf;
+  --busy-line: #16201c;
+  --on-dark: #f5f7f6;
+  --on-light: #141a17;
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --s-1: 0.8125rem;
+  --s0: 1rem;
+  --s1: 1.25rem;
+  --s2: 1.75rem;
+  --s3: 2.6rem;
+  --s4: 4.2rem;
+  --measure: 46rem;
+  --wide: 72rem;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101513; --surface: #171d1a; --sunk: #1f2723; --fg: #e2e8e5; --muted: #95a39c;
+    --rule: #2c3631; --accent: #86a9ea; --accent-soft: #1f2c44; --good: #6cc391; --good-soft: #17301f;
+    --warn: #e4a54b; --warn-soft: #36280f; --work: #7fb79f; --kernel: #e08d6f; --spin: #46514c;
+    --busy-line: #e2e8e5; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101513; --surface: #171d1a; --sunk: #1f2723; --fg: #e2e8e5; --muted: #95a39c;
+  --rule: #2c3631; --accent: #86a9ea; --accent-soft: #1f2c44; --good: #6cc391; --good-soft: #17301f;
+  --warn: #e4a54b; --warn-soft: #36280f; --work: #7fb79f; --kernel: #e08d6f; --spin: #46514c;
+  --busy-line: #e2e8e5; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: var(--s0);
+  line-height: 1.55; padding-inline: max(16px, env(safe-area-inset-left, 0px));
+  padding-block: max(24px, env(safe-area-inset-top, 0px)) 64px;
+}
+main { max-width: var(--wide); margin-inline: auto; display: grid; gap: 3.5rem; }
+section { display: grid; gap: 1rem; min-width: 0; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.1; }
+h1 { font-size: var(--s3); font-weight: 760; font-stretch: 112%; letter-spacing: -0.01em; }
+h2 { font-size: var(--s2); font-weight: 720; font-stretch: 105%; }
+h3 { font-size: var(--s1); font-weight: 650; }
+p { margin: 0; max-width: var(--measure); }
+.lede { font-size: var(--s1); max-width: 52rem; color: var(--fg); }
+.eyebrow { font-family: var(--f-mono); font-size: var(--s-1); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+.mono, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+code { font-family: var(--f-mono); font-size: 0.88em; }
+.note { font-size: var(--s-1); color: var(--muted); max-width: var(--measure); }
+a { color: var(--accent); }
+.est { font-family: var(--f-mono); font-size: 0.72em; letter-spacing: 0.06em; text-transform: uppercase; color: var(--warn); background: var(--warn-soft); padding: 0.05em 0.35em; border-radius: 3px; white-space: nowrap; vertical-align: 0.1em; }
+.pill { display: inline-block; font-family: var(--f-mono); font-size: 0.75rem; padding: 0.1em 0.5em; border-radius: 999px; white-space: nowrap; }
+.pill.yes { background: var(--good-soft); color: var(--good); }
+.pill.no { background: var(--warn-soft); color: var(--warn); }
+.pill.verify { background: var(--accent-soft); color: var(--accent); }
+header.top { display: grid; gap: 1.25rem; }
+.headline { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+.headline > div { background: var(--surface); padding: 1rem 1.1rem; display: grid; gap: 0.2rem; align-content: start; }
+.headline .big { font-family: var(--f-display); font-size: var(--s3); font-weight: 760; font-stretch: 90%; line-height: 1; font-variant-numeric: tabular-nums; }
+.headline .big small { font-size: 0.45em; font-weight: 500; margin-left: 0.15em; color: var(--muted); }
+.headline .lab { font-size: var(--s-1); color: var(--muted); }
+.chart { width: 100%; overflow-x: auto; }
+.chart svg, .chart canvas { display: block; }
+svg text { fill: var(--fg); font-family: var(--f-mono); }
+.axis text { fill: var(--muted); font-size: 11px; }
+.axis line, .axis path { stroke: var(--rule); }
+.findings { display: grid; gap: 0.75rem; max-width: 52rem; padding: 0; margin: 0; list-style: none; counter-reset: f; }
+.findings li { display: grid; grid-template-columns: 2.2rem 1fr; gap: 0.5rem; align-items: baseline; }
+.findings li::before { counter-increment: f; content: counter(f); font-family: var(--f-display); font-weight: 760; font-size: var(--s1); color: var(--accent); }
+.mapwrap { display: grid; grid-template-columns: minmax(0, 2fr) minmax(19rem, 1fr); gap: 1.25rem; align-items: start; }
+@media (max-width: 980px) { .mapwrap { grid-template-columns: 1fr; } }
+.map svg { width: 100%; min-width: 640px; height: auto; }
+.map .node { cursor: pointer; }
+.map .node:focus { outline: none; }
+.map .node:focus-visible circle.body, .map .node.sel circle.body { stroke: var(--fg); stroke-width: 3; }
+.map .edge { stroke: var(--muted); stroke-width: 1.2; fill: none; opacity: 0.7; }
+.map .edge.fb { stroke-dasharray: 4 4; }
+.map .elab { font-size: 11.5px; fill: var(--muted); }
+.map .nlab { font-size: 14px; font-family: var(--f-body); font-weight: 600; }
+.map .nsec { font-size: 12.5px; fill: var(--muted); }
+.map .groupbox { fill: none; stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 6 5; }
+.map .glab { font-size: 12px; fill: var(--muted); letter-spacing: 0.06em; }
+.panel { background: var(--surface); border: 1px solid var(--rule); padding: 1rem 1.1rem; display: grid; gap: 0.9rem; min-width: 0; }
+.panel h3 { display: flex; gap: 0.6rem; align-items: center; }
+.swatch { width: 0.9rem; height: 0.9rem; border-radius: 50%; flex: none; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.4rem 1rem; margin: 0; }
+.stats div { display: grid; }
+.stats dt { font-size: var(--s-1); color: var(--muted); }
+.stats dd { margin: 0; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-weight: 600; font-size: var(--s-1); color: var(--muted); white-space: nowrap; }
+td.r, th.r { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tablewrap { overflow-x: auto; max-width: 100%; }
+.tablewrap table { min-width: 36rem; }
+.panel .tablewrap table { min-width: 0; }
+.crossbars { display: grid; gap: 0.4rem; }
+.crossbar { display: grid; grid-template-columns: 11rem 1fr 6rem; gap: 0.6rem; align-items: center; font-size: 0.9rem; }
+.crossbar .bar { height: 0.8rem; background: var(--sunk); position: relative; }
+.crossbar .bar span { position: absolute; inset: 0 auto 0 0; background: var(--work); }
+@media (max-width: 520px) { .crossbar { grid-template-columns: 7.5rem 1fr 4.8rem; font-size: 0.8rem; } }
+.legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: var(--s-1); color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.legend i { width: 0.8rem; height: 0.8rem; display: inline-block; border-radius: 2px; }
+.tip { position: fixed; pointer-events: none; z-index: 10; background: var(--surface); color: var(--fg); border: 1px solid var(--rule); padding: 0.45rem 0.6rem; font-size: 0.8rem; font-family: var(--f-mono); max-width: 22rem; box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
+.icicle { position: relative; overflow: hidden; background: var(--sunk); border: 1px solid var(--rule); }
+.icicle .cell { position: absolute; height: 20px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--f-mono); font-size: 11px; line-height: 20px; padding: 0 4px; border-right: 1px solid var(--bg); border-bottom: 1px solid var(--bg); cursor: pointer; }
+.icicle .cell.span { font-weight: 600; }
+.crumbs { display: flex; flex-wrap: wrap; gap: 0.3rem; font-family: var(--f-mono); font-size: var(--s-1); }
+.crumbs button { font: inherit; background: var(--sunk); color: var(--fg); border: 1px solid var(--rule); padding: 0.15rem 0.5rem; cursor: pointer; }
+.crumbs button:focus-visible, .icicle .cell:focus-visible { outline: 2px solid var(--accent); }
+.scal { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 1rem; }
+.scal figure { margin: 0; background: var(--surface); border: 1px solid var(--rule); padding: 0.6rem 0.7rem; display: grid; gap: 0.3rem; min-width: 0; }
+.scal figcaption { font-size: 0.85rem; display: flex; justify-content: space-between; gap: 0.5rem; }
+.scal svg { width: 100%; height: auto; }
+.opps td:nth-child(2) { min-width: 17rem; }
+.opps td:nth-child(3) { min-width: 16rem; }
+.opps th.gain { white-space: normal; min-width: 6rem; }
+.opps th:nth-child(1) { width: 2.5rem; }
+.opps th:nth-child(2) { width: 26%; }
+.opps th:nth-child(3) { width: 28%; }
+.opps th:nth-child(4) { width: 7.5rem; }
+.opps th:nth-child(5) { width: 18%; }
+.opps .note { max-width: none; }
+.opps td.r .est { display: block; width: max-content; margin: 0.25rem 0 0 auto; }
+.opps tr.sum td { font-weight: 600; border-top: 2px solid var(--fg); }
+.twocol { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 1.5rem; }
+.twocol > * { min-width: 0; }
+ul.plain { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.4rem; max-width: var(--measure); }
+.seg { display: flex; height: 2.2rem; position: relative; border: 1px solid var(--rule); background: var(--surface); }
+.seg div { height: 100%; position: relative; overflow: hidden; font-size: 0.72rem; font-family: var(--f-mono); padding: 0.15rem 0.3rem; white-space: nowrap; }
+.seg div span { display: inline-block; }
+.gatewrap { position: relative; padding-top: 1.2rem; }
+.gate { position: absolute; top: 0; bottom: 0; border-left: 2px solid var(--accent); }
+.gate span { position: absolute; top: 0; left: 4px; font-family: var(--f-mono); font-size: 0.75rem; color: var(--accent); white-space: nowrap; }
+@media (prefers-reduced-motion: no-preference) { .icicle .cell { transition: left 0.25s, width 0.25s, top 0.25s; } }
+</style>
+</head>
+<body>
+<main id="app">
+  <header class="top">
+    <div class="eyebrow">Deep Time · P1-17 benchmark gate · earthlike_full_16k, scattered continents, 1,000 Myr, 8 threads</div>
+    <h1 id="title">Where the full 16k run spends its time</h1>
+    <p class="lede" id="lede">Loading the measurements…</p>
+    <div class="headline" id="headline"></div>
+    <div class="gatewrap" id="phasebar"></div>
+    <div class="legend" id="phaselegend"></div>
+  </header>
+
+  <section id="answer">
+    <div class="eyebrow">The answer</div>
+    <h2>Is time being left on the table?</h2>
+    <p id="verdict"></p>
+    <ol class="findings" id="findings"></ol>
+  </section>
+
+  <section id="map-section">
+    <div class="eyebrow">Systems</div>
+    <h2>Every system that runs, and what it costs</h2>
+    <p>Each circle's area is the system's time on the run's critical path: the session's own sequence of steps, which is the run's wall time. The ring around it is how many of the 8 cores did its work on average (a full ring is 8). Arrows are data handed from one system to the next; the dashed arrow is the feedback into the next step. Pick a system for its parts, its thread scaling and the functions it spends its time in.</p>
+    <div class="mapwrap">
+      <div class="chart map" id="map"></div>
+      <div class="panel" id="panel" aria-live="polite"></div>
+    </div>
+    <h3>Cross-cutting costs</h3>
+    <p class="note">CPU time spent in shared machinery, summed over every system (from perf samples; a sample is charged to the innermost category it is in).</p>
+    <div class="crossbars" id="crossbars"></div>
+  </section>
+
+  <section id="timeline-section">
+    <div class="eyebrow">Core use over the run</div>
+    <h2>How many of the 8 cores are working</h2>
+    <p id="timeline-text"></p>
+    <div class="legend" id="tl-legend"></div>
+    <div class="chart" id="timeline"></div>
+    <h3>Each thread</h3>
+    <p class="note">One row per thread of the run, darker where the thread was busier (from /proc every 0.5 s, in 2 s bins). The pool's 8 workers are deeptime-rayon-0 to 7; the main thread drives the session between steps.</p>
+    <div class="chart" id="threads"></div>
+  </section>
+
+  <section id="steps-section">
+    <div class="eyebrow">The coupled group, step by step</div>
+    <h2>The 500 plate steps</h2>
+    <p id="steps-text"></p>
+    <div class="legend" id="steps-legend"></div>
+    <div class="chart" id="steps"></div>
+  </section>
+
+  <section id="icicle-section">
+    <div class="eyebrow">Sampled call stacks</div>
+    <h2>The icicle: CPU time by span and function</h2>
+    <p id="icicle-text"></p>
+    <div class="crumbs" id="crumbs"></div>
+    <div class="icicle" id="icicle"></div>
+  </section>
+
+  <section id="scaling-section">
+    <div class="eyebrow">Thread scaling</div>
+    <h2>What more cores buy each system</h2>
+    <p id="scaling-text"></p>
+    <div class="scal" id="scaling"></div>
+    <div class="tablewrap" id="scaling-table"></div>
+  </section>
+
+  <section id="opps-section">
+    <div class="eyebrow">Opportunities</div>
+    <h2>Ranked speed-ups</h2>
+    <p id="opps-text"></p>
+    <div class="tablewrap" id="opps"></div>
+    <div id="builds"></div>
+  </section>
+
+  <section id="method-section">
+    <div class="eyebrow">Method</div>
+    <h2>How this was measured</h2>
+    <div class="twocol">
+      <div><h3>Method</h3><ul class="plain" id="method"></ul></div>
+      <div><h3>Not measured</h3><ul class="plain" id="notmeasured"></ul></div>
+    </div>
+    <h3>The measures agree</h3>
+    <div class="tablewrap" id="reconcile"></div>
+  </section>
+</main>
+<div class="tip" id="tip" hidden></div>
+<script src="data.js"></script>
+<script src="findings.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
