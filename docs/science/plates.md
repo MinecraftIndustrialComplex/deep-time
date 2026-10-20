@@ -2073,23 +2073,35 @@ master, "after" the branch's default, "switch on" the branch with PLT-294 on; ea
 | regime arc; back-arc: felsic plutonic over 50 m | 0.99; 0.87 | 1.00; 0.79 | 1.00; 0.73 |
 
 On the new master PLT-293 moves more than it did on d54c7f0f (0.72 to 0.55 at 9 to 13 cells), and
-the switch takes the ocean side's granite nearly away (0.23 there). The column draws whatever felsic
-plutonic rock is left on ocean crust as diorite or granodiorite (RCK-096), never granite, so the
-review's census of the sea floor (strata.md, "The ocean crust and the mountains, measured") shows
-no granite either way; the switch decides how much of the ocean column is arc-like rock between the
-lavas and the gabbro.
+the switch takes most of the ocean side's felsic rock away (0.23 there). The column draws the felsic
+plutonic rock left on ocean crust as diorite or granodiorite and its metamorphic rock as schist
+(RCK-096), never granite or gneiss; the switch decides how much of the ocean column is arc-like rock
+between the lavas and the gabbro. The review's census of the sea floor (strata.md, "The ocean crust
+and the mountains, measured") still finds granite in 4 % and gneiss in 21 % of the ocean columns
+(62 % and 77 % before), and both come from the continent beside them: the column rule blends 4 x 4
+horizon cells by key whatever their crust kind, so near a coast the continent's granite and its
+gneiss (its metamorphic pool and its strata log's layers buried to 650 degC, which only continental
+crust metamorphoses) reach into the ocean columns and pinch out. Of 80 such columns on the
+supercontinent planet (seed 1), 58 lie within 5 km of continental crust or land and 69 within 15 km;
+before the change, 6 and 12, with 33 more than 75 km from any.
 
 **The transition's ocean side: a switch for Ben** (PLT-294). With `transition_ocean_crust` on, an
 oceanic sink takes the same volume as ocean crust (lavas and gabbro in the ocean column's
 proportion), as the thick igneous crust of a volcanic margin would be. That removes the
 transition's granite from the sea floor (the last column above), but the continental rock that
-the sources give up is then lost, and land falls on every seed (end of the surface stage, three
-seeds each, 1000 Myr):
+the sources give up is then lost, and land falls (`earthlike_quick_16k`, 1000 Myr, the end of the
+run, seeds 1 to 3; "before" is master 49f5f543, which holds the continents fix bc2e5472, "after" the
+branch's default; 2026-10-20):
 
-| start | land, master | land, switch on | continental crust, master (10^9 km3) | switch on |
-|---|---|---|---|---|
-| supercontinent | 0.165, 0.189, 0.177 | 0.140, 0.131, 0.139 | 8.3, 8.5, 9.3 | 7.6, 7.2, 9.0 |
-| scattered continents (seed 1) | 0.154 | 0.148 | 9.8 | 9.1 |
+| start | land, before | after | switch on | continental crust (10^9 km3), before | after | switch on |
+|---|---|---|---|---|---|---|
+| supercontinent | 0.264, 0.326, 0.321 | 0.309, 0.307, 0.344 | 0.277, 0.286, 0.252 | 7.5, 8.8, 8.1 | 8.0, 8.4, 9.1 | 7.9, 7.8, 7.0 |
+| scattered continents | 0.289, 0.342, 0.282 | 0.356, 0.323, 0.294 | 0.221, 0.289, SCAT3LAND | 7.5, 8.6, 7.7 | 8.5, 8.7, 7.8 | 7.2, 7.7, SCAT3VOL |
+
+The means: before 0.30 on both starts, after 0.32, switch on 0.27 (supercontinent) and SCATMEAN
+(scattered), against Earth's 0.29. "After" against "before" is within the seeds' spread (0.26 to
+0.34). On master d54c7f0f, before the continents fix, the switch cost more: supercontinent 0.140,
+0.131 and 0.139 against 0.165, 0.189 and 0.177.
 
 Ben weighed the transition's land cost on 2026-10-05 ("Keep 200 km, raise crust in 7-8"), so the
 switch is off by default and the choice is his. The physical fix is a continent that widens as it
