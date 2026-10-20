@@ -77,6 +77,10 @@ pub struct Cover {
     sedimentary: Vec<bool>,
     /// The stacks were the ones the structure stage kept (`horizon_cache`), not baked again.
     pub kept: bool,
+    /// The world's folds and faults (`WorldState::structure`, the events the bake writes), which
+    /// the strata pass reads every stack through ([`Cover::drawn_horizons_at`]); `None` without
+    /// events.
+    deform: Option<deeptime_format::structure::Deformer>,
 }
 
 impl Cover {
@@ -94,23 +98,70 @@ impl Cover {
                 )
             })
             .collect();
+        let deform = world
+            .structure
+            .as_ref()
+            .filter(|s| !s.events.is_empty())
+            .map(|s| {
+                deeptime_format::structure::Deformer::new(
+                    s.clone(),
+                    preset.scale.circumference_blocks,
+                )
+            });
         Ok(Cover {
             hz,
             desc,
             sedimentary,
             kept,
+            deform,
         })
     }
 
-    /// Bytes the stacks hold (for the stage's memory reservation).
+    /// Bytes the stacks hold, with the folds and faults (their records and about as much again
+    /// for the index; for the stage's memory reservation).
     pub fn bytes(&self) -> u64 {
-        (self.hz.tops.len() * 7) as u64
+        let events = self.deform.as_ref().map_or(0, |d| d.structure.events.len());
+        (self.hz.tops.len() * 7 + events * 2 * deeptime_format::structure::EVENT_BYTES) as u64
     }
 
     /// The column's horizons at block (x, z) by the column rule, top-down: (top, the next
     /// horizon's top or the floor, class). A horizon fills the blocks from its top down to that
     /// lower bound + 1 (the last one down to the floor).
     pub fn horizons_at(&self, x: f64, z: f64) -> Vec<(i32, i32, u8)> {
+        let mut col = Vec::new();
+        self.plain_stack(x.floor() as i64, z.floor() as i64, &mut col);
+        Self::spans(&col, self.hz.min_y)
+    }
+
+    /// [`Cover::horizons_at`] as the strata pass paints the column: the stack read through the
+    /// world's folds and faults (`deeptime_format::column::ColumnWorld::stack`, Java's
+    /// `StrataPass.column`), so a horizon is where the player finds it.
+    pub fn drawn_horizons_at(&self, x: f64, z: f64) -> Vec<(i32, i32, u8)> {
+        let (bx, bz) = (x.floor() as i64, z.floor() as i64);
+        let mut col = Vec::new();
+        match &self.deform {
+            Some(d) => d.stack(
+                bx,
+                bz,
+                self.hz.min_y,
+                &mut |sx, sz, o| self.plain_stack(sx, sz, o),
+                &mut deeptime_format::structure::DeformScratch::default(),
+                &mut col,
+            ),
+            None => self.plain_stack(bx, bz, &mut col),
+        }
+        Self::spans(&col, self.hz.min_y)
+    }
+
+    /// (top, the next horizon's top or the floor, class) of a stack, top-down.
+    fn spans(col: &[deeptime_format::strata::ColumnHorizon], floor: i32) -> Vec<(i32, i32, u8)> {
+        (0..col.len())
+            .map(|h| (col[h].0, col.get(h + 1).map_or(floor, |n| n.0), col[h].1))
+            .collect()
+    }
+
+    /// The stack of block column (x, z) before any fold or fault (`deeptime_format::strata`).
+    fn plain_stack(&self, x: i64, z: i64, out: &mut Vec<deeptime_format::strata::ColumnHorizon>) {
         let k = self.hz.k as usize;
         let w = self.hz.grid.w as usize;
         let horizon = |i: u32, j: u32, h: u32| {
@@ -121,19 +172,7 @@ impl Cover {
                 key: self.hz.keys[at],
             }
         };
-        let mut col = Vec::new();
-        deeptime_format::strata::stack_at(
-            &self.desc,
-            self.hz.min_y,
-            horizon,
-            x.floor() as i64,
-            z.floor() as i64,
-            &mut col,
-        );
-        let floor = self.hz.min_y;
-        (0..col.len())
-            .map(|h| (col[h].0, col.get(h + 1).map_or(floor, |n| n.0), col[h].1))
-            .collect()
+        deeptime_format::strata::stack_at(&self.desc, self.hz.min_y, horizon, x, z, out);
     }
 
     /// The world's floor (block y).
