@@ -473,15 +473,27 @@ pub fn incision_cap(win: &Win, z: &[f32], ph: &Physics, out: &mut [f32]) {
 
 /// The threshold-angle multiplier 1 ± `thermal_noise` (smooth, ~40 cells across), times
 /// `cfg.submarine` where the cell is under the sea (`z < sea`): the sea floor's own critical
-/// slope (sea-floor spikes task, 2026-10-20; AMP-074).
-pub fn tmult_fill(win: &Win, cfg: &NoiseCfg, z: &[f32], sea: f32, out: &mut [f32]) {
+/// slope (sea-floor spikes task, 2026-10-20; AMP-074). A sea cell under more than `ice_m` of
+/// the glaciers' surface `zs` (empty without glaciers) keeps the land's: a fjord is a trough the
+/// ice cut in rock, and its walls go on under the water as steep as above it.
+pub fn tmult_fill(
+    win: &Win,
+    cfg: &NoiseCfg,
+    z: &[f32],
+    zs: &[f32],
+    ice_m: f32,
+    sea: f32,
+    out: &mut [f32],
+) {
     let cell = cfg.cell_blocks;
+    let iced = |c: usize| zs.len() == z.len() && zs[c] - z[c] > ice_m;
     map_cells(win, out, |i, j, o| {
         let (gi, gj) = win.global(i, j);
         let x = cfg.origin_x + gi as f64 * cell;
         let zb = cfg.origin_z + gj as f64 * cell;
         let m = 1.0 + cfg.thermal_noise * cfg.noise.value(x, zb, 40.0 * cell, 103) as f32;
-        *o = if z[j * win.w + i] < sea {
+        let c = j * win.w + i;
+        *o = if z[c] < sea && !iced(c) {
             m * cfg.submarine
         } else {
             m
@@ -778,7 +790,15 @@ fn seed_and_flood(buf: &mut Buf, ph: &Physics, cfg: &NoiseCfg, times: &mut Times
     let started = Instant::now();
     seed_step(&win, &buf.z, ph, cfg, &mut buf.z2);
     std::mem::swap(&mut buf.z, &mut buf.z2);
-    tmult_fill(&win, cfg, &buf.z, ph.sea, &mut buf.tmult);
+    tmult_fill(
+        &win,
+        cfg,
+        &buf.z,
+        &buf.zs,
+        ph.glacial.min_ice_m as f32,
+        ph.sea,
+        &mut buf.tmult,
+    );
     times.seed_ms += started.elapsed().as_secs_f64() * 1000.0;
     let started = Instant::now();
     buf.sed2.copy_from_slice(&buf.z);

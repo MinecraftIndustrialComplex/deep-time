@@ -697,10 +697,11 @@ fn steepest_sea_pair(z: &[f32], w: usize, dx: f64, below: f32) -> f64 {
 
 /// Sea-floor spikes task (2026-10-20): under the sea the thermal pass holds the sea floor's own
 /// critical slope (`submarine_slope`), not the land's talus angle. The threshold multiplier is
-/// the land's times `submarine_slope / thermal_slope` on every cell below sea level and the
-/// land's elsewhere; on a sea floor of one-L2-cell knolls (700 m on 2.4 km cells, which the
-/// interpolation makes 25 to 30 degree flanks at L3) the amplified sea floor comes out gentler
-/// than at the land's angle, and no steeper than the submarine slope at its noise's top allows.
+/// the land's times `submarine_slope / thermal_slope` on every cell below sea level, and the
+/// land's elsewhere and under a glacier's ice (a fjord); on a sea floor of one-L2-cell knolls
+/// (700 m on 2.4 km cells, which the interpolation makes 25 to 30 degree flanks at L3) the
+/// amplified sea floor comes out gentler than at the land's angle, and no steeper than the
+/// submarine slope at its noise's top allows.
 #[test]
 fn the_sea_floor_keeps_its_own_critical_slope() {
     let c = cfg(1.0);
@@ -714,12 +715,25 @@ fn the_sea_floor_keeps_its_own_critical_slope() {
     let ones = vec![1.0f32; win.cells()];
     let mut land = vec![0.0f32; win.cells()];
     let mut mixed = vec![0.0f32; win.cells()];
-    super::kernels::tmult_fill(&win, &noise, &ones, 0.0, &mut land);
-    super::kernels::tmult_fill(&win, &noise, &z, 0.0, &mut mixed);
+    super::kernels::tmult_fill(&win, &noise, &ones, &[], 60.0, 0.0, &mut land);
+    super::kernels::tmult_fill(&win, &noise, &z, &[], 60.0, 0.0, &mut mixed);
     let ratio = (c.p.submarine_slope / c.p.thermal_slope) as f32;
     for (k, ((&zk, &l), &m)) in z.iter().zip(&land).zip(&mixed).enumerate() {
         let want = if zk < 0.0 { l * ratio } else { l };
         assert_eq!(m.to_bits(), want.to_bits(), "cell {k}");
+    }
+    // Under a glacier (a fjord), a sea cell keeps the land's: ice 200 m thick on every other
+    // cell, 10 m (under `min_ice_m`) on the rest.
+    let zs: Vec<f32> = z
+        .iter()
+        .enumerate()
+        .map(|(k, &zk)| zk + if k % 2 == 0 { 200.0 } else { 10.0 })
+        .collect();
+    let mut iced = vec![0.0f32; win.cells()];
+    super::kernels::tmult_fill(&win, &noise, &z, &zs, 60.0, 0.0, &mut iced);
+    for (k, ((&zk, &l), &m)) in z.iter().zip(&land).zip(&iced).enumerate() {
+        let want = if zk < 0.0 && k % 2 == 1 { l * ratio } else { l };
+        assert_eq!(m.to_bits(), want.to_bits(), "iced cell {k}");
     }
     // A sea floor of knolls one L2 cell across.
     let mut l2 = l2_level();
