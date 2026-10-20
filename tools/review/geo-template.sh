@@ -78,6 +78,20 @@ census)
     line_points $LINE2 > "$d-line2.pts"
     "$bin" inspect-column --world-data "$d" --points "$d-line2.pts" > "$d-line2.jsonl"
     "$bin" dump-deposits --world "$d" --out "$d-deposits.json" > /dev/null
+    # The ground over the bodies' centres (are they still in the rock?), at most 4000 of them.
+    python3 -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+seen = set()
+for b in d.get("bodies", []):
+    c = (b.get("body") or b).get("center")
+    if c and len(seen) < 4000:
+        p = (round(c[0]), round(c[2]))
+        if p not in seen:
+            seen.add(p)
+            print(*p)
+' "$d-deposits.json" > "$d-bodies.pts"
+    "$bin" inspect-column --world-data "$d" --points "$d-bodies.pts" > "$d-bodies.jsonl"
     echo "censused $d"
     ;;
 report)
