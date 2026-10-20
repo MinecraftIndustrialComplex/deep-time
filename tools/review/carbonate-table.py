@@ -6,7 +6,8 @@ tools/review/carbonate-ensemble.sh, then each label's median and range.
     python3 tools/review/carbonate-table.py <run dir> [label ...]
 
 Per run: the carbonate share of the land's top blocks, of the sea floor's top blocks (and chalk
-alone), and of the sedimentary blocks of all columns (strata-check); the surface stage's volumes
+alone), and of the sedimentary blocks of all columns, with dolostone's share of the carbonate
+blocks (strata-check); the surface stage's volumes
 (carbonate, pelagic chalk, periplatform carbonate, marine clastics, delivered to the sea;
 10^6 km3) and the photic sea floor's mean area with its warm and warm-and-clear parts
 (10^6 km2); the natural CO2 (end CO2 over the present-day factor), the global temperature after
@@ -91,6 +92,8 @@ def main():
             allc = s.get("columns", {})
             sb = share(allc, sed, "block_share")
             r["sed"] = share(allc, carb, "block_share") / sb if sb > 0 else float("nan")
+            cb = share(allc, carb, "block_share")
+            r["dolo"] = share(allc, ["dolostone"], "block_share") / cb if cb > 0 else float("nan")
         length = num(surf.get("surface_final")) * 2.0  # steps x 2 Myr
         for k in ["carbonate_km3", "pelagic_km3", "periplatform_km3", "marine_km3", "to_sea_km3"]:
             r[k[: -len("_km3")]] = num(surf.get(k)) / 1e6
@@ -119,7 +122,7 @@ def main():
             r["placer"] = {"n": len(pl), "oceanic": sum(bool(x.get("oceanic")) for x in pl),
                            "below_shelf": sum((x.get("ground_m") or 0.0) < SHELF_M for x in pl)}
         rows.append(r)
-    cols = ["land", "sea", "chalk", "sed", "carbonate", "pelagic", "periplatform", "marine",
+    cols = ["land", "sea", "chalk", "sed", "dolo", "carbonate", "pelagic", "periplatform", "marine",
             "to_sea", "photic", "photic_warm", "photic_warm_clear", "co2", "T", "T_nat", "degas",
             "weath"]
     print("run".ljust(40) + "".join(c[:10].rjust(11) for c in cols))
