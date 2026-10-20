@@ -99,6 +99,7 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
         "surface/regolith_blocks",
         "surface/class_top",
         "meta/plate_id",
+        "meta/crust_type",
         "meta/crust_age_myr",
         "meta/heat_flow_mw_m2",
         "meta/province",
@@ -117,19 +118,30 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
         };
         let q = load("meta/heat_flow_mw_m2");
         let age = load("meta/crust_age_myr");
+        // The crust type (2026-10-19) agrees with both: oceanic (0) wherever the crust has an
+        // age, continental (1) wherever it has a continental heat flow, and every cell has one.
+        let kind = load("meta/crust_type");
+        assert_eq!(kind.desc.dtype, deeptime_format::DType::U8);
+        assert_eq!(kind.desc.nodata, Some(255.0));
         assert_eq!(q.desc.grid.w, age.desc.grid.w);
+        assert_eq!(kind.desc.grid.w, age.desc.grid.w);
         let (mut hot, mut cold) = (0u32, 0u32);
         for j in 0..q.desc.grid.h {
             for i in 0..q.desc.grid.w {
                 let (i, j) = (i64::from(i), i64::from(j));
-                let (v, a) = (q.get(i, j), age.get(i, j));
+                let (v, a, k) = (q.get(i, j), age.get(i, j), kind.get(i, j));
                 if v.is_nan() {
                     cold += 1;
                 } else {
                     assert!((54.9..=200.1).contains(&v), "({i}, {j}) heat flow {v}");
                     assert!(a.is_nan(), "({i}, {j}) has an age and a continental flow");
+                    assert_eq!(k, 1.0, "({i}, {j}) has a continental flow on crust {k}");
                     hot += 1;
                 }
+                if !a.is_nan() {
+                    assert_eq!(k, 0.0, "({i}, {j}) has an oceanic age on crust {k}");
+                }
+                assert!(k == 0.0 || k == 1.0, "({i}, {j}) crust type {k}");
             }
         }
         assert!(hot > 0 && cold > 0, "continents {hot}, ocean {cold}");

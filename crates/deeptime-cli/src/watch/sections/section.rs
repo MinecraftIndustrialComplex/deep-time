@@ -27,6 +27,14 @@ pub struct Column {
     pub runs: Vec<(i32, u16)>,
     /// (body id, top y, bottom y) per maximal run of the column's blocks inside a body.
     pub bodies: Vec<(u32, i32, i32)>,
+    /// The horizon stack the runs were painted from (top y, class, unit key), top-down.
+    pub horizons: Vec<ColumnHorizon>,
+    /// The crust: its `meta/crust_type` code and `meta/crust_age_myr` ([`ColumnWorld::crust_at`]).
+    ///
+    /// [`ColumnWorld::crust_at`]: deeptime_format::ColumnWorld::crust_at
+    pub crust: (Option<i64>, Option<f64>),
+    /// The structural events at the column ([`deeptime_format::column::events_at`]).
+    pub events: Vec<Value>,
 }
 
 pub struct Section {
@@ -93,6 +101,9 @@ impl RockWorld {
             _ => None,
         };
         self.stack(scratch, x, z, stack);
+        let crust = self.cw.crust_at(x, z);
+        let crust = (crust["type"].as_i64(), crust["age_myr"].as_f64());
+        let events = self.events_at(scratch, x, z);
         let mut runs: Vec<(i32, u16)> = Vec::new();
         let mut bodies = Vec::new();
         if ground >= min_y {
@@ -139,17 +150,68 @@ impl RockWorld {
             water,
             runs,
             bodies,
+            horizons: stack.clone(),
+            crust,
+            events,
         }
     }
 }
 
 impl Section {
+    /// The distinct (unit key, class) pairs of the columns' horizons, sorted: the section's unit
+    /// table, which [`Section::columns_json`]'s `units` index.
+    pub fn units(&self) -> Vec<(u16, u8)> {
+        let mut out: Vec<(u16, u8)> = self
+            .columns
+            .iter()
+            .flat_map(|c| c.horizons.iter().map(|h| (h.2, h.1)))
+            .collect();
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
+    /// The structural events at any of the columns, youngest first as the world lists them
+    /// (each as [`deeptime_format::column::events_at`] gives it at the first column it holds,
+    /// without the column's own numbers).
+    pub fn events(&self) -> Vec<Value> {
+        let mut seen = std::collections::BTreeMap::new();
+        for e in self.columns.iter().flat_map(|c| &c.events) {
+            if let Some(id) = e["id"].as_u64() {
+                seen.entry(id).or_insert_with(|| {
+                    let mut v = json!({});
+                    for k in ["id", "kind", "t_years", "key", "class", "wavelength", "amplitude"] {
+                        if let Some(x) = e.get(k) {
+                            v[k] = x.clone();
+                        }
+                    }
+                    v
+                });
+            }
+        }
+        let mut out: Vec<Value> = seen.into_values().collect();
+        out.sort_by(|a, b| {
+            b["t_years"]
+                .as_f64()
+                .unwrap_or(0.0)
+                .total_cmp(&a["t_years"].as_f64().unwrap_or(0.0))
+        });
+        out
+    }
+
     /// The columns as compact arrays (the page draws them): per column its block, top block,
-    /// water, runs `[top, class, top, class, …]` (class −1 = none) and body spans
-    /// `[id, top, bottom, …]`.
-    pub fn columns_json(&self) -> Value {
+    /// water, runs `[top, class, top, class, …]` (class −1 = none), body spans
+    /// `[id, top, bottom, …]`, the horizon stack `units` as `[top, unit, …]` (an index into
+    /// `units`, [`Section::units`]), the crust code and age, and the structural events
+    /// `[id, changed, …]` (changed 1, 0, or −1 when not checked).
+    pub fn columns_json(&self, units: &[(u16, u8)]) -> Value {
         let cols = &self.columns;
         let class = |k: u16| if k == NONE { -1 } else { i64::from(k) };
+        let unit = |h: &ColumnHorizon| {
+            units
+                .binary_search(&(h.2, h.1))
+                .map_or(-1, |i| i as i64)
+        };
         json!({
             "x": cols.iter().map(|c| c.x).collect::<Vec<_>>(),
             "z": cols.iter().map(|c| c.z).collect::<Vec<_>>(),
@@ -161,6 +223,15 @@ impl Section {
             "bodies": cols.iter().map(|c| c.bodies.iter()
                 .flat_map(|&(id, t, b)| [i64::from(id), i64::from(t), i64::from(b)]).collect::<Vec<_>>())
                 .collect::<Vec<_>>(),
+            "units": cols.iter().map(|c| c.horizons.iter()
+                .flat_map(|h| [i64::from(h.0), unit(h)]).collect::<Vec<_>>()).collect::<Vec<_>>(),
+            "crust": cols.iter().map(|c| c.crust.0).collect::<Vec<_>>(),
+            "crust_age": cols.iter().map(|c| c.crust.1).collect::<Vec<_>>(),
+            "events": cols.iter().map(|c| c.events.iter()
+                .flat_map(|e| [
+                    e["id"].as_i64().unwrap_or(-1),
+                    e["changed"].as_bool().map_or(-1, i64::from),
+                ]).collect::<Vec<_>>()).collect::<Vec<_>>(),
         })
     }
 }

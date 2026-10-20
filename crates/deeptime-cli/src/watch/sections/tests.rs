@@ -198,8 +198,35 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     assert!((v["length_km"].as_f64().unwrap() - len * km_per_block).abs() < 1e-6);
     assert_eq!(n, len.ceil() as usize + 1);
     let cols = &v["columns"];
-    for key in ["x", "z", "ground", "water", "runs", "bodies"] {
+    for key in [
+        "x", "z", "ground", "water", "runs", "bodies", "units", "crust", "crust_age", "events",
+    ] {
         assert_eq!(cols[key].as_array().unwrap().len(), n, "{key}");
+    }
+    // Every column's horizons index the unit table, and every unit is decoded.
+    let units = v["units"].as_array().unwrap();
+    assert!(!units.is_empty());
+    for u in units {
+        assert!(u["info"]["text"].is_string(), "{u}");
+    }
+    let mut typed = 0;
+    for j in 0..n {
+        let us = cols["units"][j].as_array().unwrap();
+        for k in (1..us.len()).step_by(2) {
+            let i = us[k].as_i64().unwrap();
+            assert!(i >= 0 && (i as usize) < units.len(), "column {j}: unit {i}");
+        }
+        match cols["crust"][j].as_i64() {
+            Some(0 | 1) => typed += 1,
+            None => {}
+            k => panic!("column {j}: crust {k:?}"),
+        }
+        let ev = cols["events"][j].as_array().unwrap();
+        assert_eq!(ev.len() % 2, 0, "column {j}: events {ev:?}");
+    }
+    assert!(typed > n / 2, "{typed} of {n} columns have a crust type");
+    for e in v["events"].as_array().unwrap() {
+        assert!(e["kind"].is_string() && e["age_ma"].is_number(), "{e}");
     }
     assert_eq!(
         (cols["x"][0].as_i64(), cols["z"][0].as_i64()),
@@ -276,7 +303,7 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     assert!(checked > 500, "{checked}");
     eprintln!("sections test: {checked} blocks and {spans} body spans compared");
     assert!(
-        kept(&dir, "section--700_-400_700_500-n"),
+        kept(&dir, "section2--700_-400_700_500-n"),
         "the section is kept"
     );
     assert_eq!(
