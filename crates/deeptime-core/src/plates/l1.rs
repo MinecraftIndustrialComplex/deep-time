@@ -414,12 +414,36 @@ pub(super) fn sample_with(
     // The rock pools, interpolated like the other thicknesses (P1-07's basement columns,
     // `structure::columns`: the nearest sample's pools changed every other L1 cell and built
     // columns of alternating crust); gap cells get the fresh ridge crust the next resampling makes.
+    // The rock pools come from the corners of the nearest sample's kind only (a coast cell of
+    // ocean crust does not take a continent's granite, gneiss and platform cover from a
+    // continental corner; the resampling keeps them apart too, ledger: PLT-293); the loose
+    // sediment from all three.
     let pools = |c: usize, interp: &[f64; INTERP]| -> [f32; POOL_FIELDS.len()] {
         if info[c].mode == GAP {
-            super::pools::oceanic_column()
-        } else {
-            std::array::from_fn(|k| interp[POOL0 + k].max(0.0) as f32)
+            return super::pools::oceanic_column();
         }
+        let l = &links[c];
+        let t = tris[l.tri as usize];
+        let kind = samples[l.nearest as usize].kind;
+        let mine = |kk: usize| samples[t[kk] as usize].kind == kind;
+        // Each weight at least 0, so the subset never extrapolates. The weights are not negative
+        // today (the CPU's barycentric weights are clamped, `sphere::hull::barycentric`, the
+        // device's too, `l1/gpu.rs`, and a NEAREST link is one-hot); the clamp keeps it so.
+        let w = |kk: usize| f64::from(l.w[kk]).max(0.0);
+        let sw: f64 = (0..3).filter(|&kk| mine(kk)).map(w).sum();
+        std::array::from_fn(|k| {
+            use super::state::pool;
+            let v = if k == pool::SEDIMENT || sw <= 1.0e-9 {
+                interp[POOL0 + k]
+            } else {
+                (0..3)
+                    .filter(|&kk| mine(kk))
+                    .map(|kk| w(kk) * f64::from(samples[t[kk] as usize].pools[k]))
+                    .sum::<f64>()
+                    / sw
+            };
+            v.max(0.0) as f32
+        })
     };
     let per_cell = |c: usize, interp: &[f64; INTERP]| -> [f32; 11] {
         let l = links[c];

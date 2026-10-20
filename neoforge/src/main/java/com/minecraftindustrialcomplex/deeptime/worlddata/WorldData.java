@@ -27,6 +27,8 @@ public final class WorldData {
     public static final String ELEVATION = "elevation";
     public static final String WATER_LEVEL = "water_level";
     public static final String HORIZONS = "strata/horizons";
+    /** How far each strata cell's stack rose after the history (FORMAT.md, "The lift"); the structure's heights do not include it. */
+    public static final String LIFT = "strata/lift";
 
     private final Path folder;
     private final Manifest manifest;

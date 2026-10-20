@@ -199,7 +199,7 @@ The "Design 'Now'" column is the design document's own measurements (see Documen
 Source: `docs/deeptime-implementation-plan.md` section 1.2 ("Where the documents live, and which one wins"), lines 72-82. The plan says: "The research report predates the decisions. These report positions were overturned and must not be followed:" and lists the following (each "was" is the report's position, "now" is the plan's):
 
 1. Engine language: a pure-Java engine, now Rust over JNI.
-2. World scale: 8 m per block, now about 300 m horizontal and 20 m vertical.
+2. World scale: 8 m per block, now about 300 m horizontal and 35 m vertical (SCL-002; 20 m vertical until 2026-10-02).
 3. Licence: the MIT licence, now LGPL-3.0-or-later.
 4. Floating islands: Terralith pass-through overlays, now simulated sky islands.
 5. Determinism: bit-for-bit seed determinism, now "stored data only".
