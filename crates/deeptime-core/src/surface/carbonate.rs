@@ -89,8 +89,8 @@ impl Ord for Higher {
 /// carbonate a platform exported was laid down as shale.
 ///
 /// `loss` and `gain` are the diffusion's own change (the solve's heights less the heights before
-/// it), so a cell keeps no more than it was given and the carbonate laid is at most the
-/// carbonate lost. Slope failure is not on the diffusion's faces: its debris is laid as clastic
+/// it; read per cell, so the caller need not hold them as arrays), so a cell keeps no more than it
+/// was given and the carbonate laid is at most the carbonate lost. Slope failure is not on the diffusion's faces: its debris is laid as clastic
 /// ([`StepTop::substep`]).
 ///
 /// The implicit diffusion step's exchange across each face follows from the solved heights `h`:
@@ -108,9 +108,9 @@ pub fn exported(
     dt: f64,
     h: &[f64],
     sea: &[bool],
-    loss: &[f64],
+    loss: impl Fn(usize) -> f64,
     loss_carb: &[f64],
-    gain: &[f64],
+    gain: impl Fn(usize) -> f64,
 ) -> Vec<(u32, f64)> {
     use std::collections::BinaryHeap;
     let (w, rows) = (d.w, d.h);
@@ -171,7 +171,7 @@ pub fn exported(
                 }
             }
         }
-        let total = inflow + loss[c];
+        let total = inflow + loss(c);
         let s = if total > 0.0 {
             ((inflow_carb + loss_carb[c]) / total).clamp(0.0, 1.0)
         } else {
@@ -179,8 +179,9 @@ pub fn exported(
         };
         share[c] = s as f32;
         state[c] = 2;
-        if gain[c] > 0.0 && s > 0.0 {
-            out.push((c as u32, gain[c] * s));
+        let gain = gain(c);
+        if gain > 0.0 && s > 0.0 {
+            out.push((c as u32, gain * s));
         }
         if s < EXPORT_MIN_SHARE {
             continue;
@@ -433,18 +434,30 @@ mod tests {
         let gain = [0.0, 0.5, 0.5, 0.0, 0.0, 0.0];
         // All the slope's supply is carbonate: everything it keeps is carbonate.
         let h = [0.0, -1.0, -2.0, -10.0, -10.0, -10.0];
-        let out = exported(&d, &kd, 1.0, &h, &sea, &loss, &loss_carb, &gain);
+        let out = exported(&d, &kd, 1.0, &h, &sea, |c| loss[c], &loss_carb, |c| gain[c]);
         assert_eq!(out, vec![(1, 0.5), (2, 0.5)]);
         // Cell 4 (no carbonate) gives cell 1 as much as cell 0 does: half of it is carbonate,
         // and half of what cell 1 passes on to cell 2.
         let h = [0.0, -1.0, -2.0, -10.0, 0.0, -10.0];
-        let out = exported(&d, &kd, 1.0, &h, &sea, &loss, &loss_carb, &gain);
+        let out = exported(&d, &kd, 1.0, &h, &sea, |c| loss[c], &loss_carb, |c| gain[c]);
         assert_eq!(out, vec![(1, 0.25), (2, 0.25)]);
         // On land the tracer stops; without carbonate there is none.
         let land = [true, false, true, true, true, true];
-        assert!(exported(&d, &kd, 1.0, &h, &land, &loss, &loss_carb, &gain).is_empty());
+        assert!(
+            exported(
+                &d,
+                &kd,
+                1.0,
+                &h,
+                &land,
+                |c| loss[c],
+                &loss_carb,
+                |c| gain[c]
+            )
+            .is_empty()
+        );
         let none = [0.0; 6];
-        assert!(exported(&d, &kd, 1.0, &h, &sea, &loss, &none, &gain).is_empty());
+        assert!(exported(&d, &kd, 1.0, &h, &sea, |c| loss[c], &none, |c| gain[c]).is_empty());
     }
 
     /// The step's own deposit is peeled from the top as it stands at each substep: carbonate an
@@ -475,7 +488,11 @@ mod tests {
         };
         let lost = top.diffusion_carbonate(&s2, &old);
         assert!((lost - 3.0).abs() < 1e-9, "{lost}");
-        assert_eq!((top.carb, top.other), (1.0, 3.0), "a read leaves the record");
+        assert_eq!(
+            (top.carb, top.other),
+            (1.0, 3.0),
+            "a read leaves the record"
+        );
         let (l, kept) = top.substep(&s2, 0.0, &old);
         assert!((l - 3.0).abs() < 1e-9 && kept == 0.0);
         assert_eq!((top.carb, top.other, top.taken_old), (0.0, 0.0, 2.0));
@@ -553,11 +570,32 @@ mod tests {
         let h = [0.0, -1.0];
         // The exchange is κ·Δt (Δh and Δx 1): 0.8 mm over 2 Myr is under the cut-off of 1 mm...
         let kd = [0.8e-3 / 2.0e6; 2];
-        assert!(exported(&d, &kd, 2.0e6, &h, &sea, &loss, &loss_carb, &gain).is_empty());
+        assert!(
+            exported(
+                &d,
+                &kd,
+                2.0e6,
+                &h,
+                &sea,
+                |c| loss[c],
+                &loss_carb,
+                |c| gain[c]
+            )
+            .is_empty()
+        );
         // ...and 0.6 mm over 1 Myr is over the cut-off of 0.5 mm then.
         let kd = [0.6e-3 / 1.0e6; 2];
         assert_eq!(
-            exported(&d, &kd, 1.0e6, &h, &sea, &loss, &loss_carb, &gain),
+            exported(
+                &d,
+                &kd,
+                1.0e6,
+                &h,
+                &sea,
+                |c| loss[c],
+                &loss_carb,
+                |c| gain[c]
+            ),
             vec![(1, 0.5)]
         );
     }
@@ -608,7 +646,7 @@ mod tests {
         let lost: f64 = loss_carb.iter().sum();
         assert!(lost > 0.0);
         let laid = |sea: &[bool]| -> f64 {
-            exported(&d, &kd, 1.0, &h, sea, &loss, &loss_carb, &gain)
+            exported(&d, &kd, 1.0, &h, sea, |c| loss[c], &loss_carb, |c| gain[c])
                 .iter()
                 .map(|&(_, m)| m)
                 .sum()
