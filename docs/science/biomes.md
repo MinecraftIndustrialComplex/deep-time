@@ -775,8 +775,11 @@ Both stay under the pack's own share of the flats. What else moves on the ice ca
 desert 16 to 5 % (play world); with vanilla, frozen peaks 7 to 28 % (the high slice's steepest mid-inland ground is
 frozen peaks, near-inland snowy slopes). With MIC, EF's barren ground (0.1 to 0.2 % of land) trades its ice
 spikes (11 % of it) for Terralith's cold shrubland. `bake::biomes::tests::ef_land_is_held_mid_inland_off_terraliths_near_inland_ice_spikes`
-checks the clamp against the same table without the key; the GameTest census bounds the ice cap's ice spikes
-(`EF:few_ice_spikes`, BIO-162).
+checks the clamp against the same table without the key. The GameTest census bounds the ice cap's ice spikes
+(`EF:few_ice_spikes`, BIO-162): it fails when the share's one-sided 99 % lower bound is above 0.10, between the
+shares after the fix (0.034 to 0.071) and before it (0.153 to 0.254). On the GameTests' 4k planet the ice cap is 3
+census columns (0.2 % of its land), under the 40 a family needs, so there the bound is logged and not asserted; it
+bites on a planet with an ice cap.
 
 **The rare variants.** The same emulation gives the other variants against the packs' own worlds (the play world,
 before the fix; the fix changes only frozen biomes):
@@ -894,11 +897,12 @@ pack's own share and not an area ("Ice spikes and the rare variants").
   the repository and on one pack version.
 - The vanilla reference distributions (BIO-025) were measured by the project's tool and not
   re-measured.
-- The ice cap's flats carry ice spikes at BIO-077's fifth, below the packs' own shares (MIC 34.5 %, vanilla 46.8 % of
-  their frozen, driest flats). Reaching MIC's under Terralith would need a share of the ice cap kept near-inland by
-  noise, which the placement format cannot say (a new key: Ben's to decide). With vanilla the share follows BIO-077's
-  noise, which gave the positive branch to 20 % of the play world's ice cap at erosion E3 and to 4 % of the 2026-10-20
-  supercontinent's.
+- After the fix the ice cap's flats carry ice spikes below the packs' own shares (MIC 34.5 %, vanilla 46.8 % of
+  their frozen, driest flats). With MIC the share is set by Terralith's mid-inland erosion window (19 % on both
+  measured worlds); with vanilla by what BIO-077's noise lets through, which gave the positive branch to 20 % of the
+  play world's ice cap at erosion E3 and to 4 % of the 2026-10-20 supercontinent's (16.8 % and 6.4 % of the flats).
+  Reaching a pack's own share would need a share of the ice cap kept near-inland by noise, or a weirdness threshold
+  set per world, which the placement format cannot say (a new key: Ben's to decide).
 - The rare variants ("Ice spikes and the rare variants"): mushroom fields never appear (no land cell is below
   continentalness -1.05), plateau biomes are thin on mostly near-inland land, and which variants appear is each
   class's weirdness rule's. Whether the planet should draw them at the pack's rarity is a design choice, not taken.
