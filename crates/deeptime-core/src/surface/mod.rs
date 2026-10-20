@@ -647,9 +647,14 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
         + 3 * 4 // the step's erosion by process (`erosion_bands`)
         + log // the log's advected copy
         + 21 * 8 // the glaciers' ice state, loads and passes (`glacial.rs`)
-        // The carbonate parts (pelagic, periplatform), the step-top record and the periplatform
-        // tracer's arrays at their peak (ERO-191, ERO-195).
-        + 80;
+        // The carbonate parts and the periplatform tracer (ERO-191, ERO-195): through the step the
+        // pelagic and periplatform parts, the step-top record and the last substep's other deposit
+        // and erosion (4 + 4 + 12 + 4 + 4 B); at the tracer's peak in a substep the carbonate
+        // before it, the solved heights, the sea mask, the new other deposit, the carbonate lost,
+        // the laid periplatform and `exported`'s state and share (4 + 8 + 1 + 4 + 8 + 4 + 1 + 4 B;
+        // its heap and output hold only the cells the carbonate reaches).
+        + 28
+        + 34;
     let frames = (p.run_myr() / s.frame_every_myr).ceil().max(1.0) as u64;
     let history = frames * cells * 12; // packed frames, ~12 B/cell after LZ4 (measured in P1-04)
     let steps = p.plate_steps() as f64 * f64::from(s.substeps);
@@ -1623,18 +1628,12 @@ impl SurfaceStage {
                         0.0
                     }
                 };
-                let loss: Vec<f64> = (0..n)
-                    .into_par_iter()
-                    .map(|c| (-diffusion(c)).max(0.0))
-                    .collect();
-                let gain: Vec<f64> = (0..n)
-                    .into_par_iter()
-                    .map(|c| diffusion(c).max(0.0))
-                    .collect();
+                let loss = |c: usize| (-diffusion(c)).max(0.0);
+                let gain = |c: usize| diffusion(c).max(0.0);
                 let loss_carb: Vec<f64> = (0..n)
                     .into_par_iter()
                     .map(|c| {
-                        if loss[c] > 0.0 {
+                        if loss(c) > 0.0 {
                             tops[c].diffusion_carbonate(&cell(c), &old_carb(c))
                         } else {
                             0.0
@@ -1645,12 +1644,12 @@ impl SurfaceStage {
                 // give the same totals on any (the spill and resume tests).
                 peri_source_m_cells += loss_carb.iter().sum::<f64>();
                 let mut laid = crate::alloc::filled(n, 0.0f32);
-                for (c, m) in carbonate::exported(
-                    &d, &sc.kd, dts, &solved, &sea_mask, &loss, &loss_carb, &gain,
-                ) {
+                for (c, m) in
+                    carbonate::exported(&d, &sc.kd, dts, &solved, &sea_mask, loss, &loss_carb, gain)
+                {
                     laid[c as usize] = m as f32;
                 }
-                drop((loss, gain, loss_carb));
+                drop(loss_carb);
                 let kept: Vec<f32> = tops
                     .par_iter_mut()
                     .enumerate()

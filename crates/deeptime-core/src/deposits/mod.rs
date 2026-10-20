@@ -1308,7 +1308,7 @@ fn host_horizon(
         .find(|&(hi, lo, u)| {
             around.iter().all(|col| {
                 col.iter()
-                    .any(|v| is_host(v.class) && u.same_unit(v) && v.top >= lo && v.below + 1 <= hi)
+                    .any(|v| is_host(v.class) && u.same_unit(v) && v.top >= lo && v.below < hi)
             })
         })
         .map(|(hi, lo, _)| (mid((hi, lo)), f64::from(hi - lo + 1) / 2.0))
@@ -2583,7 +2583,7 @@ impl DepositStage {
         let ages: Vec<_> = centre.iter().map(|u| cover.unit_ages_ma(u)).collect();
         let (span, ore_ma) = ((surf, want_y, cover.min_y()), cover.age_ma(t_form));
         // No candidate in the site's own column: no need to read the columns about it.
-        if host_horizon((&centre, &ages), &[], &is_host, span, ore_ma).is_none() {
+        if host_horizon((&centre, &ages), &[], is_host, span, ore_ma).is_none() {
             return HostFit::NoHost;
         }
         let (r, step) = (HOST_REACH_CELLS, cover.cell_blocks());
@@ -2599,7 +2599,7 @@ impl DepositStage {
                 }
             }
         }
-        match host_horizon((&centre, &ages), &around, &is_host, span, ore_ma) {
+        match host_horizon((&centre, &ages), &around, is_host, span, ore_ma) {
             None => HostFit::NoHost,
             Some((mid, half)) => HostFit::In {
                 centre_depth_m: (surf - mid) * f.sc.m_per_block_v,
