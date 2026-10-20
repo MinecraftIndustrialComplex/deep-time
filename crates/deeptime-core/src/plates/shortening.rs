@@ -72,7 +72,7 @@ use super::Env;
 use super::dynamics;
 use super::geometry::{Geo, Tree};
 use super::kinematics::{quat, tangent};
-use super::state::{CONTINENTAL, Collision, PlateState};
+use super::state::{CONTINENTAL, Collision, PlateState, Sample};
 use super::subduction::{CONFIRM_MM_YR, MIN_CONTACT, locked_against};
 
 /// A collision begins only where its front converges at least this fast, mm/yr: the rate a
@@ -137,6 +137,75 @@ pub fn voronoi_edge_rad(geo: &Geo, v: u32, u: u32) -> f64 {
     }
     let sum: f64 = cot.iter().filter(|c| c.is_finite()).sum();
     (0.5 * (b - a).length() * sum).max(0.0)
+}
+
+/// Σ over the lattice edges from sample `v` (at `x`, its group turned by `rot`) to samples of
+/// plate `pu`: the edge's Voronoi edge length ([`voronoi_edge_rad`]) times its direction. A
+/// Voronoi edge is square to its lattice edge, so along a chain of boundary samples these sums
+/// add up to the chord of that stretch of the boundary turned a right angle: its normal times its
+/// straight length, however the lattice zigzags. Zero where `v` has no neighbour on `pu`.
+fn crossing_sum(geo: &Geo, x: DVec3, rot: DQuat, plate_of: &[u32], v: u32, pu: u32) -> DVec3 {
+    let pts = geo.points();
+    let mut sum = DVec3::ZERO;
+    for (u, _) in geo.edges(v) {
+        if plate_of[u as usize] == pu {
+            let out = tangent(x, rot * (pts[u as usize] - pts[v as usize])).normalize_or_zero();
+            sum += voronoi_edge_rad(geo, v, u) * out;
+        }
+    }
+    sum
+}
+
+/// The plate boundary's unit normal at sample `v`, pointing to plate `pu` (zero where `v` is not
+/// on that boundary): the crossing sums ([`crossing_sum`]) of `v` and of the visible samples of
+/// its own plate within two lattice steps, which give the chord of about five spacings of the
+/// boundary. One sample's own edges give no usable normal: the lattice's boundary zigzags at its
+/// spacing, and on the (near-hexagonal) Fibonacci lattice the edges that cross a straight
+/// boundary lie about 30 degrees either side of its normal. ledger: PLT-310
+pub fn boundary_normal(
+    geo: &Geo,
+    pos: &[DVec3],
+    rots: &[DQuat],
+    samples: &[Sample],
+    plate_of: &[u32],
+    v: usize,
+    pu: u32,
+) -> DVec3 {
+    let pv = plate_of[v];
+    let mut near: Vec<u32> = Vec::with_capacity(24);
+    near.push(v as u32);
+    let mut ring = 0..1;
+    for _ in 0..2 {
+        for i in ring.clone() {
+            for (w, _) in geo.edges(near[i]) {
+                let wi = w as usize;
+                if plate_of[wi] == pv && !samples[wi].is_hidden() && !near.contains(&w) {
+                    near.push(w);
+                }
+            }
+        }
+        ring = ring.end..near.len();
+    }
+    let mut n = DVec3::ZERO;
+    for &w in &near {
+        let wi = w as usize;
+        let rot = rots[samples[wi].group as usize];
+        n += crossing_sum(geo, pos[wi], rot, plate_of, w, pu);
+    }
+    tangent(pos[v], n).normalize_or_zero()
+}
+
+/// Bird's test of a transform: a boundary whose relative motion lies within 20 degrees of its
+/// own direction is strike-slip. True when the normal part of `rel` (mm/yr, against the unit
+/// normal `normal`) is under sin 20° of its speed, or the plates do not move. Bird calls a
+/// converging step with a Benioff zone a subduction zone whatever its angle; a model contact
+/// belongs to a pair of plates, not to a stretch of their boundary, so the test stands in for the
+/// Benioff zone along a contact's strike-slip stretches. ledger: PLT-311
+pub fn is_transform(rel: DVec3, normal: DVec3) -> bool {
+    // ledger: PLT-311 (Bird 2003, paragraph [127]: within ±20 degrees of the step's azimuth)
+    const TRANSFORM_DEG: f64 = 20.0;
+    let speed = rel.length();
+    speed <= 0.0 || rel.dot(normal).abs() < TRANSFORM_DEG.to_radians().sin() * speed
 }
 
 /// One contact's collision front in a step.
@@ -867,6 +936,40 @@ mod tests {
             dt_myr: 2.0,
             stall_mm_yr: 5.0,
         }
+    }
+
+    /// The boundary x = 0 seen from plate 0's edge: the normal points along +x, a pure
+    /// strike-slip motion reads as a transform by Bird's 20 degrees, and head-on motion does not.
+    #[test]
+    fn the_boundary_normal_sees_a_transform() {
+        let fx = Fixture::new();
+        let v = 60.0;
+        let st = two_plates(&fx.geo, DVec3::X * fx.rate(v), |_| false);
+        let pos = crate::plates::geometry::positions(&st, &fx.geo);
+        let rots: Vec<DQuat> = st.groups.iter().map(|g| quat(g.rot)).collect();
+        let plate_of: Vec<u32> = (0..st.samples.len()).map(|i| st.plate_of(i)).collect();
+        let (mut total, mut worst) = (0usize, 0.0f64);
+        let mut slid = 0usize;
+        let mut head_on = 0usize;
+        for (i, x) in pos.iter().enumerate() {
+            if plate_of[i] != 0 || !fx.geo.edges(i as u32).any(|(u, _)| plate_of[u as usize] == 1)
+            {
+                continue;
+            }
+            total += 1;
+            let n = boundary_normal(&fx.geo, &pos, &rots, &st.samples, &plate_of, i, 1);
+            let want = tangent(*x, DVec3::X).normalize();
+            worst = worst.max(n.dot(want).clamp(-1.0, 1.0).acos().to_degrees());
+            let slide = fx.norm.velocity_mm_yr(DVec3::X * fx.rate(v), *x);
+            slid += usize::from(is_transform(slide, n));
+            // Head-on where the rotation about z moves the boundary fast (|y| > 0.5).
+            let push = fx.norm.velocity_mm_yr(DVec3::Z * fx.rate(v), *x);
+            head_on += usize::from(x.y.abs() <= 0.5 || !is_transform(push, n));
+        }
+        assert!(total > 100, "{total} boundary samples");
+        assert!(worst < 20.0, "the normal is {worst:.1} degrees off at worst");
+        assert!(slid as f64 > 0.97 * total as f64, "{slid} of {total} slide");
+        assert_eq!(head_on, total, "head-on read as a transform");
     }
 
     /// The Voronoi edges round a sample close its cell: their lengths times their directions sum

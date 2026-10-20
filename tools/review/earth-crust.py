@@ -14,7 +14,9 @@ columns, the top of each layer in km (positive up): water, ice, upper, middle an
 upper, middle and lower crystalline crust, mantle. The surface is the top of the water on land
 (the ice surface where there is ice), the rock surface the top of the sediments, the crust is the
 sediments and the crystalline crust (the plate model's thickness counts its sediment pools).
-Cells are weighted by their area (cos latitude). Needs numpy only.
+Cells are weighted by their area (cos latitude). Needs numpy only. The figures are ledger rows
+HYP-040 (the thickness and the heights by band) and HYP-041 (the land above 2 km by its surface
+and by its rock).
 """
 import sys
 

@@ -1935,20 +1935,26 @@ lower-crustal flow and the settling ("Mountains eat the world: the continents dr
   last one, a plate step old.
 - *The flow's heights* (PLT-281) follow from each column's crust before and after the step, as
   the collapse's do, and the settling then takes them to equilibrium.
-- *The flow's substeps* (PLT-300): explicit, as many as keep it stable, at most 64 a step, past
-  which the step moves less than the law. At the thickest channel (K = 8 K₀ = 12,000 km²/Myr) on
-  six edges and the preset's mean spacing taken as a hexagonal lattice's (about 77 km at quick
-  16k's 100,000 samples, 48 km at full 16k's 250,000), the cap holds the step to 3.1 Myr of the
-  law at quick 16k and 1.3 Myr at full 16k, whatever the step. So it binds at quick 16k only at 4
-  Myr (crust above about 78 km), and at full 16k at both (above about 76 km at 2 Myr, 70 km at 4
-  Myr). At the thickest channel a 4-Myr step then moves crust 0.79 as far per Myr as a 2-Myr
-  one at quick 16k, and half as far at full 16k. These are estimates from the constants; the substeps a step takes (`Flow::substeps`) are not logged, and
-  how much crust is that thick was not measured.
+- *The flow's substeps* (PLT-300): explicit, as many as keep it stable. The P4 review estimated
+  that the old bound of 64 a step would bind at full 16k above about 74 km of crust; but the
+  crust is held to `crust_max_km` 70, where the channel is 20 km and K = 2.4 K₀, not the 8 K₀
+  the estimate took. Measured on 2026-10-20 (land-shape task; the step's substeps and the plate
+  time they left uncovered are now world globals, `plates/channel_flow_substeps` and
+  `plates/channel_flow_short_myr`, printed by the crust budget): a full 16k run (seed 1, both
+  starts, 1000 Myr) with the bound and one without are the same to the bit, the steps took 30
+  substeps on average (12 at quick 16k), and no plate time went uncovered. The bound is now only a
+  guard (4096), and a step longer than 2 Myr runs in 2-Myr pieces, each finding its channels and
+  rings again, so a 4-Myr step moves crust as two 2-Myr steps do (test
+  `a_long_step_is_two_short_ones`).
 - *The flow's reach.* Crust moves only among the channel columns and the two rings of their
-  plate's crust around them, found once a step, so a channel's front can move at most two rings
-  (about 150 km at quick 16k, 100 km at full 16k) a step, half as far per Myr at 4 Myr. K₀'s
-  length over 15 Myr is Rey, Teyssier & Whitney's 150 km, √(K₀ t) = 77 km over 4 Myr at K₀ and
-  220 km at 8 K₀; not measured here.
+  plate's crust around them, found once a piece, so a channel's front can move at most two rings
+  (about 150 km at quick 16k, 100 km at full 16k) per 2 Myr. K₀'s length over 15 Myr is Rey,
+  Teyssier & Whitney's 150 km; √(K t) over a 2-Myr piece at the thickest channel (2.4 K₀) is 84
+  km. Measured with the substeps (`plates/channel_flow_edge`, the outermost-ring columns left
+  with a channel): about 9 a step at full 16k and 1.5 at quick 16k, against roughly 13,000
+  columns thicker than 50 km at full 16k (about 12 % of the continental crust in the crust
+  budget's bands, 0.43 of 250,000 samples), so the reach's dependence on the lattice moves almost
+  nothing and was left as it is.
 
 ## L1 sampling on a GPU (2026-10-19)
 

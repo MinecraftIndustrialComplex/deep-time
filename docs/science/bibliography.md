@@ -3764,6 +3764,16 @@ Vanilla's OverworldBiomeBuilder, Terralith, Tectonic (game and mod data), rustff
 - Read in this pass: data fetched and processed (see Part 2, Earth shares)
 - Reference check: the citation the model's own page asks for is a conference abstract, not a model paper. The paper-level reference for the predecessor CRUST 5.1 is Mooney2008 below. The 360 type names describe tectonic settings (Archean, early/mid Proterozoic, late Proterozoic, Platform, Phanerozoic, orogen, continental arc, extended crust, rift, shelf, slope, oceanic ...), so a province share needs a mapping from type name to class; none is published with the model.
 
+### Laske2013 (CRUST1.0)
+- Reference: Laske, G., Masters, G., Ma, Z., Pasyanos, M., 2013. Update on CRUST1.0: A 1-degree Global Model of Earth's Crust. Geophysical Research Abstracts 15, EGU2013-2658 (EGU General Assembly abstract). Model: CRUST1.0, 1 x 1 degree, eight layers (water, ice, three sediment layers, upper, middle and lower crystalline crust) over the mantle.
+- DOI or URL: https://igppweb.ucsd.edu/~gabi/crust1.html ; data http://igppweb.ucsd.edu/~gabi/crust1/crust1.0.tar.gz (crust1.bnds: the top of each layer, km)
+- Cited as: "CRUST1.0 (Laske, Masters, Ma & Pasyanos 2013)" (tools/review/earth-crust.py)
+- Ledger ids: HYP-040, HYP-041
+- Access: open (data files)
+- Library (the project's source library, not distributed): the model's data, fetched 2026-10-20 to the land-shape task's scratch folder on the test VM; the abstract was not fetched.
+- Read so far (by the project): the data read and measured (tools/review/earth-crust.py); the abstract is cited from the model's own page, not read (from-memory).
+- Reference check: the citation the model's page asks for is the conference abstract, as for CRUST 2.0 (Bassin2000).
+
 ### Mooney1998 (CRUST 5.1)
 - Reference: Mooney, W. D., Laske, G., Masters, T. G., 1998. CRUST 5.1: A global crustal model at 5 x 5 degrees. Journal of Geophysical Research 103(B1): 727-747.
 - DOI or URL: 10.1029/97JB02122
@@ -3957,6 +3967,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read in this pass: (PLT) abstract fetched (OpenAlex reconstruction). (CLM) search result snippet only (the citing passages returned were about regional plate boundaries and did not mention 51,000 km or 62 mm/yr)
 - Reference check: (PLT) correct. The abstract gives "14 large plates ... plus 38 small plates ... for a total of 52 plates". The area numbers and "seven largest 92 percent" are not in the abstract. (CLM) IDENTIFICATION UNCERTAIN. Bird 2003 is the PB2002 plate-boundary model; a total subduction length of 51,000 km at 62 mm/yr is plausible from it but I could not confirm it is in that paper.
 - Read in WP-13a (2026-10-02): Table 1 (areas in steradians): Pacific 2.57685 sr, 20.5 % of the sphere; seven plates above 5 %, together 81 % (not 92 %); Table 3 re-read: subduction 51,310 of 260,487 km (19.7 %). PLT-143, PLT-145, PLT-213, CHK-001, CHK-003.
+- Read in the land-shape task (2026-10-20): the PDF fetched again from the author's site into the source library (`Bird2003/`, the VM's library had lost it in the 2026-10-16 rebuild), text extracted; paragraphs [126] and [127]: a subduction zone is a step "with a convergent (component of) velocity and a Benioff zone ... and/or a parallel volcanic arc with Quaternary activity"; other steps are "strike-slip if the computed relative velocity ... has an azimuth within ±20 of the azimuth of the plate boundary step". PLT-311.
 
 ### Morra2013
 - Reference: Morra, G., Seton, M., Quevedo, L., Müller, R. D. (2013). Organization of the tectonic plates in the last 200 Myr. Earth and Planetary Science Letters 373:93-101.

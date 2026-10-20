@@ -32,8 +32,8 @@
 //! moves along each lattice edge from the thicker column to the thinner, at the diffusivity of
 //! the thicker column's channel (the channel is fed from the thick side), by an explicit
 //! conservative scheme in as many substeps as keep it stable (no bound but a guard; until
-//! 2026-10-20 at most 64, which full 16k passed), in pieces of at most 2 Myr of plate time, each
-//! finding its channel columns and their two rings again. The rock moved is the source's
+//! 2026-10-20 at most 64, which no 2-Myr step of the measured runs reached), in pieces of at most
+//! 2 Myr of plate time, each finding its channel columns and their two rings again. The rock moved is the source's
 //! own mix (pure shear). Heights follow by Airy as in the collapse (PLT-281): a source sinks by
 //! its isostatic change but not below the Airy height of the crust it keeps, a receiver rises by
 //! its isostatic change but not above the Airy height of its new column.
@@ -70,11 +70,13 @@ const CHANNEL_MAX: f64 = 2.0;
 /// The largest share of a column's difference to its neighbours one substep may move (the
 /// explicit scheme is stable below 1/2).
 const STABLE: f64 = 0.4;
-/// The most substeps a plate step takes: a guard only. The diffusivity is bounded (K ≤ 8 K₀), so
-/// the stable count is too: about 4 · 8 K₀ · dt / (0.4 d²), some 50 at quick 16k's 77 km spacing
-/// and 120 at full 16k's 48 km with the 2-Myr step. Until 2026-10-20 the bound was 64, which full
-/// 16k passed whenever a column anywhere was thicker than about 74 km: every channel on the planet
-/// then moved for only part of the step (the P4 plate-step review, 2026-10-20).
+/// The most substeps a plate step takes: a guard only. The diffusivity is bounded (K ≤ 8 K₀, and
+/// K ≤ 2.4 K₀ under `crust_max_km` 70), so the stable count is too: about 4 · K · dt / (0.4 d²)
+/// per 2-Myr piece. Until 2026-10-20 the bound was 64, which the P4 plate-step review estimated
+/// full 16k would pass above about 74 km of crust; measured (land-shape task, 2026-10-20: full
+/// 16k, seed 1, both starts, 1000 Myr, with the bound and without) the runs are the same to the
+/// bit, the steps took 30 substeps on average at full 16k and 12 at quick 16k, and no plate time
+/// was left uncovered (`SHORT_GLOBAL` 0).
 const MAX_SUBSTEPS: usize = 4096;
 /// An experiment's bound on the substeps (64 was the rule until 2026-10-20), read once.
 pub const MAX_SUBSTEPS_ENV: &str = "DEEPTIME_FLOW_MAX_SUBSTEPS";
