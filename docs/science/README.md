@@ -128,10 +128,11 @@ be to present one as physics.
 
 These hold for every page and are not repeated on each.
 
-- **Scale.** One block is 300 m horizontally and 20 m vertically. The default planet is 16,384
-  blocks round: about 4,915 km, an eighth of Earth's circumference and about 1.5 % of its area.
-  Heights are therefore stretched 15 times against widths. A real 2 km crater bowl would be 7
-  blocks across and 21 deep. Slopes, river widths, layer thicknesses and ore bodies are adjusted so
+- **Scale.** One block is 300 m horizontally and 35 m vertically (`scale.m_per_block_v`,
+  `deeptime_format::DEFAULT_M_PER_BLOCK_V`, SCL-002; 20 m until Ben's decision of 2026-10-02). The
+  default planet is 16,384 blocks round: about 4,915 km, an eighth of Earth's circumference and
+  about 1.5 % of its area. Heights are therefore stretched about 8.6 times against widths. A real
+  2 km crater bowl (about 400 m deep) would be 7 blocks across and 12 deep. Slopes, river widths, layer thicknesses and ore bodies are adjusted so
   they can be seen and used; each adjustment is a `game-choice` row.
 - **A small planet at Earth's rates.** Rates per area (impacts, deposits) are Earth's, applied to a
   planet with 1.5 % of Earth's surface. Lengths in the plate model are scaled to the planet; lengths
