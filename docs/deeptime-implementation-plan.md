@@ -2250,9 +2250,10 @@ community ports) are not opened for code.
   fields the stages already wrote. It writes nothing into `WorldState`, so the world files, the
   bake's `meta/province` (the settings that drive TerraBlender, §7.3) and the deposits are
   untouched; `deeptime provinces --in <checkpoint> --out x.png` draws one from a checkpoint.
-  The first rule that applies wins: **LIP** = a mafic volcanic pile (`plates/pool/mafic_volcanic_m`)
-  of at least a fifth of the recorded LIP thickness above the crust's own basalt (2 km on crust
-  with a gabbro lower crust); **oceanic crust** by `crust_age` (0–20, 20–65, over 65 Ma), a
+  The first rule that applies wins: **LIP** = the run's own flood basalts (`surface/lip_m`, the
+  strata log's layers of provenance `LIP_FLOW` that the volcano stage lays from the LIP events) of
+  at least a fifth of the recorded LIP thickness, on land or at sea (REV-2, 2026-10-19; until then
+  any mafic pile above the crust's own basalt, which counted about 0.3 of the planet); **oceanic crust** by `crust_age` (0–20, 20–65, over 65 Ma), a
   thickened island arc being an orogen; on continental crust **orogen** = active collision or arc,
   a collision (Himalayan) belt from the last 500 Myr, or an Andean range over 1.5 km lifted in the
   last 50 Myr (the plate model stamps Andean orogeny on every cell near a trench, so type and age
