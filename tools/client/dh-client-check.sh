@@ -25,6 +25,11 @@
 #
 # Output: smoke/<profile>/client-check.txt (the probe lines and the verdicts); exit 0 when the
 # client's requests reached the generator on both sides of the seam and the sections arrived.
+#
+# DHCC_CLIENT_JVM_ARGS: extra client JVM arguments, space-separated (a control run, e.g.
+# -Ddeeptime.dhGenerationGate=false). DHCC_CLIENT_DROP: a jar glob left out of the client's mods
+# (e.g. 'Chunky-*.jar'), the server keeps it. The client log's Distant Horizons facts are recorded:
+# its Chunky rule, Deep Time's generation gate, and whether its request module set a world gen queue.
 set -uo pipefail
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 cd "$(dirname "$0")/../.."
@@ -90,6 +95,11 @@ rcon "gamerule doDaylightCycle false" >/dev/null
 mkdir -p "$CL/game/mods"
 rm -f "$CL/game/mods/"*.jar
 cp "$SRV/mods/"*.jar "$CL/game/mods/"
+if [ -n "${DHCC_CLIENT_DROP:-}" ]; then
+    for j in "$CL/game/mods/"$DHCC_CLIENT_DROP; do [ -f "$j" ] && { rm -f "$j"; say "client leaves out $(basename "$j")"; }; done
+fi
+JVMX=(); for a in ${DHCC_CLIENT_JVM_ARGS:-}; do JVMX+=("--jvm-arg=$a"); done
+[ ${#JVMX[@]} -gt 0 ] && say "client JVM arguments: ${DHCC_CLIENT_JVM_ARGS}"
 # Distant Horizons' update check opens an "update available" screen at the title screen, which
 # holds the client there instead of joining (seen 2026-10-03 with 3.3.1: 3.3.3 is out).
 # Minecraft's first-launch accessibility screen holds it the same way; the options file skips it.
@@ -135,7 +145,7 @@ for attempt in 1 2 3; do
     start_xvfb
     say "== client joins 127.0.0.1:$GAME (attempt $attempt)"
     setsid "$PMC" --main-dir "$CL/pmc" start "neoforge::$NEO" --mc-dir "$CL/game" --jvm "$JAVA" \
-        --jvm-arg=-Xmx6G --jvm-arg=-XX:ActiveProcessorCount=6 \
+        --jvm-arg=-Xmx6G --jvm-arg=-XX:ActiveProcessorCount=6 "${JVMX[@]}" \
         -u DeepTimeProbe --resolution 1280x720 \
         --join-server 127.0.0.1 --join-server-port "$GAME" > "$CL/client-$attempt.log" 2>&1 < /dev/null &
     CPID=$!
@@ -166,7 +176,11 @@ rcon "tp DeepTimeProbe $X 300 0" >/dev/null
 sleep 300
 B="$(probe)"; say "probe after 5 min beside the seam: $B"
 
-# 4. Verdicts.
+# 4. Verdicts. First what the client's own log says about Distant Horizons' generator.
+CLOG="$CL/game/logs/latest.log"
+say "client log: DH's Chunky rule $(grep -a -c 'Partially Incompatible Distant Horizons mod detected: \[Chunky\]' "$CLOG" 2>/dev/null) line(s);" \
+    "Deep Time's gate: $(grep -a -o "\[deeptime\] Distant Horizons' world generator [a-z ]*" "$CLOG" 2>/dev/null | sort | uniq -c | tr -s ' ' | paste -sd ';' -)"
+say "client log: 'Set world gen queue' $(grep -a -c 'Set world gen queue for level' "$CLOG" 2>/dev/null) time(s) (DH's request module started)"
 s0=$(field "$J" sections); s1=$(field "$A" sections); s2=$(field "$B" sections); ext=$(field "$B" x_extent)
 say "sections asked by the client: at the spawn $(( s1 - s0 )), beside the seam $(( s2 - s1 )); x extent $ext (lap $(( -C / 2 ))..$(( C / 2 )))"
 DB=$(find "$CL/game" -path '*Distant_Horizons*' -name '*.sqlite*' -printf '%s %p\n' 2>/dev/null | sort -n | tail -3)
