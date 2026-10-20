@@ -732,8 +732,14 @@ impl SurfaceStage {
                 // The elevation moves with its own crust and takes the plate model's uplift
                 // (`advect::carried_elevation`); the offset is what stands over the plate model's
                 // elevation here.
-                let (carried, foreign) =
-                    advect::carried_elevation(&m.carry(world, &pf, &parents, (w, hgt), dt, blur_ref));
+                let (carried, foreign) = advect::carried_elevation(&m.carry(
+                    world,
+                    &pf,
+                    &parents,
+                    (w, hgt),
+                    dt,
+                    blur_ref,
+                ));
                 foreign_cells = foreign;
                 // Crust born this step starts bare.
                 m.newborn = pf
