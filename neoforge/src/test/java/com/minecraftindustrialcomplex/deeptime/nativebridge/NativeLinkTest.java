@@ -128,6 +128,53 @@ class NativeLinkTest {
         }
     }
 
+    /**
+     * The live map across JNI ({@code watchLive}, {@code copyLiveFrame}): while watched, frames of
+     * the asked-for layer at times between the keyframes, at the keyframes' size; none before it is
+     * asked for, and none kept as a keyframe. Steps of 300 ms, so the default pacing (at least
+     * 250 ms between frames) draws one after each step that draws no keyframe.
+     */
+    @Test
+    void liveFramesCrossTheBoundary() {
+        String world = "{\"dummy\":{\"steps\":8,\"sleep_ms\":300,\"stages\":[\"a\"],\"world\":{"
+                + "\"circumference\":1024,\"grid_r\":16,\"t_start_years\":-1.0e8,\"t_end_years\":0.0,"
+                + "\"keyframe_every_years\":2.5e7,\"keyframe_size\":[64,32],\"event_every_steps\":2,\"sites\":2}}}";
+        Path out = gameDir.resolve("live");
+        long id = DeepTimeNative.create(world, "", out.toString(), 2, 0);
+        try {
+            ByteBuffer rgba = ByteBuffer.allocateDirect(64 * 32 * 4);
+            assertEquals(0, DeepTimeNative.watchLive(id, null));
+            assertEquals("", DeepTimeNative.copyLiveFrame(id, rgba), "none before the first");
+            java.util.Set<Double> liveTimes = new java.util.TreeSet<>();
+            long seen = 0;
+            for (int i = 0; i < 100; i++) {
+                long seq = DeepTimeNative.watchLive(id, "elevation");
+                if (seq > seen) {
+                    String info = DeepTimeNative.copyLiveFrame(id, rgba);
+                    assertTrue(info.contains("\"layer\":\"elevation\"") && info.contains("\"w\":64"), info);
+                    assertEquals((byte) 255, rgba.get(3), "opaque first pixel");
+                    liveTimes.add(com.google.gson.JsonParser.parseString(info).getAsJsonObject().get("t").getAsDouble());
+                    seen = seq;
+                }
+                int st = DeepTimeNative.advance(id, 1);
+                if (st == DeepTimeNative.DONE)
+                    break;
+            }
+            assertTrue(liveTimes.size() >= 2, "live frames at " + liveTimes);
+            int count = DeepTimeNative.keyframeCount(id);
+            for (int n = 0; n < count; n++) {
+                double t = com.google.gson.JsonParser.parseString(DeepTimeNative.keyframeInfo(id, n)).getAsJsonObject().get("t").getAsDouble();
+                assertFalse(liveTimes.contains(t), "a live frame at keyframe " + n + "'s time");
+            }
+            assertThrows(IllegalArgumentException.class,
+                    () -> DeepTimeNative.copyLiveFrame(id, ByteBuffer.allocateDirect(16)), "short buffer");
+            assertThrows(IllegalArgumentException.class,
+                    () -> DeepTimeNative.copyLiveFrame(id, ByteBuffer.allocate(64 * 32 * 4)), "heap buffer");
+        } finally {
+            DeepTimeNative.destroy(id);
+        }
+    }
+
     private static int advanceUntilSettled(long id) {
         for (int i = 0; i < 1000; i++) {
             int st = DeepTimeNative.advance(id, 50);

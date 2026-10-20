@@ -29,6 +29,12 @@ import java.util.concurrent.Executor;
  * player scrubs back; scrubbing to the last frame follows again. After the run the player can
  * scrub freely and play the frames back.
  *
+ * <p><b>The live map.</b> While the view follows a running run, the map shows the session's live
+ * frame of the chosen layer whenever it is newer than the newest keyframe ({@code
+ * deeptime_core::live}: drawn between the keyframes a few times a minute, at most 2 % of the run's
+ * time). It is not a frame of the scrubber: {@link #index()}, {@link #current()}, the stop and the
+ * epoch stay on the keyframes; {@link #mapTime()} is the time of the picture on the map.
+ *
  * <p><b>Event cursor.</b> Events are shown up to the displayed frame's time (all of them while
  * following a live run); an event is "fresh" when it happened after the previous frame.
  */
@@ -96,6 +102,11 @@ public final class TimelapseModel {
     private long ringBytes;
     private Frame shown;
     private long version;
+    /** The newest live frame decoded, and whether one is being fetched: guarded by `ring`. */
+    private RunHandle.LiveFrame live;
+    private boolean liveLoading;
+    /** True while this model asks the run for live frames (render thread). */
+    private boolean watching;
 
     /**
      * @param stageNames the preset's stage names in order (from its estimate), for the progress line
@@ -198,6 +209,7 @@ public final class TimelapseModel {
         }
         if (follow && !frames.isEmpty())
             index = frames.size() - 1;
+        pollLive();
         if (state == State.RUNNING && run.completion().isDone()) {
             // Frames and events the worker collected before it finished arrive with the next poll too.
             try {
@@ -216,6 +228,74 @@ public final class TimelapseModel {
             }
         }
         requestDisplayed();
+    }
+
+    /**
+     * Renews the request for live frames of the shown layer while the view follows the run (and
+     * drops it once it does not), and fetches a newer live frame on {@code loader}.
+     */
+    private void pollLive() {
+        boolean want = following() && layer != null && !frames.isEmpty();
+        if (!want) {
+            if (watching) {
+                watching = false;
+                run.watchLive(null);
+            }
+            return;
+        }
+        watching = true;
+        long seq = run.watchLive(layer);
+        if (seq <= 0)
+            return;
+        synchronized (ring) {
+            if (liveLoading || (live != null && live.seq() >= seq))
+                return;
+            liveLoading = true;
+        }
+        KeyframeInfo like = frames.get(frames.size() - 1);
+        loader.execute(() -> {
+            RunHandle.LiveFrame f = null;
+            try {
+                f = run.liveFrame(like);
+            } catch (RuntimeException e) {
+                // no live frame this time: the keyframes stay on screen
+            }
+            synchronized (ring) {
+                liveLoading = false;
+                if (f != null && (live == null || f.seq() > live.seq()))
+                    live = f;
+            }
+        });
+    }
+
+    /**
+     * The live frame the map shows now, or null: while following a running run, the newest live
+     * frame of the chosen layer when it is newer than the newest keyframe.
+     */
+    private RunHandle.LiveFrame liveShown() {
+        if (!following() || layer == null || index < 0 || index != frames.size() - 1)
+            return null;
+        RunHandle.LiveFrame f;
+        synchronized (ring) {
+            f = live;
+        }
+        return f != null && f.layer().equals(layer) && f.info().t() > frames.get(index).t() ? f : null;
+    }
+
+    /** True while the map shows the live frame (the run is past the newest keyframe). */
+    public boolean showingLive() {
+        return liveShown() != null;
+    }
+
+    /**
+     * The time of the picture on the map: the live frame's while it shows, else the displayed
+     * keyframe's; empty before the first frame.
+     */
+    public java.util.OptionalDouble mapTime() {
+        RunHandle.LiveFrame f = liveShown();
+        if (f != null)
+            return java.util.OptionalDouble.of(f.info().t());
+        return index < 0 ? java.util.OptionalDouble.empty() : java.util.OptionalDouble.of(frames.get(index).t());
     }
 
     /** Cancels the run; its staging folder is deleted once it stopped. */
@@ -439,10 +519,19 @@ public final class TimelapseModel {
     }
 
     /**
-     * The frame to draw: the displayed frame once decoded, else the one drawn before (so the view
-     * never flashes empty while a frame loads); empty before the first frame is decoded.
+     * The frame to draw: the live frame while it shows ({@link #showingLive()}), else the displayed
+     * frame once decoded, else the one drawn before (so the view never flashes empty while a frame
+     * loads); empty before the first frame is decoded.
      */
     public Optional<Frame> displayed() {
+        RunHandle.LiveFrame lf = liveShown();
+        if (lf != null) {
+            if (shown == null || shown.abgr() != lf.abgr()) {
+                shown = new Frame(lf.info(), 0, lf.abgr());
+                version++;
+            }
+            return Optional.of(shown);
+        }
         if (index >= 0) {
             KeyframeInfo f = frames.get(index);
             Key k = new Key(index, layerIndex(f));

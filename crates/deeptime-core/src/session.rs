@@ -4,8 +4,8 @@
 //!
 //! Threading (plan §6.2): one caller steps a session (`advance`, `checkpoint` and
 //! `finalize_write` take the step mutex); `progress`, `cancel`, `keyframe_count`,
-//! `keyframe_info`, `copy_keyframe` and `events_since` never block on it (atomics, or short locks
-//! the stepping thread holds only to publish). Data-parallel work runs on the session's private
+//! `keyframe_info`, `copy_keyframe`, `watch_live`, `copy_live_frame` and `events_since` never
+//! block on it (atomics, or short locks the stepping thread holds only to publish). Data-parallel work runs on the session's private
 //! Rayon pool, which is dropped with the session. No thread here ever calls back into the JVM.
 //!
 //! Files: keyframes are written to `<out>/keyframes/` as they are produced; `finalize_write`
@@ -32,6 +32,7 @@ use crate::deposits::recorded::{Evicted, HistoryHandle};
 use crate::deposits::spill::SpillStore;
 use crate::error::CoreError;
 use crate::keyframes::{self, KeyframePolicy, KeyframeStore, RING_CAPACITY, ViewScale};
+use crate::live::{LiveFrame, LiveMap, LivePacing, LiveStats};
 use crate::log::{Level, LogRing};
 use crate::world::WorldState;
 
@@ -503,6 +504,8 @@ pub struct Session {
     /// The compute mode ([`Session::set_compute`]) and the log, also on every pool worker for
     /// the kernels that have no stage context (`compute::ambient`).
     ambient: Arc<crate::compute::Ambient>,
+    /// The Create World screen's live map between keyframes (`crate::live`).
+    live: LiveMap,
 }
 
 /// The share of the memory cap kept free after a step: the history is trimmed to
@@ -988,6 +991,7 @@ impl Session {
             resumed: None,
             overlap: AtomicBool::new(true),
             ambient,
+            live: LiveMap::new(),
         };
         session.log.push(
             Level::Info,
@@ -1218,6 +1222,9 @@ impl Session {
             // A stage's time includes publishing its events and drawing its keyframes (a group's
             // go to its last member that stepped).
             s.timings[last].millis += stepped.elapsed().as_secs_f64() * 1000.0;
+            // The live map, when the game watches and one is due (its time is its own,
+            // `live_stats`, so a run's stage times do not depend on whether anyone watched).
+            self.draw_live(s);
             if start.elapsed() >= budget {
                 return Ok(AdvanceStatus::Running);
             }
@@ -1539,6 +1546,45 @@ impl Session {
         Ok(())
     }
 
+    /// A live frame of the layer the game watches, if one is due (`crate::live`): drawn by the
+    /// keyframes' code from the world as it stands (a follower put off to the lead's next step,
+    /// P1-19, shows its previous step; nothing is settled for it), and never kept. Nothing here
+    /// writes to the world, so the run's results do not depend on it.
+    fn draw_live(&self, s: &Stepper) {
+        if !self.has_keyframes {
+            return;
+        }
+        let now = Instant::now();
+        let Some(layer) = self.live.due(now) else {
+            return;
+        };
+        if s.last_kf_t == Some((s.world.t_years, s.current)) {
+            self.live.stood_in(&layer, now);
+            return;
+        }
+        let group = s.group();
+        if !group_layers(&s.stages, &group).contains(&layer.as_str()) {
+            return;
+        }
+        let name = group_label(&s.stages, &group);
+        let size = self.live.pacing().size.unwrap_or(self.policy.size);
+        let world = &s.world;
+        let started = Instant::now();
+        let image = self.pool.install(|| {
+            keyframes::render(
+                world,
+                &self.ramps,
+                &self.view,
+                &name,
+                &[layer.as_str()],
+                0,
+                size,
+            )
+        });
+        let took = started.elapsed();
+        self.live.drawn(&layer, image, took, Instant::now());
+    }
+
     /// The bake wrote `rivers/rivers.dtrv` and the `water_level` layer: the last frame that shows
     /// the water (`satellite`, `rivers`) is drawn again from them, so the final map has exactly
     /// the rivers and lakes of the bake, not the ones derived from the frame's terrain. Without a
@@ -1617,6 +1663,19 @@ impl Session {
         }
         let last = group.end.max(index + 1) - 1;
         s.timings[last].millis += started.elapsed().as_secs_f64() * 1000.0;
+        let live = self.live.take_stage_stats();
+        if live.frames > 0 {
+            self.log.push(
+                Level::Info,
+                format!(
+                    "live map during {name}: {} frames, {:.0} ms each on average (longest {:.0} ms), {:.1} s in all",
+                    live.frames,
+                    live.millis / live.frames as f64,
+                    live.max_ms,
+                    live.millis / 1000.0
+                ),
+            );
+        }
         s.current = group.end.max(index + 1);
         if let Some(note) = self.history_note(&s.world) {
             let mib = |k: &str| note[k].as_f64().unwrap_or(0.0) / 1_048_576.0;
@@ -1729,6 +1788,34 @@ impl Session {
     pub fn copy_keyframe(&self, index: u32, layer: u32, dst: &mut [u8]) -> Result<(), CoreError> {
         self.require_keyframes("copyKeyframe (this preset produces no keyframes)")?;
         self.keyframes.copy(index, layer, dst)
+    }
+
+    /// `watchLive`: asks for live frames of `layer` (the layer the game's map shows while it
+    /// follows the run) for the next [`crate::live::LIVE_LEASE`]; `None` or `""` stops. Returns
+    /// the newest live frame's number (0: none yet). Never blocks on a step.
+    pub fn watch_live(&self, layer: Option<&str>) -> u64 {
+        self.live.watch(layer, Instant::now())
+    }
+
+    /// `copyLiveFrame`: the newest live frame as RGBA8 into `dst` (≥ w·h·4 bytes) and its JSON
+    /// `{"seq", "t", "stage", "layer", "w", "h"}`; `None` before the first. Never blocks on a step.
+    pub fn copy_live_frame(&self, dst: &mut [u8]) -> Result<Option<String>, CoreError> {
+        self.live.copy(dst)
+    }
+
+    /// The newest live frame, if one was drawn.
+    pub fn live_frame(&self) -> Option<Arc<LiveFrame>> {
+        self.live.latest()
+    }
+
+    /// When live frames are drawn ([`LivePacing::default`] unless set).
+    pub fn set_live_pacing(&self, pacing: LivePacing) {
+        self.live.set_pacing(pacing);
+    }
+
+    /// What the live frames cost so far.
+    pub fn live_stats(&self) -> LiveStats {
+        self.live.stats()
     }
 
     /// Events after `cursor` as a JSON array (`EVENTS.md`, "JSON"), at most `max`. The cursor
@@ -2672,6 +2759,65 @@ mod tests {
         )
         .unwrap();
         assert_eq!(s.advance(Duration::ZERO).unwrap(), AdvanceStatus::Done);
+    }
+
+    /// The live map (`crate::live`): frames of the watched layer, at the keyframes' size, at times
+    /// between the keyframes; none while nobody watches or for a layer the stage does not draw;
+    /// none kept as a keyframe.
+    #[test]
+    fn the_live_map_draws_the_watched_layer_between_keyframes() {
+        let dir = temp_dir("live");
+        let s = Session::create(DUMMY_WORLD, "", options(&dir), Arc::new(NoGauge)).unwrap();
+        s.set_live_pacing(LivePacing::EVERY_STEP);
+        // Unwatched, then a layer the dummy stages do not draw: nothing.
+        for _ in 0..3 {
+            s.advance(Duration::ZERO).unwrap();
+        }
+        s.watch_live(Some("no_such_layer"));
+        for _ in 0..3 {
+            s.advance(Duration::ZERO).unwrap();
+        }
+        assert!(s.live_frame().is_none());
+        assert_eq!(s.watch_live(Some("elevation")), 0);
+        let mut seen = Vec::new();
+        for _ in 0..10_000 {
+            s.watch_live(Some("elevation"));
+            let st = s.advance(Duration::ZERO).unwrap();
+            if let Some(f) = s.live_frame()
+                && seen.last().is_none_or(|&(seq, _)| seq != f.seq)
+            {
+                assert_eq!((f.w, f.h, f.layer.as_str()), (256, 128, "elevation"));
+                assert_eq!(f.rgba.len(), 256 * 128 * 4);
+                assert!(f.stage.starts_with("dummy_"), "{}", f.stage);
+                seen.push((f.seq, f.t));
+            }
+            if st == AdvanceStatus::Done {
+                break;
+            }
+        }
+        let kf: Vec<f64> = (0..s.keyframe_count())
+            .map(|n| {
+                serde_json::from_str::<Value>(&s.keyframe_info(n).unwrap()).unwrap()["t"]
+                    .as_f64()
+                    .unwrap()
+            })
+            .collect();
+        assert!(seen.len() >= 10, "live frames {seen:?}");
+        assert!(
+            seen.iter().all(|(_, t)| !kf.contains(t)),
+            "a step that drew a keyframe draws no live frame: live {seen:?}, keyframes {kf:?}"
+        );
+        assert_eq!(s.live_stats().frames, seen.len() as u64);
+        // Stopped watching: no more.
+        let last = s.watch_live(None);
+        assert_eq!(last, seen.last().unwrap().0);
+        let mut buf = vec![0u8; 256 * 128 * 4];
+        let info: Value =
+            serde_json::from_str(&s.copy_live_frame(&mut buf).unwrap().unwrap()).unwrap();
+        assert_eq!(info["seq"], last);
+        assert_eq!(info["layer"], "elevation");
+        assert_eq!(buf[3], 255, "opaque");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

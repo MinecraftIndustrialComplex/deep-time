@@ -48,7 +48,7 @@ public final class FarSurface {
             ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "deeptime/far_terrain/surface.json");
     private static final String JAR_RESOURCE = "data/deeptime/deeptime/far_terrain/surface.json";
 
-    /** What one biome's columns show. {@code lakeBed} is {@code top} as it is under a lake (grass becomes dirt). */
+    /** What one biome's columns show. {@code lakeBed} is {@code top} as it is under a lake (grass becomes dirt), and the sea bed in vanilla's shallow band (BAK-050); {@code seaBed} is the sea bed below it. */
     public record Choice(BlockState top, BlockState under, int depth, BlockState seaBed, BlockState lakeBed, boolean bare) {}
 
     private record Rule(List<ResourceLocation> ids, List<TagKey<Biome>> tags, BlockState top, BlockState under, Integer depth,

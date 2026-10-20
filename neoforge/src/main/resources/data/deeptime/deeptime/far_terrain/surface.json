@@ -62,7 +62,7 @@
       "sea_bed": "minecraft:sand"
     },
     {
-      "_comment": "Vanilla's rule: a lukewarm floor under water is sand, dry it is grass (dirt under a lake).",
+      "_comment": "Vanilla's rule: a lukewarm floor under water is sand below its shallow band and dirt in it (far terrain draws the lake bed there, BAK-050), dry it is grass (dirt under a lake).",
       "biomes": ["minecraft:lukewarm_ocean", "minecraft:deep_lukewarm_ocean"],
       "sea_bed": "minecraft:sand"
     },

@@ -54,6 +54,80 @@ class TimelapseModelTest {
         assertEquals(0, m.index());
     }
 
+    /**
+     * The live map: while following a running run, the newest live frame of the shown layer is on
+     * the map when it is newer than the newest keyframe; the scrubber, the stop and the epoch stay on
+     * the keyframes. Scrubbed back, another layer, an older live frame or a finished run: keyframes.
+     */
+    @Test
+    void showsTheLiveFrameBetweenKeyframesWhileFollowing() {
+        TimelapseModel m = model(Runnable::run);
+        m.poll();
+        assertTrue(run.watchCalls.isEmpty(), "no frame yet: nothing to watch for");
+        run.frame(-4e8, 8, 4, "satellite", "elevation");
+        run.frame(-3.5e8, 8, 4, "satellite", "elevation");
+        m.poll();
+        assertEquals("satellite", run.watched, "the shown layer is watched");
+        assertFalse(m.showingLive());
+        assertEquals(-3.5e8, m.mapTime().orElseThrow());
+        assertEquals(1, m.displayed().orElseThrow().info().n());
+
+        run.live(1, -3.4e8, 8, 4, "satellite");
+        m.poll();
+        assertTrue(m.showingLive());
+        TimelapseModel.Frame f = m.displayed().orElseThrow();
+        assertEquals(-1, f.info().n(), "the live frame");
+        assertEquals(0xff000001, f.abgr()[0]);
+        assertEquals(-3.4e8, m.mapTime().orElseThrow());
+        assertEquals(1, m.index(), "the scrubber stays on the newest keyframe");
+        assertEquals(-3.5e8, m.current().orElseThrow().t(), "and so does the stop");
+        long v = m.displayVersion();
+        m.poll();
+        assertEquals(v, m.displayVersion(), "the same live frame: no new upload");
+        assertEquals(1, run.liveReads.get(), "fetched once");
+
+        run.live(2, -3.3e8, 8, 4, "satellite");
+        m.poll();
+        assertEquals(0xff000002, m.displayed().orElseThrow().abgr()[0], "a newer live frame replaces it");
+        assertTrue(m.displayVersion() > v);
+
+        // A keyframe newer than the live frame takes over.
+        run.frame(-3.0e8, 8, 4, "satellite", "elevation");
+        m.poll();
+        assertFalse(m.showingLive());
+        assertEquals(2, m.displayed().orElseThrow().info().n());
+
+        // Another layer: watched, and a live frame of the old one is not shown.
+        run.live(3, -2.9e8, 8, 4, "satellite");
+        m.setLayer("elevation");
+        m.poll();
+        assertEquals("elevation", run.watched);
+        assertFalse(m.showingLive());
+        run.live(4, -2.8e8, 8, 4, "elevation");
+        m.poll();
+        assertTrue(m.showingLive());
+
+        // Scrubbed back: keyframes only, and the request is dropped.
+        m.scrubTo(0);
+        m.poll();
+        assertFalse(m.showingLive());
+        assertEquals(null, run.watched);
+        assertEquals(-4e8, m.mapTime().orElseThrow());
+        assertEquals(0, m.displayed().orElseThrow().info().n());
+        m.scrubTo(2);
+        m.poll();
+        assertTrue(m.showingLive(), "back at the newest end: live again");
+        assertEquals("elevation", run.watched);
+
+        // The run ends: keyframes only.
+        run.completion.complete("{}");
+        m.poll();
+        assertFalse(m.showingLive());
+        assertEquals(2, m.displayed().orElseThrow().info().n());
+        m.poll();
+        assertEquals(null, run.watched, "no more requests");
+    }
+
     @Test
     void eventCursorAndFreshness() {
         TimelapseModel m = model(Runnable::run);
