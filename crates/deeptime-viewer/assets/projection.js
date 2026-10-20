@@ -199,6 +199,9 @@
   // ---- Petroff ---------------------------------------------------------------------------------
   const sign = x => x > 0.0 ? 1.0 : (x < 0.0 ? -1.0 : 0.0);
   const sqrt0 = x => x > 0.0 ? Math.sqrt(x) : 0.0;
+  // The forward's switch to the coordinate form of its last step, in local units (the Rust twin's
+  // NEAR_SIDE: a numerical switch, not a physical value; ledger: SCL-083).
+  const NEAR_SIDE = 1e-6;
   function Petroff() {
     const phi0 = 3.0 * PI / 8.0;
     const sinPhi0 = sin(phi0), cosPhi0 = cos(phi0);
@@ -257,14 +260,23 @@
       const xpxpyp = den > 0.0 ? sqrt0((1.0 - cos(x)) / den) : 0.0;
       const up = ap * upupvp;
       const xpyp = sqrt0(up * up + cp * cp - 2.0 * up * cp * cos(gp));
-      let cosGammap;
-      if (xpyp > 0.0) { const q = up * sin(gp) / xpyp; cosGammap = sqrt0(1.0 - q * q); } else cosGammap = 1.0;
       const xp = xpyp * xpxpyp;
       const yp = xpyp - xp;
-      const rp = sqrt0(xp * xp + cp * cp - 2.0 * xp * cp * cosGammap);
-      let alphap;
-      if (up * rp <= 0.0) alphap = xip - PI / 6.0;
-      else { const q = (yp * yp - up * up - rp * rp) / (-2.0 * up * rp); alphap = q < 1.0 ? acos(q) : 0.0; }
+      let rp, alphap;
+      if (up <= NEAR_SIDE || yp <= NEAR_SIDE) {
+        // P′ on a side of the planar triangle: place it by coordinates (see the Rust twin).
+        const cx = cp * cos(gp), cy = cp * sin(gp);
+        const px = cx + xpxpyp * (up - cx);
+        const py = cy - xpxpyp * cy;
+        rp = Math.sqrt(px * px + py * py);
+        alphap = atan2(py, px);
+      } else {
+        let cosGammap;
+        if (xpyp > 0.0) { const q = up * sin(gp) / xpyp; cosGammap = sqrt0(1.0 - q * q); } else cosGammap = 1.0;
+        rp = sqrt0(xp * xp + cp * cp - 2.0 * xp * cp * cosGammap);
+        if (up * rp <= 0.0) alphap = xip - PI / 6.0;
+        else { const q = (yp * yp - up * up - rp * rp) / (-2.0 * up * rp); alphap = q < 1.0 ? acos(q) : 0.0; }
+      }
       const thetap = s === 0 ? alphap
         : (s === 1 ? PI - (xip - PI / 6.0) - alphap : PI - (xip - PI / 6.0) + alphap);
       const side = dl < 0.0 ? -1.0 : 1.0;
