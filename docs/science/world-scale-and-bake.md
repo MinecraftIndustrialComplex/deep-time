@@ -16,7 +16,7 @@ A Deep Time planet is small. Its circumference is 16,384 or 32,768 blocks, and o
 | [BAK](ledger/BAK.md) | spawn placement | BAK-014 to BAK-016 (3) |
 | [BAK](ledger/BAK.md) | satellite view | BAK-017 to BAK-032 (16) |
 | [BAK](ledger/BAK.md) | synthetic worlds | BAK-033 to BAK-038 (6) |
-| [BAK](ledger/BAK.md) | far terrain | BAK-039 to BAK-042, BAK-048 (5) |
+| [BAK](ledger/BAK.md) | far terrain | BAK-039 to BAK-042, BAK-048, BAK-050 (6) |
 | [BAK](ledger/BAK.md) | Distant Horizons curvature | BAK-043 to BAK-047 (5) |
 
 Rows by status: `verified` 2, `cited-unverified` 6, `calibrated` 2, `game-choice` 77, `uncited` 12.
@@ -150,8 +150,8 @@ carries plutonic rock to the world's floor where a pluton's layer is the lowest 
 ## Distant Horizons far terrain and Toroidal World's seam
 
 Far terrain (P3-04) gives Distant Horizons its distant LODs from the baked world data instead of
-from chunks generated far away. Nothing physical is decided here; the rows (BAK-039 to BAK-042
-and BAK-048) are game choices about how far terrain stays the same terrain as the chunks.
+from chunks generated far away. Nothing physical is decided here; the rows (BAK-039 to BAK-042,
+BAK-048 and BAK-050) are game choices about how far terrain stays the same terrain as the chunks.
 
 - **The seam.** Every far column folds x into the planet's lap [-C/2, C/2), the period at which
   the world data wraps and at which Toroidal World loops the level, so a section west of x = C/2,
@@ -179,14 +179,25 @@ and BAK-048) are game choices about how far terrain stays the same terrain as th
   beds at the coast; run on lake beds too, it left none, and 126 of 128 columns a side had the same
   top block. The table follows vanilla's rule where it can (since 2026-10-18 a lukewarm ocean's dry
   ground is grass, as vanilla paints it, and its floor under water sand; only a warm ocean's dry
-  ground is sand). What it cannot say stays a difference: on the same planet 8 of 128 columns west
-  of the seam and 16 east (standalone) were dirt where far terrain drew sand, lukewarm sea floors 3
-  to 7 blocks under the water at the coast. Vanilla's rule makes such a floor sand when the water
-  is over it and grass when it is dry; near land the noise aquifer sets its own water level and had
-  left these dry when the rule ran, and the water pass then filled the sea to its top and turned the
-  grass to dirt. Where the aquifer leaves a floor dry it decides from the chunk's noise (the
-  preliminary surface of the chunks around it), so far terrain cannot run it, and only a floor on
-  the top block's agreement is asserted.
+  ground is sand). On the same planet 8 of 128 columns west of the seam and 16 east (standalone)
+  were dirt where far terrain drew sand, lukewarm sea floors 3 to 7 blocks under the water at the
+  coast. That was put down to the noise aquifer leaving them dry when the rule ran, but vanilla's
+  rule paints them dirt with the water over them too (BAK-050, read in its 1.21.1 source,
+  `SurfaceRuleData.overworldLike`): a floor whose water starts at most 6 + surface depth blocks
+  above it (`waterStartCheck(-6, -1)`, `UNDER_FLOOR`) takes the rule vanilla paints under a dry
+  floor's top, dirt in an ocean or a lukewarm ocean, and only a deeper floor reaches the sea-bed
+  rule, sand in a lukewarm ocean and gravel in most others. Painted dry, the floor is grass, which
+  the water pass turns to dirt, so in vanilla's rule the aquifer changes nothing there. Since
+  2026-10-20 far terrain runs those two conditions in the game's code on the column's own surface
+  depth and draws the table's lake bed (the dry top as water leaves it) inside the band and its sea
+  bed below. The planet of 2026-10-20 (PLT-293) put the seam in a shallow lukewarm sea and the test
+  failed on it before the change: 76 of 108 columns east of the seam dirt near and sand far
+  (standalone), 47 dirt, 14 clay and 7 gravel with MIC. With the band drawn, 112 of 112 columns west
+  and 110 of 112 east have the same top block before features (standalone) and 92 of 112 and 77 of
+  108 with MIC, where Terralith's rule paints gravel, clay and sand under shallow water from noise
+  past `above_preliminary_surface`. After features vanilla's sand, clay and gravel disks cover part
+  of those dirt floors (83 and 55 of 112 the same, logged only): they are features, which far
+  terrain does not draw. Only a floor on the top block's agreement is asserted.
 - **Toroidal World's guard** (Ben, 2026-10-02: "Mixin around TW's guard"). TW 0.19.3 (MIT) refuses
   every Distant Horizons world generator but DH's own on a level it wraps, from DH 3.3.1 on: TW
   makes the seam seamless by reshaping the level's chunk generator and folding DH's section keys,
