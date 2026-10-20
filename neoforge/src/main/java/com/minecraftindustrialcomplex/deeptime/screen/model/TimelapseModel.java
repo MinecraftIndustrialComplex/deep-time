@@ -501,7 +501,28 @@ public final class TimelapseModel {
         return out;
     }
 
-    /** True when {@code e} happened after the previous frame (drawn larger, highlighted in the ticker). */
+    /** True when time {@code t} lies after the previous frame (a History row that is new with this frame). */
+    public boolean freshAt(double t) {
+        return t > previousTime();
+    }
+
+    /** The run's length in years ({@code timeline.length_myr}), NaN when the preset has none. */
+    public double lengthYears() {
+        if (Double.isNaN(lengthYears)) {
+            try {
+                lengthYears = com.minecraftindustrialcomplex.deeptime.preset.Presets.info(
+                                com.minecraftindustrialcomplex.deeptime.preset.Presets.parseObject(presetJson))
+                        .timeline().map(t -> t.lengthMyr() * 1e6).orElse(Double.POSITIVE_INFINITY);
+            } catch (RuntimeException e) {
+                lengthYears = Double.POSITIVE_INFINITY;
+            }
+        }
+        return Double.isInfinite(lengthYears) ? Double.NaN : lengthYears;
+    }
+
+    private double lengthYears = Double.NaN;
+
+    /** True when {@code e} happened after the previous frame (drawn larger, highlighted in the History). */
     public boolean fresh(GeoEvent e) {
         return e.tStart() > previousTime();
     }

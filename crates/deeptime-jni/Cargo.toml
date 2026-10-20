@@ -23,3 +23,9 @@ serde_json.workspace = true
 # Metal links Apple's frameworks (Metal, QuartzCore, Foundation) at build time.
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 deeptime-core = { workspace = true, features = ["gpu"] }
+
+[features]
+# mimalloc under the counting allocator (deeptime_core::alloc).
+# Thread-local storage for a library the JVM loads with dlopen (initial-exec TLS needs static TLS
+# space, which a library loaded late may not get).
+mimalloc = ["deeptime-core/mimalloc-dyn-tls"]
