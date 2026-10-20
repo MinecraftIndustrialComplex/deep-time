@@ -142,18 +142,25 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   - `tools/client/dh-client-check.sh` gained:
     - `DHCC_CLIENT_JVM_ARGS` and `DHCC_CLIENT_DROP`;
     - the client log's DH facts (the Chunky line, the gate's line, "Set world gen queue");
-    - an empty client DH database on every run (below).
+    - empty client and server DH databases on every run (below).
 - **Measured** (`tools/client/dh-client-check.sh dh` on the VM; the `dh` set on synth wrap-test, C = 16384; DH 3.3.1 on both sides; Chunky on the server in every run):
   - A, gate on, Chunky on the client: "Set world gen queue" once; 333 sections asked at the spawn and 1,580 beside the seam; 1,627 far sections in the client's database (west of the seam 336, east 358). PASS.
   - C (the control), gate off, Chunky on the client: the Chunky line, no "Set world gen queue", 0 sections asked at either place. FAIL.
   - D, gate off, Chunky removed from the client: "Set world gen queue" once; 1,907 and 5,326 asked. PASS. A client without Chunky joins a server that has it (Chunky registers no network payload).
   - C's and D's database counts are void (44,043 sections in both). The client kept A's database, and C's client built new rows from it between 07:29 and 07:32. Its only traffic was sync-on-login for sections it already held, and the server's generator ran 0 times. Now each run starts with an empty client database (fd9d092b).
-  - CLEAN_RERUN_PLACEHOLDER
+  - Reruns on the head's jar (2c46153f code), each with an empty client database:
+    - C2, gate off: the Chunky line, no "Set world gen queue", 0 sections asked, 0 sections in the client's database. The control: a client that holds nothing gets nothing, even from a server whose database is full.
+    - A2, gate on: the gate's line at the join (08:23:45, 5 s after DH bound), "Set world gen queue" once, 24,126 far sections in the client's database (3,916 and 3,970 in the 2,048 blocks either side of the seam).
+    - A2's verdict was FAIL only because the server's generator ran 5 times. The set's world is linked into every run, so the server answered from its own DH database, which the earlier runs had filled. The check now clears that database too (a4f69890).
+    - A3, gate on, both databases empty (a4f69890 check, head's jar): the gate's line, "Set world gen queue" once; 804 sections asked at the spawn and 1,508 beside the seam; 2,462 far sections in the client's database (812 west of the seam, 902 east). PASS.
+- **Also on 2026-10-20:**
+  - Ben's Minecraft was closed (no non-Gradle java), so Chunky was disabled in his Prism instance (`mods/Chunky-NeoForge-1.4.23.jar` renamed to `.jar.disabled`, which is what Prism's untick does); that is run D. To undo, tick it again in Prism. `play-client-apply.py` also brings it back.
+  - A trap: `mac.sh` classifies a command by its text. A quick `grep` that named `tools/client/dh-client-check.sh` queued as `client:dh` and, after 15 minutes, held up the whole admission queue until it was killed. Read results with plain `ssh` instead.
 - **Gates** (VM):
   - fmt and clippy ok; cargo test 997 passed, 0 failed, 5 ignored; deny: bans ok, licenses ok (at a8513385; no Rust has changed since).
   - `./gradlew build test` at 2c46153f: BUILD SUCCESSFUL, 373 tests, 0 failures, 2 skipped. `DhGenerationGateTest` 7; `DhApiBindingTest` 6, which lifts and restores the setting through the real 3.3.1 and 3.3.3 jars.
 - **For Ben tonight, before the merge:**
-  - With Minecraft closed, untick Chunky in Prism (Edit instance, Mods), then relaunch and join. That is run D.
+  - Chunky is already disabled in his instance (above): he relaunches and joins. That is run D.
   - A later `play-client-apply.py` puts Chunky back, by which time the new jar does the lift.
   - An optional server-side `dh pregen` around him (the coordinator's RCON commands) only makes the first answers faster. Sync-on-login refreshes only sections a client already holds, so a reconnect alone delivers nothing new.
 - **Next.**
