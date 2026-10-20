@@ -17,10 +17,10 @@ use crate::detail::{DetailSpec, Noise};
 use crate::error::{FormatError, Result};
 use crate::lazy::LazyLayer;
 use crate::manifest::Manifest;
+use crate::projection::IndexFrame;
 use crate::raster::{DType, RasterRead};
 use crate::rivers::{Rivers, read_rivers};
 use crate::sites::{Site, SiteIndex, read_sites};
-use crate::projection::IndexFrame;
 use crate::strata::ColumnHorizon;
 use crate::structure::{DeformScratch, Deformer, Shape as EventShape, StructIndex, Structure};
 use crate::water::{self, WaterColumn, WaterSource, WaterSpec};
@@ -805,7 +805,10 @@ mod tests {
         let fold = &events[1];
         assert_eq!(fold["kind"], "fold");
         assert!(fold["weight"].as_f64().unwrap() > 0.0);
-        assert_eq!(fold["changed"], false, "older than every unit of the column");
+        assert_eq!(
+            fold["changed"], false,
+            "older than every unit of the column"
+        );
         // Unchecked, `changed` is null.
         let (events, _) = events_at(&d, 4096, 0, 0, -64, &classes, false, &mut stack);
         assert!(events.iter().all(|e| e["changed"].is_null()));

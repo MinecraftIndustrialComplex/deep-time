@@ -180,7 +180,15 @@ impl Section {
             if let Some(id) = e["id"].as_u64() {
                 seen.entry(id).or_insert_with(|| {
                     let mut v = json!({});
-                    for k in ["id", "kind", "t_years", "key", "class", "wavelength", "amplitude"] {
+                    for k in [
+                        "id",
+                        "kind",
+                        "t_years",
+                        "key",
+                        "class",
+                        "wavelength",
+                        "amplitude",
+                    ] {
                         if let Some(x) = e.get(k) {
                             v[k] = x.clone();
                         }
@@ -207,11 +215,7 @@ impl Section {
     pub fn columns_json(&self, units: &[(u16, u8)]) -> Value {
         let cols = &self.columns;
         let class = |k: u16| if k == NONE { -1 } else { i64::from(k) };
-        let unit = |h: &ColumnHorizon| {
-            units
-                .binary_search(&(h.2, h.1))
-                .map_or(-1, |i| i as i64)
-        };
+        let unit = |h: &ColumnHorizon| units.binary_search(&(h.2, h.1)).map_or(-1, |i| i as i64);
         json!({
             "x": cols.iter().map(|c| c.x).collect::<Vec<_>>(),
             "z": cols.iter().map(|c| c.z).collect::<Vec<_>>(),
