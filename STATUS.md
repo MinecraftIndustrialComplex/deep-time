@@ -126,6 +126,88 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-19: The present-day nudge's cap: the 1000 Myr hothouse ends (10,011 ppm on master) were the temperate nudge multiplying the natural CO2 by up to x12.6, not the carbon cycle; a temperate present now raises CO2 by at most x1.75, and full 16k's 1000 Myr ends fall from a median 8,867 to 1,510 ppm (24.7 to 18.5 degC); the Köppen floors are tested by a 99 % Wilson bound (coordinator's task; agent worktree agent-ae6030c66af57f107, branch worktree-agent-ae6030c66af57f107 from master 26ce664e; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **The cause.**
+  - The end CO2 is the temperate present's factor times the natural CO2 (CLM-148 to CLM-151):
+    - master 26ce664e, `earthlike_full_16k`, 1000 Myr, scattered start, seeds 1 to 4: factor 6.86, 1.58, 9.73 and 12.65 on natural 1,460, 315, 794 and 932 ppm;
+    - seed 1's 10,011 ppm is the GPU agent's CPU run.
+  - The carbon cycle holds:
+    - weathering equals degassing within 0.2 % at every 100 Myr point before the last step;
+    - the natural CO2 falls from 3,800 to 4,600 ppm at -998 Myr (fainter sun) to 360 to 960 ppm at -100 Myr;
+    - T stays 9 to 16 degC throughout;
+    - over the last 500 Myr the natural CO2 is 267 to 3,209 ppm, inside the Phanerozoic's 1 to 25 PAL. It leaves that range only through the nudge, in the last 100 kyr.
+  - The nudge needed so much because of the ice sheets on high ground:
+    - land above 2 km grows from 0 to 0.20 to 0.41 of the land;
+    - 0.68 to 0.88 of the land above 3 km is under sheets in the natural end;
+    - x1.75 clears 5 to 14 % of it (`sheets_by_height`, new).
+  - A bisect of the merges 25ae6723..26ce664e (quick, 500 Myr, scattered, seeds 1 and 2):
+    - the worlds change only at 32589362, fb38204f and 7d60fc4a;
+    - each moves the factor, and none moves the natural CO2 out of the spread between seeds.
+    - The old master had the same hothouse on other seeds: scattered seed 4 x5.27, 7,832 ppm.
+  - The land share (0.12 to 0.23) and the high ground are the plates' output; the climate takes them as given.
+- **The fix.** `climate.present_co2_factor_max` = 1.75 (CLM-206), from Lüthi et al. 2008's 172 to 300 ppmv (abstract read on OSTI).
+  - It applies to temperate only, and is set in the default and the eight earthlike and pipeline presets.
+  - A present that needs more ends at the cap with `reached` false.
+  - `ice_age` and `snowball` are unlimited.
+  - The search is now a pure function, `present_search`; the bracket below the cap is unchanged, and the cap is its last step.
+  - With the cap at 10,000 the runs equal master's to every printed digit.
+  - The note gains `co2_factor_max`, `trial_rows` (every trial's factor, sheets, land ice, sea ice and T) and `sheets_by_height` / `sheets_by_latitude`.
+  - Tests:
+    - new `the_present_search_stops_at_its_cap` (pure: no cap, the cap, inside the cap, cap 0, cooling, a trivial target);
+    - `the_present_climate_setting_governs_only_the_present` extended with the new fields.
+- **Measured** (VM, `tools/review/co2-driver.sh 3 <tasks>` driving `tools/review/co2-ensemble.sh`, read with `tools/review/co2-table.py`; median [min, max]):
+
+  | | runs | end CO2, ppm | factor | natural CO2 | T, degC | land | above 2 km | under sheets | reached |
+  |---|---|---|---|---|---|---|---|---|---|
+  | old master 25ae6723, quick 500 Myr | 8 | 881 [477, 7,832] | 1.46 [1.00, 5.27] | 653 | 17.2 [14.8, 23.7] | 0.189 | 0.254 | 0.148 | 8 |
+  | master 26ce664e, quick 500 Myr | 8 | 2,030 [474, 15,463] | 1.67 [1.00, 8.91] | 1,019 | 19.2 [15.6, 28.2] | 0.180 | 0.274 | 0.148 | 8 |
+  | fixed, quick 500 Myr | 8 | 1,764 [474, 3,036] | 1.66 [1.00, 1.75] | 1,019 | 18.7 [15.6, 21.4] | 0.180 | 0.274 | 0.150 [0.117, 0.257] | 5 |
+  | master 26ce664e, full 1000 Myr | 4 | 8,867 [498, 11,790] | 8.29 [1.58, 12.65] | 863 | 24.7 [16.0, 25.9] | 0.206 | 0.333 | 0.148 | 4 |
+  | fixed, full 1000 Myr | 4 | 1,510 [502, 2,556] | 1.75 [1.60, 1.75] | 863 | 18.5 [16.0, 19.3] | 0.212 | 0.329 | 0.248 [0.150, 0.288] | 1 |
+
+  - The quick runs are `earthlike_quick_16k`, 2 threads, seeds 1 to 4, both starts. The full runs are `earthlike_full_16k`, 8 threads, scattered start, seeds 1 to 4.
+  - The fixed runs' clock series equal master's at every 100 Myr point.
+  - The fixed 1000 Myr ends are 1.8 to 9.1 PAL. Master's were 1.8 to 42, three of the four above the Phanerozoic's 25.
+  - The quick scattered seed 1 at 4 threads equals its 2-thread run.
+  - The test planet (`planet_world_4k`, seeds 11 to 14, on 26ce664e) has factor 1.00 with and without the cap.
+  - The GPU agent's 100 Myr runs (seeds 6 to 15, CPU and GPU) all have factor 1.000; its 1000 Myr GPU arm ends at 12,600 ppm (x9.73) against the CPU's 10,011 (x6.86), the factor's sensitivity to last bits that the cap now bounds.
+- **The Köppen floors.**
+  - The MIC `climateConsistent` failure (C 0.621 < 0.630 on 132 columns) is census noise: the standard error is 0.042, and the test planet's climate does not change with the fix.
+  - A family now fails only when its share's one-sided 99 % Wilson upper bound is under its floor (`ShareBound`, z = 2.326, BIO-072). The floors are unchanged.
+  - 0.621 on 132 columns has a bound of 0.713 and passes. A broken mapping at 0.3 still fails: 0.484 on 40 columns, 0.402 on 132.
+  - New `ShareBoundTest`.
+- **The independent review of Ben's laptop run** (quick, supercontinent, 1000 Myr, seed 1, 025676c8):
+  - Its last-step jump, 577 to 3,347 ppm, is this nudge: `co2_factor` 5.75, sheets 0.230 to 0.149. The cap holds it to at most 1,010 ppm.
+  - Its land ice from -760 Myr on, and the tropical ice at 4.1 km and -9 degC, are the natural climate, which the cap does not change.
+  - Candidates, not checked: the glaciers' extent rule (`glaciers.rs`), which glaciates any summer below -2.4 degC however dry; the high ground.
+- **Commands.**
+  - VM through `tools/remote/mac.sh -- tools/remote/detach.sh start <job> ...`:
+    - `tools/review/co2-bisect.sh`;
+    - `tools/review/co2-driver.sh 3 /data/ban/deeptime-runs/co2-hothouse/co2-tasks.txt`;
+    - `tools/review/fb-gates.sh rust`, then `tools/review/fb-gates.sh gradle`.
+  - Laptop, niced: `tools/review/claims_counts.py --write`.
+- **Gates.**
+  - fmt clean; clippy -D warnings clean; deny: bans ok, licenses ok.
+  - cargo test --workspace --no-fail-fast: 29 binaries, 995 passed, 0 failed, 5 ignored.
+  - `./gradlew build test`: 365 tests, 0 failures, 2 skipped.
+  - Again after merging master be17a7cf (conflicts only in the two logs): fmt, clippy and deny clean; cargo test 997 passed, 0 failed, 5 ignored; Gradle 365 tests, 0 failures, 2 skipped.
+  - No GameTest was run (the coordinator's batch).
+- **Science.**
+  - climate.md: "The present-day nudge's cap" and the ledger-ids table.
+  - biomes.md: "The floors against the census's noise".
+  - Ledger rows: CLM-151 (rewritten, now `game-choice`), CLM-206 (new; `verified` for the range), BIO-072.
+  - bibliography.md: Luthi2008, Wilson1927.
+  - claims.md recounted. Decisions log: two rows (the coordinator's calls).
+- **Choices** (the coordinator's calls, undoable):
+  - the cap at x1.75, temperate only, ending not reached;
+  - the Wilson bound at 99 % rather than 95 % (about 65 comparisons a batch);
+  - the cap as the bracket's last step.
+- **Known issue.** The natural planet is warm and icy at once:
+  - its natural CO2 at 1000 Myr is 1.1 to 5.2 PAL, and three of the four runs have 0.27 to 0.33 of the land under sheets on high ground;
+  - it ends with 0.24 to 0.29 of the land under sheets where the cap stops the nudge (Earth 0.10).
+  - The high ground and the small land share are for the plates (P4 relief); the dry-ice extent rule is for the climate.
+- **Next.** The coordinator merges this branch and runs the GameTest batch (`climateConsistent` with the bound). The scratch runs in `/data/ban/deeptime-runs/co2-hothouse/` can go when it lands.
+
 ### 2026-10-19: The GameTest planet had no active volcano because its 5,000-sample lattice is coarser than the arc band: no sample ever took the ARC flag. Each slab strip now flags its sample nearest the arc axis (PLT-043), the volcano stage is blind exactly at resamplings (VOL-011), and the volcano GameTests log what their filters leave and fail on a planet without volcanoes (coordinator's task; agent worktree agent-ac360b78dda6ccbf4, branch worktree-agent-ac360b78dda6ccbf4 from master dc9396ee, masters 26ce664e and 3e7edd49 merged; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Counts.** `deeptime run --preset tests/presets/planet_world_4k.json --threads 8` on the VM (scratch scripts under build/vz/, outputs in /data/ban/deeptime-runs/volcano-zero/, deleted after), active volcanoes in `volcanoes/active.json`: master 025676c8 0 in each of 6 runs (no arc flag ever set; 25 shields born, none alive at the end); fb38204f (before the solvers merge, the same code as 0b7eae42) 4 shields in each of 6 runs, arc flags 0; master 26ce664e with the old solvers (`surface.numerics.diffusion_solver=jacobi`, `flood=serial`) 4 shields again; master at `resolution.l0_samples=20000` 21 (19 arc, 2 shields). The arc rule alone, seeds 11 to 16: 6, 12, 8, 11, 9, 7. Both changes, seeds 11 to 16: 6 (3 arc / 3 shields), 12 (9/3), 5 (3/2), 11 (10/1), 9 (9/0), 6 (5/1). `earthlike_quick_16k` (100,000 samples), scattered continents, 150 Myr, seed 1: 49 (48/1) on master and on the branch, every volcano count the same (neither change fires there). Runs at a fixed thread count are identical.
 - **Cause.** The arc band (weight above 0.3) is d 134 to 266 km behind the slab front, 132 km wide; 5,000 samples on the plate model's Earth-radius sphere are about 320 km apart, so the distance field's first ring lies beyond it. Master's 4 to 0 is hotspot shields, not arcs: the solvers merge changed the surface and with it which hotspot volcanoes stood at the end (the old solvers on master give the 4 back). The volcano stage's old blind-step rule (a fifth of the last valid step's arc cells) also blinded real steps once the arcs existed, since its reference moved only on valid steps (24 blind of 75 steps on seed 16, 9 of them resamplings).
