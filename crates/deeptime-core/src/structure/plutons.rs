@@ -526,6 +526,104 @@ pub fn cover_m(units: &[columns::Unit], key: u16) -> f64 {
     top
 }
 
+/// Puts into an aureole's centre column (`units`, as [`HostColumns::units`] gives them under the
+/// ground at `a.surface_y`) the rock of the other intrusion events that hold the inner half of
+/// its intrusion's plan (the centre and the points half a semi-axis out along and across): a
+/// stock emplaced inside an older, larger stock, or a larger stock emplaced through it later.
+/// The aureole is a body and paints over the structural events, so its bands must not bake the
+/// older stock's crystalline rock (it has none there) nor paint over the younger one's (it is
+/// younger than the aureole). The events are applied as the column rule does at that column
+/// (oldest first; each replaces, inside its ellipsoid, the rock from the first unit older than it
+/// down, and takes its own class and key), unmoved by later folds and faults. Bands are depth
+/// layers across the whole aureole, so an event that holds only part of the plan is left out:
+/// masking it would leave the rest of the aureole unbaked at its depths. `cands` are the
+/// [`StructIndex`](deeptime_format::structure::StructIndex) candidates at the centre (youngest
+/// first), `own` the aureole's own event, `c` the planet's circumference, blocks.
+pub fn mask_intrusions(
+    units: &mut Vec<columns::Unit>,
+    a: &Aureole,
+    events: &[StructEvent],
+    cands: &[u32],
+    own: Option<usize>,
+    m_per_block_v: f64,
+    c: f64,
+) {
+    let (x, z) = (a.centre[0], a.centre[2]);
+    let (s, co) = f64::from(a.yaw).sin_cos();
+    let (ha, hc) = (0.5 * a.axes[0], 0.5 * a.axes[2]);
+    let probes = [
+        (x, z),
+        (x + ha * co, z + ha * s),
+        (x - ha * co, z - ha * s),
+        (x - hc * s, z + hc * co),
+        (x + hc * s, z - hc * co),
+    ];
+    for &e in cands.iter().rev() {
+        if Some(e as usize) == own {
+            continue;
+        }
+        let ev = &events[e as usize];
+        let StructShape::Intrusion {
+            y,
+            half_height,
+            class,
+            ..
+        } = ev.shape
+        else {
+            continue;
+        };
+        let w = &ev.window;
+        let r2 = |(px, pz): (f64, f64)| {
+            let (u, v) = w.local(px, pz, c);
+            (u / w.half_along).powi(2) + (v / w.half_across).powi(2)
+        };
+        if probes.iter().any(|&p| r2(p) >= 1.0) {
+            continue;
+        }
+        let hh = half_height * (1.0 - r2((x, z))).sqrt();
+        let from_m = (a.surface_y - (y + hh)) * m_per_block_v;
+        let to_m = (a.surface_y - (y - hh)) * m_per_block_v;
+        overlay(units, from_m, to_m, u16::from(class), ev.key);
+    }
+}
+
+/// `units` with the depths `from_m` to `to_m` made of `class` (key `key`) from the first unit
+/// whose top key is at least `key` down: an intrusion event as the column rule applies it.
+fn overlay(units: &mut Vec<columns::Unit>, from_m: f64, to_m: f64, class: u16, key: u16) {
+    if to_m <= from_m {
+        return;
+    }
+    let mut out = Vec::with_capacity(units.len() + 2);
+    let (mut top, mut reached) = (0.0, false);
+    for u in units.iter() {
+        let bottom = top + f64::from(u.thickness_m);
+        reached |= u.key[0] >= key;
+        let (lo, hi) = (from_m.max(top), to_m.min(bottom));
+        if reached && lo < hi {
+            let part = |th: f64| columns::Unit {
+                thickness_m: th as f32,
+                ..*u
+            };
+            if lo > top {
+                out.push(part(lo - top));
+            }
+            out.push(columns::Unit {
+                class,
+                thickness_m: (hi - lo) as f32,
+                source: u.source,
+                key: [key, key],
+            });
+            if bottom > hi {
+                out.push(part(bottom - hi));
+            }
+        } else {
+            out.push(*u);
+        }
+        top = bottom;
+    }
+    *units = out;
+}
+
 /// The columns the intrusions sit in as the strata pass will paint them: the column rule
 /// ([`deeptime_format::strata::stack_at`]) over the horizons the structure stage keeps for the
 /// bake ([`bake_horizons::Horizons`]), at each intrusion's centre, so that a depth reads as the
@@ -1238,5 +1336,82 @@ mod tests {
             let at = b.locate(4096, 0, y, 0).unwrap();
             assert!(b.zones_at(at).next().is_some(), "y {y}");
         }
+    }
+
+    #[test]
+    fn a_stock_inside_another_bakes_no_granite_and_paints_over_no_younger_stock() {
+        use deeptime_format::structure::Window;
+        let t = Tables::get();
+        let mv = 20.0;
+        // A stock 15 x 12 blocks in plan at the origin, under ground at y 100, key 8000.
+        let a = Aureole {
+            centre: [0.0, 40.0, 0.0],
+            axes: [15.0, 30.0, 12.0],
+            yaw: 0.0,
+            width_m: 600.0,
+            surface_y: 100.0,
+            bands: Vec::new(),
+            hollow: true,
+            age_ma: Some(12.0),
+        };
+        let stock = |id: u32, key: u16, c: [f64; 2], h: [f64; 2], y: f64, half: f64| StructEvent {
+            id,
+            key,
+            t_years: -1.0e6,
+            window: Window {
+                centre: c,
+                along: [1.0, 0.0],
+                across: [0.0, 1.0],
+                half_along: h[0],
+                half_across: h[1],
+            },
+            shape: StructShape::Intrusion {
+                y,
+                half_height: half,
+                class: index("granite") as u8,
+            },
+        };
+        let events = [
+            // 0: its own event.
+            stock(0, 8000, [0.0, 0.0], [15.0, 12.0], 40.0, 30.0),
+            // 1: an older, larger stock round it: y 50 to 70 at the centre (600 to 1,000 m deep).
+            stock(1, 9000, [0.0, 0.0], [60.0, 50.0], 60.0, 10.0),
+            // 2: an older stock holding only a corner of its plan: left out.
+            stock(2, 9000, [14.0, 10.0], [6.0, 6.0], 20.0, 15.0),
+            // 3: a younger, larger stock through it: y 10 to 20 (1,600 to 1,800 m deep).
+            stock(3, 6000, [0.0, 0.0], [40.0, 40.0], 15.0, 5.0),
+        ];
+        let mut units = vec![unit("sandstone", 1.0e4, [9500, 9600])];
+        mask_intrusions(&mut units, &a, &events, &[3, 2, 1, 0], Some(0), mv, 16384.0);
+        let layers: Vec<(u16, f64, u16)> = units
+            .iter()
+            .map(|u| (u.class, f64::from(u.thickness_m), u.key[0]))
+            .collect();
+        let expect = [
+            ("sandstone", 600.0, 9500),
+            ("granite", 400.0, 9000),
+            ("sandstone", 600.0, 9500),
+            ("granite", 200.0, 6000),
+            ("sandstone", 8200.0, 9500),
+        ];
+        assert_eq!(layers.len(), expect.len(), "{layers:?}");
+        for (&(class, th, key), (n, t_m, k)) in layers.iter().zip(expect) {
+            assert_eq!((class, key), (index(n), k), "{layers:?}");
+            assert!((th - t_m).abs() < 1e-3, "{layers:?}");
+        }
+        // Its bands: hornfels in the sandstone, none in the older granite nor in the younger stock.
+        let bands = aureole_bands(&units, &t, 0.0, 2500.0, 8000);
+        let got: Vec<(f64, f64)> = bands.iter().map(|b| (b.top_m, b.base_m)).collect();
+        assert_eq!(got.len(), 3, "{got:?}");
+        for ((top, base), (et, eb)) in
+            got.iter()
+                .zip([(0.0, 600.0), (1000.0, 1600.0), (1800.0, 2500.0)])
+        {
+            assert!(
+                (top - et).abs() < 1e-3 && (base - eb).abs() < 1e-3,
+                "{got:?}"
+            );
+        }
+        assert!(bands.iter().all(|b| b.class == index("hornfels")));
     }
 }
