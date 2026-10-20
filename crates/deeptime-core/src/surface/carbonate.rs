@@ -48,6 +48,154 @@ pub fn pelagic(z: f64, calcifiers: f64, dt: f64, ccd_m: f64) -> f64 {
         .min(z.max(0.0))
 }
 
+/// A cell's outgoing share below this is taken as none: the tracer stops spreading from it.
+const EXPORT_MIN_SHARE: f64 = 0.01; // ledger: ERO-189
+/// An exchange smaller than this (m of the giving cell over the step) does not carry the tracer
+/// on: below the wave base the marine diffusivity falls by e every 60 m, so the deep floor's
+/// exchanges are millimetres.
+const EXPORT_MIN_FLUX_M: f64 = 1.0e-3; // ledger: ERO-189
+
+#[derive(Clone, Copy, PartialEq)]
+struct Higher {
+    h: f64,
+    c: u32,
+}
+
+impl Eq for Higher {}
+
+impl PartialOrd for Higher {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Higher {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.h.total_cmp(&other.h).then(other.c.cmp(&self.c))
+    }
+}
+
+/// **Periplatform carbonate** (ledger ERO-189): the carbonate in what the marine diffusion and the
+/// slope failure laid in each sea cell over a step, m, as (cell, metres) for the cells that got
+/// any.
+///
+/// Platforms shed their carbonate: the mud and sand the factory makes is swept off the platform
+/// top and laid on its slope and the basin floor around it (periplatform ooze and
+/// calciturbidites: the Holocene aragonite-mud wedge on the western slope of Great Bahama Bank,
+/// up to 90 m thick, holds 40 to 80 % as much sediment as the bank top kept since it flooded,
+/// Wilber, Milliman & Halley 1990). The diffusion moves it as it moves mud, so without this the
+/// carbonate a platform exported was laid down as shale.
+///
+/// The implicit diffusion step's exchange across each face follows from the solved heights `h`:
+/// a cell gives c·(h_i − h_j) m to a lower neighbour j, c = ½(κ_i + κ_j)·Δt/Δx² (the solver's
+/// coupling, `diffusion.rs`; the faces of the five-point operator, x wrapping when the grid does).
+/// Every exchange runs downhill, so taking the cells from the highest down handles each cell's
+/// givers before it. What a cell passes on is a well-mixed blend of what it received and what it
+/// lost itself (`loss`, m, with `loss_carb` m of carbonate in it); what it kept of its gain
+/// (`gain`, m) has that blend's carbonate share. Slope failure's moves are not on the diffusion's
+/// faces; its losses and gains are in `loss` and `gain` and take the blend of the diffusion
+/// network around them. Only sea cells (`sea`) carry the tracer; land around them dilutes it.
+#[allow(clippy::too_many_arguments)]
+pub fn exported(
+    d: &super::grid::Dims,
+    kd: &[f64],
+    dt: f64,
+    h: &[f64],
+    sea: &[bool],
+    loss: &[f64],
+    loss_carb: &[f64],
+    gain: &[f64],
+) -> Vec<(u32, f64)> {
+    use std::collections::BinaryHeap;
+    let (w, rows) = (d.w, d.h);
+    let n = w * rows;
+    if n == 0 || d.dx <= 0.0 {
+        return Vec::new();
+    }
+    let k = dt / (d.dx * d.dx);
+    let wrap = d.wrap_x && w > 1;
+    let faces = |c: usize| -> [Option<usize>; 4] {
+        let (i, j) = (c % w, c / w);
+        let east = if i + 1 < w {
+            Some(c + 1)
+        } else if wrap {
+            Some(c + 1 - w)
+        } else {
+            None
+        };
+        let west = if i > 0 {
+            Some(c - 1)
+        } else if wrap {
+            Some(c + w - 1)
+        } else {
+            None
+        };
+        [
+            east,
+            west,
+            (j > 0).then(|| c - w),
+            (j + 1 < rows).then(|| c + w),
+        ]
+    };
+    // 0: untouched, 1: queued, 2: done.
+    let mut state = vec![0u8; n];
+    let mut share = vec![0.0f32; n];
+    let mut heap = BinaryHeap::new();
+    for c in 0..n {
+        if sea[c] && loss_carb[c] > 0.0 {
+            state[c] = 1;
+            heap.push(Higher {
+                h: h[c],
+                c: c as u32,
+            });
+        }
+    }
+    let mut out = Vec::new();
+    while let Some(Higher { c, .. }) = heap.pop() {
+        let c = c as usize;
+        let near = faces(c);
+        let (mut inflow, mut inflow_carb) = (0.0f64, 0.0f64);
+        for m in near.into_iter().flatten() {
+            if h[m] > h[c] {
+                let f = 0.5 * (kd[m] + kd[c]) * k * (h[m] - h[c]);
+                inflow += f;
+                if state[m] == 2 {
+                    inflow_carb += f * f64::from(share[m]);
+                }
+            }
+        }
+        let total = inflow + loss[c];
+        let s = if total > 0.0 {
+            ((inflow_carb + loss_carb[c]) / total).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        share[c] = s as f32;
+        state[c] = 2;
+        if gain[c] > 0.0 && s > 0.0 {
+            out.push((c as u32, gain[c] * s));
+        }
+        if s < EXPORT_MIN_SHARE {
+            continue;
+        }
+        for m in near.into_iter().flatten() {
+            if state[m] == 0
+                && sea[m]
+                && h[m] < h[c]
+                && 0.5 * (kd[m] + kd[c]) * k * (h[c] - h[m]) > EXPORT_MIN_FLUX_M
+            {
+                state[m] = 1;
+                heap.push(Higher {
+                    h: h[m],
+                    c: m as u32,
+                });
+            }
+        }
+    }
+    out.sort_unstable_by_key(|&(c, _)| c);
+    out
+}
+
 /// The photic zone the factory's limits are measured over ([`limits`]), m: Bosscher and
 /// Schlager's rate at 100 m is 2 × 10⁻⁴ of its surface value.
 pub const PHOTIC_M: f64 = 100.0; // ledger: ERO-187
@@ -149,6 +297,38 @@ mod tests {
         assert!((produce(5.0, 26.0, 0.0, 2.0e6, &p) - 5.0).abs() < 1e-9);
         assert_eq!(produce(5.0, 5.0, 0.0, 2.0e6, &p), 0.0);
         assert!(produce(150.0, 26.0, 200.0, 1.0e4, &p) < 1e-3);
+    }
+
+    #[test]
+    fn exported_carbonate_follows_the_diffusion_downhill() {
+        use crate::surface::grid::Dims;
+        // Two rows of three, faces of 1 (κ 1, Δt 1, Δx 1). Cell 0 sheds 1 m, all carbonate;
+        // cells 1 and 2 lie below it, 1 and 2 m down. Cell 4 stands at cell 0's height.
+        let d = Dims {
+            w: 3,
+            h: 2,
+            dx: 1.0,
+            wrap_x: false,
+        };
+        let kd = [1.0; 6];
+        let sea = [true; 6];
+        let loss = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let loss_carb = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let gain = [0.0, 0.5, 0.5, 0.0, 0.0, 0.0];
+        // All the slope's supply is carbonate: everything it keeps is carbonate.
+        let h = [0.0, -1.0, -2.0, -10.0, -10.0, -10.0];
+        let out = exported(&d, &kd, 1.0, &h, &sea, &loss, &loss_carb, &gain);
+        assert_eq!(out, vec![(1, 0.5), (2, 0.5)]);
+        // Cell 4 (no carbonate) gives cell 1 as much as cell 0 does: half of it is carbonate,
+        // and half of what cell 1 passes on to cell 2.
+        let h = [0.0, -1.0, -2.0, -10.0, 0.0, -10.0];
+        let out = exported(&d, &kd, 1.0, &h, &sea, &loss, &loss_carb, &gain);
+        assert_eq!(out, vec![(1, 0.25), (2, 0.25)]);
+        // On land the tracer stops; without carbonate there is none.
+        let land = [true, false, true, true, true, true];
+        assert!(exported(&d, &kd, 1.0, &h, &land, &loss, &loss_carb, &gain).is_empty());
+        let none = [0.0; 6];
+        assert!(exported(&d, &kd, 1.0, &h, &sea, &loss, &none, &gain).is_empty());
     }
 
     #[test]

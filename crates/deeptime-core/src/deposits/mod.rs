@@ -3935,7 +3935,12 @@ mod tests {
 
     #[test]
     fn lowstand_is_the_lowest_sea_since_a_time() {
-        let h = [(-3.0e8, -150.0), (-2.0e7, -40.0), (-1.0e6, -120.0), (0.0, 0.0)];
+        let h = [
+            (-3.0e8, -150.0),
+            (-2.0e7, -40.0),
+            (-1.0e6, -120.0),
+            (0.0, 0.0),
+        ];
         assert_eq!(lowstand_m(&h, -5.0e6), 120.0);
         assert_eq!(lowstand_m(&h, -1.0e9), 150.0);
         assert_eq!(lowstand_m(&h, 0.0), 0.0);

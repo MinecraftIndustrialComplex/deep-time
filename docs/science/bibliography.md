@@ -6751,7 +6751,7 @@ The temperate present's CO2 cap rests on the late Quaternary's glacial-to-interg
 - Library: not fetched.
 - Read so far (by the project): from memory. The interval's form was checked by deriving it, not against the paper: the bounds are the roots in p of (p̂ - p)² = z² p(1 - p) / n, (p̂ + z²/2n ± z sqrt(p̂(1 - p̂)/n + z²/4n²)) / (1 + z²/n). The one-sided 99 % quantile of the standard normal, 2.326, is from memory (the tables give 2.3263).
 
-## Carbonate on the sea floor, MVT hosts, impact deposits and placers (ERO-185 to ERO-188, ORE-270, ORE-271, IMP-142, IMP-143, DEP-214), added 2026-10-19
+## Carbonate on the sea floor, MVT hosts, impact deposits and placers (ERO-185 to ERO-189, ORE-270, ORE-271, IMP-142, IMP-143, DEP-214), added 2026-10-19
 
 The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above the CCD once the planktic calcifiers arrive, MVT in the carbonate horizons the columns hold, source, pathway and trap for the impact metals with densities from Earth's inventory, and placers kept off oceanic crust and the deep shelf. "Read by the research sub-agent" means a Sonnet sub-agent of the task fetched the source and quoted it on 2026-10-19; the quotes are in the ledger rows. Existing entries this task also read: Leach2010a (MVT hosts, ORE-271), Grieve1994 (abstract via OpenAlex, IMP-142, IMP-143) and Ames1998 (cited, not read, ORE-042, IMP-142).
 
@@ -6889,3 +6889,12 @@ The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above t
 - Access: paywalled.
 - Library: not fetched.
 - Read so far (by the project): from memory (N-MORB about 0.07 ppm U); not read in this work.
+
+### Wilber1990
+- Reference: Wilber, R. J., Milliman, J. D. and Halley, R. B. (1990). Accumulation of bank-top sediment on the western slope of Great Bahama Bank: rapid progradation of a carbonate megabank. Geology 18(10):970-974.
+- DOI or URL: 10.1130/0091-7613(1990)018<0970:AOBTSO>2.3.CO;2; abstract at https://pubs.usgs.gov/publication/70137851
+- Cited as: "Wilber, Milliman & Halley 1990" (surface/carbonate.rs, `exported`).
+- Ledger ids: ERO-189
+- Access: paywalled; the abstract is open (USGS Publications Warehouse).
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-20: "large-scale export of bank-top sediment and rapid progradation of the slope during the Holocene"; a wedge "up to 90 m thick" of "predominantly aragonite mud derived from the bank since flooding of the platform 6-8 ka"; its volume "40%-80% that of Holocene sediment currently retained on the bank"; vertical accumulation up to 11 to 15 m/ka.
