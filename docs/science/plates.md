@@ -1791,8 +1791,8 @@ sampling; a larger paired ensemble would tell.
 Ben, watching a planet form (earthlike_quick_16k, supercontinent, 1000 Myr): "mountains will
 'eat' the world and delete most of the continents and leave things as a stringy mess of
 'islands.'" One supercontinent at 900 Myr ago, narrow snow-capped chains and island strings in a
-mostly empty ocean by 650 Myr ago. Ledger PLT-293 to PLT-295 and ISO-078; sources in the
-bibliography, "Mountains eat the world". Code: `plates/{flow.rs, settle.rs, crust_budget.rs,
+mostly empty ocean by 650 Myr ago. Ledger PLT-293 to PLT-295, ISO-078 and HYP-035; the sources'
+bibliography entries name those ids. Code: `plates/{flow.rs, settle.rs, crust_budget.rs,
 collapse.rs, mod.rs}`; tables and maps by `tools/review/continent-budget.py`.
 
 **The budget (measurement only, PLT-295).** `DEEPTIME_CRUST_BUDGET=1` keeps the continental

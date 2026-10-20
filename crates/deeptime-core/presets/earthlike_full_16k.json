@@ -96,7 +96,7 @@
     "collapse_reach_km": 200.0,
     "crust_max_km": 70.0,
     "crust_channel_km2_myr": 1500.0,
-    "isostasy_relax_myr": 62.8,
+    "isostasy_relax_myr": 0.004,
     "thickening_max_mm_yr": 5.0,
     "uplift_max_mm_yr": 3.5,
     "transition_width_km": 200.0,
