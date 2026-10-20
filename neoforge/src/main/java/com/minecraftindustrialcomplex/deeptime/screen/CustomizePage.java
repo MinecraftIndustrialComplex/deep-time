@@ -209,8 +209,9 @@ final class CustomizePage implements PlanetEditorScreen.Page {
 
     private void fillList() {
         list.clear();
-        // The tab's own description goes above the first heading, in the band a heading row leaves.
-        list.intro(topic == Topic.ADVANCED && !query.isBlank() ? null : Lang.tr(topic.key() + ".hint"));
+        // The tab's own description goes above the first heading, in the band a heading row leaves
+        // (also above a search's result count, so that band is never empty).
+        list.intro(Lang.tr(topic.key() + ".hint"));
         Font font = screen.font();
         switch (topic) {
             case PLANET -> {
@@ -539,7 +540,7 @@ final class CustomizePage implements PlanetEditorScreen.Page {
                         introW = width;
                     }
                     for (int i = 0; i < introLines.size(); i++)
-                        g.drawString(font, introLines.get(i), left, top + 4 + 10 * i, DIM, false);
+                        g.drawString(font, introLines.get(i), left, top + 10 * i, DIM, false);
                 }
                 int y = top + height - 14;
                 g.drawString(font, fit(font, text, width), left, y, ACCENT, false);
