@@ -17,6 +17,8 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.components.tabs.TabNavigationBar;
 import net.minecraft.client.gui.screens.ConfirmScreen;
+import net.minecraft.client.gui.screens.LevelLoadingScreen;
+import net.minecraft.client.gui.screens.ReceivingLevelScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
@@ -84,6 +86,8 @@ final class ScreenshotDriver {
     private static Step step = Step.TITLE;
     private static int ticks;
     private static int stepTicks;
+    /** Ticks a screen has stayed open over the world (IN_WORLD). */
+    private static int screenTicks;
     private static CreateWorldScreen createScreen;
     private static EditorModel model;
     private static boolean guidance;
@@ -555,6 +559,16 @@ final class ScreenshotDriver {
                         go(Step.IN_WORLD);
                 }
                 case IN_WORLD -> {
+                    screenTicks = mc.screen == null ? 0 : screenTicks + 1;
+                    if (mc.screen != null && mc.player != null && screenTicks > 20 * 30
+                            && !(mc.screen instanceof LevelLoadingScreen) && !(mc.screen instanceof ReceivingLevelScreen)) {
+                        // A pack's mod can open a screen of its own once the world is up (with MIC,
+                        // Enhanced Celestials' "is here!" notice); as on the title screen, the walk
+                        // closes it and says which one.
+                        DeepTime.LOGGER.warn("[deeptime-shot] closing {} over the world", mc.screen.getClass().getName());
+                        mc.setScreen(null);
+                        screenTicks = 0;
+                    }
                     if (mc.screen != null)
                         stepTicks = Math.min(stepTicks, 100); // still loading terrain: wait for the world view
                     if (stepTicks == 200) {

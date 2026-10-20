@@ -94,8 +94,8 @@ From top to bottom:
     - a colour bar with values in the layer's unit.
   - **More**: "Keep going" (more history past today), "Final map and spawn" (the review page), and
     **Show details**. The review page follows the same layout rule as this page (the summary beside
-    the map, or under it in two columns on a tall window) and names ore provinces with the deposit
-    layers' words ("MVT Zn-Pb").
+    the map with the ore provinces under the map's legend, or both under the map in two columns on a
+    tall window) and names ore provinces with the deposit layers' words ("MVT Zn-Pb").
 - **Show details** (also F3) shows the developer's line under the bar: stage percentages and native
   memory. It is off by default.
 - **One bar of actions**:
