@@ -31,7 +31,9 @@
 //! Each plate step, on the visible continental samples of one plate (none at a trench), crust
 //! moves along each lattice edge from the thicker column to the thinner, at the diffusivity of
 //! the thicker column's channel (the channel is fed from the thick side), by an explicit
-//! conservative scheme in as many substeps as keep it stable. The rock moved is the source's
+//! conservative scheme in as many substeps as keep it stable (no bound but a guard; until
+//! 2026-10-20 at most 64, which full 16k passed), in pieces of at most 2 Myr of plate time, each
+//! finding its channel columns and their two rings again. The rock moved is the source's
 //! own mix (pure shear). Heights follow by Airy as in the collapse (PLT-281): a source sinks by
 //! its isostatic change but not below the Airy height of the crust it keeps, a receiver rises by
 //! its isostatic change but not above the Airy height of its new column.
@@ -119,27 +121,65 @@ fn open(state: &PlateState, i: usize) -> bool {
     s.kind == CONTINENTAL && !s.is_hidden() && s.flags & TRENCH == 0
 }
 
-/// One plate step of the lower-crustal flow on `state` (see the module docs).
+/// The longest piece of plate time one pass of the flow covers, Myr: a longer plate step runs the
+/// flow in pieces, each finding its channels and their rings again, so the law does not depend on
+/// the step (the P4 plate-step review, 2026-10-20: a 4-Myr step got the 2-Myr step's reach).
+// game-choice: numerical, the 2-Myr default plate step the flow was built on (coordinator's call,
+// 2026-10-20).
+const PIECE_MYR: f64 = 2.0;
+
+/// One plate step of the lower-crustal flow on `state` (see the module docs), in pieces of at most
+/// [`PIECE_MYR`]. [`Flow::columns`] is the most of one piece, the rest are sums.
 pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Flow {
-    let k = env.k;
-    let k0 = k.crust_channel_km2_myr;
+    let k0 = env.k.crust_channel_km2_myr;
     if !(k0.is_finite() && k0 > 0.0) || env.dt_myr <= 0.0 {
         return Flow::default();
     }
-    let t_c = (k.collapse_thickness_km * 1000.0).max(normal_thickness_m());
     let n = state.samples.len();
     let plate: Vec<u32> = (0..n).into_par_iter().map(|i| state.plate_of(i)).collect();
     let is_open: Vec<bool> = (0..n).into_par_iter().map(|i| open(state, i)).collect();
+    let pieces = (env.dt_myr / PIECE_MYR - 1.0e-9).ceil().max(1.0) as usize;
+    let dt = env.dt_myr / pieces as f64;
+    let mut sum = Flow::default();
+    for _ in 0..pieces {
+        let f = piece(state, geo, env, dt, &plate, &is_open);
+        sum.columns = sum.columns.max(f.columns);
+        sum.moved_km2_m += f.moved_km2_m;
+        sum.substeps += f.substeps;
+        sum.time_myr += f.time_myr;
+        sum.edge += f.edge;
+    }
+    sum
+}
+
+/// `dt_myr` of the flow (one piece of [`step`]).
+fn piece(
+    state: &mut PlateState,
+    geo: &Geo,
+    env: &Env,
+    dt_myr: f64,
+    plate: &[u32],
+    is_open: &[bool],
+) -> Flow {
+    let k = env.k;
+    let k0 = k.crust_channel_km2_myr;
+    let t_c = (k.collapse_thickness_km * 1000.0).max(normal_thickness_m());
+    let n = state.samples.len();
+    // Nothing to move: the piece's time is covered.
+    let idle = Flow {
+        time_myr: dt_myr,
+        ..Flow::default()
+    };
     // The columns with a channel, and the two rings of their plate's continental crust around
     // them: crust moves only on edges between two of these, so what one side loses the other
-    // gains (a column two rings out gains only if its neighbour passes T_c within the step).
+    // gains (a column two rings out gains only if its neighbour passes T_c within the piece).
     let mut ring = vec![u8::MAX; n];
     let mut front: Vec<u32> = (0..n as u32)
         .into_par_iter()
         .filter(|&i| is_open[i as usize] && f64::from(state.samples[i as usize].thickness_m) > t_c)
         .collect();
     if front.is_empty() {
-        return Flow::default();
+        return idle;
     }
     for &i in &front {
         ring[i as usize] = 0;
@@ -199,10 +239,10 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Flow {
     };
     let fastest = rate_of(&pools);
     if fastest <= 0.0 {
-        return Flow::default();
+        return idle;
     }
-    let substeps = ((env.dt_myr * fastest / STABLE).ceil() as usize).clamp(1, max_substeps());
-    let dt = (env.dt_myr / substeps as f64).min(STABLE / fastest);
+    let substeps = ((dt_myr * fastest / STABLE).ceil() as usize).clamp(1, max_substeps());
+    let dt = (dt_myr / substeps as f64).min(STABLE / fastest);
     let time_myr = dt * substeps as f64;
     let mut moved = 0.0f64;
     for _ in 0..substeps {
@@ -342,6 +382,32 @@ mod tests {
         off.k.crust_channel_km2_myr = 0.0;
         let mut st = planet(&off.geo, belt, 26_000.0);
         assert_eq!(step(&mut st, &off.geo, &off.env(1)), Flow::default());
+    }
+
+    /// A 4-Myr plate step is two 2-Myr pieces: the same crust as two 2-Myr steps, to the bit, and
+    /// each covers its whole time (no substep bound reached).
+    #[test]
+    fn a_long_step_is_two_short_ones() {
+        let fx = Fx::new();
+        let belt = |p: DVec3| p.x < -0.1 && p.y > 0.88 && p.y < 0.93;
+        let mut short = planet(&fx.geo, belt, 26_000.0);
+        let mut long = short.clone();
+        let mut covered = 0.0;
+        for n in 1..=2 {
+            let f = step(&mut short, &fx.geo, &fx.env(n));
+            assert!(f.substeps > 0);
+            covered += f.time_myr;
+        }
+        assert!((covered - 4.0).abs() < 1e-9, "{covered}");
+        let mut env = fx.env(1);
+        env.dt_myr = 4.0;
+        env.dt_yr = 4.0e6;
+        let f = step(&mut long, &fx.geo, &env);
+        assert!((f.time_myr - 4.0).abs() < 1e-9, "{}", f.time_myr);
+        for (a, b) in short.samples.iter().zip(&long.samples) {
+            assert_eq!(a.pools, b.pools);
+            assert_eq!(a.elevation_m, b.elevation_m);
+        }
     }
 
     #[test]
