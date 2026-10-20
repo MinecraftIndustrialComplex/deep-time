@@ -3716,21 +3716,25 @@ impl DepositStage {
     }
 
     /// A guaranteed body's centre depth (m) and vertical half-height (blocks) at ground `surf`
-    /// before any host fit: top at the ground for an exposed essential (the half-height scaled
-    /// by `size_mult_v` about its centre), else the type's formation depth, kept 16 blocks
-    /// above the floor.
+    /// before any host fit. Its top lies under the column's [`SOIL_BLOCKS`], which hold no ore:
+    /// just under them for an exposed essential (the half-height scaled by `size_mult_v` about
+    /// its centre), else at the type's formation depth or under the soil if that is shallower (a
+    /// SEDEX sheet's 100 m is under 3 blocks), kept 16 blocks above the floor.
     fn guaranteed_depth(&self, ti: usize, ess: &Essential, surf: f64, sc: &Scales) -> (f64, f64) {
         let t = &self.types[ti];
         let tonnage_t = SizeModel::new(&t.sizing).smallest_plausible().tonnage_mt * 1.0e6;
         let half_m = geometry::half_height_m(t, tonnage_t);
+        let half_blocks = half_m / sc.m_per_block_v * t.balance.size_mult_v;
+        let under_soil_m = (f64::from(SOIL_BLOCKS) + half_blocks) * sc.m_per_block_v; // ledger: ORE-076
         let depth = if ess.exposed {
-            half_m * t.balance.size_mult_v
+            under_soil_m
         } else {
             t.preservation
                 .formation_depth_m
+                .max(under_soil_m)
                 .min((surf - f64::from(sc.min_y + 16)) * sc.m_per_block_v)
         };
-        (depth, half_m / sc.m_per_block_v * t.balance.size_mult_v)
+        (depth, half_blocks)
     }
 
     /// The time a guaranteed deposit of type `ti` at `cell` formed: its best frame's, or the
@@ -4384,6 +4388,74 @@ mod tests {
         let ck = s.checkpoint().unwrap();
         s.finalize_write().unwrap();
         (ck.world, dir)
+    }
+
+    /// A guaranteed body lies under the soil, which holds no ore (ORE-076): a SEDEX sheet, whose
+    /// 100 m formation depth is under 3 blocks, sits below the top 4 blocks instead of in them;
+    /// an exposed iron body's top is just under the soil, still exposed; MVT keeps its formation
+    /// depth; and near the floor the floor cap still wins.
+    #[test]
+    fn a_guaranteed_body_lies_under_the_soil() {
+        let sp = super::synthetic::SyntheticParams {
+            seed: 1,
+            circumference: 4096,
+            grid_r: 16,
+            t_start_years: -5.0e8,
+            t_end_years: 0.0,
+            snapshot_every_years: 2.5e7,
+        };
+        let stage = DepositStage::synthetic(sp, DepositParams::default()).unwrap();
+        let sc = Scales::default();
+        let ti = |id: &str| {
+            stage
+                .types
+                .iter()
+                .position(|t| t.short() == id)
+                .unwrap_or_else(|| panic!("{id} is a built-in type"))
+        };
+        let ess = |material: &str, exposed: bool| Essential {
+            material: material.to_string(),
+            min_sites_per_region: 1,
+            region_blocks: 8192,
+            exposed,
+            primary_only: true,
+        };
+        let surf = 70.0;
+        let top = |(depth, half): (f64, f64)| surf - depth / sc.m_per_block_v + half;
+        let soil_top = surf - f64::from(SOIL_BLOCKS);
+        for (id, e) in [
+            ("sedex_zn_pb", ess("c:zinc", false)),
+            ("mvt_zn_pb", ess("c:zinc", false)),
+            ("bif_fe", ess("c:iron", true)),
+        ] {
+            let k = ti(id);
+            let (depth, half) = stage.guaranteed_depth(k, &e, surf, &sc);
+            assert!(half > 0.0, "{id}: a body has height");
+            assert!(
+                top((depth, half)) <= soil_top + 1.0e-9,
+                "{id}: top {} is under the soil ({soil_top})",
+                top((depth, half))
+            );
+            if e.exposed {
+                assert!(
+                    (top((depth, half)) - soil_top).abs() < 1.0e-9,
+                    "{id}: an exposed body's top is just under the soil"
+                );
+                assert!(top((depth, half)) >= surf - EXPOSED_BLOCKS);
+            } else {
+                let formation = stage.types[k].preservation.formation_depth_m;
+                assert!(depth >= formation, "{id}: never shallower than its formation depth");
+            }
+        }
+        let mvt = ti("mvt_zn_pb");
+        assert_eq!(
+            stage.guaranteed_depth(mvt, &ess("c:zinc", false), surf, &sc).0,
+            stage.types[mvt].preservation.formation_depth_m,
+            "MVT's 1,000 m is already under the soil"
+        );
+        let low = f64::from(sc.min_y + 18);
+        let (depth, _) = stage.guaranteed_depth(mvt, &ess("c:zinc", false), low, &sc);
+        assert!((depth - 2.0 * sc.m_per_block_v).abs() < 1.0e-9, "the floor cap wins");
     }
 
     /// Acceptance: a synthetic run places sites of several families, every site has a forming
