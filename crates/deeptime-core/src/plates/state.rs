@@ -426,7 +426,10 @@ pub struct RiftLink {
 /// least half of its front (it breaks off after `slab_breakoff_myr`), `idle_myr` how long no
 /// oceanic front has fed it: it hangs and pulls along the plates' shared boundary meanwhile and
 /// is gone after `slab_breakoff_myr` (ledger PLT-271). A subduction initiation plants one
-/// (`initiation_slab_km`).
+/// (`initiation_slab_km`). `held_myr` is how long continental crust has stood anywhere at its
+/// front (it runs down again while none does) and `torn_km` how far the tear has run along the
+/// trench from that crust since `held_myr` reached `slab_breakoff_myr` (`slab_tear_mm_yr`; ledger
+/// PLT-324).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct SlabTrack {
     pub under: u32,
@@ -434,6 +437,10 @@ pub struct SlabTrack {
     pub km: f64,
     pub blocked_myr: f64,
     pub idle_myr: f64,
+    #[serde(default)]
+    pub held_myr: f64,
+    #[serde(default)]
+    pub torn_km: f64,
 }
 
 /// Counters for the run summary.

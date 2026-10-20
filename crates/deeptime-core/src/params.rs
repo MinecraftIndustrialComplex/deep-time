@@ -675,6 +675,12 @@ pub struct TectonicParams {
     pub slab_depth_km: f64,
     /// A slab breaks off after continental crust has blocked its trench this long, Myr. PLT-184.
     pub slab_breakoff_myr: f64,
+    /// Lateral speed of a slab tear, mm/yr (km/Myr): once continental crust has stood at a
+    /// contact's front for `slab_breakoff_myr`, the slab breaks off there and the tear runs along
+    /// the trench from it at this speed, the oceanic front within its reach pulling no more; when
+    /// it has run the whole front the slab is gone (van Hunen & Allen 2011: about 300 mm/yr, 100
+    /// to 800 by the slab's age). 0 keeps only the majority break-off (FRC-019). PLT-324.
+    pub slab_tear_mm_yr: f64,
     /// Resistance of the mantle to a slab's sinking, against the basal drag of the reference
     /// plate (per 3,000 km of trench). PLT-185.
     pub slab_resistance: f64,
@@ -789,6 +795,7 @@ impl Default for TectonicParams {
             slab_pull: 1.0,                // ledger: PLT-182
             slab_depth_km: 700.0,          // ledger: PLT-184
             slab_breakoff_myr: 10.0,       // ledger: PLT-184
+            slab_tear_mm_yr: 0.0,          // ledger: PLT-324 (off; the presets set 300)
             slab_resistance: 3.0,          // ledger: PLT-185
             slab_suction_share: 0.3,       // ledger: PLT-186
             edge_energy: 0.1,              // ledger: PLT-187
@@ -1190,6 +1197,7 @@ impl PlanetPreset {
                 k.cordillera_shortening_mm_yr,
                 "$.tectonics.cordillera_shortening_mm_yr",
             ),
+            (k.slab_tear_mm_yr, "$.tectonics.slab_tear_mm_yr"),
             (k.arc_mature_crust_km, "$.tectonics.arc_mature_crust_km"),
             (
                 k.island_arc_km3_per_km_myr,
