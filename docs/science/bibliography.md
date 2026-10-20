@@ -2405,7 +2405,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Reference: Leach, D.L., Taylor, R.D., Fey, D.L., Diehl, S.F., and Saltus, R.W., 2010, A deposit model for Mississippi Valley-type lead-zinc ores, chap. A of Mineral deposit models for resource assessment: U.S. Geological Survey Scientific Investigations Report 2010-5070-A, viii + 43 p.
 - DOI or URL: (DEP) 10.3133/sir20105070A ; https://pubs.usgs.gov/sir/2010/5070/a/pdf/SIR10-5070A.pdf (ORE) https://pubs.usgs.gov/sir/2010/5070/a/ ; PDF https://pubs.usgs.gov/sir/2010/5070/a/pdf/SIR10-5070A.pdf (6.3 MB; binary to WebFetch). Note the PDF name is SIR10-5070A.pdf.
 - Cited as: (DEP) "Leach et al. 2010", "SIR 2010-5070-A (printed pp. 3-5, 8, 19, 27)". (ORE) "USGS SIR 2010-5070-A (the MVT deposit model)"; also called "Leach et al. 2010" in places.
-- Ledger ids: DEP-081, DEP-090, DEP-091, DEP-100, ORE-001, ORE-003, ORE-008, ORE-009; notes: also cited in DEP-084, 085, 086, 095; and the MVT notes in ORE-003
+- Ledger ids: DEP-081, DEP-090, DEP-091, DEP-100, ORE-001, ORE-003, ORE-008, ORE-009, ORE-271, ORE-272 (2026-10-20); notes: also cited in DEP-084, 085, 086, 095; and the MVT notes in ORE-003
 - Access: open access (agency report). [other sections: open copy (agency report) at https://pubs.usgs.gov/sir/2010/5070/a/pdf/SIR10-5070A.pdf]
 - Library (the project's source library, not distributed): fetched (PDF, 64 pages, text layer). From: https://pubs.usgs.gov/sir/2010/5070/a/pdf/SIR10-5070A.pdf. Text file: sir5070a.txt.
 - Read so far (by the project): (DEP) printed pp. 3-5, 8, 19, 27. (ORE) not stated; quoted as a phrase.
@@ -2912,7 +2912,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Reference: Leach, D.L., Bradley, D.C., Huston, D.L., Pisarevsky, S.A., Taylor, R.D., and Gardoll, S.J., 2010, Sediment-hosted lead-zinc deposits in Earth history: Economic Geology 105(3):593-625.
 - DOI or URL: (DEP) 10.2113/gsecongeo.105.3.593 (ORE) 10.2113/gsecongeo.105.3.593 (Crossref).
 - Cited as: (DEP) the code and plan write "Leach et al. 2010" for the 2.02 Ga onset; the project attaches it to SIR 2010-5070-A. (ORE) "Leach et al. 2010 (Economic Geology 105:593; sediment-hosted Pb-Zn ... first appearance at 2.02 Ga)".
-- Ledger ids: DEP-112, DEP-114, DEP-188, ORE-009, ORE-010, ORE-014, ORE-024; notes: claim
+- Ledger ids: DEP-112, DEP-114, DEP-188, ORE-009, ORE-010, ORE-014, ORE-024, ORE-272 (2026-10-20, the abstract's clastic-dominated hosts); notes: claim
 - Access: paywalled (abstract only)
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -6901,7 +6901,16 @@ The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above t
 - Ledger ids: ERO-195
 - Access: paywalled; the abstract is open (USGS Publications Warehouse).
 - Library: not fetched.
-- Read so far (by the project): the abstract, 2026-10-20: "large-scale export of bank-top sediment and rapid progradation of the slope during the Holocene"; a wedge "up to 90 m thick" of "predominantly aragonite mud derived from the bank since flooding of the platform 6-8 ka"; its volume "40%-80% that of Holocene sediment currently retained on the bank"; vertical accumulation up to 11 to 15 m/ka.
+- Read so far (by the project): the abstract, 2026-10-20: "large-scale export of bank-top sediment and rapid progradation of the slope during the Holocene"; a wedge "up to 90 m thick" of "predominantly aragonite mud derived from the bank since flooding of the platform 6-8 ka"; its volume "40%-80% that of Holocene sediment currently retained on the bank"; vertical accumulation up to 11 to 15 m/ka. Also cited for ERO-197 (the exported mud lies on the slope, off the bank top), 2026-10-20.
+
+### DemaisonMoore1980
+- Reference: Demaison, G. J. and Moore, G. T. (1980). Anoxic environments and oil source bed genesis. AAPG Bulletin 64(8):1179-1209 (from memory, not looked up).
+- DOI or URL: not looked up.
+- Cited as: "Demaison & Moore 1980, from-memory" (surface/facies.rs `classify`, via ERO-196).
+- Ledger ids: ERO-196
+- Access: paywalled (AAPG Datapages), from memory.
+- Library: not fetched.
+- Read so far (by the project): from memory, 2026-10-20 (the review fix that lets euxinic water veto chalk and periplatform limestone): anoxic bottom water, more than the sediment's make-up or the productivity alone, decides whether organic matter is kept, so organic-rich carbonate muds are source rocks as black shales are. Not read in this work.
 ## The sea floor's critical slope (YNG-022, YNG-023, AMP-074), added 2026-10-20
 
 The sea-floor spikes task (build log 2026-10-20) measured the planet's deep sea floor against ETOPO 2022 (entry above, under the climate section: the 60 arc-second global grid and five 15 arc-second tiles were downloaded to the test VM and their slopes measured with `tools/review/seafloor/earth_stats.py`) and set the sea floor's critical slope from it. The papers below give what the grids cannot: trench walls and scarps from multibeam, abyssal hill sizes, seamount flank slopes, and how much of the ocean the grids only predict.
