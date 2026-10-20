@@ -338,14 +338,14 @@ pub fn bake(
     note.insert("strata".into(), strata);
     millis.insert("strata".into(), json!(ms(t)));
 
-    // The folds and faults the strata are read through (P2-01), at the heights the lift put the
-    // rock they cut.
+    // The folds and faults the strata are read through (P2-01), at the history's heights: the
+    // readers add the lift at every column they read (`strata/lift`, STR-055).
     if let Some(st) = world.structure.as_ref().filter(|s| !s.events.is_empty()) {
-        // How far the lift at an event's centre is from the lift at the columns it cuts (STR-055).
+        // How far the lift at an event's centre is from the lift at the columns it cuts: what
+        // moving each event by the lift at its centre would have got wrong (STR-055).
         if let Some(s) = note.get_mut("strata") {
             s["structure_lift"] = strata_census::structure_offsets(&lift, st);
         }
-        let st = &lift.structure(st);
         let rel = deeptime_format::structure::STRUCTURE_PATH;
         let (bytes, crc32) = deeptime_format::structure::write_structure(out.dir, st)?;
         out.m.files.retain(|f| f.path != rel);

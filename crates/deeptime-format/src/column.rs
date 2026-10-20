@@ -157,11 +157,7 @@ impl ColumnWorld {
                 others.push((e.name.clone(), LazyLayer::open(&dir.join(&e.path))?));
             }
         }
-        let structure = Deformer::read_in(
-            dir,
-            manifest.scale.circumference_blocks,
-            manifest.world_projection().index_frame(),
-        )?;
+        let structure = Deformer::open(dir, &manifest)?;
         Ok(ColumnWorld {
             dir: dir.to_owned(),
             structure,
@@ -531,7 +527,12 @@ pub fn events_at(
     if check && !cands.is_empty() && cands.len() <= CHANGED_CHECK_MAX {
         let mut scratch = DeformScratch::default();
         let mut base = Vec::new();
-        st.deformed_stack(&d.index, x, z, min_y, stack, &mut scratch, &mut base);
+        let lift_at = |x, z| d.lift_at(x, z);
+        let lift: crate::structure::Lift<'_> = d
+            .lift
+            .as_ref()
+            .map(|_| &lift_at as &dyn Fn(i64, i64) -> f64);
+        st.deformed_stack(&d.index, x, z, min_y, stack, lift, &mut scratch, &mut base);
         // An index of one bucket about the column: the rule's candidates are then every event
         // of the reduced structure (each was a candidate of the full one).
         let frame = IndexFrame {
@@ -554,7 +555,7 @@ pub fn events_at(
                     .map(|(_, &e)| st.events[e as usize]),
             );
             let index = StructIndex::new_in(&mini, c, frame);
-            mini.deformed_stack(&index, x, z, min_y, stack, &mut scratch, &mut out);
+            mini.deformed_stack(&index, x, z, min_y, stack, lift, &mut scratch, &mut out);
             *slot = Some(out != base);
         }
     }

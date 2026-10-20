@@ -228,6 +228,10 @@ public final class Structure {
         boolean cell;
         Columns.Stack[] stacks = new Columns.Stack[4];
         int[] stackX = new int[4], stackZ = new int[4];
+        /** The lift of each source column's stack, blocks (FORMAT.md, "The lift"; 0 without a lift layer). */
+        double[] stackLift = new double[4];
+        /** The world's {@code strata/lift} layer, or null. */
+        RasterSampler lift;
         int ns;
 
         private void grow() {
@@ -276,13 +280,17 @@ public final class Structure {
                 stacks = Arrays.copyOf(stacks, 2 * ns);
                 stackX = Arrays.copyOf(stackX, 2 * ns);
                 stackZ = Arrays.copyOf(stackZ, 2 * ns);
+                stackLift = Arrays.copyOf(stackLift, 2 * ns);
             }
             if (stacks[ns] == null)
                 stacks[ns] = new Columns.Stack(strata.stackDepth());
-            if (cell)
+            if (cell) {
                 FarColumn.cellStack(strata, x, z, stacks[ns]);
-            else
+                stackLift[ns] = lift == null ? 0.0 : lift.cellValue(x, z);
+            } else {
                 Columns.stack(wd, strata, x, z, stacks[ns]);
+                stackLift[ns] = lift == null ? 0.0 : lift.columnSpline(x, z);
+            }
             stackX[ns] = x;
             stackZ[ns] = z;
             return ns++;
@@ -325,6 +333,7 @@ public final class Structure {
     public void deformedStack(WorldData wd, RasterSampler strata, int x, int z, Columns.Stack out, Scratch s,
                               boolean cell) {
         s.cell = cell;
+        s.lift = wd.has(WorldData.LIFT) ? wd.layer(WorldData.LIFT) : null;
         out.count = 0;
         s.ns = 0;
         s.np = 0;
@@ -342,7 +351,7 @@ public final class Structure {
         s.hi[0] = Double.POSITIVE_INFINITY;
         s.sx[0] = fx;
         s.sz[0] = fz;
-        s.dy[0] = 0.0;
+        s.dy[0] = 0.0 - s.stackLift[own];
         s.pkey[0] = 0;
         s.done[0] = false;
         s.src[0] = own;
@@ -382,7 +391,7 @@ public final class Structure {
                 }
                 int next = k + 1;
                 if (hc > 0) {
-                    double cut = (double) (st.tops[hc] + 1) - s.dy[k];
+                    double cut = (double) (st.tops[hc] + 1) - s.stackLift[s.src[k]] - s.dy[k];
                     if (cut <= s.lo[k]) {
                         s.done[k] = true;
                         k++;
@@ -477,7 +486,7 @@ public final class Structure {
                     out.push(yMax, s.prock[k], s.pkey[k]);
                 continue;
             }
-            int d = (int) Math.floor(s.dy[k] + 0.5);
+            int d = (int) Math.floor(s.dy[k] + s.stackLift[s.src[k]] + 0.5);
             Columns.Stack st = s.stacks[s.src[k]];
             int cnt = st.count;
             for (int hh = 0; hh < cnt; hh++) {

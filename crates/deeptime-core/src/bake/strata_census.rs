@@ -9,7 +9,8 @@
 //!   under the lifted surface), which horizon the ground cuts; on land, whether
 //!   `surface/class_top` names the rock the column rule draws at the ground.
 //! - [`structure_offsets`] (`notes.bake.strata.structure_lift`, STR-055): how far the lift at a
-//!   fault's or an intrusion's centre is from the lift at the columns it cuts.
+//!   fault's or an intrusion's centre is from the lift at the columns it cuts (the error of
+//!   moving each event by its centre's lift, which the per-column lift of the readers replaced).
 
 use deeptime_format::strata::{ColumnHorizon, StackScratch, StoredHorizon, stack_at_with};
 use rayon::prelude::*;
@@ -396,8 +397,9 @@ pub fn surface(
     })
 }
 
-/// How far the lift at a fault's or an intrusion's centre (what the structure file's event moves
-/// by, [`Lift::structure`]) is from the lift at the columns the event cuts (STR-055): over a 9 × 9
+/// How far the lift at a fault's or an intrusion's centre is from the lift at the columns the
+/// event cuts (STR-055): what moving each event by its centre's lift would get wrong, which the
+/// deformed column rule's per-column lift (`strata/lift`) does not do. Over a 9 × 9
 /// lattice of each event's window (an intrusion's: inside its ellipse), |lift(centre) −
 /// lift(point)|, blocks, as quantiles, for every point and for the points where either lift is
 /// above zero.

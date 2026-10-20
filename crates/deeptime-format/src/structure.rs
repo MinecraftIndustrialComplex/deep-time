@@ -410,6 +410,14 @@ impl Structure {
 
 use crate::strata::ColumnHorizon;
 
+/// The bake's whole-stack lift at a block column, blocks (FORMAT.md, "The lift"): how far the
+/// stacks `stack` reads rose after the history, which the structure's heights do not include.
+/// `None`: the stacks are the history's own (no lift).
+pub type Lift<'a> = Option<&'a dyn Fn(i64, i64) -> f64>;
+
+/// The name of the world's lift layer in its manifest (FORMAT.md, "The lift").
+pub const LIFT_LAYER: &str = "strata/lift";
+
 /// One piece of a column while its events are being undone.
 #[derive(Clone, Copy, Debug)]
 struct Piece {
@@ -437,6 +445,8 @@ pub struct DeformScratch {
     pieces: Vec<Piece>,
     /// Stacks of the source columns met, by block column.
     stacks: Vec<((i64, i64), Vec<ColumnHorizon>)>,
+    /// The lift of each of them (blocks; `lifts[i]` is `stacks[i]`'s).
+    lifts: Vec<f64>,
     spare: Vec<Vec<ColumnHorizon>>,
 }
 
@@ -445,15 +455,18 @@ impl DeformScratch {
         for (_, v) in self.stacks.drain(..) {
             self.spare.push(v);
         }
+        self.lifts.clear();
         self.pieces.clear();
     }
 
-    /// The scratch index of the stack of block column (x, z), read with `stack` when new.
+    /// The scratch index of the stack of block column (x, z), read with `stack` (and its lift
+    /// with `lift`, 0 without one) when new.
     fn source(
         &mut self,
         x: i64,
         z: i64,
         stack: &mut dyn FnMut(i64, i64, &mut Vec<ColumnHorizon>),
+        lift: Lift<'_>,
     ) -> usize {
         if let Some(i) = self.stacks.iter().position(|(at, _)| *at == (x, z)) {
             return i;
@@ -461,6 +474,7 @@ impl DeformScratch {
         let mut v = self.spare.pop().unwrap_or_default();
         stack(x, z, &mut v);
         self.stacks.push(((x, z), v));
+        self.lifts.push(lift.map_or(0.0, |f| f(x, z)));
         self.stacks.len() - 1
     }
 }
@@ -468,17 +482,23 @@ impl DeformScratch {
 impl Structure {
     /// **The deformed column rule** (FORMAT.md, "Structural events"): the horizon stack of block
     /// column (x, z) with the world's folds and faults, top-down like the undeformed rule's
-    /// ([`crate::strata::stack_at`], which `stack(x, z, out)` must be).
+    /// ([`crate::strata::stack_at`], which `stack(x, z, out)` must be). The events' heights are
+    /// the history's; `lift(x, z)` is how far the stack of block column (x, z) rose after it
+    /// (L, the world's `strata/lift` layer read by
+    /// [`crate::raster::RasterRead::column_spline`]; 0 without one),
+    /// so a height of the history at column (x, z) is that height plus L(x, z) in the stacks.
     ///
     /// 1. The column's own stack S₀ and its candidate events ([`StructIndex`]). No candidates (or
     ///    an empty stack): S₀.
-    /// 2. One piece covers every height, reading S₀ unshifted. The events are undone youngest
-    ///    first; each one, for every piece not yet finished whose source column it has weight at:
+    /// 2. One piece covers every height, reading S₀ with dy = −L(x, z): a piece's dy is the
+    ///    history's height at its source less the column's height, before the source's lift.
+    ///    The events are undone youngest first; each one, for every piece not yet finished whose
+    ///    source column it has weight at:
     ///    - **Cover.** In the piece's source stack, the first horizon (top-down) whose unit key is
     ///      at least the event's key is the youngest rock the event deformed. None: the whole
     ///      piece is younger and is finished. Otherwise the part of the piece above that
-    ///      horizon's top (source heights ≥ top + 1) is split off and finished: rock laid down
-    ///      after the event is not moved by it, nor by anything older.
+    ///      horizon's top (column heights ≥ top + 1 − L(source) − dy) is split off and finished:
+    ///      rock laid down after the event is not moved by it, nor by anything older.
     ///    - **Fold:** the rest is shifted (`dy −= weight · amplitude · profile`).
     ///    - **Fault:** the rest is cut at the fault plane; the part above it now reads the column
     ///      `weight · slip` back along the slip, from the stack of the block column that holds
@@ -490,7 +510,8 @@ impl Structure {
     ///    A moved piece takes the event's key.
     /// 3. The pieces are written out top-down. A piece holds the blocks y with lo ≤ y + ½ < hi
     ///    (the top piece up to S₀'s first top, the bottom one down to `min_y`); block y reads
-    ///    source block y + ⌊dy + ½⌋ of the piece's source stack, whose first horizon reaches up
+    ///    source block y + ⌊dy + L(source) + ½⌋ of the piece's source stack, whose first horizon
+    ///    reaches up
     ///    for ever; a horizon whose unit key is below the piece's key (rock younger than the
     ///    event that moved the piece: the shift has reached up into the cover) reads as the
     ///    lowest horizon of that cover (the last one going down whose key is still below the
@@ -504,6 +525,7 @@ impl Structure {
         z: i64,
         min_y: i32,
         stack: &mut dyn FnMut(i64, i64, &mut Vec<ColumnHorizon>),
+        lift: Lift<'_>,
         scratch: &mut DeformScratch,
         out: &mut Vec<ColumnHorizon>,
     ) {
@@ -513,7 +535,7 @@ impl Structure {
         let (fx, fz) = (x as f64, z as f64);
         let mut cands = std::mem::take(&mut scratch.cands);
         index.candidates(self, fx, fz, &mut cands);
-        let own = scratch.source(x, z, stack);
+        let own = scratch.source(x, z, stack, lift);
         if cands.is_empty() || scratch.stacks[own].1.is_empty() {
             out.extend_from_slice(&scratch.stacks[own].1);
             scratch.cands = cands;
@@ -524,7 +546,7 @@ impl Structure {
             hi: f64::INFINITY,
             sx: fx,
             sz: fz,
-            dy: 0.0,
+            dy: 0.0 - scratch.lifts[own],
             key: 0,
             done: false,
             src: own,
@@ -557,7 +579,7 @@ impl Structure {
                 };
                 let mut next = k + 1;
                 if h > 0 {
-                    let cut = f64::from(top + 1) - p.dy;
+                    let cut = f64::from(top + 1) - scratch.lifts[p.src] - p.dy;
                     if cut <= p.lo {
                         scratch.pieces[k].done = true;
                         k += 1;
@@ -598,7 +620,8 @@ impl Structure {
                         let cut = plane - p.dy;
                         if cut < p.hi {
                             let (sx, sz) = (p.sx - w * slip[0], p.sz - w * slip[2]);
-                            let src = scratch.source(sx.floor() as i64, sz.floor() as i64, stack);
+                            let src =
+                                scratch.source(sx.floor() as i64, sz.floor() as i64, stack, lift);
                             let moved = Piece {
                                 lo: if cut > p.lo { cut } else { p.lo },
                                 hi: p.hi,
@@ -682,7 +705,7 @@ impl Structure {
                 }
                 continue;
             }
-            let d = (p.dy + 0.5).floor() as i32;
+            let d = (p.dy + scratch.lifts[p.src] + 0.5).floor() as i32;
             let s = &scratch.stacks[p.src].1;
             let n = s.len();
             for h in 0..n {
@@ -712,16 +735,47 @@ impl Structure {
     }
 }
 
-/// A world's structure ready to deform columns: the events and their index.
+/// A world's structure ready to deform columns: the events, their index and the world's lift.
 pub struct Deformer {
     pub structure: Structure,
     pub index: StructIndex,
+    /// The `strata/lift` layer (FORMAT.md, "The lift"); `None`: the stacks are the history's.
+    pub lift: Option<crate::lazy::LazyLayer>,
 }
 
 impl Deformer {
+    /// The deformer of `structure` over stacks with no lift (the history's own).
     pub fn new(structure: Structure, circumference: u32) -> Deformer {
         let index = StructIndex::new(&structure, circumference);
-        Deformer { structure, index }
+        Deformer {
+            structure,
+            index,
+            lift: None,
+        }
+    }
+
+    /// The deformer of a world-data folder: its structure indexed in the manifest's world
+    /// projection, and its lift layer when it has one; `None` when the world has no structural
+    /// events.
+    pub fn open(world: &Path, manifest: &crate::manifest::Manifest) -> Result<Option<Deformer>> {
+        let Some(mut d) = Deformer::read_in(
+            world,
+            manifest.scale.circumference_blocks,
+            manifest.world_projection().index_frame(),
+        )?
+        else {
+            return Ok(None);
+        };
+        if let Some(e) = manifest.layer(LIFT_LAYER) {
+            d.lift = Some(crate::lazy::LazyLayer::open(&world.join(&e.path))?);
+        }
+        Ok(Some(d))
+    }
+
+    /// The lift at block column (x, z), blocks (0 without a lift layer).
+    pub fn lift_at(&self, x: i64, z: i64) -> f64 {
+        use crate::raster::RasterRead;
+        self.lift.as_ref().map_or(0.0, |l| l.column_spline(x, z))
     }
 
     /// The deformer of a Lambert world-data folder; `None` when the world has no structural
@@ -735,7 +789,8 @@ impl Deformer {
     }
 
     /// The deformer of a world-data folder whose spatial indexes use `frame` (the manifest's
-    /// world projection); `None` when the world has no structural events.
+    /// world projection), without its lift ([`Deformer::open`] reads that too); `None` when the
+    /// world has no structural events.
     pub fn read_in(
         world: &Path,
         circumference: u32,
@@ -748,11 +803,12 @@ impl Deformer {
                 Deformer {
                     structure: s,
                     index,
+                    lift: None,
                 }
             }))
     }
 
-    /// [`Structure::deformed_stack`] at block column (x, z).
+    /// [`Structure::deformed_stack`] at block column (x, z), over the world's lift.
     pub fn stack(
         &self,
         x: i64,
@@ -762,8 +818,13 @@ impl Deformer {
         scratch: &mut DeformScratch,
         out: &mut Vec<ColumnHorizon>,
     ) {
+        let lift = |x, z| self.lift_at(x, z);
+        let lift: Lift<'_> = self
+            .lift
+            .as_ref()
+            .map(|_| &lift as &dyn Fn(i64, i64) -> f64);
         self.structure
-            .deformed_stack(&self.index, x, z, min_y, stack, scratch, out);
+            .deformed_stack(&self.index, x, z, min_y, stack, lift, scratch, out);
     }
 }
 
@@ -1151,6 +1212,7 @@ mod tests {
             z,
             -64,
             &mut cake(step),
+            None,
             &mut DeformScratch::default(),
             &mut out,
         );
@@ -1259,6 +1321,84 @@ mod tests {
                 cake(step)(x, 150, &mut plain);
                 assert_eq!(col[0], plain[0], "the first top is the column's own");
             }
+        }
+    }
+
+    #[test]
+    fn a_lift_after_the_history_raises_the_deformed_column_by_the_columns_own_lift() {
+        // Every column's stack rose by its own whole number of blocks after the history, more
+        // to the east, so a fault's hanging wall reads a column that rose by another amount
+        // than the one it now lies in. The events keep the history's heights: the deformed
+        // column is the history's, risen by the column's own lift, the plane of a fault and the
+        // body of an intrusion with it.
+        let lift = |x: i64, _z: i64| f64::from(7 + 5 * (x as i32).div_euclid(8));
+        let lift_dyn: Lift<'_> = Some(&lift);
+        let mut thrust = fault();
+        if let Shape::Fault { slip, .. } = &mut thrust.shape {
+            *slip = [-slip[0] * 4.0, -slip[1] * 4.0, 0.0];
+        }
+        thrust.key = 4200;
+        for events in [
+            vec![fold(), fault(), stock(8000)],
+            vec![thrust, fold()],
+            vec![stock(4000), fault()],
+        ] {
+            let st = world(events);
+            let index = StructIndex::new(&st, 4096);
+            for step in [0, 1] {
+                for x in [60, 75, 90, 101, 112, 120, 125, 160, 180, 240] {
+                    let (mut plain, mut got) = (Vec::new(), Vec::new());
+                    let mut scratch = DeformScratch::default();
+                    st.deformed_stack(
+                        &index,
+                        x,
+                        200,
+                        -1000,
+                        &mut cake(step),
+                        None,
+                        &mut scratch,
+                        &mut plain,
+                    );
+                    let mut base = cake(step);
+                    let mut risen = |sx: i64, sz: i64, o: &mut Vec<ColumnHorizon>| {
+                        base(sx, sz, o);
+                        let l = lift(sx, sz) as i32;
+                        o.iter_mut().for_each(|h| h.0 += l);
+                    };
+                    st.deformed_stack(
+                        &index,
+                        x,
+                        200,
+                        -1000,
+                        &mut risen,
+                        lift_dyn,
+                        &mut scratch,
+                        &mut got,
+                    );
+                    let l = lift(x, 200) as i32;
+                    let want: Vec<ColumnHorizon> =
+                        plain.iter().map(|&(t, c, k)| (t + l, c, k)).collect();
+                    assert_eq!(got, want, "x {x}, step {step}, {:?}", st.events[0].shape);
+                }
+            }
+        }
+        // No lift and a lift of 0 everywhere are the same rule.
+        let st = world(vec![fold(), fault(), stock(8000)]);
+        let index = StructIndex::new(&st, 4096);
+        let zero = |_: i64, _: i64| 0.0;
+        for x in [60, 101, 125, 180] {
+            let mut got = Vec::new();
+            st.deformed_stack(
+                &index,
+                x,
+                200,
+                -64,
+                &mut cake(1),
+                Some(&zero),
+                &mut DeformScratch::default(),
+                &mut got,
+            );
+            assert_eq!(got, deformed(&st, x, 200, 1));
         }
     }
 

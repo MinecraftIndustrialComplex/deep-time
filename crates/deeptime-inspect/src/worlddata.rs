@@ -65,8 +65,7 @@ impl WorldData {
             })
             .unwrap_or_default();
         let circumference = i64::from(manifest.scale.circumference_blocks);
-        let structure =
-            deeptime_format::structure::Deformer::read(dir, manifest.scale.circumference_blocks)?;
+        let structure = deeptime_format::structure::Deformer::open(dir, &manifest)?;
         Ok(WorldData {
             structure,
             dir: dir.to_owned(),

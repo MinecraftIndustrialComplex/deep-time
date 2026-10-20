@@ -143,6 +143,23 @@ pub fn bake(
     let mean = hz.mean_horizons();
     let k = hz.k;
     out.layer_bytes(layer.desc, &layer.bytes)?;
+    // The lift beside the stacks it raised (FORMAT.md, "The lift"): the structure file keeps the
+    // history's heights, and its readers add the lift at each column they read (STR-055).
+    let lift16: Vec<i16> = moved
+        .iter()
+        .map(|m| m.lift.clamp(0, i32::from(i16::MAX)) as i16)
+        .collect();
+    out.layer(
+        super::desc(
+            deeptime_format::structure::LIFT_LAYER,
+            deeptime_format::DType::I16,
+            &hz.grid,
+            1.0 / 16.0,
+            "blocks",
+            None,
+        ),
+        &lift16,
+    )?;
     out.json(
         deeptime_format::column::CLASSES_PATH,
         &Horizons::classes_json(),
@@ -388,7 +405,8 @@ fn raise_tops(
                         if under.is_finite() {
                             local_sum[c].0 += v - under;
                             local_sum[c].1 += 1;
-                            if v >= sea_y && gi.is_multiple_of(stride) && gj.is_multiple_of(stride) {
+                            if v >= sea_y && gi.is_multiple_of(stride) && gj.is_multiple_of(stride)
+                            {
                                 points.push(Point {
                                     x: bx,
                                     z: bz,
@@ -556,7 +574,7 @@ fn raise_tops(
         "cells": lifted,
         "mean_blocks": if lifted > 0 { lift_sum / lifted as f64 } else { 0.0 },
         "max_blocks": max_lift,
-        "rule": "every horizon of a cell rises by the mean, over the L3 cells of the four L1 squares round the cell's node, of the final elevation less the history's surface at the same point (the first tops through the column rule's B-spline), where that is positive (capped at max_y); bodies and sites rise as the rock at their centre does (the column rule's height of its stratigraphic key, before and after the lift and the crest raise), the structure file's faults and intrusions by the lift at their centre",
+        "rule": "every horizon of a cell rises by the mean, over the L3 cells of the four L1 squares round the cell's node, of the final elevation less the history's surface at the same point (the first tops through the column rule's B-spline), where that is positive (capped at max_y); bodies and sites rise as the rock at their centre does (the column rule's height of its stratigraphic key, before and after the lift and the crest raise); the structure file keeps the history's heights and its readers add the lift at each column they read (the strata/lift layer)",
     });
     Ok(Raised {
         raised,
@@ -693,8 +711,9 @@ pub fn raise_stack_unit(
 /// (blocks) every horizon rose. Whatever the history put at a depth under its surface rises with
 /// the rock it was put in: the plutons and ore bodies and the deposit sites by how far the rock at
 /// their centre rose (`bodies_dy`, `sites_dy`: [`key_shift`], the lift and the crest raise
-/// together), the faults and intrusions of the structure file by the lift at their centre
-/// ([`Lift::structure`]).
+/// together). The structure file keeps the history's heights: the bake writes the lift as the
+/// `strata/lift` layer and the deformed column rule adds it at every column it reads
+/// (`deeptime_format::structure::Structure::deformed_stack`).
 #[derive(Clone, Debug)]
 pub struct Lift {
     pub grid: deeptime_format::GridDesc,
@@ -948,26 +967,6 @@ impl Lift {
                 ns
             })
             .collect()
-    }
-
-    /// The structure file's heights risen by the lift at each event's centre: a fault's plane
-    /// and an intrusion's centre (a fold moves columns relative to where they are). An
-    /// approximation (ledger: STR-055): the rock a fault or an intrusion cuts rose by the lift at
-    /// its own column, which differs from the centre's where the lift changes across the window.
-    pub fn structure(
-        &self,
-        st: &deeptime_format::structure::Structure,
-    ) -> deeptime_format::structure::Structure {
-        use deeptime_format::structure::Shape;
-        let mut out = st.clone();
-        for e in &mut out.events {
-            let dy = self.at(e.window.centre[0], e.window.centre[1]);
-            match &mut e.shape {
-                Shape::Fault { y, .. } | Shape::Intrusion { y, .. } => *y += dy,
-                Shape::Fold { .. } => {}
-            }
-        }
-        out
     }
 }
 

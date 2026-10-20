@@ -59,11 +59,16 @@ to the ceiling at y 639.
    beside it (STR-054), merges anything thinner than its class minimum into the bed under it, and keeps 32
    horizons a cell (STR-001, STR-005 to STR-008).
 5. **The lift.** The terrain the game builds (the L3 elevation and the amplifier's detail) stands above the
-   history's surface on mountains. Where it does, every horizon of the cell rises by the difference, and
-   the plutons, ore bodies, deposit sites, fault planes and intrusions with them (STR-052). The crests
-   that are still above the first horizon's top are filled by the thickest rock unit near the surface, the
-   beds over it riding up with it (STR-053). Below the history's surface nothing moves: valleys cut into
-   the stack.
+   history's surface on mountains. Where it does, every horizon of the cell rises by the difference,
+   measured point by point: the mean, over the L3 cells round the cell's node, of the elevation less the
+   history's surface at the same point, so a valley cell beside high ground is not lifted by its
+   neighbours' height (STR-052). The plutons, ore bodies and deposit sites rise with the rock at their
+   centre and stay in their host bed (STR-056). The structure file keeps the history's heights: the lift
+   is written beside the stacks (`strata/lift`) and the game's column rule adds it at every column a fold,
+   fault or intrusion reads, so a fault plane rises with the rock it cuts (STR-055). The crests that are
+   still above the first horizon's top are filled by the thickest rock unit near the surface, the beds
+   over it riding up with it (STR-053). Below the history's surface nothing moves: valleys cut into the
+   stack.
 6. **The column rule.** The game does not read a cell's stack but the blend of the 16 cells round the block
    column, matched by key, so a bed present in every cell interpolates smoothly and a bed present in some
    pinches out (STR-015 to STR-017).
@@ -102,10 +107,13 @@ to the ceiling at y 639.
 | STR-044 to STR-048 | realism checks | zero grade inversions; slivers under 8 blocks; plutonic sheets under 16 blocks | - | build log 2026-10-01 | `game-choice` |
 | STR-049 | compaction | none: a layer keeps its deposited thickness | - | - | `game-choice` |
 | STR-050 | time in a one-block horizon | 35 m / accumulation rate | Myr | secondary | `abstract-only` |
-| STR-051 | mountain-fill review measure | cells 8 and 30 blocks above the history's surface; "most" over half | blocks | review measure | `game-choice` |
-| STR-052 | the lift | every horizon + max(0, node mean elevation - first top), capped at max_y | blocks | rule of the bake | `game-choice` |
+| STR-051 | mountain-fill review measure | cells whose node relief is 8 and 30 blocks; "most" over half; first rock horizon | blocks | review measure | `game-choice` |
+| STR-052 | the lift | every horizon + max(0, node mean of elevation - history's surface at each L3 point), capped at max_y | blocks | rule of the bake | `game-choice` |
 | STR-053 | the crests | first top at least highest elevation + amplitude within two cells + 1; thickest rock unit within 16 blocks fills | blocks | rule of the bake | `game-choice` |
 | STR-054 | smoothing within one crust kind | neighbours of another kind skipped | - | rule of the bake | `game-choice` |
+| STR-055 | structures read through the lift | `strata/lift` layer; each source stack read through its own lift | blocks | rule of the format | `game-choice` |
+| STR-056 | bodies and sites rise with their rock | the column rule's height of the key at the centre, after less before | blocks | rule of the bake | `game-choice` |
+| STR-057 | surface census | every 4th L3 land cell; valley floor S >= 4 and 4 under; lifted S >= 1 | blocks | review measure | `game-choice` |
 
 The trap closure of a cell is the largest of the rules, clamped to 0 to 1 (STR-040):
 
@@ -250,9 +258,13 @@ task.
   cell; the amplifier's own deposits and the till are not in the stacks, so a lifted ridge has no extra
   young cover (STR-052). Where the terrain lies below the history's surface the cut exposes older rock, as
   before.
-- **A body rises whole.** A pluton, an ore body or one slab of an aureole rises by the lift at its centre,
-  while the horizons and the structure file's intrusions rise point by point; where the lift changes across a
-  body (a steep range front), its edges sit up to the change in lift off the rock beside them (STR-052).
+- **A body rises whole.** A pluton, an ore body or one slab of an aureole rises by how far the rock at its
+  centre rose (STR-056), while the horizons and the structure's faults and intrusions rise column by column
+  (STR-055); where the lift changes across a body (a steep range front), its edges sit up to the change in
+  lift off the rock beside them.
+- **The crest raise is not in the lift layer.** The crest raise (STR-053) thickens a unit near the surface
+  after the lift; `strata/lift` holds the whole-stack lift only, so a fault plane or an intrusion inside a
+  raised crest unit sits off the rock beside it by up to that raise (STR-055).
 - **The column rule crosses crust kinds.** The bake smooths only within one crust kind (STR-054), but
   the game's column rule blends the 4 x 4 horizon cells round a block column by key whatever their
   kind (STR-015), so within about 5 to 15 km of a coast a continent's granite and gneiss reach into
