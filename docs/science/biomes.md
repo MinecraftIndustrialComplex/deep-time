@@ -135,7 +135,8 @@ outside the earlier range.
 The MIC gate on master 025676c8 failed `climateConsistent` with "Köppen families below their floor:
 C 0.621 < 0.630 (132 columns)". Neither the mapping nor the test planet's climate had moved:
 
-- On `planet_world_4k` (seeds 11 to 14) the present-day nudge does nothing. Its factor is 1.00 on
+- On `planet_world_4k` (seeds 11 to 14, on 26ce664e, before master's arc change to that planet,
+  d54c7f0f) the present-day nudge does nothing. Its factor is 1.00 on
   all four, and 0.000 to 0.010 of the land is under ice sheets. The same holds with and without the
   nudge's new cap (climate.md, "The present-day nudge's cap"). The climate fix therefore cannot
   change this share, and it was not a climate fault.

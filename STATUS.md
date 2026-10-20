@@ -169,7 +169,8 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   - The fixed runs' clock series equal master's at every 100 Myr point.
   - The fixed 1000 Myr ends are 1.8 to 9.1 PAL. Master's were 1.8 to 42, three of the four above the Phanerozoic's 25.
   - The quick scattered seed 1 at 4 threads equals its 2-thread run.
-  - The test planet (`planet_world_4k`, seeds 11 to 14) has factor 1.00 with and without the cap.
+  - The test planet (`planet_world_4k`, seeds 11 to 14, on 26ce664e) has factor 1.00 with and without the cap.
+  - The GPU agent's 100 Myr runs (seeds 6 to 15, CPU and GPU) all have factor 1.000; its 1000 Myr GPU arm ends at 12,600 ppm (x9.73) against the CPU's 10,011 (x6.86), the factor's sensitivity to last bits that the cap now bounds.
 - **The Köppen floors.**
   - The MIC `climateConsistent` failure (C 0.621 < 0.630 on 132 columns) is census noise: the standard error is 0.042, and the test planet's climate does not change with the fix.
   - A family now fails only when its share's one-sided 99 % Wilson upper bound is under its floor (`ShareBound`, z = 2.326, BIO-072). The floors are unchanged.
@@ -189,6 +190,7 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   - fmt clean; clippy -D warnings clean; deny: bans ok, licenses ok.
   - cargo test --workspace --no-fail-fast: 29 binaries, 995 passed, 0 failed, 5 ignored.
   - `./gradlew build test`: 365 tests, 0 failures, 2 skipped.
+  - Again after merging master be17a7cf (conflicts only in the two logs): fmt, clippy and deny clean; cargo test 997 passed, 0 failed, 5 ignored; Gradle 365 tests, 0 failures, 2 skipped.
   - No GameTest was run (the coordinator's batch).
 - **Science.**
   - climate.md: "The present-day nudge's cap" and the ledger-ids table.
