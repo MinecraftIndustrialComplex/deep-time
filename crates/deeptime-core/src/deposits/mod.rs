@@ -3145,13 +3145,7 @@ impl DepositStage {
             id: site_id,
             kind: t.site_kind.site_kind(),
             deposit_type: t.id.clone(),
-            center: [
-                x.round() as i32,
-                centre_y
-                    .round()
-                    .clamp(f64::from(sc.min_y), f64::from(sc.max_y)) as i32,
-                z.round() as i32,
-            ],
+            center: centre_block(x, centre_y, z, &sc),
             lat_lon: ll,
             aabb,
             body: bodies.first().map(|b| b.id),
@@ -3221,11 +3215,7 @@ impl DepositStage {
                 id: child_id,
                 kind: ctype.site_kind.site_kind(),
                 deposit_type: ctype.id.clone(),
-                center: [
-                    x.round() as i32,
-                    (surf - depth / sc.m_per_block_v).round() as i32,
-                    z.round() as i32,
-                ],
+                center: centre_block(x, surf - depth / sc.m_per_block_v, z, &sc),
                 lat_lon: ll,
                 aabb: union_aabb(&cbodies),
                 body: cbodies.first().map(|b| b.id),
@@ -3444,11 +3434,12 @@ impl DepositStage {
             id: site_id,
             kind: child.site_kind.site_kind(),
             deposit_type: child.id.clone(),
-            center: [
-                x.round() as i32,
-                (surf - half_m * child.balance.size_mult_v / sc.m_per_block_v).round() as i32,
-                z.round() as i32,
-            ],
+            center: centre_block(
+                x,
+                surf - half_m * child.balance.size_mult_v / sc.m_per_block_v,
+                z,
+                &sc,
+            ),
             lat_lon: ll,
             aabb: union_aabb(&bodies),
             body: bodies.first().map(|b| b.id),
@@ -3791,11 +3782,7 @@ impl DepositStage {
             id: site_id,
             kind: t.site_kind.site_kind(),
             deposit_type: t.id.clone(),
-            center: [
-                x.round() as i32,
-                (surf - depth / sc.m_per_block_v).round() as i32,
-                z.round() as i32,
-            ],
+            center: centre_block(x, surf - depth / sc.m_per_block_v, z, &sc),
             lat_lon: lat_lon_of(f.c, x, z),
             aabb: union_aabb(&bodies),
             body: bodies.first().map(|b| b.id),
@@ -3812,6 +3799,17 @@ impl DepositStage {
         f.census[ti].sites += 1;
         Ok(())
     }
+}
+
+/// The block holding point (x, y, z), y kept inside the world: a site's centre. Rounding put the
+/// centre of a one-block host horizon (its middle half a block above the block's floor) in the
+/// block above it, and x and z a column off the one the host was read in (`Cover`, floor).
+fn centre_block(x: f64, y: f64, z: f64, sc: &Scales) -> [i32; 3] {
+    [
+        x.floor() as i32,
+        y.floor().clamp(f64::from(sc.min_y), f64::from(sc.max_y)) as i32,
+        z.floor() as i32,
+    ]
 }
 
 fn union_aabb(bodies: &[Body]) -> [[i32; 3]; 2] {

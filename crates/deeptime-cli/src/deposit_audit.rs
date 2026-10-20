@@ -511,6 +511,50 @@ fn pole_to_pole_blocks(m: &deeptime_format::Manifest) -> i64 {
     (z1 - z0) as i64
 }
 
+/// Of an in-stratum site's ore-body blocks (`hosts.in_stratum`: MVT), the share whose stratum
+/// (the drawn stack, without the bodies) is one of its type's host classes; None for another
+/// type or a site without ore blocks. The site's centre alone hides a body that leaves a
+/// one-block horizon sideways.
+fn host_rock_share(
+    w: &ColumnWorld,
+    t: Option<&DepositType>,
+    bodies: &[&Body],
+    deform: &mut deeptime_format::structure::DeformScratch,
+    stack: &mut Vec<deeptime_format::strata::ColumnHorizon>,
+) -> Option<f64> {
+    let t = t.filter(|t| t.hosts.in_stratum)?;
+    let weights = t.hosts.weights().ok()?;
+    let host = |class: u8| {
+        w.classes
+            .get(usize::from(class))
+            .and_then(|c| weights.get(c))
+            .is_some_and(|&v| v > 0.0)
+    };
+    let (mut n, mut inside) = (0u64, 0u64);
+    for b in bodies.iter().filter(|b| b.role == "ore") {
+        let [lo, hi] = b.aabb;
+        for x in lo[0]..=hi[0] {
+            let wx = w.wrap_x(i64::from(x));
+            for z in lo[2]..=hi[2] {
+                let mut read = false;
+                for y in lo[1].max(w.min_y)..=hi[1].min(w.max_y) {
+                    if b.locate(w.c as u32, wx as i32, y, z).is_none() {
+                        continue;
+                    }
+                    if !read {
+                        w.stack(wx, i64::from(z), deform, stack);
+                        read = true;
+                    }
+                    n += 1;
+                    let class = deeptime_format::column::horizon_at(stack, y).map(|h| stack[h].1);
+                    inside += u64::from(class.is_some_and(host));
+                }
+            }
+        }
+    }
+    (n > 0).then(|| inside as f64 / n as f64)
+}
+
 /// Runs the audit; returns the JSON report (also written to `--json`).
 pub fn run(o: &Options) -> CliResult<Value> {
     let w = ColumnWorld::open(&o.world_data)?;
@@ -627,6 +671,8 @@ pub fn run(o: &Options) -> CliResult<Value> {
         per_chunk: f64,
         in_zone_share: f64,
         hosted_share: f64,
+        /// [`host_rock_share`], for an in-stratum type.
+        host_share: Option<f64>,
         tonnage: f64,
         chunks: f64,
     }
@@ -688,6 +734,13 @@ pub fn run(o: &Options) -> CliResult<Value> {
             .and_then(|h| w.classes.get(usize::from(stack[h].1)))
             .cloned();
         let rock = m.class(sx, sy, sz).map(str::to_owned);
+        let host_share = host_rock_share(
+            &w,
+            types.iter().find(|t| t.id == s.deposit_type),
+            &bodies,
+            &mut deform,
+            &mut stack,
+        );
         let age = crust_age
             .as_ref()
             .map(|l| l.nearest(w.wrap_x(sx) as f64, sz as f64))
@@ -699,6 +752,7 @@ pub fn run(o: &Options) -> CliResult<Value> {
             // The ground and the water at the site's centre column.
             "ground_y": here.ground, "water": here.kind.name(),
             "stratum": stratum, "rock": rock, "oceanic": age.is_some(), "crust_age_myr": age,
+            "ore_in_host_share": host_share,
             "ground_m": ground_m,
             "tonnage_t": tonnage,
             "grade": s.products.first().map(|p| p.grade),
@@ -731,6 +785,7 @@ pub fn run(o: &Options) -> CliResult<Value> {
             } else {
                 0.0
             },
+            host_share,
             tonnage,
             chunks,
         });
@@ -778,6 +833,8 @@ pub fn run(o: &Options) -> CliResult<Value> {
             // Ore-equivalent (a raw block counts nine) per chunk the body reaches.
             "ore_per_chunk_in_body": summary(rs.iter().filter(|r| r.chunks > 0.0).map(|r| r.per_chunk).collect()),
             "hostable_share": summary(rs.iter().map(|r| r.hosted_share).collect()),
+            // In-stratum types: the share of a site's ore-body blocks in a host horizon.
+            "ore_in_host_share": summary(rs.iter().filter_map(|r| r.host_share).collect()),
             "ore_share_of_hostable": summary(dens),
             "scatter_per_chunk": sc.map(num),
             "vanilla_per_chunk": primary.as_deref().and_then(vanilla),

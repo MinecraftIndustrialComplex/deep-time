@@ -1226,13 +1226,22 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         vec_note.insert("structure_events".into(), json!(out.events.len()));
     }
     let bodies = read_bodies(dir)?;
+    let sites = read_sites(dir)?;
+    // A body of an in-stratum type (`hosts.in_stratum`: MVT) lies in its host horizon, which the
+    // world's stacks hold at the block y the simulation's do (each world cell takes the nearest
+    // Lambert cell's stack; only the first top is raised to the new ground): it keeps its y, as
+    // its site's centre does. Moving it with the drawn ground took it out of a thin horizon.
+    let stratabound = match &sites {
+        Some((ss, _)) => stratabound_sites(ss.iter().map(|s| (s.id, s.deposit_type.as_str())))?,
+        None => Default::default(),
+    };
     let mut new_bodies = Vec::new();
     let mut shifts = (0usize, 0.0f64);
     if let (Some(bs), Some(we)) = (&bodies, &world_elev) {
         // Each body keeps its depth under the drawn terrain: it moves up or down by the change of
         // the drawn height between its old column and its new one (the resampling smooths the
         // terrain a little, more near the poles), so a crater's lens stays under the floor and a
-        // placer on the ground.
+        // placer on the ground. A stratabound one stays in its horizon instead (above).
         // The detail term of a drawing: its noise (spec and seed) for x period `c` in projection
         // `wpj`; paired with the amplitude layer by `drawn_detail`.
         let noise = |c: u32, wpj: &WorldProjection| match (spec.as_ref(), spec_seed) {
@@ -1260,7 +1269,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 let mut nb = project_body(&map, b);
                 let dy =
                     new.height(nb.center[0], nb.center[2]) - old.height(b.center[0], b.center[2]);
-                if dy.is_finite() {
+                if dy.is_finite() && !b.site.is_some_and(|s| stratabound.contains(&s)) {
                     nb.center[1] += dy;
                     if nb.clip_top_y != deeptime_format::bodies::NO_CLIP {
                         nb.clip_top_y += dy.round() as i32;
@@ -1279,7 +1288,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             json!({"count": new_bodies.len(), "moved_a_block_or_more": shifts.0, "largest_move_blocks": shifts.1}),
         );
     }
-    if let Some((sites, _)) = read_sites(dir)? {
+    if let Some((sites, _)) = sites {
         let out: Vec<_> = sites
             .iter()
             .map(|s| project_site(&map, s, &new_bodies))
@@ -1627,6 +1636,20 @@ pub fn project_structure(
     out
 }
 
+/// Of (site id, deposit type) pairs, the sites of an in-stratum type (`hosts.in_stratum`, the
+/// built-in types): their bodies lie in a host horizon and keep their block y through the
+/// projection.
+fn stratabound_sites<'a>(
+    sites: impl IntoIterator<Item = (deeptime_format::sites::SiteId, &'a str)>,
+) -> Result<std::collections::HashSet<deeptime_format::sites::SiteId>, CoreError> {
+    let types = crate::deposits::types::builtin()?;
+    Ok(sites
+        .into_iter()
+        .filter(|&(_, ty)| types.iter().any(|t| t.id == ty && t.hosts.in_stratum))
+        .map(|(id, _)| id)
+        .collect())
+}
+
 /// A body in the world: its centre through the projection, its horizontal axes and yaw through
 /// the local Jacobian, its box recomputed.
 pub fn project_body(map: &Mapping, b: &deeptime_format::Body) -> deeptime_format::Body {
@@ -1814,6 +1837,15 @@ mod tests {
             }
         }
         sum / (nx * nz) as f64
+    }
+
+    /// MVT's bodies keep their block y through the projection (they lie in a host horizon the
+    /// world's stacks hold at that y); a porphyry's move with the drawn ground.
+    #[test]
+    fn only_in_stratum_sites_keep_their_y() {
+        let got = stratabound_sites([(1, "deeptime:mvt_zn_pb"), (2, "deeptime:porphyry_cu_mo_au")])
+            .unwrap();
+        assert_eq!(got.into_iter().collect::<Vec<_>>(), vec![1]);
     }
 
     /// A body anywhere on the simulation's grid, the pole rows and the rows past them included, projects to a body the
