@@ -2349,7 +2349,9 @@ mod tests {
         assert!(v["strata"].as_array().is_some_and(|a| !a.is_empty()));
         // The crust and the structural events, and what the core adds: every horizon's unit
         // decoded, with an age for a strata-log unit (the run's preset gives the log's span).
-        let kind = v["crust"]["type_name"].as_str().expect("a planet bakes meta/crust_type");
+        let kind = v["crust"]["type_name"]
+            .as_str()
+            .expect("a planet bakes meta/crust_type");
         assert!(kind == "oceanic" || kind == "continental", "{}", v["crust"]);
         assert!(v["structure_events"].is_array() && v["structure_candidates"].is_u64());
         let facts = deeptime_core::column_info::WorldFacts::of_world(&dir.join("world"));

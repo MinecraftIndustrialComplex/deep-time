@@ -191,12 +191,7 @@ impl RockWorld {
 
     /// The structural events at column (x, z), with which of them changed its stack
     /// ([`deeptime_format::column::events_at`]); empty in a world without any.
-    pub fn events_at(
-        &self,
-        scratch: &mut StackScratch,
-        x: i64,
-        z: i64,
-    ) -> Vec<serde_json::Value> {
+    pub fn events_at(&self, scratch: &mut StackScratch, x: i64, z: i64) -> Vec<serde_json::Value> {
         let Some(d) = self.cw.structure() else {
             return Vec::new();
         };

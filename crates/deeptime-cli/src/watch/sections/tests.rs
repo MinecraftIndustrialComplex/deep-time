@@ -199,7 +199,16 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     assert_eq!(n, len.ceil() as usize + 1);
     let cols = &v["columns"];
     for key in [
-        "x", "z", "ground", "water", "runs", "bodies", "units", "crust", "crust_age", "events",
+        "x",
+        "z",
+        "ground",
+        "water",
+        "runs",
+        "bodies",
+        "units",
+        "crust",
+        "crust_age",
+        "events",
     ] {
         assert_eq!(cols[key].as_array().unwrap().len(), n, "{key}");
     }

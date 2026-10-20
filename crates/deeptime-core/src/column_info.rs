@@ -59,7 +59,11 @@ pub enum Part {
     },
     /// A basement pool: its position `q` in `TOP_ORDER`, its pool code (`plates::state::pool`) and
     /// its metamorphic step (0 the pool's own class, 3 the fourth step or later).
-    Pool { q: usize, pool: usize, step: usize },
+    Pool {
+        q: usize,
+        pool: usize,
+        step: usize,
+    },
     Mantle,
 }
 
@@ -346,7 +350,10 @@ pub fn describe(u: &UnitKey, class: &str) -> Value {
     let peak = match (u.part, u.band) {
         (Part::Pool { .. }, Some(b)) if b == key::BANDS - 1 && plutonic(cls) => {
             v["peak_c"] = json!([key::BAND_FROM_C[b], null]);
-            Some("plutonic basement: keyed with the highest grade whatever its temperature".to_owned())
+            Some(
+                "plutonic basement: keyed with the highest grade whatever its temperature"
+                    .to_owned(),
+            )
         }
         (_, Some(b)) => {
             let (words, lo, hi) = grade(b);
@@ -439,12 +446,7 @@ impl WorldFacts {
             .map(|types| {
                 types
                     .iter()
-                    .map(|t| {
-                        (
-                            t.id.clone(),
-                            (t.balance.size_mult_h, t.balance.size_mult_v),
-                        )
-                    })
+                    .map(|t| (t.id.clone(), (t.balance.size_mult_h, t.balance.size_mult_v)))
                     .collect()
             })
             .unwrap_or_default();
@@ -519,9 +521,9 @@ pub fn annotate(v: &mut Value, facts: &WorldFacts) {
                 .find(|(ik, ic, _, _)| *ik == u64::from(k) && *ic == class)
             {
                 Some((_, _, id, age)) => {
-                    let when = age
-                        .as_f64()
-                        .map_or("age unknown".to_owned(), |a| format!("{} Myr ago", round(a, 1)));
+                    let when = age.as_f64().map_or("age unknown".to_owned(), |a| {
+                        format!("{} Myr ago", round(a, 1))
+                    });
                     json!({
                         "key": k, "part": "intrusion", "event": id, "age_ma": age,
                         "band": null, "peak_c": null, "grade": null,
@@ -572,7 +574,9 @@ mod tests {
             panic!("{top:?}")
         };
         assert_eq!(age_ma, Some(0.0));
-        assert!((key_myr.unwrap() - 1000.0 / f64::from(key::LOG_BASE - key::LOG_TOP)).abs() < 1e-12);
+        assert!(
+            (key_myr.unwrap() - 1000.0 / f64::from(key::LOG_BASE - key::LOG_TOP)).abs() < 1e-12
+        );
         let Part::Log { age_ma, .. } = decode(key::LOG_BASE, SPAN).part else {
             panic!()
         };
@@ -591,7 +595,12 @@ mod tests {
     #[test]
     fn decoding_inverts_the_key_writers() {
         for band in 0..key::BANDS {
-            for &(delta, span) in &[(0.0, 1000.0), (123.4, 1000.0), (499.0, 500.0), (3.0, 4000.0)] {
+            for &(delta, span) in &[
+                (0.0, 1000.0),
+                (123.4, 1000.0),
+                (499.0, 500.0),
+                (3.0, 4000.0),
+            ] {
                 let k = key::of_age(band, delta, span);
                 let u = decode(k, Some(span));
                 assert_eq!(u.band, Some(band), "band {band}, key {k}");
@@ -645,8 +654,16 @@ mod tests {
             .iter()
             .map(|r| r.as_str().unwrap())
             .collect();
-        assert!(rocks.contains(&"shale") && rocks.contains(&"mudstone"), "{rocks:?}");
-        assert!(d["text"].as_str().unwrap().contains("formed at or above 350 °C"));
+        assert!(
+            rocks.contains(&"shale") && rocks.contains(&"mudstone"),
+            "{rocks:?}"
+        );
+        assert!(
+            d["text"]
+                .as_str()
+                .unwrap()
+                .contains("formed at or above 350 °C")
+        );
         // Band 0 is unmetamorphosed and its rock is its own.
         let d = describe(&decode(key::of_age(0, 50.0, 1000.0), SPAN), "sandstone");
         assert_eq!(d["parent"]["kind"], "itself");
@@ -665,7 +682,12 @@ mod tests {
         let [lo, _] = key::pool(key::BANDS - 1, q, 0);
         let d = describe(&decode(lo, SPAN), "granite");
         assert_eq!(d["pool"], "felsic_plutonic");
-        assert!(d["grade"].as_str().unwrap().starts_with("plutonic basement"));
+        assert!(
+            d["grade"]
+                .as_str()
+                .unwrap()
+                .starts_with("plutonic basement")
+        );
         // The regolith and the mantle have no grade.
         assert_eq!(describe(&decode(10, SPAN), "soil")["grade"], Value::Null);
         assert_eq!(
@@ -739,8 +761,13 @@ mod tests {
         // The built-in coal type's own multiplier, as a run on the default preset draws it.
         let types = crate::deposits::types::builtin().unwrap();
         let coal = types.iter().find(|t| t.id == "deeptime:coal_seam").unwrap();
-        let n = scale_note(&coal.id, "seam", coal.balance.size_mult_h, coal.balance.size_mult_v)
-            .unwrap();
+        let n = scale_note(
+            &coal.id,
+            "seam",
+            coal.balance.size_mult_h,
+            coal.balance.size_mult_v,
+        )
+        .unwrap();
         assert!(n["text"].as_str().unwrap().starts_with("coal seam drawn"));
     }
 
