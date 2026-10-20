@@ -707,12 +707,14 @@ struct Boundary {
     front: Option<(u32, usize, DVec3, DVec3)>,
 }
 
-/// Set to 1 to scale the arcs, the cordillera and the subduction uplift by the convergence normal
-/// to the front (the boundary's normal, [`boundary_normal`]) instead of the full relative speed.
-/// Off by default: an experiment of the land-shape task (2026-10-20), which measured it to bring
-/// the arcs' yearly crust near Earth's and to take a fifth of the land away, so it waits for the
-/// continental crust's losses to be brought to Earth's (`docs/science/plates.md`, "Land shape and
-/// the high ground"). ledger: PLT-312
+/// Set to 1 to scale the arcs and the subduction uplift by the convergence normal to the front
+/// (the boundary's normal, [`boundary_normal`]) instead of the full relative speed (the cordillera
+/// takes no convergence since PLT-320). Off by default: an experiment of the land-shape task
+/// (2026-10-20), which measured it to bring the arcs' yearly crust near Earth's and to take a fifth
+/// of the land away, so it waits for the continental crust's losses to be brought to Earth's
+/// (`docs/science/plates.md`, "Land shape and the high ground"); the crust-budget task measured it
+/// again with the cordillera at Earth's typical arc and the collisions still losing four times
+/// Earth's ("The crust budget against Stern & Scholl"). ledger: PLT-312
 pub const NORMAL_CONVERGENCE_ENV: &str = "DEEPTIME_ARC_NORMAL";
 
 fn normal_convergence() -> bool {
