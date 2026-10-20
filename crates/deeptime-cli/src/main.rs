@@ -332,7 +332,9 @@ enum Command {
     /// The column evaluator (plan §9.3, P1-08): what Deep Time decides for one block column of a
     /// world-data folder — the terrain height, water, the horizon stack, the bodies it passes
     /// through and the rock from the top block down — as JSON, with every other layer's value there
-    /// and the sites whose box holds it.
+    /// and the sites whose box holds it; without `--parity` also each horizon's unit decoded (age,
+    /// peak temperature, parent rock), the crust, the structural events at the column and the
+    /// bodies' ages and drawn scales (FORMAT.md, "Inspecting a column").
     #[command(allow_negative_numbers = true)]
     InspectColumn {
         /// World-data folder (a run's `--out`, a world's `deeptime/` folder).
@@ -966,7 +968,12 @@ fn main() -> ExitCode {
                 let mut v = if parity {
                     w.sample(x, z).to_json()
                 } else {
-                    w.inspect(x, z)
+                    let mut v = w.inspect(x, z);
+                    deeptime_core::column_info::annotate(
+                        &mut v,
+                        &deeptime_core::column_info::WorldFacts::of_world(&world_data),
+                    );
+                    v
                 };
                 if why && let Err(e) = attach_why(&mut v, &world_data) {
                     eprintln!("deeptime inspect-column: {e}");
@@ -2336,10 +2343,25 @@ mod tests {
             assert!((p - fresh.p_annual).abs() < 1e-6 * fresh.p_annual.max(1.0));
         }
         // (The 4k planet's world is 3,072 blocks round: x in [−1,536, 1,536).)
-        let v = w.inspect(-1500, 300);
+        let mut v = w.inspect(-1500, 300);
         assert_eq!(v["wx"], -1500);
         assert!(v["layers"]["climate/temperature"]["bilinear"].is_number());
         assert!(v["strata"].as_array().is_some_and(|a| !a.is_empty()));
+        // The crust and the structural events, and what the core adds: every horizon's unit
+        // decoded, with an age for a strata-log unit (the run's preset gives the log's span).
+        let kind = v["crust"]["type_name"].as_str().expect("a planet bakes meta/crust_type");
+        assert!(kind == "oceanic" || kind == "continental", "{}", v["crust"]);
+        assert!(v["structure_events"].is_array() && v["structure_candidates"].is_u64());
+        let facts = deeptime_core::column_info::WorldFacts::of_world(&dir.join("world"));
+        assert!(facts.span_myr().is_some(), "the run's world has its preset");
+        deeptime_core::column_info::annotate(&mut v, &facts);
+        for h in v["strata"].as_array().unwrap() {
+            let u = &h["unit_info"];
+            assert!(u["text"].is_string(), "{h}");
+            if u["part"] == "log" {
+                assert!(u["age_ma"].is_number(), "{h}");
+            }
+        }
         // `--why`: a column inside a site's box gets the site's forming event and chain.
         if let Some((sites, _)) = deeptime_format::sites::read_sites(&dir.join("world")).unwrap()
             && let Some(site) = sites.first()
