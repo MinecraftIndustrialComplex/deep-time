@@ -154,6 +154,12 @@ public final class DevMapScreen extends Screen {
         globeLon = ll[1];
     }
 
+    /** Turns the globe to centre (lat, lon), simulation longitude. */
+    public void globeCentre(double lat, double lon) {
+        globeLat = Math.max(-89.9, Math.min(89.9, lat));
+        globeLon = lon;
+    }
+
     public ViewTransform view() {
         return view;
     }
@@ -169,8 +175,10 @@ public final class DevMapScreen extends Screen {
         WorldProjection p = c.projection();
         if (p == null || sx < vl || sx > vl + vw || sy < vt || sy > vt + vh)
             return null;
-        if (mode == Mode.MAP)
-            return p.canonical(view.blockX(sx), view.blockZ(sy));
+        if (mode == Mode.MAP) {
+            double bz = view.blockZ(sy);
+            return bz < p.zMin() || bz > p.zMax() ? null : p.canonical(view.blockX(sx), bz);
+        }
         double u = (sx - (vl + vw / 2.0)) / globeRadius, v = ((vt + vh / 2.0) - sy) / globeRadius;
         double[] ll = new GlobeProjection(globeLat, globeLon).inverse(u, v, new double[2]);
         return ll == null ? null : p.blockOf(ll[0], ll[1]);
