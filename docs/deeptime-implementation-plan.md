@@ -646,8 +646,10 @@ macOS minute costs about ten Linux minutes. The workflows are shaped around that
 ## 5. Core data model
 
 All physics runs in SI units (metres, years, kelvin or °C) and maps to blocks only when baking
-(§8.8). Planet-scale time is stored in **years relative to world creation**: geologic history is
-negative (−5.0e8 is 500 Myr ago), and anything the civ module adds later is positive.
+(§8.8). Planet-scale time is stored in **years relative to world creation**: negative years are
+before it (the geologic history, −5.0e8 is 500 Myr ago, and any civ history the rtsim writes before
+play), positive years after it (civ events during play). The sign says when, never which writer: the
+writer id and the kind namespace tell geology from civ (decisions log 2026-10-19).
 
 ### 5.1 Planet parameters, scales and presets
 
@@ -948,7 +950,7 @@ what geology wrote.
 // crates/deeptime-format/src/events.rs
 pub struct Event {
     pub id: EventId,             // u64 = (writer_id << 48) | sequence — no coordination between writers
-    pub t_start: f64,            // years relative to world creation (negative = geologic past)
+    pub t_start: f64,            // years relative to world creation (negative = before it)
     pub t_end: f64,              // = t_start for instantaneous events
     pub kind: KindId,            // interned namespaced id: "deeptime:rift_onset", "civ:city_founded"
     pub source: SourceId,        // interned: "deeptime:plates", "deeptime:erosion", "civ:politics"
