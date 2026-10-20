@@ -1340,47 +1340,67 @@ impl StructureStage {
             let [top, base] = a.depths_m(mh, mv);
             a.bands = plutons::aureole_bands(baked, t, top.max(0.0), base, key);
         };
+        // The other intrusions at an aureole's centre (`plutons::mask_intrusions`).
+        let circ = s.circumference_blocks;
+        let index = deeptime_format::structure::StructIndex::new(st, circ);
+        let mask = |a: &plutons::Aureole,
+                    own: Option<usize>,
+                    cands: &mut Vec<u32>,
+                    baked: &mut Vec<columns::Unit>| {
+            index.candidates(st, a.centre[0], a.centre[2], cands);
+            plutons::mask_intrusions(baked, a, &st.events, cands, own, mv, f64::from(circ));
+        };
         let of_plutons: Vec<plutons::Aureole> = self
             .st
             .plutons
             .par_iter()
             .zip(pluton_y.par_iter())
-            .map_init(Vec::new, |baked, (pl, &y)| {
-                let mut a = plutons::Aureole::of_pluton(pl, y, mh, mv, now);
-                if a.width_m > 0.0 {
-                    hosts.units(pl.x, pl.z, y, s.min_y, mv, baked);
-                    bands(&mut a, key_of(pl.t_myr), baked);
-                }
-                a
-            })
+            .map_init(
+                || (Vec::new(), Vec::new()),
+                |(baked, cands), (pl, &y)| {
+                    let mut a = plutons::Aureole::of_pluton(pl, y, mh, mv, now);
+                    if a.width_m > 0.0 {
+                        hosts.units(pl.x, pl.z, y, s.min_y, mv, baked);
+                        mask(&a, None, cands, baked);
+                        bands(&mut a, key_of(pl.t_myr), baked);
+                    }
+                    a
+                },
+            )
             .collect();
         let of_stocks: Vec<plutons::Aureole> = all
             .par_iter()
             .zip(st.events.par_iter())
-            .filter(|(f, _)| f.kind == deform::Kind::Stock)
-            .map_init(Vec::new, |baked, (f, e)| {
-                let (centre, axes, yaw) = plutons::stock_frame(e)?;
-                let c = plutons::cell_of(grid, centre[0], centre[2]);
-                let surface_y = src.surface_y(c, s);
-                let top_m = (surface_y - (centre[1] + axes[1])) * mv;
-                hosts.units(centre[0], centre[2], surface_y, s.min_y, mv, baked);
-                let host = plutons::host_class(baked, top_m.max(0.0));
-                let size = plutons::stock_size_m(axes, mh, mv);
-                let mut a = plutons::Aureole {
-                    centre,
-                    axes,
-                    yaw,
-                    width_m: plutons::aureole_width_m(p, t, size, host),
-                    surface_y,
-                    bands: Vec::new(),
-                    hollow: true,
-                    age_ma: age_of(f.t_myr),
-                };
-                if a.width_m > 0.0 {
-                    bands(&mut a, e.key, baked);
-                }
-                Some(a)
-            })
+            .enumerate()
+            .filter(|(_, (f, _))| f.kind == deform::Kind::Stock)
+            .map_init(
+                || (Vec::new(), Vec::new()),
+                |(baked, cands), (k, (f, e))| {
+                    let (centre, axes, yaw) = plutons::stock_frame(e)?;
+                    let c = plutons::cell_of(grid, centre[0], centre[2]);
+                    let surface_y = src.surface_y(c, s);
+                    let top_m = (surface_y - (centre[1] + axes[1])) * mv;
+                    let mut a = plutons::Aureole {
+                        centre,
+                        axes,
+                        yaw,
+                        width_m: 0.0,
+                        surface_y,
+                        bands: Vec::new(),
+                        hollow: true,
+                        age_ma: age_of(f.t_myr),
+                    };
+                    hosts.units(centre[0], centre[2], surface_y, s.min_y, mv, baked);
+                    mask(&a, Some(k), cands, baked);
+                    let host = plutons::host_class(baked, top_m.max(0.0));
+                    let size = plutons::stock_size_m(axes, mh, mv);
+                    a.width_m = plutons::aureole_width_m(p, t, size, host);
+                    if a.width_m > 0.0 {
+                        bands(&mut a, e.key, baked);
+                    }
+                    Some(a)
+                },
+            )
             .flatten()
             .collect();
         let roots = rooted

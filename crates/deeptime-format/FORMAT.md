@@ -1799,7 +1799,11 @@ intrusion, read on the column at the intrusion's centre as the strata pass paint
 events' test (a horizon whose top key is at least the intrusion's); a pluton's zones span d ∈ [0, 1], so the pluton body, painted later, keeps its own
 rock inside. A stock's aureole is hollow: the stock is a structural event, which bodies paint
 over, so its zones are cut into eight horizontal slabs whose d range starts at the stock's wall
-in that slab. **Stock roots**: a stock rooted on a pluton (`structure::deform::intrude::
+in that slab. The centre's column also holds the other intrusion events that hold the inner half
+of the intrusion's plan (the centre and the points half a semi-axis out along and across: an older
+stock it was emplaced in, a younger one through it), applied there as the column rule applies
+them: an older one's rock is crystalline and a younger one's is younger than the aureole, so no
+zone paints over either. **Stock roots**: a stock rooted on a pluton (`structure::deform::intrude::
 root_on_plutons`) also gets an ellipsoid body of role `stock`, its own ellipsoid, with one zone
 `root` (its rock class, no material) from the top of the pluton's aureole down, so the stock's
 rock reads through the aureole it rises across. Ids: every aureole first, then the stock roots,
