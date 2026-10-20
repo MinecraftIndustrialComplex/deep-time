@@ -302,7 +302,13 @@ pub fn surface(
 ) -> Value {
     let lifted: Vec<f32> = node_relief
         .iter()
-        .map(|&r| if r.is_finite() { r.max(0.0) as f32 } else { 0.0 })
+        .map(|&r| {
+            if r.is_finite() {
+                r.max(0.0) as f32
+            } else {
+                0.0
+            }
+        })
         .collect();
     let desc = hz.desc(deeptime_format::Codec::Raw);
     let (k, w) = (hz.k as usize, hz.grid.w as usize);
@@ -351,7 +357,11 @@ pub fn surface(
                         if let Some(ct) = class_top.and_then(|f| f(p.x, p.z)) {
                             let rock = bedrock(&col, h, y, unconsolidated);
                             let ct_loose = unconsolidated.get(usize::from(ct)) == Some(&true);
-                            let game = if ct_loose { rock.or(Some(ct)) } else { Some(ct) };
+                            let game = if ct_loose {
+                                rock.or(Some(ct))
+                            } else {
+                                Some(ct)
+                            };
                             t.class_top = Some([
                                 ct == class,
                                 !ct_loose,
@@ -394,10 +404,7 @@ pub fn surface(
 pub fn structure_offsets(lift: &Lift, st: &deeptime_format::structure::Structure) -> Value {
     use deeptime_format::structure::Shape;
     const N: usize = 9;
-    let (mut all, mut up) = (
-        [Vec::new(), Vec::new()],
-        [Vec::new(), Vec::new()],
-    );
+    let (mut all, mut up) = ([Vec::new(), Vec::new()], [Vec::new(), Vec::new()]);
     for e in &st.events {
         let kind = match e.shape {
             Shape::Fault { .. } => 0,
