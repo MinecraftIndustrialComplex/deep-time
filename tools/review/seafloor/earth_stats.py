@@ -114,7 +114,7 @@ def main():
     res = {
         "args": vars(args),
         "deg_pct": wpct(s, w, (50, 75, 90, 95, 99, 99.9)),
-        "share_over": {str(a): float(w[s > a].sum() / w.sum()) for a in (5, 10, 15, 20, 30)},
+        "share_over": {str(a): float(w[s > a].sum() / w.sum()) for a in (5, 6.78, 10, 15, 20, 30)},
         "tile_rms_pct": wpct(rms, tw, (10, 50, 90, 95, 99, 100)),
         "tiles": len(tiles),
         "files": per_file,

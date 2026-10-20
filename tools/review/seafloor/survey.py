@@ -139,7 +139,7 @@ def main():
     summary = {
         "coarsen": K, "baseline_blocks": step,
         "real_deg_pct_area": wpct(rd, aw, (50, 75, 90, 95, 99, 99.9)),
-        "share_real_over_area": {str(t): float(aw[rd > t].sum() / aw.sum()) for t in (5, 10, 15, 20, 30)},
+        "share_real_over_area": {str(t): float(aw[rd > t].sum() / aw.sum()) for t in (5, 6.78, 10, 15, 20, 30)},
         "mpb_pct": {p: float(np.percentile(mpb[m], p)) for p in (1, 50, 99)},
         "deep_samples": int(m.sum()),
         "rms_H_m": float(hH[m].std() * args.mpb_v),

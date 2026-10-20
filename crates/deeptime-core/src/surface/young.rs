@@ -80,8 +80,8 @@ pub const SEA_FLOOR_SLOPE_DEG: f64 = 15.0;
 
 /// Iterations of the sea floor's failure (`marine::slope_failure` at its rate 0.05): numerical.
 /// A 3 km step one L2 cell wide, a 5 km one-cell trench and a maze of 2.8 km blocks two cells
-/// across relax to within a degree of the critical slope in 100 to 200 (build/seafloor/relax.py,
-/// the rule in numpy on 2.4 km cells). ledger: YNG-023
+/// across relax to within a degree of the critical slope in 100 to 200
+/// (tools/review/seafloor/relax.py, the rule in numpy on 2.4 km cells). ledger: YNG-023
 pub const SEA_FLOOR_FAILURE_ITERATIONS: u32 = 300;
 
 /// How the young landscape is uplifted.
