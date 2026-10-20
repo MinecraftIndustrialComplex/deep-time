@@ -642,6 +642,28 @@ master's runs (land above 2 km, median height, shelf, CO₂ with one run at 14,1
 two plate checks (rift-born welds 12.7 %; the lowest continental crust 0.36, at least 0.37);
 it was not landed.
 
+**The carry's blur and the spreading at long plate steps (ERO-185, ERO-186; P1-19 #27 unlock,
+2026-10-19).** The surface rides the plates by one bilinear semi-Lagrangian carry a plate step
+(`surface/advect.rs`). A bilinear sample at a fractional offset f is a two-point average of
+variance f(1 − f) cells² along each axis, so every carry blurs the carried surface by about a
+sixth of a cell² per axis whatever the plates' speed: on the 16k planets a diffusion of 0.25 to
+1 m²/yr, beside the hillslope's 2 m²/yr (`kd_land_m2_yr`). A 4-Myr plate step carries half as
+often and so blurs half as much per Myr. A step longer than `surface.numerics.carry_blur_ref_myr`
+(2 Myr) now spreads, after its carry and before its uplift, the blur that k = step ÷ reference
+carries of a k-th of the displacement D would have left: k·v(D/k) − v(D) per axis, v(x) the
+variance of x's fraction (at k = 2, 2·min(f, 1 − f)² for f the fraction of D/2, at most half a
+cell²), as a [s/2, 1 − s, s/2] stencil over cells of the same crust only (a plate's edge stops it,
+as it stops the carry's own sample), in passes of at most half a cell². The regolith's carry and
+the climate's ice-sheet and ELA carries take the same top-up. The crust's spreading (`spread.rs`),
+whose diffusivity is the cube of the excess height, is solved in equal sub-steps of at most
+`surface.numerics.spread_step_myr` (2 Myr), since one solve over a long step holds the diffusivity
+at its start value for the whole step. At a 2-Myr plate step neither adds anything and the run is
+unchanged. Both are game-choices that keep the numerics of the 2-Myr step per Myr. Their effect on
+4-Myr worlds, with what still differs, is measured in plates.md, "The 4-Myr plate step (P1-19 #27
+unlock)". Tests: `a_long_step_owes_the_short_steps_blur` (one carry of a long step with the blur it
+owes spreads a spike as far as two carries of half the step) and
+`the_spreading_steps_at_most_the_setting` (`surface::params`).
+
 **On a GPU (gpu-phase3, 2026-10-19).** Two of these solvers run on a GPU when a player's machine
 has one (`docs/design/gpu-compute.md` §15 and §16); no law, setting or ledger value changed. The
 diffusion solve's V-cycle (ERO-183) runs on the device in f32 as it ran on the CPU in f32, with

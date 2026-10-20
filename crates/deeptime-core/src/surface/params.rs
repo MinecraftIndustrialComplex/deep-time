@@ -214,6 +214,12 @@ pub struct Numerics {
     pub diffusion_tol_m: f64, // ledger: ERO-183
     /// The depression flood (`pflood.rs`).
     pub flood: FloodMethod, // ledger: ERO-184
+    /// The plate step whose carry blur the surface keeps per Myr at longer steps, Myr
+    /// (`advect::blur_owed`; 0: none added, each carry blurs once whatever its length).
+    pub carry_blur_ref_myr: f64, // ledger: ERO-185
+    /// The longest step of the crust's spreading, Myr: a longer plate step solves it in as many
+    /// equal steps as keep each this long or shorter (`spread.rs`; 0: one solve a plate step).
+    pub spread_step_myr: f64, // ledger: ERO-186
 }
 
 impl Default for Numerics {
@@ -222,6 +228,8 @@ impl Default for Numerics {
             diffusion_solver: DiffusionSolver::Multigrid,
             diffusion_tol_m: 1.0e-5,      // ledger: ERO-183
             flood: FloodMethod::Parallel, // ledger: ERO-184
+            carry_blur_ref_myr: 2.0,      // ledger: ERO-185
+            spread_step_myr: 2.0,         // ledger: ERO-186
         }
     }
 }
@@ -234,7 +242,28 @@ impl Numerics {
                 && self.diffusion_tol_m <= 1.0,
             "numerics.diffusion_tol_m",
             "must be in (0, 1] m",
+        )?;
+        check(
+            self.carry_blur_ref_myr.is_finite() && self.carry_blur_ref_myr >= 0.0,
+            "numerics.carry_blur_ref_myr",
+            "must be 0 or more Myr",
+        )?;
+        check(
+            self.spread_step_myr.is_finite() && self.spread_step_myr >= 0.0,
+            "numerics.spread_step_myr",
+            "must be 0 or more Myr",
         )
+    }
+
+    /// Equal steps of the crust's spreading over a plate step of `dt_myr`.
+    pub fn spread_steps(&self, dt_myr: f64) -> usize {
+        if self.spread_step_myr > 0.0 {
+            ((dt_myr / self.spread_step_myr) * (1.0 - 1.0e-9))
+                .ceil()
+                .max(1.0) as usize
+        } else {
+            1
+        }
     }
 }
 
@@ -416,5 +445,23 @@ mod tests {
             ..SurfaceParams::default()
         };
         assert!(bad.validate().is_err());
+    }
+
+    /// ERO-186: the spreading takes one solve at a 2-Myr plate step (as before), two at 4, three
+    /// at 5, and one whatever the step with the setting at 0.
+    #[test]
+    fn the_spreading_steps_at_most_the_setting() {
+        let n = Numerics::default();
+        assert!((n.spread_step_myr - 2.0).abs() < 1e-12);
+        assert_eq!(n.spread_steps(2.0), 1);
+        assert_eq!(n.spread_steps(1.0), 1);
+        assert_eq!(n.spread_steps(1000.0 / 500.0), 1);
+        assert_eq!(n.spread_steps(4.0), 2);
+        assert_eq!(n.spread_steps(5.0), 3);
+        let off = Numerics {
+            spread_step_myr: 0.0,
+            ..Numerics::default()
+        };
+        assert_eq!(off.spread_steps(4.0), 1);
     }
 }

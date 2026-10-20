@@ -5257,11 +5257,12 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Mojang Studios. Minecraft 1.21.1, `net.minecraft.world.level.biome.OverworldBiomeBuilder`, as decompiled and published in the NeoForge 21.1.249 sources jar.
 - DOI or URL: none (the jar is built by the project's Gradle setup, `neoforge-21.1.249-sources.jar`)
 - Cited as: "OverworldBiomeBuilder, Minecraft 1.21.1" (default.json, OverworldBands.java, VolcanicBiomes.java)
-- Ledger ids: BIO-021 to BIO-024, BIO-112
+- Ledger ids: BIO-021 to BIO-024, BIO-112, BIO-161
 - Access: game source, not redistributed
 - Library (the project's source library, not distributed): the one class, text file MinecraftSrc1211/OverworldBiomeBuilder.java.
 - Stage 2 read (WP-11, 2026-10-02): the temperature, humidity, continentalness, erosion and weirdness constants; all equal the bake's reference bands.
 - Read 2026-10-03 (volcanic biomes): the depth parameters of `addSurfaceBiome` (points 0.0 and 1.0), `addUndergroundBiome` (span 0.2 to 0.9) and `addBottomBiome` (point 1.1); BIO-112.
+- Read 2026-10-20 (the ice spikes report, in the workbench's NeoForge 21.1.249 sources jar on the test machine): `addHighSlice`, `addMidSlice` and `addLowSlice`, which pick each continentalness and erosion cell takes (in the frozen, driest cell near-inland and mid-inland differ at erosion E0 and E1, and at E5 in the high slice: in the low slice near-inland E0 and E1 take the middle biome, mid-inland the slope-if-cold pick; in the high slice near-inland E0 takes the slope biome, mid-inland the peak biome), and the tables `MIDDLE_BIOMES`, `MIDDLE_BIOMES_VARIANT`, `PLATEAU_BIOMES` and `PLATEAU_BIOMES_VARIANT` (ice spikes the positive-weirdness variant of the frozen, driest middle and plateau cells) and `mushroomFieldsContinentalness` (-1.2 to -1.05); BIO-161.
 
 ### DeCellesGiles1996_flexure
 - Reference: DeCelles, P. G., Giles, K. A. (1996). Foreland basin systems. Basin Research 8(2):105-123. (Also `DeCellesGiles1996` in the Plate tectonics section, where stage 1 saw the abstract only.)
