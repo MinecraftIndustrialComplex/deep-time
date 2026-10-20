@@ -1584,12 +1584,25 @@ fn arcs_turn_continental_by_their_crust_not_their_height() {
     }
     let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
     finish_samples(&mut st, &geo, &z0, &env);
+    let ocean = super::transition::oceanic_m() as f32;
     for (&i, &(arc, z, hidden, turns)) in oceanic.iter().zip(&cases) {
+        let s = &st.samples[i];
         assert_eq!(
-            st.samples[i].kind == CONTINENTAL,
+            s.kind == CONTINENTAL,
             turns,
             "arc magma {arc} m (mature at {mature} m), elevation {z} m, hidden {hidden}"
         );
+        // The ocean crust under the arc stays in the column, as its basement, and is no
+        // continental crust (PLT-331).
+        if turns {
+            assert!((s.basement() - ocean).abs() < 1.0, "{s:?}");
+            assert!((s.own_thickness_m() - (s.thickness_m - ocean)).abs() < 1.0);
+            let own: f32 = s.own_pools().iter().sum();
+            assert!((own - s.own_thickness_m()).abs() < 1.0, "{own} {s:?}");
+        } else {
+            assert_eq!(s.basement(), 0.0);
+            assert_eq!(s.own_thickness_m(), s.thickness_m);
+        }
     }
 }
 
@@ -1654,6 +1667,28 @@ fn converging_plates(p: &PlanetPreset, env: &Env<'_>) -> (PlateState, Geo, Vec<D
     let (mut st, geo, pos) = two_plates(p, env, 0.1);
     st.plates[1].omega = (DVec3::X * env.norm.omega_of_speed(50.0)).to_array();
     (st, geo, pos)
+}
+
+/// An arc's front is where the plates converge across their boundary (PLT-330): a contact whose
+/// plates slide past each other has no front, however its lattice edges zigzag, and the same
+/// contact converging head-on has one along its length.
+#[test]
+fn a_contact_whose_plates_slide_past_has_no_arc_front() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let fronts = |axis: DVec3| {
+        let (mut st, geo, pos) = two_plates(&p, &env, 0.1);
+        assert!(!st.contacts.is_empty());
+        st.plates[1].omega = (axis * env.norm.omega_of_speed(50.0)).to_array();
+        subduction::fronts_begin(&st, &geo, &pos, &env).front_count()
+    };
+    // About x: the ocean moves north across the equator, towards the continent where y > 0.
+    let head_on = fronts(DVec3::X);
+    // About z: along the equator, east-west.
+    let sliding = fronts(DVec3::Z);
+    assert!(head_on > 20, "{head_on}");
+    assert_eq!(sliding, 0);
 }
 
 /// Plate task 8: the volcano stage's felsic cones over an arc (already in the pools as volcanic
