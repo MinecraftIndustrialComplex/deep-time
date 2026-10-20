@@ -89,7 +89,7 @@ use crate::plates::state::{ARC, CONTINENTAL};
 use crate::sphere::BlockFrame;
 use crate::stage::{Stage, StageContext, StageEstimate, from_state, to_state};
 use crate::surface::lithology::index;
-use crate::surface::strata_log::IN_SITU;
+use crate::surface::strata_log::{IN_SITU, LIP_FLOW};
 use crate::world::{Field, WorldState};
 
 /// The stage's name in a pipeline (`deeptime stage volcanoes`).
@@ -1414,6 +1414,8 @@ impl VolcanoStage {
             }
         }
         st.events_seen = world.events.len() as u64;
+        // The flows' log entries: the provinces count them (provenance `LIP_FLOW`).
+        let lip_from = log_ops.len();
         for (event, lat, lon, th) in new_lips {
             let x = frame.x_of_lon(f64::from(lon));
             let z = frame.z_of_lat(f64::from(lat));
@@ -1536,7 +1538,7 @@ impl VolcanoStage {
             let age = (t - 0.5 * dt) as f32;
             let soil = index("soil");
             let (sap, lat, baux) = (index("saprolite"), index("laterite"), index("bauxite"));
-            for &(c, th, class) in &log_ops {
+            for (k, &(c, th, class)) in log_ops.iter().enumerate() {
                 if th < 0.0 {
                     let left = f64::from(-th);
                     let take = f64::from(surf.regolith_m[c]).min(left);
@@ -1560,7 +1562,8 @@ impl VolcanoStage {
                     surf.regolith_m[c] = 0.0;
                     surf.regolith_kind[c] = crate::surface::weathering::SOIL;
                 }
-                surf.log.deposit(c, age, th, class, IN_SITU);
+                let prov = if k >= lip_from { LIP_FLOW } else { IN_SITU };
+                surf.log.deposit(c, age, th, class, prov);
             }
         }
         self.time("apply", started);

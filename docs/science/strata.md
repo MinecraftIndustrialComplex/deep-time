@@ -47,8 +47,8 @@ to the ceiling at y 639.
    for each map cell from the top down: the regolith, then the strata log with the classes that regional
    metamorphism left in it, then the rock pools of the plate model as basement (sediment, sedimentary,
    volcanic, metamorphic, plutonic), then the mantle. Young shallow beds are shown as their loose form
-   (sand, mud), the rest as rock (RCK-022). Each crust kind has its own classes (RCK-092): ocean crust's
-   volcanic pool is lavas over sheeted dikes (RCK-091), its felsic pools are arc rock, never granite.
+   (sand, mud), the rest as rock (RCK-022). Each crust kind has its own classes (RCK-096): ocean crust's
+   volcanic pool is lavas over sheeted dikes (RCK-095), its felsic pools are arc rock, never granite.
 3. **The order.** Every unit gets a stratigraphic key, a 16-bit number that grows downward and orders units
    identically in every column. The key space is built grade first: the regolith, then one band per
    metamorphic grade (unmetamorphosed, then from 250, 300, 350, 500, 525 and 650 degC), then the mantle.
@@ -157,8 +157,11 @@ stored stacks, which have no structures, show none).
   cell; the amplifier's own deposits and the till are not in the stacks, so a lifted ridge has no extra
   young cover (STR-052). Where the terrain lies below the history's surface the cut exposes older rock, as
   before.
+- **A body rises whole.** A pluton, an ore body or one slab of an aureole rises by the lift at its centre,
+  while the horizons and the structure file's intrusions rise point by point; where the lift changes across a
+  body (a steep range front), its edges sit up to the change in lift off the rock beside them (STR-052).
 - **Lavas and dikes in a fixed share.** Layer 2 is 0.8 km of lavas over 1.2 km of dikes on fresh crust
-  everywhere (RCK-091); Earth's share varies with spreading rate (Hole 504B against Hole 1256D).
+  everywhere (RCK-095); Earth's share varies with spreading rate (Hole 504B against Hole 1256D).
 - **Unconformities are implicit.** Rock younger than a structure is not deformed by it. A hiatus has no record,
   so the gap is only visible as a jump in age and grade (STR-022).
 - **Bodies are painted where they are.** A fault younger than a pluton does not offset it: plutons, alteration

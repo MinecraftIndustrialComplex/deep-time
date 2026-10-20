@@ -11,7 +11,7 @@
 //! | strata | `strata/horizons` (P1-07's stacks, the top horizon raised over the amplified terrain), `strata/classes.json` | [`strata`] |
 //! | climate | `climate/{t_mean_c, p_mm, koppen}` on L1; `climate/{temperature, vegetation, continents, erosion, ridges}` on L2 (the §7.2 mapping, [`biomes`]) | [`climate`], [`biomes`] |
 //! | surface | `surface/regolith_blocks`, `surface/class_top` on L2 | [`surface`] |
-//! | meta | `meta/{plate_id, crust_age_myr, heat_flow_mw_m2, province}` on L1 | [`meta`] |
+//! | meta | `meta/{plate_id, crust_type, crust_age_myr, heat_flow_mw_m2, province}` on L1 | [`meta`] |
 //! | underground | `volcanoes/active.json` (the volcanoes active at the present) and `notes.bake.underground.params` (the lava floor, lava lakes, magma chambers) | [`crate::underground`] |
 //!
 //! The record goes to `manifest.json` `notes.bake`: the detail term the game adds

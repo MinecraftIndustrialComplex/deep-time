@@ -18,7 +18,7 @@
 //!    which the pools already hold (the surface's deposits join the sediment pool, and its erosion
 //!    strips the pools from the top). Each pool is one unit whose class follows the surface's
 //!    basement rule (`surface::basement_class`, so a column shows at its top what the surface
-//!    eroded). Each crust kind has its own classes (ledger: RCK-092):
+//!    eroded). Each crust kind has its own classes (ledger: RCK-096):
 //!    - **continental**: sediment → mudstone, sedimentary → sandstone, felsic volcanic →
 //!      rhyolite (andesite in arcs), mafic volcanic → basalt, metamorphic → gneiss (schist in a
 //!      Himalayan orogen younger than 100 Myr), felsic plutonic → granite (granodiorite under an
@@ -97,7 +97,7 @@ pub const CCD_M: f64 = 4500.0;
 /// 1256D (superfast) 754 m of lavas and a 57 m transition over 346 m of dikes (0.65). 0.4 of a
 /// fresh ridge's 2 km layer 2 (`plates::pools::oceanic_column`) gives 0.8 km of lavas over
 /// 1.2 km of dikes; erosion takes the lavas first and later volcanism adds to them.
-// ledger: RCK-091 (game-choice of the share inside the drilled range; the sections verified)
+// ledger: RCK-095 (game-choice of the share inside the drilled range; the sections verified)
 pub const OCEAN_LAVA_SHARE: f64 = 0.4;
 
 /// Where a unit comes from.
@@ -409,7 +409,7 @@ pub fn pool_class(t: &Tables, cell: &Cell<'_>, p: usize) -> u16 {
         // island arc's andesite over its tonalitic middle crust (diorite under an active arc,
         // granodiorite where the arc has died or the rock is the thinned continental crust a
         // margin's transition moved to its ocean side), and schist, the metasediment of a thick
-        // sediment pile or an accreted wedge: never granite, rhyolite or gneiss (ledger: RCK-092).
+        // sediment pile or an accreted wedge: never granite, rhyolite or gneiss (ledger: RCK-096).
         pool::FELSIC_VOLCANIC => {
             if oceanic
                 || cell.regime == crate::plates::state::regime::ARC

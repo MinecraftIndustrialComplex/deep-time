@@ -12,6 +12,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use deeptime_core::column_info::WorldFacts;
 use deeptime_core::synth::EVERY_CLASS;
 use deeptime_format::column::horizon_at;
 use deeptime_format::sites::read_sites;
@@ -117,6 +118,8 @@ pub struct RockWorld {
     /// Every body, for the deposits a section crosses.
     all: BodyGrid,
     sites: HashMap<SiteId, Site>,
+    /// The history's clock and the deposit types' drawn scales (the world's `preset.json`).
+    pub facts: WorldFacts,
 }
 
 thread_local! {
@@ -156,6 +159,7 @@ impl RockWorld {
             painters,
             all,
             sites,
+            facts: WorldFacts::of_world(world),
         })
     }
 
@@ -183,6 +187,27 @@ impl RockWorld {
             }
             None => self.strata.stack_at_with(scratch, x, z, self.cw.min_y, out),
         }
+    }
+
+    /// The structural events at column (x, z), with which of them changed its stack
+    /// ([`deeptime_format::column::events_at`]); empty in a world without any.
+    pub fn events_at(&self, scratch: &mut StackScratch, x: i64, z: i64) -> Vec<serde_json::Value> {
+        let Some(d) = self.cw.structure() else {
+            return Vec::new();
+        };
+        let min_y = self.cw.min_y;
+        let strata = &self.strata;
+        deeptime_format::column::events_at(
+            d,
+            self.cw.c as u32,
+            x,
+            z,
+            min_y,
+            &self.cw.classes,
+            true,
+            &mut |sx, sz, o| strata.stack_at_with(scratch, sx, sz, min_y, o),
+        )
+        .0
     }
 
     /// The class a painting body gives block (wx, y, z), if one does (the first by id).

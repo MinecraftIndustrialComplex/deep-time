@@ -41,6 +41,9 @@ pub mod structure;
 // The bake: a finished planet run as the chunk-time layers the game reads (P1-08).
 pub mod bake;
 
+// What the column inspectors say about a baked column's units, events and bodies.
+pub mod column_info;
+
 // Rivers and lakes on the finished terrain (P1-22).
 pub mod hydro;
 

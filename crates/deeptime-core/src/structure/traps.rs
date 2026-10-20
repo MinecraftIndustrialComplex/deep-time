@@ -326,6 +326,7 @@ mod tests {
             wear_m: 0.0,
             rise: 0.0,
             depth: 0.0,
+            base: 0.0,
             rock: 0,
         };
         let at = |v: &[f32], x: f64, z: f64| v[crate::structure::plutons::cell_of(&grid, x, z)];
