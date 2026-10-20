@@ -167,6 +167,12 @@ final class ScreenshotDriver {
                         parkPointer(mc);
                         CreateWorldScreen.openFresh(mc, screen);
                         go(Step.CREATE_SCREEN);
+                    } else if (screen != null && !(screen instanceof TitleScreen) && mc.getOverlay() == null && stepTicks > 20 * 30) {
+                        // A pack's mod can hold a screen of its own over the title screen (an update
+                        // notice); the walk goes on from the title screen and says which one it closed.
+                        DeepTime.LOGGER.warn("[deeptime-shot] closing {} over the title screen", screen.getClass().getName());
+                        mc.setScreen(new TitleScreen());
+                        stepTicks = 0;
                     }
                 }
                 case CREATE_SCREEN -> {
