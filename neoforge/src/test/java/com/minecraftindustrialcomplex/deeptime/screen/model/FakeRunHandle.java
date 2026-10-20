@@ -22,6 +22,11 @@ final class FakeRunHandle implements RunHandle {
     SimSession.Progress progress = SimSession.Progress.INITIAL;
     boolean cancelled;
     int frames;
+    /** The live map: what the model last asked for (null: stopped), and the newest frame. */
+    String watched;
+    final List<String> watchCalls = new ArrayList<>();
+    LiveFrame liveFrame;
+    final AtomicInteger liveReads = new AtomicInteger();
 
     FakeRunHandle(Path out) {
         this.out = out;
@@ -32,6 +37,27 @@ final class FakeRunHandle implements RunHandle {
         KeyframeInfo f = new KeyframeInfo(frames++, t, "dummy_drift", w, h, List.of(layers));
         pendingFrames.add(f);
         return f;
+    }
+
+    /** Sets the newest live frame: {@code w × h} of {@code layer} at {@code t}, every pixel {@code 0xff00_0000 | seq}. */
+    LiveFrame live(long seq, double t, int w, int h, String layer) {
+        int[] px = new int[w * h];
+        java.util.Arrays.fill(px, 0xff000000 | (int) seq);
+        liveFrame = new LiveFrame(seq, new KeyframeInfo(-1, t, "dummy_drift", w, h, List.of(layer)), px);
+        return liveFrame;
+    }
+
+    @Override
+    public long watchLive(String layer) {
+        watched = layer;
+        watchCalls.add(String.valueOf(layer));
+        return liveFrame == null ? 0 : liveFrame.seq();
+    }
+
+    @Override
+    public LiveFrame liveFrame(KeyframeInfo like) {
+        liveReads.incrementAndGet();
+        return liveFrame;
     }
 
     GeoEvent event(long id, double t, double lat, double lon) {

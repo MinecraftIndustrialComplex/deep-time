@@ -426,8 +426,10 @@ final class GenerationPage implements PlanetEditorScreen.Page {
         Optional<KeyframeInfo> f = model == null ? Optional.empty() : model.current();
         OptionalDouble stop = f.map(em::epochStopMyr).orElse(OptionalDouble.empty());
         epoch.active = stop.isPresent();
+        // While the live map shows, the stop is still at the newest keyframe: the tooltip says so.
+        String stopHint = !running ? "gen.epoch.hint" : model.showingLive() ? "gen.stop_here.hint_live" : "gen.stop_here.hint";
         epoch.setTooltip(Tooltip.create(stop.isPresent()
-                ? Lang.tr(running ? "gen.stop_here.hint" : "gen.epoch.hint", Lang.phrase(Phrase.yearsAgo(f.get().t())))
+                ? Lang.tr(stopHint, Lang.phrase(Phrase.yearsAgo(f.get().t())))
                 : Lang.tr(running ? "gen.stop_here.none" : "gen.epoch.none")));
         if (keepGoing != null) {
             OptionalDouble end = em.runStopMyr();
@@ -480,13 +482,14 @@ final class GenerationPage implements PlanetEditorScreen.Page {
         separator(g, Screen.HEADER_SEPARATOR, top() - 4, w);
         separator(g, Screen.FOOTER_SEPARATOR, bottom, w);
 
-        // Over the view: the layer's name, "newest map" while following the newest frame (the
-        // run is ahead of it by up to a keyframe's interval), or what the view waits for.
+        // Over the view: the layer's name, "live map" while the live frame shows (the run is
+        // past the newest keyframe), "newest map" while following the newest keyframe, or what
+        // the view waits for.
         if (model != null && model.frameCount() > 0) {
             Component caption = model.layer().map(Lang::layer).orElse(Component.empty());
             label(g, font, caption, viewX + 3, viewY + 3);
             if (model.following()) {
-                Component live = Lang.tr("gen.live");
+                Component live = Lang.tr(model.showingLive() ? "gen.live.now" : "gen.live");
                 label(g, font, live, viewX + viewW - 3 - font.width(live), viewY + 3);
             }
             if (keyH >= 10)
@@ -730,10 +733,14 @@ final class GenerationPage implements PlanetEditorScreen.Page {
             globeWidget.close();
     }
 
-    /** The time scrubber: one step per keyframe, labelled with the frame's time in years ago. */
+    /**
+     * The time scrubber: one step per keyframe, labelled with the time of the picture on the map in
+     * years ago (the live frame's while it shows; {@link TimelapseModel#mapTime()}).
+     */
     final class Scrubber extends AbstractSliderButton {
 
         private int shownIndex = -2;
+        private double shownTime = Double.NaN;
 
         Scrubber(int x, int y, int w, int h) {
             super(x, y, w, h, Component.empty(), 1.0);
@@ -744,9 +751,11 @@ final class GenerationPage implements PlanetEditorScreen.Page {
             int n = model == null ? 0 : model.frameCount();
             double v = n <= 1 ? 1.0 : Math.max(0, model.index()) / (double) (n - 1);
             int idx = model == null ? -1 : model.index();
-            if (Math.abs(v - value) > 1e-9 || idx != shownIndex) {
+            double t = model == null ? Double.NaN : model.mapTime().orElse(Double.NaN);
+            if (Math.abs(v - value) > 1e-9 || idx != shownIndex || Double.compare(t, shownTime) != 0) {
                 value = v;
                 shownIndex = idx;
+                shownTime = t;
                 updateMessage();
             }
             active = n > 1;
@@ -754,8 +763,8 @@ final class GenerationPage implements PlanetEditorScreen.Page {
 
         @Override
         protected void updateMessage() {
-            Optional<KeyframeInfo> f = model == null ? Optional.empty() : model.current();
-            setMessage(f.<Component>map(k -> Lang.tr("gen.scrub.at", Lang.phrase(Phrase.yearsAgo(k.t())))).orElse(Lang.tr("gen.scrub")));
+            OptionalDouble t = model == null ? OptionalDouble.empty() : model.mapTime();
+            setMessage(t.isPresent() ? Lang.tr("gen.scrub.at", Lang.phrase(Phrase.yearsAgo(t.getAsDouble()))) : Lang.tr("gen.scrub"));
             setTooltip(Tooltip.create(Lang.tr("gen.scrub.hint")));
         }
 
