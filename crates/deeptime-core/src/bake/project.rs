@@ -1009,7 +1009,7 @@ fn raise_world_tops(
 fn horizons_of(desc: &LayerDesc, bytes: &[u8], min_y: i32) -> Horizons {
     let k = desc.stack_depth.unwrap_or(0) as usize;
     let cb = desc.cell_bytes();
-    let n = if cb == 0 { 0 } else { bytes.len() / cb };
+    let n = bytes.len().checked_div(cb).unwrap_or(0);
     let (mut tops, mut classes, mut keys) = (
         Vec::with_capacity(n * k),
         Vec::with_capacity(n * k),
