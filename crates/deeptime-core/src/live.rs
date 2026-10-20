@@ -309,10 +309,11 @@ mod tests {
             Duration::from_millis(100),
             t0,
         );
-        live.watch(Some("satellite"), t0 + Duration::from_secs(1));
-        assert_eq!(live.due(t0 + Duration::from_millis(4_800)), None);
+        // (The game renews its request meanwhile.)
+        live.watch(Some("satellite"), t0 + Duration::from_secs(4));
+        assert_eq!(live.due(t0 + Duration::from_millis(4_890)), None);
         assert_eq!(
-            live.due(t0 + Duration::from_millis(4_900)).as_deref(),
+            live.due(t0 + Duration::from_millis(4_901)).as_deref(),
             Some("satellite")
         );
         // A fast frame waits the least gap.

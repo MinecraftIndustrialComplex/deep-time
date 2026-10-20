@@ -363,13 +363,18 @@ pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge
     guard(&mut env, |env| {
         let index = non_negative(index, "index")?;
         let layer = non_negative(layer, "layer")?;
-        let dst = direct_bytes(env, &dst_rgba)?;
-        with_session(session, |s| Ok(s.copy_keyframe(index, layer, dst)?))
+        with_direct_bytes(env, &dst_rgba, |dst| {
+            with_session(session, |s| Ok(s.copy_keyframe(index, layer, dst)?))
+        })
     })
 }
 
-/// The memory of the direct buffer `dst_rgba`, for the length of one native call.
-fn direct_bytes<'b>(env: &Env<'_>, dst_rgba: &'b JByteBuffer<'_>) -> BridgeResult<&'b mut [u8]> {
+/// Runs `f` on the memory of the direct buffer `dst_rgba`.
+fn with_direct_bytes<R>(
+    env: &Env<'_>,
+    dst_rgba: &JByteBuffer<'_>,
+    f: impl FnOnce(&mut [u8]) -> BridgeResult<R>,
+) -> BridgeResult<R> {
     if dst_rgba.is_null() {
         return Err(BridgeError::IllegalArgument("dstRgba is null".into()));
     }
@@ -386,9 +391,10 @@ fn direct_bytes<'b>(env: &Env<'_>, dst_rgba: &'b JByteBuffer<'_>) -> BridgeResul
         ));
     }
     // SAFETY: a direct buffer's memory is `capacity` bytes at `address` and stays valid while
-    // Java holds `dst_rgba`, which it does for the whole call (the slice borrows the reference
-    // for no longer); no other Rust reference to it exists.
-    Ok(unsafe { std::slice::from_raw_parts_mut(address, capacity) })
+    // Java holds `dst_rgba`, which it does for the whole native call `f` runs in; no other Rust
+    // reference to it exists.
+    let dst = unsafe { std::slice::from_raw_parts_mut(address, capacity) };
+    f(dst)
 }
 
 /// `watchLive`: asks for the live map of `layer` for the next two seconds (null or "" stops);
@@ -424,8 +430,9 @@ pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge
     dst_rgba: JByteBuffer<'l>,
 ) -> JString<'l> {
     guard(&mut env, |env| {
-        let dst = direct_bytes(env, &dst_rgba)?;
-        let info = with_session(session, |s| Ok(s.copy_live_frame(dst)?))?;
+        let info = with_direct_bytes(env, &dst_rgba, |dst| {
+            with_session(session, |s| Ok(s.copy_live_frame(dst)?))
+        })?;
         Ok(env.new_string(info.unwrap_or_default())?)
     })
 }
