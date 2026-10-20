@@ -68,6 +68,8 @@ if [ -n "$RUNSET" ]; then
     [[ "$RUNSET" =~ ^[a-z0-9-]+$ ]] || { echo "vm-client: --mods is a server set name" >&2; exit 2; }
     GRADLE_SET=("-PrunSet=$RUNSET")
 fi
+# A pack's mods need more heap (dh-client-check.sh gives MIC 6G).
+XMX=4G; [ -n "$RUNSET" ] && XMX=6G
 [ "$(uname -s)" = Linux ] || { echo "vm-client: runs on the test VM (Linux)" >&2; exit 2; }
 
 # --- phase 1: the build (its own admitted job), then the client run as a server job ---------------
@@ -168,7 +170,7 @@ run_pass() {
     rm -rf "$GAMEDIR/screenshots" "$GAMEDIR/saves" "$GAMEDIR/deeptime/staging" "$GAMEDIR/crash-reports"
     write_options
     say "pass $pass: launching ($*)"
-    (cd "$GAMEDIR" && exec "$JAVA" "-Xmx4G" "-XX:ActiveProcessorCount=$THREADS" "-Djava.io.tmpdir=$WORK/tmp" "$@" \
+    (cd "$GAMEDIR" && exec "$JAVA" "-Xmx$XMX" "-XX:ActiveProcessorCount=$THREADS" "-Djava.io.tmpdir=$WORK/tmp" "$@" \
         "${DEV_ARGS[@]}" --width "${WSIZE%x*}" --height "${WSIZE#*x}") > "$log" 2>&1 < /dev/null &
     CPID=$!
     start=$(date +%s)
