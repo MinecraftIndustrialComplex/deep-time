@@ -38,9 +38,8 @@
 //!   (RCK-054; skarn is calc-silicate rock from carbonate, Meinert 1992; the fine-grained rock
 //!   baked from other hosts is hornfels, Nelson, Tulane). Only rock older than the intrusion is
 //!   baked, by the structural events' own test (a horizon's youngest key) on the column as the
-//!   bake lays it ([`units_of`] the horizons the structure stage keeps for the bake: a pile of
-//!   one rock merged over an unconformity can be cover as a whole): the cover laid on an
-//!   unroofed pluton is not. A stock lies in the rock older than
+//!   strata pass paints it ([`HostColumns`]: a pile of one rock laid over an unconformity is one
+//!   horizon, cover as a whole): the cover laid on an unroofed pluton is not. A stock lies in the rock older than
 //!   itself: under younger cover its top goes down to the cover's base ([`cover_m`]). The
 //!   aureole body's ids come before the
 //!   plutons', so a pluton paints over the aureole's inner part; a stock's aureole (`deform`'s
@@ -56,9 +55,11 @@
 use std::collections::HashMap;
 
 use deeptime_format::bodies::NO_CLIP;
+use deeptime_format::strata::{ColumnHorizon, StackScratch, StoredHorizon, stack_at_with};
 use deeptime_format::structure::{Shape as StructShape, StructEvent};
 use deeptime_format::{Body, GridDesc, Shape, Zone};
 use glam::DVec3;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::deposits::fields::cell_area_km2;
@@ -465,8 +466,8 @@ pub struct Band {
     pub class: u16,
 }
 
-/// The aureole's bands in a column (`units`, top down from the ground, as the bake lays them:
-/// [`units_of`]) between the depths
+/// The aureole's bands in a column (`units`, top down from the ground, as the strata pass
+/// paints them: [`HostColumns`]) between the depths
 /// `from_m` and `to_m`: each unit older than the intrusion takes its host's aureole class
 /// ([`aureole_class`]). Older is the structural events' own test: a unit whose top key (its
 /// youngest part) is at least `key`, the intrusion's stratigraphic key. A unit whose keys
@@ -508,7 +509,8 @@ pub fn aureole_bands(
 }
 
 /// How deep the cover younger than an intrusion of stratigraphic key `key` reaches in a column
-/// (`units`, top down from the ground, as the bake lays them: [`units_of`]), m: the depth of
+/// (`units`, top down from the ground, as the strata pass paints them: [`HostColumns`]), m: the
+/// depth of
 /// the first unit older than it by the
 /// structural events' test ([`aureole_bands`]), or the whole of `units` when none is. A stock
 /// placed in that cover would replace nothing (the column evaluator leaves younger rock alone)
@@ -524,118 +526,79 @@ pub fn cover_m(units: &[columns::Unit], key: u16) -> f64 {
     top
 }
 
-/// A column as the column evaluator will read it: one cell's baked horizons (`tops` in 1/16
-/// block, top down, with their `classes` and key spans; `bake_horizons::Horizons::cell`), each
-/// returned as a unit of its horizon's class and key span whose thickness is the metres of
-/// `m_per_block_v` it spans under the ground at `surface_y`, so that a depth reads as the blocks
-/// it lies at, as the bodies' depths do (a horizon above the ground has no thickness, the last
-/// one reaches `min_y`). The bake merges neighbours of one class and key domain into one horizon
-/// whose youngest key is its top's, and then smooths the horizons across cells, and the
-/// structural events' test reads that key, so a pile of one rock laid over an unconformity can be
-/// younger cover as a whole: [`aureole_bands`] and [`cover_m`] read this, not the strata log's
-/// units.
-pub fn units_of(
-    tops: &[i16],
-    classes: &[u8],
-    keys: &[[u16; 2]],
-    surface_y: f64,
-    min_y: i32,
-    m_per_block_v: f64,
-    out: &mut Vec<columns::Unit>,
-) {
-    out.clear();
-    let n = tops.len().min(classes.len()).min(keys.len());
-    let mut top = surface_y;
-    for h in 0..n {
-        let bottom = if h + 1 < n {
-            (f64::from(tops[h + 1]) / 16.0).min(top)
-        } else {
-            f64::from(min_y).min(top)
-        };
-        out.push(columns::Unit {
-            class: u16::from(classes[h]),
-            thickness_m: ((top - bottom) * m_per_block_v) as f32,
-            source: columns::Source::Log,
-            key: keys[h],
-        });
-        top = bottom;
-    }
-}
-
-/// The horizons the structure stage keeps for the bake ([`bake_horizons::Horizons`]), of the
-/// cells the intrusions sit in only: what the stocks' cover and the aureoles' bands read
-/// ([`units_of`]), copied out so that the whole planet's horizons need not be held while the
-/// structural events are made.
+/// The columns the intrusions sit in as the strata pass will paint them: the column rule
+/// ([`deeptime_format::strata::stack_at`]) over the horizons the structure stage keeps for the
+/// bake ([`bake_horizons::Horizons`]), at each intrusion's centre, so that a depth reads as the
+/// blocks it lies at, as the bodies' depths do. The rule smooths the cells' stacks into the
+/// column and joins equal rocks in a row into one horizon keyed by its top, and the structural
+/// events' test reads that key, so a pile of one rock laid over an unconformity (young shale on
+/// old shale) is younger cover as a whole: [`aureole_bands`] and [`cover_m`] read this, not the
+/// strata log's units. Taken while the planet's horizons are at hand, for these columns only.
 #[derive(Default)]
-pub struct HostColumns(HashMap<usize, (Vec<i16>, Vec<u8>, Vec<[u16; 2]>)>);
+pub struct HostColumns(HashMap<(i64, i64), Vec<ColumnHorizon>>);
 
 impl HostColumns {
-    /// The columns of `cells` in `hz`.
-    pub fn of(hz: &bake_horizons::Horizons, cells: impl IntoIterator<Item = usize>) -> Self {
-        let mut at = HashMap::new();
-        for c in cells {
-            at.entry(c).or_insert_with(|| {
-                let (tops, classes, keys) = hz.cell(c);
-                (tops.to_vec(), classes.to_vec(), keys.to_vec())
-            });
-        }
-        Self(at)
+    /// The columns of `hz` at the blocks `at` (block x, z).
+    pub fn of(hz: &bake_horizons::Horizons, at: impl IntoIterator<Item = (f64, f64)>) -> Self {
+        let desc = hz.desc(deeptime_format::Codec::Raw);
+        let (k, w) = (hz.k as usize, hz.grid.w as usize);
+        let horizon = |i: u32, j: u32, h: u32| {
+            let n = (j as usize * w + i as usize) * k + h as usize;
+            StoredHorizon {
+                top: hz.tops[n],
+                class: hz.classes[n],
+                key: hz.keys[n],
+            }
+        };
+        let mut blocks: Vec<(i64, i64)> = at
+            .into_iter()
+            .map(|(x, z)| (x.floor() as i64, z.floor() as i64))
+            .collect();
+        blocks.sort_unstable();
+        blocks.dedup();
+        let columns = blocks
+            .par_iter()
+            .map_init(StackScratch::default, |scratch, &(x, z)| {
+                let mut col = Vec::new();
+                stack_at_with(scratch, &desc, hz.min_y, horizon, x, z, &mut col);
+                ((x, z), col)
+            })
+            .collect();
+        Self(columns)
     }
 
-    /// Cell `c`'s column under the ground at `surface_y` into `out` ([`units_of`]); empty for a
-    /// cell not taken.
+    /// The column at block (x, z) under the ground at `surface_y` into `out`, as units of their
+    /// horizons' class and key whose thicknesses are the metres of `m_per_block_v` they span (a
+    /// horizon above the ground has none, the last reaches `min_y`); empty where none was taken.
     pub fn units(
         &self,
-        c: usize,
+        x: f64,
+        z: f64,
         surface_y: f64,
         min_y: i32,
         m_per_block_v: f64,
         out: &mut Vec<columns::Unit>,
     ) {
-        match self.0.get(&c) {
-            Some((tops, classes, keys)) => {
-                units_of(tops, classes, keys, surface_y, min_y, m_per_block_v, out);
-            }
-            None => out.clear(),
+        out.clear();
+        let Some(col) = self.0.get(&(x.floor() as i64, z.floor() as i64)) else {
+            return;
+        };
+        let mut top = surface_y;
+        for (h, &(_, class, key)) in col.iter().enumerate() {
+            // A horizon fills from its top block down to the block over the next one's top.
+            let bottom = col
+                .get(h + 1)
+                .map_or(f64::from(min_y), |n| f64::from(n.0) + 1.0)
+                .min(top);
+            out.push(columns::Unit {
+                class: u16::from(class),
+                thickness_m: ((top - bottom) * m_per_block_v) as f32,
+                source: columns::Source::Log,
+                key: [key, key],
+            });
+            top = bottom;
         }
     }
-}
-
-/// [`units_of`] one column of `units` (top down from the ground at `surface_y`) baked alone
-/// ([`bake_horizons::bake_cell`] at the bake's metres per block for strata, `k` horizons at most;
-/// without the bake's smoothing across cells, which needs the neighbours).
-#[cfg(test)]
-pub fn as_baked(
-    units: &[columns::Unit],
-    surface_y: f64,
-    s: &ScaleParams,
-    t: &Tables,
-    k: usize,
-    out: &mut Vec<columns::Unit>,
-) {
-    let mut tops = vec![0i16; k];
-    let mut classes = vec![0u8; k];
-    let mut keys = vec![[0u16; 2]; k];
-    let n = bake_horizons::bake_cell(
-        units,
-        surface_y,
-        s.min_y,
-        s.max_y,
-        s.m_per_block_v / s.feature_scale.strata,
-        &t.min_blocks,
-        &mut tops,
-        &mut classes,
-        &mut keys,
-    );
-    units_of(
-        &tops[..n],
-        &classes[..n],
-        &keys[..n],
-        surface_y,
-        s.min_y,
-        s.m_per_block_v,
-        out,
-    );
 }
 
 /// How many slabs a hollow aureole's zones follow the intrusion's wall in. Game choice: enough
@@ -1133,51 +1096,65 @@ mod tests {
     }
 
     #[test]
-    fn the_bake_merges_one_rock_over_an_unconformity_into_cover() {
-        // Young shale laid on old shale: the bake makes one horizon of them with the young
-        // key on top, so the column evaluator and the aureole take both as cover.
+    fn the_column_rule_joins_one_rock_over_an_unconformity_into_cover() {
+        // Young shale (strata log) laid on old shale (a basement pool's key range): the bake
+        // keeps two horizons, the column rule joins them into one keyed by the young top, so the
+        // structural events and the aureole take both as cover.
         let t = Tables::get();
         let mut s: ScaleParams =
             serde_json::from_value(serde_json::json!({ "circumference_blocks": 16384 })).unwrap();
         s.m_per_block_v = 20.0;
         let units = [
             unit("shale", 200.0, [4096, 5000]),
-            unit("shale", 1000.0, [9000, 12000]),
-            unit("limestone", 1000.0, [12000, 13000]),
+            unit("shale", 1000.0, [33000, 34000]),
+            unit("limestone", 1000.0, [34000, 35000]),
             unit("granite", 30000.0, [40000, 40100]),
         ];
         assert!((cover_m(&units, 8000) - 200.0).abs() < 1e-9);
-        let mut baked = Vec::new();
-        as_baked(&units, 100.0, &s, &t, 8, &mut baked);
+        let k = 8;
+        let (mut tops, mut classes, mut keys) = (vec![0i16; k], vec![0u8; k], vec![[0u16; 2]; k]);
+        let n = bake_horizons::bake_cell(
+            &units,
+            100.0,
+            s.min_y,
+            s.max_y,
+            s.m_per_block_v,
+            &t.min_blocks,
+            &mut tops,
+            &mut classes,
+            &mut keys,
+        );
+        assert_eq!(n, 4, "the bake keeps the two shales apart");
+        let hz = bake_horizons::Horizons {
+            grid: GridDesc::for_planet("L1", 64, 32).unwrap(),
+            k: k as u32,
+            min_y: s.min_y,
+            tops: tops.repeat(4),
+            classes: classes.repeat(4),
+            keys: keys.repeat(4),
+            tongues: (64, 0.15),
+            min_blocks: Vec::new(),
+        };
+        let hosts = HostColumns::of(&hz, [(3.5, -2.0)]);
+        let mut col = Vec::new();
+        hosts.units(3.9, -1.5, 100.0, s.min_y, s.m_per_block_v, &mut col);
         assert_eq!(
-            baked.iter().map(|u| u.class).collect::<Vec<_>>(),
+            col.iter().map(|u| u.class).collect::<Vec<_>>(),
             vec![index("shale"), index("limestone"), index("granite")]
         );
-        assert_eq!(baked[0].key[0], 4096);
-        assert!((cover_m(&baked, 8000) - 1200.0).abs() < 2.0);
-        let bands = aureole_bands(&baked, &t, 0.0, 4000.0, 8000);
+        assert_eq!(col[0].key[0], 4096);
+        assert!((cover_m(&col, 8000) - 1200.0).abs() <= 20.0);
+        let bands = aureole_bands(&col, &t, 0.0, 4000.0, 8000);
         assert_eq!(bands.len(), 1);
         assert_eq!(bands[0].class, index("skarn"));
-        assert!((bands[0].top_m - 1200.0).abs() < 2.0 && (bands[0].base_m - 2200.0).abs() < 2.0);
+        assert!((bands[0].top_m - 1200.0).abs() <= 20.0);
+        assert!((bands[0].base_m - 2200.0).abs() <= 20.0);
         // Its depths read in blocks of `m_per_block_v`, down to the world's floor.
-        let total: f64 = baked.iter().map(|u| f64::from(u.thickness_m)).sum();
+        let total: f64 = col.iter().map(|u| f64::from(u.thickness_m)).sum();
         assert!((total - (100.0 - f64::from(s.min_y)) * 20.0).abs() < 1.0);
-    }
-
-    #[test]
-    fn a_cells_horizons_read_as_units_under_the_ground() {
-        // A top horizon raised over a ground at y 15: its units start at the ground; a horizon
-        // wholly above the ground has no thickness; the last reaches the floor.
-        let (shale, rhyolite) = (index("shale") as u8, index("rhyolite") as u8);
-        let tops = [40 * 16, 20 * 16, -25 * 16, -109 * 16];
-        let classes = [shale, shale, shale, rhyolite];
-        let keys = [[4096, 4100], [4100, 5000], [5000, 9000], [33280, 33300]];
-        let mut out = Vec::new();
-        units_of(&tops, &classes, &keys, 15.0, -512, 35.0, &mut out);
-        let th: Vec<f32> = out.iter().map(|u| u.thickness_m).collect();
-        assert_eq!(th, vec![0.0, 40.0 * 35.0, 84.0 * 35.0, 403.0 * 35.0]);
-        assert_eq!(out[2].key, [5000, 9000]);
-        assert!((cover_m(&out, 4500) - 40.0 * 35.0).abs() < 1e-3);
+        // A block not taken has no column.
+        hosts.units(40.0, -1.5, 100.0, s.min_y, s.m_per_block_v, &mut col);
+        assert!(col.is_empty());
     }
 
     #[test]

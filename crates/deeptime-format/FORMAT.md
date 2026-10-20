@@ -1795,7 +1795,7 @@ by the aureole's width on every axis (`structure.aureole_share` of the intrusion
 dimension, `structure.aureole_carbonate_factor` times that in a carbonate host). Its zones (named
 `aureole`, no material, density 0) hold the baked rock band by band down the column: each zone's
 `rock_class` is skarn or hornfels and its v range the depths of a host horizon older than the
-intrusion, read on the column at the intrusion's centre as the bake lays it (its `horizon_stack` cell) and by the structural
+intrusion, read on the column at the intrusion's centre as the strata pass paints it (the column rule over `strata/horizons`) and by the structural
 events' test (a horizon whose top key is at least the intrusion's); a pluton's zones span d ∈ [0, 1], so the pluton body, painted later, keeps its own
 rock inside. A stock's aureole is hollow: the stock is a structural event, which bodies paint
 over, so its zones are cut into eight horizontal slabs whose d range starts at the stock's wall
