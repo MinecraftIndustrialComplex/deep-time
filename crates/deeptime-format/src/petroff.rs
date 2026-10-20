@@ -436,6 +436,53 @@ mod tests {
     }
 
     #[test]
+    fn the_diagonals_and_the_corners_round_trip() {
+        // Where P′ lies on a side of the planar triangle (ledger: SCL-083): each quadrant's central
+        // meridian (the square's diagonals, through V at 67.5° and the equator's midpoint M) at
+        // every latitude, and the equator's corners E (the Guyou world's cone points), exactly and a
+        // hair off. The original's law-of-cosines angle is rounding noise there (up to 10° off).
+        let p = Petroff::new();
+        let mut worst: f64 = 0.0;
+        let mut check = |lam: f64, phi: f64| {
+            let (x, y) = p.forward(lam, phi);
+            let (l2, p2) = p.inverse(x, y);
+            let d = angle(unit(lam, phi), unit(l2, p2));
+            worst = worst.max(d);
+            // The inverse's own error on the diagonals is up to ~1e-8 rad; the forward's is 1e-11.
+            assert!(d < 1e-7, "({lam}, {phi}) -> ({x}, {y}) -> ({l2}, {p2}): {d}");
+            (x, y)
+        };
+        for q in 0..4 {
+            let lam_m = PI / 4.0 + f64::from(q) * PI / 2.0;
+            for k in -900..=900 {
+                let phi = f64::from(k) / 900.0 * (PI / 2.0);
+                let (x, y) = check(lam_m, phi);
+                if q == 0 {
+                    // dl is exactly 0: the point is on the diagonal x = −y.
+                    assert!((x + y).abs() < 1e-12, "φ {phi}: ({x}, {y})");
+                }
+                for off in [1e-15, -1e-12, 1e-9, -1e-7] {
+                    check(lam_m + off, phi);
+                }
+            }
+            let lam_e = f64::from(q) * PI / 2.0;
+            for off in [0.0, 1e-15, -1e-12, 1e-9] {
+                for phi in [0.0, 1e-15, -1e-12, 1e-9, -1e-7] {
+                    let (x, y) = check(lam_e + off, phi);
+                    if off == 0.0 && phi == 0.0 {
+                        // A corner of the equator's diamond.
+                        assert!(
+                            (x.abs() + y.abs() - 1.0).abs() < 1e-12 && x.abs().min(y.abs()) < 1e-12,
+                            "E at λ {lam_e}: ({x}, {y})"
+                        );
+                    }
+                }
+            }
+        }
+        eprintln!("diagonals and corners: worst round trip {worst:e} rad");
+    }
+
+    #[test]
     fn the_boundary_rays_are_continuous() {
         // The quadrant boundaries (the axes) and the diagonals: points just either side map to
         // nearby sphere points (the original's quadrant rule put the rays y = 0, x < 0 and
