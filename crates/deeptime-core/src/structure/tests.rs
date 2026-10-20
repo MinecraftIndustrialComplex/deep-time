@@ -183,13 +183,12 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     let plutons: Vec<&deeptime_format::Body> =
         world.bodies.iter().filter(|b| b.role == "pluton").collect();
     assert_eq!(plutons.len() as u64, bodies);
-    assert!(world.bodies.iter().all(|b| [
-        "pluton",
-        "aureole",
-        "stock",
-        "impact_breccia"
-    ]
-    .contains(&b.role.as_str())));
+    assert!(
+        world
+            .bodies
+            .iter()
+            .all(|b| ["pluton", "aureole", "stock", "impact_breccia"].contains(&b.role.as_str()))
+    );
     for b in plutons {
         let class = b.rock_class.as_deref().unwrap();
         assert!(
@@ -201,8 +200,11 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     }
     // Their aureoles: bodies of hornfels and skarn zones, counted in the note, before the
     // plutons (a pluton paints over its aureole's inner part).
-    let aureoles: Vec<&deeptime_format::Body> =
-        world.bodies.iter().filter(|b| b.role == "aureole").collect();
+    let aureoles: Vec<&deeptime_format::Body> = world
+        .bodies
+        .iter()
+        .filter(|b| b.role == "aureole")
+        .collect();
     let a = &note["aureoles"];
     assert_eq!(
         aureoles.len() as u64,
@@ -217,8 +219,10 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
         }
         b.validate().unwrap();
     }
-    if let (Some(a), Some(p)) = (aureoles.last(), world.bodies.iter().find(|b| b.role == "pluton"))
-    {
+    if let (Some(a), Some(p)) = (
+        aureoles.last(),
+        world.bodies.iter().find(|b| b.role == "pluton"),
+    ) {
         assert!(a.id < p.id, "aureoles come before the plutons");
     }
     assert_eq!(note["horizons"]["check"], "ok");

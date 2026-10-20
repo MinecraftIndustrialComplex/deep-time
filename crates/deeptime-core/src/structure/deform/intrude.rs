@@ -20,10 +20,10 @@ use super::emplace::{Inputs, length_blocks, mask_axis, strain};
 use super::feature::{Counts, Feature, Kind};
 use super::params::DeformationParams;
 use crate::deposits::random::Rng;
-use crate::structure::plutons::{self, Pluton};
 use crate::plates::state::{ARC, CONTINENTAL, regime};
 use crate::sphere::BlockFrame;
 use crate::structure::params::StructureParams;
+use crate::structure::plutons::{self, Pluton};
 use crate::surface::lithology::index;
 use crate::surface::volcanoes::{Kind as VolcanoKind, Volcano};
 
