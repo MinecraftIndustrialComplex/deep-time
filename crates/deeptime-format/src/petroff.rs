@@ -11,7 +11,12 @@
 //!   y = 0, x < 0 in a quadrant 4 and x = 0, y < 0 in quadrant 1; found by the world-shape page's
 //!   tear check, 2026-10-04, and fixed in `tools/research/projection-survey/survey.py`);
 //! - 0/0 cases the original masks with array arithmetic are explicit branches, and arguments of
-//!   `acos`, `asin` and `sqrt` that rounding pushes past their domain are clamped.
+//!   `acos`, `asin` and `sqrt` that rounding pushes past their domain are clamped;
+//! - the forward places P′ by coordinates when it lies on a side of the planar triangle
+//!   ([`NEAR_SIDE`]). The original's law-of-cosines angle there is rounding noise, and at the cone
+//!   points (up = 0) its fallback angle ξ′ − π/6 is right only for sub-triangle 2, so exact inputs on
+//!   the Petroff diagonals and at the cone points landed off by up to 10° (found by the developer
+//!   map, 2026-10-20; the original `new_projection.py` has the same fallback).
 //!
 //! **Frame.** The square is [−1, 1]² with the north pole at its centre and the equator the diamond
 //! |x| + |y| = 1 (the southern hemisphere in the four corners); longitude λ in [0, 2π) runs counter-
@@ -51,6 +56,13 @@ impl Default for Petroff {
         Petroff::new()
     }
 }
+
+/// The forward's switch to the coordinate form of its last step: when P′ is within this many local
+/// units (about 0.002 blocks at 6656 blocks a hemisphere) of the side V′U′ (`up`) or U′C′ (`yp`).
+/// A numerical switch, not a physical value (ledger: SCL-083): above it the law of cosines is good
+/// to about 1e-7 blocks (measured against a 50-digit reference, 2026-10-20), and every random input
+/// keeps its bits.
+const NEAR_SIDE: f64 = 1e-6;
 
 /// The sign of `x`: −1, 0 or 1 (numpy's `sign`).
 #[inline]
@@ -185,20 +197,32 @@ impl Petroff {
         };
         let up = ap * upupvp;
         let xpyp = sqrt0(up * up + cp * cp - 2.0 * up * cp * pm::cos(gp));
-        let cos_gammap = if xpyp > 0.0 {
-            let q = up * pm::sin(gp) / xpyp;
-            sqrt0(1.0 - q * q)
-        } else {
-            1.0
-        };
         let xp = xpyp * xpxpyp;
         let yp = xpyp - xp;
-        let rp = sqrt0(xp * xp + cp * cp - 2.0 * xp * cp * cos_gammap);
-        let alphap = if up * rp <= 0.0 {
-            self.xip - PI / 6.0
+        let (rp, alphap) = if up <= NEAR_SIDE || yp <= NEAR_SIDE {
+            // P′ on a side of the planar triangle (V′U′ or U′C′): the triangle V′U′P′ is (nearly)
+            // flat and the law of cosines below loses alphap to rounding (it is 0/0 when up = 0, at
+            // the cone points). Place P′ = C′ + xpxpyp (U′ − C′) by coordinates instead, with V′ at
+            // the origin, U′ = (up, 0) and C′ at the angle gp: the same point, well conditioned.
+            let (cx, cy) = (cp * pm::cos(gp), cp * pm::sin(gp));
+            let px = cx + xpxpyp * (up - cx);
+            let py = cy - xpxpyp * cy;
+            ((px * px + py * py).sqrt(), pm::atan2(py, px))
         } else {
-            let q = (yp * yp - up * up - rp * rp) / (-2.0 * up * rp);
-            if q < 1.0 { pm::acos(q) } else { 0.0 }
+            let cos_gammap = if xpyp > 0.0 {
+                let q = up * pm::sin(gp) / xpyp;
+                sqrt0(1.0 - q * q)
+            } else {
+                1.0
+            };
+            let rp = sqrt0(xp * xp + cp * cp - 2.0 * xp * cp * cos_gammap);
+            let alphap = if up * rp <= 0.0 {
+                self.xip - PI / 6.0
+            } else {
+                let q = (yp * yp - up * up - rp * rp) / (-2.0 * up * rp);
+                if q < 1.0 { pm::acos(q) } else { 0.0 }
+            };
+            (rp, alphap)
         };
         let thetap = match s {
             0 => alphap,
