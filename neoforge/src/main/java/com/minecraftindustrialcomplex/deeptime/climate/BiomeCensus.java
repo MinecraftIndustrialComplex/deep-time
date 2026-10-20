@@ -113,17 +113,24 @@ public final class BiomeCensus {
      * {@code glaciated} limits the family to its columns under the ice cover ({@code true}), or to
      * those without ({@code false}); null is either. {@code colderThan} limits the family to the columns
      * whose baked temperature parameter is below it (null: any), for a class that is only wrong in part of
-     * its range (a cold desert, not a hot one).
+     * its range (a cold desert, not a hot one). {@code steep} limits it to the columns whose baked erosion is
+     * below vanilla's third erosion band ({@code true}: bands E0 and E1, under -0.375) or in it and above
+     * ({@code false}: the flats); null is any.
      */
     public record Forbid(String name, String classes, IntPredicate koppen, Boolean glaciated, Double colderThan,
-                         java.util.Set<String> biomes) {
+                         Boolean steep, java.util.Set<String> biomes) {
         public Forbid(String name, String classes, IntPredicate koppen, Boolean glaciated, java.util.Set<String> biomes) {
-            this(name, classes, koppen, glaciated, null, biomes);
+            this(name, classes, koppen, glaciated, null, null, biomes);
+        }
+
+        public Forbid(String name, String classes, IntPredicate koppen, Boolean glaciated, Double colderThan,
+                      java.util.Set<String> biomes) {
+            this(name, classes, koppen, glaciated, colderThan, null, biomes);
         }
     }
 
-    /** The {@link #FORBIDDEN} entry that bounds the ice cap's ice spikes. */
-    public static final String EF_ICE_SPIKES = "EF:few_ice_spikes";
+    /** The {@link #FORBIDDEN} entries that bound the ice cap's ice spikes, on its steep ground and on its flats. */
+    public static final String EF_ICE_SPIKES_STEEP = "EF:few_ice_spikes_on_steep", EF_ICE_SPIKES_FLATS = "EF:few_ice_spikes_on_flats";
 
     /**
      * EF is ice cap where the glacier model puts ice and barren frozen ground elsewhere (Ben, 2026-09-29,
@@ -138,9 +145,13 @@ public final class BiomeCensus {
             // Cherry groves are positive-weirdness variants: ice caps are steered off them.
             new Forbid("EF:no_cherry", "EF", k -> k == 30, null, java.util.Set.of("terralith:snowy_cherry_grove", "minecraft:cherry_grove")),
             // Ice spikes on a share of the ice cap only (Ben, 2026-09-30, "Bring ice spikes back"; the ice spikes report,
-            // 2026-10-20: Terralith drew them on every near-inland flat of it, 18 % of the ice cap of Ben's play planet).
-            // A bounded share, not a ban: its ceiling is BiomeGameTests.FORBIDDEN_CEILINGS' (ledger: BIO-162).
-            new Forbid(EF_ICE_SPIKES, "EF under ice", k -> k == 30, true, java.util.Set.of("minecraft:ice_spikes")),
+            // 2026-10-20, BIO-161: near-inland, Terralith drew them on the ice cap's flats on both signs of weirdness, 65 to
+            // 71 % of them, and vanilla's builder on a fifth of its steep ground). Bounded shares, not bans: the ceilings are
+            // BiomeGameTests.forbiddenCeiling's (ledger: BIO-162).
+            new Forbid(EF_ICE_SPIKES_STEEP, "EF under ice, erosion E0 and E1", k -> k == 30, true, null, true,
+                    java.util.Set.of("minecraft:ice_spikes")),
+            new Forbid(EF_ICE_SPIKES_FLATS, "EF under ice, erosion E2 and up", k -> k == 30, true, null, false,
+                    java.util.Set.of("minecraft:ice_spikes")),
             // Cold deserts (Ben, 2026-10-02): a BWk with a mean under 10 degC is in the frozen or cold band
             // (the placement's cold_desert and polar_ice ramps) and is not drawn as sand desert or badlands.
             new Forbid("BWk:cold_not_sand", "BWk colder than the cold band's top", k -> k == 5, null, COLD_BAND_TOP,
@@ -397,6 +408,8 @@ public final class BiomeCensus {
         // purpose (the relief's own erosion stays below it), so swamp there whatever the Köppen family.
         // The pack's peatland regions put cold wetland there too (Peatland), and it is set aside likewise.
         double e6 = OverworldBands.defaults().erosion()[6];
+        // Vanilla's steep ground, erosion bands E0 and E1, ends at its third band's lower edge (-0.375; BIO-023).
+        double e2 = OverworldBands.defaults().erosion()[2];
         // The biome rules (decisions log 2026-10-04): what decided each land column, with the level's bound rules.
         VolcanicBiomes.Level rules = sampler.spawnTarget() instanceof com.minecraftindustrialcomplex.deeptime.worldgen.RegionSpawnTarget m
                 ? m.volcanic() : null;
@@ -557,6 +570,8 @@ public final class BiomeCensus {
                         if (f.glaciated() != null && f.glaciated() != (ice != null && ice.blocks(x, z) > 0))
                             continue;
                         if (f.colderThan() != null && !(t.raster("climate/temperature", x, z) < f.colderThan()))
+                            continue;
+                        if (f.steep() != null && f.steep() != (wd.raster(ClimateMapping.EROSION, x, z) < e2))
                             continue;
                         int[] n = forbidden.get(f.name());
                         n[1]++;
