@@ -1204,13 +1204,26 @@ fn lowstand_m(history: &[(f64, f64)], t_years: f64) -> f64 {
 /// clear the same way (its loose sediment, and one rule for both).
 const SOIL_BLOCKS: i32 = 4; // ledger: ORE-271
 
-/// The host horizon of a column for a body wanted at block `want_y`: of the `horizons` (top,
-/// the next horizon's top or the floor, class; top-down) whose class `is_host`, each cut to its
-/// blocks under the top [`SOIL_BLOCKS`] solid blocks of the column whose ground is `surf` and
-/// above the floor's last 4 blocks (`min_y` the floor), the one whose middle is nearest `want_y`.
-/// (middle y, half thickness in blocks).
+/// How far round a site its host horizon must run (strata cells; the columns checked are the
+/// 5 × 5 square of cells about the site). The world's projection pass gives each world strata
+/// cell the stack of the nearest simulation cell (`bake::project`) and the column rule then
+/// blends the 4 × 4 cells about a block, so the stack the game paints at a site blends simulation
+/// cells up to about two cells away, not the simulation's own blend there; a facies change or a
+/// pinch-out inside that reach moves the host off the body. A horizon that runs this far at the
+/// body's height is where the game paints it. MVT ore lies in regional platform carbonate (Leach
+/// et al. 2010), which runs far beyond two cells (about 10 km at 300 m a block).
+const HOST_REACH_CELLS: i32 = 2; // ledger: ORE-271 (game-choice: the projection's reach)
+
+/// The host horizon of a site for a body wanted at block `want_y`, read from `centre`, the site
+/// column's horizons (top, the next horizon's top or the floor, class; top-down), and `around`,
+/// the columns about it. The candidates are the centre's horizons whose class `is_host`, each
+/// cut to its blocks under the top [`SOIL_BLOCKS`] solid blocks of the column whose ground is
+/// `surf` and above the floor's last 4 blocks (`min_y` the floor), taken nearest `want_y` first;
+/// each is cut again to its overlap with a host horizon of every column of `around` (the one it
+/// shares most blocks with). The first with a block left: (middle y, half thickness in blocks).
 fn host_horizon(
-    horizons: &[(i32, i32, u8)],
+    centre: &[(i32, i32, u8)],
+    around: &[Vec<(i32, i32, u8)>],
     is_host: impl Fn(u8) -> bool,
     surf: f64,
     want_y: f64,
@@ -1218,24 +1231,34 @@ fn host_horizon(
 ) -> Option<(f64, f64)> {
     let hi_max = surf.floor() as i32 - SOIL_BLOCKS;
     let lo_min = min_y + 4; // ledger: ORE-271
-    // (distance from the wanted depth, middle y, half thickness)
-    let mut best: Option<(f64, f64, f64)> = None;
-    for &(top, below, class) in horizons {
-        if !is_host(class) {
-            continue;
+    // A column's host horizons as block spans (highest, lowest); a horizon's blocks run from its
+    // top down to the next horizon's top + 1.
+    let spans = |col: &[(i32, i32, u8)]| -> Vec<(i32, i32)> {
+        col.iter()
+            .filter(|h| is_host(h.2))
+            .map(|&(top, below, _)| (top.min(hi_max), (below + 1).max(lo_min)))
+            .filter(|(hi, lo)| hi >= lo)
+            .collect()
+    };
+    let mid = |(hi, lo): (i32, i32)| f64::from(lo + hi + 1) / 2.0;
+    let mut candidates = spans(centre);
+    // Nearest the wanted depth first; a stable sort keeps the higher of two as near.
+    candidates.sort_by(|&a, &b| (mid(a) - want_y).abs().total_cmp(&(mid(b) - want_y).abs()));
+    'candidate: for (mut hi, mut lo) in candidates {
+        for col in around {
+            let shared = spans(col)
+                .into_iter()
+                .map(|(h, l)| (h.min(hi), l.max(lo)))
+                .filter(|(h, l)| h >= l)
+                .max_by_key(|(h, l)| h - l);
+            let Some((h, l)) = shared else {
+                continue 'candidate;
+            };
+            (hi, lo) = (h, l);
         }
-        // The horizon's blocks run from its top down to the next horizon's top + 1.
-        let (hi, lo) = (top.min(hi_max), (below + 1).max(lo_min));
-        if hi < lo {
-            continue;
-        }
-        let mid = f64::from(lo + hi + 1) / 2.0;
-        let d = (mid - want_y).abs();
-        if best.is_none_or(|b| d < b.0) {
-            best = Some((d, mid, f64::from(hi - lo + 1) / 2.0));
-        }
+        return Some((mid((hi, lo)), f64::from(hi - lo + 1) / 2.0));
     }
-    best.map(|(_, mid, half)| (mid, half))
+    None
 }
 
 /// Where a body of an in-stratum type sits (`hosts.in_stratum`, [`DepositStage::host_stratum`]).
@@ -2476,10 +2499,11 @@ impl DepositStage {
     /// Where a body of in-stratum type `ti` at (x, z) sits: in the column's horizon of a host
     /// class (`hosts.weights` above 0) whose middle is nearest the ledger's depth
     /// `want_depth_m`, read from the horizons the world draws (`structure::Cover`), each kept
-    /// under a block of ground and above the floor's last 4 blocks. A stratabound ore lies in
-    /// its host unit (MVT: replacement and open-space fill of platform carbonate, Leach et al.
-    /// 2010), so a column without one has no deposit, nor does crust that is oceanic now (no
-    /// platform; Leach et al. 2010).
+    /// under the soil and above the floor's last 4 blocks, and cut to the blocks where a host
+    /// horizon runs through every column within [`HOST_REACH_CELLS`] strata cells. A stratabound
+    /// ore lies in its host unit (MVT: replacement and open-space fill of platform carbonate,
+    /// Leach et al. 2010), so a column without one has no deposit, nor does crust that is oceanic
+    /// now (no platform; Leach et al. 2010).
     fn host_stratum(
         &self,
         f: &Finish,
@@ -2508,13 +2532,17 @@ impl DepositStage {
                 .is_some_and(|&w| w > 0.0)
         };
         let want_y = surf - want_depth_m / f.sc.m_per_block_v;
-        match host_horizon(
-            &cover.drawn_horizons_at(x, z),
-            is_host,
-            surf,
-            want_y,
-            cover.min_y(),
-        ) {
+        let centre = cover.drawn_horizons_at(x, z);
+        if !centre.iter().any(|h| is_host(h.2)) {
+            return HostFit::NoHost;
+        }
+        let (r, step) = (HOST_REACH_CELLS, cover.cell_blocks());
+        let around: Vec<_> = (-r..=r)
+            .flat_map(|j| (-r..=r).map(move |i| (i, j)))
+            .filter(|&ij| ij != (0, 0))
+            .map(|(i, j)| cover.drawn_horizons_at(x + f64::from(i) * step, z + f64::from(j) * step))
+            .collect();
+        match host_horizon(&centre, &around, is_host, surf, want_y, cover.min_y()) {
             None => HostFit::NoHost,
             Some((mid, half)) => HostFit::In {
                 centre_depth_m: (surf - mid) * f.sc.m_per_block_v,
@@ -3927,20 +3955,39 @@ mod tests {
         let col = [(70, 65, 0u8), (65, 60, 1), (60, 40, 2), (40, -61, 1)];
         let host = |c: u8| c == 1;
         // Wanted shallow: the limestone, its 5 blocks well under the soil of a ground at 70.5.
-        let (mid, half) = host_horizon(&col, host, 70.5, 64.0, -64).unwrap();
+        let (mid, half) = host_horizon(&col, &[], host, 70.5, 64.0, -64).unwrap();
         assert_eq!((mid, half), (63.5, 2.5));
         // Wanted deep: the dolostone, cut above the floor's last 4 blocks (-60).
-        let (mid, half) = host_horizon(&col, host, 70.5, 0.0, -64).unwrap();
+        let (mid, half) = host_horizon(&col, &[], host, 70.5, 0.0, -64).unwrap();
         assert_eq!((mid, half), (-9.5, 50.5));
         // Ground at block 66: its soil is blocks 63 to 66, so only the limestone's 61 and 62
         // count (the span 61 to 63).
-        let (mid, half) = host_horizon(&col, host, 66.2, 64.0, -64).unwrap();
+        let (mid, half) = host_horizon(&col, &[], host, 66.2, 64.0, -64).unwrap();
         assert_eq!((mid, half), (62.0, 1.0));
         // Ground at block 64: the limestone lies all in the soil, so the dolostone is the host.
-        let (mid, _) = host_horizon(&col, host, 64.5, 64.0, -64).unwrap();
+        let (mid, _) = host_horizon(&col, &[], host, 64.5, 64.0, -64).unwrap();
         assert_eq!(mid, -9.5);
         // No host class: none.
-        assert!(host_horizon(&col, |c| c == 9, 70.5, 64.0, -64).is_none());
+        assert!(host_horizon(&col, &[], |c| c == 9, 70.5, 64.0, -64).is_none());
+    }
+
+    #[test]
+    fn a_host_horizon_must_run_through_the_columns_about_the_site() {
+        // The site: limestone 65..=61 and dolostone 40..=-60 (as above).
+        let col = [(70, 65, 0u8), (65, 60, 1), (60, 40, 2), (40, -61, 1)];
+        let host = |c: u8| c == 1;
+        // A neighbour whose limestone dips to 63..=58: the body keeps the shared 61 to 63.
+        let dip = vec![(70, 63, 0u8), (63, 57, 1), (57, 40, 2), (40, -61, 1)];
+        let (mid, half) = host_horizon(&col, &[dip.clone()], host, 70.5, 64.0, -64).unwrap();
+        assert_eq!((mid, half), (62.5, 1.5));
+        // A neighbour where the limestone passes into shale (a facies change): the shallow
+        // horizon does not run through, so the body goes to the dolostone that does.
+        let shale = vec![(70, 65, 0u8), (65, 40, 2), (40, -61, 1)];
+        let (mid, _) = host_horizon(&col, &[dip, shale.clone()], host, 70.5, 64.0, -64).unwrap();
+        assert_eq!(mid, -9.5);
+        // No host anywhere in a neighbour: none.
+        let barren = vec![(70, -61, 2u8)];
+        assert!(host_horizon(&col, &[shale, barren], host, 70.5, 64.0, -64).is_none());
     }
 
     #[test]
