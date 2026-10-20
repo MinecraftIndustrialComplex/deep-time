@@ -36,6 +36,39 @@ public interface RunHandle {
         return false;
     }
 
+    /**
+     * A live frame ({@code deeptime_core::live}): the one layer the map shows, drawn between the
+     * keyframes while the view follows the run. Not a keyframe: it is not kept and cannot be scrubbed
+     * to, stopped at or picked.
+     *
+     * @param seq  the session's live frame number, from 1 (a larger one is newer)
+     * @param info its time, stage and size; {@code n} is −1 and {@code layers} holds its one layer
+     * @param abgr the pixels, {@code w × h}
+     */
+    record LiveFrame(long seq, KeyframeInfo info, int[] abgr) {
+
+        public String layer() {
+            return info.layers().get(0);
+        }
+    }
+
+    /**
+     * Asks for live frames of {@code layer} (null: no more) and returns the newest one's number, 0
+     * when there is none. The request lapses after two seconds, so the caller renews it on every poll
+     * while it wants them. Cheap, safe from the render thread; a handle without a live map returns 0.
+     */
+    default long watchLive(String layer) {
+        return 0;
+    }
+
+    /**
+     * The newest live frame, or null (none, or the run is over). {@code like} is one of the run's
+     * keyframes: the live frame has its size. May block briefly; runs on a loader thread.
+     */
+    default LiveFrame liveFrame(KeyframeInfo like) {
+        return null;
+    }
+
     /** Completes with the manifest JSON; exceptionally when cancelled or failed. */
     CompletableFuture<String> completion();
 }

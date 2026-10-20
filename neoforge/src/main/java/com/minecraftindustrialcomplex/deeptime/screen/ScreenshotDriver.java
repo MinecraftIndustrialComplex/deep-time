@@ -8,6 +8,7 @@ import com.minecraftindustrialcomplex.deeptime.screen.model.EditorFields;
 import com.minecraftindustrialcomplex.deeptime.screen.model.EditorModel;
 import com.minecraftindustrialcomplex.deeptime.screen.model.GenerationStatus;
 import com.minecraftindustrialcomplex.deeptime.screen.model.LayerCatalog;
+import com.minecraftindustrialcomplex.deeptime.screen.model.Phrase;
 import com.minecraftindustrialcomplex.deeptime.screen.model.TimelapseModel;
 import com.minecraftindustrialcomplex.deeptime.worldgen.PlanetGenerators;
 import com.mojang.blaze3d.platform.NativeImage;
@@ -39,8 +40,8 @@ import java.util.List;
  * its own, as a player would (docs/design/create-world-ux.md), and takes screenshots into
  * {@code <gamedir>/screenshots/}: Create World as it opens (it must already be on Deep Time when
  * the natives loaded; the walk logs FAILED otherwise), the Customize page, the generation page that
- * Create opens (preparing, live with its History, Map and More tabs, a few layers, the globe, done,
- * scrubbed), the final map and spawn, then Play; with {@code -Ddeeptime.dev.screenshots.create=true}
+ * Create opens (preparing, live with its History, Map and More tabs, the live map twice between
+ * keyframes ({@code 04c-live-map-a}, {@code 04d-live-map-b}), a few layers, the globe, done, scrubbed), the final map and spawn, then Play; with {@code -Ddeeptime.dev.screenshots.create=true}
  * the world is created (the staging move at server start) and shot in-world, else the walk stops
  * at Create World after Accept. Every step logs a {@code [deeptime-shot]} line. Used by
  * {@code tools/client/vm-client.sh} (the test VM, Xvfb) and {@code tools/client/mac-screenshots.sh};
@@ -65,13 +66,21 @@ final class ScreenshotDriver {
     private static final int STEP_TIMEOUT_TICKS = 20 * 180;
 
     private enum Step {
-        TITLE, CREATE_SCREEN, CUSTOMIZE, ADVANCED, PRESS_CREATE, GENERATING, CANCEL, RUNNING, TABS, LAYERS, GLOBE, DONE, EPOCH,
+        TITLE, CREATE_SCREEN, CUSTOMIZE, ADVANCED, PRESS_CREATE, GENERATING, CANCEL, RUNNING, LIVE, TABS, LAYERS, GLOBE, DONE, EPOCH,
         CONTINUE, REVIEW, ACCEPTED, CREATING, IN_WORLD, VISTA, QUIT
     }
 
     /** Layers shot mid-run ({@code .layers=a,b,…}; those the run has). */
     private static final String DEFAULT_LAYERS = "plates,climate/koppen,structure/rock,provinces";
     private static int layerShot;
+    /** The live map's first shot: its time and the newest keyframe's then (NaN before it). */
+    private static double liveT = Double.NaN;
+    private static double liveKeyT;
+    /** The newest live frame's time the walk has seen, and the tick it was seen at. */
+    private static double liveSeen = Double.NaN;
+    private static int liveSeenTick;
+    /** How long the live map's shots wait for a new picture before the walk goes on. */
+    private static final int LIVE_WAIT_TICKS = 20 * 150;
     private static boolean cancelled;
     private static String cancelledId;
     private static TimelapseModel cancelledRun;
@@ -365,7 +374,45 @@ final class ScreenshotDriver {
                     status("live");
                     DeepTime.LOGGER.info("[deeptime-shot] live: {} frames, {} events, layer {}, groups {}, layers {}", run.frameCount(),
                             run.events().size(), run.layer().orElse("-"), run.groups(), run.layers());
-                    go(Step.TABS);
+                    GenerationPage.setTab(GenerationPage.Tab.MAP);
+                    ed.refresh();
+                    liveT = Double.NaN;
+                    liveSeen = Double.NaN;
+                    go(Step.LIVE);
+                }
+                case LIVE -> {
+                    // The live map between keyframes: two shots of it at two times (the map follows
+                    // the run, not only the keyframes), with the newest keyframe's time beside each.
+                    TimelapseModel run = model.run().orElseThrow();
+                    if (!(screen instanceof PlanetEditorScreen))
+                        return;
+                    double newestKey = run.frames().isEmpty() ? Double.NaN : run.frames().get(run.frameCount() - 1).t();
+                    double t = run.mapTime().orElse(Double.NaN);
+                    boolean live = run.showingLive();
+                    if (run.state() != TimelapseModel.State.RUNNING || stepTicks > LIVE_WAIT_TICKS) {
+                        DeepTime.LOGGER.error("[deeptime-shot] FAILED: no {} live map in {} s ({}; newest keyframe {})",
+                                Double.isNaN(liveT) ? "first" : "second", stepTicks / 20, run.state(), Lang.phrase(Phrase.yearsAgo(newestKey)).getString());
+                        go(Step.TABS);
+                    } else if (live && t != liveSeen) {
+                        // A new live frame: shot a second later, once the map's texture shows it.
+                        liveSeen = t;
+                        liveSeenTick = stepTicks;
+                    } else if (live && t == liveSeen && stepTicks - liveSeenTick >= 20 && (Double.isNaN(liveT) || t != liveT)) {
+                        boolean first = Double.isNaN(liveT);
+                        shot(first ? "04c-live-map-a" : "04d-live-map-b");
+                        DeepTime.LOGGER.info("[deeptime-shot] live map {}: {} (t {} Myr), newest keyframe {} (t {} Myr), {} keyframes{}",
+                                first ? "a" : "b", Lang.phrase(Phrase.yearsAgo(t)).getString(), Math.round(t / 1e6),
+                                Lang.phrase(Phrase.yearsAgo(newestKey)).getString(), Math.round(newestKey / 1e6), run.frameCount(),
+                                first ? "" : newestKey == liveKeyT ? ", the same newest keyframe as shot a" : ", a newer keyframe than shot a");
+                        if (first) {
+                            liveT = t;
+                            liveKeyT = newestKey;
+                            stepTicks = 1;
+                            liveSeenTick = 0;
+                        } else {
+                            go(Step.TABS);
+                        }
+                    }
                 }
                 case TABS -> {
                     if (!(screen instanceof PlanetEditorScreen ed))

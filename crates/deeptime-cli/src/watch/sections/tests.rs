@@ -50,6 +50,8 @@ fn workbench(name: &str) -> (PathBuf, Arc<Workbench>) {
         checkpoints: false,
         stop_myr: None,
         epochs: false,
+        live: None,
+        live_every_step: false,
         common: c,
     })
     .unwrap();
