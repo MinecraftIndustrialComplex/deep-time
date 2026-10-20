@@ -19,9 +19,16 @@ import java.util.List;
  * @param min       inclusive AABB min (x may leave the canonical span)
  * @param max       inclusive AABB max
  * @param rockClass the rock class the whole body's host becomes, or null
+ * @param ageMa     when the body formed, Myr before the end of the world's history, or NaN (FORMAT.md)
  */
 public record Body(int id, int site, int shape, String role, double[] center, float[] axes, float yaw, float dip,
-                   int clipTopY, int[] min, int[] max, String rockClass, List<Zone> zones) {
+                   int clipTopY, int[] min, int[] max, String rockClass, List<Zone> zones, float ageMa) {
+
+    /** A body with no age (deposit bodies, tests). */
+    public Body(int id, int site, int shape, String role, double[] center, float[] axes, float yaw, float dip,
+                int clipTopY, int[] min, int[] max, String rockClass, List<Zone> zones) {
+        this(id, site, shape, role, center, axes, yaw, dip, clipTopY, min, max, rockClass, zones, Float.NaN);
+    }
 
     public static final int NO_CLIP = Integer.MAX_VALUE;
 

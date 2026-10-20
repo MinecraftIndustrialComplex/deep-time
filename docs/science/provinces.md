@@ -26,7 +26,11 @@ Which region a province gets is chance (PRV-030); the class does not decide it.
 
 1. **Classify each cell.** After the history is run, every cell of the L1 grid gets one class, by
    the first rule that applies (PRV-006 to PRV-020):
-   a mafic volcanic pile much thicker than ocean crust carries is a large igneous province;
+   a pile of the run's own flood basalts (the flows and tuffs its LIP events laid, followed
+   in the strata log as they are buried, eroded, rifted apart or subducted) at least a fifth as
+   thick as those events recorded is a large igneous province, on land or as an oceanic plateau;
+   ordinary basalt, ocean-floor gabbro and hotspot piles are not (Bryan and Ernst 2008 define a
+   LIP by its emplacement; PRV-006);
    oceanic crust is sea floor in three age classes (under 20 Myr, 20 to 65 Myr, over 65 Myr), or,
    where it is an arc on crust thicker than 9 km, an orogen (island arc);
    continental crust in a collision or arc regime, crust a collision touched in the last 500 Myr
@@ -64,6 +68,7 @@ value is [ledger/PRV.md](ledger/PRV.md). The ones P1-10 made settings or added:
 | PRV-012 | Andean range is an orogen | lifted within 50 Myr (`andean_max_age_myr`) and over 1,500 m (`andean_min_elevation_m`) | Myr, m | none; set by running the model until Andean orogeny stopped covering whole continents (87 % of continental cells carried it) | `calibrated` |
 | PRV-029 | smallest bake province | 50,000 km^2 (`min_area_km2`) | km^2 | none; "a region the size of a small country" | `game-choice` |
 | PRV-030 | province to region | stratified deal by TerraBlender weight | - | none; not a physical claim | `game-choice` |
+| PRV-006 | large igneous province | the run's LIP flows (`surface/lip_m`) at least 0.2 of the recorded LIP thickness | m | Bryan and Ernst 2008 (definition by origin; abstract) | `game-choice` |
 
 ## Earth against the mod
 
@@ -75,7 +80,7 @@ small regions; the Earth figures are of that kind.
 | cratons (shield + platform + basin) | about 0.71 | CRUST 2.0 crust types by name, land without Antarctica, derived by an earlier sub-agent (method not recorded); the stage 1 spot check, with its own crude name mapping, got 0.75 | 0.431 | A |
 | orogens + arcs | about 0.17 (0.12 + 0.05) | same; the spot check got 0.18 | 0.245 | A |
 | extended crust + rifts | about 0.07 | same; the spot check got 0.066 | 0.224 | A |
-| large igneous provinces | no figure | not looked for | 0.100 | A |
+| large igneous provinces | 0.067 of the land; 0.059 of the whole surface (oceanic plateaus included) | Johansson et al. 2018 polygons, area measured by the REV-2 lookup (bibliography `Johansson2018`) | 0.100 (the old rule); 0.001 to 0.016 under REV-2's rule (table below) | A; REV-2 |
 | orogens + arcs, earlier state of the model | | | 0.421 | B |
 
 Run A: `earthlike_quick_16k`, scattered continents, 500 Myr, preset seed, this branch merged with
@@ -98,8 +103,47 @@ belts 0.042 and Andean ranges 0.060, so the share is 0.245: nearer the Earth's 0
 it. The part no threshold reaches is the active regime. Tightening the thresholds (orogen 200 Myr,
 Andean 25 Myr and 2,500 m) takes run A from 0.245 to 0.185, at the cost of calling the old belts
 of the Appalachian type platform or shield. The defaults are unchanged; the question is with Ben
-(STATUS pending questions). Large igneous provinces at 0.10 of the continents are probably high
-too (the Earth's are a few per cent); no Earth figure has been looked for.
+(STATUS pending questions). Large igneous provinces at 0.10 of the continents were high: the old
+rule counted any mafic pile thicker than ocean crust carries, and on a later run (1a156f22b66,
+1000 Myr) that grew to 0.56 of the continents and 0.30 of the planet. REV-2 (2026-10-19) counts
+only the run's own flood basalts; the shares it measured are in the table below.
+
+### Large igneous provinces under REV-2's rule
+
+`earthlike_quick_16k`, 1000 Myr, 4 threads, master be17a7cf against the REV-2 branch, on the test
+VM, 2026-10-19. "Classified" is the rules' class share before the bake absorbs regions under
+50,000 km^2; "map" is the baked provinces layer the game and the inspector show. Shares are of the
+planet / of the continental (non-ocean) area.
+
+| Run | Old rule, classified | Old rule, map | REV-2, classified | REV-2, map |
+|---|---|---|---|---|
+| supercontinent, seed 1 | 0.312 / 0.586 | 0.172 / 0.356 | 0.0027 / 0.0068 | 0 / 0 |
+| supercontinent, seed 2 | 0.314 / 0.579 | 0.278 / 0.595 | 0.0005 / 0.0013 | 0 / 0 |
+| scattered continents, seed 1 | 0.403 / 0.630 | 0.514 / 0.775 | 0.0029 / 0.0059 | 0 / 0 |
+| scattered continents, seed 2 | 0.350 / 0.571 | 0.615 / 0.887 | 0.0077 / 0.0162 | 0 / 0 |
+| the Earth (Johansson et al. 2018) | | | 0.059 / 0.067 (of land) | |
+
+The old rule called a third of the planet a LIP, five to seven times the Earth's share; REV-2's rule calls
+between a hundredth and an eighth of the Earth's share one, and none survives the bake's minimum area. The
+threshold is not what keeps it low: in supercontinent seed 1 (dump of `surface/lip_m` at the last
+checkpoint) the run's flood basalts are left on 0.31 % of the planet at any thickness and 0.27 %
+at the rule's 300 m (the median pile is 1,096 m). Through the run the share swings between 0.1 %
+and 1.3 % of the planet (the provinces keyframes, 50 Myr apart), so it is what the run keeps of
+its LIPs, not the rule, that sets it:
+
+- The runs lay 12 to 21 LIP events in 1000 Myr, each a disc of about 110 km radius on the 16k
+  planet (the preset's 900 km scaled to the planet; 0.5 % of its surface, near the Earth's largest
+  single provinces, 0.1 to 0.4 % of its surface). Their lavas wear off the land and go down with
+  subducted sea floor: by the keyframes, the share falls back within one to three hundred Myr of
+  each event. The Earth's figure is the present-day footprint (mapped outcrop and inferred extent)
+  of some 2,500 polygons, seamount and ridge polygons among them (4.6 % without those;
+  bibliography `Johansson2018`).
+- One LIP disc is about 38,000 km^2 on the 16k planet, under the bake's 50,000 km^2 minimum
+  (0.65 % of the planet, PRV-029), so the map shows none even while one is fresh, unless two
+  overlap. On a larger planet the disc grows with it and the minimum does not.
+
+Raising the share is a change to the volcano stage's LIP events or to what a LIP leaves behind,
+not to this rule; it is open (STATUS known issues).
 
 ## Simplifications and limits
 
@@ -132,7 +176,6 @@ too (the Earth's are a few per cent); no Earth figure has been looked for.
   through the plate model's collision frequency and halo? With Ben.
 - Find the USGS map's own rules or a published table of Earth's province shares (WP-12 in
   [claims.md](claims.md)); until then the Earth column is partial.
-- Large igneous province share of 0.10: check against a published LIP area.
 - A geologist should look at the platform and shield split, which is by cover thickness.
 
 ## Sources

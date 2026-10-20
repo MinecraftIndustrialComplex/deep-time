@@ -122,6 +122,9 @@ pub mod field {
     pub const DEPOSITION: &str = "surface/deposition_m_myr";
     /// Thickness of the strata log, m.
     pub const SEDIMENT: &str = "surface/sediment_m";
+    /// Thickness of the strata log's flood basalts (the layers of provenance
+    /// `strata_log::LIP_FLOW`), m: what the geologic provinces count as a LIP.
+    pub const LIP: &str = "surface/lip_m";
     /// The plate and the rigid group under each cell after the last step (`plates/plate_id`,
     /// `plates/group_id` as the stage saw them): the next step's advection carries the offset only
     /// from cells that held the same crust (`advect::bilinear_same`).
@@ -1861,6 +1864,11 @@ impl SurfaceStage {
         put(world, field::EROSION, crate::alloc::copied(&erosion));
         put(world, field::DEPOSITION, crate::alloc::copied(&deposition));
         put(world, field::SEDIMENT, sediment);
+        let lip: Vec<f32> = (0..n)
+            .into_par_iter()
+            .map(|c| st.log.thickness_of(c, strata_log::LIP_FLOW) as f32)
+            .collect();
+        put(world, field::LIP, lip);
         put(world, field::CLASS, class_now);
         put(world, field::DRAINAGE, drainage);
         put(world, field::REGOLITH, crate::alloc::copied(&st.regolith_m));
