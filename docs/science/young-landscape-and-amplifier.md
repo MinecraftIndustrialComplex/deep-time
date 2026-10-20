@@ -10,12 +10,14 @@ The deep-time simulation works on cells several kilometres wide. Two later steps
 |---|---|---|
 | [YNG](ledger/YNG.md) | young landscape | YNG-001 to YNG-014 (14) |
 | [YNG](ledger/YNG.md) | detail noise | YNG-015 to YNG-021 (7) |
+| [YNG](ledger/YNG.md) | sea floor | YNG-022, YNG-023 (2) |
 | [AMP](ledger/AMP.md) | amplifier kernels | AMP-001 to AMP-022 (22) |
 | [AMP](ledger/AMP.md) | incision | AMP-023 to AMP-033 (11) |
 | [AMP](ledger/AMP.md) | mountain character | AMP-034 to AMP-066 (33) |
 | [AMP](ledger/AMP.md) | resampling | AMP-067 to AMP-071 (5) |
+| [AMP](ledger/AMP.md) | sea floor | AMP-074 (1) |
 
-Rows by status: `cited-unverified` 9, `calibrated` 1, `game-choice` 62, `uncited` 20.
+Rows by status (YNG and AMP, recounted 2026-10-20): `cited-unverified` 8, `calibrated` 3, `game-choice` 65, `uncited` 19.
 
 ## Material for the stage 2 writer
 
