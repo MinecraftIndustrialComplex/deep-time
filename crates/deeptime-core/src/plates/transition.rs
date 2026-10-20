@@ -41,16 +41,18 @@
 //! thinner than T* within each stretch of margin (a catchment about W/2 long, below), the share
 //! 1 − e^(−δt/τ) of what would bring the stretch to the profile (τ = `transition_myr`). The
 //! sources thin in proportion (pure shear) and the sinks take their rock. With
-//! `transition_ocean_crust` (off by default; PLT-294, Ben's to choose) an oceanic sink takes the
+//! `transition_ocean_crust` (PLT-294; on in every shipped preset since 2026-10-20, the coordinator's
+//! call in the decisions log, off in `TectonicParams::default`) an oceanic sink takes the
 //! same volume as ocean crust instead (lavas and gabbro in the ocean column's proportion), as the
 //! thick igneous crust of a volcanic margin (from-memory: White & McKenzie 1989, not read), the
 //! commoner kind (Franke 2013, read; ledger PLT-294, a game-choice): the crust-template
 //! review of 2026-10-19 found the sources' rock is the main source of granite and gneiss under
 //! the sea on the quick planet, whose oceans lie mostly within W/2 of a margin, but the
-//! continental rock the switch stops parking on the ocean side is then lost, and with it about
-//! 0.04 of the planet's land on supercontinent starts. Crust types do not change: the thickened
-//! ocean-side crust stays oceanic, so the continental crust share and land are not redefined by
-//! the rule.
+//! continental rock the switch stops parking on the ocean side is then lost, and with it some land
+//! (about 0.04 of the planet on supercontinent starts on master d54c7f0f; with the cordillera at
+//! 1.7 mm/yr, 2026-10-20, the quick ensemble's land 0.27 on both starts, Earth's 0.29). Crust
+//! types do not change: the thickened ocean-side crust stays oceanic, so the continental crust
+//! share and land are not redefined by the rule.
 //!
 //! Heights follow the crust along the line through two reference columns: a continent of T_n at
 //! z_0 (the middle of `continent_elevation_m`) and old ocean floor of T_o at z_f
