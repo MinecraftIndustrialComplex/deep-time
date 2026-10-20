@@ -1,19 +1,20 @@
 # Strata
 
-Status of this page: `stage 2 (checked against sources on 2026-10-02, package WP-7)`. Of the 46 active rows,
-1 is `verified`, 1 `abstract-only`, 2 `calibrated` and 42 `game-choice`. Nothing in this subsystem is a
+Status of this page: `stage 2 (checked against sources on 2026-10-02, package WP-7; the crust templates and
+the relief lift added 2026-10-19)`. Of the 50 active rows, 1 is `verified`, 1 `abstract-only`, 2 `calibrated`
+and 46 `game-choice`. Nothing in this subsystem is a
 physical law that the code could get wrong in a number: almost everything is a rule of how the game
 draws layers. The page says which parts agree with geology, which do not, and where the code departs on
 purpose.
 
-Ledger ids on this page: `STR-001` to `STR-050` (see [claims.md](claims.md)). The rock classes themselves
+Ledger ids on this page: `STR-001` to `STR-054` (see [claims.md](claims.md)). The rock classes themselves
 and the metamorphism that changes them are on [rock-and-metamorphism.md](rock-and-metamorphism.md).
 
 ## What you see in the world
 
 Dig down anywhere and the rock comes in horizontal beds in the order they were laid down, youngest on top.
-Each bed is at least one block (20 m) thick, a bed of regional metamorphic rock at least eight blocks
-(160 m) and a bed of plutonic rock at least 16 (320 m). Beds run on across the landscape for kilometres and
+Each bed is at least one block (35 m) thick, a bed of regional metamorphic rock at least eight blocks
+(280 m) and a bed of plutonic rock at least 16 (560 m). Beds run on across the landscape for kilometres and
 thin out where the sea or the river that laid them did not reach; where one rock grades into another
 sideways the two interleave in tongues. Under a belt of folded rock the beds are bent, cut by faults and
 repeated, and the same bed can be met twice going down a thrust. Gaps in the record show as a bed lying on
@@ -21,9 +22,20 @@ much older rock. Slate, schist and gneiss lie under unmetamorphosed cover, never
 metamorphic grade rises as you go down. Granite and its relatives are not beds but bodies: they cut across
 the beds (see the other page).
 
-The strata are drawn tall. One block is 300 m across and 20 m deep, so every layer is drawn 15 times thicker
-against its width than on Earth. The world is 992 blocks (19.8 km) from the floor at y -352 to the ceiling at
-y 639.
+Continents and the sea floor are built differently. Under a continent the basement is granite, gneiss and
+their relatives. Under the sea floor it is ocean crust as drilling and ophiolites show it (the Penrose
+sequence): pelagic sediment, thin near a ridge and thicker on old crust, then basalt lavas, then the sheeted
+dikes (greenstone), then gabbro, and about 7 km under the sea floor the mantle's peridotite. Granite and
+gneiss do not reach under the sea; an island arc's crust (andesite over diorite or granodiorite) and the
+thinned continental crust on the ocean side of a rifted margin are the exceptions.
+
+Mountains are rock to their tops. Where the terrain stands above the surface the deep-time history left (the
+amplifier's ridges and peaks), the whole stack rises with it, so a ridge shows the region's formations in
+order and not one thick bed of its youngest rock.
+
+The strata are drawn tall. One block is 300 m across and 35 m deep (SCL-002), so every layer is drawn 8.6
+times thicker against its width than on Earth. The world is 1,152 blocks (40.3 km) from the floor at y -512
+to the ceiling at y 639.
 
 ## The model in plain words
 
@@ -35,34 +47,42 @@ y 639.
    for each map cell from the top down: the regolith, then the strata log with the classes that regional
    metamorphism left in it, then the rock pools of the plate model as basement (sediment, sedimentary,
    volcanic, metamorphic, plutonic), then the mantle. Young shallow beds are shown as their loose form
-   (sand, mud), the rest as rock (RCK-022).
+   (sand, mud), the rest as rock (RCK-022). Each crust kind has its own classes (RCK-092): ocean crust's
+   volcanic pool is lavas over sheeted dikes (RCK-091), its felsic pools are arc rock, never granite.
 3. **The order.** Every unit gets a stratigraphic key, a 16-bit number that grows downward and orders units
    identically in every column. The key space is built grade first: the regolith, then one band per
    metamorphic grade (unmetamorphosed, then from 250, 300, 350, 500, 525 and 650 degC), then the mantle.
    Inside a band the log's layers go by age and the basement pools in erosion order (STR-018 to STR-021).
    Ordered by key, a column can only get hotter downward.
 4. **Settling.** The bake smooths the layers sideways (a Gaussian of about 10 cells, STR-011 to STR-014),
-   merges anything thinner than its class minimum into the bed under it, and keeps 32 horizons a cell
-   (STR-001, STR-005 to STR-008).
-5. **The column rule.** The game does not read a cell's stack but the blend of the 16 cells round the block
+   only among cells of the same crust kind, so a continent's basement is not smeared into the sea floor
+   beside it (STR-054), merges anything thinner than its class minimum into the bed under it, and keeps 32
+   horizons a cell (STR-001, STR-005 to STR-008).
+5. **The lift.** The terrain the game builds (the L3 elevation and the amplifier's detail) stands above the
+   history's surface on mountains. Where it does, every horizon of the cell rises by the difference, and
+   the plutons, ore bodies, deposit sites, fault planes and intrusions with them (STR-052). The crests
+   that are still above the first horizon's top are filled by the thickest rock unit near the surface, the
+   beds over it riding up with it (STR-053). Below the history's surface nothing moves: valleys cut into
+   the stack.
+6. **The column rule.** The game does not read a cell's stack but the blend of the 16 cells round the block
    column, matched by key, so a bed present in every cell interpolates smoothly and a bed present in some
    pinches out (STR-015 to STR-017).
-6. **Structures.** Fold, fault, dyke and plug events (P2-01, see
+7. **Structures.** Fold, fault, dyke and plug events (P2-01, see
    [folds-faults-intrusions.md](folds-faults-intrusions.md)) displace the keys' beds in the column rule. Rock
    laid down after a structure formed is not touched by it, which is how unconformities appear (STR-022).
-7. **Traps and hosts.** For the oil and gas engine each cell gets a trap score from 0 to 1, the largest of
+8. **Traps and hosts.** For the oil and gas engine each cell gets a trap score from 0 to 1, the largest of
    several rules (folds, thrusts, faults, salt, growth faults, drape). For the ore engine each rock class gets
    the share it takes of the top 2,000 m (STR-025 to STR-043).
-8. **The checks.** `deeptime strata-check` counts the columns a geologist would object to (STR-044 to STR-048).
+9. **The checks.** `deeptime strata-check` counts the columns a geologist would object to (STR-044 to STR-048).
 
 ## Equations and constants
 
 | Ledger id | Quantity | As coded | Units | Source | Status |
 |---|---|---|---|---|---|
 | STR-001 | horizons per cell | 32 (2 to 255) | count | plan section 5.7.4 | `game-choice` |
-| STR-003 | build range | y -352 to 639, sea level y 63 | blocks | design decisions file | `game-choice` |
+| STR-003 | build range | y -512 to 639, sea level y 63 | blocks | design decisions file | `game-choice` |
 | STR-004 | strata thickness multiplier | m_per_block_v / feature_scale.strata; preset 1 | - | decisions log 2026-09-28 | `game-choice` |
-| STR-005 | thinnest horizon | 1 block (20 m) | blocks | build log P1-07 | `game-choice` |
+| STR-005 | thinnest horizon | 1 block (35 m) | blocks | build log P1-07 | `game-choice` |
 | STR-006 | thinnest metamorphic horizon in a stack | 8 blocks (160 m) | blocks | build log 2026-10-01 | `game-choice` |
 | STR-007 | thinnest plutonic horizon in a stack | 16 blocks (320 m) | blocks | build log 2026-10-01 | `game-choice` |
 | STR-009 | rock cover over a deposit ends at a non-sedimentary horizon at least | 3 blocks | blocks | decisions log 2026-09-30 | `game-choice` |
@@ -81,7 +101,11 @@ y 639.
 | STR-041 | ore window | 2,000 | m | design | `game-choice` |
 | STR-044 to STR-048 | realism checks | zero grade inversions; slivers under 8 blocks; plutonic sheets under 16 blocks | - | build log 2026-10-01 | `game-choice` |
 | STR-049 | compaction | none: a layer keeps its deposited thickness | - | - | `game-choice` |
-| STR-050 | time in a one-block horizon | 20 m / accumulation rate | Myr | secondary | `abstract-only` |
+| STR-050 | time in a one-block horizon | 35 m / accumulation rate | Myr | secondary | `abstract-only` |
+| STR-051 | mountain-fill review measure | cells 8 and 30 blocks above the history's surface; "most" over half | blocks | review measure | `game-choice` |
+| STR-052 | the lift | every horizon + max(0, node mean elevation - first top), capped at max_y | blocks | rule of the bake | `game-choice` |
+| STR-053 | the crests | first top at least highest elevation + amplitude within two cells + 1; thickest rock unit within 16 blocks fills | blocks | rule of the bake | `game-choice` |
+| STR-054 | smoothing within one crust kind | neighbours of another kind skipped | - | rule of the bake | `game-choice` |
 
 The trap closure of a cell is the largest of the rules, clamped to 0 to 1 (STR-040):
 
@@ -96,7 +120,7 @@ min(1, halite / 200 m) x min(1, overburden / 1,000 m) (salt); 0.8 x min(1, (sedi
 | Width of the Zagros fold-thrust belt | average about 300 km, in a 200 to 300 km wide zone of deformation | Alavi 2007, Am. J. Sci. 307, abstract and text (read in full) | `fold_belt_km` 300 | the setting; no run needed |
 | Thickness of a deposited shale layer after burial | 60 % of its deposited thickness at 1 km, 43 % at 3 km (sand 82 % and 65 %, chalk 46 % and 33 %) | worked from Sclater and Christie 1980 parameters as tabulated in the pyBacktrack documentation (secondary) | 100 % at any depth (STR-049) | arithmetic: phi = phi0 exp(-z/c), thickness ratio (1 - phi0) / (1 - phi) |
 | Porosity of mud and sand at 150 m | shale 0.58, sand 0.47 (still soft) | same | rock below 150 m if older than 20 Myr (RCK-022) | arithmetic |
-| Accumulation rate of pelagic sediment | calcareous ooze 3-50 m/Myr, siliceous ooze 2-10, red clay 1-5; platform carbonate up to about 1,000 m/Myr | Rothwell 2005 via Wikipedia; Schlager 1981 via Wikipedia (secondary) | a one-block bed is 20 m, so 0.4-20 Myr of pelagic sediment | arithmetic |
+| Accumulation rate of pelagic sediment | calcareous ooze 3-50 m/Myr, siliceous ooze 2-10, red clay 1-5; platform carbonate up to about 1,000 m/Myr | Rothwell 2005 via Wikipedia; Schlager 1981 via Wikipedia (secondary) | a one-block bed is 35 m, so 0.7-35 Myr of pelagic sediment | arithmetic |
 | Niger Delta wedge | a clastic wedge 12 km thick over 75,000 km2, growth faults detached on overpressured shale | Sanuade and Kaka 2017, Geol. Q. 61(1) (secondary review) | growth-fault threshold 1,500 m (no source) | not measured |
 | Dip of beds under lowland | none given | - | median 18.6 degrees in block space, 1.3 degrees real-equivalent at sigma 10 | `dips.py` on 1,500 columns, `earthlike_quick_16k`, scattered, 500 Myr, seed 1, 2026-09-30 (build log) |
 | Columns with a grade inversion, a thin metamorphic sliver, a plutonic sheet | none counted; inverted sequences are real but rare in a given column | - | 0.07 % of columns have a grade inversion, 0.25 % a metamorphic sliver, 0.05 % a plutonic sheet (20,000 columns) | see below |
@@ -127,8 +151,14 @@ stored stacks, which have no structures, show none).
   strata are already drawn enlarged, so this changes the proportion of sediment against crystalline rock, not
   the look of a column. It is not a decision anyone recorded (STR-049).
 - **No sedimentary structures.** A bed is one rock class with one age span. There is no bedding thickness
-  distribution, no cross-bedding, no turbidite sequence: a one-block bed stands for 0.4 to 20 Myr of pelagic
-  sediment and as little as 20 kyr of platform growth (STR-050).
+  distribution, no cross-bedding, no turbidite sequence: a one-block bed stands for 0.7 to 35 Myr of pelagic
+  sediment and as little as 35 kyr of platform growth (STR-050).
+- **No young cover on the lifted relief.** The lift keeps the regolith and loose cover the history gave a
+  cell; the amplifier's own deposits and the till are not in the stacks, so a lifted ridge has no extra
+  young cover (STR-052). Where the terrain lies below the history's surface the cut exposes older rock, as
+  before.
+- **Lavas and dikes in a fixed share.** Layer 2 is 0.8 km of lavas over 1.2 km of dikes on fresh crust
+  everywhere (RCK-091); Earth's share varies with spreading rate (Hole 504B against Hole 1256D).
 - **Unconformities are implicit.** Rock younger than a structure is not deformed by it. A hiatus has no record,
   so the gap is only visible as a jump in age and grade (STR-022).
 - **Bodies are painted where they are.** A fault younger than a pluton does not offset it: plutons, alteration
@@ -150,8 +180,9 @@ stored stacks, which have no structures, show none).
 Most of this page: the number of horizons (STR-001), the build range (STR-003, decided by Ben, design decisions
 file), the one-block minimum (STR-005), the 8 and 16 block minimums (STR-006, STR-007), the smoothing and its
 taper (STR-011 to STR-014, Ben 2026-09-30 and 2026-10-01), the column rule and tongues (STR-015 to STR-017, Ben
-2026-09-29), the key space (STR-018 to STR-021), the coal cover cap (STR-009, Ben 2026-09-30), and the trap and
-host weights (STR-025 to STR-043, agent design values).
+2026-09-29), the key space (STR-018 to STR-021), the coal cover cap (STR-009, Ben 2026-09-30), the trap and
+host weights (STR-025 to STR-043, agent design values), and the relief lift, its crest rule, the
+smoothing within one crust kind and the mountain-fill measure (STR-051 to STR-054, agent, 2026-10-19).
 
 ## Open questions
 
