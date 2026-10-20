@@ -4958,7 +4958,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Reference: NOAA National Centers for Environmental Information (2022). ETOPO 2022 15 Arc-Second Global Relief Model. NOAA NCEI.
 - DOI or URL: 10.25921/fd45-gt74 (title and year confirmed through the DataCite API)
 - Cited as: "ETOPO 2022"
-- Ledger ids: ERO-168, HNT-093 (margins and spires task, 2026-10-03), PLT-265 (the ocean–continent transition, 2026-10-04: the same transects as the comparison)
+- Ledger ids: ERO-168, HNT-093 (margins and spires task, 2026-10-03), PLT-265 (the ocean–continent transition, 2026-10-04: the same transects as the comparison), YNG-022 and AMP-074 (sea-floor spikes task, 2026-10-20: deep sea-floor slope distributions from the 60 and 15 arc-second grids)
 - Access: open access (dataset)
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://doi.org/10.25921/fd45-gt74. File: ETOPO2022.txt.
 - Read so far (by the project): data named
@@ -5901,7 +5901,7 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Reference: Pratson, L. F. and Haxby, W. F. (1996). What is the slope of the U.S. continental slope? Geology 24(1):3-6.
 - DOI or URL: 10.1130/0091-7613(1996)024<0003:WITSOT>2.3.CO;2
 - Cited as: "Pratson & Haxby 1996" (the regional slope of the steepest clastic margin, 2.5°).
-- Ledger ids: ERO-168, HNT-093
+- Ledger ids: ERO-168, HNT-093, YNG-022 (sea-floor spikes task, 2026-10-20: the steepest mean local slope of a margin, 12.0°, against the sea floor's critical slope)
 - Access: paywalled (GSA); the abstract is on Duke Scholars (https://fds.duke.edu/db/pratt/gendell/faculty/lincoln.pratson/publications/279477).
 - Library (the project's source library, not distributed): not fetched.
 - Read so far (by the project): abstract only, 2026-10-03 (margins and spires task): regional and mean local slopes, West Florida (passive carbonate) 4.4° and 12.0°, New Jersey–Maryland (passive clastic) 2.5° and 7.6°, Louisiana (salt) 0.5° and 2.9°, California (strike-slip) 1.8° and 5.2°, Oregon (convergent) 2.0° and 5.2°, from multibeam bathymetry of five U.S. margins.
@@ -6747,3 +6747,107 @@ The temperate present's CO2 cap rests on the late Quaternary's glacial-to-interg
 - Access: paywalled (Taylor & Francis).
 - Library: not fetched.
 - Read so far (by the project): from memory. The interval's form was checked by deriving it, not against the paper: the bounds are the roots in p of (p̂ - p)² = z² p(1 - p) / n, (p̂ + z²/2n ± z sqrt(p̂(1 - p̂)/n + z²/4n²)) / (1 + z²/n). The one-sided 99 % quantile of the standard normal, 2.326, is from memory (the tables give 2.3263).
+
+## The sea floor's critical slope (YNG-022, YNG-023, AMP-074), added 2026-10-20
+
+The sea-floor spikes task (build log 2026-10-20) measured the planet's deep sea floor against ETOPO 2022 (entry above, under the climate section: the 60 arc-second global grid and five 15 arc-second tiles were downloaded to the test VM and their slopes measured with `tools/review/seafloor/earth_stats.py`) and set the sea floor's critical slope from it. The papers below give what the grids cannot: trench walls and scarps from multibeam, abyssal hill sizes, seamount flank slopes, and how much of the ocean the grids only predict.
+
+### StewartJamieson2018
+- Reference: Stewart, H. A. and Jamieson, A. J. (2018). Habitat heterogeneity of hadal trenches: considerations and implications for future studies. Progress in Oceanography 161:47-65.
+- DOI or URL: 10.1016/j.pocean.2018.01.007 (printed on the PDF's first page).
+- Cited as: "Stewart & Jamieson 2018" (trench walls, scarps and ridges in multibeam bathymetry).
+- Ledger ids: YNG-022, AMP-074
+- Access: open copy (the PDF was fetched by a sub-agent, 2026-10-20).
+- Library (the project's source library, not distributed): not filed; read as a text extraction (pdftotext) on the laptop, 2026-10-20.
+- Read so far (by the project): full text, 2026-10-20 (sea-floor spikes task). Kermadec Trench: "The mean slope on the overidding west side is 7.7° ± 1.2 S.D. and on the underridding east side is 5.9° ± 1.8 S.D." (sic); the bend faults' "seafloor offsets frequently between 400 and 1200 m ... within 30 km of the trench axis, reducing to 150–400 m offset with increasing distance", and "Slope angles associated with the fault scarps are typically between 10° and 40° with slopes frequently in excess of 25°"; accretionary ridges "form slopes generally up to 15°, although locally can exceed 20°"; a pinnacle "approximately 750 m in height" in a sediment pond; "slope angles of up to 40° locally". Sediment ponds are nearly flat (under 4°). The hadal zone as a whole: its areas "combined total over 800,000 km−2 [sic] and represents the deepest 45% of the global ocean (Jamieson et al., 2010)"; hadal means "deeper than 6000 m (or 6500 m; Watling et al., 2013)".
+- Reference check: correct (journal, volume, pages and DOI on the PDF's first page). Not the same work as StewartJamieson2019 (the five deeps).
+
+### GoffSmithMarks2004
+- Reference: Goff, J. A., Smith, W. H. F. and Marks, K. M. (2004). The contributions of abyssal hill morphology and noise to altimetric gravity fabric. Oceanography 17(1):24-37.
+- DOI or URL: 10.5670/oceanog.2004.64 (OpenAlex, 2026-10-20); open copy on tos.org.
+- Cited as: "Goff, Smith & Marks 2004" (abyssal hill heights and widths).
+- Ledger ids: YNG-022
+- Access: open (The Oceanography Society).
+- Library (the project's source library, not distributed): not filed; read as a text extraction on the laptop, 2026-10-20.
+- Read so far (by the project): full text, 2026-10-20. Table 2 (mean abyssal hill properties, after Goff et al. 1997): rms height Hb 56.1 m (Pacific-Cocos, 110 mm/yr) to 235.8 m (northern MAR, 28 mm/yr), characteristic width λbn 1.76 to 8.21 km, aspect ratio 2.6 to 6.6. Text: along the slow-spreading Mid-Atlantic Ridge "abyssal hills have characteristic heights of 150-400 m and widths of 4-14 km", along the fast East Pacific Rise "50-200 m height, 1-5 km width"; the altimetric gravity filter is "~18-20 km wide (full-wavelength)".
+- Reference check: authors, journal, volume and issue on the PDF; pages 24-37 and the DOI from OpenAlex.
+
+### Sandwell2022
+- Reference: Sandwell, D. T., Goff, J. A., Gevorgian, J., Harper, H., Kim, S.-S., Yu, Y., Tozer, B., Wessel, P. and Smith, W. H. F. (2022). Improved bathymetric prediction using geological information: SYNBATH. Earth and Space Science 9(2):e2021EA002069.
+- DOI or URL: 10.1029/2021EA002069 (printed on the PDF).
+- Cited as: "Sandwell et al. 2022 (SYNBATH)".
+- Ledger ids: YNG-022, AMP-074
+- Access: gold open access (AGU).
+- Library (the project's source library, not distributed): not filed; read as a text extraction on the laptop, 2026-10-20.
+- Read so far (by the project): full text, 2026-10-20. "∼20% of the ocean floor has been surveyed by ships at a spatial resolution of 400 m or better. The remaining 80% has depth predicted from satellite altimeter-derived gravity measurements"; satellite gravity "can only resolve ½ wavelength of 6 km when the regional depth is 4 km"; seamounts are fitted with a Gaussian whose width is 2.4 times the height, "a maximum seamount slope of 0.25 independent of seamount height" (14°). This is why the ETOPO deep-sea slope statistics are a lower bound for the true sea floor.
+- Reference check: correct (title, authors and DOI on the PDF; volume 9, issue 2 from OpenAlex).
+
+### WesselSandwellKim2010
+- Reference: Wessel, P., Sandwell, D. T. and Kim, S.-S. (2010). The global seamount census. Oceanography 23(1):24-33.
+- DOI or URL: 10.5670/oceanog.2010.60 (OpenAlex, 2026-10-20).
+- Cited as: "Wessel, Sandwell & Kim 2010" (abyssal hill and fracture zone amplitudes on slow-ridge flanks; mean sea-floor slope).
+- Ledger ids: YNG-022
+- Access: open (The Oceanography Society).
+- Library (the project's source library, not distributed): not filed; read as a text extraction on the laptop, 2026-10-20.
+- Read so far (by the project): full text, 2026-10-20. "Abyssal hills and fracture zones on the flanks of slow spreading ridges commonly have topographic amplitude greater than 1 km"; Figure 3: the mean slope of the sea floor from ship soundings "commonly exceeds 0.05 on the flanks of the seafloor spreading ridges, especially the ridges spreading at a rate of < 70 mm yr-1 (Becker and Sandwell, 2008)". Wessel 2001 (below) was read in its abstract only; this later census by the same author gives the slope figure.
+- Reference check: authors, title, journal, volume, issue and first page on the PDF.
+
+### BeckerSandwell2008
+- Reference: Becker, J. J. and Sandwell, D. T. (2008). Global estimates of seafloor slope from single-beam ship soundings. Journal of Geophysical Research 113:C05028.
+- DOI or URL: 10.1029/2006JC003879 (OpenAlex).
+- Cited as: "Becker & Sandwell 2008" (satellite bathymetry is not a proxy for multibeam slopes).
+- Ledger ids: YNG-022
+- Access: paywalled (AGU); the abstract is open. The PDF fetch returned an empty file.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract only, 2026-10-20 (OpenAlex): "the small-scale but ubiquitous abyssal hills and fracture zones dominate the global map of rough topography"; "satellite bathymetry is not a valid proxy for multibeam measurements, but edited single-beam sonar data are adequate to provide a global perspective on features with horizontal wavelengths as small as 2 km". Its global slope numbers were not read.
+- Reference check: title, year, DOI, volume 113 and issue C5 from OpenAlex; the article number C05028 from memory.
+
+### GoffJordan1988
+- Reference: Goff, J. A. and Jordan, T. H. (1988). Stochastic modeling of seafloor morphology: inversion of Sea Beam data for second-order statistics. Journal of Geophysical Research 93(B11):13589-13608.
+- DOI or URL: 10.1029/JB093iB11p13589 (OpenAlex, 2026-10-20).
+- Cited as: "Goff & Jordan 1988" (the abyssal hill statistical model).
+- Ledger ids: YNG-022 (context only: no value rests on it)
+- Access: paywalled (AGU).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract only, 2026-10-20 (OpenAlex): "The seafloor is modeled as a stationary, zero-mean, Gaussian random field completely specified by its two-point covariance function", an anisotropic covariance with "five free parameters describing the amplitude, orientation, characteristic wave numbers, and Hausdorff (fractal) dimension", inverted from Sea Beam data "at scale lengths less than 100 km or so". The abstract gives no number the project uses; the hill sizes come from GoffSmithMarks2004, which tabulates the later inversions.
+- Reference check: authors, year, journal, volume, issue and pages from OpenAlex.
+
+### Goff1991
+- Reference: Goff, J. A. (1991). A global and regional stochastic analysis of near-ridge abyssal hill morphology. Journal of Geophysical Research 96(B13):21713-21737.
+- DOI or URL: 10.1029/91JB02275 (OpenAlex, 2026-10-20).
+- Cited as: "Goff 1991" (abyssal hill rms height and width against spreading rate).
+- Ledger ids: YNG-022 (context only)
+- Access: paywalled (AGU).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract only, 2026-10-20 (OpenAlex): 64 Sea Beam swaths from the East Pacific Rise, the Mid-Atlantic Ridge and the Central Indian Ridge; "The slowest spreading rate subset (Mid-Atlantic data) exhibit the largest scales (rms height and characteristic width and length) of abyssal hills. These parameters generally decrease as spreading rate increases up to the fast spreading rate data (Pacific-Cocos) but increase going from fast to very fast (Pacific-Nazca)"; "steeper inward facing slopes in the medium and fast spreading rate data". Its own numbers were not read; GoffSmithMarks2004 Table 2 gives its Pacific-Cocos values (Hb 56.1 m, λbn 2.00 km) with the citation "Goff (1991)".
+- Reference check: authors, year, journal, volume, issue and pages from OpenAlex.
+
+### SmithJordan1988
+- Reference: Smith, D. K. and Jordan, T. H. (1988). Seamount statistics in the Pacific Ocean. Journal of Geophysical Research 93(B4):2899-2918.
+- DOI or URL: 10.1029/JB093iB04p02899 (OpenAlex, 2026-10-20).
+- Cited as: "Smith & Jordan 1988" (seamount size distribution).
+- Ledger ids: YNG-022 (context only)
+- Access: paywalled (AGU).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract only, 2026-10-20 (OpenAlex): about 157,000 km of wide-beam profiles in eight regions of the eastern and southern Pacific; "the average number of seamounts with summit heights h ≥ H is well-approximated by the exponential frequency-size distribution: ν(H)=νo e^(−βH)", better than a power law. It says nothing of flank slopes. No value in the code rests on it.
+- Reference check: authors, year, journal, volume, issue and pages from OpenAlex.
+
+### Smith1988
+- Reference: Smith, D. K. (1988). Shape analysis of Pacific seamounts. Earth and Planetary Science Letters 90(4):457-466.
+- DOI or URL: 10.1016/0012-821X(88)90143-4 (OpenAlex, 2026-10-20; OpenAlex has no abstract).
+- Cited as: "Smith 1988" (seamount height to basal radius).
+- Ledger ids: YNG-022 (context only)
+- Access: paywalled (Elsevier).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): not read. From memory only: a height to basal radius ratio of about 0.21 ± 0.08 for Pacific seamounts, which would put a cone's flank at about 12°; the project uses Sandwell2022's measured 0.25 maximum slope instead.
+- Reference check: title, journal, volume, issue and pages from OpenAlex; the ratio from memory.
+
+### Wessel2001
+- Reference: Wessel, P. (2001). Global distribution of seamounts inferred from gridded Geosat/ERS-1 altimetry. Journal of Geophysical Research 106(B9):19431-19441.
+- DOI or URL: 10.1029/2000JB000083 (OpenAlex, 2026-10-20).
+- Cited as: "Wessel 2001" (seamounts as axisymmetric Gaussians; heights limited by plate age).
+- Ledger ids: YNG-022 (context only)
+- Access: paywalled (AGU).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract only, 2026-10-20 (OpenAlex): "a forward modeling approach based on an axisymmetric Gaussian seamount"; "The global seamount distribution is long-tailed and resembles a power law distribution for seamounts in the height range 2-7 km"; the limiting height is "a simple function of plate age at the time of seamount emplacement". No flank slope in the abstract; the Gaussian's measured width is in Sandwell2022.
+- Reference check: authors, year, journal, volume, issue and pages from OpenAlex.
