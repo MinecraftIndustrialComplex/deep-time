@@ -31,7 +31,8 @@
 #   --places P    the driver's places, name:x:z;... (default: spawn, beside the seam, beside the north pole)
 #
 # Output: review/out/<N>/devmap-*.png, shots.txt (the driver's lines), server.txt (the server's
-# [devmap] lines), index.html, client.log, console.log. Exit 0 when the walk finished with no FAIL.
+# [devmap] lines), index.html, client.log (the game's log), launcher.log, console.log (the server's). Exit 0
+# when the walk finished ("done after" in shots.txt) with no FAIL.
 set -uo pipefail
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 cd "$(dirname "$0")/../.."
@@ -152,7 +153,7 @@ say "server up; $(grep -a -m1 '\[devmap\] base image' "$SRV/console.log" | sed '
 
 # 2. The client: the server's three jars, an offline profile, software GL on the job's display.
 mkdir -p "$CL/game/mods" "$CL/game/config"
-rm -rf "$CL/game/mods/"*.jar "$CL/game/screenshots" "$CL/game/crash-reports"
+rm -rf "$CL/game/mods/"*.jar "$CL/game/screenshots" "$CL/game/crash-reports" "$CL/game/logs"
 cp "$SRV/mods/"*.jar "$CL/game/mods/"
 cat > "$CL/game/options.txt" <<'EOF'
 onboardAccessibility:false
@@ -188,7 +189,9 @@ rm -f "/tmp/.X${DISP#:}-lock" "/tmp/.X11-unix/X${DISP#:}" 2>/dev/null
 setsid "$XVFB" "$DISP" -screen 0 1600x900x24 -nolisten tcp +extension GLX > "$WORK/xvfb.log" 2>&1 < /dev/null &
 XPID=$!; sleep 3
 kill -0 "$XPID" 2>/dev/null || { say "Xvfb $DISP did not start"; exit 1; }
-CLOG="$OUT/client.log"
+# The launcher's output (until FML hands logging to log4j) and the game's own log, where the driver writes.
+CLOG="$OUT/launcher.log"
+GLOG="$CL/game/logs/latest.log"
 say "client joins (display $DISP, 1600x900, GUI scale 2)"
 setsid "$PMC" --main-dir "$PMCDIR" start "neoforge::$NEO" --mc-dir "$CL/game" --jvm "$JAVA" \
     --jvm-arg=-Xmx6G --jvm-arg=-XX:ActiveProcessorCount=6 \
@@ -213,18 +216,19 @@ while kill -0 "$CPID" 2>/dev/null; do
     sleep 5
     now=$(date +%s)
     if [ $((now - start)) -gt 2400 ]; then say "timed out after 40 min"; st=124; break; fi
-    if grep -a -q 'Preparing crash report' "$CLOG"; then say "the client crashed"; sleep 10; st=1; break; fi
+    if grep -a -q 'Preparing crash report' "$CLOG" "$GLOG" 2>/dev/null; then say "the client crashed"; sleep 10; st=1; break; fi
     if [ $((now - last)) -ge 60 ]; then
-        say "$((now - start))s: $(grep -aF '[devmap-shot]' "$CLOG" | tail -1 | sed 's/^.*\[devmap-shot\] //' | cut -c1-200)"
+        say "$((now - start))s: $(grep -aF '[devmap-shot]' "$GLOG" 2>/dev/null | tail -1 | sed 's/^.*\[devmap-shot\] //' | cut -c1-200)"
         last=$now
     fi
 done
 [ -z "$st" ] && { wait "$CPID"; st=$?; }
 CPID=""
-grep -aF '[devmap-shot]' "$CLOG" | sed 's/^.*\[devmap-shot\] //' > "$OUT/shots.txt"
+grep -aF '[devmap-shot]' "$GLOG" | sed 's/^.*\[devmap-shot\] //' > "$OUT/shots.txt"
 grep -aF '[devmap]' "$SRV/console.log" | sed 's/^.*\[devmap\] //' > "$OUT/server.txt"
-grep -aF '[devmap]' "$CLOG" | sed 's/^.*\[devmap\] //' >> "$OUT/server.txt"
+grep -aF '[devmap]' "$GLOG" | sed 's/^.*\[devmap\] //' >> "$OUT/server.txt"
 cp "$CL/game/screenshots/"devmap-*.png "$OUT/" 2>/dev/null
+[ -f "$GLOG" ] && cp "$GLOG" "$OUT/client.log"
 [ -d "$CL/game/crash-reports" ] && cp -R "$CL/game/crash-reports" "$OUT/crash-reports"
 
 # 4. A contact sheet.
@@ -244,6 +248,7 @@ with open(os.path.join(out, "index.html"), "w") as f:
     f.write("<h2>Driver</h2><pre>" + html.escape(shots) + "</pre><h2>Server</h2><pre>" + html.escape(server) + "</pre>")
 PY
 fails=$(grep -c 'FAIL' "$OUT/shots.txt")
+done_line=$(grep -c '^done after' "$OUT/shots.txt")
 n=$(ls "$OUT"/devmap-*.png 2>/dev/null | wc -l)
-say "client exited $st; $n PNGs, $fails FAIL lines; teleports: $(grep -c 'teleported' "$OUT/server.txt") ($(grep -c 'AGREE' "$OUT/server.txt") agree, $(grep -c 'DIFFER' "$OUT/server.txt") differ)"
-[ "$st" = 0 ] && [ "$fails" = 0 ] && [ "$n" -gt 0 ]
+say "client exited $st; $n PNGs, $fails FAIL lines, walk finished: $([ "$done_line" -gt 0 ] && echo yes || echo NO); teleports: $(grep -c 'teleported' "$OUT/server.txt") ($(grep -c 'AGREE' "$OUT/server.txt") agree, $(grep -c 'DIFFER' "$OUT/server.txt") differ)"
+[ "$st" = 0 ] && [ "$fails" = 0 ] && [ "$done_line" -gt 0 ] && [ "$n" -gt 0 ]

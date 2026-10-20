@@ -80,7 +80,7 @@ public final class DevMapScreen extends Screen {
         hudButton = addRenderableWidget(Button.builder(hudLabel(), b -> {
             DevMapClient.toggleHud();
             b.setMessage(hudLabel());
-        }).bounds(x, 3, 70, 16).build());
+        }).bounds(x, 3, 96, 16).build());
         vl = 4;
         vt = TOP;
         vw = width - 8;
@@ -304,8 +304,8 @@ public final class DevMapScreen extends Screen {
         super.render(g, mouseX, mouseY, partialTick);
         MapContext c = MapContext.current();
         Minecraft mc = Minecraft.getInstance();
-        g.drawString(font, "Deep Time dev map: " + (mode == Mode.MAP ? "map (block space)" : "globe")
-                + "   drag: pan/turn   wheel: zoom   right-click: teleport   Tab: map/globe", 4 + 42 * 2 + 62 + 72 + 6, 7, DIM, false);
+        g.drawString(font, "Dev map: " + (mode == Mode.MAP ? "block space" : "globe")
+                + "   drag: move   wheel: zoom   right-click: teleport   Tab: switch", 4 + 42 * 2 + 62 + 98 + 6, 7, DIM, false);
         if (c.problem() != null || view == null) {
             Draw.rect(g, vl, vt, vl + vw, vt + vh, 0xFF101418);
             g.flush();
@@ -415,7 +415,8 @@ public final class DevMapScreen extends Screen {
                             view.screenY(im[1]) + (pole.latDeg() > 0 ? 3 : -11), POLE);
             }
             double sx = view.screenX(P / 2 + k * P);
-            label(g, "seam x = ±" + Math.round(P / 2), sx + 3, view.screenY(0.5 * (zMin + zMax)), SEAM);
+            // At the top of the view: on the equator's row it sat under the player's own label.
+            label(g, "seam x = ±" + Math.round(P / 2), sx + 3, vt + 4, SEAM);
         }
         for (PlayersPayload.Entry e : otherPlayers(c, self)) {
             double[] s = mapScreenPos(e.x(), e.z());

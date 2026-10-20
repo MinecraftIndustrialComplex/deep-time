@@ -72,8 +72,12 @@ record MapContext(String dimension, WorldProjection projection, WorldInfoPayload
         List<String> out = new ArrayList<>();
         double[] ll = PlanetGeometry.displayLatLon(projection, x, z);
         double mPerBlock = info != null ? info.mPerBlockH() : 0;
-        out.add(withY ? String.format(Locale.ROOT, "Block %.1f / %.1f / %.1f   %s", x, y, z, PlanetGeometry.formatLatLon(ll[0], ll[1]))
-                : String.format(Locale.ROOT, "Block %.0f / %.0f   %s", x, z, PlanetGeometry.formatLatLon(ll[0], ll[1])));
+        // x as Toroidal World's F3 XYZ line shows it (wrapped into the period), the raw x beside it
+        // when the player is laps away from the origin (TW's "Unwrapped" line).
+        double wx = projection.wrapX(x);
+        String unwrapped = Math.abs(wx - x) > 0.5 ? String.format(Locale.ROOT, " (unwrapped x %.1f)", x) : "";
+        out.add(withY ? String.format(Locale.ROOT, "Block %.1f / %.1f / %.1f%s   %s", wx, y, z, unwrapped, PlanetGeometry.formatLatLon(ll[0], ll[1]))
+                : String.format(Locale.ROOT, "Block %.0f / %.0f%s   %s", wx, z, unwrapped, PlanetGeometry.formatLatLon(ll[0], ll[1])));
         double seam = PlanetGeometry.seamDistance(projection, x);
         double edge = PlanetGeometry.edgeDistance(projection, x, z);
         boolean pg = PlanetGeometry.petroffGuyou(projection);
