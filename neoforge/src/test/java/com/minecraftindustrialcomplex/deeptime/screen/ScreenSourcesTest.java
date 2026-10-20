@@ -7,7 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.minecraftindustrialcomplex.deeptime.preset.Presets;
+import com.minecraftindustrialcomplex.deeptime.screen.model.CustomizeTopics;
 import com.minecraftindustrialcomplex.deeptime.screen.model.EditorFields;
+import com.minecraftindustrialcomplex.deeptime.screen.model.GenerationStatus;
+import com.minecraftindustrialcomplex.deeptime.screen.model.Legend;
+import com.minecraftindustrialcomplex.deeptime.screen.model.Ramps;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -26,7 +30,8 @@ import org.junit.jupiter.api.Test;
  * <ul>
  *   <li><b>Dist separation.</b> Client-only types ({@code net.minecraft.client}, {@code com.mojang.blaze3d},
  *       NeoForge's client events) appear only in the client packages: {@code screen} (whose entry point
- *       is the {@code dist = CLIENT} mod class) and P1-18's {@code client}; nothing outside them
+ *       is the {@code dist = CLIENT} mod class), P1-18's {@code client} and the client mixins
+ *       ({@code mixin.client}, the "client" section of deeptime.mixins.json); nothing outside them
  *       references a screen class, and the plain-Java {@code screen.model} references no Minecraft type
  *       at all, so JUnit and GameTests run it.</li>
  *   <li><b>Language keys.</b> Every key the screens and models name exists in {@code en_us.json}.</li>
@@ -62,8 +67,10 @@ class ScreenSourcesTest {
         for (Path p : javaFiles()) {
             String r = rel(p);
             String text = Files.readString(p, StandardCharsets.UTF_8);
-            // Client-only packages: screen/ (P1-11, not screen/model/) and client/ (P1-18).
-            boolean screen = (r.startsWith("screen/") && !r.startsWith("screen/model/")) || r.startsWith("client/");
+            // Client-only packages: screen/ (P1-11, not screen/model/), client/ (P1-18) and mixin/client/
+            // (the client mixins: applied only on the physical client).
+            boolean screen = (r.startsWith("screen/") && !r.startsWith("screen/model/")) || r.startsWith("client/")
+                    || r.startsWith("mixin/client/");
             if (!screen && CLIENT_IMPORT.matcher(text).find())
                 bad.add(r + " imports a client-only type");
             if (!screen && SCREEN_REF.matcher(text).find())
@@ -74,10 +81,21 @@ class ScreenSourcesTest {
         assertEquals(List.of(), bad);
         String setup = Files.readString(src().resolve("screen/ClientSetup.java"), StandardCharsets.UTF_8);
         assertTrue(setup.contains("dist = Dist.CLIENT"), "the screens' entry point is client-only");
+        // The client mixins are listed only in the config's client section.
+        String mixins = Files.readString(Path.of(System.getProperty("deeptime.repoRoot"), "neoforge/src/main/resources/deeptime.mixins.json"),
+                StandardCharsets.UTF_8);
+        JsonObject config = JsonParser.parseString(mixins).getAsJsonObject();
+        for (String section : List.of("mixins", "server"))
+            if (config.has(section))
+                config.getAsJsonArray(section).forEach(e -> assertTrue(!e.getAsString().startsWith("client."),
+                        e.getAsString() + " is a client mixin outside the client section"));
     }
 
     private static final Pattern TR = Pattern.compile("\\btr\\(\"([a-z0-9_.]+)\"\\s*[,)]");
     private static final Pattern PROBLEM = Pattern.compile("Problem\\.(?:of|warning)\\(\"([a-z0-9_.]+)\"");
+    private static final Pattern PHRASE = Pattern.compile("Phrase\\.of\\(\"([a-z0-9_.]+)\"\\s*[,)]");
+    /** Phrase's own time words, {@code of("time.…")}. */
+    private static final Pattern TIME = Pattern.compile("(?<![\\w.])of\\(\"(time\\.[a-z0-9_.]+)\"\\s*[,)]");
 
     @Test
     void everyLanguageKeyExists() throws IOException {
@@ -86,7 +104,7 @@ class ScreenSourcesTest {
         Set<String> used = new TreeSet<>();
         for (Path p : javaFiles()) {
             String text = Files.readString(p, StandardCharsets.UTF_8);
-            for (Pattern pat : List.of(TR, PROBLEM)) {
+            for (Pattern pat : List.of(TR, PROBLEM, PHRASE, TIME)) {
                 Matcher m = pat.matcher(text);
                 while (m.find())
                     used.add("deeptime." + m.group(1));
@@ -109,9 +127,46 @@ class ScreenSourcesTest {
             used.add("deeptime.editor.size." + k);
         for (String k : List.of("world_data", "keyframe"))
             used.add("deeptime.review.source." + k);
+        // The generation page: every event kind's History words (one and many), every stage's words,
+        // every legend line a ramp can produce.
+        for (String k : o.keySet())
+            if (k.startsWith("deeptime.event.")) {
+                String kind = k.substring("deeptime.event.".length());
+                used.add("deeptime.milestone." + kind);
+                used.add("deeptime.milestone." + kind + ".many");
+            }
+        for (String unit : List.of("billion", "million", "thousand"))
+            for (String dir : List.of("ago", "ahead"))
+                used.add("deeptime.time." + unit + "." + dir);
+        used.add("deeptime.stage.other");
+        for (String s : GenerationStatus.STAGES)
+            used.add("deeptime.stage." + s);
+        for (String u : Legend.UNITS)
+            used.add("deeptime.legend.value." + u);
+        Ramps ramps = Ramps.builtin();
+        for (String r : ramps.names())
+            for (String key : ramps.ramp(r).keys().keySet())
+                used.add("deeptime.legend.key." + key);
+        Legend.CODED.forEach((ramp, codes) -> {
+            assertTrue(ramps.names().contains(ramp), "Legend names codes of a ramp ramps.json lacks: " + ramp);
+            for (int c : codes)
+                used.add("deeptime.legend." + ramp + "." + c);
+        });
+        for (String t : List.of("history", "map", "more"))
+            used.add("deeptime.gen.tab." + t);
+        // The Customize page: its tabs and every heading a setting can be listed under.
+        for (CustomizeTopics.Topic t : CustomizeTopics.Topic.values()) {
+            used.add("deeptime." + t.key());
+            used.add("deeptime." + t.key() + ".hint");
+        }
+        for (String k : CustomizeTopics.headingKeys())
+            used.add("deeptime." + k);
         used.add("generator.deeptime.planet");
         used.add("generator.deeptime.planet_32k");
         List<String> missing = used.stream().filter(k -> !o.has(k)).toList();
         assertEquals(List.of(), missing);
+        // Ben's rule: no em dashes in any text the player reads.
+        List<String> dashed = o.keySet().stream().filter(k -> o.get(k).getAsString().contains("—")).toList();
+        assertEquals(List.of(), dashed, "em dashes in en_us.json");
     }
 }

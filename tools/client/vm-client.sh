@@ -20,7 +20,10 @@
 #   --no-build     skip the Gradle step (classes, host natives, launch script, run/mods links)
 #   --no-guidance  skip the second pass (natives forced off: the guidance panel, Create blocked)
 #   --no-create    stop after Accept (no world creation, no in-world shot)
-#   --size WxH     window size (default 1280x720; the GUI scale is 2)
+#   --size WxH     window size (default 1280x720)
+#   --gui-scale N  Minecraft's GUI scale (default 2; 0 is the game's "Auto", the largest that fits)
+#   --mods SET     link smoke/<SET>/server/mods into the client too (Gradle -PrunSet=SET; e.g. mic for
+#                  the MIC pack's worldgen mods); DEEPTIME_RUN_MODS=<dir> points at another copy's set
 #   --timeout S    per client pass (default 7200: a 1,000-Myr quick planet's ETA was ~2 h on the
 #                  loaded VM; --prop length=300 takes a fraction of that)
 #   --threads N    processors the client JVM sees (-XX:ActiveProcessorCount; default 8): the editor
@@ -39,6 +42,7 @@ REPO="$PWD"
 ADMIT="${DEEPTIME_ADMIT:-/usr/local/lib/deeptime/admit.py}"
 
 NAME=vm-client; BUILD=1; GUIDANCE=1; CREATE=true; WSIZE=1280x720; TIMEOUT=7200; THREADS=8; PROPS=()
+GUISCALE=2; RUNSET=""; GRADLE_SET=()
 ARGS=("$@")
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -47,6 +51,8 @@ while [ $# -gt 0 ]; do
         --no-guidance) GUIDANCE=0; shift ;;
         --no-create) CREATE=false; shift ;;
         --size) WSIZE="$2"; shift 2 ;;
+        --gui-scale) GUISCALE="$2"; shift 2 ;;
+        --mods) RUNSET="$2"; shift 2 ;;
         --timeout) TIMEOUT="$2"; shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
         --prop) [[ "$2" =~ ^[a-z]+=[-0-9.,\;a-z_/]+$ ]] || { echo "vm-client: bad --prop $2" >&2; exit 2; }
@@ -57,19 +63,27 @@ while [ $# -gt 0 ]; do
 done
 [[ "$NAME" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "vm-client: --name must be one plain word" >&2; exit 2; }
 [[ "$WSIZE" =~ ^[0-9]+x[0-9]+$ ]] || { echo "vm-client: --size is WxH" >&2; exit 2; }
+[[ "$GUISCALE" =~ ^[0-9]$ ]] || { echo "vm-client: --gui-scale is 0 (auto) to 9" >&2; exit 2; }
+if [ -n "$RUNSET" ]; then
+    [[ "$RUNSET" =~ ^[a-z0-9-]+$ ]] || { echo "vm-client: --mods is a server set name" >&2; exit 2; }
+    GRADLE_SET=("-PrunSet=$RUNSET")
+fi
+# A pack's mods need more heap (dh-client-check.sh gives MIC 6G).
+XMX=4G; [ -n "$RUNSET" ] && XMX=6G
 [ "$(uname -s)" = Linux ] || { echo "vm-client: runs on the test VM (Linux)" >&2; exit 2; }
 
 # --- phase 1: the build (its own admitted job), then the client run as a server job ---------------
 if [ "${DEEPTIME_ADMIT_PID:-}" != "$$" ] && [ -f "$ADMIT" ]; then
     if [ "$BUILD" = 1 ]; then
         python3 "$ADMIT" run --kind gradle:build --label "$(basename "$REPO")" -- \
-            bash -c 'cd neoforge && ./gradlew --console=plain -q classes gametestClasses createClientLaunchScript linkRunModsClient' \
+            bash -c 'cd neoforge && ./gradlew --console=plain -q "$@" classes gametestClasses createClientLaunchScript linkRunModsClient' \
+            vm-client-gradle ${GRADLE_SET[@]+"${GRADLE_SET[@]}"} \
             || { echo "vm-client: the Gradle step failed" >&2; exit 1; }
     fi
     exec python3 "$ADMIT" run --kind client:editor --server --label "$(basename "$REPO")" -- "$SELF" "${ARGS[@]}" --no-build
 fi
 if [ "$BUILD" = 1 ]; then
-    (cd neoforge && ./gradlew --console=plain -q classes gametestClasses createClientLaunchScript linkRunModsClient) \
+    (cd neoforge && ./gradlew --console=plain -q ${GRADLE_SET[@]+"${GRADLE_SET[@]}"} classes gametestClasses createClientLaunchScript linkRunModsClient) \
         || { echo "vm-client: the Gradle step failed" >&2; exit 1; }
 fi
 
@@ -95,14 +109,20 @@ DEV_ARGS=("$@")
 [ -d "$GAMEDIR/mods" ] || { say "no $GAMEDIR/mods (./gradlew linkRunModsClient)"; exit 1; }
 
 # --- the display: Xvfb + Mesa llvmpipe, sound to a private null sink ---------------------------------
-MESA=$(nix build --no-link --print-out-paths nixpkgs#mesa | head -1)
-GLVND=$(nix build --no-link --print-out-paths nixpkgs#libglvnd | head -1)
-XVFB=$(nix build --no-link --print-out-paths nixpkgs#xorg.xorgserver | head -1)/bin/Xvfb
-PA=$(nix build --no-link --print-out-paths nixpkgs#pulseaudio | head -1)/bin/pulseaudio
+# Mesa, libglvnd and Xvfb come from the flake's own nixpkgs (flake.lock), the revision the client's
+# JDK comes from. Mesa's driver loads inside the JVM, which has already loaded that revision's
+# libraries (libstdc++, zlib, ...) by soname; the registry's newer Mesa then fails to load there and
+# GLFW sees "GLX: No GLXFBConfigs returned" while glxinfo on the same display works (2026-10-19).
+# Xvfb needs LIBGL_DRIVERS_PATH too: nixpkgs' xorg-server carries no DRI drivers of its own.
+pinned() { nix build --no-link --print-out-paths --inputs-from "$REPO" "nixpkgs#$1" | head -1; }
+MESA=$(pinned mesa)
+GLVND=$(pinned libglvnd)
+XVFB=$(pinned xorg-server)/bin/Xvfb
+PA=$(pinned pulseaudio)/bin/pulseaudio
 DISP="${DEEPTIME_DISPLAY:-:91}"
 export DISPLAY=$DISP LD_LIBRARY_PATH="$MESA/lib:$GLVND/lib" __GLX_VENDOR_LIBRARY_NAME=mesa \
     __EGL_VENDOR_LIBRARY_DIRS="$MESA/share/glvnd/egl_vendor.d" LIBGL_DRIVERS_PATH="$MESA/lib/dri" \
-    LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe LP_NUM_THREADS=4
+    LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe LP_NUM_THREADS=4 LIBGL_DEBUG=verbose
 XPID=""; PAPID=""; CPID=""
 cleanup() {
     [ -n "$CPID" ] && kill "$CPID" 2>/dev/null && sleep 3 && kill -9 "$CPID" 2>/dev/null
@@ -123,14 +143,14 @@ setsid "$XVFB" "$DISP" -screen 0 "${WSIZE}x24" -nolisten tcp +extension GLX > "$
 XPID=$!
 sleep 3
 kill -0 "$XPID" 2>/dev/null || { say "Xvfb $DISP did not start ($(tail -3 "$WORK/xvfb.log"))"; exit 1; }
-say "display $DISP (${WSIZE}, llvmpipe), client JVM sees $THREADS processors"
+say "display $DISP (${WSIZE}, llvmpipe, GUI scale $GUISCALE${RUNSET:+, mods $RUNSET}), client JVM sees $THREADS processors"
 
 write_options() {
     mkdir -p "$GAMEDIR/config"
-    cat > "$GAMEDIR/options.txt" <<'EOF'
+    cat > "$GAMEDIR/options.txt" <<EOF
 onboardAccessibility:false
 pauseOnLostFocus:false
-guiScale:2
+guiScale:$GUISCALE
 narrator:0
 tutorialStep:none
 joinedFirstServer:true
@@ -141,6 +161,14 @@ soundCategory_music:0.0
 renderDistance:8
 EOF
     printf 'earlyWindowControl = false\n' > "$GAMEDIR/config/fml.toml"
+    # Distant Horizons (in MIC) opens an "update available" screen over the title screen, which held
+    # the walk there (2026-10-20, --mods mic); dh-client-check.sh turns its updater off the same way.
+    local dhc="$GAMEDIR/config/DistantHorizons.toml"
+    if [ -f "$dhc" ]; then
+        sed -i 's/^\(\s*enableAutoUpdater\s*=\s*\).*/\1false/' "$dhc"
+    else
+        printf '[client]\n\t[client.advanced]\n\t\t[client.advanced.autoUpdater]\n\t\t\tenableAutoUpdater = false\n' > "$dhc"
+    fi
 }
 
 # run_pass <pass> <-D...>: one client, start to quit; returns its exit status (124 on timeout).
@@ -150,7 +178,7 @@ run_pass() {
     rm -rf "$GAMEDIR/screenshots" "$GAMEDIR/saves" "$GAMEDIR/deeptime/staging" "$GAMEDIR/crash-reports"
     write_options
     say "pass $pass: launching ($*)"
-    (cd "$GAMEDIR" && exec "$JAVA" "-Xmx4G" "-XX:ActiveProcessorCount=$THREADS" "-Djava.io.tmpdir=$WORK/tmp" "$@" \
+    (cd "$GAMEDIR" && exec "$JAVA" "-Xmx$XMX" "-XX:ActiveProcessorCount=$THREADS" "-Djava.io.tmpdir=$WORK/tmp" "$@" \
         "${DEV_ARGS[@]}" --width "${WSIZE%x*}" --height "${WSIZE#*x}") > "$log" 2>&1 < /dev/null &
     CPID=$!
     start=$(date +%s)
