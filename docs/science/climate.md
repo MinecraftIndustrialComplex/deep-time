@@ -19,6 +19,7 @@ The constants of the per-cell design were checked against their sources before t
 | [CLM](ledger/CLM.md) | moisture budget (built behind `rain_model = budget`, not the default) | CLM-139 to CLM-146 (8) |
 | [CLM](ledger/CLM.md) | the belts' rain amount (`belts_rain_scale`); the upwind rain is on [upwind-rain.md](upwind-rain.md) | CLM-201 (1) |
 | [CLM](ledger/CLM.md) | ice branch: the flowing-sheet switch, present-day climate, supply-limited and seafloor weathering (merged 2026-10-02) | CLM-147 to CLM-162 (16) |
+| [CLM](ledger/CLM.md) | the present-day climate since 2026-10-18: the target counts ice sheets (CLM-203) and the temperate present's cap on its CO₂ factor (CLM-206, 2026-10-19) | CLM-203, CLM-206 (2) |
 | [GLA](ledger/GLA.md) | the flowing ice sheet (`climate/sheet.rs`, off by default) and the ice mass balance for the hydrology; on the glacial page | GLA-067 to GLA-076 (10) |
 | [MOI](ledger/MOI.md) | wind and rain belts | MOI-001 to MOI-033 (33) |
 | [MOI](ledger/MOI.md) | orographic rain | MOI-034 to MOI-050 (17) |
@@ -187,6 +188,208 @@ temperature or sea ice moves far from the last snapshot's (P1-26 design §4.2), 
 In the runs above the triggered snapshots barely changed: none on the scattered start and two on
 every supercontinent run with either interval, except two 1000 Myr supercontinent runs at 20 Myr
 with three.
+
+## The present-day nudge's cap (2026-10-19)
+
+The 1000 Myr full 16k gate runs on master (7d60fc4a) ended at 10,011 ppm CO2 (CPU) and 7,981 ppm
+(GPU), at 22 to 25 degC. The 100 Myr runs of the same build ended at 385 to 681 ppm. The cause is
+the temperate present-day nudge (CLM-148 to CLM-151), not the carbon cycle. It is now capped at
+x1.75 (CLM-206). Build log 2026-10-19, "The present-day nudge's cap".
+
+### Where the CO2 comes from
+
+The runs: `earthlike_quick_16k` (500 Myr, 2 threads, seeds 1 to 4, both starts) and
+`earthlike_full_16k` (1000 Myr, 8 threads, scattered start, seeds 1 to 4). They used
+`tools/review/co2-ensemble.sh` and were read with `tools/review/co2-table.py`. "Natural" is the
+run's own CO2 at the last plate step, before the nudge; "factor" is what the nudge multiplied it by.
+
+- *The end CO2 is the nudge's factor times the natural CO2.* On master 26ce664e at 1000 Myr the
+  factor was 6.9, 1.6, 9.7 and 12.6 (seeds 1 to 4). The natural CO2 was 1,460, 315, 794 and
+  932 ppm. Seed 1 reproduces the gate's 10,011 ppm. The nudge searched up to x10^4, raising CO2
+  until at most 0.15 of the land was under ice sheets (CLM-150, CLM-203). It held the carbon reservoirs
+  still while it did so. At the end, weathering is therefore 30.91 and 25.97 against a degassing
+  of 7.66 and 6.35 x 10^12 mol/yr (seeds 1 and 3): the nudge held the CO2 high, and weathering is
+  what that CO2 would draw down.
+- *The carbon cycle's thermostat holds.* At every 100 Myr point of every series before the last
+  step, weathering equals degassing to within 0.2 %. The natural CO2 shows no drift toward a
+  hothouse:
+  - Over 1000 Myr it falls from 3,800 to 4,600 ppm at the start to 360 to 960 ppm at -100 Myr,
+    as the sun brightens (one run passes 8,600 ppm at -800 Myr and comes back).
+  - At -1000 Myr the sun is about 8 % dimmer (from memory), so the planet needs more CO2 for the
+    same warmth.
+  - The global temperature stays between 9 and 16 degC on the 1000 Myr runs, and between 11 and
+    19 degC on the 500 Myr runs, until the last 100 kyr.
+  - Over the last 500 Myr the natural CO2 runs from 267 to 3,209 ppm, about 1 to 11 times
+    280 ppm, inside the Phanerozoic's 1 to 25 (below). It leaves that range only in the last
+    100 kyr, and only through the nudge: master's 1000 Myr ends of 10,011, 7,723 and 11,790 ppm
+    are 36, 28 and 42 times 280 ppm.
+- *What grows over the history is the high ground.* Land above 2 km goes from 0 at the start to
+  0.20 to 0.41 of the land at the end (Earth about 0.1, from memory). The land's share of the
+  surface falls from 0.30 to 0.12 to 0.23. Ice sheets form on that ground at any CO2, as
+  Antarctica's do.
+- *The nudge cannot melt them cheaply.* The present's new report
+  (`sheets_by_height`) splits the land at 1, 2 and 3 km. In the four capped 500 Myr runs that
+  needed warming (the scattered start, seeds 1 to 4):
+  - 0.17 to 0.22 of the land lies above 3 km;
+  - 0.68 to 0.88 of that land is under sheets in the natural climate;
+  - x1.64 to x1.75 clears 5 to 14 % of it (0.64 to 0.83 stays under sheets);
+  - below 1 km at most 0.04 of the land in that class is under sheets, natural or not.
+
+  The trials' rows (`trial_rows`) show the sheet share falling only slowly with the factor. On
+  the scattered start, seed 2:
+  - x1.0: 0.192 of the land under sheets;
+  - x1.42: 0.173;
+  - x2.01: 0.157;
+  - x2.86: 0.141;
+  - x4.06: 0.125.
+
+  The uncapped search stopped at x2.40, 19.2 degC at the end. On three of the 1000 Myr runs,
+  with 0.27 to 0.33 of the land under sheets in the natural end, it went to x6.9, x9.7 and
+  x12.6.
+- *Why 100 Myr looked Earth-like.* In the 1000 Myr series, 100 Myr in, 0.06 to 0.14 of the land
+  is above 2 km. A 100 Myr run ends with that little high ground, so (inferred; no 100 Myr run was
+  made here) it has few sheets on high ground and the nudge has little to do.
+- *Why the runs spread so far.* The planet is chaotic: in the GPU agent's runs, one f32 ulp moved
+  a 100 Myr end from 546 to 633 ppm. The nudge then multiplied whatever natural state a run
+  ended in by whatever its high ground needed. The end CO2 inherited both spreads. With the cap,
+  a last-bit change in the natural state moves the end by at most x1.75, not up to x10^4.
+
+**Which merge?** A bisect on the quick preset (scattered start, seeds 1 and 2, 500 Myr) over the
+merges from 25ae6723 to master 26ce664e found three commits that change the worlds. Each moves the
+nudge's factor; none moves the natural CO2 outside the spread between seeds. The runs at 5cf2f9bb
+(after-group), e2166684 (climate), c767da2c (plates part 2), fde7e021 (surface) and 64982ccd (GPU)
+are the same to every printed digit as the run before them.
+
+| commit | end CO2, ppm | factor | natural CO2, ppm | land under sheets, natural | land above 2 km |
+|---|---|---|---|---|---|
+| 25ae6723 (old master) | 477, 739 | 1.00, 1.00 | 477, 739 | 0.136, 0.134 | 0.243, 0.221 |
+| 32589362 (natives and plates part 1) | 1,751, 1,283 | 2.51, 1.97 | 699, 651 | 0.190, 0.177 | 0.199, 0.214 |
+| fb38204f (plate cadence: per-Myr rules, 20 Myr snapshots) | 3,868, 1,165 | 2.99, 1.00 | 1,296, 1,165 | 0.187, 0.144 | 0.217, 0.305 |
+| 7d60fc4a (surface solvers) = 26ce664e (master) | 2,140, 1,930 | 1.65, 2.40 | 1,294, 805 | 0.178, 0.192 | 0.315, 0.298 |
+
+The old master had the same hothouse on other seeds. In its 500 Myr ensemble (8 runs):
+- scattered seed 4 ended at 7,832 ppm (x5.27 on 1,486 ppm);
+- supercontinent seed 1 ended at 2,862 ppm (x3.72).
+
+### The carbon cycle against WHAK, GEOCARB and COPSE
+
+These are checks of order of magnitude. The sources' figures are from memory: none of the three
+was read for this.
+
+- *WHAK* (Walker, Hays & Kasting 1981): weathering rises with temperature and runoff, so the CO2
+  settles where weathering balances degassing. The model does this at every point of every
+  series (above).
+- *GEOCARB* (Berner): at fixed degassing, the steady CO2 rises as the weathering land shrinks.
+  - Weathering goes roughly as RCO2^0.5: the temperature's effect on the kinetics, with about
+    4 K per e-fold of CO2, and the runoff's.
+  - The 500 Myr planets have 0.65 of Earth's land (0.19 of the surface against 0.29). About a
+    sixth of it is under sheets in the natural end, against Earth's tenth, and ice-covered land
+    does not weather (CLM-066). That leaves about 0.61 of Earth's weathering land, which needs
+    about (1 / 0.61)^2 = 2.7 times the pre-industrial CO2.
+  - Their degassing is about 1.2 times Earth's 6.65 x 10^12 mol/yr (`DEGASSING_EARTH_MOL_YR`),
+    which squares to 1.44. Together: about 3.9 times, near 1,100 ppm.
+  - The natural CO2 at 500 Myr has a median of 653 ppm on the old master and 1,019 ppm on master
+    and the fixed branch, the size this estimate gives.
+- *The Phanerozoic range:* GEOCARB III's RCO2 runs from about 1 to 25 (Berner & Kothavala 2001),
+  and COPSE's from about 1 to 20 (Bergman, Lenton & Watson 2004). Every natural end here lies
+  between 1.1 and 6.2 times 280 ppm.
+- *Degassing* follows the ridge rate:
+  - at the start, 13 to 15 x 10^12 mol/yr, on 6.7 to 7.8 km2/yr of new seafloor;
+  - at the end, 4 to 9 x 10^12 mol/yr, on 2.1 to 4.5 km2/yr;
+  - Earth makes about 3 km2/yr (from memory).
+- *The land at 0.12 to 0.23 of the surface* is the plates' output, not the climate's:
+  - the crust thickens into high ground, so the same volume covers less area;
+  - collisions take crust under, and the resamplings consume it (PLT-290 to PLT-292).
+
+  The climate takes the land as given. A planet with less land and more of it high is warmer and
+  higher in CO2 than Earth for a physical reason.
+
+### The fix
+
+A temperate present raises the CO2 by at most x1.75 (`climate.present_co2_factor_max`, CLM-206).
+That is what the ocean gives back from a glacial to an interglacial: Lüthi et al. 2008 extend the
+late Quaternary's range to 172 to 300 ppm, and 300 / 172 = 1.74.
+
+- A planet whose sheets that warming does not clear keeps them, as Antarctica and Greenland stay
+  through Earth's interglacials. The note marks such a present not reached.
+- `ice_age` and `snowball` keep the unlimited search: the user forces them.
+- CLM-151's bracket is unchanged below the cap, and the cap itself is the bracket's last step
+  before the bisection (code: `present_search`).
+- Nothing before the last 100 kyr moves, and the carbon cycle and CLM-150's shares are as they
+  were.
+- With the cap set to 10,000 the branch reproduces master's runs to every printed digit (the
+  quick scattered seeds 1 and 2: 2,140 and 1,930 ppm, x1.654 and x2.399).
+
+**Measured** (median [min, max]; 500 Myr is `earthlike_quick_16k`, 2 threads, seeds 1 to 4,
+both starts; 1000 Myr is `earthlike_full_16k`, 8 threads, the scattered start, seeds 1 to 4; "land
+under sheets" is at the end, after the nudge; "reached" counts the runs whose present met the
+target):
+
+| | runs | end CO2, ppm | factor | natural CO2, ppm | T global, degC | land | land above 2 km | land under sheets | reached |
+|---|---|---|---|---|---|---|---|---|---|
+| old master 25ae6723, 500 Myr | 8 | 881 [477, 7,832] | 1.46 [1.00, 5.27] | 653 [342, 1,682] | 17.2 [14.8, 23.7] | 0.189 [0.151, 0.219] | 0.254 [0.165, 0.329] | 0.148 [0.062, 0.150] | 8 of 8 |
+| master 26ce664e, 500 Myr | 8 | 2,030 [474, 15,463] | 1.67 [1.00, 8.91] | 1,019 [474, 1,735] | 19.2 [15.6, 28.2] | 0.180 [0.124, 0.222] | 0.274 [0.195, 0.353] | 0.148 [0.117, 0.150] | 8 of 8 |
+| fixed, 500 Myr | 8 | 1,764 [474, 3,036] | 1.66 [1.00, 1.75] | 1,019 [474, 1,735] | 18.7 [15.6, 21.4] | 0.180 [0.126, 0.223] | 0.274 [0.195, 0.351] | 0.150 [0.117, 0.257] | 5 of 8 |
+| master 26ce664e, 1000 Myr | 4 | 8,867 [498, 11,790] | 8.29 [1.58, 12.65] | 863 [315, 1,460] | 24.7 [16.0, 25.9] | 0.206 [0.169, 0.218] | 0.333 [0.203, 0.406] | 0.148 [0.143, 0.150] | 4 of 4 |
+| fixed, 1000 Myr | 4 | 1,510 [502, 2,556] | 1.75 [1.60, 1.75] | 863 [314, 1,461] | 18.5 [16.0, 19.3] | 0.212 [0.169, 0.225] | 0.329 [0.203, 0.403] | 0.248 [0.150, 0.288] | 1 of 4 |
+
+- *The fix takes out the multiplication.* At 1000 Myr the median end falls from 8,867 to
+  1,510 ppm, the highest from 11,790 to 2,556 ppm, and the temperature from 24.7 to 18.5 degC.
+  The four runs' clock series are the same as master's at every 100 Myr point to the printed
+  digit, so only the last 100 kyr changed. At 500 Myr master's worst end, 15,463 ppm (x8.9,
+  28.2 degC, the scattered start, seed 3), becomes 3,036 ppm (x1.75, 21.4 degC).
+- *Where a run needed less than x1.75 the end barely moves.* The supercontinent seeds 1 to 3 are
+  the same as master's. The supercontinent seed 4 (2,119 against 2,129 ppm) and the scattered
+  seed 1 (2,121 against 2,140) differ a little, because the cap is now the bracket's second step
+  and the bisection starts from a different pair.
+- *Against the expected range.* The fixed 1000 Myr ends are 1.8 to 9.1 times 280 ppm, inside the
+  Phanerozoic's 1 to 25. Master's were 1.8 to 42, three of the four above 25. One of the four
+  is Earth-like (1 to 2 PAL): the scattered seed 2 (502 ppm, 16.0 degC). The other three are
+  warmer because their natural planets are: 794 to 1,461 ppm, with 0.28 to 0.40 of their land
+  above 2 km and 0.27 to 0.33 of it under sheets before the nudge.
+- *The cost is ice.* Three of the four 1000 Myr runs and three of the eight 500 Myr runs end at
+  the cap with more of their land under sheets than the target's 0.15: 0.244 to 0.288 at
+  1000 Myr (Earth 0.10). The ice is on the high ground:
+  - in the four 1000 Myr runs 0.10 to 0.26 of the land lies above 3 km;
+  - 0.75 to 0.83 of that land is under sheets in the natural climate, and 0.72 to 0.80 after
+    the nudge.
+- *Threads.* The quick scattered seed 1 at 4 threads ends the same as at 2 threads to every
+  printed digit (2,121 ppm, x1.639).
+
+**An independent review of a laptop run** (`earthlike_quick_16k`, supercontinent, 1000 Myr,
+seed 1, built from 025676c8, 2026-10-19) found two things:
+- The CO2 jumps from 577 to 3,347 ppm at the last step. Its climate note shows the same cause:
+  `co2_factor` 5.75, 0.230 of the land under sheets in the natural end and 0.149 after. With the
+  cap it ends at no more than 1.75 x 577 = 1,010 ppm, with more of its land under sheets.
+- Land ice holds without a break from -760 Myr to the present. At the end, 17 % of it lies within
+  30 degrees of the equator, at a median 4.1 km and -9 degC.
+
+  The cap does not touch this: it is the natural climate on high ground. Two things to check,
+  neither done here:
+  - The glaciers' extent rule (`glaciers.rs`, Ohmura et al. 1992's T_ELA) still puts ice where
+    the summer is below -2.4 degC at zero precipitation, so a dry tropical plateau glaciates.
+    Neither the extent nor the default thickness (Nye's profile) depends on the snowfall. Only
+    the mass balance read by the hydrology and the flowing sheet (off by default) does
+    (`ice.rs`, `surface_balance`).
+  - The hypsometry (plates.md) puts 0.2 to 0.4 of the land above 2 km, where Earth has about
+    0.1.
+
+The present's report in the climate note now carries:
+- `co2_factor_max` (temperate only);
+- `trial_rows`: every trial's factor, land under sheets, land under ice, sea ice and global
+  temperature, the natural end first;
+- `sheets_by_height` and `sheets_by_latitude`: the share of the land in each class, and the share
+  of each class under sheets, in the natural climate and the chosen one.
+
+The geometry's sums are taken row by row in parallel and added in row order, and the bracket's
+trials run side by side and are read in order. The choice therefore does not depend on the
+thread count, and the 4-thread run above bears that out.
+
+**On the test planet** (`planet_world_4k`, seeds 11 to 14) the nudge does nothing: the factor is
+1.00 on all four, with or without the cap, and 0.000 to 0.010 of the land is under sheets. The
+MIC GameTest's `climateConsistent` failure on master ("C 0.621 < 0.630 (132 columns)") is
+therefore not a climate fault. It is the census's sampling noise, and the floors now allow for
+it (biomes.md, "The floors against the census's noise").
 
 ## Material for the stage 2 writer
 
