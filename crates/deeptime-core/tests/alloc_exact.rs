@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! The counting allocator's count is exact: after any mix of small allocations, reallocations
 //! (across size classes, in place and moved), zeroed allocations and frees, on this thread and on
-//! others, the count is back where it started, with the system allocator and with mimalloc under
-//! it (`--features mimalloc`). One test in its own binary, so the allocator counts nothing else
+//! others, the count is back where it started (after a thread exits, within its park's bytes), with
+//! the system allocator and with mimalloc under it (`--features mimalloc`). One test in its own binary, so the allocator counts nothing else
 //! (the test harness's own threads are idle while it runs).
 
 use std::alloc::{GlobalAlloc, Layout};
@@ -36,7 +36,7 @@ fn churn(seed: u64) {
                 let layout = Layout::from_size_align(size, align).unwrap();
                 // SAFETY: a non-zero size; freed below with the layout it was made with.
                 let p = unsafe {
-                    if rng.next() % 3 == 0 {
+                    if rng.next().is_multiple_of(3) {
                         GLOBAL.alloc_zeroed(layout)
                     } else {
                         GLOBAL.alloc(layout)
@@ -52,7 +52,10 @@ fn churn(seed: u64) {
                 // SAFETY: `p` is live with `layout`; the new size is non-zero.
                 let q = unsafe { GLOBAL.realloc(p, layout, new_size) };
                 assert!(!q.is_null());
-                live[i] = (q, Layout::from_size_align(new_size, layout.align()).unwrap());
+                live[i] = (
+                    q,
+                    Layout::from_size_align(new_size, layout.align()).unwrap(),
+                );
             }
             _ if !live.is_empty() => {
                 let i = (rng.next() % live.len() as u64) as usize;
@@ -76,7 +79,11 @@ fn the_count_returns_to_where_it_started() {
     let before = alloc::in_use();
     churn(7);
     alloc::unpark_thread();
-    assert_eq!(alloc::in_use(), before, "one thread's churn leaves the count unchanged");
+    assert_eq!(
+        alloc::in_use(),
+        before,
+        "one thread's churn leaves the count unchanged"
+    );
 
     let handles: Vec<_> = (0..4u64)
         .map(|k| {
@@ -90,5 +97,14 @@ fn the_count_returns_to_where_it_started() {
         h.join().unwrap();
     }
     alloc::release_cache();
-    assert_eq!(alloc::in_use(), before, "four threads' churn leaves the count unchanged");
+    // The standard library frees a few blocks of its own after the closure's last `unpark_thread`,
+    // as the thread exits; the park has no destructor (an allocator cannot allocate for one), so
+    // up to its 4 slots of 4 KiB per thread stay counted. Anything a miscount of 20,000
+    // operations left would be far above that.
+    let left = alloc::in_use() as i64 - before as i64;
+    let bound = 4 * (4 * 4096);
+    assert!(
+        left.abs() <= bound,
+        "four threads' churn left {left} bytes counted (at most {bound} from thread exits)"
+    );
 }

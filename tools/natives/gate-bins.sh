@@ -50,6 +50,7 @@ fi
 HOST="$(rustc -vV | sed -n 's/^host: //p')"
 [[ "$HOST" == x86_64-* ]] || { echo "gate-bins: the host is $HOST; the gate's two builds need an x86-64 host" >&2; exit 1; }
 [ -z "$PGO" ] || [[ "$PGO" == /* && -f "$PGO" ]] || { echo "gate-bins: --pgo needs the absolute path of an existing merged profile" >&2; exit 2; }
+PKGS=("${PGO_PKGS[@]}")
 FEAT=(); [ -z "$FEATURES" ] || FEAT=(--features "$FEATURES")
 mkdir -p "$OUT"
 printf 'build\tseconds\n' > "$OUT/build-times.tsv"
@@ -57,7 +58,7 @@ printf 'build\tseconds\n' > "$OUT/build-times.tsv"
 timed() { # name, cargo args...: builds and records the wall time
     local name=$1 t0 ms; shift
     t0=$(date +%s%N)
-    cargo build --locked -p deeptime-cli "${FEAT[@]}" "$@"
+    cargo build --locked "${PKGS[@]}" "${FEAT[@]}" "$@"
     ms=$(( ($(date +%s%N) - t0) / 1000000 ))
     printf '%s\t%d.%d\n' "$name" $((ms / 1000)) $(((ms % 1000) / 100)) >> "$OUT/build-times.tsv"
 }

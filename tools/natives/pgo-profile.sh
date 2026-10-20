@@ -1,26 +1,30 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
 #
-# Makes the PGO profile the shipped natives and the gate bench are built with (STATUS.md build log
-# 2026-10-19): an instrumented `deeptime` (the `ship` profile plus `-C profile-generate`), a short
-# training run of a representative preset on it, and `llvm-profdata merge`.
+# Makes the PGO profile an opt-in `gate-bins.sh --pgo` build uses (STATUS.md build log 2026-10-19;
+# PGO is not shipped: it won nothing beyond noise): an instrumented `deeptime` (the `ship` profile
+# plus `-C profile-generate`), a short training run of a representative preset on it, and
+# `llvm-profdata merge`.
 #
 #   tools/natives/pgo-profile.sh <out dir> [--preset P] [--start S] [--myr N] [--threads T]
 #                                [--features F]
 #
-#   <out dir>/deeptime.profdata   the merged profile: pass it to gate-bins.sh --pgo and to
-#                                 build-natives.sh --pgo (an absolute path)
-#   <out dir>/raw/                the instrumented run's raw profiles (removed with --clean)
+#   <out dir>/deeptime.profdata   the merged profile: pass it to gate-bins.sh --pgo (an absolute path)
+#   <out dir>/raw/                the instrumented run's raw profiles
 #   <out dir>/train.log           the training run's output
 #   <out dir>/pgo-times.tsv       wall seconds: the instrumented build, the training run, the merge
 #
-# The training run is `deeptime bench` of preset P (default earthlike_full_16k, scattered
-# continents) for N Myr (default 40) on T threads (default 8); the instrumented binary runs about
-# twice as slow as a ship build. Counters do not depend on the CPU, so the instrumented build is
-# for the host's baseline CPU and its profile serves the x86-64-v3 builds as well; the profile
-# also fits other targets' builds of the same source as far as the code is the same (see the
-# build log). llvm-profdata must come from rustc's own LLVM (the `llvm-tools` rustup component,
-# in the Nix dev shell too): another LLVM version may not read the raw profiles.
+# The training run is `deeptime bench` of preset P (default earthlike_quick_16k, scattered
+# continents) for N Myr (default 6) on T threads (default 1). Keep T at 1 or 2: the instrumented
+# binary's counters are shared atomics, and at 8 threads it ran 10 to 30 times slower than a ship
+# build (the full 16k at 8 threads did not finish in an hour); at 1 thread it runs about 5 times
+# slower, and the quick preset's hot code is the full preset's.
+#
+# Counters do not depend on the CPU, so the instrumented build is for the host's baseline CPU and
+# its profile serves the x86-64-v3 build as well. It does not fit another target triple's build
+# (build log 2026-10-19), so build-natives.sh has no PGO. llvm-profdata must come from rustc's own
+# LLVM (the `llvm-tools` rustup component, in the Nix dev shell too): another LLVM version may not
+# read the raw profiles.
 #
 # Run from the repository root inside the dev shell, on the test VM and admitted (a cargo:build,
 # then a sim:<preset>:<threads>t; a script that starts both wraps each in `deeptime-admit run`),
@@ -33,7 +37,7 @@ cd "$ROOT"
 # shellcheck source=tools/natives/ship.sh
 . tools/natives/ship.sh
 
-OUT=""; PRESET=earthlike_full_16k; START=scattered_continents; MYR=40; THREADS=8; FEATURES=""
+OUT=""; PRESET=earthlike_quick_16k; START=scattered_continents; MYR=6; THREADS=1; FEATURES=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --preset) PRESET="$2"; shift 2 ;;
@@ -41,12 +45,12 @@ while [ $# -gt 0 ]; do
         --myr) MYR="$2"; shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
         --features) FEATURES="$2"; shift 2 ;;
-        -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
         -*) echo "pgo-profile: unknown option $1" >&2; exit 2 ;;
         *) OUT="$1"; shift ;;
     esac
 done
-[ -n "$OUT" ] || { sed -n '2,29p' "$0"; exit 2; }
+[ -n "$OUT" ] || { sed -n '2,32p' "$0"; exit 2; }
 if [ -n "${RUSTFLAGS:-}${CARGO_ENCODED_RUSTFLAGS:-}" ]; then
     echo "pgo-profile: RUSTFLAGS is set; it would replace .cargo/config.toml's flags. Unset it." >&2
     exit 1
@@ -68,9 +72,9 @@ note() { # step, start ms
 }
 
 FEAT=(); [ -z "$FEATURES" ] || FEAT=(--features "$FEATURES")
-GEN_DIR=target/pgo-gen
+GEN_DIR=target/pgo-gen${FEATURES:+-$FEATURES}
 t0=$(now_ms)
-cargo build --locked -p deeptime-cli "${FEAT[@]}" --profile "$SHIP_PROFILE" --target "$HOST" \
+cargo build --locked "${PGO_PKGS[@]}" "${FEAT[@]}" --profile "$SHIP_PROFILE" --target "$HOST" \
     --target-dir "$GEN_DIR" \
     --config "target.$HOST.rustflags=[\"-C\", \"profile-generate=$OUT/raw\"]"
 note instrumented_build "$t0"
