@@ -134,7 +134,7 @@ min(1, halite / 200 m) x min(1, overburden / 1,000 m) (salt); 0.8 x min(1, (sedi
 | Ocean crust, sea floor to mantle | about 7.5 km (7.1 km of igneous crust, 0.4 km of deep-ocean sediment) | White et al. 1992 (abstract); GlobSed (Straume et al. 2019, read) | 9.8 km on crust younger than 20 Myr, 12.1 km over all ages (13.1 before) | `geo-template.sh`, six runs, 2026-10-20 (below) |
 | Ocean crust's layer 2 and layer 3 | 1.84 km and 4.31 km | Christeson et al. 2019 (abstract; layer 3 secondary) | 2.1 km of lavas and dikes over 4.5 km of gabbro on crust younger than 20 Myr | same |
 | Granite and gneiss under the sea | none (plagiogranite in the Penrose sequence) | Penrose Field Conference 1972, second hand | in 4 % and 21 % of the ocean columns, at the coasts (62 % and 77 % before) | same |
-| Mountains filled by the top bed | the beds run on under the ranges | - | the top unit fills over half of the relief on 31 % of the cells 8 blocks or more above the history's surface (100 % before) | same |
+| Mountains filled by the top bed | the beds run on under the ranges | - | the top unit fills over half of the relief on 29 % of the cells whose node relief is 8 blocks or more (100 % before); one rock unit, mostly the crest rule's, still fills most on 98 % | same |
 | Columns with a grade inversion, a thin metamorphic sliver, a plutonic sheet | none counted; inverted sequences are real but rare in a given column | - | 0.07 % of columns have a grade inversion, 0.25 % a metamorphic sliver, 0.05 % a plutonic sheet (20,000 columns) | see below |
 
 Strata-check on a 16k quick planet (preset `earthlike_quick_16k`, start `scattered_continents`, 500 Myr, 2 threads,
@@ -221,30 +221,81 @@ What it shows:
   the ocean columns lie within 61 km of continental crust or land), where GlobSed's mean is 3.0 km;
   the young crust's sediment is still several times Earth's (open questions).
 
-The mountains (STR-051: L1 cells whose mean L3 elevation stands at least 8 or 30 blocks above the
-surface the history left, and the share of them where the stack's first horizon spans more than
-half of that relief):
+The mountains, after the review of the lift (2026-10-20: STR-051 on the lift's own window, the
+pointwise relief of STR-052, STR-055 to STR-057). Rerun on the test machine, the same preset,
+starts and seeds: "before" is master 5dc06974 with the census notes ported (no world change),
+"after" the branch with the pointwise lift (structures still lifted at each window's centre),
+"oldlift" the branch's first lift (a cell's mean elevation against its own first top) on seed 1 of
+both starts, "final" the branch reading structures through `strata/lift` (seed 1 supercontinent).
+The ocean census above came out the same within rounding (before 6,561 ocean columns, granite in
+63 %; after 6,473, sea floor to mantle 12.2 km over all ages).
 
-| | before | after |
+| L1 cells whose node relief is at least 8 blocks (six runs) | before | after |
 |---|---|---|
-| cells at least 8 blocks above the history's surface (six runs) | 154,025 | 159,527 |
-| top unit fills over half of the relief | 1.000 on every run | 0.31 (0.28 to 0.33) |
-| cells at least 30 blocks above it | 29,281 | 27,153 |
-| top unit fills over half of the relief | 1.000 on every run | 0.24 (0.21 to 0.28) |
-| L1 cells lifted (STR-052), mean lift | none | 159,000 to 167,000 a run, 3.9 to 4.9 blocks |
-| bodies whose centre stands above the ground | 3.1 to 5.7 % | 3.0 to 5.0 % |
+| cells | 59,862 | 58,091 |
+| top unit (first horizon) over half of the relief | 0.997 (0.994 to 0.998) | 0.289 (0.25 to 0.32) |
+| the same at 30 blocks (5,739 and 5,629 cells) | 0.994 (0.988 to 1.000) | 0.210 (0.18 to 0.27) |
+| first rock horizon over half | 0.520 | 0.652 |
+| any one horizon over half | 0.997 | 0.982 |
+| mean share of regolith and loose cover | 0.476 | 0.001 |
+| crest raise over the relief (mean, at most 1) | 0.996 | 0.967 |
+| L1 cells lifted (STR-052), mean lift | none | 148,000 to 154,000 a run, 2.2 to 2.5 blocks |
+| bodies whose centre stands above the ground | 0.7 to 1.6 % | 2.5 to 5.8 % |
 
-Before, the first horizon was stretched up to every crest, so the top bed filled the whole relief
-of every mountain. After, the stack rises by the lift and a crest above it is filled by the thickest
-rock unit within 16 blocks of the surface (STR-053); where the top unit still fills over half of the
-relief it is a thick bed (a kilometre of sandstone is 29 blocks) or that crest unit. The census
-figure is `review/out/geo-template/ocean_census.png` (every age band of every tag beside Earth's
-Penrose column) and the sections `line1-*.png` and `line2-*.png` there (one file per start and seed,
-a panel each for before, after and switch on; each run is its own planet, so the panels cross
-different ground). Land, deposit sites and body counts move within the seeds' spread (the plate
-change makes each planet a different one), and the bodies standing above the ground did not
-increase. Nothing here changes the trench code: the trench width and the hadal area are a separate
-task.
+The first lift (oldlift) raised 163,000 cells a run by 4.8 blocks on average, so about half of it
+was the coarse surface's curvature. With the pointwise relief the top unit fills over half of the
+relief on 0.28 of the cells against 0.23 at 8 blocks and 0.19 against 0.12 at 30 (seed 1, two
+planets each), and the first rock horizon on 0.64 against 0.54.
+
+What fills a mountain is now rock, not stretched loose cover (its share fell from 0.48 to 0.001),
+but it is still mostly one unit: the crest rule (STR-053) raises the first top to the highest ground
+plus the detail amplitude within two L1 cells, which on mountain cells is at least the node relief
+again (0.97 of it on average), and the thickest rock unit near the surface takes that up. The lift
+follows a window's mean ground, the crest rule its highest (limits and open questions below). The
+crest rule touches about 320,000 of the 335,872 L1 cells in every build, after by at most 219 to
+285 blocks a run.
+
+Valley floors and the ground (STR-057: land L3 points every 4 cells; a valley floor has a smoothed
+node relief of at least 4 blocks and the ground at least 4 blocks under it):
+
+| | before, six runs | after, six runs | oldlift, seed 1 | after, seed 1 |
+|---|---|---|---|---|
+| valley-floor points | 9,174 | 11,421 | 3,461 | 3,461 |
+| ground in the first horizon | 0.267 | 0.057 | 0.064 | 0.067 |
+| ground in loose cover | 0.259 | 0.000 | 0.000 | 0.000 |
+| depth under the first top (blocks) | 41.1 | 41.9 | 37.3 | 38.1 |
+| commonest ground | sandstone 0.29, shale 0.22, sand 0.17 | sandstone 0.44, shale 0.24, mudstone 0.20 | sandstone 0.49, mudstone 0.24, shale 0.20 | sandstone 0.47, mudstone 0.25, shale 0.20 |
+| lifted land: ground in the first horizon | 0.645 | 0.112 | 0.122 | 0.124 |
+
+Against master the valley floors lost the stretched top bed (horizon 0 at the ground on 27 % of
+them, a quarter of them loose cover, against 6 % and none). The curvature term did not show on
+them: horizon 0 at the ground on 6.4 % with it and 6.7 % without, no loose cover in either, the same
+classes. Likely because the crest rule sets the first top beside high ground in both builds (it
+reads the highest ground within two L1 cells); inferred, not measured point by point.
+
+`surface/class_top` against the drawn column (review finding 4): on land the sim's surface class
+(L2, nearest) is the drawn ground class at 11 to 15 % of the points after (8 to 10 % before); where
+it is consolidated it is the drawn bedrock at 26 % (22 to 25 %), and the game's bedrock choice
+(class_top, or under loose cover the drawn rock within 8 blocks, BIO-153) agrees with the drawn
+bedrock at 57 to 69 % (53 to 68 %). The surface pass and the column disagree about the rock at the
+ground on a third or more of the land (open questions).
+
+Structures (STR-055): the event-centre lift put fault planes off their rock by p90 2.1 to 3.0 blocks
+and p99 12 to 14 over the six runs (at most 68 to 101), intrusions by p90 0.5 to 1.2 and p99 3.8 to
+5.5; the first lift's by p90 3.8 to 4.8 and p99 34 to 42 for faults. Read through `strata/lift`,
+final's columns differ from after's at 6.0 % of a 208-block grid (122 of 2,048; 103 of them keep
+their classes in order, contacts moved by p50 1, p90 3 and at most 24 blocks) and at 28 % of 4,000
+body centres (p90 3, at most 65); its bake notes are after's to the digit.
+
+Bodies: before, they stayed at the history's depth under ground the amplifier had raised; after,
+they rise with their host rock, lift and crest raise together (STR-056; 17 to 24 % of them more than
+a block off the cell's lift, 2.7 to 3.2 blocks on average), so where a valley cuts below that rock
+the body's centre is in the air: 2.5 to 5.8 % of them against 0.7 to 1.6 %. A body in rock that
+erosion removed is gone, which is right in kind; how many is the crest rule's doing (limits). The
+census figure is `review/out/geo-template/ocean_census.png` and the sections `line1-*.png` and
+`line2-*.png` there (one file per start and seed, a panel for each build run on it; each run is its
+own planet, so the panels cross different ground). Nothing here changes the trench code: the
+trench width and the hadal area are a separate task.
 
 ## Simplifications and limits
 
@@ -262,6 +313,13 @@ task.
   centre rose (STR-056), while the horizons and the structure's faults and intrusions rise column by column
   (STR-055); where the lift changes across a body (a steep range front), its edges sit up to the change in
   lift off the rock beside them.
+- **One unit fills most mountains.** The lift follows a window's mean ground and the crest rule
+  (STR-053) its highest, so on mountain cells the crest raise is about the node relief again and the
+  thickest rock unit near the surface takes it up: one horizon spans over half the relief on 98 % of
+  them. Beds do run on under the ranges, but the range above them is mostly that one unit.
+- **Bodies in rock that a valley cuts.** Bodies rise with the crest raise as well as the lift
+  (STR-056), so a valley cut below the raised rock leaves 2.5 to 5.8 % of the bodies' centres in the
+  air, against 0.7 to 1.6 % when they stayed at the history's depth.
 - **The crest raise is not in the lift layer.** The crest raise (STR-053) thickens a unit near the surface
   after the lift; `strata/lift` holds the whole-stack lift only, so a fault plane or an intrusion inside a
   raised crest unit sits off the rock beside it by up to that raise (STR-055).
@@ -298,7 +356,7 @@ file), the one-block minimum (STR-005), the 8 and 16 block minimums (STR-006, ST
 taper (STR-011 to STR-014, Ben 2026-09-30 and 2026-10-01), the column rule and tongues (STR-015 to STR-017, Ben
 2026-09-29), the key space (STR-018 to STR-021), the coal cover cap (STR-009, Ben 2026-09-30), the trap and
 host weights (STR-025 to STR-043, agent design values), and the relief lift, its crest rule, the
-smoothing within one crust kind and the mountain-fill measure (STR-051 to STR-054, agent, 2026-10-19).
+smoothing within one crust kind and the mountain-fill measure (STR-051 to STR-054, agent, 2026-10-19), and after the review of the lift the structures read through the lift, the bodies' key shift and the surface census (STR-055 to STR-057, agent, 2026-10-20; the `strata/lift` layer allowed by the coordinator).
 
 ## Open questions
 
@@ -312,6 +370,12 @@ smoothing within one crust kind and the mountain-fill measure (STR-051 to STR-05
    in the census against GlobSed's 0.27 km under 82 Myr ("The ocean crust and the mountains,
    measured"). The model's ocean is mostly margin, where Earth's mean is 3.0 km, but even so the
    young crust looks too buried; where the surface stage puts its marine sediment was not traced.
+6. **`surface/class_top` against the drawn column.** The sim's surface class is the drawn ground
+   class at only 11 to 15 % of the land points, and the game's bedrock choice the drawn bedrock at 57
+   to 69 % (STR-057). Which one the surface pass should trust where they disagree is not decided.
+7. **The crest rule's share.** A lift by a high quantile of the window's ground, or a crest raise
+   spread over several units, would leave less of a mountain to one stretched unit (STR-053); not
+   tried.
 
 ## Sources
 
