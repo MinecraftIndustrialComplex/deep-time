@@ -5,7 +5,7 @@
 # on the play world's data, on the test VM. From the laptop:
 #
 #   tools/remote/mac.sh -- 'cd neoforge && ./gradlew build -x test'        # the two jars (or the full gate)
-#   tools/remote/mac.sh -- tools/remote/detach.sh start devmap-shots tools/client/devmap-shots.sh [options]
+#   tools/remote/mac.sh -- tools/remote/detach.sh start devmap-shots --kind client:devmap tools/client/devmap-shots.sh [options]
 #   tools/remote/mac.sh --no-sync -- tools/remote/detach.sh wait devmap-shots
 #   tools/remote/mac.sh --no-sync --pull review/out/devmap-shots -- true
 #
@@ -54,6 +54,12 @@ done
 if [ "${DEEPTIME_ADMIT_PID:-}" != "$$" ] && [ -f "$ADMIT" ]; then
     exec python3 "$ADMIT" run --kind client:devmap --server --label "$(basename "$REPO")" -- "$SELF" "${ARGS[@]}"
 fi
+# Admitted by someone else (detach.sh) as a job without its own ports and display: refuse, rather
+# than boot a server on the set's ports beside other jobs.
+if [ -f "$ADMIT" ] && [ -z "${DEEPTIME_SERVER_DIR:-}" ]; then
+    echo "devmap-shots: admitted without a server slot; start it with detach.sh start <name> --kind client:devmap" >&2
+    exit 2
+fi
 
 if [ -z "$WORLD" ]; then
     PLAY_DIR="$(sed -n 's/^PLAY_DIR=//p' /etc/default/deeptime-play 2>/dev/null)"
@@ -92,7 +98,12 @@ python3 "$REPO/tools/smoke/instance.py" make --set "$SET" --dest "$SRV" >/dev/nu
 rm -rf "$SRV/mods" "$SRV/planet" "$SRV/world" "$SRV/config/voicechat"; mkdir -p "$SRV/mods" "$SRV/planet"
 cp "$DT" "$DM" "$TW" "$SRV/mods/"
 rsync -a --exclude=/keyframes/ --exclude=/epochs/ "$WORLD/" "$SRV/planet/deeptime/"
-[ -d "$WORLD/keyframes" ] && ln -s "$WORLD/keyframes" "$SRV/planet/deeptime/keyframes"
+if [ -d "$WORLD/keyframes" ]; then
+    ln -s "$WORLD/keyframes" "$SRV/planet/deeptime/keyframes"
+    # Minecraft refuses a world folder with a symlink unless the server's allowed_symlinks.txt lists
+    # its target (a plain line is a prefix of the link's target).
+    printf '%s\n' "$WORLD/keyframes" > "$SRV/allowed_symlinks.txt"
+fi
 GAME=$(sed -n 's/^server-port=//p' "$SRV/server.properties"); GAME=${GAME:-25565}
 RCONP=$(sed -n 's/^rcon.port=//p' "$SRV/server.properties"); RCONP=${RCONP:-25575}
 PW=$(python3 -c "import secrets; print(secrets.token_hex(12))")
