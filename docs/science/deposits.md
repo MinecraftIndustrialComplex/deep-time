@@ -534,28 +534,35 @@ The rules (ORE-269):
 **What changed.**
 
 - **In-stratum hosts** (ORE-271, DEP-088, DEP-089). A type with `hosts.in_stratum` lies in a host
-  horizon the column really holds: of the horizons the world draws (`structure::Cover`, the same
+  horizon the column really holds. Of the units the world draws (`structure::Cover`, the same
   smoothed stacks as the bake, read through the world's folds and faults as the strata pass reads
-  them), those of a host class, each cut to its blocks under the column's
-  top four solid blocks (the soil, which hosts no ore in the game; the first ensemble without this
-  cut put most bodies there, a median 0 ore blocks per MVT site) and above the floor's last four,
-  the one whose middle is nearest the type's formation depth, and cut again to the blocks a host
-  horizon holds in every column within two strata cells (32 blocks) of the site. The lateral test
-  is there because the column rule interfingers a facies change block by block: a one-block
-  limestone stringer that holds in the site's column alone is gone a few blocks away, and a body
-  wider than that sits mostly in shale. The body's centre is that middle,
-  its half height at most the horizon's, its dip 0, and no erosion cut is applied to it. The
-  site's centre is the block holding the body's centre (rounding had put the centre of a one-block
-  horizon in the block above it, and x and z a column off the one the host was read in), and
-  the projection to Petroff-Guyou leaves such a body at its block y, where the world's stacks
-  keep its horizon, instead of moving it with the drawn ground. A site
-  with no such horizon places nothing, nor does one on crust
-  that is oceanic now (`plates/crust_type`); `survives()` decides the same way as `materialise()`,
-  and the guarantee step that forces one deposit of a type skips such cells. MVT is the one such
-  type: its hosts are limestone and dolostone (dolostone weighted 1.5, after Leach et al. 2010:
-  "More MVT deposits are hosted in dolostone rather than limestone"), not chalk (pelagic, no
-  platform) or marble, and the body keeps its host rock (no `rock_class`). The census counts the
-  drops (`no_host`, `oceanic`).
+  them), those of a host class are candidates, each cut to its blocks under the column's top four
+  solid blocks (the soil, which hosts no ore in the game; the first ensemble without this cut put
+  most bodies there, a median 0 ore blocks per MVT site), above the floor's last four, and to its
+  part at least as old as the ore. MVT ore is epigenetic: its brines replace a carbonate that is
+  already there, so a unit laid after the ore formed cannot hold it. The strata log's keys date a
+  unit (the log is age-linear), and a unit the ore's age falls inside keeps its blocks below that
+  age. Nearest the type's formation depth first, the first candidate is taken that overlaps the
+  same unit, in a host class, in each column within two strata cells (32 blocks) of the site,
+  each column on its own, so a dipping unit passes. The lateral test is there because the column
+  rule interfingers a facies change block by block: a one-block limestone stringer that holds in
+  the site's column alone is gone a few blocks away, and a body wider than that sits mostly in
+  shale. The body's centre is the unit's middle, its half height at most the unit's (a body the
+  cap thins spreads along the unit and keeps its volume, so the ore it draws matches the site's
+  tonnage), its dip 0, and no erosion cut is applied to it. The site's centre is the block
+  holding the body's centre (rounding had put the centre of a one-block horizon in the block
+  above it, and x and z a column off the one the host was read in), projected through that
+  block's centre. The projection to Petroff-Guyou leaves such a body at its block y, where the
+  world's stacks keep its horizon, instead of moving it with the drawn ground, and clips it four
+  blocks under the world's final ground (the young landscape and the amplifier run after the
+  deposit stage, so that ground can lie lower than the one the stage kept the body under). A
+  site with no such horizon places nothing, nor does one on crust that is oceanic now
+  (`plates/crust_type`); `survives()` decides the same way as `materialise()`, and the guarantee
+  step that forces one deposit of a type skips such cells (an exposed essential's body must still
+  reach the exposed band). MVT is the one such type: its hosts are limestone and dolostone
+  (dolostone weighted 1.5, after Leach et al. 2010: "More MVT deposits are hosted in dolostone
+  rather than limestone"), not chalk (pelagic, no platform) or marble, and the body keeps its host
+  rock (no `rock_class`). The census counts the drops (`no_host`, `oceanic`).
 - **Placers stay on land and the shelf** (DEP-214). A placer is not placed on oceanic crust, nor
   where the ground lies deeper under the present sea than the sea's lowest stand since the placer
   formed (the surface stage now keeps its sea level per step, `SurfaceState.sea_history`). A bench
@@ -595,6 +602,26 @@ simulation's crust, which the rule reads, is continental. The 3 below the shelf 
 continental crust where the drawn ground is 7 to 28 blocks under the sea; the rule reads the
 simulation cell's height, not the drawn column. Porphyry, coal and petroleum move within the
 planets' spread; their rules did not change.
+
+**After the review (2026-10-20).** An Opus review of the branch raised these; each was checked
+against the code before it was fixed.
+
+- The placer's depth counted the sea level twice. `deeptime:elevation_m` is already relative to
+  the sea of its time, so the depth under the present sea is minus the present elevation
+  (DEP-214). A NaN crust type had read as oceanic (`as u8` gives 0); it is now no crust type.
+- The lateral host test cut the candidate to the blocks every column of the reach held at once,
+  which a dipping unit fails; each column is now asked on its own for the same unit. A host
+  younger than the ore was accepted; a unit is now cut to its part at least as old as the ore.
+- The projection kept a stratabound body at its y but not under the final ground; it now clips it
+  there. A site was projected through its block's corner, which could land a block off; now
+  through the block's centre.
+- The guarantee pass read a candidate's host fit for each essential, with a new deform scratch
+  each time; the fits are now cached per type, exposure and cell, with one scratch. An exposed
+  essential's fit whose body top lies below the exposed band is no fit, so it stays exposed.
+- The vertical cap took volume from a body without taking tonnage from its site; the body now
+  widens to keep its volume.
+- `stratabound_sites` in the projection asks only the built-in types. Not a defect: the core has
+  only built-in types, and the filter reads their `hosts.in_stratum`.
 
 ## Simplifications and limits
 

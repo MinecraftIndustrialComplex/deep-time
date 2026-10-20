@@ -153,7 +153,15 @@ pub fn bodies_for(
     let semi_m = semi_axes_m(shape, t.geometry.aspect, volume);
     let mut axes = to_blocks(semi_m, t, sc);
     if f64::from(axes[1]) > at.max_half_v_blocks {
-        axes[1] = at.max_half_v_blocks.max(0.5) as f32;
+        // A stratabound body no thicker than its host spreads along it instead (MVT and SEDEX
+        // ore is tabular, its extent set by the fluid's path, ledger ORE-271): the two other
+        // semi-axes grow by the square root of what the cap took, so the body keeps its volume
+        // and the ore it draws matches the site's tonnage.
+        let capped = at.max_half_v_blocks.max(0.5);
+        let widen = (f64::from(axes[1]) / capped).sqrt();
+        axes[0] = (f64::from(axes[0]) * widen) as f32;
+        axes[2] = (f64::from(axes[2]) * widen) as f32;
+        axes[1] = capped as f32;
     }
     let centre_y = at.surface_y - at.centre_depth_m / sc.m_per_block_v;
     let surface_clip = at.surface_y.floor() as i32;
@@ -649,7 +657,11 @@ mod tests {
         };
         let b = bodies_for(&t, 1, 10.0e6, &Grades::new(), &capped, &sc, &mut next);
         assert_eq!(b[0].axes[1], 1.5);
-        assert_eq!(b[0].axes[0], open[0].axes[0]);
+        // Spread along the horizon: wider, the same volume (so the site's tonnage).
+        assert!(b[0].axes[0] > open[0].axes[0], "{:?}", b[0].axes);
+        let vol = |a: [f32; 3]| a.iter().map(|&x| f64::from(x)).product::<f64>();
+        let (v0, v1) = (vol(open[0].axes), vol(b[0].axes));
+        assert!((v1 / v0 - 1.0).abs() < 1.0e-5, "{v0} {v1}");
         // The MVT body keeps its host rock (no dolostone lens).
         assert!(b[0].rock_class.is_none());
     }
