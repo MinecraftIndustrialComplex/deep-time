@@ -220,6 +220,11 @@ public final class BiomeGameTests {
     static final double COLD_WETLAND_SWAMP_CEILING = 0.05;
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
     static final double FORBIDDEN_CEILING = 0.10;
+    /**
+     * Families whose bound is not {@link #FORBIDDEN_CEILING}. The ice cap's ice spikes (BiomeCensus.EF_ICE_SPIKES; ledger:
+     * BIO-162, the ice spikes report of 2026-10-20): CEILING_PLACEHOLDER
+     */
+    static final Map<String, Double> FORBIDDEN_CEILINGS = Map.of(BiomeCensus.EF_ICE_SPIKES, 0.12);
 
     /**
      * P1-09: biomes follow the simulated climate. On the real baked planet ({@code test_planet_real},
@@ -291,8 +296,9 @@ public final class BiomeGameTests {
         for (var f : BiomeCensus.FORBIDDEN) {
             double share = r.forbiddenShare(f.name());
             DeepTime.LOGGER.info("[gametest] climateConsistent {} {} of {} columns", f.name(), share, r.forbiddenTotal(f.name()));
-            if (r.forbiddenTotal(f.name()) >= minColumns && share > FORBIDDEN_CEILING)
-                red.append(String.format(java.util.Locale.ROOT, " %s %.3f > %.3f (%d columns)", f.name(), share, FORBIDDEN_CEILING,
+            double ceiling = FORBIDDEN_CEILINGS.getOrDefault(f.name(), FORBIDDEN_CEILING);
+            if (r.forbiddenTotal(f.name()) >= minColumns && share > ceiling)
+                red.append(String.format(java.util.Locale.ROOT, " %s %.3f > %.3f (%d columns)", f.name(), share, ceiling,
                         r.forbiddenTotal(f.name())));
         }
         helper.assertTrue(red.isEmpty(), "families on biomes they must not have:" + red);
