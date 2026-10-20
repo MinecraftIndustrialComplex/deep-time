@@ -1206,6 +1206,19 @@ fn lowstand_m(history: &[(f64, f64)], t_years: f64) -> f64 {
     (now - lowest).max(0.0)
 }
 
+/// Whether a `plates/crust_type` value is oceanic crust: a finite value that is the oceanic
+/// type (a NaN, no crust type, is not; `as u8` would read it as 0, oceanic).
+fn crust_is_oceanic(k: f32) -> bool {
+    k.is_finite() && k as u8 == crate::plates::state::OCEANIC
+}
+
+/// Whether a placer at ground `elev_m` (m above the present sea: `deeptime:elevation_m` is
+/// relative to the sea of its time) over crust that is `oceanic` now is offshore: on oceanic
+/// crust, or under the present sea deeper than the sea's lowest stand since `t_years` ([`lowstand_m`]).
+fn placer_offshore(elev_m: f64, oceanic: bool, history: &[(f64, f64)], t_years: f64) -> bool {
+    oceanic || -elev_m > lowstand_m(history, t_years)
+}
+
 /// The top solid blocks of a column that hold no in-stratum body: a dry column's soil, which the
 /// game's deposit feature leaves without ore (an unconsolidated block hosts only a loose body)
 /// and the deposit audit counts as soil (`--soil`, 4); a sea or river bed's top blocks are kept
@@ -1304,9 +1317,9 @@ struct Finish {
     /// The sedimentary cover a coal stack must lie in, as the world will draw it; None without a
     /// planet's columns (a synthetic history).
     cover: Option<crate::structure::Cover>,
-    /// Whether each cell's crust is continental now (`plates/crust_type`); None without the
-    /// plates' field (a synthetic history).
-    continental: Option<Vec<bool>>,
+    /// Whether each cell's crust is oceanic now (`plates/crust_type`, [`crust_is_oceanic`]); None
+    /// without the field.
+    oceanic: Option<Vec<bool>>,
     /// The surface's sea level step by step, (years, m), oldest first (`SurfaceState::
     /// sea_history`); empty without it.
     sea_history: Vec<(f64, f64)>,
@@ -1416,22 +1429,13 @@ pub fn bilinear_cells(grid: &GridDesc, values: &[f32], x: f64, z: f64) -> f64 {
 }
 
 impl Finish {
-    /// How far below the present sea the sea stood at its lowest since `t_years` (m, ≥ 0).
-    fn lowstand_m(&self, t_years: f64) -> f64 {
-        lowstand_m(&self.sea_history, t_years)
-    }
-
-    /// The present sea level (m, the elevation's datum; the history's last level, 0 without one).
-    fn sea_now_m(&self) -> f64 {
-        self.sea_history.last().map_or(0.0, |&(_, m)| m)
-    }
-
-    /// Whether the crust at `cell` is oceanic now (false without the plates' field).
+    /// Whether the crust at `cell` is oceanic now (false without the plates' field, and where
+    /// the field holds no crust type: a NaN is not oceanic).
     fn oceanic(&self, cell: u32) -> bool {
-        self.continental
+        self.oceanic
             .as_ref()
             .and_then(|c| c.get(cell as usize))
-            .is_some_and(|&cont| !cont)
+            .is_some_and(|&o| o)
     }
 
     /// The present surface (block y) at block (x, z): the L1 elevation sampled bilinearly, the
@@ -1641,16 +1645,11 @@ impl DepositStage {
             placed: vec![Vec::new(); self.types.len()],
             present,
             paths: BTreeMap::new(),
-            continental: world
+            oceanic: world
                 .fields
                 .get("plates/crust_type")
                 .filter(|fl| fl.data.len() == n)
-                .map(|fl| {
-                    fl.data
-                        .iter()
-                        .map(|&k| k as u8 == crate::plates::state::CONTINENTAL)
-                        .collect()
-                }),
+                .map(|fl| fl.data.iter().map(|&k| crust_is_oceanic(k)).collect()),
             sea_history: world.surface.as_ref().map_or_else(Vec::new, |st| {
                 st.sea_history
                     .iter()
@@ -3357,9 +3356,9 @@ impl DepositStage {
         // A placer is a river or beach bench: none on oceanic crust, nor under the sea deeper
         // than the lowest sea level since it formed (a bench drowned by the rise after a
         // lowstand, as the gold of the Bering shelf off Nome, keeps within that range).
-        let depth_m = f.sea_now_m() - bilinear_cells(&f.grid, &f.elev, x, z);
+        let elev_m = bilinear_cells(&f.grid, &f.elev, x, z);
         // ledger: DEP-214
-        if f.oceanic(cell) || depth_m > f.lowstand_m(t_gone) {
+        if placer_offshore(elev_m, f.oceanic(cell), &f.sea_history, t_gone) {
             f.census[ct].offshore += 1;
             return Ok(());
         }
@@ -4011,6 +4010,34 @@ mod tests {
         assert_eq!(lowstand_m(&[], -1.0e9), 0.0);
         // A sea higher than now in the past drowns nothing.
         assert_eq!(lowstand_m(&[(-1.0e6, 50.0), (0.0, 0.0)], -2.0e6), 0.0);
+    }
+
+    /// The ground's elevation is already relative to the present sea (`deeptime:elevation_m`),
+    /// so a present sea above the datum does not deepen the water a second time.
+    #[test]
+    fn a_placer_is_offshore_by_its_depth_under_the_present_sea() {
+        // The sea rose from 0 to 50 m over the last 10 Myr: a bench formed before is drowned
+        // within 50 m of the present sea.
+        let h = [(-1.0e7, 0.0), (-5.0e6, 20.0), (0.0, 50.0)];
+        let t = -1.0e7;
+        // 30 m under the present sea: a drowned bench, kept (sea now − ground would read 80 m).
+        assert!(!placer_offshore(-30.0, false, &h, t));
+        // On land, kept; deeper than the lowstand, offshore.
+        assert!(!placer_offshore(20.0, false, &h, t));
+        assert!(placer_offshore(-60.0, false, &h, t));
+        // A bench formed after the rise drowned nothing: any water is too deep.
+        assert!(placer_offshore(-1.0, false, &h, -1.0e6));
+        assert!(!placer_offshore(0.0, false, &h, -1.0e6));
+        // Oceanic crust: never.
+        assert!(placer_offshore(20.0, true, &h, t));
+    }
+
+    #[test]
+    fn a_nan_crust_type_is_not_oceanic() {
+        assert!(crust_is_oceanic(0.0));
+        assert!(!crust_is_oceanic(1.0));
+        assert!(!crust_is_oceanic(f32::NAN));
+        assert!(!crust_is_oceanic(f32::INFINITY));
     }
 
     /// The surface's block y follows the world's sea level and vertical scale (2026-10-02: it read
