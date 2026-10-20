@@ -37,6 +37,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+use deeptime_core::deposits::playability::{Essential, Regions};
 use deeptime_core::deposits::types::{self, DepositType};
 use deeptime_core::surface::lithology;
 use deeptime_core::synth::SplitMix;
@@ -53,8 +54,47 @@ const SCATTER: &[&str] = &[
     include_str!("../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/copper.json"),
     include_str!("../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/gold.json"),
     include_str!("../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/iron.json"),
+    include_str!("../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/lead.json"),
     include_str!("../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/zinc.json"),
 ];
+
+/// The essentials the jar ships (`data/deeptime/deeptime/essentials/*.json`): the audit counts
+/// each one's sources (the sites that count toward it) by region and from the spawn.
+const ESSENTIALS: &[&str] = &[
+    include_str!(
+        "../../../neoforge/src/main/resources/data/deeptime/deeptime/essentials/coal.json"
+    ),
+    include_str!(
+        "../../../neoforge/src/main/resources/data/deeptime/deeptime/essentials/copper.json"
+    ),
+    include_str!(
+        "../../../neoforge/src/main/resources/data/deeptime/deeptime/essentials/gold.json"
+    ),
+    include_str!(
+        "../../../neoforge/src/main/resources/data/deeptime/deeptime/essentials/iron.json"
+    ),
+    include_str!(
+        "../../../neoforge/src/main/resources/data/deeptime/deeptime/essentials/lead.json"
+    ),
+    include_str!(
+        "../../../neoforge/src/main/resources/data/deeptime/deeptime/essentials/zinc.json"
+    ),
+];
+
+/// The shipped essentials in the core's form (the jar's `_comment` dropped, as the game's content
+/// bundle does).
+pub fn shipped_essentials() -> CliResult<Vec<Essential>> {
+    ESSENTIALS
+        .iter()
+        .map(|text| {
+            let mut v: Value = serde_json::from_str(text)?;
+            if let Some(o) = v.as_object_mut() {
+                o.remove("_comment");
+            }
+            Ok(serde_json::from_value(v)?)
+        })
+        .collect()
+}
 
 /// Ore blocks per chunk in a vanilla 1.21.1 overworld (all heights, every biome of the sample),
 /// measured with `tools/review/deposit-audit.sh vanilla` (STATUS.md, build log "deposit audit"):
@@ -81,7 +121,13 @@ pub const RAW_SALT: i32 = 0x5241_5721;
 pub const RAW_WORTH: f64 = 9.0;
 
 /// The materials the early-game access probe looks for.
-pub const ACCESS_MATERIALS: &[&str] = &["c:coal", "c:copper", "c:iron"];
+pub const ACCESS_MATERIALS: &[&str] = &["c:coal", "c:copper", "c:iron", "c:lead", "c:zinc"];
+
+/// The event of a site the playability pass added (`deposits::playability`).
+const GUARANTEED: &str = "deeptime:guaranteed_occurrence";
+
+/// A finer region grid than the essentials' (blocks), to see how evenly the sources spread.
+const FINE_REGION_BLOCKS: u32 = 2048;
 
 /// What to audit.
 pub struct Options {
@@ -109,6 +155,9 @@ pub struct Options {
     pub access_need: f64,
     /// The probe looks no farther than this many chunks.
     pub access_radius: i64,
+    /// Materials whose shipped scatter rule is left out: the audit of a world as a build that
+    /// ships none plays it (`c:lead` before 2026-10-20).
+    pub drop_scatter: Vec<String>,
 }
 
 /// A uniform draw in [0, 1) from a block position and a salt: `DepositFeature.unit`.
@@ -560,7 +609,17 @@ pub fn run(o: &Options) -> CliResult<Value> {
     let w = ColumnWorld::open(&o.world_data)?;
     let (sites, _) = read_sites(&o.world_data)?.ok_or("the world data has no sites")?;
     let types: Vec<DepositType> = types::builtin()?;
-    let rules = scatter_rules(o.scatter_dir.as_deref())?;
+    let mut rules = scatter_rules(o.scatter_dir.as_deref())?;
+    rules.retain(|r| !o.drop_scatter.contains(&r.material));
+    // The sites the playability pass added (their forming event).
+    let guaranteed: HashSet<deeptime_format::events::EventId> =
+        match deeptime_format::events::EventLog::load(&o.world_data) {
+            Ok(log) => log.of_kind(GUARANTEED).map(|e| e.id).collect(),
+            Err(e) => {
+                eprintln!("deposit-audit: no event log ({e}); no site counts as guaranteed");
+                HashSet::new()
+            }
+        };
     let mult = o
         .scatter_mult
         .unwrap_or_else(|| world_scatter_mult(&w.manifest.notes));
@@ -675,6 +734,7 @@ pub fn run(o: &Options) -> CliResult<Value> {
         host_share: Option<f64>,
         tonnage: f64,
         chunks: f64,
+        guaranteed: bool,
     }
     let mut stats: Vec<Row> = Vec::new();
     for s in &sites {
@@ -749,6 +809,7 @@ pub fn run(o: &Options) -> CliResult<Value> {
         let ground_m = (col.surface - f64::from(sea)) * w.manifest.scale.m_per_block_v;
         rows.push(json!({
             "site": s.id, "type": s.deposit_type, "center": s.center, "bodies": bodies.len(),
+            "guaranteed": guaranteed.contains(&s.forming_event),
             // The ground and the water at the site's centre column.
             "ground_y": here.ground, "water": here.kind.name(),
             "stratum": stratum, "rock": rock, "oceanic": age.is_some(), "crust_age_myr": age,
@@ -788,6 +849,7 @@ pub fn run(o: &Options) -> CliResult<Value> {
             host_share,
             tonnage,
             chunks,
+            guaranteed: guaranteed.contains(&s.forming_event),
         });
     }
 
@@ -823,6 +885,8 @@ pub fn run(o: &Options) -> CliResult<Value> {
             "primary": primary,
             "sites": rs.len(),
             "sites_with_ore": rs.iter().filter(|r| r.ore_total > 0.0).count(),
+            // Of the sites, those the playability pass added.
+            "guaranteed_sites": rs.iter().filter(|r| r.guaranteed).count(),
             "tonnage_t": summary(rs.iter().map(|r| r.tonnage).collect()),
             "volume_blocks": summary(rs.iter().map(|r| r.volume).collect()),
             "chunks": summary(rs.iter().map(|r| r.chunks).collect()),
@@ -871,14 +935,21 @@ pub fn run(o: &Options) -> CliResult<Value> {
     let band_chunks = (c / 16) as f64 * ((pole_to_pole_blocks(&w.manifest) / 16) * 7 / 8) as f64;
     let land_chunks = band_chunks * land.len() as f64 / tries.max(1) as f64;
     let mut in_deposits: BTreeMap<String, u64> = BTreeMap::new();
+    let mut in_guaranteed: BTreeMap<String, u64> = BTreeMap::new();
     for r in &rows {
+        let g = r["guaranteed"].as_bool().unwrap_or(false);
+        let mut add = |k: &String, n: u64| {
+            *in_deposits.entry(k.clone()).or_default() += n;
+            if g {
+                *in_guaranteed.entry(k.clone()).or_default() += n;
+            }
+        };
         for (k, v) in r["ore_blocks"].as_object().into_iter().flatten() {
-            *in_deposits.entry(k.clone()).or_default() += v.as_u64().unwrap_or(0);
+            add(k, v.as_u64().unwrap_or(0));
         }
         // A raw block is nine ores' worth: eight more than its one block.
         for (k, v) in r["raw_blocks"].as_object().into_iter().flatten() {
-            *in_deposits.entry(k.clone()).or_default() +=
-                (RAW_WORTH as u64 - 1) * v.as_u64().unwrap_or(0);
+            add(k, (RAW_WORTH as u64 - 1) * v.as_u64().unwrap_or(0));
         }
     }
     let mut totals = serde_json::Map::new();
@@ -887,12 +958,17 @@ pub fn run(o: &Options) -> CliResult<Value> {
     materials.dedup();
     for k in materials {
         let d = in_deposits.get(k).copied().unwrap_or(0) as f64;
+        let g = in_guaranteed.get(k).copied().unwrap_or(0) as f64;
         let s = scatter.get(k).copied().unwrap_or(0.0) * land_chunks;
+        let per = |x: f64| num(x / land_chunks.max(1.0));
         totals.insert(
             k.clone(),
             json!({
-                "in_deposits": d, "in_scatter": s.round(),
+                "in_deposits": d, "in_guaranteed": g, "in_scatter": s.round(),
                 "deposit_share": if d + s > 0.0 { num(d / (d + s)) } else { Value::Null },
+                // Ore-equivalent per land chunk: the planet's deposits (of them, the guaranteed
+                // ones) and the scatter, spread over its land.
+                "per_land_chunk": {"deposits": per(d), "guaranteed": per(g), "scatter": per(s), "all": per(d + s)},
             }),
         );
     }
@@ -903,9 +979,12 @@ pub fn run(o: &Options) -> CliResult<Value> {
         Value::Null
     };
 
+    let essentials = essential_sources(o, &w, &sites, &guaranteed)?;
+
     let report = json!({
         "planet": {"land_chunks_estimate": land_chunks.round(), "ore_by_source": totals},
         "access": access,
+        "essentials": essentials,
         "world_data": o.world_data.display().to_string(),
         "circumference": c,
         "preset": w.manifest.notes.get("run").and_then(|r| r.get("preset")).cloned(),
@@ -919,6 +998,110 @@ pub fn run(o: &Options) -> CliResult<Value> {
         std::fs::write(p, serde_json::to_string_pretty(&report)?)?;
     }
     Ok(report)
+}
+
+/// Each shipped essential's sources (the sites that count toward it, `Essential::counts`): how
+/// many land regions of its grid, and of a finer one, hold one, and how far each spawn candidate
+/// (`spawn/candidates.json`, the first is the world's spawn) is from the nearest (blocks, across
+/// the x seam); the same distance to any site with the material among its products.
+fn essential_sources(
+    o: &Options,
+    w: &ColumnWorld,
+    sites: &[Site],
+    guaranteed: &HashSet<deeptime_format::events::EventId>,
+) -> CliResult<Value> {
+    let c = w.c as f64;
+    let sea = f64::from(w.manifest.scale.sea_level_y);
+    let (zlo, zhi) = w.manifest.world_projection().z_range();
+    let spawn: Vec<(f64, f64)> =
+        std::fs::read_to_string(o.world_data.join("spawn/candidates.json"))
+            .ok()
+            .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+            .and_then(|v| v["candidates"].as_array().cloned())
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|p| Some((p["x"].as_f64()?, p["z"].as_f64()?)))
+            .collect();
+    let dist = |(x, z): (f64, f64), (sx, sz): (f64, f64)| {
+        let dx = (x - sx).rem_euclid(c);
+        dx.min(c - dx).hypot(z - sz)
+    };
+    let at = |s: &Site| (f64::from(s.center[0]), f64::from(s.center[2]));
+    // The land regions of a grid: those a lattice of land points falls in.
+    let land_regions = |r: &Regions| -> HashSet<usize> {
+        let step = (r.size / 8.0).max(16.0);
+        let mut out = HashSet::new();
+        let mut z = zlo;
+        while z <= zhi {
+            let mut x = -c / 2.0;
+            while x < c / 2.0 {
+                if w.height(x as i64, z as i64) >= sea {
+                    out.insert(r.index(x, z));
+                }
+                x += step;
+            }
+            z += step;
+        }
+        out
+    };
+    let mut out = serde_json::Map::new();
+    for ess in shipped_essentials()? {
+        let sources: Vec<&Site> = sites.iter().filter(|s| ess.counts(&s.products)).collect();
+        let any: Vec<&Site> = sites
+            .iter()
+            .filter(|s| s.products.iter().any(|p| p.material == ess.material))
+            .collect();
+        let mut grids = serde_json::Map::new();
+        for (name, size) in [
+            ("essential", ess.region_blocks),
+            ("fine", FINE_REGION_BLOCKS),
+        ] {
+            let r = Regions::new(w.c as u32, size);
+            let land = land_regions(&r);
+            let with: HashSet<usize> = sources
+                .iter()
+                .map(|s| {
+                    let (x, z) = at(s);
+                    r.index(x, z)
+                })
+                .collect();
+            grids.insert(
+                name.into(),
+                json!({
+                    "region_blocks": size, "regions": r.count(), "land_regions": land.len(),
+                    "land_regions_with_a_source": land.intersection(&with).count(),
+                    "regions_with_a_source": with.len(),
+                }),
+            );
+        }
+        let nearest = |list: &[&Site]| -> Vec<Value> {
+            spawn
+                .iter()
+                .map(|&p| {
+                    list.iter()
+                        .map(|s| dist(p, at(s)))
+                        .min_by(f64::total_cmp)
+                        .map_or(Value::Null, num)
+                })
+                .collect()
+        };
+        out.insert(
+            ess.material.clone(),
+            json!({
+                "primary_only": ess.primary_only,
+                "sources": sources.len(),
+                "guaranteed_sources": sources.iter().filter(|s| guaranteed.contains(&s.forming_event)).count(),
+                "sites_with_the_material": any.len(),
+                "regions": grids,
+                "spawn_to_nearest_source": nearest(&sources),
+                "spawn_to_nearest_site_with_the_material": nearest(&any),
+            }),
+        );
+    }
+    Ok(json!({
+        "spawn_candidates": spawn.len(), "by_material": out,
+        "note": "a source is a site that counts toward the shipped essential (a primary product unless primary_only is off); distances in blocks from each spawn candidate, the first the world's spawn",
+    }))
 }
 
 /// The world's scatter multiplier: `notes.deposits.scatter_mult` (`BackgroundScatterFeature
@@ -1148,6 +1331,33 @@ pub fn table(report: &Value) -> String {
             ));
         }
     }
+    if let Some(by) = report["essentials"]["by_material"].as_object() {
+        out.push_str(&format!(
+            "\nEssentials' sources (shipped list; {} spawn candidates).\n\n| material | sources (guaranteed) | sites with it | land regions with a source | fine | spawn to nearest source | to nearest site with it |\n|---|---|---|---|---|---|---|\n",
+            report["essentials"]["spawn_candidates"]
+        ));
+        for (k, v) in by {
+            let g = |name: &str| {
+                let r = &v["regions"][name];
+                format!(
+                    "{} of {} ({} blocks)",
+                    r["land_regions_with_a_source"], r["land_regions"], r["region_blocks"]
+                )
+            };
+            let first = |key: &str| f(&v[key][0]);
+            out.push_str(&format!(
+                "| {} | {} ({}) | {} | {} | {} | {} | {} |\n",
+                k,
+                v["sources"],
+                v["guaranteed_sources"],
+                v["sites_with_the_material"],
+                g("essential"),
+                g("fine"),
+                first("spawn_to_nearest_source"),
+                first("spawn_to_nearest_site_with_the_material"),
+            ));
+        }
+    }
     if !report["area"].is_null() {
         out.push_str(&format!(
             "\nBox {}: deposit ore {}, scatter ore {} ({} chunks)\n",
@@ -1186,12 +1396,34 @@ mod tests {
     #[test]
     fn the_shipped_scatter_rules_parse() {
         let r = scatter_rules(None).unwrap();
-        assert_eq!(r.len(), 5);
+        assert_eq!(r.len(), 6);
+        // Galena in carbonate and shale (ORE-272).
+        let lead = r.iter().find(|r| r.material == "c:lead").unwrap();
+        assert_eq!(lead.bias(Some("dolostone")), 1.0);
+        assert_eq!(lead.bias(Some("black_shale")), 1.0);
+        assert_eq!(lead.bias(Some("granite")), 0.2);
+        assert_eq!(lead.bias(None), 0.3);
         let gold = r.iter().find(|r| r.material == "c:gold").unwrap();
         assert_eq!(gold.size, 4);
         assert_eq!(gold.bias(Some("shale")), 1.0);
         let coal = r.iter().find(|r| r.material == "c:coal").unwrap();
         assert_eq!(coal.bias(Some("granite")), 0.3);
         assert_eq!(coal.bias(None), 0.6);
+    }
+
+    /// The jar's essentials read as the core's (the game's bundle drops `_comment` the same way);
+    /// lead counts its co-products, every other one its primary products only (ORE-273).
+    #[test]
+    fn the_shipped_essentials_parse() {
+        let e = shipped_essentials().unwrap();
+        let names: Vec<&str> = e.iter().map(|e| e.material.as_str()).collect();
+        assert_eq!(
+            names,
+            ["c:coal", "c:copper", "c:gold", "c:iron", "c:lead", "c:zinc"]
+        );
+        for e in &e {
+            assert_eq!(e.primary_only, e.material != "c:lead", "{}", e.material);
+            assert_eq!(e.min_sites_per_region, 1);
+        }
     }
 }
