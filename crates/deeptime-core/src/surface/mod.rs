@@ -1626,7 +1626,9 @@ impl SurfaceStage {
                         }
                     })
                     .collect();
-                peri_source_m_cells += loss_carb.par_iter().sum::<f64>();
+                // In order: a parallel float sum differs with the thread count, and a run must
+                // give the same totals on any (the spill and resume tests).
+                peri_source_m_cells += loss_carb.iter().sum::<f64>();
                 let mut laid = crate::alloc::filled(n, 0.0f32);
                 for (c, m) in carbonate::exported(
                     &d, &sc.kd, dts, &solved, &sea_mask, &loss, &loss_carb, &gain,
