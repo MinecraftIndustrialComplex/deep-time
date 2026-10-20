@@ -51,6 +51,8 @@ dependencies {
     // The world-data reader's own libraries, as neoforge/ names them for its tests.
     testImplementation 'com.google.guava:guava:32.1.2-jre'
     testImplementation 'com.google.code.gson:gson:2.10.1'
+    // PlanetGeometry's logger (Minecraft ships slf4j-api 2.0.9 at run time).
+    testRuntimeOnly 'org.slf4j:slf4j-api:2.0.9'
 }
 
 tasks.named('test', Test) {
