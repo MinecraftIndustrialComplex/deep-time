@@ -70,7 +70,8 @@ pub fn undo_order(features: &mut [Feature]) {
 /// The world's structure from the structures the run left: `features` in [`undo_order`];
 /// `surface_y(x, z)` is the ground's height at a block position (a fault's trace lies on it) and
 /// `key(feature)` its age as a stratigraphic key of the horizon stacks
-/// (`columns::key::of_age`); `floor_y` is the world's floor (intrusions are rooted on it).
+/// (`columns::key::of_age`); `floor_y` is the world's floor (dykes and plugs, and stocks without
+/// a `base`, are rooted on it).
 pub fn finish(
     features: &[Feature],
     surface_y: impl Fn(f64, f64) -> f64,
