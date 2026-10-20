@@ -111,7 +111,7 @@ Quotes are exact. "Suspicion" means my own reading, not a fact.
 
 ## What a player sees
 
-All figures from the build log and the code; sizes use the world scale of 300 m per block horizontally and 20 m per block vertically (design-decisions scale table), so 1 km is 3.3 blocks across and 100 m of height is 5 blocks. Block counts for sizes other than the build log's own are my arithmetic from the coded formulas at `depth_scale` 0.5 and are approximate.
+All figures from the build log and the code; sizes use the world scale of the time, 300 m per block horizontally and 20 m per block vertically (design-decisions scale table), so 1 km is 3.3 blocks across and 100 m of height is 5 blocks. Today a block is 35 m tall (SCL-002), so 100 m of height is 2.9 blocks and the vertical block counts below are 20/35 of what they say. Block counts for sizes other than the build log's own are my arithmetic from the coded formulas at `depth_scale` 0.5 and are approximate.
 
 **Where and how many.** On the quick 16k planet (16,384 blocks round, 8,192 by 16,384 blocks) at Earth's rate, a 500-Myr history made 567 craters, but only 71 remain and 19 show; 17 of those 19 are on continental crust and 7 hold a dry floor above the sea. A player may walk a long way without meeting one (the build log's own pending question says so). The Heavy slider (flux 10) or a higher flux gives more.
 
