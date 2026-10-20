@@ -37,4 +37,31 @@ class ShareBoundTest {
         // A real shortfall on many columns still fails: half of 132 under 0.63.
         assertTrue(ShareBound.below(66, 132, 0.63, ShareBound.Z_99));
     }
+
+    @Test
+    void theLowerBoundMirrorsTheUpper() {
+        // The two bounds of h of n are symmetric about one half: lower(h, n) = 1 - upper(n - h, n).
+        for (int n : new int[] {1, 40, 132, 1000})
+            for (int h = 0; h <= n; h += Math.max(1, n / 7)) {
+                double l = ShareBound.wilsonLower(h, n, ShareBound.Z_99);
+                assertEquals(1.0 - ShareBound.wilsonUpper(n - h, n, ShareBound.Z_99), l, 1e-12, h + "/" + n);
+                assertTrue(l >= 0.0 && l <= h / (double) n, h + "/" + n + " -> " + l);
+            }
+        assertEquals(0.0, ShareBound.wilsonLower(0, 0, ShareBound.Z_99));
+    }
+
+    @Test
+    void theIceCapsIceSpikesCeilingPassesTheFixAndFailsTheBypass() {
+        // Shares of the ice cap on ice spikes measured on 2026-10-20 (docs/science/biomes.md, "Ice spikes
+        // and the rare variants"; ledger BIO-162): after the fix at most 0.071, before it 0.153 to 0.254.
+        double ceiling = 0.10; // BiomeGameTests.FORBIDDEN_CEILINGS for BiomeCensus.EF_ICE_SPIKES
+        for (int n : new int[] {40, 132, 1000, 20000})
+            assertFalse(ShareBound.above((int) Math.round(0.071 * n), n, ceiling, ShareBound.Z_99), "0.071 of " + n);
+        for (int n : new int[] {1000, 20000})
+            for (double p : new double[] {0.153, 0.183, 0.254})
+                assertTrue(ShareBound.above((int) Math.round(p * n), n, ceiling, ShareBound.Z_99), p + " of " + n);
+        // On the fewest columns asserted (40) only the larger excess is told from the sample's noise.
+        assertFalse(ShareBound.above(7, 40, ceiling, ShareBound.Z_99));
+        assertTrue(ShareBound.above(10, 40, ceiling, ShareBound.Z_99));
+    }
 }

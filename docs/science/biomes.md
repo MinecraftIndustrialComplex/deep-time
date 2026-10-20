@@ -758,8 +758,20 @@ land's.
 held mid-inland: `placement.json` `classes.EF.continentalness` `{"min": 0.1}`, the class clamp `map` already applies
 at band 4 and up (FORMAT.md, "for a class or a rule"; no format change). 0.1 rather than the band edge 0.03 keeps
 the game's bilinear read next to the unclamped beach strip inside the band. Terralith's near-inland ice spikes slot
-and vanilla's near-inland low-slice middle biome are then out of reach, and the flats rule decides again. What else
-moves on the ice cap: with MIC, snowy slopes 40 to 41 %, frozen peaks 14 to 28 %, snowy plains 8 to 18 %, gravel
+and vanilla's near-inland low-slice middle biome are then out of reach. What sets the share after that differs by
+pack:
+
+- With vanilla, the flats rule: its positive branch on the flats, plus a few valley columns (absolute weirdness
+  under 0.05, which vanilla's builder gives the variant mid- and far-inland at erosion E0 and E1: up to 7 % of
+  those columns). The flats' share is what the noise lets through, 16.8 % on the play world and 6.4 % on the
+  2026-10-20 supercontinent: BIO-077's threshold is not a fifth on every world (see "Open questions").
+- With MIC, Terralith's own mid-inland slot: erosion 0.05 to 0.33 (after the climate mapping) on both signs of
+  weirdness. 94 to 95 % of the ice cap's mid-inland E4 ground is ice spikes, and its other flats none, so the flats'
+  share is how much of them falls in that window: 19.3 % on the play world and 19.0 % on the 2026-10-20
+  supercontinent, near BIO-077's fifth by the erosion and not by the noise. The beach strip, which is not clamped,
+  keeps Terralith's coastal ice spikes (half to four fifths of its E3 columns).
+
+Both stay under the pack's own share of the flats. What else moves on the ice cap: with MIC, snowy slopes 40 to 41 %, frozen peaks 14 to 28 %, snowy plains 8 to 18 %, gravel
 desert 16 to 5 % (play world); with vanilla, frozen peaks 7 to 28 % (the high slice's steepest mid-inland ground is
 frozen peaks, near-inland snowy slopes). With MIC, EF's barren ground (0.1 to 0.2 % of land) trades its ice
 spikes (11 % of it) for Terralith's cold shrubland. `bake::biomes::tests::ef_land_is_held_mid_inland_off_terraliths_near_inland_ice_spikes`
