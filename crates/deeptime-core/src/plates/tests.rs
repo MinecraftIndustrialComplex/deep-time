@@ -1185,6 +1185,27 @@ fn the_gap_budget_changes_nothing_and_adds_up() {
     same_world(&strip(with), &strip(without));
 }
 
+/// The continental crust budget (`crust_budget.rs`) changes nothing but its note, and snapshots
+/// the start and every 50 Myr.
+#[test]
+fn the_crust_budget_changes_nothing() {
+    let p = preset(8000, 200.0, "scattered_continents", 6);
+    let mut with = run_stage_with(
+        PlatesStage::new(p.clone()).with_crust_budget(),
+        &p,
+        |_, _, _| {},
+    );
+    let note = with
+        .notes
+        .remove(super::CRUST_BUDGET_NOTE)
+        .expect("the budget's note");
+    assert_eq!(note.matches("\ncb_t ").count(), 5, "{note}");
+    assert!(note.contains("resample_blend:"), "{note}");
+    let without = run_stage_with(PlatesStage::new(p.clone()), &p, |_, _, _| {});
+    assert!(!without.notes.contains_key(super::CRUST_BUDGET_NOTE));
+    same_world(&with, &without);
+}
+
 /// Two plates on the preset's planet: the northern hemisphere continental (plate 0), the southern
 /// oceanic (plate 1), the southern turned by `turn` radians about the x axis since the last
 /// resampling, so it runs under the continent where y > 0 and opens a gap where y < 0. Overlaps
