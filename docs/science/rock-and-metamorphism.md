@@ -49,9 +49,9 @@ The structure stage runs each step after the surface stage has laid down or stri
    host at the roof is a carbonate (RCK-053, RCK-091). The shell is read band by band down the column at the intrusion's
    centre: skarn where a band is a carbonate, hornfels where it is other soft rock, nothing in crystalline rock, and only rock
    older than the intrusion is baked, by the test the structural events use (a unit whose youngest part is older), so cover
-   laid on an unroofed pluton stays as it was (RCK-054). The test reads the column as the bake lays it (the horizons the
-   structure stage keeps for the bake, smoothed across cells): the bake merges a pile of one rock into one horizon dated
-   by its top, so shale laid over older shale across an unconformity is young cover as a whole, as it is to the
+   laid on an unroofed pluton stays as it was (RCK-054). The test reads the column as the strata pass paints it (the column
+   rule over the horizons the structure stage keeps for the bake): the rule joins equal rocks in a row into one horizon
+   dated by its top, so shale laid over older shale across an unconformity is young cover as a whole, as it is to the
    intrusion. Each aureole is a body of
    its own in the world data (role `aureole`), written before the intrusions so the intrusion paints over it; a stock's
    aureole is hollow, cut into slabs that stop at the stock's wall, so the stock itself stays intact. A typical 3 km thick
