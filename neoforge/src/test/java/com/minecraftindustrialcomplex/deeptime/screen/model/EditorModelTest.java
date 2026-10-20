@@ -429,6 +429,53 @@ class EditorModelTest {
         assertTrue(m.effectivePresetJson().matches(".*\"seed\":1[,}].*"), "an invalid seed is not used");
     }
 
+    /**
+     * The Customize page's change marks (docs/design/create-world-ux.md, "Customize"): a setting is
+     * changed when it differs from the preset it starts from, or holds text that is not a valid value;
+     * each one resets on its own, and Reset all also brings the timeline and the cap back.
+     */
+    @Test
+    void changesCountAgainstThePresetAndReset() {
+        EditorModel m = ready();
+        JsonObject p = Presets.parseObject(Presets.builtin("earthlike_quick_16k").orElseThrow());
+        p.addProperty("seed", 1);
+        p.addProperty("name", "seeded");
+        assertTrue(m.importShareCode(ShareCode.encode(p.toString())).isEmpty());
+        assertEquals(0, m.editCount(), "the preset as it is");
+        EditorFields.Field seed = EditorFields.byId("seed");
+        assertEquals(Optional.of("1"), m.presetText(seed));
+        m.setFieldText(seed, "1.0");
+        assertFalse(m.edited(seed), "the preset's own value is no change");
+        m.setFieldText(seed, "42");
+        assertTrue(m.edited(seed));
+        assertEquals(1, m.editCount());
+        m.setFieldText(seed, "4.5");
+        assertTrue(m.edited(seed), "an invalid value stays marked until fixed or reset");
+        m.resetField(seed);
+        assertFalse(m.edited(seed));
+        assertEquals("1", m.fieldText(seed));
+
+        EditorFields.Field steering = EditorFields.byId("steering");
+        m.setToggle(steering, !m.toggle(steering));
+        EditorFields.Field sky = EditorFields.byId("sky_islands");
+        m.setToggle(sky, true);
+        assertFalse(m.edited(sky), "a setting that cannot be changed here is never marked");
+        assertEquals(1, m.editCount());
+
+        assertFalse(m.startEdited() || m.lengthEdited() || m.capEdited(), "the one-click defaults");
+        m.setStart(Presets.START_CONFIGS.stream().filter(s -> !s.equals(EditorModel.DEFAULT_START)).findFirst().orElseThrow());
+        m.setLengthText("300");
+        m.setCapText("8");
+        assertTrue(m.startEdited() && m.lengthEdited() && m.capEdited());
+        m.resetAll();
+        assertEquals(0, m.editCount());
+        assertFalse(m.startEdited() || m.lengthEdited() || m.capEdited());
+        assertEquals(Optional.of(EditorModel.DEFAULT_START), m.start());
+        assertEquals("1000", m.lengthText());
+        assertEquals("4", m.capText());
+        assertTrue(m.isImported(), "Reset all goes back to the preset it starts from, not another one");
+    }
+
     @Test
     void shareCodeRoundTrip() {
         EditorModel a = ready();

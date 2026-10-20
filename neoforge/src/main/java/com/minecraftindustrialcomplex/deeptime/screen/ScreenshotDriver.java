@@ -3,6 +3,7 @@ package com.minecraftindustrialcomplex.deeptime.screen;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeLoader;
+import com.minecraftindustrialcomplex.deeptime.screen.model.CustomizeTopics;
 import com.minecraftindustrialcomplex.deeptime.screen.model.EditorFields;
 import com.minecraftindustrialcomplex.deeptime.screen.model.EditorModel;
 import com.minecraftindustrialcomplex.deeptime.screen.model.GenerationStatus;
@@ -197,37 +198,48 @@ final class ScreenshotDriver {
                         stepTicks = 0;
                     if (screen instanceof PlanetEditorScreen ed && stepTicks == 20) {
                         guidance = ed.guidanceOnly();
-                        shot(guidance ? "02-guidance-panel" : "02-customize");
                         DeepTime.LOGGER.info("[deeptime-shot] Customize opened: guidance={} canRun={} problems={}", guidance, model.canRun(),
                                 model.problems());
                         if (guidance) {
+                            shot("02-guidance-panel");
                             ed.onClose();
                             go(Step.ACCEPTED);
-                        } else if (model.advancedAvailable() > 0) {
-                            // The settings audit: the Advanced settings, open and scrolled through.
-                            model.setAdvancedOpen(true);
-                            SetupPage.showAdvanced();
+                        } else {
+                            // The walk's settings, typed as a player would (the timeline shows as changed),
+                            // and one setting edited to show its mark and reset; undone before Create.
+                            applyProps();
+                            EditorFields.Field seed = EditorFields.byId("seed");
+                            if (model.available(seed))
+                                model.setFieldText(seed, "20261019");
+                            CustomizePage.setTopic(CustomizeTopics.Topic.PLANET);
                             ed.refresh();
                             go(Step.ADVANCED);
-                        } else {
-                            applyProps();
-                            ed.onClose();
-                            go(Step.PRESS_CREATE);
                         }
                     }
                 }
                 case ADVANCED -> {
+                    // The Customize page's topics, then a search under Advanced.
                     if (screen instanceof PlanetEditorScreen ed) {
-                        if (stepTicks == 30) {
-                            shot("02b-customize-advanced");
-                            DeepTime.LOGGER.info("[deeptime-shot] advanced: {} of {} settings in the preset",
-                                    model.advancedAvailable(), EditorFields.advancedFields().size());
-                            SetupPage.scrollRows(16);
+                        if (stepTicks == 20) {
+                            shot("02-customize-planet");
+                            DeepTime.LOGGER.info("[deeptime-shot] customize: {} changes, {} of {} settings in the preset",
+                                    model.editCount(), EditorFields.ALL.stream().filter(model::available).count(), EditorFields.ALL.size());
+                            CustomizePage.setTopic(CustomizeTopics.Topic.CLIMATE);
+                            ed.refresh();
+                        } else if (stepTicks == 40) {
+                            shot("02b-customize-climate");
+                            CustomizePage.setTopic(CustomizeTopics.Topic.ROCKS);
                             ed.refresh();
                         } else if (stepTicks == 60) {
-                            shot("02c-customize-advanced-scrolled");
-                            model.setAdvancedOpen(false);
-                            applyProps();
+                            shot("02c-customize-rocks");
+                            CustomizePage.setTopic(CustomizeTopics.Topic.ADVANCED);
+                            CustomizePage.setQuery("river");
+                            ed.refresh();
+                        } else if (stepTicks == 80) {
+                            shot("02d-customize-search");
+                            CustomizePage.setQuery("");
+                            CustomizePage.setTopic(CustomizeTopics.Topic.PLANET);
+                            model.resetField(EditorFields.byId("seed"));
                             ed.onClose(); // back to Create World, as the player would
                             go(Step.PRESS_CREATE);
                         }

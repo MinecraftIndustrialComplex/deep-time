@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.minecraftindustrialcomplex.deeptime.preset.Presets;
+import com.minecraftindustrialcomplex.deeptime.screen.model.CustomizeTopics;
 import com.minecraftindustrialcomplex.deeptime.screen.model.EditorFields;
 import com.minecraftindustrialcomplex.deeptime.screen.model.GenerationStatus;
 import com.minecraftindustrialcomplex.deeptime.screen.model.Legend;
@@ -153,6 +154,13 @@ class ScreenSourcesTest {
         });
         for (String t : List.of("history", "map", "more"))
             used.add("deeptime.gen.tab." + t);
+        // The Customize page: its tabs and every heading a setting can be listed under.
+        for (CustomizeTopics.Topic t : CustomizeTopics.Topic.values()) {
+            used.add("deeptime." + t.key());
+            used.add("deeptime." + t.key() + ".hint");
+        }
+        for (String k : CustomizeTopics.headingKeys())
+            used.add("deeptime." + k);
         used.add("generator.deeptime.planet");
         used.add("generator.deeptime.planet_32k");
         List<String> missing = used.stream().filter(k -> !o.has(k)).toList();
