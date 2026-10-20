@@ -31,6 +31,14 @@ v3_cargo_args() {
     V3_ARGS=(--target-dir "$V3_TARGET_DIR" --config "target.$1.rustflags=[\"-C\", \"target-cpu=$V3_LEVEL\"]")
 }
 
+# PGO_PKGS: the package set of the instrumented build and of every profile-guided build, the CLI
+# alone. A function's profile entry is found by its symbol name, which carries the crate's id, and
+# cargo's crate ids depend on the roots of the build and on the target triple: the CLI built alone
+# and the library built alone share no names (13,000 functions without data), and no other target's
+# build found the Linux profile's names either (build log 2026-10-19). So a profile serves the
+# build that made it, on the host triple, and the x86-64-v3 build of the same package.
+PGO_PKGS=(-p deeptime-cli)
+
 # pgo_cargo_args T LEVEL PROFDATA: sets PGO_ARGS and PGO_TARGET_DIR for a profile-guided build of
 # target T at LEVEL (`baseline` or the x86-64-v3 name) from the merged profile PROFDATA (an
 # absolute path: llvm-profdata merge, tools/natives/pgo-profile.sh). `-C profile-use` goes into
