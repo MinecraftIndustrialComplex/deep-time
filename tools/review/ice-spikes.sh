@@ -4,9 +4,11 @@
 # Ice spikes report (Ben, 2026-10-20: "like 20x more ice spike biomes than I'd usually see"): a baked planet's
 # rare-biome shares against a normal world of the same pack. Scratch: /Volumes/Graphide/ban/deeptime-runs/icespikes/.
 #
-#   tools/remote/mac.sh --kind cargo:build -- tools/review/ice-spikes.sh planet <name> <preset.json>
+#   tools/remote/mac.sh --kind cargo:build -- tools/review/ice-spikes.sh planet <name> <preset.json> [run args]
 #       builds this tree's release CLI and runs that preset (a play world's own preset.json) again, 8 threads,
-#       with epoch checkpoints, detached through the admission tool, into <name>-world/ (log <name>.log)
+#       detached through the admission tool, into <name>-world/ (log <name>.log); then `dump` it
+#   Before and after: `--placement-patch /Volumes/Graphide/ban/deeptime-runs/icespikes/no-ef-floor.json` (written
+#   by every call) bakes the planet without EF's continentalness floor (BIO-161), as before 2026-10-20.
 #   tools/remote/mac.sh --kind cargo:build -- tools/review/ice-spikes.sh rebake <from name> <name>
 #       builds this tree's release CLI, copies <from name>-world/ to <name>-world/ and resumes it to its own stop
 #       (only the run's tail and the bake run again), detached; the same planet baked by this tree
@@ -31,16 +33,17 @@ PYENV='(builtins.getFlake "nixpkgs").legacyPackages.${builtins.currentSystem}.py
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 mkdir -p "$RUNS"
 cd "$REPO"
+printf '%s\n' '{"schema": 1, "id": "no-ef-floor", "patch": {"classes": {"EF": {"continentalness": null}}}}' > "$RUNS/no-ef-floor.json"
 
 case "${1:-}" in
     planet)
-        name="${2:?name}"; preset="${3:?preset.json}"
+        name="${2:?name}"; preset="${3:?preset.json}"; shift 3
         CARGO_BUILD_JOBS=8 cargo build --release -q -p deeptime-cli
         cp target/release/deeptime "$RUNS/deeptime-$name"
         rm -rf "$RUNS/$name-world"
-        setsid nohup deeptime-admit run --kind sim:earthlike_quick_16k:8t --label "icespikes-$name" -- \
-            "$RUNS/deeptime-$name" run --preset "$preset" --threads 8 --epochs --out "$RUNS/$name-world" \
-            > "$RUNS/$name.log" 2>&1 < /dev/null &
+        setsid nohup bash -c 'deeptime-admit run --kind sim:earthlike_quick_16k:8t --label "icespikes-$1" -- \
+            "$2/deeptime-$1" run --preset "$3" --threads 8 --out "$2/$1-world" "${@:5}" && "$4" dump "$1" "$2/$1-world"' \
+            _ "$name" "$RUNS" "$preset" "$0" "$@" > "$RUNS/$name.log" 2>&1 < /dev/null &
         echo "started pid $! -> $RUNS/$name.log"
         ;;
     rebake)
