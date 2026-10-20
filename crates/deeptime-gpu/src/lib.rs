@@ -278,6 +278,18 @@ impl Bands {
     }
 }
 
+/// A buffer the host reads results from, kept for repeated read-backs: [`Gpu::download`]
+/// allocates its staging buffer per call, which a solver reading back every iteration should not.
+pub struct Readback {
+    buf: wgpu::Buffer,
+}
+
+impl Readback {
+    pub fn size(&self) -> u64 {
+        self.buf.size()
+    }
+}
+
 impl Gpu {
     /// Adapter, backend, type and driver, for logs and run notes.
     pub fn describe(&self) -> String {
@@ -424,6 +436,85 @@ impl Gpu {
             off += n;
         }
         Ok(())
+    }
+
+    /// A read-back buffer of `bytes` (rounded up to 4), or why there is none.
+    pub fn readback(&self, label: &str, bytes: u64) -> Result<Readback, String> {
+        let size = bytes.max(4).next_multiple_of(4);
+        if size > self.limits.max_buffer_size {
+            return Err(format!(
+                "{label}: {size} bytes exceed the adapter's largest buffer ({} bytes)",
+                self.limits.max_buffer_size
+            ));
+        }
+        let oom = self.device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
+        let invalid = self.device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let buf = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(label),
+            size,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let e1 = block_on(invalid.pop());
+        let e2 = block_on(oom.pop());
+        match e1.or(e2) {
+            Some(e) => Err(format!("{label}: {e}")),
+            None => Ok(Readback { buf }),
+        }
+    }
+
+    /// Ends `enc` with copies of the start of each source (`(buffer, bytes)`, placed one after
+    /// another in `rb`), submits it, waits, and hands `read` the copied bytes (one submission and
+    /// one wait for the work and its results).
+    pub fn submit_and_read<R>(
+        &self,
+        mut enc: wgpu::CommandEncoder,
+        rb: &Readback,
+        copies: &[(&wgpu::Buffer, u64)],
+        read: impl FnOnce(&[u8]) -> R,
+    ) -> Result<R, String> {
+        let total: u64 = copies.iter().map(|c| c.1).sum();
+        if total > rb.buf.size() || copies.iter().any(|c| !c.1.is_multiple_of(4)) {
+            return Err(format!(
+                "read-back of {total} bytes into {} (each a multiple of 4)",
+                rb.buf.size()
+            ));
+        }
+        let mut off = 0u64;
+        for &(src, n) in copies {
+            if n > 0 {
+                enc.copy_buffer_to_buffer(src, 0, &rb.buf, off, n);
+            }
+            off += n;
+        }
+        let idx = self.queue.submit([enc.finish()]);
+        if total == 0 {
+            self.wait(Some(idx))?;
+            return Ok(read(&[]));
+        }
+        let (tx, rx) = mpsc::channel();
+        rb.buf.map_async(wgpu::MapMode::Read, 0..total, move |r| {
+            let _ = tx.send(r);
+        });
+        self.wait(Some(idx))?;
+        let mapped = match rx.try_recv() {
+            Ok(r) => r,
+            Err(_) => {
+                self.wait(None)?;
+                rx.try_recv()
+                    .map_err(|_| "read-back: the buffer was never mapped".to_string())?
+            }
+        };
+        mapped.map_err(|e| format!("read-back: {e}"))?;
+        let out = {
+            let view = rb
+                .buf
+                .get_mapped_range(0..total)
+                .map_err(|e| format!("read-back: {e}"))?;
+            read(&view)
+        };
+        rb.buf.unmap();
+        Ok(out)
     }
 
     /// Compiles WGSL `source`.

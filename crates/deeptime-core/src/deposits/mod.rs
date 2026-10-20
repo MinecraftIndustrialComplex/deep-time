@@ -442,6 +442,14 @@ fn select_types(params: &DepositParams, feature: f64) -> Result<Vec<DepositType>
     Ok(types)
 }
 
+/// The deposit types a recorded run on `preset` places, as [`DepositStage::recorded`] selects them
+/// (the preset's multipliers folded in): what a reader of the world needs to say how a type's
+/// bodies were drawn (the column inspectors' drawn scale, `crate::column_info`).
+pub fn types_of(preset: &crate::params::PlanetPreset) -> Result<Vec<DepositType>, CoreError> {
+    let params = preset.deposits.clone().unwrap_or_default();
+    select_types(&params, preset.scale.feature_scale.deposits)
+}
+
 impl DepositParams {
     /// Range checks and the type list, each naming its key under `path` (`$.deposits` in a planet
     /// preset).

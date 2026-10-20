@@ -112,13 +112,15 @@ const MAX_SAMPLES_Z: usize = 64;
 /// `units` is `flag` is one too, named here or not). `climate/koppen_l2` came a day after this list
 /// and was averaged as a number until 2026-10-18: a class border's footprint mean named a class
 /// neither side had (BSk beside Cfa read Csa to Csc), which the census and the biome rules' Köppen
-/// conditions read (ledger SCL-090).
-const CATEGORICAL: [&str; 6] = [
+/// conditions read (ledger SCL-090). `meta/crust_type` (2026-10-19) is a code: an average of 0 and
+/// 1 at a coast would be no crust at all.
+const CATEGORICAL: [&str; 7] = [
     "climate/koppen",
     "climate/koppen_l2",
     "climate/wetland",
     "surface/class_top",
     "meta/plate_id",
+    "meta/crust_type",
     "meta/province",
 ];
 
@@ -2024,6 +2026,7 @@ mod tests {
             "climate/wetland",
             "climate/koppen",
             "climate/koppen_l2",
+            "meta/crust_type",
             "meta/province",
             "surface/class_top",
         ] {

@@ -643,6 +643,47 @@ master's runs (land above 2 km, median height, shelf, CO₂ with one run at 14,1
 two plate checks (rift-born welds 12.7 %; the lowest continental crust 0.36, at least 0.37);
 it was not landed.
 
+**The carry's blur and the spreading at long plate steps (ERO-185, ERO-186; P1-19 #27 unlock,
+2026-10-19).** The surface rides the plates by one bilinear semi-Lagrangian carry a plate step
+(`surface/advect.rs`). A bilinear sample at a fractional offset f is a two-point average of
+variance f(1 − f) cells² along each axis, so every carry blurs the carried surface by about a
+sixth of a cell² per axis whatever the plates' speed: on the 16k planets a diffusion of 0.25 to
+1 m²/yr, beside the hillslope's 2 m²/yr (`kd_land_m2_yr`). A 4-Myr plate step carries half as
+often and so blurs half as much per Myr. A step longer than `surface.numerics.carry_blur_ref_myr`
+(2 Myr) now spreads, after its carry and before its uplift, the blur that k = step ÷ reference
+carries of a k-th of the displacement D would have left: k·v(D/k) − v(D) per axis, v(x) the
+variance of x's fraction (at k = 2, 2·min(f, 1 − f)² for f the fraction of D/2, at most half a
+cell²), as a [s/2, 1 − s, s/2] stencil over cells of the same crust only (a plate's edge stops it,
+as it stops the carry's own sample), in passes of at most half a cell². The regolith's carry and
+the climate's ice-sheet and ELA carries take the same top-up. The crust's spreading (`spread.rs`),
+whose diffusivity is the cube of the excess height, is solved in equal sub-steps of at most
+`surface.numerics.spread_step_myr` (2 Myr), since one solve over a long step holds the diffusivity
+at its start value for the whole step. At a 2-Myr plate step neither adds anything and the run is
+unchanged. Both are game-choices that keep the numerics of the 2-Myr step per Myr. Their effect on
+4-Myr worlds, with what still differs, is measured in plates.md, "The 4-Myr plate step (P1-19 #27
+unlock)". Tests: `a_long_step_owes_the_short_steps_blur` (one carry of a long step with the blur it
+owes spreads a spike as far as two carries of half the step) and
+`the_spreading_steps_at_most_the_setting` (`surface::params`).
+
+**On a GPU (gpu-phase3, 2026-10-19).** Two of these solvers run on a GPU when a player's machine
+has one (`docs/design/gpu-compute.md` §15 and §16); no law, setting or ledger value changed. The
+diffusion solve's V-cycle (ERO-183) runs on the device in f32 as it ran on the CPU in f32, with
+the conjugate gradients, their stopping rule and the mass put-back still in f64 on the CPU, so the
+solve meets the same 1e-5 m residual; on the test VM's software GPU it gave the CPU's heights to
+the bit in all 50 solves of a 100 Myr history. The slope failure (ERO-168, ERO-169) runs its 40
+iterations at 5 % on the device in f32, every iteration over every cell (the CPU stops when an
+iteration moves nothing, which gives the same result); matter is kept to the f32 round-off of
+the changes, not f64's. On the same states it moved the CPU's metres to 1.5e-8, left heights
+within 1.5 mm (RMS 2.5e-5 m at most) and put no cell on the other side of the shoreline. The
+stopping rule above was not taken up for the GPU either: a pass costs one dispatch over the grid
+whatever moves, and a stop would need a read-back every pass. Over whole 100 Myr histories, worlds
+with any ported kernel on the GPU end with slightly more land than the CPU's (+0.007 of the
+planet's area on average over 15 seeds), from no single kernel and from none on the same state
+(gpu-compute.md §10). CPU runs with changes that do nothing physical (one threshold 1e-10 off,
+or four rates 1e-7 off on every cell) end with a little more land too (+0.002 over three such
+controls), so part of it is the model's sensitivity to any perturbation; the GPU's worlds sit
++0.005 above those controls, a fifth of the spread between seeds, and no other field leans.
+
 ## Carbonate on the sea floor (carbonate and ore-deposit task, 2026-10-19)
 
 **What was wrong.** The review of run 1a156f22b66 found carbonate on 0.009 % of the land and

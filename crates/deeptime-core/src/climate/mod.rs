@@ -497,7 +497,7 @@ impl CellsAccel {
 /// The cells loop's device under the session's compute mode (`compute.rs`).
 #[cfg(feature = "gpu")]
 fn cells_accel(ctx: &StageContext<'_>) -> Option<Arc<dyn snapshot::CellsDevice>> {
-    let g = crate::compute::device(ctx.compute, ctx.log)?;
+    let g = crate::compute::device(ctx.compute, ctx.log, "climate:cells")?;
     match gpu::CellsGpu::new(g) {
         Ok(c) => Some(Arc::new(c)),
         Err(e) => {
@@ -1167,6 +1167,14 @@ impl ClimateStage {
             self.s.omega.as_ref().map(|prev| {
                 advect::sources(&grid, pid, &omega_for(prev, &parents), dt_myr * 1.0e6)
             });
+        // The surface's carry blur, kept per Myr at its reference step (`advect::blur_owed`).
+        let blur_ref = self.preset.surface.as_ref().map_or_else(
+            || crate::surface::params::Numerics::default().carry_blur_ref_myr,
+            |s| s.numerics.carry_blur_ref_myr,
+        ) * 1.0e6;
+        let owed = src
+            .as_ref()
+            .and_then(|src| advect::blur_owed(w, src, dt_myr * 1.0e6, blur_ref));
         let mut h: Vec<f64> = need("plates/elevation_m")?
             .iter()
             .map(|&z| f64::from(z))
@@ -1196,6 +1204,7 @@ impl ClimateStage {
                 parents: &parents,
                 known_plates: prev.len(),
                 dt_yr: dt_myr * 1.0e6,
+                blur_ref_yr: blur_ref,
             });
             h.par_iter_mut()
                 .zip(carried.par_iter())
@@ -1205,10 +1214,16 @@ impl ClimateStage {
         let carry = |world: &WorldState, name: &str| -> Option<Vec<f32>> {
             let v = &world.fields.get(name).filter(|f| f.data.len() == n)?.data;
             Some(match src.as_ref() {
-                Some(src) => src
-                    .par_iter()
-                    .map(|&[fi, fj]| advect::bilinear(w, hgt, v, fi, fj))
-                    .collect(),
+                Some(src) => {
+                    let mut out: Vec<f32> = src
+                        .par_iter()
+                        .map(|&[fi, fj]| advect::bilinear(w, hgt, v, fi, fj))
+                        .collect();
+                    if let Some(var) = &owed {
+                        advect::blur(w, hgt, var, &mut out, |_, _| true);
+                    }
+                    out
+                }
                 None => v.clone(),
             })
         };

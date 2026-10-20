@@ -322,4 +322,69 @@ class DhApiBindingTest {
             }
         }
     }
+
+    /**
+     * The generation slot reaches the real jar's {@code IDhApiWorldGenerationConfig.
+     * enableDistantWorldGeneration()} by its published names, and the gate takes Distant Horizons'
+     * Chunky override ("off" on the API layer) off on a planet and puts it back off the planet,
+     * without the player's value ever moving.
+     */
+    @Test
+    void theGenerationSlotReachesTheRealConfigInterfaces() throws Exception {
+        for (Map.Entry<String, File> e : jars().entrySet()) {
+            try (URLClassLoader loader = new URLClassLoader(new URL[]{e.getValue().toURI().toURL()}, ClassLoader.getPlatformClassLoader())) {
+                DhApiBinding api = DhApiBinding.find(loader, null).orElseThrow();
+                String s = api.suffix(), base = DhApiBinding.API;
+                assertNull(api.generationEnabled(), "before Distant Horizons starts its API there is no setting");
+
+                Class<?> configType = Class.forName(base + "interfaces.config.IDhApiConfig" + s, false, loader);
+                Class<?> worldGenType = Class.forName(base + "interfaces.config.both.IDhApiWorldGenerationConfig" + s, false, loader);
+                Class<?> valueType = Class.forName(base + "interfaces.config.IDhApiConfigValue" + s, false, loader);
+                assertEquals(valueType, worldGenType.getMethod("enableDistantWorldGeneration").getReturnType(), e.getKey());
+                Boolean[] layer = {Boolean.FALSE}; // Distant Horizons' Chunky rule, set at client start
+                boolean[] player = {true};
+                Object value = Proxy.newProxyInstance(loader, new Class<?>[]{valueType}, (p, m, a) -> switch (m.getName()) {
+                    case "getValue" -> layer[0] != null ? layer[0] : player[0];
+                    case "getTrueValue" -> player[0];
+                    case "getApiValue" -> layer[0];
+                    case "getCanBeOverrodeByApi" -> true;
+                    case "setValue" -> {
+                        layer[0] = (Boolean) a[0];
+                        yield true;
+                    }
+                    case "clearValue" -> {
+                        layer[0] = null;
+                        yield true;
+                    }
+                    default -> throw new UnsupportedOperationException(m.getName());
+                });
+                Object worldGen = Proxy.newProxyInstance(loader, new Class<?>[]{worldGenType}, (p, m, a) -> {
+                    if (m.getName().equals("enableDistantWorldGeneration"))
+                        return value;
+                    throw new UnsupportedOperationException(m.getName());
+                });
+                Object configs = Proxy.newProxyInstance(loader, new Class<?>[]{configType}, (p, m, a) -> {
+                    if (m.getName().equals("worldGenerator"))
+                        return worldGen;
+                    throw new UnsupportedOperationException(m.getName());
+                });
+                Class.forName(base + "DhApi$Delayed" + s, true, loader).getField("configs").set(null, configs);
+
+                DhGenerationGate.Slot slot = api.generationEnabled();
+                assertNotNull(slot);
+                assertTrue(slot.playerValue());
+                assertEquals(Boolean.FALSE, slot.apiValue());
+                assertTrue(slot.overridable());
+
+                DhGenerationGate.Controller gate = new DhGenerationGate.Controller();
+                assertEquals(DhGenerationGate.Outcome.LIFTED, gate.reconcile(slot, true, true));
+                assertNull(layer[0], e.getKey() + ": the override is off the API layer");
+                assertEquals(DhGenerationGate.Outcome.UNCHANGED, gate.reconcile(slot, true, true));
+                assertEquals(DhGenerationGate.Outcome.RESTORED, gate.reconcile(slot, false, true));
+                assertEquals(Boolean.FALSE, layer[0], "Distant Horizons' value is back off the planet");
+                assertTrue(player[0], "the player's own value never moves");
+                System.out.printf("[dh] %s: enableDistantWorldGeneration lifted and restored through %s%n", e.getKey(), valueType.getSimpleName());
+            }
+        }
+    }
 }

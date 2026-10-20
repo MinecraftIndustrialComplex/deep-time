@@ -97,6 +97,8 @@ x86-64 baseline and once for x86-64-v3, the two builds an x86-64 player's machin
 ```sh
 # both binaries (and, with --plain, the everyday release build for comparison), admitted as cargo:build
 tools/remote/mac.sh --kind cargo:build -- tools/natives/gate-bins.sh /data/ban/deeptime-runs/<task>/bins
+# opt-in variants for comparisons (not what ships; STATUS.md build log 2026-10-20): --features mimalloc,
+# and --pgo <profile from tools/natives/pgo-profile.sh>
 # one run each, side by side: v3 on set A, the baseline on set B (then the other way round)
 B=/data/ban/deeptime-runs/<task>
 tools/remote/mac.sh --no-sync -- tools/remote/detach.sh start gate-v3 --kind sim:earthlike_full_16k:8t \

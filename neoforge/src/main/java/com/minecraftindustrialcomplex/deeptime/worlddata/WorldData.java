@@ -265,6 +265,11 @@ public final class WorldData {
         return detail == null ? 0.0 : amplitude.bilinear(x, z) * detail.at(x, z);
     }
 
+    /** The detail term's amplitude layer (A of H = E + A·N, blocks), or null in a world without one. */
+    public RasterSampler amplitudeLayer() {
+        return amplitude;
+    }
+
     /** The world's detail noise, or null. */
     public DetailNoise detailNoise() {
         return detail;

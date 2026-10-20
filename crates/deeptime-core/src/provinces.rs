@@ -12,12 +12,16 @@
 //! regions in the game. The view always uses the default thresholds.
 //!
 //! # Rules (plan §8.1 note; the first that applies wins)
-//! 1. **Large igneous province**: a pile of mafic volcanic rock (`plates/pool/mafic_volcanic_m`)
-//!    beyond what the column's crust carries (the 2 km of basalt of oceanic crust, told by its
-//!    gabbro lower crust, `plates/pool/mafic_plutonic_m`) of at least a fifth of the LIP thickness
-//!    the run's `deeptime:large_igneous_province` events recorded (`lip_thickness_m`, 1.5 km by
-//!    default): a plume-head province's footprint, which rides its plate and stays until the crust
-//!    is subducted. Hotspot piles of that size count too. Without a LIP event, none.
+//! 1. **Large igneous province**: a pile of the run's own flood basalts (`surface/lip_m`: the
+//!    strata log's flows and tuffs of provenance `LIP_FLOW`, laid by the volcano stage from the
+//!    plate model's `deeptime:large_igneous_province` events) of at least a fifth of the thinnest
+//!    LIP thickness those events recorded (`lip_thickness_m`, 1.5 km by default). Bryan & Ernst
+//!    (2008) define a LIP by its emplacement, not by mafic rock in general: over 0.1 Mkm² and
+//!    0.1 Mkm³ of mainly mafic magma in pulses of a few Myr, seamounts, hotspot tracks and
+//!    ordinary oceanic crust excluded. So only these flows count, on land and at sea (an oceanic
+//!    plateau is a LIP's flows on oceanic crust), and their fragments count for as long as the
+//!    log keeps them: they ride the surface with their plate, wear down with erosion and go with
+//!    subducted crust. Without a LIP event, none.
 //! 2. **Oceanic crust** (`plates/crust_type` = 0), in the USGS map's three age classes, 0–20 Ma,
 //!    20–65 Ma and over 65 Ma (`crust_age`); an island arc (regime arc on crust thickened above
 //!    9 km, `plates/thickness_m`) is an **orogen**.
@@ -125,10 +129,8 @@ pub struct Rules {
     pub subsiding_cover_m: f32,
     /// Basement under less cover than this is at the surface, m.
     pub shield_cover_m: f32,
-    /// A LIP is a mafic pile of this fraction of the recorded LIP thickness.
+    /// A LIP is a pile of the run's flood basalts this fraction of the recorded LIP thickness.
     pub lip_fraction: f32,
-    /// The basalt an oceanic crust carries (`plates::pools::oceanic_column`), m.
-    pub oceanic_basalt_m: f32,
 }
 
 impl Default for Rules {
@@ -147,9 +149,7 @@ impl Default for Rules {
             subsiding_mm_yr: 0.03,               // ledger: PRV-017 (uncited)
             subsiding_cover_m: 1_000.0,          // ledger: PRV-017
             shield_cover_m: 200.0,               // ledger: PRV-018 (uncited)
-            lip_fraction: 0.2,                   // ledger: PRV-006 (uncited)
-            oceanic_basalt_m: crate::plates::pools::oceanic_column()
-                [crate::plates::state::pool::MAFIC_VOLCANIC],
+            lip_fraction: 0.2,                   // ledger: PRV-006 (game choice)
         }
     }
 }
@@ -239,8 +239,8 @@ pub struct Cell {
     pub cover_m: f32,
     /// Sinking rate, mm/yr (positive down).
     pub subsidence_mm_yr: f32,
-    /// Mafic volcanic rock beyond what the column's crust carries, m.
-    pub mafic_excess_m: f32,
+    /// The run's flood basalts in the column (`surface/lip_m`), m.
+    pub lip_m: f32,
     /// Whether the surface rock is crystalline (`None`: not known).
     pub crystalline_surface: Option<bool>,
 }
@@ -248,7 +248,7 @@ pub struct Cell {
 /// The class of one cell; `lip_min_m` is the pile a LIP needs (`None`: the run recorded no LIP).
 pub fn classify(c: &Cell, lip_min_m: Option<f32>, r: &Rules) -> u8 {
     if let Some(min) = lip_min_m
-        && c.mafic_excess_m >= min
+        && c.lip_m >= min
     {
         return LIP;
     }
@@ -519,8 +519,7 @@ fn cells(world: &WorldState, r: &Rules) -> Option<(Vec<Option<Cell>>, Option<f32
     let uplift = get("plates/uplift_mm_yr");
     let sediment_pool = get("plates/pool/sediment_m");
     let sedimentary_pool = get("plates/pool/sedimentary_m");
-    let mafic_volcanic = get("plates/pool/mafic_volcanic_m");
-    let mafic_plutonic = get("plates/pool/mafic_plutonic_m");
+    let lip_pile = get(crate::surface::field::LIP);
     let log = get("surface/sediment_m");
     let rock = get("structure/rock").or_else(|| get("surface/class"));
     let crystalline: Vec<bool> = crate::surface::lithology::table()
@@ -543,15 +542,6 @@ fn cells(world: &WorldState, r: &Rules) -> Option<(Vec<Option<Cell>>, Option<f32
                 (_, true) => pools,
                 _ => f32::NAN,
             };
-            // Crust with a gabbro lower crust (5 km, against a continent's 4.5) is oceanic or was:
-            // it carries its basalt, which is no province.
-            let basalt = if mafic_plutonic.is_some() {
-                r.oceanic_basalt_m * ((at(mafic_plutonic, c) - 4500.0) / 500.0).clamp(0.0, 1.0)
-            } else if continental {
-                0.0
-            } else {
-                r.oceanic_basalt_m
-            };
             let cell = Cell {
                 continental,
                 regime: regime_f.data[c].round().max(0.0) as u8,
@@ -562,7 +552,7 @@ fn cells(world: &WorldState, r: &Rules) -> Option<(Vec<Option<Cell>>, Option<f32
                 thickness_m: at(thick, c),
                 cover_m: cover,
                 subsidence_mm_yr: -at(uplift, c),
-                mafic_excess_m: at(mafic_volcanic, c) - basalt,
+                lip_m: at(lip_pile, c),
                 crystalline_surface: rock.and_then(|f| {
                     let k = f[c];
                     (k.is_finite() && k >= 0.0)
@@ -738,7 +728,7 @@ mod tests {
             thickness_m: 35_000.0,
             cover_m: 100.0,
             subsidence_mm_yr: 0.0,
-            mafic_excess_m: 0.0,
+            lip_m: 0.0,
             crystalline_surface: None,
         }
     }
@@ -917,12 +907,12 @@ mod tests {
         );
         // A LIP wins over everything, on land and at sea, and only when the run recorded one.
         let lava = Cell {
-            mafic_excess_m: 400.0,
+            lip_m: 400.0,
             ..land()
         };
         assert_eq!(k(&lava), LIP);
         let plateau = Cell {
-            mafic_excess_m: 400.0,
+            lip_m: 400.0,
             ..sea(100.0)
         };
         assert_eq!(k(&plateau), LIP);
@@ -934,7 +924,7 @@ mod tests {
             thickness_m: f32::NAN,
             cover_m: f32::NAN,
             subsidence_mm_yr: f32::NAN,
-            mafic_excess_m: f32::NAN,
+            lip_m: f32::NAN,
             ..land()
         };
         assert_eq!(k(&unknown), PLATFORM);
@@ -1012,6 +1002,7 @@ mod tests {
         put(&mut world, "plates/pool/sedimentary_m", 3000.0, 0.0);
         put(&mut world, "plates/pool/mafic_plutonic_m", 4500.0, 5000.0);
         put(&mut world, "plates/pool/mafic_volcanic_m", 0.0, 2000.0);
+        put(&mut world, "surface/lip_m", 0.0, 0.0);
         let before = world.clone();
         let f = derive(&world).unwrap();
         assert_eq!(world, before, "the derivation reads only");
@@ -1023,9 +1014,11 @@ mod tests {
             "at 5.6° a cell, the 1.35° rifted margin is less than a cell"
         );
         assert_eq!(f.data[n - 1], f32::from(OCEAN_MID));
-        // A recorded LIP of 1.5 km makes 500 m of basalt on a continent, or 500 m above the
-        // ordinary 2 km on the sea floor, a province; the sea floor's ordinary basalt is not.
-        put(&mut world, "plates/pool/mafic_volcanic_m", 500.0, 2500.0);
+        // A recorded LIP of 1.5 km makes 500 m of its flows on a continent or on the sea floor a
+        // province; the sea floor's own basalt, or mafic rock of any other origin, is not.
+        put(&mut world, "plates/pool/mafic_volcanic_m", 2500.0, 5000.0);
+        assert_eq!(derive(&world).unwrap().data[n - 1], f32::from(OCEAN_MID));
+        put(&mut world, "surface/lip_m", 500.0, 500.0);
         assert_eq!(
             f32::from(BASIN),
             derive(&world).unwrap().data[inland],
@@ -1042,6 +1035,9 @@ mod tests {
         let f = derive(&world).unwrap();
         assert_eq!(f.data[inland], f32::from(LIP));
         assert_eq!(f.data[n - 1], f32::from(LIP));
+        // Worn down below a fifth of the recorded thickness (300 m): no longer one.
+        put(&mut world, "surface/lip_m", 0.0, 250.0);
+        assert_eq!(derive(&world).unwrap().data[n - 1], f32::from(OCEAN_MID));
         put(&mut world, "plates/pool/mafic_volcanic_m", 0.0, 2000.0);
         assert_eq!(derive(&world).unwrap().data[n - 1], f32::from(OCEAN_MID));
     }

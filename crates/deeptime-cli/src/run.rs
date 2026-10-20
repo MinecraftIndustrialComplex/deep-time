@@ -300,7 +300,11 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
                 .gap_budget
                 .as_ref()
                 .map(|gb| gb.lines())
-                .unwrap_or_default(),
+                .unwrap_or_default()
+            + world
+                .notes
+                .get(deeptime_core::plates::CRUST_BUDGET_NOTE)
+                .map_or("", String::as_str),
     )
 }
 
