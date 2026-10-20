@@ -52,8 +52,9 @@ The structure stage runs each step after the surface stage has laid down or stri
    laid on an unroofed pluton stays as it was (RCK-054). The test reads the column as the strata pass paints it (the column
    rule over the horizons the structure stage keeps for the bake): the rule joins equal rocks in a row into one horizon
    dated by its top, so shale laid over older shale across an unconformity is young cover as a whole, as it is to the
-   intrusion. Another stock that holds the inner half of the intrusion's plan is part of that column: a stock emplaced
-   inside an older one bakes none of the older granite, and a younger stock through it is not painted over. Each aureole is a body of
+   intrusion. Another stock that reaches the inner half of the intrusion's plan is part of that column: a stock emplaced
+   inside or beside an older one bakes none of the older granite, and a younger stock through it is not painted over
+   (the aureole then goes unbaked at those depths all round, since its bands are depth layers). Each aureole is a body of
    its own in the world data (role `aureole`), written before the intrusions so the intrusion paints over it; a stock's
    aureole is hollow, cut into slabs that stop at the stock's wall, so the stock itself stays intact. A typical 3 km thick
    pluton has a 900 m aureole, about 26 blocks of height at 16k scale and 3 blocks of width.
@@ -191,8 +192,8 @@ columns before folds are applied; a wider phyllite band (350 to 525) makes more 
   that changes sideways within the aureole takes the class of the centre's host at that depth.
 - **Aureole and pluton bodies paint over younger dykes and stocks** that cut them, because the world data paints bodies over
   every structural event. A stock rooted on its own pluton is repainted through that pluton's aureole by a `stock` body; a
-  dyke or a much younger stock is not, unless the stock holds the inner half of the aureole's intrusion in plan (then
-  the aureole's bands leave its depths alone, `mask_intrusions`). A format rule "a body with an age paints only older
+  dyke or a much younger stock is not, unless the stock reaches the inner half of the aureole's intrusion in plan (then
+  the aureole's bands leave its depths alone, `mask_intrusions`); one that crosses only the aureole's rim is painted over. A format rule "a body with an age paints only older
   rock" would fix it; it is not built (REV-2 follow-up).
 - **Plutons are rounder than the big real ones** (width over length 0.5 to 1 against 0.17 to 0.4), and sit shallower
   than the Sierra's 3.5 to 10 km.
