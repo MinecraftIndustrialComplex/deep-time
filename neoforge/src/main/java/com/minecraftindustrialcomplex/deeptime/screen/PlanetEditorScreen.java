@@ -23,11 +23,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * The Deep Time planet editor (plan §7.12), opened by the Create World screen's Customize button
- * for {@code deeptime:planet}: the setup page, the run page (the timelapse) and the review page,
+ * The Deep Time planet editor (plan §7.12; docs/design/create-world-ux.md): the generation page
+ * (the timelapse, opened by Create World's Create button through {@link #generate}), the Customize
+ * page (opened by the World tab's Customize button for {@code deeptime:planet}) and the review page,
  * or the guidance panel when the natives did not load (plan §6.6). All state lives in an
- * {@link EditorModel}, one per Create World screen, so closing and reopening Customize keeps the
- * run, the timelapse and the accepted result.
+ * {@link EditorModel}, one per Create World screen, so leaving and coming back keeps the run, the
+ * timelapse and the accepted result.
  */
 public final class PlanetEditorScreen extends Screen {
 
@@ -53,6 +54,11 @@ public final class PlanetEditorScreen extends Screen {
         /** Drawn after the widgets (text in free space). */
         default void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {}
 
+        /** The page's title, drawn at the top. */
+        default net.minecraft.network.chat.Component title() {
+            return Lang.tr("editor.title");
+        }
+
         default void close() {}
     }
 
@@ -73,6 +79,17 @@ public final class PlanetEditorScreen extends Screen {
                 apply(parent, a);
         });
         return new PlanetEditorScreen(parent, m);
+    }
+
+    /**
+     * Create World's Create button on a Deep Time world without world data
+     * ({@link CreateWorldFlow#interceptCreate}): the generation page, simulating the current settings
+     * (the defaults unless Customize changed them) as soon as the estimate is in.
+     */
+    static Screen generate(CreateWorldScreen parent) {
+        EditorModel m = model(parent.getUiState());
+        m.generate();
+        return create(parent, parent.getUiState().getSettings());
     }
 
     /** The model of a Create World screen (created on first use). */
@@ -159,7 +176,9 @@ public final class PlanetEditorScreen extends Screen {
     }
 
     private Object wanted() {
-        return guidanceOnly() ? "guidance" : model.page();
+        if (guidanceOnly())
+            return "guidance";
+        return model.page() == EditorModel.Page.RUN && model.run().isEmpty() ? "preparing" : model.page();
     }
 
     @Override
@@ -172,7 +191,15 @@ public final class PlanetEditorScreen extends Screen {
         } else {
             page = switch (model.page()) {
                 case SETUP -> new SetupPage();
-                case RUN -> new RunPage();
+                case RUN -> model.run().isPresent() ? new RunPage() : new Page() {
+                    @Override
+                    public void init(PlanetEditorScreen s) {}
+
+                    @Override
+                    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+                        g.drawCenteredString(font, Lang.tr("editor.problem.estimating"), width / 2, height / 2, 0xffa0a0a0);
+                    }
+                };
                 case REVIEW -> new ReviewPage();
             };
         }
@@ -190,6 +217,9 @@ public final class PlanetEditorScreen extends Screen {
             }
         }));
         model.run().ifPresent(r -> r.poll());
+        if (model.tickAutoStart().isPresent())
+            DeepTime.LOGGER.info("Deep Time: generating {} ({}, {} blocks)", model.run().map(r -> r.stagingId()).orElse("?"),
+                    model.presetName(), model.circumference());
         if (page != null)
             page.tick();
         if (!wanted().equals(shown))
@@ -199,7 +229,7 @@ public final class PlanetEditorScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
-        g.drawCenteredString(font, title, width / 2, 6, 0xffffffff);
+        g.drawCenteredString(font, page == null ? title : page.title(), width / 2, 6, 0xffffffff);
         if (page != null)
             page.render(g, mouseX, mouseY, partialTick);
     }
@@ -230,6 +260,15 @@ public final class PlanetEditorScreen extends Screen {
         DeepTime.LOGGER.info("Deep Time: accepted run {} ({}); the world will be created from {}", a.stagingId(), a.label(),
                 com.minecraftindustrialcomplex.deeptime.server.Staging.dir(FMLPaths.GAMEDIR.get(), a.stagingId()));
         minecraft.setScreen(parent);
+    }
+
+    /**
+     * Play: accept the finished run, bind the world to it and create the world, as Create World's
+     * Create button does (the experimental-settings confirmation included).
+     */
+    void play() {
+        accept();
+        CreateWorldFlow.create(parent);
     }
 
     private static void apply(CreateWorldScreen parent, EditorModel.Accepted a) {

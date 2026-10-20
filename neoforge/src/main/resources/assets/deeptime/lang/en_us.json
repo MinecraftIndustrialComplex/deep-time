@@ -4,7 +4,7 @@
   "generator.deeptime.planet_lambert": "Deep Time Planet (Lambert map)",
   "generator.deeptime.planet_lambert_32k": "Deep Time Planet (Lambert map, 32k)",
 
-  "deeptime.editor.title": "Deep Time — Planet",
+  "deeptime.editor.title": "Deep Time: your planet",
   "deeptime.editor.section.preset": "Preset",
   "deeptime.editor.section.timeline": "Timeline",
   "deeptime.editor.section.share": "Share code",
@@ -441,8 +441,8 @@
   "deeptime.guidance.copied": "Copied",
 
   "deeptime.create.blocked.natives": "Deep Time cannot simulate here (the native library did not load). Open Customize for details.",
-  "deeptime.create.blocked.not_simulated": "Open Customize, choose a timeline, run the simulation and accept it first.",
-  "deeptime.create.blocked.staging_missing": "The accepted run's data is gone. Open Customize and run the simulation again.",
+  "deeptime.create.blocked.not_simulated": "Deep Time first simulates your planet's history, which takes a few minutes, then you play. Customize (World tab) changes the planet first.",
+  "deeptime.create.blocked.staging_missing": "The simulated planet's data is gone: Create simulates it again.",
 
   "deeptime.layer.satellite": "Satellite",
   "deeptime.layer.rivers": "Rivers & lakes",
@@ -598,6 +598,8 @@
   "deeptime.wrap.create.refused.contraption": "This structure reaches across a turning seam; moving structures cannot cross seams yet",
   "create.track.deeptime_seam": "Train track cannot cross or touch a turning seam yet",
   "deeptime.configuration.title": "Deep Time",
+  "deeptime.configuration.defaultWorldType": "Create World starts on Deep Time",
+  "deeptime.configuration.defaultWorldType.tooltip": "Opens the Create World screen with Deep Time Planet as the world type. Create then simulates the planet's history (a few minutes) and plays it. The other world types stay in the World tab.",
   "deeptime.configuration.dhAutoCurvature": "Distant Horizons curvature follows the planet",
   "deeptime.configuration.dhAutoCurvature.tooltip": "In a Deep Time world, bends Distant Horizons' far terrain to the planet's own curvature (a sphere of circumference / 2 pi blocks) unless you set Distant Horizons' Earth Curve Ratio yourself. It uses Distant Horizons' API override, so its config file is never rewritten, and puts the setting back when you leave."
 }
