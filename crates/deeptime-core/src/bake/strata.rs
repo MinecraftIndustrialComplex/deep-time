@@ -8,14 +8,21 @@
 //! amplifier's relief, `surface::amplify`). That relief is rock of the region, not a pile of its
 //! youngest bed, so two steps follow (ledger: STR-052, STR-053):
 //!
-//! 1. **The lift.** Every horizon of a cell rises by how far the mean L3 elevation round the
-//!    cell's node stands above its first top, where it does (never down; capped so the first top
-//!    stays at or under `max_y`). The contacts follow the ground; the loose cover and the
-//!    regolith keep the thickness the history gave them (no young cover is invented: the till and
-//!    the amplifier's deposits are not in the stacks). Where the terrain lies below the history's
-//!    surface nothing moves: valleys cut into the stack and expose the rock beneath, as before.
-//!    What the history put at a depth (bodies, sites, the structure file's faults and
-//!    intrusions) rises by the same lift, read through the column rule's B-spline ([`Lift`]).
+//! 1. **The lift.** Every horizon of a cell rises by the relief at its node: over the L3 cells of
+//!    the four L1 squares round it, the mean of the elevation less the history's surface at the
+//!    same point (the first tops as the column rule draws them, a B-spline), where that is
+//!    positive (never down; capped so the first top stays at or under `max_y`). Measured point by
+//!    point, a node in a valley of the history's surface between its ridges has no relief where
+//!    the terrain only follows that surface. The contacts follow the ground; the loose cover and
+//!    the regolith keep the thickness the history gave them (no young cover is invented: the till
+//!    and the amplifier's deposits are not in the stacks). Where the terrain lies below the
+//!    history's surface nothing moves: valleys cut into the stack and expose the rock beneath, as
+//!    before. The lift is one value per node, so a valley narrower than the node window
+//!    (amplifier relief, 2 × the L1 spacing) still cuts into its lifted stack
+//!    ([`strata_census::surface`] counts how far). What the history put at a depth rises with the
+//!    rock it was put in: bodies and sites by the column rule's height of their stratigraphic key
+//!    before and after ([`key_shift`]), the structure file's faults and intrusions by the lift at
+//!    their centre ([`Lift`]).
 //! 2. **The crests.** The first top of every cell must still reach the highest terrain any
 //!    block interpolating from it can have (the largest `elevation` plus the largest
 //!    `detail/amplitude` over the L3 cells within two L1 cells) plus one block; the column rule
@@ -29,6 +36,7 @@ use rayon::prelude::*;
 use serde_json::{Value, json};
 
 use super::Out;
+use super::strata_census::{self, Point, census_stride};
 use super::terrain::Terrain;
 use crate::error::CoreError;
 use crate::params::PlanetPreset;
@@ -70,8 +78,12 @@ pub fn bake(
         max_raise,
         limit,
         fill,
-        lift,
-        lift_note,
+        mut lift,
+        mut lift_note,
+        node_relief,
+        moved,
+        points,
+        stride,
     } = raise_tops(
         &mut hz,
         terrain,
@@ -85,6 +97,44 @@ pub fn bake(
             "the horizons failed their check after the raise: {e}"
         ))
     })?;
+    // The bodies and sites rise with the rock at their centre (STR-056).
+    let (bodies_dy, sites_dy) = shifts(&hz, &moved, &world.bodies, &world.sites);
+    lift_note["bodies"] = shift_note(&lift, &bodies_dy, world.bodies.iter().map(|b| (b.center[0], b.center[2])));
+    lift_note["sites"] = shift_note(
+        &lift,
+        &sites_dy,
+        world
+            .sites
+            .iter()
+            .map(|s| (f64::from(s.center[0]), f64::from(s.center[2]))),
+    );
+    lift.bodies_dy = bodies_dy;
+    lift.sites_dy = sites_dy;
+    // What the ground cuts and what surface/class_top names there (STR-057): class_top is the
+    // young landscape's class, else the deep-time surface's, nearest on L2 (`super::surface`).
+    let (_, l2) = super::grids(p)?;
+    let ct_field = super::field(world, crate::surface::young::field::CLASS)
+        .or_else(|| super::field(world, crate::surface::field::CLASS));
+    let class_top = ct_field.map(|f| {
+        let l2 = l2.clone();
+        move |x: f64, z: f64| -> Option<u8> {
+            let i = ((x - l2.origin_block_x as f64) / f64::from(l2.r)).round() as i64;
+            let j = ((z - l2.origin_block_z as f64) / f64::from(l2.r)).round() as i64;
+            let v = super::nearest(f, l2.block_x(i) as f64, l2.block_z(j) as f64);
+            (!v.is_nan()).then(|| (v.round() as i64).clamp(0, 254) as u8)
+        }
+    });
+    let surface_census = strata_census::surface(
+        &hz,
+        &node_relief,
+        &points,
+        stride,
+        class_top
+            .as_ref()
+            .map(|f| f as &(dyn Fn(f64, f64) -> Option<u8> + Sync)),
+        &tables.unconsolidated,
+    );
+    drop(points);
     let layer = hz.to_layer(deeptime_format::Codec::Lz4Block)?;
     let mean = hz.mean_horizons();
     let k = hz.k;
@@ -102,6 +152,7 @@ pub fn bake(
             "top_raise_blocks_max": max_raise,
             "lift": lift_note,
             "mountain_fill": fill,
+            "surface_census": surface_census,
             "build_limit": limit.note(p.scale.min_y, p.scale.max_y, p.scale.build_fit()),
             "realism": {
                 "cells": census.columns,
@@ -127,6 +178,29 @@ pub fn bake(
         }),
         lift,
     ))
+}
+
+/// The bodies' or the sites' rise (`dy`, blocks, one per centre `at`): how many rose, their mean
+/// and largest rise, and how many rose more than a block beyond the lift at their centre (the
+/// crest raise's part, STR-056).
+fn shift_note(lift: &Lift, dy: &[f64], at: impl Iterator<Item = (f64, f64)>) -> Value {
+    let (mut n, mut sum, mut max, mut beyond) = (0u64, 0.0f64, 0.0f64, 0u64);
+    for (&d, (x, z)) in dy.iter().zip(at) {
+        if d == 0.0 {
+            continue;
+        }
+        n += 1;
+        sum += d;
+        max = max.max(d);
+        beyond += u64::from((d - lift.at(x, z)).abs() > 1.0);
+    }
+    json!({
+        "count": dy.len(),
+        "risen": n,
+        "mean_blocks": if n > 0 { sum / n as f64 } else { 0.0 },
+        "max_blocks": max,
+        "off_the_lift_over_1_block": beyond,
+    })
 }
 
 /// How much of the baked `elevation` stands above the world's build limit (`scale.max_y`): the game
@@ -206,6 +280,16 @@ impl BuildLimit {
     }
 }
 
+/// Per L1 square [x1, x1 + r1) × [z1, z1 + r1) of an L3 layer: the highest value, the sum and
+/// count of (value minus the history's surface at the same point), the build-limit counts and the
+/// census's land points.
+struct Squares {
+    best: Vec<f64>,
+    relief: Vec<(f64, u32)>,
+    limit: BuildLimit,
+    points: Vec<Point>,
+}
+
 /// Per L1 cell: the whole stack lifted where the final terrain stands above the surface the
 /// history left ([`Lift`]), then the top units raised over the highest L3 terrain the cell's
 /// interpolation reaches ([`raise_stack`]). Returns the counts, the elevation against the build
@@ -229,14 +313,35 @@ fn raise_tops(
     }
     let ratio = (g1.r / l3.r) as usize;
     let k = hz.k as usize;
-    // Highest elevation and highest amplitude of the L3 cells in each L1 cell's square
-    // [x1, x1 + r1) × [z1, z1 + r1), in blocks.
+    let stride = census_stride(l3.cells());
+    // The surface the history left (each cell's first top before any raise), 1/16 block, and in
+    // blocks as the column rule draws it between the nodes (NaN where a cell has no stack).
+    let coarse: Vec<i16> = (0..w1 * h1).map(|c| hz.tops[c * k]).collect();
+    let coarse_blocks: Vec<f32> = coarse
+        .iter()
+        .map(|&t| {
+            if t == NO_TOP {
+                f32::NAN
+            } else {
+                f32::from(t) / 16.0
+            }
+        })
+        .collect();
     let (limit_y, sea_y) = (f64::from(max_y), f64::from(sea_level_y));
     let (floor_y, slide_y) = (f64::from(min_y), f64::from(min_y) + FLOOR_SLIDE_BLOCKS);
-    type Tile = (usize, usize, usize, Vec<f64>, Vec<(f64, u32)>, BuildLimit);
-    // Per L1 square: the highest value, the mean of its L3 cells, and the build-limit counts.
-    type Squares = (Vec<f64>, Vec<f64>, BuildLimit);
-    let square = |path: &std::path::Path| -> Result<Squares, CoreError> {
+    type Tile = (
+        usize,
+        usize,
+        usize,
+        Vec<f64>,
+        Vec<(f64, u32)>,
+        BuildLimit,
+        Vec<Point>,
+    );
+    // `relief`: also sum each L3 cell's value less the history's surface at its position (the
+    // column rule's B-spline of the first tops, as the stack is drawn there), count the cells
+    // against the build limit and take the census's land points.
+    let square = |path: &std::path::Path, relief: bool| -> Result<Squares, CoreError> {
         let r = TilePackReader::open(path)?;
         let d = r.desc().clone();
         let mut best = vec![f64::NEG_INFINITY; w1 * h1];
@@ -255,35 +360,59 @@ fn raise_tops(
                 let mut local = vec![f64::NEG_INFINITY; lw * lh];
                 let mut local_sum = vec![(0.0f64, 0u32); lw * lh];
                 let mut limit = BuildLimit::NONE;
+                let mut points = Vec::new();
                 for lj in 0..th as usize {
-                    let sj = (z0 as usize + lj) / ratio - j0;
+                    let gj = z0 as usize + lj;
+                    let sj = gj / ratio - j0;
                     for li in 0..tw as usize {
-                        let si = (x0 as usize + li) / ratio - i0;
+                        let gi = x0 as usize + li;
+                        let si = gi / ratio - i0;
                         let at = (lj * tw as usize + li) * cb;
                         let v = d.physical(d.dtype.decode_scalar(&bytes[at..at + cb]));
                         let c = sj * lw + si;
-                        if v.is_finite() && v > local[c] {
+                        if !v.is_finite() {
+                            continue;
+                        }
+                        if v > local[c] {
                             local[c] = v;
                         }
-                        if v.is_finite() {
-                            local_sum[c].0 += v;
-                            local_sum[c].1 += 1;
-                            limit.cells_above += u64::from(v > limit_y);
-                            limit.cells_compressed += u64::from(v > knee_y);
-                            limit.land_cells += u64::from(v >= sea_y);
-                            limit.highest_y = limit.highest_y.max(v);
-                            limit.cells_below += u64::from(v < floor_y);
-                            limit.cells_in_slide += u64::from(v >= floor_y && v < slide_y);
-                            limit.lowest_y = limit.lowest_y.min(v);
+                        if !relief {
+                            continue;
                         }
+                        let (bx, bz) = (
+                            l3.block_x(gi as i64) as f64,
+                            l3.block_z(gj as i64) as f64,
+                        );
+                        let under = bspline_at(&g1, &coarse_blocks, bx, bz);
+                        if under.is_finite() {
+                            local_sum[c].0 += v - under;
+                            local_sum[c].1 += 1;
+                            if v >= sea_y && gi % stride == 0 && gj % stride == 0 {
+                                points.push(Point {
+                                    x: bx,
+                                    z: bz,
+                                    elev: v,
+                                    relief: v - under,
+                                });
+                            }
+                        }
+                        limit.cells_above += u64::from(v > limit_y);
+                        limit.cells_compressed += u64::from(v > knee_y);
+                        limit.land_cells += u64::from(v >= sea_y);
+                        limit.highest_y = limit.highest_y.max(v);
+                        limit.cells_below += u64::from(v < floor_y);
+                        limit.cells_in_slide += u64::from(v >= floor_y && v < slide_y);
+                        limit.lowest_y = limit.lowest_y.min(v);
                     }
                 }
-                Ok((i0, j0, lw, local, local_sum, limit))
+                Ok((i0, j0, lw, local, local_sum, limit, points))
             })
             .collect::<Result<_, _>>()?;
         let mut limit = BuildLimit::NONE;
-        for (i0, j0, lw, local, local_sum, l) in tiles {
+        let mut points = Vec::new();
+        for (i0, j0, lw, local, local_sum, l, p) in tiles {
             limit = limit.merge(l);
+            points.extend(p);
             for (q, (v, (sv, n))) in local.into_iter().zip(local_sum).enumerate() {
                 let (i, j) = (i0 + q % lw, j0 + q / lw);
                 if i < w1 && j < h1 {
@@ -297,19 +426,23 @@ fn raise_tops(
                 }
             }
         }
-        let mean = sum
-            .into_iter()
-            .map(|(v, n)| if n > 0 { v / f64::from(n) } else { f64::NAN })
-            .collect();
-        Ok((best, mean, limit))
+        Ok(Squares {
+            best,
+            relief: sum,
+            limit,
+            points,
+        })
     };
-    let (elev, mean, limit) = square(&t.elevation)?;
+    let Squares {
+        best: elev,
+        relief,
+        limit,
+        points,
+    } = square(&t.elevation, true)?;
     let amp = match &t.amplitude {
-        Some(a) => square(a)?.0,
+        Some(a) => square(a, false)?.best,
         None => vec![0.0; w1 * h1],
     };
-    // The surface the history left (each cell's first top before any raise), 1/16 block.
-    let coarse: Vec<i16> = (0..w1 * h1).map(|c| hz.tops[c * k]).collect();
     // Over the 4 × 4 squares i − 2 ..= i + 1, j − 2 ..= j + 1 (x wraps, z clamps).
     let window = |v: &[f64], i: usize, j: usize| -> f64 {
         let mut m = f64::NEG_INFINITY;
@@ -322,27 +455,32 @@ fn raise_tops(
         }
         m
     };
-    // The terrain at each cell's node (the column rule places a cell's stack at its corner
-    // (x1, z1), `deeptime_format::strata::stack_at`): the mean of the four squares round it.
-    let node_mean = |i: usize, j: usize| -> f64 {
-        let (mut sum, mut n) = (0.0, 0u32);
-        for dj in -1i64..=0 {
-            let jj = (j as i64 + dj).clamp(0, h1 as i64 - 1) as usize;
-            for di in -1i64..=0 {
-                let ii = (i as i64 + di).rem_euclid(w1 as i64) as usize;
-                let v = mean[jj * w1 + ii];
-                if v.is_finite() {
-                    sum += v;
-                    n += 1;
+    // The relief at each cell's node (the column rule places a cell's stack at its corner
+    // (x1, z1), `deeptime_format::strata::stack_at`): the mean, over the L3 cells of the four
+    // squares round it, of the final terrain less the history's surface at the same point. Both
+    // are read at the same points, so a node in a coarse valley between coarse ridges has no
+    // relief where the terrain only follows that surface. ledger: STR-052
+    let node_relief: Vec<f64> = (0..w1 * h1)
+        .into_par_iter()
+        .map(|c| {
+            let (i, j) = (c % w1, c / w1);
+            let (mut sum, mut n) = (0.0, 0u32);
+            for dj in -1i64..=0 {
+                let jj = (j as i64 + dj).clamp(0, h1 as i64 - 1) as usize;
+                for di in -1i64..=0 {
+                    let ii = (i as i64 + di).rem_euclid(w1 as i64) as usize;
+                    let (s, m) = relief[jj * w1 + ii];
+                    sum += s;
+                    n += m;
                 }
             }
-        }
-        if n > 0 { sum / f64::from(n) } else { f64::NAN }
-    };
+            if n > 0 { sum / f64::from(n) } else { f64::NAN }
+        })
+        .collect();
     let tables = crate::structure::columns::Tables::get();
     let max16 = max_y * 16;
-    // Per cell: (the whole-stack lift, the crest raise of the top units), 1/16 block.
-    let moved: Vec<(i32, i32)> = hz
+    // Per cell: the whole-stack lift and the crest raise of the top units.
+    let moved: Vec<Moved> = hz
         .tops
         .par_chunks_mut(k)
         .zip(hz.classes.par_chunks(k))
@@ -352,15 +490,15 @@ fn raise_tops(
             let (i, j) = (c % w1, c / w1);
             let n = classes.iter().position(|&x| x == NO_CLASS).unwrap_or(k);
             if n == 0 || tops[0] == NO_TOP {
-                return (0, 0);
+                return Moved::default();
             }
             let top0 = i32::from(tops[0]);
             // The whole stack rises where the terrain stands above the surface the history
             // left: the amplifier's relief is rock, so every contact follows it (below that
             // surface the valleys cut into the stack as before). ledger: STR-052
-            let m = node_mean(i, j);
+            let m = node_relief[c];
             let lift = if m.is_finite() {
-                ((m * 16.0).round() as i32 - top0).clamp(0, (max16 - top0).max(0))
+                ((m * 16.0).round() as i32).clamp(0, (max16 - top0).max(0))
             } else {
                 0
             };
@@ -374,10 +512,13 @@ fn raise_tops(
             let e = window(&elev, i, j);
             let a = window(&amp, i, j).max(0.0);
             if !e.is_finite() {
-                return (lift, 0);
+                return Moved {
+                    lift,
+                    ..Moved::default()
+                };
             }
             let need = ((e + a).ceil() as i32 + TOP_MARGIN_BLOCKS).min(max_y) * 16;
-            let raise = raise_stack(
+            let (raise, upto) = raise_stack_unit(
                 &mut tops[..n],
                 &classes[..n],
                 &keys[..n],
@@ -385,30 +526,41 @@ fn raise_tops(
                 min_y * 16,
                 &tables.unconsolidated,
             );
-            (lift, raise)
+            Moved {
+                lift,
+                raise,
+                upto: upto as u16,
+            }
         })
         .collect();
     let (mut raised, mut max_raise) = (0u64, 0.0f64);
     let (mut lifted, mut lift_sum, mut max_lift) = (0u64, 0.0f64, 0.0f64);
     let mut lift = vec![0.0f32; w1 * h1];
-    for (c, &(l, r)) in moved.iter().enumerate() {
-        if r > 0 {
+    for (c, m) in moved.iter().enumerate() {
+        if m.raise > 0 {
             raised += 1;
-            max_raise = max_raise.max(f64::from(r) / 16.0);
+            max_raise = max_raise.max(f64::from(m.raise) / 16.0);
         }
-        if l > 0 {
+        if m.lift > 0 {
             lifted += 1;
-            lift_sum += f64::from(l) / 16.0;
-            max_lift = max_lift.max(f64::from(l) / 16.0);
-            lift[c] = l as f32 / 16.0;
+            lift_sum += f64::from(m.lift) / 16.0;
+            max_lift = max_lift.max(f64::from(m.lift) / 16.0);
+            lift[c] = m.lift as f32 / 16.0;
         }
     }
-    let fill = mountain_fill(hz, &coarse, &mean);
+    let raise16: Vec<i32> = moved.iter().map(|m| m.raise).collect();
+    let fill = strata_census::mountain_fill(
+        hz,
+        &coarse,
+        &node_relief,
+        &raise16,
+        &tables.unconsolidated,
+    );
     let note = json!({
         "cells": lifted,
         "mean_blocks": if lifted > 0 { lift_sum / lifted as f64 } else { 0.0 },
         "max_blocks": max_lift,
-        "rule": "every horizon of a cell rises by how far the mean L3 elevation round the cell's node stands above the surface the history left (never down; capped at max_y); bodies, sites and the folds' and faults' heights rise by the same lift, read through the column rule's B-spline",
+        "rule": "every horizon of a cell rises by the mean, over the L3 cells of the four L1 squares round the cell's node, of the final elevation less the history's surface at the same point (the first tops through the column rule's B-spline), where that is positive (capped at max_y); bodies and sites rise as the rock at their centre does (the column rule's height of its stratigraphic key, before and after the lift and the crest raise), the structure file's faults and intrusions by the lift at their centre",
     });
     Ok(Raised {
         raised,
@@ -418,8 +570,14 @@ fn raise_tops(
         lift: Lift {
             grid: g1,
             blocks: lift,
+            bodies_dy: Vec::new(),
+            sites_dy: Vec::new(),
         },
         lift_note: note,
+        node_relief,
+        moved,
+        points,
+        stride,
     })
 }
 
@@ -431,6 +589,33 @@ struct Raised {
     fill: Value,
     lift: Lift,
     lift_note: Value,
+    /// Per L1 cell, the relief at its node (blocks; NaN where unknown) and what raised it.
+    node_relief: Vec<f64>,
+    moved: Vec<Moved>,
+    /// The surface census's land points and their stride (L3 cells).
+    points: Vec<Point>,
+    stride: usize,
+}
+
+/// What the bake's raise did to one L1 cell's stack (1/16 block): the whole-stack lift, the
+/// crest raise, and the last horizon the crest raise moved (horizons 0 ..= `upto` rose by it).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Moved {
+    pub lift: i32,
+    pub raise: i32,
+    pub upto: u16,
+}
+
+impl Moved {
+    /// How far horizon `h`'s top rose, 1/16 block.
+    pub fn top(&self, h: usize) -> i32 {
+        self.lift
+            + if h <= usize::from(self.upto) {
+                self.raise
+            } else {
+                0
+            }
+    }
 }
 
 /// Raises one stack's first top to at least `need` (1/16 block) and returns the raise (0 when it
@@ -450,10 +635,23 @@ pub fn raise_stack(
     floor: i32,
     unconsolidated: &[bool],
 ) -> i32 {
+    raise_stack_unit(tops, classes, keys, need, floor, unconsolidated).0
+}
+
+/// [`raise_stack`], also returning the horizon that took up the raise (horizons 0 ..= it rose;
+/// 0 when nothing moved).
+pub fn raise_stack_unit(
+    tops: &mut [i16],
+    classes: &[u8],
+    keys: &[[u16; 2]],
+    need: i32,
+    floor: i32,
+    unconsolidated: &[bool],
+) -> (i32, usize) {
     use crate::structure::columns::key;
     let n = tops.len().min(classes.len()).min(keys.len());
     if n == 0 || tops[0] == NO_TOP || i32::from(tops[0]) >= need {
-        return 0;
+        return (0, 0);
     }
     let raise = need - i32::from(tops[0]);
     let loose = |h: usize| {
@@ -492,18 +690,185 @@ pub fn raise_stack(
     for t in &mut tops[..=upto] {
         *t = (i32::from(*t) + raise).min(i32::from(i16::MAX)) as i16;
     }
-    raise
+    (raise, upto)
 }
 
 /// The whole-stack lift of the bake ([`raise_tops`]): per L1 cell of the horizon grid, how far
-/// (blocks) every horizon rose. Whatever the history put at a depth under its surface (the
-/// plutons and ore bodies, the deposit sites, the faults and intrusions of the structure file)
-/// rises with it, by the lift the column rule reads at its place, so it stays in the rock it was
-/// put in.
+/// (blocks) every horizon rose. Whatever the history put at a depth under its surface rises with
+/// the rock it was put in: the plutons and ore bodies and the deposit sites by how far the rock at
+/// their centre rose (`bodies_dy`, `sites_dy`: [`key_shift`], the lift and the crest raise
+/// together), the faults and intrusions of the structure file by the lift at their centre
+/// ([`Lift::structure`]).
 #[derive(Clone, Debug)]
 pub struct Lift {
     pub grid: deeptime_format::GridDesc,
     pub blocks: Vec<f32>,
+    /// Per body of the world (in its order), how far the rock at its centre rose, blocks; empty:
+    /// the lift at its centre ([`Lift::at`]).
+    pub bodies_dy: Vec<f64>,
+    /// Per site of the world, the same.
+    pub sites_dy: Vec<f64>,
+}
+
+/// The column rule's cubic B-spline of a per-cell field `v` of grid `g` at block (x, z), as
+/// `deeptime_format::strata::stack_at` reads the horizon tops (x wraps, z clamps); NaN where any
+/// of the 16 cells is.
+pub fn bspline_at(g: &deeptime_format::GridDesc, v: &[f32], x: f64, z: f64) -> f64 {
+    if v.is_empty() || g.w == 0 || g.r == 0 {
+        return 0.0;
+    }
+    let c = f64::from(g.w) * f64::from(g.r);
+    let wx = (x + c / 2.0).rem_euclid(c) - c / 2.0;
+    let u = (wx - g.origin_block_x as f64) / f64::from(g.r);
+    let w = (z - g.origin_block_z as f64) / f64::from(g.r);
+    let (i0, j0) = (u.floor() as i64, w.floor() as i64);
+    let (bu, bv) = (
+        deeptime_format::strata::bspline(u - i0 as f64),
+        deeptime_format::strata::bspline(w - j0 as f64),
+    );
+    let mut sum = 0.0;
+    for (b, &wv) in bv.iter().enumerate() {
+        for (a, &wu) in bu.iter().enumerate() {
+            let (ci, cj) = g.cell(i0 - 1 + a as i64, j0 - 1 + b as i64);
+            sum += wu * wv * f64::from(v[cj as usize * g.w as usize + ci as usize]);
+        }
+    }
+    sum
+}
+
+/// One cell's height (1/16 block) at every key of `ss` (ascending), its tops read by `top(h)`:
+/// the column rule's reading of one stack (`Horizons::height_at`).
+fn heights_sorted(
+    top: impl Fn(usize) -> i32,
+    keys: &[[u16; 2]],
+    floor: f64,
+    ss: &[u16],
+    out: &mut [f64],
+) {
+    let n = keys.len();
+    if n == 0 {
+        out.fill(floor);
+        return;
+    }
+    let mut h = 0;
+    for (o, &s) in out.iter_mut().zip(ss) {
+        if s <= keys[0][0] {
+            *o = f64::from(top(0));
+            continue;
+        }
+        while h + 1 < n && keys[h + 1][0] <= s {
+            h += 1;
+        }
+        let t = f64::from(top(h));
+        let b = if h + 1 < n {
+            f64::from(top(h + 1))
+        } else {
+            floor
+        };
+        let [kt, kb] = keys[h];
+        *o = if s >= kb {
+            b
+        } else {
+            t - (t - b) * (f64::from(s - kt) / f64::from(kb - kt))
+        };
+    }
+}
+
+/// How far the bake's raise moved the rock at block (x, y, z), blocks (ledger: STR-056): the
+/// column rule's height of the stratigraphic key the rock has there, after the raise less before.
+/// The lift and the crest raise only move tops, so every cell keeps its keys, and the column's
+/// height is linear in the key between the keys of the sixteen cells round it: the rock at y lies
+/// at a fraction of one such interval before and at the same fraction of it after, so it keeps
+/// its horizon. A point over the column's first top moves with that top; one under the last key
+/// (the floor) by what that key moved. `hz` is the raised stacks, `moved` per cell what raised
+/// them.
+pub fn key_shift(hz: &Horizons, moved: &[Moved], x: f64, y: f64, z: f64) -> f64 {
+    use deeptime_format::strata::{CELLS, bspline};
+    let g = &hz.grid;
+    if g.w == 0 || g.r == 0 || moved.len() != g.cells() {
+        return 0.0;
+    }
+    // The column rule's sixteen cells and weights at the block column (`stack_at`).
+    let (bx, bz) = (x.floor() as i64, z.floor() as i64);
+    let c = i64::from(g.w) * i64::from(g.r);
+    let wx = (bx + c / 2).rem_euclid(c) - c / 2;
+    let u = (wx - g.origin_block_x) as f64 / f64::from(g.r);
+    let v = (bz - g.origin_block_z) as f64 / f64::from(g.r);
+    let (i0, j0) = (u.floor() as i64, v.floor() as i64);
+    let (bu, bv) = (bspline(u - i0 as f64), bspline(v - j0 as f64));
+    let mut cells = [(0usize, 0.0f64); CELLS];
+    for (b, &wv) in bv.iter().enumerate() {
+        for (a, &wu) in bu.iter().enumerate() {
+            let (ci, cj) = g.cell(i0 - 1 + a as i64, j0 - 1 + b as i64);
+            cells[b * 4 + a] = (cj as usize * g.w as usize + ci as usize, wu * wv);
+        }
+    }
+    if cells
+        .iter()
+        .all(|&(c, _)| moved[c].lift == 0 && moved[c].raise == 0)
+    {
+        return 0.0;
+    }
+    let mut keys: Vec<u16> = cells
+        .iter()
+        .flat_map(|&(c, _)| hz.cell(c).2.iter().flatten().copied())
+        .collect();
+    keys.sort_unstable();
+    keys.dedup();
+    let m = keys.len();
+    if m == 0 {
+        return 0.0;
+    }
+    let floor = f64::from(hz.min_y) * 16.0;
+    let (mut before, mut after) = (vec![0.0f64; m], vec![0.0f64; m]);
+    let (mut hb, mut ha) = (vec![0.0f64; m], vec![0.0f64; m]);
+    for &(c, w) in &cells {
+        let (tops, _, ks) = hz.cell(c);
+        let mv = moved[c];
+        heights_sorted(|h| i32::from(tops[h]) - mv.top(h), ks, floor, &keys, &mut hb);
+        heights_sorted(|h| i32::from(tops[h]), ks, floor, &keys, &mut ha);
+        for q in 0..m {
+            before[q] += w * hb[q];
+            after[q] += w * ha[q];
+        }
+    }
+    let y16 = y * 16.0;
+    if y16 >= before[0] {
+        return (after[0] - before[0]) / 16.0;
+    }
+    for q in 0..m - 1 {
+        if y16 >= before[q + 1] {
+            let f = (before[q] - y16) / (before[q] - before[q + 1]);
+            return (after[q] - f * (after[q] - after[q + 1]) - y16) / 16.0;
+        }
+    }
+    (after[m - 1] - before[m - 1]) / 16.0
+}
+
+/// Per body and per site, how far the rock at its centre rose ([`key_shift`]).
+pub fn shifts(
+    hz: &Horizons,
+    moved: &[Moved],
+    bodies: &[deeptime_format::Body],
+    sites: &[deeptime_format::Site],
+) -> (Vec<f64>, Vec<f64>) {
+    let b = bodies
+        .par_iter()
+        .map(|b| key_shift(hz, moved, b.center[0], b.center[1], b.center[2]))
+        .collect();
+    let s = sites
+        .par_iter()
+        .map(|s| {
+            key_shift(
+                hz,
+                moved,
+                f64::from(s.center[0]),
+                f64::from(s.center[1]),
+                f64::from(s.center[2]),
+            )
+        })
+        .collect();
+    (b, s)
 }
 
 impl Lift {
@@ -511,37 +876,24 @@ impl Lift {
     /// round it, as `deeptime_format::strata::stack_at` reads the horizon tops (a uniform lift of
     /// every cell moves every interpolated top by this much).
     pub fn at(&self, x: f64, z: f64) -> f64 {
-        let g = &self.grid;
-        if self.blocks.is_empty() || g.w == 0 || g.r == 0 {
-            return 0.0;
-        }
-        let c = f64::from(g.w) * f64::from(g.r);
-        let wx = (x + c / 2.0).rem_euclid(c) - c / 2.0;
-        let u = (wx - g.origin_block_x as f64) / f64::from(g.r);
-        let v = (z - g.origin_block_z as f64) / f64::from(g.r);
-        let (i0, j0) = (u.floor() as i64, v.floor() as i64);
-        let (bu, bv) = (
-            deeptime_format::strata::bspline(u - i0 as f64),
-            deeptime_format::strata::bspline(v - j0 as f64),
-        );
-        let mut sum = 0.0;
-        for (b, &wv) in bv.iter().enumerate() {
-            for (a, &wu) in bu.iter().enumerate() {
-                let (ci, cj) = g.cell(i0 - 1 + a as i64, j0 - 1 + b as i64);
-                sum += wu * wv * f64::from(self.blocks[cj as usize * g.w as usize + ci as usize]);
-            }
-        }
-        sum
+        bspline_at(&self.grid, &self.blocks, x, z)
     }
 
-    /// `bodies` risen by the lift at each one's centre (its clip and box with it).
+    /// `bodies` risen with the rock at each one's centre (`bodies_dy`; the lift there when the
+    /// bake gave none), their clips and boxes with them.
     pub fn bodies(&self, bodies: &[deeptime_format::Body]) -> Vec<deeptime_format::Body> {
+        let given = self.bodies_dy.len() == bodies.len();
         bodies
             .iter()
-            .map(|b| {
+            .enumerate()
+            .map(|(i, b)| {
                 let mut nb = b.clone();
-                let dy = self.at(b.center[0], b.center[2]);
-                if dy > 0.0 {
+                let dy = if given {
+                    self.bodies_dy[i]
+                } else {
+                    self.at(b.center[0], b.center[2])
+                };
+                if dy != 0.0 {
                     nb.center[1] += dy;
                     if nb.clip_top_y != deeptime_format::bodies::NO_CLIP {
                         nb.clip_top_y += dy.round() as i32;
@@ -553,20 +905,26 @@ impl Lift {
             .collect()
     }
 
-    /// `sites` risen with their bodies (`bodies`, already risen): a site's box is its bodies'
-    /// boxes, its centre rises by the lift there.
+    /// `sites` risen with the rock at each one's centre (`sites_dy`; the lift there when the bake
+    /// gave none), so a site stays in its host horizon; its box is its bodies' boxes (`bodies`,
+    /// already risen), or its own risen with it.
     pub fn sites(
         &self,
         sites: &[deeptime_format::Site],
         bodies: &[deeptime_format::Body],
     ) -> Vec<deeptime_format::Site> {
+        let given = self.sites_dy.len() == sites.len();
         sites
             .iter()
-            .map(|s| {
+            .enumerate()
+            .map(|(i, s)| {
                 let mut ns = s.clone();
-                let dy = self
-                    .at(f64::from(s.center[0]), f64::from(s.center[2]))
-                    .round() as i32;
+                let dy = if given {
+                    self.sites_dy[i]
+                } else {
+                    self.at(f64::from(s.center[0]), f64::from(s.center[2]))
+                }
+                .round() as i32;
                 ns.center[1] += dy;
                 let mine: Vec<_> = bodies.iter().filter(|b| b.site == Some(s.id)).collect();
                 if mine.is_empty() {
@@ -591,7 +949,9 @@ impl Lift {
     }
 
     /// The structure file's heights risen by the lift at each event's centre: a fault's plane
-    /// and an intrusion's centre (a fold moves columns relative to where they are).
+    /// and an intrusion's centre (a fold moves columns relative to where they are). An
+    /// approximation (ledger: STR-055): the rock a fault or an intrusion cuts rose by the lift at
+    /// its own column, which differs from the centre's where the lift changes across the window.
     pub fn structure(
         &self,
         st: &deeptime_format::structure::Structure,
@@ -607,53 +967,6 @@ impl Lift {
         }
         out
     }
-}
-
-/// Relief (blocks) above the coarse surface a cell must have to count in [`mountain_fill`].
-pub const FILL_RELIEF_BLOCKS: [f64; 2] = [8.0, 30.0]; // ledger: STR-051 (game-choice: review thresholds)
-
-/// How much of the relief the final terrain has above the surface the history left (a cell's
-/// first top before the raise, `coarse`, 1/16 block) the stack's top unit fills: per L1 cell
-/// whose mean L3 elevation (`mean`, blocks) stands at least [`FILL_RELIEF_BLOCKS`] above that
-/// surface, the share of the interval [coarse, mean] the first horizon spans. Returns, per
-/// threshold, the cells, the share of them where the top unit fills more than half the relief,
-/// and the mean share filled.
-pub fn mountain_fill(hz: &Horizons, coarse: &[i16], mean: &[f64]) -> Value {
-    let floor = f64::from(hz.min_y);
-    let mut rows = Vec::new();
-    for &min_relief in &FILL_RELIEF_BLOCKS {
-        let (mut n, mut most, mut sum) = (0u64, 0u64, 0.0f64);
-        for (c, (&c0, &m)) in coarse.iter().zip(mean).enumerate() {
-            if c0 == NO_TOP || !m.is_finite() {
-                continue;
-            }
-            let lo = f64::from(c0) / 16.0;
-            let relief = m - lo;
-            if relief < min_relief {
-                continue;
-            }
-            let (tops, _, _) = hz.cell(c);
-            if tops.is_empty() {
-                continue;
-            }
-            let top = f64::from(tops[0]) / 16.0;
-            let base = tops.get(1).map_or(floor, |&t| f64::from(t) / 16.0);
-            let filled = (top.min(m) - base.max(lo)).max(0.0) / relief;
-            n += 1;
-            most += u64::from(filled > 0.5);
-            sum += filled;
-        }
-        rows.push(json!({
-            "min_relief_blocks": min_relief,
-            "cells": n,
-            "top_unit_fills_most": if n > 0 { most as f64 / n as f64 } else { 0.0 },
-            "mean_share_filled": if n > 0 { sum / n as f64 } else { 0.0 },
-        }));
-    }
-    json!({
-        "by_relief": rows,
-        "rule": "L1 cells whose mean L3 elevation stands at least min_relief_blocks above the surface the history left (the first top before the raise): the share of them where the first horizon spans more than half of that relief, and the mean share it spans",
-    })
 }
 
 #[cfg(test)]
@@ -708,6 +1021,8 @@ mod tests {
         let lift = Lift {
             grid,
             blocks: vec![12.5; n],
+            bodies_dy: Vec::new(),
+            sites_dy: Vec::new(),
         };
         for (x, z) in [(0.0, 0.0), (-511.0, 3.5), (300.25, -100.0), (511.9, 150.0)] {
             let got = lift.at(x, z);
@@ -716,7 +1031,183 @@ mod tests {
         let none = Lift {
             grid: lift.grid.clone(),
             blocks: vec![0.0; n],
+            bodies_dy: Vec::new(),
+            sites_dy: Vec::new(),
         };
         assert_eq!(none.at(17.0, -3.0), 0.0);
+    }
+
+    /// A small planet's stacks (soil, sandstone, granite and gabbro, the same keys everywhere,
+    /// tops varying from cell to cell), raised as the bake raises them: a lift of 0 to 40 blocks
+    /// on two cells in three, then a crest raise of up to 30 blocks on every other cell, which
+    /// thickens the granite and carries the soil and sandstone up over it.
+    fn raised_planet() -> (Horizons, Horizons, Vec<Moved>) {
+        let t = Tables::get();
+        let grid = deeptime_format::GridDesc::for_planet("L1", 1024, 16).unwrap();
+        let n = grid.cells();
+        let k = 4usize;
+        let min_y = -64;
+        let classes = [
+            class("soil"),
+            class("sandstone"),
+            class("granite"),
+            class("gabbro"),
+        ];
+        let keys = [
+            [0u16, 10],
+            [5000, 5010],
+            [32_768 + 64, 32_768 + 127],
+            [33_100, 33_163],
+        ];
+        let mut rng = crate::sphere::SplitMix64::new(7);
+        let mut tops = vec![NO_TOP; n * k];
+        for c in 0..n {
+            let s = 64 * 16 + rng.below(32 * 16) as i32;
+            let sand = 2 * 16 + rng.below(12 * 16) as i32;
+            let granite = 10 * 16 + rng.below(40 * 16) as i32;
+            let t0 = [s, s - 32, s - 32 - sand, s - 32 - sand - granite];
+            for (h, &v) in t0.iter().enumerate() {
+                tops[c * k + h] = v as i16;
+            }
+        }
+        let before = Horizons {
+            grid,
+            k: k as u32,
+            min_y,
+            tops,
+            classes: classes.repeat(n),
+            keys: keys.repeat(n),
+            tongues: (64, 0.15),
+            min_blocks: Vec::new(),
+        };
+        let mut after = before.clone();
+        let mut moved = vec![Moved::default(); n];
+        for (c, m) in moved.iter_mut().enumerate() {
+            let tops = &mut after.tops[c * k..(c + 1) * k];
+            let lift = if rng.below(3) > 0 {
+                rng.below(40 * 16) as i32
+            } else {
+                0
+            };
+            for t in tops.iter_mut() {
+                *t = (i32::from(*t) + lift) as i16;
+            }
+            let need = i32::from(tops[0])
+                + if rng.below(2) == 0 {
+                    rng.below(30 * 16) as i32
+                } else {
+                    0
+                };
+            let (raise, upto) =
+                raise_stack_unit(tops, &classes, &keys, need, min_y * 16, &t.unconsolidated);
+            *m = Moved {
+                lift,
+                raise,
+                upto: upto as u16,
+            };
+        }
+        (before, after, moved)
+    }
+
+    /// The column rule's undeformed column of `hz` at block (x, z).
+    fn column(hz: &Horizons, x: i64, z: i64) -> Vec<deeptime_format::strata::ColumnHorizon> {
+        let desc = hz.desc(deeptime_format::Codec::Raw);
+        let (k, w) = (hz.k as usize, hz.grid.w as usize);
+        let mut out = Vec::new();
+        deeptime_format::strata::stack_at(
+            &desc,
+            hz.min_y,
+            |i, j, h| {
+                let n = (j as usize * w + i as usize) * k + h as usize;
+                deeptime_format::strata::StoredHorizon {
+                    top: hz.tops[n],
+                    class: hz.classes[n],
+                    key: hz.keys[n],
+                }
+            },
+            x,
+            z,
+            &mut out,
+        );
+        out
+    }
+
+    /// The class of a drawn column at block y (`None` over its first top).
+    fn class_at(col: &[deeptime_format::strata::ColumnHorizon], y: i32) -> Option<u8> {
+        if col.is_empty() || y > col[0].0 {
+            return None;
+        }
+        let mut h = 0;
+        while h + 1 < col.len() && col[h + 1].0 >= y {
+            h += 1;
+        }
+        Some(col[h].1)
+    }
+
+    fn site(id: u32, center: [i32; 3]) -> deeptime_format::Site {
+        deeptime_format::Site {
+            id,
+            kind: deeptime_format::SiteKind::Deposit,
+            deposit_type: "deeptime:test_deposit".into(),
+            center,
+            lat_lon: [0.0, 0.0],
+            aabb: [center, center],
+            body: None,
+            products: Vec::new(),
+            forming_event: deeptime_format::EventId(1),
+            parent: None,
+            extraction: deeptime_format::Extraction::default(),
+        }
+    }
+
+    #[test]
+    fn a_site_keeps_its_host_stratum_across_the_lift() {
+        let (before, after, moved) = raised_planet();
+        let mut rng = crate::sphere::SplitMix64::new(11);
+        let (mut sites, mut host) = (Vec::new(), Vec::new());
+        while sites.len() < 300 {
+            let (x, z) = (rng.below(1024) as i64 - 512, rng.below(400) as i64 - 200);
+            let col = column(&before, x, z);
+            let h = rng.below(col.len() as u64) as usize;
+            let bottom = col.get(h + 1).map_or(before.min_y, |c| c.0 + 1);
+            // Mid-horizon, clear of the contacts by more than the rounding of a site's centre.
+            if col[h].0 - bottom < 6 {
+                continue;
+            }
+            let y = (col[h].0 + bottom) / 2;
+            sites.push(site(sites.len() as u32, [x as i32, y, z as i32]));
+            host.push(col[h].1);
+        }
+        let (_, sites_dy) = shifts(&after, &moved, &[], &sites);
+        let blocks: Vec<f32> = moved.iter().map(|m| m.lift as f32 / 16.0).collect();
+        let lift = Lift {
+            grid: after.grid.clone(),
+            blocks,
+            bodies_dy: Vec::new(),
+            sites_dy,
+        };
+        let risen = lift.sites(&sites, &[]);
+        let (mut rose, mut lift_alone_leaves) = (0, 0);
+        for ((s, r), &class) in sites.iter().zip(&risen).zip(&host) {
+            let [x, y, z] = r.center;
+            let col = column(&after, i64::from(x), i64::from(z));
+            assert_eq!(
+                class_at(&col, y),
+                Some(class),
+                "site {} at {:?} rose to y {y}",
+                s.id,
+                s.center
+            );
+            assert_eq!(r.aabb[0][1] - s.aabb[0][1], y - s.center[1]);
+            rose += usize::from(y > s.center[1]);
+            // The lift at the centre alone (the rule before) misses the crest raise.
+            let by_lift = s.center[1] + lift.at(f64::from(x), f64::from(z)).round() as i32;
+            lift_alone_leaves += usize::from(class_at(&col, by_lift) != Some(class));
+        }
+        assert!(rose > sites.len() / 2, "only {rose} sites rose");
+        assert!(
+            lift_alone_leaves > 0,
+            "the test needs sites the crest raise moves off the lift"
+        );
     }
 }
