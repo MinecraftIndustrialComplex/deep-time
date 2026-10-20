@@ -8,6 +8,8 @@ dominated by rivers & lakes". This counts, for every keyframe of a world-data fo
   - the largest lake (8-connected, wrapping east-west) as a share of the planet,
   - the share of the land the `rivers` layer draws as river (pixels touched, and the ink: a
     pixel's share of river when a thread narrower than a pixel is blended over the land),
+  - the land share and the coast p50 (the median distance from land to the open sea, the crust
+    budget's measure on the map's pixels),
 from the `rivers` layer's colours (crates/deeptime-core/src/water_view.rs: LAND with a hill shade,
 SEA, LAKE, FROZEN, PLAYA; anything else is a river on the `rivers` ramp) and the frame's
 `climate/ice_thickness_m` layer (under 1 m of ice is #141414 on the `ice` ramp). The map is the
@@ -35,6 +37,7 @@ from pathlib import Path
 import lz4.block
 import numpy as np
 from scipy import ndimage
+from scipy.spatial import cKDTree
 
 SEA = (0x2C, 0x40, 0x56)
 LAKE = (0x5C, 0xC0, 0xEA)
@@ -43,6 +46,8 @@ PLAYA = (0xF0, 0xD9, 0xA8)
 LAND = (0xDD, 0xD9, 0xCD)
 NO_ICE = (0x14, 0x14, 0x14)
 EARTH_KM2 = 510.07e6
+# The plate model is Earth-sized (tectonics are Earth-normalised), so the coast distance is on R.
+EARTH_R_KM = 6371.0
 
 
 def read_dtk(path: Path, want: set[str]) -> tuple[dict, dict]:
@@ -158,6 +163,24 @@ def river_ink(riv: np.ndarray, river: np.ndarray, land_dry: np.ndarray) -> np.nd
     return ink
 
 
+def coast_p50_km(land: np.ndarray, sea: np.ndarray) -> float | None:
+    """Median great-circle distance from the land to the nearest open sea, km on an Earth-sized
+    sphere, the crust budget's measure (plates/crust_budget.rs, tools/review/earth-coast.py: 433
+    km for Earth) taken on the map's pixels instead of the plate samples: the map is equal-area,
+    so every land pixel weighs the same. Lakes count as land, as the plate model has none."""
+    if not land.any() or not sea.any():
+        return None
+    h, w = land.shape
+    lat = np.arcsin(1.0 - 2.0 * (np.arange(h) + 0.5) / h)
+    lon = 2.0 * np.pi * (np.arange(w) + 0.5) / w - np.pi
+    def xyz(mask):
+        j, i = np.nonzero(mask)
+        cl = np.cos(lat[j])
+        return np.stack([cl * np.cos(lon[i]), cl * np.sin(lon[i]), np.sin(lat[j])], 1)
+    d, _ = cKDTree(xyz(sea)).query(xyz(land))
+    return float(np.median(2.0 * np.arcsin(np.minimum(d / 2.0, 1.0))) * EARTH_R_KM)
+
+
 def frame_stats(layers: dict, ice: np.ndarray | None) -> dict | None:
     riv = layers.get("rivers")
     if riv is None:
@@ -183,6 +206,7 @@ def frame_stats(layers: dict, ice: np.ndarray | None) -> dict | None:
         "river_share_of_land": int(river.sum()) / n_land if n_land else None,
         "river_ink_share_of_land": float(ink.sum()) / n_land if n_land else None,
         "largest_lake_share_of_planet": largest_component(water) / planet if planet else None,
+        "coast_p50_km": coast_p50_km(land, sea),
     }
     if ice is not None:
         iv = ice[..., 3] > 0
@@ -351,7 +375,7 @@ def main() -> int:
     plate = [r for r in rows if r["stage"].startswith("plates")]
     keys = ["lake_share_of_land", "lake_share_of_ice_free_land", "largest_lake_share_of_planet",
             "river_share_of_land", "river_ink_share_of_land", "river_share_of_ice_free_land", "ice_share_of_land",
-            "land_share_of_planet"]
+            "land_share_of_planet", "coast_p50_km"]
     summ = {"all_plate_frames": {k: summary(k, plate) for k in keys},
             "first_150_myr": {k: summary(k, [r for r in plate if r["myr_ago"] > 850]) for k in keys},
             "after_150_myr": {k: summary(k, [r for r in plate if r["myr_ago"] <= 850]) for k in keys},

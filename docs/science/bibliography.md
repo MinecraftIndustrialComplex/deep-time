@@ -1422,10 +1422,10 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Reference: Messager, Mathis L.; Lehner, Bernhard; Grill, Gunther; Nedeva, Irena; Schmitt, Oliver. 2016. Estimating the volume and age of water stored in global lakes using a geo-statistical approach. Nature Communications 7:13603.
 - DOI or URL: https://doi.org/10.1038/ncomms13603 ; PMC https://pmc.ncbi.nlm.nih.gov/articles/PMC5171767/
 - Cited as: "Messager et al. 2016, Nat. Commun. 7:13603 (HydroLAKES: 1.42 million lakes of 10 ha and more, 2.67 million km2, 1.8 % of land)"
-- Ledger ids: HYD-063
+- Ledger ids: HYD-063, HYD-090
 - Access: open access
 - Library (the project's source library, not distributed): fetched (PDF, 11 pages, text layer, 59,360 characters). From: https://www.nature.com/articles/ncomms13603.pdf. Text file: Messager2016.txt.
-- Read so far (by the project): nothing stated
+- Read so far (by the project): 2026-10-20, the lakes task: the full text (PMC) for the lake count, area and land share, quoted in HYD-063; also "21.2 million natural lakes with a surface area of at least 0.01 km2 (1 ha)", "3.23 × 10^6 km2 or 2.2% of global land area". "Global land area" is not defined further in the text read.
 - Read in this pass: full text fetched (PMC, summariser: lake count, area, land share, comparison with Verpoorter)
 - Reference check: matches. Note HydroLAKES has 1.43 million polygons, of which 1.42 million are natural lakes (the 1.42 million is natural lakes only).
 
@@ -1433,10 +1433,10 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Reference: Verpoorter, Charles; Kutser, Tiit; Seekell, David A.; Tranvik, Lars J. 2014. A global inventory of lakes based on high-resolution satellite imagery. Geophysical Research Letters 41(18):6396-6402.
 - DOI or URL: https://doi.org/10.1002/2014GL060641 (hybrid open access per OpenAlex); HAL record https://insu.hal.science/hal-01066344
 - Cited as: "Verpoorter et al. 2014, GRL 41:6396 (117 million lakes over 0.002 km2, 5.0 million km2, 3.7 % of non-glaciated land)"
-- Ledger ids: HYD-062, HYD-063
+- Ledger ids: HYD-062, HYD-063, HYD-090
 - Access: open access (hybrid)
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
-- Read so far (by the project): the run review lists it among linked sources; nothing says the paper was read
+- Read so far (by the project): the abstract, 2026-10-20 (the lakes task, through Semantic Scholar; the publisher answered 403): about 117 million lakes over 0.002 km2, about 5 x 10^6 km2, about 3.7 % of the nonglaciated land. The paper itself is not read.
 - Read in this pass: abstract fetched (OpenAlex)
 - Reference check: matches (authors, year, journal, volume, pages, DOI).
 
