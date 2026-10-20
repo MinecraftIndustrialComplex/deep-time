@@ -701,15 +701,17 @@ struct Boundary {
 }
 
 /// Set to 1 to scale the arcs, the cordillera and the subduction uplift by the convergence normal
-/// to the front (the boundary's normal, [`boundary_normal`]) instead of the full relative
-/// speed (the land-shape task's experiment, 2026-10-20).
+/// to the front (the boundary's normal, [`boundary_normal`]) instead of the full relative speed.
+/// Off by default: an experiment of the land-shape task (2026-10-20), which measured it to bring
+/// the arcs' yearly crust near Earth's and to take a fifth of the land away, so it waits for the
+/// continental crust's losses to be brought to Earth's (`docs/science/plates.md`, "Land shape and
+/// the high ground"). ledger: PLT-312
 pub const NORMAL_CONVERGENCE_ENV: &str = "DEEPTIME_ARC_NORMAL";
 
 fn normal_convergence() -> bool {
     static M: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *M.get_or_init(|| std::env::var(NORMAL_CONVERGENCE_ENV).is_ok_and(|v| v == "1"))
 }
-
 
 /// The first part of [`fronts_and_uplift`]: what it reads of the plates, their groups, the
 /// hidden flags, the positions, the motions and the contacts, none of which the belts' stacking
