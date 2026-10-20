@@ -85,7 +85,7 @@ fi
     || { echo "mac.sh: /Volumes/Graphide is not mounted on $HOST" >&2; exit 1; }
 
 EXCLUDES=(--exclude=/target/ --exclude=/smoke/ --exclude=/run/ --exclude=/run-gametest/ --exclude=/run-planet/
-          --exclude=/libs/ --exclude=/review/out/ --exclude=/neoforge/build/ --exclude=/neoforge/.gradle/
+          --exclude=/libs/ --exclude=/review/out/ --exclude=/neoforge/build/ --exclude=/devmap/build/ --exclude=/neoforge/.gradle/
           --exclude=.gradle/ --exclude=/.graphide/ --exclude=/.claude/ --exclude=/.git)
 # The Mac's /usr/bin/git is Apple's stub (no Xcode command-line tools), so a nixpkgs git is kept,
 # GC-rooted, on the SSD. It matters: without a git index Nix would treat the synced tree as a path

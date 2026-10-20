@@ -758,8 +758,10 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // A seed whose collisions weld in 300 Myr (under the force balance a held collision welds less
     // often than under the old speed law: 8 of 32 welded in the sweep of 2026-10-16, and 12 of
     // seeds 1 to 24 under the thickening limit, `rate.rs`, 2026-10-18; 7 of seeds 1 to 24 once
-    // crossed crust stays under, PLT-289 to PLT-292, the same day: 3, 7, 8, 12, 15, 20 and 21).
-    let p = preset(8000, 300.0, "scattered_continents", 3);
+    // crossed crust stays under, PLT-289 to PLT-292, the same day: 3, 7, 8, 12, 15, 20 and 21;
+    // 14 of seeds 3 to 24 with the lower-crustal flow and the settling, PLT-300 and ISO-078,
+    // 2026-10-20: 5 to 9, 11 to 14, 18 to 21 and 24, seed 14 three times, seed 3 no more).
+    let p = preset(8000, 300.0, "scattered_continents", 14);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -866,7 +868,7 @@ fn the_collision_footprint_lives_with_its_collision() {
 fn recording_does_not_change_the_world_and_matches_the_run() {
     // A seed with welds, so the collision record is tested (as in
     // `collisions_weld_on_stall_and_transfer_on_shortening`).
-    let p = preset(8000, 300.0, "scattered_continents", 3);
+    let p = preset(8000, 300.0, "scattered_continents", 14);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
@@ -1183,6 +1185,27 @@ fn the_gap_budget_changes_nothing_and_adds_up() {
         w
     };
     same_world(&strip(with), &strip(without));
+}
+
+/// The continental crust budget (`crust_budget.rs`) changes nothing but its note, and snapshots
+/// the start and every 50 Myr.
+#[test]
+fn the_crust_budget_changes_nothing() {
+    let p = preset(8000, 200.0, "scattered_continents", 6);
+    let mut with = run_stage_with(
+        PlatesStage::new(p.clone()).with_crust_budget(),
+        &p,
+        |_, _, _| {},
+    );
+    let note = with
+        .notes
+        .remove(super::CRUST_BUDGET_NOTE)
+        .expect("the budget's note");
+    assert_eq!(note.matches("\ncb_t ").count(), 5, "{note}");
+    assert!(note.contains("resample_blend:"), "{note}");
+    let without = run_stage_with(PlatesStage::new(p.clone()), &p, |_, _, _| {});
+    assert!(!without.notes.contains_key(super::CRUST_BUDGET_NOTE));
+    same_world(&with, &without);
 }
 
 /// Two plates on the preset's planet: the northern hemisphere continental (plate 0), the southern

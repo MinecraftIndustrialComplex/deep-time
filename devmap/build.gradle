@@ -1,0 +1,80 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Deep Time's internal developer map (mod id deeptime_devmap): a subproject of the neoforge/ build
+// (neoforge/settings.gradle includes it), compiled against Deep Time so it reuses Deep Time's own
+// projection and world-data code. Its jar is a separate file (build/libs/deeptime_devmap-*.jar):
+// never part of Deep Time's jar, never in the MIC pack. tools/remote/vm/play-stage.sh --devmap and
+// play-client-stage.sh --devmap add it to the play server and client by hand.
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev'
+}
+
+def devmapId = 'deeptime_devmap'
+
+version = mod_version
+group   = mod_group_id
+
+base {
+    archivesName = "${devmapId}-${minecraft_version}"
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    maven { url = 'https://maven.neoforged.net/releases' }
+}
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    mods {
+        "${devmapId}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+dependencies {
+    // Deep Time's classes (WorldProjection, WorldData, Ramps, GlobeProjection, ClientPlanetState):
+    // compiled against, loaded at run time from Deep Time's own jar (a required dependency).
+    compileOnly project(':')
+
+    testImplementation project(':')
+    testImplementation platform("org.junit:junit-bom:${junit_version}")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // The world-data reader's own libraries, as neoforge/ names them for its tests.
+    testImplementation 'com.google.guava:guava:32.1.2-jre'
+    testImplementation 'com.google.code.gson:gson:2.10.1'
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+    testLogging { events 'passed', 'failed'; exceptionFormat 'full' }
+}
+
+def generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+    def replaceProperties = [
+            minecraft_version_range: minecraft_version_range,
+            neo_version_range      : neo_version_range,
+            loader_version_range   : loader_version_range,
+            mod_version            : mod_version,
+            mod_authors            : mod_authors,
+            devmap_id              : devmapId,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from 'src/main/templates'
+    into 'build/generated/sources/modMetadata'
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

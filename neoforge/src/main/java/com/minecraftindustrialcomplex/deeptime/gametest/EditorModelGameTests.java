@@ -238,7 +238,7 @@ public final class EditorModelGameTests {
             helper.fail("natives not linked: " + NativeLoader.status().map(s -> s.describe()).orElse("never loaded"));
         EditorModel m = model();
         helper.assertTrue(m.importShareCode(ShareCode.encode(FAST)).isEmpty(), "the fast preset imports");
-        helper.assertTrue(!m.canRun(), "no timeline yet: Run is disabled");
+        helper.assertTrue(!m.canRun(), "no estimate yet: Run is disabled");
         m.setStart("supercontinent");
         m.setLengthText("100");
         m.refreshEstimate();
