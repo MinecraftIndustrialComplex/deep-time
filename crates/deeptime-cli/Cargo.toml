@@ -18,3 +18,8 @@ deeptime-format.workspace = true
 deeptime-viewer.workspace = true
 clap = { version = "4.5", features = ["derive"] }
 serde_json = "1.0.151"
+
+[features]
+# mimalloc under the counting allocator (deeptime_core::alloc).
+mimalloc = ["deeptime-core/mimalloc"]
+mimalloc-v2 = ["deeptime-core/mimalloc-v2"]

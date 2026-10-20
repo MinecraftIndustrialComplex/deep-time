@@ -31,6 +31,23 @@ v3_cargo_args() {
     V3_ARGS=(--target-dir "$V3_TARGET_DIR" --config "target.$1.rustflags=[\"-C\", \"target-cpu=$V3_LEVEL\"]")
 }
 
+# pgo_cargo_args T LEVEL PROFDATA: sets PGO_ARGS and PGO_TARGET_DIR for a profile-guided build of
+# target T at LEVEL (`baseline` or the x86-64-v3 name) from the merged profile PROFDATA (an
+# absolute path: llvm-profdata merge, tools/natives/pgo-profile.sh). `-C profile-use` goes into
+# target.T.rustflags through --config, as the v3 flag does (with --target it never reaches build
+# scripts); `-pgo-warn-missing-function` makes rustc say, for every function the profile has no
+# data for, so a profile that does not fit the source or the target shows. Its own target dir per
+# level, so the plain builds' artifacts are never rebuilt.
+pgo_cargo_args() {
+    local flags='"-C", "profile-use='"$3"'", "-C", "llvm-args=-pgo-warn-missing-function"'
+    PGO_TARGET_DIR=target/pgo
+    if [ "$2" = "$V3_LEVEL" ]; then
+        flags="\"-C\", \"target-cpu=$V3_LEVEL\", $flags"
+        PGO_TARGET_DIR=target/pgo-$V3_LEVEL
+    fi
+    PGO_ARGS=(--target-dir "$PGO_TARGET_DIR" --config "target.$1.rustflags=[$flags]")
+}
+
 cpu_level_of() {
     if grep -aq "$V3_LEVEL" "$1"; then echo "$V3_LEVEL"
     elif grep -aq baseline "$1"; then echo baseline

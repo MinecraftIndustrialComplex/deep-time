@@ -33,7 +33,9 @@
           "aarch64-apple-darwin"
         ];
         rust = pkgs.rust-bin.stable.${rustChannel}.default.override {
-          extensions = [ "rust-src" "rustfmt" "clippy" ];
+          # llvm-tools: the llvm-profdata that matches rustc's LLVM, for the PGO profile
+          # (tools/natives/pgo-profile.sh); the shell's llvmPackages.llvm is another version.
+          extensions = [ "rust-src" "rustfmt" "clippy" "llvm-tools" ];
           targets = rustTargets;
         };
 
