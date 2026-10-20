@@ -2673,6 +2673,20 @@ scattered; one seed each, so within the spread the quick ensemble shows):
 | collisions lose, km³ a year | 2.26 | 1.67 | 2.01 | 0.7 |
 | plate checks met (pooled) | 26 of 45 | 25 of 45 | 29 of 45 | |
 
+**Stage times** (`tools/review/p1-19-pair.sh`, `earthlike_full_16k`, scattered continents,
+1000 Myr, 8 threads, master c24ff793 and the branch side by side on the VM's two halves, then
+swapped; the VM was loaded, 18 to 22 other cores busy, so the totals are above a quiet run's):
+
+| pair | plates, master / branch, s | total, master / branch, s |
+|---|---|---|
+| ab | 409.2 / 402.0 | 1,634.9 / 1,675.5 |
+| ba | 347.6 / 341.5 | 1,422.0 / 1,430.8 |
+| mean ratio | 0.982 | 1.016 |
+
+The plates take 1.8 % less (the shorter cordillera moves less rock); the total takes 1.6 % more,
+all of it in the surface stage (747 to 780 s), which works on a different planet. The branch
+adds no work per step, so the 900 s gate stands where master left it.
+
 **What is left, and for whom.**
 1. *The island-arc front* (gain, 2.8 times Earth's): fewer and longer-lived ocean-ocean subduction
    zones from the force balance. Plate work; with it PLT-312 can be measured again.
