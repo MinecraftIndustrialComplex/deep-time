@@ -733,7 +733,7 @@ impl Default for TectonicParams {
             collapse_quiet_myr: 10.0,       // ledger: PLT-259
             collapse_reach_km: 200.0,       // ledger: PLT-257
             crust_max_km: 70.0,             // ledger: PLT-258
-            crust_channel_km2_myr: 1500.0,  // ledger: PLT-293
+            crust_channel_km2_myr: 1500.0,  // ledger: PLT-300
             isostasy_relax_myr: 0.004,      // ledger: ISO-078
             thickening_max_mm_yr: 5.0,      // ledger: PLT-287
             uplift_max_mm_yr: 3.5,          // ledger: PLT-288

@@ -1791,11 +1791,11 @@ sampling; a larger paired ensemble would tell.
 Ben, watching a planet form (earthlike_quick_16k, supercontinent, 1000 Myr): "mountains will
 'eat' the world and delete most of the continents and leave things as a stringy mess of
 'islands.'" One supercontinent at 900 Myr ago, narrow snow-capped chains and island strings in a
-mostly empty ocean by 650 Myr ago. Ledger PLT-293 to PLT-295, ISO-078 and HYP-035; the sources'
+mostly empty ocean by 650 Myr ago. Ledger PLT-300 to PLT-302, ISO-078 and HYP-035; the sources'
 bibliography entries name those ids. Code: `plates/{flow.rs, settle.rs, crust_budget.rs,
 collapse.rs, mod.rs}`; tables and maps by `tools/review/continent-budget.py`.
 
-**The budget (measurement only, PLT-295).** `DEEPTIME_CRUST_BUDGET=1` keeps the continental
+**The budget (measurement only, PLT-302).** `DEEPTIME_CRUST_BUDGET=1` keeps the continental
 crust's stocks every 50 Myr (area, volume visible and hidden, land at the climate's sea level, the
 dry share of the continental crust, the land above 2 km, the median distance from land to the
 coast, the thickness bands with their elevation and Airy height), books each stock's change to the
@@ -1870,3 +1870,42 @@ thickness ends near its isostatic height and spreads when it is thick and hot.
 
 The transition's width (PLT-262) is Ben's (decisions log 2026-10-05, "Keep 200 km, raise crust in
 7–8") and is not changed here.
+
+**The fix.** Two rules on the plate model's samples, each with its own parameter and its own
+ledger row, run each plate step after the collapse and before the rate limits:
+
+1. *The lower-crustal flow* (`plates/flow.rs`, PLT-300, PLT-301): continental crust thicker than
+   `collapse_thickness_km` (50 km, PLT-256) spreads into the crust around it on its plate,
+   orogeny or not, by diffusion of thickness, ∂T/∂t = ∇·(K∇T) with K = K₀ (h/15 km)³ and h the
+   channel's thickness above 50 km (at most 30 km). It is the thin-channel flux in the isostatic
+   limit (Bird 1991; Clark & Royden 2000). K₀ = `crust_channel_km2_myr` = 1,500 km²/Myr, the
+   diffusivity whose length over 15 Myr, √(K t), is Rey, Teyssier & Whitney's 150 km. It moves
+   crust, not area: the test `a_thick_belt_spreads_into_the_crust_around_it_and_keeps_its_volume`
+   holds the volume to a millionth.
+2. *The settling* (`plates/settle.rs`, ISO-078): every visible continental column moves to the
+   height its crust holds up, z* = z_A above the sea and s + (z_A − s) · 1.454 below it (its
+   water on it), plus the surface's flexure. Its time, `isostasy_relax_myr`, is the mantle's:
+   4 kyr (Wieczerkowski, Mitrovica & Wolf 1999, abstract), so a 2 Myr step settles the whole way.
+   The model's thermal heights (the ocean floor's age-depth law, the margins' transition on
+   McKenzie's 62.8 Myr) have their own rules; the gaps the plate rules leave are mechanical.
+
+The flow alone does not bring the land back, and the settling on the thermal time does not either
+(`earthlike_quick_16k`, supercontinent seed 2, 1000 Myr, the end):
+
+| run | land | dry share of the continental crust | land above 2 km, of land | coast distance p50, km | continental crust |
+|---|---|---|---|---|---|
+| master (c88c2eb5 with the budget) | 0.192 | 0.45 | 0.336 | 166 | 0.392 |
+| flow only | 0.200 | 0.44 | 0.233 | 189 | 0.411 |
+| settling on 62.8 Myr only | 0.244 | 0.56 | 0.206 | 151 | 0.422 |
+| flow, settling on 62.8 Myr | 0.250 | 0.61 | 0.294 | 175 | 0.399 |
+| flow, settling on 10 Myr | 0.274 | 0.71 | 0.448 | 174 | 0.347 |
+| flow, settling on 0.5 Myr | 0.338 | 0.68 | 0.301 | 152 | 0.433 |
+| Earth | 0.289 | 0.71 | 0.102 | 433 | 0.41 |
+
+One seed each, so the differences between the fast settlings are within a run's chaos; every
+settling of 10 Myr or less brings every thickness band to its Airy height. The flow takes the
+thickest crust down (the 55-70 km band's share) and the land above 2 km with it when the settling
+is off; with the settling on, the land above 2 km is set by the thickness distribution under the
+model's Airy line (z_0 = 525 m at 35.1 km, 1 km per 7.02 km of crust): 45 km of crust stands at
+1.9 km and 50 km at 2.6 km, and 0.3 to 0.4 of the continental crust is thicker than 45 km at the
+end of a run, where Earth's mean is 41.1 km and its orogens 46.3 km (Christensen & Mooney 1995).
