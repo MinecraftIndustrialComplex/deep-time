@@ -94,7 +94,27 @@ public final class TextWrap {
         }
         if (best != null)
             return best;
-        return wrap(sentences.get(0), width, lineWidths);
+        return beforeOpenAside(wrap(sentences.get(0), width, lineWidths), width, lineWidths);
+    }
+
+    /**
+     * A cut that would end inside a bracket ("as a multiple of the default sizes (at 1 a…") ends
+     * before the bracket instead, when that keeps at least half the first line: the aside is the
+     * part a short summary can drop. game-choice (P1-11d): the half line is a layout rule.
+     */
+    private static Wrapped beforeOpenAside(Wrapped cut, ToIntFunction<String> width, int... lineWidths) {
+        if (!cut.cut() || cut.lines().isEmpty())
+            return cut;
+        String shown = String.join(" ", cut.lines());
+        shown = shown.substring(0, shown.length() - ELLIPSIS.length());
+        int open = shown.lastIndexOf('(');
+        if (open <= 0 || shown.indexOf(')', open) >= 0)
+            return cut;
+        String prefix = stripTrailing(shown.substring(0, open).trim());
+        if (width.applyAsInt(prefix) < lineWidths[0] / 2)
+            return cut;
+        Wrapped shorter = wrap(prefix + ELLIPSIS, width, lineWidths);
+        return shorter.cut() || shorter.lines().isEmpty() ? cut : new Wrapped(shorter.lines(), true);
     }
 
     /** The sentences of {@code text}: split after ".", "!" or "?" followed by a space and a capital letter or a digit. */

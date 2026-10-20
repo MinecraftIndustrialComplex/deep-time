@@ -10,6 +10,7 @@ import com.minecraftindustrialcomplex.deeptime.screen.model.Estimate;
 import com.minecraftindustrialcomplex.deeptime.screen.model.Formats;
 import com.minecraftindustrialcomplex.deeptime.screen.model.Phrase;
 import com.minecraftindustrialcomplex.deeptime.screen.model.Problem;
+import com.minecraftindustrialcomplex.deeptime.screen.model.TextWrap;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -37,18 +38,23 @@ import java.util.function.BooleanSupplier;
  * The Customize page (docs/design/create-world-ux.md, "Customize"): opt-in, for players who want to
  * shape the planet themselves. Six topic tabs over the {@link EditorFields} catalogue (the same
  * parameters as the browser workbench, sorted by {@link CustomizeTopics}); every setting is one row
- * with its name, what it does in one line, its range and unit, and a reset to the preset's value, and
- * a changed setting is marked. Above the list, the preset it starts from and how many changes were
+ * with its name, what it does in up to two lines, its range and unit, and a reset to the preset's
+ * value, and a changed setting is marked. The tab's description sits above its first heading. Above the list, the preset it starts from and how many changes were
  * made; below it, the live estimate (time and memory, with a warning when the run is slow or does not
  * fit the memory cap), share codes out and in, Back, and Generate. Advanced holds the memory cap, the
  * Phase 3 placeholders and a search over every setting, the only place the preset paths show.
  */
 final class CustomizePage implements PlanetEditorScreen.Page {
 
-    static final int ROW = 34, GAP = 8;
+    /**
+     * A setting's row: its name and control (20 high), then what it does on two lines from
+     * {@link #LINE}, 10 apart; the next row's control starts 3 below the second line.
+     */
+    static final int ROW = 42, GAP = 8, LINE = 21;
     /** The per-setting Reset button's width; it shows only on a changed setting. */
     static final int RESET_W = 44;
-    static final int TEXT = 0xffe8e8e8, DIM = 0xff9aa3ad, FAINT = 0xff6f7883, ACCENT = 0xffffd060, ERROR = 0xffff7070,
+    /** RANGE: a setting's range and unit, lighter than the old 0xff6f7883 so it reads on the list's dark ground. */
+    static final int TEXT = 0xffe8e8e8, DIM = 0xff9aa3ad, RANGE = 0xff8a949e, ACCENT = 0xffffd060, ERROR = 0xffff7070,
             GOOD = 0xff80e080;
 
     /** Remembered across rebuilds: the open topic, each topic's scroll, the search. */
@@ -203,6 +209,8 @@ final class CustomizePage implements PlanetEditorScreen.Page {
 
     private void fillList() {
         list.clear();
+        // The tab's own description goes above the first heading, in the band a heading row leaves.
+        list.intro(topic == Topic.ADVANCED && !query.isBlank() ? null : Lang.tr(topic.key() + ".hint"));
         Font font = screen.font();
         switch (topic) {
             case PLANET -> {
@@ -460,11 +468,18 @@ final class CustomizePage implements PlanetEditorScreen.Page {
     // The list
     // ------------------------------------------------------------------------------------------
 
-    /** The settings list: headings, notes and setting rows of two lines each. */
+    /** The settings list: headings, notes and setting rows of three lines each. */
     static final class Rows extends ContainerObjectSelectionList<Rows.Entry> {
+
+        /** What the list's first heading shows above itself (the open tab's description), or null. */
+        private Component intro;
 
         Rows(Minecraft mc, int width, int height, int y) {
             super(mc, width, height, y, ROW);
+        }
+
+        void intro(Component text) {
+            intro = text;
         }
 
         @Override
@@ -483,7 +498,7 @@ final class CustomizePage implements PlanetEditorScreen.Page {
         }
 
         void heading(Component text) {
-            addEntry(new Heading(text));
+            addEntry(new Heading(text, children().isEmpty() ? intro : null));
         }
 
         void note(Component text) {
@@ -505,16 +520,27 @@ final class CustomizePage implements PlanetEditorScreen.Page {
         abstract static class Entry extends ContainerObjectSelectionList.Entry<Entry> {}
 
         static final class Heading extends Entry {
-            private final Component text;
+            private final Component text, intro;
+            private List<String> introLines = List.of();
+            private int introW = -1;
 
-            Heading(Component text) {
+            Heading(Component text, Component intro) {
                 this.text = text;
+                this.intro = intro;
             }
 
             @Override
             public void render(GuiGraphics g, int index, int top, int left, int width, int height, int mouseX, int mouseY,
                     boolean hovering, float partialTick) {
                 Font font = Minecraft.getInstance().font;
+                if (intro != null) {
+                    if (introW != width) {
+                        introLines = TextWrap.wrap(intro.getString(), font::width, width, width).lines();
+                        introW = width;
+                    }
+                    for (int i = 0; i < introLines.size(); i++)
+                        g.drawString(font, introLines.get(i), left, top + 4 + 10 * i, DIM, false);
+                }
                 int y = top + height - 14;
                 g.drawString(font, fit(font, text, width), left, y, ACCENT, false);
                 g.fill(left, y + 10, left + width, y + 11, 0x40ffffff);
@@ -543,7 +569,7 @@ final class CustomizePage implements PlanetEditorScreen.Page {
                     boolean hovering, float partialTick) {
                 Font font = Minecraft.getInstance().font;
                 int y = top + 3;
-                for (var l : font.split(text, width).stream().limit(3).toList()) {
+                for (var l : font.split(text, width).stream().limit((height - 3) / 10).toList()) {
                     g.drawString(font, l, left, y, DIM, false);
                     y += 10;
                 }
@@ -560,13 +586,19 @@ final class CustomizePage implements PlanetEditorScreen.Page {
             }
         }
 
-        /** One setting: name and control on the first line, what it does and its range on the second. */
+        /**
+         * One setting: name and control on the first line; what it does on the next two (as many
+         * of its sentences as fit, {@link TextWrap#summary}, the whole of it in the tooltip), with
+         * its range at the right of the first of them.
+         */
         static final class Setting extends Entry {
             private final Component label, line, range, tooltip;
             private final AbstractWidget widget;
             private final Button reset;
             private final BooleanSupplier edited;
             private final int widgetW;
+            private List<String> lines = List.of();
+            private int linesFirst = -1, linesSecond = -1;
 
             Setting(Component label, AbstractWidget widget, Button reset, BooleanSupplier edited, Component line, Component range,
                     Component tooltip, int widgetW) {
@@ -589,11 +621,20 @@ final class CustomizePage implements PlanetEditorScreen.Page {
                 int wx = rx - 4 - widgetW;
                 int textW = wx - left - 12;
                 if (ed)
-                    g.fill(left, top + 1, left + 2, top + height - 4, ACCENT);
+                    g.fill(left, top + 1, left + 2, top + height - 3, ACCENT);
                 g.drawString(font, fit(font, label, textW), left + 6, top + 6, ed ? ACCENT : TEXT, false);
-                g.drawString(font, fit(font, line, textW), left + 6, top + 20, DIM, false);
                 String r = fit(font, range, widgetW + RESET_W + 4);
-                g.drawString(font, r, left + width - font.width(r), top + 20, FAINT, false);
+                int rangeX = left + width - font.width(r);
+                g.drawString(font, r, rangeX, top + LINE, RANGE, false);
+                // The description runs up to the range on its first line and the full width on its second.
+                int first = rangeX - 8 - (left + 6), second = width - 6;
+                if (first != linesFirst || second != linesSecond) {
+                    lines = TextWrap.summary(line.getString(), font::width, first, second).lines();
+                    linesFirst = first;
+                    linesSecond = second;
+                }
+                for (int i = 0; i < lines.size(); i++)
+                    g.drawString(font, lines.get(i), left + 6, top + LINE + 10 * i, DIM, false);
                 widget.setX(wx);
                 widget.setY(top);
                 widget.render(g, mouseX, mouseY, partialTick);
@@ -603,7 +644,8 @@ final class CustomizePage implements PlanetEditorScreen.Page {
                 reset.visible = ed;
                 reset.active = ed;
                 reset.render(g, mouseX, mouseY, partialTick);
-                if (hovering && mouseX < wx && tooltip != null && !tooltip.getString().isBlank()
+                // Anywhere but on the control and Reset (which have their own), the row shows the whole description.
+                if (hovering && (mouseX < wx || mouseY >= top + LINE) && tooltip != null && !tooltip.getString().isBlank()
                         && Minecraft.getInstance().screen != null)
                     Minecraft.getInstance().screen.setTooltipForNextRenderPass(font.split(tooltip, Math.max(160, width / 2)));
             }
