@@ -105,8 +105,66 @@ class ProjectionParityTest {
                 checked += 2;
                 k++;
             }
+            // Exact inputs on the forward's degenerate lines (the equator, the tiles' midlines and
+            // edges, the cone points, the 67.5° vertices; ledger: SCL-083).
+            k = 0;
+            for (JsonElement el : w.getAsJsonArray("exact")) {
+                JsonObject r = el.getAsJsonObject();
+                double[] p = g.blockOf(f(r.get("lat")), f(r.get("lon")));
+                same("b " + b + " exact[" + k + "].x", p[0], r.get("x"));
+                same("b " + b + " exact[" + k + "].z", p[1], r.get("z"));
+                checked += 2;
+                k++;
+            }
+            assertTrue(k > 400, "b " + b + ": " + k + " exact rows");
         }
         assertTrue(checked > 2000, "the fixture holds " + checked + " values");
+    }
+
+    /**
+     * Sphere to block to sphere on exact inputs where Petroff's forward is degenerate (ledger:
+     * SCL-083): the equator at every 0.1° of longitude, the meridians λc, λc ± 90° and λc + 180° at
+     * every 0.1° of latitude, the cone points, the 67.5° vertices, the tile centres and the poles.
+     * Before 2026-10-20 these landed up to 10.5° off (the play world's cone points at (616, −3328)).
+     */
+    @Test
+    void exactInputsOnTheDiagonalsRoundTrip() {
+        double[][] worlds = {{6656, 31.25}, {13056, 200.0}, {1536, 0.0}, {6656, 146.0}};
+        for (double[] wc : worlds) {
+            PetroffGuyou g = new PetroffGuyou((long) wc[0], wc[1]);
+            double b = wc[0], h = b / 2, lc = wc[1];
+            java.util.List<double[]> pts = new java.util.ArrayList<>();
+            for (int k = 0; k < 3600; k++)
+                pts.add(new double[]{0.0, k * 0.1});
+            for (int k = -899; k <= 899; k++)
+                for (double d : new double[]{0, 90, 180, 270})
+                    pts.add(new double[]{k * 0.1, PortableMath.wrapDeg(lc + d)});
+            for (double lat : new double[]{45, -45})
+                for (double d : new double[]{90, 270})
+                    pts.add(new double[]{lat, PortableMath.wrapDeg(lc + d)});
+            for (double d : new double[]{0, 180}) {
+                for (double o : new double[]{22.5, -22.5}) {
+                    pts.add(new double[]{0.0, PortableMath.wrapDeg(lc + d + o)});
+                    pts.add(new double[]{o, PortableMath.wrapDeg(lc + d)});
+                }
+                pts.add(new double[]{0.0, PortableMath.wrapDeg(lc + d)});
+            }
+            pts.add(new double[]{90, 0});
+            pts.add(new double[]{-90, 0});
+            double worst = 0;
+            for (double[] ll : pts) {
+                double[] p = g.blockOf(ll[0], ll[1]);
+                String at = "b " + (long) b + " λc " + lc + ": (" + ll[0] + ", " + ll[1] + ") -> (" + p[0] + ", " + p[1] + ")";
+                assertTrue(p[0] >= -b && p[0] < b && Math.abs(p[1]) <= h, at);
+                double d = Math.toDegrees(angle(g.unit(p[0], p[1]), unitOf(ll[0], ll[1])));
+                worst = Math.max(worst, d);
+                assertTrue(d < 1e-5, at + " is " + d + "° off");
+                if (ll[0] == 0.0)
+                    assertTrue(Math.abs(p[1]) < 1e-6, at + ": the equator is z = 0");
+            }
+            System.out.println("exact diagonal inputs, b " + (long) b + " λc " + lc + ": " + pts.size()
+                    + " points, worst round trip " + worst + "°");
+        }
     }
 
     private static double angle(double[] a, double[] b) {
