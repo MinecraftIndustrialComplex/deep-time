@@ -223,15 +223,19 @@ class PlanetGeometryTest {
     }
 
     @Test
-    void theGuardThrowsOnAForwardThatMisses() {
-        // PG with a forward 0.01° off in latitude: PlanetGeometry.blockOf must refuse it.
+    void theGuardCatchesAForwardThatMisses() {
+        // PG with a forward 0.01° off in latitude: strictBlockOf refuses it; blockOf (the render
+        // paths') logs it once and still returns the forward's result rather than crash the client.
         WorldProjection off = (WorldProjection) java.lang.reflect.Proxy.newProxyInstance(
                 WorldProjection.class.getClassLoader(), new Class<?>[]{WorldProjection.class},
                 (proxy, m, args) -> m.getName().equals("blockOf")
                         ? PG.blockOf((double) args[0] + 0.01, (double) args[1])
                         : m.invoke(PG, args));
-        assertThrows(IllegalStateException.class, () -> PlanetGeometry.blockOf(off, 10.0, 20.0));
-        assertEquals(PG.blockOf(10.0, 20.0)[0], PlanetGeometry.blockOf(PG, 10.0, 20.0)[0]);
+        assertThrows(IllegalStateException.class, () -> PlanetGeometry.strictBlockOf(off, 10.0, 20.0));
+        PlanetGeometry.FORWARD_MISS_LOGGED.set(false);
+        assertEquals(off.blockOf(10.0, 20.0)[1], PlanetGeometry.blockOf(off, 10.0, 20.0)[1]);
+        assertTrue(PlanetGeometry.FORWARD_MISS_LOGGED.get(), "the miss was logged");
+        assertEquals(PG.blockOf(10.0, 20.0)[0], PlanetGeometry.strictBlockOf(PG, 10.0, 20.0)[0]);
     }
 
     @Test
