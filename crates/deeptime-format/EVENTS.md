@@ -83,7 +83,7 @@ sections
 
 ```text
 0    8   u64 id
-8    8   f64 t_start, years relative to world creation (negative = geologic past)
+8    8   f64 t_start, years relative to world creation (negative = before it, positive = after)
 16   8   f64 t_end (= t_start for an instantaneous event; t_end ≥ t_start)
 24   4   u32 kind (string index)
 28   4   u32 source (string index)

@@ -997,7 +997,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Clark, M. K. and Royden, L. H. (2000). Topographic ooze: Building the eastern margin of Tibet by lower crustal flow. Geology 28(8):703-706.
 - DOI or URL: 10.1130/0091-7613(2000)28<703:TOBTEM>2.0.CO;2.
 - Cited as: (ERO, ISO, HYP) "Clark & Royden 2000, Geology 28(8):703-706" (spread.rs). (PLT) "Clark & Royden 2000, Geology 28:703".
-- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy)
+- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy); PLT-300, PLT-301 (2026-10-20: the channel flow out of Tibet and its 15 km channel, from memory)
 - Access: paywalled (GeoScienceWorld 403); not fetched. [other sections: paywalled (GSA; not tested).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1010,7 +1010,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Royden, L. H., Burchfiel, B. C., King, R. W., Wang, E., Chen, Z., Shen, F. and Liu, Y. (1997). Surface deformation and lower crustal flow in eastern Tibet. Science 276(5313):788-790.
 - DOI or URL: 10.1126/science.276.5313.788.
 - Cited as: (ERO, ISO, HYP) "Royden et al. 1997, Science 276:788-790". (PLT) "Royden et al. 1997".
-- Ledger ids: ISO-018, ISO-020
+- Ledger ids: ISO-018, ISO-020; PLT-300 (2026-10-20, as the channel flow's background; not fetched)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1047,7 +1047,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Bird, P. (1991). Lateral extrusion of lower crust from under high topography in the isostatic limit. Journal of Geophysical Research 96(B6):10275-10286.
 - DOI or URL: 10.1029/91JB00370.
 - Cited as: (ERO, ISO, HYP) "Bird 1991, JGR 96(B6):10275-10286". (PLT) "Bird 1991 (JGR 96:10275)".
-- Ledger ids: ISO-019, ISO-020, PLT-255 (orogenic collapse, 2026-10-03: the abstract's "cannot maintain short-wavelength (100 km) Moho relief of more than 1 km for times greater than 10–20 m.y. at most", Basin and Range)
+- Ledger ids: ISO-019, ISO-020, PLT-255 (orogenic collapse, 2026-10-03: the abstract's "cannot maintain short-wavelength (100 km) Moho relief of more than 1 km for times greater than 10–20 m.y. at most", Basin and Range); PLT-300 (2026-10-20: the same abstract quote beside the lower-crustal flow)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1120,7 +1120,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Cogley, J. G. (1984). Continental margins and the extent and number of the continents. Reviews of Geophysics 22(2):101-122.
 - DOI or URL: 10.1029/RG022i002p00101.
 - Cited as: (ERO, ISO, HYP) "Cogley 1984 (continental crust 41 % of the surface)". (PLT) "Cogley 1984, Rev. Geophys. 22:101-122" (29 percent land on 41 percent continental crust).
-- Ledger ids: HYP-012, HYP-013, PLT-158, PLT-159, PLT-205
+- Ledger ids: HYP-012, HYP-013, PLT-158, PLT-159, PLT-205; HYP-035 (2026-10-20: the 41 % share as the stand-in contour for the continental edge)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1214,7 +1214,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Tozer, B., Sandwell, D. T., Smith, W. H. F., Olson, C., Beale, J. R. and Wessel, P. (2019). Global bathymetry and topography at 15 arc sec: SRTM15+. Earth and Space Science 6(10):1847-1864.
 - DOI or URL: (ERO, ISO, HYP) 10.1029/2019EA000658 (gold open access; DOAJ record https://doaj.org/article/95db1757cac2402aaa9c72408bdc82ed). (MOI, BIO) https://doi.org/10.1029/2019EA000658 (gold open access) (PLT) 10.1029/2019EA000658 (open access in Wiley). (CLM) 10.1029/2019EA000658
 - Cited as: (ERO, ISO, HYP) "Tozer et al. 2019" (SRTM15+) in build log 2026-10-01. (MOI, BIO) "GMT earth_relief (SRTM15+, Tozer et al. 2019)" (PLT) "Tozer et al. 2019 (SRTM15+, GMT earth_relief 30 arc-minute)".
-- Ledger ids: HYP-001 to HYP-011, HYP-032, PLT-168, PLT-170; none (relief used in the Earth comparisons); notes: as the dataset behind GMT earth_relief; relief used in the Earth comparisons
+- Ledger ids: HYP-001 to HYP-011, HYP-032, PLT-168, PLT-170; none (relief used in the Earth comparisons); notes: as the dataset behind GMT earth_relief; relief used in the Earth comparisons; HYP-035 (2026-10-20: the median distance from land to the coast on the model's sampling, computed on earth_relief_15m_p)
 - Access: open access. [other sections: open access (Wiley/AGU). / not checked (journal is open access)]
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Read so far (by the project): (ERO, ISO, HYP) no record. (MOI, BIO) used as data (PLT) numbers computed by the project from the GMT grid. (CLM) data used
@@ -5246,7 +5246,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Wieczerkowski, K., Mitrovica, J. X., Wolf, D. (1999). A revised relaxation-time spectrum for Fennoscandia. Geophysical Journal International 139(1):69-86.
 - DOI or URL: 10.1046/j.1365-246X.1999.00924.x
 - Cited as: docs/design/flexure.md sections 7 and 11
-- Ledger ids: ISO-064
+- Ledger ids: ISO-064, ISO-078 (2026-10-20, the continent budget: the abstract's 3-5 kyr as the settling's time, 4 kyr, `plates/settle.rs`)
 - Access: open (publisher page).
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: relaxation times "close to 3-5 kyr".
@@ -5990,7 +5990,7 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 ### ReyTeyssierWhitney2010
 - Reference: Rey, P. F., Teyssier, C. and Whitney, D. L. (2010). Limit of channel flow in orogenic plateaux. Lithosphere 2(5):328-332.
 - DOI or URL: 10.1130/L114.1 (author copy https://www.earthbyte.org/Resources/Pdf/rey_L114_v1.pdf)
-- Ledger ids: PLT-257
+- Ledger ids: PLT-257, PLT-300 (2026-10-20: K₀ = 150² / 15 km²/Myr, the lower-crustal flow `plates/flow.rs`)
 - Access: open author copy; full text read.
 - Library: not fetched.
 - Read so far (by the project): full text, 2026-10-03: "Over 15 m.y., the length scale of channel-flow extrusion is 150 km rather than 1500 km"; a channel "travels at most 150 km into the foreland after 12 m.y. of gravitational collapse"; flow "1 cm yr–1 or less".
@@ -6334,7 +6334,7 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Reference: McKenzie, D. (1978). Some remarks on the development of sedimentary basins. Earth and Planetary Science Letters 40:25-32.
 - DOI or URL: 10.1016/0012-821X(78)90071-7 (the DOI from the standard citation, not seen on the scan); scan at http://www.zetaware.com/public/McKenzie_1978.pdf
 - Cited as: "McKenzie 1978" (uniform stretching by β; initial and thermal subsidence).
-- Ledger ids: PLT-261, PLT-263, PLT-264
+- Ledger ids: PLT-261, PLT-263, PLT-264, ISO-078 (2026-10-20, the continent budget: τ = 62.8 My of Table 1, tried as the settling's time and dropped, `plates/settle.rs`)
 - Access: scanned copy, open.
 - Read so far (by the project): full text (OCR; the equations partly garbled), 2026-10-04: "a unit length of continental lithosphere is suddenly extended to a length β, causing upwelling of hot asthenosphere"; "The slow subsidence and the heat flow depend only on the amount of stretching"; Table 1: τ = 62.8 My, E0 = 3.2 km, ρ_c 2.8, ρ_m 3.33, ρ_w 1.0 g/cm³; thermal subsidence S_t ≈ E0 r (1 − e^(−t/τ)), r = (β/π) sin(π/β).
 
@@ -6792,3 +6792,25 @@ The sources behind the ocean crust's own column (build log 2026-10-19 "Crust tem
 - Access: Wiley, not fetched.
 - Library: not kept.
 - Read so far (by the project): nothing. Cited from memory (crust templates agent, 2026-10-19): the ocean–continent transition of a volcanic margin is thick igneous crust (seaward-dipping lavas over a high-velocity lower crust of underplated gabbro), thicker than normal ocean crust and thinning to it seaward. No thickness is quoted because none was read. Franke 2013 (above, read in full on 2026-10-04) gives the share of volcanic margins; its accepted manuscript did not answer (HTTP 522) when it was checked again on 2026-10-19.
+
+## The present-day nudge's cap and the Köppen floors' noise (CLM-151, CLM-206, BIO-072), added 2026-10-19
+
+The temperate present's CO2 cap rests on the late Quaternary's glacial-to-interglacial range; the GameTest floors are compared with a share's confidence bound (build log 2026-10-19, "The present-day nudge's cap").
+
+### Luthi2008
+- Reference: Lüthi, D., Le Floch, M., Bereiter, B., Blunier, T., Barnola, J.-M., Siegenthaler, U., Raynaud, D., Jouzel, J., Fischer, H., Kawamura, K. and Stocker, T. F. (2008). High-resolution carbon dioxide concentration record 650,000-800,000 years before present. Nature 453(7193):379-382.
+- DOI or URL: 10.1038/nature06949; abstract on OSTI, https://www.osti.gov/etdeweb/biblio/21286198; data PANGAEA 10.1594/PANGAEA.710901.
+- Cited as: "Lüthi et al. 2008" (climate/params.rs, `present_co2_factor_max`: the late Quaternary's 172 to 300 ppm).
+- Ledger ids: CLM-206, CLM-151
+- Access: paywalled (Nature); the abstract is open.
+- Library: not kept (read through the web fetch tool, 2026-10-19).
+- Read so far (by the project): the abstract, 2026-10-19: "We report the lowest carbon dioxide concentration measured in an ice core, which extends the pre-industrial range of carbon dioxide concentrations during the late Quaternary by about 10 p.p.m.v. to 172-300 p.p.m.v."; the record reaches 800,000 yr before present over eight glacial cycles, and CO2 stayed below 180 p.p.m.v. for about 3,000 yr in Marine Isotope Stage 16. The paper itself was not read.
+
+### Wilson1927
+- Reference: Wilson, E. B. (1927). Probable inference, the law of succession, and statistical inference. Journal of the American Statistical Association 22(158):209-212.
+- DOI or URL: 10.1080/01621459.1927.10502953 (from memory, not looked up).
+- Cited as: "Wilson's score interval, Wilson 1927, JASA 22: 209" (neoforge gametest/ShareBound.java).
+- Ledger ids: BIO-072
+- Access: paywalled (Taylor & Francis).
+- Library: not fetched.
+- Read so far (by the project): from memory. The interval's form was checked by deriving it, not against the paper: the bounds are the roots in p of (p̂ - p)² = z² p(1 - p) / n, (p̂ + z²/2n ± z sqrt(p̂(1 - p̂)/n + z²/4n²)) / (1 + z²/n). The one-sided 99 % quantile of the standard normal, 2.326, is from memory (the tables give 2.3263).

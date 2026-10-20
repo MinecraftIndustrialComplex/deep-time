@@ -159,7 +159,7 @@ if [ "$PORT" = 8642 ] && "${SSH[@]}" 'test -e /etc/systemd/system/deeptime-workb
     [ "${#PRESET[@]}" = 0 ] || echo "mac-watch: the service ignores --preset/--start/--length-myr; start runs from the page" >&2
     busy="$("${SSH[@]}" "curl -s -m 5 http://127.0.0.1:$PORT/api/runs" | python3 -c 'import json,sys; j=json.load(sys.stdin); print(j["running"] or "", *j["queue"])' 2>/dev/null || true)"
     [ -z "${busy// /}" ] || { echo "mac-watch: the workbench has runs in progress ($busy); not restarting it" >&2; exit 3; }
-    [ "$BUILD" = 0 ] || tools/remote/mac.sh -- 'cargo build --release -p deeptime-cli 2>&1 | tail -2'
+    [ "$BUILD" = 0 ] || tools/remote/mac.sh -- 'set -o pipefail; cargo build --release -p deeptime-cli 2>&1 | tail -2'
     "${SSH[@]}" "set -e; cp '$REMOTE/target/release/deeptime' '$WB/bin/deeptime.new' && mv '$WB/bin/deeptime.new' '$WB/bin/deeptime'
 sudo systemctl restart deeptime-workbench; sleep 2; systemctl is-active deeptime-workbench"
     echo "mac-watch: the workbench service restarted with this checkout's binary (http://localhost:$PORT/ through the laptop's tunnel)"
@@ -180,7 +180,7 @@ tv) tv_open; exit $? ;;
 esac
 
 if [ "$BUILD" = 1 ]; then
-    tools/remote/mac.sh -- 'cargo build --release -p deeptime-cli 2>&1 | tail -2'
+    tools/remote/mac.sh -- 'set -o pipefail; cargo build --release -p deeptime-cli 2>&1 | tail -2'
 fi
 stop_remote >/dev/null
 ARGS=(watch --bind 127.0.0.1 --port "$PORT" --runs "$WB/runs" --keep "$KEEP" --threads "$THREADS" --mem-cap "$MEM_CAP")

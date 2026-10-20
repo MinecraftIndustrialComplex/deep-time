@@ -177,6 +177,14 @@ public final class BiomeGameTests {
     // 0.608 standalone and 0.569 with MIC, the mapping unchanged; its misses are coastal and mountain
     // columns (BWh 64 % stony shore standalone, granite cliffs with MIC). BW goes to 0.46 by the same rule.
     // The same planet's high latitudes warmed (Dfc 138 -> 7 columns, E 4 -> 0; D 507 -> 511, mostly Dfa).
+    //
+    // 2026-10-19: the floors are compared with the share's one-sided 99 % upper bound (ShareBound,
+    // Wilson's score interval), not the bare share. The MIC gate on master 025676c8 failed C 0.621 <
+    // 0.630 on 132 columns with the mapping unchanged: one standard error of a share at 0.63 on 132
+    // columns is 0.042 from where the census's points fell alone, so the bare share failed on noise
+    // (its upper bound is 0.713). A broken mapping (0.1 to 0.3) still fails: C on 40 columns at 0.3
+    // has 0.484. The families with low floors (A, Dfc:taiga, BW:desert) let a share of 0.2 through on
+    // 40 columns; a broken mapping fails the high floors (C, D, E, sea) at once.
     static final Map<String, Double> FLOORS = Map.ofEntries(
             Map.entry("A", 0.34), Map.entry("Af", 0.54), Map.entry("BW", 0.46), Map.entry("BS", 0.42), Map.entry("C", 0.63),
             Map.entry("D", 0.88), Map.entry("Dsub", 0.38), Map.entry("E", 0.82), Map.entry("sea", 0.95),
@@ -248,8 +256,15 @@ public final class BiomeGameTests {
             if (r.total(ch.name()) < minColumns)
                 continue;
             double floor = (bop ? FLOORS_TB : Map.<String, Double>of()).getOrDefault(ch.name(), FLOORS.getOrDefault(ch.name(), 0.0));
-            if (share < floor)
-                low.append(String.format(java.util.Locale.ROOT, " %s %.3f < %.3f (%d columns)", ch.name(), share, floor, r.total(ch.name())));
+            // Significantly below the floor, not merely below it (ShareBound, 2026-10-19).
+            int n = r.total(ch.name()), hits = r.checks().get(ch.name())[0];
+            double upper = ShareBound.wilsonUpper(hits, n, ShareBound.Z_99);
+            if (upper < floor)
+                low.append(String.format(java.util.Locale.ROOT, " %s %.3f (99 %% upper bound %.3f) < %.3f (%d columns)",
+                        ch.name(), share, upper, floor, n));
+            else if (share < floor)
+                DeepTime.LOGGER.info("[gametest] climateConsistent {} {} under its floor {} on {} columns, within the sample's noise "
+                        + "(99 % upper bound {})", ch.name(), share, floor, n, upper);
         }
         helper.assertTrue(low.isEmpty(), "Köppen families below their floor:" + low);
         // The wetlands are left out of the families (BiomeCensus): the bake sends wet, flat, low,

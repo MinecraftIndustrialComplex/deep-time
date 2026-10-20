@@ -93,6 +93,11 @@ use super::state::{CONTINENTAL, OCEANIC, PlateState, Sample, TRENCH, pool};
 pub const MOVED_GLOBAL: &str = "plates/collapse_km3";
 /// … and the ocean floor it turned continental, km² (Earth-normalized).
 pub const GAINED_GLOBAL: &str = "plates/collapse_gained_km2";
+/// Measurement only (the crust budget): what the collapse held back over the run, km³, from
+/// columns an orogeny still holds up …
+pub const HELD_GLOBAL: &str = "plates/collapse_held_km3";
+/// … and for want of room within reach.
+pub const UNPLACED_GLOBAL: &str = "plates/collapse_unplaced_km3";
 /// Continental crust lost to the mantle beyond `crust_max_km` over the run, km³.
 pub const FOUNDERED_GLOBAL: &str = "plates/foundered_km3";
 
@@ -225,6 +230,11 @@ pub struct Collapse {
     pub moved_km2_m: f64,
     /// Ocean samples turned continental.
     pub converted: u32,
+    /// Crust the collapse would have released from columns an orogeny still holds up (the quiet
+    /// time), km² × m (measurement: the crust budget).
+    pub held_km2_m: f64,
+    /// Crust released that found no room within reach and stayed, km² × m (measurement).
+    pub unplaced_km2_m: f64,
 }
 
 /// One step of the collapse on `state` (see the module docs). Runs after the step's uplift
@@ -243,7 +253,16 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
 
     // Each plate's sources and what they would release this step, m of thickness.
     let mut by_plate: BTreeMap<u32, Vec<(usize, f64)>> = BTreeMap::new();
-    // P1-19: found in parallel, kept in sample order.
+    // P1-19: found in parallel, kept in sample order (and summed in it: a parallel sum's order,
+    // so its last bits, would change from run to run).
+    let held: f64 = state
+        .samples
+        .par_iter()
+        .filter(|s| s.kind == CONTINENTAL && !s.is_hidden() && s.orogeny_myr >= quiet_before)
+        .map(|s| (rate * (f64::from(s.thickness_m) - t_c)).max(0.0))
+        .collect::<Vec<f64>>()
+        .iter()
+        .sum();
     let release: Vec<(usize, f64)> = state
         .samples
         .par_iter()
@@ -257,11 +276,23 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
             (q > 0.0).then_some((i, q))
         })
         .collect();
+    let mut budgets: BTreeMap<u32, f64> = BTreeMap::new();
     for (i, q) in release {
-        by_plate.entry(state.plate_of(i)).or_default().push((i, q));
+        let p = state.plate_of(i);
+        *budgets.entry(p).or_insert(0.0) += q;
+        by_plate.entry(p).or_default().push((i, q));
     }
-    let mut out = Collapse::default();
-    spread(state, geo, env, by_plate, normal, &mut out, None);
+    let area = env.norm.sample_area_km2();
+    let mut out = Collapse {
+        held_km2_m: held * area,
+        ..Collapse::default()
+    };
+    let shares = spread(state, geo, env, by_plate, normal, &mut out, None);
+    out.unplaced_km2_m = budgets
+        .iter()
+        .map(|(p, b)| b * (1.0 - shares.get(p).copied().unwrap_or(0.0)))
+        .sum::<f64>()
+        * area;
     out
 }
 
@@ -426,7 +457,7 @@ pub(super) fn spread(
 }
 
 #[cfg(test)]
-mod tests {
+pub(in crate::plates) mod tests {
     use glam::DVec3;
 
     use super::*;
@@ -457,7 +488,11 @@ mod tests {
     /// Plate 0 is x < 0, plate 1 x ≥ 0. A continent (35.1 km, 300 m) within 40° of +y on both,
     /// ocean floor at −4.5 km elsewhere; on the continent a belt (`belt(p)`) thickened by
     /// `thick_m` and raised by `thick_m` / 7.0.
-    fn planet(geo: &Geo, belt: impl Fn(DVec3) -> bool, thick_m: f32) -> PlateState {
+    pub(in crate::plates) fn planet(
+        geo: &Geo,
+        belt: impl Fn(DVec3) -> bool,
+        thick_m: f32,
+    ) -> PlateState {
         let samples: Vec<Sample> = geo
             .points()
             .iter()
@@ -518,14 +553,14 @@ mod tests {
         st
     }
 
-    struct Fx {
-        k: TectonicParams,
-        geo: Geo,
-        norm: Norm,
+    pub(in crate::plates) struct Fx {
+        pub(in crate::plates) k: TectonicParams,
+        pub(in crate::plates) geo: Geo,
+        pub(in crate::plates) norm: Norm,
     }
 
     impl Fx {
-        fn new() -> Fx {
+        pub(in crate::plates) fn new() -> Fx {
             let k = TectonicParams {
                 collapse_myr: 25.0,
                 collapse_thickness_km: 45.0,
@@ -540,7 +575,7 @@ mod tests {
             }
         }
 
-        fn env(&self, step: u64) -> Env<'_> {
+        pub(in crate::plates) fn env(&self, step: u64) -> Env<'_> {
             Env {
                 k: &self.k,
                 norm: self.norm,
@@ -559,7 +594,7 @@ mod tests {
             .count()
     }
 
-    fn crust_m(st: &PlateState) -> f64 {
+    pub(in crate::plates) fn crust_m(st: &PlateState) -> f64 {
         st.samples.iter().map(|s| f64::from(s.thickness_m)).sum()
     }
 
@@ -627,6 +662,15 @@ mod tests {
         }
     }
 
+    /// What a step moved, without its measurements of the crust it held or could not place.
+    fn moves(c: Collapse) -> Collapse {
+        Collapse {
+            held_km2_m: 0.0,
+            unplaced_km2_m: 0.0,
+            ..c
+        }
+    }
+
     /// One collapse step on fixed positions.
     fn step_once(fx: &Fx, st: &mut PlateState, n: u64) -> Collapse {
         let env = fx.env(n);
@@ -650,7 +694,9 @@ mod tests {
             }
         }
         let before = st.samples.clone();
-        assert_eq!(step_once(&fx, &mut st, 1), Collapse::default());
+        let c = step_once(&fx, &mut st, 1);
+        assert_eq!(moves(c), Collapse::default());
+        assert!(c.held_km2_m > 0.0, "the held crust is counted: {c:?}");
         assert_eq!(st.samples, before);
         // The same belt stamped last step collapses now.
         assert!(step_once(&fx, &mut st.clone(), 2).sources > 0);
@@ -659,7 +705,7 @@ mod tests {
         quiet.k.collapse_quiet_myr = 10.0;
         for step in 2..=6 {
             assert_eq!(
-                step_once(&quiet, &mut st, step),
+                moves(step_once(&quiet, &mut st, step)),
                 Collapse::default(),
                 "{step}"
             );
@@ -695,7 +741,12 @@ mod tests {
         let middle = |p: DVec3| p.x < -0.02 && p.y > 0.95;
         let mut st = planet(&fx.geo, middle, 26_000.0);
         let before = st.samples.clone();
-        assert_eq!(step_once(&fx, &mut st, 1), Collapse::default());
+        let c = step_once(&fx, &mut st, 1);
+        assert_eq!(moves(c), Collapse::default());
+        assert!(
+            c.unplaced_km2_m > 0.0,
+            "the crust with no room is counted: {c:?}"
+        );
         assert_eq!(st.samples, before);
         // Off.
         fx.k.collapse_reach_km = 1500.0;
