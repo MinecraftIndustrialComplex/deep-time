@@ -444,6 +444,10 @@ enum Command {
         /// How far the access probe looks, in chunks.
         #[arg(long, default_value_t = 96)]
         access_radius: i64,
+        /// Leave out the shipped scatter rule of this material (repeatable): audit a world as a
+        /// build that ships none plays it.
+        #[arg(long)]
+        drop_scatter: Vec<String>,
     },
     /// Write the Java↔Rust column parity fixture (plan §9.2): columns of a world-data folder as the
     /// column evaluator answers them, for `ColumnParityTest` and the real-planet GameTest.
@@ -1096,6 +1100,7 @@ fn main() -> ExitCode {
             access_depth,
             access_need,
             access_radius,
+            drop_scatter,
         }) => {
             let o = deposit_audit::Options {
                 scatter_mult,
@@ -1103,6 +1108,7 @@ fn main() -> ExitCode {
                 access_depth,
                 access_need,
                 access_radius,
+                drop_scatter,
                 world_data,
                 scatter_dir,
                 chunks,

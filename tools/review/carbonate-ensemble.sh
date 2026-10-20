@@ -13,11 +13,22 @@
 #
 # The binary is copied first, so a rebuild does not change a running ensemble. A run whose audit
 # exists is not run again. Read the results with tools/review/carbonate-table.py.
+#
+# AUDIT_BIN (environment) audits with another build than the one that runs (a newer audit on an
+# older build's worlds); AUDIT_ARGS adds deposit-audit arguments, comma-separated with no spaces
+# ("--drop-scatter=c:lead").
 set -uo pipefail
 OUT=$1; BIN=$2; LABEL=$3; LANES=$4; PRESET=$5; LEN=$6; T=$7; RUNS=${8//,/ }; shift 8
 mkdir -p "$OUT"
 cmp -s "$BIN" "$OUT/$LABEL.bin" || cp "$BIN" "$OUT/$LABEL.bin" || exit 1
 BIN=$OUT/$LABEL.bin
+ABIN=$BIN
+if [ -n "${AUDIT_BIN:-}" ]; then
+  cmp -s "$AUDIT_BIN" "$OUT/$LABEL.audit.bin" || cp "$AUDIT_BIN" "$OUT/$LABEL.audit.bin" || exit 1
+  ABIN=$OUT/$LABEL.audit.bin
+fi
+AARGS=${AUDIT_ARGS:-}
+AARGS=${AARGS//,/ }
 printf '%s\n' "$PRESET $LEN ${T}t [$RUNS] $*" > "$OUT/$LABEL.args"
 one() {
   local start=$1 seed=$2 f=$3; shift 3
@@ -28,11 +39,12 @@ one() {
   mv "$f.part" "$f.txt"
   "$BIN" strata-check --world-data "$w" > "$f.strata.json" 2> "$f.strata.err" \
     || echo "FAILED strata-check $f" >&2
-  "$BIN" deposit-audit --world-data "$w" --json "$f.audit.json" > "$f.audit.md" 2> "$f.audit.err" \
+  # shellcheck disable=SC2086
+  "$ABIN" deposit-audit --world-data "$w" --json "$f.audit.json" $AARGS > "$f.audit.md" 2> "$f.audit.err" \
     || echo "FAILED deposit-audit $f" >&2
 }
 export -f one
-export BIN PRESET LEN T
+export BIN ABIN AARGS PRESET LEN T
 n=0
 for r in $RUNS; do
   start=${r%%:*}; seed=${r##*:}
