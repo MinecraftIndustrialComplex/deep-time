@@ -477,7 +477,7 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
     Some(format!(
         "surface_final={} land_frac={:.3} max_elevation_m={:.0} sea_level_m={:.1} sediment_km3={:.3e} \
          eroded_km3={:.3e} fluvial_km3={:.3e} lake_km3={:.3e} marine_km3={:.3e} carbonate_km3={:.3e} \
-         evaporite_km3={:.3e} pelagic_km3={:.3e} photic_km2_myr={:.3e} photic_warm_km2_myr={:.3e} photic_warm_clear_km2_myr={:.3e} \
+         evaporite_km3={:.3e} pelagic_km3={:.3e} periplatform_km3={:.3e} photic_km2_myr={:.3e} photic_warm_km2_myr={:.3e} photic_warm_clear_km2_myr={:.3e} \
          to_sea_km3={:.3e} mass_residual_km3={:.3e} mean_log_layers={:.2} \
          spl_iterations_per_step={:.2} cg_iterations_per_step={:.1} sinks={} erosion_pulses={} basins={} sea_events={} frames={} \
          history_mib={:.1} land_z_p50_m={:.0} land_z_p90_m={:.0} land_z_p99_m={:.0} plate_cap_bound_share={:.5} \
@@ -497,6 +497,7 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         t.carbonate_km3,
         t.evaporite_km3,
         t.pelagic_km3,
+        t.periplatform_km3,
         // The photic sea floor's area × time over the run, and its warm and warm-and-clear
         // parts (`surface::Totals`).
         t.photic_km2_myr,

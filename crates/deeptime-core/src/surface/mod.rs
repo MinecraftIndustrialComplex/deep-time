@@ -183,6 +183,11 @@ pub struct Totals {
     pub photic_warm_km2_myr: f64,
     #[serde(default)]
     pub photic_warm_clear_km2_myr: f64,
+    /// Carbonate the marine diffusion and slope failure moved off platforms and laid on their
+    /// slopes and the floor around them (`carbonate::exported`; part of `carbonate_km3` and
+    /// `pelagic_km3` before it moved, and not in `marine_km3`).
+    #[serde(default)]
+    pub periplatform_km3: f64,
     pub evaporite_km3: f64,
     pub to_sea_km3: f64,
     pub weathered_km3: f64,
@@ -402,6 +407,10 @@ struct Parts {
     carbonate: Vec<f32>,
     /// The open sea's calcareous ooze (`carbonate::pelagic`).
     pelagic: Vec<f32>,
+    /// Carbonate the marine diffusion and slope failure brought off platforms
+    /// (`carbonate::exported`; taken out of `marine`, and in neither `carbonate` nor the totals'
+    /// production).
+    periplatform: Vec<f32>,
     evaporite: Vec<f32>,
     /// Till and glaciomarine diamict (`glacial.rs`).
     till: Vec<f32>,
@@ -427,6 +436,7 @@ impl Parts {
             marine: filled(n, 0.0),
             carbonate: filled(n, 0.0),
             pelagic: filled(n, 0.0),
+            periplatform: filled(n, 0.0),
             evaporite: filled(n, 0.0),
             till: filled(n, 0.0),
             glacial_eroded: filled(n, 0.0),
@@ -1332,29 +1342,28 @@ impl SurfaceStage {
             let (kind, filled, clastic) = (&sc.kind, &sc.filled, &parts.marine);
             // The photic factory's limits (measurement only): its area, warm, warm and clear.
             // (Summed in fixed chunks, then in order: the same bits on any thread count.)
-            let lim: Vec<[f64; 3]> = sc
-                .h
-                .par_chunks(4096)
-                .enumerate()
-                .map(|(i, hs)| {
-                    let mut acc = [0.0f64; 3];
-                    for (j, &h) in hs.iter().enumerate() {
-                        let c = i * 4096 + j;
-                        if kind[c] == BASE {
-                            let l = carbonate::limits(
-                                sea - h,
-                                f64::from(clim.sst_c[c]),
-                                f64::from(clastic[c]),
-                                &carb_p,
-                            );
-                            for (x, y) in acc.iter_mut().zip(l) {
-                                *x += y;
+            let lim: Vec<[f64; 3]> =
+                sc.h.par_chunks(4096)
+                    .enumerate()
+                    .map(|(i, hs)| {
+                        let mut acc = [0.0f64; 3];
+                        for (j, &h) in hs.iter().enumerate() {
+                            let c = i * 4096 + j;
+                            if kind[c] == BASE {
+                                let l = carbonate::limits(
+                                    sea - h,
+                                    f64::from(clim.sst_c[c]),
+                                    f64::from(clastic[c]),
+                                    &carb_p,
+                                );
+                                for (x, y) in acc.iter_mut().zip(l) {
+                                    *x += y;
+                                }
                             }
                         }
-                    }
-                    acc
-                })
-                .collect();
+                        acc
+                    })
+                    .collect();
             for l in lim {
                 for (x, y) in photic.iter_mut().zip(l) {
                     *x += y;
@@ -1364,6 +1373,14 @@ impl SurfaceStage {
             let calcifiers = epoch.pelagic_calcifiers_at(
                 (t_end_myr - dt_myr + (sub as f64 + 0.5) * dts / 1.0e6) * 1.0e6,
             );
+            // The carbonate laid before this substep: what it lays lies on top (the
+            // periplatform tracer below takes it first).
+            let carb_before: Vec<f32> = parts
+                .carbonate
+                .par_iter()
+                .zip(parts.pelagic.par_iter())
+                .map(|(a, b)| a + b)
+                .collect();
             sc.h.par_iter_mut()
                 .zip(parts.carbonate.par_iter_mut())
                 .zip(parts.pelagic.par_iter_mut())
@@ -1454,6 +1471,8 @@ impl SurfaceStage {
                 nm.diffusion_solver,
                 nm.diffusion_tol_m,
             ) as u64;
+            // The solved heights: the diffusion's exchanges follow from them.
+            let solved = crate::alloc::copied(&sc.h);
             // The solve's own share of "diffusion" (P1-17's breakdown).
             self.time("diffusion_solve", solve);
             let failing = Instant::now();
@@ -1490,6 +1509,69 @@ impl SurfaceStage {
                     });
             }
             self.time("diffusion", started);
+
+            // Periplatform carbonate (ledger ERO-189): the carbonate the diffusion and the slope
+            // failure moved off platforms is carbonate where it lands, not marine clastic.
+            let started = Instant::now();
+            {
+                let (h, kind, log, reg) = (&sc.h, &sc.kind, &st.log, &st.regolith_m);
+                let sea_mask: Vec<bool> = kind.par_iter().map(|&k| k == BASE).collect();
+                let change: Vec<f64> = (0..n)
+                    .into_par_iter()
+                    .map(|c| {
+                        if kind[c] == BASE {
+                            h[c] - before[c]
+                        } else {
+                            0.0
+                        }
+                    })
+                    .collect();
+                let loss: Vec<f64> = change.par_iter().map(|&x| (-x).max(0.0)).collect();
+                let gain: Vec<f64> = change.par_iter().map(|&x| x.max(0.0)).collect();
+                let carb_class =
+                    |k: u16| k == cls.limestone || k == cls.dolostone || k == cls.chalk;
+                // What a cell lost, from the top down: this substep's carbonate, then the rest
+                // of what the step laid there, the regolith, then its strata log.
+                let loss_carb: Vec<f64> = (0..n)
+                    .into_par_iter()
+                    .map(|c| {
+                        let mut left = loss[c];
+                        if left <= 0.0 {
+                            return 0.0;
+                        }
+                        let fresh =
+                            f64::from(parts.carbonate[c] + parts.pelagic[c] - carb_before[c])
+                                .max(0.0);
+                        let mut carb = fresh.min(left);
+                        left -= carb;
+                        let other = f64::from(
+                            parts.marine[c] + parts.till[c] + parts.evaporite[c] + reg[c],
+                        );
+                        left -= other.min(left);
+                        for layer in log.column(c).iter().rev() {
+                            if left <= 0.0 {
+                                break;
+                            }
+                            let take = f64::from(layer.thickness_m).min(left);
+                            if carb_class(layer.class) {
+                                carb += take;
+                            }
+                            left -= take;
+                        }
+                        carb
+                    })
+                    .collect();
+                let laid = carbonate::exported(
+                    &d, &sc.kd, dts, &solved, &sea_mask, &loss, &loss_carb, &gain,
+                );
+                for (c, m) in laid {
+                    let c = c as usize;
+                    let m = (m as f32).min(parts.marine[c]).max(0.0);
+                    parts.marine[c] -= m;
+                    parts.periplatform[c] += m;
+                }
+            }
+            self.time("periplatform", started);
         }
 
         // 4. Strata log, regolith and weathering.
@@ -1556,7 +1638,7 @@ impl SurfaceStage {
                         fluvial: f64::from(parts.fluvial[c]),
                         lake: f64::from(parts.lake[c]),
                         marine_clastic: f64::from(parts.marine[c]),
-                        carbonate: f64::from(parts.carbonate[c]),
+                        carbonate: f64::from(parts.carbonate[c] + parts.periplatform[c]),
                         evaporite: f64::from(parts.evaporite[c]),
                         glacial: f64::from(parts.till[c]),
                         pelagic: f64::from(parts.pelagic[c]),
@@ -1825,6 +1907,7 @@ impl SurfaceStage {
         let sum_net: f64 = net.iter().sum();
         let carb: f64 = parts.carbonate.iter().map(|&x| f64::from(x)).sum();
         let pel: f64 = parts.pelagic.iter().map(|&x| f64::from(x)).sum();
+        let peri: f64 = parts.periplatform.iter().map(|&x| f64::from(x)).sum();
         let evap: f64 = parts.evaporite.iter().map(|&x| f64::from(x)).sum();
         let km3 = a / 1.0e9;
         let t = &mut st.totals;
@@ -1834,6 +1917,7 @@ impl SurfaceStage {
         t.marine_km3 += parts.marine.iter().map(|&x| f64::from(x)).sum::<f64>() * km3;
         t.carbonate_km3 += carb * km3;
         t.pelagic_km3 += pel * km3;
+        t.periplatform_km3 += peri * km3;
         let km2_myr = a / 1.0e6 * dts / 1.0e6;
         t.photic_km2_myr += photic[0] * km2_myr;
         t.photic_warm_km2_myr += photic[1] * km2_myr;

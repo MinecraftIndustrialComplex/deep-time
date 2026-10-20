@@ -7,11 +7,12 @@ tools/review/carbonate-ensemble.sh, then each label's median and range.
 
 Per run: the carbonate share of the land's top blocks, of the sea floor's top blocks (and chalk
 alone), and of the sedimentary blocks of all columns (strata-check); the surface stage's volumes
-(carbonate, pelagic chalk, marine clastics; km3) and the photic sea floor's mean area with its warm
-and warm-and-clear parts (10^6 km2); the natural CO2 (end CO2 over the present-day factor), the
-global temperature after the factor and before it (the clock's last row, with its degassing and
-weathering, 10^12 mol C/yr); then the deposit sites by type with their strata, MVT on carbonate strata and
-on oceanic crust, placers on oceanic crust and below the shelf.
+(carbonate, pelagic chalk, periplatform carbonate, marine clastics, delivered to the sea;
+10^6 km3) and the photic sea floor's mean area with its warm and warm-and-clear parts
+(10^6 km2); the natural CO2 (end CO2 over the present-day factor), the global temperature after
+the factor and before it (the clock's last row, with its degassing and weathering,
+10^12 mol C/yr); then the deposit sites by type with their strata, MVT on carbonate strata and on
+oceanic crust, placers on oceanic crust and below the shelf.
 """
 import collections
 import glob
@@ -91,8 +92,8 @@ def main():
             sb = share(allc, sed, "block_share")
             r["sed"] = share(allc, carb, "block_share") / sb if sb > 0 else float("nan")
         length = num(surf.get("surface_final")) * 2.0  # steps x 2 Myr
-        for k in ["carbonate_km3", "pelagic_km3", "marine_km3"]:
-            r[k.split("_")[0]] = num(surf.get(k)) / 1e6
+        for k in ["carbonate_km3", "pelagic_km3", "periplatform_km3", "marine_km3", "to_sea_km3"]:
+            r[k[: -len("_km3")]] = num(surf.get(k)) / 1e6
         for k in ["photic_km2_myr", "photic_warm_km2_myr", "photic_warm_clear_km2_myr"]:
             r[k.replace("_km2_myr", "")] = num(surf.get(k)) / length / 1e6 if length > 0 else float("nan")
         fac = num(clim.get("present_co2_factor", 1.0))
@@ -118,8 +119,9 @@ def main():
             r["placer"] = {"n": len(pl), "oceanic": sum(bool(x.get("oceanic")) for x in pl),
                            "below_shelf": sum((x.get("ground_m") or 0.0) < SHELF_M for x in pl)}
         rows.append(r)
-    cols = ["land", "sea", "chalk", "sed", "carbonate", "pelagic", "marine", "photic",
-            "photic_warm", "photic_warm_clear", "co2", "T", "T_nat", "degas", "weath"]
+    cols = ["land", "sea", "chalk", "sed", "carbonate", "pelagic", "periplatform", "marine",
+            "to_sea", "photic", "photic_warm", "photic_warm_clear", "co2", "T", "T_nat", "degas",
+            "weath"]
     print("run".ljust(40) + "".join(c[:10].rjust(11) for c in cols))
     for r in rows:
         print(r["run"].ljust(40) + "".join(f"{r.get(c, float('nan')):11.4g}" for c in cols))
