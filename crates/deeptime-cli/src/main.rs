@@ -502,7 +502,8 @@ enum Command {
         /// count, the second horizon's top and the water kind.
         #[arg(long)]
         columns: bool,
-        /// Also the ground distance one block spans there, metres (the projection's local scale).
+        /// Also the ground distance one block spans there, metres (the projection's local scale),
+        /// and the block's latitude and longitude.
         #[arg(long)]
         scale: bool,
         /// The .npy file to write (and <out>.json).
