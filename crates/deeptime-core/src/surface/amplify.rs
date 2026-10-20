@@ -113,6 +113,10 @@ pub enum StreamMode {
     Never,
 }
 
+/// The sea floor's critical slope at drama 1 (`AmplifyParams::submarine_slope`): tan 15° (see the
+/// field). ledger: AMP-074
+pub const SUBMARINE_SLOPE: f64 = 0.268;
+
 /// Bytes per cell of the thinned copy the last level keeps for the keyframes (three f32 arrays:
 /// terrain, detail amplitude, drainage), allocated before the first tile runs.
 pub const PREVIEW_BYTES_PER_CELL: u64 = 12;
@@ -234,6 +238,12 @@ pub struct AmplifyParams {
     pub thermal_slope: f64,
     pub thermal_rate: f64,
     pub thermal_noise: f64,
+    /// Critical slope of the sea floor (every cell below sea level, except under a glacier's
+    /// ice: a fjord keeps the land's) at drama 1, in place of `thermal_slope` (sea-floor spikes
+    /// task, 2026-10-20): the L3 counterpart of the young stage's `sea_floor_slope_deg`, which
+    /// relaxes the plate model's sea-floor steps on L2. The land's talus angle let what the
+    /// interpolation steepened stand under the sea.
+    pub submarine_slope: f64, // ledger: AMP-074
     /// Sediment, m per cell, a flow of 100 km² at slope 0.1 carries; the share of a load's excess
     /// over the capacity a cell drops per iteration.
     pub deposit_capacity_m: f64,
@@ -279,6 +289,7 @@ impl Default for AmplifyParams {
             thermal_slope: 0.6,
             thermal_rate: 0.05,
             thermal_noise: 0.25,
+            submarine_slope: SUBMARINE_SLOPE,
             deposit_capacity_m: 4.0,
             deposit_fraction: 0.5,
             seed_relief: 0.25,
@@ -352,6 +363,9 @@ impl AmplifyParams {
         }
         if !(0.0..=0.9).contains(&self.thermal_noise) {
             return Err(bad("thermal_noise", "must be in [0, 0.9]"));
+        }
+        if !(self.submarine_slope.is_finite() && self.submarine_slope > 0.0) {
+            return Err(bad("submarine_slope", "must be > 0"));
         }
         pos(self.deposit_capacity_m, "deposit_capacity_m")?;
         if !(self.deposit_fraction > 0.0 && self.deposit_fraction <= 1.0) {
@@ -462,6 +476,7 @@ impl Config {
             noise: Noise::new(self.seed, self.circumference),
             seed_relief: self.p.seed_relief as f32,
             thermal_noise: self.p.thermal_noise as f32,
+            submarine: (self.p.submarine_slope / self.p.thermal_slope) as f32,
             cell_blocks: c / gw_fine as f64,
             origin_x: -c / 2.0,
             origin_z: self.origin_z((c / gw_fine as f64).round() as u32),
