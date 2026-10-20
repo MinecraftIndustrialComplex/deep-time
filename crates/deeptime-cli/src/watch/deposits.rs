@@ -101,7 +101,14 @@ pub fn view(
     m_per_block_h: f64,
     source: &str,
 ) -> Value {
-    view_in_world(sites, bodies, circumference, m_per_block_h, source, &HashMap::new())
+    view_in_world(
+        sites,
+        bodies,
+        circumference,
+        m_per_block_h,
+        source,
+        &HashMap::new(),
+    )
 }
 
 /// [`view`] for sites whose `x` and `z` are not the world's blocks: `world` maps a site's id to
@@ -451,7 +458,10 @@ mod tests {
             (s["x"].as_i64().unwrap(), s["z"].as_i64().unwrap()),
             (sx.round() as i64, sz.round() as i64)
         );
-        assert_eq!((s["x"].as_i64(), s["z"].as_i64()), (Some(7056), Some(-1686)));
+        assert_eq!(
+            (s["x"].as_i64(), s["z"].as_i64()),
+            (Some(7056), Some(-1686))
+        );
         let (elat, elon) = g.lat_lon(7056.0, -1686.0);
         assert!((elat - 23.875).abs() < 0.01 && (elon - 101.11).abs() < 0.01);
         // A Lambert world's block is its x and z.
