@@ -29,8 +29,8 @@
 //!
 //! with z_A its column's Airy height (`collapse::iso_height`), s the sea level, ρ_w the sea water
 //! (ISO-044: a column below the sea carries the water above it) and F the surface's flexure
-//! (`surface/flexure_m`, ISO-...: how far the plate holds the ground above or below local
-//! isostasy; 0 without a surface stage), τ = `isostasy_relax_myr`. The model cannot tell which
+//! (`surface/flexure_m`, the flexure solve of ISO-040: how far the plate holds the ground above
+//! or below local isostasy; 0 without a surface stage), τ = `isostasy_relax_myr`. The model cannot tell which
 //! part of a gap is mechanical (gone in kyr) and which is thermal, so it settles on the slower,
 //! thermal time (ISO-078). The change is the step's uplift, which the surface stage takes as it
 //! takes any uplift; the step's rise guard (PLT-288) runs after it.
