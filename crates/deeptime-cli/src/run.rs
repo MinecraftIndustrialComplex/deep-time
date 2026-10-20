@@ -1323,10 +1323,12 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
     let stepped = started.elapsed();
     s.finalize_write()?;
     forward_log(&s, o.common.verbose);
-    if let Some(layer) = live {
+    // Always printed, so a run without `--live` gives its stepping time for an A/B.
+    {
         let st = s.live_stats();
         println!(
-            "deeptime run: live layer={layer} frames={} live_ms={:.0} mean_ms={:.1} max_ms={:.1} share_of_steps={:.4} stepped_s={:.2}",
+            "deeptime run: live layer={} frames={} live_ms={:.0} mean_ms={:.1} max_ms={:.1} share_of_steps={:.4} stepped_s={:.2}",
+            live.unwrap_or("none"),
             st.frames,
             st.millis,
             if st.frames > 0 {
