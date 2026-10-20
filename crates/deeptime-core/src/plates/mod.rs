@@ -419,7 +419,7 @@ impl PlatesStage {
         lap(&mut clock, "fronts");
         // The boundary mix (measurement only) on the same samples as the fronts, before the
         // collapse below turns any crust over.
-        let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
+        let mix = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
         book(st, gap_budget::Part::Other);
         lap(&mut clock, "boundary_mix");
         // Crust beyond the thickest column goes down; thickened crust that nothing raises any
@@ -679,7 +679,7 @@ impl PlatesStage {
             final_step,
             dynamics::Observed {
                 front_km: &pull.front_km,
-                mix_km,
+                mix,
                 arcs,
                 forces: balance.recorded.as_ref(),
                 guarded: &guarded,
