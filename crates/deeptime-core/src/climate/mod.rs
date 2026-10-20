@@ -406,7 +406,7 @@ impl CellsAccel {
 /// The cells loop's device under the session's compute mode (`compute.rs`).
 #[cfg(feature = "gpu")]
 fn cells_accel(ctx: &StageContext<'_>) -> Option<Arc<dyn snapshot::CellsDevice>> {
-    let g = crate::compute::device(ctx.compute, ctx.log)?;
+    let g = crate::compute::device(ctx.compute, ctx.log, "climate:cells")?;
     match gpu::CellsGpu::new(g) {
         Ok(c) => Some(Arc::new(c)),
         Err(e) => {
