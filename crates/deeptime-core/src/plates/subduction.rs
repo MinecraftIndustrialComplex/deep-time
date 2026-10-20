@@ -59,6 +59,7 @@ use super::events::{self, SUBDUCTION_ONSET};
 use super::geometry::{Cover, Geo, Tree, cover, dijkstra_parts};
 use super::kinematics::{quat, tangent, to_group, to_world};
 use super::pools::isostatic_change_m;
+use super::shortening::voronoi_edge_rad;
 use super::state::{
     ARC, CONTINENTAL, Contact, DIVERGENT, EMERGED, FORELAND, HIDDEN, HOTSPOT, OROGENY_ANDEAN,
     OROGENY_HIMALAYAN, PlateState, SUBDUCTION_ZONE, TRENCH, pool,
@@ -698,7 +699,8 @@ struct Boundary {
     trench: bool,
     front: Option<(u32, usize, DVec3, DVec3)>,
     /// At a front: the sum of the directions of every lattice edge from the sample to the
-    /// front's other plate (the boundary's normal before smoothing, [`front_normals`]).
+    /// front's other plate, each weighted by its Voronoi edge (the boundary's normal before
+    /// smoothing, [`front_normals`]).
     across: DVec3,
 }
 
@@ -819,12 +821,15 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
                     b.front = Some((u, c, rel, out));
                 }
             }
+            // The boundary's normal: each crossing edge's direction weighted by the stretch of
+            // boundary it stands for, as the collision fronts weigh them. ledger: PLT-222
             if let Some((u, ..)) = b.front {
                 let pu = plate_of[u as usize];
                 for (w, _) in geo.edges(v as u32) {
                     if plate_of[w as usize] == pu {
+                        let len = voronoi_edge_rad(geo, v as u32, w);
                         b.across +=
-                            tangent(x, rot * (pts[w as usize] - pts[v])).normalize_or_zero();
+                            len * tangent(x, rot * (pts[w as usize] - pts[v])).normalize_or_zero();
                     }
                 }
             }
