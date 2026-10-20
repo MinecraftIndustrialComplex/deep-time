@@ -18,12 +18,24 @@
 //!    which the pools already hold (the surface's deposits join the sediment pool, and its erosion
 //!    strips the pools from the top). Each pool is one unit whose class follows the surface's
 //!    basement rule (`surface::basement_class`, so a column shows at its top what the surface
-//!    eroded): sediment → mudstone (on the ocean floor pelagic chalk above the carbonate
-//!    compensation depth, pelagic clay as mudstone below it), sedimentary → sandstone (shale on
-//!    oceanic crust), felsic volcanic → rhyolite (andesite in arcs), mafic volcanic → basalt,
-//!    metamorphic → gneiss (schist in a Himalayan orogen younger than 100 Myr), felsic plutonic →
-//!    granite (granodiorite under an Andean orogeny), mafic plutonic → gabbro. The first basement
-//!    unit takes the surface's regime overrides (arc → andesite, hotspot → basalt). The pools have
+//!    eroded). Each crust kind has its own classes (ledger: RCK-092):
+//!    - **continental**: sediment → mudstone, sedimentary → sandstone, felsic volcanic →
+//!      rhyolite (andesite in arcs), mafic volcanic → basalt, metamorphic → gneiss (schist in a
+//!      Himalayan orogen younger than 100 Myr), felsic plutonic → granite (granodiorite under an
+//!      Andean orogeny), mafic plutonic → gabbro; the first basement unit takes the surface's
+//!      regime overrides (arc → andesite, hotspot → basalt);
+//!    - **oceanic** (the Penrose sequence): sediment → pelagic chalk above the carbonate
+//!      compensation depth, pelagic clay as mudstone below it; sedimentary → shale; the mafic
+//!      volcanic pool (seismic layer 2) → basalt lavas over the sheeted dike complex, greenstone
+//!      (greenschist-facies diabase; [`OCEAN_LAVA_SHARE`]); mafic plutonic → gabbro (layer 3);
+//!      then the mantle. Felsic and metamorphic pools on ocean crust are local rock: an island
+//!      arc's (andesite, its tonalitic middle crust as diorite under an active arc and as
+//!      granodiorite where the arc has died), the thinned continental crust a margin's
+//!      transition moved to its ocean side (granodiorite), or an accreted or deeply buried
+//!      sediment pile's (schist). The plate model blends the rock pools only within one crust
+//!      kind and does not blend ocean crust's felsic and metamorphic pools at all
+//!      (`plates::ridges`, `plates::l1`), so a continent's granite does not spread into the sea
+//!      floor beside it. The pools have
 //!    no burial history, so on continental crust a pool unit steps along its class's metamorphic
 //!    path by the **present** geotherm (`metamorphism.rs`'s temperatures and geotherm, without the
 //!    collision factor): the unit is split at the depths of the isotherms of its path, so a thick
@@ -75,6 +87,16 @@ use super::params::StructureParams;
 /// Wikipedia, SEPM Strata, LibreTexts), so 4,500 m is the Pacific figure.
 // ledger: RCK-015 (game choice)
 pub const CCD_M: f64 = 4500.0;
+
+/// The share of ocean crust's mafic volcanic pool (seismic layer 2) that is lavas, pillows and
+/// flows; the rest is the sheeted dike complex under them. Drilled sections (Alt et al. 1996;
+/// IODP Exp. 309/312): Hole 504B (Costa Rica Rift, intermediate rate) 571.5 m of lavas and a
+/// 209 m transition over 1050 m of dikes, not bottomed (lavas 0.31 to 0.37 of the section); Hole
+/// 1256D (superfast) 754 m of lavas and a 57 m transition over 346 m of dikes (0.65). 0.4 of a
+/// fresh ridge's 2 km layer 2 (`plates::pools::oceanic_column`) gives 0.8 km of lavas over
+/// 1.2 km of dikes; erosion takes the lavas first and later volcanism adds to them.
+// ledger: RCK-091 (game-choice of the share inside the drilled range; the sections verified)
+pub const OCEAN_LAVA_SHARE: f64 = 0.4;
 
 /// Where a unit comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -206,6 +228,8 @@ pub struct Tables {
     pub peridotite: u16,
     pub chalk: u16,
     pub diorite: u16,
+    /// The sheeted dikes of ocean crust (greenschist-facies diabase, [`OCEAN_LAVA_SHARE`]).
+    pub greenstone: u16,
     pub hornfels: u16,
     pub skarn: u16,
     pub halite: u16,
@@ -251,6 +275,7 @@ impl Tables {
             peridotite: index("peridotite"),
             chalk: index("chalk"),
             diorite: index("diorite"),
+            greenstone: index("greenstone"),
             hornfels: index("hornfels"),
             skarn: index("skarn"),
             halite: index("halite"),
@@ -378,8 +403,14 @@ pub fn pool_class(t: &Tables, cell: &Cell<'_>, p: usize) -> u16 {
                 c.sandstone
             }
         }
+        // On ocean crust the felsic and metamorphic pools are local rock (`plates::ridges`): an
+        // island arc's andesite over its tonalitic middle crust (diorite under an active arc,
+        // granodiorite where the arc has died or the rock is the thinned continental crust a
+        // margin's transition moved to its ocean side), and schist, the metasediment of a thick
+        // sediment pile or an accreted wedge: never granite, rhyolite or gneiss (ledger: RCK-092).
         pool::FELSIC_VOLCANIC => {
-            if cell.regime == crate::plates::state::regime::ARC
+            if oceanic
+                || cell.regime == crate::plates::state::regime::ARC
                 || (cell.orogeny == OROGENY_ANDEAN && young(30.0))
             {
                 c.andesite
@@ -389,14 +420,16 @@ pub fn pool_class(t: &Tables, cell: &Cell<'_>, p: usize) -> u16 {
         }
         pool::MAFIC_VOLCANIC => c.basalt,
         pool::METAMORPHIC => {
-            if cell.orogeny == OROGENY_HIMALAYAN && young(100.0) {
+            if oceanic || (cell.orogeny == OROGENY_HIMALAYAN && young(100.0)) {
                 c.schist
             } else {
                 c.gneiss
             }
         }
         pool::FELSIC_PLUTONIC => {
-            if cell.orogeny == OROGENY_ANDEAN {
+            if oceanic && cell.regime == crate::plates::state::regime::ARC {
+                t.diorite
+            } else if oceanic || cell.orogeny == OROGENY_ANDEAN {
                 c.granodiorite
             } else {
                 c.granite
@@ -560,6 +593,26 @@ pub fn build(
             });
             push(out, class, th, src, key::pool(band, q, step));
         };
+        // Ocean crust's layer 2: the lavas over the sheeted dikes, which the ridge's hydrothermal
+        // circulation altered to greenschist facies as they formed (the dikes are the basalt
+        // pool's first step, greenstone, so they share its keys with metamorphosed basalt
+        // elsewhere). Either goes further along the path when the rock above was hotter.
+        if cell.crust_type == OCEANIC && k == pool::MAFIC_VOLCANIC && class == t.cls.basalt {
+            let steps = t.paths.steps(class);
+            // How far along the path the roof's temperature takes the rock.
+            let past = |hot: f64| steps.iter().take_while(|&&(_, temp)| temp <= hot).count();
+            let class_of = |m: usize| if m == 0 { class } else { steps[m - 1].0 };
+            // The dikes are the lower part of a fresh ridge's layer 2; erosion takes the lavas
+            // first, and later volcanism (cones, flood basalts) adds lavas on top.
+            let fresh = f64::from(crate::plates::pools::oceanic_column()[pool::MAFIC_VOLCANIC]);
+            let dikes = th.min((1.0 - OCEAN_LAVA_SHARE) * fresh);
+            let m = past(hot);
+            emit(out, class_of(m), th - dikes, m, &mut hot);
+            let m = past(hot).max(usize::from(!steps.is_empty()));
+            emit(out, class_of(m), dikes, m, &mut hot);
+            depth += th;
+            continue;
+        }
         for &(next, temp) in t.paths.steps(class) {
             let z = if temp < super::realism::METAMORPHIC_FROM_C {
                 // Diagenesis: the present geotherm alone.
@@ -692,7 +745,7 @@ mod tests {
     }
 
     #[test]
-    fn oceanic_columns_have_pelagic_sediment_basalt_gabbro_and_mantle() {
+    fn oceanic_columns_are_the_penrose_sequence() {
         let t = Tables::get();
         let p = StructureParams::default();
         let mut pools = crate::plates::pools::oceanic_column();
@@ -705,17 +758,62 @@ mod tests {
         let mut out = Vec::new();
         build(&cell, &t, &p, 0.0, 10_000.0, &mut out);
         let classes: Vec<u16> = out.iter().map(|u| u.class).collect();
+        // Pelagic sediment, the lavas, the sheeted dikes, gabbro, the mantle.
         assert_eq!(
             classes,
             [
                 index("chalk"),
                 index("basalt"),
+                index("greenstone"),
                 index("gabbro"),
                 index("peridotite")
             ]
         );
+        let th: Vec<f32> = out.iter().map(|u| u.thickness_m).collect();
+        assert!((th[1] - 800.0).abs() < 1.0 && (th[2] - 1200.0).abs() < 1.0, "{th:?}");
+        assert!((th[3] - 5000.0).abs() < 1.0, "{th:?}");
+        // Keys still grow downwards.
+        for w in out.windows(2) {
+            assert!(w[0].key[1] <= w[1].key[0], "{:?}", out);
+        }
         cell.depth_below_sea_m = 5500.0;
         build(&cell, &t, &p, 0.0, 10_000.0, &mut out);
         assert_eq!(out[0].class, index("mudstone"), "below the CCD");
+
+        // Erosion takes the lavas first: 1500 m of layer 2 is 300 m of lavas over the dikes.
+        cell.pools[pool::MAFIC_VOLCANIC] = 1500.0;
+        build(&cell, &t, &p, 0.0, 10_000.0, &mut out);
+        let lava = out.iter().find(|u| u.class == index("basalt")).unwrap();
+        let dikes = out.iter().find(|u| u.class == index("greenstone")).unwrap();
+        assert!((lava.thickness_m - 300.0).abs() < 1.0 && (dikes.thickness_m - 1200.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn ocean_crust_felsic_rock_is_arc_rock_never_granite() {
+        let t = Tables::get();
+        let p = StructureParams::default();
+        let mut cell = continental(&[]);
+        cell.pools = crate::plates::pools::oceanic_column();
+        cell.pools[pool::FELSIC_VOLCANIC] = 1500.0;
+        cell.pools[pool::FELSIC_PLUTONIC] = 4000.0;
+        cell.pools[pool::METAMORPHIC] = 300.0;
+        cell.crust_type = OCEANIC;
+        cell.regime = regime::OCEAN_BASIN;
+        cell.depth_below_sea_m = 2000.0;
+        let mut out = Vec::new();
+        build(&cell, &t, &p, 0.0, 20_000.0, &mut out);
+        let classes: Vec<u16> = out.iter().map(|u| u.class).collect();
+        for name in ["granite", "diorite", "rhyolite", "gneiss"] {
+            assert!(!classes.contains(&index(name)), "{name} in {classes:?}");
+        }
+        for name in ["andesite", "granodiorite", "schist", "gabbro"] {
+            assert!(classes.contains(&index(name)), "{name} missing from {classes:?}");
+        }
+        // Under an active island arc the plutonic rock is the arc's tonalitic middle crust.
+        cell.regime = crate::plates::state::regime::ARC;
+        build(&cell, &t, &p, 0.0, 20_000.0, &mut out);
+        let classes: Vec<u16> = out.iter().map(|u| u.class).collect();
+        assert!(classes.contains(&index("diorite")), "{classes:?}");
+        assert!(!classes.contains(&index("granite")), "{classes:?}");
     }
 }
