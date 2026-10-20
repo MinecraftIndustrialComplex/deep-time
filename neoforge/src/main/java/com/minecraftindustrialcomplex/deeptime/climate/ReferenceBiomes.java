@@ -32,8 +32,9 @@ import java.util.stream.IntStream;
  * ({@link BiomeCensus}) is read against: what a player of this pack sees in a world without Deep Time. No chunk is
  * loaded and no level is touched. Land is every column whose biome is neither an ocean nor a river
  * ({@code #minecraft:is_ocean}, {@code #minecraft:is_river}). Besides each biome's count it keeps the land's temperature
- * and humidity band cross table (vanilla's band edges, {@link OverworldBands#defaults()}), the frozen and dry corner's
- * biomes (temperature band 0 and humidity band 0, where vanilla draws ice spikes) and the weirdness sign there, and it
+ * and humidity band cross table (vanilla's band edges, {@link OverworldBands#defaults()}), its erosion and
+ * continentalness bands, the frozen and dry corner's biomes (temperature band 0 and humidity band 0, where vanilla
+ * draws ice spikes), the weirdness sign there and the corner's columns and ice spikes by slot, and it
  * writes the parameter list itself so the offline emulation ({@code tools/review/ice_spikes.py}) can run the same
  * climate search on a planet's baked inputs.
  */
@@ -47,6 +48,9 @@ public final class ReferenceBiomes {
         final Map<String, long[]> corner = new TreeMap<>();
         final long[][] cross = new long[5][5];
         final long[] erosion = new long[7];
+        final long[] continents = new long[7];
+        /** The frozen and dry corner by slot: continentalness band, erosion band, weirdness sign; columns, ice spikes. */
+        final Map<String, long[]> slots = new TreeMap<>();
         long samples, landN, cornerN, cornerPositive, positive;
 
         void add(Tally o) {
@@ -55,8 +59,15 @@ public final class ReferenceBiomes {
             for (int i = 0; i < 5; i++)
                 for (int j = 0; j < 5; j++)
                     cross[i][j] += o.cross[i][j];
-            for (int i = 0; i < 7; i++)
+            for (int i = 0; i < 7; i++) {
                 erosion[i] += o.erosion[i];
+                continents[i] += o.continents[i];
+            }
+            o.slots.forEach((k, v) -> {
+                long[] m = slots.computeIfAbsent(k, q -> new long[2]);
+                m[0] += v[0];
+                m[1] += v[1];
+            });
             samples += o.samples;
             landN += o.landN;
             cornerN += o.cornerN;
@@ -116,7 +127,10 @@ public final class ReferenceBiomes {
                     int tb = band(bands.temperature(), Climate.unquantizeCoord(p.temperature()));
                     int hb = band(bands.vegetation(), Climate.unquantizeCoord(p.humidity()));
                     row.cross[tb][hb]++;
-                    row.erosion[band(bands.erosion(), Climate.unquantizeCoord(p.erosion()))]++;
+                    int eb = band(bands.erosion(), Climate.unquantizeCoord(p.erosion()));
+                    int cb = band(bands.continents(), Climate.unquantizeCoord(p.continentalness()));
+                    row.erosion[eb]++;
+                    row.continents[cb]++;
                     boolean positive = p.weirdness() >= 0;
                     if (positive)
                         row.positive++;
@@ -125,6 +139,11 @@ public final class ReferenceBiomes {
                         if (positive)
                             row.cornerPositive++;
                         row.corner.computeIfAbsent(id, q -> new long[1])[0]++;
+                        long[] slot = row.slots.computeIfAbsent("C" + cb + " E" + eb + (positive ? " +" : " -"),
+                                q -> new long[2]);
+                        slot[0]++;
+                        if (id.equals("minecraft:ice_spikes"))
+                            slot[1]++;
                     }
                 }
                 return row;
@@ -158,10 +177,24 @@ public final class ReferenceBiomes {
         for (long v : all.erosion)
             er.add(v);
         o.add("land_erosion_bands", er);
+        JsonArray co = new JsonArray();
+        for (long v : all.continents)
+            co.add(v);
+        // Continentalness bands: mushroom, deep ocean, ocean, coast, near-, mid-, far-inland.
+        o.add("land_continentalness_bands", co);
         JsonObject corner = new JsonObject();
         corner.addProperty("land", all.cornerN);
         corner.addProperty("weirdness_positive", all.cornerPositive);
         corner.add("biomes", counts(all.corner));
+        JsonObject slots = new JsonObject();
+        all.slots.forEach((k, v) -> {
+            JsonArray a = new JsonArray();
+            a.add(v[0]);
+            a.add(v[1]);
+            slots.add(k, a);
+        });
+        // Continentalness band (3 coast ... 6 far-inland), erosion band, weirdness sign: [columns, ice spikes].
+        corner.add("slots", slots);
         o.add("frozen_dry_corner", corner);
         Files.createDirectories(out.getParent());
         Files.writeString(out, o.toString(), StandardCharsets.UTF_8);

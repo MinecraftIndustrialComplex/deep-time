@@ -184,6 +184,23 @@ def main():
         top = ", ".join(f"{b.split(':')[1]} {pct(x, ns):.0f}" for b, x in Counter(bio[s]).most_common(5))
         print(f"{label:16} {pct(ns, n):7.1f} {pct((s & t0 & h0).sum(), ns):8.1f} {pct((s & pos).sum(), ns):6.1f} "
               f"{pct((s & spikes).sum(), ns):8.1f} {pct((s & spikes).sum(), spikes.sum()):15.1f}  {top}")
+    # The ice cap's ice spikes by the slot they come from (pack units: continentalness band, erosion band, sign).
+    cap = (k == EF) & g
+    cband = np.searchsorted([-0.455, -0.19, -0.11, 0.03, 0.3], c[keep], side="right")
+    eband = np.searchsorted([-0.78, -0.375, -0.2225, 0.05, 0.45, 0.55], e[keep], side="right")
+    cnames = ["deep", "ocean", "coast", "near", "mid", "far"]
+    slots = Counter()
+    for ci, ei, p_, sp in zip(cband[cap], eband[cap], pos[cap], spikes[cap]):
+        slots[(cnames[ci], f"E{ei}", "+" if p_ else "-")] += np.array([1, int(sp)])
+    bands_of = lambda s, b, m: " ".join(f"{nm} {pct((b[s] == i).sum(), s.sum()):.0f}" for i, nm in enumerate(m))
+    enames = [f"E{i}" for i in range(7)]
+    print(f"\ncontinentalness bands, % of land:   {bands_of(np.ones(n, bool), cband, cnames)}")
+    print(f"continentalness bands, % of ice cap: {bands_of(cap, cband, cnames)}")
+    print(f"erosion bands, % of land:   {bands_of(np.ones(n, bool), eband, enames)}")
+    print(f"erosion bands, % of ice cap: {bands_of(cap, eband, enames)}")
+    print("\nice cap by slot (continentalness, erosion band, weirdness sign): columns, of them ice spikes")
+    for s_, v_ in sorted(slots.items(), key=lambda kv: -kv[1][0])[:24]:
+        print(f"  {s_[0]:5} {s_[1]} {s_[2]}  {v_[0]:6d} {v_[1]:6d}")
     corner = t0 & h0
     print(f"\nice spikes: {pct(spikes.sum(), n):.2f} % of land; of the T0 and H0 land {pct((spikes & corner).sum(), corner.sum()):.1f} %, "
           f"of it with weirdness > 0 {pct((spikes & corner & pos).sum(), (corner & pos).sum()):.1f} %, "
@@ -210,6 +227,15 @@ def main():
               f"T0 and H0 {pct(rc['land'], ref['land']):.2f} % (weirdness > 0 {pct(rc['weirdness_positive'], rc['land']):.0f} %); "
               f"ice spikes {pct(rc['biomes'].get('minecraft:ice_spikes', 0), rc['land']):.1f} % of that corner, "
               f"{pct(ref['land_biomes'].get('minecraft:ice_spikes', 0), ref['land']):.3f} % of land")
+        if "land_continentalness_bands" in ref:
+            cb_ = ref["land_continentalness_bands"]
+            print(f"  continentalness bands, % of land: " + " ".join(
+                f"{nm} {pct(x, ref['land']):.0f}" for nm, x in zip(["mushroom", "deep", "ocean", "coast", "near", "mid", "far"], cb_)))
+            eb_ = ref["land_erosion_bands"]
+            print(f"  erosion bands, % of land: " + " ".join(f"E{i} {pct(x, ref['land']):.0f}" for i, x in enumerate(eb_)))
+            print("  T0 and H0 corner by slot (continentalness band, erosion band, sign): % of the corner, its ice spikes rate")
+            for s_, (cols_, sp_) in sorted(rc.get("slots", {}).items(), key=lambda kv: -kv[1][0])[:20]:
+                print(f"    {s_:10} {pct(cols_, rc['land']):6.1f} % {pct(sp_, cols_):6.1f} %")
 
 
 if __name__ == "__main__":
