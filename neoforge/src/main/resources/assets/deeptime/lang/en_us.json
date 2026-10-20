@@ -524,6 +524,7 @@
   "deeptime.customize.reset_all": "Reset all",
   "deeptime.customize.reset_all.hint": "Every setting back to the preset's value, and the timeline and memory cap back to their defaults.",
   "deeptime.customize.reset": "Back to the preset's value",
+  "deeptime.customize.reset.button": "Reset",
   "deeptime.customize.preset_value": "Preset: %s",
   "deeptime.customize.range": "%s to %s",
   "deeptime.customize.range.unit": "%s to %s %s",

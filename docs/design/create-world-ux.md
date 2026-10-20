@@ -70,11 +70,12 @@ From top to bottom:
 - **The map**, with the time scrubber, play/pause and "● Live" under it. "Stop here" and "Pick this
   epoch" are optional and stay beside the scrubber.
 - **A panel with three tabs**:
-  - **History**: the event log grouped and counted (`model.Milestones`). It is cut into time windows
-    (a fiftieth of the run, at least 1 Myr), with one row per kind per window ("8 new ocean ridges
-    formed"), newest first. Each row has its kind's colour, the same as the map's markers, so the list
-    is also the markers' legend. Event kinds from the Rust core are mapped to player text on the Java
-    side (`deeptime.milestone.<kind>`, `.many`); no Rust event was renamed.
+  - **History**: the event log grouped and counted (`model.Milestones`). It is cut into time
+    windows (a fiftieth of the run, at least 1 Myr), with one row per kind per window ("8 new
+    ocean ridges formed"), newest first (by window, then by the row's newest event), so the time
+    column reads in order. Each row has its kind's colour, the same as the map's markers, so the
+    list is also the markers' legend. Event kinds from the Rust core are mapped to player text on
+    the Java side (`deeptime.milestone.<kind>`, `.many`); no Rust event was renamed.
   - **Map**: layer groups and layers, "Show as a globe" and "Show events on the map", and the shown
     layer's **legend** (`model.Legend`). The legend is read from the same `ramps.json` the picture is
     coloured with:
@@ -130,7 +131,7 @@ Every setting is one row:
   - a number box, red while the text is not valid;
   - an on/off button;
   - a choice button;
-- a **↺** reset to the preset's value, active only when the setting is changed.
+- a **Reset** button back to the preset's value, shown only when the setting is changed.
 
 A changed setting has an accent bar and an accent label. The tooltip adds "Preset: <value>". A
 setting the chosen preset does not carry says so ("Not in this preset: start from another preset to

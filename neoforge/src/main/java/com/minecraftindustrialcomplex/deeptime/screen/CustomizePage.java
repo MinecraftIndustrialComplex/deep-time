@@ -46,6 +46,8 @@ import java.util.function.BooleanSupplier;
 final class CustomizePage implements PlanetEditorScreen.Page {
 
     static final int ROW = 34, GAP = 8;
+    /** The per-setting Reset button's width; it shows only on a changed setting. */
+    static final int RESET_W = 44;
     static final int TEXT = 0xffe8e8e8, DIM = 0xff9aa3ad, FAINT = 0xff6f7883, ACCENT = 0xffffd060, ERROR = 0xffff7070,
             GOOD = 0xff80e080;
 
@@ -490,10 +492,10 @@ final class CustomizePage implements PlanetEditorScreen.Page {
 
         void row(Component label, AbstractWidget widget, BooleanSupplier edited, Runnable reset, Component line, Component range,
                 Component tooltip) {
-            Button r = Button.builder(Component.literal("↺"), b -> {
+            Button r = Button.builder(Lang.tr("customize.reset.button"), b -> {
                 if (reset != null)
                     reset.run();
-            }).width(20).build();
+            }).width(RESET_W).build();
             r.setTooltip(Tooltip.create(Lang.tr("customize.reset")));
             if (tooltip != null && !tooltip.getString().isBlank())
                 widget.setTooltip(Tooltip.create(tooltip));
@@ -583,20 +585,22 @@ final class CustomizePage implements PlanetEditorScreen.Page {
                     boolean hovering, float partialTick) {
                 Font font = Minecraft.getInstance().font;
                 boolean ed = edited.getAsBoolean();
-                int rx = left + width - 20;
+                int rx = left + width - RESET_W;
                 int wx = rx - 4 - widgetW;
                 int textW = wx - left - 12;
                 if (ed)
                     g.fill(left, top + 1, left + 2, top + height - 4, ACCENT);
                 g.drawString(font, fit(font, label, textW), left + 6, top + 6, ed ? ACCENT : TEXT, false);
                 g.drawString(font, fit(font, line, textW), left + 6, top + 20, DIM, false);
-                String r = fit(font, range, widgetW + 24);
+                String r = fit(font, range, widgetW + RESET_W + 4);
                 g.drawString(font, r, left + width - font.width(r), top + 20, FAINT, false);
                 widget.setX(wx);
                 widget.setY(top);
                 widget.render(g, mouseX, mouseY, partialTick);
                 reset.setX(rx);
                 reset.setY(top);
+                // Only a changed setting has something to reset; the space stays so the controls line up.
+                reset.visible = ed;
                 reset.active = ed;
                 reset.render(g, mouseX, mouseY, partialTick);
                 if (hovering && mouseX < wx && tooltip != null && !tooltip.getString().isBlank()
