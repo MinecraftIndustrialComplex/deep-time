@@ -20,9 +20,12 @@
 //! feedback goes to the `erosion` part (all of its change: erosion, deposition, isostasy,
 //! flexure, the sea), a resampling to `resample_blend`. A snapshot every
 //! [`super::GAP_SNAPSHOT_MYR`] and at the end. With [`MAPS_ENV`] set to a folder, every snapshot
-//! also writes the visible samples there (`t<Myr>.bin`, little-endian f32 records of latitude and
-//! longitude in degrees, elevation (m), thickness (m), kind (0 oceanic, 1 continental)) for
-//! `tools/review/continent-budget.py`.
+//! also writes the visible samples there (`t<Myr>.bin`, little-endian f32 records of
+//! [`MAP_FIELDS`]: latitude and longitude in degrees, elevation (m), thickness (m), kind (0
+//! oceanic, 1 continental), orogeny (0 none, 1 Andean, 2 Himalayan), the orogeny's age (Myr), the
+//! island-arc and continental-arc magma (m), the plate group, the flags) for
+//! `tools/review/continent-budget.py`. Each snapshot also splits the land by the origin of its
+//! crust (`cb_origin`: island arc, collision, Andean margin, the rest).
 //!
 //! Off unless [`ON_ENV`] is set; it changes nothing the model does.
 
@@ -36,7 +39,7 @@ use rayon::prelude::*;
 use super::collapse::iso_height;
 use super::gap_budget::{NAMES, PARTS, Part};
 use super::geometry::Tree;
-use super::state::Sample;
+use super::state::{OROGENY_ANDEAN, OROGENY_HIMALAYAN, Sample};
 
 /// Set to switch the budget on.
 pub const ON_ENV: &str = "DEEPTIME_CRUST_BUDGET";
@@ -96,7 +99,11 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 20] = [
+const GLOBALS: [(&str, &str); 24] = [
+    ("flow_steps", super::flow::STEPS_GLOBAL),
+    ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
+    ("flow_short_myr", super::flow::SHORT_GLOBAL),
+    ("flow_edge", super::flow::EDGE_GLOBAL),
     ("foundered", super::collapse::FOUNDERED_GLOBAL),
     ("rate_lost", super::rate::LOST_GLOBAL),
     ("crossed", super::belts::CROSSED_GLOBAL),
@@ -124,6 +131,25 @@ const GLOBALS: [(&str, &str); 20] = [
 
 /// Earth's radius, km: the distances to the coast are Earth-normalized.
 const EARTH_KM: f64 = 6371.0;
+
+/// The origins the snapshots split the land by (see [`origin`]).
+const ORIGINS: usize = 4;
+const ORIGIN_NAMES: [&str; ORIGINS] = ["island_arc", "collision", "andean", "other"];
+
+/// Where a sample's crust came from: island-arc crust (more than 1 km of island-arc magma, more
+/// than of continental-arc magma, as [`super::dynamics::is_island_arc`]), else a collision's belt,
+/// else an Andean margin, else the rest (measurement only).
+fn origin(s: &Sample) -> usize {
+    if s.arc_oceanic_m >= 1000.0 && s.arc_oceanic_m > s.arc_continental_m {
+        0
+    } else if s.orogeny == OROGENY_HIMALAYAN {
+        1
+    } else if s.orogeny == OROGENY_ANDEAN {
+        2
+    } else {
+        3
+    }
+}
 
 fn bits(s: &Sample) -> u8 {
     let mut b = 0;
@@ -216,19 +242,35 @@ impl CrustBudget {
         self.lines.is_empty()
     }
 
-    /// Books every change since the last booking to `part`.
-    pub fn book(&mut self, samples: &[Sample], part: Part) {
+    /// Books the stocks' changes since the last booking to `part`, and starts the samples' states
+    /// afresh: for a resampling, whose new lattice has the same number of samples at other places,
+    /// so sample i before and after is not one piece of crust. (Until 2026-10-20 a resampling was
+    /// booked with [`CrustBudget::book`], which compared sample i of the old lattice with sample i
+    /// of the new: about c (1 - c) of the samples counted as made oceanic or continental at each
+    /// resampling, the "15.9 of the planet's worth" of the build log's 2026-10-20 entry.)
+    pub fn book_lattice(&mut self, samples: &[Sample], part: Part) {
         let now = stocks(samples);
         let p = part as usize;
         for (k, x) in self.parts[p].iter_mut().enumerate() {
             *x += now[k] - self.last[k];
         }
         self.last = now;
+        self.bits = samples.par_iter().map(bits).collect();
+    }
+
+    /// Books every change since the last booking to `part`.
+    pub fn book(&mut self, samples: &[Sample], part: Part) {
         if samples.len() != self.bits.len() {
             // A resampling: the samples are new, their changes of state are not single moves.
-            self.bits = samples.par_iter().map(bits).collect();
+            self.book_lattice(samples, part);
             return;
         }
+        let now = stocks(samples);
+        let p = part as usize;
+        for (k, x) in self.parts[p].iter_mut().enumerate() {
+            *x += now[k] - self.last[k];
+        }
+        self.last = now;
         let moved = self
             .bits
             .par_iter_mut()
@@ -323,6 +365,39 @@ impl CrustBudget {
         } else {
             f64::NAN
         };
+        // The land by where its crust came from (the land-shape task, 2026-10-20): island-arc
+        // crust grown continental, a collision's belt, an Andean margin, the rest. Per origin: its
+        // share of the land, its share above 2 km and its median distance to the coast.
+        let origin_line = if pos.len() == samples.len() && n_land_sl > 0.0 {
+            let sea_tree = Tree::over(pos, |i| visible(i) && samples[i].elevation_m <= sea);
+            let mut d: [Vec<f64>; ORIGINS] = Default::default();
+            let mut high = [0.0f64; ORIGINS];
+            for i in (0..samples.len()).filter(|&i| land(i)) {
+                let o = origin(&samples[i]);
+                if samples[i].elevation_m > sea + 2000.0 {
+                    high[o] += 1.0;
+                }
+                if let Some((_, c2)) = sea_tree.nearest(pos[i]) {
+                    d[o].push(2.0 * (0.5 * c2.sqrt()).min(1.0).asin() * EARTH_KM);
+                }
+            }
+            let mut out = format!("\ncb_origin t={t_myr:.0}");
+            for (o, v) in d.iter_mut().enumerate() {
+                v.sort_by(f64::total_cmp);
+                let n = v.len() as f64;
+                let _ = write!(
+                    out,
+                    " {}=[land={:.4} above_2km={:.4} coast_p50_km={:.0}]",
+                    ORIGIN_NAMES[o],
+                    n / n_land_sl,
+                    high[o] / n.max(1.0),
+                    v.get(v.len() / 2).copied().unwrap_or(f64::NAN),
+                );
+            }
+            out
+        } else {
+            String::new()
+        };
         let mut line = format!(
             "\ncb_t t={t_myr:.0} vis={:.0} cont={:.4} cont_hidden={:.4} vol_km3={:.4e} \
              vol_hidden_km3={:.4e} land0={:.4} land={:.4} sea_m={sea_m:.0} dry={:.4} \
@@ -339,6 +414,7 @@ impl CrustBudget {
             ocean_land / n_land_sl.max(1.0),
             s[VOL] / s[CONT].max(1.0) / 1000.0,
         );
+        line += &origin_line;
         // The thickness bands of the visible continental crust.
         let mut bands: Vec<Vec<(f32, f32, f32)>> = vec![Vec::new(); EDGES_KM.len() - 1];
         for x in samples
@@ -446,13 +522,28 @@ impl CrustBudget {
     }
 }
 
+/// The f32 fields of a map record, in order.
+pub const MAP_FIELDS: [&str; 11] = [
+    "lat",
+    "lon",
+    "z",
+    "thickness",
+    "kind",
+    "orogeny",
+    "orogeny_age",
+    "arc_oceanic_m",
+    "arc_continental_m",
+    "group",
+    "flags",
+];
+
 /// Writes the visible samples to `<dir>/t<Myr>.bin` (measurement only; a failure is reported and
 /// ignored).
 fn write_map(dir: &std::path::Path, samples: &[Sample], pos: &[DVec3], t_myr: f64) {
     if pos.len() != samples.len() {
         return;
     }
-    let mut buf: Vec<u8> = Vec::with_capacity(samples.len() * 20);
+    let mut buf: Vec<u8> = Vec::with_capacity(samples.len() * 4 * MAP_FIELDS.len());
     for (s, p) in samples.iter().zip(pos) {
         if s.is_hidden() {
             continue;
@@ -466,6 +557,12 @@ fn write_map(dir: &std::path::Path, samples: &[Sample], pos: &[DVec3], t_myr: f6
             s.elevation_m,
             s.thickness_m,
             f32::from(u8::from(s.is_continental())),
+            f32::from(s.orogeny),
+            (t_myr - f64::from(s.orogeny_myr)) as f32,
+            s.arc_oceanic_m,
+            s.arc_continental_m,
+            s.group as f32,
+            f32::from(s.flags),
         ] {
             buf.extend_from_slice(&x.to_le_bytes());
         }
@@ -518,5 +615,20 @@ mod tests {
         let out = b.lines();
         assert!(out.contains("cb_t t=2"), "{out}");
         assert!(out.contains("collapse=[o2c="), "{out}");
+        assert!(out.contains("cb_origin t=2 island_arc=[land="), "{out}");
+    }
+
+    /// The land's origins: island-arc crust before a collision, a collision before an Andean margin.
+    #[test]
+    fn origins_in_order() {
+        let mut s = column(CONTINENTAL, 500.0);
+        assert_eq!(ORIGIN_NAMES[origin(&s)], "other");
+        s.orogeny = OROGENY_ANDEAN;
+        assert_eq!(ORIGIN_NAMES[origin(&s)], "andean");
+        s.orogeny = OROGENY_HIMALAYAN;
+        assert_eq!(ORIGIN_NAMES[origin(&s)], "collision");
+        s.arc_oceanic_m = 8000.0;
+        s.arc_continental_m = 2000.0;
+        assert_eq!(ORIGIN_NAMES[origin(&s)], "island_arc");
     }
 }
