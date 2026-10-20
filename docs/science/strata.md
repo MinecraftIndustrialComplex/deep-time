@@ -123,6 +123,10 @@ min(1, halite / 200 m) x min(1, overburden / 1,000 m) (salt); 0.8 x min(1, (sedi
 | Accumulation rate of pelagic sediment | calcareous ooze 3-50 m/Myr, siliceous ooze 2-10, red clay 1-5; platform carbonate up to about 1,000 m/Myr | Rothwell 2005 via Wikipedia; Schlager 1981 via Wikipedia (secondary) | a one-block bed is 35 m, so 0.7-35 Myr of pelagic sediment | arithmetic |
 | Niger Delta wedge | a clastic wedge 12 km thick over 75,000 km2, growth faults detached on overpressured shale | Sanuade and Kaka 2017, Geol. Q. 61(1) (secondary review) | growth-fault threshold 1,500 m (no source) | not measured |
 | Dip of beds under lowland | none given | - | median 18.6 degrees in block space, 1.3 degrees real-equivalent at sigma 10 | `dips.py` on 1,500 columns, `earthlike_quick_16k`, scattered, 500 Myr, seed 1, 2026-09-30 (build log) |
+| Ocean crust, sea floor to mantle | about 7.5 km (7.1 km of igneous crust, 0.4 km of deep-ocean sediment) | White et al. 1992 (abstract); GlobSed (Straume et al. 2019, read) | 9.8 km on crust younger than 20 Myr, 12.1 km over all ages (13.1 before) | `geo-template.sh`, six runs, 2026-10-20 (below) |
+| Ocean crust's layer 2 and layer 3 | 1.84 km and 4.31 km | Christeson et al. 2019 (abstract; layer 3 secondary) | 2.1 km of lavas and dikes over 4.5 km of gabbro on crust younger than 20 Myr | same |
+| Granite and gneiss under the sea | none (plagiogranite in the Penrose sequence) | Penrose Field Conference 1972, second hand | in 4 % and 21 % of the ocean columns, at the coasts (62 % and 77 % before) | same |
+| Mountains filled by the top bed | the beds run on under the ranges | - | the top unit fills over half of the relief on 31 % of the cells 8 blocks or more above the history's surface (100 % before) | same |
 | Columns with a grade inversion, a thin metamorphic sliver, a plutonic sheet | none counted; inverted sequences are real but rare in a given column | - | 0.07 % of columns have a grade inversion, 0.25 % a metamorphic sliver, 0.05 % a plutonic sheet (20,000 columns) | see below |
 
 Strata-check on a 16k quick planet (preset `earthlike_quick_16k`, start `scattered_continents`, 500 Myr, 2 threads,
@@ -145,6 +149,89 @@ columns changed by a structure, 49.1 % of land columns; 120 columns meet a bed t
 The grade inversions, slivers and sheets that remain are the ones folds and faults introduce (the
 stored stacks, which have no structures, show none).
 
+### The ocean crust and the mountains, measured
+
+The external review of 2026-10-19 found one column template for every crust kind (granite and gneiss
+under most of the sea floor) and mountains filled to their crests by the top unit (defects D1 and D2;
+the fixes are RCK-095, RCK-096, PLT-293 and STR-051 to STR-054). Measured with
+`tools/review/geo-template.sh` on the test machine, 2026-10-20: `earthlike_quick_16k`, 1000 Myr,
+8 threads, both starts, seeds 1 to 3; "before" is master 49f5f543 (with the continents fix
+bc2e5472 and the sea-floor fix), "after" this branch at its
+default, "switch on" the branch with PLT-294 on (TectonicParams `transition_ocean_crust`; SWITCHRUNS).
+`deeptime inspect-column` read a grid every 208 blocks; an ocean column is a sea column whose crust
+has an age (`meta/crust_age_myr`). Thicknesses are means over all the band's columns (a block is
+35 m), with the share of columns holding any of the group; "granite" and "gneiss" are those classes
+alone; the last column is the median depth from the sea floor to the first peridotite.
+
+| Crust age | Columns | Sediment (km) | Lavas, dikes (km) | Gabbro (km) | Felsic plutonic (km, share) | Metamorphic (km, share) | Granite | Gneiss | Sea floor to mantle (km) |
+|---|---|---|---|---|---|---|---|---|---|
+| before, 0-20 Myr | 1,450 | 2.2 | 1.96, 0.03 | 3.9 | 1.26, 64 % | 2.23, 67 % | 53 % | 65 % | 10.8 |
+| after, 0-20 Myr | 1,381 | 2.6 | 0.97, 1.16 | 4.5 | 0.62, 47 % | 0.95, 52 % | 2 % | 12 % | 9.8 |
+| switch on, 0-20 Myr | SW0N | SW0S | SW0L | SW0G | SW0F | SW0M | SW0GR | SW0GN | SW0D |
+| before, 20-65 Myr | 2,235 | 2.7 | 1.85, 0.03 | 3.6 | 1.84, 78 % | 2.48, 74 % | 67 % | 72 % | 12.0 |
+| after, 20-65 Myr | 2,252 | 3.2 | 0.93, 1.13 | 4.1 | 1.14, 65 % | 1.22, 63 % | 3 % | 16 % | 11.1 |
+| before, 65-150 Myr | 1,910 | 4.7 | 1.79, 0.05 | 2.6 | 2.51, 86 % | 3.08, 85 % | 69 % | 83 % | 14.4 |
+| after, 65-150 Myr | 1,858 | 5.7 | 0.97, 1.07 | 3.1 | 1.30, 70 % | 1.95, 76 % | 4 % | 21 % | 14.0 |
+| before, over 150 Myr | 966 | 7.2 | 1.56, 0.06 | 1.2 | 2.36, 86 % | 4.92, 95 % | 53 % | 94 % | 16.4 |
+| after, over 150 Myr | 982 | 8.8 | 0.98, 0.87 | 1.5 | 1.25, 61 % | 3.54, 94 % | 7 % | 41 % | 16.7 |
+| before, all ages | 6,561 | 3.8 | 1.82, 0.04 | 3.0 | 1.98, 79 % | 2.96, 79 % | 62 % | 77 % | 13.1 |
+| after, all ages | 6,473 | 4.6 | 0.96, 1.08 | 3.5 | 1.09, 62 % | 1.73, 69 % | 4 % | 21 % | 12.1 |
+| switch on, all ages | SWAN | SWAS | SWAL | SWAG | SWAF | SWAM | SWAGR | SWAGN | SWAD |
+| Earth | | 0.27 (crust under 82 Myr), 0.40 (deep ocean), 3.0 (margins) | layer 2: 1.84 | layer 3: 4.31 | plagiogranite only | none | none | none | about 7.5 |
+
+Earth's row: GlobSed (Straume et al. 2019) for the sediment, Christeson et al. 2019 for layers 2 and
+3 (a secondary reading of their section 4.1), White et al. 1992's 7.1 km of igneous crust plus the
+deep ocean's sediment for the last column, the Penrose sequence for what is in it (bibliography,
+"Ocean crust as drilled").
+
+What it shows:
+
+- **The Penrose sequence is there.** Ocean crust is now lavas over sheeted dikes (greenstone, in
+  97 % of the ocean columns against 8 %) over gabbro: 6.6 km of igneous crust on crust younger than
+  20 Myr against White's 7.1. Felsic plutonic rock on ocean crust is island-arc rock (diorite and
+  granodiorite) and its metamorphic rock schist (RCK-096).
+- **Granite and gneiss fell from 62 % and 77 % of the ocean columns to 4 % and 21 %**, and what is
+  left sits at the coasts: 92 % of the gneiss columns and 96 % of the granite columns lie within
+  one grid step (61 km) of continental crust or land. Probing every 8 blocks round 80 of them (supercontinent, seed 1), 58 lie within
+  5 km of continental crust or land and 69 within 15 km (before: 6 and 12, and 33 more than 75 km
+  from any). Their keys say where they come from: the continent's felsic plutonic pool (granite),
+  its metamorphic pool and its strata log's layers buried to 650 degC (gneiss; the log
+  metamorphoses only on continental crust), carried across the crust-kind boundary by the column
+  rule (limits below). A few granite stocks of collision belts (DEF-045) also stand in coastal ocean
+  columns.
+- **The felsic rock the plate model still puts on ocean crust** (62 % of the ocean columns hold some,
+  1.1 km on average) is mostly the transition's (PLT-261): the continent's rock parked on the ocean
+  side of every margin within 100 km, drawn as granodiorite. The switch PLT-294 takes most of it away
+  (SWITCHFEL) at a cost in land (plates.md, "Ocean crust keeps its own rock").
+- **The sea floor is still deep to its mantle**, 9.8 km on young crust and 12.1 km over all ages
+  against Earth's 7.5: the sediment, 2.6 km on crust younger than 20 Myr against GlobSed's
+  0.27 km under 82 Myr, and the arc and transition rock. Most of the model's ocean is margin (68 % of
+  the ocean columns lie within 61 km of continental crust or land), where GlobSed's mean is 3.0 km;
+  the young crust's sediment is still several times Earth's (open questions).
+
+The mountains (STR-051: L1 cells whose mean L3 elevation stands at least 8 or 30 blocks above the
+surface the history left, and the share of them where the stack's first horizon spans more than
+half of that relief):
+
+| | before | after |
+|---|---|---|
+| cells at least 8 blocks above the history's surface (six runs) | 154,025 | 159,527 |
+| top unit fills over half of the relief | 1.000 on every run | 0.31 (0.28 to 0.33) |
+| cells at least 30 blocks above it | 29,281 | 27,153 |
+| top unit fills over half of the relief | 1.000 on every run | 0.24 (0.21 to 0.28) |
+| L1 cells lifted (STR-052), mean lift | none | 159,000 to 167,000 a run, 3.9 to 4.9 blocks |
+| bodies whose centre stands above the ground | 3.1 to 5.7 % | 3.0 to 5.0 % |
+
+Before, the first horizon was stretched up to every crest, so the top bed filled the whole relief
+of every mountain. After, the stack rises by the lift and a crest above it is filled by the thickest
+rock unit within 16 blocks of the surface (STR-053); where the top unit still fills over half of the
+relief it is a thick bed (a kilometre of sandstone is 29 blocks) or that crest unit. Sections across
+both starts (`review/out/geo-template/line*-*.png`, one panel per run) show the beds and the
+basement rising under the ranges. Land, deposit sites and body counts move within the seeds' spread
+(the plate change makes each planet a different one), the bodies standing above the ground did not
+increase. Nothing here changes the trench code: the trench width and the hadal area are a separate
+task.
+
 ## Simplifications and limits
 
 - **No compaction.** A layer keeps its deposited thickness at any depth. Real mud halves by 3 km of burial. The
@@ -160,6 +247,14 @@ stored stacks, which have no structures, show none).
 - **A body rises whole.** A pluton, an ore body or one slab of an aureole rises by the lift at its centre,
   while the horizons and the structure file's intrusions rise point by point; where the lift changes across a
   body (a steep range front), its edges sit up to the change in lift off the rock beside them (STR-052).
+- **The column rule crosses crust kinds.** The bake smooths only within one crust kind (STR-054), but
+  the game's column rule blends the 4 x 4 horizon cells round a block column by key whatever their
+  kind (STR-015), so within about 5 to 15 km of a coast a continent's granite and gneiss reach into
+  the ocean columns and pinch out (4 % and 21 % of the ocean columns, "The ocean crust and the
+  mountains, measured"). A real continent thins to the ocean over tens of kilometres, so the tongue
+  is not wrong in kind. Keeping kinds apart would mean the column rule reading the crust kind (the
+  world data has it since REV-2, the `meta/crust_type` layer) in both evaluators, Rust and Java; not
+  done here.
 - **Lavas and dikes in a fixed share.** Layer 2 is 0.8 km of lavas over 1.2 km of dikes on fresh crust
   everywhere (RCK-095); Earth's share varies with spreading rate (Hole 504B against Hole 1256D).
 - **Unconformities are implicit.** Rock younger than a structure is not deformed by it. A hiatus has no record,
@@ -195,6 +290,10 @@ smoothing within one crust kind and the mountain-fill measure (STR-051 to STR-05
    paywalled. A reader with access could check the 100 m, 1,000 m and 1,500 m values.
 3. **The Subandean belt width** (100 to 200 km in the stage-1 comment) was not read.
 4. **Wording of the stub:** the stage-1 stub said the mod "compacts" layers. It does not.
+5. **Sediment on young ocean crust.** Crust younger than 20 Myr carries 2.2 to 2.6 km of sediment
+   in the census against GlobSed's 0.27 km under 82 Myr ("The ocean crust and the mountains,
+   measured"). The model's ocean is mostly margin, where Earth's mean is 3.0 km, but even so the
+   young crust looks too buried; where the surface stage puts its marine sediment was not traced.
 
 ## Sources
 
