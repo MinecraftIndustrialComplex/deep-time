@@ -649,6 +649,43 @@ Ecosphere's island biomes, kept out of Deep Time's deep-sea slots (BIO-132), wou
 on the sea floor (the test planet's sea fell to 0.685 ocean biomes with Expanded Ecosphere before this was fixed; 1.0
 after).
 
+## Ice spikes and the rare variants (2026-10-20)
+
+Ben, on his play world (bake be17a7cf, workbench run 1a1578fa5d2: `earthlike_quick_16k`, supercontinent, 1,000 Myr,
+seed 1, with MIC): "I've also noticed like 20x more ice spike biomes than I'd usually see, might be indicative of
+biome rarities being ignored."
+
+**How a column's biome is chosen.** No step weighs a biome by rarity. In a normal world a biome is rare because its
+slots in the pack's parameter list cover a small part of the noise space; Deep Time replaces the noise with the baked
+climate, so a biome's share is how often the planet's baked inputs fall in its slots.
+
+1. The bake, once per world. `bake/biomes.rs` `map` (line 1147) gives every L2 cell the five inputs in vanilla units.
+   Temperature and humidity come from the Köppen class through `placement.json` (`Placement::place`,
+   `bake/placement.rs` line 1259). EF under the ice cover takes the glaciated block: temperature ramp `polar_ice`
+   (band 0.6 to 0.8, vanilla -0.67 to -0.56) and humidity `ice_cap` (band 0.5, vanilla -0.675), the frozen and
+   driest cell (T0, H0) where vanilla and Terralith draw their ice spikes (BIO-078). Continentalness is the distance
+   to the sea (the block after `// Continentalness.` in `map`: the beach strip, 16 blocks, is band 4, 200 blocks
+   band 5, 1,000 band 6, 5,000 band 7), clamped inland of the beach strip by a class's `continentalness` limits.
+   Erosion follows the rank of the local relief, weirdness the crest index and the class's weirdness rule (EF's flats
+   rule, BIO-077). They are the layers `climate/temperature`, `vegetation`, `continents`, `erosion` and `ridges`.
+2. The router, every column. `worldgen/noise_settings/planet.json` (lines 57 to 85) reads those layers through
+   `deeptime:raster` density functions (`RasterDensity.compute`, line 36, then `WorldDataTerrain.raster`, line 310:
+   bilinear, the ridges as an odd field) and maps each from vanilla units onto the pack's router with the world's
+   climate mapping (`ClimateMapping.apply`, line 234, each table's `Table.apply`, line 56): with MIC, onto
+   Tectonic's stretched erosion and continentalness.
+3. The biome source. `worldgen/world_preset/planet.json` (lines 8 and 9) keeps `minecraft:multi_noise` with the
+   preset `minecraft:overworld`, so the parameter list is the pack's: vanilla's `OverworldBiomeBuilder`, or with MIC
+   Terralith 2.6.2's own list (MIC ships Terralith with Lithostitched and Tectonic, which reshapes the router, and
+   no TerraBlender). The game takes the nearest slot (`Climate.ParameterList`).
+4. Deep Time's hook. `VolcanicBiomeSourceMixin` (its `@Inject` at line 34; Deep Time levels only, line 37) keeps
+   the volcanic biomes out of that search and places them at the volcanoes and applies the biome rules
+   (`BiomeRules.search`, line 158); with TerraBlender, whose regions follow the provinces (P1-10),
+   `mixin.compat.terrablender.RegionBiomeSourceMixin` does the same in the region's tree. No rule file names ice
+   spikes, so with vanilla and MIC they come from the parameter list alone.
+5. The ice cover (`IcePass`) then lays snow and ice over the ice cap's columns, whatever their biome.
+
+ICE_SPIKES_NUMBERS
+
 ## Simplifications and limits
 
 - Peel classifies station records of many years. The mod classifies the monthly means of one
