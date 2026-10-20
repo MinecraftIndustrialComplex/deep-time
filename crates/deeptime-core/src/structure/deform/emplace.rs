@@ -441,6 +441,7 @@ pub fn emplace(
                 wear_m: 0.0,
                 rise: 0.0,
                 depth: 0.0,
+                base: 0.0,
                 rock: 0,
             };
             match kind {

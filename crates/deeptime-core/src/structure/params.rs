@@ -95,13 +95,23 @@ pub struct StructureParams {
     /// 7 km (Bateman 1992) and the Tuolumne suite at 6 to 10 km, so 2 to 6 km is shallow.
     // ledger: RCK-063
     pub pluton_roof_km: [f64; 2],
-    /// Share of a pluton's normalised radius its contact aureole (hornfels or skarn) takes, as
-    /// the outer shell of the body (0 turns aureoles off). Game choice. Aureole thickness scales
-    /// with the intrusion's thickness, but measured aureoles run from a few per cent of it
-    /// (Manaslu, ~100 m round a several-km sheet) to ~30 % (Adamello, 1.7 km round 5.5 km): Annen
-    /// 2017.
+    /// Width of an intrusion's contact aureole (hornfels or skarn), the shell of host rock it
+    /// bakes outside itself, as a share of the intrusion's thickness (0 turns aureoles off;
+    /// `plutons::aureole_width_m`). Game choice. Aureole thickness grows linearly with the
+    /// intrusion's thickness, and Annen 2017 (Front. Earth Sci. 5:82) collects measured ratios:
+    /// ~0.3 for the western Adamello (1.7 km round 5.5 km), 0.3 to 0.5 for the Alta stock, at
+    /// least 0.5 for Mooselookmeguntic, 0.05 to 0.2 for Cupsuctic, 0.05 for Skaergaard's floor,
+    /// 0.01 to 0.02 for Manaslu (incremental assembly). 0.3 is the middle of the bodies emplaced
+    /// in one pulse.
     // ledger: RCK-053 (game choice)
-    pub aureole_shell: f64,
+    pub aureole_share: f64,
+    /// The aureole is this many times wider where the host at the intrusion's roof is a
+    /// carbonate. Game choice, weakly founded: the Alta stock's aureole in dolomite reaches
+    /// further than conduction alone explains (its talc isograd ~1.5 km from the contact), which
+    /// is ascribed to heat carried by fluids (Brenner et al. 2021, seen only in search excerpts:
+    /// from-memory); no source read compares carbonate and pelite hosts directly.
+    // ledger: RCK-091 (game choice)
+    pub aureole_carbonate_factor: f64,
     /// Fold-thrust belts reach this far into the foreland of an orogen, km: the Zagros fold-thrust
     /// belt has "an average width of ~300 km" in a 200–300 km wide zone of deformation (Alavi
     /// 2007, Am. J. Sci. 307, read in full); the Subandean belt was not read.
@@ -156,7 +166,8 @@ impl Default for StructureParams {
             pluton_length_km: [25.0, 8.0, 80.0],
             pluton_length_sigma: 0.5,
             pluton_roof_km: [2.0, 6.0],
-            aureole_shell: 0.15,
+            aureole_share: 0.3,
+            aureole_carbonate_factor: 1.5,
             fold_belt_km: 300.0,
             trap_min_sediment_m: 500.0,
             salt_min_m: 100.0,
@@ -252,9 +263,14 @@ impl StructureParams {
             "[min, max] with 0 ≤ min ≤ max",
         )?;
         check(
-            (0.0..1.0).contains(&self.aureole_shell),
-            "aureole_shell",
-            "must be in [0, 1)",
+            (0.0..=2.0).contains(&self.aureole_share),
+            "aureole_share",
+            "must be in [0, 2]",
+        )?;
+        check(
+            (1.0..=5.0).contains(&self.aureole_carbonate_factor),
+            "aureole_carbonate_factor",
+            "must be in [1, 5]",
         )?;
         self.deformation.validate()?;
         Ok(())

@@ -7,13 +7,14 @@
 //!
 //! | What | Where and when | Shape | Rock |
 //! |---|---|---|---|
-//! | **stock** | in a collision belt or a continental arc while it is active (a Poisson process like the folds) | a cupola a few km across rising from the world's floor, its top from just above the ground (unroofed) to tens of blocks under it | granite in collisions, granodiorite or diorite in arcs |
+//! | **stock** | in a collision belt or a continental arc while it is active (a Poisson process like the folds) | a small pluton a few km across, as thick as Cruden & McCaffrey's law of pluton outlines gives (`stock_thickness_m`), its top from just above the ground (unroofed) to tens of blocks under it; one over a pluton of about its age rises from that pluton's roof instead (`root_on_plutons`) | granite in collisions, granodiorite or diorite in arcs |
 //! | **dyke** | in a continental rift while it rifts | a sheet along the rift rising from the world's floor, a block or two wide, reaching the ground along its middle | basalt |
 //! | **plug** | under every extinct volcano on land still standing at the end of the run | a neck up the cone's axis | rhyolite (silicic centres), andesite (arc cones) or basalt |
 //!
 //! Stocks and dykes ride their plates like the folds (`feature::advance`); plugs are made at the
 //! end from the volcano catalogue, which rides the plates itself. The batholiths of P1-07
-//! (`plutons.rs`) stay bodies: they are far larger than the structures and carry aureoles.
+//! (`plutons.rs`) stay bodies: they are far larger than the structures. Plutons and stocks both
+//! get contact aureoles, written as bodies at the end of the run (`plutons::Aureole`).
 
 use super::emplace::{Inputs, length_blocks, mask_axis, strain};
 use super::feature::{Counts, Feature, Kind};
@@ -22,6 +23,7 @@ use crate::deposits::random::Rng;
 use crate::plates::state::{ARC, CONTINENTAL, regime};
 use crate::sphere::BlockFrame;
 use crate::structure::params::StructureParams;
+use crate::structure::plutons::{self, Pluton};
 use crate::surface::lithology::index;
 use crate::surface::volcanoes::{Kind as VolcanoKind, Volcano};
 
@@ -30,6 +32,76 @@ use crate::surface::volcanoes::{Kind as VolcanoKind, Volcano};
 /// (a / half_along)² + (b / half_across)² < 1 − 1 / (1 + RISE)² = 0.36, the middle 60 % of its
 /// length and width, with walls that are nearly upright.
 const RISE: f32 = 0.25; // ledger: DEF-051
+
+/// How close in emplacement time a pluton and a stock over it must be for the stock to rise from
+/// it, Myr. Game choice (ledger DEF-078): a cupola and its batholith belong to one magmatic
+/// episode; 10 Myr is the length of a long one, so stocks of other episodes keep their own floor.
+const ROOT_WINDOW_MYR: f64 = 10.0;
+
+/// How far a stock rooted on a pluton reaches below the pluton's roof, as a share of its height
+/// above it. Game choice (ledger DEF-078): enough that the stock, an ellipsoid narrowing to its
+/// base, still has 0.8 of its width where it meets the roof (√(1 − 0.6²)), so the two join.
+const ROOT_OVERLAP: f64 = 0.25;
+
+/// Thickness of a stock whose map outline has semi-axes `half_along_m` and `half_across_m`, m:
+/// a stock is a small pluton, so it takes the plutons' law (`plutons::thickness_km`, Cruden &
+/// McCaffrey 2001, T = 0.6 D^0.6 km with D the circle-equivalent diameter). The law was fitted on
+/// plutons 4.5 to 600 km across; the smallest stocks (2 km in radius) sit at its lower end.
+pub fn stock_thickness_m(half_along_m: f64, half_across_m: f64) -> f64 {
+    // ledger: RCK-061, DEF-079
+    1000.0 * plutons::thickness_km(2.0e-3 * half_along_m, 2.0e-3 * half_across_m)
+}
+
+/// Roots every stock that lies over a pluton (`plutons`, the ones alive at the end, whose bodies
+/// sit under ground at `pluton_surface_y`) emplaced within [`ROOT_WINDOW_MYR`] of it on the
+/// highest such pluton's roof: its base goes down to the roof and [`ROOT_OVERLAP`] beyond, when
+/// that is deeper than its own floor. `surface_y(x, z)` is the ground's y at a block position.
+/// Returns, for each stock rooted, its index in `features`, the pluton's index and the y of the
+/// pluton's roof under the stock's centre.
+pub fn root_on_plutons(
+    features: &mut [Feature],
+    plutons: &[Pluton],
+    pluton_surface_y: &[f64],
+    surface_y: impl Fn(f64, f64) -> f64,
+    frame: &BlockFrame,
+    m_per_block_h: f64,
+    m_per_block_v: f64,
+) -> Vec<(usize, usize, f64)> {
+    let mut out = Vec::new();
+    for (k, f) in features.iter_mut().enumerate() {
+        if f.kind != Kind::Stock {
+            continue;
+        }
+        let top_y = surface_y(f.x, f.z) - f64::from(f.depth);
+        let mut best: Option<(usize, f64)> = None;
+        for (i, (pl, &py)) in plutons.iter().zip(pluton_surface_y).enumerate() {
+            if (f64::from(pl.t_myr) - f64::from(f.t_myr)).abs() > ROOT_WINDOW_MYR {
+                continue;
+            }
+            let dx = frame.wrap_x(f.x - pl.x) * m_per_block_h;
+            let dz = (f.z - pl.z) * m_per_block_h;
+            let (sy, cy) = f64::from(pl.yaw).sin_cos();
+            let (u, w) = (cy * dx + sy * dz, -sy * dx + cy * dz);
+            let r2 = (u / f64::from(pl.a_m)).powi(2) + (w / f64::from(pl.c_m)).powi(2);
+            if r2 >= 1.0 {
+                continue;
+            }
+            let roof_y = plutons::centre_y(pl, py, m_per_block_v)
+                + f64::from(pl.b_m) / m_per_block_v * (1.0 - r2).sqrt();
+            if roof_y < top_y && best.is_none_or(|(_, y)| roof_y > y) {
+                best = Some((i, roof_y));
+            }
+        }
+        if let Some((i, roof_y)) = best {
+            let need = (top_y - roof_y) * (1.0 + ROOT_OVERLAP);
+            if need > f64::from(f.base) {
+                f.base = need as f32;
+                out.push((k, i, roof_y));
+            }
+        }
+    }
+    out
+}
 
 /// A feature of `kind` with nothing set but where and when.
 fn blank(id: u32, kind: Kind, x: f64, z: f64, plate: u32, t_myr: f64) -> Feature {
@@ -53,6 +125,7 @@ fn blank(id: u32, kind: Kind, x: f64, z: f64, plate: u32, t_myr: f64) -> Feature
         wear_m: 0.0,
         rise: 0.0,
         depth: 0.0,
+        base: 0.0,
         rock: 0,
     }
 }
@@ -139,6 +212,11 @@ pub fn emplace(
                 f.half_across = radius as f32;
                 f.half_along = (radius * (1.0 + 0.6 * u[0])) as f32; // ledger: DEF-043
                 f.depth = lerp(p.stock_top_depth_blocks, u[1]) as f32;
+                // Its own floor: as thick as a pluton of its outline.
+                f.base = (stock_thickness_m(
+                    f64::from(f.half_along) * x.m_per_block_h,
+                    f64::from(f.half_across) * x.m_per_block_h,
+                ) / x.m_per_block_v) as f32;
                 // ledger: DEF-045
                 f.rock = if x.regime[c] as u8 == regime::COLLISION {
                     index("granite")
@@ -274,7 +352,8 @@ mod tests {
                 }
                 k => panic!("{k:?} from intrude::emplace"),
             }
-            // Baked: an ellipsoid rooted on the world's floor.
+            // Baked: a dyke an ellipsoid rooted on the world's floor, a stock one of its own
+            // thickness under its top.
             let e = f.to_baked(70.0, 5000, -330.0);
             let Shape::Intrusion {
                 y,
@@ -286,10 +365,15 @@ mod tests {
             };
             assert_eq!(u16::from(class), f.rock);
             let top = y + half_height;
-            assert_eq!(y, -330.0);
             if f.kind == Kind::Stock {
-                assert!((top - (70.0 - f64::from(f.depth))).abs() < 1e-9);
+                assert!((top - (70.0 - f64::from(f.depth))).abs() < 1e-6);
+                let m = |b: f32| f64::from(b) * p.inputs().m_per_block_h;
+                let t = stock_thickness_m(m(f.half_along), m(f.half_across));
+                assert!((2.0 * half_height - t / p.inputs().m_per_block_v).abs() < 1e-3);
+                // A few km thick, not the world's height.
+                assert!((800.0..6000.0).contains(&t), "{t}");
             } else {
+                assert_eq!(y, -330.0);
                 assert!(top > 70.0 + 50.0, "a dyke stands through the ground: {top}");
             }
         }

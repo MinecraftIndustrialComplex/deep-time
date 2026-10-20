@@ -111,15 +111,21 @@ pub struct Feature {
     /// How much the deep-time surface has eroded or buried the ground at its centre since it
     /// formed, m: what wears its relief off the ground (`relief_left`).
     pub wear_m: f32,
-    /// Intrusions are rooted: the ellipsoid's centre lies on the world's floor and its
+    /// Dykes and plugs are rooted: the ellipsoid's centre lies on the world's floor and its
     /// horizontal half-axes are `half_along` and `half_across`, so it has no floor of its own
     /// and narrows upwards to its top. `rise`: how far above the ground the top would stand, as
-    /// a share of the ground's height above the floor (dykes and plugs: they reach the ground
-    /// over the middle of their plan; 0 for a stock).
+    /// a share of the ground's height above the floor (they reach the ground over the middle of
+    /// their plan; 0 for a stock).
     pub rise: f32,
     /// Intrusions: how far the top lies under the ground, blocks (stocks; negative: it crops
     /// out).
     pub depth: f32,
+    /// Stocks: how far the ellipsoid's base lies under its top, blocks: the stock's own
+    /// thickness (Cruden & McCaffrey's power law of its outline, `intrude::stock_thickness_m`),
+    /// or down into the roof of the pluton it rises from (`intrude::root_on_plutons`). 0: rooted
+    /// on the world's floor like a dyke.
+    #[serde(default)]
+    pub base: f32,
     /// Intrusions: the rock class (index into the class table).
     pub rock: u16,
 }
@@ -297,7 +303,7 @@ impl Feature {
     }
 
     /// The feature as a baked event of the world data (`key`: its age as a stratigraphic key;
-    /// `floor_y`: the world's floor, where intrusions are rooted). The vectors are taken from
+    /// `floor_y`: the world's floor, where dykes and plugs are rooted). The vectors are taken from
     /// the Noddy event's own frame, so the two agree.
     pub fn to_baked(&self, surface_y: f64, key: u16, floor_y: f64) -> StructEvent {
         let az = f64::from(self.azimuth_deg);
@@ -339,6 +345,15 @@ impl Feature {
                     y: surface_y,
                     pole: [fwd[0][0], fwd[2][0], -fwd[1][0]],
                     slip: [s * rev[1][0], s * rev[1][2], -s * rev[1][1]],
+                }
+            }
+            Kind::Stock if self.base > 0.0 => {
+                // An ellipsoid of its own height, its top `depth` under the ground.
+                let half = 0.5 * f64::from(self.base);
+                Shape::Intrusion {
+                    y: surface_y - f64::from(self.depth) - half,
+                    half_height: half,
+                    class: self.rock as u8,
                 }
             }
             Kind::Stock | Kind::Dyke | Kind::Plug => Shape::Intrusion {
@@ -475,6 +490,7 @@ mod tests {
             wear_m: 0.0,
             rise: 0.0,
             depth: 0.0,
+            base: 0.0,
             rock: 0,
         }
     }
