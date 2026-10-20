@@ -274,4 +274,83 @@ class TimelapseModelTest {
         assertTrue(m.progressLine(4L << 30).startsWith("done · 0 keyframes · 0 events"), m.progressLine(4L << 30));
         assertEquals(1.0, m.fraction());
     }
+
+    /** The estimate of the VM's client walk of 2026-10-20 (earthlike 16k, 300 Myr), as its log printed it. */
+    static Estimate walkEstimate() {
+        return new Estimate(3_866_864_384L, 3_678_120_704L, 188_743_680L, List.of(
+                new Estimate.Stage("plates", 1, 53.44, null),
+                new Estimate.Stage("climate", 1, 95.740352, "plates"),
+                new Estimate.Stage("surface", 1, 78.6432, "plates"),
+                new Estimate.Stage("volcanoes", 1, 0.786432, "plates"),
+                new Estimate.Stage("impacts", 1, 0.393216, "plates"),
+                new Estimate.Stage("structure", 1, 3.93216, "plates"),
+                new Estimate.Stage("deposits", 1, 8.4639744, null),
+                new Estimate.Stage("young", 1, 5.373952, null),
+                new Estimate.Stage("amplify", 1, 65.4311424, null)));
+    }
+
+    static SimSession.Progress running(int stage, int stagePermille, long elapsedMs) {
+        return new SimSession.Progress(SimSession.Progress.RUNNING, stage, 9, stagePermille, (stage * 1000 + stagePermille) / 9,
+                0, elapsedMs, -1, 0, 0, 0, 0);
+    }
+
+    /**
+     * The bar and the time left follow the estimate's seconds with the bake after them, not the
+     * session's equal stage shares. That walk's run: the coupled plates group took 100 s of its
+     * 157, the other stages 34 s, the bake 21 s. A third of the way through the plates, 29 s in
+     * (18 % of the run's wall time), the session's own total read 3 %.
+     */
+    @Test
+    void progressFollowsTheEstimateAndCountsTheBake() {
+        TimelapseModel m = model(Runnable::run);
+        long[] now = {5_000_000};
+        m.clock(() -> now[0]);
+        m.setEstimate(walkEstimate());
+
+        run.progress = running(0, 333, 29_000);
+        m.poll();
+        assertEquals(37, run.progress.totalPermille(), "the session's equal shares");
+        assertEquals(0.21, m.fraction(), 0.02, "a third of the plates group is a fifth of the run");
+        assertEquals(m.permille(), (int) Math.round(m.fraction() * 1000));
+        assertTrue(m.progressLine(4L << 30).contains("total 21%"), m.progressLine(4L << 30));
+        assertEquals(128_000, m.timeLeftMs(), 32_000, "the run had 128 s left");
+
+        run.progress = running(6, 0, 100_000);
+        m.poll();
+        assertEquals(100.0 / 157, m.fraction(), 0.03, "the group done: 100 s of 157");
+        assertEquals(57_000, m.timeLeftMs(), 6_000, "57 s left, the bake's 21 s included");
+        assertFalse(m.baking());
+
+        // The stages are done; the session's clock stops at 134 s and the bake runs.
+        run.progress = new SimSession.Progress(SimSession.Progress.DONE, 9, 9, 0, 1000, 0, 134_000, 0, 0, 0, 0, 0);
+        m.poll();
+        assertTrue(m.baking());
+        assertEquals(134.0 / 157, m.fraction(), 0.02, "not 100 % while the world is written");
+        assertEquals(22_000, m.timeLeftMs(), 3_000, "the bake took 21 s");
+        now[0] += 11_000;
+        assertEquals(145.0 / 157, m.fraction(), 0.02);
+        now[0] += 60_000;
+        assertTrue(m.fraction() < 1, "an overdue bake holds short of the end");
+        assertTrue(m.fraction() > 0.98);
+        assertEquals(0, m.timeLeftMs());
+
+        run.completion.complete("{}");
+        m.poll();
+        assertFalse(m.baking());
+        assertEquals(1.0, m.fraction());
+    }
+
+    /** An estimate for other stages (a continued run's) leaves the session's own figures. */
+    @Test
+    void progressWithoutAMatchingEstimateIsTheSessions() {
+        TimelapseModel m = model(Runnable::run);
+        m.setEstimate(new Estimate(1, List.of(new Estimate.Stage("plates", 1, 10))));
+        run.progress = running(0, 333, 29_000);
+        m.poll();
+        assertEquals(0.037, m.fraction(), 1e-9);
+        run.progress = new SimSession.Progress(SimSession.Progress.DONE, 9, 9, 0, 1000, 0, 134_000, 0, 0, 0, 0, 0);
+        m.poll();
+        assertEquals(1.0, m.fraction());
+        assertEquals(0, m.timeLeftMs());
+    }
 }

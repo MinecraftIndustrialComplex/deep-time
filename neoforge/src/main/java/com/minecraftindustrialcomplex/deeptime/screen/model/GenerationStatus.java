@@ -93,7 +93,7 @@ public final class GenerationStatus {
         return Optional.empty();
     }
 
-    /** The progress bar, 0 to 1. */
+    /** The progress bar, 0 to 1, weighted by the stages' estimated seconds and the bake ({@link TimelapseModel#fraction}). */
     public static double fraction(EditorModel m) {
         return m.run().map(TimelapseModel::fraction).orElse(0.0);
     }
