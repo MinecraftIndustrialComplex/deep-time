@@ -737,11 +737,12 @@ mod tests {
         let felsic = pool_parents(pool::FELSIC_PLUTONIC, "gneiss", 1);
         assert!(felsic.contains(&"granite"), "{felsic:?}");
         // Gabbro's greenstone and amphibolite steps are below the last band: a plutonic pool's
-        // gabbro never takes them. Only a continental hotspot's first basement unit, which
-        // `basement_class` makes basalt whatever its pool, can be greenstone there.
+        // gabbro never takes them. Only the first basement unit of a continental hotspot or arc,
+        // which `basement_class` makes basalt or andesite whatever its pool, can be greenstone
+        // there.
         assert_eq!(
             pool_parents(pool::MAFIC_PLUTONIC, "greenstone", 1),
-            vec!["basalt"]
+            vec!["andesite", "basalt"]
         );
         // The last slot holds every later step: shale's gneiss is its fourth.
         let last = usize::from(key::STEPS) - 1;
