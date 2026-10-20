@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+modLoader     = "javafml"
+loaderVersion = "${loader_version_range}"
+license       = "LGPL-3.0-or-later"
+
+[[mods]]
+modId       = "${devmap_id}"
+version     = "${mod_version}"
+displayName = "Deep Time Dev Map"
+authors     = "${mod_authors}"
+description = '''Internal developer map for Deep Time: the planet as laid out in block space and as a globe, the player's position, latitude and longitude, the seam, the poles and the edges. Not for players; never in the MIC pack.'''
+
+[[dependencies.${devmap_id}]]
+    modId        = "minecraft"
+    type         = "required"
+    versionRange = "${minecraft_version_range}"
+    ordering     = "NONE"
+    side         = "BOTH"
+
+[[dependencies.${devmap_id}]]
+    modId        = "neoforge"
+    type         = "required"
+    versionRange = "${neo_version_range}"
+    ordering     = "NONE"
+    side         = "BOTH"
+
+# Its projection, world data, ramps and globe are Deep Time's own classes.
+[[dependencies.${devmap_id}]]
+    modId        = "deeptime"
+    type         = "required"
+    versionRange = "[${mod_version},)"
+    ordering     = "AFTER"
+    side         = "BOTH"
