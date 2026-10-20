@@ -50,7 +50,7 @@ pub fn pelagic(z: f64, calcifiers: f64, dt: f64, ccd_m: f64) -> f64 {
 
 /// The photic zone the factory's limits are measured over ([`limits`]), m: Bosscher and
 /// Schlager's rate at 100 m is 2 × 10⁻⁴ of its surface value.
-pub const PHOTIC_M: f64 = 100.0;
+pub const PHOTIC_M: f64 = 100.0; // ledger: ERO-187
 
 /// Whether a cell at depth `z` is in the photic zone, and its warmth and warmth × clarity factors
 /// (`produce`'s), each 0 outside it (measurement only).

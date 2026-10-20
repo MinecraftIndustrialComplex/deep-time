@@ -677,6 +677,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Read so far (by the project): (IMP) no statement (ORE) not stated.
 - Read in this pass: (IMP) not fetched (ORE) not fetched (Crossref metadata only).
 - Reference check: (IMP) matches. (ORE) matches (volume, issue, pages).
+- Read in the carbonate and ore-deposit task (2026-10-19, ledger IMP-142, IMP-143): the abstract through OpenAlex (https://api.openalex.org/works/doi:10.1080/00206819409465452), by the task's research sub-agent: "Approximately 25% of the known terrestrial impact craters are associated with some form of economic resources and ~12% currently are exploited"; "iron and uranium ore exposed at Ternovka ... and Carswell (Saskatchewan)", both progenetic, exploitable "because of uplift in the center of complex impact structures" (the abstract places Ternovka in Russia; it is in Ukraine). The paper itself was not read.
 
 ### Ames1998
 - Reference: Ames, D. E., Watkinson, D. H., and Parrish, R. R. (1998). Dating of a regional hydrothermal system induced by the 1850 Ma Sudbury impact event. Geology 26(5):447-450.
@@ -689,6 +690,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Read so far (by the project): (IMP) no statement (ORE) not stated.
 - Read in this pass: (IMP) not fetched (ORE) not fetched (Crossref metadata only; Crossref prints first page 447).
 - Reference check: (IMP) matches. (ORE) matches (volume, issue, first page).
+- Cited again in the carbonate and ore-deposit task (2026-10-19, ORE-042, IMP-142) for the Sudbury hydrothermal system as the model's hydrothermal driver; not read.
 
 ### Herrick1997 (not in the sources file; it is the real source of Collins et al.'s eq. 28)
 - Reference: Herrick, R. R., Sharpton, V. L., Malin, M. C., Lyons, S. N., and Feely, K. (1997). Morphology and morphometry of impact craters. In: Bougher, S. W., Hunten, D. M., and Phillips, R. J. (eds), Venus II, University of Arizona Press, Tucson, pp. 1015-1046. (Collins et al. print the last author as "Freely".)
@@ -2408,6 +2410,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read in this pass: (DEP) full text fetched (Table 1, vertical extent, fluid temperature and salinity, the 600 km criterion, district areas). (ORE) abstract fetched (USGS page). The PDF is COULD NOT READ.
 - Reference check: (DEP) matches. "Leach et al. 2010" in the code is used for two different papers (this one and Leach2010b); the 2.02 Ga claim belongs to Leach2010b. (ORE) matches. Important: the code uses "Leach et al. 2010" for two different papers (this report, and Leach2010b below, Economic Geology 105:593). The authors differ.
 - Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Leach2010a/sir5070a.txt: Table 1 (printed p. 4) and text pp. 3, 5-8, 10-11, 19, 25, 27 (600 km tract guide, fluid temperatures and salinities, Pine Point, ore-event durations). It has no 2.02 Ga statement: that is Leach2010b.
+- Read in the carbonate and ore-deposit task (2026-10-19, DEP-088, ORE-271), by the task's research sub-agent from the PDF: "hosted mainly by dolostone and limestone in platform carbonate sequences and usually located at flanks of basins, orogenic forelands, or foreland thrust belts inboard of the clastic rock-dominated passive margin sequences"; "More MVT deposits are hosted in dolostone rather than limestone, and dolostone-hosted deposits are generally larger and contain higher Pb, Zn, and Ag grades" (no numeric split; Navan is the named limestone exception).
 
 ### MosierBriskey1986
 - Reference: Mosier, D.L., and Briskey, J.A., 1986, Grade and tonnage model of southeast Missouri Pb-Zn and Appalachian Zn deposits (models 32a and 32b), in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 224-226.
@@ -6747,3 +6750,142 @@ The temperate present's CO2 cap rests on the late Quaternary's glacial-to-interg
 - Access: paywalled (Taylor & Francis).
 - Library: not fetched.
 - Read so far (by the project): from memory. The interval's form was checked by deriving it, not against the paper: the bounds are the roots in p of (p̂ - p)² = z² p(1 - p) / n, (p̂ + z²/2n ± z sqrt(p̂(1 - p̂)/n + z²/4n²)) / (1 + z²/n). The one-sided 99 % quantile of the standard normal, 2.326, is from memory (the tables give 2.3263).
+
+## Carbonate on the sea floor, MVT hosts, impact deposits and placers (ERO-185 to ERO-188, ORE-270, ORE-271, IMP-142, IMP-143, DEP-214), added 2026-10-19
+
+The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above the CCD once the planktic calcifiers arrive, MVT in the carbonate horizons the columns hold, source, pathway and trap for the impact metals with densities from Earth's inventory, and placers kept off oceanic crust and the deep shelf. "Read by the research sub-agent" means a Sonnet sub-agent of the task fetched the source and quoted it on 2026-10-19; the quotes are in the ledger rows. Existing entries this task also read: Leach2010a (MVT hosts, ORE-271), Grieve1994 (abstract via OpenAlex, IMP-142, IMP-143) and Ames1998 (cited, not read, ORE-042, IMP-142).
+
+### RidgwellZeebe2005
+- Reference: Ridgwell, A. and Zeebe, R. E. (2005). The role of the global carbonate cycle in the regulation and evolution of the Earth system. Earth and Planetary Science Letters 234(3-4):299-315.
+- DOI or URL: 10.1016/j.epsl.2005.03.006; open copy https://sseh.uchicago.edu/doc/Ridgwell_and_Zeebe_2005.pdf
+- Cited as: "Ridgwell and Zeebe 2005, EPSL 234: 307" (deposits/clocks.rs; surface/carbonate.rs).
+- Ledger ids: ORE-270, ERO-188
+- Access: open copy.
+- Library: not kept (fetched through the web fetch tool and the PDF's text layer extracted with pdftotext, 2026-10-19).
+- Read so far (by the project): full text, 2026-10-19. P. 307: "it is not until the Mesozoic that a marked proliferation in coccolithophore and planktic foraminiferal diversity and abundance is observed ... Only then would a substantive deep-sea sedimentary carbonate sink have been possible"; "the mean area of platform carbonates during the Mesozoic and Cenozoic is much reduced compared to the Paleozoic"; the abstract's "Mid-Mesozoic Revolution"; the "Neritan" and "Cretan" ocean modes.
+
+### Ridgwell2005
+- Reference: Ridgwell, A. (2005). A Mid Mesozoic Revolution in the regulation of ocean chemistry. Marine Geology 217(3-4):339-357.
+- DOI or URL: 10.1016/j.margeo.2004.10.036
+- Cited as: "Ridgwell 2005" (surface/carbonate.rs, deposits/clocks.rs).
+- Ledger ids: ORE-270
+- Access: paywalled.
+- Library: not fetched.
+- Read so far (by the project): Crossref metadata and abstract only, 2026-10-19.
+
+### MillimanDroxler1995
+- Reference: Milliman, J. D. and Droxler, A. W. (1995). Calcium carbonate sedimentation in the global ocean: linkages between the neritic and deep-sea. Oceanography 8(3).
+- DOI or URL: https://tos.org/oceanography/assets/docs/8-3_milliman.pdf
+- Cited as: "Milliman and Droxler 1995, after Milliman 1993" (surface/carbonate.rs).
+- Ledger ids: ERO-185
+- Access: open access.
+- Library: not kept.
+- Read so far (by the project): the text layer, by the research sub-agent, 2026-10-19: the budget table "modified from Milliman (1993)", in 10^12 mol/yr: deep sea 290 x 10^6 km2, production 24.0, accumulation 11.0; slopes 32 x 10^6 km2, 5.0 and 4.0; reefs, banks, shelves and Halimeda mounds about 14.5 of accumulation; total accumulation 32; neritic and pelagic accumulation "roughly equal".
+
+### Milliman1993
+- Reference: Milliman, J. D. (1993). Production and accumulation of calcium carbonate in the ocean: budget of a nonsteady state. Global Biogeochemical Cycles 7(4):927-957.
+- DOI or URL: 10.1029/93GB02524
+- Cited as: "Milliman 1993".
+- Ledger ids: ERO-185
+- Access: open access (AGU).
+- Library: not fetched.
+- Read so far (by the project): the abstract through Crossref, by the research sub-agent, 2026-10-19: "about 5 billion tons (bt) per year, of which about 3 bt accumulate in sediments; the other 40% is dissolved. Nearly half of the carbonate sediment accumulates on reefs, banks, and tropical shelves."
+
+### Dutkiewicz2015
+- Reference: Dutkiewicz, A., Müller, R. D., O'Callaghan, S. and Jónasson, H. (2015). Census of seafloor sediments in the world's ocean. Geology 43(9):795-798.
+- DOI or URL: 10.1130/G36883.1; supplement ftp://ftp.earthbyte.org/papers/Dutkiewicz_etal_seafloor_lithology/Dutkiewicz_etal_census_of_seafloor_sediments_Geology_suppmat_2015.pdf
+- Cited as: "Dutkiewicz et al. 2015, supplement table DR1".
+- Ledger ids: ERO-185
+- Access: paywalled paper; open supplement.
+- Library: not kept.
+- Read so far (by the project): supplement table DR1, by the research sub-agent, 2026-10-19: per ocean, clay / calcareous ooze / fine-grained calcareous %: N Atlantic 27/36/27, S Atlantic 34/39/21, N Pacific 62/16/5, S Pacific 43/29/15, N Indian 40/33/13, S Indian 33/38/14, Southern 29/21/6 (the unweighted mean, about 30 % ooze and 14 % fine calcareous, is the sub-agent's arithmetic).
+
+### Diesing2020
+- Reference: Diesing, M. (2020). Deep-sea sediments of the global ocean. Earth System Science Data 12(4):3367-3381.
+- DOI or URL: 10.5194/essd-12-3367-2020; https://essd.copernicus.org/articles/12/3367/2020/
+- Cited as: "Diesing 2020: 37 %" (surface/carbonate.rs).
+- Ledger ids: ERO-185
+- Access: open access.
+- Library: not kept.
+- Read so far (by the project): the article, by the research sub-agent, 2026-10-19: of the seabed below 500 m, calcareous 36.8 %, clay 31.0 %, radiolarian ooze 14.2 %, lithogenous 9.5 %, diatom ooze 8.5 %. (Its preprint's 50.3 % is a share of samples, not of area.)
+
+### HartmannMoosdorf2012
+- Reference: Hartmann, J. and Moosdorf, N. (2012). The new global lithological map database GLiM: A representation of rock properties at the Earth surface. Geochemistry, Geophysics, Geosystems 13(12):Q12004.
+- DOI or URL: 10.1029/2012GC004370
+- Cited as: "Hartmann and Moosdorf 2012" (erosion-and-sediment.md, the land's carbonate share).
+- Ledger ids: none (a comparison figure on the science page)
+- Access: open access.
+- Library: not fetched.
+- Read so far (by the project): the abstract through Crossref, by the research sub-agent, 2026-10-19: "64% sediments (a third of which are carbonates) ... 10% are covered by water or ice". The pure carbonate class's 7.8 % is from memory.
+
+### Goldscheider2020
+- Reference: Goldscheider, N., Chen, Z., Auler, A. S., Bakalowicz, M., Broda, S., Drew, D., Hartmann, J., Jiang, G., Moosdorf, N., Stevanovic, Z. and Veni, G. (2020). Global distribution of carbonate rocks and karst water resources. Hydrogeology Journal 28:1661-1677.
+- DOI or URL: 10.1007/s10040-020-02139-5
+- Cited as: "Goldscheider et al. 2020" (erosion-and-sediment.md).
+- Ledger ids: none (a comparison figure)
+- Access: open access.
+- Library: not kept.
+- Read so far (by the project): the PDF, by the research sub-agent, 2026-10-19: carbonate rocks crop out on 15.2 % (20.3 million km2) of the ice-free land, 9.4 % continuous and 5.8 % discontinuous.
+
+### James2022
+- Reference: James, S., Chandran, S. R., Santosh, M., Pradeepkumar, A. P., Praseetha, B. S. and Sajinkumar, K. S. (2022). Meteorite impact craters as hotspots for mineral resources and energy fuels: A global review. Energy Geoscience 3(2):136-146. With the LPSC 2023 abstract 2841 on the same work.
+- DOI or URL: 10.1016/j.engeos.2021.12.006; https://digitalcommons.mtu.edu/michigantech-p/16147/; https://www.hou.usra.edu/meetings/lpsc2023/pdf/2841.pdf
+- Cited as: "James et al. 2022 / LPSC 2023" (impact deposit type notes).
+- Ledger ids: IMP-143
+- Access: open access.
+- Library: not kept.
+- Read so far (by the project): the abstract and the LPSC abstract, by the research sub-agent, 2026-10-19: "60 of the 208 terrestrial craters have been identified to host diverse resources"; "hydrocarbons (19), major minerals (10)". The author list is from memory beyond the first author.
+
+### WikipediaImpactStructures2026
+- Reference: Wikipedia contributors, "List of impact structures on Earth" (compiled after the Earth Impact Database, Planetary and Space Science Centre, University of New Brunswick), revision of 2026-10-19.
+- DOI or URL: https://en.wikipedia.org/wiki/List_of_impact_structures_on_Earth (the wikitext, action=raw)
+- Cited as: "the Wikipedia list of impact structures, from the Earth Impact Database" (impact deposit type notes).
+- Ledger ids: IMP-143
+- Access: open (web page; secondary to the database).
+- Library: not kept (downloaded to a scratch folder, 2026-10-19).
+- Read so far (by the project): the whole list's wikitext, 2026-10-19; the implementing agent summed pi/4 D^2 over the rows: 199 structures with a diameter, 135,890 km2; the 105 at least 8 km across, 134,649 km2; the 51 at least 20 km across, 127,810 km2.
+
+### Clark2009
+- Reference: Clark, P. U., Dyke, A. S., Shakun, J. D., Carlson, A. E., Clark, J., Wohlfarth, B., Mitrovica, J. X., Hostetler, S. W. and McCabe, A. M. (2009). The Last Glacial Maximum. Science 325(5941):710-714.
+- DOI or URL: 10.1126/science.1172873
+- Cited as: "Clark et al. 2009" (deposits.md, the drowned placer's depth).
+- Ledger ids: DEP-214
+- Access: paywalled; an author copy was read.
+- Library: not kept.
+- Read so far (by the project): the PDF, by the research sub-agent, 2026-10-19: "peak eustatic sea-level fall of ~130 m over the LGM", elsewhere "127.5 ± 7.5 m".
+
+### ARDF-NM253
+- Reference: U.S. Geological Survey, Alaska Resource Data File, record NM253 (the Nome offshore placer).
+- DOI or URL: https://mrdata.usgs.gov/ardf/show-ardf.php?ardf_num=NM253
+- Cited as: "the gold of the Bering shelf off Nome" (deposits/mod.rs, spawn_placer).
+- Ledger ids: DEP-214
+- Access: open (agency database).
+- Library: not kept.
+- Read so far (by the project): the record, by the research sub-agent, 2026-10-19: the placer "extends from Present Beach offshore for 2 miles to water depths of about 60 feet" (about 18 m).
+
+### Warren2000
+- Reference: Warren, J. (2000). Dolomite: occurrence, evolution and economically important associations. Earth-Science Reviews 52(1-3):1-81.
+- DOI or URL: 10.1016/S0012-8252(00)00022-2
+- Cited as: "Warren 2000" (erosion-and-sediment.md, dolostone).
+- Ledger ids: none (a comparison on the science page)
+- Access: paywalled; a copy was read.
+- Library: not kept.
+- Read so far (by the project): the PDF, by the research sub-agent, 2026-10-19: the settings of section 4 (4.1 syndepositional, sabkha-style, Abu Dhabi; 4.6 burial; 4.7 hydrothermal); "up to 50% of the world's carbonate reservoirs are dolomites".
+
+### RudnickGao2003
+- Reference: Rudnick, R. L. and Gao, S. (2003). Composition of the continental crust. In: Rudnick, R. L. (ed.), Treatise on Geochemistry vol. 3, The Crust, Elsevier, pp. 1-64.
+- DOI or URL: 10.1016/B0-08-043751-6/03016-4 (from memory, not looked up)
+- Cited as: "Rudnick & Gao 2003, from-memory" (impact_basin_u.json source note).
+- Ledger ids: ORE-039
+- Access: paywalled (book chapter).
+- Library: not fetched.
+- Read so far (by the project): from memory (upper continental crust about 2.7 ppm U); not read in this work.
+
+### Hofmann1988
+- Reference: Hofmann, A. W. (1988). Chemical differentiation of the Earth: the relationship between mantle, continental crust, and oceanic crust. Earth and Planetary Science Letters 90(3):297-314.
+- DOI or URL: 10.1016/0012-821X(88)90132-X (from memory, not looked up)
+- Cited as: "Hofmann 1988, from-memory" (impact_basin_u.json source note).
+- Ledger ids: ORE-039
+- Access: paywalled.
+- Library: not fetched.
+- Read so far (by the project): from memory (N-MORB about 0.07 ppm U); not read in this work.

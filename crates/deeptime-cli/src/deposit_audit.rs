@@ -679,11 +679,7 @@ pub fn run(o: &Options) -> CliResult<Value> {
             .unwrap_or(0);
         let tonnage = s.products.first().map_or(0.0, |p| p.tonnage_t);
         let chunks = tot.chunks.len() as f64;
-        let (sx, sy, sz) = (
-            i64::from(s.center[0]),
-            s.center[1],
-            i64::from(s.center[2]),
-        );
+        let (sx, sy, sz) = (i64::from(s.center[0]), s.center[1], i64::from(s.center[2]));
         let here = w.hydro(sx, sz);
         // The stratum at the site's centre (the baked stack, without the site's own bodies), the
         // rock there with them, the crust and the ground's height over the sea.

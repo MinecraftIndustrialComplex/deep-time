@@ -226,6 +226,10 @@ pub struct SurfaceState {
     pub totals: Totals,
     /// Sea level of the last step, m.
     pub sea_level_m: f64,
+    /// Every step's sea level, [end of the step (Myr), m], oldest first: the range the sea has
+    /// stood in since a time (the deposit engine's drowned placer benches).
+    #[serde(default)]
+    pub sea_history: Vec<[f32; 2]>,
     /// The plate's load and deflection (`flexure.rs`); None while `flexure.strength` is 0.
     pub flexure: Option<flexure::FlexState>,
     /// Inherited iron-formation basins (`deposits::bif_basins`): 1 in a basin, per cell, carried
@@ -783,6 +787,7 @@ impl SurfaceStage {
                     events: events::EventState::default(),
                     totals: Totals::default(),
                     sea_level_m: p.sea_level.at(t_end_myr - dt_myr),
+                    sea_history: Vec::new(),
                     flexure: None,
                     bif_basin: Vec::new(),
                 }
@@ -2146,6 +2151,7 @@ impl SurfaceStage {
         st.step = pstep;
         st.t_myr = t_end_myr;
         st.sea_level_m = sea;
+        st.sea_history.push([t_end_myr as f32, sea as f32]);
         if last {
             world.notes.insert(
                 STAGE_NAME.into(),

@@ -126,7 +126,7 @@ pub fn classify(s: &Setting, c: &Classes) -> (u16, Kind) {
     match main {
         0 if total > 0.0 => evaporite(s.aridity),
         5 => (c.till, Kind::Clastic),
-        6 => (c.chalk, Kind::Pelagic),
+        6 => (c.chalk, Kind::Pelagic), // ledger: ERO-188
         1 => {
             if s.aridity < EVAPORITE_ARIDITY && s.depth_m < DOLOMITE_DEPTH_M {
                 (c.dolostone, Kind::Carbonate)

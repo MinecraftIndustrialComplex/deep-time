@@ -107,10 +107,10 @@ impl Cover {
         (self.hz.tops.len() * 7) as u64
     }
 
-    /// Blocks of sedimentary rock under `surface_y` at block (x, z) by the column rule: down to
-    /// the top of the column's first horizon of another rock at least [`COVER_MIN_BLOCKS`] thick
-    /// (a thinner tongue does not end it), or to the floor.
-    pub fn blocks_at(&self, x: f64, z: f64, surface_y: f64) -> f64 {
+    /// The column's horizons at block (x, z) by the column rule, top-down: (top, the next
+    /// horizon's top or the floor, class). A horizon fills the blocks from its top down to that
+    /// lower bound + 1 (the last one down to the floor).
+    pub fn horizons_at(&self, x: f64, z: f64) -> Vec<(i32, i32, u8)> {
         let k = self.hz.k as usize;
         let w = self.hz.grid.w as usize;
         let horizon = |i: u32, j: u32, h: u32| {
@@ -131,8 +131,22 @@ impl Cover {
             &mut col,
         );
         let floor = self.hz.min_y;
-        for (h, &(top, class, _)) in col.iter().enumerate() {
-            let bottom = col.get(h + 1).map_or(floor, |n| n.0);
+        (0..col.len())
+            .map(|h| (col[h].0, col.get(h + 1).map_or(floor, |n| n.0), col[h].1))
+            .collect()
+    }
+
+    /// The world's floor (block y).
+    pub fn min_y(&self) -> i32 {
+        self.hz.min_y
+    }
+
+    /// Blocks of sedimentary rock under `surface_y` at block (x, z) by the column rule: down to
+    /// the top of the column's first horizon of another rock at least [`COVER_MIN_BLOCKS`] thick
+    /// (a thinner tongue does not end it), or to the floor.
+    pub fn blocks_at(&self, x: f64, z: f64, surface_y: f64) -> f64 {
+        let floor = self.hz.min_y;
+        for (top, bottom, class) in self.horizons_at(x, z) {
             let sed = self
                 .sedimentary
                 .get(usize::from(class))
