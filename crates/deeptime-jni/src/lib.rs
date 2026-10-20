@@ -363,26 +363,70 @@ pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge
     guard(&mut env, |env| {
         let index = non_negative(index, "index")?;
         let layer = non_negative(layer, "layer")?;
-        if dst_rgba.is_null() {
-            return Err(BridgeError::IllegalArgument("dstRgba is null".into()));
-        }
-        let not_direct = |_| BridgeError::IllegalArgument("dstRgba is not a direct buffer".into());
-        let capacity = env
-            .get_direct_buffer_capacity(&dst_rgba)
-            .map_err(not_direct)?;
-        let address = env
-            .get_direct_buffer_address(&dst_rgba)
-            .map_err(not_direct)?;
-        if address.is_null() {
-            return Err(BridgeError::IllegalArgument(
-                "dstRgba is not a direct buffer".into(),
-            ));
-        }
-        // SAFETY: a direct buffer's memory is `capacity` bytes at `address` and stays valid while
-        // Java holds `dst_rgba`, which it does for the whole call; no other Rust reference to it
-        // exists.
-        let dst = unsafe { std::slice::from_raw_parts_mut(address, capacity) };
+        let dst = direct_bytes(env, &dst_rgba)?;
         with_session(session, |s| Ok(s.copy_keyframe(index, layer, dst)?))
+    })
+}
+
+/// The memory of the direct buffer `dst_rgba`, for the length of one native call.
+fn direct_bytes<'b>(env: &Env<'_>, dst_rgba: &'b JByteBuffer<'_>) -> BridgeResult<&'b mut [u8]> {
+    if dst_rgba.is_null() {
+        return Err(BridgeError::IllegalArgument("dstRgba is null".into()));
+    }
+    let not_direct = |_| BridgeError::IllegalArgument("dstRgba is not a direct buffer".into());
+    let capacity = env
+        .get_direct_buffer_capacity(dst_rgba)
+        .map_err(not_direct)?;
+    let address = env
+        .get_direct_buffer_address(dst_rgba)
+        .map_err(not_direct)?;
+    if address.is_null() {
+        return Err(BridgeError::IllegalArgument(
+            "dstRgba is not a direct buffer".into(),
+        ));
+    }
+    // SAFETY: a direct buffer's memory is `capacity` bytes at `address` and stays valid while
+    // Java holds `dst_rgba`, which it does for the whole call (the slice borrows the reference
+    // for no longer); no other Rust reference to it exists.
+    Ok(unsafe { std::slice::from_raw_parts_mut(address, capacity) })
+}
+
+/// `watchLive`: asks for the live map of `layer` for the next two seconds (null or "" stops);
+/// returns the newest live frame's number (0: none yet). Never waits for a step.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge_DeepTimeNative_watchLive<
+    'l,
+>(
+    mut env: EnvUnowned<'l>,
+    _class: JClass<'l>,
+    session: jlong,
+    layer: JString<'l>,
+) -> jlong {
+    guard(&mut env, |env| {
+        let layer = if layer.is_null() {
+            None
+        } else {
+            Some(layer.try_to_string(env)?)
+        };
+        with_session(session, |s| Ok(s.watch_live(layer.as_deref()) as jlong))
+    })
+}
+
+/// `copyLiveFrame`: the newest live frame's RGBA8 into `dstRgba` and its JSON
+/// `{"seq","t","stage","layer","w","h"}`; "" before the first. Never waits for a step.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge_DeepTimeNative_copyLiveFrame<
+    'l,
+>(
+    mut env: EnvUnowned<'l>,
+    _class: JClass<'l>,
+    session: jlong,
+    dst_rgba: JByteBuffer<'l>,
+) -> JString<'l> {
+    guard(&mut env, |env| {
+        let dst = direct_bytes(env, &dst_rgba)?;
+        let info = with_session(session, |s| Ok(s.copy_live_frame(dst)?))?;
+        Ok(env.new_string(info.unwrap_or_default())?)
     })
 }
 

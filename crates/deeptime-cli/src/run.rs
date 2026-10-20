@@ -1199,6 +1199,11 @@ pub struct RunOptions {
     pub stop_myr: Option<f64>,
     /// Write epoch checkpoints into `<out>/epochs/`.
     pub epochs: bool,
+    /// `--live`: draw the live map of this layer while the run goes, as the game's screen does
+    /// while it follows a run (`deeptime_core::live`).
+    pub live: Option<String>,
+    /// `--live-every-step`: a live frame after every step (to time one).
+    pub live_every_step: bool,
     pub common: Common,
 }
 
@@ -1300,9 +1305,40 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
     }
     s.set_history_budget(o.common.history_mem);
     o.common.apply_compute(&s);
-    drive(&s, o.common.verbose, |_, st| st == AdvanceStatus::Done)?;
+    if o.live_every_step {
+        s.set_live_pacing(deeptime_core::live::LivePacing::EVERY_STEP);
+    }
+    // The game renews its request on every poll; this renews it before every advance.
+    let live = o.live.as_deref();
+    let watch = |s: &Session| {
+        if live.is_some() {
+            s.watch_live(live);
+        }
+    };
+    watch(&s);
+    drive(&s, o.common.verbose, |s, st| {
+        watch(s);
+        st == AdvanceStatus::Done
+    })?;
+    let stepped = started.elapsed();
     s.finalize_write()?;
     forward_log(&s, o.common.verbose);
+    if let Some(layer) = live {
+        let st = s.live_stats();
+        println!(
+            "deeptime run: live layer={layer} frames={} live_ms={:.0} mean_ms={:.1} max_ms={:.1} share_of_steps={:.4} stepped_s={:.2}",
+            st.frames,
+            st.millis,
+            if st.frames > 0 {
+                st.millis / st.frames as f64
+            } else {
+                0.0
+            },
+            st.max_ms,
+            st.millis / 1000.0 / stepped.as_secs_f64().max(1e-9),
+            stepped.as_secs_f64(),
+        );
+    }
     report_run(&s, &o.out, &o.preset, o.viewer.as_deref(), started)
 }
 

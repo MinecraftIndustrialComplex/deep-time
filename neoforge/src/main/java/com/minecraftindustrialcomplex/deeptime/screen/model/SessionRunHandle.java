@@ -15,7 +15,8 @@ import java.util.concurrent.CompletableFuture;
  * A {@link SimSession} launched for the Create World screen (plan §6.2): created and stepped on its
  * {@code deeptime-sim} worker, which also collects keyframe infos and events. Pixels come across
  * JNI ({@code copyKeyframe} into a direct buffer) while the session lives and from
- * {@code keyframes/kf-<n>.dtk} ({@link KeyframeFiles}) once it is destroyed.
+ * {@code keyframes/kf-<n>.dtk} ({@link KeyframeFiles}) once it is destroyed; the live map's frames
+ * ({@code watchLive}, {@code copyLiveFrame}) only while it lives.
  */
 public final class SessionRunHandle implements RunHandle {
 
@@ -101,6 +102,33 @@ public final class SessionRunHandle implements RunHandle {
             }
         }
         return KeyframeFiles.readAbgr(session.outDir(), f.n(), layer);
+    }
+
+    @Override
+    public long watchLive(String layer) {
+        return session.watchLive(layer);
+    }
+
+    @Override
+    public LiveFrame liveFrame(KeyframeInfo like) {
+        if (session.isFinished())
+            return null;
+        ByteBuffer buf = BUFFER.get();
+        if (buf == null || buf.capacity() < like.pixels() * 4) {
+            buf = ByteBuffer.allocateDirect(like.pixels() * 4);
+            BUFFER.set(buf);
+        }
+        buf.clear();
+        String json = session.copyLiveFrame(buf);
+        return json == null ? null : liveFrame(json, buf);
+    }
+
+    /** The live frame {@code copyLiveFrame} described with {@code json} and copied into {@code rgba}. */
+    static LiveFrame liveFrame(String json, ByteBuffer rgba) {
+        com.google.gson.JsonObject o = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
+        KeyframeInfo info = new KeyframeInfo(-1, o.get("t").getAsDouble(), o.get("stage").getAsString(),
+                o.get("w").getAsInt(), o.get("h").getAsInt(), List.of(o.get("layer").getAsString()));
+        return new LiveFrame(o.get("seq").getAsLong(), info, KeyframeFiles.abgr(rgba, info.pixels()));
     }
 
     @Override

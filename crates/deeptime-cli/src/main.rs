@@ -84,6 +84,15 @@ enum Command {
         /// playability-steering.md).
         #[arg(long)]
         epochs: bool,
+        /// Draws the live map of this layer while the run goes, as the game's Create World screen
+        /// does while it follows a run (`deeptime_core::live`: between the keyframes, at most 2 %
+        /// of the run's time), and reports what it cost. For measuring it; the world data is the
+        /// same with or without.
+        #[arg(long, value_name = "LAYER")]
+        live: Option<String>,
+        /// With --live: a live frame after every step, whatever it costs (to time one).
+        #[arg(long, requires = "live")]
+        live_every_step: bool,
         #[command(flatten)]
         common: CommonArgs,
     },
@@ -792,6 +801,8 @@ fn main() -> ExitCode {
             checkpoints,
             stop_myr,
             epochs,
+            live,
+            live_every_step,
             common,
         }) => finish(
             "run",
@@ -806,6 +817,8 @@ fn main() -> ExitCode {
                 checkpoints,
                 stop_myr,
                 epochs,
+                live,
+                live_every_step,
                 common: common.common(),
             }),
         ),
@@ -1880,6 +1893,8 @@ mod tests {
             checkpoints: true,
             stop_myr: None,
             epochs: false,
+            live: None,
+            live_every_step: false,
             common: quiet(),
         })
         .unwrap();
@@ -1953,6 +1968,8 @@ mod tests {
             checkpoints: false,
             stop_myr: None,
             epochs: false,
+            live: None,
+            live_every_step: false,
             common: quiet(),
         })
         .unwrap();
@@ -2384,6 +2401,8 @@ mod tests {
             checkpoints: false,
             stop_myr: None,
             epochs: false,
+            live: None,
+            live_every_step: false,
             common,
         })
         .unwrap();
