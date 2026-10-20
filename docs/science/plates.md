@@ -15,7 +15,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
 | [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228, PLT-293 (20; PLT-293 ocean crust keeps its own rock at resamplings and in the L1 sampling, 2026-10-19) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
-| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284, PLT-287 to PLT-288 (43; PLT-287 and PLT-288 the fastest thickening and rise, 2026-10-18; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
+| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284, PLT-287 to PLT-288, PLT-294 (44; PLT-294 the transition's ocean side thickens with ocean crust, 2026-10-19; PLT-287 and PLT-288 the fastest thickening and rise, 2026-10-18; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221, PLT-265 (41; PLT-265 Earth's passive margins, the transition's comparison) |
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
@@ -274,9 +274,12 @@ orogenic collapse and before the surface processes:
    stretch of margin (boundary samples grouped round seeds at least W/2 apart; every sample of the
    zone belongs to the seed of its nearest boundary sample, through its own crust and plate), the
    share 1 − e^(−δt/τ) per step of what would bring the stretch to the profile (τ =
-   `transition_myr`, 20 Myr, PLT-263), as the source's own rock thinned in proportion (pure shear).
-   Volume is conserved, and crust types do not change: the thickened ocean-side samples stay
-   oceanic, so the continental area and the crust share are not redefined by this rule.
+   `transition_myr`, 20 Myr, PLT-263), the sources thinned in proportion (pure shear). A
+   continental sink takes the sources' rock; since 2026-10-19 an oceanic sink takes the same volume
+   as ocean crust, lavas and gabbro in the ocean column's proportion (PLT-294, "Ocean crust keeps
+   its own rock" below). Volume is conserved, and crust types do not change: the thickened
+   ocean-side samples stay oceanic, so the continental area and the crust share are not redefined
+   by this rule.
 4. *Heights* (PLT-264). A metre of crust moved changes the height by 1/f, f = (T_n − T_o) / (z_0 −
    z_f) = 4.24 m/m with the presets' continent (z_0 = 525 m) and old ocean floor (z_f = −5,600 m),
    on both sides, so the two sides meet. An oceanic sample of the zone then cools with its age (the
