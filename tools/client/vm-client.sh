@@ -161,6 +161,14 @@ soundCategory_music:0.0
 renderDistance:8
 EOF
     printf 'earlyWindowControl = false\n' > "$GAMEDIR/config/fml.toml"
+    # Distant Horizons (in MIC) opens an "update available" screen over the title screen, which held
+    # the walk there (2026-10-20, --mods mic); dh-client-check.sh turns its updater off the same way.
+    local dhc="$GAMEDIR/config/DistantHorizons.toml"
+    if [ -f "$dhc" ]; then
+        sed -i 's/^\(\s*enableAutoUpdater\s*=\s*\).*/\1false/' "$dhc"
+    else
+        printf '[client]\n\t[client.advanced]\n\t\t[client.advanced.autoUpdater]\n\t\t\tenableAutoUpdater = false\n' > "$dhc"
+    fi
 }
 
 # run_pass <pass> <-D...>: one client, start to quit; returns its exit status (124 on timeout).
