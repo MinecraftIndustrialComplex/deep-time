@@ -25,7 +25,8 @@ import java.util.Locale;
  * Development only: with {@code -Ddeeptime_devmap.shots=true} the client, once in a world, walks
  * the dev map on its own and quits ({@code tools/client/devmap-shots.sh}). For each place (the
  * player's own spot, beside the wrap seam, beside the north pole; {@code
- * -Ddeeptime_devmap.shots.places=name:x:z;...} overrides) it right-clicks the place on the map
+ * -Ddeeptime_devmap.shots.places=name:x:z;...} overrides; {@code .settle=<seconds>}, default 25,
+ * is how long it waits there for the terrain) it right-clicks the place on the map
  * (the operator teleport), waits for the terrain, checks the readout against Deep Time's own F3
  * line and the markers' screen positions against the projection's inverse, and takes the HUD
  * (with F3), the map and the globe. Every step logs a {@code [devmap-shot]} line; a failed check
@@ -155,7 +156,7 @@ final class ShotDriver {
                 if (mc.screen != null)
                     mc.setScreen(null);
                 // Time for the server to generate and the software renderer to draw the terrain around.
-                if (stepTicks == 20 * 25) {
+                if (stepTicks == 20 * Integer.getInteger(PROP + ".settle", 25)) {
                     checkReadout(c, mc);
                     go(Step.HUD);
                 }
