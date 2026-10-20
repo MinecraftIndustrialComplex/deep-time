@@ -14,7 +14,8 @@ probe's median half-width to gather its need of each (deposits and scatter; poin
 radius), and the MVT and SEDEX sites (natural, guaranteed). From the run log's `surface_final` (absent on older
 builds) and `strata-check`: black shale laid (10^6 km3), the mean area of the deposit engine's
 carbonate-platform and euxinic-basin fields and of source rock richer than plain shale
-(10^6 km2), the mean source-rock TOC over the planet (wt %), and black shale's share of the sea
+(10^6 km2), the source-rock TOC summed over the planet's area (`toc_area`, 10^6 km2 x wt %; the
+log holds no planet area to make it a mean), and black shale's share of the sea
 floor's and the land's top blocks.
 """
 import collections
@@ -87,7 +88,7 @@ def run_row(root, stem):
         r["black_shale"] = num(s.get("black_shale_km3")) / 1e6
         for k in ["platform", "euxinic", "toc_rich"]:
             r[k] = num(s.get(f"{k}_km2_myr")) / myr / 1e6 if myr > 0 else float("nan")
-        r["toc_mean"] = num(s.get("toc_km2_myr")) / myr if myr > 0 else float("nan")
+        r["toc_area"] = num(s.get("toc_km2_myr")) / myr / 1e6 if myr > 0 else float("nan")
     sj = root / f"{stem}.strata.json"
     if sj.exists():
         st = json.load(open(sj))
