@@ -196,6 +196,21 @@ pub struct Totals {
     /// thin or onto land is not laid as carbonate).
     #[serde(default)]
     pub periplatform_source_km3: f64,
+    /// Deposits classed black shale (facies `Kind::Euxinic`), km³ (measurement only).
+    #[serde(default)]
+    pub black_shale_km3: f64,
+    /// The deposit engine's facies fields over the run (measurement only), km² × Myr summed
+    /// over the steps: the carbonate-platform and euxinic-basin fields as 0–1 shares of each
+    /// cell, the source-rock TOC weighted by area (wt % × km² × Myr), and the area whose source
+    /// rock is richer than plain shale ([`fields::SHALE_TOC_WT`]: black shale or coal).
+    #[serde(default)]
+    pub platform_km2_myr: f64,
+    #[serde(default)]
+    pub euxinic_km2_myr: f64,
+    #[serde(default)]
+    pub toc_km2_myr: f64,
+    #[serde(default)]
+    pub toc_rich_km2_myr: f64,
     pub evaporite_km3: f64,
     pub to_sea_km3: f64,
     pub weathered_km3: f64,
@@ -2025,6 +2040,12 @@ impl SurfaceStage {
         t.weathered_km3 += weathered * km3;
         t.isostasy_km3 += iso * km3;
         t.slope_failure_km3 += failed_m_cells * km3;
+        // In order, as every float total here (the thread count must not change it).
+        t.black_shale_km3 += (0..n)
+            .filter(|&c| kind_step[c] == fields::KIND_EUXINIC)
+            .map(|c| net[c].max(0.0))
+            .sum::<f64>()
+            * km3;
         t.mass_residual_km3 += (sum_net - carb - pel - evap) * km3;
         t.steps += 1;
         t.spl_iterations += iterations;
@@ -2215,6 +2236,27 @@ impl SurfaceStage {
         );
         for (name, v) in fields::STEP_FIELDS.iter().zip(&sc.step_fields) {
             st.acc.add(name, v, dt);
+        }
+        // The facies fields' reach over the run (measurement only, `Totals`), summed in order.
+        {
+            let at = |name: &str| -> &[f32] {
+                fields::STEP_FIELDS
+                    .iter()
+                    .position(|&f| f == name)
+                    .map_or(&[], |i| &sc.step_fields[i])
+            };
+            let sum = |v: &[f32]| v.iter().map(|&x| f64::from(x)).sum::<f64>();
+            let toc = at("deeptime:source_rock_toc");
+            let rich = toc
+                .iter()
+                .filter(|&&x| f64::from(x) > fields::SHALE_TOC_WT)
+                .count() as f64;
+            let km2_myr = a / 1.0e6 * dt_myr;
+            let t = &mut st.totals;
+            t.platform_km2_myr += sum(at("deeptime:carbonate_platform")) * km2_myr;
+            t.euxinic_km2_myr += sum(at("deeptime:euxinic_basin")) * km2_myr;
+            t.toc_km2_myr += sum(toc) * km2_myr;
+            t.toc_rich_km2_myr += rich * km2_myr;
         }
         // Inherited iron-formation basins (`deposits::bif_basins`; Ben, 2026-10-02): dealt once,
         // over the stable continental interiors of the first step, then carried with the crust;
