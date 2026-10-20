@@ -178,8 +178,15 @@ impl YoungParams {
 /// to spare again. 2026-10-19, the step's arrays freed as soon as it stops reading them
 /// (`YoungStage::lem`): 275 B a cell on full 16k (the stage alone from a 100 Myr checkpoint,
 /// 2,293 → 1,408 MiB above the world it started with) and about 285 B on the test's small planet
-/// (74.4 → 60.3 MiB held), so 320, 12 % above the larger.
-pub const OWN_BYTES_PER_L2_CELL: u64 = 320;
+/// (74.4 → 60.3 MiB held), so 320, 12 % above the larger. 2026-10-20: the stage's arrays follow
+/// the terrain (the lakes and the routing's queues), and on the test's small planet it held
+/// 62.3 MiB on master d9bd2b65 and 63.1 with PLT-294 on (the presets' transition of ocean crust),
+/// a hair over the 63.1 estimated, while the world it started with was the same (structure
+/// 47.9 → 47.7 MiB); 340 lists 64.7 MiB there, and is about the most the quick 16k bound of
+/// `the_estimate_covers_the_measured_hold_closely` allows (1,086 MiB listed, at most 15 % over
+/// the 947 held on 2026-10-19). A per-cell constant cannot follow both closely: the small
+/// planet's own arrays take about 320 B a cell, full 16k's 275.
+pub const OWN_BYTES_PER_L2_CELL: u64 = 340;
 
 /// Estimate: the world the surface and the stages after it leave ([`super::retained_bytes`]),
 /// the recorded history, and the stage's own arrays on the L2 grid; ≈ 1 µs per cell per step
@@ -191,7 +198,8 @@ pub const OWN_BYTES_PER_L2_CELL: u64 = 320;
 /// not 1/2): 6,049 MiB on full 16k against the 4,143 MiB the stage held (the world 2,010 MiB, its
 /// own arrays 2,133 MiB, the history besides), so the editor refused full at a 5 GiB cap it fits
 /// under. Now 4,485 MiB without the history (quick: 1,240 MiB against 1,105 MiB held); 3,769 MiB
-/// since 2026-10-19 (quick 1,060), against 3,462 and 947 MiB held.
+/// since 2026-10-19 (quick 1,060), against 3,462 and 947 MiB held; 3,872 and 1,086 MiB since
+/// 2026-10-20 (20 B a cell more, on 4096 × 1312 and 2048 × 656 cells).
 pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let y = p.young.clone().unwrap_or_default();
     let c = u64::from(p.scale.circumference_blocks);
@@ -1141,7 +1149,7 @@ mod tests {
     /// full 4,311 → 4,349 MiB. Again once the step freed its arrays as soon as it stopped reading
     /// them (2026-10-19, the same method): quick 1,171 → 947 MiB (1,166.9 less 219.5), full
     /// 4,349 → 3,462 MiB (the history all on disk); they list 1,060 and 3,769 MiB with 320 B a
-    /// cell.
+    /// cell, 1,086 and 3,872 MiB with 340 (2026-10-20, `OWN_BYTES_PER_L2_CELL`).
     #[test]
     fn the_estimate_covers_the_measured_hold_closely() {
         const MIB: u64 = 1 << 20;
