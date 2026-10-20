@@ -180,6 +180,11 @@ impl Cover {
         self.hz.min_y
     }
 
+    /// The stacks' cell size (blocks): the spacing of the stored stacks the column rule blends.
+    pub fn cell_blocks(&self) -> f64 {
+        f64::from(self.hz.grid.r)
+    }
+
     /// Blocks of sedimentary rock under `surface_y` at block (x, z) by the column rule: down to
     /// the top of the column's first horizon of another rock at least [`COVER_MIN_BLOCKS`] thick
     /// (a thinner tongue does not end it), or to the floor.
