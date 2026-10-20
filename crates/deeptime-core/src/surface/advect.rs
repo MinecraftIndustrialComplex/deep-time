@@ -131,6 +131,94 @@ pub fn bilinear_same(
     (weight > 1e-9).then(|| (sum / weight) as f32)
 }
 
+/// The blur the carry owes a long step, per cell: the variance, in cells² along i and along j,
+/// that `k = dt / ref` carries of a k-th of the step's displacement each would have spread a value
+/// over, less what the step's one carry did; `None` when the step is no longer than `ref_yr`.
+///
+/// A bilinear sample at a fractional offset t is a two-point average of variance t(1 − t), so
+/// every carry blurs the carried fields, by about a sixth of a cell² along each axis whatever the
+/// plates' speed (the offset's fraction is anything); a step twice as long carries half as often
+/// and blurs half as much per Myr. On the 16k planets that blur is a diffusion of 0.25 to 1 m²/yr,
+/// beside the hillslope's 2 (`kd_land_m2_yr`), and it is the most the summits lose to anything
+/// but the rivers: at 4-Myr plate steps without this the highest ground stood 2 to 3 km higher
+/// (P1-19 #27). The top-up keeps the blur per Myr what it was at the reference step (ERO-185).
+/// A step of displacement D (in cells, along one axis) owes `k·v(D/k) − v(D)`, v(x) the variance
+/// of x's fraction: at k = 2, 2·min(f, 1 − f)² for f the fraction of D/2, at most a half.
+pub fn blur_owed(w: usize, src: &[[f64; 2]], dt_yr: f64, ref_yr: f64) -> Option<Vec<[f32; 2]>> {
+    if ref_yr.is_nan() || ref_yr <= 0.0 || dt_yr <= ref_yr * (1.0 + 1.0e-9) {
+        return None;
+    }
+    let k = dt_yr / ref_yr;
+    let var = |x: f64| {
+        let f = x - x.floor();
+        f * (1.0 - f)
+    };
+    let owed = |d: f64| (k * var(d / k) - var(d)).max(0.0) as f32;
+    let wf = w as f64;
+    Some(
+        src.par_iter()
+            .enumerate()
+            .map(|(c, &[fi, fj])| {
+                // The displacement, the shorter way round the wrapped axis.
+                let di = fi - (c % w) as f64;
+                let di = di - wf * (di / wf).round();
+                let dj = fj - (c / w) as f64;
+                [owed(di), owed(dj)]
+            })
+            .collect(),
+    )
+}
+
+/// Spreads `v` by the variances `var` (cells² along i and along j, [`blur_owed`]): a cell takes
+/// var/2 of its difference to each neighbour along that axis, x wrapping and rows ending at the
+/// poles, from neighbours that `same(c, n)` says hold the same crust and whose value is finite (the
+/// others count as the cell itself, so nothing crosses a plate's edge, as `bilinear_same` keeps it).
+/// Variances past a half are spread in as many passes as keep each pass's below it, so no weight is
+/// negative.
+pub fn blur(
+    w: usize,
+    h: usize,
+    var: &[[f32; 2]],
+    v: &mut [f32],
+    same: impl Fn(usize, usize) -> bool + Sync,
+) {
+    let most = var
+        .par_iter()
+        .map(|s| s[0].max(s[1]))
+        .reduce(|| 0.0, f32::max);
+    if most <= 0.0 {
+        return;
+    }
+    let passes = (f64::from(most) / 0.5).ceil().max(1.0) as usize;
+    let share = 0.5 / passes as f64;
+    for _ in 0..passes {
+        let old = crate::alloc::copied(v);
+        v.par_iter_mut().enumerate().for_each(|(c, out)| {
+            let [si, sj] = var[c];
+            let x0 = old[c];
+            if (si <= 0.0 && sj <= 0.0) || !x0.is_finite() {
+                return;
+            }
+            let (i, j) = (c % w, c / w);
+            let mut d = 0.0f64;
+            let mut take = |n: usize, s: f32| {
+                if s > 0.0 && old[n].is_finite() && same(c, n) {
+                    d += share * f64::from(s) * f64::from(old[n] - x0);
+                }
+            };
+            take(j * w + (i + w - 1) % w, si);
+            take(j * w + (i + 1) % w, si);
+            if j > 0 {
+                take((j - 1) * w + i, sj);
+            }
+            if j + 1 < h {
+                take((j + 1) * w + i, sj);
+            }
+            *out = (f64::from(x0) + d) as f32;
+        });
+    }
+}
+
 /// What [`carried_elevation`] reads.
 pub struct Carry<'a> {
     pub w: usize,
@@ -153,9 +241,18 @@ pub struct Carry<'a> {
     pub parents: &'a [Option<u32>],
     pub known_plates: usize,
     pub dt_yr: f64,
+    /// The step the carry's blur is kept to per Myr (`surface.numerics.carry_blur_ref_myr`, in
+    /// years; 0: none added): [`carried_elevation`] tops the blur up ([`blur_owed`]); the other
+    /// carries ([`carried_fields`]) do not.
+    pub blur_ref_yr: f64,
 }
 
 impl Carry<'_> {
+    /// Whether cells `c` and `n` hold the same crust now: the same plate or the same rigid group.
+    pub fn same_now(&self, c: usize, n: usize) -> bool {
+        self.plate[c] == self.plate[n] || self.group.is_some_and(|g| g[c] == g[n])
+    }
+
     /// Whether source cell `s` held, before the step, the crust that is at cell `c` now: the same
     /// rigid group, the same plate, or the parent of a plate born this step.
     pub fn same(&self, c: usize, s: usize) -> bool {
@@ -246,26 +343,33 @@ pub fn carried_fields<const K: usize>(x: &Carry<'_>, v: [&[f32]; K]) -> Vec<Opti
 /// plate model's uplift of that crust over the step; where no corner held it (another plate's
 /// edge arrived over a trench, a small plate was absorbed), the plate model's elevation: what the
 /// surface had built there belongs to the crust that left. A group keeps its number when a
-/// collision hands it to another plate, so a sutured terrane keeps its surface.
+/// collision hands it to another plate, so a sutured terrane keeps its surface. A step longer than
+/// `blur_ref_yr` has the blur it owes ([`blur_owed`]) spread into the carried surface before the
+/// uplift, over the same crust only.
 pub fn carried_elevation(x: &Carry<'_>) -> (Vec<f32>, u64) {
     let same = |c: usize, s: usize| x.same(c, s);
     let lift = x.dt_yr * 1.0e-3;
-    let foreign = std::sync::atomic::AtomicU64::new(0);
-    let h = x
+    // NaN where the crust is new at the place.
+    let mut h: Vec<f32> = x
         .src
         .par_iter()
         .enumerate()
         .map(|(c, &[fi, fj])| {
-            match bilinear_same(x.w, x.h, x.prev_elevation, fi, fj, |s| same(c, s)) {
-                Some(h) => (f64::from(h) + f64::from(x.uplift_mm_yr[c]) * lift) as f32,
-                None => {
-                    foreign.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                    x.plate_elevation[c]
-                }
-            }
+            bilinear_same(x.w, x.h, x.prev_elevation, fi, fj, |s| same(c, s)).unwrap_or(f32::NAN)
         })
         .collect();
-    (h, foreign.into_inner())
+    if let Some(var) = blur_owed(x.w, x.src, x.dt_yr, x.blur_ref_yr) {
+        blur(x.w, x.h, &var, &mut h, |c, n| x.same_now(c, n));
+    }
+    let foreign = h.par_iter().filter(|z| z.is_nan()).count() as u64;
+    h.par_iter_mut().enumerate().for_each(|(c, z)| {
+        *z = if z.is_nan() {
+            x.plate_elevation[c]
+        } else {
+            (f64::from(*z) + f64::from(x.uplift_mm_yr[c]) * lift) as f32
+        };
+    });
+    (h, foreign)
 }
 
 /// The nearest cell to fractional (fi, fj).
@@ -377,6 +481,75 @@ mod tests {
         assert_eq!(bilinear_same(w, h, &v, 19.0, 10.0, |c| c % w == 20), None);
     }
 
+    /// P1-19 #27: one carry of a long step with the blur it owes spreads a spike as far as two
+    /// carries of half the step do (the variances add), with its middle in the same place; a step
+    /// no longer than the reference owes nothing; the blur stops at another crust.
+    #[test]
+    fn a_long_step_owes_the_short_steps_blur() {
+        let grid = GridDesc::for_planet("L1", 1024, 16).unwrap();
+        let (w, h) = (grid.w as usize, grid.h as usize);
+        let dlon = std::f64::consts::TAU / w as f64;
+        // 2.6 cells along i over the long step.
+        let dt = 4.0e6;
+        let omega = vec![[0.0, 0.0, 2.6 * dlon / dt]];
+        let ids = vec![0.0f32; grid.cells()];
+        let row = h / 2;
+        let mut v0 = vec![0.0f32; grid.cells()];
+        v0[row * w + 40] = 1.0;
+        let carry = |v: &[f32], src: &[[f64; 2]]| -> Vec<f32> {
+            src.iter()
+                .map(|&[fi, fj]| bilinear(w, h, v, fi, fj))
+                .collect()
+        };
+        let half = sources(&grid, &ids, &omega, 0.5 * dt);
+        let short = carry(&carry(&v0, &half), &half);
+        let full = sources(&grid, &ids, &omega, dt);
+        assert!(blur_owed(w, &full, dt, dt).is_none());
+        assert!(blur_owed(w, &full, dt, 0.0).is_none());
+        let owed = blur_owed(w, &full, dt, 0.5 * dt).unwrap();
+        let mut long = carry(&v0, &full);
+        let before = long.clone();
+        blur(w, h, &owed, &mut long, |_, _| true);
+        let moments = |v: &[f32]| {
+            let r = &v[row * w..(row + 1) * w];
+            let m0: f64 = r.iter().map(|&x| f64::from(x)).sum();
+            let m1: f64 = r
+                .iter()
+                .enumerate()
+                .map(|(i, &x)| i as f64 * f64::from(x))
+                .sum();
+            let mean = m1 / m0;
+            let var: f64 = r
+                .iter()
+                .enumerate()
+                .map(|(i, &x)| (i as f64 - mean).powi(2) * f64::from(x))
+                .sum::<f64>()
+                / m0;
+            (m0, mean, var)
+        };
+        let (s0, s_mean, s_var) = moments(&short);
+        let (l0, l_mean, l_var) = moments(&long);
+        let (_, _, b_var) = moments(&before);
+        assert!(
+            (s0 - 1.0).abs() < 1e-5 && (l0 - 1.0).abs() < 1e-5,
+            "{s0} {l0}"
+        );
+        assert!((s_mean - l_mean).abs() < 1e-4, "{s_mean} {l_mean}");
+        // 2 · 0.3 · 0.7 for the two short carries; 0.6 · 0.4 for the long one alone.
+        assert!((s_var - 0.42).abs() < 1e-4, "{s_var}");
+        assert!((b_var - 0.24).abs() < 1e-4, "{b_var}");
+        assert!((l_var - s_var).abs() < 1e-4, "{l_var} against {s_var}");
+        // Nothing crosses to another crust: a wall west of column 41 keeps the spike's west side.
+        let mut walled = before.clone();
+        blur(w, h, &owed, &mut walled, |c, n| {
+            (c % w > 41) == (n % w > 41)
+        });
+        let r = row * w;
+        let west: f32 = walled[r..r + 42].iter().sum();
+        let west0: f32 = before[r..r + 42].iter().sum();
+        assert!((west - west0).abs() < 1e-6, "{west} {west0}");
+    }
+
     /// The 2026-10-01 defect in small: plate 0 (low, a trench with 4 km of fill on it) west of
     /// column 8, plate 1 (a 9 km margin) from it east; nothing moves and nothing is uplifted, but
     /// the boundary steps one column west, so column 7 now reads plate 1's crust. The surface
@@ -416,6 +589,7 @@ mod tests {
                 parents,
                 known_plates: 2,
                 dt_yr: 2.0e6,
+                blur_ref_yr: 2.0e6,
             })
         };
         let (z, foreign) = carry(&plate, &plate, &[None, None]);
