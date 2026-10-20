@@ -400,6 +400,11 @@ impl PlatesStage {
                 pull.front_oceanic_km_myr,
             ),
             (subduction::CORDILLERA_GLOBAL, pull.cordillera_km3),
+            (subduction::FRONT_G_FULL_GLOBAL, pull.front_g_full_km_myr),
+            (
+                subduction::FRONT_G_NORMAL_GLOBAL,
+                pull.front_g_normal_km_myr,
+            ),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
         }
@@ -447,6 +452,16 @@ impl PlatesStage {
             .globals
             .entry(flow::MOVED_GLOBAL.to_owned())
             .or_insert(0.0) += flowed.moved_km2_m / 1000.0;
+        if flowed.substeps > 0 {
+            for (key, v) in [
+                (flow::STEPS_GLOBAL, 1.0),
+                (flow::SUBSTEPS_GLOBAL, f64::from(flowed.substeps)),
+                (flow::SHORT_GLOBAL, (env.dt_myr - flowed.time_myr).max(0.0)),
+                (flow::EDGE_GLOBAL, f64::from(flowed.edge)),
+            ] {
+                *world.globals.entry(key.to_owned()).or_insert(0.0) += v;
+            }
+        }
         lap(&mut clock, "flow");
         // Rifted margins taper from continent to ocean over Earth's width (`transition.rs`).
         let taper = transition::step(st, &cache.geo, &pos, &env);
@@ -591,7 +606,7 @@ impl PlatesStage {
         if ridges::due(st, &env) || ((final_step || sutured) && st.resample_step != st.step) {
             let geo = ridges::resample(st, world, &pos, &tree, &cache.geo, &env)?;
             if let Some(b) = cb.borrow_mut().as_mut() {
-                b.book(&st.samples, gap_budget::Part::ResampleBlend);
+                b.book_lattice(&st.samples, gap_budget::Part::ResampleBlend);
             }
             // The accretion is thickening too (ledger: PLT-287); the surface's change counts as
             // the step's uplift, as the accretion's own rise does.

@@ -249,8 +249,10 @@ def plots(out, groups, maps):
                 files[(2 * len(files)) // 3], files[-1]]
         fig, axes = plt.subplots(len(pick), 2, figsize=(16, 3.3 * len(pick)))
         for row, f in zip(axes, pick):
-            a = np.fromfile(f, dtype="<f4").reshape(-1, 5)
-            lat, lon, z, thick, kind = a.T
+            # crust_budget.rs MAP_FIELDS: lat, lon, z, thickness, kind, orogeny, orogeny_age,
+            # arc_oceanic_m, arc_continental_m, group, flags.
+            a = np.fromfile(f, dtype="<f4").reshape(-1, 11)
+            lat, lon, z, thick, kind = a.T[:5]
             land = z > 0
             cont = kind > 0.5
             # Left: the sea floor in blues, the land from pale (low) to brown (high).
