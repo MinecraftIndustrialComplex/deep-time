@@ -188,7 +188,8 @@ pub type Params = BTreeMap<String, ParamValue>;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Event {
     pub id: EventId,
-    /// Years relative to world creation (negative = geologic past).
+    /// Years relative to world creation: negative before it (geology, and civ history written
+    /// before play), positive after it. The sign says when, never which writer.
     pub t_start: f64,
     /// `= t_start` for instantaneous events.
     pub t_end: f64,

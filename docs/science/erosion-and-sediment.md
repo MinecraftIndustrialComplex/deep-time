@@ -663,3 +663,22 @@ unchanged. Both are game-choices that keep the numerics of the 2-Myr step per My
 unlock)". Tests: `a_long_step_owes_the_short_steps_blur` (one carry of a long step with the blur it
 owes spreads a spike as far as two carries of half the step) and
 `the_spreading_steps_at_most_the_setting` (`surface::params`).
+
+**On a GPU (gpu-phase3, 2026-10-19).** Two of these solvers run on a GPU when a player's machine
+has one (`docs/design/gpu-compute.md` §15 and §16); no law, setting or ledger value changed. The
+diffusion solve's V-cycle (ERO-183) runs on the device in f32 as it ran on the CPU in f32, with
+the conjugate gradients, their stopping rule and the mass put-back still in f64 on the CPU, so the
+solve meets the same 1e-5 m residual; on the test VM's software GPU it gave the CPU's heights to
+the bit in all 50 solves of a 100 Myr history. The slope failure (ERO-168, ERO-169) runs its 40
+iterations at 5 % on the device in f32, every iteration over every cell (the CPU stops when an
+iteration moves nothing, which gives the same result); matter is kept to the f32 round-off of
+the changes, not f64's. On the same states it moved the CPU's metres to 1.5e-8, left heights
+within 1.5 mm (RMS 2.5e-5 m at most) and put no cell on the other side of the shoreline. The
+stopping rule above was not taken up for the GPU either: a pass costs one dispatch over the grid
+whatever moves, and a stop would need a read-back every pass. Over whole 100 Myr histories, worlds
+with any ported kernel on the GPU end with slightly more land than the CPU's (+0.007 of the
+planet's area on average over 15 seeds), from no single kernel and from none on the same state
+(gpu-compute.md §10). CPU runs with changes that do nothing physical (one threshold 1e-10 off,
+or four rates 1e-7 off on every cell) end with a little more land too (+0.002 over three such
+controls), so part of it is the model's sensitivity to any perturbation; the GPU's worlds sit
++0.005 above those controls, a fifth of the spread between seeds, and no other field leans.
