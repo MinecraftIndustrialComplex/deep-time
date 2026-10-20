@@ -188,7 +188,7 @@ public final class PlanetEditorScreen extends Screen {
             page = new GuidancePanel();
         } else {
             page = switch (model.page()) {
-                case SETUP -> new SetupPage();
+                case SETUP -> new CustomizePage();
                 case RUN -> new GenerationPage();
                 case REVIEW -> new ReviewPage();
             };

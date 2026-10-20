@@ -107,14 +107,20 @@ DEV_ARGS=("$@")
 [ -d "$GAMEDIR/mods" ] || { say "no $GAMEDIR/mods (./gradlew linkRunModsClient)"; exit 1; }
 
 # --- the display: Xvfb + Mesa llvmpipe, sound to a private null sink ---------------------------------
-MESA=$(nix build --no-link --print-out-paths nixpkgs#mesa | head -1)
-GLVND=$(nix build --no-link --print-out-paths nixpkgs#libglvnd | head -1)
-XVFB=$(nix build --no-link --print-out-paths nixpkgs#xorg.xorgserver | head -1)/bin/Xvfb
-PA=$(nix build --no-link --print-out-paths nixpkgs#pulseaudio | head -1)/bin/pulseaudio
+# Mesa, libglvnd and Xvfb come from the flake's own nixpkgs (flake.lock), the revision the client's
+# JDK comes from. Mesa's driver loads inside the JVM, which has already loaded that revision's
+# libraries (libstdc++, zlib, ...) by soname; the registry's newer Mesa then fails to load there and
+# GLFW sees "GLX: No GLXFBConfigs returned" while glxinfo on the same display works (2026-10-19).
+# Xvfb needs LIBGL_DRIVERS_PATH too: nixpkgs' xorg-server carries no DRI drivers of its own.
+pinned() { nix build --no-link --print-out-paths --inputs-from "$REPO" "nixpkgs#$1" | head -1; }
+MESA=$(pinned mesa)
+GLVND=$(pinned libglvnd)
+XVFB=$(pinned xorg-server)/bin/Xvfb
+PA=$(pinned pulseaudio)/bin/pulseaudio
 DISP="${DEEPTIME_DISPLAY:-:91}"
 export DISPLAY=$DISP LD_LIBRARY_PATH="$MESA/lib:$GLVND/lib" __GLX_VENDOR_LIBRARY_NAME=mesa \
     __EGL_VENDOR_LIBRARY_DIRS="$MESA/share/glvnd/egl_vendor.d" LIBGL_DRIVERS_PATH="$MESA/lib/dri" \
-    LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe LP_NUM_THREADS=4
+    LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe LP_NUM_THREADS=4 LIBGL_DEBUG=verbose
 XPID=""; PAPID=""; CPID=""
 cleanup() {
     [ -n "$CPID" ] && kill "$CPID" 2>/dev/null && sleep 3 && kill -9 "$CPID" 2>/dev/null

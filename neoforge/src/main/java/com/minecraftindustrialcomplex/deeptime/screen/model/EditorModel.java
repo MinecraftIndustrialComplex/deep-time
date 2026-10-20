@@ -428,6 +428,86 @@ public final class EditorModel {
     }
 
     // ------------------------------------------------------------------------------------------
+    // Changes from the starting preset (the Customize page)
+    // ------------------------------------------------------------------------------------------
+
+    /**
+     * True when the field differs from the selected preset: a value the player set that is not the
+     * preset's, or a typed number that is not valid (shown red until fixed or reset).
+     */
+    public boolean edited(EditorFields.Field f) {
+        if (!fieldValid(f))
+            return true;
+        JsonElement o = overrides.get(f.id());
+        if (o == null || !available(f))
+            return false;
+        Optional<JsonElement> preset = f.get(base());
+        if (preset.isEmpty())
+            return true;
+        JsonElement p = preset.get();
+        if (o.isJsonPrimitive() && p.isJsonPrimitive() && o.getAsJsonPrimitive().isNumber() && p.getAsJsonPrimitive().isNumber())
+            return o.getAsDouble() != p.getAsDouble();
+        return !o.equals(p);
+    }
+
+    /** How many parameters differ from the selected preset ({@link #edited}). */
+    public int editCount() {
+        int n = 0;
+        for (EditorFields.Field f : EditorFields.ALL)
+            if (edited(f))
+                n++;
+        return n;
+    }
+
+    /** Back to the preset's value. */
+    public void resetField(EditorFields.Field f) {
+        overrides.remove(f.id());
+        fieldTexts.remove(f.id());
+        changed();
+    }
+
+    /** The selected preset's value of a field, as the field shows it; empty when the preset lacks it. */
+    public Optional<String> presetText(EditorFields.Field f) {
+        return f.get(base()).map(e -> e.isJsonPrimitive() && e.getAsJsonPrimitive().isNumber() ? Formats.number(e.getAsDouble())
+                : e.isJsonPrimitive() ? e.getAsString() : e.toString());
+    }
+
+    /** True when the start differs from the default ({@link #DEFAULT_START}). */
+    public boolean startEdited() {
+        return !DEFAULT_START.equals(start);
+    }
+
+    /** True when the history length differs from the default ({@link #DEFAULT_LENGTH_MYR}). */
+    public boolean lengthEdited() {
+        return Formats.parse(lengthText) != DEFAULT_LENGTH_MYR;
+    }
+
+    /** True when the memory cap differs from the default ({@link #DEFAULT_CAP_GIB}). */
+    public boolean capEdited() {
+        return Formats.parse(capText) != DEFAULT_CAP_GIB;
+    }
+
+    public void resetStart() {
+        setStart(DEFAULT_START);
+    }
+
+    public void resetLength() {
+        setLengthText(Formats.number(DEFAULT_LENGTH_MYR));
+    }
+
+    public void resetCap() {
+        setCapText(Formats.number(DEFAULT_CAP_GIB));
+    }
+
+    /** Reset all: every parameter back to the preset's, the timeline and the memory cap to their defaults. */
+    public void resetAll() {
+        resetFields();
+        resetStart();
+        resetLength();
+        resetCap();
+    }
+
+    // ------------------------------------------------------------------------------------------
     // Memory cap
     // ------------------------------------------------------------------------------------------
 
