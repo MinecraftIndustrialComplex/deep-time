@@ -53,6 +53,8 @@ import java.util.Optional;
  * IDhApiTerrainDataRepo.getColumnDataAtBlockPos(IDhApiLevelWrapper, int, int, IDhApiTerrainDataCache)
  * DhApi.Delayed.configs : IDhApiConfig (null until DH starts its API)
  *   graphics() : IDhApiGraphicsConfig;  earthCurvatureRatio() : IDhApiConfigValue&lt;Integer&gt;  (client; {@link DhCurvature})
+ *   worldGenerator() : IDhApiWorldGenerationConfig (interfaces.config.both);
+ *     enableDistantWorldGeneration() : IDhApiConfigValue&lt;Boolean&gt;  ({@link DhGenerationGate})
  * IDhApiConfigValue: getTrueValue() (the player's file), getApiValue() (the override layer), getDefaultValue(),
  *   getCanBeOverrodeByApi(), setValue(T) and clearValue() (override layer only, never saved)
  * </pre>
@@ -324,6 +326,64 @@ public final class DhApiBinding {
         @Override
         public boolean setApi(int ratio) {
             return (Boolean) get("setValue", Integer.valueOf(ratio));
+        }
+
+        @Override
+        public boolean clearApi() {
+            return (Boolean) get("clearValue");
+        }
+    }
+
+    private static final String WORLD_GEN_CONFIG = "interfaces.config.both.IDhApiWorldGenerationConfig";
+
+    /**
+     * Distant Horizons' "distant generation enabled" setting ({@code DhApi.Delayed.configs.
+     * worldGenerator().enableDistantWorldGeneration()}, the generator plan as a boolean) as a
+     * {@link DhGenerationGate.Slot}; null before Distant Horizons has started its API. The same
+     * API-layer reads and writes as {@link #earthCurvature}; the config file is not reachable.
+     */
+    public DhGenerationGate.Slot generationEnabled() throws ReflectiveOperationException {
+        Object configs = delayed("configs");
+        if (configs == null)
+            return null;
+        Object value = call(WORLD_GEN_CONFIG, call(CONFIG, configs, "worldGenerator"), "enableDistantWorldGeneration");
+        return new GenerationSlot(value);
+    }
+
+    /** {@code IDhApiConfigValue<Boolean>} behind {@link DhGenerationGate.Slot}. */
+    private final class GenerationSlot implements DhGenerationGate.Slot {
+        private final Object value;
+
+        GenerationSlot(Object value) {
+            this.value = value;
+        }
+
+        private Object get(String method, Object... args) {
+            try {
+                return call(CONFIG_VALUE, value, method, args);
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException("Distant Horizons' " + method + ": " + e, e);
+            }
+        }
+
+        @Override
+        public boolean playerValue() {
+            return Boolean.TRUE.equals(get("getTrueValue"));
+        }
+
+        @Override
+        public Boolean apiValue() {
+            return (Boolean) get("getApiValue");
+        }
+
+        @Override
+        public boolean overridable() {
+            return (Boolean) get("getCanBeOverrodeByApi");
+        }
+
+        @Override
+        public boolean setApi(boolean enabled) {
+            return (Boolean) get("setValue", Boolean.valueOf(enabled));
         }
 
         @Override
