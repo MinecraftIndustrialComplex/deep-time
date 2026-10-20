@@ -1,7 +1,8 @@
 # The seamless world: Petroff's equal-area map in the Guyou layout
 
 Status of this page: `stage 2 (written with the code, 2026-10-04; Petroff's paper and code read in
-full, the map's properties tested; the layout and its sizes are game choices)`.
+full, the map's properties tested; the layout and its sizes are game choices; the forward's
+degenerate lines fixed 2026-10-20)`.
 
 Ledger ids on this page: `SCL-049`, `SCL-083`, `SCL-084`, `SCL-086` to `SCL-091`, `POL-022` to
 `POL-024` (see [claims.md](claims.md)).
@@ -104,10 +105,11 @@ exact rows.
 
 Measured after the fix: every exact input on the equator (every 0.1° of longitude), on the meridians
 λc, λc ± 90° and λc + 180° (every 0.1° of latitude), at the cone points, the 67.5° vertices, the
-tile centres and the poles comes back within 1e-5° in five worlds (`exact_inputs_on_the_diagonals_round_trip`,
-`ProjectionParityTest.exactInputsOnTheDiagonalsRoundTrip`); the worst is 4.2e-7°, which is the
-inverse's own rounding on the diagonals (the forward is within 1.4e-7 blocks of the reference
-there). The inverse is unchanged.
+tile centres and the poles (10,812 inputs a world) comes back within 1e-5° in five worlds
+(`exact_inputs_on_the_diagonals_round_trip`; four in Java's
+`ProjectionParityTest.exactInputsOnTheDiagonalsRoundTrip`). The worst is 4.3e-7° (0.02 blocks),
+which is the inverse's own rounding on the diagonals: the forward is within 1.4e-7 blocks of the
+reference there. The inverse is unchanged.
 
 ## Equations and constants
 
@@ -195,6 +197,9 @@ On the earlier bake of the same preset the isotropic footprint alone gave 13.4 a
 ## Sources
 
 - `petroff2021` (Petroff, M. A. 2021, ACM TSAS 7(4):18; code Zenodo 4661351): read in full (paper by a
-  sub-agent, 2026-10-03; code by the implementing agent, 2026-10-04).
+  sub-agent, 2026-10-03; code by the implementing agent, 2026-10-04). `new_projection.py` re-read
+  2026-10-20 at the forward's last step (the `alphaprime` lines and their divide-by-zero fallback);
+  the paper was not re-read for that fix, and the coordinate form is geometry of the code's own
+  quantities, checked numerically (above), not a formula from the paper.
 - The projection survey, `docs/research/notes/seamless-projection-survey.md`, for Guyou's aspect,
   the shape statistics and the layout.
