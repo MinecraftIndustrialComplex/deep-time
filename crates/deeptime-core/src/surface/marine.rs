@@ -24,6 +24,9 @@ use std::collections::BinaryHeap;
 
 use super::grid::Dims;
 
+#[cfg(feature = "gpu")]
+mod gpu;
+
 /// Landlab's `SimpleSubmarineDiffuser` diffusivity at water depth `z` (m, positive below sea
 /// level), m²/yr; `land` is returned on land.
 pub fn submarine_kd(z: f64, d0: f64, wave_base: f64, tidal_range: f64, land: f64) -> f64 {
@@ -227,6 +230,10 @@ pub struct FailureParams {
 /// takes part is kept per cell. Each value is computed by the same expression from the same
 /// inputs and the movers are applied in ascending cell order, so the result is bit for bit what
 /// the full sweep gives (`slope_failure_reference` in the tests keeps the full sweep).
+///
+/// With the `gpu` feature a session's device takes the call on a large grid (`gpu.rs` here,
+/// `docs/design/gpu-compute.md` §16): every iteration over every cell in `f32`, the same rule; a
+/// device that fails hands the call back to this path.
 pub fn slope_failure(
     d: &Dims,
     sea: &[bool],
@@ -241,6 +248,18 @@ pub fn slope_failure(
     let n = d.cells();
     if n == 0 {
         return 0.0;
+    }
+    #[cfg(feature = "gpu")]
+    if let Some(g) = gpu::session_device(n) {
+        let started = std::time::Instant::now();
+        match gpu::slope_failure(&g, d, sea, sea_level, p, h, avail) {
+            Ok(moved) => {
+                crate::compute::lap("slope_failure_device", started);
+                count_failure(0, u64::from(p.iterations));
+                return moved;
+            }
+            Err(e) => gpu::device_failed(&e),
+        }
     }
     // Whether a cell takes part, kept up to date as the cells move (P1-17: the test was taken
     // nine times per cell and pass before).
@@ -727,5 +746,77 @@ mod tests {
             (after - before) * 1e6
         );
         assert!(h[210] <= -20.0 + 1e-9);
+    }
+
+    /// The device's slope failure against the CPU's on the worlds of the bit-for-bit test above
+    /// (dense, sparse, not wrapping, one and two cells wide, one row), at the stage's iterations
+    /// and at 400: the heights and the sediment within a centimetre on floors kilometres deep
+    /// (the device's `f32` steps there are a few tenths of a millimetre), the metres moved within
+    /// 1e-4 of the CPU's, and matter kept to the `f32` round-off of the changes.
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn the_gpu_slope_failure_matches_the_cpu() {
+        let g = match deeptime_gpu::shared(true) {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skipped: {e}");
+                return;
+            }
+        };
+        eprintln!("adapter: {}", g.describe());
+        let s_c = 2.5f64.to_radians().tan();
+        let mut cases = 0;
+        for &(w, hh, wrap, mounds) in &[
+            (96usize, 64usize, true, 3usize),
+            (96, 64, true, 0),
+            (160, 48, false, 6),
+            (1, 40, true, 1),
+            (2, 40, true, 1),
+            (40, 1, true, 2),
+            (33, 17, true, 40),
+        ] {
+            for seed in 1..=3u64 {
+                for &iterations in &[FAILURE_ITERATIONS, 400] {
+                    let label = format!("{w}x{hh} wrap {wrap} seed {seed} iterations {iterations}");
+                    let d = Dims::new(w, hh, 4800.0, wrap);
+                    let (h0, a0, sea) = failure_world(w, hh, seed, mounds);
+                    let p = FailureParams {
+                        critical_slope: s_c,
+                        rate: FAILURE_RATE,
+                        iterations,
+                    };
+                    let (mut hc, mut ac) = (h0.clone(), a0.clone());
+                    let mc = slope_failure(&d, &sea, 0.0, &p, &mut hc, &mut ac);
+                    let (mut hd, mut ad) = (h0.clone(), a0.clone());
+                    let md = gpu::slope_failure(&g, &d, &sea, 0.0, &p, &mut hd, &mut ad)
+                        .expect("the device runs the slope failure");
+                    let worst = |a: &[f64], b: &[f64]| {
+                        a.iter()
+                            .zip(b)
+                            .fold(0.0f64, |m, (x, y)| m.max((x - y).abs()))
+                    };
+                    let (dh, da) = (worst(&hd, &hc), worst(&ad, &ac));
+                    let mass: f64 = hd.iter().sum::<f64>() - h0.iter().sum::<f64>();
+                    eprintln!(
+                        "{label}: moved {mc:.4} vs {md:.4}, heights {dh:.2e}, sediment {da:.2e}, \
+                         mass {mass:.2e}"
+                    );
+                    assert!(dh <= 1e-2, "{label}: heights {dh:e} from the CPU's");
+                    assert!(da <= 1e-2, "{label}: sediment {da:e} from the CPU's");
+                    assert!(
+                        (md - mc).abs() <= 1e-4 * mc + 1e-6,
+                        "{label}: moved {md} against {mc}"
+                    );
+                    assert!(
+                        mass.abs() <= 1e-5 * mc.max(1.0),
+                        "{label}: mass changed by {mass:e} m·cells"
+                    );
+                    if mc > 0.0 {
+                        cases += 1;
+                    }
+                }
+            }
+        }
+        assert!(cases >= 20, "only {cases} cases moved any sediment");
     }
 }

@@ -356,6 +356,121 @@ impl Level {
     }
 }
 
+/// What the cycle runs on besides the CPU: a wgpu device with the `gpu` feature, nothing
+/// without it.
+#[cfg(feature = "gpu")]
+pub(super) type Device = deeptime_gpu::Gpu;
+#[cfg(not(feature = "gpu"))]
+pub(super) type Device = std::convert::Infallible;
+
+/// In `auto` mode a grid smaller than this keeps its cycle on the CPU: a cycle's fixed cost on a
+/// device (its ~60 dispatches, a submission and a read-back) is about what the CPU cycle of a
+/// grid this size takes. A forced `gpu` mode uses the device at any size (the tests on lavapipe).
+/// game-choice: engineering threshold, not physical (gpu-phase3, 2026-10-19).
+#[cfg(feature = "gpu")]
+const DEVICE_MIN_CELLS: usize = 1 << 17;
+
+/// The session's device for a solve of `n` cells, if it should take the cycle (`compute.rs`).
+#[cfg(feature = "gpu")]
+fn session_device(n: usize) -> Option<std::sync::Arc<Device>> {
+    let a = crate::compute::ambient()?;
+    if a.mode() == crate::compute::ComputeMode::Auto && n < DEVICE_MIN_CELLS {
+        return None;
+    }
+    crate::compute::ambient_device(gpu::KERNEL)
+}
+
+/// The preconditioner of one solve: the CPU's levels, or the device's. A device that fails hands
+/// the rest of the solve to a CPU cycle built then (from the same operator and residual).
+enum Pre {
+    Cpu(Hierarchy),
+    #[cfg(feature = "gpu")]
+    Device(Box<gpu::DeviceCycle>),
+}
+
+impl Pre {
+    fn new(op: &Operator, cy: Cycle, device: Option<&std::sync::Arc<Device>>) -> Pre {
+        #[cfg(feature = "gpu")]
+        if let Some(g) = device {
+            let started = std::time::Instant::now();
+            match gpu::DeviceCycle::new(g, op, cy) {
+                Ok(dc) => {
+                    crate::compute::lap("mg_setup_device", started);
+                    return Pre::Device(Box::new(dc));
+                }
+                Err(e) => device_failed(&e),
+            }
+        }
+        #[cfg(not(feature = "gpu"))]
+        if let Some(d) = device {
+            match **d {}
+        }
+        let started = std::time::Instant::now();
+        let h = Hierarchy::new(op, cy);
+        crate::compute::lap("mg_setup", started);
+        Pre::Cpu(h)
+    }
+
+    /// The finest level's `f32` residual, which the caller sets before [`Pre::precondition`].
+    fn r32(&mut self) -> &mut [f32] {
+        match self {
+            Pre::Cpu(h) => &mut h.levels[0].r,
+            #[cfg(feature = "gpu")]
+            Pre::Device(d) => &mut d.r32,
+        }
+    }
+
+    fn z(&self) -> &[f32] {
+        match self {
+            Pre::Cpu(h) => h.z(),
+            #[cfg(feature = "gpu")]
+            Pre::Device(d) => &d.z32,
+        }
+    }
+
+    /// z = M⁻¹ r; returns Σ `r64`·z.
+    fn precondition(&mut self, op: &Operator, cy: Cycle, r64: &[f64]) -> f64 {
+        #[cfg(not(feature = "gpu"))]
+        let _ = (op, cy);
+        let started = std::time::Instant::now();
+        match self {
+            Pre::Cpu(h) => {
+                let v = h.precondition(r64);
+                crate::compute::lap("mg_cycle", started);
+                v
+            }
+            #[cfg(feature = "gpu")]
+            Pre::Device(d) => match d.precondition(r64) {
+                Ok(v) => {
+                    crate::compute::lap("mg_cycle_device", started);
+                    v
+                }
+                Err(e) => {
+                    device_failed(&e);
+                    let mut h = Hierarchy::new(op, cy);
+                    h.levels[0].r.copy_from_slice(&d.r32);
+                    *self = Pre::Cpu(h);
+                    self.precondition(op, cy, r64)
+                }
+            },
+        }
+    }
+}
+
+/// Says once per session that the device failed and the cycle runs on the CPU (counted).
+#[cfg(feature = "gpu")]
+fn device_failed(e: &str) {
+    let msg = format!(
+        "compute: {} failed on the GPU, the CPU runs the cycle ({e})",
+        gpu::KERNEL
+    );
+    match crate::compute::ambient() {
+        Some(a) => a.tell_once("surface:diffusion failed", crate::log::Level::Warn, msg),
+        None => eprintln!("{msg}"),
+    }
+    crate::compute::add("mg_fallback_n", 1.0);
+}
+
 /// The level hierarchy of one solve.
 struct Hierarchy {
     levels: Vec<Level>,
@@ -420,9 +535,15 @@ pub(super) fn cg(
     dt: f64,
     tol_m: f64,
 ) -> usize {
-    cg_with(ws, d, x, kd, dt, tol_m, CYCLE)
+    #[cfg(feature = "gpu")]
+    let device = session_device(d.cells());
+    #[cfg(not(feature = "gpu"))]
+    let device: Option<std::sync::Arc<Device>> = None;
+    cg_on(ws, d, x, kd, dt, tol_m, CYCLE, device.as_ref())
 }
 
+/// [`cg`] with the cycle's settings given and the cycle on the CPU (the tests vary the cycle).
+#[cfg(test)]
 pub(super) fn cg_with(
     ws: &mut Workspace,
     d: &Dims,
@@ -431,6 +552,22 @@ pub(super) fn cg_with(
     dt: f64,
     tol_m: f64,
     cy: Cycle,
+) -> usize {
+    cg_on(ws, d, x, kd, dt, tol_m, cy, None)
+}
+
+/// [`cg`] with the cycle's settings and its device given (the one dispatch point of the device
+/// cycle; None: the CPU's).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn cg_on(
+    ws: &mut Workspace,
+    d: &Dims,
+    x: &mut [f64],
+    kd: &[f64],
+    dt: f64,
+    tol_m: f64,
+    cy: Cycle,
+    device: Option<&std::sync::Arc<Device>>,
 ) -> usize {
     let n = d.cells();
     let (w, h) = (d.w, d.h);
@@ -451,10 +588,10 @@ pub(super) fn cg_with(
     let b: &[f64] = b;
     let live = Live::all(d);
     let op = Operator::new(d, kd, dt, &live, east, south, diag);
-    let mut mg = Hierarchy::new(&op, cy);
+    let mut mg = Pre::new(&op, cy, device);
     // r = b − A·x, its f32 copy for the cycle, and r·r.
     let rr0: f64 = {
-        let r32 = &mut mg.levels[0].r;
+        let r32 = mg.r32();
         let xs: &[f64] = x;
         r.par_chunks_mut(STRIP_ROWS * w)
             .zip(r32.par_chunks_mut(STRIP_ROWS * w))
@@ -483,7 +620,7 @@ pub(super) fn cg_with(
     let tol2 = tol_m * tol_m * n as f64;
     let mut iterations = 0;
     if rr0 > tol2 {
-        let mut rz = mg.precondition(r);
+        let mut rz = mg.precondition(&op, cy, r);
         // The direction, two buffers: an iteration reads the last and writes the next. The first
         // direction is z itself, so the old one, which the workspace still holds from another
         // solve, is not read.
@@ -564,7 +701,7 @@ pub(super) fn cg_with(
             pending = Some(alpha);
             // r −= α·A·p, its f32 copy, r·r.
             let rr: f64 = {
-                let r32 = &mut mg.levels[0].r;
+                let r32 = mg.r32();
                 r.par_chunks_mut(STRIP_ROWS * w)
                     .zip(r32.par_chunks_mut(STRIP_ROWS * w))
                     .zip(ap.par_chunks(STRIP_ROWS * w))
@@ -584,7 +721,7 @@ pub(super) fn cg_with(
             if rr <= tol2 {
                 break;
             }
-            let rz_new = mg.precondition(r);
+            let rz_new = mg.precondition(&op, cy, r);
             if !(rz_new.is_finite() && rz > 0.0) {
                 break;
             }
@@ -624,6 +761,9 @@ pub(super) fn cg_with(
     }
     iterations
 }
+
+#[cfg(feature = "gpu")]
+mod gpu;
 
 #[cfg(test)]
 mod tests;
