@@ -79,6 +79,10 @@ public final class TimelapseModel {
     private volatile boolean cancelRequested;
     private volatile boolean superseded;
     private volatile Estimate estimate;
+    /** Wall milliseconds (tests set their own). */
+    private java.util.function.LongSupplier clock = System::currentTimeMillis;
+    /** When the stages were seen done and the bake began, by {@link #clock}; -1 before. */
+    private long bakeStartedMs = -1;
     private long playAccumulator;
     private SimSession.Progress progress = SimSession.Progress.INITIAL;
     private State state = State.RUNNING;
@@ -176,6 +180,8 @@ public final class TimelapseModel {
     /** Takes new progress, frames and events, and notices the end of the run. */
     public void poll() {
         progress = run.progress();
+        if (bakeStartedMs < 0 && baking())
+            bakeStartedMs = clock.getAsLong();
         List<KeyframeInfo> fresh = run.newKeyframes();
         for (KeyframeInfo f : fresh) {
             frames.add(f);
@@ -586,14 +592,40 @@ public final class TimelapseModel {
         this.estimate = estimate;
     }
 
-    /** Milliseconds left: from the estimate while the stages step, else the session's figure. */
+    /** Sets the wall clock (tests). */
+    void clock(java.util.function.LongSupplier clock) {
+        this.clock = clock;
+    }
+
+    /** True once the stages are done and the run writes its world data (the bake), until it is done. */
+    public boolean baking() {
+        return state == State.RUNNING && progress.stageCount() > 0 && progress.state() != SimSession.Progress.RUNNING;
+    }
+
+    /** The run's estimate when it describes this session's stages, else null. */
+    private Estimate matching(SimSession.Progress p) {
+        Estimate e = estimate;
+        return e != null && e.stages().size() == p.stageCount() ? e : null;
+    }
+
+    private long bakeElapsedMs() {
+        return bakeStartedMs < 0 ? 0 : clock.getAsLong() - bakeStartedMs;
+    }
+
+    /**
+     * Milliseconds left: from the estimate while the stages step and while the bake runs (the
+     * session's elapsed time stops with its stages), else the session's figure.
+     */
     public long timeLeftMs() {
         SimSession.Progress p = progress;
-        if (estimate != null && p.state() == SimSession.Progress.RUNNING && estimate.stages().size() == p.stageCount()) {
-            long t = estimate.timeLeftMs(p.stageIndex(), p.stagePermille(), p.elapsedMs());
+        Estimate e = matching(p);
+        if (e != null && p.state() == SimSession.Progress.RUNNING) {
+            long t = e.timeLeftMs(p.stageIndex(), p.stagePermille(), p.elapsedMs());
             if (t >= 0)
                 return t;
         }
+        if (e != null && baking())
+            return e.bakeLeftMs(p.elapsedMs(), bakeElapsedMs());
         return p.etaMs();
     }
 
@@ -611,7 +643,7 @@ public final class TimelapseModel {
                 } else if (p.state() == SimSession.Progress.RUNNING) {
                     b.append(stageName()).append(' ').append(Formats.percent(p.stagePermille()))
                             .append(" (").append(Formats.ma(p.simulatedTime())).append(')')
-                            .append(" · total ").append(Formats.percent(p.totalPermille()));
+                            .append(" · total ").append(Formats.percent(permille()));
                 } else {
                     b.append("writing world data");
                 }
@@ -630,10 +662,27 @@ public final class TimelapseModel {
         return b.toString();
     }
 
-    /** Total progress 0…1 (1 once done). */
+    /**
+     * Total progress 0…1 (1 once done): weighted by the estimate's seconds, bake included
+     * ({@link Estimate#fraction}), else the session's own figure, which counts every stage alike.
+     */
     public double fraction() {
         if (state == State.DONE)
             return 1;
-        return Math.max(0, Math.min(1, progress.totalPermille() / 1000.0));
+        SimSession.Progress p = progress;
+        Estimate e = matching(p);
+        if (e != null && p.state() == SimSession.Progress.RUNNING) {
+            double f = e.fraction(p.stageIndex(), p.stagePermille());
+            if (f >= 0)
+                return f;
+        }
+        if (e != null && baking())
+            return e.bakeFraction(p.elapsedMs(), bakeElapsedMs());
+        return Math.max(0, Math.min(1, p.totalPermille() / 1000.0));
+    }
+
+    /** {@link #fraction} in permille, for the percentage shown. */
+    public int permille() {
+        return (int) Math.round(fraction() * 1000);
     }
 }
