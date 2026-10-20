@@ -350,7 +350,16 @@ impl PlatesStage {
         let begun = subduction::fronts_begin(st, &cache.geo, &pos, &env);
         let geo = &cache.geo;
         let (stacked, arcs) = rayon::join(
-            || belts::stack(st, geo, &pos, &env, &fronts, flexure.as_deref().filter(|_| collisions)),
+            || {
+                belts::stack(
+                    st,
+                    geo,
+                    &pos,
+                    &env,
+                    &fronts,
+                    flexure.as_deref().filter(|_| collisions),
+                )
+            },
             || subduction::fronts_reach(geo, &begun, &env),
         );
         book(st, gap_budget::Part::Belts);
@@ -634,9 +643,7 @@ impl PlatesStage {
                 );
             }
             if step >= self.total {
-                world
-                    .notes
-                    .insert(CRUST_BUDGET_NOTE.to_owned(), b.lines());
+                world.notes.insert(CRUST_BUDGET_NOTE.to_owned(), b.lines());
             }
         }
         self.crust_budget = cb;

@@ -398,15 +398,14 @@ impl CrustBudget {
             let _ = write!(line, " {name}=[{}]", row.join(","));
         }
         let _ = write!(line, "\ncb_moves t={t_myr:.0}");
-        for p in 0..PARTS {
-            let m = &self.moves[p];
+        for (name, m) in NAMES.iter().zip(&self.moves) {
             if m.iter().all(|&x| x == 0.0) {
                 continue;
             }
             let _ = write!(
                 line,
                 " {}=[o2c={:.5} o2c_z={:.0} o2c_t_km={:.1} c2o={:.5} hide={:.5} surface={:.5} drown={:.5} emerge={:.5}]",
-                NAMES[p],
+                name,
                 m[0] / vis,
                 m[1] / m[0].max(1.0),
                 m[2] / m[0].max(1.0) / 1000.0,
