@@ -247,8 +247,14 @@ run's own CO2 at the last plate step, before the nudge; "factor" is what the nud
   with 0.27 to 0.33 of the land under sheets in the natural end, it went to x6.9, x9.7 and
   x12.6.
 - *Why 100 Myr looked Earth-like.* In the 1000 Myr series, 100 Myr in, 0.06 to 0.14 of the land
-  is above 2 km. A 100 Myr run ends with that little high ground, so (inferred; no 100 Myr run was
-  made here) it has few sheets on high ground and the nudge has little to do.
+  is above 2 km. A 100 Myr run ends with that little high ground, so it has few sheets on high
+  ground and the nudge has nothing to do. The GPU agent's 100 Myr runs bear this out (full 16k,
+  seeds 6 to 15, CPU and GPU arms, gpu-phase3 on master 3e7edd49): the factor is 1.000 in every
+  world, and the CO2 is 152 to 1,038 ppm.
+- *The same seed on the GPU path* (that agent's 1000 Myr default-seed pair, laptop) ends at
+  12,600 ppm (x9.73) against the CPU's 10,011 (x6.86): last-bit differences moved the natural
+  end from 1,460 to about 1,295 ppm and the factor from 6.9 to 9.7. With the cap both ends are
+  at most 1.75 times their natural CO2: 2,556 ppm (measured, seed 1 above) and about 2,270 ppm.
 - *Why the runs spread so far.* The planet is chaotic: in the GPU agent's runs, one f32 ulp moved
   a 100 Myr end from 546 to 633 ppm. The nudge then multiplied whatever natural state a run
   ended in by whatever its high ground needed. The end CO2 inherited both spreads. With the cap,
@@ -385,8 +391,9 @@ The geometry's sums are taken row by row in parallel and added in row order, and
 trials run side by side and are read in order. The choice therefore does not depend on the
 thread count, and the 4-thread run above bears that out.
 
-**On the test planet** (`planet_world_4k`, seeds 11 to 14) the nudge does nothing: the factor is
-1.00 on all four, with or without the cap, and 0.000 to 0.010 of the land is under sheets. The
+**On the test planet** (`planet_world_4k`, seeds 11 to 14, on 26ce664e) the nudge does nothing:
+the factor is 1.00 on all four, with or without the cap, and 0.000 to 0.010 of the land is under
+sheets. Master's later arc change to that planet (d54c7f0f, PLT-043) was not measured again. The
 MIC GameTest's `climateConsistent` failure on master ("C 0.621 < 0.630 (132 columns)") is
 therefore not a climate fault. It is the census's sampling noise, and the floors now allow for
 it (biomes.md, "The floors against the census's noise").
