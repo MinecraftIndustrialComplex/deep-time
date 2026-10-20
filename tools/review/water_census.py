@@ -6,7 +6,8 @@ Ben, 2026-10-20: "the majority of the world surface (that isn't mountains) appea
 dominated by rivers & lakes". This counts, for every keyframe of a world-data folder:
   - the lakes (open and frozen) as a share of the land and of the ice-free land,
   - the largest lake (8-connected, wrapping east-west) as a share of the planet,
-  - the share of the land the `rivers` layer draws as river,
+  - the share of the land the `rivers` layer draws as river (pixels touched, and the ink: a
+    pixel's share of river when a thread narrower than a pixel is blended over the land),
 from the `rivers` layer's colours (crates/deeptime-core/src/water_view.rs: LAND with a hill shade,
 SEA, LAKE, FROZEN, PLAYA; anything else is a river on the `rivers` ramp) and the frame's
 `climate/ice_thickness_m` layer (under 1 m of ice is #141414 on the `ice` ramp). The map is the
@@ -114,6 +115,49 @@ def largest_component(mask: np.ndarray) -> int:
     return max(total.values())
 
 
+# The `rivers` ramp of ramps.json (log10 m3/s, colour), sampled for the ink estimate.
+RIVER_STOPS = [(0.3, (0x4A, 0xA0, 0xF2)), (1.3, (0x2F, 0x7F, 0xE0)), (2.3, (0x1C, 0x5C, 0xC4)),
+               (3.5, (0x0F, 0x3F, 0x95))]
+
+
+def river_ramp(n: int = 64) -> np.ndarray:
+    xs = np.array([s[0] for s in RIVER_STOPS])
+    cs = np.array([s[1] for s in RIVER_STOPS], dtype=np.float32)
+    v = np.linspace(xs[0], xs[-1], n)
+    return np.stack([np.interp(v, xs, cs[:, c]) for c in range(3)], -1)
+
+
+def river_ink(riv: np.ndarray, river: np.ndarray, land_dry: np.ndarray) -> np.ndarray:
+    """How much of each river pixel is river: water_view.rs draws a river narrower than a pixel
+    as a thread blended at its coverage over the land, so a pixel is `base (1 - a) + c a` with c
+    on the ramp. The base is the mean of the dry land pixels within two pixels (LAND where there
+    are none); a and c are the ramp colour that explains the pixel best. A hard-edged river pixel
+    (the drawing before 2026-10-20) is a = 1."""
+    img = riv[..., :3].astype(np.float32)
+    k = np.ones((5, 5), np.float32)
+    wsum = ndimage.convolve(land_dry.astype(np.float32), k, mode="wrap")
+    base = np.empty_like(img)
+    for c in range(3):
+        s = ndimage.convolve(img[..., c] * land_dry, k, mode="wrap")
+        base[..., c] = np.where(wsum > 0, s / np.maximum(wsum, 1e-6), LAND[c])
+    ys, xs = np.nonzero(river)
+    p = img[ys, xs]
+    b = base[ys, xs]
+    ramp = river_ramp()
+    best_a = np.zeros(len(p), np.float32)
+    best_e = np.full(len(p), np.inf, np.float32)
+    for col in ramp:
+        d = col[None, :] - b
+        a = np.clip(((p - b) * d).sum(1) / np.maximum((d * d).sum(1), 1e-6), 0.0, 1.0)
+        e = ((b + a[:, None] * d - p) ** 2).sum(1)
+        better = e < best_e
+        best_e[better] = e[better]
+        best_a[better] = a[better]
+    ink = np.zeros(river.shape, np.float32)
+    ink[ys, xs] = best_a
+    return ink
+
+
 def frame_stats(layers: dict, ice: np.ndarray | None) -> dict | None:
     riv = layers.get("rivers")
     if riv is None:
@@ -127,6 +171,7 @@ def frame_stats(layers: dict, ice: np.ndarray | None) -> dict | None:
     river = valid & ~(sea | lake | frozen | playa | land_dry)
     land = valid & ~sea
     water = lake | frozen
+    ink = river_ink(riv, river, land_dry)
     planet = int(valid.sum())
     n_land = int(land.sum())
     out = {
@@ -136,6 +181,7 @@ def frame_stats(layers: dict, ice: np.ndarray | None) -> dict | None:
         "frozen_share_of_lake": int(frozen.sum()) / max(int(water.sum()), 1),
         "playa_share_of_land": int(playa.sum()) / n_land if n_land else None,
         "river_share_of_land": int(river.sum()) / n_land if n_land else None,
+        "river_ink_share_of_land": float(ink.sum()) / n_land if n_land else None,
         "largest_lake_share_of_planet": largest_component(water) / planet if planet else None,
     }
     if ice is not None:
@@ -304,7 +350,8 @@ def main() -> int:
 
     plate = [r for r in rows if r["stage"].startswith("plates")]
     keys = ["lake_share_of_land", "lake_share_of_ice_free_land", "largest_lake_share_of_planet",
-            "river_share_of_land", "river_share_of_ice_free_land", "ice_share_of_land", "land_share_of_planet"]
+            "river_share_of_land", "river_ink_share_of_land", "river_share_of_ice_free_land", "ice_share_of_land",
+            "land_share_of_planet"]
     summ = {"all_plate_frames": {k: summary(k, plate) for k in keys},
             "first_150_myr": {k: summary(k, [r for r in plate if r["myr_ago"] > 850]) for k in keys},
             "after_150_myr": {k: summary(k, [r for r in plate if r["myr_ago"] <= 850]) for k in keys},

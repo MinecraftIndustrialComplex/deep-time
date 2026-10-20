@@ -30,12 +30,17 @@
 //! A [`WaterView`] holds the water in the picture's own pixels: the coverage of the rivers (a
 //! thick line along each segment of the network, anti-aliased, the largest discharge where several
 //! meet), the discharge under each river pixel, and the coverage of the lakes (the share of the
-//! frame's cells under each pixel that hold lake water). A river is drawn at least
-//! [`Look::width_px`] wide, thicker by [`Look::width_per_decade`] for every tenfold of flow past
-//! the stream threshold, and at least its real width (`w` blocks across a `C`-block planet) so the
-//! great rivers keep their true size. The colour is the `rivers` ramp of `ramps.json` at
-//! log₁₀(m³/s): a clear water blue that deepens with flow. Lakes are one flat colour ([`LAKE`]).
-//! Neither is drawn on the sea (a pixel at least a block below sea level).
+//! frame's cells under each pixel that hold lake water). **A river is drawn at its width in the
+//! game** (`w` blocks across a `C`-block planet: the bake's width law, so the map's ink is the
+//! game's water; HYD-091): one wider than [`Look::hairline_px`] is drawn at that width; a narrower
+//! one is a hairline whose coverage is its width in pixels, never under [`Look::ink_min`] so a
+//! stream still shows as a faint thread. On a 1,024-pixel map of a 13,312-block planet a pixel
+//! is 13 blocks, so most rivers (2 to 6 blocks wide) are faint threads and only the great rivers
+//! draw solid (before 2026-10-20 every river was at least a pixel wide plus half a pixel per
+//! tenfold of flow, which drew rivers over 12.6 % of the land where the bake's channels cover
+//! 2.0 %). The colour is the `rivers` ramp of `ramps.json` at log₁₀(m³/s): a clear water blue
+//! that deepens with flow. Lakes are one flat colour ([`LAKE`]). Neither is drawn on the sea (a
+//! pixel at least a block below sea level).
 //!
 //! **Lakes follow the climate** (Ben, 2026-10-01, "freeze them and size them by climate"; the
 //! hydrology's water balance, `hydro`): a basin that evaporates more than it gets holds a smaller
@@ -44,13 +49,16 @@
 //! below `hydro.lake_freeze_mean_c` (0 °C: under ice for more than half the year, the frame's
 //! `climate/t_mean_c` at the cell) is a **frozen lake**, drawn as lake ice ([`FROZEN`]).
 //!
-//! - **On the satellite view** ([`WaterView::overlay`]): rivers are blended over the land at 60 %
-//!   (a stream) to 92 % (the largest river), lakes (open and frozen) at 95 % and playas at 80 %,
-//!   after the hill shade, so they are flat. Under glacier ice (`climate/ice_thickness_m`, gone
-//!   from 60 m of it) none show, as the ice is drawn white over the ground.
+//! - **On the satellite view** ([`WaterView::overlay`]): rivers are blended over the land at their
+//!   coverage times 60 % (a stream) to 92 % (the largest river), lakes (open and frozen) at 95 %
+//!   and playas at 80 %, after the hill shade, so they are flat. Under glacier ice
+//!   (`climate/ice_thickness_m`, gone from 60 m of it) none show, as the ice is drawn white over
+//!   the ground.
 //! - **As a layer** ([`WaterView::render`]): a quiet base (land in a pale neutral with a soft hill
-//!   shade, the sea in slate) with the lakes, playas and rivers hard-edged on it, so the workbench
-//!   can read the colour back under the pointer: a pixel on the ramp is "river (~N m³/s)", one of
+//!   shade, the sea in slate) with the lakes, playas and rivers on it. Lakes, playas and a river
+//!   pixel at least half covered are hard-edged, so the workbench can read the colour back under
+//!   the pointer; a river under half a pixel is blended at its coverage over the base (a faint
+//!   thread the pointer does not read). A pixel on the ramp is "river (~N m³/s)", one of
 //!   [`LAKE`] is "lake", of [`FROZEN`] "frozen lake", of [`PLAYA`] "salt flat". On the satellite
 //!   view the pointer reads the same three by their colours.
 
@@ -98,10 +106,12 @@ pub const FROZEN_SATELLITE: [u8; 3] = [0xd0, 0xe6, 0xf0];
 /// The look's constants (the module docs give them in words).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Look {
-    /// A river's width in pixels at the stream threshold …
-    pub width_px: f32,
-    /// … and what each tenfold of discharge adds.
-    pub width_per_decade: f32,
+    /// The narrowest line a river is drawn as, pixels: a river narrower than this in the game is
+    /// a line this wide whose coverage is its width over it …
+    pub hairline_px: f32,
+    /// … and never less than this (game-choice: a stream two blocks wide is a sixth of a pixel
+    /// on a 1,024-pixel map, and would not show at all; HYD-091).
+    pub ink_min: f32,
     /// How opaque a stream and the largest river are on the satellite view, and the decades of
     /// discharge over which one grows into the other.
     pub alpha_min: f32,
@@ -119,8 +129,8 @@ pub struct Look {
 impl Default for Look {
     fn default() -> Look {
         Look {
-            width_px: 1.0,
-            width_per_decade: 0.5,
+            hairline_px: 1.0,
+            ink_min: 0.25,
             alpha_min: 0.6,
             alpha_max: 0.92,
             alpha_decades: 2.5,
@@ -345,7 +355,6 @@ impl WaterView {
                 proj.picture_y(f64::from(z), ph) as f32,
             )
         };
-        let q_min = view.hydro.river_min_discharge_m3s.max(1e-3) as f32;
         let px_per_block = (fw / c) as f32;
         for ch in &rivers.chains {
             let (a, b) = (ch.first as usize, (ch.first + ch.count) as usize);
@@ -362,11 +371,11 @@ impl WaterView {
                 if (p1.0 - p0.0).abs() > 0.5 * self.w as f32 {
                     continue;
                 }
-                let cartographic =
-                    look.width_px + look.width_per_decade * (q.max(q_min) / q_min).log10();
+                // The river's width in the game, pixels (`hw` is its half width, blocks).
                 let real = (v0.hw + v1.hw) * px_per_block;
-                let radius = 0.5 * cartographic.max(real);
-                self.stamp(p0, p1, radius, q);
+                let radius = 0.5 * real.max(look.hairline_px);
+                let ink = (real / look.hairline_px).clamp(look.ink_min, 1.0);
+                self.stamp(p0, p1, radius, q, ink);
             }
         }
         // Not on the sea: a river's last vertex is the sea cell it ends in.
@@ -379,10 +388,11 @@ impl WaterView {
         }
     }
 
-    /// Lays one capsule (the segment p0 → p1 grown by `radius` pixels) into the coverage, keeping
-    /// the larger coverage and the larger discharge: the same pixels are met again and again by a
-    /// network sampled finer than the picture, which must not thicken it.
-    fn stamp(&mut self, p0: (f32, f32), p1: (f32, f32), radius: f32, q: f32) {
+    /// Lays one capsule (the segment p0 → p1 grown by `radius` pixels, its coverage times `ink`)
+    /// into the coverage, keeping the larger coverage and the larger discharge: the same pixels
+    /// are met again and again by a network sampled finer than the picture, which must not
+    /// thicken it.
+    fn stamp(&mut self, p0: (f32, f32), p1: (f32, f32), radius: f32, q: f32, ink: f32) {
         let (w, h) = (self.w as i64, self.h as i64);
         let reach = radius + 1.0;
         let y0 = (p0.1.min(p1.1) - reach).floor().max(0.0) as i64;
@@ -400,7 +410,7 @@ impl WaterView {
                     0.0
                 };
                 let d = (fx - t * dx).hypot(fy - t * dy);
-                let cov = (radius + 0.5 - d).clamp(0.0, 1.0);
+                let cov = (radius + 0.5 - d).clamp(0.0, 1.0) * ink;
                 if cov > 0.0 {
                     let k = (y * w + x.rem_euclid(w)) as usize;
                     if cov > self.river[k] {
@@ -528,11 +538,25 @@ impl WaterView {
                 PLAYA
             } else if self.river[k] >= 0.5 && self.q[k] > 0.0 {
                 Self::river_rgb(ramp, self.q[k])
-            } else if z < 0.0 {
-                SEA
             } else {
-                let f = (1.0 + look.relief * (shade - 1.0)).clamp(0.6, 1.2);
-                LAND.map(|v| (f32::from(v) * f).round().clamp(0.0, 255.0) as u8)
+                let base = if z < 0.0 {
+                    SEA
+                } else {
+                    let f = (1.0 + look.relief * (shade - 1.0)).clamp(0.6, 1.2);
+                    LAND.map(|v| (f32::from(v) * f).round().clamp(0.0, 255.0) as u8)
+                };
+                // A river under half a pixel: a thread blended at its coverage.
+                let a = if self.q[k] > 0.0 { self.river[k] } else { 0.0 };
+                if a > 0.0 {
+                    let rgb = Self::river_rgb(ramp, self.q[k]);
+                    std::array::from_fn(|i| {
+                        (f32::from(base[i]) * (1.0 - a) + f32::from(rgb[i]) * a)
+                            .round()
+                            .clamp(0.0, 255.0) as u8
+                    })
+                } else {
+                    base
+                }
             };
             [rgb[0], rgb[1], rgb[2], 255]
         };

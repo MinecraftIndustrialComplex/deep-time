@@ -57,6 +57,59 @@ pub const RHO_CRUST_MEAN: f64 = 2830.0; // ledger: PLT-281
 /// Crust per metre of height for a whole column, ρ_m / (ρ_m − ρ̄_c) (see [`RHO_CRUST_MEAN`]).
 pub const COLUMN_ISOSTATIC_FACTOR: f64 = RHO_MANTLE_ISO / (RHO_MANTLE_ISO - RHO_CRUST_MEAN);
 
+/// The sedimentary cover's pore water (2026-10-20, Ben: "the majority of the world surface
+/// (that isn't mountains) appears to be getting dominated by rivers & lakes"). Sediment and
+/// sedimentary rock are not crust at [`RHO_CRUST_MEAN`]: water fills their pores, and the
+/// porosity falls with depth as the overburden compacts them, φ(z) = φ_0 e^(−cz) (Athy 1930;
+/// Sclater & Christie 1980 fitted it to North Sea wells). A column with more cover than the
+/// normal one stands higher by the cover's mass deficit over the mantle's density, and a closed
+/// basin fills with about 1 / (1 − ρ_b / ρ_m) metres of sediment per metre of depth (3.3 to 3.5
+/// over the first kilometres) where crust at the mean density needs 7.0: without it the settling
+/// (`settle.rs`, ISO-078) held basins open twice as long as sediment fills them, and lakes covered
+/// 6 to 7 % of the land against Earth's 1.8 to 3.7 % (HYD-090). The cover is Sclater &
+/// Christie's shaly sandstone, between their shale and their sandstone, for a cover that is
+/// mostly mixed clastics: surface porosity φ_0 …
+pub const COVER_SURFACE_POROSITY: f64 = 0.56; // ledger: ISO-080 (from-memory)
+/// … its compaction coefficient c, per m (0.39 per km) …
+pub const COVER_COMPACTION_PER_M: f64 = 0.39e-3; // ledger: ISO-080 (from-memory)
+/// … and its grain density, kg/m³.
+pub const RHO_COVER_GRAIN: f64 = 2680.0; // ledger: ISO-081 (from-memory)
+/// The water in the pores, kg/m³: sea water, the surface's flexure's (ISO-044).
+const RHO_PORE_WATER: f64 = 1030.0; // ledger: ISO-044
+
+/// The height `s` metres of compacted cover (sediment and sedimentary rock) add to a column over
+/// the same thickness of crust at the mean density, m: its mass deficit
+/// ∫_0^s (ρ̄_c − ρ_b(z)) dz over ρ_m, with the bulk density ρ_b = ρ_g − φ(z) (ρ_g − ρ_w) and Athy's
+/// φ(z), = (s (ρ̄_c − ρ_g) + (ρ_g − ρ_w) φ_0 (1 − e^(−cs)) / c) / ρ_m. ledger: ISO-082
+pub fn cover_lift_m(s: f64) -> f64 {
+    let (phi_0, c) = (COVER_SURFACE_POROSITY, COVER_COMPACTION_PER_M);
+    let s = s.max(0.0);
+    (s * (RHO_CRUST_MEAN - RHO_COVER_GRAIN)
+        + (RHO_COVER_GRAIN - RHO_PORE_WATER) * phi_0 * (1.0 - (-c * s).exp()) / c)
+        / RHO_MANTLE_ISO
+}
+
+/// A column's cover, m: its sediment and sedimentary rock.
+pub fn cover_m(pools: &[f32; pool::COUNT]) -> f64 {
+    f64::from(pools[pool::SEDIMENT].max(0.0)) + f64::from(pools[pool::SEDIMENTARY].max(0.0))
+}
+
+/// How high a continental column's pools hold its surface above the normal column's
+/// ([`continental_column`]), m: the Airy height of the thickness beyond it
+/// ([`COLUMN_ISOSTATIC_FACTOR`]), plus its cover's pore water beyond the normal cover's
+/// ([`cover_lift_m`]), less its eclogite root's pull ([`root_drop_m`]).
+pub fn column_height_m(pools: &[f32; pool::COUNT], gravity: f64) -> f64 {
+    static NORMAL: std::sync::OnceLock<(f64, f64)> = std::sync::OnceLock::new();
+    let &(t_n, lift_n) = NORMAL.get_or_init(|| {
+        let n = continental_column();
+        (n.iter().map(|&x| f64::from(x)).sum(), cover_lift_m(cover_m(&n)))
+    });
+    let t: f64 = pools.iter().map(|&x| f64::from(x.max(0.0))).sum();
+    (t - t_n) / COLUMN_ISOSTATIC_FACTOR + cover_lift_m(cover_m(pools))
+        - lift_n
+        - root_drop_m(eclogite_m(pools, gravity))
+}
+
 /// The eclogite root (2026-10-06, Ben: "Fix isostasy first"): mafic lower crust carried deeper
 /// than the pressure at which it turns to eclogite becomes denser than the mantle, so a thickened
 /// column stands lower than Airy isostasy with one crustal density gives it. The pressure past
@@ -90,16 +143,15 @@ pub fn root_drop_m(eclogite_m: f64) -> f64 {
 }
 
 /// The change of a continental column's surface when its pools go from `before` to `after`, m:
-/// the Airy change of its thickness (`ΔT / COLUMN_ISOSTATIC_FACTOR`) less the change of its
-/// eclogite root's pull ([`root_drop_m`]).
+/// the change of [`column_height_m`] (the Airy change of its thickness, `ΔT /
+/// COLUMN_ISOSTATIC_FACTOR`, and of its cover's pore water, less the change of its eclogite
+/// root's pull).
 pub fn isostatic_change_m(
     before: &[f32; pool::COUNT],
     after: &[f32; pool::COUNT],
     gravity: f64,
 ) -> f64 {
-    let t = |p: &[f32; pool::COUNT]| -> f64 { p.iter().map(|&x| f64::from(x.max(0.0))).sum() };
-    (t(after) - t(before)) / COLUMN_ISOSTATIC_FACTOR
-        - (root_drop_m(eclogite_m(after, gravity)) - root_drop_m(eclogite_m(before, gravity)))
+    column_height_m(after, gravity) - column_height_m(before, gravity)
 }
 
 /// Order in which erosion strips the pools, top first: the conserved pools and the mafic volcanic
@@ -397,7 +449,9 @@ mod tests {
         );
         assert!(e > 0.0);
         let change = isostatic_change_m(&normal, &thick, 9.81);
-        let airy = (t - f64::from(total)) / COLUMN_ISOSTATIC_FACTOR;
+        // The scaled column's cover is thicker too (ISO-082).
+        let pores = |p: &[f32; pool::COUNT]| cover_lift_m(cover_m(p));
+        let airy = (t - f64::from(total)) / COLUMN_ISOSTATIC_FACTOR + pores(&thick) - pores(&normal);
         assert!(
             (airy - change - e * (RHO_ECLOGITE - RHO_CRUST_MEAN) / RHO_MANTLE_ISO).abs() < 1e-6,
             "{airy} {change}"
@@ -409,6 +463,38 @@ mod tests {
         let ta: f64 = a.iter().map(|&x| f64::from(x)).sum();
         assert!(ta < depth);
         let plain = isostatic_change_m(&normal, &a, 9.81);
-        assert!((plain - (ta - f64::from(total)) / COLUMN_ISOSTATIC_FACTOR).abs() < 1e-6);
+        let airy_a = (ta - f64::from(total)) / COLUMN_ISOSTATIC_FACTOR + pores(&a) - pores(&normal);
+        assert!((plain - airy_a).abs() < 1e-6);
+    }
+
+    /// The cover's pore water (ISO-080 to ISO-082): the normal column stands at its own height; a
+    /// fresh metre of sediment on a bare column raises it by 1 − ρ_b/ρ_m with the surface
+    /// porosity's bulk density; a closed basin of depth D on the normal column fills with about
+    /// 3.4 D of sediment (the whole column's density would need 7 D); and the lift flattens to
+    /// the grains' own (ρ̄_c − ρ_g)/ρ_m per metre deep in the cover, where the pores are closed.
+    #[test]
+    fn porous_cover_fills_a_basin_with_about_three_and_a_half_times_its_depth() {
+        let normal = continental_column();
+        assert!(column_height_m(&normal, 9.81).abs() < 1e-9);
+        let rho_b0 =
+            RHO_COVER_GRAIN - COVER_SURFACE_POROSITY * (RHO_COVER_GRAIN - RHO_PORE_WATER);
+        let first = cover_lift_m(1.0) + 1.0 / COLUMN_ISOSTATIC_FACTOR;
+        assert!((first - (1.0 - rho_b0 / RHO_MANTLE_ISO)).abs() < 1e-3, "{first}");
+        // Fill a 500 m basin on the normal column: sediment raises the floor until it is full.
+        let fill_for = |depth: f64| {
+            let mut p = normal;
+            let mut added = 0.0;
+            while column_height_m(&p, 9.81) < depth {
+                p[pool::SEDIMENT] += 1.0;
+                added += 1.0;
+            }
+            added / depth
+        };
+        let ratio = fill_for(500.0);
+        assert!((3.0..3.8).contains(&ratio), "{ratio}");
+        assert!(ratio < 0.6 * COLUMN_ISOSTATIC_FACTOR);
+        let deep = cover_lift_m(20_001.0) - cover_lift_m(20_000.0);
+        let grains = (RHO_CRUST_MEAN - RHO_COVER_GRAIN) / RHO_MANTLE_ISO;
+        assert!((deep - grains).abs() < 1e-4, "{deep} {grains}");
     }
 }
