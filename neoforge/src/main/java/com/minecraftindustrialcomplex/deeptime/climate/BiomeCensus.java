@@ -122,10 +122,13 @@ public final class BiomeCensus {
         }
     }
 
+    /** The {@link #FORBIDDEN} entry that bounds the ice cap's ice spikes. */
+    public static final String EF_ICE_SPIKES = "EF:few_ice_spikes";
+
     /**
      * EF is ice cap where the glacier model puts ice and barren frozen ground elsewhere (Ben, 2026-09-29,
      * "Ice only where there's ice"): never Terralith's red, terracotta snowy badlands or its scarlet
-     * (Nether-stone) mountains, and never a warm badlands.
+     * (Nether-stone) mountains, and never a warm badlands; and ice spikes on no more than a share of the ice cap.
      */
     public static final List<Forbid> FORBIDDEN = List.of(
             new Forbid("EF:no_red", "EF", k -> k == 30, null, java.util.Set.of("terralith:snowy_badlands", "terralith:scarlet_mountains",
@@ -134,6 +137,10 @@ public final class BiomeCensus {
             new Forbid("EF:no_chasm_on_barren", "EF without ice", k -> k == 30, false, java.util.Set.of("terralith:glacial_chasm")),
             // Cherry groves are positive-weirdness variants: ice caps are steered off them.
             new Forbid("EF:no_cherry", "EF", k -> k == 30, null, java.util.Set.of("terralith:snowy_cherry_grove", "minecraft:cherry_grove")),
+            // Ice spikes on a share of the ice cap only (Ben, 2026-09-30, "Bring ice spikes back"; the ice spikes report,
+            // 2026-10-20: Terralith drew them on every near-inland flat of it, 18 % of the ice cap of Ben's play planet).
+            // A bounded share, not a ban: its ceiling is BiomeGameTests.FORBIDDEN_CEILINGS' (ledger: BIO-162).
+            new Forbid(EF_ICE_SPIKES, "EF under ice", k -> k == 30, true, java.util.Set.of("minecraft:ice_spikes")),
             // Cold deserts (Ben, 2026-10-02): a BWk with a mean under 10 degC is in the frozen or cold band
             // (the placement's cold_desert and polar_ice ramps) and is not drawn as sand desert or badlands.
             new Forbid("BWk:cold_not_sand", "BWk colder than the cold band's top", k -> k == 5, null, COLD_BAND_TOP,
