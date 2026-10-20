@@ -118,6 +118,11 @@ def main():
     ap.add_argument("--census")
     ap.add_argument("--reference", action="append", default=[])
     ap.add_argument("--sea-y", type=float, default=63.0)
+    ap.add_argument("--ef-flats", choices=["positive", "negative"], help="what if: every EF flat (reference erosion "
+                    "-0.27 and up, the placement's positive_below_erosion) on this branch of the weirdness; the share of "
+                    "ice spikes is linear in the positive share between the two")
+    ap.add_argument("--ef-c-min", type=float, help="what if: EF land inland of the beach strip (reference continentalness "
+                    "-0.11 and up) held at or above this continentalness (the bake's class clamp, reference units)")
     a = ap.parse_args()
 
     arr = np.load(a.layers)
@@ -137,6 +142,14 @@ def main():
     ice = np.nan_to_num(get("climate/ice_cover"), nan=0.0) > 0 if "climate/ice_cover" in ch else np.zeros(len(K), bool)
     H = get(meta["channels"][0])
     cand = np.nonzero((K != SEA) & (H > a.sea_y))[0]
+    if a.ef_flats:
+        fl = (K == EF) & (E >= -0.27)
+        W = np.where(fl, np.abs(W) if a.ef_flats == "positive" else -np.abs(W), W)
+        print(f"what if: EF flats all {a.ef_flats} ({fl.sum()} columns)")
+    if a.ef_c_min is not None:
+        hold = (K == EF) & (C >= -0.11)
+        C = np.where(hold, np.maximum(C, a.ef_c_min), C)
+        print(f"what if: EF continentalness held at {a.ef_c_min} or more ({hold.sum()} columns)")
     t = table(tables["climate/temperature"])(T[cand])
     v = table(tables["climate/vegetation"])(V[cand])
     c = table(tables["climate/continents"])(C[cand])
@@ -202,7 +215,12 @@ def main():
     for s_, v_ in sorted(slots.items(), key=lambda kv: -kv[1][0])[:24]:
         print(f"  {s_[0]:5} {s_[1]} {s_[2]}  {v_[0]:6d} {v_[1]:6d}")
     corner = t0 & h0
-    print(f"\nice spikes: {pct(spikes.sum(), n):.2f} % of land; of the T0 and H0 land {pct((spikes & corner).sum(), corner.sum()):.1f} %, "
+    # The flats: erosion at or above vanilla's E1 | E2 edge (BiomeCensus.MOUNTAIN_EROSION), where both lists draw
+    # ice spikes; below it is mountain relief (slopes and peaks) in every list.
+    flat = e[keep] >= -0.375
+    print(f"\nice spikes on the T0 and H0 flats (erosion -0.375 and up): {pct((spikes & corner & flat).sum(), (corner & flat).sum()):.1f} % "
+          f"of {(corner & flat).sum()} columns ({pct((corner & flat).sum(), corner.sum()):.0f} % of the corner)")
+    print(f"ice spikes: {pct(spikes.sum(), n):.2f} % of land; of the T0 and H0 land {pct((spikes & corner).sum(), corner.sum()):.1f} %, "
           f"of it with weirdness > 0 {pct((spikes & corner & pos).sum(), (corner & pos).sum()):.1f} %, "
           f"with weirdness < 0 {pct((spikes & corner & ~pos).sum(), (corner & ~pos).sum()):.1f} %")
 
@@ -233,6 +251,10 @@ def main():
                 f"{nm} {pct(x, ref['land']):.0f}" for nm, x in zip(["mushroom", "deep", "ocean", "coast", "near", "mid", "far"], cb_)))
             eb_ = ref["land_erosion_bands"]
             print(f"  erosion bands, % of land: " + " ".join(f"E{i} {pct(x, ref['land']):.0f}" for i, x in enumerate(eb_)))
+            sl = rc.get("slots", {})
+            fl = [v_ for k_, v_ in sl.items() if int(k_.split()[1][1:]) >= 2]
+            fc, fs = sum(v_[0] for v_ in fl), sum(v_[1] for v_ in fl)
+            print(f"  ice spikes on the corner's flats (E2 and up): {pct(fs, fc):.1f} % of {fc} columns ({pct(fc, rc['land']):.0f} % of the corner)")
             print("  T0 and H0 corner by slot (continentalness band, erosion band, sign): % of the corner, its ice spikes rate")
             for s_, (cols_, sp_) in sorted(rc.get("slots", {}).items(), key=lambda kv: -kv[1][0])[:20]:
                 print(f"    {s_:10} {pct(cols_, rc['land']):6.1f} % {pct(sp_, cols_):6.1f} %")
