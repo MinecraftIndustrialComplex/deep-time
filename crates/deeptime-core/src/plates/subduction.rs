@@ -895,7 +895,10 @@ pub fn fronts_finish(
                 (speed, out)
             };
             let obliquity = if speed > 0.0 {
-                (rel.dot(-facing) / speed).clamp(-1.0, 1.0).acos().to_degrees()
+                (rel.dot(-facing) / speed)
+                    .clamp(-1.0, 1.0)
+                    .acos()
+                    .to_degrees()
             } else {
                 0.0
             };

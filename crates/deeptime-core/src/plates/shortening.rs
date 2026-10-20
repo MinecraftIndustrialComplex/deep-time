@@ -952,7 +952,11 @@ mod tests {
         let mut slid = 0usize;
         let mut head_on = 0usize;
         for (i, x) in pos.iter().enumerate() {
-            if plate_of[i] != 0 || !fx.geo.edges(i as u32).any(|(u, _)| plate_of[u as usize] == 1)
+            if plate_of[i] != 0
+                || !fx
+                    .geo
+                    .edges(i as u32)
+                    .any(|(u, _)| plate_of[u as usize] == 1)
             {
                 continue;
             }
@@ -967,7 +971,10 @@ mod tests {
             head_on += usize::from(x.y.abs() <= 0.5 || !is_transform(push, n));
         }
         assert!(total > 100, "{total} boundary samples");
-        assert!(worst < 20.0, "the normal is {worst:.1} degrees off at worst");
+        assert!(
+            worst < 20.0,
+            "the normal is {worst:.1} degrees off at worst"
+        );
         assert!(slid as f64 > 0.97 * total as f64, "{slid} of {total} slide");
         assert_eq!(head_on, total, "head-on read as a transform");
     }
