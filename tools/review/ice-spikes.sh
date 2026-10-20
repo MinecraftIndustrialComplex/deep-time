@@ -70,6 +70,11 @@ case "${1:-}" in
         profile="${2:?profile}"; name="${3:?name}"; world="${4:?world-data folder}"
         [ -d "$world" ] || { echo "no world data at $world" >&2; exit 1; }
         tools/smoke/install.sh "$profile" --size 16384
+        # The world data's own level type (install.sh without a preset picks Lambert): Petroff-Guyou worlds
+        # are deeptime:planet (13,312 blocks round), Lambert ones deeptime:planet_lambert (16,384).
+        level_type=$(python3 -c 'import json,sys; m = json.load(open(sys.argv[1])); c = m["scale"]["circumference_blocks"]
+pg = m.get("projection", {}).get("kind") == "petroff_guyou"
+print("deeptime:planet" + ("" if pg else "_lambert") + ("" if c <= 16384 else "_32k"))' "$world/manifest.json")
         server="smoke/$profile/server"
         rm -rf "$server/planet"
         mkdir -p "$server/planet"
@@ -77,7 +82,7 @@ case "${1:-}" in
         rm -rf "$server/planet/deeptime/epochs"
         # The server runs in a private copy of its set: the probes write where the mod is told to.
         PROBE="$RUNS/probe-$profile-$name"; rm -rf "$PROBE"; mkdir -p "$PROBE"
-        DEEPTIME_PROBE_DIR="$PROBE" python3 tools/smoke/run.py --profile "$profile" --timeout 3000 \
+        DEEPTIME_PROBE_DIR="$PROBE" python3 tools/smoke/run.py --profile "$profile" --level-type "$level_type" --timeout 3000 \
             --rcon "deeptime probe biomes 16" --rcon "deeptime probe reference_biomes" || true
         cp "$PROBE/biomemap.json" "$RUNS/$name-$profile-biomemap.json"
         cp "$PROBE/reference_biomes.json" "$RUNS/$profile-reference.json"
