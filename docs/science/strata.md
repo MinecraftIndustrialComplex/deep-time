@@ -156,8 +156,8 @@ under most of the sea floor) and mountains filled to their crests by the top uni
 the fixes are RCK-095, RCK-096, PLT-293 and STR-051 to STR-054). Measured with
 `tools/review/geo-template.sh` on the test machine, 2026-10-20: `earthlike_quick_16k`, 1000 Myr,
 8 threads, both starts, seeds 1 to 3; "before" is master 49f5f543 (with the continents fix
-bc2e5472 and the sea-floor fix), "after" this branch at its
-default, "switch on" the branch with PLT-294 on (TectonicParams `transition_ocean_crust`; SWITCHRUNS).
+bc2e5472 and the sea-floor fix), "after" this branch at its default, "switch on" the branch with
+PLT-294 on (TectonicParams `transition_ocean_crust`), the same seeds.
 `deeptime inspect-column` read a grid every 208 blocks; an ocean column is a sea column whose crust
 has an age (`meta/crust_age_myr`). Thicknesses are means over all the band's columns (a block is
 35 m), with the share of columns holding any of the group; "granite" and "gneiss" are those classes
@@ -167,7 +167,7 @@ alone; the last column is the median depth from the sea floor to the first perid
 |---|---|---|---|---|---|---|---|---|---|
 | before, 0-20 Myr | 1,450 | 2.2 | 1.96, 0.03 | 3.9 | 1.26, 64 % | 2.23, 67 % | 53 % | 65 % | 10.8 |
 | after, 0-20 Myr | 1,381 | 2.6 | 0.97, 1.16 | 4.5 | 0.62, 47 % | 0.95, 52 % | 2 % | 12 % | 9.8 |
-| switch on, 0-20 Myr | SW0N | SW0S | SW0L | SW0G | SW0F | SW0M | SW0GR | SW0GN | SW0D |
+| switch on, 0-20 Myr | 1,524 | 2.4 | 1.07, 1.16 | 4.7 | 0.49, 35 % | 0.69, 43 % | 3 % | 13 % | 9.8 |
 | before, 20-65 Myr | 2,235 | 2.7 | 1.85, 0.03 | 3.6 | 1.84, 78 % | 2.48, 74 % | 67 % | 72 % | 12.0 |
 | after, 20-65 Myr | 2,252 | 3.2 | 0.93, 1.13 | 4.1 | 1.14, 65 % | 1.22, 63 % | 3 % | 16 % | 11.1 |
 | before, 65-150 Myr | 1,910 | 4.7 | 1.79, 0.05 | 2.6 | 2.51, 86 % | 3.08, 85 % | 69 % | 83 % | 14.4 |
@@ -176,7 +176,7 @@ alone; the last column is the median depth from the sea floor to the first perid
 | after, over 150 Myr | 982 | 8.8 | 0.98, 0.87 | 1.5 | 1.25, 61 % | 3.54, 94 % | 7 % | 41 % | 16.7 |
 | before, all ages | 6,561 | 3.8 | 1.82, 0.04 | 3.0 | 1.98, 79 % | 2.96, 79 % | 62 % | 77 % | 13.1 |
 | after, all ages | 6,473 | 4.6 | 0.96, 1.08 | 3.5 | 1.09, 62 % | 1.73, 69 % | 4 % | 21 % | 12.1 |
-| switch on, all ages | SWAN | SWAS | SWAL | SWAG | SWAF | SWAM | SWAGR | SWAGN | SWAD |
+| switch on, all ages | 6,895 | 4.2 | 1.21, 1.09 | 4.0 | 0.92, 51 % | 1.26, 59 % | 4 % | 21 % | 11.8 |
 | Earth | | 0.27 (crust under 82 Myr), 0.40 (deep ocean), 3.0 (margins) | layer 2: 1.84 | layer 3: 4.31 | plagiogranite only | none | none | none | about 7.5 |
 
 Earth's row: GlobSed (Straume et al. 2019) for the sediment, Christeson et al. 2019 for layers 2 and
@@ -192,17 +192,19 @@ What it shows:
   granodiorite) and its metamorphic rock schist (RCK-096).
 - **Granite and gneiss fell from 62 % and 77 % of the ocean columns to 4 % and 21 %**, and what is
   left sits at the coasts: 92 % of the gneiss columns and 96 % of the granite columns lie within
-  one grid step (61 km) of continental crust or land. Probing every 8 blocks round 80 of them (supercontinent, seed 1), 58 lie within
-  5 km of continental crust or land and 69 within 15 km (before: 6 and 12, and 33 more than 75 km
-  from any). Their keys say where they come from: the continent's felsic plutonic pool (granite),
+  one grid step (61 km) of continental crust or land. Probing every 8 blocks round 80 of them
+  (supercontinent, seed 1), 58 lie within 5 km of continental crust or land and 69 within 15 km
+  (before: 6 and 12, and 33 more than 75 km from any). Their keys say where they come from: the continent's felsic plutonic pool (granite),
   its metamorphic pool and its strata log's layers buried to 650 degC (gneiss; the log
   metamorphoses only on continental crust), carried across the crust-kind boundary by the column
   rule (limits below). A few granite stocks of collision belts (DEF-045) also stand in coastal ocean
   columns.
 - **The felsic rock the plate model still puts on ocean crust** (62 % of the ocean columns hold some,
-  1.1 km on average) is mostly the transition's (PLT-261): the continent's rock parked on the ocean
-  side of every margin within 100 km, drawn as granodiorite. The switch PLT-294 takes most of it away
-  (SWITCHFEL) at a cost in land (plates.md, "Ocean crust keeps its own rock").
+  1.1 km on average, drawn as granodiorite or diorite) is the transition's (PLT-261: the continent's
+  rock parked on the ocean side of every margin within 100 km), the island arcs' (PLT-043 to PLT-046,
+  along fronts about 8.6 times Earth's length) and the coastal tongues above. With the switch PLT-294
+  on, 51 % hold some, 0.9 km on average (in the L1 fields of seed 1, the ocean-basin cells holding
+  over 50 m fall from 0.73 to 0.46), at a cost in land (plates.md, "Ocean crust keeps its own rock").
 - **The sea floor is still deep to its mantle**, 9.8 km on young crust and 12.1 km over all ages
   against Earth's 7.5: the sediment, 2.6 km on crust younger than 20 Myr against GlobSed's
   0.27 km under 82 Myr, and the arc and transition rock. Most of the model's ocean is margin (68 % of
@@ -225,10 +227,12 @@ half of that relief):
 Before, the first horizon was stretched up to every crest, so the top bed filled the whole relief
 of every mountain. After, the stack rises by the lift and a crest above it is filled by the thickest
 rock unit within 16 blocks of the surface (STR-053); where the top unit still fills over half of the
-relief it is a thick bed (a kilometre of sandstone is 29 blocks) or that crest unit. Sections across
-both starts (`review/out/geo-template/line*-*.png`, one panel per run) show the beds and the
-basement rising under the ranges. Land, deposit sites and body counts move within the seeds' spread
-(the plate change makes each planet a different one), the bodies standing above the ground did not
+relief it is a thick bed (a kilometre of sandstone is 29 blocks) or that crest unit. The census
+figure is `review/out/geo-template/ocean_census.png` (every age band of every tag beside Earth's
+Penrose column) and the sections `line1-*.png` and `line2-*.png` there (one file per start and seed,
+a panel each for before, after and switch on; each run is its own planet, so the panels cross
+different ground). Land, deposit sites and body counts move within the seeds' spread (the plate
+change makes each planet a different one), and the bodies standing above the ground did not
 increase. Nothing here changes the trench code: the trench width and the hadal area are a separate
 task.
 

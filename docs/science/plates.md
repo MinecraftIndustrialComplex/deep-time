@@ -2096,10 +2096,9 @@ branch's default; 2026-10-20):
 | start | land, before | after | switch on | continental crust (10^9 km3), before | after | switch on |
 |---|---|---|---|---|---|---|
 | supercontinent | 0.264, 0.326, 0.321 | 0.309, 0.307, 0.344 | 0.277, 0.286, 0.252 | 7.5, 8.8, 8.1 | 8.0, 8.4, 9.1 | 7.9, 7.8, 7.0 |
-| scattered continents | 0.289, 0.342, 0.282 | 0.356, 0.323, 0.294 | 0.221, 0.289, SCAT3LAND | 7.5, 8.6, 7.7 | 8.5, 8.7, 7.8 | 7.2, 7.7, SCAT3VOL |
+| scattered continents | 0.289, 0.342, 0.282 | 0.356, 0.323, 0.294 | 0.221, 0.289, 0.293 | 7.5, 8.6, 7.7 | 8.5, 8.7, 7.8 | 7.2, 7.7, 8.3 |
 
-The means: before 0.30 on both starts, after 0.32, switch on 0.27 (supercontinent) and SCATMEAN
-(scattered), against Earth's 0.29. "After" against "before" is within the seeds' spread (0.26 to
+The means: before 0.30 on both starts, after 0.32, switch on 0.27 on both, against Earth's 0.29. "After" against "before" is within the seeds' spread (0.26 to
 0.34). On master d54c7f0f, before the continents fix, the switch cost more: supercontinent 0.140,
 0.131 and 0.139 against 0.165, 0.189 and 0.177.
 
