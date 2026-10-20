@@ -446,4 +446,22 @@ mod tests {
         };
         assert!(bad.validate().is_err());
     }
+
+    /// ERO-186: the spreading takes one solve at a 2-Myr plate step (as before), two at 4, three
+    /// at 5, and one whatever the step with the setting at 0.
+    #[test]
+    fn the_spreading_steps_at_most_the_setting() {
+        let n = Numerics::default();
+        assert!((n.spread_step_myr - 2.0).abs() < 1e-12);
+        assert_eq!(n.spread_steps(2.0), 1);
+        assert_eq!(n.spread_steps(1.0), 1);
+        assert_eq!(n.spread_steps(1000.0 / 500.0), 1);
+        assert_eq!(n.spread_steps(4.0), 2);
+        assert_eq!(n.spread_steps(5.0), 3);
+        let off = Numerics {
+            spread_step_myr: 0.0,
+            ..Numerics::default()
+        };
+        assert_eq!(off.spread_steps(4.0), 1);
+    }
 }

@@ -1684,6 +1684,112 @@ stages 0.63 and 0.68, the rest of the run fixed), and its ensemble stage sums ar
 master's at 500 and 1000 Myr, so at the gate's length it would save about a third of the run. It
 stays out for the planet's sake (above).
 
+## The 4-Myr plate step (P1-19 #27 unlock, 2026-10-19)
+
+The task after C20 landed: find every place where a longer plate step changes the physics rather
+than only the cost, make it per Myr or exact in the step, and measure a 4-Myr step against C20 as
+ensembles with the chaos separated from the bias. Ben (decisions log 2026-10-19): "I'm a little
+worried about the impact on quality of worlds by increasing the plate step, make sure to do
+thorough testing on it". So the 4-Myr step is a preset switch and the 2-Myr step stays the
+default; whether it becomes the default is Ben's call after the comparison. Code:
+`surface/{advect,mod,params}.rs`, `climate/mod.rs`, `surface/volcanoes/mod.rs`. Ledger: ERO-185,
+ERO-186, VOL-040.
+
+**What changed in the code.** None of the three changes a run at a 2-Myr step.
+
+- *The carry's blur* (ERO-185; erosion-and-sediment.md, "The carry's blur and the spreading at
+  long plate steps"). The surface rides the plates by one bilinear carry a plate step, and each
+  carry blurs by the same amount whatever the displacement, so a 4-Myr step blurred half as much
+  per Myr. A step longer than 2 Myr now adds the blur the 2-Myr carries would have left, over
+  cells of the same crust; the regolith and the climate's ice and ELA fields take the same.
+- *The crust's spreading* (ERO-186). Its diffusivity is the cube of the excess height, and one
+  solve over a step holds it at the step's start; a long step is now solved in sub-steps of at
+  most 2 Myr.
+- *A dead cone's slot* (VOL-040). A stratovolcano that outlived its drawn life frees its place on
+  the arc from the end of that life, not from the step that found it dead (at 4-Myr steps the
+  slot stayed shut up to a step too long).
+
+**What still depends on the step** (the per-step audit of the coupled stages; the rules that
+counted steps were made per Myr in the cadence task above).
+
+| what | at a 2-Myr step | at a 4-Myr step |
+|---|---|---|
+| the landscape step (`surface.substeps`, ERO-018) | one of 2 Myr | one of 4 Myr, or two of 2 with `substeps` 2; inside it the river solver's iterations (`spl_max_iter`), the slope failure's (ERO-169), the glacial sub-steps' caps (4 a landscape step, each taking at most 100 m of till and lowering the bed by at most half the ice's thickness) and the frozen flow routing are per landscape step |
+| the isostatic answer to a step's erosion | lands after that step's erosion | the same, over twice the erosion; the diagnosis branch's `rebound_ref_myr` (screened as p4fix, not in this branch) holds back the share beyond 2 Myr |
+| a stratovolcano without arc flux (VOL-010) | one 2-Myr step forgiven | one 4-Myr step forgiven |
+| a cone's life (VOL-038) | ends at the first step end after its drawn death, 1 Myr late on average | 2 Myr late on average |
+| hotspot births | at most one a hotspot a step | the same: above 17.5 mm/yr over the plume (35 at 2 Myr) a chain's spacing is the plate's motion in a step |
+| cadences of round(X ÷ step) steps | every 10 Myr (margins, ages, arc bases VOL-071) | every 12 Myr; the 20-Myr climate snapshot stays 20 |
+| times compared at step ends (orogeny minimum, slowdown PLT-226, welds PLT-246) | rounded up to 2 Myr | rounded up to 4 Myr |
+| the event record (`surface/events.rs`) | events on 2-Myr step ends; pulses and basins found from the step's mean rates | on 4-Myr step ends, from 4-Myr means |
+| the strata log | consecutive entries of a land column 2 Myr apart at the median | 4 Myr apart (with `substeps` 2 as well) |
+| contacts and collisions | found from 2 Myr of motion (200 km at 100 mm/yr) | from 4 Myr (400 km), not sub-stepped |
+| the ocean floor's subsidence (pools.rs) | one explicit step, 0.8 % of the way to the −10 km floor at 0.04 mm/yr | 1.6 %; the exact exponential differs by about 0.01 % |
+| `ice_relax_kyr` (GLA-074) | per plate step | the same; inert, as the ice dynamics are off in every preset |
+
+The plate checks that measure one step are reported per 2 Myr of step (`TARGET_STEP_MYR`, above),
+but the rotation's change, the land one step gains and the partings' lengths still read the
+step's sampling.
+
+**The screen** (quick 16k, 2026-10-20). `earthlike_quick_16k`, 1000 Myr, 2 threads, seeds 1 to 3
+on both starts, six runs a setting, all on this branch's build (0c368e27) except p4fix and
+p4fs2, which ran the diagnosis branch's (0c368e27 with 29bfe825 and afaec853, `rebound_ref_myr`
+2). **C20** is the default; **c20tw** is C20 with the serial flood fill
+(`surface.numerics.flood=serial`), which changes only rounding, so C20 against c20tw is what
+chaos alone does (the A/A row); **p4** `tectonics.time_step_myr=4`; **p4s2** p4 with
+`surface.substeps=2`; **p4fix** p4 with the rebound hold-back; **p4fs2** p4fix with
+`surface.substeps=2`. Each run's 820 numbers (`build/p4/metrics.py`: relief, belts, plates and
+the plate checks, ocean floor, continents and coasts, rivers, crust, strata, volcanoes, climate,
+the event record) were compared with C20's by `build/p4/compare.py`: a number is flagged when
+the Mann-Whitney p ≤ 0.1, or |d| ≥ 0.8, or all of five or more pairs (the same seed and start)
+move the same way, or the pairs' Wilcoxon signed-rank p ≤ 0.1, or (against the twin) the pair
+differences differ from the twin's at p ≤ 0.1. The rule that picked the setting for the
+full runs was written before the tables were computed: the flagged numbers among 66 headline
+ones (land share, high ground and the plate checks met counted twice) plus the flagged
+plate-check numbers (141); lowest wins.
+
+| | c20tw (A/A) | p4 | p4s2 | p4fix | p4fs2 |
+|---|---|---|---|---|---|
+| headline numbers flagged (weighted) | 8 (9) | 37 (43) | 30 (36) | 33 (36) | 28 (31) |
+| plate-check numbers flagged, of 141 | 23 | 65 | 48 | 72 | 65 |
+| all numbers flagged, of 820 | 68 | 391 | 377 | 436 | 372 |
+| score | 32 | 108 | 84 | 108 | 96 |
+
+The written rule described the flag without its Wilcoxon part; scored that way the five are
+26, 107, 80, 106 and 94, the same order. p4s2 against p4fs2 directly: 160 of 820 flagged. Means
+over the six runs (C20's range in
+brackets; * flagged, † outside C20's range):
+
+| | C20 | c20tw | p4 | p4s2 | p4fix | p4fs2 |
+|---|---|---|---|---|---|---|
+| land | 0.166 [0.126, 0.193] | 0.179 | 0.191* | 0.205*† | 0.216*† | 0.205*† |
+| land above 2 km (share of land) | 0.248 [0.124, 0.383] | 0.254 | 0.324* | 0.334* | 0.299 | 0.290 |
+| highest cell, m | 7,038 [5,415, 7,563] | 6,866 | 8,989*† | 9,255*† | 7,790*† | 7,985*† |
+| land median, m | 809 [466, 1,312] | 884 | 1,094* | 1,181* | 1,008* | 1,010 |
+| mountain belts | 19.2 [17, 22] | 20.0 | 15.8*† | 17.0 | 16.7*† | 16.8*† |
+| plates (run mean) | 21.6 [17.6, 23.8] | 22.9* | 22.3 | 22.7 | 22.1 | 22.6 |
+| size ranks' L1 to Bird 2003 | 0.282 [0.251, 0.308] | 0.288 | 0.274 | 0.269 | 0.261* | 0.255* |
+| plate speed p50, mm/yr | 21.3 [17.8, 25.1] | 23.4 | 26.1*† | 22.7 | 23.8* | 25.0* |
+| plate checks met, of 45 | 25.8 [22, 28] | 28.3*† | 28.0* | 27.3* | 25.8 | 27.5* |
+| ocean floor age mean, Myr | 89.3 [71.1, 120] | 85.5 | 88.0 | 79.1 | 79.5 | 82.7 |
+| collisions per 100 Myr | 1.92 [1.70, 2.20] | 2.00 | 1.58*† | 1.70 | 1.67*† | 1.68*† |
+| Hack's exponent | 0.450 [0.348, 0.500] | 0.482* | 0.465 | 0.428 | 0.473 | 0.494 |
+| carbonate, km³ | 1,452,583 | 1,404,667 | 670,017*† | 1,086,433* | 606,417*† | 1,088,833* |
+| eroded, km³ | 296.5 M | 308.2 M | 241.2 M*† | 296.7 M | 272.8 M* | 321.2 M |
+| stratovolcanoes born | 30,898 | 30,720 | 24,388* | 25,283* | 25,331* | 26,480* |
+| T, °C | 19.1 [16.0, 26.9] | 17.5 | 21.2* | 20.4 | 22.5* | 21.7 |
+| natural CO₂, ppm | 907 [532, 2,434] | 818 | 1,010 | 1,241* | 1,571* | 1,161 |
+| distinct event times per 100 Myr | 46.9 [46.1, 48.3] | 47.2 | 24.0*† | 24.0*† | 24.0*† | 24.1*† |
+| strata layer span p50, Myr | 2 | 2 | 4*† | 4*† | 4*† | 4*† |
+| strata log layers per land column | 5.37 [4.41, 5.97] | 6.42*† | 4.22*† | 4.11*† | 4.75* | 4.15*† |
+
+p4s2 scored lowest and went to the full runs (C20 and p4s2 only; the coordinator's call).
+Shared by every 4-Myr setting: the event record and the strata log on 4-Myr ends, the per-step
+plate numbers (the rotation's change, the land one step gains, partings of 8 against 5.3 Myr and
+24 against 35 per 100 Myr) and the arcs read higher by the sampling effect above (continental
+arcs' median 1.19 to 1.41 km against 0.66). The full tables are `build/p4/out/screen/` on the
+branch's scratch (not committed); the review page carries them.
+
 ## L1 sampling on a GPU (2026-10-19)
 
 **What changes.** With a usable GPU (`compute` auto or gpu; `docs/design/gpu-compute.md`, section
