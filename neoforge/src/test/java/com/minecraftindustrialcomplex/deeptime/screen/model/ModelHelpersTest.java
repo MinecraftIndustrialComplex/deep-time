@@ -148,6 +148,15 @@ class ModelHelpersTest {
         assertEquals(c.lonEast() - c.lonWest(), 30, 1e-9);
         assertEquals(0xd7301f, ProvinceHints.colour("porphyry_cu_mo_au"));
         assertEquals(0xffb000, ProvinceHints.colour("deeptime:dummy"));
+        assertEquals("deeptime.layer.word.mvt_zn_pb", ProvinceHints.nameKey("deeptime:mvt_zn_pb"));
+    }
+
+    /** The review page names every deposit type in words ("MVT Zn-Pb"), not its id ("Mvt zn pb"). */
+    @Test
+    void everyDepositTypeHasAName() throws java.io.IOException {
+        com.google.gson.JsonObject lang = LayerCatalogTest.lang();
+        for (String type : ProvinceHints.COLOURS.keySet())
+            assertTrue(lang.has(ProvinceHints.nameKey(type)), type);
     }
 
     /**
