@@ -739,6 +739,14 @@ pub struct FrontsBegun {
     key: Vec<u32>,
 }
 
+#[cfg(test)]
+impl FrontsBegun {
+    /// The step's front samples.
+    pub(super) fn front_count(&self) -> usize {
+        self.sources.len()
+    }
+}
+
 /// [`FrontsBegun::key`]'s mark of a hidden sample.
 const HIDDEN_KEY: u32 = 1 << 31;
 

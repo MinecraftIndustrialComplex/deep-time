@@ -1116,6 +1116,26 @@ mod tests {
         );
     }
 
+    /// Continental crust made from ocean floor keeps the floor's own crust under it as its
+    /// basement (PLT-331): at a collision only the crust on top stacks, and the basement goes
+    /// down with the slab.
+    #[test]
+    fn a_basement_goes_down_with_the_slab() {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        fx.preset.tectonics.collision_stacking_share = 1.0;
+        fx.preset.tectonics.crust_strength_mpa = 2000.0;
+        let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(40.0));
+        for s in st.samples.iter_mut().filter(|s| s.kind == CONTINENTAL) {
+            s.basement_m = 4000.0;
+        }
+        let (stacked, _) = fx.step(&mut st, 1, None);
+        let s = &stacked[&0];
+        // The continent's 35.1 km less the 4 km of basement.
+        assert!(s.crossed_km2 > 0.0, "{s:?}");
+        assert!((s.thickness_m - 31_100.0).abs() < 1.0, "{s:?}");
+    }
+
     /// The crust that stacks is the crust that crossed the front: the volume added is the
     /// volume consumed times `collision_stacking_share` (all of it at 1), with the consumed
     /// crust's rock (its sediments metamorphosed). Nothing changes kind, so the continental area
