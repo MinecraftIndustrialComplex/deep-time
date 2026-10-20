@@ -20,7 +20,7 @@ Through the whole history, rivers cut into rising land (the stream power law: er
 | [ERO](ledger/ERO.md) | erosion audit, plateaus and the measured diffusivity | ERO-171 to ERO-178 (8) |
 | [ERO](ledger/ERO.md) | the erosion law against measured rates | ERO-179 to ERO-182 (4) |
 | [ERO](ledger/ERO.md) | surface numerics: the diffusion solve, the parallel flood | ERO-183 to ERO-184 (2) |
-| [ERO](ledger/ERO.md) | pelagic and periplatform carbonate, photic diagnostics | ERO-191 to ERO-195 (5) |
+| [ERO](ledger/ERO.md) | pelagic and periplatform carbonate, photic diagnostics, euxinic veto | ERO-191 to ERO-197 (7) |
 
 Rows by status (2026-10-18, `tools/review/claims_counts.py`): `verified` 10, `cited-unverified` 82, `from-memory` 2, `abstract-only` 4, `calibrated` 8, `game-choice` 11, `uncited` 56.
 
@@ -733,17 +733,25 @@ al. 2015). Three causes, measured:
   and Zeebe 2005: the Mesozoic proliferation of coccolithophores and planktic foraminifera; before
   it no "substantive deep-sea sedimentary carbonate sink"). A step's deposit that is mostly ooze
   is chalk (ERO-194); chalk is not platform carbonate for the deposit engine (`Kind::Pelagic`).
-- **Periplatform carbonate** (ERO-195). A tracer follows the diffusion solve's own exchanges: the
-  flux across each face of the five-point operator follows from the solved heights,
-  (kd_i + kd_j) / 2 x dt / dx^2 x (h_i - h_j). Taken from the highest sea cell down, each cell
-  passes on a well-mixed blend of what came to it and what it lost, its loss counted from the top
-  down (this substep's carbonate and chalk, the rest of the step's deposit, the regolith, then its
-  strata log, carbonate where a layer is limestone, dolostone or chalk). What a cell kept of its
-  gain takes that blend's carbonate share, out of the marine clastic part and into a periplatform
-  part that votes with carbonate in the facies (so mostly-periplatform deposit is limestone, or
-  dolostone where ERO-091 holds). The tracer stops where the share falls below 1 % or the flux
-  below 1 mm (a cost bound, not physics). It is always on: a preset switch would have changed
-  the share-code fixture for a tool, and nothing is released.
+- **Periplatform carbonate** (ERO-195, ERO-197). A tracer follows the diffusion solve's own change
+  (the solved heights less those before the solve, so the slope failure's debris stays clastic)
+  through its exchanges: the flux across each face of the five-point operator follows from the
+  solved heights, (kd_i + kd_j) / 2 x dt / dx^2 x (h_i - h_j). Taken from the highest sea cell
+  down, each cell passes on a well-mixed blend of what came to it and what it lost, its loss
+  counted from the top of the column as the substep leaves it (this substep's carbonate and
+  chalk, the rest it laid, the step's earlier substeps' deposit, then the column the step began
+  with: its regolith and strata log, carbonate where a layer is limestone, dolostone or chalk).
+  What a cell kept of its gain takes that blend's carbonate share, out of the marine clastic part
+  and into a periplatform part that votes with the factory's carbonate for the class (so a deposit
+  mostly of carbonate is limestone, or dolostone where ERO-091 holds). Laid below the photic zone
+  where it outweighs the factory's own, it is no platform for the deposit engine
+  (`Kind::Periplatform`, ERO-197), and in euxinic water it is black shale (ERO-196). What fails off
+  a cell takes its share of the carbonate the diffusion laid there. The carbonate laid is at most
+  what the diffusion took off sea cells (`periplatform_source_km3`; the implicit step's exchanges
+  conserve it, and the tests check it). The tracer stops where the share falls below 1 % or the
+  flux below 1 mm per 2 Myr (a cost bound, not physics, scaled with the substep's length). It is
+  always on: a preset switch would have changed the share-code fixture for a tool, and nothing is
+  released.
 - **Photic diagnostics** (ERO-193). `surface_final` prints the photic floor's area over the run
   and its warm and warm-and-clear parts, with the pelagic and periplatform volumes;
   `tools/review/carbonate-table.py` reads them.
@@ -840,5 +848,5 @@ where the marine diffusion's clastics reach, a step's deposit is mostly clastic 
 diffusion spreads them over the deep floor, which on Earth gets mostly pelagic sediment beyond the
 fans (inferred from the shares, not measured cell by cell). Carbonate burial is
 not tied to the carbon budget (the ocean does not lose the carbon the surface stage buries). The
-periplatform tracer follows the diffusion solve's fluxes; the slope failure's runout, which moves
-material further than one face, is counted only where those fluxes reach.
+periplatform tracer follows the diffusion solve's change; the slope failure's runout, which moves
+material further than one face, carries carbonate only as the share of what fails off a cell.
