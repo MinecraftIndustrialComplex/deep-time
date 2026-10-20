@@ -55,7 +55,7 @@ pub fn bake(
         Ok(()) => "ok".to_owned(),
         Err(e) => e,
     };
-    let (raised, max_raise, limit) = raise_tops(
+    let (raised, max_raise, limit, fill) = raise_tops(
         &mut hz,
         terrain,
         p.scale.min_y,
@@ -82,6 +82,7 @@ pub fn bake(
         "mean_horizons": mean,
         "top_raised_cells": raised,
         "top_raise_blocks_max": max_raise,
+        "mountain_fill": fill,
         "build_limit": limit.note(p.scale.min_y, p.scale.max_y, p.scale.build_fit()),
         "realism": {
             "cells": census.columns,
@@ -194,7 +195,7 @@ fn raise_tops(
     max_y: i32,
     sea_level_y: i32,
     knee_y: f64,
-) -> Result<(u64, f64, BuildLimit), CoreError> {
+) -> Result<(u64, f64, BuildLimit, Value), CoreError> {
     let g1 = hz.grid.clone();
     let (w1, h1) = (g1.w as usize, g1.h as usize);
     let l3 = &t.l3;
@@ -205,15 +206,19 @@ fn raise_tops(
         )));
     }
     let ratio = (g1.r / l3.r) as usize;
+    let k = hz.k as usize;
     // Highest elevation and highest amplitude of the L3 cells in each L1 cell's square
     // [x1, x1 + r1) × [z1, z1 + r1), in blocks.
     let (limit_y, sea_y) = (f64::from(max_y), f64::from(sea_level_y));
     let (floor_y, slide_y) = (f64::from(min_y), f64::from(min_y) + FLOOR_SLIDE_BLOCKS);
-    type Tile = (usize, usize, usize, Vec<f64>, BuildLimit);
-    let square = |path: &std::path::Path| -> Result<(Vec<f64>, BuildLimit), CoreError> {
+    type Tile = (usize, usize, usize, Vec<f64>, Vec<(f64, u32)>, BuildLimit);
+    // Per L1 square: the highest value, the mean of its L3 cells, and the build-limit counts.
+    type Squares = (Vec<f64>, Vec<f64>, BuildLimit);
+    let square = |path: &std::path::Path| -> Result<Squares, CoreError> {
         let r = TilePackReader::open(path)?;
         let d = r.desc().clone();
         let mut best = vec![f64::NEG_INFINITY; w1 * h1];
+        let mut sum = vec![(0.0f64, 0u32); w1 * h1];
         // Each tile covers whole L1 squares (its edge, 256 cells, is a multiple of the ratio), so
         // tiles fill disjoint parts of `best`.
         let tiles: Vec<Tile> = (0..d.tile_count())
@@ -226,6 +231,7 @@ fn raise_tops(
                 let lw = (tw as usize).div_ceil(ratio);
                 let lh = (th as usize).div_ceil(ratio);
                 let mut local = vec![f64::NEG_INFINITY; lw * lh];
+                let mut local_sum = vec![(0.0f64, 0u32); lw * lh];
                 let mut limit = BuildLimit::NONE;
                 for lj in 0..th as usize {
                     let sj = (z0 as usize + lj) / ratio - j0;
@@ -238,6 +244,8 @@ fn raise_tops(
                             local[c] = v;
                         }
                         if v.is_finite() {
+                            local_sum[c].0 += v;
+                            local_sum[c].1 += 1;
                             limit.cells_above += u64::from(v > limit_y);
                             limit.cells_compressed += u64::from(v > knee_y);
                             limit.land_cells += u64::from(v >= sea_y);
@@ -248,29 +256,38 @@ fn raise_tops(
                         }
                     }
                 }
-                Ok((i0, j0, lw, local, limit))
+                Ok((i0, j0, lw, local, local_sum, limit))
             })
             .collect::<Result<_, _>>()?;
         let mut limit = BuildLimit::NONE;
-        for (i0, j0, lw, local, l) in tiles {
+        for (i0, j0, lw, local, local_sum, l) in tiles {
             limit = limit.merge(l);
-            for (k, v) in local.into_iter().enumerate() {
-                let (i, j) = (i0 + k % lw, j0 + k / lw);
+            for (q, (v, (sv, n))) in local.into_iter().zip(local_sum).enumerate() {
+                let (i, j) = (i0 + q % lw, j0 + q / lw);
                 if i < w1 && j < h1 {
                     let b = &mut best[j * w1 + i];
                     if v > *b {
                         *b = v;
                     }
+                    let a = &mut sum[j * w1 + i];
+                    a.0 += sv;
+                    a.1 += n;
                 }
             }
         }
-        Ok((best, limit))
+        let mean = sum
+            .into_iter()
+            .map(|(v, n)| if n > 0 { v / f64::from(n) } else { f64::NAN })
+            .collect();
+        Ok((best, mean, limit))
     };
-    let (elev, limit) = square(&t.elevation)?;
+    let (elev, mean, limit) = square(&t.elevation)?;
     let amp = match &t.amplitude {
         Some(a) => square(a)?.0,
         None => vec![0.0; w1 * h1],
     };
+    // The surface the history left (each cell's first top before any raise), 1/16 block.
+    let coarse: Vec<i16> = (0..w1 * h1).map(|c| hz.tops[c * k]).collect();
     // Over the 4 × 4 squares i − 2 ..= i + 1, j − 2 ..= j + 1 (x wraps, z clamps).
     let window = |v: &[f64], i: usize, j: usize| -> f64 {
         let mut m = f64::NEG_INFINITY;
@@ -283,7 +300,6 @@ fn raise_tops(
         }
         m
     };
-    let k = hz.k as usize;
     let tops: Vec<(usize, i16, f64)> = (0..w1 * h1)
         .into_par_iter()
         .filter_map(|c| {
@@ -311,5 +327,53 @@ fn raise_tops(
         hz.tops[c * k] = top;
         max_raise = max_raise.max(raise);
     }
-    Ok((tops.len() as u64, max_raise, limit))
+    let fill = mountain_fill(hz, &coarse, &mean);
+    Ok((tops.len() as u64, max_raise, limit, fill))
+}
+
+/// Relief (blocks) above the coarse surface a cell must have to count in [`mountain_fill`].
+pub const FILL_RELIEF_BLOCKS: [f64; 2] = [8.0, 30.0]; // ledger: STR-051 (game-choice: review thresholds)
+
+/// How much of the relief the final terrain has above the surface the history left (a cell's
+/// first top before the raise, `coarse`, 1/16 block) the stack's top unit fills: per L1 cell
+/// whose mean L3 elevation (`mean`, blocks) stands at least [`FILL_RELIEF_BLOCKS`] above that
+/// surface, the share of the interval [coarse, mean] the first horizon spans. Returns, per
+/// threshold, the cells, the share of them where the top unit fills more than half the relief,
+/// and the mean share filled.
+pub fn mountain_fill(hz: &Horizons, coarse: &[i16], mean: &[f64]) -> Value {
+    let floor = f64::from(hz.min_y);
+    let mut rows = Vec::new();
+    for &min_relief in &FILL_RELIEF_BLOCKS {
+        let (mut n, mut most, mut sum) = (0u64, 0u64, 0.0f64);
+        for (c, (&c0, &m)) in coarse.iter().zip(mean).enumerate() {
+            if c0 == NO_TOP || !m.is_finite() {
+                continue;
+            }
+            let lo = f64::from(c0) / 16.0;
+            let relief = m - lo;
+            if relief < min_relief {
+                continue;
+            }
+            let (tops, _, _) = hz.cell(c);
+            if tops.is_empty() {
+                continue;
+            }
+            let top = f64::from(tops[0]) / 16.0;
+            let base = tops.get(1).map_or(floor, |&t| f64::from(t) / 16.0);
+            let filled = (top.min(m) - base.max(lo)).max(0.0) / relief;
+            n += 1;
+            most += u64::from(filled > 0.5);
+            sum += filled;
+        }
+        rows.push(json!({
+            "min_relief_blocks": min_relief,
+            "cells": n,
+            "top_unit_fills_most": if n > 0 { most as f64 / n as f64 } else { 0.0 },
+            "mean_share_filled": if n > 0 { sum / n as f64 } else { 0.0 },
+        }));
+    }
+    json!({
+        "by_relief": rows,
+        "rule": "L1 cells whose mean L3 elevation stands at least min_relief_blocks above the surface the history left (the first top before the raise): the share of them where the first horizon spans more than half of that relief, and the mean share it spans",
+    })
 }
