@@ -183,19 +183,43 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     let plutons: Vec<&deeptime_format::Body> =
         world.bodies.iter().filter(|b| b.role == "pluton").collect();
     assert_eq!(plutons.len() as u64, bodies);
-    assert!(
-        world
-            .bodies
-            .iter()
-            .all(|b| b.role == "pluton" || b.role == "impact_breccia")
-    );
+    assert!(world.bodies.iter().all(|b| [
+        "pluton",
+        "aureole",
+        "stock",
+        "impact_breccia"
+    ]
+    .contains(&b.role.as_str())));
     for b in plutons {
         let class = b.rock_class.as_deref().unwrap();
         assert!(
             ["granodiorite", "granite", "diorite"].contains(&class),
             "{class}"
         );
+        assert!(b.age_ma.is_some_and(|a| a >= 0.0), "a pluton has its age");
         b.validate().unwrap();
+    }
+    // Their aureoles: bodies of hornfels and skarn zones, counted in the note, before the
+    // plutons (a pluton paints over its aureole's inner part).
+    let aureoles: Vec<&deeptime_format::Body> =
+        world.bodies.iter().filter(|b| b.role == "aureole").collect();
+    let a = &note["aureoles"];
+    assert_eq!(
+        aureoles.len() as u64,
+        a["plutons"].as_u64().unwrap() + a["stocks"].as_u64().unwrap(),
+        "{a}"
+    );
+    for b in &aureoles {
+        assert!(b.rock_class.is_none() && !b.zones.is_empty() && b.age_ma.is_some());
+        for z in &b.zones {
+            let class = z.rock_class.as_deref().unwrap();
+            assert!(["hornfels", "skarn"].contains(&class), "{class}");
+        }
+        b.validate().unwrap();
+    }
+    if let (Some(a), Some(p)) = (aureoles.last(), world.bodies.iter().find(|b| b.role == "pluton"))
+    {
+        assert!(a.id < p.id, "aureoles come before the plutons");
     }
     assert_eq!(note["horizons"]["check"], "ok");
     // Keyframe layers exist with valid values.

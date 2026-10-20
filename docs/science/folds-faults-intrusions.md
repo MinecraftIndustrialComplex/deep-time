@@ -56,7 +56,11 @@ middle. Young faults and folds also shape the ground: fault scarps,
 rift valleys and fold ridges up to a few hundred metres high, worn away over 10 Myr.
 
 **Intrusions.** Stocks (small bodies of granite, granodiorite or diorite) rise in collision belts and
-arcs; most stop below the ground, and where one crops out only its domed top shows. Basalt dykes,
+arcs; most stop below the ground, and where one crops out only its domed top shows. A stock is a
+small pluton, as thick as the plutons' law gives for its outline (0.6 D^0.6 km, so 1.4 to 3.6 km for
+4 to 20 km across), and one that rises over a batholith of about its age is a cupola of it: its base
+sits in the batholith's roof. Each bakes a rim of hornfels or skarn in its host, 0.3 of its smallest
+dimension wide. Basalt dykes,
 1.7 to 3 blocks wide at depth (1 to 2 where they reach the ground) and 15 km (50 blocks) long at the
 median, cut the rock along rifts. Under every extinct volcano still standing on land a plug of
 rhyolite, andesite or basalt 4 to 10 blocks across at depth (2.4 to 6 at the ground) fills the old
@@ -135,7 +139,9 @@ keeps a list of structures that ride on their plates.
 | DEF-076 | collision foreland | 0.6 x strength where the plate is flagged foreland and flexure < -100 m | - | Davis, Suppe & Dahlen 1983; DeCelles & Giles 1996 (as read for PLT-249) | `game-choice` |
 | DEF-077 | fold strain in a collision | e = S / (S + W), clamped to 0.08 to 0.30 | fraction | geometry of pure shortening; Zagros 16 to 30 % | `game-choice` |
 | DEF-030 | thrust dip direction | under the hinterland | - | Alavi 2007: foreland-verging folds | `verified` |
-| DEF-042 | stock radius at the world's floor | lognormal, median 4, clamped 2 to 10 | km | design; a stock is exposed over less than 100 km2 (Earle 2019) | `game-choice` |
+| DEF-042 | stock half-width | lognormal, median 4, clamped 2 to 10 | km | design; a stock is exposed over less than 100 km2 (Earle 2019) | `game-choice` |
+| DEF-078 | stock rooted on a pluton | within 10 Myr, over its outline, base 25 % below its roof | Myr; share | design (stocks as cupolas, Earle 2019) | `game-choice` |
+| DEF-079 | stock thickness | T = 0.6 D^0.6, D the circle-equivalent diameter | km | Cruden and McCaffrey 2001 via Cruden 2008 (RCK-061) | `verified` (the law) |
 | DEF-047 | dyke length | lognormal, median 15, clamped 5 to 50 | km | design inside 1 to 2,000 km read | `game-choice` |
 | DEF-048 | dyke half-width | 0.85 to 1.5 | blocks | Ben, decisions log 2026-10-02 (real dykes 1 to 150 m) | `game-choice` |
 | DEF-049 | plug radius | 8 % of the volcano's radius, clamped 2 to 5 | blocks | Ben, decisions log 2026-10-02 (Ship Rock 500 m across) | `game-choice` |
@@ -200,7 +206,7 @@ built twice, before (stretch 1, the old intrusion sizes and relief 1) and after;
 | Dyke length | 1 to 9 km (Ship Rock); over 2,000 km (Mackenzie) | Delaney & Pollard 1981; Bunger et al. 2013 | median 50 blocks = 15 km | base |
 | Dyke spacing in a swarm | 6.7 km to 25 km mean (Mackenzie), most continuous ones 35 to 65 km | Bunger et al. 2013 (quoting Hou et al. 2010, Stott & Josey 2009) | not measured (2,633 dykes kept) | base |
 | Volcanic neck width | Ship Rock 500 m; small plugs under 30 m; Round Butte diatreme 170 to 190 m | New Mexico Bureau of Geology Ship Rock page; Delaney & Pollard 1981; Latutrie 2020 | 4 to 10 blocks (1.2 to 3 km) at depth, 2.4 to 6 blocks (0.7 to 1.8 km) where they crop out (were 5 to 16 blocks) | code (DEF-049) |
-| Stock | exposed over less than 100 km2 | Earle 2019 §3.5 | radius median 13.3 blocks = 4.0 km at the world's floor; outcrops a few per cent of that | base |
+| Stock | exposed over less than 100 km2 | Earle 2019 §3.5 | half-width median 13.3 blocks = 4.0 km; before REV-2 the ellipsoid ran down to the world's floor and outcrops were a few per cent of that, now it is about 1.4 to 3.6 km thick or reaches into a pluton's roof (REV-2 build log 2026-10-19 has the counts) | base |
 | Cratons with old deformation | the basement of every craton is metamorphosed crystalline rock; its sedimentary platform cover is weakly deformed | Earle 2019 §21.1-21.2; Wikipedia "Craton" (secondary) | 65 % of craton cells under a structure, 16 % under one younger than 50 Myr | base |
 | Rock columns a geologist would object to | none expected outside real overturned belts | (a check, not an Earth figure) | grade inversions 0.15 % of columns (`x1`), 0.36 % (`x4`; on land 0.10 % and 0.71 %); metamorphic slivers 0.41 % and 0.95 %; plutonic sheets 0.015 % and 0.17 %; malformed columns 0 in both | `strata-check`, 20,000 columns |
 | Ground lifted or dropped by young structures | fault scarps and range fronts of hundreds of metres to a few km | (not sourced) | up to +337 m and -106 m, 43,920 cells, land median +1.2 m, identical in `x1` and `x4` (the relief share lowered to 0.25 with the scale) | x1, x4 |
@@ -235,8 +241,9 @@ built twice, before (stretch 1, the old intrusion sizes and relief 1) and after;
   folds, no fault-propagation or fault-bend folds, which the Zagros mostly has (Alavi 2007 p. 1077).
 - **Planar faults** with a smooth bell of displacement towards their tips: no listric faults, no
   detachments, no duplexes; a thrust is a single ramp.
-- **No sills**; stocks, dykes and plugs are ellipsoids rooted on the world's floor; the large
-  batholiths are bodies of the plutons code and are not offset by younger faults.
+- **No sills**; dykes and plugs are ellipsoids rooted on the world's floor; stocks are ellipsoids of
+  their own thickness, or reach down into the roof of the pluton they rise from; the large
+  batholiths, the aureoles and the stocks' roots are bodies and are not offset by younger faults.
 - **Structures are drawn from strain, not computed from stress.** The rates per area are design
   values; the counts are not compared with any count on Earth.
 
@@ -254,8 +261,8 @@ built twice, before (stretch 1, the old intrusion sizes and relief 1) and after;
   narrowest dyke is the narrowest whose outcrop does not break into separate blocks.
 - The fold profile is the exact sine where Noddy's default is a 21-point approximation of it
   (DEF-010).
-- Every rate, overlap and age rule, the strain weights, the fold-train shape, the stock shape and
-  depth and the relief rules: design values of the P2-01 agent (build log 2026-10-01, stages A and
+- Every rate, overlap and age rule, the strain weights, the fold-train shape, the stock shape,
+  depth and rooting (DEF-078) and the relief rules: design values of the P2-01 agent (build log 2026-10-01, stages A and
   B), listed one by one in the ledger.
 - The Andean rule's uplift scale, 0.1 mm/yr (DEF-026), kept when plate task 8 lowered the arcs'
   uplift (re-checked 2026-10-18, coordinator's call): the arcs' mean lift factor fell from 0.365 to

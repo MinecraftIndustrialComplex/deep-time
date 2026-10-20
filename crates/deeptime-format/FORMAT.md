@@ -901,7 +901,7 @@ than the rock above it: a sedimentary or volcanic pool under a metamorphosed log
 along its metamorphic path at least as far as that layer's formation temperature (the pools
 themselves know only today's geotherm), and a plutonic pool stays what it is (it may be younger
 than the metamorphism of its roof) but for granite turning to gneiss at the 650 °C isotherm.
-Plutons are bodies (role `pluton`, below), not horizons.
+Plutons and contact aureoles are bodies (roles `pluton` and `aureole`, below), not horizons.
 
 **The 0.2 bake** smooths the stacks laterally before writing them, because the strata log is
 carried cell by cell and neighbouring cells' stacks differ more than the rocks would: each cell's
@@ -1708,8 +1708,9 @@ body record                                      zone record
 ```
 
 The age (2026-10-19, decisions log "Add the fields"; within 0.5, no minor of its own, since nothing
-is released): plutons carry their emplacement, every other body NaN for now. A file written before
-it holds 0 there.
+is released): plutons, their aureoles, stocks' aureoles and stock roots carry their emplacement
+(the aureole takes its intrusion's), every other body NaN for now. A file written before it holds 0
+there.
 
 Shapes: 0 ellipsoid, 1 stockwork_shell, 2 lens, 3 pod, 10 dome use the **ellipsoid metric**;
 4 sheet, 5 dyke, 6 pipe, 7 blanket, 8 seam, 9 channel use the **cylinder metric**. Evaluation of
@@ -1738,12 +1739,26 @@ material's raw-ore block instead (`#c:storage_blocks/raw_<material>`, else vanil
 the same hash with the body id XOR `0x52415721`, falls below `raw`: vanilla's ore veins carry raw
 blocks among their ore the same way (Ben, 2026-10-02).
 
-**Plutons** (P1-07, `structure::plutons`): ellipsoid bodies with no site, role `pluton`, the
-body's `rock_class` its intrusion (granodiorite, granite or diorite), and, where the roof's host
-was a carbonate or another non-crystalline rock, one zone `aureole` (no material, density 0) whose
-`rock_class` (skarn or hornfels) holds the outer shell d ∈ [0.85, 1] (`structure.aureole_shell`).
-Their ids come before any deposit body the deposit stage adds later, so where they overlap the
-pluton paints first.
+**Plutons** (P1-07, `structure::plutons`): ellipsoid bodies with no site, role `pluton`, no zones,
+the body's `rock_class` its intrusion (granodiorite, granite or diorite).
+
+**Contact aureoles** (REV-2, 2026-10-19): ellipsoid bodies with no site, role `aureole`, no
+`rock_class`, one per pluton and per stock whose host can be baked. The body is its intrusion grown
+by the aureole's width on every axis (`structure.aureole_share` of the intrusion's smallest
+dimension, `structure.aureole_carbonate_factor` times that in a carbonate host). Its zones (named
+`aureole`, no material, density 0) hold the baked rock band by band down the column: each zone's
+`rock_class` is skarn or hornfels and its v range the depths of a host unit older than the
+intrusion; a pluton's zones span d ∈ [0, 1], so the pluton body, painted later, keeps its own
+rock inside. A stock's aureole is hollow: the stock is a structural event, which bodies paint
+over, so its zones are cut into eight horizontal slabs whose d range starts at the stock's wall
+in that slab. **Stock roots**: a stock rooted on a pluton (`structure::deform::intrude::
+root_on_plutons`) also gets an ellipsoid body of role `stock`, its own ellipsoid, with one zone
+`root` (its rock class, no material) from the top of the pluton's aureole down, so the stock's
+rock reads through the aureole it rises across. Ids: every aureole first, then the stock roots,
+then the plutons, then any deposit body the deposit stage adds later, so where they overlap the
+later body wins (a body with a higher id paints over a lower one). `notes.structure.aureoles`
+counts them: `plutons`, `stocks`, `zones`, `median_width_m` [pluton, stock] and `stock_roots`;
+`notes.structure.deformation.stocks_rooted` the stocks rooted on a pluton.
 
 The AABB is conservative: the world extent along axis i is `Σ_j |R_ji|·h_j` around the centre
 (R the rotation above, h the semi-axes), clipped at `clip_top_y`. The viewer's `report.js` carries
@@ -1855,8 +1870,10 @@ normal and strike-slip faults whose slip dies out along the trace and away from 
 (kind 2: stocks in orogens, dykes along rifts, plugs under extinct volcanoes), each dated to
 the plate step that made it; the key is `structure::columns::key::of_age(0, age, span)`, the
 unmetamorphosed strata log's key of that age, so basement and metamorphic units (larger keys) are
-deformed by every event; a fault's `y` is the ground at its centre; an intrusion's `y` is the
-world's floor (it is rooted there and narrows upwards to its top). `notes.bake.structure` records
+deformed by every event; a fault's `y` is the ground at its centre; an intrusion's `y` is its
+ellipsoid's centre: for dykes and plugs the world's floor (they are rooted there and narrow
+upwards to their top), for a stock the middle of its own thickness (Cruden & McCaffrey's law
+on its outline) or of its reach down into the roof of the pluton it rises from. `notes.bake.structure` records
 the counts and the margin, `notes.structure.deformation` what the run made.
 
 ## Keyframes (`keyframes/index.json`, `keyframes/kf-<n>.dtk`)
