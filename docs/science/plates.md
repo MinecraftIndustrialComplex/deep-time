@@ -2087,8 +2087,8 @@ before the change, 6 and 12, with 33 more than 75 km from any.
 
 **The transition's ocean side: a switch for Ben** (PLT-294). With `transition_ocean_crust` on, an
 oceanic sink takes the same volume as ocean crust (lavas and gabbro in the ocean column's
-proportion), as the thick igneous crust of a volcanic margin would be. That removes the
-transition's granite from the sea floor (the last column above), but the continental rock that
+proportion), as the thick igneous crust of a volcanic margin would be. That takes most of the
+transition's granite off the sea floor (the "switch on" columns above), but the continental rock that
 the sources give up is then lost, and land falls (`earthlike_quick_16k`, 1000 Myr, the end of the
 run, seeds 1 to 3; "before" is master 49f5f543, which holds the continents fix bc2e5472, "after" the
 branch's default; 2026-10-20):
@@ -2098,8 +2098,8 @@ branch's default; 2026-10-20):
 | supercontinent | 0.264, 0.326, 0.321 | 0.309, 0.307, 0.344 | 0.277, 0.286, 0.252 | 7.5, 8.8, 8.1 | 8.0, 8.4, 9.1 | 7.9, 7.8, 7.0 |
 | scattered continents | 0.289, 0.342, 0.282 | 0.356, 0.323, 0.294 | 0.221, 0.289, 0.293 | 7.5, 8.6, 7.7 | 8.5, 8.7, 7.8 | 7.2, 7.7, 8.3 |
 
-The means: before 0.30 on both starts, after 0.32, switch on 0.27 on both, against Earth's 0.29. "After" against "before" is within the seeds' spread (0.26 to
-0.34). On master d54c7f0f, before the continents fix, the switch cost more: supercontinent 0.140,
+The means: before 0.30 on both starts, after 0.32, switch on 0.27 on both, against Earth's 0.29.
+"After" against "before" is within the seeds' spread (0.26 to 0.34). On master d54c7f0f, before the continents fix, the switch cost more: supercontinent 0.140,
 0.131 and 0.139 against 0.165, 0.189 and 0.177.
 
 Ben weighed the transition's land cost on 2026-10-05 ("Keep 200 km, raise crust in 7-8"), so the
