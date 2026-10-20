@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.gametest;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.LavaFeatures;
 import com.minecraftindustrialcomplex.deeptime.worldgen.LavaRules;
@@ -199,8 +200,11 @@ public final class LavaGameTests {
      *       or a cave alike;</li>
      *   <li>a body with a crater lake has lava at the lake's surface under open air.</li>
      * </ul>
-     * A planet with no active volcano passes with a line saying so: the geometry itself is
-     * {@code MagmaTest}'s, on cones built in closed form.
+     * The test planet is a mobile-lid planet with oceanic subduction, so it always ends with arc
+     * volcanoes on its active margins (the plate model flags every front's arc at any lattice,
+     * ledger PLT-043; volcano-zero fix, 2026-10-19): a planet with no active volcano, or none with
+     * room for a chamber, fails (Ben's rule, decisions log 2026-10-01: a test that reads nothing is
+     * not a pass). The line logs what each filter leaves.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void magmaUnderActiveVolcanoes(GameTestHelper helper) {
@@ -219,10 +223,16 @@ public final class LavaGameTests {
         int lakeZoneTop = Math.max(t.lava().highestLakeY(minY), t.lava().floodY(minY, sea));
         List<Magma.Body> all = magma.bodies().stream().filter(b -> b.chamberRh() > 0).toList();
         long lakes = all.stream().filter(Magma.Body::lake).count(), submerged = all.stream().filter(Magma.Body::submerged).count();
+        var active = t.data().volcanoes().list();
+        java.util.Map<String, Long> byKind = new java.util.TreeMap<>(active.stream()
+                .collect(java.util.stream.Collectors.groupingBy(Volcanoes.Volcano::kind, java.util.stream.Collectors.counting())));
+        DeepTime.LOGGER.info("[gametest] magmaUnderActiveVolcanoes filters: activeVolcanoes={} byKind={} bodies={} withChamber={} "
+                + "craterLakes={} underWater={}", active.size(), byKind, magma.bodies().size(), all.size(), lakes, submerged);
         if (all.isEmpty()) {
-            DeepTime.LOGGER.info("[gametest] magmaUnderActiveVolcanoes activeVolcanoes={} withMagma=0: this planet has no active "
-                    + "volcano with room for a chamber; nothing to read back", t.data().volcanoes().list().size());
-            helper.succeed();
+            helper.fail(active.isEmpty()
+                    ? "the test planet has no active volcano: a mobile-lid planet with subduction keeps arc volcanoes on its "
+                    + "active margins, so the plate model's arc flags, the volcano stage or volcanoes/active.json lost them"
+                    : "none of the planet's " + active.size() + " active volcanoes has room for a chamber " + byKind);
             return;
         }
         List<Magma.Body> picked = new ArrayList<>();

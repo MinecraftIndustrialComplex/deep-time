@@ -88,6 +88,10 @@ catalogue of individual volcanoes that ride on their plates.
    turns that into an arc magma flux between 0 and 1: the convergence speed divided by 80 mm/yr,
    capped at 1, and multiplied by 0.7 on oceanic crust (VOL-003, no source found; most arcs in a run
    reach 1). It then thins the flagged band to its centre line, the volcanic front (VOL-004).
+   A step in which the plate model resampled its crust, which clears the flags, says nothing
+   about the arcs: no volcano is born or dies in it (VOL-011). On a lattice coarser than the arc
+   band the plate model flags each slab strip's sample nearest the arc's axis, so a planet with
+   subduction always has arcs (PLT-043, since 2026-10-19; [plates.md](plates.md)).
 2. **Birth of arc volcanoes.** On the front, wherever the flux is at least 0.25, a new
    stratovolcano (a steep cone of lava and ash) is placed if no other cone stands within 60 km
    times a random factor of 0.8 to 1.2 (VOL-002, VOL-039). Its planned height runs from 0.6 km at
@@ -239,6 +243,7 @@ described under them.
 | Active volcanoes at the present | 123: 119 arc, 3 caldera complexes, 1 shield; 100 on land; 16 with a crater lava lake | `earthlike_quick_16k`, supercontinent, 500 Myr, 2026-10-01 |
 | Distance from a land point to the nearest active volcano on land | median 658 blocks (10th percentile 169, 90th 1,309) | same; 4,000 points |
 | Effect on land height | with volcanoes off, land above 2 km falls from 0.307 to 0.170 of the land (Earth: 0.102) | hypsometry runs, `earthlike_quick_16k`, 500 Myr, 2026-10-01 (before flexure) |
+| Active volcanoes at the end, the GameTest planet | 0 on master (every run; 4 hotspot shields before the solvers merge); since the arc fix 5 to 12 (3 to 10 arc stratovolcanoes, 0 to 3 shields) over seeds 11 to 16 | `planet_world_4k`, 150 Myr, 2026-10-19 ([plates.md](plates.md), "Arcs on a lattice coarser than the arc band") |
 
 Stage 2 runs (WP-2, 2026-10-02): `earthlike_quick_16k`, 500 Myr, seed 1, both starts (scattered
 continents / supercontinent), `deeptime stage volcanoes`, two threads, on the test VM, built from
@@ -340,7 +345,9 @@ What these runs show:
 - **Volcano positions follow the plate model's arc flag**, which covers broad areas; the stage
   reduces it to a line itself. When the plate model changes (see [plates.md](plates.md)), so will
   where volcanoes stand. Most arcs reach the highest flux, so cone height hardly varies with the
-  speed of subduction.
+  speed of subduction. On a lattice coarser than the arc band (the 4k test planet's 5,000 samples)
+  the flag is one sample per slab strip, about 320 km wide: seed 11 of the 4k planet ends with 3
+  active arc cones against 19 on the same planet at 20,000 samples (3 to 10 over seeds 11 to 16).
 - **Lengths do not shrink with the planet.** A volcano's radius is in real kilometres on a planet
   an eighth of Earth's size, so volcanoes are large for their world. Flood basalt provinces, by
   contrast, are scaled to the planet (about 110 km in radius at 16k).
@@ -464,7 +471,10 @@ Not yet settled, for a later package or a geologist:
     model; see [isostasy-and-height-limit.md](isostasy-and-height-limit.md). Ojos del Salado's
     height was read only in a secondary source.
 13. **Flood basalt frequency**: the 1,000 Myr run made 17, about a third of Earth's rate if the
-    Courtillot & Renne list is taken at face value. That is the plate model's doing.
+    Courtillot & Renne list is taken at face value. That is the plate model's doing: it keeps about
+    3 live hotspots against Earth's catalogues of 26 to 69, and half of its few births bring a
+    plume head ([plates.md](plates.md), "Also found, not changed: the hotspot population",
+    2026-10-19). With so few plumes most planets end with 0 to 3 active shields.
 14. **Where the lava floor goes** is undecided, and so is whether a median 658 blocks to the
     nearest volcano is acceptable for players (STATUS.md, pending questions).
 

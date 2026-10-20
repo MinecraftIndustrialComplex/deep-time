@@ -382,6 +382,13 @@ pub struct ClimateParams {
     /// the mountain ice, are left out (decisions log 2026-10-18).
     pub present_interglacial_ice_frac: f64,
     pub present_glacial_ice_frac: f64,
+    /// `temperate` raises the CO₂ by at most this factor: what the ocean gives back from a glacial
+    /// to an interglacial (the late Quaternary's 172 to 300 ppm, Lüthi et al. 2008, ×1.74). Where
+    /// the ice sheets stand on high ground that this does not melt, they stay and the present is
+    /// marked not reached; before the cap (2026-10-19) such a planet ended a hothouse, the CO₂
+    /// raised ×23 to ×47 (climate.md, "The present-day nudge's cap"). `ice_age` and `snowball`
+    /// are not limited (the user forces them). 1 never warms; 10⁴ is the search's own limit.
+    pub present_co2_factor_max: f64,
     /// Glen's flow factor A, Pa⁻³ yr⁻¹ (EISMINT: 10⁻¹⁶).
     pub ice_flow_a: f64,
     /// Mass-balance gradients above and below the equilibrium line, (m of ice/yr) per m of height
@@ -531,6 +538,7 @@ impl Default for ClimateParams {
             present_ramp_kyr: 10.0,                     // ledger: CLM-149
             present_interglacial_ice_frac: 0.15,        // ledger: CLM-150
             present_glacial_ice_frac: 0.25,             // ledger: CLM-150
+            present_co2_factor_max: 1.75,               // ledger: CLM-206
             ice_flow_a: 1.0e-16,                        // ledger: GLA-068
             ice_accumulation_gradient: 0.005,           // ledger: GLA-069
             ice_ablation_gradient: 0.01,                // ledger: GLA-069
@@ -805,6 +813,12 @@ impl ClimateParams {
                 "present_glacial_ice_frac",
                 0.0,
                 1.0,
+            ),
+            (
+                self.present_co2_factor_max,
+                "present_co2_factor_max",
+                1.0,
+                1.0e4,
             ),
             (
                 self.ice_yield_stress_kpa,

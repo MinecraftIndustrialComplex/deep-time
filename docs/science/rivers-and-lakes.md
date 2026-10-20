@@ -11,7 +11,7 @@ Rain that does not evaporate runs downhill, gathers into rivers and fills hollow
 | [HYD](ledger/HYD.md) | rivers | HYD-001 to HYD-027 (27) |
 | [HYD](ledger/HYD.md) | runoff and evaporation | HYD-028 to HYD-046 (19) |
 | [HYD](ledger/HYD.md) | lakes | HYD-047 to HYD-065 (19) |
-| [HYD](ledger/HYD.md) | water in the game | HYD-066 to HYD-077 (12) |
+| [HYD](ledger/HYD.md) | water in the game | HYD-066 to HYD-079 (14) |
 
 Rows by status: `cited-unverified` 14, `from-memory` 3, `calibrated` 1, `game-choice` 37, `uncited` 22.
 
@@ -27,4 +27,5 @@ Rows by status: `cited-unverified` 14, `from-memory` 3, `calibrated` 1, `game-ch
 - Leopold & Maddock 1953 was read in stage 1: the exponents 0.5 (width) and 0.4 (depth) are in it, as "representative" downstream values for a discharge of given frequency. The coefficients are the code's own.
 - Two runoff laws coexist: hydrology uses the corrected cold-climate law, the young landscape and the erosion stage still use the old one (extraction notes HYD, flag 5).
 - Holdridge defines biotemperature with temperatures above 30 degC counted as zero as well as those below 0 degC; the code applies only the lower limit (spot check HYD-030, MISMATCH).
+- The shores in the game are kept free of cave mouths (HYD-078): the noise router's near-surface cave entrances opened dry pits beside rivers, lakes and shallow coasts, and the water pass built the banks and beds up from the pits' floors, which drew walls of dirt 10 to 27 blocks tall around the water (Ben's report, 2026-10-20). The router now closes the entrances within 8 blocks of the water, fading out by 16, and what the water pass fills is 3 blocks of soil over the column's own rock (HYD-079). Every other water GameTest runs without noise caves; `WaterShoreGameTests.shoresHaveNoDirtWalls` runs with them.
 - A lake in the game is a game-side placement of the hydrology's level: every lake column is cut to its bed like a river channel, because the generated ground between noise-cell corners can stand a block or two above the rule's bilinear ground and left one-block-deep lake margins dry (HYD-077). A frozen lake's ice is its surface, not ground, so the snow and ice cover leaves it alone (BIO-084).
