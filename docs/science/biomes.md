@@ -869,7 +869,10 @@ in kind (decisions log 2026-10-04, "Build out support for both") and the agent's
 goes with which class or setting, every threshold, which biomes are exclusive, the rock window and the GameTest
 tolerances. Terralith's placement table and the geology
 gate (BIO-140 to BIO-154) are Ben's in kind (decisions log 2026-10-04, "Deep Time-side fixes (Recommended)") and the
-agent's in every number, but the cloud forest's height (BIO-145, read in Scatena et al. 2010).
+agent's in every number, but the cloud forest's height (BIO-145, read in Scatena et al. 2010). EF's continentalness
+floor (BIO-161) and the census's bound on the ice cap's ice spikes (BIO-162) are the coordinator's calls (2026-10-20,
+on Ben's ice spikes report), and so is the target they serve: BIO-077's share of the frozen, driest flats, not the
+pack's own share and not an area ("Ice spikes and the rare variants").
 
 ## Open questions
 
@@ -879,6 +882,17 @@ agent's in every number, but the cloud forest's height (BIO-145, read in Scatena
   the repository and on one pack version.
 - The vanilla reference distributions (BIO-025) were measured by the project's tool and not
   re-measured.
+- The ice cap's flats carry ice spikes at BIO-077's fifth, below the packs' own shares (MIC 34.5 %, vanilla 46.8 % of
+  their frozen, driest flats). Reaching MIC's under Terralith would need a share of the ice cap kept near-inland by
+  noise, which the placement format cannot say (a new key: Ben's to decide). With vanilla the share follows BIO-077's
+  noise, which gave the positive branch to 20 % of the play world's ice cap at erosion E3 and to 4 % of the 2026-10-20
+  supercontinent's.
+- The rare variants ("Ice spikes and the rare variants"): mushroom fields never appear (no land cell is below
+  continentalness -1.05), plateau biomes are thin on mostly near-inland land, and which variants appear is each
+  class's weirdness rule's. Whether the planet should draw them at the pack's rarity is a design choice, not taken.
+- 72 to 78 % of the measured planets' land is near-inland without EF's floor (continentalness from the distance to the
+  sea), against 22 to 27 % in the packs' own worlds; it shapes every biome that differs between near- and
+  mid-inland.
 - The Holdridge biotemperature upper cut-off at 30 °C (HYD-030) is missing from the hydrology code.
   Confirmed in Holdridge's text (see the sources) and left to the rivers and lakes package, which
   owns that row.
@@ -894,7 +908,10 @@ agent's in every number, but the cloud forest's height (BIO-145, read in Scatena
   sources.
 - Scatena, Bruijnzeel, Bubb and Das 2010 (`Scatena2010`), chapter 1 of *Tropical Montane Cloud Forests*: the
   publisher's excerpt read (the 18 °C threshold, 1200–1500 m on large equatorial mountains, the regional table).
-- Terralith 2.6.2's parameter list (the jar in MIC's server set): read on the test machine, 2026-10-04.
+- Terralith 2.6.2's parameter list (the jar in MIC's server set): read on the test machine, 2026-10-04; its nine
+  `minecraft:ice_spikes` entries read again 2026-10-20 (BIO-161).
+- Minecraft 1.21.1 `OverworldBiomeBuilder`'s high, mid and low slices and its biome tables: read 2026-10-20 in the
+  NeoForge 21.1.249 sources (BIO-161).
 - Ohmura, Kasser and Funk 1992 (`Ohmura1992`): the equation read; its use belongs to the glacier
   page.
 - Holdridge 1967 (`Holdridge1967`): the sentences on the 30 °C cut-off and the factor 58.93 read.
