@@ -15,7 +15,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
 | [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228, PLT-293 (20; PLT-293 ocean crust keeps its own rock at resamplings and in the L1 sampling, 2026-10-19) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
-| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284, PLT-287 to PLT-288, PLT-294 (44; PLT-294 the transition's ocean side thickens with ocean crust, 2026-10-19; PLT-287 and PLT-288 the fastest thickening and rise, 2026-10-18; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
+| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284, PLT-287 to PLT-288, PLT-294 (44; PLT-294 the switch for the transition's ocean side, ocean crust or the continent's rock, 2026-10-19; PLT-287 and PLT-288 the fastest thickening and rise, 2026-10-18; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221, PLT-265 (41; PLT-265 Earth's passive margins, the transition's comparison) |
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
@@ -274,10 +274,10 @@ orogenic collapse and before the surface processes:
    stretch of margin (boundary samples grouped round seeds at least W/2 apart; every sample of the
    zone belongs to the seed of its nearest boundary sample, through its own crust and plate), the
    share 1 − e^(−δt/τ) per step of what would bring the stretch to the profile (τ =
-   `transition_myr`, 20 Myr, PLT-263), the sources thinned in proportion (pure shear). A
-   continental sink takes the sources' rock; since 2026-10-19 an oceanic sink takes the same volume
-   as ocean crust, lavas and gabbro in the ocean column's proportion (PLT-294, "Ocean crust keeps
-   its own rock" below). Volume is conserved, and crust types do not change: the thickened
+   `transition_myr`, 20 Myr, PLT-263), the sources thinned in proportion (pure shear), as their
+   own rock. A switch added on 2026-10-19, off by default (`transition_ocean_crust`, PLT-294,
+   "Ocean crust keeps its own rock" below), gives an oceanic sink the same volume as ocean crust
+   instead, lavas and gabbro in the ocean column's proportion. Volume is conserved, and crust types do not change: the thickened
    ocean-side samples stay oceanic, so the continental area and the crust share are not redefined
    by this rule.
 4. *Heights* (PLT-264). A metre of crust moved changes the height by 1/f, f = (T_n − T_o) / (z_0 −
@@ -1788,3 +1788,79 @@ four, equal in one), where one f32 ulp on one weight moved the CPU's own land sh
 planet by up to 0.004 and, before the cadence change, by 0.024. The same-state comparison above
 finds no lean, so the four in five is chance or an effect too indirect to show in a single
 sampling; a larger paired ensemble would tell.
+
+## Ocean crust keeps its own rock (2026-10-19)
+
+**What was wrong.** The external review of 2026-10-19 (defect D1) found granite in 73 to 86 % and
+metamorphic rock in 67 to 78 % of the sea-floor columns of run 1a156f22b66, and 11 to 14 km from
+the sea floor to the peridotite where Earth has about 7.5 km (GlobSed's 0.4 km of deep-ocean
+sediment over White et al. 1992's 7.1 km of igneous crust). Part of that was drawing: every crust
+kind's pools were drawn with the continental classes (the rock page, RCK-091 and RCK-092). The
+rest is rock the plate model puts there.
+
+**Where the rock came from.** A diagnosis build (master d54c7f0f with counters on every
+mechanism that adds felsic plutonic or metamorphic rock to an ocean sample, except the
+transition; `earthlike_quick_16k`, supercontinent start, seed 1, 1000 Myr) counted:
+
+| Felsic plutonic rock gained by ocean samples | Share |
+|---|---|
+| from continental corners, when a resampling blended all three corners' pools | 51 % |
+| island arcs (PLT-043 to PLT-046) | 32 % |
+| crust accreted at a resampling (the footprints under the new sample) | 17 % |
+
+| Metamorphic rock gained by ocean samples | Share |
+|---|---|
+| diagenesis of sediment piles thicker than about 11 km | 52 % |
+| from continental corners at resamplings | 34 % |
+| accretion at resamplings | 13 % |
+
+Blending within the ocean then moved 3.2 times as much felsic plutonic rock between ocean samples
+as all the sources added, a little further at every resampling. The first change (PLT-293) stops
+both: a resampling and the L1 sampling blend each pool over corners of the sample's own kind, and
+on ocean crust a resampling keeps the felsic and metamorphic pools of the nearest corner. On its
+own it barely moved where the rock lay. The final checkpoints, read with `deeptime dump-fields`
+(`tools/review/geo_template_fields.py`), show why: the share of ocean L1 cells holding more than
+50 m of felsic plutonic rock falls with the distance (L1 cells, 4.8 km each on the planet) from
+the nearest continental cell over about the transition's half-width (W/2 = 100 km = 21 cells),
+and switching the transition off (`transition_width_km` = 0) takes most of it away:
+
+| cells to land | ocean cells (master) | master | PLT-293 | PLT-293, no transition | PLT-293 and PLT-294 on |
+|---|---|---|---|---|---|
+| 1 | 36,171 | 0.96 | 0.91 | 0.72 | 0.73 |
+| 2 | 23,360 | 0.93 | 0.91 | 0.69 | 0.70 |
+| 3 | 17,839 | 0.90 | 0.89 | 0.60 | 0.61 |
+| 4 to 5 | 27,380 | 0.85 | 0.84 | 0.48 | 0.48 |
+| 6 to 8 | 29,531 | 0.78 | 0.76 | 0.34 | 0.37 |
+| 9 to 13 | 31,611 | 0.67 | 0.66 | 0.23 | 0.31 |
+| 14 to 21 | 23,576 | 0.52 | 0.50 | 0.15 | 0.21 |
+| 22 to 34 | 12,340 | 0.37 | 0.29 | 0.10 | 0.12 |
+| farther | 5,054 | 0.12 | 0.20 | 0.25 | 0.01 |
+
+(Supercontinent start, seed 1, each column its own run, so the planets differ by chaos.) The
+transition (PLT-261) moves the continent's own rock to the oceanic samples of its ocean side and
+keeps them oceanic; on this planet nearly all the ocean lies within W/2 of a margin, so it laid
+granite and gneiss between the lavas and the gabbro of nearly every ocean column.
+
+**The transition's ocean side: a switch for Ben** (PLT-294). With `transition_ocean_crust` on, an
+oceanic sink takes the same volume as ocean crust (lavas and gabbro in the ocean column's
+proportion), as the thick igneous crust of a volcanic margin would be. That removes the
+transition's granite from the sea floor (the last column above), but the continental rock that
+the sources give up is then lost, and land falls on every seed (end of the surface stage, three
+seeds each, 1000 Myr):
+
+| start | land, master | land, switch on | continental crust, master (10^9 km3) | switch on |
+|---|---|---|---|---|
+| supercontinent | 0.165, 0.189, 0.177 | 0.140, 0.131, 0.139 | 8.3, 8.5, 9.3 | 7.6, 7.2, 9.0 |
+| scattered continents (seed 1) | 0.154 | 0.148 | 9.8 | 9.1 |
+
+Ben weighed the transition's land cost on 2026-10-05 ("Keep 200 km, raise crust in 7-8"), so the
+switch is off by default and the choice is his. The physical fix is a continent that widens as it
+stretches, which the model's fixed boundary cannot do without the ratchet PLT-289 records.
+
+**What is left under the sea** (switch on, seed 1, ocean L1 cells holding over 50 m of felsic
+plutonic rock): 1.00 of the arc cells and 0.61 of the back-arc cells (island-arc rock, which the
+column draws as andesite over diorite or granodiorite, RCK-092; the model's oceanic fronts are
+about 8.6 times Earth's length, PLT-045), 0.45 of the ocean basin, 0.16 of the ridges and 0.07 of
+the crust younger than 20 Myr. On crust older than 150 Myr the sediment pile averages 6.4 km and
+its base turns to schist (the diagenesis above): the pile, not the ocean crust, makes old sea
+floor deep to its mantle.
