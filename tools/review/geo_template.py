@@ -12,6 +12,10 @@ columns holding any of it, the share holding granite and gneiss themselves (the 
 classes), and the median depth from the sea floor to the first peridotite. Each start is also
 pooled over its seeds, and OUT/ocean_census.png draws the pooled bands of every tag beside Earth's
 Penrose column.
+
+The relief lift's tables come from the bake's own notes (`notes.bake.strata`): the mountain fill
+(STR-051), the surface census on valley floors and lifted land (STR-057) and the structure lift
+offsets (STR-055), pooled per tag (and per tag on seed 1) and per run.
 """
 import collections
 import glob
@@ -178,6 +182,127 @@ def fmt_band(b):
                              [f"{moho / 1000:.1f}" if moho is not None else '-']) + ' |'
 
 
+SURFACE_SETS = ['valley_floor', 'lifted', 'not_lifted']
+FILL_KEYS = ['first_rock_fills_most', 'first_rock_mean_share', 'one_unit_fills_most',
+             'first_horizon_fills_most', 'loose_mean_share', 'stretched_mean_share']
+# Each surface-census share and what it is a share of.
+SURFACE_SHARES = [('ground_in_first_horizon', 'points'), ('ground_in_loose_cover', 'points'),
+                  ('ground_above_first_top', 'points'),
+                  ('class_top_is_ground_class', 'with_class_top'),
+                  ('class_top_rock_is_drawn_rock', 'class_top_rock'),
+                  ('bedrock_agrees', 'with_class_top')]
+
+
+def pool_fill(fills):
+    """Mountain fill rows pooled over runs, weighted by cells, per threshold."""
+    out = {}
+    for mf in fills:
+        for row in (mf or {}).get('by_relief', []):
+            k = round(row['min_relief_blocks'])
+            o = out.setdefault(k, {'cells': 0, **{f: 0.0 for f in FILL_KEYS}})
+            n = row['cells']
+            o['cells'] += n
+            for f in FILL_KEYS:
+                o[f] += row.get(f, 0.0) * n
+    for o in out.values():
+        for f in FILL_KEYS:
+            o[f] = o[f] / o['cells'] if o['cells'] else 0.0
+    return out
+
+
+def pool_surface(censuses, part):
+    """One surface-census set pooled over runs: counts summed, shares weighted by their base."""
+    o = {'points': 0, 'with_class_top': 0, 'class_top_rock': 0, 'depth': 0.0, 'depth_n': 0}
+    sums = collections.Counter()
+    classes = collections.Counter()
+    for sc in censuses:
+        s = (sc or {}).get(part)
+        if not s:
+            continue
+        for base in ('points', 'with_class_top', 'class_top_rock'):
+            o[base] += s.get(base, 0)
+        for f, base in SURFACE_SHARES:
+            sums[f] += s.get(f, 0.0) * s.get(base, 0)
+        under = s['points'] * (1 - s.get('ground_above_first_top', 0.0))
+        o['depth'] += s.get('mean_depth_under_first_top_blocks', 0.0) * under
+        o['depth_n'] += under
+        for c in s.get('ground_classes', []):
+            classes[c['class']] += c['share'] * s['points']
+    for f, base in SURFACE_SHARES:
+        o[f] = sums[f] / o[base] if o[base] else 0.0
+    o['mean_depth'] = o['depth'] / o['depth_n'] if o['depth_n'] else 0.0
+    o['classes'] = [(c, v / o['points']) for c, v in classes.most_common(4)] if o['points'] else []
+    return o
+
+
+def strata_tables(report):
+    """The relief lift's review tables: mountain fill, the surface census and the structure
+    lift, pooled per tag (and per tag on seed 1, where the oldlift build ran too), then per run."""
+    md = []
+    groups = {}
+    for name, r in report.items():
+        groups.setdefault(f"{r['tag']}, every planet", []).append(r)
+        if r['seed'] == 1:
+            groups.setdefault(f"{r['tag']}, seed 1", []).append(r)
+    md += ['## Mountain fill (STR-051), pooled', '',
+           '| set | runs | relief | cells | first rock fills most | first rock mean share | '
+           'one unit fills most | first horizon fills most | loose share | stretched share |',
+           '|' + '---|' * 10]
+    for key in sorted(groups):
+        rs = groups[key]
+        for k, o in sorted(pool_fill([r['mountain_fill'] for r in rs]).items()):
+            md.append('| ' + ' | '.join([key, str(len(rs)), f'>= {k}', str(o['cells'])] +
+                                        [f"{o[f]:.3f}" for f in FILL_KEYS]) + ' |')
+    md += ['', '## Surface census (STR-057), pooled', '',
+           '| set | part | points | in first horizon | in loose cover | over first top | '
+           'mean depth under first top | class_top is ground class | consolidated class_top is '
+           'drawn rock | game bedrock agrees | commonest ground |', '|' + '---|' * 11]
+    for key in sorted(groups):
+        rs = groups[key]
+        for part in SURFACE_SETS:
+            o = pool_surface([r['surface_census'] for r in rs], part)
+            if not o['points']:
+                continue
+            md.append('| ' + ' | '.join(
+                [key, part, str(o['points'])] +
+                [f"{o[f]:.3f}" for f, _ in SURFACE_SHARES[:3]] + [f"{o['mean_depth']:.1f}"] +
+                [f"{o[f]:.3f}" for f, _ in SURFACE_SHARES[3:]] +
+                [', '.join(f'{c} {v:.2f}' for c, v in o['classes'])]) + ' |')
+    md += ['', '## Structure lift offsets (STR-055), per run', '',
+           '| run | set | points | p50 | p90 | p99 | max | share over 2 blocks |',
+           '|' + '---|' * 8]
+    for name in sorted(report):
+        sl = report[name]['structure_lift']
+        if not sl:
+            continue
+        for kind in ('faults', 'intrusions', 'every'):
+            for part in ('all', 'lifted'):
+                s = sl[kind][part]
+                md.append(f"| {name} | {kind} {part} | {s['points']} | {s['p50']:.2f} | "
+                          f"{s['p90']:.2f} | {s['p99']:.2f} | {s['max']:.1f} | "
+                          f"{s['share_over_2_blocks']:.3f} |")
+    md += ['', '## Mountain fill and valley floors, per run', '',
+           '| run | fill >= 8: cells, first rock most | fill >= 30: cells, first rock most | '
+           'valley points | valley in first horizon | valley in loose cover | lifted: class_top '
+           'is ground | lifted: game bedrock agrees |', '|' + '---|' * 8]
+    for name in sorted(report):
+        r = report[name]
+        mf = {round(x['min_relief_blocks']): x for x in (r['mountain_fill'] or {}).get('by_relief', [])}
+        sc = r['surface_census'] or {}
+        v, up = sc.get('valley_floor') or {}, sc.get('lifted') or {}
+        cell = [name]
+        cell += [f"{mf[k]['cells']}, {mf[k].get('first_rock_fills_most', 0):.3f}" if k in mf else '-'
+                 for k in (8, 30)]
+        cell += [str(v.get('points', '-'))]
+        cell += [f"{v[f]:.3f}" if f in v else '-' for f in ('ground_in_first_horizon',
+                                                             'ground_in_loose_cover')]
+        cell += [f"{up[f]:.3f}" if f in up else '-' for f in ('class_top_is_ground_class',
+                                                               'bedrock_agrees')]
+        md.append('| ' + ' | '.join(cell) + ' |')
+    md.append('')
+    return md
+
+
 def section_plot(plt, panels, path, title):
     fig, axes = plt.subplots(len(panels), 1, figsize=(12, 3.2 * len(panels)), squeeze=False)
     for ax, (label, rows) in zip(axes[:, 0], panels):
@@ -224,6 +349,8 @@ def main():
             'tag': tag, 'start': start, 'seed': seed,
             'census': census(grid),
             'mountain_fill': strata.get('mountain_fill'),
+            'surface_census': strata.get('surface_census'),
+            'structure_lift': strata.get('structure_lift'),
             'lift': strata.get('lift'),
             'top_raised_cells': strata.get('top_raised_cells'),
             'land': {k: v for k, v in proj.items() if 'land' in k},
@@ -251,18 +378,16 @@ def main():
         if c['continental_sea']:
             md.append(fmt_band(c['continental_sea']))
         md.append('')
+    md += strata_tables(report)
     md += ['## Per run: what else moved', '',
-           '| run | land share | fill >= 8 most | fill >= 30 most | lifted cells | mean lift | '
-           'sites | bodies | bodies above ground |', '|' + '---|' * 9]
+           '| run | land share | lifted cells | mean lift | '
+           'sites | bodies | bodies above ground |', '|' + '---|' * 7]
     for name in sorted(report):
         r = report[name]
-        mf = {round(x['min_relief_blocks']): x for x in (r['mountain_fill'] or {}).get('by_relief', [])}
         lift = r['lift'] or {}
         d = r['deposits'] or {}
         b = r['bodies'] or {}
         cell = [name, f"{r['census']['land_share_of_grid']:.3f}"]
-        cell += [f"{mf[k]['top_unit_fills_most']:.3f} of {mf[k]['cells']}" if k in mf else '-'
-                 for k in (8, 30)]
         cell += [str(lift.get('cells', '-')),
                  f"{lift['mean_blocks']:.1f}" if 'mean_blocks' in lift else '-',
                  str(d.get('sites', '-')), str(d.get('bodies', '-')),
@@ -283,8 +408,14 @@ def main():
         if mf:
             for row in mf.get('by_relief', []):
                 md.append(f"mountain fill, relief >= {row['min_relief_blocks']:.0f} blocks: "
-                          f"{row['cells']} cells, top unit fills most {row['top_unit_fills_most']:.3f}, "
-                          f"mean share {row['mean_share_filled']:.3f}")
+                          + json.dumps({k: v for k, v in row.items() if k != 'min_relief_blocks'}))
+        if r['surface_census']:
+            sc = r['surface_census']
+            for part in SURFACE_SETS:
+                if sc.get(part):
+                    md.append(f"surface census, {part}: {json.dumps(sc[part])}")
+        if r['structure_lift']:
+            md.append(f"structure lift: {json.dumps({k: v for k, v in r['structure_lift'].items() if k != 'rule'})}")
         if r['lift']:
             md.append(f"lift: {json.dumps({k: v for k, v in r['lift'].items() if k != 'rule'})}")
         md.append(f"land: {json.dumps(r['land'])}")
