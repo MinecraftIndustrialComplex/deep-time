@@ -513,7 +513,11 @@ mod tests {
         let moments = |v: &[f32]| {
             let r = &v[row * w..(row + 1) * w];
             let m0: f64 = r.iter().map(|&x| f64::from(x)).sum();
-            let m1: f64 = r.iter().enumerate().map(|(i, &x)| i as f64 * f64::from(x)).sum();
+            let m1: f64 = r
+                .iter()
+                .enumerate()
+                .map(|(i, &x)| i as f64 * f64::from(x))
+                .sum();
             let mean = m1 / m0;
             let var: f64 = r
                 .iter()
@@ -526,7 +530,10 @@ mod tests {
         let (s0, s_mean, s_var) = moments(&short);
         let (l0, l_mean, l_var) = moments(&long);
         let (_, _, b_var) = moments(&before);
-        assert!((s0 - 1.0).abs() < 1e-5 && (l0 - 1.0).abs() < 1e-5, "{s0} {l0}");
+        assert!(
+            (s0 - 1.0).abs() < 1e-5 && (l0 - 1.0).abs() < 1e-5,
+            "{s0} {l0}"
+        );
         assert!((s_mean - l_mean).abs() < 1e-4, "{s_mean} {l_mean}");
         // 2 · 0.3 · 0.7 for the two short carries; 0.6 · 0.4 for the long one alone.
         assert!((s_var - 0.42).abs() < 1e-4, "{s_var}");
@@ -534,7 +541,9 @@ mod tests {
         assert!((l_var - s_var).abs() < 1e-4, "{l_var} against {s_var}");
         // Nothing crosses to another crust: a wall west of column 41 keeps the spike's west side.
         let mut walled = before.clone();
-        blur(w, h, &owed, &mut walled, |c, n| (c % w > 41) == (n % w > 41));
+        blur(w, h, &owed, &mut walled, |c, n| {
+            (c % w > 41) == (n % w > 41)
+        });
         let r = row * w;
         let west: f32 = walled[r..r + 42].iter().sum();
         let west0: f32 = before[r..r + 42].iter().sum();

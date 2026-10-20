@@ -1168,15 +1168,10 @@ impl ClimateStage {
                 advect::sources(&grid, pid, &omega_for(prev, &parents), dt_myr * 1.0e6)
             });
         // The surface's carry blur, kept per Myr at its reference step (`advect::blur_owed`).
-        let blur_ref = self
-            .preset
-            .surface
-            .as_ref()
-            .map_or_else(
-                || crate::surface::params::Numerics::default().carry_blur_ref_myr,
-                |s| s.numerics.carry_blur_ref_myr,
-            )
-            * 1.0e6;
+        let blur_ref = self.preset.surface.as_ref().map_or_else(
+            || crate::surface::params::Numerics::default().carry_blur_ref_myr,
+            |s| s.numerics.carry_blur_ref_myr,
+        ) * 1.0e6;
         let owed = src
             .as_ref()
             .and_then(|src| advect::blur_owed(w, src, dt_myr * 1.0e6, blur_ref));
