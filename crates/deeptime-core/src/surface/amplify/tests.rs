@@ -662,6 +662,96 @@ fn drama_scales_the_slopes_and_the_detail() {
     );
 }
 
+/// The steepest pair of neighbouring L3 cells (8 neighbours, x wrapping) both deeper than
+/// `below` m, as a gradient, over a raster `w` wide of `dx` m cells.
+fn steepest_sea_pair(z: &[f32], w: usize, dx: f64, below: f32) -> f64 {
+    let h = z.len() / w;
+    let mut top = 0.0f64;
+    for j in 0..h {
+        for i in 0..w {
+            let c = j * w + i;
+            if z[c] >= below {
+                continue;
+            }
+            for (di, dj) in [(1i64, 0i64), (1, 1), (0, 1), (-1, 1)] {
+                let jj = j as i64 + dj;
+                if jj < 0 || jj >= h as i64 {
+                    continue;
+                }
+                let ii = (i as i64 + di).rem_euclid(w as i64) as usize;
+                let m = jj as usize * w + ii;
+                if z[m] >= below {
+                    continue;
+                }
+                let d = if di != 0 && dj != 0 {
+                    dx * 2f64.sqrt()
+                } else {
+                    dx
+                };
+                top = top.max(f64::from((z[c] - z[m]).abs()) / d);
+            }
+        }
+    }
+    top
+}
+
+/// Sea-floor spikes task (2026-10-20): under the sea the thermal pass holds the sea floor's own
+/// critical slope (`submarine_slope`), not the land's talus angle. The threshold multiplier is
+/// the land's times `submarine_slope / thermal_slope` on every cell below sea level and the
+/// land's elsewhere; on a sea floor of one-L2-cell knolls (700 m on 2.4 km cells, which the
+/// interpolation makes 25 to 30 degree flanks at L3) the amplified sea floor comes out gentler
+/// than at the land's angle, and no steeper than the submarine slope at its noise's top allows.
+#[test]
+fn the_sea_floor_keeps_its_own_critical_slope() {
+    let c = cfg(1.0);
+    // The multiplier: the sea's is the land's times the ratio, cell by cell.
+    let gw = 4 * W2;
+    let win = Win::full(gw, 4 * H2);
+    let noise = c.noise_cfg(gw);
+    let z: Vec<f32> = (0..win.cells())
+        .map(|k| if k % 3 == 0 { -50.0 } else { 50.0 })
+        .collect();
+    let ones = vec![1.0f32; win.cells()];
+    let mut land = vec![0.0f32; win.cells()];
+    let mut mixed = vec![0.0f32; win.cells()];
+    super::kernels::tmult_fill(&win, &noise, &ones, 0.0, &mut land);
+    super::kernels::tmult_fill(&win, &noise, &z, 0.0, &mut mixed);
+    let ratio = (c.p.submarine_slope / c.p.thermal_slope) as f32;
+    for (k, ((&zk, &l), &m)) in z.iter().zip(&land).zip(&mixed).enumerate() {
+        let want = if zk < 0.0 { l * ratio } else { l };
+        assert_eq!(m.to_bits(), want.to_bits(), "cell {k}");
+    }
+    // A sea floor of knolls one L2 cell across.
+    let mut l2 = l2_level();
+    for j in 0..H2 {
+        for i in 0..W2 {
+            let k = j * W2 + i;
+            if l2.z[k] < -400.0 {
+                l2.z[k] = -3000.0 + if (i + j) % 3 == 0 { 700.0 } else { 0.0 };
+            }
+        }
+    }
+    let run_with = |submarine: f64| {
+        let mut c = cfg(1.0);
+        c.p.thermal_iterations = 24;
+        c.p.submarine_slope = submarine;
+        let (s, _) = run_mem(&l2, &c, plan_whole(), 2);
+        steepest_sea_pair(&s.z, gw, f64::from(R2) * 300.0 / 4.0, -1000.0)
+    };
+    let at_land = run_with(c.p.thermal_slope);
+    let own = run_with(c.p.submarine_slope);
+    let deg = |g: f64| g.atan().to_degrees();
+    let top = c.p.submarine_slope * (1.0 + c.p.thermal_noise) * 1.1;
+    assert!(
+        own < 0.8 * at_land && own <= top,
+        "steepest sea-floor pair {:.1} degrees at the sea floor's slope, {:.1} at the land's \
+         (bound {:.1})",
+        deg(own),
+        deg(at_land),
+        deg(top)
+    );
+}
+
 #[test]
 fn the_detail_amplitude_fades_along_channels_and_stays_under_its_cap() {
     let l2 = l2_level();

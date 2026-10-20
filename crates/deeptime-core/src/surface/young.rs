@@ -75,6 +75,15 @@ pub const KEYFRAME_LAYERS: [&str; 3] = [field::ELEVATION, field::DRAINAGE, field
 /// Till at least this thick makes a cell's surface rock till, m.
 const TILL_SHOWS_M: f32 = 5.0;
 
+/// The sea floor's critical slope, degrees ([`YoungParams::sea_floor_slope_deg`]). ledger: YNG-022
+pub const SEA_FLOOR_SLOPE_DEG: f64 = 15.0;
+
+/// Iterations of the sea floor's failure (`marine::slope_failure` at its rate 0.05): numerical.
+/// A 3 km step one L2 cell wide, a 5 km one-cell trench and a maze of 2.8 km blocks two cells
+/// across relax to within a degree of the critical slope in 100 to 200 (build/seafloor/relax.py,
+/// the rule in numpy on 2.4 km cells). ledger: YNG-023
+pub const SEA_FLOOR_FAILURE_ITERATIONS: u32 = 300;
+
 /// How the young landscape is uplifted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -102,6 +111,16 @@ pub struct YoungParams {
     pub min_lake_depth_m: f64,
     /// Multiplier on the surface section's K (finer cells may want a different erodibility).
     pub k_scale: f64,
+    /// The steepest slope the sea floor holds, degrees: before the steps, open-sea cells
+    /// steeper than this fail (`marine::slope_failure` with nothing limiting what a cell gives:
+    /// rock as well as sediment), the matter kept and the failed rock building the slope's toe.
+    /// 0 turns it off. Sea-floor spikes task (2026-10-20): the plate model draws the sea floor's
+    /// steps one sample or one L1 cell wide (a trench pulled toward 10 km, a strip where plates
+    /// and crusts interleave), 2 to 5 km tall over 5 to 9 km on this small planet, and nothing
+    /// under the wave base relaxed them (the marine diffusion vanishes there, the sediment
+    /// failure moves sediment only, the amplifier's thermal pass held them at the land's talus
+    /// angle), so they stood as 30 to 45 degree walls, 80 degrees and more in the game.
+    pub sea_floor_slope_deg: f64, // ledger: YNG-022
 }
 
 impl Default for YoungParams {
@@ -113,6 +132,7 @@ impl Default for YoungParams {
             uplift_factor: 1.0,
             min_lake_depth_m: 5.0,
             k_scale: 1.0,
+            sea_floor_slope_deg: SEA_FLOOR_SLOPE_DEG,
         }
     }
 }
@@ -134,6 +154,11 @@ impl YoungParams {
         }
         if !(self.k_scale.is_finite() && self.k_scale > 0.0) {
             return Err(bad("k_scale", "must be > 0"));
+        }
+        if !(self.sea_floor_slope_deg.is_finite()
+            && (0.0..60.0).contains(&self.sea_floor_slope_deg))
+        {
+            return Err(bad("sea_floor_slope_deg", "must be in [0, 60)"));
         }
         Ok(())
     }
@@ -219,6 +244,26 @@ pub fn rock_property(class1: &[f32], w1: usize, h1: usize, k: u32, table: &[f64]
         h *= 2;
     }
     cur
+}
+
+/// The sea floor's failure ([`YoungParams::sea_floor_slope_deg`]): open-sea cells (`open`, below
+/// `sea`) of `z` steeper than `slope_deg` to an open-sea neighbour give the excess down the slope
+/// (`marine::slope_failure`, every cell free to give any amount: rock fails as well as sediment),
+/// so a wall the plate model drew one cell wide becomes a ramp at that slope with its toe built of
+/// what fell. Matter is kept. Returns the volume moved, km³.
+pub fn fail_sea_floor(d: &Dims, open: &[bool], sea: f64, slope_deg: f64, z: &mut [f32]) -> f64 {
+    let mut h: Vec<f64> = z.iter().map(|&v| f64::from(v)).collect();
+    let mut avail = vec![1.0e9; z.len()];
+    let fp = marine::FailureParams {
+        critical_slope: slope_deg.to_radians().tan(),
+        rate: marine::FAILURE_RATE,
+        iterations: SEA_FLOOR_FAILURE_ITERATIONS,
+    };
+    let moved = marine::slope_failure(d, open, sea, &fp, &mut h, &mut avail);
+    for (v, &x) in z.iter_mut().zip(&h) {
+        *v = x as f32;
+    }
+    moved * d.cell_area() / 1.0e9
 }
 
 /// Land elevations above sea: (median, 90th percentile, maximum), m.
@@ -380,6 +425,18 @@ impl YoungStage {
                 small += 1;
             }
         }
+        drop(filled);
+        drop(base);
+        // The sea floor fails where the plate model left it steeper than it holds.
+        let sea_floor_km3 = if self.p.sea_floor_slope_deg > 0.0 {
+            ctx.reserve(n2 as u64 * 26)?;
+            let open: Vec<bool> = kind.iter().map(|&k| k == BASE).collect();
+            fail_sea_floor(&d, &open, sea, self.p.sea_floor_slope_deg, &mut z2)
+        } else {
+            0.0
+        };
+        drop(h);
+        drop(kind);
         let (p50, p90, max) = land_stats(&z2, sea);
         let put = |world: &mut WorldState, name: &str, data: Vec<f32>| {
             world.fields.insert(
@@ -424,6 +481,7 @@ impl YoungStage {
                 "steps": self.p.steps, "myr": self.p.myr,
                 "uplift": self.p.uplift,
                 "filled_small_depressions": small,
+                "sea_floor_failed_km3": sea_floor_km3,
                 "glaciers": glaciated,
                 "before": {"land_z_p50_m": p50, "land_z_p90_m": p90, "land_z_max_m": max},
             })
@@ -995,7 +1053,8 @@ pub fn summary_line(v: &Value) -> String {
     };
     format!(
         "young_final={}x{} steps={} myr={} uplift={} land_z_p50_m={:.0}->{:.0} land_z_p90_m={:.0}->{:.0} \
-         land_z_max_m={:.0}->{:.0} lake_cells={} sinks={} filled_small_depressions={}{glacial}",
+         land_z_max_m={:.0}->{:.0} lake_cells={} sinks={} filled_small_depressions={} \
+         sea_floor_failed_km3={:.3e}{glacial}",
         v["l2"]["w"],
         v["l2"]["h"],
         v["steps"],
@@ -1010,6 +1069,7 @@ pub fn summary_line(v: &Value) -> String {
         v["lake_cells"],
         v["sinks"],
         v["filled_small_depressions"],
+        f(&v["sea_floor_failed_km3"]),
     )
 }
 
@@ -1117,6 +1177,94 @@ mod tests {
             v["peak_bytes"].as_u64().unwrap() <= 5 << 30,
             "full 16k at a 5 GiB cap: {v}"
         );
+    }
+
+    /// The sea floor the plate model leaves, on 2.4 km cells (quick 16k's L2): an abyssal plain at
+    /// 4.5 km, a trench one cell wide pulled to 10 km, a strip where two crusts interleave cell
+    /// by cell (3 km steps), and a continent with its shelf ending in a one-cell wall. The
+    /// steepest pair of open-sea neighbours, as a gradient (drop over distance).
+    fn sea_floor_world() -> (Dims, Vec<bool>, Vec<f32>) {
+        let (w, h) = (96usize, 48usize);
+        let d = Dims::new(w, h, 2400.0, true);
+        let mut z = vec![-4500.0f32; w * h];
+        for j in 0..h {
+            for i in 0..w {
+                let c = j * w + i;
+                if i < 12 {
+                    z[c] = 300.0;
+                } else if i < 16 {
+                    z[c] = -100.0;
+                } else if i == 40 {
+                    z[c] = -10_000.0;
+                } else if (60..72).contains(&i) && ((i / 2) + (j / 2)) % 2 == 0 {
+                    z[c] = -1500.0;
+                }
+            }
+        }
+        let open = z.iter().map(|&v| v < 0.0).collect();
+        (d, open, z)
+    }
+
+    fn steepest_open_pair(d: &Dims, open: &[bool], z: &[f32]) -> f64 {
+        let mut top = 0.0f64;
+        for (c, (&zc, &o)) in z.iter().zip(open).enumerate() {
+            if !o {
+                continue;
+            }
+            for (m, dist) in d.neighbours(c) {
+                if open[m] {
+                    top = top.max(f64::from(zc - z[m]) / dist);
+                }
+            }
+        }
+        top
+    }
+
+    /// Sea-floor spikes task (2026-10-20): the walls the plate model draws one cell wide under the
+    /// sea fail to the sea floor's critical slope, rock and all. Before the task nothing below
+    /// the wave base relaxed them (the marine diffusion vanishes there and the slope failure
+    /// moved sediment only), and they stood at 51 to 66 degrees here; the planet's were 30 to 45
+    /// degrees on the ground and 80 and more in the game. Matter is kept, land is not touched,
+    /// and the trench stays a trench.
+    #[test]
+    fn the_plate_model_sea_floor_fails_to_its_critical_slope() {
+        let (d, open, z0) = sea_floor_world();
+        let crit = SEA_FLOOR_SLOPE_DEG.to_radians().tan();
+        let before = steepest_open_pair(&d, &open, &z0);
+        assert!(before > 1.2, "the walls start steep: {before}");
+        let mut z = z0.clone();
+        let km3 = fail_sea_floor(&d, &open, 0.0, SEA_FLOOR_SLOPE_DEG, &mut z);
+        assert!(km3 > 0.0);
+        let after = steepest_open_pair(&d, &open, &z);
+        assert!(
+            after <= crit * 1.03,
+            "steepest sea-floor pair {:.1} degrees, critical {SEA_FLOOR_SLOPE_DEG}",
+            after.atan().to_degrees()
+        );
+        let sum = |v: &[f32]| v.iter().map(|&x| f64::from(x)).sum::<f64>();
+        let total = z0.iter().map(|&x| f64::from(x.abs())).sum::<f64>();
+        assert!(
+            (sum(&z) - sum(&z0)).abs() < 1e-6 * total,
+            "matter kept: {} vs {}",
+            sum(&z),
+            sum(&z0)
+        );
+        for (c, ((&a, &b), &o)) in z.iter().zip(&z0).zip(&open).enumerate() {
+            if !o {
+                assert_eq!(a.to_bits(), b.to_bits(), "land cell {c} moved");
+            }
+        }
+        let w = d.w;
+        let trench = (0..d.h).map(|j| z[j * w + 40]).fold(f32::MAX, f32::min);
+        assert!(trench < -5500.0, "the trench is still deep: {trench}");
+        // 0 turns the failure off; the key stays under 60 degrees.
+        let mut y = YoungParams {
+            sea_floor_slope_deg: 0.0,
+            ..YoungParams::default()
+        };
+        assert!(y.validate().is_ok());
+        y.sea_floor_slope_deg = 75.0;
+        assert!(y.validate().is_err());
     }
 
     /// P1-23: what the erosion reads of the rock has no L1 cell in it. On a random map of two
