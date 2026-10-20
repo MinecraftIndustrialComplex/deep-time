@@ -35,11 +35,13 @@
 //!      sediment pile's (schist). The plate model blends the rock pools only within one crust
 //!      kind and does not blend ocean crust's felsic and metamorphic pools at all
 //!      (`plates::ridges`, `plates::l1`), so a continent's granite does not spread into the sea
-//!      floor beside it. The pools have
-//!    no burial history, so on continental crust a pool unit steps along its class's metamorphic
-//!    path by the **present** geotherm (`metamorphism.rs`'s temperatures and geotherm, without the
-//!    collision factor): the unit is split at the depths of the isotherms of its path, so a thick
-//!    sedimentary pool is sandstone near the surface and quartzite below the 300 °C isotherm.
+//!      floor beside it.
+//!
+//!    The pools have no burial history, so on continental crust a pool unit steps along its
+//!    class's metamorphic path by the **present** geotherm (`metamorphism.rs`'s temperatures and
+//!    geotherm, without the collision factor): the unit is split at the depths of the isotherms
+//!    of its path, so a thick sedimentary pool is sandstone near the surface and quartzite below
+//!    the 300 °C isotherm.
 //! 4. **The mantle** (peridotite) below the crust, down to the depth asked for.
 //!
 //! Neighbouring units of one class merge. Plutons are bodies, not units (`plutons.rs`).
@@ -770,7 +772,10 @@ mod tests {
             ]
         );
         let th: Vec<f32> = out.iter().map(|u| u.thickness_m).collect();
-        assert!((th[1] - 800.0).abs() < 1.0 && (th[2] - 1200.0).abs() < 1.0, "{th:?}");
+        assert!(
+            (th[1] - 800.0).abs() < 1.0 && (th[2] - 1200.0).abs() < 1.0,
+            "{th:?}"
+        );
         assert!((th[3] - 5000.0).abs() < 1.0, "{th:?}");
         // Keys still grow downwards.
         for w in out.windows(2) {
@@ -807,7 +812,10 @@ mod tests {
             assert!(!classes.contains(&index(name)), "{name} in {classes:?}");
         }
         for name in ["andesite", "granodiorite", "schist", "gabbro"] {
-            assert!(classes.contains(&index(name)), "{name} missing from {classes:?}");
+            assert!(
+                classes.contains(&index(name)),
+                "{name} missing from {classes:?}"
+            );
         }
         // Under an active island arc the plutonic rock is the arc's tonalitic middle crust.
         cell.regime = crate::plates::state::regime::ARC;

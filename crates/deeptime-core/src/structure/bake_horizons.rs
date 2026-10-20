@@ -870,7 +870,10 @@ pub fn bake_with(
     let mut tops = vec![NO_TOP; n * k];
     let mut classes = vec![NO_CLASS; n * k];
     let mut keys = vec![[NO_KEY, NO_KEY]; n * k];
-    let kind: Vec<u8> = (0..n).into_par_iter().map(|c| src.cell(c).crust_type).collect();
+    let kind: Vec<u8> = (0..n)
+        .into_par_iter()
+        .map(|c| src.cell(c).crust_type)
+        .collect();
     tops.par_chunks_mut(k)
         .zip(classes.par_chunks_mut(k))
         .zip(keys.par_chunks_mut(k))
