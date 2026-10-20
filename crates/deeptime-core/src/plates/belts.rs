@@ -407,12 +407,15 @@ fn stack_front(
     // The step's crust: what crossed the front, its thickness and the share that stays.
     let shortened_km = side.conv.max(0.0) * env.dt_myr;
     let crossed_km2 = shortened_km * f.length_km();
+    // Continental crust made from ocean floor keeps the floor's own crust under it (its
+    // basement, `Sample::basement_m`): that goes down with the slab, only the crust on top
+    // stacks (ledger: PLT-331).
     let thickness_m = if f.crust.is_empty() {
         0.0
     } else {
         f.crust
             .iter()
-            .map(|&j| f64::from(samples[j as usize].thickness_m))
+            .map(|&j| f64::from(samples[j as usize].own_thickness_m()))
             .sum::<f64>()
             / f.crust.len() as f64
     };
@@ -452,7 +455,7 @@ fn stack_front(
     // ledger: PLT-248.
     let mut mix = [0.0f64; pool::COUNT];
     for &j in &f.crust {
-        for (m, &x) in mix.iter_mut().zip(samples[j as usize].pools.iter()) {
+        for (m, &x) in mix.iter_mut().zip(samples[j as usize].own_pools().iter()) {
             *m += f64::from(x.max(0.0));
         }
     }

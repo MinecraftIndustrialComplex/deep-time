@@ -261,7 +261,8 @@ pub fn resolve(
         for idx in [o.i, o.cover.major()] {
             let s = &mut state.samples[idx as usize];
             if s.kind != CONTINENTAL && crystalline_m(&s.pools) >= buoyant_m {
-                s.kind = CONTINENTAL;
+                // The floor's own crust stays under the crust on top (ledger: PLT-331).
+                s.make_continental();
                 state.counters.buoyant += 1;
             }
         }
@@ -1165,6 +1166,7 @@ pub fn fronts_finish(
                 for p in s.pools.iter_mut() {
                     *p -= (f64::from(p.max(0.0)) * phi) as f32;
                 }
+                s.basement_m *= (1.0 - phi) as f32;
             }
             // Arc magma and the deposit accumulators.
             let m = plan.magma_m;
