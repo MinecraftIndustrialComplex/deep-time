@@ -85,6 +85,8 @@ final class GenerationPage implements PlanetEditorScreen.Page {
     private final List<Tab> tabsShown = new ArrayList<>();
     /** The map view's box, the area it sits in, and the panel's. */
     private int viewX, viewY, viewW, viewH, panelX, panelY, panelW, panelH, bottom;
+    /** The key's band under the time row (side by side only; 0 high when there is none). */
+    private int keyY, keyH;
     private boolean wide;
     private GenerationStatus.State builtState;
     private Object historyKey, mainKey;
@@ -164,28 +166,37 @@ final class GenerationPage implements PlanetEditorScreen.Page {
         tick();
     }
 
+    /** Where the page's content starts: under the bar, and under the developer's line when it shows. */
+    private static int top() {
+        return details ? TOP + 10 : TOP;
+    }
+
     /**
-     * Places the view and the panel. Side by side: the panel on the right and the map left of it.
-     * Stacked, when the map gets much larger that way (a tall screen such as 2000×1500 at GUI
-     * scale 3): the map across the width, the panel below it.
+     * Places the view and the panel. Side by side: the panel on the right and the map left of it,
+     * as wide as its column allows at the projection's π:1 (a 1920×1080 screen's column is wider
+     * than tall but not π times, so the map fills the width and the shown layer's key fills the
+     * height under the time row). Stacked, when the map gets much larger that way (a tall screen
+     * such as 2000×1500 at GUI scale 3): the map across the width, the panel below it.
      */
     private void layout(int w) {
+        int top = top();
         int sideW = Math.max(140, Math.min(210, w * 32 / 100));
         int sideAreaW = w - 2 * GAP - sideW - GAP;
-        int sideAreaH = bottom - TOP - ROW_H - 4 - 4;
+        int sideAreaH = bottom - top - ROW_H - 4 - 4;
         int[] side = MapWidget.fit(sideAreaW, sideAreaH);
         int fullW = w - 2 * GAP;
         int minPanel = 8 * PanelList.ROW + TAB_H + 8;
-        int stackAreaH = bottom - TOP - ROW_H - 4 - 6 - minPanel;
+        int stackAreaH = bottom - top - ROW_H - 4 - 6 - minPanel;
         int[] stack = MapWidget.fit(fullW, Math.max(20, stackAreaH));
         boolean stacked = stack[0] > side[0] * 5 / 4;
+        keyH = 0;
         if (stacked) {
             viewW = stack[0];
             viewH = stack[1];
             if (globe)
                 viewW = fullW;
             viewX = GAP + (fullW - viewW) / 2;
-            viewY = TOP;
+            viewY = top;
             panelX = GAP;
             panelY = viewY + viewH + 4 + ROW_H + 6;
             panelW = fullW;
@@ -198,12 +209,14 @@ final class GenerationPage implements PlanetEditorScreen.Page {
                 viewH = sideAreaH;
             }
             viewX = GAP + (sideAreaW - viewW) / 2;
-            // The view and its time row as one block, centred in the height.
-            viewY = TOP + Math.max(0, (sideAreaH - viewH) / 2);
+            // At the top beside the panel; what the column has left under the time row holds the key.
+            viewY = top;
+            keyY = viewY + viewH + 4 + ROW_H + 6;
+            keyH = globe ? 0 : bottom - 4 - keyY;
             panelX = w - GAP - sideW;
-            panelY = TOP;
+            panelY = top;
             panelW = sideW;
-            panelH = bottom - 4 - TOP;
+            panelH = bottom - 4 - top;
         }
         wide = panelW >= 400;
     }
@@ -217,9 +230,10 @@ final class GenerationPage implements PlanetEditorScreen.Page {
         tabsShown.clear();
         int listX = panelX, listW = panelW;
         if (wide) {
-            // History has the left half to itself; the tabs switch the right half.
+            // History has the left half to itself, from the tabs' row down (its heading beside them);
+            // the tabs switch the right half.
             int hw = (panelW - GAP) / 2;
-            history = screen.add(new PanelList(Minecraft.getInstance(), panelX, panelY + TAB_H + 2, hw, panelH - TAB_H - 2));
+            history = screen.add(new PanelList(Minecraft.getInstance(), panelX, panelY, hw, panelH));
             listX = panelX + hw + GAP;
             listW = panelW - hw - GAP;
             tabsShown.addAll(List.of(Tab.MAP, Tab.MORE));
@@ -324,7 +338,8 @@ final class GenerationPage implements PlanetEditorScreen.Page {
         int timeW = font.width("0,000");
         rows.add(PanelList.text(Lang.tr("gen.history.column"), 0xff7d8590));
         for (Milestones.Row r : Milestones.of(model.events(), model.cursorTime(), Milestones.bucketYears(model.lengthYears())))
-            rows.add(PanelList.milestone(Phrase.myrAgo(r.tYears()), timeW, r.colour(), Lang.milestone(r), model.freshAt(r.tYears())));
+            rows.addAll(PanelList.milestone(Phrase.myrAgo(r.tYears()), timeW, r.colour(), Lang.milestone(r), model.freshAt(r.tYears()),
+                    list.getRowWidth()));
         return rows;
     }
 
@@ -461,11 +476,12 @@ final class GenerationPage implements PlanetEditorScreen.Page {
         if (fill > GAP)
             g.fill(GAP, barY, fill, barY + 5, colour);
         if (details && model != null)
-            g.drawString(font, font.plainSubstrByWidth(model.progressLine(em.capBytes()), w - 2 * GAP), GAP, barY + 7, 0xff707880, false);
-        separator(g, Screen.HEADER_SEPARATOR, details ? barY + 17 : TOP - 4, w);
+            g.drawString(font, font.plainSubstrByWidth(model.progressLine(em.capBytes()), w - 2 * GAP), GAP, barY + 7, 0xff8a939d, false);
+        separator(g, Screen.HEADER_SEPARATOR, top() - 4, w);
         separator(g, Screen.FOOTER_SEPARATOR, bottom, w);
 
-        // Over the view: the layer's name, "live" while following the newest frame, or what the view waits for.
+        // Over the view: the layer's name, "newest map" while following the newest frame (the
+        // run is ahead of it by up to a keyframe's interval), or what the view waits for.
         if (model != null && model.frameCount() > 0) {
             Component caption = model.layer().map(Lang::layer).orElse(Component.empty());
             label(g, font, caption, viewX + 3, viewY + 3);
@@ -473,6 +489,8 @@ final class GenerationPage implements PlanetEditorScreen.Page {
                 Component live = Lang.tr("gen.live");
                 label(g, font, live, viewX + viewW - 3 - font.width(live), viewY + 3);
             }
+            if (keyH >= 10)
+                drawKey(g, font, viewX, keyY, viewW, keyH);
         } else {
             List<Component> lines = new ArrayList<>();
             switch (state) {
@@ -511,13 +529,137 @@ final class GenerationPage implements PlanetEditorScreen.Page {
         }
     }
 
+    /** Something the key draws at a place on one of its lines. */
+    private interface KeyDraw {
+        void draw(GuiGraphics g, int x, int y);
+    }
+
+    private record KeyOp(int line, int x, int w, KeyDraw draw) {}
+
+    private String keyLayer;
+    private List<Legend.Part> keyParts = List.of();
+
+    /**
+     * The shown layer's key in the band under the time row (side by side, where the map leaves
+     * the column's height free): the Map tab's legend with its colours side by side and wrapped,
+     * as many lines as the band holds, then what the markers are; "…" when the rest is left to
+     * the Map tab.
+     */
+    private void drawKey(GuiGraphics g, Font font, int x, int y, int w, int h) {
+        String layer = model.layer().orElse(null);
+        if (layer == null)
+            return;
+        if (!layer.equals(keyLayer)) {
+            keyLayer = layer;
+            keyParts = Legend.of(Ramps.builtin(), layer);
+        }
+        g.drawString(font, Lang.tr("gen.map.legend", Lang.layer(layer)).withStyle(ChatFormatting.BOLD), x, y, 0xffffd060, false);
+        int lines = (h - 11) / 10;
+        if (lines <= 0)
+            return;
+        List<Legend.Part> parts = new ArrayList<>(keyParts);
+        if (markersOn)
+            parts.add(new Legend.Note(Phrase.of("gen.map.markers.legend")));
+        List<KeyOp> ops = new ArrayList<>();
+        int line = 0, cx = 0;
+        boolean cut = false;
+        outer:
+        for (Legend.Part p : parts) {
+            if (p instanceof Legend.Swatch sw) {
+                Component t = Lang.phrase(sw.text());
+                int tw = 12 + font.width(t);
+                if (cx > 0 && cx + tw > w) {
+                    line++;
+                    cx = 0;
+                }
+                if (line >= lines) {
+                    cut = true;
+                    break;
+                }
+                ops.add(new KeyOp(line, cx, tw, (gg, ox, oy) -> {
+                    gg.fill(ox, oy - 1, ox + 9, oy + 8, 0xff000000);
+                    gg.fill(ox + 1, oy, ox + 8, oy + 7, 0xff000000 | sw.rgb());
+                    gg.drawString(font, t, ox + 12, oy, 0xffd8d8d8, false);
+                }));
+                cx += tw + 8;
+                continue;
+            }
+            // Anything else starts a line of its own.
+            if (cx > 0) {
+                line++;
+                cx = 0;
+            }
+            if (line >= lines) {
+                cut = true;
+                break;
+            }
+            switch (p) {
+                case Legend.Heading hd -> {
+                    Component t = Lang.phrase(hd.text()).withStyle(ChatFormatting.BOLD);
+                    int tw = font.width(t);
+                    ops.add(new KeyOp(line, 0, tw, (gg, ox, oy) -> gg.drawString(font, t, ox, oy, DIM, false)));
+                    cx = tw + 8; // its colours follow on the same line
+                }
+                case Legend.Bar bar -> {
+                    Component lo = Lang.phrase(bar.low()), hi = Lang.phrase(bar.high());
+                    int lw = font.width(lo), hw = font.width(hi);
+                    int bw = Math.min(120, w - lw - hw - 8);
+                    int[] rgb = bar.rgb();
+                    ops.add(new KeyOp(line, 0, lw + bw + hw + 8, (gg, ox, oy) -> {
+                        gg.drawString(font, lo, ox, oy, 0xffd8d8d8, false);
+                        int x0 = ox + lw + 4;
+                        if (bw >= 8) {
+                            gg.fill(x0 - 1, oy - 1, x0 + bw + 1, oy + 8, 0xff000000);
+                            for (int i = 0; i < bw; i++)
+                                gg.fill(x0 + i, oy, x0 + i + 1, oy + 7, 0xff000000 | rgb[Math.min(rgb.length - 1, i * rgb.length / bw)]);
+                        }
+                        gg.drawString(font, hi, x0 + Math.max(0, bw) + 4, oy, 0xffd8d8d8, false);
+                    }));
+                    line++;
+                }
+                case Legend.Note n -> {
+                    for (var seq : font.split(Lang.phrase(n.text()), w)) {
+                        if (line >= lines) {
+                            cut = true;
+                            break outer;
+                        }
+                        ops.add(new KeyOp(line, 0, font.width(seq), (gg, ox, oy) -> gg.drawString(font, seq, ox, oy, DIM, false)));
+                        line++;
+                    }
+                }
+                case Legend.Swatch ignored -> {}
+            }
+        }
+        if (cut) {
+            // "…" at the end of the last line, in place of what no longer fits beside it.
+            int last = lines - 1, dots = font.width("…");
+            while (true) {
+                int end = 0;
+                KeyOp tail = null;
+                for (KeyOp o : ops)
+                    if (o.line() == last && o.x() + o.w() >= end) {
+                        end = o.x() + o.w();
+                        tail = o;
+                    }
+                if (tail == null || end + 6 + dots <= w) {
+                    int at = tail == null ? 0 : end + 6;
+                    ops.add(new KeyOp(last, at, dots, (gg, ox, oy) -> gg.drawString(font, "…", ox, oy, DIM, false)));
+                    break;
+                }
+                ops.remove(tail);
+            }
+        }
+        for (KeyOp o : ops)
+            o.draw().draw(g, x + o.x(), y + 12 + o.line() * 10);
+    }
+
     /** "42% · about 3 min left" while going, "Took 4 min" when done. */
     private Component rightOfStatus(GenerationStatus.State state) {
         if (state == GenerationStatus.State.DONE && model != null)
             return Lang.tr("gen.status.took", Lang.phrase(Phrase.duration(model.progress().elapsedMs() / 1000.0)));
         Optional<Phrase> left = GenerationStatus.timeLeft(em);
         if (state == GenerationStatus.State.RUNNING || state == GenerationStatus.State.BAKING) {
-            String pct = Formats.percent(model.progress().totalPermille());
+            String pct = Formats.percent(model.permille());
             return left.<Component>map(p -> Lang.tr("gen.status.progress", pct, Lang.phrase(p))).orElse(Component.literal(pct));
         }
         return left.<Component>map(Lang::phrase).orElse(null);
@@ -575,6 +717,7 @@ final class GenerationPage implements PlanetEditorScreen.Page {
     boolean keyPressed(int key) {
         if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_F3) {
             details = !details;
+            screen.refresh(); // the line takes a row: the page moves down under it
             return true;
         }
         return false;
@@ -612,7 +755,7 @@ final class GenerationPage implements PlanetEditorScreen.Page {
         @Override
         protected void updateMessage() {
             Optional<KeyframeInfo> f = model == null ? Optional.empty() : model.current();
-            setMessage(f.<Component>map(k -> Lang.phrase(Phrase.yearsAgo(k.t()))).orElse(Lang.tr("gen.scrub")));
+            setMessage(f.<Component>map(k -> Lang.tr("gen.scrub.at", Lang.phrase(Phrase.yearsAgo(k.t())))).orElse(Lang.tr("gen.scrub")));
             setTooltip(Tooltip.create(Lang.tr("gen.scrub.hint")));
         }
 

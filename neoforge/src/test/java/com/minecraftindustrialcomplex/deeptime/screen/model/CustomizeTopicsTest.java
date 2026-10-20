@@ -88,6 +88,8 @@ class CustomizeTopicsTest {
         assertEquals(Phrase.of("customize.range.list"), CustomizeTopics.range(EditorFields.byId("essentials")));
         EditorFields.Field ocean = EditorFields.byId("ocean_fraction");
         assertEquals("customize.range", CustomizeTopics.range(ocean).key(), "no unit");
+        assertEquals(Phrase.of("customize.range.min", "0", ""), CustomizeTopics.range(EditorFields.byId("seed")),
+                "the seed's 2^53 - 1 is no limit a player meets: its range says only where it starts");
         assertFalse(CustomizeTopics.slow(null));
         assertFalse(CustomizeTopics.slow(new Estimate(1L << 30, List.of(new Estimate.Stage("plates", 1L << 30, 600)))));
         assertTrue(CustomizeTopics.slow(new Estimate(1L << 30, List.of(new Estimate.Stage("plates", 1L << 30, 1200),
