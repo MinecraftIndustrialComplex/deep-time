@@ -612,20 +612,24 @@ impl StructureStage {
             deform::undo_order(&mut all);
             let span = (src.now_myr - self.preset.t_start_years() / 1.0e6).max(1.0);
             let now = src.now_myr;
-            // A stock lies in the rock older than itself: under younger cover its top goes down
-            // to the cover's base (its depth is drawn under the present ground, DEF-044).
+            // A stock lies in the rock older than itself: under younger cover (the column as the
+            // bake lays it) its top goes down to the cover's base (its depth is drawn under the
+            // present ground, DEF-044).
             let covers: Vec<f32> = all
                 .par_iter()
-                .map_init(Vec::new, |units, f| {
-                    if f.kind != deform::Kind::Stock || f.base <= 0.0 {
-                        return 0.0;
-                    }
-                    let c = plutons::cell_of(&grid, f.x, f.z);
-                    let deep_m = (src.surface_y(c, &s) - f64::from(s.min_y)) * s.m_per_block_v;
-                    columns::build(&src.cell(c), &self.tables, &self.p, now, deep_m, units);
-                    let key = columns::key::of_age(0, now - f64::from(f.t_myr), span);
-                    (plutons::cover_m(units, key) / s.m_per_block_v) as f32
-                })
+                .map_init(
+                    || (Vec::new(), Vec::new()),
+                    |(units, baked), f| {
+                        if f.kind != deform::Kind::Stock || f.base <= 0.0 {
+                            return 0.0;
+                        }
+                        let c = plutons::cell_of(&grid, f.x, f.z);
+                        let y = src.surface_y(c, &s);
+                        self.baked_column(&src, &s, c, y, units, baked);
+                        let key = columns::key::of_age(0, now - f64::from(f.t_myr), span);
+                        (plutons::cover_m(baked, key) / s.m_per_block_v) as f32
+                    },
+                )
                 .collect();
             let mut under_cover = 0usize;
             for (f, &cover) in all.iter_mut().zip(&covers) {
@@ -1034,7 +1038,10 @@ impl StructureStage {
         let mut written = [0u64; 3];
         let mut zones = 0u64;
         let mut widths: [Vec<f64>; 2] = [Vec::new(), Vec::new()];
-        for (k, list) in [&aureoles.plutons, &aureoles.stocks].into_iter().enumerate() {
+        for (k, list) in [&aureoles.plutons, &aureoles.stocks]
+            .into_iter()
+            .enumerate()
+        {
             for a in list {
                 let id = world.next_body_id();
                 if let Some(b) = a.to_body(id, mh, mv, s.min_y) {
@@ -1295,6 +1302,39 @@ impl StructureStage {
             .collect()
     }
 
+    /// Cell `c`'s whole column (ground at `surface_y`) as the bake lays it, into `baked`
+    /// ([`plutons::as_baked`]; `units` is scratch): what the stocks' cover and the aureoles'
+    /// bands read, so that they test the same horizons the column evaluator will.
+    fn baked_column(
+        &self,
+        src: &CellSource<'_>,
+        s: &ScaleParams,
+        c: usize,
+        surface_y: f64,
+        units: &mut Vec<columns::Unit>,
+        baked: &mut Vec<columns::Unit>,
+    ) {
+        // The bake's own depth (bake_horizons): to the world's floor at its metres per block.
+        let mv = s.m_per_block_v / s.feature_scale.strata;
+        let deep_m = (surface_y - f64::from(s.min_y)).max(1.0) * mv + 100.0;
+        columns::build(
+            &src.cell(c),
+            &self.tables,
+            &self.p,
+            src.now_myr,
+            deep_m,
+            units,
+        );
+        plutons::as_baked(
+            units,
+            surface_y,
+            s,
+            &self.tables,
+            self.p.horizons as usize,
+            baked,
+        );
+    }
+
     /// The contact aureoles of the plutons alive at the end and of the stocks of `all` (baked as
     /// `st`'s events), each with its bands read from the column at its centre
     /// ([`plutons::aureole_bands`]: only rock older than the intrusion), and the roots of the
@@ -1317,54 +1357,60 @@ impl StructureStage {
         let (mh, mv) = (s.m_per_block_h, s.m_per_block_v);
         let key_of = |t_myr: f32| columns::key::of_age(0, now - f64::from(t_myr), span);
         let age_of = |t_myr: f32| Some((now - f64::from(t_myr)).max(0.0) as f32);
-        // The bands of `a` from the column of cell `c`, for an intrusion with stratigraphic key
-        // `key`.
-        let bands = |a: &mut plutons::Aureole, c: usize, key: u16, units: &mut Vec<_>| {
+        // The bands of `a` from its centre's column as the bake lays it (`baked`), for an
+        // intrusion with stratigraphic key `key`.
+        let bands = |a: &mut plutons::Aureole, key: u16, baked: &[columns::Unit]| {
             let [top, base] = a.depths_m(mh, mv);
-            columns::build(&src.cell(c), t, p, now, base.max(0.0) + 1.0, units);
-            a.bands = plutons::aureole_bands(units, t, top.max(0.0), base, key);
+            a.bands = plutons::aureole_bands(baked, t, top.max(0.0), base, key);
         };
         let of_plutons: Vec<plutons::Aureole> = self
             .st
             .plutons
             .par_iter()
             .zip(pluton_y.par_iter())
-            .map_init(Vec::new, |units, (pl, &y)| {
-                let mut a = plutons::Aureole::of_pluton(pl, y, mh, mv, now);
-                if a.width_m > 0.0 {
-                    let c = plutons::cell_of(grid, pl.x, pl.z);
-                    bands(&mut a, c, key_of(pl.t_myr), units);
-                }
-                a
-            })
+            .map_init(
+                || (Vec::new(), Vec::new()),
+                |(units, baked), (pl, &y)| {
+                    let mut a = plutons::Aureole::of_pluton(pl, y, mh, mv, now);
+                    if a.width_m > 0.0 {
+                        let c = plutons::cell_of(grid, pl.x, pl.z);
+                        self.baked_column(src, s, c, y, units, baked);
+                        bands(&mut a, key_of(pl.t_myr), baked);
+                    }
+                    a
+                },
+            )
             .collect();
         let of_stocks: Vec<plutons::Aureole> = all
             .par_iter()
             .zip(st.events.par_iter())
             .filter(|(f, _)| f.kind == deform::Kind::Stock)
-            .map_init(Vec::new, |units, (f, e)| {
-                let (centre, axes, yaw) = plutons::stock_frame(e)?;
-                let c = plutons::cell_of(grid, centre[0], centre[2]);
-                let surface_y = src.surface_y(c, s);
-                let top_m = (surface_y - (centre[1] + axes[1])) * mv;
-                columns::build(&src.cell(c), t, p, now, top_m.max(0.0) + 1.0, units);
-                let host = plutons::host_class(units, top_m.max(0.0));
-                let size = plutons::stock_size_m(axes, mh, mv);
-                let mut a = plutons::Aureole {
-                    centre,
-                    axes,
-                    yaw,
-                    width_m: plutons::aureole_width_m(p, t, size, host),
-                    surface_y,
-                    bands: Vec::new(),
-                    hollow: true,
-                    age_ma: age_of(f.t_myr),
-                };
-                if a.width_m > 0.0 {
-                    bands(&mut a, c, e.key, units);
-                }
-                Some(a)
-            })
+            .map_init(
+                || (Vec::new(), Vec::new()),
+                |(units, baked), (f, e)| {
+                    let (centre, axes, yaw) = plutons::stock_frame(e)?;
+                    let c = plutons::cell_of(grid, centre[0], centre[2]);
+                    let surface_y = src.surface_y(c, s);
+                    let top_m = (surface_y - (centre[1] + axes[1])) * mv;
+                    self.baked_column(src, s, c, surface_y, units, baked);
+                    let host = plutons::host_class(baked, top_m.max(0.0));
+                    let size = plutons::stock_size_m(axes, mh, mv);
+                    let mut a = plutons::Aureole {
+                        centre,
+                        axes,
+                        yaw,
+                        width_m: plutons::aureole_width_m(p, t, size, host),
+                        surface_y,
+                        bands: Vec::new(),
+                        hollow: true,
+                        age_ma: age_of(f.t_myr),
+                    };
+                    if a.width_m > 0.0 {
+                        bands(&mut a, e.key, baked);
+                    }
+                    Some(a)
+                },
+            )
             .flatten()
             .collect();
         let roots = rooted

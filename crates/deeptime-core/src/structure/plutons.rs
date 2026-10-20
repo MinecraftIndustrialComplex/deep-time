@@ -37,9 +37,11 @@
 //!   carbonate, hornfels where it is any other non-crystalline rock, none in crystalline rock
 //!   (RCK-054; skarn is calc-silicate rock from carbonate, Meinert 1992; the fine-grained rock
 //!   baked from other hosts is hornfels, Nelson, Tulane). Only rock older than the intrusion is
-//!   baked, by the structural events' own test (a unit's youngest key): the cover laid on an
-//!   unroofed pluton is not. A stock lies in the rock older than itself: under younger cover its
-//!   top goes down to the cover's base ([`cover_m`]). The aureole body's ids come before the
+//!   baked, by the structural events' own test (a horizon's youngest key) on the column as the
+//!   bake will lay it ([`as_baked`]: a pile of one rock merged over an unconformity is cover as
+//!   a whole): the cover laid on an unroofed pluton is not. A stock lies in the rock older than
+//!   itself: under younger cover its top goes down to the cover's base ([`cover_m`]). The
+//!   aureole body's ids come before the
 //!   plutons', so a pluton paints over the aureole's inner part; a stock's aureole (`deform`'s
 //!   stocks are structural events, not bodies) leaves the stock's own volume alone instead
 //!   ([`Aureole::hollow`]). Bodies are not moved by the faults younger than them, so an aureole
@@ -58,12 +60,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::deposits::fields::cell_area_km2;
 use crate::deposits::random::Rng;
+use crate::params::ScaleParams;
 use crate::plates::kinematics::rotation;
 use crate::plates::state::{ARC, CONTINENTAL, regime};
 use crate::sphere::BlockFrame;
 use crate::surface::lithology::{index, table};
 use crate::synth::EVERY_CLASS;
 
+use super::bake_horizons;
 use super::columns::{self, Tables};
 use super::params::StructureParams;
 
@@ -154,7 +158,13 @@ pub fn intensity(x: &ArcInputs<'_>, c: usize, p: &StructureParams) -> f64 {
 /// module docs).
 pub fn aureole_width_m(p: &StructureParams, t: &Tables, size_m: f64, host: Option<u16>) -> f64 {
     let carbonate = host.is_some_and(|h| t.carbonate.get(usize::from(h)) == Some(&true));
-    p.aureole_share * size_m * if carbonate { p.aureole_carbonate_factor } else { 1.0 }
+    p.aureole_share
+        * size_m
+        * if carbonate {
+            p.aureole_carbonate_factor
+        } else {
+            1.0
+        }
 }
 
 /// Draws this step's new plutons. `host_at(c, depth)` gives the host class at depth `depth`
@@ -451,7 +461,8 @@ pub struct Band {
     pub class: u16,
 }
 
-/// The aureole's bands in a column (`units`, top down from the ground) between the depths
+/// The aureole's bands in a column (`units`, top down from the ground, as the bake lays them:
+/// [`as_baked`]) between the depths
 /// `from_m` and `to_m`: each unit older than the intrusion takes its host's aureole class
 /// ([`aureole_class`]). Older is the structural events' own test: a unit whose top key (its
 /// youngest part) is at least `key`, the intrusion's stratigraphic key. A unit whose keys
@@ -493,7 +504,8 @@ pub fn aureole_bands(
 }
 
 /// How deep the cover younger than an intrusion of stratigraphic key `key` reaches in a column
-/// (`units`, top down from the ground), m: the depth of the first unit older than it by the
+/// (`units`, top down from the ground, as the bake lays them: [`as_baked`]), m: the depth of
+/// the first unit older than it by the
 /// structural events' test ([`aureole_bands`]), or the whole of `units` when none is. A stock
 /// placed in that cover would replace nothing (the column evaluator leaves younger rock alone)
 /// and its aureole would bake rock laid after it, so its top goes down to there.
@@ -506,6 +518,54 @@ pub fn cover_m(units: &[columns::Unit], key: u16) -> f64 {
         top += f64::from(u.thickness_m);
     }
     top
+}
+
+/// The column as the column evaluator will read it: `units` (top down from the ground at
+/// `surface_y`) baked into horizons as the bake lays them ([`bake_horizons::bake_cell`] at the
+/// bake's metres per block for strata, `k` horizons at most), each returned as a unit of its
+/// horizon's class and key span, its thickness in metres of `s.m_per_block_v` so that a depth
+/// reads as the blocks it lies at, as the bodies' depths do. The bake merges neighbours of one
+/// class and key domain into one horizon whose youngest key is its top's, and the structural
+/// events' test reads that key, so a pile of one rock laid over an unconformity is younger cover
+/// as a whole: [`aureole_bands`] and [`cover_m`] read this, not the strata log's units.
+pub fn as_baked(
+    units: &[columns::Unit],
+    surface_y: f64,
+    s: &ScaleParams,
+    t: &Tables,
+    k: usize,
+    out: &mut Vec<columns::Unit>,
+) {
+    let mut tops = vec![0i16; k];
+    let mut classes = vec![0u8; k];
+    let mut keys = vec![[0u16; 2]; k];
+    let n = bake_horizons::bake_cell(
+        units,
+        surface_y,
+        s.min_y,
+        s.max_y,
+        s.m_per_block_v / s.feature_scale.strata,
+        &t.min_blocks,
+        &mut tops,
+        &mut classes,
+        &mut keys,
+    );
+    out.clear();
+    let mut top = surface_y;
+    for h in 0..n {
+        let bottom = if h + 1 < n {
+            f64::from(tops[h + 1]) / 16.0
+        } else {
+            f64::from(s.min_y)
+        };
+        out.push(columns::Unit {
+            class: u16::from(classes[h]),
+            thickness_m: ((top - bottom).max(0.0) * s.m_per_block_v) as f32,
+            source: columns::Source::Log,
+            key: keys[h],
+        });
+        top = bottom;
+    }
 }
 
 /// How many slabs a hollow aureole's zones follow the intrusion's wall in. Game choice: enough
@@ -937,10 +997,7 @@ mod tests {
             outcrop_at(&cut, &t, r2, r2g, Some(index("limestone"))),
             Some(index("skarn"))
         );
-        assert_eq!(
-            outcrop_at(&cut, &t, r2, r2g, Some(index("granite"))),
-            None
-        );
+        assert_eq!(outcrop_at(&cut, &t, r2, r2g, Some(index("granite"))), None);
         // Younger cover (no older host at the surface): nothing baked.
         assert_eq!(outcrop_at(&cut, &t, r2, r2g, None), None);
         // 7.5 km out: past the aureole.
@@ -1003,6 +1060,38 @@ mod tests {
                 class: index("hornfels")
             }]
         );
+    }
+
+    #[test]
+    fn the_bake_merges_one_rock_over_an_unconformity_into_cover() {
+        // Young shale laid on old shale: the bake makes one horizon of them with the young
+        // key on top, so the column evaluator and the aureole take both as cover.
+        let t = Tables::get();
+        let mut s: ScaleParams =
+            serde_json::from_value(serde_json::json!({ "circumference_blocks": 16384 })).unwrap();
+        s.m_per_block_v = 20.0;
+        let units = [
+            unit("shale", 200.0, [4096, 5000]),
+            unit("shale", 1000.0, [9000, 12000]),
+            unit("limestone", 1000.0, [12000, 13000]),
+            unit("granite", 30000.0, [40000, 40100]),
+        ];
+        assert!((cover_m(&units, 8000) - 200.0).abs() < 1e-9);
+        let mut baked = Vec::new();
+        as_baked(&units, 100.0, &s, &t, 8, &mut baked);
+        assert_eq!(
+            baked.iter().map(|u| u.class).collect::<Vec<_>>(),
+            vec![index("shale"), index("limestone"), index("granite")]
+        );
+        assert_eq!(baked[0].key[0], 4096);
+        assert!((cover_m(&baked, 8000) - 1200.0).abs() < 2.0);
+        let bands = aureole_bands(&baked, &t, 0.0, 4000.0, 8000);
+        assert_eq!(bands.len(), 1);
+        assert_eq!(bands[0].class, index("skarn"));
+        assert!((bands[0].top_m - 1200.0).abs() < 2.0 && (bands[0].base_m - 2200.0).abs() < 2.0);
+        // Its depths read in blocks of `m_per_block_v`, down to the world's floor.
+        let total: f64 = baked.iter().map(|u| f64::from(u.thickness_m)).sum();
+        assert!((total - (100.0 - f64::from(s.min_y)) * 20.0).abs() < 1.0);
     }
 
     #[test]
