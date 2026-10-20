@@ -11,8 +11,8 @@ import java.util.Map;
  * The generation page's History list (docs/design/create-world-ux.md): the event log grouped and
  * counted in plain words instead of one row per event. Events are cut into time windows of
  * {@link #bucketYears} (a fiftieth of the run, at least a million years); within a window the
- * events of one kind make one row, "8 new ocean ridges formed". Newest window first, and within a
- * window the most frequent kind first. Each row carries its kind's colour ({@link EventStyle}, the
+ * events of one kind make one row, "8 new ocean ridges formed". Newest first, by window and then by
+ * each row's newest event (the most frequent kind first on a tie), so the times read in order. Each row carries its kind's colour ({@link EventStyle}, the
  * map markers' and the workbench's), so the list is also the markers' legend.
  */
 public final class Milestones {
@@ -71,7 +71,9 @@ public final class Milestones {
             List<Row> rows = new ArrayList<>();
             for (Map.Entry<String, double[]> k : windows.get(w).entrySet())
                 rows.add(new Row(k.getValue()[1], k.getKey(), (int) k.getValue()[0], EventStyle.colour(k.getKey())));
-            rows.sort(Comparator.comparingInt(Row::count).reversed().thenComparing(Row::kind));
+            // Newest first inside the window too, so the time column reads in order down the list.
+            rows.sort(Comparator.comparingDouble(Row::tYears).reversed()
+                    .thenComparing(Comparator.comparingInt(Row::count).reversed()).thenComparing(Row::kind));
             for (Row r : rows) {
                 if (out.size() >= MAX_ROWS)
                     return out;
