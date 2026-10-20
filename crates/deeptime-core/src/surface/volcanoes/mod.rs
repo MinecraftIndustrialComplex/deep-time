@@ -1027,9 +1027,12 @@ impl VolcanoStage {
                 .iter()
                 .filter(|v| {
                     // New vents keep clear of live cones, of the just-dead and of dead cones
-                    // still standing at half their height.
+                    // still standing at half their height. A cone that outlived its life died
+                    // at its end, not at the step that found it dead (the same at 2-Myr steps,
+                    // where the two are less than the `recent` apart; at longer steps the slot
+                    // would stay shut a step too long, P1-19 #27).
                     v.kind == Kind::Strato
-                        && (v.extinct_myr.is_none_or(|e| t - e < recent)
+                        && (v.extinct_myr.is_none_or(|e| t - e.min(v.dies_myr) < recent)
                             // ledger: VOL-040
                             || v.height_m >= 0.5 * v.peak_m)
                 })
