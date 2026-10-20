@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 """Carries the VM's client stage into Ben's Prism instance (run on the laptop).
 
-    tools/remote/play-client-apply.py --hash 8f2b7e79 [--instance <minecraft dir>] [--dry-run]
+    tools/remote/play-client-apply.py --hash 8f2b7e79 [--instance <minecraft dir>] [--dry-run] [--devmap] [--extra-mod JAR]...
 
 The stage is /data/ban/play/<hash>-client/minecraft/ on the test VM, built by
 tools/remote/vm/play-client-stage.sh: the MIC pack's last commit installed with packwiz-installer
@@ -21,10 +21,20 @@ in minecraft/ at all). What changes:
 
 Nothing here is heavy: one rsync of the changed jars. It refuses to run while a Minecraft process
 has the instance open.
+
+Opt-in extras, for dev play tests (never the pack's):
+
+  * --devmap also puts the internal developer map (mod id deeptime_devmap) in mods/: the play
+    folder's own deeptime_devmap-*.jar (/data/ban/play/<hash>/mods, put there by play-stage.sh
+    --devmap), so the client runs the server's build. Not needed when the stage was built with
+    play-client-stage.sh --devmap (the mirror brings it then). Without either, the mirror removes
+    a dev map jar the instance held: a later plain apply takes it out again.
+  * --extra-mod JAR (repeatable) copies a local jar into mods/ after the mirror.
 """
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -62,7 +72,14 @@ def main():
     ap.add_argument("--hash", required=True, help="the play folder's name; the stage is <hash>-client")
     ap.add_argument("--instance", default=DEFAULT_INSTANCE, help="the instance's minecraft folder")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--devmap", action="store_true",
+                    help="also install the play folder's deeptime_devmap jar (the internal dev map; opt-in)")
+    ap.add_argument("--extra-mod", action="append", default=[], metavar="JAR",
+                    help="also copy this local jar into mods/ (repeatable; opt-in)")
     a = ap.parse_args()
+    for j in a.extra_mod:
+        if not (os.path.isfile(j) and j.endswith(".jar")):
+            sys.exit(f"play-client-apply: --extra-mod {j}: not a jar file")
     inst = os.path.abspath(a.instance)
     if not os.path.isfile(os.path.join(inst, "packwiz.json")):
         sys.exit(f"play-client-apply: {inst} has no packwiz.json (not the instance's minecraft folder?)")
@@ -100,6 +117,18 @@ def main():
         print("mods/: mirror the stage (checksums; extra jars are deleted)")
         os.makedirs(os.path.join(inst, "mods"), exist_ok=True)
         rsync(["-rl", "--checksum", "--delete", "--itemize-changes", stage + "mods/", os.path.join(inst, "mods") + "/"], a.dry_run)
+        if a.devmap:
+            print("mods/: + the play folder's dev map jar (--devmap)")
+            src = f"{HOST}:/data/ban/play/{a.hash}/mods/deeptime_devmap-*.jar"
+            try:
+                rsync(["--checksum", "--itemize-changes", src, os.path.join(inst, "mods") + "/"], a.dry_run)
+            except subprocess.CalledProcessError:
+                sys.exit(f"play-client-apply: --devmap: no deeptime_devmap-*.jar in /data/ban/play/{a.hash}/mods "
+                         "(tools/remote/vm/play-stage.sh --mods-only --hash <hash> --devmap first)")
+        for j in a.extra_mod:
+            print(f"mods/: + {j} (--extra-mod)")
+            if not a.dry_run:
+                shutil.copy2(j, os.path.join(inst, "mods", os.path.basename(j)))
 
         if copy:
             lst = os.path.join(tmp, "files.txt")
