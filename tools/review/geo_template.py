@@ -8,7 +8,10 @@ section figures OUT/<line>-<start>-s<seed>.png (one panel per tag).
 
 Ocean crust census (the triage's format): the sea columns of the 208-block grid whose crust has an
 age (`meta/crust_age_myr`), by age band: the mean thickness of each rock group and the share of
-columns holding any of it, and the median depth from the sea floor to the first peridotite.
+columns holding any of it, the share holding granite and gneiss themselves (the continental
+classes), and the median depth from the sea floor to the first peridotite. Each start is also
+pooled over its seeds, and OUT/ocean_census.png draws the pooled bands of every tag beside Earth's
+Penrose column.
 """
 import collections
 import glob
@@ -66,6 +69,10 @@ def row_of(d):
                 strata=[(s['top'], s['bottom'], s['class']) for s in d.get('strata') or []])
 
 
+# Single classes counted on their own (the continental ones the review found under the sea).
+CLASSES = ['granite', 'gneiss']
+
+
 def stack(r):
     t = collections.Counter()
     first = {}
@@ -74,6 +81,8 @@ def stack(r):
             continue
         g = grp(c)
         t[g] += top - bot + 1
+        if c in CLASSES:
+            t['class:' + c] += top - bot + 1
         first.setdefault(g, top)
     moho = first.get('peridotite')
     return t, (r['top_y'] - moho) if moho is not None else None
@@ -93,7 +102,7 @@ def census(rows):
         for r in sel:
             t, c = stack(r)
             tot.update(t)
-            for g, _ in GROUPS:
+            for g in [g for g, _ in GROUPS] + ['class:' + c for c in CLASSES]:
                 if t[g] > 0:
                     has[g] += 1
             if c is not None:
@@ -101,6 +110,7 @@ def census(rows):
         return {'label': label, 'n': n,
                 'mean_m': {g: tot[g] / n * M_PER_BLOCK for g, _ in GROUPS},
                 'share': {g: has[g] / n for g, _ in GROUPS},
+                'class_share': {c: has['class:' + c] / n for c in CLASSES},
                 'seabed_to_peridotite_m': statistics.median(crust) * M_PER_BLOCK if crust else None}
 
     for lo, hi in BANDS:
@@ -162,6 +172,7 @@ def runs(root):
 
 def fmt_band(b):
     cells = [f"{b['mean_m'][g]:.0f} ({b['share'][g] * 100:.0f}%)" for g in SHOW]
+    cells += [f"{b['class_share'][c] * 100:.0f}%" for c in CLASSES]
     moho = b['seabed_to_peridotite_m']
     return '| ' + ' | '.join([b['label'], str(b['n'])] + cells +
                              [f"{moho / 1000:.1f}" if moho is not None else '-']) + ' |'
@@ -196,9 +207,11 @@ def main():
     root, out = sys.argv[1], sys.argv[2]
     os.makedirs(out, exist_ok=True)
     report = {}
+    grids = {}
     for name, (tag, start, seed) in runs(root).items():
         base = os.path.join(root, name)
         grid = [row_of(d) for d in load(base + '-grid.jsonl') if 'err' not in d]
+        grids[name] = grid
         man = json.load(open(os.path.join(base, 'manifest.json')))
         bake = (man.get('notes') or {}).get('bake') or {}
         strata = bake.get('strata') or {}
@@ -217,12 +230,45 @@ def main():
             'deposits': deposit_counts(deposits),
             'bodies': bodies_check(bodies, deposits),
         }
-    json.dump(report, open(os.path.join(out, 'report.json'), 'w'), indent=1)
+    # Pooled over the seeds: per tag and start, and per tag over every start.
+    pooled = {}
+    for name, r in report.items():
+        for key in ((r['tag'], r['start']), (r['tag'], 'all starts')):
+            pooled.setdefault(key, []).extend(grids[name])
+    pooled = {f'{t} {s}': census(rows) for (t, s), rows in sorted(pooled.items())}
+    json.dump({'runs': report, 'pooled': pooled}, open(os.path.join(out, 'report.json'), 'w'),
+              indent=1)
 
     md = ['# Crust template and relief lift review', '']
     head = ('| age band | n | ' + ' | '.join(f'{g} m (share)' for g in SHOW) +
-            ' | seabed to peridotite km |')
-    sep = '|' + '---|' * (len(SHOW) + 3)
+            ' | ' + ' | '.join(f'{c} (share)' for c in CLASSES) + ' | seabed to peridotite km |')
+    sep = '|' + '---|' * (len(SHOW) + len(CLASSES) + 3)
+    md += ['## Pooled over seeds', '']
+    for key, c in pooled.items():
+        md += [f'### {key}', '', f"ocean columns {c['ocean']}, land share of grid "
+               f"{c['land_share_of_grid']:.3f}", '', head, sep]
+        md += [fmt_band(b) for b in c['bands']]
+        if c['continental_sea']:
+            md.append(fmt_band(c['continental_sea']))
+        md.append('')
+    md += ['## Per run: what else moved', '',
+           '| run | land share | fill >= 8 most | fill >= 30 most | lifted cells | mean lift | '
+           'sites | bodies | bodies above ground |', '|' + '---|' * 9]
+    for name in sorted(report):
+        r = report[name]
+        mf = {round(x['min_relief_blocks']): x for x in (r['mountain_fill'] or {}).get('by_relief', [])}
+        lift = r['lift'] or {}
+        d = r['deposits'] or {}
+        b = r['bodies'] or {}
+        cell = [name, f"{r['census']['land_share_of_grid']:.3f}"]
+        cell += [f"{mf[k]['top_unit_fills_most']:.3f} of {mf[k]['cells']}" if k in mf else '-'
+                 for k in (8, 30)]
+        cell += [str(lift.get('cells', '-')),
+                 f"{lift['mean_blocks']:.1f}" if 'mean_blocks' in lift else '-',
+                 str(d.get('sites', '-')), str(d.get('bodies', '-')),
+                 f"{b['centre_above_ground']:.3f} of {b['checked']}" if b else '-']
+        md.append('| ' + ' | '.join(cell) + ' |')
+    md.append('')
     for name in sorted(report):
         r = report[name]
         c = r['census']
@@ -273,7 +319,43 @@ def main():
             if panels:
                 section_plot(plt, panels, os.path.join(out, f'{line}-{start}-s{seed}.png'),
                              f'{line} {start} s{seed}')
+    census_plot(plt, pooled, os.path.join(out, 'ocean_census.png'))
     print('report', os.path.join(out, 'report.md'))
+
+
+def census_plot(plt, pooled, path):
+    """The pooled ocean bands of every tag (all starts) as stacked bars, sea floor to peridotite,
+    beside Earth's Penrose column (GlobSed's deep-ocean 0.4 km of sediment, Christeson et al.
+    2019's 1.84 km layer 2 split as the mod splits it, White et al. 1992's 7.1 km igneous crust)."""
+    bars = []
+    for key, c in pooled.items():
+        if not key.endswith('all starts'):
+            continue
+        tag = key.split(' ')[0]
+        for b in c['bands']:
+            if b['label'] != 'all ages':
+                bars.append((f"{tag}, {b['label']}", b['mean_m'], b['n'], b['share']['granitoid'],
+                             b['class_share']['granite']))
+    bars.append(('Earth, Penrose', {'sed': 404, 'lava': 740, 'dikes': 1100, 'gabbro': 7100 - 1840},
+                 None, None, None))
+    fig, ax = plt.subplots(figsize=(11, 0.45 * len(bars) + 1.5))
+    for i, (label, m, n, fel, gr) in enumerate(reversed(bars)):
+        left = 0.0
+        for g in SHOW:
+            w = m.get(g, 0.0) / 1000.0
+            ax.barh(i, w, left=left, color=COLOURS[g], height=0.8)
+            left += w
+        if n is not None:
+            ax.text(left + 0.1, i, f'n={n}, felsic plutonic in {fel * 100:.0f}%, granite in '
+                    f'{gr * 100:.0f}%', va='center', fontsize=7)
+    ax.set_yticks(range(len(bars)))
+    ax.set_yticklabels([b[0] for b in reversed(bars)], fontsize=7)
+    ax.set_xlabel('mean thickness, km (blocks x 35 m), top of rock to top of peridotite')
+    handles = [plt.Rectangle((0, 0), 1, 1, color=COLOURS[g]) for g in SHOW]
+    ax.legend(handles, SHOW, fontsize=7, loc='lower right')
+    fig.tight_layout()
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
 
 
 if __name__ == '__main__':

@@ -3,7 +3,8 @@
 """Where ocean crust's felsic and metamorphic rock lies on a checkpoint (the crust-template review,
 tools/review/geo-template.sh): reads a `deeptime dump-fields` folder and prints, for the oceanic L1
 cells, the share holding felsic plutonic, metamorphic and sedimentary rock and their mean
-thickness by distance (in cells, x wrapping) from the nearest continental cell, and by crust age.
+thickness by distance (in cells, x wrapping) from the nearest continental cell, by crust age and
+by regime, with the crystalline crust and the sediment cover over it (km).
 
     python3 geo_template_fields.py <dump-fields folder>
 """
@@ -40,6 +41,9 @@ names = {
     'sedy': find('pool', 'sedimentary_m'),
     'sed': find('pool', 'sediment_m'),
     'mv': find('pool', 'mafic_volcanic'),
+    'mp': find('pool', 'mafic_plutonic'),
+    'fv': find('pool', 'felsic_volcanic'),
+    'regime': find('regime'),
 }
 print('fields:', json.dumps(names))
 if not names['kind'] or not names['fp']:
@@ -72,7 +76,7 @@ while q:
 
 
 def table(key, label):
-    rows = collections.defaultdict(lambda: [0, 0, 0, 0.0, 0.0, 0.0])
+    rows = collections.defaultdict(lambda: [0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0])
     for c in range(n):
         if not ocean[c]:
             continue
@@ -86,11 +90,13 @@ def table(key, label):
         r[3] += f['fp'][c]
         r[4] += f['met'][c]
         r[5] += f['sedy'][c] if 'sedy' in f else 0
-    print(f'\n{label:>14} {"cells":>7} {"fp>50m":>7} {"met>50m":>8} {"fp m":>7} {"met m":>7} {"sedy m":>7}')
+        r[6] += sum(f[k][c] for k in ('fp', 'met', 'mv', 'mp', 'fv') if k in f)
+        r[7] += sum(f[k][c] for k in ('sed', 'sedy') if k in f)
+    print(f'\n{label:>14} {"cells":>7} {"fp>50m":>7} {"met>50m":>8} {"fp m":>7} {"met m":>7} {"sedy m":>7} {"cryst km":>8} {"cover km":>8}')
     for b in sorted(rows):
         r = rows[b]
         print(f'{b:>14} {r[0]:>7} {r[1] / r[0]:>7.2f} {r[2] / r[0]:>8.2f} {r[3] / r[0]:>7.0f} '
-              f'{r[4] / r[0]:>7.0f} {r[5] / r[0]:>7.0f}')
+              f'{r[4] / r[0]:>7.0f} {r[5] / r[0]:>7.0f} {r[6] / r[0] / 1e3:>8.1f} {r[7] / r[0] / 1e3:>8.1f}')
 
 
 EDGES = [1, 2, 3, 5, 8, 13, 21, 34, 1 << 29]
@@ -116,5 +122,20 @@ def by_age(c):
     return None
 
 
+REGIMES = ['ocean_basin', 'ridge', 'trench', 'arc', 'back_arc', 'collision', 'rift', 'hotspot',
+           'craton', 'passive_margin']
+
+
+def by_regime(c):
+    if 'regime' not in f:
+        return None
+    r = f['regime'][c]
+    if r != r:
+        return None
+    r = int(r)
+    return f'{r} {REGIMES[r]}' if 0 <= r < len(REGIMES) else str(r)
+
+
 table(by_dist, 'cells to land')
 table(by_age, 'age Myr')
+table(by_regime, 'regime')
