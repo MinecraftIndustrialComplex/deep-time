@@ -1573,9 +1573,9 @@ mod petroff_guyou_tests {
 
     #[test]
     fn exact_inputs_on_the_diagonals_round_trip() {
-        // Sphere → block → sphere on the forward's degenerate lines (SCL-083). Before 2026-10-20 the
-        // forward lost its last angle there: up to 1.6° off on the equator and 10.5° at the cone
-        // points of the play world (6656, λc 146), whose cone points clamped to (616, −3328).
+        // Sphere → block → sphere on the forward's degenerate lines (SCL-083). Before 2026-10-20
+        // the forward lost its last angle there: up to 1.6° off on the equator and 10.5° at the
+        // cone points of the play world (6656, λc 146), whose cone points clamped to (616, −3328).
         for (b, lc) in WORLDS.into_iter().chain([(6_656, 146.0), (6_656, 31.25)]) {
             let g = PetroffGuyou::new(b, lc);
             let (bf, h) = (f64::from(b), f64::from(b) / 2.0);
