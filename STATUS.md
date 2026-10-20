@@ -97,7 +97,6 @@ Only what is Ben's to decide stays here (his rule of 2026-10-16): architecture, 
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
-| 2026-10-20 | Crust templates and the relief lift (review D1) | PLT-294: should the transition's ocean side be ocean crust (`tectonics.transition_ocean_crust` on) instead of the continent's rock? Recommended: turn it on; on the measured planets the ocean-basin L1 cells holding felsic plutonic rock fall from 0.73 to 0.46 and land from 0.32 to about 0.27 (Earth 0.29, master 0.30). Or keep it off and keep the land. | build log 2026-10-20, through the coordinator |
 
 ## Follow-ups from decided questions
 Work left behind by questions decided under Ben's rule of 2026-10-16 (decide what can be undone, then tell; decisions log 2026-10-16). Each line is a task for whoever next touches that area; remove the line when it lands. Sizes: small is under a day, medium is one to three days, large is more.

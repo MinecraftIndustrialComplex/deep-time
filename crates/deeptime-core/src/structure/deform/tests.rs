@@ -113,7 +113,7 @@ fn the_column_rule_is_the_noddy_port() {
             ));
         }
     }
-    let check = lattice::noddy_check(&features, &st, &index, &sample, -352.0, 640.0, 7.0);
+    let check = lattice::noddy_check(&features, &st, &index, &sample, -352.0, 640.0, 7.0, 1e-6);
     println!(
         "noddy_check: {} columns ({} with events), {} points, {:.2} events per point, worst {:.3e}, \
          side flips {}, {:.0} ns/point Noddy, {:.0} ns/point columns",
@@ -290,7 +290,7 @@ fn a_planet_of_structures_evaluates_on_a_lattice() {
             )
         })
         .collect();
-    let check = lattice::noddy_check(&features, &st, &index, &sample, -352.0, 640.0, 16.0);
+    let check = lattice::noddy_check(&features, &st, &index, &sample, -352.0, 640.0, 16.0, 1e-6);
     // (Rounding only: at the default vertical scale faults dip 80° to 85° in blocks, and the two
     // frames' rounding differs by up to about 1 / cos(dip) times more than at 1:1.)
     assert!(check.worst < 1e-4, "{check:?}");
@@ -403,7 +403,7 @@ fn a_place_with_more_structures_than_one_noddy_history_holds() {
     let sample: Vec<(f64, f64)> = (0..25)
         .map(|k| (f64::from(k % 5) * 9.0 - 18.0, f64::from(k / 5) * 9.0 - 18.0))
         .collect();
-    let check = lattice::noddy_check(&features, &st, &index, &sample, -352.0, 640.0, 16.0);
+    let check = lattice::noddy_check(&features, &st, &index, &sample, -352.0, 640.0, 16.0, 1e-6);
     assert_eq!(check.columns_with_events, 25);
     assert_eq!(check.max_history, 420, "every structure reaches the middle");
     assert_eq!(check.long_histories, 25);
