@@ -208,6 +208,9 @@ pub struct StepRec {
     pub arc_oceanic: ArcStat,
     #[serde(default)]
     pub arc_continental: ArcStat,
+    /// The subducting boundary by slab length, convergence and contact age ([`FrontBands`]).
+    #[serde(default)]
+    pub front_bands: FrontBands,
 }
 
 /// One plate's force budget in a step (`forces.rs`, version 4): the size of each torque term,
@@ -882,15 +885,7 @@ pub fn classify_boundary(v_kind: u8, nbrs: &[Neighbour]) -> Option<(usize, u32)>
     if nbrs.is_empty() {
         return None;
     }
-    let mut best = f64::NEG_INFINITY;
-    let mut front: Option<&Neighbour> = None;
-    for n in nbrs {
-        if n.normal < 0.0 && n.side == Side::Over && -n.along > best {
-            best = -n.along;
-            front = Some(n);
-        }
-    }
-    if let Some(n) = front {
+    if let Some(n) = front_index(nbrs).map(|k| &nbrs[k]) {
         let class = if n.kind == CONTINENTAL {
             mix::COLLISION
         } else if v_kind == CONTINENTAL {
@@ -912,6 +907,85 @@ pub fn classify_boundary(v_kind: u8, nbrs: &[Neighbour]) -> Option<(usize, u32)>
     Some((mix::OTHER, 1))
 }
 
+/// Which of a boundary sample's neighbours makes it a front ([`classify_boundary`]): the
+/// fastest-converging one across the boundary on the subducting side of an active contact.
+fn front_index(nbrs: &[Neighbour]) -> Option<usize> {
+    let mut best = f64::NEG_INFINITY;
+    let mut front = None;
+    for (k, n) in nbrs.iter().enumerate() {
+        if n.normal < 0.0 && n.side == Side::Over && -n.along > best {
+            best = -n.along;
+            front = Some(k);
+        }
+    }
+    front
+}
+
+/// The lower edges of [`FrontBands::slab`]'s bands, km of slab.
+pub const SLAB_BANDS_KM: [f64; BANDS] = [0.0, 50.0, 100.0, 150.0, 300.0, 600.0];
+/// The lower edges of [`FrontBands::normal`]'s bands, mm/yr of convergence across the boundary.
+pub const NORMAL_BANDS_MM_YR: [f64; BANDS] = [0.0, 5.0, 10.0, 20.0, 40.0, 80.0];
+/// The lower edges of [`FrontBands::age`]'s bands, Myr since the contact's onset.
+pub const AGE_BANDS_MYR: [f64; BANDS] = [0.0, 6.0, 12.0, 24.0, 50.0, 100.0];
+/// The number of bands of each [`FrontBands`] measure.
+pub const BANDS: usize = 6;
+
+/// The band of `x` among the lower edges `edges`.
+fn band_of(x: f64, edges: &[f64; BANDS]) -> usize {
+    edges.iter().rposition(|&e| x >= e).unwrap_or(0)
+}
+
+/// Measurement only (the arc-front task, 2026-10-20): the subducting boundary of the mix
+/// ([`mix`]`::OCEAN_OCEAN`, then `OCEAN_CONTINENT`) by the length of its contact's slab
+/// (`PlateState::slabs`), by the convergence across it and by its contact's age, km in the bands
+/// of [`SLAB_BANDS_KM`], [`NORMAL_BANDS_MM_YR`] and [`AGE_BANDS_MYR`]; and the boundary of class
+/// `OTHER` that converges across it (no contact yet), km.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct FrontBands {
+    pub slab: [[f64; BANDS]; 2],
+    pub normal: [[f64; BANDS]; 2],
+    pub age: [[f64; BANDS]; 2],
+    pub other_converging: f64,
+}
+
+/// [`boundary_mix`]'s answer: the length by kind and the subducting length's bands.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Mix {
+    pub km: [f64; MIX_CLASSES],
+    pub bands: FrontBands,
+}
+
+/// [`Mix`] in half sample spacings, summed over samples.
+#[derive(Clone, Copy, Default)]
+struct MixUnits {
+    km: [u64; MIX_CLASSES],
+    slab: [[u64; BANDS]; 2],
+    normal: [[u64; BANDS]; 2],
+    age: [[u64; BANDS]; 2],
+    other_converging: u64,
+}
+
+impl MixUnits {
+    fn add(mut self, b: MixUnits) -> MixUnits {
+        for (x, y) in self.km.iter_mut().zip(b.km) {
+            *x += y;
+        }
+        for (mine, theirs) in [
+            (&mut self.slab, b.slab),
+            (&mut self.normal, b.normal),
+            (&mut self.age, b.age),
+        ] {
+            for (row, other) in mine.iter_mut().zip(theirs) {
+                for (x, y) in row.iter_mut().zip(other) {
+                    *x += y;
+                }
+            }
+        }
+        self.other_converging += b.other_converging;
+        self
+    }
+}
+
 /// The length of plate boundary by kind, km ([`mix`]), at the plates' positions `pos` and the
 /// motion the step's fronts were found with (call it after `fronts_and_uplift`, before the
 /// motion is updated). All zeros when the record is off.
@@ -920,9 +994,9 @@ pub fn boundary_mix(
     geo: &Geo,
     pos: &[DVec3],
     env: &Env<'_>,
-) -> [f64; MIX_CLASSES] {
+) -> Mix {
     if st.dynamics.is_none() {
-        return [0.0; MIX_CLASSES];
+        return Mix::default();
     }
     let samples = &st.samples;
     let plate_of: Vec<u32> = (0..samples.len()).map(|i| st.plate_of(i)).collect();
@@ -939,11 +1013,24 @@ pub fn boundary_mix(
         .filter(|c| c.last_step == env.step)
         .map(|c| (c.under, c.over))
         .collect();
+    // Each active contact's slab length, km, and age, Myr (the bands, measurement only).
+    let slab_km: BTreeMap<(u32, u32), f64> =
+        st.slabs.iter().map(|s| ((s.under, s.over), s.km)).collect();
+    let contact_of: BTreeMap<(u32, u32), (f64, f64)> = st
+        .contacts
+        .iter()
+        .filter(|c| c.last_step == env.step)
+        .map(|c| {
+            let key = (c.under, c.over);
+            let km = slab_km.get(&key).copied().unwrap_or(0.0);
+            (key, (km, env.t_myr - c.onset_myr))
+        })
+        .collect();
     let norm = env.norm;
     let units = (0..samples.len())
         .into_par_iter()
         .fold(
-            || [0u64; MIX_CLASSES],
+            MixUnits::default,
             |mut acc, v| {
                 let sv = &samples[v];
                 if sv.is_hidden() {
@@ -958,6 +1045,7 @@ pub fn boundary_mix(
                     kind: OCEANIC,
                     side: Side::None,
                 }; 16];
+                let mut plate_buf = [0u32; 16];
                 let mut n = 0;
                 // The boundary's normal towards each plate met, found once per plate.
                 let mut normals: [(u32, DVec3); 4] = [(u32::MAX, DVec3::ZERO); 4];
@@ -996,25 +1084,46 @@ pub fn boundary_mix(
                             Side::None
                         },
                     };
+                    plate_buf[n] = pu;
                     n += 1;
                 }
                 if let Some((class, half)) = classify_boundary(sv.kind, &buf[..n]) {
-                    acc[class] += u64::from(half);
+                    acc.km[class] += u64::from(half);
+                    let setting = match class {
+                        mix::OCEAN_OCEAN => Some(0),
+                        mix::OCEAN_CONTINENT => Some(1),
+                        _ => None,
+                    };
+                    if let (Some(k), Some(f)) = (setting, front_index(&buf[..n])) {
+                        let (km, age) = contact_of
+                            .get(&(plate_buf[f], pv))
+                            .copied()
+                            .unwrap_or((0.0, 0.0));
+                        acc.slab[k][band_of(km, &SLAB_BANDS_KM)] += u64::from(half);
+                        acc.normal[k][band_of(-buf[f].normal, &NORMAL_BANDS_MM_YR)] +=
+                            u64::from(half);
+                        acc.age[k][band_of(age, &AGE_BANDS_MYR)] += u64::from(half);
+                    }
+                    if class == mix::OTHER && buf[..n].iter().any(|b| b.normal < 0.0) {
+                        acc.other_converging += u64::from(half);
+                    }
                 }
                 acc
             },
         )
-        .reduce(
-            || [0; MIX_CLASSES],
-            |mut a, b| {
-                for (x, y) in a.iter_mut().zip(b) {
-                    *x += y;
-                }
-                a
-            },
-        );
+        .reduce(MixUnits::default, MixUnits::add);
     let spacing_km = norm.km(norm.spacing_rad());
-    units.map(|u| (u as f64 * 0.5 * spacing_km).round())
+    let km = |u: u64| (u as f64 * 0.5 * spacing_km).round();
+    let bands = |b: [[u64; BANDS]; 2]| b.map(|row| row.map(km));
+    Mix {
+        km: units.km.map(km),
+        bands: FrontBands {
+            slab: bands(units.slab),
+            normal: bands(units.normal),
+            age: bands(units.age),
+            other_converging: km(units.other_converging),
+        },
+    }
 }
 
 /// The elevations of the arc cells of one kind in one step: how many, how many stand above the
@@ -1115,7 +1224,7 @@ pub fn arc_heights(st: &PlateState) -> [ArcStat; 2] {
 pub struct Observed<'a> {
     /// Each plate's subduction front length this step (`subduction::Pull::front_km`).
     pub front_km: &'a [f64],
-    pub mix_km: [f64; MIX_CLASSES],
+    pub mix: Mix,
     /// Oceanic, continental.
     pub arcs: [ArcStat; 2],
     /// The force balance (`None` when it was not taken).
@@ -1376,7 +1485,8 @@ pub fn record_step(
         old180: older(OLD_AGES_MYR[0]) as u32,
         old250: older(OLD_AGES_MYR[1]) as u32,
         pieces,
-        mix_km: seen.mix_km,
+        mix_km: seen.mix.km,
+        front_bands: seen.mix.bands,
         arc_oceanic: seen.arcs[0],
         arc_continental: seen.arcs[1],
         forces: seen.forces.map(|f| f.forces.clone()).unwrap_or_default(),
