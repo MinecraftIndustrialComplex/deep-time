@@ -940,6 +940,23 @@ pub fn fronts_finish(
             plan
         })
         .collect();
+    // Per front sample (the distance field's label): how near its strip's closest sample with arc
+    // magma lies to the arc's axis, km. Where the lattice is coarser than the arc band (5,000
+    // samples are about 320 km apart, the band where its weight passes 0.3 is 132 km wide), no
+    // sample may fall inside the band, and without this the planet has no arc at all; so each
+    // front's strip flags its sample nearest the axis as well, within one spacing. On a lattice
+    // finer than the band that sample lies inside the band already. ledger: PLT-043
+    let mut axis_gap_km = vec![f64::INFINITY; info.len()];
+    for &i in &reached {
+        let i = i as usize;
+        let d = dist[i];
+        if !d.is_finite() || state.samples[i].is_hidden() || plans[i].magma_m <= 0.0 {
+            continue;
+        }
+        let gap = &mut axis_gap_km[label[i] as usize];
+        *gap = gap.min((norm.km(d) - k.arc_distance_km).abs());
+    }
+    let axis_gap_km = &axis_gap_km;
     let mut budget = vec![Budget::default(); contacts.len()];
     // Over the reached samples, ascending (P1-19: over every sample before; the others add
     // nothing).
@@ -1082,7 +1099,12 @@ pub fn fronts_finish(
                 .clamp(0.0, 1.0);
                 let total = before_m + m as f32;
                 s.oxidation = (s.oxidation * before_m + ox as f32 * m as f32) / total.max(1e-6);
-                if w_arc_of(d_km, k) > 0.3 {
+                // The band where its weight passes 0.3, or the strip's sample nearest the axis
+                // (above). ledger: PLT-043
+                let gap = (d_km - k.arc_distance_km).abs();
+                if w_arc_of(d_km, k) > 0.3
+                    || (gap <= axis_gap_km[label[i] as usize] && gap < front_km)
+                {
                     s.flags |= ARC;
                 }
             }
