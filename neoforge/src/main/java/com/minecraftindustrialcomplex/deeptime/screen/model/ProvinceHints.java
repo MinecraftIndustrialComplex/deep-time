@@ -97,23 +97,28 @@ public final class ProvinceHints {
         return out;
     }
 
-    /** The viewer's colour of a deposit type ({@code viewer.js} {@code TYPE_COLOURS}), as {@code 0xRRGGBB}. */
+    /** The viewer's colours of the deposit types ({@code viewer.js} {@code TYPE_COLOURS}), as {@code 0xRRGGBB}. */
+    public static final Map<String, Integer> COLOURS = Map.ofEntries(
+            Map.entry("deeptime:porphyry_cu_mo_au", 0xd7301f),
+            Map.entry("deeptime:supergene_cu_blanket", 0xfdae61),
+            Map.entry("deeptime:placer_au", 0xffd700),
+            Map.entry("deeptime:bif_fe", 0xa6611a),
+            Map.entry("deeptime:coal_seam", 0x9e9e9e),
+            Map.entry("deeptime:mvt_zn_pb", 0x1a9850),
+            Map.entry("deeptime:sedex_zn_pb", 0x66c2a5),
+            Map.entry("deeptime:petroleum_trap", 0x8073ac),
+            Map.entry("deeptime:impact_ni_cu_pge", 0x7a9a3a),
+            Map.entry("deeptime:impact_hydrothermal_cu_zn_au", 0x2aa7b8),
+            Map.entry("deeptime:impact_diamond", 0x7df9ff),
+            Map.entry("deeptime:impact_basin_u", 0xa4d233));
+
+    /** The viewer's colour of a deposit type, as {@code 0xRRGGBB}. */
     public static int colour(String type) {
-        String t = type.contains(":") ? type : "deeptime:" + type;
-        return switch (t) {
-            case "deeptime:porphyry_cu_mo_au" -> 0xd7301f;
-            case "deeptime:supergene_cu_blanket" -> 0xfdae61;
-            case "deeptime:placer_au" -> 0xffd700;
-            case "deeptime:bif_fe" -> 0xa6611a;
-            case "deeptime:coal_seam" -> 0x9e9e9e;
-            case "deeptime:mvt_zn_pb" -> 0x1a9850;
-            case "deeptime:sedex_zn_pb" -> 0x66c2a5;
-            case "deeptime:petroleum_trap" -> 0x8073ac;
-            case "deeptime:impact_ni_cu_pge" -> 0x7a9a3a;
-            case "deeptime:impact_hydrothermal_cu_zn_au" -> 0x2aa7b8;
-            case "deeptime:impact_diamond" -> 0x7df9ff;
-            case "deeptime:impact_basin_u" -> 0xa4d233;
-            default -> 0xffb000;
-        };
+        return COLOURS.getOrDefault(type.contains(":") ? type : "deeptime:" + type, 0xffb000);
+    }
+
+    /** The language key of a deposit type's name, the same word the Map tab's deposit layers use. */
+    public static String nameKey(String type) {
+        return "deeptime.layer.word." + type.substring(type.indexOf(':') + 1);
     }
 }
