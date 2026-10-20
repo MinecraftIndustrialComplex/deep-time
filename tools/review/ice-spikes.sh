@@ -20,6 +20,8 @@
 #       <profile>-reference.json, <profile>-reference-parameters.json and <name>-<profile>-climate_mapping.json
 #   tools/remote/mac.sh --no-sync -- tools/review/ice-spikes.sh shares <name> <profile>
 #       tools/review/ice_spikes.py over them, against both references when both exist
+#   tools/remote/mac.sh --kind cargo:build -- tools/review/ice-spikes.sh testplanet <name> <tree|binary> [run args]
+#       the GameTests' 4k planet (planet_world_4k) baked by this tree or a saved CLI, dumped into <name>-layers.npy
 #   tools/remote/mac.sh --no-sync -- tools/review/ice-spikes.sh emulate <ice_spikes.py arguments>
 #   tools/remote/mac.sh --no-sync -- tools/review/ice-spikes.sh clean
 set -euo pipefail
@@ -56,9 +58,11 @@ case "${1:-}" in
         name="${2:?name}"; world="${3:?world-data folder}"
         bin="$REPO/target/release/deeptime"
         [ -x "$bin" ] || CARGO_BUILD_JOBS=8 cargo build --release -q -p deeptime-cli
-        # The census's grid (BiomeCensus: step 16, x0 = -C/2 + 8, z0 = -zp + 8; zp = C/4 on Petroff-Guyou).
-        c=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["scale"]["circumference_blocks"])' "$world/manifest.json")
-        zp=$(( c / 4 ))
+        # The census's grid (BiomeCensus: step 16, x0 = -C/2 + 8, z0 = -zp + 8; zp the projection's z edge, C/4 on
+        # Petroff-Guyou, the pole C/2pi on Lambert).
+        read -r c zp < <(python3 -c 'import json, math, sys; m = json.load(open(sys.argv[1])); c = m["scale"]["circumference_blocks"]
+d = m.get("projection", {}).get("domain")
+print(c, int(d["z_max"]) if d else int(c / (2 * math.pi)))' "$world/manifest.json")
         x0=$(( -c / 2 + 8 )); x1=$(( x0 + c ))
         z0=$(( -zp + 8 )); z1=$(( z0 + 2 * zp ))
         "$bin" heightmap --world-data "$world" --box="$x0,$z0,$x1,$z1" --step 16 \
@@ -89,6 +93,19 @@ print("deeptime:planet" + ("" if pg else "_lambert") + ("" if c <= 16384 else "_
         cp "$PROBE/reference_biomes-parameters.json" "$RUNS/$profile-reference-parameters.json"
         cp "$server/planet/deeptime/climate_mapping.json" "$RUNS/$name-$profile-climate_mapping.json" 2>/dev/null || true
         ;;
+    testplanet)
+        # The GameTests' 4k planet (gametest.sh: planet_world_4k, Terralith's table with MIC), baked by <binary>
+        # (`tree`: this tree's release CLI) with any further `deeptime run` arguments, then dumped like `dump`.
+        name="${2:?name}"; bin="${3:?binary or tree}"; shift 3
+        if [ "$bin" = tree ]; then
+            CARGO_BUILD_JOBS=8 cargo build --release -q -p deeptime-cli
+            bin="$RUNS/deeptime-tree"; cp target/release/deeptime "$bin"
+        fi
+        rm -rf "$RUNS/$name-world"
+        "$bin" run --preset crates/deeptime-core/tests/presets/planet_world_4k.json "$@" --out "$RUNS/$name-world" \
+            > "$RUNS/$name.log" 2>&1
+        "$0" dump "$name" "$RUNS/$name-world"
+        ;;
     emulate)
         # Any arguments of tools/review/ice_spikes.py.
         shift
@@ -110,6 +127,6 @@ print("deeptime:planet" + ("" if pg else "_lambert") + ("" if c <= 16384 else "_
         rm -rf "$RUNS"
         ;;
     *)
-        sed -n '3,27p' "$0"; exit 2
+        sed -n '3,29p' "$0"; exit 2
         ;;
 esac
