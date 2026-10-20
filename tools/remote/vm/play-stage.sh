@@ -108,6 +108,14 @@ if [ -f "$OPS_FROM/ops.json" ] && [ "$OPS_FROM" != "$DEST" ]; then
     cp -a "$OPS_FROM/ops.json" "$DEST/ops.json"
     echo "   operators carried over from $OPS_FROM/ops.json: $(grep -o '"name": *"[^"]*"' "$OPS_FROM/ops.json" | cut -d'"' -f4 | tr '\n' ' ')"
 fi
+# A pack mob's AI bug must not take the play server down (2026-10-20: Ice and Fire's hippocampus
+# NPE'd in Toroidal World's seam distance check): NeoForge drops the erroring entity instead.
+NF="$DEST/config/neoforge-server.toml"
+if [ -f "$NF" ]; then
+    sed -i 's/^removeErroringEntities = false/removeErroringEntities = true/; s/^removeErroringBlockEntities = false/removeErroringBlockEntities = true/' "$NF"
+else
+    printf '%s\n' 'removeErroringBlockEntities = true' 'removeErroringEntities = true' > "$NF"
+fi
 mkdir -p "$DEST/config/voicechat"
 VC="$DEST/config/voicechat/voicechat-server.properties"
 if [ -f "$VC" ] && grep -q '^port=' "$VC"; then sed -i 's/^port=.*/port=24464/' "$VC"; else echo 'port=24464' >> "$VC"; fi
