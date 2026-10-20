@@ -80,7 +80,7 @@ small regions; the Earth figures are of that kind.
 | cratons (shield + platform + basin) | about 0.71 | CRUST 2.0 crust types by name, land without Antarctica, derived by an earlier sub-agent (method not recorded); the stage 1 spot check, with its own crude name mapping, got 0.75 | 0.431 | A |
 | orogens + arcs | about 0.17 (0.12 + 0.05) | same; the spot check got 0.18 | 0.245 | A |
 | extended crust + rifts | about 0.07 | same; the spot check got 0.066 | 0.224 | A |
-| large igneous provinces | 0.067 of the land; 0.059 of the whole surface (oceanic plateaus included) | Johansson et al. 2018 polygons, area measured by the REV-2 lookup (bibliography `Johansson2018`) | 0.100 | A |
+| large igneous provinces | 0.067 of the land; 0.059 of the whole surface (oceanic plateaus included) | Johansson et al. 2018 polygons, area measured by the REV-2 lookup (bibliography `Johansson2018`) | 0.100 (the old rule); 0.001 to 0.016 under REV-2's rule (table below) | A; REV-2 |
 | orogens + arcs, earlier state of the model | | | 0.421 | B |
 
 Run A: `earthlike_quick_16k`, scattered continents, 500 Myr, preset seed, this branch merged with
@@ -107,6 +107,43 @@ of the Appalachian type platform or shield. The defaults are unchanged; the ques
 rule counted any mafic pile thicker than ocean crust carries, and on a later run (1a156f22b66,
 1000 Myr) that grew to 0.56 of the continents and 0.30 of the planet. REV-2 (2026-10-19) counts
 only the run's own flood basalts; the shares it measured are in the table below.
+
+### Large igneous provinces under REV-2's rule
+
+`earthlike_quick_16k`, 1000 Myr, 4 threads, master be17a7cf against the REV-2 branch, on the test
+VM, 2026-10-19. "Classified" is the rules' class share before the bake absorbs regions under
+50,000 km^2; "map" is the baked provinces layer the game and the inspector show. Shares are of the
+planet / of the continental (non-ocean) area.
+
+| Run | Old rule, classified | Old rule, map | REV-2, classified | REV-2, map |
+|---|---|---|---|---|
+| supercontinent, seed 1 | 0.312 / 0.586 | 0.172 / 0.356 | 0.0027 / 0.0068 | 0 / 0 |
+| supercontinent, seed 2 | 0.314 / 0.579 | 0.278 / 0.595 | 0.0005 / 0.0013 | 0 / 0 |
+| scattered continents, seed 1 | 0.403 / 0.630 | 0.514 / 0.775 | 0.0029 / 0.0059 | 0 / 0 |
+| scattered continents, seed 2 | 0.350 / 0.571 | 0.615 / 0.887 | 0.0077 / 0.0162 | 0 / 0 |
+| the Earth (Johansson et al. 2018) | | | 0.059 / 0.067 (of land) | |
+
+The old rule called a third of the planet a LIP, five to seven times the Earth's share; REV-2's rule calls
+between a hundredth and an eighth of the Earth's share one, and none survives the bake's minimum area. The
+threshold is not what keeps it low: in supercontinent seed 1 (dump of `surface/lip_m` at the last
+checkpoint) the run's flood basalts are left on 0.31 % of the planet at any thickness and 0.27 %
+at the rule's 300 m (the median pile is 1,096 m). Through the run the share swings between 0.1 %
+and 1.3 % of the planet (the provinces keyframes, 50 Myr apart), so it is what the run keeps of
+its LIPs, not the rule, that sets it:
+
+- The runs lay 12 to 21 LIP events in 1000 Myr, each a disc of about 110 km radius on the 16k
+  planet (the preset's 900 km scaled to the planet; 0.5 % of its surface, near the Earth's largest
+  single provinces, 0.1 to 0.4 % of its surface). Their lavas wear off the land and go down with
+  subducted sea floor: by the keyframes, the share falls back within one to three hundred Myr of
+  each event. The Earth's figure is the present-day footprint (mapped outcrop and inferred extent)
+  of some 2,500 polygons, seamount and ridge polygons among them (4.6 % without those;
+  bibliography `Johansson2018`).
+- One LIP disc is about 38,000 km^2 on the 16k planet, under the bake's 50,000 km^2 minimum
+  (0.65 % of the planet, PRV-029), so the map shows none even while one is fresh, unless two
+  overlap. On a larger planet the disc grows with it and the minimum does not.
+
+Raising the share is a change to the volcano stage's LIP events or to what a LIP leaves behind,
+not to this rule; it is open (STATUS known issues).
 
 ## Simplifications and limits
 

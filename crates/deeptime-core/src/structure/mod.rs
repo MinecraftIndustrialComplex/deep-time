@@ -610,6 +610,30 @@ impl StructureStage {
             self.st.deform_counts.plugs = plugs.len() as u64;
             all.extend(plugs);
             deform::undo_order(&mut all);
+            let span = (src.now_myr - self.preset.t_start_years() / 1.0e6).max(1.0);
+            let now = src.now_myr;
+            // A stock lies in the rock older than itself: under younger cover its top goes down
+            // to the cover's base (its depth is drawn under the present ground, DEF-044).
+            let covers: Vec<f32> = all
+                .par_iter()
+                .map_init(Vec::new, |units, f| {
+                    if f.kind != deform::Kind::Stock || f.base <= 0.0 {
+                        return 0.0;
+                    }
+                    let c = plutons::cell_of(&grid, f.x, f.z);
+                    let deep_m = (src.surface_y(c, &s) - f64::from(s.min_y)) * s.m_per_block_v;
+                    columns::build(&src.cell(c), &self.tables, &self.p, now, deep_m, units);
+                    let key = columns::key::of_age(0, now - f64::from(f.t_myr), span);
+                    (plutons::cover_m(units, key) / s.m_per_block_v) as f32
+                })
+                .collect();
+            let mut under_cover = 0usize;
+            for (f, &cover) in all.iter_mut().zip(&covers) {
+                if cover > 0.0 && cover > f.depth {
+                    f.depth = cover;
+                    under_cover += 1;
+                }
+            }
             // The stocks over a pluton of their own episode rise from its roof.
             rooted = deform::intrude::root_on_plutons(
                 &mut all,
@@ -620,8 +644,6 @@ impl StructureStage {
                 s.m_per_block_h,
                 s.m_per_block_v,
             );
-            let span = (src.now_myr - self.preset.t_start_years() / 1.0e6).max(1.0);
-            let now = src.now_myr;
             let mut st = deform::finish(
                 &all,
                 |x, z| src.surface_y(plutons::cell_of(&grid, x, z), &s),
@@ -643,6 +665,7 @@ impl StructureStage {
             add_time(&mut self.timings, "deformation_lattice", started);
             let mut report = report;
             report["stocks_rooted"] = json!(rooted.len());
+            report["stocks_under_cover"] = json!(under_cover);
             if let Some(serde_json::Value::Object(timing)) =
                 report.as_object_mut().and_then(|o| o.remove("timing"))
             {
@@ -1400,7 +1423,8 @@ impl StructureStage {
                         classes,
                         keys,
                     );
-                    (classes[0], keys[0][1])
+                    // The horizon's own key, its youngest part: the structural events' test.
+                    (classes[0], keys[0][0])
                 },
             )
             .collect::<Vec<(u8, u16)>>()

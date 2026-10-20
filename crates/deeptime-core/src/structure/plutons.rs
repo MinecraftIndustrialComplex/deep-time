@@ -37,7 +37,9 @@
 //!   carbonate, hornfels where it is any other non-crystalline rock, none in crystalline rock
 //!   (RCK-054; skarn is calc-silicate rock from carbonate, Meinert 1992; the fine-grained rock
 //!   baked from other hosts is hornfels, Nelson, Tulane). Only rock older than the intrusion is
-//!   baked: the cover laid on an unroofed pluton is not. The aureole body's ids come before the
+//!   baked, by the structural events' own test (a unit's youngest key): the cover laid on an
+//!   unroofed pluton is not. A stock lies in the rock older than itself: under younger cover its
+//!   top goes down to the cover's base ([`cover_m`]). The aureole body's ids come before the
 //!   plutons', so a pluton paints over the aureole's inner part; a stock's aureole (`deform`'s
 //!   stocks are structural events, not bodies) leaves the stock's own volume alone instead
 //!   ([`Aureole::hollow`]). Bodies are not moved by the faults younger than them, so an aureole
@@ -450,10 +452,12 @@ pub struct Band {
 }
 
 /// The aureole's bands in a column (`units`, top down from the ground) between the depths
-/// `from_m` and `to_m`: each unit older than the intrusion (unit keys ≥ `key`, the intrusion's
-/// own stratigraphic key) takes its host's aureole class ([`aureole_class`]). A unit whose keys
-/// straddle `key` is baked in the older share of its thickness, at its base (keys run linearly
-/// with age through a strata-log unit). Neighbouring bands of one class merge.
+/// `from_m` and `to_m`: each unit older than the intrusion takes its host's aureole class
+/// ([`aureole_class`]). Older is the structural events' own test: a unit whose top key (its
+/// youngest part) is at least `key`, the intrusion's stratigraphic key. A unit whose keys
+/// straddle `key` is younger cover as a whole, as it is to the stock it would wrap (the column
+/// evaluator replaces only the rock under a horizon whose key is at least the event's).
+/// Neighbouring bands of one class merge.
 pub fn aureole_bands(
     units: &[columns::Unit],
     t: &Tables,
@@ -469,14 +473,7 @@ pub fn aureole_bands(
         }
         let th = f64::from(u.thickness_m);
         let bottom = top + th;
-        let older_from = if u.key[0] >= key {
-            top
-        } else if u.key[1] < key {
-            bottom
-        } else {
-            let span = f64::from(u.key[1].saturating_sub(u.key[0]).max(1));
-            top + f64::from(key - u.key[0]) / span * th
-        };
+        let older_from = if u.key[0] >= key { top } else { bottom };
         let (lo, hi) = (older_from.max(from_m), bottom.min(to_m));
         if lo < hi
             && let Some(class) = aureole_class(t, u.class)
@@ -493,6 +490,22 @@ pub fn aureole_bands(
         top = bottom;
     }
     out
+}
+
+/// How deep the cover younger than an intrusion of stratigraphic key `key` reaches in a column
+/// (`units`, top down from the ground), m: the depth of the first unit older than it by the
+/// structural events' test ([`aureole_bands`]), or the whole of `units` when none is. A stock
+/// placed in that cover would replace nothing (the column evaluator leaves younger rock alone)
+/// and its aureole would bake rock laid after it, so its top goes down to there.
+pub fn cover_m(units: &[columns::Unit], key: u16) -> f64 {
+    let mut top = 0.0;
+    for u in units {
+        if u.key[0] >= key {
+            return top;
+        }
+        top += f64::from(u.thickness_m);
+    }
+    top
 }
 
 /// How many slabs a hollow aureole's zones follow the intrusion's wall in. Game choice: enough
@@ -955,33 +968,41 @@ mod tests {
         let units = [
             // Younger than the intrusion (key 8000): sealed over it, not baked.
             unit("sandstone", 500.0, [5000, 6000]),
-            // Straddles it: the older half, at its base, is baked.
+            // Straddles it: cover as a whole, as the column evaluator takes it.
             unit("shale", 1000.0, [7000, 9000]),
             unit("limestone", 1000.0, [9000, 10000]),
             unit("granite", 5000.0, [40000, 40100]),
         ];
         let bands = aureole_bands(&units, &t, 0.0, 4000.0, 8000);
-        let hornfels = index("hornfels");
         let skarn = index("skarn");
+        // The limestone only: the granite under it is crystalline.
         assert_eq!(
             bands,
-            vec![
-                Band {
-                    top_m: 1000.0,
-                    base_m: 1500.0,
-                    class: hornfels
-                },
-                Band {
-                    top_m: 1500.0,
-                    base_m: 2500.0,
-                    class: skarn
-                },
-            ]
+            vec![Band {
+                top_m: 1500.0,
+                base_m: 2500.0,
+                class: skarn
+            }]
         );
         // Clipped to the depths asked for.
         let bands = aureole_bands(&units, &t, 1200.0, 2000.0, 8000);
-        assert_eq!(bands.len(), 2);
-        assert!((bands[0].top_m - 1200.0).abs() < 1e-9 && (bands[1].base_m - 2000.0).abs() < 1e-9);
+        assert_eq!(bands.len(), 1);
+        assert!((bands[0].top_m - 1500.0).abs() < 1e-9 && (bands[0].base_m - 2000.0).abs() < 1e-9);
+        // The cover a stock of that key would lie under: the sandstone and the shale.
+        assert!((cover_m(&units, 8000) - 1500.0).abs() < 1e-9);
+        assert!((cover_m(&units, 4000)).abs() < 1e-9);
+        assert!((cover_m(&units, 50000) - 7500.0).abs() < 1e-9);
+        // A unit wholly older than the intrusion is baked from its top.
+        let older = [unit("shale", 1000.0, [8000, 9000])];
+        let bands = aureole_bands(&older, &t, 0.0, 4000.0, 8000);
+        assert_eq!(
+            bands,
+            vec![Band {
+                top_m: 0.0,
+                base_m: 1000.0,
+                class: index("hornfels")
+            }]
+        );
     }
 
     #[test]
