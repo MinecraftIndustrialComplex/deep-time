@@ -113,7 +113,8 @@
   // ---------------------------------------------------------------------------------------------
   const RING = 28;
   // `answer`: { source, circumference, m_per_block_h, sites: [{ id, kind, type, lat, lon, x, y, z,
-  // y_range, fp: { x, z, a, c, yaw, km2 }, bodies, products, forming_event, parent }] }.
+  // block, y_range, fp: { x, z, a, c, yaw, km2 }, bodies, products, forming_event, parent }] }: x, z
+  // and fp in the simulation's Lambert frame (the map's), block [x, z] in the world's.
   function prepare(answer) {
     const C = answer.circumference || 16384;
     const sites = (answer.sites || []).map(raw => {
@@ -348,12 +349,15 @@
   function factRows(s, model, helpers) {
     const h = helpers || {};
     const yr = s.y_range || [s.y, s.y];
+    // The world's block (`block`); `x` and `z` are the simulation's frame the overlay is drawn in,
+    // another place on a Petroff–Guyou world.
+    const [bx, bz] = s.block || [s.x, s.z];
     const rows = [
       ['Family', esc(s.family.label)],
       ['Size', esc(sizeText(s))],
       ['Footprint', `${esc(fmtArea(s.fp.km2))} · ${esc(Math.round(s.fp.a * 2))} × ${esc(Math.round(s.fp.c * 2))} blocks`],
       ['Where', esc(h.where || `${s.lat.toFixed(1)}°, ${s.lon.toFixed(1)}°`)],
-      ['Block x, z', `${esc(s.x)}, ${esc(s.z)}`],
+      ['Block x, z', `${esc(bx)}, ${esc(bz)}`],
       ['Depth', `y ${esc(yr[0])} … ${esc(yr[1])}${s.bodies > 1 ? ` · ${esc(s.bodies)} bodies` : ''}`],
     ];
     if (h.age) rows.splice(2, 0, ['Formed', esc(h.age)]);
