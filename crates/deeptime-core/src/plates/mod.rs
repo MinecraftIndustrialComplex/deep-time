@@ -400,6 +400,8 @@ impl PlatesStage {
                 pull.front_oceanic_km_myr,
             ),
             (subduction::CORDILLERA_GLOBAL, pull.cordillera_km3),
+            (subduction::FRONT_G_FULL_GLOBAL, pull.front_g_full_km_myr),
+            (subduction::FRONT_G_NORMAL_GLOBAL, pull.front_g_normal_km_myr),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
         }
