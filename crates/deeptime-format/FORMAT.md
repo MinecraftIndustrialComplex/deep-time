@@ -1794,8 +1794,9 @@ the body's `rock_class` its intrusion (granodiorite, granite or diorite).
 by the aureole's width on every axis (`structure.aureole_share` of the intrusion's smallest
 dimension, `structure.aureole_carbonate_factor` times that in a carbonate host). Its zones (named
 `aureole`, no material, density 0) hold the baked rock band by band down the column: each zone's
-`rock_class` is skarn or hornfels and its v range the depths of a host unit older than the
-intrusion; a pluton's zones span d ∈ [0, 1], so the pluton body, painted later, keeps its own
+`rock_class` is skarn or hornfels and its v range the depths of a host horizon older than the
+intrusion, read on the column at the intrusion's centre as the bake lays it (its `horizon_stack` cell) and by the structural
+events' test (a horizon whose top key is at least the intrusion's); a pluton's zones span d ∈ [0, 1], so the pluton body, painted later, keeps its own
 rock inside. A stock's aureole is hollow: the stock is a structural event, which bodies paint
 over, so its zones are cut into eight horizontal slabs whose d range starts at the stock's wall
 in that slab. **Stock roots**: a stock rooted on a pluton (`structure::deform::intrude::
@@ -1805,7 +1806,8 @@ rock reads through the aureole it rises across. Ids: every aureole first, then t
 then the plutons, then any deposit body the deposit stage adds later, so where they overlap the
 later body wins (a body with a higher id paints over a lower one). `notes.structure.aureoles`
 counts them: `plutons`, `stocks`, `zones`, `median_width_m` [pluton, stock] and `stock_roots`;
-`notes.structure.deformation.stocks_rooted` the stocks rooted on a pluton.
+`notes.structure.deformation.stocks_rooted` the stocks rooted on a pluton and `stocks_under_cover`
+the stocks whose top was taken down to the base of younger cover.
 
 The AABB is conservative: the world extent along axis i is `Σ_j |R_ji|·h_j` around the centre
 (R the rotation above, h the semi-axes), clipped at `clip_top_y`. The viewer's `report.js` carries
