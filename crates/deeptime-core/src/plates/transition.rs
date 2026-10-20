@@ -376,6 +376,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
             s.pools[p] = (before * keep) as f32;
             acc[p] += before - f64::from(s.pools[p]);
         }
+        s.basement_m *= keep as f32;
         s.thickness_m = s.pools.iter().sum();
         s.elevation_m = (f64::from(s.elevation_m) - g / f).clamp(lo, hi) as f32;
         out.moved_km2_m += g * env.norm.sample_area_km2();
