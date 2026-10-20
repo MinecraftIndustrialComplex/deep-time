@@ -93,6 +93,11 @@ use super::state::{CONTINENTAL, OCEANIC, PlateState, Sample, TRENCH, pool};
 pub const MOVED_GLOBAL: &str = "plates/collapse_km3";
 /// … and the ocean floor it turned continental, km² (Earth-normalized).
 pub const GAINED_GLOBAL: &str = "plates/collapse_gained_km2";
+/// Measurement only (the crust budget): what the collapse held back over the run, km³, from
+/// columns an orogeny still holds up …
+pub const HELD_GLOBAL: &str = "plates/collapse_held_km3";
+/// … and for want of room within reach.
+pub const UNPLACED_GLOBAL: &str = "plates/collapse_unplaced_km3";
 /// Continental crust lost to the mantle beyond `crust_max_km` over the run, km³.
 pub const FOUNDERED_GLOBAL: &str = "plates/foundered_km3";
 
@@ -225,6 +230,11 @@ pub struct Collapse {
     pub moved_km2_m: f64,
     /// Ocean samples turned continental.
     pub converted: u32,
+    /// Crust the collapse would have released from columns an orogeny still holds up (the quiet
+    /// time), km² × m (measurement: the crust budget).
+    pub held_km2_m: f64,
+    /// Crust released that found no room within reach and stayed, km² × m (measurement).
+    pub unplaced_km2_m: f64,
 }
 
 /// One step of the collapse on `state` (see the module docs). Runs after the step's uplift
@@ -244,6 +254,12 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
     // Each plate's sources and what they would release this step, m of thickness.
     let mut by_plate: BTreeMap<u32, Vec<(usize, f64)>> = BTreeMap::new();
     // P1-19: found in parallel, kept in sample order.
+    let held: f64 = state
+        .samples
+        .par_iter()
+        .filter(|s| s.kind == CONTINENTAL && !s.is_hidden() && s.orogeny_myr >= quiet_before)
+        .map(|s| (rate * (f64::from(s.thickness_m) - t_c)).max(0.0))
+        .sum();
     let release: Vec<(usize, f64)> = state
         .samples
         .par_iter()
@@ -257,11 +273,23 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
             (q > 0.0).then_some((i, q))
         })
         .collect();
+    let mut budgets: BTreeMap<u32, f64> = BTreeMap::new();
     for (i, q) in release {
-        by_plate.entry(state.plate_of(i)).or_default().push((i, q));
+        let p = state.plate_of(i);
+        *budgets.entry(p).or_insert(0.0) += q;
+        by_plate.entry(p).or_default().push((i, q));
     }
-    let mut out = Collapse::default();
-    spread(state, geo, env, by_plate, normal, &mut out, None);
+    let area = env.norm.sample_area_km2();
+    let mut out = Collapse {
+        held_km2_m: held * area,
+        ..Collapse::default()
+    };
+    let shares = spread(state, geo, env, by_plate, normal, &mut out, None);
+    out.unplaced_km2_m = budgets
+        .iter()
+        .map(|(p, b)| b * (1.0 - shares.get(p).copied().unwrap_or(0.0)))
+        .sum::<f64>()
+        * area;
     out
 }
 

@@ -51,6 +51,7 @@ pub mod collision;
 pub mod crust_budget;
 pub mod dynamics;
 pub mod events;
+pub mod flow;
 pub mod forces;
 pub mod gap_budget;
 pub mod geometry;
@@ -64,6 +65,7 @@ pub mod pools;
 pub mod rate;
 pub mod ridges;
 pub mod rifting;
+pub mod settle;
 pub mod shortening;
 pub mod state;
 pub mod stats;
@@ -290,7 +292,10 @@ impl PlatesStage {
             );
             cb = Some(b);
         }
-        let (mut cones, flexure) = self.apply_surface_feedback(st, world, &env, collisions)?;
+        // The settling (`settle.rs`) reads the flexure too.
+        let settles = k.isostasy_relax_myr.is_finite() && k.isostasy_relax_myr > 0.0;
+        let (mut cones, flexure) =
+            self.apply_surface_feedback(st, world, &env, collisions || settles)?;
         cones.resize(st.samples.len(), [0.0; 2]);
         if let Some(b) = cb.as_mut() {
             b.book(&st.samples, gap_budget::Part::Erosion);
@@ -308,11 +313,12 @@ impl PlatesStage {
                 b.book(&st.samples, part);
             }
         };
-        let flexure = if collisions {
+        let flexure = if collisions || settles {
             flexure.or_else(|| self.sample_flexure(world))
         } else {
             None
         };
+        let sea = sea_m(world);
         let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
         if let Some(gb) = st.gap_budget.as_mut() {
             gb.begin_step(&st.samples);
@@ -344,7 +350,7 @@ impl PlatesStage {
         let begun = subduction::fronts_begin(st, &cache.geo, &pos, &env);
         let geo = &cache.geo;
         let (stacked, arcs) = rayon::join(
-            || belts::stack(st, geo, &pos, &env, &fronts, flexure.as_deref()),
+            || belts::stack(st, geo, &pos, &env, &fronts, flexure.as_deref().filter(|_| collisions)),
             || subduction::fronts_reach(geo, &begun, &env),
         );
         book(st, gap_budget::Part::Belts);
@@ -416,7 +422,23 @@ impl PlatesStage {
             .globals
             .entry(collapse::GAINED_GLOBAL.to_owned())
             .or_insert(0.0) += f64::from(fell.converted) * env.norm.sample_area_km2();
+        *world
+            .globals
+            .entry(collapse::HELD_GLOBAL.to_owned())
+            .or_insert(0.0) += quiet.held_km2_m / 1000.0;
+        *world
+            .globals
+            .entry(collapse::UNPLACED_GLOBAL.to_owned())
+            .or_insert(0.0) += quiet.unplaced_km2_m / 1000.0;
         lap(&mut clock, "collapse");
+        // Thickened crust spreads through its lower crust (`flow.rs`).
+        let flowed = flow::step(st, &cache.geo, &env);
+        book(st, gap_budget::Part::Flow);
+        *world
+            .globals
+            .entry(flow::MOVED_GLOBAL.to_owned())
+            .or_insert(0.0) += flowed.moved_km2_m / 1000.0;
+        lap(&mut clock, "flow");
         // Rifted margins taper from continent to ocean over Earth's width (`transition.rs`).
         let taper = transition::step(st, &cache.geo, &pos, &env);
         book(st, gap_budget::Part::Transition);
@@ -478,6 +500,18 @@ impl PlatesStage {
         hotspots::step(st, world, &pos, &tree, &env, &mut cones)?;
         book(st, gap_budget::Part::Hotspots);
         lap(&mut clock, "hotspots");
+        // Continental columns settle towards the height their crust holds up (`settle.rs`).
+        let settled = settle::step(st, &env, flexure.as_deref(), sea);
+        book(st, gap_budget::Part::Settle);
+        *world
+            .globals
+            .entry(settle::RISE_GLOBAL.to_owned())
+            .or_insert(0.0) += settled.rise_km2_m / 1000.0;
+        *world
+            .globals
+            .entry(settle::FALL_GLOBAL.to_owned())
+            .or_insert(0.0) += settled.fall_km2_m / 1000.0;
+        lap(&mut clock, "settle");
         // No column ends the step's processes thicker than its ceiling or higher than its top
         // (ledger: PLT-287, PLT-288).
         let limited = rate::limit(st, &cache.geo, &env);
