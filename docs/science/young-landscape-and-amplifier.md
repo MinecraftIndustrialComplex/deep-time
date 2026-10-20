@@ -227,6 +227,27 @@ cells), the young step alone gives 8 % fewer, and it was not traced further.
 (the ocean's area from memory). The planet's 1.36 % comes from the plate model's trenches and deep
 basins; it is not this task's to change and is listed under the open questions.
 
+**On today's planet.** While this work ran, master changed the plate model (continents keep their
+land: lower-crustal flow and isostatic settling; master c83f445e). A fresh run on it (the same
+preset, start, length and seed; the bake chose λc 113.25, pinned for both arms), its young and
+amplify stages rerun with the fix off and at 15° (`calib.sh m-off 0 0.6 113.25 run-m1` and
+`calib.sh m-d15 15 0.268 113.25 run-m1`, with a binary of this branch merged with that master):
+
+| run | share steeper than 20° | steeper than 30° | p99 / p99.9 | relief RMS p90 / p99 |
+|---|---|---|---|---|
+| off | 1.37 (0.83) % | 0.37 (0.15) % | 23.0 / 36.2° | 220 / 495 m |
+| 15° | 0.36 (0.21) % | 0.061 (0.029) % | 16.5 / 26.9° | 185 / 341 m |
+
+The new plate model's tail is smaller than the play world's (1.37 against 2.29 % steeper than 20°)
+but its share steeper than 30° is still 2.5 times the top of Earth's rough range; with the fix both
+shares sit in the lower half of the range and the p99.9 inside it. Its sea is 76 % of the planet
+(84 % on run-s1), the shelf 12.2 % of the sea, the mean depth 2,590 m, the hadal sea floor 0.51 →
+0.42 % of the sea (Earth about 0.22 %), and the share steeper than 45° on screen 7.6 → 8.1 %. The
+deepest point falls from 9,112 to 7,833 m: failing to 15° gives 1.3 km of the deepest trench's
+floor to its walls (on run-s1 the deepest point lost 55 m; the trench's width was not measured). Earth's deepest trenches reach about 10.9 km (the Challenger Deep, from
+memory), so the planet's deepest point is now shallower than Earth's; a trench drawn wider than one
+sample at the source would keep its depth through the failure (open questions).
+
 **Simplifications.** One critical slope for all the sea floor, with no cohesion, failure plane or
 runout: real walls stand steeper where the rock is strong (fault scarps 10 to 40°, the inner walls of
 trenches, carbonate platform margins) and fail as slumps and debris avalanches that run out tens of
@@ -246,4 +267,5 @@ failure itself; carbonate platform walls.
 
 **Open questions.** Whether the plate model should draw its trenches wider than one sample and its
 crust strips with gentler edges at the source (the plates' and ocean crust's owners); this fix
-relaxes what reaches the young landscape. The vertical scale (Ben's).
+relaxes what reaches the young landscape, and on today's planet it costs the deepest trench
+1.3 km (9.1 to 7.8 km, against Earth's 10.9). The vertical scale (Ben's).
