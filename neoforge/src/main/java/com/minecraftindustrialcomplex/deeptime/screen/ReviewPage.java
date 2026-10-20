@@ -148,10 +148,43 @@ final class ReviewPage implements PlanetEditorScreen.Page {
             drawLines(g, font, lines, sideX, textY);
             drawLines(g, font, provinces, sideX + sideW + 12, textY);
         } else {
-            lines.add(Component.empty());
-            lines.addAll(provinces);
+            // Beside the map (a wide window) the map is bound by its width and leaves room under the
+            // legend: the provinces go there, side by side, when they fit, else under the summary.
+            int underY = ly + 7 + 10 + 8;
+            if (!flowLines(g, font, provinces, mapX, underY, mapW, screen.height - 30 - underY)) {
+                lines.add(Component.empty());
+                lines.addAll(provinces);
+            }
             drawLines(g, font, lines, sideX, textY);
         }
+    }
+
+    /**
+     * The first line (the heading) on a line of its own, the rest side by side in rows of {@code w};
+     * nothing is drawn and false is returned when that takes more than {@code h}.
+     */
+    private static boolean flowLines(GuiGraphics g, Font font, List<Component> items, int x, int y, int w, int h) {
+        int n = items.size();
+        int[] ox = new int[n], oy = new int[n];
+        int line = 0, cx = 0;
+        for (int i = 1; i < n; i++) {
+            int tw = font.width(items.get(i));
+            if (tw > w)
+                return false;
+            if (i == 1 || cx + tw > w) {
+                line++;
+                cx = 0;
+            }
+            ox[i] = cx;
+            oy[i] = line * 10;
+            cx += tw + 10;
+        }
+        if (n == 0 || font.width(items.get(0)) > w || (line + 1) * 10 > h)
+            return false;
+        g.drawString(font, items.get(0), x, y, 0xffe0e0e0, false);
+        for (int i = 1; i < n; i++)
+            g.drawString(font, items.get(i), x + ox[i], y + oy[i], 0xffe0e0e0, false);
+        return true;
     }
 
     private void drawLines(GuiGraphics g, Font font, List<Component> lines, int x, int y) {
