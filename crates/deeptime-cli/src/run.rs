@@ -1492,7 +1492,8 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     let opts = session_options(&work, &o.common);
     let s = match (&o.input, &o.preset) {
         (Some(input), None) => {
-            let mut ck = Checkpoint::read(input)?;
+            // An epoch checkpoint is read with the epochs its history needs (`dump::chain_of`).
+            let mut ck = Checkpoint::read_chain(&crate::dump::chain_of(input)?)?;
             ck.preset_json = apply_overrides(&ck.preset_json, &o.common.set)?;
             // A stage coupled to others (plates + surface) runs with its group, which starts at
             // the group's lead: a checkpoint whose next stage is the lead serves any member.

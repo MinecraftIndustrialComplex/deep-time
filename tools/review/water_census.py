@@ -27,7 +27,6 @@ Needs numpy, scipy and lz4 (on the VM: nix shell --impure --expr
 
 import argparse
 import json
-import math
 import struct
 import sys
 from pathlib import Path
