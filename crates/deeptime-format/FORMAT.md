@@ -1703,9 +1703,13 @@ body record                                      zone record
 88   4  u32 first zone
 92   4  u32 zone count
 96   4  u32 rock class of the whole body (string, u32::MAX = none)
-100  4  reserved, 0
+100  4  f32 age: when the body formed, Myr before the end of the world's history (NaN = none)
 104  8  reserved, 0 (voxel blobs, later)
 ```
+
+The age (2026-10-19, decisions log "Add the fields"; within 0.5, no minor of its own, since nothing
+is released): plutons carry their emplacement, every other body NaN for now. A file written before
+it holds 0 there.
 
 Shapes: 0 ellipsoid, 1 stockwork_shell, 2 lens, 3 pod, 10 dome use the **ellipsoid metric**;
 4 sheet, 5 dyke, 6 pipe, 7 blanket, 8 seam, 9 channel use the **cylinder metric**. Evaluation of
@@ -1744,7 +1748,7 @@ pluton paints first.
 The AABB is conservative: the world extent along axis i is `Σ_j |R_ji|·h_j` around the centre
 (R the rotation above, h the semi-axes), clipped at `clip_top_y`. The viewer's `report.js` carries
 each body as JSON: `id, site, shape, metric, role, center, axes, yaw, dip, clip_top_y (null = none),
-aabb, rock_class, zones [{name, material, rock_class, d, v, grade, density, raw}]`.
+aabb, rock_class, age_ma (null = none), zones [{name, material, rock_class, d, v, grade, density, raw}]`.
 
 `manifest.json` `notes.deposits` (runs with the deposit stage) is the stage's census: per type
 `id, sites, target (the survivors the density asks for: count_mult · ρ · Σ permissive area, plan
