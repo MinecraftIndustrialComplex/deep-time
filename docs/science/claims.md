@@ -40,17 +40,17 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [MAG](ledger/MAG.md) | magma and lava | 57 | 2 | 1 | 0 | 1 | 0 | 52 | 1 | 0 | 0 | 0 |
 | [MOI](ledger/MOI.md) | moisture, winds, seasons | 70 | 0 | 17 | 0 | 0 | 0 | 8 | 45 | 70 | 0 | 6 |
 | [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 194 | 25 | 17 | 1 | 17 | 0 | 65 | 69 | 0 | 0 | 75 |
-| [PLT](ledger/PLT.md) | plate tectonics | 230 | 22 | 49 | 5 | 19 | 10 | 91 | 34 | 133 | 6 | 47 |
+| [PLT](ledger/PLT.md) | plate tectonics | 231 | 22 | 49 | 5 | 20 | 10 | 92 | 33 | 132 | 6 | 47 |
 | [POL](ledger/POL.md) | the pole cap | 24 | 0 | 0 | 0 | 0 | 0 | 21 | 3 | 0 | 0 | 0 |
 | [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 71 | 2 | 8 | 0 | 1 | 2 | 51 | 7 | 11 | 0 | 3 |
 | [PRV](ledger/PRV.md) | geologic provinces | 31 | 0 | 0 | 0 | 5 | 4 | 10 | 12 | 0 | 0 | 0 |
-| [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 79 | 11 | 8 | 0 | 1 | 1 | 55 | 3 | 0 | 0 | 11 |
+| [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 81 | 11 | 8 | 1 | 1 | 1 | 56 | 3 | 0 | 0 | 11 |
 | [SCL](ledger/SCL.md) | world scale, planet constants | 73 | 5 | 6 | 5 | 0 | 2 | 49 | 6 | 0 | 6 | 1 |
 | [STE](ledger/STE.md) |  | 15 | 0 | 1 | 3 | 0 | 0 | 10 | 1 | 0 | 0 | 0 |
-| [STR](ledger/STR.md) | strata, traps, hosts | 46 | 1 | 0 | 0 | 1 | 2 | 42 | 0 | 0 | 0 | 4 |
+| [STR](ledger/STR.md) | strata, traps, hosts | 50 | 1 | 0 | 0 | 1 | 2 | 46 | 0 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 74 | 0 | 0 | 0 | 1 | 2 | 47 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
-| **all** | | **2,563** | **298** | **326** | **51** | **103** | **85** | **1,184** | **516** | **334** | **14** | **228** |
+| **all** | | **2,570** | **298** | **326** | **52** | **104** | **85** | **1,190** | **515** | **333** | **14** | **228** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),

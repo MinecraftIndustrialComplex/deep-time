@@ -6725,3 +6725,61 @@ The methods behind the P1-19 changes to the surface stage's solvers (build log 2
 - Access: paywalled (Springer).
 - Library: not fetched.
 - Read so far (by the project): from memory (piecewise-constant aggregation makes the Galerkin coarse operator too stiff for smooth error, about twice for the Laplacian, remedied by over-weighting the coarse correction). The project uses the equivalent halving of the coarse couplings (`SCALE` 0.5) and measured the effect itself (ERO-183).
+
+## Ocean crust as drilled: the Penrose sequence (PLT-104, PLT-293, RCK-091, RCK-092), added 2026-10-19
+
+The sources behind the ocean crust's own column (build log 2026-10-19 "Crust templates and the relief lift"): the thickness of new crust and of its layer 2, the share of lavas and sheeted dikes in two drilled holes, the ophiolite sequence the classes follow, and the sediment the census compares with.
+
+### White1992
+- Reference: White, R. S., McKenzie, D. and O'Nions, R. K. (1992). Oceanic crustal thickness from seismic measurements and rare earth element inversions. Journal of Geophysical Research: Solid Earth 97(B13):19683-19715.
+- DOI or URL: 10.1029/92JB01749
+- Cited as: "White et al. 1992" (plates/pools.rs oceanic_column).
+- Ledger ids: PLT-104
+- Access: paywalled (AGU).
+- Library: not kept (the abstract was read from the publisher page and Crossref, 2026-10-19).
+- Read so far (by the project): abstract, 2026-10-19 (crust templates agent): "the igneous section of oceanic crust averages 7.1±0.8 km thick away from anomalous regions such as fracture zones and hot-spots, with extremal bounds of 5.0-8.5 km".
+
+### Christeson2019
+- Reference: Christeson, G. L., Goff, J. A. and Reece, R. S. (2019). Synthesis of oceanic crustal structure from two-dimensional seismic profiles. Reviews of Geophysics 57:504-529.
+- DOI or URL: 10.1029/2019RG000641
+- Cited as: "Christeson et al. 2019" (plates/pools.rs oceanic_column; structure/columns.rs OCEAN_LAVA_SHARE).
+- Ledger ids: PLT-104, RCK-091
+- Access: open (AGU review).
+- Library: not kept.
+- Read so far (by the project): abstract, 2026-10-19 (crust templates agent): "Layer 2 has an average thickness of 1.84 km", "Total crustal thickness averages 6.15 km and is similar across all spreading rates". The layer 2 and layer 3 thicknesses with their deviations (1.84 ± 0.61 km, 4.31 ± 0.99 km) come from a secondary reading of section 4.1 and were not checked.
+
+### Alt1996
+- Reference: Alt, J. C., Laverne, C. and others (1996). The synthesis of the alteration of Hole 504B. Proceedings of the Ocean Drilling Program, Scientific Results 148, chapter 34 (the full title and author list not checked).
+- DOI or URL: https://www-odp.tamu.edu/publications/148_SR/VOLUME/CHAPTERS/sr148_34.pdf
+- Cited as: "Hole 504B" (structure/columns.rs OCEAN_LAVA_SHARE).
+- Ledger ids: RCK-091
+- Access: open (ODP publications).
+- Library: not kept (fetched 2026-10-19).
+- Read so far (by the project): the chapter, 2026-10-19 (crust templates agent): Hole 504B penetrated "274.5 m sediment, 571.5 m of volcanic rocks, a 209 m transition zone, and 1050 m into a sheeted dike complex" (1056 m elsewhere in the chapter), the dikes altered to greenschist assemblages at 300 to 400 degC.
+
+### IODP309-312
+- Reference: Expedition 309/312 Scientists (2006). Expedition 309/312 summary. Proceedings of the Integrated Ocean Drilling Program 309/312 (the editors and the page not checked).
+- DOI or URL: https://iodp.tamu.edu/publications/exp309_312/103/103_7.htm
+- Cited as: "Hole 1256D" (structure/columns.rs OCEAN_LAVA_SHARE).
+- Ledger ids: RCK-091
+- Access: open (IODP publications).
+- Library: not kept (fetched 2026-10-19).
+- Read so far (by the project): the summary's section on the drilled sequence, 2026-10-19 (crust templates agent): Hole 1256D, in crust formed at a superfast spreading rate, has 754 m of extrusive rocks, a 57 m transition zone and 346 m of sheeted dikes over gabbro reached at 1406.6 m below the sea floor.
+
+### Penrose1972
+- Reference: Anonymous (1972). Penrose Field Conference on ophiolites. Geotimes 17(12):24-25.
+- DOI or URL: none (print).
+- Cited as: "Penrose Field Conference 1972" (structure/columns.rs pool_class).
+- Ledger ids: RCK-092
+- Access: print only; copy not located.
+- Library: not fetched.
+- Read so far (by the project): through a secondary page that reproduces the definition (travelinggeologist.com, "Pilgrimage to the Semail ophiolite", 2015), 2026-10-19 (crust templates agent): from the bottom, an ultramafic complex, a gabbroic complex, a mafic sheeted dike complex and a mafic volcanic complex, with sediments and minor sodic felsic intrusive rocks (plagiogranite) as associated rocks. Not read in Geotimes, so the row is `from-memory`.
+
+### Straume2019
+- Reference: Straume, E. O., Gaina, C. and others (2019). GlobSed: updated total sediment thickness in the world's oceans. Geochemistry, Geophysics, Geosystems 20(4):1756-1772.
+- DOI or URL: 10.1029/2018GC008115; author copy https://epic.awi.de/49326/
+- Cited as: "GlobSed (Straume et al. 2019)" (strata.md, the census of the ocean crust's sediment by age).
+- Ledger ids: none (the comparison in strata.md; no constant rests on it).
+- Access: open author copy.
+- Library: not kept (read 2026-10-19 from the author-accepted PDF, text-extracted).
+- Read so far (by the project): 2026-10-19 (crust templates agent): abstract, "sediment thickness increases with age of the oceanic crust, towards high southern and northern latitudes, and towards the equator"; Table 3, the mean over the whole grid 927 m, continental margins 3044 m, the deep ocean more than 200 km from the continent-ocean boundary 404 m; section 3, the ocean younger than 82 Myr within 72 degS to 72 degN "is characterized by an average sediment thickness of 267 m".
