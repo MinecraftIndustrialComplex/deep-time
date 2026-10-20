@@ -181,11 +181,42 @@ class PlanetGeometryTest {
             double dLon = ll[1] - w[3];
             dLon -= 360 * Math.round(dLon / 360);
             assertEquals(0.0, dLon, 1e-3, "lon at " + w[0] + ", " + w[1]);
-            double[] b = PG.blockOf(w[2], w[3]);
-            assertEquals(w[1], b[1], 1e-3);
-            assertEquals(0.0, Math.min(Math.abs(PG.wrapX(b[0] - w[0])), Math.abs(PG.wrapX(b[0] + w[0]))), 1e-3);
+            // The checked forward (Deep Time's own blockOf lands 616 blocks along the edge here).
+            double[] b = PlanetGeometry.blockOf(PG, w[2], w[3]);
+            assertEquals(w[1], b[1], 1e-3, "z of " + w[0] + ", " + w[1]);
+            assertEquals(0.0, Math.min(Math.abs(PG.wrapX(b[0] - w[0])), Math.abs(PG.wrapX(b[0] + w[0]))), 1e-3,
+                    "x of " + w[0] + ", " + w[1] + ": " + b[0]);
         }
         assertTrue(PlanetGeometry.conePoints(LAMBERT).isEmpty());
+    }
+
+    @Test
+    void checkedForwardOnTheExactEquatorAndDiagonals() {
+        // Exact inputs on the Petroff square's diagonals: the world's equator (latitude exactly 0)
+        // and the meridians through the hemisphere centres (λc and λc + 180°). Deep Time's
+        // PetroffGuyou.blockOf misses some of them by tens of blocks; the checked forward may not.
+        int raw = 0, n = 0;
+        double worst = 0;
+        for (double t = 0; t < 360.0; t += 0.25) {
+            for (double[] ll : new double[][]{{0.0, t}, {t / 2 - 90, 146.0}, {t / 2 - 90, 326.0}}) {
+                if (Math.abs(ll[0]) > 89.9)
+                    continue;
+                if (PlanetGeometry.forwardError(PG, PG.blockOf(ll[0], ll[1]), ll[0], ll[1]) > PlanetGeometry.FORWARD_TOLERANCE_DEG)
+                    raw++;
+                double[] b = PlanetGeometry.blockOf(PG, ll[0], ll[1]);
+                worst = Math.max(worst, PlanetGeometry.forwardError(PG, b, ll[0], ll[1]));
+                n++;
+            }
+        }
+        System.out.println("[devmap test] Deep Time's PetroffGuyou.blockOf missed " + raw + " of " + n
+                + " exact diagonal inputs by more than 1e-5°; the checked forward's worst " + worst + "°");
+        assertTrue(worst <= PlanetGeometry.FORWARD_TOLERANCE_DEG, "checked forward worst " + worst + "°");
+        // On the equator the checked point is on z = 0 (the equator's line).
+        for (double t = 0; t < 360.0; t += 0.25)
+            assertEquals(0.0, PlanetGeometry.blockOf(PG, 0.0, t)[1], 1e-3, "equator at " + t);
+        // Lambert's forward is closed form: nothing to repair.
+        for (double t = 0; t < 360.0; t += 7.25)
+            assertTrue(PlanetGeometry.forwardError(LAMBERT, LAMBERT.blockOf(0.0, t), 0.0, t) < 1e-9);
     }
 
     @Test

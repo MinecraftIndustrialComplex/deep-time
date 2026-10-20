@@ -40,6 +40,52 @@ public final class PlanetGeometry {
         return w >= 360.0 ? 0.0 : w;
     }
 
+    /** How far, in degrees, the checked forward lets the inverse of its result miss the asked point. */
+    static final double FORWARD_TOLERANCE_DEG = 1e-5;
+    private static final double[] NUDGES_DEG = {1e-9, 1e-7, 1e-5};
+
+    /**
+     * Deep Time's forward projection {@link WorldProjection#blockOf}, checked by its inverse
+     * {@link WorldProjection#latLon}. Deep Time's Petroff forward ({@code Petroff.forward}, and its
+     * Rust twin) goes wrong on a few exact inputs: on the square's diagonals between the centre and
+     * the 67.5° vertex, where {@code up} is rounding noise and the branch on {@code up * rp} picks
+     * an arbitrary {@code alphap} (on the play planet every latitude of exactly 0° at simulation
+     * longitudes near 127°..168° and 304°..338°, up to 75 blocks off), and at the cone points
+     * themselves ((45° N, 236°) comes back 616 blocks along the edge). A result whose inverse
+     * misses the asked point by more than {@link #FORWARD_TOLERANCE_DEG} is retried from inputs
+     * nudged by 1e-9°, then 1e-7° and 1e-5°, and the closest is kept. Returns {x, z}, canonical.
+     */
+    public static double[] blockOf(WorldProjection p, double latDeg, double lonDeg) {
+        double[] b = p.blockOf(latDeg, lonDeg);
+        double err = forwardError(p, b, latDeg, lonDeg);
+        if (err <= FORWARD_TOLERANCE_DEG)
+            return b;
+        double[] best = b;
+        for (double eps : NUDGES_DEG) {
+            for (int k = 0; k < 4; k++) {
+                double la = Math.max(-90.0, Math.min(90.0, latDeg + (k == 0 ? eps : k == 1 ? -eps : 0.0)));
+                double lo = lonDeg + (k == 2 ? eps : k == 3 ? -eps : 0.0);
+                double[] c = p.blockOf(la, lo);
+                double e = forwardError(p, c, latDeg, lonDeg);
+                if (e < err) {
+                    err = e;
+                    best = c;
+                }
+            }
+            if (err <= Math.max(FORWARD_TOLERANCE_DEG, 2.0 * eps))
+                return best;
+        }
+        return best;
+    }
+
+    /** Degrees between the asked point and the inverse of a block point (latitude, and longitude scaled by cos latitude). */
+    static double forwardError(WorldProjection p, double[] b, double latDeg, double lonDeg) {
+        double[] ll = p.latLon(b[0], b[1]);
+        double dLon = ll[1] - lonDeg;
+        dLon -= 360.0 * Math.round(dLon / 360.0);
+        return Math.max(Math.abs(ll[0] - latDeg), Math.abs(dLon) * Math.cos(Math.toRadians(latDeg)));
+    }
+
     /** {latitude, F3 longitude} of block (x, z), degrees. */
     public static double[] displayLatLon(WorldProjection p, double x, double z) {
         double[] ll = p.latLon(x, z);
@@ -84,7 +130,7 @@ public final class PlanetGeometry {
         for (int s = 1; s >= -1; s -= 2) {
             String name = s > 0 ? "north" : "south";
             double lat = 90.0 * s;
-            double[] c = p.blockOf(lat, 0.0);
+            double[] c = blockOf(p, lat, 0.0);
             List<double[]> images = new ArrayList<>(2);
             if (petroffGuyou(p)) {
                 // On an edge: the half-turn about the edge's midpoint (x, z) -> (−x, z) glues it to its mirror.

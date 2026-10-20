@@ -181,7 +181,7 @@ public final class DevMapScreen extends Screen {
         }
         double u = (sx - (vl + vw / 2.0)) / globeRadius, v = ((vt + vh / 2.0) - sy) / globeRadius;
         double[] ll = new GlobeProjection(globeLat, globeLon).inverse(u, v, new double[2]);
-        return ll == null ? null : p.blockOf(ll[0], ll[1]);
+        return ll == null ? null : PlanetGeometry.blockOf(p, ll[0], ll[1]);
     }
 
     /** The right-click: asks the server to put the player at the block under (sx, sy). */

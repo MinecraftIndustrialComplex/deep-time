@@ -65,7 +65,7 @@ public final class Graticule {
         for (int i = 0; i < n; i++) {
             double t = from + (to - from) * i / (n - 1);
             double[] ll = latLonAt.apply(t);
-            double[] q = p.blockOf(ll[0], ll[1]);
+            double[] q = PlanetGeometry.blockOf(p, ll[0], ll[1]);
             if (prev == null) {
                 cur.add(q);
             } else {
@@ -93,7 +93,7 @@ public final class Graticule {
     static boolean jumps(WorldProjection p, double[] a, double[] b, double[] llA, double[] llB) {
         double dLon = llB[1] - llA[1];
         dLon -= 360.0 * Math.round(dLon / 360.0);
-        double[] m = p.blockOf(0.5 * (llA[0] + llB[0]), llA[1] + 0.5 * dLon);
+        double[] m = PlanetGeometry.blockOf(p, 0.5 * (llA[0] + llB[0]), llA[1] + 0.5 * dLon);
         double mx = 0.5 * (a[0] + b[0]), mz = 0.5 * (a[1] + b[1]);
         double off = Math.hypot(p.wrapX(m[0] - mx), m[1] - mz);
         double chord = Math.hypot(b[0] - a[0], b[1] - a[1]);

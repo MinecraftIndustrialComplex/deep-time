@@ -174,7 +174,7 @@ class MapModelTest {
                 for (int i = 0; i < l.size(); i++) {
                     double[] ll = PlanetGeometry.displayLatLon(p, l.xs()[i], l.zs()[i]);
                     if (l.kind() == Graticule.Kind.PARALLEL) {
-                        assertEquals(l.value(), ll[0], 1e-6);
+                        assertEquals(l.value(), ll[0], PlanetGeometry.FORWARD_TOLERANCE_DEG);
                     } else if (Math.abs(ll[0]) < 89.8) {
                         double d = ll[1] - l.value();
                         d -= 360 * Math.round(d / 360);
