@@ -2509,7 +2509,7 @@ impl DepositStage {
         };
         let want_y = surf - want_depth_m / f.sc.m_per_block_v;
         match host_horizon(
-            &cover.horizons_at(x, z),
+            &cover.drawn_horizons_at(x, z),
             is_host,
             surf,
             want_y,
