@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.screen;
 
+import com.minecraftindustrialcomplex.deeptime.screen.model.TextWrap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -18,8 +19,9 @@ import java.util.function.Supplier;
  * A scrolling list of one-line rows on a dark panel, the generation page's History and Map tabs
  * (docs/design/create-world-ux.md): text, headings, colour swatches, a colour bar, the History's
  * milestone rows (a time column, a colour square, the words) and clickable choices and toggles.
- * Rows are one text line high, so a 270-pixel-high screen still shows a dozen of them; a row whose
- * words do not fit ends in an ellipsis and shows them whole on hover.
+ * Rows are one text line high, so a 270-pixel-high screen still shows a dozen of them; History's
+ * words wrap onto a second row ({@link #milestone}), and any other row whose words do not fit ends
+ * in an ellipsis and shows them whole on hover.
  */
 final class PanelList extends ContainerObjectSelectionList<PanelList.Row> {
 
@@ -164,24 +166,46 @@ final class PanelList extends ContainerObjectSelectionList<PanelList.Row> {
         };
     }
 
+    /** Where a History row's words start, from the row's left: the time column, a gap, the colour square and a gap. */
+    static int milestoneTextX(int timeWidth) {
+        return timeWidth + 4 + 11;
+    }
+
     /**
-     * A History row: the time in the column headed "Million years ago", the kind's colour (the map
-     * markers' colour), the words; highlighted when {@code fresh}.
+     * A History entry: the time in the column headed "Million years ago", the kind's colour (the
+     * map markers' colour), the words, wrapped to two rows (the second under the words, so the
+     * column of times stays clear); highlighted when {@code fresh}. Words that need more than two
+     * rows end in "…" and show whole on hover.
      */
-    static Row milestone(String time, int timeWidth, int colour, Component text, boolean fresh) {
-        return new Row() {
-            @Override
-            public void render(GuiGraphics g, int index, int top, int left, int width, int height, int mouseX, int mouseY,
-                    boolean hovering, float partialTick) {
-                Font f = font();
-                if (fresh)
-                    g.fill(left - 2, top - 1, left + width, top + 10, 0xff252b35);
-                g.drawString(f, time, left + timeWidth - f.width(time), top + 1, 0xff9aa3ad, false);
-                int sx = left + timeWidth + 4;
-                g.fill(sx, top + 1, sx + 7, top + 8, 0xff000000 | colour);
-                fitted(g, text, sx + 11, top + 1, width - (sx + 11 - left), fresh ? 0xffffffff : 0xffd8d8d8, hovering);
-            }
-        };
+    static List<Row> milestone(String time, int timeWidth, int colour, Component text, boolean fresh, int rowWidth) {
+        int textW = rowWidth - milestoneTextX(timeWidth);
+        TextWrap.Wrapped w = TextWrap.wrap(text.getString(), Row.font()::width, textW, textW);
+        List<String> lines = w.lines().isEmpty() ? List.of("") : w.lines();
+        Component tip = w.cut() ? text : null;
+        List<Row> rows = new java.util.ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) {
+            boolean first = i == 0, more = i < lines.size() - 1;
+            String line = lines.get(i);
+            rows.add(new Row() {
+                @Override
+                public void render(GuiGraphics g, int index, int top, int left, int width, int height, int mouseX, int mouseY,
+                        boolean hovering, float partialTick) {
+                    Font f = font();
+                    // The highlight runs on into the entry's next row.
+                    if (fresh)
+                        g.fill(left - 2, top - 1, left + width, top + (more ? 11 : 10), 0xff252b35);
+                    if (first) {
+                        g.drawString(f, time, left + timeWidth - f.width(time), top + 1, 0xff9aa3ad, false);
+                        int sx = left + timeWidth + 4;
+                        g.fill(sx, top + 1, sx + 7, top + 8, 0xff000000 | colour);
+                    }
+                    g.drawString(f, line, left + milestoneTextX(timeWidth), top + 1, fresh ? 0xffffffff : 0xffd8d8d8, false);
+                    if (hovering && tip != null && Minecraft.getInstance().screen != null)
+                        Minecraft.getInstance().screen.setTooltipForNextRenderPass(tip);
+                }
+            });
+        }
+        return rows;
     }
 
     /** A column heading over the milestone rows' time column and words. */

@@ -42,6 +42,12 @@ public final class Petroff {
         tanB = new double[]{PortableMath.tan(PI / 4.0), PortableMath.tan(b1), PortableMath.tan(b2)};
     }
 
+    /**
+     * The forward's switch to the coordinate form of its last step, in local units (the Rust twin's
+     * {@code NEAR_SIDE}: a numerical switch, not a physical value; ledger: SCL-083).
+     */
+    private static final double NEAR_SIDE = 1e-6;
+
     private static double sign(double x) {
         return x > 0.0 ? 1.0 : (x < 0.0 ? -1.0 : 0.0);
     }
@@ -95,22 +101,31 @@ public final class Petroff {
         double xpxpyp = den > 0.0 ? sqrt0((1.0 - PortableMath.cos(x)) / den) : 0.0;
         double up = ap * upupvp;
         double xpyp = sqrt0(up * up + cp * cp - 2.0 * up * cp * PortableMath.cos(gp));
-        double cosGammap;
-        if (xpyp > 0.0) {
-            double q = up * PortableMath.sin(gp) / xpyp;
-            cosGammap = sqrt0(1.0 - q * q);
-        } else {
-            cosGammap = 1.0;
-        }
         double xp = xpyp * xpxpyp;
         double yp = xpyp - xp;
-        double rp = sqrt0(xp * xp + cp * cp - 2.0 * xp * cp * cosGammap);
-        double alphap;
-        if (up * rp <= 0.0) {
-            alphap = xip - PI / 6.0;
+        double rp, alphap;
+        if (up <= NEAR_SIDE || yp <= NEAR_SIDE) {
+            // P′ on a side of the planar triangle: place it by coordinates (see the Rust twin).
+            double cx = cp * PortableMath.cos(gp), cy = cp * PortableMath.sin(gp);
+            double px = cx + xpxpyp * (up - cx);
+            double py = cy - xpxpyp * cy;
+            rp = Math.sqrt(px * px + py * py);
+            alphap = PortableMath.atan2(py, px);
         } else {
-            double q = (yp * yp - up * up - rp * rp) / (-2.0 * up * rp);
-            alphap = q < 1.0 ? PortableMath.acos(q) : 0.0;
+            double cosGammap;
+            if (xpyp > 0.0) {
+                double q = up * PortableMath.sin(gp) / xpyp;
+                cosGammap = sqrt0(1.0 - q * q);
+            } else {
+                cosGammap = 1.0;
+            }
+            rp = sqrt0(xp * xp + cp * cp - 2.0 * xp * cp * cosGammap);
+            if (up * rp <= 0.0) {
+                alphap = xip - PI / 6.0;
+            } else {
+                double q = (yp * yp - up * up - rp * rp) / (-2.0 * up * rp);
+                alphap = q < 1.0 ? PortableMath.acos(q) : 0.0;
+            }
         }
         double thetap = s == 0 ? alphap
                 : (s == 1 ? PI - (xip - PI / 6.0) - alphap : PI - (xip - PI / 6.0) + alphap);

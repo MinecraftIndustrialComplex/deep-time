@@ -1536,6 +1536,74 @@ mod petroff_guyou_tests {
     /// The hemisphere sides of the 16k and 32k worlds and a small test world, with a λc each.
     const WORLDS: [(u32, f64); 3] = [(6_656, 31.0), (13_056, 200.25), (1_536, 0.0)];
 
+    /// Exact inputs on the lines where Petroff's forward is degenerate (ledger: SCL-083), for the
+    /// round trip below and the parity fixture: the equator every `step` degrees of longitude; the
+    /// meridians λc, λc ± 90° and λc + 180° (the tiles' midlines and edges) every `step` degrees of
+    /// latitude; the four cone points; the eight 67.5° vertices of Petroff's square (the equator at
+    /// λc ± 22.5° and λc + 180° ± 22.5°, latitude ±22.5° on λc and λc + 180°); the two tile centres
+    /// and the poles.
+    pub(super) fn diagonal_inputs(lc: f64, step: f64) -> Vec<(f64, f64)> {
+        let mut p = Vec::new();
+        let n = (360.0 / step).round() as i32;
+        for k in 0..n {
+            p.push((0.0, f64::from(k) * step));
+        }
+        let m = (90.0 / step).round() as i32;
+        for k in 1 - m..m {
+            for d in [0.0, 90.0, 180.0, 270.0] {
+                p.push((f64::from(k) * step, wrap_deg(lc + d)));
+            }
+        }
+        for lat in [45.0, -45.0] {
+            for d in [90.0, 270.0] {
+                p.push((lat, wrap_deg(lc + d)));
+            }
+        }
+        for d in [0.0, 180.0] {
+            for o in [22.5, -22.5] {
+                p.push((0.0, wrap_deg(lc + d + o)));
+                p.push((o, wrap_deg(lc + d)));
+            }
+            p.push((0.0, wrap_deg(lc + d)));
+        }
+        p.push((90.0, 0.0));
+        p.push((-90.0, 0.0));
+        p
+    }
+
+    #[test]
+    fn exact_inputs_on_the_diagonals_round_trip() {
+        // Sphere → block → sphere on the forward's degenerate lines (SCL-083). Before 2026-10-20
+        // the forward lost its last angle there: up to 1.6° off on the equator and 10.5° at the
+        // cone points of the play world (6656, λc 146), whose cone points clamped to (616, −3328).
+        for (b, lc) in WORLDS.into_iter().chain([(6_656, 146.0), (6_656, 31.25)]) {
+            let g = PetroffGuyou::new(b, lc);
+            let (bf, h) = (f64::from(b), f64::from(b) / 2.0);
+            let pts = diagonal_inputs(lc, 0.1);
+            let mut worst: f64 = 0.0;
+            for &(lat, lon) in &pts {
+                let (x, z) = g.block_of(lat, lon);
+                assert!(
+                    (-bf..bf).contains(&x) && z.abs() <= h,
+                    "b {b} λc {lc}: ({lat}, {lon}) -> ({x}, {z})"
+                );
+                let d = angle(g.unit(x, z), unit_of_lat_lon(lat, lon)).to_degrees();
+                worst = worst.max(d);
+                assert!(
+                    d < 1e-5,
+                    "b {b} λc {lc}: ({lat}, {lon}) -> ({x}, {z}) is {d}° off"
+                );
+                if lat == 0.0 {
+                    assert!(z.abs() < 1e-6, "b {b} λc {lc}: equator at {lon} -> z {z}");
+                }
+            }
+            eprintln!(
+                "b {b} λc {lc}: {} exact inputs, worst round trip {worst:e}°",
+                pts.len()
+            );
+        }
+    }
+
     #[test]
     fn the_sizes_follow_the_planet() {
         assert_eq!(PetroffGuyou::hemisphere_for(16_384), 6_656);
@@ -1891,8 +1959,8 @@ mod petroff_guyou_tests {
 }
 
 /// The cross-language parity fixture (`tests/data/projection_parity.json`): inputs and outputs of
-/// the portable trigonometry, Petroff's square and two Petroff–Guyou worlds, every number as the
-/// hex of its bits. Java's `ProjectionParityTest` and the pages' `tools/viewer/projection-check.js`
+/// the portable trigonometry, Petroff's square and two Petroff–Guyou worlds (random points and
+/// exact inputs on the forward's degenerate lines), every number as the hex of its bits. Java's `ProjectionParityTest` and the pages' `tools/viewer/projection-check.js`
 /// read it and must give the same bits. `DEEPTIME_WRITE_PARITY=1 cargo test -p deeptime-format
 /// parity_fixture` rewrites it after a deliberate change.
 #[cfg(test)]
@@ -2010,11 +2078,25 @@ mod parity_fixture {
                     hx(z)
                 ));
             }
+            // Exact inputs on the forward's degenerate lines (SCL-083; no draws from `g`, so the
+            // rows above keep their inputs).
+            let mut exact = Vec::new();
+            for (lat, lon) in super::petroff_guyou_tests::diagonal_inputs(lc, 2.5) {
+                let (x, z) = w.block_of(lat, lon);
+                exact.push(format!(
+                    "        {{\"lat\": {}, \"lon\": {}, \"x\": {}, \"z\": {}}}",
+                    hx(lat),
+                    hx(lon),
+                    hx(x),
+                    hx(z)
+                ));
+            }
             worlds.push(format!(
-                "    {{\"b\": {b}, \"lambda_c_deg\": {}, \"points\": [\n{}\n      ], \"inverse\": [\n{}\n      ]}}",
+                "    {{\"b\": {b}, \"lambda_c_deg\": {}, \"points\": [\n{}\n      ], \"inverse\": [\n{}\n      ], \"exact\": [\n{}\n      ]}}",
                 hx(lc),
                 pts.join(",\n"),
-                inv.join(",\n")
+                inv.join(",\n"),
+                exact.join(",\n")
             ));
         }
         out.push_str(&worlds.join(",\n"));
