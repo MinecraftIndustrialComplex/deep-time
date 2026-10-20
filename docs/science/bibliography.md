@@ -6751,7 +6751,7 @@ The temperate present's CO2 cap rests on the late Quaternary's glacial-to-interg
 - Library: not fetched.
 - Read so far (by the project): from memory. The interval's form was checked by deriving it, not against the paper: the bounds are the roots in p of (p̂ - p)² = z² p(1 - p) / n, (p̂ + z²/2n ± z sqrt(p̂(1 - p̂)/n + z²/4n²)) / (1 + z²/n). The one-sided 99 % quantile of the standard normal, 2.326, is from memory (the tables give 2.3263).
 
-## Carbonate on the sea floor, MVT hosts, impact deposits and placers (ERO-185 to ERO-189, ORE-270, ORE-271, IMP-142, IMP-143, DEP-214), added 2026-10-19
+## Carbonate on the sea floor, MVT hosts, impact deposits and placers (ERO-191 to ERO-195, ORE-270, ORE-271, IMP-142, IMP-143, DEP-214), added 2026-10-19
 
 The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above the CCD once the planktic calcifiers arrive, MVT in the carbonate horizons the columns hold, source, pathway and trap for the impact metals with densities from Earth's inventory, and placers kept off oceanic crust and the deep shelf. "Read by the research sub-agent" means a Sonnet sub-agent of the task fetched the source and quoted it on 2026-10-19; the quotes are in the ledger rows. Existing entries this task also read: Leach2010a (MVT hosts, ORE-271), Grieve1994 (abstract via OpenAlex, IMP-142, IMP-143) and Ames1998 (cited, not read, ORE-042, IMP-142).
 
@@ -6759,7 +6759,7 @@ The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above t
 - Reference: Ridgwell, A. and Zeebe, R. E. (2005). The role of the global carbonate cycle in the regulation and evolution of the Earth system. Earth and Planetary Science Letters 234(3-4):299-315.
 - DOI or URL: 10.1016/j.epsl.2005.03.006; open copy https://sseh.uchicago.edu/doc/Ridgwell_and_Zeebe_2005.pdf
 - Cited as: "Ridgwell and Zeebe 2005, EPSL 234: 307" (deposits/clocks.rs; surface/carbonate.rs).
-- Ledger ids: ORE-270, ERO-188
+- Ledger ids: ORE-270, ERO-194
 - Access: open copy.
 - Library: not kept (fetched through the web fetch tool and the PDF's text layer extracted with pdftotext, 2026-10-19).
 - Read so far (by the project): full text, 2026-10-19. P. 307: "it is not until the Mesozoic that a marked proliferation in coccolithophore and planktic foraminiferal diversity and abundance is observed ... Only then would a substantive deep-sea sedimentary carbonate sink have been possible"; "the mean area of platform carbonates during the Mesozoic and Cenozoic is much reduced compared to the Paleozoic"; the abstract's "Mid-Mesozoic Revolution"; the "Neritan" and "Cretan" ocean modes.
@@ -6777,7 +6777,7 @@ The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above t
 - Reference: Milliman, J. D. and Droxler, A. W. (1995). Calcium carbonate sedimentation in the global ocean: linkages between the neritic and deep-sea. Oceanography 8(3).
 - DOI or URL: https://tos.org/oceanography/assets/docs/8-3_milliman.pdf
 - Cited as: "Milliman and Droxler 1995, after Milliman 1993" (surface/carbonate.rs).
-- Ledger ids: ERO-185
+- Ledger ids: ERO-191
 - Access: open access.
 - Library: not kept.
 - Read so far (by the project): the text layer, by the research sub-agent, 2026-10-19: the budget table "modified from Milliman (1993)", in 10^12 mol/yr: deep sea 290 x 10^6 km2, production 24.0, accumulation 11.0; slopes 32 x 10^6 km2, 5.0 and 4.0; reefs, banks, shelves and Halimeda mounds about 14.5 of accumulation; total accumulation 32; neritic and pelagic accumulation "roughly equal".
@@ -6786,7 +6786,7 @@ The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above t
 - Reference: Milliman, J. D. (1993). Production and accumulation of calcium carbonate in the ocean: budget of a nonsteady state. Global Biogeochemical Cycles 7(4):927-957.
 - DOI or URL: 10.1029/93GB02524
 - Cited as: "Milliman 1993".
-- Ledger ids: ERO-185
+- Ledger ids: ERO-191
 - Access: open access (AGU).
 - Library: not fetched.
 - Read so far (by the project): the abstract through Crossref, by the research sub-agent, 2026-10-19: "about 5 billion tons (bt) per year, of which about 3 bt accumulate in sediments; the other 40% is dissolved. Nearly half of the carbonate sediment accumulates on reefs, banks, and tropical shelves."
@@ -6795,7 +6795,7 @@ The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above t
 - Reference: Dutkiewicz, A., Müller, R. D., O'Callaghan, S. and Jónasson, H. (2015). Census of seafloor sediments in the world's ocean. Geology 43(9):795-798.
 - DOI or URL: 10.1130/G36883.1; supplement ftp://ftp.earthbyte.org/papers/Dutkiewicz_etal_seafloor_lithology/Dutkiewicz_etal_census_of_seafloor_sediments_Geology_suppmat_2015.pdf
 - Cited as: "Dutkiewicz et al. 2015, supplement table DR1".
-- Ledger ids: ERO-185
+- Ledger ids: ERO-191
 - Access: paywalled paper; open supplement.
 - Library: not kept.
 - Read so far (by the project): supplement table DR1, by the research sub-agent, 2026-10-19: per ocean, clay / calcareous ooze / fine-grained calcareous %: N Atlantic 27/36/27, S Atlantic 34/39/21, N Pacific 62/16/5, S Pacific 43/29/15, N Indian 40/33/13, S Indian 33/38/14, Southern 29/21/6 (the unweighted mean, about 30 % ooze and 14 % fine calcareous, is the sub-agent's arithmetic).
@@ -6804,7 +6804,7 @@ The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above t
 - Reference: Diesing, M. (2020). Deep-sea sediments of the global ocean. Earth System Science Data 12(4):3367-3381.
 - DOI or URL: 10.5194/essd-12-3367-2020; https://essd.copernicus.org/articles/12/3367/2020/
 - Cited as: "Diesing 2020: 37 %" (surface/carbonate.rs).
-- Ledger ids: ERO-185
+- Ledger ids: ERO-191
 - Access: open access.
 - Library: not kept.
 - Read so far (by the project): the article, by the research sub-agent, 2026-10-19: of the seabed below 500 m, calcareous 36.8 %, clay 31.0 %, radiolarian ooze 14.2 %, lithogenous 9.5 %, diatom ooze 8.5 %. (Its preprint's 50.3 % is a share of samples, not of area.)
@@ -6894,7 +6894,7 @@ The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above t
 - Reference: Wilber, R. J., Milliman, J. D. and Halley, R. B. (1990). Accumulation of bank-top sediment on the western slope of Great Bahama Bank: rapid progradation of a carbonate megabank. Geology 18(10):970-974.
 - DOI or URL: 10.1130/0091-7613(1990)018<0970:AOBTSO>2.3.CO;2; abstract at https://pubs.usgs.gov/publication/70137851
 - Cited as: "Wilber, Milliman & Halley 1990" (surface/carbonate.rs, `exported`).
-- Ledger ids: ERO-189
+- Ledger ids: ERO-195
 - Access: paywalled; the abstract is open (USGS Publications Warehouse).
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-20: "large-scale export of bank-top sediment and rapid progradation of the slope during the Holocene"; a wedge "up to 90 m thick" of "predominantly aragonite mud derived from the bank since flooding of the platform 6-8 ka"; its volume "40%-80% that of Holocene sediment currently retained on the bank"; vertical accumulation up to 11 to 15 m/ka.

@@ -28,10 +28,10 @@
 /// that is calcareous (Dutkiewicz et al. 2015, supplement table DR1; Diesing 2020: 37 %), so
 /// 4.4 m/Myr of chalk at 30 % porosity (RCK-001: dry chalk 1,940 kg/m³, 28.8 %); rounded down
 /// because the taper above the CCD thins it further (calcareous ooze 0.3–5 cm/kyr wet).
-pub const PELAGIC_M_MYR: f64 = 4.0; // ledger: ERO-185
+pub const PELAGIC_M_MYR: f64 = 4.0; // ledger: ERO-191
 /// The lysocline lies this far above the CCD: the ooze's dissolution grows linearly from none at
 /// the lysocline to all of it at the CCD.
-pub const LYSOCLINE_ABOVE_CCD_M: f64 = 1000.0; // ledger: ERO-186
+pub const LYSOCLINE_ABOVE_CCD_M: f64 = 1000.0; // ledger: ERO-192
 
 /// The share of the pelagic rain that survives at water depth `z` (m) over a CCD at `ccd_m`.
 pub fn pelagic_share(z: f64, ccd_m: f64) -> f64 {
@@ -49,11 +49,11 @@ pub fn pelagic(z: f64, calcifiers: f64, dt: f64, ccd_m: f64) -> f64 {
 }
 
 /// A cell's outgoing share below this is taken as none: the tracer stops spreading from it.
-const EXPORT_MIN_SHARE: f64 = 0.01; // ledger: ERO-189
+const EXPORT_MIN_SHARE: f64 = 0.01; // ledger: ERO-195
 /// An exchange smaller than this (m of the giving cell over the step) does not carry the tracer
 /// on: below the wave base the marine diffusivity falls by e every 60 m, so the deep floor's
 /// exchanges are millimetres.
-const EXPORT_MIN_FLUX_M: f64 = 1.0e-3; // ledger: ERO-189
+const EXPORT_MIN_FLUX_M: f64 = 1.0e-3; // ledger: ERO-195
 
 #[derive(Clone, Copy, PartialEq)]
 struct Higher {
@@ -75,7 +75,7 @@ impl Ord for Higher {
     }
 }
 
-/// **Periplatform carbonate** (ledger ERO-189): the carbonate in what the marine diffusion and the
+/// **Periplatform carbonate** (ledger ERO-195): the carbonate in what the marine diffusion and the
 /// slope failure laid in each sea cell over a step, m, as (cell, metres) for the cells that got
 /// any.
 ///
@@ -198,7 +198,7 @@ pub fn exported(
 
 /// The photic zone the factory's limits are measured over ([`limits`]), m: Bosscher and
 /// Schlager's rate at 100 m is 2 × 10⁻⁴ of its surface value.
-pub const PHOTIC_M: f64 = 100.0; // ledger: ERO-187
+pub const PHOTIC_M: f64 = 100.0; // ledger: ERO-193
 
 /// Whether a cell at depth `z` is in the photic zone, and its warmth and warmth × clarity factors
 /// (`produce`'s), each 0 outside it (measurement only).

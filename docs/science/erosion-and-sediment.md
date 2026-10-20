@@ -20,7 +20,7 @@ Through the whole history, rivers cut into rising land (the stream power law: er
 | [ERO](ledger/ERO.md) | erosion audit, plateaus and the measured diffusivity | ERO-171 to ERO-178 (8) |
 | [ERO](ledger/ERO.md) | the erosion law against measured rates | ERO-179 to ERO-182 (4) |
 | [ERO](ledger/ERO.md) | surface numerics: the diffusion solve, the parallel flood | ERO-183 to ERO-184 (2) |
-| [ERO](ledger/ERO.md) | pelagic and periplatform carbonate, photic diagnostics | ERO-185 to ERO-189 (5) |
+| [ERO](ledger/ERO.md) | pelagic and periplatform carbonate, photic diagnostics | ERO-191 to ERO-195 (5) |
 
 Rows by status (2026-10-18, `tools/review/claims_counts.py`): `verified` 10, `cited-unverified` 82, `from-memory` 2, `abstract-only` 4, `calibrated` 8, `game-choice` 11, `uncited` 56.
 
@@ -684,15 +684,15 @@ al. 2015). Three causes, measured:
 
 **What changed.**
 
-- **Pelagic chalk** (ERO-185, ERO-186, ORE-270). Once the planktic calcifiers are in full, the
+- **Pelagic chalk** (ERO-191, ERO-192, ORE-270). Once the planktic calcifiers are in full, the
   open sea floor gains calcareous ooze at 4.0 m/Myr of chalk (from Milliman and Droxler's deep-sea
   accumulation over the calcareous share of the floor, the arithmetic in the ledger row), times
   the share that survives dissolution, all of it down to 1,000 m above the CCD and none at the
   CCD (4,500 m, RCK-015). The calcifiers' clock is 0 before 0.20 Ga and 1 from 0.10 Ga (Ridgwell
   and Zeebe 2005: the Mesozoic proliferation of coccolithophores and planktic foraminifera; before
   it no "substantive deep-sea sedimentary carbonate sink"). A step's deposit that is mostly ooze
-  is chalk (ERO-188); chalk is not platform carbonate for the deposit engine (`Kind::Pelagic`).
-- **Periplatform carbonate** (ERO-189). A tracer follows the diffusion solve's own exchanges: the
+  is chalk (ERO-194); chalk is not platform carbonate for the deposit engine (`Kind::Pelagic`).
+- **Periplatform carbonate** (ERO-195). A tracer follows the diffusion solve's own exchanges: the
   flux across each face of the five-point operator follows from the solved heights,
   (kd_i + kd_j) / 2 x dt / dx^2 x (h_i - h_j). Taken from the highest sea cell down, each cell
   passes on a well-mixed blend of what came to it and what it lost, its loss counted from the top
@@ -703,7 +703,7 @@ al. 2015). Three causes, measured:
   dolostone where ERO-091 holds). The tracer stops where the share falls below 1 % or the flux
   below 1 mm (a cost bound, not physics). It is always on: a preset switch would have changed
   the share-code fixture for a tool, and nothing is released.
-- **Photic diagnostics** (ERO-187). `surface_final` prints the photic floor's area over the run
+- **Photic diagnostics** (ERO-193). `surface_final` prints the photic floor's area over the run
   and its warm and warm-and-clear parts, with the pelagic and periplatform volumes;
   `tools/review/carbonate-table.py` reads them.
 - **Dolostone unchanged.** The facies rule is the sabkha path alone: carbonate laid in arid water
@@ -795,7 +795,7 @@ predicts.
 **Limits.** The factory's room (no epeiric seas on high-standing continents) is the larger part of
 the land's shortfall and is a plate and sea-level matter, outside this task. The sea floor's top
 is still mostly shale and mud (57 % and 26 % on the branch's supercontinent seed 1, chalk 4 %):
-where the marine diffusion's clastics reach, a step's deposit is mostly clastic (ERO-188), and the
+where the marine diffusion's clastics reach, a step's deposit is mostly clastic (ERO-194), and the
 diffusion spreads them over the deep floor, which on Earth gets mostly pelagic sediment beyond the
 fans (inferred from the shares, not measured cell by cell). Carbonate burial is
 not tied to the carbon budget (the ocean does not lose the carbon the surface stage buries). The
