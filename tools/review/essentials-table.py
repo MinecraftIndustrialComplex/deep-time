@@ -9,8 +9,9 @@ label's median and range.
 Per run, from `deposit-audit`'s JSON: zinc and lead ore blocks per land chunk (the deposits, the
 guaranteed deposits among them, the scatter, all), the land regions holding a source of each
 essential (the audit's `essentials`: 8,192-block regions and 2,048-block ones), the distance from
-the spawn (the first spawn candidate) and the median candidate to the nearest source, and the
-MVT and SEDEX sites (natural, guaranteed). From the run log's `surface_final` (absent on older
+the spawn (the first spawn candidate) and the median candidate to the nearest source, the access
+probe's median half-width to gather its need of each (deposits and scatter; points beyond its
+radius), and the MVT and SEDEX sites (natural, guaranteed). From the run log's `surface_final` (absent on older
 builds) and `strata-check`: black shale laid (10^6 km3), the mean area of the deposit engine's
 carbonate-platform and euxinic-basin fields and of source rock richer than plain shale
 (10^6 km2), the mean source-rock TOC over the planet (wt %), and black shale's share of the sea
@@ -56,7 +57,7 @@ def run_row(root, stem):
     if aj.exists():
         a = json.load(open(aj))
         by = a.get("planet", {}).get("ore_by_source", {})
-        ess = a.get("essentials", {})
+        ess = a.get("essentials", {}).get("by_material", {})
         for m in MATERIALS:
             k = m.split(":")[1]
             pl = by.get(m, {}).get("per_land_chunk", {})
@@ -71,6 +72,9 @@ def run_row(root, stem):
             r[f"{k}_spawn_med"] = statistics.median(d) if d else float("nan")
             r[f"{k}_sources"] = e.get("sources", 0)
             r[f"{k}_guaranteed_sources"] = e.get("guaranteed_sources", 0)
+            acc = ((a.get("access") or {}).get("by_material") or {}).get(m, {}).get("deposits_and_scatter", {})
+            r[f"{k}_access_p50"] = num(acc.get("p50"))
+            r[f"{k}_access_beyond"] = acc.get("beyond_radius", "?")
         sites = a.get("sites", [])
         for t in ["mvt_zn_pb", "sedex_zn_pb"]:
             of = [x for x in sites if x["type"].endswith(t)]
