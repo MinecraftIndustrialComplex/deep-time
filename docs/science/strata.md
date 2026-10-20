@@ -202,7 +202,9 @@ What it shows:
 - **The felsic rock the plate model still puts on ocean crust** (62 % of the ocean columns hold some,
   1.1 km on average, drawn as granodiorite or diorite) is the transition's (PLT-261: the continent's
   rock parked on the ocean side of every margin within 100 km), the island arcs' (PLT-043 to PLT-046,
-  along fronts about 8.6 times Earth's length) and the coastal tongues above. With the switch PLT-294
+  along oceanic fronts about 8.6 times Earth's length: 125,000 km against 14,500 at 500 Myr in
+  plate task 8, 2026-10-17, plates.md "The crust budget on sourced rates", itself inferred from the
+  fronts' km x Myr and not re-measured here) and the coastal tongues above. With the switch PLT-294
   on, 51 % hold some, 0.9 km on average (in the L1 fields of seed 1, the ocean-basin cells holding
   over 50 m fall from 0.73 to 0.46), at a cost in land (plates.md, "Ocean crust keeps its own rock").
 - **The sea floor is still deep to its mantle**, 9.8 km on young crust and 12.1 km over all ages

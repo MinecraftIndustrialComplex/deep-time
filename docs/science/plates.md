@@ -2108,8 +2108,9 @@ stretches, which the model's fixed boundary cannot do without the ratchet PLT-28
 
 **What is left under the sea** (switch on, seed 1 supercontinent on master bc2e5472, the table
 above): all the arc cells and 0.73 of the back-arc cells hold island-arc rock (drawn as andesite over
-diorite or granodiorite, RCK-096; the model's oceanic fronts are about 8.6 times Earth's length,
-PLT-045), and 0.46 of the ocean basin, 0.21 of the ridges and 0.16 of the crust younger than 20 Myr
+diorite or granodiorite, RCK-096; the model's oceanic fronts were about 8.6 times Earth's length,
+125,000 km against 14,500 at 500 Myr in plate task 8, 2026-10-17, "The crust budget on sourced
+rates" above, inferred from the fronts' km × Myr and not re-measured since, PLT-045), and 0.46 of the ocean basin, 0.21 of the ridges and 0.16 of the crust younger than 20 Myr
 hold some; on d54c7f0f these were 0.61, 0.45, 0.16 and 0.07. On crust older than 150 Myr the
 sediment pile averages 9.6 to 9.9 km (6.4 km on d54c7f0f) and its base turns to schist (the
 diagenesis above): the pile, not the ocean crust, makes old sea floor deep to its mantle.
