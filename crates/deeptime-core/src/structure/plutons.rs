@@ -1388,7 +1388,15 @@ mod tests {
             stock(4, 9000, [10.5, 0.0], [5.0, 5.0], 85.0, 10.0),
         ];
         let mut units = vec![unit("sandstone", 1.0e4, [9500, 9600])];
-        mask_intrusions(&mut units, &a, &events, &[3, 0, 4, 2, 1], Some(0), mv, 16384.0);
+        mask_intrusions(
+            &mut units,
+            &a,
+            &events,
+            &[3, 0, 4, 2, 1],
+            Some(0),
+            mv,
+            16384.0,
+        );
         let layers: Vec<(u16, f64, u16)> = units
             .iter()
             .map(|u| (u.class, f64::from(u.thickness_m), u.key[0]))
