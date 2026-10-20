@@ -220,6 +220,36 @@ public final class BiomeGameTests {
     static final double COLD_WETLAND_SWAMP_CEILING = 0.05;
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
     static final double FORBIDDEN_CEILING = 0.10;
+    /**
+     * The ice cap's ice spikes are bounded rather than banned (BiomeCensus.EF_ICE_SPIKES_STEEP and _FLATS; ledger:
+     * BIO-162, the ice spikes report of 2026-10-20): a share fails only when its one-sided 99 % lower bound is above
+     * its ceiling ({@link ShareBound#above}). The game's census emulated on bakes (vanilla and MIC; Ben's play world
+     * and the 2026-10-20 master's supercontinent and scattered continents) gave, on the ice cap's steep ground (erosion
+     * E0 and E1), 0.010 to 0.030 after EF's continentalness floor (BIO-161; with vanilla its valley columns and the
+     * near-inland ring the world grid's projection leaves along the ice cap's coast, 0.030 on a real bake of the
+     * supercontinent; none with MIC) and 0.175 to 0.212 before it with vanilla; on its flats, with MIC 0.170 to 0.200
+     * after and 0.648 to 0.706 before, with vanilla 0.059 to 0.343 both (the flats rule's noise, BIO-077). The steep
+     * ceiling sits near the geometric mean of 0.030 and 0.175; the flats' is the pack's own share of its frozen,
+     * driest flats (BIO-161's target: never above it). On the GameTests' 4k planet the ice cap is 3 census columns,
+     * under {@link #MIN_COLUMNS}, so there both are logged; they are asserted on a planet with an ice cap.
+     */
+    static final double STEEP_ICE_SPIKES_CEILING = 0.07; // ledger: BIO-162
+    /** Ice spikes' share of the frozen, driest flats in the pack's own worlds (4 seeds each, 2026-10-20): Terralith 2.6.2's and vanilla's. */
+    static final double OWN_FLATS_ICE_SPIKES_TERRALITH = 0.345, OWN_FLATS_ICE_SPIKES_VANILLA = 0.468; // ledger: BIO-162
+
+    /** Whether a {@link BiomeCensus#FORBIDDEN} family is a bounded share rather than a ban. */
+    static boolean bounded(String name) {
+        return name.equals(BiomeCensus.EF_ICE_SPIKES_STEEP) || name.equals(BiomeCensus.EF_ICE_SPIKES_FLATS);
+    }
+
+    /** A {@link BiomeCensus#FORBIDDEN} family's ceiling; a pack without Terralith is held to vanilla's own share. */
+    static double forbiddenCeiling(String name) {
+        if (name.equals(BiomeCensus.EF_ICE_SPIKES_STEEP))
+            return STEEP_ICE_SPIKES_CEILING;
+        if (name.equals(BiomeCensus.EF_ICE_SPIKES_FLATS))
+            return ModList.get().isLoaded("terralith") ? OWN_FLATS_ICE_SPIKES_TERRALITH : OWN_FLATS_ICE_SPIKES_VANILLA;
+        return FORBIDDEN_CEILING;
+    }
 
     /**
      * P1-09: biomes follow the simulated climate. On the real baked planet ({@code test_planet_real},
@@ -291,9 +321,19 @@ public final class BiomeGameTests {
         for (var f : BiomeCensus.FORBIDDEN) {
             double share = r.forbiddenShare(f.name());
             DeepTime.LOGGER.info("[gametest] climateConsistent {} {} of {} columns", f.name(), share, r.forbiddenTotal(f.name()));
-            if (r.forbiddenTotal(f.name()) >= minColumns && share > FORBIDDEN_CEILING)
-                red.append(String.format(java.util.Locale.ROOT, " %s %.3f > %.3f (%d columns)", f.name(), share, FORBIDDEN_CEILING,
-                        r.forbiddenTotal(f.name())));
+            int n = r.forbiddenTotal(f.name());
+            if (n < minColumns)
+                continue;
+            if (bounded(f.name())) {
+                // A bounded share, not a ban: significantly above its ceiling, as the floors are significantly
+                // below theirs (ShareBound, 2026-10-19 and 2026-10-20).
+                double ceiling = forbiddenCeiling(f.name());
+                double lower = ShareBound.wilsonLower(r.forbiddenHits(f.name()), n, ShareBound.Z_99);
+                if (lower > ceiling)
+                    red.append(String.format(java.util.Locale.ROOT, " %s %.3f (99 %% lower bound %.3f) > %.3f (%d columns)",
+                            f.name(), share, lower, ceiling, n));
+            } else if (share > FORBIDDEN_CEILING)
+                red.append(String.format(java.util.Locale.ROOT, " %s %.3f > %.3f (%d columns)", f.name(), share, FORBIDDEN_CEILING, n));
         }
         helper.assertTrue(red.isEmpty(), "families on biomes they must not have:" + red);
         helper.succeed();

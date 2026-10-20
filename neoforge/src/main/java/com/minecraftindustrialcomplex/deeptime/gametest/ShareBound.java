@@ -34,4 +34,23 @@ public final class ShareBound {
     public static boolean below(int hits, int n, double floor, double z) {
         return wilsonUpper(hits, n, z) < floor;
     }
+
+    /** Wilson's score lower bound of {@code hits / n} at the normal quantile {@code z} (0 when {@code n} is 0). */
+    public static double wilsonLower(int hits, int n, double z) {
+        if (n <= 0)
+            return 0.0;
+        double p = hits / (double) n, z2 = z * z;
+        double centre = p + z2 / (2.0 * n);
+        double half = z * Math.sqrt(p * (1.0 - p) / n + z2 / (4.0 * n * (double) n));
+        return Math.max(0.0, (centre - half) / (1.0 + z2 / n));
+    }
+
+    /**
+     * Whether {@code hits} of {@code n} is significantly (one-sided, {@code z}) above {@code ceiling}: the
+     * mirror of {@link #below}, for a share that is bounded rather than banned (the ice cap's ice spikes,
+     * 2026-10-20), whose expected value is not zero and so moves with the sample like a floor's.
+     */
+    public static boolean above(int hits, int n, double ceiling, double z) {
+        return wilsonLower(hits, n, z) > ceiling;
+    }
 }
