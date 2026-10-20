@@ -127,6 +127,23 @@ final class ScreenshotDriver {
         }
     }
 
+    /**
+     * Puts the game's idea of the pointer in the top-left corner. Opening a screen centres it, and in
+     * the centre it hovers a setting or the map, so a tooltip covered part of the shots. GLFW drops
+     * the motion event of its own warp, so the handler's fields are set directly (a dev-only walk).
+     */
+    private static void parkPointer(Minecraft mc) {
+        try {
+            for (String name : new String[]{"xpos", "ypos"}) {
+                java.lang.reflect.Field f = net.minecraft.client.MouseHandler.class.getDeclaredField(name);
+                f.setAccessible(true);
+                f.setDouble(mc.mouseHandler, 1.0);
+            }
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            DeepTime.LOGGER.warn("[deeptime-shot] could not park the pointer ({}); tooltips may show in the shots", e.toString());
+        }
+    }
+
     private static void status(String when) {
         DeepTime.LOGGER.info("[deeptime-shot] {}: status {} ({}), {}%", when, GenerationStatus.state(model),
                 GenerationStatus.sentence(model), Math.round(GenerationStatus.fraction(model) * 100));
@@ -147,6 +164,7 @@ final class ScreenshotDriver {
             switch (step) {
                 case TITLE -> {
                     if (screen instanceof TitleScreen && stepTicks > 40) {
+                        parkPointer(mc);
                         CreateWorldScreen.openFresh(mc, screen);
                         go(Step.CREATE_SCREEN);
                     }
