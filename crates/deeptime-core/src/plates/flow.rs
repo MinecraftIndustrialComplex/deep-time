@@ -51,6 +51,14 @@ use super::state::{CONTINENTAL, PlateState, TRENCH, pool};
 
 /// `WorldState::globals`: crust the lower-crustal flow moved over the run, km³.
 pub const MOVED_GLOBAL: &str = "plates/channel_flow_km3";
+/// `WorldState::globals`: plate steps in which some crust had a channel.
+pub const STEPS_GLOBAL: &str = "plates/channel_flow_steps";
+/// `WorldState::globals`: the substeps those steps took.
+pub const SUBSTEPS_GLOBAL: &str = "plates/channel_flow_substeps";
+/// `WorldState::globals`: the plate time the substeps did not cover, Myr ([`Flow::time_myr`]).
+pub const SHORT_GLOBAL: &str = "plates/channel_flow_short_myr";
+/// `WorldState::globals`: the outermost-ring columns left with a channel ([`Flow::edge`]).
+pub const EDGE_GLOBAL: &str = "plates/channel_flow_edge";
 
 /// The channel thickness at which K₀ holds, m (Clark & Royden 2000's channel; from memory).
 // ledger: PLT-301
@@ -60,8 +68,25 @@ const CHANNEL_MAX: f64 = 2.0;
 /// The largest share of a column's difference to its neighbours one substep may move (the
 /// explicit scheme is stable below 1/2).
 const STABLE: f64 = 0.4;
-/// The most substeps a plate step takes; past them the step moves less than the law would.
-const MAX_SUBSTEPS: usize = 64;
+/// The most substeps a plate step takes: a guard only. The diffusivity is bounded (K ≤ 8 K₀), so
+/// the stable count is too: about 4 · 8 K₀ · dt / (0.4 d²), some 50 at quick 16k's 77 km spacing
+/// and 120 at full 16k's 48 km with the 2-Myr step. Until 2026-10-20 the bound was 64, which full
+/// 16k passed whenever a column anywhere was thicker than about 74 km: every channel on the planet
+/// then moved for only part of the step (the P4 plate-step review, 2026-10-20).
+const MAX_SUBSTEPS: usize = 4096;
+/// An experiment's bound on the substeps (64 was the rule until 2026-10-20), read once.
+pub const MAX_SUBSTEPS_ENV: &str = "DEEPTIME_FLOW_MAX_SUBSTEPS";
+
+fn max_substeps() -> usize {
+    static M: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *M.get_or_init(|| {
+        std::env::var(MAX_SUBSTEPS_ENV)
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|&m| m > 0)
+            .unwrap_or(MAX_SUBSTEPS)
+    })
+}
 /// The Laplacian's weight of one lattice edge, times its length squared: 2/3 on a hexagonal
 /// lattice (∇²T ≈ (2 / 3d²) Σ (T_j − T_i)).
 const HEX_WEIGHT: f64 = 2.0 / 3.0;
@@ -75,6 +100,11 @@ pub struct Flow {
     pub moved_km2_m: f64,
     /// Substeps taken.
     pub substeps: u32,
+    /// The plate time the substeps covered, Myr: the step's own unless the substeps ran out.
+    pub time_myr: f64,
+    /// Columns of the outermost ring of the active set that ended with a channel (thicker than
+    /// T_c): where the flow would have gone on past the set within the step.
+    pub edge: u32,
 }
 
 /// The diffusivity of crust of thickness `t_m` (m), km²/Myr.
@@ -171,8 +201,9 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Flow {
     if fastest <= 0.0 {
         return Flow::default();
     }
-    let substeps = ((env.dt_myr * fastest / STABLE).ceil() as usize).clamp(1, MAX_SUBSTEPS);
+    let substeps = ((env.dt_myr * fastest / STABLE).ceil() as usize).clamp(1, max_substeps());
     let dt = (env.dt_myr / substeps as f64).min(STABLE / fastest);
+    let time_myr = dt * substeps as f64;
     let mut moved = 0.0f64;
     for _ in 0..substeps {
         let t: Vec<f64> = pools.par_iter().map(thick).collect();
@@ -210,6 +241,11 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Flow {
         pools = next;
         moved += out.iter().sum::<f64>();
     }
+    let edge = active
+        .iter()
+        .zip(&pools)
+        .filter(|&(&i, p)| ring[i as usize] == 2 && thick(p) > t_c)
+        .count() as u32;
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
     let mut columns = 0;
     for (a, &i) in active.iter().enumerate() {
@@ -232,6 +268,8 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Flow {
         columns,
         moved_km2_m: moved * env.norm.sample_area_km2(),
         substeps: substeps as u32,
+        time_myr,
+        edge,
     }
 }
 
