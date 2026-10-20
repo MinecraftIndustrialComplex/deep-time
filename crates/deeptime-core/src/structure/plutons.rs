@@ -527,16 +527,18 @@ pub fn cover_m(units: &[columns::Unit], key: u16) -> f64 {
 }
 
 /// Puts into an aureole's centre column (`units`, as [`HostColumns::units`] gives them under the
-/// ground at `a.surface_y`) the rock of the other intrusion events that hold the inner half of
-/// its intrusion's plan (the centre and the points half a semi-axis out along and across): a
-/// stock emplaced inside an older, larger stock, or a larger stock emplaced through it later.
-/// The aureole is a body and paints over the structural events, so its bands must not bake the
-/// older stock's crystalline rock (it has none there) nor paint over the younger one's (it is
-/// younger than the aureole). The events are applied as the column rule does at that column
-/// (oldest first; each replaces, inside its ellipsoid, the rock from the first unit older than it
-/// down, and takes its own class and key), unmoved by later folds and faults. Bands are depth
-/// layers across the whole aureole, so an event that holds only part of the plan is left out:
-/// masking it would leave the rest of the aureole unbaked at its depths. `cands` are the
+/// ground at `a.surface_y`) the rock of the other intrusion events that reach the inner half of
+/// its intrusion's plan (any of five probes: the centre and the points half a semi-axis out along
+/// and across): a stock emplaced inside or beside an older stock, or a stock emplaced through it
+/// later. The aureole is a body and paints over the structural events, so its bands must not
+/// bake the older stock's crystalline rock nor paint over the younger one's (it is younger than
+/// the aureole). The events are applied as the column rule does at that column (oldest first;
+/// each replaces, inside its ellipsoid, the rock from the first unit older than it down, and
+/// takes its own class and key), as thick as at the probe it holds deepest, unmoved by later
+/// folds and faults. Bands are depth layers across the whole aureole, so an event that holds
+/// part of the plan leaves the rest of the aureole unbaked at its depths: the price of no
+/// hornfels inside another stock's granite (REV-2, the 2.png line at 220 km). One that holds
+/// only the rim is left out. `cands` are the
 /// [`StructIndex`](deeptime_format::structure::StructIndex) candidates at the centre (youngest
 /// first), `own` the aureole's own event, `c` the planet's circumference, blocks.
 pub fn mask_intrusions(
@@ -577,10 +579,11 @@ pub fn mask_intrusions(
             let (u, v) = w.local(px, pz, c);
             (u / w.half_along).powi(2) + (v / w.half_across).powi(2)
         };
-        if probes.iter().any(|&p| r2(p) >= 1.0) {
+        let held = probes.iter().map(|&p| r2(p)).fold(f64::INFINITY, f64::min);
+        if held >= 1.0 {
             continue;
         }
-        let hh = half_height * (1.0 - r2((x, z))).sqrt();
+        let hh = half_height * (1.0 - held).sqrt();
         let from_m = (a.surface_y - (y + hh)) * m_per_block_v;
         let to_m = (a.surface_y - (y - hh)) * m_per_block_v;
         overlay(units, from_m, to_m, u16::from(class), ev.key);
@@ -1339,7 +1342,7 @@ mod tests {
     }
 
     #[test]
-    fn a_stock_inside_another_bakes_no_granite_and_paints_over_no_younger_stock() {
+    fn a_stock_inside_or_beside_another_bakes_no_granite_and_paints_over_no_younger_stock() {
         use deeptime_format::structure::Window;
         let t = Tables::get();
         let mv = 20.0;
@@ -1376,19 +1379,24 @@ mod tests {
             stock(0, 8000, [0.0, 0.0], [15.0, 12.0], 40.0, 30.0),
             // 1: an older, larger stock round it: y 50 to 70 at the centre (600 to 1,000 m deep).
             stock(1, 9000, [0.0, 0.0], [60.0, 50.0], 60.0, 10.0),
-            // 2: an older stock holding only a corner of its plan: left out.
+            // 2: an older stock holding only a corner of its plan (no probe): left out.
             stock(2, 9000, [14.0, 10.0], [6.0, 6.0], 20.0, 15.0),
             // 3: a younger, larger stock through it: y 10 to 20 (1,600 to 1,800 m deep).
             stock(3, 6000, [0.0, 0.0], [40.0, 40.0], 15.0, 5.0),
+            // 4: an older stock beside it holding the point half a semi-axis out along (7.5, 0),
+            // r2 0.36 there, so 8 of its 10 blocks of half height: y 77 to 93 (140 to 460 m).
+            stock(4, 9000, [10.5, 0.0], [5.0, 5.0], 85.0, 10.0),
         ];
         let mut units = vec![unit("sandstone", 1.0e4, [9500, 9600])];
-        mask_intrusions(&mut units, &a, &events, &[3, 2, 1, 0], Some(0), mv, 16384.0);
+        mask_intrusions(&mut units, &a, &events, &[3, 0, 4, 2, 1], Some(0), mv, 16384.0);
         let layers: Vec<(u16, f64, u16)> = units
             .iter()
             .map(|u| (u.class, f64::from(u.thickness_m), u.key[0]))
             .collect();
         let expect = [
-            ("sandstone", 600.0, 9500),
+            ("sandstone", 140.0, 9500),
+            ("granite", 320.0, 9000),
+            ("sandstone", 140.0, 9500),
             ("granite", 400.0, 9000),
             ("sandstone", 600.0, 9500),
             ("granite", 200.0, 6000),
@@ -1402,11 +1410,13 @@ mod tests {
         // Its bands: hornfels in the sandstone, none in the older granite nor in the younger stock.
         let bands = aureole_bands(&units, &t, 0.0, 2500.0, 8000);
         let got: Vec<(f64, f64)> = bands.iter().map(|b| (b.top_m, b.base_m)).collect();
-        assert_eq!(got.len(), 3, "{got:?}");
-        for ((top, base), (et, eb)) in
-            got.iter()
-                .zip([(0.0, 600.0), (1000.0, 1600.0), (1800.0, 2500.0)])
-        {
+        assert_eq!(got.len(), 4, "{got:?}");
+        for ((top, base), (et, eb)) in got.iter().zip([
+            (0.0, 140.0),
+            (460.0, 600.0),
+            (1000.0, 1600.0),
+            (1800.0, 2500.0),
+        ]) {
             assert!(
                 (top - et).abs() < 1e-3 && (base - eb).abs() < 1e-3,
                 "{got:?}"
