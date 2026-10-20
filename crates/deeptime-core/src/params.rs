@@ -507,6 +507,15 @@ pub struct TectonicParams {
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
     /// 0 = no limit.
     pub crust_max_km: f64,
+    /// Lower-crustal flow (`plates/flow.rs`): continental crust thicker than
+    /// `collapse_thickness_km` spreads into the crust around it on its plate, by diffusion of
+    /// thickness with this diffusivity for a 15 km channel, km²/Myr (the cube of the channel's
+    /// thickness above `collapse_thickness_km` scales it). 0 = off.
+    pub crust_channel_km2_myr: f64,
+    /// A continental column's surface settles towards the height its crust holds up (its Airy
+    /// height, under its sea water when below the sea, plus the surface's flexure) with this
+    /// e-folding time, Myr (`plates/settle.rs`). 0 = off.
+    pub isostasy_relax_myr: f64,
     /// The fastest a column's crust thickens, mm/yr (km/Myr): no process of a plate step, the
     /// resampling's accretion included, leaves a visible column thicker than it was when the
     /// step began plus this rate times the step; the excess goes to the nearest room on its
@@ -730,6 +739,8 @@ impl Default for TectonicParams {
             collapse_quiet_myr: 10.0,       // ledger: PLT-259
             collapse_reach_km: 200.0,       // ledger: PLT-257
             crust_max_km: 70.0,             // ledger: PLT-258
+            crust_channel_km2_myr: 1500.0,  // ledger: PLT-300
+            isostasy_relax_myr: 0.004,      // ledger: ISO-078
             thickening_max_mm_yr: 5.0,      // ledger: PLT-287
             uplift_max_mm_yr: 3.5,          // ledger: PLT-288
             transition_width_km: 200.0,     // ledger: PLT-262
@@ -1059,6 +1070,8 @@ impl PlanetPreset {
             (k.collapse_quiet_myr, "$.tectonics.collapse_quiet_myr"),
             (k.collapse_reach_km, "$.tectonics.collapse_reach_km"),
             (k.crust_max_km, "$.tectonics.crust_max_km"),
+            (k.crust_channel_km2_myr, "$.tectonics.crust_channel_km2_myr"),
+            (k.isostasy_relax_myr, "$.tectonics.isostasy_relax_myr"),
             (k.thickening_max_mm_yr, "$.tectonics.thickening_max_mm_yr"),
             (k.uplift_max_mm_yr, "$.tectonics.uplift_max_mm_yr"),
             (k.transition_width_km, "$.tectonics.transition_width_km"),

@@ -1141,7 +1141,7 @@ impl AmplifyStage {
 /// The device the middle passes run on under the session's compute mode (`compute.rs`).
 #[cfg(feature = "gpu")]
 fn accel(ctx: &StageContext<'_>) -> Option<Arc<dyn PassDevice>> {
-    let gpu = crate::compute::device(ctx.compute, ctx.log)?;
+    let gpu = crate::compute::device(ctx.compute, ctx.log, "amplify:middle")?;
     match gpu::AmplifyGpu::new(gpu) {
         Ok(a) => Some(Arc::new(a)),
         Err(e) => {

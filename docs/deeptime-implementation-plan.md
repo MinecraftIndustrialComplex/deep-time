@@ -646,8 +646,10 @@ macOS minute costs about ten Linux minutes. The workflows are shaped around that
 ## 5. Core data model
 
 All physics runs in SI units (metres, years, kelvin or °C) and maps to blocks only when baking
-(§8.8). Planet-scale time is stored in **years relative to world creation**: geologic history is
-negative (−5.0e8 is 500 Myr ago), and anything the civ module adds later is positive.
+(§8.8). Planet-scale time is stored in **years relative to world creation**: negative years are
+before it (the geologic history, −5.0e8 is 500 Myr ago, and any civ history the rtsim writes before
+play), positive years after it (civ events during play). The sign says when, never which writer: the
+writer id and the kind namespace tell geology from civ (decisions log 2026-10-19).
 
 ### 5.1 Planet parameters, scales and presets
 
@@ -948,7 +950,7 @@ what geology wrote.
 // crates/deeptime-format/src/events.rs
 pub struct Event {
     pub id: EventId,             // u64 = (writer_id << 48) | sequence — no coordination between writers
-    pub t_start: f64,            // years relative to world creation (negative = geologic past)
+    pub t_start: f64,            // years relative to world creation (negative = before it)
     pub t_end: f64,              // = t_start for instantaneous events
     pub kind: KindId,            // interned namespaced id: "deeptime:rift_onset", "civ:city_founded"
     pub source: SourceId,        // interned: "deeptime:plates", "deeptime:erosion", "civ:politics"
@@ -1295,6 +1297,12 @@ all processors at server first start and in the CLI. Rust threads never attach t
   Gradle's host native and the tests stay on `release`. Cost and gain: STATUS.md build log
   2026-10-18 (natives). On `x86_64-apple-darwin`, `.cargo/config.toml`'s `codegen-units=2` (above)
   outranks it.
+- **Build-level speed-ups not taken** (STATUS.md build log 2026-10-20). mimalloc under the counting
+  allocator (`--features mimalloc` on `deeptime-cli` and `deeptime-jni`, off) and profile-guided
+  optimisation (`tools/natives/pgo-profile.sh`, then `gate-bins.sh --pgo`; not in `build-natives.sh`)
+  each changed a full 16k run by under the pair noise (about 4 %), so the natives ship with
+  neither. A PGO profile fits only the target triple that made it, and the CLI's profile does not
+  fit the library's build, so PGO would be one instrumented build and training run per target.
 - **Toolchain.** Stable Rust 1.98.1 (the latest stable on 2026-09-28), no nightly features. zig 0.13.0
   for cargo-zigbuild 0.23.4, wired in through the package override of §4.4 (nixpkgs' own pairing is
   zig 0.16.0, which cargo-zigbuild's documentation does not yet cover; if 0.13 ever blocks a build,

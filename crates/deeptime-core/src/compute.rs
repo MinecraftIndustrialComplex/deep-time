@@ -52,6 +52,27 @@ impl ComputeMode {
     }
 }
 
+/// The kernels the device may take, comma-separated names or prefixes (`surface:` takes both
+/// surface kernels; the names are each kernel's log name: `plates:write_l1`, `climate:cells`,
+/// `amplify:middle`, `surface:diffusion`, `surface:slope_failure`). Unset or empty: every kernel.
+/// A diagnostic for bisecting a difference between the CPU and GPU worlds kernel by kernel
+/// (`docs/design/gpu-compute.md` §10): a kernel left out runs on the CPU as under `cpu`.
+pub const ENV_KERNELS: &str = "DEEPTIME_GPU_KERNELS";
+
+/// Whether [`ENV_KERNELS`] lets the device take `kernel` (read once a process).
+pub fn kernel_allowed(kernel: &str) -> bool {
+    static LIST: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    let list = LIST.get_or_init(|| {
+        std::env::var(ENV_KERNELS)
+            .unwrap_or_default()
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    });
+    list.is_empty() || list.iter().any(|p| kernel.starts_with(p.as_str()))
+}
+
 /// A session's compute mode and log, for kernels called deep inside a stage that has no
 /// [`crate::stage::StageContext`] at hand (the plates' L1 sampling, `plates/l1.rs`, whose callers
 /// in `plates/mod.rs` pass none). The session puts it on every worker of its Rayon pool when the
@@ -151,6 +172,14 @@ pub fn ambient_device(kernel: &'static str) -> Option<Arc<deeptime_gpu::Gpu>> {
     if mode == ComputeMode::Cpu {
         return None;
     }
+    if !kernel_allowed(kernel) {
+        a.tell_once(
+            kernel,
+            Level::Info,
+            format!("compute: {kernel} runs on the CPU ({ENV_KERNELS} leaves it out)"),
+        );
+        return None;
+    }
     match deeptime_gpu::shared(mode == ComputeMode::Gpu) {
         Ok(g) => {
             a.tell_once(
@@ -208,10 +237,21 @@ pub fn reset_timings() {
     }
 }
 
-/// The device the GPU kernels use under `mode`, or None for the CPU; logs the choice.
+/// The device `kernel` uses under `mode`, or None for the CPU; logs the choice.
 #[cfg(feature = "gpu")]
-pub fn device(mode: ComputeMode, log: &LogRing) -> Option<std::sync::Arc<deeptime_gpu::Gpu>> {
+pub fn device(
+    mode: ComputeMode,
+    log: &LogRing,
+    kernel: &'static str,
+) -> Option<std::sync::Arc<deeptime_gpu::Gpu>> {
     if mode == ComputeMode::Cpu {
+        return None;
+    }
+    if !kernel_allowed(kernel) {
+        log.push(
+            Level::Info,
+            format!("compute: {kernel} runs on the CPU ({ENV_KERNELS} leaves it out)"),
+        );
         return None;
     }
     match deeptime_gpu::shared(mode == ComputeMode::Gpu) {

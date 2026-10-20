@@ -358,3 +358,136 @@ fn tune_the_cycle() {
         }
     }
 }
+
+/// The device the GPU tests use (lavapipe on the test VM), or None (skipped) without one.
+#[cfg(feature = "gpu")]
+fn test_device() -> Option<std::sync::Arc<Device>> {
+    match deeptime_gpu::shared(true) {
+        Ok(g) => {
+            eprintln!("adapter: {}", g.describe());
+            Some(g)
+        }
+        Err(e) => {
+            eprintln!("skipped: {e}");
+            None
+        }
+    }
+}
+
+/// The device's V-cycle against the CPU's on the same operator and residual: the same levels,
+/// sweeps and transfers in `f32`, so the corrections agree to a few ulps of the cycle's own
+/// rounding (a fused multiply-add, WGSL's 2.5-ulp division), far inside what a preconditioner
+/// needs; and the sum it returns is the one over the device's correction.
+#[cfg(feature = "gpu")]
+#[test]
+fn the_gpu_cycle_matches_the_cpu_cycle() {
+    let Some(g) = test_device() else {
+        return;
+    };
+    for &(w, h, wrap) in &[
+        (300usize, 129usize, true),
+        (64, 40, false),
+        (37, 23, true),
+        (5, 3, true),
+        (2, 9, true),
+        (1, 7, false),
+        (1, 1, false),
+    ] {
+        let d = Dims::new(w, h, 2400.0, wrap);
+        let z = terrain(w, h, 13 + w as u64);
+        let kd = shelf_kd(&z, 13);
+        let [mut east, mut south, mut diag] = op_vectors(&d);
+        let live = Live::all(&d);
+        let op = Operator::new(&d, &kd, 2.0e6, &live, &mut east, &mut south, &mut diag);
+        let mut cpu = Hierarchy::new(&op, CYCLE);
+        let mut dev = gpu::DeviceCycle::new(&g, &op, CYCLE).expect("the device cycle");
+        let mut rng = SplitMix64::new(17 + w as u64);
+        for round in 0..3 {
+            let r: Vec<f64> = (0..w * h).map(|_| rng.next_f64() - 0.5).collect();
+            for ((a, b), &v) in cpu.levels[0].r.iter_mut().zip(dev.r32.iter_mut()).zip(&r) {
+                *a = v as f32;
+                *b = v as f32;
+            }
+            let rz_cpu = cpu.precondition(&r);
+            let rz_dev = dev.precondition(&r).expect("the device cycle runs");
+            let (zc, zd) = (cpu.z(), &dev.z32);
+            let top = zc.iter().fold(0.0f32, |m, v| m.max(v.abs()));
+            let worst = zc
+                .iter()
+                .zip(zd)
+                .fold(0.0f32, |m, (a, b)| m.max((a - b).abs()));
+            let label = format!("{w}x{h} wrap {wrap} round {round}");
+            eprintln!(
+                "{label}: z {:.2e} of its largest, r·z {:.2e} relative",
+                worst / top.max(f32::MIN_POSITIVE),
+                (rz_dev - rz_cpu).abs() / rz_cpu.abs().max(1e-300)
+            );
+            assert!(
+                worst <= 1e-4 * top,
+                "{label}: largest difference {worst:e} of {top:e}"
+            );
+            let own: f64 = r.iter().zip(zd).map(|(a, &b)| a * f64::from(b)).sum();
+            assert!(
+                (rz_dev - own).abs() <= 1e-9 * own.abs().max(1e-30),
+                "{label}: {rz_dev} vs {own}"
+            );
+            assert!(
+                (rz_dev - rz_cpu).abs() <= 1e-4 * rz_cpu.abs(),
+                "{label}: {rz_dev} vs {rz_cpu}"
+            );
+        }
+    }
+}
+
+/// The whole solve with the device's cycle: it meets the tolerance against the exact solution,
+/// keeps the mass, and lands within the tolerance of the CPU cycle's solve in about as many
+/// iterations.
+#[cfg(feature = "gpu")]
+#[test]
+fn the_gpu_cycle_solve_meets_its_tolerance_and_keeps_the_mass() {
+    let Some(g) = test_device() else {
+        return;
+    };
+    for &(w, h) in &[(200usize, 96usize), (129, 67), (17, 9), (2, 5), (1, 1)] {
+        for wrap in [true, false] {
+            let d = Dims::new(w, h, 2400.0, wrap);
+            let b = terrain(w, h, 5 + w as u64);
+            let kd = shelf_kd(&b, 5);
+            for &(dt, tol) in &[(2.0e6, 1.0e-5), (2.0e6, 1.0e-3), (2.0e4, 1.0e-6)] {
+                let label = format!("{w}x{h} wrap {wrap} dt {dt} tol {tol}");
+                let exact = reference(&d, &b, &kd, dt);
+                let mut x = b.to_vec();
+                lod(&d, &mut x, &kd, dt, &Live::all(&d));
+                let mut ws = Workspace::default();
+                ws.fit_rhs(&d);
+                ws.b.copy_from_slice(&b);
+                ws.fit(&d);
+                let its = cg_on(&mut ws, &d, &mut x, &kd, dt, tol, CYCLE, Some(&g));
+                assert!(its < super::super::CG_MAX_ITER, "{label}: {its} iterations");
+                let lim = bound(&d, &kd, dt, tol);
+                let err = rms(&x, &exact);
+                assert!(err <= lim, "{label}: RMS error {err:.3e} above {lim:.3e}");
+                let (sb, sx): (f64, f64) = (b.iter().sum(), x.iter().sum());
+                let scale: f64 = b.iter().map(|v| v.abs()).sum::<f64>().max(1.0);
+                assert!(
+                    (sb - sx).abs() <= 1e-12 * scale,
+                    "{label}: mass {sb} vs {sx}"
+                );
+                let (xc, its_cpu) = solve_mg(&d, &b, &kd, dt, tol, CYCLE, true);
+                let diff = rms(&x, &xc);
+                eprintln!(
+                    "{label}: {its} iterations (CPU cycle {its_cpu}), error {err:.2e} of \
+                     {lim:.2e}, {diff:.2e} from the CPU cycle's solve"
+                );
+                assert!(
+                    diff <= 2.0 * lim,
+                    "{label}: {diff:.3e} from the CPU cycle's solve"
+                );
+                assert!(
+                    its <= its_cpu + 2,
+                    "{label}: {its} iterations against the CPU cycle's {its_cpu}"
+                );
+            }
+        }
+    }
+}

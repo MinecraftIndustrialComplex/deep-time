@@ -130,6 +130,45 @@ the share of BW columns with a desert or badlands biome is 0.651, against 0.475 
 over ten planets before (floor comment in `BiomeGameTests`), so the cold deserts did not pull it
 outside the earlier range.
 
+### The floors against the census's noise (2026-10-19)
+
+The MIC gate on master 025676c8 failed `climateConsistent` with "Köppen families below their floor:
+C 0.621 < 0.630 (132 columns)". Neither the mapping nor the test planet's climate had moved:
+
+- On `planet_world_4k` (seeds 11 to 14, on 26ce664e, before master's arc change to that planet,
+  d54c7f0f) the present-day nudge does nothing. Its factor is 1.00 on
+  all four, and 0.000 to 0.010 of the land is under ice sheets. The same holds with and without the
+  nudge's new cap (climate.md, "The present-day nudge's cap"). The climate fix therefore cannot
+  change this share, and it was not a climate fault.
+- The census samples columns, so a family's share is a binomial proportion. At 0.63 on 132 columns
+  its standard error is about 0.042, so a family whose true share is one standard error above its
+  floor falls under it in about one census in six. The bare share most likely failed on where
+  the census's points fell.
+
+`climateConsistent` now fails a family only when the share's one-sided 99 % upper bound is under
+the floor (BIO-072; `ShareBound.wilsonUpper`, z = 2.326). The bound is Wilson's score interval,
+which stays inside 0 and 1 and is sound at small counts and at shares near 0 or 1, where the
+normal approximation is not.
+
+| Case | Share | Columns | 99 % upper bound | Floor | Result |
+|---|---|---|---|---|---|
+| The MIC failure | 0.621 | 132 | 0.713 | 0.63 | passes |
+| A broken mapping, small family | 0.30 | 40 | 0.484 | 0.63 | fails |
+| A broken mapping, C's size | 0.30 | 132 | 0.402 | 0.63 | fails |
+
+- *Not vacuous.* A mapping that sends a family to the wrong tags leaves it only the columns that
+  match by chance, far under floors set 0.1 under the lowest of ten planets. A share of 0.3 fails
+  at every count from the census's 40-column minimum up (`ShareBoundTest` holds both cases).
+- *Not one planet.* The floors and the bound depend only on the share and the count, so a planet
+  with fewer columns in a family gets a wider allowance and a large family a tight one.
+- *99 % rather than 95 %:* a gate batch makes about 65 such comparisons (13 families, five test
+  sets). If every share sat at its floor, a 95 % bound would fail about three of them by chance
+  in every batch on a correct mapping, and a 99 % bound fewer than one.
+- *What it does not cover:* a mapping that is a little wrong, say 0.05 under its floor on a small
+  family, now passes; on C's 132 columns the allowance is about 0.09, and a share of 0.50 (bound
+  0.599) still fails. The floors were never meant to catch a small error. They catch a broken
+  mapping, not a wrong climate (Game choices, below).
+
 ## Cold deserts
 
 Köppen tests dry land before polar (Peel et al. 2007, Table 1; BIO-002), so cold dry land is BWk or BSk and not ET or EF.
@@ -670,7 +709,8 @@ continentalness, erosion and weirdness derivations (BIO-063 to BIO-070), the fro
 (BIO-074 to BIO-078: Ben, decisions log 2026-09-29 and 2026-09-30) and the ice cover (BIO-079 to
 BIO-084: Ben, 2026-09-30; its balance closure, the class under it and its read rule, BIO-157 to BIO-159, and the
 census's tag gaps, BIO-160, the agent's, 2026-10-18). The GameTest floors (BIO-072) were set 0.1 under the lowest share
-measured over ten test planets and catch a broken mapping, not a wrong climate. The volcanic biomes (BIO-104 to BIO-114) are Ben's in kind
+measured over ten test planets and catch a broken mapping, not a wrong climate; since 2026-10-19 a family is
+tested by its share's 99 % upper bound, not the bare share ("The floors against the census's noise", the coordinator's call). The volcanic biomes (BIO-104 to BIO-114) are Ben's in kind
 (decisions log 2026-10-03, "Tie them to real volcanoes") and the agent's in every number: zone sizes, the
 activity needed for fresh ash, the role order and the tags' order. The biome rules (BIO-115 to BIO-132) are Ben's
 in kind (decisions log 2026-10-04, "Build out support for both") and the agent's in every rule: which biome

@@ -38,8 +38,9 @@ import java.util.regex.Pattern;
  *   <li>A <b>preset</b> is a built-in family ({@code earthlike_quick}, {@code earthlike_full}: the
  *       built-in names without their size suffix) at a <b>size</b> (16,384 or 32,768 blocks), or a
  *       preset imported from a share code (its size is fixed).</li>
- *   <li>The <b>timeline</b> — start configuration and length — has no default (decisions file,
- *       "Timeline"); Run stays disabled until both are chosen.</li>
+ *   <li>The <b>timeline</b>, start configuration and length, starts at {@link #DEFAULT_START} and
+ *       {@link #DEFAULT_LENGTH_MYR} Myr (Ben, decisions log 2026-10-19: one-click Create with
+ *       sensible defaults); Run is disabled while either is cleared or invalid.</li>
  *   <li>The <b>parameters</b> of {@link EditorFields}: each is editable only when the preset carries
  *       its path, so the placeholder presets show them unavailable and the real presets need no
  *       screen change. Fantasy toggles are shown disabled (Phase 3).</li>
@@ -50,6 +51,8 @@ import java.util.regex.Pattern;
  *
  * <h2>Run, review, accept</h2>
  * Run writes into a new staging folder ({@link Staging}); the {@link TimelapseModel} follows it.
+ * {@link #generate} (Create World's Create button, the Customize page's Generate) asks for a run
+ * that starts by itself as soon as Run is allowed ({@link #tickAutoStart}: once the estimate is in).
  * Review ({@link ReviewModel}) shows the finished data; Accept returns what
  * {@code PlanetGenerators.withStaging} needs. A run replaced by another, discarded, cancelled or
  * failed has its folder deleted; the accepted one is kept until another is accepted.
@@ -113,6 +116,9 @@ public final class EditorModel {
     public static final double DEFAULT_CAP_GIB = 4.0;
     public static final double MIN_CAP_GIB = 0.25;
     public static final int DEFAULT_CIRCUMFERENCE = 16_384;
+    /** The default timeline (Ben, decisions log 2026-10-19), the play world's and the screenshot walk's. */
+    public static final String DEFAULT_START = "supercontinent";
+    public static final double DEFAULT_LENGTH_MYR = 1000.0;
 
     private static final Pattern SIZE_SUFFIX = Pattern.compile("^(.*)_(\\d+)k$");
 
@@ -125,8 +131,8 @@ public final class EditorModel {
     private int circumference;
     private JsonObject imported;          // the imported preset (timeline removed), or null
     private String importedName;
-    private String start;                 // null until chosen
-    private String lengthText = "";
+    private String start = DEFAULT_START; // null when cleared
+    private String lengthText = Formats.number(DEFAULT_LENGTH_MYR);
     private String capText = Formats.number(DEFAULT_CAP_GIB);
     private final Map<String, String> fieldTexts = new LinkedHashMap<>();
     private final Map<String, JsonElement> overrides = new LinkedHashMap<>();
@@ -134,6 +140,12 @@ public final class EditorModel {
     private String effective;             // cached effective preset JSON
 
     private Page page = Page.SETUP;
+    /** Generate was asked for: the run starts as soon as Run is allowed ({@link #tickAutoStart}). */
+    private boolean autoStart;
+    /** The effective preset the current run was started for (before any epoch or continue). */
+    private String runFor;
+    /** The Customize page was opened from the generation page (its Back returns there). */
+    private boolean customizeFromRun;
     private TimelapseModel run;
     private ReviewModel review;
     private Accepted accepted;
@@ -416,6 +428,86 @@ public final class EditorModel {
     }
 
     // ------------------------------------------------------------------------------------------
+    // Changes from the starting preset (the Customize page)
+    // ------------------------------------------------------------------------------------------
+
+    /**
+     * True when the field differs from the selected preset: a value the player set that is not the
+     * preset's, or a typed number that is not valid (shown red until fixed or reset).
+     */
+    public boolean edited(EditorFields.Field f) {
+        if (!fieldValid(f))
+            return true;
+        JsonElement o = overrides.get(f.id());
+        if (o == null || !available(f))
+            return false;
+        Optional<JsonElement> preset = f.get(base());
+        if (preset.isEmpty())
+            return true;
+        JsonElement p = preset.get();
+        if (o.isJsonPrimitive() && p.isJsonPrimitive() && o.getAsJsonPrimitive().isNumber() && p.getAsJsonPrimitive().isNumber())
+            return o.getAsDouble() != p.getAsDouble();
+        return !o.equals(p);
+    }
+
+    /** How many parameters differ from the selected preset ({@link #edited}). */
+    public int editCount() {
+        int n = 0;
+        for (EditorFields.Field f : EditorFields.ALL)
+            if (edited(f))
+                n++;
+        return n;
+    }
+
+    /** Back to the preset's value. */
+    public void resetField(EditorFields.Field f) {
+        overrides.remove(f.id());
+        fieldTexts.remove(f.id());
+        changed();
+    }
+
+    /** The selected preset's value of a field, as the field shows it; empty when the preset lacks it. */
+    public Optional<String> presetText(EditorFields.Field f) {
+        return f.get(base()).map(e -> e.isJsonPrimitive() && e.getAsJsonPrimitive().isNumber() ? Formats.number(e.getAsDouble())
+                : e.isJsonPrimitive() ? e.getAsString() : e.toString());
+    }
+
+    /** True when the start differs from the default ({@link #DEFAULT_START}). */
+    public boolean startEdited() {
+        return !DEFAULT_START.equals(start);
+    }
+
+    /** True when the history length differs from the default ({@link #DEFAULT_LENGTH_MYR}). */
+    public boolean lengthEdited() {
+        return Formats.parse(lengthText) != DEFAULT_LENGTH_MYR;
+    }
+
+    /** True when the memory cap differs from the default ({@link #DEFAULT_CAP_GIB}). */
+    public boolean capEdited() {
+        return Formats.parse(capText) != DEFAULT_CAP_GIB;
+    }
+
+    public void resetStart() {
+        setStart(DEFAULT_START);
+    }
+
+    public void resetLength() {
+        setLengthText(Formats.number(DEFAULT_LENGTH_MYR));
+    }
+
+    public void resetCap() {
+        setCapText(Formats.number(DEFAULT_CAP_GIB));
+    }
+
+    /** Reset all: every parameter back to the preset's, the timeline and the memory cap to their defaults. */
+    public void resetAll() {
+        resetFields();
+        resetStart();
+        resetLength();
+        resetCap();
+    }
+
+    // ------------------------------------------------------------------------------------------
     // Memory cap
     // ------------------------------------------------------------------------------------------
 
@@ -679,9 +771,80 @@ public final class EditorModel {
         }
         launchError = null;
         run = new TimelapseModel(h, id, json, circumference, stages, deps.loader(), deps.io());
+        runFor = json;
         estimate().ifPresent(run::setEstimate);
         page = Page.RUN;
         return Optional.of(run);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Generate: the one-click flow (docs/design/create-world-ux.md)
+    // ------------------------------------------------------------------------------------------
+
+    /**
+     * Generate: shows the generation page with a run of the current settings. A run of these settings
+     * that is going or finished is shown as it is; otherwise one starts by itself as soon as Run is
+     * allowed ({@link #tickAutoStart}), and any other run is dropped now: one still going is
+     * cancelled (its folder goes once it stopped; the new one waits for its natives to let go), a
+     * finished, cancelled or failed one is deleted unless it was accepted.
+     */
+    public void generate() {
+        page = Page.RUN;
+        customizeFromRun = false;
+        if (run != null && effectivePresetJson().equals(runFor)
+                && (run.state() == TimelapseModel.State.RUNNING || run.state() == TimelapseModel.State.DONE))
+            return;
+        // Any other run (going with old settings, finished with old settings, cancelled, failed) goes,
+        // so the page never shows it while the new one waits for its estimate.
+        if (run != null) {
+            dropRun();
+            run = null;
+            review = null;
+        }
+        launchError = null;
+        autoStart = true;
+    }
+
+    /** True while a Generate waits for Run to be allowed (the estimate). */
+    public boolean generating() {
+        return autoStart;
+    }
+
+    /**
+     * Once per tick: starts the run Generate asked for when Run is allowed. A blocking problem other
+     * than the estimate in flight (an invalid value, over the memory cap, no natives) ends the wait;
+     * the generation page then shows it ({@link #problems()}), as it shows a launch that failed.
+     */
+    public Optional<TimelapseModel> tickAutoStart() {
+        if (!autoStart)
+            return Optional.empty();
+        if (run != null && run.state() == TimelapseModel.State.RUNNING)
+            return Optional.empty();
+        for (Problem p : problems()) {
+            if (!p.blocking())
+                continue;
+            if (!p.key().equals("editor.problem.estimating"))
+                autoStart = false;
+            return Optional.empty();
+        }
+        autoStart = false;
+        return startRun();
+    }
+
+    /** Opens the Customize page; from the generation page its Back returns there. */
+    public void openCustomize(boolean fromRun) {
+        customizeFromRun = fromRun && run != null;
+        page = Page.SETUP;
+    }
+
+    /** True when the Customize page was opened from the generation page. */
+    public boolean customizeFromRun() {
+        return customizeFromRun && run != null;
+    }
+
+    /** True when the current run is of the current settings (Customize changed nothing since). */
+    public boolean runIsCurrent() {
+        return run != null && effectivePresetJson().equals(runFor);
     }
 
     // ------------------------------------------------------------------------------------------
@@ -779,12 +942,14 @@ public final class EditorModel {
         launchError = null;
         run = new TimelapseModel(h, old.stagingId(), json, old.circumference(), old.stageNames(), deps.loader(), deps.io());
         old.estimate().ifPresent(run::setEstimate);
+        // runFor stays: the same settings, stopped or continued elsewhere.
         page = Page.RUN;
         return Optional.of(run);
     }
 
-    /** Cancels the running run and returns to the setup page (its folder goes once it stopped). */
+    /** Cancels the running run (and a Generate waiting to start) and returns to the setup page (its folder goes once it stopped). */
     public void cancelRun() {
+        autoStart = false;
         if (run != null && run.state() == TimelapseModel.State.RUNNING)
             run.cancel();
         page = Page.SETUP;
@@ -845,6 +1010,7 @@ public final class EditorModel {
      * reach again. The accepted run's folder stays for the server to move.
      */
     public void abandon() {
+        autoStart = false;
         if (run != null && (accepted == null || !accepted.stagingId().equals(run.stagingId()))) {
             dropRun();
             run = null;

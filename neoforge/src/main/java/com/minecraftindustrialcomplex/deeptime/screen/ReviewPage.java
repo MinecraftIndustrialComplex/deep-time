@@ -19,8 +19,9 @@ import java.util.Map;
 /**
  * The review page (plan §7.12 page 3): the final map (the world data's elevation in the viewer's
  * colours), the spawn marker, ore-province hints (coarse cells, never exact deposits), a summary
- * and the elevation legend; Accept binds the world to the run. The pack's biome names over the map
- * (§7.2) come with P1-09.
+ * and the elevation legend; Play binds the world to the run and creates it, as the generation page's
+ * Play does. Opened from the generation page's More tab. The pack's biome names over the map (§7.2)
+ * come with P1-09.
  */
 final class ReviewPage implements PlanetEditorScreen.Page {
 
@@ -47,21 +48,18 @@ final class ReviewPage implements PlanetEditorScreen.Page {
         mapH = fit[1];
         s.add(new MapWidget(mapX, mapY, mapW, mapH, texture, this::spawnMarker, this::provinceBoxes));
         int by = s.height - 24;
-        int bw = Math.min(90, (s.width - 40) / 4);
-        int x = s.width / 2 - (4 * bw + 12) / 2;
-        s.add(Button.builder(hints ? Lang.tr("review.hints.on") : Lang.tr("review.hints.off"), b -> {
-            hints = !hints;
-            b.setMessage(hints ? Lang.tr("review.hints.on") : Lang.tr("review.hints.off"));
-        }).bounds(x, by, bw, 20).build());
+        int bw = Math.min(96, (s.width - 32) / 3);
         s.add(Button.builder(Lang.tr("review.back"), b -> {
             s.model().showRun();
             s.refresh();
-        }).bounds(x + bw + 4, by, bw, 20).build());
-        s.add(Button.builder(Lang.tr("review.discard"), b -> {
-            s.model().discardRun();
-            s.refresh();
-        }).bounds(x + 2 * (bw + 4), by, bw, 20).build());
-        accept = s.add(Button.builder(Lang.tr("review.accept"), b -> s.accept()).bounds(x + 3 * (bw + 4), by, bw, 20).build());
+        }).bounds(8, by, bw, 20).build());
+        s.add(Button.builder(hints ? Lang.tr("review.hints.on") : Lang.tr("review.hints.off"), b -> {
+            hints = !hints;
+            b.setMessage(hints ? Lang.tr("review.hints.on") : Lang.tr("review.hints.off"));
+        }).bounds(8 + bw + 4, by, bw, 20).build());
+        int pw = Math.min(120, bw + 24);
+        accept = s.add(Button.builder(Lang.tr("gen.play").withStyle(net.minecraft.ChatFormatting.BOLD), b -> s.play())
+                .bounds(s.width - 8 - pw, by, pw, 20).build());
         uploaded = false;
         tick();
     }
@@ -88,6 +86,7 @@ final class ReviewPage implements PlanetEditorScreen.Page {
             uploaded = true;
         }
         accept.active = model.ready() && screen.model().canAccept();
+        accept.setTooltip(net.minecraft.client.gui.components.Tooltip.create(Lang.tr("gen.play.hint")));
     }
 
     @Override
@@ -138,6 +137,11 @@ final class ReviewPage implements PlanetEditorScreen.Page {
         }
         if (screen.model().accepted().map(a -> a.stagingId().equals(screen.model().run().map(r -> r.stagingId()).orElse(""))).orElse(false))
             g.drawString(font, Lang.tr("review.already_accepted"), x, y + 4, 0xff80ff80, false);
+    }
+
+    @Override
+    public Component title() {
+        return Lang.tr("review.title");
     }
 
     @Override

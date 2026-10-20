@@ -38,10 +38,49 @@
 //! `park` module: a per-cell `Vec` freed and allocated again on one thread then touches neither
 //! malloc nor the shared count).
 
-use std::alloc::{GlobalAlloc, Layout, System};
+use std::alloc::{GlobalAlloc, Layout};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use crate::session::MemoryGauge;
+
+/// The allocator small blocks come from: the platform's own ([`std::alloc::System`]), or with the
+/// `mimalloc` feature Microsoft's mimalloc, which the counting allocator wraps (the count, the
+/// large blocks, the kept blocks and the parked ones stay this module's).
+#[cfg(not(feature = "mimalloc"))]
+static INNER: std::alloc::System = std::alloc::System;
+#[cfg(feature = "mimalloc")]
+static INNER: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+/// The two mimalloc calls the count needs (its static library, which `libmimalloc-sys` links, has
+/// them whether or not that crate declares them).
+#[cfg(feature = "mimalloc")]
+mod mi {
+    use std::ffi::c_void;
+    unsafe extern "C" {
+        pub fn mi_usable_size(p: *const c_void) -> usize;
+        pub fn mi_collect(force: bool);
+    }
+}
+
+/// What the small block `ptr`, requested as `size` bytes, occupies in [`INNER`]. mimalloc says so
+/// exactly (its size class: the same figure when the block is counted and when it is freed, since
+/// the class depends on the block alone); the system allocator's chunk is estimated
+/// ([`small_footprint`]).
+#[inline]
+fn footprint(ptr: *const u8, size: usize) -> usize {
+    #[cfg(feature = "mimalloc")]
+    {
+        let _ = size;
+        // SAFETY: `ptr` is a live block of `INNER` (the callers pass what it returned and have
+        // not freed it yet).
+        unsafe { mi::mi_usable_size(ptr.cast()) }
+    }
+    #[cfg(not(feature = "mimalloc"))]
+    {
+        let _ = ptr;
+        small_footprint(size)
+    }
+}
 
 /// Blocks this large or larger are mapped from the OS on their own (Linux).
 pub const LARGE_BYTES: usize = 1 << 20;
@@ -270,12 +309,18 @@ pub fn kept_bytes() -> u64 {
 }
 
 /// Returns the free memory the system allocator keeps in its arenas to the OS (glibc's
-/// `malloc_trim(0)`: every arena's top and the whole pages of its free chunks); a no-op where the
-/// C library is not glibc. Small blocks freed by the stages' threads otherwise stay resident in
+/// `malloc_trim(0)`: every arena's top and the whole pages of its free chunks, or mimalloc's
+/// `mi_collect(true)`); a no-op where the C library is not glibc and mimalloc is off. Small blocks freed by the stages' threads otherwise stay resident in
 /// those threads' arenas, uncounted (module docs). The blocks in use are untouched, so the count
 /// does not change.
 pub fn trim_system() {
-    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    #[cfg(feature = "mimalloc")]
+    {
+        // SAFETY: mi_collect(true) frees this thread's heap's unused pages and returns the
+        // allocator's free memory to the OS; blocks in use are untouched.
+        unsafe { mi::mi_collect(true) };
+    }
+    #[cfg(all(target_os = "linux", target_env = "gnu", not(feature = "mimalloc")))]
     {
         unsafe extern "C" {
             fn malloc_trim(pad: usize) -> i32;
@@ -292,8 +337,8 @@ pub fn set_cache_limit(bytes: usize) {
     shed(|c| c.bytes > bytes);
 }
 
-/// The counting allocator: [`System`] for small blocks, the OS's own mappings for large ones on
-/// Linux, and two atomics.
+/// The counting allocator: [`INNER`] (the system allocator or mimalloc) for small blocks, the OS's
+/// own mappings for large ones on Linux, and two atomics.
 pub struct CountingAlloc;
 
 /// Counts `bytes` more; returns the count with them. While kept blocks hold the count over the
@@ -319,6 +364,7 @@ fn removed(bytes: usize) {
 /// What a small block occupies in the system allocator: glibc's chunk (size + 8 rounded up to
 /// 16, at least 32 bytes); about the same in the other platforms' allocators.
 #[inline]
+#[cfg_attr(feature = "mimalloc", allow(dead_code))]
 fn small_footprint(size: usize) -> usize {
     (size.saturating_add(8 + 15) & !15).max(32)
 }
@@ -457,13 +503,13 @@ impl CountingAlloc {
         // SAFETY: forwarded unchanged; the caller upholds `GlobalAlloc::alloc`'s contract.
         let p = unsafe {
             if zeroed {
-                System.alloc_zeroed(layout)
+                INNER.alloc_zeroed(layout)
             } else {
-                System.alloc(layout)
+                INNER.alloc(layout)
             }
         };
         if !p.is_null() {
-            added(small_footprint(layout.size()));
+            added(footprint(p, layout.size()));
         }
         p
     }
@@ -565,10 +611,11 @@ mod park {
 
 /// Frees a block that was parked: the system allocator's, `size` bytes, as [`park::fits`] took.
 fn free_parked(p: usize, size: usize) {
-    // SAFETY: a parked block is a live `System` block of this size and an alignment the
-    // system allocator gives every block (`park::fits`), and nothing else refers to it.
-    unsafe { System.dealloc(p as *mut u8, Layout::from_size_align_unchecked(size, 1)) };
-    removed(small_footprint(size));
+    // SAFETY: a parked block is a live `INNER` block of this size and an alignment the
+    // allocator gives every block (`park::fits`), and nothing else refers to it.
+    let held = footprint(p as *const u8, size);
+    unsafe { INNER.dealloc(p as *mut u8, Layout::from_size_align_unchecked(size, 1)) };
+    removed(held);
 }
 
 /// Gives this thread's parked small blocks back to the system allocator (the session's threads
@@ -596,7 +643,7 @@ fn hold_ceiling(now: u64) -> u64 {
     in_use()
 }
 
-// SAFETY: small blocks are forwarded to `System` with the caller's layout; large blocks are
+// SAFETY: small blocks are forwarded to `INNER` with the caller's layout; large blocks are
 // page-aligned private mappings of at least the layout's size, freed with the same length.
 // Whether a block is large depends only on its layout and the threshold, which is fixed before
 // the first large allocation (`set_large_threshold`).
@@ -627,9 +674,10 @@ unsafe impl GlobalAlloc for CountingAlloc {
             }
             return;
         }
-        // SAFETY: `ptr` was allocated by `System` with `layout`.
-        unsafe { System.dealloc(ptr, layout) };
-        removed(small_footprint(layout.size()));
+        let held = footprint(ptr, layout.size());
+        // SAFETY: `ptr` was allocated by `INNER` with `layout`.
+        unsafe { INNER.dealloc(ptr, layout) };
+        removed(held);
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
@@ -637,11 +685,12 @@ unsafe impl GlobalAlloc for CountingAlloc {
         let new_layout = unsafe { Layout::from_size_align_unchecked(new_size, layout.align()) };
         match (is_large(&layout), is_large(&new_layout)) {
             (false, false) => {
+                let held = footprint(ptr, layout.size());
                 // SAFETY: as for `dealloc`; `new_size` is checked by the caller.
-                let p = unsafe { System.realloc(ptr, layout, new_size) };
+                let p = unsafe { INNER.realloc(ptr, layout, new_size) };
                 if !p.is_null() {
-                    removed(small_footprint(layout.size()));
-                    added(small_footprint(new_size));
+                    removed(held);
+                    added(footprint(p, new_size));
                 }
                 p
             }
