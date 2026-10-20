@@ -162,6 +162,21 @@ def print_globals(name, runs, length):
         print(f"  {k:20s} {v / (length * 1e6):10.3f}")
 
 
+def print_compare(groups):
+    """With several groups: the series at chosen times, each group's mean over its runs."""
+    if len(groups) < 2:
+        return
+    print("\n== groups compared: mean over each group's runs")
+    times = sorted({t for runs in groups.values() for sn in runs for t, s in sn.items() if "t" in s})
+    picks = sorted({times[0], times[len(times) // 10], times[len(times) // 3], times[len(times) // 2], times[-1]})
+    print("  group           t  " + "  ".join(f"{c:>6s}" for c, _, _ in SERIES))
+    for gname, runs in groups.items():
+        for t in picks:
+            vals = [mean([series_value(sn[t], k) if t in sn and "t" in sn[t] else None for sn in runs])
+                    for _, k, _ in SERIES]
+            print(f"  {gname:12s} {t:5.0f}  " + "  ".join(f"{f.format(v):>6s}" for (_, _, f), v in zip(SERIES, vals)))
+
+
 def plots(out, groups, maps):
     import matplotlib
 
@@ -281,6 +296,7 @@ def main():
         print_parts(gname, runs)
         print_moves(gname, runs)
         print_globals(gname, runs, a.length)
+    print_compare({k: v for k, v in groups.items() if v})
     if a.out:
         plots(Path(a.out), {k: v for k, v in groups.items() if v}, [m.split("=", 1) for m in a.maps])
 

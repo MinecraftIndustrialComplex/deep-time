@@ -235,7 +235,70 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Flow {
 
 #[cfg(test)]
 mod tests {
+    use glam::DVec3;
+
     use super::*;
+    use crate::plates::collapse::tests::{Fx, crust_m, planet};
+
+    /// A belt 26 km thicker than normal inside plate 0's continent, ringed by crust of normal
+    /// thickness (no room for the collapse): its crust flows out into the ring, the volume is
+    /// kept, no column ends thinner than it started or thicker than the belt, plate 1 does not
+    /// change, no column stands above its Airy height, and with `crust_channel_km2_myr` 0 nothing
+    /// moves.
+    #[test]
+    fn a_thick_belt_spreads_into_the_crust_around_it_and_keeps_its_volume() {
+        let fx = Fx::new();
+        let belt = |p: DVec3| p.x < -0.1 && p.y > 0.88 && p.y < 0.93;
+        let mut st = planet(&fx.geo, belt, 26_000.0);
+        let t0: Vec<f64> = st.samples.iter().map(|s| f64::from(s.thickness_m)).collect();
+        let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+        let crust0 = crust_m(&st);
+        let top0 = t0.iter().copied().fold(f64::MIN, f64::max);
+        let mut moved = 0.0;
+        for n in 1..=20 {
+            moved += step(&mut st, &fx.geo, &fx.env(n)).moved_km2_m;
+        }
+        assert!(moved > 0.0);
+        assert!(
+            (crust_m(&st) - crust0).abs() < 1e-6 * crust0,
+            "volume kept: {} vs {crust0}",
+            crust_m(&st)
+        );
+        let z_0 = 0.5 * (fx.k.continent_elevation_m[0] + fx.k.continent_elevation_m[1]);
+        let (mut gained, mut top) = (0, f64::MIN);
+        for (i, s) in st.samples.iter().enumerate() {
+            let p = fx.geo.points()[i];
+            let t = f64::from(s.thickness_m);
+            top = top.max(t);
+            assert!(t <= top0 + 1.0, "{t} above the belt's {top0}");
+            if p.x >= 0.0 {
+                assert_eq!(t, t0[i], "plate 1 has no belt");
+                continue;
+            }
+            if !belt(p) {
+                assert!(t >= t0[i] - 1.0, "{t} below its {}", t0[i]);
+                if t > t0[i] + 100.0 {
+                    gained += 1;
+                    assert!(s.elevation_m > z0[i], "a receiver rises");
+                }
+            }
+            if s.kind == CONTINENTAL {
+                let z_a = iso_height(&s.pools, z_0, 9.81);
+                assert!(
+                    f64::from(s.elevation_m) <= z_a.max(f64::from(z0[i])) + 1.0,
+                    "{} above its Airy height {z_a}",
+                    s.elevation_m
+                );
+            }
+        }
+        assert!(gained > 20, "{gained} columns gained");
+        assert!(top < top0 - 1000.0, "the belt thinned: {top} of {top0}");
+
+        let mut off = Fx::new();
+        off.k.crust_channel_km2_myr = 0.0;
+        let mut st = planet(&off.geo, belt, 26_000.0);
+        assert_eq!(step(&mut st, &off.geo, &off.env(1)), Flow::default());
+    }
 
     #[test]
     fn no_channel_below_the_threshold_and_the_cube_above() {

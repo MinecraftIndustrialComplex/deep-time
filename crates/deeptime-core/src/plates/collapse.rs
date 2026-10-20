@@ -454,7 +454,7 @@ pub(super) fn spread(
 }
 
 #[cfg(test)]
-mod tests {
+pub(in crate::plates) mod tests {
     use glam::DVec3;
 
     use super::*;
@@ -485,7 +485,7 @@ mod tests {
     /// Plate 0 is x < 0, plate 1 x ≥ 0. A continent (35.1 km, 300 m) within 40° of +y on both,
     /// ocean floor at −4.5 km elsewhere; on the continent a belt (`belt(p)`) thickened by
     /// `thick_m` and raised by `thick_m` / 7.0.
-    fn planet(geo: &Geo, belt: impl Fn(DVec3) -> bool, thick_m: f32) -> PlateState {
+    pub(in crate::plates) fn planet(geo: &Geo, belt: impl Fn(DVec3) -> bool, thick_m: f32) -> PlateState {
         let samples: Vec<Sample> = geo
             .points()
             .iter()
@@ -546,14 +546,14 @@ mod tests {
         st
     }
 
-    struct Fx {
-        k: TectonicParams,
-        geo: Geo,
-        norm: Norm,
+    pub(in crate::plates) struct Fx {
+        pub(in crate::plates) k: TectonicParams,
+        pub(in crate::plates) geo: Geo,
+        pub(in crate::plates) norm: Norm,
     }
 
     impl Fx {
-        fn new() -> Fx {
+        pub(in crate::plates) fn new() -> Fx {
             let k = TectonicParams {
                 collapse_myr: 25.0,
                 collapse_thickness_km: 45.0,
@@ -568,7 +568,7 @@ mod tests {
             }
         }
 
-        fn env(&self, step: u64) -> Env<'_> {
+        pub(in crate::plates) fn env(&self, step: u64) -> Env<'_> {
             Env {
                 k: &self.k,
                 norm: self.norm,
@@ -587,7 +587,7 @@ mod tests {
             .count()
     }
 
-    fn crust_m(st: &PlateState) -> f64 {
+    pub(in crate::plates) fn crust_m(st: &PlateState) -> f64 {
         st.samples.iter().map(|s| f64::from(s.thickness_m)).sum()
     }
 
