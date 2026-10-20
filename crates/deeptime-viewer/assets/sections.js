@@ -88,6 +88,7 @@
 .sv-side { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; padding-right: 2px; }
 .sv-read { flex: 0 0 auto; min-height: 58px; padding: 7px 9px; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--line-1); font-size: 11.5px; line-height: 1.5; color: var(--fg-2); font-variant-numeric: tabular-nums; }
 .sv-read b { color: var(--fg-1); font-weight: 600; }
+.sv-read .sv-sub { color: var(--fg-3, var(--fg-2)); font-size: 11px; }
 .sv-read .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .25); }
 .sv-note { font-size: 11px; color: var(--fg-4); line-height: 1.45; flex: 0 0 auto; }
 .sv-leg { display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start; flex: 1 1 auto; }
@@ -412,6 +413,8 @@ button.chip[aria-pressed="true"] { border-color: var(--accent-line); background:
     d.name = [];
     for (const k of d.classes) { d.colour[k.i] = k.colour; d.name[k.i] = k.name.replace(/_/g, ' '); }
     d.bodyInfo = new Map(d.bodies.map(b => [b.id, b]));
+    d.units = d.units || [];
+    d.eventInfo = new Map((d.events || []).map(e => [e.id, e]));
     const area = new Map();
     let minGround = Infinity, maxTop = -Infinity, total = 0;
     for (let j = 0; j < n; j++) {
@@ -433,7 +436,7 @@ button.chip[aria-pressed="true"] { border-color: var(--accent-line); background:
     }
     return d;
   }
-  const ROLE_COLOURS = { ore: '#ffd23f', pluton: '#ff8fb1', gossan: '#e09a5a', lithocap: '#d9d9d9', reservoir: '#59d0ff', blanket: '#ffb347' };
+  const ROLE_COLOURS = { ore: '#ffd23f', pluton: '#ff8fb1', aureole: '#b99cff', gossan: '#e09a5a', lithocap: '#d9d9d9', reservoir: '#59d0ff', blanket: '#ffb347' };
   const roleColour = b => ROLE_COLOURS[b.role] || '#ffffff';
   const kmText = km => km < 10 ? km.toFixed(1) : fmtInt(km);
   const pct = f => f >= 0.1 ? `${(f * 100).toFixed(0)}%` : f >= 0.001 ? `${(f * 100).toFixed(1)}%` : '<0.1%';
@@ -582,7 +585,46 @@ button.chip[aria-pressed="true"] { border-color: var(--accent-line); background:
   // A block x of the section (a line across the seam runs past it) as the world numbers it.
   const wrapX = (d, x) => ((((x + d.circumference / 2) % d.circumference) + d.circumference) % d.circumference) - d.circumference / 2;
 
-  // What is at column j, block y: the rock, its depth under the surface, water, bodies.
+  // An age in Myr before the end of the history; "no age" when there is none.
+  const fmtMa = a => a === null || a === undefined ? 'no age' : `${a < 10 ? a.toFixed(2) : a < 100 ? a.toFixed(1) : fmtInt(a)} Ma`;
+  // The horizon of column j's stack that holds block y (the strata pass's rule: the first
+  // horizon from its top down to the next one's top + 1), as its entry in `d.units`.
+  function unitAt(d, j, y) {
+    const u = (d.columns.units || [])[j] || [];
+    for (let k = 0; k < u.length; k += 2) {
+      if (y <= u[k] && (k + 2 >= u.length || y > u[k + 2])) return d.units[u[k + 1]] || null;
+    }
+    return null;
+  }
+  // What a unit is: its key decoded (deeptime_core::column_info), as readout lines.
+  function unitLines(u) {
+    const i = u && u.info;
+    if (!i) return '';
+    let h = `<br><span class="sv-sub">unit key ${u.key}: ${esc(i.text)}</span>`;
+    if (i.age_ma !== undefined) h += `<br>age: <b>${esc(fmtMa(i.age_ma))}</b>${i.part === 'log' ? ' (the top of its layer)' : ''}`;
+    if (i.peak_c) h += `<br>peak temperature: <b>${i.peak_c[1] === null ? `${fmtInt(i.peak_c[0])} °C or more` : `${fmtInt(i.peak_c[0])} to ${fmtInt(i.peak_c[1])} °C`}</b>`;
+    if (i.parent && i.parent.text) h += `<br>parent rock: ${esc(i.parent.text)}`;
+    return h;
+  }
+  function crustLine(d, j) {
+    const c = d.columns, k = (c.crust || [])[j], a = (c.crust_age || [])[j];
+    if (k === undefined || k === null) return '';
+    return k === 0 ? `<br>crust: <b>oceanic</b>${a !== null && a !== undefined ? `, ${fmtInt(a)} Myr old` : ''}` : '<br>crust: <b>continental</b> (no formation age in the plate model)';
+  }
+  function eventLines(d, j) {
+    const ev = (d.columns.events || [])[j] || [];
+    if (!ev.length) return '';
+    const parts = [];
+    for (let k = 0; k < ev.length; k += 2) {
+      const e = d.eventInfo.get(ev[k]) || { id: ev[k], kind: 'event' };
+      const changed = ev[k + 1] === 1 ? 'changed it' : ev[k + 1] === 0 ? 'did not change it' : 'not checked';
+      parts.push(`${esc(e.kind)} ${e.id}${e.class ? ` (${esc(shortName(e.class))})` : ''}, ${esc(fmtMa(e.age_ma))}, ${changed}`);
+    }
+    return `<br>deformation here: ${parts.join('; ')}`;
+  }
+
+  // What is at column j, block y: the rock, its depth under the surface, its unit, the crust,
+  // the structural events, water, bodies.
   function readout(d, j, y) {
     const c = d.columns, ground = c.ground[j];
     let cls = null;
@@ -600,13 +642,20 @@ button.chip[aria-pressed="true"] { border-color: var(--accent-line); background:
       const nm = cls === null || cls < 0 ? 'unclassified crust' : d.name[cls];
       h += `y ${fmtInt(y)}, ${fmtInt(ground - y)} below the surface:<br><span class="sw" style="background:${cls === null || cls < 0 ? '#4a4f5a' : d.colour[cls]}"></span><b>${esc(nm)}</b>`;
       const sp = c.bodies[j];
+      let inBody = false;
       for (let k = 0; k < sp.length; k += 3) {
         if (y <= sp[k + 1] && y >= sp[k + 2]) {
           const b = d.bodyInfo.get(sp[k]);
-          h += `<br>inside ${esc(b.role)} body ${b.id}${b.deposit_type ? ` · ${esc(shortName(b.deposit_type))}` : ''}${b.site !== null && b.site !== undefined ? ` (site ${b.site})` : ''}`;
+          inBody = true;
+          h += `<br>inside ${esc(b.role)} body ${b.id}${b.shape ? ` (${esc(b.shape)})` : ''}${b.deposit_type ? ` · ${esc(shortName(b.deposit_type))}` : ''}${b.site !== null && b.site !== undefined ? ` (site ${b.site})` : ''}` +
+            ` · rock ${b.rock_class ? esc(shortName(b.rock_class)) : 'none of its own'} · ${esc(fmtMa(b.age_ma))}`;
+          if (b.drawn_scale) h += `<br><span class="sv-sub">${esc(b.drawn_scale.text)}</span>`;
         }
       }
+      const u = unitAt(d, j, y);
+      if (u) h += (inBody ? '<br><span class="sv-sub">the horizon under the body:</span>' : '') + unitLines(u);
     }
+    h += crustLine(d, j) + eventLines(d, j);
     return h;
   }
 
