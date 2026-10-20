@@ -46,7 +46,7 @@ import java.util.Optional;
  *       ground, as vanilla's {@code freeze_top_layer} lays them); the top block of dry ground, of
  *       the sea bed and of a lake's bed from the level's own surface rule wherever the part of it
  *       that reads no chunk decides it ({@link PackSurfaceRule}: Expanded Ecosphere's coral and sand
- *       at y 58 to 62);</li>
+ *       at y 58 to 62), and a sea bed in vanilla's shallow band drawn as a lake's bed (BAK-050);</li>
  *   <li><b>the blocks</b>: rock classes through the {@link RockPalette} with the strata pass's
  *       member choice ({@link StrataPass#horizonKey}), so a bed is the same block far and near.</li>
  * </ul>
@@ -84,7 +84,7 @@ public final class FarTerrain {
     private final BiomeSource biomes;
     private final Climate.Sampler sampler;
     private final FarSurface surface;
-    /** The part of the level's surface rule run here (null: none can run without a chunk, the table gives every top block). */
+    /** The part of the level's surface rule run here (none when none can run without a chunk: the table then gives every top block). */
     private final PackSurfaceRule packRule;
     private final int levelMinY, levelMaxY;
     private final int cell;
@@ -231,9 +231,16 @@ public final class FarTerrain {
                 // rule, so the rule saw it dry, and leaves its bed as the rule painted it, grass as
                 // dirt); a river's bed is the water pass's own sand or gravel.
                 BlockState packTop = null;   // ledger: BAK-048
-                if (packRule != null && shape.ground >= levelMinY && shape.ground <= levelMaxY
-                        && (!shape.water() || shape.kind == Water.Kind.SEA || shape.kind == Water.Kind.LAKE))
-                    packTop = packRule.top(wx, shape.ground, z, shape.water() && shape.kind == Water.Kind.SEA ? shape.waterTop + 1 : Integer.MIN_VALUE);
+                // Where the table stands in, a sea bed in vanilla's shallow band is painted as under
+                // a dry floor's top: the lake's bed, grass as dirt (BAK-050); the table's sea bed is deeper.
+                BlockState seaBed = soil.seaBed();
+                if (shape.ground >= levelMinY && shape.ground <= levelMaxY
+                        && (!shape.water() || shape.kind == Water.Kind.SEA || shape.kind == Water.Kind.LAKE)) {
+                    int waterHeight = shape.water() && shape.kind == Water.Kind.SEA ? shape.waterTop + 1 : Integer.MIN_VALUE;
+                    packTop = packRule.top(wx, shape.ground, z, waterHeight);
+                    if (packTop == null && waterHeight != Integer.MIN_VALUE && packRule.shallowFloor(wx, shape.ground, z, waterHeight))
+                        seaBed = soil.lakeBed();
+                }
                 boolean bare = soil.bare();
                 int depth = soil.depth();
                 if (packTop != null && StrataPass.isCrust(packTop)) {
@@ -267,7 +274,7 @@ public final class FarTerrain {
                 int openFrom = shape.ground - exposure;
                 int waterDepth = shape.water() ? Math.min(shape.waterTop, spec.maxY()) - shape.ground : 0;
                 for (int k = 0; k < layers.count; k++) {
-                    s.blocks[k] = block(layers, k, soil, packTop, cover, rocks);
+                    s.blocks[k] = block(layers, k, soil, packTop, seaBed, cover, rocks);
                     int light;
                     if (k > topSolid)
                         light = 15;
@@ -282,8 +289,8 @@ public final class FarTerrain {
         }
     }
 
-    /** Layer k's block; {@code packTop}, when not null, is the top block the level's surface rule gives (dry ground, sea bed, lake bed). */
-    private static BlockState block(FarColumn.Layers layers, int k, FarSurface.Choice soil, BlockState packTop, Cover cover,
+    /** Layer k's block; {@code packTop}, when not null, is the top block the level's surface rule gives (dry ground, sea bed, lake bed), {@code seaBed} the sea bed's otherwise (BAK-050). */
+    private static BlockState block(FarColumn.Layers layers, int k, FarSurface.Choice soil, BlockState packTop, BlockState seaBed, Cover cover,
                                     PaletteRules.Result<BlockState>[] rocks) {
         switch (layers.material[k]) {
             case FarColumn.AIR:
@@ -299,7 +306,7 @@ public final class FarTerrain {
             case FarColumn.SOIL_UNDER:
                 return soil.under();
             case FarColumn.SEA_BED:
-                return packTop != null ? packTop : soil.seaBed();
+                return packTop != null ? packTop : seaBed;
             case FarColumn.LAKE_BED:
                 return packTop != null ? WaterBodies.underWater(packTop) : soil.lakeBed();
             case FarColumn.RIVER_GRAVEL:
