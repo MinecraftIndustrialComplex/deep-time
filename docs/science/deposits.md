@@ -115,7 +115,10 @@ host rock in the top 2 km) and three global clocks.
    expected counted survivors equal N\*.
 5. **Positions.** Within a tract, deposits are drawn in clusters (a Thomas process: camps of
    deposits) at least the USGS same-deposit distance apart (2 km for porphyry). Coal fields instead
-   tile a basin, touching but not overlapping.
+   tile a basin, touching but not overlapping. A type that lies in a bed (MVT, since 2026-10-19) is
+   placed only where the column holds a horizon of its host rock, inside that horizon, and never
+   on oceanic crust; a placer only on land or on a shelf the sea has drowned since it formed
+   (see "Hosts, crust and placers").
 6. **Sizes and grades.** Tonnage is a lognormal through the USGS grade-tonnage percentiles
    (P90, P50, P10); grades are drawn with the published correlations (a Gaussian copula).
 7. **Bodies.** Each deposit becomes zoned bodies (porphyry: ore core, phyllic and propylitic halo,
@@ -503,6 +506,95 @@ The rules (ORE-269):
   overrides `data/deeptime/loot_table/archaeology/placer_gold.json` to change the count (for
   chunks generated after the change: the nuggets are in the block once it is placed). The
   `deeptime-inspect` tool counts ore blocks and does not count suspicious blocks as ore.
+
+## Hosts, crust and placers (carbonate and ore-deposit task, 2026-10-19)
+
+**What was wrong.** The review of run 1a156f22b66 and six planets of master b438d47a
+(`earthlike_quick_16k`, 1,000 Myr, supercontinent and scattered continents, seeds 1 to 3,
+`deposit-audit`) found three kinds of misplaced deposit:
+
+- **MVT with no carbonate.** Of 1,003 MVT sites, none had limestone or dolostone at its centre
+  in the drawn column (630 sat in shale, 157 in sandstone) and 308 lay on oceanic crust. The host
+  score read the history's host fields (`deeptime:host/<class>`, the share of the top 2 km at each frame,
+  `deposits/rules.rs:222` on master), a time average that a carbonate long since eroded or thinned
+  below a block still satisfied; the body was then painted dolostone wherever it formed
+  (`geometry.rock_class` in `mvt_zn_pb.json:65`, applied at `geometry.rs:181` and `:485`), and the
+  crust test was a thickness curve (20 to 30 km, `mvt_zn_pb.json:21`) that thick oceanic crust passes.
+- **Placers at sea.** Of 452 placers, 102 lay on oceanic crust and 190 deeper than the shelf
+  (200 m): a placer was spawned where its eroded parent stood, with no test of where that is now
+  (`spawn_placer`, `deposits/mod.rs:3051` on master).
+- **Impact ore everywhere a crater was.** A median 153 impact-basin uranium sites per planet
+  (62 to 359) and 75 hydrothermal Cu-Zn-Au sites (43 to 541). Basin uranium had no uranium
+  source: its source term was the crater basin itself (`impact_basin_u.json` on master: source `impact_basin`, driver
+  deposition, trap reservoir quality), so a crater on oceanic basalt made uranium as readily as
+  one in granite; the hydrothermal type's source was the hydrothermal strength alone. Their
+  densities (50 and 100 per 100,000 km² of crater, p50) were placeholders about 10 to 25 times
+  Earth's inventory (IMP-143).
+
+**What changed.**
+
+- **In-stratum hosts** (ORE-271, DEP-088, DEP-089). A type with `hosts.in_stratum` lies in a host
+  horizon the column really holds: of the horizons the world draws (`structure::Cover`, the same
+  smoothed stacks as the bake, read through the world's folds and faults as the strata pass reads
+  them), those of a host class, each cut to its blocks under the column's
+  top four solid blocks (the soil, which hosts no ore in the game; the first ensemble without this
+  cut put most bodies there, a median 0 ore blocks per MVT site) and above the floor's last four,
+  the one whose middle is nearest the type's formation depth, and cut again to the blocks a host
+  horizon holds in every column within two strata cells (32 blocks) of the site. The lateral test
+  is there because the column rule interfingers a facies change block by block: a one-block
+  limestone stringer that holds in the site's column alone is gone a few blocks away, and a body
+  wider than that sits mostly in shale. The body's centre is that middle,
+  its half height at most the horizon's, its dip 0, and no erosion cut is applied to it. The
+  site's centre is the block holding the body's centre (rounding had put the centre of a one-block
+  horizon in the block above it, and x and z a column off the one the host was read in), and
+  the projection to Petroff-Guyou leaves such a body at its block y, where the world's stacks
+  keep its horizon, instead of moving it with the drawn ground. A site
+  with no such horizon places nothing, nor does one on crust
+  that is oceanic now (`plates/crust_type`); `survives()` decides the same way as `materialise()`,
+  and the guarantee step that forces one deposit of a type skips such cells. MVT is the one such
+  type: its hosts are limestone and dolostone (dolostone weighted 1.5, after Leach et al. 2010:
+  "More MVT deposits are hosted in dolostone rather than limestone"), not chalk (pelagic, no
+  platform) or marble, and the body keeps its host rock (no `rock_class`). The census counts the
+  drops (`no_host`, `oceanic`).
+- **Placers stay on land and the shelf** (DEP-214). A placer is not placed on oceanic crust, nor
+  where the ground lies deeper under the present sea than the sea's lowest stand since the placer
+  formed (the surface stage now keeps its sea level per step, `SurfaceState.sea_history`). A bench
+  drowned by a later rise, as the gold of the Bering shelf off Nome (to about 18 m of water, ARDF
+  NM253; the Last Glacial Maximum's fall was about 130 m, Clark et al. 2009), is kept within that
+  range. The parent link is unchanged; the census counts the drops as `offshore`.
+- **Impact metals need a source, a fluid and a trap** (IMP-142, IMP-143, ORE-039, ORE-040,
+  ORE-042). See [impacts.md](impacts.md#impact-deposits-need-a-source).
+
+**Measured.** The six quick planets of erosion-and-sediment.md "Carbonate on the sea floor"
+(master b438d47a against the branch at 686a01cf, `deeptime deposit-audit` with `--soil 4`,
+`tools/review/carbonate-table.py`); sites per planet are medians with the range, the rest sums
+over the six:
+
+| measure | master | branch |
+|---|---|---|
+| MVT sites per planet | 159.5 [91, 253] | 5 [0, 23] |
+| MVT centred in limestone or dolostone | 0 of 1,003 | 50 of 51 (limestone; one centre block reads shale) |
+| MVT on oceanic crust | 308 | 0 |
+| MVT ore-body blocks in a host horizon | 0 % | 99.9 % |
+| placer gold sites per planet | 75.5 [61, 90] | 65 [41, 90] |
+| placers on crust the bake marks oceanic | 102 | 13 |
+| placers deeper than the shelf (200 m) | 190 | 3 |
+| porphyry Cu-Mo-Au sites per planet | 15 [2, 28] | 24.5 [8, 56] |
+| coal seam fields per planet | 71 [62, 94] | 94 [68, 115] |
+| petroleum traps per planet | 17 [10, 29] | 15.5 [9, 28] |
+
+MVT now forms only where a limestone horizon runs through the ground about the site, and the
+planets have little of it (carbonate is 0.7 % of the land's top blocks), so the count fell about
+thirtyfold; no dolostone host was found, because the planets lay almost none. On the full 16k
+planet (`earthlike_full_16k`, scattered continents, seed 1) MVT went from 168 sites to 7, all in
+limestone, and the deposits' share of the world's zinc from 0.80 to 0.07 (lead from 14,636 ore
+blocks to 281): zinc now comes mostly from the pack's scatter. The 13 placers the audit counts on
+oceanic crust read the bake's crust-age layer at its nearest sample; 10 of them stand on land
+(rivers and lakes 46 to 1,293 m above the sea) and 3 at the coast within 85 m under it, where the
+simulation's crust, which the rule reads, is continental. The 3 below the shelf lie on
+continental crust where the drawn ground is 7 to 28 blocks under the sea; the rule reads the
+simulation cell's height, not the drawn column. Porphyry, coal and petroleum move within the
+planets' spread; their rules did not change.
 
 ## Simplifications and limits
 

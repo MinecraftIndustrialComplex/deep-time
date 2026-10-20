@@ -20,6 +20,7 @@ Through the whole history, rivers cut into rising land (the stream power law: er
 | [ERO](ledger/ERO.md) | erosion audit, plateaus and the measured diffusivity | ERO-171 to ERO-178 (8) |
 | [ERO](ledger/ERO.md) | the erosion law against measured rates | ERO-179 to ERO-182 (4) |
 | [ERO](ledger/ERO.md) | surface numerics: the diffusion solve, the parallel flood | ERO-183 to ERO-184 (2) |
+| [ERO](ledger/ERO.md) | pelagic and periplatform carbonate, photic diagnostics | ERO-185 to ERO-189 (5) |
 
 Rows by status (2026-10-18, `tools/review/claims_counts.py`): `verified` 10, `cited-unverified` 82, `from-memory` 2, `abstract-only` 4, `calibrated` 8, `game-choice` 11, `uncited` 56.
 
@@ -641,3 +642,153 @@ effect of the flood (inferred from the two ensembles). The stopping form moved t
 master's runs (land above 2 km, median height, shelf, CO₂ with one run at 14,177 ppm) and failed
 two plate checks (rift-born welds 12.7 %; the lowest continental crust 0.36, at least 0.37);
 it was not landed.
+
+## Carbonate on the sea floor (carbonate and ore-deposit task, 2026-10-19)
+
+**What was wrong.** The review of run 1a156f22b66 found carbonate on 0.009 % of the land and
+about 1 % of the column tops. Six quick planets of master b438d47a (`earthlike_quick_16k`,
+1,000 Myr, supercontinent and scattered continents, seeds 1 to 3, `strata-check`) agree: the
+median planet has carbonate in 0.38 % of the land's top blocks (0 to 2.2 %), 2.0 % of the sea
+floor's (chalk 1.8 %) and 0.34 % of all its sedimentary blocks. On Earth carbonate rocks crop out
+on 15.2 % of the ice-free land (Goldscheider et al. 2020), a third of the land's sediments are
+carbonate (Hartmann and Moosdorf 2012), and calcareous sediment covers 36.8 % of the seabed below
+500 m (Diesing 2020; 30 to 45 % of each ocean's floor counting fine calcareous mud, Dutkiewicz et
+al. 2015). Three causes, measured:
+
+1. **No pelagic carbonate.** The surface stage's carbonate loop (`surface/mod.rs:1303-1340` on
+   master) had only the neritic factory, which needs the photic water, and the climate's cap
+   carbonate, laid above 4,000 m only when weathering outruns degassing; otherwise the deep sea
+   floor gained only what the marine diffusion and the slope failure brought, recorded as
+   clastic. The one deep-sea chalk was the column builder's: the basement's
+   sediment pool drawn as chalk on oceanic crust above the CCD (`structure/columns.rs:368`),
+   which shows only where no strata log covers it.
+2. **The platforms' export was recorded as shale.** Every sea gain of the diffusion solve and the
+   slope failure went to the marine clastic part (`surface/mod.rs:1414-1415` on master), so
+   carbonate swept off a platform top was laid on its slope as shale or mudstone. On Great Bahama
+   Bank the slope wedge holds 40 to 80 % as much sediment as the bank top kept (Wilber, Milliman
+   and Halley 1990).
+3. **The factory has little room.** Where it works the factory lays about 20 m/Myr averaged over
+   the warm and clear photic floor, a long-term platform rate, and the photic floor (0 to 100 m,
+   0.38 x 10^6 km2, about 3 % of the planet) is close to Earth's share, but only 0.22 x 10^6 km2
+   of it is warm enough and the clarity term (`surface/carbonate.rs:61-62` on master,
+   exp(-clastic / clastic_m), ERO-065) takes 64 % of that. Raising its scale did not help: P1-17's
+   calibration found five times `carbonate_clastic_m` "gave no more carbonate platform" (build
+   log), because the delivered clastics fill the accommodation whatever the factory does. Its
+   carbonate is about 1 % of the volume the land delivers to the sea (1.5 against 141 x 10^6 km3
+   at the median); Earth's carbonate accumulation, 32 x 10^12 mol/yr (Milliman and Droxler 1995)
+   or about 3.2 Gt/yr, is about a seventh of the sediment the rivers bring (some 20 Gt/yr, from
+   memory). The planets have no wide epeiric seas: a flooded craton, where most of Earth's
+   Palaeozoic platform carbonate formed (Ridgwell and Zeebe 2005: "the mean area of platform
+   carbonates during the Mesozoic and Cenozoic is much reduced compared to the Paleozoic"), is
+   rare when the continents stand high.
+
+**What changed.**
+
+- **Pelagic chalk** (ERO-185, ERO-186, ORE-270). Once the planktic calcifiers are in full, the
+  open sea floor gains calcareous ooze at 4.0 m/Myr of chalk (from Milliman and Droxler's deep-sea
+  accumulation over the calcareous share of the floor, the arithmetic in the ledger row), times
+  the share that survives dissolution, all of it down to 1,000 m above the CCD and none at the
+  CCD (4,500 m, RCK-015). The calcifiers' clock is 0 before 0.20 Ga and 1 from 0.10 Ga (Ridgwell
+  and Zeebe 2005: the Mesozoic proliferation of coccolithophores and planktic foraminifera; before
+  it no "substantive deep-sea sedimentary carbonate sink"). A step's deposit that is mostly ooze
+  is chalk (ERO-188); chalk is not platform carbonate for the deposit engine (`Kind::Pelagic`).
+- **Periplatform carbonate** (ERO-189). A tracer follows the diffusion solve's own exchanges: the
+  flux across each face of the five-point operator follows from the solved heights,
+  (kd_i + kd_j) / 2 x dt / dx^2 x (h_i - h_j). Taken from the highest sea cell down, each cell
+  passes on a well-mixed blend of what came to it and what it lost, its loss counted from the top
+  down (this substep's carbonate and chalk, the rest of the step's deposit, the regolith, then its
+  strata log, carbonate where a layer is limestone, dolostone or chalk). What a cell kept of its
+  gain takes that blend's carbonate share, out of the marine clastic part and into a periplatform
+  part that votes with carbonate in the facies (so mostly-periplatform deposit is limestone, or
+  dolostone where ERO-091 holds). The tracer stops where the share falls below 1 % or the flux
+  below 1 mm (a cost bound, not physics). It is always on: a preset switch would have changed
+  the share-code fixture for a tool, and nothing is released.
+- **Photic diagnostics** (ERO-187). `surface_final` prints the photic floor's area over the run
+  and its warm and warm-and-clear parts, with the pelagic and periplatform volumes;
+  `tools/review/carbonate-table.py` reads them.
+- **Dolostone unchanged.** The facies rule is the sabkha path alone: carbonate laid in arid water
+  shallower than 10 m (ERO-091). Warren (2000) lists syndepositional, burial and hydrothermal
+  dolomite and finds "up to 50% of the world's carbonate reservoirs are dolomites"; reflux and
+  burial need a brine and burial-fluid history the surface stage does not keep, so the rule was
+  left as it is and its share is measured below.
+
+**Measured.** Six quick planets each (`tools/review/carbonate-ensemble.sh` on the VM,
+`earthlike_quick_16k`, 1,000 Myr, 4 threads, supercontinent and scattered continents, seeds 1 to
+3; master b438d47a's binary against the branch at 686a01cf; `tools/review/carbonate-table.py
+review/out/carb base branch3`), medians with the range, shares from `strata-check`:
+
+| measure | master | branch | Earth |
+|---|---|---|---|
+| carbonate in the land's top blocks | 0.38 % [0, 2.2] | 0.71 % [0.18, 2.4] | 15.2 % of the ice-free land |
+| carbonate in the sea floor's top blocks | 2.0 % [1.8, 2.9] | 5.9 % [4.6, 6.3] | 36.8 % calcareous below 500 m |
+| chalk in the sea floor's top blocks | 1.8 % [0.7, 2.7] | 4.5 % [4.0, 5.6] | |
+| carbonate in the sedimentary blocks | 0.34 % [0.27, 0.42] | 0.43 % [0.31, 0.85] | about a third of the land's sediments |
+| dolostone's share of the carbonate blocks | 0 [0, 0.19 %] | 0 [0, 0.03 %] | up to half of carbonate reservoirs |
+| neritic carbonate laid (10^6 km3) | 1.46 [0.98, 1.90] | 1.52 [1.16, 2.21] | |
+| pelagic chalk laid (10^6 km3) | none | 2.36 [2.18, 2.72] | |
+| periplatform carbonate laid (10^6 km3) | none | 1.02 [0.88, 1.30] | |
+| photic floor, warm, warm and clear (10^6 km2) | | 0.37, 0.21, 0.08 | |
+
+The full 16k planet (`earthlike_full_16k`, scattered continents, seed 1, 8 threads): carbonate in
+the land's top blocks 0.28 % on both, in the sea floor's 3.0 % on master and 10.0 % on the branch
+(chalk 2.8 % and 9.8 %), in the sedimentary blocks 0.29 % and 0.75 %. The sea floor's share
+tripled and the deep floor gained its chalk; the land's moved little, because the factory's room
+is unchanged (cause 3) and only the land the sea once covered can show it. Dolostone stays near
+zero (the rule is the sabkha path alone, see above).
+
+**The chalk that P1-07 saw.** P1-07 counted 33 % of the sea floor as chalk; the review read about
+2 %. They are two metrics. P1-07's is the `strata/outcrop` view layer of `deeptime stage
+structure --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --threads 8`
+(500 Myr, scattered continents, seed 1), counted over the sea floor; the review's is the strata
+check's drawn top block, which reads 5 to 10 times lower on the planets measured here. On P1-07's
+own metric, each commit built from its own tree with its own class list, the sea floor's chalk
+went:
+
+| commit | what it is | chalk on the sea floor |
+|---|---|---|
+| 2fd6f154 | P1-07 merge | 47.4 % |
+| ae27fb71 | before the P1-17 calibration | {AE} |
+| a3c63fed | P1-17 partial: calibration with the real climate | {A3} |
+| ba8019af | | 32.4 % |
+| efafc88c | | 30.7 % |
+| 8600e031 | P1-17 hypsometry merge | 20.6 % |
+| 3e4c1967 | | 26.5 % |
+| 1eba8e09 | continental margins and spires | 20.3 % |
+| b438d47a | master | 21.9 % |
+| this branch | | 25.1 % |
+
+{STEPS} Both steps deepen the ocean floor, and the column builder draws the basement's sediment
+pool as chalk only above the CCD (`structure/columns.rs:368`, 4,500 m): with the age-depth law
+z(a) = z_f + (z_r - z_f) exp(-a / tau), tau = |z_f| / damping (`plates/pools.rs`
+`ocean_elevation`), the floor crossed the CCD at an age of about 123 Myr before a3c63fed (ridge
+-1,000 m, trench -10,000 m, 0.04 mm/yr), 62 Myr after it (ridge -2,500 m and 0.05 mm/yr,
+`pipeline_quick_16k.json:46, 54` at a3c63fed) and 48 Myr after 8600e031, whose floor follows GDH1
+(`oceanic_floor_elevation_m` -5,600 m and 0.12 mm/yr, `pipeline_quick_16k.json:71-72` at 8600e031,
+read in place of the trench at `plates/init.rs:328, 359`). Those are calibrations toward Earth's
+ocean depths (the median sea depth of a 500 Myr planet is near Earth's 4,062 m, plates.md), so
+they were kept; the chalk they removed was chalk on floor deeper than the CCD would allow. The
+deep floor's chalk now comes from the surface stage's own pelagic rule above.
+
+**The carbon cycle.** The climate's carbon budget is degassing against silicate weathering, and
+its weathering supply is blind to rock type: the surface stage's erosion x 2,700 kg/m3 x
+1.26 mol/kg (`climate/carbon.rs:54`, CLM-153, CLM-154). Carbonate enters it in one place: the
+weathering's drawdown beyond the degassing is laid as cap carbonate over the shallow sea floor
+(`climate/mod.rs:1730-1741`). The neritic, pelagic and periplatform carbonate the surface stage
+lays is a record; it takes no carbon from the ocean, and limestone weathers like any rock. So the
+carbonate changes reach CO2 only through the relief and the land area they change. Measured on
+the same planets: the natural CO2 (the end CO2 over the present-day factor) has a median of
+795 ppm on master [388, 2,434] and 820 ppm on the branch [414, 1,949], the end temperature
+17.95 and 17.55 °C. The planets move both ways (supercontinent seed 1 760 to 414 ppm, scattered
+seed 1 850 to 1,949 ppm), as a changed first step moves them, and the full 16k planet went from
+1,461 to 739 ppm (19.3 to 16.6 °C). No shift stands out of the planets' spread, as the coupling
+predicts.
+
+**Limits.** The factory's room (no epeiric seas on high-standing continents) is the larger part of
+the land's shortfall and is a plate and sea-level matter, outside this task. The sea floor's top
+is still mostly shale and mud (57 % and 26 % on the branch's supercontinent seed 1, chalk 4 %):
+where the marine diffusion's clastics reach, a step's deposit is mostly clastic (ERO-188), and the
+diffusion spreads them over the deep floor, which on Earth gets mostly pelagic sediment beyond the
+fans (inferred from the shares, not measured cell by cell). Carbonate burial is
+not tied to the carbon budget (the ocean does not lose the carbon the surface stage buries). The
+periplatform tracer follows the diffusion solve's fluxes; the slope failure's runout, which moves
+material further than one face, is counted only where those fluxes reach.
