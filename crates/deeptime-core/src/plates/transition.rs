@@ -39,9 +39,18 @@
 //! the toe, d = −W/2) and centred on the model's boundary: stretching a step from T_n to T_o into
 //! this ramp keeps the crust's volume. Crust moves from the samples thicker than T* to the samples
 //! thinner than T* within each stretch of margin (a catchment about W/2 long, below), the share
-//! 1 − e^(−δt/τ) of what would bring the stretch to the profile (τ = `transition_myr`), as the
-//! sources' own rock (pure shear). Crust types do not change: the thinned ocean-side crust stays
-//! oceanic, so the continental crust share and land are not redefined by the rule.
+//! 1 − e^(−δt/τ) of what would bring the stretch to the profile (τ = `transition_myr`). The
+//! sources thin in proportion (pure shear) and the sinks take their rock. With
+//! `transition_ocean_crust` (off by default; PLT-294, Ben's to choose) an oceanic sink takes the
+//! same volume as ocean crust instead (lavas and gabbro in the ocean column's proportion), as the
+//! thick igneous crust of a volcanic margin (from-memory: White & McKenzie 1989, not read), the
+//! commoner kind (Franke 2013, read; ledger PLT-294, a game-choice): the crust-template
+//! review of 2026-10-19 found the sources' rock is the main source of granite and gneiss under
+//! the sea on the quick planet, whose oceans lie mostly within W/2 of a margin, but the
+//! continental rock the switch stops parking on the ocean side is then lost, and with it about
+//! 0.04 of the planet's land on supercontinent starts. Crust types do not change: the thickened
+//! ocean-side crust stays oceanic, so the continental crust share and land are not redefined by
+//! the rule.
 //!
 //! Heights follow the crust along the line through two reference columns: a continent of T_n at
 //! z_0 (the middle of `continent_elevation_m`) and old ocean floor of T_o at z_f
@@ -65,7 +74,8 @@
 //! its own side, through its own plate), and a stretch balances its sources against its sinks
 //! (a narrow peninsula has more ocean than continent: its continent thins to the profile and the
 //! ocean beside it gets what there is).
-// ledger: PLT-261 (the rule), PLT-262 (the width), PLT-263 (τ), PLT-264 (the height line).
+// ledger: PLT-261 (the rule), PLT-262 (the width), PLT-263 (τ), PLT-264 (the height line),
+// PLT-294 (the ocean side's rock).
 
 use std::collections::HashMap;
 
@@ -370,6 +380,9 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         s.elevation_m = (f64::from(s.elevation_m) - g / f).clamp(lo, hi) as f32;
         out.moved_km2_m += g * env.norm.sample_area_km2();
     }
+    // What an oceanic sink takes: the ocean column's own rock in its own proportion.
+    let ocean = oceanic_column().map(f64::from);
+    let ocean_total: f64 = ocean.iter().sum();
     for m in &members {
         if m.excess >= 0.0 {
             continue;
@@ -385,8 +398,16 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         let moved = rate * give.min(take);
         let g = -m.excess * moved / take;
         let s = &mut state.samples[m.i];
-        for (x, a) in s.pools.iter_mut().zip(acc.iter()) {
-            *x += (g * a / total) as f32;
+        // With `transition_ocean_crust`, ocean floor thickens with ocean crust, the lavas and
+        // gabbro of a volcanic margin, never with the continent's granite and gneiss; otherwise,
+        // and on a continental sink, with the sources' rock. ledger: PLT-294.
+        let (add, sum) = if k.transition_ocean_crust && s.kind == OCEANIC {
+            (&ocean, ocean_total)
+        } else {
+            (acc, total)
+        };
+        for (x, a) in s.pools.iter_mut().zip(add.iter()) {
+            *x += (g * a / sum) as f32;
         }
         s.thickness_m = s.pools.iter().sum();
         s.elevation_m = (f64::from(s.elevation_m) + g / f).clamp(lo, hi) as f32;
@@ -644,6 +665,59 @@ mod tests {
             old_step > 3000.0,
             "the old model steps at the coast: {z0:?}"
         );
+    }
+
+    /// With `transition_ocean_crust` the ocean side thickens with ocean crust (PLT-294): no
+    /// continental granite, gneiss or felsic lava reaches an oceanic sample, its lavas and gabbro
+    /// grow in the ocean column's proportion, and the continent side still loses its own rock.
+    #[test]
+    fn the_ocean_side_thickens_with_ocean_crust_not_the_continents_rock() {
+        let base = Fx::new(PLANET_KM);
+        let fx = Fx::with(TectonicParams {
+            transition_ocean_crust: true,
+            ..base.k.clone()
+        });
+        let mut st = planet(&fx.geo, 0.0);
+        let before = st.samples.clone();
+        fx.run(&mut st, 30);
+        let ocean = oceanic_column();
+        let ratio = f64::from(ocean[pool::MAFIC_VOLCANIC]) / f64::from(ocean[pool::MAFIC_PLUTONIC]);
+        let (mut thickened, mut thinned) = (0, 0);
+        for (i, s) in st.samples.iter().enumerate() {
+            let b = &before[i];
+            if s.kind == OCEANIC {
+                for p in [
+                    pool::FELSIC_PLUTONIC,
+                    pool::FELSIC_VOLCANIC,
+                    pool::METAMORPHIC,
+                ] {
+                    assert_eq!(s.pools[p], b.pools[p], "sample {i}, pool {p}");
+                }
+                let mv = f64::from(s.pools[pool::MAFIC_VOLCANIC] - b.pools[pool::MAFIC_VOLCANIC]);
+                let mp = f64::from(s.pools[pool::MAFIC_PLUTONIC] - b.pools[pool::MAFIC_PLUTONIC]);
+                if mp > 100.0 {
+                    thickened += 1;
+                    assert!((mv / mp - ratio).abs() < 1e-3, "sample {i}: {mv} over {mp}");
+                }
+            } else if s.pools[pool::FELSIC_PLUTONIC] < b.pools[pool::FELSIC_PLUTONIC] - 100.0 {
+                thinned += 1;
+            }
+        }
+        assert!(
+            thickened > 20 && thinned > 20,
+            "{thickened} thickened, {thinned} thinned"
+        );
+        // Off (the default), the ocean side takes the continent's own rock.
+        let mut st = planet(&base.geo, 0.0);
+        base.run(&mut st, 30);
+        let parked = (0..st.samples.len())
+            .filter(|&i| {
+                st.samples[i].kind == OCEANIC
+                    && st.samples[i].pools[pool::FELSIC_PLUTONIC]
+                        > before[i].pools[pool::FELSIC_PLUTONIC] + 100.0
+            })
+            .count();
+        assert!(parked > 20, "{parked} ocean samples took granite");
     }
 
     /// The ocean side's thicker crust gives it a held floor, and cooling takes it towards that

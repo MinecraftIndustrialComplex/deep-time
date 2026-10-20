@@ -531,8 +531,14 @@ pub struct TectonicParams {
     /// size), centred on the boundary between the crusts; the crust the continent's edge loses
     /// thickens the ocean floor beside it. 0 = off …
     pub transition_width_km: f64,
-    /// … with this e-folding time towards the taper, Myr (0 = off).
+    /// … with this e-folding time towards the taper, Myr (0 = off) …
     pub transition_myr: f64,
+    /// … and what the ocean side is made of (PLT-294): `false` (the default) the continent's own
+    /// rock, kept under the oceanic label, so the continental crust budget is the transition's
+    /// as Ben weighed it on 2026-10-05; `true` ocean crust (lavas and gabbro), a volcanic
+    /// margin's, so no granite or gneiss reaches the sea floor, at a cost in land (about 0.04 of
+    /// the planet on supercontinent starts, build log 2026-10-19). Ben's to choose.
+    pub transition_ocean_crust: bool,
     /// Plates at the start.
     pub initial_plates: u32,
     /// Spread of initial plate sizes (additive Voronoi weight, radians).
@@ -746,6 +752,7 @@ impl Default for TectonicParams {
             uplift_max_mm_yr: 3.5,          // ledger: PLT-288
             transition_width_km: 200.0,     // ledger: PLT-262
             transition_myr: 20.0,           // ledger: PLT-263
+            transition_ocean_crust: false,  // ledger: PLT-294 (game-choice, Ben's to choose)
             initial_plates: 14,
             plate_size_variety_rad: 0.35,
             continent_elevation_m: [150.0, 900.0],

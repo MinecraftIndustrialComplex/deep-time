@@ -400,6 +400,15 @@ impl Horizons {
     /// too: a class that wins on both sides of a domain's edge makes two horizons. σ 0 changes
     /// nothing.
     pub fn smoothed(&self, sigma: f64, t: &Tables) -> Horizons {
+        self.smoothed_within(sigma, t, None)
+    }
+
+    /// [`Horizons::smoothed`] with each cell's neighbours limited to the cells of its own crust
+    /// kind (`kind[c]`, `plates::state::OCEANIC` or `CONTINENTAL`): one kind's basement is never
+    /// averaged into the other's across a continent-ocean boundary (ocean crust is basalt,
+    /// dikes and gabbro, a continent granite and gneiss; ledger: STR-054). A cell with no
+    /// neighbour of its kind on the lattice keeps its own stack.
+    pub fn smoothed_within(&self, sigma: f64, t: &Tables, kind: Option<&[u8]>) -> Horizons {
         if sigma <= 0.0 {
             return self.clone();
         }
@@ -455,12 +464,18 @@ impl Horizons {
                                 continue;
                             }
                             let n = (jl.clamp(0, h - 1) * w + il.rem_euclid(w)) as usize;
+                            if kind.is_some_and(|kd| kd[n] != kd[c]) {
+                                continue;
+                            }
                             near.push((n, g));
                             wsum += g;
                             for key in self.cell(n).2 {
                                 keys.extend_from_slice(key);
                             }
                         }
+                    }
+                    if near.is_empty() || wsum <= 0.0 {
+                        return;
                     }
                     for x in near.iter_mut() {
                         x.1 /= wsum;
@@ -855,6 +870,10 @@ pub fn bake_with(
     let mut tops = vec![NO_TOP; n * k];
     let mut classes = vec![NO_CLASS; n * k];
     let mut keys = vec![[NO_KEY, NO_KEY]; n * k];
+    let kind: Vec<u8> = (0..n)
+        .into_par_iter()
+        .map(|c| src.cell(c).crust_type)
+        .collect();
     tops.par_chunks_mut(k)
         .zip(classes.par_chunks_mut(k))
         .zip(keys.par_chunks_mut(k))
@@ -889,7 +908,7 @@ pub fn bake_with(
             .map(|&b| b.clamp(1, 255) as u8)
             .collect(),
     }
-    .smoothed(p.strata_smoothing_cells, t)
+    .smoothed_within(p.strata_smoothing_cells, t, Some(&kind))
 }
 
 #[cfg(test)]

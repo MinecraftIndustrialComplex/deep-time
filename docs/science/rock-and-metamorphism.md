@@ -1,12 +1,13 @@
 # Rock classes, metamorphism and intrusions
 
-Status of this page: `stage 2 (constants checked against sources on 2026-10-02, package WP-7)`. Of the 79 active
-rows, 11 are `verified`, 1 `abstract-only`, 9 `cited-unverified`, 1 `calibrated`, 54 `game-choice` and 3 `uncited`.
+Status of this page: `stage 2 (constants checked against sources on 2026-10-02, package WP-7; the ocean crust's
+classes added 2026-10-19)`. Of the 82 active rows, 11 are `verified`, 1 `abstract-only`, 8 `cited-unverified`, 1
+`from-memory`, 1 `calibrated`, 57 `game-choice` and 3 `uncited` (the ledger's count).
 Where a book the code cites (Winter 2010, Yardley 1989, Telford et al. 1990) could not be read, the row says so and
 says what was read instead.
 
-Ledger ids on this page: `RCK-001` to `RCK-090` (see [claims.md](claims.md)); the layer order, the traps and the
-checks are on [strata.md](strata.md).
+Ledger ids on this page: `RCK-001` to `RCK-091`, `RCK-095` and `RCK-096` (see [claims.md](claims.md)); the layer
+order, the traps and the checks are on [strata.md](strata.md).
 
 ## What you see in the world
 
@@ -24,6 +25,12 @@ km thick, which erosion exposes as granite country; round them, and round the sm
 lies a rim of hornfels in shale, sandstone or volcanic rock, or of skarn in limestone and dolomite, a few hundred metres
 to about 2 km wide (tens of blocks deep, a few blocks wide at 16k scale). Rock laid down after the intrusion is not baked.
 
+Under the sea floor the rock is ocean crust, as drilling and ophiolites show it: chalk or mud over shale near the
+top, then basalt lavas, then the sheeted dikes (drawn as greenstone), then gabbro, then peridotite. Granite and
+gneiss stay on the continents. The felsic rock an ocean column can hold is an island arc's: andesite, with diorite
+under an active arc and granodiorite under a dead one or on the thinned continental crust at the foot of a rifted
+margin; buried sediment there becomes schist.
+
 ## The model in plain words
 
 The structure stage runs each step after the surface stage has laid down or stripped sediment.
@@ -40,6 +47,10 @@ The structure stage runs each step after the surface stage has laid down or stri
 4. **Basement.** The plate model's rock pools under the loose cover (sediment, sedimentary, volcanic, metamorphic, plutonic)
    have no burial history, so each is stepped along its path by the present geotherm and split at the depths of the
    isotherms. A column never gets cooler downward: a unit under metamorphosed rock takes at least that grade (RCK-050, RCK-051).
+   Each crust kind has its own classes (RCK-096). On ocean crust the mafic volcanic pool is seismic layer 2: its lower
+   1.2 km on fresh crust are the sheeted dikes, greenstone, and the rest the lavas, basalt (RCK-095); the felsic
+   volcanic pool is andesite, the felsic plutonic pool diorite under an active arc and granodiorite elsewhere, the
+   metamorphic pool schist. On a continent the pools keep their classes (granite, rhyolite, gneiss and so on).
 5. **Plutons.** Under arcs, and weakly in collision zones, a Poisson number of plutons is emplaced each step. Each is an
    ellipsoid with a roof 2 to 6 km below the surface, a lognormal length (median 25 km), a width of 0.5 to 1 times that, and a
    thickness from the Cruden-McCaffrey power law. They ride their plate, are unroofed by erosion, and are lost if the oceanic
@@ -177,6 +188,30 @@ planet's own changes put more into gneiss). The inversions that exist are all ma
 dykes put a hotter rock over a colder one, as in the Himalaya: Mottram et al. 2014), none by the stored stacks or by the
 columns before folds are applied; a wider phyllite band (350 to 525) makes more pairs such as gneiss over phyllite.
 
+### Ocean crust's own classes (2026-10-19)
+
+The external review of 2026-10-19 (defect D1) found granite in 73 to 86 % and metamorphic rock in 67 to 78 % of the
+sea-floor columns it sampled, no sheeted dikes, and 11 to 14 km from the sea floor to the peridotite where Earth has
+about 7 km (White et al. 1992: the igneous crust "averages 7.1±0.8 km"). Two things made it. The classes: the
+basement step drew every crust kind's pools with the continental classes, so any felsic plutonic rock on ocean crust
+was granite and any metamorphic rock gneiss. And the rock itself: the plate model's resampling spread continental and
+arc rock across the ocean floor (the cause, measured, is on [plates.md](plates.md), "Ocean crust keeps its own
+rock").
+
+The column now follows the Penrose sequence (Penrose Field Conference 1972, read through a secondary copy:
+from the bottom, an ultramafic complex, a gabbroic complex, a sheeted dike complex and a volcanic complex, with
+sediment and minor sodic felsic intrusions as associated rocks). Layer 2 is split into lavas over dikes at a share
+chosen between two drilled holes: Hole 504B, intermediate spreading rate, 571.5 m of volcanic rock, a 209 m
+transition and more than 1050 m of dikes (Alt et al. 1996), and Hole 1256D, superfast, 754 m of extrusives, a 57 m
+transition and 346 m of dikes (Expedition 309/312). The mod's 0.8 km of lavas over 1.2 km of dikes (lava share 0.4)
+sits between them, nearer 504B, inside Christeson et al. 2019's 1.84 km mean for layer 2 with its deviation. The
+dikes are drawn as greenstone, the existing class for greenschist-facies basalt and diabase (RCK-040): 504B's dikes
+carry greenschist assemblages formed at 300 to 400 degC. Plagiogranite has no class and is left out; it is a minor
+body.
+
+No new class was needed: greenstone, andesite, diorite, granodiorite and schist all exist. Measured results are in
+the plates page's section and on [strata.md](strata.md).
+
 ### REV-2: aureoles and stocks (2026-10-20)
 
 The external review of run 1a156f22b66 (supercontinent, 1000 Myr, seed 1) found stocks standing from the world's floor,
@@ -246,6 +281,10 @@ What this says:
 - **Densities are of fresh rock.** Weathered and porous rock is lighter (the New Zealand database runs down to 1500-2000 kg/m3
   for igneous rock); the table is for unweathered crust.
 - **One CCD** of 4,500 m for every ocean, the Pacific value.
+- **A fixed share of lavas and dikes.** Layer 2 is 0.4 lavas everywhere (RCK-095); Earth's share varies with spreading
+  rate (0.31 in 504B, 0.65 in 1256D).
+- **Arc crust by regime.** An ocean column's felsic plutonic rock is diorite where the cell is an arc now and
+  granodiorite otherwise (RCK-096); the pool does not record which process made it.
 - **Loose and rock.** Sediment turns to rock at 150 m only for beds under 20 Myr old; real mud and sand stay soft for 1 to 3 km.
 
 ## Game choices
@@ -279,3 +318,6 @@ Hacker (UCSB), Greenwood and Berman, Wikipedia pages, pyBacktrack and RocFall do
 Yardley 1989, Spear 1993, Telford et al. 1990, Schon 2015, Cruden 1998, McCaffrey and Petford 1997, Cruden and McCaffrey 2001,
 Buddington 1959, Haederle and Atherton 2002, Mukasa 1986, Warren 2016. Details and library keys in
 [bibliography.md](bibliography.md), section "Rock classes, metamorphism, plutons and strata: sources read in WP-7".
+Added 2026-10-19 for the ocean crust (bibliography section "Ocean crust as drilled"): Alt et al. 1996 (Hole 504B) and
+the Expedition 309/312 summary (Hole 1256D), read in the relevant part; White et al. 1992 and Christeson et al. 2019,
+abstract only; Penrose Field Conference 1972, secondary.

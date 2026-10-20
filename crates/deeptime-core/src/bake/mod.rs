@@ -26,6 +26,7 @@ pub mod meta;
 pub mod placement;
 pub mod project;
 pub mod strata;
+pub mod strata_census;
 pub mod surface;
 pub mod terrain;
 pub mod water;
@@ -270,14 +271,16 @@ fn ms(t: Instant) -> f64 {
 }
 
 /// Bakes a finished planet run into `dir` and records it in `m` (layers, grids, files, the
-/// preset's scale). Returns `notes.bake`. A world without the deep-time surface (the plate-only
-/// presets) has no terrain to bake: the record says so and nothing is written.
+/// preset's scale). Returns `notes.bake` and the strata's whole-stack lift
+/// ([`strata::Lift`]), which the bodies and sites the caller writes must rise by. A world without
+/// the deep-time surface (the plate-only presets) has no terrain to bake: the record says so and
+/// nothing is written.
 pub fn bake(
     world: &WorldState,
     p: &PlanetPreset,
     dir: &Path,
     m: &mut Manifest,
-) -> Result<Value, CoreError> {
+) -> Result<(Value, Option<strata::Lift>), CoreError> {
     let started = Instant::now();
     let s = &p.scale;
     m.scale = Scale {
@@ -290,11 +293,14 @@ pub fn bake(
     };
     m.planet.insert("radius_m".into(), json!(s.radius_m()));
     let Some(surface) = world.surface.as_ref() else {
-        return Ok(json!({
-            "version": VERSION,
-            "baked": false,
-            "why": "the preset has no surface section: no terrain to bake (a plate-only run)",
-        }));
+        return Ok((
+            json!({
+                "version": VERSION,
+                "baked": false,
+                "why": "the preset has no surface section: no terrain to bake (a plate-only run)",
+            }),
+            None,
+        ));
     };
     let mut out = Out {
         dir,
@@ -321,7 +327,7 @@ pub fn bake(
     }
 
     let t = Instant::now();
-    let mut strata = strata::bake(world, p, &terrain, &mut out)?;
+    let (mut strata, lift) = strata::bake(world, p, &terrain, &mut out)?;
     // The strata part reads every elevation tile once (the top raise) and counts the terrain above
     // the build limit on the way; the count belongs to the terrain's note.
     if let Some(limit) = strata.as_object_mut().and_then(|s| s.remove("build_limit"))
@@ -332,8 +338,14 @@ pub fn bake(
     note.insert("strata".into(), strata);
     millis.insert("strata".into(), json!(ms(t)));
 
-    // The folds and faults the strata are read through (P2-01).
+    // The folds and faults the strata are read through (P2-01), at the history's heights: the
+    // readers add the lift at every column they read (`strata/lift`, STR-055).
     if let Some(st) = world.structure.as_ref().filter(|s| !s.events.is_empty()) {
+        // How far the lift at an event's centre is from the lift at the columns it cuts: what
+        // moving each event by the lift at its centre would have got wrong (STR-055).
+        if let Some(s) = note.get_mut("strata") {
+            s["structure_lift"] = strata_census::structure_offsets(&lift, st);
+        }
         let rel = deeptime_format::structure::STRUCTURE_PATH;
         let (bytes, crc32) = deeptime_format::structure::write_structure(out.dir, st)?;
         out.m.files.retain(|f| f.path != rel);
@@ -417,7 +429,7 @@ pub fn bake(
     note.insert("millis".into(), Value::Object(millis));
     note.insert("bytes".into(), json!(out.bytes));
     note.insert("layers".into(), json!(out.layers));
-    Ok(Value::Object(note))
+    Ok((Value::Object(note), Some(lift)))
 }
 
 /// The `notes` key of the record.

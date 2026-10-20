@@ -583,6 +583,34 @@ pub trait RasterRead {
             ],
         )
     }
+
+    /// The column rule's cubic B-spline of the physical values at block column (x, z)
+    /// (FORMAT.md, "The lift"): the 4 × 4 cells and weights [`crate::strata::stack_at`] reads a
+    /// column's horizon tops with (x folded in whole blocks, z clamped), summed as an offset from
+    /// cell (i0, j0)'s value as the tops are, so a uniform field gives exactly its value. A layer
+    /// that moved every horizon of each cell by the cell's value (`strata/lift`) moved the
+    /// interpolated tops of the column by this much.
+    fn column_spline(&self, x: i64, z: i64) -> f64 {
+        let g = &self.desc().grid;
+        let c = i64::from(g.w) * i64::from(g.r);
+        let wx = (x + c / 2).rem_euclid(c) - c / 2;
+        let u = (wx - g.origin_block_x) as f64 / f64::from(g.r);
+        let v = (z - g.origin_block_z) as f64 / f64::from(g.r);
+        let (i0, j0) = (u.floor() as i64, v.floor() as i64);
+        let (bu, bv) = (
+            crate::strata::bspline(u - i0 as f64),
+            crate::strata::bspline(v - j0 as f64),
+        );
+        let base = self.get(i0, j0);
+        let mut sum = 0.0f64;
+        for (b, &wv) in bv.iter().enumerate() {
+            for (a, &wu) in bu.iter().enumerate() {
+                let w = wu * wv;
+                sum += w * (self.get(i0 - 1 + a as i64, j0 - 1 + b as i64) - base);
+            }
+        }
+        base + sum
+    }
 }
 
 /// The weights of a bilinear blend's four cells at fractions (fu, fv) of the cell step: cells
@@ -718,6 +746,26 @@ mod tests {
         assert_eq!(l1.h * 8, g.h, "the ladder nests: L3 row 8j is L1 row j");
         assert_eq!(g.circumference(), 16384);
         assert!(GridDesc::for_planet("x", 1000, 16).is_err());
+    }
+
+    #[test]
+    fn the_column_spline_is_exact_on_a_uniform_field_and_follows_a_ramp() {
+        // A lift of 12.5 blocks everywhere (sixteenths, as `strata/lift` stores it).
+        let grid = GridDesc::for_planet("L1", 1024, 16).unwrap();
+        let mut d = LayerDesc::scalar("strata/lift", DType::I16, grid.clone(), Codec::Raw);
+        d.scale = 1.0 / 16.0;
+        let flat = Raster::<i16>::from_fn(grid.clone(), |_, _| 200);
+        let flat = LoadedLayer::new(d.clone(), flat.to_le_bytes()).unwrap();
+        for (x, z) in [(0, 0), (-511, 3), (300, -100), (511, 150), (1500, -9999)] {
+            assert_eq!(flat.column_spline(x, z), 12.5, "({x}, {z})");
+        }
+        // A ramp east-west (away from the wrap's seam): the cubic B-spline reproduces it.
+        let ramp = Raster::<i16>::from_fn(grid.clone(), |i, _| (i as i16) * 16);
+        let ramp = LoadedLayer::new(d, ramp.to_le_bytes()).unwrap();
+        for x in [-400i64, -100, -7, 0, 9, 250] {
+            let u = (x - grid.origin_block_x) as f64 / f64::from(grid.r);
+            assert!((ramp.column_spline(x, 40) - u).abs() < 1e-9, "{x}");
+        }
     }
 
     #[test]
