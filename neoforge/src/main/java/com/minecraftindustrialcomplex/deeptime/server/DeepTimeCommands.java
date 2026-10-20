@@ -71,6 +71,17 @@ public final class DeepTimeCommands {
                         .executes(c -> probeBiomes(c.getSource(), 16))
                         .then(Commands.argument("step", IntegerArgumentType.integer(4, 4096))
                                 .executes(c -> probeBiomes(c.getSource(), IntegerArgumentType.getInteger(c, "step")))))
+                // The pack's normal-world surface biome shares (its own router and parameter list, several seeds),
+                // the reference a planet's census is read against; goes to deeptime-probe/reference_biomes.json.
+                .then(Commands.literal("reference_biomes")
+                        .executes(c -> probeReferenceBiomes(c.getSource(), 200_000, 512, 4))
+                        .then(Commands.argument("radius", IntegerArgumentType.integer(1024, 1 << 22))
+                                .then(Commands.argument("step", IntegerArgumentType.integer(16, 65536))
+                                        .then(Commands.argument("seeds", IntegerArgumentType.integer(1, 64))
+                                                .executes(c -> probeReferenceBiomes(c.getSource(),
+                                                        IntegerArgumentType.getInteger(c, "radius"),
+                                                        IntegerArgumentType.getInteger(c, "step"),
+                                                        IntegerArgumentType.getInteger(c, "seeds")))))))
                 // P1-10: TerraBlender's regions over the provinces; the grid goes to deeptime-probe/regionmap.json.
                 .then(Commands.literal("regions")
                         .executes(c -> probeRegions(c.getSource(), 16))
@@ -360,6 +371,29 @@ public final class DeepTimeCommands {
             o.addProperty("error", e.toString());
         }
         o.addProperty("probe", "biomes");
+        return emit(source, o);
+    }
+
+    /**
+     * {@code /deeptime probe reference_biomes [radius step seeds]}: the surface biome shares of a world of this pack
+     * without Deep Time ({@link com.minecraftindustrialcomplex.deeptime.climate.ReferenceBiomes}); written to
+     * {@code reference_biomes.json} and the parameter list to {@code reference_biomes-parameters.json} in the probe folder.
+     */
+    private static int probeReferenceBiomes(CommandSourceStack source, int radius, int step, int seeds) {
+        JsonObject o;
+        try {
+            long t0 = System.nanoTime();
+            String probeDir = System.getenv("DEEPTIME_PROBE_DIR");
+            java.nio.file.Path dir = probeDir == null || probeDir.isBlank()
+                    ? source.getServer().getServerDirectory().resolve("deeptime-probe") : java.nio.file.Path.of(probeDir);
+            o = com.minecraftindustrialcomplex.deeptime.climate.ReferenceBiomes.run(source.getServer().registryAccess(), radius, step,
+                    seeds, dir.resolve("reference_biomes.json"));
+            o.addProperty("seconds", Math.round((System.nanoTime() - t0) / 1e7) / 100.0);
+        } catch (Exception e) {
+            o = new JsonObject();
+            o.addProperty("error", e.toString());
+        }
+        o.addProperty("probe", "reference_biomes");
         return emit(source, o);
     }
 
