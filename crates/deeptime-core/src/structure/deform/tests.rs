@@ -50,6 +50,7 @@ fn scatter(n: usize, seed: u64) -> Vec<Feature> {
             wear_m: 0.0,
             rise: 0.0,
             depth: 0.0,
+            base: 0.0,
             rock: 0,
         };
         match kind {
@@ -162,6 +163,7 @@ fn each_kind_moves_rock_the_way_its_name_says() {
         wear_m: 0.0,
         rise: 0.0,
         depth: 0.0,
+        base: 0.0,
         rock: 0,
     };
     let column = |f: &Feature, x: f64, z: f64| {
@@ -390,6 +392,7 @@ fn a_place_with_more_structures_than_one_noddy_history_holds() {
                 wear_m: 0.0,
                 rise: 0.0,
                 depth: 0.0,
+                base: 0.0,
                 rock: 0,
             }
         })
@@ -454,6 +457,7 @@ fn the_column_rule_offsets_beds_by_the_stretch() {
             wear_m: 0.0,
             rise: 0.0,
             depth: 0.0,
+            base: 0.0,
             rock: 0,
         }
     };
@@ -524,6 +528,7 @@ fn the_default_relief_keeps_the_ground_as_at_one_to_one() {
         wear_m: 0.0,
         rise: 0.0,
         depth: 0.0,
+        base: 0.0,
         rock: 0,
     };
     let (dip, slip) = super::emplace::stretch(60.0, 10.0, 4.0);

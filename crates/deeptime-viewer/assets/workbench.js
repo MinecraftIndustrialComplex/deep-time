@@ -812,13 +812,28 @@
     // The clock.
     const { label: ln } = layerLabel(layer);
     let sub = `${esc(stageText(f.stage))} · step ${f.n + 1}`;
-    if (dn !== p.cur) sub += ` · <span class="warnc">${esc(ln)} from step ${fd.n + 1}</span>`;
+    if (dn !== p.cur && historyKept(r, dn, p.cur)) sub += ` · <span class="warnc">${esc(ln)} as at the end of the history stages (step ${fd.n + 1}); this stage does not redraw ${/s$/.test(ln) ? 'them' : 'it'}</span>`;
+    else if (dn !== p.cur) sub += ` · <span class="warnc">${esc(ln)} from step ${fd.n + 1}</span>`;
     else if (layer && !f.layers.includes(layer)) sub += ` · <span class="warnc">no ${esc(ln)} here</span>`;
     p.clock.innerHTML = `<div class="t">${tHTML(f.t)}</div><div class="s">${sub}</div>`;
     badge(p);
     if (p.i === focus) tvHud(p, f);
   }
   const stageText = s => String(s || '').split('+').join(' + ');
+  // The history stages (every frame up to the end of the history: "plates+climate+…+structure")
+  // and the layers only they draw: a later stage (deposits, young, amplify) shows the last history
+  // frame's, which it does not redraw. Elevation, the rivers and the deposits are redrawn later,
+  // so they keep the plain "from step N".
+  const HISTORY_STAGES = new Set(['plates', 'climate', 'surface', 'volcanoes', 'impacts', 'structure']);
+  const HISTORY_LAYERS = new Set(['plates', 'crust_age', 'regime', 'provinces']);
+  const historyStage = s => !!s && String(s).split('+').every(x => HISTORY_STAGES.has(x));
+  const historyLayer = name => !!name && (HISTORY_LAYERS.has(name) || HISTORY_STAGES.has(layerGroup(name)));
+  // Whether frame `cur` shows the current layer from frame `dn` as the history stages left it.
+  function historyKept(r, dn, cur) {
+    const fd = r.frames[dn], f = r.frames[cur], next = r.frames[dn + 1];
+    return dn < cur && historyLayer(layer) && fd && f && historyStage(fd.stage) && !historyStage(f.stage)
+      && !(next && historyStage(next.stage));
+  }
 
   function drawGrid(p) {
     if (!gridOn || TV) return;
@@ -1345,7 +1360,7 @@
       } else if (state === 'answer' && direct) {
         const c = st.inspect, n = (c.body_details || []).length, sn = (c.sites || []).length;
         h += `<div class="jrow" style="margin-top:8px"><span style="display:flex;gap:5px;align-items:center;white-space:nowrap">${ic('check', 'ic-s')}From the run's bake</span><span class="elapsed" style="text-align:right">${fmtInt(st.seconds * 1000)} ms</span></div>` +
-          `<div class="jmsg">Terrain ${fmtInt(st.terrain_height)} blocks · ${n ? `${n} ore ${n === 1 ? 'body' : 'bodies'}` : 'no ore body'}${sn ? ` · ${sn} ${sn === 1 ? 'site' : 'sites'}` : ''}</div>` +
+          `<div class="jmsg">Terrain ${fmtInt(st.terrain_height)} blocks · ${n ? `${n} ${n === 1 ? 'body' : 'bodies'}` : 'no body'}${sn ? ` · ${sn} ${sn === 1 ? 'site' : 'sites'}` : ''}</div>` +
           `<div class="jacts"><button class="btn btn-primary btn-sm" data-jact="details">${ic('info', 'ic-s')}Show details</button></div>`;
       } else if (state === 'answer') {
         h += `<pre class="lines" style="margin-top:10px;max-height:260px;overflow:auto">${esc(JSON.stringify(Object.assign({}, st, { note: undefined }), null, 1))}</pre>`;
@@ -1949,7 +1964,9 @@
     mapDirty = true; evShownKey = ''; tickerDirty = true;
   }
   // A column answered from the run's bake (`deeptime inspect-column --why` through /api/inspect):
-  // the terrain, the rock from the top block down, the ore bodies and each site's "why here".
+  // the terrain and the crust, the rock from the top block down, each horizon's unit (its key
+  // decoded: age, peak temperature, parent rock), the structural events at the column, the bodies
+  // and each site's "why here".
   function showColumn(job) {
     const st = job.st, c = st.inspect, r = job.run;
     if (!c) return;
@@ -1965,20 +1982,60 @@
     const rock = c.rock || [], shown = rock.slice(0, 14);
     const bodies = c.body_details || [], sites = c.sites || [];
     const site = id => sites.find(s => s.id === id);
+    const nm = k => String(k).replace(/^deeptime:/, '').replace(/_/g, ' ');
+    const ma = a => a === null || a === undefined ? 'no age' : `${numText(a)} Ma`;
+    const crust = c.crust ? (c.crust.type_name === 'oceanic' ? `oceanic${c.crust.age_myr != null ? `, ${numText(c.crust.age_myr)} Myr old` : ''}`
+      : c.crust.type_name === 'continental' ? 'continental <span class="none">(the plate model gives it no formation age)</span>' : '<span class="none">no data</span>')
+      : '<span class="none">not in this bake</span>';
+    // A horizon's unit (deeptime_core::column_info): what its key says.
+    const unitText = u => {
+      const i = u.unit_info;
+      if (!i) return '';
+      const bits = [esc(i.text)];
+      if (i.age_ma !== undefined) bits.push(`age <b>${esc(ma(i.age_ma))}</b>`);
+      if (i.peak_c) bits.push(`peak temperature ${i.peak_c[1] == null ? `${fmtInt(i.peak_c[0])} °C or more` : `${fmtInt(i.peak_c[0])} to ${fmtInt(i.peak_c[1])} °C`}`);
+      if (i.parent && i.parent.text) bits.push(`parent rock: ${esc(i.parent.text)}`);
+      return `<div class="desc" style="margin-top:2px">unit key ${i.key} · ${bits.join(' · ')}</div>`;
+    };
+    const strata = c.strata || [], units = strata.slice(0, 14);
+    const events = c.structure_events || [];
+    const evText = e => {
+      const bits = [esc(ma(e.age_ma)), e.changed === true ? '<b>changed this column</b>' : e.changed === false ? 'did not change it' : 'not checked', `weight ${numText(e.weight)}`];
+      if (e.kind === 'fold') bits.push(`lifted it ${numText(e.uplift)} blocks (amplitude ${numText(e.amplitude)}, wavelength ${numText(e.wavelength)})`);
+      if (e.kind === 'fault') bits.push(`plane at y ${numText(e.plane_y)}, throw ${numText(e.throw)}, heave ${numText(e.heave)} blocks`);
+      if (e.kind === 'intrusion') bits.push(`${esc(nm(e.class))}${e.inside ? `, y ${numText(e.bottom_y)} to ${numText(e.top_y)}` : ', in its window, outside the body'}`);
+      return bits.join(' · ');
+    };
+    const bodyText = b => {
+      let t = `${esc(cap1(String(b.role || 'body').replace(/_/g, ' ')))} body ${b.id} · ${esc(String(b.shape || 'body'))} · ` +
+        `${b.rock_class ? `rock ${esc(nm(b.rock_class))}` : 'no rock class of its own'} · <b>${esc(ma(b.age_ma))}</b>` +
+        `${b.site != null ? ` · site ${b.site}` : ''}${b.deposit_type ? ` · ${esc(prettyKind(b.deposit_type))}` : ''}`;
+      const zr = (b.zones || []).filter(z => z.rock_class);
+      if (zr.length) t += `<div class="desc" style="margin-top:2px">zones: ${zr.map(z => `${esc(z.name)} (${esc(nm(z.rock_class))})`).join(', ')}</div>`;
+      if (b.drawn_scale) t += `<div class="desc" style="margin-top:2px">${esc(b.drawn_scale.text)}</div>`;
+      return t;
+    };
     let h = `<div class="dh" style="--c:#7cc4ff"><span class="d"></span><div><h4>Column x ${fmtInt(c.x)}, z ${fmtInt(c.z)}</h4>` +
       `<div class="id">${esc(latLonText(c.lat, c.lon))} · from the run's bake · ${fmtInt(st.seconds * 1000)} ms</div></div></div>` +
       `<div class="kv">${rows([
         ['Terrain height', `<b class="tnum">${numText(c.surface)}</b> blocks (top block y ${fmtInt(c.top_y)})`],
         ['Elevation', `${numText(c.elevation)} + ${numText(c.detail)} of detail`],
         ['Water', c.water === null || c.water === undefined ? 'none' : `surface at y ${numText(c.water)}`],
-        ['Horizons', `${(c.strata || []).length} in the column's stack`],
+        ['Horizons', `${strata.length} in the column's stack`],
+        ['Crust', crust],
       ])}</div>` +
-      `<h5>Rock, top block down</h5><div class="kv">${rows(shown.map(([t, b, k]) => [yr(t, b), k ? esc(k.replace(/^deeptime:/, '').replace(/_/g, ' ')) : '<span class="none">unclassified</span>']))}` +
+      `<h5>Rock, top block down</h5><div class="kv">${rows(shown.map(([t, b, k]) => [yr(t, b), k ? esc(nm(k)) : '<span class="none">unclassified</span>']))}` +
       `${rock.length > shown.length ? `<div></div><div class="none">… and ${rock.length - shown.length} more</div>` : ''}</div>` +
-      `<h5>Ore bodies here</h5>` +
-      (bodies.length ? `<div class="kv">${rows(bodies.map(b => [yr(b.top, b.bottom),
-        `${esc(cap1(String(b.role || 'body').replace(/_/g, ' ')))} of ${esc(String(b.shape || 'body'))}${b.rock_class ? ` in ${esc(String(b.rock_class).replace(/^deeptime:/, '').replace(/_/g, ' '))}` : ''}${b.site != null ? ` · site ${b.site}` : ''}`]))}</div>`
-        : '<div class="chain"><span class="none">The column passes through no ore body.</span></div>');
+      `<h5>Units, top horizon down</h5>` +
+      (units.length ? `<div class="kv">${rows(units.map(u => [yr(u.top, u.bottom), `${esc(nm(u.class))}${unitText(u)}`]))}` +
+        `${strata.length > units.length ? `<div></div><div class="none">… and ${strata.length - units.length} more</div>` : ''}</div>`
+        : '<div class="chain"><span class="none">The bake has no horizon stack here.</span></div>') +
+      `<h5>Deformation here</h5>` +
+      (events.length ? `<div class="kv">${rows(events.map(e => [`${esc(cap1(String(e.kind)))} ${e.id}`, evText(e)]))}</div>`
+        : `<div class="chain"><span class="none">No fold, fault or intrusion holds or changed the column${c.structure_candidates ? ` (${c.structure_candidates} near enough to check)` : ''}.</span></div>`) +
+      `<h5>Bodies here</h5>` +
+      (bodies.length ? `<div class="kv">${rows(bodies.map(b => [yr(b.top, b.bottom), bodyText(b)]))}</div>`
+        : '<div class="chain"><span class="none">The column passes through no body.</span></div>');
     for (const s of sites) {
       const why = s.why || {};
       const prods = (s.products || []).map(p => `${esc(shortKind(p.material))}${p.role ? ` (${esc(p.role)})` : ''} · grade ${numText(p.grade)} · ${numText(p.tonnage_t)} t`).join('<br>');

@@ -37,4 +37,47 @@ class ShareBoundTest {
         // A real shortfall on many columns still fails: half of 132 under 0.63.
         assertTrue(ShareBound.below(66, 132, 0.63, ShareBound.Z_99));
     }
+
+    @Test
+    void theLowerBoundMirrorsTheUpper() {
+        // The two bounds of h of n are symmetric about one half: lower(h, n) = 1 - upper(n - h, n).
+        for (int n : new int[] {1, 40, 132, 1000})
+            for (int h = 0; h <= n; h += Math.max(1, n / 7)) {
+                double l = ShareBound.wilsonLower(h, n, ShareBound.Z_99);
+                assertEquals(1.0 - ShareBound.wilsonUpper(n - h, n, ShareBound.Z_99), l, 1e-12, h + "/" + n);
+                assertTrue(l >= 0.0 && l <= h / (double) n, h + "/" + n + " -> " + l);
+            }
+        assertEquals(0.0, ShareBound.wilsonLower(0, 0, ShareBound.Z_99));
+    }
+
+    @Test
+    void theIceCapsIceSpikesCeilingsPassTheFixAndFailTheBypass() {
+        // Shares measured on 2026-10-20 (docs/science/biomes.md, "Ice spikes and the rare variants"; ledger
+        // BIO-162), checked from the fewest columns asserted (40) up to a large planet's thousands.
+        int[] sizes = {40, 132, 1000, 20000};
+        // The ice cap's steep ground (erosion E0 and E1): after the fix at most 0.030 (a real bake), before it 0.175
+        // to 0.212 (vanilla's near-inland low slice).
+        double steep = BiomeGameTests.STEEP_ICE_SPIKES_CEILING;
+        for (int n : sizes) {
+            assertFalse(above(0.030, n, steep), "steep 0.030 of " + n);
+            for (double p : new double[] {0.175, 0.212})
+                assertTrue(above(p, n, steep), "steep " + p + " of " + n);
+        }
+        // Its flats against the pack's own share: MIC after the fix at most 0.200, before it 0.648 to 0.706
+        // (Terralith's near-inland slot); vanilla at most 0.343 either way (its bypass was on the steep ground).
+        double terralith = BiomeGameTests.OWN_FLATS_ICE_SPIKES_TERRALITH, vanilla = BiomeGameTests.OWN_FLATS_ICE_SPIKES_VANILLA;
+        for (int n : sizes) {
+            assertFalse(above(0.200, n, terralith), "MIC flats 0.200 of " + n);
+            for (double p : new double[] {0.648, 0.706})
+                assertTrue(above(p, n, terralith), "MIC flats " + p + " of " + n);
+            assertFalse(above(0.343, n, vanilla), "vanilla flats 0.343 of " + n);
+        }
+        // A share at its ceiling is the sample's noise, not a failure.
+        assertFalse(above(0.345, 20000, terralith));
+        assertFalse(above(0.07, 40, steep));
+    }
+
+    private static boolean above(double share, int n, double ceiling) {
+        return ShareBound.above((int) Math.round(share * n), n, ceiling, ShareBound.Z_99);
+    }
 }

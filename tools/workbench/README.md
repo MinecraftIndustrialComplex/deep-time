@@ -110,7 +110,16 @@ A box larger than 256 x 256 is cut to its centre (the note says so). The job con
   their "why here" (the forming event and its cause chain from the world data's event log), under
   `inspect`, with `seconds`, `note` and `note_kind: "run"`. It is what Deep Time decides for the column;
   what other mods' features add is in the 3D export. The page shows it in the inspector's Details tab
-  (`workbench.js showColumn`), with a small card in the 3D tab.
+  (`workbench.js showColumn`), with a small card in the 3D tab. Since 2026-10-19 the panel also
+  shows (FORMAT.md, "Inspecting a column"): the crust (oceanic with its age, or continental, from
+  `meta/crust_type` and `meta/crust_age_myr`); **Units, top horizon down**, each horizon's unit key
+  decoded by `deeptime_core::column_info` (the part of the column it came from, a log unit's age,
+  the band's peak temperature, the parent rock: the pool, or the protoliths the metamorphic paths
+  allow, marked inferred); **Deformation here**, the folds, faults and intrusions whose window holds
+  the column, with their age and which of them changed its stack; and **Bodies here** (every body,
+  ore or not: role, shape, rock class, age or "no age", site, deposit type, zones that name a rock,
+  and a drawn-scale note such as "coal seam drawn 35 x its modelled thickness (game choice, ledger
+  DEP-127)").
 - **a run without one**: a finished test-world preview holding the column answers at once (the viewer
   opens with the column's top block selected: `pickcol`); one being made of it answers with its
   `status_url`; otherwise a 32 x 32 preview around the column starts (about a minute).
@@ -126,14 +135,17 @@ added to a run or its bake) and keeps each answer in `<runs>/<id>/rock/`.
 |---|---|
 | `/api/runs/<id>/rock` | `{available, why, circumference, min_y, max_y, sea_level_y, m_per_block_h/v, depths, classes: [{i, name, colour, k}]}`; `available: false` with the reason for a run that has not finished or has no bake (format must equal the build's) |
 | `/api/runs/<id>/rock/slice.png?depth=<blocks\|floor>[&w=1024]` | the rock class that many blocks below the terrain's top block, over the whole map, RGBA in the `rock_class` colours (pixel (px, py) is centred on longitude 360°·px/w and latitude 90° − 180°·py/h, as a keyframe's); `409` with `why` without a bake |
-| `/api/runs/<id>/rock/section?x0=&z0=&x1=&z1=[&n=]` | JSON: the strata along the line from block (x0, z0) to (x1, z1) (the shorter way round in x), one block column per sample (up to 2,048): `columns.{x, z, ground, water, water_kind, runs, bodies}`, the class table, the bodies crossed (role, site, deposit type), the length in blocks and km |
+| `/api/runs/<id>/rock/section?x0=&z0=&x1=&z1=[&n=]` | JSON: the strata along the line from block (x0, z0) to (x1, z1) (the shorter way round in x), one block column per sample (up to 2,048): `columns.{x, z, ground, water, water_kind, runs, bodies, units, crust, crust_age, events}`, the class table, `units` (each distinct horizon unit with its decoded key, as inspect-column's `unit_info`), `events` (the structural events at any column, with their age), the bodies crossed (role, shape, site, deposit type, rock class, age, zones, drawn scale), the length in blocks and km. Kept as `section2-…json` since 2026-10-19 |
 
 A column is the evaluator's: the slice and the section agree with `deeptime inspect-column` (a test in
 `sections/tests.rs` compares every block of the sampled columns and a slice's classes with
 `ColumnWorld::sample`), except that where two bodies that name a rock class overlap, the first by id
 wins as in the game's strata pass (`sample` takes the last). Times on the Mac at 16k quick (a planet
 with ~12 horizons a cell, load average ~60): a slice 1.1 to 1.6 s (4.4 s of CPU), a section of 2,048
-columns 30 ms. The page's side is `crates/deeptime-viewer/assets/sections.js` (the depth control under
+columns 30 ms (before the events were checked per column, 2026-10-19: each column now also undoes
+its candidate events one at a time to tell which changed it). The readout under the pointer gives the
+unit's key, age, peak temperature and parent rock, the crust, the events at the column and, inside a
+body, its age and drawn scale. The page's side is `crates/deeptime-viewer/assets/sections.js` (the depth control under
 the legend of a rock layer, the Section tool, the dock over the map, the Section tab);
 `tools/workbench/sections_shots.py` drives it in headless Chromium on the Mac and shoots it.
 
