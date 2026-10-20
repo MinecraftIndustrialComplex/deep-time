@@ -25,7 +25,7 @@
 //!   ∂T/∂t = ∇·(K ∇T),   K = K₀ · (h / h₀)³,   h = min(max(T − T_c, 0), 2 h₀),
 //!
 //! with T_c = `collapse_thickness_km` (no channel in thinner crust, PLT-256), h₀ = 15 km and
-//! K₀ = `crust_channel_km2_myr` the diffusivity of a 15 km channel (PLT-293).
+//! K₀ = `crust_channel_km2_myr` the diffusivity of a 15 km channel (PLT-300).
 //!
 //! # The rule
 //! Each plate step, on the visible continental samples of one plate (none at a trench), crust
@@ -39,7 +39,7 @@
 //! # What it is not
 //! The surface stage's plateau spreading (`surface::spread`), which moves the surface above the
 //! strength height; this moves crust on the plate model's samples, below any height.
-// ledger: PLT-293 (the rule and K₀), PLT-294 (h₀ and the bound).
+// ledger: PLT-300 (the rule and K₀), PLT-301 (h₀ and the bound).
 
 use rayon::prelude::*;
 
@@ -53,9 +53,9 @@ use super::state::{CONTINENTAL, PlateState, TRENCH, pool};
 pub const MOVED_GLOBAL: &str = "plates/channel_flow_km3";
 
 /// The channel thickness at which K₀ holds, m (Clark & Royden 2000's channel; from memory).
-// ledger: PLT-294
+// ledger: PLT-301
 const CHANNEL_REF_M: f64 = 15_000.0;
-/// The thickest channel counted, in [`CHANNEL_REF_M`] (K ≤ 8 K₀). ledger: PLT-294
+/// The thickest channel counted, in [`CHANNEL_REF_M`] (K ≤ 8 K₀). ledger: PLT-301
 const CHANNEL_MAX: f64 = 2.0;
 /// The largest share of a column's difference to its neighbours one substep may move (the
 /// explicit scheme is stable below 1/2).

@@ -81,7 +81,7 @@ const BIT_HIDDEN: u8 = 2;
 const BIT_DRY: u8 = 4;
 
 /// The thickness bands of the snapshots, km.
-// ledger: PLT-293 (game-choice: reporting bands, read by no rule; agent, 2026-10-19).
+// ledger: PLT-300 (game-choice: reporting bands, read by no rule; agent, 2026-10-19).
 pub const EDGES_KM: [f64; 10] = [
     0.0,
     20.0,

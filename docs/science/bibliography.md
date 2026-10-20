@@ -997,7 +997,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Clark, M. K. and Royden, L. H. (2000). Topographic ooze: Building the eastern margin of Tibet by lower crustal flow. Geology 28(8):703-706.
 - DOI or URL: 10.1130/0091-7613(2000)28<703:TOBTEM>2.0.CO;2.
 - Cited as: (ERO, ISO, HYP) "Clark & Royden 2000, Geology 28(8):703-706" (spread.rs). (PLT) "Clark & Royden 2000, Geology 28:703".
-- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy); PLT-293, PLT-294 (2026-10-20: the channel flow out of Tibet and its 15 km channel, from memory)
+- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy); PLT-300, PLT-301 (2026-10-20: the channel flow out of Tibet and its 15 km channel, from memory)
 - Access: paywalled (GeoScienceWorld 403); not fetched. [other sections: paywalled (GSA; not tested).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1010,7 +1010,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Royden, L. H., Burchfiel, B. C., King, R. W., Wang, E., Chen, Z., Shen, F. and Liu, Y. (1997). Surface deformation and lower crustal flow in eastern Tibet. Science 276(5313):788-790.
 - DOI or URL: 10.1126/science.276.5313.788.
 - Cited as: (ERO, ISO, HYP) "Royden et al. 1997, Science 276:788-790". (PLT) "Royden et al. 1997".
-- Ledger ids: ISO-018, ISO-020; PLT-293 (2026-10-20, as the channel flow's background; not fetched)
+- Ledger ids: ISO-018, ISO-020; PLT-300 (2026-10-20, as the channel flow's background; not fetched)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1047,7 +1047,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Bird, P. (1991). Lateral extrusion of lower crust from under high topography in the isostatic limit. Journal of Geophysical Research 96(B6):10275-10286.
 - DOI or URL: 10.1029/91JB00370.
 - Cited as: (ERO, ISO, HYP) "Bird 1991, JGR 96(B6):10275-10286". (PLT) "Bird 1991 (JGR 96:10275)".
-- Ledger ids: ISO-019, ISO-020, PLT-255 (orogenic collapse, 2026-10-03: the abstract's "cannot maintain short-wavelength (100 km) Moho relief of more than 1 km for times greater than 10–20 m.y. at most", Basin and Range); PLT-293 (2026-10-20: the same abstract quote beside the lower-crustal flow)
+- Ledger ids: ISO-019, ISO-020, PLT-255 (orogenic collapse, 2026-10-03: the abstract's "cannot maintain short-wavelength (100 km) Moho relief of more than 1 km for times greater than 10–20 m.y. at most", Basin and Range); PLT-300 (2026-10-20: the same abstract quote beside the lower-crustal flow)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -5990,7 +5990,7 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 ### ReyTeyssierWhitney2010
 - Reference: Rey, P. F., Teyssier, C. and Whitney, D. L. (2010). Limit of channel flow in orogenic plateaux. Lithosphere 2(5):328-332.
 - DOI or URL: 10.1130/L114.1 (author copy https://www.earthbyte.org/Resources/Pdf/rey_L114_v1.pdf)
-- Ledger ids: PLT-257, PLT-293 (2026-10-20: K₀ = 150² / 15 km²/Myr, the lower-crustal flow `plates/flow.rs`)
+- Ledger ids: PLT-257, PLT-300 (2026-10-20: K₀ = 150² / 15 km²/Myr, the lower-crustal flow `plates/flow.rs`)
 - Access: open author copy; full text read.
 - Library: not fetched.
 - Read so far (by the project): full text, 2026-10-03: "Over 15 m.y., the length scale of channel-flow extrusion is 150 km rather than 1500 km"; a channel "travels at most 150 km into the foreland after 12 m.y. of gravitational collapse"; flow "1 cm yr–1 or less".
