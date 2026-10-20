@@ -85,7 +85,7 @@ pub fn decode(k: u16, span_myr: Option<f64>) -> UnitKey {
         _ => {
             let band = usize::from((d - 1) / 2);
             let [lo, hi] = key::log_range(band);
-            if (d - 1) % 2 == 0 {
+            if (d - 1).is_multiple_of(2) {
                 let f = f64::from(k.saturating_sub(lo)) / f64::from(hi - lo);
                 let span = span_myr.filter(|s| s.is_finite()).map(|s| s.max(1.0));
                 (
@@ -126,13 +126,16 @@ fn plutonic(class: &str) -> bool {
 /// class is named by the rock it lithifies to): the possible parents of a metamorphic log unit.
 const LOG_FAMILIES: [&str; 3] = ["clastic_sedimentary", "chemical_sedimentary", "volcanic"];
 
+/// A pool's classes, each with the classes its steps take ([`pool_rocks`]).
+type PoolRocks = Vec<(u16, Vec<u16>)>;
+
 /// Per pool code, the classes its units can start as, each with the classes its steps take in
 /// the columns' order ([`columns::build`]: a plutonic class passes over the metamorphic steps
 /// below the last band). Worked out from [`columns::pool_class`] and the first unit's
 /// [`basement_class`] over every crust type, regime, orogeny, orogeny age and sea depth, not
 /// copied from them.
 fn pool_rocks(p: usize) -> &'static [(u16, Vec<u16>)] {
-    static ROCKS: OnceLock<Vec<Vec<(u16, Vec<u16>)>>> = OnceLock::new();
+    static ROCKS: OnceLock<Vec<PoolRocks>> = OnceLock::new();
     let all = ROCKS.get_or_init(|| {
         let t = Tables::get();
         let mut out = vec![BTreeSet::new(); pool::COUNT];
@@ -613,7 +616,7 @@ mod tests {
                     "band {band}: {delta} Myr read back as {a} (a key is {step} Myr)"
                 );
             }
-            for q in 0..TOP_ORDER.len() {
+            for (q, &top) in TOP_ORDER.iter().enumerate() {
                 for m in 0..usize::from(key::STEPS) {
                     let [lo, hi] = key::pool(band, q, m);
                     for k in [lo, hi] {
@@ -623,7 +626,7 @@ mod tests {
                             u.part,
                             Part::Pool {
                                 q,
-                                pool: TOP_ORDER[q],
+                                pool: top,
                                 step: m
                             },
                             "band {band}, pool {q}, step {m}, key {k}"
@@ -733,9 +736,13 @@ mod tests {
         );
         let felsic = pool_parents(pool::FELSIC_PLUTONIC, "gneiss", 1);
         assert!(felsic.contains(&"granite"), "{felsic:?}");
-        // Gabbro's greenstone and amphibolite steps are below the last band: a plutonic pool
-        // never takes them.
-        assert!(pool_parents(pool::MAFIC_PLUTONIC, "greenstone", 1).is_empty());
+        // Gabbro's greenstone and amphibolite steps are below the last band: a plutonic pool's
+        // gabbro never takes them. Only a continental hotspot's first basement unit, which
+        // `basement_class` makes basalt whatever its pool, can be greenstone there.
+        assert_eq!(
+            pool_parents(pool::MAFIC_PLUTONIC, "greenstone", 1),
+            vec!["basalt"]
+        );
         // The last slot holds every later step: shale's gneiss is its fourth.
         let last = usize::from(key::STEPS) - 1;
         assert!(pool_parents(pool::SEDIMENTARY, "gneiss", last).contains(&"shale"));
