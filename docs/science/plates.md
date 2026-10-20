@@ -2021,11 +2021,12 @@ Blending within the ocean then moved 3.2 times as much felsic plutonic rock betw
 as all the sources added, a little further at every resampling. The first change (PLT-293) stops
 both: a resampling and the L1 sampling blend each pool over corners of the sample's own kind, and
 on ocean crust a resampling keeps the felsic and metamorphic pools of the nearest corner. On its
-own it barely moved where the rock lay. The final checkpoints, read with `deeptime dump-fields`
-(`tools/review/geo_template_fields.py`), show why: the share of ocean L1 cells holding more than
-50 m of felsic plutonic rock falls with the distance (L1 cells, 4.8 km each on the planet) from
-the nearest continental cell over about the transition's half-width (W/2 = 100 km = 21 cells),
-and switching the transition off (`transition_width_km` = 0) takes most of it away:
+own, on master d54c7f0f, it barely moved where the rock lay. The final checkpoints, read with
+`deeptime dump-fields` (`tools/review/geo_template_fields.py`), show why: the share of ocean L1
+cells holding more than 50 m of felsic plutonic rock falls with the distance (L1 cells, 4.8 km
+each on the planet) from the nearest continental cell over about the transition's half-width
+(W/2 = 100 km = 21 cells), and switching the transition off (`transition_width_km` = 0) takes
+most of it away (master d54c7f0f, 2026-10-19):
 
 | cells to land | ocean cells (master) | master | PLT-293 | PLT-293, no transition | PLT-293 and PLT-294 on |
 |---|---|---|---|---|---|
@@ -2044,6 +2045,40 @@ transition (PLT-261) moves the continent's own rock to the oceanic samples of it
 keeps them oceanic; on this planet nearly all the ocean lies within W/2 of a margin, so it laid
 granite and gneiss between the lavas and the gabbro of nearly every ocean column.
 
+**On today's master** (bc2e5472, the continents fix, PLT-300 to PLT-302; the sea-floor fix
+49f5f543 does not touch the plate model), the same planet with checkpoints, 2026-10-20. "Before" is
+master, "after" the branch's default, "switch on" the branch with PLT-294 on; each its own run:
+
+| cells to land | ocean cells (before) | before | after | after, switch on |
+|---|---|---|---|---|
+| 1 | 37,906 | 0.96 | 0.89 | 0.75 |
+| 2 | 23,108 | 0.94 | 0.88 | 0.71 |
+| 3 | 16,875 | 0.93 | 0.84 | 0.62 |
+| 4 to 5 | 23,839 | 0.90 | 0.77 | 0.48 |
+| 6 to 8 | 24,484 | 0.83 | 0.67 | 0.34 |
+| 9 to 13 | 26,710 | 0.72 | 0.55 | 0.23 |
+| 14 to 21 | 24,364 | 0.56 | 0.41 | 0.12 |
+| 22 to 34 | 16,442 | 0.32 | 0.26 | 0.06 |
+| farther | 5,899 | 0.04 | 0.05 | 0.00 |
+
+| ocean L1 cells | before | after | after, switch on |
+|---|---|---|---|
+| crust 0 to 20 Myr old: felsic plutonic over 50 m | 0.27 | 0.35 | 0.16 |
+| crust 0 to 20 Myr old: crystalline crust, sediment cover (km) | 8.2, 0.5 | 8.0, 0.8 | 7.5, 0.4 |
+| crust 20 to 65 Myr: felsic plutonic over 50 m | 0.67 | 0.73 | 0.47 |
+| crust 65 to 150 Myr: felsic plutonic over 50 m | 0.89 | 0.84 | 0.63 |
+| crust over 150 Myr: felsic plutonic over 50 m; sediment cover (km) | 0.99; 7.8 | 0.98; 9.6 | 0.79; 9.9 |
+| regime ocean basin: felsic plutonic, metamorphic over 50 m | 0.81, 0.72 | 0.73, 0.65 | 0.46, 0.38 |
+| regime ridge: felsic plutonic over 50 m | 0.48 | 0.36 | 0.21 |
+| regime arc; back-arc: felsic plutonic over 50 m | 0.99; 0.87 | 1.00; 0.79 | 1.00; 0.73 |
+
+On the new master PLT-293 moves more than it did on d54c7f0f (0.72 to 0.55 at 9 to 13 cells), and
+the switch takes the ocean side's granite nearly away (0.23 there). The column draws whatever felsic
+plutonic rock is left on ocean crust as diorite or granodiorite (RCK-092), never granite, so the
+review's census of the sea floor (strata.md, "The ocean crust and the mountains, measured") shows
+no granite either way; the switch decides how much of the ocean column is arc-like rock between the
+lavas and the gabbro.
+
 **The transition's ocean side: a switch for Ben** (PLT-294). With `transition_ocean_crust` on, an
 oceanic sink takes the same volume as ocean crust (lavas and gabbro in the ocean column's
 proportion), as the thick igneous crust of a volcanic margin would be. That removes the
@@ -2060,13 +2095,13 @@ Ben weighed the transition's land cost on 2026-10-05 ("Keep 200 km, raise crust 
 switch is off by default and the choice is his. The physical fix is a continent that widens as it
 stretches, which the model's fixed boundary cannot do without the ratchet PLT-289 records.
 
-**What is left under the sea** (switch on, seed 1, ocean L1 cells holding over 50 m of felsic
-plutonic rock): 1.00 of the arc cells and 0.61 of the back-arc cells (island-arc rock, which the
-column draws as andesite over diorite or granodiorite, RCK-092; the model's oceanic fronts are
-about 8.6 times Earth's length, PLT-045), 0.45 of the ocean basin, 0.16 of the ridges and 0.07 of
-the crust younger than 20 Myr. On crust older than 150 Myr the sediment pile averages 6.4 km and
-its base turns to schist (the diagenesis above): the pile, not the ocean crust, makes old sea
-floor deep to its mantle.
+**What is left under the sea** (switch on, seed 1 supercontinent on master bc2e5472, the table
+above): all the arc cells and 0.73 of the back-arc cells hold island-arc rock (drawn as andesite over
+diorite or granodiorite, RCK-092; the model's oceanic fronts are about 8.6 times Earth's length,
+PLT-045), and 0.46 of the ocean basin, 0.21 of the ridges and 0.16 of the crust younger than 20 Myr
+hold some; on d54c7f0f these were 0.61, 0.45, 0.16 and 0.07. On crust older than 150 Myr the
+sediment pile averages 9.6 to 9.9 km (6.4 km on d54c7f0f) and its base turns to schist (the
+diagenesis above): the pile, not the ocean crust, makes old sea floor deep to its mantle.
 
 ## Mountains eat the world: the continents drown (2026-10-19)
 
